@@ -132,4 +132,6 @@ test project written for this round, [SHOT] FL driven as a black box (screenshot
 - 2026-10-31: items 1–8 implemented in ../lynx-wt-left167 (feature/left167). Tools in tmp/left167/py.
 - 2026-10-31 15:00: unit tests `LYNX_TEST=left167` with FL Data: 331 checks, 0 failures. Windows build checked
   (bendrectest both modes OK, shots g04/g05/g07/g08/g13); LYNX test instance closed, desktop clean (g99), locks
-  released. Next: merge origin/main, full test build, land.
+  released.
+- 15:25: full suite with FL Data: 1888393 checks; the only 14 failures were the embedded i18n tables not regenerated
+  (fixed with tools/make_i18n.py; translations tests 106/0). Landing.
