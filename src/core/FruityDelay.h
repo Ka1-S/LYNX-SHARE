@@ -42,6 +42,10 @@ public:
     // or stereo offset rebuilds the line (FL resizes it; its content after a resize is not confirmed: cleared here)
     void set (const Delay2State& s, double bpm);
     void process (float* left, float* right, int n) noexcept; // in place, n <= maxBlock
+    // Room for the line at tempos down to minBpm (UI thread), so a later restart() or set() does not allocate.
+    void reserve (double minBpm);
+    // As if newly made with these values, reusing the line's memory (the audio thread's first block).
+    void restart (const Delay2State& s, double bpm, bool settled);
 
 private:
     double rate = 44100.0;
