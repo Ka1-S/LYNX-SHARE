@@ -2,6 +2,10 @@
 
 #include "core/EffectPresets.h"
 #include "core/FruityBasicFx.h"
+#include "core/HostSlide.h"
+#include "core/MixerOps.h"
+
+#include <set>
 
 namespace left167
 {
@@ -103,4 +107,154 @@ TEST (left167_flp_import_reads_the_automatic_crossfades_flag)
             std::vector<std::uint8_t> bytes ((std::istreambuf_iterator<char> (in)), {});
             CHECK (flp::parseProject (bytes).autoCrossfades == on);
         }
+}
+
+namespace left167
+{
+// one held C4 on `channel` (Pattern mode, 120 BPM, 48 kHz), the channel's PITCH knob (`knob` semitones) or the main
+// pitch (`main` cents) turned at `at` seconds, as a live tweak does: the rack state is rebuilt from the edited song
+// (the instruments are kept and configured again)
+std::vector<float> renderLiveTweak (const lynx::ChannelDef& channel, float knob, float main, double at, double seconds)
+{
+    using namespace lynx;
+    Song s;
+    s.mixer = Song::defaultMixer (2);
+    s.bpm = 120.0;
+    auto c = channel;
+    c.mixerTrack = 1;
+    s.channels.push_back (c);
+    s.patterns.emplace_back();
+    Note held;
+    held.key = 60;
+    held.length = ppq * 16;
+    held.velocity = 0.8f;
+    s.patterns[0].notes = { held };
+    s.patterns[0].lengthTicks = (std::int64_t) (ppq * 32);
+    s.mode = PlayMode::pattern;
+    auto samples = [] (const std::string& path) -> std::shared_ptr<const SampleData> {
+        auto p = path;
+        std::replace (p.begin(), p.end(), '\\', '/');
+        return tools::readWav (existingPathIgnoringCase (p));
+    };
+    std::shared_ptr<const RackState> state = RackState::build (s, nullptr, 48000.0, samples);
+    RackRenderer r;
+    r.prepare (48000.0, 512);
+    const auto n = (int) (seconds * 48000.0);
+    const auto tweak = (int) (at * 48000.0);
+    std::vector<float> out;
+    const auto tps = 120.0 / 60.0 * ppq / 48000.0;
+    bool tweaked = false;
+    for (int done = 0; done < n; done += 512)
+    {
+        if (! tweaked && done >= tweak)
+        {
+            tweaked = true;
+            s.channels[0].sampler.pitch += knob;
+            s.masterPitch += main;
+            state = RackState::build (s, state.get(), 48000.0, samples);
+        }
+        std::vector<float> l (512), rr (512);
+        r.process (state.get(), true, done * tps, 512, l.data(), rr.data(), nullptr);
+        out.insert (out.end(), l.begin(), l.end());
+    }
+    return out;
+}
+} // namespace left167
+
+// FL's generators follow a live PITCH knob or main pitch move on the note that is already sounding (FL 2025 render,
+// REA_rodada167a §1: every synth reads +200 cents right after a +200 move). LYNX's engines took both at note on only.
+TEST (left167_sounding_notes_follow_a_live_pitch_knob_and_main_pitch)
+{
+    using namespace lynx;
+    if (realFlpDir.empty())
+        return;
+    const auto print = std::getenv ("LYNX_PITCH_AUDIT") != nullptr;
+    // FL measured (allpitch2.flp): these follow it at once; the others are drums or unreadable by the estimate
+    const std::set<std::string> follow { "3x Osc", "Sytrus", "Harmless", "MiniSynth", "Sawer", "SimSynth", "PoiZone", "GMS",
+                                         "Harmor", "Fruity DX10", "FL Keys", "BooBass", "Sakura" };
+    const auto fl = natives142::flAccess();
+    for (const auto& e : natives::instrumentEngines())
+    {
+        const auto c = natives::makeChannel (e.kind, fl);
+        if (! c)
+            continue;
+        const auto knobOut = left167::renderLiveTweak (*c, 2.0f, 0.0f, 0.75, 2.0);
+        const auto mainOut = left167::renderLiveTweak (*c, 0.0f, 200.0f, 0.75, 2.0);
+        const auto base = issue14::pitchAt (knobOut, 0.5);
+        const auto knob = issue14::cents (base, issue14::pitchAt (knobOut, 1.25));
+        const auto main = issue14::cents (issue14::pitchAt (mainOut, 0.5), issue14::pitchAt (mainOut, 1.25));
+        if (print)
+            std::printf ("  %-28s %9.1f knob %+6.0f main %+6.0f\n", e.name, base, knob, main);
+        if (follow.count (e.name) != 0)
+        {
+            if (std::abs (knob - 200.0) > 30.0 || std::abs (main - 200.0) > 30.0)
+                std::printf ("  live pitch: %s doesn't follow (knob %+.0f, main %+.0f cents)\n", e.name, knob, main);
+            CHECK (std::abs (knob - 200.0) < 30.0);
+            CHECK (std::abs (main - 200.0) < 30.0);
+        }
+    }
+}
+
+// The live follow keeps the output bit-exact when nothing moves, and a later slide note still lands on its pitch
+TEST (left167_host_slide_live_jump)
+{
+    using namespace lynx;
+    HostSlide s;
+    s.anchor (100.0f);
+    s.follow (100.0f);
+    CHECK (! s.moving());
+    s.follow (300.0f); // +200
+    CHECK (s.moving());
+    CHECK (s.advance (64.0f) == 200.0f);
+    CHECK (! s.moving());
+    s.follow (300.0f);
+    CHECK (! s.moving());
+    // a pending jump and a slide in the same block: the glide ends where it was asked to
+    s.follow (400.0f);
+    s.start (900.0f, 100.0f);
+    s.advance (50.0f);
+    CHECK (std::abs (s.cents - 600.0f) < 0.01f); // from 300 (200 + the jump) half-way to 900
+    s.advance (100.0f);
+    CHECK (s.cents == 900.0f);
+    HostSlide untracked; // never anchored: an engine driven alone doesn't follow
+    untracked.follow (500.0f);
+    CHECK (! untracked.moving());
+}
+
+// FL's "Render armed tracks to wave file(s)" with "Auto-create audio clip" (FL 2026 [SHOT s28–s37]): a new audio clip
+// channel named after the file, to the Master ("---"), and a clip of the whole file from bar 1 on the first Playlist
+// track after every used track (Track 28 when 27 were used), the track keeping its name
+TEST (left167_rendered_tracks_go_on_the_first_free_playlist_track)
+{
+    using namespace lynx;
+    Song s;
+    s.mixer = Song::defaultMixer (4);
+    s.bpm = 120.0;
+    s.patterns.emplace_back();
+    Clip c;
+    c.pattern = 0, c.track = 26, c.start = 0, c.length = ppq * 4;
+    s.playlist.push_back (c);
+    c.track = 3;
+    s.playlist.push_back (c);
+    CHECK (mixerops::firstTrackAfterUsed (s) == 27);
+    const auto channels = s.channels.size();
+    const auto placed = mixerops::placeRenderedFiles (s, { { "C:\\Users\\me\\Recorded\\recto.wav", 48000.0 * 4.0, 48000.0 },
+                                                           { "/tmp/none.wav", 0.0, 48000.0 },
+                                                           { "/tmp/two.flac", 44100.0 * 2.0, 44100.0 } });
+    CHECK (placed == 2);
+    CHECK (s.channels.size() == channels + 2);
+    const auto& ch = s.channels[channels];
+    CHECK (ch.name == "recto" && ch.instrument == InstrumentKind::audioClip && ch.mixerTrack == 0);
+    CHECK (ch.samplePath == "C:\\Users\\me\\Recorded\\recto.wav");
+    CHECK (s.channels[channels + 1].name == "two");
+    const auto& clip = s.playlist[2];
+    CHECK (clip.kind == ClipKind::audio && clip.channel == (int) channels && clip.track == 27 && clip.start == 0);
+    CHECK (clip.length == (std::int64_t) (ppq * 8)); // 4 s at 120 BPM = 8 beats
+    CHECK (s.playlist[3].track == 28 && s.playlist[3].length == (std::int64_t) (ppq * 4));
+    CHECK (s.playlistTracks.size() <= 27 || s.playlistTracks[27].name.empty()); // the track keeps its (default) name
+    Song empty;
+    CHECK (mixerops::firstTrackAfterUsed (empty) == 0);
+    CHECK (mixerops::insertDisplayName (s, 2) == "Insert 2");
+    s.mixer[2].name = "Vocals";
+    CHECK (mixerops::insertDisplayName (s, 2) == "Vocals");
 }

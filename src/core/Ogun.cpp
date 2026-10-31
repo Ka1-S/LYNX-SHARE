@@ -2024,6 +2024,15 @@ public:
     int voices() const noexcept { return (int) order.size(); }
     bool quiet() const noexcept { return order.empty() && quietFor >= quietNeeded; }
 
+    // FL's PITCH knob and main pitch, live (round 167a): the next voice's channel pitch, and the channel's pitch now
+    float nextLiveRef = NAN;
+    void followPitch (float now) noexcept
+    {
+        for (auto* v : order)
+            if (! v->dead)
+                v->slide.follow (now);
+    }
+
     // one host block (n ≤ maxHostBlock): adds to out
     // a slide note (issue #14): the held voices glide to `to` (Final.Pitch, cents from C5) over `samples`
     void slideTo (double to, float samples) noexcept
@@ -2241,6 +2250,7 @@ private:
         v.fvol = fvol, v.fpan = fpan, v.fcutH = fcut, v.fresH = fres;
         v.FP = f32 (100.0 * key - 6000.0 + pofs);
         v.slide = {};
+        v.slide.anchor (nextLiveRef);
         v.relvel = relvel;
         const auto note = std::max (f32 (v.FP * f32 (0.01) + 60.0), 0.0);
         v.note = note;
@@ -3528,10 +3538,20 @@ public:
         if (engine == nullptr)
             return;
         engine->maxpoly = mono.load() ? 1 : 0;
-        const auto pofs = (double) channelCents.load() + (double) nextCents;
+        const auto knob = channelCents.load();
+        const auto pofs = (double) knob + (double) nextCents;
+        engine->nextLiveRef = live.ref (knob);
         engine->noteOn (key, std::clamp ((double) velocity, 0.0, 1.0), channelVol, (double) nextPan + channelPan, pofs, 0.0, 0.0,
                         0.5, 0, key, (double) nextPan);
         nextPan = 0.0f, nextCents = 0.0f;
+    }
+
+    // FL's PITCH knob and main pitch move the sounding notes too (round 167a)
+    void setChannelPitchNow (float knob, float rest) noexcept override
+    {
+        live.set (knob, rest);
+        if (engine != nullptr)
+            engine->followPitch (live.now());
     }
 
     void slideTo (int key, float cents, float samples) noexcept override
@@ -3625,6 +3645,7 @@ private:
     std::mutex buildMutex; // configure (UI thread) and prepare build engines; the audio thread only takes them
     std::atomic<double> rate { 44100.0 };
     std::atomic<float> channelCents { 0.0f };
+    LiveChannelPitch live; // (audio thread)
     std::atomic<bool> mono { false };
     const bool autogun;
     std::vector<std::uint8_t> loadedState;
