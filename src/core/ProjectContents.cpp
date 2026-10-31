@@ -10,12 +10,13 @@ namespace lynx::projectcontents
 {
 bool playsSampleFile (InstrumentKind kind) noexcept
 {
-    return kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip || kind == InstrumentKind::granulizer;
+    return kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip || kind == InstrumentKind::granulizer
+           || kind == InstrumentKind::wavetraveller;
 }
 
 bool pluginWindowTakesSample (InstrumentKind kind) noexcept
 {
-    return kind == InstrumentKind::granulizer;
+    return kind == InstrumentKind::granulizer || kind == InstrumentKind::wavetraveller;
 }
 
 std::string insertName (const Song& song, int track)
