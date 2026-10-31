@@ -135,7 +135,7 @@ struct RackState
         int track = 0, slot = 0, target = 0;
     };
     std::vector<SendTap> sendTaps;
-    std::vector<std::vector<int>> slotTap; // [track][slot]: index into sendTaps, or −1
+    std::vector<std::vector<int>> slotTap; // [track][slot · maxSlotSends + output]: index into sendTaps, or −1
     std::vector<std::vector<int>> mixerLayers;        // inserts with no dependencies among them, in order
     // "Allow threaded processing" off (PluginRef::threaded, REA round 134): those channels / inserts always run on the
     // calling (audio) thread, the others may go to the workers. Same layers as mixerLayers.

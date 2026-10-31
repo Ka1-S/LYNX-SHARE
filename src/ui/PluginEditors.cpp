@@ -15,6 +15,7 @@
 
 #include "core/Effects.h"
 #include "core/FlEffects.h"
+#include "core/Transmitter.h"
 #include "core/FruityShapers.h"
 #include "core/GrossBeat.h"
 #include "core/LynxTune.h"
@@ -126,7 +127,8 @@ public:
             if (item.type == Item::display && item.display != nullptr
                 && (std::strcmp (item.display, "grmeter") == 0 || std::strcmp (item.display, "grleds") == 0 || std::strcmp (item.display, "vumeter") == 0 || std::strcmp (item.display, "iometer") == 0 || std::strcmp (item.display, "outmeter") == 0 || std::strcmp (item.display, "limitpill") == 0 || std::strcmp (item.display, "gcmeter") == 0
                     || std::strcmp (item.display, "pitchgraph") == 0 || std::strcmp (item.display, "panpos") == 0 || std::strcmp (item.display, "hwping") == 0
-                    || std::strcmp (item.display, "pitchtrace") == 0 || std::strcmp (item.display, "pitchring") == 0 || dynui::isLive (item.display)))
+                    || std::strcmp (item.display, "pitchtrace") == 0 || std::strcmp (item.display, "pitchring") == 0 || std::strcmp (item.display, "tssenvelope") == 0
+                    || dynui::isLive (item.display)))
             {
                 liveDisplays = true;
                 break;
@@ -294,6 +296,8 @@ public:
                                                                     || juce::String (item.display) == "prismbands" || juce::String (item.display) == "emberbands"
                                                                     || juce::String (item.display) == "tunekeys" || juce::String (item.display) == "tuneautokey"
                                                                     || juce::String (item.display) == "pitchring" || juce::String (item.display) == "waveshaper"
+                                                                    || juce::String (item.display) == "tssenvelope" || juce::String (item.display) == "tsssend0"
+                                                                    || juce::String (item.display) == "tsssend1"
                                                                     || isBars (item) || isRhythmEdit (item) || isRhythmPatterns (item)))
                 return i;
             if (item.type == Item::display || (item.param == nullptr && ! hasStyle (item, plugui::pageTabs)))
@@ -1841,6 +1845,102 @@ public:
         return { r.getX() + w * (float) (o % item.columns), r.getY() + h * (float) (o / item.columns), w, h };
     }
 
+    // --- round 167b: the Transmitter's envelope view and its transient / sustain sends (REA_rodada167b §1, §3)
+    std::shared_ptr<Effect> runningEffect() const
+    {
+        if (node.running)
+            return node.running();
+        return engine.getEffect (track, slot);
+    }
+
+    // FL's envelope view: the last columns of the detector, newest on the right. Per column: the output's peak (grey,
+    // mirrored around the middle), the transient envelope e (accent) and the sustain envelope 1 − e (light line).
+    void paintTransmitterEnvelope (juce::Graphics& g, juce::Rectangle<float> area, const EffectSlot& fx)
+    {
+        using namespace theme;
+        const auto s = scale();
+        const auto running = runningEffect();
+        const auto* view = transmitter::envelopeOf (running.get());
+        const auto columns = juce::jmax (8, (int) area.getWidth());
+        std::vector<transmitter::EnvelopeColumn> shown ((std::size_t) columns);
+        if (view != nullptr)
+        {
+            const auto written = view->written.load (std::memory_order_acquire);
+            const auto have = (int) juce::jmin<std::uint32_t> (written, (std::uint32_t) juce::jmin (columns, (int) transmitter::EnvelopeView::size - 1));
+            for (int k = 0; k < have; ++k)
+                shown[(std::size_t) (columns - have + k)] = view->columns[(written - (std::uint32_t) have + (std::uint32_t) k) % transmitter::EnvelopeView::size];
+        }
+        else if (demoDisplays) // a drum loop's envelopes, for the snapshots
+            for (int k = 0; k < columns; ++k)
+            {
+                const auto t = std::fmod ((float) k / 46.0f, 1.0f);
+                const auto e = std::exp (-t * 9.0f);
+                shown[(std::size_t) k] = { 0.15f + 0.75f * std::exp (-t * 4.0f), e, 1.0f - e };
+            }
+        const auto x0 = area.getX(), w = area.getWidth() / (float) columns;
+        const auto mid = area.getCentreY(), half = area.getHeight() * 0.5f;
+        // the output, as a mirrored peak outline
+        juce::Path wave;
+        for (int k = 0; k < columns; ++k)
+        {
+            const auto y = mid - half * juce::jlimit (0.0f, 1.0f, shown[(std::size_t) k].output);
+            if (k == 0) wave.startNewSubPath (x0, y); else wave.lineTo (x0 + w * (float) k, y);
+        }
+        for (int k = columns - 1; k >= 0; --k)
+            wave.lineTo (x0 + w * (float) k, mid + half * juce::jlimit (0.0f, 1.0f, shown[(std::size_t) k].output));
+        wave.closeSubPath();
+        g.setColour (colour::textDisabled.withAlpha (fx.enabled ? 0.45f : 0.25f));
+        g.fillPath (wave);
+        auto line = [&] (float transmitter::EnvelopeColumn::* field, juce::Colour c) {
+            juce::Path p;
+            for (int k = 0; k < columns; ++k)
+            {
+                const auto y = area.getBottom() - area.getHeight() * juce::jlimit (0.0f, 1.0f, shown[(std::size_t) k].*field);
+                if (k == 0) p.startNewSubPath (x0, y); else p.lineTo (x0 + w * (float) k, y);
+            }
+            skin::glowStroke (g, p, c, juce::jmax (1.2f, 1.6f * s), fx.enabled ? 1.0f : 0.0f);
+        };
+        line (&transmitter::EnvelopeColumn::sustain, (fx.enabled ? colour::textSecondary : colour::textDisabled).withAlpha (0.8f));
+        line (&transmitter::EnvelopeColumn::transient, fx.enabled ? accent : colour::textDisabled);
+        // the legend
+        g.setFont (font (juce::jmax (7.0f, 9.0f * s), true));
+        auto legend = area.reduced (4.0f * s, 2.0f * s).removeFromTop (12.0f * s);
+        g.setColour (fx.enabled ? accent : colour::textDisabled);
+        g.drawText (caps (tr ("Transient")), legend.removeFromLeft (80.0f * s), juce::Justification::centredLeft);
+        g.setColour (colour::textSecondary);
+        g.drawText (caps (tr ("Sustain")), legend.removeFromLeft (80.0f * s), juce::Justification::centredLeft);
+    }
+
+    // the send box of a part: FL's "send to mixer track" menu (… = not sent)
+    void paintTransmitterSend (juce::Graphics& g, juce::Rectangle<float> r, const EffectSlot& fx, int part)
+    {
+        using namespace theme;
+        const auto s = scale();
+        const auto target = fx.sendTracks[(std::size_t) part];
+        g.setColour (target > 0 ? accent : colour::accentMuted);
+        g.fillRoundedRectangle (r, radius::sm * s);
+        g.setColour (target > 0 ? colour::onAccent : colour::textSecondary);
+        g.setFont (font (juce::jmax (8.0f, 10.0f * s), true));
+        const auto text = target > 0 ? tr ("Send to {0}", { juce::String (target) + "  " + insertName (target) }) : tr ("Send to") + juce::String (juce::CharPointer_UTF8 (" \xe2\x80\xa6"));
+        g.drawFittedText (text, r.reduced (4.0f * s, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.6f);
+    }
+
+    void showTransmitterSendMenu (int part, juce::Rectangle<float> r)
+    {
+        const auto* fx = current();
+        if (fx == nullptr || node.locate) // (a Patcher node has no insert to send from)
+            return;
+        juce::PopupMenu menu;
+        const auto chosen = fx->sendTracks[(std::size_t) part];
+        auto choose = [this, part] (int t) { editSlot ([part, t] (EffectSlot& e) { e.sendTracks[(std::size_t) part] = t; }); };
+        menu.addItem (tr ("None"), true, chosen <= 0, [choose] { choose (0); });
+        const auto& mixer = engine.getSong().mixer;
+        for (int t = 1; t < (int) mixer.size(); ++t)
+            if (t != track)
+                menu.addItem (juce::String (t) + "  " + insertName (t), engine.getSong().canRoute (track, t) || t == chosen, t == chosen, [choose, t] { choose (t); });
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (r.toNearestInt())));
+    }
+
     void paintDisplay (juce::Graphics& g, const LayoutItem& item, juce::Rectangle<float> r, const EffectSlot& fx)
     {
         using namespace theme;
@@ -1852,6 +1952,16 @@ public:
         const auto inner = r.reduced (6.0f * s);
         if (dynui::paint (g, id, r, s, fx, [this] (int k) { return liveMeter (k); }, dynHistory)) // the dynamics suite
             return;
+        if (id == "tssenvelope")
+        {
+            paintTransmitterEnvelope (g, inner, fx);
+            return;
+        }
+        if (id == "tsssend0" || id == "tsssend1")
+        {
+            paintTransmitterSend (g, r, fx, id == "tsssend0" ? 0 : 1);
+            return;
+        }
 
         auto grid = [&] (int columns, int rows) {
             g.setColour (colour::gridBeat);
@@ -3651,6 +3761,11 @@ public:
                 dragItem = index;
             return;
         }
+        if (item.type == Item::display && (juce::String (item.display) == "tsssend0" || juce::String (item.display) == "tsssend1"))
+        {
+            showTransmitterSendMenu (juce::String (item.display) == "tsssend0" ? 0 : 1, rectOf (item));
+            return;
+        }
         if (item.type == Item::display && juce::String (item.display) == "tunekeys")
         {
             tuneKeyClick (rectOf (item), e.position);
@@ -4097,6 +4212,17 @@ public:
         const auto& item = activeLayout().items[(std::size_t) index];
         if (isWaveShaperGraph (item))
             return;
+        if (item.type == Item::display && juce::String (item.display) == "tssenvelope") // FL's envelope view speed
+        {
+            if (auto* view = const_cast<transmitter::EnvelopeView*> (transmitter::envelopeOf (runningEffect().get())))
+            {
+                const auto speed = juce::jlimit (0, 100, view->speed.load() + (wheel.deltaY > 0 ? 2 : -2));
+                view->speed.store (speed);
+                view->columnLength.store (transmitter::columnSamples (juce::jmax (1.0, engine.getTransport().sampleRate.load()), speed));
+                repaint();
+            }
+            return;
+        }
         if (item.type == Item::display) // EQ graph: Q / bandwidth of the band under the mouse (or the selected one)
         {
             const auto* fx = current();
@@ -4371,6 +4497,19 @@ private:
         learnScaleFromMidi();
         if (kind == EffectKind::hardwareInsert)
             hwPingTick();
+        if (kind == EffectKind::transmitter) // the envelope view scrolls while columns arrive
+        {
+            const auto* view = transmitter::envelopeOf (runningEffect().get());
+            const auto written = view != nullptr ? view->written.load (std::memory_order_relaxed) : 0u;
+            if (written != envelopeSeen)
+            {
+                envelopeSeen = written;
+                for (const auto& item : activeLayout().items)
+                    if (item.type == Item::display && item.display != nullptr && std::strcmp (item.display, "tssenvelope") == 0 && visible (item))
+                        repaint (rectOf (item).getSmallestIntegerContainer());
+            }
+            return;
+        }
         // an idle display (silent track: meters unchanged for longer than the longest history) is not redrawn
         float meters = 0.0f;
         for (int k = 0; k < 6; ++k) meters += liveMeter (k) * (float) (k + 1);
@@ -4411,6 +4550,7 @@ private:
             dynHistory.push (liveMeter (0), liveMeter (2), liveMeter (3));
     }
 
+    std::uint32_t envelopeSeen = 0; // the Transmitter's envelope columns already drawn
     AudioEngine& engine;
     int track, slot;
     NodeTarget node;
