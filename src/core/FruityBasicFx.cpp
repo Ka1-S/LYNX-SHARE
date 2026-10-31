@@ -230,6 +230,45 @@ float rescaleSendTrackValue (float value, int savedSpan) noexcept
         return value;
     return sendTrackValue (rawFrom (value, 0, savedSpan));
 }
+float sendTrackValueInSpan (float value, int span) noexcept
+{
+    if (span <= 0 || span == maxMixerTracks - 1)
+        return value;
+    return norm (std::clamp (sendTrack (value), 0, span), 0, span);
+}
+int saveSendSpan (std::initializer_list<float> values) noexcept
+{
+    return saveSendSpanOf (values);
+}
+const EffectSlot* sendToTargetOf (const Song& song, const AutomationTarget& t) noexcept
+{
+    if (t.kind != AutomationTargetKind::effectParam || t.param != 3 || t.index < 0 || t.index >= (int) song.mixer.size())
+        return nullptr;
+    const auto& fx = song.mixer[(std::size_t) t.index].effects;
+    if (t.slot < 0 || t.slot >= (int) fx.size() || fx[(std::size_t) t.slot].kind != EffectKind::fruitySend)
+        return nullptr;
+    return &fx[(std::size_t) t.slot];
+}
+int saveSendSpanOf (const Song& song, int track, int slot)
+{
+    const AutomationTarget target { AutomationTargetKind::effectParam, track, slot, 3 };
+    const auto* fx = sendToTargetOf (song, target);
+    if (fx == nullptr)
+        return legacySendSpan;
+    std::vector<float> values { fx->params[3] };
+    if (fx->abOther.size() > 3)
+        values.push_back (fx->abOther[3]);
+    for (const auto& a : song.automations)
+        if (a.target == target)
+            for (const auto& pt : a.points)
+                values.push_back (pt.value);
+    for (const auto& p : song.patterns)
+        for (const auto& lane : p.events)
+            if (lane.target == target)
+                for (const auto& e : lane.events)
+                    values.push_back (e.value);
+    return saveSendSpanOf (values);
+}
 void sendToParams (const SendState& s, float* p) noexcept
 {
     p[0] = norm (s.pan, -128, 128);

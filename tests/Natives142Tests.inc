@@ -112,7 +112,7 @@ TEST (natives142_lists_and_no_fl_installation)
             CHECK (fx->kind == e.kind);
     }
     CHECK (natives::newEffect (EffectKind::eq, none).has_value()); // (a plain effect: always)
-    CHECK (natives::effectMenuName (EffectKind::newtime) == "Newtime (beta)" && natives::effectMenuName (EffectKind::newtone) == "Newtone" && natives::effectMenuName (EffectKind::maximus) == "Maximus");
+    CHECK (natives::effectMenuName (EffectKind::newtime) == "Newtime" && natives::effectMenuName (EffectKind::newtone) == "Newtone" && natives::effectMenuName (EffectKind::maximus) == "Maximus");
 }
 
 TEST (natives142_fl_keys_default_wavetable)
@@ -162,7 +162,21 @@ TEST (natives142_engines_from_the_fl_installation)
         const auto rms = natives142::renderChannel (*c, fl, e.kind == InstrumentKind::drumaxx ? 48 : 60);
         CHECK (rms > 1.0e-3 && std::isfinite (rms));
         if (! (rms > 1.0e-3))
+        {
+            // (round 167e: FL Keys was silent once, rms 0, in a full run on a busy machine and never alone: what the
+            // next time says — which of its files did not read, and whether a second render plays)
             std::printf ("  silent: %s (%g)\n", e.name, rms);
+            for (const auto& z : c->zones)
+            {
+                auto p = z.path;
+                std::replace (p.begin(), p.end(), '\\', '/');
+                const auto local = lynx::existingPathIgnoringCase (p);
+                const auto data = lynx::tools::readWav (local);
+                if (data == nullptr || data->frames() == 0)
+                    std::printf ("    unreadable now: %s (%s, exists %d)\n", z.path.c_str(), local.c_str(), (int) std::filesystem::exists (local));
+            }
+            std::printf ("    again: %g\n", natives142::renderChannel (*c, fl, e.kind == InstrumentKind::drumaxx ? 48 : 60));
+        }
     }
     CHECK (made == (int) natives::instrumentEngines().size());
 

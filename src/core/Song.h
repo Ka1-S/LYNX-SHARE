@@ -765,6 +765,9 @@ struct EffectSlot
     PluginRef plugin;                             // used when kind == plugin
     int sidechain = -1;   // mixer track whose (post-fader) output feeds the effect's detector (compressor); −1 = none
     int sidechain2 = -1;  // second side input (vocoder carrier); −1 = none
+    // Extra stereo outputs sent to other inserts (round 167b, FL's Transmitter: [0] the transient part, [1] the
+    // sustain part, after their tilt and section effect and before their level / on switch); 0 = not sent
+    std::array<int, 2> sendTracks { 0, 0 };
     std::vector<EffectBranch> branches;           // used when kind == parallel
     std::vector<EffectLink> links;                // used when kind == parallel
     std::vector<std::uint8_t> state;              // FL's raw plugin state, for exact effects built from it (vocodex, maximus)
@@ -811,6 +814,10 @@ struct PatchNode
 // The insert a Fruity Send slot sends its mid-chain signal to (1…127), or −1 (none, or not a Fruity Send).
 // Such a slot is a route too: the destination is processed after the slot's insert (Song::mixerOrder).
 int fruitySendTarget (const EffectSlot& slot) noexcept;
+// Every insert a slot sends to: output `output` (0 or 1) → the destination insert, or −1. Output 0 is the Fruity
+// Send / Patcher target above; a Transmitter has two (its transient and sustain sends, EffectSlot::sendTracks).
+constexpr int maxSlotSends = 2;
+int slotSendTarget (const EffectSlot& slot, int output) noexcept;
 
 // Send from one track to another (post-fader), like FL's routing between inserts.
 struct MixerSend
@@ -897,6 +904,9 @@ struct MixerTrack
     InputMonitor monitor = InputMonitor::automatic;
     // record safe (round 163, as Pro Tools / Nuendo): the insert can't be armed by accident (saved)
     bool recordSafe = false;
+    // FL's "Record <insert> to" (the arm button's right-click, round 167a [SHOT s20–s27]): the file this insert records
+    // and renders to (empty = an automatic name). Saved.
+    std::string recordTo;
     // an FL project's input (.flp 0x9A, REA round 157c): the index in FL's list of its own device's inputs, which only
     // the open device can turn into a channel — AudioEngine::setSong resolves it (flInputSource) when the project opens,
     // if inputChannel is still -1. -1 = none. Not saved.
@@ -1406,7 +1416,12 @@ struct Song
 // The Fruity Send slots of insert `track` that send to another existing insert, in slot order (only the first
 // maxEffectSlots slots run): {slot index, destination insert}. The renderer, the PDC plan and the routing order
 // all enumerate them this way.
-std::vector<std::pair<int, int>> fruitySendsOf (const Song& song, int track);
+struct SlotSendTap
+{
+    int slot = 0, target = 0, output = 0;
+    bool afterSlot = false; // the send leaves after the slot's own processing (Transmitter), not at its input
+};
+std::vector<SlotSendTap> fruitySendsOf (const Song& song, int track);
 
 // Pattern clips follow their pattern's length, like FL's: after an edit, the clips of a pattern whose length
 // changed get the new length when they had the old one and start at the pattern's start (an auto-sized clip;

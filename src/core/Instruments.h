@@ -60,6 +60,11 @@ public:
     // thread, before every render. Native engines take these at note on (configure / setNextNoteExpression) and ignore
     // it; a hosted plugin turns it into MIDI pitch bend (FL's wrapper: pitch bend range).
     virtual void setLivePitch (float /*cents*/) noexcept {}
+    // The same, split: `knob` = the PITCH knob (cents, what configure() gave the engine as the channel's pitch), `rest` =
+    // fine tune + main pitch (what setNextNoteExpression adds to each note). FL's generators follow both on their
+    // sounding notes (round 167a, REA_rodada167a §1: a +200 knob or main pitch move retunes a held note at once); the
+    // native engines that do override this, the others (and hosted plugins) get setLivePitch (knob + rest).
+    virtual void setChannelPitchNow (float knob, float rest) noexcept { setLivePitch (knob + rest); }
     // A controller (CC 0…127, `value` 0..1) played live into a native instrument (the mod wheel is CC 1). Ignored by
     // engines without MIDI controllers; hosted plugins get the raw message (midiMessage).
     virtual void controlChange (int /*cc*/, float /*value*/) noexcept {}
@@ -95,6 +100,9 @@ public:
     // Channel settings (sampler, synth). UI thread, on every snapshot; the instrument stores them
     // so the audio thread can read without waiting.
     virtual void configure (const ChannelDef&, double /*bpm*/) noexcept {}
+    // A new instrument, configured and not yet playing (UI thread): it may take its settings now, so the first
+    // block or note does not build them on the audio thread.
+    virtual void settleNew() {}
     // Control output ("controller" instruments), 0..1. Audio thread.
     virtual float controlOutput (int /*output*/) const noexcept { return 0.0f; }
     // Song position (ticks) at the start of the block, for the global LFOs. Audio thread.

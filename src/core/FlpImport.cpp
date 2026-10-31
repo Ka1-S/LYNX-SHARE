@@ -23,6 +23,7 @@
 #include "core/BassDrum.h"
 #include "core/FruitKick.h"
 #include "core/Harmor.h"
+#include "core/ClipOps.h"
 #include "core/MiniSynth.h"
 #include "core/SimSynth.h"
 #include "core/Drumaxx.h"
@@ -822,6 +823,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     Song song;
     song.bpm = project.tempo > 0.0 ? project.tempo : 140.0;
     song.performanceMode = project.performanceMode; // (round 165m)
+    song.autoCrossfades = project.autoCrossfades;   // FL's Playlist "Automatic crossfades" (round 167a)
     song.beatsPerBar = std::clamp (project.beatsPerBar, 1, 32);
     song.swing = std::clamp (project.swing / 128.0f, 0.0f, 1.0f);
     song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
@@ -2832,12 +2834,14 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 else if (fx.kind == EffectKind::transmitter)
                 {
                     // the detection follows FL's sidechain input when one is chosen (the inputs list, like the Limiter's);
-                    // the transient / sustain parts sent to other mixer tracks are not routed (the main output is exact)
+                    // the transient / sustain parts go to the inserts FL's send menus name (the insert number, like the
+                    // Fruity Send's destination: REA_rodada167b §1)
                     if (const auto st = transmitter::parse (slot.state))
                     {
                         fx.sidechain = sidechainSource (insert.index, st->sidechain);
-                        if (options.report != nullptr && (st->transientSend > 0 || st->sustainSend > 0))
-                            ++options.report->partialEffects["Transmitter (transient / sustain sends to other tracks not routed)"];
+                        const int sends[2] = { st->transientSend, st->sustainSend };
+                        for (int o = 0; o < 2; ++o)
+                            fx.sendTracks[(std::size_t) o] = sends[o] > 0 && sends[o] < tracks && sends[o] != insert.index ? sends[o] : 0;
                     }
                 }
                 else if (fx.kind == EffectKind::newtone || fx.kind == EffectKind::newtime)
@@ -2869,14 +2873,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                                     addMissingFile (options.report->missingFiles, candidates.front(),
                                                     (insert.name.empty() ? "Insert " + std::to_string (insert.index) : insert.name) + ": " + slot.plugin);
                             }
-                            // Newtone's note edits are rendered by LYNX's engine (REA_rodada95, close, not exact); Newtime's
-                            // warping is not reproduced. Only slave mode plays them (otherwise FL passes the input through).
-                            if (parsed->edited() && parsed->slave() && fx.kind == EffectKind::newtime)
-                                ++options.report->partialEffects[slot.plugin + " (edits not reproduced: plays the original sample)"];
-                            else if (fx.kind == EffectKind::newtime)
-                                ++options.report->partialEffects["Newtime (time warping engine not reproduced: plays the original sample)"];
-                            else
-                                ++options.report->converted[slot.plugin];
+                            // Newtone's note edits and Newtime's warp markers are rendered by LYNX's engines (REA_rodada95,
+                            // REA_rodada167b: close, not sample-exact). Only slave mode plays them (otherwise FL passes the
+                            // input through).
+                            ++options.report->converted[slot.plugin];
                         }
                     }
                 }
@@ -3616,6 +3616,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         splitDrumChannel (song, it->first, it->second);
 
     numberChorusInstances (song); // the random LFO phases FL gives each Hyper Chorus instance (REA_rodada59 §2.6)
+    clipops::updateCrossfades (song); // the project's "Automatic crossfades" on its overlapping audio clips (round 167a)
     return song;
 }
 } // namespace lynx

@@ -3908,6 +3908,7 @@ struct NoteRec
     bool used = false, held = false, pressed = false, inHeads = false, inHeld = false;
     int key = 60, group = 0, nv = 0;
     double vel = 1, fv = 1, fp = 0, fpitch = 0, notePan = 0;
+    float liveRef = NAN; // the channel pitch it started with (round 167a: its records follow the live knob)
     long long st = 0, seq = 0;
     std::array<int, 18> voices {};
 };
@@ -4025,6 +4026,7 @@ public:
         auto& nt = notes[(std::size_t) slot];
         nt.used = true, nt.pressed = true, nt.held = false, nt.inHeads = false, nt.inHeld = false;
         nt.key = key, nt.vel = vel, nt.fv = fv, nt.fp = fp, nt.fpitch = fpitch, nt.notePan = notePan;
+        nt.liveRef = nextLiveRef;
         nt.st = now, nt.seq = noteSeq++, nt.nv = 0, nt.group = 0;
         arpDirty = true;
         if (P->legato)
@@ -4329,6 +4331,14 @@ public:
         advance (n);
     }
 
+    // FL's PITCH knob and main pitch, live (round 167a): the next note's channel pitch, and the channel's pitch now
+    float nextLiveRef = NAN;
+    void followPitch (float now) noexcept
+    {
+        for (int i = 0; i < liveCount; ++i)
+            records[(std::size_t) live[(std::size_t) i]].slide.follow (now);
+    }
+
     // a slide note (issue #14): the sounding, unreleased voices glide to `to` (Final.Pitch, cents) over `samples`
     void slideTo (double to, float samples) noexcept
     {
@@ -4459,6 +4469,7 @@ private:
         const auto& nt = notes[(std::size_t) slot];
         v.fpan = nt.fp, v.fvol = nt.fv, v.fpitch = nt.fpitch, v.vel = nt.vel, v.note = slot;
         v.slide = {};
+        v.slide.anchor (nt.liveRef);
     }
 
     void releaseNote (int slot) noexcept
@@ -4589,6 +4600,7 @@ private:
         }
         v.fvol = nt.fv, v.fpan = nt.fp, v.fpitch = nt.fpitch, v.vel = nt.vel;
         v.slide = {};
+        v.slide.anchor (nt.liveRef);
         v.n = 0, v.firstblk = true;
         v.a.fill (0.0f), v.T.fill (0.0f), v.kg.fill ((float) p.glide), v.ph.fill (0.0), v.f.fill (0.0);
         v.centsValid = false, v.prismValid = false, v.hbValid = false;
@@ -6416,6 +6428,13 @@ public:
         nextCents = cents;
     }
 
+    // FL's PITCH knob and main pitch move the sounding notes too (round 167a)
+    void setChannelPitchNow (float knob, float rest) noexcept override
+    {
+        live.set (knob, rest);
+        engine.followPitch (live.now());
+    }
+
     void slideTo (int key, float cents, float samples) noexcept override
     {
         take();
@@ -6426,7 +6445,9 @@ public:
     {
         take();
         const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
-        const auto fpitch = 100.0 * key - 6000.0 + (double) pitchCents.load() + (double) nextCents;
+        const auto knob = pitchCents.load();
+        const auto fpitch = 100.0 * key - 6000.0 + (double) knob + (double) nextCents;
+        engine.nextLiveRef = live.ref (knob);
         engine.noteOn (key, vel, channelVol, (double) nextPan + channelPan, fpitch, (double) nextPan);
         nextPan = 0.0f;
         nextCents = 0.0f;
@@ -6489,6 +6510,7 @@ private:
     std::atomic<bool> hasPending { false };
     std::atomic<double> preparedRate { 44100.0 };
     std::atomic<float> pitchCents { 0.0f };
+    LiveChannelPitch live; // (audio thread)
     std::vector<std::uint8_t> state, compState;
     double bpm = 120.0, rate = 44100.0, channelVol = 1.0, channelPan = 0.0;
     float nextPan = 0.0f, nextCents = 0.0f;

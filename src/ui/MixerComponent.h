@@ -37,6 +37,11 @@ extern std::function<void()> openAudioSettings;
 void showMenu (AudioEngine& engine, int track, juce::Component* target, std::function<void()> chosen = {});
 // The arm switch: disarms, or arms at once — also an insert without an input source, as FL 2026 does.
 void toggleArm (AudioEngine& engine, int track, juce::Component* target);
+// FL's right-click on the arm switch (round 167a [SHOT s20–s27]): a Save dialog "Record <insert> to" (the recordings
+// folder, "<project>_<date time>_<insert>.wav"); the file chosen becomes the insert's record-to file and arms it.
+void chooseRecordTo (AudioEngine& engine, int track);
+// The arm switch's hint: FL's "Record to: <file>" when the insert has one, then what the switch does.
+juce::String armHint (const AudioEngine& engine, int track);
 // Explains a recording problem to the user, with a way to Settings > Audio when it is about the device.
 void explain (const AudioEngine::RecordingNotice& notice);
 } // namespace mixerinput
@@ -62,7 +67,7 @@ extern std::function<void()> changed;
 extern std::function<void (bool)> setShowUsedOnly;
 // Opens the Export window for these inserts only (FL's "Render armed / selected tracks to wave file(s)"; the main
 // window sets it, with the project's folder and name). `done` (optional) runs once the files are written.
-extern std::function<void (std::vector<int>, std::function<void()> done)> renderTracks;
+extern std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&)> done)> renderTracks;
 // The items: this project's clean mixer, show only used inserts, remove unused inserts at the end and — with
 // `newProjects` — the new-project choices (inserts, Master chain, clean mixer, Playlist tracks).
 void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects);
