@@ -1770,7 +1770,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 // FL's engine from the raw state (REA_rodada46) with its LFO-shape and noise tables read at run time from the
                 // user's own engine DLL; the synth conversion stays as the fallback (state or DLL not usable)
                 const auto dll = resolveFlPath ("%FLStudioFactoryData%\\Plugins\\Fruity\\Generators\\Kepler\\engine_x64.dll", options.roots);
-                if (keplerStateUsable (c.pluginState) && ! dll.empty() && options.fileExists && options.fileExists (dll) && keplerDllUsable (dll))
+                if (keplerStateUsable (c.pluginState) && ! keplerExoState (c.pluginState) && ! dll.empty() && options.fileExists
+                    && options.fileExists (dll) && keplerDllUsable (dll) && ! keplerExoDllUsable (dll))
                 {
                     def.instrument = InstrumentKind::kepler;
                     def.pluginState = c.pluginState;
@@ -1779,6 +1780,19 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 }
                 else if (synthFromKepler (c.pluginState, fromPlugin, pluginGain))
                     adopt();
+            }
+            else if (name == "kepler exo")
+            {
+                // FL 2026's Kepler Exo: Kepler's engine on the "Kepler-2" state (REA_rodada167d) with the tables of the user's own
+                // Kepler Exo engine DLL; no synth conversion exists for it (state or DLL not usable: the channel stays empty)
+                const auto dll = resolveFlPath ("%FLStudioFactoryData%\\Plugins\\Fruity\\Generators\\Kepler Exo\\engine_x64.dll", options.roots);
+                if (keplerExoState (c.pluginState) && ! dll.empty() && options.fileExists && options.fileExists (dll) && keplerExoDllUsable (dll))
+                {
+                    def.instrument = InstrumentKind::keplerExo;
+                    def.pluginState = c.pluginState;
+                    def.samplePath = dll;
+                    adoptedFromPlugin = true;
+                }
             }
             else if (name == "boobass")
             {
@@ -2010,7 +2024,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                      || def.instrument == InstrumentKind::morphine
                      || def.instrument == InstrumentKind::ogun || def.instrument == InstrumentKind::minisynth
                      || def.instrument == InstrumentKind::dx10
-                     || def.instrument == InstrumentKind::kepler || def.instrument == InstrumentKind::poizone
+                     || def.instrument == InstrumentKind::kepler || def.instrument == InstrumentKind::keplerExo || def.instrument == InstrumentKind::poizone
                      || def.instrument == InstrumentKind::fruitkick || def.instrument == InstrumentKind::bassdrum || def.instrument == InstrumentKind::toxic
                      || def.instrument == InstrumentKind::autogun || def.instrument == InstrumentKind::transistorbass
                      || def.instrument == InstrumentKind::simsynth || def.instrument == InstrumentKind::wasp
@@ -2739,7 +2753,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     // the ones that don't touch audio (controllers, visualizers, notes) aren't missed
                     static const char* silent[] = { "Fruity Peak Controller", "Fruity X-Y Controller", "Control Surface",
                                                     "Fruity NoteBook 2", "Fruity NoteBook", "Edison",
-                                                    "Fruity Formula Controller", "Fruity LSD", "Fruity dB Meter", "Fruity Spectroman" };
+                                                    "Fruity Formula Controller", "Fruity LSD" };
                     const auto harmless = std::any_of (std::begin (silent), std::end (silent), [&] (const char* n) { return slot.plugin == n; });
 
                     // FL plugins with nothing to reproduce here (vendor lighting, discontinued bridges): the note says why (round 165g)

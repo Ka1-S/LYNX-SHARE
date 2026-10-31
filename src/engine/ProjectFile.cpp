@@ -122,6 +122,7 @@ const char* instrumentId (InstrumentKind k)
         case InstrumentKind::voltage: return "voltage";
         case InstrumentKind::vfx: return "vfx";
         case InstrumentKind::videoplayer: return "videoplayer";
+        case InstrumentKind::keplerExo: return "keplerexo";
     }
     return "synth";
 }
@@ -136,7 +137,7 @@ InstrumentKind instrumentFromId (const juce::String& id)
                     InstrumentKind::fruitkick, InstrumentKind::bassdrum, InstrumentKind::toxic,
                     InstrumentKind::threeosc, InstrumentKind::autogun, InstrumentKind::transistorbass,
                     InstrumentKind::simsynth, InstrumentKind::wasp, InstrumentKind::plucked, InstrumentKind::beepmap, InstrumentKind::sawer, InstrumentKind::flkeys,
-                    InstrumentKind::granulizer, InstrumentKind::drumaxx, InstrumentKind::slayer, InstrumentKind::fruitydance, InstrumentKind::directwave, InstrumentKind::midiOut, InstrumentKind::patcher, InstrumentKind::soundfont, InstrumentKind::layer, InstrumentKind::dashboard, InstrumentKind::voltage, InstrumentKind::vfx, InstrumentKind::videoplayer })
+                    InstrumentKind::granulizer, InstrumentKind::drumaxx, InstrumentKind::slayer, InstrumentKind::fruitydance, InstrumentKind::directwave, InstrumentKind::midiOut, InstrumentKind::patcher, InstrumentKind::soundfont, InstrumentKind::layer, InstrumentKind::dashboard, InstrumentKind::voltage, InstrumentKind::vfx, InstrumentKind::videoplayer, InstrumentKind::keplerExo })
         if (id == instrumentId (k))
             return k;
 
@@ -243,6 +244,7 @@ const char* effectId (EffectKind k)
         case EffectKind::formulaController: return "formulaController";
         case EffectKind::voiceShift: return "voiceShift";
         case EffectKind::emphasizer: return "emphasizer";
+        case EffectKind::flEmphasis: return "flEmphasis";
         case EffectKind::flFrequencyShifter: return "flFrequencyShifter";
         case EffectKind::flLowLifter: return "flLowLifter";
         case EffectKind::flPhaseInverter: return "flPhaseInverter";
@@ -888,7 +890,7 @@ std::optional<EffectKind> effectFromId (const juce::String& id)
                     EffectKind::flPhaseInverter, EffectKind::flCenter, EffectKind::flBassBoost, EffectKind::fl7BandEq, EffectKind::flDelay1,
                     EffectKind::xyController, EffectKind::xyzController, EffectKind::controlSurface, EffectKind::hardwareInsert,
                     EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook,
-                    EffectKind::scratcher, EffectKind::transmitter })
+                    EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis })
         if (id == effectId (k))
             return k;
 

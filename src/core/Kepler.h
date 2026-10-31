@@ -17,9 +17,10 @@
 // per-note pan / pitch expressions from FinalLevels (pan law √(1 − p), √p with p = (pan + 1)/2), the X/Y (FCut/FRes)
 // modulation routes, the channel volume / pan as FL's MIDI events (REA_rodada165g-flbeta165k §3); cut groups do not
 // cut it. FL's renders of all 277 factory presets null against LYNX's engine at the 16-bit floor once FL's export
-// warm-up (1536…2304 samples, varies between FL runs) is given. Not modelled / differences: the Kepler-2 (Kepler Exo) layout, DCO2, the filter types 1/2, saturation,
-// EQ, delay, reverb and hyper chorus (all off in every Kepler-1 state); the chorus noise/gate (off in all FL data); the
-// oversampling ×4 flag (0 in all data). The free-running oscillators/LFO pause while LYNX skips an idle channel (only
+// warm-up (1536…2304 samples, varies between FL runs) is given. Kepler Exo's "Kepler-2" states run on the same port
+// with Exo's setters, matrix, DCO2, LFO2, saturation, chorus noise / gate, EQ, hyper chorus, delay and reverb
+// (REA_rodada167d). Not modelled: the oversampling ×4 flag and Exo's alternative oscillator byte (0 in all data; such
+// states are refused). The free-running oscillators/LFO pause while LYNX skips an idle channel (only
 // their phase at the next note differs, as between two FL runs).
 
 #include <cstdint>
@@ -34,8 +35,11 @@ namespace lynx
 // true for a "Kepler-1" state the engine can play (layout parsed, version 2…4)
 bool keplerStateUsable (const std::vector<std::uint8_t>& state);
 
-// true when `path` is the analysed build of Kepler's engine_x64.dll (its shape and noise tables can be read)
+// true when `path` is the analysed build of Kepler's or Kepler Exo's engine_x64.dll (its tables can be read)
 bool keplerDllUsable (const std::string& path);
+// true for a "Kepler-2" (Kepler Exo) state the engine can play, and for the analysed build of Kepler Exo's DLL
+bool keplerExoState (const std::vector<std::uint8_t>& state);
+bool keplerExoDllUsable (const std::string& path);
 
 // byte offset of the panel float `k` (0…n−1, "Kepler-1" order) inside a usable state, or −1
 int keplerPanelOffset (const std::vector<std::uint8_t>& state, int k);

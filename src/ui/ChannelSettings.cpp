@@ -456,6 +456,7 @@ public:
         miniSynth = def.instrument == InstrumentKind::minisynth;
         dx10 = def.instrument == InstrumentKind::dx10;
         kepler = def.instrument == InstrumentKind::kepler;
+        keplerExo = def.instrument == InstrumentKind::keplerExo;
         poizone = def.instrument == InstrumentKind::poizone;
         fruitkick = def.instrument == InstrumentKind::fruitkick;
         bassdrum = def.instrument == InstrumentKind::bassdrum;
@@ -821,6 +822,13 @@ public:
             { 33, "Volume" }, { 19, "Cutoff" }, { 20, "Resonance" }, { 22, "Env amount" }, { 26, "Attack" }, { 27, "Decay" },
             { 28, "Sustain" }, { 29, "Release" }, { 11, "PW" }, { 16, "Sub level" }, { 17, "Noise" }, { 5, "LFO rate" },
             { 10, "Vibrato" }, { 18, "High-pass" }, { 30, "Chorus" } };
+        // Kepler Exo: the same layout with the "Kepler-2" parameter list (REA_rodada167d §1)
+        static const FloatKnob keplerExoKnobs[] = {
+            { 0x48, "Volume" }, { 0x25, "Cutoff" }, { 0x26, "Resonance" }, { 0x2c, "Env amount" }, { 0x3d, "Attack" },
+            { 0x3e, "Decay" }, { 0x3f, "Sustain" }, { 0x40, "Release" }, { 0x21, "DCO2 level" }, { 0x0e, "DCO2 detune" },
+            { 0x30, "LFO1 rate" }, { 0x36, "LFO2 rate" }, { 0x50, "Portamento" }, { 0x24, "High-pass" }, { 0x87, "Saturation" },
+            { 0x70, "Delay amount" }, { 0x73, "Delay feedback" }, { 0x80, "Reverb decay" }, { 0x85, "Reverb wet" },
+            { 0x93, "Hyper chorus mix" } };
         auto addKepler = [&] (const FloatKnob& k) {
             const auto at = keplerPanelOffset (def.pluginState, k.index);
             if (at < 0)
@@ -971,6 +979,9 @@ public:
                 addDx10 (k);
         else if (kepler)
             for (const auto& k : keplerKnobs)
+                addKepler (k);
+        else if (keplerExo)
+            for (const auto& k : keplerExoKnobs)
                 addKepler (k);
         else if (gms)
             for (const auto& k : gmsKnobs)
@@ -1420,6 +1431,7 @@ public:
                     : miniSynth ? tr ("MiniSynth — FL's engine with its effects (wave tables read from your FL installation)")
                     : dx10 ? tr ("Fruity DX10 — FL's FM engine")
                     : kepler ? tr ("Kepler — FL's engine (LFO shape and noise read from your FL installation; new settings restart the voices)")
+                    : keplerExo ? tr ("Kepler Exo — FL's engine with its effects (tables read from your FL installation; new settings restart the voices)")
                     : fruitkick ? tr ("Fruit Kick — FL's engine (channel envelopes stepped per tick)")
                     : bassdrum ? tr ("BassDrum — FL's engine (table and noise samples read from your FL installation)")
                     : toxic ? tr ("Toxic Biohazard — FL's engine with its effects (waves read from your FL installation)")
@@ -1617,7 +1629,7 @@ private:
     ChannelRef ref;
     juce::Colour accent { skin::colour::crimson }; // the plugin page's accent (ui/PluginSkin.h)
     skin::Style pageStyle = skin::Style::glow;     // the plugin page's automatic style (round 126)
-    bool sakura = true, boobass = false, drumsynth = false, harmless = false, harmor = false, gms = false, morphine = false, ogun = false, autogun = false, transistorBass = false, miniSynth = false, dx10 = false, kepler = false, poizone = false,
+    bool sakura = true, boobass = false, drumsynth = false, harmless = false, harmor = false, gms = false, morphine = false, ogun = false, autogun = false, transistorBass = false, miniSynth = false, dx10 = false, kepler = false, keplerExo = false, poizone = false,
          fruitkick = false, bassdrum = false, toxic = false, threeOsc = false, simSynth = false, wasp = false, plucked = false, beepMap = false,
          sawer = false, flKeys = false, granulizer = false, drumaxx = false, slayer = false, fruityDance = false, sytrus = false, wavesFound = false;
     int editorKey = 60;
@@ -2460,7 +2472,7 @@ private:
         };
 
         const auto generators = patches.getChildFile ("Plugin presets/Generators");
-        for (const auto* name : { "Sytrus", "Harmor", "GMS", "Harmless", "MiniSynth", "Fruity DX10", "Fruit Kick", "Ogun", "Sakura", "Kepler",
+        for (const auto* name : { "Sytrus", "Harmor", "GMS", "Harmless", "MiniSynth", "Fruity DX10", "Fruit Kick", "Ogun", "Sakura", "Kepler", "Kepler Exo",
                                  "PoiZone", "Toxic Biohazard", "BassDrum" })
             if (auto sub = folderMenu (generators.getChildFile (name), 0); sub.getNumItems() > 0)
                 menu.addSubMenu (name, sub);
@@ -3722,7 +3734,7 @@ bool isModelKind (InstrumentKind kind) noexcept
            || kind == InstrumentKind::drumsynth || kind == InstrumentKind::harmless || kind == InstrumentKind::harmor
            || kind == InstrumentKind::gms || kind == InstrumentKind::morphine
            || kind == InstrumentKind::ogun || kind == InstrumentKind::minisynth
-           || kind == InstrumentKind::dx10 || kind == InstrumentKind::kepler || kind == InstrumentKind::poizone
+           || kind == InstrumentKind::dx10 || kind == InstrumentKind::kepler || kind == InstrumentKind::keplerExo || kind == InstrumentKind::poizone
            || kind == InstrumentKind::fruitkick || kind == InstrumentKind::bassdrum || kind == InstrumentKind::toxic
            || kind == InstrumentKind::threeosc
            || kind == InstrumentKind::autogun || kind == InstrumentKind::transistorbass
@@ -3870,6 +3882,7 @@ bool hasChannelSettings (InstrumentKind kind) noexcept
         case InstrumentKind::minisynth:
         case InstrumentKind::dx10:
         case InstrumentKind::kepler:
+        case InstrumentKind::keplerExo:
         case InstrumentKind::poizone:
         case InstrumentKind::fruitkick:
         case InstrumentKind::bassdrum:
@@ -3961,7 +3974,7 @@ std::unique_ptr<juce::Component> makeChannelSettingsPanel (AudioEngine& engine, 
                  || kind == InstrumentKind::drumsynth || kind == InstrumentKind::harmless || kind == InstrumentKind::harmor
                  || kind == InstrumentKind::gms || kind == InstrumentKind::morphine
                  || kind == InstrumentKind::ogun || kind == InstrumentKind::minisynth
-                 || kind == InstrumentKind::dx10 || kind == InstrumentKind::kepler || kind == InstrumentKind::poizone
+                 || kind == InstrumentKind::dx10 || kind == InstrumentKind::kepler || kind == InstrumentKind::keplerExo || kind == InstrumentKind::poizone
                  || kind == InstrumentKind::fruitkick || kind == InstrumentKind::bassdrum || kind == InstrumentKind::toxic
                  || kind == InstrumentKind::threeosc
                  || kind == InstrumentKind::autogun || kind == InstrumentKind::transistorbass
