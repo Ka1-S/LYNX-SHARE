@@ -102,3 +102,35 @@ No scripting in the audio editor.
   clipboard host, the built-ins, form memory, literal joins). Harness check (not in the repo, FL's files): all 12
   scripts FL ships (Amp, Bit reduction, Destructoid, Limiter, Old school, Ring modulation, Pulse / Saw / Silence / Sine
   generator, Convert markers, Play to end) run to the end with their defaults on a stereo sample and on an empty editor.
+
+## §3 Edison: Deverb
+
+Reporter's words: "Edison: Deverb … as FL 2026, REA on Edison's DLL."
+
+### 3.1 FL's evidence
+- Menu: Tools › Spectral › "Deverb..." after "Vocal denoise/isolator..." [SHOT 03-tools.png].
+- DeverbMenuClick (Edison_x64.dll 0x876680; FLEngine 0xce4120) checks the trial ("Deverb|This feature is not available
+  in trial."), then that the optional feature is installed ("This feature needs to be downloaded before it can be
+  used.", "…requires the latest version of deverb module. Please try "Repair optional features"…"); the module is
+  loaded by name prefix "deverb_" ("Failed to init deverb module", 0x843e90). FL's Deverb is a separately downloaded
+  neural model (not present on this PC, so its output cannot be measured).
+- TDeverbForm [DFM Edison_x64.dll], three sheets: Options — Profile combo (General, Voice; default General), Block size
+  combo (1–5; default 1), "Limit CPU usage" (limit separation to fewer CPU cores), "Safe mode" (troubleshooting), the
+  hint "Choose a profile that best matches the source material"; Processing — "Analysing sample, please wait..." with a
+  progress gauge; Result — the Mix wheel (−256 … 256, starts at 256 shown "100"), labels "Original" / "Processed",
+  Preview, OK / Cancel.
+
+### 3.2 LYNX before
+No Deverb.
+
+### 3.3 LYNX now
+- core/AudioEditTools deverb(): LYNX's own DSP (published method: late-reverberation spectral subtraction, Lebart et
+  al. 2001 / Habets 2007). The room's T60 is read from the free decays of the whole sample (estimateReverbTime: 10 ms
+  energy frames, straight-line fits of falling runs, median slope); the late part's spectrum is predicted from the
+  smoothed spectrum 50 ms (Voice: 32 ms) earlier, decayed by the T60, and subtracted with over-subtraction 2 (Voice 3),
+  a gain floor of −20 dB (Voice −26 dB) and a slower fall of the gains. Block size 1–5 = an analysis block of 512 …
+  8192 frames at 44.1 kHz. Limit CPU usage / Safe mode belong to FL's neural module and are left out.
+- UI: Tools › Spectral › Deverb... opens the form (Profile, Block size, Mix, Preview / Accept / Cancel).
+- Tests (tests/Deverb167Tests.inc): T60 read within ±30 % (0.5 s and 1 s rooms); in a live room (reverb 10 dB over the
+  direct sound) the tail between bursts drops 15 dB (Voice 23 dB) while the bursts drop 1.5 dB (Voice 4.6 dB); mix 0
+  leaves the audio unchanged, mix +1 and −1 add up to the original; only the selection changes.
