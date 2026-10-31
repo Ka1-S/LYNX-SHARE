@@ -1,5 +1,6 @@
 #include "engine/FileSort.h"
 #include "engine/SampleLibrary.h"
+#include "core/CacheBudget.h"
 #include "platform/Paths.h"
 
 #include <array>
@@ -283,20 +284,12 @@ void pruneStretchCache()
     for (const auto& t : SampleLibrary::cacheFolder().findChildFiles (juce::File::findFiles, false, "*.str.*.tmp"))
         if (t.getLastModificationTime() < juce::Time::getCurrentTime() - juce::RelativeTime::hours (1))
             t.deleteFile();
-    auto files = SampleLibrary::cacheFolder().findChildFiles (juce::File::findFiles, false, "*.str");
-    juce::int64 total = 0;
+    const auto files = SampleLibrary::cacheFolder().findChildFiles (juce::File::findFiles, false, "*.str");
+    std::vector<cachebudget::Entry> entries;
     for (const auto& f : files)
-        total += f.getSize();
-    if (total <= stretchCacheLimit)
-        return;
-    filesort::byTime (files, filesort::By::modificationTime);
-    for (const auto& f : files)
-    {
-        if (total <= stretchCacheLimit * 3 / 4)
-            break;
-        total -= f.getSize();
-        f.deleteFile();
-    }
+        entries.push_back ({ f.getSize(), f.getLastModificationTime().toMilliseconds() });
+    for (const auto i : cachebudget::toPrune (entries, stretchCacheLimit))
+        files[(int) i].deleteFile();
 }
 
 void writeStretched (const juce::File& file, const SampleData& data)
@@ -335,13 +328,18 @@ void writeStretched (const juce::File& file, const SampleData& data)
 // The disk copy is written in the background, off the project open (round 165i: on Windows the 23 stretched copies of
 // Thief, 229 MB, took 14.7 s of the threads' time to write, the open waited 7 s more than without the cache). One
 // low-priority thread, never destroyed: a write cut short by quitting leaves a .tmp, which the next prune removes.
-void writeStretchedLater (const juce::File& file, std::shared_ptr<const SampleData> data)
+juce::ThreadPool& cacheWriter()
 {
     static auto* writer = new juce::ThreadPool (juce::ThreadPoolOptions{}
                                                     .withThreadName ("LYNX stretch cache")
                                                     .withNumberOfThreads (1)
                                                     .withDesiredThreadPriority (juce::Thread::Priority::background));
-    writer->addJob ([file, data = std::move (data)] { writeStretched (file, *data); });
+    return *writer;
+}
+
+void writeStretchedLater (const juce::File& file, std::shared_ptr<const SampleData> data)
+{
+    cacheWriter().addJob ([file, data = std::move (data)] { writeStretched (file, *data); });
 }
 } // namespace
 
@@ -440,6 +438,25 @@ std::unique_ptr<juce::MemoryMappedFile> mapChannel (const juce::File& file, doub
     return rate == sampleRate && count == frames ? std::move (mapped) : nullptr;
 }
 
+// Round 167e: the decoded copies (*.L.pcm / *.R.pcm) had no size limit (2.4 GB in the temp folder of the PC LYNX is
+// made on). Like the stretched copies: past the limit the least recently used go (oldest first) down to 3/4 of it, once
+// per session in the background. A copy mapped right now is not lost: Windows refuses to delete it, and elsewhere the
+// mapping keeps the data until it is unmapped. A copy found again is marked as used (its date), so it goes last.
+constexpr juce::int64 pcmCacheLimit = 2048LL * 1024 * 1024;
+
+void markUsed (const juce::File& file)
+{
+    const auto now = juce::Time::getCurrentTime();
+    if (file.getLastModificationTime() < now - juce::RelativeTime::hours (1)) // (not a write on every load)
+        file.setLastModificationTime (now);
+}
+
+void prunePcmCacheLater()
+{
+    static std::once_flag once;
+    std::call_once (once, [] { cacheWriter().addJob ([] { SampleLibrary::prunePcmCache (pcmCacheLimit); }); });
+}
+
 // Reads one sample per page so the OS brings the range in from disk now (off the audio thread).
 float touch (const float* data, std::size_t from, std::size_t to)
 {
@@ -462,6 +479,13 @@ std::shared_ptr<const SampleData> SampleLibrary::loadStreamed (const juce::File&
     const auto leftFile = cacheFolder().getChildFile (key + ".L.pcm");
     const auto rightFile = cacheFolder().getChildFile (key + ".R.pcm");
 
+    prunePcmCacheLater();
+    if (leftFile.existsAsFile())
+    {
+        markUsed (leftFile);
+        if (channels > 1)
+            markUsed (rightFile);
+    }
     auto mapped = std::make_shared<Mapped>();
     mapped->left = mapChannel (leftFile, reader.sampleRate, frames);
     mapped->right = channels > 1 ? mapChannel (rightFile, reader.sampleRate, frames) : nullptr;
@@ -521,6 +545,22 @@ std::shared_ptr<const SampleData> SampleLibrary::loadStreamed (const juce::File&
     volatile float sink = touch (data->leftData(), 0, head) + touch (data->rightData(), 0, head);
     juce::ignoreUnused (sink);
     return data;
+}
+
+juce::int64 SampleLibrary::prunePcmCache (juce::int64 limitBytes)
+{
+    const auto files = cacheFolder().findChildFiles (juce::File::findFiles, false, "*.pcm");
+    std::vector<cachebudget::Entry> entries;
+    juce::int64 total = 0;
+    for (const auto& f : files)
+    {
+        entries.push_back ({ f.getSize(), f.getLastModificationTime().toMilliseconds() });
+        total += entries.back().bytes;
+    }
+    for (const auto i : cachebudget::toPrune (entries, limitBytes))
+        if (files[(int) i].deleteFile()) // (mapped now, on Windows: kept)
+            total -= entries[i].bytes;
+    return total;
 }
 
 void prefetchSample (const SampleData& data, double fromSeconds, double toSeconds)

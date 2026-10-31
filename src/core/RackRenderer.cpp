@@ -207,6 +207,7 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
     std::shared_ptr<Instrument> instrument = makeInstrument (kind, std::move (sample));
     instrument->prepare (sampleRate);
     instrument->configure (channel, bpm);
+    instrument->settleNew();
     if ((kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip) && channel.sampler.keepPitch)
     {
         if (deferKeyShift != nullptr)

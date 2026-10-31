@@ -16499,6 +16499,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Patcher164vTests.inc"
 #include "Vfx164Tests.inc"
 #include "VfxScript165Tests.inc"
+#include "Perf167Tests.inc"
 #include "Misc164Tests.inc"
 #include "Store165Tests.inc" // (round 165n; kept off the end of the list, where every round appends)
 #include "Rack165Tests.inc"  // (round 165f-rack; likewise)

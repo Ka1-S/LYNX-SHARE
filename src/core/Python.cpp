@@ -24,8 +24,12 @@
  #include <windows.h>
 #elif defined(__APPLE__)
  #include <dispatch/dispatch.h>
+ #include <mach/mach.h>
+ #include <pthread.h>
 #else
+ #include <pthread.h>
  #include <semaphore.h>
+ #include <time.h>
 #endif
 
 extern "C"
@@ -41,6 +45,49 @@ namespace lynx::python
 namespace
 {
 using Clock = std::chrono::steady_clock;
+
+// The CPU time of one thread, read from another (round 167e: the time limit counts the Python thread's own CPU time;
+// a wall-clock limit stopped good scripts while the machine was busy — the memory test's 768 MB took 4.3 s on two
+// cores shared with ten other processes, past the export's 3 s limit, and was reported as "took too long").
+struct ThreadCpuClock
+{
+#if defined(_WIN32)
+    HANDLE thread = nullptr;
+    void capture() { DuplicateHandle (GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &thread, 0, FALSE, DUPLICATE_SAME_ACCESS); }
+    std::int64_t ns() const noexcept
+    {
+        FILETIME created, exited, kernel, user;
+        if (thread == nullptr || ! GetThreadTimes (thread, &created, &exited, &kernel, &user))
+            return -1;
+        const auto k = ((std::uint64_t) kernel.dwHighDateTime << 32) | kernel.dwLowDateTime;
+        const auto u = ((std::uint64_t) user.dwHighDateTime << 32) | user.dwLowDateTime;
+        return (std::int64_t) ((k + u) * 100);
+    }
+#elif defined(__APPLE__)
+    mach_port_t thread = MACH_PORT_NULL;
+    void capture() { thread = pthread_mach_thread_np (pthread_self()); }
+    std::int64_t ns() const noexcept
+    {
+        thread_basic_info_data_t info {};
+        mach_msg_type_number_t count = THREAD_BASIC_INFO_COUNT;
+        if (thread == MACH_PORT_NULL || thread_info (thread, THREAD_BASIC_INFO, (thread_info_t) &info, &count) != KERN_SUCCESS)
+            return -1;
+        return ((std::int64_t) info.user_time.seconds + info.system_time.seconds) * 1000000000LL
+               + ((std::int64_t) info.user_time.microseconds + info.system_time.microseconds) * 1000LL;
+    }
+#else
+    clockid_t clock {};
+    bool valid = false;
+    void capture() { valid = pthread_getcpuclockid (pthread_self(), &clock) == 0; }
+    std::int64_t ns() const noexcept
+    {
+        timespec t {};
+        if (! valid || clock_gettime (clock, &t) != 0)
+            return -1;
+        return (std::int64_t) t.tv_sec * 1000000000LL + t.tv_nsec;
+    }
+#endif
+};
 
 // --- LYNX's library ----------------------------------------------------------------------------------------------
 
@@ -701,7 +748,10 @@ struct Host
     std::mutex servicesLock; // held by the Python thread while it serves (remove waits for it)
     std::vector<Service*> services;
 
-    std::atomic<std::int64_t> deadline { 0 }; // steady-clock ns; 0 = no limit running
+    std::atomic<std::int64_t> deadline { 0 }; // steady-clock ns; 0 = no limit running (the wall-clock backstop)
+    std::atomic<std::int64_t> cpuDeadline { -1 }; // the Python thread's CPU time (ns) at which the limit is reached
+    ThreadCpuClock pythonCpu; // (set by the Python thread before anything else runs)
+    std::atomic<bool> pythonCpuReady { false };
     std::mutex supervisorLock;
     std::condition_variable supervisorWake;
 
@@ -731,6 +781,8 @@ struct Host
 
     void run()
     {
+        pythonCpu.capture();
+        pythonCpuReady = true;
         pythonThread = std::this_thread::get_id();
 #if defined(_WIN32)
         // (the audio thread waits for this thread's answers: it runs above the UI, below the audio threads)
@@ -770,7 +822,13 @@ struct Host
         {
             supervisorWake.wait_for (l, std::chrono::milliseconds (10));
             const auto d = deadline.load();
-            if (d != 0 && Clock::now().time_since_epoch().count() > d)
+            if (d == 0)
+                continue;
+            // the limit is the Python thread's CPU time; the wall clock only stops a script that waits (4x the limit)
+            const auto cpuLimit = cpuDeadline.load();
+            const auto cpuNow = pythonCpuReady.load() ? pythonCpu.ns() : -1;
+            const auto overCpu = cpuLimit >= 0 && cpuNow >= 0 && cpuNow > cpuLimit;
+            if (overCpu || Clock::now().time_since_epoch().count() > d)
             {
                 py_lynx_interrupt = 1;
                 deadline = 0;
@@ -895,7 +953,11 @@ void setTimeLimit (double milliseconds) noexcept
         py_lynx_out_of_memory = 0;
         return;
     }
-    h.deadline = (Clock::now() + std::chrono::microseconds ((std::int64_t) (milliseconds * 1000.0))).time_since_epoch().count();
+    const auto limitNs = (std::int64_t) (milliseconds * 1.0e6);
+    const auto cpu = h.pythonCpuReady.load() ? h.pythonCpu.ns() : -1;
+    h.cpuDeadline = cpu >= 0 ? cpu + limitNs : -1;
+    // (without a CPU clock the wall clock is the limit, as before)
+    h.deadline = (Clock::now() + std::chrono::nanoseconds (cpu >= 0 ? 4 * limitNs : limitNs)).time_since_epoch().count();
     py_lynx_interrupt = 0;
     py_lynx_out_of_memory = 0;
 }
