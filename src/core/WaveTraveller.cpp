@@ -208,7 +208,8 @@ void buildTable (const std::vector<Point>& pts, float* table, int& n) noexcept
                         else
                         {
                             const auto i1 = (std::size_t) at, i0 = (std::size_t) (at - 1);
-                            y = by[i0] + (fx - bx[i0]) * ((by[i1] - by[i0]) / (bx[i1] - bx[i0]));
+                            const auto slope = (float) ((double) (by[i1] - by[i0]) / (double) (bx[i1] - bx[i0]));
+                            y = (float) ((double) by[i0] + ((double) fx - (double) bx[i0]) * (double) slope);
                         }
                     }
                 }

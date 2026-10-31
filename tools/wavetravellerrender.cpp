@@ -4,6 +4,7 @@
 //   sample.f32: planar float32 (the decoder's output); taps 0 = live mode, 64/128/256 = render mode
 //   events: on=<frame>,<key>,<finalVol>,<finalPan>,<pitch offset cents>[,<initPan>]   off=<frame>,<note index>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -28,6 +29,17 @@ int main (int argc, char** argv)
     {
         std::fprintf (stderr, "state not parsed\n");
         return 1;
+    }
+    if (const char* dump = std::getenv ("WT_DUMP")) // key: its wave table, as text (comparisons with the DLL's)
+    {
+        const auto& pt = state.patches[(std::size_t) std::clamp (std::atoi (dump), 0, 119)];
+        std::printf ("N %d\n", pt.waveN);
+        for (int i = 0; i <= pt.waveN; ++i)
+            std::printf ("%.9g\n", (double) pt.waveTable[(std::size_t) i]);
+        std::printf ("V %d\n", pt.volN);
+        for (int i = 0; i <= pt.volN; ++i)
+            std::printf ("%.9g\n", (double) pt.volTable[(std::size_t) i]);
+        return 0;
     }
     const auto chans = std::atoi (argv[3]), length = std::atoi (argv[4]), rate = std::atoi (argv[5]);
     const auto tempo = (float) std::atof (argv[6]);
