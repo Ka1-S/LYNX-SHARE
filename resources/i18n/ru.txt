@@ -5996,3 +5996,6 @@ countries: ru by kz
 "In scale" = "В ладу"
 "AMPLITUDE" = "АМПЛИТУДА"
 "VARIATION" = "ВАРИАЦИЯ"
+"Created: {0}" = "Создан: {0}"
+"Working time: {0}" = "Время работы: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Играть усечённые ноты в клипах (нота, начавшаяся до клипа паттерна, звучит с начала клипа)"

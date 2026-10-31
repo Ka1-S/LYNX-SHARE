@@ -232,6 +232,7 @@ void applyNewProjectDefaults (Song& song, const NewProjectDefaults& defaults)
 
     song.cleanMixer = defaults.cleanMixer;
     song.autoCrossfades = defaults.autoCrossfades;
+    song.playTruncatedNotes = true; // (on in FL's Empty template and new projects)
 }
 
 NewProjectDefaults& newProjectDefaults()

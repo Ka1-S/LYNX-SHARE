@@ -5996,3 +5996,6 @@ countries: tw hk mo
 "In scale" = "按音階"
 "AMPLITUDE" = "幅度"
 "VARIATION" = "變化"
+"Created: {0}" = "建立於：{0}"
+"Working time: {0}" = "工作時間：{0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "播放片段中被截斷的音符（在模式片段之前開始的音符從片段開頭播放）"

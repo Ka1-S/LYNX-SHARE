@@ -5996,3 +5996,6 @@ countries: pl
 "In scale" = "W skali"
 "AMPLITUDE" = "AMPLITUDA"
 "VARIATION" = "WARIACJA"
+"Created: {0}" = "Utworzono: {0}"
+"Working time: {0}" = "Czas pracy: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Odtwarzaj ucięte nuty w klipach (nuta zaczynająca się przed klipem patternu gra od początku klipu)"
