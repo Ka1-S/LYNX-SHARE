@@ -321,7 +321,7 @@ bool argInt (int i, py_StackRef argv, py_i64& out)
     return true;
 }
 
-bool nNew (int argc, py_StackRef argv)
+bool nNew (int argc, py_StackRef)
 {
     PY_CHECK_ARGC (0);
     if (ctx == nullptr)

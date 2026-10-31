@@ -436,7 +436,9 @@ void Engine::processDvs (float* left, float* right, int n) noexcept
         const auto place = decoder.active() ? decoder.position() : -1.0;
         if (place >= 0.0)
         {
-            dvsStuck = place == dvsLast ? dvsStuck + 1 : 0;
+            // FL compares the places exactly; LYNX's speed tracker settles to ±1e-12-ish instead of an exact 0 after
+            // the needle lifts, so "the same place" is within 1e-7 s (0.004 frames at 44.1 kHz)
+            dvsStuck = std::abs (place - dvsLast) < 1.0e-7 ? dvsStuck + 1 : 0;
             if (dvsStuck < holdLimit)
             {
                 const auto x = place * rate;

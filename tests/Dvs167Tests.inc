@@ -58,7 +58,8 @@ TEST (dvs167_register_and_table)
     const auto sig = dvstest::make (f, 0.0, [] (double) { return 1.0; }, 44100, 44100.0);
     for (int i = 0; i < 44100; ++i)
         dec.process (sig.left[(std::size_t) i], sig.right[(std::size_t) i]);
-    CHECK (dec.locked() && std::abs (dec.position() - sig.place.back()) < 0.005);
+    // (from a cold start the place runs on the pitch until it is 0.1 s off, as in FL: the first lock's few ms stay)
+    CHECK (dec.locked() && std::abs (dec.position() - sig.place.back()) < 0.01);
 }
 
 TEST (dvs167_decoder_follows_the_record)
