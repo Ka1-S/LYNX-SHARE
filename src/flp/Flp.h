@@ -369,6 +369,7 @@ struct Project
     bool performanceMode = false; // event 0x1F (round 165m)
     int panLaw = 0;      // event 0x17: 0 = FL's circular (sin/cos) pan law, 2 = triangular (REA_rodada76 §9)
     std::uint32_t flagsA9 = 0;
+    bool autoCrossfades = false; // event 0x2C (FL 21+); files without it load with it off, as in FL
     std::string title, artist, genre, url;
     std::string comments; // event 0xC3 (the Info page's comments; line breaks saved as CR)
 

@@ -1141,6 +1141,19 @@ public:
         return -1;
     }
 
+    // FL's PITCH knob and main pitch, live (round 167a): a note's pitch at its note on, and the channel's pitch now
+    void anchorNote (int index, float ref) noexcept
+    {
+        if (index >= 0 && (std::size_t) index < notes.size())
+            notes[(std::size_t) index].slide.anchor (ref);
+    }
+    void followPitch (float now) noexcept
+    {
+        for (const auto ni : order)
+            if (auto& nt = notes[(std::size_t) ni]; ! nt.ghost)
+                nt.slide.follow (now);
+    }
+
     // adds n (≤ maxHostBlock) samples; channelVol / channelPan: FL's chan.Vol and chan.Pan this block
     // a slide note (issue #14): the sounding, unreleased notes glide to `to` (Final.Pitch, cents) over `samples`
     void slideTo (double to, float samples) noexcept
@@ -2278,6 +2291,13 @@ public:
         nextCents = cents;
     }
 
+    // FL's PITCH knob and main pitch move the sounding notes too (round 167a)
+    void setChannelPitchNow (float knob, float rest) noexcept override
+    {
+        live.set (knob, rest);
+        engine.followPitch (live.now());
+    }
+
     void slideTo (int key, float cents, float samples) noexcept override
     {
         take();
@@ -2290,7 +2310,9 @@ public:
         const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
         // VEL → volume (p37): Final.Vol = chan.Vol·Init.Vol when on, chan.Vol when off
         const auto volFactor = engine.P.p[37] > 0 ? (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0 : 1.0;
-        engine.noteOn (key, vel, volFactor, channelVol, (double) nextPan, channelPan, (double) settings.pitchCents + (double) nextCents);
+        const auto index = engine.noteOn (key, vel, volFactor, channelVol, (double) nextPan, channelPan,
+                                          (double) settings.pitchCents + (double) nextCents);
+        engine.anchorNote (index, live.ref (settings.pitchCents));
         nextPan = 0.0f;
         nextCents = 0.0f;
     }
@@ -2381,6 +2403,7 @@ private:
     double rate = 44100.0, channelVol = 1.0, channelPan = 0.0, songTicks = -1.0;
     long long sinceTicks = 0;
     float nextPan = 0.0f, nextCents = 0.0f;
+    LiveChannelPitch live; // (audio thread)
 };
 } // namespace
 

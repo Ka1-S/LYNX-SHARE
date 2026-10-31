@@ -1613,7 +1613,8 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
     auto& instrument = *state.instruments[(std::size_t) i];
     instrument.beginChunk (n); // (extra outputs: a generator Patcher's, REA_rodada141)
     // issue #14: the channel's pitch as it is now (a hosted plugin bends to it; native engines took it at note on)
-    instrument.setLivePitch (c.sampler.pitch * 100.0f + c.misc.fineTune + (c.misc.mainPitch ? state.song.masterPitch : 0.0f));
+    // (round 167a: the native generators move their sounding notes with it, as FL's do)
+    instrument.setChannelPitchNow (c.sampler.pitch * 100.0f, c.misc.fineTune + (c.misc.mainPitch ? state.song.masterPitch : 0.0f));
     if (c.instrument == InstrumentKind::patcher) // its Hardware Insert nodes: this chunk's device buses (round 165c)
         instrument.setHardwareIo (liveInput, hwOut != nullptr && hwOut->active.load (std::memory_order_relaxed) ? hwOut : nullptr, liveInputOffset);
 

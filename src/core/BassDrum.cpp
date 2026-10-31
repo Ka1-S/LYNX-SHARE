@@ -3,6 +3,7 @@
 // engine's own CRT powf/sincosf algorithms where their last bits matter, and long double for FL's x87 pan law.
 
 #include "core/BassDrum.h"
+#include "core/HostSlide.h"
 
 #include <algorithm>
 #include <array>
@@ -722,6 +723,10 @@ public:
     {
         bool on = false;
         double fvol = 1.0, fpan = 0.0, pitchCents = 0.0;
+        bool down = true; // its note off has not come yet
+        // a slide note / the live PITCH knob moving Final.Pitch (round 167a): BassDrum reads the host's per-note pitch
+        // table every chunk (REA_rodada43 §2, Tp in process), so a sounding hit follows it
+        HostSlide slide;
     };
 
     Engine eng;
@@ -738,7 +743,23 @@ public:
     void noteOff (int key)
     {
         if (key >= 0 && key < 128)
+        {
+            held[key].down = false;
             eng.noteOff (key);
+        }
+    }
+    // a slide note (round 167a): the held keys glide to `toCents` (Final.Pitch, cents from C5) over `samples`
+    void slideTo (double toCents, float samples) noexcept
+    {
+        for (int i = 0; i < 128; ++i)
+            if (held[i].on && held[i].down)
+                held[i].slide.start ((float) (toCents - (100.0 * i - 6000.0 + held[i].pitchCents)), samples);
+    }
+    void followPitch (float now) noexcept
+    {
+        for (auto& h : held)
+            if (h.on)
+                h.slide.follow (now);
     }
     void setLevels (double fvol, double panOffset, const float* notePan)
     {
@@ -757,12 +778,16 @@ public:
         float L[128], R[128], Tp[128];
         float cl = 0.0f, cr = 0.0f, cp = 0.0f;
         bool first = true;
+        for (auto& h : held)
+            if (h.slide.moving())
+                h.slide.advance ((float) n);
         for (int i = 0; i < 128; ++i)
         {
             if (held[i].on)
             {
                 lawA (held[i].fpan, held[i].fvol, cl, cr);
-                const auto fp = (float) (100.0 * i - 6000.0 + held[i].pitchCents);
+                const auto fp = held[i].slide.cents != 0.0f ? (float) (100.0 * i - 6000.0 + held[i].pitchCents + (double) held[i].slide.cents)
+                                                            : (float) (100.0 * i - 6000.0 + held[i].pitchCents);
                 cp = (float) ((double) fp * 0.01 - (double) i + 60.0);
                 if (first)
                 {
@@ -837,9 +862,24 @@ public:
         const auto initVol = (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0; // FL's Init.Vol (REA_rodada28 §4.1)
         const auto k = std::clamp (key, 0, 127);
         notePan[k] = nextPan;
-        plugin->noteOn (k, initVol, channelVol, std::clamp ((double) nextPan + channelPan, -1.0, 1.0),
-                        (double) pitchCents.load() + (double) nextCents);
+        const auto knob = pitchCents.load();
+        plugin->noteOn (k, initVol, channelVol, std::clamp ((double) nextPan + channelPan, -1.0, 1.0), (double) knob + (double) nextCents);
+        plugin->held[k].slide.anchor (live.ref (knob));
         nextPan = 0.0f, nextCents = 0.0f;
+    }
+
+    // slide notes and the live PITCH knob / main pitch move the sounding hit (round 167a; a slide doesn't retrigger)
+    void slideTo (int key, float cents, float samples) noexcept override
+    {
+        take();
+        if (plugin != nullptr)
+            plugin->slideTo (100.0 * (std::clamp (key, 0, 127) - 60) + (double) pitchCents.load() + (double) cents, samples);
+    }
+    void setChannelPitchNow (float knob, float rest) noexcept override
+    {
+        live.set (knob, rest);
+        if (plugin != nullptr)
+            plugin->followPitch (live.now());
     }
 
     void noteOff (int key) noexcept override
@@ -922,6 +962,7 @@ private:
     std::atomic<Setup*> incoming { nullptr }, retired { nullptr };
     std::atomic<double> rate { 44100.0 };
     std::atomic<float> pitchCents { 0.0f };
+    LiveChannelPitch live; // (audio thread)
     std::vector<std::uint8_t> state;
     std::string dir;
     double channelVol = 1.0, channelPan = 0.0;

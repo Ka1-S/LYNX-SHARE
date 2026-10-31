@@ -944,6 +944,15 @@ public:
 
     void setNextNoteExpression (float, float cents, bool) noexcept override { nextCents = cents; }
 
+    // FL's PITCH knob and main pitch move the sounding notes too (round 167a)
+    void setChannelPitchNow (float knob, float rest) noexcept override
+    {
+        live.set (knob, rest);
+        for (auto& v : voices)
+            if (v.active)
+                v.slide.follow (live.now());
+    }
+
     void slideTo (int key, float cents, float samples) noexcept override
     {
         const auto to = 100.0f * (float) (key - 60) + pitchCents.load() + cents;
@@ -965,8 +974,10 @@ public:
         if (target == nullptr)
             target = &voices[(std::size_t) (nextSteal++ % maxVoices)];
         start (*target, key, velocity);
-        target->noteCents = pitchCents.load() + nextCents;
+        const auto knob = pitchCents.load();
+        target->noteCents = knob + nextCents;
         target->slide = {};
+        target->slide.anchor (live.ref (knob));
         nextCents = 0.0f;
     }
 
@@ -1379,6 +1390,7 @@ private:
     int nextSteal = 0;
     std::atomic<float> pitchCents { 0.0f }; // the channel's PITCH knob (configure)
     float nextCents = 0.0f;                 // the next note's fine pitch + main pitch (setNextNoteExpression)
+    LiveChannelPitch live;                  // (audio thread, round 167a)
     double hostRate = 48000.0, position = 1.0;
     int maxHostBlock = 4096, quietSamples = 0;
     std::array<float, 2> previous {}, current {};
@@ -1898,6 +1910,14 @@ public:
 
     void setNextNoteExpression (float, float cents, bool) noexcept override { nextCents = cents; }
 
+    // FL's PITCH knob and main pitch move the sounding note too (round 167a)
+    void setChannelPitchNow (float knob, float rest) noexcept override
+    {
+        live.set (knob, rest);
+        if (active)
+            slide.follow (live.now());
+    }
+
     // a slide note moves Final.Pitch, which BooBass reads every block (REA_rodada29 §4.2; issue #14)
     void slideTo (int key, float cents, float samples) noexcept override
     {
@@ -1914,9 +1934,11 @@ public:
         // Keys below 36 (p < 0) read outside FL's table: LYNX clamps p at 0 (its own choice)
         currentKey = key;
         // + the channel's PITCH knob, fine tune and main pitch: FL's Final.Pitch (issue #14)
-        finalPitch = 100.0f * (key - 60) + (pitchCents.load() + nextCents);
+        const auto knob = pitchCents.load();
+        finalPitch = 100.0f * (key - 60) + (knob + nextCents);
         nextCents = 0.0f;
         slide = {};
+        slide.anchor (live.ref (knob));
         const auto p = std::clamp ((int) (finalPitch + 2400.0f), 0, 9600);
         int z = 5;
         while (z >= 0 && tables->zones[(std::size_t) z].root > p)
@@ -2145,6 +2167,7 @@ private:
     bool active = false;
     int zone = 0, pitch = 0, currentKey = -1, stage = 0, countdown = 0;
     std::atomic<float> pitchCents { 0.0f }; // the channel's PITCH knob (configure)
+    LiveChannelPitch live; // (audio thread, round 167a)
     float nextCents = 0.0f, finalPitch = 0.0f;
     lynx::HostSlide slide;
     std::array<int, 5> counts {};
