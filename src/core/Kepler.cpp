@@ -3,6 +3,8 @@
 
 #include "core/Kepler.h"
 #include "core/HostSlide.h"
+#include "core/KeplerExoDelay.h"
+#include "core/KeplerExoEq.h"
 
 #include <algorithm>
 #include <array>
@@ -1231,6 +1233,8 @@ public:
         RenderMode mode;
         const auto dt = 1.0 / (double) fsF;
         const auto beatsPerSecond = tempo * 0.016666666666666666;
+        if (exo)
+            fxDelay.setTempo (tempo);
         if (exo && slotsDirty)
         {
             slotsDirty = false;
@@ -1310,6 +1314,8 @@ private:
                 v.osc2.leakMax = v.osc.leakMax;
             gmInterval = (int) (sr * 0.001);
             satK = (float) (1.0 - powD (0.09999999999999998, 20.0 / sr));
+            fxEq.setRate (sr);
+            fxDelay.setRate (sr);
             // every host value again through the parameter forwarder (REA_rodada167d §1.3)
             for (int i = 0; i < 0x102; ++i)
                 forwardExo (i, host[(std::size_t) i]);
@@ -2566,6 +2572,7 @@ private:
     // DCO1 sub phase 0.5, chorus noise 0, oversampling ×2, then the rate set-up again
     void resetExo()
     {
+        fxDelay.reset();
         for (int i = 0; i < 0x102; ++i)
         {
             const auto v = exoDefaultParam (i);
@@ -2845,7 +2852,12 @@ private:
             case 0x87: satTarget = tanF (powF (x, 0.3333333432674408f) * 1.5499999523162842f); break;
             case 0x88: satPost = x >= 0.5f; break;
             case 0x98: satHq = x >= 0.5f; break;
-            default: break;
+            default:
+                if (i >= 0x64 && i <= 0x6d)
+                    fxEq.setParam (i, x);
+                else if (i >= 0x6e && i <= 0x78)
+                    fxDelay.setParam (i, x);
+                break;
         }
     }
 
@@ -3369,6 +3381,8 @@ private:
     {
         if (satOn && ! satPost)
             saturate (L, R);
+        fxEq.process (L, R);
+        fxDelay.process (L, R);
         if (satOn && satPost)
             saturate (L, R);
     }
@@ -3784,6 +3798,8 @@ private:
     bool chorusGateOn = false;
     // effects (§5)
     bool satOn = false, satPost = false, satHq = false;
+    kepler_exo::Eq fxEq;
+    kepler_exo::Delay fxDelay;
     float satTarget = 1.0f, satDrive = 1.0f, satK = 0.01f, satPrev[2] {};
 };
 

@@ -410,5 +410,26 @@ struct EqT
 };
 using Eq = EqT<>;
 
+// ---------------------------------------------------------------------------------------------- verification notes
+// Harnesses (Windows, our own code; the DLL loaded unmodified and its functions called at their RVAs; LYNX side the
+// same steps on this header, built with -ffp-contract=off), every float compared bit for bit:
+//  * band setter FUN_180006950 on 60000 random records (types 0/1/2, 20..22000 Hz, Q 0.28..3.64, -16..+16 dB incl. 0 dB,
+//    2/fs for 44100 and 48000): round-to-nearest 0 mismatches; MXCSR | 0xE040 (render mode) 159 of 300000 floats differ
+//    (up to 12 ulp), all from the double routines below.
+//  * container: ctor FUN_180006a50, setRate FUN_180007500 (44100 / 48000 / 96000), then 20000 random parameter steps
+//    through FUN_180006da0 (Q, gain, frequency of the three bands, incl. 0 and 1), all coefficients, type, gain,
+//    frequency and Q of the three bands after each step: nearest 0 mismatches at all three rates; RZ 215 / 66 / 0 floats
+//    of 580054 differ (again only through the double routines).
+//  * powf FUN_1800c1630 vs ildsp::powf_ on 100000 (x, 1.28) and 100000 (13, x) pairs: 0 mismatches in both modes.
+//  * the render biquad (inline in the synth render at 0x18001c7a3, not callable on its own) was transcribed from the
+//    disassembly in operation order; it is plain float arithmetic.
+// Not exact: the engine's double sin / cos / cosh / exp / log / pow differ from correctly rounded ones when called with
+// MXCSR in round-toward-zero (exp / log / pow by one ulp on ~50 % of inputs, cosh up to 3 ulp, sin / cos with a range
+// reduction error near 1e-11 relative). The default ExoEqStdCrt evaluates them in round-to-nearest, where the engine's
+// results match the correctly rounded ones (all within one ulp, which the float coefficients absorbed in every test).
+// Parameter changes in the engine normally run outside the render (nearest); a host that applies them inside the
+// render (RZ) needs a Crt with the engine's RZ behaviour for a bit-exact match (Kepler.cpp's pow re-creation covers pow /
+// pow2; sin / cos / cosh / exp / log would need the same treatment).
+
 } // namespace kepler_exo
 } // namespace lynx

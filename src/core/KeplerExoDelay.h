@@ -572,5 +572,24 @@ struct DelayT
 };
 using Delay = DelayT<>;
 
+// ---------------------------------------------------------------------------------------------- verification notes
+// Harness (Windows, our own code, DLL unmodified): an object built as the synth ctor builds it (ILDelay3 ctor
+// FUN_180010b30 at +0x30, the wrapper fields, FUN_180010650 (i, 0.5) for the eleven parameters), then ILDelay3 setRate
+// FUN_180011ff0, reset FUN_180011120 and the Exo defaults; per sample FUN_1800107b0 in MXCSR | 0xE040; events (parameter
+// changes, host tempo +0x490, reset, setRate) applied between samples in nearest or in RZ. LYNX side: Delay with the same
+// calls. 13 scenarios, 6.8 M output floats (L, R), 0 mismatches:
+//  * defaults at 44100 and 48000 (150000 samples each);
+//  * six random scenarios of 400000 samples (44100 / 48000 / 96000 / 22050 Hz, one with sample-rate changes) with ~90
+//    random events each (all eleven parameters, tempo 60..200 BPM, resets), events in nearest and in RZ;
+//  * directed: band-pass type with the cutoff moved every 300 / 500 samples (44100 RZ events, 48000 nearest), high-pass
+//    with feedback 0.97, tempo sync with tempo and time changes, frequent time / offset changes (overlapping crossfades);
+//    full-scale and sparse (silence between bursts) noise input; the wet signal is non-trivial in all of them.
+//  * CRT: sinf FUN_1800c2a70 vs ildsp::sinf_ (400000 args in 0..3.2) and tanf FUN_1800c3990 vs exoDelayTanf (200000 args
+//    in 0..1.5): 0 mismatches in both modes (plain tanf rounded from std::tan was 1 ulp off on ~0.02 % of them).
+// Not covered bit for bit: the band-pass cos FUN_1800bdce0 runs inside the render (RZ), where the engine's double cos
+// carries a ~1e-11 relative range-reduction error; ExoDelayStdCrt::cos is evaluated in nearest. The coefficient is
+// rounded to float afterwards and no mismatch showed up in ~1600 band-pass redesigns, but a rare 1-ulp coefficient
+// difference is possible. tanf arguments of 2^23 and above (never produced here) use std::tan.
+
 } // namespace kepler_exo
 } // namespace lynx
