@@ -32,6 +32,7 @@
 #include "core/BeepMap.h"
 #include "core/Sawer.h"
 #include "core/Granulizer.h"
+#include "core/WaveTraveller.h"
 #include "core/Ogun.h"
 #include "core/Dx10.h"
 #include "core/Kepler.h"
@@ -1236,15 +1237,18 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 }
             }
 
-        // Wave Traveller: plays its sample (the scratch curve is left out)
+        // Wave Traveller: FL's engine (REA_rodada167f) on FL's state, with the sample its state names (FL loads that
+        // one, not the channel's). Without the sample the channel stays silent, as in FL (the plugin refuses notes)
         if (c.pluginName == "Wave Traveller")
-            if (const auto wave = waveTravellerSample (c.pluginState))
-                if (auto path = existing (wave->first); ! path.empty())
-                {
-                    def.instrument = InstrumentKind::sampler;
-                    def.samplePath = std::move (path);
-                    def.sampler.pitch = std::clamp (def.sampler.pitch + (float) (60 - wave->second), -24.0f, 24.0f);
-                }
+        {
+            wavetrav::State wt;
+            if (wavetrav::parseState (c.pluginState, wt))
+            {
+                def.instrument = InstrumentKind::wavetraveller;
+                def.pluginState = c.pluginState;
+                def.samplePath = wt.samplePath.empty() ? std::string() : existing (wt.samplePath);
+            }
+        }
 
         // Fruity Envelope Controller: "controller" channel (silent) that triggers the envelopes from notes
         if ((c.pluginName == "Fruity Envelope Controller" && parseEnvelopeController (c.pluginState))
@@ -1958,13 +1962,12 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                      || def.instrument == InstrumentKind::sawer || def.instrument == InstrumentKind::flkeys
                      || def.instrument == InstrumentKind::granulizer || def.instrument == InstrumentKind::drumaxx
                      || def.instrument == InstrumentKind::slayer || def.instrument == InstrumentKind::fruitydance
-                     || def.instrument == InstrumentKind::videoplayer
+                     || def.instrument == InstrumentKind::videoplayer || def.instrument == InstrumentKind::wavetraveller
                      || def.instrument == InstrumentKind::directwave || def.instrument == InstrumentKind::soundfont)
                 ++r.converted[c.pluginName]; // FL's own engine rebuilt from the plugin state
             else if ((plugin == "harmless" && def.instrument != InstrumentKind::harmless) || (plugin == "harmor" && def.instrument != InstrumentKind::harmor && adoptedFromPlugin) || (plugin == "minisynth" && def.instrument != InstrumentKind::minisynth) || plugin == "fruity dx10" || plugin == "dx10" || (plugin == "fruit kick" && def.instrument != InstrumentKind::fruitkick)
                      || ((plugin == "sytrus" || plugin == "gms" || plugin == "ogun" || plugin == "autogun" || plugin == "sakura" || plugin == "kepler" || plugin == "boobass" || plugin == "drumpad" || plugin == "poizone" || plugin == "bassdrum"
                          || plugin == "toxic biohazard" || plugin == "morphine") && adoptedFromPlugin)
-                     || (plugin == "wave traveller" && def.instrument == InstrumentKind::sampler)
                      || (plugin == "fruity drumsynth live" && def.instrument == InstrumentKind::sampler))
                 ++r.approximated[c.pluginName];
             else if (((plugin == "fruity envelope controller" || plugin == "fruity keyboard controller") && def.instrument == InstrumentKind::controller)

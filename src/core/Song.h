@@ -86,8 +86,10 @@ enum class InstrumentKind : std::uint8_t
     voltage,    // FL's Voltage Controller (REA_rodada164a, core/VoltageController.h): its notes as control voltages; FL's
                 // state in pluginState
     vfx,        // FL's VFX note processors (round 164b, core/Vfx.h): kind, output port and FL's state in pluginState; no sound
-    videoplayer // FL's Fruity Video Player (round 165g, core/VideoPlayer.h): FL's state (with the video's path) in
+    videoplayer, // FL's Fruity Video Player (round 165g, core/VideoPlayer.h): FL's state (with the video's path) in
                 // pluginState; plays the video's sound in sync with the song, the video is shown by its editor
+    wavetraveller // FL's Wave Traveller (REA_rodada167f, core/WaveTraveller.h): FL's state (per-key curves) in pluginState,
+                  // the channel's sample in samplePath
 };
 
 // External plugin: format identifier (the app knows how to find the file) + saved state.

@@ -73,6 +73,8 @@ struct State
     std::array<Patch, keyCount> patches;
 };
 
+// a new point as FL's editor makes one (linear segment, default handles)
+Point newPoint (float x, float y);
 Patch defaultPatch();
 State defaultState();
 
@@ -106,9 +108,8 @@ struct Sample
 {
     std::vector<float> frames; // interleaved L/R, (length + 1) frames
     int length = 0;
-    double rateConv = 1.0;     // the host's SmpRateConv (absolute speed only)
 };
-std::shared_ptr<const Sample> sampleFrom (const SampleData& data, double hostRate);
+std::shared_ptr<const Sample> sampleFrom (const SampleData& data);
 
 class Engine
 {
@@ -125,6 +126,9 @@ public:
     int trigger (const NoteParams& note) noexcept; // voice slot, −1 when refused (no sample)
     void release (int slot) noexcept;
     void kill (int slot) noexcept;
+    // the host's Final.Vol / Final.Pan of a sounding voice (FL's voice parameters are live: the plugin reads them on
+    // every render)
+    void setVoiceLevels (int slot, float finalVol, float finalPan) noexcept;
     void killAll() noexcept;
     int voiceKey (int slot) const noexcept;
     std::uint32_t voiceSerial (int slot) const noexcept; // changes when the slot is reused
@@ -145,6 +149,7 @@ private:
     int count = 0;
     int rate = 44100;
     float samplesPerMinute = 44100.0f * 60.0f, dcCoef = 0.99f, tempo = 0.0f;
+    double rateConv = 1.0; // the host's SmpRateConv for the 44.1 kHz sample [HYP: 44100 / rate] (absolute speed only)
     int renderTaps = 0;
     std::uint32_t serials = 0;
 };

@@ -56,7 +56,7 @@ int main (int argc, char** argv)
     if (chans > 1)
         data.right.assign (planar.begin() + length, planar.begin() + 2 * length);
     data.sampleRate = 44100.0;
-    const auto smp = lynx::wavetrav::sampleFrom (data, (double) rate);
+    const auto smp = lynx::wavetrav::sampleFrom (data);
     std::vector<lynx::wavetrav::RefNote> notes;
     for (int i = 10; i < argc; ++i)
     {

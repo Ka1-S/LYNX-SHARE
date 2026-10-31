@@ -67,6 +67,7 @@
 #include "core/MiniSynth.h"
 #include "core/SimSynth.h"
 #include "core/Granulizer.h"
+#include "core/WaveTraveller.h"
 #include "core/Drumaxx.h"
 #include "core/Wasp.h"
 #include "core/PluginLayout.h"
@@ -689,8 +690,8 @@ TEST (plugin_state_decoders_survive_garbage)
             CHECK (std::isfinite (synth.cutoff) && std::isfinite (synth.attack) && std::isfinite (harmlessGain));
         if (auto sound = lynx::drumSynthLiveSound (blob))
             CHECK (sound->size() < 256);
-        if (auto wave = lynx::waveTravellerSample (blob))
-            CHECK (! wave->first.empty() && wave->second >= 0 && wave->second <= 127);
+        if (lynx::wavetrav::State wt; lynx::wavetrav::parseState (blob, wt))
+            CHECK (wt.patches[60].waveN >= 0 && wt.patches[60].waveN < lynx::wavetrav::tableCapacity);
         lynx::synthFromBooBass (blob, synth);
         lynx::gmsStateUsable (blob); // (the exact engines' parsers reject garbage without crashing)
         lynx::morphineStateUsable (blob);
@@ -1823,7 +1824,7 @@ TEST (flp_real_files)
                 else if (c.pluginName == "Kepler")
                     decoded = lynx::synthFromKepler (c.pluginState, gs, g);
                 else if (c.pluginName == "Wave Traveller")
-                    decoded = lynx::waveTravellerSample (c.pluginState).has_value() ? 2 : 0;
+                    decoded = lynx::waveTravellerStateUsable (c.pluginState) ? 2 : 0;
                 else if (c.pluginName == "PoiZone")
                     decoded = lynx::synthFromPoiZone (c.pluginState, gs, g);
                 else if (c.pluginName == "BassDrum")
@@ -16265,6 +16266,273 @@ TEST (emphasizer_matches_fl_engine)
     CHECK (lynx::formatEffectParam (lynx::EffectKind::emphasizer, 0, 0.5f, 120.0) == "+12.0 dB");
     CHECK (lynx::formatEffectParam (lynx::EffectKind::emphasizer, 5, 1.0f, 120.0) == "0.0 dB");
     CHECK (lynx::formatEffectParam (lynx::EffectKind::emphasizer, 2, 1.0f, 120.0) == "Soft");
+}
+
+// ---- Wave Traveller (REA_rodada167f-wavetraveller) ----
+namespace
+{
+// the crafted case: a sample on the 16-bit grid and a state that uses every feature (the same data went to the DLL)
+inline std::vector<float> wtTestSample (int n) // planar stereo, values on the 16-bit grid
+{
+    std::vector<float> s ((std::size_t) n * 2);
+    std::uint32_t r = 2024;
+    for (int i = 0; i < n; ++i)
+        for (int c = 0; c < 2; ++c)
+        {
+            r = r * 1664525u + 1013904223u;
+            const auto noise = (int) (r >> 20) - 2048; // ±2048
+            const auto tone = (int) std::lround (12000.0 * std::sin ((double) i * (c == 0 ? 0.031 : 0.047)));
+            s[(std::size_t) c * (std::size_t) n + (std::size_t) i] = (float) (tone + noise) / 32768.0f;
+        }
+    return s;
+}
+
+inline lynx::wavetrav::State wtTestState()
+{
+    using namespace lynx::wavetrav;
+    auto st = defaultState();
+    st.samplePath = "x.wav"; // (FL asks its host for the sample only when the state names one)
+    auto pt = [] (float x, float y, int type, float tension = 0.5f, float c1x = -0.05f, float c1y = -0.2f, float c2x = 0.1f, float c2y = 0.3f) {
+        auto p = newPoint (x, y);
+        p.type = type, p.tension = tension, p.c1x = c1x, p.c1y = c1y, p.c2x = c2x, p.c2y = c2y;
+        return p;
+    };
+    auto& a = st.patches[60]; // every segment type, tempo based
+    a.wave.clear();
+    const float xs[] { 0.0f, 0.15f, 0.3f, 0.45f, 0.6f, 0.75f, 0.9f, 1.0f }, ys[] { 0.1f, 0.8f, 0.2f, 0.9f, 0.05f, 0.7f, 0.3f, 1.0f };
+    const int ts[] { 1, 2, 3, 4, 5, 6, 8, 1 };
+    for (int i = 0; i < 8; ++i)
+        a.wave.push_back (pt (xs[i], ys[i], ts[i], ts[i] == 6 ? 0.2f : 0.5f));
+    a.speedBeats = 2.0f;
+    auto& b = st.patches[61]; // volume curve, mutes, start / end, attack / release
+    b.vol = { pt (0.0f, 0.2f, 2), pt (0.4f, 1.0f, 6, 0.8f), pt (0.7f, 0.3f, 4), pt (1.0f, 0.9f, 1) };
+    b.mutes = { { true, 0.0f }, { false, 0.3f }, { true, 0.5f } };
+    b.start = 0.2f, b.end = 0.7f, b.attackMs = 50.0f, b.releaseMs = 300.0f, b.speedBeats = 1.0f;
+    auto& c = st.patches[62]; // absolute speed, tension segments
+    c.splineType = 1, c.absSpeed = 2.3f, c.start = 0.1f, c.end = 0.6f;
+    c.wave = { pt (0.0f, 0.0f, 6, 0.5f), pt (0.5f, 0.9f, 6, 0.9f), pt (1.0f, 0.2f, 1) };
+    auto& d = st.patches[63]; // types that write nothing, a tiny Bezier
+    d.wave = { pt (0.0f, 0.0f, 1), pt (0.2f, 0.5f, 7), pt (0.3f, 0.1f, 0), pt (0.5f, 0.6f, 3, 0.5f, -0.05f, -0.2f, 0.0f, 0.0f),
+               pt (0.5004f, 0.2f, 3), pt (0.501f, 0.9f, 1), pt (1.0f, 0.4f, 1) };
+    for (auto& p : st.patches)
+        p.rebuild();
+    return st;
+}
+
+std::uint64_t floatBitsHash (const std::vector<float>& v)
+{
+    std::uint64_t h = 0xcbf29ce484222325ull;
+    for (const float x : v)
+    {
+        std::uint32_t u;
+        std::memcpy (&u, &x, 4);
+        h = (h ^ u) * 0x100000001b3ull;
+    }
+    return h;
+}
+
+lynx::SampleData wtSampleData (const std::vector<float>& planar, int channels)
+{
+    lynx::SampleData d;
+    const auto n = planar.size() / (std::size_t) channels;
+    d.left.assign (planar.begin(), planar.begin() + (std::ptrdiff_t) n);
+    if (channels > 1)
+        d.right.assign (planar.begin() + (std::ptrdiff_t) n, planar.end());
+    d.sampleRate = 44100.0;
+    return d;
+}
+} // namespace
+
+TEST (wave_traveller_state_and_tables)
+{
+    using namespace lynx::wavetrav;
+    // FL's state layout (§2): it round-trips byte for byte, and the default patch is FL's
+    const auto def = writeState (defaultState());
+    State s;
+    CHECK (parseState (def, s) && writeState (s) == def && s.selectedKey == 60 && s.samplePath.empty());
+    CHECK (s.patches[0].wave.size() == 2 && s.patches[119].vol.size() == 2 && s.patches[60].mutes.size() == 1 && s.patches[60].mutes[0].on);
+    const auto crafted = writeState (wtTestState());
+    CHECK (parseState (crafted, s) && writeState (s) == crafted);
+    CHECK (s.patches[62].splineType == 1 && s.patches[61].mutes.size() == 3 && ! s.patches[61].mutes[1].on && s.patches[60].wave.size() == 8);
+    // tables (§3): a 0 → 1 line is 1022 values long (the writer steps back one value per segment)
+    CHECK (s.patches[0].waveN == 1022 && s.patches[0].waveTable[0] == 0.0f && s.patches[0].volTable[500] == 1.0f);
+    std::vector<float> tables;
+    for (int k = 60; k < 64; ++k)
+    {
+        const auto& p = s.patches[(std::size_t) k];
+        tables.insert (tables.end(), p.waveTable.begin(), p.waveTable.begin() + p.waveN + 1);
+        tables.insert (tables.end(), p.volTable.begin(), p.volTable.begin() + p.volN + 1);
+        CHECK (std::all_of (p.waveTable.begin(), p.waveTable.end(), [] (float v) { return v >= 0.0f && v <= 1.0f; }));
+    }
+    CHECK (floatBitsHash (tables) == 0x0000000000000000ull /*WT_TABLES_HASH*/);
+    if (floatBitsHash (tables) != 0x0000000000000000ull /*WT_TABLES_HASH*/)
+        std::printf ("  wave traveller tables: %016llx\n", (unsigned long long) floatBitsHash (tables));
+    // knobs (FUN_007579e0 / 757b10 / 757b60)
+    CHECK (speedFromKnob (0.0f, false) == 0.125f && speedFromKnob (1.0f, false) == 8.0f && speedFromKnob (0.0f, true) == 0.25f
+           && speedFromKnob (1.0f, true) == 4.0f && attackFromKnob (1.0f) == 500.0f && releaseFromKnob (1.0f) == 1000.0f);
+    // a .spln preset (§6): knob positions, curves, mutes
+    std::vector<std::uint8_t> spln;
+    auto i32 = [&spln] (std::int32_t v) { spln.insert (spln.end(), (std::uint8_t*) &v, (std::uint8_t*) &v + 4); };
+    auto f32 = [&spln] (float v) { spln.insert (spln.end(), (std::uint8_t*) &v, (std::uint8_t*) &v + 4); };
+    i32 (4000), i32 (1000005), i32 (1);
+    for (float v : { 0.5f, 0.2f, 0.1f, 0.3f, 0.25f, 0.75f })
+        f32 (v);
+    const auto rec = [&] (float x, float y) {
+        std::vector<std::uint8_t> r (60, 0);
+        std::memcpy (r.data() + 8, &x, 4), std::memcpy (r.data() + 12, &y, 4);
+        const std::int32_t one = 1;
+        std::memcpy (r.data() + 0x30, &one, 4);
+        spln.insert (spln.end(), r.begin(), r.end());
+    };
+    i32 (3), rec (0.0f, 1.0f), rec (0.5f, 0.0f), rec (1.0f, 1.0f);
+    i32 (2), rec (0.0f, 1.0f), rec (1.0f, 0.5f);
+    i32 (2), i32 (0), f32 (0.0f), i32 (1), f32 (0.5f);
+    auto p = defaultPatch();
+    CHECK (applyPreset (spln, p) && p.splineType == 1 && p.speedBeats == speedFromKnob (0.5f, false) && p.absSpeed == speedFromKnob (0.2f, true)
+           && p.attackMs == attackFromKnob (0.1f) && p.releaseMs == releaseFromKnob (0.3f) && p.start == 0.25f && p.end == 0.75f
+           && p.wave.size() == 3 && p.vol.size() == 2 && p.mutes.size() == 2 && ! p.mutes[0].on && p.waveN > 1000);
+    // garbage is refused without crashing
+    std::uint32_t r = 7;
+    for (int round = 0; round < 300; ++round)
+    {
+        std::vector<std::uint8_t> blob (crafted.begin(), crafted.begin() + (std::ptrdiff_t) (r % crafted.size()));
+        for (int k = 0; k < 8 && ! blob.empty(); ++k)
+        {
+            r = r * 1664525u + 1013904223u;
+            blob[(r >> 8) % blob.size()] = (std::uint8_t) (r >> 24);
+        }
+        r = r * 1664525u + 1013904223u;
+        if (parseState (blob, s))
+            for (const auto& q : s.patches)
+                CHECK (q.waveN >= 0 && q.waveN < tableCapacity && q.volN >= 0 && q.volN < tableCapacity);
+    }
+    CHECK (! parseState ({ 1, 2, 3 }, s) && ! lynx::waveTravellerStateUsable ({}));
+
+    // the installation's states (read at test time): the render test and the plugin database preset
+    if (realFlpDir.empty())
+        return;
+    auto read = [] (const std::filesystem::path& path) {
+        std::ifstream in (path, std::ios::binary);
+        return std::vector<std::uint8_t> { std::istreambuf_iterator<char> (in), {} };
+    };
+    const auto base = std::filesystem::path (realFlpDir);
+    if (const auto b = read (base / "System" / "Render tests" / "Wave Traveller.flp"); ! b.empty())
+    {
+        const auto project = flp::parseProject (b);
+        int found = 0;
+        for (const auto& c : project.channels)
+            if (c.pluginName == "Wave Traveller")
+            {
+                ++found;
+                CHECK (parseState (c.pluginState, s) && s.samplePath.find ("808 Snare.wav") != std::string::npos);
+            }
+        CHECK (found == 1);
+        const auto song = lynx::importFlp (project);
+        const auto it = std::find_if (song.channels.begin(), song.channels.end(), [] (const lynx::ChannelDef& c) { return c.instrument == lynx::InstrumentKind::wavetraveller; });
+        CHECK (it != song.channels.end() && lynx::waveTravellerStateUsable (it->pluginState));
+    }
+    if (const auto b = read (base / "System" / "Plugin databases" / "Plugin database (alphabetical)" / "Generators" / "Wave Traveller.fst"); ! b.empty())
+    {
+        const auto project = flp::parseProject (b, true);
+        CHECK (! project.channels.empty() && parseState (project.channels.front().pluginState, s) && s.samplePath.empty());
+    }
+}
+
+TEST (wave_traveller_matches_fl_engine)
+{
+    // §8: goldens of the installation's Wave Traveller_x64.dll in our harness (16-bit stereo sample handed by LoadSample,
+    // 512-frame calls, tempo by ProcessEvent): FNV-1a of the output's float bits. LYNX's engine reproduces them exactly.
+    using namespace lynx::wavetrav;
+    const auto planar = wtTestSample (30000);
+    const auto smp = sampleFrom (wtSampleData (planar, 2));
+    CHECK (smp != nullptr && smp->length == 30000);
+    if (smp == nullptr)
+        return;
+    const auto state = wtTestState();
+    auto note = [] (int start, int key, float vol, float pan, float cents, int release, float initPan = 0.0f) {
+        RefNote n;
+        n.start = start, n.release = release;
+        n.note.key = key, n.note.finalVol = vol, n.note.finalPan = pan, n.note.initPan = initPan;
+        n.note.finalPitch = 100.0f * (float) key - 6000.0f + cents;
+        return n;
+    };
+    struct Case { std::vector<RefNote> notes; int rate; float tempo; int taps, length; std::uint64_t hash; };
+    const Case cases[] {
+        // live: every segment type, volume curve + mutes + attack / release, absolute speed, types 0 / 7 and a tiny Bezier
+        { { note (0, 60, 0.9f, 0.25f, 30.0f, 20000), note (100, 61, 0.7f, -0.5f, -120.0f, 15000), note (2000, 62, 0.8f, 0.0f, 0.0f, -1),
+            note (5000, 63, 1.0f, 0.6f, 250.0f, -1) }, 44100, 140.0f, 0, 40000, 0x0000000000000000ull /*WT_B1*/ },
+        // render mode, 256 taps per side (FL's render default), with the notes' own pan
+        { { note (0, 60, 0.9f, 0.25f, 30.0f, 20000, -0.3f), note (100, 61, 0.7f, -0.5f, -120.0f, 15000, -0.3f), note (2000, 62, 0.8f, 0.0f, 0.0f, -1, -0.3f),
+            note (5000, 63, 1.0f, 0.6f, 250.0f, -1, -0.3f) }, 44100, 140.0f, 256, 8000, 0x0000000000000000ull /*WT_B2*/ },
+        // a 48 kHz host at tempo 97.5
+        { { note (0, 62, 0.9f, -0.6f, -250.0f, 20000), note (300, 60, 0.8f, 0.3f, 100.0f, -1) }, 48000, 97.5f, 0, 30000, 0x0000000000000000ull /*WT_B3*/ },
+    };
+    for (const auto& c : cases)
+    {
+        const auto out = renderReference (state, *smp, c.notes, c.rate, c.tempo, c.taps, c.length);
+        CHECK (floatBitsHash (out) == c.hash);
+        if (floatBitsHash (out) != c.hash)
+            std::printf ("  wave traveller case: %016llx\n", (unsigned long long) floatBitsHash (out));
+    }
+
+    // the instrument (channel → engine) plays what the reference plays: velocity 1/1.28 = FL's Init.Vol 1, centred
+    {
+        lynx::ChannelDef ch;
+        ch.instrument = lynx::InstrumentKind::wavetraveller;
+        ch.pluginState = writeState (state);
+        auto inst = lynx::makeInstrument (lynx::InstrumentKind::wavetraveller, std::make_shared<lynx::SampleData> (wtSampleData (planar, 2)));
+        inst->configure (ch, 140.0);
+        inst->prepare (44100.0);
+        std::vector<float> l (20480, 0.0f), r (20480, 0.0f);
+        for (int pos = 0; pos < 20480; pos += 512)
+        {
+            if (pos == 0)
+                inst->noteOn (61, 1.0f / 1.28f);
+            if (pos == 10240)
+                inst->noteOff (61);
+            inst->render (l.data() + pos, r.data() + pos, 512, 1.0f, 1.0f);
+        }
+        const auto ref = renderReference (state, *smp, { note (0, 61, 1.0f, 0.0f, 0.0f, 10240) }, 44100, 140.0f, 0, 20480);
+        bool same = true;
+        for (int i = 0; i < 20480; ++i)
+            same = same && l[(std::size_t) i] == ref[2 * (std::size_t) i] && r[(std::size_t) i] == ref[2 * (std::size_t) i + 1];
+        CHECK (same && inst->idle());
+        auto silent = lynx::makeInstrument (lynx::InstrumentKind::wavetraveller); // no sample: FL refuses the notes
+        silent->configure (ch, 140.0);
+        silent->prepare (44100.0);
+        silent->noteOn (60, 1.0f);
+        std::fill (l.begin(), l.end(), 0.0f);
+        silent->render (l.data(), r.data(), 512, 1.0f, 1.0f);
+        CHECK (silent->idle() && std::all_of (l.begin(), l.begin() + 512, [] (float v) { return v == 0.0f; }));
+    }
+
+    // the installation's render test (its 808 Snare decoded as FL decodes it), read at test time
+    if (realFlpDir.empty())
+        return;
+    const auto base = std::filesystem::path (realFlpDir);
+    std::ifstream fin (base / "System" / "Render tests" / "Wave Traveller.flp", std::ios::binary);
+    std::ifstream sin (base / "Patches" / "Packs" / "Drums" / "Snares" / "808 Snare.wav", std::ios::binary);
+    const std::vector<std::uint8_t> flpBytes { std::istreambuf_iterator<char> (fin), {} }, wav { std::istreambuf_iterator<char> (sin), {} };
+    lynx::oggvorbis::Decoded dec;
+    if (flpBytes.empty() || wav.empty() || ! lynx::oggvorbis::decode (wav.data(), wav.size(), dec) || dec.channels != 1)
+        return;
+    const auto project = flp::parseProject (flpBytes);
+    for (const auto& c : project.channels)
+        if (c.pluginName == "Wave Traveller")
+        {
+            State st;
+            CHECK (parseState (c.pluginState, st));
+            lynx::SampleData d;
+            d.left = dec.data[0];
+            const auto snare = sampleFrom (d);
+            CHECK (snare != nullptr && snare->length == 11002);
+            if (snare == nullptr)
+                return;
+            const auto out = renderReference (st, *snare, { note (0, 60, 1.0f, 0.0f, 0.0f, 44100) }, 44100, 140.0f, 0, 88200);
+            CHECK (floatBitsHash (out) == 0xafcb49e8c0ef918dull);
+            if (floatBitsHash (out) != 0xafcb49e8c0ef918dull)
+                std::printf ("  wave traveller render test: %016llx\n", (unsigned long long) floatBitsHash (out));
+        }
 }
 
 TEST (fl_legacy_fx_match_fl_engines)

@@ -281,6 +281,11 @@ void Patch::rebuild() noexcept
     buildTable (vol, volTable.data(), volN);
 }
 
+Point newPoint (float x, float y)
+{
+    return makePoint (x, y);
+}
+
 Patch defaultPatch()
 {
     Patch p;
@@ -432,7 +437,7 @@ bool applyPreset (const std::vector<std::uint8_t>& spln, Patch& patch)
 
 // ---- the sample (§4) ----
 
-std::shared_ptr<const Sample> sampleFrom (const SampleData& data, double hostRate)
+std::shared_ptr<const Sample> sampleFrom (const SampleData& data)
 {
     const auto frames = data.frames();
     if (frames == 0)
@@ -469,7 +474,6 @@ std::shared_ptr<const Sample> sampleFrom (const SampleData& data, double hostRat
     // the guard frame (FUN_00757e00): the first frame's right value twice
     s->frames[(std::size_t) s->length * 2] = s->frames[1];
     s->frames[(std::size_t) s->length * 2 + 1] = s->frames[1];
-    s->rateConv = hostRate > 0.0 ? 44100.0 / hostRate : 1.0; // [HYP] FL's SmpRateConv of the converted sample
     return s;
 }
 
@@ -508,6 +512,7 @@ void Engine::setRate (int sampleRate) noexcept
     rate = std::max (1, sampleRate);
     samplesPerMinute = (float) (rate * 60);
     dcCoef = (float) (1.0 - 126.0 / (double) rate);
+    rateConv = 44100.0 / (double) rate; // [HYP] FL's SmpRateConv of the sample it hands at 44.1 kHz
 }
 
 int Engine::trigger (const NoteParams& note) noexcept
@@ -542,7 +547,7 @@ int Engine::trigger (const NoteParams& note) noexcept
     if (P.splineType == 0)
         v.step = (tempo * (float) (v.waveN - 1)) / (P.speedBeats * samplesPerMinute);
     else
-        v.step = (float) ((sample->rateConv * (double) P.absSpeed * (double) (v.waveN - 1))
+        v.step = (float) ((rateConv * (double) P.absSpeed * (double) (v.waveN - 1))
                           / (double) ((float) (M - 1) * (P.end - P.start)));
     const auto d = (note.finalPitch - (float) ((key - 60) * 100)) / 1200.0f;
     if (note.finalPitch < 0.0f)
@@ -585,6 +590,14 @@ void Engine::kill (int slot) noexcept
         std::copy (at + 1, order.begin() + count, at);
         --count;
     }
+}
+
+void Engine::setVoiceLevels (int slot, float finalVol, float finalPan) noexcept
+{
+    if (slot < 0 || slot >= maxVoices || ! voices[(std::size_t) slot].used)
+        return;
+    voices[(std::size_t) slot].note.finalVol = finalVol;
+    voices[(std::size_t) slot].note.finalPan = finalPan;
 }
 
 void Engine::killAll() noexcept
@@ -826,3 +839,180 @@ std::vector<float> renderReference (const State& st, const Sample& smp, const st
     return out;
 }
 } // namespace lynx::wavetrav
+
+namespace lynx
+{
+bool waveTravellerStateUsable (const std::vector<std::uint8_t>& state)
+{
+    wavetrav::State s;
+    return wavetrav::parseState (state, s);
+}
+
+namespace
+{
+// The channel's Wave Traveller. configure() (UI thread) parses the state and hands it over; the audio thread takes it
+// at its next note or render and gives the old one back to be freed on the UI thread (as the Granulizer does).
+class WaveTravellerInstrument final : public Instrument
+{
+public:
+    explicit WaveTravellerInstrument (std::shared_ptr<const SampleData> s)
+    {
+        if (s != nullptr)
+            engine.setSample (wavetrav::sampleFrom (*s));
+        current.state = std::make_shared<wavetrav::State> (wavetrav::defaultState());
+        engine.setState (current.state);
+        engine.setTempo (140.0f);
+    }
+
+    ~WaveTravellerInstrument() override
+    {
+        delete incoming.exchange (nullptr);
+        delete retired.exchange (nullptr);
+    }
+
+    void prepare (double sr) noexcept override
+    {
+        take();
+        engine.killAll();
+        engine.setRate ((int) std::lround (sr));
+        // FL picks the render mode (windowed sinc, its render quality's 256 taps) when it exports, the 6-point
+        // polynomial live (Dispatcher ProcessMode, REA §5)
+        engine.setRenderTaps (offlineRendering() ? 256 : 0);
+    }
+
+    void configure (const ChannelDef& channel, double bpm) noexcept override
+    {
+        delete retired.exchange (nullptr);
+        pitchCents.store (channel.sampler.pitch * 100.0f);
+        const auto tempo = (float) (bpm > 0.0 ? bpm : 140.0);
+        if (channel.pluginState == lastState && tempo == lastTempo)
+            return;
+        auto s = std::make_unique<Setup>();
+        auto st = std::make_shared<wavetrav::State>();
+        if (! wavetrav::parseState (channel.pluginState, *st))
+            *st = wavetrav::defaultState();
+        s->state = std::move (st);
+        s->tempo = tempo;
+        lastState = channel.pluginState, lastTempo = tempo;
+        delete incoming.exchange (s.release());
+    }
+
+    void setNextNoteExpression (float pan, float cents, bool) noexcept override
+    {
+        nextPan = pan;
+        nextCents = cents;
+    }
+
+    void noteOn (int key, float velocity) noexcept override
+    {
+        take();
+        const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
+        const auto initVol = (float) ((std::pow (11.0, 1.28 * vel) - 1.0) / 10.0);
+        const auto k = std::clamp (key, 0, 127);
+        wavetrav::NoteParams p;
+        p.key = k;
+        p.initPan = nextPan;
+        p.finalPan = (float) std::clamp ((double) nextPan + channelPan, -1.0, 1.0);
+        p.finalVol = (float) (channelVol * (double) initVol);
+        p.finalPitch = (float) (100.0 * (k - 60) + (double) pitchCents.load() + (double) nextCents);
+        const auto slot = engine.trigger (p);
+        if (slot >= 0)
+        {
+            volFactor[(std::size_t) slot] = initVol;
+            notePan[(std::size_t) slot] = nextPan;
+            noteKey[(std::size_t) slot] = k;
+        }
+        nextPan = 0.0f;
+        nextCents = 0.0f;
+    }
+
+    void noteOff (int key) noexcept override
+    {
+        for (int slot = 0; slot < wavetrav::Engine::maxVoices; ++slot)
+            if (engine.voiceActive (slot) && noteKey[(std::size_t) slot] == key)
+                engine.release (slot);
+    }
+
+    void allNotesOff() noexcept override
+    {
+        for (int slot = 0; slot < wavetrav::Engine::maxVoices; ++slot)
+            if (engine.voiceActive (slot))
+                engine.release (slot);
+    }
+
+    void panic() noexcept override { engine.killAll(); }
+
+    bool idle() const noexcept override { return engine.idle(); }
+
+    void render (float* left, float* right, int n, float gl, float gr) noexcept override
+    {
+        take();
+        // FL's channel volume / pan from LYNX's gains (as the Granulizer and 3x Osc)
+        const auto vol = std::sqrt (((double) gl * gl + (double) gr * gr) * 0.5);
+        auto pan = vol > 0.0 ? std::atan2 ((double) gr, (double) gl) * (4.0 / 3.141592653589793) - 1.0 : 0.0;
+        if (std::fabs (pan) < 1e-9)
+            pan = 0.0;
+        if (vol != channelVol || pan != channelPan)
+        {
+            channelVol = vol, channelPan = pan;
+            for (int slot = 0; slot < wavetrav::Engine::maxVoices; ++slot)
+                engine.setVoiceLevels (slot, (float) (vol * (double) volFactor[(std::size_t) slot]),
+                                       (float) std::clamp ((double) notePan[(std::size_t) slot] + pan, -1.0, 1.0));
+        }
+        if (engine.idle())
+            return;
+        for (int done = 0; done < n;)
+        {
+            const auto len = std::min (blockSize, n - done);
+            std::fill (buf.begin(), buf.begin() + 2 * len, 0.0f);
+            engine.render (buf.data(), len);
+            for (int j = 0; j < len; ++j)
+            {
+                left[done + j] += buf[(std::size_t) (2 * j)];
+                right[done + j] += buf[(std::size_t) (2 * j + 1)];
+            }
+            done += len;
+        }
+    }
+
+private:
+    struct Setup
+    {
+        std::shared_ptr<const wavetrav::State> state;
+        float tempo = 140.0f;
+    };
+
+    void take() noexcept
+    {
+        if (retired.load() != nullptr)
+            return;
+        if (auto* s = incoming.exchange (nullptr))
+        {
+            std::swap (current.state, s->state); // the old state leaves with `s`, freed on the UI thread
+            current.tempo = s->tempo;
+            engine.setState (current.state);
+            engine.setTempo (current.tempo);
+            retired.store (s);
+        }
+    }
+
+    static constexpr int blockSize = 512;
+    wavetrav::Engine engine;
+    Setup current;
+    std::atomic<Setup*> incoming { nullptr }, retired { nullptr };
+    std::atomic<float> pitchCents { 0.0f };
+    std::vector<std::uint8_t> lastState;
+    float lastTempo = -1.0f;
+    std::array<float, 2 * blockSize> buf {};
+    std::array<float, wavetrav::Engine::maxVoices> volFactor {}, notePan {};
+    std::array<int, wavetrav::Engine::maxVoices> noteKey {};
+    double channelVol = 1.0, channelPan = 0.0;
+    float nextPan = 0.0f, nextCents = 0.0f;
+};
+} // namespace
+
+std::unique_ptr<Instrument> makeWaveTravellerInstrument (std::shared_ptr<const SampleData> sample)
+{
+    return std::make_unique<WaveTravellerInstrument> (std::move (sample));
+}
+} // namespace lynx

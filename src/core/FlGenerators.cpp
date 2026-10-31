@@ -1009,23 +1009,6 @@ bool synthFromKepler (const std::vector<std::uint8_t>& state, SynthSettings& syn
     return true;
 }
 
-// ---- Wave Traveller (§4): the sample and root note ----
-
-std::optional<std::pair<std::string, int>> waveTravellerSample (const std::vector<std::uint8_t>& state)
-{
-    if (state.size() < 24 || u32At (state.data(), 0) != 1000)
-        return std::nullopt;
-    const auto root = (int) u32At (state.data(), 12);
-    const auto length = (std::size_t) u32At (state.data(), 16);
-    if (length == 0 || length > 4096 || 20 + length > state.size())
-        return std::nullopt;
-    std::string path (reinterpret_cast<const char*> (state.data() + 20), length);
-    path.resize (strnlen (path.c_str(), path.size()));
-    if (path.empty())
-        return std::nullopt;
-    return std::make_pair (path, std::clamp (root, 0, 127));
-}
-
 // ---- FLEX (§1.1): only the plugin state (the packs are protected and are not opened) ----
 
 std::optional<std::pair<std::string, std::string>> flexPresetName (const std::vector<std::uint8_t>& state)
