@@ -454,6 +454,7 @@ countries: nl be
 "Sytrus — FL's engine, main settings (operators, filters and effects keep the saved patch)" = "Sytrus — de engine van FL, hoofdinstellingen (operators, filters en effecten behouden de opgeslagen patch)"
 "Fruity DX10 — FL's FM engine" = "Fruity DX10 — de FM-engine van FL"
 "Kepler — FL's engine (LFO shape and noise read from your FL installation; new settings restart the voices)" = "Kepler — de engine van FL (LFO-vorm en ruis gelezen uit je FL-installatie; nieuwe instellingen herstarten de voices)"
+"Kepler Exo — FL's engine with its effects (tables read from your FL installation; new settings restart the voices)" = "Kepler Exo — de engine van FL met zijn effecten (tabellen gelezen uit je FL-installatie; nieuwe instellingen herstarten de voices)"
 "PoiZone — FL's engine with its gate, chorus, delay and arpeggiator (new settings restart the voices)" = "PoiZone — de engine van FL met zijn gate, chorus, delay en arpeggiator (nieuwe instellingen herstarten de voices)"
 "Fruit Kick — FL's engine (channel envelopes stepped per tick)" = "Fruit Kick — de engine van FL (kanaalenvelopes per tick getrapt)"
 "BassDrum — FL's engine (table and noise samples read from your FL installation)" = "BassDrum — de engine van FL (tabel- en ruissamples gelezen uit je FL-installatie)"

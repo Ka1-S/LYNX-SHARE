@@ -454,6 +454,7 @@ countries: kr
 "Sytrus — FL's engine, main settings (operators, filters and effects keep the saved patch)" = "Sytrus — FL 엔진, 주요 설정(오퍼레이터, 필터, 이펙트는 저장된 패치를 유지)"
 "Fruity DX10 — FL's FM engine" = "Fruity DX10 — FL의 FM 엔진"
 "Kepler — FL's engine (LFO shape and noise read from your FL installation; new settings restart the voices)" = "Kepler — FL 엔진(설치된 FL에서 LFO 모양과 노이즈를 읽음, 설정을 바꾸면 보이스가 다시 시작됨)"
+"Kepler Exo — FL's engine with its effects (tables read from your FL installation; new settings restart the voices)" = "Kepler Exo — FL 엔진과 이펙트(설치된 FL에서 테이블을 읽음, 설정을 바꾸면 보이스가 다시 시작됨)"
 "PoiZone — FL's engine with its gate, chorus, delay and arpeggiator (new settings restart the voices)" = "PoiZone — 게이트, 코러스, 딜레이, 아르페지에이터를 포함한 FL 엔진(설정을 바꾸면 보이스가 다시 시작됨)"
 "Fruit Kick — FL's engine (channel envelopes stepped per tick)" = "Fruit Kick — FL 엔진(채널 엔벨로프는 틱 단위로 계단식 적용)"
 "BassDrum — FL's engine (table and noise samples read from your FL installation)" = "BassDrum — FL 엔진(설치된 FL에서 테이블과 노이즈 샘플을 읽음)"
