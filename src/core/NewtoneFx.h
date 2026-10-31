@@ -187,6 +187,15 @@ double warpToOutput (const WarpMap& map, std::int64_t frames, double source);
 double warpToSource (const WarpMap& map, std::int64_t frames, double output);
 // The warped source (nullptr: no marker moves anything)
 std::shared_ptr<SampleData> renderWarp (const SampleData& source, const WarpMap& map);
+// FL's Newtime warp (round 167b): a TimelineWarp track's segments become the markers (each segment's source start →
+// its output start, and the last one's end); nullopt = not a Newtime track
+std::optional<WarpMap> warpFromTrack (const Track& track);
+// The warp a slot's state describes: LYNX's own ("LXNW") or the first Newtime track of FL's state
+std::optional<WarpMap> warpOf (const std::vector<std::uint8_t>& state);
+
+// FL Newtone / Newtime's Snap to grid (Beat, 1/2 ... 1/8 beat, Off): a sample position moved to the nearest line
+// of a grid of beat / division at the song tempo, counted from the sample's start; division <= 0 = Off
+std::int64_t snapToBeatGrid (std::int64_t position, double sampleRate, double bpm, int division);
 
 // What a slot plays in slave mode: the source with its edits (Newtone notes / Newtime warp; LYNX's or FL's state)
 std::shared_ptr<const SampleData> renderedSource (std::shared_ptr<const SampleData> source, const std::vector<std::uint8_t>& state);
