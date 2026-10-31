@@ -5995,3 +5995,6 @@ countries: id
 "In scale" = "Dalam skala"
 "AMPLITUDE" = "AMPLITUDO"
 "VARIATION" = "VARIASI"
+"Created: {0}" = "Dibuat: {0}"
+"Working time: {0}" = "Waktu kerja: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Mainkan not terpotong di klip (not yang dimulai sebelum klip pattern dimainkan dari awal klip)"

@@ -1542,6 +1542,8 @@ juce::String toJson (const Song& song)
         root->setProperty ("performanceMode", true);
     if (song.autoCrossfades)
         root->setProperty ("autoCrossfades", true);
+    if (song.playTruncatedNotes)
+        root->setProperty ("playTruncatedNotes", true);
     if (! song.info.empty())
     {
         auto info = std::make_unique<juce::DynamicObject>();
@@ -1556,6 +1558,10 @@ juce::String toJson (const Song& song)
         set ("comments", song.info.comments);
         if (song.info.showOnOpen)
             info->setProperty ("showOnOpen", true);
+        if (song.info.created > 0.0)
+            info->setProperty ("created", song.info.created);
+        if (song.info.workSeconds > 0.0)
+            info->setProperty ("workSeconds", song.info.workSeconds);
         root->setProperty ("info", juce::var (info.release()));
     }
     root->setProperty ("currentPattern", song.currentPattern);
@@ -1844,6 +1850,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
     song.cleanMixer = (bool) root.getProperty ("cleanMixer", false);
     song.performanceMode = (bool) root.getProperty ("performanceMode", false);
     song.autoCrossfades = (bool) root.getProperty ("autoCrossfades", false);
+    song.playTruncatedNotes = (bool) root.getProperty ("playTruncatedNotes", false);
     if (const auto info = root.getProperty ("info", {}); info.isObject())
     {
         auto get = [&info] (const char* key) { return info.getProperty (key, {}).toString().toStdString(); };
@@ -1853,6 +1860,8 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
         song.info.url = get ("url");
         song.info.comments = get ("comments");
         song.info.showOnOpen = (bool) info.getProperty ("showOnOpen", false);
+        song.info.created = std::max (0.0, (double) info.getProperty ("created", 0.0));
+        song.info.workSeconds = std::max (0.0, (double) info.getProperty ("workSeconds", 0.0));
     }
     song.currentPattern = (int) root.getProperty ("currentPattern", 0);
 

@@ -66,9 +66,34 @@
 #include <cctype>
 #include <cmath>
 #include <map>
+#include <ctime>
 
 namespace lynx
 {
+double flDateTimeToUnix (double days)
+{
+    if (! (days > 25569.0 && days < 2958466.0)) // 1970-01-01 … 9999-12-31
+        return 0.0;
+    // the local wall-clock reading as a civil date (H. Hinnant's days → y/m/d), then mktime gives UTC
+    const auto local = (days - 25569.0) * 86400.0;
+    const auto secs = (long long) std::floor (local);
+    long long z = secs / 86400 + 719468;
+    const auto sod = secs % 86400;
+    const long long era = z / 146097, doe = z - era * 146097;
+    const long long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    const long long doy = doe - (365 * yoe + yoe / 4 - yoe / 100), mp = (5 * doy + 2) / 153;
+    std::tm tm {};
+    tm.tm_mday = (int) (doy - (153 * mp + 2) / 5 + 1);
+    tm.tm_mon = (int) (mp < 10 ? mp + 2 : mp - 10);
+    tm.tm_year = (int) (yoe + era * 400 + (tm.tm_mon <= 1 ? 1 : 0)) - 1900;
+    tm.tm_hour = (int) (sod / 3600);
+    tm.tm_min = (int) (sod / 60 % 60);
+    tm.tm_sec = (int) (sod % 60);
+    tm.tm_isdst = -1;
+    const auto t = std::mktime (&tm);
+    return t == (std::time_t) -1 ? local : (double) t + (local - (double) secs);
+}
+
 namespace
 {
 bool contains (const std::string& haystack, const char* needle)
@@ -799,6 +824,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.performanceMode = project.performanceMode; // (round 165m)
     song.beatsPerBar = std::clamp (project.beatsPerBar, 1, 32);
     song.swing = std::clamp (project.swing / 128.0f, 0.0f, 1.0f);
+    song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
+    song.masterPitch = (float) std::clamp (project.mainPitch, -1200, 1200); // FL's render follows it (REA round 167g §1)
     song.channelGroups = project.filterGroups;
     song.info.title = project.title;
     song.info.author = project.artist;
@@ -806,6 +833,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.info.url = project.url;
     song.info.comments = project.comments;
     std::replace (song.info.comments.begin(), song.info.comments.end(), '\r', '\n'); // (FL saves CR line breaks)
+    song.info.showOnOpen = project.showInfo; // 0x0A, Project info › Show on opening (REA round 167g)
+    // 0xED: TDateTime days since 1899-12-30 (25569 days before 1970-01-01), FL's local time kept as it reads
+    song.info.created = flDateTimeToUnix (project.createdDays);
+    song.info.workSeconds = std::min (project.workDays, 36500.0) * 86400.0;
 
     // FL channels may have sparse indices; we map them to dense indices.
     std::map<int, int> channelMap;
@@ -3462,17 +3493,29 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         song.arrangements.push_back (std::move (a));
     }
 
-    // the .flp doesn't say which arrangement was open; the fullest is usually the song
+    // the arrangement open when FL saved (event 0x64, REA round 167g); files without it: the fullest is usually the song
     {
-        int fullest = 0;
-        std::size_t most = song.playlist.size();
+        int fullest = -1;
 
-        for (int i = 1; i < (int) song.arrangements.size(); ++i)
-            if (song.arrangements[(std::size_t) i].clips.size() > most)
-            {
-                most = song.arrangements[(std::size_t) i].clips.size();
+        for (int i = 0; i < (int) project.arrangements.size() && i < (int) song.arrangements.size(); ++i)
+            if (project.currentArrangement >= 0 && project.arrangements[(std::size_t) i].index == project.currentArrangement)
                 fullest = i;
-            }
+
+        if (fullest < 0 && project.currentArrangement != -1)
+            fullest = 0; // FL's loader: an index past the last arrangement opens the first
+
+        if (fullest < 0)
+        {
+            fullest = 0;
+            std::size_t most = song.playlist.size();
+
+            for (int i = 1; i < (int) song.arrangements.size(); ++i)
+                if (song.arrangements[(std::size_t) i].clips.size() > most)
+                {
+                    most = song.arrangements[(std::size_t) i].clips.size();
+                    fullest = i;
+                }
+        }
 
         song.selectArrangement (fullest);
 
@@ -3524,17 +3567,24 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             }
     }
 
-    if (! song.playlist.empty())
+    // PAT / SONG as saved (event 0x09, REA round 167g); files without it: SONG when the Playlist has clips
+    if (project.songMode >= 0)
+        song.mode = project.songMode == 1 ? PlayMode::song : PlayMode::pattern;
+    else if (! song.playlist.empty())
         song.mode = PlayMode::song;
 
 
     if (song.patterns.empty())
         song.patterns.emplace_back().name = "Pattern 1";
 
-    // The .flp doesn't say which pattern was open; the fullest is the best starting point.
-    for (int i = 0; i < (int) song.patterns.size(); ++i)
-        if (song.patterns[(std::size_t) i].notes.size() > song.patterns[(std::size_t) song.currentPattern].notes.size())
-            song.currentPattern = i;
+    // The pattern selected when FL saved (event 0x43, REA round 167g); when it is missing or was empty (empty patterns
+    // are not imported), the fullest is the best starting point.
+    if (const auto it = patternMap.find (project.currentPattern); project.currentPattern > 0 && it != patternMap.end())
+        song.currentPattern = it->second;
+    else
+        for (int i = 0; i < (int) song.patterns.size(); ++i)
+            if (song.patterns[(std::size_t) i].notes.size() > song.patterns[(std::size_t) song.currentPattern].notes.size())
+                song.currentPattern = i;
 
     // FPC kits: one channel per pad (last to first, so indices don't shift)
     for (auto it = drumKits.rbegin(); it != drumKits.rend(); ++it)
