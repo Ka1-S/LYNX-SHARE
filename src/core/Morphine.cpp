@@ -1333,6 +1333,13 @@ struct Synth
     int held[128] {};
     double notePofs[128] {};  // each key's Final.Pitch offset at its note on (cents)
     HostSlide slides[128] {}; // a slide note moving a key's Final.Pitch (issue #14)
+    // FL's PITCH knob and main pitch, live (round 167a): the held keys move to the channel's pitch now
+    void followPitch (float now) noexcept
+    {
+        for (int k = 0; k < 128; ++k)
+            if (held[k] != 0 && hasPtab[k])
+                slides[k].follow (now);
+    }
     std::uint32_t rng = 2222;
     int lastnote = -1;
     long long age = 0;
@@ -2169,6 +2176,14 @@ public:
         nextCents = cents;
     }
 
+    // FL's PITCH knob and main pitch move the sounding notes too (round 167a)
+    void setChannelPitchNow (float knob, float rest) noexcept override
+    {
+        live.set (knob, rest);
+        if (synth != nullptr)
+            synth->followPitch (live.now());
+    }
+
     void slideTo (int key, float cents, float samples) noexcept override
     {
         take();
@@ -2185,7 +2200,9 @@ public:
         const auto initVol = (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0;
         const auto k = std::clamp (key, 0, 127);
         notePan[k] = nextPan;
-        synth->noteOn (k, initVol, channelVol, std::clamp ((double) nextPan + channelPan, -1.0, 1.0), (double) pitchCents.load() + (double) nextCents);
+        const auto knob = pitchCents.load();
+        synth->noteOn (k, initVol, channelVol, std::clamp ((double) nextPan + channelPan, -1.0, 1.0), (double) knob + (double) nextCents);
+        synth->slides[k].anchor (live.ref (knob));
         quiet = 0;
         nextPan = 0.0f;
         nextCents = 0.0f;
@@ -2264,6 +2281,7 @@ private:
     Synth* synth = nullptr;
     std::atomic<Setup*> incoming { nullptr }, retired { nullptr };
     std::atomic<float> pitchCents { 0.0f };
+    LiveChannelPitch live; // (audio thread)
     std::atomic<double> tempo { 120.0 }, preparedRate { 44100.0 };
     std::vector<std::uint8_t> state;
     std::string noisePath;

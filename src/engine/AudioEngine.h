@@ -137,6 +137,9 @@ public:
         // FL's Mixer › Disk recording › "Auto-unarm" (round 166e measured): "Render armed tracks to wave file(s)"
         // disarms the tracks it rendered
         bool unarmAfterRender = false;
+        // FL's Mixer › Disk recording › "Auto-create audio clip" (on by default, round 167a [SHOT s28–s37]): the files
+        // "Render armed tracks to wave file(s)" writes go on the Playlist (mixerops::placeRenderedFiles)
+        bool autoCreateClip = true;
         // FL's record menu "Quantize" section (REA round 139); `quantise` is the grid. quantiseStarts = "Note start
         // time", noteEnd = "Note end time" (quantize) / "Leave note duration" (keepLength) / neither (keepEnd),
         // toStepSequencer = "Record to step sequencer"
@@ -234,6 +237,9 @@ public:
     // "<projectStem>_<yyyy-mm-dd hh-mm-ss>_<insert name>.wav". UI thread.
     void setRecordingTarget (const juce::File& folder, const juce::String& projectStem);
     juce::File getRecordingFolder() const { return recordingFolder; }
+    juce::String getRecordingStem() const { return recordingStem; }
+    // A MIDI message as if a controller had sent it (the --bendrectest of round 167a). Message thread.
+    void injectMidiInput (const juce::MidiMessage& message) { handleIncomingMidiMessage (nullptr, message); }
     static juce::File defaultRecordingFolder();
     // The take files written since LYNX started (or since forgetRecordings), oldest first. UI thread.
     const std::vector<juce::File>& getSessionRecordings() const noexcept { return sessionRecordings; }

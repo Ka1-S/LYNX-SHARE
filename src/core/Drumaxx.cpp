@@ -1,4 +1,5 @@
 #include "core/Drumaxx.h"
+#include "core/HostSlide.h"
 
 #include <algorithm>
 #include <array>
@@ -1248,12 +1249,38 @@ public:
         const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
         const auto initVol = (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0;
         engine->keyL[(std::size_t) k] = engine->keyR[(std::size_t) k] = (float) channelVol;
-        engine->keyPitch[(std::size_t) k] = (float) (((double) pitchCents.load() + (double) nextCents) / 100.0);
+        const auto knob = pitchCents.load();
+        keyCents[(std::size_t) k] = (double) knob + (double) nextCents;
+        keyDown[(std::size_t) k] = true;
+        keySlide[(std::size_t) k] = {};
+        keySlide[(std::size_t) k].anchor (live.ref (knob));
+        engine->keyPitch[(std::size_t) k] = (float) (keyCents[(std::size_t) k] / 100.0);
         engine->noteOn (k, (float) midiVelocity (initVol) * inv127);
         nextCents = 0.0f;
     }
 
-    void noteOff (int) noexcept override {} // (one-shot pads; note-offs only stop patterns)
+    // (one-shot pads; note-offs only stop patterns — and end the key's slides, round 167a)
+    void noteOff (int key) noexcept override
+    {
+        if (key >= 0 && key < 128)
+            keyDown[(std::size_t) key] = false;
+    }
+
+    // Drumaxx reads the host's per-note pitch every block (FUN_180034280, REA_rodada67 §7): a slide note or a live
+    // PITCH knob / main pitch move bends the pads still ringing on that key (round 167a; a slide doesn't retrigger)
+    void slideTo (int key, float cents, float samples) noexcept override
+    {
+        const auto to = 100.0 * (std::clamp (key, 0, 127) - 60) + (double) pitchCents.load() + (double) cents;
+        for (int k = 0; k < 128; ++k)
+            if (keyDown[(std::size_t) k])
+                keySlide[(std::size_t) k].start ((float) (to - (100.0 * (k - 60) + keyCents[(std::size_t) k])), samples);
+    }
+    void setChannelPitchNow (float knob, float rest) noexcept override
+    {
+        live.set (knob, rest);
+        for (auto& sl : keySlide)
+            sl.follow (live.now());
+    }
     void allNotesOff() noexcept override {}
 
     bool idle() const noexcept override
@@ -1270,6 +1297,12 @@ public:
         // FL's channel volume reaches the plugin as Final.Vol (the plugin ignores Final.Pan)
         const auto vol = std::sqrt (((double) gl * gl + (double) gr * gr) * 0.5);
         channelVol = vol;
+        for (int k = 0; k < 128; ++k) // slides (round 167a): the key's Final.Pitch offset this block
+            if (auto& sl = keySlide[(std::size_t) k]; sl.moving())
+            {
+                sl.advance ((float) n);
+                engine->keyPitch[(std::size_t) k] = (float) ((keyCents[(std::size_t) k] + (double) sl.cents) / 100.0);
+            }
         for (int done = 0; done < n;)
         {
             const auto m = std::min (blockSize, n - done);
@@ -1307,6 +1340,10 @@ private:
     std::unique_ptr<Engine> engine;
     std::atomic<Kit*> incoming { nullptr }, retired { nullptr };
     std::atomic<float> pitchCents { 0.0f };
+    std::array<double, 128> keyCents {};   // each key's Final.Pitch offset at its note on (cents)
+    std::array<bool, 128> keyDown {};
+    std::array<HostSlide, 128> keySlide {};
+    LiveChannelPitch live; // (audio thread)
     std::vector<std::uint8_t> state;
     std::array<float, blockSize> bufL {}, bufR {};
     double rate = 44100.0, channelVol = 1.0;

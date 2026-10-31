@@ -11,9 +11,11 @@ namespace lynx
 void showExportDialog (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& suggestedName, int format = -1);
 // FL's Mixer › Disk recording › "Render armed / selected tracks to wave file(s)..." (REA round 165f-mixer): the same
 // window, set to one file per insert for `tracks` only (the Master in the list = also the full mix).
-// `afterRender` (optional) runs on the message thread once the files are written (FL's "Auto-unarm", round 166e).
+// `afterRender` (optional) runs on the message thread once the files are written, with the files (FL's "Auto-unarm",
+// round 166e; "Auto-create audio clip", round 167a). Inserts with a "Record to" file render to it, and when every one
+// has one there is no file dialog, as in FL (round 167a).
 void showExportDialogForTracks (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& suggestedName,
-                                const std::vector<int>& tracks, std::function<void()> afterRender = {});
+                                const std::vector<int>& tracks, std::function<void (const std::vector<juce::File>&)> afterRender = {});
 
 // "Render to audio" (freeze): the insert becomes an audio clip on a new insert with the same
 // routing, and the original is muted. Runs on a background thread with progress.
