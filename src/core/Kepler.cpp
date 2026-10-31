@@ -3895,14 +3895,30 @@ public:
             synth->noteOff (k, v7); // FL's wrapper releases the previous voice of the key first
         sounding[(std::size_t) k] = true;
         notePan[(std::size_t) k] = nextPan;
-        noteCents[(std::size_t) k] = (float) channelCents.load() + nextCents;
+        const auto knob = channelCents.load();
+        noteCents[(std::size_t) k] = (float) knob + nextCents;
         slides[(std::size_t) k] = {};
+        slides[(std::size_t) k].anchor (live.ref (knob));
         synth->noteOn (k, v7);
         synth->setPanExpression (k, nextPan);
         sentPan[(std::size_t) k] = -10000.0f;
         sentCents[(std::size_t) k] = -10000.0f;
         nextPan = 0.0f, nextCents = 0.0f;
         quiet = 0;
+    }
+
+    // FL's PITCH knob and main pitch move the sounding notes too (round 167a), at once
+    void setChannelPitchNow (float knob, float rest) noexcept override
+    {
+        live.set (knob, rest);
+        for (int k = 0; k < 128; ++k)
+            if (sounding[(std::size_t) k])
+            {
+                auto& sl = slides[(std::size_t) k];
+                sl.follow (live.now());
+                if (sl.jump != 0.0f)
+                    sl.advance (0.0f);
+            }
     }
 
     // a slide note (issue #14): the sounding keys glide their Final.Pitch to the slide's pitch
@@ -4027,6 +4043,7 @@ private:
     std::array<bool, 128> sounding {};
     std::array<float, 128> notePan {}, noteCents {}, sentPan {}, sentCents {};
     std::array<HostSlide, 128> slides {};
+    LiveChannelPitch live; // (audio thread, round 167a)
     float nextPan = 0.0f, nextCents = 0.0f;
     std::array<float, 512> scratchL {}, scratchR {};
 };

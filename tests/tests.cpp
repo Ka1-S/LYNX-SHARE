@@ -16540,6 +16540,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Round166eTests.inc"
 #include "Issue15Tests.inc"
 #include "Issue14bugsTests.inc"
+#include "Left167Tests.inc"
 #include "Tune166cTests.inc"
 #include "Update166bTests.inc"
 #include "Ntt167Tests.inc"

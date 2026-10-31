@@ -1347,6 +1347,17 @@ public:
     };
     Engine eng;
     Held held[128];
+    // FL's PITCH knob and main pitch, live (round 167a): the held keys move to the channel's pitch now (at once)
+    void followPitch (float now) noexcept
+    {
+        for (auto& h : held)
+            if (h.on)
+            {
+                h.slide.follow (now);
+                if (h.slide.jump != 0.0f)
+                    h.slide.advance (0.0f);
+            }
+    }
     bool sliding = false;
     float chunkL[chunk] {}, chunkR[chunk] {};
 
@@ -1532,8 +1543,10 @@ public:
         const auto initVol = (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0;
         const auto k = std::clamp (key, 0, 127);
         notePan[k] = nextPan;
+        const auto knob = pitchCents.load();
         plugin->noteOn (k, initVol, channelVol, std::clamp ((double) nextPan + channelPan, -1.0, 1.0),
-                        (double) pitchCents.load() + (double) nextCents);
+                        (double) knob + (double) nextCents);
+        plugin->held[k].slide.anchor (live.ref (knob));
         nextPan = 0.0f;
         nextCents = 0.0f;
     }
@@ -1542,6 +1555,14 @@ public:
     {
         take();
         plugin->noteOff (key);
+    }
+
+    // FL's PITCH knob and main pitch move the sounding notes too (round 167a)
+    void setChannelPitchNow (float knob, float rest) noexcept override
+    {
+        live.set (knob, rest);
+        if (plugin != nullptr)
+            plugin->followPitch (live.now());
     }
 
     void slideTo (int key, float cents, float samples) noexcept override
@@ -1606,6 +1627,7 @@ private:
     std::atomic<Setup*> incoming { nullptr }, retired { nullptr };
     std::array<std::shared_ptr<const WaveTable>, 8> warm {};
     std::atomic<float> pitchCents { 0.0f }, tempo { 125.0f };
+    LiveChannelPitch live; // (audio thread)
     std::vector<std::uint8_t> state;
     std::string dllPath;
     double rate = 44100.0, channelVol = 1.0, channelPan = 0.0;

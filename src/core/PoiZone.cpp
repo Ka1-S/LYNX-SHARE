@@ -1778,6 +1778,17 @@ public:
     };
     Engine eng;
     Slot slots[128];
+    // FL's PITCH knob and main pitch, live (round 167a): the held keys move to the channel's pitch now (at once)
+    void followPitch (float now) noexcept
+    {
+        for (auto& h : slots)
+            if (h.on)
+            {
+                h.slide.follow (now);
+                if (h.slide.jump != 0.0f)
+                    h.slide.advance (0.0f);
+            }
+    }
     bool sliding = false;
     bool panLaw = true;
     double lastLevelsVol = -1.0;
@@ -1957,7 +1968,9 @@ public:
         const auto initVol = (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0;
         const auto k = std::clamp (key, 0, 127);
         notePan[k] = nextPan;
-        plugin->noteOn (k, initVol, channelVol, std::clamp ((double) nextPan + channelPan, -1.0, 1.0), (double) pitchCents.load() + (double) nextCents);
+        const auto knob = pitchCents.load();
+        plugin->noteOn (k, initVol, channelVol, std::clamp ((double) nextPan + channelPan, -1.0, 1.0), (double) knob + (double) nextCents);
+        plugin->slots[k].slide.anchor (live.ref (knob));
         nextPan = 0.0f, nextCents = 0.0f;
     }
 
@@ -1966,6 +1979,14 @@ public:
         take();
         if (plugin != nullptr)
             plugin->noteOff (key);
+    }
+
+    // FL's PITCH knob and main pitch move the sounding notes too (round 167a)
+    void setChannelPitchNow (float knob, float rest) noexcept override
+    {
+        live.set (knob, rest);
+        if (plugin != nullptr)
+            plugin->followPitch (live.now());
     }
 
     void slideTo (int key, float cents, float samples) noexcept override
@@ -2052,6 +2073,7 @@ private:
     std::mutex buildMutex; // configure (UI thread) and prepare build plugins; the audio thread only takes them
     std::atomic<double> rate { 44100.0 }, tempo { 120.0 };
     std::atomic<float> pitchCents { 0.0f };
+    LiveChannelPitch live; // (audio thread)
     std::vector<std::uint8_t> loadedState;
     double loadedRate = 0.0;
     int loadedPoly = 0;

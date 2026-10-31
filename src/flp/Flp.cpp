@@ -32,6 +32,7 @@ enum : std::uint32_t
     evSampleRootNote = 0x87,
     evChannelFineTune = 0x8E, // REA round 151 [DATA: FL 2026's Misc › Fine tune +15 / +78 cents saved as 15 / 78]
     evFileFlags = 0xA9,
+    evAutoCrossfades = 0x2C,    // u8: Playlist "Automatic crossfades" (this project), FL 21+ (REA round 167a)
     evChannelParams = 0xD7,
     evChannelEnvelope = 0xDA,
     evPluginState = 0xD5,       // plugin blob (channel generator or slot effect)
@@ -531,6 +532,11 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
 
             case evFileFlags:
                 project.flagsA9 = e.value;
+                break;
+
+            case evAutoCrossfades: // [DECOMP] FL's saver writes the project's flag as byte event 0x2C (REA_rodada167a §3)
+                if (section == Section::global)
+                    project.autoCrossfades = e.value != 0;
                 break;
 
             case evChannelSwingMix:

@@ -1302,7 +1302,20 @@ void AudioEngine::startAudioTake()
             insert = song.mixer[(std::size_t) w.track].name.empty() ? "Insert " + juce::String (w.track)
                                                                     : juce::String::fromUTF8 (song.mixer[(std::size_t) w.track].name.c_str());
         juce::File file;
-        if (recordingSettings.trackTakeNames)
+        const auto recordTo = w.track > 0 ? juce::String::fromUTF8 (song.mixer[(std::size_t) w.track].recordTo.c_str()) : juce::String();
+        if (recordTo.isNotEmpty() && juce::File::isAbsolutePath (recordTo))
+        {
+            // FL's "Record <insert> to" file (round 167a): that file; LYNX never overwrites an earlier take, the next
+            // ones get "_2", "_3"... (its own choice)
+            const auto target = juce::File (recordTo).withFileExtension (".wav");
+            target.getParentDirectory().createDirectory();
+            const auto unique = safety::uniqueName (target.getFileNameWithoutExtension().toStdString(), [&target, &made] (const std::string& n) {
+                const auto f = target.getSiblingFile (juce::String::fromUTF8 (n.c_str()) + ".wav");
+                return f.exists() || std::any_of (made.begin(), made.end(), [&f] (const std::shared_ptr<Take>& t) { return t->file == f; });
+            });
+            file = target.getSiblingFile (juce::String::fromUTF8 (unique.c_str()) + ".wav");
+        }
+        else if (recordingSettings.trackTakeNames)
         {
             // "<Insert>_Take<N>.wav", N raised until the name is free (round 163)
             for (int n = 1; n < 100000; ++n)

@@ -40,6 +40,7 @@
 #include "core/PhysicalModels.h"
 
 #include <algorithm>
+#include <limits>
 #include <utility>
 #include <atomic>
 
@@ -1452,6 +1453,9 @@ struct SamplerVoice
     float lfoGain = 1.0f, lfoGainStep = 0.0f;
     float basePan = 0.0f;
     float cents = 0.0f; // the note's fine pitch (a VFX may move it while it sounds)
+    // the channel's pitch it started with (knob + fine tune + main pitch, cents; NaN = doesn't follow) and how far a
+    // live knob or main pitch move has taken it since (round 167a)
+    float liveRef = std::numeric_limits<float>::quiet_NaN(), liveApplied = 0.0f;
     const SampleData* data = nullptr; // this voice's sample (the chosen zone, in multi-sample)
     float zoneGain = 1.0f;
     double loopStart = 0.0, loopEnd = 0.0; // loopEnd > loopStart: the voice jumps back to the loop start
@@ -1806,6 +1810,7 @@ public:
         voicePan (clipMode ? 0.0f : nextPan, target->panL, target->panR);
         target->basePan = clipMode ? 0.0f : nextPan;
         target->cents = clipMode ? 0.0f : nextCents;
+        target->liveRef = clipMode ? std::numeric_limits<float>::quiet_NaN() : pitch.load() * 100.0f + liveRest;
 
         for (std::size_t i = 0; i < lfoTargets; ++i)
             if (lfos[i].active && ! clipMode)
@@ -1972,6 +1977,27 @@ public:
     void pitchBend (float semitones) noexcept override
     {
         bendMul = clipMode || ! std::isfinite (semitones) ? 1.0 : std::exp2 ((double) std::clamp (semitones, -48.0f, 48.0f) / 12.0);
+    }
+
+    // FL's channel PITCH knob is its pitch bend (Misc › pitch bend range): a sounding note follows it, and the main
+    // pitch (round 167a, REA_rodada167a §1). A stretched voice that keeps its length moves its transposition instead.
+    void setChannelPitchNow (float knob, float rest) noexcept override
+    {
+        liveRest = rest;
+        const auto now = knob + rest;
+        if (clipMode || ! std::isfinite (now))
+            return;
+        for (auto& v : voices)
+            if (v.active && ! std::isnan (v.liveRef))
+                if (const auto want = now - v.liveRef; want != v.liveApplied)
+                {
+                    const auto ratio = std::exp2 ((double) (want - v.liveApplied) / 1200.0);
+                    v.liveApplied = want;
+                    if (auto& ks = shifts[(std::size_t) (&v - voices.data())]; ks.on)
+                        ks.factor *= ratio;
+                    else
+                        v.rate *= ratio;
+                }
     }
 
     // a VFX changes a sounding note (round 164b): its fine pitch, pan or volume
@@ -2611,6 +2637,7 @@ private:
     std::array<float, 2 * flBlock> flX {}, flY {};
     std::array<float, flBlock> flG {};
     std::atomic<float> pitch { 0.0f }, attack { 0.0f }, decay { 0.0f }, sustain { 1.0f }, release { 0.0f }, stretchBeats { 0.0f };
+    float liveRest = std::numeric_limits<float>::quiet_NaN(); // fine tune + main pitch this block (round 167a), audio thread
     std::atomic<double> bpm { 120.0 };
     std::atomic<float> regionStart { 0.0f }, regionEnd { 1.0f };
     std::atomic<float> cutoff { 20000.0f }, resonance { 0.0f };
