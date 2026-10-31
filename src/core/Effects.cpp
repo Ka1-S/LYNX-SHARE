@@ -14,6 +14,7 @@
 #include "core/LuxeVerb.h"
 #include "core/ConvolverFx.h"
 #include "core/VintagePhaser.h"
+#include "core/EmphasisFx.h"
 #include "core/EmphasizerFx.h"
 #include "core/FlLegacyFx.h"
 #include "core/FreqShifterFl.h"
@@ -2888,6 +2889,17 @@ const EffectInfo& effectInfo (EffectKind kind)
                                                            { "Level matching", 0.0f }, { "Bypass", 0.0f }, { "Output", 1.0f } } };
             return info;
         }
+        case EffectKind::flEmphasis:
+        {
+            // FL's controls and a new instance's values (the "Default" preset)
+            static const EffectInfo info { "Emphasis", { { "Bypass", 0.0f }, { "Delta", 0.0f }, { "Envelope order", 0.0f },
+                                                         { "True peak", 0.0f }, { "Channel mode", 0.0f }, { "Mode", 0.0f },
+                                                         { "Input gain", 0.0f }, { "Linking", 1.0f }, { "Emphasis", 1.0f },
+                                                         { "Ceiling", 0.9912f }, { "Level matching", 0.0f }, { "Oversampling", 0.5f },
+                                                         { "Hardness", 7.0f / 9.0f }, { "Loudness compensation", 0.0f },
+                                                         { "Instant recovery", 1.0f }, { "DC block", 1.0f } } };
+            return info;
+        }
         case EffectKind::flFrequencyShifter:
         {
             // FL's controls and defaults (a new instance: Mix 100 %, Frequency shifter, +200 Hz in the 200 Hz range)
@@ -3562,6 +3574,8 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
             return voiceshift::paramText (param, v);
         case EffectKind::emphasizer:
             return emphasizer::paramText (param, v);
+        case EffectKind::flEmphasis:
+            return emphasis::paramText (param, v);
         case EffectKind::flFrequencyShifter:
             return fsfl::paramText (param, v);
         case EffectKind::flLowLifter:
@@ -3735,6 +3749,8 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
         return fsplit::make (slot.params);
     if (slot.kind == EffectKind::hardwareInsert) // its round trip (latency) known before the first block (round 164d)
         return std::make_unique<hwinsert::HardwareInsertFx> (&slot.params);
+    if (slot.kind == EffectKind::flEmphasis) // its look-ahead / oversampling latency known before the first block (round 167f)
+        return emphasis::make (&slot.params);
     if (slot.kind == EffectKind::flLowLifter) // its look-ahead (latency) known before the first block (round 154)
         return lowlifter::make (slot.params[4] >= 0.5f);
     if (slot.kind == EffectKind::hushDeEsser) // its look-ahead (latency) known before the first block (round 128)
@@ -3861,6 +3877,7 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::formulaController: return formula::makeEffect ({});
         case EffectKind::voiceShift: return voiceshift::make(); // round 135
         case EffectKind::emphasizer: return emphasizer::make(); // round 154
+        case EffectKind::flEmphasis: return emphasis::make(); // round 167f
         case EffectKind::flFrequencyShifter: return fsfl::make(); // round 154
         case EffectKind::flLowLifter: return lowlifter::make(); // round 154
         case EffectKind::flPhaseInverter: return fllegacy::makePhaseInverter(); // round 165k
