@@ -713,7 +713,7 @@ bool frequencyShifter (const std::vector<std::uint8_t>& d, EffectSlot& slot)
     return true;
 }
 
-bool emphasis (const std::vector<std::uint8_t>& d, EffectSlot& slot)
+bool emphasisApprox (const std::vector<std::uint8_t>& d, EffectSlot& slot)
 {
     if (d.size() < 4 + 13 * 4)
         return false;
@@ -1556,7 +1556,7 @@ std::optional<EffectSlot> effectFromFl (const std::string& pluginName, const std
     else if (is ("Frequency Shifter"))
         frequencyShifter (state, slot);
     else if (is ("Emphasis"))
-        emphasis (state, slot);
+        emphasisApprox (state, slot);
     else if (is ("Low Lifter"))
         lowLifter (state, slot);
     else if (is ("Fruity Send"))
