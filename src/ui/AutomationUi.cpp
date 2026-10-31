@@ -9,6 +9,7 @@
 #include "core/VoltageController.h"
 #include "core/XyController.h"
 #include "core/MidiControls.h"
+#include "core/MidiOut.h"
 #include "core/FlSynths.h"
 #include "engine/Text.h"
 #include "core/EditorGestures.h"
@@ -734,6 +735,14 @@ juce::String describeAutomationTarget (AudioEngine& engine, const AutomationTarg
                      && song.channels[(std::size_t) t.index].instrument == InstrumentKind::sampler && t.param >= 0
                      && t.param < samplerparam::count) // (issue #12)
                 param = tr (samplerparam::name (t.param));
+            else if (t.kind == AutomationTargetKind::channelParam && t.index >= 0 && t.index < (int) song.channels.size()
+                     && song.channels[(std::size_t) t.index].instrument == InstrumentKind::midiOut && t.param >= 0
+                     && t.param <= midiout::controlCount) // (round 167i)
+            {
+                const auto ms = midiout::stateOf (song.channels[(std::size_t) t.index].pluginState);
+                const auto l = t.param == midiout::programParam ? std::string() : midiout::label (ms.controls[(std::size_t) (t.param - 1)]);
+                param = t.param == midiout::programParam ? tr ("Patch") : l.empty() ? tr ("Control {0}", { juce::String (t.param) }) : utf8 (l);
+            }
             else if (t.kind == AutomationTargetKind::effectParam && t.index < (int) song.mixer.size()
                      && t.slot < (int) song.mixer[(std::size_t) t.index].effects.size())
             {

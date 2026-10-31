@@ -3,6 +3,10 @@
 #include <algorithm>
 
 #include "core/ControlSurface.h"
+#include "core/FlSynths.h"
+#include "core/FruityDance.h"
+#include "core/MidiControls.h"
+#include "core/SoundFont.h"
 #include "core/NativeEngines.h"
 #include "core/Preferences.h"
 #include "core/ProjectContents.h"
@@ -13,63 +17,77 @@
 #include "ui/ChannelRackComponent.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
+#include "ui/PluginWindow.h"
 
 namespace lynx::quickpick
 {
-std::vector<GeneratorEntry> generatorEntries (AudioEngine& engine)
+std::vector<GeneratorEntry> generatorEntries (AudioEngine& engine, bool withUnavailable)
 {
     std::vector<GeneratorEntry> out;
-    auto add = [&out] (std::string english, juce::String label, juce::String detail, int folder, std::function<std::optional<ChannelDef>()> make) {
-        out.push_back ({ "lynx:gen:" + english, std::move (label), std::move (detail), folder, std::move (make) });
+    auto add = [&out] (std::string english, juce::String label, juce::String detail, int folder, int section, InstrumentKind kind,
+                       std::function<std::optional<ChannelDef>()> make) {
+        out.push_back ({ "lynx:gen:" + english, std::move (label), std::move (detail), folder, std::move (make), section, kind });
     };
-
-    const std::pair<InstrumentKind, const char*> builtIn[] = { { InstrumentKind::synth, TR_NOOP ("Synth") }, { InstrumentKind::kick, TR_NOOP ("Kick") },
-                                                               { InstrumentKind::snare, TR_NOOP ("Snare") }, { InstrumentKind::hat, TR_NOOP ("Hat") },
-                                                               { InstrumentKind::clap, TR_NOOP ("Clap") } };
-    for (const auto& [kind, name] : builtIn)
-        add (name, tr (name), tr ("built-in"), 0, [kind = kind, english = std::string (name)] {
+    // a built-in whose channel is `kind` with the English name; `setup` fills its state
+    auto builtIn = [&add] (const char* english, juce::String label, int section, InstrumentKind kind, std::function<void (ChannelDef&)> setup = nullptr) {
+        add (english, std::move (label), tr ("built-in"), 0, section, kind, [kind, name = std::string (english), setup] {
             ChannelDef c;
-            c.name = english;
+            c.name = name;
             c.instrument = kind;
+            if (setup)
+                setup (c);
             return std::optional<ChannelDef> (c);
         });
-    // FL's Layer and Dashboard (round 164)
-    add ("Layer", tr ("Layer"), tr ("built-in"), 0, [] {
-        ChannelDef c;
-        c.name = "Layer";
-        c.instrument = InstrumentKind::layer;
-        return std::optional<ChannelDef> (c);
-    });
-    add ("Dashboard", "Dashboard", tr ("built-in"), 0, [] {
-        ChannelDef c;
-        c.name = "Dashboard";
-        c.instrument = InstrumentKind::dashboard;
-        c.patcher.surface = surface::starterControls();
-        return std::optional<ChannelDef> (c);
-    });
-    add ("Voltage Controller", "Voltage Controller", tr ("built-in"), 0, [] {
-        ChannelDef c;
-        c.name = "Voltage Controller";
-        c.instrument = InstrumentKind::voltage;
-        c.pluginState = voltage::write (voltage::Settings {});
-        return std::optional<ChannelDef> (c);
-    });
-    add ("Fruity Video Player", "Fruity Video Player", tr ("built-in"), 0, [] {
-        ChannelDef c;
-        c.name = "Fruity Video Player";
-        c.instrument = InstrumentKind::videoplayer;
-        c.pluginState = video::write (video::Settings {});
-        return std::optional<ChannelDef> (c);
-    });
+    };
 
+    // the first block, FL's menu order (Kick … Synth)
+    builtIn (TR_NOOP ("Kick"), tr ("Kick"), 0, InstrumentKind::kick);
+    builtIn (TR_NOOP ("Snare"), tr ("Snare"), 0, InstrumentKind::snare);
+    builtIn (TR_NOOP ("Hat"), tr ("Hat"), 0, InstrumentKind::hat);
+    builtIn (TR_NOOP ("Clap"), tr ("Clap"), 0, InstrumentKind::clap);
+    builtIn (TR_NOOP ("Synth"), tr ("Synth"), 0, InstrumentKind::synth);
+
+    // built-in controllers and tools (rounds 133–165): no sound of their own
+    builtIn (TR_NOOP ("Envelope Controller"), tr ("Envelope Controller"), 1, InstrumentKind::controller,
+             [] (ChannelDef& c) { c.controllerState = writeEnvelopeController (defaultEnvelopeController()); });
+    add ("MIDI Out", tr ("MIDI Out"), tr ("built-in"), 0, 1, InstrumentKind::midiOut, [&engine] {
+        ChannelDef c;
+        c.name = "MIDI Out";
+        c.instrument = InstrumentKind::midiOut;
+        // FL gives each new MIDI Out the next MIDI channel, skipping the drum channel 10 (REA_rodada16 §1.1)
+        int count = 0;
+        for (const auto& ch : engine.getSong().channels)
+            count += ch.instrument == InstrumentKind::midiOut;
+        midictl::MidiOutSettings settings;
+        settings.channel = count % 15 >= 9 ? count % 15 + 1 : count % 15;
+        midictl::writeMidiOut (c.pluginState, settings);
+        return std::optional<ChannelDef> (c);
+    });
+    builtIn (TR_NOOP ("Layer"), tr ("Layer"), 1, InstrumentKind::layer);
+    builtIn ("Dashboard", "Dashboard", 1, InstrumentKind::dashboard, [] (ChannelDef& c) { c.patcher.surface = surface::starterControls(); });
+    builtIn ("Voltage Controller", "Voltage Controller", 1, InstrumentKind::voltage,
+             [] (ChannelDef& c) { c.pluginState = voltage::write (voltage::Settings {}); });
+    builtIn ("Fruity Dance", "Fruity Dance", 1, InstrumentKind::fruitydance, [] (ChannelDef& c) { c.pluginState = dance::toState (dance::Settings {}); });
+    builtIn ("Fruity Video Player", "Fruity Video Player", 1, InstrumentKind::videoplayer,
+             [] (ChannelDef& c) { c.pluginState = video::write (video::Settings {}); });
+    builtIn ("Patcher", tr ("Patcher"), 2, InstrumentKind::patcher);
+    add ("LYNX Soundfont", "LYNX Soundfont", tr ("built-in"), 0, 2, InstrumentKind::soundfont, [] { return std::optional<ChannelDef> (sf::makeChannel()); });
+
+    // FL's own instrument engines (round 142)
     const auto& fl = flStudioAccess();
     for (const auto& e : natives::instrumentEngines())
-        if (natives::available (e, fl))
-            add (e.name, flEngineName (e), tr ("built-in FL engine"), 1, [kind = e.kind] { return natives::makeChannel (kind, flStudioAccess()); });
+    {
+        const auto available = natives::available (e, fl);
+        if (available || withUnavailable)
+        {
+            add (e.name, flEngineName (e), tr ("built-in FL engine"), 1, 1, e.kind, [kind = e.kind] { return natives::makeChannel (kind, flStudioAccess()); });
+            out.back().available = available;
+        }
+    }
 
     // FL's VFX note processors (round 164b): channels with no sound, they play other channels / Patcher nodes
     for (const auto kind : vfx::allKinds)
-        add (vfx::flName (kind), vfx::flName (kind), tr ("built-in"), 2, [kind] {
+        add (vfx::flName (kind), vfx::flName (kind), tr ("built-in"), 2, 1, InstrumentKind::vfx, [kind] {
             ChannelDef c;
             vfx::makeChannel (c, kind);
             return std::optional<ChannelDef> (c);
@@ -88,7 +106,7 @@ std::vector<GeneratorEntry> generatorEntries (AudioEngine& engine)
                                 c.plugin.id = id;
                                 c.plugin.name = name;
                                 return std::optional<ChannelDef> (c);
-                            } });
+                            }, 1, InstrumentKind::plugin });
         }
     return out;
 }
@@ -121,6 +139,55 @@ std::vector<EffectEntry> effectEntries (AudioEngine& engine)
                             } });
         }
     return out;
+}
+
+void addGeneratorMenu (juce::PopupMenu& menu, AudioEngine& engine, std::function<void (ChannelDef)> pick,
+                       std::function<void()> chooseSample, const ChannelDef* current, juce::Component* owner)
+{
+    const auto entries = generatorEntries (engine, true);
+    auto item = [&] (juce::PopupMenu& m, const GeneratorEntry& e) {
+        // the channel's own generator is ticked (only kinds with one entry: the VFX and FL engines share kinds / names)
+        const auto own = current != nullptr && current->instrument == e.kind && e.folder == 0 && e.kind != InstrumentKind::controller;
+        m.addItem (shownName (engine, e.key, e.label), e.available, own, [make = e.make, pick] {
+            if (auto c = make())
+                pick (std::move (*c));
+            else
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("FL engines"),
+                                                        tr ("This engine needs the data files of an FL Studio installation, which were not found or could not be read."));
+        });
+    };
+    auto section = [&] (int s) {
+        for (const auto& e : entries)
+            if (e.folder == 0 && e.section == s)
+                item (menu, e);
+    };
+    auto folder = [&] (int f, const juce::String& name) {
+        juce::PopupMenu sub;
+        for (const auto& e : entries)
+            if (e.folder == f)
+                item (sub, e);
+        if (sub.getNumItems() > 0)
+            menu.addSubMenu (name, sub);
+    };
+
+    section (0);
+    menu.addSeparator();
+    section (1);
+    folder (1, tr ("FL engines"));
+    folder (2, tr ("VFX (note effects)"));
+    section (2);
+    menu.addSeparator();
+    if (chooseSample)
+        menu.addItem (tr ("Sampler (choose file)..."), chooseSample);
+    juce::PopupMenu plugins;
+    addPluginItems (plugins, engine, true, [pick] (PluginRef ref) {
+        ChannelDef c;
+        c.name = ref.name;
+        c.instrument = InstrumentKind::plugin;
+        c.plugin = ref;
+        pick (std::move (c));
+    }, owner, pick);
+    menu.addSubMenu (tr ("Plugin (VST/VST3/CLAP)"), plugins);
 }
 
 juce::String shownName (AudioEngine& engine, const std::string& key, const juce::String& original)

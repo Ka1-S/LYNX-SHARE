@@ -1,5 +1,7 @@
 #include "core/MidiControls.h"
 
+#include "core/MidiOut.h"
+
 #include <algorithm>
 #include <cstring>
 
@@ -101,55 +103,35 @@ std::string paramName (int param)
         return "MIDI Channel " + std::to_string (param - pitchBendBase + 1) + " Pitch Bend";
     return {};
 }
-namespace
-{
-std::int32_t i32At (const std::vector<std::uint8_t>& d, std::size_t at) noexcept
-{
-    std::int32_t v = 0;
-    if (at + 4 <= d.size())
-        std::memcpy (&v, d.data() + at, 4);
-    return v;
-}
-
-void putAt (std::vector<std::uint8_t>& d, std::size_t at, std::int32_t v)
-{
-    std::memcpy (d.data() + at, &v, 4);
-}
-
-constexpr std::size_t headerSize = 30 + 73 * 4; // up to the 72 control values
-} // namespace
-
 MidiOutSettings parseMidiOut (const std::vector<std::uint8_t>& d) noexcept
 {
     MidiOutSettings s;
-    if (d.size() < 28)
-        return s;
-    s.channel = std::clamp (i32At (d, 4), 0, 15);
-    s.bankMsb = std::clamp (i32At (d, 12), -1, 127);
-    s.bankLsb = std::clamp (i32At (d, 16), -1, 127);
-    s.port = std::clamp (i32At (d, 24), 0, 255);
-    if (d.size() >= 34)
-        s.program = std::clamp (i32At (d, 30), 0, 128);
+    try
+    {
+        if (const auto state = midiout::parse (d))
+        {
+            s.channel = state->channel;
+            s.port = state->port;
+            s.program = state->program;
+            s.bankMsb = state->bankMsb;
+            s.bankLsb = state->bankLsb;
+        }
+    }
+    catch (...)
+    {
+    }
     return s;
 }
 
 void writeMidiOut (std::vector<std::uint8_t>& d, const MidiOutSettings& s)
 {
-    if (d.size() < headerSize)
-    {
-        // FL's version 7 with no custom controls (0xFF ends the definitions) — LYNX reads only the header
-        std::vector<std::uint8_t> fresh (headerSize, 0);
-        putAt (fresh, 0, 7);
-        putAt (fresh, 8, -1);
-        putAt (fresh, 20, 0);
-        fresh[28] = 1; // "Send pan, volume and pitch"
-        fresh.push_back (0xFF);
-        d = std::move (fresh);
-    }
-    putAt (d, 4, std::clamp (s.channel, 0, 15));
-    putAt (d, 12, std::clamp (s.bankMsb, -1, 127));
-    putAt (d, 16, std::clamp (s.bankLsb, -1, 127));
-    putAt (d, 24, std::clamp (s.port, 0, 255));
-    putAt (d, 30, std::clamp (s.program, 0, 128));
+    // (the whole FL state is kept: controls, pages, options; round 167i)
+    auto state = midiout::stateOf (d);
+    state.channel = std::clamp (s.channel, 0, 15);
+    state.port = std::clamp (s.port, 0, 255);
+    state.program = std::clamp (s.program, 0, 128);
+    state.bankMsb = std::clamp (s.bankMsb, -1, 127);
+    state.bankLsb = std::clamp (s.bankLsb, -1, 127);
+    d = midiout::write (state);
 }
 } // namespace lynx::midictl

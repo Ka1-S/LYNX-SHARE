@@ -11,6 +11,7 @@
 #include "core/Vfx.h"
 #include "core/FacetEq.h"
 #include "core/MidiControls.h"
+#include "core/MidiOut.h"
 #include "core/Patcher.h"
 #include "core/LoadTrace.h"
 #include "core/DynamicsSuite.h"
@@ -790,6 +791,7 @@ void RackState::buildMidiRoutes()
     vfxChannels.clear();
     portEventChannels.clear();
     dashboardChannels.clear();
+    mapNoteColour.assign (count, 0);
     vfxPort.assign (count, -1);
     hasMidiRoutes = false;
     midiOutTargets.assign (count, {});
@@ -912,8 +914,11 @@ void RackState::buildMidiRoutes()
         }
         if (song.channels[c].instrument != InstrumentKind::midiOut)
             continue;
-        const auto settings = midictl::parseMidiOut (song.channels[c].pluginState);
+        // its knobs' MIDI (round 167i) goes out like a Dashboard's
+        const auto settings = midiout::stateOf (song.channels[c].pluginState);
         midiOutChannel[c] = settings.channel;
+        mapNoteColour[c] = settings.mapNoteColour ? 1 : 0;
+        dashboardChannels.push_back ((int) c);
         send (c, settings.port, settings.channel, 0);
     }
 }
@@ -988,7 +993,8 @@ void RackState::buildAutomationTables()
                                   || song.channels[(std::size_t) t.index].instrument == InstrumentKind::patcher // (its published parameters)
                                   || song.channels[(std::size_t) t.index].instrument == InstrumentKind::slayer
                                   || song.channels[(std::size_t) t.index].instrument == InstrumentKind::soundfont // (LYNX Soundfont's knobs)
-                                  || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::midiOut && midictl::isMidiParam (t.param))
+                                  || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::midiOut
+                                      && (midictl::isMidiParam (t.param) || (t.param >= 0 && t.param <= midiout::controlCount)))
                                   // a recorded / drawn pitch bend plays on any instrument (issue #12)
                                   || midictl::isPitchBend (t.param)
                                   // an Envelope Controller's global Mod X / Y (round 164f)
@@ -1710,8 +1716,11 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
             {
                 if (route.other != e.channel || (e.port >= 0 && route.port != e.port) || (e.port < 0 && route.portOnly))
                     continue;
-                // (a VFX channel's voice keeps its colour as the MIDI channel)
-                const auto midiChannel = e.port >= 0 ? (int) e.colour : route.midiChannel;
+                // (a VFX channel's voice keeps its colour as the MIDI channel; so does a MIDI Out's note with "Map note
+                // color to MIDI channel", round 167i)
+                const auto midiChannel = e.port >= 0 || ((std::size_t) e.channel < state.mapNoteColour.size() && state.mapNoteColour[(std::size_t) e.channel] != 0)
+                                             ? (int) (e.colour & 15)
+                                             : route.midiChannel;
                 if (e.type == NoteEvent::Type::voiceProp) // (round 165c: outside a Patcher too)
                     instrument.voicePropertyPort (route.port, e.key, e.prop, e.velocity, midiChannel);
                 else if (e.type == NoteEvent::Type::on)
@@ -2189,34 +2198,12 @@ void RackRenderer::process (const RackState* state,
                 echo->reset();
     }
 
-    // FL's MIDI Out sends its bank and program when playback starts (REA_rodada16 §1.3)
-    if (playing && ! wasPlaying && state->hasMidiRoutes)
-        for (std::size_t c = 0; c < state->midiTargets.size(); ++c)
-        {
-            if (state->midiTargets[c].empty() || state->song.channels[c].instrument != InstrumentKind::midiOut) // (a Dashboard sends its own)
-                continue;
-            const auto s = midictl::parseMidiOut (state->song.channels[c].pluginState);
-            const auto status = (std::uint8_t) (s.channel & 15);
-            for (const auto t : state->midiTargets[c])
-            {
-                auto& target = *state->instruments[(std::size_t) t];
-                if (s.bankMsb >= 0)
-                {
-                    const std::uint8_t m[3] { (std::uint8_t) (0xB0 | status), 0, (std::uint8_t) s.bankMsb };
-                    target.midiMessage (m, 3);
-                }
-                if (s.bankLsb >= 0)
-                {
-                    const std::uint8_t m[3] { (std::uint8_t) (0xB0 | status), 32, (std::uint8_t) s.bankLsb };
-                    target.midiMessage (m, 3);
-                }
-                if (s.program > 0)
-                {
-                    const std::uint8_t m[2] { (std::uint8_t) (0xC0 | status), (std::uint8_t) (s.program - 1) };
-                    target.midiMessage (m, 2);
-                }
-            }
-        }
+    // FL resets its generators when playback starts: a MIDI Out sends its bank, patch and controls again
+    // (REA_rodada167i §1.4)
+    if (playing && ! wasPlaying)
+        for (std::size_t c = 0; c < state->song.channels.size() && c < state->instruments.size(); ++c)
+            if (state->song.channels[c].instrument == InstrumentKind::midiOut && state->instruments[c] != nullptr)
+                state->instruments[c]->transportStarted();
 
     // started playing or jumped: audio clips in progress must start mid-way
     resumeAudio = playing && (! wasPlaying || jumped);
@@ -2278,10 +2265,11 @@ void RackRenderer::process (const RackState* state,
                     if (! route.portOnly && route.other < (int) state->instruments.size() && state->instruments[(std::size_t) route.other] != nullptr)
                     {
                         auto& target = *state->instruments[(std::size_t) route.other];
+                        const auto midiChannel = state->mapNoteColour[(std::size_t) e.channel] != 0 ? (int) (e.colour & 15) : route.midiChannel;
                         if (e.type == NoteEvent::Type::on)
-                            target.noteOnPort (route.port, e.key, e.velocity, route.midiChannel);
+                            target.noteOnPort (route.port, e.key, e.velocity, midiChannel);
                         else if (e.type == NoteEvent::Type::off)
-                            target.noteOffPort (route.port, e.key, route.midiChannel);
+                            target.noteOffPort (route.port, e.key, midiChannel);
                     }
             // and the mixer-slot Patchers on its port (round 162)
             // (notes that go through the channel's note path reach them in processChunk)
@@ -2798,7 +2786,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     {
         if ((std::size_t) c >= state.instruments.size() || state.instruments[(std::size_t) c] == nullptr)
             continue;
-        std::array<std::uint32_t, 192> sent;
+        std::array<std::uint32_t, midiout::maxResetMessages + 8> sent; // (a MIDI Out's reset: every active control at once)
         const auto count = state.instruments[(std::size_t) c]->takeMidiMessages (sent.data(), (int) sent.size());
         if (count <= 0 || (std::size_t) c >= state.midiTargets.size())
             continue;

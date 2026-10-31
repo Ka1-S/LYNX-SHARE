@@ -4,6 +4,7 @@
 #include "core/VoltageController.h"
 #include "core/Vfx.h"
 #include "core/VideoPlayer.h"
+#include "core/MidiOut.h"
 #include "core/Scheduler.h"
 #include "core/ClipOps.h"
 
@@ -3062,7 +3063,9 @@ std::unique_ptr<Instrument> makeInstrument (InstrumentKind kind, std::shared_ptr
 {
     if (kind == InstrumentKind::controller)
         return std::make_unique<ControllerInstrument>();
-    if (kind == InstrumentKind::midiOut || kind == InstrumentKind::layer) // (a Layer's notes go to its children)
+    if (kind == InstrumentKind::midiOut) // its knobs, patch and bank as MIDI messages (round 167i)
+        return midiout::makeInstrument();
+    if (kind == InstrumentKind::layer) // (a Layer's notes go to its children)
         return std::make_unique<MidiOutInstrument>();
     if (kind == InstrumentKind::dashboard) // its controls' values as control outputs (round 164)
         return surface::makeDashboard();

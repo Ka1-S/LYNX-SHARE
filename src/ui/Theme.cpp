@@ -682,37 +682,11 @@ void LookAndFeel::positionComboBoxText (juce::ComboBox& box, juce::Label& label)
 
 void LookAndFeel::preparePopupMenuWindow (juce::Component& window)
 {
+    // A submenu opens where JUCE puts it: right beside the item that opened it, at the item's height (flipped to the
+    // left / moved up only when it does not fit on the screen). Issue #18: moving it beside the whole parent window
+    // (0.1.19…0.1.21) put a two-column menu's other column between the item and its submenu, and the mouse crossing
+    // that column opened the other items' submenus on the way.
     juce::LookAndFeel_V4::preparePopupMenuWindow (window);
-
-    // JUCE places a submenu next to its item, so an item in the first column of a two-column menu opens its submenu
-    // over the second column; JUCE's menu windows then both claim the click (on Linux the click is lost, on every
-    // system the submenu hides half of its parent). Move the submenu beside the whole parent window instead.
-    static std::vector<juce::Component::SafePointer<juce::Component>> menus;
-    menus.erase (std::remove_if (menus.begin(), menus.end(), [] (const auto& m) { return m == nullptr || ! m->isVisible(); }), menus.end());
-
-    if (window.isOnDesktop())
-    {
-        auto bounds = window.getBounds();
-        for (const auto& menu : menus)
-        {
-            if (menu == nullptr || menu.getComponent() == &window || ! menu->isOnDesktop()
-                || std::abs (menu->getDesktopScaleFactor() - window.getDesktopScaleFactor()) > 0.001f)
-                continue;
-            const auto other = menu->getBounds();
-            if (! other.intersects (bounds))
-                continue;
-            const auto scale = juce::jmax (0.01f, window.getDesktopScaleFactor() / juce::Desktop::getInstance().getGlobalScaleFactor());
-            const auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect (other * scale);
-            const auto area = display != nullptr ? (display->userArea / scale).toNearestInt() : other.expanded (10000);
-            if (other.getRight() + bounds.getWidth() <= area.getRight())
-                bounds.setX (other.getRight());
-            else if (other.getX() - bounds.getWidth() >= area.getX())
-                bounds.setX (other.getX() - bounds.getWidth());
-        }
-        if (bounds != window.getBounds())
-            window.setBounds (bounds);
-    }
-    menus.push_back (&window);
 }
 
 void LookAndFeel::drawPopupMenuBackground (juce::Graphics& g, int width, int height)
