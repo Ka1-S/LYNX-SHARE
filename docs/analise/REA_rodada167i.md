@@ -112,8 +112,20 @@ version-7 writer and its `.fst` keep everything.
   Replace keeps the channel's place, name and mixer insert (`replaceGenerator`). The submenu relocation is gone:
   JUCE opens a submenu right beside its item and flips it only when it does not fit the screen.
 
+## Verification
+
+- [TEST] core suite with FL's data folder: 1,889,373 checks, 0 failures (new: `tests/MidiOut167iTests.inc`, 7 tests;
+  `Feat133Tests` now expects FL's reset at playback start).
+- [GUI, Windows, real mouse, 1920×1080, fresh profile, LYNX_TEST_MODE] screenshots in
+  `E:\lynx-work\midiout167\s\`: `a3` Replace › opens beside its item with the full list, Kick ticked; `a4` Kick
+  replaced by MIDI Out, its editor; `a5`–`a6` FL's 41 presets, "Nord Lead 2" loaded (pages, names, ranges);
+  `a7`–`a8` knob menu (Configure..., automation / remote items) and the Configure window; `a9` a label click
+  activates (bold), Options menu with FL's "On reset" ticks; `b1`–`b2` "+ add channel" = the same list, FL engines ›
+  beside its item; `b5`–`b7` Channel Rack at the screen's bottom-right corner: Replace › moves up to stay on screen,
+  still beside the item, and a click on an item that overlaps the parent menu works (Layer created).
+
 ## Where I stopped
 
-- Code: MidiOut core + editor + import + menus done; core tests building (fast lane).
-- Next: Windows build, GUI screenshots (Insert / Replace submenus at 1920×1080 and a small window, the MIDI Out
-  editor), land.
+- Done: MIDI Out core + editor + import, one generator list, submenu placement; tests and Windows build green.
+- Left: the Patcher's "Add" menu and the quick-add palette keep their own generator lists (Patcher adds the
+  Keyboard Controller, the palette searches); not part of issue #18's Channel Rack menus.
