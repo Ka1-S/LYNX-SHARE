@@ -589,6 +589,10 @@ juce::var effectToVar (const EffectSlot& slot)
         e->setProperty ("sidechain", slot.sidechain);
     if (slot.sidechain2 >= 0)
         e->setProperty ("sidechain2", slot.sidechain2);
+    if (slot.sendTracks[0] > 0) // a Transmitter's transient / sustain sends (round 167b)
+        e->setProperty ("sendTransient", slot.sendTracks[0]);
+    if (slot.sendTracks[1] > 0)
+        e->setProperty ("sendSustain", slot.sendTracks[1]);
     if (! slot.state.empty()) // FL's raw state of an exact effect (Vocodex), base64
         e->setProperty ("state", juce::Base64::toBase64 (slot.state.data(), slot.state.size()));
     if (! slot.samplePath.empty()) // Newtone / Newtime source sample
@@ -678,6 +682,8 @@ std::optional<EffectSlot> effectFromVar (const juce::var& e)
         slot.substituteFor = pluginFromVar (e["substituteFor"]);
     slot.sidechain = juce::jlimit (-1, maxMixerTracks - 1, (int) e.getProperty ("sidechain", -1));
     slot.sidechain2 = juce::jlimit (-1, maxMixerTracks - 1, (int) e.getProperty ("sidechain2", -1));
+    slot.sendTracks[0] = juce::jlimit (0, maxMixerTracks - 1, (int) e.getProperty ("sendTransient", 0));
+    slot.sendTracks[1] = juce::jlimit (0, maxMixerTracks - 1, (int) e.getProperty ("sendSustain", 0));
     slot.samplePath = e.getProperty ("sample", "").toString().toStdString();
     slot.presetName = e.getProperty ("preset", "").toString().toStdString();
     if (auto* other = e["abOther"].getArray())

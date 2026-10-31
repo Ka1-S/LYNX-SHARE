@@ -150,7 +150,7 @@ const std::vector<EffectEngine>& effectEngines()
         { EffectKind::squeeze, "Fruity Squeeze", own, false },
         { EffectKind::rhythmGain, "", own, false },
         { EffectKind::newtone, "", own, false }, // out of beta in round 165g (REA_rodada165g-flnewt165)
-        { EffectKind::newtime, "", own, true },
+        { EffectKind::newtime, "", own, false }, // out of beta in round 167b (REA_rodada167b)
     };
     return list;
 }

@@ -94,7 +94,7 @@ class NewtoneEditor final : public juce::Component,
 public:
     NewtoneEditor (AudioEngine& e, int t, int s) : engine (e), track (t), slot (s)
     {
-        for (auto* b : { &load, &analyse, &cutMode, &snapAll, &reset, &preview, &save, &scoreButton, &stretch })
+        for (auto* b : { &load, &analyse, &cutMode, &snapAll, &reset, &preview, &save, &scoreButton, &stretch, &snapButton, &toPlaylist })
         {
             addAndMakeVisible (*b);
             b->setWantsKeyboardFocus (false);
@@ -122,6 +122,13 @@ public:
         load.setTooltip (tr ("Choose the audio file to edit (WAV, AIFF, FLAC, OGG, MP3)"));
         analyse.setTooltip (tr ("Find the notes of the sample again (discards the note edits)"));
 
+        snapButton.setButtonText (tr ("Snap"));
+        snapButton.setTooltip (tr ("Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid"));
+        toPlaylist.setButtonText (tr ("Send to Playlist"));
+        toPlaylist.setTooltip (tr ("Send to the Playlist as an audio clip"));
+        snapButton.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
+        snapButton.onClick = [this] { showSnapMenu(); };
+        toPlaylist.onClick = [this] { sendToPlaylist(); };
         load.onClick = [this] { chooseSample(); };
         analyse.onClick = [this] { reanalyse(); };
         cutMode.onClick = [this] { updateButtons(); };
@@ -299,7 +306,7 @@ public:
     {
         auto r = getLocalBounds().reduced (8);
         auto top = r.removeFromTop (26);
-        for (auto* b : { &load, &analyse, &cutMode, &snapAll, &stretch, &reset, &preview, &save, &scoreButton })
+        for (auto* b : { &load, &analyse, &cutMode, &snapAll, &stretch, &reset, &preview, &save, &toPlaylist, &scoreButton, &snapButton })
             if (b->isVisible())
             {
                 b->setBounds (top.removeFromLeft (juce::jmax (60, b->getBestWidthForHeight (26) + 14)));
@@ -496,7 +503,8 @@ public:
             const auto lo = drag.marker > 0 ? warp.markers[(std::size_t) drag.marker - 1].output + 1 : 1;
             const auto hi = drag.marker + 1 < (int) warp.markers.size() ? warp.markers[(std::size_t) drag.marker + 1].output - 1
                                                                         : (std::int64_t) (4 * frames());
-            m.output = std::clamp<std::int64_t> ((std::int64_t) std::llround (outputOfX (e.position.x)), lo, std::max (lo, hi));
+            const auto at = snapPosition ((std::int64_t) std::llround (outputOfX (e.position.x)), e.mods.isAltDown());
+            m.output = std::clamp<std::int64_t> (at, lo, std::max (lo, hi));
             drag.moved = true;
             repaint();
             return;
@@ -524,7 +532,9 @@ public:
             auto& p = notes.pitches[(std::size_t) f.note];
             if (drag.time)
             {
-                const auto dx = (std::int64_t) std::llround ((double) e.getDistanceFromDragStartX() / pixelsPerSample());
+                auto dx = (std::int64_t) std::llround ((double) e.getDistanceFromDragStartX() / pixelsPerSample());
+                if (const auto& a = *anchor; snapDivision > 0)
+                    dx = snapPosition (a.start + dx, e.mods.isAltDown()) - a.start; // the dragged note's start on the grid, the others follow
                 const auto len = f.end - f.start;
                 p.curStart = std::clamp<std::int64_t> (f.start + dx, 0, std::max<std::int64_t> (0, frames() - len));
                 p.curEnd = p.curStart + len;
@@ -636,7 +646,8 @@ private:
 
     AudioEngine& engine;
     int track, slot;
-    juce::TextButton load, analyse, cutMode, snapAll, reset, preview, save, scoreButton, stretch;
+    juce::TextButton load, analyse, cutMode, snapAll, reset, preview, save, scoreButton, stretch, snapButton, toPlaylist;
+    int snapDivision = 0; // FL's Snap to grid: beat / division, 0 = Off
     juce::ToggleButton slave;
     juce::Label status, panelTitle;
     BarSlider centreKnob, variationKnob, transitionKnob;
@@ -826,7 +837,7 @@ private:
         }
         if (warpMode())
         {
-            warp = newtonefx::parseWarp (fx->state).value_or (newtonefx::WarpMap {});
+            warp = newtonefx::warpOf (fx->state).value_or (newtonefx::WarpMap {}); // (LYNX's own, or FL's Newtime markers)
             warp.frames = frames();
         }
         else if (auto t = newtonefx::trackOf (fx->state); t && sample != nullptr)
@@ -952,6 +963,87 @@ private:
         engine.previewSample (newtonefx::renderedSource (sample, savedState), false, 0.8f);
     }
 
+    // FL's Snap to grid (Newtone / Newtime Snap menu): Beat, 1/2, 1/3, 1/4, 1/6, 1/8 beat, Off; Alt = free
+    std::int64_t snapPosition (std::int64_t position, bool free) const
+    {
+        if (free || sample == nullptr)
+            return position;
+        return newtonefx::snapToBeatGrid (position, sample->sampleRate, engine.getSong().bpm, snapDivision);
+    }
+
+    void showSnapMenu()
+    {
+        juce::PopupMenu menu;
+        menu.addSectionHeader (tr ("Snap to grid"));
+        const std::pair<int, const char*> items[] { { 1, "Beat" }, { 2, "1/2 beat" }, { 3, "1/3 beat" }, { 4, "1/4 beat" },
+                                                    { 6, "1/6 beat" }, { 8, "1/8 beat" }, { 0, "Off" } };
+        for (const auto& [division, name] : items)
+            menu.addItem (tr (name), true, snapDivision == division, [this, d = division] {
+                snapDivision = d;
+                snapButton.setToggleState (d > 0, juce::dontSendNotification);
+            });
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&snapButton));
+    }
+
+    // FL's Send to playlist as audio clip (SendToPlaylistBtnClick): the edited sample written as <sample name>.wav
+    // and placed in the Playlist as an audio clip
+    void sendToPlaylist()
+    {
+        if (sample == nullptr)
+            return;
+        const auto out = newtonefx::renderedSource (sample, savedState);
+        const juce::File src (juce::String::fromUTF8 (samplePath.c_str()));
+        const auto folder = juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile ("LYNX/Edits");
+        folder.createDirectory();
+        const auto title = src.getFileNameWithoutExtension().isNotEmpty() ? src.getFileNameWithoutExtension() : juce::String ("Dragged sample");
+        const auto file = folder.getNonexistentChildFile (juce::File::createLegalFileName (title), ".wav");
+        if (! writeWav (*out, file))
+            return;
+        const auto& song = engine.getSong();
+        const auto length = juce::jmax<std::int64_t> (ppq / 4, (std::int64_t) ((double) out->frames() / out->sampleRate * song.bpm / 60.0 * ppq));
+        const auto start = (std::int64_t) (engine.getTransport().positionTicks.load() / ppq) * ppq;
+        int lane = 0;
+        while (std::any_of (song.playlist.begin(), song.playlist.end(),
+                            [&] (const Clip& c) { return c.track == lane && c.start < start + length && c.end() > start; }))
+            ++lane;
+        const auto path = file.getFullPathName().toStdString();
+        const auto name = title.toStdString();
+        engine.editSong ([=] (Song& s) {
+            ChannelDef c;
+            c.name = name;
+            c.instrument = InstrumentKind::audioClip;
+            c.samplePath = path;
+            c.mixerTrack = s.claimFreeInsert();
+            s.channels.push_back (c);
+            Clip clip;
+            clip.kind = ClipKind::audio;
+            clip.channel = (int) s.channels.size() - 1;
+            clip.track = lane;
+            clip.start = start;
+            clip.length = length;
+            s.playlist.push_back (clip);
+        });
+        status.setText (tr ("Sent to the Playlist (track {0})", { juce::String (lane + 1) }), juce::dontSendNotification);
+    }
+
+    static bool writeWav (const SampleData& out, const juce::File& file)
+    {
+        file.deleteFile();
+        std::unique_ptr<juce::OutputStream> stream (file.createOutputStream().release());
+        juce::WavAudioFormat wav;
+        const auto channels = out.isStereo() ? 2 : 1;
+        std::unique_ptr<juce::AudioFormatWriter> writer (
+            stream != nullptr ? wav.createWriterFor (stream.get(), out.sampleRate, (unsigned int) channels, 24, {}, 0) : nullptr);
+        if (writer == nullptr)
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save"), tr ("Could not write {0}", { file.getFullPathName() }));
+            return false;
+        }
+        stream.release();
+        const float* data[2] { out.leftData(), out.isStereo() ? out.rightData() : out.leftData() };
+        return writer->writeFromFloatArrays (data, channels, (int) out.frames());
+    }
+
     void saveWav()
     {
         if (sample == nullptr)
@@ -963,21 +1055,7 @@ private:
                                   if (safe == nullptr || fc.getResult() == juce::File())
                                       return;
                                   const auto out = newtonefx::renderedSource (safe->sample, safe->savedState);
-                                  const auto file = fc.getResult().withFileExtension ("wav");
-                                  file.deleteFile();
-                                  std::unique_ptr<juce::OutputStream> stream (file.createOutputStream().release());
-                                  juce::WavAudioFormat wav;
-                                  const auto channels = out->isStereo() ? 2 : 1;
-                                  std::unique_ptr<juce::AudioFormatWriter> writer (
-                                      stream != nullptr ? wav.createWriterFor (stream.get(), out->sampleRate, (unsigned int) channels, 24, {}, 0) : nullptr);
-                                  if (writer == nullptr)
-                                  {
-                                      juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save"), tr ("Could not write {0}", { file.getFullPathName() }));
-                                      return;
-                                  }
-                                  stream.release();
-                                  const float* data[2] { out->leftData(), out->isStereo() ? out->rightData() : out->leftData() };
-                                  writer->writeFromFloatArrays (data, channels, (int) out->frames());
+                                  writeWav (*out, fc.getResult().withFileExtension ("wav"));
                               });
     }
 
@@ -1122,16 +1200,16 @@ private:
         snapAll.setVisible (! warpMode());
         scoreButton.setVisible (! warpMode());
         stretch.setVisible (warpMode());
-        for (auto* b : { &analyse, &cutMode, &snapAll, &reset, &preview, &save, &scoreButton, &stretch })
+        for (auto* b : { &analyse, &cutMode, &snapAll, &reset, &preview, &save, &scoreButton, &stretch, &toPlaylist })
             b->setEnabled (has);
         load.setEnabled (validSlot());
         slave.setEnabled (validSlot());
         preview.setButtonText (previewing ? tr ("Stop") : tr ("Preview"));
-        juce::String text = warpMode() ? tr ("(beta) LYNX SHARE's own time engine; FL's own warping is not reproduced exactly") : juce::String();
+        juce::String text;
         if (sample != nullptr)
         {
             const juce::File f (juce::String::fromUTF8 (samplePath.c_str()));
-            text = (warpMode() ? text + "  ·  " : juce::String()) + f.getFileName() + "  ·  " + juce::String ((double) frames() / sample->sampleRate, 2) + " s  ·  ";
+            text = f.getFileName() + "  ·  " + juce::String ((double) frames() / sample->sampleRate, 2) + " s  ·  ";
             text += warpMode() ? tr ("{0} warp markers. Double-click: add a marker, drag it to move that point, right-click: remove", { juce::String ((int) warp.markers.size()) })
                     : cutMode.getToggleState()
                         ? tr ("{0} notes. Cut mode: click a note to slice it, Ctrl+click to glue it to the one before (C: leave)", { juce::String ((int) notes.pitches.size()) })

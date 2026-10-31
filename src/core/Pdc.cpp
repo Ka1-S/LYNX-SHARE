@@ -60,12 +60,13 @@ PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, co
     };
 
     // the latency of a Fruity Send slot's signal: the insert's input plus the enabled slots before it
-    auto tapLatency = [&] (int t, int slot) {
+    auto tapLatency = [&] (int t, int slot, bool afterSlot = false) {
         int sum = plan.inAlign[(std::size_t) t];
         if (t < (int) slotLatency.size())
         {
             const auto& slots = song.mixer[(std::size_t) t].effects;
-            for (int s = 0; s < slot && s < (int) slots.size() && s < (int) slotLatency[(std::size_t) t].size(); ++s)
+            const auto end = afterSlot ? slot + 1 : slot; // (a Transmitter's sends leave after its own latency)
+            for (int s = 0; s < end && s < (int) slots.size() && s < (int) slotLatency[(std::size_t) t].size(); ++s)
                 if (song.slotActive (slots[(std::size_t) s]))
                     sum += std::max (0, slotLatency[(std::size_t) t][(std::size_t) s]);
         }
@@ -90,8 +91,8 @@ PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, co
                 plan.inAlign[(std::size_t) s.target] = std::max (plan.inAlign[(std::size_t) s.target], plan.outLat[(std::size_t) t]);
 
         // Fruity Send slots leave the chain after the slots before them
-        for (const auto& [slot, target] : fruitySendsOf (song, t))
-            plan.inAlign[(std::size_t) target] = std::max (plan.inAlign[(std::size_t) target], tapLatency (t, slot));
+        for (const auto& tap : fruitySendsOf (song, t))
+            plan.inAlign[(std::size_t) tap.target] = std::max (plan.inAlign[(std::size_t) tap.target], tapLatency (t, tap.slot, tap.afterSlot));
     }
 
     plan.outLat[0] = plan.inAlign[0] + effectsLatency (0) + manual (0);
@@ -120,7 +121,7 @@ PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, co
         }
 
         for (std::size_t j = 0; j < taps.size(); ++j)
-            delays[1 + track.sends.size() + j] = std::max (0, plan.inAlign[(std::size_t) taps[j].second] - tapLatency (t, taps[j].first));
+            delays[1 + track.sends.size() + j] = std::max (0, plan.inAlign[(std::size_t) taps[j].target] - tapLatency (t, taps[j].slot, taps[j].afterSlot));
     }
 
     return plan;

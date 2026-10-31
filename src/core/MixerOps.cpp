@@ -52,6 +52,9 @@ void remapTrackReferences (Song& song, Map&& map)
                 slot.sidechain = map (slot.sidechain);
             if (slot.sidechain2 > 0)
                 slot.sidechain2 = map (slot.sidechain2);
+            for (auto& send : slot.sendTracks)
+                if (send > 0)
+                    send = map (send);
         });
     }
 
@@ -165,6 +168,9 @@ bool deleteTrack (Song& song, int t)
                 slot.sidechain = 0;
             if (slot.sidechain2 == t)
                 slot.sidechain2 = 0;
+            for (auto& send : slot.sendTracks)
+                if (send == t)
+                    send = 0;
         });
     }
 
