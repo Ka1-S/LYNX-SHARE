@@ -13,6 +13,10 @@
 #include <iterator>
 #include <map>
 #include <mutex>
+#ifdef LYNX_KEPLER_TRACE
+#include <cstdio>
+#include <cstdlib>
+#endif
 
 #include "core/Sha256.h"
 #include "core/Song.h"
@@ -298,6 +302,10 @@ void engineSinCos (float x, float& s, float& c) noexcept
 
 // --------------------------------------------------------------------------------------------- installation data (§2)
 constexpr const char* engineSha256 = "baf37a1d8266aaafc55016de259be4b95f1a136a1fc13ba97514c72e2afc63ab";
+// Kepler Exo's engine (Plugins\Fruity\Generators\Kepler Exo\engine_x64.dll, REA_rodada167d): the same render code with
+// its own parameter setters, defaults and state loader; the shape and noise tables at the same addresses, the library's
+// 2^(j/64) tables 0x70 bytes higher
+constexpr const char* exoEngineSha256 = "10ed2464e1074934c57ad98d89ef3bb235da38ea8df150b3ff18564262a25d6c";
 constexpr int lfoPoints = 2170;
 constexpr int noisePoints = 0xA6905;
 
@@ -306,6 +314,7 @@ struct Tables
     std::array<float, lfoPoints + 1> lfo {};  // LFO1 shape, −1…1, wrap point appended
     std::vector<std::int16_t> noise;          // noise oscillator
     std::vector<float> blit;                  // band-limited impulse rows (1025 × 32, §3.2)
+    bool exo = false;                         // read from Kepler Exo's engine
 };
 
 std::vector<float> blitRows()
@@ -373,7 +382,11 @@ std::shared_ptr<const Tables> loadTables (const std::string& path)
     if (! in)
         return nullptr;
     const std::vector<std::uint8_t> b ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
-    if (b.size() < 0x1000 || sha256Hex (b.data(), b.size()) != engineSha256)
+    if (b.size() < 0x1000)
+        return nullptr;
+    const auto hash = sha256Hex (b.data(), b.size());
+    const bool exo = hash == exoEngineSha256;
+    if (! exo && hash != engineSha256)
         return nullptr;
     auto rd = [&] (std::size_t off, auto& v) { if (off + sizeof (v) <= b.size()) std::memcpy (&v, b.data() + off, sizeof (v)); };
     std::uint32_t pe = 0;
@@ -399,6 +412,7 @@ std::shared_ptr<const Tables> loadTables (const std::string& path)
         return b.size();
     };
     auto t = std::make_shared<Tables>();
+    t->exo = exo;
     // LFO shape: 2 170 int16, centred on (min + max)/2 and scaled by 1/((max − min)/2) in float (§2.1)
     const auto lo = offset (0x252ED0);
     if (lo + 2 * lfoPoints > b.size())
@@ -419,7 +433,7 @@ std::shared_ptr<const Tables> loadTables (const std::string& path)
     // the library's 2^(j/64) tables (§1 of REA_rodada165g-kepler): powf's rounded values, pow's 24-bit heads and tails
     if (crtExp.load (std::memory_order_acquire) == nullptr)
     {
-        const auto fo = offset (0xF19B0), ho = offset (0xF1BB0), to = offset (0xF1DB0);
+        const auto fo = offset (exo ? 0xF1A20 : 0xF19B0), ho = offset (exo ? 0xF1C20 : 0xF1BB0), to = offset (exo ? 0xF1E20 : 0xF1DB0);
         if (fo + 512 > b.size() || ho + 512 > b.size() || to + 512 > b.size())
             return nullptr;
         static CrtExp crt;
@@ -488,12 +502,50 @@ float defaultParam (int i) noexcept
     }
 }
 
+// Kepler Exo's defaults (REA_rodada167d §2.1: the engine's default table, doubles rounded to float)
+float exoDefaultParam (int i) noexcept
+{
+    switch (i)
+    {
+        case 3: case 8: case 10: case 0xf: case 0x11: case 0x17: case 0x20: case 0x21: case 0x25: case 0x28: case 0x49: case 0x5a:
+        case 0x6e: case 0x76: case 0x9a:
+            return 1.0f;
+        case 0xb: case 0xd: case 0x12: case 0x2f: case 0x30: case 0x3e: case 0x42: case 0x43: case 0x48: case 0x4a: case 0x53:
+        case 0x5c: case 0x5d: case 0x5e: case 0x5f: case 0x60: case 0x61: case 0x62: case 0x63:
+        case 0x65: case 0x66: case 0x67: case 0x68: case 0x69: case 0x6a: case 0x6b: case 0x6c: case 0x6d:
+        case 0x70: case 0x72: case 0x95: case 0x96: case 0x98: case 0x99: case 0x100: case 0x101:
+            return 0.5f;
+        case 0xe: case 0x36: case 0x3f:
+            return 0.33f;
+        case 0x46: return (float) 0.09;
+        case 0x71: return (float) 0.607166666537523;
+        case 0x74: return (float) 0.749833333306015;
+        case 0x78: return (float) 0.75;
+        case 0x7a: return (float) 0.201308285817504;
+        case 0x7b: return (float) 0.786500000394881;
+        case 0x7d: case 0x7e: case 0x82: return (float) 0.52309999987483;
+        case 0x7f: return (float) 0.776200000196695;
+        case 0x80: return (float) 0.382000000216067;
+        case 0x81: return (float) 0.225599999539554;
+        case 0x83: return (float) 0.800300000235438;
+        case 0x84: return (float) 0.800333333201706;
+        case 0x85: return (float) 0.486899999901652;
+        default:
+            return 0.0f;
+    }
+}
+
 struct Patch
 {
     std::array<float, paramCount> P {};
     std::vector<std::pair<int, float>> order; // the values in the order the state applies them
     bool arpRestartAligned = false; // byte of version > 1 (§1.1)
     bool usable = false;
+    // "Kepler-2" (Kepler Exo) states: every value by internal index, the modulation-matrix slots (source, destination)
+    bool exo = false;
+    int version = 0;
+    bool slotsSet = false;
+    std::array<std::pair<int, int>, 8> slots {};
 };
 
 std::uint32_t u32 (const std::vector<std::uint8_t>& s, std::size_t at) noexcept
@@ -511,8 +563,77 @@ float f32At (const std::vector<std::uint8_t>& s, std::size_t at) noexcept
     return v;
 }
 
+// "Kepler-2" layout (REA_rodada167d §1): u32 version, u32 n, n floats (internal index order, < 0x9b used), u32 matrix
+// flag (1: u32 count, count × (i32 source, i32 destination)), version > 2: arpeggiator-alignment byte, ×4-oversampling
+// byte; version > 3: the alternative-oscillator byte
+Patch parseExoState (const std::vector<std::uint8_t>& s)
+{
+    Patch p;
+    p.exo = true;
+    for (int i = 0; i < paramCount; ++i)
+        p.P[(std::size_t) i] = exoDefaultParam (i);
+    for (auto& sl : p.slots)
+        sl = { -1, -1 };
+    const auto version = (int) u32 (s, 0x19);
+    p.version = version;
+    std::size_t at = 0x1D;
+    if (version > 0)
+    {
+        const auto n = (int) u32 (s, at);
+        at += 4;
+        if (n < 0 || n > 4096 || at + (std::size_t) n * 4 > s.size())
+            return p;
+        for (int k = 0; k < n; ++k, at += 4)
+        {
+            const auto v = f32At (s, at);
+            if (k < 0x9b)
+            {
+                if (! std::isfinite (v))
+                    return p;
+                p.P[(std::size_t) k] = v;
+                p.order.emplace_back (k, v);
+            }
+        }
+        if (at + 4 > s.size())
+            return p;
+        const auto flag = u32 (s, at);
+        at += 4;
+        if (flag == 1)
+        {
+            if (at + 4 > s.size())
+                return p;
+            const auto count = (int) u32 (s, at);
+            at += 4;
+            if (count < 0 || count > 4096 || at + (std::size_t) count * 8 > s.size())
+                return p;
+            for (int k = 0; k < count; ++k, at += 8)
+                if (k < 8)
+                    p.slots[(std::size_t) k] = { (int) (std::int32_t) u32 (s, at), (int) (std::int32_t) u32 (s, at + 4) };
+            p.slotsSet = true;
+        }
+        if (version > 2)
+        {
+            if (at + 2 > s.size())
+                return p;
+            p.arpRestartAligned = (std::int8_t) s[at] > 0;
+            if ((std::int8_t) s[at + 1] > 0) // ×4 oversampling: not modelled (no factory preset uses it)
+                return p;
+            at += 2;
+        }
+        if (version > 3)
+        {
+            if (at + 1 > s.size() || (std::int8_t) s[at] > 0) // the alternative oscillator path: not modelled
+                return p;
+        }
+    }
+    p.usable = true;
+    return p;
+}
+
 Patch parseState (const std::vector<std::uint8_t>& s)
 {
+    if (s.size() >= 0x1D && u32 (s, 12) == 9 && std::memcmp (s.data() + 16, "Kepler-2", 9) == 0)
+        return parseExoState (s);
     Patch p;
     for (int i = 0; i < paramCount; ++i)
         p.P[(std::size_t) i] = defaultParam (i);
@@ -581,6 +702,10 @@ struct Osc
     std::array<float, 16> buf {};
     bool pulseHigh = false, subDone = false;
     float subSign = 1.0f;
+    // Kepler Exo's DCO2 hard sync (REA_rodada167d §3.2): the master's wrap restarts the slave inside the next sample
+    Osc* slave = nullptr;
+    bool syncOn = false, reset = false;
+    float resetFrac = 0.0f, shapeOut = 0.0f; // shapeOut: the naive waveform (cross-modulation / filter-FM shape 5)
 
     void impulse (const float* rows, float pos, float amp) noexcept
     {
@@ -631,13 +756,46 @@ struct Osc
             subSign = -subSign;
             impulse (rows, pos, subSign * sub);
         }
+        if (slave != nullptr && slave->syncOn)
+        {
+            slave->resetFrac = (float) (phase / inc);
+            slave->reset = true;
+        }
     }
 
     void tick (const float* rows) noexcept
     {
-        const auto prev = (float) phase;
-        phase = inc + phase;
-        edges (rows, prev);
+        if (! reset)
+        {
+            const auto prev = (float) phase;
+            phase = inc + phase;
+            edges (rows, prev);
+        }
+        else
+        {
+            // synced restart: run up to the master's wrap, step the waveform back to its start, run the rest
+            reset = false;
+            const auto prev = phase;
+            const auto f = 1.0f - resetFrac;
+            const auto part = (float) inc * f;
+            phase = (double) part + prev;
+            edges (rows, (float) prev);
+            auto amp = (float) phase * saw;
+            if (pulseHigh)
+            {
+                amp = amp + pulseAtWrap;
+                pulseHigh = false;
+            }
+            if (0.0f < subSign || subSign == 0.0f)
+                amp = amp - sub;
+            subSign = -1.0f;
+            subDone = false;
+            impulse (rows, f, amp);
+            offset = f;
+            phase = (double) ((float) inc * resetFrac);
+            edges (rows, 0.0f);
+            offset = 0.0f;
+        }
         auto v = integ - (float) inc * saw;
         integ = v;
         v = (v + buf[(std::size_t) ring]) * leak;
@@ -645,6 +803,9 @@ struct Osc
         out = (v + v) - saw;
         buf[(std::size_t) ring] = 0.0f;
         ring = (ring + 1) & 15;
+        auto w = (((float) phase + (float) phase) - 1.0f) * saw;
+        w = pulseHigh ? w + pulse : w - pulse;
+        shapeOut = subSign * sub + w;
     }
 };
 
@@ -684,6 +845,17 @@ struct Voice
     // rate-derived
     float fs = 44100.0f;
     double incScale = 1.0 / 88200.0, rate = 44100.0;
+    // Kepler Exo (REA_rodada167d §3): DCO2, cross-modulation, AM, VCA source, matrix sources and amounts
+    Osc osc2;
+    bool dco2On = false;
+    float lfo1Dco2 = 0.0f, lfo2Dco2 = 0.0f, env2Dco2 = 0.0f, pw2Amount = 0.0f, dco2Pitch = 0.0f, fine2 = 0.0f;
+    PwSource pw2Source = PwSource::lfo;
+    float dco2Level = 1.0f, am = 0.0f, noise = 0.0f;
+    int xmodShape12 = 0, xmodShape21 = 0, fmShape = 0;
+    int vcaMode = 0; // 0 gate (velocity), 1 envelope 1, 2 envelope 2
+    float released = 0.0f, vel2 = 0.0f, keyN = 0.0f, keyC = 0.0f, toggleVal = 0.0f, random = 0.0f;
+    float xExpr = 0.0f, yExpr = 0.0f, X = 0.0f, Y = 0.0f, Xp = 0.0f, Yp = 0.0f;
+    std::array<float, 8> mxAmount {};
 };
 
 // filter group of 4 voices (§3.3)
@@ -714,6 +886,11 @@ public:
     // the plugin's life up to the first block: constructor (at 44.1 kHz), state load, host sample rate (§1.3)
     void init (const Patch& patch, std::shared_ptr<const Tables> t, double sampleRate)
     {
+        if (patch.exo)
+        {
+            initExo (patch, std::move (t), sampleRate);
+            return;
+        }
         tabs = std::move (t);
         construct (44100.0);
         for (int i = 0; i < paramCount; ++i) // the constructor's defaults pass: no modulation routes yet
@@ -788,6 +965,16 @@ public:
                         lfo1Wrapped = true;
                     }
                 }
+                if (exo && ! lfo2TrigMode)
+                {
+                    lfo2Ramp = 0.0f;
+                    lfo2SyncReset = true;
+                    if (P[0x3b] >= 0.5f)
+                    {
+                        lfo2Phase = (double) std::min (std::max (P[0x3c], 0.0f), 0.9999989867210388f);
+                        lfo2Wrapped = true;
+                    }
+                }
                 holdFirst = false;
                 first = true;
                 if (holdOn && arpOn)
@@ -834,12 +1021,20 @@ public:
         RenderMode mode;
         const auto dt = 1.0 / (double) fsF;
         const auto beatsPerSecond = tempo * 0.016666666666666666;
+        if (exo && slotsDirty)
+        {
+            slotsDirty = false;
+            compileMatrices();
+        }
         for (int i = 0; i < n; ++i)
         {
             const auto t = arpSync ? beatPos : seconds;
             arpClock (t);
             float l = 0.0f, r = 0.0f;
-            sample (l, r, beatPos);
+            if (exo)
+                sampleExo (l, r, beatPos);
+            else
+                sample (l, r, beatPos);
             left[i] += l;
             right[i] += r;
             beatPos = beatPos + dt * beatsPerSecond;
@@ -898,6 +1093,16 @@ private:
             v.vcaK = (float) (1.0 - powD (0.09999999999999998, 400.0 / (double) fsF));
             v.panK = v.ampK = (float) (1.0 - powD (0.09999999999999998, 200.0 / (double) fsF));
             v.osc.leakMax = (float) powD (0.37, 10.0 / (double) fsF);
+        }
+        if (exo)
+        {
+            for (auto& v : voices)
+                v.osc2.leakMax = v.osc.leakMax;
+            gmInterval = (int) (sr * 0.001);
+            // every host value again through the parameter forwarder (REA_rodada167d §1.3)
+            for (int i = 0; i < 0x102; ++i)
+                forwardExo (i, host[(std::size_t) i]);
+            return;
         }
         if (! construct) // every parameter again from the stored values (routed ones through the matrix only)
             for (int i = 0; i < paramCount; ++i)
@@ -1267,6 +1472,7 @@ private:
         // played order, ascending and descending lists (§5.3)
         std::array<std::vector<std::pair<int, int>>, 4> lists;
         int mode = 0, range = 1, dir = 1, index = -1, octave = 0, note = 0, vel = 0;
+        std::uint32_t lcg = 1793462892u; // random modes (Kepler Exo)
         void clear() noexcept
         {
             for (auto& l : lists)
@@ -1332,6 +1538,8 @@ private:
         arp.add (key, vel);
         if (! first)
         {
+            if (! arpJunoIndex)
+                return;
             // a note added while the arpeggio runs keeps its place relative to the current step
             const auto& l = arp.dir == 2 ? arp.lists[3] : arp.lists[2];
             int at = -1;
@@ -1349,7 +1557,7 @@ private:
         arpWaiting = true;
         arpRunning = ! arp.lists[0].empty();
         arp.index = -1;
-        if (arp.mode == 2)
+        if (arp.mode == 2 || arp.mode == 8)
         {
             arp.octave = arp.range - 1;
             arp.dir = 2;
@@ -1389,7 +1597,7 @@ private:
         arpWaiting = true;
         arpRunning = false;
         arp.index = -1;
-        if (arp.mode == 2)
+        if (arp.mode == 2 || arp.mode == 8)
         {
             arp.octave = arp.range - 1;
             arp.dir = 2;
@@ -1404,9 +1612,42 @@ private:
 
     void arpStep() noexcept
     {
-        // modes 0 (up), 1 (up/down), 2 (down) of the Kepler-1 panel (§5.3)
-        auto& up = arp.lists[2];
-        auto& down = arp.lists[3];
+        // modes 0 (up), 1 (up/down), 2 (down) of the Kepler-1 panel (§5.3); Kepler Exo adds 3–5 (random: any note, no
+        // immediate repeat of note and octave, no repeat of the note) and 6–8 (as 0–2 in the played order,
+        // REA_rodada167d §5.3)
+        if (arp.mode >= 3 && arp.mode <= 5)
+        {
+            const auto& l = arp.lists[2];
+            const auto n = (int) l.size();
+            if (n == 0)
+                return;
+            const auto prevNote = arp.note, prevOct = arp.octave;
+            for (;;)
+            {
+                arp.lcg = arp.lcg * 0x0BB38435u + 0x3619636Bu;
+                const auto k = (int) ((double) (float) ((double) arp.lcg * 2.3283064365386963e-10) * (double) n * 0.9999);
+                arp.note = l[(std::size_t) k].first;
+                arp.vel = l[(std::size_t) k].second;
+                arp.lcg = arp.lcg * 0x0BB38435u + 0x3619636Bu;
+                arp.octave = (int) ((double) (float) ((double) arp.lcg * 2.3283064365386963e-10) * (double) arp.range * 0.9999);
+                if (arp.mode == 4)
+                {
+                    if (arp.range * n > 1 && arp.note == prevNote && arp.octave == prevOct)
+                        continue;
+                    break;
+                }
+                if (arp.mode == 5 && n >= 2 && arp.note == prevNote)
+                    continue;
+                break;
+            }
+            arpNote = std::min (127, std::max (0, arp.note + arp.octave * 12));
+            voiceNoteOn (arpNote, arp.vel);
+            return;
+        }
+        const bool played = arp.mode >= 6;
+        const bool upDown = arp.mode == 1 || arp.mode == 7;
+        auto& up = arp.lists[played ? 0 : 2];
+        auto& down = arp.lists[played ? 1 : 3];
         ++arp.index;
         const std::vector<std::pair<int, int>>* list = &up;
         if (arp.dir == 2)
@@ -1417,7 +1658,7 @@ private:
                 arp.index = 0;
                 if (arp.octave < 0)
                 {
-                    if (arp.mode == 1)
+                    if (upDown)
                     {
                         arp.dir = 1;
                         int o = 0;
@@ -1441,7 +1682,7 @@ private:
                 arp.index = 0;
                 if (arp.octave >= arp.range)
                 {
-                    if (arp.mode == 1)
+                    if (upDown)
                     {
                         arp.dir = 2;
                         int o;
@@ -1467,6 +1708,7 @@ private:
         if (list->empty())
             return;
         const auto& e = (*list)[(std::size_t) std::min (std::max (arp.index, 0), (int) list->size() - 1)];
+        arp.note = e.first;
         arp.vel = e.second;
         arpNote = std::min (127, std::max (0, e.first + arp.octave * 12));
         voiceNoteOn (arpNote, arp.vel);
@@ -1544,6 +1786,18 @@ private:
         const auto prev = order.empty() ? -1 : order.back();
         order.erase (std::remove (order.begin(), order.end(), key), order.end());
         order.push_back (key);
+        if (exo && P[0x4b] >= 0.5f)
+        {
+            // monophonic (REA_rodada167d §5.1): voice 0; glide from where it is unless legato's first note; the
+            // envelopes restart on the first note or with "always trigger"
+            const auto count = (int) order.size();
+            const auto from = (count == 1 && P[0x4c] >= 0.5f) ? key : -1;
+            const bool retrigger = P[0x4d] >= 0.5f || count == 1;
+            startVoice (voices[0], from, key, (float) vel * 0.007874015718698502f, retrigger, count == 1);
+            lastNote = key;
+            updateMatrixVoice();
+            return;
+        }
         bool reused = false;
         const auto i = allocate (key, reused);
         auto& v = voices[(std::size_t) i];
@@ -1551,15 +1805,19 @@ private:
         const auto from = P[0x4c] < 0.5f ? lastNote : (prev >= 0 ? prev : key);
         startVoice (v, from, key, (float) vel * 0.007874015718698502f, true, ! reused);
         lastNote = key;
+        if (exo)
+            updateMatrixVoice();
     }
 
     void startVoice (Voice& v, int from, int key, float vel, bool retrigger, bool fresh) noexcept
     {
         const auto toggle = lfoToggle;
         lfoToggle = -lfoToggle;
-        (void) toggle;
+        v.toggleVal = toggle;
         lcg = lcg * 0x0BB38435u + 0x3619636Bu;
+        v.random = (float) (std::int32_t) lcg * 2.3283064365386963e-10f;
         v.gate = 1.0f;
+        v.released = 0.0f;
         v.fresh = fresh;
         if (from >= 0)
             v.glide = (float) (from - 69) * 0.0833333358168602f;
@@ -1575,26 +1833,55 @@ private:
         }
         v.note = key;
         v.age = 0;
+        v.vel2 = vel;
+        v.keyN = (float) key * 0.007874015718698502f;
+        v.keyC = v.keyN - 0.5f;
         if (retrigger)
         {
             v.st1 = 0, v.dcy1 = 1.0f;
             v.st2 = 0, v.dcy2 = 1.0f;
         }
         v.matrixCount = v.matrixInterval;
-        matrix (v);
+        if (exo)
+            voiceMatrixExo (v);
+        else
+            matrix (v);
     }
 
-    void voiceNoteOff (int key, int /*vel*/) noexcept
+    void voiceNoteOff (int key, int vel) noexcept
     {
         order.erase (std::remove (order.begin(), order.end(), key), order.end());
+        if (exo && P[0x4b] >= 0.5f)
+        {
+            // monophonic: back to the newest held note (envelopes restart with "restart on note off"), else release
+            if (order.empty())
+            {
+                if (voices[0].gate != 0.0f)
+                    releaseVoice (voices[0], (float) vel * 0.007874015718698502f);
+            }
+            else
+                startVoice (voices[0], -1, order.back(), -0.007874015718698502f, host[0x4e] >= 0.5f, false);
+            updateMatrixVoice();
+            return;
+        }
+        if (exo)
+        {
+            for (auto& v : voices)
+                if (v.gate != 0.0f && v.note == key)
+                    releaseVoice (v, (float) vel * 0.007874015718698502f);
+            updateMatrixVoice();
+            return;
+        }
         for (auto& v : voices)
             if (v.gate != 0.0f && v.note == key)
                 releaseVoice (v, 0.0f);
     }
 
-    void releaseVoice (Voice& v, float) noexcept
+    void releaseVoice (Voice& v, float vel) noexcept
     {
         v.gate = 0.0f;
+        v.released = 1.0f;
+        v.vel2 = vel;
         v.velGain = 0.0f;
         v.st1 = v.st2 = 2;
     }
@@ -2006,6 +2293,905 @@ private:
         }
     }
 
+    // ================================================================ Kepler Exo (REA_rodada167d)
+    // The Exo engine runs the same render code as Kepler; its parameter forwarder, global / voice setters, defaults and
+    // state loader differ. Everything below is used only for "Kepler-2" states (exo == true).
+
+    // the plugin's life as the harness / FL drive it: constructor at 44.1 kHz (rate set-up with every host value 0,
+    // then the defaults reset), state load (reset again, the stored values, the matrix slots), host sample rate (§1.3)
+    void initExo (const Patch& patch, std::shared_ptr<const Tables> t, double sampleRate)
+    {
+        exo = true;
+        tabs = std::move (t);
+        for (auto& sl : slots)
+            sl = { -1, -1 };
+        for (int i = 0; i < 8; ++i)
+            voices[(std::size_t) i].noiseIndex = (int) ((double) i * 85280.625);
+        for (auto& v : voices)
+            v.osc.slave = nullptr;
+        lfo1Gate = lfo2Gate = 0.0f;
+        lfo1RampInc = lfo2RampInc = 0.0f;
+        holdFirst = true;
+        setRate (44100.0, true);
+        resetExo();
+        // state load
+        resetExo();
+        for (const auto& [index, value] : patch.order)
+        {
+            host[(std::size_t) index] = value;
+            forwardExo (index, value);
+        }
+        if (patch.slotsSet)
+        {
+            slots = patch.slots;
+            slotsDirty = true;
+        }
+        if (patch.version > 2)
+            arpAligned = patch.arpRestartAligned;
+        if (patch.version < 2)
+        {
+            // old states with a BPM-synced LFO: the loader rewrites the stored host value only (applied at the next
+            // rate set-up), the law of REA_rodada33 §3.4
+            auto convert = [this] (int rateIndex) {
+                const auto x = host[(std::size_t) rateIndex];
+                const auto e = powF (2.0f, x * 7.0f);
+                const auto nOld = (int) ((e - 1.0f) * 48.370079f + 1.1f);
+                const auto m = (int) (9216.0f / (float) nOld + 0.1f);
+                const auto l = lnF ((float) (m - 1) * 0.0206739f + 1.0f);
+                host[(std::size_t) rateIndex] = 1.0f - l * 0.2060993f;
+            };
+            if (host[0x31] >= 0.5f)
+                convert (0x30);
+            if (host[0x37] >= 0.5f)
+                convert (0x36);
+        }
+        setRate (sampleRate, false);
+    }
+
+    // the defaults reset: every value from the default table (stored, current and forwarded), velocity → volume 1,
+    // DCO1 sub phase 0.5, chorus noise 0, oversampling ×2, then the rate set-up again
+    void resetExo()
+    {
+        for (int i = 0; i < 0x102; ++i)
+        {
+            const auto v = exoDefaultParam (i);
+            host[(std::size_t) i] = base[(std::size_t) i] = P[(std::size_t) i] = v;
+            forwardExo (i, v);
+        }
+        host[0x49] = 1.0f;
+        forwardExo (0x49, 1.0f);
+        host[0x0b] = 0.5f;
+        forwardExo (0x0b, 0.5f);
+        arpAligned = false;
+        chorusGateOn = false;
+        forwardExo (0x46, 0.0f);
+        host[0x46] = 0.0f;
+        setRate (rate, true);
+        for (int i = 0; i < 0x102; ++i)
+            forwardExo (i, host[(std::size_t) i]);
+    }
+
+    bool slotDestination (int i) const noexcept
+    {
+        for (const auto& sl : slots)
+            if (sl.second == i && sl.first >= 0)
+                return true;
+        return false;
+    }
+
+    // the parameter forwarder: stored value, then the setters unless a matrix slot drives the parameter
+    void forwardExo (int i, float x) noexcept
+    {
+        if (i < 0 || i >= paramCount)
+            return;
+        base[(std::size_t) i] = x;
+        if (slotDestination (i))
+            return;
+        setGlobalExo (i, x);
+    }
+
+    static bool globalDestination (int d) noexcept
+    {
+        if (d == 0x54)
+            return false;
+        if (d >= 0x5c && d <= 0x63)
+            return true;
+        switch (d - 0x24)
+        {
+            case 0: case 0xc: case 0xe: case 0xf: case 0x12: case 0x14: case 0x15: case 0x16: case 0x21: case 0x22: case 0x24:
+            case 0x26: case 0x27: case 0x28: case 0x29: case 0x2a: case 0x2b: case 0x2c:
+            case 0x30: case 0x31: case 0x32: case 0x33: case 0x34: case 0x35: case 0x36: case 0x37:
+            case 0x40: case 0x41: case 0x42: case 0x43: case 0x44: case 0x45: case 0x46: case 0x47: case 0x48: case 0x49: case 0x4a:
+            case 0x4b: case 0x4c: case 0x4d: case 0x4e: case 0x4f: case 0x50: case 0x52: case 0x53: case 0x55: case 0x56: case 0x57:
+            case 0x58: case 0x59: case 0x5a: case 0x5b: case 0x5c: case 0x5d: case 0x5e: case 0x5f: case 0x60: case 0x61: case 0x62:
+            case 0x63: case 0x64: case 0x65: case 0x66: case 0x67: case 0x68: case 0x69: case 0x6a: case 0x6b: case 0x6c: case 0x6d:
+            case 0x6e: case 0x6f: case 0x70: case 0x71: case 0x72:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    // both matrices from the slot list (§4.3): one entry per destination (first slot order), every slot to it a term
+    void compileMatrices()
+    {
+        auto build = [this] (std::vector<MatrixDst>& out, bool global) {
+            out.clear();
+            for (const auto& sl : slots)
+            {
+                const auto d = sl.second;
+                if (d < 0 || sl.first < 0)
+                    continue;
+                if (std::any_of (out.begin(), out.end(), [d] (const MatrixDst& e) { return e.dst == d; }))
+                    continue;
+                const bool valid = global ? globalDestination (d) : ((d >= 0x5c && d <= 0x63) || ! globalDestination (d));
+                if (! valid || d >= paramCount)
+                    continue;
+                MatrixDst e;
+                e.dst = d;
+                for (int k = 0; k < 8; ++k)
+                    if (slots[(std::size_t) k].second == d && slots[(std::size_t) k].first >= 0)
+                        e.terms.push_back ({ slots[(std::size_t) k].first, k });
+                out.push_back (std::move (e));
+            }
+        };
+        build (voiceMx, false);
+        build (globalMx, true);
+    }
+
+    float voiceSource (const Voice& v, int src) const noexcept
+    {
+        switch (src)
+        {
+            case 0: return lfo1Tri;
+            case 1: return lfo2Bip;
+            case 2: return v.env1;
+            case 3: return v.env2;
+            case 4: return v.velocity;
+            case 5: return v.vel2;
+            case 6: return v.X;
+            case 7: return v.Y;
+            case 8: return v.gate;
+            case 9: return v.released;
+            case 10: return lfo1Shape;
+            case 11: return lfo1Uni;
+            case 12: return lfo2Uni;
+            case 13: return v.keyC;
+            case 14: return lfo1TriW;
+            case 15: return lfo2BipW;
+            case 16: return lfo1Out;
+            case 17: return lfo1UniW;
+            case 18: return lfo2UniW;
+            case 19: return v.toggleVal;
+            case 20: return v.keyN;
+            case 21: return v.random;
+            case 22: return v.Xp;
+            case 23: return v.Yp;
+            default: return 0.0f;
+        }
+    }
+
+    static float clampUnit (float a) noexcept
+    {
+        auto c = a <= 0.0f ? 0.0f : a;
+        return 1.0f <= c ? 1.0f : c;
+    }
+
+    void voiceMatrixExo (Voice& v) noexcept
+    {
+        for (const auto& e : voiceMx)
+        {
+            auto acc = base[(std::size_t) e.dst];
+            for (const auto& t : e.terms)
+                acc = voiceSource (v, t.src) * v.mxAmount[(std::size_t) t.slot] + acc;
+            setVoiceExo (v, e.dst, clampUnit (acc));
+        }
+    }
+
+    // the global matrix every millisecond with the sources of the newest note's voice copied first (§4.3)
+    void globalMatrixExo() noexcept
+    {
+        const auto& v = voices[(std::size_t) mxVoice];
+        Voice g;
+        g.env1 = v.env1, g.env2 = v.env2, g.X = v.X, g.Y = v.Y, g.Xp = v.Xp, g.Yp = v.Yp, g.gate = v.gate, g.released = v.released;
+        g.velocity = v.velocity, g.vel2 = v.vel2, g.keyC = v.keyC, g.toggleVal = v.toggleVal, g.keyN = v.keyN, g.random = v.random;
+        globalSrc = g;
+        for (const auto& e : globalMx)
+        {
+            auto acc = base[(std::size_t) e.dst];
+            for (const auto& t : e.terms)
+                acc = voiceSource (globalSrc, t.src) * globalAmount[(std::size_t) t.slot] + acc;
+            setGlobalExo (e.dst, clampUnit (acc));
+        }
+    }
+
+    // ---------------------------------------------------------------- Exo global setter (§4.1)
+    void setGlobalExo (int i, float x) noexcept
+    {
+        const auto old = P[(std::size_t) i];
+        switch (i)
+        {
+            case 0x36:
+            case 0x37:
+            {
+                P[(std::size_t) i] = x;
+                if (i == 0x37)
+                    lfo2Sync = x >= 0.5f;
+                const auto x6 = P[0x36];
+                lfo2Inc = (double) (powF (10.0f, x6 * 4.0f) * 0.10000000149011612f * invFs);
+                const auto e = powF (2.0f, (1.0f - x6) * 7.0f);
+                lfo2Kappa = 192.0 / (double) (int) ((e - 1.0f) * 48.370079040527344f + 1.100000023841858f);
+                break;
+            }
+            case 0x38:
+            {
+                P[(std::size_t) i] = x;
+                const auto d = table (tLfoDelay, x);
+                lfo2RampInc = d > 0.0f ? 1.0f / (d * fsF) : 1.0f;
+                break;
+            }
+            case 0x39:
+                P[(std::size_t) i] = x;
+                lfo2TrigMode = x >= 0.5f;
+                lfo2Gate = (! lfo2TrigMode || P[0x51] >= 0.5f) ? 1.0f : 0.0f;
+                break;
+            case 0x3a:
+                P[(std::size_t) i] = x;
+                lfo2Shape = (int) (x * 5.0f + 0.5f);
+                break;
+            case 0x46:
+            {
+                P[(std::size_t) i] = x;
+                const auto q = x * 0.25f;
+                chorusNoise = x * x * q * 0.012500000186264515f; // the noise gain; ×8 for the chorus noise filters (§3.7)
+                break;
+            }
+            case 0x47:
+                P[(std::size_t) i] = x;
+                chorusGateOn = x >= 0.5f;
+                break;
+            case 0x4b:
+                P[(std::size_t) i] = x;
+                break;
+            case 0x51:
+                P[(std::size_t) i] = x;
+                if (old < 0.5f && x >= 0.5f)
+                {
+                    if (lfo1TrigMode)
+                    {
+                        lfo1Ramp = 0.0f;
+                        lfo1SyncReset = true;
+                        if (P[0x34] >= 0.5f)
+                        {
+                            lfo1Phase = (double) std::min (std::max (P[0x35], 0.0f), 0.9999989867210388f);
+                            lfo1Wrapped = true;
+                        }
+                    }
+                    if (lfo2TrigMode)
+                    {
+                        lfo2Ramp = 0.0f;
+                        lfo2SyncReset = true;
+                        if (P[0x3b] >= 0.5f)
+                        {
+                            lfo2Phase = (double) std::min (std::max (P[0x3c], 0.0f), 0.9999989867210388f);
+                            lfo2Wrapped = true;
+                        }
+                    }
+                }
+                lfo1Gate = (! lfo1TrigMode || P[0x51] >= 0.5f) ? 1.0f : 0.0f;
+                lfo2Gate = (! lfo2TrigMode || P[0x51] >= 0.5f) ? 1.0f : 0.0f;
+                break;
+            case 0x59:
+                P[(std::size_t) i] = x;
+                arp.mode = (int) (x * 8.0f + 0.5f);
+                break;
+            case 0x5b:
+                P[(std::size_t) i] = x;
+                arpJunoIndex = x < 0.5f;
+                break;
+            case 0x5c: case 0x5d: case 0x5e: case 0x5f: case 0x60: case 0x61: case 0x62: case 0x63:
+                P[(std::size_t) i] = x;
+                globalAmount[(std::size_t) (i - 0x5c)] = (x + x) - 1.0f;
+                break;
+            case 0x95:
+            case 0x96:
+                P[(std::size_t) i] = x;
+                for (auto& v : voices)
+                {
+                    auto c = ((i == 0x95 ? P[0x95] : P[0x96]) + (i == 0x95 ? v.xExpr : v.yExpr)) - 0.5f;
+                    c = c >= -0.5f ? (c >= 0.5f ? 0.5f : c) : -0.5f;
+                    if (i == 0x95)
+                        v.X = c, v.Xp = c + 0.5f;
+                    else
+                        v.Y = c, v.Yp = c + 0.5f;
+                }
+                break;
+            default:
+                if ((i >= 0x64 && i <= 0x94) || i == 0x98)
+                {
+                    P[(std::size_t) i] = x;
+                    setEffectExo (i, x);
+                }
+                else
+                    setGlobal (i, x);
+                break;
+        }
+        for (auto& v : voices)
+            setVoiceExo (v, i, x);
+    }
+
+    // the effects' parameters (filled in by the effect section)
+    void setEffectExo (int, float) noexcept {}
+
+    // ---------------------------------------------------------------- Exo voice setter (§4.2)
+    void setVoiceExo (Voice& v, int i, float x) noexcept
+    {
+        v.p[(std::size_t) i] = x;
+        const auto& q = v.p;
+        auto dcoLfo = [&q] (int a, int b) {
+            auto t = table (tDcoLfo, q[(std::size_t) a]);
+            if (q[(std::size_t) b] >= 0.5f)
+                t = t * 10.0f;
+            return t;
+        };
+        auto pwSource = [] (float y) {
+            return y < 0.3330000042915344f ? PwSource::lfo : (y >= 0.6660000085830688f ? PwSource::envelope : PwSource::manual);
+        };
+        switch (i)
+        {
+            case 0x0c:
+                v.dco2On = x >= 0.5f;
+                v.osc.slave = v.dco2On ? &v.osc2 : nullptr;
+                break;
+            case 0x0d:
+            case 0x0e:
+                v.dco2Pitch = ((float) (int) ((q[0x0d] - 0.5f) * 96.0f) + (q[0x0e] - 0.5f)) * 0.0833333358168602f;
+                break;
+            case 0x0f:
+                v.osc2.saw = x < 0.5f ? 0.0f : 1.0f;
+                break;
+            case 0x10:
+            case 0x11:
+                v.osc2.sub = q[0x10] < 0.5f ? 0.0f : table (tSubVol, q[0x11]) * 1.1111111640930176f;
+                break;
+            case 0x12:
+                v.osc2.subPoint = x * 0.9900000095367432f;
+                break;
+            case 0x13:
+                v.pw2Amount = x;
+                break;
+            case 0x14:
+            case 0x15:
+                v.lfo1Dco2 = dcoLfo (0x14, 0x15);
+                break;
+            case 0x16:
+            case 0x17:
+                v.lfo2Dco2 = dcoLfo (0x16, 0x17);
+                break;
+            case 0x18:
+                v.env2Dco2 = x * 10.0f;
+                break;
+            case 0x19:
+                v.pw2Source = pwSource (x);
+                break;
+            case 0x1a:
+                v.osc2.pulse = x < 0.5f ? 0.0f : 1.0f;
+                break;
+            case 0x1b:
+                v.osc2.syncOn = x >= 0.5f;
+                break;
+            case 0x1e:
+                v.xmodShape12 = (int) (x * 5.0f + 0.5f);
+                break;
+            case 0x1f:
+                v.xmodShape21 = (int) (x * 5.0f + 0.5f);
+                break;
+            case 0x21:
+                v.dco2Level = x;
+                break;
+            case 0x23:
+                v.am = x;
+                break;
+            case 0x2a:
+                v.fmShape = (int) (x * 5.0f + 0.5f);
+                break;
+            case 0x2f:
+                v.vcaMode = x >= 0.3330000042915344f ? (x < 0.6660000085830688f ? 0 : 2) : 1;
+                break;
+            case 0x50:
+            {
+                const auto d = (double) x * (double) x * (double) x * 10.0;
+                if (d == 0.0)
+                {
+                    v.glideK = 1.0f;
+                    v.glideStep = 1000.0f;
+                }
+                else
+                {
+                    v.glideK = (float) (1.0 - powD (0.09999999999999998, 1.0 / (d * v.rate)));
+                    v.glideStep = d > 0.0 ? (float) (1.0 / (d * v.rate)) : 1000.0f;
+                }
+                break;
+            }
+            case 0x53:
+            case 0x99:
+                v.octave = (((float) (int) (q[0x53] + q[0x53] + 0.5f) + q[0x99]) + q[0x99]) - 2.0f;
+                break;
+            case 0x5c: case 0x5d: case 0x5e: case 0x5f: case 0x60: case 0x61: case 0x62: case 0x63:
+                v.mxAmount[(std::size_t) (i - 0x5c)] = (x + x) - 1.0f;
+                break;
+            case 0x101:
+                v.fine2 = (x - 0.5f) * 24.0f;
+                break;
+            default:
+                setVoice (v, i, x);
+                break;
+        }
+    }
+
+    // DCO cross-modulation / filter-FM shapes (§3.2): sine, triangle, square, saw, noise, the other DCO's waveform
+    float modShape (const Voice& v, int shape, float phase, float other) const noexcept
+    {
+        switch (shape)
+        {
+            case 0: return sinF (phase * 6.2831854820251465f);
+            case 1: return 0.5f <= phase ? 1.0f - (phase - 0.5f) * 4.0f : phase * 4.0f - 1.0f;
+            case 2: return 0.5f <= phase ? 1.0f : -1.0f;
+            case 3: return (phase + phase) - 1.0f;
+            case 4: return v.noise;
+            case 5: return other;
+            default: return 0.0f;
+        }
+    }
+
+    // LFO2 (§3.5): triangle, saw up, saw down, sine, sample & hold, smoothed random; BPM sync as LFO1
+    void lfo2Tick (double beats) noexcept
+    {
+        if (lfo2SyncReset)
+        {
+            lfo2LastBeat = beats;
+            lfo2SyncReset = false;
+        }
+        const auto ph = (float) lfo2Phase;
+        switch (lfo2Shape)
+        {
+            case 0:
+                if (ph < 0.25f)
+                    lfo2Bip = ph + ph;
+                else if (ph < 0.75f)
+                    lfo2Bip = 0.5f - (((ph - 0.25f) + ph) - 0.25f);
+                else
+                    lfo2Bip = (((ph - 0.75f) + ph) - 0.75f) - 0.5f;
+                break;
+            case 1:
+                lfo2Bip = ph - 0.5f;
+                break;
+            case 2:
+                lfo2Bip = 0.5f - ph;
+                break;
+            case 3:
+                lfo2Bip = sinF (ph * 6.2831854820251465f) * 0.5f;
+                break;
+            case 4:
+                if (lfo2Wrapped)
+                {
+                    lfo2Lcg = lfo2Lcg * 0x0BB38435u + 0x3619636Bu;
+                    lfo2Bip = (float) (std::int32_t) lfo2Lcg * 2.3283064365386963e-10f;
+                }
+                break;
+            case 5:
+                if (! lfo2Wrapped)
+                    lfo2Bip = lfo2Delta * ph + lfo2Hold;
+                else
+                {
+                    const auto prev = lfo2Bip;
+                    lfo2Hold = prev;
+                    lfo2Lcg = lfo2Lcg * 0x0BB38435u + 0x3619636Bu;
+                    lfo2Delta = (float) (std::int32_t) lfo2Lcg * 2.3283064365386963e-10f - prev;
+                    lfo2Bip = lfo2Delta * ph + prev;
+                }
+                break;
+            default:
+                lfo2Bip = 0.0f;
+                break;
+        }
+        if (lfo2Sync)
+        {
+            const auto d = (beats - lfo2LastBeat) * lfo2Kappa;
+            lfo2LastBeat = beats;
+            if (0.0 <= d && d < 1.0)
+                lfo2Inc = d;
+        }
+        auto p = lfo2Phase + lfo2Inc;
+        lfo2Wrapped = p >= 1.0;
+        if (lfo2Wrapped)
+            p = p - 1.0;
+        lfo2Phase = p;
+        lfo2Uni = lfo2Bip + 0.5f;
+    }
+
+    // ---------------------------------------------------------------- Exo voice control, once per host sample (§3.1)
+    void controlExo (Voice& v) noexcept
+    {
+        switch (v.st1)
+        {
+            case 0:
+            {
+                const auto e = (1.7000000476837158f - v.env1) * v.atkK1 + v.env1;
+                v.env1 = e;
+                if (e >= 1.0f)
+                    v.env1 = 1.0f, v.st1 = 1;
+                break;
+            }
+            case 1:
+            {
+                const auto d = v.dcyK1 * v.dcy1;
+                v.dcy1 = d;
+                v.env1 = d * v.oneMinusSus1 + v.sus1;
+                break;
+            }
+            case 2:
+                v.env1 = v.relK1 * v.env1;
+                break;
+            default:
+                break;
+        }
+        switch (v.st2)
+        {
+            case 0:
+            {
+                const auto e = (1.7000000476837158f - v.env2) * v.atkK2 + v.env2;
+                v.env2 = e;
+                if (e >= 1.0f)
+                    v.env2 = 1.0f, v.st2 = 1;
+                break;
+            }
+            case 1:
+            {
+                const auto d = v.dcyK2 * v.dcy2;
+                v.dcy2 = d;
+                v.env2 = d * v.oneMinusSus2 + v.sus2;
+                break;
+            }
+            case 2:
+                v.env2 = v.relK2 * v.env2;
+                break;
+            default:
+                break;
+        }
+        if (++v.matrixCount >= v.matrixInterval)
+        {
+            v.matrixCount = 0;
+            voiceMatrixExo (v);
+        }
+        auto pwSrc = [&v, this] (PwSource s) { return s == PwSource::lfo ? lfo1Uni : (s == PwSource::manual ? 1.0f : v.env1); };
+        v.osc.pw = 0.4580000042915344f - pwSrc (v.pwSource) * 0.4320000112056732f * v.pwAmount;
+        float pitch;
+        if (! v.glideLinear)
+        {
+            pitch = (v.glideTarget - v.glide) * v.glideK + v.glide;
+            v.glide = pitch;
+        }
+        else
+        {
+            pitch = v.glide;
+            if (v.glideTarget > pitch)
+            {
+                pitch = pitch + v.glideStep;
+                if (v.glideTarget <= pitch)
+                    pitch = v.glideTarget;
+            }
+            else if (pitch > v.glideTarget)
+            {
+                pitch = pitch - v.glideStep;
+                if (pitch <= v.glideTarget)
+                    pitch = v.glideTarget;
+            }
+            v.glide = pitch;
+        }
+        const auto env2 = v.env2;
+        const auto l1 = lfo1Out + lfo1Out;
+        const auto l2 = lfo2BipW + lfo2BipW;
+        auto common = 0.0f * v.bendRange + pitch;
+        auto envTerm = env2 * v.env2Dco;
+        auto s = l1 * v.lfo1Dco;
+        common = common + v.octave;
+        const auto lfo2Term = l2 * v.lfo2Dco;
+        s = s + v.dcoPitch;
+        common = common + v.pitchExpr;
+        envTerm = envTerm + lfo2Term;
+        common = common + midiPitch;
+        s = s + common;
+        s = s + envTerm;
+        if (v.dco2On)
+            s = s + modShape (v, v.xmodShape21, (float) v.osc2.phase, v.osc2.shapeOut) * v.p[0x1d];
+        auto inc = powD (2.0, (double) s * 1.0005) * 440.0 * v.incScale;
+        if (inc >= 0.25)
+            inc = 0.25;
+        inc = std::max (inc, 0.0);
+        v.osc.inc = inc;
+        {
+            const auto lk = 1.0f - (float) inc * 0.2679489850997925f;
+            v.osc.leak = lk >= v.osc.leakMax ? v.osc.leakMax : lk;
+        }
+        if (v.dco2On)
+        {
+            auto x = common + v.dco2Pitch;
+            v.osc2.pw = 0.4580000042915344f - pwSrc (v.pw2Source) * 0.4320000112056732f * v.pw2Amount;
+            x = x + l1 * v.lfo1Dco2;
+            x = x + l2 * v.lfo2Dco2;
+            x = x + env2 * v.env2Dco2;
+            x = x + v.fine2;
+            x = x + modShape (v, v.xmodShape12, (float) v.osc.phase, v.osc.shapeOut) * v.p[0x1c];
+            auto f = powF (2.0f, x) * 440.0f * (float) v.incScale;
+            f = f >= 0.25f ? 0.25f : f;
+            f = std::max (f, 0.0f);
+            v.osc2.inc = (double) f;
+            const auto lk = 1.0f - f * 0.2679489850997925f;
+            v.osc2.leak = lk >= v.osc2.leakMax ? v.osc2.leakMax : lk;
+        }
+        auto e = v.polarity * v.env1;
+        e = e * v.envCutoff;
+        const auto c1 = l1 * v.lfo1Cutoff;
+        e = e + c1;
+        auto kf = (float) (v.note - 24) * 0.0833333358168602f;
+        kf = kf * v.p[0x27];
+        kf = kf + l2 * v.lfo2Cutoff;
+        kf = kf + e;
+        if (v.filterFm != 0.0f)
+            kf = kf + modShape (v, v.fmShape, (float) v.osc.phase, v.osc.shapeOut) * v.filterFm;
+        auto cut = powF (2.0f, kf) * v.cutoffHz;
+        cut = cut >= 5.0f ? std::min (cut, 30000.0f) : 5.0f;
+        v.laneCut = cut;
+        v.laneRes = v.resonance;
+        ++v.age;
+        v.vca = (v.velGain - v.vca) * v.vcaK + v.vca;
+    }
+
+    // ---------------------------------------------------------------- Exo: one host sample (§3.4)
+    void sampleExo (float& outL, float& outR, double beats) noexcept
+    {
+        const auto& T = *tabs;
+        if (++gmCount >= gmInterval)
+        {
+            gmCount = 0;
+            globalMatrixExo();
+        }
+        if (lfo1SyncReset)
+        {
+            lfo1LastBeat = beats;
+            lfo1SyncReset = false;
+        }
+        {
+            const auto ph = (float) lfo1Phase;
+            float tri;
+            if (ph < 0.25f)
+                tri = ph + ph;
+            else if (ph < 0.75f)
+                tri = 0.5f - (((ph - 0.25f) + ph) - 0.25f);
+            else
+                tri = ((ph - 0.75f) + ph) - 1.25f;
+            auto x = ph * 2170.0f;
+            const auto k = (int) x;
+            x = x - (float) k;
+            const auto a = (1.0f - x) * T.lfo[(std::size_t) k];
+            const auto b = x * T.lfo[(std::size_t) k + 1];
+            lfo1Shape = (a + b) * 0.5f;
+            lfo1Tri = tri;
+            if (lfo1Sync)
+            {
+                const auto d = (beats - lfo1LastBeat) * lfo1Kappa;
+                lfo1LastBeat = beats;
+                if (0.0 <= d && d < 1.0)
+                    lfo1Inc = d;
+            }
+            auto p = lfo1Phase + lfo1Inc;
+            lfo1Wrapped = p >= 1.0;
+            if (lfo1Wrapped)
+                p = p - 1.0;
+            lfo1Phase = p;
+            lfo1Uni = tri + 0.5f;
+        }
+        lfo2Tick (beats);
+        const auto rg1 = lfo1Ramp * lfo1Gate;
+        const auto rg2 = lfo2Ramp * lfo2Gate;
+        lfo1Ramp = std::min (lfo1Ramp + lfo1RampInc, 1.0f);
+        lfo2Ramp = std::min (lfo2Ramp + lfo2RampInc, 1.0f);
+        lfo1UniW = rg1 * lfo1Uni;
+        lfo1TriW = rg1 * lfo1Tri;
+        lfo2UniW = rg2 * lfo2Uni;
+        lfo2BipW = rg2 * lfo2Bip;
+        lfo1Out = rg1 * lfo1Shape;
+
+        const bool mono = P[0x4b] >= 0.5f;
+        const int nv = mono ? 1 : 8, ng = mono ? 1 : 2;
+        for (int vi = 0; vi < nv; ++vi)
+            controlExo (voices[(std::size_t) vi]);
+
+        for (int g = 0; g < ng; ++g)
+        {
+            auto& G = groups[(std::size_t) g];
+            for (int l = 0; l < 4; ++l)
+            {
+                const auto& v = voices[(std::size_t) (g * 4 + l)];
+                G.cut[(std::size_t) l] = v.laneCut;
+                G.res[(std::size_t) l] = v.laneRes;
+                G.slope = voices[(std::size_t) (g * 4)].slope;
+                const auto r = G.res[(std::size_t) l];
+                const auto k4 = r * 4.199999809265137f;
+                G.onePlusRes[(std::size_t) l] = r + 1.0f;
+                G.k[(std::size_t) l] = k4;
+                auto c = std::min (G.cut[(std::size_t) l], G.maxCut);
+                c = std::max (c, 20.0f);
+                const auto w = c * G.piOverFs;
+                const auto w2 = w * w;
+                const auto t = ((2.4716885089874268f - w2 * 0.18975968658924103f) * w) / (2.4674010276794434f - w2);
+                const auto gg = 1.0f / (t + 1.0f);
+                G.G[(std::size_t) l] = gg;
+                const auto g1 = gg * t;
+                G.g[(std::size_t) l] = g1;
+                auto g2 = g1 * g1;
+                g2 = g2 * g2;
+                G.g4[(std::size_t) l] = g2;
+                G.norm[(std::size_t) l] = 1.0f / (k4 * g2 + 1.0f);
+            }
+        }
+
+        std::array<float, 2> osL {}, osR {};
+        const auto* rows = T.blit.data();
+        for (int os = 0; os < oversampling; ++os)
+        {
+            for (int vi = 0; vi < nv; ++vi)
+            {
+                auto& v = voices[(std::size_t) vi];
+                v.osc.tick (rows);
+                v.noise = (float) (int) T.noise[(std::size_t) v.noiseIndex] * 8.631591481389478e-05f;
+                if (++v.noiseIndex >= noisePoints)
+                    v.noiseIndex = 0;
+                float a, b;
+                if (! v.dco2On)
+                {
+                    a = v.osc.out * v.dco1Level;
+                    b = v.noise * v.noiseVol;
+                }
+                else
+                {
+                    v.osc2.tick (rows);
+                    a = (v.osc.out * v.am + v.dco2Level) * v.osc2.out + v.osc.out * v.dco1Level;
+                    b = v.noise * v.noiseVol;
+                }
+                groups[(std::size_t) (vi >> 2)].in[(std::size_t) (vi & 3)] = (b + a) * 0.27000001072883606f;
+            }
+            for (int g = 0; g < ng; ++g)
+                ladder (groups[(std::size_t) g]);
+            float l = 0.0f, r = 0.0f;
+            for (int vi = 0; vi < nv; ++vi)
+            {
+                auto& v = voices[(std::size_t) vi];
+                float a;
+                if (v.vcaMode == 0)
+                {
+                    a = v.vca;
+                    v.amp = a;
+                }
+                else
+                {
+                    auto e = (v.vcaMode == 1 ? v.env1 : v.env2) - 0.02500000037252903f;
+                    if (e <= 0.0f)
+                        e = 0.0f;
+                    e = e * v.velGainEnv;
+                    a = v.vcaSmooth ? (e - v.amp) * v.ampK + v.amp : e;
+                    v.amp = a;
+                }
+                float pl = v.panL, pr = v.panR;
+                if (v.fresh)
+                    v.fresh = false;
+                else
+                {
+                    pl = (pl - v.panLs) * v.panK + v.panLs;
+                    pr = (pr - v.panRs) * v.panK + v.panRs;
+                }
+                v.panLs = pl, v.panRs = pr;
+                const auto y = groups[(std::size_t) (vi >> 2)].out[(std::size_t) (vi & 3)];
+                const auto yl = y * pl * a;
+                const auto yr = y * pr * a;
+                r = r + yr;
+                l = l + yl;
+            }
+            osL[(std::size_t) os] = l;
+            osR[(std::size_t) os] = r;
+        }
+        auto L = 0.0f, R = 0.0f;
+        decimate (osL, osR, L, R);
+        postExo (L, R);
+        outL = L, outR = R;
+#ifdef LYNX_KEPLER_TRACE
+        if (static FILE* tf = std::getenv ("KTRACE") ? std::fopen (std::getenv ("KTRACE"), "w") : nullptr; tf != nullptr)
+        {
+            const auto& v = voices[0];
+            std::fprintf (tf, "%.17g %.17g %.9g | %.17g %.17g %.17g %.17g | %.9g %.9g %.9g %.9g %.9g\n", lfo1Phase, lfo1Inc, P[0x30],
+                          v.osc.phase, v.osc.inc, v.osc2.phase, v.osc2.inc, v.env1, v.env2, v.laneCut, v.amp, outL);
+        }
+#endif
+    }
+
+    // after the decimator: high-pass, chorus, the effects, main volume / pan and the output gain (§3.6–3.8)
+    void postExo (float& L, float& R) noexcept
+    {
+        if (hpOn)
+        {
+            const auto yl = (hpB0 * L + hpB1 * hpXL) + hpA1 * hpYL;
+            const auto yr = (hpB0 * R + hpB1 * hpXR) + hpA1 * hpYR;
+            hpYL = yl, hpYR = yr;
+            hpXL = L, hpXR = R;
+            L = yl, R = yr;
+        }
+        chorusStage (L, R);
+        effectsExo (L, R);
+        mainSL = (mainL - mainSL) * mainK + mainSL;
+        mainSR = (mainR - mainSR) * mainK + mainSR;
+        L = mainSL * L;
+        R = R * mainSR;
+        L = outGL * L;
+        R = outGR * R;
+        outGL = (outTargetL - outGL) * 0.05000000074505806f + outGL;
+        outGR = (outTargetR - outGR) * 0.05000000074505806f + outGR;
+    }
+
+    void effectsExo (float&, float&) noexcept {}
+
+    // the chorus with its mode cross-fade (§3.7), as in sample()
+    void chorusStage (float& L, float& R) noexcept
+    {
+        if (chorusFade == 0)
+        {
+            if (chorusMode != 0)
+                chorusProcess (L, R);
+            return;
+        }
+        auto cl = L, cr = R;
+        if (chorusMode != 0)
+            chorusProcess (cl, cr);
+        const auto f = std::max (chorusMix, 0.0f);
+        const auto dry = 1.0f - f;
+        L = L * dry + f * cl;
+        R = dry * R + f * cr;
+        if (chorusFade == 1)
+        {
+            chorusMix = chorusFadeStep + chorusMix;
+            if (chorusMix > 1.0f)
+            {
+                chorusMix = 1.0f;
+                chorusFade = 0;
+            }
+        }
+        else if (chorusFade == 2)
+        {
+            chorusMix = chorusMix - chorusFadeStep;
+            if (chorusMix < 0.0f)
+            {
+                chorusMix = -1.0f;
+                chorusFade = 1;
+                chorusMode = chorusTarget;
+                if (chorusMode != 0)
+                    chorusSetMode (chorusMode);
+            }
+        }
+    }
+
+    // newest note's voice (the global matrix reads its sources)
+    void updateMatrixVoice() noexcept
+    {
+        if (order.empty())
+            return;
+        for (int i = 0; i < 8; ++i)
+            if (voices[(std::size_t) i].note == order.back())
+            {
+                mxVoice = i;
+                return;
+            }
+    }
+
     // ---------------------------------------------------------------- chorus (§3.7)
     void designChorusHp (float f) noexcept
     {
@@ -2218,6 +3404,25 @@ private:
     bool arpOn = false, arpSync = false, arpRunning = false, arpWaiting = true, arpAligned = false;
     int arpRestart = 0, arpNote = -1;
     double arpPeriod = 0.811, arpGate = 1.0, arpGateLen = 0.811, arpLast = 0.0, arpDelta = 0.0, arpAcc = 0.0, arpNext = 0.0, arpStart = 0.0;
+    bool arpJunoIndex = true; // a note added mid-arpeggio shifts the step index (the Juno behaviour, Exo's 0x5b off)
+    // Kepler Exo
+    struct MatrixTerm { int src, slot; };
+    struct MatrixDst { int dst = 0; std::vector<MatrixTerm> terms; };
+    bool exo = false, slotsDirty = false;
+    std::array<float, paramCount> host {};
+    std::array<std::pair<int, int>, 8> slots {};
+    std::vector<MatrixDst> voiceMx, globalMx;
+    std::array<float, 8> globalAmount {};
+    Voice globalSrc;
+    int gmCount = 0, gmInterval = 44, mxVoice = 0;
+    double lfo2Phase = 0.0, lfo2Inc = 0.0, lfo2Kappa = 1.0, lfo2LastBeat = 0.0;
+    bool lfo2Sync = false, lfo2Wrapped = false, lfo2SyncReset = false, lfo2TrigMode = false;
+    int lfo2Shape = 0;
+    std::uint32_t lfo2Lcg = 55555u;
+    float lfo2Bip = 0.0f, lfo2Uni = 0.0f, lfo2Hold = 0.0f, lfo2Delta = 0.0f, lfo2Ramp = 1.0f, lfo2RampInc = 0.0f, lfo2Gate = 0.0f;
+    float lfo1UniW = 0.0f, lfo1TriW = 0.0f, lfo2UniW = 0.0f, lfo2BipW = 0.0f;
+    float chorusNoise = 0.0f;
+    bool chorusGateOn = false;
 };
 
 // MIDI velocity as FL's wrapper derives it from Init.Vol (§5.1)
