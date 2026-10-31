@@ -741,7 +741,7 @@ juce::String describeAutomationTarget (AudioEngine& engine, const AutomationTarg
             {
                 const auto ms = midiout::stateOf (song.channels[(std::size_t) t.index].pluginState);
                 const auto l = t.param == midiout::programParam ? std::string() : midiout::label (ms.controls[(std::size_t) (t.param - 1)]);
-                param = t.param == midiout::programParam ? tr ("Patch") : l.empty() ? tr ("Control {0}", { juce::String (t.param) }) : utf8 (l);
+                param = t.param == midiout::programParam ? tr ("Patch") : l.empty() ? tr ("Control {0}", { juce::String (t.param) }) : utf8 (l.c_str());
             }
             else if (t.kind == AutomationTargetKind::effectParam && t.index < (int) song.mixer.size()
                      && t.slot < (int) song.mixer[(std::size_t) t.index].effects.size())

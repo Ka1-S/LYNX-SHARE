@@ -111,7 +111,7 @@ TEST (midi_out_reads_every_fl_preset)
     {
         if (e.path().extension() != ".fst")
             continue;
-        const auto file = readFile (e.path());
+        const auto file = i18ntest::readFile (e.path());
         const auto blob = stateFromFst ({ file.begin(), file.end() });
         const auto s = parse (blob);
         CHECK (s.has_value());
@@ -143,7 +143,7 @@ TEST (midi_out_import_track_state_is_fls_miditrack_fst)
     const auto file = std::filesystem::path (realFlpDir) / "System" / "MIDITrack.fst";
     if (realFlpDir.empty() || ! std::filesystem::exists (file))
         return;
-    const auto bytes = readFile (file);
+    const auto bytes = i18ntest::readFile (file);
     const auto fl = parse (stateFromFst ({ bytes.begin(), bytes.end() }));
     CHECK (fl.has_value());
     if (! fl)

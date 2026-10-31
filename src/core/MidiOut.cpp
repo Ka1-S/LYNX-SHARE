@@ -104,7 +104,7 @@ std::optional<State> parse (const std::vector<std::uint8_t>& data)
     // the header block: 20 bytes before version 2, 24 before version 4, then 26 (the two option bytes)
     const auto v = s.version;
     const auto headerBytes = (std::size_t) ((6 - (v < 2 ? 1 : 0)) * 4 + (v > 3 ? 2 : 0));
-    if (r.pos + headerBytes + 4 * (1 + controlCount) > data.size())
+    if (r.pos + headerBytes > data.size())
         return std::nullopt;
     // (a state that does not hold the option bytes keeps "Send pan, volume and pitch" on, as FL loads it)
     s.sendPanVolPitch = true;
@@ -121,11 +121,16 @@ std::optional<State> parse (const std::vector<std::uint8_t>& data)
         s.sendPanVolPitch = r.u8() != 0;
         s.mapNoteColour = r.u8() != 0;
     }
-    s.program = r.i32();
+    // (a cut-short state — LYNX's older writer, a hand-made test — keeps its header: the rest stays at the defaults)
+    const auto headerOk = r.ok;
+    if (const auto program = r.i32(); r.ok)
+        s.program = program;
     for (auto& value : s.values)
-        value = r.i32();
-    if (! r.ok)
+        if (const auto v = r.i32(); r.ok)
+            value = v;
+    if (! headerOk)
         return std::nullopt;
+    const auto complete = r.ok;
     s.channel = std::clamp (s.channel, 0, 15);
     s.port = std::clamp (s.port, 0, 255);
     s.page = std::clamp (s.page, 0, pageCount - 1);
@@ -135,6 +140,8 @@ std::optional<State> parse (const std::vector<std::uint8_t>& data)
     // before version 6 the reset options follow "Send pan, volume and pitch" (cut notes always on)
     if (v <= 5)
         s.resetFlags = (s.sendPanVolPitch ? resetPitch | resetBendRange | resetPan | resetVolume | resetProgram : 0) | resetCutNotes;
+    if (! complete)
+        return s;
 
     // the controls that differ from the default: index, then 16 (version < 3), 20 (< 7) or 24 bytes, then two strings
     const auto recordWords = v < 3 ? 4 : v < 7 ? 5 : 6;

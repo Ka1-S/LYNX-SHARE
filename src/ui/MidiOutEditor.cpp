@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 
 #include "core/MidiControls.h"
 #include "core/MidiOut.h"
@@ -103,7 +104,7 @@ public:
     ControlSettings (const Control& start, std::function<void (const Control&)> accept) : control (start), onAccept (std::move (accept))
     {
         for (int t = 0; t <= 4; ++t)
-            type.addItem (tr (midiout::typeName ((midiout::Type) t)), t + 1);
+            type.addItem (t == 3 ? tr ("Channel aftertouch") : t == 4 ? tr ("Note") : juce::String (midiout::typeName ((midiout::Type) t)), t + 1);
         type.onChange = [this] { updateRanges(); };
         for (int c = 0; c <= 16; ++c)
             channel.addItem (c == 0 ? tr ("Default") : juce::String (c), c + 1);
@@ -393,7 +394,7 @@ public:
         rename.setBounds (pageRow.removeFromLeft (22).reduced (2));
         area.removeFromTop (8);
 
-        knobArea = area.removeFromTop (300);
+        knobArea = area.removeFromTop (264);
         auto grid = knobArea.reduced (8);
         const auto cw = grid.getWidth() / 3, ch = grid.getHeight() / 3;
         for (int k = 0; k < midiout::knobsPerPage; ++k)
@@ -435,7 +436,7 @@ private:
             ui::ValueSpec s;
             s.name = owner.knobName (index());
             s.minimum = juce::jmin (c.min, c.max);
-            s.maximum = juce::jmax (c.max, s.minimum + 1);
+            s.maximum = juce::jmax ((double) c.max, s.minimum + 1.0);
             s.interval = 1.0;
             s.defaultValue = s.minimum;
             s.toText = [] (double v) { return juce::String ((int) std::lround (v)); };
@@ -478,7 +479,7 @@ private:
                 g.fillPath (cogPath (juce::Rectangle<float> (14.0f, 14.0f).withCentre (label.getCentre())));
                 return;
             }
-            g.setColour (live ? theme::colour::textPrimary : theme::colour::textDisabled);
+            g.setColour (live ? theme::colour::textPrimary : theme::colour::textSecondary); // (bold when it sends, FL)
             ui::drawFittingText (g, utf (midiout::label (c)), label.reduced (2.0f, 0.0f), juce::Justification::centred,
                                  juce::Font (theme::font (theme::type::small, live)));
         }
@@ -612,7 +613,7 @@ private:
     {
         if (channel < 0)
             return;
-        if (auto* instrument = engine.getChannelInstrument (channel))
+        if (auto instrument = engine.getChannelInstrument (channel))
             midiout::requestReset (*instrument, allControllersFirst);
     }
 
