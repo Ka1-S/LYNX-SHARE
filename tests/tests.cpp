@@ -16460,12 +16460,12 @@ TEST (wave_traveller_matches_fl_engine)
     const Case cases[] {
         // live: every segment type, volume curve + mutes + attack / release, absolute speed, types 0 / 7 and a tiny Bezier
         { { note (0, 60, 0.9f, 0.25f, 30.0f, 20000), note (100, 61, 0.7f, -0.5f, -120.0f, 15000), note (2000, 62, 0.8f, 0.0f, 0.0f, -1),
-            note (5000, 63, 1.0f, 0.6f, 250.0f, -1) }, 44100, 140.0f, 0, 40000, 0x0000000000000000ull /*WT_B1*/ },
+            note (5000, 63, 1.0f, 0.6f, 250.0f, -1) }, 44100, 140.0f, 0, 40000, 0x9001a50747634ba6ull },
         // render mode, 256 taps per side (FL's render default), with the notes' own pan
         { { note (0, 60, 0.9f, 0.25f, 30.0f, 20000, -0.3f), note (100, 61, 0.7f, -0.5f, -120.0f, 15000, -0.3f), note (2000, 62, 0.8f, 0.0f, 0.0f, -1, -0.3f),
-            note (5000, 63, 1.0f, 0.6f, 250.0f, -1, -0.3f) }, 44100, 140.0f, 256, 8000, 0x0000000000000000ull /*WT_B2*/ },
+            note (5000, 63, 1.0f, 0.6f, 250.0f, -1, -0.3f) }, 44100, 140.0f, 256, 8000, 0xedabd9728ffbb252ull },
         // a 48 kHz host at tempo 97.5
-        { { note (0, 62, 0.9f, -0.6f, -250.0f, 20000), note (300, 60, 0.8f, 0.3f, 100.0f, -1) }, 48000, 97.5f, 0, 30000, 0x0000000000000000ull /*WT_B3*/ },
+        { { note (0, 62, 0.9f, -0.6f, -250.0f, 20000), note (300, 60, 0.8f, 0.3f, 100.0f, -1) }, 48000, 97.5f, 0, 30000, 0x71b988c298c5ab31ull },
     };
     for (const auto& c : cases)
     {

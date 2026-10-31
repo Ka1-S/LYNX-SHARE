@@ -60,7 +60,8 @@ struct Patch
     std::vector<Point> wave, vol;
 
     // built from the curves (FUN_007558c0): values 0 … 1, n = the table's length
-    std::array<float, tableCapacity> waveTable {}, volTable {};
+    // (on the heap: a State holds 240 of them)
+    std::vector<float> waveTable = std::vector<float> (tableCapacity, 0.0f), volTable = std::vector<float> (tableCapacity, 0.0f);
     int waveN = 0, volN = 0;
 
     void rebuild() noexcept;
