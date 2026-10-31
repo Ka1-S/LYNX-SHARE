@@ -5,10 +5,8 @@ Fruity Scratcher_x64.dll, its engine_x64.dll), [DFM] form resources, [REF] FL's 
 LYNX screenshot, [TEST]. Clean-room: behaviour only, implemented from this document.
 
 ## Where I stopped
-- 2026-10-31 14:00: §1 DVS landed on the branch (48edd100); §2 scripts engine + Tools › Scripting UI on the branch
-  (e1d61beb, 7bae38e2, string joins). FL's 12 shipped .pyscript files all run on LYNX's engine (harness, defaults, a
-  stereo sample and an empty editor). Next: Edison_x64.dll in Ghidra (E:\lynx-work\edscr167\ghidra, project "ed")
-  for Convert to score and the Deverb form, then i18n, build, land.
+- 2026-10-31 15:00: all four items implemented on feature/edscr167 (DVS, scripts, Deverb, Convert to score), docs and
+  i18n done. Next: full build-local + Windows build, merge origin/main, land.
 
 ## §1 Fruity Scratcher: DVS timecode input and RIAA preamp
 
@@ -119,6 +117,14 @@ Reporter's words: "Edison: Deverb … as FL 2026, REA on Edison's DLL."
   hint "Choose a profile that best matches the source material"; Processing — "Analysing sample, please wait..." with a
   progress gauge; Result — the Mix wheel (−256 … 256, starts at 256 shown "100"), labels "Original" / "Processed",
   Preview, OK / Cancel.
+- The work (0x843e90): the selection (or the whole sample) is made stereo and resampled to 48 kHz (FormShow 0x843b70,
+  rate constant 48000.0), clipped to ±1, cut into blocks of Block size seconds (rate × (index + 1) frames) with 0.1 s
+  linear cross-fades, run through the model "deverb_<profile>.mod"; Limit CPU usage sets the process affinity to 4 cores
+  for the run. The result gets the input's peak back (capped at 1) when the two differ by more than 0.01 (0x62e8c0
+  scale by peakIn / peakOut).
+- The Mix wheel (0x844d00): f = (value − min) / (max − min) (0 … 1); output = processed × f + original × (1 − f); its label
+  shows value × 100 / 256 ("%.0f"; 0x843c50). So −100 = the original, 0 = half and half, 100 = processed (the default).
+  OK resamples back to the sample's own rate (0x845050).
 
 ### 3.2 LYNX before
 No Deverb.
@@ -129,8 +135,43 @@ No Deverb.
   energy frames, straight-line fits of falling runs, median slope); the late part's spectrum is predicted from the
   smoothed spectrum 50 ms (Voice: 32 ms) earlier, decayed by the T60, and subtracted with over-subtraction 2 (Voice 3),
   a gain floor of −20 dB (Voice −26 dB) and a slower fall of the gains. Block size 1–5 = an analysis block of 512 …
-  8192 frames at 44.1 kHz. Limit CPU usage / Safe mode belong to FL's neural module and are left out.
+  8192 frames at 44.1 kHz (FL's blocks are the model's chunk length in seconds; LYNX's method needs no chunks).
+  Limit CPU usage / Safe mode belong to FL's neural module and are left out. FL's mix rule and peak restore as above.
 - UI: Tools › Spectral › Deverb... opens the form (Profile, Block size, Mix, Preview / Accept / Cancel).
 - Tests (tests/Deverb167Tests.inc): T60 read within ±30 % (0.5 s and 1 s rooms); in a live room (reverb 10 dB over the
-  direct sound) the tail between bursts drops 15 dB (Voice 23 dB) while the bursts drop 1.5 dB (Voice 4.6 dB); mix 0
-  leaves the audio unchanged, mix +1 and −1 add up to the original; only the selection changes.
+  direct sound) the tail between bursts drops 13 dB (Voice 19 dB) while the bursts change < 1 dB; mix −1 leaves the
+  audio unchanged, 0 is the mean of the original and the processed sound; the processed peak equals the original's;
+  only the selection changes.
+
+## §4 Edison: Convert to score and dump to piano roll
+
+Reporter's words: "Edison: … Convert to score (audio → notes into the Piano Roll) … as FL 2026."
+
+### 4.1 FL's evidence
+- Menu: Tools › Analysis › "Convert to score and dump to piano roll" [SHOT 03-tools.png; Edison_x64.dll 0x886c20].
+- The command (Edison_x64.dll 0x88b640): makes a pitch analyser on the sample (0x7a9880 → SolPitchAn_CreateInstance /
+  SolPitchAn_CreatePitchMarks loaded from FL's pitch library, 0x7a95b0: the analyser Newtone uses); a sample over 40 MB
+  of data asks "This sample is probably too big to be analyzed…" (0x7a99d0); status "Detecting score...". The analyser
+  is fed the WHOLE sample in 8192-frame blocks (0x7a9a10), then "Computing segments..."; it returns the notes (28-byte
+  records: pitch, level, weight, start frame, end frame) and the sample's overall detune.
+- "Dumping score...": a note list in the plugin SDK's form — target 1 (piano roll), flags 3 (empty first + use
+  selection), pattern −1 (current), channel −1 (selected) — each note: key = Round(pitch − detune), only 0..127;
+  position / length from the frames by 0x88b570 (frames × tempo / (rate × 60) × PPQ, rounded; a sample with its own
+  tempo goes through the stretch map), notes of 3 ticks or less dropped; volume = level × 0.5 + 0.5 (constant 0.5 at
+  0x88b968); pan, pitch, colour 0. Sent to the host (dispatcher 0x11).
+
+### 4.2 LYNX before
+No conversion.
+
+### 4.3 LYNX now
+- core/NewtoneFx detectScore(): LYNX's Newtone analysis (analyseNotes: YIN pitch track, steady voiced stretches) on
+  the whole sample; the detune = the notes' length-weighted mean offset from their semitones; key = round(pitch −
+  detune), 0..127; volume = 0.5 + 0.5 × the note's RMS over the loudest note's (FL's level is the analyser's own).
+- dumpScore(): the current pattern, the selected channel's notes there removed first, then the notes at frames × tempo /
+  (rate × 60) × PPQ; notes of 3 ticks at FL's PPQ 96 or less (≤ 30 LYNX ticks) dropped.
+- UI: Audio editor › Tools › Analysis › Convert to score and dump to piano roll (worker thread; "Detecting score...",
+  "Dumping score...", then how many notes went in). Not done: FL's "use selection" flag (dump inside a Piano roll
+  selection) and the big-sample warning (LYNX's analysis has no such limit).
+- Tests (tests/Score167Tests.inc): a sung-like C4–E4–G4 line 0.2 semitone sharp → keys 60/64/67, detune 0.2, times
+  within 30 ms, volumes 1 / ~0.75 / 1; the dump replaces only the selected channel's notes in the current pattern, the
+  first note's tick matches the formula, a 0.01 s note is dropped.
