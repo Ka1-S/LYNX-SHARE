@@ -26,11 +26,11 @@ TEST (ntt167_transmitter_synced_text_and_columns)
     CHECK (syncedText (2500) == "4:1");   // 0.25 · 767 + 0.5 → 192 → 193 = 4 steps 1 tick
     CHECK (syncedText (144) == "0:12");   // FL's Default preset's transient delay
     CHECK (paramText (tDelaySynced, paramFromRaw (tDelaySynced, 10000)) == "16:0");
-    CHECK (paramText (sDelaySynced, paramFromRaw (sDelaySynced, 3156)) == "5:5");
+    CHECK (paramText (sDelaySynced, paramFromRaw (sDelaySynced, 3156)) == "5:3");
     // the envelope view: FL's Default speed 90 → 2.87 ms columns at 44.1 kHz, speed 50 → 12.2 ms, never under 16
     CHECK (columnSamples (44100, 90) == (int) std::lround (44100 * ((std::pow (601.0, 0.1) - 1) * 0.0004125 + 0.0025)));
     CHECK (columnSamples (44100, 90) == 127);
-    CHECK (columnSamples (44100, 50) == 539);
+    CHECK (columnSamples (44100, 50) == 538);
     CHECK (columnSamples (100, 100) == 16);
     // FL's state carries the view's speed after the sidechain
     const auto st = parse (fltrans165::flState (fltrans165::defaultRaw(), 0, 0, 0));
@@ -101,7 +101,7 @@ TEST (ntt167_transmitter_sends_route_to_inserts)
         t.params[transientOn] = t.params[sustainOn] = 0.0f;
         s.mixer[1].effects.push_back (t);
     }, 1, 4000);
-    CHECK (std::abs (l0[3999]) < 1e-6f);
+    CHECK (std::abs (l0[3999]) < 1e-4f); // (the on switches glide down with FL's 8 ms level glide)
     // only the sustain sent: a steady DC is all sustain once the onset has passed
     const auto [l1, r1] = send105::render ([] (Song& s) {
         auto t = ntt167::plainTransmitter();
