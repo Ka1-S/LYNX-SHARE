@@ -98,6 +98,12 @@ Not done in this round: both need EXEC studies of zplane's engine (black-box) as
 (long smooth times up to 40 c off; FL's whole-sample re-alignment after edits). The harness is ready
 (`/mnt/e/lynx-work/flnewt165/tools`: `flrun.sh`, `run2b.py`, `cmp.py`, `ntr`).
 
+## Checks
+
+- Linux build with FL Data: 1888120 checks, 0 failures (`/mnt/e/lynx-work/ntt167/bl3.log`).
+- Windows build: [SHOT] `/mnt/e/lynx-work/ntt167/shots/fx/transmitter-default.png` (envelope panel, two send boxes),
+  `shots/sn-newtone.png`, `shots/sn-newtime.png` (Send to Playlist, Snap; no beta line) — fresh profile, test mode.
+
 ## Per-item table
 
 | Item | Reporter's words | FL evidence | LYNX before | LYNX now |
@@ -110,6 +116,7 @@ Not done in this round: both need EXEC studies of zplane's engine (black-box) as
 | Legato glides / realign | as FL | — | 165g residuals | left |
 
 ## Where I stopped
+- 2026-10-31 (3): builds green, shots checked, landing.
 - 2026-10-31 (2): Transmitter, Newtime and Newtone Snap / Send to Playlist written and committed; builds and Windows
   shots next; legato / realign left.
 - 2026-10-31: worktree created, briefs and earlier rounds (73, 95, 165g flnewt165 / fltrans165) read. Starting with
