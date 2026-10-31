@@ -29,6 +29,7 @@
 #include "core/FruityMultiband.h"
 #include "core/FlangusFastDist.h"
 #include "core/FruityPhaser.h"
+#include "core/EmphasisFx.h"
 #include "core/EmphasizerFx.h"
 #include "core/FlLegacyFx.h"
 #include "core/FreqShifterFl.h"
@@ -712,7 +713,7 @@ bool frequencyShifter (const std::vector<std::uint8_t>& d, EffectSlot& slot)
     return true;
 }
 
-bool emphasis (const std::vector<std::uint8_t>& d, EffectSlot& slot)
+bool emphasisApprox (const std::vector<std::uint8_t>& d, EffectSlot& slot)
 {
     if (d.size() < 4 + 13 * 4)
         return false;
@@ -1222,6 +1223,13 @@ std::optional<EffectSlot> effectFromFl (const std::string& pluginName, const std
             emphasizer::toParams (*s, slot.params.data());
             return slot;
         }
+    if (pluginName == "Emphasis") // REA_rodada167f: FL's own engine (an unreadable state keeps the limiter approximation)
+        if (const auto s = emphasis::parse (state))
+        {
+            auto slot = makeEffectSlot (EffectKind::flEmphasis);
+            emphasis::toParams (*s, slot.params.data());
+            return slot;
+        }
     // round 165g (REA_rodada165g): Fruity Mute 2 (exact), Big Clock, Tuner, HTML NoteBook
     if (pluginName == "Fruity Mute 2")
     {
@@ -1267,6 +1275,15 @@ std::optional<EffectSlot> effectFromFl (const std::string& pluginName, const std
     {
         auto slot = makeEffectSlot (EffectKind::waveCandy);
         visualfx::wavecandy::fromFl (state, slot);
+        return slot;
+    }
+    if (pluginName == "Fruity dB Meter" || pluginName == "Fruity Spectroman")
+    {
+        // round 167f: FL's legacy level meter and spectrum analyser (no audio change) as LYNX's analyser in their
+        // role, in the matching view, so the slot (and what it shows) is kept instead of dropped
+        auto slot = makeEffectSlot (EffectKind::waveCandy);
+        slot.params[0] = visualfx::wavecandy::modeValue (pluginName == "Fruity dB Meter" ? visualfx::wavecandy::Mode::peakMeter
+                                                                                         : visualfx::wavecandy::Mode::spectrum);
         return slot;
     }
     if (pluginName == "ZGameEditor Visualizer") // REA_rodada164c: its layers mapped to LYNX Visualizer layers
@@ -1543,7 +1560,7 @@ std::optional<EffectSlot> effectFromFl (const std::string& pluginName, const std
     else if (is ("Frequency Shifter"))
         frequencyShifter (state, slot);
     else if (is ("Emphasis"))
-        emphasis (state, slot);
+        emphasisApprox (state, slot);
     else if (is ("Low Lifter"))
         lowLifter (state, slot);
     else if (is ("Fruity Send"))
@@ -1616,6 +1633,7 @@ std::vector<std::string> flPluginsForEffect (EffectKind kind)
         case EffectKind::voiceShift: return {}; // LYNX's own effect: no FL counterpart
         case EffectKind::hardwareInsert: return {}; // LYNX's own effect (round 164d): FL has none
         case EffectKind::emphasizer: return { "Emphasizer" };
+        case EffectKind::flEmphasis: return { "Emphasis" };
         case EffectKind::flFrequencyShifter: return { "Frequency Shifter" };
         case EffectKind::flLowLifter: return { "Low Lifter" };
         case EffectKind::flPhaseInverter: return { "Fruity Phase Inverter" };
