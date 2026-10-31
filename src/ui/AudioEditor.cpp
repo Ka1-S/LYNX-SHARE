@@ -3517,6 +3517,7 @@ juce::PopupMenu AudioEditor::mainMenu()
     tools.addItem (tr ("Clean up (denoise)..."), has, false, [this] { openEdisonTool (T::denoise); });
     tools.addItem (tr ("Match spectrum..."), has, false, [this] { openEdisonTool (T::matchSpectrum); });
     tools.addItem (tr ("Vocal denoise/isolator..."), has, false, [this] { openEdisonTool (T::vocalDenoise); });
+    tools.addItem (tr ("Deverb..."), has, false, [this] { openEdisonTool (T::deverb); });
     tools.addSectionHeader (tr ("Regions"));
     tools.addItem (tr ("Normalize all regions"), has, false, [this] { regionsTool (tr ("Normalize all regions"), [] (ae::Document& d) { return ae::normalizeRegions (d); }); });
     tools.addItem (tr ("Declick in all regions"), has, false, [this] { regionsTool (tr ("Declick in all regions"), [] (ae::Document& d) { return ae::declickRegions (d, true, false); }); });
@@ -3660,7 +3661,7 @@ std::unique_ptr<juce::Component> makeAudioEditorForSnapshot (AudioEngine& engine
 std::unique_ptr<juce::Component> makeAudioToolPanelForSnapshot (juce::Component& editor, int tool, int envelopeMode)
 {
     auto* e = dynamic_cast<AudioEditor*> (&editor);
-    if (e == nullptr || tool < 0 || tool > (int) audiotools::Tool::stretch)
+    if (e == nullptr || tool < 0 || tool > (int) audiotools::Tool::deverb)
         return {};
     e->setEnvModeForSnapshot (envelopeMode);
     return audiotools::makeToolPanel (*e, (audiotools::Tool) tool);
@@ -3668,7 +3669,7 @@ std::unique_ptr<juce::Component> makeAudioToolPanelForSnapshot (juce::Component&
 
 const char* audioToolNameForSnapshot (int tool)
 {
-    if (tool < 0 || tool > (int) audiotools::Tool::stretch)
+    if (tool < 0 || tool > (int) audiotools::Tool::deverb)
         return nullptr;
     return audiotools::toolTitle ((audiotools::Tool) tool);
 }
