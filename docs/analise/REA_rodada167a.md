@@ -98,7 +98,8 @@ test project written for this round, [SHOT] FL driven as a black box (screenshot
 - **LYNX before:** default "2", the field not focused; after the error nothing was added (already as FL).
 - **LYNX now:** default 10, digits only, the field focused with its text selected; Ctrl+A is the text editor's own
   select-all (JUCE's TextEditor key map; the AlertWindow is its own top-level window, so LYNX's shortcuts never see
-  the key). After the error, still nothing is added.
+  the key). After the error, still nothing is added. [SHOT, LYNX Windows build, fresh test profile] g07 = the box with
+  "10" selected, g08 = End deselects, g13 = Ctrl+A selects it again (`C:\Users\kauan\lynx-test\left167\s\`).
 
 ## 7. Mixer: right-click on the arm switch = FL's "Record to" dialog
 
@@ -114,14 +115,21 @@ test project written for this round, [SHOT] FL driven as a black box (screenshot
   write to that file (LYNX never overwrites an earlier take: "_2", "_3"... — its own choice) and "Render armed /
   selected tracks" render to it. The input / monitoring / record-safe menu stays on the input box (the notices that
   pointed to the arm's right-click now point to the input box). A record-safe insert explains why it can't be armed.
+  [SHOT, LYNX Windows build] g04 = "Record Insert 1 to" with "untitled_2026-10-31 14-55-52_Insert 1" (*.wav), g05 = the
+  insert armed, hint "Record to: ….wav".
 
 ## 8. Pitch-bend recording test with injected MIDI
 
 - **LYNX now:** `LYNX --bendrectest <report> [song|pattern]` (test mode only): records with the engine, injects a
   note on and a pitch-wheel sweep through `handleIncomingMidiMessage` while recording, stops, and checks the recorded
-  channel pitch-bend lane (or clip): ≥ 20 points, values 0..1, the last back at 0.5, a span of 3–6 beats, ≥ 1 note.
-  Run on the Windows build with a fresh profile (see "Where I stopped").
+  channel pitch-bend lane (or clip): ≥ 20 points, values reaching 0 and 1, ≥ 1 note; song mode: a span of 3–6 beats
+  ending back at 0.5; pattern mode (the take wraps the 1-bar pattern): a span of 2–4 beats with a centre point.
+  Windows build, fresh profile + test mode: pattern result=OK (163 points, 0.004..0.997), song result=OK (226 points,
+  last 0.500).
 
 ## Where I stopped
 
 - 2026-10-31: items 1–8 implemented in ../lynx-wt-left167 (feature/left167). Tools in tmp/left167/py.
+- 2026-10-31 15:00: unit tests `LYNX_TEST=left167` with FL Data: 331 checks, 0 failures. Windows build checked
+  (bendrectest both modes OK, shots g04/g05/g07/g08/g13); LYNX test instance closed, desktop clean (g99), locks
+  released. Next: merge origin/main, full test build, land.

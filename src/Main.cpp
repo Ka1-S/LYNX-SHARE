@@ -4012,9 +4012,12 @@ private:
                           + ", notes " + juce::String (notes));
                     if (! got.empty())
                         step ("last=" + juce::String (got.back().second, 3));
-                    const auto ok = got.size() >= 20 && hi > 0.97f && lo < 0.03f && sorted && span > lynx::ppq * 3 && span < lynx::ppq * 6
-                                    && std::abs (got.back().second - 0.5f) < 0.02f && notes >= 1;
-                    juce::ignoreUnused (songMode);
+                    // song mode: a clip over the take, ending back at the centre. Pattern mode: the take loops the 1-bar pattern
+                    // (4.6 beats of take), so the lane spans the bar and the last wheel message (the centre) lands inside it
+                    const auto centred = std::any_of (got.begin(), got.end(), [] (const auto& p) { return std::abs (p.second - 0.5f) < 0.02f; });
+                    const auto ok = got.size() >= 20 && hi > 0.97f && lo < 0.03f && sorted && notes >= 1
+                                    && (songMode ? span > lynx::ppq * 3 && span < lynx::ppq * 6 && std::abs (got.back().second - 0.5f) < 0.02f
+                                                 : span > lynx::ppq * 2 && span <= lynx::ppq * 4 && centred);
                     step (ok ? "result=OK" : "result=FAILED");
                     finish (ok ? 0 : 1);
                 });
