@@ -10,15 +10,17 @@ driven by our harness, [DATA] FL's factory presets.
 
 | item | the brief | FL evidence | LYNX before | LYNX now |
 |---|---|---|---|---|
-| engine | "implement it on FL's own engine" | render `FUN_18001b7d0` = Kepler's `FUN_18001b940` + Exo blocks [DECOMP] | Kepler-1 only; Kepler Exo channels imported empty | Kepler-2 states on the same port, voice part bit-exact on 150/188 factory states, the rest ≤ −98 dB (§1–§3) |
-| effects | "bit-identical or as close as measured" | §5 [DECOMP][EXEC] | none | saturation (both modes) and chorus noise/gate done; EQ, delay, reverb, hyper chorus: see §5 |
+| engine | "implement it on FL's own engine" | render `FUN_18001b7d0` = Kepler's `FUN_18001b940` + Exo blocks [DECOMP] | Kepler-1 only; Kepler Exo channels imported empty | Kepler-2 states on the same port: voice part bit-exact on 188 − 34 factory states, 186 below −90 dB (§1–§3); with every effect on 119 bit-exact, 175 below −90 dB (§5.4) |
+| effects | "bit-identical or as close as measured" | §5 [DECOMP][EXEC] | none | saturation (both modes), chorus noise / gate, EQ, hyper chorus, delay and reverb, each verified against the DLL's own routines and in the engine (§5) |
 | presets / .flp | "presets/.flp import" | plugin name "Kepler Exo", state "Kepler-2" [DATA] | not imported | InstrumentKind::keplerExo from .flp / .fst with the user's DLL (§6) |
 | editor | "editor in LYNX style" | — | — | the channel's knob panel with 20 Exo parameters (§6) |
 
 ## 1. State and parameter set-up [DECOMP loader 0x18001efd0, defaults 0x18001d790, reset 0x18001ec40]
 - "Kepler-2" state: u32 version at 0x19, u32 n at 0x1D, n floats (the 0x102-entry parameter list), then u32 matrix
   flag; flag 1 → u32 count and count (source, destination) int pairs (8 slots); version > 2 adds bytes (arp restart
-  aligned, ×4 oversampling, alt-osc). States using ×4 oversampling or version > 3 are refused (none in FL's data).
+  aligned, ×4 oversampling; version > 3 the alternative-oscillator byte). FL 2026 saves version 4 with 155 values (the
+  harness's save of a new instance). States with ×4 oversampling or the alternative oscillator on are refused (none in
+  FL's data).
 - Life of the plug-in: constructor at 44.1 kHz with host values 0 → defaults reset (every value from the default table
   forwarded, velocity → volume 1, DCO1 sub phase 0.5, chorus noise 0) → state load (reset again, values forwarded,
   slots dirty; version < 2: an LFO1/LFO2 rate with BPM sync rewritten in the stored host value only) → host rate.
@@ -47,9 +49,14 @@ DCO2 with hard sync (`FUN_180014f80` restart path), DCO1↔DCO2 cross-modulation
 modes 3–8 (random with its LCG 1793462892, played order), the Juno-index option (0x5b), mono note-on/off
 (`FUN_180018720` / `FUN_1800189b0`), glide, octave transpose, X/Y offsets.
 
+The voice's FM / cross-modulation sine shape and LFO2's sine call the library's `sinf` (`FUN_1800c2a70`, re-created
+as `ildsp::sinf_`, exact in both rounding modes); LYNX used the correctly rounded sine, 1 ulp apart on some inputs:
+presets with filter FM on the sine shape (30 of the 36 non-exact ones) were −130 dB off, now bit-exact.
+
 Battery without effects (`py/xbat.py nofx`: 3 overlapping notes, 66150 samples, blocks of 512, EQ/delay/reverb/
-saturation/hyper chorus/chorus noise off) [EXEC]: **150 of 188 bit-exact, 184 below −90 dB**; the worst
-(Brightsweep −35 dB, Unsettling 2 −84 dB) still open (global-matrix destinations).
+saturation/hyper chorus/chorus noise off) [EXEC]: **152 of 188 bit-exact, 186 below −90 dB** before the sinf fix
+(every probed filter-FM preset exact after it); open: Unsettling 2 (−84 dB, LFO2 → cross-mod) and Obkeys (−34 dB with
+the effects zeroed, bit-exact with its own effects on).
 
 ## 4. The library's float routines (the saturation needs their last bits) [DECOMP][EXEC]
 The HQ saturation divides ln(cosh) differences by a step ≥ 10⁻³, so 1-ulp differences of the C runtime become
@@ -81,8 +88,34 @@ from a library-wide counter: 333784 / 401782 for the first instance) through pea
 2·LFO + 1, redesigned every 16 samples) added to the wet taps (after the feedback copy). Gate: output ≥ threshold →
 hold 440 samples at gain 1, then gain × 0.99965 per sample.
 
-### 5.3 EQ, delay, reverb, hyper chorus
-In progress (see "Where I stopped").
+- The chorus LFO's sine is the library's `sinf` too (call 0x1800c2a70 in `FUN_180001a60`); Kepler keeps its measured
+  correctly rounded one. Noise biquad order from the disassembly: ((y1·a1 + a2·y2) + b2·x2) + (x·b0 + x1·b1). The
+  object's counter reads 16 before its first sample (EXEC, chorus+0x238), so the first noise sample designs the
+  filters (LYNX started at 0: 16 samples without noise). Battery keep=46 (14 states): 7 bit-exact, the rest −138 to
+  −178 dB.
+
+### 5.3 EQ, delay, reverb, hyper chorus [DECOMP][EXEC]
+Ported as `src/core/KeplerExoEq.h`, `KeplerExoDelay.h`, `KeplerExoReverb.h`, `KeplerExoChorus.h`, each checked
+float-for-float against the DLL's own functions called by our harnesses (`fxa/`, `fxb/`):
+- EQ (flag 0x64, bands 0x65…0x6d; container `FUN_180006a50`, band setter `FUN_180006950` → designer `FUN_180004320`
+  kinds 5/6/8, biquad inline at 0x18001c7a3): 0 mismatches in 60 000 band designs and 3 × 20 000 parameter steps
+  (nearest; the setters run outside the render).
+- Delay (0x6e…0x78; wrapper synth+0x1bdf8 `FUN_1800107b0`, ILDelay3 `FUN_180010b30` / `FUN_180011210`): 13 scenarios,
+  6.8 M floats, 0 mismatches. The synth's rate set-up also writes the wrapper's update interval (int)(fs·0.002)
+  (0x18001d4c7): the first time / offset crossfade starts at sample 88 at 44.1 kHz.
+- Reverb (0x79…0x85; fxReverb synth+0x1c290, process `FUN_18000d630`): the class of LYNX's `ilfx::ReverbT` with two
+  differences — parameter 4 is a feedback gain on the pre-delay line, and only the first early-reflection tap per
+  side has a gain. Hyper chorus (0x89…0x94; wrapper synth+0x1cc78, banks `FUN_18000f3a0` / `FUN_18000f880`, initial
+  LFO phases from the C runtime's `rand()`, 16 calls). 50 scenarios, 7.7 M floats, 0 mismatches.
+
+### 5.4 The whole engine
+Batteries against the DLL (3 overlapping notes, 66150 samples) with only one effect kept on (`py/xbatk.py`): EQ 134 of
+170 bit-exact, 153 below −90 dB; delay 86 of 105, 104 below −90 dB; reverb 70 of 153, 151 below −90 dB; hyper chorus
+116 of 142, 134 below −90 dB. All factory states with their own effects (`py/xbat.py`): **119 of 188 bit-exact, 175
+below −90 dB**; the 13 others (−70 to −89 dB) are residuals of −137 to −178 dB (reverb, chorus noise) that the HQ
+saturation's antiderivative step (a division by a step ≥ 10⁻³) amplifies by ~60 dB. Test
+`kepler_exo_renders_like_the_dll`: the state FL 2026 saves for a new Kepler Exo (version 4, 155 values) with every
+effect on and a matrix slot, bit-exact (energy and samples) against the DLL.
 
 ## 6. LYNX integration
 - `InstrumentKind::keplerExo` ("keplerexo" in projects), the same `makeKeplerInstrument()` (the state decides the
@@ -94,7 +127,5 @@ In progress (see "Where I stopped").
   rate, Portamento, High-pass, Saturation, Delay amount/feedback, Reverb decay/wet, Hyper chorus mix).
 
 ## Where I stopped
-- 2026-10-31 15:00 — voice engine, matrix, LFO2, saturation, chorus noise/gate and the integration (kind, import,
-  engine list, knob panel) written; EQ + delay and reverb + hyper chorus being reversed in parallel (headers
-  `src/core/KeplerExoEq.h`, `KeplerExoDelay.h`, `KeplerExoReverb.h`, `KeplerExoChorus.h`), then wired into
-  `effectsExo`, battery with effects on, tests, i18n, Windows build.
+- 2026-10-31 17:30 — all effects wired; batteries above; golden test added. Open: the reverb's in-engine −137 dB
+  residual on some states (being checked), Unsettling 2, Obkeys with zeroed effects; tests + Windows build, landing.
