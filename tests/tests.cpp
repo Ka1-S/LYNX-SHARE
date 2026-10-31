@@ -16543,4 +16543,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Left167Tests.inc"
 #include "Tune166cTests.inc"
 #include "Update166bTests.inc"
+#include "Dvs167Tests.inc"
+#include "EdisonScript167Tests.inc"
+#include "Deverb167Tests.inc"
+#include "Score167Tests.inc"
 #include "Ntt167Tests.inc"

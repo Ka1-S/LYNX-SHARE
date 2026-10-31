@@ -6,13 +6,22 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <map>
+#include <optional>
+#include <thread>
+
+#include <juce_audio_formats/juce_audio_formats.h>
 
 #include "core/AudioCapture.h"
 #include "core/AudioEditTools.h"
+#include "core/EdisonScript.h"
+#include "core/Instruments.h"
+#include "core/NewtoneFx.h"
 #include "core/WaveAnalysis.h"
 #include "core/ValueMath.h"
 #include "engine/SampleLibrary.h"
 #include "engine/Text.h"
+#include "platform/Paths.h"
 #include "ui/HintBar.h"
 #include "ui/ValueControl.h"
 #include "ui/I18n.h"
@@ -31,6 +40,24 @@ ae::Audio& clipboard()
 {
     static ae::Audio audio;
     return audio;
+}
+
+// an audio file read on a worker thread (an audio script's Sample.LoadFromFile)
+bool readAudioFile (const juce::File& file, ae::Audio& out)
+{
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file));
+    if (reader == nullptr || reader->lengthInSamples <= 0 || reader->lengthInSamples > (juce::int64) 1 << 31 || reader->numChannels == 0)
+        return false;
+    const auto channels = (int) juce::jmin (2u, reader->numChannels);
+    juce::AudioBuffer<float> buffer (channels, (int) reader->lengthInSamples);
+    if (! reader->read (&buffer, 0, buffer.getNumSamples(), 0, true, channels > 1))
+        return false;
+    out = ae::silence (channels, reader->sampleRate, buffer.getNumSamples());
+    for (int c = 0; c < channels; ++c)
+        std::copy (buffer.getReadPointer (c), buffer.getReadPointer (c) + buffer.getNumSamples(), out.channels[(std::size_t) c].begin());
+    return true;
 }
 
 // the clean clip look (docs/analise/UI_STUDY_playlist_clips.md): one light filled shape in a tint of the audio colour
@@ -181,6 +208,219 @@ private:
     juce::ComboBox choiceBox;
     juce::TextButton previewButton, acceptButton, cancelButton;
     Action apply, preview;
+};
+
+// --- Edison's script form ("Configure script", REA_rodada167c.md §2): the controls a script's ScriptDialog asks for;
+// Preview (automatic, when a control changes) / Regenerate / Reset / Edit script / Run / Cancel ------------------------
+class ScriptPanel final : public juce::Component,
+                          private juce::Timer
+{
+public:
+    using Answer = std::function<void (const ae::script::Form&)>;
+
+    ScriptPanel (ae::script::Form f, Answer runAction, Answer previewAction, std::function<void()> editAction)
+        : form (std::move (f)), defaults (form), run (std::move (runAction)), preview (std::move (previewAction)), edit (std::move (editAction))
+    {
+        header.setText (juce::String::fromUTF8 (form.title.c_str()), juce::dontSendNotification);
+        header.setFont (theme::font (theme::type::title));
+        header.setColour (juce::Label::textColourId, theme::colour::textPrimary);
+        addAndMakeVisible (header);
+        description.setText (juce::String::fromUTF8 (form.description.c_str()), juce::dontSendNotification);
+        description.setFont (theme::font (theme::type::body));
+        description.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        description.setJustificationType (juce::Justification::topLeft);
+        description.setVisible (! form.description.empty());
+        addChildComponent (description);
+
+        using T = ae::script::Control::Type;
+        for (std::size_t i = 0; i < form.controls.size(); ++i)
+        {
+            const auto& c = form.controls[i];
+            auto* label = labels.add (new juce::Label ({}, juce::String::fromUTF8 (c.name.c_str())));
+            label->setFont (theme::font (theme::type::body));
+            label->setColour (juce::Label::textColourId, theme::colour::textSecondary);
+            label->setTooltip (juce::String::fromUTF8 (c.hint.c_str()));
+            addAndMakeVisible (label);
+            std::unique_ptr<juce::Component> editor;
+            switch (c.type)
+            {
+                case T::value:
+                case T::knob:
+                case T::knobInt:
+                {
+                    auto s = std::make_unique<juce::Slider> (juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight);
+                    const auto lo = std::min (c.minimum, c.maximum), hi = std::max (c.minimum, c.maximum);
+                    s->setRange (lo, hi > lo ? hi : lo + 1.0, c.type == T::knobInt ? 1.0 : 0.0);
+                    s->setNumDecimalPlacesToDisplay (c.type == T::knobInt ? 0 : 3);
+                    s->setValue (c.value, juce::dontSendNotification);
+                    s->setTextBoxStyle (juce::Slider::TextBoxRight, false, 84, 22);
+                    s->onValueChange = [this, i, p = s.get()] {
+                        form.controls[i].value = p->getValue();
+                        changed();
+                    };
+                    editor = std::move (s);
+                    break;
+                }
+                case T::combo:
+                {
+                    auto b = std::make_unique<juce::ComboBox>();
+                    for (std::size_t o = 0; o < c.options.size(); ++o)
+                        b->addItem (juce::String::fromUTF8 (c.options[o].c_str()), (int) o + 1);
+                    b->setSelectedItemIndex ((int) c.value, juce::dontSendNotification);
+                    b->onChange = [this, i, p = b.get()] {
+                        form.controls[i].value = juce::jmax (0, p->getSelectedItemIndex());
+                        changed();
+                    };
+                    editor = std::move (b);
+                    break;
+                }
+                case T::checkbox:
+                {
+                    auto b = std::make_unique<juce::ToggleButton>();
+                    b->setToggleState (c.value != 0.0, juce::dontSendNotification);
+                    b->onClick = [this, i, p = b.get()] {
+                        form.controls[i].value = p->getToggleState() ? 1.0 : 0.0;
+                        changed();
+                    };
+                    editor = std::move (b);
+                    break;
+                }
+                case T::text:
+                {
+                    auto t = std::make_unique<juce::TextEditor>();
+                    t->setText (juce::String::fromUTF8 (c.text.c_str()), false);
+                    t->onTextChange = [this, i, p = t.get()] {
+                        form.controls[i].text = p->getText().toStdString();
+                        changed();
+                    };
+                    editor = std::move (t);
+                    break;
+                }
+                case T::surface:
+                {
+                    auto l = std::make_unique<juce::Label> (juce::String {}, tr ("(Control Surface presets are not available in LYNX SHARE)"));
+                    l->setFont (theme::font (theme::type::caption));
+                    l->setColour (juce::Label::textColourId, theme::colour::textDisabled);
+                    editor = std::move (l);
+                    break;
+                }
+            }
+            addAndMakeVisible (*editor);
+            editors.push_back (std::move (editor));
+        }
+
+        previewToggle.setButtonText (tr ("Preview"));
+        previewToggle.setTooltip (tr ("Automatic preview when controls are modified"));
+        previewToggle.onClick = [this] {
+            if (previewToggle.getToggleState())
+                startTimer (1);
+            else
+                stopTimer();
+        };
+        regenerateButton.setButtonText (tr ("Regenerate"));
+        regenerateButton.onClick = [this] { startTimer (1); };
+        resetButton.setButtonText (tr ("Reset"));
+        resetButton.onClick = [this] { reset(); };
+        editButton.setButtonText (tr ("Edit script"));
+        editButton.onClick = [this] {
+            if (edit)
+                edit();
+        };
+        runButton.setButtonText (tr ("Run"));
+        runButton.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
+        runButton.onClick = [this] {
+            stopTimer();
+            const auto f = form;
+            auto action = run;
+            closeToolWindowOf (*this); // (deletes this)
+            if (action)
+                action (f);
+        };
+        cancelButton.setButtonText (tr ("Cancel"));
+        cancelButton.onClick = [this] { closeToolWindowOf (*this); };
+        for (juce::Component* b : { (juce::Component*) &previewToggle, (juce::Component*) &regenerateButton, (juce::Component*) &resetButton,
+                                    (juce::Component*) &editButton, (juce::Component*) &runButton, (juce::Component*) &cancelButton })
+            addAndMakeVisible (*b);
+        editButton.setVisible (edit != nullptr);
+        previewToggle.setVisible (preview != nullptr);
+        regenerateButton.setVisible (preview != nullptr);
+
+        setSize (500, 24 + 34 + (form.description.empty() ? 0 : 44) + (int) form.controls.size() * 36 + 52);
+    }
+
+    void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg2); }
+
+    void resized() override
+    {
+        auto area = getLocalBounds().reduced (theme::space::lg);
+        header.setBounds (area.removeFromTop (26));
+        area.removeFromTop (8);
+        if (description.isVisible())
+        {
+            description.setBounds (area.removeFromTop (36));
+            area.removeFromTop (8);
+        }
+        for (std::size_t i = 0; i < editors.size(); ++i)
+        {
+            auto row = area.removeFromTop (28);
+            labels[(int) i]->setBounds (row.removeFromLeft (150));
+            editors[i]->setBounds (row);
+            area.removeFromTop (8);
+        }
+        auto buttons = area.removeFromBottom (30);
+        previewToggle.setBounds (buttons.removeFromLeft (84));
+        regenerateButton.setBounds (buttons.removeFromLeft (92));
+        cancelButton.setBounds (buttons.removeFromRight (70));
+        buttons.removeFromRight (6);
+        runButton.setBounds (buttons.removeFromRight (70));
+        buttons.removeFromRight (6);
+        editButton.setBounds (buttons.removeFromRight (82));
+        buttons.removeFromRight (6);
+        resetButton.setBounds (buttons.removeFromRight (64));
+    }
+
+private:
+    void changed()
+    {
+        if (previewToggle.getToggleState())
+            startTimer (250); // (a drag previews once it pauses)
+    }
+
+    void timerCallback() override
+    {
+        stopTimer();
+        if (preview)
+            preview (form);
+    }
+
+    void reset()
+    {
+        using T = ae::script::Control::Type;
+        form = defaults;
+        for (std::size_t i = 0; i < form.controls.size(); ++i)
+        {
+            const auto& c = form.controls[i];
+            auto* e = editors[i].get();
+            if (auto* s = dynamic_cast<juce::Slider*> (e))
+                s->setValue (c.value, juce::dontSendNotification);
+            else if (auto* b = dynamic_cast<juce::ComboBox*> (e))
+                b->setSelectedItemIndex ((int) c.value, juce::dontSendNotification);
+            else if (auto* t = dynamic_cast<juce::ToggleButton*> (e))
+                t->setToggleState (c.value != 0.0, juce::dontSendNotification);
+            else if (auto* x = dynamic_cast<juce::TextEditor*> (e); x != nullptr && c.type == T::text)
+                x->setText (juce::String::fromUTF8 (c.text.c_str()), false);
+        }
+        changed();
+    }
+
+    ae::script::Form form, defaults;
+    Answer run, preview;
+    std::function<void()> edit;
+    juce::Label header, description;
+    juce::OwnedArray<juce::Label> labels;
+    std::vector<std::unique_ptr<juce::Component>> editors;
+    juce::ToggleButton previewToggle;
+    juce::TextButton regenerateButton, resetButton, editButton, runButton, cancelButton;
 };
 
 // --- the editor --------------------------------------------------------------------------------------------------
@@ -1640,6 +1880,330 @@ private:
         commit (tr ("Set loop"));
     }
 
+    // --- Tools › Analysis › Convert to score and dump to piano roll (REA_rodada167c.md §4): the whole sample's notes
+    // into the selected channel's notes of the current pattern (replacing them), as FL's Edison
+    void convertToScore()
+    {
+        if (doc.audio.empty() || scoreBusy)
+            return;
+        stopPlayback();
+        auto data = std::make_shared<SampleData>();
+        data->sampleRate = doc.audio.sampleRate;
+        data->left = doc.audio.channels[0];
+        if (doc.audio.numChannels() > 1)
+            data->right = doc.audio.channels[1];
+        scoreBusy = true;
+        setStatus (tr ("Detecting score..."), false);
+        juce::Component::SafePointer<AudioEditor> self (this);
+        std::thread ([self, data] {
+            auto notes = std::make_shared<std::vector<newtonefx::DetectedNote>> (newtonefx::detectScore (*data));
+            juce::MessageManager::callAsync ([self, notes, rate = data->sampleRate] {
+                if (self == nullptr)
+                    return;
+                self->scoreBusy = false;
+                if (notes->empty())
+                {
+                    self->setStatus (tr ("No notes found in the sample"), false);
+                    return;
+                }
+                self->setStatus (tr ("Dumping score..."), false);
+                const auto channel = self->engine.getSelectedChannel();
+                int count = 0;
+                self->engine.editSong ([&] (Song& s) {
+                    if (channel >= 0 && channel < (int) s.channels.size())
+                        count = newtonefx::dumpScore (s, channel, *notes, rate);
+                });
+                self->setStatus (tr ("{0} notes put in the Piano roll of the selected channel", { juce::String (count) }), false);
+            });
+        }).detach();
+    }
+
+    // --- scripts (Tools › Scripting: Run script / Edit last script; REA_rodada167c.md §2) -----------------------------
+    struct ScriptRef
+    {
+        juce::String name;   // menu name
+        juce::String key;    // the form memory's key (the script's path, or "lynx:<folder>/<name>")
+        juce::String folder; // a built-in script's folder
+        std::string source;  // a built-in script's text (a file is read when it runs)
+        juce::File file;
+    };
+
+    struct ScriptJob
+    {
+        ScriptRef ref;
+        std::string source;
+        ae::Document start;
+        ae::Range selection;
+        ae::Audio clip;
+        std::vector<ae::script::Form> answers;
+        std::uint64_t version = 0;
+    };
+
+    struct ScriptResult
+    {
+        ae::script::Outcome outcome;
+        ae::Document doc;
+        std::optional<ae::Audio> clip;
+    };
+
+    // where scripts come from: FL Studio's own folder (System/Config/Audio scripts, read in place), then the user's
+    // Documents/LYNX/Audio scripts
+    static std::vector<std::pair<juce::String, juce::File>> scriptFolders()
+    {
+        static const auto fl = [] {
+            const auto roots = findFlStudioRoots();
+            return roots.factoryData.empty() ? juce::File()
+                                             : platform::localFile (roots.factoryData).getChildFile ("System").getChildFile ("Config").getChildFile ("Audio scripts");
+        }();
+        std::vector<std::pair<juce::String, juce::File>> out;
+        if (fl.isDirectory())
+            out.emplace_back ("FL Studio", fl);
+        out.emplace_back (tr ("My scripts"), platform::documentsFolder().getChildFile ("Audio scripts"));
+        return out;
+    }
+
+    juce::PopupMenu scriptMenu()
+    {
+        juce::PopupMenu menu;
+        menu.addSectionHeader ("LYNX SHARE");
+        std::map<juce::String, juce::PopupMenu> own;
+        for (const auto& b : ae::script::builtins())
+        {
+            ScriptRef r;
+            r.name = juce::String::fromUTF8 (b.name);
+            r.folder = juce::String::fromUTF8 (b.folder);
+            r.key = "lynx:" + r.folder + "/" + r.name;
+            r.source = b.source;
+            own[r.folder].addItem (r.name, true, false, [this, r] { runScript (r); });
+        }
+        for (auto& [folder, sub] : own)
+            menu.addSubMenu (folder, sub);
+        for (const auto& [title, dir] : scriptFolders())
+        {
+            menu.addSectionHeader (title);
+            auto addFolder = [this] (const juce::File& d, juce::PopupMenu& into, auto& self, int depth) -> bool {
+                bool any = false;
+                auto subs = d.findChildFiles (juce::File::findDirectories, false);
+                subs.sort();
+                for (const auto& s : subs)
+                {
+                    juce::PopupMenu sub;
+                    if (depth < 3 && self (s, sub, self, depth + 1))
+                    {
+                        into.addSubMenu (s.getFileName(), sub);
+                        any = true;
+                    }
+                }
+                auto files = d.findChildFiles (juce::File::findFiles, false, "*.pyscript");
+                files.sort();
+                for (const auto& f : files)
+                {
+                    ScriptRef r;
+                    r.name = f.getFileNameWithoutExtension();
+                    r.key = f.getFullPathName();
+                    r.file = f;
+                    into.addItem (r.name, true, false, [this, r] { runScript (r); });
+                    any = true;
+                }
+                return any;
+            };
+            if (! dir.isDirectory() || ! addFolder (dir, menu, addFolder, 0))
+                menu.addItem (tr ("(no scripts)"), false, false, nullptr);
+        }
+        menu.addSeparator();
+        menu.addItem (tr ("Open my scripts folder"), true, false, [] {
+            const auto dir = platform::documentsFolder().getChildFile ("Audio scripts");
+            dir.createDirectory();
+            if (platform::testMode())
+                platform::testModeLog ("open folder " + dir.getFullPathName());
+            else
+                dir.startAsProcess();
+        });
+        return menu;
+    }
+
+    void runScript (const ScriptRef& ref)
+    {
+        if (scriptBusy || recState != RecState::idle)
+            return;
+        auto job = std::make_shared<ScriptJob>();
+        job->ref = ref;
+        if (ref.file != juce::File())
+        {
+            juce::MemoryBlock bytes;
+            if (! ref.file.loadFileAsData (bytes) || ! juce::CharPointer_UTF8::isValidString (static_cast<const char*> (bytes.getData()), (int) bytes.getSize()))
+            {
+                showScriptText (tr ("Error"), tr ("Failed to load the script file. Please make sure it is saved in utf8-format."));
+                return;
+            }
+            job->source.assign (static_cast<const char*> (bytes.getData()), bytes.getSize());
+        }
+        else
+            job->source = ref.source;
+        lastScript = ref;
+        stopPlayback();
+        job->start = doc;
+        job->selection = selection;
+        job->clip = clipboard();
+        job->version = docVersion;
+        scriptStep (job);
+    }
+
+    // runs the script on a worker thread (the Python thread does the work; the UI never waits for it)
+    static void launchScript (std::shared_ptr<const ScriptJob> job, std::vector<ae::script::Form> answers,
+                              std::function<void (std::shared_ptr<ScriptResult>)> done)
+    {
+        std::thread ([job, answers = std::move (answers), done = std::move (done)] {
+            auto r = std::make_shared<ScriptResult>();
+            r->doc = job->start;
+            ae::script::Host host;
+            host.clipboard = [job] (ae::Audio& a) {
+                a = job->clip;
+                return ! a.empty();
+            };
+            host.setClipboard = [r] (const ae::Audio& a) { r->clip = a; };
+            host.loadFile = [] (const std::string& path, ae::Audio& a) { return readAudioFile (juce::File (juce::String::fromUTF8 (path.c_str())), a); };
+            r->outcome = ae::script::run (job->source, r->doc, job->selection, answers, host);
+            juce::MessageManager::callAsync ([done, r] { done (r); });
+        }).detach();
+    }
+
+    void scriptStep (std::shared_ptr<ScriptJob> job)
+    {
+        scriptBusy = true;
+        setStatus (tr ("Running script {0}...", { job->ref.name }), false);
+        juce::Component::SafePointer<AudioEditor> self (this);
+        launchScript (job, job->answers, [self, job] (std::shared_ptr<ScriptResult> r) {
+            if (self != nullptr)
+                self->scriptFinished (job, *r);
+        });
+    }
+
+    void scriptFinished (std::shared_ptr<ScriptJob> job, ScriptResult& r)
+    {
+        scriptBusy = false;
+        using S = ae::script::Outcome::Status;
+        auto& out = r.outcome;
+        if (out.status == S::failed)
+        {
+            setStatus (tr ("The script stopped with an error"), true);
+            showScriptText (tr ("Script error"), juce::String::fromUTF8 (out.error.c_str()));
+            return;
+        }
+        juce::Component::SafePointer<AudioEditor> self (this);
+        if (out.status == S::needsForm)
+        {
+            setStatus ({}, false);
+            auto form = out.form;
+            const auto key = job->ref.key.toStdString();
+            if (form.controls.size() == 1 && form.controls[0].hint == "file") // Sample.LoadFromFile_Ask
+            {
+                auto chooser = std::make_shared<juce::FileChooser> (tr ("Open"), juce::File(), "*.wav;*.flac;*.aif;*.aiff;*.ogg;*.mp3");
+                chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [self, job, form, chooser] (const juce::FileChooser& fc) {
+                    if (self == nullptr)
+                        return;
+                    auto answer = form;
+                    answer.controls[0].text = fc.getResult().getFullPathName().toStdString();
+                    job->answers.push_back (answer);
+                    self->scriptStep (job);
+                });
+                return;
+            }
+            ae::script::restore (key, form);
+            auto panel = std::make_unique<ScriptPanel> (
+                form,
+                [self, job, key] (const ae::script::Form& f) {
+                    ae::script::remember (key, f);
+                    job->answers.push_back (f);
+                    if (self != nullptr)
+                        self->scriptStep (job);
+                },
+                [self, job] (const ae::script::Form& f) {
+                    if (self != nullptr)
+                        self->previewScript (job, f);
+                },
+                [self] {
+                    if (self != nullptr)
+                        self->editLastScript();
+                });
+            openToolWindow (std::move (panel), tr ("Configure script"), "audioeditor-script");
+            return;
+        }
+
+        // done: one undo step (nothing when the script changed nothing)
+        for (const auto& m : out.messages)
+            showScriptText (tr ("Script message"), juce::String::fromUTF8 (m.c_str()));
+        if (r.clip)
+            clipboard() = std::move (*r.clip);
+        if (docVersion != job->version)
+        {
+            setStatus (tr ("The audio changed while the script ran: run it again"), true);
+            return;
+        }
+        const bool same = r.doc.audio.sampleRate == doc.audio.sampleRate && r.doc.audio.channels == doc.audio.channels && r.doc.markers.size() == doc.markers.size()
+                          && std::equal (r.doc.markers.begin(), r.doc.markers.end(), doc.markers.begin(), [] (const ae::Marker& a, const ae::Marker& b) {
+                                 return a.start == b.start && a.end == b.end && a.name == b.name && a.info == b.info && a.keyNum == b.keyNum;
+                             });
+        setStatus (tr ("Script {0} done", { job->ref.name }), false);
+        if (same)
+            return;
+        const bool wasEmpty = doc.audio.empty();
+        if (wasEmpty)
+            history.reset (doc, tr ("Empty").toStdString());
+        doc = std::move (r.doc);
+        commit (tr ("Script: {0}", { job->ref.name }));
+        if (wasEmpty)
+            zoomToFit();
+    }
+
+    // Preview: the script with these values on a copy, played from the selection (or the start)
+    void previewScript (std::shared_ptr<ScriptJob> job, const ae::script::Form& f)
+    {
+        auto answers = job->answers;
+        answers.push_back (f);
+        const auto ticket = ++previewTicket;
+        juce::Component::SafePointer<AudioEditor> self (this);
+        launchScript (job, std::move (answers), [self, job, ticket] (std::shared_ptr<ScriptResult> r) {
+            if (self == nullptr || ticket != self->previewTicket || r->outcome.status != ae::script::Outcome::Status::done || r->doc.audio.empty())
+                return;
+            const auto from = juce::jlimit<std::int64_t> (0, r->doc.audio.frames(), job->selection.empty() ? 0 : job->selection.start);
+            self->playAudio (ae::copy (r->doc.audio, { from, r->doc.audio.frames() }), 0, false);
+        });
+    }
+
+    // Edit last script: the script's file in the system's editor (a LYNX script is first saved to My scripts)
+    void editLastScript()
+    {
+        if (lastScript.key.isEmpty())
+            return;
+        auto file = lastScript.file;
+        if (file == juce::File())
+        {
+            file = platform::documentsFolder().getChildFile ("Audio scripts").getChildFile (lastScript.folder).getChildFile (lastScript.name + ".pyscript");
+            if (! file.existsAsFile())
+            {
+                file.getParentDirectory().createDirectory();
+                file.replaceWithText (juce::String::fromUTF8 (lastScript.source.c_str()), false, false, "\n");
+            }
+            lastScript.file = file;
+            lastScript.key = file.getFullPathName();
+        }
+        if (platform::testMode())
+            platform::testModeLog ("edit script " + file.getFullPathName());
+        else if (! file.startAsProcess())
+            file.revealToUser();
+    }
+
+    void showScriptText (const juce::String& title, const juce::String& text)
+    {
+        if (platform::testMode())
+        {
+            platform::testModeLog (title + ": " + text);
+            return;
+        }
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::NoIcon, title, text, tr ("OK"), this);
+    }
+
     // --- tool windows ---------------------------------------------------------------------------------------
     // plays `fn` applied to a copy of the selection (Preview)
     void previewProcessed (const std::function<void (ae::Document&)>& fn)
@@ -2753,6 +3317,10 @@ private:
     ae::Curve fadeCurve = ae::Curve::smooth;
 
     bool playing = false, loopPlay = false;
+    ScriptRef lastScript;         // Edit last script
+    bool scriptBusy = false;      // a script is running (its form may be open)
+    bool scoreBusy = false;       // Convert to score is analysing
+    std::uint64_t previewTicket = 0;
     std::int64_t playFrom = 0, playhead = -1;
     double playStartedMs = 0.0;
 
@@ -2959,6 +3527,10 @@ juce::PopupMenu AudioEditor::mainMenu()
         if (history.size() <= 2)
             zoomToFit();
     });
+    tools.addSectionHeader (tr ("Scripting"));
+    tools.addSubMenu (tr ("Run script"), scriptMenu(), ! scriptBusy);
+    tools.addItem (lastScript.key.isEmpty() ? tr ("Edit last script") : tr ("Edit last script: {0}", { lastScript.name }), ! lastScript.key.isEmpty(), false,
+                   [this] { editLastScript(); });
     tools.addSectionHeader (tr ("Noise gating"));
     tools.addItem (tr ("Acquire noise threshold"), has && ! selection.empty(), false, [this] { acquireThreshold(); });
     tools.addItem (tr ("Gate noise"), has, false, [this] {
@@ -2986,12 +3558,15 @@ juce::PopupMenu AudioEditor::mainMenu()
     tools.addItem (tr ("Clean up (denoise)..."), has, false, [this] { openEdisonTool (T::denoise); });
     tools.addItem (tr ("Match spectrum..."), has, false, [this] { openEdisonTool (T::matchSpectrum); });
     tools.addItem (tr ("Vocal denoise/isolator..."), has, false, [this] { openEdisonTool (T::vocalDenoise); });
+    tools.addItem (tr ("Deverb..."), has, false, [this] { openEdisonTool (T::deverb); });
     tools.addSectionHeader (tr ("Regions"));
     tools.addItem (tr ("Normalize all regions"), has, false, [this] { regionsTool (tr ("Normalize all regions"), [] (ae::Document& d) { return ae::normalizeRegions (d); }); });
     tools.addItem (tr ("Declick in all regions"), has, false, [this] { regionsTool (tr ("Declick in all regions"), [] (ae::Document& d) { return ae::declickRegions (d, true, false); }); });
     tools.addItem (tr ("Declick out all regions"), has, false, [this] { regionsTool (tr ("Declick out all regions"), [] (ae::Document& d) { return ae::declickRegions (d, false, true); }); });
     tools.addItem (tr ("Perfect all regions"), has, false, [this] { regionsTool (tr ("Perfect all regions"), [] (ae::Document& d) { return ae::perfectRegions (d); }); });
     tools.addItem (tr ("Tune loop..."), has, false, [this] { openEdisonTool (T::loopTuner); });
+    tools.addSectionHeader (tr ("Analysis"));
+    tools.addItem (tr ("Convert to score and dump to piano roll"), has && ! scoreBusy, false, [this] { convertToScore(); });
 
     juce::PopupMenu regions;
     regions.addItem (tr ("Add marker") + "\tM", has, false, [this] { addMarkerAtCursor(); });
@@ -3129,7 +3704,7 @@ std::unique_ptr<juce::Component> makeAudioEditorForSnapshot (AudioEngine& engine
 std::unique_ptr<juce::Component> makeAudioToolPanelForSnapshot (juce::Component& editor, int tool, int envelopeMode)
 {
     auto* e = dynamic_cast<AudioEditor*> (&editor);
-    if (e == nullptr || tool < 0 || tool > (int) audiotools::Tool::stretch)
+    if (e == nullptr || tool < 0 || tool > (int) audiotools::Tool::deverb)
         return {};
     e->setEnvModeForSnapshot (envelopeMode);
     return audiotools::makeToolPanel (*e, (audiotools::Tool) tool);
@@ -3137,7 +3712,7 @@ std::unique_ptr<juce::Component> makeAudioToolPanelForSnapshot (juce::Component&
 
 const char* audioToolNameForSnapshot (int tool)
 {
-    if (tool < 0 || tool > (int) audiotools::Tool::stretch)
+    if (tool < 0 || tool > (int) audiotools::Tool::deverb)
         return nullptr;
     return audiotools::toolTitle ((audiotools::Tool) tool);
 }

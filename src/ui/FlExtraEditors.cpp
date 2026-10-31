@@ -8,6 +8,7 @@
 
 #include "core/Effects.h"
 #include "core/FlExtraFx.h"
+#include "core/Dvs.h"
 #include "core/Scratcher.h"
 #include "core/Transmitter.h"
 #include "core/VisualFx.h"
@@ -888,8 +889,31 @@ public:
           hold (t, scratcher::hold, tr ("Off"), tr ("On"), tr ("Hold")), mute (t, scratcher::mute, tr ("Off"), tr ("On"), tr ("Mute"))
     {
         for (auto* c : std::initializer_list<juce::Component*> { &transportSel, &pan, &volume, &speed, &accel, &sens, &smooth1, &smooth2,
-                                                                 &smooth3, &smooth4, &hold, &mute, &load })
+                                                                 &smooth3, &smooth4, &hold, &mute, &load, &timecodeBox, &riaaBox })
             addAndMakeVisible (*c);
+        // DVS (REA_rodada167c §1): FL's Timecode type list and RIAA preamp switch
+        for (int i = 0; i < dvs::comboCount; ++i)
+        {
+            const auto state = dvs::stateOfCombo (i);
+            auto name = i == 0 ? tr ("Off") : juce::String (dvs::comboName (i));
+            if (i == dvs::comboCount - 1)
+                name = tr ("Timecode CD");
+            if (state != -1 && ! dvs::supported (state))
+                name += " " + tr ("(not decoded yet)");
+            timecodeBox.addItem (name, i + 1);
+        }
+        ui::setHint (timecodeBox, tr ("Timecode type: a timecode vinyl or CD on this insert's input moves the platter"));
+        timecodeBox.onChange = [this] {
+            const auto combo = juce::jmax (0, timecodeBox.getSelectedItemIndex());
+            dvs::warm (dvs::stateOfCombo (combo));
+            target.edit ([v = scratcher::timecodeValue (dvs::stateOfCombo (combo))] (EffectSlot& s) { s.params[scratcher::timecodeType] = v; });
+        };
+        riaaBox.setButtonText (tr ("RIAA preamp"));
+        ui::setHint (riaaBox, tr ("RIAA preamp: for a turntable plugged straight into a line input (phono level)"));
+        riaaBox.onClick = [this] {
+            target.edit ([on = riaaBox.getToggleState()] (EffectSlot& s) { s.params[scratcher::riaaPreamp] = on ? 1.0f : 0.0f; });
+        };
+        syncDvs();
         load.setButtonText (tr ("Load sample..."));
         load.onClick = [this] { chooseSample(); };
         ui::setHint (load, tr ("The sample on the platter (or drop a file here)"));
@@ -914,7 +938,10 @@ public:
         area.removeFromTop (4);
         waveArea = area.removeFromTop (54);
         area.removeFromTop (8);
-        transportSel.setBounds (area.removeFromBottom (30).withSizeKeepingCentre (300, 30));
+        auto bottom = area.removeFromBottom (30);
+        timecodeBox.setBounds (bottom.removeFromLeft (juce::jmin (210, bottom.getWidth() / 3)).reduced (0, 3));
+        riaaBox.setBounds (bottom.removeFromRight (juce::jmin (130, bottom.getWidth() / 3)));
+        transportSel.setBounds (bottom.withSizeKeepingCentre (juce::jmin (300, bottom.getWidth()), 30));
         area.removeFromBottom (4);
 
         auto left = area.removeFromLeft (84);
@@ -1134,8 +1161,20 @@ private:
         const auto* e = target.current();
         if (e != nullptr && e->samplePath != shownPath)
             refreshSample();
+        syncDvs();
         repaint (platter.getSmallestIntegerContainer().expanded (4));
         repaint (waveArea);
+    }
+
+    void syncDvs()
+    {
+        const auto* e = target.current();
+        const auto state = e != nullptr ? scratcher::timecodeOf (e->params[scratcher::timecodeType]) : -1;
+        if (timecodeBox.getSelectedItemIndex() != dvs::comboOfState (state))
+            timecodeBox.setSelectedItemIndex (dvs::comboOfState (state), juce::dontSendNotification);
+        const auto riaa = e != nullptr && e->params[scratcher::riaaPreamp] >= 0.5f;
+        if (riaaBox.getToggleState() != riaa)
+            riaaBox.setToggleState (riaa, juce::dontSendNotification);
     }
 
     void refreshSample()
@@ -1207,6 +1246,8 @@ private:
     Knob pan, volume, speed, accel, sens, smooth1, smooth2, smooth3, smooth4;
     Switch hold, mute;
     juce::TextButton load;
+    juce::ComboBox timecodeBox;
+    juce::ToggleButton riaaBox;
     juce::Rectangle<int> nameArea, waveArea, smoothArea;
     juce::Rectangle<float> platter;
     std::vector<std::pair<float, float>> peaks;

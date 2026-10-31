@@ -29,6 +29,10 @@ struct Marker
 {
     std::int64_t start = 0, end = 0;
     std::string name;
+    // what Edison keeps with a region besides its name (an audio script's Region.Info / Time / KeyNum; round 167c)
+    std::string info;
+    double time = 0.0; // beat position
+    int keyNum = -1;   // linked MIDI note (−1 = none)
     bool isRegion() const noexcept { return end > start; }
 };
 
