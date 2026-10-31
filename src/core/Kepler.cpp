@@ -1233,6 +1233,11 @@ public:
         const auto beatsPerSecond = tempo * 0.016666666666666666;
         if (exo)
             fxDelay.setTempo (tempo);
+        if (exo && exoResetPending) // the queued engine reset: the reverb's lines to 1e-30 after the rate set-up (REA_rodada167d §5.3)
+        {
+            exoResetPending = false;
+            fxReverb.reset();
+        }
         if (exo && slotsDirty)
         {
             slotsDirty = false;
@@ -2772,6 +2777,7 @@ private:
                 break;
             case 0x4b:
                 P[(std::size_t) i] = x;
+                exoResetPending = true; // the setter queues the engine reset (FUN_18001ce10), run at the next block start
                 break;
             case 0x51:
                 P[(std::size_t) i] = x;
@@ -3795,6 +3801,7 @@ private:
     kepler_exo::Delay fxDelay;
     kepler_exo::HyperChorus fxHyper;
     kepler_exo::Reverb fxReverb;
+    bool exoResetPending = false;
     float satTarget = 1.0f, satDrive = 1.0f, satK = 0.01f, satPrev[2] {};
 };
 

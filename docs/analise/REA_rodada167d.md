@@ -10,7 +10,7 @@ driven by our harness, [DATA] FL's factory presets.
 
 | item | the brief | FL evidence | LYNX before | LYNX now |
 |---|---|---|---|---|
-| engine | "implement it on FL's own engine" | render `FUN_18001b7d0` = Kepler's `FUN_18001b940` + Exo blocks [DECOMP] | Kepler-1 only; Kepler Exo channels imported empty | Kepler-2 states on the same port: voice part bit-exact on 188 − 34 factory states, 186 below −90 dB (§1–§3); with every effect on 119 bit-exact, 175 below −90 dB (§5.4) |
+| engine | "implement it on FL's own engine" | render `FUN_18001b7d0` = Kepler's `FUN_18001b940` + Exo blocks [DECOMP] | Kepler-1 only; Kepler Exo channels imported empty | Kepler-2 states on the same port: voice part bit-exact on 188 − 34 factory states, 186 below −90 dB (§1–§3); with every effect on 179 bit-exact, 182 below −90 dB (§5.4) |
 | effects | "bit-identical or as close as measured" | §5 [DECOMP][EXEC] | none | saturation (both modes), chorus noise / gate, EQ, hyper chorus, delay and reverb, each verified against the DLL's own routines and in the engine (§5) |
 | presets / .flp | "presets/.flp import" | plugin name "Kepler Exo", state "Kepler-2" [DATA] | not imported | InstrumentKind::keplerExo from .flp / .fst with the user's DLL (§6) |
 | editor | "editor in LYNX style" | — | — | the channel's knob panel with 20 Exo parameters (§6) |
@@ -110,10 +110,13 @@ float-for-float against the DLL's own functions called by our harnesses (`fxa/`,
 
 ### 5.4 The whole engine
 Batteries against the DLL (3 overlapping notes, 66150 samples) with only one effect kept on (`py/xbatk.py`): EQ 134 of
-170 bit-exact, 153 below −90 dB; delay 86 of 105, 104 below −90 dB; reverb 70 of 153, 151 below −90 dB; hyper chorus
-116 of 142, 134 below −90 dB. All factory states with their own effects (`py/xbat.py`): **119 of 188 bit-exact, 175
-below −90 dB**; the 13 others (−70 to −89 dB) are residuals of −137 to −178 dB (reverb, chorus noise) that the HQ
-saturation's antiderivative step (a division by a step ≥ 10⁻³) amplifies by ~60 dB. Test
+170 bit-exact, 153 below −90 dB; delay 86 of 105, 104 below −90 dB; reverb 153 of 153; hyper chorus
+116 of 142, 134 below −90 dB. The global setter's case 0x4b always queues the engine reset (`FUN_18001ce10`); the render drains that queue at the
+next block start, after the host rate set-up, so FL's reverb starts its first block with lines of 1e-30 where its
+rate set-up had left zeros — LYNX now runs the same deferred reset (reverb battery 70 → 153 of 153 bit-exact).
+All factory states with their own effects (`py/xbat.py`): **179 of 188 bit-exact, 182 below −90 dB**; the 6 others
+(−71 to −82 dB: Horn, Horror Night, Trumpet, Cat, Bottleneck, Warmnest) are chorus-noise residuals of −138 to −178 dB
+that the HQ saturation's antiderivative step (a division by a step ≥ 10⁻³) amplifies by ~60 dB. Test
 `kepler_exo_renders_like_the_dll`: the state FL 2026 saves for a new Kepler Exo (version 4, 155 values) with every
 effect on and a matrix slot, bit-exact (energy and samples) against the DLL.
 
@@ -127,5 +130,7 @@ effect on and a matrix slot, bit-exact (energy and samples) against the DLL.
   rate, Portamento, High-pass, Saturation, Delay amount/feedback, Reverb decay/wet, Hyper chorus mix).
 
 ## Where I stopped
-- 2026-10-31 17:30 — all effects wired; batteries above; golden test added. Open: the reverb's in-engine −137 dB
-  residual on some states (being checked), Unsettling 2, Obkeys with zeroed effects; tests + Windows build, landing.
+- 2026-10-31 18:30 — all effects wired, 179 of 188 factory states bit-exact with their effects; golden test added;
+  tests green. Open: the chorus-noise residual (−138…−178 dB, 6 states audible as −71…−82 dB after the HQ
+  saturation), Unsettling 2 (−84 dB, LFO2 → cross-mod), Obkeys only with its effects zeroed; ×4 oversampling and the
+  alternative oscillator byte (refused, unused in FL's data); the editor is the channel knob panel, not Exo's own UI.
