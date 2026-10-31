@@ -829,6 +829,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.beatsPerBar = std::clamp (project.beatsPerBar, 1, 32);
     song.swing = std::clamp (project.swing / 128.0f, 0.0f, 1.0f);
     song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
+    song.fastDeclick = project.fastDeclick;               // 0x28 (REA round 167h)
     song.masterPitch = (float) std::clamp (project.mainPitch, -1200, 1200); // FL's render follows it (REA round 167g §1)
     song.channelGroups = project.filterGroups;
     song.info.title = project.title;
@@ -1949,13 +1950,37 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         // sample region and start offset
         if (std::isfinite (c.sampleStart) && std::isfinite (c.sampleEnd) && std::isfinite (c.startOffset))
         {
-            const auto start = std::clamp (c.sampleStart, 0.0, 1.0), end = std::clamp (c.sampleEnd, 0.0, 1.0);
+            // FL's end is a fraction of what follows the start: the region is [start, start + end·(1 − start)]
+            // (FLEngine FUN_00ff0db0, REA_rodada167h §2; FL's demos hold ends below their starts, e.g. 0.62 / 0.14)
+            const auto start = std::clamp (c.sampleStart, 0.0, 1.0);
+            const auto end = std::clamp (start + std::clamp (c.sampleEnd, 0.0, 1.0) * (1.0 - start), 0.0, 1.0);
 
             if (end > start)
             {
-                def.sampler.regionStart = (float) std::clamp (start + std::clamp (c.startOffset, 0.0, 1.0) * (end - start), 0.0, 1.0);
+                def.sampler.regionStart = (float) start;
                 def.sampler.regionEnd = (float) end;
+                // the start offset: FL starts notes there, a fraction of the (cropped) region [FL render, §4]
+                def.sampler.startOffset = (float) std::clamp (c.startOffset, 0.0, 1.0);
             }
+        }
+
+        // the Sampler's precomputed effects, loop flags and declicking mode (REA_rodada167h §1)
+        if (c.type == flp::ChannelType::sampler && def.instrument != InstrumentKind::audioClip)
+        {
+            auto& p = def.sampler.precompute;
+            p.fadeStereo = (c.fxFlags & 1) != 0;
+            def.sampler.reverse = def.sampler.reverse || (c.fxFlags & 2) != 0;
+            p.swapStereo = (c.fxFlags & 0x100) != 0;
+            p.fadeIn = std::clamp (c.fadeIn, 0, 1024);
+            p.fadeOut = std::clamp (c.fadeOut, 0, 1024);
+            p.removeDc = c.removeDc;
+            p.normalize = c.normalize;
+            p.reversePolarity = c.reversePolarity;
+            p.crossfade = std::clamp (c.crossfade, 0, 2048);
+            p.trim = std::clamp (c.trim, 0, 32768);
+            p.pingPong = c.pingPong;
+            def.sampler.useLoopPoints = c.useLoopPoints();
+            def.sampler.declickMode = std::clamp (c.declickMode, 0, 5);
         }
 
         // time-stretch: the sample lasts TIME/192 beats × MUL
@@ -2728,7 +2753,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     // the ones that don't touch audio (controllers, visualizers, notes) aren't missed
                     static const char* silent[] = { "Fruity Peak Controller", "Fruity X-Y Controller", "Control Surface",
                                                     "Fruity NoteBook 2", "Fruity NoteBook", "Edison",
-                                                    "Fruity Formula Controller", "Fruity LSD", "Fruity dB Meter", "Fruity Spectroman" };
+                                                    "Fruity Formula Controller", "Fruity LSD" };
                     const auto harmless = std::any_of (std::begin (silent), std::end (silent), [&] (const char* n) { return slot.plugin == n; });
 
                     // FL plugins with nothing to reproduce here (vendor lighting, discontinued bridges): the note says why (round 165g)

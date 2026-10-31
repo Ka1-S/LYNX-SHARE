@@ -1252,6 +1252,42 @@ Layout emphasizer()
     return l;
 }
 
+Layout flEmphasis()
+{
+    // round 167f: FL's Emphasis interpreted (its controls and captions, LYNX's drawing): INPUT GAIN, the big EMPHASIS
+    // knob and CEILING on top with the meter strip; the mode, ENVELOPE order, HARDNESS and LINKING below; the bottom
+    // strip carries OVERSAMPLING, CHANNEL MODE and the option switches
+    Layout l;
+    l.fl = "Emphasis";
+    l.width = 560;
+    l.height = 196;
+    auto& v = l.items;
+    v.push_back (section (0, 0, 300, 96, nullptr, boxed));
+    v.push_back (knob (50, 38, 34, "Input gain", TR_NOOP ("INPUT GAIN"), 82, showValue));
+    v.push_back (knob (150, 38, 44, "Emphasis", TR_NOOP ("EMPHASIS"), 82, showValue));
+    v.push_back (knob (250, 38, 34, "Ceiling", TR_NOOP ("CEILING"), 82, showValue));
+    v.push_back (display (304, 4, 252, 92, "meter"));
+    v.push_back (section (0, 100, 556, 50, nullptr, boxed));
+    v.push_back (label (8, 102, 120, 14, TR_NOOP ("MODE"), alignLeft));
+    v.push_back (radio (8, 118, 220, 26, "Mode", TR_NOOP ("Versatile|Loud|Transient|Steady")));
+    v.push_back (stepper (240, 116, 50, 30, "Envelope order", TR_NOOP ("ENVELOPE"), 4));
+    v.push_back (stepper (304, 116, 50, 30, "Hardness", TR_NOOP ("HARDNESS"), 10));
+    v.push_back (knob (400, 118, 22, "Linking", TR_NOOP ("LINKING"), 138, showValue));
+    v.push_back (label (450, 102, 100, 14, TR_NOOP ("CHANNEL MODE"), alignLeft));
+    v.push_back (radio (450, 118, 100, 26, "Channel mode", "L/R|M/S"));
+    v.push_back (label (4, 154, 100, 16, "EMPHASIS", alignLeft));
+    v.push_back (label (110, 154, 96, 14, TR_NOOP ("OVERSAMPLING"), alignLeft));
+    v.push_back (radio (206, 152, 200, 18, "Oversampling", TR_NOOP ("Off|2x|4x|8x|16x")));
+    v.push_back (toggle (410, 152, 70, 18, "True peak", TR_NOOP ("TRUE PEAK")));
+    v.push_back (toggle (484, 152, 72, 18, "Bypass", TR_NOOP ("BYPASS")));
+    v.push_back (toggle (4, 174, 104, 18, "Level matching", TR_NOOP ("LEVEL MATCHING")));
+    v.push_back (toggle (112, 174, 60, 18, "Delta", TR_NOOP ("DELTA")));
+    v.push_back (toggle (176, 174, 120, 18, "Instant recovery", TR_NOOP ("INSTANT RECOVERY")));
+    v.push_back (toggle (300, 174, 80, 18, "DC block", TR_NOOP ("DC BLOCK")));
+    v.push_back (toggle (384, 174, 172, 18, "Loudness compensation", TR_NOOP ("LOUDNESS COMPENSATION")));
+    return l;
+}
+
 Layout fruitySqueeze()
 {
     // SQUARIZE (amount), PUNCHER (preserve, impact, relation, amount) on plates; FILTER (on, type, freq, res, pre / post);
@@ -3401,7 +3437,9 @@ const std::vector<EffectKind>& flLayoutKinds()
                                                  // round 154
                                                  EffectKind::emphasizer,
                                                  // round 165g
-                                                 EffectKind::fruityMute2, EffectKind::transmitter };
+                                                 EffectKind::fruityMute2, EffectKind::transmitter,
+                                                 // round 167f
+                                                 EffectKind::flEmphasis };
     return kinds;
 }
 
@@ -3457,6 +3495,7 @@ const Layout& layoutFor (EffectKind kind)
         case EffectKind::fruityBalance: l = fruityBalance(); break;
         case EffectKind::squeeze: l = fruitySqueeze(); break;
         case EffectKind::emphasizer: l = emphasizer(); break;
+        case EffectKind::flEmphasis: l = flEmphasis(); break;
         case EffectKind::maximus: l = maximus(); break;
         case EffectKind::vintagePhaser: l = vintagePhaser(); break;
         case EffectKind::fruityPhaser: l = fruityPhaser(); break;

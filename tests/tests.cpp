@@ -93,6 +93,8 @@
 #include "core/TransistorBass.h"
 #include "core/HarmlessFx.h"
 #include "core/MaximusFx.h"
+#include "core/EmphasisFx.h"
+#include "core/VisualFx.h"
 #include "core/EmphasizerFx.h"
 #include "core/FlLegacyFx.h"
 #include "core/FreqShifterFl.h"
@@ -771,14 +773,27 @@ TEST (fl_round15_effects_convert_known_values)
     }
     const auto fsOld = lynx::effectFromFl ("Frequency Shifter", blob ({ 4, 10000, 0 }));
     CHECK (fsOld && fsOld->kind == lynx::EffectKind::freqShift);
-    // Emphasis: input 0.0625 (= +1.5 dB) and ceiling 0.9308 (≈ −1.6 dB) -> limiter
+    // Emphasis (Bien Duro's Master): FL's own engine since round 167f, its controls as (raw − min) / range: input 625
+    // (+1.5 dB), ceiling 9308 (−1.60 dB), envelope order 2, true peak; an unreadable state keeps the limiter
     const auto em = lynx::effectFromFl ("Emphasis", blob ({ 8, 0, 0, 2, 1, 0, 0, 625, 10000, 10000, 9308, 0, 2, 7, 0 }));
-    CHECK (em && em->kind == lynx::EffectKind::limiter && em->enabled);
+    CHECK (em && em->kind == lynx::EffectKind::flEmphasis && em->enabled);
     if (em)
     {
-        CHECK (std::abs (em->params[1] * 24.0f - 1.5f) < 0.05f);
-        CHECK (std::abs (em->params[0] * 12.0f - 12.0f + 1.6f) < 0.1f);
+        CHECK (std::abs (em->params[6] - 0.0625f) < 1e-6f && std::abs (em->params[9] - 0.9308f) < 1e-6f);
+        CHECK (std::abs (em->params[2] - 1.0f / 3.0f) < 1e-6f && em->params[3] == 1.0f && std::abs (em->params[11] - 0.5f) < 1e-6f);
+        CHECK (lynx::formatEffectParam (lynx::EffectKind::flEmphasis, 6, em->params[6], 120.0) == "+1.5 dB");
+        CHECK (lynx::formatEffectParam (lynx::EffectKind::flEmphasis, 9, em->params[9], 120.0) == "-1.60 dB");
+        CHECK (em->params[14] == 0.0f && em->params[15] == 0.0f); // a version-8 state has no option bytes: off
     }
+    const auto emOld = lynx::effectFromFl ("Emphasis", blob ({ 8, 0, 0, 2 }));
+    CHECK (emOld && emOld->kind == lynx::EffectKind::limiter);
+    // round 167f: FL's legacy dB Meter / Spectroman keep their slot as LYNX's analyser in the matching view
+    const auto dbm = lynx::effectFromFl ("Fruity dB Meter", {});
+    CHECK (dbm && dbm->kind == lynx::EffectKind::waveCandy
+           && dbm->params[0] == lynx::visualfx::wavecandy::modeValue (lynx::visualfx::wavecandy::Mode::peakMeter));
+    const auto spm = lynx::effectFromFl ("Fruity Spectroman", {});
+    CHECK (spm && spm->kind == lynx::EffectKind::waveCandy
+           && spm->params[0] == lynx::visualfx::wavecandy::modeValue (lynx::visualfx::wavecandy::Mode::spectrum));
     // Pitch Shifter +12 st, mix 100%
     const auto ps = lynx::effectFromFl ("Pitch Shifter", blob ({ 7, 1200, 0, 0, 2400, 8500, 200, 0, 0, 768, 0, 0, 65536, 0, 65536, 0, 0, 0, 0 }));
     CHECK (ps && ps->kind == lynx::EffectKind::flPitchShifter && ps->params[0] == 1.0f && ps->params[3] == 1.0f); // REA_rodada61
@@ -16509,6 +16524,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Markers165Tests.inc"
 #include "PerfMode165Tests.inc"
 #include "Rea167gTests.inc"
+#include "Rea167hTests.inc"
 #include "Patch165Tests.inc"
 #include "FlPlugins165Tests.inc"
 #include "FlScratch165Tests.inc"
@@ -16543,6 +16559,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Left167Tests.inc"
 #include "Tune166cTests.inc"
 #include "Update166bTests.inc"
+#include "Emphasis167fTests.inc"
 #include "Dvs167Tests.inc"
 #include "EdisonScript167Tests.inc"
 #include "Deverb167Tests.inc"

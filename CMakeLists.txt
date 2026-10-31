@@ -89,6 +89,8 @@ add_library(lynx_core STATIC
     src/core/SytrusEngine.cpp
     src/core/VintagePhaser.cpp
     src/core/EmphasizerFx.cpp
+    src/core/EmphasisFx.cpp
+    src/core/EmphasisEngine.cpp
     src/core/FreqShifterFl.cpp
     src/core/LowLifterFl.cpp
     src/core/FlLegacyFx.cpp

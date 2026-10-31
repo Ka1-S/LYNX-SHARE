@@ -555,7 +555,7 @@ accordingly. Highlights of what is **confirmed and applied**:
   designed at a fixed 44.1 kHz, x87 direct form I, CENTER DC remover; Fruity Filter: the Chamberlin SVF (×2 cascade),
   per-call smoothers, CENTER. Bit-identical to the three DLLs on every installation state (7 Fast LP, 2 + 9 Free
   Filter, 19 + 4 Fruity Filter demo/preset states) plus synthetic ones, at 22.05/44.1/48/96 kHz with automation, for
-  render calls of up to 512 frames. (Low Lifter was ported exactly in round 154; Emphasis is still approximate.)
+  render calls of up to 512 frames. (Low Lifter was ported exactly in round 154, Emphasis in round 167f.)
 - **Emphasizer, Frequency Shifter and Low Lifter:** FL's exact engines (`core/EmphasizerFx`, `core/FreqShifterFl`,
   `core/LowLifterFl`, REA round 154) imported from the saved state, editable/automatable, with FL's latency (2 ms
   Emphasizer lookahead, 10 ms Low Lifter lookahead when enabled) reported for delay compensation.
@@ -658,8 +658,9 @@ accordingly. Highlights of what is **confirmed and applied**:
 - Fruity WaveShaper (REA round 51 §5): every LYNX export is treated as FL's rendering mode (the process-mode value FL
   sends when it exports was not observed); the editor-only toggle stored by layout ≥ 2 is not identified.
 - Fruity Fast LP / Free Filter / Filter (REA round 63 §7): FL's render-call size for mixer effects is not confirmed
-  (LYNX uses calls of at most 512 frames; the glides and end-of-call guards are per call). Emphasis keeps
-  its approximation (limiter) — not ported yet (survey in REA round 154 §3).
+  (LYNX uses calls of at most 512 frames; the glides and end-of-call guards are per call).
+- Emphasis (REA round 167f): FL's own engine, bit-identical to the DLL in the harness (716 cases); the meters of FL's
+  panel are not reproduced (they never touch the audio); compared against the DLL, not against FL's own renders.
 - Emphasizer, Frequency Shifter, Low Lifter (REA round 154): bit-identical to FL's DLLs in the harness; FL renders
   match 98–99.98 % sample-for-sample once FL's warm-up on silence before rendering is reproduced. That warm-up length
   varies between FL runs (1536–2304 samples observed), so the Frequency Shifter's shifter mode only nulls against a
