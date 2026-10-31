@@ -1666,6 +1666,135 @@ void vocalDenoise (Document& doc, Range r, double mix, Progress* progress)
     report (progress, 1.0);
 }
 
+// --- deverb (round 167c) -------------------------------------------------------------------------------------------
+// LYNX's own dereverberation (FL's Deverb is a downloaded neural module, REA_rodada167c.md §3): the late reverberation's
+// spectrum is predicted from the signal itself one "early" time ago, decayed by the room's reverberation time (Lebart,
+// Boucher & Denbigh 2001; Habets 2007), and subtracted (a gain per bin with a floor and smoothing).
+double estimateReverbTime (const Audio& audio, Range r)
+{
+    r = { std::max<std::int64_t> (0, r.start), std::min (audio.frames(), r.end) };
+    if (audio.empty() || r.length() < 4)
+        return 0.0;
+    // 10 ms energy frames (dB) of the channels' sum
+    const auto rate = audio.sampleRate;
+    const auto step = std::max<std::int64_t> (1, (std::int64_t) (rate * 0.01));
+    std::vector<double> db;
+    for (auto s = r.start; s + step <= r.end; s += step)
+    {
+        double e = 0.0;
+        for (const auto& ch : audio.channels)
+            for (auto i = s; i < s + step; ++i)
+                e += (double) ch[(std::size_t) i] * ch[(std::size_t) i];
+        db.push_back (10.0 * std::log10 (e / (double) step + 1.0e-12));
+    }
+    // free decays: runs of falling energy at least 150 ms long, from a peak at least 15 dB above the floor; the slope
+    // of a straight-line fit (dB per second) of each run, the median of them -> T60 = 60 / -slope
+    auto sorted = db;
+    std::sort (sorted.begin(), sorted.end());
+    const auto floorDb = sorted.empty() ? -120.0 : sorted[sorted.size() / 10];
+    std::vector<double> slopes;
+    const auto n = (int) db.size();
+    for (int i = 1; i + 15 < n;)
+    {
+        if (! (db[(std::size_t) i] >= db[(std::size_t) (i - 1)] && db[(std::size_t) i] > db[(std::size_t) (i + 1)] && db[(std::size_t) i] > floorDb + 15.0))
+        {
+            ++i;
+            continue;
+        }
+        // the run goes on while the level keeps falling (a 1 dB rise is tolerated) and stays 5 dB over the floor
+        int j = i + 1;
+        double low = db[(std::size_t) i];
+        while (j < n && db[(std::size_t) j] < low + 1.0 && db[(std::size_t) j] > floorDb + 5.0)
+        {
+            low = std::min (low, db[(std::size_t) j]);
+            ++j;
+        }
+        // skip the direct sound's first 30 ms
+        const int a = i + 3, b = j;
+        if (b - a >= 15)
+        {
+            double sx = 0, sy = 0, sxx = 0, sxy = 0;
+            for (int k = a; k < b; ++k)
+            {
+                const auto x = (k - a) * 0.01, y = db[(std::size_t) k];
+                sx += x;
+                sy += y;
+                sxx += x * x;
+                sxy += x * y;
+            }
+            const auto m = (double) (b - a);
+            const auto slope = (m * sxy - sx * sy) / std::max (1.0e-12, m * sxx - sx * sx);
+            if (slope < -1.0)
+                slopes.push_back (slope);
+        }
+        i = std::max (i + 1, j);
+    }
+    if (slopes.empty())
+        return 0.0;
+    std::sort (slopes.begin(), slopes.end());
+    return std::clamp (60.0 / -slopes[slopes.size() / 2], 0.1, 8.0);
+}
+
+void deverb (Document& doc, Range r, const DeverbSettings& s, Progress* progress)
+{
+    r = orAll (doc, r);
+    if (r.empty())
+        return;
+    const auto rate = doc.audio.sampleRate;
+    const int size = (int) std::lround (512.0 * std::pow (2.0, std::clamp (s.blockSize, 1, 5) - 1) * std::max (1.0, rate / 44100.0));
+    int fft = 256;
+    while (fft < size)
+        fft *= 2;
+    const auto hop = fft / 4;
+    const auto bins = fft / 2 + 1;
+    // the room: measured on the whole sample (more decays to look at than the selection alone)
+    auto t60 = estimateReverbTime (doc.audio, { 0, doc.audio.frames() });
+    if (t60 <= 0.0)
+        t60 = 0.8;
+    // voice: an earlier start of the late part, a deeper subtraction and floor (speech is sparse in time-frequency)
+    const auto early = s.voice ? 0.032 : 0.05;                 // seconds before the late reverberation starts
+    const auto over = s.voice ? 3.0 : 2.0;                     // over-subtraction
+    const auto floorGain = s.voice ? 0.05 : 0.1;               // the gains' floor (-26 / -20 dB in amplitude)
+    const auto delta = 3.0 * std::log (10.0) / t60;            // the energy's decay constant
+    const auto lag = std::max (1, (int) std::lround (early * rate / hop));
+    const auto decay = std::exp (-2.0 * delta * lag * hop / rate);
+    const auto from = r.start - fft, to = r.end + fft;
+    auto parts = excerpt (doc.audio, from, to);
+    const auto channels = (int) parts.size();
+    const auto mix = std::clamp (s.mix, -1.0, 1.0);
+    for (int c = 0; c < channels; ++c)
+    {
+        std::vector<std::vector<double>> past ((std::size_t) lag, std::vector<double> ((std::size_t) bins, 0.0));
+        std::vector<double> smooth ((std::size_t) bins, 0.0), lastGain ((std::size_t) bins, 1.0);
+        auto out = stftProcess (parts[(std::size_t) c], fft, [&] (std::vector<double>& re, std::vector<double>& im, std::int64_t f) {
+            auto& late = past[(std::size_t) (f % lag)]; // the smoothed power `lag` frames ago (then overwritten)
+            for (int b = 0; b < bins; ++b)
+            {
+                const auto power = re[(std::size_t) b] * re[(std::size_t) b] + im[(std::size_t) b] * im[(std::size_t) b];
+                // the ratio of smoothed powers (a single frame's power scatters too much to compare)
+                smooth[(std::size_t) b] = 0.85 * smooth[(std::size_t) b] + 0.15 * power;
+                const auto now = smooth[(std::size_t) b];
+                const auto predicted = over * decay * late[(std::size_t) b];
+                auto g = now > 0.0 ? std::sqrt (std::max (0.0, 1.0 - predicted / now)) : 1.0;
+                g = std::max (floorGain, g);
+                // a gain rises at once but falls a bit slower (less "musical noise")
+                g = std::max (g, 0.5 * lastGain[(std::size_t) b]);
+                lastGain[(std::size_t) b] = g;
+                const auto k = mix >= 0.0 ? (1.0 - mix) + mix * g : (1.0 + mix) + (-mix) * (1.0 - g);
+                re[(std::size_t) b] *= k;
+                im[(std::size_t) b] *= k;
+            }
+            late = smooth;
+        }, progress, (double) c / channels, 1.0 / channels);
+        if (stop (progress))
+            return;
+        auto& ch = doc.audio.channels[(std::size_t) c];
+        for (auto i = r.start; i < r.end; ++i)
+            ch[(std::size_t) i] = out[(std::size_t) (i - from)];
+    }
+    report (progress, 1.0);
+}
+
 // --- match spectrum --------------------------------------------------------------------------------------------------
 namespace
 {

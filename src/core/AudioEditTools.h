@@ -209,6 +209,18 @@ int declick (Audio& audio, Range r, double sensitivity);
 
 // Vocal denoise / isolator: mix -1 (only the noise) .. 0 .. 1 (only the voice).
 void vocalDenoise (Document& doc, Range r, double mix, Progress* progress = nullptr);
+// Deverb (round 167c; LYNX's own DSP, FL's is a downloaded neural module): removes a room's late reverberation.
+// voice: the "Voice" profile (stronger, for speech / singing); blockSize 1..5 (FL's choices: the analysis block, 512 ..
+// 8192 frames at 44.1 kHz); mix as vocalDenoise: 1 only the dry sound, 0 unchanged, -1 only the reverberation.
+struct DeverbSettings
+{
+    bool voice = false;
+    int blockSize = 1;
+    double mix = 1.0;
+};
+void deverb (Document& doc, Range r, const DeverbSettings& s, Progress* progress = nullptr);
+// The reverberation time (T60, seconds) read from the free decays in the range (0: none found).
+double estimateReverbTime (const Audio& audio, Range r);
 // Match spectrum: makes the range's long-term spectrum match `reference`'s (amount 0..1, smoothing in octaves).
 void matchSpectrum (Document& doc, Range r, const Audio& reference, double amount = 1.0, double smoothingOctaves = 1.0 / 3.0,
                     Progress* progress = nullptr);
