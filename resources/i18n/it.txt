@@ -5995,3 +5995,4 @@ countries: it ch sm
 "In scale" = "Nella scala"
 "AMPLITUDE" = "AMPIEZZA"
 "VARIATION" = "VARIAZIONE"
+"Send to {0}" = "Invia a {0}"

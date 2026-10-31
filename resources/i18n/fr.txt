@@ -5995,3 +5995,4 @@ countries: fr be ch ca lu
 "In scale" = "Dans la gamme"
 "AMPLITUDE" = "AMPLITUDE"
 "VARIATION" = "VARIATION"
+"Send to {0}" = "Envoyer vers {0}"

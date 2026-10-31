@@ -5995,3 +5995,4 @@ countries: es mx ar co cl pe ve
 "In scale" = "En escala"
 "AMPLITUDE" = "AMPLITUD"
 "VARIATION" = "VARIACIÓN"
+"Send to {0}" = "Enviar a {0}"

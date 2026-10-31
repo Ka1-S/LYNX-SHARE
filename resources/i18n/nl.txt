@@ -5995,3 +5995,4 @@ countries: nl be
 "In scale" = "In toonladder"
 "AMPLITUDE" = "AMPLITUDE"
 "VARIATION" = "VARIATIE"
+"Send to {0}" = "Sturen naar {0}"

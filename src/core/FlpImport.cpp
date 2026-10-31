@@ -2776,12 +2776,14 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 else if (fx.kind == EffectKind::transmitter)
                 {
                     // the detection follows FL's sidechain input when one is chosen (the inputs list, like the Limiter's);
-                    // the transient / sustain parts sent to other mixer tracks are not routed (the main output is exact)
+                    // the transient / sustain parts go to the inserts FL's send menus name (the insert number, like the
+                    // Fruity Send's destination: REA_rodada167b §1)
                     if (const auto st = transmitter::parse (slot.state))
                     {
                         fx.sidechain = sidechainSource (insert.index, st->sidechain);
-                        if (options.report != nullptr && (st->transientSend > 0 || st->sustainSend > 0))
-                            ++options.report->partialEffects["Transmitter (transient / sustain sends to other tracks not routed)"];
+                        const int sends[2] = { st->transientSend, st->sustainSend };
+                        for (int o = 0; o < 2; ++o)
+                            fx.sendTracks[(std::size_t) o] = sends[o] > 0 && sends[o] < tracks && sends[o] != insert.index ? sends[o] : 0;
                     }
                 }
                 else if (fx.kind == EffectKind::newtone || fx.kind == EffectKind::newtime)

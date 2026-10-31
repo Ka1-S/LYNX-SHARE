@@ -5995,3 +5995,4 @@ countries: pl
 "In scale" = "W skali"
 "AMPLITUDE" = "AMPLITUDA"
 "VARIATION" = "WARIACJA"
+"Send to {0}" = "Wysyłaj do {0}"

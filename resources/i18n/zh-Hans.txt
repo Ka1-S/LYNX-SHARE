@@ -5995,3 +5995,4 @@ countries: cn sg
 "In scale" = "按音阶"
 "AMPLITUDE" = "幅度"
 "VARIATION" = "变化"
+"Send to {0}" = "发送到 {0}"

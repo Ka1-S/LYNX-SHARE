@@ -5995,3 +5995,4 @@ countries: tw hk mo
 "In scale" = "按音階"
 "AMPLITUDE" = "幅度"
 "VARIATION" = "變化"
+"Send to {0}" = "傳送到 {0}"

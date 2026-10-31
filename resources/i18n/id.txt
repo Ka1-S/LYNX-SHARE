@@ -5995,3 +5995,4 @@ countries: id
 "In scale" = "Dalam skala"
 "AMPLITUDE" = "AMPLITUDO"
 "VARIATION" = "VARIASI"
+"Send to {0}" = "Kirim ke {0}"

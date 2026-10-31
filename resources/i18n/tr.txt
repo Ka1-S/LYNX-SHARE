@@ -5995,3 +5995,4 @@ countries: tr
 "In scale" = "Gamda"
 "AMPLITUDE" = "GENLİK"
 "VARIATION" = "VARYASYON"
+"Send to {0}" = "Şuraya gönder: {0}"

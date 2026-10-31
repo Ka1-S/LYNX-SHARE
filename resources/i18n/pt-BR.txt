@@ -6152,3 +6152,4 @@ countries: br
 "In scale" = "Na escala"
 "AMPLITUDE" = "AMPLITUDE"
 "VARIATION" = "VARIAÇÃO"
+"Send to {0}" = "Enviar para {0}"

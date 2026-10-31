@@ -5995,3 +5995,4 @@ countries: de at ch li lu
 "In scale" = "In Skala"
 "AMPLITUDE" = "AMPLITUDE"
 "VARIATION" = "VARIATION"
+"Send to {0}" = "Senden an {0}"

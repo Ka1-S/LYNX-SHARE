@@ -5995,3 +5995,4 @@ countries: ru by kz
 "In scale" = "В ладу"
 "AMPLITUDE" = "АМПЛИТУДА"
 "VARIATION" = "ВАРИАЦИЯ"
+"Send to {0}" = "Посыл на {0}"

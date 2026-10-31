@@ -5995,3 +5995,4 @@ countries: jp
 "In scale" = "スケール内"
 "AMPLITUDE" = "振幅"
 "VARIATION" = "揺らぎ"
+"Send to {0}" = "送り先: {0}"

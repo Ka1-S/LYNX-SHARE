@@ -5995,3 +5995,4 @@ countries: kr
 "In scale" = "스케일 내"
 "AMPLITUDE" = "진폭"
 "VARIATION" = "변화"
+"Send to {0}" = "보낼 대상: {0}"
