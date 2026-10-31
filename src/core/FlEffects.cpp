@@ -1273,6 +1273,15 @@ std::optional<EffectSlot> effectFromFl (const std::string& pluginName, const std
         visualfx::wavecandy::fromFl (state, slot);
         return slot;
     }
+    if (pluginName == "Fruity dB Meter" || pluginName == "Fruity Spectroman")
+    {
+        // round 167f: FL's legacy level meter and spectrum analyser (no audio change) as LYNX's analyser in their
+        // role, in the matching view, so the slot (and what it shows) is kept instead of dropped
+        auto slot = makeEffectSlot (EffectKind::waveCandy);
+        slot.params[0] = visualfx::wavecandy::modeValue (pluginName == "Fruity dB Meter" ? visualfx::wavecandy::Mode::peakMeter
+                                                                                         : visualfx::wavecandy::Mode::spectrum);
+        return slot;
+    }
     if (pluginName == "ZGameEditor Visualizer") // REA_rodada164c: its layers mapped to LYNX Visualizer layers
     {
         auto slot = makeEffectSlot (EffectKind::visualizer);

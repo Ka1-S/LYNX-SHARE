@@ -2679,7 +2679,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     // the ones that don't touch audio (controllers, visualizers, notes) aren't missed
                     static const char* silent[] = { "Fruity Peak Controller", "Fruity X-Y Controller", "Control Surface",
                                                     "Fruity NoteBook 2", "Fruity NoteBook", "Edison",
-                                                    "Fruity Formula Controller", "Fruity LSD", "Fruity dB Meter", "Fruity Spectroman" };
+                                                    "Fruity Formula Controller", "Fruity LSD" };
                     const auto harmless = std::any_of (std::begin (silent), std::end (silent), [&] (const char* n) { return slot.plugin == n; });
 
                     // FL plugins with nothing to reproduce here (vendor lighting, discontinued bridges): the note says why (round 165g)
