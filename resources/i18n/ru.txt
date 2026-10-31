@@ -454,6 +454,7 @@ countries: ru by kz
 "Sytrus — FL's engine, main settings (operators, filters and effects keep the saved patch)" = "Sytrus — движок FL, основные настройки (операторы, фильтры и эффекты берутся из сохраненного патча)"
 "Fruity DX10 — FL's FM engine" = "Fruity DX10 — FM-движок FL"
 "Kepler — FL's engine (LFO shape and noise read from your FL installation; new settings restart the voices)" = "Kepler — движок FL (форма LFO и шум читаются из вашей установки FL; новые настройки перезапускают голоса)"
+"Kepler Exo — FL's engine with its effects (tables read from your FL installation; new settings restart the voices)" = "Kepler Exo — движок FL с его эффектами (таблицы читаются из вашей установки FL; новые настройки перезапускают голоса)"
 "PoiZone — FL's engine with its gate, chorus, delay and arpeggiator (new settings restart the voices)" = "PoiZone — движок FL с его гейтом, хорусом, дилеем и арпеджиатором (новые настройки перезапускают голоса)"
 "Fruit Kick — FL's engine (channel envelopes stepped per tick)" = "Fruit Kick — движок FL (огибающие канала ступенчато по тикам)"
 "BassDrum — FL's engine (table and noise samples read from your FL installation)" = "BassDrum — движок FL (таблица и сэмплы шума читаются из вашей установки FL)"
