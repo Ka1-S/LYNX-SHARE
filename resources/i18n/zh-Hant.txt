@@ -454,6 +454,7 @@ countries: tw hk mo
 "Sytrus — FL's engine, main settings (operators, filters and effects keep the saved patch)" = "Sytrus——FL的引擎，主要設定（算子、濾波器和效果沿用已儲存的音色）"
 "Fruity DX10 — FL's FM engine" = "Fruity DX10——FL的FM引擎"
 "Kepler — FL's engine (LFO shape and noise read from your FL installation; new settings restart the voices)" = "Kepler——FL的引擎（LFO形狀和噪音讀取自你的FL安裝；新設定會重啟發聲）"
+"Kepler Exo — FL's engine with its effects (tables read from your FL installation; new settings restart the voices)" = "Kepler Exo——FL的引擎及其效果（表格讀取自你的FL安裝；新設定會重啟發聲）"
 "PoiZone — FL's engine with its gate, chorus, delay and arpeggiator (new settings restart the voices)" = "PoiZone——FL的引擎及其閘門、合唱、延時和琶音器（新設定會重啟發聲）"
 "Fruit Kick — FL's engine (channel envelopes stepped per tick)" = "Fruit Kick——FL的引擎（通道波封按tick步進）"
 "BassDrum — FL's engine (table and noise samples read from your FL installation)" = "BassDrum——FL的引擎（表格和噪音取樣讀取自你的FL安裝）"

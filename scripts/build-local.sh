@@ -126,7 +126,7 @@ $CXX $FLAGS $CORE $WAVPACK tools/ogunrender.cpp -o build-local/ogunrender 2> >(g
 $CXX $FLAGS src/core/MiniSynth.cpp tools/minisynthrender.cpp -o build-local/minisynthrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/SimSynth.cpp tools/simsynthrender.cpp -o build-local/simsynthrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/Dx10.cpp tools/dx10render.cpp -o build-local/dx10render 2> >(grep -v 'glibc version' >&2)
-$CXX $FLAGS src/core/Kepler.cpp tools/keplerrender.cpp -o build-local/keplerrender 2> >(grep -v 'glibc version' >&2)
+$CXX $FLAGS src/core/Kepler.cpp src/core/IldspMath.cpp tools/keplerrender.cpp -o build-local/keplerrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/TransistorBass.cpp tools/tbassrender.cpp -o build-local/tbassrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/PoiZone.cpp tools/poizonerender.cpp -o build-local/poizonerender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/FruityDelay.cpp tools/fdelayrender.cpp -o build-local/fdelayrender 2> >(grep -v 'glibc version' >&2)

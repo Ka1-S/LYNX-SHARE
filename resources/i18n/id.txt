@@ -454,6 +454,7 @@ countries: id
 "Sytrus — FL's engine, main settings (operators, filters and effects keep the saved patch)" = "Sytrus — engine FL, pengaturan utama (operator, filter dan efek mempertahankan patch yang disimpan)"
 "Fruity DX10 — FL's FM engine" = "Fruity DX10 — engine FM FL"
 "Kepler — FL's engine (LFO shape and noise read from your FL installation; new settings restart the voices)" = "Kepler — engine FL (bentuk LFO dan noise dibaca dari instalasi FL Anda; pengaturan baru memulai ulang voice)"
+"Kepler Exo — FL's engine with its effects (tables read from your FL installation; new settings restart the voices)" = "Kepler Exo — engine FL dengan efeknya (tabel dibaca dari instalasi FL Anda; pengaturan baru memulai ulang voice)"
 "PoiZone — FL's engine with its gate, chorus, delay and arpeggiator (new settings restart the voices)" = "PoiZone — engine FL dengan gate, chorus, delay dan arpeggiator-nya (pengaturan baru memulai ulang voice)"
 "Fruit Kick — FL's engine (channel envelopes stepped per tick)" = "Fruit Kick — engine FL (envelope channel bertahap per tick)"
 "BassDrum — FL's engine (table and noise samples read from your FL installation)" = "BassDrum — engine FL (sample tabel dan noise dibaca dari instalasi FL Anda)"
