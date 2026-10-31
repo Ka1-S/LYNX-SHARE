@@ -6030,6 +6030,5 @@ countries: kr
 "Original" = "원본"
 "Deverb" = "Deverb"
 "Deverb..." = "Deverb..."
-"{0}% processed" = "{0}% 처리됨"
-"{0}% reverb" = "{0}% 리버브"
 "Choose a profile that best matches the source material" = "원본 소재에 가장 잘 맞는 프로필을 고르세요"
+"Processed" = "처리됨"

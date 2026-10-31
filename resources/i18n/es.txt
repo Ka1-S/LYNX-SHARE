@@ -6030,6 +6030,5 @@ countries: es mx ar co cl pe ve
 "Original" = "Original"
 "Deverb" = "Deverb"
 "Deverb..." = "Deverb..."
-"{0}% processed" = "{0}% procesado"
-"{0}% reverb" = "{0}% reverberación"
 "Choose a profile that best matches the source material" = "Elige el perfil que mejor se ajuste al material de origen"
+"Processed" = "Procesado"

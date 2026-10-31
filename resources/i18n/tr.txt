@@ -6030,6 +6030,5 @@ countries: tr
 "Original" = "Orijinal"
 "Deverb" = "Deverb"
 "Deverb..." = "Deverb..."
-"{0}% processed" = "%{0} işlenmiş"
-"{0}% reverb" = "%{0} yankı"
 "Choose a profile that best matches the source material" = "Kaynak malzemeye en uygun profili seçin"
+"Processed" = "İşlenmiş"

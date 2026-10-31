@@ -968,9 +968,11 @@ private:
                 const auto profile = choice (tr ("Profile"), { tr ("General"), tr ("Voice") }, 0, 1);
                 const auto block = choice (tr ("Block size"), { "1", "2", "3", "4", "5" }, 0, 1);
                 header (tr ("Result"));
+                // FL's wheel: -100 Original .. 100 Processed (its value shown as is; double-click: 0, half and half)
                 const auto mix = knob (tr ("Mix"), -100, 100, 1, 100, [] (double v) {
-                    return v > 0 ? tr ("{0}% processed", { juce::String ((int) v) }) : v < 0 ? tr ("{0}% reverb", { juce::String (-(int) v) }) : tr ("Original");
+                    return v <= -100 ? tr ("Original") : v >= 100 ? tr ("Processed") : juce::String ((int) v);
                 }, 2);
+                static_cast<juce::Slider*> (editors[mix].get())->setDoubleClickReturnValue (true, 0.0);
                 describe = [where] { return where + "\n" + tr ("Choose a profile that best matches the source material"); };
                 makeProcess = [=, this] {
                     ae::DeverbSettings s;

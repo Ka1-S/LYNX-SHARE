@@ -6030,6 +6030,5 @@ countries: tw hk mo
 "Original" = "原始"
 "Deverb" = "Deverb"
 "Deverb..." = "Deverb..."
-"{0}% processed" = "{0}% 已處理"
-"{0}% reverb" = "{0}% 混響"
 "Choose a profile that best matches the source material" = "選擇最符合來源素材的設定檔"
+"Processed" = "處理後"

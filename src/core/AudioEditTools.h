@@ -211,7 +211,8 @@ int declick (Audio& audio, Range r, double sensitivity);
 void vocalDenoise (Document& doc, Range r, double mix, Progress* progress = nullptr);
 // Deverb (round 167c; LYNX's own DSP, FL's is a downloaded neural module): removes a room's late reverberation.
 // voice: the "Voice" profile (stronger, for speech / singing); blockSize 1..5 (FL's choices: the analysis block, 512 ..
-// 8192 frames at 44.1 kHz); mix as vocalDenoise: 1 only the dry sound, 0 unchanged, -1 only the reverberation.
+// 8192 frames at 44.1 kHz); mix as FL's wheel: -1 the original, 0 half and half, 1 only the processed sound (which,
+// as in FL, gets the original's peak level back).
 struct DeverbSettings
 {
     bool voice = false;

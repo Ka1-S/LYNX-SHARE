@@ -6030,6 +6030,5 @@ countries: jp
 "Original" = "オリジナル"
 "Deverb" = "Deverb"
 "Deverb..." = "Deverb..."
-"{0}% processed" = "{0}% 処理済み"
-"{0}% reverb" = "{0}% リバーブ"
 "Choose a profile that best matches the source material" = "素材に最も合うプロファイルを選んでください"
+"Processed" = "処理後"

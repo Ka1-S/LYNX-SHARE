@@ -6030,6 +6030,5 @@ countries: nl be
 "Original" = "Origineel"
 "Deverb" = "Deverb"
 "Deverb..." = "Deverb..."
-"{0}% processed" = "{0}% bewerkt"
-"{0}% reverb" = "{0}% galm"
 "Choose a profile that best matches the source material" = "Kies het profiel dat het best bij het bronmateriaal past"
+"Processed" = "Bewerkt"

@@ -6030,6 +6030,5 @@ countries: it ch sm
 "Original" = "Originale"
 "Deverb" = "Deverb"
 "Deverb..." = "Deverb..."
-"{0}% processed" = "{0}% elaborato"
-"{0}% reverb" = "{0}% riverbero"
 "Choose a profile that best matches the source material" = "Scegli il profilo più adatto al materiale di partenza"
+"Processed" = "Elaborato"

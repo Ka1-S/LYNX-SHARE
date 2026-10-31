@@ -19,7 +19,7 @@ inline Room make (double t60, double rate = 44100.0, double seconds = 4.0, doubl
     };
     for (int i = 0; i < n; ++i)
         if (std::fmod (i / rate, period) < burst)
-            r.dry.audio.channels[0][(std::size_t) i] = (float) (0.3 * rnd());
+            r.dry.audio.channels[0][(std::size_t) i] = (float) (0.05 * rnd());
     // the impulse response: the direct sound, then 2000 taps/s from 5 ms on, each ±e^(-6.9 t / t60)
     std::vector<std::pair<int, double>> taps { { 0, 1.0 } };
     const auto spacing = rate / 2000.0;
@@ -84,27 +84,31 @@ TEST (deverb167_removes_the_tail)
         // energy is already reverberation: 10 dB over the dry sound)
         const auto tailBefore = deverb167::energyDb (room.wet.audio, 0.3, 0.75), tailAfter = deverb167::energyDb (d.audio, 0.3, 0.75);
         const auto burstBefore = deverb167::energyDb (room.wet.audio, 0.0, 0.12), burstAfter = deverb167::energyDb (d.audio, 0.0, 0.12);
-        CHECK (tailBefore - tailAfter > (voice ? 18.0 : 12.0));
+        CHECK (tailBefore - tailAfter > (voice ? 15.0 : 10.0));
         CHECK (burstBefore - burstAfter < 5.0 && (tailBefore - tailAfter) - (burstBefore - burstAfter) > 10.0);
         std::printf ("  deverb voice=%d: tail %.1f dB, bursts %.1f dB\n", (int) voice, tailAfter - tailBefore, burstAfter - burstBefore);
     }
-    // the mix: 0 = unchanged; +1 and -1 add up to the original (the dry part and the reverberation)
-    auto none = room.wet, dry = room.wet, rev = room.wet;
+    // FL's mix: -1 = the original, 1 = processed, 0 = half and half
+    auto none = room.wet, dry = room.wet, half = room.wet;
     DeverbSettings s;
-    s.mix = 0.0;
+    s.mix = -1.0;
     deverb (none, {}, s);
     s.mix = 1.0;
     deverb (dry, {}, s);
-    s.mix = -1.0;
-    deverb (rev, {}, s);
-    double worst = 0.0, worstSum = 0.0;
+    s.mix = 0.0;
+    deverb (half, {}, s);
+    double worst = 0.0, worstHalf = 0.0, peakIn = 0.0, peakOut = 0.0;
     for (int i = 0; i < room.wet.audio.frames(); ++i)
     {
         const auto w = room.wet.audio.channels[0][(std::size_t) i];
         worst = std::max (worst, (double) std::abs (none.audio.channels[0][(std::size_t) i] - w));
-        worstSum = std::max (worstSum, (double) std::abs (dry.audio.channels[0][(std::size_t) i] + rev.audio.channels[0][(std::size_t) i] - w));
+        worstHalf = std::max (worstHalf, (double) std::abs (half.audio.channels[0][(std::size_t) i] - 0.5f * (dry.audio.channels[0][(std::size_t) i] + w)));
+        peakIn = std::max (peakIn, (double) std::abs (w));
+        peakOut = std::max (peakOut, (double) std::abs (dry.audio.channels[0][(std::size_t) i]));
     }
-    CHECK (worst < 1e-4 && worstSum < 1e-4);
+    CHECK (worst < 1e-6 && worstHalf < 1e-5);
+    // the processed sound gets the original's peak back
+    CHECK (peakIn < 1.0 && std::abs (peakOut - peakIn) < 1e-4);
     // a selection: only it changes
     auto part = room.wet;
     deverb (part, Range { 44100, 88200 }, DeverbSettings {});

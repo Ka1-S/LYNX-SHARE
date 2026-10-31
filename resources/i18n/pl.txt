@@ -6030,6 +6030,5 @@ countries: pl
 "Original" = "Oryginał"
 "Deverb" = "Deverb"
 "Deverb..." = "Deverb..."
-"{0}% processed" = "{0}% przetworzone"
-"{0}% reverb" = "{0}% pogłosu"
 "Choose a profile that best matches the source material" = "Wybierz profil najlepiej pasujący do materiału źródłowego"
+"Processed" = "Przetworzony"

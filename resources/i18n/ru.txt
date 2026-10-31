@@ -6030,6 +6030,5 @@ countries: ru by kz
 "Original" = "Оригинал"
 "Deverb" = "Deverb"
 "Deverb..." = "Deverb..."
-"{0}% processed" = "{0}% обработано"
-"{0}% reverb" = "{0}% реверберации"
 "Choose a profile that best matches the source material" = "Выберите профиль, лучше всего подходящий к исходному материалу"
+"Processed" = "Обработанный"

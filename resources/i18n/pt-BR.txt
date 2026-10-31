@@ -6187,6 +6187,5 @@ countries: br
 "Original" = "Original"
 "Deverb" = "Deverb"
 "Deverb..." = "Deverb..."
-"{0}% processed" = "{0}% processado"
-"{0}% reverb" = "{0}% reverb"
 "Choose a profile that best matches the source material" = "Escolha o perfil que melhor combina com o material de origem"
+"Processed" = "Processado"

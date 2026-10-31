@@ -1761,12 +1761,14 @@ void deverb (Document& doc, Range r, const DeverbSettings& s, Progress* progress
     const auto from = r.start - fft, to = r.end + fft;
     auto parts = excerpt (doc.audio, from, to);
     const auto channels = (int) parts.size();
-    const auto mix = std::clamp (s.mix, -1.0, 1.0);
+    // FL's Mix wheel (-256 .. 256): the processed sound's share goes 0 .. 1 [DECOMP Edison 0x844d00]
+    const auto share = (std::clamp (s.mix, -1.0, 1.0) + 1.0) * 0.5;
+    std::vector<std::vector<float>> processed ((std::size_t) channels);
     for (int c = 0; c < channels; ++c)
     {
         std::vector<std::vector<double>> past ((std::size_t) lag, std::vector<double> ((std::size_t) bins, 0.0));
         std::vector<double> smooth ((std::size_t) bins, 0.0), lastGain ((std::size_t) bins, 1.0);
-        auto out = stftProcess (parts[(std::size_t) c], fft, [&] (std::vector<double>& re, std::vector<double>& im, std::int64_t f) {
+        processed[(std::size_t) c] = stftProcess (parts[(std::size_t) c], fft, [&] (std::vector<double>& re, std::vector<double>& im, std::int64_t f) {
             auto& late = past[(std::size_t) (f % lag)]; // the smoothed power `lag` frames ago (then overwritten)
             for (int b = 0; b < bins; ++b)
             {
@@ -1780,17 +1782,29 @@ void deverb (Document& doc, Range r, const DeverbSettings& s, Progress* progress
                 // a gain rises at once but falls a bit slower (less "musical noise")
                 g = std::max (g, 0.5 * lastGain[(std::size_t) b]);
                 lastGain[(std::size_t) b] = g;
-                const auto k = mix >= 0.0 ? (1.0 - mix) + mix * g : (1.0 + mix) + (-mix) * (1.0 - g);
-                re[(std::size_t) b] *= k;
-                im[(std::size_t) b] *= k;
+                re[(std::size_t) b] *= g;
+                im[(std::size_t) b] *= g;
             }
             late = smooth;
         }, progress, (double) c / channels, 1.0 / channels);
         if (stop (progress))
             return;
+    }
+    // as FL: the processed sound gets the original's peak back (at most full scale) when they differ by over 0.01
+    double peakIn = 0.0, peakOut = 0.0;
+    for (int c = 0; c < channels; ++c)
+        for (auto i = r.start; i < r.end; ++i)
+        {
+            peakIn = std::max (peakIn, (double) std::abs (doc.audio.channels[(std::size_t) c][(std::size_t) i]));
+            peakOut = std::max (peakOut, (double) std::abs (processed[(std::size_t) c][(std::size_t) (i - from)]));
+        }
+    peakIn = std::min (peakIn, 1.0);
+    const auto makeUp = peakOut > 0.0 && std::abs (peakIn - peakOut) > 0.01 ? peakIn / peakOut : 1.0;
+    for (int c = 0; c < channels; ++c)
+    {
         auto& ch = doc.audio.channels[(std::size_t) c];
         for (auto i = r.start; i < r.end; ++i)
-            ch[(std::size_t) i] = out[(std::size_t) (i - from)];
+            ch[(std::size_t) i] = (float) ((1.0 - share) * ch[(std::size_t) i] + share * makeUp * processed[(std::size_t) c][(std::size_t) (i - from)]);
     }
     report (progress, 1.0);
 }

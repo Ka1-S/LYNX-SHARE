@@ -6030,6 +6030,5 @@ countries: cn sg
 "Original" = "原始"
 "Deverb" = "Deverb"
 "Deverb..." = "Deverb..."
-"{0}% processed" = "{0}% 已处理"
-"{0}% reverb" = "{0}% 混响"
 "Choose a profile that best matches the source material" = "选择最符合源素材的配置"
+"Processed" = "处理后"

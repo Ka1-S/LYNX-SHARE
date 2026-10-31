@@ -6030,6 +6030,5 @@ countries: fr be ch ca lu
 "Original" = "Original"
 "Deverb" = "Deverb"
 "Deverb..." = "Deverb..."
-"{0}% processed" = "{0}% traité"
-"{0}% reverb" = "{0}% réverbération"
 "Choose a profile that best matches the source material" = "Choisissez le profil qui correspond le mieux au matériau source"
+"Processed" = "Traité"
