@@ -54,6 +54,15 @@ the info shown; "Asher Postman - Future House" on its second arrangement).
 | LYNX before | No creation date, no working time. |
 | LYNX now | `ProjectInfo::created` (seconds since 1970 UTC; FL's local-time TDateTime converted in this machine's time zone by `flDateTimeToUnix`) and `ProjectInfo::workSeconds`; imported from 0xED, kept in .lynx (`info.created`, `info.workSeconds`). The engine's work clock starts when a project is set (open / import / new) and adds the elapsed wall-clock time before every save (`AudioEngine::stampWorkTime`, called by `capturePluginStates`, which every save path calls first). A new project gets created = now unless its template has a date. Settings › Info shows "Created: 2018-07-13 18:38    Working time: 12:58:47" (updated every second), all 15 languages. Test `rea167g_flp_created_and_working_time`. |
 
+## Windows check [SHOT]
+
+Branch build, fresh `LYNX_PROFILE_DIR` + `LYNX_TEST_MODE=1`, `g_state_a.flp` (FL's Empty template with 3 patterns, two
+arrangements, 0x43 = 2, 0x09 = 1, 0x64 = 1, 0x0A = 1, comments "Info 167g A"; its 0xED is the template's):
+`C:\Users\kauan\lynx-test\r167g\shots\lynx_open.png` — opens on Pat2, SONG lit, arrangement Arr2;
+test-mode.log "skipped: project info shown on open"; F11 → `lynx_info.png` — Settings › Info with the comments, "Show
+this page when the project is opened" ticked, "Created: 2015-01-22 09:52    Working time: 0:03:56" (the template's
+3 min 36 s + this session); closed normally, `desktop_after.png` clean.
+
 ## 4. Channel events still not read (for a next round)
 
 The channel saver **FUN_00f3e190** [DECOMP] writes, per channel, in this order: 0x40, 0x15, 0x00, (names, plugin),
@@ -72,8 +81,7 @@ channels), 0x29 / 0x32 (≈ 1 500 / 1 170 channels with 1). Not done this round.
 
 - Done (branch feature/flapp167, pushed as wip/flapp167): §1 main pitch, §2 saved state, §3 created / working time,
   with tests in tests/Rea167gTests.inc; gap list REA_rodada167g-gaps.md.
-- In progress: build-local with FL Data and a Windows build of the branch (tmp/r167g/bl*.log, win1.log); then a
-  Windows check of Settings › Info (fresh LYNX_PROFILE_DIR + LYNX_TEST_MODE=1) and land.sh.
+- Windows check done (section above). In progress: build-local with FL Data (tmp/r167g/bl1.log), then land.sh.
 - Next: §4 channel events (trace the channel settings form), gap items 8, 10, 13.
 - Rerun: `tmp/r167g/g.sh <out.c> 0 <addr>` (headless decompile on /mnt/e/lynx-work/r167g), `python3
   tmp/r167g/py/flpctx.py "<FL Data>" 0x..` (event contexts), `tmp/r167g/flrender.sh` (FL renders — both locks).

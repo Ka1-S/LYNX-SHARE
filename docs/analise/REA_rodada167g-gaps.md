@@ -24,4 +24,4 @@ some, L = cosmetic or rare.
 | 10 | 0xE2 + 0xE6 (the second link list: 20 B records + names, next to 0xE3) | saver writes list 0 as 0xE2, list 1 as 0xE3 [DECOMP] | 0xE3 read, 0xE2 ignored | M | L | open |
 | 11 | 0x12 time-signature denominator (always 4 in the demos) | saver [DECOMP] | LYNX's project signature is "beats per bar" only | M | L | not planned |
 | 12 | 0xC6 RTF comments | the RTF twin of 0xC3 [DATA] | the plain 0xC3 is read | — | L | not needed |
-| 13 | 0x1D, 0x27, 0x28, 0x26 (bit 0 / bit 1 = two form checkboxes), 0x67 (u16) after the arrangements; 0x23, 0x2C, 0x1E, 0xA7 among the project's settings | saver [DECOMP]: globals, meaning not traced yet | ignored | ? | ? | open |
+| 13 | 0x1D, 0x27, 0x28, 0x26 (bit 0 = the Playlist form's `PLTrackMonitorExtAndMixerInputMenu` (field 0x938) checked, bit 1 = `PLTrackMonitorExtInputOnlyMenu` (0x930) — the audio-track monitoring choice; 1 in 67 demos, 3 in 9), 0x67 (u16) after the arrangements; 0x23, 0x2C, 0x1E, 0xA7 among the project's settings | saver [DECOMP]: globals, meaning not traced yet | ignored | ? | ? | open |

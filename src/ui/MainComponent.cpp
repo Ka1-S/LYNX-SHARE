@@ -4002,7 +4002,7 @@ void MainComponent::flpImported (const juce::File& file)
         if (engine.getSong().info.showOnOpen && platform::testMode())
             platform::testModeLog ("project info shown on open");
         else if (engine.getSong().info.showOnOpen)
-            openSettings (1);
+            openSettings ((int) SettingsPage::info);
     }
 }
 
