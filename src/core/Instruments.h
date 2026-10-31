@@ -40,6 +40,8 @@ public:
     // they hold, as FL's do (round 165d: FL's Arpeggiator script on a "cut itself" Patcher keeps arpeggiating a chord
     // whose notes start apart [EXEC: FL render, REA_rodada165d §4])
     virtual void cut() noexcept { allNotesOff(); }
+    // FL's Options › Project › "Fast declick for cut groups" (REA round 167h §3): a cut voice fades out in 2 ms
+    virtual void setFastDeclick (bool /*fast*/) noexcept {}
     // A note on a given MIDI channel (0…15), from a MIDI Out channel routed to this one's MIDI input port. Only
     // hosted plugins see the channel; the others play it as a plain note.
     virtual void noteOnMidi (int key, float velocity, int /*midiChannel*/) noexcept { noteOn (key, velocity); }
@@ -166,6 +168,10 @@ struct SampleData
     // the sample's regions and beats (Fruity Granulizer's slices and tempo sync)
     std::vector<std::int64_t> markerStarts;
     float acidBeats = 0.0f;
+    // a sample FL's precomputed effects were applied to (core/SamplePrecompute.h): it holds only the played region,
+    // which was [cropFrom, cropTo] of the file (fractions); the sampler maps its Start / End knobs into it
+    bool cropped = false;
+    double cropFrom = 0.0, cropTo = 1.0;
 
     const float* mappedLeft = nullptr;
     const float* mappedRight = nullptr; // nullptr = mono

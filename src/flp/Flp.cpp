@@ -20,6 +20,13 @@ enum : std::uint32_t
     evShowInfo = 0x0A,           // u8: Project info › "Show on opening" (ShowInfoBox, REA round 167g)
     evCurrentArrangement = 0x64, // u16: the arrangement open when saved (after every arrangement, REA round 167g)         // i16: the toolbar's main (master) pitch in cents (REA round 167g)
     evPanLaw = 0x17,
+    evFastDeclick = 0x28,       // u8: Options › Project › "Fast declick for cut groups" (> 0 = on; REA round 167h §3)
+    evChannelFxFlags = 0x46,    // u16: Sampler › Precomputed: bit 0 fade stereo, 1 reverse, 2 clip, 8 swap stereo (REA round 167h §1)
+    evChannelFadeIn = 0x4C,     // u16: Precomputed › fade in (0…1024)
+    evChannelFadeOut = 0x4B,    // u16: Precomputed › fade out (0…1024)
+    evSampleFlags = 0x8F,       // u32: bit 0 resample, 1 load regions, 2 load ACID markers, 3 use loop points, 8 keep on disk
+    evSampleLoopPointsOld = 0x13, // (older files) "use loop points" on
+    evSamplePingPong = 0x14,    // u8: Sampler › Ping pong loop
     evTimeSignatureNumerator = 0x11,
     evChannelSwingMix = 0x61,
     evLayerChild = 0x5E,  // u16: a Layer channel's child (one event per child; REA_rodada164a §1)
@@ -526,6 +533,40 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
                     project.mainPitch = (int) (std::int16_t) (std::uint16_t) e.value;
                 break;
 
+            case evFastDeclick: // (FL saves it after the Playlist tracks; its loader reads it in any context)
+                project.fastDeclick = e.value > 0;
+                break;
+
+            case evChannelFxFlags:
+                if (section == Section::channel)
+                    channel().fxFlags = (int) e.value;
+                break;
+
+            case evChannelFadeIn:
+                if (section == Section::channel)
+                    channel().fadeIn = (int) e.value;
+                break;
+
+            case evChannelFadeOut:
+                if (section == Section::channel)
+                    channel().fadeOut = (int) e.value;
+                break;
+
+            case evSampleFlags:
+                if (section == Section::channel)
+                    channel().sampleFlags = (int) e.value;
+                break;
+
+            case evSampleLoopPointsOld:
+                if (section == Section::channel)
+                    channel().loopPointsOld = true;
+                break;
+
+            case evSamplePingPong:
+                if (section == Section::channel)
+                    channel().pingPong = e.value != 0;
+                break;
+
             case evPanLaw:
                 project.panLaw = (int) e.value;
                 break;
@@ -696,6 +737,17 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
                     c.stretchPitch = readLE<std::int32_t> (e.data, 0x64);
                     c.stretchMul = readLE<std::int32_t> (e.data, 0x68);
                     c.stretchMode = readLE<std::int32_t> (e.data, 0x6C);
+                    // Sampler › Precomputed effects (REA round 167h §1: the channel form's handlers write the channel's
+                    // +0x28d / +0x2d4 / +0x2d5 / +0x2d7 / +0x2d8 / +0x2dc = this record's base +0x284 plus these)
+                    c.removeDc = e.data[0x09] != 0;
+                    if (e.data.size() >= 0x5C)
+                    {
+                        c.normalize = e.data[0x50] != 0;
+                        c.reversePolarity = e.data[0x51] != 0;
+                        c.declickMode = e.data[0x53];
+                        c.crossfade = readLE<std::int32_t> (e.data, 0x54);
+                        c.trim = readLE<std::int32_t> (e.data, 0x58);
+                    }
 
                     if (e.data.size() >= 0x98)
                     {

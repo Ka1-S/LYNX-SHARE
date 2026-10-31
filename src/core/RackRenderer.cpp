@@ -1,4 +1,5 @@
 #include "core/RackRenderer.h"
+#include "core/SamplePrecompute.h"
 #include "core/MetronomeVoice.h"
 
 #include "core/ChannelLoops.h"
@@ -205,6 +206,11 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
             sample = std::move (stretched);
     }
 
+    // FL's Sampler › Precomputed effects (REA_rodada167h §2): the played region, processed once
+    if (sample != nullptr && kind == InstrumentKind::sampler && precompute::needed (channel.sampler)) // (audio clips: not yet)
+        if (auto processed = precompute::apply (*sample, channel.sampler))
+            sample = std::move (processed);
+
     const loadtrace::Scope timing ("rack_instruments");
     std::shared_ptr<Instrument> instrument = makeInstrument (kind, std::move (sample));
     instrument->prepare (sampleRate);
@@ -355,6 +361,14 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                 || (previous->song.channels[i].samplePath == channel.samplePath && previous->song.channels[i].zones == channel.zones
                     && previous->song.channels[i].modelParams == channel.modelParams
                     && previous->song.channels[i].sampler.keepPitch == channel.sampler.keepPitch
+                    // FL's precomputed effects (round 167h): the sample is processed when the channel is built
+                    && previous->song.channels[i].sampler.precompute == channel.sampler.precompute
+                    && previous->song.channels[i].sampler.useLoopPoints == channel.sampler.useLoopPoints
+                    && (! precompute::needed (channel.sampler)
+                        || (previous->song.channels[i].sampler.regionStart == channel.sampler.regionStart
+                            && previous->song.channels[i].sampler.regionEnd == channel.sampler.regionEnd
+                            && previous->song.channels[i].sampler.reverse == channel.sampler.reverse
+                            && precompute::needed (previous->song.channels[i].sampler)))
                     && (! channel.sampler.keepPitch
                         || (previous->song.channels[i].sampler.stretchBeats == channel.sampler.stretchBeats
                             && previous->song.channels[i].sampler.stretchMethod == channel.sampler.stretchMethod
@@ -386,6 +400,10 @@ std::unique_ptr<const RackState> RackState::build (Song song,
 
         state->instruments.push_back (buildInstrument (channel, sampleRate, song.bpm, factories, &keyShiftLater));
     }
+    // Options › Project › "Fast declick for cut groups" (REA round 167h §3)
+    for (auto& instrument : state->instruments)
+        if (instrument != nullptr)
+            instrument->setFastDeclick (song.fastDeclick);
     prepareKeyShifts (keyShiftLater, sampleRate);
 
     state->effects.resize (song.mixer.size());

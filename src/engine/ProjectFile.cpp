@@ -1207,6 +1207,8 @@ juce::var channelToVar (const ChannelDef& c)
         if (c.sampler.stretchMethod != StretchMethod::general)
             sampler->setProperty ("stretchMethod", (int) c.sampler.stretchMethod);
         sampler->setProperty ("region", juce::Array<juce::var> { c.sampler.regionStart, c.sampler.regionEnd });
+        if (c.sampler.startOffset > 0.0f)
+            sampler->setProperty ("startOffset", c.sampler.startOffset);
 
         if (! c.sampler.slices.empty())
         {
@@ -1224,6 +1226,23 @@ juce::var channelToVar (const ChannelDef& c)
         sampler->setProperty ("filter", juce::Array<juce::var> { c.sampler.cutoff, c.sampler.resonance, c.sampler.filterType });
         if (c.sampler.gainDb != 0.0f)
             sampler->setProperty ("gainDb", c.sampler.gainDb);
+        // FL's precomputed effects, loop flag and declicking mode (round 167h)
+        if (const auto& p = c.sampler.precompute; p.any())
+        {
+            auto pre = std::make_unique<juce::DynamicObject>();
+            for (auto [name, on] : { std::pair { "removeDc", p.removeDc }, { "normalize", p.normalize }, { "reversePolarity", p.reversePolarity },
+                                     { "fadeStereo", p.fadeStereo }, { "swapStereo", p.swapStereo }, { "pingPong", p.pingPong } })
+                if (on)
+                    pre->setProperty (name, true);
+            for (auto [name, v] : { std::pair { "fadeIn", p.fadeIn }, { "fadeOut", p.fadeOut }, { "crossfade", p.crossfade }, { "trim", p.trim } })
+                if (v != 0)
+                    pre->setProperty (name, v);
+            sampler->setProperty ("precomputed", juce::var (pre.release()));
+        }
+        if (! c.sampler.useLoopPoints)
+            sampler->setProperty ("useLoopPoints", false);
+        if (c.sampler.declickMode != 0)
+            sampler->setProperty ("declickMode", c.sampler.declickMode);
         if (! c.sampler.flVolumeEnvelope.empty())
         {
             juce::Array<juce::var> env;
@@ -1491,11 +1510,28 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
             def.sampler.regionStart = juce::jlimit (0.0f, 1.0f, (float) (double) region[0]);
             def.sampler.regionEnd = juce::jlimit (0.0f, 1.0f, (float) (double) region[1]);
         }
+        def.sampler.startOffset = juce::jlimit (0.0f, 1.0f, (float) (double) s.getProperty ("startOffset", 0.0));
         def.sampler.reverse = (bool) s.getProperty ("reverse", false);
         def.sampler.cut = (bool) s.getProperty ("cut", false);
         def.sampler.porta = (bool) s.getProperty ("porta", false);
         def.sampler.portaBeats = juce::jlimit (0.0f, 8.0f, (float) (double) s.getProperty ("portaTime", (double) SamplerSettings {}.portaBeats));
         def.sampler.gainDb = juce::jlimit (-24.0f, 24.0f, (float) (double) s.getProperty ("gainDb", 0.0));
+        if (const auto& pre = s["precomputed"]; pre.isObject())
+        {
+            auto& p = def.sampler.precompute;
+            p.removeDc = (bool) pre.getProperty ("removeDc", false);
+            p.normalize = (bool) pre.getProperty ("normalize", false);
+            p.reversePolarity = (bool) pre.getProperty ("reversePolarity", false);
+            p.fadeStereo = (bool) pre.getProperty ("fadeStereo", false);
+            p.swapStereo = (bool) pre.getProperty ("swapStereo", false);
+            p.pingPong = (bool) pre.getProperty ("pingPong", false);
+            p.fadeIn = juce::jlimit (0, 1024, (int) pre.getProperty ("fadeIn", 0));
+            p.fadeOut = juce::jlimit (0, 1024, (int) pre.getProperty ("fadeOut", 0));
+            p.crossfade = juce::jlimit (0, 2048, (int) pre.getProperty ("crossfade", 0));
+            p.trim = juce::jlimit (0, 32768, (int) pre.getProperty ("trim", 0));
+        }
+        def.sampler.useLoopPoints = (bool) s.getProperty ("useLoopPoints", true);
+        def.sampler.declickMode = juce::jlimit (0, 5, (int) s.getProperty ("declickMode", 0));
 
         if (auto* env = s["flVolumeEnvelope"].getArray(); env != nullptr && env->size() == 18)
             for (const auto& v : *env)
@@ -1691,6 +1727,8 @@ juce::String toJson (const Song& song)
         root->setProperty ("autoCrossfades", true);
     if (song.playTruncatedNotes)
         root->setProperty ("playTruncatedNotes", true);
+    if (song.fastDeclick)
+        root->setProperty ("fastDeclick", true);
     if (! song.info.empty())
     {
         auto info = std::make_unique<juce::DynamicObject>();
@@ -1999,6 +2037,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
     song.performanceMode = (bool) root.getProperty ("performanceMode", false);
     song.autoCrossfades = (bool) root.getProperty ("autoCrossfades", false);
     song.playTruncatedNotes = (bool) root.getProperty ("playTruncatedNotes", false);
+    song.fastDeclick = (bool) root.getProperty ("fastDeclick", false);
     if (const auto info = root.getProperty ("info", {}); info.isObject())
     {
         auto get = [&info] (const char* key) { return info.getProperty (key, {}).toString().toStdString(); };
