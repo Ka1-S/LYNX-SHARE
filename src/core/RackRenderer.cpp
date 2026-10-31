@@ -23,6 +23,7 @@
 #include "core/DirectWave.h"
 #include "core/SoundFont.h"
 #include "core/NewtoneFx.h"
+#include "core/Dvs.h"
 #include "core/Scratcher.h"
 
 #include <algorithm>
@@ -244,6 +245,8 @@ std::shared_ptr<Effect> buildEffect (const EffectSlot& slot, double sampleRate, 
         // Fruity Scratcher: its turntable's sample, loaded off the audio thread (REA_rodada165g-flscratch165)
         effect = scratcher::make (factories.samples && ! slot.samplePath.empty() ? factories.samples (slot.samplePath) : nullptr);
         effect->prepare (sampleRate);
+        // its DVS position table (REA_rodada167c §1), built here so the audio thread finds it ready
+        dvs::warm (scratcher::timecodeOf (slot.params[scratcher::timecodeType]), true);
     }
     else
     {
