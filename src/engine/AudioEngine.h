@@ -233,6 +233,8 @@ public:
     void setRecordingTarget (const juce::File& folder, const juce::String& projectStem);
     juce::File getRecordingFolder() const { return recordingFolder; }
     juce::String getRecordingStem() const { return recordingStem; }
+    // A MIDI message as if a controller had sent it (the --bendrectest of round 167a). Message thread.
+    void injectMidiInput (const juce::MidiMessage& message) { handleIncomingMidiMessage (nullptr, message); }
     static juce::File defaultRecordingFolder();
     // The take files written since LYNX started (or since forgetRecordings), oldest first. UI thread.
     const std::vector<juce::File>& getSessionRecordings() const noexcept { return sessionRecordings; }

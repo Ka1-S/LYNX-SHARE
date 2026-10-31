@@ -3952,7 +3952,7 @@ private:
         // 2 s of wheel at ~100 messages a second: 0 → +1 (0.5 s), +1 → −1 (1 s), −1 → 0 (0.5 s)
         auto sent = std::make_shared<std::vector<std::pair<double, float>>>();
         auto t0 = std::make_shared<double> (juce::Time::getMillisecondCounterHiRes());
-        engine->handleIncomingMidiMessage (nullptr, juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100));
+        engine->injectMidiInput (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100));
         auto tick = std::make_shared<std::function<void()>>();
         *tick = [this, sent, t0, tick, step, finish, songMode] {
             if (engine == nullptr)
@@ -3963,13 +3963,13 @@ private:
                 const auto x = ms / 1000.0;
                 const auto v = (float) (x < 0.5 ? x * 2.0 : x < 1.5 ? 1.0 - (x - 0.5) * 2.0 : -1.0 + (x - 1.5) * 2.0);
                 const auto wheel = juce::jlimit (0, 16383, 8192 + juce::roundToInt (v * 8191.0f));
-                engine->handleIncomingMidiMessage (nullptr, juce::MidiMessage::pitchWheel (1, wheel));
+                engine->injectMidiInput (juce::MidiMessage::pitchWheel (1, wheel));
                 sent->push_back ({ ms, (float) (wheel - 8192) / 8192.0f });
                 juce::Timer::callAfterDelay (10, *tick);
                 return;
             }
-            engine->handleIncomingMidiMessage (nullptr, juce::MidiMessage::pitchWheel (1, 8192));
-            engine->handleIncomingMidiMessage (nullptr, juce::MidiMessage::noteOff (1, 60));
+            engine->injectMidiInput (juce::MidiMessage::pitchWheel (1, 8192));
+            engine->injectMidiInput (juce::MidiMessage::noteOff (1, 60));
             juce::Timer::callAfterDelay (400, [this, sent, step, finish, songMode] {
                 if (engine == nullptr)
                     return;

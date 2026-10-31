@@ -169,9 +169,11 @@ TEST (left167_sounding_notes_follow_a_live_pitch_knob_and_main_pitch)
     if (realFlpDir.empty())
         return;
     const auto print = std::getenv ("LYNX_PITCH_AUDIT") != nullptr;
-    // FL measured (allpitch2.flp): these follow it at once; the others are drums or unreadable by the estimate
+    // FL measured (allpitch2.flp) the first twelve following it at once (Sakura too, but the autocorrelation can't read
+    // its string model here, as in issue14_pitch_audit_of_the_instruments); Morphine, Toxic and Kepler take the same host
+    // path in LYNX. The others are drums, own pitch models or unreadable by the estimate.
     const std::set<std::string> follow { "3x Osc", "Sytrus", "Harmless", "MiniSynth", "Sawer", "SimSynth", "PoiZone", "GMS",
-                                         "Harmor", "Fruity DX10", "FL Keys", "BooBass", "Sakura" };
+                                         "Harmor", "Fruity DX10", "FL Keys", "BooBass", "Morphine", "Toxic Biohazard", "Kepler" };
     const auto fl = natives142::flAccess();
     for (const auto& e : natives::instrumentEngines())
     {
@@ -257,4 +259,43 @@ TEST (left167_rendered_tracks_go_on_the_first_free_playlist_track)
     CHECK (mixerops::insertDisplayName (s, 2) == "Insert 2");
     s.mixer[2].name = "Vocals";
     CHECK (mixerops::insertDisplayName (s, 2) == "Vocals");
+}
+
+// Slide notes on drums (REA_rodada167a §2): FL never retriggers a hit on a slide; BassDrum and Drumaxx read the host's
+// per-note pitch every block, so the hit still ringing glides; Fruit Kick reads it only at the trigger (no change)
+TEST (left167_drum_slides_bend_bassdrum_and_drumaxx_only)
+{
+    using namespace lynx;
+    if (realFlpDir.empty())
+        return;
+    const auto fl = natives142::flAccess();
+    Note hit;
+    hit.key = 60;
+    hit.length = ppq * 2;
+    hit.velocity = 0.8f;
+    Note slide;
+    slide.key = 67;
+    slide.start = ppq / 4;
+    slide.length = ppq / 4;
+    slide.slide = true;
+    for (const auto kind : { InstrumentKind::bassdrum, InstrumentKind::drumaxx, InstrumentKind::fruitkick })
+    {
+        const auto c = natives::makeChannel (kind, fl);
+        if (! c)
+            continue;
+        const auto plain = issue14::renderPattern (*c, { hit }, 0.0f, 0.5);
+        const auto slid = issue14::renderPattern (*c, { hit, slide }, 0.0f, 0.5);
+        const auto at = (std::size_t) (0.125 * 48000.0); // the slide starts at 1/4 beat = 0.125 s (120 BPM)
+        bool same = true, sameBefore = true;
+        double energy = 0.0;
+        for (std::size_t i = 0; i < plain.size() && i < slid.size(); ++i)
+        {
+            if (plain[i] != slid[i])
+                (i < at ? sameBefore : same) = false;
+            energy += (double) plain[i] * plain[i];
+        }
+        CHECK (sameBefore); // a slide note starts nothing
+        if (energy > 1e-6)
+            CHECK (same == (kind == InstrumentKind::fruitkick));
+    }
 }
