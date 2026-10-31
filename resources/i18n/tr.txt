@@ -5997,3 +5997,4 @@ countries: tr
 "VARIATION" = "VARYASYON"
 "Created: {0}" = "Oluşturuldu: {0}"
 "Working time: {0}" = "Çalışma süresi: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Kliplerde kesilmiş notaları çal (pattern klibinden önce başlayan nota klibin başından çalar)"

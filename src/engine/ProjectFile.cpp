@@ -1542,6 +1542,8 @@ juce::String toJson (const Song& song)
         root->setProperty ("performanceMode", true);
     if (song.autoCrossfades)
         root->setProperty ("autoCrossfades", true);
+    if (song.playTruncatedNotes)
+        root->setProperty ("playTruncatedNotes", true);
     if (! song.info.empty())
     {
         auto info = std::make_unique<juce::DynamicObject>();
@@ -1848,6 +1850,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
     song.cleanMixer = (bool) root.getProperty ("cleanMixer", false);
     song.performanceMode = (bool) root.getProperty ("performanceMode", false);
     song.autoCrossfades = (bool) root.getProperty ("autoCrossfades", false);
+    song.playTruncatedNotes = (bool) root.getProperty ("playTruncatedNotes", false);
     if (const auto info = root.getProperty ("info", {}); info.isObject())
     {
         auto get = [&info] (const char* key) { return info.getProperty (key, {}).toString().toStdString(); };

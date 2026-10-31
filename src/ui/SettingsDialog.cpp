@@ -84,6 +84,10 @@ public:
         crossfadesNew.setEnabled (hooks.getGeneral != nullptr);
         crossfadesNew.setToggleState (hooks.getGeneral != nullptr ? hooks.getGeneral().crossfadesInNewProjects : true, juce::dontSendNotification);
         addAndMakeVisible (crossfadesNew);
+        // FL's Project › "Play truncated notes in clips" (round 167g)
+        truncated.setButtonText (tr ("Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)"));
+        truncated.onClick = [this] { edit ([on = truncated.getToggleState()] (Song& s) { s.playTruncatedNotes = on; }); };
+        addAndMakeVisible (truncated);
 
         engine.addChangeListener (this);
         load();
@@ -117,6 +121,7 @@ public:
         area.removeFromTop (6);
         crossfades.setBounds (area.removeFromTop (26));
         crossfadesNew.setBounds (area.removeFromTop (26));
+        truncated.setBounds (area.removeFromTop (26));
     }
 
 private:
@@ -136,6 +141,7 @@ private:
         swing.setValue (s.swing * 100.0, juce::dontSendNotification);
         pitch.setValue (s.masterPitch, juce::dontSendNotification);
         crossfades.setToggleState (s.autoCrossfades, juce::dontSendNotification);
+        truncated.setToggleState (s.playTruncatedNotes, juce::dontSendNotification);
     }
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override
@@ -151,7 +157,7 @@ private:
         playlistTitle { tr ("Playlist") };
     juce::Label tempoLabel, beatsLabel, swingLabel, pitchLabel, ppqText, stepsText, signatureText;
     juce::Slider tempo, beats, swing, pitch;
-    juce::ToggleButton crossfades, crossfadesNew;
+    juce::ToggleButton crossfades, crossfadesNew, truncated;
 };
 
 // --- Info page -------------------------------------------------------------------------------------

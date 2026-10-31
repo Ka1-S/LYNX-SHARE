@@ -1287,6 +1287,10 @@ struct Song
     // without it loads with it off (FL: "old projects now load with automatic crossfades turned off"); new projects
     // take Settings' "Enable automatic crossfades in new projects".
     bool autoCrossfades = false;
+    // FL's Project › "Play truncated notes in clips" (REA round 167g, .flp 0x1E): a note that starts before a pattern
+    // clip's start (the clip trimmed or sliced into it) plays from the clip's start with what is left of its length
+    // (FL FUN_010608a0); off = such notes are dropped (LYNX's behaviour before; projects saved before keep it off).
+    bool playTruncatedNotes = false;
     // whether an effect slot processes: switched on, and not a substitute while the substitutes are bypassed
     bool slotActive (const EffectSlot& slot) const noexcept { return slot.enabled && ! (substitutesBypassed && slot.isSubstitute()); }
     std::vector<Automation> automations;

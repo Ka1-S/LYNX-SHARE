@@ -5997,3 +5997,4 @@ countries: nl be
 "VARIATION" = "VARIATIE"
 "Created: {0}" = "Gemaakt: {0}"
 "Working time: {0}" = "Werktijd: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Afgekapte noten in clips spelen (een noot die vóór een patternclip begint, klinkt vanaf het begin van de clip)"

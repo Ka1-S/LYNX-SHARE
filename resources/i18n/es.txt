@@ -5997,3 +5997,4 @@ countries: es mx ar co cl pe ve
 "VARIATION" = "VARIACIÓN"
 "Created: {0}" = "Creado: {0}"
 "Working time: {0}" = "Tiempo de trabajo: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Reproducir notas truncadas en clips (una nota que empieza antes de un clip de patrón suena desde el inicio del clip)"

@@ -824,6 +824,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.performanceMode = project.performanceMode; // (round 165m)
     song.beatsPerBar = std::clamp (project.beatsPerBar, 1, 32);
     song.swing = std::clamp (project.swing / 128.0f, 0.0f, 1.0f);
+    song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
     song.masterPitch = (float) std::clamp (project.mainPitch, -1200, 1200); // FL's render follows it (REA round 167g §1)
     song.channelGroups = project.filterGroups;
     song.info.title = project.title;

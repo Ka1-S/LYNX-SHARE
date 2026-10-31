@@ -177,3 +177,64 @@ TEST (rea167g_flp_created_and_working_time)
     CHECK (std::abs (demo.info.workSeconds / 3600.0 - 12.98) < 0.01);
     CHECK (std::abs (demo.info.created - 1531507131.0) <= 14.0 * 3600.0 + 1.0);
 }
+
+// §5 Play truncated notes in clips (.flp 0x1E, FL's Project setting; FL FUN_010608a0 cuts a clip's notes at its offset:
+// a note starting before keeps its remaining length from the offset, or is dropped when the setting is off)
+TEST (rea167g_play_truncated_notes_in_clips)
+{
+    lynx::Song s;
+    s.channels.resize (1);
+    auto& p = s.patterns.emplace_back();
+    lynx::Note long1;
+    long1.start = 0;
+    long1.length = 3 * lynx::ppq; // beats 1–3
+    long1.key = 60;
+    p.notes.push_back (long1);
+    lynx::Note short1 = long1;
+    short1.start = lynx::ppq / 2;
+    short1.length = lynx::ppq / 4; // ends before the offset: never plays
+    short1.key = 62;
+    p.notes.push_back (short1);
+    p.sortNotes();
+
+    lynx::Clip c; // the clip starts 2 beats into the pattern, at song beat 4, 2 beats long
+    c.pattern = 0;
+    c.start = 4 * lynx::ppq;
+    c.length = 2 * lynx::ppq;
+    c.offset = 2 * lynx::ppq;
+    s.playlist.push_back (c);
+
+    const auto tps = lynx::ticksPerSample (120.0, 48000.0); // 1 beat = 24000 samples
+    const auto run = [&] {
+        lynx::EventBuffer ev;
+        lynx::scheduleSong (s, 0.0, 192000, tps, ev);
+        std::vector<std::pair<int, int>> out; // (sample, key) of the "on"s, then of the "off"s as -key
+        for (const auto& e : ev)
+            out.emplace_back (e.sampleOffset, e.type == lynx::NoteEvent::Type::on ? e.key : -e.key);
+        std::sort (out.begin(), out.end());
+        return out;
+    };
+
+    CHECK (! s.playTruncatedNotes); // (projects saved before keep LYNX's old behaviour)
+    CHECK (run().empty());
+
+    s.playTruncatedNotes = true;
+    const auto on = run();
+    CHECK (on.size() == 2);
+    if (on.size() == 2)
+    {
+        CHECK (on[0].first == 4 * 24000 && on[0].second == 60);  // from the clip's start
+        CHECK (on[1].first == 5 * 24000 && on[1].second == -60); // the 1 beat that was left
+    }
+
+    // .flp: 0x1E = 1 → on; FL leaves it out when off
+    FlpBuilder b;
+    b.u8 (0x1E);
+    b.u8 (1);
+    CHECK (lynx::importFlp (flp::parseProject (b.bytes)).playTruncatedNotes);
+    CHECK (! lynx::importFlp (flp::parseProject (FlpBuilder().bytes)).playTruncatedNotes);
+    // a new project has it on, as FL's
+    lynx::Song fresh;
+    lynx::applyNewProjectDefaults (fresh, lynx::NewProjectDefaults {});
+    CHECK (fresh.playTruncatedNotes);
+}
