@@ -90,3 +90,41 @@ TEST (kepler_exo_imports_from_fl_projects)
     CHECK (lynx::kepler::renderReference (st, keplerDll(), { { 0, 60, 1.0, 0.0, 0.0, -1 } }, 44100.0, 512).empty());
     CHECK (! lynx::kepler::renderReference (st, dll, { { 0, 60, 1.0, 0.0, 0.0, -1 } }, 44100.0, 512).empty());
 }
+
+TEST (kepler_exo_renders_like_the_dll)
+{
+    // the state FL 2026 saves for a new Kepler Exo (version 4, 155 values) with saturation, EQ, hyper chorus, delay and
+    // reverb on and envelope 1 routed to the cutoff: bit-exact against FL's engine DLL driven by the EXEC harness
+    const std::vector<float> panel {
+                                 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.5f, 0.0f, 0.5f, 0.330000013f, 1.0f, 0.0f,
+                                 1.0f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
+                                 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                 0.0f, 0.330000013f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.330000013f, 0.0f, 0.0f, 0.5f, 0.5f, 0.0f,
+                                 0.0f, 0.0f, 0.0f, 0.5f, 1.0f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f, 0.0f,
+                                 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 1.0f, 0.5f, 0.5f, 0.5f, 0.5f,
+                                 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.5f, 0.607166648f, 0.5f, 0.0f, 0.749833345f, 0.0f, 1.0f, 0.0f, 0.75f,
+                                 1.0f, 0.20130828f, 0.786499977f, 0.0f, 0.523100019f, 0.523100019f, 0.776199996f, 0.381999999f, 0.225600004f,
+                                 0.523100019f, 0.800300002f, 0.800333321f, 0.486900002f, 1.0f, 0.400000006f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.5f, 0.0f, 0.5f, 0.5f, 1.0f };
+    const auto st = keplerExoTestState (panel, 4, { { 2, 0x25 } });
+    CHECK (lynx::keplerExoState (st));
+    const auto dll = keplerExoDll();
+    if (dll.empty() || ! lynx::keplerExoDllUsable (dll))
+        return;
+    const std::vector<lynx::kepler::RefNote> notes { { 0, 60, 1.0, 0.0, 0.0, 33075 }, { 11025, 64, 0.6, 0.0, 0.0, 33075 },
+                                                     { 22050, 67, 0.8, 0.0, 0.0, 44100 } };
+    const auto y = lynx::kepler::renderReference (st, dll, notes, 44100.0, 40000);
+    CHECK (y.size() == 2 * 40000);
+    if (y.size() != 2 * 40000)
+        return;
+    double el = 0.0, er = 0.0;
+    for (std::size_t i = 0; i < y.size(); i += 2)
+        el += (double) y[i] * y[i], er += (double) y[i + 1] * y[i + 1];
+    std::printf ("  Kepler Exo: energy %.9f %.9f (FL's DLL 1006.548688564 903.640697576)\n", el, er);
+    CHECK (std::abs (el - 1006.548688564) < 1e-6 && std::abs (er - 903.640697576) < 1e-6);
+    const std::tuple<int, std::uint32_t, std::uint32_t> golden[] { { 3000, 1040504742u, 1044004408u }, { 9000, 3164105609u, 3189124468u },
+                                                                   { 15000, 1044674706u, 1040577009u }, { 26000, 3196220183u, 3189818383u },
+                                                                   { 38000, 1043140332u, 1000940744u } };
+    for (const auto& [i, l, r] : golden)
+        CHECK (y[2 * (std::size_t) i] == kepler165Bits (l) && y[2 * (std::size_t) i + 1] == kepler165Bits (r));
+}

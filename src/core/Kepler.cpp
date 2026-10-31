@@ -4,7 +4,9 @@
 #include "core/Kepler.h"
 #include "core/HostSlide.h"
 #include "core/KeplerExoDelay.h"
+#include "core/KeplerExoChorus.h"
 #include "core/KeplerExoEq.h"
+#include "core/KeplerExoReverb.h"
 
 #include <algorithm>
 #include <array>
@@ -15,10 +17,6 @@
 #include <iterator>
 #include <map>
 #include <mutex>
-#ifdef LYNX_KEPLER_TRACE
-#include <cstdio>
-#include <cstdlib>
-#endif
 
 #include "core/Sha256.h"
 #include "core/Song.h"
@@ -1316,6 +1314,8 @@ private:
             satK = (float) (1.0 - powD (0.09999999999999998, 20.0 / sr));
             fxEq.setRate (sr);
             fxDelay.setRate (sr);
+            fxHyper.setRate (sr);
+            fxReverb.setRate (sr);
             // every host value again through the parameter forwarder (REA_rodada167d §1.3)
             for (int i = 0; i < 0x102; ++i)
                 forwardExo (i, host[(std::size_t) i]);
@@ -2556,9 +2556,6 @@ private:
                 const auto m = (int) (9216.0f / (float) nOld + 0.1f);
                 const auto l = lnF ((float) (m - 1) * 0.020673936f + 1.0f);
                 host[(std::size_t) rateIndex] = 1.0f - l * 0.2060993f;
-#ifdef LYNX_KEPLER_TRACE
-                std::fprintf (stderr, "CONV %d x=%.9g e=%.9g n=%d m=%d l=%.9g r=%.9g\n", rateIndex, x, e, nOld, m, l, host[(std::size_t) rateIndex]);
-#endif
             };
             if (host[0x31] >= 0.5f)
                 convert (0x30);
@@ -2573,6 +2570,7 @@ private:
     void resetExo()
     {
         fxDelay.reset();
+        fxReverb.reset();
         for (int i = 0; i < 0x102; ++i)
         {
             const auto v = exoDefaultParam (i);
@@ -2857,6 +2855,10 @@ private:
                     fxEq.setParam (i, x);
                 else if (i >= 0x6e && i <= 0x78)
                     fxDelay.setParam (i, x);
+                else if (i >= 0x79 && i <= 0x85)
+                    fxReverb.setParam (i, x);
+                else if (i >= 0x89 && i <= 0x94)
+                    fxHyper.setParam (i, x);
                 break;
         }
     }
@@ -3343,14 +3345,6 @@ private:
         decimate (osL, osR, L, R);
         postExo (L, R);
         outL = L, outR = R;
-#ifdef LYNX_KEPLER_TRACE
-        if (static FILE* tf = std::getenv ("KTRACE") ? std::fopen (std::getenv ("KTRACE"), "w") : nullptr; tf != nullptr)
-        {
-            const auto& v = voices[0];
-            std::fprintf (tf, "%.17g %.17g %.9g U %.9g %.9g %.9g B %.9g A %.9g %.9g | %.17g %.17g %.17g %.17g | %.9g %.9g %.9g %.9g %.9g\n", lfo1Phase, lfo1Inc, P[0x30], lfo1Uni, lfo1Shape, lfo1Tri, base[0x30], globalMx.empty() ? -1.f : globalAmount[(std::size_t) globalMx[0].terms[0].slot], globalMx.empty() ? -1.f : (float) globalMx[0].dst,
-                          v.osc.phase, v.osc.inc, v.osc2.phase, v.osc2.inc, v.env1, v.env2, v.laneCut, v.amp, outL);
-        }
-#endif
     }
 
     // after the decimator: high-pass, chorus, the effects, main volume / pan and the output gain (§3.6–3.8)
@@ -3382,7 +3376,9 @@ private:
         if (satOn && ! satPost)
             saturate (L, R);
         fxEq.process (L, R);
+        fxHyper.process (L, R);
         fxDelay.process (L, R);
+        fxReverb.process (L, R);
         if (satOn && satPost)
             saturate (L, R);
     }
@@ -3416,10 +3412,6 @@ private:
         }
         else
             r = exoTanhf ((prev + y) * 0.5f);
-#ifdef LYNX_KEPLER_TRACE
-        if (lane == 0)
-            std::fprintf (stderr, "ADAA y=%.9g prev=%.9g r=%.9g\n", y, prev, r);
-#endif
         satPrev[lane] = y;
         return r;
     }
@@ -3800,6 +3792,8 @@ private:
     bool satOn = false, satPost = false, satHq = false;
     kepler_exo::Eq fxEq;
     kepler_exo::Delay fxDelay;
+    kepler_exo::HyperChorus fxHyper;
+    kepler_exo::Reverb fxReverb;
     float satTarget = 1.0f, satDrive = 1.0f, satK = 0.01f, satPrev[2] {};
 };
 

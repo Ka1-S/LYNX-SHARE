@@ -13,7 +13,8 @@
 //                                                                                    0 low-pass, 1 high-pass (state
 //                                                                                    variable), 2 band-pass (biquad), 3 off
 //   0x76 wet balance L/R ((x + 1) / 2)  0x77 cross-feedback of the echo lines    0x78 tone (one-pole LP below 0.5, HP above)
-// Time and offset changes are applied every 11th sample with a 1000-sample linear crossfade between two read-head pairs.
+// Time and offset changes are picked up every (int) (fs * 0.002) + 1 samples (89 at 44100; 11 before the first rate
+// set-up) and applied with a 1000-sample linear crossfade between two read-head pairs.
 // ILDelay3's own LFO (modulation depth fixed at 0 in Exo), its second filter set and its unused buffers are omitted: they
 // never reach the output.
 //
@@ -477,8 +478,14 @@ struct DelayT
             setParam (0x6e + i, 0.5f);
     }
 
-    // the synth's rate set-up calls ILDelay3::setRate (vtable +8), which also clears the delay lines
-    void setRate (double fs) noexcept { c.setRate (fs); }
+    // the synth's rate set-up (0x18001d49b..0x18001d4c7) calls ILDelay3::setRate (vtable +8), which also clears the
+    // delay lines, then sets the wrapper's update interval to (int) (fs * 0.002) samples (88 at 44100; the ctor's 10
+    // only holds until the first rate set-up)
+    void setRate (double fs) noexcept
+    {
+        c.setRate (fs);
+        updEvery = (int) (fs * 0.002);
+    }
     // the synth's reset calls ILDelay3's reset FUN_180011120
     void reset() noexcept { c.reset(); }
     void setTempo (double bpm) noexcept { tempo = bpm; }
@@ -575,7 +582,8 @@ using Delay = DelayT<>;
 // ---------------------------------------------------------------------------------------------- verification notes
 // Harness (Windows, our own code, DLL unmodified): an object built as the synth ctor builds it (ILDelay3 ctor
 // FUN_180010b30 at +0x30, the wrapper fields, FUN_180010650 (i, 0.5) for the eleven parameters), then ILDelay3 setRate
-// FUN_180011ff0, reset FUN_180011120 and the Exo defaults; per sample FUN_1800107b0 in MXCSR | 0xE040; events (parameter
+// FUN_180011ff0 plus the synth rate set-up's update interval (+0x48c = (int) (fs * 0.002), 0x18001d4c7), reset
+// FUN_180011120 and the Exo defaults; per sample FUN_1800107b0 in MXCSR | 0xE040; events (parameter
 // changes, host tempo +0x490, reset, setRate) applied between samples in nearest or in RZ. LYNX side: Delay with the same
 // calls. 13 scenarios, 6.8 M output floats (L, R), 0 mismatches:
 //  * defaults at 44100 and 48000 (150000 samples each);
