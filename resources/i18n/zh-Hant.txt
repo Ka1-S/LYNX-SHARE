@@ -5996,3 +5996,8 @@ countries: tw hk mo
 "AMPLITUDE" = "幅度"
 "VARIATION" = "變化"
 "Send to {0}" = "傳送到 {0}"
+"1/6 beat" = "1/6拍"
+"1/8 beat" = "1/8拍"
+"Snap to grid" = "貼齊格線"
+"Send to Playlist" = "傳送到播放清單"
+"Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid" = "貼齊格線：移動的音符（Ctrl+拖曳）與變速標記會落在歌曲的節拍格線上"

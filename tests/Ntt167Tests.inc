@@ -175,3 +175,77 @@ TEST (ntt167_transmitter_envelope_view)
     lastS = view->columns[written - 1].sustain;
     CHECK (peakT > 0.5f && lastS > 0.5f && peakOut > 0.5f);
 }
+
+namespace ntt167
+{
+// FL's Newtime XML (REA_rodada167b §4): three segments of a 3000-sample file, the second marker moved 300 later
+std::string newtimeXml (std::int64_t moved)
+{
+    auto seg = [] (int k, std::int64_t os, std::int64_t oe, std::int64_t cs, std::int64_t ce) {
+        return "<Pitch_" + std::to_string (k) + " bIsEnabled=\"1\" fOrigPitch=\"60.0\" iOrigStartSamplePos=\"" + std::to_string (os) + "\" iOrigEndSamplePos=\""
+               + std::to_string (oe) + "\" iCurStartSamplePos=\"" + std::to_string (cs) + "\" iCurEndSamplePos=\"" + std::to_string (ce)
+               + "\" fCurInvStretchFactor=\"" + std::to_string ((double) (oe - os) / (double) (ce - cs)) + "\"/>";
+    };
+    return "<NewToneProject NumOfTracks=\"1\"><Tracks><Trk_0 TrackNum=\"0\" Type=\"class CzplJTimelineWarpSource\" FilePath=\"x.wav\">"
+           "<AudioObject SelfBPM=\"120.0\" OriginalFileLength=\"3000\" NumOfPitches=\"3\">"
+           + seg (0, 0, 1000, 0, 1000) + seg (1, 1000, 2000, 1000, 2000 + moved) + seg (2, 2000, 3000, 2000 + moved, 3000)
+           + "</AudioObject></Trk_0></Tracks></NewToneProject>";
+}
+} // namespace ntt167
+
+TEST (ntt167_newtime_imports_fl_warp_markers)
+{
+    using namespace lynx;
+    using namespace lynx::newtonefx;
+    // FL's segments become LYNX's markers: each segment's source start → output start, and the end
+    const auto st = newtonetest::state (1, 4, ntt167::newtimeXml (300), "C:\\x.wav");
+    const auto map = warpOf (st);
+    CHECK (map && map->frames == 3000);
+    if (! map)
+        return;
+    CHECK (map->markers.size() == 3);
+    CHECK (map->markers.size() == 3 && map->markers[0] == (WarpMarker { 1000, 1000 }) && map->markers[1] == (WarpMarker { 2000, 2300 })
+           && map->markers[2] == (WarpMarker { 3000, 3000 }));
+    CHECK (warpedLength (*map, 3000) == 3000);
+    CHECK (std::abs (warpToOutput (*map, 3000, 1500.0) - 1650.0) < 1e-9); // segment 1 stretched 1.3×
+    CHECK (std::abs (warpToOutput (*map, 3000, 2500.0) - 2650.0) < 1e-9); // segment 2 squeezed to 700
+    // a Newtone state is no warp; LYNX's own markers still read
+    CHECK (! warpOf (newtonetest::state (0, 4, newtonetest::xmlWithTrack (true), "")));
+    CHECK (warpOf (writeWarp (*map)) == map);
+
+    // the render: a click at source 1500 lands at 1650 (FL's piecewise-linear map), the length is kept
+    SampleData src;
+    src.sampleRate = 44100;
+    src.left.assign (3000, 0.0f);
+    for (int i = 0; i < 3000; ++i)
+        src.left[(std::size_t) i] = 0.05f * std::sin ((float) i * 0.07f);
+    for (int i = 0; i < 8; ++i)
+        src.left[(std::size_t) (1500 + i)] = 0.9f;
+    auto shared = std::make_shared<SampleData> (src);
+    const auto out = renderedSource (shared, st);
+    CHECK (out != nullptr && out->frames() == 3000);
+    if (out != nullptr && out->frames() == 3000)
+    {
+        int peak = 0;
+        for (int i = 1; i < 3000; ++i)
+            if (std::abs (out->left[(std::size_t) i]) > std::abs (out->left[(std::size_t) peak]))
+                peak = i;
+        CHECK (std::abs (peak - 1652) < 40);
+    }
+    // FL's unmoved analysis (stretch ratios 1.0001 from its rounding) plays the source unchanged
+    const auto plain = newtonetest::state (1, 4, ntt167::newtimeXml (0), "C:\\x.wav");
+    CHECK (renderedSource (shared, plain) == shared);
+}
+
+TEST (ntt167_newtone_snap_to_beat_grid)
+{
+    using namespace lynx::newtonefx;
+    // FL's Snap to grid menu (Beat, 1/2 ... 1/8 beat, Off): at 120 BPM / 44.1 kHz a beat is 22050 samples
+    CHECK (snapToBeatGrid (12000, 44100.0, 120.0, 1) == 22050);
+    CHECK (snapToBeatGrid (10000, 44100.0, 120.0, 1) == 0);
+    CHECK (snapToBeatGrid (6000, 44100.0, 120.0, 4) == 5513);    // 5512.5 rounds up
+    CHECK (snapToBeatGrid (2000, 44100.0, 120.0, 8) == 2756);
+    CHECK (snapToBeatGrid (7400, 44100.0, 120.0, 3) == 7350);
+    CHECK (snapToBeatGrid (7400, 44100.0, 120.0, 0) == 7400);    // Off
+    CHECK (snapToBeatGrid (7400, 44100.0, 0.0, 4) == 7400);
+}

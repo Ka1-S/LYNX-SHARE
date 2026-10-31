@@ -5996,3 +5996,8 @@ countries: it ch sm
 "AMPLITUDE" = "AMPIEZZA"
 "VARIATION" = "VARIAZIONE"
 "Send to {0}" = "Invia a {0}"
+"1/6 beat" = "1/6 di beat"
+"1/8 beat" = "1/8 di beat"
+"Snap to grid" = "Aggancia alla griglia"
+"Send to Playlist" = "Invia alla Playlist"
+"Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid" = "Aggancia alla griglia: le note spostate (Ctrl+trascina) e i marker di warp cadono sulla griglia dei beat del brano"

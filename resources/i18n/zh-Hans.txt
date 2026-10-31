@@ -5996,3 +5996,8 @@ countries: cn sg
 "AMPLITUDE" = "幅度"
 "VARIATION" = "变化"
 "Send to {0}" = "发送到 {0}"
+"1/6 beat" = "1/6拍"
+"1/8 beat" = "1/8拍"
+"Snap to grid" = "吸附到网格"
+"Send to Playlist" = "发送到播放列表"
+"Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid" = "吸附到网格：移动的音符（Ctrl+拖动）和变速标记会落在歌曲的节拍网格上"

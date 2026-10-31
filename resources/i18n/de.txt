@@ -5996,3 +5996,8 @@ countries: de at ch li lu
 "AMPLITUDE" = "AMPLITUDE"
 "VARIATION" = "VARIATION"
 "Send to {0}" = "Senden an {0}"
+"1/6 beat" = "1/6 Schlag"
+"1/8 beat" = "1/8 Schlag"
+"Snap to grid" = "Am Raster ausrichten"
+"Send to Playlist" = "An Playlist senden"
+"Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid" = "Am Raster ausrichten: verschobene Noten (Strg+Ziehen) und Warp-Marker rasten auf dem Schlagraster des Songs ein"

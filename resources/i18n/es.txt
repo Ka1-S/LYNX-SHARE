@@ -5996,3 +5996,8 @@ countries: es mx ar co cl pe ve
 "AMPLITUDE" = "AMPLITUD"
 "VARIATION" = "VARIACIÓN"
 "Send to {0}" = "Enviar a {0}"
+"1/6 beat" = "1/6 de tiempo"
+"1/8 beat" = "1/8 de tiempo"
+"Snap to grid" = "Ajustar a la cuadrícula"
+"Send to Playlist" = "Enviar a la Playlist"
+"Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid" = "Ajustar a la cuadrícula: las notas movidas (Ctrl+arrastrar) y los marcadores de warp caen en la cuadrícula de tiempos de la canción"

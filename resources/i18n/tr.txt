@@ -5996,3 +5996,8 @@ countries: tr
 "AMPLITUDE" = "GENLİK"
 "VARIATION" = "VARYASYON"
 "Send to {0}" = "Şuraya gönder: {0}"
+"1/6 beat" = "1/6 vuruş"
+"1/8 beat" = "1/8 vuruş"
+"Snap to grid" = "Izgaraya hizala"
+"Send to Playlist" = "Playlist'e gönder"
+"Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid" = "Izgaraya hizala: taşınan notalar (Ctrl+sürükle) ve warp işaretleri şarkının vuruş ızgarasına oturur"

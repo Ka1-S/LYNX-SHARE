@@ -6153,3 +6153,8 @@ countries: br
 "AMPLITUDE" = "AMPLITUDE"
 "VARIATION" = "VARIAÇÃO"
 "Send to {0}" = "Enviar para {0}"
+"1/6 beat" = "1/6 de tempo"
+"1/8 beat" = "1/8 de tempo"
+"Snap to grid" = "Ajustar à grade"
+"Send to Playlist" = "Enviar para a Playlist"
+"Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid" = "Ajustar à grade: notas movidas (Ctrl+arrastar) e marcadores de warp caem na grade de tempos da música"

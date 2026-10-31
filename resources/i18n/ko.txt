@@ -5996,3 +5996,8 @@ countries: kr
 "AMPLITUDE" = "진폭"
 "VARIATION" = "변화"
 "Send to {0}" = "보낼 대상: {0}"
+"1/6 beat" = "1/6박"
+"1/8 beat" = "1/8박"
+"Snap to grid" = "그리드에 스냅"
+"Send to Playlist" = "플레이리스트로 보내기"
+"Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid" = "그리드에 스냅: 이동한 노트(Ctrl+드래그)와 워프 마커가 곡의 박자 그리드에 맞춰집니다"

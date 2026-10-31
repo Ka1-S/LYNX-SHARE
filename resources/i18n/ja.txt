@@ -5996,3 +5996,8 @@ countries: jp
 "AMPLITUDE" = "振幅"
 "VARIATION" = "揺らぎ"
 "Send to {0}" = "送り先: {0}"
+"1/6 beat" = "1/6拍"
+"1/8 beat" = "1/8拍"
+"Snap to grid" = "グリッドにスナップ"
+"Send to Playlist" = "プレイリストへ送る"
+"Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid" = "グリッドにスナップ: 移動したノート (Ctrl+ドラッグ) とワープマーカーが曲の拍グリッドに揃います"

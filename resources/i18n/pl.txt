@@ -5996,3 +5996,8 @@ countries: pl
 "AMPLITUDE" = "AMPLITUDA"
 "VARIATION" = "WARIACJA"
 "Send to {0}" = "Wysyłaj do {0}"
+"1/6 beat" = "1/6 miary"
+"1/8 beat" = "1/8 miary"
+"Snap to grid" = "Przyciągaj do siatki"
+"Send to Playlist" = "Wyślij do Playlisty"
+"Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid" = "Przyciągaj do siatki: przesuwane nuty (Ctrl+przeciągnij) i znaczniki warp trafiają na siatkę miar utworu"

@@ -5996,3 +5996,8 @@ countries: ru by kz
 "AMPLITUDE" = "АМПЛИТУДА"
 "VARIATION" = "ВАРИАЦИЯ"
 "Send to {0}" = "Посыл на {0}"
+"1/6 beat" = "1/6 доли"
+"1/8 beat" = "1/8 доли"
+"Snap to grid" = "Привязка к сетке"
+"Send to Playlist" = "Отправить в плейлист"
+"Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid" = "Привязка к сетке: сдвинутые ноты (Ctrl+перетаскивание) и маркеры варпа встают на сетку долей песни"
