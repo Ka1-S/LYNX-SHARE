@@ -60,6 +60,8 @@ extern const double lnT[258];    // ln (1 + j/256), then 0
 extern const float lgRcp[130];   // float (2 / (1 + j/128))
 extern const float lgHi[130];    // log10 (1 + j/128) to 10 mantissa bits (truncated)
 extern const float lgLo[130];    // the rest, rounded toward zero
+extern const float lnHi[130];    // ln (1 + j/128) to 12 significant bits (truncated) — round 167f, logf
+extern const float lnLo[130];    // the rest, rounded toward zero
 
 // expf
 inline float expf_ (float xf)
@@ -461,6 +463,122 @@ inline void sincosf_ (float x, float& s, float& c)
     }
     s = vsin1 (x);
     c = vsin1 (a + 1.57079637f);
+}
+
+// logf for finite x > 0 (round 167f, REA_rodada167f-transporter.md §A.1): the same reduction as log10f (a 128-entry
+// table around the mantissa, a cubic in the scaled remainder) with natural-log tables and ln 2 split in two halves;
+// near 1 (|x − 1| < 1/16) a series in u = f / (2 + f)
+inline float logf_ (float xf)
+{
+    std::uint32_t xb = fbits (xf);
+    if ((xb & 0x7f800000u) == 0x7f800000u) return xf != xf ? xf : (xb >> 31 ? NAN : xf);
+    if (! (xf > 0.0f)) return xf == 0.0f ? -INFINITY : NAN;
+    float e = (float) ((std::int32_t) (xb >> 23) - 127);
+    std::uint32_t mb = xb & 0x007fffffu;
+    const float d1 = std::fabs (xf - 1.0f);
+    const bool fused = useFma();
+    if (e == -127.0f) // denormal input (not reached with DAZ)
+    {
+        const float t = ffrom (mb | 0x3f800000u) - 1.0f;
+        const std::uint32_t tb = fbits (t);
+        e = (float) ((std::int32_t) (tb >> 23) - 253);
+        mb = tb & 0x007fffffu;
+        xb = tb;
+    }
+    if (! (d1 < 0.0625f))
+    {
+        const std::uint32_t idx = ((xb & 0x007f0000u) + ((xb & 0x00008000u) << 1)) >> 16;
+        const float cm = ffrom ((xb & 0x007f0000u) + ((xb & 0x00008000u) << 1) | 0x3f000000u);
+        const float mm = ffrom (mb | 0x3f000000u);
+        const float r = (cm - mm) * lgRcp[idx];
+        float s, a, b;
+        if (fused)
+        {
+            const float q = fmaF (0.333333343f, r, 0.5f);
+            s = fmaF (q, r * r, r);
+            b = fmaF (e, 0x1.0bfbe8p-15f, -s);
+            a = fmaF (0x1.62ep-1f, e, lnHi[idx]);
+        }
+        else
+        {
+            const float q = r * 0.333333343f + 0.5f;
+            s = q * (r * r) + r;
+            b = 0x1.0bfbe8p-15f * e - s;
+            a = 0x1.62ep-1f * e + lnHi[idx];
+        }
+        b = b + lnLo[idx];
+        return a + b;
+    }
+    const float f = xf - 1.0f;
+    const float u = f / (2.0f + f);
+    const float fu = f * u;
+    const float s = u + u;
+    const float v = s * s;
+    const float sv = s * v;
+    float t;
+    if (fused)
+    {
+        t = fmaF (0.0125000002f, v, 0.0833333358f);
+        t = fmaF (t, sv, -fu);
+    }
+    else
+    {
+        t = v * 0.0125000002f + 0.0833333358f;
+        t = t * sv - fu;
+    }
+    return f + t;
+}
+
+// tanf (round 167f, REA_rodada167f-transporter.md §A.2): double evaluation, x + x³·P(x²)/Q(x²) on |x| ≤ π/4 after a
+// two-step reduction by π/2 (odd quarter → −1/t); |x| < 2⁻¹³ uses x + x³/3, |x| < 2⁻²⁷ returns x. Reduction for
+// arguments ≥ 2²³ (never reached by the engines) falls back to the C library.
+inline double tanPoly (double r, bool fused)
+{
+    const double r2 = r * r;
+    double num, den;
+    if (fused)
+    {
+        num = fmaD (-0.017203248047148168, r2, 0.38529607126399540);
+        den = fmaD (fmaD (0.018442392569016560, r2, -0.51396505478854540), r2, 1.1558882143468838);
+        return fmaD (r2 * r, num / den, r);
+    }
+    num = -0.017203248047148168 * r2 + 0.38529607126399540;
+    den = (0.018442392569016560 * r2 + -0.51396505478854540) * r2 + 1.1558882143468838;
+    return r + (r2 * r) * (num / den);
+}
+inline float tanf_ (float xf)
+{
+    if ((fbits (xf) & 0x7f800000u) == 0x7f800000u) return xf - xf; // ±inf → NaN, NaN stays
+    const double x = xf;
+    const double ax = std::fabs (x);
+    const bool fused = useFma();
+    if (ax <= 0.78539816339744828)
+    {
+        if (ax < 0x1p-27) return xf;
+        if (ax < 0x1p-13)
+            return d2f (fused ? fmaD (x * x * x, 0.33333333333333331, x) : (x * x * x) * 0.33333333333333331 + x);
+        return d2f (tanPoly (x, fused));
+    }
+    if (ax >= 8388608.0) return (float) std::tan (x);
+    int n;
+    double r;
+    if (fused)
+    {
+        n = cvttD2I (fmaD (ax, 0.63661977236758138, 0.5));
+        const double nd = n;
+        const double a = fmaD (-nd, 1.5707963267341256, ax);
+        r = a - nd * 6.0771005065061922e-11;
+    }
+    else
+    {
+        n = cvttD2I (ax * 0.63661977236758138 + 0.5);
+        const double nd = n;
+        const double a = ax - nd * 1.5707963267341256;
+        r = a - nd * 6.0771005065061922e-11;
+    }
+    double t = tanPoly (r, fused);
+    if (n & 1) t = -1.0 / t;
+    return d2f (x < 0 ? -t : t);
 }
 
 // fminf / fmaxf of the library (NaN → the other operand; −0 < +0)
