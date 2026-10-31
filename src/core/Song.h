@@ -206,6 +206,23 @@ enum LfoTarget { lfoPan, lfoVolume, lfoCutoff, lfoPitch, lfoTargets };
 // a single voice or instrument (FL's E3 mono, E2 mono / speech).
 enum class StretchMethod : int { general = 0, transients = 1, mono = 2 };
 
+// FL's Sampler › "Precomputed effects" (REA_rodada167h §1–§2): computed once on the sample, in FL's order, before it
+// plays (core/SamplePrecompute.h). Raw FL values: fadeIn / fadeOut 0…1024 (256 = a ramp over the whole sample),
+// crossfade 0…2048 (a fraction of the loop), trim 0…32768 (the silence threshold).
+struct SamplePrecompute
+{
+    bool removeDc = false, normalize = false, reversePolarity = false, fadeStereo = false, swapStereo = false;
+    int fadeIn = 0, fadeOut = 0, crossfade = 0, trim = 0;
+    bool pingPong = false; // Ping pong loop: the loop plays forward then backward (with loop points)
+
+    bool any() const noexcept
+    {
+        return removeDc || normalize || reversePolarity || fadeStereo || swapStereo || fadeIn > 0 || fadeOut > 0 || crossfade > 0
+               || trim > 0 || pingPong;
+    }
+    bool operator== (const SamplePrecompute&) const = default;
+};
+
 struct SamplerSettings
 {
     float pitch = 0.0f;   // semitones, -24..24
@@ -220,6 +237,8 @@ struct SamplerSettings
     StretchMethod stretchMethod = StretchMethod::general; // with keepPitch: the stretcher's preset
     float regionStart = 0.0f;  // played region of the sample (fractions 0..1)
     float regionEnd = 1.0f;
+    float startOffset = 0.0f;  // FL's start offset (0xD7 f64 at 0x90): where notes start, a fraction of the region (after
+                               // the precompute crops it, REA_rodada167h §4)
     std::vector<float> slices; // slices (starts as fractions): key 60 + i plays slice i, at the original pitch
     bool porta = false;        // portamento (with "cut", the 808 glide): the note starts from the previous note's pitch
     float portaBeats = 0.125f; // glide time, in beats
@@ -242,6 +261,12 @@ struct SamplerSettings
     // (core/FlVoiceProcessor.h); ADSR, cutoff/resonance/type, the modulation envelopes and LFOs above are then unused.
     // Editing the envelope or the filter by hand clears it.
     std::vector<std::int32_t> flChannel;
+
+    SamplePrecompute precompute;
+    bool useLoopPoints = true; // FL's "Use loop points": the file's own loop (WAV smpl) plays (.flp 0x8F bit 3)
+    // FL's "Declicking mode" (.flp 0xD7 byte 0x53, REA_rodada167h §3): 0 out only, 1 transient (no bleeding),
+    // 2 transient, 3 generic, 4 smooth, 5 crossfade — how fast a cut voice fades out (10 / 10 / 20 / 20 / 100 / 200 ms)
+    int declickMode = 0;
 
     bool operator== (const SamplerSettings&) const = default;
 };
@@ -1304,6 +1329,9 @@ struct Song
     // clip's start (the clip trimmed or sliced into it) plays from the clip's start with what is left of its length
     // (FL FUN_010608a0); off = such notes are dropped (LYNX's behaviour before; projects saved before keep it off).
     bool playTruncatedNotes = false;
+    // FL's Options › Project › "Fast declick for cut groups" (REA round 167h §3, .flp 0x28): a voice cut by a cut group or
+    // by "cut itself" fades out in 2 ms instead of its channel's declicking time. Saved with the project.
+    bool fastDeclick = false;
     // whether an effect slot processes: switched on, and not a substitute while the substitutes are bypassed
     bool slotActive (const EffectSlot& slot) const noexcept { return slot.enabled && ! (substitutesBypassed && slot.isSubstitute()); }
     std::vector<Automation> automations;

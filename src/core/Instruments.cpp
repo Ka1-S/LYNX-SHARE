@@ -1436,6 +1436,10 @@ struct SamplerVoice
     float velocity = 0.0f;
     float fade = 1.0f;     // < 1 when the voice was stolen (declick)
     bool stolen = false;
+    int cutFrames = 0, cutK = 0; // > 0: the stolen voice fades out with FL's declicker (a raised cosine over cutFrames)
+    int cutShape = 3;            // FL's release shape: 3 raised cosine, 1 the follower declick (mode 1, "no bleeding")
+    float cutCurve = 0.0f;       // the release curve (mode 5: 5)
+    float cutC = 0.0f, folL = 0.0f, folR = 0.0f; // shape 1: the follower's coefficient and state per side
     int age = 0;
     int key = 60;
     float env = 1.0f;      // envelope
@@ -1569,7 +1573,9 @@ public:
         knob (samplerparam::sustain, s.sustain);
         knob (samplerparam::release, s.release);
         reverse.store (s.reverse);
-        cut.store (s.cut);
+        cutSelf.store (s.cut);
+        useLoops.store (s.useLoopPoints);
+        declickMode.store (std::clamp (s.declickMode, 0, 5));
         // with "keep pitch" the sample arrives already stretched (RackState): play at normal speed; the keys then
         // transpose it through each voice's pitch shifter (round 162), so its length stays
         stretchBeats.store (s.keepPitch ? 0.0f : std::max (0.0f, s.stretchBeats));
@@ -1580,6 +1586,7 @@ public:
         keyShiftMethod.store ((int) s.stretchMethod);
         knob (samplerparam::start, s.regionStart);
         knob (samplerparam::end, s.regionEnd);
+        startOffset.store (std::clamp (s.startOffset, 0.0f, 1.0f));
         porta.store (s.porta);
         portaBeats.store (std::max (0.0f, s.portaBeats));
         knob (samplerparam::cutoff, s.cutoff);
@@ -1652,8 +1659,19 @@ public:
         const auto total = (double) (data->frames() - 1);
         // sample region (the start acts as "start offset"); audio clips use the whole file. `last` is the region's
         // last frame: FL plays until the read position passes it, interpolating with that frame repeated.
-        auto first = clipMode ? 0.0 : std::floor (total * std::min (regionStart.load(), regionEnd.load()));
-        auto last = clipMode ? total : std::max (first + 1.0, std::floor (total * regionEnd.load()));
+        auto knobStart = (double) std::min (regionStart.load(), regionEnd.load()), knobEnd = (double) regionEnd.load();
+        if (data->cropped) // FL's precomputed effects cut the region out (core/SamplePrecompute.h): the knobs map into it
+        {
+            const auto span = std::max (1.0e-9, data->cropTo - data->cropFrom);
+            knobStart = std::clamp ((knobStart - data->cropFrom) / span, 0.0, 1.0);
+            knobEnd = std::clamp ((knobEnd - data->cropFrom) / span, 0.0, 1.0);
+            if (knobEnd >= 1.0 - 1.0e-6)
+                knobEnd = 1.0;
+        }
+        auto first = clipMode ? 0.0 : std::floor (total * knobStart);
+        auto last = clipMode ? total : std::max (first + 1.0, std::floor (total * knobEnd));
+        if (const auto offset = (double) startOffset.load (std::memory_order_relaxed); ! clipMode && offset > 0.0)
+            first += offset * (last - first + 1.0); // FL: a fraction of the region's frames (not floored, FL render §4)
         auto sliced = false;
 
         // sliced sample: each key from C5 up plays one slice, at the original pitch
@@ -1681,10 +1699,10 @@ public:
         if (startFrame >= last + 1.0)
             return;
 
-        if (! clipMode && cut.load())
+        if (! clipMode && cutSelf.load())
             for (auto& v : voices)
                 if (v.active)
-                    v.stolen = true; // "cut itself": the previous note fades out quickly
+                    startCut (v, true); // "cut itself": the previous note fades out quickly
 
         SamplerVoice* target = nullptr;
 
@@ -1799,7 +1817,7 @@ public:
             target->tickLeft = 0.0;
             target->nextGap = std::max (1.0, (double) flvp::roundEven ((double) (target->tickIndex + 1) * spt) - songSample);
             // the file's own loop (WAV smpl): FL plays it while the note lasts (REA_rodada76 §8)
-            if (zone == nullptr && ! backwards && data->loopStart >= 0 && data->loopEnd > data->loopStart + 1
+            if (zone == nullptr && ! backwards && useLoops.load (std::memory_order_relaxed) && data->loopStart >= 0 && data->loopEnd > data->loopStart + 1
                 && (double) data->loopStart >= first && (double) data->loopEnd <= last + 1.0)
             {
                 target->loopStart = (double) data->loopStart;
@@ -2133,6 +2151,80 @@ public:
                 v.stolen = true; // fade out instead of a hard cut
     }
 
+    // a cut group's cut: FL's voice takes its channel's declicker release, or the 2 ms one with "Fast declick for cut
+    // groups" (FLEngine FUN_00d24160, REA_rodada167h §3)
+    void cut() noexcept override
+    {
+        if (clipMode)
+        {
+            allNotesOff();
+            return;
+        }
+        for (auto& v : voices)
+            if (v.active)
+                startCut (v, true);
+    }
+
+    void setFastDeclick (bool fast) noexcept override { fastDeclick.store (fast, std::memory_order_relaxed); }
+
+    // FL's declickers (FUN_012c6ae0: release ms of modes 0…5, and the fast one) as a raised cosine over
+    // max(1, round(ms·rate/1000)) frames: g = (1 + cos(k·π/(n+1))) / 2 (FUN_00977870, shape 3)
+    void startCut (SamplerVoice& v, bool byCut) const noexcept
+    {
+        if (v.stolen)
+            return;
+        static constexpr double releaseMs[] = { 10.0, 10.0, 20.0, 20.0, 100.0, 200.0 };
+        const auto ms = byCut && fastDeclick.load (std::memory_order_relaxed) ? 2.0 : releaseMs[std::clamp (declickMode.load (std::memory_order_relaxed), 0, 5)];
+        const auto mode = std::clamp (declickMode.load (std::memory_order_relaxed), 0, 5);
+        const auto fast = byCut && fastDeclick.load (std::memory_order_relaxed);
+        v.stolen = true;
+        v.cutFrames = std::max (1, (int) std::nearbyint (ms * 0.001 * sampleRate));
+        v.cutK = 0;
+        v.cutShape = mode == 1 && ! fast ? 1 : 3;
+        v.cutCurve = mode == 5 && ! fast ? 5.0f : 0.0f;
+        v.folL = v.folR = 0.0f;
+        v.cutC = (float) std::min (1.0, 2.0 / sampleRate * std::exp (std::log (22050.0) / (double) v.cutFrames));
+    }
+    // shape 1 (FL's mode 1 release, FUN_00977870): a one-pole follower whose coefficient climbs from 2/rate to 1
+    // (22050^(k/n)) is subtracted from the voice, so it sinks to silence without a step
+    static void cutFollow (SamplerVoice& v, float& l, float& r) noexcept
+    {
+        if (! v.stolen || v.cutShape != 1 || v.cutFrames <= 0)
+            return;
+        v.folL += v.cutC * (l - v.folL);
+        v.folR += v.cutC * (r - v.folR);
+        l -= v.folL;
+        r -= v.folR;
+    }
+    void stepFade (SamplerVoice& v) const noexcept
+    {
+        if (v.cutFrames > 0)
+        {
+            ++v.cutK;
+            const auto n = v.cutFrames;
+            if (v.cutK > n)
+                v.fade = 0.0f;
+            else if (v.cutShape == 1)
+            {
+                // the next frame's coefficient and window: 1, then a raised cosine over the last round(rate·0.001)
+                const auto k = v.cutK + 1;
+                v.cutC = (float) std::min (1.0, 2.0 / sampleRate * std::exp ((double) k * std::log (22050.0) / (double) n));
+                const auto m = std::min (n, (int) std::nearbyint (sampleRate * 0.001));
+                const auto from = n - m;
+                v.fade = k > n ? 0.0f : k > from ? (float) (0.5 * (1.0 + std::cos ((double) (k - from) * 3.141592653589793 / (double) (m + 1)))) : 1.0f;
+            }
+            else
+            {
+                auto g = 0.5 * (1.0 + std::cos ((double) v.cutK * 3.141592653589793 / (double) (n + 1)));
+                if (v.cutCurve > 0.0f) // FL's curved release (FUN_006774b0 / FUN_00677540): 1 − ((c+1)^(1−g) − 1) / c
+                    g = 1.0 - (std::exp ((1.0 - g) * std::log ((double) v.cutCurve + 1.0)) - 1.0) / (double) v.cutCurve;
+                v.fade = (float) std::max (0.0, g);
+            }
+        }
+        else
+            v.fade -= fadeStep;
+    }
+
     void render (float* left, float* right, int n, float gl, float gr) noexcept override
     {
         const struct Advance
@@ -2280,6 +2372,7 @@ public:
                     sr = f.process (sr, v.lowR, v.bandR);
                 }
 
+                cutFollow (v, sl, sr);
                 auto gain = v.velocity * v.fade * v.env * v.lfoGain * v.zoneGain;
 
                 if (v.flEnvelope)
@@ -2350,7 +2443,7 @@ public:
                     v.env += v.envStep;
 
                 if (v.stolen)
-                    v.fade -= fadeStep;
+                    stepFade (v);
             }
         }
     }
@@ -2492,6 +2585,7 @@ public:
                         readFrame (v, l, r, lastFrame, looping, sl, sr, v.rate * v.pitchMul * bendMul);
                     v.holdL = sl, v.holdR = sr;
                 }
+                cutFollow (v, sl, sr);
                 auto gain = v.fade * v.zoneGain * outGain.load (std::memory_order_relaxed);
                 if (v.fadeIn > 0.0f || v.fadeOut > 0.0f)
                 {
@@ -2520,7 +2614,7 @@ public:
                     --v.glideLeft;
                 }
                 if (v.stolen)
-                    v.fade -= fadeStep;
+                    stepFade (v);
             }
             seg = m;
 
@@ -2639,7 +2733,7 @@ private:
     std::atomic<float> pitch { 0.0f }, attack { 0.0f }, decay { 0.0f }, sustain { 1.0f }, release { 0.0f }, stretchBeats { 0.0f };
     float liveRest = std::numeric_limits<float>::quiet_NaN(); // fine tune + main pitch this block (round 167a), audio thread
     std::atomic<double> bpm { 120.0 };
-    std::atomic<float> regionStart { 0.0f }, regionEnd { 1.0f };
+    std::atomic<float> regionStart { 0.0f }, regionEnd { 1.0f }, startOffset { 0.0f };
     std::atomic<float> cutoff { 20000.0f }, resonance { 0.0f };
     // automated knobs (issue #12): which hold an automation's value, and the song values configure last saw (UI thread)
     std::array<std::atomic<bool>, samplerparam::count> automatedKnob {};
@@ -2743,7 +2837,9 @@ private:
     float nextPan = 0.0f, nextCents = 0.0f;
     float nextGain = 1.0f; // the next note's volume factor (setNextNoteGain)
     bool nextPorta = false;
-    std::atomic<bool> reverse { false }, cut { false };
+    std::atomic<bool> reverse { false }, cutSelf { false };
+    std::atomic<bool> useLoops { true }, fastDeclick { false };
+    std::atomic<int> declickMode { 0 };
 };
 } // namespace
 
