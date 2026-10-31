@@ -547,14 +547,16 @@ void RackState::buildMixerGraph()
         const auto taps = fruitySendsOf (song, t);
         for (std::size_t j = 0; j < taps.size(); ++j)
         {
-            const auto [slot, target] = taps[j];
+            const auto slot = taps[j].slot, target = taps[j].target;
             if ((int) sendTaps.size() >= maxSendTaps)
                 break;
             if ((std::size_t) t >= slotTap.size())
                 slotTap.resize ((std::size_t) t + 1);
-            if ((std::size_t) slot >= slotTap[(std::size_t) t].size())
-                slotTap[(std::size_t) t].resize ((std::size_t) slot + 1, -1);
-            slotTap[(std::size_t) t][(std::size_t) slot] = (int) sendTaps.size();
+            // (two entries per slot: its outputs 0 and 1, the Transmitter's transient / sustain sends)
+            const auto key = (std::size_t) slot * maxSlotSends + (std::size_t) taps[j].output;
+            if (key >= slotTap[(std::size_t) t].size())
+                slotTap[(std::size_t) t].resize (key + 1, -1);
+            slotTap[(std::size_t) t][key] = (int) sendTaps.size();
             mixerInputs[(std::size_t) target].push_back ({ t, (int) (1 + track.sends.size() + j), 1.0f, (int) sendTaps.size() });
             sendTaps.push_back ({ t, slot, target });
             depth[(std::size_t) target] = std::max (depth[(std::size_t) target], depth[(std::size_t) t] + 1);
@@ -1228,7 +1230,7 @@ bool sameBranches (const EffectSlot& a, const EffectSlot& b)
 bool sameSlotSetup (const EffectSlot& a, const EffectSlot& b)
 {
     return a.kind == b.kind && a.enabled == b.enabled && a.params == b.params && a.mix == b.mix && a.plugin.id == b.plugin.id
-           && a.sidechain == b.sidechain && a.sidechain2 == b.sidechain2 && a.state == b.state && a.samplePath == b.samplePath
+           && a.sidechain == b.sidechain && a.sidechain2 == b.sidechain2 && a.sendTracks == b.sendTracks && a.state == b.state && a.samplePath == b.samplePath
            && sameBranches (a, b);
 }
 } // namespace
@@ -2003,21 +2005,26 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         if (slots[i].kind == EffectKind::hardwareInsert || slots[i].kind == EffectKind::patcher) // (a Patcher hands them to its nodes, round 165c)
             effects[i]->setHardwareIo (liveInput, hwOut != nullptr && hwOut->active.load (std::memory_order_relaxed) ? hwOut : nullptr, liveInputOffset);
 
-        // Fruity Send: what it sends goes to its own buffer, pulled by the destination insert (processed later)
-        if (slots[i].kind == EffectKind::fruitySend || slots[i].kind == EffectKind::patcher)
+        // Fruity Send / Patcher / Transmitter: what it sends goes to its own buffer, pulled by the destination insert
+        // (processed later)
+        if (slots[i].kind == EffectKind::fruitySend || slots[i].kind == EffectKind::patcher || slots[i].kind == EffectKind::transmitter)
         {
-            const auto tap = (std::size_t) track < state.slotTap.size() && i < state.slotTap[(std::size_t) track].size()
-                                 ? state.slotTap[(std::size_t) track][i]
-                                 : -1;
-            if (tap >= 0 && tap < RackState::maxSendTaps)
+            for (int o = 0; o < maxSlotSends; ++o)
             {
-                std::memset (tapBuffer (tap, 0), 0, sizeof (float) * (std::size_t) n);
-                std::memset (tapBuffer (tap, 1), 0, sizeof (float) * (std::size_t) n);
-                effects[i]->setSendOutput (tapBuffer (tap, 0), tapBuffer (tap, 1));
-                tapActive[(std::size_t) tap] = 1;
+                const auto key = i * (std::size_t) maxSlotSends + (std::size_t) o;
+                const auto tap = (std::size_t) track < state.slotTap.size() && key < state.slotTap[(std::size_t) track].size()
+                                     ? state.slotTap[(std::size_t) track][key]
+                                     : -1;
+                if (tap >= 0 && tap < RackState::maxSendTaps)
+                {
+                    std::memset (tapBuffer (tap, 0), 0, sizeof (float) * (std::size_t) n);
+                    std::memset (tapBuffer (tap, 1), 0, sizeof (float) * (std::size_t) n);
+                    effects[i]->setExtraOutput (o, tapBuffer (tap, 0), tapBuffer (tap, 1));
+                    tapActive[(std::size_t) tap] = 1;
+                }
+                else
+                    effects[i]->setExtraOutput (o, nullptr, nullptr);
             }
-            else
-                effects[i]->setSendOutput (nullptr, nullptr);
         }
 
         if (slots[i].kind == EffectKind::hardwareInsert && wet < 0.999f)

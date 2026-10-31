@@ -111,6 +111,13 @@ public:
     // Effects that send audio to another insert (FL's Fruity Send): the buffers the next process() adds its send
     // into (cleared by the renderer), or nullptr = nothing is sent this block.
     virtual void setSendOutput (float* /*left*/, float* /*right*/) noexcept {}
+    // The same for an effect with several sent outputs (round 167b, the Transmitter's transient / sustain sends):
+    // output 0 is setSendOutput's.
+    virtual void setExtraOutput (int output, float* left, float* right) noexcept
+    {
+        if (output == 0)
+            setSendOutput (left, right);
+    }
     // Latency the effect introduces (plugins), in samples. Used by PDC.
     virtual int latencySamples() const noexcept { return 0; }
     // The hardware insert (round 164d): the device's input of the current callback piece and the device-output buses,

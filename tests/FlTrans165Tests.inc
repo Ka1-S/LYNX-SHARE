@@ -229,7 +229,7 @@ TEST (fltrans165_latency_and_sidechain)
 TEST (fltrans165_flp_import)
 {
     // insert 1 holds a Transmitter whose sidechain is its first input (insert 2 routes into it) and whose transient goes to
-    // a send track: the slot follows the sidechain, the sends are reported as not routed
+    // a send track: the slot follows the sidechain, the transient is sent to insert 5 (round 167b)
     using namespace lynx::transmitter;
     flp::Project project;
     project.tempo = 120.0;
@@ -255,6 +255,7 @@ TEST (fltrans165_flp_import)
         return;
     const auto& fx = song.mixer[1].effects[0];
     CHECK (fx.kind == lynx::EffectKind::transmitter && fx.sidechain == 2 && rawFromParam (sustainEffect, fx.params[sustainEffect]) == delay);
-    CHECK (report.partialEffects.count ("Transmitter (transient / sustain sends to other tracks not routed)") == 1);
+    CHECK (fx.sendTracks[0] == 5 && fx.sendTracks[1] == 0);
+    CHECK (report.partialEffects.empty());
     CHECK (report.droppedEffects.count ("Transmitter") == 0);
 }

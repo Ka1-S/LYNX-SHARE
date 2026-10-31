@@ -16,6 +16,7 @@
 // No JUCE here (tests/FlTrans165Tests.inc).
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -51,12 +52,17 @@ float paramFromRaw (int k, int raw);      // FL raw → LYNX 0…1
 float engineValue (int k, int raw);       // FL's front-end mapping: raw control → the engine's value (ms, dB, …)
 std::array<float, count> defaults();      // FL's Default preset
 std::string paramText (int k, float v);   // FL's value texts
+std::string syncedText (int raw);         // the tempo-synced delay time as FL shows it: steps:ticks (16 steps, 48 ticks each)
+// FL's envelope view: samples per column at a display speed (FL's Default preset: 90)
+constexpr int defaultSpeed = 90;
+int columnSamples (double sampleRate, int speed);
 
 // FL's state (0xD5): version 3, 42 raw controls, send / sidechain tracks, editor bytes
 struct State
 {
     std::array<int, count> raw {};
     int transientSend = 0, sustainSend = 0, sidechain = 0;
+    int speed = defaultSpeed; // the envelope view's speed (FL's editor)
 };
 std::optional<State> parse (const std::vector<std::uint8_t>& data);
 
@@ -76,11 +82,31 @@ public:
     void process (const float* inL, const float* inR, float* outL, float* outR, int n, bool sidechain = false,
                   const float* scL = nullptr, const float* scR = nullptr);
     int latency() const;
+    // after process(): the transient (0) / sustain (1) part of the last block, after its tilt and section effect and
+    // before its level and on switch (what FL sends to other mixer tracks); and the detector's envelope e per sample
+    const float* part (int which, int channel) const;
+    const float* envelope() const;
     struct Impl;
 
 private:
     std::unique_ptr<Impl> impl;
 };
+
+// FL's envelope view (REA_rodada167b §3): a running effect keeps its last columns; the editor reads them (lock-free,
+// one writer: the audio thread)
+struct EnvelopeColumn
+{
+    float output = 0, transient = 0, sustain = 0; // peaks over the column: |output|, e, 1 − e
+};
+struct EnvelopeView
+{
+    static constexpr std::uint32_t size = 1024;
+    std::array<EnvelopeColumn, size> columns {};
+    std::atomic<std::uint32_t> written { 0 };        // columns written so far (column k at k % size)
+    std::atomic<int> columnLength { 127 };           // samples per column
+    std::atomic<int> speed { defaultSpeed };
+};
+const EnvelopeView* envelopeOf (const Effect* effect); // nullptr: not a running Transmitter
 
 std::unique_ptr<Effect> make();
 } // namespace lynx::transmitter
