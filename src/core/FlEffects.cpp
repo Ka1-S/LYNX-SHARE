@@ -1241,8 +1241,12 @@ std::optional<EffectSlot> effectFromFl (const std::string& pluginName, const std
     {
         auto slot = makeEffectSlot (EffectKind::scratcher);
         if (const auto st = scratcher::parse (state))
+        {
             for (int i = 0; i < scratcher::count; ++i)
                 slot.params[(std::size_t) i] = st->values[(std::size_t) i];
+            slot.params[scratcher::timecodeType] = scratcher::timecodeValue (st->timecode);
+            slot.params[scratcher::riaaPreamp] = st->riaa ? 1.0f : 0.0f;
+        }
         return slot;
     }
     if (pluginName == "Transmitter") // REA_rodada165g-fltrans165: the 42 controls (raw) of FL's state 0xD5

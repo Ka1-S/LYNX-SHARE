@@ -28,6 +28,7 @@
 #include <string_view>
 #include <vector>
 
+#include "core/Dvs.h"
 #include "core/Song.h"
 
 namespace lynx
@@ -54,8 +55,16 @@ enum Param
     smooth3 = 11,
     smooth4 = 12,
     rotations = 13,
-    count = 14
+    count = 14, // FL's 14 controls (pattern events, automation)
+    // LYNX parameters for FL's two DVS settings (stored in FL's state, not controls): Timecode type (FL's list entry
+    // / 8: 0 = Off … 1 = Timecode CD, core/Dvs.h) and RIAA preamp (0/1)
+    timecodeType = 14,
+    riaaPreamp = 15,
+    paramCount = 16
 };
+// the state's timecode index (−1 = off) for the Timecode type parameter, and back
+int timecodeOf (float value) noexcept;
+float timecodeValue (int state) noexcept;
 
 // FL's control range of each parameter (the raw integer of its knob / switch / selector)
 struct Range
@@ -88,11 +97,13 @@ struct State
     std::uint32_t version = 0;
     std::array<float, count> values {}; // LYNX's parameters, quantized like FL's controls after a load
     std::string samplePath;             // as stored (macros not expanded)
-    int timecode = -1;                  // FL's DVS (timecode vinyl) input: not reproduced
+    int timecode = -1;                  // FL's DVS type: the state's timecode index (−1 = off, core/Dvs.h)
+    bool riaa = false;                  // FL's RIAA preamp switch
 };
 std::optional<State> parse (const std::vector<std::uint8_t>& state);
-// FL's state for these parameters and path (version 0xF462A, timecode off)
-std::vector<std::uint8_t> toFl (const std::array<float, count>& values, const std::string& samplePath);
+// FL's state for these parameters and path (version 0xF462A) with the DVS settings
+std::vector<std::uint8_t> toFl (const std::array<float, count>& values, const std::string& samplePath, int timecode = -1,
+                                bool riaa = false);
 
 // The sample as FL's host hands it to the plugin [DECOMP 0x72be20]: 16-bit stereo at 44.1 kHz, as floats (k / 32768),
 // plus one extra frame for the interpolation (FL fills it with frame 0's right channel on both sides). Mono is
@@ -106,6 +117,10 @@ struct Turntable
 std::shared_ptr<const Turntable> prepareSample (const SampleData& sample);
 std::shared_ptr<const Turntable> prepareSample (const float* left, const float* right, std::size_t frames, double sampleRate);
 
+// FL's RIAA preamp [DECOMP 0x72cdf0]: b0, b1, a1, a2 of y = b0 x + b1 x₋₁ − a1 y₋₁ − a2 y₋₂ (poles 3180 µs / 75 µs, zero
+// 318 µs, gain 20)
+std::array<double, 4> riaaCoefficients (double sampleRate) noexcept;
+
 // The engine, as FL's plugin renders [DECOMP 0x72add0]. Parameter changes take effect as in FL: Wave position, Volume
 // and Pan are read from the previous block's values (FL copies them at the end of each block), the others at once.
 class Engine
@@ -118,6 +133,13 @@ public:
     void setParam (int param, float value) noexcept; // LYNX's value; quantized here
     void reset() noexcept;                           // FL's reset: platter at 0, the defaults' gains
     void process (float* left, float* right, int n) noexcept;
+    // the project's rate (the RIAA preamp, the DVS decoder and the record → sample mapping use it)
+    void setSampleRate (double sampleRate) noexcept;
+    // DVS [REA_rodada167c §1]: the state's timecode index (−1 = off, core/Dvs.h) and the RIAA preamp. With a type set
+    // the input drives the platter: the output is the sample at the record's place (the motor, Hold and the output
+    // stage are not used, as in FL). Call dvs::warm (state) off the audio thread first.
+    void setTimecode (int state, bool riaa) noexcept;
+    int timecodeState() const noexcept { return timecode; }
 
     // the platter, for the editor: its position in turns (0…1, wrapped) and whether a sample plays
     float position() const noexcept { return lastPos; }
@@ -142,6 +164,19 @@ private:
     // [0x194…0x1a8]: 1/(n−1), n−1, 2/(n−1) of the playing sample
     float invSpan = 0.0f, motorScale = 0.0f;
     int span = 0;
+
+    // DVS [0x200 on, 0x204 type, 0x220 / 0x230 the RIAA filter, 0x298 fade, 0x29c hold limit, 0x2a0 / 0x2a4 hold]
+    void setupDvs() noexcept;
+    void processDvs (float* left, float* right, int n) noexcept;
+    double rate = 44100.0;
+    int timecode = -1;
+    bool riaaOn = false;
+    dvs::Decoder decoder;
+    std::array<double, 4> riaa {};                    // b0, b1, a1, a2
+    std::array<std::array<double, 3>, 2> riaaState {}; // x1, y1, y2 per side
+    int holdLimit = 4410, dvsStuck = 0;
+    float holdDecay = 1.0f, dvsOutL = 0.0f, dvsOutR = 0.0f;
+    double dvsLast = 0.0;
 };
 
 // Whether a file dropped on the editor (an OS file drop or a drag from LYNX's Browser) is loaded onto the platter:

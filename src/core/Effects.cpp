@@ -2975,7 +2975,8 @@ const EffectInfo& effectInfo (EffectKind kind)
                                     { { "Wave position", d[0] }, { "Mute", d[1] }, { "Speed", d[2] }, { "Acceleration", d[3] },
                                       { "Pan", d[4] }, { "Volume", d[5] }, { "Hold", d[6] }, { "Sensitivity", d[7] },
                                       { "Transport", d[8] }, { "Smooth 1", d[9] }, { "Smooth 2", d[10] }, { "Smooth 3", d[11] },
-                                      { "Smooth 4", d[12] }, { "Rotations", d[13] } } };
+                                      { "Smooth 4", d[12] }, { "Rotations", d[13] }, { "Timecode type", 0.0f },
+                                      { "RIAA preamp", 0.0f } } };
             }();
             return info;
         }

@@ -95,6 +95,7 @@ add_library(lynx_core STATIC
     src/core/VisualFx.cpp
     src/core/FlExtraFx.cpp
     src/core/Scratcher.cpp
+    src/core/Dvs.cpp
     src/core/Transmitter.cpp
     src/core/VideoPlayer.cpp
     src/core/FruityDance.cpp
@@ -223,7 +224,8 @@ target_sources(lynx_core PRIVATE
 # the embedded Python (pocketpy) and FL's VFX Script (round 165d)
 target_sources(lynx_core PRIVATE
     src/core/Python.cpp
-    src/core/VfxScript.cpp)
+    src/core/VfxScript.cpp
+    src/core/EdisonScript.cpp)
 
 # pocketpy 2.2 (MIT; third_party/pocketpy, LYNX's changes marked "LYNX"): a small embeddable Python 3 interpreter,
 # sandboxed (no os module / files) and interruptible (the watchdog)
