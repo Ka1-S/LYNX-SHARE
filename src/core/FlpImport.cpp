@@ -1,4 +1,6 @@
 #include "core/FlpImport.h"
+
+#include "core/Dvs.h"
 #include "core/FlExtraFx.h"
 #include "core/Scratcher.h"
 #include "core/Transmitter.h"
@@ -23,6 +25,7 @@
 #include "core/BassDrum.h"
 #include "core/FruitKick.h"
 #include "core/Harmor.h"
+#include "core/ClipOps.h"
 #include "core/MiniSynth.h"
 #include "core/SimSynth.h"
 #include "core/Drumaxx.h"
@@ -822,6 +825,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     Song song;
     song.bpm = project.tempo > 0.0 ? project.tempo : 140.0;
     song.performanceMode = project.performanceMode; // (round 165m)
+    song.autoCrossfades = project.autoCrossfades;   // FL's Playlist "Automatic crossfades" (round 167a)
     song.beatsPerBar = std::clamp (project.beatsPerBar, 1, 32);
     song.swing = std::clamp (project.swing / 128.0f, 0.0f, 1.0f);
     song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
@@ -2797,8 +2801,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                                 addMissingFile (options.report->missingFiles, wanted,
                                                 (insert.name.empty() ? "Insert " + std::to_string (insert.index) : insert.name) + ": " + slot.plugin);
                             }
-                            if (st->timecode != -1)
-                                ++options.report->partialEffects["Fruity Scratcher (timecode vinyl input not reproduced: plays from its own platter)"];
+                            if (st->timecode != -1 && ! dvs::supported (st->timecode))
+                                ++options.report->partialEffects["Fruity Scratcher (Traktor Mk2 / Timecode CD timecode not decoded: the platter stays silent)"];
                             else
                                 ++options.report->converted[slot.plugin];
                         }
@@ -3589,6 +3593,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         splitDrumChannel (song, it->first, it->second);
 
     numberChorusInstances (song); // the random LFO phases FL gives each Hyper Chorus instance (REA_rodada59 §2.6)
+    clipops::updateCrossfades (song); // the project's "Automatic crossfades" on its overlapping audio clips (round 167a)
     return song;
 }
 } // namespace lynx

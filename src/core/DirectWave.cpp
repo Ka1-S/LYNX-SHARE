@@ -2160,6 +2160,14 @@ public:
         nextCents = cents;
     }
 
+    // FL's PITCH knob and main pitch move the sounding notes too (round 167a)
+    void setChannelPitchNow (float knob, float rest) noexcept override
+    {
+        live.set (knob, rest);
+        for (auto& nt : notes)
+            nt.slide.follow (live.now());
+    }
+
     void slideTo (int key, float cents, float samples) noexcept override
     {
         const auto to = 100.0 * (std::clamp (key, 0, 127) - 60) + (double) pitchCents.load() + (double) cents;
@@ -2178,7 +2186,9 @@ public:
         n.key = std::clamp (key, 0, 127);
         n.initVol = initVol;
         n.pan = nextPan;
-        n.cents = (double) pitchCents.load() + (double) nextCents;
+        const auto knob = pitchCents.load();
+        n.cents = (double) knob + (double) nextCents;
+        n.slide.anchor (live.ref (knob));
         engine.setTempo (tempo.load());
         engine.noteOn (n.id, n.key, vel, channelVol * initVol, std::clamp ((double) n.pan + channelPan, -1.0, 1.0), n.cents);
         if (notes.size() < 1024)
@@ -2260,6 +2270,7 @@ private:
     double rate = 44100.0, channelVol = 1.0, channelPan = 0.0;
     std::atomic<double> tempo { 120.0 };
     std::atomic<float> pitchCents { 0.0f };
+    LiveChannelPitch live; // (audio thread)
     float nextPan = 0.0f, nextCents = 0.0f;
     bool loaded = false, usable = false;
 };

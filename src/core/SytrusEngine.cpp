@@ -2995,6 +2995,7 @@ struct BandTable
 
 struct Engine::Impl
 {
+    float nextLiveRef = NAN; // (round 167a)
     std::shared_ptr<const Patch> keep;
     const Patch* P = nullptr;
     double fs = 44100.0;
@@ -3520,6 +3521,7 @@ struct Engine::Impl
         v.fvol = nt.fvol, v.fpan = nt.fpan;
         v.pitch = F (100.0 * nt.key + nt.cents - 6000.0) + F (S.mget (2) * 100);
         v.notePitch = v.pitch, v.noteFinal = 100.0 * nt.key + nt.cents - 6000.0, v.slide = {};
+        v.slide.anchor (nextLiveRef);
         v.master = gCurve (S.mget (0), 128);
         v.tick = tick;
         v.base = F (523.251130601197 / fsv);
@@ -4850,6 +4852,18 @@ void Engine::slideTo (double toCents, float samples) noexcept
         }
 }
 
+void Engine::setNextLiveRef (float ref) noexcept { impl->nextLiveRef = ref; }
+
+void Engine::followPitch (float now) noexcept
+{
+    for (auto* v : impl->act)
+    {
+        v->slide.follow (now);
+        for (int s = 0; s < v->nslaves; ++s)
+            v->slaves[s]->slide.follow (now);
+    }
+}
+
 void Engine::killAll() noexcept
 {
     for (auto* v : impl->act)
@@ -4983,7 +4997,9 @@ public:
             return;
         sytrus::NoteParams p;
         p.key = (float) key;
-        p.cents = channelCents.load() + nextCents;
+        const auto knob = channelCents.load();
+        p.cents = knob + nextCents;
+        engine->setNextLiveRef (live.ref (knob));
         p.velocity = std::clamp (velocity, 0.0f, 1.0f);
         p.pan = nextPan;
         // LYNX's per-note porta flag inverts the patch's PORTA button, as FL's note colour 14 does (§6.4; inference)
@@ -4992,6 +5008,14 @@ public:
         nextPan = 0.0f, nextCents = 0.0f, nextPorta = false;
         engine->setMaxPolyphony (mono.load() ? 1 : 1 << 20);
         engine->noteOn (p);
+    }
+
+    // FL's PITCH knob and main pitch move the sounding notes too (round 167a)
+    void setChannelPitchNow (float knob, float rest) noexcept override
+    {
+        live.set (knob, rest);
+        if (engine != nullptr)
+            engine->followPitch (live.now());
     }
 
     void slideTo (int key, float cents, float samples) noexcept override
@@ -5064,6 +5088,7 @@ private:
     std::atomic<sytrus::Engine*> incoming { nullptr }, retired { nullptr };
     std::atomic<double> rate { 44100.0 }, tempo { 120.0 };
     std::atomic<float> channelCents { 0.0f };
+    LiveChannelPitch live; // (audio thread)
     std::atomic<bool> mono { false };
     std::vector<std::uint8_t> loadedState;
     std::shared_ptr<const sytrus::Patch> patch;

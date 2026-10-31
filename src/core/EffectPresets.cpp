@@ -8,6 +8,7 @@
 #include <sstream>
 
 #include "core/Effects.h"
+#include "core/FruityBasicFx.h"
 #include "core/EffectPresetTable.inc"
 
 namespace lynx::presets
@@ -255,6 +256,11 @@ EffectParams apply (EffectKind kind, const Preset& preset, double bpm, std::vect
     return params;
 }
 
+namespace
+{
+const std::string sendSpanKey = "Send to span";
+}
+
 std::string toText (EffectKind kind, const std::string& name, const EffectParams& params)
 {
     std::ostringstream out;
@@ -262,10 +268,15 @@ std::string toText (EffectKind kind, const std::string& name, const EffectParams
     out << "engine = " << effectInfo (kind).name << "\n";
     out << "name = " << name << "\n";
     const auto& info = effectInfo (kind).params;
+    // round 167a: Fruity Send's "Send to" over 0..127 when it fits (older LYNX versions read the same insert)
+    const auto sendSpan = kind == EffectKind::fruitySend && params.size() > 3 ? flbasic::saveSendSpan ({ params[3] }) : 0;
+    if (sendSpan > 0)
+        out << sendSpanKey << " = " << sendSpan << "\n";
     for (std::size_t i = 0; i < info.size() && i < params.size(); ++i)
     {
         char value[32];
-        std::snprintf (value, sizeof (value), "%.6g", (double) params[i]);
+        const auto v = sendSpan > 0 && i == 3 ? flbasic::sendTrackValueInSpan (params[i], sendSpan) : params[i];
+        std::snprintf (value, sizeof (value), "%.6g", (double) v);
         out << info[i].name << " = " << value << "\n";
     }
     return out.str();
@@ -281,6 +292,7 @@ std::optional<Loaded> fromText (EffectKind kind, const std::string& text)
     loaded.params = makeEffectSlot (kind).params;
     bool sameEngine = false;
     std::size_t saved = 0;
+    int sendSpan = flbasic::legacySendSpan; // Fruity Send presets saved before round 166d: "Send to" over 0..127
     while (std::getline (in, line))
     {
         const auto eq = line.find ('=');
@@ -291,6 +303,8 @@ std::optional<Loaded> fromText (EffectKind kind, const std::string& text)
             sameEngine = folded (value) == folded (effectInfo (kind).name);
         else if (key == "name")
             loaded.name = value;
+        else if (key == sendSpanKey)
+            sendSpan = std::atoi (value.c_str());
         else if (const auto p = paramByName (kind, key); p >= 0)
         {
             loaded.params[(std::size_t) p] = (float) std::clamp (std::atof (value.c_str()), 0.0, 1.0);
@@ -299,6 +313,8 @@ std::optional<Loaded> fromText (EffectKind kind, const std::string& text)
     }
     if (! sameEngine)
         return std::nullopt;
+    if (kind == EffectKind::fruitySend)
+        loaded.params[3] = flbasic::rescaleSendTrackValue (loaded.params[3], sendSpan);
     // round 165w: a preset written before an engine's appended law loads like a project of that time (the old law)
     EffectSlot slot = makeEffectSlot (kind);
     slot.params = loaded.params;

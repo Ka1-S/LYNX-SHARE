@@ -132,7 +132,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         if (safe != nullptr)
             safe->mixer.getStripsForSnapshot().setShowUsedOnly (on);
     };
-    mixeroptions::renderTracks = [safe = juce::Component::SafePointer<MainComponent> (this)] (std::vector<int> tracks, std::function<void()> done) {
+    mixeroptions::renderTracks = [safe = juce::Component::SafePointer<MainComponent> (this)] (std::vector<int> tracks,
+                                                                                             std::function<void (const std::vector<juce::File>&)> done) {
         if (safe != nullptr)
             showExportDialogForTracks (safe->engine, safe->currentFile.getParentDirectory(), safe->projectName, tracks, std::move (done));
     };
@@ -1554,11 +1555,12 @@ void MainComponent::loadUiSettings()
         else if (key == "undoLevels")
             engine.setUndoLevels (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "askWhatToRecord" || key == "recordNotes" || key == "recordAudio" || key == "recordStartsPlayback" || key == "disarmOnStop"
-                 || key == "recordOffOnStop" || key == "unarmAfterRender")
+                 || key == "recordOffOnStop" || key == "unarmAfterRender" || key == "renderAutoClip")
         {
             auto o = engine.getRecordOptions();
             (key == "askWhatToRecord" ? o.askWhatToRecord : key == "recordNotes" ? o.recordNotes : key == "recordAudio" ? o.recordAudio
              : key == "disarmOnStop" ? o.disarmOnStop : key == "recordOffOnStop" ? o.recordOffOnStop : key == "unarmAfterRender" ? o.unarmAfterRender
+             : key == "renderAutoClip"                                                                                         ? o.autoCreateClip
                                                                                                                                   : o.startsPlayback) = on;
             engine.setRecordOptions (o);
         }
@@ -1648,6 +1650,7 @@ void MainComponent::saveUiSettings()
                                       + "\ndisarmOnStop=" + juce::String (engine.getRecordOptions().disarmOnStop ? 1 : 0)
                                       + "\nrecordOffOnStop=" + juce::String (engine.getRecordOptions().recordOffOnStop ? 1 : 0)
                                       + "\nunarmAfterRender=" + juce::String (engine.getRecordOptions().unarmAfterRender ? 1 : 0)
+                                      + "\nrenderAutoClip=" + juce::String (engine.getRecordOptions().autoCreateClip ? 1 : 0)
                                       + "\nrecordQuantiseStarts=" + juce::String (recordQuantiseOn ? 1 : 0)
                                       + "\nrecordNoteEnd=" + juce::String ((int) engine.getRecordOptions().noteEnd)
                                       + "\nrecordToStepSequencer=" + juce::String (engine.getRecordOptions().toStepSequencer ? 1 : 0)

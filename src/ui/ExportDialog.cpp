@@ -77,7 +77,8 @@ private:
 class StemsThread final : public juce::ThreadWithProgressWindow
 {
 public:
-    StemsThread (const AudioEngine& e, exportopts::Options o, juce::File base, const std::vector<int>& onlyTracks = {}, std::function<void()> done = {})
+    StemsThread (const AudioEngine& e, exportopts::Options o, juce::File base, const std::vector<int>& onlyTracks = {},
+                 std::function<void (const std::vector<juce::File>&)> done = {})
         : juce::ThreadWithProgressWindow (tr ("Exporting stems..."), true, true),
           afterRender (std::move (done)),
           options (o),
@@ -99,8 +100,19 @@ public:
                                    exportopts::makeChannelStemSong (song, c) });
         else
             for (auto t : exportopts::stemTracks (song, onlyTracks))
-                items.push_back ({ juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()), file (t, song.mixer[(std::size_t) t].name),
+                items.push_back ({ juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()),
+                                   ! onlyTracks.empty() && recordToFile (song, t) != juce::File() ? recordToFile (song, t).withFileExtension (ext)
+                                                                                                  : file (t, song.mixer[(std::size_t) t].name),
                                    makeBounceSong (song, t) });
+    }
+
+    // FL's "Record <insert> to" file of an insert (round 167a): a track render writes there; none = File()
+    static juce::File recordToFile (const Song& song, int t)
+    {
+        if (t <= 0 || t >= (int) song.mixer.size())
+            return {};
+        const auto path = juce::String::fromUTF8 (song.mixer[(std::size_t) t].recordTo.c_str());
+        return path.isNotEmpty() && juce::File::isAbsolutePath (path) ? juce::File (path) : juce::File();
     }
 
     void run() override
@@ -126,7 +138,10 @@ public:
             }, error);
 
             if (ok)
+            {
                 ++written;
+                files.push_back (item.file);
+            }
 
             juce::WaitableEvent gone;
             juce::MessageManager::callAsync ([&] {
@@ -140,7 +155,7 @@ public:
     void threadComplete (bool cancelled) override
     {
         if (! cancelled && written > 0 && afterRender)
-            afterRender();
+            afterRender (files);
         if (! cancelled && options.showWhenDone && written > 0)
             baseFile.getParentDirectory().startAsProcess();
         else if (! cancelled)
@@ -157,11 +172,12 @@ private:
         juce::File file;
         Song song;
     };
-    std::function<void()> afterRender;
+    std::function<void (const std::vector<juce::File>&)> afterRender;
     exportopts::Options options;
     juce::File baseFile;
     Song song;
     std::vector<Item> items;
+    std::vector<juce::File> files; // written
     int written = 0;
 };
 
@@ -699,6 +715,29 @@ private:
 
         const auto o = options;
         const auto extension = juce::String (exportopts::extension (o.format));
+
+        // FL renders the armed tracks straight to their "Record to" files, without a file dialog (round 167a [SHOT s33])
+        if (! onlyTracks.empty() && ! realtime && o.stems != exportopts::Stems::none && ! o.stemsIncludeMaster)
+        {
+            const auto& song = engine.getSong();
+            const auto list = exportopts::stemTracks (song, onlyTracks);
+            const auto all = ! list.empty() && std::all_of (list.begin(), list.end(), [&song] (int t) {
+                return t > 0 && t < (int) song.mixer.size() && juce::File::isAbsolutePath (juce::String::fromUTF8 (song.mixer[(std::size_t) t].recordTo.c_str()));
+            });
+            if (all)
+            {
+                engine.capturePluginStates();
+                const auto base = juce::File (juce::String::fromUTF8 (song.mixer[(std::size_t) list.front()].recordTo.c_str())).withFileExtension (extension);
+                base.getParentDirectory().createDirectory();
+                auto& engineRef = engine;
+                const auto tracks = onlyTracks;
+                const auto after = afterRender;
+                close(); // deletes this panel: no `this` after this point
+                (new StemsThread (engineRef, o, base, tracks, after))->launchThread();
+                return;
+            }
+        }
+
         auto folder = lastFolder.isDirectory() ? lastFolder
                       : suggestedFolder.isDirectory() ? suggestedFolder
                                                       : juce::File::getSpecialLocation (juce::File::userMusicDirectory);
@@ -744,7 +783,7 @@ private:
     }
 
 public:
-    std::function<void()> afterRender; // showExportDialogForTracks: once the files are written
+    std::function<void (const std::vector<juce::File>&)> afterRender; // showExportDialogForTracks: once the files are written
 
 private:
     AudioEngine& engine;
@@ -852,7 +891,7 @@ std::unique_ptr<juce::Component> makeExportPanelForTracks (AudioEngine& engine, 
 }
 
 void showExportDialogForTracks (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& suggestedName,
-                                const std::vector<int>& tracks, std::function<void()> afterRender)
+                                const std::vector<int>& tracks, std::function<void (const std::vector<juce::File>&)> afterRender)
 {
     juce::DialogWindow::LaunchOptions options;
     auto panel = std::make_unique<ExportPanel> (engine, suggestedFolder, suggestedName.isNotEmpty() ? suggestedName : "LYNX SHARE", true, -1, tracks);

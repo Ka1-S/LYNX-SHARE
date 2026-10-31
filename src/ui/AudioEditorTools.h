@@ -53,7 +53,8 @@ enum class Tool
     smoothUp,
     createSequence,
     pasteSpectral,
-    stretch
+    stretch,
+    deverb // round 167c
 };
 
 const char* toolTitle (Tool tool); // English, for tr()
