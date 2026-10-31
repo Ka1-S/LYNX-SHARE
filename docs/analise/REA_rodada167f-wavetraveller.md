@@ -151,5 +151,5 @@ LYNX reproduces exactly.
 - Pitch changes after the note starts (pitch bend, slides) do not change a sounding voice's speed in FL either (the
   step is computed at trigger) [DECOMP]; LYNX matches.
 
-Where I stopped: spec complete; engine, import, save/load, editor, i18n and tests done; next would be FL's own
-converter for non-44.1 kHz samples and the real SmpRateConv value.
+Where I stopped: done — spec, engine, import, save / load, editor, 15 languages, tests (full core suite green on
+2026-10-31). Open: FL's own converter for samples not at 16-bit / 44.1 kHz and the host's real SmpRateConv value.

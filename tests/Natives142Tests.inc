@@ -101,7 +101,8 @@ TEST (natives142_lists_and_no_fl_installation)
         if (c)
         {
             CHECK (c->instrument == e.kind && c->name == e.name);
-            CHECK (natives142::renderChannel (*c, none) > 1.0e-3);
+            CHECK (e.kind == InstrumentKind::wavetraveller // (plays the channel's sample: none yet, silent as FL)
+                   || natives142::renderChannel (*c, none) > 1.0e-3);
         }
     }
     for (const auto& e : natives::effectEngines())
@@ -157,7 +158,7 @@ TEST (natives142_engines_from_the_fl_installation)
         }
         ++made;
         CHECK (c->instrument == e.kind && c->name == e.name);
-        if (e.kind == InstrumentKind::granulizer) // (plays the channel's sample: none yet)
+        if (e.kind == InstrumentKind::granulizer || e.kind == InstrumentKind::wavetraveller) // (play the channel's sample: none yet)
             continue;
         const auto rms = natives142::renderChannel (*c, fl, e.kind == InstrumentKind::drumaxx ? 48 : 60);
         CHECK (rms > 1.0e-3 && std::isfinite (rms));
