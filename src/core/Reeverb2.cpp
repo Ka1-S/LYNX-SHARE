@@ -649,6 +649,26 @@ void Engine::prepare (int sampleRate, const Settings& s, double bpm, bool flushe
         D.flush();
 }
 
+void Engine::reserve (int sampleRate, int maxBlock)
+{
+    auto& D = *d;
+    const auto fs = std::max (1, sampleRate);
+    for (int k = 0; k < 12; ++k)
+        D.line[(std::size_t) k].reserve ((std::size_t) std::max (1, (int) ((long long) lineN[k] * fs / 20000)));
+    D.pre.reserve ((std::size_t) (2 * fs + 2));
+    int r = roundEven ((double) fs * 0.3163265306122449), bits = 0; // (reinit's early-reflection size)
+    while (r > 0)
+        r >>= 1, ++bits;
+    D.er.reserve ((std::size_t) 1 << (bits + 1));
+    for (auto& m : D.mod)
+        m.reserve ((std::size_t) modSize);
+    const auto block = (std::size_t) std::max (1, maxBlock);
+    D.mono.reserve (block);
+    D.wet.reserve (2 * block);
+    D.erBuf.reserve (2 * block);
+    D.inter.reserve (2 * block);
+}
+
 void Engine::flush() noexcept { d->flush(); }
 
 void Engine::set (const Settings& s, double bpm)
@@ -918,6 +938,15 @@ void Engine::prepare (int sampleRate, const Raw& raw)
     D.flush();
 }
 
+void Engine::reserve (int sampleRate, int maxBlock)
+{
+    // the lines' sizes depend on the rate only: prepare's assign then reuses them
+    auto& D = *d;
+    D.fs = std::max (1, sampleRate);
+    D.allocate();
+    D.inter.reserve (2 * (std::size_t) std::max (1, maxBlock));
+}
+
 void Engine::flush() noexcept { d->flush(); }
 
 void Engine::set (const Raw& raw)
@@ -951,6 +980,7 @@ public:
     {
         rate = (int) std::lround (sampleRate);
         ready = false;
+        engine.reserve (rate, 8192); // (its first block allocated its lines on the audio thread; round 167e)
     }
 
     void reset() noexcept override
@@ -991,6 +1021,7 @@ public:
     {
         rate = (int) std::lround (sampleRate);
         ready = false;
+        engine.reserve (rate, 8192);
     }
 
     void reset() noexcept override

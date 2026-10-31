@@ -7,12 +7,16 @@
 //   LYNX_THREADS=n    n worker threads, as the app's audio engine uses
 //   LYNX_REALTIME=1   paces the blocks at real time (the workers sleep between blocks, as with a sound card)
 //   LYNX_PROFILE=1    per-channel / per-insert-effect CPU time, heaviest first
+//   LYNX_ALLOCS=1     counts the heap allocations made while a block is processed (the audio thread and the
+//                     workers; round 167e) and prints where the first distinct ones came from (Linux: addresses for
+//                     addr2line -e renderwav)
 // The block timing report (budget = block duration) is always printed.
 
 #include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iterator>
 #include <vector>
@@ -25,6 +29,11 @@
 #include <chrono>
 #include <thread>
 #include <time.h>
+#include <atomic>
+#include <new>
+#if defined(__linux__)
+ #include <execinfo.h>
+#endif
 #if defined(_WIN32)
  #define WIN32_LEAN_AND_MEAN
  #define NOMINMAX
@@ -37,6 +46,71 @@
 #include "core/PluginSubstitutes.h"
 #include "core/RackRenderer.h"
 #include "core/WorkerPool.h"
+
+// LYNX_ALLOCS: every operator new while `counting` is set (inside RackRenderer::process) is counted
+namespace allocs
+{
+std::atomic<bool> counting { false };
+std::atomic<long> count { 0 };
+constexpr int maxSites = 96, depth = 12;
+struct Site
+{
+    void* frames[depth] {};
+    int n = 0;
+    long hits = 0;
+};
+Site sites[maxSites];
+std::atomic<int> siteCount { 0 };
+std::atomic_flag recording = ATOMIC_FLAG_INIT;
+
+void note() noexcept
+{
+    count.fetch_add (1, std::memory_order_relaxed);
+#if defined(__linux__)
+    if (recording.test_and_set()) // (one at a time; backtrace() itself may allocate once: not counted, flag held)
+        return;
+    counting.store (false);
+    void* f[depth + 2];
+    const auto n = backtrace (f, depth + 2);
+    const auto used = std::max (0, n - 2);
+    bool found = false;
+    for (int i = 0; i < siteCount.load() && ! found; ++i)
+        if (sites[i].n == used && std::equal (f + 2, f + 2 + used, sites[i].frames))
+            found = ++sites[i].hits > 0;
+    if (! found && siteCount.load() < maxSites)
+    {
+        auto& s = sites[siteCount.load()];
+        s.n = used;
+        std::copy (f + 2, f + 2 + used, s.frames);
+        s.hits = 1;
+        siteCount.fetch_add (1);
+    }
+    counting.store (true);
+    recording.clear();
+#endif
+}
+} // namespace allocs
+
+void* operator new (std::size_t n)
+{
+    if (allocs::counting.load (std::memory_order_relaxed))
+        allocs::note();
+    if (auto* p = std::malloc (n > 0 ? n : 1))
+        return p;
+    throw std::bad_alloc();
+}
+void* operator new[] (std::size_t n) { return operator new (n); }
+void* operator new (std::size_t n, const std::nothrow_t&) noexcept
+{
+    if (allocs::counting.load (std::memory_order_relaxed))
+        allocs::note();
+    return std::malloc (n > 0 ? n : 1);
+}
+void* operator new[] (std::size_t n, const std::nothrow_t& t) noexcept { return operator new (n, t); }
+void operator delete (void* p) noexcept { std::free (p); }
+void operator delete[] (void* p) noexcept { std::free (p); }
+void operator delete (void* p, std::size_t) noexcept { std::free (p); }
+void operator delete[] (void* p, std::size_t) noexcept { std::free (p); }
 
 namespace
 {
@@ -253,6 +327,8 @@ int main (int argc, char** argv)
     }
     renderer.prepare (sampleRate, std::max (2048, blockSize));
     const bool profile = std::getenv ("LYNX_PROFILE") != nullptr;
+    const bool countAllocs = std::getenv ("LYNX_ALLOCS") != nullptr;
+    long blocksWithAllocs = 0;
     const bool realtime = std::getenv ("LYNX_REALTIME") != nullptr;
 #if defined(_WIN32)
     timeBeginPeriod (1);
@@ -285,7 +361,11 @@ int main (int argc, char** argv)
         const bool playing = tick < (double) lengthTicks;
         const auto t0 = std::chrono::steady_clock::now();
         const auto c0 = threadCpuMs();
+        const auto allocsBefore = allocs::count.load();
+        allocs::counting.store (countAllocs);
         renderer.process (state.get(), playing, tick, n, left.data() + pos, right.data() + pos);
+        allocs::counting.store (false);
+        blocksWithAllocs += allocs::count.load() != allocsBefore;
         wallMs.push_back (std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t0).count());
         cpuMs.push_back (threadCpuMs() - c0);
         tick += n * tps;
@@ -339,6 +419,24 @@ int main (int argc, char** argv)
             std::printf ("workers: %d threads ran %llu indices, %llu wake-ups\n", pool->workers(),
                          (unsigned long long) pool->indicesRunByWorkers(), (unsigned long long) pool->wakeUps());
 #endif
+    }
+
+    if (countAllocs)
+    {
+        std::printf ("allocations while processing: %ld in %ld of %zu blocks\n", allocs::count.load(), blocksWithAllocs, wallMs.size());
+        for (int i = 0; i < allocs::siteCount.load(); ++i)
+        {
+            std::printf ("  site %d (%ld):", i, allocs::sites[i].hits);
+#if defined(__linux__)
+            if (char** names = backtrace_symbols (allocs::sites[i].frames, allocs::sites[i].n))
+            {
+                for (int k = 0; k < allocs::sites[i].n; ++k)
+                    std::printf (" %s", std::strrchr (names[k], '(') != nullptr ? std::strrchr (names[k], '(') : names[k]);
+                std::free (names);
+            }
+#endif
+            std::printf ("\n");
+        }
     }
 
     if (profile)

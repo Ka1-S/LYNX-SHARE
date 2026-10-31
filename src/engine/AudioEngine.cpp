@@ -445,9 +445,13 @@ float AudioEngine::renderOffline (const RenderOptions& options)
     std::int64_t quietSamples = 0;
     bool cancelled = lastRenderStats.warmUp.cancelled;
 
+    vfx::script::setSongEnded (false);
     for (std::int64_t done = 0; done < totalSamples && ! cancelled; done += blockSize)
     {
         const auto n = (int) juce::jmin<std::int64_t> (blockSize, totalSamples - done);
+        // the tail: the song has ended (VFX Script sees the transport stopped, like FL's render; round 167e)
+        if (done >= musicSamples)
+            vfx::script::setSongEnded (true);
         juce::AudioBuffer<float> view (buffer.getArrayOfWritePointers(), 2, n);
         view.clear();
         const auto before = juce::Time::getMillisecondCounterHiRes();
@@ -497,6 +501,7 @@ float AudioEngine::renderOffline (const RenderOptions& options)
     }
 
     stop();
+    vfx::script::setSongEnded (false);
 
     if (rackProcessor != nullptr)
     {
