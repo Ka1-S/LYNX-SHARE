@@ -174,7 +174,7 @@ bool Song::insertInUse (int t) const
         || m.outputChannel != outputDefault)
         return true;
     if (std::any_of (mixer.begin(), mixer.end(), [t] (const MixerTrack& o) {
-            return std::any_of (o.effects.begin(), o.effects.end(), [t] (const EffectSlot& e) { return e.sidechain == t || e.sidechain2 == t; });
+            return std::any_of (o.effects.begin(), o.effects.end(), [t] (const EffectSlot& e) { return e.sidechain == t || e.sidechain2 == t || e.sendTracks[0] == t || e.sendTracks[1] == t; });
         }))
         return true;
     return std::any_of (automations.begin(), automations.end(), [t] (const Automation& a) {
@@ -344,16 +344,24 @@ int fruitySendTarget (const EffectSlot& slot) noexcept
     return track > 0 ? track : -1;
 }
 
-std::vector<std::pair<int, int>> fruitySendsOf (const Song& song, int track)
+int slotSendTarget (const EffectSlot& slot, int output) noexcept
 {
-    std::vector<std::pair<int, int>> out;
+    if (slot.kind == EffectKind::transmitter)
+        return output >= 0 && output < maxSlotSends && slot.sendTracks[(std::size_t) output] > 0 ? slot.sendTracks[(std::size_t) output] : -1;
+    return output == 0 ? fruitySendTarget (slot) : -1;
+}
+
+std::vector<SlotSendTap> fruitySendsOf (const Song& song, int track)
+{
+    std::vector<SlotSendTap> out;
     const auto n = (int) song.mixer.size();
     if (track <= 0 || track >= n)
         return out;
     const auto& slots = song.mixer[(std::size_t) track].effects;
     for (int s = 0; s < (int) slots.size() && s < maxEffectSlots; ++s)
-        if (const auto target = fruitySendTarget (slots[(std::size_t) s]); target > 0 && target < n && target != track)
-            out.emplace_back (s, target);
+        for (int o = 0; o < maxSlotSends; ++o)
+            if (const auto target = slotSendTarget (slots[(std::size_t) s], o); target > 0 && target < n && target != track)
+                out.push_back ({ s, target, o, slots[(std::size_t) s].kind == EffectKind::transmitter });
     return out;
 }
 
@@ -434,8 +442,9 @@ bool Song::canRoute (int from, int to) const
             if (s.target > 0 && s.target < n)
                 stack.push_back (s.target);
         for (const auto& fx : mixer[(std::size_t) t].effects)
-            if (const auto target = fruitySendTarget (fx); target > 0 && target < n)
-                stack.push_back (target);
+            for (int o = 0; o < maxSlotSends; ++o)
+                if (const auto target = slotSendTarget (fx, o); target > 0 && target < n)
+                    stack.push_back (target);
     }
 
     return true;
@@ -481,9 +490,10 @@ std::vector<int> Song::mixerOrder() const
         for (const auto& s : mixer[(std::size_t) t].sends)
             if (s.target > 0 && s.target < n)
                 next[(std::size_t) t].push_back (s.target);
-        for (const auto& fx : mixer[(std::size_t) t].effects) // Fruity Send slots: the destination comes after
-            if (const auto target = fruitySendTarget (fx); target > 0 && target < n && target != t)
-                next[(std::size_t) t].push_back (target);
+        for (const auto& fx : mixer[(std::size_t) t].effects) // Fruity Send / Transmitter slots: the destination comes after
+            for (int o = 0; o < maxSlotSends; ++o)
+                if (const auto target = slotSendTarget (fx, o); target > 0 && target < n && target != t)
+                    next[(std::size_t) t].push_back (target);
         for (const auto& fx : mixer[(std::size_t) t].effects)
             for (const auto source : { fx.sidechain, fx.sidechain2 })
                 if (source > 0 && source < n && source != t)
@@ -558,8 +568,9 @@ std::vector<bool> Song::soloAudible() const
             if (s.target > 0 && s.target < (int) n)
                 stack.push_back (s.target);
         for (const auto& fx : mixer[(std::size_t) t].effects)
-            if (const auto target = fruitySendTarget (fx); target > 0 && target < (int) n)
-                stack.push_back (target);
+            for (int o = 0; o < maxSlotSends; ++o)
+                if (const auto target = slotSendTarget (fx, o); target > 0 && target < (int) n)
+                    stack.push_back (target);
     }
 
     // upstream: whoever feeds the soloed tracks
@@ -575,7 +586,7 @@ std::vector<bool> Song::soloAudible() const
             if (! feeds[src]
                 && (routes ((int) src, t)
                     || std::any_of (mixer[src].effects.begin(), mixer[src].effects.end(),
-                                    [t] (const EffectSlot& fx) { return fruitySendTarget (fx) == t; })))
+                                    [t] (const EffectSlot& fx) { return slotSendTarget (fx, 0) == t || slotSendTarget (fx, 1) == t; })))
             {
                 feeds[src] = true;
                 audible[src] = true;
@@ -1183,7 +1194,7 @@ bool PatchNode::operator== (const PatchNode& o) const
 bool EffectSlot::operator== (const EffectSlot& o) const
 {
     if (kind != o.kind || enabled != o.enabled || params != o.params || mix != o.mix || ! (plugin == o.plugin) || sidechain != o.sidechain
-        || sidechain2 != o.sidechain2 || state != o.state || samplePath != o.samplePath || ! (substituteFor == o.substituteFor)
+        || sidechain2 != o.sidechain2 || sendTracks != o.sendTracks || state != o.state || samplePath != o.samplePath || ! (substituteFor == o.substituteFor)
         || presetName != o.presetName || abOther != o.abOther || abShowingB != o.abShowingB || branches.size() != o.branches.size()
         || links.size() != o.links.size() || ! (patcher == o.patcher))
         return false;

@@ -34,7 +34,7 @@ bool sameChannel (const ChannelDef& a, const ChannelDef& b) noexcept
 bool sameSlot (const EffectSlot& a, const EffectSlot& b) noexcept
 {
     return a.kind == b.kind && a.enabled == b.enabled && a.params == b.params && a.mix == b.mix && a.plugin == b.plugin
-           && a.sidechain == b.sidechain && a.sidechain2 == b.sidechain2 && a.branches.size() == b.branches.size() && a.state == b.state
+           && a.sidechain == b.sidechain && a.sidechain2 == b.sidechain2 && a.sendTracks == b.sendTracks && a.branches.size() == b.branches.size() && a.state == b.state
            && a.presetName == b.presetName && a.abOther == b.abOther && a.abShowingB == b.abShowingB;
 }
 
