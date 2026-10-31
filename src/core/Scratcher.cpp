@@ -108,8 +108,22 @@ std::array<float, count> defaults() noexcept
     return d;
 }
 
+int timecodeOf (float value) noexcept
+{
+    return dvs::stateOfCombo ((int) std::lround (std::clamp (value, 0.0f, 1.0f) * (float) (dvs::comboCount - 1)));
+}
+
+float timecodeValue (int state) noexcept
+{
+    return (float) dvs::comboOfState (state) / (float) (dvs::comboCount - 1);
+}
+
 std::string paramText (int param, float value)
 {
+    if (param == timecodeType)
+        return dvs::comboName (dvs::comboOfState (timecodeOf (value)));
+    if (param == riaaPreamp)
+        return value >= 0.5f ? "On" : "Off";
     char b[48] {};
     const auto raw = rawOfValue (param, value);
     switch (param)
@@ -189,11 +203,16 @@ std::optional<State> parse (const std::vector<std::uint8_t>& s)
         ++at; // the editor's size option
     if (*version >= 0xF462Au)
         if (const auto tc = u32At (s, at))
-            st.timecode = (std::int32_t) *tc;
+        {
+            st.timecode = std::clamp ((std::int32_t) *tc, -1, dvs::comboCount - 2);
+            if (at + 4 < s.size())
+                st.riaa = s[at + 4] != 0;
+        }
     return st;
 }
 
-std::vector<std::uint8_t> toFl (const std::array<float, count>& values, const std::string& samplePath)
+std::vector<std::uint8_t> toFl (const std::array<float, count>& values, const std::string& samplePath, int timecodeState,
+                                bool riaaOn)
 {
     std::vector<std::uint8_t> out;
     auto put = [&out] (const void* p, std::size_t n) {
@@ -219,8 +238,8 @@ std::vector<std::uint8_t> toFl (const std::array<float, count>& values, const st
     const auto len = (std::int32_t) samplePath.size();
     put (&len, 4);
     put (samplePath.data(), samplePath.size());
-    const std::uint8_t editor = 0, riaa = 0;
-    const std::int32_t timecode = -1;
+    const std::uint8_t editor = 0, riaa = riaaOn ? 1 : 0;
+    const std::int32_t timecode = timecodeState;
     put (&editor, 1);
     put (&timecode, 4);
     put (&riaa, 1);
@@ -345,10 +364,112 @@ void Engine::setParam (int param, float value) noexcept
     }
 }
 
+std::array<double, 4> riaaCoefficients (double sampleRate) noexcept
+{
+    const auto p1 = std::exp (-1.0 / (sampleRate * 0.00318)), p2 = std::exp (-1.0 / (sampleRate * 7.5e-5));
+    const auto z1 = std::exp (-1.0 / (sampleRate * 3.18e-4));
+    return { 20.0, -20.0 * z1, -(p1 + p2), p1 * p2 };
+}
+
+void Engine::setSampleRate (double sampleRate) noexcept
+{
+    if (sampleRate > 0.0 && sampleRate != rate)
+    {
+        rate = sampleRate;
+        setupDvs();
+    }
+}
+
+void Engine::setTimecode (int state, bool riaa) noexcept
+{
+    if (state != timecode || riaa != riaaOn)
+    {
+        timecode = state;
+        riaaOn = riaa;
+        setupDvs();
+    }
+}
+
+void Engine::setupDvs() noexcept
+{
+    // [DECOMP 0x72c920] a new decoder for the type; [DECOMP 0x72ccf0 / 0x72cdf0] the RIAA preamp: poles at
+    // 3180 µs and 75 µs, a zero at 318 µs, gain 20; the hold: the same place for 0.1 s fades out, to 1/10 in 50 ms
+    decoder.configure (timecode, rate);
+    riaa = riaaCoefficients (rate);
+    riaaState = {};
+    holdLimit = (int) rate / 10;
+    holdDecay = (float) std::pow (0.1, 1.0 / (0.05 * rate));
+    dvsLast = 0.0;
+    dvsStuck = 0;
+    dvsOutL = dvsOutR = 0.0f;
+}
+
+void Engine::processDvs (float* left, float* right, int n) noexcept
+{
+    // [DECOMP 0x72add0, timecode branch] the input (through the RIAA preamp when on) drives the decoder; the record's
+    // place, in seconds × the rate, is the sample's frame (looping). The output is the sample alone: the input, the
+    // volume, the pan and the DC blocker are not used. No place (or the same place for 0.1 s): the last frame fades.
+    if (riaaOn)
+        for (int c = 0; c < 2; ++c)
+        {
+            auto* x = c == 0 ? left : right;
+            auto& s = riaaState[(std::size_t) c];
+            for (int i = 0; i < n; ++i)
+            {
+                const auto in = (double) x[i];
+                const auto y = riaa[0] * in + riaa[1] * s[0] - riaa[2] * s[1] - riaa[3] * s[2];
+                s[0] = in;
+                s[2] = s[1];
+                s[1] = y;
+                x[i] = (float) y;
+            }
+        }
+    const float* buf = playing->frames.data();
+    const auto frames = (long long) playing->n;
+    auto fade = [this] {
+        dvsOutL = std::abs ((double) dvsOutL) <= 1e-6 ? 0.0f : dvsOutL * holdDecay;
+        dvsOutR = std::abs ((double) dvsOutR) <= 1e-6 ? 0.0f : dvsOutR * holdDecay;
+    };
+    for (int i = 0; i < n; ++i)
+    {
+        decoder.process (left[i], right[i]);
+        const auto place = decoder.active() ? decoder.position() : -1.0;
+        if (place >= 0.0)
+        {
+            // FL compares the places exactly; LYNX's speed tracker settles to ±1e-12-ish instead of an exact 0 after
+            // the needle lifts, so "the same place" is within 1e-7 s (0.004 frames at 44.1 kHz)
+            dvsStuck = std::abs (place - dvsLast) < 1.0e-7 ? dvsStuck + 1 : 0;
+            if (dvsStuck < holdLimit)
+            {
+                const auto x = place * rate;
+                const auto k = (long long) x;
+                const auto f = (float) (x - (double) k);
+                const auto a = k % frames, b = (k + 1) % frames;
+                dvsOutL = (float) ((double) buf[2 * a] * (1.0 - (double) f) + (double) (buf[2 * b] * f));
+                dvsOutR = (float) ((double) buf[2 * a + 1] * (1.0 - (double) f) + (double) (buf[2 * b + 1] * f));
+                lastPos = (float) ((double) a / (double) frames);
+            }
+            else
+                fade();
+            dvsLast = place;
+        }
+        else
+        {
+            dvsStuck = 0;
+            fade();
+            dvsLast = 0.0;
+        }
+        left[i] = dvsOutL;
+        right[i] = dvsOutR;
+    }
+}
+
 void Engine::process (float* left, float* right, int n) noexcept
 {
     // [DECOMP 0x72add0]
-    if (playing != nullptr && n > 0)
+    if (playing != nullptr && n > 0 && timecode != -1)
+        processDvs (left, right, n);
+    else if (playing != nullptr && n > 0)
     {
         const float* buf = playing->frames.data();
 
@@ -475,7 +596,7 @@ public:
             engine.setSample (prepareSample (*sample));
     }
 
-    void prepare (double) noexcept override {}
+    void prepare (double sampleRate) noexcept override { engine.setSampleRate (sampleRate); }
     void reset() noexcept override
     {
         engine.reset();
@@ -493,6 +614,7 @@ public:
                 engine.setParam (i, params[(std::size_t) i]);
             }
         first = false;
+        engine.setTimecode (timecodeOf (params[timecodeType]), params[riaaPreamp] >= 0.5f);
         engine.process (left, right, n);
         position.store (engine.position(), std::memory_order_relaxed);
     }

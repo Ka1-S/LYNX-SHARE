@@ -37,6 +37,7 @@ const char* toolTitle (Tool tool)
         case Tool::createSequence: return TR_NOOP ("Create sequence");
         case Tool::pasteSpectral: return TR_NOOP ("Paste mix (spectral)");
         case Tool::stretch: return TR_NOOP ("Time stretcher / pitch shifter");
+        case Tool::deverb: return TR_NOOP ("Deverb");
     }
     return "";
 }
@@ -956,6 +957,29 @@ private:
                 makeProcess = [=, this] {
                     const auto m = value (mix) / 100.0;
                     return Process ([m] (ae::Document& d, ae::Range r, ae::Progress& p) { ae::vocalDenoise (d, r, m, &p); });
+                };
+                break;
+            }
+            case Tool::deverb:
+            {
+                // FL's Deverb form (REA_rodada167c.md §3): Profile, Block size, then the Mix wheel between the original
+                // and the processed sound. (FL's own is a downloaded neural module; LYNX's DSP is its own.)
+                header (tr ("Options"));
+                const auto profile = choice (tr ("Profile"), { tr ("General"), tr ("Voice") }, 0, 1);
+                const auto block = choice (tr ("Block size"), { "1", "2", "3", "4", "5" }, 0, 1);
+                header (tr ("Result"));
+                // FL's wheel: -100 Original .. 100 Processed (its value shown as is; double-click: 0, half and half)
+                const auto mix = knob (tr ("Mix"), -100, 100, 1, 100, [] (double v) {
+                    return v <= -100 ? tr ("Original") : v >= 100 ? tr ("Processed") : juce::String ((int) v);
+                }, 2);
+                static_cast<juce::Slider*> (editors[mix].get())->setDoubleClickReturnValue (true, 0.0);
+                describe = [where] { return where + "\n" + tr ("Choose a profile that best matches the source material"); };
+                makeProcess = [=, this] {
+                    ae::DeverbSettings s;
+                    s.voice = chosen (profile) == 1;
+                    s.blockSize = chosen (block) + 1;
+                    s.mix = value (mix) / 100.0;
+                    return Process ([s] (ae::Document& d, ae::Range r, ae::Progress& p) { ae::deverb (d, r, s, &p); });
                 };
                 break;
             }
