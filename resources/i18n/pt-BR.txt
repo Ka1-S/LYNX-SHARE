@@ -6177,3 +6177,6 @@ countries: br
 "Versatile|Loud|Transient|Steady" = "Versátil|Alto|Transiente|Estável"
 "Off|2x|4x|8x|16x" = "Desl.|2x|4x|8x|16x"
 "L/R" = "E/D"
+"Created: {0}" = "Criado em: {0}"
+"Working time: {0}" = "Tempo de trabalho: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Tocar notas truncadas nos clipes (uma nota que começa antes de um clipe de pattern toca a partir do início do clipe)"

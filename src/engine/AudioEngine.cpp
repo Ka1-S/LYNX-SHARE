@@ -445,9 +445,13 @@ float AudioEngine::renderOffline (const RenderOptions& options)
     std::int64_t quietSamples = 0;
     bool cancelled = lastRenderStats.warmUp.cancelled;
 
+    vfx::script::setSongEnded (false);
     for (std::int64_t done = 0; done < totalSamples && ! cancelled; done += blockSize)
     {
         const auto n = (int) juce::jmin<std::int64_t> (blockSize, totalSamples - done);
+        // the tail: the song has ended (VFX Script sees the transport stopped, like FL's render; round 167e)
+        if (done >= musicSamples)
+            vfx::script::setSongEnded (true);
         juce::AudioBuffer<float> view (buffer.getArrayOfWritePointers(), 2, n);
         view.clear();
         const auto before = juce::Time::getMillisecondCounterHiRes();
@@ -497,6 +501,7 @@ float AudioEngine::renderOffline (const RenderOptions& options)
     }
 
     stop();
+    vfx::script::setSongEnded (false);
 
     if (rackProcessor != nullptr)
     {
@@ -2102,6 +2107,7 @@ void AudioEngine::setSong (Song newSong)
     undoStack.clear();
     redoStack.clear();
     song = std::move (newSong);
+    workSince = (double) juce::Time::currentTimeMillis();
     clipops::updateCrossfades (song);
     selectedChannel = 0;
     selectedChannels = { 0 };
@@ -3678,8 +3684,29 @@ void AudioEngine::setPluginsRenderMode (bool offline)
             graphMode (patcher::graphOf (getEffect ((int) t, (int) s).get()));
 }
 
+void AudioEngine::stampWorkTime()
+{
+    const auto now = (double) juce::Time::currentTimeMillis();
+    if (workSince > 0.0 && now > workSince)
+        song.info.workSeconds += (now - workSince) / 1000.0;
+    workSince = now;
+}
+
+double AudioEngine::workSecondsNow() const
+{
+    const auto now = (double) juce::Time::currentTimeMillis();
+    return song.info.workSeconds + (workSince > 0.0 && now > workSince ? (now - workSince) / 1000.0 : 0.0);
+}
+
+void AudioEngine::markCreatedNow()
+{
+    if (song.info.created <= 0.0)
+        song.info.created = (double) juce::Time::currentTimeMillis() / 1000.0;
+}
+
 void AudioEngine::capturePluginStates()
 {
+    stampWorkTime();
     // Changes only the saved state (recreates nothing and doesn't enter the undo history).
     for (std::size_t i = 0; i < song.channels.size(); ++i)
         if (auto* p = dynamic_cast<PluginInstrument*> (getChannelInstrument ((int) i).get()))

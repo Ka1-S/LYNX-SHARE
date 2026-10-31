@@ -66,6 +66,10 @@ struct FlpImportOptions
 // by name. Patterns are rescaled to our PPQ. Plugins not yet.
 Song importFlp (const flp::Project& project, const FlpImportOptions& options = {});
 
+// FL's dates (Delphi TDateTime: days since 1899-12-30, the saving machine's local time) → seconds since 1970 UTC, read
+// in this machine's time zone; 0 for no date / out of range (REA round 167g: event 0xED)
+double flDateTimeToUnix (double days);
+
 // FL Layer channel options (.flp 0x90, REA_rodada164a §1) into LYNX's Layer settings
 void applyFlLayerFlags (int flags, LayerSettings& layer);
 InstrumentKind guessInstrument (const std::string& channelName, flp::ChannelType type);

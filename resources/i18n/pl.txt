@@ -6020,3 +6020,6 @@ countries: pl
 "Versatile|Loud|Transient|Steady" = "Uniwersalny|Głośny|Transjent|Stabilny"
 "Off|2x|4x|8x|16x" = "Wył.|2x|4x|8x|16x"
 "L/R" = "L/P"
+"Created: {0}" = "Utworzono: {0}"
+"Working time: {0}" = "Czas pracy: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Odtwarzaj ucięte nuty w klipach (nuta zaczynająca się przed klipem patternu gra od początku klipu)"

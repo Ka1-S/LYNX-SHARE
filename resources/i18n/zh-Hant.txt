@@ -6020,3 +6020,6 @@ countries: tw hk mo
 "Versatile|Loud|Transient|Steady" = "通用|響亮|瞬態|平穩"
 "Off|2x|4x|8x|16x" = "關|2x|4x|8x|16x"
 "L/R" = "左/右"
+"Created: {0}" = "建立於：{0}"
+"Working time: {0}" = "工作時間：{0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "播放片段中被截斷的音符（在模式片段之前開始的音符從片段開頭播放）"

@@ -32,6 +32,9 @@ public:
     // in RAM ("disk streaming"). The cache is reused across sessions.
     static constexpr double streamAboveSeconds = 30.0;
     static juce::File cacheFolder();
+    // The decoded copies (*.pcm) above `limitBytes`: the least recently used are deleted down to 3/4 of it (round 167e;
+    // done once per session in the background). Returns the bytes left.
+    static juce::int64 prunePcmCache (juce::int64 limitBytes);
 
     // Filter for FileChooser ("*.wav;*.flac;...")
     juce::String wildcard() const;

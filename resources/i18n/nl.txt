@@ -6020,3 +6020,6 @@ countries: nl be
 "Versatile|Loud|Transient|Steady" = "Veelzijdig|Luid|Transiënt|Stabiel"
 "Off|2x|4x|8x|16x" = "Uit|2x|4x|8x|16x"
 "L/R" = "L/R"
+"Created: {0}" = "Gemaakt: {0}"
+"Working time: {0}" = "Werktijd: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Afgekapte noten in clips spelen (een noot die vóór een patternclip begint, klinkt vanaf het begin van de clip)"

@@ -95,12 +95,29 @@ Ramp ramp (float& cur, float target, float maxStep, int n) noexcept
 Delay2Engine::Delay2Engine (const Delay2State& s, double sampleRate, double bpm, int maxBlock, bool settled)
     : rate (sampleRate), block (maxBlock)
 {
-    fbCur = (float) s.v[3] * 0.0078125f;
     tmp.resize ((std::size_t) maxBlock * 2);
+    restart (s, bpm, settled);
+}
+
+void Delay2Engine::restart (const Delay2State& s, double bpm, bool settled)
+{
+    fbCur = (float) s.v[3] * 0.0078125f;
+    for (auto& g : gCur)
+        g = 0.0f;
+    stL = stR = 0.0;
+    line.clear(); // (its capacity stays)
     set (s, bpm);
     if (settled)
         for (int k = 0; k < 4; ++k)
             gCur[k] = gTarget[k];
+}
+
+void Delay2Engine::reserve (double minBpm)
+{
+    // set()'s longest line: the time knob's maximum at minBpm, the block and the 0.5 s stereo offset
+    const auto delay = (double) delay2Max[4] * rate * 0.3125 / std::max (1.0, minBpm);
+    const auto most = (std::size_t) (delay + (double) block + rate * 0.5 + 4.0);
+    line.reserve (most * 2);
 }
 
 void Delay2Engine::set (const Delay2State& s, double bpm)
@@ -1196,10 +1213,15 @@ class Delay2Effect final : public Effect
 public:
     void prepare (double sampleRate) noexcept override
     {
+        // the engine and its line (room for tempos down to 60 BPM) are made here, off the audio thread
         rate = sampleRate;
-        engine.reset();
+        Delay2State s;
+        s.v = delay2Default;
+        engine = std::make_unique<Delay2Engine> (s, rate, 120.0, block, true);
+        engine->reserve (60.0);
+        fresh = true;
     }
-    void reset() noexcept override { engine.reset(); }
+    void reset() noexcept override { fresh = true; }
 
     void process (float* left, float* right, int n, const EffectParams& params, double bpm) noexcept override
     {
@@ -1209,8 +1231,11 @@ public:
         bpm = bpm > 0.0 ? bpm : 120.0;
         if (engine == nullptr)
             engine = std::make_unique<Delay2Engine> (s, rate, bpm, block, true);
+        else if (fresh)
+            engine->restart (s, bpm, true);
         else if (s.v != current.v || bpm != tempo)
             engine->set (s, bpm);
+        fresh = false;
         current = s;
         tempo = bpm;
         for (int done = 0; done < n;)
@@ -1226,6 +1251,7 @@ private:
     double rate = 44100.0, tempo = 0.0;
     Delay2State current;
     std::unique_ptr<Delay2Engine> engine;
+    bool fresh = true;
 };
 
 class Delay3Effect final : public Effect

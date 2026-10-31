@@ -6020,3 +6020,6 @@ countries: id
 "Versatile|Loud|Transient|Steady" = "Serbaguna|Keras|Transien|Stabil"
 "Off|2x|4x|8x|16x" = "Mati|2x|4x|8x|16x"
 "L/R" = "Ki/Ka"
+"Created: {0}" = "Dibuat: {0}"
+"Working time: {0}" = "Waktu kerja: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Mainkan not terpotong di klip (not yang dimulai sebelum klip pattern dimainkan dari awal klip)"

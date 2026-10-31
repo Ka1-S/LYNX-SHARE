@@ -259,6 +259,10 @@ vfx.addOutputController('n', 0)
     }
     script::setRealtime (false);
     const auto m2 = script::monitorOf (0x165d0002);
+    // (round 167e: the limit is 250 ms of the Python thread's CPU time, so on a busy machine it may come after the
+    // 400 blocks: waited for, up to the 1 s wall-clock backstop and some)
+    for (int w = 0; w < 300 && m2 != nullptr && m2->status().find ("took too long") == std::string::npos; ++w)
+        std::this_thread::sleep_for (std::chrono::milliseconds (10));
     CHECK (m2 != nullptr && m2->status().find ("took too long") != std::string::npos);
     std::sort (times.begin(), times.end());
     const auto p95 = times[times.size() * 95 / 100];
@@ -364,11 +368,16 @@ TEST (vfx_script_python_has_what_fl_scripts_use)
 TEST (vfx_script_late_answers_play_at_the_next_block)
 {
     using namespace lynx::vfx;
-    // a script slower than the real-time budget: its note comes one block later, at the block's start
+    // a script slower than the real-time budget: its note comes later, at the start of the first block after it
+    // answered. (Round 167e: the script took 6 ms against the 2 ms budget and the test looked 30 ms later. On a busy
+    // machine the test thread could be preempted inside its wait for longer than the script (the answer was then on
+    // time, in the first block) or the Python thread could answer after the 30 ms: the margins, not LYNX, were flaky.
+    // The script now takes 40 ms (20x the budget, well inside the 250 ms real-time limit) and the blocks go on until
+    // the answer has come.)
     const char* src = R"(
 import flvfx as vfx, time
 def onTriggerVoice(v):
-    t = time.time() + 0.006
+    t = time.time() + 0.04
     while time.time() < t:
         pass
     c = vfx.Voice(v)
@@ -377,14 +386,18 @@ def onTriggerVoice(v):
     auto p = makeProcessor (Kind::script, vfxs165::state (src));
     script::setRealtime (true);
     lynx::vfx::Transport t;
-    lynx::vfx::EventList first, second;
+    lynx::vfx::EventList first, later;
     auto e = vfx164::on (60, 100);
     p->process (&e, 1, 512, t, first);
-    std::this_thread::sleep_for (std::chrono::milliseconds (30));
-    p->process (nullptr, 0, 512, t, second);
+    int blocks = 0;
+    for (; blocks < 400 && later.size() == 0; ++blocks)
+    {
+        std::this_thread::sleep_for (std::chrono::milliseconds (5));
+        p->process (nullptr, 0, 512, t, later);
+    }
     script::setRealtime (false);
     CHECK (first.size() == 0);
-    CHECK (second.size() == 1 && second[0].offset == 0 && second[0].voice.key == 60);
+    CHECK (later.size() == 1 && later[0].offset == 0 && later[0].voice.key == 60);
     // offline (export) it waits: the note is at its sample
     lynx::vfx::EventList exact;
     auto p2 = makeProcessor (Kind::script, vfxs165::state (src));

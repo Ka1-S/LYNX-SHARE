@@ -155,6 +155,8 @@ struct MatrixCore
         maxSlope = (float) ((44100.0 / rate) * 0.001);
         maxHz = (float) ((double) rate * 0.4999);
         rateScale = (float) ((double) rate / 100000.0);
+        // the delay's longest setting (50000 units: 0.5 s), so a delay change never allocates on the audio thread
+        ring.reserve ((std::size_t) std::nearbyint (50000.0 * (double) rateScale) + 2);
         ap.clear();
         for (auto& g : gains)
             g.current = 0.0f; // the plugins fade the matrix in when they are created
