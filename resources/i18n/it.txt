@@ -6001,3 +6001,6 @@ countries: it ch sm
 "Snap to grid" = "Aggancia alla griglia"
 "Send to Playlist" = "Invia alla Playlist"
 "Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid" = "Aggancia alla griglia: le note spostate (Ctrl+trascina) e i marker di warp cadono sulla griglia dei beat del brano"
+"Created: {0}" = "Creato: {0}"
+"Working time: {0}" = "Tempo di lavoro: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Riproduci le note troncate nelle clip (una nota che inizia prima di una clip di pattern suona dall'inizio della clip)"

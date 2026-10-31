@@ -6001,3 +6001,6 @@ countries: de at ch li lu
 "Snap to grid" = "Am Raster ausrichten"
 "Send to Playlist" = "An Playlist senden"
 "Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid" = "Am Raster ausrichten: verschobene Noten (Strg+Ziehen) und Warp-Marker rasten auf dem Schlagraster des Songs ein"
+"Created: {0}" = "Erstellt: {0}"
+"Working time: {0}" = "Arbeitszeit: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Abgeschnittene Noten in Clips spielen (eine Note, die vor einem Pattern-Clip beginnt, klingt ab dem Clipanfang)"

@@ -6001,3 +6001,6 @@ countries: pl
 "Snap to grid" = "Przyciągaj do siatki"
 "Send to Playlist" = "Wyślij do Playlisty"
 "Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid" = "Przyciągaj do siatki: przesuwane nuty (Ctrl+przeciągnij) i znaczniki warp trafiają na siatkę miar utworu"
+"Created: {0}" = "Utworzono: {0}"
+"Working time: {0}" = "Czas pracy: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Odtwarzaj ucięte nuty w klipach (nuta zaczynająca się przed klipem patternu gra od początku klipu)"

@@ -12,6 +12,13 @@ namespace
 enum : std::uint32_t
 {
     evSwing = 0x0B,
+    evMainPitch = 0x50,
+    evPlayTruncatedNotes = 0x1E, // u8: Project › Play truncated notes in clips (saved only when on; REA round 167g)
+    evProjectTimes = 0xED,       // 16 B: f64 creation date, f64 working time (Delphi TDateTime days; REA round 167g)
+    evCurrentPattern = 0x43,     // u16: the pattern selected when saved, 1…999 (REA round 167g)
+    evSongMode = 0x09,           // u8: 1 = SONG, 0 = PAT (saved as "the transport's PatBtn is up", REA round 167g)
+    evShowInfo = 0x0A,           // u8: Project info › "Show on opening" (ShowInfoBox, REA round 167g)
+    evCurrentArrangement = 0x64, // u16: the arrangement open when saved (after every arrangement, REA round 167g)         // i16: the toolbar's main (master) pitch in cents (REA round 167g)
     evPanLaw = 0x17,
     evTimeSignatureNumerator = 0x11,
     evChannelSwingMix = 0x61,
@@ -476,6 +483,46 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
 
             case evSwing:
                 project.swing = (int) e.value;
+                break;
+
+            case evCurrentPattern:
+                if (section == Section::global)
+                    project.currentPattern = e.value >= 1 && e.value <= 999 ? (int) e.value : 1; // (FL's loader: else 1)
+                break;
+
+            case evSongMode:
+                if (section == Section::global)
+                    project.songMode = e.value == 1 ? 1 : 0; // (FL: PatBtn down unless the value is 1)
+                break;
+
+            case evShowInfo:
+                if (section == Section::global)
+                    project.showInfo = e.value == 1;
+                break;
+
+            case evCurrentArrangement:
+                project.currentArrangement = (int) e.value;
+                break;
+
+            case evProjectTimes:
+                if (section == Section::global && e.data.size() >= 16)
+                {
+                    double created, work;
+                    std::memcpy (&created, e.data.data(), 8);
+                    std::memcpy (&work, e.data.data() + 8, 8);
+                    project.createdDays = std::isfinite (created) ? created : 0.0;
+                    project.workDays = std::isfinite (work) && work > 0.0 ? work : 0.0;
+                }
+                break;
+
+            case evPlayTruncatedNotes:
+                if (section == Section::global)
+                    project.playTruncatedNotes = e.value > 0;
+                break;
+
+            case evMainPitch:
+                if (section == Section::global)
+                    project.mainPitch = (int) (std::int16_t) (std::uint16_t) e.value;
                 break;
 
             case evPanLaw:

@@ -275,12 +275,23 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
     {
         const auto& note = *it;
 
-        if (note.muted || note.start < clip.offset || note.start >= clip.offset + clip.length)
+        if (note.muted || note.start >= clip.offset + clip.length)
             continue;
 
         const auto timing = noteTiming (note, song.swing, channelOf (&song.channels, note.channel));
-        const auto on = std::min (clip.start + (note.start - clip.offset) + (timing.start - note.start), clip.end() - 1);
-        const auto off = std::min (on + timing.length, clip.end());
+        auto on = std::min (clip.start + (note.start - clip.offset) + (timing.start - note.start), clip.end() - 1);
+        auto off = std::min (on + timing.length, clip.end());
+
+        // FL's "Play truncated notes in clips" (FUN_010608a0): a note starting before the clip's offset keeps what is
+        // left of it from the clip's start (dropped when nothing is left); off: dropped
+        if (note.start < clip.offset)
+        {
+            const auto left = note.start + timing.length - clip.offset;
+            if (! song.playTruncatedNotes || left < 1)
+                continue;
+            on = clip.start;
+            off = std::min (clip.start + left, clip.end());
+        }
 
         NoteEvent e;
         e.type = NoteEvent::Type::on;

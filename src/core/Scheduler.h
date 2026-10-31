@@ -130,7 +130,7 @@ ScheduleIndex makeScheduleIndex (const Song& song);
 
 // Generates the Playlist's events (playing the whole song in a loop). Each pattern clip
 // plays the pattern's notes that fall in [offset, offset + length); notes are cut at the
-// end of the clip. Audio clips trigger the channel's sample at the start and stop at the end.
+// end of the clip. With Song::playTruncatedNotes, a note that started before the offset plays from the clip's start. Audio clips trigger the channel's sample at the start and stop at the end.
 // `resume` = playback started or jumped to startTick: audio clips that were already
 // in progress at that point start in the middle, on the first sample of the block.
 void scheduleSong (const Song& song,

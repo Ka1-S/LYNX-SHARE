@@ -48,6 +48,7 @@ public:
     Engine();
     ~Engine();
     void prepare (int sampleRate, const Raw& raw); // creation, rate, state and FL's flush
+    void reserve (int sampleRate, int maxBlock); // the buffers for that rate, ahead of prepare (UI thread)
     void flush() noexcept;
     void set (const Raw& raw);
     void process (float* left, float* right, int n) noexcept;
@@ -85,6 +86,9 @@ public:
     ~Engine();
     // creation + state load, then FL's flush (without it the gains fade in from 0 as in a freshly created plugin)
     void prepare (int sampleRate, const Settings& s, double bpm, bool flushed = true);
+    // The memory prepare() / a predelay change would take, reserved now (off the audio thread; round 167e): the first
+    // block and predelay automation then never allocate (predelay up to 2 s: tempo-synced at 60 BPM and above)
+    void reserve (int sampleRate, int maxBlock);
     void flush() noexcept;                                         // FL's flush: clears the reverb, ends the ramps
     void set (const Settings& s, double bpm);                      // parameter / tempo changes (FL's ProcessParam)
     void process (float* left, float* right, int n) noexcept;

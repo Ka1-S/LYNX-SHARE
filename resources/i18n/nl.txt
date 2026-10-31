@@ -6001,3 +6001,6 @@ countries: nl be
 "Snap to grid" = "Uitlijnen op raster"
 "Send to Playlist" = "Naar Playlist sturen"
 "Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid" = "Uitlijnen op raster: verplaatste noten (Ctrl+slepen) en warpmarkers vallen op het telraster van het nummer"
+"Created: {0}" = "Gemaakt: {0}"
+"Working time: {0}" = "Werktijd: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Afgekapte noten in clips spelen (een noot die vóór een patternclip begint, klinkt vanaf het begin van de clip)"

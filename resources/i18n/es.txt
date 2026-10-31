@@ -6001,3 +6001,6 @@ countries: es mx ar co cl pe ve
 "Snap to grid" = "Ajustar a la cuadrícula"
 "Send to Playlist" = "Enviar a la Playlist"
 "Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid" = "Ajustar a la cuadrícula: las notas movidas (Ctrl+arrastrar) y los marcadores de warp caen en la cuadrícula de tiempos de la canción"
+"Created: {0}" = "Creado: {0}"
+"Working time: {0}" = "Tiempo de trabajo: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Reproducir notas truncadas en clips (una nota que empieza antes de un clip de patrón suena desde el inicio del clip)"

@@ -6001,3 +6001,6 @@ countries: fr be ch ca lu
 "Snap to grid" = "Aimanter à la grille"
 "Send to Playlist" = "Envoyer à la Playlist"
 "Snap to grid: moved notes (Ctrl+drag) and warp markers land on the song's beat grid" = "Aimanter à la grille : les notes déplacées (Ctrl+glisser) et les marqueurs de warp se calent sur la grille des temps du morceau"
+"Created: {0}" = "Créé : {0}"
+"Working time: {0}" = "Temps de travail : {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Jouer les notes tronquées dans les clips (une note qui commence avant un clip de pattern joue depuis le début du clip)"

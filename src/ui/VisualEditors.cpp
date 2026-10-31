@@ -3564,21 +3564,36 @@ private:
             stopTimer();
             worker.join();
             plainJob.reset();
-            juce::AudioFormatManager formats;
-            formats.registerBasicFormats();
-            std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (folder.getChildFile ("plain.wav")));
-            juce::int64 first = -1;
-            if (reader != nullptr)
-            {
+            // the first sound of a WAV (-1: none)
+            auto firstSound = [] (const juce::File& file) -> juce::int64 {
+                juce::AudioFormatManager formats;
+                formats.registerBasicFormats();
+                std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file));
+                if (reader == nullptr)
+                    return -1;
                 juce::AudioBuffer<float> b (2, (int) reader->lengthInSamples);
                 reader->read (&b, 0, (int) reader->lengthInSamples, 0, true, true);
-                for (int k = 0; k < b.getNumSamples() && first < 0; ++k)
+                for (int k = 0; k < b.getNumSamples(); ++k)
                     if (std::abs (b.getSample (0, k)) > 1.0e-3f)
-                        first = k;
+                        return k;
+                return -1;
+            };
+            const auto first = firstSound (folder.getChildFile ("plain.wav"));
+            // Round 167e: the reference is the same export run here, on the message thread (round 164c's bug lost the
+            // start only on another thread). The test used to expect the sound at once (< 0.1 s), right for the default
+            // demo but an ERROR for a project whose first note comes later (a ZGE demo starts at 1.2 s).
+            juce::int64 reference = -1;
+            {
+                exportopts::Options o;
+                o.sampleRate = 48000.0;
+                ExportJob here (engine->getSong(), o, folder.getChildFile ("plain-message-thread.wav"));
+                juce::String error;
+                if (here.run ([] (double) { return true; }, error))
+                    reference = firstSound (folder.getChildFile ("plain-message-thread.wav"));
             }
-            report << "plain export (worker thread): " << (jobResult ? "OK" : "ERROR") << ", first sound at " << juce::String ((double) first / 48000.0, 3) << " s\n";
-            videoOk = videoOk && jobResult && first >= 0 && first < 4800; // (this project starts at once: before round 164c the
-                                                                        // Export window's thread lost its first ~0.05–2 s)
+            report << "plain export (worker thread): " << (jobResult ? "OK" : "ERROR") << ", first sound at " << juce::String ((double) first / 48000.0, 3)
+                   << " s (message thread: " << juce::String ((double) reference / 48000.0, 3) << " s)\n";
+            videoOk = videoOk && jobResult && first >= 0 && reference >= 0 && std::abs (first - reference) < 480; // (within 10 ms)
             {
                 nextVideo();
             }
