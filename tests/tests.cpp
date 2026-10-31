@@ -16364,8 +16364,9 @@ TEST (wave_traveller_state_and_tables)
         tables.insert (tables.end(), p.volTable.begin(), p.volTable.begin() + p.volN + 1);
         CHECK (std::all_of (p.waveTable.begin(), p.waveTable.end(), [] (float v) { return v >= 0.0f && v <= 1.0f; }));
     }
-    CHECK (floatBitsHash (tables) == 0x0000000000000000ull /*WT_TABLES_HASH*/);
-    if (floatBitsHash (tables) != 0x0000000000000000ull /*WT_TABLES_HASH*/)
+    // (LYNX's own value; the tables reach the DLL goldens of wave_traveller_matches_fl_engine through the output)
+    CHECK (floatBitsHash (tables) == 0xd94594a6f22cb4dfull);
+    if (floatBitsHash (tables) != 0xd94594a6f22cb4dfull)
         std::printf ("  wave traveller tables: %016llx\n", (unsigned long long) floatBitsHash (tables));
     // knobs (FUN_007579e0 / 757b10 / 757b60)
     CHECK (speedFromKnob (0.0f, false) == 0.125f && speedFromKnob (1.0f, false) == 8.0f && speedFromKnob (0.0f, true) == 0.25f
