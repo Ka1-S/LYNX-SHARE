@@ -251,6 +251,216 @@ std::uint32_t floatBits (float f) noexcept
     return u;
 }
 
+// Kepler Exo's C runtime logf and tanhf (REA_rodada167d §5.1): the saturation's HQ mode divides their results by a
+// small step, so their last bits matter. logf: a 129-entry table of 1/c and ln c (c = 1 + j/128) split in a high part
+// (12 low bits cleared) and a low part (truncated), a degree-3 tail; the library takes its FMA variant on CPUs with
+// FMA. tanhf: an odd rational below 1, else 1 − 2/(e^{2x} + 1) with e^{2x} from a 32-entry 2^{j/32} table.
+struct ExoCrtTables
+{
+    float rcp[129], lnHi[129], lnLo[129], expHi[32];
+    ExoCrtTables() noexcept
+    {
+        NearestMode m; // built on first use, which can be inside the render's rounding mode
+        for (int j = 0; j < 129; ++j)
+        {
+            rcp[j] = (float) (1.0 / (0.5 * (1.0 + j / 128.0)));
+            const auto L = std::log1p (j / 128.0);
+            std::uint32_t u;
+            const auto lf = (float) L;
+            std::memcpy (&u, &lf, 4);
+            u &= 0xfffff000u;
+            std::memcpy (&lnHi[j], &u, 4);
+            const auto d = L - (double) lnHi[j];
+            auto t = (float) d;
+            if (std::abs ((double) t) > std::abs (d))
+                t = std::nextafter (t, 0.0f);
+            lnLo[j] = t;
+        }
+        for (int j = 0; j < 32; ++j)
+        {
+            const auto ef = (float) std::exp2 (j / 32.0);
+            std::uint32_t u;
+            std::memcpy (&u, &ef, 4);
+            u &= 0xffffc000u;
+            std::memcpy (&expHi[j], &u, 4);
+        }
+    }
+};
+const ExoCrtTables& exoCrt() noexcept
+{
+    static const ExoCrtTables t;
+    return t;
+}
+// the low parts of 2^{j/32} as the library stores them (not a plain rounding of the remainder: measured, §5.1)
+constexpr std::uint32_t exoExpLoBits[32] = {
+    0x00000000u, 0x39d86988u, 0x3aab0d9fu, 0x3a407404u, 0x3a2e0f1eu, 0x3a90e62du, 0x38f4dce0u, 0x3ad3bea3u, 0x3adfc146u, 0x39d39b9cu, 0x3ad4c982u, 0x3ac10c0cu, 0x3afb5aa6u, 0x3a856ad3u, 0x3a41f752u, 0x3a8fd607u, 0x391e6678u, 0x3aeebd1du, 0x398a39f4u, 0x3ab13329u, 0x3a9ca845u, 0x3ae6f619u, 0x3a923054u, 0x3aa07647u, 0x391f9958u, 0x3aeede5fu, 0x39cdeec0u, 0x3ae41b9du, 0x37c6e7c0u, 0x3a92e66fu, 0x3a95f454u, 0x38ecb6d0u };
+
+// coshf of the same library: double evaluation cosh n·cosh f + sinh n·sinh f (n = trunc |x|, degree-13/12 polynomials
+// in f, the library's 37-entry tables of sinh n, cosh n), rounded to float in the current mode; |x| < 2^-14 → 1
+constexpr double exoSinhN[37] = { 0.0, 1.1752011936438014, 3.6268604078470186, 10.0178749274099, 27.28991719712775, 74.20321057778875, 201.71315737027922, 548.3161232732465, 1490.47882578955, 4051.54190208279, 11013.232874703392, 29937.070849248055, 81377.39570642984, 221206.6960033301, 601302.1420819726, 1634508.6862359024, 4443055.260253879, 12077476.376787627, 32829984.568665247, 89241150.48159362, 242582597.7048951, 659407867.2416073, 1792456423.0657957, 4872401723.124451, 13244561064.921736, 36002449668.69293, 97864804714.41937, 266024120300.8993, 723128532145.7375, 1965667148572.021, 5343237290762.23, 14524424832623.71, 39481480091340.34, 107321789892958.03, 291730871263727.44, 793006726156715.2, 2155615773557597.5 };
+constexpr double exoCoshN[37] = { 1.0, 1.5430806348152437, 3.7621956910836314, 10.067661995777765, 27.308232836016487, 74.20994852478783, 201.7156361224559, 548.317035155212, 1490.479161252178, 4051.542025492594, 11013.232920103323, 29937.070865949758, 81377.39571257406, 221206.6960055904, 601302.1420828041, 1634508.686236208, 4443055.260253992, 12077476.376787668, 32829984.568665262, 89241150.48159362, 242582597.70489514, 659407867.2416073, 1792456423.0657957, 4872401723.124451, 13244561064.921736, 36002449668.69293, 97864804714.41937, 266024120300.8993, 723128532145.7375, 1965667148572.021, 5343237290762.23, 14524424832623.71, 39481480091340.34, 107321789892958.03, 291730871263727.44, 793006726156715.2, 2155615773557597.5 };
+float exoCoshf (float xf) noexcept
+{
+    auto x = std::abs ((double) xf);
+    if (x < 6.103515625e-05)
+        return 1.0f;
+    if (! (x < 36.12359947967774))
+        return std::isnan (x) ? xf : (float) (0.5 * std::exp (x));
+    const auto n = (int) x;
+    const auto f = x - (double) n;
+    const auto f2 = f * f;
+    const auto f3 = f2 * f;
+    auto s = f2 * 7.746188980094184e-13 + 1.605767931219399e-10;
+    s = s * f2 + 2.5052117699413348e-08;
+    s = s * f2 + 2.7557319191363643e-06;
+    s = s * f2 + 0.0001984126984132424;
+    s = s * f2 + 0.008333333333333299;
+    s = s * f2 + 0.16666666666666666;
+    s = s * f3;
+    s = s + f;
+    s = s * exoSinhN[n];
+    auto c = f2 * 1.1639213881721737e-11 + 2.0874434983147137e-09;
+    c = c * f2 + 2.755733507560166e-07;
+    c = c * f2 + 2.4801587246062242e-05;
+    c = c * f2 + 0.0013888888888981485;
+    c = c * f2 + 0.04166666666666609;
+    c = c * f2 + 0.5;
+    c = c * f2 + 1.0;
+    c = c * exoCoshN[n];
+    return (float) (s + c);
+}
+
+bool exoFma() noexcept
+{
+#if defined(LYNX_KEPLER_HW_FMA)
+    return cpuHasFma;
+#elif defined(__aarch64__) || defined(_M_ARM64)
+    return true;
+#else
+    return false;
+#endif
+}
+
+// a fused multiply-add in the current rounding mode (the hardware instruction where the library would use it)
+#if defined(LYNX_KEPLER_HW_FMA)
+__attribute__ ((target ("fma"))) float exoFmaHw (float a, float b, float c) noexcept { return __builtin_fmaf (a, b, c); }
+float exoFmaf (float a, float b, float c) noexcept { return exoFmaHw (a, b, c); }
+#else
+float exoFmaf (float a, float b, float c) noexcept { return std::fmaf (a, b, c); }
+#endif
+
+float exoLogf (float x) noexcept
+{
+    std::uint32_t u;
+    std::memcpy (&u, &x, 4);
+    if (! (x > 0.0f) || (u & 0x7f800000u) == 0x7f800000u)
+        return (float) std::log ((double) x);
+    auto e = (float) ((int) (u >> 23) - 127);
+    auto m = u & 0x007fffffu;
+    if (e == -127.0f) // subnormal: normalise through 1 | m − 1
+    {
+        auto v = bitsF (m | 0x3f800000u) - 1.0f;
+        std::uint32_t w;
+        std::memcpy (&w, &v, 4);
+        e = (float) ((int) (w >> 23) - 253);
+        m = w & 0x007fffffu;
+        u = w;
+    }
+    const auto& T = exoCrt();
+    const bool fused = exoFma();
+    if (std::abs (x - 1.0f) < 0.0625f)
+    {
+        const auto f = x - 1.0f;
+        const auto t = f / (2.0f + f);
+        const auto ft = f * t;
+        const auto w = t + t;
+        const auto w2 = w * w;
+        const auto w3 = w * w2;
+        if (fused)
+            return f + exoFmaf (w3, exoFmaf (w2, 0.012500000186264515f, 0.0833333358168602f), -ft);
+        return f + ((w2 * 0.012500000186264515f + 0.0833333358168602f) * w3 - ft);
+    }
+    const auto v = (u & 0x007f0000u) + ((u & 0x8000u) << 1);
+    const auto j = v >> 16;
+    const auto r = (bitsF (v | 0x3f000000u) - bitsF (m | 0x3f000000u)) * T.rcp[j];
+    if (fused)
+    {
+        const auto pq = exoFmaf (r, 0.3333333432674408f, 0.5f);
+        const auto q = exoFmaf (pq, r * r, r);
+        auto s = exoFmaf (e, 3.194618329871446e-05f, -q);
+        const auto hi = exoFmaf (e, 0.693115234375f, T.lnHi[j]);
+        s = s + T.lnLo[j];
+        return hi + s;
+    }
+    auto pq = r * 0.3333333432674408f + 0.5f;
+    pq = pq * (r * r);
+    const auto q = r + pq;
+    auto s = 3.194618329871446e-05f * e - q;
+    s = s + T.lnLo[j];
+    const auto hi = 0.693115234375f * e + T.lnHi[j];
+    return hi + s;
+}
+
+float exoTanhf (float x) noexcept
+{
+    std::uint32_t u;
+    std::memcpy (&u, &x, 4);
+    const auto a = u & 0x7fffffffu;
+    if (a < 0x39000000u)
+        return x;
+    if (a > 0x7f800000u)
+        return x + x;
+    const auto sg = 1.0f - (float) (a != u ? 1 : 0) * 2.0f;
+    const auto y = sg * x;
+    float r = 1.0f;
+    if (y > 10.0f)
+        r = 1.0f;
+    else if (! (1.0f < y))
+    {
+        const auto y2 = y * y;
+        const auto y3 = y2 * y;
+        float num, den;
+        if (0.9f > y)
+        {
+            num = (y2 * bitsF (0x384d2b7du) - bitsF (0x3abfbc9eu)) * y2 - bitsF (0x3e9058e0u);
+            den = y2 * bitsF (0x3eaf769cu) + bitsF (0x3f588550u);
+        }
+        else
+        {
+            num = (y2 * bitsF (0x382089d8u) - bitsF (0x3aa18e00u)) * y2 - bitsF (0x3e7679b1u);
+            den = y2 * bitsF (0x3e95c65fu) + bitsF (0x3f38db60u);
+        }
+        r = num * y3 / den + y;
+    }
+    else
+    {
+        auto t = y + y;
+        auto k = t * 46.16624069213867f;
+        k = k > 0.0f ? k + 0.5f : k - 0.5f;
+        const auto n = (int) k;
+        const auto j = n & 31;
+        const auto mm = n & ~31;
+        const auto& T = exoCrt();
+        const auto t1 = T.expHi[j], t2 = bitsF (exoExpLoBits[j]);
+        t = t - (float) n * 0.02165985107421875f;
+        const auto lo = (float) (-n) * 9.983182280848268e-07f;
+        const auto ex = mm / 32;
+        const auto half = ex / 2;
+        const auto s1 = bitsF ((std::uint32_t) (half + 0x7f) << 23), s2 = bitsF ((std::uint32_t) (ex - half + 0x7f) << 23);
+        const auto rr = lo + t;
+        auto p = (rr * 0.1666666716337204f + 0.5f) * (rr * rr);
+        p = p + lo;
+        p = p + t;
+        p = p * (t2 + t1);
+        p = p + t2;
+        p = p + t1;
+        p = p * s1 * s2;
+        r = 1.0f - 2.0f / (p + 1.0f);
+    }
+    return r * sg;
+}
+
+
 // sine and cosine as the engine's library computes them for the chorus filter design (REA_rodada165g-flbeta165k §2):
 // for |x| ≥ 2⁻¹³ a four-lane float sine run on (x, |x| + π/2) — Cody-Waite reduction by π in four float products, an
 // odd degree-9 polynomial, the parity of the quotient flipping the sign; below 2⁻¹³ sin = x, cos = 1 − x²/2. Every step
@@ -683,7 +893,7 @@ Patch parseState (const std::vector<std::uint8_t>& s)
         const auto e = powF (2.0f, x * 7.0f);
         const auto nOld = (int) ((e - 1.0f) * 48.370079f + 1.1f);
         const auto m = (int) (9216.0f / (float) nOld + 0.1f);
-        const auto l = lnF ((float) (m - 1) * 0.0206739f + 1.0f);
+        const auto l = lnF ((float) (m - 1) * 0.020673936f + 1.0f);
         p.P[0x30] = 1.0f - l * 0.2060993f;
         p.order.emplace_back (-1, p.P[0x30]); // stored without running the setter (REA_rodada33 §3.4)
     }
@@ -853,7 +1063,7 @@ struct Voice
     float dco2Level = 1.0f, am = 0.0f, noise = 0.0f;
     int xmodShape12 = 0, xmodShape21 = 0, fmShape = 0;
     int vcaMode = 0; // 0 gate (velocity), 1 envelope 1, 2 envelope 2
-    float released = 0.0f, vel2 = 0.0f, keyN = 0.0f, keyC = 0.0f, toggleVal = 0.0f, random = 0.0f;
+    float released = 1.0f, vel2 = 0.0f, keyN = 0.0f, keyC = 0.0f, toggleVal = 0.0f, random = 0.0f;
     float xExpr = 0.0f, yExpr = 0.0f, X = 0.0f, Y = 0.0f, Xp = 0.0f, Yp = 0.0f;
     std::array<float, 8> mxAmount {};
 };
@@ -1099,6 +1309,7 @@ private:
             for (auto& v : voices)
                 v.osc2.leakMax = v.osc.leakMax;
             gmInterval = (int) (sr * 0.001);
+            satK = (float) (1.0 - powD (0.09999999999999998, 20.0 / sr));
             // every host value again through the parameter forwarder (REA_rodada167d §1.3)
             for (int i = 0; i < 0x102; ++i)
                 forwardExo (i, host[(std::size_t) i]);
@@ -2337,8 +2548,11 @@ private:
                 const auto e = powF (2.0f, x * 7.0f);
                 const auto nOld = (int) ((e - 1.0f) * 48.370079f + 1.1f);
                 const auto m = (int) (9216.0f / (float) nOld + 0.1f);
-                const auto l = lnF ((float) (m - 1) * 0.0206739f + 1.0f);
+                const auto l = lnF ((float) (m - 1) * 0.020673936f + 1.0f);
                 host[(std::size_t) rateIndex] = 1.0f - l * 0.2060993f;
+#ifdef LYNX_KEPLER_TRACE
+                std::fprintf (stderr, "CONV %d x=%.9g e=%.9g n=%d m=%d l=%.9g r=%.9g\n", rateIndex, x, e, nOld, m, l, host[(std::size_t) rateIndex]);
+#endif
             };
             if (host[0x31] >= 0.5f)
                 convert (0x30);
@@ -2621,7 +2835,18 @@ private:
     }
 
     // the effects' parameters (filled in by the effect section)
-    void setEffectExo (int, float) noexcept {}
+    void setEffectExo (int i, float x) noexcept
+    {
+        P[(std::size_t) i] = x;
+        switch (i)
+        {
+            case 0x86: satOn = x >= 0.5f; break;
+            case 0x87: satTarget = tanF (powF (x, 0.3333333432674408f) * 1.5499999523162842f); break;
+            case 0x88: satPost = x >= 0.5f; break;
+            case 0x98: satHq = x >= 0.5f; break;
+            default: break;
+        }
+    }
 
     // ---------------------------------------------------------------- Exo voice setter (§4.2)
     void setVoiceExo (Voice& v, int i, float x) noexcept
@@ -3109,7 +3334,7 @@ private:
         if (static FILE* tf = std::getenv ("KTRACE") ? std::fopen (std::getenv ("KTRACE"), "w") : nullptr; tf != nullptr)
         {
             const auto& v = voices[0];
-            std::fprintf (tf, "%.17g %.17g %.9g | %.17g %.17g %.17g %.17g | %.9g %.9g %.9g %.9g %.9g\n", lfo1Phase, lfo1Inc, P[0x30],
+            std::fprintf (tf, "%.17g %.17g %.9g U %.9g %.9g %.9g B %.9g A %.9g %.9g | %.17g %.17g %.17g %.17g | %.9g %.9g %.9g %.9g %.9g\n", lfo1Phase, lfo1Inc, P[0x30], lfo1Uni, lfo1Shape, lfo1Tri, base[0x30], globalMx.empty() ? -1.f : globalAmount[(std::size_t) globalMx[0].terms[0].slot], globalMx.empty() ? -1.f : (float) globalMx[0].dst,
                           v.osc.phase, v.osc.inc, v.osc2.phase, v.osc2.inc, v.env1, v.env2, v.laneCut, v.amp, outL);
         }
 #endif
@@ -3138,7 +3363,75 @@ private:
         outGR = (outTargetR - outGR) * 0.05000000074505806f + outGR;
     }
 
-    void effectsExo (float&, float&) noexcept {}
+    // the effect chain after the chorus (§5): saturation before or after the EQ, delay and reverb
+    void effectsExo (float& L, float& R) noexcept
+    {
+        if (satOn && ! satPost)
+            saturate (L, R);
+        if (satOn && satPost)
+            saturate (L, R);
+    }
+
+    // the saturation's tanh, a [7/6] Padé fraction in float (§5.1)
+    static float pade (float z) noexcept
+    {
+        const auto z2 = z * z;
+        const auto num = (((z2 + 378.0f) * z2 + 17325.0f) * z2 + 135135.0f) * z;
+        const auto den = ((z2 * 28.0f + 3150.0f) * z2 + 62370.0f) * z2 + 135135.0f;
+        return num / den;
+    }
+
+    static float clamp5 (float z) noexcept
+    {
+        z = z > -5.0f ? z : -5.0f; // maxps / minps: the second operand when not ordered greater / less
+        return z < 5.0f ? z : 5.0f;
+    }
+
+    // ln(cosh) antiderivative step of the HQ mode, tanh of the midpoint when the step is below 10⁻³ (FUN_180021e00)
+    float adaa (float y, int lane) noexcept
+    {
+        const auto prev = satPrev[lane];
+        float r;
+        if (std::abs (y - prev) >= 0.001f)
+        {
+            const auto a = std::min (exoCoshf (y), 3.4028234663852886e+38f);
+            const auto b = std::min (exoCoshf (prev), 3.4028234663852886e+38f);
+            r = exoLogf (a / b);
+            r = r / (y - prev);
+        }
+        else
+            r = exoTanhf ((prev + y) * 0.5f);
+#ifdef LYNX_KEPLER_TRACE
+        if (lane == 0)
+            std::fprintf (stderr, "ADAA y=%.9g prev=%.9g r=%.9g\n", y, prev, r);
+#endif
+        satPrev[lane] = y;
+        return r;
+    }
+
+    void saturate (float& L, float& R) noexcept
+    {
+        const auto d = (satTarget - satDrive) * satK + satDrive;
+        satDrive = d;
+        const auto norm = pade (clamp5 (d)) * 3.0f;
+        const auto yl = L * 3.0f * d, yr = R * 3.0f * d;
+        if (norm == 0.0f) // the engine divides 0 by 0 here (drive 0); silence instead of NaN
+        {
+            L = R = 0.0f;
+            return;
+        }
+        if (! satHq)
+        {
+            L = pade (clamp5 (yl)) / norm;
+            R = pade (clamp5 (yr)) / norm;
+        }
+        else
+        {
+            const auto g = 1.0f / norm;
+            L = adaa (yl, 0) * g;
+            R = adaa (yr, 1) * g;
+        }
+    }
 
     // the chorus with its mode cross-fade (§3.7), as in sample()
     void chorusStage (float& L, float& R) noexcept
@@ -3423,6 +3716,9 @@ private:
     float lfo1UniW = 0.0f, lfo1TriW = 0.0f, lfo2UniW = 0.0f, lfo2BipW = 0.0f;
     float chorusNoise = 0.0f;
     bool chorusGateOn = false;
+    // effects (§5)
+    bool satOn = false, satPost = false, satHq = false;
+    float satTarget = 1.0f, satDrive = 1.0f, satK = 0.01f, satPrev[2] {};
 };
 
 // MIDI velocity as FL's wrapper derives it from Init.Vol (§5.1)
