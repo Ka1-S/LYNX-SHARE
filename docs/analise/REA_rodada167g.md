@@ -54,6 +54,14 @@ the info shown; "Asher Postman - Future House" on its second arrangement).
 | LYNX before | No creation date, no working time. |
 | LYNX now | `ProjectInfo::created` (seconds since 1970 UTC; FL's local-time TDateTime converted in this machine's time zone by `flDateTimeToUnix`) and `ProjectInfo::workSeconds`; imported from 0xED, kept in .lynx (`info.created`, `info.workSeconds`). The engine's work clock starts when a project is set (open / import / new) and adds the elapsed wall-clock time before every save (`AudioEngine::stampWorkTime`, called by `capturePluginStates`, which every save path calls first). A new project gets created = now unless its template has a date. Settings › Info shows "Created: 2018-07-13 18:38    Working time: 12:58:47" (updated every second), all 15 languages. Test `rea167g_flp_created_and_working_time`. |
 
+## 5. Play truncated notes in clips (0x1E)
+
+| | |
+|---|---|
+| FL evidence | Loader case 0x1E: global 0x015e1b18 = value > 0 and the Settings form's `TruncateClipNotesBox` (field 0xaf8) follows it [DECOMP FUN_00f46490]; its caption is "Play truncated notes in clips", hint "Play partial notes in playlist clips" [DFM TMIDIForm]. The saver writes 0x1E **only when it is on** [DECOMP FUN_00f40840]. The flag is passed to the clip's note cutter **FUN_010608a0** (from FUN_012293d0 and the playlist scheduler FUN_012dc060, `flag × 2 | 1`) [DECOMP]: for each note whose position is before the clip's offset — off: the note is dropped; on: length −= offset − position, dropped when < 1 tick, else position = offset; the caller then shifts the kept notes by the offset and drops those past the clip's end. Demos: on in 152 of 156 projects that carry the project block, and in FL's Empty template [DATA]. |
+| LYNX before | Always "off": a pattern clip trimmed or sliced into a held note was silent until the next note. |
+| LYNX now | `Song::playTruncatedNotes` (Settings › Project › Playlist › "Play truncated notes in clips…", undoable, saved in .lynx; on for new projects like FL's template; projects saved before keep it off; .flp 0x1E present → on). The scheduler plays such a note from the clip's start with the rest of its length (cut at the clip's end as before). 15 languages. Test `rea167g_play_truncated_notes_in_clips`. |
+
 ## Windows check [SHOT]
 
 Branch build, fresh `LYNX_PROFILE_DIR` + `LYNX_TEST_MODE=1`, `g_state_a.flp` (FL's Empty template with 3 patterns, two
