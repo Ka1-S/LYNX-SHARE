@@ -5995,6 +5995,9 @@ countries: fr be ch ca lu
 "In scale" = "Dans la gamme"
 "AMPLITUDE" = "AMPLITUDE"
 "VARIATION" = "VARIATION"
+"Created: {0}" = "Créé : {0}"
+"Working time: {0}" = "Temps de travail : {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Jouer les notes tronquées dans les clips (une note qui commence avant un clip de pattern joue depuis le début du clip)"
 
 # --- Round 167c: Edison scripts / Deverb / Convert to score, Scratcher DVS
 "(Control Surface presets are not available in LYNX SHARE)" = "(les presets Control Surface ne sont pas disponibles dans LYNX SHARE)"

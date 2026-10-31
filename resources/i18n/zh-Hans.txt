@@ -5995,6 +5995,9 @@ countries: cn sg
 "In scale" = "按音阶"
 "AMPLITUDE" = "幅度"
 "VARIATION" = "变化"
+"Created: {0}" = "创建于：{0}"
+"Working time: {0}" = "工作时间：{0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "播放片段中被截断的音符（在模式片段之前开始的音符从片段开头播放）"
 
 # --- Round 167c: Edison scripts / Deverb / Convert to score, Scratcher DVS
 "(Control Surface presets are not available in LYNX SHARE)" = "(LYNX SHARE 中不提供 Control Surface 预设)"

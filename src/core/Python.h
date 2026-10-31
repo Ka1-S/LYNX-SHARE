@@ -45,7 +45,8 @@ int acquireVm();
 void releaseVm (int vm);
 // Switch to that interpreter
 void use (int vm);
-// The time limit of the Python code run from now on (ms; 0 = none): past it the code raises TimeoutError
+// The time limit of the Python code run from now on (ms; 0 = none): past it the code raises TimeoutError. It counts the
+// Python thread's CPU time (a busy machine doesn't stop a good script), with 4x the limit of wall time as a backstop.
 void setTimeLimit (double milliseconds) noexcept;
 // The pending exception as text (traceback, last line = type and message), cleared
 std::string takeError();

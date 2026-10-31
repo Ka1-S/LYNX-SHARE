@@ -5995,6 +5995,9 @@ countries: tr
 "In scale" = "Gamda"
 "AMPLITUDE" = "GENLİK"
 "VARIATION" = "VARYASYON"
+"Created: {0}" = "Oluşturuldu: {0}"
+"Working time: {0}" = "Çalışma süresi: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Kliplerde kesilmiş notaları çal (pattern klibinden önce başlayan nota klibin başından çalar)"
 
 # --- Round 167c: Edison scripts / Deverb / Convert to score, Scratcher DVS
 "(Control Surface presets are not available in LYNX SHARE)" = "(Control Surface ön ayarları LYNX SHARE'de yok)"
