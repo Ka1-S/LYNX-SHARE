@@ -17,9 +17,10 @@
 // per-note pan / pitch expressions from FinalLevels (pan law √(1 − p), √p with p = (pan + 1)/2), the X/Y (FCut/FRes)
 // modulation routes, the channel volume / pan as FL's MIDI events (REA_rodada165g-flbeta165k §3); cut groups do not
 // cut it. FL's renders of all 277 factory presets null against LYNX's engine at the 16-bit floor once FL's export
-// warm-up (1536…2304 samples, varies between FL runs) is given. Not modelled / differences: the Kepler-2 (Kepler Exo) layout, DCO2, the filter types 1/2, saturation,
-// EQ, delay, reverb and hyper chorus (all off in every Kepler-1 state); the chorus noise/gate (off in all FL data); the
-// oversampling ×4 flag (0 in all data). The free-running oscillators/LFO pause while LYNX skips an idle channel (only
+// warm-up (1536…2304 samples, varies between FL runs) is given. Kepler Exo's "Kepler-2" states run on the same port
+// with Exo's setters, matrix, DCO2, LFO2, saturation, chorus noise / gate, EQ, hyper chorus, delay and reverb
+// (REA_rodada167d). Not modelled: the oversampling ×4 flag and Exo's alternative oscillator byte (0 in all data; such
+// states are refused). The free-running oscillators/LFO pause while LYNX skips an idle channel (only
 // their phase at the next note differs, as between two FL runs).
 
 #include <cstdint>

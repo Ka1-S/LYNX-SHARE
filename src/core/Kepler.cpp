@@ -2974,7 +2974,7 @@ private:
     {
         switch (shape)
         {
-            case 0: return sinF (phase * 6.2831854820251465f);
+            case 0: return exo ? ildsp::sinf_ (phase * 6.2831854820251465f) : sinF (phase * 6.2831854820251465f);
             case 1: return 0.5f <= phase ? 1.0f - (phase - 0.5f) * 4.0f : phase * 4.0f - 1.0f;
             case 2: return 0.5f <= phase ? 1.0f : -1.0f;
             case 3: return (phase + phase) - 1.0f;
@@ -3010,7 +3010,7 @@ private:
                 lfo2Bip = 0.5f - ph;
                 break;
             case 3:
-                lfo2Bip = sinF (ph * 6.2831854820251465f) * 0.5f;
+                lfo2Bip = ildsp::sinf_ (ph * 6.2831854820251465f) * 0.5f;
                 break;
             case 4:
                 if (lfo2Wrapped)
@@ -3573,8 +3573,9 @@ private:
         float w1, w2;
         if (c.sine)
         {
-            w1 = (sinF (ph * 6.2831854820251465f) + 1.0f) * 0.5f;
-            w2 = (sinF (ph2 * 6.2831854820251465f) + 1.0f) * 0.5f;
+            // Exo's engine calls the library's sinf (Kepler's DLL: the correctly rounded value is measured)
+            w1 = ((exo ? ildsp::sinf_ (ph * 6.2831854820251465f) : sinF (ph * 6.2831854820251465f)) + 1.0f) * 0.5f;
+            w2 = ((exo ? ildsp::sinf_ (ph2 * 6.2831854820251465f) : sinF (ph2 * 6.2831854820251465f)) + 1.0f) * 0.5f;
         }
         else
         {
@@ -3716,7 +3717,7 @@ private:
         float mixTarget = 0.5f, mix = 0.0f, gainTarget = 1.0f, out = 0.0f, wetGain = 1.0f;
         // Kepler Exo: filtered noise into the wet taps and the output gate (REA_rodada167d §3.7)
         std::uint32_t noiseA = 333784u, noiseB = 401782u; // the first instance's seeds of the library's counter
-        int noiseCount = 0;
+        int noiseCount = 16; // the engine's object reads 16 before its first sample (EXEC): the first noise sample designs the filters
         std::array<float, 5> nqL {}, nqR {}; // b0, b1, b2, −a1, −a2
         std::array<float, 4> nsL {}, nsR {}; // y1, y2, x1, x2
         float gateThreshold = 0.0025f, gateGain = 1.0f, gateDecay = 0.99965197f;
