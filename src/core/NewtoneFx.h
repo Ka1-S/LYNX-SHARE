@@ -141,6 +141,24 @@ struct ScoreNote
 };
 std::vector<ScoreNote> score (const Track& track, double sampleRate);
 
+// Edison's "Convert to score and dump to piano roll" (round 167c, REA_rodada167c.md §4): FL runs its pitch analyser
+// (the one Newtone uses) on the whole sample and takes each note it finds: key = round(pitch - the sample's overall
+// detune), only keys 0..127; volume = 0.5 + 0.5 x the note's level. LYNX: analyseNotes(), the detune = the notes'
+// length-weighted mean offset from their semitones, the level = the note's RMS over the loudest note's (0..1).
+// Times in source frames, [start, end).
+struct DetectedNote
+{
+    std::int64_t start = 0, end = 0;
+    int key = 60;
+    float velocity = 1.0f;
+};
+std::vector<DetectedNote> detectScore (const SampleData& source, double* detune = nullptr);
+// FL hands them to the Piano roll of the selected channel in the current pattern, replacing that channel's notes
+// there (the plugin SDK's note list: piano roll, flags "empty first" + "use selection", pattern -1, channel -1):
+// position = frames / rate x tempo / 60 x PPQ (rounded), notes of 3 ticks or less at FL's PPQ 96 (LYNX: 30 ticks)
+// are left out. Returns how many notes went in.
+int dumpScore (Song& song, int channel, const std::vector<DetectedNote>& notes, double sampleRate);
+
 // Newtone: the track's notes. "LXNT" + version + frames + global formant + the notes.
 std::vector<std::uint8_t> writeNative (const Track& track);
 std::optional<Track> parseNative (const std::vector<std::uint8_t>& state);

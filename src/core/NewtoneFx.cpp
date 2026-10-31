@@ -965,6 +965,89 @@ std::vector<ScoreNote> score (const Track& track, double sampleRate)
     return out;
 }
 
+std::vector<DetectedNote> detectScore (const SampleData& source, double* detune)
+{
+    std::vector<DetectedNote> out;
+    const auto track = analyseNotes (source);
+    if (track.pitches.empty())
+    {
+        if (detune != nullptr)
+            *detune = 0.0;
+        return out;
+    }
+    // the overall detune: how far the notes sit from their semitones, weighted by their length
+    double sum = 0.0, weight = 0.0;
+    for (const auto& p : track.pitches)
+    {
+        const auto w = (double) (p.origEnd - p.origStart);
+        sum += w * (p.origPitch - std::round (p.origPitch));
+        weight += w;
+    }
+    const auto offset = weight > 0.0 ? sum / weight : 0.0;
+    if (detune != nullptr)
+        *detune = offset;
+    // each note's level (RMS of the channels' mean)
+    std::vector<double> rms;
+    double loudest = 0.0;
+    for (const auto& p : track.pitches)
+    {
+        double e = 0.0;
+        for (auto i = p.origStart; i < p.origEnd; ++i)
+        {
+            const auto x = 0.5 * ((double) source.leftData()[i] + (double) source.rightData()[i]);
+            e += x * x;
+        }
+        rms.push_back (std::sqrt (e / (double) std::max<std::int64_t> (1, p.origEnd - p.origStart)));
+        loudest = std::max (loudest, rms.back());
+    }
+    for (std::size_t k = 0; k < track.pitches.size(); ++k)
+    {
+        const auto& p = track.pitches[k];
+        const auto key = (int) std::lround (p.origPitch - offset);
+        if (key < 0 || key > 127)
+            continue;
+        DetectedNote n;
+        n.start = p.origStart;
+        n.end = p.origEnd;
+        n.key = key;
+        n.velocity = (float) (0.5 + 0.5 * (loudest > 0.0 ? rms[k] / loudest : 1.0));
+        out.push_back (n);
+    }
+    return out;
+}
+
+int dumpScore (Song& song, int channel, const std::vector<DetectedNote>& notes, double sampleRate)
+{
+    if (sampleRate <= 0.0 || channel < 0)
+        return 0;
+    if (song.patterns.empty())
+        song.patterns.emplace_back();
+    song.currentPattern = std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1);
+    auto& pattern = song.patterns[(std::size_t) song.currentPattern];
+    pattern.notes.erase (std::remove_if (pattern.notes.begin(), pattern.notes.end(), [channel] (const lynx::Note& n) { return n.channel == channel; }),
+                         pattern.notes.end());
+    const auto ticksPerFrame = song.bpm / 60.0 * ppq / sampleRate;
+    const std::int64_t shortest = 3 * ppq / 96;
+    int count = 0;
+    for (const auto& d : notes)
+    {
+        const auto start = std::max<std::int64_t> (0, std::llround ((double) d.start * ticksPerFrame));
+        const auto end = std::max<std::int64_t> (0, std::llround ((double) d.end * ticksPerFrame));
+        if (end - start <= shortest)
+            continue;
+        lynx::Note n;
+        n.start = start;
+        n.length = end - start;
+        n.channel = channel;
+        n.key = d.key;
+        n.velocity = std::clamp (d.velocity, 0.0f, 1.0f);
+        pattern.notes.push_back (n);
+        ++count;
+    }
+    pattern.sortNotes();
+    return count;
+}
+
 std::vector<std::uint8_t> writeNative (const Track& track)
 {
     std::vector<std::uint8_t> out { 'L', 'X', 'N', 'T' };

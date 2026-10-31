@@ -15,6 +15,8 @@
 #include "core/AudioCapture.h"
 #include "core/AudioEditTools.h"
 #include "core/EdisonScript.h"
+#include "core/Instruments.h"
+#include "core/NewtoneFx.h"
 #include "core/WaveAnalysis.h"
 #include "core/ValueMath.h"
 #include "engine/SampleLibrary.h"
@@ -1878,6 +1880,44 @@ private:
         commit (tr ("Set loop"));
     }
 
+    // --- Tools › Analysis › Convert to score and dump to piano roll (REA_rodada167c.md §4): the whole sample's notes
+    // into the selected channel's notes of the current pattern (replacing them), as FL's Edison
+    void convertToScore()
+    {
+        if (doc.audio.empty() || scoreBusy)
+            return;
+        stopPlayback();
+        auto data = std::make_shared<SampleData>();
+        data->sampleRate = doc.audio.sampleRate;
+        data->left = doc.audio.channels[0];
+        if (doc.audio.numChannels() > 1)
+            data->right = doc.audio.channels[1];
+        scoreBusy = true;
+        setStatus (tr ("Detecting score..."), false);
+        juce::Component::SafePointer<AudioEditor> self (this);
+        std::thread ([self, data] {
+            auto notes = std::make_shared<std::vector<newtonefx::DetectedNote>> (newtonefx::detectScore (*data));
+            juce::MessageManager::callAsync ([self, notes, rate = data->sampleRate] {
+                if (self == nullptr)
+                    return;
+                self->scoreBusy = false;
+                if (notes->empty())
+                {
+                    self->setStatus (tr ("No notes found in the sample"), false);
+                    return;
+                }
+                self->setStatus (tr ("Dumping score..."), false);
+                const auto channel = self->engine.getSelectedChannel();
+                int count = 0;
+                self->engine.editSong ([&] (Song& s) {
+                    if (channel >= 0 && channel < (int) s.channels.size())
+                        count = newtonefx::dumpScore (s, channel, *notes, rate);
+                });
+                self->setStatus (tr ("{0} notes put in the Piano roll of the selected channel", { juce::String (count) }), false);
+            });
+        }).detach();
+    }
+
     // --- scripts (Tools › Scripting: Run script / Edit last script; REA_rodada167c.md §2) -----------------------------
     struct ScriptRef
     {
@@ -3279,6 +3319,7 @@ private:
     bool playing = false, loopPlay = false;
     ScriptRef lastScript;         // Edit last script
     bool scriptBusy = false;      // a script is running (its form may be open)
+    bool scoreBusy = false;       // Convert to score is analysing
     std::uint64_t previewTicket = 0;
     std::int64_t playFrom = 0, playhead = -1;
     double playStartedMs = 0.0;
@@ -3524,6 +3565,8 @@ juce::PopupMenu AudioEditor::mainMenu()
     tools.addItem (tr ("Declick out all regions"), has, false, [this] { regionsTool (tr ("Declick out all regions"), [] (ae::Document& d) { return ae::declickRegions (d, false, true); }); });
     tools.addItem (tr ("Perfect all regions"), has, false, [this] { regionsTool (tr ("Perfect all regions"), [] (ae::Document& d) { return ae::perfectRegions (d); }); });
     tools.addItem (tr ("Tune loop..."), has, false, [this] { openEdisonTool (T::loopTuner); });
+    tools.addSectionHeader (tr ("Analysis"));
+    tools.addItem (tr ("Convert to score and dump to piano roll"), has && ! scoreBusy, false, [this] { convertToScore(); });
 
     juce::PopupMenu regions;
     regions.addItem (tr ("Add marker") + "\tM", has, false, [this] { addMarkerAtCursor(); });
