@@ -98,6 +98,9 @@ public:
     // Channel settings (sampler, synth). UI thread, on every snapshot; the instrument stores them
     // so the audio thread can read without waiting.
     virtual void configure (const ChannelDef&, double /*bpm*/) noexcept {}
+    // A new instrument, configured and not yet playing (UI thread): it may take its settings now, so the first
+    // block or note does not build them on the audio thread.
+    virtual void settleNew() {}
     // Control output ("controller" instruments), 0..1. Audio thread.
     virtual float controlOutput (int /*output*/) const noexcept { return 0.0f; }
     // Song position (ticks) at the start of the block, for the global LFOs. Audio thread.

@@ -5998,3 +5998,6 @@ countries: ru by kz
 "Record to: {0}" = "Запись в: {0}"
 "Record {0} to" = "Записать {0} в"
 "Auto-create audio clip (the rendered files go on the Playlist)" = "Автоматически создавать аудиоклип (отрендеренные файлы попадают в Playlist)"
+"Created: {0}" = "Создан: {0}"
+"Working time: {0}" = "Время работы: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Играть усечённые ноты в клипах (нота, начавшаяся до клипа паттерна, звучит с начала клипа)"

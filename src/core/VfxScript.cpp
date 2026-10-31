@@ -301,6 +301,7 @@ std::int64_t bitsOfFloat (float f)
 // The running instance
 
 std::atomic<bool> realtimeFlag { false };
+std::atomic<bool> songEndedFlag { false };
 
 constexpr int maxControls = 256, maxOutputs = 64, ringSize = 8, maxIn = 256, maxOut = 768, logCap = 64 * 1024;
 
@@ -448,6 +449,15 @@ public:
             j.state.store (0, std::memory_order_release);
             ++readIndex;
         }
+        // Round 167e: a script that stopped (an error, too slow, too much memory) or never compiled answers nothing, so the
+        // audio thread doesn't hand it blocks any more. It waited for the Python thread's empty answer every block
+        // (up to the 2 ms budget whenever that thread was slow to wake on a busy machine: the endless-loop test's
+        // flaky 95th percentile). A compile or a restart clears it before the next block.
+        if (readIndex == writeIndex && halted.load (std::memory_order_acquire))
+        {
+            carryCount = 0;
+            return;
+        }
         auto& job = r[(std::size_t) (writeIndex % ringSize)];
         if (job.state.load (std::memory_order_acquire) != 0) // (the Python thread is far behind: keep the notes)
         {
@@ -461,6 +471,8 @@ public:
         }
         job.n = n;
         job.transport = transport;
+        if (songEndedFlag.load (std::memory_order_relaxed))
+            job.transport.playing = false;
         job.releaseAll = releaseRequested.exchange (false);
         job.inCount = 0;
         for (int k = 0; k < carryCount; ++k)
@@ -517,6 +529,7 @@ public:
         {
             auto& job = r[(std::size_t) (serveIndex % ringSize)];
             run (job);
+            halted.store (! ok || stopped || vm <= 0, std::memory_order_release);
             job.state.store (2, std::memory_order_release);
             ++serveIndex;
         }
@@ -700,6 +713,7 @@ private:
     std::array<Event, maxIn> carry {};
     int carryCount = 0;
     std::atomic<bool> releaseRequested { false };
+    std::atomic<bool> halted { false }; // (set by the Python thread after a block: the script answers nothing now)
 
     std::uint32_t tag = 0;
     bool started = false;
@@ -1049,6 +1063,7 @@ void Runtime::compileOnPythonThread (const ScriptSettings& settings, bool keepVa
     vm = python::acquireVm();
     ok = false;
     stopped = false;
+    halted.store (false, std::memory_order_release);
     lastError.clear();
     auto info = std::make_shared<Info>();
     if (vm < 0)
@@ -1538,6 +1553,7 @@ std::shared_ptr<Monitor> monitorOf (std::uint32_t tag)
 std::unique_ptr<Processor> makeProcessor (const std::vector<std::uint8_t>& flState) { return std::make_unique<ScriptProcessor> (flState); }
 
 void setRealtime (bool on) noexcept { realtimeFlag.store (on); }
+void setSongEnded (bool ended) noexcept { songEndedFlag.store (ended); }
 
 const char* apiReference() noexcept
 {

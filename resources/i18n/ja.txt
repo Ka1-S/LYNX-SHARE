@@ -5998,3 +5998,6 @@ countries: jp
 "Record to: {0}" = "録音先: {0}"
 "Record {0} to" = "{0} の録音先"
 "Auto-create audio clip (the rendered files go on the Playlist)" = "オーディオクリップを自動作成 (レンダリングしたファイルをプレイリストに配置)"
+"Created: {0}" = "作成日時: {0}"
+"Working time: {0}" = "作業時間: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "クリップ内の途切れたノートを再生（パターンクリップより前に始まるノートをクリップの先頭から鳴らす）"

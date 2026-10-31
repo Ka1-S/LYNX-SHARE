@@ -5998,3 +5998,6 @@ countries: tw hk mo
 "Record to: {0}" = "錄製到：{0}"
 "Record {0} to" = "將 {0} 錄製到"
 "Auto-create audio clip (the rendered files go on the Playlist)" = "自動建立音訊片段（算繪的檔案放入播放清單）"
+"Created: {0}" = "建立於：{0}"
+"Working time: {0}" = "工作時間：{0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "播放片段中被截斷的音符（在模式片段之前開始的音符從片段開頭播放）"

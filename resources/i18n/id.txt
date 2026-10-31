@@ -5998,3 +5998,6 @@ countries: id
 "Record to: {0}" = "Rekam ke: {0}"
 "Record {0} to" = "Rekam {0} ke"
 "Auto-create audio clip (the rendered files go on the Playlist)" = "Buat clip audio otomatis (file hasil render masuk ke Playlist)"
+"Created: {0}" = "Dibuat: {0}"
+"Working time: {0}" = "Waktu kerja: {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Mainkan not terpotong di klip (not yang dimulai sebelum klip pattern dimainkan dari awal klip)"

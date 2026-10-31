@@ -5998,3 +5998,6 @@ countries: cn sg
 "Record to: {0}" = "录制到：{0}"
 "Record {0} to" = "将 {0} 录制到"
 "Auto-create audio clip (the rendered files go on the Playlist)" = "自动创建音频片段（渲染的文件放入播放列表）"
+"Created: {0}" = "创建于：{0}"
+"Working time: {0}" = "工作时间：{0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "播放片段中被截断的音符（在模式片段之前开始的音符从片段开头播放）"

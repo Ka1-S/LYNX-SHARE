@@ -3850,6 +3850,7 @@ void MainComponent::startNewProject (Song song, const juce::File& file)
     engine.stop();
     engine.rewind();
     engine.setSong (std::move (song));
+    engine.markCreatedNow(); // Project info › created (a template's own date is kept, as FL does)
     currentFile = juce::File();
     projectName = {};
     importedSuffix = {};
@@ -4000,6 +4001,11 @@ void MainComponent::flpImported (const juce::File& file)
         playlist.showSongAfterOpen();
 
         showMissingFiles (true);
+        // FL opens Project info when the project's "Show on opening" box is on (event 0x0A, REA round 167g)
+        if (engine.getSong().info.showOnOpen && platform::testMode())
+            platform::testModeLog ("project info shown on open");
+        else if (engine.getSong().info.showOnOpen)
+            openSettings ((int) SettingsPage::info);
     }
 }
 

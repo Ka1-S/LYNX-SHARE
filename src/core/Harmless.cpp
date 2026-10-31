@@ -2326,6 +2326,9 @@ public:
 
     void allNotesOff() noexcept override { engine.allNotesOff(); }
 
+    // a new channel builds its effects rack here (UI thread), not at its first note on the audio thread
+    void settleNew() override { take(); }
+
     bool idle() const noexcept override { return engine.idle() && engine.rack.quiet(); }
 
     // the LFO (global mode) and phaser phases follow song-position jumps as FL's song-position event sets them

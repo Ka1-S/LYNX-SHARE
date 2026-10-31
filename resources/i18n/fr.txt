@@ -5998,3 +5998,6 @@ countries: fr be ch ca lu
 "Record to: {0}" = "Enregistrer dans : {0}"
 "Record {0} to" = "Enregistrer {0} dans"
 "Auto-create audio clip (the rendered files go on the Playlist)" = "Créer automatiquement un clip audio (les fichiers rendus vont dans la Playlist)"
+"Created: {0}" = "Créé : {0}"
+"Working time: {0}" = "Temps de travail : {0}"
+"Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)" = "Jouer les notes tronquées dans les clips (une note qui commence avant un clip de pattern joue depuis le début du clip)"

@@ -87,7 +87,12 @@ public:
     std::shared_ptr<Effect> getEffect (int track, int slot) const;
 
     // Copies the plugins' current state into the Song (before saving).
-    void capturePluginStates();
+    void capturePluginStates(); // (before every save: also adds the working time so far, see stampWorkTime)
+    // FL's Project info working time (REA round 167g): wall-clock time since the project was opened, added to the
+    // saved total at each save. workSecondsNow() = the saved total + this session so far.
+    void stampWorkTime();
+    double workSecondsNow() const;
+    void markCreatedNow(); // a new project: Project info › created = now (when it has no date yet)
     // Offline render mode for the hosted plugins (setNonRealtime), around renderOffline.
     void setPluginsRenderMode (bool offline);
     // Every hosted plugin of the song that has not crashed (channels, inserts, inside Patchers); `notifyRender` is the
@@ -870,6 +875,7 @@ private:
     int selectedChannel = 0;
     std::vector<int> selectedChannels { 0 };
     bool modified = false;
+    double workSince = 0.0; // wall clock (ms since 1970) when the working time was last added
     std::unique_ptr<StreamPrefetcher> prefetcher; // only with an audio device (playing live)
 
     std::size_t maxUndoSteps = prefs::defaultUndoLevels;

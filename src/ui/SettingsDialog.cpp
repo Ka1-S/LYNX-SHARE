@@ -84,6 +84,10 @@ public:
         crossfadesNew.setEnabled (hooks.getGeneral != nullptr);
         crossfadesNew.setToggleState (hooks.getGeneral != nullptr ? hooks.getGeneral().crossfadesInNewProjects : true, juce::dontSendNotification);
         addAndMakeVisible (crossfadesNew);
+        // FL's Project › "Play truncated notes in clips" (round 167g)
+        truncated.setButtonText (tr ("Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)"));
+        truncated.onClick = [this] { edit ([on = truncated.getToggleState()] (Song& s) { s.playTruncatedNotes = on; }); };
+        addAndMakeVisible (truncated);
 
         engine.addChangeListener (this);
         load();
@@ -117,6 +121,7 @@ public:
         area.removeFromTop (6);
         crossfades.setBounds (area.removeFromTop (26));
         crossfadesNew.setBounds (area.removeFromTop (26));
+        truncated.setBounds (area.removeFromTop (26));
     }
 
 private:
@@ -136,6 +141,7 @@ private:
         swing.setValue (s.swing * 100.0, juce::dontSendNotification);
         pitch.setValue (s.masterPitch, juce::dontSendNotification);
         crossfades.setToggleState (s.autoCrossfades, juce::dontSendNotification);
+        truncated.setToggleState (s.playTruncatedNotes, juce::dontSendNotification);
     }
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override
@@ -151,12 +157,13 @@ private:
         playlistTitle { tr ("Playlist") };
     juce::Label tempoLabel, beatsLabel, swingLabel, pitchLabel, ppqText, stepsText, signatureText;
     juce::Slider tempo, beats, swing, pitch;
-    juce::ToggleButton crossfades, crossfadesNew;
+    juce::ToggleButton crossfades, crossfadesNew, truncated;
 };
 
 // --- Info page -------------------------------------------------------------------------------------
 class InfoPage final : public juce::Component,
-                       private juce::ChangeListener
+                       private juce::ChangeListener,
+                       private juce::Timer
 {
 public:
     explicit InfoPage (AudioEngine& e) : engine (e)
@@ -201,8 +208,13 @@ public:
         showOnOpen.onClick = [this] { commit(); };
         addAndMakeVisible (showOnOpen);
 
+        // FL's Project info: when the project was created and how long it has been worked on (REA round 167g)
+        styleLabel (timesLabel, {}); // (secondary text colour)
+        addAndMakeVisible (timesLabel);
+
         engine.addChangeListener (this);
         load();
+        startTimer (1000);
     }
 
     ~InfoPage() override
@@ -236,6 +248,7 @@ public:
             r.removeFromRight (4);
             url.setBounds (r);
         }
+        timesLabel.setBounds (area.removeFromBottom (22));
         showOnOpen.setBounds (area.removeFromBottom (26));
         area.removeFromBottom (8);
         commentsLabel.setBounds (area.removeFromTop (22));
@@ -245,7 +258,7 @@ public:
 private:
     ProjectInfo typed() const
     {
-        ProjectInfo i;
+        ProjectInfo i = engine.getSong().info; // (created / working time are not typed)
         i.title = title.getText().trim().toStdString();
         i.author = author.getText().trim().toStdString();
         i.genre = genre.getText().trim().toStdString();
@@ -278,6 +291,19 @@ private:
         set (url, i.url);
         set (comments, i.comments);
         showOnOpen.setToggleState (i.showOnOpen, juce::dontSendNotification);
+        timerCallback();
+    }
+
+    void timerCallback() override
+    {
+        const auto& i = engine.getSong().info;
+        const auto created = i.created > 0.0 ? juce::Time ((juce::int64) (i.created * 1000.0)).formatted ("%Y-%m-%d %H:%M")
+                                             : juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x94"));
+        const auto work = (juce::int64) engine.workSecondsNow();
+        const auto text = tr ("Created: {0}").replace ("{0}", created) + "    " + tr ("Working time: {0}").replace ("{0}", juce::String (work / 3600) + ":"
+            + juce::String (work / 60 % 60).paddedLeft ('0', 2) + ":" + juce::String (work % 60).paddedLeft ('0', 2));
+        if (timesLabel.getText() != text)
+            timesLabel.setText (text, juce::dontSendNotification);
     }
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override
@@ -309,6 +335,7 @@ private:
     juce::TextEditor title, author, genre, url, comments;
     juce::TextButton genreMenu, openLink { tr ("Open") };
     juce::ToggleButton showOnOpen;
+    juce::Label timesLabel;
 };
 
 // --- Files page ------------------------------------------------------------------------------------
