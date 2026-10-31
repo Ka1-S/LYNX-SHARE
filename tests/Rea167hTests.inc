@@ -345,9 +345,9 @@ TEST (rea167h_start_offset_is_in_the_region)
     std::vector<float> l (4000), r (4000);
     sampler->render (l.data(), r.data(), 4000, 1.0f, 1.0f);
     int first = 0;
-    while (first < 4000 && std::fabs (l[(std::size_t) first]) < 1.0e-4f)
+    const auto top = *std::max_element (l.begin(), l.end());
+    while (first < 4000 && l[(std::size_t) first] < 0.5f * top) // (half height: the interpolator rings before a step)
         ++first;
-    std::printf ("  rea167h first %d\n", first);
     CHECK (std::abs (first - 2205) <= 2);
 
     // and it is imported apart from the region
