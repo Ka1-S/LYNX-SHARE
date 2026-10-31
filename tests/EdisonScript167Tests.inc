@@ -159,6 +159,16 @@ TEST (edscript167_sample_api)
     CHECK (out.status == script::Outcome::Status::failed && out.error.find ("IndexError") != std::string::npos);
     out = script::run ("x = = 1\n", copy, Range {}, {}, {});
     CHECK (out.status == script::Outcome::Status::failed && ! out.error.empty());
+    // Python's adjacent literals join (FL's Limiter.pyscript: 'Gain doesn''t apply'); other strings stay as written
+    out = edscript167::runAll (R"PY(from enveditor import *
+f = ScriptDialog('Lim','doesn''t' "a" "b's")
+assert 'x''y' == 'xy' and 'a' 'b'  'c' == 'abc' and "q'" + '#' == "q'#" # 'z''w'
+assert '''t''' + 'u' == 'tu' and 'it\'s' 'x' == "it'sx" and len('\\' 'n') == 2
+)PY",
+                               d3, Range {});
+    CHECK (out.status == script::Outcome::Status::done);
+    if (out.status != script::Outcome::Status::done)
+        std::printf ("  %s\n", out.error.c_str());
     // LoadFromClipboard through the host
     script::Host host;
     host.clipboard = [] (Audio& a) {

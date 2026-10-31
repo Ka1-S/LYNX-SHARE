@@ -1,6 +1,7 @@
 #include "core/EdisonScript.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <deque>
 #include <map>
@@ -957,6 +958,85 @@ bool installModule (std::string& error)
     return true;
 }
 
+// Python joins adjacent string literals ('doesn''t' is "doesnt"; FL's Limiter.pyscript relies on it); pocketpy does
+// not, so plain literals next to each other on one line become one before the script runs
+std::string joinAdjacentStrings (const std::string& s)
+{
+    std::string out;
+    out.reserve (s.size());
+    std::size_t i = 0;
+    auto isIdent = [] (char c) { return std::isalnum ((unsigned char) c) != 0 || c == '_'; };
+    while (i < s.size())
+    {
+        const char c = s[i];
+        if (c == '#') // a comment, to the end of the line
+        {
+            const auto e = s.find ('\n', i);
+            const auto end = e == std::string::npos ? s.size() : e;
+            out.append (s, i, end - i);
+            i = end;
+            continue;
+        }
+        if (c != '\'' && c != '"')
+        {
+            out += c;
+            ++i;
+            continue;
+        }
+        const bool prefixed = i > 0 && isIdent (s[i - 1]);
+        if (s.compare (i, 3, std::string (3, c)) == 0) // a triple-quoted string: copied as it is
+        {
+            const auto e = s.find (std::string (3, c), i + 3);
+            const auto end = e == std::string::npos ? s.size() : e + 3;
+            out.append (s, i, end - i);
+            i = end;
+            continue;
+        }
+        // a one-line string
+        std::size_t j = i + 1;
+        while (j < s.size() && s[j] != c && s[j] != '\n')
+            j += s[j] == '\\' ? 2 : 1;
+        if (j >= s.size() || s[j] != c)
+        {
+            out.append (s, i, std::min (j, s.size()) - i);
+            i = std::min (j, s.size());
+            continue;
+        }
+        out.append (s, i, j - i); // (the closing quote is written below, unless the next literal joins this one)
+        i = j + 1;
+        for (;;)
+        {
+            std::size_t k = i;
+            while (k < s.size() && (s[k] == ' ' || s[k] == '\t'))
+                ++k;
+            if (prefixed || k >= s.size() || (s[k] != '\'' && s[k] != '"') || s.compare (k, 3, std::string (3, s[k])) == 0)
+                break;
+            const char q = s[k];
+            std::size_t m = k + 1;
+            while (m < s.size() && s[m] != q && s[m] != '\n')
+                m += s[m] == '\\' ? 2 : 1;
+            if (m >= s.size() || s[m] != q)
+                break;
+            // its text inside this literal's quotes (an unescaped quote of ours gets a backslash)
+            for (std::size_t x = k + 1; x < m; ++x)
+            {
+                if (s[x] == '\\')
+                {
+                    out.append (s, x, 2);
+                    ++x;
+                    continue;
+                }
+                if (s[x] == c)
+                    out += '\\';
+                out += s[x];
+            }
+            i = m + 1;
+        }
+        out += c;
+    }
+    return out;
+}
+
 std::string normalized (const std::string& source)
 {
     std::string s;
@@ -975,7 +1055,7 @@ std::string normalized (const std::string& source)
     if (s.rfind ("\xEF\xBB\xBF", 0) == 0)
         s.erase (0, 3);
     s += '\n';
-    return s;
+    return joinAdjacentStrings (s);
 }
 
 bool isNeedsForm (const std::string& error)
