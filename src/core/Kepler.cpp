@@ -1063,7 +1063,7 @@ struct Voice
     float dco2Level = 1.0f, am = 0.0f, noise = 0.0f;
     int xmodShape12 = 0, xmodShape21 = 0, fmShape = 0;
     int vcaMode = 0; // 0 gate (velocity), 1 envelope 1, 2 envelope 2
-    float released = 1.0f, vel2 = 0.0f, keyN = 0.0f, keyC = 0.0f, toggleVal = 0.0f, random = 0.0f;
+    float released = 1.0f, vel2 = 0.0f, keyN = 0.0f, keyC = 0.5f, toggleVal = 0.5f, random = 0.0f;
     float xExpr = 0.0f, yExpr = 0.0f, X = 0.0f, Y = 0.0f, Xp = 0.0f, Yp = 0.0f;
     std::array<float, 8> mxAmount {};
 };

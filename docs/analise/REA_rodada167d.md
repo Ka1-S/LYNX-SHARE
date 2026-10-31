@@ -36,6 +36,10 @@ driven by our harness, [DATA] FL's factory presets.
 - A voice's "released" source starts at 1 (voice constructor `FUN_180021ee0` writes 1.0 at +0x2e64; note start
   `FUN_1800222e0` clears it) — LYNX started it at 0: presets routing "released" (Stickyfifth) diverged on the second
   note (−4.6 dB → −137 dB).
+- The voice matrix also runs on idle voices, so their source values matter before a note starts. Read from the DLL's
+  idle voice (source getter `FUN_180022650`, run under EXEC): key − 0.5 (+0x2e80) = 0.5 and toggle (+0x11cc) = 0.5,
+  where LYNX had 0. Presets routing key → resonance (Twinklikeys) or toggle → cutoff (Brightsweep) went from −28 / −35 dB
+  to bit-exact.
 
 ## 3. Voice and global DSP added for Exo [DECOMP]
 DCO2 with hard sync (`FUN_180014f80` restart path), DCO1↔DCO2 cross-modulation shapes, FM shapes, VCA source

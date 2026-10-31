@@ -39,9 +39,67 @@ namespace lynx
 {
 namespace kepler_exo
 {
-// The engine's CRT float routines as the reverb's coefficient pass calls them (inside the render: RZ | FTZ | DAZ).
-// powf FUN_1800c1630, expf FUN_1800bf3b0, cosf FUN_1800be260: ildsp's FMA-aware re-creations match them bit for bit;
-// tanf FUN_1800c3990 is (float) tan ((double) x) evaluated in round-to-nearest, the conversion in the current mode.
+// tanf FUN_1800c3990 of the engine's CRT (FMA path at 0x1800c3d00 when the CPU has FMA, the plain one otherwise):
+// |x| <= pi/4 a rational approximation in double, pi/4 < |x| < 3.37e9 one Cody-Waite step by pi/2 (odd quadrant
+// -1/t); the result converted in the current rounding mode. Huge arguments (Payne-Hanek path) fall back to tan.
+inline float exoTanf (float xf) noexcept
+{
+    const auto xb = ildsp::fbits (xf);
+    if ((xb & 0x7f800000u) == 0x7f800000u)
+        return (float) std::tan ((double) xf); // inf / NaN: NaN
+    const double x = xf;
+    const auto ax = ildsp::dbits (x) & 0x7fffffffffffffffull;
+    const bool fused = ildsp::useFma();
+    auto rational = [fused] (double r) {
+        const auto r2 = r * r;
+        double num, den;
+        if (fused)
+        {
+            num = ildsp::fmaD (-0.017203248047148168, r2, 0.3852960712639954);
+            den = ildsp::fmaD (ildsp::fmaD (0.01844239256901656, r2, -0.5139650547885454), r2, 1.1558882143468838);
+            return ildsp::fmaD (r2 * r, num / den, r);
+        }
+        num = -0.017203248047148168 * r2 + 0.3852960712639954;
+        den = (0.01844239256901656 * r2 + -0.5139650547885454) * r2 + 1.1558882143468838;
+        return r + (r2 * r) * (num / den);
+    };
+    if (ax <= 0x3fe921fb54442d18ull) // |x| <= pi/4
+    {
+        if (ax < 0x3f20000000000000ull) // 2^-13
+        {
+            if (ax < 0x3e40000000000000ull) // 2^-27
+                return xf;
+            const auto x3 = (x * x) * x;
+            return ildsp::d2f (fused ? ildsp::fmaD (x3, 0.3333333333333333, x) : x3 * 0.3333333333333333 + x);
+        }
+        return ildsp::d2f (rational (x));
+    }
+    if (ax >= 0x41e921fb40000000ull) // 3373259264
+        return (float) std::tan (x);
+    const auto a = std::fabs (x);
+    int k;
+    double r1;
+    if (fused)
+    {
+        k = ildsp::cvttD2I (ildsp::fmaD (a, 0.6366197723675814, 0.5));
+        r1 = ildsp::fmaD (-(double) k, 1.5707963267341256, a);
+    }
+    else
+    {
+        k = ildsp::cvttD2I (a * 0.6366197723675814 + 0.5);
+        r1 = a - (double) k * 1.5707963267341256;
+    }
+    const auto r = r1 - (double) k * 6.077100506506192e-11;
+    auto t = rational (r);
+    if (k & 1)
+        t = -1.0 / t;
+    if (x < 0.0)
+        t = -t;
+    return ildsp::d2f (t);
+}
+
+// The engine's CRT float routines as the reverb's coefficient pass calls them (inside the render: RZ | FTZ | DAZ):
+// powf FUN_1800c1630, expf FUN_1800bf3b0, cosf FUN_1800be260 = ildsp's FMA-aware re-creations bit for bit; tanf above.
 struct ExoCrt
 {
     static float powf (float x, float y) noexcept { return ildsp::powf_ (x, y); }
@@ -49,14 +107,7 @@ struct ExoCrt
     static float cosf (float x) noexcept { return ildsp::cosf_ (x); }
     static void sincosf (float x, float& s, float& c) noexcept { ildsp::sincosf_ (x, s, c); }
     static float expf (float x) noexcept { return ildsp::expf_ (x); }
-    static float tanf (float x) noexcept
-    {
-        const auto saved = _mm_getcsr();
-        _mm_setcsr (saved & ~0x6000u);
-        const volatile double t = std::tan ((double) x);
-        _mm_setcsr (saved);
-        return (float) t;
-    }
+    static float tanf (float x) noexcept { return exoTanf (x); }
 };
 
 template <class Crt = ExoCrt>

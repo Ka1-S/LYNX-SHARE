@@ -408,6 +408,7 @@ struct EqT
         }
     }
 };
+using Eq = EqT<>;
 
 } // namespace kepler_exo
 } // namespace lynx

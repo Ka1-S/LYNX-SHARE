@@ -42,15 +42,46 @@ namespace lynx
 {
 namespace kepler_exo
 {
+// One lane of the engine's packed double sine (FUN_1800ba000 → 0x1800ba7a0 / 0x1800ba120, same arithmetic): n by the
+// 1.5·2^52 shifter (current rounding mode), a four-part π reduction, an odd degree-15 polynomial, sign by n's parity.
+// Arguments below 2^24 (the slow path for larger ones is never reached here: |w| ≤ π + π/2).
+inline double exoSinKernel (double x) noexcept
+{
+    const auto sign = ildsp::dbits (x) & 0x8000000000000000ull;
+    const auto a = std::fabs (x);
+    const volatile double shifter = 6755399441055744.0;
+    const auto t = a * 0.3183098861837907 + shifter;
+    const auto parity = ildsp::dbits (t) << 63;
+    const auto n = t - shifter;
+    const auto r = (((a - n * 3.141592502593994) - n * 1.5099578831723193e-07) - n * 1.078060505991553e-14) - n * 6.564007085747001e-22;
+    const auto r2 = r * r;
+    const auto rs = ildsp::dfrom (ildsp::dbits (r) ^ parity);
+    auto p = -7.373344533110665e-13 * r2 + 1.6048095404959637e-10;
+    p = p * r2 + -2.505188027386288e-08;
+    p = p * r2 + 2.7557316600552628e-06;
+    p = p * r2 + -0.00019841269825056256;
+    p = p * r2 + 0.008333333333285542;
+    p = p * r2 + -0.16666666666666186;
+    const auto y = (r2 * p) * rs;
+    return ildsp::dfrom (ildsp::dbits (rs + y) ^ sign);
+}
+
 // The engine's CRT routines the chorus calls (in the parameter path): powf FUN_1800c1630 (= ildsp::powf_ bit for bit)
-// and the double sine/cosine pair FUN_1800ba020 (= std::sin / std::cos, see the report of the round)
+// and the double pair FUN_1800ba020: (x, 1 − x²/2) below 2^-27, else the kernel on (x, |x| + π/2)
 struct ChorusCrt
 {
     static float powf (float x, float y) noexcept { return ildsp::powf_ (x, y); }
     static void sincos (double w, double& s, double& c) noexcept
     {
-        s = std::sin (w);
-        c = std::cos (w);
+        const auto a = std::fabs (w);
+        if (a < 7.450580596923828e-09)
+        {
+            s = w;
+            c = 1.0 - (a * a) * 0.5;
+            return;
+        }
+        s = exoSinKernel (w);
+        c = exoSinKernel (a + 1.5707963267948966);
     }
 };
 
