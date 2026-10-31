@@ -94,12 +94,70 @@ loader's 0x28 (`> 0`, also sets the Settings form's field 0xf00) [DECOMP FUN_00f
 ramping when cutting notes" [DFM] — Options › Project › General, the advanced panel next to the pan law.
 Release shape 3 (FUN_00977870 [DECOMP]): a raised cosine over n = max(1, round(ms·0.001·rate)) frames,
 g = (1 + cos(k·π/(n+1))) / 2.
+The builder FUN_00977f50(declicker, attack shape, attack ms, attack curve, release shape, release ms, release curve)
+[DECOMP] gives the six modes these releases: modes 0, 2, 3, 4 shape 3 (raised cosine) with no curve; **mode 1 shape 1**
+— the follower declick of §2 (a one-pole follower whose coefficient climbs min(1, 2/rate·22050^(k/n)) is subtracted
+from the voice, and the last round(rate·0.001) frames get a raised-cosine window); **mode 5 shape 3 with curve 5**:
+FUN_006774b0 keeps c, 1/c and ln(c + 1), FUN_00677540 bends the table to g' = 1 − ((c + 1)^(1−g) − 1) / c (at g = ½:
+0.710). The fast declicker [6] is shape 3, 2 ms, no curve.
+
+## 4. FL's own render [FL render]
+
+`tmp/r167h/py/mk167h.py` writes a test project (one Sampler channel per case, the sample path event 0xC4 after the
+flag events as in FL's own files — FL precomputes when the sample loads, so a path written before 0x8F / 0x14 renders
+without the effects), FL renders it from the command line (`tmp/r167h/flrender.sh`, both locks, one session), and
+`tmp/r167h/py/model.py` + `cmp.py` rebuild every case from the source WAV with the formulas of §2:
+
+| Case | Model of §2 vs FL's render (max error / peak) |
+|---|---|
+| Reverse, Normalize, Remove DC, Reverse polarity, Swap stereo, Fade stereo | 0.0001 (16-bit rounding) each |
+| Fade in 280, Fade out 1024, Reverse + Fade in 256 | 0.0001 each (fade out 1024 is silent after the first quarter, as the formula says) |
+| Trim 256 (a sample with quiet ends) | 0.0001, 13 229 of 22 050 frames left |
+| Region 0.25 … (relative end 0.5) | 0.0001 **with** the edge declick; 0.44 without it — the 0.5 ms / 4 ms edge declick is real |
+| Combo (fade out 256 + normalize + region 0.1 / 0.8) | 0.0000 (0.47 without the edge declick) |
+| Use loop points on / off (a WAV with a smpl loop) | on: the note sustains to its end (last sound at frame 33 507); off: the file plays once (ends at 9 255) |
+| Ping pong, Crossfade | sustained loops (frames 33 510 / 33 507), crossfade lowers the loop's level (peak 0.195 vs 0.252) |
+
+Cut groups (two channels in cut group 1, the second note 0.25 s into the first): the first note's release after the
+cut follows its declicking mode — mode 0 dies in ≈ 10 ms (437 frames), mode 2 in ≈ 20 ms (876), mode 4 in ≈ 100 ms
+(4 386), as the declicker table of §3 says.
+
+**LYNX against the same FL render** (`tmp/r167h/py/cmpl.py`, LYNX's `--render` of the same .flp): every
+precompute case 0.0001 or better; loop on / off, ping pong, crossfade 0.0001; cut-group modes 0, 2, 3, 4 ≤ 0.004.
+Two differences it found, both fixed: **the start offset** (0xD7 f64 at 0x90) is a fraction of the *cropped* region —
+FL starts at 0.5 × 8 269 frames into the region it cropped at 0.25 (first sound at 2 068 frames after the note,
+because the fade in 1024 silences the region's first three quarters); LYNX had folded the offset into the region
+start, so the crop and its fade began elsewhere (error 0.52). And the **release shapes** of modes 1 and 5 (above;
+errors 0.57 / 0.21 with a plain raised cosine).
+
+**Open question — Fast declick.** The same project with 0x28 = 1 rendered **sample-identical** (cut groups and "cut
+itself"): in FL's command-line render the flag changed nothing here. The decompiled cut methods do switch to the 2 ms
+declicker when it is on, so either the render path does not reach them or the flag is reset when the project is
+loaded for a render. LYNX follows the decompiled code (2 ms when on, off by default, 0 in all 60 demos that store it);
+an interactive FL test (play, not render) is the next check.
+
+## 5. What LYNX does now
+
+| Item | Reporter / brief | FL evidence | LYNX before | LYNX now |
+|---|---|---|---|---|
+| Precomputed effects (Remove DC, Normalize, Reverse polarity, Fade stereo, Reverse, Swap stereo, Fade in / out, Crossfade, Trim) | 167g gap #7 | §1–§2 [RTTI, DECOMP], §4 [FL render] | not imported, not available | imported from 0x46 / 0x4B / 0x4C / 0xD7; `core/SamplePrecompute.h` runs FL's §2 order once when the channel's settings change; Channel settings › "Precomputed effects..." panel; saved in .lynx |
+| Region (start / end) crop | — | §2 step 1, §4 | the end was read as absolute (wrong for every demo with start > 0, many have end < start) | relative end, FL's rounding, edge declick 0.5 ms / 4 ms |
+| Use loop points (0x8F bit 3, old 0x13), Ping pong (0x14) | 167g #7 | §1, §4 | every file loop played | flag honoured; ping pong loop built |
+| Declicking mode (0xD7 0x53) | 167g #7 | §3, §4 | one fixed release | the voice's cut / cut-group release takes the mode's declicker: 10, 10, 20, 20, 100, 200 ms; raised cosine, mode 1 the follower declick, mode 5 curve 5 |
+| Start offset (0xD7 0x90) | — | §4 [FL render] | folded into the region start | its own setting (`SamplerSettings::startOffset`, .lynx `startOffset`): notes start that fraction into the played region |
+| Fast declick for cut groups (0x28) | brief: implement | §3 [DECOMP, DFM]; §4 open question | missing | Options › Project › "Fast declick for cut groups"; 2 ms cut release when on; .flp + .lynx |
+
+Left: the legacy panel (boost, ring mod, low-pass, stereo delay, reverb, FX, FX3 — ≤ 20 demo channels each), the
+declicker attack shapes of modes 1–5 (note starts), audio clips (they skip the precompute), 0x20 / 0x30 / 0x32 / 0xAA,
+track byte 0x2B, links 0xE2 / 0xE6, 0x26 monitoring (see `REA_rodada167h-gaps.md` and 167g's list).
 
 ## Where I stopped
 
-- Done: REA of §1–§3 (decompilations in `tmp/r167h/h1n.c`, `pc2.c`, `pc3.c`, `pc4.c`, `dc1.c`, `dc2.c`, `voice.c`;
-  tables `tmp/r167h/chanform-methods.txt`, `chanform-fields.txt`).
-- Next: implement the Sampler's precomputed effects + loop flags import / engine / UI, the fast declick option; one FL
-  render session to verify (both locks); then the Options-dialog gap table (part 2 of the brief).
-- Rerun: `tmp/r167h/g.sh <out.c> 0 <hex addr…>` (headless decompile, Ghidra lock), `SCRIPT=Refs.java tmp/r167h/g.sh
-  <out> <addr>`, `python3 tmp/r167h/py/mtab.py <HandlerName>`, `python3 tmp/r167h/py/chsurvey.py "<FL Data>"`.
+- Done: §1–§5; LYNX's render of the FL test project matches FL's render (§4); Options gap list in
+  `REA_rodada167h-gaps.md` (part 2); "Fast declick for cut groups" is the part-2 item implemented.
+- Left (next round): Fast declick under interactive FL playback (§4 open question); the note-off tail of a cut-group
+  note one octave up (`cut self` case of the test project: LYNX's tail after the note end is about twice FL's for
+  ~300 frames); the legacy precompute panel; Panning law selector (gap #2, needs one FL render of a panned mixer track).
+- Rerun: `python3 tmp/r167h/py/mk167h.py` (test project), `tmp/r167h/flrender.sh` (FL, both locks), LYNX
+  `--render h_fx.flp ly_h_fx.wav 33`, `python3 tmp/r167h/py/cmpl.py h_fx.wav ly_h_fx.wav`; screenshots
+  `LYNX --precomputeshot project.flp <prefix>`; decompile `tmp/r167h/g.sh <out.c> 0 <hex addr…>`.

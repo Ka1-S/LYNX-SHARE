@@ -1063,6 +1063,8 @@ juce::var channelToVar (const ChannelDef& c)
         if (c.sampler.stretchMethod != StretchMethod::general)
             sampler->setProperty ("stretchMethod", (int) c.sampler.stretchMethod);
         sampler->setProperty ("region", juce::Array<juce::var> { c.sampler.regionStart, c.sampler.regionEnd });
+        if (c.sampler.startOffset > 0.0f)
+            sampler->setProperty ("startOffset", c.sampler.startOffset);
 
         if (! c.sampler.slices.empty())
         {
@@ -1364,6 +1366,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
             def.sampler.regionStart = juce::jlimit (0.0f, 1.0f, (float) (double) region[0]);
             def.sampler.regionEnd = juce::jlimit (0.0f, 1.0f, (float) (double) region[1]);
         }
+        def.sampler.startOffset = juce::jlimit (0.0f, 1.0f, (float) (double) s.getProperty ("startOffset", 0.0));
         def.sampler.reverse = (bool) s.getProperty ("reverse", false);
         def.sampler.cut = (bool) s.getProperty ("cut", false);
         def.sampler.porta = (bool) s.getProperty ("porta", false);

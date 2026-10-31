@@ -1939,13 +1939,15 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
             if (end > start)
             {
-                def.sampler.regionStart = (float) std::clamp (start + std::clamp (c.startOffset, 0.0, 1.0) * (end - start), 0.0, 1.0);
+                def.sampler.regionStart = (float) start;
                 def.sampler.regionEnd = (float) end;
+                // the start offset: FL starts notes there, a fraction of the (cropped) region [FL render, §4]
+                def.sampler.startOffset = (float) std::clamp (c.startOffset, 0.0, 1.0);
             }
         }
 
         // the Sampler's precomputed effects, loop flags and declicking mode (REA_rodada167h §1)
-        if (c.type == flp::ChannelType::sampler && def.instrument == InstrumentKind::sampler)
+        if (c.type == flp::ChannelType::sampler && def.instrument != InstrumentKind::audioClip)
         {
             auto& p = def.sampler.precompute;
             p.fadeStereo = (c.fxFlags & 1) != 0;

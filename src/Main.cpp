@@ -808,6 +808,37 @@ public:
             return;
         }
 
+        if (args.contains ("--precomputeshot"))
+        {
+            // LYNX.exe --precomputeshot project.(flp|lynx) <prefix>: round 167h — <prefix>-precompute.png (channel 1's
+            // Precomputed effects panel) and <prefix>-project.png (Options › Project with "Fast declick for cut groups")
+            const auto i = args.indexOf ("--precomputeshot");
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            lynx::AudioEngine shotEngine (false);
+            const juce::File input (args[i + 1].unquoted());
+            const auto prefix = args[i + 2].unquoted();
+            juce::String error;
+            bool ok = false;
+            if (input.hasFileExtension ("flp"))
+                ok = shotEngine.importFlpFile (input, error);
+            else if (auto song = lynx::ProjectFile::load (input, error))
+                shotEngine.setSong (std::move (*song)), ok = true;
+            shotEngine.dispatchPendingMessages();
+            auto shoot = [&] (std::unique_ptr<juce::Component> c, const juce::String& name) {
+                if (c == nullptr)
+                    return false;
+                if (c->getWidth() <= 0)
+                    c->setSize (520, 600);
+                savePng (c->createComponentSnapshot (c->getLocalBounds()), prefix + name);
+                return true;
+            };
+            ok = ok && shoot (lynx::makeChannelPrecomputePanel (shotEngine, 0), "-precompute.png");
+            ok = ok && shoot (lynx::makeSettingsPanel (shotEngine, lynx::SettingsPage::project), "-project.png");
+            setApplicationReturnValue (ok ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--flextrashot"))
         {
             // LYNX.exe --flextrashot <folder>: pictures of the editors of round 165g (Big Clock, Tuner, HTML NoteBook, Mute 2, Scratcher, Transmitter)

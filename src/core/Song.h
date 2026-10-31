@@ -235,6 +235,8 @@ struct SamplerSettings
     StretchMethod stretchMethod = StretchMethod::general; // with keepPitch: the stretcher's preset
     float regionStart = 0.0f;  // played region of the sample (fractions 0..1)
     float regionEnd = 1.0f;
+    float startOffset = 0.0f;  // FL's start offset (0xD7 f64 at 0x90): where notes start, a fraction of the region (after
+                               // the precompute crops it, REA_rodada167h §4)
     std::vector<float> slices; // slices (starts as fractions): key 60 + i plays slice i, at the original pitch
     bool porta = false;        // portamento (with "cut", the 808 glide): the note starts from the previous note's pitch
     float portaBeats = 0.125f; // glide time, in beats

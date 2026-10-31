@@ -3916,6 +3916,11 @@ std::unique_ptr<juce::Component> makeChannelModulationPanel (AudioEngine& engine
     return std::make_unique<ModulationPanel> (engine, ChannelRef::rack (channel));
 }
 
+std::unique_ptr<juce::Component> makeChannelPrecomputePanel (AudioEngine& engine, int channel)
+{
+    return std::make_unique<PrecomputePanel> (engine, ChannelRef::rack (channel));
+}
+
 std::unique_ptr<juce::Component> makeChannelFrame (AudioEngine& engine, int channel, int tab)
 {
     const auto kind = engine.getSong().channels[(std::size_t) channel].instrument;

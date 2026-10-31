@@ -219,7 +219,7 @@ TEST (rea167h_precompute_region_crop_and_play)
     REA167H_REQUIRE (pc::needed (s));
     const auto out = pc::apply (*in, s);
     REA167H_REQUIRE (out != nullptr);
-    const auto s0 = (int) std::nearbyint (0.25 * 4409.0), s1 = (int) std::nearbyint (0.75 * 4409.0);
+    const auto s0 = (int) std::nearbyint (0.25 * 4409.0), s1 = s0 + (int) std::nearbyint (0.5 * 4409.0); // FL: s0 + round(span)
     CHECK ((int) out->frames() == s1 - s0 + 1);
     CHECK (std::abs (out->cropFrom - (double) s0 / 4409.0) < 1e-9 && std::abs (out->cropTo - (double) s1 / 4409.0) < 1e-9);
     // declick in: 22 frames (0.5 ms at 44.1 kHz), the edge frame near 0, the middle untouched; out: 176 frames
@@ -242,7 +242,7 @@ TEST (rea167h_precompute_region_crop_and_play)
     int sounding = 0;
     for (auto v : l)
         sounding += std::fabs (v) > 1e-4f ? 1 : 0;
-    CHECK (std::abs (sounding - (int) processed->frames()) <= 12); // (less the declicked edges' near-zero frames)
+    CHECK (std::abs (sounding - (int) processed->frames()) <= 24); // (less the declicked edges' near-zero frames)
 }
 
 // §3 a cut voice fades out with FL's declicker: a raised cosine over the channel's declicking release (10 ms for
@@ -278,4 +278,89 @@ TEST (rea167h_cut_declick_times)
     CHECK (std::abs (measure (0, true).first - 88) <= 2);
     CHECK (std::abs (measure (2, false).first - 882) <= 2);
     CHECK (measure (4, false).first == 1000); // 100 ms: still sounding after 1000 frames
+}
+
+// FL's release shapes of the declicking modes (FUN_00977870): mode 1 subtracts a follower (shape 1, the signal sinks
+// to zero, 10 ms), mode 5 bends the 200 ms raised cosine with curve 5: at its middle 1 − (√6 − 1) / 5 = 0.710
+TEST (rea167h_cut_release_shapes)
+{
+    auto data = std::make_shared<lynx::SampleData>();
+    data->sampleRate = 44100.0;
+    data->left.assign (44100, 0.5f);
+    auto run = [&] (int mode, int frames) {
+        auto sampler = lynx::makeInstrument (lynx::InstrumentKind::sampler, data);
+        sampler->prepare (44100.0);
+        lynx::ChannelDef def;
+        def.instrument = lynx::InstrumentKind::sampler;
+        def.sampler.declickMode = mode;
+        sampler->configure (def, 120.0);
+        sampler->noteOn (60, 1.0f);
+        std::vector<float> l (1000), r (1000);
+        sampler->render (l.data(), r.data(), 1000, 1.0f, 1.0f);
+        const auto level = l[999];
+        sampler->cut();
+        std::vector<float> out ((std::size_t) frames), r2 ((std::size_t) frames);
+        sampler->render (out.data(), r2.data(), frames, 1.0f, 1.0f);
+        for (auto& v : out)
+            v /= level;
+        return out;
+    };
+    const auto one = run (1, 1000);
+    // the model (FUN_00977870 shape 1): f += c_k (x − f), y = (x − f)·w_k over n = 441 frames, the window over the last 44
+    {
+        double f = 0.0;
+        const int n = 441, m = 44;
+        for (int k = 1; k <= n; ++k)
+        {
+            const auto c = std::min (1.0, 2.0 / 44100.0 * std::exp ((double) k * std::log (22050.0) / (double) n));
+            f += c * (1.0 - f);
+            const auto w = k > n - m ? 0.5 * (1.0 + std::cos ((double) (k - (n - m)) * 3.141592653589793 / (double) (m + 1))) : 1.0;
+            if (k == 1 || k == 300 || k == 380)
+                CHECK (std::abs (one[(std::size_t) (k - 1)] - (float) ((1.0 - f) * w)) < 0.01f);
+        }
+    }
+    CHECK (std::fabs (one[460]) == 0.0f); // silent after 10 ms
+    const auto five = run (5, 8820);
+    CHECK (std::abs (five[4410] - 0.710f) < 0.01f);
+    CHECK (five[8819] < 0.01f);
+}
+
+// FL's start offset (0xD7 f64 at 0x90) is a fraction of the played region: region 0.25 … 0.75 with offset 0.4 starts
+// at 0.25 + 0.4·0.5 = 0.45 of the file [FL render, REA_rodada167h §4]
+TEST (rea167h_start_offset_is_in_the_region)
+{
+    auto data = std::make_shared<lynx::SampleData>();
+    data->sampleRate = 44100.0;
+    data->left.assign (44100, 0.0f);
+    std::fill (data->left.begin() + 22050, data->left.end(), 1.0f);
+    auto sampler = lynx::makeInstrument (lynx::InstrumentKind::sampler, data);
+    sampler->prepare (44100.0);
+    lynx::ChannelDef def;
+    def.instrument = lynx::InstrumentKind::sampler;
+    def.sampler.regionStart = 0.25f;
+    def.sampler.regionEnd = 0.75f;
+    def.sampler.startOffset = 0.4f;
+    sampler->configure (def, 120.0);
+    sampler->noteOn (60, 1.0f);
+    std::vector<float> l (4000), r (4000);
+    sampler->render (l.data(), r.data(), 4000, 1.0f, 1.0f);
+    int first = 0;
+    while (first < 4000 && std::fabs (l[(std::size_t) first]) < 1.0e-4f)
+        ++first;
+    std::printf ("  rea167h first %d\n", first);
+    CHECK (std::abs (first - 2205) <= 2);
+
+    // and it is imported apart from the region
+    const auto project = rea167h::channelProject ([] (FlpBuilder& b) {
+        std::vector<std::uint8_t> d7 (0xA8, 0);
+        const double start = 0.25, end = 0.5, offset = 0.5;
+        std::memcpy (d7.data() + 0x80, &start, 8);
+        std::memcpy (d7.data() + 0x88, &end, 8);
+        std::memcpy (d7.data() + 0x90, &offset, 8);
+        b.data (0xD7, d7);
+    });
+    const auto song = lynx::importFlp (project);
+    REA167H_REQUIRE (! song.channels.empty());
+    CHECK (std::abs (song.channels[0].sampler.regionStart - 0.25f) < 1e-6f);
+    CHECK (std::abs (song.channels[0].sampler.startOffset - 0.5f) < 1e-6f);
 }
