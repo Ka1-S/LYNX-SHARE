@@ -12,6 +12,7 @@ namespace
 enum : std::uint32_t
 {
     evSwing = 0x0B,
+    evMainPitch = 0x50,         // i16: the toolbar's main (master) pitch in cents (REA round 167g)
     evPanLaw = 0x17,
     evTimeSignatureNumerator = 0x11,
     evChannelSwingMix = 0x61,
@@ -476,6 +477,11 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
 
             case evSwing:
                 project.swing = (int) e.value;
+                break;
+
+            case evMainPitch:
+                if (section == Section::global)
+                    project.mainPitch = (int) (std::int16_t) (std::uint16_t) e.value;
                 break;
 
             case evPanLaw:
