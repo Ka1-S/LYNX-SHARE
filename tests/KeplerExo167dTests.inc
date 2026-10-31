@@ -31,6 +31,18 @@ std::vector<std::uint8_t> keplerExoTestState (const std::vector<float>& panel, i
     return st;
 }
 
+// the plugin state FL 2026 saves (.fst / .flp): a 16-byte wrapper (1, 1, engine-state size, 0), the engine state, the
+// wrapper's trailer (68 bytes in FL's factory presets)
+std::vector<std::uint8_t> keplerExoWrapped (const std::vector<std::uint8_t>& engine)
+{
+    std::vector<std::uint8_t> st;
+    auto u32 = [&] (std::uint32_t v) { for (int i = 0; i < 4; ++i) st.push_back ((std::uint8_t) (v >> (8 * i))); };
+    u32 (1), u32 (1), u32 ((std::uint32_t) engine.size()), u32 (0);
+    st.insert (st.end(), engine.begin(), engine.end());
+    st.insert (st.end(), 68, (std::uint8_t) 0x5a);
+    return st;
+}
+
 std::string keplerExoDll()
 {
     if (realFlpDir.empty())
@@ -55,6 +67,12 @@ TEST (kepler_exo_state_layout)
     auto cut = st;
     cut.resize (0x21 + 4 * 10);
     CHECK (! lynx::keplerExoState (cut));
+    // FL's wrapped plugin state: the same engine state 16 bytes in
+    const auto wrapped = keplerExoWrapped (st);
+    CHECK (lynx::keplerExoState (wrapped) && lynx::keplerPanelOffset (wrapped, 0x48) == 16 + 0x21 + 4 * 0x48);
+    auto badSize = wrapped;
+    badSize[8] = 0xff, badSize[9] = 0xff; // an engine-state size past the end
+    CHECK (! lynx::keplerExoState (badSize));
 }
 
 TEST (kepler_exo_imports_from_fl_projects)
@@ -84,6 +102,8 @@ TEST (kepler_exo_imports_from_fl_projects)
     const auto s = import ("Kepler Exo", st, factory);
     CHECK (s.channels.size() == 1 && s.channels[0].instrument == lynx::InstrumentKind::keplerExo);
     CHECK (s.channels[0].pluginState == st && ! s.channels[0].samplePath.empty());
+    const auto w = import ("Kepler Exo", keplerExoWrapped (st), factory);
+    CHECK (w.channels.size() == 1 && w.channels[0].instrument == lynx::InstrumentKind::keplerExo);
     const auto k1 = import ("Kepler Exo", keplerTestState(), factory);
     CHECK (k1.channels.size() == 1 && k1.channels[0].instrument != lynx::InstrumentKind::keplerExo);
     // the engines refuse the other plugin's DLL
@@ -114,6 +134,7 @@ TEST (kepler_exo_renders_like_the_dll)
     const std::vector<lynx::kepler::RefNote> notes { { 0, 60, 1.0, 0.0, 0.0, 33075 }, { 11025, 64, 0.6, 0.0, 0.0, 33075 },
                                                      { 22050, 67, 0.8, 0.0, 0.0, 44100 } };
     const auto y = lynx::kepler::renderReference (st, dll, notes, 44100.0, 40000);
+    CHECK (lynx::kepler::renderReference (keplerExoWrapped (st), dll, notes, 44100.0, 40000) == y);
     CHECK (y.size() == 2 * 40000);
     if (y.size() != 2 * 40000)
         return;

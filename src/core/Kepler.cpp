@@ -840,8 +840,20 @@ Patch parseExoState (const std::vector<std::uint8_t>& s)
     return p;
 }
 
+// FL 2026 saves Kepler Exo's engine state inside a 16-byte wrapper (u32 1, u32 1, u32 engine-state size, u32 0), then
+// the engine state, then the wrapper's own trailer (REA_rodada167d §1, every factory .fst): the engine state's offset
+std::size_t exoWrapperSize (const std::vector<std::uint8_t>& s)
+{
+    if (s.size() >= 16 + 0x1D && u32 (s, 0) == 1 && u32 (s, 4) == 1 && u32 (s, 12) == 0 && 16 + (std::size_t) u32 (s, 8) <= s.size()
+        && u32 (s, 16 + 12) == 9 && std::memcmp (s.data() + 32, "Kepler-2", 9) == 0)
+        return 16;
+    return 0;
+}
+
 Patch parseState (const std::vector<std::uint8_t>& s)
 {
+    if (const auto w = exoWrapperSize (s); w > 0)
+        return parseExoState (std::vector<std::uint8_t> (s.begin() + (std::ptrdiff_t) w, s.begin() + (std::ptrdiff_t) (w + u32 (s, 8))));
     if (s.size() >= 0x1D && u32 (s, 12) == 9 && std::memcmp (s.data() + 16, "Kepler-2", 9) == 0)
         return parseExoState (s);
     Patch p;
@@ -4038,9 +4050,10 @@ bool keplerExoDllUsable (const std::string& path)
 
 int keplerPanelOffset (const std::vector<std::uint8_t>& state, int k)
 {
-    if (! parseState (state).usable || k < 0 || k >= (int) u32 (state, 0x1D))
+    const auto w = exoWrapperSize (state);
+    if (! parseState (state).usable || k < 0 || k >= (int) u32 (state, w + 0x1D))
         return -1;
-    return 0x21 + 4 * k;
+    return (int) w + 0x21 + 4 * k;
 }
 
 std::unique_ptr<Instrument> makeKeplerInstrument() { return std::make_unique<KeplerInstrument>(); }

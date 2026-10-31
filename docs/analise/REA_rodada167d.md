@@ -16,6 +16,10 @@ driven by our harness, [DATA] FL's factory presets.
 | editor | "editor in LYNX style" | — | — | the channel's knob panel with 20 Exo parameters (§6) |
 
 ## 1. State and parameter set-up [DECOMP loader 0x18001efd0, defaults 0x18001d790, reset 0x18001ec40]
+- FL 2026 stores the plug-in's data (event 0xD5 of .fst / .flp) as a 16-byte wrapper — u32 1, u32 1, u32 size of the
+  engine state, u32 0 — then the engine state, then a trailer of the wrapper (68 bytes in every factory preset) [DATA];
+  Kepler-1 states have no wrapper. LYNX reads the engine state inside it (the first build looked for "Kepler-2" at
+  offset 16 only: FL's own Default.fst did not import).
 - "Kepler-2" state: u32 version at 0x19, u32 n at 0x1D, n floats (the 0x102-entry parameter list), then u32 matrix
   flag; flag 1 → u32 count and count (source, destination) int pairs (8 slots); version > 2 adds bytes (arp restart
   aligned, ×4 oversampling; version > 3 the alternative-oscillator byte). FL 2026 saves version 4 with 155 values (the
