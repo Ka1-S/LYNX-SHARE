@@ -38,7 +38,7 @@ into the same FL send buffer in the same block.
 
 FL evidence [DECOMP `FUN_00716b00`, parameters 0x1b / 0x1f]: with x = raw / 10000, i = floor(x·767 + 0.5) + 1 and the
 text is `"%d:%d"` of i / 48 : i % 48 (steps : ticks, 48 ticks a step).
-LYNX before: the synced value showed as a fraction. LYNX now: `transmitter::syncedText()` — FL's text. [TEST]
+LYNX before: the synced value showed as decimal steps ("4.00 steps"). LYNX now: `transmitter::syncedText()` — FL's text. [TEST]
 
 ## 3. Transmitter — detection envelope view
 
@@ -103,7 +103,7 @@ Not done in this round: both need EXEC studies of zplane's engine (black-box) as
 | Item | Reporter's words | FL evidence | LYNX before | LYNX now |
 |---|---|---|---|---|
 | Transmitter sends | route transient/sustain to other tracks | DECOMP 0x717600, EXEC goldens | not routed | two send outputs, mixer graph, import |
-| Synced time | steps:ticks | DECOMP 0x716b00 | fraction | FL's "s:t" |
+| Synced time | steps:ticks | DECOMP 0x716b00 | "x.xx steps" | FL's "s:t" |
 | Envelope view | detection envelope view | DECOMP 0x717900/0x714af0 | none | FL's 6-value column ring |
 | Newtime warp | import FL's warp markers, stretch as FL | EXEC fx.exe ntw.py | pass-through, beta | markers read, measured, out of beta |
 | Snap / Send to Playlist / Sync | as FL | DECOMP 0x79a5b0, DFM, 0x79b340 | Sync only | Snap to grid menu, Send to Playlist |
