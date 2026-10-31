@@ -1658,6 +1658,145 @@ private:
     bool menuClick = false;
 };
 
+// FL's Sampler › "Precomputed effects", the loop flags and the declicking mode (REA_rodada167h §1–§3): computed once on
+// the sample when the channel changes (core/SamplePrecompute.h). Opened from the Sampler settings.
+class PrecomputePanel final : public juce::Component
+{
+public:
+    PrecomputePanel (AudioEngine& e, ChannelRef c) : engine (e), ref (std::move (c))
+    {
+        const std::pair<juce::ToggleButton*, const char*> toggles[] = {
+            { &removeDc, TR_NOOP ("Remove DC offset") }, { &normalize, TR_NOOP ("Normalize") }, { &polarity, TR_NOOP ("Reverse polarity") },
+            { &fadeStereo, TR_NOOP ("Fade stereo") }, { &swapStereo, TR_NOOP ("Swap stereo") },
+            { &useLoops, TR_NOOP ("Use loop points") }, { &pingPong, TR_NOOP ("Ping pong loop") } };
+        for (auto [b, text] : toggles)
+        {
+            b->setButtonText (tr (text));
+            b->onClick = [this] { apply(); };
+            addAndMakeVisible (b);
+        }
+        normalize.setTooltip (tr ("Raises the sample so its loudest point reaches 0 dB"));
+        fadeStereo.setTooltip (tr ("The left channel fades out over the sample while the right one fades in"));
+        useLoops.setTooltip (tr ("Plays the loop stored in the sample file (WAV loop points)"));
+        pingPong.setTooltip (tr ("The loop plays forward, then backward"));
+        const std::tuple<juce::Slider*, juce::Label*, const char*, double> knobs[] = {
+            { &fadeIn, &fadeInLabel, TR_NOOP ("Fade in"), 1024.0 }, { &fadeOut, &fadeOutLabel, TR_NOOP ("Fade out"), 1024.0 },
+            { &crossfade, &crossfadeLabel, TR_NOOP ("Crossfade"), 2048.0 }, { &trim, &trimLabel, TR_NOOP ("Trim"), 32768.0 } };
+        for (auto [k, label, text, hi] : knobs)
+        {
+            k->setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+            k->setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 18);
+            k->setRange (0.0, hi, 1.0);
+            k->setDoubleClickReturnValue (true, 0.0);
+            k->onValueChange = [this] { apply(); };
+            addAndMakeVisible (k);
+            label->setText (tr (text), juce::dontSendNotification);
+            label->setJustificationType (juce::Justification::centred);
+            addAndMakeVisible (label);
+        }
+        auto percent = [] (double hi) { return [hi] (double v) { return juce::String (v / hi * 100.0, 1) + "%"; }; };
+        fadeIn.textFromValueFunction = percent (1024.0);
+        fadeOut.textFromValueFunction = percent (1024.0);
+        crossfade.textFromValueFunction = percent (2048.0);
+        trim.textFromValueFunction = [] (double v) {
+            return v <= 0.0 ? tr ("Off") : juce::String (20.0 * std::log10 (v / 32768.0), 1) + " dB";
+        };
+        fadeIn.setTooltip (tr ("Fades the sample in: 25% ramps over the whole sample, 100% over its last quarter"));
+        fadeOut.setTooltip (tr ("Fades the sample out: 25% over the whole sample, 100% within its first quarter"));
+        crossfade.setTooltip (tr ("Crossfades the loop's end into its start (a share of the loop), for a smooth loop"));
+        trim.setTooltip (tr ("Cuts the silence below this level at the sample's start and end"));
+        declickLabel.setText (tr ("Declicking mode"), juce::dontSendNotification);
+        addAndMakeVisible (declickLabel);
+        declick.addItemList ({ tr ("Out only"), tr ("Transient (no bleeding)"), tr ("Transient"), tr ("Generic"), tr ("Smooth"), tr ("Crossfade") }, 1);
+        declick.setTooltip (tr ("How fast a cut note fades out: 10 ms (out only, transient no bleeding), 20 ms (transient, generic), 100 ms (smooth), 200 ms (crossfade)"));
+        declick.onChange = [this] { apply(); };
+        addAndMakeVisible (declick);
+        load();
+        setSize (420, 330);
+    }
+
+    void resized() override
+    {
+        auto area = getLocalBounds().reduced (12);
+        auto rows = area.removeFromTop (4 * 26);
+        auto left = rows.removeFromLeft (rows.getWidth() / 2);
+        for (auto* b : { &removeDc, &normalize, &polarity, &fadeStereo })
+            b->setBounds (left.removeFromTop (26));
+        for (auto* b : { &swapStereo, &useLoops, &pingPong })
+            b->setBounds (rows.removeFromTop (26));
+        area.removeFromTop (10);
+        auto knobRow = area.removeFromTop (110);
+        const auto w = knobRow.getWidth() / 4;
+        for (auto [k, label] : { std::pair { &fadeIn, &fadeInLabel }, { &fadeOut, &fadeOutLabel }, { &crossfade, &crossfadeLabel }, { &trim, &trimLabel } })
+        {
+            auto column = knobRow.removeFromLeft (w);
+            label->setBounds (column.removeFromTop (18));
+            k->setBounds (column);
+        }
+        area.removeFromTop (12);
+        auto row = area.removeFromTop (26);
+        declickLabel.setBounds (row.removeFromLeft (140));
+        declick.setBounds (row.removeFromLeft (220));
+    }
+
+private:
+    void load()
+    {
+        const auto* c = ref.get (engine);
+        if (c == nullptr)
+            return;
+        const juce::ScopedValueSetter<bool> guard (loading, true);
+        const auto& p = c->sampler.precompute;
+        removeDc.setToggleState (p.removeDc, juce::dontSendNotification);
+        normalize.setToggleState (p.normalize, juce::dontSendNotification);
+        polarity.setToggleState (p.reversePolarity, juce::dontSendNotification);
+        fadeStereo.setToggleState (p.fadeStereo, juce::dontSendNotification);
+        swapStereo.setToggleState (p.swapStereo, juce::dontSendNotification);
+        useLoops.setToggleState (c->sampler.useLoopPoints, juce::dontSendNotification);
+        pingPong.setToggleState (p.pingPong, juce::dontSendNotification);
+        fadeIn.setValue (p.fadeIn, juce::dontSendNotification);
+        fadeOut.setValue (p.fadeOut, juce::dontSendNotification);
+        crossfade.setValue (p.crossfade, juce::dontSendNotification);
+        trim.setValue (p.trim, juce::dontSendNotification);
+        declick.setSelectedId (juce::jlimit (0, 5, c->sampler.declickMode) + 1, juce::dontSendNotification);
+    }
+
+    void apply()
+    {
+        if (loading)
+            return;
+        SamplePrecompute p;
+        p.removeDc = removeDc.getToggleState();
+        p.normalize = normalize.getToggleState();
+        p.reversePolarity = polarity.getToggleState();
+        p.fadeStereo = fadeStereo.getToggleState();
+        p.swapStereo = swapStereo.getToggleState();
+        p.pingPong = pingPong.getToggleState();
+        p.fadeIn = (int) fadeIn.getValue();
+        p.fadeOut = (int) fadeOut.getValue();
+        p.crossfade = (int) crossfade.getValue();
+        p.trim = (int) trim.getValue();
+        const auto loops = useLoops.getToggleState();
+        const auto mode = juce::jlimit (0, 5, declick.getSelectedId() - 1);
+        const auto* c = ref.get (engine);
+        if (c == nullptr || (c->sampler.precompute == p && c->sampler.useLoopPoints == loops && c->sampler.declickMode == mode))
+            return;
+        ref.edit (engine, [p, loops, mode] (ChannelDef& d) {
+            d.sampler.precompute = p;
+            d.sampler.useLoopPoints = loops;
+            d.sampler.declickMode = mode;
+        });
+    }
+
+    AudioEngine& engine;
+    ChannelRef ref;
+    bool loading = false;
+    juce::ToggleButton removeDc, normalize, polarity, fadeStereo, swapStereo, useLoops, pingPong;
+    juce::Slider fadeIn, fadeOut, crossfade, trim;
+    juce::Label fadeInLabel, fadeOutLabel, crossfadeLabel, trimLabel, declickLabel;
+    juce::ComboBox declick;
+};
+
 class SettingsPanel final : public juce::Component,
                             public juce::DragAndDropTarget,
                             public juce::FileDragAndDropTarget,
@@ -1694,6 +1833,12 @@ public:
         modulationButton.setButtonText (tr ("Modulation (envelopes and LFOs)..."));
         modulationButton.onClick = [this] { showModulationFor (*this, engine, ref.index); };
         addAndMakeVisible (modulationButton);
+        precomputeButton.setButtonText (tr ("Precomputed effects..."));
+        precomputeButton.setTooltip (tr ("FL's precomputed effects: remove DC, normalize, reverse polarity, fades, swap / fade stereo, trim, loop crossfade, loop points and the declicking mode"));
+        precomputeButton.onClick = [this] {
+            juce::CallOutBox::launchAsynchronously (std::make_unique<PrecomputePanel> (engine, ref), precomputeButton.getScreenBounds(), nullptr);
+        };
+        addAndMakeVisible (precomputeButton);
         regionEnd.setDoubleClickReturnValue (true, 1.0);
         regionStart.setTooltip (tr ("Where the sample starts playing (fraction of the file)"));
         sustain.setDoubleClickReturnValue (true, 1.0);
@@ -1808,7 +1953,12 @@ public:
             filterType.setBounds (filterRow.removeFromRight (filterRow.getWidth() / 3).withSizeKeepingCentre (124, 24));
             place (filterRow.withWidth (filterRow.getWidth() * 3 / 2), { { &cutoff, &cutoffLabel }, { &resonance, &resonanceLabel } });
         }
-        modulationButton.setBounds (area.removeFromBottom (26).withSizeKeepingCentre (260, 26));
+        {
+            auto buttons = area.removeFromBottom (26);
+            const auto half = buttons.getWidth() / 2;
+            modulationButton.setBounds (buttons.removeFromLeft (half).reduced (4, 0));
+            precomputeButton.setBounds (buttons.reduced (4, 0));
+        }
         area.removeFromTop (6);
         reverse.setBounds (area.removeFromLeft (150).removeFromTop (24));
         cut.setBounds (area.removeFromLeft (130).removeFromTop (24));
@@ -2067,7 +2217,7 @@ private:
         cutoffLabel, resonanceLabel;
     juce::ToggleButton reverse, cut, keepPitch, porta;
     juce::ComboBox filterType, stretchMethod;
-    juce::TextButton modulationButton;
+    juce::TextButton modulationButton, precomputeButton;
     ui::WaveformDisplay wave;
 };
 

@@ -163,6 +163,17 @@ struct Channel
     float stretchTime = 0.0f;         // already decoded (1/192 of a beat)
     double sampleStart = 0.0, sampleEnd = 1.0, startOffset = 0.0; // fractions of the sample
 
+    // Sampler › Precomputed effects and sample flags (REA round 167h §1): 0x46 bits (0 fade stereo, 1 reverse, 2 clip,
+    // 8 swap stereo), 0x4C fade in / 0x4B fade out (0…1024), 0xD7 remove DC (0x09), normalize (0x50), reverse polarity
+    // (0x51), declicking mode (0x53), crossfade (i32 0x54, 0…2048) and trim (i32 0x58, 0…32768); 0x8F sample flags
+    // (bit 3 = use loop points; −1 = not saved), 0x13 (older files: use loop points), 0x14 ping pong loop
+    int fxFlags = 0, fadeIn = 0, fadeOut = 0;
+    bool removeDc = false, normalize = false, reversePolarity = false;
+    int declickMode = 0, crossfade = 0, trim = 0;
+    int sampleFlags = -1;
+    bool loopPointsOld = false, pingPong = false;
+    bool useLoopPoints() const noexcept { return sampleFlags >= 0 ? (sampleFlags & 8) != 0 : loopPointsOld; }
+
     // Seconds for an envelope time value (docs/analise/REA_rodada3.md §1.4). With sync (flags & 1), in beats.
     static double envelopeTime (int v) noexcept;
 };
@@ -364,6 +375,7 @@ struct Project
     int currentArrangement = -1; // event 0x64: index (0x63) of the arrangement open when saved (−1 = not in the file)
     int mainPitch = 0;
     bool playTruncatedNotes = false; // event 0x1E (FL writes it only when on)
+    bool fastDeclick = false;        // event 0x28: Options › Project › "Fast declick for cut groups" (REA round 167h §3)
     // event 0xED (2 × f64 Delphi TDateTime, days since 1899-12-30): the creation date and the working time in days
     double createdDays = 0.0, workDays = 0.0;   // event 0x50 (i16): the main pitch knob in cents (FL saves it in FUN_00f40840, REA round 167g)
     bool performanceMode = false; // event 0x1F (round 165m)

@@ -88,6 +88,10 @@ public:
         truncated.setButtonText (tr ("Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)"));
         truncated.onClick = [this] { edit ([on = truncated.getToggleState()] (Song& s) { s.playTruncatedNotes = on; }); };
         addAndMakeVisible (truncated);
+        // FL's Options › Project › General › advanced: "Fast declick for cut groups" (round 167h)
+        fastDeclick.setButtonText (tr ("Fast declick for cut groups (use faster ramping when cutting notes)"));
+        fastDeclick.onClick = [this] { edit ([on = fastDeclick.getToggleState()] (Song& s) { s.fastDeclick = on; }); };
+        addAndMakeVisible (fastDeclick);
 
         engine.addChangeListener (this);
         load();
@@ -122,6 +126,7 @@ public:
         crossfades.setBounds (area.removeFromTop (26));
         crossfadesNew.setBounds (area.removeFromTop (26));
         truncated.setBounds (area.removeFromTop (26));
+        fastDeclick.setBounds (area.removeFromTop (26));
     }
 
 private:
@@ -142,6 +147,7 @@ private:
         pitch.setValue (s.masterPitch, juce::dontSendNotification);
         crossfades.setToggleState (s.autoCrossfades, juce::dontSendNotification);
         truncated.setToggleState (s.playTruncatedNotes, juce::dontSendNotification);
+        fastDeclick.setToggleState (s.fastDeclick, juce::dontSendNotification);
     }
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override
@@ -157,7 +163,7 @@ private:
         playlistTitle { tr ("Playlist") };
     juce::Label tempoLabel, beatsLabel, swingLabel, pitchLabel, ppqText, stepsText, signatureText;
     juce::Slider tempo, beats, swing, pitch;
-    juce::ToggleButton crossfades, crossfadesNew, truncated;
+    juce::ToggleButton crossfades, crossfadesNew, truncated, fastDeclick;
 };
 
 // --- Info page -------------------------------------------------------------------------------------

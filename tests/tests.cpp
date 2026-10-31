@@ -16508,6 +16508,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Markers165Tests.inc"
 #include "PerfMode165Tests.inc"
 #include "Rea167gTests.inc"
+#include "Rea167hTests.inc"
 #include "Patch165Tests.inc"
 #include "FlPlugins165Tests.inc"
 #include "FlScratch165Tests.inc"
