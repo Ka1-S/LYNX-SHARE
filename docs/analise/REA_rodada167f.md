@@ -25,8 +25,27 @@ phases). Per channel (L/R or M/S) the object holds one instance of each detector
 
 (Detailed per-stage spec below, in progress.)
 
+### 1.3 Front end **[EXEC]**
+
+Our harness hooks the engine's vtable (prepare, setParam, process) while the unmodified plug-in runs. The front end
+prepares the engine once with the host rate and a 2048-frame maximum, then sends the state's controls in the order
+0…9, 11, 12, 10 and the three option bytes as engine parameters 26, 27, 25; each render call is one engine call on the
+host block. Its output is the engine's output bit for bit (Default preset, 1 s of noise), so the front end adds
+nothing to the audio path. Values sent (raw = the state's integer): bypass, delta, true peak, channel mode, mode,
+level matching, oversampling, hardness and the options as the integer; envelope order − 1; input gain `24·raw/10000`
+dB; linking and emphasis `raw/10000`; ceiling `20·log10((e^(x·ln 11) − 1)/10)` dB with `x = raw/10000` (the same
+evaluation as Emphasizer's output control, round 154: bit-identical on all values we logged; −∞ at 0). The state:
+`i32 version` (10; old presets 7–8), 13 `i32` controls, `i32` UI page, `i32` (v ≥ 7), then `u8` → engine 25 (v ≥ 9),
+`u8` → 26, `u8` → 27 (v ≥ 10); a state without them sends 0. Before version 8 the envelope order is stored 0-based.
+The panel's buttons are named LoudnessCompBtn, FastRecoveryBtn ("INSTANT RECOVERY") and DCBlockBtn ("DC BLOCK")
+**[STR]**; engine 27 is the input DC blocker **[DECOMP]**.
+
 ## Where I stopped
 
+- 2026-10-31 (3): front end mapped (§1.3, fxh.exe = fx.c + vtable hooks); LYNX side written (core/EmphasisFx,
+  EffectKind::flEmphasis, editor, 15 languages, tests/Emphasis167fTests.inc with DLL goldens at 44.1/48 kHz); the engine
+  port (core/EmphasisEngine, §1.2) in progress by a helper; Transporter and Wave Traveller helpers in their own
+  worktrees (feature/flgap167-tp, feature/flgap167-wt).
 - 2026-10-31 (2): Emphasis engine mapped (§1.1); own harness `tmp/flgap167/run/limh.c` → `/mnt/e/lynx-work/flgap167/limh.exe`
   drives `ildsp_x64.dll`'s `Limiter_CreateInstance` directly (engine params, memory dumps); the plug-in harness
   `fx.exe` (round 154) runs `emp.dll` with its states (`tmp/flgap167/states/emp`, 26 states). Decompilations in
