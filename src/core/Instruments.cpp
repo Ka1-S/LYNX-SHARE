@@ -266,6 +266,7 @@ private:
             case InstrumentKind::minisynth:
             case InstrumentKind::dx10:
             case InstrumentKind::kepler:
+            case InstrumentKind::keplerExo:
             case InstrumentKind::poizone:
             case InstrumentKind::fruitkick:
             case InstrumentKind::bassdrum:
@@ -3083,7 +3084,7 @@ std::unique_ptr<Instrument> makeInstrument (InstrumentKind kind, std::shared_ptr
         return makeMiniSynthInstrument();
     if (kind == InstrumentKind::dx10)
         return makeDx10Instrument();
-    if (kind == InstrumentKind::kepler)
+    if (kind == InstrumentKind::kepler || kind == InstrumentKind::keplerExo)
         return makeKeplerInstrument();
     if (kind == InstrumentKind::poizone)
         return makePoiZoneInstrument();

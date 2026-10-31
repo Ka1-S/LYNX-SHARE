@@ -2757,7 +2757,8 @@ private:
             {
                 P[(std::size_t) i] = x;
                 const auto q = x * 0.25f;
-                chorusNoise = x * x * q * 0.012500000186264515f; // the noise gain; ×8 for the chorus noise filters (§3.7)
+                chorusNoise = x * x * q * 0.012500000186264515f; // the noise gain (§3.7)
+                chorus.gateThreshold = chorusNoise * 8.0f;
                 break;
             }
             case 0x47:
@@ -3618,10 +3619,13 @@ private:
         c.writeR = (c.writeR + 1) & 32767;
         const auto wetR = chorusTap (c.lineR, c.writeR, c.d2);
         c.wetL = wetL, c.wetR = wetR;
+        auto nl = wetL, nr = wetR;
+        if (exo && chorusNoise > 0.0f)
+            chorusNoiseTick (w1, w2, nl, nr);
         // post low-pass 7 kHz, equal-power mix, output gain
-        const auto pl = (c.lpB1 * c.lpXL + c.lpB0 * wetL) + c.lpA1 * c.lpYL;
-        const auto pr = (c.lpB1 * c.lpXR + c.lpB0 * wetR) + c.lpA1 * c.lpYR;
-        c.lpXL = wetL, c.lpXR = wetR, c.lpYL = pl, c.lpYR = pr;
+        const auto pl = (c.lpB1 * c.lpXL + c.lpB0 * nl) + c.lpA1 * c.lpYL;
+        const auto pr = (c.lpB1 * c.lpXR + c.lpB0 * nr) + c.lpA1 * c.lpYR;
+        c.lpXL = nl, c.lpXR = nr, c.lpYL = pl, c.lpYR = pr;
         c.mix = (c.mixTarget - c.mix) * c.s + c.mix;
         c.out = (c.gainTarget - c.out) * c.s + c.out;
         const auto wet = std::sqrt (c.mix), dry = std::sqrt (1.0f - c.mix);
@@ -3631,8 +3635,63 @@ private:
         ol = ol + dry * L;
         orr = orr * c.wetGain;
         orr = orr + dry * R;
+        if (exo && chorusGateOn)
+        {
+            int n;
+            if (c.gateThreshold <= std::abs (ol) || c.gateThreshold <= std::abs (orr))
+                n = c.gateCount = c.gateHold, c.gateGain = 1.0f;
+            else
+                n = c.gateCount;
+            if (n < 1)
+                c.gateGain = c.gateDecay * c.gateGain;
+            else
+                c.gateCount = n - 1;
+            ol = c.gateGain * ol;
+            orr = c.gateGain * orr;
+        }
         L = ol * c.out;
         R = c.out * orr;
+    }
+
+    // Kepler Exo's chorus noise (FUN_180001a60 with the designer FUN_180002690 type 2): two LCG white noises through
+    // peaking biquads at 6.5 kHz (Q 0.25, gain 2·LFO + 1, redesigned every 16 samples), added to the wet taps
+    void chorusNoiseTick (float w1, float w2, float& l, float& r) noexcept
+    {
+        auto& c = chorus;
+        ++c.noiseCount;
+        c.noiseA = c.noiseA * 0x0BB38435u + 0x3619636Bu;
+        c.noiseB = c.noiseB * 0x0BB38435u + 0x3619636Bu;
+        const auto na = (float) (std::int32_t) c.noiseA * 4.656612873077393e-10f;
+        const auto nb = (float) (std::int32_t) c.noiseB * 4.656612873077393e-10f;
+        if (c.noiseCount > 15)
+        {
+            c.noiseCount = 0;
+            auto design = [&c] (float gain, std::array<float, 5>& q) {
+                const auto w = 6500.0f * 6.2831854820251465f / c.fs;
+                float sn, cs;
+                engineSinCos (w, sn, cs);
+                const auto al = 0.5f / 0.25f * sn;
+                const auto aA = al * gain, aOverA = al / gain;
+                const auto b1 = cs * -2.0f;
+                const auto inv = 1.0f / (aOverA + 1.0f);
+                q[0] = inv * (aA + 1.0f);
+                q[1] = inv * b1;
+                q[2] = inv * (1.0f - aA);
+                q[3] = -(inv * b1);
+                q[4] = -(inv * (1.0f - aOverA));
+            };
+            design (w1 + w1 + 1.0f, c.nqL);
+            design (w2 + w2 + 1.0f, c.nqR);
+        }
+        auto tick = [] (std::array<float, 4>& st, const std::array<float, 5>& q, float x) {
+            auto y = st[0] * q[3] + q[4] * st[1];
+            y = y + q[2] * st[3];
+            y = y + (x * q[0] + st[2] * q[1]);
+            st[1] = st[0], st[0] = y, st[3] = st[2], st[2] = x;
+            return y;
+        };
+        l = l + tick (c.nsL, c.nqL, na) * chorusNoise;
+        r = r + tick (c.nsR, c.nqR, nb) * chorusNoise;
     }
 
     struct Chorus
@@ -3649,6 +3708,13 @@ private:
         float wetL = 0, wetR = 0;
         float lpB0 = 0, lpB1 = 0, lpA1 = 0, lpXL = 0, lpXR = 0, lpYL = 0, lpYR = 0;
         float mixTarget = 0.5f, mix = 0.0f, gainTarget = 1.0f, out = 0.0f, wetGain = 1.0f;
+        // Kepler Exo: filtered noise into the wet taps and the output gate (REA_rodada167d §3.7)
+        std::uint32_t noiseA = 333784u, noiseB = 401782u; // the first instance's seeds of the library's counter
+        int noiseCount = 0;
+        std::array<float, 5> nqL {}, nqR {}; // b0, b1, b2, −a1, −a2
+        std::array<float, 4> nsL {}, nsR {}; // y1, y2, x1, x2
+        float gateThreshold = 0.0025f, gateGain = 1.0f, gateDecay = 0.99965197f;
+        int gateHold = 440, gateCount = 440;
     };
 
     struct Decimator
@@ -3896,7 +3962,7 @@ public:
 private:
     std::unique_ptr<Synth> build() const
     {
-        if (! patch.usable || tables == nullptr)
+        if (! patch.usable || tables == nullptr || patch.exo != tables->exo) // a Kepler-2 state needs Kepler Exo's DLL
             return nullptr;
         auto s = std::make_unique<Synth>();
         s->init (patch, tables, rate.load());
@@ -3940,6 +4006,18 @@ bool keplerStateUsable (const std::vector<std::uint8_t>& state) { return parseSt
 
 bool keplerDllUsable (const std::string& path) { return loadTables (path) != nullptr; }
 
+bool keplerExoState (const std::vector<std::uint8_t>& state)
+{
+    const auto p = parseState (state);
+    return p.usable && p.exo;
+}
+
+bool keplerExoDllUsable (const std::string& path)
+{
+    const auto t = loadTables (path);
+    return t != nullptr && t->exo;
+}
+
 int keplerPanelOffset (const std::vector<std::uint8_t>& state, int k)
 {
     if (! parseState (state).usable || k < 0 || k >= (int) u32 (state, 0x1D))
@@ -3956,7 +4034,7 @@ std::vector<float> renderReference (const std::vector<std::uint8_t>& state, cons
 {
     const auto patch = parseState (state);
     auto tables = loadTables (dll);
-    if (! patch.usable || tables == nullptr || length <= 0)
+    if (! patch.usable || tables == nullptr || patch.exo != tables->exo || length <= 0)
         return {};
     auto synth = std::make_unique<Synth>();
     synth->init (patch, tables, sampleRate);
