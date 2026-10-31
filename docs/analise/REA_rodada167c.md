@@ -5,8 +5,10 @@ Fruity Scratcher_x64.dll, its engine_x64.dll), [DFM] form resources, [REF] FL's 
 LYNX screenshot, [TEST]. Clean-room: behaviour only, implemented from this document.
 
 ## Where I stopped
-- 2026-10-31 15:00: all four items implemented on feature/edscr167 (DVS, scripts, Deverb, Convert to score), docs and
-  i18n done. Next: full build-local + Windows build, merge origin/main, land.
+- 2026-10-31 16:10: round done — DVS, scripts, Deverb, Convert to score on feature/edscr167; build-local 0 failures,
+  Windows build and --edisonshot checked (menu lists FL's 12 installed scripts; Deverb form). Landing.
+- Left for later: Traktor Mk2 and FL's Timecode CD decoders (listed, not decoded); FL's "use selection" when dumping a
+  score; Deverb's neural model (LYNX uses its own DSP).
 
 ## §1 Fruity Scratcher: DVS timecode input and RIAA preamp
 
