@@ -113,8 +113,11 @@ TEST (rea167g_flp_saved_state)
         CHECK (song.currentPattern == 0 && song.mode == lynx::PlayMode::pattern && song.currentArrangement == 0);
     }
     {
-        const auto p = flp::parseProject (rea167g::stateProject (1000, -1, -1, -1)); // out of FL's 1…999
-        CHECK (p.currentPattern == 0);
+        // FL's loader: a pattern number out of 1…999 selects pattern 1; 0x09 / 0x0A only mean "on" when = 1; an
+        // arrangement index past the last one opens the first
+        const auto p = flp::parseProject (rea167g::stateProject (1000, 2, 2, 7));
+        CHECK (p.currentPattern == 1 && p.songMode == 0 && ! p.showInfo);
+        CHECK (lynx::importFlp (p).currentArrangement == 0);
     }
 
     if (realFlpDir.empty())
@@ -139,4 +142,38 @@ TEST (rea167g_flp_saved_state)
     const auto asher = load ("Asher Postman - Future House.flp");
     if (! asher.empty())
         CHECK (lynx::importFlp (flp::parseProject (asher)).currentArrangement == 1);
+}
+
+// §3 Project created / working time: event 0xED = f64 creation date + f64 working time (Delphi TDateTime days); FL's
+// loader keeps the date and sets its clock to Now − working time (FUN_00f46490 case 0xED), FUN_011d55b0 = Now − that.
+TEST (rea167g_flp_created_and_working_time)
+{
+    FlpBuilder b;
+    std::vector<std::uint8_t> times (16);
+    const double created = 45126.776, work = 0.5408; // 2023-07-17 18:37 local, 12 h 58 min
+    std::memcpy (times.data(), &created, 8);
+    std::memcpy (times.data() + 8, &work, 8);
+    b.data (0xED, times);
+    const auto p = flp::parseProject (b.bytes);
+    CHECK (p.createdDays == created && p.workDays == work);
+    const auto song = lynx::importFlp (p);
+    CHECK (std::abs (song.info.workSeconds - work * 86400.0) < 1e-6);
+    // a local reading: within the widest time-zone offset (±14 h) of the same reading taken as UTC
+    CHECK (std::abs (song.info.created - (created - 25569.0) * 86400.0) <= 14.0 * 3600.0);
+    CHECK (! song.info.empty());
+    CHECK (lynx::flDateTimeToUnix (0.0) == 0.0 && lynx::flDateTimeToUnix (-3.0) == 0.0 && lynx::flDateTimeToUnix (1e9) == 0.0);
+    // whole seconds survive the conversion
+    const auto t = lynx::flDateTimeToUnix (45126.5);
+    CHECK (std::abs (t - std::round (t)) < 1e-3);
+
+    if (realFlpDir.empty())
+        return;
+    std::ifstream in (std::filesystem::path (realFlpDir) / "Demo projects" / "Demo songs" / "Asher Postman - Future House.flp", std::ios::binary);
+    const std::vector<std::uint8_t> file ((std::istreambuf_iterator<char> (in)), {});
+    if (file.empty())
+        return;
+    const auto demo = lynx::importFlp (flp::parseProject (file));
+    // [DATA] created 2018-07-13 18:38:51 (FL's local time), 12.98 hours of work
+    CHECK (std::abs (demo.info.workSeconds / 3600.0 - 12.98) < 0.01);
+    CHECK (std::abs (demo.info.created - 1531507131.0) <= 14.0 * 3600.0 + 1.0);
 }

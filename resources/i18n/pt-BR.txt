@@ -6152,3 +6152,5 @@ countries: br
 "In scale" = "Na escala"
 "AMPLITUDE" = "AMPLITUDE"
 "VARIATION" = "VARIAÇÃO"
+"Created: {0}" = "Criado em: {0}"
+"Working time: {0}" = "Tempo de trabalho: {0}"

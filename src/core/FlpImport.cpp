@@ -66,9 +66,34 @@
 #include <cctype>
 #include <cmath>
 #include <map>
+#include <ctime>
 
 namespace lynx
 {
+double flDateTimeToUnix (double days)
+{
+    if (! (days > 25569.0 && days < 2958466.0)) // 1970-01-01 … 9999-12-31
+        return 0.0;
+    // the local wall-clock reading as a civil date (H. Hinnant's days → y/m/d), then mktime gives UTC
+    const auto local = (days - 25569.0) * 86400.0;
+    const auto secs = (long long) std::floor (local);
+    long long z = secs / 86400 + 719468;
+    const auto sod = secs % 86400;
+    const long long era = z / 146097, doe = z - era * 146097;
+    const long long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    const long long doy = doe - (365 * yoe + yoe / 4 - yoe / 100), mp = (5 * doy + 2) / 153;
+    std::tm tm {};
+    tm.tm_mday = (int) (doy - (153 * mp + 2) / 5 + 1);
+    tm.tm_mon = (int) (mp < 10 ? mp + 2 : mp - 10);
+    tm.tm_year = (int) (yoe + era * 400 + (tm.tm_mon <= 1 ? 1 : 0)) - 1900;
+    tm.tm_hour = (int) (sod / 3600);
+    tm.tm_min = (int) (sod / 60 % 60);
+    tm.tm_sec = (int) (sod % 60);
+    tm.tm_isdst = -1;
+    const auto t = std::mktime (&tm);
+    return t == (std::time_t) -1 ? local : (double) t + (local - (double) secs);
+}
+
 namespace
 {
 bool contains (const std::string& haystack, const char* needle)
@@ -808,6 +833,9 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.info.comments = project.comments;
     std::replace (song.info.comments.begin(), song.info.comments.end(), '\r', '\n'); // (FL saves CR line breaks)
     song.info.showOnOpen = project.showInfo; // 0x0A, Project info › Show on opening (REA round 167g)
+    // 0xED: TDateTime days since 1899-12-30 (25569 days before 1970-01-01), FL's local time kept as it reads
+    song.info.created = flDateTimeToUnix (project.createdDays);
+    song.info.workSeconds = std::min (project.workDays, 36500.0) * 86400.0;
 
     // FL channels may have sparse indices; we map them to dense indices.
     std::map<int, int> channelMap;
@@ -3471,6 +3499,9 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         for (int i = 0; i < (int) project.arrangements.size() && i < (int) song.arrangements.size(); ++i)
             if (project.currentArrangement >= 0 && project.arrangements[(std::size_t) i].index == project.currentArrangement)
                 fullest = i;
+
+        if (fullest < 0 && project.currentArrangement != -1)
+            fullest = 0; // FL's loader: an index past the last arrangement opens the first
 
         if (fullest < 0)
         {

@@ -5995,3 +5995,5 @@ countries: tw hk mo
 "In scale" = "按音階"
 "AMPLITUDE" = "幅度"
 "VARIATION" = "變化"
+"Created: {0}" = "建立於：{0}"
+"Working time: {0}" = "工作時間：{0}"

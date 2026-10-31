@@ -5995,3 +5995,5 @@ countries: id
 "In scale" = "Dalam skala"
 "AMPLITUDE" = "AMPLITUDO"
 "VARIATION" = "VARIASI"
+"Created: {0}" = "Dibuat: {0}"
+"Working time: {0}" = "Waktu kerja: {0}"

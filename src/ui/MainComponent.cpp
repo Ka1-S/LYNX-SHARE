@@ -3847,6 +3847,7 @@ void MainComponent::startNewProject (Song song, const juce::File& file)
     engine.stop();
     engine.rewind();
     engine.setSong (std::move (song));
+    engine.markCreatedNow(); // Project info › created (a template's own date is kept, as FL does)
     currentFile = juce::File();
     projectName = {};
     importedSuffix = {};

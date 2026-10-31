@@ -5995,3 +5995,5 @@ countries: nl be
 "In scale" = "In toonladder"
 "AMPLITUDE" = "AMPLITUDE"
 "VARIATION" = "VARIATIE"
+"Created: {0}" = "Gemaakt: {0}"
+"Working time: {0}" = "Werktijd: {0}"

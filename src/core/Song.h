@@ -1184,8 +1184,17 @@ struct ProjectInfo
 {
     std::string title, author, genre, url, comments;
     bool showOnOpen = false; // open Settings › Info when the project is opened
+    // FL's Project info › created / working time (event 0xED, REA round 167g): when the project was created (seconds
+    // since 1970, UTC; 0 = unknown) and the wall-clock time it has been open, summed over every session up to the last
+    // save (FL: Now − the time it was opened + the saved time)
+    double created = 0.0;
+    double workSeconds = 0.0;
 
-    bool empty() const noexcept { return title.empty() && author.empty() && genre.empty() && url.empty() && comments.empty() && ! showOnOpen; }
+    bool empty() const noexcept
+    {
+        return title.empty() && author.empty() && genre.empty() && url.empty() && comments.empty() && ! showOnOpen && created == 0.0
+               && workSeconds == 0.0;
+    }
     bool operator== (const ProjectInfo&) const = default;
 };
 

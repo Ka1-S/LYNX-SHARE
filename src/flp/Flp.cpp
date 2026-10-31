@@ -13,6 +13,7 @@ enum : std::uint32_t
 {
     evSwing = 0x0B,
     evMainPitch = 0x50,
+    evProjectTimes = 0xED,       // 16 B: f64 creation date, f64 working time (Delphi TDateTime days; REA round 167g)
     evCurrentPattern = 0x43,     // u16: the pattern selected when saved, 1…999 (REA round 167g)
     evSongMode = 0x09,           // u8: 1 = SONG, 0 = PAT (saved as "the transport's PatBtn is up", REA round 167g)
     evShowInfo = 0x0A,           // u8: Project info › "Show on opening" (ShowInfoBox, REA round 167g)
@@ -484,22 +485,33 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
                 break;
 
             case evCurrentPattern:
-                if (section == Section::global && e.value >= 1 && e.value <= 999)
-                    project.currentPattern = (int) e.value;
+                if (section == Section::global)
+                    project.currentPattern = e.value >= 1 && e.value <= 999 ? (int) e.value : 1; // (FL's loader: else 1)
                 break;
 
             case evSongMode:
                 if (section == Section::global)
-                    project.songMode = e.value != 0 ? 1 : 0;
+                    project.songMode = e.value == 1 ? 1 : 0; // (FL: PatBtn down unless the value is 1)
                 break;
 
             case evShowInfo:
                 if (section == Section::global)
-                    project.showInfo = e.value != 0;
+                    project.showInfo = e.value == 1;
                 break;
 
             case evCurrentArrangement:
                 project.currentArrangement = (int) e.value;
+                break;
+
+            case evProjectTimes:
+                if (section == Section::global && e.data.size() >= 16)
+                {
+                    double created, work;
+                    std::memcpy (&created, e.data.data(), 8);
+                    std::memcpy (&work, e.data.data() + 8, 8);
+                    project.createdDays = std::isfinite (created) ? created : 0.0;
+                    project.workDays = std::isfinite (work) && work > 0.0 ? work : 0.0;
+                }
                 break;
 
             case evMainPitch:

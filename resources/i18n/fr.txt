@@ -5995,3 +5995,5 @@ countries: fr be ch ca lu
 "In scale" = "Dans la gamme"
 "AMPLITUDE" = "AMPLITUDE"
 "VARIATION" = "VARIATION"
+"Created: {0}" = "Créé : {0}"
+"Working time: {0}" = "Temps de travail : {0}"

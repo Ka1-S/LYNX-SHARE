@@ -2102,6 +2102,7 @@ void AudioEngine::setSong (Song newSong)
     undoStack.clear();
     redoStack.clear();
     song = std::move (newSong);
+    workSince = (double) juce::Time::currentTimeMillis();
     clipops::updateCrossfades (song);
     selectedChannel = 0;
     selectedChannels = { 0 };
@@ -3678,8 +3679,29 @@ void AudioEngine::setPluginsRenderMode (bool offline)
             graphMode (patcher::graphOf (getEffect ((int) t, (int) s).get()));
 }
 
+void AudioEngine::stampWorkTime()
+{
+    const auto now = (double) juce::Time::currentTimeMillis();
+    if (workSince > 0.0 && now > workSince)
+        song.info.workSeconds += (now - workSince) / 1000.0;
+    workSince = now;
+}
+
+double AudioEngine::workSecondsNow() const
+{
+    const auto now = (double) juce::Time::currentTimeMillis();
+    return song.info.workSeconds + (workSince > 0.0 && now > workSince ? (now - workSince) / 1000.0 : 0.0);
+}
+
+void AudioEngine::markCreatedNow()
+{
+    if (song.info.created <= 0.0)
+        song.info.created = (double) juce::Time::currentTimeMillis() / 1000.0;
+}
+
 void AudioEngine::capturePluginStates()
 {
+    stampWorkTime();
     // Changes only the saved state (recreates nothing and doesn't enter the undo history).
     for (std::size_t i = 0; i < song.channels.size(); ++i)
         if (auto* p = dynamic_cast<PluginInstrument*> (getChannelInstrument ((int) i).get()))

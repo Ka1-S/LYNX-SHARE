@@ -5995,3 +5995,5 @@ countries: ru by kz
 "In scale" = "В ладу"
 "AMPLITUDE" = "АМПЛИТУДА"
 "VARIATION" = "ВАРИАЦИЯ"
+"Created: {0}" = "Создан: {0}"
+"Working time: {0}" = "Время работы: {0}"

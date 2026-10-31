@@ -5995,3 +5995,5 @@ countries: de at ch li lu
 "In scale" = "In Skala"
 "AMPLITUDE" = "AMPLITUDE"
 "VARIATION" = "VARIATION"
+"Created: {0}" = "Erstellt: {0}"
+"Working time: {0}" = "Arbeitszeit: {0}"

@@ -5995,3 +5995,5 @@ countries: kr
 "In scale" = "스케일 내"
 "AMPLITUDE" = "진폭"
 "VARIATION" = "변화"
+"Created: {0}" = "생성: {0}"
+"Working time: {0}" = "작업 시간: {0}"

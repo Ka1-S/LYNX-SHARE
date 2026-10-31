@@ -5995,3 +5995,5 @@ countries: pl
 "In scale" = "W skali"
 "AMPLITUDE" = "AMPLITUDA"
 "VARIATION" = "WARIACJA"
+"Created: {0}" = "Utworzono: {0}"
+"Working time: {0}" = "Czas pracy: {0}"

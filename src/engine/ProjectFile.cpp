@@ -1556,6 +1556,10 @@ juce::String toJson (const Song& song)
         set ("comments", song.info.comments);
         if (song.info.showOnOpen)
             info->setProperty ("showOnOpen", true);
+        if (song.info.created > 0.0)
+            info->setProperty ("created", song.info.created);
+        if (song.info.workSeconds > 0.0)
+            info->setProperty ("workSeconds", song.info.workSeconds);
         root->setProperty ("info", juce::var (info.release()));
     }
     root->setProperty ("currentPattern", song.currentPattern);
@@ -1853,6 +1857,8 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
         song.info.url = get ("url");
         song.info.comments = get ("comments");
         song.info.showOnOpen = (bool) info.getProperty ("showOnOpen", false);
+        song.info.created = std::max (0.0, (double) info.getProperty ("created", 0.0));
+        song.info.workSeconds = std::max (0.0, (double) info.getProperty ("workSeconds", 0.0));
     }
     song.currentPattern = (int) root.getProperty ("currentPattern", 0);
 

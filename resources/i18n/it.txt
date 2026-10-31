@@ -5995,3 +5995,5 @@ countries: it ch sm
 "In scale" = "Nella scala"
 "AMPLITUDE" = "AMPIEZZA"
 "VARIATION" = "VARIAZIONE"
+"Created: {0}" = "Creato: {0}"
+"Working time: {0}" = "Tempo di lavoro: {0}"

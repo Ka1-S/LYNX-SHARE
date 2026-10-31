@@ -5995,3 +5995,5 @@ countries: tr
 "In scale" = "Gamda"
 "AMPLITUDE" = "GENLİK"
 "VARIATION" = "VARYASYON"
+"Created: {0}" = "Oluşturuldu: {0}"
+"Working time: {0}" = "Çalışma süresi: {0}"

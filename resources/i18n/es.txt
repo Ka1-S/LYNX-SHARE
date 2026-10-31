@@ -5995,3 +5995,5 @@ countries: es mx ar co cl pe ve
 "In scale" = "En escala"
 "AMPLITUDE" = "AMPLITUD"
 "VARIATION" = "VARIACIÓN"
+"Created: {0}" = "Creado: {0}"
+"Working time: {0}" = "Tiempo de trabajo: {0}"
