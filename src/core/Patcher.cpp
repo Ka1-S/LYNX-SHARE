@@ -76,6 +76,7 @@ bool sameInstrumentSetup (const ChannelDef& a, const ChannelDef& b)
             return a.samplePath == b.samplePath && a.zones == b.zones && a.modelParams == b.modelParams && a.sampler.keepPitch == b.sampler.keepPitch
                    && (! a.sampler.keepPitch || (a.sampler.stretchBeats == b.sampler.stretchBeats && a.sampler.stretchMethod == b.sampler.stretchMethod));
         case InstrumentKind::granulizer:
+        case InstrumentKind::wavetraveller:
         case InstrumentKind::soundfont: return a.samplePath == b.samplePath;
         case InstrumentKind::directwave: return a.zones == b.zones && a.modelParams == b.modelParams && a.pluginState == b.pluginState;
         case InstrumentKind::dashboard: // (its outputs are structure)

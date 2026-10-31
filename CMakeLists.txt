@@ -77,6 +77,7 @@ add_library(lynx_core STATIC
     src/core/SimSynth.cpp
     src/core/Wasp.cpp
     src/core/Granulizer.cpp
+    src/core/WaveTraveller.cpp
     src/core/Drumaxx.cpp
     src/core/Slayer.cpp
     src/core/Dx10.cpp
@@ -368,6 +369,7 @@ if(LYNX_BUILD_APP)
         src/ui/VisualGl.cpp
         src/ui/DanceView.cpp
         src/ui/VideoPlayerView.cpp
+        src/ui/WaveTravellerEditor.cpp
         src/ui/NewtoneEditor.cpp
         src/ui/ChannelSettings.cpp
         src/ui/LayerEditor.cpp

@@ -27,6 +27,7 @@
 #include "core/Sawer.h"
 #include "core/Drumaxx.h"
 #include "core/Granulizer.h"
+#include "core/WaveTraveller.h"
 #include "core/Slayer.h"
 #include "core/Ogun.h"
 #include "core/TransistorBass.h"
@@ -282,6 +283,7 @@ private:
             case InstrumentKind::sawer:
             case InstrumentKind::flkeys:
             case InstrumentKind::granulizer:
+            case InstrumentKind::wavetraveller:
             case InstrumentKind::drumaxx:
             case InstrumentKind::slayer:
             case InstrumentKind::fruitydance:
@@ -3237,6 +3239,8 @@ std::unique_ptr<Instrument> makeInstrument (InstrumentKind kind, std::shared_ptr
         return makeSawerInstrument();
     if (kind == InstrumentKind::granulizer)
         return makeGranulizerInstrument (std::move (sample));
+    if (kind == InstrumentKind::wavetraveller)
+        return makeWaveTravellerInstrument (std::move (sample));
     if (kind == InstrumentKind::drumaxx)
         return makeDrumaxxInstrument();
     if (kind == InstrumentKind::slayer)
