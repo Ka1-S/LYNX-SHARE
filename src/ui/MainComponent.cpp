@@ -1995,6 +1995,9 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "playlist.rippleDelete", tr ("Delete the selected clips and close the gaps"));
             action (menu, "playlist.autoCrossfades", tr ("Automatic crossfades (current project)"), true, engine.getSong().autoCrossfades);
             action (menu, "playlist.follow", tr ("Follow the playhead (auto scrolling)"), true, EditorGlobals::get().isFollowing (false));
+            action (menu, "playlist.pitchClipsDown", tr ("Pitch selected audio clips one semitone down"));
+            action (menu, "playlist.pitchClipsUp", tr ("Pitch selected audio clips one semitone up"));
+            action (menu, "playlist.reverseClips", tr ("Reverse selected audio clips"));
             action (menu, "playlist.quantizeStarts", tr ("Quantize the clips' starts"));
             action (menu, "playlist.quantizeHalf", tr ("Quantize the clips' starts 50% (halfway to the grid)"));
             menu.addSubMenu (tr ("Zoom"), zoomMenu ("playlist."));

@@ -293,6 +293,18 @@ patcher::Factories patcherFactories (double sampleRate, double bpm, const RackSt
     return f;
 }
 
+// an audio clip channel that resamples but has a clip of its own pitch (FL 2026's keys 7/8): it needs the shifters
+bool clipShiftWanted (const Song& song, std::size_t channel)
+{
+    if (channel >= song.channels.size() || song.channels[channel].instrument != InstrumentKind::audioClip
+        || song.channels[channel].sampler.keepPitch)
+        return false;
+    for (const auto& c : song.playlist)
+        if (c.kind == ClipKind::audio && c.channel == (int) channel && c.pitch != 0.0f)
+            return true;
+    return false;
+}
+
 // The keep-pitch samplers' shifters, in parallel: each instrument only touches its own pool, and each shifter's
 // set-up is deterministic (a fixed seed and a silent priming run), so the result is the same as one by one
 void prepareKeyShifts (const std::vector<Instrument*>& list, double sampleRate)
@@ -363,6 +375,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                 || (previous->song.channels[i].samplePath == channel.samplePath && previous->song.channels[i].zones == channel.zones
                     && previous->song.channels[i].modelParams == channel.modelParams
                     && previous->song.channels[i].sampler.keepPitch == channel.sampler.keepPitch
+                    && clipShiftWanted (previous->song, i) == clipShiftWanted (song, i)
                     // FL's precomputed effects (round 167h): the sample is processed when the channel is built
                     && previous->song.channels[i].sampler.precompute == channel.sampler.precompute
                     && previous->song.channels[i].sampler.useLoopPoints == channel.sampler.useLoopPoints
@@ -401,6 +414,12 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         }
 
         state->instruments.push_back (buildInstrument (channel, sampleRate, song.bpm, factories, &keyShiftLater));
+        // FL 2026's clip pitch (round 167k): a channel with a pitched clip gets its pitch shifters even when it resamples
+        if (clipShiftWanted (song, i) && state->instruments.back() != nullptr)
+        {
+            state->instruments.back()->setClipShift (true);
+            keyShiftLater.push_back (state->instruments.back().get());
+        }
     }
     // Options › Project › "Fast declick for cut groups" (REA round 167h §3)
     for (auto& instrument : state->instruments)
@@ -1885,7 +1904,9 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                 }
                 instrument.setNextNoteColour (e.colour);
 
-                if (e.fadeIn > 0.0f || e.fadeOut > 0.0f)
+                if (e.clipPitch != 0.0f)
+                    instrument.setNextClipPitch (e.clipPitch);
+                if (e.fadeIn > 0.0f || e.fadeOut > 0.0f || e.fadeShape != 0)
                     instrument.setNextClipFades (e.clipElapsed, e.clipRemaining, e.fadeIn, e.fadeOut, e.fadeShape);
 
                 // an echo's volume: the instrument scales the voice, else (engines without it) the velocity

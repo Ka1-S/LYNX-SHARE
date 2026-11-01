@@ -1,5 +1,7 @@
 #pragma once
 
+#include <utility>
+
 #include <array>
 #include <cstdint>
 #include <vector>
@@ -81,6 +83,20 @@ void addJumpToNextBar (Song& song, std::int64_t tick);
 // "Change to marker loop": the time selection becomes a marker loop (a Marker loop at its start, a marker at its end)
 // and the selection is cleared
 void changeToMarkerLoop (Song& song);
+
+// The Playlist's Time markers keys (round 167k, FL 2026's EEMarkerMainMenu):
+// Ctrl+T "Add auto" (FUN_0122a070 → FUN_00e546a0): a plain marker at `tick` named "Auto", "Auto #2", "Auto #3"... (the
+// first name no marker has); a marker already at `tick` is kept and nothing is added. The marker's index.
+int addAuto (Song& song, std::int64_t tick);
+// Shift+T "Place loop" (FUN_0122bb80): every song Loop marker goes; unless the old one was at `tick`, a Loop marker is
+// placed at `tick` (the same key again takes it away)
+void placeSongLoop (Song& song, std::int64_t tick);
+// Shift+Alt+T "Add time signature change..." (FUN_0122bd20): a num/den change at `from` (floored to a beat); when the
+// time selection ends at `to` > 0 before the song's end with no signature there, a change back to the signature that
+// was in force at `from` is added at `to` (floored to a beat), so only the selection changes
+void addSignatureChange (Song& song, std::int64_t from, std::int64_t to, int numerator, int denominator);
+// the time signature in force at `tick` (the last signature marker at or before it, else the song's beats per bar / 4)
+std::pair<int, int> signatureAt (const Song& song, std::int64_t tick);
 
 // FL's name of an action ("Marker loop"...; English, for tr()), empty for none / unknown
 const char* actionName (int action) noexcept;

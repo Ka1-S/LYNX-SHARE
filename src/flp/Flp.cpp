@@ -1004,6 +1004,15 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
                         item.gain = std::max (0.0f, finiteOr (readLE<float> (e.data, o + 0x34), 1.0f));
                     }
 
+                    if (recordSize >= 80)
+                    {
+                        // FL 2026's clip pitch (+0x3C, semitones, -12..12: keys 7/8, FUN_00e2d7b0) and clip flags
+                        // (+0x48, bit 0 = reversed: key 9, FUN_01065520) — round 167k
+                        const auto pitch = readLE<float> (e.data, o + 0x3C);
+                        item.pitch = std::isfinite (pitch) ? std::clamp (pitch, -12.0f, 12.0f) : 0.0f;
+                        item.reversed = (readLE<std::uint32_t> (e.data, o + 0x48) & 1) != 0;
+                    }
+
                     const auto patternBase = base != 0 ? base : playlistPatternBase;
 
                     if (index > patternBase)

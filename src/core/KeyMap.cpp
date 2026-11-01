@@ -194,6 +194,16 @@ std::vector<Action> makeActions()
         { "playlist.ripple", TR_NOOP ("Ripple editing on/off"), Context::playlist, { chord ('S', shift) } },
         // FL's Playlist › Edit › "Automatic crossfades (current project)" (round 166e)
         { "playlist.autoCrossfades", TR_NOOP ("Automatic crossfades (current project) on/off"), Context::playlist, {} },
+        // FL 2026's Playlist › Time markers (round 167k: EEMarkerAdd2Menu 32852, EEMarkerAddAutoMenu 16468,
+        // EEMarkerAddTSChangeMenu 41044, EEMarkerAddSongLoopMenu 8276); Ctrl+T stays the typing piano elsewhere
+        { "playlist.markerAdd", TR_NOOP ("Time markers: Add one..."), Context::playlist, { chord ('T', alt) } },
+        { "playlist.markerAuto", TR_NOOP ("Time markers: Add auto"), Context::playlist, { chord ('T', ctrl) } },
+        { "playlist.markerSignature", TR_NOOP ("Time markers: Add time signature change..."), Context::playlist, { chord ('T', shift | alt) } },
+        { "playlist.markerLoop", TR_NOOP ("Time markers: Place loop"), Context::playlist, { chord ('T', shift) } },
+        // FL 2026's Playlist › Edit (round 167k: EEPitchSelectedAudioClipsDown/UpAction, EEReverseSelectedAudioClipsAction)
+        { "playlist.pitchClipsDown", TR_NOOP ("Pitch selected audio clips one semitone down"), Context::playlist, { chord ('7') } },
+        { "playlist.pitchClipsUp", TR_NOOP ("Pitch selected audio clips one semitone up"), Context::playlist, { chord ('8') } },
+        { "playlist.reverseClips", TR_NOOP ("Reverse selected audio clips"), Context::playlist, { chord ('9') } },
         { "playlist.quantizeStarts", TR_NOOP ("Quantize the clips' starts"), Context::playlist, { chord ('Q', ctrl) } },
         { "playlist.quantizeHalf", TR_NOOP ("Quantize the clips' starts 50% (halfway to the grid)"), Context::playlist, {} },
         { "playlist.follow", TR_NOOP ("Follow the playhead (auto scrolling) on/off"), Context::playlist, {} },
@@ -228,6 +238,11 @@ std::vector<Action> makeActions()
         { "mixer.linkChannels", TR_NOOP ("Link the selected channels to the selected insert"), Context::mixer, { chord ('L', ctrl) } },
         { "mixer.linkChannelsFrom", TR_NOOP ("Link the selected channels to inserts starting from the selected one"), Context::mixer, { chord ('L', ctrl | shift) } },
         { "mixer.selectLinkedChannels", TR_NOOP ("Select the channels linked to the selected insert"), Context::mixer, { chord ('L', alt) } },
+        // FL's mixer track menu keys (round 167k, the DFM's ShortCut values: F2, S, Alt+R, Shift+Alt+R)
+        { "mixer.rename", TR_NOOP ("Rename and color the selected mixer track"), Context::mixer, { chord (f2) } },
+        { "mixer.soloSelected", TR_NOOP ("Solo the selected mixer track(s)"), Context::mixer, { chord ('S') } },
+        { "mixer.renderArmed", TR_NOOP ("Disk recording: render the armed tracks to wave file(s)"), Context::mixer, { chord ('R', alt) } },
+        { "mixer.renderSelected", TR_NOOP ("Disk recording: render the selected tracks to wave file(s)"), Context::mixer, { chord ('R', shift | alt) } },
         { "mixer.deleteEffect", TR_NOOP ("Delete the selected effect slot's plugin"), Context::mixer, { chord (del) } },
     };
 

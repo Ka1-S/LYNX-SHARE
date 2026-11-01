@@ -53,6 +53,69 @@ inline std::int64_t fileTicks (const ChannelDef& channel, double fileFrames, dou
     return perTick > 0.0 ? (std::int64_t) std::llround (fileFrames / perTick) : 0;
 }
 
+// An audio clip's speed with FL 2026's own clip pitch (round 167k, keys 7/8): the clip pitch is a shift that keeps the
+// length (FL render: a 2 s clip pitched +3 still lasts 2 s on a channel that resamples), so only the channel's counts.
+inline double clipSpeed (const ChannelDef& channel, const Clip&) noexcept
+{
+    return clipSpeed (channel);
+}
+
+inline double framesPerTick (const ChannelDef& channel, const Clip& clip, double fileFrames, double fileRate, double bpm) noexcept
+{
+    return framesPerTick (channel.sampler, fileFrames, fileRate, bpm) * clipSpeed (channel, clip);
+}
+
+inline std::int64_t fileTicks (const ChannelDef& channel, const Clip& clip, double fileFrames, double fileRate, double bpm) noexcept
+{
+    const auto perTick = framesPerTick (channel, clip, fileFrames, fileRate, bpm);
+    return perTick > 0.0 ? (std::int64_t) std::llround (fileFrames / perTick) : 0;
+}
+
+// The clip reads its file backwards: the channel's Reverse, flipped again by the clip's own reverse (key 9).
+inline bool playsBackwards (const ChannelDef& channel, const Clip& clip) noexcept
+{
+    return channel.sampler.reverse != clip.reversed;
+}
+
+// Keys 7 / 8 of FL's Playlist (EEPitchSelectedAudioClipsDown/UpAction → FUN_00e2d7b0): every selected audio clip's
+// pitch moves one semitone, clamped to -12..+12; the clips keep their place and length. False when none is audio.
+inline bool pitchAudioClips (Song& song, const std::vector<int>& clips, int semitones) noexcept
+{
+    auto any = false;
+    for (auto i : clips)
+        if (i >= 0 && i < (int) song.playlist.size() && song.playlist[(std::size_t) i].kind == ClipKind::audio)
+        {
+            auto& c = song.playlist[(std::size_t) i];
+            c.pitch = std::clamp (c.pitch + (float) semitones, -12.0f, 12.0f);
+            any = true;
+        }
+    return any;
+}
+
+// Key 9 (EEReverseSelectedAudioClipsAction → FUN_00e2db70 → FUN_01065520): toggles each selected audio clip's
+// reverse; the part of the file it shows mirrors (start' = file − min(end, file), clamped at 0), so the clip plays the
+// same audio backwards. `wholeFileTicks(i)` gives clip i's file length in ticks (≤ 0: unknown, the offset stays).
+template <typename FileTicks>
+inline bool reverseAudioClips (Song& song, const std::vector<int>& clips, FileTicks&& wholeFileTicks)
+{
+    auto any = false;
+    for (auto i : clips)
+        if (i >= 0 && i < (int) song.playlist.size() && song.playlist[(std::size_t) i].kind == ClipKind::audio)
+        {
+            const auto file = (std::int64_t) wholeFileTicks (i);
+            auto& c = song.playlist[(std::size_t) i];
+            c.reversed = ! c.reversed;
+            if (file > 0)
+            {
+                const auto played = std::min (c.length, std::max<std::int64_t> (0, file - c.offset));
+                c.offset = std::max<std::int64_t> (0, file - (c.offset + played));
+                c.offsetFraction = 0.0f;
+            }
+            any = true;
+        }
+    return any;
+}
+
 // Scales every clip of audio channel `channel` (offset, length, fades) after its file's length in ticks changed from
 // `before` to `after` (a stretch or a resampling pitch), so each keeps showing and playing the same audio.
 inline void rescaleClipsOf (Song& song, int channel, std::int64_t before, std::int64_t after) noexcept

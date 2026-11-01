@@ -125,6 +125,10 @@ public:
     void selectLinkedChannels();             // Alt+L
     // The insert's right-click menu (FL's mixer track menu, REA rounds 115/134/143); public for --snapshot and tests.
     juce::PopupMenu buildMenu (int track);
+    // runs the selected track's menu item whose caption (before any "\t" key text) is `caption` (translated): the
+    // Mixer's menu keys (round 167k: FL's F2, S, Alt+R, Shift+Alt+R) do exactly what the menu does. False when absent
+    // or disabled.
+    bool runMenuItem (const juce::String& caption);
 
     // Mixer menu › "Show only used inserts" (round 163; ui-options.txt "mixerUsedOnly"): inserts nothing uses
     // (Song::insertInUse) take no room; "+" brings back the first unused insert before adding one.

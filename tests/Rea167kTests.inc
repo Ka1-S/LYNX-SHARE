@@ -132,3 +132,298 @@ TEST (rea167k_undo_backwards_key)
     CHECK (map.find ({ 'Z', ctrl | alt }, Context::global, false) == "edit.undoBackwards");
     CHECK (map.find ({ 'Z', ctrl }, Context::global, false) == "edit.undo");
 }
+
+namespace rea167k
+{
+// one audio channel with a 2 s ramp (frame i = i / 96000) at 48 kHz: 4 beats at 120 BPM; one clip of 4 beats
+inline lynx::Song rampSong()
+{
+    lynx::Song s;
+    s.bpm = 120.0;
+    lynx::ChannelDef c;
+    c.instrument = lynx::InstrumentKind::audioClip;
+    c.samplePath = "ramp";
+    c.volume = 1.0f;
+    s.channels.push_back (c);
+    s.patterns.emplace_back();
+    lynx::Clip clip;
+    clip.kind = lynx::ClipKind::audio;
+    clip.channel = 0;
+    clip.length = 4 * lynx::ppq;
+    s.playlist.push_back (clip);
+    s.mode = lynx::PlayMode::song;
+    return s;
+}
+
+// the left output at `beats` (from the start, 256-sample blocks)
+inline float rampLevelAt (const lynx::Song& s, double beats)
+{
+    auto provider = [] (const std::string&) {
+        auto d = std::make_shared<lynx::SampleData>();
+        d->sampleRate = 48000.0;
+        d->left.resize (96000);
+        for (std::size_t i = 0; i < d->left.size(); ++i)
+            d->left[i] = (float) i / 96000.0f;
+        return std::shared_ptr<const lynx::SampleData> (d);
+    };
+    auto state = lynx::RackState::build (s, nullptr, 48000.0, provider);
+    lynx::RackRenderer r;
+    r.prepare (48000.0, 256);
+    std::vector<float> l (256), rr (256);
+    const auto tps = lynx::ticksPerSample (120.0, 48000.0);
+    const auto blocks = (int) (beats * 24000.0 / 256.0);
+    for (int b = 0; b <= blocks; ++b)
+        r.process (state.get(), true, (double) b * 256.0 * tps, 256, l.data(), rr.data());
+    return std::abs (l[255]);
+}
+} // namespace rea167k
+
+TEST (rea167k_clip_pitch_and_reverse_keys)
+{
+    // FL 2026's keys 7 / 8 / 9 (FUN_00e2d7b0, FUN_00e2db70 → FUN_01065520): the selected audio clips only
+    using namespace lynx;
+    auto s = rea167k::rampSong();
+    Clip pattern;
+    pattern.length = ppq;
+    s.playlist.push_back (pattern);
+    CHECK (clipops::pitchAudioClips (s, { 0, 1 }, 1));
+    CHECK (s.playlist[0].pitch == 1.0f && s.playlist[1].pitch == 0.0f);
+    for (int i = 0; i < 20; ++i)
+        clipops::pitchAudioClips (s, { 0 }, 1);
+    CHECK (s.playlist[0].pitch == 12.0f); // clamped at +12
+    for (int i = 0; i < 30; ++i)
+        clipops::pitchAudioClips (s, { 0 }, -1);
+    CHECK (s.playlist[0].pitch == -12.0f);
+    CHECK (! clipops::pitchAudioClips (s, { 1 }, 1)); // a pattern clip: nothing
+    CHECK (! clipops::pitchAudioClips (s, {}, 1));
+
+    // reverse: the shown part of the file mirrors (start' = file − min(end, file))
+    s.playlist[0].pitch = 0.0f;
+    s.playlist[0].offset = ppq;
+    s.playlist[0].length = 2 * ppq;
+    CHECK (clipops::reverseAudioClips (s, { 0, 1 }, [] (int) { return (std::int64_t) (4 * ppq); }));
+    CHECK (s.playlist[0].reversed && s.playlist[0].offset == ppq && ! s.playlist[1].reversed);
+    s.playlist[0].offset = 0;
+    s.playlist[0].length = 3 * ppq;
+    clipops::reverseAudioClips (s, { 0 }, [] (int) { return (std::int64_t) (4 * ppq); });
+    CHECK (! s.playlist[0].reversed && s.playlist[0].offset == ppq);
+    // a clip longer than the file: start' clamps at 0
+    s.playlist[0].offset = ppq;
+    s.playlist[0].length = 8 * ppq;
+    clipops::reverseAudioClips (s, { 0 }, [] (int) { return (std::int64_t) (4 * ppq); });
+    CHECK (s.playlist[0].offset == 0);
+
+    // the clip's own pitch keeps its length (FL render c_p3: 2 s at 522.5 Hz): the speed is the channel's
+    const auto& ch = s.channels[0];
+    Clip up;
+    up.pitch = 12.0f;
+    CHECK (clipops::clipSpeed (ch, up) == 1.0);
+    auto pitched = ch;
+    pitched.sampler.pitch = 12.0f;
+    CHECK (std::abs (clipops::clipSpeed (pitched, up) - 2.0) < 1e-9); // (the channel's pitch knob still resamples)
+    CHECK (clipops::playsBackwards (ch, Clip { .reversed = true }) && ! clipops::playsBackwards (ch, Clip {}));
+
+    // the keys (Playlist focused)
+    KeyMap map;
+    CHECK (map.conflicts().empty());
+    CHECK (map.find ({ '7', keys::none }, Context::playlist, false) == "playlist.pitchClipsDown");
+    CHECK (map.find ({ '8', keys::none }, Context::playlist, false) == "playlist.pitchClipsUp");
+    CHECK (map.find ({ '9', keys::none }, Context::playlist, false) == "playlist.reverseClips");
+}
+
+TEST (rea167k_clip_pitch_and_reverse_play)
+{
+    using namespace lynx;
+    auto s = rea167k::rampSong();
+    const auto forward = rea167k::rampLevelAt (s, 1.0); // reads frame ~24000: 0.25
+    REA167K_REQUIRE (forward > 0.0f);
+    s.playlist[0].reversed = true; // reads 96000 − 24000: 0.75
+    CHECK (std::abs (rea167k::rampLevelAt (s, 1.0) / forward - 3.0f) < 0.02f);
+    // a reversed channel and a reversed clip play forwards
+    s.playlist[0].pitch = 0.0f;
+    s.playlist[0].reversed = true;
+    s.channels[0].sampler.reverse = true;
+    CHECK (std::abs (rea167k::rampLevelAt (s, 1.0) / forward - 1.0f) < 0.02f);
+}
+
+TEST (rea167k_flp_clip_pitch_and_reverse_import)
+{
+    // the playlist item's +0x3C (pitch, semitones) and +0x48 bit 0 (reversed) in 80-byte records (25.2.5, 0xA9 = 7)
+    FlpBuilder b (96);
+    b.ascii (0xC7, "25.2.5.5319");
+    b.u8 (0xA9); b.u32 (7);
+    b.u8 (0x9C); b.u32 (120000);
+    b.u8 (0x40); b.u16 (0);
+    b.u8 (0x15); b.u8 (4);
+    b.utf16 (0xC4, u"C:\\samples\\ramp.wav");
+    std::vector<std::uint8_t> items (160, 0);
+    for (int k = 0; k < 2; ++k)
+    {
+        auto* r = items.data() + 80 * k;
+        std::uint32_t pos = (std::uint32_t) (k * 384), len = 384;
+        std::uint16_t base = 20480, idx = 0, rv = 499;
+        const float gain = 1.0f, pitch = k == 0 ? 3.0f : -5.0f;
+        const std::uint32_t flags = k == 0 ? 1u : 0u;
+        const double stretch = 1.0;
+        std::memcpy (r + 0, &pos, 4);
+        std::memcpy (r + 4, &base, 2);
+        std::memcpy (r + 6, &idx, 2);
+        std::memcpy (r + 8, &len, 4);
+        std::memcpy (r + 12, &rv, 2);
+        std::memcpy (r + 0x34, &gain, 4);
+        std::memcpy (r + 0x3C, &pitch, 4);
+        std::memcpy (r + 0x40, &stretch, 8);
+        std::memcpy (r + 0x48, &flags, 4);
+    }
+    b.data (0xE9, items);
+    const auto p = flp::parseProject (b.bytes);
+    REA167K_REQUIRE (p.arrangements.size() == 1 && p.arrangements[0].items.size() == 2);
+    const auto& a = p.arrangements[0].items[0];
+    const auto& c = p.arrangements[0].items[1];
+    CHECK (a.kind == flp::PlaylistItem::Kind::channelClip && a.pitch == 3.0f && a.reversed);
+    CHECK (c.pitch == -5.0f && ! c.reversed);
+
+    lynx::FlpImportOptions o;
+    o.fileExists = [] (const std::string&) { return true; };
+    o.sampleSeconds = [] (const std::string&) { return 2.0; };
+    const auto song = lynx::importFlp (p, o);
+    int audio = 0;
+    for (const auto& clip : song.playlist)
+        if (clip.kind == lynx::ClipKind::audio)
+        {
+            CHECK ((clip.start == 0 && clip.pitch == 3.0f && clip.reversed) || (clip.start > 0 && clip.pitch == -5.0f && ! clip.reversed));
+            ++audio;
+        }
+    CHECK (audio == 2);
+}
+
+TEST (rea167k_time_marker_keys)
+{
+    using namespace lynx;
+    // the keys: FL's ShortCut values 32852 / 16468 / 41044 / 8276 (Alt+T, Ctrl+T, Shift+Alt+T, Shift+T), Playlist focused
+    {
+        using namespace lynx::keys;
+        KeyMap map;
+        CHECK (map.conflicts().empty());
+        CHECK (map.find ({ 'T', alt }, Context::playlist, false) == "playlist.markerAdd");
+        CHECK (map.find ({ 'T', ctrl }, Context::playlist, false) == "playlist.markerAuto");
+        CHECK (map.find ({ 'T', shift | alt }, Context::playlist, false) == "playlist.markerSignature");
+        CHECK (map.find ({ 'T', shift }, Context::playlist, false) == "playlist.markerLoop");
+        CHECK (map.find ({ 'T', ctrl }, Context::global, false) == "view.typingPiano"); // elsewhere: the typing piano
+    }
+
+    // Ctrl+T (FUN_00e546a0): "Auto", "Auto #2"...; a marker already there is kept
+    Song s;
+    s.markers().clear();
+    CHECK (markers::addAuto (s, 0) == 0 && s.markers()[0].name == "Auto");
+    markers::addAuto (s, ppq);
+    markers::addAuto (s, 2 * ppq);
+    REA167K_REQUIRE (s.markers().size() == 3);
+    CHECK (s.markers()[1].name == "Auto #2" && s.markers()[2].name == "Auto #3");
+    CHECK (markers::addAuto (s, ppq) == 1 && s.markers().size() == 3);
+    CHECK (s.markers()[1].action == Marker::none && ! s.markers()[1].isSignature());
+
+    // Shift+T (FUN_0122bb80): one song Loop marker; the same place again takes it away
+    s.markers().clear();
+    markers::placeSongLoop (s, 4 * ppq);
+    REA167K_REQUIRE (s.markers().size() == 1);
+    CHECK (s.markers()[0].action == Marker::songLoop && s.markers()[0].tick == 4 * ppq);
+    markers::placeSongLoop (s, 8 * ppq);
+    CHECK (s.markers().size() == 1 && s.markers()[0].tick == 8 * ppq);
+    markers::placeSongLoop (s, 8 * ppq);
+    CHECK (s.markers().empty());
+
+    // Shift+Alt+T (FUN_0122bd20): at the selection's start (on a beat), the old signature back at its end
+    s.markers().clear();
+    s.playlist.clear();
+    Clip c;
+    c.length = 64 * ppq;
+    s.playlist.push_back (c);
+    markers::addSignatureChange (s, 16 * ppq + 5, 24 * ppq, 3, 4);
+    REA167K_REQUIRE (s.markers().size() == 2);
+    CHECK (s.markers()[0].tick == 16 * ppq && s.markers()[0].numerator == 3 && s.markers()[0].denominator == 4 && s.markers()[0].name == "3/4");
+    CHECK (s.markers()[1].tick == 24 * ppq && s.markers()[1].numerator == 4 && s.markers()[1].denominator == 4);
+    CHECK (markers::signatureAt (s, 20 * ppq) == std::make_pair (3, 4) && markers::signatureAt (s, 30 * ppq) == std::make_pair (4, 4));
+    // no selection: only the change
+    s.markers().clear();
+    markers::addSignatureChange (s, 8 * ppq, -1, 7, 8);
+    CHECK (s.markers().size() == 1 && s.markers()[0].numerator == 7 && s.markers()[0].denominator == 8);
+}
+
+TEST (rea167k_mixer_menu_keys)
+{
+    // FL's mixer track menu (EEMixer DFM ShortCut): F2 rename and color, S solo selected, Alt+R / Shift+Alt+R disk
+    // recording renders; the Mixer focused (F2 elsewhere stays the pattern's rename)
+    using namespace lynx::keys;
+    KeyMap map;
+    CHECK (map.conflicts().empty());
+    CHECK (map.find ({ f2, none }, Context::mixer, false) == "mixer.rename");
+    CHECK (map.find ({ f2, none }, Context::global, false) == "pattern.rename");
+    CHECK (map.find ({ 'S', none }, Context::mixer, false) == "mixer.soloSelected");
+    CHECK (map.find ({ 'R', alt }, Context::mixer, false) == "mixer.renderArmed");
+    CHECK (map.find ({ 'R', shift | alt }, Context::mixer, false) == "mixer.renderSelected");
+}
+
+namespace rea167k
+{
+// a 2 s 440 Hz sine on an audio clip channel at 48 kHz (4 beats at 120 BPM), one clip of 6 beats: the rendered left
+// channel over 3 s
+inline std::vector<float> renderSine (const lynx::Song& s)
+{
+    auto provider = [] (const std::string&) {
+        auto d = std::make_shared<lynx::SampleData>();
+        d->sampleRate = 48000.0;
+        d->left.resize (96000);
+        for (std::size_t i = 0; i < d->left.size(); ++i)
+            d->left[i] = 0.5f * (float) std::sin (2.0 * 3.14159265358979 * 440.0 * (double) i / 48000.0);
+        return std::shared_ptr<const lynx::SampleData> (d);
+    };
+    auto state = lynx::RackState::build (s, nullptr, 48000.0, provider);
+    lynx::RackRenderer r;
+    r.prepare (48000.0, 256);
+    std::vector<float> l (256), rr (256), out;
+    const auto tps = lynx::ticksPerSample (120.0, 48000.0);
+    for (int b = 0; b < 3 * 48000 / 256; ++b)
+    {
+        r.process (state.get(), true, (double) b * 256.0 * tps, 256, l.data(), rr.data());
+        out.insert (out.end(), l.begin(), l.end());
+    }
+    return out;
+}
+
+inline double frequencyOf (const std::vector<float>& x, double from, double to)
+{
+    std::vector<std::size_t> up;
+    for (auto i = (std::size_t) (from * 48000.0); i + 1 < (std::size_t) (to * 48000.0) && i + 1 < x.size(); ++i)
+        if (x[i] < 0.0f && x[i + 1] >= 0.0f)
+            up.push_back (i);
+    return up.size() > 2 ? (double) (up.size() - 1) / ((double) (up.back() - up.front()) / 48000.0) : 0.0;
+}
+
+inline float peakOf (const std::vector<float>& x, double from, double to)
+{
+    float m = 0.0f;
+    for (auto i = (std::size_t) (from * 48000.0); i < (std::size_t) (to * 48000.0) && i < x.size(); ++i)
+        m = std::max (m, std::abs (x[i]));
+    return m;
+}
+} // namespace rea167k
+
+TEST (rea167k_clip_pitch_keeps_the_length)
+{
+    // FL 2026 renders (r167k/fl/clip: a 2 s 440 Hz file, channel in Resample): clip pitch +3 → 522.5 Hz, −5 → 329.2 Hz,
+    // and the audio still ends at 2 s
+    using namespace lynx;
+    auto s = rea167k::rampSong();
+    s.playlist[0].length = 6 * ppq;
+    const auto base = rea167k::renderSine (s);
+    CHECK (std::abs (rea167k::frequencyOf (base, 0.3, 0.8) - 440.0) < 1.0);
+    for (auto [semitones, hz] : { std::pair { 3.0f, 523.25 }, { -5.0f, 329.63 } })
+    {
+        s.playlist[0].pitch = semitones;
+        const auto x = rea167k::renderSine (s);
+        CHECK (std::abs (rea167k::frequencyOf (x, 0.3, 0.8) - hz) < 2.0);
+        CHECK (rea167k::peakOf (x, 1.80, 1.95) > 0.2f);    // still playing near the end of the file
+        CHECK (rea167k::peakOf (x, 2.15, 2.9) < 0.05f);    // and not after it
+    }
+}

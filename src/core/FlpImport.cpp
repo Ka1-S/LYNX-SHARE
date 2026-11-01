@@ -3478,6 +3478,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
                 // clip gain and fades (FL 20.99+ records); fades are in ms, at most the clip length
                 clip.gain = item.gain;
+                clip.pitch = item.pitch;
+                clip.reversed = item.reversed;
                 const auto msToTicks = [&] (float ms)
                 { return std::clamp ((std::int64_t) std::llround (ms / 1000.0 * song.bpm / 60.0 * ppq), (std::int64_t) 0, clip.length); };
                 clip.fadeIn = msToTicks (item.fadeInMs);

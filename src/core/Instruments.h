@@ -83,6 +83,10 @@ public:
     // "Slide" note: sounding notes glide to `key` over `samples`, without retriggering. Ignored if unsupported.
     virtual void slideTo (int /*key*/, float /*cents*/, float /*samples*/) noexcept {}
     // Audio clip: fades and in-clip position of the next note (before noteOn), in samples.
+    // FL 2026's clip pitch (round 167k): the next audio clip note's own transposition, shifted keeping its length;
+    // setClipShift (UI thread, before prepareKeyShift) asks for the pitch shifters even without "keep pitch"
+    virtual void setNextClipPitch (float /*semitones*/) noexcept {}
+    virtual void setClipShift (bool) {}
     virtual void setNextClipFades (float /*elapsed*/, float /*remaining*/, float /*fadeIn*/, float /*fadeOut*/, std::uint8_t /*shape*/ = 0) noexcept {}
     // Pan, fine tuning and "porta" (inverts the channel's porta) of the next note (called right before
     // noteOn). Ignored if unsupported.

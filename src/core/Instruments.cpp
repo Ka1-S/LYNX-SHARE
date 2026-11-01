@@ -1649,6 +1649,10 @@ public:
     void noteOnAt (int key, float velocity, double startSeconds) noexcept override
     {
         const auto noteGain = std::exchange (nextGain, 1.0f);
+        // this note's clip fades and flags, taken now so a note that does not sound leaves none to the next one
+        const auto clipFades = std::exchange (nextClip, {});
+        const auto clipShape = std::exchange (nextClipShape, (std::uint8_t) 0);
+        const auto clipPitch = clipMode ? (double) std::clamp (std::exchange (nextClipPitch, 0.0f), -12.0f, 12.0f) : 0.0;
         const auto* zone = clipMode ? nullptr : zoneFor (key, velocity);
         const auto* data = zone != nullptr ? zone->sample.get() : sample.get();
 
@@ -1659,7 +1663,8 @@ public:
             return;
 
         sliceMailbox.read (slices);
-        const auto backwards = reverse.load(); // audio clips too (the clip menu's Reverse)
+        // audio clips too (the clip menu's Reverse); a reversed clip (FL 2026's clip reverse, key 9) flips it again
+        const auto backwards = reverse.load() != (clipMode && (clipShape & 4) != 0);
         const auto total = (double) (data->frames() - 1);
         // sample region (the start acts as "start offset"); audio clips use the whole file. `last` is the region's
         // last frame: FL plays until the read position passes it, interpolating with that frame repeated.
@@ -1757,13 +1762,11 @@ public:
         target->position = startFrame;
         target->first = first;
         target->last = last;
-        target->clipElapsed = nextClip[0];
-        target->clipRemaining = nextClip[1];
-        target->fadeIn = nextClip[2];
-        target->fadeOut = nextClip[3];
-        target->fadeShape = nextClipShape;
-        nextClip = {};
-        nextClipShape = 0;
+        target->clipElapsed = clipFades[0];
+        target->clipRemaining = clipFades[1];
+        target->fadeIn = clipFades[2];
+        target->fadeOut = clipFades[3];
+        target->fadeShape = (std::uint8_t) (clipShape & 3);
         // FL's read speed: the rate ratio at the original pitch, else exp(cents·ln2/1200)·ratio
         target->rate = flrs::speedFor ((float) (semitones * 100.0), base);
         target->reversed = backwards;
@@ -1837,7 +1840,12 @@ public:
         for (std::size_t i = 0; i < lfoTargets; ++i)
             if (lfos[i].active && ! clipMode)
                 lfos[i].start (target->lfo[i], songTicks);
-        startKeyShift (*target, semitones, base);
+        // FL 2026's clip pitch (round 167k, FL render: +3 → 522.5 Hz from 440 Hz, the 2 s clip still 2 s on a channel
+        // that resamples): a shift on top of the channel's own pitch, whatever the channel's mode, the length stays
+        if (clipMode && ! keyShift.load (std::memory_order_relaxed))
+            startKeyShift (*target, clipPitch, base, true);
+        else
+            startKeyShift (*target, semitones + clipPitch, base);
         nextPan = nextCents = 0.0f;
         nextPorta = false;
     }
@@ -1861,13 +1869,14 @@ public:
     // Stretch keeping pitch (round 162, issue #9): a transposed note reads the stretched sample at its own speed, so it
     // lasts as long as at the root key, and its pitch shifter transposes it (FL's Stretch modes: "pitch changes keep
     // the original duration", the voices of a chord stay in sync). The root key plays the stretched sample untouched.
-    void startKeyShift (SamplerVoice& v, double semitones, double base) noexcept
+    // keepRate: only the clip's own pitch is shifted (round 167k); the voice keeps its (resampled) speed
+    void startKeyShift (SamplerVoice& v, double semitones, double base, bool keepRate = false) noexcept
     {
         const auto index = (std::size_t) (&v - voices.data());
         auto& ks = shifts[index];
         ks.on = false;
         ks.shifter = nullptr;
-        if (! keyShift.load (std::memory_order_relaxed) || std::abs (semitones) < 1.0e-6)
+        if ((! keyShift.load (std::memory_order_relaxed) && ! (keepRate && clipShift)) || std::abs (semitones) < 1.0e-6)
         {
             if (keyShift.load (std::memory_order_relaxed))
                 lastFactor = 1.0;
@@ -1899,9 +1908,12 @@ public:
             ks.factor = lastFactor;
         }
         lastFactor = std::exp2 (semitones / 12.0);
-        v.rate = base;
-        v.glideLeft = 0;
-        lastRate = base;
+        if (! keepRate)
+        {
+            v.rate = base;
+            v.glideLeft = 0;
+            lastRate = base;
+        }
 
         ks.ahead = v;
         ks.ahead.pitchMul = 1.0;
@@ -1980,9 +1992,13 @@ public:
         ++ks.pos;
     }
 
+    void setClipShift (bool on) override { clipShift = on; }
+
+    void setNextClipPitch (float semitones) noexcept override { nextClipPitch = std::isfinite (semitones) ? semitones : 0.0f; }
+
     void prepareKeyShift (double sr) override
     {
-        if (! keyShift.load())
+        if (! keyShift.load() && ! clipShift)
             return;
         const auto method = (StretchMethod) keyShiftMethod.load();
         for (auto& shifter : shifterPool)
@@ -2841,6 +2857,8 @@ private:
     }
     std::array<ModCoefficients, 2> modEnv {};
     std::array<float, 4> nextClip {}; // fades for the next noteOn (only the audio thread touches it)
+    float nextClipPitch = 0.0f;       // the next clip's own pitch (semitones, audio thread)
+    bool clipShift = false;           // pitch shifters for the clips' own pitch (set before prepareKeyShift)
     std::uint8_t nextClipShape = 0;
 
     struct SliceTable

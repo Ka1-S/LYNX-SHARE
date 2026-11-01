@@ -937,10 +937,14 @@ juce::var clipsToVar (const std::vector<Clip>& list)
                                       (juce::int64) c.offset, (int) c.kind,
                                       c.kind == ClipKind::automation ? c.automation : c.channel };
 
-        // [.., fade-in, fade-out, gain, muted, sub-tick offset] only when not default
+        // [.., fade-in, fade-out, gain, muted, sub-tick offset, pan, pitch, reversed] up to the last value that is not
+        // the default (round 167k: FL 2026's clip pitch and clip reverse, keys 7/8/9)
         const auto fraction = juce::roundToInt (c.offsetFraction * 10000.0f) / 10000.0;
         const auto pan = juce::roundToInt (c.pan * 1000.0f) / 1000.0;
-        if (c.fadeIn > 0 || c.fadeOut > 0 || c.gain != 1.0f || c.muted || fraction != 0.0 || pan != 0.0)
+        const auto pitch = juce::roundToInt (c.pitch * 1000.0f) / 1000.0;
+        const int used = c.reversed ? 8 : pitch != 0.0 ? 7 : pan != 0.0 ? 6 : fraction != 0.0 ? 5 : c.muted ? 4
+                       : (c.fadeIn > 0 || c.fadeOut > 0 || c.gain != 1.0f) ? 3 : 0;
+        if (used > 0)
         {
             clip.add ((juce::int64) c.fadeIn);
             clip.add ((juce::int64) c.fadeOut);
@@ -951,12 +955,16 @@ juce::var clipsToVar (const std::vector<Clip>& list)
                 const auto scale = std::pow (10.0, 5.0 - std::floor (std::log10 (g)));
                 return std::round (g * scale) / scale;
             }());
-            if (c.muted || fraction != 0.0 || pan != 0.0)
+            if (used >= 4)
                 clip.add (c.muted);
-            if (fraction != 0.0 || pan != 0.0)
+            if (used >= 5)
                 clip.add (fraction);
-            if (pan != 0.0)
-                clip.add (pan); // [.., sub-tick offset, pan]
+            if (used >= 6)
+                clip.add (pan);
+            if (used >= 7)
+                clip.add (pitch);
+            if (used >= 8)
+                clip.add (c.reversed);
         }
 
         clips.add (clip);
@@ -991,6 +999,8 @@ std::vector<Clip> clipsFromVar (const juce::var& v, const Song& song)
                 clip.muted = c.size() >= 11 && (bool) c[10];
                 clip.offsetFraction = c.size() >= 12 ? juce::jlimit (-0.5f, 0.5f, (float) (double) c[11]) : 0.0f;
                 clip.pan = c.size() >= 13 ? juce::jlimit (-1.0f, 1.0f, (float) (double) c[12]) : 0.0f;
+                clip.pitch = c.size() >= 14 ? juce::jlimit (-12.0f, 12.0f, (float) (double) c[13]) : 0.0f;
+                clip.reversed = c.size() >= 15 && (bool) c[14];
             }
 
             if (c.size() >= 7 && (int) c[5] == 2)

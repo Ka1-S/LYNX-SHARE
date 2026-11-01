@@ -1719,6 +1719,24 @@ void MixerStrips::showMenu (int t)
     buildMenu (t).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
+bool MixerStrips::runMenuItem (const juce::String& caption)
+{
+    auto menu = buildMenu (getSelectedTrack());
+    for (juce::PopupMenu::MenuItemIterator it (menu, true); it.next();)
+    {
+        const auto& item = it.getItem();
+        if (item.isEnabled && item.action != nullptr && item.subMenu == nullptr
+            && item.text.upToFirstOccurrenceOf ("\t", false, false).trim() == caption)
+        {
+            const auto action = item.action; // (the menu goes away first)
+            menu = {};
+            action();
+            return true;
+        }
+    }
+    return false;
+}
+
 juce::PopupMenu MixerStrips::buildMenu (int t)
 {
     const auto& song = engine.getSong();
@@ -2021,7 +2039,7 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                 armed.push_back (x);
         juce::PopupMenu disk;
         auto& eng = engine;
-        disk.addItem (tr ("Render armed tracks to wave file(s)..."), ! armed.empty(), false, [armed, &eng] {
+        disk.addItem (tr ("Render armed tracks to wave file(s)...") + "\tAlt+R", ! armed.empty(), false, [armed, &eng] {
             if (mixeroptions::renderTracks)
                 mixeroptions::renderTracks (armed, [armed, &eng] (const std::vector<juce::File>& files) {
                     if (eng.getRecordOptions().unarmAfterRender) // FL's "Auto-unarm" (round 166e)
@@ -2031,7 +2049,7 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                         placeRenderedFiles (eng, files);
                 });
         });
-        disk.addItem (tr ("Render selected tracks to wave file(s)..."), ! targets.empty(), false, [targets] {
+        disk.addItem (tr ("Render selected tracks to wave file(s)...") + "\tShift+Alt+R", ! targets.empty(), false, [targets] {
             if (mixeroptions::renderTracks)
                 mixeroptions::renderTracks (targets, {});
         });
@@ -4990,6 +5008,14 @@ bool MixerComponent::runAction (const std::string& id)
         strips.linkSelectedChannels (true);
     else if (id == "mixer.selectLinkedChannels")
         strips.selectLinkedChannels();
+    else if (id == "mixer.rename") // FL's mixer menu keys (round 167k): the menu's own items
+        return strips.runMenuItem (tr ("Rename and color..."));
+    else if (id == "mixer.soloSelected")
+        return strips.runMenuItem (tr ("Solo selected track(s)"));
+    else if (id == "mixer.renderArmed")
+        return strips.runMenuItem (tr ("Render armed tracks to wave file(s)..."));
+    else if (id == "mixer.renderSelected")
+        return strips.runMenuItem (tr ("Render selected tracks to wave file(s)..."));
     else if (id == "mixer.deleteEffect") // FL: Delete on the selected effect slot (issue #11)
         effects.deleteSlot (effects.getSelectedSlot());
     else
