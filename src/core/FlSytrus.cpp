@@ -1942,6 +1942,19 @@ std::optional<KeyboardControllerData> parseKeyboardController (const std::vector
     out.autoRelease = d[552] != 0;
     return out;
 }
+std::vector<std::uint8_t> defaultKeyboardController()
+{
+    std::vector<std::uint8_t> s (553, 0);
+    const std::uint32_t version = 3;
+    std::memcpy (s.data(), &version, 4);
+    for (int k = 0; k < 132; ++k)
+    {
+        const auto v = (float) std::min (1.0, k / 127.0);
+        std::memcpy (s.data() + 12 + k * 4, &v, 4);
+    }
+    s[552] = 1;
+    return s;
+}
 void writeKeyboardController (const KeyboardControllerData& data, std::vector<std::uint8_t>& d)
 {
     if (! parseKeyboardController (d))

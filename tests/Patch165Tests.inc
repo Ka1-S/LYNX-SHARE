@@ -221,6 +221,15 @@ TEST (patch165_keyboard_controller_state_round_trip)
     CHECK (state[4] == 77 && state[541] == 9 && back && ! back->autoRelease && back->keys[60] == 1.0f);
 }
 
+TEST (keyboard_controller_default_state)
+{
+    using namespace lynx;
+    // what a new one starts with, in the Channel Rack and in the Patcher: a ramp over the keys, released to 0
+    const auto d = parseKeyboardController (defaultKeyboardController());
+    CHECK (d && d->keys[0] == 0.0f && d->keys[127] == 1.0f && d->keys[131] == 1.0f);
+    CHECK (d && d->keys[60] > d->keys[59] && d->noteOffValue == 0.0f && d->autoRelease);
+}
+
 // --- Round 165c patch165: FL's Layer as a Patcher node (its Children pin plays the generators cabled to it)
 
 namespace patch165

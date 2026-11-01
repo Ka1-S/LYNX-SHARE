@@ -50,6 +50,8 @@ std::vector<GeneratorEntry> generatorEntries (AudioEngine& engine, bool withUnav
     // built-in controllers and tools (rounds 133–165): no sound of their own
     builtIn (TR_NOOP ("Envelope Controller"), tr ("Envelope Controller"), 1, InstrumentKind::controller,
              [] (ChannelDef& c) { c.controllerState = writeEnvelopeController (defaultEnvelopeController()); });
+    builtIn (TR_NOOP ("Keyboard Controller"), tr ("Keyboard Controller"), 1, InstrumentKind::controller,
+             [] (ChannelDef& c) { c.controllerState = defaultKeyboardController(); });
     add ("MIDI Out", tr ("MIDI Out"), tr ("built-in"), 0, 1, InstrumentKind::midiOut, [&engine] {
         ChannelDef c;
         c.name = "MIDI Out";
