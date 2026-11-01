@@ -199,6 +199,8 @@ render, **[GUI]** LYNX driven on Windows (fresh profile, `LYNX_TEST_MODE=1`), **
 - **LYNX before:** no keys; Ctrl+Left / Ctrl+Right did nothing in the Playlist.
 - **LYNX now:** `playlist.selectTimeAround`, `playlist.timePrevious`, `playlist.timeNext` (Playlist focused);
   `PlaylistComponent::selectTimeAroundSelection` / `moveTimeSelection`. [TEST] `rea167k_select_time_keys`.
+  [GUI, Windows] the demo: one Chords clip selected, Ctrl+Enter selects bars 5–9; Ctrl+Right moves it to 9–13 with
+  the playhead at bar 9; with nothing selected Ctrl+Enter selects the view and again clears it.
 
 ## 10. Declicker attacks and the sample's end (167h leftover)
 
@@ -220,11 +222,12 @@ render, **[GUI]** LYNX driven on Windows (fresh profile, `LYNX_TEST_MODE=1`), **
   ended 432 frames after the sample.
 - **LYNX now:** with a declicking mode other than 0, a voice that runs past its sample's end holds the last frame and
   starts the mode's release (`startCut (v, false)`: the same declicker as a note cut); mode 0 keeps the 10 ms end
-  table. [TEST] `rea167k_sample_end_uses_the_declicking_release`.
+  table. [TEST] `rea167k_sample_end_uses_the_declicking_release`. LYNX `--render` of the same `dk.flp` against FL's
+  render: max error 0.0000 / 0.0000 / 0.0004 / 0.0004 / 0.0001 / 0.0001 for modes 0–5 (before: up to 0.19).
 
 ## Where I stopped
 
-- Done (feature/flopt167k): items 1–10, tests green (`tests/Rea167kTests.inc`), Windows GUI re-check (keys 7/8/9,
+- Done (feature/flopt167k): items 1–10 (first landing d2ad4494 = items 1–8), tests green (`tests/Rea167kTests.inc`), Windows GUI re-check (keys 7/8/9,
   marker keys, undo, mixer keys, export dialog) and render checks against FL.
 - Left from the brief: 167h leftovers (Sampler legacy panel, .flp events 0x20 (+0x892),
   0x30 (+0x224), 0x32 (+0x1fc), 0xAA (+0x714 count + strings), 0x2B, 0xE2/0xE6, 0x26: they need the channel form
