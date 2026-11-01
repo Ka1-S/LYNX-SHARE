@@ -4877,6 +4877,9 @@ private:
                 const auto loaded = juce::Time::getMillisecondCounterHiRes();
                 // .mp3: the Export window's MP3 (320 kbps); everything else as before
                 auto options = settings.toOptions();
+                // --save-tempo: FL's "Tempo information" (acid chunk) on (round 167l: compare with FL's AcidBox render)
+                if (juce::JUCEApplication::getCommandLineParameters().contains ("--save-tempo"))
+                    options.saveTempo = true;
                 // --no-warmup: the export's plugin warm-up off (round 155: compare the start of the file)
                 if (juce::JUCEApplication::getCommandLineParameters().contains ("--no-warmup"))
                     options.pluginWarmUp = false;
@@ -4890,6 +4893,7 @@ private:
                     options.mp3Kbps = 320;
                 }
                 lynx::ExportJob job (insert > 0 ? lynx::makeBounceSong (loader.getSong(), insert) : loader.getSong(), options, output);
+                job.setExtraData (true);
                 const auto prepared = juce::Time::getMillisecondCounterHiRes();
                 lynx::loadtrace::end();
                 int lastPercent = -1;

@@ -232,3 +232,118 @@ TEST (rea167l_transport_notes_off_bytes)
     for (int ch = 0; ch < 16; ++ch)
         CHECK (b[(std::size_t) ch * 3] == 0xb0 + ch && b[(std::size_t) ch * 3 + 1] == 123 && b[(std::size_t) ch * 3 + 2] == 0);
 }
+
+// §3 the export's extra data: FL 2026's render of r167l/fl/l_all.flp (take 1: 120 BPM, 44.1 kHz, three plain markers
+// at beats 8 / 16 / 30, the second unnamed, AcidBox on) — every byte after "data" up to FL's LIST INFO
+TEST (rea167l_export_wav_extras_match_fl)
+{
+    static const char* fl =
+        "736d706c3c0000000000000000000000945800003c000000000000000000000000000000010000000000000000000200000400000000000089e43b000000"
+        "0000000000006163696418000000040000003c00800000000000b2000000040004000000f042637565204c000000030000000000010010b10200646174"
+        "61000000000000000010b1020001000100206205006461746100000000000000002062050002000100fc170a00646174610000000000000000fc170a00"
+        "4c495354400000006164746c6c61626c0a000000000001005665727365006c61626c0d000000010001004d61726b6572203100006c61626c0b00000002"
+        "00010044726f7020410000746c73744c0000000300000063756520ffff000001000000ff3c90000000000000000000637565200000010001000000ff3d"
+        "90000000000000000000637565200100010001000000ff3e90000000000000000000";
+    std::vector<std::uint8_t> want;
+    for (const char* p = fl; p[0] != 0 && p[1] != 0; p += 2)
+        want.push_back ((std::uint8_t) std::stoi (std::string (p, 2), nullptr, 16));
+    lynx::exportopts::WavExtras x;
+    x.loop = true;
+    x.musicFrames = 3925130; // (FL's loop end 3925129 = the last frame of the music)
+    x.acid = true;
+    x.tempo = 120.0f;
+    x.markers = { { 176400, "Verse" }, { 352800, "" }, { 661500, "Drop A" } };
+    const auto got = lynx::exportopts::wavExtraChunks (x, 44100.0, 3925359);
+    CHECK (got.size() == want.size());
+    CHECK (got == want);
+
+    // from a song: the plain markers only, at their time; tempo and meter
+    auto song = lynx::Song::makeDefault();
+    song.bpm = 120.0;
+    song.beatsPerBar = 3;
+    song.markers().clear();
+    lynx::Marker a;
+    a.tick = 8 * lynx::ppq;
+    a.name = "Verse";
+    song.addMarker (a);
+    lynx::Marker sig;
+    sig.tick = 12 * lynx::ppq;
+    sig.numerator = 7;
+    sig.action = lynx::Marker::timeSignature;
+    song.addMarker (sig);
+    lynx::Marker loop;
+    loop.tick = 14 * lynx::ppq;
+    loop.action = lynx::Marker::markerLoop;
+    song.addMarker (loop);
+    lynx::exportopts::Options o;
+    o.range = lynx::exportopts::Range::pattern;
+    auto e = lynx::exportopts::wavExtras (song, o, 44100.0);
+    CHECK (e.loop && ! e.acid && e.numerator == 3 && e.denominator == 4 && e.tempo == 120.0f);
+    o.saveTempo = true;
+    o.loopMarkers = false;
+    o.playlistMarkers = false;
+    e = lynx::exportopts::wavExtras (song, o, 44100.0);
+    CHECK (e.acid && ! e.loop && e.markers.empty());
+    // the defaults are FL's (tempo off, loop and playlist markers on) and survive the settings text
+    const lynx::exportopts::Options d;
+    CHECK (! d.saveTempo && d.loopMarkers && d.playlistMarkers);
+    CHECK (lynx::exportopts::fromText (lynx::exportopts::toText (o)) == o);
+    CHECK (lynx::exportopts::wavExtraChunks ({}, 44100.0, 100).empty());
+}
+
+TEST (rea167l_export_wav_extras_song_markers)
+{
+    auto song = lynx::Song::makeDefault();
+    song.bpm = 120.0;
+    song.markers().clear();
+    lynx::Marker a;
+    a.tick = 2 * lynx::ppq; // 1 s
+    a.name = "A";
+    song.addMarker (a);
+    lynx::Marker b;
+    b.tick = 6 * lynx::ppq; // 3 s
+    song.addMarker (b);
+    // the song as the range: a clip of 16 beats so both markers are inside
+    song.mode = lynx::PlayMode::song;
+    song.playlist.clear();
+    lynx::Clip c;
+    c.pattern = 0;
+    c.start = 0;
+    c.length = 16 * lynx::ppq;
+    song.playlist.push_back (c);
+    lynx::exportopts::Options o;
+    const auto e = lynx::exportopts::wavExtras (song, o, 44100.0);
+    REA167L_REQUIRE (e.markers.size() == 2);
+    CHECK (e.markers[0].frame == 44100 && e.markers[0].name == "A" && e.markers[1].frame == 132300 && e.markers[1].name.empty());
+    // a selection from beat 4: the second marker 1 s in, the first left out
+    song.loopStart = 4 * lynx::ppq;
+    song.loopEnd = 12 * lynx::ppq;
+    o.range = lynx::exportopts::Range::selection;
+    const auto s = lynx::exportopts::wavExtras (song, o, 44100.0);
+    REA167L_REQUIRE (s.markers.size() == 1);
+    CHECK (s.markers[0].frame == 44100);
+
+    // appended to a WAV file: the RIFF size follows, the frames are read back
+    const auto path = (std::filesystem::temp_directory_path() / "lynx_rea167l_extras.wav").string();
+    {
+        std::vector<std::uint8_t> w;
+        auto put = [&w] (const char* t) { w.insert (w.end(), t, t + 4); };
+        auto u32 = [&w] (std::uint32_t v) { for (int i = 0; i < 4; ++i) w.push_back ((std::uint8_t) (v >> (8 * i))); };
+        put ("RIFF"); u32 (4 + 24 + 8 + 10); put ("WAVE");
+        put ("fmt "); u32 (16); u32 (0x00020001); u32 (44100); u32 (176400); u32 (0x00100004);
+        put ("data"); u32 (10); for (int i = 0; i < 10; ++i) w.push_back (0);
+        std::ofstream (path, std::ios::binary).write ((const char*) w.data(), (std::streamsize) w.size());
+    }
+    CHECK (lynx::exportopts::wavDataFrames (path) == 2);
+    lynx::exportopts::WavExtras x;
+    x.markers = { { 1, "m" } };
+    CHECK (lynx::exportopts::appendWavExtras (path, x, 44100.0));
+    std::ifstream in (path, std::ios::binary);
+    std::vector<std::uint8_t> back ((std::istreambuf_iterator<char> (in)), {});
+    REA167L_REQUIRE (back.size() > 54);
+    const auto riff = (std::uint32_t) back[4] | (std::uint32_t) back[5] << 8 | (std::uint32_t) back[6] << 16 | (std::uint32_t) back[7] << 24;
+    CHECK (riff == back.size() - 8);
+    CHECK (std::string (back.begin() + 54, back.begin() + 58) == "cue ");
+    CHECK (lynx::exportopts::wavDataFrames (path) == 2);
+    std::filesystem::remove (path);
+}

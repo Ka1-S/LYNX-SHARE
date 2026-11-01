@@ -126,6 +126,7 @@ public:
             juce::WaitableEvent ready;
             juce::MessageManager::callAsync ([&] {
                 job = std::make_unique<ExportJob> (item.song, options, item.file);
+                job->setExtraData (true);
                 ready.signal();
             });
             ready.wait();
@@ -343,7 +344,8 @@ public:
         combo (ditherLabel, tr ("Dither"), ditherBox, { tr ("Off"), tr ("TPDF"), tr ("TPDF + noise shaping") },
                tr ("Hides the rounding noise of 16 and 24 bit files (noise shaping moves it where the ear is least sensitive)"));
 
-        for (auto* t : { &normalizeToggle, &masterFxToggle, &insertFxToggle, &trimToggle, &hqToggle, &showToggle, &polyToggle, &warmUpToggle, &realtimeToggle })
+        for (auto* t : { &normalizeToggle, &masterFxToggle, &insertFxToggle, &trimToggle, &hqToggle, &showToggle, &polyToggle, &warmUpToggle, &realtimeToggle,
+                         &tempoToggle, &loopMarkersToggle, &playlistMarkersToggle })
         {
             t->onClick = [this] { readControls(); };
             addAndMakeVisible (t);
@@ -363,6 +365,13 @@ public:
         warmUpToggle.setTooltip (tr ("Before the export starts, third-party plugins process a moment of silence until they have "
                                      "finished loading their settings (bridged plugins, samplers that load in the background), "
                                      "so the file does not start with half-loaded effects"));
+        // FL's "Extra data" (REA_rodada167l §3): chunks of the WAV file other programs read
+        tempoToggle.setButtonText (tr ("Tempo information"));
+        tempoToggle.setTooltip (tr ("WAV: stores the tempo, the length in beats and the meter (an acid chunk), so other programs play the file at the song's tempo"));
+        loopMarkersToggle.setButtonText (tr ("Loop markers"));
+        loopMarkersToggle.setTooltip (tr ("WAV: marks the music (without the tail) as the file's loop (a smpl chunk), for samplers"));
+        playlistMarkersToggle.setButtonText (tr ("Playlist markers"));
+        playlistMarkersToggle.setTooltip (tr ("WAV: the Playlist's markers become cue points with their names (cue and labl chunks)"));
         // round 165c: only offered when the song has an active hardware insert (outboard gear can't run faster than real time)
         realtimeToggle.setButtonText (tr ("Render through the hardware in real time"));
         realtimeToggle.setTooltip (tr ("The song plays through the audio device while it is recorded, so the hardware inserts' gear is "
@@ -392,7 +401,9 @@ public:
         cancelButton.onClick = [this] { close(); };
 
         writeControls();
-        setSize (620, realtimeToggle.isVisible() ? 512 : 486);
+        // round 167l: the height the content needs (a fixed 486 left an empty band above "Mix"): the taller column (the
+        // right one with FLAC's two rows and, in some languages, "Also save" on its own line) plus the switches
+        setSize (620, 12 + columnsHeight() + 6 + mixHeight() + 8 + 32 + 12);
     }
 
     // --snapshot: the window with this format chosen (0 WAV, 1 MP3, 2 OGG, 3 FLAC) and a few options set
@@ -423,7 +434,7 @@ public:
 
         // three columns of switches (round 167k: the fourth switch of row 2 squeezed "Show the file(s)..." to two clipped
         // lines); the real-time render switch gets a row of its own when the song has hardware inserts
-        auto mix = area.removeFromBottom (realtimeToggle.isVisible() ? 136 : 110);
+        auto mix = area.removeFromBottom (mixHeight());
         optionsTitle.setBounds (mix.removeFromTop (26));
         mix.removeFromTop (4);
         const int colA = 200, colB = 196;
@@ -444,12 +455,20 @@ public:
             warmUpToggle.setBounds (row3.removeFromLeft (colA));
             insertFxToggle.setBounds (row3.removeFromLeft (colB));
         }
+        mix.removeFromTop (2);
+        {
+            auto row4 = mix.removeFromTop (24);
+            tempoToggle.setBounds (row4.removeFromLeft (colA));
+            loopMarkersToggle.setBounds (row4.removeFromLeft (colB));
+            playlistMarkersToggle.setBounds (row4);
+        }
         if (realtimeToggle.isVisible())
         {
             mix.removeFromTop (2);
             realtimeToggle.setBounds (mix.removeFromTop (24));
         }
         area.removeFromBottom (6);
+        columnsBottom = area.getBottom();
 
         auto left = area.removeFromLeft ((area.getWidth() - 24) / 2);
         area.removeFromLeft (24);
@@ -523,10 +542,26 @@ public:
         // a hairline between the two columns
         const auto x = 16 + (getWidth() - 32 - 24) / 2 + 12;
         g.setColour (theme::colour::border);
-        g.fillRect (x, 22, 1, getHeight() - 22 - 12 - 32 - 8 - 58 - 6 - 8);
+        g.fillRect (x, 22, 1, juce::jmax (0, columnsBottom - 22 - 8));
     }
 
 private:
+    int mixHeight() const { return 26 + 4 + 4 * 24 + 3 * 2 + (realtimeToggle.isVisible() ? 26 : 0); }
+
+    // the two columns' heights (as resized() lays them out), the taller one
+    int columnsHeight()
+    {
+        constexpr int rowHeight = 26, gap = 7;
+        const auto leftHeight = 26 + 8 + 5 * (rowHeight + gap) + 22 + (onlyTracks.empty() ? 0 : gap + rowHeight + gap);
+        const auto columnWidth = (620 - 32 - 24) / 2;
+        const auto labelNeeds = theme::labelColumnWidth ({ &alsoLabel }, 0, 400);
+        const auto ownLine = labelNeeds > (columnWidth - 4 * 54) * 11 / 10;
+        // the most rows a format has: FLAC (bit depth, compression) + rate, channels, dither
+        const auto rightHeight = 26 + 8 + 28 + 4 + (ownLine ? 18 : 0) + 22 + gap + 5 * (rowHeight + gap);
+        return juce::jmax (leftHeight, rightHeight);
+    }
+    int columnsBottom = 0;
+
     void close()
     {
         if (auto* w = findParentComponentOfClass<juce::DialogWindow>())
@@ -577,6 +612,9 @@ private:
         showToggle.setToggleState (options.showWhenDone, n);
         polyToggle.setToggleState (options.disableMaxPolyphony, n);
         realtimeToggle.setToggleState (realtime, n);
+        tempoToggle.setToggleState (options.saveTempo, n);
+        loopMarkersToggle.setToggleState (options.loopMarkers, n);
+        playlistMarkersToggle.setToggleState (options.playlistMarkers, n);
         for (int i = 0; i < 4; ++i)
             alsoToggles[(std::size_t) i].setToggleState (i == (int) options.format || (options.moreFormats & (1u << i)) != 0, n);
         refresh();
@@ -612,6 +650,9 @@ private:
         options.normalize = normalizeToggle.getToggleState();
         options.trimPdc = trimToggle.getToggleState();
         options.showWhenDone = showToggle.getToggleState();
+        options.saveTempo = tempoToggle.getToggleState();
+        options.loopMarkers = loopMarkersToggle.getToggleState();
+        options.playlistMarkers = playlistMarkersToggle.getToggleState();
         if (! realtime) // (while real time is ticked these show what it uses: the offline choices stay as they were)
         {
             options.masterEffects = masterFxToggle.getToggleState();
@@ -666,6 +707,10 @@ private:
         const auto f = options.format;
         for (int i = 0; i < 4; ++i)
             alsoToggles[(std::size_t) i].setEnabled (i != (int) f);
+        // (WAV only: FL writes them into WAV files)
+        const auto wav = f == Format::wav || (options.moreFormats & (1u << (int) Format::wav)) != 0;
+        for (auto* t : { &tempoToggle, &loopMarkersToggle, &playlistMarkersToggle })
+            t->setEnabled (wav);
         depthLabel.setVisible (f == Format::wav || f == Format::flac);
         depthBox.setVisible (f == Format::wav || f == Format::flac);
         bitrateLabel.setVisible (f == Format::mp3 || f == Format::ogg);
@@ -774,6 +819,7 @@ private:
                                   if (realtime) // round 165c: through the device, in real time
                                   {
                                       auto job = std::make_unique<ExportJob> (engineRef, o, file);
+                                      job->setExtraData (true);
                                       close(); // deletes this panel: no `this` after this point
                                       auto* thread = new ExportThread (std::move (job), file, {}, tr ("Exporting in real time..."));
                                       thread->reveal = o.showWhenDone;
@@ -788,6 +834,7 @@ private:
                                   }
 
                                   auto job = std::make_unique<ExportJob> (engineRef.getSong(), o, file);
+                                  job->setExtraData (true);
                                   close(); // deletes this panel: no `this` after this point
                                   auto* thread = new ExportThread (std::move (job), file);
                                   thread->reveal = o.showWhenDone;
@@ -817,6 +864,7 @@ private:
     juce::Label depthLabel, bitrateLabel, compressionLabel, rateLabel, channelsLabel, ditherLabel;
     juce::ComboBox depthBox, mp3Box, oggBox, flacLevelBox, rateBox, channelsBox, ditherBox;
     juce::ToggleButton normalizeToggle, masterFxToggle, insertFxToggle, trimToggle, hqToggle, showToggle, polyToggle, warmUpToggle, realtimeToggle;
+    juce::ToggleButton tempoToggle, loopMarkersToggle, playlistMarkersToggle;
     bool realtime = false; // "Render through the hardware in real time" (round 165c; not remembered: it takes the song's length)
     juce::Label alsoLabel;
     std::array<juce::ToggleButton, 4> alsoToggles;

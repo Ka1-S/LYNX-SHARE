@@ -64,6 +64,10 @@ public:
 
     double getMusicSeconds() const noexcept { return musicSeconds; }
     float getPeak() const noexcept { return peak; }
+    // FL's "Extra data" (markers, loop, tempo: Options::saveTempo / loopMarkers / playlistMarkers) in WAV files: on for
+    // the user's exports (the export window, --render), off for LYNX's own renders (bounces, consolidation, the
+    // auto-sampler), whose files become samples again and must not carry a loop
+    void setExtraData (bool on) noexcept { extraData = on; }
     AudioEngine& getEngine() noexcept { return *engine; }
 
 private:
@@ -80,6 +84,8 @@ private:
     juce::File output;
     std::string title, artist;
     double musicSeconds = 0.0, loopSeconds = 0.0;
+    exportopts::WavExtras extras; // FL's extra data for WAV files
+    bool extraData = false;
     float peak = 0.0f;
 };
 
