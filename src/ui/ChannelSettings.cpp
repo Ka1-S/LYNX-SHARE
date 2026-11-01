@@ -3608,8 +3608,6 @@ private:
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> sections;
 };
 
-std::unique_ptr<juce::Component> makeInstrumentPage (AudioEngine& engine, const ChannelRef& ref);
-
 // FL's preset arrows of a generator's window (round 167o, issue #24; FL's TPluginForm NextPrevPreset, FLEngine
 // 0x12b6c70): ◀ name ▶ over the .fst presets of the plugin's folder (FL's factory folder and the user's, subfolders
 // too) in FL's order; no preset yet: ▶ the first, ◀ the last; both wrap. The step loads the preset into the channel
@@ -3922,7 +3920,7 @@ public:
     void presetLoaded (bool hasPage, const juce::String& oldName, const juce::String& newName)
     {
         if (hasPage && ! pages.empty())
-            if (auto fresh = makeInstrumentPage (engine, ChannelRef::rack (channel)))
+            if (auto fresh = makeChannelSettingsPanel (engine, channel))
             {
                 removeChildComponent (pages.front().get());
                 pages.front() = std::move (fresh);
