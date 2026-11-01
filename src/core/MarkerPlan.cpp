@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
 
 #include "core/Song.h"
 
@@ -152,6 +153,87 @@ bool hasMarkerAt (const Song& song, std::int64_t tick)
     return false;
 }
 } // namespace
+
+int addAuto (Song& song, std::int64_t tick)
+{
+    tick = std::max<std::int64_t> (0, tick);
+    for (int i = 0; i < (int) song.markers().size(); ++i)
+        if (song.markers()[(std::size_t) i].tick == tick)
+            return i;
+    std::string name;
+    for (int n = 1;; ++n)
+    {
+        name = n == 1 ? std::string ("Auto") : "Auto #" + std::to_string (n);
+        auto taken = false;
+        for (const auto& m : song.markers())
+            taken = taken || m.name == name;
+        if (! taken)
+            break;
+    }
+    Marker m;
+    m.tick = tick;
+    m.name = name;
+    song.addMarker (m);
+    for (int i = 0; i < (int) song.markers().size(); ++i)
+        if (song.markers()[(std::size_t) i].tick == tick && song.markers()[(std::size_t) i].name == name)
+            return i;
+    return -1;
+}
+
+void placeSongLoop (Song& song, std::int64_t tick)
+{
+    tick = std::max<std::int64_t> (0, tick);
+    std::int64_t old = -1;
+    auto& list = song.markers();
+    for (auto it = list.begin(); it != list.end();)
+        if (! it->isSignature() && it->action == Marker::songLoop)
+        {
+            old = it->tick;
+            it = list.erase (it);
+        }
+        else
+            ++it;
+    if (old == tick)
+        return;
+    Marker m;
+    m.tick = tick;
+    m.action = Marker::songLoop;
+    song.addMarker (m);
+}
+
+std::pair<int, int> signatureAt (const Song& song, std::int64_t tick)
+{
+    std::pair<int, int> sig { std::max (1, song.beatsPerBar), 4 };
+    for (const auto& m : song.markers())
+        if (m.isSignature() && m.tick <= tick)
+            sig = { m.numerator, m.denominator };
+    return sig;
+}
+
+void addSignatureChange (Song& song, std::int64_t from, std::int64_t to, int numerator, int denominator)
+{
+    from = std::max<std::int64_t> (0, from) / ppq * ppq;
+    const auto before = signatureAt (song, from);
+    auto restore = false;
+    if (to > 0 && to != song.songLength())
+    {
+        to = to / ppq * ppq;
+        restore = to > from;
+        for (const auto& m : song.markers())
+            restore = restore && ! (m.isSignature() && m.tick == to);
+    }
+    auto put = [&song] (std::int64_t at, int n, int d) {
+        Marker m;
+        m.tick = at;
+        m.name = std::to_string (n) + "/" + std::to_string (d);
+        m.numerator = n;
+        m.denominator = d;
+        song.addMarker (m);
+    };
+    put (from, std::clamp (numerator, 1, 32), std::clamp (denominator, 1, 32));
+    if (restore)
+        put (to, before.first, before.second);
+}
 
 void addEvery (Song& song, int bars)
 {

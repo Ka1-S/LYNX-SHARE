@@ -230,7 +230,8 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
         e.pan = clip.pan;
         e.fadeIn = (float) ((double) clip.effectiveFadeIn() / tps);
         e.fadeOut = (float) ((double) clip.effectiveFadeOut() / tps);
-        e.fadeShape = (std::uint8_t) ((clip.crossfadeIn > 0 ? 1 : 0) | (clip.crossfadeOut > 0 ? 2 : 0));
+        e.fadeShape = (std::uint8_t) ((clip.crossfadeIn > 0 ? 1 : 0) | (clip.crossfadeOut > 0 ? 2 : 0) | (clip.reversed ? 4 : 0));
+        e.clipPitch = clip.pitch; // FL 2026's clip pitch (round 167k): shifted, the clip's length stays
 
         if (resume && loopStart > (double) clip.start && loopStart < (double) clip.end())
         {

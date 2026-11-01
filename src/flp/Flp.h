@@ -295,6 +295,9 @@ struct PlaylistItem
     float fadeInMs = 0.0f;
     float fadeOutMs = 0.0f;
     float gain = 1.0f;
+    // Audio clips, records of 80 B and more: FL 2026's clip pitch (semitones) and clip reverse (round 167k).
+    float pitch = 0.0f;
+    bool reversed = false;
 };
 
 struct PlaylistTrackInfo

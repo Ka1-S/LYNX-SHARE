@@ -392,7 +392,7 @@ public:
         cancelButton.onClick = [this] { close(); };
 
         writeControls();
-        setSize (620, 486);
+        setSize (620, realtimeToggle.isVisible() ? 512 : 486);
     }
 
     // --snapshot: the window with this format chosen (0 WAV, 1 MP3, 2 OGG, 3 FLAC) and a few options set
@@ -421,26 +421,33 @@ public:
         warningLabel.setBounds (buttons);
         area.removeFromBottom (8);
 
-        auto mix = area.removeFromBottom (110);
+        // three columns of switches (round 167k: the fourth switch of row 2 squeezed "Show the file(s)..." to two clipped
+        // lines); the real-time render switch gets a row of its own when the song has hardware inserts
+        auto mix = area.removeFromBottom (realtimeToggle.isVisible() ? 136 : 110);
         optionsTitle.setBounds (mix.removeFromTop (26));
         mix.removeFromTop (4);
+        const int colA = 200, colB = 196;
         auto mixRow = mix.removeFromTop (24);
-        normalizeToggle.setBounds (mixRow.removeFromLeft (200));
-        masterFxToggle.setBounds (mixRow.removeFromLeft (150));
+        normalizeToggle.setBounds (mixRow.removeFromLeft (colA));
+        masterFxToggle.setBounds (mixRow.removeFromLeft (colB));
         trimToggle.setBounds (mixRow);
         mix.removeFromTop (2);
         {
             auto row2 = mix.removeFromTop (24);
-            hqToggle.setBounds (row2.removeFromLeft (170));
-            polyToggle.setBounds (row2.removeFromLeft (200));
-            insertFxToggle.setBounds (row2.removeFromLeft (150));
+            hqToggle.setBounds (row2.removeFromLeft (colA));
+            polyToggle.setBounds (row2.removeFromLeft (colB));
             showToggle.setBounds (row2);
         }
         mix.removeFromTop (2);
         {
             auto row3 = mix.removeFromTop (24);
-            warmUpToggle.setBounds (row3.removeFromLeft (200));
-            realtimeToggle.setBounds (row3);
+            warmUpToggle.setBounds (row3.removeFromLeft (colA));
+            insertFxToggle.setBounds (row3.removeFromLeft (colB));
+        }
+        if (realtimeToggle.isVisible())
+        {
+            mix.removeFromTop (2);
+            realtimeToggle.setBounds (mix.removeFromTop (24));
         }
         area.removeFromBottom (6);
 

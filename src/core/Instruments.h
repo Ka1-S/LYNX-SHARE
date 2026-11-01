@@ -83,6 +83,10 @@ public:
     // "Slide" note: sounding notes glide to `key` over `samples`, without retriggering. Ignored if unsupported.
     virtual void slideTo (int /*key*/, float /*cents*/, float /*samples*/) noexcept {}
     // Audio clip: fades and in-clip position of the next note (before noteOn), in samples.
+    // FL 2026's clip pitch (round 167k): the next audio clip note's own transposition, shifted keeping its length;
+    // setClipShift (UI thread, before prepareKeyShift) asks for the pitch shifters even without "keep pitch"
+    virtual void setNextClipPitch (float /*semitones*/) noexcept {}
+    virtual void setClipShift (bool) {}
     virtual void setNextClipFades (float /*elapsed*/, float /*remaining*/, float /*fadeIn*/, float /*fadeOut*/, std::uint8_t /*shape*/ = 0) noexcept {}
     // Pan, fine tuning and "porta" (inverts the channel's porta) of the next note (called right before
     // noteOn). Ignored if unsupported.
@@ -101,6 +105,11 @@ public:
     // Playback started (FL resets its generators: a MIDI Out sends its bank, patch and controls again).
     virtual void transportStarted() noexcept {}
     virtual void panic() noexcept { allNotesOff(); }
+    // FL's "Reset plugins on transport" (round 167k: FL resets every plugin it registered, generators included —
+    // FUN_012b8620 adds each opened plugin to the list FUN_012b5210 resets). The Sampler / audio clip channels are not
+    // plugins in FL and keep their voices; a plugin generator stops its voices, a hosted plugin is also reset (with its
+    // wrapper's "Reset plugin when FL Studio resets").
+    virtual void transportReset() noexcept { panic(); }
     // Channel settings (sampler, synth). UI thread, on every snapshot; the instrument stores them
     // so the audio thread can read without waiting.
     virtual void configure (const ChannelDef&, double /*bpm*/) noexcept {}

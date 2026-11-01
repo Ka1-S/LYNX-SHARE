@@ -209,9 +209,21 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
     }
 
     // FL's Sampler › Precomputed effects (REA_rodada167h §2): the played region, processed once
-    if (sample != nullptr && kind == InstrumentKind::sampler && precompute::needed (channel.sampler)) // (audio clips: not yet)
+    // Audio clips too (round 167k, FL render r167k/fl/clip/p_*: an audio clip channel's Normalize, Reverse polarity,
+    // Fade in / out play in FL); a clip plays the whole file, so the region stays whole there
+    if (sample != nullptr && kind == InstrumentKind::sampler && precompute::needed (channel.sampler))
+    {
         if (auto processed = precompute::apply (*sample, channel.sampler))
             sample = std::move (processed);
+    }
+    else if (sample != nullptr && kind == InstrumentKind::audioClip && channel.sampler.precompute.any())
+    {
+        auto whole = channel.sampler;
+        whole.regionStart = 0.0f;
+        whole.regionEnd = 1.0f;
+        if (auto processed = precompute::apply (*sample, whole))
+            sample = std::move (processed);
+    }
 
     const loadtrace::Scope timing ("rack_instruments");
     std::shared_ptr<Instrument> instrument = makeInstrument (kind, std::move (sample));
@@ -293,6 +305,18 @@ patcher::Factories patcherFactories (double sampleRate, double bpm, const RackSt
     return f;
 }
 
+// an audio clip channel that resamples but has a clip of its own pitch (FL 2026's keys 7/8): it needs the shifters
+bool clipShiftWanted (const Song& song, std::size_t channel)
+{
+    if (channel >= song.channels.size() || song.channels[channel].instrument != InstrumentKind::audioClip
+        || song.channels[channel].sampler.keepPitch)
+        return false;
+    for (const auto& c : song.playlist)
+        if (c.kind == ClipKind::audio && c.channel == (int) channel && c.pitch != 0.0f)
+            return true;
+    return false;
+}
+
 // The keep-pitch samplers' shifters, in parallel: each instrument only touches its own pool, and each shifter's
 // set-up is deterministic (a fixed seed and a silent priming run), so the result is the same as one by one
 void prepareKeyShifts (const std::vector<Instrument*>& list, double sampleRate)
@@ -363,6 +387,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                 || (previous->song.channels[i].samplePath == channel.samplePath && previous->song.channels[i].zones == channel.zones
                     && previous->song.channels[i].modelParams == channel.modelParams
                     && previous->song.channels[i].sampler.keepPitch == channel.sampler.keepPitch
+                    && clipShiftWanted (previous->song, i) == clipShiftWanted (song, i)
                     // FL's precomputed effects (round 167h): the sample is processed when the channel is built
                     && previous->song.channels[i].sampler.precompute == channel.sampler.precompute
                     && previous->song.channels[i].sampler.useLoopPoints == channel.sampler.useLoopPoints
@@ -401,6 +426,12 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         }
 
         state->instruments.push_back (buildInstrument (channel, sampleRate, song.bpm, factories, &keyShiftLater));
+        // FL 2026's clip pitch (round 167k): a channel with a pitched clip gets its pitch shifters even when it resamples
+        if (clipShiftWanted (song, i) && state->instruments.back() != nullptr)
+        {
+            state->instruments.back()->setClipShift (true);
+            keyShiftLater.push_back (state->instruments.back().get());
+        }
     }
     // Options › Project › "Fast declick for cut groups" (REA round 167h §3)
     for (auto& instrument : state->instruments)
@@ -1885,7 +1916,9 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                 }
                 instrument.setNextNoteColour (e.colour);
 
-                if (e.fadeIn > 0.0f || e.fadeOut > 0.0f)
+                if (e.clipPitch != 0.0f)
+                    instrument.setNextClipPitch (e.clipPitch);
+                if (e.fadeIn > 0.0f || e.fadeOut > 0.0f || e.fadeShape != 0)
                     instrument.setNextClipFades (e.clipElapsed, e.clipRemaining, e.fadeIn, e.fadeOut, e.fadeShape);
 
                 // an echo's volume: the instrument scales the voice, else (engines without it) the velocity
@@ -2309,15 +2342,25 @@ void RackRenderer::process (const RackState* state,
 
     // started playing or jumped: audio clips in progress must start mid-way
     resumeAudio = playing && (! wasPlaying || jumped);
-    // FL's "Play truncated notes on transport": at the start of playback the notes already sounding there play
-    chaseNotes = playing && ! wasPlaying && playTruncatedOnTransport;
-    // FL's "Reset plugins on transport" (FUN_011e7a10 → FUN_011c8a40 mode 2 → every plugin's reset): the effects'
-    // tails and buffers are cleared when playback starts or jumps
+    // FL's "Play truncated notes on transport": at the start of playback, and after the user moves the position while
+    // playing (FL's set-position FUN_011e7a10 → FUN_011e78a0 → FUN_011e7470 with its catch-up flag set, round 167k),
+    // the notes already sounding there play. The loop's wrap is not a set-position and chases nothing.
+    const auto userJump = jumped && userJumpSerial != seenUserJumpSerial;
+    seenUserJumpSerial = userJumpSerial;
+    chaseNotes = playing && (! wasPlaying || userJump) && playTruncatedOnTransport;
+    // FL's "Reset plugins on transport" (FUN_011e7a10 → FUN_011c8a40 mode 2 → FUN_012b5210, every registered plugin's
+    // reset, generators included): the effects' tails and buffers are cleared and the plugin generators stop when
+    // playback starts or jumps (round 167k: instruments too, hosted plugins with their wrapper's reset option)
     if (resetPluginsOnTransport && playing && (! wasPlaying || jumped))
+    {
         for (auto& slots : state->effects)
             for (auto& effect : slots)
                 if (effect != nullptr)
-                    effect->reset();
+                    effect->transportReset();
+        for (auto& instrument : state->instruments)
+            if (instrument != nullptr)
+                instrument->transportReset();
+    }
     wasPlaying = playing;
     // tempo automation: the tempo holds for the whole block (evaluated at its start)
     bpm = tempoOverride > 0.0 ? tempoOverride : state->song.bpm;

@@ -213,6 +213,12 @@ private:
     static juce::String markerLabel (const Marker& m);   // the text of a marker's tag on the ruler
     int markerTagAt (int x, int y) const;                 // the marker whose tag is under (x, y), or -1
     void editMarkerName (std::int64_t tick, int existing); // existing = index, or -1 to create
+    // FL 2026's Playlist › Time markers keys (round 167k): Alt+T, Ctrl+T, Shift+Alt+T, Shift+T
+    std::int64_t songPositionTick() const;      // the playhead (song position), wrapped like centreOnPlayhead
+    void addMarkerByKey();                      // "Add one..." at the time selection / visible playhead / first bar
+    void addAutoMarker();                       // "Add auto" at the playhead, on the grid
+    void addSignatureChangeByKey();             // "Add time signature change..." (dialog)
+    void placeLoopMarker();                     // "Place loop" at the time selection / first bar in view
     void deleteSelection();
     void copySelection();
     void pasteClips (std::int64_t at = -1);
@@ -256,6 +262,9 @@ private:
     ToolStrip tools { true };
     IconButton followButton { "follow", Icon::follow }; // Follow (auto scrolling) on/off, EditorGlobals (round 162)
     void quantizeClips (double strength); // the selected clips' starts (all clips without a selection)
+    // FL 2026's keys 7 / 8 / 9 (round 167k): the selected audio clips' own pitch one semitone down / up, reverse
+    void pitchSelectedAudioClips (int semitones);
+    void reverseSelectedAudioClips();
     int titleInsetLeft = 0, titleInsetRight = 0; // the window's title and buttons share the toolbar row
 
     double pixelsPerTick = 96.0 / (4 * ppq); // 96 px per 4-beat bar

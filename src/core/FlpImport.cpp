@@ -1970,7 +1970,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         }
 
         // the Sampler's precomputed effects, loop flags and declicking mode (REA_rodada167h §1)
-        if (c.type == flp::ChannelType::sampler && def.instrument != InstrumentKind::audioClip)
+        // (audio clip channels: the precomputed effects and Reverse too — FL plays them, round 167k §8)
+        if (c.type == flp::ChannelType::sampler || def.instrument == InstrumentKind::audioClip)
         {
             auto& p = def.sampler.precompute;
             p.fadeStereo = (c.fxFlags & 1) != 0;
@@ -3478,6 +3479,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
                 // clip gain and fades (FL 20.99+ records); fades are in ms, at most the clip length
                 clip.gain = item.gain;
+                clip.pitch = item.pitch;
+                clip.reversed = item.reversed;
                 const auto msToTicks = [&] (float ms)
                 { return std::clamp ((std::int64_t) std::llround (ms / 1000.0 * song.bpm / 60.0 * ppq), (std::int64_t) 0, clip.length); };
                 clip.fadeIn = msToTicks (item.fadeInMs);

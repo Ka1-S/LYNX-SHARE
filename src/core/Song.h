@@ -1107,6 +1107,10 @@ struct Clip
     float gain = 1.0f;        // audio clips: clip volume (linear; FL's gain handle: −96.1 … +36 dB, round 166e)
     float pan = 0.0f;         // audio clips: clip pan -1..1 (FL 2026's clip pan; REA round 153)
     bool muted = false;       // clip-level mute (the Mute tool); independent of the track mute
+    // audio clips: FL 2026's clip pitch (semitones, -12..+12; keys 7/8 of the Playlist) and clip reverse (key 9) —
+    // per clip, on top of the channel's own pitch and reverse (FL: the playlist item's +0x3C / +0x48 bit 0, round 167k)
+    float pitch = 0.0f;
+    bool reversed = false;
     // FL's automatic crossfades (round 166e): where this audio clip overlaps the previous / next audio clip on its
     // track, the overlap in ticks — derived from the arrangement by clipops::updateCrossfades while
     // Song::autoCrossfades is on (never saved). A crossfade replaces that side's fade, with an S-shaped curve.

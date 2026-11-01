@@ -602,6 +602,12 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
 {
     if (crashed.load (std::memory_order_relaxed))
         return; // bypassed: the input plays through
+    if (resetPending.exchange (false, std::memory_order_relaxed))
+        if (const auto code = crashguard::run ([this] { plugin->reset(); }); code != 0)
+        {
+            failed (code);
+            return;
+        }
     flushMidiControls();
 
     if (fixed != nullptr)

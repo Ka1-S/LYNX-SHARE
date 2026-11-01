@@ -217,6 +217,10 @@ private:
     // The toolbar's edit mode (drag panels to move, add or remove them; toolbar::EditOverlay)
     void setToolbarEditing (bool editing);
     void undoRedo (bool redo); // with "Undone: ..." and the undo level in the hint bar
+    // FL's Edit › Undo (Ctrl+Z, round 167k): undoes the last step, or redoes one when something is undone (FL's
+    // FUN_010173a0: history position 0 → 1, else position − 1); with "Alternate undo mode" a plain multi-level undo
+    void flUndo();
+    bool alternateUndo = false; // Settings › General › "Alternate undo mode" (FL's default: off)
     std::unique_ptr<toolbar::EditOverlay> toolbarEditor;
     std::unique_ptr<juce::Component> setupOverlay; // the first-start / Options > Setup wizard, over everything
     toolbar::EditOverlay::Bounds panelBounds {}; // each shown toolbar panel (for the edit mode)

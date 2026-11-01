@@ -85,6 +85,10 @@ public:
 
     virtual void prepare (double sampleRate) noexcept = 0;
     virtual void reset() noexcept = 0;
+    // FL's Settings › Audio › "Reset plugins on transport" (REA_rodada167j §3, round 167k): playback started or jumped.
+    // A built-in effect clears its state; a hosted plugin is reset only with its wrapper's "Reset plugin when FL Studio
+    // resets" (on by default), at the next block.
+    virtual void transportReset() noexcept { reset(); }
 
     // Processes in place. Parameters arrive every block (they may change at any time).
     virtual void process (float* left, float* right, int n, const EffectParams& params, double bpm) noexcept = 0;

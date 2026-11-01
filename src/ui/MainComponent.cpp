@@ -171,7 +171,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         return key.isEmpty() ? text : text + " (" + key + ")";
     };
     undoButton.setTooltip (withKey (tr ("Undo"), "edit.undo"));
-    undoButton.onClick = [this] { undoRedo (false); };
+    undoButton.onClick = [this] { flUndo(); }; // FL's toolbar Undo is its Edit › Undo (UndoAction)
     undoButton.onRightClick = [this] { showHistory(); };
     redoButton.setTooltip (withKey (tr ("Redo"), "edit.redo"));
     redoButton.onClick = [this] { undoRedo (true); };
@@ -1047,6 +1047,14 @@ void MainComponent::setToolbarEditing (bool editing)
         toolbarEditor->grabKeyboardFocus();
 }
 
+void MainComponent::flUndo()
+{
+    if (alternateUndo)
+        undoRedo (false);
+    else
+        undoRedo (engine.canRedo()); // something undone: Ctrl+Z redoes the next step (FL: "undo/redo on the same shortcut")
+}
+
 void MainComponent::undoRedo (bool redo)
 {
     // FL says in the hint bar what was undone and the undo level ("Undone: ...  Level 2/3")
@@ -1314,7 +1322,8 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("file.export")) exportAudio();
     else if (is ("file.exportMp3")) exportAudio (1);
     else if (is ("file.exportMidi")) exportMidiFile();
-    else if (is ("edit.undo")) undoRedo (false);
+    else if (is ("edit.undo")) flUndo();
+    else if (is ("edit.undoBackwards")) undoRedo (false);
     else if (is ("edit.redo")) undoRedo (true);
     else if (is ("help.shortcuts")) showHelp();
     else if (is ("rack.selectPrevious")) rack.selectRelative (-1, false);
@@ -1498,6 +1507,8 @@ void MainComponent::loadUiSettings()
             ChannelRackComponent::keepEditorsOpen = on;
         else if (key == "selFirstChanPatChanges")
             ChannelRackComponent::selectFirstChannelWithNotes = on;
+        else if (key == "alternateUndo")
+            alternateUndo = on;
         else if (key == "waveSpectral") // ("waveColours", the old spectral-by-default key, is ignored)
             ui::WaveformCache::spectral = on;
         else if (key == "pluginStyle") // "Automatic" or a style forced on every plugin
@@ -1625,6 +1636,7 @@ void MainComponent::saveUiSettings()
     uiSettingsFile().replaceWithText ("typingPiano=" + juce::String (typingPiano ? 1 : 0) + "\nkeepEditorsOpen="
                                       + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
                                       + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
+                                      + "\nalternateUndo=" + juce::String (alternateUndo ? 1 : 0)
                                       + "\neditPatternsIn="
                                       + juce::String (PlaylistComponent::editPatternsIn) + "\nsplash=" + juce::String (startup.splash ? 1 : 0)
                                       + "\nstartupSound=" + juce::String (startup.sound ? 1 : 0)
@@ -1983,6 +1995,9 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "playlist.rippleDelete", tr ("Delete the selected clips and close the gaps"));
             action (menu, "playlist.autoCrossfades", tr ("Automatic crossfades (current project)"), true, engine.getSong().autoCrossfades);
             action (menu, "playlist.follow", tr ("Follow the playhead (auto scrolling)"), true, EditorGlobals::get().isFollowing (false));
+            action (menu, "playlist.pitchClipsDown", tr ("Pitch selected audio clips one semitone down"));
+            action (menu, "playlist.pitchClipsUp", tr ("Pitch selected audio clips one semitone up"));
+            action (menu, "playlist.reverseClips", tr ("Reverse selected audio clips"));
             action (menu, "playlist.quantizeStarts", tr ("Quantize the clips' starts"));
             action (menu, "playlist.quantizeHalf", tr ("Quantize the clips' starts 50% (halfway to the grid)"));
             menu.addSubMenu (tr ("Zoom"), zoomMenu ("playlist."));
@@ -4105,6 +4120,7 @@ void MainComponent::openSettings (int page)
         o.typingPiano = safe->typingPiano;
         o.keepEditorsOpen = ChannelRackComponent::keepEditorsOpen;
         o.selectFirstChannelWithNotes = ChannelRackComponent::selectFirstChannelWithNotes;
+        o.alternateUndo = safe->alternateUndo;
         o.rememberSeek = EditorGlobals::get().rememberSeek;
         o.editPatternsIn = PlaylistComponent::editPatternsIn;
         o.undoLevels = safe->engine.getUndoLevels();
@@ -4167,6 +4183,7 @@ void MainComponent::openSettings (int page)
         updater::setAutomatic (o.checkUpdates);
         ChannelRackComponent::keepEditorsOpen = o.keepEditorsOpen;
         ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
+        self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;
         PlaylistComponent::editPatternsIn = juce::jlimit (0, 2, o.editPatternsIn);
         self.startup.splash = o.splash;
@@ -4696,7 +4713,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
     }
     else if (index == 1)
     {
-        menu.addItem (tr ("Undo") + shortcutText ("edit.undo"), engine.canUndo(), false, [this] { undoRedo (false); });
+        // FL's Edit menu: "Undo backwards" (Ctrl+Alt+Z) above "Undo" (Ctrl+Z: undo, or redo after an undo)
+        menu.addItem (tr ("Undo backwards") + shortcutText ("edit.undoBackwards"), engine.canUndo(), false, [this] { undoRedo (false); });
+        menu.addItem ((alternateUndo || ! engine.canRedo() ? tr ("Undo") : tr ("Undo (redo)")) + shortcutText ("edit.undo"),
+                      engine.canUndo() || engine.canRedo(), false, [this] { flUndo(); });
         menu.addItem (tr ("Redo") + shortcutText ("edit.redo"), engine.canRedo(), false, [this] { undoRedo (true); });
         menu.addItem (tr ("Undo history...") + shortcutText ("edit.history"), [this] { showHistory(); });
         menu.addItem (tr ("Audio editor..."), [this] { openAudioEditor (engine); });
