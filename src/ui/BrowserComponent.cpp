@@ -2950,6 +2950,10 @@ void BrowserComponent::rebuildRoots()
     add (tr ("FL MIDI"), data.getChildFile ("Patches").getChildFile ("Scores"), RootKind::flMidi);
     add (tr ("3x Osc presets (FL)"), data.getChildFile ("Patches").getChildFile ("Channel presets").getChildFile ("3x Osc"), RootKind::flPresets);
     add (tr ("Synth presets (FL)"), data.getChildFile ("Patches").getChildFile ("Plugin presets").getChildFile ("Generators"), RootKind::flPresets);
+    // FL's Browser folder "Mixer presets" (REA round 167q, FUN_009db5b0: the user's and the installation's)
+    if (const auto userData = findFlStudio().userData; userData.isDirectory())
+        add (tr ("Mixer presets"), userData.getChildFile ("Presets").getChildFile ("Mixer presets"), RootKind::flPresets);
+    add (tr ("Mixer presets (FL)"), data.getChildFile ("Patches").getChildFile ("Mixer presets"), RootKind::flPresets);
     pluginpresetui::presetsRoot().createDirectory(); // (the plugin window saves presets there; round 162d)
     add (tr ("Plugin presets"), pluginpresetui::presetsRoot(), RootKind::pluginPresets);
     add (tr ("Documents"), juce::File::getSpecialLocation (juce::File::userDocumentsDirectory), RootKind::documents);
@@ -3803,6 +3807,10 @@ void BrowserComponent::openFile (const juce::File& file)
         engine.setSelectedChannel ((int) engine.getSong().channels.size() - 1);
         return;
     }
+
+    // FL's mixer preset (REA round 167q) or LYNX's mixer track state: onto the selected mixer tracks
+    if (file.hasFileExtension ("fst;lynxtrack") && onOpenMixerPreset && onOpenMixerPreset (file))
+        return;
 
     // preset of an FL synth that LYNX converts (3x Osc, Sytrus, GMS...): new channel with the built-in synth
     if (file.hasFileExtension ("fst;gmsynth"))

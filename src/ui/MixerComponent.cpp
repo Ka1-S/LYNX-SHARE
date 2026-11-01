@@ -5,6 +5,8 @@
 #include "ui/TextCache.h"
 
 #include "core/Patcherize.h"
+#include "core/FlpImport.h"
+#include "engine/FlStudio.h"
 #include "core/FlEffects.h"
 #include "core/ProjectContents.h"
 #include "core/FruityVocoder.h"
@@ -245,13 +247,43 @@ int MixerStrips::stripX (int track) const noexcept
 
 bool MixerStrips::isInterestedInDragSource (const SourceDetails& details)
 {
-    return BrowserComponent::isEffectDrag (details);
+    if (BrowserComponent::isEffectDrag (details))
+        return true;
+    if (! BrowserComponent::isBrowserDrag (details))
+        return false;
+    // (asked on every mouse move of the drag: the answer for the dragged file is kept)
+    static juce::File lastFile;
+    static bool lastAnswer = false;
+    if (const auto file = BrowserComponent::draggedFile (details); file != lastFile)
+    {
+        lastFile = file;
+        lastAnswer = mixerpresets::isMixerPreset (file);
+    }
+    return lastAnswer;
 }
 
 void MixerStrips::itemDropped (const SourceDetails& details)
 {
     const auto t = trackAt (details.localPosition.x);
-    if (t < 0 || t >= (int) engine.getSong().mixer.size() || onEffectDropped == nullptr)
+    const auto tracks = (int) engine.getSong().mixer.size();
+    // FL's mixer preset dropped from the Browser (WhatsNew): onto a track it loads there, onto the empty mixer space
+    // (or "+") it makes a new track
+    if (BrowserComponent::isBrowserDrag (details))
+    {
+        const auto file = BrowserComponent::draggedFile (details);
+        if (! mixerpresets::isMixerPreset (file))
+            return;
+        if (t >= 0 && t < tracks)
+            mixerpresets::loadOnTracks (engine, { t }, file);
+        else if (const auto added = mixerpresets::insertTrack (engine, tracks, file); added > 0)
+        {
+            revealed.insert (added);
+            updateSize();
+            selectTrack (added);
+        }
+        return;
+    }
+    if (t < 0 || t >= tracks || onEffectDropped == nullptr)
         return;
     if (auto fx = BrowserComponent::draggedEffect (details))
         onEffectDropped (t, std::move (*fx));
@@ -832,6 +864,18 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
             selectTrack (juce::jmax (1, count));
         });
         menu.addItem (tr ("Add multiple..."), room, false, [this, count] { askInsertMultiple (juce::jmax (1, count)); });
+        // FL's "Add from state" (REA round 167q: AddMixerTracksMenu, FUN_012a87d0 / FUN_012a83b0)
+        juce::PopupMenu fromState;
+        for (const auto& f : mixerpresets::all())
+            fromState.addItem (f.getFileNameWithoutExtension(), room, false, [this, count, f] {
+                if (const auto added = mixerpresets::insertTrack (engine, juce::jmax (1, count), f); added > 0)
+                {
+                    revealed.insert (added);
+                    updateSize();
+                    selectTrack (added);
+                }
+            });
+        menu.addSubMenu (tr ("Add from state"), fromState, room && fromState.getNumItems() > 0);
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
         return;
     }
@@ -1504,13 +1548,6 @@ juce::File mixerStatesFolder()
     return lynx::platform::documentsFolder().getChildFile ("LYNX/Mixer states");
 }
 
-juce::Array<juce::File> savedMixerStates()
-{
-    auto files = mixerStatesFolder().findChildFiles (juce::File::findFiles, false, juce::String ("*") + ProjectFile::mixerTrackStateExtension);
-    files.sort();
-    return files;
-}
-
 std::unique_ptr<juce::FileChooser>& mixerStateChooser()
 {
     static std::unique_ptr<juce::FileChooser> chooser;
@@ -1633,25 +1670,117 @@ juce::PopupMenu trackLatencyMenu (AudioEngine& engine, int t)
 
 bool loadMixerTrackState (AudioEngine& engine, int track, const juce::File& file, bool asNewInsert)
 {
+    if (track < 0 || track >= (int) engine.getSong().mixer.size())
+        return false;
+    if (asNewInsert)
+        return mixerpresets::insertTrack (engine, juce::jmax (1, track + 1), file) > 0;
+    return mixerpresets::loadOnTracks (engine, { track }, file);
+}
+
+namespace mixerpresets
+{
+juce::Array<juce::File> folders()
+{
+    // FL's browser folder 0x3f8 (REA round 167q, FUN_009db5b0): "Presets\Mixer presets" of the user data folder and
+    // "Data\Patches\Mixer presets" of the installation
+    static const auto fl = findFlStudio();
+    juce::Array<juce::File> out;
+    if (fl.userData.isDirectory())
+        out.add (fl.userData.getChildFile ("Presets").getChildFile ("Mixer presets"));
+    if (fl.installDir.isDirectory())
+        out.add (fl.installDir.getChildFile ("Data").getChildFile ("Patches").getChildFile ("Mixer presets"));
+    out.add (mixerStatesFolder());
+    out.removeIf ([] (const juce::File& f) { return ! f.isDirectory(); });
+    return out;
+}
+
+juce::Array<juce::File> all()
+{
+    juce::Array<juce::File> files;
+    for (const auto& folder : folders())
+        for (const auto& f : folder.findChildFiles (juce::File::findFiles, true, juce::String ("*.fst;*") + ProjectFile::mixerTrackStateExtension))
+            files.add (f);
+    std::stable_sort (files.begin(), files.end(), [] (const juce::File& a, const juce::File& b) {
+        return a.getFileNameWithoutExtension().compareNatural (b.getFileNameWithoutExtension()) < 0;
+    });
+    return files;
+}
+
+static std::vector<std::uint8_t> bytesOf (const juce::File& file)
+{
+    juce::MemoryBlock data;
+    if (file.getSize() > 64 * 1024 * 1024 || ! file.loadFileAsData (data))
+        return {};
+    const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
+    return { bytes, bytes + data.getSize() };
+}
+
+bool isMixerPreset (const juce::File& file)
+{
+    if (file.hasFileExtension (ProjectFile::mixerTrackStateExtension))
+        return true;
+    if (! file.hasFileExtension ("fst"))
+        return false;
+    for (auto p = file.getParentDirectory(); p != juce::File() && p.getParentDirectory() != p; p = p.getParentDirectory())
+        if (p.getFileName().equalsIgnoreCase ("Mixer presets"))
+            return true;
+    const auto bytes = bytesOf (file);
+    return flp::looksLikeMixerPreset (bytes);
+}
+
+std::optional<MixerTrack> read (const juce::File& file)
+{
+    if (file.hasFileExtension ("fst"))
+    {
+        FlpImportOptions options;
+        options.roots = findFlStudioRoots();
+        options.fileExists = [] (const std::string& path) { return platform::localFile (path).existsAsFile(); };
+        options.readFile = [] (const std::string& path) { return bytesOf (platform::localFile (path)); };
+        return mixerTrackFromFlPreset (bytesOf (file), options);
+    }
     juce::String error;
     auto state = ProjectFile::mixerTrackStateFromJson (file.loadFileAsString(), error);
-    if (! state || track < 0 || track >= (int) engine.getSong().mixer.size())
+    if (state && state->name.empty())
+        state->name = file.getFileNameWithoutExtension().toStdString();
+    return state;
+}
+
+bool loadOnTracks (AudioEngine& engine, const std::vector<int>& tracks, const juce::File& file)
+{
+    const auto state = read (file);
+    if (! state)
         return false;
+    // FL's mixer presets restore the track's name and colour (WhatsNew); LYNX's states keep the track's own
+    const auto takeName = file.hasFileExtension ("fst") && ! state->name.empty();
+    bool any = false;
+    engine.editSong ([&] (Song& s) {
+        for (const auto t : tracks)
+            if (t >= 0 && t < (int) s.mixer.size())
+            {
+                ProjectFile::applyMixerTrackState (s.mixer[(std::size_t) t], *state, takeName);
+                any = true;
+            }
+    });
+    return any;
+}
+
+int insertTrack (AudioEngine& engine, int at, const juce::File& file)
+{
+    auto state = read (file);
+    if (! state)
+        return -1;
     if (state->name.empty())
         state->name = file.getFileNameWithoutExtension().toStdString();
-    bool ok = true;
+    at = juce::jlimit (1, (int) engine.getSong().mixer.size(), at);
+    bool ok = false;
     engine.editSong ([&] (Song& s) {
-        auto at = track;
-        if (asNewInsert)
-        {
-            at = juce::jmax (1, track + 1);
-            ok = mixerops::insertTrack (s, at);
-        }
+        ok = mixerops::insertTrack (s, at);
         if (ok)
-            ProjectFile::applyMixerTrackState (s.mixer[(std::size_t) at], *state, asNewInsert);
+            ProjectFile::applyMixerTrackState (s.mixer[(std::size_t) at], *state, true);
     });
-    return ok;
+    return ok ? at : -1;
 }
+} // namespace mixerpresets
 
 bool saveMixerTrackState (AudioEngine& engine, int track, const juce::File& file)
 {
@@ -1780,17 +1909,22 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
     });
     menu.addSeparator();
 
-    // FL's "File" submenu: the track's state (LYNX's own .lynxtrack files)
+    // FL's "File" submenu (REA round 167q, TFXForm's FileMenu): open/save a state, Browse states and the "States" list
+    // of FL's mixer presets (FL's own .fst and the user's) and LYNX's .lynxtrack states, loaded onto every selected
+    // track (FUN_012a7440)
     {
+        const auto targets = std::find (selection.begin(), selection.end(), t) != selection.end() ? selection : std::vector<int> { t };
         juce::PopupMenu file;
-        file.addItem (tr ("Open mixer track state..."), [this, t] {
+        file.addItem (tr ("Open mixer track state..."), [this, targets] {
             auto& chooser = mixerStateChooser();
-            chooser = std::make_unique<juce::FileChooser> (tr ("Open mixer track state"), mixerStatesFolder(),
-                                                           juce::String ("*") + ProjectFile::mixerTrackStateExtension);
+            const auto start = mixerpresets::folders().isEmpty() ? mixerStatesFolder() : mixerpresets::folders()[0];
+            chooser = std::make_unique<juce::FileChooser> (tr ("Open mixer track state"), start,
+                                                           juce::String ("*.fst;*") + ProjectFile::mixerTrackStateExtension);
             juce::Component::SafePointer<MixerStrips> safe (this);
-            chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe, t] (const juce::FileChooser& fc) {
-                if (safe != nullptr && fc.getResult().existsAsFile())
-                    loadMixerTrackState (safe->engine, t, fc.getResult(), false);
+            chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe, targets] (const juce::FileChooser& fc) {
+                if (safe != nullptr && fc.getResult().existsAsFile() && ! mixerpresets::loadOnTracks (safe->engine, targets, fc.getResult()))
+                    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Open mixer track state"),
+                                                            tr ("This file is not a mixer track state LYNX SHARE can read."));
             });
         });
         file.addItem (tr ("Save mixer track state as...") + "\tCtrl+Shift+S", [this, t, trackName] {
@@ -1809,12 +1943,12 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
             mixerStatesFolder().createDirectory();
             mixerStatesFolder().startAsProcess();
         });
-        const auto states = savedMixerStates();
+        const auto states = mixerpresets::all();
         if (! states.isEmpty())
         {
             file.addSectionHeader (tr ("States"));
             for (const auto& f : states)
-                file.addItem (f.getFileNameWithoutExtension(), [this, t, f] { loadMixerTrackState (engine, t, f, false); });
+                file.addItem (f.getFileNameWithoutExtension(), [this, targets, f] { mixerpresets::loadOnTracks (engine, targets, f); });
         }
         menu.addSubMenu (tr ("File"), file);
     }
@@ -2021,8 +2155,11 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         });
         menu.addItem (tr ("Insert multiple..."), room, false, [this, t] { askInsertMultiple (t); });
         juce::PopupMenu fromState;
-        for (const auto& f : savedMixerStates())
-            fromState.addItem (f.getFileNameWithoutExtension(), room, false, [this, t, f] { loadMixerTrackState (engine, t - 1, f, true); });
+        for (const auto& f : mixerpresets::all())
+            fromState.addItem (f.getFileNameWithoutExtension(), room, false, [this, t, f] {
+                if (const auto added = mixerpresets::insertTrack (engine, t, f); added > 0)
+                    setSelection ({ added }, added);
+            });
         menu.addSubMenu (tr ("Insert from state"), fromState, room && fromState.getNumItems() > 0);
 
         // FL's last section, "CPU" (REA round 134)
@@ -5026,6 +5163,11 @@ bool MixerComponent::runAction (const std::string& id)
         return false;
 
     return true;
+}
+
+bool MixerComponent::loadPresetOnSelection (const juce::File& file)
+{
+    return mixerpresets::loadOnTracks (engine, strips.getSelection(), file);
 }
 
 bool MixerComponent::addEffectToSelected (EffectSlot slot)

@@ -6222,3 +6222,7 @@ countries: id
 "WAV: stores the tempo, the length in beats and the meter (an acid chunk), so other programs play the file at the song's tempo" = "WAV: menyimpan tempo, panjang dalam ketukan dan birama (chunk acid), agar program lain memutar file pada tempo lagu"
 "WAV: marks the music (without the tail) as the file's loop (a smpl chunk), for samplers" = "WAV: menandai musik (tanpa ekor) sebagai loop file (chunk smpl), untuk sampler"
 "WAV: the Playlist's markers become cue points with their names (cue and labl chunks)" = "WAV: penanda playlist menjadi titik cue dengan namanya (chunk cue dan labl)"
+"Add from state" = "Tambah dari state"
+"Mixer presets" = "Preset mixer"
+"Mixer presets (FL)" = "Preset mixer (FL)"
+"This file is not a mixer track state LYNX SHARE can read." = "File ini bukan state trek mixer yang dapat dibaca LYNX SHARE."

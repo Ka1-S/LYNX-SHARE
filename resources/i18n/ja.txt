@@ -6222,3 +6222,7 @@ countries: jp
 "WAV: stores the tempo, the length in beats and the meter (an acid chunk), so other programs play the file at the song's tempo" = "WAV: テンポ、拍数での長さ、拍子を保存します（acid チャンク）。他のプログラムが曲のテンポでファイルを再生できます"
 "WAV: marks the music (without the tail) as the file's loop (a smpl chunk), for samplers" = "WAV: 音楽（テールを除く）をファイルのループとして記録します（smpl チャンク）。サンプラー向け"
 "WAV: the Playlist's markers become cue points with their names (cue and labl chunks)" = "WAV: プレイリストのマーカーが名前付きのキューポイントになります（cue と labl チャンク）"
+"Add from state" = "状態から追加"
+"Mixer presets" = "ミキサープリセット"
+"Mixer presets (FL)" = "ミキサープリセット (FL)"
+"This file is not a mixer track state LYNX SHARE can read." = "このファイルは LYNX SHARE が読み込めるミキサートラックの状態ではありません。"

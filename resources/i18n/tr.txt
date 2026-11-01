@@ -6222,3 +6222,7 @@ countries: tr
 "WAV: stores the tempo, the length in beats and the meter (an acid chunk), so other programs play the file at the song's tempo" = "WAV: tempoyu, vuruş cinsinden uzunluğu ve ölçüyü kaydeder (acid chunk), böylece diğer programlar dosyayı şarkının temposunda çalar"
 "WAV: marks the music (without the tail) as the file's loop (a smpl chunk), for samplers" = "WAV: müziği (kuyruk olmadan) dosyanın döngüsü olarak işaretler (smpl chunk), sampler'lar için"
 "WAV: the Playlist's markers become cue points with their names (cue and labl chunks)" = "WAV: çalma listesi işaretleri adlarıyla cue noktalarına dönüşür (cue ve labl chunk'ları)"
+"Add from state" = "Durumdan kanal ekle"
+"Mixer presets" = "Mikser ön ayarları"
+"Mixer presets (FL)" = "Mikser ön ayarları (FL)"
+"This file is not a mixer track state LYNX SHARE can read." = "Bu dosya LYNX SHARE'in okuyabileceği bir mikser kanalı durumu değil."

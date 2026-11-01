@@ -6222,3 +6222,7 @@ countries: tw hk mo
 "WAV: stores the tempo, the length in beats and the meter (an acid chunk), so other programs play the file at the song's tempo" = "WAV：儲存速度、以拍計的長度和拍號（acid 區塊），讓其他程式以歌曲的速度播放檔案"
 "WAV: marks the music (without the tail) as the file's loop (a smpl chunk), for samplers" = "WAV：將音樂（不含尾音）標記為檔案的循環（smpl 區塊），供取樣器使用"
 "WAV: the Playlist's markers become cue points with their names (cue and labl chunks)" = "WAV：播放清單的標記成為帶名稱的提示點（cue 和 labl 區塊）"
+"Add from state" = "從狀態新增"
+"Mixer presets" = "混音器預設"
+"Mixer presets (FL)" = "混音器預設 (FL)"
+"This file is not a mixer track state LYNX SHARE can read." = "此檔案不是 LYNX SHARE 可讀取的混音器軌道狀態。"

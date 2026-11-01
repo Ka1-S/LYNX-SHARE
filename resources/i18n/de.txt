@@ -6222,3 +6222,7 @@ countries: de at ch li lu
 "WAV: stores the tempo, the length in beats and the meter (an acid chunk), so other programs play the file at the song's tempo" = "WAV: speichert Tempo, Länge in Schlägen und Takt (ein acid-Chunk), damit andere Programme die Datei im Songtempo abspielen"
 "WAV: marks the music (without the tail) as the file's loop (a smpl chunk), for samplers" = "WAV: markiert die Musik (ohne Ausklang) als Loop der Datei (ein smpl-Chunk), für Sampler"
 "WAV: the Playlist's markers become cue points with their names (cue and labl chunks)" = "WAV: die Marker der Playlist werden Cue-Punkte mit ihren Namen (cue- und labl-Chunks)"
+"Add from state" = "Aus Zustand hinzufügen"
+"Mixer presets" = "Mixer-Presets"
+"Mixer presets (FL)" = "Mixer-Presets (FL)"
+"This file is not a mixer track state LYNX SHARE can read." = "Diese Datei ist kein Mixer-Insert-Zustand, den LYNX SHARE lesen kann."
