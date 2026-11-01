@@ -219,6 +219,9 @@ private:
     void addAutoMarker();                       // "Add auto" at the playhead, on the grid
     void addSignatureChangeByKey();             // "Add time signature change..." (dialog)
     void placeLoopMarker();                     // "Place loop" at the time selection / first bar in view
+    // FL's Select › time keys (round 167k: EESelAroundSelAction Ctrl+Enter, EESelPrev/NextAction Ctrl+Left/Right)
+    void selectTimeAroundSelection();
+    void moveTimeSelection (int direction);
     void deleteSelection();
     void copySelection();
     void pasteClips (std::int64_t at = -1);

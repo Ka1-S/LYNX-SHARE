@@ -189,10 +189,49 @@ render, **[GUI]** LYNX driven on Windows (fresh profile, `LYNX_TEST_MODE=1`), **
 - **LYNX now (LYNX `--render` against FL: the same samples for p_rev / p_normpol / p_fadein / p_fadeout):** imported for audio clip channels too. `buildInstrument` processes an audio clip's whole file (the
   region stays whole: a clip plays the whole file). [TEST] `rea167k_audio_clip_channels_keep_precomputed_effects`.
 
+## 9. Playlist › Select › time keys (167j gap row)
+
+- **FL evidence [REA]:** FL's Playlist actions `EESelAroundSelAction` (Ctrl+Enter), `EESelPrevAction` /
+  `EESelNextAction` (Ctrl+Left / Ctrl+Right, Tag −1 / +1). `FUN_00eb1b90` → `FUN_00e4ea50`: the time selection spans
+  the selected clips, or the visible range when none is selected; the same span again clears it. `FUN_00e43ea0`
+  (Tag ±1): the time selection moves by its own length, never before the song's start, the song position goes to
+  its new start and the view follows.
+- **LYNX before:** no keys; Ctrl+Left / Ctrl+Right did nothing in the Playlist.
+- **LYNX now:** `playlist.selectTimeAround`, `playlist.timePrevious`, `playlist.timeNext` (Playlist focused);
+  `PlaylistComponent::selectTimeAroundSelection` / `moveTimeSelection`. [TEST] `rea167k_select_time_keys`.
+  [GUI, Windows] the demo: one Chords clip selected, Ctrl+Enter selects bars 5–9; Ctrl+Right moves it to 9–13 with
+  the playhead at bar 9; with nothing selected Ctrl+Enter selects the view and again clears it.
+
+## 10. Declicker attacks and the sample's end (167h leftover)
+
+- **Brief:** "declicker attacks" (the attack halves of FL's seven declickers, REA_rodada167h §3).
+- **FL evidence [DECOMP]:** FUN_012c6ae0 builds the declickers with FUN_00977f50(declicker, attack shape, attack ms,
+  attack curve, release shape, release ms, release curve): mode 0 none / 3·10 ms, mode 1 2·4 ms / 1·10 ms, mode 2
+  2·4 ms / 3·20 ms, mode 3 3·20 / 3·20, mode 4 3·100 / 3·100, mode 5 3·200 c5 / 3·200 c5, fast none / 3·2 ms.
+  FUN_00977870 makes the attack tables: shape 3 a rising raised cosine, shape 2 a falling one that FUN_00978250 uses
+  to subtract the first frame (x − x₀·g). But the start of the attack is decided by FUN_00978070(declicker, state,
+  use attack): its position is 0x7fffffff (done) unless the third argument is set, and **every** sampler voice start
+  passes 0 (FUN_00d277d0, FUN_00d27cf0 at 00d27d74 / 00d286a5 / 00d28728, FUN_00d24400). So FL's Sampler notes
+  start without an attack ramp in every mode.
+- **FL evidence [FL render]:** `r167k/fl/dk/dk.flp` (`tmp/r167k/py/mkdk.py`): a 0.3 s DC sample (0.5) on six
+  Sampler channels, modes 0–5, a 0.5 s note each. Every note starts at full level on its first frame (no attack in any
+  mode). Where the sample ends (frame 13 230) FL holds the last frame and fades it with the **mode's release**:
+  sound ends 438 / 369 / 877 / 877 / 4 388 / 8 782 frames later; modes 0, 2, 3, 4 a raised cosine (error ≤ 0.003),
+  mode 1 the follower shape, mode 5 the curved one (0.69 at the middle).
+- **LYNX before:** no attack (right), but the sample's end always faded with the fixed 10 ms end table: every mode
+  ended 432 frames after the sample.
+- **LYNX now:** with a declicking mode other than 0, a voice that runs past its sample's end holds the last frame and
+  starts the mode's release (`startCut (v, false)`: the same declicker as a note cut); mode 0 keeps the 10 ms end
+  table. [TEST] `rea167k_sample_end_uses_the_declicking_release`. LYNX `--render` of the same `dk.flp` against FL's
+  render: max error 0.0000 / 0.0000 / 0.0004 / 0.0004 / 0.0001 / 0.0001 for modes 0–5 (before: up to 0.19).
+
 ## Where I stopped
 
-- Done (feature/flopt167k): items 1–8, tests green (`tests/Rea167kTests.inc`), Windows GUI re-check (keys 7/8/9,
+- Done (feature/flopt167k): items 1–10 (first landing d2ad4494 = items 1–8), tests green (`tests/Rea167kTests.inc`), Windows GUI re-check (keys 7/8/9,
   marker keys, undo, mixer keys, export dialog) and render checks against FL.
-- Left from the brief: 167h leftovers (Sampler legacy panel, declicker attacks, audio clips through precompute,
-  .flp events 0x20/0x30/0x32/0xAA, 0x2B, 0xE2/0xE6, 0x26); the 167h gap table; more 167j gap rows (Ctrl+Enter /
-  Ctrl+Left / Ctrl+Right time selection, export "Save tempo information (acid)", markers in exports, Alt solo).
+- Left from the brief: 167h leftovers (Sampler legacy panel, .flp events 0x20 (+0x892),
+  0x30 (+0x224), 0x32 (+0x1fc), 0xAA (+0x714 count + strings), 0x2B, 0xE2/0xE6, 0x26: they need the channel form
+  handlers traced); more 167j gap rows (export "Save tempo information (acid)", markers in exports, Alt solo not yet
+  proven, per-clip stretch at clip +0x40).
+- Seen, not fixed: the export dialog has a large empty gap above Mix; Ctrl+F4 on an empty pattern; CC123 to MIDI
+  out on a reset jump (MIDI Out is another round's area); generator level differences (plugin area, 167f).

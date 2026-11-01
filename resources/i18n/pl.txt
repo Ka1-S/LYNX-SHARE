@@ -6192,3 +6192,6 @@ countries: pl
 "Solo the selected mixer track(s)" = "Solo zaznaczonych ścieżek miksera"
 "Disk recording: render the armed tracks to wave file(s)" = "Nagrywanie na dysk: renderuj uzbrojone ścieżki do plików wave"
 "Disk recording: render the selected tracks to wave file(s)" = "Nagrywanie na dysk: renderuj zaznaczone ścieżki do plików wave"
+"Select time around selection" = "Zaznacz czas wokół zaznaczenia"
+"Select previous time" = "Zaznacz poprzedni czas"
+"Select next time" = "Zaznacz następny czas"

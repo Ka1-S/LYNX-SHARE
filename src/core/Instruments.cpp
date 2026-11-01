@@ -1480,6 +1480,7 @@ struct SamplerVoice
     std::int64_t tickIndex = 0;
     double nextGap = 0.0;             // samples from this tick to the next one on the song's grid
     int endFade = -1;                 // ≥ 0: past the sample's end, the last frame fading out (FL's 10 ms end fade)
+    bool endByDeclicker = false;      // that fade is the declicking mode's release (modes 1–5, round 167k)
     int offFade = -1;                 // ≥ 0: a looping voice fading out after its note-off (the same table)
     float holdL = 0.0f, holdR = 0.0f; // the last frame read
 };
@@ -2596,18 +2597,30 @@ public:
                 }
                 // past the region's end FL holds the last frame and fades it out with the 441-entry end table (EXEC:
                 // FL's render, REA_rodada76 §6)
+                // With a declicking mode other than 0 that fade is the mode's release instead (FL render,
+                // REA_rodada167k §10: 20 / 20 / 100 / 200 ms, mode 1 the follower, mode 5 curved).
                 if (v.endFade < 0 && ((double) flrs::wholeFrames (v.position) > lastFrame || v.position < v.first))
+                {
                     v.endFade = 0;
+                    if (! v.stolen && declickMode.load (std::memory_order_relaxed) != 0)
+                    {
+                        startCut (v, false);
+                        v.endByDeclicker = true;
+                    }
+                }
                 float sl, sr, endGain = 1.0f;
                 if (v.endFade >= 0)
                 {
                     const auto& table = flvp::endTable();
-                    if (v.endFade >= (int) table.size())
+                    if (! v.endByDeclicker)
                     {
-                        ended = true;
-                        break;
+                        if (v.endFade >= (int) table.size())
+                        {
+                            ended = true;
+                            break;
+                        }
+                        endGain = table[(std::size_t) v.endFade++];
                     }
-                    endGain = table[(std::size_t) v.endFade++];
                     sl = v.holdL, sr = v.holdR;
                 }
                 else

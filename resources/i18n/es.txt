@@ -6192,3 +6192,6 @@ countries: es mx ar co cl pe ve
 "Solo the selected mixer track(s)" = "Solo en la(s) pista(s) del mezclador seleccionada(s)"
 "Disk recording: render the armed tracks to wave file(s)" = "Grabación en disco: renderizar las pistas armadas a archivo(s) wave"
 "Disk recording: render the selected tracks to wave file(s)" = "Grabación en disco: renderizar las pistas seleccionadas a archivo(s) wave"
+"Select time around selection" = "Seleccionar el tiempo alrededor de la selección"
+"Select previous time" = "Seleccionar el tiempo anterior"
+"Select next time" = "Seleccionar el tiempo siguiente"

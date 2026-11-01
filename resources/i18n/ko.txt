@@ -6192,3 +6192,6 @@ countries: kr
 "Solo the selected mixer track(s)" = "선택한 믹서 트랙 솔로"
 "Disk recording: render the armed tracks to wave file(s)" = "디스크 녹음: 암된 트랙을 WAV 파일로 렌더링"
 "Disk recording: render the selected tracks to wave file(s)" = "디스크 녹음: 선택한 트랙을 WAV 파일로 렌더링"
+"Select time around selection" = "선택 영역 주변 시간 선택"
+"Select previous time" = "이전 시간 선택"
+"Select next time" = "다음 시간 선택"

@@ -6192,3 +6192,6 @@ countries: it ch sm
 "Solo the selected mixer track(s)" = "Solo sulla/e traccia/e del mixer selezionata/e"
 "Disk recording: render the armed tracks to wave file(s)" = "Registrazione su disco: renderizza le tracce armate in file wave"
 "Disk recording: render the selected tracks to wave file(s)" = "Registrazione su disco: renderizza le tracce selezionate in file wave"
+"Select time around selection" = "Seleziona il tempo attorno alla selezione"
+"Select previous time" = "Seleziona il tempo precedente"
+"Select next time" = "Seleziona il tempo successivo"

@@ -6192,3 +6192,6 @@ countries: tw hk mo
 "Solo the selected mixer track(s)" = "獨奏所選混音軌道"
 "Disk recording: render the armed tracks to wave file(s)" = "磁碟錄音：將已預備的軌道算繪為 WAV 檔案"
 "Disk recording: render the selected tracks to wave file(s)" = "磁碟錄音：將所選軌道算繪為 WAV 檔案"
+"Select time around selection" = "選取所選內容周圍的時間"
+"Select previous time" = "選取上一段時間"
+"Select next time" = "選取下一段時間"
