@@ -16,7 +16,7 @@ Evidence: [SHOT] LYNX before = `/mnt/e/lynx-work/shot167q/*.png` (main 5d3f5c17)
 | page row | aligned with Channel / Patch | [SHOT] FL: Page under Channel / Patch | Page combo at its own x | "Page" label in the Channel column, combo exactly over the Patch column, pencil after it |
 | margins | no big empty side margins | FL's form is 558 x 389 | 560 px page centred in the 800 px channel window (Misc tab needs 800) → 120 px empty each side | the editor uses the window's 800 px; the title line ("MIDI Out", already the window title) is gone, Presets / Options moved onto the page row → the window is 30 px shorter |
 | bottom | | [SHOT] FL bottom bar: Reset, Deactivate all, Send pan…, Map note color | toggles on their own row | Reset, Deactivate all and both toggles on one row (FL's bar); LYNX's own Send to a plugin / Automate / "Plays:" on the next |
-| Configure | consistent −/+ sizes, no empty gap, dialog behaviour | [DFM TCtrlSetForm] compact 238 x 286 form | Controller's −/+ 72 px wide, Range's 15 px; fixed 360 x 300 with an empty band above the buttons; launched without `keepAboveMainWindow` | every number field 116 px (same −/+), Range "min – max", window height from its rows (290 px, no gap); launched like Export / Customize toolbar (`keepAboveMainWindow`: modal, above the LYNX windows) |
+| Configure | consistent −/+ sizes, no empty gap, dialog behaviour | [DFM TCtrlSetForm] compact 238 x 286 form | Controller's −/+ 72 px wide, Range's 15 px; fixed 360 x 300 with an empty band above the buttons; launched without `keepAboveMainWindow` | every number field 116 px (same −/+), Range "min – max", window height from its rows (274 px; on Windows the native title bar's height was added to the client area after showing — corrected once shown, so no empty band); launched like Export / Customize toolbar (`keepAboveMainWindow`: modal, above the LYNX windows) |
 | title | "MIDI Out (Insert 6)" | [EXEC round 149] FL names a channel window "<channel name> (<mixer track>)" | — | unchanged: it IS the channel's name + its insert, like every other channel window (rename the channel → the title follows). Checked, nothing to change. |
 | preset arrows | not here (167o) | | | room left free right of *Presets* (56 px) for 167o's ◀ ▶ |
 
@@ -39,9 +39,12 @@ Evidence: [SHOT] LYNX before = `/mnt/e/lynx-work/shot167q/*.png` (main 5d3f5c17)
 - [TEST] `polish167p_submenu_beside_outer_edge` (outer edge, row-aligned, bottom of the screen, no room on the right,
   taller than the screen, second monitor at negative x).
 
+## Windows GUI check (real mouse, fresh profile, test mode)
+`/mnt/e/lynx-work/shot167p/`: before_*.png (main 5d3f5c17) / after_*.png. Insert › submenu beside the outer edge,
+level with "Insert", downwards; a 40-step glide across the right column drifting 9 px up reaches the submenu (Kick
+highlighted, `after_rack_insert_submenu.png`); Replace › same; nested FL engines › at its parent's edge, moved up only
+by what the screen needs; MIDI Out editor (unassigned / configured "Cutoff" 34 / switched off by its name); Configure
+dialog without the empty band. build-local 1 890 633 checks, 0 failures.
+
 ## Where I stopped
-- Done: code (Theme.cpp, MenuPlacement.h, LynxPatchJuce.cmake, MidiOutEditor.cpp, MidiOutView.h), tests.
-- In progress: build-local + Windows build, Windows GUI check (after shots in /mnt/e/lynx-work/shot167p/).
-- Next: look at the shots, fix, land via `flock ~/projetos/lynx/.git/lynx-merge.lock ~/.claude/jobs/f8789b49/tmp/coord/land.sh polish167p`.
-- Rerun: `OUT=build-win ~/.claude/jobs/f8789b49/tmp/coord/winbuild.sh scripts/build-windows-zig.sh` (zig cache
-  ~/.cache/zig-polish167p), GUI script /mnt/e/lynx-work/shot167p/run.sh.
+- Done: everything above; landing via land.sh.
