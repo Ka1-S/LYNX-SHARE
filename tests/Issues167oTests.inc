@@ -185,13 +185,13 @@ TEST (issue24_fl_ogun_presets_in_fls_order)
     channel->mixerTrack = 3;
     channel->misc.pitchRange = 7;
     // (FL's three "Default" presets are Ogun state version 12, which LYNX's Ogun engine doesn't read yet: the arrows
-    // pass over them; "300 Ft Glass Bowl" is version 14)
+    // pass over them; "300 Ft Glass Bowl", the new channel's own default, and "Alien Queens Lair" are version 14)
     CHECK (! lynx::natives::withPreset (*channel, list[1].path, list[1].name, fl).has_value());
-    const auto next = lynx::natives::withPreset (*channel, list[3].path, list[3].name, fl);
+    const auto next = lynx::natives::withPreset (*channel, list[4].path, list[4].name, fl);
     CHECK (next.has_value());
     if (next)
     {
-        CHECK (next->instrument == lynx::InstrumentKind::ogun && next->name == "300 Ft Glass Bowl");
+        CHECK (next->instrument == lynx::InstrumentKind::ogun && next->name == "Alien Queens Lair");
         CHECK (next->mixerTrack == 3 && next->misc.pitchRange == 7);
         CHECK (next->pluginState != channel->pluginState);
     }
@@ -317,6 +317,7 @@ TEST (issue22_sfz_loads_and_plays_at_the_regions_pitch)
     CHECK (std::abs (sft::frequency (octave, rig.rate) - 440.0 * std::pow (2.0, 11.0 / 12.0)) < 10.0);
     const auto stereo = sfzt::play (rig, 81, 0.2); // root 57 → 2 octaves up: 880 Hz (the 1 s file lasts 0.25 s there)
     CHECK (std::abs (sft::frequency (stereo, rig.rate) - 880.0) < 12.0);
+    rig.run (1.0); // (the one-shot above plays to its end)
     CHECK (sft::peak (sfzt::play (rig, 100, 0.2)) < 1e-6f); // its sample is missing
     std::error_code ec;
     std::filesystem::remove_all (dir, ec);
