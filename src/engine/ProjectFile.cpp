@@ -938,12 +938,13 @@ juce::var clipsToVar (const std::vector<Clip>& list)
                                       (juce::int64) c.offset, (int) c.kind,
                                       c.kind == ClipKind::automation ? c.automation : c.channel };
 
-        // [.., fade-in, fade-out, gain, muted, sub-tick offset, pan, pitch, reversed] up to the last value that is not
-        // the default (round 167k: FL 2026's clip pitch and clip reverse, keys 7/8/9)
+        // [.., fade-in, fade-out, gain, muted, sub-tick offset, pan, pitch, reversed, stretch] up to the last value that
+        // is not the default (round 167k: FL 2026's clip pitch and clip reverse, keys 7/8/9; 167l: the clip stretch)
         const auto fraction = juce::roundToInt (c.offsetFraction * 10000.0f) / 10000.0;
         const auto pan = juce::roundToInt (c.pan * 1000.0f) / 1000.0;
         const auto pitch = juce::roundToInt (c.pitch * 1000.0f) / 1000.0;
-        const int used = c.reversed ? 8 : pitch != 0.0 ? 7 : pan != 0.0 ? 6 : fraction != 0.0 ? 5 : c.muted ? 4
+        const auto stretch = std::round (c.stretch * 1.0e6) / 1.0e6;
+        const int used = stretch != 1.0 ? 9 : c.reversed ? 8 : pitch != 0.0 ? 7 : pan != 0.0 ? 6 : fraction != 0.0 ? 5 : c.muted ? 4
                        : (c.fadeIn > 0 || c.fadeOut > 0 || c.gain != 1.0f) ? 3 : 0;
         if (used > 0)
         {
@@ -966,6 +967,8 @@ juce::var clipsToVar (const std::vector<Clip>& list)
                 clip.add (pitch);
             if (used >= 8)
                 clip.add (c.reversed);
+            if (used >= 9)
+                clip.add (stretch);
         }
 
         clips.add (clip);
@@ -1002,6 +1005,7 @@ std::vector<Clip> clipsFromVar (const juce::var& v, const Song& song)
                 clip.pan = c.size() >= 13 ? juce::jlimit (-1.0f, 1.0f, (float) (double) c[12]) : 0.0f;
                 clip.pitch = c.size() >= 14 ? juce::jlimit (-12.0f, 12.0f, (float) (double) c[13]) : 0.0f;
                 clip.reversed = c.size() >= 15 && (bool) c[14];
+                clip.stretch = c.size() >= 16 ? juce::jlimit (0.01, 100.0, (double) c[15]) : 1.0;
             }
 
             if (c.size() >= 7 && (int) c[5] == 2)

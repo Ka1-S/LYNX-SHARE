@@ -2199,7 +2199,7 @@ void ChannelRackComponent::applyPaint (const juce::MouseEvent& e)
 
 // --- menus -------------------------------------------------------------------------------------
 
-void ChannelRackComponent::showChannelMenu (int channel)
+juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
 {
     const auto& c = engine.getSong().channels[(std::size_t) channel];
     // Replace › lists exactly what Insert › and "+" list (issue #18: one source, quickpick::addGeneratorMenu); the
@@ -2495,8 +2495,12 @@ void ChannelRackComponent::showChannelMenu (int channel)
     }
     menu.addItem (tr ("Select unused channels"), [this] { selectUnused(); });
     menu.addItem (tr ("Group selected...") + "\tAlt+G", [this] { groupSelected(); });
+    return menu;
+}
 
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+void ChannelRackComponent::showChannelMenu (int channel)
+{
+    buildChannelMenu (channel).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
 juce::String flEngineName (const natives::InstrumentEngine& e)

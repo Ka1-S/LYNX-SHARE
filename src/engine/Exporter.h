@@ -65,7 +65,7 @@ public:
     double getMusicSeconds() const noexcept { return musicSeconds; }
     float getPeak() const noexcept { return peak; }
     // FL's "Extra data" (markers, loop, tempo: Options::saveTempo / loopMarkers / playlistMarkers) in WAV files: on for
-    // the user's exports (the export window, --render), off for LYNX's own renders (bounces, consolidation, the
+    // the user's exports (the export window, --export), off for LYNX's own renders (bounces, consolidation, the
     // auto-sampler), whose files become samples again and must not carry a loop
     void setExtraData (bool on) noexcept { extraData = on; }
     AudioEngine& getEngine() noexcept { return *engine; }

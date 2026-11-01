@@ -347,3 +347,90 @@ TEST (rea167l_export_wav_extras_song_markers)
     CHECK (lynx::exportopts::wavDataFrames (path) == 2);
     std::filesystem::remove (path);
 }
+
+// §2 FL 2026's per-clip stretch (+0x40) [FL render r167l/fl/l_all.flp take 2: a 2 s 440 Hz ramp, 6-beat clips]
+namespace rea167l
+{
+inline std::vector<float> renderSine (const lynx::Song& s, double seconds)
+{
+    auto provider = [] (const std::string&) {
+        auto d = std::make_shared<lynx::SampleData>();
+        d->sampleRate = 48000.0;
+        d->left.resize (96000);
+        for (std::size_t i = 0; i < d->left.size(); ++i)
+            d->left[i] = 0.5f * (float) std::sin (2.0 * 3.14159265358979 * 440.0 * (double) i / 48000.0);
+        return std::shared_ptr<const lynx::SampleData> (d);
+    };
+    auto state = lynx::RackState::build (s, nullptr, 48000.0, provider);
+    lynx::RackRenderer r;
+    r.prepare (48000.0, 256);
+    std::vector<float> l (256), rr (256), out;
+    const auto tps = lynx::ticksPerSample (s.bpm, 48000.0);
+    for (int b = 0; b < (int) (seconds * 48000.0 / 256.0); ++b)
+    {
+        r.process (state.get(), true, (double) b * 256.0 * tps, 256, l.data(), rr.data());
+        out.insert (out.end(), l.begin(), l.end());
+    }
+    return out;
+}
+} // namespace rea167l
+
+TEST (rea167l_clip_stretch_import)
+{
+    FlpBuilder b (96);
+    b.ascii (0xC7, "25.2.5.5319");
+    b.u8 (0xA9); b.u32 (7);
+    b.u8 (0x9C); b.u32 (120000);
+    b.u8 (0x40); b.u16 (0);
+    b.u8 (0x15); b.u8 (4);
+    b.utf16 (0xC4, u"C:\\samples\\ramp.wav");
+    std::vector<std::uint8_t> items (80, 0);
+    std::uint32_t pos = 0, len = 576;
+    std::uint16_t base = 20480, idx = 0, rv = 499;
+    const float gain = 1.0f;
+    const double stretch = 1.5;
+    std::memcpy (items.data() + 0, &pos, 4);
+    std::memcpy (items.data() + 4, &base, 2);
+    std::memcpy (items.data() + 6, &idx, 2);
+    std::memcpy (items.data() + 8, &len, 4);
+    std::memcpy (items.data() + 12, &rv, 2);
+    std::memcpy (items.data() + 0x34, &gain, 4);
+    std::memcpy (items.data() + 0x40, &stretch, 8);
+    b.data (0xE9, items);
+    const auto p = flp::parseProject (b.bytes);
+    REA167L_REQUIRE (p.arrangements.size() == 1 && p.arrangements[0].items.size() == 1);
+    CHECK (p.arrangements[0].items[0].stretch == 1.5);
+    lynx::FlpImportOptions o;
+    o.fileExists = [] (const std::string&) { return true; };
+    o.sampleSeconds = [] (const std::string&) { return 2.0; };
+    const auto song = lynx::importFlp (p, o);
+    REA167L_REQUIRE (song.playlist.size() == 1);
+    // FL: the 6-beat item stretched 1.5 ends 9 beats after its start (the song's end with it)
+    CHECK (song.playlist[0].stretch == 1.5 && song.playlist[0].length == 9 * lynx::ppq);
+    // the Playlist reads the file at 1 / stretch
+    const auto& ch = song.channels[(std::size_t) song.playlist[0].channel];
+    CHECK (std::abs (lynx::clipops::framesPerTick (ch, song.playlist[0], 96000.0, 48000.0, 120.0) * 1.5
+                     - lynx::clipops::framesPerTick (ch, 96000.0, 48000.0, 120.0)) < 1.0e-9);
+}
+
+TEST (rea167l_clip_stretch_plays_like_fl)
+{
+    using namespace lynx;
+    auto s = rea167k::rampSong();
+    s.playlist[0].length = 12 * ppq; // 6 s at 120 BPM
+    // Resample: ×2 = 4 s at 220 Hz, ×0.5 = 1 s at 880 Hz (FL: st_r_2 / st_r_05)
+    s.playlist[0].stretch = 2.0;
+    auto x = rea167l::renderSine (s, 5.0);
+    CHECK (std::abs (rea167k::frequencyOf (x, 0.5, 1.5) - 220.0) < 1.5);
+    CHECK (rea167k::peakOf (x, 3.7, 3.95) > 0.2f && rea167k::peakOf (x, 4.15, 4.9) < 0.05f);
+    s.playlist[0].stretch = 0.5;
+    x = rea167l::renderSine (s, 2.0);
+    CHECK (std::abs (rea167k::frequencyOf (x, 0.2, 0.8) - 880.0) < 3.0);
+    CHECK (rea167k::peakOf (x, 0.85, 0.97) > 0.2f && rea167k::peakOf (x, 1.1, 1.9) < 0.05f);
+    // a stretch mode (FL: st_e3_2 / st_rt_2): ×2 = 4 s, the pitch stays 440 Hz
+    s.channels[0].sampler.keepPitch = true;
+    s.playlist[0].stretch = 2.0;
+    x = rea167l::renderSine (s, 5.0);
+    CHECK (std::abs (rea167k::frequencyOf (x, 0.5, 3.0) - 440.0) < 3.0);
+    CHECK (rea167k::peakOf (x, 3.6, 3.9) > 0.1f && rea167k::peakOf (x, 4.3, 4.9) < 0.05f);
+}

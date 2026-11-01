@@ -1129,6 +1129,10 @@ struct Clip
     // per clip, on top of the channel's own pitch and reverse (FL: the playlist item's +0x3C / +0x48 bit 0, round 167k)
     float pitch = 0.0f;
     bool reversed = false;
+    // audio clips: FL 2026's per-clip stretch (the playlist item's +0x40 double, REA_rodada167l §2): the clip plays its
+    // audio `stretch` times longer (2 = half speed). Its channel's time-stretch mode decides how: Resample changes the
+    // speed and the pitch together, the other modes keep the pitch. `length` is already the stretched length.
+    double stretch = 1.0;
     // FL's automatic crossfades (round 166e): where this audio clip overlaps the previous / next audio clip on its
     // track, the overlap in ticks — derived from the arrangement by clipops::updateCrossfades while
     // Song::autoCrossfades is on (never saved). A crossfade replaces that side's fade, with an S-shaped curve.

@@ -1077,6 +1077,10 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
                         const auto pitch = readLE<float> (e.data, o + 0x3C);
                         item.pitch = std::isfinite (pitch) ? std::clamp (pitch, -12.0f, 12.0f) : 0.0f;
                         item.reversed = (readLE<std::uint32_t> (e.data, o + 0x48) & 1) != 0;
+                        // the clip's stretch (+0x40, double; 1 = none): FL plays the clip that many times longer
+                        // (FUN_01064f40 makes a variant of the sample for it in the offline stretch modes; round 167l)
+                        const auto stretch = readLE<double> (e.data, o + 0x40);
+                        item.stretch = std::isfinite (stretch) && stretch > 0.0 ? std::clamp (stretch, 0.01, 100.0) : 1.0;
                     }
 
                     const auto patternBase = base != 0 ? base : playlistPatternBase;

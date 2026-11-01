@@ -307,6 +307,7 @@ struct PlaylistItem
     // Audio clips, records of 80 B and more: FL 2026's clip pitch (semitones) and clip reverse (round 167k).
     float pitch = 0.0f;
     bool reversed = false;
+    double stretch = 1.0; // FL 2026's per-clip stretch (+0x40 double; round 167l)
 };
 
 struct PlaylistTrackInfo

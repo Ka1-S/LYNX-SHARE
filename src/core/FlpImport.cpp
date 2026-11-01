@@ -3495,6 +3495,16 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 clip.gain = item.gain;
                 clip.pitch = item.pitch;
                 clip.reversed = item.reversed;
+                // FL's clip stretch (round 167l, FL render: a 6-beat item with stretch 1.5 ends 9 beats later, the song
+                // with it): the item's length and start offset are the unstretched ones
+                clip.stretch = item.stretch;
+                if (clip.stretch != 1.0)
+                {
+                    clip.length = (std::int64_t) std::llround ((double) clip.length * clip.stretch);
+                    const auto offset = ((double) clip.offset + (double) clip.offsetFraction) * clip.stretch;
+                    clip.offset = (std::int64_t) std::llround (offset);
+                    clip.offsetFraction = (float) (offset - (double) clip.offset);
+                }
                 const auto msToTicks = [&] (float ms)
                 { return std::clamp ((std::int64_t) std::llround (ms / 1000.0 * song.bpm / 60.0 * ppq), (std::int64_t) 0, clip.length); };
                 clip.fadeIn = msToTicks (item.fadeInMs);

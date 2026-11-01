@@ -86,6 +86,8 @@ public:
     // FL 2026's clip pitch (round 167k): the next audio clip note's own transposition, shifted keeping its length;
     // setClipShift (UI thread, before prepareKeyShift) asks for the pitch shifters even without "keep pitch"
     virtual void setNextClipPitch (float /*semitones*/) noexcept {}
+    // the next audio clip's stretch (FL 2026's clip stretch, round 167l): its audio lasts that many times longer
+    virtual void setNextClipStretch (float /*stretch*/) noexcept {}
     virtual void setClipShift (bool) {}
     virtual void setNextClipFades (float /*elapsed*/, float /*remaining*/, float /*fadeIn*/, float /*fadeOut*/, std::uint8_t /*shape*/ = 0) noexcept {}
     // Pan, fine tuning and "porta" (inverts the channel's porta) of the next note (called right before

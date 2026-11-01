@@ -4877,7 +4877,7 @@ private:
                 const auto loaded = juce::Time::getMillisecondCounterHiRes();
                 // .mp3: the Export window's MP3 (320 kbps); everything else as before
                 auto options = settings.toOptions();
-                // --save-tempo: FL's "Tempo information" (acid chunk) on (round 167l: compare with FL's AcidBox render)
+                // --save-tempo: FL's "Tempo information" (acid chunk) on (round 167l: compare with FL's AcidBox render; --export)
                 if (juce::JUCEApplication::getCommandLineParameters().contains ("--save-tempo"))
                     options.saveTempo = true;
                 // --no-warmup: the export's plugin warm-up off (round 155: compare the start of the file)
@@ -6785,6 +6785,9 @@ private:
                                                      ui.getPlaylistForSnapshot().getTrackMenuForSnapshot (0),
                                                      ui.getMixerForSnapshot().getStripsForSnapshot().buildMenu (1) };
                 saveMenus (juce::StringArray { "Piano roll tools", "Playlist track", "Mixer track" }, menus, prefix + "-menus143.png");
+                // round 167l: the channel menu ("Lock active/mute state")
+                if (! offline.getSong().channels.empty())
+                    saveMenus (juce::StringArray { "Channel" }, std::vector<juce::PopupMenu> { ui.getRackForSnapshot().getChannelMenuForSnapshot (0) }, prefix + "-channel-menu.png");
                 // round 163: menu density, compact (default) and comfortable, on a Browser folder menu
                 {
                     juce::PopupMenu folder;
