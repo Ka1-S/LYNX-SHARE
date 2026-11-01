@@ -136,8 +136,7 @@ of controls 0, 3, 6, 7, 8, 9 matched the formulas bit for bit (12801 values each
   the two sends go to the slot's send output (Song::fruitySendTarget: the Send-to parameter); the beat is computed per
   512-frame chunk from LYNX's song ticks and tempo.
 - FL import (`effectFromFl "Transporter"`, FlpImport post-pass): the controls, Source, Stereo; the input track →
-  the slot's side-chain source; the send track → the k-th route of the insert (report line "loop send routed to the
-  insert's routes in order: unverified"); automation of the 22 controls (FlParamMap, flRawRange).
+  the slot's side-chain source; the send track → the mixer insert of that number (round 167n, REA_rodada167n §1); automation of the 22 controls (FlParamMap, flRawRange).
 - Editor: generated layout (LEVELS / LOOP / BIAS / MODE sections, 640×262), i18n in all languages.
 
 ## 5. Verification
@@ -153,11 +152,10 @@ of controls 0, 3, 6, 7, 8, 9 matched the formulas bit for bit (12801 values each
   tp167f_reset_latency_and_project_round_trip.
 
 ## 6. Not exact / open
-- Send track → LYNX insert: FL addresses a mixer track; LYNX maps it to the k-th route of the insert. [HYP]
+- Send track → LYNX insert: resolved in round 167n (the insert number, as Fruity Send; REA_rodada167n §1).
 - FL's host silence handling around plug-ins is not modelled; LYNX always processes.
 - The beat input is derived per 512-frame chunk from LYNX's ticks (FL: per host block, integer ticks).
-- Update / Flush buttons latch in LYNX's parameter model (FL's buttons are momentary; the engine reacts to the rising
-  edge either way, a second press needs the value to return to 0).
+- Update / Flush buttons: momentary since round 167n (each click is a press for one block; REA_rodada167n §2).
 - Input-track buffer missing: LYNX feeds zeros to the detector (FL would read whatever the buffer holds).
 - v3 states: FL reads Source / Stereo from uninitialised memory; LYNX uses 2 / 1.
 
