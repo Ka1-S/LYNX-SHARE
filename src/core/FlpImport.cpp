@@ -2873,22 +2873,14 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 else if (fx.kind == EffectKind::flTransporter)
                 {
                     // the detector follows FL's input track when one is chosen (the inputs list, like the Limiter's); the
-                    // loops' send goes to the insert's k-th output (its routes in order) [HYP, REA_rodada167f-transporter §6]
+                    // loops' send goes to the mixer insert of that number: the plug-in asks the host for the send buffer
+                    // with the same call and index as Fruity Send (REA_rodada167n §1, REA_rodada105_send §2)
                     if (const auto st = transporter::parse (slot.state))
                     {
                         fx.sidechain = sidechainSource (insert.index, st->inputTrack);
-                        if (st->sendTrack > 0)
-                        {
-                            auto outs = insert.routes;
-                            std::sort (outs.begin(), outs.end());
-                            outs.erase (std::unique (outs.begin(), outs.end()), outs.end());
-                            outs.erase (std::remove_if (outs.begin(), outs.end(), [&insert] (int t) { return t <= 0 || t == insert.index; }), outs.end());
-                            const auto k = (std::size_t) st->sendTrack - 1;
-                            if (k < outs.size() && outs[k] < tracks)
-                                fx.params[(std::size_t) transporter::sendParam] = (float) outs[k] / (float) transporter::rawMax[transporter::sendParam];
-                            if (options.report != nullptr)
-                                ++options.report->partialEffects["Transporter (loop send routed to the insert's routes in order: unverified)"];
-                        }
+                        const auto send = st->sendTrack;
+                        fx.params[(std::size_t) transporter::sendParam] =
+                            send > 0 && send < tracks && send != insert.index ? (float) send / (float) transporter::rawMax[transporter::sendParam] : 0.0f;
                     }
                 }
                 else if (fx.kind == EffectKind::transmitter)

@@ -6,7 +6,7 @@
 
 namespace tp167f
 {
-std::vector<std::uint8_t> state (int version, std::initializer_list<std::int32_t> controls, bool tail, int source = 2, int stereo = 1)
+std::vector<std::uint8_t> state (int version, std::initializer_list<std::int32_t> controls, bool tail, int source = 2, int stereo = 1, int send = 0, int input = 0)
 {
     std::vector<std::uint8_t> out;
     auto put = [&out] (std::int32_t x) {
@@ -24,8 +24,8 @@ std::vector<std::uint8_t> state (int version, std::initializer_list<std::int32_t
         put (stereo);
         if (version >= 8)
         {
-            put (0); // send track
-            put (0); // input track
+            put (send);  // send track
+            put (input); // input track
         }
     }
     return out;
@@ -62,9 +62,13 @@ std::uint32_t bits (float x)
     return u;
 }
 // the effect path: FL's state → effectFromFl → the mixer effect, 512-frame blocks at 44.1 kHz, 60 BPM
+std::uint64_t runSlot (const std::optional<lynx::EffectSlot>& slot);
 std::uint64_t runEffect (const std::vector<std::uint8_t>& st)
 {
-    const auto slot = lynx::effectFromFl ("Transporter", st, 60.0);
+    return runSlot (lynx::effectFromFl ("Transporter", st, 60.0));
+}
+std::uint64_t runSlot (const std::optional<lynx::EffectSlot>& slot)
+{
     if (! slot || slot->kind != lynx::EffectKind::flTransporter)
         return 0;
     auto fx = lynx::makeEffect (*slot);
@@ -229,4 +233,99 @@ TEST (tp167f_reset_latency_and_project_round_trip)
         silent = silent && l[(std::size_t) i] == 0.0f && r[(std::size_t) i] == 0.0f;
     CHECK (silent);
     CHECK (lynx::effectInfo (lynx::EffectKind::flTransporter).name == std::string ("Transporter"));
+}
+
+TEST (tp167n_fl_factory_presets_match_fl_plugin)
+{
+    // FL's six factory presets (Data/Patches/Plugin presets/Effects/Transporter/*.fst, read from the installation) through
+    // LYNX's preset loader and effect: FNV-1a of FL's own plug-in output on the same input (round 167n)
+    const auto dir = std::filesystem::path (realFlpDir) / "Patches" / "Plugin presets" / "Effects" / "Transporter";
+    if (realFlpDir.empty() || ! std::filesystem::is_directory (dir))
+        return;
+    const std::map<std::string, std::uint64_t> fl { { "Basic reverser", 0x4a1508e9d88c40c3ull }, { "Beatdrifter", 0xc64d1c414699a0e2ull },
+                                                    { "Default", 0x6bbaf64ff2925971ull },        { "Flashbacker", 0x0ea5acce97ff601bull },
+                                                    { "Octavary", 0x4a1508e9d88c40c3ull },       { "Radpad", 0x9ac4aefec8553442ull } };
+    int found = 0;
+    for (const auto& [name, hash] : fl)
+    {
+        const auto file = dir / (name + ".fst");
+        if (! std::filesystem::exists (file))
+            continue;
+        ++found;
+        const auto bytes = i18ntest::readFile (file);
+        const auto slot = lynx::effectFromFlPreset ({ bytes.begin(), bytes.end() }, 60.0);
+        CHECK (slot && slot->kind == lynx::EffectKind::flTransporter);
+        CHECK (tp167f::runSlot (slot) == hash);
+    }
+    CHECK (found == 6);
+}
+
+TEST (tp167n_flp_import_send_and_input_tracks)
+{
+    // insert 1 holds a Transporter whose detector is its first input (insert 2 routes into it) and whose loops go to send
+    // track 4: FL's send index is the mixer insert number (the host's send-buffer call, as Fruity Send's), round 167n
+    using namespace lynx::transporter;
+    flp::Project project;
+    project.tempo = 120.0;
+    flp::MixerInsert one, two, four;
+    one.index = 1;
+    two.index = 2;
+    four.index = 4;
+    two.hasRoutes = true;
+    two.routes = { 1 };
+    flp::MixerInsert::Slot s;
+    s.index = 0;
+    s.plugin = "Transporter";
+    s.state = tp167f::state (8, { 11000, 5362, 5675, 4969, 0, 0, 499, 2000, 12, 1024, 512, 0, 0, 1, 0, 0, 0, 0, 0, 1, 21, 0 }, true, 2, 1, 4, 1);
+    one.slots.push_back (s);
+    s.state = tp167f::state (8, { 11000, 5362, 5675, 4969, 0, 0, 499, 2000, 12, 1024, 512, 0, 0, 1, 0, 0, 0, 0, 0, 1, 21, 0 }, true, 2, 1, 2, 0);
+    four.slots.push_back (s);
+    project.mixer = { one, two, four };
+    lynx::FlpImportReport report;
+    lynx::FlpImportOptions options;
+    options.report = &report;
+    const auto song = lynx::importFlp (project, options);
+    CHECK (song.mixer.size() > 4 && song.mixer[1].effects.size() == 1 && song.mixer[4].effects.size() == 1);
+    if (song.mixer.size() < 5 || song.mixer[1].effects.empty() || song.mixer[4].effects.empty())
+        return;
+    const auto& fx = song.mixer[1].effects[0];
+    CHECK (fx.kind == lynx::EffectKind::flTransporter && fx.sidechain == 2 && lynx::fruitySendTarget (fx) == 4);
+    CHECK (rawOf (0, fx.params[0]) == 11000);
+    const auto& other = song.mixer[4].effects[0];
+    CHECK (other.kind == lynx::EffectKind::flTransporter && other.sidechain < 0 && lynx::fruitySendTarget (other) == 2);
+    CHECK (report.partialEffects.empty());
+}
+
+TEST (tp167n_update_buttons_are_momentary)
+{
+    // LYNX's push buttons flip their value at each click; the effect hands every flip to FL's engine as a press (1 for a
+    // block, then 0), so a second click (1 → 0) restarts the loops again (round 167n)
+    const auto run = [] (std::initializer_list<int> flips, int param) {
+        auto slot = lynx::makeEffectSlot (lynx::EffectKind::flTransporter);
+        auto fx = lynx::makeEffect (slot);
+        fx->prepare (44100.0);
+        const auto in = tp167f::signal();
+        std::vector<float> l (48000), r (48000), out;
+        for (int i = 0; i < 48000; ++i)
+        {
+            l[(std::size_t) i] = in[(std::size_t) (2 * i)];
+            r[(std::size_t) i] = in[(std::size_t) (2 * i + 1)];
+        }
+        for (int b = 0; b * 512 < 48000; ++b)
+        {
+            for (const auto f : flips)
+                if (f == b)
+                    slot.params[(std::size_t) param] = slot.params[(std::size_t) param] > 0.5f ? 0.0f : 1.0f;
+            fx->process (l.data() + b * 512, r.data() + b * 512, std::min (512, 48000 - b * 512), slot.params, 60.0);
+        }
+        out.insert (out.end(), l.begin(), l.end());
+        out.insert (out.end(), r.begin(), r.end());
+        return tp167f::fnv (out);
+    };
+    const auto none = run ({}, 15);
+    const auto once = run ({ 20 }, 15);
+    const auto twice = run ({ 20, 60 }, 15);
+    CHECK (once != none && twice != once);
+    CHECK (run ({ 20 }, 16) != none && run ({ 20 }, 17) != none);
+    CHECK (run ({ 20, 21 }, 15) != once); // pressed again right away: a new press
 }

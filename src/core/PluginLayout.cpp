@@ -1046,11 +1046,11 @@ Layout transporterLayout()
                          "1/1|1/2|1/4|1/8|1/16|1/32|1/1 dotted|1/2 dotted|1/4 dotted|1/8 dotted|1/16 dotted|1/1 triplet|1/2 triplet|"
                          "1/4 triplet|1/8 triplet|1/16 triplet|1/1 quint.|1/2 quint.|1/4 quint.|1/8 quint.|1/16 quint.|Off"));
     v.push_back (tabs (10, 210, 220, 22, "Deterministic", TR_NOOP ("Probabilistic|Deterministic")));
-    v.push_back (toggle (240, 210, 70, 22, "Update loop A", TR_NOOP ("Update A")));
-    v.push_back (toggle (314, 210, 70, 22, "Update loop B", TR_NOOP ("Update B")));
-    v.push_back (toggle (388, 210, 82, 22, "Update loops A/B", TR_NOOP ("Update A/B")));
+    v.push_back (toggle (240, 210, 70, 22, "Update loop A", TR_NOOP ("Update A"), momentary));
+    v.push_back (toggle (314, 210, 70, 22, "Update loop B", TR_NOOP ("Update B"), momentary));
+    v.push_back (toggle (388, 210, 82, 22, "Update loops A/B", TR_NOOP ("Update A/B"), momentary));
     v.push_back (toggle (480, 210, 70, 22, "Freeze", TR_NOOP ("Freeze")));
-    v.push_back (toggle (560, 210, 70, 22, "Flush", TR_NOOP ("Flush")));
+    v.push_back (toggle (560, 210, 70, 22, "Flush", TR_NOOP ("Flush"), momentary));
     v.push_back (menuOf (10, 236, 220, 22, "Source", TR_NOOP ("Detector source"), TR_NOOP ("Left|Right|Left + right")));
     v.push_back (toggle (240, 236, 100, 22, "Stereo", TR_NOOP ("Stereo")));
     v.push_back (toggle (560, 236, 70, 22, "Bypass", TR_NOOP ("Bypass")));

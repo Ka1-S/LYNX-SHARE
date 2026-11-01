@@ -738,10 +738,37 @@ public:
                 if (k != 12)
                     engine->setParam (k, engineValue (k, raw[(std::size_t) k]));
             current = raw;
+            held = {};
+            queued = {};
             tempo = -1.0;
             ready = true;
         }
         else
+        {
+            // FL's Flush and Update buttons are momentary (pressed = 1, released = 0; the engine reacts to the press).
+            // LYNX's push buttons flip their value at each click: any change is a press, given to the engine for one
+            // block and released on the next; a click during that block is pressed after the release (round 167n)
+            for (int b = 0; b < numButtons; ++b)
+            {
+                const int k = buttons[(std::size_t) b];
+                const bool released = held[(std::size_t) b];
+                if (released)
+                {
+                    engine->setParam (k, 0.0f);
+                    held[(std::size_t) b] = false;
+                }
+                if (raw[(std::size_t) k] != current[(std::size_t) k])
+                {
+                    current[(std::size_t) k] = raw[(std::size_t) k];
+                    queued[(std::size_t) b] = std::min (queued[(std::size_t) b] + 1, 2);
+                }
+                if (queued[(std::size_t) b] > 0 && ! released)
+                {
+                    engine->setParam (k, 1.0f);
+                    held[(std::size_t) b] = true;
+                    --queued[(std::size_t) b];
+                }
+            }
             for (int k = 0; k < numParams; ++k)
                 if (raw[(std::size_t) k] != current[(std::size_t) k])
                 {
@@ -753,6 +780,7 @@ public:
                         engine->setParam (25, (float) raw[(std::size_t) k]);
                     current[(std::size_t) k] = raw[(std::size_t) k];
                 }
+        }
         if (bpm > 0.0 && bpm != tempo) // FL's tempo event
         {
             engine->setParam (22, (float) bpm);
@@ -796,7 +824,11 @@ public:
     }
 
 private:
+    static constexpr int numButtons = 4;
+    static constexpr std::array<int, numButtons> buttons { 12, 15, 16, 17 }; // Flush, Update A / B / A+B
     static constexpr int blockSize = 512;
+    std::array<bool, numButtons> held {}; // pressed in the previous block (released in this one)
+    std::array<int, numButtons> queued {}; // clicks not given to the engine yet
     std::unique_ptr<Engine> engine;
     std::array<int, numParams> current {};
     std::vector<float> beat = std::vector<float> (blockSize), detL = std::vector<float> (blockSize), detR = std::vector<float> (blockSize),
