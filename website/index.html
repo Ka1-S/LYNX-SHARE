@@ -278,13 +278,24 @@ input[type=range]{accent-color:var(--red);width:130px}
 .dl-hint{max-width:640px;margin:0 auto 20px;font-size:13px;line-height:1.6;color:var(--muted);display:grid;gap:6px}
 .dl-hint:empty{display:none}
 .dl-hint b{color:var(--text);font-weight:600}
-.dl-hint code,.dl-plat code{font:500 12px "JetBrains Mono",monospace;background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:#c9ccd4;overflow-wrap:anywhere;display:inline-block;max-width:100%;vertical-align:middle}
+.dl-hint code,.dl-plat code,.dl-port code{font:500 12px "JetBrains Mono",monospace;background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:#c9ccd4;overflow-wrap:anywhere;display:inline-block;max-width:100%;vertical-align:middle}
 .dl-other{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px;margin:0 auto 22px;font-size:13px;color:var(--dim)}
 .dl-other a{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:4px 12px;background:rgba(255,255,255,.03);color:var(--muted);transition:color .2s,border-color .2s}
 .dl-other a:hover{color:var(--text);border-color:var(--dim)}
 .dl-other a b{font-weight:600;color:#c9ccd4}
 .dl .cta .btn small{white-space:nowrap}
 @media (max-width:560px){.dl .cta .btn{white-space:normal;flex-wrap:wrap;justify-content:center;text-align:center;row-gap:2px}}
+/* portable versions: own block so people find them */
+.dl-port{max-width:640px;margin:4px auto 22px;border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px;background:rgba(0,0,0,.22)}
+.dl-port:empty{display:none}
+.dl-port h3{font-size:15px;margin:0 0 4px}
+.dl-port p{font-size:13px;color:var(--muted);margin:0 auto 14px;max-width:none}
+.dl-port .pbtns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.dl-port .pbtns a{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:rgba(255,255,255,.03);color:var(--text);transition:border-color .2s,background .2s}
+.dl-port .pbtns a:hover{border-color:var(--red,#e5383b);background:rgba(229,56,59,.08)}
+.dl-port .pbtns a b{font-size:14px}
+.dl-port .pbtns a small{font-size:12px;color:var(--muted);line-height:1.45}
+@media (max-width:560px){.dl-port .pbtns{grid-template-columns:1fr}}
 .dl-plat{font-size:12px;color:var(--dim);margin:14px auto 0;max-width:620px}
 /* three OS buttons side by side (the visitor's OS gets the accent), stacked on phones */
 .os-btns{display:grid;grid-template-columns:repeat(3,minmax(0,200px));gap:12px;justify-content:center}
@@ -294,6 +305,8 @@ input[type=range]{accent-color:var(--red);width:130px}
 .os-btns .btn small{font-weight:500;font-size:12px;opacity:.75}
 .os-btns .btn em{position:absolute;top:7px;right:9px;font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
 .hero-dl{margin-bottom:14px}
+.hero-port{display:inline-block;font-size:13px;color:var(--muted);margin:0 0 18px;text-decoration:underline;text-underline-offset:3px}
+.hero-port:hover{color:var(--text)}
 .hero-dl .btn{padding:12px 12px}
 @media (max-width:560px){.os-btns{grid-template-columns:minmax(0,320px)}.os-btns .btn{flex-direction:row;gap:10px;padding:13px 16px;justify-content:flex-start;text-align:left}.os-btns .btn small{margin-left:auto}.os-btns .btn em{display:none}.os-btns .btn svg.os{width:22px;height:22px}}
 
@@ -414,6 +427,7 @@ html.shot .ft,html.shot .cl,html.shot .cl-vh,html.shot .cl-alt{opacity:1!importa
     <h1 id="h1" data-i18n-words="hero.title">A lightweight DAW, fully open source.</h1>
     <p class="lead fade-up" style="animation-delay:.7s" data-i18n="hero.lead">LYNX SHARE is a lightweight, fully open-source DAW with the FL Studio workflow you already know — Channel Rack, Piano Roll, Playlist and Mixer — built in modern C++ to run smoothly on any PC. It even opens your .flp projects.</p>
     <div class="os-btns hero-dl fade-up" style="animation-delay:.9s" data-os-btns><a class="btn btn-red" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><span>Download</span></a></div>
+    <a class="hero-port fade-up" style="animation-delay:.95s" href="#dlPort" data-i18n="hero.port">Portable versions too: no install needed →</a>
     <div class="cta fade-up" style="animation-delay:1s">
       <a class="btn btn-ghost" href="https://github.com/Ka1-S/LYNX-SHARE">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a12 12 0 00-3.8 23.4c.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.2-3.1-.1-.4-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 016 0C17.3 4.6 18.3 5 18.3 5c.7 1.6.2 2.8.1 3.2.8.8 1.2 1.9 1.2 3.1 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0012 .5z"/></svg>
@@ -581,6 +595,7 @@ html.shot .ft,html.shot .cl,html.shot .cl-vh,html.shot .cl-alt{opacity:1!importa
         <a class="btn btn-red" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><span>Download</span></a>
       </div>
       <div class="dl-hint" id="dlHint" style="position:relative"></div>
+      <div class="dl-port" id="dlPort" style="position:relative"></div>
       <div class="dl-other" id="dlOther" style="position:relative"><span>Windows · macOS · Linux</span></div>
       <div class="small" style="position:relative"><span class="ver-line">Latest release</span> · <a href="https://github.com/Ka1-S/LYNX-SHARE/releases" data-i18n="dl.all">all releases &amp; checksums</a></div>
       <div class="req" style="position:relative"><span>Windows 10 / 11 · 64-bit</span><span data-i18n="dl.reqmac">macOS 11+ · Apple Silicon / Intel</span><span>Linux x86_64 · glibc 2.35+</span><span>VST3 · CLAP</span><span data-i18n="dl.alpha">Alpha — expect rough edges</span></div>
@@ -648,7 +663,7 @@ const PT = {
  'media.song':'“Demo” — a música de exemplo','media.songp':'124 BPM · kick, clap, reese bass, pad, pluck e supersaw. Clique na onda para pular.',
  'gal.title':'Escura, limpa, focada.','g.ws':'O espaço de trabalho completo','g.synth':'Synth de 3 osciladores embutido','g.eq':'EQ paramétrico de 7 bandas','g.auto':'Clipes de automação','g.mix':'Mixer com sends e sidechain',
  'os.title':'Feito às claras.','os.lead':'C++20 e JUCE 8. Cada recurso vem com testes, e cada comportamento do FL Studio que reproduzimos é documentado. Dê uma estrela, abra uma issue, mande um pull request.','os.star':'Estrela no GitHub',
- 'dl.title':'Comece a fazer música.','dl.lead':'Para Windows, macOS e Linux. Sem conta, sem assinatura.','dl.reqmac':'macOS 11+ · Apple Silicon / Intel',
+ 'hero.port':'Também tem versão portátil: sem instalar →','dl.title':'Comece a fazer música.','dl.lead':'Para Windows, macOS e Linux. Sem conta, sem assinatura.','dl.reqmac':'macOS 11+ · Apple Silicon / Intel',
  'dl.plat':'Audio Units no macOS e LV2 no Linux. Plugins VST2, ASIO e o isolamento de plugins são só do Windows.','dl.all':'todas as versões e checksums','dl.alpha':'Alpha — pode ter arestas',
  'legal':'LYNX SHARE é um projeto independente, sem afiliação ou endosso da Image-Line. FL Studio é marca registrada da Image-Line Software.',
  'sig.title':'Política de assinatura de código','sig.pending':'aguardando aprovação',
@@ -887,7 +902,15 @@ function renderDownload(){
   const btns = Object.keys(DL).map(o => `<a class="btn ${o===userOS ? 'btn-red' : 'btn-ghost'}" href="${url(o,'main')}"${o===userOS ? ' aria-current="true"' : ''}>`
       + `${OSICON[o]}<span>${DL[o].name}</span><small>${fmt(DL[o].main)}</small>${o===userOS ? `<em>${T.yours}</em>` : ''}</a>`).join('');
   const hint = userOS ? `<div>${H[userOS]}</div>` : Object.keys(DL).map(o => `<div>${H[o]}</div>`).join('');
-  const alts = Object.keys(DL).filter(o => DL[o].alt);
+  const P = pt ? {title:'Versões portáteis (sem instalar)', lead:'Baixe, descompacte e abra: não precisa instalar nem de permissão de administrador.',
+                   win:['Windows portátil (.zip)','Descompacte em qualquer pasta e abra o <code>LYNX.exe</code>.'],
+                   linux:['Linux AppImage','Um arquivo só: <code>chmod +x</code> e execute.']}
+               : {title:'Portable versions (no install)', lead:'Download, unzip and run: nothing to install, no admin rights needed.',
+                   win:['Windows portable (.zip)','Unzip to any folder and open <code>LYNX.exe</code>.'],
+                   linux:['Linux AppImage','A single file: <code>chmod +x</code> it and run.']};
+  const port = [['win','alt'],['linux','main']].map(([o,k]) => `<a href="${url(o,k)}"><b>${P[o][0]}</b><small>${P[o][1]}</small></a>`).join('');
+  $('#dlPort').innerHTML = `<h3>${P.title}</h3><p>${P.lead}</p><div class="pbtns">${port}</div>`;
+  const alts = Object.keys(DL).filter(o => DL[o].alt && o !== 'win');
   if (userOS) alts.sort((a,b) => (b===userOS) - (a===userOS));
   const row = `<span>${T.more}</span>` + alts.map(o => chip(o,'alt')).join('');
   $$('[data-os-btns]').forEach(e => e.innerHTML = btns);

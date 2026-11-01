@@ -17,6 +17,7 @@
 #include "core/Effects.h"
 #include "core/FlEffects.h"
 #include "core/Transmitter.h"
+#include "core/TransporterFl.h"
 #include "core/FruityShapers.h"
 #include "core/GrossBeat.h"
 #include "core/LynxTune.h"
@@ -259,10 +260,17 @@ public:
         return fx != nullptr && plugui::isShown (kind, item, page, fx->params, &fx->state);
     }
 
+    // the destination-insert menus: Fruity Send's "Send to", the Transporter's loop send (round 167n)
+    bool isSendTarget (int p) const
+    {
+        return (kind == EffectKind::fruitySend && p == 3) || (kind == EffectKind::flTransporter && p == transporter::sendParam);
+    }
+
     // wide option menus of LYNX's own panels get step arrows at both ends (round 114)
     bool hasStepArrows (const LayoutItem& item) const
     {
         return item.type == Item::menu && item.w >= 110.0f && kind != EffectKind::parametricEq && kind != EffectKind::fruitySend && kind != EffectKind::hardwareInsert
+               && kind != EffectKind::flTransporter
                && std::find (plugui::ownLayoutKinds().begin(), plugui::ownLayoutKinds().end(), kind) != plugui::ownLayoutKinds().end();
     }
 
@@ -394,7 +402,7 @@ public:
             return {};
         if (isStateParam (param))
             return utf8 (stateTable().text (fx->state, plugui::stateIndex (kind, param), plugui::stateRaw (kind, param, value)).c_str());
-        if (kind == EffectKind::fruitySend && param == 3)
+        if (isSendTarget (param))
             return flbasic::sendTrack (value) > 0 ? insertName (flbasic::sendTrack (value)) : tr ("None");
         if (kind == EffectKind::hardwareInsert && (param == hwinsert::output || param == hwinsert::input))
             return hwChannelText (param == hwinsert::output, fx->params);
@@ -889,6 +897,18 @@ public:
 
             case Item::menu:
             {
+                if (kind == EffectKind::flTransporter && param == transporter::sendParam) // the loops' send (round 167n)
+                {
+                    const auto target = flbasic::sendTrack (value);
+                    g.setColour ((target > 0 ? accent : colour::accentMuted).withAlpha (hot ? 1.0f : 0.85f));
+                    g.fillRoundedRectangle (r, radius::sm * s);
+                    g.setColour (target > 0 ? colour::onAccent : colour::textSecondary);
+                    g.setFont (font (juce::jmax (8.0f, 10.0f * s), true));
+                    g.drawFittedText (target > 0 ? tr ("Send to {0}", { juce::String (target) + "  " + insertName (target) })
+                                                 : tr ("Send to") + juce::String (juce::CharPointer_UTF8 (" \xe2\x80\xa6")),
+                                      r.reduced (4.0f * s, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.6f);
+                    break;
+                }
                 if (kind == EffectKind::fruitySend) // the destination insert (FL's tinted box; "…" = none)
                 {
                     const auto target = flbasic::sendTrack (value);
@@ -3944,7 +3964,7 @@ public:
                 showHwChannelMenu (param == hwinsert::output, r);
                 return;
             }
-            if (kind == EffectKind::fruitySend) // FL's list: no destination, then every other insert by name
+            if (isSendTarget (param)) // FL's list: no destination, then every other insert by name (+ Transporter's send, round 167n)
             {
                 juce::PopupMenu menu;
                 const auto chosen = flbasic::sendTrack (valueOf (param));

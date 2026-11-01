@@ -2209,6 +2209,7 @@ const EffectKind allEffects[] = { EffectKind::eq,     EffectKind::parametricEq, 
                                       EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook, // round 165g
                                       EffectKind::scratcher, // round 165g (flscratch165): FL's turntable
                                       EffectKind::transmitter, // round 165g (fltrans165): FL's transient / sustain splitter
+                                      EffectKind::flTransporter, // round 167f: FL's transient looper, exact
                                       // FL engines that need more than their parameters (round 142, issue #5): a new one starts from
                                       // the plugin's Default preset of the user's FL installation (core/NativeEngines.h)
                                       EffectKind::maximus, EffectKind::vocodex, EffectKind::equo, EffectKind::distructor, EffectKind::lovePhilter,
