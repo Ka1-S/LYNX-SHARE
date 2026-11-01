@@ -1729,6 +1729,8 @@ juce::String toJson (const Song& song)
         root->setProperty ("playTruncatedNotes", true);
     if (song.fastDeclick)
         root->setProperty ("fastDeclick", true);
+    if (song.panTriangular)
+        root->setProperty ("panLaw", "triangular");
     if (! song.info.empty())
     {
         auto info = std::make_unique<juce::DynamicObject>();
@@ -2038,6 +2040,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
     song.autoCrossfades = (bool) root.getProperty ("autoCrossfades", false);
     song.playTruncatedNotes = (bool) root.getProperty ("playTruncatedNotes", false);
     song.fastDeclick = (bool) root.getProperty ("fastDeclick", false);
+    song.panTriangular = root.getProperty ("panLaw", "circular").toString() == "triangular";
     if (const auto info = root.getProperty ("info", {}); info.isObject())
     {
         auto get = [&info] (const char* key) { return info.getProperty (key, {}).toString().toStdString(); };
@@ -2055,6 +2058,11 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
     if (auto* channels = root["channels"].getArray())
         for (const auto& c : *channels)
             song.channels.push_back (channelFromVar (c, song));
+    // projects imported from FL before round 167j kept the triangular law only in their Sampler channels' snapshot
+    if (! root.hasProperty ("panLaw"))
+        for (const auto& c : song.channels)
+            if (c.sampler.flChannel.size() == 90 && c.sampler.flChannel[89] == 2)
+                song.panTriangular = true;
 
     if (auto* patterns = root["patterns"].getArray())
         for (const auto& p : *patterns)

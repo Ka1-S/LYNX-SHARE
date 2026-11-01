@@ -13,6 +13,8 @@
 #include "engine/MidiFileIo.h"
 #include "ui/Dialogs.h"
 #include "engine/Text.h"
+
+#include <optional>
 #include "ui/AutomationUi.h"
 #include "ui/EventEditor.h"
 #include "ui/HintBar.h"
@@ -1271,16 +1273,13 @@ void PianoRollComponent::togglePorta()
     });
 }
 
-void PianoRollComponent::toggleMute()
+void PianoRollComponent::setNotesMuted (bool mute)
 {
     const auto target = selectionOrAll();
 
     if (target.empty())
         return;
 
-    // if any is playing, mute all; otherwise unmute
-    const auto& notes = currentPattern (engine.getSong()).notes;
-    const auto mute = std::any_of (target.begin(), target.end(), [&notes] (int i) { return ! notes[(std::size_t) i].muted; });
     editNotes ([&target, mute] (Pattern& p) {
         for (auto i : target)
             p.notes[(std::size_t) i].muted = mute;
@@ -3447,7 +3446,7 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
         return true;
     }
 
-    if (code == juce::KeyPress::deleteKey)
+    if (code == juce::KeyPress::deleteKey && ! (cmd && shift)) // (Ctrl+Shift+Del: pattern.delete)
     {
         deleteSelection();
         return true;
@@ -3486,7 +3485,7 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
         return true;
     }
 
-    if (cmd && letter == 'C')
+    if (cmd && ! shift && letter == 'C') // (Ctrl+Shift+C: pattern.clone)
     {
         copySelection();
         return true;
@@ -3544,9 +3543,17 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
         return true;
     }
 
-    if (cmd && letter == 'M')
+    // FL's editor keys (ShortcutsModule EEMuteAction / EEUnmuteAction / EEDeselAction, round 167j): Alt+M mutes,
+    // Shift+Alt+M unmutes, Ctrl+D deselects. (Ctrl+M stays FL's metronome.)
+    if (alt && ! cmd && letter == 'M')
     {
-        toggleMute();
+        setNotesMuted (! shift);
+        return true;
+    }
+
+    if (cmd && ! alt && ! shift && letter == 'D')
+    {
+        setSelection ({});
         return true;
     }
 
@@ -3556,20 +3563,22 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
         return true;
     }
 
-    if (! cmd && ! alt && ! selection.empty())
+    // FL's editor arrow keys (noteedit::arrowMove): Shift+Up/Down a semitone, Ctrl+Up/Down an octave,
+    // Shift+Left/Right one grid step
+    if (! selection.empty())
     {
-        if (code == juce::KeyPress::upKey || code == juce::KeyPress::downKey)
-        {
-            nudge (0, (code == juce::KeyPress::upKey ? 1 : -1) * (shift ? 12 : 1));
-            return true;
-        }
-
-        if (code == juce::KeyPress::leftKey || code == juce::KeyPress::rightKey)
-        {
-            const auto amount = shift ? bar : grid;
-            nudge ((code == juce::KeyPress::rightKey ? 1 : -1) * amount, 0);
-            return true;
-        }
+        using noteedit::Arrow;
+        const auto arrow = code == juce::KeyPress::upKey ? std::optional<Arrow> (Arrow::up)
+                         : code == juce::KeyPress::downKey ? std::optional<Arrow> (Arrow::down)
+                         : code == juce::KeyPress::leftKey ? std::optional<Arrow> (Arrow::left)
+                         : code == juce::KeyPress::rightKey ? std::optional<Arrow> (Arrow::right)
+                         : std::nullopt;
+        if (arrow)
+            if (const auto move = noteedit::arrowMove (*arrow, cmd, shift, alt); move.handled)
+            {
+                nudge (move.gridSteps * grid, move.keys);
+                return true;
+            }
     }
 
     // (the tools and the other single letters are key map actions now: runKeyAction, issue #12)

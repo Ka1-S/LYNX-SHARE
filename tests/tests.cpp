@@ -5873,25 +5873,62 @@ TEST (bounce_insert_song_and_apply)
 
 TEST (mixer_stereo_separation_phase_swap)
 {
+    // FL's level matrix (REA_rodada2 §2.2, REA_rodada167j §1): outL = ll·inL + rl·inR, outR = rr·inR + lr·inL
     lynx::MixerTrack t;
-    std::vector<float> l { 1.0f }, r { 0.0f };
+    auto near = [] (float a, float b) { return std::abs (a - b) < 1e-5f; };
     t.stereo = 1.0f; // mono
-    lynx::RackRenderer::applyStereoForTest (t, l.data(), r.data(), 1);
-    CHECK (std::abs (l[0] - 0.5f) < 1e-6f && std::abs (r[0] - 0.5f) < 1e-6f);
+    auto m = lynx::mixerMatrix (t, lynx::unityFader, 0.0f, false);
+    CHECK (near (m.ll, 0.5f) && near (m.rl, 0.5f) && near (m.rr, 0.5f) && near (m.lr, 0.5f));
 
-    l = { 1.0f };
-    r = { 0.0f };
     t.stereo = -1.0f; // doubled side: 1.5 L - 0.5 R
-    lynx::RackRenderer::applyStereoForTest (t, l.data(), r.data(), 1);
-    CHECK (std::abs (l[0] - 1.5f) < 1e-6f && std::abs (r[0] + 0.5f) < 1e-6f);
+    m = lynx::mixerMatrix (t, lynx::unityFader, 0.0f, false);
+    CHECK (near (m.ll, 1.5f) && near (m.rl, -0.5f) && near (m.rr, 1.5f) && near (m.lr, -0.5f));
 
-    l = { 1.0f };
-    r = { 0.25f };
     t.stereo = 0.0f;
     t.swapChannels = true;
     t.invertPhase = true;
-    lynx::RackRenderer::applyStereoForTest (t, l.data(), r.data(), 1);
-    CHECK (l[0] == -0.25f && r[0] == -1.0f);
+    m = lynx::mixerMatrix (t, lynx::unityFader, 0.0f, false);
+    CHECK (m.ll == 0.0f && m.rl == -1.0f && m.rr == 0.0f && m.lr == -1.0f); // outL = −inR, outR = −inL
+
+    // unity, centre, no separation: exactly the identity (FL's fast path)
+    m = lynx::mixerMatrix (lynx::MixerTrack {}, lynx::unityFader, 0.0f, false);
+    CHECK (m == lynx::MixerMatrix {});
+}
+
+TEST (mixer_pan_fold_and_panning_law_match_fl_render)
+{
+    // FL 2026's render of j_tri.flp (round 167j: a 441 Hz left / 882 Hz right sample on ten inserts, pan law
+    // triangular), the matrix fitted per insert: {pan, separation, ll, rl, lr, rr}
+    struct Case { float pan, sep, ll, rl, lr, rr; };
+    const Case fl[] = { { -1.0f, 0.0f, 0.499982f, 0.499972f, 0.0f, 0.0f },     { -0.5f, 0.0f, 0.749991f, 0.249984f, 0.0f, 0.499971f },
+                        { 0.25f, 0.0f, 0.75f, 0.0f, 0.125001f, 0.874978f },     { 0.5f, 0.0f, 0.499985f, 0.0f, 0.250011f, 0.749964f },
+                        { 1.0f, 0.0f, 0.0f, 0.0f, 0.499982f, 0.499972f },       { 0.5f, 0.5f, 0.422756f, 0.077253f, 0.4045f, 0.595469f },
+                        { -0.5f, -0.5f, 1.0f, 0.0f, -0.125004f, 0.624974f },    { 0.75f, 0.0f, 0.250003f, 0.0f, 0.375006f, 0.624975f },
+                        { 0.0f, 0.75f, 0.70703f, 0.292941f, 0.292965f, 0.707045f } };
+    for (const auto& c : fl)
+    {
+        lynx::MixerTrack t;
+        t.stereo = c.sep;
+        const auto m = lynx::mixerMatrix (t, lynx::unityFader, c.pan, true);
+        // the fit's own error is ~5e-5 (16-bit render)
+        CHECK (std::abs (m.ll - c.ll) < 2e-4f && std::abs (m.rl - c.rl) < 2e-4f && std::abs (m.lr - c.lr) < 2e-4f
+               && std::abs (m.rr - c.rr) < 2e-4f);
+    }
+
+    // circular (the default): +3 dB on the side panned to, and the folded half of the other side
+    const auto hard = lynx::mixerMatrix (lynx::MixerTrack {}, lynx::unityFader, 1.0f, false);
+    CHECK (std::abs (hard.ll) < 1e-6f && std::abs (hard.rl) < 1e-6f);
+    CHECK (std::abs (hard.rr - 0.70710677f) < 1e-6f && std::abs (hard.lr - 0.70710677f) < 1e-6f);
+    const auto half = lynx::mixerMatrix (lynx::MixerTrack {}, lynx::unityFader, 0.5f, false);
+    const auto gl = (float) std::cos (0.75 * 3.14159265358979 / 2.0) * 1.4142135f, gr = (float) std::sin (0.75 * 3.14159265358979 / 2.0) * 1.4142135f;
+    CHECK (std::abs (half.ll - gl) < 1e-5f && half.rl == 0.0f);
+    CHECK (std::abs (half.rr - gr * (1.0f - (1.0f - gl) * 0.5f)) < 1e-5f && std::abs (half.lr - gr * (1.0f - gl) * 0.5f) < 1e-5f);
+    // the fader scales the whole matrix (−6 dB-ish position), polarity negates it
+    lynx::MixerTrack inv;
+    inv.invertPhase = true;
+    const auto low = lynx::mixerMatrix (inv, 0.5f, 0.0f, false);
+    const auto g = (float) ((std::exp ((double) (0.625f * 2.3978953f)) - 1.0) * 0.1);
+    CHECK (std::abs (low.ll + g) < 1e-5f && std::abs (low.rr + g) < 1e-5f && std::abs (low.rl) < 1e-6f);
 }
 
 TEST (effects_limiter_filter_distortion_chorus)
@@ -16794,6 +16831,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "PerfMode165Tests.inc"
 #include "Rea167gTests.inc"
 #include "Rea167hTests.inc"
+#include "Rea167jTests.inc"
 #include "Patch165Tests.inc"
 #include "FlPlugins165Tests.inc"
 #include "FlScratch165Tests.inc"

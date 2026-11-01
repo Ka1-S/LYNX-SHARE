@@ -4478,13 +4478,13 @@ bool PlaylistComponent::handleKey (const juce::KeyPress& key)
     }
 
     // Ctrl+Ins / Ctrl+Del: insert / remove the time selection's length across all tracks
-    if (cmd && code == juce::KeyPress::insertKey)
+    if (cmd && ! mods.isShiftDown() && code == juce::KeyPress::insertKey) // (Ctrl+Shift+Ins: pattern.insert)
     {
         insertTimeSelection();
         return true;
     }
 
-    if (cmd && code == juce::KeyPress::deleteKey)
+    if (cmd && ! mods.isShiftDown() && code == juce::KeyPress::deleteKey) // (Ctrl+Shift+Del: pattern.delete)
     {
         deleteTimeSelection();
         return true;
@@ -4514,7 +4514,7 @@ bool PlaylistComponent::handleKey (const juce::KeyPress& key)
         return true;
     }
 
-    if (cmd && letter == 'C')
+    if (cmd && ! mods.isShiftDown() && letter == 'C') // (Ctrl+Shift+C: pattern.clone)
     {
         copySelection();
         return true;

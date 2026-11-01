@@ -147,6 +147,7 @@ Options ExportJob::realtimeOptions (Options o, double deviceRate)
     o.loops = 1;
     o.stems = Stems::none;
     o.masterEffects = true;
+    o.insertEffects = true;
     o.hqAllPlugins = false;  // (the playback quality: what you hear)
     o.pluginWarmUp = false;  // (the plugins are already running)
     o.disableMaxPolyphony = false;

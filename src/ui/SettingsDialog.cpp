@@ -92,6 +92,14 @@ public:
         fastDeclick.setButtonText (tr ("Fast declick for cut groups (use faster ramping when cutting notes)"));
         fastDeclick.onClick = [this] { edit ([on = fastDeclick.getToggleState()] (Song& s) { s.fastDeclick = on; }); };
         addAndMakeVisible (fastDeclick);
+        // FL's Options › Project › General › advanced: "Panning law" (round 167j)
+        styleLabel (panLawLabel, tr ("Panning law"));
+        addAndMakeVisible (panLawLabel);
+        panLaw.addItem (tr ("Circular"), 1);
+        panLaw.addItem (tr ("Triangular"), 2);
+        panLaw.setTooltip (tr ("Circular: centre at 0 dB, +3 dB on the side panned to. Triangular: the louder side keeps its level. Mixer inserts and Sampler channels."));
+        panLaw.onChange = [this] { edit ([on = panLaw.getSelectedId() == 2] (Song& s) { s.panTriangular = on; }); };
+        addAndMakeVisible (panLaw);
 
         engine.addChangeListener (this);
         load();
@@ -127,6 +135,10 @@ public:
         crossfadesNew.setBounds (area.removeFromTop (26));
         truncated.setBounds (area.removeFromTop (26));
         fastDeclick.setBounds (area.removeFromTop (26));
+        area.removeFromTop (4);
+        auto lawRow = area.removeFromTop (26);
+        panLawLabel.setBounds (lawRow.removeFromLeft (150));
+        panLaw.setBounds (lawRow.removeFromLeft (180));
     }
 
 private:
@@ -148,6 +160,7 @@ private:
         crossfades.setToggleState (s.autoCrossfades, juce::dontSendNotification);
         truncated.setToggleState (s.playTruncatedNotes, juce::dontSendNotification);
         fastDeclick.setToggleState (s.fastDeclick, juce::dontSendNotification);
+        panLaw.setSelectedId (s.panTriangular ? 2 : 1, juce::dontSendNotification);
     }
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override
@@ -161,9 +174,10 @@ private:
     bool loading = false;
     SectionTitle timeTitle { tr ("Time settings") }, grooveTitle { tr ("Groove and tuning") }, gridTitle { tr ("Timebase") },
         playlistTitle { tr ("Playlist") };
-    juce::Label tempoLabel, beatsLabel, swingLabel, pitchLabel, ppqText, stepsText, signatureText;
+    juce::Label tempoLabel, beatsLabel, swingLabel, pitchLabel, ppqText, stepsText, signatureText, panLawLabel;
     juce::Slider tempo, beats, swing, pitch;
     juce::ToggleButton crossfades, crossfadesNew, truncated, fastDeclick;
+    juce::ComboBox panLaw;
 };
 
 // --- Info page -------------------------------------------------------------------------------------

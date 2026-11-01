@@ -42,6 +42,8 @@ public:
     virtual void cut() noexcept { allNotesOff(); }
     // FL's Options › Project › "Fast declick for cut groups" (REA round 167h §3): a cut voice fades out in 2 ms
     virtual void setFastDeclick (bool /*fast*/) noexcept {}
+    // the project's panning law (Song::panTriangular, FL's Options › Project › Panning law; REA round 167j §1)
+    virtual void setPanTriangular (bool /*triangular*/) noexcept {}
     // A note on a given MIDI channel (0…15), from a MIDI Out channel routed to this one's MIDI input port. Only
     // hosted plugins see the channel; the others play it as a plain note.
     virtual void noteOnMidi (int key, float velocity, int /*midiChannel*/) noexcept { noteOn (key, velocity); }

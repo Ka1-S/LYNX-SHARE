@@ -25,6 +25,10 @@ struct Transport
     std::atomic<float> metronomeVolume { 1.0f };
     // FL's Settings › Audio › Mixer › "Metronome track": 0 = "---" (the Master), n = insert n
     std::atomic<int> metronomeTrack { 0 };
+    // FL's Settings › Audio › Mixer (REA_rodada167j §2–§3): "Play truncated notes on transport" (FL's default: on) and
+    // "Reset plugins on transport" (FL's default: off)
+    std::atomic<bool> playTruncatedOnTransport { true };
+    std::atomic<bool> resetPluginsOnTransport { false };
     std::atomic<bool> recording { false };
     std::atomic<double> bpm { 130.0 };
     // External clock sync (round 165f): > 0 = the tempo LYNX follows from an incoming MIDI clock, over the song's

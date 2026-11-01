@@ -135,6 +135,7 @@ juce::String channelName (const Song& song, int row)
 } // namespace
 
 bool ChannelRackComponent::keepEditorsOpen = false;
+bool ChannelRackComponent::selectFirstChannelWithNotes = false;
 
 ChannelRackComponent::ChannelRackComponent (AudioEngine& e)
     : engine (e)

@@ -34,6 +34,10 @@ int findNextEmptyPattern (const Song& song, int from) noexcept;
 // Returns its index.
 int gotoNextEmptyPattern (Song& song);
 
+// FL's Patterns › "Find first empty" (Shift+F4, round 167j): selects the lowest-numbered empty pattern, appending a
+// new one if every pattern has notes. Returns its index.
+int gotoFirstEmptyPattern (Song& song);
+
 // Inserts an empty pattern before `index` (Playlist clips keep pointing at the same patterns)
 // and selects it. Returns the new index.
 int insertPattern (Song& song, int index, const std::string& name);

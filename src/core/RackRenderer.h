@@ -274,6 +274,18 @@ struct ProcessTimes
     }
 };
 
+// FL's mixer level matrix (FLEngine FUN_0127b050, REA_rodada2 §2.2, REA_rodada167j §1): fader, polarity, pan with
+// the project's panning law, stereo separation and L/R swap in one 2×2 matrix, outL = ll·inL + rl·inR and
+// outR = rr·inR + lr·inL. The side a pan turns down is not lost: half of what it loses folds into the other side
+// (hard right = both inputs on the right). NaN in `ll` = not set yet.
+struct MixerMatrix
+{
+    float ll = 1.0f, rl = 0.0f, lr = 0.0f, rr = 1.0f;
+    bool operator== (const MixerMatrix&) const = default;
+};
+// `volume` = the fader position (0..1, MixerTrack::volume), `pan` −1..1 (both possibly automated)
+MixerMatrix mixerMatrix (const MixerTrack& track, float volume, float pan, bool triangular) noexcept;
+
 class RackRenderer
 {
 public:
@@ -293,6 +305,13 @@ public:
     // The metronome's click for the next process() block (round 165z-a2, FL's Settings › Audio › "Metronome track"):
     // added to the input of mixer track `track` (0 = the Master, FL's "---"; an insert this song lacks = the Master),
     // so it plays through that track's effects and fader. nullptr = silent. Same thread as process().
+    // FL's Settings › Audio › Mixer: "Play truncated notes on transport" (on by default) and "Reset plugins on
+    // transport" (off by default), REA_rodada167j §2–§3. Read by the audio thread at each start of playback.
+    void setTransportOptions (bool playTruncated, bool resetPlugins) noexcept
+    {
+        playTruncatedOnTransport = playTruncated;
+        resetPluginsOnTransport = resetPlugins;
+    }
     void setMetronomeInput (const float* left, const float* right, int track) noexcept
     {
         clickLeft = left;
@@ -315,8 +334,6 @@ public:
                   LiveEventQueue* live = nullptr,
                   MeterBank* meters = nullptr,
                   LiveEventQueue* moreLive = nullptr) noexcept;
-
-    static void applyStereoForTest (const MixerTrack& t, float* l, float* r, int n) noexcept { applyStereo (t, l, r, n); }
 
     // Per-unit CPU profile (REA round 87): the time spent in each channel (instrument, notes, PDC) and in each insert
     // effect slot, accumulated while profiling is on. Off by default (it costs two clock reads per unit and chunk).
@@ -370,7 +387,6 @@ private:
     void processTrack (const RackState& state, int track, int n, MeterBank* meters) noexcept;
     void pullInputs (const RackState& state, int track, int n) noexcept;
     void updatePdcBypass (const RackState& state, bool playing) noexcept;
-    static void applyStereo (const MixerTrack& track, float* l, float* r, int n) noexcept;
     void deliverToEffects (const RackState& state, const NoteEvent& e) noexcept; // (round 162)
     float* channelBuffer (int channel, int side) noexcept;
     float* trackScratch (int track, int side) noexcept;
@@ -390,6 +406,8 @@ private:
     bool wasPlaying = false;
     double expectedTick = -1.0; // where the next block should start, to detect jumps
     bool resumeAudio = false;
+    bool chaseNotes = false; // this block starts playback: notes crossing the position play (setTransportOptions)
+    bool playTruncatedOnTransport = true, resetPluginsOnTransport = false;
     const RackState* lastState = nullptr;
     EventBuffer events;
     std::vector<float> mixBuffers; // maxMixerTracks * 2 * blockCapacity
@@ -400,7 +418,7 @@ private:
     std::array<std::atomic<std::uint32_t>, RackState::maxAutomations / 32> overridden {}; // touched while recording
     std::atomic<bool> anyOverridden { false };
     void clearOverriddenValues() noexcept;
-    std::array<float, maxMixerTracks * 2> lastTrackGain {}; // L/R gain of the previous block, for the ramp
+    std::array<MixerMatrix, maxMixerTracks> lastTrackGain {}; // the level matrix of the previous block, for the ramp
     std::array<char, maxMixerTracks> trackActive {};        // the track output has sound in this block
     std::vector<float> tapBuffers;                          // RackState::maxSendTaps * 2 * chunkCapacity
     std::array<char, RackState::maxSendTaps> tapActive {};  // the Fruity Send slot sent something this block

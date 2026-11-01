@@ -104,7 +104,7 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
                                                                  &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &pluginStyleLabel, &pluginStyleBox, &reducedEffects, &gpuRendering, &splash, &startupSound, &scanAtStart, &menuEntry,
-                                                                 &typingPiano, &keepEditors, &rememberSeek, &editInLabel, &editInBox, &undoLabel,
+                                                                 &typingPiano, &keepEditors, &rememberSeek, &firstChannel, &editInLabel, &editInBox, &undoLabel,
                                                                  &undoBox, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &unusedTakes,
                                                                  &sandbox, &sandboxNote, &substitutes, &substitutesNote, &managePlugins, &manageShortcuts, &shortcutsNote,
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote })
@@ -188,6 +188,8 @@ public:
         toggle (typingPiano, tr ("Typing keyboard as a piano"), options.typingPiano, [this] (bool on) { options.typingPiano = on; });
         toggle (keepEditors, tr ("Keep channel editors open (a channel button click doesn't close the previous editor)"), options.keepEditorsOpen,
                 [this] (bool on) { options.keepEditorsOpen = on; });
+        toggle (firstChannel, tr ("Select first channel with notes when the pattern changes"), options.selectFirstChannelWithNotes,
+                [this] (bool on) { options.selectFirstChannelWithNotes = on; });
         toggle (rememberSeek, tr ("Remember seek time: Stop goes back to the position clicked on the Playlist ruler"), options.rememberSeek,
                 [this] (bool on) { options.rememberSeek = on; });
 
@@ -297,7 +299,7 @@ private:
             menuEntry.setBounds (r.full (24));
 
         r.section (editingTitle);
-        for (auto* t : { &typingPiano, &keepEditors, &rememberSeek })
+        for (auto* t : { &typingPiano, &keepEditors, &rememberSeek, &firstChannel })
             t->setBounds (r.full (24));
         editInBox.setBounds (r.row (editInLabel, 0));
         undoBox.setBounds (r.row (undoLabel, 120));
@@ -392,7 +394,7 @@ private:
     juce::Label languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote;
     juce::HyperlinkButton translationLink;
     juce::ComboBox crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox;
-    juce::ToggleButton stereoWaves, reducedEffects, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, sandbox, substitutes, unusedTakes, checkUpdates;
+    juce::ToggleButton stereoWaves, reducedEffects, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, firstChannel, sandbox, substitutes, unusedTakes, checkUpdates;
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
         checkNow { tr ("Check now") };
 };
@@ -412,7 +414,7 @@ public:
                                                                  &bufferNote, &panelButton, &testButton, &status, &load, &outputChannels, &realtime, &recordInput, &recordNote, &inputChannels,
                                                                  &formatLabel, &formatBox, &takeNames, &latencyTitle, &latencyText, &pingOutLabel, &pingOutBox,
                                                                  &pingInLabel, &pingInBox, &measureButton, &pingNote, &useMeasured, &offsetLabel, &offsetSlider, &offsetNote,
-                                                                 &mixerTitle, &metronomeTrackLabel, &metronomeTrackBox, &metronomeTrackNote })
+                                                                 &mixerTitle, &metronomeTrackLabel, &metronomeTrackBox, &metronomeTrackNote, &playTruncated, &resetPlugins })
             add (*c);
         setupRecordingControls();
         setupMixerControls();
@@ -535,6 +537,8 @@ private:
         r.section (mixerTitle);
         metronomeTrackBox.setBounds (r.row (metronomeTrackLabel, 260));
         metronomeTrackNote.setBounds (r.full (32).translated (0, -3));
+        playTruncated.setBounds (r.full (24));
+        resetPlugins.setBounds (r.full (24));
         return r.bottom();
     }
 
@@ -558,6 +562,24 @@ private:
             engine.getTransport().metronomeTrack.store (juce::jmax (0, metronomeTrackBox.getSelectedId() - 1));
             if (mixeroptions::changed)
                 mixeroptions::changed(); // (ui-options.txt)
+        };
+        // FL's Settings › Audio › Mixer (round 167j): "Play truncated notes on transport" (FL: "Play notes crossing
+        // start position", on by default) and "Reset plugins on transport" (FL: off by default)
+        styleToggle (playTruncated, tr ("Play truncated notes on transport"));
+        playTruncated.setTooltip (tr ("Play notes crossing start position"));
+        playTruncated.setToggleState (engine.getTransport().playTruncatedOnTransport.load(), juce::dontSendNotification);
+        playTruncated.onClick = [this] {
+            engine.getTransport().playTruncatedOnTransport.store (playTruncated.getToggleState());
+            if (mixeroptions::changed)
+                mixeroptions::changed();
+        };
+        styleToggle (resetPlugins, tr ("Reset plugins on transport"));
+        resetPlugins.setTooltip (tr ("Clears the effects' tails when playback starts or jumps. Uncheck for faster response when relocating"));
+        resetPlugins.setToggleState (engine.getTransport().resetPluginsOnTransport.load(), juce::dontSendNotification);
+        resetPlugins.onClick = [this] {
+            engine.getTransport().resetPluginsOnTransport.store (resetPlugins.getToggleState());
+            if (mixeroptions::changed)
+                mixeroptions::changed();
         };
     }
 
@@ -957,6 +979,7 @@ private:
     SectionTitle mixerTitle { tr ("Mixer") };
     juce::Label metronomeTrackLabel, metronomeTrackNote;
     juce::ComboBox metronomeTrackBox;
+    juce::ToggleButton playTruncated, resetPlugins;
 };
 
 // ================================================================================================================
