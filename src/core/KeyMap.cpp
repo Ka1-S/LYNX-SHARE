@@ -64,14 +64,19 @@ std::vector<Action> makeActions()
         { "panel.channelRack", TR_NOOP ("Show, focus or hide the Channel Rack"), Context::global, { chord (f6) } },
         { "panel.pianoRoll", TR_NOOP ("Show, focus or hide the Piano Roll"), Context::global, { chord (f7) } },
         { "panel.browser", TR_NOOP ("Show, focus or hide the Browser"), Context::global, { chord (f8, alt) } },
-        { "panel.quickAdd", TR_NOOP ("Quick-add palette: instruments and effects"), Context::global, { chord (f8) } },
+        // FL's F8 (ShowPluginPickerAction, round 167o): opens the plugin picker, or closes it when it is open
+        { "panel.quickAdd", TR_NOOP ("Quick-add palette: instruments and effects (press again to close)"), Context::global, { chord (f8) } },
         { "panel.mixer", TR_NOOP ("Show, focus or hide the Mixer"), Context::global, { chord (f9) } },
         // FL 2026's other window keys (its shortcut list, REA round 165a)
         { "view.pluginDatabase", TR_NOOP ("Plugin database (in the Browser)"), Context::global, { chord (f8, shift) } },
-        { "view.midiSettings", TR_NOOP ("MIDI settings"), Context::global, { chord (f10) } },
-        { "view.projectInfo", TR_NOOP ("Project info"), Context::global, { chord (f11) } },
+        // F10 / F11 toggle like FL's (round 167o, settingsKeyPress): Settings on another page switches to this one
+        { "view.midiSettings", TR_NOOP ("MIDI settings (press again to close)"), Context::global, { chord (f10) } },
+        { "view.projectInfo", TR_NOOP ("Project info (press again to close)"), Context::global, { chord (f11) } },
         { "view.closeWindows", TR_NOOP ("Close all windows (plugins, channel settings, tools)"), Context::global, { chord (f12) } },
         { "view.closePluginWindows", TR_NOOP ("Close all plugin windows"), Context::global, { chord (f12, alt) } },
+        // FL's CloseAllUnfocusedWindowsAction (Ctrl+F12) and ShowTouchControllerAction (Alt+F7), round 167o
+        { "view.closeUnfocusedWindows", TR_NOOP ("Close all windows except the focused one"), Context::global, { chord (f12, ctrl) } },
+        { "view.touchKeyboard", TR_NOOP ("Show or hide the Touch keyboard"), Context::global, { chord (f7, alt) } },
         { "panel.maximisePlaylist", TR_NOOP ("Maximize or restore the Playlist"), Context::global, { chord (enter) } },
 
         // patterns
@@ -108,7 +113,7 @@ std::vector<Action> makeActions()
         { "edit.undoBackwards", TR_NOOP ("Undo backwards"), Context::global, { chord ('Z', ctrl | alt) } },
         { "edit.redo", TR_NOOP ("Redo"), Context::global, { chord ('Y', ctrl), chord ('Z', ctrl | shift) } },
         { "edit.history", TR_NOOP ("Undo history"), Context::global, { chord ('H', ctrl) } },
-        { "help.shortcuts", TR_NOOP ("Shortcut sheet"), Context::global, { chord (f1) } },
+        { "help.shortcuts", TR_NOOP ("Shortcut sheet (press again to close)"), Context::global, { chord (f1) } },
         { "browser.search", TR_NOOP ("Search the Browser"), Context::global, { chord ('F', ctrl) } },
 
         // Channel Rack (focused)
@@ -670,6 +675,35 @@ std::string KeyMap::toJson() const
     }
 
     return out + "}\n";
+}
+
+std::vector<KeyMap::Binding> KeyMap::functionKeyBindings() const
+{
+    std::vector<Binding> out;
+    const auto& list = actions();
+    for (std::size_t i = 0; i < list.size(); ++i)
+        for (const auto& c : chords[i])
+            if (c.key >= f1 && c.key <= f12)
+                out.push_back ({ c, list[i].id, list[i].context });
+    // plain, Shift, Ctrl, Alt, then the combinations; global before a panel's own
+    auto modRank = [] (std::uint8_t m) {
+        switch (m)
+        {
+            case none: return 0;
+            case shift: return 1;
+            case ctrl: return 2;
+            case alt: return 3;
+            default: return 4 + (int) m;
+        }
+    };
+    std::stable_sort (out.begin(), out.end(), [&] (const Binding& a, const Binding& b) {
+        if (a.chord.key != b.chord.key)
+            return a.chord.key < b.chord.key;
+        if (a.chord.mods != b.chord.mods)
+            return modRank (a.chord.mods) < modRank (b.chord.mods);
+        return (int) a.context < (int) b.context;
+    });
+    return out;
 }
 
 std::vector<std::pair<std::string, std::string>> KeyMap::conflicts() const

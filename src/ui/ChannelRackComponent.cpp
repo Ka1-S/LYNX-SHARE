@@ -2711,7 +2711,7 @@ void ChannelRackComponent::sliceChannel (int channel)
 bool ChannelRackComponent::isInterestedInFileDrag (const juce::StringArray& files)
 {
     for (const auto& f : files)
-        if (SampleLibrary::isSampleFile (juce::File (f)) || juce::File (f).hasFileExtension ("sf2;sf3"))
+        if (SampleLibrary::isSampleFile (juce::File (f)) || juce::File (f).hasFileExtension ("sf2;sf3;sfz"))
             return true;
 
     return false;
@@ -2727,7 +2727,7 @@ void ChannelRackComponent::filesDropped (const juce::StringArray& files, int x, 
     {
         const juce::File file (f);
 
-        if (file.hasFileExtension ("sf2;sf3"))
+        if (file.hasFileExtension ("sf2;sf3;sfz"))
         {
             // a SoundFont: into the LYNX Soundfont channel it was dropped on, else a new channel
             openSoundFontFile (engine, file, target);

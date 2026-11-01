@@ -93,7 +93,7 @@ public:
     int getToolbarAndTrayHeightForSnapshot() const { return toolbarHeight + (toolbarEditor != nullptr ? toolbar::EditOverlay::trayHeight : 0); }
     juce::Rectangle<int> getToolStripAreaForSnapshot (bool playlistStrip);
     void setMetersForSnapshot (double cpu, std::int64_t memory, int polyphony) { perfMeter.setValues (cpu, memory, polyphony); }
-    static std::unique_ptr<juce::Component> makeHelpContent();
+    static std::unique_ptr<juce::Component> makeHelpContent (const keys::KeyMap* keyMap = nullptr); // nullptr: the defaults
     static std::unique_ptr<juce::AlertWindow> makeAboutWindow();
     std::unique_ptr<juce::AlertWindow> makeConfirmDiscardWindow();
     PianoRollComponent& getPianoRollForSnapshot() { return pianoRoll; }
@@ -131,6 +131,9 @@ private:
     int scansSeen = 0; // background plugin scans already announced in the hint bar
     int pluginCrashesSeen = 0; // hosted plugins that crashed (engine/PluginHost.h) and were already announced
     void showHelp();
+    void closeUnfocusedWindows();
+    void closeHelp();
+    juce::Component::SafePointer<juce::DialogWindow> helpWindow; // the shortcut sheet (F1 toggles it)
 
     // transport
     void playStop();     // Space: play, or stop and go back to where playback started

@@ -6,6 +6,7 @@
 #include "ui/VisualEditors.h"
 #include "ui/FlExtraEditors.h"
 #include "ui/PluginEditors.h"
+#include "core/PresetCycle.h"
 #include "core/ShownEffectSlot.h"
 
 #include <cstring>
@@ -36,6 +37,7 @@
 #include "core/HardwareInsert.h"
 #include "engine/Text.h"
 #include "ui/DynamicsDisplays.h"
+#include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Icons.h"
 #include "ui/FacetEqEditor.h"
@@ -4346,13 +4348,11 @@ public:
         const auto roots = findFlStudioRoots();
         if (roots.data.empty() || layout == &plugui::soundgoodizerLayout()) // Soundgoodizer: its presets A–D are on the page
             return all;
-        const auto base = juce::File (juce::String::fromUTF8 (roots.data.c_str())).getChildFile ("Patches/Plugin presets/Effects");
+        // FL's list and order (round 167o, FLEngine 0x12b6c70 / 0x662a40): FL's folder and the user's merged, a
+        // folder's own presets before its subfolders, numbers as numbers
         for (const auto& plugin : flPluginsForEffect (kind))
-        {
-            auto files = base.getChildFile (juce::String::fromUTF8 (plugin.c_str())).findChildFiles (juce::File::findFiles, true, "*.fst");
-            std::sort (files.begin(), files.end(), [] (const juce::File& a, const juce::File& b) { return a.getFullPathName().compareNatural (b.getFullPathName()) < 0; });
-            all.addArray (files);
-        }
+            for (const auto& p : presetcycle::listPresets (presetcycle::pluginPresetFolders (roots, false, plugin)))
+                all.add (juce::File (juce::String::fromUTF8 (p.path.c_str())));
         return all;
     }
 
@@ -4392,8 +4392,9 @@ public:
         for (int i = 0; i < files.size(); ++i)
             if (files[i].getFileNameWithoutExtension() == presetName)
                 at = i;
-        at = at < 0 ? (delta > 0 ? 0 : files.size() - 1) : (at + delta + files.size()) % files.size();
+        at = presetcycle::step (at, delta, files.size());
         loadPreset (files[at]);
+        ui::postHint ({ presetName, juce::String (presetcycle::positionText (at, files.size())) }, 2500); // FL's "n / N"
     }
 
     // FL's factory presets of this plugin, in folders (the header's preset menu)
