@@ -6095,3 +6095,5 @@ countries: ru by kz
 "Dumping score..." = "Выгрузка нот..."
 "No notes found in the sample" = "В сэмпле не найдено нот"
 "{0} notes put in the Piano roll of the selected channel" = "{0} нот добавлено в Piano roll выбранного канала"
+"Panning law" = "Закон панорамирования"
+"Circular: centre at 0 dB, +3 dB on the side panned to. Triangular: the louder side keeps its level. Mixer inserts and Sampler channels." = "Круговой: центр 0 дБ, +3 дБ на стороне, куда панорамируют. Треугольный: более громкая сторона сохраняет уровень. Вставки микшера и каналы Sampler."

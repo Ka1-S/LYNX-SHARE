@@ -6095,3 +6095,5 @@ countries: pl
 "Dumping score..." = "Przenoszenie nut..."
 "No notes found in the sample" = "Nie znaleziono nut w samplu"
 "{0} notes put in the Piano roll of the selected channel" = "{0} nut wstawiono do piano rolla wybranego kanału"
+"Panning law" = "Prawo panoramy"
+"Circular: centre at 0 dB, +3 dB on the side panned to. Triangular: the louder side keeps its level. Mixer inserts and Sampler channels." = "Kołowe: środek na 0 dB, +3 dB po stronie, w którą panoramujesz. Trójkątne: głośniejsza strona zachowuje poziom. Ścieżki miksera i kanały Samplera."

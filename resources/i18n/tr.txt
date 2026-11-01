@@ -6095,3 +6095,5 @@ countries: tr
 "Dumping score..." = "Notalar aktarılıyor..."
 "No notes found in the sample" = "Örnekte nota bulunamadı"
 "{0} notes put in the Piano roll of the selected channel" = "Seçili kanalın Piano roll'una {0} nota kondu"
+"Panning law" = "Pan yasası"
+"Circular: centre at 0 dB, +3 dB on the side panned to. Triangular: the louder side keeps its level. Mixer inserts and Sampler channels." = "Dairesel: merkez 0 dB, pan yapılan tarafta +3 dB. Üçgen: yüksek taraf seviyesini korur. Mikser insert'leri ve Sampler kanalları."

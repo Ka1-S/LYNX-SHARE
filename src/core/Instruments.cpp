@@ -1606,7 +1606,6 @@ public:
                 std::memcpy (snap.data() + 0x168, &s.flChannel[87], 4);
                 const auto ppq = std::clamp ((int) s.flChannel[88], 24, 3840);
                 m.flNative = true;
-                m.flTriangular = s.flChannel.size() == 90 && s.flChannel[89] == 2;
                 m.fl.build (snap.data(), ppq, std::max (1.0, songBpm));
                 m.ticksPerSecond = (double) ppq * std::max (1.0, songBpm) / 60.0;
             }
@@ -2166,6 +2165,7 @@ public:
     }
 
     void setFastDeclick (bool fast) noexcept override { fastDeclick.store (fast, std::memory_order_relaxed); }
+    void setPanTriangular (bool on) noexcept override { panTriangular.store (on, std::memory_order_relaxed); }
 
     // FL's declickers (FUN_012c6ae0: release ms of modes 0…5, and the fast one) as a raised cosine over
     // max(1, round(ms·rate/1000)) frames: g = (1 + cos(k·π/(n+1))) / 2 (FUN_00977870, shape 3)
@@ -2466,10 +2466,10 @@ public:
         pr.control (S);
         const auto finalVol = v.initVol * chanVol, finalPan = v.notePan + chanPan;
         float tL, tR;
-        if (modulation.flTriangular)
+        if (panTriangular.load (std::memory_order_relaxed))
         {
             // FL's pan-law mode 1 (FLEngine FUN_006a39c0, x87): vol·sin(π/4) on the louder side, (1 ∓ pan)·that on the
-            // other (EXEC: FL's render with the project's pan law 2, REA_rodada76 §9)
+            // other (EXEC: FL's render with the project's pan law 2, REA_rodada76 §9); the project's law (Song::panTriangular)
             const auto pan = std::min (std::max (finalPan + pr.pan, -1.0f), 1.0f);
             const auto vol = finalVol * pr.vol * 0.70710677f;
             using ld = long double;
@@ -2800,7 +2800,6 @@ private:
         flvp::Rec volume {};       // its settings (FLEngine FUN_009ce9e0 = the plugins' FUN_0071ff00, REA_rodada69 §3)
         double ticksPerSecond = 0; // FL steps it once per sequencer tick
         bool flNative = false;     // FL's whole sampler voice (SamplerSettings::flChannel)
-        bool flTriangular = false; // the project's triangular pan law
         flvp::Settings fl {};
     };
     SettingsMailbox<Modulation> envelopeMailbox;
@@ -2838,7 +2837,7 @@ private:
     float nextGain = 1.0f; // the next note's volume factor (setNextNoteGain)
     bool nextPorta = false;
     std::atomic<bool> reverse { false }, cutSelf { false };
-    std::atomic<bool> useLoops { true }, fastDeclick { false };
+    std::atomic<bool> useLoops { true }, fastDeclick { false }, panTriangular { false };
     std::atomic<int> declickMode { 0 };
 };
 } // namespace

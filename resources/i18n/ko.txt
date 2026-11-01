@@ -6095,3 +6095,5 @@ countries: kr
 "Dumping score..." = "악보 보내는 중..."
 "No notes found in the sample" = "샘플에서 노트를 찾지 못했습니다"
 "{0} notes put in the Piano roll of the selected channel" = "선택한 채널의 피아노 롤에 노트 {0}개를 넣었습니다"
+"Panning law" = "패닝 법칙"
+"Circular: centre at 0 dB, +3 dB on the side panned to. Triangular: the louder side keeps its level. Mixer inserts and Sampler channels." = "원형: 가운데 0 dB, 패닝한 쪽 +3 dB. 삼각형: 큰 쪽이 레벨을 유지합니다. 믹서 인서트와 Sampler 채널."

@@ -6095,3 +6095,5 @@ countries: nl be
 "Dumping score..." = "Noten worden overgezet..."
 "No notes found in the sample" = "Geen noten gevonden in de sample"
 "{0} notes put in the Piano roll of the selected channel" = "{0} noten in de pianorol van het gekozen kanaal gezet"
+"Panning law" = "Panwet"
+"Circular: centre at 0 dB, +3 dB on the side panned to. Triangular: the louder side keeps its level. Mixer inserts and Sampler channels." = "Cirkelvormig: midden op 0 dB, +3 dB aan de kant waarheen gepand wordt. Driehoekig: de luidere kant houdt zijn niveau. Mixer-inserts en Sampler-kanalen."

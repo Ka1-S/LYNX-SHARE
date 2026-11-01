@@ -6095,3 +6095,5 @@ countries: es mx ar co cl pe ve
 "Dumping score..." = "Volcando la partitura..."
 "No notes found in the sample" = "No se encontraron notas en el sample"
 "{0} notes put in the Piano roll of the selected channel" = "{0} notas puestas en el Piano roll del canal seleccionado"
+"Panning law" = "Ley de paneo"
+"Circular: centre at 0 dB, +3 dB on the side panned to. Triangular: the louder side keeps its level. Mixer inserts and Sampler channels." = "Circular: centro a 0 dB, +3 dB en el lado hacia el que se panea. Triangular: el lado más fuerte mantiene su nivel. Inserciones del mezclador y canales Sampler."

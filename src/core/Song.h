@@ -1332,6 +1332,10 @@ struct Song
     // FL's Options › Project › "Fast declick for cut groups" (REA round 167h §3, .flp 0x28): a voice cut by a cut group or
     // by "cut itself" fades out in 2 ms instead of its channel's declicking time. Saved with the project.
     bool fastDeclick = false;
+    // FL's Options › Project › "Panning law" (REA round 167j §1, .flp 0x17 = 2 × the mode): circular = cos/sin (the
+    // mixer's centre 0 dB, +3 dB on the side panned to), triangular = linear (the louder side stays at the level, the
+    // other falls to 0). It sets the mixer inserts' pan (FLEngine FUN_0127b050) and the FL Sampler voices' pan.
+    bool panTriangular = false;
     // whether an effect slot processes: switched on, and not a substitute while the substitutes are bypassed
     bool slotActive (const EffectSlot& slot) const noexcept { return slot.enabled && ! (substitutesBypassed && slot.isSubstitute()); }
     std::vector<Automation> automations;

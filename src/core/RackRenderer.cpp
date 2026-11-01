@@ -21,6 +21,7 @@
 #include "core/WorkerPool.h"
 #include "core/Denormals.h"
 #include "core/FlKeys.h"
+#include "core/FlVoiceProcessor.h"
 #include "core/DirectWave.h"
 #include "core/SoundFont.h"
 #include "core/NewtoneFx.h"
@@ -401,7 +402,10 @@ std::unique_ptr<const RackState> RackState::build (Song song,
     // Options › Project › "Fast declick for cut groups" (REA round 167h §3)
     for (auto& instrument : state->instruments)
         if (instrument != nullptr)
+        {
             instrument->setFastDeclick (song.fastDeclick);
+            instrument->setPanTriangular (song.panTriangular);
+        }
     prepareKeyShifts (keyShiftLater, sampleRate);
 
     state->effects.resize (song.mixer.size());
@@ -1143,26 +1147,6 @@ void panGains (float pan, float gain, float& left, float& right) noexcept
     right = gain * std::sin (angle) * 1.41421356f;
 }
 
-// FL's mixer fader and pan: each side's gain moves toward its target by at most 0.001 per sample (a linear glide;
-// measured on FL's renders of pattern events on a track's volume and pan, REA_rodada85 §3). Returns the gain reached.
-float glideGain (const float* in, float* out, int n, float from, float to) noexcept
-{
-    constexpr float step = 0.001f;
-    auto g = from;
-    int i = 0;
-
-    for (; i < n && g != to; ++i)
-    {
-        g = to > g ? std::min (to, g + step) : std::max (to, g - step);
-        out[i] = in[i] * g;
-    }
-
-    for (; i < n; ++i)
-        out[i] = in[i] * g;
-
-    return g;
-}
-
 float peakOf (const float* data, int n) noexcept
 {
     float peak = 0.0f;
@@ -1317,7 +1301,7 @@ void RackRenderer::resetUnitTimes() noexcept
 void RackRenderer::prepare (double sr, int maxBlockSize)
 {
     automationValues.fill (std::numeric_limits<float>::quiet_NaN());
-    lastTrackGain.fill (std::numeric_limits<float>::quiet_NaN());
+    lastTrackGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     channelBuffers.assign ((std::size_t) maxChannels * 2 * chunkCapacity, 0.0f);
     smartDisable.assign ((std::size_t) maxMixerTracks * maxEffectSlots, {});
     trackEqs.assign ((std::size_t) maxMixerTracks, {});
@@ -2983,27 +2967,19 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     if (! song.mixer.empty())
     {
         applyTrackEq (song.mixer[0], 0, song.cleanMixer, trackBuffer (0, 0), trackBuffer (0, 1), numSamples);
-        applyStereo (song.mixer[0], trackBuffer (0, 0), trackBuffer (0, 1), numSamples);
     }
 
-    float gl = 1.0f, gr = 1.0f;
+    MixerMatrix target; // without a mixer: unity
 
     if (! song.mixer.empty())
     {
         const auto& master = song.mixer[0];
         const auto volume = state.hasAutomation ? automated (state.mixerVolumeAuto[0], master.volume) : master.volume;
         const auto pan = state.hasAutomation ? automated (state.mixerPanAuto[0], (master.pan + 1.0f) * 0.5f) * 2.0f - 1.0f : master.pan;
-        panGains (pan, master.muted ? 0.0f : faderGain (volume), gl, gr);
+        target = master.muted ? MixerMatrix { 0.0f, 0.0f, 0.0f, 0.0f } : mixerMatrix (master, volume, pan, song.panTriangular);
     }
 
-    auto& lastL = lastTrackGain[0];
-    auto& lastR = lastTrackGain[1];
-    const auto fromL = std::isnan (lastL) ? gl : lastL;
-    const auto fromR = std::isnan (lastR) ? gr : lastR;
-    const auto* masterL = trackBuffer (0, 0);
-    const auto* masterR = trackBuffer (0, 1);
-    lastL = glideGain (masterL, left, numSamples, fromL, gl);
-    lastR = glideGain (masterR, right, numSamples, fromR, gr);
+    lastTrackGain[0] = applyMatrix (trackBuffer (0, 0), trackBuffer (0, 1), left, right, numSamples, lastTrackGain[0], target);
 
     if (meters != nullptr)
     {
@@ -3062,36 +3038,103 @@ void RackRenderer::mixHardwareOutputs (const RackState& state, int n) noexcept
     }
 }
 
-// Track stereo separation, phase and channel swap (before the fader, like FL).
-// Narrowing uses FL's exponential curve, widening is linear (docs/analise/REA_rodada2.md §2.2).
-void RackRenderer::applyStereo (const MixerTrack& track, float* l, float* r, int n) noexcept
+MixerMatrix mixerMatrix (const MixerTrack& track, float volume, float pan, bool triangular) noexcept
 {
-    if (track.stereo != 0.0f)
+    // FL keeps the fader as an int (12800 = 0 dB), the pan ±6400 and the separation ±64; LYNX keeps them /16000,
+    // /6400 and /64. Float arithmetic as FL's, the circular kernel in x87 extended precision (flvp::panLaw).
+    const auto x = std::clamp (volume, 0.0f, 1.0f) * 1.25f;
+    const auto p = std::clamp (pan, -1.0f, 1.0f);
+    const auto sep = std::clamp (track.stereo, -1.0f, 1.0f);
+    MixerMatrix m;
+    if (x == 1.0f && p == 0.0f && sep == 0.0f) // FL's fast path: exactly unity
     {
-        const auto s = track.stereo > 0.0f ? (std::pow (5.0f, std::min (track.stereo, 1.0f)) - 1.0f) / 4.0f
-                                           : std::max (track.stereo, -1.0f);
-        // s = 1: mono; s = -1: side doubled
-        const auto keep = 1.0f - 0.5f * s, cross = 0.5f * s;
-
-        for (int i = 0; i < n; ++i)
-        {
-            const auto a = l[i], b = r[i];
-            l[i] = keep * a + cross * b;
-            r[i] = keep * b + cross * a;
-        }
+        m.ll = m.rr = track.invertPhase ? -1.0f : 1.0f;
+        m.rl = m.lr = 0.0f;
     }
-
-    if (track.swapChannels)
-        for (int i = 0; i < n; ++i)
-            std::swap (l[i], r[i]);
-
-    if (track.invertPhase)
-        for (int i = 0; i < n; ++i)
+    else if (x == 0.0f)
+        m = { 0.0f, 0.0f, 0.0f, 0.0f };
+    else
+    {
+        constexpr float ln11 = 2.3978953f, sqrt2 = 1.4142135f, sin45 = 0.70710677f;
+        auto g = x == 1.0f ? 1.0f : (float) ((std::exp ((double) (x * ln11)) - 1.0) * (double) 0.1f);
+        if (track.invertPhase)
+            g = -g;
+        float gl, gr;
+        if (triangular) // FUN_006a39c0: the louder side keeps the level
         {
-            l[i] = -l[i];
-            r[i] = -r[i];
+            const auto v = g * sqrt2 * sin45;
+            if (std::signbit (p))
+                gl = v, gr = (p + 1.0f) * v;
+            else
+                gr = v, gl = (1.0f - p) * v;
         }
+        else
+            flvp::panLaw (p, g * sqrt2, gl, gr);
+        float fl = 0.0f, fr = 0.0f; // the share of each side that folds into the other
+        if (p != 0.0f)
+        {
+            if (p < 0.0f)
+                fl = 1.0f - gr / g;
+            else
+                fr = 1.0f - gl / g;
+        }
+        if (sep != 0.0f)
+        {
+            // narrowing (5^s − 1)/4 (up to mono), widening linear (−1: side ×2)
+            const auto s = sep < 0.0f ? sep : (float) (std::exp ((double) sep * std::log (5.0)) - 1.0) * 0.25f;
+            fl = std::min (fl + s, 1.0f);
+            fr = std::min (fr + s, 1.0f);
+        }
+        m.rl = gl * fl * 0.5f;
+        m.ll = gl * (1.0f - fl * 0.5f);
+        m.lr = gr * fr * 0.5f;
+        m.rr = gr * (1.0f - fr * 0.5f);
+    }
+    if (track.swapChannels) // the outputs trade places
+        m = { m.lr, m.rr, m.ll, m.rl };
+    return m;
 }
+
+namespace
+{
+// The matrix over a block, each coefficient gliding toward its target by at most 0.001 per sample (FL's fader / pan
+// glide, REA_rodada85 §3; the folded terms glide the same way). `from` = the previous block's matrix (NaN: none).
+// The output may be the input. Returns the matrix reached.
+MixerMatrix applyMatrix (const float* inL, const float* inR, float* outL, float* outR, int n, MixerMatrix from,
+                         const MixerMatrix& to) noexcept
+{
+    if (std::isnan (from.ll))
+        from = to;
+    constexpr float step = 0.001f;
+    auto toward = [] (float g, float target) { return target > g ? std::min (target, g + step) : std::max (target, g - step); };
+    auto m = from;
+    int i = 0;
+    for (; i < n && ! (m == to); ++i)
+    {
+        m = { toward (m.ll, to.ll), toward (m.rl, to.rl), toward (m.lr, to.lr), toward (m.rr, to.rr) };
+        const auto a = inL[i], b = inR[i];
+        outL[i] = m.ll * a + m.rl * b;
+        outR[i] = m.rr * b + m.lr * a;
+    }
+    if (i < n)
+    {
+        if (m.rl == 0.0f && m.lr == 0.0f) // no fold: two gains (the common case)
+            for (int k = i; k < n; ++k)
+            {
+                outL[k] = inL[k] * m.ll;
+                outR[k] = inR[k] * m.rr;
+            }
+        else
+            for (int k = i; k < n; ++k)
+            {
+                const auto a = inL[k], b = inR[k];
+                outL[k] = m.ll * a + m.rl * b;
+                outR[k] = m.rr * b + m.lr * a;
+            }
+    }
+    return m;
+}
+} // namespace
 
 void RackRenderer::mixLiveInput (const RackState& state, bool playing, int n) noexcept
 {
@@ -3337,23 +3380,22 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
 
     const auto silent = track.muted || ! state.mixerAudible[(std::size_t) t];
 
-    // target gain; the ramp from the previous block avoids clicks on mute and fader
-    float gl = 0.0f, gr = 0.0f;
+    // target matrix; the ramp from the previous block avoids clicks on mute and fader
+    MixerMatrix target { 0.0f, 0.0f, 0.0f, 0.0f };
 
     if (! silent)
     {
         const auto volume = state.hasAutomation ? automated (state.mixerVolumeAuto[(std::size_t) t], track.volume) : track.volume;
         const auto pan = state.hasAutomation ? automated (state.mixerPanAuto[(std::size_t) t], (track.pan + 1.0f) * 0.5f) * 2.0f - 1.0f
                                              : track.pan;
-        panGains (pan, faderGain (volume), gl, gr);
+        target = mixerMatrix (track, volume, pan, state.song.panTriangular);
     }
 
-    auto& lastL = lastTrackGain[(std::size_t) t * 2];
-    auto& lastR = lastTrackGain[(std::size_t) t * 2 + 1];
-    const auto fromL = std::isnan (lastL) ? gl : lastL;
-    const auto fromR = std::isnan (lastR) ? gr : lastR;
+    auto& last = lastTrackGain[(std::size_t) t];
+    const auto from = std::isnan (last.ll) ? target : last;
+    constexpr MixerMatrix zero { 0.0f, 0.0f, 0.0f, 0.0f };
 
-    if (silent && fromL == 0.0f && fromR == 0.0f)
+    if (silent && from == zero)
     {
         if (meters != nullptr)
             meters->capture.pushSilence (t, n);
@@ -3370,8 +3412,7 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     {
         if (t < (int) trackEqs.size() && trackEqs[(std::size_t) t].running)
             trackEqs[(std::size_t) t] = {};
-        lastL = gl;
-        lastR = gr;
+        last = target;
         if (meters != nullptr)
             meters->capture.pushSilence (t, n);
         return;
@@ -3379,9 +3420,7 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
 
     runEffects (state, t, n);
     applyTrackEq (track, t, state.song.cleanMixer, l, r, n);
-    applyStereo (track, l, r, n);
-    lastL = glideGain (l, l, n, fromL, gl);
-    lastR = glideGain (r, r, n, fromR, gr);
+    last = applyMatrix (l, r, l, r, n, from, target);
 
     trackActive[(std::size_t) t] = 1;
 

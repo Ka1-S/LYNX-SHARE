@@ -6095,3 +6095,5 @@ countries: it ch sm
 "Dumping score..." = "Invio della partitura..."
 "No notes found in the sample" = "Nessuna nota trovata nel campione"
 "{0} notes put in the Piano roll of the selected channel" = "{0} note inserite nel Piano roll del canale selezionato"
+"Panning law" = "Legge di panoramica"
+"Circular: centre at 0 dB, +3 dB on the side panned to. Triangular: the louder side keeps its level. Mixer inserts and Sampler channels." = "Circolare: centro a 0 dB, +3 dB sul lato verso cui si panoramica. Triangolare: il lato più forte mantiene il livello. Insert del mixer e canali Sampler."

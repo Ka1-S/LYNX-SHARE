@@ -830,6 +830,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.swing = std::clamp (project.swing / 128.0f, 0.0f, 1.0f);
     song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
     song.fastDeclick = project.fastDeclick;               // 0x28 (REA round 167h)
+    song.panTriangular = (project.panLaw >> 1) == 1;       // 0x17: FL saves 2 × its pan-law mode (REA round 167j §1)
     song.masterPitch = (float) std::clamp (project.mainPitch, -1200, 1200); // FL's render follows it (REA round 167g §1)
     song.channelGroups = project.filterGroups;
     song.info.title = project.title;

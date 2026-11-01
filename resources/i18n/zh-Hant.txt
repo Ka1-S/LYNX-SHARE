@@ -6095,3 +6095,5 @@ countries: tw hk mo
 "Dumping score..." = "正在匯入樂譜..."
 "No notes found in the sample" = "取樣中未找到音符"
 "{0} notes put in the Piano roll of the selected channel" = "已將 {0} 個音符放入所選通道的鋼琴捲簾"
+"Panning law" = "聲像定律"
+"Circular: centre at 0 dB, +3 dB on the side panned to. Triangular: the louder side keeps its level. Mixer inserts and Sampler channels." = "圓形：置中 0 dB，聲像偏向的一側 +3 dB。三角形：較響的一側保持電平。適用於混音器插槽和 Sampler 通道。"
