@@ -474,3 +474,57 @@ TEST (rea167k_audio_clip_channels_keep_precomputed_effects)
     ramp.channels[0].sampler.precompute.fadeIn = 256; // a ramp over the whole file: much quieter at beat 1
     CHECK (rea167k::rampLevelAt (ramp, 1.0) < 0.5f * plain);
 }
+
+// 167h leftover "declicker attacks": FL's sampler voices start their declicker without the attack (FUN_00978070 is
+// called with 0 by every voice start, FUN_00d277d0 / FUN_00d27cf0), so a note starts at full level in every mode; at
+// the sample's end the held last frame fades with the mode's release: 10 / 10 (follower) / 20 / 20 / 100 / 200 ms
+// [FL render r167k/fl/dk: ends 438 / 369 / 877 / 877 / 4 388 / 8 782 frames after the sample]
+TEST (rea167k_sample_end_uses_the_declicking_release)
+{
+    // FL's native sampler voice, as an FL project's Sampler channel gets it (the default articulator records, Mod X
+    // 256, 96 PPQ)
+    lynx::ChannelDef flDef;
+    flDef.instrument = lynx::InstrumentKind::sampler;
+    {
+        const auto defaults = lynx::flvp::defaultSnapshot();
+        flDef.sampler.flChannel.assign (90, 0);
+        for (int k = 0; k < 5; ++k)
+            std::memcpy (flDef.sampler.flChannel.data() + 17 * k, defaults.data() + 0x44 * k, 68);
+        flDef.sampler.flChannel[85] = 256;
+        flDef.sampler.flChannel[88] = 96;
+    }
+    auto data = std::make_shared<lynx::SampleData>();
+    data->sampleRate = 44100.0;
+    data->left.assign (13230, 0.5f);
+    auto run = [&] (int mode) {
+        auto sampler = lynx::makeInstrument (lynx::InstrumentKind::sampler, data);
+        sampler->prepare (44100.0);
+        auto def = flDef;
+        def.sampler.declickMode = mode;
+        sampler->configure (def, 120.0);
+        sampler->noteOn (60, 1.0f);
+        std::vector<float> l (22050), r (22050);
+        sampler->render (l.data(), r.data(), 22050, 1.0f, 1.0f);
+        return l;
+    };
+    auto tail = [] (const std::vector<float>& l) {
+        int last = 0;
+        for (int i = 0; i < (int) l.size(); ++i)
+            if (std::fabs (l[(std::size_t) i]) > 1e-5f / 0.1948f * std::fabs (l[100]))
+                last = i;
+        return last - 13230;
+    };
+    for (int mode = 0; mode <= 5; ++mode)
+    {
+        const auto l = run (mode);
+        CHECK (l[0] > 0.0f && std::abs (l[0] - l[100]) < 1e-6f); // no attack ramp
+    }
+    CHECK (std::abs (tail (run (0)) - 438) <= 12);
+    CHECK (std::abs (tail (run (2)) - 877) <= 12);
+    CHECK (std::abs (tail (run (3)) - 877) <= 12);
+    CHECK (std::abs (tail (run (4)) - 4388) <= 30);
+    CHECK (std::abs (tail (run (5)) - 8782) <= 60);
+    CHECK (tail (run (1)) < 441);
+    const auto five = run (5);
+    CHECK (std::abs (five[13230 + 4410] / five[100] - 0.710f) < 0.02f);
+}
