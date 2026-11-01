@@ -965,6 +965,89 @@ std::vector<ScoreNote> score (const Track& track, double sampleRate)
     return out;
 }
 
+std::vector<DetectedNote> detectScore (const SampleData& source, double* detune)
+{
+    std::vector<DetectedNote> out;
+    const auto track = analyseNotes (source);
+    if (track.pitches.empty())
+    {
+        if (detune != nullptr)
+            *detune = 0.0;
+        return out;
+    }
+    // the overall detune: how far the notes sit from their semitones, weighted by their length
+    double sum = 0.0, weight = 0.0;
+    for (const auto& p : track.pitches)
+    {
+        const auto w = (double) (p.origEnd - p.origStart);
+        sum += w * (p.origPitch - std::round (p.origPitch));
+        weight += w;
+    }
+    const auto offset = weight > 0.0 ? sum / weight : 0.0;
+    if (detune != nullptr)
+        *detune = offset;
+    // each note's level (RMS of the channels' mean)
+    std::vector<double> rms;
+    double loudest = 0.0;
+    for (const auto& p : track.pitches)
+    {
+        double e = 0.0;
+        for (auto i = p.origStart; i < p.origEnd; ++i)
+        {
+            const auto x = 0.5 * ((double) source.leftData()[i] + (double) source.rightData()[i]);
+            e += x * x;
+        }
+        rms.push_back (std::sqrt (e / (double) std::max<std::int64_t> (1, p.origEnd - p.origStart)));
+        loudest = std::max (loudest, rms.back());
+    }
+    for (std::size_t k = 0; k < track.pitches.size(); ++k)
+    {
+        const auto& p = track.pitches[k];
+        const auto key = (int) std::lround (p.origPitch - offset);
+        if (key < 0 || key > 127)
+            continue;
+        DetectedNote n;
+        n.start = p.origStart;
+        n.end = p.origEnd;
+        n.key = key;
+        n.velocity = (float) (0.5 + 0.5 * (loudest > 0.0 ? rms[k] / loudest : 1.0));
+        out.push_back (n);
+    }
+    return out;
+}
+
+int dumpScore (Song& song, int channel, const std::vector<DetectedNote>& notes, double sampleRate)
+{
+    if (sampleRate <= 0.0 || channel < 0)
+        return 0;
+    if (song.patterns.empty())
+        song.patterns.emplace_back();
+    song.currentPattern = std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1);
+    auto& pattern = song.patterns[(std::size_t) song.currentPattern];
+    pattern.notes.erase (std::remove_if (pattern.notes.begin(), pattern.notes.end(), [channel] (const lynx::Note& n) { return n.channel == channel; }),
+                         pattern.notes.end());
+    const auto ticksPerFrame = song.bpm / 60.0 * ppq / sampleRate;
+    const std::int64_t shortest = 3 * ppq / 96;
+    int count = 0;
+    for (const auto& d : notes)
+    {
+        const auto start = std::max<std::int64_t> (0, std::llround ((double) d.start * ticksPerFrame));
+        const auto end = std::max<std::int64_t> (0, std::llround ((double) d.end * ticksPerFrame));
+        if (end - start <= shortest)
+            continue;
+        lynx::Note n;
+        n.start = start;
+        n.length = end - start;
+        n.channel = channel;
+        n.key = d.key;
+        n.velocity = std::clamp (d.velocity, 0.0f, 1.0f);
+        pattern.notes.push_back (n);
+        ++count;
+    }
+    pattern.sortNotes();
+    return count;
+}
+
 std::vector<std::uint8_t> writeNative (const Track& track)
 {
     std::vector<std::uint8_t> out { 'L', 'X', 'N', 'T' };
@@ -1097,8 +1180,8 @@ namespace
 std::vector<std::pair<double, double>> warpPoints (const WarpMap& map, std::int64_t frames)
 {
     std::vector<std::pair<double, double>> pts { { 0.0, 0.0 } };
-    for (const auto& m : map.markers)
-        if ((double) m.source < (double) frames)
+    for (const auto& m : map.markers) // (a marker at the very end: FL's last segment end, round 167b)
+        if ((double) m.source <= (double) frames && (double) m.source > pts.back().first && (double) m.output > pts.back().second)
             pts.push_back ({ (double) m.source, (double) m.output });
     const auto& last = pts.back();
     const auto slope = pts.size() >= 2 ? (last.second - pts[pts.size() - 2].second) / std::max (1.0, last.first - pts[pts.size() - 2].first) : 1.0;
@@ -1145,9 +1228,9 @@ std::shared_ptr<SampleData> renderWarp (const SampleData& source, const WarpMap&
     if (n <= 0)
         return nullptr;
     const auto pts = warpPoints (map, n);
-    bool moved = false;
+    bool moved = false; // (FL's own analysis leaves its unmoved markers up to 2 samples off: still the source)
     for (const auto& [a, b] : pts)
-        moved = moved || std::abs (a - b) > 0.5;
+        moved = moved || std::abs (a - b) > 2.5;
     if (! moved)
         return nullptr;
 
@@ -1167,8 +1250,28 @@ std::shared_ptr<SampleData> renderWarp (const SampleData& source, const WarpMap&
             piece.right.assign (source.rightData() + a, source.rightData() + b);
         const auto ratio = (double) (wantEnd - wantStart) / (double) (b - a);
         std::shared_ptr<SampleData> stretched;
-        if (std::abs (ratio - 1.0) > 1e-6)
+        if (std::abs (ratio - 1.0) > 1e-3)
             stretched = timeStretch (piece, ratio, StretchMethod::mono); // Newtone edits monophonic material
+        else if (wantEnd - wantStart != b - a)
+        {
+            // FL's analysis leaves its segments a sample or two off (ratios like 1.0001): read the piece at that rate
+            // (under 2 cents) instead of running the stretcher, so an unmoved segment stays the source
+            stretched = std::make_shared<SampleData>();
+            stretched->sampleRate = piece.sampleRate;
+            const auto len = wantEnd - wantStart;
+            const auto step = (double) (b - a - 1) / (double) std::max<std::int64_t> (1, len - 1);
+            auto read = [] (const std::vector<float>& x, double at) {
+                const auto i = (std::size_t) at;
+                const auto f = (float) (at - (double) i);
+                return i + 1 < x.size() ? x[i] + (x[i + 1] - x[i]) * f : x.back();
+            };
+            for (std::int64_t k = 0; k < len; ++k)
+            {
+                stretched->left.push_back (read (piece.left, (double) k * step));
+                if (stereo)
+                    stretched->right.push_back (read (piece.right, (double) k * step));
+            }
+        }
         const auto& src = stretched != nullptr ? *stretched : piece;
         // each piece lands exactly where its markers say (the stretcher's length is trimmed / padded)
         const auto length = (std::size_t) (wantEnd - wantStart);
@@ -1186,11 +1289,43 @@ std::shared_ptr<SampleData> renderWarp (const SampleData& source, const WarpMap&
     return out;
 }
 
+std::optional<WarpMap> warpFromTrack (const Track& track)
+{
+    if (! track.timeWarp || track.pitches.empty())
+        return std::nullopt;
+    WarpMap m;
+    m.frames = track.frames > 0 ? track.frames : track.pitches.back().origEnd;
+    auto add = [&m] (std::int64_t source, std::int64_t output) {
+        if (source <= 0 || output <= 0)
+            return;
+        if (! m.markers.empty() && (source <= m.markers.back().source || output <= m.markers.back().output))
+            return;
+        m.markers.push_back ({ source, output });
+    };
+    // Newtime's segments ("Pitch_N", REA_rodada167b §4): each starts at a warp marker, source iOrigStartSamplePos →
+    // output iCurStartSamplePos; the last one's end is the end marker
+    for (const auto& p : track.pitches)
+        add (p.origStart, p.curStart);
+    add (track.pitches.back().origEnd, track.pitches.back().curEnd);
+    return m;
+}
+
+std::optional<WarpMap> warpOf (const std::vector<std::uint8_t>& state)
+{
+    if (auto native = parseWarp (state))
+        return native;
+    if (const auto s = parse (state))
+        for (const auto& t : s->tracks)
+            if (t.timeWarp)
+                return warpFromTrack (t);
+    return std::nullopt;
+}
+
 std::shared_ptr<const SampleData> renderedSource (std::shared_ptr<const SampleData> source, const std::vector<std::uint8_t>& state)
 {
     if (source == nullptr)
         return source;
-    if (const auto warp = parseWarp (state))
+    if (const auto warp = warpOf (state))
     {
         if (auto warped = renderWarp (*source, *warp))
             return warped;
@@ -1201,4 +1336,13 @@ std::shared_ptr<const SampleData> renderedSource (std::shared_ptr<const SampleDa
             return edited;
     return source;
 }
+
+std::int64_t snapToBeatGrid (std::int64_t position, double sampleRate, double bpm, int division)
+{
+    if (division <= 0 || sampleRate <= 0.0 || bpm <= 0.0)
+        return position;
+    const auto step = sampleRate * 60.0 / bpm / division;
+    return (std::int64_t) std::llround (std::round ((double) position / step) * step);
+}
+
 } // namespace lynx::newtonefx

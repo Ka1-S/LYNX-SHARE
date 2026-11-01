@@ -76,6 +76,9 @@ struct Options
     bool stemsIncludeMaster = false; // with stems: also the full mix
     bool normalize = false;          // peak to 0 dBFS
     bool masterEffects = true;       // the Master insert's effects
+    // FL's "Enable insert effects" (on by default; WAVRenderForm InputFXBox, REA round 167j §4): off = the inserts'
+    // effect slots (not the Master's) are bypassed for the render
+    bool insertEffects = true;
     bool trimPdc = true;             // drop the silence the delay compensation adds at the start
     // FL's "HQ for all plugins" (REA round 134): engines with a separate render quality use it and HQ switches are
     // forced on; off = the export uses the same (draft) quality as playback, so it matches what was heard
@@ -92,6 +95,12 @@ struct Options
     // `1 << Format`, besides `format` (whose settings window shows); 0 = only `format`
     std::uint32_t moreFormats = 0;
     Channels channels = Channels::stereo;
+    // FL's "Extra data" (WAVRenderForm AcidBox / LoopMarkersBox / PlaylistMarkersBox, REA_rodada167l §3), WAV files
+    // only: "Tempo information" (an acid chunk: tempo, beats, meter; off by default), "Loop markers" (a smpl chunk
+    // with the song as one loop; on), "Playlist markers" (the Playlist's markers as cue points with their names; on)
+    bool saveTempo = false;
+    bool loopMarkers = true;
+    bool playlistMarkers = true;
 
     bool operator== (const Options&) const = default;
 };
@@ -186,4 +195,37 @@ inline int channelCount (Channels mode) noexcept { return mode == Channels::ster
 
 // "m:ss" (or "h:mm:ss") for the total time line.
 std::string formatDuration (double seconds);
+
+// --- FL's extra data in exported WAV files (REA_rodada167l §3) -----------------------------------------------------
+
+struct WavExtras
+{
+    bool loop = false;              // smpl: one loop over the music
+    std::int64_t musicFrames = 0;   // the music's length (no tail): the loop is [0, musicFrames − 1]
+    bool acid = false;              // acid: tempo information
+    float tempo = 120.0f;
+    int numerator = 4, denominator = 4;
+    struct Cue
+    {
+        std::int64_t frame = 0;
+        std::string name;           // empty: FL's "Marker <index>"
+    };
+    std::vector<Cue> markers;       // cue + LIST adtl labl + tlst
+};
+
+// What `o` asks for, for the export of `song` (the range the export plays: the selection's markers move to its start)
+// at `sampleRate`. Plain Playlist markers only (the actions and the time signatures are not cue points).
+WavExtras wavExtras (const Song& song, const Options& o, double sampleRate);
+
+// The chunks FL writes after "data", in its order: smpl, acid, cue , LIST adtl (labl), tlst. Empty when nothing is on.
+// `dataFrames` = the frames in the file (the acid's beat count). Byte layout from FL 2026's renders (§3).
+std::vector<std::uint8_t> wavExtraChunks (const WavExtras& x, double sampleRate, std::int64_t dataFrames);
+
+// Appends `chunks` to the RIFF/WAVE file at `path` and fixes the RIFF size (a "data" chunk of odd size gets its pad
+// byte first). False if the file is not a RIFF/WAVE file or cannot be written.
+bool appendWavChunks (const std::string& path, const std::vector<std::uint8_t>& chunks);
+// The frames in the "data" chunk of the WAV file at `path` (fmt's block align), −1 if it is not one.
+std::int64_t wavDataFrames (const std::string& path);
+// What the export does after writing a WAV file: the chunks of `x` appended (nothing to do = true).
+bool appendWavExtras (const std::string& path, const WavExtras& x, double sampleRate);
 } // namespace lynx::exportopts

@@ -77,6 +77,7 @@ add_library(lynx_core STATIC
     src/core/SimSynth.cpp
     src/core/Wasp.cpp
     src/core/Granulizer.cpp
+    src/core/WaveTraveller.cpp
     src/core/Drumaxx.cpp
     src/core/Slayer.cpp
     src/core/Dx10.cpp
@@ -89,6 +90,8 @@ add_library(lynx_core STATIC
     src/core/SytrusEngine.cpp
     src/core/VintagePhaser.cpp
     src/core/EmphasizerFx.cpp
+    src/core/EmphasisFx.cpp
+    src/core/EmphasisEngine.cpp
     src/core/FreqShifterFl.cpp
     src/core/LowLifterFl.cpp
     src/core/TransporterFl.cpp
@@ -96,6 +99,7 @@ add_library(lynx_core STATIC
     src/core/VisualFx.cpp
     src/core/FlExtraFx.cpp
     src/core/Scratcher.cpp
+    src/core/Dvs.cpp
     src/core/Transmitter.cpp
     src/core/VideoPlayer.cpp
     src/core/FruityDance.cpp
@@ -152,6 +156,7 @@ add_library(lynx_core STATIC
     src/core/DynamicsSuite.cpp
     src/core/VoiceTools.cpp
     src/core/MidiControls.cpp
+    src/core/MidiOut.cpp
     src/core/FormulaController.cpp
     src/core/VoiceShift.cpp
     src/core/NativeEngines.cpp
@@ -224,7 +229,8 @@ target_sources(lynx_core PRIVATE
 # the embedded Python (pocketpy) and FL's VFX Script (round 165d)
 target_sources(lynx_core PRIVATE
     src/core/Python.cpp
-    src/core/VfxScript.cpp)
+    src/core/VfxScript.cpp
+    src/core/EdisonScript.cpp)
 
 # pocketpy 2.2 (MIT; third_party/pocketpy, LYNX's changes marked "LYNX"): a small embeddable Python 3 interpreter,
 # sandboxed (no os module / files) and interruptible (the watchdog)
@@ -360,11 +366,13 @@ if(LYNX_BUILD_APP)
         src/ui/AutoSamplerDialog.cpp
         src/ui/AutomationUi.cpp
         src/ui/ControllerEditors.cpp
+        src/ui/MidiOutEditor.cpp
         src/ui/VisualEditors.cpp
         src/ui/FlExtraEditors.cpp
         src/ui/VisualGl.cpp
         src/ui/DanceView.cpp
         src/ui/VideoPlayerView.cpp
+        src/ui/WaveTravellerEditor.cpp
         src/ui/NewtoneEditor.cpp
         src/ui/ChannelSettings.cpp
         src/ui/LayerEditor.cpp

@@ -12,7 +12,31 @@ namespace
 enum : std::uint32_t
 {
     evSwing = 0x0B,
+    evMainPitch = 0x50,
+    evPlayTruncatedNotes = 0x1E, // u8: Project › Play truncated notes in clips (saved only when on; REA round 167g)
+    evProjectTimes = 0xED,       // 16 B: f64 creation date, f64 working time (Delphi TDateTime days; REA round 167g)
+    evCurrentPattern = 0x43,     // u16: the pattern selected when saved, 1…999 (REA round 167g)
+    evSongMode = 0x09,           // u8: 1 = SONG, 0 = PAT (saved as "the transport's PatBtn is up", REA round 167g)
+    evShowInfo = 0x0A,           // u8: Project info › "Show on opening" (ShowInfoBox, REA round 167g)
+    evCurrentArrangement = 0x64, // u16: the arrangement open when saved (after every arrangement, REA round 167g)         // i16: the toolbar's main (master) pitch in cents (REA round 167g)
     evPanLaw = 0x17,
+    evFastDeclick = 0x28,       // u8: Options › Project › "Fast declick for cut groups" (> 0 = on; REA round 167h §3)
+    evChannelFxFlags = 0x46,    // u16: Sampler › Precomputed: bit 0 fade stereo, 1 reverse, 2 clip, 8 swap stereo (REA round 167h §1)
+    evChannelFadeIn = 0x4C,     // u16: Precomputed › fade in (0…1024)
+    evChannelFadeOut = 0x4B,    // u16: Precomputed › fade out (0…1024)
+    evChannelBoost = 0x4A,      // u16: legacy precomputed boost 0…256 (REA round 167l §1)
+    evChannelEq = 0x45,         // u16: legacy "FX" / EQ 0…256 (128 = flat)
+    evChannelRingMod = 0x83,    // u32: legacy ring modulation mix (low 16 bits) | frequency << 16
+    evChannelStereoDelay = 0x55, // u16: legacy stereo delay 0…4096 (2048 = none)
+    evChannelCutoff = 0x47,     // u16: legacy low-pass cutoff 16…1024 (1024 = off)
+    evChannelResonance = 0x53,  // u16: legacy low-pass resonance 0…640
+    evChannelReverb = 0x8B,     // u32: legacy reverb (low 16 bits) | its type << 16
+    evChannelPogo = 0x56,       // u16: legacy "FX3" / pogo 0…512 (256 = none)
+    evChannelSoloLock = 0x20,   // u8: the channel's "Lock active/mute state" (REA round 167l §5)
+    evChannelGhost = 0x32,      // u8: the channel's ghost notes shown in the Piano Roll (FUN_00e568b0 writes +0x1fc; REA round 167l §5)
+    evSampleFlags = 0x8F,       // u32: bit 0 resample, 1 load regions, 2 load ACID markers, 3 use loop points, 8 keep on disk
+    evSampleLoopPointsOld = 0x13, // (older files) "use loop points" on
+    evSamplePingPong = 0x14,    // u8: Sampler › Ping pong loop
     evTimeSignatureNumerator = 0x11,
     evChannelSwingMix = 0x61,
     evLayerChild = 0x5E,  // u16: a Layer channel's child (one event per child; REA_rodada164a §1)
@@ -25,6 +49,7 @@ enum : std::uint32_t
     evSampleRootNote = 0x87,
     evChannelFineTune = 0x8E, // REA round 151 [DATA: FL 2026's Misc › Fine tune +15 / +78 cents saved as 15 / 78]
     evFileFlags = 0xA9,
+    evAutoCrossfades = 0x2C,    // u8: Playlist "Automatic crossfades" (this project), FL 21+ (REA round 167a)
     evChannelParams = 0xD7,
     evChannelEnvelope = 0xDA,
     evPluginState = 0xD5,       // plugin blob (channel generator or slot effect)
@@ -478,12 +503,147 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
                 project.swing = (int) e.value;
                 break;
 
+            case evCurrentPattern:
+                if (section == Section::global)
+                    project.currentPattern = e.value >= 1 && e.value <= 999 ? (int) e.value : 1; // (FL's loader: else 1)
+                break;
+
+            case evSongMode:
+                if (section == Section::global)
+                    project.songMode = e.value == 1 ? 1 : 0; // (FL: PatBtn down unless the value is 1)
+                break;
+
+            case evShowInfo:
+                if (section == Section::global)
+                    project.showInfo = e.value == 1;
+                break;
+
+            case evCurrentArrangement:
+                project.currentArrangement = (int) e.value;
+                break;
+
+            case evProjectTimes:
+                if (section == Section::global && e.data.size() >= 16)
+                {
+                    double created, work;
+                    std::memcpy (&created, e.data.data(), 8);
+                    std::memcpy (&work, e.data.data() + 8, 8);
+                    project.createdDays = std::isfinite (created) ? created : 0.0;
+                    project.workDays = std::isfinite (work) && work > 0.0 ? work : 0.0;
+                }
+                break;
+
+            case evPlayTruncatedNotes:
+                if (section == Section::global)
+                    project.playTruncatedNotes = e.value > 0;
+                break;
+
+            case evMainPitch:
+                if (section == Section::global)
+                    project.mainPitch = (int) (std::int16_t) (std::uint16_t) e.value;
+                break;
+
+            case evFastDeclick: // (FL saves it after the Playlist tracks; its loader reads it in any context)
+                project.fastDeclick = e.value > 0;
+                break;
+
+            case evChannelFxFlags:
+                if (section == Section::channel)
+                    channel().fxFlags = (int) e.value;
+                break;
+
+            case evChannelFadeIn:
+                if (section == Section::channel)
+                    channel().fadeIn = (int) e.value;
+                break;
+
+            case evChannelFadeOut:
+                if (section == Section::channel)
+                    channel().fadeOut = (int) e.value;
+                break;
+
+            case evChannelBoost:
+                if (section == Section::channel)
+                    channel().boost = (int) e.value;
+                break;
+
+            case evChannelEq:
+                if (section == Section::channel)
+                    channel().eq = (int) e.value;
+                break;
+
+            case evChannelRingMod:
+                if (section == Section::channel)
+                {
+                    channel().ringMix = (int) (e.value & 0xffff);
+                    channel().ringFreq = (int) ((e.value >> 16) & 0xffff);
+                }
+                break;
+
+            case evChannelStereoDelay:
+                if (section == Section::channel)
+                    channel().stereoDelay = (int) e.value;
+                break;
+
+            case evChannelCutoff:
+                if (section == Section::channel)
+                    channel().cutoff = (int) e.value;
+                break;
+
+            case evChannelResonance:
+                if (section == Section::channel)
+                    channel().resonance = (int) e.value;
+                break;
+
+            case evChannelReverb:
+                if (section == Section::channel)
+                {
+                    channel().reverb = (int) (e.value & 0xffff);
+                    channel().reverbType = (int) ((e.value >> 16) & 0xffff);
+                }
+                break;
+
+            case evChannelPogo:
+                if (section == Section::channel)
+                    channel().pogo = (int) e.value;
+                break;
+
+            case evChannelSoloLock:
+                if (section == Section::channel)
+                    channel().soloLock = e.value != 0;
+                break;
+
+            case evChannelGhost:
+                if (section == Section::channel)
+                    channel().ghostShown = e.value != 0;
+                break;
+
+            case evSampleFlags:
+                if (section == Section::channel)
+                    channel().sampleFlags = (int) e.value;
+                break;
+
+            case evSampleLoopPointsOld:
+                if (section == Section::channel)
+                    channel().loopPointsOld = true;
+                break;
+
+            case evSamplePingPong:
+                if (section == Section::channel)
+                    channel().pingPong = e.value != 0;
+                break;
+
             case evPanLaw:
                 project.panLaw = (int) e.value;
                 break;
 
             case evFileFlags:
                 project.flagsA9 = e.value;
+                break;
+
+            case evAutoCrossfades: // [DECOMP] FL's saver writes the project's flag as byte event 0x2C (REA_rodada167a §3)
+                if (section == Section::global)
+                    project.autoCrossfades = e.value != 0;
                 break;
 
             case evChannelSwingMix:
@@ -643,6 +803,17 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
                     c.stretchPitch = readLE<std::int32_t> (e.data, 0x64);
                     c.stretchMul = readLE<std::int32_t> (e.data, 0x68);
                     c.stretchMode = readLE<std::int32_t> (e.data, 0x6C);
+                    // Sampler › Precomputed effects (REA round 167h §1: the channel form's handlers write the channel's
+                    // +0x28d / +0x2d4 / +0x2d5 / +0x2d7 / +0x2d8 / +0x2dc = this record's base +0x284 plus these)
+                    c.removeDc = e.data[0x09] != 0;
+                    if (e.data.size() >= 0x5C)
+                    {
+                        c.normalize = e.data[0x50] != 0;
+                        c.reversePolarity = e.data[0x51] != 0;
+                        c.declickMode = e.data[0x53];
+                        c.crossfade = readLE<std::int32_t> (e.data, 0x54);
+                        c.trim = readLE<std::int32_t> (e.data, 0x58);
+                    }
 
                     if (e.data.size() >= 0x98)
                     {
@@ -897,6 +1068,19 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
                         item.fadeInMs = std::max (0.0f, finiteOr (readLE<float> (e.data, o + 0x24), 0.0f));
                         item.fadeOutMs = std::max (0.0f, finiteOr (readLE<float> (e.data, o + 0x2C), 0.0f));
                         item.gain = std::max (0.0f, finiteOr (readLE<float> (e.data, o + 0x34), 1.0f));
+                    }
+
+                    if (recordSize >= 80)
+                    {
+                        // FL 2026's clip pitch (+0x3C, semitones, -12..12: keys 7/8, FUN_00e2d7b0) and clip flags
+                        // (+0x48, bit 0 = reversed: key 9, FUN_01065520) — round 167k
+                        const auto pitch = readLE<float> (e.data, o + 0x3C);
+                        item.pitch = std::isfinite (pitch) ? std::clamp (pitch, -12.0f, 12.0f) : 0.0f;
+                        item.reversed = (readLE<std::uint32_t> (e.data, o + 0x48) & 1) != 0;
+                        // the clip's stretch (+0x40, double; 1 = none): FL plays the clip that many times longer
+                        // (FUN_01064f40 makes a variant of the sample for it in the offline stretch modes; round 167l)
+                        const auto stretch = readLE<double> (e.data, o + 0x40);
+                        item.stretch = std::isfinite (stretch) && stretch > 0.0 ? std::clamp (stretch, 0.01, 100.0) : 1.0;
                     }
 
                     const auto patternBase = base != 0 ? base : playlistPatternBase;

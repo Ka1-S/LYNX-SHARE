@@ -132,7 +132,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         if (safe != nullptr)
             safe->mixer.getStripsForSnapshot().setShowUsedOnly (on);
     };
-    mixeroptions::renderTracks = [safe = juce::Component::SafePointer<MainComponent> (this)] (std::vector<int> tracks, std::function<void()> done) {
+    mixeroptions::renderTracks = [safe = juce::Component::SafePointer<MainComponent> (this)] (std::vector<int> tracks,
+                                                                                             std::function<void (const std::vector<juce::File>&)> done) {
         if (safe != nullptr)
             showExportDialogForTracks (safe->engine, safe->currentFile.getParentDirectory(), safe->projectName, tracks, std::move (done));
     };
@@ -170,7 +171,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         return key.isEmpty() ? text : text + " (" + key + ")";
     };
     undoButton.setTooltip (withKey (tr ("Undo"), "edit.undo"));
-    undoButton.onClick = [this] { undoRedo (false); };
+    undoButton.onClick = [this] { flUndo(); }; // FL's toolbar Undo is its Edit › Undo (UndoAction)
     undoButton.onRightClick = [this] { showHistory(); };
     redoButton.setTooltip (withKey (tr ("Redo"), "edit.redo"));
     redoButton.onClick = [this] { undoRedo (true); };
@@ -1046,6 +1047,14 @@ void MainComponent::setToolbarEditing (bool editing)
         toolbarEditor->grabKeyboardFocus();
 }
 
+void MainComponent::flUndo()
+{
+    if (alternateUndo)
+        undoRedo (false);
+    else
+        undoRedo (engine.canRedo()); // something undone: Ctrl+Z redoes the next step (FL: "undo/redo on the same shortcut")
+}
+
 void MainComponent::undoRedo (bool redo)
 {
     // FL says in the hint bar what was undone and the undo level ("Undone: ...  Level 2/3")
@@ -1223,6 +1232,9 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("pattern.next")) selectPattern (stepPattern (engine.getSong(), 1));
     else if (is ("pattern.previous")) selectPattern (stepPattern (engine.getSong(), -1));
     else if (is ("pattern.nextEmpty")) nextEmptyPattern();
+    else if (is ("pattern.firstEmpty")) { engine.editSong ([] (Song& s) { gotoFirstEmptyPattern (s); }); showRenamePattern (engine.getSong().currentPattern); }
+    else if (is ("pattern.nextEmptyNoName")) engine.editSong ([] (Song& s) { gotoNextEmptyPattern (s); });
+    else if (is ("pattern.delete")) deleteCurrentPattern();
     else if (is ("pattern.rename")) showRenamePattern (engine.getSong().currentPattern);
     else if (is ("pattern.insert")) insertPatternHere();
     else if (is ("pattern.clone")) clonePatternNow();
@@ -1308,7 +1320,10 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("file.saveAs")) save (true);
     else if (is ("file.saveNewVersion")) saveNewVersion();
     else if (is ("file.export")) exportAudio();
-    else if (is ("edit.undo")) undoRedo (false);
+    else if (is ("file.exportMp3")) exportAudio (1);
+    else if (is ("file.exportMidi")) exportMidiFile();
+    else if (is ("edit.undo")) flUndo();
+    else if (is ("edit.undoBackwards")) undoRedo (false);
     else if (is ("edit.redo")) undoRedo (true);
     else if (is ("help.shortcuts")) showHelp();
     else if (is ("rack.selectPrevious")) rack.selectRelative (-1, false);
@@ -1490,6 +1505,10 @@ void MainComponent::loadUiSettings()
             typingPiano = on;
         else if (key == "keepEditorsOpen")
             ChannelRackComponent::keepEditorsOpen = on;
+        else if (key == "selFirstChanPatChanges")
+            ChannelRackComponent::selectFirstChannelWithNotes = on;
+        else if (key == "alternateUndo")
+            alternateUndo = on;
         else if (key == "waveSpectral") // ("waveColours", the old spectral-by-default key, is ignored)
             ui::WaveformCache::spectral = on;
         else if (key == "pluginStyle") // "Automatic" or a style forced on every plugin
@@ -1543,6 +1562,10 @@ void MainComponent::loadUiSettings()
             engine.getTransport().metronomeSound.store (metronome::clampSound (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue()));
         else if (key == "metronomeTrack")
             engine.getTransport().metronomeTrack.store (juce::jlimit (0, maxMixerTracks - 1, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue()));
+        else if (key == "playTruncatedOnTransport")
+            engine.getTransport().playTruncatedOnTransport.store (on);
+        else if (key == "resetPluginsOnTransport")
+            engine.getTransport().resetPluginsOnTransport.store (on);
         else if (key == "metronomeVolume")
             engine.getTransport().metronomeVolume.store ((float) controls::clampUtilityVolume (line.fromFirstOccurrenceOf ("=", false, false).trim().getDoubleValue()));
         else if (key == "previewVolume")
@@ -1554,11 +1577,12 @@ void MainComponent::loadUiSettings()
         else if (key == "undoLevels")
             engine.setUndoLevels (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "askWhatToRecord" || key == "recordNotes" || key == "recordAudio" || key == "recordStartsPlayback" || key == "disarmOnStop"
-                 || key == "recordOffOnStop" || key == "unarmAfterRender")
+                 || key == "recordOffOnStop" || key == "unarmAfterRender" || key == "renderAutoClip")
         {
             auto o = engine.getRecordOptions();
             (key == "askWhatToRecord" ? o.askWhatToRecord : key == "recordNotes" ? o.recordNotes : key == "recordAudio" ? o.recordAudio
              : key == "disarmOnStop" ? o.disarmOnStop : key == "recordOffOnStop" ? o.recordOffOnStop : key == "unarmAfterRender" ? o.unarmAfterRender
+             : key == "renderAutoClip"                                                                                         ? o.autoCreateClip
                                                                                                                                   : o.startsPlayback) = on;
             engine.setRecordOptions (o);
         }
@@ -1610,7 +1634,10 @@ void MainComponent::saveUiSettings()
         return;
 
     uiSettingsFile().replaceWithText ("typingPiano=" + juce::String (typingPiano ? 1 : 0) + "\nkeepEditorsOpen="
-                                      + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0) + "\neditPatternsIn="
+                                      + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
+                                      + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
+                                      + "\nalternateUndo=" + juce::String (alternateUndo ? 1 : 0)
+                                      + "\neditPatternsIn="
                                       + juce::String (PlaylistComponent::editPatternsIn) + "\nsplash=" + juce::String (startup.splash ? 1 : 0)
                                       + "\nstartupSound=" + juce::String (startup.sound ? 1 : 0)
                                       + "\nwaveSpectral=" + juce::String (ui::WaveformCache::spectral ? 1 : 0)
@@ -1638,6 +1665,8 @@ void MainComponent::saveUiSettings()
                                       + "\nmetronomeVolume=" + juce::String (engine.getTransport().metronomeVolume.load(), 2)
                                       + "\nmetronomeSoundFl=" + juce::String (metronome::clampSound (engine.getTransport().metronomeSound.load()))
                                       + "\nmetronomeTrack=" + juce::String (engine.getTransport().metronomeTrack.load())
+                                      + "\nplayTruncatedOnTransport=" + juce::String (engine.getTransport().playTruncatedOnTransport.load() ? 1 : 0)
+                                      + "\nresetPluginsOnTransport=" + juce::String (engine.getTransport().resetPluginsOnTransport.load() ? 1 : 0)
                                       + "\npreviewVolume=" + juce::String (engine.getPreviewVolume(), 2)
                                       + "\neditorVolume=" + juce::String (engine.getEditorVolume(), 2)
                                       + "\nrackPianoRollView=" + juce::String (rack.isPianoRollView() ? 1 : 0)
@@ -1648,6 +1677,7 @@ void MainComponent::saveUiSettings()
                                       + "\ndisarmOnStop=" + juce::String (engine.getRecordOptions().disarmOnStop ? 1 : 0)
                                       + "\nrecordOffOnStop=" + juce::String (engine.getRecordOptions().recordOffOnStop ? 1 : 0)
                                       + "\nunarmAfterRender=" + juce::String (engine.getRecordOptions().unarmAfterRender ? 1 : 0)
+                                      + "\nrenderAutoClip=" + juce::String (engine.getRecordOptions().autoCreateClip ? 1 : 0)
                                       + "\nrecordQuantiseStarts=" + juce::String (recordQuantiseOn ? 1 : 0)
                                       + "\nrecordNoteEnd=" + juce::String ((int) engine.getRecordOptions().noteEnd)
                                       + "\nrecordToStepSequencer=" + juce::String (engine.getRecordOptions().toStepSequencer ? 1 : 0)
@@ -1900,6 +1930,13 @@ void MainComponent::nextEmptyPattern()
     showRenamePattern (engine.getSong().currentPattern);
 }
 
+void MainComponent::deleteCurrentPattern()
+{
+    // FL's Patterns › Delete (Ctrl+Shift+Del); the last pattern stays
+    if (engine.getSong().patterns.size() > 1)
+        engine.editSong ([] (Song& s) { s.removePattern (s.currentPattern); });
+}
+
 void MainComponent::insertPatternHere()
 {
     engine.editSong ([] (Song& s) { insertPattern (s, s.currentPattern, newPatternName (s)); });
@@ -1958,6 +1995,9 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "playlist.rippleDelete", tr ("Delete the selected clips and close the gaps"));
             action (menu, "playlist.autoCrossfades", tr ("Automatic crossfades (current project)"), true, engine.getSong().autoCrossfades);
             action (menu, "playlist.follow", tr ("Follow the playhead (auto scrolling)"), true, EditorGlobals::get().isFollowing (false));
+            action (menu, "playlist.pitchClipsDown", tr ("Pitch selected audio clips one semitone down"));
+            action (menu, "playlist.pitchClipsUp", tr ("Pitch selected audio clips one semitone up"));
+            action (menu, "playlist.reverseClips", tr ("Reverse selected audio clips"));
             action (menu, "playlist.quantizeStarts", tr ("Quantize the clips' starts"));
             action (menu, "playlist.quantizeHalf", tr ("Quantize the clips' starts 50% (halfway to the grid)"));
             menu.addSubMenu (tr ("Zoom"), zoomMenu ("playlist."));
@@ -2713,7 +2753,9 @@ juce::PopupMenu MainComponent::makePatternMenu()
                   [this] { selectPattern (stepPattern (engine.getSong(), 1)); });
     menu.addItem (tr ("Previous pattern") + shortcutText ("pattern.previous"), index > 0, false,
                   [this] { selectPattern (stepPattern (engine.getSong(), -1)); });
+    menu.addItem (tr ("First empty pattern (and name it)") + shortcutText ("pattern.firstEmpty"), [this] { runAction ("pattern.firstEmpty"); });
     menu.addItem (tr ("Next empty pattern (and name it)") + shortcutText ("pattern.nextEmpty"), [this] { nextEmptyPattern(); });
+    menu.addItem (tr ("Next empty pattern (no naming)") + shortcutText ("pattern.nextEmptyNoName"), [this] { runAction ("pattern.nextEmptyNoName"); });
     menu.addSeparator();
     menu.addItem (tr ("Rename and color...") + shortcutText ("pattern.rename"), [this, index] { showRenamePattern (index); });
     menu.addSubMenu (tr ("Color"), colours);
@@ -2731,7 +2773,7 @@ juce::PopupMenu MainComponent::makePatternMenu()
 
     menu.addSubMenu (tr ("Song time signature"), signatures);
     menu.addSeparator();
-    menu.addItem (tr ("Delete pattern"), song.patterns.size() > 1, false,
+    menu.addItem (tr ("Delete pattern") + shortcutText ("pattern.delete"), song.patterns.size() > 1, false,
                   [this, index] { engine.editSong ([index] (Song& s) { s.removePattern (index); }); });
     return menu;
 }
@@ -2785,6 +2827,15 @@ void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
     }
 
     const auto& song = engine.getSong();
+    // FL's "Select first channel with notes when the pattern changes" (Settings › General, REA round 167j §5)
+    if (song.currentPattern != lastCurrentPattern)
+    {
+        const auto changedPattern = lastCurrentPattern >= 0;
+        lastCurrentPattern = song.currentPattern;
+        if (changedPattern && ChannelRackComponent::selectFirstChannelWithNotes)
+            if (const auto first = firstChannelWithNotes (song, song.currentPattern); first >= 0 && first != engine.getSelectedChannel())
+                engine.setSelectedChannel (first);
+    }
     bool namesChanged = patternBox.getNumItems() != (int) song.patterns.size();
 
     for (int i = 0; ! namesChanged && i < patternBox.getNumItems(); ++i)
@@ -3847,6 +3898,7 @@ void MainComponent::startNewProject (Song song, const juce::File& file)
     engine.stop();
     engine.rewind();
     engine.setSong (std::move (song));
+    engine.markCreatedNow(); // Project info › created (a template's own date is kept, as FL does)
     currentFile = juce::File();
     projectName = {};
     importedSuffix = {};
@@ -3997,6 +4049,11 @@ void MainComponent::flpImported (const juce::File& file)
         playlist.showSongAfterOpen();
 
         showMissingFiles (true);
+        // FL opens Project info when the project's "Show on opening" box is on (event 0x0A, REA round 167g)
+        if (engine.getSong().info.showOnOpen && platform::testMode())
+            platform::testModeLog ("project info shown on open");
+        else if (engine.getSong().info.showOnOpen)
+            openSettings ((int) SettingsPage::info);
     }
 }
 
@@ -4062,6 +4119,8 @@ void MainComponent::openSettings (int page)
         o.scanAtStart = backgroundScanAtStart();
         o.typingPiano = safe->typingPiano;
         o.keepEditorsOpen = ChannelRackComponent::keepEditorsOpen;
+        o.selectFirstChannelWithNotes = ChannelRackComponent::selectFirstChannelWithNotes;
+        o.alternateUndo = safe->alternateUndo;
         o.rememberSeek = EditorGlobals::get().rememberSeek;
         o.editPatternsIn = PlaylistComponent::editPatternsIn;
         o.undoLevels = safe->engine.getUndoLevels();
@@ -4123,6 +4182,8 @@ void MainComponent::openSettings (int page)
             crashreporter::setConsent ((crashreport::Consent) juce::jlimit (0, 2, o.crashReports));
         updater::setAutomatic (o.checkUpdates);
         ChannelRackComponent::keepEditorsOpen = o.keepEditorsOpen;
+        ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
+        self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;
         PlaylistComponent::editPatternsIn = juce::jlimit (0, 2, o.editPatternsIn);
         self.startup.splash = o.splash;
@@ -4607,10 +4668,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             // FL's File › Export (REA round 139): one entry per format, then the formats of the last export
             juce::PopupMenu exports;
             exports.addItem (tr ("Wave file..."), [this] { exportAudio (0); });
-            exports.addItem (tr ("MP3 file..."), [this] { exportAudio (1); });
+            exports.addItem (tr ("MP3 file...") + shortcutText ("file.exportMp3"), [this] { exportAudio (1); });
             exports.addItem (tr ("OGG file..."), [this] { exportAudio (2); });
             exports.addItem (tr ("FLAC file..."), [this] { exportAudio (3); });
-            exports.addItem (tr ("MIDI file..."), [this] { exportMidiFile(); });
+            exports.addItem (tr ("MIDI file...") + shortcutText ("file.exportMidi"), [this] { exportMidiFile(); });
             exports.addItem (tr ("Last exported format(s)...") + shortcutText ("file.export"), [this] { exportAudio(); });
             exports.addSeparator();
             exports.addItem (tr ("Project with samples (.zip)..."), [this] { exportPackage(); });
@@ -4652,7 +4713,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
     }
     else if (index == 1)
     {
-        menu.addItem (tr ("Undo") + shortcutText ("edit.undo"), engine.canUndo(), false, [this] { undoRedo (false); });
+        // FL's Edit menu: "Undo backwards" (Ctrl+Alt+Z) above "Undo" (Ctrl+Z: undo, or redo after an undo)
+        menu.addItem (tr ("Undo backwards") + shortcutText ("edit.undoBackwards"), engine.canUndo(), false, [this] { undoRedo (false); });
+        menu.addItem ((alternateUndo || ! engine.canRedo() ? tr ("Undo") : tr ("Undo (redo)")) + shortcutText ("edit.undo"),
+                      engine.canUndo() || engine.canRedo(), false, [this] { flUndo(); });
         menu.addItem (tr ("Redo") + shortcutText ("edit.redo"), engine.canRedo(), false, [this] { undoRedo (true); });
         menu.addItem (tr ("Undo history...") + shortcutText ("edit.history"), [this] { showHistory(); });
         menu.addItem (tr ("Audio editor..."), [this] { openAudioEditor (engine); });
@@ -4966,8 +5030,9 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent()
             { TR_NOOP ("Shift+drag"), TR_NOOP ("Copy") },
             { "Ctrl+A/C/X/V", TR_NOOP ("Select all, copy, cut, paste") },
             { "Ctrl+B / Ctrl+Q", TR_NOOP ("Duplicate / quantize") },
-            { "Ctrl+M / Ctrl+P", TR_NOOP ("Mute / portamento") },
-            { TR_NOOP ("Arrows"), TR_NOOP ("Move (Shift = octave/bar)") },
+            { "Alt+M / Shift+Alt+M", TR_NOOP ("Mute / unmute") },
+            { "Ctrl+P / Ctrl+D", TR_NOOP ("Portamento / deselect") },
+            { TR_NOOP ("Shift+arrows"), TR_NOOP ("Transpose a semitone / move by the grid (Ctrl+Up/Down: an octave)") },
             { TR_NOOP ("Alt / Ctrl+wheel"), TR_NOOP ("Disable snap / zoom") } } },
         { "Playlist",
           { { TR_NOOP ("Click"), TR_NOOP ("Paint the current pattern") },

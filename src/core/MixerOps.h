@@ -61,6 +61,10 @@ bool moveEffectSlot (Song& song, int track, int from, int to);
 // "Reset selected track(s) to default": level, pan, stereo separation, phase, swap and EQ back to the defaults,
 // mute and solo off (name, colour, effects and routing stay).
 void resetToDefault (Song& song, const std::vector<int>& tracks);
+// FL's "Solo selected track(s)" (S) and "Alt solo selected track(s)" (Alt+S) (FUN_0127c2a0 → FUN_0127bb10,
+// REA_rodada167l §4): the targets play with their path to Master; the alt solo also keeps the tracks that feed them.
+// Again on the same solo clears it; one kind on the other kind switches to it.
+void soloSelected (Song& song, const std::vector<int>& targets, bool alt);
 // "Reset selected track(s) routing": each insert sends only to the Master again, at full level.
 void resetRouting (Song& song, const std::vector<int>& tracks);
 // "Unroute tracks routed to the selected track(s)": the sends into them are removed (an insert left with no
@@ -118,4 +122,21 @@ int resetManualLatency (Song& song);
 // All effects of the insert on or off (the "effects" switch).
 void setAllEffectsEnabled (Song& song, int track, bool enabled);
 bool anyEffectEnabled (const Song& song, int track) noexcept;
+
+// --- FL's Disk recording (round 167a, REA_rodada167a §4 / §7) -------------------------------------------------------
+// "Auto-create audio clip": what "Render armed tracks to wave file(s)" puts in the project afterwards. Per file, as FL
+// 2026 does [SHOT s28–s37]: a new audio clip channel named after the file (target "---", the Master), at the end of
+// the Channel Rack, and a clip of the whole file from the song's start on the first Playlist track after every used
+// track (the tracks keep their names). Files with no frames are skipped. Returns how many clips were placed.
+struct RenderedFile
+{
+    std::string path;
+    double frames = 0.0, sampleRate = 0.0;
+};
+int placeRenderedFiles (Song& song, const std::vector<RenderedFile>& files);
+// The first Playlist track after every track that holds a clip (0 on an empty Playlist).
+int firstTrackAfterUsed (const Song& song) noexcept;
+// FL's "Record <insert> to" default name (REA_rodada167a §7 [SHOT s20–s27]): "<project>_<yyyy-mm-dd hh-mm-ss>_<insert>"
+// (as a take's name, safety::recordingName), the insert's own name or "Insert N".
+std::string insertDisplayName (const Song& song, int track);
 } // namespace lynx::mixerops

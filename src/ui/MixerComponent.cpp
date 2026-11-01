@@ -11,6 +11,7 @@
 #include "core/LiveInput.h"
 #include "core/HardwareOutput.h"
 #include "core/MixerOps.h"
+#include "core/ProjectSafety.h"
 #include "core/Templates.h"
 #include "core/RackOps.h"
 #include "ui/AutomationUi.h"
@@ -866,8 +867,8 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
 
     if (part == Part::arm)
     {
-        if (e.mods.isPopupMenu())
-            mixerinput::showMenu (engine, t, this);
+        if (e.mods.isPopupMenu()) // FL: "Record <insert> to" (round 167a); the input box keeps the input menu
+            mixerinput::chooseRecordTo (engine, t);
         else
             mixerinput::toggleArm (engine, t, this);
         repaint();
@@ -1341,7 +1342,7 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
         case Part::send:
             return ui::valueHint (specFor (part, t), valueOf (part, t), gesture);
         case Part::mute: h.text = name + " - " + tr ("Click: mute.  Right-click or Ctrl+click: solo"); break;
-        case Part::arm: h.text = name + " - " + tr ("Record arm: Rec + Play records this insert's audio input into a Playlist clip  [RMB] input and monitoring"); h.hasMenu = true; break;
+        case Part::arm: h.text = name + " - " + mixerinput::armHint (engine, t); h.hasMenu = true; break;
         case Part::input: h.text = name + " - " + tr ("Input level of this insert's audio input  [LMB] choose the input"); h.hasMenu = true; break;
         case Part::solo: h.text = name + " - " + tr ("Solo"); break;
         case Part::meter: h.text = name + " - " + tr ("Peak meter (left/right) with peak hold  [LMB] selects the track and clears the clip light"); break;
@@ -1661,10 +1662,26 @@ bool saveMixerTrackState (AudioEngine& engine, int track, const juce::File& file
     return file.replaceWithText (ProjectFile::mixerTrackStateToJson (engine.getSong().mixer[(std::size_t) track]));
 }
 
+// FL's "Auto-create audio clip" (round 167a [SHOT s28–s37]): the rendered files go on the Playlist, one undo step
+static void placeRenderedFiles (AudioEngine& engine, const std::vector<juce::File>& files)
+{
+    std::vector<mixerops::RenderedFile> list;
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    for (const auto& f : files)
+        if (std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (f)); reader != nullptr)
+            list.push_back ({ f.getFullPathName().toStdString(), (double) reader->lengthInSamples, reader->sampleRate });
+    if (! list.empty())
+        engine.editSong ([list] (Song& s) { mixerops::placeRenderedFiles (s, list); });
+}
+
 void MixerStrips::askInsertMultiple (int at)
 {
     auto* window = new juce::AlertWindow (tr ("Insert multiple"), tr ("How many blank inserts?"), juce::MessageBoxIconType::NoIcon);
-    window->addTextEditor ("count", "2");
+    // FL 2026's box starts at 10, already selected; Ctrl+A selects it again (round 167a [SHOT s13–s15])
+    window->addTextEditor ("count", "10");
+    if (auto* field = window->getTextEditor ("count"))
+        field->setInputRestrictions (4, "0123456789");
     window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
     window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
     juce::Component::SafePointer<MixerStrips> safe (this);
@@ -1690,11 +1707,34 @@ void MixerStrips::askInsertMultiple (int at)
                                  }
                              }),
                              true);
+    if (auto* field = window->getTextEditor ("count"))
+    {
+        field->grabKeyboardFocus();
+        field->selectAll();
+    }
 }
 
 void MixerStrips::showMenu (int t)
 {
     buildMenu (t).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+
+bool MixerStrips::runMenuItem (const juce::String& caption)
+{
+    auto menu = buildMenu (getSelectedTrack());
+    for (juce::PopupMenu::MenuItemIterator it (menu, true); it.next();)
+    {
+        const auto& item = it.getItem();
+        if (item.isEnabled && item.action != nullptr && item.subMenu == nullptr
+            && item.text.upToFirstOccurrenceOf ("\t", false, false).trim() == caption)
+        {
+            const auto action = item.action; // (the menu goes away first)
+            menu = {};
+            action();
+            return true;
+        }
+    }
+    return false;
 }
 
 juce::PopupMenu MixerStrips::buildMenu (int t)
@@ -1886,11 +1926,13 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                     v.push_back (x);
             return v;
         }();
+        // FL's two solo items (REA_rodada167l §4): the plain one mutes the tracks feeding the soloed ones, the alt one
+        // keeps them; the same item again clears the solo
         menu.addItem (tr ("Solo selected track(s)") + "\tS", ! inserts.empty(), false, [this, inserts] {
-            engine.editSong ([inserts] (Song& s) {
-                for (std::size_t i = 1; i < s.mixer.size(); ++i)
-                    s.mixer[i].solo = std::find (inserts.begin(), inserts.end(), (int) i) != inserts.end();
-            });
+            engine.editSong ([inserts] (Song& s) { mixerops::soloSelected (s, inserts, false); });
+        });
+        menu.addItem (tr ("Alt solo selected track(s)") + "\tAlt+S", ! inserts.empty(), false, [this, inserts] {
+            engine.editSong ([inserts] (Song& s) { mixerops::soloSelected (s, inserts, true); });
         });
         menu.addItem (tr ("Arm selected track(s)"), ! inserts.empty(), false, [this, inserts] {
             for (auto x : inserts)
@@ -1999,15 +2041,17 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                 armed.push_back (x);
         juce::PopupMenu disk;
         auto& eng = engine;
-        disk.addItem (tr ("Render armed tracks to wave file(s)..."), ! armed.empty(), false, [armed, &eng] {
+        disk.addItem (tr ("Render armed tracks to wave file(s)...") + "\tAlt+R", ! armed.empty(), false, [armed, &eng] {
             if (mixeroptions::renderTracks)
-                mixeroptions::renderTracks (armed, [armed, &eng] {
+                mixeroptions::renderTracks (armed, [armed, &eng] (const std::vector<juce::File>& files) {
                     if (eng.getRecordOptions().unarmAfterRender) // FL's "Auto-unarm" (round 166e)
                         for (auto t : armed)
                             eng.setInsertArmed (t, false);
+                    if (eng.getRecordOptions().autoCreateClip) // FL's "Auto-create audio clip" (round 167a)
+                        placeRenderedFiles (eng, files);
                 });
         });
-        disk.addItem (tr ("Render selected tracks to wave file(s)..."), ! targets.empty(), false, [targets] {
+        disk.addItem (tr ("Render selected tracks to wave file(s)...") + "\tShift+Alt+R", ! targets.empty(), false, [targets] {
             if (mixeroptions::renderTracks)
                 mixeroptions::renderTracks (targets, {});
         });
@@ -2023,6 +2067,8 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         };
         disk.addItem (tr ("Auto-unarm (rendering the armed tracks disarms them)"), true, ro.unarmAfterRender,
                       [setRecord] { setRecord ([] (AudioEngine::RecordOptions& r) { r.unarmAfterRender = ! r.unarmAfterRender; }); });
+        disk.addItem (tr ("Auto-create audio clip (the rendered files go on the Playlist)"), true, ro.autoCreateClip,
+                      [setRecord] { setRecord ([] (AudioEngine::RecordOptions& r) { r.autoCreateClip = ! r.autoCreateClip; }); });
         disk.addItem (tr ("Disarm the inserts when recording stops"), true, ro.disarmOnStop,
                       [setRecord] { setRecord ([] (AudioEngine::RecordOptions& r) { r.disarmOnStop = ! r.disarmOnStop; }); });
         menu.addSubMenu (tr ("Disk recording"), disk);
@@ -2157,7 +2203,7 @@ const EffectKind allEffects[] = { EffectKind::eq,     EffectKind::parametricEq, 
                                       EffectKind::fruityFastDist, EffectKind::fruityFlangus, EffectKind::fruityFlanger, EffectKind::fruityPhaser, EffectKind::luxeVerb,
                                       EffectKind::fruityFastLP, EffectKind::fruityFreeFilter, EffectKind::fruityFilter,
                                       EffectKind::hardcore,
-                                      EffectKind::multibandDelay, EffectKind::emphasizer, EffectKind::flFrequencyShifter, EffectKind::flLowLifter,
+                                      EffectKind::multibandDelay, EffectKind::emphasizer, EffectKind::flEmphasis, EffectKind::flFrequencyShifter, EffectKind::flLowLifter,
                                       EffectKind::flPhaseInverter, EffectKind::flCenter, EffectKind::flBassBoost, EffectKind::fl7BandEq, EffectKind::flDelay1, // round 165k
                                       EffectKind::waveCandy, EffectKind::visualizer, // visual plugins (round 164c)
                                       EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook, // round 165g
@@ -2622,7 +2668,7 @@ namespace mixeroptions
 {
 std::function<void()> changed;
 std::function<void (bool)> setShowUsedOnly;
-std::function<void (std::vector<int>, std::function<void()>)> renderTracks;
+std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&)>)> renderTracks;
 
 namespace
 {
@@ -3562,8 +3608,8 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
 
     if (track > 0 && armBounds().contains (e.getPosition()))
     {
-        if (e.mods.isPopupMenu())
-            mixerinput::showMenu (engine, track, this);
+        if (e.mods.isPopupMenu()) // FL: "Record <insert> to" (round 167a)
+            mixerinput::chooseRecordTo (engine, track);
         else
             mixerinput::toggleArm (engine, track, this);
         repaint();
@@ -3939,7 +3985,7 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
     }
     if (track > 0 && armBounds().contains (p))
     {
-        h.text = tr ("Record arm: Rec + Play records this insert's audio input into a Playlist clip  [RMB] input and monitoring");
+        h.text = mixerinput::armHint (engine, track);
         h.hasMenu = true;
         return h;
     }
@@ -4693,14 +4739,14 @@ juce::String issueText (const AudioEngine::RecordingNotice& notice)
             return tr ("No audio input device was found. Connect a microphone or an audio interface, then choose it as the input device in Settings > Audio.");
         case I::noInputOpen: return tr ("No audio input is open, so nothing can be recorded. Choose an input device in Settings > Audio.");
         case I::armedWithoutInput:
-            return tr ("Please select an audio input first: the armed insert has none. Click the input box above the insert's effect slots in the Mixer (or right-click its arm button).");
+            return tr ("Please select an audio input first: the armed insert has none. Click the input box above the insert's effect slots in the Mixer.");
         case I::insertWithoutInput: return tr ("Insert {0} is armed but has no audio input, so it records nothing.", { juce::String (notice.track) });
         case I::failed: return tr ("The audio input could not be used: {0}", { notice.detail });
         case I::lowDisk:
             return tr ("The recordings drive is almost full: about {0} minute(s) of recording left. Free some space or choose another project folder.",
                        { notice.detail });
         case I::recordSafe:
-            return tr ("Insert {0} is record safe, so it can't be armed. Right-click its arm button and turn \"Record safe\" off first.",
+            return tr ("Insert {0} is record safe, so it can't be armed. Click its input box and turn \"Record safe\" off first.",
                        { juce::String (notice.track) });
         case I::framesLost:
             return tr ("The disk could not keep up while recording: {0} sample(s) became silence (the timing of the take was kept). "
@@ -4855,6 +4901,61 @@ void showMenu (AudioEngine& engine, int track, juce::Component* target, std::fun
     menu.showMenuAsync (options);
 }
 
+juce::String armHint (const AudioEngine& engine, int track)
+{
+    const auto text = tr ("Record arm: Rec + Play records this insert's audio input into a Playlist clip  [RMB] record to a file");
+    if (track <= 0 || track >= (int) engine.getSong().mixer.size() || engine.getSong().mixer[(std::size_t) track].recordTo.empty())
+        return text;
+    const auto file = juce::File (juce::String::fromUTF8 (engine.getSong().mixer[(std::size_t) track].recordTo.c_str()));
+    return tr ("Record to: {0}", { file.getFileName() }) + "  " + text;
+}
+
+void chooseRecordTo (AudioEngine& engine, int track)
+{
+    if (track <= 0 || track >= (int) engine.getSong().mixer.size())
+        return;
+    if (engine.getSong().mixer[(std::size_t) track].recordSafe)
+    {
+        AudioEngine::RecordingNotice notice;
+        notice.issue = AudioEngine::InputIssue::recordSafe;
+        notice.track = track;
+        explain (notice);
+        return;
+    }
+    const auto insert = juce::String::fromUTF8 (mixerops::insertDisplayName (engine.getSong(), track).c_str());
+    const auto& current = engine.getSong().mixer[(std::size_t) track].recordTo;
+    juce::File initial;
+    if (! current.empty() && juce::File::isAbsolutePath (juce::String::fromUTF8 (current.c_str())))
+        initial = juce::File (juce::String::fromUTF8 (current.c_str()));
+    else
+    {
+        // FL's default: Audio\Recorded, "<project title>_YYYY-MM-DD HH-MM-SS_<insert name>"
+        auto folder = engine.getRecordingFolder();
+        folder.createDirectory();
+        const auto now = juce::Time::getCurrentTime();
+        const auto name = juce::File::createLegalFileName (juce::String::fromUTF8 (
+            safety::recordingName (engine.getRecordingStem().toStdString(), now.getYear(), now.getMonth() + 1, now.getDayOfMonth(), now.getHours(),
+                                   now.getMinutes(), now.getSeconds(), insert.toStdString()).c_str()));
+        initial = folder.getChildFile (name + ".wav");
+    }
+    static std::unique_ptr<juce::FileChooser> chooser;
+    chooser = std::make_unique<juce::FileChooser> (tr ("Record {0} to", { insert }), initial, "*.wav");
+    chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                          [&engine, track] (const juce::FileChooser& fc) {
+                              auto file = fc.getResult();
+                              if (file == juce::File() || track >= (int) engine.getSong().mixer.size())
+                                  return;
+                              if (! file.hasFileExtension (".wav"))
+                                  file = file.withFileExtension (".wav");
+                              engine.editSong ([track, path = file.getFullPathName().toStdString()] (Song& s) {
+                                  if (track < (int) s.mixer.size())
+                                      s.mixer[(std::size_t) track].recordTo = path;
+                              });
+                              if (! engine.isInsertArmed (track)) // FL arms it (and the insert gets selected)
+                                  toggleArm (engine, track, nullptr);
+                          });
+}
+
 void toggleArm (AudioEngine& engine, int track, juce::Component* /*target*/)
 {
     if (track < 0 || track >= (int) engine.getSong().mixer.size())
@@ -4910,6 +5011,16 @@ bool MixerComponent::runAction (const std::string& id)
         strips.linkSelectedChannels (true);
     else if (id == "mixer.selectLinkedChannels")
         strips.selectLinkedChannels();
+    else if (id == "mixer.rename") // FL's mixer menu keys (round 167k): the menu's own items
+        return strips.runMenuItem (tr ("Rename and color..."));
+    else if (id == "mixer.soloSelected")
+        return strips.runMenuItem (tr ("Solo selected track(s)"));
+    else if (id == "mixer.altSoloSelected")
+        return strips.runMenuItem (tr ("Alt solo selected track(s)"));
+    else if (id == "mixer.renderArmed")
+        return strips.runMenuItem (tr ("Render armed tracks to wave file(s)..."));
+    else if (id == "mixer.renderSelected")
+        return strips.runMenuItem (tr ("Render selected tracks to wave file(s)..."));
     else if (id == "mixer.deleteEffect") // FL: Delete on the selected effect slot (issue #11)
         effects.deleteSlot (effects.getSelectedSlot());
     else

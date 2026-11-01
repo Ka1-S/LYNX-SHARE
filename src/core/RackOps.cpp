@@ -93,6 +93,22 @@ int gotoNextEmptyPattern (Song& song)
     return index;
 }
 
+int gotoFirstEmptyPattern (Song& song)
+{
+    for (int i = 0; i < (int) song.patterns.size(); ++i)
+        if (isPatternEmpty (song.patterns[(std::size_t) i]))
+        {
+            song.currentPattern = i;
+            return i;
+        }
+
+    Pattern p;
+    p.name = newPatternName (song);
+    song.patterns.push_back (std::move (p));
+    song.currentPattern = (int) song.patterns.size() - 1;
+    return song.currentPattern;
+}
+
 namespace
 {
 // Shifts pattern clip references at or after `index` by `delta`.

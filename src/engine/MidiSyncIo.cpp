@@ -65,7 +65,7 @@ void MidiSyncIo::configure (const prefs::MidiPrefs& prefs, bool devices, bool dr
         wanted.resize (maxOutputs);
 
     const auto available = devices ? juce::MidiOutput::getAvailableDevices() : juce::Array<juce::MidiDeviceInfo>();
-    auto any = false;
+    auto any = false, notesOff = false;
     for (int i = 0; i < maxOutputs; ++i)
     {
         auto& slot = slots[(std::size_t) i];
@@ -96,9 +96,11 @@ void MidiSyncIo::configure (const prefs::MidiPrefs& prefs, bool devices, bool dr
         slot.offsetMs.store (want != nullptr ? juce::jlimit (-1000, 1000, want->offsetMs) : 0);
         slot.active.store (slot.sync && (slot.device != nullptr || ! devices));
         any = any || slot.active.load();
+        notesOff = notesOff || (slot.notesOff && (slot.device != nullptr || dryRun));
     }
     anySync.store (any);
-    if ((devices || dryRun) && any && ! isThreadRunning())
+    anyNotesOff.store (notesOff);
+    if ((devices || dryRun) && (any || notesOff) && ! isThreadRunning())
         startThread (juce::Thread::Priority::highest);
 }
 
@@ -112,6 +114,36 @@ void MidiSyncIo::sendAllNotesOff()
                 s.device->sendMessageNow (juce::MidiMessage::controllerEvent (ch, 64, 0));
                 s.device->sendMessageNow (juce::MidiMessage::allNotesOff (ch));
             }
+}
+
+void MidiSyncIo::requestTransportNotesOff() noexcept
+{
+    if (anyNotesOff.load (std::memory_order_relaxed))
+    {
+        notesOffRequests.fetch_add (1, std::memory_order_release);
+        notify();
+    }
+}
+
+void MidiSyncIo::sendTransportNotesOff()
+{
+    const auto requested = notesOffRequests.load (std::memory_order_acquire);
+    if (requested == notesOffHandled)
+        return;
+    notesOffHandled = requested;
+    const juce::ScopedLock lock (outputLock);
+    for (auto& s : slots)
+        if (s.notesOff && (s.device != nullptr || dry.load (std::memory_order_relaxed)))
+        {
+            if (s.device != nullptr)
+            {
+                std::array<std::uint8_t, 48> bytes {};
+                midisync::transportNotesOff (bytes);
+                for (int ch = 0; ch < 16; ++ch)
+                    s.device->sendMessageNow (juce::MidiMessage (bytes.data() + ch * 3, 3));
+            }
+            transportNotesOffCount.fetch_add (1, std::memory_order_relaxed);
+        }
 }
 
 void MidiSyncIo::deviceStarted (double rate, int bufferSize, int outputLatencySamples) noexcept
@@ -244,6 +276,7 @@ void MidiSyncIo::run()
     std::array<std::deque<Timed>, maxOutputs> pending;
     while (! threadShouldExit())
     {
+        sendTransportNotesOff();
         auto any = false;
         for (int i = 0; i < maxOutputs; ++i)
         {
@@ -255,7 +288,7 @@ void MidiSyncIo::run()
         if (! any)
         {
             if (! anySync.load())
-                wait (50);
+                wait (20); // (requestTransportNotesOff wakes it)
             else
                 std::this_thread::sleep_for (std::chrono::microseconds (500));
             continue;
@@ -384,6 +417,22 @@ juce::String MidiSyncIo::selfTest (const juce::String& outputName, const juce::S
             report << "loopback bpm=" << bpm << " received=" << juce::String (r.bpm(), 3) << " error=" << juce::String (r.bpm() - bpm, 3)
                    << " position error ticks=" << juce::String (positionError, 2) << " running=" << (r.running() ? 1 : 0) << "\n";
         }
+    }
+
+    // 1b. "Reset plugins on transport": a position change sends the CC 123 burst through the sender thread
+    {
+        MidiSyncIo off;
+        prefs::MidiPrefs p;
+        prefs::MidiOutputPrefs o;
+        o.name = "(dry run)";
+        o.allNotesOff = true;
+        p.setOutput (o);
+        off.configure (p, false, true);
+        off.requestTransportNotesOff();
+        for (int i = 0; i < 200 && off.transportNotesOffSent() == 0; ++i)
+            std::this_thread::sleep_for (std::chrono::milliseconds (1));
+        std::this_thread::sleep_for (std::chrono::milliseconds (50));
+        report << "transport notes off: bursts=" << (juce::int64) off.transportNotesOffSent() << " (expected 1)\n";
     }
 
     // 2. the sender thread at real time

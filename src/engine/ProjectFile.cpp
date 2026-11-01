@@ -3,6 +3,7 @@
 #include "core/MixerOps.h"
 
 #include <algorithm>
+#include <tuple>
 #include <cmath>
 
 #include "core/Effects.h"
@@ -122,6 +123,8 @@ const char* instrumentId (InstrumentKind k)
         case InstrumentKind::voltage: return "voltage";
         case InstrumentKind::vfx: return "vfx";
         case InstrumentKind::videoplayer: return "videoplayer";
+        case InstrumentKind::keplerExo: return "keplerexo";
+        case InstrumentKind::wavetraveller: return "wavetraveller";
     }
     return "synth";
 }
@@ -136,7 +139,7 @@ InstrumentKind instrumentFromId (const juce::String& id)
                     InstrumentKind::fruitkick, InstrumentKind::bassdrum, InstrumentKind::toxic,
                     InstrumentKind::threeosc, InstrumentKind::autogun, InstrumentKind::transistorbass,
                     InstrumentKind::simsynth, InstrumentKind::wasp, InstrumentKind::plucked, InstrumentKind::beepmap, InstrumentKind::sawer, InstrumentKind::flkeys,
-                    InstrumentKind::granulizer, InstrumentKind::drumaxx, InstrumentKind::slayer, InstrumentKind::fruitydance, InstrumentKind::directwave, InstrumentKind::midiOut, InstrumentKind::patcher, InstrumentKind::soundfont, InstrumentKind::layer, InstrumentKind::dashboard, InstrumentKind::voltage, InstrumentKind::vfx, InstrumentKind::videoplayer })
+                    InstrumentKind::granulizer, InstrumentKind::drumaxx, InstrumentKind::slayer, InstrumentKind::fruitydance, InstrumentKind::directwave, InstrumentKind::midiOut, InstrumentKind::patcher, InstrumentKind::soundfont, InstrumentKind::layer, InstrumentKind::dashboard, InstrumentKind::voltage, InstrumentKind::vfx, InstrumentKind::videoplayer, InstrumentKind::keplerExo, InstrumentKind::wavetraveller })
         if (id == instrumentId (k))
             return k;
 
@@ -243,6 +246,7 @@ const char* effectId (EffectKind k)
         case EffectKind::formulaController: return "formulaController";
         case EffectKind::voiceShift: return "voiceShift";
         case EffectKind::emphasizer: return "emphasizer";
+        case EffectKind::flEmphasis: return "flEmphasis";
         case EffectKind::flFrequencyShifter: return "flFrequencyShifter";
         case EffectKind::flLowLifter: return "flLowLifter";
         case EffectKind::flPhaseInverter: return "flPhaseInverter";
@@ -566,6 +570,141 @@ PatcherDoc patcherFromVar (const juce::var& v, const Song& song)
     return doc;
 }
 
+namespace
+{
+// Round 167a: Fruity Send's "Send to" is normalised over 0..500 inserts since round 166d; older LYNX versions read it
+// over 0..127. A file stores every "Send to" value of a slot (its parameter, its A/B other side, the automation clips
+// and event lanes that move it) over 0..127 when all of them target an insert up to 127 — older versions then read the
+// same insert — and over today's span only when one of them needs more. "sendSpan" says which, on the slot and on each
+// automation / lane of it.
+double rounded4 (float v) { return juce::roundToInt (v * 10000.0f) / 10000.0; }
+
+// value [1] of every [tick, value, ...] entry, written over `span`
+void rewriteSendValues (juce::var& list, int span)
+{
+    if (auto* entries = list.getArray())
+        for (auto& entry : *entries)
+            if (auto* e = entry.getArray(); e != nullptr && e->size() >= 2)
+                e->set (1, rounded4 (flbasic::sendTrackValueInSpan ((float) (double) (*e)[1], span)));
+}
+
+// the event lanes of a pattern that toJson writes, in its order
+std::vector<const PatternEvents*> savedLanes (const Pattern& p)
+{
+    std::vector<const PatternEvents*> lanes;
+    for (const auto& lane : p.events)
+        if (! lane.events.empty() && lane.target.kind != AutomationTargetKind::none)
+            lanes.push_back (&lane);
+    return lanes;
+}
+
+void storeSendSpans (const Song& song, juce::DynamicObject& root)
+{
+    auto* mixer = root.getProperty ("mixer").getArray();
+    auto* automations = root.getProperty ("automations").getArray();
+    auto* patterns = root.getProperty ("patterns").getArray();
+    if (mixer == nullptr)
+        return;
+    for (int t = 0; t < (int) song.mixer.size() && t < mixer->size(); ++t)
+    {
+        auto* effects = (*mixer)[t]["effects"].getArray();
+        for (int s = 0; effects != nullptr && s < (int) song.mixer[(std::size_t) t].effects.size() && s < effects->size(); ++s)
+        {
+            const auto& slot = song.mixer[(std::size_t) t].effects[(std::size_t) s];
+            if (slot.kind != EffectKind::fruitySend)
+                continue;
+            const AutomationTarget target { AutomationTargetKind::effectParam, t, s, 3 };
+            const auto span = flbasic::saveSendSpanOf (song, t, s);
+
+            auto* fx = (*effects)[s].getDynamicObject();
+            if (fx == nullptr)
+                continue;
+            fx->setProperty ("sendSpan", span);
+            if (span == maxMixerTracks - 1)
+                continue;
+            if (auto* params = fx->getProperty ("params").getArray(); params != nullptr && params->size() > 3)
+                params->set (3, rounded4 (flbasic::sendTrackValueInSpan (slot.params[3], span)));
+            if (auto* other = fx->getProperty ("abOther").getArray(); other != nullptr && other->size() > 3 && slot.abOther.size() > 3)
+                other->set (3, rounded4 (flbasic::sendTrackValueInSpan (slot.abOther[3], span)));
+            for (int i = 0; automations != nullptr && i < (int) song.automations.size() && i < automations->size(); ++i)
+                if (song.automations[(std::size_t) i].target == target)
+                    if (auto* o = (*automations)[i].getDynamicObject())
+                    {
+                        o->setProperty ("sendSpan", span);
+                        auto points = o->getProperty ("points");
+                        rewriteSendValues (points, span);
+                    }
+            for (int pi = 0; patterns != nullptr && pi < (int) song.patterns.size() && pi < patterns->size(); ++pi)
+            {
+                const auto lanes = savedLanes (song.patterns[(std::size_t) pi]);
+                auto* saved = (*patterns)[pi]["events"].getArray();
+                for (int li = 0; saved != nullptr && li < (int) lanes.size() && li < saved->size(); ++li)
+                    if (lanes[(std::size_t) li]->target == target)
+                        if (auto* o = (*saved)[li].getDynamicObject())
+                        {
+                            o->setProperty ("sendSpan", span);
+                            auto events = o->getProperty ("events");
+                            rewriteSendValues (events, span);
+                        }
+            }
+        }
+    }
+}
+
+// Loading: the automations and lanes of a Send's "Send to" come back to today's span. Their own "sendSpan" when they
+// have one; written by 0.1.21 (none of their own), the slot's; older files: 0..127.
+void readSendSpans (Song& song, const juce::var& root)
+{
+    const auto spanOf = [&] (const AutomationTarget& t, const juce::var& holder) {
+        if (holder.hasProperty ("sendSpan"))
+            return (int) holder["sendSpan"];
+        const auto fx = root["mixer"][t.index]["effects"][t.slot];
+        return (int) fx.getProperty ("sendSpan", flbasic::legacySendSpan);
+    };
+    if (auto* automations = root["automations"].getArray())
+        for (int i = 0; i < (int) song.automations.size() && i < automations->size(); ++i)
+        {
+            auto& a = song.automations[(std::size_t) i];
+            if (flbasic::sendToTargetOf (song, a.target) == nullptr)
+                continue;
+            const auto span = spanOf (a.target, (*automations)[i]);
+            for (auto& pt : a.points)
+                pt.value = flbasic::rescaleSendTrackValue (pt.value, span);
+        }
+    if (auto* patterns = root["patterns"].getArray())
+        for (int pi = 0; pi < (int) song.patterns.size() && pi < patterns->size(); ++pi)
+        {
+            auto& p = song.patterns[(std::size_t) pi];
+            const auto* saved = (*patterns)[pi]["events"].getArray();
+            if (saved == nullptr)
+                continue;
+            // the lanes kept at load, in file order (see the loader: a target and at least one event)
+            int li = 0;
+            for (auto& lane : p.events)
+            {
+                while (li < saved->size())
+                {
+                    const auto& l = (*saved)[li];
+                    const auto& t = l["target"];
+                    const auto* ev = l["events"].getArray();
+                    if (t.isArray() && t.size() == 4 && ev != nullptr && ! ev->isEmpty())
+                        break;
+                    ++li;
+                }
+                if (li >= saved->size())
+                    break;
+                if (flbasic::sendToTargetOf (song, lane.target) != nullptr)
+                {
+                    const auto span = spanOf (lane.target, (*saved)[li]);
+                    for (auto& e : lane.events)
+                        e.value = flbasic::rescaleSendTrackValue (e.value, span);
+                }
+                ++li;
+            }
+        }
+}
+} // namespace
+
 juce::var effectToVar (const EffectSlot& slot)
 {
     auto e = std::make_unique<juce::DynamicObject>();
@@ -589,6 +728,10 @@ juce::var effectToVar (const EffectSlot& slot)
         e->setProperty ("sidechain", slot.sidechain);
     if (slot.sidechain2 >= 0)
         e->setProperty ("sidechain2", slot.sidechain2);
+    if (slot.sendTracks[0] > 0) // a Transmitter's transient / sustain sends (round 167b)
+        e->setProperty ("sendTransient", slot.sendTracks[0]);
+    if (slot.sendTracks[1] > 0)
+        e->setProperty ("sendSustain", slot.sendTracks[1]);
     if (! slot.state.empty()) // FL's raw state of an exact effect (Vocodex), base64
         e->setProperty ("state", juce::Base64::toBase64 (slot.state.data(), slot.state.size()));
     if (! slot.samplePath.empty()) // Newtone / Newtime source sample
@@ -678,6 +821,8 @@ std::optional<EffectSlot> effectFromVar (const juce::var& e)
         slot.substituteFor = pluginFromVar (e["substituteFor"]);
     slot.sidechain = juce::jlimit (-1, maxMixerTracks - 1, (int) e.getProperty ("sidechain", -1));
     slot.sidechain2 = juce::jlimit (-1, maxMixerTracks - 1, (int) e.getProperty ("sidechain2", -1));
+    slot.sendTracks[0] = juce::jlimit (0, maxMixerTracks - 1, (int) e.getProperty ("sendTransient", 0));
+    slot.sendTracks[1] = juce::jlimit (0, maxMixerTracks - 1, (int) e.getProperty ("sendSustain", 0));
     slot.samplePath = e.getProperty ("sample", "").toString().toStdString();
     slot.presetName = e.getProperty ("preset", "").toString().toStdString();
     if (auto* other = e["abOther"].getArray())
@@ -748,7 +893,7 @@ std::optional<EffectKind> effectFromId (const juce::String& id)
                     EffectKind::flPhaseInverter, EffectKind::flCenter, EffectKind::flBassBoost, EffectKind::fl7BandEq, EffectKind::flDelay1,
                     EffectKind::xyController, EffectKind::xyzController, EffectKind::controlSurface, EffectKind::hardwareInsert,
                     EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook,
-                    EffectKind::scratcher, EffectKind::transmitter, EffectKind::flTransporter })
+                    EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis, EffectKind::flTransporter })
         if (id == effectId (k))
             return k;
 
@@ -794,10 +939,15 @@ juce::var clipsToVar (const std::vector<Clip>& list)
                                       (juce::int64) c.offset, (int) c.kind,
                                       c.kind == ClipKind::automation ? c.automation : c.channel };
 
-        // [.., fade-in, fade-out, gain, muted, sub-tick offset] only when not default
+        // [.., fade-in, fade-out, gain, muted, sub-tick offset, pan, pitch, reversed, stretch] up to the last value that
+        // is not the default (round 167k: FL 2026's clip pitch and clip reverse, keys 7/8/9; 167l: the clip stretch)
         const auto fraction = juce::roundToInt (c.offsetFraction * 10000.0f) / 10000.0;
         const auto pan = juce::roundToInt (c.pan * 1000.0f) / 1000.0;
-        if (c.fadeIn > 0 || c.fadeOut > 0 || c.gain != 1.0f || c.muted || fraction != 0.0 || pan != 0.0)
+        const auto pitch = juce::roundToInt (c.pitch * 1000.0f) / 1000.0;
+        const auto stretch = std::round (c.stretch * 1.0e6) / 1.0e6;
+        const int used = stretch != 1.0 ? 9 : c.reversed ? 8 : pitch != 0.0 ? 7 : pan != 0.0 ? 6 : fraction != 0.0 ? 5 : c.muted ? 4
+                       : (c.fadeIn > 0 || c.fadeOut > 0 || c.gain != 1.0f) ? 3 : 0;
+        if (used > 0)
         {
             clip.add ((juce::int64) c.fadeIn);
             clip.add ((juce::int64) c.fadeOut);
@@ -808,12 +958,18 @@ juce::var clipsToVar (const std::vector<Clip>& list)
                 const auto scale = std::pow (10.0, 5.0 - std::floor (std::log10 (g)));
                 return std::round (g * scale) / scale;
             }());
-            if (c.muted || fraction != 0.0 || pan != 0.0)
+            if (used >= 4)
                 clip.add (c.muted);
-            if (fraction != 0.0 || pan != 0.0)
+            if (used >= 5)
                 clip.add (fraction);
-            if (pan != 0.0)
-                clip.add (pan); // [.., sub-tick offset, pan]
+            if (used >= 6)
+                clip.add (pan);
+            if (used >= 7)
+                clip.add (pitch);
+            if (used >= 8)
+                clip.add (c.reversed);
+            if (used >= 9)
+                clip.add (stretch);
         }
 
         clips.add (clip);
@@ -848,6 +1004,9 @@ std::vector<Clip> clipsFromVar (const juce::var& v, const Song& song)
                 clip.muted = c.size() >= 11 && (bool) c[10];
                 clip.offsetFraction = c.size() >= 12 ? juce::jlimit (-0.5f, 0.5f, (float) (double) c[11]) : 0.0f;
                 clip.pan = c.size() >= 13 ? juce::jlimit (-1.0f, 1.0f, (float) (double) c[12]) : 0.0f;
+                clip.pitch = c.size() >= 14 ? juce::jlimit (-12.0f, 12.0f, (float) (double) c[13]) : 0.0f;
+                clip.reversed = c.size() >= 15 && (bool) c[14];
+                clip.stretch = c.size() >= 16 ? juce::jlimit (0.01, 100.0, (double) c[15]) : 1.0;
             }
 
             if (c.size() >= 7 && (int) c[5] == 2)
@@ -883,6 +1042,8 @@ juce::var channelToVar (const ChannelDef& c)
     o->setProperty ("muted", c.muted);
     if (c.ghostHidden)
         o->setProperty ("ghostHidden", true);
+    if (c.soloLock)
+        o->setProperty ("soloLock", true);
 
     if (! c.samplePath.empty())
         o->setProperty ("sample", str (c.samplePath));
@@ -1064,6 +1225,8 @@ juce::var channelToVar (const ChannelDef& c)
         if (c.sampler.stretchMethod != StretchMethod::general)
             sampler->setProperty ("stretchMethod", (int) c.sampler.stretchMethod);
         sampler->setProperty ("region", juce::Array<juce::var> { c.sampler.regionStart, c.sampler.regionEnd });
+        if (c.sampler.startOffset > 0.0f)
+            sampler->setProperty ("startOffset", c.sampler.startOffset);
 
         if (! c.sampler.slices.empty())
         {
@@ -1081,6 +1244,33 @@ juce::var channelToVar (const ChannelDef& c)
         sampler->setProperty ("filter", juce::Array<juce::var> { c.sampler.cutoff, c.sampler.resonance, c.sampler.filterType });
         if (c.sampler.gainDb != 0.0f)
             sampler->setProperty ("gainDb", c.sampler.gainDb);
+        // FL's precomputed effects, loop flag and declicking mode (round 167h)
+        if (const auto& p = c.sampler.precompute; p.any())
+        {
+            auto pre = std::make_unique<juce::DynamicObject>();
+            for (auto [name, on] : { std::pair { "removeDc", p.removeDc }, { "normalize", p.normalize }, { "reversePolarity", p.reversePolarity },
+                                     { "fadeStereo", p.fadeStereo }, { "swapStereo", p.swapStereo }, { "pingPong", p.pingPong } })
+                if (on)
+                    pre->setProperty (name, true);
+            for (auto [name, v] : { std::pair { "fadeIn", p.fadeIn }, { "fadeOut", p.fadeOut }, { "crossfade", p.crossfade }, { "trim", p.trim } })
+                if (v != 0)
+                    pre->setProperty (name, v);
+            // the legacy effects (round 167l), only when not FL's default
+            const SamplePrecompute none;
+            for (auto [name, v, d] : { std::tuple { "boost", p.boost, none.boost }, { "eq", p.eq, none.eq }, { "ringMix", p.ringMix, none.ringMix },
+                                       { "ringFreq", p.ringFreq, none.ringFreq }, { "stereoDelay", p.stereoDelay, none.stereoDelay },
+                                       { "cutoff", p.cutoff, none.cutoff }, { "resonance", p.resonance, none.resonance },
+                                       { "reverb", p.reverb, none.reverb }, { "reverbType", p.reverbType, none.reverbType }, { "pogo", p.pogo, none.pogo } })
+                if (v != d)
+                    pre->setProperty (name, v);
+            if (p.clip)
+                pre->setProperty ("clip", true);
+            sampler->setProperty ("precomputed", juce::var (pre.release()));
+        }
+        if (! c.sampler.useLoopPoints)
+            sampler->setProperty ("useLoopPoints", false);
+        if (c.sampler.declickMode != 0)
+            sampler->setProperty ("declickMode", c.sampler.declickMode);
         if (! c.sampler.flVolumeEnvelope.empty())
         {
             juce::Array<juce::var> env;
@@ -1117,6 +1307,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
     def.pan = juce::jlimit (-1.0f, 1.0f, (float) c.getProperty ("pan", 0.0));
     def.muted = (bool) c.getProperty ("muted", false);
     def.ghostHidden = (bool) c.getProperty ("ghostHidden", false);
+    def.soloLock = (bool) c.getProperty ("soloLock", false);
     def.samplePath = c["sample"].toString().toStdString();
 
     {
@@ -1348,11 +1539,39 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
             def.sampler.regionStart = juce::jlimit (0.0f, 1.0f, (float) (double) region[0]);
             def.sampler.regionEnd = juce::jlimit (0.0f, 1.0f, (float) (double) region[1]);
         }
+        def.sampler.startOffset = juce::jlimit (0.0f, 1.0f, (float) (double) s.getProperty ("startOffset", 0.0));
         def.sampler.reverse = (bool) s.getProperty ("reverse", false);
         def.sampler.cut = (bool) s.getProperty ("cut", false);
         def.sampler.porta = (bool) s.getProperty ("porta", false);
         def.sampler.portaBeats = juce::jlimit (0.0f, 8.0f, (float) (double) s.getProperty ("portaTime", (double) SamplerSettings {}.portaBeats));
         def.sampler.gainDb = juce::jlimit (-24.0f, 24.0f, (float) (double) s.getProperty ("gainDb", 0.0));
+        if (const auto& pre = s["precomputed"]; pre.isObject())
+        {
+            auto& p = def.sampler.precompute;
+            p.removeDc = (bool) pre.getProperty ("removeDc", false);
+            p.normalize = (bool) pre.getProperty ("normalize", false);
+            p.reversePolarity = (bool) pre.getProperty ("reversePolarity", false);
+            p.fadeStereo = (bool) pre.getProperty ("fadeStereo", false);
+            p.swapStereo = (bool) pre.getProperty ("swapStereo", false);
+            p.pingPong = (bool) pre.getProperty ("pingPong", false);
+            p.fadeIn = juce::jlimit (0, 1024, (int) pre.getProperty ("fadeIn", 0));
+            p.fadeOut = juce::jlimit (0, 1024, (int) pre.getProperty ("fadeOut", 0));
+            p.crossfade = juce::jlimit (0, 2048, (int) pre.getProperty ("crossfade", 0));
+            p.trim = juce::jlimit (0, 32768, (int) pre.getProperty ("trim", 0));
+            p.boost = juce::jlimit (0, 256, (int) pre.getProperty ("boost", 0));
+            p.eq = juce::jlimit (0, 256, (int) pre.getProperty ("eq", 128));
+            p.ringMix = juce::jlimit (0, 256, (int) pre.getProperty ("ringMix", 0));
+            p.ringFreq = juce::jlimit (0, 256, (int) pre.getProperty ("ringFreq", 128));
+            p.stereoDelay = juce::jlimit (0, 4096, (int) pre.getProperty ("stereoDelay", 2048));
+            p.cutoff = juce::jlimit (16, 1024, (int) pre.getProperty ("cutoff", 1024));
+            p.resonance = juce::jlimit (0, 640, (int) pre.getProperty ("resonance", 0));
+            p.reverb = juce::jlimit (0, 256, (int) pre.getProperty ("reverb", 0));
+            p.reverbType = (int) pre.getProperty ("reverbType", 1) == 0 ? 0 : 1;
+            p.pogo = juce::jlimit (0, 512, (int) pre.getProperty ("pogo", 256));
+            p.clip = (bool) pre.getProperty ("clip", false);
+        }
+        def.sampler.useLoopPoints = (bool) s.getProperty ("useLoopPoints", true);
+        def.sampler.declickMode = juce::jlimit (0, 5, (int) s.getProperty ("declickMode", 0));
 
         if (auto* env = s["flVolumeEnvelope"].getArray(); env != nullptr && env->size() == 18)
             for (const auto& v : *env)
@@ -1388,6 +1607,8 @@ juce::var mixerTrackToVar (const MixerTrack& t)
     o->setProperty ("pan", t.pan);
     o->setProperty ("muted", t.muted);
     o->setProperty ("solo", t.solo);
+    if (! t.soloSources)
+        o->setProperty ("soloSources", false);
     if (! t.threaded)
         o->setProperty ("threaded", false);
     if (t.separator)
@@ -1417,6 +1638,8 @@ juce::var mixerTrackToVar (const MixerTrack& t)
         o->setProperty ("monitor", (int) t.monitor);
     if (t.recordSafe)
         o->setProperty ("recordSafe", true);
+    if (! t.recordTo.empty())
+        o->setProperty ("recordTo", juce::String::fromUTF8 (t.recordTo.c_str()));
     if (t.latencyMs != 0.0f) // FL's manual track latency, ms (REA round 165f-mixer)
         o->setProperty ("latencyMs", juce::roundToInt (t.latencyMs * 1000.0f) / 1000.0);
     if (t.latencyBypass != LatencyBypass::never)
@@ -1462,6 +1685,7 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     track.pan = juce::jlimit (-1.0f, 1.0f, (float) t.getProperty ("pan", 0.0));
     track.muted = (bool) t.getProperty ("muted", false);
     track.solo = (bool) t.getProperty ("solo", false);
+    track.soloSources = (bool) t.getProperty ("soloSources", true);
     track.threaded = (bool) t.getProperty ("threaded", true);
     track.separator = (bool) t.getProperty ("separator", false);
     track.dock = t["dock"].toString() == "left" ? MixerDock::left : t["dock"].toString() == "right" ? MixerDock::right : MixerDock::middle;
@@ -1477,6 +1701,7 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     track.inputStereo = ! (bool) t.getProperty ("inputMono", false);
     track.monitor = (InputMonitor) juce::jlimit (0, 3, (int) t.getProperty ("monitor", (int) InputMonitor::automatic));
     track.recordSafe = (bool) t.getProperty ("recordSafe", false);
+    track.recordTo = t.getProperty ("recordTo", "").toString().toStdString();
     track.latencyMs = juce::jlimit (-maxTrackLatencyMs, maxTrackLatencyMs, (float) (double) t.getProperty ("latencyMs", 0.0));
     if (const auto bypass = t["latencyBypass"].toString(); bypass == "always")
         track.latencyBypass = LatencyBypass::always;
@@ -1543,6 +1768,12 @@ juce::String toJson (const Song& song)
         root->setProperty ("performanceMode", true);
     if (song.autoCrossfades)
         root->setProperty ("autoCrossfades", true);
+    if (song.playTruncatedNotes)
+        root->setProperty ("playTruncatedNotes", true);
+    if (song.fastDeclick)
+        root->setProperty ("fastDeclick", true);
+    if (song.panTriangular)
+        root->setProperty ("panLaw", "triangular");
     if (! song.info.empty())
     {
         auto info = std::make_unique<juce::DynamicObject>();
@@ -1557,6 +1788,10 @@ juce::String toJson (const Song& song)
         set ("comments", song.info.comments);
         if (song.info.showOnOpen)
             info->setProperty ("showOnOpen", true);
+        if (song.info.created > 0.0)
+            info->setProperty ("created", song.info.created);
+        if (song.info.workSeconds > 0.0)
+            info->setProperty ("workSeconds", song.info.workSeconds);
         root->setProperty ("info", juce::var (info.release()));
     }
     root->setProperty ("currentPattern", song.currentPattern);
@@ -1802,6 +2037,7 @@ juce::String toJson (const Song& song)
         mixer.add (mixerTrackToVar (t));
 
     root->setProperty ("mixer", mixer);
+    storeSendSpans (song, *root); // round 167a: "Send to" over 0..127 when it fits (older LYNX versions)
     root->setProperty ("mode", song.mode == PlayMode::song ? "song" : "pattern");
 
     if (song.hasLoop())
@@ -1845,6 +2081,9 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
     song.cleanMixer = (bool) root.getProperty ("cleanMixer", false);
     song.performanceMode = (bool) root.getProperty ("performanceMode", false);
     song.autoCrossfades = (bool) root.getProperty ("autoCrossfades", false);
+    song.playTruncatedNotes = (bool) root.getProperty ("playTruncatedNotes", false);
+    song.fastDeclick = (bool) root.getProperty ("fastDeclick", false);
+    song.panTriangular = root.getProperty ("panLaw", "circular").toString() == "triangular";
     if (const auto info = root.getProperty ("info", {}); info.isObject())
     {
         auto get = [&info] (const char* key) { return info.getProperty (key, {}).toString().toStdString(); };
@@ -1854,12 +2093,19 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
         song.info.url = get ("url");
         song.info.comments = get ("comments");
         song.info.showOnOpen = (bool) info.getProperty ("showOnOpen", false);
+        song.info.created = std::max (0.0, (double) info.getProperty ("created", 0.0));
+        song.info.workSeconds = std::max (0.0, (double) info.getProperty ("workSeconds", 0.0));
     }
     song.currentPattern = (int) root.getProperty ("currentPattern", 0);
 
     if (auto* channels = root["channels"].getArray())
         for (const auto& c : *channels)
             song.channels.push_back (channelFromVar (c, song));
+    // projects imported from FL before round 167j kept the triangular law only in their Sampler channels' snapshot
+    if (! root.hasProperty ("panLaw"))
+        for (const auto& c : song.channels)
+            if (c.sampler.flChannel.size() == 90 && c.sampler.flChannel[89] == 2)
+                song.panTriangular = true;
 
     if (auto* patterns = root["patterns"].getArray())
         for (const auto& p : *patterns)
@@ -2126,6 +2372,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
                                        [n = (int) song.mixer.size()] (const MixerSend& s) { return s.target <= 0 || s.target >= n; }),
                        t.sends.end());
 
+    readSendSpans (song, root); // round 167a: automations / lanes of Fruity Send's "Send to"
     song.currentPattern = juce::jlimit (0, (int) song.patterns.size() - 1, song.currentPattern);
     return song;
 }

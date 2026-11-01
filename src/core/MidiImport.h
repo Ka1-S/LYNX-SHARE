@@ -16,7 +16,7 @@ struct RawEvent
 {
     int track = 0;           // the file's track (0-based, every track of the file)
     std::int64_t tick = 0;   // LYNX ticks
-    std::uint8_t status = 0; // 0x80 note off, 0x90 note on, 0xB0 controller (low nibble = MIDI channel)
+    std::uint8_t status = 0; // 0x80 note off, 0x90 note on, 0xB0 controller, 0xC0 program, 0xE0 pitch bend (low nibble = MIDI channel)
     std::uint8_t data1 = 0, data2 = 0;
 };
 
@@ -57,6 +57,10 @@ struct Group
     int track = -1;          // per track: the file track; per channel: −1
     std::vector<Note> notes; // channel = 0
     std::vector<PatternEvent> controller; // the chosen controller's values (0..1)
+    // with a MIDI Out channel type (FL's import, REA_rodada167i §1.6): every lane FL imports — CC 7 / 10 as the
+    // channel's volume / pan, CC 1, 2, 4, 5, 91, 93, 64…69 onto the MIDI Out's knobs, program changes onto its patch,
+    // the pitch bend
+    std::vector<PatternEvents> midiOutLanes;
 };
 std::vector<Group> groups (const ParsedMidi& midi, const Options& options);
 

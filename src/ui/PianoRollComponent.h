@@ -181,7 +181,7 @@ private:
     float laneValue (const Note& n) const;          // 0..1 of the chosen property
     void setLaneValue (Note& n, float value) const; // inverse
     bool laneIsBipolar() const;
-    void toggleMute();
+    void setNotesMuted (bool mute); // the selection (or all notes)
     void togglePorta(); // porta notes glide from the previous note (toggles the channel's porta)
 
     void deleteSelection();

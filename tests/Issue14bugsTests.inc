@@ -126,7 +126,8 @@ TEST (issue14_pitch_audit_of_the_instruments)
     // the pitch of a guitar / string model and of drums can't be read by the autocorrelation estimate (Sakura: C4 reads as
     // 870 Hz and G4 lower than C4; Ogun's held C4 reads 2 octaves apart at 0.3 s and 1.0 s, its slide +726…+740 cents at
     // 0.6…0.65 s with LYNX_PITCH_TRACE; Drumpad doesn't follow the key)
-    const std::set<std::string> unreadable { "FL Slayer", "Fruity Granulizer", "Drumaxx", "Fruit Kick", "BassDrum", "Drumpad", "Sakura", "Ogun" };
+    // Wave Traveller plays the channel's sample (none here: silent, as FL) and its pitch changes the curve's speed (REA_rodada167f)
+    const std::set<std::string> unreadable { "FL Slayer", "Fruity Granulizer", "Wave Traveller", "Drumaxx", "Fruit Kick", "BassDrum", "Drumpad", "Sakura", "Ogun" };
     // Plucked! reads Final.Pitch only when a voice starts (REA_rodada65 §1.2: it sizes the delay line): FL can't glide it
     const std::set<std::string> noSlide { "Plucked!" };
     const auto fl = natives142::flAccess();

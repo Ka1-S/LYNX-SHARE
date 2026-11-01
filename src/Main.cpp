@@ -335,6 +335,18 @@ public:
             return;
         }
 
+        if (args.contains ("--bendrectest"))
+        {
+            // LYNX --bendrectest report.txt [song|pattern] (round 167a, issue #12): pitch bend recording end to end. A
+            // controller's pitch wheel is injected into LYNX's MIDI input (as a device would send it) while recording
+            // plays: a held note and a wheel sweep 0 → full up → full down → centre. The recorded lane (pattern mode) or
+            // automation clip (song mode) of the channel's pitch bend must follow the sweep.
+            const auto i = args.indexOf ("--bendrectest");
+            const auto songMode = args.size() > i + 2 && args[i + 2] == "song";
+            runBendRecordTest (juce::File (args[i + 1].unquoted()), songMode);
+            return;
+        }
+
         if (args.contains ("--rectest"))
         {
             // LYNX --rectest report.txt [seconds] [--type T] [--device D] [--input I] [--loop] [--buffer N]
@@ -805,6 +817,37 @@ public:
             // animates (demo signal) — round 122's check that an idle editor burns no CPU
             const auto i = args.indexOf ("--editorcpu");
             runEditorCpu (args[i + 1].unquoted());
+            return;
+        }
+
+        if (args.contains ("--precomputeshot"))
+        {
+            // LYNX.exe --precomputeshot project.(flp|lynx) <prefix>: round 167h — <prefix>-precompute.png (channel 1's
+            // Precomputed effects panel) and <prefix>-project.png (Options › Project with "Fast declick for cut groups")
+            const auto i = args.indexOf ("--precomputeshot");
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            lynx::AudioEngine shotEngine (false);
+            const juce::File input (args[i + 1].unquoted());
+            const auto prefix = args[i + 2].unquoted();
+            juce::String error;
+            bool ok = false;
+            if (input.hasFileExtension ("flp"))
+                ok = shotEngine.importFlpFile (input, error);
+            else if (auto song = lynx::ProjectFile::load (input, error))
+                shotEngine.setSong (std::move (*song)), ok = true;
+            shotEngine.dispatchPendingMessages();
+            auto shoot = [&] (std::unique_ptr<juce::Component> c, const juce::String& name) {
+                if (c == nullptr)
+                    return false;
+                if (c->getWidth() <= 0)
+                    c->setSize (520, 600);
+                savePng (c->createComponentSnapshot (c->getLocalBounds()), prefix + name);
+                return true;
+            };
+            ok = ok && shoot (lynx::makeChannelPrecomputePanel (shotEngine, 0), "-precompute.png");
+            ok = ok && shoot (lynx::makeSettingsPanel (shotEngine, lynx::SettingsPage::project), "-project.png");
+            setApplicationReturnValue (ok ? 0 : 1);
+            quit();
             return;
         }
 
@@ -1872,22 +1915,47 @@ private:
             }
             if (! back)
                 nativesResult = "ERROR " + error;
-            // each instrument plays a note alone (the granulizer needs a sample: it is silent here)
+            // each instrument plays a note alone. The Granulizer and Wave Traveller play the channel's sample, and a new
+            // one has none (a PC without FL Studio, macOS / Linux: FL's presets are not there either), so they get a
+            // generated one: a second of a 220 Hz tone (round 167m, PR #19: Wave Traveller was "SILENT 1" on macOS)
+            const auto toneWav = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-selftest-natives.wav");
+            {
+                juce::WavAudioFormat format;
+                juce::AudioBuffer<float> tone (1, 48000);
+                for (int i = 0; i < 48000; ++i)
+                    tone.setSample (0, i, 0.5f * std::sin (juce::MathConstants<float>::twoPi * 220.0f * (float) i / 48000.0f));
+                toneWav.deleteFile();
+                std::unique_ptr<juce::OutputStream> out (toneWav.createOutputStream().release());
+                if (auto* w = format.createWriterFor (out.get(), 48000.0, 1, 16, {}, 0))
+                {
+                    out.release();
+                    std::unique_ptr<juce::AudioFormatWriter> writer (w);
+                    writer->writeFromAudioSampleBuffer (tone, 0, 48000);
+                }
+            }
+            juce::StringArray silentNames;
             for (std::size_t i = 0; same && i < song.channels.size(); ++i)
             {
                 auto one = song;
                 one.channels = { song.channels[i] };
                 one.channels[0].mixerTrack = 1;
+                const auto kind = song.channels[i].instrument;
+                if ((kind == lynx::InstrumentKind::granulizer || kind == lynx::InstrumentKind::wavetraveller) && one.channels[0].samplePath.empty())
+                    one.channels[0].samplePath = toneWav.getFullPathName().toStdString();
                 one.mixer[2].effects.clear();
                 one.patterns[0].notes = { { 0, 1920, 0, song.channels[i].instrument == lynx::InstrumentKind::drumaxx ? 48 : 60, 0.8f } };
                 lynx::AudioEngine player (false);
                 player.setSong (std::move (one));
                 player.dispatchPendingMessages();
-                if (! (player.renderOffline (1.0, 48000.0) > 1.0e-4f) && song.channels[i].instrument != lynx::InstrumentKind::granulizer)
+                if (! (player.renderOffline (1.0, 48000.0) > 1.0e-4f))
+                {
                     ++nativesSilent;
+                    silentNames.add (juce::String::fromUTF8 (song.channels[i].name.c_str()));
+                }
             }
+            toneWav.deleteFile();
             if (nativesSilent > 0 && nativesResult == "OK")
-                nativesResult = "SILENT " + juce::String (nativesSilent);
+                nativesResult = "SILENT " + juce::String (nativesSilent) + " [" + silentNames.joinIntoString (", ") + "]";
         }
         const auto nativesOk = nativesResult == "OK";
 
@@ -3902,6 +3970,118 @@ private:
         });
     }
 
+    // --bendrectest (round 167a): see the command line above
+    void runBendRecordTest (const juce::File& report, bool songMode)
+    {
+        engine = std::make_unique<lynx::AudioEngine>();
+        auto text = std::make_shared<juce::String>();
+        auto step = [report, text] (const juce::String& line) { *text << line << "\n"; report.replaceWithText (*text); };
+        auto finish = [this] (int code) {
+            setApplicationReturnValue (code);
+            quit();
+        };
+        auto* device = engine->getDeviceManager().getCurrentAudioDevice();
+        if (device == nullptr)
+        {
+            step ("result=ERROR no audio device");
+            finish (1);
+            return;
+        }
+        step ("device=" + device->getTypeName() + " | " + device->getName() + " | mode " + (songMode ? "song" : "pattern"));
+        auto song = lynx::Song::makeDefault();
+        song.bpm = 120.0;
+        song.mode = songMode ? lynx::PlayMode::song : lynx::PlayMode::pattern;
+        engine->setSong (std::move (song));
+        auto o = engine->getRecordOptions();
+        o.recordNotes = true;
+        o.recordAutomation = true;
+        o.countInBars = 0;
+        o.waitForInput = false;
+        o.quantiseAutomation = false;
+        o.punchLoopRegion = false;
+        o.preRollBars = o.postRollBars = 0;
+        engine->setRecordOptions (o);
+        engine->stop();
+        engine->rewind();
+        engine->setRecording (true);
+        engine->startPlayback();
+        // 2 s of wheel at ~100 messages a second: 0 → +1 (0.5 s), +1 → −1 (1 s), −1 → 0 (0.5 s)
+        auto sent = std::make_shared<std::vector<std::pair<double, float>>>();
+        auto t0 = std::make_shared<double> (juce::Time::getMillisecondCounterHiRes());
+        engine->injectMidiInput (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100));
+        auto tick = std::make_shared<std::function<void()>>();
+        *tick = [this, sent, t0, tick, step, finish, songMode] {
+            if (engine == nullptr)
+                return;
+            const auto ms = juce::Time::getMillisecondCounterHiRes() - *t0;
+            if (ms < 2000.0)
+            {
+                const auto x = ms / 1000.0;
+                const auto v = (float) (x < 0.5 ? x * 2.0 : x < 1.5 ? 1.0 - (x - 0.5) * 2.0 : -1.0 + (x - 1.5) * 2.0);
+                const auto wheel = juce::jlimit (0, 16383, 8192 + juce::roundToInt (v * 8191.0f));
+                engine->injectMidiInput (juce::MidiMessage::pitchWheel (1, wheel));
+                sent->push_back ({ ms, (float) (wheel - 8192) / 8192.0f });
+                juce::Timer::callAfterDelay (10, *tick);
+                return;
+            }
+            engine->injectMidiInput (juce::MidiMessage::pitchWheel (1, 8192));
+            engine->injectMidiInput (juce::MidiMessage::noteOff (1, 60));
+            juce::Timer::callAfterDelay (400, [this, sent, step, finish, songMode] {
+                if (engine == nullptr)
+                    return;
+                engine->stop();
+                juce::Timer::callAfterDelay (600, [this, sent, step, finish, songMode] {
+                    if (engine == nullptr)
+                        return;
+                    engine->setRecording (false);
+                    const auto& s = engine->getSong();
+                    // the channel's pitch bend (MIDI channel 1), recorded as a lane or a clip
+                    std::vector<std::pair<std::int64_t, float>> got;
+                    juce::String where = "nothing";
+                    for (const auto& a : s.automations)
+                        if (a.target.kind == lynx::AutomationTargetKind::channelParam && lynx::midictl::isPitchBend (a.target.param))
+                        {
+                            where = "automation clip \"" + juce::String (a.name) + "\"";
+                            for (const auto& pt : a.points)
+                                got.push_back ({ pt.tick, pt.value });
+                        }
+                    for (const auto& p : s.patterns)
+                        for (const auto& lane : p.events)
+                            if (lane.target.kind == lynx::AutomationTargetKind::channelParam && lynx::midictl::isPitchBend (lane.target.param))
+                            {
+                                where = "pattern \"" + juce::String (p.name) + "\" event lane";
+                                for (const auto& e : lane.events)
+                                    got.push_back ({ e.tick, e.value });
+                            }
+                    int notes = 0;
+                    for (const auto& p : s.patterns)
+                        notes += (int) p.notes.size();
+                    float lo = 1.0f, hi = 0.0f;
+                    for (const auto& [t, v] : got)
+                        lo = std::min (lo, v), hi = std::max (hi, v);
+                    // ticks: in order, spread over the ~2 s sweep (8 beats of 96 ticks at 120 bpm ≈ 4 beats)
+                    const auto span = got.empty() ? 0 : got.back().first - got.front().first;
+                    const auto sorted = std::is_sorted (got.begin(), got.end(), [] (const auto& a, const auto& b) { return a.first < b.first; });
+                    step ("sent=" + juce::String ((int) sent->size()) + " wheel messages over 2 s");
+                    step ("recorded=" + juce::String ((int) got.size()) + " points in " + where + ", value " + juce::String (lo, 3) + " .. "
+                          + juce::String (hi, 3) + " (0.5 = centre), ticks " + juce::String (span) + " apart, " + (sorted ? "in order" : "OUT OF ORDER")
+                          + ", notes " + juce::String (notes));
+                    if (! got.empty())
+                        step ("last=" + juce::String (got.back().second, 3));
+                    // song mode: a clip over the take, ending back at the centre. Pattern mode: the take loops the 1-bar pattern
+                    // (4.6 beats of take), so the lane spans the bar and the last wheel message (the centre) lands inside it
+                    const auto centred = std::any_of (got.begin(), got.end(), [] (const auto& p) { return std::abs (p.second - 0.5f) < 0.02f; });
+                    const auto ok = got.size() >= 20 && hi > 0.97f && lo < 0.03f && sorted && notes >= 1
+                                    && (songMode ? span > lynx::ppq * 3 && span < lynx::ppq * 6 && std::abs (got.back().second - 0.5f) < 0.02f
+                                                 : span > lynx::ppq * 2 && span <= lynx::ppq * 4 && centred);
+                    step (ok ? "result=OK" : "result=FAILED");
+                    finish (ok ? 0 : 1);
+                });
+            });
+        };
+        juce::Timer::callAfterDelay (300, *tick);
+    }
+
     // --rectest (round 163): see the command line above. Writes report lines step by step (a driver that ends the
     // process leaves what was done).
     void runRecordTest (const juce::File& report, double seconds, const juce::String& deviceType, const juce::String& deviceName,
@@ -4722,6 +4902,9 @@ private:
                 const auto loaded = juce::Time::getMillisecondCounterHiRes();
                 // .mp3: the Export window's MP3 (320 kbps); everything else as before
                 auto options = settings.toOptions();
+                // --save-tempo: FL's "Tempo information" (acid chunk) on (round 167l: compare with FL's AcidBox render; --export)
+                if (juce::JUCEApplication::getCommandLineParameters().contains ("--save-tempo"))
+                    options.saveTempo = true;
                 // --no-warmup: the export's plugin warm-up off (round 155: compare the start of the file)
                 if (juce::JUCEApplication::getCommandLineParameters().contains ("--no-warmup"))
                     options.pluginWarmUp = false;
@@ -4735,6 +4918,7 @@ private:
                     options.mp3Kbps = 320;
                 }
                 lynx::ExportJob job (insert > 0 ? lynx::makeBounceSong (loader.getSong(), insert) : loader.getSong(), options, output);
+                job.setExtraData (true);
                 const auto prepared = juce::Time::getMillisecondCounterHiRes();
                 lynx::loadtrace::end();
                 int lastPercent = -1;
@@ -6626,6 +6810,9 @@ private:
                                                      ui.getPlaylistForSnapshot().getTrackMenuForSnapshot (0),
                                                      ui.getMixerForSnapshot().getStripsForSnapshot().buildMenu (1) };
                 saveMenus (juce::StringArray { "Piano roll tools", "Playlist track", "Mixer track" }, menus, prefix + "-menus143.png");
+                // round 167l: the channel menu ("Lock active/mute state")
+                if (! offline.getSong().channels.empty())
+                    saveMenus (juce::StringArray { "Channel" }, std::vector<juce::PopupMenu> { ui.getRackForSnapshot().getChannelMenuForSnapshot (0) }, prefix + "-channel-menu.png");
                 // round 163: menu density, compact (default) and comfortable, on a Browser folder menu
                 {
                     juce::PopupMenu folder;

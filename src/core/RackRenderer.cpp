@@ -1,4 +1,5 @@
 #include "core/RackRenderer.h"
+#include "core/SamplePrecompute.h"
 #include "core/MetronomeVoice.h"
 
 #include "core/ChannelLoops.h"
@@ -11,6 +12,7 @@
 #include "core/Vfx.h"
 #include "core/FacetEq.h"
 #include "core/MidiControls.h"
+#include "core/MidiOut.h"
 #include "core/Patcher.h"
 #include "core/LoadTrace.h"
 #include "core/DynamicsSuite.h"
@@ -20,9 +22,11 @@
 #include "core/WorkerPool.h"
 #include "core/Denormals.h"
 #include "core/FlKeys.h"
+#include "core/FlVoiceProcessor.h"
 #include "core/DirectWave.h"
 #include "core/SoundFont.h"
 #include "core/NewtoneFx.h"
+#include "core/Dvs.h"
 #include "core/Scratcher.h"
 
 #include <algorithm>
@@ -187,12 +191,13 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
 
     std::shared_ptr<const SampleData> sample;
 
-    if ((kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip || kind == InstrumentKind::granulizer) && samples
+    if ((kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip || kind == InstrumentKind::granulizer
+         || kind == InstrumentKind::wavetraveller) && samples
         && ! channel.samplePath.empty())
         sample = samples (channel.samplePath);
 
     // pitch-preserving stretch: the sample comes already stretched to the current tempo
-    if (sample != nullptr && kind != InstrumentKind::granulizer && channel.sampler.keepPitch && channel.sampler.stretchBeats > 0.0f
+    if (sample != nullptr && kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller && channel.sampler.keepPitch && channel.sampler.stretchBeats > 0.0f
         && factories.stretchedSamples
         && sample->frames() > 0)
     {
@@ -203,10 +208,28 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
             sample = std::move (stretched);
     }
 
+    // FL's Sampler › Precomputed effects (REA_rodada167h §2): the played region, processed once
+    // Audio clips too (round 167k, FL render r167k/fl/clip/p_*: an audio clip channel's Normalize, Reverse polarity,
+    // Fade in / out play in FL); a clip plays the whole file, so the region stays whole there
+    if (sample != nullptr && kind == InstrumentKind::sampler && precompute::needed (channel.sampler))
+    {
+        if (auto processed = precompute::apply (*sample, channel.sampler))
+            sample = std::move (processed);
+    }
+    else if (sample != nullptr && kind == InstrumentKind::audioClip && channel.sampler.precompute.any())
+    {
+        auto whole = channel.sampler;
+        whole.regionStart = 0.0f;
+        whole.regionEnd = 1.0f;
+        if (auto processed = precompute::apply (*sample, whole))
+            sample = std::move (processed);
+    }
+
     const loadtrace::Scope timing ("rack_instruments");
     std::shared_ptr<Instrument> instrument = makeInstrument (kind, std::move (sample));
     instrument->prepare (sampleRate);
     instrument->configure (channel, bpm);
+    instrument->settleNew();
     if ((kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip) && channel.sampler.keepPitch)
     {
         if (deferKeyShift != nullptr)
@@ -244,6 +267,8 @@ std::shared_ptr<Effect> buildEffect (const EffectSlot& slot, double sampleRate, 
         // Fruity Scratcher: its turntable's sample, loaded off the audio thread (REA_rodada165g-flscratch165)
         effect = scratcher::make (factories.samples && ! slot.samplePath.empty() ? factories.samples (slot.samplePath) : nullptr);
         effect->prepare (sampleRate);
+        // its DVS position table (REA_rodada167c §1), built here so the audio thread finds it ready
+        dvs::warm (scratcher::timecodeOf (slot.params[scratcher::timecodeType]), true);
     }
     else
     {
@@ -278,6 +303,18 @@ patcher::Factories patcherFactories (double sampleRate, double bpm, const RackSt
         return buildInstrument (channel, sampleRate, bpm, factories);
     };
     return f;
+}
+
+// an audio clip channel that resamples but has a clip of its own pitch (FL 2026's keys 7/8): it needs the shifters
+bool clipShiftWanted (const Song& song, std::size_t channel)
+{
+    if (channel >= song.channels.size() || song.channels[channel].instrument != InstrumentKind::audioClip
+        || song.channels[channel].sampler.keepPitch)
+        return false;
+    for (const auto& c : song.playlist)
+        if (c.kind == ClipKind::audio && c.channel == (int) channel && c.pitch != 0.0f)
+            return true;
+    return false;
 }
 
 // The keep-pitch samplers' shifters, in parallel: each instrument only touches its own pool, and each shifter's
@@ -339,7 +376,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
 
         if (previous != nullptr && i < previous->song.channels.size() && i < previous->instruments.size()
             && previous->song.channels[i].instrument == kind && kind != InstrumentKind::patcher
-            && (kind != InstrumentKind::granulizer || previous->song.channels[i].samplePath == channel.samplePath)
+            && ((kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller)
+                || previous->song.channels[i].samplePath == channel.samplePath)
             && (kind != InstrumentKind::soundfont
                 || (previous->song.channels[i].samplePath == channel.samplePath && previous->sampleRate == sampleRate))
             && (kind != InstrumentKind::directwave
@@ -349,6 +387,15 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                 || (previous->song.channels[i].samplePath == channel.samplePath && previous->song.channels[i].zones == channel.zones
                     && previous->song.channels[i].modelParams == channel.modelParams
                     && previous->song.channels[i].sampler.keepPitch == channel.sampler.keepPitch
+                    && clipShiftWanted (previous->song, i) == clipShiftWanted (song, i)
+                    // FL's precomputed effects (round 167h): the sample is processed when the channel is built
+                    && previous->song.channels[i].sampler.precompute == channel.sampler.precompute
+                    && previous->song.channels[i].sampler.useLoopPoints == channel.sampler.useLoopPoints
+                    && (! precompute::needed (channel.sampler)
+                        || (previous->song.channels[i].sampler.regionStart == channel.sampler.regionStart
+                            && previous->song.channels[i].sampler.regionEnd == channel.sampler.regionEnd
+                            && previous->song.channels[i].sampler.reverse == channel.sampler.reverse
+                            && precompute::needed (previous->song.channels[i].sampler)))
                     && (! channel.sampler.keepPitch
                         || (previous->song.channels[i].sampler.stretchBeats == channel.sampler.stretchBeats
                             && previous->song.channels[i].sampler.stretchMethod == channel.sampler.stretchMethod
@@ -379,7 +426,20 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         }
 
         state->instruments.push_back (buildInstrument (channel, sampleRate, song.bpm, factories, &keyShiftLater));
+        // FL 2026's clip pitch (round 167k): a channel with a pitched clip gets its pitch shifters even when it resamples
+        if (clipShiftWanted (song, i) && state->instruments.back() != nullptr)
+        {
+            state->instruments.back()->setClipShift (true);
+            keyShiftLater.push_back (state->instruments.back().get());
+        }
     }
+    // Options › Project › "Fast declick for cut groups" (REA round 167h §3)
+    for (auto& instrument : state->instruments)
+        if (instrument != nullptr)
+        {
+            instrument->setFastDeclick (song.fastDeclick);
+            instrument->setPanTriangular (song.panTriangular);
+        }
     prepareKeyShifts (keyShiftLater, sampleRate);
 
     state->effects.resize (song.mixer.size());
@@ -546,14 +606,16 @@ void RackState::buildMixerGraph()
         const auto taps = fruitySendsOf (song, t);
         for (std::size_t j = 0; j < taps.size(); ++j)
         {
-            const auto [slot, target] = taps[j];
+            const auto slot = taps[j].slot, target = taps[j].target;
             if ((int) sendTaps.size() >= maxSendTaps)
                 break;
             if ((std::size_t) t >= slotTap.size())
                 slotTap.resize ((std::size_t) t + 1);
-            if ((std::size_t) slot >= slotTap[(std::size_t) t].size())
-                slotTap[(std::size_t) t].resize ((std::size_t) slot + 1, -1);
-            slotTap[(std::size_t) t][(std::size_t) slot] = (int) sendTaps.size();
+            // (two entries per slot: its outputs 0 and 1, the Transmitter's transient / sustain sends)
+            const auto key = (std::size_t) slot * maxSlotSends + (std::size_t) taps[j].output;
+            if (key >= slotTap[(std::size_t) t].size())
+                slotTap[(std::size_t) t].resize (key + 1, -1);
+            slotTap[(std::size_t) t][key] = (int) sendTaps.size();
             mixerInputs[(std::size_t) target].push_back ({ t, (int) (1 + track.sends.size() + j), 1.0f, (int) sendTaps.size() });
             sendTaps.push_back ({ t, slot, target });
             depth[(std::size_t) target] = std::max (depth[(std::size_t) target], depth[(std::size_t) t] + 1);
@@ -784,6 +846,7 @@ void RackState::buildMidiRoutes()
     vfxChannels.clear();
     portEventChannels.clear();
     dashboardChannels.clear();
+    mapNoteColour.assign (count, 0);
     vfxPort.assign (count, -1);
     hasMidiRoutes = false;
     midiOutTargets.assign (count, {});
@@ -906,8 +969,11 @@ void RackState::buildMidiRoutes()
         }
         if (song.channels[c].instrument != InstrumentKind::midiOut)
             continue;
-        const auto settings = midictl::parseMidiOut (song.channels[c].pluginState);
+        // its knobs' MIDI (round 167i) goes out like a Dashboard's
+        const auto settings = midiout::stateOf (song.channels[c].pluginState);
         midiOutChannel[c] = settings.channel;
+        mapNoteColour[c] = settings.mapNoteColour ? 1 : 0;
+        dashboardChannels.push_back ((int) c);
         send (c, settings.port, settings.channel, 0);
     }
 }
@@ -982,7 +1048,8 @@ void RackState::buildAutomationTables()
                                   || song.channels[(std::size_t) t.index].instrument == InstrumentKind::patcher // (its published parameters)
                                   || song.channels[(std::size_t) t.index].instrument == InstrumentKind::slayer
                                   || song.channels[(std::size_t) t.index].instrument == InstrumentKind::soundfont // (LYNX Soundfont's knobs)
-                                  || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::midiOut && midictl::isMidiParam (t.param))
+                                  || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::midiOut
+                                      && (midictl::isMidiParam (t.param) || (t.param >= 0 && t.param <= midiout::controlCount)))
                                   // a recorded / drawn pitch bend plays on any instrument (issue #12)
                                   || midictl::isPitchBend (t.param)
                                   // an Envelope Controller's global Mod X / Y (round 164f)
@@ -1109,6 +1176,104 @@ void RackState::slotsOfTarget (const Song& song, const AutomationTarget& target,
         }
 }
 
+MixerMatrix mixerMatrix (const MixerTrack& track, float volume, float pan, bool triangular) noexcept
+{
+    // FL keeps the fader as an int (12800 = 0 dB), the pan ±6400 and the separation ±64; LYNX keeps them /16000,
+    // /6400 and /64. Float arithmetic as FL's, the circular kernel in x87 extended precision (flvp::panLaw).
+    const auto x = std::clamp (volume, 0.0f, 1.0f) * 1.25f;
+    const auto p = std::clamp (pan, -1.0f, 1.0f);
+    const auto sep = std::clamp (track.stereo, -1.0f, 1.0f);
+    MixerMatrix m;
+    if (x == 1.0f && p == 0.0f && sep == 0.0f) // FL's fast path: exactly unity
+    {
+        m.ll = m.rr = track.invertPhase ? -1.0f : 1.0f;
+        m.rl = m.lr = 0.0f;
+    }
+    else if (x == 0.0f)
+        m = { 0.0f, 0.0f, 0.0f, 0.0f };
+    else
+    {
+        constexpr float ln11 = 2.3978953f, sqrt2 = 1.4142135f, sin45 = 0.70710677f;
+        auto g = x == 1.0f ? 1.0f : (float) ((std::exp ((double) (x * ln11)) - 1.0) * (double) 0.1f);
+        if (track.invertPhase)
+            g = -g;
+        float gl, gr;
+        if (triangular) // FUN_006a39c0: the louder side keeps the level
+        {
+            const auto v = g * sqrt2 * sin45;
+            if (std::signbit (p))
+                gl = v, gr = (p + 1.0f) * v;
+            else
+                gr = v, gl = (1.0f - p) * v;
+        }
+        else
+            flvp::panLaw (p, g * sqrt2, gl, gr);
+        float fl = 0.0f, fr = 0.0f; // the share of each side that folds into the other
+        if (p != 0.0f)
+        {
+            if (p < 0.0f)
+                fl = 1.0f - gr / g;
+            else
+                fr = 1.0f - gl / g;
+        }
+        if (sep != 0.0f)
+        {
+            // narrowing (5^s − 1)/4 (up to mono), widening linear (−1: side ×2)
+            const auto s = sep < 0.0f ? sep : (float) (std::exp ((double) sep * std::log (5.0)) - 1.0) * 0.25f;
+            fl = std::min (fl + s, 1.0f);
+            fr = std::min (fr + s, 1.0f);
+        }
+        m.rl = gl * fl * 0.5f;
+        m.ll = gl * (1.0f - fl * 0.5f);
+        m.lr = gr * fr * 0.5f;
+        m.rr = gr * (1.0f - fr * 0.5f);
+    }
+    if (track.swapChannels) // the outputs trade places
+        m = { m.lr, m.rr, m.ll, m.rl };
+    return m;
+}
+
+namespace
+{
+// The matrix over a block, each coefficient gliding toward its target by at most 0.001 per sample (FL's fader / pan
+// glide, REA_rodada85 §3; the folded terms glide the same way). `from` = the previous block's matrix (NaN: none).
+// The output may be the input. Returns the matrix reached.
+MixerMatrix applyMatrix (const float* inL, const float* inR, float* outL, float* outR, int n, MixerMatrix from,
+                         const MixerMatrix& to) noexcept
+{
+    if (std::isnan (from.ll))
+        from = to;
+    constexpr float step = 0.001f;
+    auto toward = [] (float g, float target) { return target > g ? std::min (target, g + step) : std::max (target, g - step); };
+    auto m = from;
+    int i = 0;
+    for (; i < n && ! (m == to); ++i)
+    {
+        m = { toward (m.ll, to.ll), toward (m.rl, to.rl), toward (m.lr, to.lr), toward (m.rr, to.rr) };
+        const auto a = inL[i], b = inR[i];
+        outL[i] = m.ll * a + m.rl * b;
+        outR[i] = m.rr * b + m.lr * a;
+    }
+    if (i < n)
+    {
+        if (m.rl == 0.0f && m.lr == 0.0f) // no fold: two gains (the common case)
+            for (int k = i; k < n; ++k)
+            {
+                outL[k] = inL[k] * m.ll;
+                outR[k] = inR[k] * m.rr;
+            }
+        else
+            for (int k = i; k < n; ++k)
+            {
+                const auto a = inL[k], b = inR[k];
+                outL[k] = m.ll * a + m.rl * b;
+                outR[k] = m.rr * b + m.lr * a;
+            }
+    }
+    return m;
+}
+} // namespace
+
 namespace
 {
 // Constant-power pan: at center both sides are 1 (0 dB).
@@ -1117,26 +1282,6 @@ void panGains (float pan, float gain, float& left, float& right) noexcept
     const auto angle = (pan + 1.0f) * 0.25f * 3.14159265f;
     left = gain * std::cos (angle) * 1.41421356f;
     right = gain * std::sin (angle) * 1.41421356f;
-}
-
-// FL's mixer fader and pan: each side's gain moves toward its target by at most 0.001 per sample (a linear glide;
-// measured on FL's renders of pattern events on a track's volume and pan, REA_rodada85 §3). Returns the gain reached.
-float glideGain (const float* in, float* out, int n, float from, float to) noexcept
-{
-    constexpr float step = 0.001f;
-    auto g = from;
-    int i = 0;
-
-    for (; i < n && g != to; ++i)
-    {
-        g = to > g ? std::min (to, g + step) : std::max (to, g - step);
-        out[i] = in[i] * g;
-    }
-
-    for (; i < n; ++i)
-        out[i] = in[i] * g;
-
-    return g;
 }
 
 float peakOf (const float* data, int n) noexcept
@@ -1227,7 +1372,7 @@ bool sameBranches (const EffectSlot& a, const EffectSlot& b)
 bool sameSlotSetup (const EffectSlot& a, const EffectSlot& b)
 {
     return a.kind == b.kind && a.enabled == b.enabled && a.params == b.params && a.mix == b.mix && a.plugin.id == b.plugin.id
-           && a.sidechain == b.sidechain && a.sidechain2 == b.sidechain2 && a.state == b.state && a.samplePath == b.samplePath
+           && a.sidechain == b.sidechain && a.sidechain2 == b.sidechain2 && a.sendTracks == b.sendTracks && a.state == b.state && a.samplePath == b.samplePath
            && sameBranches (a, b);
 }
 } // namespace
@@ -1293,7 +1438,7 @@ void RackRenderer::resetUnitTimes() noexcept
 void RackRenderer::prepare (double sr, int maxBlockSize)
 {
     automationValues.fill (std::numeric_limits<float>::quiet_NaN());
-    lastTrackGain.fill (std::numeric_limits<float>::quiet_NaN());
+    lastTrackGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     channelBuffers.assign ((std::size_t) maxChannels * 2 * chunkCapacity, 0.0f);
     smartDisable.assign ((std::size_t) maxMixerTracks * maxEffectSlots, {});
     trackEqs.assign ((std::size_t) maxMixerTracks, {});
@@ -1607,7 +1752,8 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
     auto& instrument = *state.instruments[(std::size_t) i];
     instrument.beginChunk (n); // (extra outputs: a generator Patcher's, REA_rodada141)
     // issue #14: the channel's pitch as it is now (a hosted plugin bends to it; native engines took it at note on)
-    instrument.setLivePitch (c.sampler.pitch * 100.0f + c.misc.fineTune + (c.misc.mainPitch ? state.song.masterPitch : 0.0f));
+    // (round 167a: the native generators move their sounding notes with it, as FL's do)
+    instrument.setChannelPitchNow (c.sampler.pitch * 100.0f, c.misc.fineTune + (c.misc.mainPitch ? state.song.masterPitch : 0.0f));
     if (c.instrument == InstrumentKind::patcher) // its Hardware Insert nodes: this chunk's device buses (round 165c)
         instrument.setHardwareIo (liveInput, hwOut != nullptr && hwOut->active.load (std::memory_order_relaxed) ? hwOut : nullptr, liveInputOffset);
 
@@ -1703,8 +1849,11 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
             {
                 if (route.other != e.channel || (e.port >= 0 && route.port != e.port) || (e.port < 0 && route.portOnly))
                     continue;
-                // (a VFX channel's voice keeps its colour as the MIDI channel)
-                const auto midiChannel = e.port >= 0 ? (int) e.colour : route.midiChannel;
+                // (a VFX channel's voice keeps its colour as the MIDI channel; so does a MIDI Out's note with "Map note
+                // color to MIDI channel", round 167i)
+                const auto midiChannel = e.port >= 0 || ((std::size_t) e.channel < state.mapNoteColour.size() && state.mapNoteColour[(std::size_t) e.channel] != 0)
+                                             ? (int) (e.colour & 15)
+                                             : route.midiChannel;
                 if (e.type == NoteEvent::Type::voiceProp) // (round 165c: outside a Patcher too)
                     instrument.voicePropertyPort (route.port, e.key, e.prop, e.velocity, midiChannel);
                 else if (e.type == NoteEvent::Type::on)
@@ -1767,7 +1916,11 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                 }
                 instrument.setNextNoteColour (e.colour);
 
-                if (e.fadeIn > 0.0f || e.fadeOut > 0.0f)
+                if (e.clipPitch != 0.0f)
+                    instrument.setNextClipPitch (e.clipPitch);
+                if (e.clipStretch != 1.0f)
+                    instrument.setNextClipStretch (e.clipStretch);
+                if (e.fadeIn > 0.0f || e.fadeOut > 0.0f || e.fadeShape != 0)
                     instrument.setNextClipFades (e.clipElapsed, e.clipRemaining, e.fadeIn, e.fadeOut, e.fadeShape);
 
                 // an echo's volume: the instrument scales the voice, else (engines without it) the velocity
@@ -2001,21 +2154,27 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         if (slots[i].kind == EffectKind::hardwareInsert || slots[i].kind == EffectKind::patcher) // (a Patcher hands them to its nodes, round 165c)
             effects[i]->setHardwareIo (liveInput, hwOut != nullptr && hwOut->active.load (std::memory_order_relaxed) ? hwOut : nullptr, liveInputOffset);
 
-        // Fruity Send: what it sends goes to its own buffer, pulled by the destination insert (processed later)
-        if (slots[i].kind == EffectKind::fruitySend || slots[i].kind == EffectKind::patcher || slots[i].kind == EffectKind::flTransporter)
+        // Fruity Send / Patcher / Transmitter / Transporter: what it sends goes to its own buffer, pulled by the destination insert
+        // (processed later)
+        if (slots[i].kind == EffectKind::fruitySend || slots[i].kind == EffectKind::patcher || slots[i].kind == EffectKind::transmitter
+            || slots[i].kind == EffectKind::flTransporter)
         {
-            const auto tap = (std::size_t) track < state.slotTap.size() && i < state.slotTap[(std::size_t) track].size()
-                                 ? state.slotTap[(std::size_t) track][i]
-                                 : -1;
-            if (tap >= 0 && tap < RackState::maxSendTaps)
+            for (int o = 0; o < maxSlotSends; ++o)
             {
-                std::memset (tapBuffer (tap, 0), 0, sizeof (float) * (std::size_t) n);
-                std::memset (tapBuffer (tap, 1), 0, sizeof (float) * (std::size_t) n);
-                effects[i]->setSendOutput (tapBuffer (tap, 0), tapBuffer (tap, 1));
-                tapActive[(std::size_t) tap] = 1;
+                const auto key = i * (std::size_t) maxSlotSends + (std::size_t) o;
+                const auto tap = (std::size_t) track < state.slotTap.size() && key < state.slotTap[(std::size_t) track].size()
+                                     ? state.slotTap[(std::size_t) track][key]
+                                     : -1;
+                if (tap >= 0 && tap < RackState::maxSendTaps)
+                {
+                    std::memset (tapBuffer (tap, 0), 0, sizeof (float) * (std::size_t) n);
+                    std::memset (tapBuffer (tap, 1), 0, sizeof (float) * (std::size_t) n);
+                    effects[i]->setExtraOutput (o, tapBuffer (tap, 0), tapBuffer (tap, 1));
+                    tapActive[(std::size_t) tap] = 1;
+                }
+                else
+                    effects[i]->setExtraOutput (o, nullptr, nullptr);
             }
-            else
-                effects[i]->setSendOutput (nullptr, nullptr);
         }
 
         if (slots[i].kind == EffectKind::hardwareInsert && wet < 0.999f)
@@ -2177,37 +2336,34 @@ void RackRenderer::process (const RackState* state,
                 echo->reset();
     }
 
-    // FL's MIDI Out sends its bank and program when playback starts (REA_rodada16 §1.3)
-    if (playing && ! wasPlaying && state->hasMidiRoutes)
-        for (std::size_t c = 0; c < state->midiTargets.size(); ++c)
-        {
-            if (state->midiTargets[c].empty() || state->song.channels[c].instrument != InstrumentKind::midiOut) // (a Dashboard sends its own)
-                continue;
-            const auto s = midictl::parseMidiOut (state->song.channels[c].pluginState);
-            const auto status = (std::uint8_t) (s.channel & 15);
-            for (const auto t : state->midiTargets[c])
-            {
-                auto& target = *state->instruments[(std::size_t) t];
-                if (s.bankMsb >= 0)
-                {
-                    const std::uint8_t m[3] { (std::uint8_t) (0xB0 | status), 0, (std::uint8_t) s.bankMsb };
-                    target.midiMessage (m, 3);
-                }
-                if (s.bankLsb >= 0)
-                {
-                    const std::uint8_t m[3] { (std::uint8_t) (0xB0 | status), 32, (std::uint8_t) s.bankLsb };
-                    target.midiMessage (m, 3);
-                }
-                if (s.program > 0)
-                {
-                    const std::uint8_t m[2] { (std::uint8_t) (0xC0 | status), (std::uint8_t) (s.program - 1) };
-                    target.midiMessage (m, 2);
-                }
-            }
-        }
+    // FL resets its generators when playback starts: a MIDI Out sends its bank, patch and controls again
+    // (REA_rodada167i §1.4)
+    if (playing && ! wasPlaying)
+        for (std::size_t c = 0; c < state->song.channels.size() && c < state->instruments.size(); ++c)
+            if (state->song.channels[c].instrument == InstrumentKind::midiOut && state->instruments[c] != nullptr)
+                state->instruments[c]->transportStarted();
 
     // started playing or jumped: audio clips in progress must start mid-way
     resumeAudio = playing && (! wasPlaying || jumped);
+    // FL's "Play truncated notes on transport": at the start of playback, and after the user moves the position while
+    // playing (FL's set-position FUN_011e7a10 → FUN_011e78a0 → FUN_011e7470 with its catch-up flag set, round 167k),
+    // the notes already sounding there play. The loop's wrap is not a set-position and chases nothing.
+    const auto userJump = jumped && userJumpSerial != seenUserJumpSerial;
+    seenUserJumpSerial = userJumpSerial;
+    chaseNotes = playing && (! wasPlaying || userJump) && playTruncatedOnTransport;
+    // FL's "Reset plugins on transport" (FUN_011e7a10 → FUN_011c8a40 mode 2 → FUN_012b5210, every registered plugin's
+    // reset, generators included): the effects' tails and buffers are cleared and the plugin generators stop when
+    // playback starts or jumps (round 167k: instruments too, hosted plugins with their wrapper's reset option)
+    if (resetPluginsOnTransport && playing && (! wasPlaying || jumped))
+    {
+        for (auto& slots : state->effects)
+            for (auto& effect : slots)
+                if (effect != nullptr)
+                    effect->transportReset();
+        for (auto& instrument : state->instruments)
+            if (instrument != nullptr)
+                instrument->transportReset();
+    }
     wasPlaying = playing;
     // tempo automation: the tempo holds for the whole block (evaluated at its start)
     bpm = tempoOverride > 0.0 ? tempoOverride : state->song.bpm;
@@ -2266,10 +2422,11 @@ void RackRenderer::process (const RackState* state,
                     if (! route.portOnly && route.other < (int) state->instruments.size() && state->instruments[(std::size_t) route.other] != nullptr)
                     {
                         auto& target = *state->instruments[(std::size_t) route.other];
+                        const auto midiChannel = state->mapNoteColour[(std::size_t) e.channel] != 0 ? (int) (e.colour & 15) : route.midiChannel;
                         if (e.type == NoteEvent::Type::on)
-                            target.noteOnPort (route.port, e.key, e.velocity, route.midiChannel);
+                            target.noteOnPort (route.port, e.key, e.velocity, midiChannel);
                         else if (e.type == NoteEvent::Type::off)
-                            target.noteOffPort (route.port, e.key, route.midiChannel);
+                            target.noteOffPort (route.port, e.key, midiChannel);
                     }
             // and the mixer-slot Patchers on its port (round 162)
             // (notes that go through the channel's note path reach them in processChunk)
@@ -2340,6 +2497,7 @@ void RackRenderer::process (const RackState* state,
         liveInputOffset = done;
         processChunk (*state, playing, startTick + done * tps, n, left + done, right + done, meters);
         resumeAudio = false;
+        chaseNotes = false;
         done += n;
     }
     publishSoundingKeys ((int) state->song.channels.size());
@@ -2688,7 +2846,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     if (songPlaying)
     {
         scheduleSong (song, startTick, numSamples, ticksPerSample (bpm, sampleRate), events, resumeAudio, &state.schedule,
-                      liveInput == nullptr || ! liveInput->linearSong.load (std::memory_order_relaxed));
+                      liveInput == nullptr || ! liveInput->linearSong.load (std::memory_order_relaxed), chaseNotes);
     }
     // Performance mode (round 165m): the launched clips, on the Player's steady clock (the transport's ticks from
     // where playback started, never wrapping with the song loop)
@@ -2718,7 +2876,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         const auto patternIndex = std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1);
         const auto& pattern = song.patterns[(std::size_t) patternIndex];
         schedulePatternLoop (pattern, pattern.effectiveLength (song.beatsPerBar), startTick, numSamples,
-                             ticksPerSample (bpm, sampleRate), events, song.swing, &song.channels);
+                             ticksPerSample (bpm, sampleRate), events, song.swing, &song.channels, chaseNotes);
     }
 
     // FL's wrapper "Output port" (round 149): the notes a plugin sent out in the previous chunk play the plugins on
@@ -2786,7 +2944,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     {
         if ((std::size_t) c >= state.instruments.size() || state.instruments[(std::size_t) c] == nullptr)
             continue;
-        std::array<std::uint32_t, 192> sent;
+        std::array<std::uint32_t, midiout::maxResetMessages + 8> sent; // (a MIDI Out's reset: every active control at once)
         const auto count = state.instruments[(std::size_t) c]->takeMidiMessages (sent.data(), (int) sent.size());
         if (count <= 0 || (std::size_t) c >= state.midiTargets.size())
             continue;
@@ -2953,27 +3111,19 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     if (! song.mixer.empty())
     {
         applyTrackEq (song.mixer[0], 0, song.cleanMixer, trackBuffer (0, 0), trackBuffer (0, 1), numSamples);
-        applyStereo (song.mixer[0], trackBuffer (0, 0), trackBuffer (0, 1), numSamples);
     }
 
-    float gl = 1.0f, gr = 1.0f;
+    MixerMatrix target; // without a mixer: unity
 
     if (! song.mixer.empty())
     {
         const auto& master = song.mixer[0];
         const auto volume = state.hasAutomation ? automated (state.mixerVolumeAuto[0], master.volume) : master.volume;
         const auto pan = state.hasAutomation ? automated (state.mixerPanAuto[0], (master.pan + 1.0f) * 0.5f) * 2.0f - 1.0f : master.pan;
-        panGains (pan, master.muted ? 0.0f : faderGain (volume), gl, gr);
+        target = master.muted ? MixerMatrix { 0.0f, 0.0f, 0.0f, 0.0f } : mixerMatrix (master, volume, pan, song.panTriangular);
     }
 
-    auto& lastL = lastTrackGain[0];
-    auto& lastR = lastTrackGain[1];
-    const auto fromL = std::isnan (lastL) ? gl : lastL;
-    const auto fromR = std::isnan (lastR) ? gr : lastR;
-    const auto* masterL = trackBuffer (0, 0);
-    const auto* masterR = trackBuffer (0, 1);
-    lastL = glideGain (masterL, left, numSamples, fromL, gl);
-    lastR = glideGain (masterR, right, numSamples, fromR, gr);
+    lastTrackGain[0] = applyMatrix (trackBuffer (0, 0), trackBuffer (0, 1), left, right, numSamples, lastTrackGain[0], target);
 
     if (meters != nullptr)
     {
@@ -3030,37 +3180,6 @@ void RackRenderer::mixHardwareOutputs (const RackState& state, int n) noexcept
         auto* b = count > 1 ? hwOut->bus (first + 1, liveInputOffset, n) : nullptr;
         addToOutput (l, r, route.mode, a, b, n);
     }
-}
-
-// Track stereo separation, phase and channel swap (before the fader, like FL).
-// Narrowing uses FL's exponential curve, widening is linear (docs/analise/REA_rodada2.md §2.2).
-void RackRenderer::applyStereo (const MixerTrack& track, float* l, float* r, int n) noexcept
-{
-    if (track.stereo != 0.0f)
-    {
-        const auto s = track.stereo > 0.0f ? (std::pow (5.0f, std::min (track.stereo, 1.0f)) - 1.0f) / 4.0f
-                                           : std::max (track.stereo, -1.0f);
-        // s = 1: mono; s = -1: side doubled
-        const auto keep = 1.0f - 0.5f * s, cross = 0.5f * s;
-
-        for (int i = 0; i < n; ++i)
-        {
-            const auto a = l[i], b = r[i];
-            l[i] = keep * a + cross * b;
-            r[i] = keep * b + cross * a;
-        }
-    }
-
-    if (track.swapChannels)
-        for (int i = 0; i < n; ++i)
-            std::swap (l[i], r[i]);
-
-    if (track.invertPhase)
-        for (int i = 0; i < n; ++i)
-        {
-            l[i] = -l[i];
-            r[i] = -r[i];
-        }
 }
 
 void RackRenderer::mixLiveInput (const RackState& state, bool playing, int n) noexcept
@@ -3307,23 +3426,22 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
 
     const auto silent = track.muted || ! state.mixerAudible[(std::size_t) t];
 
-    // target gain; the ramp from the previous block avoids clicks on mute and fader
-    float gl = 0.0f, gr = 0.0f;
+    // target matrix; the ramp from the previous block avoids clicks on mute and fader
+    MixerMatrix target { 0.0f, 0.0f, 0.0f, 0.0f };
 
     if (! silent)
     {
         const auto volume = state.hasAutomation ? automated (state.mixerVolumeAuto[(std::size_t) t], track.volume) : track.volume;
         const auto pan = state.hasAutomation ? automated (state.mixerPanAuto[(std::size_t) t], (track.pan + 1.0f) * 0.5f) * 2.0f - 1.0f
                                              : track.pan;
-        panGains (pan, faderGain (volume), gl, gr);
+        target = mixerMatrix (track, volume, pan, state.song.panTriangular);
     }
 
-    auto& lastL = lastTrackGain[(std::size_t) t * 2];
-    auto& lastR = lastTrackGain[(std::size_t) t * 2 + 1];
-    const auto fromL = std::isnan (lastL) ? gl : lastL;
-    const auto fromR = std::isnan (lastR) ? gr : lastR;
+    auto& last = lastTrackGain[(std::size_t) t];
+    const auto from = std::isnan (last.ll) ? target : last;
+    constexpr MixerMatrix zero { 0.0f, 0.0f, 0.0f, 0.0f };
 
-    if (silent && fromL == 0.0f && fromR == 0.0f)
+    if (silent && from == zero)
     {
         if (meters != nullptr)
             meters->capture.pushSilence (t, n);
@@ -3340,8 +3458,7 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     {
         if (t < (int) trackEqs.size() && trackEqs[(std::size_t) t].running)
             trackEqs[(std::size_t) t] = {};
-        lastL = gl;
-        lastR = gr;
+        last = target;
         if (meters != nullptr)
             meters->capture.pushSilence (t, n);
         return;
@@ -3349,9 +3466,7 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
 
     runEffects (state, t, n);
     applyTrackEq (track, t, state.song.cleanMixer, l, r, n);
-    applyStereo (track, l, r, n);
-    lastL = glideGain (l, l, n, fromL, gl);
-    lastR = glideGain (r, r, n, fromR, gr);
+    last = applyMatrix (l, r, l, r, n, from, target);
 
     trackActive[(std::size_t) t] = 1;
 

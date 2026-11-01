@@ -421,4 +421,13 @@ std::string statusText (const Receiver& r, double now)
     std::snprintf (text, sizeof (text), "Receiving clock %.1f BPM%s", r.bpm(), r.running() ? ", playing" : "");
     return text;
 }
+void transportNotesOff (std::array<std::uint8_t, 48>& out) noexcept
+{
+    for (int ch = 0; ch < 16; ++ch)
+    {
+        out[(std::size_t) ch * 3] = (std::uint8_t) (0xb0 + ch);
+        out[(std::size_t) ch * 3 + 1] = 123;
+        out[(std::size_t) ch * 3 + 2] = 0;
+    }
+}
 } // namespace lynx::midisync

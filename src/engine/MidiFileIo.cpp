@@ -175,7 +175,7 @@ std::optional<midiimport::ParsedMidi> parseFile (const juce::File& file, juce::S
             }
             else if (m.isTrackNameEvent() && name.empty())
                 name = m.getTextFromTextMetaEvent().toStdString();
-            else if (m.isNoteOnOrOff() || m.isController())
+            else if (m.isNoteOnOrOff() || m.isController() || m.isPitchWheel() || m.isProgramChange()) // (bend / program: MIDI Out import)
             {
                 const auto* raw = m.getRawData();
                 // a running-status note off may come as a note on with velocity 0: kept as it is (the import decides)

@@ -445,9 +445,13 @@ float AudioEngine::renderOffline (const RenderOptions& options)
     std::int64_t quietSamples = 0;
     bool cancelled = lastRenderStats.warmUp.cancelled;
 
+    vfx::script::setSongEnded (false);
     for (std::int64_t done = 0; done < totalSamples && ! cancelled; done += blockSize)
     {
         const auto n = (int) juce::jmin<std::int64_t> (blockSize, totalSamples - done);
+        // the tail: the song has ended (VFX Script sees the transport stopped, like FL's render; round 167e)
+        if (done >= musicSamples)
+            vfx::script::setSongEnded (true);
         juce::AudioBuffer<float> view (buffer.getArrayOfWritePointers(), 2, n);
         view.clear();
         const auto before = juce::Time::getMillisecondCounterHiRes();
@@ -497,6 +501,7 @@ float AudioEngine::renderOffline (const RenderOptions& options)
     }
 
     stop();
+    vfx::script::setSongEnded (false);
 
     if (rackProcessor != nullptr)
     {
@@ -1297,7 +1302,20 @@ void AudioEngine::startAudioTake()
             insert = song.mixer[(std::size_t) w.track].name.empty() ? "Insert " + juce::String (w.track)
                                                                     : juce::String::fromUTF8 (song.mixer[(std::size_t) w.track].name.c_str());
         juce::File file;
-        if (recordingSettings.trackTakeNames)
+        const auto recordTo = w.track > 0 ? juce::String::fromUTF8 (song.mixer[(std::size_t) w.track].recordTo.c_str()) : juce::String();
+        if (recordTo.isNotEmpty() && juce::File::isAbsolutePath (recordTo))
+        {
+            // FL's "Record <insert> to" file (round 167a): that file; LYNX never overwrites an earlier take, the next
+            // ones get "_2", "_3"... (its own choice)
+            const auto target = juce::File (recordTo).withFileExtension (".wav");
+            target.getParentDirectory().createDirectory();
+            const auto unique = safety::uniqueName (target.getFileNameWithoutExtension().toStdString(), [&target, &made] (const std::string& n) {
+                const auto f = target.getSiblingFile (juce::String::fromUTF8 (n.c_str()) + ".wav");
+                return f.exists() || std::any_of (made.begin(), made.end(), [&f] (const std::shared_ptr<Take>& t) { return t->file == f; });
+            });
+            file = target.getSiblingFile (juce::String::fromUTF8 (unique.c_str()) + ".wav");
+        }
+        else if (recordingSettings.trackTakeNames)
         {
             // "<Insert>_Take<N>.wav", N raised until the name is free (round 163)
             for (int n = 1; n < 100000; ++n)
@@ -2102,6 +2120,7 @@ void AudioEngine::setSong (Song newSong)
     undoStack.clear();
     redoStack.clear();
     song = std::move (newSong);
+    workSince = (double) juce::Time::currentTimeMillis();
     clipops::updateCrossfades (song);
     selectedChannel = 0;
     selectedChannels = { 0 };
@@ -2437,6 +2456,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         for (const auto& c : out.song.channels)
         {
             if (c.instrument == InstrumentKind::sampler || c.instrument == InstrumentKind::audioClip || c.instrument == InstrumentKind::granulizer
+                || c.instrument == InstrumentKind::wavetraveller
                 || c.instrument == InstrumentKind::flkeys || c.instrument == InstrumentKind::directwave)
                 addPath (c.samplePath);
             for (const auto& z : c.zones)
@@ -3678,8 +3698,29 @@ void AudioEngine::setPluginsRenderMode (bool offline)
             graphMode (patcher::graphOf (getEffect ((int) t, (int) s).get()));
 }
 
+void AudioEngine::stampWorkTime()
+{
+    const auto now = (double) juce::Time::currentTimeMillis();
+    if (workSince > 0.0 && now > workSince)
+        song.info.workSeconds += (now - workSince) / 1000.0;
+    workSince = now;
+}
+
+double AudioEngine::workSecondsNow() const
+{
+    const auto now = (double) juce::Time::currentTimeMillis();
+    return song.info.workSeconds + (workSince > 0.0 && now > workSince ? (now - workSince) / 1000.0 : 0.0);
+}
+
+void AudioEngine::markCreatedNow()
+{
+    if (song.info.created <= 0.0)
+        song.info.created = (double) juce::Time::currentTimeMillis() / 1000.0;
+}
+
 void AudioEngine::capturePluginStates()
 {
+    stampWorkTime();
     // Changes only the saved state (recreates nothing and doesn't enter the undo history).
     for (std::size_t i = 0; i < song.channels.size(); ++i)
         if (auto* p = dynamic_cast<PluginInstrument*> (getChannelInstrument ((int) i).get()))
@@ -3758,10 +3799,20 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
     } measure { *this, callbackStart, numSamples };
 
     if (transport.rewindRequested.exchange (false))
+    {
         transport.positionTicks.store (0.0);
+        transport.userJumps.fetch_add (1, std::memory_order_relaxed);
+        if (transport.resetPluginsOnTransport.load (std::memory_order_relaxed))
+            midiSync.requestTransportNotesOff(); // FL: CC 123 to the "Send all notes off" outputs (REA 167l §6)
+    }
 
     if (const auto target = transport.seekRequest.exchange (-1.0); target >= 0.0)
+    {
         transport.positionTicks.store (target);
+        transport.userJumps.fetch_add (1, std::memory_order_relaxed);
+        if (transport.resetPluginsOnTransport.load (std::memory_order_relaxed))
+            midiSync.requestTransportNotesOff();
+    }
 
     transport.readMarkers (rtMarkers, rtMarkerVersion); // FL's marker actions (a new table when the song changed)
     // an external MIDI clock moves the transport (round 165f)
@@ -3913,6 +3964,7 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
                 position = transport.pendingJumpTo.load (std::memory_order_relaxed);
                 transport.pendingJumpAt.store (-1.0, std::memory_order_relaxed);
                 markerEvents.fetch_add (1, std::memory_order_relaxed);
+                transport.userJumps.fetch_add (1, std::memory_order_relaxed);
             }
             else if (markerJump != nullptr && position >= (double) markerJump->at - 1e-6)
             {
@@ -3925,6 +3977,7 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
                     transport.playing.store (false, std::memory_order_relaxed); // the rest of the block plays stopped
                 }
                 position = (double) markerJump->to;
+                transport.userJumps.fetch_add (1, std::memory_order_relaxed);
             }
             else if (looping && position >= loopEnd - 1e-6)
             {

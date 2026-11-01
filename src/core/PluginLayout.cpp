@@ -1065,9 +1065,9 @@ Layout transmitterLayout()
     Layout l;
     l.fl = "Transmitter";
     l.width = 620;
-    l.height = 344;
+    l.height = 432;
     auto& v = l.items;
-    v.push_back (section (0, 0, 620, 112, TR_NOOP ("DETECTION")));
+    v.push_back (section (0, 0, 620, 200, TR_NOOP ("DETECTION")));
     v.push_back (knob (52, 52, 40, "Sensitivity", TR_NOOP ("Sensitivity"), 92, showValue));
     v.push_back (knob (126, 52, 40, "Hold", TR_NOOP ("Hold"), 92, showValue));
     v.push_back (knob (200, 52, 40, "Release", TR_NOOP ("Release"), 92, showValue));
@@ -1075,6 +1075,9 @@ Layout transmitterLayout()
     v.push_back (tabs (262, 46, 190, 24, "Mode", TR_NOOP ("Smooth|Balanced|Dense")));
     v.push_back (toggle (474, 34, 132, 22, "Lookahead", TR_NOOP ("Lookahead")));
     v.push_back (toggle (474, 64, 132, 22, "Stereo link", TR_NOOP ("Stereo link")));
+    // round 167b: FL's envelope view (the output and the detector's transient / sustain envelopes, scrolling;
+    // the mouse wheel sets its speed)
+    v.push_back (display (12, 108, 596, 82, "tssenvelope"));
 
     struct Part
     {
@@ -1098,13 +1101,13 @@ Layout transmitterLayout()
     for (const auto& p : parts)
     {
         const float x = p.x;
-        v.push_back (section (x, 116, 310, 228, p.title));
-        v.push_back (toggle (x + 12, 146, 76, 22, p.on, TR_NOOP ("On")));
-        v.push_back (slider (Item::vslider, x + 30, 178, 32, 124, p.level, TR_NOOP ("Level")));
-        v.push_back (value (x + 8, 316, 82, 18, p.level, 0));
-        v.push_back (knob (x + 112, 196, 40, p.tilt, TR_NOOP ("Tilt"), 236, bipolar | showValue));
-        v.push_back (menuOf (x + 146, 146, 152, 24, p.effect, TR_NOOP ("Effect"), TR_NOOP ("Saturation|Bounce|Diffusion|Blur|Delay|Off")));
-        const float k1 = x + 172, k2 = x + 222, k3 = x + 272, ky = 214, cy = 252;
+        v.push_back (section (x, 204, 310, 228, p.title));
+        v.push_back (toggle (x + 12, 234, 76, 22, p.on, TR_NOOP ("On")));
+        v.push_back (slider (Item::vslider, x + 30, 266, 32, 124, p.level, TR_NOOP ("Level")));
+        v.push_back (value (x + 8, 404, 82, 18, p.level, 0));
+        v.push_back (knob (x + 112, 284, 40, p.tilt, TR_NOOP ("Tilt"), 324, bipolar | showValue));
+        v.push_back (menuOf (x + 146, 234, 152, 24, p.effect, TR_NOOP ("Effect"), TR_NOOP ("Saturation|Bounce|Diffusion|Blur|Delay|Off")));
+        const float k1 = x + 172, k2 = x + 222, k3 = x + 272, ky = 302, cy = 340;
         // Saturation [0, 0.1), Bounce [0.1, 0.3), Diffusion [0.3, 0.5), Blur [0.5, 0.7), Delay [0.7, 0.9), Off [0.9, 1]
         v.push_back (when (knob (k1, ky, 36, p.satMix, TR_NOOP ("Mix"), cy, showValue), p.effect, 0.0f, 0.1f));
         v.push_back (when (knob (k2, ky, 36, p.drive, TR_NOOP ("Drive"), cy, showValue), p.effect, 0.0f, 0.1f));
@@ -1115,13 +1118,15 @@ Layout transmitterLayout()
         v.push_back (when (knob (k1, ky, 36, p.diffMix, TR_NOOP ("Mix"), cy, showValue), p.effect, 0.3f, 0.5f));
         v.push_back (when (knob (k2, ky, 36, p.depth, TR_NOOP ("Depth"), cy, showValue), p.effect, 0.3f, 0.5f));
         v.push_back (when (knob (k3, ky, 36, p.diffDelay, TR_NOOP ("Delay"), cy, showValue), p.effect, 0.3f, 0.5f));
-        v.push_back (when (label (x + 146, 204, 152, 20, TR_NOOP ("No settings"), dim), p.effect, 0.5f, 0.7f));
+        v.push_back (when (label (x + 146, 292, 152, 20, TR_NOOP ("No settings"), dim), p.effect, 0.5f, 0.7f));
         v.push_back (when (knob (k1, ky, 36, p.delayMix, TR_NOOP ("Mix"), cy, showValue), p.effect, 0.7f, 0.9f));
         v.push_back (when (when (knob (k2, ky, 36, p.time, TR_NOOP ("Time"), cy, showValue), p.effect, 0.7f, 0.9f), p.sync, 0.0f, 0.5f));
         v.push_back (when (when (knob (k2, ky, 36, p.synced, TR_NOOP ("Time"), cy, showValue), p.effect, 0.7f, 0.9f), p.sync, 0.5f, 1.0f));
         v.push_back (when (knob (k3, ky, 36, p.feedback, TR_NOOP ("Feedback"), cy, showValue), p.effect, 0.7f, 0.9f));
-        v.push_back (when (toggle (x + 150, 286, 148, 22, p.sync, TR_NOOP ("Tempo sync")), p.effect, 0.7f, 0.9f));
-        v.push_back (when (label (x + 146, 204, 152, 20, TR_NOOP ("No settings"), dim), p.effect, 0.9f, 1.0f));
+        v.push_back (when (toggle (x + 150, 374, 148, 22, p.sync, TR_NOOP ("Tempo sync")), p.effect, 0.7f, 0.9f));
+        v.push_back (when (label (x + 146, 292, 152, 20, TR_NOOP ("No settings"), dim), p.effect, 0.9f, 1.0f));
+        // round 167b: FL's send of this part to another mixer track
+        v.push_back (display (x + 150, 402, 148, 22, p.x == 0 ? "tsssend0" : "tsssend1"));
     }
     return l;
 }
@@ -1289,6 +1294,42 @@ Layout emphasizer()
     v.push_back (toggle (236, 78, 96, 16, "Soft clipping", TR_NOOP ("SOFT CLIPPING")));
     v.push_back (toggle (336, 78, 104, 16, "Level matching", TR_NOOP ("LEVEL MATCHING")));
     v.push_back (toggle (444, 78, 64, 16, "Bypass", TR_NOOP ("BYPASS")));
+    return l;
+}
+
+Layout flEmphasis()
+{
+    // round 167f: FL's Emphasis interpreted (its controls and captions, LYNX's drawing): INPUT GAIN, the big EMPHASIS
+    // knob and CEILING on top with the meter strip; the mode, ENVELOPE order, HARDNESS and LINKING below; the bottom
+    // strip carries OVERSAMPLING, CHANNEL MODE and the option switches
+    Layout l;
+    l.fl = "Emphasis";
+    l.width = 560;
+    l.height = 196;
+    auto& v = l.items;
+    v.push_back (section (0, 0, 300, 96, nullptr, boxed));
+    v.push_back (knob (50, 38, 34, "Input gain", TR_NOOP ("INPUT GAIN"), 82, showValue));
+    v.push_back (knob (150, 38, 44, "Emphasis", TR_NOOP ("EMPHASIS"), 82, showValue));
+    v.push_back (knob (250, 38, 34, "Ceiling", TR_NOOP ("CEILING"), 82, showValue));
+    v.push_back (display (304, 4, 252, 92, "meter"));
+    v.push_back (section (0, 100, 556, 50, nullptr, boxed));
+    v.push_back (label (8, 102, 120, 14, TR_NOOP ("MODE"), alignLeft));
+    v.push_back (radio (8, 118, 220, 26, "Mode", TR_NOOP ("Versatile|Loud|Transient|Steady")));
+    v.push_back (stepper (240, 116, 50, 30, "Envelope order", TR_NOOP ("ENVELOPE"), 4));
+    v.push_back (stepper (304, 116, 50, 30, "Hardness", TR_NOOP ("HARDNESS"), 10));
+    v.push_back (knob (400, 118, 22, "Linking", TR_NOOP ("LINKING"), 138, showValue));
+    v.push_back (label (450, 102, 100, 14, TR_NOOP ("CHANNEL MODE"), alignLeft));
+    v.push_back (radio (450, 118, 100, 26, "Channel mode", "L/R|M/S"));
+    v.push_back (label (4, 154, 100, 16, "EMPHASIS", alignLeft));
+    v.push_back (label (110, 154, 96, 14, TR_NOOP ("OVERSAMPLING"), alignLeft));
+    v.push_back (radio (206, 152, 200, 18, "Oversampling", TR_NOOP ("Off|2x|4x|8x|16x")));
+    v.push_back (toggle (410, 152, 70, 18, "True peak", TR_NOOP ("TRUE PEAK")));
+    v.push_back (toggle (484, 152, 72, 18, "Bypass", TR_NOOP ("BYPASS")));
+    v.push_back (toggle (4, 174, 104, 18, "Level matching", TR_NOOP ("LEVEL MATCHING")));
+    v.push_back (toggle (112, 174, 60, 18, "Delta", TR_NOOP ("DELTA")));
+    v.push_back (toggle (176, 174, 120, 18, "Instant recovery", TR_NOOP ("INSTANT RECOVERY")));
+    v.push_back (toggle (300, 174, 80, 18, "DC block", TR_NOOP ("DC BLOCK")));
+    v.push_back (toggle (384, 174, 172, 18, "Loudness compensation", TR_NOOP ("LOUDNESS COMPENSATION")));
     return l;
 }
 
@@ -3443,7 +3484,7 @@ const std::vector<EffectKind>& flLayoutKinds()
                                                  // round 165g
                                                  EffectKind::fruityMute2, EffectKind::transmitter,
                                                  // round 167f
-                                                 EffectKind::flTransporter };
+                                                 EffectKind::flEmphasis, EffectKind::flTransporter };
     return kinds;
 }
 
@@ -3499,6 +3540,7 @@ const Layout& layoutFor (EffectKind kind)
         case EffectKind::fruityBalance: l = fruityBalance(); break;
         case EffectKind::squeeze: l = fruitySqueeze(); break;
         case EffectKind::emphasizer: l = emphasizer(); break;
+        case EffectKind::flEmphasis: l = flEmphasis(); break;
         case EffectKind::maximus: l = maximus(); break;
         case EffectKind::vintagePhaser: l = vintagePhaser(); break;
         case EffectKind::fruityPhaser: l = fruityPhaser(); break;

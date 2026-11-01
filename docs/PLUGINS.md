@@ -165,6 +165,7 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | Transistor Bass engine † | Transistor Bass | Near-exact | 55/128 programs bit-exact, worst −108.6 dB; CC/pitch-bend not modelled |
 | Sawer engine † | Sawer | Near-exact | 423 presets bit-identical with effects off; reverb −137 dB; modulation by aftertouch/bend not fed |
 | Granulizer engine | Fruity Granulizer | Near-exact | within −128 dB on 100 random states; slice modes and tempo sync not played |
+| Wave Traveller engine | Wave Traveller | Exact | bit-identical with the DLL: the render test, demo states, every curve segment type, mutes, the 19 presets, live and render (sinc) modes, 44.1 / 48 kHz; samples not at 16-bit / 44.1 kHz use LYNX's conversion (REA_rodada167f-wavetraveller) |
 | Autogun engine † | Autogun | Near-exact | within −127 dB on the template states (Ogun engine + Soundgoodizer stage) |
 | DrumSynth engine † | Fruity DrumSynth Live | Near-exact | all 120 patches; recorded waves need the exact engine DLL build; sends and Mod X/Y not modelled |
 | BooBass engine † | BooBass | Near-exact | needs the exact engine DLL build (otherwise a saw approximation) |
@@ -175,7 +176,7 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | GMS engine † | GMS | Close | model within −60 dB on 9/9 demo channels; FL's shared random generator makes noise/phases differ by design |
 | Morphine engine † | Morphine | Close | model within −60 dB on 7/7 demo channels; release loops and unison not modelled |
 | Sakura / Drumpad models | Sakura, Drumpad | Close | physical models rebuilt from the engines; Sakura's resonators within −72 dB; no CC sources |
-| Sampler (FL voice) | Channel sampler, FPC, Slicex, Fruity Slicer, Wave Traveller | Near-exact | FL's interpolators and sampler voice (within one 16-bit code of FL's renders); per-plugin extras partly; WAV loop points not read |
+| Sampler (FL voice) | Channel sampler, FPC, Slicex, Fruity Slicer | Near-exact | FL's interpolators and sampler voice (within one 16-bit code of FL's renders); per-plugin extras partly; WAV loop points not read |
 | LYNX Soundfont | Fruity Soundfont Player (SoundFont Player) | Close | own SF2 / SF3 player (TinySoundFont parsing, LYNX SHARE voices): FL's state read (font, preset, envelope / LFO / cut-off overrides, send levels, options; REA_rodada158); preset search over all SoundFonts in the user's folders; "send to" a mixer insert, mod-wheel knob and FL's built-in reverb / chorus sound not reproduced (LYNX SHARE's own reverb / chorus) |
 | Built-in synth | FLEX | Approximate | FLEX packs are encrypted and never opened: a synth patch chosen by preset name |
 | Silent channel | Wasp / Wasp XT | Placeholder | silent in FL Studio 2026 (64-bit placeholder); state kept |
@@ -242,8 +243,8 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | Vintage Phaser | Vintage Phaser | Import | Near-exact | within −121 dB |
 | Pitch correction | Pitcher | Insert | Close | bit-exact with the reference model; MIDI mode / Harmonize get no MIDI in LYNX SHARE |
 | Newtone | Newtone | Import | Close | pass-through as FL; in slave mode the note edits (pitch offsets and transitions, drift, vibrato, tremolo, ramps, formant, volume, timing, disabled notes) rendered by LYNX SHARE's own pitch engine: against FL's own engine on 135 states every note's level within 0.4 dB and its median pitch within 9 cents, unedited notes bit-identical; legato glides with long smooth times (up to 40 c) and FL's sample re-alignment after edits differ (round 165g) |
-| Newtime | Newtime | Import | Placeholder | pass-through (as FL) + the source sample in slave mode; time warping not reproduced |
-| Limiter | Emphasis | Insert | Approximate | not ported yet |
+| Newtime | Newtime | Import | Close | pass-through as FL; in slave mode the sample warped by its markers (LYNX SHARE's own markers or FL's imported Newtime warp markers) with LYNX SHARE's own time-stretch: against FL's own engine on mono drums, stereo drums and a sung vowel (moved markers, 0.75x/1.3x/1.5x) onsets within 54 samples, 10 ms envelopes median 0.0 dB (90% within 1.1 dB), pitch kept; FL's élastique colouring of unmoved audio (about 1 dB) is not reproduced (round 167b) |
+| Emphasis | Emphasis | Insert | Exact | FL's own engine (the shared library's limiter): bit-identical to the installation's DLL on its 26 states and 690 more cases (44.1–96 kHz, any block size, every mode, envelope order, hardness, oversampling 1–16×, true peak, M/S, delta, bypass, level matching, the three options, control changes mid-stream); its latency reported for PDC; the panel's meters are LYNX's own (round 167f) |
 
 **Windows.** Every native effect opens its own window (double-click its Mixer slot, or the **Editor** button over its
 knobs). For the plugins studied so far — Fruity Limiter, Parametric EQ 2, Delay 3, Multiband Compressor, Reeverb 2,

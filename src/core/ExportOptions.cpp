@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
+#include <fstream>
 #include <set>
 #include <sstream>
 
@@ -250,13 +252,17 @@ std::string toText (const Options& o)
       << "stemsMaster=" << (o.stemsIncludeMaster ? 1 : 0) << "\n"
       << "normalize=" << (o.normalize ? 1 : 0) << "\n"
       << "masterEffects=" << (o.masterEffects ? 1 : 0) << "\n"
+      << "insertEffects=" << (o.insertEffects ? 1 : 0) << "\n"
       << "trimPdc=" << (o.trimPdc ? 1 : 0) << "\n"
       << "hqAllPlugins=" << (o.hqAllPlugins ? 1 : 0) << "\n"
       << "pluginWarmUp=" << (o.pluginWarmUp ? 1 : 0) << "\n"
       << "showWhenDone=" << (o.showWhenDone ? 1 : 0) << "\n"
       << "disableMaxPolyphony=" << (o.disableMaxPolyphony ? 1 : 0) << "\n"
       << "moreFormats=" << o.moreFormats << "\n"
-      << "channels=" << (int) o.channels << "\n";
+      << "channels=" << (int) o.channels << "\n"
+      << "saveTempo=" << (o.saveTempo ? 1 : 0) << "\n"
+      << "loopMarkers=" << (o.loopMarkers ? 1 : 0) << "\n"
+      << "playlistMarkers=" << (o.playlistMarkers ? 1 : 0) << "\n";
     return s.str();
 }
 
@@ -281,6 +287,7 @@ Options fromText (const std::string& text)
     o.stemsIncludeMaster = toInt (kv, "stemsMaster", d.stemsIncludeMaster ? 1 : 0) != 0;
     o.normalize = toInt (kv, "normalize", d.normalize ? 1 : 0) != 0;
     o.masterEffects = toInt (kv, "masterEffects", d.masterEffects ? 1 : 0) != 0;
+    o.insertEffects = toInt (kv, "insertEffects", d.insertEffects ? 1 : 0) != 0;
     o.trimPdc = toInt (kv, "trimPdc", d.trimPdc ? 1 : 0) != 0;
     o.hqAllPlugins = toInt (kv, "hqAllPlugins", d.hqAllPlugins ? 1 : 0) != 0;
     o.pluginWarmUp = toInt (kv, "pluginWarmUp", d.pluginWarmUp ? 1 : 0) != 0;
@@ -288,6 +295,9 @@ Options fromText (const std::string& text)
     o.disableMaxPolyphony = toInt (kv, "disableMaxPolyphony", d.disableMaxPolyphony ? 1 : 0) != 0;
     o.moreFormats = (std::uint32_t) std::clamp (toInt (kv, "moreFormats", 0), 0, 15);
     o.channels = (Channels) toInt (kv, "channels", (int) d.channels);
+    o.saveTempo = toInt (kv, "saveTempo", d.saveTempo ? 1 : 0) != 0;
+    o.loopMarkers = toInt (kv, "loopMarkers", d.loopMarkers ? 1 : 0) != 0;
+    o.playlistMarkers = toInt (kv, "playlistMarkers", d.playlistMarkers ? 1 : 0) != 0;
     return clamped (o);
 }
 
@@ -367,6 +377,9 @@ Song makeRenderSong (const Song& song, const Options& o, std::int64_t tailTicks,
 
     if (! o.masterEffects && ! base.mixer.empty())
         base.mixer[0].effects.clear();
+    if (! o.insertEffects)
+        for (std::size_t t = 1; t < base.mixer.size(); ++t)
+            base.mixer[t].effects.clear();
 
     if (o.disableMaxPolyphony) // FL: every channel's Max polyphony becomes 0 (no limit) for the render
         for (auto& c : base.channels)
@@ -519,5 +532,221 @@ std::string formatDuration (double seconds)
     else
         std::snprintf (text, sizeof (text), "%lld:%02lld", m, s);
     return text;
+}
+
+namespace
+{
+void put32 (std::vector<std::uint8_t>& b, std::uint32_t v)
+{
+    for (int i = 0; i < 4; ++i)
+        b.push_back ((std::uint8_t) (v >> (8 * i)));
+}
+void put16 (std::vector<std::uint8_t>& b, std::uint16_t v)
+{
+    b.push_back ((std::uint8_t) v);
+    b.push_back ((std::uint8_t) (v >> 8));
+}
+void putTag (std::vector<std::uint8_t>& b, const char* tag)
+{
+    b.insert (b.end(), tag, tag + 4);
+}
+void putFloat (std::vector<std::uint8_t>& b, float f)
+{
+    std::uint32_t v = 0;
+    std::memcpy (&v, &f, 4);
+    put32 (b, v);
+}
+// a chunk: tag, size, body, pad byte
+void chunk (std::vector<std::uint8_t>& out, const char* tag, const std::vector<std::uint8_t>& body)
+{
+    putTag (out, tag);
+    put32 (out, (std::uint32_t) body.size());
+    out.insert (out.end(), body.begin(), body.end());
+    if ((body.size() & 1) != 0)
+        out.push_back (0);
+}
+} // namespace
+
+WavExtras wavExtras (const Song& song, const Options& o, double sampleRate)
+{
+    WavExtras x;
+    std::int64_t musicTicks = 0, loopTicks = 0;
+    const auto copy = makeRenderSong (song, o, 0, musicTicks, loopTicks);
+    x.musicFrames = (std::int64_t) std::llround (copy.secondsForTicks (musicTicks) * sampleRate);
+    x.loop = o.loopMarkers;
+    x.acid = o.saveTempo;
+    x.tempo = (float) song.bpm;
+    x.numerator = std::max (1, song.beatsPerBar);
+    x.denominator = std::max (1, 16 / stepsPerBeat); // FL: 16 / steps per beat
+    if (o.playlistMarkers)
+    {
+        // the range: the selection starts at the loop region (as makeRenderSong cuts it), one pass
+        const auto selection = o.range == Range::selection && hasSelection (song);
+        const auto start = selection ? song.loopStart : (std::int64_t) 0;
+        const auto end = selection ? song.loopEnd : start + loopTicks;
+        const auto startSeconds = song.secondsForTicks (start);
+        for (const auto& m : song.markers())
+            if (m.action == Marker::none && ! m.isSignature() && m.tick >= start && m.tick < end)
+                x.markers.push_back ({ (std::int64_t) std::llround ((song.secondsForTicks (m.tick) - startSeconds) * sampleRate), m.name });
+        std::stable_sort (x.markers.begin(), x.markers.end(), [] (const auto& a, const auto& b) { return a.frame < b.frame; });
+    }
+    return x;
+}
+
+std::vector<std::uint8_t> wavExtraChunks (const WavExtras& x, double sampleRate, std::int64_t dataFrames)
+{
+    std::vector<std::uint8_t> out;
+    if (x.loop)
+    {
+        // smpl: manufacturer 0, product 0, sample period (ns), MIDI unity note 60, pitch fraction 0, SMPTE 0 / 0,
+        // one loop, no sampler data; the loop: id 0x20000, type 0x400, start 0, end = last frame of the music
+        std::vector<std::uint8_t> b;
+        put32 (b, 0);
+        put32 (b, 0);
+        put32 (b, (std::uint32_t) std::llround (1.0e9 / std::max (1.0, sampleRate)));
+        put32 (b, 60);
+        put32 (b, 0);
+        put32 (b, 0);
+        put32 (b, 0);
+        put32 (b, 1);
+        put32 (b, 0);
+        put32 (b, 0x20000);
+        put32 (b, 0x400);
+        put32 (b, 0);
+        put32 (b, (std::uint32_t) std::max<std::int64_t> (0, x.musicFrames - 1));
+        put32 (b, 0);
+        put32 (b, 0);
+        chunk (out, "smpl", b);
+    }
+    if (x.acid)
+    {
+        // acid: flags 4, root note 60, 0x80, 0.0, beats, meter (FL writes the numerator first), tempo
+        std::vector<std::uint8_t> b;
+        put32 (b, 4);
+        put16 (b, 60);
+        put16 (b, 0x80);
+        putFloat (b, 0.0f);
+        put32 (b, (std::uint32_t) std::llround ((double) dataFrames * x.tempo / (std::max (1.0, sampleRate) * 60.0)));
+        put16 (b, (std::uint16_t) x.numerator);
+        put16 (b, (std::uint16_t) x.denominator);
+        putFloat (b, x.tempo);
+        chunk (out, "acid", b);
+    }
+    if (! x.markers.empty())
+    {
+        // cue: ids 0x10000 + index, each at its frame in the "data" chunk
+        std::vector<std::uint8_t> cue, adtl, tlst;
+        put32 (cue, (std::uint32_t) x.markers.size());
+        putTag (adtl, "adtl");
+        for (std::size_t i = 0; i < x.markers.size(); ++i)
+        {
+            const auto id = (std::uint32_t) (0x10000 + i);
+            const auto frame = (std::uint32_t) std::max<std::int64_t> (0, x.markers[i].frame);
+            put32 (cue, id);
+            put32 (cue, frame);
+            putTag (cue, "data");
+            put32 (cue, 0);
+            put32 (cue, 0);
+            put32 (cue, frame);
+            // labl: the name, or "Marker <index>"
+            auto name = x.markers[i].name.empty() ? "Marker " + std::to_string (i) : x.markers[i].name;
+            std::vector<std::uint8_t> l;
+            put32 (l, id);
+            l.insert (l.end(), name.begin(), name.end());
+            l.push_back (0);
+            chunk (adtl, "labl", l);
+        }
+        chunk (out, "cue ", cue);
+        chunk (out, "LIST", adtl);
+        // tlst (FL's trigger list, up to 125 markers): 'cue ', the id − 1 (sic), 1, 0xff, note 60 + index (≤ 131),
+        // 0x90, then zeros
+        if (x.markers.size() < 0x7e)
+        {
+            put32 (tlst, (std::uint32_t) x.markers.size());
+            for (std::size_t i = 0; i < x.markers.size(); ++i)
+            {
+                putTag (tlst, "cue ");
+                put32 (tlst, (std::uint32_t) (0x10000 + i - 1));
+                put32 (tlst, 1);
+                tlst.push_back (0xff);
+                tlst.push_back ((std::uint8_t) std::min<std::size_t> (0x3c + i, 0x83));
+                tlst.push_back (0x90);
+                tlst.push_back (0);
+                put32 (tlst, 0);
+                put32 (tlst, 0);
+            }
+            chunk (out, "tlst", tlst);
+        }
+    }
+    return out;
+}
+
+bool appendWavChunks (const std::string& path, const std::vector<std::uint8_t>& chunks)
+{
+    if (chunks.empty())
+        return true;
+    std::fstream f (path, std::ios::in | std::ios::out | std::ios::binary);
+    if (! f)
+        return false;
+    char head[12] {};
+    f.read (head, 12);
+    if (! f || std::memcmp (head, "RIFF", 4) != 0 || std::memcmp (head + 8, "WAVE", 4) != 0)
+        return false;
+    f.seekg (0, std::ios::end);
+    auto size = (std::uint64_t) f.tellg();
+    std::vector<std::uint8_t> tail;
+    if ((size & 1) != 0) // (the last chunk's pad byte)
+        tail.push_back (0);
+    tail.insert (tail.end(), chunks.begin(), chunks.end());
+    if (size + tail.size() - 8 > 0xffffffffull)
+        return false;
+    f.seekp ((std::streamoff) size);
+    f.write ((const char*) tail.data(), (std::streamsize) tail.size());
+    size += tail.size();
+    std::uint8_t riff[4];
+    for (int i = 0; i < 4; ++i)
+        riff[i] = (std::uint8_t) ((size - 8) >> (8 * i));
+    f.seekp (4);
+    f.write ((const char*) riff, 4);
+    return (bool) f;
+}
+
+std::int64_t wavDataFrames (const std::string& path)
+{
+    std::ifstream f (path, std::ios::binary);
+    char head[12] {};
+    f.read (head, 12);
+    if (! f || std::memcmp (head, "RIFF", 4) != 0 || std::memcmp (head + 8, "WAVE", 4) != 0)
+        return -1;
+    std::uint32_t align = 0;
+    for (;;)
+    {
+        std::uint8_t h[8] {};
+        f.read ((char*) h, 8);
+        if (! f)
+            return -1;
+        const auto size = (std::uint32_t) h[4] | (std::uint32_t) h[5] << 8 | (std::uint32_t) h[6] << 16 | (std::uint32_t) h[7] << 24;
+        if (std::memcmp (h, "fmt ", 4) == 0 && size >= 16)
+        {
+            std::uint8_t fmt[16] {};
+            f.read ((char*) fmt, 16);
+            align = (std::uint32_t) fmt[12] | (std::uint32_t) fmt[13] << 8;
+            f.seekg ((std::streamoff) (size - 16 + (size & 1)), std::ios::cur);
+            continue;
+        }
+        if (std::memcmp (h, "data", 4) == 0)
+            return align > 0 ? (std::int64_t) (size / align) : -1;
+        f.seekg ((std::streamoff) (size + (size & 1)), std::ios::cur);
+    }
+}
+
+bool appendWavExtras (const std::string& path, const WavExtras& x, double sampleRate)
+{
+    if (! x.loop && ! x.acid && x.markers.empty())
+        return true;
+    const auto frames = wavDataFrames (path);
+    if (frames < 0)
+        return false;
+    return appendWavChunks (path, wavExtraChunks (x, sampleRate, frames));
 }
 } // namespace lynx::exportopts

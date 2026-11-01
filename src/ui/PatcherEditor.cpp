@@ -1,4 +1,5 @@
 #include "ui/VideoPlayerView.h"
+#include "ui/WaveTravellerEditor.h"
 #include "ui/PatcherEditor.h"
 #include "ui/VisualEditors.h"
 #include "ui/FlExtraEditors.h"
@@ -1463,22 +1464,6 @@ private:
         });
     }
 
-    // FL's Fruity Keyboard Controller state (REA_rodada16 §1.4, version 3): each key's value rising from 0 to 1 over the
-    // keyboard, note-off value 0 with auto release (LYNX's own default)
-    static std::vector<std::uint8_t> defaultKeyboardController()
-    {
-        std::vector<std::uint8_t> s (553, 0);
-        const std::uint32_t version = 3;
-        std::memcpy (s.data(), &version, 4);
-        for (int k = 0; k < 132; ++k)
-        {
-            const auto v = (float) std::min (1.0, k / 127.0);
-            std::memcpy (s.data() + 12 + k * 4, &v, 4);
-        }
-        s[552] = 1;
-        return s;
-    }
-
     // The FL Plugin picker's categories (FL Studio 2026, issue #7 screenshot): generators
     static const char* engineCategory (InstrumentKind kind)
     {
@@ -1490,6 +1475,7 @@ private:
             case InstrumentKind::boobass: case InstrumentKind::flkeys: case InstrumentKind::soundfont:
                 return "Misc";
             case InstrumentKind::granulizer: case InstrumentKind::directwave: case InstrumentKind::sampler:
+            case InstrumentKind::wavetraveller:
                 return "Sampler";
             case InstrumentKind::beepmap: case InstrumentKind::harmor: case InstrumentKind::morphine: case InstrumentKind::ogun:
             case InstrumentKind::autogun: case InstrumentKind::plucked: case InstrumentKind::sakura: case InstrumentKind::slayer:
@@ -1519,7 +1505,7 @@ private:
             case EffectKind::compressor: case EffectKind::limiter: case EffectKind::apexLimiter: case EffectKind::volumeGate:
             case EffectKind::crestCompressor: case EffectKind::prismMultiband: case EffectKind::sentryGate: case EffectKind::fruityLimiter:
             case EffectKind::fruityCompressor: case EffectKind::transientProcessor: case EffectKind::fruityMultiband: case EffectKind::maximus:
-            case EffectKind::glowLeveler: case EffectKind::hushDeEsser: case EffectKind::emphasizer: case EffectKind::squeeze:
+            case EffectKind::glowLeveler: case EffectKind::hushDeEsser: case EffectKind::emphasizer: case EffectKind::flEmphasis: case EffectKind::squeeze:
                 return "Dynamics";
             case EffectKind::eq: case EffectKind::parametricEq: case EffectKind::facetEq: case EffectKind::filter: case EffectKind::fruityFastLP:
             case EffectKind::fruityFreeFilter: case EffectKind::fruityFilter: case EffectKind::equo: case EffectKind::lovePhilter:
@@ -1914,6 +1900,11 @@ private:
         if (node.generator && node.channel.instrument == InstrumentKind::videoplayer) // round 165g
         {
             openToolWindow (makeVideoPlayerEditor (engine, locate, -1), title + " - " + tr ("Patcher"), target.key() + "-node-" + juce::String (n));
+            return;
+        }
+        if (node.generator && node.channel.instrument == InstrumentKind::wavetraveller) // round 167f
+        {
+            openToolWindow (makeWaveTravellerEditor (engine, locate, -1), title + " - " + tr ("Patcher"), target.key() + "-node-" + juce::String (n));
             return;
         }
         if (node.generator && node.channel.instrument == InstrumentKind::midiOut)

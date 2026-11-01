@@ -52,6 +52,7 @@
 #include "ui/SoundFontEditor.h"
 #include "ui/VfxEditors.h"
 #include "ui/VideoPlayerView.h"
+#include "ui/WaveTravellerEditor.h"
 #include "ui/BrowserComponent.h"
 #include "engine/SampleLibrary.h"
 #include "core/SampleFiles.h"
@@ -456,6 +457,7 @@ public:
         miniSynth = def.instrument == InstrumentKind::minisynth;
         dx10 = def.instrument == InstrumentKind::dx10;
         kepler = def.instrument == InstrumentKind::kepler;
+        keplerExo = def.instrument == InstrumentKind::keplerExo;
         poizone = def.instrument == InstrumentKind::poizone;
         fruitkick = def.instrument == InstrumentKind::fruitkick;
         bassdrum = def.instrument == InstrumentKind::bassdrum;
@@ -821,6 +823,13 @@ public:
             { 33, "Volume" }, { 19, "Cutoff" }, { 20, "Resonance" }, { 22, "Env amount" }, { 26, "Attack" }, { 27, "Decay" },
             { 28, "Sustain" }, { 29, "Release" }, { 11, "PW" }, { 16, "Sub level" }, { 17, "Noise" }, { 5, "LFO rate" },
             { 10, "Vibrato" }, { 18, "High-pass" }, { 30, "Chorus" } };
+        // Kepler Exo: the same layout with the "Kepler-2" parameter list (REA_rodada167d §1)
+        static const FloatKnob keplerExoKnobs[] = {
+            { 0x48, "Volume" }, { 0x25, "Cutoff" }, { 0x26, "Resonance" }, { 0x2c, "Env amount" }, { 0x3d, "Attack" },
+            { 0x3e, "Decay" }, { 0x3f, "Sustain" }, { 0x40, "Release" }, { 0x21, "DCO2 level" }, { 0x0e, "DCO2 detune" },
+            { 0x30, "LFO1 rate" }, { 0x36, "LFO2 rate" }, { 0x50, "Portamento" }, { 0x24, "High-pass" }, { 0x87, "Saturation" },
+            { 0x70, "Delay amount" }, { 0x73, "Delay feedback" }, { 0x80, "Reverb decay" }, { 0x85, "Reverb wet" },
+            { 0x93, "Hyper chorus mix" } };
         auto addKepler = [&] (const FloatKnob& k) {
             const auto at = keplerPanelOffset (def.pluginState, k.index);
             if (at < 0)
@@ -971,6 +980,9 @@ public:
                 addDx10 (k);
         else if (kepler)
             for (const auto& k : keplerKnobs)
+                addKepler (k);
+        else if (keplerExo)
+            for (const auto& k : keplerExoKnobs)
                 addKepler (k);
         else if (gms)
             for (const auto& k : gmsKnobs)
@@ -1420,6 +1432,7 @@ public:
                     : miniSynth ? tr ("MiniSynth — FL's engine with its effects (wave tables read from your FL installation)")
                     : dx10 ? tr ("Fruity DX10 — FL's FM engine")
                     : kepler ? tr ("Kepler — FL's engine (LFO shape and noise read from your FL installation; new settings restart the voices)")
+                    : keplerExo ? tr ("Kepler Exo — FL's engine with its effects (tables read from your FL installation; new settings restart the voices)")
                     : fruitkick ? tr ("Fruit Kick — FL's engine (channel envelopes stepped per tick)")
                     : bassdrum ? tr ("BassDrum — FL's engine (table and noise samples read from your FL installation)")
                     : toxic ? tr ("Toxic Biohazard — FL's engine with its effects (waves read from your FL installation)")
@@ -1617,7 +1630,7 @@ private:
     ChannelRef ref;
     juce::Colour accent { skin::colour::crimson }; // the plugin page's accent (ui/PluginSkin.h)
     skin::Style pageStyle = skin::Style::glow;     // the plugin page's automatic style (round 126)
-    bool sakura = true, boobass = false, drumsynth = false, harmless = false, harmor = false, gms = false, morphine = false, ogun = false, autogun = false, transistorBass = false, miniSynth = false, dx10 = false, kepler = false, poizone = false,
+    bool sakura = true, boobass = false, drumsynth = false, harmless = false, harmor = false, gms = false, morphine = false, ogun = false, autogun = false, transistorBass = false, miniSynth = false, dx10 = false, kepler = false, keplerExo = false, poizone = false,
          fruitkick = false, bassdrum = false, toxic = false, threeOsc = false, simSynth = false, wasp = false, plucked = false, beepMap = false,
          sawer = false, flKeys = false, granulizer = false, drumaxx = false, slayer = false, fruityDance = false, sytrus = false, wavesFound = false;
     int editorKey = 60;
@@ -1658,6 +1671,229 @@ private:
     bool menuClick = false;
 };
 
+// FL's Sampler › "Precomputed effects", the loop flags and the declicking mode (REA_rodada167h §1–§3): computed once on
+// the sample when the channel changes (core/SamplePrecompute.h). Opened from the Sampler settings.
+class PrecomputePanel final : public juce::Component
+{
+public:
+    PrecomputePanel (AudioEngine& e, ChannelRef c) : engine (e), ref (std::move (c))
+    {
+        const std::pair<juce::ToggleButton*, const char*> toggles[] = {
+            { &removeDc, TR_NOOP ("Remove DC offset") }, { &normalize, TR_NOOP ("Normalize") }, { &polarity, TR_NOOP ("Reverse polarity") },
+            { &fadeStereo, TR_NOOP ("Fade stereo") }, { &swapStereo, TR_NOOP ("Swap stereo") },
+            { &useLoops, TR_NOOP ("Use loop points") }, { &pingPong, TR_NOOP ("Ping pong loop") } };
+        for (auto [b, text] : toggles)
+        {
+            b->setButtonText (tr (text));
+            b->onClick = [this] { apply(); };
+            addAndMakeVisible (b);
+        }
+        normalize.setTooltip (tr ("Raises the sample so its loudest point reaches 0 dB"));
+        fadeStereo.setTooltip (tr ("The left channel fades out over the sample while the right one fades in"));
+        useLoops.setTooltip (tr ("Plays the loop stored in the sample file (WAV loop points)"));
+        pingPong.setTooltip (tr ("The loop plays forward, then backward"));
+        const std::tuple<juce::Slider*, juce::Label*, const char*, double> knobs[] = {
+            { &fadeIn, &fadeInLabel, TR_NOOP ("Fade in"), 1024.0 }, { &fadeOut, &fadeOutLabel, TR_NOOP ("Fade out"), 1024.0 },
+            { &crossfade, &crossfadeLabel, TR_NOOP ("Crossfade"), 2048.0 }, { &trim, &trimLabel, TR_NOOP ("Trim"), 32768.0 } };
+        for (auto [k, label, text, hi] : knobs)
+        {
+            k->setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+            k->setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 18);
+            k->setRange (0.0, hi, 1.0);
+            k->setDoubleClickReturnValue (true, 0.0);
+            k->onValueChange = [this] { apply(); };
+            addAndMakeVisible (k);
+            label->setText (tr (text), juce::dontSendNotification);
+            label->setJustificationType (juce::Justification::centred);
+            addAndMakeVisible (label);
+        }
+        auto percent = [] (double hi) { return [hi] (double v) { return juce::String (v / hi * 100.0, 1) + "%"; }; };
+        fadeIn.textFromValueFunction = percent (1024.0);
+        fadeOut.textFromValueFunction = percent (1024.0);
+        crossfade.textFromValueFunction = percent (2048.0);
+        trim.textFromValueFunction = [] (double v) {
+            return v <= 0.0 ? tr ("Off") : juce::String (20.0 * std::log10 (v / 32768.0), 1) + " dB";
+        };
+        fadeIn.setTooltip (tr ("Fades the sample in: 25% ramps over the whole sample, 100% over its last quarter"));
+        fadeOut.setTooltip (tr ("Fades the sample out: 25% over the whole sample, 100% within its first quarter"));
+        crossfade.setTooltip (tr ("Crossfades the loop's end into its start (a share of the loop), for a smooth loop"));
+        trim.setTooltip (tr ("Cuts the silence below this level at the sample's start and end"));
+        declickLabel.setText (tr ("Declicking mode"), juce::dontSendNotification);
+        addAndMakeVisible (declickLabel);
+        declick.addItemList ({ tr ("Out only"), tr ("Transient (no bleeding)"), tr ("Transient"), tr ("Generic"), tr ("Smooth"), tr ("Crossfade") }, 1);
+        declick.setTooltip (tr ("How fast a cut note fades out: 10 ms (out only, transient no bleeding), 20 ms (transient, generic), 100 ms (smooth), 200 ms (crossfade)"));
+        declick.onChange = [this] { apply(); };
+        addAndMakeVisible (declick);
+
+        // FL's legacy effects page (REA_rodada167l §1): FL's knob ranges, defaults and hints
+        legacyHeader.setText (tr ("Legacy effects"), juce::dontSendNotification);
+        legacyHeader.setFont (juce::FontOptions (13.0f, juce::Font::bold));
+        addAndMakeVisible (legacyHeader);
+        const std::tuple<juce::Slider*, juce::Label*, const char*, const char*, double, double, double> legacy[] = {
+            { &boost, &boostLabel, TR_NOOP ("Boost"), TR_NOOP ("Boosts the gain"), 0.0, 256.0, 0.0 },
+            { &eq, &eqLabel, TR_NOOP ("EQ"), TR_NOOP ("Shifts the frequency balance"), 0.0, 256.0, 128.0 },
+            { &ringMix, &ringMixLabel, TR_NOOP ("RM mix"), TR_NOOP ("Ring modulation mix"), 0.0, 256.0, 0.0 },
+            { &ringFreq, &ringFreqLabel, TR_NOOP ("RM freq"), TR_NOOP ("Ring modulation frequency"), 0.0, 256.0, 128.0 },
+            { &pogo, &pogoLabel, TR_NOOP ("Pogo"), TR_NOOP ("Pogo effect"), 0.0, 512.0, 256.0 },
+            { &cutoff, &cutoffLabel, TR_NOOP ("Cut"), TR_NOOP ("Filter cutoff"), 16.0, 1024.0, 1024.0 },
+            { &resonance, &resonanceLabel, TR_NOOP ("Res"), TR_NOOP ("Filter resonance"), 0.0, 640.0, 0.0 },
+            { &stereoDelay, &stereoDelayLabel, TR_NOOP ("Stereo delay"), TR_NOOP ("Stereo delay"), 0.0, 4096.0, 2048.0 },
+            { &reverbAmount, &reverbLabel, TR_NOOP ("Reverb"), TR_NOOP ("Reverb amount"), 0.0, 256.0, 0.0 } };
+        for (auto [k, label, text, hint, lo, hi, def] : legacy)
+        {
+            k->setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+            k->setTextBoxStyle (juce::Slider::TextBoxBelow, false, 56, 18);
+            k->setRange (lo, hi, 1.0);
+            k->setValue (def, juce::dontSendNotification);
+            k->setDoubleClickReturnValue (true, def);
+            k->setTooltip (tr (hint));
+            k->onValueChange = [this] { apply(); };
+            addAndMakeVisible (k);
+            label->setText (tr (text), juce::dontSendNotification);
+            label->setJustificationType (juce::Justification::centred);
+            addAndMakeVisible (label);
+        }
+        reverbType.addItemList ({ tr ("Type 1"), tr ("Type 2") }, 1);
+        reverbType.setTooltip (tr ("Reverb type"));
+        reverbType.onChange = [this] { apply(); };
+        addAndMakeVisible (reverbType);
+        clip.setButtonText (tr ("Clip"));
+        clip.setTooltip (tr ("Add clipping at 0dB"));
+        clip.onClick = [this] { apply(); };
+        addAndMakeVisible (clip);
+        load();
+        setSize (500, 560);
+    }
+
+    void resized() override
+    {
+        auto area = getLocalBounds().reduced (12);
+        auto rows = area.removeFromTop (4 * 26);
+        auto left = rows.removeFromLeft (rows.getWidth() / 2);
+        for (auto* b : { &removeDc, &normalize, &polarity, &fadeStereo })
+            b->setBounds (left.removeFromTop (26));
+        for (auto* b : { &swapStereo, &useLoops, &pingPong })
+            b->setBounds (rows.removeFromTop (26));
+        area.removeFromTop (10);
+        auto knobRow = area.removeFromTop (110);
+        const auto w = knobRow.getWidth() / 4;
+        for (auto [k, label] : { std::pair { &fadeIn, &fadeInLabel }, { &fadeOut, &fadeOutLabel }, { &crossfade, &crossfadeLabel }, { &trim, &trimLabel } })
+        {
+            auto column = knobRow.removeFromLeft (w);
+            label->setBounds (column.removeFromTop (18));
+            k->setBounds (column);
+        }
+        area.removeFromTop (12);
+        auto row = area.removeFromTop (26);
+        declickLabel.setBounds (row.removeFromLeft (140));
+        declick.setBounds (row.removeFromLeft (220));
+
+        area.removeFromTop (14);
+        legacyHeader.setBounds (area.removeFromTop (20));
+        auto layoutRow = [] (juce::Rectangle<int> r, std::initializer_list<std::pair<juce::Slider*, juce::Label*>> knobs) {
+            const auto w = r.getWidth() / 5;
+            for (auto [k, label] : knobs)
+            {
+                auto column = r.removeFromLeft (w);
+                label->setBounds (column.removeFromTop (18));
+                k->setBounds (column);
+            }
+            return r;
+        };
+        layoutRow (area.removeFromTop (96), { { &boost, &boostLabel }, { &eq, &eqLabel }, { &ringMix, &ringMixLabel }, { &ringFreq, &ringFreqLabel }, { &pogo, &pogoLabel } });
+        area.removeFromTop (6);
+        auto last = layoutRow (area.removeFromTop (96), { { &cutoff, &cutoffLabel }, { &resonance, &resonanceLabel }, { &stereoDelay, &stereoDelayLabel }, { &reverbAmount, &reverbLabel } });
+        last.removeFromTop (22);
+        reverbType.setBounds (last.removeFromTop (24).reduced (4, 0));
+        last.removeFromTop (8);
+        clip.setBounds (last.removeFromTop (24).reduced (4, 0));
+    }
+
+private:
+    void load()
+    {
+        const auto* c = ref.get (engine);
+        if (c == nullptr)
+            return;
+        const juce::ScopedValueSetter<bool> guard (loading, true);
+        const auto& p = c->sampler.precompute;
+        removeDc.setToggleState (p.removeDc, juce::dontSendNotification);
+        normalize.setToggleState (p.normalize, juce::dontSendNotification);
+        polarity.setToggleState (p.reversePolarity, juce::dontSendNotification);
+        fadeStereo.setToggleState (p.fadeStereo, juce::dontSendNotification);
+        swapStereo.setToggleState (p.swapStereo, juce::dontSendNotification);
+        useLoops.setToggleState (c->sampler.useLoopPoints, juce::dontSendNotification);
+        pingPong.setToggleState (p.pingPong, juce::dontSendNotification);
+        fadeIn.setValue (p.fadeIn, juce::dontSendNotification);
+        fadeOut.setValue (p.fadeOut, juce::dontSendNotification);
+        crossfade.setValue (p.crossfade, juce::dontSendNotification);
+        trim.setValue (p.trim, juce::dontSendNotification);
+        boost.setValue (p.boost, juce::dontSendNotification);
+        eq.setValue (p.eq, juce::dontSendNotification);
+        ringMix.setValue (p.ringMix, juce::dontSendNotification);
+        ringFreq.setValue (p.ringFreq, juce::dontSendNotification);
+        pogo.setValue (p.pogo, juce::dontSendNotification);
+        cutoff.setValue (p.cutoff, juce::dontSendNotification);
+        resonance.setValue (p.resonance, juce::dontSendNotification);
+        stereoDelay.setValue (p.stereoDelay, juce::dontSendNotification);
+        reverbAmount.setValue (p.reverb, juce::dontSendNotification);
+        reverbType.setSelectedId (p.reverbType == 0 ? 1 : 2, juce::dontSendNotification);
+        clip.setToggleState (p.clip, juce::dontSendNotification);
+        declick.setSelectedId (juce::jlimit (0, 5, c->sampler.declickMode) + 1, juce::dontSendNotification);
+    }
+
+    void apply()
+    {
+        if (loading)
+            return;
+        SamplePrecompute p;
+        p.removeDc = removeDc.getToggleState();
+        p.normalize = normalize.getToggleState();
+        p.reversePolarity = polarity.getToggleState();
+        p.fadeStereo = fadeStereo.getToggleState();
+        p.swapStereo = swapStereo.getToggleState();
+        p.pingPong = pingPong.getToggleState();
+        p.fadeIn = (int) fadeIn.getValue();
+        p.fadeOut = (int) fadeOut.getValue();
+        p.crossfade = (int) crossfade.getValue();
+        p.trim = (int) trim.getValue();
+        p.boost = (int) boost.getValue();
+        p.eq = (int) eq.getValue();
+        p.ringMix = (int) ringMix.getValue();
+        p.ringFreq = (int) ringFreq.getValue();
+        p.pogo = (int) pogo.getValue();
+        p.cutoff = (int) cutoff.getValue();
+        p.resonance = (int) resonance.getValue();
+        p.stereoDelay = (int) stereoDelay.getValue();
+        p.reverb = (int) reverbAmount.getValue();
+        p.reverbType = reverbType.getSelectedId() == 1 ? 0 : 1;
+        p.clip = clip.getToggleState();
+        const auto loops = useLoops.getToggleState();
+        const auto mode = juce::jlimit (0, 5, declick.getSelectedId() - 1);
+        const auto* c = ref.get (engine);
+        if (c == nullptr || (c->sampler.precompute == p && c->sampler.useLoopPoints == loops && c->sampler.declickMode == mode))
+            return;
+        ref.edit (engine, [p, loops, mode] (ChannelDef& d) {
+            d.sampler.precompute = p;
+            d.sampler.useLoopPoints = loops;
+            d.sampler.declickMode = mode;
+        });
+    }
+
+    AudioEngine& engine;
+    ChannelRef ref;
+    bool loading = false;
+    juce::ToggleButton removeDc, normalize, polarity, fadeStereo, swapStereo, useLoops, pingPong;
+    juce::Slider fadeIn, fadeOut, crossfade, trim;
+    juce::Label fadeInLabel, fadeOutLabel, crossfadeLabel, trimLabel, declickLabel;
+    juce::ComboBox declick;
+    juce::Label legacyHeader;
+    juce::Slider boost, eq, ringMix, ringFreq, pogo, cutoff, resonance, stereoDelay, reverbAmount;
+    juce::Label boostLabel, eqLabel, ringMixLabel, ringFreqLabel, pogoLabel, cutoffLabel, resonanceLabel, stereoDelayLabel, reverbLabel;
+    juce::ComboBox reverbType;
+    juce::ToggleButton clip;
+};
+
 class SettingsPanel final : public juce::Component,
                             public juce::DragAndDropTarget,
                             public juce::FileDragAndDropTarget,
@@ -1694,6 +1930,12 @@ public:
         modulationButton.setButtonText (tr ("Modulation (envelopes and LFOs)..."));
         modulationButton.onClick = [this] { showModulationFor (*this, engine, ref.index); };
         addAndMakeVisible (modulationButton);
+        precomputeButton.setButtonText (tr ("Precomputed effects..."));
+        precomputeButton.setTooltip (tr ("FL's precomputed effects: remove DC, normalize, reverse polarity, fades, swap / fade stereo, trim, loop crossfade, loop points and the declicking mode"));
+        precomputeButton.onClick = [this] {
+            juce::CallOutBox::launchAsynchronously (std::make_unique<PrecomputePanel> (engine, ref), precomputeButton.getScreenBounds(), nullptr);
+        };
+        addAndMakeVisible (precomputeButton);
         regionEnd.setDoubleClickReturnValue (true, 1.0);
         regionStart.setTooltip (tr ("Where the sample starts playing (fraction of the file)"));
         sustain.setDoubleClickReturnValue (true, 1.0);
@@ -1808,7 +2050,12 @@ public:
             filterType.setBounds (filterRow.removeFromRight (filterRow.getWidth() / 3).withSizeKeepingCentre (124, 24));
             place (filterRow.withWidth (filterRow.getWidth() * 3 / 2), { { &cutoff, &cutoffLabel }, { &resonance, &resonanceLabel } });
         }
-        modulationButton.setBounds (area.removeFromBottom (26).withSizeKeepingCentre (260, 26));
+        {
+            auto buttons = area.removeFromBottom (26);
+            const auto half = buttons.getWidth() / 2;
+            modulationButton.setBounds (buttons.removeFromLeft (half).reduced (4, 0));
+            precomputeButton.setBounds (buttons.reduced (4, 0));
+        }
         area.removeFromTop (6);
         reverse.setBounds (area.removeFromLeft (150).removeFromTop (24));
         cut.setBounds (area.removeFromLeft (130).removeFromTop (24));
@@ -2067,7 +2314,7 @@ private:
         cutoffLabel, resonanceLabel;
     juce::ToggleButton reverse, cut, keepPitch, porta;
     juce::ComboBox filterType, stretchMethod;
-    juce::TextButton modulationButton;
+    juce::TextButton modulationButton, precomputeButton;
     ui::WaveformDisplay wave;
 };
 
@@ -2310,7 +2557,7 @@ private:
         };
 
         const auto generators = patches.getChildFile ("Plugin presets/Generators");
-        for (const auto* name : { "Sytrus", "Harmor", "GMS", "Harmless", "MiniSynth", "Fruity DX10", "Fruit Kick", "Ogun", "Sakura", "Kepler",
+        for (const auto* name : { "Sytrus", "Harmor", "GMS", "Harmless", "MiniSynth", "Fruity DX10", "Fruit Kick", "Ogun", "Sakura", "Kepler", "Kepler Exo",
                                  "PoiZone", "Toxic Biohazard", "BassDrum" })
             if (auto sub = folderMenu (generators.getChildFile (name), 0); sub.getNumItems() > 0)
                 menu.addSubMenu (name, sub);
@@ -3572,7 +3819,7 @@ bool isModelKind (InstrumentKind kind) noexcept
            || kind == InstrumentKind::drumsynth || kind == InstrumentKind::harmless || kind == InstrumentKind::harmor
            || kind == InstrumentKind::gms || kind == InstrumentKind::morphine
            || kind == InstrumentKind::ogun || kind == InstrumentKind::minisynth
-           || kind == InstrumentKind::dx10 || kind == InstrumentKind::kepler || kind == InstrumentKind::poizone
+           || kind == InstrumentKind::dx10 || kind == InstrumentKind::kepler || kind == InstrumentKind::keplerExo || kind == InstrumentKind::poizone
            || kind == InstrumentKind::fruitkick || kind == InstrumentKind::bassdrum || kind == InstrumentKind::toxic
            || kind == InstrumentKind::threeosc
            || kind == InstrumentKind::autogun || kind == InstrumentKind::transistorbass
@@ -3593,6 +3840,8 @@ std::unique_ptr<juce::Component> makeInstrumentPage (AudioEngine& engine, const 
         return makeDanceEditor (engine, ref.index); // round 165e
     if (kind == InstrumentKind::videoplayer)
         return makeVideoPlayerEditor (engine, ref.locate, ref.index); // round 165g
+    if (kind == InstrumentKind::wavetraveller)
+        return makeWaveTravellerEditor (engine, ref.locate, ref.index); // round 167f
     if (kind == InstrumentKind::synth)
         return std::make_unique<SynthPanel> (engine, ref);
     if (isModelKind (kind))
@@ -3720,6 +3969,7 @@ bool hasChannelSettings (InstrumentKind kind) noexcept
         case InstrumentKind::minisynth:
         case InstrumentKind::dx10:
         case InstrumentKind::kepler:
+        case InstrumentKind::keplerExo:
         case InstrumentKind::poizone:
         case InstrumentKind::fruitkick:
         case InstrumentKind::bassdrum:
@@ -3743,6 +3993,7 @@ bool hasChannelSettings (InstrumentKind kind) noexcept
         case InstrumentKind::dashboard:
         case InstrumentKind::voltage:
         case InstrumentKind::vfx:
+        case InstrumentKind::wavetraveller:
             return true;
         default:
             return false;
@@ -3764,6 +4015,11 @@ void closeChannelSettings (int channel)
 std::unique_ptr<juce::Component> makeChannelModulationPanel (AudioEngine& engine, int channel)
 {
     return std::make_unique<ModulationPanel> (engine, ChannelRef::rack (channel));
+}
+
+std::unique_ptr<juce::Component> makeChannelPrecomputePanel (AudioEngine& engine, int channel)
+{
+    return std::make_unique<PrecomputePanel> (engine, ChannelRef::rack (channel));
 }
 
 std::unique_ptr<juce::Component> makeChannelFrame (AudioEngine& engine, int channel, int tab)
@@ -3801,12 +4057,14 @@ std::unique_ptr<juce::Component> makeChannelSettingsPanel (AudioEngine& engine, 
         return makeDanceEditor (engine, channel); // round 165e
     if (engine.getSong().channels[(std::size_t) channel].instrument == InstrumentKind::videoplayer)
         return makeVideoPlayerEditor (engine, channel); // round 165g
+    if (engine.getSong().channels[(std::size_t) channel].instrument == InstrumentKind::wavetraveller)
+        return makeWaveTravellerEditor (engine, channel); // round 167f
     if (const auto kind = engine.getSong().channels[(std::size_t) channel].instrument;
         kind == InstrumentKind::sakura || kind == InstrumentKind::drumpad || kind == InstrumentKind::boobass
                  || kind == InstrumentKind::drumsynth || kind == InstrumentKind::harmless || kind == InstrumentKind::harmor
                  || kind == InstrumentKind::gms || kind == InstrumentKind::morphine
                  || kind == InstrumentKind::ogun || kind == InstrumentKind::minisynth
-                 || kind == InstrumentKind::dx10 || kind == InstrumentKind::kepler || kind == InstrumentKind::poizone
+                 || kind == InstrumentKind::dx10 || kind == InstrumentKind::kepler || kind == InstrumentKind::keplerExo || kind == InstrumentKind::poizone
                  || kind == InstrumentKind::fruitkick || kind == InstrumentKind::bassdrum || kind == InstrumentKind::toxic
                  || kind == InstrumentKind::threeosc
                  || kind == InstrumentKind::autogun || kind == InstrumentKind::transistorbass

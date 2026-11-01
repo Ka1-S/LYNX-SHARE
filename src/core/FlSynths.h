@@ -121,6 +121,9 @@ std::optional<KeyboardControllerData> parseKeyboardController (const std::vector
 // Writes `data` into a version 3 state (round 165c, the Keyboard Controller's editor): the other bytes of a valid `state`
 // (smoothing, the UI's key range, "link") are kept; anything else becomes a new state with FL's defaults.
 void writeKeyboardController (const KeyboardControllerData& data, std::vector<std::uint8_t>& state);
+// A new Keyboard Controller (LYNX's own default): each key's value rising from 0 to 1 over the keyboard, note-off value 0
+// with auto release.
+std::vector<std::uint8_t> defaultKeyboardController();
 
 // Fruity Love Philter (REA_rodada16 §2): zlib state with 6 globals, Mod X/Y and 8 filter units, each
 // with 12 parameters, mode (stages), type, flags and 8 articulators (pan, volume, cutoff, resonance,
@@ -217,9 +220,6 @@ std::optional<std::string> drumSynthLiveSound (const std::vector<std::uint8_t>& 
 
 // Kepler (REA_rodada13 §2, "Kepler-1" mode): saw/pulse/sub/noise, VCF with Env1, LFO, chorus.
 bool synthFromKepler (const std::vector<std::uint8_t>& state, SynthSettings& synth, float& gain);
-
-// Wave Traveller (§4): the sample (path with FL's variables) and the root note; scratching is left out.
-std::optional<std::pair<std::string, int>> waveTravellerSample (const std::vector<std::uint8_t>& state);
 
 // FLEX (§1.1): pack and preset names, from the plugin state. FLEX packs are protected and
 // LYNX does not open them: the channel gets a synth patch chosen by those names.

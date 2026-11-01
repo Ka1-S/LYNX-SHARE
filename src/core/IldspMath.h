@@ -598,4 +598,134 @@ inline float fminf_ (float x, float y)
     if (x != y) return y;
     return (fbits (x) >> 31) ? x : y;
 }
+
+// --- round 167f (the limiter behind Emphasis, REA_rodada167f.md §1.2): the library's double exp and float ln ---
+// Tables, from their definitions: expHiT[j] = 2^(j/64) cut to 28 significant bits, expLoT[j] = 2^(j/64) − expHiT[j]
+// rounded toward zero; lnHiT[j] = ln (1 + j/128) cut to 11 significant bits, lnLoT[j] = the rest rounded toward zero
+// (j = 128: ln 2; j = 129: 0). The reciprocals of logf_ are lgRcp.
+inline constexpr double expHiT[64] = {0x1.0000000000000p+0, 0x1.02c9a30000000p+0, 0x1.059b0d0000000p+0, 0x1.0874510000000p+0, 0x1.0b55860000000p+0, 0x1.0e3ec30000000p+0, 0x1.11301d0000000p+0, 0x1.1429aa0000000p+0, 0x1.172b830000000p+0, 0x1.1a35be0000000p+0, 0x1.1d48730000000p+0, 0x1.2063b80000000p+0, 0x1.2387a60000000p+0, 0x1.26b4560000000p+0, 0x1.29e9df0000000p+0, 0x1.2d285a0000000p+0, 0x1.306fe00000000p+0, 0x1.33c08b0000000p+0, 0x1.371a730000000p+0, 0x1.3a7db30000000p+0, 0x1.3dea640000000p+0, 0x1.4160a20000000p+0, 0x1.44e0860000000p+0, 0x1.486a2b0000000p+0, 0x1.4bfdad0000000p+0, 0x1.4f9b270000000p+0, 0x1.5342b50000000p+0, 0x1.56f4730000000p+0, 0x1.5ab07d0000000p+0, 0x1.5e76f10000000p+0, 0x1.6247eb0000000p+0, 0x1.6623880000000p+0, 0x1.6a09e60000000p+0, 0x1.6dfb230000000p+0, 0x1.71f75e0000000p+0, 0x1.75feb50000000p+0, 0x1.7a11470000000p+0, 0x1.7e2f330000000p+0, 0x1.8258990000000p+0, 0x1.868d990000000p+0, 0x1.8ace540000000p+0, 0x1.8f1ae90000000p+0, 0x1.93737b0000000p+0, 0x1.97d8290000000p+0, 0x1.9c49180000000p+0, 0x1.a0c6670000000p+0, 0x1.a5503b0000000p+0, 0x1.a9e6b50000000p+0, 0x1.ae89f90000000p+0, 0x1.b33a2b0000000p+0, 0x1.b7f76f0000000p+0, 0x1.bcc1e90000000p+0, 0x1.c199bd0000000p+0, 0x1.c67f120000000p+0, 0x1.cb720d0000000p+0, 0x1.d072d40000000p+0, 0x1.d5818d0000000p+0, 0x1.da9e600000000p+0, 0x1.dfc9730000000p+0, 0x1.e502ee0000000p+0, 0x1.ea4afa0000000p+0, 0x1.efa1be0000000p+0, 0x1.f507650000000p+0, 0x1.fa7c180000000p+0};
+inline constexpr double expLoT[64] = {0x0.0p+0, 0x1.cef00c1dcdef9p-25, 0x1.8ac2ba1d73e2ap-27, 0x1.0eb37901186bep-25, 0x1.9f3121ec53172p-25, 0x1.69e8d10103a17p-27, 0x1.25b50a4ebbf1ap-32, 0x1.d525bbf668203p-25, 0x1.8faa2f5b9bef9p-25, 0x1.6df96ea796d31p-25, 0x1.68b9aa7805b80p-28, 0x1.0c519ac771dd6p-25, 0x1.ceac470cd83f5p-25, 0x1.789f37495e99cp-26, 0x1.47f7b84b09745p-26, 0x1.b900c2d002475p-26, 0x1.4636e2a5bd1abp-25, 0x1.320b7fa64e430p-27, 0x1.ceaa72a9c5154p-26, 0x1.3967fdba86f24p-26, 0x1.82468446b6824p-25, 0x1.f72e29f84325bp-28, 0x1.8624b40c4dbd0p-30, 0x1.704f3404f068ep-26, 0x1.4d8a89c750e5ep-26, 0x1.a74b29ab4cf62p-26, 0x1.a753e077c2a0fp-26, 0x1.ad49f699bb2c0p-26, 0x1.a90a852b19260p-25, 0x1.6b48521ba6f93p-26, 0x1.d2ac258f87d03p-31, 0x1.2a91124893ecfp-27, 0x1.9fcef32422cbep-26, 0x1.8ca345de441c5p-25, 0x1.1d8bee7ba46e1p-25, 0x1.9099f22fdba6ap-26, 0x1.f580c36bea881p-27, 0x1.b3d398841740ap-26, 0x1.2999c25159f11p-25, 0x1.68925d901c83bp-25, 0x1.15506dadd3e2ap-27, 0x1.22aee6c57304ep-25, 0x1.9b8bc9e8a0387p-29, 0x1.fbc9c9f173d24p-25, 0x1.51f8480e3e235p-27, 0x1.6bbcac96535b5p-25, 0x1.1f12ae45a1224p-27, 0x1.5e7f6fd0fac90p-26, 0x1.2b5a75abd0e69p-25, 0x1.09e2bf5ed7fa1p-25, 0x1.7daf237553d84p-27, 0x1.2f074891ee83dp-30, 0x1.b0aa538444196p-25, 0x1.cafa29694426fp-25, 0x1.9df20d22a0797p-25, 0x1.40f12f71a1e45p-25, 0x1.9f7490e4bb40bp-25, 0x1.ed9942b84600dp-27, 0x1.bdcdaf5cb4656p-27, 0x1.e2cffd89cf44cp-26, 0x1.52486cc2c7b9dp-27, 0x1.cc2b44eee3fa4p-25, 0x1.6dc8a80ce9f09p-25, 0x1.9e90d82e90a7ep-28};
+inline constexpr float lnHiT[130] = {0x0.0p+0f, 0x1.fe00000000000p-8f, 0x1.fc00000000000p-7f, 0x1.7b80000000000p-6f, 0x1.f820000000000p-6f, 0x1.39e0000000000p-5f, 0x1.7740000000000p-5f, 0x1.b420000000000p-5f, 0x1.f0a0000000000p-5f, 0x1.1640000000000p-4f, 0x1.3400000000000p-4f, 0x1.51a0000000000p-4f, 0x1.6f00000000000p-4f, 0x1.8c20000000000p-4f, 0x1.a920000000000p-4f, 0x1.c5e0000000000p-4f, 0x1.e260000000000p-4f, 0x1.fec0000000000p-4f, 0x1.0d60000000000p-3f, 0x1.1b60000000000p-3f, 0x1.2940000000000p-3f, 0x1.3700000000000p-3f, 0x1.44c0000000000p-3f, 0x1.5260000000000p-3f, 0x1.5fe0000000000p-3f, 0x1.6d60000000000p-3f, 0x1.7aa0000000000p-3f, 0x1.87e0000000000p-3f, 0x1.9520000000000p-3f, 0x1.a220000000000p-3f, 0x1.af20000000000p-3f, 0x1.bc20000000000p-3f, 0x1.c8e0000000000p-3f, 0x1.d5c0000000000p-3f, 0x1.e260000000000p-3f, 0x1.ef00000000000p-3f, 0x1.fb80000000000p-3f, 0x1.0400000000000p-2f, 0x1.0a20000000000p-2f, 0x1.1040000000000p-2f, 0x1.1660000000000p-2f, 0x1.1c80000000000p-2f, 0x1.2280000000000p-2f, 0x1.2880000000000p-2f, 0x1.2e80000000000p-2f, 0x1.3460000000000p-2f, 0x1.3a60000000000p-2f, 0x1.4040000000000p-2f, 0x1.4600000000000p-2f, 0x1.4be0000000000p-2f, 0x1.51a0000000000p-2f, 0x1.5760000000000p-2f, 0x1.5d00000000000p-2f, 0x1.62c0000000000p-2f, 0x1.6860000000000p-2f, 0x1.6e00000000000p-2f, 0x1.7380000000000p-2f, 0x1.7920000000000p-2f, 0x1.7ea0000000000p-2f, 0x1.8420000000000p-2f, 0x1.89a0000000000p-2f, 0x1.8f00000000000p-2f, 0x1.9460000000000p-2f, 0x1.99c0000000000p-2f, 0x1.9f20000000000p-2f, 0x1.a480000000000p-2f, 0x1.a9c0000000000p-2f, 0x1.af00000000000p-2f, 0x1.b440000000000p-2f, 0x1.b980000000000p-2f, 0x1.bea0000000000p-2f, 0x1.c3c0000000000p-2f, 0x1.c8e0000000000p-2f, 0x1.ce00000000000p-2f, 0x1.d320000000000p-2f, 0x1.d820000000000p-2f, 0x1.dd40000000000p-2f, 0x1.e240000000000p-2f, 0x1.e740000000000p-2f, 0x1.ec20000000000p-2f, 0x1.f120000000000p-2f, 0x1.f600000000000p-2f, 0x1.fae0000000000p-2f, 0x1.ffc0000000000p-2f, 0x1.0240000000000p-1f, 0x1.04a0000000000p-1f, 0x1.0720000000000p-1f, 0x1.0980000000000p-1f, 0x1.0be0000000000p-1f, 0x1.0e40000000000p-1f, 0x1.1080000000000p-1f, 0x1.12e0000000000p-1f, 0x1.1540000000000p-1f, 0x1.1780000000000p-1f, 0x1.19e0000000000p-1f, 0x1.1c20000000000p-1f, 0x1.1e80000000000p-1f, 0x1.20c0000000000p-1f, 0x1.2300000000000p-1f, 0x1.2540000000000p-1f, 0x1.2780000000000p-1f, 0x1.29c0000000000p-1f, 0x1.2c00000000000p-1f, 0x1.2e40000000000p-1f, 0x1.3060000000000p-1f, 0x1.32a0000000000p-1f, 0x1.34e0000000000p-1f, 0x1.3700000000000p-1f, 0x1.3920000000000p-1f, 0x1.3b60000000000p-1f, 0x1.3d80000000000p-1f, 0x1.3fa0000000000p-1f, 0x1.41c0000000000p-1f, 0x1.43e0000000000p-1f, 0x1.4600000000000p-1f, 0x1.4820000000000p-1f, 0x1.4a40000000000p-1f, 0x1.4c60000000000p-1f, 0x1.4e60000000000p-1f, 0x1.5080000000000p-1f, 0x1.52a0000000000p-1f, 0x1.54a0000000000p-1f, 0x1.56a0000000000p-1f, 0x1.58c0000000000p-1f, 0x1.5ac0000000000p-1f, 0x1.5cc0000000000p-1f, 0x1.5ee0000000000p-1f, 0x1.60e0000000000p-1f, 0x1.62e0000000000p-1f, 0x0.0p+0f};
+inline constexpr float lnLoT[130] = {0x0.0p+0f, 0x1.5358820000000p-23f, 0x1.5161f80000000p-20f, 0x1.1b07d40000000p-18f, 0x1.361cf00000000p-19f, 0x1.0f73fc0000000p-18f, 0x1.63d8ca0000000p-19f, 0x1.bae2320000000p-18f, 0x1.86008a0000000p-20f, 0x1.36eea20000000p-16f, 0x1.d7961a0000000p-16f, 0x1.073f060000000p-16f, 0x1.a515ca0000000p-17f, 0x1.45d6300000000p-16f, 0x1.b4e92a0000000p-18f, 0x1.523d6e0000000p-18f, 0x1.076e2a0000000p-16f, 0x1.2263b60000000p-17f, 0x1.7e7cd00000000p-15f, 0x1.2ad52e0000000p-15f, 0x1.52f81e0000000p-15f, 0x1.fc201e0000000p-15f, 0x1.2b6cca0000000p-15f, 0x1.cbc7420000000p-16f, 0x1.3070a60000000p-15f, 0x1.fce33a0000000p-20f, 0x1.8902100000000p-15f, 0x1.a065200000000p-15f, 0x1.6a73d00000000p-17f, 0x1.bc1fe20000000p-15f, 0x1.c94e800000000p-15f, 0x1.0ce85a0000000p-16f, 0x1.f7c79a0000000p-15f, 0x1.0b5a7c0000000p-18f, 0x1.076e2a0000000p-15f, 0x1.5b97b80000000p-16f, 0x1.186d5e0000000p-15f, 0x1.2ca5a60000000p-17f, 0x1.24e2720000000p-14f, 0x1.8bf9ae0000000p-14f, 0x1.5cabaa0000000p-14f, 0x1.3182d20000000p-15f, 0x1.41fbce0000000p-14f, 0x1.5a13de0000000p-14f, 0x1.c575c20000000p-15f, 0x1.dd9a980000000p-14f, 0x1.3155a40000000p-16f, 0x1.8434340000000p-17f, 0x1.8bc21c0000000p-14f, 0x1.7e55dc0000000p-16f, 0x1.5b0e5a0000000p-15f, 0x1.dc5d140000000p-16f, 0x1.bdbf580000000p-14f, 0x1.05e5720000000p-15f, 0x1.903d360000000p-15f, 0x1.1d54560000000p-15f, 0x1.d7f6ba0000000p-14f, 0x1.4abfba0000000p-15f, 0x1.f077040000000p-15f, 0x1.a3b43c0000000p-15f, 0x1.9c360a0000000p-17f, 0x1.1e87360000000p-14f, 0x1.941c200000000p-14f, 0x1.9581160000000p-14f, 0x1.23ecbe0000000p-14f, 0x1.0243960000000p-16f, 0x1.d935340000000p-15f, 0x1.2932460000000p-14f, 0x1.eef7980000000p-15f, 0x1.625a4c0000000p-16f, 0x1.4d9da60000000p-14f, 0x1.d7a7cc0000000p-14f, 0x1.f7c79a0000000p-14f, 0x1.af0b840000000p-14f, 0x1.fcfc000000000p-15f, 0x1.e7258a0000000p-14f, 0x1.a813060000000p-16f, 0x1.1034f80000000p-15f, 0x1.09875a0000000p-16f, 0x1.99d2460000000p-14f, 0x1.1ebf5e0000000p-15f, 0x1.23fa700000000p-14f, 0x1.588f780000000p-14f, 0x1.2e08560000000p-14f, 0x1.52a5a40000000p-13f, 0x1.df9da80000000p-13f, 0x1.f2e0e60000000p-16f, 0x1.bd3d5c0000000p-15f, 0x1.cb90940000000p-15f, 0x1.2617460000000p-15f, 0x1.f39e2c0000000p-13f, 0x1.7195920000000p-13f, 0x1.87a5e80000000p-14f, 0x1.eabbd80000000p-13f, 0x1.cd68ce0000000p-14f, 0x1.b81f700000000p-13f, 0x1.7d79c00000000p-15f, 0x1.b9a3240000000p-14f, 0x1.30d7be0000000p-13f, 0x1.5bce980000000p-13f, 0x1.5e12880000000p-13f, 0x1.37fec20000000p-13f, 0x1.d3da880000000p-14f, 0x1.d0db900000000p-15f, 0x1.d7334e0000000p-13f, 0x1.1339120000000p-13f, 0x1.44ece60000000p-16f, 0x1.17b5460000000p-13f, 0x1.e0d3560000000p-13f, 0x1.0893fe0000000p-14f, 0x1.026a700000000p-13f, 0x1.5b84d00000000p-13f, 0x1.8fe8460000000p-13f, 0x1.9fe2f80000000p-13f, 0x1.8bc21c0000000p-13f, 0x1.53d1ea0000000p-13f, 0x1.f0bb600000000p-14f, 0x1.e6bf320000000p-15f, 0x1.d811b60000000p-13f, 0x1.13cc000000000p-13f, 0x1.6932de0000000p-16f, 0x1.2467980000000p-13f, 0x1.f9d5b20000000p-13f, 0x1.5b6b9a0000000p-14f, 0x1.404c340000000p-13f, 0x1.b1dc6c0000000p-13f, 0x1.54920a0000000p-20f, 0x1.97a23c0000000p-16f, 0x1.0bfbe80000000p-15f, 0x0.0p+0f};
+
+// exp of a double (the library's own, not the C runtime's): 2^(N/64) e^y with N = trunc (x · 64/ln 2), the table
+// value split in three, a degree-6 polynomial; FMA or plain variant like the originals
+inline double expD_ (double x)
+{
+    const std::uint64_t ax = dbits (x) & 0x7fffffffffffffffull;
+    if (ax >= 0x7ff0000000000000ull)
+    {
+        if (x != x) return x + x;
+        return (dbits (x) >> 63) ? 0.0 : x;
+    }
+    if (! (x <= 0x1.62e42fefa39efp+9 && ! (x < -0x1.74046dfefd9d0p+9)))
+    {
+        if (x > 0x1.62e42fefa39efp+9) return INFINITY;
+        return x > -0x1.74910d52d3051p+9 ? 4.9406564584124654e-324 : 0.0;
+    }
+    if (ax <= 0x3e50000000000000ull) return x + 1.0; // |x| ≤ 2^-26
+    const double t = x * 0x1.71547652b82fep+6;
+    const int N = cvttD2I (t);
+    const double nd = N;
+    double q;
+    if (useFma())
+    {
+        const double x1 = fmaD (nd, -0x1.62e42fefa0000p-7, x);
+        const double y = nd * -0x1.cf79abc9e3b39p-46 + x1;
+        double p = fmaD (0x1.6c16c16c16c17p-10, y, 0x1.1111111111111p-7);
+        p = fmaD (p, y, 0x1.5555555555555p-5);
+        p = fmaD (p, y, 0x1.5555555555555p-3);
+        p = fmaD (p, y, 0.5);
+        q = fmaD (y * y, p, y);
+    }
+    else
+    {
+        const double x1 = x + nd * -0x1.62e42fefa0000p-7;
+        const double y = nd * -0x1.cf79abc9e3b39p-46 + x1;
+        double a = 0x1.6c16c16c16c17p-10 * y + 0x1.1111111111111p-7;
+        double b = 0x1.5555555555555p-3 * y;
+        const double y2 = y * y;
+        b = b + 0.5;
+        const double y4 = y2 * y2;
+        a = a * y;
+        b = b * y2;
+        a = a + 0x1.5555555555555p-5;
+        b = b + y;
+        a = a * y4;
+        q = b + a;
+    }
+    const int j = N & 63, m = N >> 6;
+    double r = q * exp2T[j];
+    r = r + expLoT[j];
+    r = r + expHiT[j];
+    if (m > -1022 || (m == -1022 && r >= 1.0))
+        return dfrom (dbits (r) + ((std::uint64_t) (std::int64_t) m << 52));
+    const int sh = m + 1074;
+    return sh >= 0 ? r * dfrom (1ull << sh) : 0.0;
+}
+
+// natural log of a float x > 0 (log10f_'s twin: same reduction, ln tables and constants)
+inline float logf_ (float xf)
+{
+    std::uint32_t xb = fbits (xf);
+    if ((xb & 0x7fffffffu) >= 0x7f800000u) return xf != xf ? ffrom (xb | 0x400000u) : (xb >> 31 ? NAN : xf);
+    if (! (xf > 0.0f)) return xf == 0.0f ? -INFINITY : NAN;
+    float e = (float) ((std::int32_t) (xb >> 23) - 127);
+    std::uint32_t mb = xb & 0x007fffffu;
+    const float d1 = std::fabs (xf - 1.0f);
+    const bool fused = useFma();
+    if (e == -127.0f) // denormal input (not reached with DAZ)
+    {
+        const float t = ffrom (mb | 0x3f800000u) - 1.0f;
+        const std::uint32_t tb = fbits (t);
+        e = (float) ((std::int32_t) (tb >> 23) - 253);
+        mb = tb & 0x007fffffu;
+        xb = tb;
+    }
+    if (! (d1 < 0.0625f))
+    {
+        const std::uint32_t ib = (xb & 0x007f0000u) + ((xb & 0x00008000u) << 1);
+        const std::uint32_t idx = ib >> 16;
+        const float cm = ffrom (ib | 0x3f000000u);
+        const float mm = ffrom (mb | 0x3f000000u);
+        const float r = (cm - mm) * lgRcp[idx];
+        float s, a, b;
+        if (fused)
+        {
+            const float q = fmaF (0.333333343f, r, 0.5f);
+            s = fmaF (q, r * r, r);
+            a = fmaF (0x1.0bfbe8p-15f, e, -s);
+            b = fmaF (0x1.62ep-1f, e, lnHiT[idx]);
+        }
+        else
+        {
+            float q = r * 0.333333343f + 0.5f;
+            q = q * (r * r);
+            s = r + q;
+            a = 0x1.0bfbe8p-15f * e;
+            a = a - s;
+            b = 0x1.62ep-1f * e + lnHiT[idx];
+        }
+        a = a + lnLoT[idx];
+        return b + a;
+    }
+    const float f = xf - 1.0f;
+    const float u = f / (2.0f + f);
+    const float fu = f * u;
+    const float s = u + u;
+    const float v = s * s;
+    const float sv = s * v;
+    float t;
+    if (fused)
+    {
+        t = fmaF (v, 0.0125000002f, 0.0833333358f);
+        t = fmaF (t, sv, -fu);
+    }
+    else
+    {
+        t = v * 0.0125000002f + 0.0833333358f;
+        t = t * sv - fu;
+    }
+    return f + t;
+}
 } // namespace lynx::ildsp

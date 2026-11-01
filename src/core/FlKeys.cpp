@@ -1041,10 +1041,12 @@ public:
         const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
         const auto initVol = (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0;
         const auto k = std::clamp (key, 0, 127);
-        const auto finalPitch = (float) (100.0 * (k - 60) + (double) pitchCents.load() + (double) nextCents);
+        const auto knob = pitchCents.load();
+        const auto finalPitch = (float) (100.0 * (k - 60) + (double) knob + (double) nextCents);
         if (auto* v = engine.trigger (k, (float) initVol, (float) (channelVol * initVol),
                                       (float) std::clamp ((double) nextPan + channelPan, -1.0, 1.0), finalPitch))
         {
+            v->slide.anchor (live.ref (knob));
             const auto slot = (std::size_t) (v - engine.voices.data());
             volFactor[slot] = (float) initVol;
             notePan[slot] = nextPan;
@@ -1068,6 +1070,15 @@ public:
         for (auto& v : engine.voices)
             if (v.active && ! v.released)
                 v.slide.start (to - (v.finalPitch - v.slide.cents), samples);
+    }
+
+    // FL's PITCH knob and main pitch move the sounding notes too (round 167a)
+    void setChannelPitchNow (float knob, float rest) noexcept override
+    {
+        live.set (knob, rest);
+        for (auto& v : engine.voices)
+            if (v.active)
+                v.slide.follow (live.now());
     }
 
     bool idle() const noexcept override { return engine.idle(); }
@@ -1126,6 +1137,7 @@ private:
     std::array<std::atomic<int>, 15> knobs {};
     std::array<int, 15> current {};
     std::atomic<float> pitchCents { 0.0f };
+    LiveChannelPitch live; // (audio thread)
     std::array<float, maxVoices> volFactor {}, notePan {};
     double channelVol = 1.0, channelPan = 0.0;
     float nextPan = 0.0f, nextCents = 0.0f;

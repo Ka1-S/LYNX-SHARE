@@ -12,11 +12,8 @@
 
 namespace lynx
 {
-// The FL instrument engines a native project can add (core/NativeEngines.h, round 142, issue #5) as items of `menu`:
-// a new one starts from the plugin's Default preset of the user's FL installation; without it the item is disabled
-// and says "(requires FL Studio)". `add` receives the new channel (mixerTrack left to it).
-void addFlEngineItems (juce::PopupMenu& menu, std::function<void (ChannelDef)> add);
-// The engine's menu name ("(beta)", "(requires FL Studio)")
+// The menu name of an FL instrument engine (core/NativeEngines.h, round 142, issue #5; the generator menus list them
+// through quickpick::generatorEntries) ("(beta)", "(requires FL Studio)")
 juce::String flEngineName (const natives::InstrumentEngine& e);
 
 // FL-style Channel Rack: one row per channel with mute, pan, volume, mixer insert, name, selector
@@ -50,6 +47,8 @@ public:
 
     // Settings > "Keep channel editors open": opening an editor never closes the previous one.
     static bool keepEditorsOpen;
+    // FL's "Select first channel with notes when the pattern changes" (Settings › General; REA round 167j §5)
+    static bool selectFirstChannelWithNotes;
 
     void paint (juce::Graphics& g) override;
     void mouseDown (const juce::MouseEvent& e) override;
@@ -87,6 +86,7 @@ public:
     void setPianoRollView (bool on);
     bool isPianoRollView() const noexcept { return pianoRollView; }
     bool areGraphLanesShown() const noexcept { return graphLanes; }
+    juce::PopupMenu getChannelMenuForSnapshot (int channel) { return buildChannelMenu (channel); }
     void setGraphLevelForSnapshot (int level) { graphLevel = level; graphLanes = true; updateSize(); repaint(); }
     void rotateSelected (int steps);
     void fillSelected (int every);
@@ -196,8 +196,10 @@ private:
     juce::Rectangle<int> stepBounds (int row, int step) const;
     bool cellHasNote (int channel, int step) const;
     void applyPaint (const juce::MouseEvent& e);
+    juce::PopupMenu buildChannelMenu (int channel);
     void showChannelMenu (int channel);
-    void chooseSample (int channel); // channel < 0 = new channel
+    void chooseSample (int channel, int insertAt = -1); // channel < 0 = new channel (at the end, or at row insertAt)
+    void openNewGenerator (int row, InstrumentKind kind); // the window a new / replaced generator opens with
     void assignSample (int channel, const juce::File& file);
     void rename (int channel);
     void openPluginWindow (int channel);

@@ -78,9 +78,12 @@ std::vector<Action> makeActions()
         { "pattern.next", TR_NOOP ("Next pattern"), Context::global, { chord (numpadPlus) } },
         { "pattern.previous", TR_NOOP ("Previous pattern"), Context::global, { chord (numpadMinus) } },
         { "pattern.nextEmpty", TR_NOOP ("Next empty pattern (and name it)"), Context::global, { chord (f4) } },
+        { "pattern.firstEmpty", TR_NOOP ("First empty pattern (and name it)"), Context::global, { chord (f4, shift) } },
+        { "pattern.nextEmptyNoName", TR_NOOP ("Next empty pattern (no naming)"), Context::global, { chord (f4, ctrl) } },
         { "pattern.rename", TR_NOOP ("Rename and color the pattern"), Context::global, { chord (f2) } },
         { "pattern.insert", TR_NOOP ("Insert an empty pattern before the current one"), Context::global, { chord (insert, ctrl | shift) } },
-        { "pattern.clone", TR_NOOP ("Clone the current pattern"), Context::global, { chord ('C', alt) } },
+        { "pattern.clone", TR_NOOP ("Clone the current pattern"), Context::global, { chord ('C', ctrl | shift), chord ('C', alt) } },
+        { "pattern.delete", TR_NOOP ("Delete the current pattern"), Context::global, { chord (del, ctrl | shift) } },
         { "pattern.moveUp", TR_NOOP ("Move the current pattern up"), Context::global, { chord (up, ctrl | shift) } },
         { "pattern.moveDown", TR_NOOP ("Move the current pattern down"), Context::global, { chord (down, ctrl | shift) } },
 
@@ -98,7 +101,11 @@ std::vector<Action> makeActions()
         { "file.saveAs", TR_NOOP ("Save project as"), Context::global, { chord ('S', ctrl | shift) } },
         { "file.saveNewVersion", TR_NOOP ("Save new version (Song_2, Song_3...)"), Context::global, { chord ('S', ctrl | alt) } },
         { "file.export", TR_NOOP ("Export audio"), Context::global, { chord ('R', ctrl) } },
+        { "file.exportMp3", TR_NOOP ("Export an MP3 file"), Context::global, { chord ('R', ctrl | shift) } },
+        { "file.exportMidi", TR_NOOP ("Export a MIDI file"), Context::global, { chord ('M', ctrl | shift) } },
         { "edit.undo", TR_NOOP ("Undo"), Context::global, { chord ('Z', ctrl) } },
+        // FL's Edit › "Undo backwards" (EditUndoBackwardsAction, Ctrl+Alt+Z; round 167k): one more step back
+        { "edit.undoBackwards", TR_NOOP ("Undo backwards"), Context::global, { chord ('Z', ctrl | alt) } },
         { "edit.redo", TR_NOOP ("Redo"), Context::global, { chord ('Y', ctrl), chord ('Z', ctrl | shift) } },
         { "edit.history", TR_NOOP ("Undo history"), Context::global, { chord ('H', ctrl) } },
         { "help.shortcuts", TR_NOOP ("Shortcut sheet"), Context::global, { chord (f1) } },
@@ -187,6 +194,20 @@ std::vector<Action> makeActions()
         { "playlist.ripple", TR_NOOP ("Ripple editing on/off"), Context::playlist, { chord ('S', shift) } },
         // FL's Playlist › Edit › "Automatic crossfades (current project)" (round 166e)
         { "playlist.autoCrossfades", TR_NOOP ("Automatic crossfades (current project) on/off"), Context::playlist, {} },
+        // FL's Select › time (round 167k: EESelAroundSelAction, EESelPrevAction / EESelNextAction, Playlist focused)
+        { "playlist.selectTimeAround", TR_NOOP ("Select time around selection"), Context::playlist, { chord (enter, ctrl) } },
+        { "playlist.timePrevious", TR_NOOP ("Select previous time"), Context::playlist, { chord (left, ctrl) } },
+        { "playlist.timeNext", TR_NOOP ("Select next time"), Context::playlist, { chord (right, ctrl) } },
+        // FL 2026's Playlist › Time markers (round 167k: EEMarkerAdd2Menu 32852, EEMarkerAddAutoMenu 16468,
+        // EEMarkerAddTSChangeMenu 41044, EEMarkerAddSongLoopMenu 8276); Ctrl+T stays the typing piano elsewhere
+        { "playlist.markerAdd", TR_NOOP ("Time markers: Add one..."), Context::playlist, { chord ('T', alt) } },
+        { "playlist.markerAuto", TR_NOOP ("Time markers: Add auto"), Context::playlist, { chord ('T', ctrl) } },
+        { "playlist.markerSignature", TR_NOOP ("Time markers: Add time signature change..."), Context::playlist, { chord ('T', shift | alt) } },
+        { "playlist.markerLoop", TR_NOOP ("Time markers: Place loop"), Context::playlist, { chord ('T', shift) } },
+        // FL 2026's Playlist › Edit (round 167k: EEPitchSelectedAudioClipsDown/UpAction, EEReverseSelectedAudioClipsAction)
+        { "playlist.pitchClipsDown", TR_NOOP ("Pitch selected audio clips one semitone down"), Context::playlist, { chord ('7') } },
+        { "playlist.pitchClipsUp", TR_NOOP ("Pitch selected audio clips one semitone up"), Context::playlist, { chord ('8') } },
+        { "playlist.reverseClips", TR_NOOP ("Reverse selected audio clips"), Context::playlist, { chord ('9') } },
         { "playlist.quantizeStarts", TR_NOOP ("Quantize the clips' starts"), Context::playlist, { chord ('Q', ctrl) } },
         { "playlist.quantizeHalf", TR_NOOP ("Quantize the clips' starts 50% (halfway to the grid)"), Context::playlist, {} },
         { "playlist.follow", TR_NOOP ("Follow the playhead (auto scrolling) on/off"), Context::playlist, {} },
@@ -221,6 +242,12 @@ std::vector<Action> makeActions()
         { "mixer.linkChannels", TR_NOOP ("Link the selected channels to the selected insert"), Context::mixer, { chord ('L', ctrl) } },
         { "mixer.linkChannelsFrom", TR_NOOP ("Link the selected channels to inserts starting from the selected one"), Context::mixer, { chord ('L', ctrl | shift) } },
         { "mixer.selectLinkedChannels", TR_NOOP ("Select the channels linked to the selected insert"), Context::mixer, { chord ('L', alt) } },
+        // FL's mixer track menu keys (round 167k, the DFM's ShortCut values: F2, S, Alt+R, Shift+Alt+R)
+        { "mixer.rename", TR_NOOP ("Rename and color the selected mixer track"), Context::mixer, { chord (f2) } },
+        { "mixer.soloSelected", TR_NOOP ("Solo the selected mixer track(s)"), Context::mixer, { chord ('S') } },
+        { "mixer.altSoloSelected", TR_NOOP ("Alt solo the selected mixer track(s) (with the tracks that feed them)"), Context::mixer, { chord ('S', alt) } },
+        { "mixer.renderArmed", TR_NOOP ("Disk recording: render the armed tracks to wave file(s)"), Context::mixer, { chord ('R', alt) } },
+        { "mixer.renderSelected", TR_NOOP ("Disk recording: render the selected tracks to wave file(s)"), Context::mixer, { chord ('R', shift | alt) } },
         { "mixer.deleteEffect", TR_NOOP ("Delete the selected effect slot's plugin"), Context::mixer, { chord (del) } },
     };
 

@@ -1,4 +1,6 @@
 #include "core/FlpImport.h"
+
+#include "core/Dvs.h"
 #include "core/FlExtraFx.h"
 #include "core/Scratcher.h"
 #include "core/Transmitter.h"
@@ -24,6 +26,7 @@
 #include "core/BassDrum.h"
 #include "core/FruitKick.h"
 #include "core/Harmor.h"
+#include "core/ClipOps.h"
 #include "core/MiniSynth.h"
 #include "core/SimSynth.h"
 #include "core/Drumaxx.h"
@@ -33,6 +36,7 @@
 #include "core/BeepMap.h"
 #include "core/Sawer.h"
 #include "core/Granulizer.h"
+#include "core/WaveTraveller.h"
 #include "core/Ogun.h"
 #include "core/Dx10.h"
 #include "core/Kepler.h"
@@ -67,9 +71,34 @@
 #include <cctype>
 #include <cmath>
 #include <map>
+#include <ctime>
 
 namespace lynx
 {
+double flDateTimeToUnix (double days)
+{
+    if (! (days > 25569.0 && days < 2958466.0)) // 1970-01-01 … 9999-12-31
+        return 0.0;
+    // the local wall-clock reading as a civil date (H. Hinnant's days → y/m/d), then mktime gives UTC
+    const auto local = (days - 25569.0) * 86400.0;
+    const auto secs = (long long) std::floor (local);
+    long long z = secs / 86400 + 719468;
+    const auto sod = secs % 86400;
+    const long long era = z / 146097, doe = z - era * 146097;
+    const long long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    const long long doy = doe - (365 * yoe + yoe / 4 - yoe / 100), mp = (5 * doy + 2) / 153;
+    std::tm tm {};
+    tm.tm_mday = (int) (doy - (153 * mp + 2) / 5 + 1);
+    tm.tm_mon = (int) (mp < 10 ? mp + 2 : mp - 10);
+    tm.tm_year = (int) (yoe + era * 400 + (tm.tm_mon <= 1 ? 1 : 0)) - 1900;
+    tm.tm_hour = (int) (sod / 3600);
+    tm.tm_min = (int) (sod / 60 % 60);
+    tm.tm_sec = (int) (sod % 60);
+    tm.tm_isdst = -1;
+    const auto t = std::mktime (&tm);
+    return t == (std::time_t) -1 ? local : (double) t + (local - (double) secs);
+}
+
 namespace
 {
 bool contains (const std::string& haystack, const char* needle)
@@ -800,8 +829,13 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     Song song;
     song.bpm = project.tempo > 0.0 ? project.tempo : 140.0;
     song.performanceMode = project.performanceMode; // (round 165m)
+    song.autoCrossfades = project.autoCrossfades;   // FL's Playlist "Automatic crossfades" (round 167a)
     song.beatsPerBar = std::clamp (project.beatsPerBar, 1, 32);
     song.swing = std::clamp (project.swing / 128.0f, 0.0f, 1.0f);
+    song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
+    song.fastDeclick = project.fastDeclick;               // 0x28 (REA round 167h)
+    song.panTriangular = (project.panLaw >> 1) == 1;       // 0x17: FL saves 2 × its pan-law mode (REA round 167j §1)
+    song.masterPitch = (float) std::clamp (project.mainPitch, -1200, 1200); // FL's render follows it (REA round 167g §1)
     song.channelGroups = project.filterGroups;
     song.info.title = project.title;
     song.info.author = project.artist;
@@ -809,6 +843,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.info.url = project.url;
     song.info.comments = project.comments;
     std::replace (song.info.comments.begin(), song.info.comments.end(), '\r', '\n'); // (FL saves CR line breaks)
+    song.info.showOnOpen = project.showInfo; // 0x0A, Project info › Show on opening (REA round 167g)
+    // 0xED: TDateTime days since 1899-12-30 (25569 days before 1970-01-01), FL's local time kept as it reads
+    song.info.created = flDateTimeToUnix (project.createdDays);
+    song.info.workSeconds = std::min (project.workDays, 36500.0) * 86400.0;
 
     // FL channels may have sparse indices; we map them to dense indices.
     std::map<int, int> channelMap;
@@ -894,6 +932,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
         def.mixerTrack = std::clamp (c.mixerTrack, 0, maxMixerTracks - 1);
         def.muted = ! c.enabled; // switched off in FL's Channel Rack: its notes don't play (REA_rodada80 §3.1)
+        def.soloLock = c.soloLock;          // 0x20 "Lock active/mute state" (REA_rodada167l §5)
+        def.ghostHidden = ! c.ghostShown;   // 0x32: the channel's ghost notes in the Piano Roll (REA_rodada167l §5)
 
         if (c.colour != 0)
             def.colour = 0xFF000000u | c.colour;
@@ -1239,15 +1279,18 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 }
             }
 
-        // Wave Traveller: plays its sample (the scratch curve is left out)
+        // Wave Traveller: FL's engine (REA_rodada167f) on FL's state, with the sample its state names (FL loads that
+        // one, not the channel's). Without the sample the channel stays silent, as in FL (the plugin refuses notes)
         if (c.pluginName == "Wave Traveller")
-            if (const auto wave = waveTravellerSample (c.pluginState))
-                if (auto path = existing (wave->first); ! path.empty())
-                {
-                    def.instrument = InstrumentKind::sampler;
-                    def.samplePath = std::move (path);
-                    def.sampler.pitch = std::clamp (def.sampler.pitch + (float) (60 - wave->second), -24.0f, 24.0f);
-                }
+        {
+            wavetrav::State wt;
+            if (wavetrav::parseState (c.pluginState, wt))
+            {
+                def.instrument = InstrumentKind::wavetraveller;
+                def.pluginState = c.pluginState;
+                def.samplePath = wt.samplePath.empty() ? std::string() : existing (wt.samplePath);
+            }
+        }
 
         // Fruity Envelope Controller: "controller" channel (silent) that triggers the envelopes from notes
         if ((c.pluginName == "Fruity Envelope Controller" && parseEnvelopeController (c.pluginState))
@@ -1737,7 +1780,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 // FL's engine from the raw state (REA_rodada46) with its LFO-shape and noise tables read at run time from the
                 // user's own engine DLL; the synth conversion stays as the fallback (state or DLL not usable)
                 const auto dll = resolveFlPath ("%FLStudioFactoryData%\\Plugins\\Fruity\\Generators\\Kepler\\engine_x64.dll", options.roots);
-                if (keplerStateUsable (c.pluginState) && ! dll.empty() && options.fileExists && options.fileExists (dll) && keplerDllUsable (dll))
+                if (keplerStateUsable (c.pluginState) && ! keplerExoState (c.pluginState) && ! dll.empty() && options.fileExists
+                    && options.fileExists (dll) && keplerDllUsable (dll) && ! keplerExoDllUsable (dll))
                 {
                     def.instrument = InstrumentKind::kepler;
                     def.pluginState = c.pluginState;
@@ -1746,6 +1790,19 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 }
                 else if (synthFromKepler (c.pluginState, fromPlugin, pluginGain))
                     adopt();
+            }
+            else if (name == "kepler exo")
+            {
+                // FL 2026's Kepler Exo: Kepler's engine on the "Kepler-2" state (REA_rodada167d) with the tables of the user's own
+                // Kepler Exo engine DLL; no synth conversion exists for it (state or DLL not usable: the channel stays empty)
+                const auto dll = resolveFlPath ("%FLStudioFactoryData%\\Plugins\\Fruity\\Generators\\Kepler Exo\\engine_x64.dll", options.roots);
+                if (keplerExoState (c.pluginState) && ! dll.empty() && options.fileExists && options.fileExists (dll) && keplerExoDllUsable (dll))
+                {
+                    def.instrument = InstrumentKind::keplerExo;
+                    def.pluginState = c.pluginState;
+                    def.samplePath = dll;
+                    adoptedFromPlugin = true;
+                }
             }
             else if (name == "boobass")
             {
@@ -1903,13 +1960,50 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         // sample region and start offset
         if (std::isfinite (c.sampleStart) && std::isfinite (c.sampleEnd) && std::isfinite (c.startOffset))
         {
-            const auto start = std::clamp (c.sampleStart, 0.0, 1.0), end = std::clamp (c.sampleEnd, 0.0, 1.0);
+            // FL's end is a fraction of what follows the start: the region is [start, start + end·(1 − start)]
+            // (FLEngine FUN_00ff0db0, REA_rodada167h §2; FL's demos hold ends below their starts, e.g. 0.62 / 0.14)
+            const auto start = std::clamp (c.sampleStart, 0.0, 1.0);
+            const auto end = std::clamp (start + std::clamp (c.sampleEnd, 0.0, 1.0) * (1.0 - start), 0.0, 1.0);
 
             if (end > start)
             {
-                def.sampler.regionStart = (float) std::clamp (start + std::clamp (c.startOffset, 0.0, 1.0) * (end - start), 0.0, 1.0);
+                def.sampler.regionStart = (float) start;
                 def.sampler.regionEnd = (float) end;
+                // the start offset: FL starts notes there, a fraction of the (cropped) region [FL render, §4]
+                def.sampler.startOffset = (float) std::clamp (c.startOffset, 0.0, 1.0);
             }
+        }
+
+        // the Sampler's precomputed effects, loop flags and declicking mode (REA_rodada167h §1)
+        // (audio clip channels: the precomputed effects and Reverse too — FL plays them, round 167k §8)
+        if (c.type == flp::ChannelType::sampler || def.instrument == InstrumentKind::audioClip)
+        {
+            auto& p = def.sampler.precompute;
+            p.fadeStereo = (c.fxFlags & 1) != 0;
+            def.sampler.reverse = def.sampler.reverse || (c.fxFlags & 2) != 0;
+            p.swapStereo = (c.fxFlags & 0x100) != 0;
+            p.fadeIn = std::clamp (c.fadeIn, 0, 1024);
+            p.fadeOut = std::clamp (c.fadeOut, 0, 1024);
+            p.removeDc = c.removeDc;
+            p.normalize = c.normalize;
+            p.reversePolarity = c.reversePolarity;
+            p.crossfade = std::clamp (c.crossfade, 0, 2048);
+            p.trim = std::clamp (c.trim, 0, 32768);
+            p.pingPong = c.pingPong;
+            // the legacy precomputed effects (REA_rodada167l §1), within the ranges of FL's knobs
+            p.boost = std::clamp (c.boost, 0, 256);
+            p.eq = std::clamp (c.eq, 0, 256);
+            p.ringMix = std::clamp (c.ringMix, 0, 256);
+            p.ringFreq = std::clamp (c.ringFreq, 0, 256);
+            p.stereoDelay = std::clamp (c.stereoDelay, 0, 4096);
+            p.cutoff = std::clamp (c.cutoff, 16, 1024);
+            p.resonance = std::clamp (c.resonance, 0, 640);
+            p.reverb = std::clamp (c.reverb, 0, 256);
+            p.reverbType = c.reverbType == 0 ? 0 : 1;
+            p.pogo = std::clamp (c.pogo, 0, 512);
+            p.clip = (c.fxFlags & 4) != 0;
+            def.sampler.useLoopPoints = c.useLoopPoints();
+            def.sampler.declickMode = std::clamp (c.declickMode, 0, 5);
         }
 
         // time-stretch: the sample lasts TIME/192 beats × MUL
@@ -1953,7 +2047,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                      || def.instrument == InstrumentKind::morphine
                      || def.instrument == InstrumentKind::ogun || def.instrument == InstrumentKind::minisynth
                      || def.instrument == InstrumentKind::dx10
-                     || def.instrument == InstrumentKind::kepler || def.instrument == InstrumentKind::poizone
+                     || def.instrument == InstrumentKind::kepler || def.instrument == InstrumentKind::keplerExo || def.instrument == InstrumentKind::poizone
                      || def.instrument == InstrumentKind::fruitkick || def.instrument == InstrumentKind::bassdrum || def.instrument == InstrumentKind::toxic
                      || def.instrument == InstrumentKind::autogun || def.instrument == InstrumentKind::transistorbass
                      || def.instrument == InstrumentKind::simsynth || def.instrument == InstrumentKind::wasp
@@ -1961,13 +2055,12 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                      || def.instrument == InstrumentKind::sawer || def.instrument == InstrumentKind::flkeys
                      || def.instrument == InstrumentKind::granulizer || def.instrument == InstrumentKind::drumaxx
                      || def.instrument == InstrumentKind::slayer || def.instrument == InstrumentKind::fruitydance
-                     || def.instrument == InstrumentKind::videoplayer
+                     || def.instrument == InstrumentKind::videoplayer || def.instrument == InstrumentKind::wavetraveller
                      || def.instrument == InstrumentKind::directwave || def.instrument == InstrumentKind::soundfont)
                 ++r.converted[c.pluginName]; // FL's own engine rebuilt from the plugin state
             else if ((plugin == "harmless" && def.instrument != InstrumentKind::harmless) || (plugin == "harmor" && def.instrument != InstrumentKind::harmor && adoptedFromPlugin) || (plugin == "minisynth" && def.instrument != InstrumentKind::minisynth) || plugin == "fruity dx10" || plugin == "dx10" || (plugin == "fruit kick" && def.instrument != InstrumentKind::fruitkick)
                      || ((plugin == "sytrus" || plugin == "gms" || plugin == "ogun" || plugin == "autogun" || plugin == "sakura" || plugin == "kepler" || plugin == "boobass" || plugin == "drumpad" || plugin == "poizone" || plugin == "bassdrum"
                          || plugin == "toxic biohazard" || plugin == "morphine") && adoptedFromPlugin)
-                     || (plugin == "wave traveller" && def.instrument == InstrumentKind::sampler)
                      || (plugin == "fruity drumsynth live" && def.instrument == InstrumentKind::sampler))
                 ++r.approximated[c.pluginName];
             else if (((plugin == "fruity envelope controller" || plugin == "fruity keyboard controller") && def.instrument == InstrumentKind::controller)
@@ -2683,7 +2776,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     // the ones that don't touch audio (controllers, visualizers, notes) aren't missed
                     static const char* silent[] = { "Fruity Peak Controller", "Fruity X-Y Controller", "Control Surface",
                                                     "Fruity NoteBook 2", "Fruity NoteBook", "Edison",
-                                                    "Fruity Formula Controller", "Fruity LSD", "Fruity dB Meter", "Fruity Spectroman" };
+                                                    "Fruity Formula Controller", "Fruity LSD" };
                     const auto harmless = std::any_of (std::begin (silent), std::end (silent), [&] (const char* n) { return slot.plugin == n; });
 
                     // FL plugins with nothing to reproduce here (vendor lighting, discontinued bridges): the note says why (round 165g)
@@ -2770,8 +2863,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                                 addMissingFile (options.report->missingFiles, wanted,
                                                 (insert.name.empty() ? "Insert " + std::to_string (insert.index) : insert.name) + ": " + slot.plugin);
                             }
-                            if (st->timecode != -1)
-                                ++options.report->partialEffects["Fruity Scratcher (timecode vinyl input not reproduced: plays from its own platter)"];
+                            if (st->timecode != -1 && ! dvs::supported (st->timecode))
+                                ++options.report->partialEffects["Fruity Scratcher (Traktor Mk2 / Timecode CD timecode not decoded: the platter stays silent)"];
                             else
                                 ++options.report->converted[slot.plugin];
                         }
@@ -2801,12 +2894,14 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 else if (fx.kind == EffectKind::transmitter)
                 {
                     // the detection follows FL's sidechain input when one is chosen (the inputs list, like the Limiter's);
-                    // the transient / sustain parts sent to other mixer tracks are not routed (the main output is exact)
+                    // the transient / sustain parts go to the inserts FL's send menus name (the insert number, like the
+                    // Fruity Send's destination: REA_rodada167b §1)
                     if (const auto st = transmitter::parse (slot.state))
                     {
                         fx.sidechain = sidechainSource (insert.index, st->sidechain);
-                        if (options.report != nullptr && (st->transientSend > 0 || st->sustainSend > 0))
-                            ++options.report->partialEffects["Transmitter (transient / sustain sends to other tracks not routed)"];
+                        const int sends[2] = { st->transientSend, st->sustainSend };
+                        for (int o = 0; o < 2; ++o)
+                            fx.sendTracks[(std::size_t) o] = sends[o] > 0 && sends[o] < tracks && sends[o] != insert.index ? sends[o] : 0;
                     }
                 }
                 else if (fx.kind == EffectKind::newtone || fx.kind == EffectKind::newtime)
@@ -2838,14 +2933,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                                     addMissingFile (options.report->missingFiles, candidates.front(),
                                                     (insert.name.empty() ? "Insert " + std::to_string (insert.index) : insert.name) + ": " + slot.plugin);
                             }
-                            // Newtone's note edits are rendered by LYNX's engine (REA_rodada95, close, not exact); Newtime's
-                            // warping is not reproduced. Only slave mode plays them (otherwise FL passes the input through).
-                            if (parsed->edited() && parsed->slave() && fx.kind == EffectKind::newtime)
-                                ++options.report->partialEffects[slot.plugin + " (edits not reproduced: plays the original sample)"];
-                            else if (fx.kind == EffectKind::newtime)
-                                ++options.report->partialEffects["Newtime (time warping engine not reproduced: plays the original sample)"];
-                            else
-                                ++options.report->converted[slot.plugin];
+                            // Newtone's note edits and Newtime's warp markers are rendered by LYNX's engines (REA_rodada95,
+                            // REA_rodada167b: close, not sample-exact). Only slave mode plays them (otherwise FL passes the
+                            // input through).
+                            ++options.report->converted[slot.plugin];
                         }
                     }
                 }
@@ -3427,6 +3518,18 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
                 // clip gain and fades (FL 20.99+ records); fades are in ms, at most the clip length
                 clip.gain = item.gain;
+                clip.pitch = item.pitch;
+                clip.reversed = item.reversed;
+                // FL's clip stretch (round 167l, FL render: a 6-beat item with stretch 1.5 ends 9 beats later, the song
+                // with it): the item's length and start offset are the unstretched ones
+                clip.stretch = item.stretch;
+                if (clip.stretch != 1.0)
+                {
+                    clip.length = (std::int64_t) std::llround ((double) clip.length * clip.stretch);
+                    const auto offset = ((double) clip.offset + (double) clip.offsetFraction) * clip.stretch;
+                    clip.offset = (std::int64_t) std::llround (offset);
+                    clip.offsetFraction = (float) (offset - (double) clip.offset);
+                }
                 const auto msToTicks = [&] (float ms)
                 { return std::clamp ((std::int64_t) std::llround (ms / 1000.0 * song.bpm / 60.0 * ppq), (std::int64_t) 0, clip.length); };
                 clip.fadeIn = msToTicks (item.fadeInMs);
@@ -3487,17 +3590,29 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         song.arrangements.push_back (std::move (a));
     }
 
-    // the .flp doesn't say which arrangement was open; the fullest is usually the song
+    // the arrangement open when FL saved (event 0x64, REA round 167g); files without it: the fullest is usually the song
     {
-        int fullest = 0;
-        std::size_t most = song.playlist.size();
+        int fullest = -1;
 
-        for (int i = 1; i < (int) song.arrangements.size(); ++i)
-            if (song.arrangements[(std::size_t) i].clips.size() > most)
-            {
-                most = song.arrangements[(std::size_t) i].clips.size();
+        for (int i = 0; i < (int) project.arrangements.size() && i < (int) song.arrangements.size(); ++i)
+            if (project.currentArrangement >= 0 && project.arrangements[(std::size_t) i].index == project.currentArrangement)
                 fullest = i;
-            }
+
+        if (fullest < 0 && project.currentArrangement != -1)
+            fullest = 0; // FL's loader: an index past the last arrangement opens the first
+
+        if (fullest < 0)
+        {
+            fullest = 0;
+            std::size_t most = song.playlist.size();
+
+            for (int i = 1; i < (int) song.arrangements.size(); ++i)
+                if (song.arrangements[(std::size_t) i].clips.size() > most)
+                {
+                    most = song.arrangements[(std::size_t) i].clips.size();
+                    fullest = i;
+                }
+        }
 
         song.selectArrangement (fullest);
 
@@ -3549,23 +3664,31 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             }
     }
 
-    if (! song.playlist.empty())
+    // PAT / SONG as saved (event 0x09, REA round 167g); files without it: SONG when the Playlist has clips
+    if (project.songMode >= 0)
+        song.mode = project.songMode == 1 ? PlayMode::song : PlayMode::pattern;
+    else if (! song.playlist.empty())
         song.mode = PlayMode::song;
 
 
     if (song.patterns.empty())
         song.patterns.emplace_back().name = "Pattern 1";
 
-    // The .flp doesn't say which pattern was open; the fullest is the best starting point.
-    for (int i = 0; i < (int) song.patterns.size(); ++i)
-        if (song.patterns[(std::size_t) i].notes.size() > song.patterns[(std::size_t) song.currentPattern].notes.size())
-            song.currentPattern = i;
+    // The pattern selected when FL saved (event 0x43, REA round 167g); when it is missing or was empty (empty patterns
+    // are not imported), the fullest is the best starting point.
+    if (const auto it = patternMap.find (project.currentPattern); project.currentPattern > 0 && it != patternMap.end())
+        song.currentPattern = it->second;
+    else
+        for (int i = 0; i < (int) song.patterns.size(); ++i)
+            if (song.patterns[(std::size_t) i].notes.size() > song.patterns[(std::size_t) song.currentPattern].notes.size())
+                song.currentPattern = i;
 
     // FPC kits: one channel per pad (last to first, so indices don't shift)
     for (auto it = drumKits.rbegin(); it != drumKits.rend(); ++it)
         splitDrumChannel (song, it->first, it->second);
 
     numberChorusInstances (song); // the random LFO phases FL gives each Hyper Chorus instance (REA_rodada59 §2.6)
+    clipops::updateCrossfades (song); // the project's "Automatic crossfades" on its overlapping audio clips (round 167a)
     return song;
 }
 } // namespace lynx

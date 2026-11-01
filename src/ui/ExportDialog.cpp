@@ -77,7 +77,8 @@ private:
 class StemsThread final : public juce::ThreadWithProgressWindow
 {
 public:
-    StemsThread (const AudioEngine& e, exportopts::Options o, juce::File base, const std::vector<int>& onlyTracks = {}, std::function<void()> done = {})
+    StemsThread (const AudioEngine& e, exportopts::Options o, juce::File base, const std::vector<int>& onlyTracks = {},
+                 std::function<void (const std::vector<juce::File>&)> done = {})
         : juce::ThreadWithProgressWindow (tr ("Exporting stems..."), true, true),
           afterRender (std::move (done)),
           options (o),
@@ -99,8 +100,19 @@ public:
                                    exportopts::makeChannelStemSong (song, c) });
         else
             for (auto t : exportopts::stemTracks (song, onlyTracks))
-                items.push_back ({ juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()), file (t, song.mixer[(std::size_t) t].name),
+                items.push_back ({ juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()),
+                                   ! onlyTracks.empty() && recordToFile (song, t) != juce::File() ? recordToFile (song, t).withFileExtension (ext)
+                                                                                                  : file (t, song.mixer[(std::size_t) t].name),
                                    makeBounceSong (song, t) });
+    }
+
+    // FL's "Record <insert> to" file of an insert (round 167a): a track render writes there; none = File()
+    static juce::File recordToFile (const Song& song, int t)
+    {
+        if (t <= 0 || t >= (int) song.mixer.size())
+            return {};
+        const auto path = juce::String::fromUTF8 (song.mixer[(std::size_t) t].recordTo.c_str());
+        return path.isNotEmpty() && juce::File::isAbsolutePath (path) ? juce::File (path) : juce::File();
     }
 
     void run() override
@@ -114,6 +126,7 @@ public:
             juce::WaitableEvent ready;
             juce::MessageManager::callAsync ([&] {
                 job = std::make_unique<ExportJob> (item.song, options, item.file);
+                job->setExtraData (true);
                 ready.signal();
             });
             ready.wait();
@@ -126,7 +139,10 @@ public:
             }, error);
 
             if (ok)
+            {
                 ++written;
+                files.push_back (item.file);
+            }
 
             juce::WaitableEvent gone;
             juce::MessageManager::callAsync ([&] {
@@ -140,7 +156,7 @@ public:
     void threadComplete (bool cancelled) override
     {
         if (! cancelled && written > 0 && afterRender)
-            afterRender();
+            afterRender (files);
         if (! cancelled && options.showWhenDone && written > 0)
             baseFile.getParentDirectory().startAsProcess();
         else if (! cancelled)
@@ -157,11 +173,12 @@ private:
         juce::File file;
         Song song;
     };
-    std::function<void()> afterRender;
+    std::function<void (const std::vector<juce::File>&)> afterRender;
     exportopts::Options options;
     juce::File baseFile;
     Song song;
     std::vector<Item> items;
+    std::vector<juce::File> files; // written
     int written = 0;
 };
 
@@ -327,7 +344,8 @@ public:
         combo (ditherLabel, tr ("Dither"), ditherBox, { tr ("Off"), tr ("TPDF"), tr ("TPDF + noise shaping") },
                tr ("Hides the rounding noise of 16 and 24 bit files (noise shaping moves it where the ear is least sensitive)"));
 
-        for (auto* t : { &normalizeToggle, &masterFxToggle, &trimToggle, &hqToggle, &showToggle, &polyToggle, &warmUpToggle, &realtimeToggle })
+        for (auto* t : { &normalizeToggle, &masterFxToggle, &insertFxToggle, &trimToggle, &hqToggle, &showToggle, &polyToggle, &warmUpToggle, &realtimeToggle,
+                         &tempoToggle, &loopMarkersToggle, &playlistMarkersToggle })
         {
             t->onClick = [this] { readControls(); };
             addAndMakeVisible (t);
@@ -337,6 +355,8 @@ public:
         trimToggle.setButtonText (tr ("Trim the delay compensation's silence"));
         normalizeToggle.setTooltip (tr ("Raises or lowers the whole file so its loudest peak reaches full scale"));
         masterFxToggle.setTooltip (tr ("Off: the Master insert's effects are bypassed for the export"));
+        insertFxToggle.setButtonText (tr ("Insert effects"));
+        insertFxToggle.setTooltip (tr ("Off: the effects of the inserts (not the Master's) are bypassed for the export"));
         trimToggle.setTooltip (tr ("Removes the silence plugin latency compensation adds at the start"));
         hqToggle.setButtonText (tr ("HQ for all plugins"));
         showToggle.setButtonText (tr ("Show the file(s) when complete"));
@@ -345,6 +365,13 @@ public:
         warmUpToggle.setTooltip (tr ("Before the export starts, third-party plugins process a moment of silence until they have "
                                      "finished loading their settings (bridged plugins, samplers that load in the background), "
                                      "so the file does not start with half-loaded effects"));
+        // FL's "Extra data" (REA_rodada167l §3): chunks of the WAV file other programs read
+        tempoToggle.setButtonText (tr ("Tempo information"));
+        tempoToggle.setTooltip (tr ("WAV: stores the tempo, the length in beats and the meter (an acid chunk), so other programs play the file at the song's tempo"));
+        loopMarkersToggle.setButtonText (tr ("Loop markers"));
+        loopMarkersToggle.setTooltip (tr ("WAV: marks the music (without the tail) as the file's loop (a smpl chunk), for samplers"));
+        playlistMarkersToggle.setButtonText (tr ("Playlist markers"));
+        playlistMarkersToggle.setTooltip (tr ("WAV: the Playlist's markers become cue points with their names (cue and labl chunks)"));
         // round 165c: only offered when the song has an active hardware insert (outboard gear can't run faster than real time)
         realtimeToggle.setButtonText (tr ("Render through the hardware in real time"));
         realtimeToggle.setTooltip (tr ("The song plays through the audio device while it is recorded, so the hardware inserts' gear is "
@@ -374,7 +401,9 @@ public:
         cancelButton.onClick = [this] { close(); };
 
         writeControls();
-        setSize (620, 486);
+        // round 167l: the height the content needs (a fixed 486 left an empty band above "Mix"): the taller column (the
+        // right one with FLAC's two rows and, in some languages, "Also save" on its own line) plus the switches
+        setSize (620, 12 + columnsHeight() + 6 + mixHeight() + 8 + 32 + 12);
     }
 
     // --snapshot: the window with this format chosen (0 WAV, 1 MP3, 2 OGG, 3 FLAC) and a few options set
@@ -403,27 +432,43 @@ public:
         warningLabel.setBounds (buttons);
         area.removeFromBottom (8);
 
-        auto mix = area.removeFromBottom (110);
+        // three columns of switches (round 167k: the fourth switch of row 2 squeezed "Show the file(s)..." to two clipped
+        // lines); the real-time render switch gets a row of its own when the song has hardware inserts
+        auto mix = area.removeFromBottom (mixHeight());
         optionsTitle.setBounds (mix.removeFromTop (26));
         mix.removeFromTop (4);
+        const int colA = 200, colB = 196;
         auto mixRow = mix.removeFromTop (24);
-        normalizeToggle.setBounds (mixRow.removeFromLeft (200));
-        masterFxToggle.setBounds (mixRow.removeFromLeft (150));
+        normalizeToggle.setBounds (mixRow.removeFromLeft (colA));
+        masterFxToggle.setBounds (mixRow.removeFromLeft (colB));
         trimToggle.setBounds (mixRow);
         mix.removeFromTop (2);
         {
             auto row2 = mix.removeFromTop (24);
-            hqToggle.setBounds (row2.removeFromLeft (170));
-            polyToggle.setBounds (row2.removeFromLeft (200));
+            hqToggle.setBounds (row2.removeFromLeft (colA));
+            polyToggle.setBounds (row2.removeFromLeft (colB));
             showToggle.setBounds (row2);
         }
         mix.removeFromTop (2);
         {
             auto row3 = mix.removeFromTop (24);
-            warmUpToggle.setBounds (row3.removeFromLeft (200));
-            realtimeToggle.setBounds (row3);
+            warmUpToggle.setBounds (row3.removeFromLeft (colA));
+            insertFxToggle.setBounds (row3.removeFromLeft (colB));
+        }
+        mix.removeFromTop (2);
+        {
+            auto row4 = mix.removeFromTop (24);
+            tempoToggle.setBounds (row4.removeFromLeft (colA));
+            loopMarkersToggle.setBounds (row4.removeFromLeft (colB));
+            playlistMarkersToggle.setBounds (row4);
+        }
+        if (realtimeToggle.isVisible())
+        {
+            mix.removeFromTop (2);
+            realtimeToggle.setBounds (mix.removeFromTop (24));
         }
         area.removeFromBottom (6);
+        columnsBottom = area.getBottom();
 
         auto left = area.removeFromLeft ((area.getWidth() - 24) / 2);
         area.removeFromLeft (24);
@@ -497,10 +542,26 @@ public:
         // a hairline between the two columns
         const auto x = 16 + (getWidth() - 32 - 24) / 2 + 12;
         g.setColour (theme::colour::border);
-        g.fillRect (x, 22, 1, getHeight() - 22 - 12 - 32 - 8 - 58 - 6 - 8);
+        g.fillRect (x, 22, 1, juce::jmax (0, columnsBottom - 22 - 8));
     }
 
 private:
+    int mixHeight() const { return 26 + 4 + 4 * 24 + 3 * 2 + (realtimeToggle.isVisible() ? 26 : 0); }
+
+    // the two columns' heights (as resized() lays them out), the taller one
+    int columnsHeight()
+    {
+        constexpr int rowHeight = 26, gap = 7;
+        const auto leftHeight = 26 + 8 + 5 * (rowHeight + gap) + 22 + (onlyTracks.empty() ? 0 : gap + rowHeight + gap);
+        const auto columnWidth = (620 - 32 - 24) / 2;
+        const auto labelNeeds = theme::labelColumnWidth ({ &alsoLabel }, 0, 400);
+        const auto ownLine = labelNeeds > (columnWidth - 4 * 54) * 11 / 10;
+        // the most rows a format has: FLAC (bit depth, compression) + rate, channels, dither
+        const auto rightHeight = 26 + 8 + 28 + 4 + (ownLine ? 18 : 0) + 22 + gap + 5 * (rowHeight + gap);
+        return juce::jmax (leftHeight, rightHeight);
+    }
+    int columnsBottom = 0;
+
     void close()
     {
         if (auto* w = findParentComponentOfClass<juce::DialogWindow>())
@@ -544,12 +605,16 @@ private:
         ditherBox.setSelectedItemIndex ((int) options.dither, n);
         normalizeToggle.setToggleState (options.normalize, n);
         masterFxToggle.setToggleState (options.masterEffects, n);
+        insertFxToggle.setToggleState (options.insertEffects, n);
         trimToggle.setToggleState (options.trimPdc, n);
         hqToggle.setToggleState (options.hqAllPlugins, n);
         warmUpToggle.setToggleState (options.pluginWarmUp, n);
         showToggle.setToggleState (options.showWhenDone, n);
         polyToggle.setToggleState (options.disableMaxPolyphony, n);
         realtimeToggle.setToggleState (realtime, n);
+        tempoToggle.setToggleState (options.saveTempo, n);
+        loopMarkersToggle.setToggleState (options.loopMarkers, n);
+        playlistMarkersToggle.setToggleState (options.playlistMarkers, n);
         for (int i = 0; i < 4; ++i)
             alsoToggles[(std::size_t) i].setToggleState (i == (int) options.format || (options.moreFormats & (1u << i)) != 0, n);
         refresh();
@@ -585,9 +650,13 @@ private:
         options.normalize = normalizeToggle.getToggleState();
         options.trimPdc = trimToggle.getToggleState();
         options.showWhenDone = showToggle.getToggleState();
+        options.saveTempo = tempoToggle.getToggleState();
+        options.loopMarkers = loopMarkersToggle.getToggleState();
+        options.playlistMarkers = playlistMarkersToggle.getToggleState();
         if (! realtime) // (while real time is ticked these show what it uses: the offline choices stay as they were)
         {
             options.masterEffects = masterFxToggle.getToggleState();
+            options.insertEffects = insertFxToggle.getToggleState();
             options.hqAllPlugins = hqToggle.getToggleState();
             options.pluginWarmUp = warmUpToggle.getToggleState();
             options.disableMaxPolyphony = polyToggle.getToggleState();
@@ -615,7 +684,7 @@ private:
         loopsBox.setEnabled (! realtime);
         // a real-time bounce (round 165c): the device's rate, the song or the selection once, the Master's effects, the
         // playback quality, no stems — the controls it doesn't use are off
-        for (auto* c : std::initializer_list<juce::Component*> { &rateBox, &stemsBox, &masterFxToggle, &hqToggle, &polyToggle, &warmUpToggle })
+        for (auto* c : std::initializer_list<juce::Component*> { &rateBox, &stemsBox, &masterFxToggle, &insertFxToggle, &hqToggle, &polyToggle, &warmUpToggle })
             c->setEnabled (! realtime);
         stemsBox.setEnabled (! realtime && onlyTracks.empty()); // a list of tracks locks the stem choice
         rangeBox.setItemEnabled (2, ! realtime);
@@ -623,6 +692,7 @@ private:
             // the boxes show what the export will use: real time = the Master's effects, the playback quality
             const auto used = realtime ? ExportJob::realtimeOptions (options, engine.getTransport().sampleRate.load()) : options;
             masterFxToggle.setToggleState (used.masterEffects, juce::dontSendNotification);
+            insertFxToggle.setToggleState (used.insertEffects, juce::dontSendNotification);
             hqToggle.setToggleState (used.hqAllPlugins, juce::dontSendNotification);
             warmUpToggle.setToggleState (used.pluginWarmUp, juce::dontSendNotification);
             polyToggle.setToggleState (used.disableMaxPolyphony, juce::dontSendNotification);
@@ -637,6 +707,10 @@ private:
         const auto f = options.format;
         for (int i = 0; i < 4; ++i)
             alsoToggles[(std::size_t) i].setEnabled (i != (int) f);
+        // (WAV only: FL writes them into WAV files)
+        const auto wav = f == Format::wav || (options.moreFormats & (1u << (int) Format::wav)) != 0;
+        for (auto* t : { &tempoToggle, &loopMarkersToggle, &playlistMarkersToggle })
+            t->setEnabled (wav);
         depthLabel.setVisible (f == Format::wav || f == Format::flac);
         depthBox.setVisible (f == Format::wav || f == Format::flac);
         bitrateLabel.setVisible (f == Format::mp3 || f == Format::ogg);
@@ -699,6 +773,29 @@ private:
 
         const auto o = options;
         const auto extension = juce::String (exportopts::extension (o.format));
+
+        // FL renders the armed tracks straight to their "Record to" files, without a file dialog (round 167a [SHOT s33])
+        if (! onlyTracks.empty() && ! realtime && o.stems != exportopts::Stems::none && ! o.stemsIncludeMaster)
+        {
+            const auto& song = engine.getSong();
+            const auto list = exportopts::stemTracks (song, onlyTracks);
+            const auto all = ! list.empty() && std::all_of (list.begin(), list.end(), [&song] (int t) {
+                return t > 0 && t < (int) song.mixer.size() && juce::File::isAbsolutePath (juce::String::fromUTF8 (song.mixer[(std::size_t) t].recordTo.c_str()));
+            });
+            if (all)
+            {
+                engine.capturePluginStates();
+                const auto base = juce::File (juce::String::fromUTF8 (song.mixer[(std::size_t) list.front()].recordTo.c_str())).withFileExtension (extension);
+                base.getParentDirectory().createDirectory();
+                auto& engineRef = engine;
+                const auto tracks = onlyTracks;
+                const auto after = afterRender;
+                close(); // deletes this panel: no `this` after this point
+                (new StemsThread (engineRef, o, base, tracks, after))->launchThread();
+                return;
+            }
+        }
+
         auto folder = lastFolder.isDirectory() ? lastFolder
                       : suggestedFolder.isDirectory() ? suggestedFolder
                                                       : juce::File::getSpecialLocation (juce::File::userMusicDirectory);
@@ -722,6 +819,7 @@ private:
                                   if (realtime) // round 165c: through the device, in real time
                                   {
                                       auto job = std::make_unique<ExportJob> (engineRef, o, file);
+                                      job->setExtraData (true);
                                       close(); // deletes this panel: no `this` after this point
                                       auto* thread = new ExportThread (std::move (job), file, {}, tr ("Exporting in real time..."));
                                       thread->reveal = o.showWhenDone;
@@ -736,6 +834,7 @@ private:
                                   }
 
                                   auto job = std::make_unique<ExportJob> (engineRef.getSong(), o, file);
+                                  job->setExtraData (true);
                                   close(); // deletes this panel: no `this` after this point
                                   auto* thread = new ExportThread (std::move (job), file);
                                   thread->reveal = o.showWhenDone;
@@ -744,7 +843,7 @@ private:
     }
 
 public:
-    std::function<void()> afterRender; // showExportDialogForTracks: once the files are written
+    std::function<void (const std::vector<juce::File>&)> afterRender; // showExportDialogForTracks: once the files are written
 
 private:
     AudioEngine& engine;
@@ -764,7 +863,8 @@ private:
     Segmented formatButtons { { "WAV", "MP3", "OGG", "FLAC" } };
     juce::Label depthLabel, bitrateLabel, compressionLabel, rateLabel, channelsLabel, ditherLabel;
     juce::ComboBox depthBox, mp3Box, oggBox, flacLevelBox, rateBox, channelsBox, ditherBox;
-    juce::ToggleButton normalizeToggle, masterFxToggle, trimToggle, hqToggle, showToggle, polyToggle, warmUpToggle, realtimeToggle;
+    juce::ToggleButton normalizeToggle, masterFxToggle, insertFxToggle, trimToggle, hqToggle, showToggle, polyToggle, warmUpToggle, realtimeToggle;
+    juce::ToggleButton tempoToggle, loopMarkersToggle, playlistMarkersToggle;
     bool realtime = false; // "Render through the hardware in real time" (round 165c; not remembered: it takes the song's length)
     juce::Label alsoLabel;
     std::array<juce::ToggleButton, 4> alsoToggles;
@@ -852,7 +952,7 @@ std::unique_ptr<juce::Component> makeExportPanelForTracks (AudioEngine& engine, 
 }
 
 void showExportDialogForTracks (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& suggestedName,
-                                const std::vector<int>& tracks, std::function<void()> afterRender)
+                                const std::vector<int>& tracks, std::function<void (const std::vector<juce::File>&)> afterRender)
 {
     juce::DialogWindow::LaunchOptions options;
     auto panel = std::make_unique<ExportPanel> (engine, suggestedFolder, suggestedName.isNotEmpty() ? suggestedName : "LYNX SHARE", true, -1, tracks);

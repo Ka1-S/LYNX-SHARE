@@ -115,6 +115,7 @@ const std::vector<InstrumentEngine>& instrumentEngines()
         { InstrumentKind::poizone, "PoiZone", "PoiZone", fl, false },
         { InstrumentKind::sakura, "Sakura", "Sakura", fl, false },
         { InstrumentKind::kepler, "Kepler", "Kepler", fl, false },
+        { InstrumentKind::keplerExo, "Kepler Exo", "Kepler Exo", fl, false },
         { InstrumentKind::transistorbass, "Transistor Bass", "Transistor Bass", fl, false },
         { InstrumentKind::boobass, "BooBass", "", fl, false }, // (its multisample: the user's BooBass_Eng_x64.dll)
         { InstrumentKind::simsynth, "SimSynth", "SimSynth", own, false },
@@ -126,6 +127,7 @@ const std::vector<InstrumentEngine>& instrumentEngines()
         { InstrumentKind::flkeys, "FL Keys", "FL Keys", fl, false },
         { InstrumentKind::slayer, "FL Slayer", "FL Slayer", fl, false },
         { InstrumentKind::granulizer, "Fruity Granulizer", "Fruity Granulizer", fl, false },
+        { InstrumentKind::wavetraveller, "Wave Traveller", "Wave Traveller", own, false },
         { InstrumentKind::drumaxx, "Drumaxx", "Drumaxx", fl, false },
         { InstrumentKind::drumpad, "Drumpad", "Drumpad", fl, false },
         { InstrumentKind::fruitkick, "Fruit Kick", "Fruit Kick", fl, false },
@@ -149,7 +151,7 @@ const std::vector<EffectEngine>& effectEngines()
         { EffectKind::squeeze, "Fruity Squeeze", own, false },
         { EffectKind::rhythmGain, "", own, false },
         { EffectKind::newtone, "", own, false }, // out of beta in round 165g (REA_rodada165g-flnewt165)
-        { EffectKind::newtime, "", own, true },
+        { EffectKind::newtime, "", own, false }, // out of beta in round 167b (REA_rodada167b)
     };
     return list;
 }

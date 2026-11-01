@@ -85,6 +85,10 @@ public:
 
     virtual void prepare (double sampleRate) noexcept = 0;
     virtual void reset() noexcept = 0;
+    // FL's Settings › Audio › "Reset plugins on transport" (REA_rodada167j §3, round 167k): playback started or jumped.
+    // A built-in effect clears its state; a hosted plugin is reset only with its wrapper's "Reset plugin when FL Studio
+    // resets" (on by default), at the next block.
+    virtual void transportReset() noexcept { reset(); }
 
     // Processes in place. Parameters arrive every block (they may change at any time).
     virtual void process (float* left, float* right, int n, const EffectParams& params, double bpm) noexcept = 0;
@@ -111,6 +115,13 @@ public:
     // Effects that send audio to another insert (FL's Fruity Send): the buffers the next process() adds its send
     // into (cleared by the renderer), or nullptr = nothing is sent this block.
     virtual void setSendOutput (float* /*left*/, float* /*right*/) noexcept {}
+    // The same for an effect with several sent outputs (round 167b, the Transmitter's transient / sustain sends):
+    // output 0 is setSendOutput's.
+    virtual void setExtraOutput (int output, float* left, float* right) noexcept
+    {
+        if (output == 0)
+            setSendOutput (left, right);
+    }
     // Latency the effect introduces (plugins), in samples. Used by PDC.
     virtual int latencySamples() const noexcept { return 0; }
     // The hardware insert (round 164d): the device's input of the current callback piece and the device-output buses,

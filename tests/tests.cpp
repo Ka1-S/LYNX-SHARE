@@ -67,6 +67,7 @@
 #include "core/MiniSynth.h"
 #include "core/SimSynth.h"
 #include "core/Granulizer.h"
+#include "core/WaveTraveller.h"
 #include "core/Drumaxx.h"
 #include "core/Wasp.h"
 #include "core/PluginLayout.h"
@@ -93,6 +94,8 @@
 #include "core/TransistorBass.h"
 #include "core/HarmlessFx.h"
 #include "core/MaximusFx.h"
+#include "core/EmphasisFx.h"
+#include "core/VisualFx.h"
 #include "core/EmphasizerFx.h"
 #include "core/FlLegacyFx.h"
 #include "core/FreqShifterFl.h"
@@ -689,8 +692,8 @@ TEST (plugin_state_decoders_survive_garbage)
             CHECK (std::isfinite (synth.cutoff) && std::isfinite (synth.attack) && std::isfinite (harmlessGain));
         if (auto sound = lynx::drumSynthLiveSound (blob))
             CHECK (sound->size() < 256);
-        if (auto wave = lynx::waveTravellerSample (blob))
-            CHECK (! wave->first.empty() && wave->second >= 0 && wave->second <= 127);
+        if (lynx::wavetrav::State wt; lynx::wavetrav::parseState (blob, wt))
+            CHECK (wt.patches[60].waveN >= 0 && wt.patches[60].waveN < lynx::wavetrav::tableCapacity);
         lynx::synthFromBooBass (blob, synth);
         lynx::gmsStateUsable (blob); // (the exact engines' parsers reject garbage without crashing)
         lynx::morphineStateUsable (blob);
@@ -771,14 +774,27 @@ TEST (fl_round15_effects_convert_known_values)
     }
     const auto fsOld = lynx::effectFromFl ("Frequency Shifter", blob ({ 4, 10000, 0 }));
     CHECK (fsOld && fsOld->kind == lynx::EffectKind::freqShift);
-    // Emphasis: input 0.0625 (= +1.5 dB) and ceiling 0.9308 (≈ −1.6 dB) -> limiter
+    // Emphasis (Bien Duro's Master): FL's own engine since round 167f, its controls as (raw − min) / range: input 625
+    // (+1.5 dB), ceiling 9308 (−1.60 dB), envelope order 2, true peak; an unreadable state keeps the limiter
     const auto em = lynx::effectFromFl ("Emphasis", blob ({ 8, 0, 0, 2, 1, 0, 0, 625, 10000, 10000, 9308, 0, 2, 7, 0 }));
-    CHECK (em && em->kind == lynx::EffectKind::limiter && em->enabled);
+    CHECK (em && em->kind == lynx::EffectKind::flEmphasis && em->enabled);
     if (em)
     {
-        CHECK (std::abs (em->params[1] * 24.0f - 1.5f) < 0.05f);
-        CHECK (std::abs (em->params[0] * 12.0f - 12.0f + 1.6f) < 0.1f);
+        CHECK (std::abs (em->params[6] - 0.0625f) < 1e-6f && std::abs (em->params[9] - 0.9308f) < 1e-6f);
+        CHECK (std::abs (em->params[2] - 1.0f / 3.0f) < 1e-6f && em->params[3] == 1.0f && std::abs (em->params[11] - 0.5f) < 1e-6f);
+        CHECK (lynx::formatEffectParam (lynx::EffectKind::flEmphasis, 6, em->params[6], 120.0) == "+1.5 dB");
+        CHECK (lynx::formatEffectParam (lynx::EffectKind::flEmphasis, 9, em->params[9], 120.0) == "-1.60 dB");
+        CHECK (em->params[14] == 0.0f && em->params[15] == 0.0f); // a version-8 state has no option bytes: off
     }
+    const auto emOld = lynx::effectFromFl ("Emphasis", blob ({ 8, 0, 0, 2 }));
+    CHECK (emOld && emOld->kind == lynx::EffectKind::limiter);
+    // round 167f: FL's legacy dB Meter / Spectroman keep their slot as LYNX's analyser in the matching view
+    const auto dbm = lynx::effectFromFl ("Fruity dB Meter", {});
+    CHECK (dbm && dbm->kind == lynx::EffectKind::waveCandy
+           && dbm->params[0] == lynx::visualfx::wavecandy::modeValue (lynx::visualfx::wavecandy::Mode::peakMeter));
+    const auto spm = lynx::effectFromFl ("Fruity Spectroman", {});
+    CHECK (spm && spm->kind == lynx::EffectKind::waveCandy
+           && spm->params[0] == lynx::visualfx::wavecandy::modeValue (lynx::visualfx::wavecandy::Mode::spectrum));
     // Pitch Shifter +12 st, mix 100%
     const auto ps = lynx::effectFromFl ("Pitch Shifter", blob ({ 7, 1200, 0, 0, 2400, 8500, 200, 0, 0, 768, 0, 0, 65536, 0, 65536, 0, 0, 0, 0 }));
     CHECK (ps && ps->kind == lynx::EffectKind::flPitchShifter && ps->params[0] == 1.0f && ps->params[3] == 1.0f); // REA_rodada61
@@ -1823,7 +1839,7 @@ TEST (flp_real_files)
                 else if (c.pluginName == "Kepler")
                     decoded = lynx::synthFromKepler (c.pluginState, gs, g);
                 else if (c.pluginName == "Wave Traveller")
-                    decoded = lynx::waveTravellerSample (c.pluginState).has_value() ? 2 : 0;
+                    decoded = lynx::waveTravellerStateUsable (c.pluginState) ? 2 : 0;
                 else if (c.pluginName == "PoiZone")
                     decoded = lynx::synthFromPoiZone (c.pluginState, gs, g);
                 else if (c.pluginName == "BassDrum")
@@ -5857,25 +5873,62 @@ TEST (bounce_insert_song_and_apply)
 
 TEST (mixer_stereo_separation_phase_swap)
 {
+    // FL's level matrix (REA_rodada2 §2.2, REA_rodada167j §1): outL = ll·inL + rl·inR, outR = rr·inR + lr·inL
     lynx::MixerTrack t;
-    std::vector<float> l { 1.0f }, r { 0.0f };
+    auto near = [] (float a, float b) { return std::abs (a - b) < 1e-5f; };
     t.stereo = 1.0f; // mono
-    lynx::RackRenderer::applyStereoForTest (t, l.data(), r.data(), 1);
-    CHECK (std::abs (l[0] - 0.5f) < 1e-6f && std::abs (r[0] - 0.5f) < 1e-6f);
+    auto m = lynx::mixerMatrix (t, lynx::unityFader, 0.0f, false);
+    CHECK (near (m.ll, 0.5f) && near (m.rl, 0.5f) && near (m.rr, 0.5f) && near (m.lr, 0.5f));
 
-    l = { 1.0f };
-    r = { 0.0f };
     t.stereo = -1.0f; // doubled side: 1.5 L - 0.5 R
-    lynx::RackRenderer::applyStereoForTest (t, l.data(), r.data(), 1);
-    CHECK (std::abs (l[0] - 1.5f) < 1e-6f && std::abs (r[0] + 0.5f) < 1e-6f);
+    m = lynx::mixerMatrix (t, lynx::unityFader, 0.0f, false);
+    CHECK (near (m.ll, 1.5f) && near (m.rl, -0.5f) && near (m.rr, 1.5f) && near (m.lr, -0.5f));
 
-    l = { 1.0f };
-    r = { 0.25f };
     t.stereo = 0.0f;
     t.swapChannels = true;
     t.invertPhase = true;
-    lynx::RackRenderer::applyStereoForTest (t, l.data(), r.data(), 1);
-    CHECK (l[0] == -0.25f && r[0] == -1.0f);
+    m = lynx::mixerMatrix (t, lynx::unityFader, 0.0f, false);
+    CHECK (m.ll == 0.0f && m.rl == -1.0f && m.rr == 0.0f && m.lr == -1.0f); // outL = −inR, outR = −inL
+
+    // unity, centre, no separation: exactly the identity (FL's fast path)
+    m = lynx::mixerMatrix (lynx::MixerTrack {}, lynx::unityFader, 0.0f, false);
+    CHECK (m == lynx::MixerMatrix {});
+}
+
+TEST (mixer_pan_fold_and_panning_law_match_fl_render)
+{
+    // FL 2026's render of j_tri.flp (round 167j: a 441 Hz left / 882 Hz right sample on ten inserts, pan law
+    // triangular), the matrix fitted per insert: {pan, separation, ll, rl, lr, rr}
+    struct Case { float pan, sep, ll, rl, lr, rr; };
+    const Case fl[] = { { -1.0f, 0.0f, 0.499982f, 0.499972f, 0.0f, 0.0f },     { -0.5f, 0.0f, 0.749991f, 0.249984f, 0.0f, 0.499971f },
+                        { 0.25f, 0.0f, 0.75f, 0.0f, 0.125001f, 0.874978f },     { 0.5f, 0.0f, 0.499985f, 0.0f, 0.250011f, 0.749964f },
+                        { 1.0f, 0.0f, 0.0f, 0.0f, 0.499982f, 0.499972f },       { 0.5f, 0.5f, 0.422756f, 0.077253f, 0.4045f, 0.595469f },
+                        { -0.5f, -0.5f, 1.0f, 0.0f, -0.125004f, 0.624974f },    { 0.75f, 0.0f, 0.250003f, 0.0f, 0.375006f, 0.624975f },
+                        { 0.0f, 0.75f, 0.70703f, 0.292941f, 0.292965f, 0.707045f } };
+    for (const auto& c : fl)
+    {
+        lynx::MixerTrack t;
+        t.stereo = c.sep;
+        const auto m = lynx::mixerMatrix (t, lynx::unityFader, c.pan, true);
+        // the fit's own error is ~5e-5 (16-bit render)
+        CHECK (std::abs (m.ll - c.ll) < 2e-4f && std::abs (m.rl - c.rl) < 2e-4f && std::abs (m.lr - c.lr) < 2e-4f
+               && std::abs (m.rr - c.rr) < 2e-4f);
+    }
+
+    // circular (the default): +3 dB on the side panned to, and the folded half of the other side
+    const auto hard = lynx::mixerMatrix (lynx::MixerTrack {}, lynx::unityFader, 1.0f, false);
+    CHECK (std::abs (hard.ll) < 1e-6f && std::abs (hard.rl) < 1e-6f);
+    CHECK (std::abs (hard.rr - 0.70710677f) < 1e-6f && std::abs (hard.lr - 0.70710677f) < 1e-6f);
+    const auto half = lynx::mixerMatrix (lynx::MixerTrack {}, lynx::unityFader, 0.5f, false);
+    const auto gl = (float) std::cos (0.75 * 3.14159265358979 / 2.0) * 1.4142135f, gr = (float) std::sin (0.75 * 3.14159265358979 / 2.0) * 1.4142135f;
+    CHECK (std::abs (half.ll - gl) < 1e-5f && half.rl == 0.0f);
+    CHECK (std::abs (half.rr - gr * (1.0f - (1.0f - gl) * 0.5f)) < 1e-5f && std::abs (half.lr - gr * (1.0f - gl) * 0.5f) < 1e-5f);
+    // the fader scales the whole matrix (−6 dB-ish position), polarity negates it
+    lynx::MixerTrack inv;
+    inv.invertPhase = true;
+    const auto low = lynx::mixerMatrix (inv, 0.5f, 0.0f, false);
+    const auto g = (float) ((std::exp ((double) (0.625f * 2.3978953f)) - 1.0) * 0.1);
+    CHECK (std::abs (low.ll + g) < 1e-5f && std::abs (low.rr + g) < 1e-5f && std::abs (low.rl) < 1e-6f);
 }
 
 TEST (effects_limiter_filter_distortion_chorus)
@@ -16267,6 +16320,274 @@ TEST (emphasizer_matches_fl_engine)
     CHECK (lynx::formatEffectParam (lynx::EffectKind::emphasizer, 2, 1.0f, 120.0) == "Soft");
 }
 
+// ---- Wave Traveller (REA_rodada167f-wavetraveller) ----
+namespace
+{
+// the crafted case: a sample on the 16-bit grid and a state that uses every feature (the same data went to the DLL)
+inline std::vector<float> wtTestSample (int n) // planar stereo, values on the 16-bit grid
+{
+    std::vector<float> s ((std::size_t) n * 2);
+    std::uint32_t r = 2024;
+    for (int i = 0; i < n; ++i)
+        for (int c = 0; c < 2; ++c)
+        {
+            r = r * 1664525u + 1013904223u;
+            const auto noise = (int) (r >> 20) - 2048; // ±2048
+            const auto tone = (int) std::lround (12000.0 * std::sin ((double) i * (c == 0 ? 0.031 : 0.047)));
+            s[(std::size_t) c * (std::size_t) n + (std::size_t) i] = (float) (tone + noise) / 32768.0f;
+        }
+    return s;
+}
+
+inline lynx::wavetrav::State wtTestState()
+{
+    using namespace lynx::wavetrav;
+    auto st = defaultState();
+    st.samplePath = "x.wav"; // (FL asks its host for the sample only when the state names one)
+    auto pt = [] (float x, float y, int type, float tension = 0.5f, float c1x = -0.05f, float c1y = -0.2f, float c2x = 0.1f, float c2y = 0.3f) {
+        auto p = newPoint (x, y);
+        p.type = type, p.tension = tension, p.c1x = c1x, p.c1y = c1y, p.c2x = c2x, p.c2y = c2y;
+        return p;
+    };
+    auto& a = st.patches[60]; // every segment type, tempo based
+    a.wave.clear();
+    const float xs[] { 0.0f, 0.15f, 0.3f, 0.45f, 0.6f, 0.75f, 0.9f, 1.0f }, ys[] { 0.1f, 0.8f, 0.2f, 0.9f, 0.05f, 0.7f, 0.3f, 1.0f };
+    const int ts[] { 1, 2, 3, 4, 5, 6, 8, 1 };
+    for (int i = 0; i < 8; ++i)
+        a.wave.push_back (pt (xs[i], ys[i], ts[i], ts[i] == 6 ? 0.2f : 0.5f));
+    a.speedBeats = 2.0f;
+    auto& b = st.patches[61]; // volume curve, mutes, start / end, attack / release
+    b.vol = { pt (0.0f, 0.2f, 2), pt (0.4f, 1.0f, 6, 0.8f), pt (0.7f, 0.3f, 4), pt (1.0f, 0.9f, 1) };
+    b.mutes = { { true, 0.0f }, { false, 0.3f }, { true, 0.5f } };
+    b.start = 0.2f, b.end = 0.7f, b.attackMs = 50.0f, b.releaseMs = 300.0f, b.speedBeats = 1.0f;
+    auto& c = st.patches[62]; // absolute speed, tension segments
+    c.splineType = 1, c.absSpeed = 2.3f, c.start = 0.1f, c.end = 0.6f;
+    c.wave = { pt (0.0f, 0.0f, 6, 0.5f), pt (0.5f, 0.9f, 6, 0.9f), pt (1.0f, 0.2f, 1) };
+    auto& d = st.patches[63]; // types that write nothing, a tiny Bezier
+    d.wave = { pt (0.0f, 0.0f, 1), pt (0.2f, 0.5f, 7), pt (0.3f, 0.1f, 0), pt (0.5f, 0.6f, 3, 0.5f, -0.05f, -0.2f, 0.0f, 0.0f),
+               pt (0.5004f, 0.2f, 3), pt (0.501f, 0.9f, 1), pt (1.0f, 0.4f, 1) };
+    for (auto& p : st.patches)
+        p.rebuild();
+    return st;
+}
+
+std::uint64_t floatBitsHash (const std::vector<float>& v)
+{
+    std::uint64_t h = 0xcbf29ce484222325ull;
+    for (const float x : v)
+    {
+        std::uint32_t u;
+        std::memcpy (&u, &x, 4);
+        h = (h ^ u) * 0x100000001b3ull;
+    }
+    return h;
+}
+
+lynx::SampleData wtSampleData (const std::vector<float>& planar, int channels)
+{
+    lynx::SampleData d;
+    const auto n = planar.size() / (std::size_t) channels;
+    d.left.assign (planar.begin(), planar.begin() + (std::ptrdiff_t) n);
+    if (channels > 1)
+        d.right.assign (planar.begin() + (std::ptrdiff_t) n, planar.end());
+    d.sampleRate = 44100.0;
+    return d;
+}
+} // namespace
+
+TEST (wave_traveller_state_and_tables)
+{
+    using namespace lynx::wavetrav;
+    // FL's state layout (§2): it round-trips byte for byte, and the default patch is FL's
+    const auto def = writeState (defaultState());
+    State s;
+    CHECK (parseState (def, s) && writeState (s) == def && s.selectedKey == 60 && s.samplePath.empty());
+    CHECK (s.patches[0].wave.size() == 2 && s.patches[119].vol.size() == 2 && s.patches[60].mutes.size() == 1 && s.patches[60].mutes[0].on);
+    const auto crafted = writeState (wtTestState());
+    CHECK (parseState (crafted, s) && writeState (s) == crafted);
+    CHECK (s.patches[62].splineType == 1 && s.patches[61].mutes.size() == 3 && ! s.patches[61].mutes[1].on && s.patches[60].wave.size() == 8);
+    // tables (§3): a 0 → 1 line is 1022 values long (the writer steps back one value per segment)
+    CHECK (s.patches[0].waveN == 1022 && s.patches[0].waveTable[0] == 0.0f && s.patches[0].volTable[500] == 1.0f);
+    std::vector<float> tables;
+    for (int k = 60; k < 64; ++k)
+    {
+        const auto& p = s.patches[(std::size_t) k];
+        tables.insert (tables.end(), p.waveTable.begin(), p.waveTable.begin() + p.waveN + 1);
+        tables.insert (tables.end(), p.volTable.begin(), p.volTable.begin() + p.volN + 1);
+        CHECK (std::all_of (p.waveTable.begin(), p.waveTable.end(), [] (float v) { return v >= 0.0f && v <= 1.0f; }));
+    }
+    // (LYNX's own value; the tables reach the DLL goldens of wave_traveller_matches_fl_engine through the output)
+    CHECK (floatBitsHash (tables) == 0xd94594a6f22cb4dfull);
+    if (floatBitsHash (tables) != 0xd94594a6f22cb4dfull)
+        std::printf ("  wave traveller tables: %016llx\n", (unsigned long long) floatBitsHash (tables));
+    // knobs (FUN_007579e0 / 757b10 / 757b60)
+    CHECK (speedFromKnob (0.0f, false) == 0.125f && speedFromKnob (1.0f, false) == 8.0f && speedFromKnob (0.0f, true) == 0.25f
+           && speedFromKnob (1.0f, true) == 4.0f && attackFromKnob (1.0f) == 500.0f && releaseFromKnob (1.0f) == 1000.0f);
+    // a .spln preset (§6): knob positions, curves, mutes
+    std::vector<std::uint8_t> spln;
+    auto i32 = [&spln] (std::int32_t v) { spln.insert (spln.end(), (std::uint8_t*) &v, (std::uint8_t*) &v + 4); };
+    auto f32 = [&spln] (float v) { spln.insert (spln.end(), (std::uint8_t*) &v, (std::uint8_t*) &v + 4); };
+    i32 (4000), i32 (1000005), i32 (1);
+    for (float v : { 0.5f, 0.2f, 0.1f, 0.3f, 0.25f, 0.75f })
+        f32 (v);
+    const auto rec = [&] (float x, float y) {
+        std::vector<std::uint8_t> r (60, 0);
+        std::memcpy (r.data() + 8, &x, 4), std::memcpy (r.data() + 12, &y, 4);
+        const std::int32_t one = 1;
+        std::memcpy (r.data() + 0x30, &one, 4);
+        spln.insert (spln.end(), r.begin(), r.end());
+    };
+    i32 (3), rec (0.0f, 1.0f), rec (0.5f, 0.0f), rec (1.0f, 1.0f);
+    i32 (2), rec (0.0f, 1.0f), rec (1.0f, 0.5f);
+    i32 (2), i32 (0), f32 (0.0f), i32 (1), f32 (0.5f);
+    auto p = defaultPatch();
+    CHECK (applyPreset (spln, p) && p.splineType == 1 && p.speedBeats == speedFromKnob (0.5f, false) && p.absSpeed == speedFromKnob (0.2f, true)
+           && p.attackMs == attackFromKnob (0.1f) && p.releaseMs == releaseFromKnob (0.3f) && p.start == 0.25f && p.end == 0.75f
+           && p.wave.size() == 3 && p.vol.size() == 2 && p.mutes.size() == 2 && ! p.mutes[0].on && p.waveN > 1000);
+    // garbage is refused without crashing
+    std::uint32_t r = 7;
+    for (int round = 0; round < 300; ++round)
+    {
+        std::vector<std::uint8_t> blob (crafted.begin(), crafted.begin() + (std::ptrdiff_t) (r % crafted.size()));
+        for (int k = 0; k < 8 && ! blob.empty(); ++k)
+        {
+            r = r * 1664525u + 1013904223u;
+            blob[(r >> 8) % blob.size()] = (std::uint8_t) (r >> 24);
+        }
+        r = r * 1664525u + 1013904223u;
+        if (parseState (blob, s))
+            for (const auto& q : s.patches)
+                CHECK (q.waveN >= 0 && q.waveN < tableCapacity && q.volN >= 0 && q.volN < tableCapacity);
+    }
+    CHECK (! parseState ({ 1, 2, 3 }, s) && ! lynx::waveTravellerStateUsable ({}));
+
+    // the installation's states (read at test time): the render test and the plugin database preset
+    if (realFlpDir.empty())
+        return;
+    auto read = [] (const std::filesystem::path& path) {
+        std::ifstream in (path, std::ios::binary);
+        return std::vector<std::uint8_t> { std::istreambuf_iterator<char> (in), {} };
+    };
+    const auto base = std::filesystem::path (realFlpDir);
+    if (const auto b = read (base / "System" / "Render tests" / "Wave Traveller.flp"); ! b.empty())
+    {
+        const auto project = flp::parseProject (b);
+        int found = 0;
+        for (const auto& c : project.channels)
+            if (c.pluginName == "Wave Traveller")
+            {
+                ++found;
+                CHECK (parseState (c.pluginState, s) && s.samplePath.find ("808 Snare.wav") != std::string::npos);
+            }
+        CHECK (found == 1);
+        const auto song = lynx::importFlp (project);
+        const auto it = std::find_if (song.channels.begin(), song.channels.end(), [] (const lynx::ChannelDef& c) { return c.instrument == lynx::InstrumentKind::wavetraveller; });
+        CHECK (it != song.channels.end() && lynx::waveTravellerStateUsable (it->pluginState));
+    }
+    if (const auto b = read (base / "System" / "Plugin databases" / "Plugin database (alphabetical)" / "Generators" / "Wave Traveller.fst"); ! b.empty())
+    {
+        const auto project = flp::parseProject (b, true);
+        CHECK (! project.channels.empty() && parseState (project.channels.front().pluginState, s) && s.samplePath.empty());
+    }
+}
+
+TEST (wave_traveller_matches_fl_engine)
+{
+    // §8: goldens of the installation's Wave Traveller_x64.dll in our harness (16-bit stereo sample handed by LoadSample,
+    // 512-frame calls, tempo by ProcessEvent): FNV-1a of the output's float bits. LYNX's engine reproduces them exactly.
+    using namespace lynx::wavetrav;
+    const auto planar = wtTestSample (30000);
+    const auto smp = sampleFrom (wtSampleData (planar, 2));
+    CHECK (smp != nullptr && smp->length == 30000);
+    if (smp == nullptr)
+        return;
+    const auto state = wtTestState();
+    auto note = [] (int start, int key, float vol, float pan, float cents, int release, float initPan = 0.0f) {
+        RefNote n;
+        n.start = start, n.release = release;
+        n.note.key = key, n.note.finalVol = vol, n.note.finalPan = pan, n.note.initPan = initPan;
+        n.note.finalPitch = 100.0f * (float) key - 6000.0f + cents;
+        return n;
+    };
+    struct Case { std::vector<RefNote> notes; int rate; float tempo; int taps, length; std::uint64_t hash; };
+    const Case cases[] {
+        // live: every segment type, volume curve + mutes + attack / release, absolute speed, types 0 / 7 and a tiny Bezier
+        { { note (0, 60, 0.9f, 0.25f, 30.0f, 20000), note (100, 61, 0.7f, -0.5f, -120.0f, 15000), note (2000, 62, 0.8f, 0.0f, 0.0f, -1),
+            note (5000, 63, 1.0f, 0.6f, 250.0f, -1) }, 44100, 140.0f, 0, 40000, 0x9001a50747634ba6ull },
+        // render mode, 256 taps per side (FL's render default), with the notes' own pan
+        { { note (0, 60, 0.9f, 0.25f, 30.0f, 20000, -0.3f), note (100, 61, 0.7f, -0.5f, -120.0f, 15000, -0.3f), note (2000, 62, 0.8f, 0.0f, 0.0f, -1, -0.3f),
+            note (5000, 63, 1.0f, 0.6f, 250.0f, -1, -0.3f) }, 44100, 140.0f, 256, 8000, 0xedabd9728ffbb252ull },
+        // a 48 kHz host at tempo 97.5
+        { { note (0, 62, 0.9f, -0.6f, -250.0f, 20000), note (300, 60, 0.8f, 0.3f, 100.0f, -1) }, 48000, 97.5f, 0, 30000, 0x71b988c298c5ab31ull },
+    };
+    for (const auto& c : cases)
+    {
+        const auto out = renderReference (state, *smp, c.notes, c.rate, c.tempo, c.taps, c.length);
+        CHECK (floatBitsHash (out) == c.hash);
+        if (floatBitsHash (out) != c.hash)
+            std::printf ("  wave traveller case: %016llx\n", (unsigned long long) floatBitsHash (out));
+    }
+
+    // the instrument (channel → engine) plays what the reference plays: velocity 1/1.28 = FL's Init.Vol 1, centred
+    {
+        lynx::ChannelDef ch;
+        ch.instrument = lynx::InstrumentKind::wavetraveller;
+        ch.pluginState = writeState (state);
+        auto inst = lynx::makeInstrument (lynx::InstrumentKind::wavetraveller, std::make_shared<lynx::SampleData> (wtSampleData (planar, 2)));
+        inst->configure (ch, 140.0);
+        inst->prepare (44100.0);
+        std::vector<float> l (20480, 0.0f), r (20480, 0.0f);
+        for (int pos = 0; pos < 20480; pos += 512)
+        {
+            if (pos == 0)
+                inst->noteOn (61, 1.0f / 1.28f);
+            if (pos == 10240)
+                inst->noteOff (61);
+            inst->render (l.data() + pos, r.data() + pos, 512, 1.0f, 1.0f);
+        }
+        const auto ref = renderReference (state, *smp, { note (0, 61, 1.0f, 0.0f, 0.0f, 10240) }, 44100, 140.0f, 0, 20480);
+        bool same = true;
+        for (int i = 0; i < 20480; ++i)
+            same = same && l[(std::size_t) i] == ref[2 * (std::size_t) i] && r[(std::size_t) i] == ref[2 * (std::size_t) i + 1];
+        CHECK (same && inst->idle());
+        auto silent = lynx::makeInstrument (lynx::InstrumentKind::wavetraveller); // no sample: FL refuses the notes
+        silent->configure (ch, 140.0);
+        silent->prepare (44100.0);
+        silent->noteOn (60, 1.0f);
+        std::fill (l.begin(), l.end(), 0.0f);
+        silent->render (l.data(), r.data(), 512, 1.0f, 1.0f);
+        CHECK (silent->idle() && std::all_of (l.begin(), l.begin() + 512, [] (float v) { return v == 0.0f; }));
+    }
+
+    // the installation's render test (its 808 Snare decoded as FL decodes it), read at test time
+    if (realFlpDir.empty())
+        return;
+    const auto base = std::filesystem::path (realFlpDir);
+    std::ifstream fin (base / "System" / "Render tests" / "Wave Traveller.flp", std::ios::binary);
+    std::ifstream sin (base / "Patches" / "Packs" / "Drums" / "Snares" / "808 Snare.wav", std::ios::binary);
+    const std::vector<std::uint8_t> flpBytes { std::istreambuf_iterator<char> (fin), {} }, wav { std::istreambuf_iterator<char> (sin), {} };
+    lynx::oggvorbis::Decoded dec;
+    if (flpBytes.empty() || wav.empty() || ! lynx::oggvorbis::decode (wav.data(), wav.size(), dec) || dec.channels != 1)
+        return;
+    const auto project = flp::parseProject (flpBytes);
+    for (const auto& c : project.channels)
+        if (c.pluginName == "Wave Traveller")
+        {
+            State st;
+            CHECK (parseState (c.pluginState, st));
+            lynx::SampleData d;
+            d.left = dec.data[0];
+            const auto snare = sampleFrom (d);
+            CHECK (snare != nullptr && snare->length == 11002);
+            if (snare == nullptr)
+                return;
+            const auto out = renderReference (st, *snare, { note (0, 60, 1.0f, 0.0f, 0.0f, 44100) }, 44100, 140.0f, 0, 88200);
+            CHECK (floatBitsHash (out) == 0xafcb49e8c0ef918dull);
+            if (floatBitsHash (out) != 0xafcb49e8c0ef918dull)
+                std::printf ("  wave traveller render test: %016llx\n", (unsigned long long) floatBitsHash (out));
+        }
+}
+
 TEST (fl_legacy_fx_match_fl_engines)
 {
     // REA_rodada165k: FL's Fruity Phase Inverter, Center, Bass Boost, 7 Band EQ and Delay (v1) through the import (state → slot →
@@ -16499,6 +16820,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Patcher164vTests.inc"
 #include "Vfx164Tests.inc"
 #include "VfxScript165Tests.inc"
+#include "Perf167Tests.inc"
 #include "Misc164Tests.inc"
 #include "Store165Tests.inc" // (round 165n; kept off the end of the list, where every round appends)
 #include "Rack165Tests.inc"  // (round 165f-rack; likewise)
@@ -16507,6 +16829,11 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Patcher164fTests.inc"
 #include "Markers165Tests.inc"
 #include "PerfMode165Tests.inc"
+#include "Rea167gTests.inc"
+#include "Rea167hTests.inc"
+#include "Rea167jTests.inc"
+#include "Rea167kTests.inc"
+#include "Rea167lTests.inc"
 #include "Patch165Tests.inc"
 #include "FlPlugins165Tests.inc"
 #include "FlScratch165Tests.inc"
@@ -16522,6 +16849,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FlGran165Tests.inc"
 #include "GranDrop165Tests.inc"
 #include "Kepler165kTests.inc"
+#include "KeplerExo167dTests.inc"
 #include "MixerLatency165Tests.inc"
 #include "Audit165Tests.inc"
 #include "Vfx165cTests.inc"
@@ -16537,6 +16865,14 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Round166eTests.inc"
 #include "Issue15Tests.inc"
 #include "Issue14bugsTests.inc"
+#include "Left167Tests.inc"
 #include "Tune166cTests.inc"
 #include "Update166bTests.inc"
+#include "Emphasis167fTests.inc"
+#include "Dvs167Tests.inc"
+#include "EdisonScript167Tests.inc"
+#include "Deverb167Tests.inc"
+#include "Score167Tests.inc"
+#include "Ntt167Tests.inc"
+#include "MidiOut167iTests.inc"
 #include "Transporter167fTests.inc"

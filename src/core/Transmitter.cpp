@@ -5,6 +5,7 @@
 #include "core/IldspMath.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 
@@ -621,6 +622,21 @@ std::array<float, count> defaults()
     return p;
 }
 
+std::string syncedText (int raw)
+{
+    // FL's front end (REA_rodada167b §2): the control over 768 positions (16 steps of 48 ticks), shown one tick on
+    const double x = std::clamp (raw, 0, 10000) * 0.0001;
+    const int i = (int) std::floor (x * 767.0 + 0.5) + 1;
+    return std::to_string (i / 48) + ":" + std::to_string (i % 48);
+}
+
+int columnSamples (double sampleRate, int speed)
+{
+    // FL's envelope view (REA_rodada167b §3): (601^(1 − speed/100) − 1) · 0.4125 ms + 2.5 ms per column, at least 16
+    const double t = (std::pow (601.0, 1.0 - std::clamp (speed, 0, 100) * 0.01) - 1.0) * 0.0004125 + 0.0025;
+    return std::max (16, (int) std::lround (sampleRate * t));
+}
+
 std::string paramText (int k, float v)
 {
     const int raw = rawFromParam (k, v);
@@ -635,7 +651,7 @@ std::string paramText (int k, float v)
             std::snprintf (buf, sizeof buf, "%.1f dB", e); break;
         case tDiffDelay: case sDiffDelay: std::snprintf (buf, sizeof buf, "%.2f s", e); break;
         case tDelayTime: case sDelayTime: std::snprintf (buf, sizeof buf, "%.3f s", e); break;
-        case tDelaySynced: case sDelaySynced: std::snprintf (buf, sizeof buf, "%.2f steps", e); break;
+        case tDelaySynced: case sDelaySynced: return syncedText (raw);
         case mode: return modes[std::clamp (raw, 0, 2)];
         case transientEffect: case sustainEffect: return sections[std::clamp (raw, 0, 5)];
         case lookahead: case stereoLink: case transientOn: case sustainOn: case tDelaySync: case sDelaySync:
@@ -662,6 +678,8 @@ std::optional<State> parse (const std::vector<std::uint8_t>& data)
         s.sustainSend = rd (8 + 4 * count);
         s.sidechain = rd (12 + 4 * count);
     }
+    if (data.size() >= 4 + 4 * count + 16)
+        s.speed = std::clamp (rd (16 + 4 * count), 0, 100);
     return s;
 }
 
@@ -756,6 +774,13 @@ void Engine::setParams (const float* params)
         setRaw (k, rawFromParam (k, params[k]));
 }
 
+const float* Engine::part (int which, int channel) const
+{
+    return impl->buf[(std::size_t) (std::clamp (which, 0, 1) * 2 + std::clamp (channel, 0, 1))].data();
+}
+
+const float* Engine::envelope() const { return impl->buf[4].data(); }
+
 int Engine::latency() const
 {
     return impl->v[lookahead] > 0.5f ? (int) std::lround (impl->fs * 0.002f) : 0;
@@ -781,6 +806,7 @@ void Engine::process (const float* inL, const float* inR, float* outL, float* ou
     {
         const float d = ! sidechain ? (inL[i] + inR[i]) * 0.5f : scL != nullptr && scR != nullptr ? (scL[i] + scR[i]) * 0.5f : 0.0f;
         const float e = m.det.run (d, sensFactor, la, hold, rel);
+        m.buf[4][(std::size_t) i] = e;
         const float xl = m.la[0].run (inL[i], la), xr = m.la[1].run (inR[i], la);
         tl[i] = xl * e; tr[i] = xr * e;
         sl[i] = xl * (1.0f - e); sr[i] = xr * (1.0f - e);
@@ -834,7 +860,15 @@ namespace
 class TransmitterEffect final : public Effect
 {
 public:
-    void prepare (double sampleRate) noexcept override { rate = sampleRate; engine.prepare (sampleRate); first = true; }
+    void prepare (double sampleRate) noexcept override
+    {
+        rate = sampleRate;
+        engine.prepare (sampleRate);
+        first = true;
+        view.columnLength.store (columnSamples (sampleRate, view.speed.load (std::memory_order_relaxed)), std::memory_order_relaxed);
+        inColumn = 0;
+        column = {};
+    }
     void reset() noexcept override { engine.reset(); first = true; }
     void process (float* left, float* right, int n, const EffectParams& params, double bpm) noexcept override
     {
@@ -853,6 +887,20 @@ public:
         engine.process (left, right, left, right, n, hasSide, sideL, sideR);
         hasSide = false;
         sideL = sideR = nullptr;
+        // FL's transient / sustain sends: each part after its tilt and section effect, before its level and on switch
+        // (FL copies them into the destination's buffer; LYNX's send buffer is the slot's own, so adding is the same)
+        for (int o = 0; o < 2; ++o)
+            if (sendL[o] != nullptr && sendR[o] != nullptr)
+            {
+                const float* pl = engine.part (o, 0);
+                const float* pr = engine.part (o, 1);
+                for (int i = 0; i < n; ++i)
+                {
+                    sendL[o][i] += pl[i];
+                    sendR[o][i] += pr[i];
+                }
+            }
+        record (left, right, n);
     }
     // the slot's sidechain (FL's sidechain input feeds the detection), set before each process() when the slot has one
     void setSidechain (const float* l, const float* r) noexcept override
@@ -861,16 +909,58 @@ public:
         sideL = l;
         sideR = r;
     }
+    void setExtraOutput (int output, float* l, float* r) noexcept override
+    {
+        if (output >= 0 && output < 2)
+        {
+            sendL[output] = l;
+            sendR[output] = r;
+        }
+    }
     int latencySamples() const noexcept override { return engine.latency(); }
 
+    EnvelopeView view;
+
 private:
+    // FL's envelope view: per column the peak of the output and of the detector's transient (e) / sustain (1 − e) envelopes
+    void record (const float* l, const float* r, int n) noexcept
+    {
+        const float* e = engine.envelope();
+        const int length = std::max (16, view.columnLength.load (std::memory_order_relaxed));
+        for (int i = 0; i < n; ++i)
+        {
+            column.output = std::max (column.output, std::max (std::abs (l[i]), std::abs (r[i])));
+            column.transient = std::max (column.transient, e[i]);
+            column.sustain = std::max (column.sustain, 1.0f - e[i]);
+            if (++inColumn >= length)
+            {
+                const auto at = view.written.load (std::memory_order_relaxed);
+                view.columns[at % EnvelopeView::size] = column;
+                view.written.store (at + 1, std::memory_order_release);
+                column = {};
+                inColumn = 0;
+            }
+        }
+    }
+
     Engine engine;
     std::array<float, count> last {};
     double rate = 44100, lastBpm = 0;
     bool first = true, hasSide = false;
     const float *sideL = nullptr, *sideR = nullptr;
+    float* sendL[2] { nullptr, nullptr };
+    float* sendR[2] { nullptr, nullptr };
+    EnvelopeColumn column;
+    int inColumn = 0;
 };
 } // namespace
+
+const EnvelopeView* envelopeOf (const Effect* effect)
+{
+    if (const auto* t = dynamic_cast<const TransmitterEffect*> (effect))
+        return &t->view;
+    return nullptr;
+}
 
 std::unique_ptr<Effect> make() { return std::make_unique<TransmitterEffect>(); }
 } // namespace lynx::transmitter

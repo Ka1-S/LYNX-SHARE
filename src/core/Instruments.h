@@ -40,6 +40,10 @@ public:
     // they hold, as FL's do (round 165d: FL's Arpeggiator script on a "cut itself" Patcher keeps arpeggiating a chord
     // whose notes start apart [EXEC: FL render, REA_rodada165d §4])
     virtual void cut() noexcept { allNotesOff(); }
+    // FL's Options › Project › "Fast declick for cut groups" (REA round 167h §3): a cut voice fades out in 2 ms
+    virtual void setFastDeclick (bool /*fast*/) noexcept {}
+    // the project's panning law (Song::panTriangular, FL's Options › Project › Panning law; REA round 167j §1)
+    virtual void setPanTriangular (bool /*triangular*/) noexcept {}
     // A note on a given MIDI channel (0…15), from a MIDI Out channel routed to this one's MIDI input port. Only
     // hosted plugins see the channel; the others play it as a plain note.
     virtual void noteOnMidi (int key, float velocity, int /*midiChannel*/) noexcept { noteOn (key, velocity); }
@@ -58,6 +62,11 @@ public:
     // thread, before every render. Native engines take these at note on (configure / setNextNoteExpression) and ignore
     // it; a hosted plugin turns it into MIDI pitch bend (FL's wrapper: pitch bend range).
     virtual void setLivePitch (float /*cents*/) noexcept {}
+    // The same, split: `knob` = the PITCH knob (cents, what configure() gave the engine as the channel's pitch), `rest` =
+    // fine tune + main pitch (what setNextNoteExpression adds to each note). FL's generators follow both on their
+    // sounding notes (round 167a, REA_rodada167a §1: a +200 knob or main pitch move retunes a held note at once); the
+    // native engines that do override this, the others (and hosted plugins) get setLivePitch (knob + rest).
+    virtual void setChannelPitchNow (float knob, float rest) noexcept { setLivePitch (knob + rest); }
     // A controller (CC 0…127, `value` 0..1) played live into a native instrument (the mod wheel is CC 1). Ignored by
     // engines without MIDI controllers; hosted plugins get the raw message (midiMessage).
     virtual void controlChange (int /*cc*/, float /*value*/) noexcept {}
@@ -74,6 +83,12 @@ public:
     // "Slide" note: sounding notes glide to `key` over `samples`, without retriggering. Ignored if unsupported.
     virtual void slideTo (int /*key*/, float /*cents*/, float /*samples*/) noexcept {}
     // Audio clip: fades and in-clip position of the next note (before noteOn), in samples.
+    // FL 2026's clip pitch (round 167k): the next audio clip note's own transposition, shifted keeping its length;
+    // setClipShift (UI thread, before prepareKeyShift) asks for the pitch shifters even without "keep pitch"
+    virtual void setNextClipPitch (float /*semitones*/) noexcept {}
+    // the next audio clip's stretch (FL 2026's clip stretch, round 167l): its audio lasts that many times longer
+    virtual void setNextClipStretch (float /*stretch*/) noexcept {}
+    virtual void setClipShift (bool) {}
     virtual void setNextClipFades (float /*elapsed*/, float /*remaining*/, float /*fadeIn*/, float /*fadeOut*/, std::uint8_t /*shape*/ = 0) noexcept {}
     // Pan, fine tuning and "porta" (inverts the channel's porta) of the next note (called right before
     // noteOn). Ignored if unsupported.
@@ -89,10 +104,20 @@ public:
     // Playback stopped: the held notes stop (hosted plugins may send "All Notes Off" or only those notes' note offs:
     // FL's wrapper option). The panic button: everything stops (a hosted plugin may also be reset).
     virtual void transportStopped() noexcept { allNotesOff(); }
+    // Playback started (FL resets its generators: a MIDI Out sends its bank, patch and controls again).
+    virtual void transportStarted() noexcept {}
     virtual void panic() noexcept { allNotesOff(); }
+    // FL's "Reset plugins on transport" (round 167k: FL resets every plugin it registered, generators included —
+    // FUN_012b8620 adds each opened plugin to the list FUN_012b5210 resets). The Sampler / audio clip channels are not
+    // plugins in FL and keep their voices; a plugin generator stops its voices, a hosted plugin is also reset (with its
+    // wrapper's "Reset plugin when FL Studio resets").
+    virtual void transportReset() noexcept { panic(); }
     // Channel settings (sampler, synth). UI thread, on every snapshot; the instrument stores them
     // so the audio thread can read without waiting.
     virtual void configure (const ChannelDef&, double /*bpm*/) noexcept {}
+    // A new instrument, configured and not yet playing (UI thread): it may take its settings now, so the first
+    // block or note does not build them on the audio thread.
+    virtual void settleNew() {}
     // Control output ("controller" instruments), 0..1. Audio thread.
     virtual float controlOutput (int /*output*/) const noexcept { return 0.0f; }
     // Song position (ticks) at the start of the block, for the global LFOs. Audio thread.
@@ -158,6 +183,10 @@ struct SampleData
     // the sample's regions and beats (Fruity Granulizer's slices and tempo sync)
     std::vector<std::int64_t> markerStarts;
     float acidBeats = 0.0f;
+    // a sample FL's precomputed effects were applied to (core/SamplePrecompute.h): it holds only the played region,
+    // which was [cropFrom, cropTo] of the file (fractions); the sampler maps its Start / End knobs into it
+    bool cropped = false;
+    double cropFrom = 0.0, cropTo = 1.0;
 
     const float* mappedLeft = nullptr;
     const float* mappedRight = nullptr; // nullptr = mono

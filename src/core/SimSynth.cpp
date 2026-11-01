@@ -1722,15 +1722,33 @@ public:
             eng->release (held[k]);
         notePan[k] = nextPan;
         const auto pan = std::clamp (nextPan + (float) channelPan, -1.0f, 1.0f);
-        const auto pitch = (float) (100.0 * (k - 60)) + pitchCents.load() + nextCents;
+        const auto knob = pitchCents.load();
+        const auto pitch = (float) (100.0 * (k - 60)) + knob + nextCents;
         // FL hands SimSynth the old voice record: integer pan (−64…64) and pitch (cents)
         const auto sl = eng->trigger (k, (int) std::lround (pan * 64.0f), (float) channelVol, (int) std::lround (pitch), 0.0f, 0.0f);
         for (auto& h : held)
             if (h == sl)
                 h = -1;
         held[k] = sl;
+        if (sl >= 0)
+            eng->slots[sl].slide.anchor (live.ref (knob));
         nextPan = 0.0f;
         nextCents = 0.0f;
+    }
+
+    // FL's PITCH knob and main pitch move the sounding notes too (round 167a), at once
+    void setChannelPitchNow (float knob, float rest) noexcept override
+    {
+        live.set (knob, rest);
+        if (eng == nullptr)
+            return;
+        for (auto& sl : eng->slots)
+            if (sl.used)
+            {
+                sl.slide.follow (live.now());
+                if (sl.slide.jump != 0.0f)
+                    sl.pitch = sl.notePitch + (int) std::lround (sl.slide.advance (0.0f));
+            }
     }
 
     // a slide note (issue #14): the held keys' voices glide their Final.Pitch to the slide's pitch
@@ -1821,6 +1839,7 @@ private:
     std::optional<State> current;
     std::atomic<double> rate { 44100.0 };
     std::atomic<float> pitchCents { 0.0f };
+    LiveChannelPitch live; // (audio thread)
     std::vector<std::uint8_t> state;
     double channelVol = 1.0, channelPan = 0.0;
     int held[128] {};

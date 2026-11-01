@@ -1304,9 +1304,9 @@ void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, co
         // the same mapping as paintAudioClip
         const auto wave = body.reduced (0.0f, body.getHeight() >= 14.0f ? 2.0f : 1.0f);
         const auto total = (double) summary->frames;
-        const auto perTick = clipops::framesPerTick (channel, total, summary->sampleRate, song.bpm);
+        const auto perTick = clipops::framesPerTick (channel, c, total, summary->sampleRate, song.bpm);
         const auto startTick = (double) c.offset + (double) (wave.getX() - r.getX()) / pixelsPerTick;
-        const auto forward = ! channel.sampler.reverse;
+        const auto forward = ! clipops::playsBackwards (channel, c);
         const auto startFrame = forward ? startTick * perTick : total - startTick * perTick;
         const auto colour = clipContentColour (base);
         auto style = ui::currentWaveStyle (colour, juce::jmin (ui::normalisingGain (*summary), 4.0f) * c.gain);
@@ -1375,11 +1375,11 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
     {
         const auto wave = body.reduced (0.0f, body.getHeight() >= 14.0f ? 2.0f : 1.0f);
         const auto total = (double) summary->frames;
-        const auto perTick = clipops::framesPerTick (channel, total, summary->sampleRate, song.bpm);
+        const auto perTick = clipops::framesPerTick (channel, c, total, summary->sampleRate, song.bpm);
         // r's left edge is the clip start, i.e. tick `offset` of the audio (counted from the file's end when
         // the channel is reversed)
         const auto startTick = (double) c.offset + (double) (wave.getX() - r.getX()) / pixelsPerTick;
-        const auto forward = ! channel.sampler.reverse;
+        const auto forward = ! clipops::playsBackwards (channel, c);
         const auto startFrame = forward ? startTick * perTick : total - startTick * perTick;
         auto style = ui::currentWaveStyle (clipContentColour (colour), juce::jmin (ui::normalisingGain (*summary), 4.0f) * c.gain);
         if (! style.spectral && c.gain > 1.0f) // louder clip gain: the shape may hit the top, which is honest
@@ -3614,10 +3614,14 @@ void PlaylistComponent::showRulerMenu (int x)
             every.addItem (tr (text), [this, bars = bars] {
                 engine.editSong ([bars] (Song& s) { markers::addEvery (s, bars); });
             });
+        timeMarkers.addItem (tr ("Add one...") + "\tAlt+T", [this] { runAction ("playlist.markerAdd"); });
+        timeMarkers.addItem (tr ("Add auto") + "\tCtrl+T", [this] { runAction ("playlist.markerAuto"); });
         timeMarkers.addSubMenu (tr ("Add one every"), every);
         timeMarkers.addItem (tr ("Add jump to next bar"), [this, tick] {
             engine.editSong ([tick] (Song& s) { markers::addJumpToNextBar (s, tick); });
         });
+        timeMarkers.addItem (tr ("Add time signature change...") + "\tShift+Alt+T", [this] { runAction ("playlist.markerSignature"); });
+        timeMarkers.addItem (tr ("Place loop") + "\tShift+T", [this] { runAction ("playlist.markerLoop"); });
         timeMarkers.addItem (tr ("Change to marker loop"), song.hasLoop(), false, [this] {
             engine.editSong ([] (Song& s) { markers::changeToMarkerLoop (s); });
         });
@@ -3701,6 +3705,14 @@ void PlaylistComponent::showRulerMenu (int x)
         menu.addSubMenu (tr ("Select"), select);
     }
     menu.addItem (tr ("Ripple editing (resizing and deleting move the later clips)") + "\tShift+S", true, ripple, [this] { setRipple (! ripple); });
+    {
+        auto anyAudio = false;
+        for (auto i : selection)
+            anyAudio = anyAudio || (i >= 0 && i < (int) song.playlist.size() && song.playlist[(std::size_t) i].kind == ClipKind::audio);
+        menu.addItem (tr ("Pitch selected audio clips one semitone down") + "\t7", anyAudio, false, [this] { runAction ("playlist.pitchClipsDown"); });
+        menu.addItem (tr ("Pitch selected audio clips one semitone up") + "\t8", anyAudio, false, [this] { runAction ("playlist.pitchClipsUp"); });
+        menu.addItem (tr ("Reverse selected audio clips") + "\t9", anyAudio, false, [this] { runAction ("playlist.reverseClips"); });
+    }
     menu.addItem (tr ("Automatic crossfades (current project)"), true, engine.getSong().autoCrossfades, [this] { runAction ("playlist.autoCrossfades"); });
     {
         juce::PopupMenu zoom;
@@ -4139,10 +4151,10 @@ void PlaylistComponent::normalizeClips (const std::vector<int>& targets)
             continue;
 
         const auto total = (double) sample->frames();
-        const auto perTick = clipops::framesPerTick (channel, total, sample->sampleRate, song.bpm);
+        const auto perTick = clipops::framesPerTick (channel, c, total, sample->sampleRate, song.bpm);
         auto from = juce::jlimit (0.0, total, (double) c.offset * perTick);
         auto to = juce::jlimit (from, total, (double) (c.offset + c.length) * perTick);
-        if (channel.sampler.reverse) // the clip's offset counts from the file's end
+        if (clipops::playsBackwards (channel, c)) // the clip's offset counts from the file's end
         {
             const auto f = total - to, t = total - from;
             from = f;
@@ -4324,6 +4336,16 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.ripple")) setRipple (! ripple);
     else if (is ("playlist.autoCrossfades")) engine.editSong ([] (Song& s) { s.autoCrossfades = ! s.autoCrossfades; });
     else if (is ("playlist.follow")) EditorGlobals::get().setFollowing (false, ! EditorGlobals::get().isFollowing (false));
+    else if (is ("playlist.selectTimeAround")) selectTimeAroundSelection();
+    else if (is ("playlist.timePrevious")) moveTimeSelection (-1);
+    else if (is ("playlist.timeNext")) moveTimeSelection (1);
+    else if (is ("playlist.markerAdd")) addMarkerByKey();
+    else if (is ("playlist.markerAuto")) addAutoMarker();
+    else if (is ("playlist.markerSignature")) addSignatureChangeByKey();
+    else if (is ("playlist.markerLoop")) placeLoopMarker();
+    else if (is ("playlist.pitchClipsDown")) pitchSelectedAudioClips (-1);
+    else if (is ("playlist.pitchClipsUp")) pitchSelectedAudioClips (1);
+    else if (is ("playlist.reverseClips")) reverseSelectedAudioClips();
     else if (is ("playlist.quantizeStarts")) quantizeClips (1.0);
     else if (is ("playlist.quantizeHalf")) quantizeClips (0.5);
     else if (is ("playlist.performanceMode")) togglePerformanceMode();
@@ -4334,6 +4356,178 @@ bool PlaylistComponent::runAction (const std::string& id)
         return false;
 
     return true;
+}
+
+std::int64_t PlaylistComponent::songPositionTick() const
+{
+    const auto& song = engine.getSong();
+    const auto tick = engine.getTransport().positionTicks.load();
+    return (std::int64_t) std::max (0.0, song.hasLoop() ? tick : std::fmod (tick, (double) juce::jmax<std::int64_t> (1, song.songLength())));
+}
+
+void PlaylistComponent::addMarkerByKey()
+{
+    // FL (FUN_01229d20): the song position when it is in view, else the bar line nearest the view's left edge; the
+    // time selection's start wins over both. Then the name dialog.
+    const auto& song = engine.getSong();
+    const auto left = (std::int64_t) std::max (0.0, scrollTicks);
+    const auto right = (std::int64_t) (scrollTicks + gridArea().getWidth() / pixelsPerTick);
+    auto tick = songPositionTick();
+    if (tick < left || tick > right)
+    {
+        const auto bar = song.barAt (left);
+        tick = left - bar.tick > bar.length / 2 ? bar.tick + bar.length : bar.tick;
+    }
+    if (song.hasLoop())
+        tick = song.loopStart;
+    editMarkerName (tick, -1);
+}
+
+void PlaylistComponent::addAutoMarker()
+{
+    // FL (FUN_00e546a0 with FUN_00e43fa0 (snap)): the song position on the grid
+    const auto tick = snap ((double) songPositionTick(), true);
+    for (const auto& m : engine.getSong().markers())
+        if (m.tick == tick)
+            return; // FL keeps the marker that is there (and no undo step)
+    engine.editSong ([tick] (Song& s) { markers::addAuto (s, tick); });
+}
+
+void PlaylistComponent::addSignatureChangeByKey()
+{
+    // FL (FUN_0122bd20): the time selection (start, and its end gets the old signature back), else the song position
+    const auto& song = engine.getSong();
+    const auto from = song.hasLoop() ? song.loopStart : snap ((double) songPositionTick(), true);
+    const auto to = song.hasLoop() ? song.loopEnd : (std::int64_t) -1;
+    const auto current = markers::signatureAt (song, from);
+
+    auto* window = new juce::AlertWindow (tr ("Add time signature change..."), {}, juce::MessageBoxIconType::NoIcon, this);
+    juce::StringArray numerators, denominators;
+    for (int n = 1; n <= 32; ++n)
+        numerators.add (juce::String (n));
+    for (int d : { 1, 2, 4, 8, 16, 32 })
+        denominators.add (juce::String (d));
+    window->addComboBox ("numerator", numerators, tr ("Numerator"));
+    window->addComboBox ("denominator", denominators, tr ("Denominator"));
+    window->getComboBoxComponent ("numerator")->setText (juce::String (current.first), juce::dontSendNotification);
+    window->getComboBoxComponent ("denominator")->setText (juce::String (current.second), juce::dontSendNotification);
+    window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([this, from, to, window] (int result) {
+                                 if (result != 1)
+                                     return;
+                                 const auto n = window->getComboBoxComponent ("numerator")->getText().getIntValue();
+                                 const auto d = window->getComboBoxComponent ("denominator")->getText().getIntValue();
+                                 engine.editSong ([from, to, n, d] (Song& s) { markers::addSignatureChange (s, from, to, n, d); });
+                             }),
+                             true);
+}
+
+void PlaylistComponent::selectTimeAroundSelection()
+{
+    // FL (FUN_00eb1b90 → FUN_00e4ea50): the time selection spans the selected clips, or the view when none is
+    // selected; the same span again clears it
+    const auto& song = engine.getSong();
+    std::int64_t from = -1, to = -1;
+    for (auto i : selection)
+        if (i >= 0 && i < (int) song.playlist.size())
+        {
+            const auto& c = song.playlist[(std::size_t) i];
+            from = from < 0 ? c.start : std::min (from, c.start);
+            to = std::max (to, c.end());
+        }
+    if (from < 0)
+    {
+        from = (std::int64_t) std::llround (std::max (0.0, scrollTicks));
+        to = (std::int64_t) std::llround (std::max (0.0, scrollTicks) + gridArea().getWidth() / pixelsPerTick);
+    }
+    const auto same = song.hasLoop() && song.loopStart == from && song.loopEnd == to;
+    engine.editSong ([from, to, same] (Song& s) {
+        s.loopStart = same ? 0 : from;
+        s.loopEnd = same ? 0 : to;
+    }, false);
+    repaint();
+}
+
+void PlaylistComponent::moveTimeSelection (int direction)
+{
+    // FL (FUN_00e43ea0, the action's Tag ±1): the time selection moves by its own length (not before the song's
+    // start) and the song position goes to its start
+    const auto& song = engine.getSong();
+    if (! song.hasLoop())
+        return;
+    const auto length = song.loopEnd - song.loopStart;
+    const auto from = song.loopStart + direction * length;
+    const auto songMode = song.mode == PlayMode::song;
+    if (from < 0)
+        return;
+    engine.editSong ([from, length] (Song& s) {
+        s.loopStart = from;
+        s.loopEnd = from + length;
+    }, false);
+    if (! songMode)
+        engine.editSong ([] (Song& s) { s.mode = PlayMode::song; }, false);
+    engine.jumpTo ((double) from);
+    playheadTick = (double) from;
+    // keep it in view
+    const auto visible = gridArea().getWidth() / pixelsPerTick;
+    if ((double) from < scrollTicks || (double) (from + length) > scrollTicks + visible)
+    {
+        scrollTicks = std::max (0.0, (double) from - visible * 0.1);
+        updateScrollBars();
+    }
+    repaint();
+}
+
+void PlaylistComponent::placeLoopMarker()
+{
+    // FL (FUN_0122bb80): the bar line nearest the view's left edge, or the time selection's start
+    const auto& song = engine.getSong();
+    const auto left = (std::int64_t) std::max (0.0, scrollTicks);
+    const auto bar = song.barAt (left);
+    auto tick = left - bar.tick > bar.length / 2 ? bar.tick + bar.length : bar.tick;
+    if (song.hasLoop())
+        tick = song.loopStart;
+    engine.editSong ([tick] (Song& s) { markers::placeSongLoop (s, tick); });
+}
+
+void PlaylistComponent::pitchSelectedAudioClips (int semitones)
+{
+    // FL (FUN_00e2d7b0): only the selected clips that are audio clips; nothing selected, nothing changes
+    const auto targets = selection;
+    engine.editSong ([targets, semitones] (Song& s) { clipops::pitchAudioClips (s, targets, semitones); });
+    repaint();
+}
+
+void PlaylistComponent::reverseSelectedAudioClips()
+{
+    const auto targets = selection;
+    // each clip's file length in ticks at its own speed, read here (the sample library is not for the edit lambda)
+    std::vector<std::int64_t> ticks;
+    {
+        const auto& song = engine.getSong();
+        for (auto i : targets)
+        {
+            std::int64_t t = 0;
+            if (i >= 0 && i < (int) song.playlist.size())
+                if (const auto& c = song.playlist[(std::size_t) i]; c.kind == ClipKind::audio && c.channel >= 0 && c.channel < (int) song.channels.size())
+                {
+                    const auto& channel = song.channels[(std::size_t) c.channel];
+                    if (const auto sample = engine.getSampleLibrary().load (juce::String::fromUTF8 (channel.samplePath.c_str())); sample != nullptr)
+                        t = clipops::fileTicks (channel, c, (double) sample->frames(), sample->sampleRate, song.bpm);
+                }
+            ticks.push_back (t);
+        }
+    }
+    engine.editSong ([targets, ticks] (Song& s) {
+        clipops::reverseAudioClips (s, targets, [&] (int clip) {
+            for (std::size_t k = 0; k < targets.size(); ++k)
+                if (targets[k] == clip)
+                    return ticks[k];
+            return (std::int64_t) 0;
+        });
+    });
+    repaint();
 }
 
 void PlaylistComponent::quantizeClips (double strength)
@@ -4478,13 +4672,13 @@ bool PlaylistComponent::handleKey (const juce::KeyPress& key)
     }
 
     // Ctrl+Ins / Ctrl+Del: insert / remove the time selection's length across all tracks
-    if (cmd && code == juce::KeyPress::insertKey)
+    if (cmd && ! mods.isShiftDown() && code == juce::KeyPress::insertKey) // (Ctrl+Shift+Ins: pattern.insert)
     {
         insertTimeSelection();
         return true;
     }
 
-    if (cmd && code == juce::KeyPress::deleteKey)
+    if (cmd && ! mods.isShiftDown() && code == juce::KeyPress::deleteKey) // (Ctrl+Shift+Del: pattern.delete)
     {
         deleteTimeSelection();
         return true;
@@ -4514,7 +4708,7 @@ bool PlaylistComponent::handleKey (const juce::KeyPress& key)
         return true;
     }
 
-    if (cmd && letter == 'C')
+    if (cmd && ! mods.isShiftDown() && letter == 'C') // (Ctrl+Shift+C: pattern.clone)
     {
         copySelection();
         return true;

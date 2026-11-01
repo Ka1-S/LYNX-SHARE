@@ -38,8 +38,13 @@ struct NoteEvent
     bool porta = false;        // the note inverts the channel's porta
     // audio clips: fades (in samples) and the position within the clip when the note starts
     float clipElapsed = 0.0f, clipRemaining = 0.0f, fadeIn = 0.0f, fadeOut = 0.0f;
-    // bit 0: the fade-in is a crossfade (FL's S curve, clipops::crossfadeCurve), bit 1: the fade-out (round 166e)
+    // bit 0: the fade-in is a crossfade (FL's S curve, clipops::crossfadeCurve), bit 1: the fade-out (round 166e);
+    // bit 2: the audio clip itself is reversed (FL 2026's clip reverse, round 167k)
     std::uint8_t fadeShape = 0;
+    // audio clips: FL 2026's clip pitch in semitones (keys 7/8): a pitch shift that keeps the length (round 167k)
+    float clipPitch = 0.0f;
+    // audio clips: FL 2026's clip stretch (the audio plays that many times longer; round 167l)
+    float clipStretch = 1.0f;
     // the note's Mod X / Y (0..1, 0.5 = none) and, on its "off", its release velocity (0..1) — REA round 151
     float modX = 0.5f, modY = 0.5f, release = 0.5f;
     // the note's level factor (a Layer's VOL and crossfade, round 164): the instrument scales the voice when it can,
@@ -90,7 +95,11 @@ void schedulePatternLoop (const Pattern& pattern,
                           double ticksPerSampleValue,
                           EventBuffer& out,
                           float swing = 0.0f,
-                          const std::vector<ChannelDef>* channels = nullptr) noexcept;
+                          const std::vector<ChannelDef>* channels = nullptr,
+                          bool chase = false) noexcept;
+// `chase` (both schedulers): playback starts at startTick and FL's Settings › Audio › "Play truncated notes on
+// transport" is on (FLEngine FUN_011e7470, REA_rodada167j §2): the notes that started before startTick and still
+// sound there start on the block's first sample, with what is left of their length.
 // The range the transport loops over: in Song mode the Playlist's loop region, or else the whole song (FL plays the
 // song in a loop: at its end the position goes back to the start, issue #4). Pattern mode: none (end <= start); the
 // pattern loop is the position modulo the pattern length.
@@ -130,7 +139,7 @@ ScheduleIndex makeScheduleIndex (const Song& song);
 
 // Generates the Playlist's events (playing the whole song in a loop). Each pattern clip
 // plays the pattern's notes that fall in [offset, offset + length); notes are cut at the
-// end of the clip. Audio clips trigger the channel's sample at the start and stop at the end.
+// end of the clip. With Song::playTruncatedNotes, a note that started before the offset plays from the clip's start. Audio clips trigger the channel's sample at the start and stop at the end.
 // `resume` = playback started or jumped to startTick: audio clips that were already
 // in progress at that point start in the middle, on the first sample of the block.
 void scheduleSong (const Song& song,
@@ -140,7 +149,8 @@ void scheduleSong (const Song& song,
                    EventBuffer& out,
                    bool resume = false,
                    const ScheduleIndex* index = nullptr,
-                   bool wrap = true) noexcept;
+                   bool wrap = true,
+                   bool chase = false) noexcept;
 // One clip played once where it is (no song loop), its events in the block (not sorted): Performance mode's passes.
 void scheduleSingleClip (const Song& song, const Clip& clip, std::size_t clipIndex, double startTick, int numSamples, double tps,
                          EventBuffer& out, const ScheduleIndex* index = nullptr) noexcept;

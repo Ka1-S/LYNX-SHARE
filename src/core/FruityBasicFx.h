@@ -27,6 +27,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <initializer_list>
 #include <string>
 #include <vector>
 
@@ -62,6 +63,25 @@ int sendTrack (float value) noexcept;      // and back
 // 0..127 and carry no "sendSpan": their value is rescaled to the current span (the same insert).
 constexpr int legacySendSpan = 127;
 float rescaleSendTrackValue (float value, int savedSpan) noexcept;
+// Round 167a: the other way, for saving. A "Send to" value (today's span) written over `span` (127 for files older
+// LYNX versions read the same insert from; inserts past 127 need today's span).
+float sendTrackValueInSpan (float value, int span) noexcept;
+// The span a file stores "Send to" values in: the legacy 0..127 when every one of them targets an insert ≤ 127 (any
+// LYNX version reads them right), else today's span.
+int saveSendSpan (std::initializer_list<float> values) noexcept;
+// The Fruity Send whose "Send to" an automation target moves (mixer slot, parameter 3), else nullptr.
+const EffectSlot* sendToTargetOf (const Song& song, const AutomationTarget& target) noexcept;
+// The span a project stores the "Send to" values of mixer slot (track, slot) in: its parameter, its A/B other side and
+// every automation clip and pattern event lane that moves it.
+int saveSendSpanOf (const Song& song, int track, int slot);
+template <typename Range>
+int saveSendSpanOf (const Range& values) noexcept
+{
+    for (const auto v : values)
+        if (sendTrack (v) > legacySendSpan)
+            return maxMixerTracks - 1;
+    return legacySendSpan;
+}
 
 std::string panOMaticParamText (int param, float value01);
 std::string balanceParamText (int param, float value01);

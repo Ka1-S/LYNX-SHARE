@@ -1,10 +1,49 @@
 #include "core/MixerOps.h"
+#include "core/ClipOps.h"
 
 #include <algorithm>
 #include <numeric>
 
 namespace lynx::mixerops
 {
+void soloSelected (Song& song, const std::vector<int>& targets, bool alt)
+{
+    std::vector<int> t;
+    for (auto x : targets)
+        if (x > 0 && x < (int) song.mixer.size())
+            t.push_back (x);
+    if (t.empty())
+        return;
+    auto fed = [&] (int to) {
+        for (int src = 1; src < (int) song.mixer.size(); ++src)
+            if (src != to && song.routes (src, to))
+                return true;
+        return false;
+    };
+    // FL: "soloed" = every target soloed; "alt state" = every target soloed with its sources heard (no source: both)
+    auto soloed = true, altState = true, anySources = false;
+    for (auto x : t)
+    {
+        const auto& m = song.mixer[(std::size_t) x];
+        const auto sources = fed (x);
+        anySources = anySources || sources;
+        soloed = soloed && m.solo;
+        altState = altState && m.solo && (m.soloSources || ! sources);
+    }
+    bool solo;
+    if (alt)
+        solo = ! (soloed && altState);
+    else
+        solo = (altState && anySources) || ! soloed;
+    for (std::size_t i = 1; i < song.mixer.size(); ++i)
+    {
+        const auto on = solo && std::find (t.begin(), t.end(), (int) i) != t.end();
+        song.mixer[i].solo = on;
+        if (on)
+            song.mixer[i].soloSources = alt;
+    }
+}
+
 namespace
 {
 bool isInsert (const Song& song, int t) noexcept
@@ -52,6 +91,9 @@ void remapTrackReferences (Song& song, Map&& map)
                 slot.sidechain = map (slot.sidechain);
             if (slot.sidechain2 > 0)
                 slot.sidechain2 = map (slot.sidechain2);
+            for (auto& send : slot.sendTracks)
+                if (send > 0)
+                    send = map (send);
         });
     }
 
@@ -165,6 +207,9 @@ bool deleteTrack (Song& song, int t)
                 slot.sidechain = 0;
             if (slot.sidechain2 == t)
                 slot.sidechain2 = 0;
+            for (auto& send : slot.sendTracks)
+                if (send == t)
+                    send = 0;
         });
     }
 
@@ -636,5 +681,52 @@ void dockTracks (Song& song, const std::vector<int>& tracks, MixerDock dock)
     for (auto t : tracks)
         if (t >= 0 && t < (int) song.mixer.size())
             song.mixer[(std::size_t) t].dock = dock;
+}
+
+int firstTrackAfterUsed (const Song& song) noexcept
+{
+    int track = 0;
+    for (const auto& c : song.playlist)
+        track = std::max (track, c.track + 1);
+    return track;
+}
+
+std::string insertDisplayName (const Song& song, int track)
+{
+    if (track <= 0 || track >= (int) song.mixer.size())
+        return "Master";
+    const auto& name = song.mixer[(std::size_t) track].name;
+    return name.empty() ? "Insert " + std::to_string (track) : name;
+}
+
+int placeRenderedFiles (Song& song, const std::vector<RenderedFile>& files)
+{
+    int placed = 0;
+    auto track = firstTrackAfterUsed (song);
+    for (const auto& f : files)
+    {
+        if (f.path.empty() || ! (f.frames > 0.0) || ! (f.sampleRate > 0.0))
+            continue;
+        ChannelDef c;
+        auto stem = f.path.substr (f.path.find_last_of ("/\\") == std::string::npos ? 0 : f.path.find_last_of ("/\\") + 1);
+        if (const auto dot = stem.find_last_of ('.'); dot != std::string::npos && dot > 0)
+            stem.resize (dot);
+        c.name = stem;
+        c.instrument = InstrumentKind::audioClip;
+        c.samplePath = f.path;
+        c.mixerTrack = 0; // FL: "---"
+        song.channels.push_back (c);
+        Clip clip;
+        clip.kind = ClipKind::audio;
+        clip.channel = (int) song.channels.size() - 1;
+        clip.track = track++;
+        clip.start = 0;
+        clip.length = std::max<std::int64_t> (1, clipops::fileTicks (song.channels.back(), f.frames, f.sampleRate, song.bpm));
+        song.playlist.push_back (clip);
+        ++placed;
+    }
+    if (placed > 0 && song.autoCrossfades)
+        clipops::updateCrossfades (song);
+    return placed;
 }
 } // namespace lynx::mixerops

@@ -163,6 +163,26 @@ struct Channel
     float stretchTime = 0.0f;         // already decoded (1/192 of a beat)
     double sampleStart = 0.0, sampleEnd = 1.0, startOffset = 0.0; // fractions of the sample
 
+    // Sampler › Precomputed effects and sample flags (REA round 167h §1): 0x46 bits (0 fade stereo, 1 reverse, 2 clip,
+    // 8 swap stereo), 0x4C fade in / 0x4B fade out (0…1024), 0xD7 remove DC (0x09), normalize (0x50), reverse polarity
+    // (0x51), declicking mode (0x53), crossfade (i32 0x54, 0…2048) and trim (i32 0x58, 0…32768); 0x8F sample flags
+    // (bit 3 = use loop points; −1 = not saved), 0x13 (older files: use loop points), 0x14 ping pong loop
+    int fxFlags = 0, fadeIn = 0, fadeOut = 0;
+    bool removeDc = false, normalize = false, reversePolarity = false;
+    int declickMode = 0, crossfade = 0, trim = 0;
+    int sampleFlags = -1;
+    bool loopPointsOld = false, pingPong = false;
+    // the legacy precomputed effects (REA round 167l §1): 0x4A boost, 0x45 EQ ("FX"), 0x83 ring mod mix | freq << 16,
+    // 0x55 stereo delay, 0x47 / 0x53 low-pass cutoff / resonance, 0x8B reverb | type << 16, 0x56 pogo ("FX3"); FL's
+    // defaults when absent
+    int boost = 0, eq = 128, ringMix = 0, ringFreq = 128, stereoDelay = 2048, cutoff = 1024, resonance = 0;
+    int reverb = 0, reverbType = 1, pogo = 256;
+    // 0x20: "Lock active/mute state" (the channel keeps its state when another one is soloed; REA round 167l §5)
+    bool soloLock = false;
+    // 0x32: the channel's notes are shown as ghosts in the Piano Roll (FL's ghost channels menu; 1 = shown, FL's default)
+    bool ghostShown = true;
+    bool useLoopPoints() const noexcept { return sampleFlags >= 0 ? (sampleFlags & 8) != 0 : loopPointsOld; }
+
     // Seconds for an envelope time value (docs/analise/REA_rodada3.md §1.4). With sync (flags & 1), in beats.
     static double envelopeTime (int v) noexcept;
 };
@@ -284,6 +304,10 @@ struct PlaylistItem
     float fadeInMs = 0.0f;
     float fadeOutMs = 0.0f;
     float gain = 1.0f;
+    // Audio clips, records of 80 B and more: FL 2026's clip pitch (semitones) and clip reverse (round 167k).
+    float pitch = 0.0f;
+    bool reversed = false;
+    double stretch = 1.0; // FL 2026's per-clip stretch (+0x40 double; round 167l)
 };
 
 struct PlaylistTrackInfo
@@ -358,9 +382,19 @@ struct Project
     double tempo = 140.0;
     int beatsPerBar = 4; // event 0x11 (the first one, the project's)
     int swing = 0;       // event 0x0B: 0..128
+    int currentPattern = 0;     // event 0x43: FL's pattern number selected when saved (1…999; 0 = not in the file)
+    int songMode = -1;          // event 0x09: 1 = SONG, 0 = PAT (−1 = not in the file)
+    bool showInfo = false;      // event 0x0A: Project info › Show on opening
+    int currentArrangement = -1; // event 0x64: index (0x63) of the arrangement open when saved (−1 = not in the file)
+    int mainPitch = 0;
+    bool playTruncatedNotes = false; // event 0x1E (FL writes it only when on)
+    bool fastDeclick = false;        // event 0x28: Options › Project › "Fast declick for cut groups" (REA round 167h §3)
+    // event 0xED (2 × f64 Delphi TDateTime, days since 1899-12-30): the creation date and the working time in days
+    double createdDays = 0.0, workDays = 0.0;   // event 0x50 (i16): the main pitch knob in cents (FL saves it in FUN_00f40840, REA round 167g)
     bool performanceMode = false; // event 0x1F (round 165m)
     int panLaw = 0;      // event 0x17: 0 = FL's circular (sin/cos) pan law, 2 = triangular (REA_rodada76 §9)
     std::uint32_t flagsA9 = 0;
+    bool autoCrossfades = false; // event 0x2C (FL 21+); files without it load with it off, as in FL
     std::string title, artist, genre, url;
     std::string comments; // event 0xC3 (the Info page's comments; line breaks saved as CR)
 

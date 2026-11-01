@@ -42,7 +42,8 @@ lynx::natives::FlAccess flAccess()
 }
 
 // one channel alone in the rack, a note held for `seconds`: the output's RMS
-double renderChannel (const lynx::ChannelDef& channel, const lynx::natives::FlAccess& fl, int key = 60, double seconds = 1.0)
+double renderChannel (const lynx::ChannelDef& channel, const lynx::natives::FlAccess& fl, int key = 60, double seconds = 1.0,
+                      std::shared_ptr<const lynx::SampleData> given = nullptr)
 {
     lynx::Song s;
     s.mixer = lynx::Song::defaultMixer (2);
@@ -50,7 +51,9 @@ double renderChannel (const lynx::ChannelDef& channel, const lynx::natives::FlAc
     c.mixerTrack = 1;
     s.channels.push_back (c);
     s.patterns.emplace_back();
-    auto samples = [&fl] (const std::string& path) -> std::shared_ptr<const lynx::SampleData> {
+    auto samples = [&fl, given] (const std::string& path) -> std::shared_ptr<const lynx::SampleData> {
+        if (given != nullptr)
+            return given;
         auto p = path;
         std::replace (p.begin(), p.end(), '\\', '/');
         (void) fl;
@@ -101,7 +104,8 @@ TEST (natives142_lists_and_no_fl_installation)
         if (c)
         {
             CHECK (c->instrument == e.kind && c->name == e.name);
-            CHECK (natives142::renderChannel (*c, none) > 1.0e-3);
+            CHECK (e.kind == InstrumentKind::wavetraveller // (plays the channel's sample: none yet, silent as FL)
+                   || natives142::renderChannel (*c, none) > 1.0e-3);
         }
     }
     for (const auto& e : natives::effectEngines())
@@ -112,7 +116,38 @@ TEST (natives142_lists_and_no_fl_installation)
             CHECK (fx->kind == e.kind);
     }
     CHECK (natives::newEffect (EffectKind::eq, none).has_value()); // (a plain effect: always)
-    CHECK (natives::effectMenuName (EffectKind::newtime) == "Newtime (beta)" && natives::effectMenuName (EffectKind::newtone) == "Newtone" && natives::effectMenuName (EffectKind::maximus) == "Maximus");
+    CHECK (natives::effectMenuName (EffectKind::newtime) == "Newtime" && natives::effectMenuName (EffectKind::newtone) == "Newtone" && natives::effectMenuName (EffectKind::maximus) == "Maximus");
+}
+
+TEST (natives167m_sample_engines_play_a_sample_without_fl)
+{
+    using namespace lynx;
+    // round 167m (PR #19): on a PC without FL Studio (the macOS / Linux CI, the contributor's Mac) a new Wave Traveller
+    // or Granulizer has no sample and is silent, which the app's --selftest counted as a broken engine. Given a
+    // sample (what --selftest now generates), both play with LYNX's own default state.
+    auto tone = std::make_shared<SampleData>();
+    tone->sampleRate = 48000.0;
+    tone->left.resize (48000);
+    for (std::size_t i = 0; i < tone->left.size(); ++i)
+        tone->left[i] = 0.5f * (float) std::sin (2.0 * 3.141592653589793 * 220.0 * (double) i / 48000.0);
+    natives::FlAccess none;
+    for (const auto kind : { InstrumentKind::wavetraveller, InstrumentKind::granulizer })
+    {
+        auto c = natives::makeChannel (kind, none);
+        if (kind == InstrumentKind::granulizer)
+        {
+            CHECK (! c.has_value()); // (needs FL's default preset)
+            ChannelDef g;
+            g.name = "Fruity Granulizer";
+            g.instrument = kind;
+            c = g;
+        }
+        CHECK (c.has_value() && c->samplePath.empty());
+        CHECK (natives142::renderChannel (*c, none) < 1.0e-6); // no sample: silent, as FL
+        c->samplePath = "tone.wav";
+        const auto rms = natives142::renderChannel (*c, none, 60, 1.0, tone);
+        CHECK (rms > 1.0e-3 && std::isfinite (rms));
+    }
 }
 
 TEST (natives142_fl_keys_default_wavetable)
@@ -157,12 +192,26 @@ TEST (natives142_engines_from_the_fl_installation)
         }
         ++made;
         CHECK (c->instrument == e.kind && c->name == e.name);
-        if (e.kind == InstrumentKind::granulizer) // (plays the channel's sample: none yet)
+        if (e.kind == InstrumentKind::granulizer || e.kind == InstrumentKind::wavetraveller) // (play the channel's sample: none yet)
             continue;
         const auto rms = natives142::renderChannel (*c, fl, e.kind == InstrumentKind::drumaxx ? 48 : 60);
         CHECK (rms > 1.0e-3 && std::isfinite (rms));
         if (! (rms > 1.0e-3))
+        {
+            // (round 167e: FL Keys was silent once, rms 0, in a full run on a busy machine and never alone: what the
+            // next time says — which of its files did not read, and whether a second render plays)
             std::printf ("  silent: %s (%g)\n", e.name, rms);
+            for (const auto& z : c->zones)
+            {
+                auto p = z.path;
+                std::replace (p.begin(), p.end(), '\\', '/');
+                const auto local = lynx::existingPathIgnoringCase (p);
+                const auto data = lynx::tools::readWav (local);
+                if (data == nullptr || data->frames() == 0)
+                    std::printf ("    unreadable now: %s (%s, exists %d)\n", z.path.c_str(), local.c_str(), (int) std::filesystem::exists (local));
+            }
+            std::printf ("    again: %g\n", natives142::renderChannel (*c, fl, e.kind == InstrumentKind::drumaxx ? 48 : 60));
+        }
     }
     CHECK (made == (int) natives::instrumentEngines().size());
 
