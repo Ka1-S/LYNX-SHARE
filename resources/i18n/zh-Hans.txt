@@ -6234,3 +6234,5 @@ countries: cn sg
 "This preset could not be read: {0}" = "无法读取此预设：{0}"
 "No presets found (they come with FL Studio)" = "未找到预设（预设随 FL Studio 提供）"
 "SFZ instrument: [LMB] preview  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "SFZ 乐器：[LMB] 预览  [2xLMB] 新建LYNX Soundfont通道（或载入所选通道）  拖到通道机架"
+"Open a .sf2 / .sf3 / .sfz file" = "打开.sf2 / .sf3 / .sfz文件"
+"LYNX Soundfont: plays SoundFont 2 / 3 banks and SFZ instruments. Search presets across all your SoundFonts, click to preview, double-click to load." = "LYNX Soundfont：播放SoundFont 2 / 3音色库和SFZ乐器。在所有SoundFont中搜索预设，单击预览，双击加载。"

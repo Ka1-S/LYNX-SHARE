@@ -420,7 +420,7 @@ public:
         ensureSoundFontIndex();
 
         load.setButtonText (tr ("Load SoundFont..."));
-        load.setTooltip (tr ("Open a .sf2 / .sf3 file"));
+        load.setTooltip (tr ("Open a .sf2 / .sf3 / .sfz file"));
         load.onClick = [this] { chooseFont(); };
         addAndMakeVisible (load);
 
@@ -595,7 +595,7 @@ public:
         top.removeFromTop (headerHeight);
         g.setColour (theme::colour::textSecondary);
         g.setFont (theme::font (11.0f));
-        g.drawFittedText (tr ("LYNX Soundfont: plays SoundFont 2 / 3 banks. Search presets across all your SoundFonts, click to preview, double-click to load."),
+        g.drawFittedText (tr ("LYNX Soundfont: plays SoundFont 2 / 3 banks and SFZ instruments. Search presets across all your SoundFonts, click to preview, double-click to load."),
                           top.toNearestInt(), juce::Justification::centredLeft, 1, 0.75f);
         // the font's name next to the load button
         g.setColour (theme::colour::textPrimary);

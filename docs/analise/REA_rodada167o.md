@@ -81,8 +81,15 @@ LYNX (no DirectWave clone: an .sfz opens in LYNX's own sampler-player, the LYNX 
 - Not yet: filters other than low-pass (hpf / bpf), `xfin` / `xfout` crossfades, CC-driven opcodes (`*_oncc`),
   generated waves (`*sine`), `<curve>` / `<effect>`.
 
+## LYNX check on Windows (2026-11-01, fresh test profile, LYNX_TEST_MODE)
+
+F1 opens the sheet with its "Function keys" column, F1 closes it; F10 → MIDI, F11 switches to Info in place, F11
+closes; F8 opens / closes the Quick-add palette; Alt+F7 shows / hides the Touch keyboard. Ogun: ▶ from a fresh channel
+→ "300 Ft Glass Bowl 4 / 229" (FL's three "Default" presets are Ogun state version 12, which LYNX's Ogun doesn't read:
+passed over), ▶ "Alien Queens Lair 5 / 229" with the knobs, window title and rack name updated; ◀ ◀ wraps to
+"Waterphone 229 / 229". LYNX Soundfont › Load (filter *.sf2;*.sf3;*.sfz) → "Test Keys (Test Keys.sfz)", one preset.
+Known gap: about 95 of FL's 229 Ogun presets are state versions < 14 (LYNX's Ogun engine reads 14+).
+
 ## Where I stopped
 
-- 2026-11-01 17:30: FL measured (one session, closed by PID 10972, desktop clean `dend.png`). REA done for #23 / #24.
-  Next: implement #23 (KeyMap + MainComponent + Settings toggle + sheet), #24 (channel window arrows, FL order),
-  land both; then #22 SFZ.
+- 2026-11-01 20:00: all done; tests 0 failures (Linux, FL Data); landing feature/issues167o.

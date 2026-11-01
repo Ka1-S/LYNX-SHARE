@@ -6234,3 +6234,5 @@ countries: id
 "This preset could not be read: {0}" = "Preset ini tidak dapat dibaca: {0}"
 "No presets found (they come with FL Studio)" = "Tidak ada preset (preset disertakan dengan FL Studio)"
 "SFZ instrument: [LMB] preview  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "Instrumen SFZ: [LMB] pratinjau  [2xLMB] channel LYNX Soundfont baru (atau ke channel terpilih)  seret ke Channel Rack"
+"Open a .sf2 / .sf3 / .sfz file" = "Buka file .sf2 / .sf3 / .sfz"
+"LYNX Soundfont: plays SoundFont 2 / 3 banks and SFZ instruments. Search presets across all your SoundFonts, click to preview, double-click to load." = "LYNX Soundfont: memutar bank SoundFont 2 / 3 dan instrumen SFZ. Cari preset di semua SoundFont Anda, klik untuk pratinjau, klik ganda untuk memuat."

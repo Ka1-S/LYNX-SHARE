@@ -6234,3 +6234,5 @@ countries: it ch sm
 "This preset could not be read: {0}" = "Impossibile leggere questo preset: {0}"
 "No presets found (they come with FL Studio)" = "Nessun preset trovato (sono inclusi in FL Studio)"
 "SFZ instrument: [LMB] preview  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "Strumento SFZ: [LMB] anteprima  [2xLMB] nuovo canale LYNX Soundfont (o in quello selezionato)  trascina nel Channel Rack"
+"Open a .sf2 / .sf3 / .sfz file" = "Apri un file .sf2 / .sf3 / .sfz"
+"LYNX Soundfont: plays SoundFont 2 / 3 banks and SFZ instruments. Search presets across all your SoundFonts, click to preview, double-click to load." = "LYNX Soundfont: riproduce banchi SoundFont 2 / 3 e strumenti SFZ. Cerca preset in tutti i tuoi SoundFont, fai clic per l'anteprima, doppio clic per caricare."
