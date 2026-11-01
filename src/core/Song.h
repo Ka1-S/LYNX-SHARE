@@ -743,10 +743,11 @@ enum class EffectKind : std::uint8_t
     htmlNotebook,    // FL's Fruity HTML NoteBook (REA_rodada165g §4, core/FlExtraFx.h): no sound; its page's address in EffectSlot::state
     scratcher,       // FL's Fruity Scratcher (REA_rodada165g-flscratch165, core/Scratcher.h): turntable over EffectSlot::samplePath, added to the input
     transmitter,     // FL's Transmitter (REA_rodada165g-fltrans165, core/Transmitter.h): transient / sustain splitter, a section effect on each part
-    flEmphasis       // FL's Emphasis, exact (REA_rodada167f, core/EmphasisFx.h): FL's 13 controls + 3 options, (raw − min) / range
+    flEmphasis,      // FL's Emphasis, exact (REA_rodada167f, core/EmphasisFx.h): FL's 13 controls + 3 options, (raw − min) / range
+    flTransporter    // FL's Transporter, exact (REA_rodada167f-transporter, core/TransporterFl.h): FL's 22 controls (raw − min) / range + source, stereo, send
 };
 // the last EffectKind (loops over every kind; update when one is appended)
-constexpr EffectKind lastEffectKind = EffectKind::flEmphasis;
+constexpr EffectKind lastEffectKind = EffectKind::flTransporter;
 
 // round 165x: 160 → 192 (Ember had reached 160; a slot's parameters are 768 bytes, project files store only an engine's
 // own count, so older projects load unchanged). Round 150: 128 → 160 (Prism Multiband 155, Ember 133).

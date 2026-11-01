@@ -16875,4 +16875,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Score167Tests.inc"
 #include "Ntt167Tests.inc"
 #include "MidiOut167iTests.inc"
+#include "Transporter167fTests.inc"
 #include "Polish167pTests.inc"

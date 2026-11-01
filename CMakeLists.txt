@@ -94,6 +94,7 @@ add_library(lynx_core STATIC
     src/core/EmphasisEngine.cpp
     src/core/FreqShifterFl.cpp
     src/core/LowLifterFl.cpp
+    src/core/TransporterFl.cpp
     src/core/FlLegacyFx.cpp
     src/core/VisualFx.cpp
     src/core/FlExtraFx.cpp
