@@ -6241,3 +6241,4 @@ countries: pl
 "Update A/B" = "Odśwież A/B"
 "Flush" = "Opróżnij"
 "Detector source" = "Źródło detektora"
+"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "Powiększanie: przeciągnij w górę = bliżej, na boki = przewijanie  [Ctrl] tylko powiększenie"

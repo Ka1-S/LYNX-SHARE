@@ -6241,3 +6241,4 @@ countries: tw hk mo
 "Update A/B" = "更新 A/B"
 "Flush" = "清空"
 "Detector source" = "偵測來源"
+"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "縮放：向上拖曳 = 放大，左右拖曳 = 捲動  [Ctrl] 僅縮放"

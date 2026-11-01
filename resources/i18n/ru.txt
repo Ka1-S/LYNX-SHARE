@@ -6241,3 +6241,4 @@ countries: ru by kz
 "Update A/B" = "Обновить A/B"
 "Flush" = "Очистить"
 "Detector source" = "Источник детектора"
+"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "Масштаб: тяните вверх = ближе, в стороны = прокрутка  [Ctrl] только масштаб"

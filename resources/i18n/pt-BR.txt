@@ -6398,3 +6398,4 @@ countries: br
 "Update A/B" = "Atualizar A/B"
 "Flush" = "Esvaziar"
 "Detector source" = "Fonte do detector"
+"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "Zoom: arraste para cima = mais perto, para os lados = rolar  [Ctrl] só zoom"
