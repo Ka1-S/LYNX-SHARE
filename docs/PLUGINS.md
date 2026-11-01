@@ -136,7 +136,7 @@ saved settings are translated and the original stays in the project byte for byt
 | Type | Exact | Near-exact | Close | Approximate | Placeholder | Entries |
 |---|---:|---:|---:|---:|---:|---:|
 | Generators | 12 | 10 | 7 | 1 | 2 | 32 |
-| Effects | 43 | 10 | 1 | 2 | 1 | 57 |
+| Effects | 44 | 10 | 1 | 1 | 1 | 57 |
 
 (Some entries cover several FL plugins that share one LYNX SHARE engine, e.g. the sampler or Parametric EQ / EQ 2.)
 
@@ -222,6 +222,7 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | Pitch Shifter | Pitch Shifter | Import | Exact | all 15 states and 70 random ones |
 | EQUO | EQUO | Import | Exact | the send output to another track is not routed |
 | Low Lifter | Low Lifter | Insert | Exact | the library's Faust engine (crossovers, look-ahead limiter, Chebyshev harmonics, diffuser, low cut): all 11 installation states and 12 random ones at 44.1–96 kHz bit-identical, FL's one-second silence gate included (round 154) |
+| Transporter | Transporter | Insert | Exact | FL's own engine (the library's Faust transient looper: 8-band transient detector, loops A / B, Auto / Bouncing / Adaptive / Tempo, reverse / octave / ignore probabilities, spread and auto-pan, loop send): bit-identical with the library on 190 random runs and with the plug-in on 6 states; side-chain from the input track; the send goes to the insert's routes (mapping unverified) (round 167f) |
 | Frequency Shifter | Frequency Shifter | Insert | Exact | bit-identical on the installation's 14 states and on random ones with control changes at 44.1–96 kHz, except the Tempo range at 48/96 kHz (−85 dB); while the song plays the Tempo range gets the song position in beats (FL's unit not confirmed); the ring modulator's side chain is not routed (round 154) |
 | Emphasizer | Emphasizer | Insert | Exact | every state, 22.05–96 kHz, with control changes; against FL's own renders 98–99.97 % of the 16-bit samples identical (FL's warm-up before a render varies) (round 154) |
 | Fruity Phaser | Fruity Phaser | Insert | Exact | all 27 presets at 44.1–96 kHz bit-identical (round 105) |
@@ -242,7 +243,6 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | Pitch correction | Pitcher | Insert | Close | bit-exact with the reference model; MIDI mode / Harmonize get no MIDI in LYNX SHARE |
 | Newtone | Newtone | Import | Close | pass-through as FL; in slave mode the note edits (pitch offsets and transitions, drift, vibrato, tremolo, ramps, formant, volume, timing, disabled notes) rendered by LYNX SHARE's own pitch engine: against FL's own engine on 135 states every note's level within 0.4 dB and its median pitch within 9 cents, unedited notes bit-identical; legato glides with long smooth times (up to 40 c) and FL's sample re-alignment after edits differ (round 165g) |
 | Newtime | Newtime | Import | Placeholder | pass-through (as FL) + the source sample in slave mode; time warping not reproduced |
-| Utility | Transporter | Insert | Approximate | mapped to a utility stage |
 | Limiter | Emphasis | Insert | Approximate | not ported yet |
 
 **Windows.** Every native effect opens its own window (double-click its Mixer slot, or the **Editor** button over its

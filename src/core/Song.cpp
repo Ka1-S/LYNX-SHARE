@@ -338,6 +338,11 @@ int fruitySendTarget (const EffectSlot& slot) noexcept
 {
     if (slot.kind == EffectKind::patcher) // a Patcher's first extra output (REA_rodada141)
         return ! slot.patcher.outputTracks.empty() && slot.patcher.outputTracks.front() > 0 ? slot.patcher.outputTracks.front() : -1;
+    if (slot.kind == EffectKind::flTransporter) // FL's Transporter: its loops' send (parameter 24, round 167f)
+    {
+        const auto t = (int) std::lround (std::clamp ((double) slot.params[24], 0.0, 1.0) * (maxMixerTracks - 1));
+        return t > 0 ? t : -1;
+    }
     if (slot.kind != EffectKind::fruitySend)
         return -1;
     const auto track = (int) std::lround (std::clamp ((double) slot.params[3], 0.0, 1.0) * (maxMixerTracks - 1));

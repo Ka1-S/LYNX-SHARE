@@ -49,6 +49,7 @@
 #include "core/FlExtraFx.h"
 #include "core/Scratcher.h"
 #include "core/Transmitter.h"
+#include "core/TransporterFl.h"
 #include "flp/Flp.h"
 
 namespace lynx
@@ -1245,6 +1246,16 @@ std::optional<EffectSlot> effectFromFl (const std::string& pluginName, const std
                 slot.params[(std::size_t) i] = st->values[(std::size_t) i];
         return slot;
     }
+    if (pluginName == "Transporter") // REA_rodada167f-transporter: FL's own engine; the side-chain / send tracks by the import
+    {
+        if (const auto st = transporter::parse (state))
+        {
+            auto slot = makeEffectSlot (EffectKind::flTransporter);
+            transporter::toParams (*st, slot.params.data());
+            slot.params[(std::size_t) transporter::sendParam] = 0.0f; // the import routes FL's send (its outputs list)
+            return slot;
+        }
+    }
     if (pluginName == "Transmitter") // REA_rodada165g-fltrans165: the 42 controls (raw) of FL's state 0xD5
     {
         auto slot = makeEffectSlot (EffectKind::transmitter);
@@ -1626,6 +1637,7 @@ std::vector<std::string> flPluginsForEffect (EffectKind kind)
         case EffectKind::htmlNotebook: return { "Fruity HTML NoteBook" };
         case EffectKind::scratcher: return { "Fruity Scratcher" };
         case EffectKind::transmitter: return { "Transmitter" };
+        case EffectKind::flTransporter: return { "Transporter" };
         case EffectKind::visualizer: return { "ZGameEditor Visualizer" };
         case EffectKind::xyController: return { "Fruity X-Y Controller" };
         case EffectKind::xyzController: return {}; // (FL's X-Y-Z Controller: name from REA_rodada164a)
@@ -1724,6 +1736,11 @@ std::optional<FlParamMap> effectParamFromFl (const std::string& pluginName, int 
     // quantized to the control's steps like FL's
     if (is ("Fruity Scratcher") && k >= 0 && k < scratcher::count)
         return FlParamMap { k, [k] (float v) { return scratcher::quantize (k, std::clamp (v, 0.0f, 1.0f)); } };
+    // Transporter: its 22 controls over their ranges (the switches and selectors on their steps)
+    if (is ("Transporter") && k >= 0 && k < transporter::numControls)
+        return FlParamMap { k, [k] (float v) {
+                               const int lo = transporter::rawMin[(std::size_t) k], hi = transporter::rawMax[(std::size_t) k];
+                               return (float) (transporter::rawOf (k, std::clamp (v, 0.0f, 1.0f)) - lo) / (float) (hi - lo); } };
     // Transmitter: its 42 controls over their ranges (the switches and selectors on their steps)
     if (is ("Transmitter") && k >= 0 && k < transmitter::count)
         return FlParamMap { k, [k] (float v) { return transmitter::paramFromRaw (k, transmitter::rawFromParam (k, v)); } };

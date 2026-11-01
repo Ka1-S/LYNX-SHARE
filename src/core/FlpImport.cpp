@@ -2,6 +2,7 @@
 #include "core/FlExtraFx.h"
 #include "core/Scratcher.h"
 #include "core/Transmitter.h"
+#include "core/TransporterFl.h"
 #include "core/ControlSurface.h"
 #include "core/VoltageController.h"
 #include "core/XyController.h"
@@ -273,6 +274,8 @@ std::optional<std::pair<int, int>> flRawRange (flp::ControlId id, const std::str
         return std::pair { convolver::ranges[(std::size_t) k].lo, convolver::ranges[(std::size_t) k].hi };
     if (plugin == "Fruity Scratcher" && k < scratcher::count) // the platter wheel 0…30000, Mute 0/1 (1 = muted), …
         return std::pair { scratcher::controlRange (k).lo, scratcher::controlRange (k).hi };
+    if (plugin == "Transporter" && k < transporter::numControls) // FL's 22 controls, each over its own range
+        return std::pair { transporter::rawMin[(std::size_t) k], transporter::rawMax[(std::size_t) k] };
     if (plugin == "Transmitter" && k < transmitter::count) // 0…10000 for the knobs, the switches / selectors raw
         return std::pair { transmitter::controlRange (k).lo, transmitter::controlRange (k).hi };
     if (plugin == "LuxeVerb" && k < luxeVerbControlCount)
@@ -2146,6 +2149,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         else if ((plugin == "Fruity PanOMatic" && fx.kind != EffectKind::fruityPanOMatic)
                  || (plugin == "Fruity Balance" && fx.kind != EffectKind::fruityBalance)
                  || (plugin == "Fruity Send" && fx.kind != EffectKind::fruitySend)
+                 || (plugin == "Transporter" && fx.kind != EffectKind::flTransporter)
                  || (plugin == "Fruity Blood Overdrive" && fx.kind != EffectKind::fruityBloodOverdrive))
             ++options.report->partialEffects[plugin + " (state not readable: approximated)"];
         else if ((plugin == "Fruity Phase Inverter" && fx.kind != EffectKind::flPhaseInverter)
@@ -2770,6 +2774,27 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                                 ++options.report->partialEffects["Fruity Scratcher (timecode vinyl input not reproduced: plays from its own platter)"];
                             else
                                 ++options.report->converted[slot.plugin];
+                        }
+                    }
+                }
+                else if (fx.kind == EffectKind::flTransporter)
+                {
+                    // the detector follows FL's input track when one is chosen (the inputs list, like the Limiter's); the
+                    // loops' send goes to the insert's k-th output (its routes in order) [HYP, REA_rodada167f-transporter §6]
+                    if (const auto st = transporter::parse (slot.state))
+                    {
+                        fx.sidechain = sidechainSource (insert.index, st->inputTrack);
+                        if (st->sendTrack > 0)
+                        {
+                            auto outs = insert.routes;
+                            std::sort (outs.begin(), outs.end());
+                            outs.erase (std::unique (outs.begin(), outs.end()), outs.end());
+                            outs.erase (std::remove_if (outs.begin(), outs.end(), [&insert] (int t) { return t <= 0 || t == insert.index; }), outs.end());
+                            const auto k = (std::size_t) st->sendTrack - 1;
+                            if (k < outs.size() && outs[k] < tracks)
+                                fx.params[(std::size_t) transporter::sendParam] = (float) outs[k] / (float) transporter::rawMax[transporter::sendParam];
+                            if (options.report != nullptr)
+                                ++options.report->partialEffects["Transporter (loop send routed to the insert's routes in order: unverified)"];
                         }
                     }
                 }

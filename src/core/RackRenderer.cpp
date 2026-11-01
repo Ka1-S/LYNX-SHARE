@@ -2002,7 +2002,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             effects[i]->setHardwareIo (liveInput, hwOut != nullptr && hwOut->active.load (std::memory_order_relaxed) ? hwOut : nullptr, liveInputOffset);
 
         // Fruity Send: what it sends goes to its own buffer, pulled by the destination insert (processed later)
-        if (slots[i].kind == EffectKind::fruitySend || slots[i].kind == EffectKind::patcher)
+        if (slots[i].kind == EffectKind::fruitySend || slots[i].kind == EffectKind::patcher || slots[i].kind == EffectKind::flTransporter)
         {
             const auto tap = (std::size_t) track < state.slotTap.size() && i < state.slotTap[(std::size_t) track].size()
                                  ? state.slotTap[(std::size_t) track][i]
