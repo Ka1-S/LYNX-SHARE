@@ -6233,3 +6233,4 @@ countries: id
 "Presets: [LMB] the list, the arrows load the previous / next one" = "Preset: [LMB] daftar, panah memuat yang sebelumnya / berikutnya"
 "This preset could not be read: {0}" = "Preset ini tidak dapat dibaca: {0}"
 "No presets found (they come with FL Studio)" = "Tidak ada preset (preset disertakan dengan FL Studio)"
+"SFZ instrument: [LMB] preview  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "Instrumen SFZ: [LMB] pratinjau  [2xLMB] channel LYNX Soundfont baru (atau ke channel terpilih)  seret ke Channel Rack"

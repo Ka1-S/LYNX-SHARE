@@ -727,7 +727,7 @@ private:
     void chooseFont()
     {
         const auto start = currentPath().empty() ? juce::File::getSpecialLocation (juce::File::userDocumentsDirectory) : juce::File (u8 (currentPath()));
-        chooser = std::make_unique<juce::FileChooser> (tr ("Load SoundFont"), start, "*.sf2;*.sf3");
+        chooser = std::make_unique<juce::FileChooser> (tr ("Load SoundFont"), start, "*.sf2;*.sf3;*.sfz");
         chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [safe = juce::Component::SafePointer<SoundFontEditor> (this)] (const juce::FileChooser& fc) {
                                   if (safe == nullptr || fc.getResult() == juce::File())

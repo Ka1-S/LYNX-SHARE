@@ -6233,3 +6233,4 @@ countries: cn sg
 "Presets: [LMB] the list, the arrows load the previous / next one" = "预设：[LMB] 列表，箭头加载上一个 / 下一个"
 "This preset could not be read: {0}" = "无法读取此预设：{0}"
 "No presets found (they come with FL Studio)" = "未找到预设（预设随 FL Studio 提供）"
+"SFZ instrument: [LMB] preview  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "SFZ 乐器：[LMB] 预览  [2xLMB] 新建LYNX Soundfont通道（或载入所选通道）  拖到通道机架"

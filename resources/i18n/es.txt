@@ -6233,3 +6233,4 @@ countries: es mx ar co cl pe ve
 "Presets: [LMB] the list, the arrows load the previous / next one" = "Presets: [LMB] la lista, las flechas cargan el anterior / el siguiente"
 "This preset could not be read: {0}" = "No se pudo leer este preset: {0}"
 "No presets found (they come with FL Studio)" = "No se encontraron presets (vienen con FL Studio)"
+"SFZ instrument: [LMB] preview  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "Instrumento SFZ: [LMB] preescuchar  [2xLMB] canal LYNX Soundfont nuevo (o en el seleccionado)  arrastrar al Channel Rack"

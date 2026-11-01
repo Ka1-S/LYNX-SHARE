@@ -2,6 +2,7 @@
 // and validates the RIFF chunks itself (so damaged files are rejected before TinySoundFont indexes them) and keeps the
 // samples as 16-bit. See core/SoundFont.h.
 
+#include "core/Sfz.h"
 #include "core/SoundFont.h"
 
 #include <algorithm>
@@ -377,6 +378,8 @@ std::shared_ptr<const Font> parseFont (const std::vector<std::uint8_t>& bytes, s
 
 std::shared_ptr<const Font> loadFontFile (const std::string& path, std::string* error)
 {
+    if (sfz::isSfzPath (path)) // an SFZ instrument (round 167o): its regions and samples as a one-preset font
+        return sfz::loadFile (path, error);
     std::ifstream in (std::filesystem::path ((const char8_t*) path.c_str()), std::ios::binary);
     if (! in)
     {
@@ -433,6 +436,8 @@ FontInfo scanFont (const std::vector<std::uint8_t>& bytes)
 
 FontInfo scanFontFile (const std::string& path)
 {
+    if (sfz::isSfzPath (path))
+        return sfz::scanFile (path);
     // reads the chunk headers and every chunk but the sample data
     std::ifstream in (std::filesystem::path ((const char8_t*) path.c_str()), std::ios::binary);
     if (! in)

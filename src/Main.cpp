@@ -56,6 +56,7 @@
 #include "core/MidiControls.h"
 #include "core/FlSynths.h"
 #include "core/SoundFont.h"
+#include "core/Sfz.h"
 #include "ui/Dialogs.h"
 #include "core/RackOps.h"
 #include "core/Layer.h"
@@ -289,6 +290,25 @@ public:
 
         // a crash in any mode (UI, command line) writes its backtrace to %APPDATA%\LYNX\autosave
         juce::SystemStats::setApplicationCrashHandler (onCrash);
+
+        // SFZ instruments (round 167o): their FLAC / OGG / AIFF / MP3 samples through JUCE's readers
+        lynx::sfz::setDecoder ([] (const std::string& path, lynx::sfz::Audio& out) {
+            juce::AudioFormatManager formats;
+            formats.registerBasicFormats();
+            std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (juce::File (juce::String::fromUTF8 (path.c_str()))));
+            if (reader == nullptr || reader->lengthInSamples <= 0 || reader->lengthInSamples > (1 << 28) || reader->numChannels == 0)
+                return false;
+            const auto frames = (int) reader->lengthInSamples;
+            juce::AudioBuffer<float> buffer ((int) std::min (2u, reader->numChannels), frames);
+            if (! reader->read (&buffer, 0, frames, 0, true, buffer.getNumChannels() > 1))
+                return false;
+            out.channels.clear();
+            for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+                out.channels.emplace_back (buffer.getReadPointer (ch), buffer.getReadPointer (ch) + frames);
+            out.sampleRate = reader->sampleRate;
+            out.loopStart = out.loopEnd = -1;
+            return true;
+        });
 
         // child process of a sandboxed plugin: no window or audio of its own
         if (lynx::runPluginSandboxWorker (commandLine))

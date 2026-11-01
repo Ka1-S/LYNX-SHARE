@@ -193,3 +193,202 @@ TEST (issue24_fl_ogun_presets_in_fls_order)
         CHECK (next->pluginState != channel->pluginState);
     }
 }
+
+// --- #22: SFZ instruments ---------------------------------------------------------------------------------------------
+
+#include "core/Sfz.h"
+
+namespace
+{
+namespace sfzt
+{
+// a mono (or stereo) 16-bit WAV of a sine at `hz`, with a smpl loop when loopEnd > loopStart
+void writeSine (const std::string& path, double hz, double seconds, int channels = 1, std::int64_t loopStart = -1, std::int64_t loopEnd = -1)
+{
+    lynx::audioedit::Document d;
+    d.audio.sampleRate = 44100.0;
+    const auto n = (std::size_t) (seconds * 44100.0);
+    d.audio.channels.assign ((std::size_t) channels, std::vector<float> (n));
+    for (std::size_t i = 0; i < n; ++i)
+        for (auto& ch : d.audio.channels)
+            ch[i] = 0.5f * (float) std::sin (2.0 * 3.14159265358979 * hz * (double) i / 44100.0);
+    d.loopStart = loopStart, d.loopEnd = loopEnd;
+    sft::writeFile (path, lynx::audioedit::encodeWav (d, lynx::audioedit::WavFormat::int16));
+}
+
+std::string writeText (const std::string& path, const std::string& text)
+{
+    std::ofstream out (path, std::ios::binary);
+    out << text;
+    return path;
+}
+
+// plays `key` for `seconds` (released at `release`), returns the left channel
+std::vector<float> play (sft::Rig& rig, int key, double seconds, double release = 1e9, float velocity = 0.8f)
+{
+    const auto n = (int) (seconds * rig.rate), off = (int) (std::min (release, seconds) * rig.rate);
+    std::vector<float> l ((std::size_t) n, 0.0f), r ((std::size_t) n, 0.0f);
+    rig.inst->noteOn (key, velocity);
+    bool released = false;
+    for (int at = 0; at < n; at += 128)
+    {
+        if (! released && at >= off)
+            rig.inst->noteOff (key), released = true;
+        rig.inst->render (l.data() + at, r.data() + at, std::min (128, n - at), 1.0f, 1.0f);
+    }
+    if (! released)
+        rig.inst->noteOff (key);
+    return l;
+}
+} // namespace sfzt
+} // namespace
+
+TEST (issue22_sfz_parse_headers_defines_and_note_names)
+{
+    namespace sfz = lynx::sfz;
+    CHECK (sfz::noteNumber ("c4") == 60 && sfz::noteNumber ("C#4") == 61 && sfz::noteNumber ("db4") == 61);
+    CHECK (sfz::noteNumber ("a-1") == 9 && sfz::noteNumber ("64") == 64 && sfz::noteNumber ("x") == -1);
+
+    const std::string text = R"(// a comment
+#define $ROOT 57
+<control> default_path=Samples/ note_offset=0
+<global> ampeg_release=0.5 /* block
+ comment */ volume=-6
+<group> lokey=c3 hikey=b3 pitch_keycenter=$ROOT
+<region> sample=a.wav
+<region> sample=b.wav ampeg_release=1 hikey=c4
+<group> key=72
+#include "more.sfz"
+<curve> v000=0
+)";
+    const auto parsed = sfz::parse (text, [] (const std::string& file) -> std::optional<std::string> {
+        if (file == "more.sfz")
+            return std::string ("<region> sample=c d.wav lovel=64");
+        return std::nullopt;
+    });
+    CHECK (parsed.regions.size() == 3);
+    if (parsed.regions.size() != 3)
+        return;
+    const auto& a = parsed.regions[0];
+    CHECK (a.get ("sample") == "a.wav" && a.get ("lokey") == "c3" && a.get ("pitch_keycenter") == "57");
+    CHECK (a.get ("ampeg_release") == "0.5" && a.get ("volume") == "-6");
+    const auto& b = parsed.regions[1];
+    CHECK (b.get ("ampeg_release") == "1" && b.get ("hikey") == "c4"); // the region's own value wins
+    const auto& c = parsed.regions[2];
+    CHECK (c.get ("sample") == "c d.wav"); // (a sample path runs to the next opcode: spaces kept)
+    CHECK (c.get ("key") == "72" && c.get ("lokey").empty() && c.get ("lovel") == "64"); // a new group: the old one's opcodes gone
+    CHECK (c.get ("__default_path") == "Samples/");
+    CHECK (parsed.unknownHeaders == 1);
+}
+
+TEST (issue22_sfz_loads_and_plays_at_the_regions_pitch)
+{
+    const auto dir = sft::tempDir ("sfz-play");
+    std::filesystem::create_directories (dir + "/Samples");
+    sfzt::writeSine (dir + "/Samples/a440.wav", 440.0, 1.0);
+    sfzt::writeSine (dir + "/Samples/stereo.wav", 220.0, 1.0, 2);
+    const auto path = sfzt::writeText (dir + "/Test Piano.sfz", R"(<control> default_path=Samples/
+<region> sample=a440.wav lokey=60 hikey=80 pitch_keycenter=a4
+<region> sample=stereo.wav lokey=81 hikey=90 pitch_keycenter=57 loop_mode=one_shot
+<region> sample=missing.wav key=100
+)");
+    lynx::sfz::Report report;
+    std::string error;
+    const auto font = lynx::sfz::loadFile (path, &error, &report);
+    CHECK (font != nullptr);
+    if (font == nullptr)
+        return;
+    CHECK (font->presets.size() == 1 && font->presets[0].name == "Test Piano");
+    CHECK (report.regions == 3 && report.samplesLoaded == 2 && report.samplesMissing == 1); // (stereo: two regions)
+    CHECK (font->presets[0].regions.size() == 3);
+
+    // the browser's quick scan: valid, one preset named after the file
+    const auto info = lynx::sf::scanFontFile (path);
+    CHECK (info.valid && info.presets.size() == 1 && info.presets[0].name == "Test Piano");
+    CHECK (! lynx::sf::scanFontFile (sfzt::writeText (dir + "/empty.sfz", "<region> lokey=1")).valid);
+
+    sft::Rig rig (path);
+    const auto up = sfzt::play (rig, 69, 0.5); // key 69 = the root: 440 Hz
+    CHECK (std::abs (sft::frequency (up, rig.rate) - 440.0) < 6.0);
+    const auto octave = sfzt::play (rig, 80, 0.5); // 11 semitones up
+    CHECK (std::abs (sft::frequency (octave, rig.rate) - 440.0 * std::pow (2.0, 11.0 / 12.0)) < 10.0);
+    const auto stereo = sfzt::play (rig, 81, 0.5); // root 57 → 2 octaves up: 880 Hz
+    CHECK (std::abs (sft::frequency (stereo, rig.rate) - 880.0) < 12.0);
+    CHECK (sft::peak (sfzt::play (rig, 100, 0.2)) < 1e-6f); // its sample is missing
+    std::error_code ec;
+    std::filesystem::remove_all (dir, ec);
+}
+
+TEST (issue22_sfz_round_robin_random_and_key_switches)
+{
+    const auto dir = sft::tempDir ("sfz-rr");
+    sfzt::writeSine (dir + "/low.wav", 220.0, 1.0);
+    sfzt::writeSine (dir + "/high.wav", 660.0, 1.0);
+    const auto path = sfzt::writeText (dir + "/rr.sfz", R"(<group> key=60 pitch_keycenter=60 seq_length=2
+<region> sample=low.wav seq_position=1
+<region> sample=high.wav seq_position=2
+<global> sw_lokey=24 sw_hikey=25 sw_default=24
+<region> sample=low.wav key=62 pitch_keycenter=62 sw_last=24
+<region> sample=high.wav key=62 pitch_keycenter=62 sw_last=25
+<region> sample=low.wav key=64 pitch_keycenter=64 lorand=0 hirand=0.5
+<region> sample=high.wav key=64 pitch_keycenter=64 lorand=0.5 hirand=1
+)");
+    sft::Rig rig (path);
+    auto freq = [&] (int key) { return sft::frequency (sfzt::play (rig, key, 0.3, 0.25), rig.rate); };
+    // round robin: low, high, low
+    CHECK (std::abs (freq (60) - 220.0) < 5.0);
+    CHECK (std::abs (freq (60) - 660.0) < 12.0);
+    CHECK (std::abs (freq (60) - 220.0) < 5.0);
+    // key switches: the default (24) first, then the last switch pressed
+    CHECK (std::abs (freq (62) - 220.0) < 5.0);
+    sfzt::play (rig, 25, 0.05, 0.02);
+    CHECK (std::abs (freq (62) - 660.0) < 12.0);
+    sfzt::play (rig, 24, 0.05, 0.02);
+    CHECK (std::abs (freq (62) - 220.0) < 5.0);
+    // random: exactly one of the two plays each time, both are heard over many notes
+    int low = 0, high = 0;
+    for (int i = 0; i < 24; ++i)
+    {
+        const auto f = freq (64);
+        low += std::abs (f - 220.0) < 5.0;
+        high += std::abs (f - 660.0) < 12.0;
+    }
+    CHECK (low + high == 24 && low > 0 && high > 0);
+    std::error_code ec;
+    std::filesystem::remove_all (dir, ec);
+}
+
+TEST (issue22_sfz_release_trigger_choke_groups_and_loops)
+{
+    const auto dir = sft::tempDir ("sfz-trig");
+    sfzt::writeSine (dir + "/short.wav", 440.0, 0.2, 1, 2205, 4410); // a smpl loop over 50 ms
+    sfzt::writeSine (dir + "/tone.wav", 330.0, 1.0);
+    const auto path = sfzt::writeText (dir + "/trig.sfz", R"(<region> sample=tone.wav key=60 pitch_keycenter=60 ampeg_release=0.01
+<region> sample=tone.wav key=60 pitch_keycenter=60 trigger=release
+<region> sample=short.wav key=62 pitch_keycenter=69
+<region> sample=short.wav key=63 pitch_keycenter=69 loop_mode=no_loop
+<region> sample=tone.wav key=42 pitch_keycenter=42 group=1 off_by=2
+<region> sample=tone.wav key=46 pitch_keycenter=46 group=2
+)");
+    sft::Rig rig (path);
+    // trigger=release: after the note-off a second region sounds (the first one's release is 10 ms)
+    const auto rel = sfzt::play (rig, 60, 0.6, 0.2);
+    CHECK (sft::peak (rel, (std::size_t) (0.35 * rig.rate), (std::size_t) (0.5 * rig.rate)) > 0.1f);
+    // the sample's smpl loop: still sounding after the 0.2 s file while held; without a loop it ends
+    const auto looped = sfzt::play (rig, 62, 0.6);
+    CHECK (sft::peak (looped, (std::size_t) (0.4 * rig.rate)) > 0.1f);
+    const auto once = sfzt::play (rig, 63, 0.6);
+    CHECK (sft::peak (once, (std::size_t) (0.4 * rig.rate)) < 1e-4f);
+    rig.run (1.0);
+    // off_by: the open hi-hat (group 1) is choked by the closed one (group 2)
+    rig.inst->noteOn (42, 0.8f);
+    rig.run (0.05);
+    CHECK (lynx::sf::activeVoices (*rig.inst) >= 1);
+    rig.inst->noteOn (46, 0.8f);
+    rig.run (0.1);
+    CHECK (lynx::sf::activeVoices (*rig.inst) == 1);
+    rig.inst->noteOff (42);
+    rig.inst->noteOff (46);
+    std::error_code ec;
+    std::filesystem::remove_all (dir, ec);
+}
