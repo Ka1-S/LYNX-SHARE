@@ -5,6 +5,7 @@
 // (see SnapshotExchange.h), so nothing here needs to be thread-safe.
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -1142,6 +1143,17 @@ struct Clip
     std::int64_t effectiveFadeIn() const noexcept { return crossfadeIn > 0 ? crossfadeIn : fadeIn; }
     std::int64_t effectiveFadeOut() const noexcept { return crossfadeOut > 0 ? crossfadeOut : fadeOut; }
 };
+
+// FL repeats a pattern clip's content along a clip longer than its pattern (issue #25): the pattern tick that song tick
+// `tick` inside clip `c` plays — tick − start + offset, wrapped around `patternLength` (the pattern's effectiveLength)
+// when the clip reaches past its pattern.
+inline double patternTickInClip (const Clip& c, double tick, std::int64_t patternLength) noexcept
+{
+    const auto local = tick - (double) c.start + (double) c.offset;
+    if (patternLength <= 0 || c.offset + c.length <= patternLength || local < (double) patternLength)
+        return local;
+    return std::fmod (local, (double) patternLength);
+}
 
 enum class PlayMode : std::uint8_t
 {
