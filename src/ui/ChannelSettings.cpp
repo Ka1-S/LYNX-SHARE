@@ -3608,6 +3608,8 @@ private:
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> sections;
 };
 
+std::unique_ptr<juce::Component> makeInstrumentPage (AudioEngine& engine, const ChannelRef& ref);
+
 // FL's preset arrows of a generator's window (round 167o, issue #24; FL's TPluginForm NextPrevPreset, FLEngine
 // 0x12b6c70): ◀ name ▶ over the .fst presets of the plugin's folder (FL's factory folder and the user's, subfolders
 // too) in FL's order; no preset yet: ▶ the first, ◀ the last; both wrap. The step loads the preset into the channel
@@ -3615,6 +3617,9 @@ private:
 class ChannelPresetBar final : public juce::Component
 {
 public:
+    // after a preset is loaded (the channel's old name, the preset's): the window refreshes its page and title
+    std::function<void (const juce::String&, const juce::String&)> onLoaded;
+
     ChannelPresetBar (AudioEngine& e, int c) : engine (e), channel (c)
     {
         for (auto* b : { &prev, &next })
@@ -3684,34 +3689,46 @@ private:
     void step (int delta)
     {
         const auto& all = list();
-        const auto at = presetcycle::step (current, delta, (int) all.size());
-        if (at >= 0)
-            load (at);
+        const auto count = (int) all.size();
+        // FL's next index; a preset LYNX can't read (e.g. Ogun's oldest state format) is passed over in the same
+        // direction, so the arrows keep going
+        auto at = presetcycle::step (current, delta, count);
+        for (int tries = 0; at >= 0 && tries < count; ++tries)
+        {
+            if (load (at, tries == count - 1))
+                return;
+            at = presetcycle::step (at, delta, count);
+        }
     }
 
-    void load (int index)
+    bool load (int index, bool reportFailure = true)
     {
         const auto& all = list();
         const auto* d = def();
         if (d == nullptr || ! juce::isPositiveAndBelow (index, (int) all.size()))
-            return;
+            return false;
         const auto& preset = all[(std::size_t) index];
         auto changed = natives::withPreset (*d, preset.path, preset.name, flStudioAccess());
         if (! changed)
         {
-            ui::postHint ({ tr ("This preset could not be read: {0}", { juce::String::fromUTF8 (preset.name.c_str()) }), {} }, 2500);
+            if (reportFailure)
+                ui::postHint ({ tr ("This preset could not be read: {0}", { juce::String::fromUTF8 (preset.name.c_str()) }), {} }, 2500);
             current = index; // (the next step goes on from it)
-            return;
+            return false;
         }
         const auto kind = d->instrument;
+        const auto oldName = juce::String::fromUTF8 (d->name.c_str());
         engine.editSong ([ch = channel, kind, c = std::move (*changed)] (Song& s) {
             if (ch < (int) s.channels.size() && s.channels[(std::size_t) ch].instrument == kind)
                 s.channels[(std::size_t) ch] = c;
         });
+        if (onLoaded != nullptr)
+            onLoaded (oldName, juce::String::fromUTF8 (preset.name.c_str()));
         current = index;
         currentName = juce::String::fromUTF8 (preset.name.c_str());
         ui::postHint ({ currentName, juce::String (presetcycle::positionText (index, (int) all.size())) }, 2500);
         repaint();
+        return true;
     }
 
     void showMenu()
@@ -3775,6 +3792,7 @@ public:
             tabs.push_back (std::move (button));
             pages.push_back (std::move (page));
         };
+        instrumentPageFirst = instrumentPage != nullptr;
         if (instrumentPage != nullptr) // (none: a channel whose instrument has its own window, e.g. a hosted plugin)
             addPage (std::move (instrumentPage), tr ("Plugin"), tr ("The instrument's own settings"));
         if (envelopePage != nullptr)
@@ -3806,6 +3824,13 @@ public:
         if (ChannelPresetBar::wanted (engine, channel))
         {
             presetBar = std::make_unique<ChannelPresetBar> (engine, channel);
+            presetBar->onLoaded = [this, hasPage = instrumentPageFirst] (const juce::String& oldName, const juce::String& newName) {
+                // the plugin page shows the new preset's settings, the window takes the channel's new name (as FL)
+                juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<ChannelFrame> (this), hasPage, oldName, newName] {
+                    if (safe != nullptr)
+                        safe->presetLoaded (hasPage, oldName, newName);
+                });
+            };
             addAndMakeVisible (*presetBar);
         }
         const auto name = [this] { return channelNameOf (engine.getSong(), channel); };
@@ -3894,6 +3919,22 @@ public:
         }
     }
 
+    void presetLoaded (bool hasPage, const juce::String& oldName, const juce::String& newName)
+    {
+        if (hasPage && ! pages.empty())
+            if (auto fresh = makeInstrumentPage (engine, ChannelRef::rack (channel)))
+            {
+                removeChildComponent (pages.front().get());
+                pages.front() = std::move (fresh);
+                addChildComponent (*pages.front());
+                resized();
+                showTab (current);
+            }
+        if (auto* window = findParentComponentOfClass<juce::DocumentWindow>())
+            if (const auto title = window->getName(); oldName.isNotEmpty() && title.startsWith (oldName))
+                window->setName (newName + title.substring (oldName.length()));
+    }
+
     int getTab() const noexcept { return current; }
     int tabCount() const noexcept { return (int) pages.size(); }
 
@@ -3954,6 +3995,7 @@ private:
     std::vector<std::unique_ptr<FrameKnob>> header;
     juce::ToggleButton on;
     std::unique_ptr<ChannelPresetBar> presetBar;
+    bool instrumentPageFirst = false;
 };
 
 bool hasEnvelopeTab (InstrumentKind kind) noexcept

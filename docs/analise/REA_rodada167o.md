@@ -66,7 +66,20 @@ FL evidence [STR]: `DirectWave_x64.dll` lists `.sfz` among its import formats (w
 Groups / Standalone regions"); `FLEngine_x64.dll` has "Export kit as SFZ file...". FL's Browser lists no `.sfz`
 (no such string in FLEngine's file filters). So FL loads SFZ instruments through DirectWave.
 
-(implementation: see "Where I stopped")
+LYNX (no DirectWave clone: an .sfz opens in LYNX's own sampler-player, the LYNX Soundfont channel):
+- `core/Sfz.{h,cpp}` reads the file into a one-preset `sf::Font` (headers `<control> <global> <master> <group>
+  <region>` with their inheritance, comments, `#define` / `#include`, `default_path`, `note_offset`, `octave_offset`,
+  note names c4 = 60); the samples are WAV (LYNX's reader, the `smpl` loop kept) or FLAC / OGG / AIFF / MP3 through
+  JUCE's readers (`sfz::setDecoder`, installed by the app). Stereo samples become a left / right region pair.
+- the voice engine (`core/SoundFont.cpp`) gained what SF2 has no generator for: `trigger=release`, `loop_mode=one_shot`,
+  `group` / `off_by` (choke), `seq_length` / `seq_position` (round robin), `lorand` / `hirand`, key switches
+  (`sw_lokey`/`sw_hikey`/`sw_last`/`sw_default`), `amp_veltrack`.
+- `sf::loadFontFile` and `sf::scanFontFile` dispatch `.sfz`, so the Browser (lists `.sfz`, preview, double-click,
+  Enter, menu, drag to the Channel Rack), the Channel Rack file drop and the Soundfont editor's Load dialog take it.
+- [TEST] issue22_sfz_parse_headers_defines_and_note_names, issue22_sfz_loads_and_plays_at_the_regions_pitch,
+  issue22_sfz_round_robin_random_and_key_switches, issue22_sfz_release_trigger_choke_groups_and_loops.
+- Not yet: filters other than low-pass (hpf / bpf), `xfin` / `xfout` crossfades, CC-driven opcodes (`*_oncc`),
+  generated waves (`*sine`), `<curve>` / `<effect>`.
 
 ## Where I stopped
 
