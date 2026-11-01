@@ -1053,6 +1053,14 @@ Layout transporterLayout()
     v.push_back (toggle (560, 210, 70, 22, "Flush", TR_NOOP ("Flush"), momentary));
     v.push_back (menuOf (10, 236, 220, 22, "Source", TR_NOOP ("Detector source"), TR_NOOP ("Left|Right|Left + right")));
     v.push_back (toggle (240, 236, 100, 22, "Stereo", TR_NOOP ("Stereo")));
+    LayoutItem send; // round 167n: the loops' send (A left, B right) to a mixer insert; the editor lists the song's inserts
+    send.type = Item::menu;
+    send.x = 350, send.y = 236, send.w = 200, send.h = 22;
+    send.param = "Send to";
+    send.label = TR_NOOP ("Send to");
+    send.options = "None|Insert 1";
+    send.values = { 0.0f, 1.0f / (float) (maxMixerTracks - 1) };
+    v.push_back (send);
     v.push_back (toggle (560, 236, 70, 22, "Bypass", TR_NOOP ("Bypass")));
     return l;
 }
