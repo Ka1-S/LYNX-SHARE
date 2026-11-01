@@ -1,5 +1,6 @@
 #include "platform/FileTypes.h"
 #include "platform/Package.h"
+#include "platform/Paths.h"
 
 #include <juce_core/juce_core.h>
 
@@ -142,6 +143,8 @@ void registerFileTypes()
     // private copy of the registry)
     if (platform::runningPackaged())
         return;
+    if (platform::testMode()) // (a test build never takes over the user's file types)
+        return;
     using juce::WindowsRegistry;
     const auto exe = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getFullPathName();
     const juce::String classes = "HKEY_CURRENT_USER\\Software\\Classes\\";
@@ -149,13 +152,16 @@ void registerFileTypes()
     const auto command = "\"" + exe + "\" \"%1\"";
     const auto icon = "\"" + exe + "\",-2"; // resource id 2 in resources/LYNX.rc: the project-file icon
 
-    if (WindowsRegistry::getValue (classes + ".lynx\\") == progId
+    if (WindowsRegistry::getValue (classes + ".lynx\\") == progId && WindowsRegistry::getValue (classes + ".lynxpack\\") == progId
         && WindowsRegistry::getValue (classes + progId + "\\shell\\open\\command\\") == command
         && WindowsRegistry::getValue (classes + progId + "\\DefaultIcon\\") == icon)
         return;
 
     WindowsRegistry::setValue (classes + ".lynx\\", progId);
     WindowsRegistry::setValue (classes + ".lynx\\Content Type", juce::String ("application/x-lynx-project"));
+    // Online Sessions' packages (round 168a): a project a friend sent, or a part sent back
+    WindowsRegistry::setValue (classes + ".lynxpack\\", progId);
+    WindowsRegistry::setValue (classes + ".lynxpack\\Content Type", juce::String ("application/x-lynx-package"));
     WindowsRegistry::setValue (classes + progId + "\\", juce::String ("LYNX SHARE Project"));
     WindowsRegistry::setValue (classes + progId + "\\DefaultIcon\\", icon);
     WindowsRegistry::setValue (classes + progId + "\\shell\\open\\command\\", command);

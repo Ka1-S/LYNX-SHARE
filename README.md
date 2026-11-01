@@ -19,6 +19,7 @@ Windows, macOS and Linux.</p>
   <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><strong>Download</strong></a> ·
   <a href="#features"><strong>Features</strong></a> ·
   <a href="#opens-fl-studio-projects">FL projects</a> ·
+  <a href="docs/USER_GUIDE.md">User guide</a> ·
   <a href="docs/PLUGINS.md">Built-in plugins</a> ·
   <a href="#building">Building</a> ·
   <a href="docs/STATUS.md">Status</a> ·

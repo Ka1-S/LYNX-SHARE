@@ -70,6 +70,16 @@ public:
     // Tools > Audio logger (REA round 153): records everything the Master plays to a WAV in the background.
     AudioLogger& getAudioLogger();
     PluginHost& getPluginHost() noexcept { return plugins; }
+    // Online Sessions (round 168a): the channels / inserts whose third-party plugin is missing here and that play their
+    // stand-in render instead (core/StandIns.h), as of the last publish — the Channel Rack and the Mixer badge them.
+    bool playsStandIn (int channel) const noexcept
+    {
+        return std::find (standInChannels.begin(), standInChannels.end(), channel) != standInChannels.end();
+    }
+    bool insertPlaysStandIn (int track) const noexcept
+    {
+        return std::find (standInInserts.begin(), standInInserts.end(), track) != standInInserts.end();
+    }
 
     // Third-party plugins from the last imported .flp that were not found among the scanned ones.
     const juce::StringArray& getMissingPlugins() const noexcept { return missingPlugins; }
@@ -883,6 +893,7 @@ private:
     juce::Time lastUndoPress; // mouse click that already produced an undo step
     SnapshotExchange<RackState> rackExchange;
     RackState lastPublishedShape; // channels + instruments of the last snapshot, to reuse voices
+    std::vector<int> standInChannels, standInInserts; // (playsStandIn)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioEngine)
 };

@@ -281,6 +281,22 @@ public:
 
     std::unique_ptr<juce::PluginDescription> find (const juce::String& id) const;
 
+    // Online Sessions (round 168a). The plugin of `ref` is installed here (scanned, its file still there); when it is
+    // not, a part that has a stand-in render plays that instead (core/StandIns.h).
+    bool isInstalled (const PluginRef& ref);
+    // A plugin as another computer can find it (JUCE's identifier string holds a hash of the file's path, which differs
+    // from PC to PC): format, unique ids, name, vendor, version, role and file name.
+    struct Identity
+    {
+        juce::String ref, name, format, manufacturer, version, file;
+        int uniqueId = 0, deprecatedUid = 0;
+        bool instrument = false;
+    };
+    std::optional<Identity> identityOf (const PluginRef& ref) const;
+    // The installed plugin of an identity: the same format and unique id, else the same name and vendor in the same
+    // role (another format: its state may not carry over).
+    std::optional<juce::PluginDescription> findByIdentity (const Identity& identity, bool* sameFormat = nullptr);
+
     // Third-party plugins from an imported .flp (ForeignPlugin): finds the same plugin among the
     // scanned ones (VST3 by class ID, CLAP by id; then the file FL Studio's plugin database lists for it; then
     // VST2 by its ID; by name as a fallback) and carries the state over (VST3: JUCE's format; VST2: FL's layout as is).

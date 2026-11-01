@@ -1,5 +1,8 @@
 #include "engine/AudioEngine.h"
 
+#include "core/SessionIds.h"
+#include "core/StandIns.h"
+
 #include "core/ClipOps.h"
 #include "core/MarkerPlan.h"
 #include "engine/AudioLogger.h"
@@ -2721,6 +2724,8 @@ const AutomationDisplay& AudioEngine::getAutomationDisplay()
 void AudioEngine::publishSong()
 {
     ++songStamp;
+    // Online Sessions (round 168a): every entity has its stable id after any edit, import or load
+    uids::normalize (song);
     // diagnostics (round 149): with LYNX_TRACE_EDITS set, each publish's time goes to %APPDATA%\LYNX\edits.log
     static const bool traceEdits = std::getenv ("LYNX_TRACE_EDITS") != nullptr;
     const auto publishStart = juce::Time::getMillisecondCounterHiRes();
@@ -2797,7 +2802,17 @@ void AudioEngine::publishSong()
     const auto tracePhases = traceEdits && ! loadtrace::active(); // the build's phases (an open traces its own)
     if (tracePhases)
         loadtrace::begin ("edit");
-    auto state = RackState::build (song, &lastPublishedShape, transport.sampleRate.load(), factories);
+    // the parts whose third-party plugin is missing here play their stand-in renders (core/StandIns.h): the audio
+    // engine gets that projection of the song, the UI keeps the song itself
+    // (no copy of the song for the almost every project that has none)
+    std::optional<Song> projectedSong;
+    standins::Projected projected;
+    if (standins::hasAny (song))
+        projectedSong = standins::project (song, [this] (const PluginRef& ref) { return ! plugins.isInstalled (ref); }, &projected);
+    const Song& played = projectedSong ? *projectedSong : song;
+    standInChannels = std::move (projected.channels);
+    standInInserts = std::move (projected.inserts);
+    auto state = RackState::build (played, &lastPublishedShape, transport.sampleRate.load(), factories);
     if (traceEdits)
         platform::settingsFile ("edits.log").appendText (juce::String (juce::Time::getMillisecondCounterHiRes() - buildStart, 1) + " ms rack build\n"
                                                          + (tracePhases ? juce::String (loadtrace::reportLines()) : juce::String()));
@@ -2805,8 +2820,8 @@ void AudioEngine::publishSong()
         loadtrace::end();
 
     // what the next build needs to reuse instruments and effects
-    lastPublishedShape.song.channels = song.channels;
-    lastPublishedShape.song.mixer = song.mixer;
+    lastPublishedShape.song.channels = played.channels;
+    lastPublishedShape.song.mixer = played.mixer;
     // the tempo too (round 149): a channel that plays a time-stretched copy is kept when its stretch and the tempo
     // did not change; without it every edit rebuilt them (sample reloaded and stretch looked up, ~0.5 s on Thief)
     lastPublishedShape.song.bpm = song.bpm;
@@ -2827,7 +2842,7 @@ void AudioEngine::publishSong()
     mark ("exchanged");
 
     if (prefetcher != nullptr)
-        prefetcher->update (song, samples);
+        prefetcher->update (played, samples);
     mark ("prefetch updated");
 
     sendChangeMessage();

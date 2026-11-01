@@ -892,9 +892,20 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 g.strokePath (shackle, juce::PathStrokeType (1.4f));
                 g.fillRoundedRectangle (lockBox.withTrimmedTop (4.5f), 1.5f);
             }
+            // Online Sessions (round 168a): the plugin is not installed here, its stand-in render plays (an amber tag)
+            auto badgeWidth = 0.0f;
+            if (engine.playsStandIn (row))
+            {
+                badgeWidth = 16.0f;
+                const auto tag = juce::Rectangle<float> (nameArea.getRight() - (locked ? 34.0f : 18.0f), nameArea.getCentreY() - 6.5f, 14.0f, 13.0f);
+                theme::fillRoundRect (g, tag, 3.0f, warning.withAlpha (0.85f));
+                g.setColour (bg1);
+                g.setFont (theme::font (10.0f, true));
+                g.drawText ("R", tag, juce::Justification::centred, false);
+            }
             g.setColour (channel.muted ? textDisabled : textPrimary);
-            textcache::drawText (g, juce::String::fromUTF8 (channel.name.c_str()), nameArea.withTrimmedLeft (14).withTrimmedRight (locked ? 18 : 6).toNearestInt(),
-                        juce::Justification::centredLeft, true);
+            textcache::drawText (g, juce::String::fromUTF8 (channel.name.c_str()),
+                                 nameArea.withTrimmedLeft (14).withTrimmedRight ((locked ? 18 : 6) + badgeWidth).toNearestInt(), juce::Justification::centredLeft, true);
 
             // selector: a slim pill, lit when the row is selected
             const auto pill = juce::Rectangle<float> ((float) selectLeft() + 3.0f, (float) y + 7.0f, (float) selectWidth - 6.0f, (float) rowHeight - 14.0f);
@@ -2113,6 +2124,8 @@ ui::Hint ChannelRackComponent::hintAt (juce::Point<int> p)
                 h.text << "  " << tr ("(pitch: [RMB] › Pitch...)");
             if (row >= 0 && row < (int) song.channels.size() && ! song.channels[(std::size_t) row].receiveFrom.empty())
                 h.text << "  " << tr ("(locked: receives the notes of {0})", { juce::String::fromUTF8 (song.channels[(std::size_t) row].receiveFrom.c_str()) });
+            if (engine.playsStandIn (row))
+                h.text = name + " - " + tr ("Stand-in: its plugin is not installed on this PC, a render of this part plays (the plugin's settings are kept)");
             h.hasMenu = true;
             // FL's hint bar names what the channel is ("Audio Clip", the plugin's name) on the right (REA round 143b)
             if (row >= 0 && row < (int) song.channels.size())

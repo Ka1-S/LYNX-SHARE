@@ -47,6 +47,8 @@
 #include "engine/MidiFileIo.h"
 #include "engine/ProjectFile.h"
 #include "engine/ProjectPackage.h"
+#include "engine/SessionPack.h"
+#include "ui/SessionDialogs.h"
 #include "core/ProjectSafety.h"
 #include "core/MissingFiles.h"
 #include "ui/AutomationUi.h"
@@ -3655,6 +3657,14 @@ void MainComponent::revertToLastBackup()
                         true);
 }
 
+sessionui::Context MainComponent::sessionContext()
+{
+    return { engine, currentFile, projectName, [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::File& project) {
+                if (safe != nullptr)
+                    safe->openLynxProject (project);
+            } };
+}
+
 void MainComponent::exportPackage()
 {
     // FL's zipped loop package: the project and every sample it uses in one .zip
@@ -3945,7 +3955,7 @@ void MainComponent::chooseFileToOpen()
 void MainComponent::chooseFileToOpenNow()
 {
     fileChooser = std::make_unique<juce::FileChooser> (tr ("Open project"), currentFile.getParentDirectory(),
-                                                       juce::String ("*") + ProjectFile::extension + ";*.dawproj;*.flp;*.zip;*.mid;*.midi");
+                                                       juce::String ("*") + ProjectFile::extension + ";*.dawproj;*.flp;*.zip;*.lynxpack;*.mid;*.midi");
 
     fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [this] (const juce::FileChooser& chooser) {
@@ -3970,6 +3980,13 @@ void MainComponent::openFile (const juce::File& file)
             return;
         }
         openFile (project);
+        return;
+    }
+
+    if (file.hasFileExtension (sessionpack::extension))
+    {
+        // Online Sessions (round 168a): a project a friend sent (opened after a summary) or a part sent back (merged)
+        sessionui::openPackage (sessionContext(), file);
         return;
     }
 
@@ -4677,6 +4694,16 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             exports.addItem (tr ("Project with samples (.zip)..."), [this] { exportPackage(); });
             exports.addItem (tr ("Project data files (collect the samples into a folder)..."), [this] { collectSamples(); });
             menu.addSubMenu (tr ("Export"), exports);
+        }
+        {
+            // Online Sessions, phase 1 (docs/design/ONLINE_SESSIONS.md, round 168a): a project goes to a friend as a
+            // .lynxpack, his part comes back the same way
+            const auto guestCopy = engine.getSong().session.isGuestCopy();
+            juce::PopupMenu online;
+            online.addItem (tr ("Send project..."), ! guestCopy, false, [this] { sessionui::sendProject (sessionContext()); });
+            online.addItem (tr ("Send my part back..."), guestCopy, false, [this] { sessionui::sendPartBack (sessionContext()); });
+            online.addItem (tr ("Merge a part..."), ! guestCopy, false, [this] { sessionui::mergePart (sessionContext()); });
+            menu.addSubMenu (tr ("Online session"), online);
         }
 
         menu.addSectionHeader (tr ("Recent projects"));

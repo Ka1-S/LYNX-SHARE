@@ -30,6 +30,9 @@
 #include "engine/PluginHost.h"
 #include "engine/PluginSandbox.h"
 #include "engine/ProjectFile.h"
+#include "engine/SessionPack.h"
+#include "core/SessionIds.h"
+#include "core/SessionParts.h"
 #include "engine/SampleLibrary.h"
 #include "engine/Text.h"
 #include "platform/FileTypes.h"
@@ -1786,6 +1789,113 @@ private:
             dir.deleteRecursively();
         }
 
+        // Online Sessions (round 168a): a project sent as a .lynxpack (one sample used twice is stored once, the uids
+        // survive), a stand-in rendered through an ExportJob, the guest's part sent back and merged by the host
+        juce::String sessionResult = "ERROR";
+        {
+            const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-selftest-session");
+            dir.deleteRecursively();
+            dir.getChildFile ("src").createDirectory();
+            const auto wav = dir.getChildFile ("src/hit.wav");
+            {
+                juce::WavAudioFormat format;
+                juce::AudioBuffer<float> hit (1, 4800);
+                for (int i = 0; i < 4800; ++i)
+                    hit.setSample (0, i, 0.5f * std::sin (0.05f * (float) i) * (1.0f - (float) i / 4800.0f));
+                std::unique_ptr<juce::OutputStream> out (wav.createOutputStream().release());
+                if (auto* w = format.createWriterFor (out.get(), 48000.0, 1, 16, {}, 0))
+                {
+                    out.release();
+                    std::unique_ptr<juce::AudioFormatWriter> writer (w);
+                    writer->writeFromAudioSampleBuffer (hit, 0, 4800);
+                }
+            }
+            auto host = lynx::Song::makeDefault();
+            host.mode = lynx::PlayMode::song;
+            for (const auto* name : { "Hit", "Hit 2" })
+            {
+                lynx::ChannelDef c;
+                c.name = name;
+                c.instrument = lynx::InstrumentKind::sampler;
+                c.samplePath = wav.getFullPathName().toStdString();
+                host.channels.push_back (c);
+            }
+            const auto hitChannel = (int) host.channels.size() - 2;
+            lynx::Note hitNote;
+            hitNote.channel = hitChannel;
+            hitNote.length = 480;
+            host.patterns[0].notes.push_back (hitNote);
+            host.playlist.push_back ({ 0, 0, 0, host.patterns[0].effectiveLength (host.beatsPerBar), 0 });
+            lynx::uids::normalize (host);
+            const auto* guest = lynx::parts::invite (host, "Host", "Ana", 0xFF3D9BE9, false);
+            juce::String e;
+            std::vector<lynx::sessionpack::Rendered> rendered;
+            // (a sampler stands in for a plugin channel here: render() renders whatever it is given)
+            const std::vector<lynx::sessionpack::RenderItem> items { { false, hitChannel, false, "Hit", "Test" } };
+            const auto renderedOk = guest != nullptr && lynx::sessionpack::render (host, items, 44100.0, dir.getChildFile ("stems"), "Host", rendered, {}, e)
+                                    && rendered.size() == 1 && rendered[0].standIns.size() == 2
+                                    && juce::File (juce::String::fromUTF8 (rendered[0].standIns[0].path.c_str())).getSize() > 1000;
+            if (renderedOk)
+                lynx::sessionpack::apply (host, rendered);
+            lynx::sessionpack::Manifest m;
+            m.projectName = "Selftest";
+            m.from = *host.session.find (lynx::session::hostTag);
+            m.to = *host.session.find (2);
+            lynx::sessionpack::WriteResult written;
+            const auto pack = dir.getChildFile (juce::String ("Selftest") + lynx::sessionpack::extension);
+            const auto packOk = renderedOk && lynx::sessionpack::write (lynx::parts::guestCopy (host, 2), m, offline.getPluginHost(), pack, written, e)
+                                && written.media == 3 && written.duplicates == 1; // the sample once (used twice), the stand-in pair
+            auto opened = packOk ? lynx::sessionpack::open (pack, dir.getChildFile ("received"), e) : std::nullopt;
+            bool openOk = false, mergeOk = false;
+            if (opened && opened->corrupt.isEmpty())
+            {
+                const auto& g = opened->song;
+                const juce::File sample (juce::String::fromUTF8 (g.channels[(std::size_t) hitChannel].samplePath.c_str()));
+                openOk = g.session.me == 2 && g.projectId == host.projectId && g.channels[(std::size_t) hitChannel].uid == host.channels[(std::size_t) hitChannel].uid
+                         && sample.existsAsFile() && sample.isAChildOf (opened->folder) && g.channels[(std::size_t) hitChannel].standIns.size() == 2
+                         && juce::File (juce::String::fromUTF8 (g.channels[(std::size_t) hitChannel].standIns[1].path.c_str())).existsAsFile();
+                // the guest adds a channel and a pattern of his own, sends his part back
+                auto copy = g;
+                lynx::ChannelDef mine;
+                mine.name = "Ana's hit";
+                mine.instrument = lynx::InstrumentKind::sampler;
+                mine.samplePath = sample.getFullPathName().toStdString();
+                copy.channels.push_back (mine);
+                lynx::Pattern p;
+                p.name = "Ana";
+                lynx::Note note;
+                note.channel = (int) copy.channels.size() - 1;
+                note.length = 240;
+                note.key = 64;
+                p.notes.push_back (note);
+                copy.patterns.push_back (p);
+                lynx::uids::normalize (copy);
+                // its uids survive a save and a load
+                const auto saved = dir.getChildFile ("guest.lynx");
+                auto reloaded = lynx::ProjectFile::save (copy, saved, e) ? lynx::ProjectFile::load (saved, e) : std::nullopt;
+                lynx::sessionpack::Manifest back;
+                back.part = true;
+                back.from = *copy.session.self();
+                const auto partFile = dir.getChildFile (juce::String ("Ana part") + lynx::sessionpack::extension);
+                lynx::sessionpack::WriteResult partWritten;
+                auto part = reloaded && reloaded->channels.back().uid == copy.channels.back().uid && lynx::uids::tagOf (reloaded->channels.back().uid) == 2
+                                ? lynx::sessionpack::write (lynx::parts::extract (*reloaded, 2), back, offline.getPluginHost(), partFile, partWritten, e)
+                                : false;
+                auto partOpened = part ? lynx::sessionpack::open (partFile, dir.getChildFile ("parts"), e) : std::nullopt;
+                if (partOpened && partOpened->manifest.part && lynx::sessionpack::adoptMedia (partOpened->song, dir.getChildFile ("Session media/Ana"), e))
+                {
+                    const auto report = lynx::parts::merge (host, partOpened->song, 2);
+                    const auto& added = host.channels.back();
+                    mergeOk = report.ok && report.channels >= 1 && added.name == "Ana's hit" && lynx::uids::tagOf (added.uid) == 2
+                              && juce::File (juce::String::fromUTF8 (added.samplePath.c_str())).isAChildOf (dir.getChildFile ("Session media/Ana"))
+                              && host.channels[(std::size_t) hitChannel].name == "Hit";
+                }
+            }
+            sessionResult = mergeOk ? juce::String ("OK")
+                                    : "ERROR (" + juce::String (renderedOk ? packOk ? openOk ? "merge" : "open" : "pack" : "render") + (e.isEmpty() ? "" : ": " + e) + ")";
+            dir.deleteRecursively();
+        }
+
         // WavPack: a .wv from the FL packs (if installed) opens through the sample loader
         juce::String wavpack = "NO_FL";
         {
@@ -2013,6 +2123,7 @@ private:
         const auto driverPanel = lynx::AudioEngine::driverPanelSelfTest();
 
         const auto ok = audioOk && projectOk && richOk && hwOutOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
+                        && sessionResult == "OK"
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk;
 
         juce::String report;
@@ -2029,6 +2140,7 @@ private:
                << "recording=" << (recordOk && recordUndoOk ? "OK" : "ERROR") << "\n"
                << "midi=" << (midiOk ? "OK" : "ERROR") << "\n"
                << "package=" << (packageOk ? "OK" : "ERROR") << "\n"
+               << "online_session=" << sessionResult << "\n"
                << "wavpack=" << wavpack << "\n"
                << "effects=" << (effectsOk ? "OK" : "NONFINITE") << "\n"
                << "driver_panel=" << driverPanel << "\n"

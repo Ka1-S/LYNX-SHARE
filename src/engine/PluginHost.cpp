@@ -1475,6 +1475,55 @@ std::optional<juce::PluginDescription> PluginHost::findForeign (const ForeignPlu
     return byName;
 }
 
+bool PluginHost::isInstalled (const PluginRef& ref)
+{
+    if (ref.id.empty())
+        return false;
+    const auto d = find (juce::String::fromUTF8 (ref.id.c_str()));
+    return d != nullptr && fileStillThere (d->fileOrIdentifier);
+}
+
+std::optional<PluginHost::Identity> PluginHost::identityOf (const PluginRef& ref) const
+{
+    const auto d = find (juce::String::fromUTF8 (ref.id.c_str()));
+    if (d == nullptr)
+        return std::nullopt;
+    Identity id;
+    id.ref = juce::String::fromUTF8 (ref.id.c_str());
+    id.name = d->name;
+    id.format = d->pluginFormatName;
+    id.manufacturer = d->manufacturerName;
+    id.version = d->version;
+    id.file = juce::File::createFileWithoutCheckingPath (d->fileOrIdentifier).getFileName();
+    id.uniqueId = d->uniqueId;
+    id.deprecatedUid = d->deprecatedUid;
+    id.instrument = d->isInstrument;
+    return id;
+}
+
+std::optional<juce::PluginDescription> PluginHost::findByIdentity (const Identity& identity, bool* sameFormat)
+{
+    const auto types = known.getTypes();
+    for (const auto& d : types)
+        if (d.pluginFormatName == identity.format && fileStillThere (d.fileOrIdentifier)
+            && ((identity.uniqueId != 0 && d.uniqueId == identity.uniqueId) || (identity.deprecatedUid != 0 && d.deprecatedUid == identity.deprecatedUid))
+            && (identity.name.isEmpty() || plainName (d.name) == plainName (identity.name)))
+        {
+            if (sameFormat != nullptr)
+                *sameFormat = true;
+            return d;
+        }
+    for (const auto& d : types)
+        if (d.isInstrument == identity.instrument && fileStillThere (d.fileOrIdentifier) && plainName (d.name) == plainName (identity.name)
+            && (identity.manufacturer.isEmpty() || plainName (d.manufacturerName) == plainName (identity.manufacturer)))
+        {
+            if (sameFormat != nullptr)
+                *sameFormat = d.pluginFormatName == identity.format;
+            return d;
+        }
+    return std::nullopt;
+}
+
 bool PluginHost::fileStillThere (const juce::String& file)
 {
     if (! juce::File::isAbsolutePath (file))
@@ -1778,7 +1827,8 @@ int PluginHost::applySubstitutes (Song& song, int* restored, int* substituted)
                     ++back;
                 }
             }
-            else if (substitute && fx.kind == EffectKind::plugin && fx.plugin.foreign.format == ForeignPlugin::Format::none
+            // (an insert with a stand-in render plays that in place of its chain: no substitute; round 168a)
+            else if (substitute && track.standIns.empty() && fx.kind == EffectKind::plugin && fx.plugin.foreign.format == ForeignPlugin::Format::none
                      && ! fx.plugin.id.empty() && find (juce::String::fromUTF8 (fx.plugin.id.c_str())) == nullptr)
             {
                 if (substituteEffectSlot (fx, identityOf (fx.plugin), context))

@@ -1,14 +1,10 @@
 language: Português (Brasil)
 countries: br
 
-# LYNX SHARE interface in Brazilian Portuguese (JUCE LocalisedStrings format).
-# One line per string: "English text" = "Texto em português"  (escapes: \n \t \" \\)
-# English is the source language; tools/i18n_keys.py --missing lists strings still untranslated.
-# After editing, run: python3 tools/make_i18n.py  (embeds this file in src/ui/I18nData.h)
-#
-# Glossary: Channel Rack, Piano Roll, Playlist, Mixer and Browser are proper names (not translated);
-# pattern, sample, plugin, preset, insert, send, step, slot, loop, stem, velocity stay as Brazilian
-# producers say them; track = faixa, bar = compasso, clip = clipe, automation = automação.
+# LYNX interface in Português (Brasil) (JUCE LocalisedStrings format).
+# One line per string: "English text" = "Translation"  (escapes: \n \t \" \\)
+# Every key of pt-BR.txt must be here; terms: docs/i18n/pt-BR-glossary.md; how to help: docs/i18n/README.md
+# After editing, run: python3 tools/make_i18n.py  (embeds the tables in src/ui/I18nData.h)
 
 # --- Main window, menus and dialogs
 "New project" = "Novo projeto"
@@ -999,6 +995,7 @@ countries: br
 "[Shift][LMB] drags a copy of the clip (selection)" = "[Shift][LMB] arrasta uma cópia do clipe (seleção)"
 "[Shift][LMB] drags a copy of the note (selection)" = "[Shift][LMB] arrasta uma cópia da nota (seleção)"
 "{0} lane: [LMB] drag draws  [RMB] drag draws a line  [Shift][LMB] one value  [Alt][LMB] reset  [Alt][Wheel] over a note: adjust" = "Faixa de {0}: [LMB] arrastar desenha  [RMB] arrastar desenha uma linha  [Shift][LMB] um só valor  [Alt][LMB] restaura  [Alt][Wheel] sobre uma nota: ajusta"
+
 # --- UI-C: Channel Rack and Mixer polish (value read-out, hover, routing lane)
 "Swing mix" = "Mix do swing"
 "Swing mix ({0})..." = "Mix do swing ({0})..."
@@ -1010,6 +1007,7 @@ countries: br
 "Channels: {0}" = "Canais: {0}"
 "Peak meter (left/right) with peak hold  [LMB] selects the track and clears the clip light" = "Medidor de pico (esquerdo/direito) com retenção de pico  [LMB] seleciona a faixa e apaga a luz de clip"
 "[LMB] selects  [Ctrl]+[LMB] adds  [Shift]+[LMB] range  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] seleciona  [Ctrl]+[LMB] inclui  [Shift]+[LMB] intervalo  [LMB] arrastar para o lado reordena  [RMB] menu do insert"
+
 # --- Main window chrome: toolbar, hint bar (markup tokens in [ ] stay as they are)
 "Master pitch" = "Afinação master"
 "[LMB] drag  [Ctrl] fine  [Wheel] step  [Alt][LMB] reset  [2xLMB] type  [RMB] menu" = "[LMB] arrastar  [Ctrl] fino  [Wheel] passo  [Alt][LMB] zerar  [2xLMB] digitar  [RMB] menu"
@@ -1078,6 +1076,7 @@ countries: br
 "Polyphony: notes sounding now in the song and from the keyboard (voices still releasing are not counted)" = "Polifonia: notas soando agora na música e no teclado (vozes ainda em release não contam)"
 "max {0}" = "máx. {0}"
 "Output: the waveform and peak level of what you hear (the meter's top turns red when it clipped)" = "Saída: forma de onda e pico do que você ouve (o topo do medidor fica vermelho quando clipou)"
+
 # --- Editors: live hints while dragging (Piano Roll, Playlist)
 "Cutting along the line  [Alt] no snap" = "Cortando ao longo da linha  [Alt] sem grade"
 "Deleting what the mouse crosses" = "Apagando o que o mouse cruza"
@@ -1096,8 +1095,6 @@ countries: br
 "Setting {0}" = "Ajustando {0}"
 "Sliding the content inside the clip  [Alt] no snap" = "Deslizando o conteúdo dentro do clipe  [Alt] sem grade"
 "{0} selected" = "{0} selecionado(s)"
-
-# onboarding: setup wizard, background plugin scan, FL Studio integration
 "same VST3 class ID" = "mesmo class ID VST3"
 "same CLAP id" = "mesmo id CLAP"
 "FL Studio's plugin database" = "banco de plugins do FL Studio"
@@ -1132,6 +1129,7 @@ countries: br
 "Show LYNX SHARE in the applications menu and open .lynx files with it" = "Mostrar o LYNX SHARE no menu de aplicativos e abrir arquivos .lynx com ele"
 "LYNX SHARE setup" = "Configuração do LYNX SHARE"
 "{0} found (its plugin database lists no third-party plugins yet). .flp projects find their samples in FL Studio's folders; their plugins are found by scanning." = "{0} encontrado (o banco de plugins dele ainda não lista plugins de terceiros). Projetos .flp acham os samples nas pastas do FL Studio; os plugins deles são encontrados pela busca."
+
 # --- Spectral waveforms (Playlist audio clips, Sampler editor, Browser preview)
 "Waveforms" = "Formas de onda"
 "Spectral colours (warm = bass, cool = treble)" = "Cores espectrais (quente = graves, frio = agudos)"
@@ -1152,6 +1150,7 @@ countries: br
 "The previewed sample: warm colours = bass, cool colours = treble" = "O sample em pré-escuta: cores quentes = graves, cores frias = agudos"
 "Could not read this audio file" = "Não foi possível ler este arquivo de áudio"
 "Analysing..." = "Analisando..."
+
 # --- UI polish round 2 (UI-D): editors, toolbar
 "Track height" = "Altura da faixa"
 "Drum brush" = "Pincel de bateria"
@@ -1312,6 +1311,7 @@ countries: br
 "not found" = "não encontrada"
 "Time signature" = "Fórmula de compasso"
 "Project info" = "Informações do projeto"
+
 # --- Playlist clip menu and clean waveforms (uifix round)
 "Clean (the clip colour)" = "Limpa (a cor do clipe)"
 "Rename audio clip" = "Renomear clipe de áudio"
@@ -1637,8 +1637,6 @@ countries: br
 "Input channels ({0}): {1}" = "Canais de entrada ({0}): {1}"
 "Piano Roll notes: [LMB] opens them in the Piano Roll" = "Notas do Piano Roll: [LMB] abre no Piano Roll"
 "Overview: [LMB] drag the window to scroll, drag its edges to zoom, click elsewhere to jump there  [2xLMB] show everything" = "Visão geral: [LMB] arraste a janela para rolar, arraste as bordas para dar zoom, clique fora para pular até lá  [2xLMB] mostra tudo"
-
-# audio editor (round 86)
 "Preview" = "Pré-ouvir"
 "Menu: file, edit, tools, regions, view" = "Menu: arquivo, editar, ferramentas, regiões, exibir"
 "What and when to record" = "O que e quando gravar"
@@ -1798,7 +1796,6 @@ countries: br
 "Audio editor..." = "Editor de áudio..."
 "Audio editor (record this insert)..." = "Editor de áudio (gravar este insert)..."
 "Press Record to capture {0}" = "Aperte Gravar para capturar {0}"
-# Round 89: VST2 hosting, plugins that won't sound as in FL Studio
 "same VST2 ID" = "mesmo ID VST2"
 "the plugin could not start" = "o plugin não conseguiu iniciar"
 "Its default settings: the project saved them for the other format (VST2/VST3)" = "Configurações padrão: o projeto as salvou para o outro formato (VST2/VST3)"
@@ -1806,6 +1803,7 @@ countries: br
 "Plugins found but playing their default settings (the project saved them for the other format, VST2/VST3):" = "Plugins encontrados mas tocando com as configurações padrão (o projeto as salvou para o outro formato, VST2/VST3):"
 "Plugins installed but not loaded (silent):" = "Plugins instalados mas não carregados (em silêncio):"
 "{0} plugin(s) will not sound as in FL Studio (not installed, not loaded, or without their settings): see what LYNX SHARE did with each." = "{0} plugin(s) não vão soar como no FL Studio (não instalados, não carregados ou sem as configurações): veja o que o LYNX SHARE fez com cada um."
+
 # --- Round 84: Export options, New project, Clip properties, Arrangements, Plugin performance monitor, Touch keyboard
 "Source" = "Origem"
 "Time" = "Tempo"
@@ -2002,7 +2000,6 @@ countries: br
 "Feed" = "Realim."
 "Feedback distortion" = "Distorção da realimentação"
 "Feedback" = "Realimentação"
-# Fruity Phaser (round 105)
 "Sweep freq." = "Freq. da varredura"
 "Min depth" = "Prof. mínima"
 "Max depth" = "Prof. máxima"
@@ -2235,8 +2232,6 @@ countries: br
 "Feedback HP" = "PA do feedback"
 "Engine V2" = "Motor V2"
 "Invert feedback" = "Inverter feedback"
-
-# Mixing suite panels (round 96)
 "Filters" = "Filtros"
 "To sidechain" = "No sidechain"
 "Equalizer" = "Equalizador"
@@ -2360,7 +2355,6 @@ countries: br
 "[LMB] show" = "[LMB] mostrar"
 "Pattern: [LMB] paint it with the pencil  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] pinta com o lápis  [2xLMB] abre  [RMB] menu"
 "Clip source: [LMB] paint it with the pencil" = "Fonte de clipe: [LMB] pinta com o lápis"
-# round 105: FL arrangements of Fruity Vocoder, Frequency Splitter, Fruity Delay Bank, EQUO, Multiband Delay, Fruity Convolver...
 "Add mode" = "Modo somar"
 "Bands" = "Bandas"
 "Bank" = "Banco"
@@ -2448,6 +2442,7 @@ countries: br
 "X param" = "Parâm. X"
 "Y mod" = "Mod Y"
 "Y param" = "Parâm. Y"
+
 # --- Facet EQ editor and LYNX Tune pitch display (round 103)
 "LIVE PITCH" = "AFINAÇÃO AO VIVO"
 "Tilt shelf" = "Tilt shelf"
@@ -2505,8 +2500,6 @@ countries: br
 "Analyzer:" = "Analisador:"
 "Detector:" = "Detector:"
 "Dynamic EQ: the gain follows the level of the band's region (threshold, range)" = "EQ dinâmico: o ganho segue o nível da região da banda (limiar, faixa)"
-
-# LYNX's reverbs (round 100)
 "Concert Hall|Plate|Room|Chamber|Random Space|Chorus Space|Ambience|Bright Hall|Nave|Grit Hall|Grit Plate|Smooth Plate|Smooth Room|Smooth Space|Gated|Drift Chamber|Drift Hall|Drift Space|Cathedral|Grand Hall|Vintage Chamber|Vintage Hall" = "Sala de concerto|Placa|Sala|Câmara|Espaço aleatório|Espaço chorus|Ambiência|Salão brilhante|Nave|Salão sujo|Placa suja|Placa suave|Sala suave|Espaço suave|Gated|Câmara à deriva|Salão à deriva|Espaço à deriva|Catedral|Grande salão|Câmara vintage|Salão vintage"
 "1970s|1980s|Now" = "Anos 70|Anos 80|Atual"
 "Bass mult" = "Mult. graves"
@@ -2544,8 +2537,6 @@ countries: br
 "Late mix" = "Mix da cauda"
 "Level to Master" = "Nível para o Master"
 "Remove the route to Master" = "Remover a rota para o Master"
-
-# Delay / modulation suite panels (round 101)
 "Spacing" = "Espaçamento"
 "Age" = "Idade"
 "Wow" = "Wow"
@@ -2632,8 +2623,6 @@ countries: br
 "Talks to the sound card directly. Choose \"default\" or \"pipewire\" to share the device with other programs; a \"hw:\" device gives the lowest latency but takes the card for LYNX SHARE alone." = "Fala direto com a placa de som. Escolha \"default\" ou \"pipewire\" para dividir o dispositivo com outros programas; um dispositivo \"hw:\" dá a menor latência, mas deixa a placa só para o LYNX SHARE."
 "Low latency, shared with other programs and routable. On current distributions PipeWire answers as JACK (package pipewire-jack); otherwise start a JACK server first." = "Latência baixa, compartilhado com outros programas e roteável. Nas distribuições atuais o PipeWire responde como JACK (pacote pipewire-jack); senão, inicie um servidor JACK antes."
 
-
-
 # --- Display-first editors of the dynamics / saturation engines (REA round 114)
 "Drag GAIN on the left  -  drag the red ceiling line  -  wheel on the display: gain" = "Arraste GANHO à esquerda  -  arraste a linha vermelha do teto  -  roda no display: ganho"
 "Output ceiling: drag up or down (the bottom bar's Out does the same)" = "Teto de saída: arraste para cima ou para baixo (o Out da barra inferior faz o mesmo)"
@@ -2714,7 +2703,6 @@ countries: br
 "Power" = "Liga"
 "Power: switch the effect on or off" = "Liga: liga ou desliga o efeito"
 "VU meter: click to show the gain reduction or the output level" = "Medidor VU: clique para mostrar a redução de ganho ou o nível de saída"
-# Round 115: Browser "Current project" and tabs, toolbar edit mode
 "Show or hide the toolbar panels" = "Mostrar ou esconder os painéis da barra de ferramentas"
 "Default (everything)" = "Padrão (tudo)"
 "Compact" = "Compacta"
@@ -2792,7 +2780,6 @@ countries: br
 "Generator" = "Gerador"
 "Undone: {0}" = "Desfeito: {0}"
 "Redone: {0}" = "Refeito: {0}"
-# Project safety (REA round 118): backups, save new version, project packages, crash recovery
 "Save new version" = "Salvar nova versão"
 "Save new version (Song_2, Song_3...)" = "Salvar nova versão (Música_2, Música_3...)"
 "Saved as a new version: {0}" = "Salvo como nova versão: {0}"
@@ -2835,6 +2822,7 @@ countries: br
 "Run in a separate process" = "Rodar em um processo separado"
 "Run in a separate process (on for all plugins in Options)" = "Rodar em um processo separado (ligado para todos os plugins em Opções)"
 "{0} underruns (the sound broke up; red number)" = "{0} underruns (o som falhou; número vermelho)"
+
 # --- Voice tools (round 119): Quell Denoiser, Gemini Doubler; Echoform's output / pairs
 "Noise suppressor" = "Supressor de ruído"
 "Listen" = "Ouvir"
@@ -2863,7 +2851,6 @@ countries: br
 "PITCH GRAPH" = "GRÁFICO DE AFINAÇÃO"
 "INPUT" = "ENTRADA"
 "no pitch" = "sem afinação"
-# round 128 (parity with the originals): Facet EQ
 "Invert polarity" = "Inverter polaridade"
 "Pan: left / right" = "Pan: esquerda / direita"
 "Pan: mid / side" = "Pan: mid / side"
@@ -2877,7 +2864,6 @@ countries: br
 "Stereo placement: the band works on both channels, the left or right one, or the mid or side signal" = "Posição estéreo: a banda atua nos dois canais, só no esquerdo ou no direito, ou no sinal mid ou side"
 "Auto gain: takes back the EQ curve's overall level change so louder never fools the ear" = "Ganho automático: desfaz a mudança de volume geral da curva para o mais alto não enganar o ouvido"
 "Output level - right-click: polarity, auto gain, pan mode" = "Nível de saída - clique direito: polaridade, ganho automático, modo de pan"
-# round 128: Ember Saturator
 "Presence" = "Presença"
 "OFF" = "DESL."
 "Mute the band" = "Silenciar a banda"
@@ -2885,8 +2871,6 @@ countries: br
 "-|S|M" = "-|S|M"
 "Band character" = "Caráter das bandas"
 "Solo / mute" = "Solo / mudo"
-
-# round 128 (parity128a): Apex Limiter and Hush De-esser parity with the references
 "Display" = "Display"
 "Channel linking" = "Link de canais"
 "Transients" = "Transientes"
@@ -2913,7 +2897,6 @@ countries: br
 "Drag the left handle: where the band starts (high-pass); the right one: where it ends (low-pass, far right = off)" = "Arraste a alça esquerda: onde a banda começa (passa-altas); a direita: onde ela termina (passa-baixas, no fim à direita = desligado)"
 "Mid (M/S)" = "Mid (M/S)"
 "Single vocal|Allround" = "Voz única|Geral"
-# round 128 (parity128b): Crest / Sentry / Prism parity controls
 "Link mode" = "Modo do link"
 "Input meter: show or hide" = "Medidor de entrada: mostrar ou ocultar"
 "Gain M" = "Ganho M"
@@ -2941,7 +2924,6 @@ countries: br
 "Stereo|Mid only|Side only|Mid > side|Side > mid" = "Estéreo|Só mid|Só side|Mid > side|Side > mid"
 "Mid only" = "Só mid"
 "Side only" = "Só side"
-# round 128 (parity128c): LYNX Tune
 "Pitch graph" = "Gráfico de afinação"
 "MODE" = "MODO"
 "RATE" = "VELOCIDADE"
@@ -2966,7 +2948,6 @@ countries: br
 "Auto Key" = "Tom automático"
 "Play the vocal for a few seconds first" = "Toque a voz por alguns segundos primeiro"
 "Pitch graph|Advanced" = "Gráfico de afinação|Avançado"
-# round 129: the originals' preset bar (undo / redo, A / B, presets) and the parity panels
 "Undo this plugin's last change" = "Desfazer a última alteração deste plugin"
 "Redo this plugin's change" = "Refazer a alteração deste plugin"
 "Setting A: compare two settings (A / B)" = "Ajuste A: compare dois ajustes (A / B)"
@@ -2996,7 +2977,6 @@ countries: br
 "Tap tempo: click in time (two taps or more) to set the delay" = "Tap tempo: clique no tempo (dois toques ou mais) para definir o delay"
 "Keep the Mix when loading presets" = "Manter o Mix ao carregar presets"
 "Delay L" = "Delay E"
-# round 129: the description line of LYNX's own panels
 "Balance between the dry signal and the effect" = "Equilíbrio entre o sinal original e o efeito"
 "Time before the reverb starts" = "Tempo antes de o reverb começar"
 "How long the reverb takes to die away" = "Quanto tempo o reverb leva para sumir"
@@ -3059,7 +3039,6 @@ countries: br
 "Split" = "Divisão"
 "Classic|E console" = "Clássico|Console E"
 "Modern|Classic split" = "Moderno|Clássico dividido"
-# round 124: Echoform's hybrid engine
 "Hybrid" = "Híbrido"
 "Off|Clean|Analog" = "Desligado|Limpo|Analógico"
 "Matched" = "Calibrado"
@@ -3067,8 +3046,6 @@ countries: br
 "Classic|Vintage" = "Clássico|Vintage"
 "No third-party plugins found yet ({0}). Press Find new plugins, or add folders with Plugin folders..." = "Nenhum plugin de terceiros encontrado ainda ({0}). Clique em Buscar plugins novos, ou adicione pastas em Pastas de plugins..."
 "LYNX SHARE's own instruments and effects are not listed here: they are always available from the Channel Rack's + button, a mixer insert slot or the Quick-add palette (F8)." = "Os instrumentos e efeitos próprios do LYNX SHARE não aparecem aqui: estão sempre disponíveis no botão + do Channel Rack, num slot de insert do mixer ou na paleta de inserção rápida (F8)."
-
-# round 135 (parity135v): the description line of LYNX's engines, Halo / Lattice modes, mix lock
 "Level of the unprocessed signal mixed back in" = "Nível do sinal sem processamento misturado de volta"
 "Level going into the effect" = "Nível que entra no efeito"
 "Output trim after everything else" = "Ajuste de saída depois de tudo"
@@ -3446,8 +3423,6 @@ countries: br
 "MIDI input: blinks when a connected device sends MIDI. Click to reconnect the MIDI inputs." = "Entrada MIDI: pisca quando um dispositivo conectado envia MIDI. Clique para reconectar as entradas MIDI."
 "No MIDI input is open." = "Nenhuma entrada MIDI está aberta."
 "Open: {0}" = "Abertas: {0}"
-
-# round 135w: Waves roles + Echoform parity (H-Delay, ValhallaDelay, EchoBoy / PrimalTap), Gemini 4 voices, LYNX Tune real-time page, RComp switches
 "Real-time" = "Tempo real"
 "Pitch graph|Advanced|Real-time" = "Gráfico de afinação|Avançado|Tempo real"
 "SPEED" = "VELOCIDADE"
@@ -3483,7 +3458,6 @@ countries: br
 "Input and output level (peak, dBFS); the numbers hold the highest peak; OUT turns red when the output clips; click to reset" = "Nível de entrada e saída (pico, dBFS); os números guardam o maior pico; OUT fica vermelho quando a saída clipa; clique para zerar"
 "Output limiter: lit while it keeps the output under 0 dBFS" = "Limitador de saída: aceso enquanto mantém a saída abaixo de 0 dBFS"
 "Output level (peak, dBFS): the lamp lights when the output clips, the number holds the highest peak; click to reset" = "Nível de saída (pico, dBFS): a luz acende quando a saída clipa, o número guarda o maior pico; clique para zerar"
-# Round 133 (issue #3): MIDI CC automation of plugins, Envelope / Formula Controller, MIDI Out
 "Key value" = "Valor da tecla"
 "Formula Controller" = "Formula Controller"
 "Peak Controller" = "Peak Controller"
@@ -3590,7 +3564,6 @@ countries: br
 "Steps (b = count)" = "Degraus (b = quantidade)"
 "Switch: a when c is off, b when on" = "Chave: a com c desligado, b com c ligado"
 "all above" = "todas acima"
-# round 135f: FabFilter-role parity (Apex loudness / display / oversampling, Prism six bands, Facet shapes, LYNX Tune learn)
 "Learn scale" = "Aprender escala"
 "Flat tilt" = "Inclinação plana"
 "All pass" = "Passa-tudo"
@@ -3619,7 +3592,6 @@ countries: br
 "Band 1|Band 2|Band 3|Band 4|Band 5|Band 6" = "Banda 1|Banda 2|Banda 3|Banda 4|Banda 5|Banda 6"
 "Crossover 4" = "Crossover 4"
 "Crossover 5" = "Crossover 5"
-# round 132: issue #4 feature requests (audio editor in View, preview volume, rack piano-roll view, metronome volume, tempo tapper, sample gain)
 "Open the audio editor" = "Abrir o editor de áudio"
 "Tempo tapper (tap the tempo)" = "Tempo tapper (bater o andamento)"
 "Piano-roll view of all channels on/off" = "Vista de piano roll de todos os canais liga/desliga"
@@ -3694,7 +3666,6 @@ countries: br
 "Recent projects" = "Projetos recentes"
 "More recent projects" = "Mais projetos recentes"
 "Selected: {0}" = "Selecionado: {0}"
-# round 135 (parity135s): Voice Shift, Ember's Decapitator controls, Auto-pan's panner sources, Foil's infinite decay
 "R" = "R"
 "FL pan law" = "Lei de pan do FL"
 "Control only" = "Só controle"
@@ -3808,7 +3779,6 @@ countries: br
 "Dynamic phase: the crossovers' phase only where a band works; linear phase: no phase change (more latency); minimum phase: the classic crossover sum" = "Fase dinâmica: a fase dos crossovers só onde uma banda atua; fase linear: sem mudança de fase (mais latência); fase mínima: a soma clássica dos crossovers"
 "Resolution" = "Resolução"
 "What each band's pan balances: left / right, or mid / side" = "O que o pan de cada banda equilibra: esquerda / direita, ou meio / lados"
-# REA round 143: Last tweaked, automation recording, File › Import, the Master's input
 "Notes and automation" = "Notas e automação"
 "Notes played on a MIDI keyboard or the PC keyboard, and the controls you move" = "Notas tocadas num teclado MIDI ou no teclado do PC, e os controles que você mexe"
 "Notes, automation, and audio from the armed inserts" = "Notas, automação e o áudio dos inserts armados"
@@ -3900,8 +3870,6 @@ countries: br
 "Chop in quarter beats" = "Picotar em quartos de tempo"
 "Chop in 8th beats" = "Picotar em oitavos de tempo"
 "Glue notes" = "Unir notas"
-
-# REA round 143b: channel window frame (Misc tab), Browser menus, hint bar
 "System" = "Sistema"
 "Open parent folder" = "Abrir a pasta"
 "Locate file" = "Localizar o arquivo"
@@ -3938,8 +3906,6 @@ countries: br
 "Miscellaneous functions: levels, polyphony, time, cut groups, arpeggiator" = "Funções diversas: níveis, polifonia, tempo, grupos de corte, arpejador"
 "Channel on / off (mute)" = "Canal ligado / desligado (mudo)"
 "Miscellaneous functions (polyphony, cut groups, arpeggiator)..." = "Funções diversas (polifonia, grupos de corte, arpejador)..."
-
-# Round 142: FL engines in native projects, Newtone / Newtime editors
 "FL engines" = "Motores do FL"
 "{0} (beta)" = "{0} (beta)"
 "{0} (requires FL Studio)" = "{0} (requer o FL Studio)"
@@ -3967,19 +3933,15 @@ countries: br
 "Plugin database: LYNX SHARE's built-in generators and effects, FL's engines and the installed plugins" = "Banco de plugins: geradores e efeitos embutidos do LYNX SHARE, motores do FL e os plugins instalados"
 "[double-click] add it (generators: a new channel; effects: into the selected insert)" = "[duplo clique] adicionar (geradores: um novo canal; efeitos: no insert selecionado)"
 "Linear|Dynamic|Minimum" = "Linear|Dinâmica|Mínima"
-# round 136: Ember's Classic voicing
 "A|E|N|T|P" = "A|E|N|T|P"
-# round 136: LYNX Tune's voice-shifter extras
 "Notes are picked from the pitch" = "As notas são escolhidas pela afinação"
 "with its vibrato smoothed" = "com o vibrato suavizado"
 "Voice shifter" = "Deslocador de voz"
 "Drive stage" = "Estágio de drive"
 "Formant ±12 st" = "Formante ±12 st"
 "DRIVE" = "DRIVE"
-# round 136: Echoform's tape voicing
 "Tape voicing" = "Voz de fita"
 "Off|Ping-pong tape|Studio tape|Studio tape hot" = "Desligado|Fita pingue-pongue|Fita de estúdio|Fita de estúdio quente"
-# round 138 (merge of rounds 135 / 136): Auto-pan's measured Rhythm voicing panel
 "Measured rhythm voicing" = "Voz rítmica medida"
 "Hz|Beats" = "Hz|Tempos"
 "Left / right|8 steps" = "Esquerda / direita|8 passos"
@@ -4019,8 +3981,6 @@ countries: br
 "Allow the plugin to be multi-threaded (off: always on the audio thread)" = "Permite processar o plugin em várias threads (desligado: sempre na thread de áudio)"
 "Allow smart disable for the plugin (off: it is always processed)" = "Permite o smart disable do plugin (desligado: ele é sempre processado)"
 "Load the plugin in a separate process (bridged)" = "Carrega o plugin em um processo separado (ponte)"
-
-# round 146b: FL's Misc tab (time shift / gate, tracking, echo delay, arpeggiator chord / slide / repeat), the MIDI import window
 "Mod X (filter cutoff)" = "Mod X (corte do filtro)"
 "Mod Y (filter resonance)" = "Mod Y (ressonância do filtro)"
 "Full porta" = "Porta completo"
@@ -4069,7 +4029,6 @@ countries: br
 "CC 11 (expression) → channel volume" = "CC 11 (expressão) → volume do canal"
 "CC 10 (pan) → channel pan" = "CC 10 (pan) → pan do canal"
 "Which controller to import? (into the pattern's events)" = "Qual controlador importar? (nos eventos do pattern)"
-# REA round 146: parameter menu (initialized controls, piano roll events, global links)
 "Edit events in piano roll" = "Editar eventos no piano roll"
 "Init song with this position" = "Iniciar a música com esta posição"
 "Delete initial value" = "Apagar valor inicial"
@@ -4081,8 +4040,6 @@ countries: br
 "Links (this project, then global)" = "Vínculos (deste projeto, depois os globais)"
 "global" = "global"
 "Pattern events" = "Eventos do pattern"
-
-# round 147 (parity147): Prism Multiband's measured Dynamic phase
 "Classic dynamic" = "Dinâmica clássica"
 "This project's Dynamic phase runs the engine it was saved with (before round 147). Click to use the measured one (Pro-MB's response)." = "A fase dinâmica deste projeto usa o motor com que foi salvo (antes da rodada 147). Clique para usar o medido (a resposta do Pro-MB)."
 "Expert >>" = "Avançado >>"
@@ -4122,6 +4079,7 @@ countries: br
 "Initialized controls" = "Controles inicializados"
 "Initialized controls: to be reset when the song starts (a control's menu > Init song with this position)" = "Controles inicializados: voltam a este valor quando a música começa (menu de um controle > Iniciar a música com esta posição)"
 "reset to this value when the song starts  [RMB] delete the initial value" = "volta a este valor quando a música começa  [RMB] apagar o valor inicial"
+
 # --- Round 145: Ridge Strip's Vocal strip voicing
 "Compander" = "Compander"
 "Make-up" = "Ganho de compensação"
@@ -4248,7 +4206,6 @@ countries: br
 "Button" = "Botão"
 "Check box" = "Caixa de seleção"
 "XY pad" = "Pad XY"
-# round 150 (parity150): Prism Multiband's free layout, per-band side chain, measured detector
 "Split layout: the bands sit side by side on crossovers" = "Layout dividido: as bandas ficam lado a lado nos crossovers"
 "Free layout (as Pro-MB): each band has its own edges and slopes; the room between bands passes untouched" = "Layout livre (como o Pro-MB): cada banda tem suas próprias bordas e inclinações; o espaço entre as bandas passa intacto"
 "Old det." = "Det. antigo"
@@ -4268,9 +4225,9 @@ countries: br
 "What this band's detector hears: the plug-in's input or the external side chain (global: the External SC switch)" = "O que o detector desta banda escuta: a entrada do plug-in ou o side chain externo (global: a chave de SC externo)"
 "Measured: the reference's attack, release and soft range (a range-limited band recovers at once); classic: the detector of projects saved before round 150" = "Medido: o ataque, o release e o range suave da referência (uma banda limitada pelo range se recupera na hora); clássico: o detector dos projetos salvos antes da rodada 150"
 "LYNX|RComp" = "LYNX|RComp"
-# round 150 (parity150a): Echoform's voicings — measured stereo behaviour, EchoBoy's L/R offset
 "L/R offset" = "Desvio L/R"
 "Voicing stereo" = "Estéreo da voz"
+
 # --- Round 150b: Ember six bands, pans, measured characters; LYNX Tune Send / Receive
 "Bands 5 / 6, pans, characters" = "Bandas 5 / 6, pans, caracteres"
 "Off|5|6" = "Desl.|5|6"
@@ -4312,15 +4269,12 @@ countries: br
 "Wavefold" = "Dobra de onda"
 "Octave rectifier" = "Retificador de oitava"
 "Wreck" = "Destroço"
-# round 150 (parity150a): Auto-pan's Rhythm voicing — the Tweak page (PanMan's role)
 "Rate mod" = "Mod. da taxa"
 "Offset mod" = "Mod. do deslocamento"
 "Width mod" = "Mod. da largura"
 "Beyond" = "Além"
-# round 150 (parity150a): Foil Plate's measured plate voicing
 "Measured plate" = "Placa medida"
 "Thresh." = "Limiar"
-# round 152 (parity152a): Compressor ← RComp (measured vintage curve, bipolar gain-change meter), Glow ← CLA-2A (Limit, Auto makeup, Analog)
 "Old|Measured" = "Antigo|Medido"
 "Off|50 Hz|60 Hz" = "Desl.|50 Hz|60 Hz"
 "Gain change (dB): down = reduction, up = the expansion's boost below 1:1; the number holds the largest change; click to reset" = "Mudança de ganho (dB): para baixo = redução, para cima = o reforço da expansão abaixo de 1:1; o número guarda a maior mudança; clique para zerar"
@@ -4330,7 +4284,6 @@ countries: br
 "Measured: the reference's static curve at every ratio; old: the curve of projects saved before round 152" = "Medido: a curva estática da referência em cada razão; antigo: a curva dos projetos salvos antes da rodada 152"
 "Vintage curve" = "Curva vintage"
 "Opto law" = "Lei óptica"
-# round 152 (parity152b): Ember modulation, own slopes, processing; LYNX Tune Group octaves
 "Slopes, processing, modulation" = "Inclinações, processamento, modulação"
 "Min. phase|Linear" = "Fase mín.|Linear"
 "LFO 1" = "LFO 1"
@@ -4391,8 +4344,6 @@ countries: br
 "Diffuser depth" = "Profundidade do difusor"
 "High band gain" = "Ganho da banda aguda"
 "Multiband" = "Multibanda"
-
-# REA round 153: note colours, Select menu, chord readout
 "Colour the selected notes with the note colour" = "Colorir as notas selecionadas com a cor de nota"
 "Select the notes of the same colour" = "Selecionar as notas da mesma cor"
 "Invert the note selection" = "Inverter a seleção de notas"
@@ -4438,12 +4389,9 @@ countries: br
 "Detector" = "Detector"
 "Hush|Vocal" = "Hush|Vocal"
 "Vocal: the measured single-vocal detector (sibilants that stand out from the voice)" = "Vocal: o detector medido de voz única (sibilantes que se destacam da voz)"
-# round 152 (parity152): Foil Plate's one-knob Plate view
 "Full|Plate" = "Completo|Placa"
-# round 152 (parity152): Prism's model revision
 "Model" = "Modelo"
 "Round 150|Round 152" = "Rodada 150|Rodada 152"
-# round 152 (parity152): Auto-pan's trigger sources (the PanMan role)
 "Clock|Ping-pong|Random step" = "Relógio|Pingue-pongue|Passo aleatório"
 "Divider" = "Divisor"
 "Off|HP|LP" = "Desl.|PA|PB"
@@ -4451,7 +4399,6 @@ countries: br
 "Random steps" = "Passos aleatórios"
 "Full: every control of the plate; Plate: the one-knob panel of the Little Plate role (Low Cut, Decay, Mod, Mix)" = "Completo: todos os controles da placa; Placa: o painel de um botão do papel do Little Plate (Low Cut, Decay, Mod, Mix)"
 "Round 152: the reference's attack in the gain stage, its narrow Dynamic-phase bands and the 0.8-octave minimum band; round 150: projects saved before" = "Rodada 152: o ataque da referência no estágio de ganho, suas bandas estreitas em fase dinâmica e a banda mínima de 0,8 oitava; rodada 150: projetos salvos antes"
-# round 152 (parity152c): Facet EQ's spectral dynamics and EQ match
 "Density {0} %" = "Densidade {0} %"
 "reference {0} s" = "referência {0} s"
 "this track {0} s" = "esta faixa {0} s"
@@ -4492,8 +4439,6 @@ countries: br
 "The crash was in the graphics driver ({0}). LYNX SHARE now draws its windows without the GPU; you can turn GPU rendering back on in Options > General settings (after a driver update, for example)." = "A falha foi no driver de vídeo ({0}). Agora o LYNX SHARE desenha as janelas sem a GPU; você pode religar a renderização pela GPU em Opções > Configurações gerais (depois de atualizar o driver, por exemplo)."
 "Draw with the GPU (Direct2D). Turn off if LYNX SHARE crashes in the graphics driver or the screen flickers" = "Desenhar com a GPU (Direct2D). Desligue se o LYNX SHARE travar no driver de vídeo ou a tela piscar"
 "Tip: Windows Audio (shared) drops out more easily; choose the ASIO driver \"{0}\" in Options > Audio settings." = "Dica: o Windows Audio (compartilhado) falha com mais facilidade; escolha o driver ASIO \"{0}\" em Opções > Configurações de áudio."
-
-# LYNX Soundfont (round 158, issue #6)
 "Mod wheel" = "Roda de modulação"
 "Also send the effect's input to a mixer insert (put your own reverb or chorus there)" = "Também envia a entrada do efeito para um insert do mixer (coloque lá seu próprio reverb ou chorus)"
 "SoundFont: [LMB] preview its first preset  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "SoundFont: [LMB] pré-ouvir o primeiro preset  [2xLMB] novo canal LYNX Soundfont (ou no selecionado)  arraste para o Channel Rack"
@@ -4606,6 +4551,7 @@ countries: br
 "The report could not be sent ({0}); LYNX SHARE tries again at the next start" = "Não foi possível enviar o relatório ({0}); o LYNX SHARE tenta de novo na próxima abertura"
 "Report a problem" = "Relatar um problema"
 "Report a problem..." = "Relatar um problema..."
+
 # --- In-app update check (round 166b)
 "Check for updates..." = "Procurar atualizações..."
 "Check for updates automatically" = "Procurar atualizações automaticamente"
@@ -4651,8 +4597,6 @@ countries: br
 "Always send" = "Sempre enviar"
 "Never send" = "Nunca enviar"
 "A report holds LYNX SHARE's version, your system and audio device, the crash or freeze file and the last steps, without your name, file names or projects. It goes to lynx-share.com only with your consent (Help > Report a problem... sends one by hand)." = "Um relatório contém a versão do LYNX SHARE, seu sistema e dispositivo de áudio, o arquivo da falha ou do travamento e os últimos passos, sem seu nome, nomes de arquivos ou projetos. Ele vai para lynx-share.com só com o seu consentimento (Ajuda > Relatar um problema... envia um manualmente)."
-
-# Linux audio: native PipeWire driver and real-time priority (round 161)
 "PipeWire (native)" = "PipeWire (nativo)"
 "LYNX SHARE talks to PipeWire directly: low latency, shared with other programs. \"System default\" follows the output chosen in the system's sound settings (also when a device is plugged in or removed); LYNX SHARE appears as \"LYNX\" in pw-link, qpwgraph or Helvum." = "O LYNX SHARE fala direto com o PipeWire: baixa latência, compartilhado com outros programas. \"System default\" segue a saída escolhida nas configurações de som do sistema (também quando um dispositivo é conectado ou removido); o LYNX SHARE aparece como \"LYNX\" no pw-link, qpwgraph ou Helvum."
 "Audio thread: real-time priority ({0})" = "Thread de áudio: prioridade de tempo real ({0})"
@@ -4698,8 +4642,6 @@ countries: br
 "Background" = "Fundo"
 "Click a color, pick any color below, or press F2 for a random one" = "Clique em uma cor, escolha qualquer cor abaixo ou pressione F2 para uma aleatória"
 "Accent color" = "Cor de destaque"
-
-# round 162d: plugin presets in the wrapper and the Browser (issue #8)
 "Plugin preset: [2xLMB] load it into its plugin (an open plugin window, or the selected channel's plugin)" = "Preset de plugin: [2xLMB] carrega no plugin dele (uma janela de plugin aberta ou o plugin do canal selecionado)"
 "Plugin presets" = "Presets de plugins"
 "Plugin preset" = "Preset de plugin"
@@ -4726,11 +4668,9 @@ countries: br
 "Load preset file..." = "Carregar arquivo de preset..."
 "Export preset file..." = "Exportar arquivo de preset..."
 "Export preset" = "Exportar preset"
-# Round 162d: the toolbar's last-tweaked read-out
 "Last tweaked parameter: click for its menu (automation clip, link to controller, events, value)" = "Último parâmetro mexido: clique para o menu dele (clipe de automação, ligar a um controlador, eventos, valor)"
 "Last tweaked parameter: [LMB] its menu (create automation clip, link to controller, edit events, init song with this position, value)" = "Último parâmetro mexido: [LMB] o menu dele (criar clipe de automação, ligar a um controlador, editar eventos, iniciar a música com esta posição, valor)"
 "Last tweaked: none" = "Último mexido: nenhum"
-# round 162 (browser162): Browser search index, focus, Stop, plugin drag
 "Search the selected folder (or every folder) and below; in PROJECT, the project's items: words must all match; OR, -word (not), \"exact phrase\", * and ? wildcards  [Enter] to the results  [Esc] clear" = "Busca na pasta selecionada (ou em todas) e abaixo; em PROJETO, nos itens do projeto: todas as palavras precisam bater; OR, -palavra (não), \"frase exata\", curingas * e ?  [Enter] vai para os resultados  [Esc] limpa"
 "Stop the sample preview" = "Parar a prévia do sample"
 "Indexing the folders... nothing found for \"{0}\" yet." = "Indexando as pastas... nada encontrado para \"{0}\" ainda."
@@ -4754,7 +4694,6 @@ countries: br
 "could not replace {0}" = "não foi possível substituir {0}"
 "could not write {0}" = "não foi possível gravar {0}"
 "Playback volume: {0} (the audio is not changed; Tools > Amp... changes it)" = "Volume de reprodução: {0} (o áudio não é alterado; Ferramentas > Amplitude... altera)"
-# round 162 (issue #9): Follow, quantize 50%, double Stop, rack pattern selector
 "Quick quantize (starts and lengths)" = "Quantização rápida (inícios e durações)"
 "Quantize starts" = "Quantizar inícios"
 "Quantize starts 50% (halfway to the grid)" = "Quantizar inícios 50% (metade do caminho até a grade)"
@@ -4773,8 +4712,6 @@ countries: br
 "Quantise starts 50% (halfway to the grid)" = "Quantizar inícios 50% (metade do caminho até a grade)"
 "Quick quantize 50% (halfway to the grid)" = "Quantização rápida 50% (metade do caminho até a grade)"
 "Follow: the Playlist scrolls along with the playhead while the song plays; off, you can look around freely" = "Seguir: a Playlist rola junto com o cursor enquanto a música toca; desligado, você navega livremente"
-
-# round 162 (patcher162): Patcher plugin list, I/O node MIDI ports, MIDI Out inside a Patcher
 "Keyboard Controller" = "Controlador de teclado"
 "Open plugin picker..." = "Abrir seletor de plugins..."
 "More..." = "Mais..."
@@ -4896,8 +4833,6 @@ countries: br
 "Sample browser (separate window)" = "Browser de samples (janela separada)"
 "Sample browser" = "Browser de samples"
 "Open in the file manager" = "Abrir no gerenciador de arquivos"
-
-# round 164d: the hardware insert
 "Mono (L+R to one output)" = "Mono (L+R em uma saída)"
 "Return" = "Retorno"
 "Round trip" = "Ida e volta"
@@ -4919,8 +4854,6 @@ countries: br
 "Delay compensated (PDC)" = "Atraso compensado (PDC)"
 "Round trip: {0} samples" = "Ida e volta: {0} amostras"
 "Ping" = "Ping"
-
-# round 164a: Layer channel
 "Layer" = "Layer"
 "Key region: {0} to {1} (drag to set, double-click for the whole keyboard)" = "Região de teclas: {0} a {1} (arraste para definir, clique duplo para o teclado inteiro)"
 "Set children" = "Definir filhos"
@@ -4949,8 +4882,6 @@ countries: br
 "Delete children (removes the channels)" = "Excluir filhos (remove os canais)"
 "Delete children" = "Excluir filhos"
 "Delete the {0} child channels of this Layer from the project?" = "Excluir do projeto os {0} canais filhos deste Layer?"
-
-# round 164a: X-Y / X-Y-Z Controller, Control Surface, Dashboard
 "Show the {0} axis' settings (level, min, max, tension)" = "Mostra os ajustes do eixo {0} (nível, mín., máx., tensão)"
 "{0} level: where the target goes" = "Nível {0}: para onde o alvo vai"
 "{0} minimum: the output at the pad's low edge" = "Mínimo {0}: a saída na borda baixa do pad"
@@ -4963,8 +4894,6 @@ countries: br
 "Edit mode: drag a control to move it, right-click it to rename, resize or delete it" = "Modo de edição: arraste um controle para movê-lo, clique direito para renomear, redimensionar ou excluir"
 "Add a control (knob, slider, button, check box, XY pad): each one is an output to link to any knob" = "Adicionar controle (knob, slider, botão, caixa de seleção, pad XY): cada um é uma saída para ligar a qualquer knob"
 "Empty panel. \"+\" adds a knob, a slider, a button, a check box or an XY pad; each one becomes an output you can link to any knob (right-click it > Link to internal controller)." = "Painel vazio. \"+\" adiciona um knob, um slider, um botão, uma caixa de seleção ou um pad XY; cada um vira uma saída que você pode ligar a qualquer knob (clique direito nele > Vincular a controlador interno)."
-
-# round 164a: Voltage Controller
 "Bipolar" = "Bipolar"
 "Unipolar" = "Unipolar"
 "Clock" = "Clock"
@@ -4979,7 +4908,6 @@ countries: br
 "Voltage range of the interface: full scale (1.0) is 10 V" = "Faixa de tensão da interface: a escala cheia (1.0) é 10 V"
 "{0} offset" = "Offset de {0}"
 "{0} scale" = "Escala de {0}"
-# Round 164b: FL's VFX note effects
 "Enable" = "Ativar"
 "All (gain-compensated)" = "Todas (ganho compensado)"
 "Cycle up" = "Ciclo para cima"
@@ -5129,7 +5057,6 @@ countries: br
 "Control values" = "Valores dos controles"
 "Root" = "Tônica"
 "Script" = "Script"
-# round 164e (misc164): Browser folders window
 "Show folders..." = "Mostrar pastas..."
 "Remove this folder from the Browsers" = "Remover esta pasta dos Browsers"
 "Add one of your own folders to the Browsers (samples, projects, SoundFonts...)" = "Adicionar uma pasta sua aos Browsers (samples, projetos, SoundFonts...)"
@@ -5147,7 +5074,6 @@ countries: br
 "the project's patterns, channels, samples and history" = "patterns, canais, samples e histórico do projeto"
 "LYNX SHARE's, FL's and your installed plugins" = "plugins do LYNX SHARE, do FL e os que você instalou"
 "Sample browser folders" = "Pastas do Browser de samples"
-# Round 164c: Wave Candy, Visualizer, video export
 "Visual" = "Visual"
 "Hold (middle-click)" = "Congelar (clique do meio)"
 "Freeze the display (also: middle-click it)" = "Congela a tela (também: clique do meio nela)"
@@ -5258,7 +5184,6 @@ countries: br
 "Runs the script again from the start (its variables start over, the controls keep their values)" = "Executa o script de novo desde o início (as variáveis recomeçam, os controles mantêm os valores)"
 "This script has no controls." = "Este script não tem controles."
 "Use print() in the script to write to this log" = "Use print() no script para escrever neste log"
-# round 165m: Performance mode and Patcherize
 "Performance mode on/off (launch the clips before the Start marker)" = "Modo performance liga/desliga (dispara os clipes antes do marcador Start)"
 "Zoom on the performance clips" = "Zoom nos clipes de performance"
 "Show the performance clips' progress" = "Mostrar o progresso dos clipes de performance"
@@ -5294,8 +5219,6 @@ countries: br
 "Performance mode: put a Start marker where the song starts (right-click the ruler); the clips before it are launched with a click while playing" = "Modo performance: coloque um marcador Start onde a música começa (clique direito na régua); os clipes antes dele são disparados com um clique durante a reprodução"
 "Performance mode channel" = "Canal do modo performance"
 "With Performance mode on, its notes launch the Playlist's clips: an octave per track, a note per clip; notes 120/121 move the tracks, 122/123 the clips, 124 switches big steps." = "Com o modo performance ligado, as notas dele disparam os clipes da Playlist: uma oitava por trilha, uma nota por clipe; as notas 120/121 mudam as trilhas, 122/123 os clipes, 124 liga os passos grandes."
-
-# round 165c (patch165): Hardware Insert in a Patcher, real-time export, re-ping prompt, Keyboard Controller editor
 "Stop recording first" = "Pare a gravação primeiro"
 "A latency ping is running" = "Um ping de latência está em andamento"
 "A real-time bounce is already running" = "Uma exportação em tempo real já está em andamento"
@@ -5374,7 +5297,6 @@ countries: br
 "Jump to the next song marker (Quantize song jumps while playing)" = "Saltar para o próximo marcador da música (Quantizar saltos da música durante a reprodução)"
 "Jump to the previous song marker" = "Saltar para o marcador anterior da música"
 "Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [RMB] action, rename, delete" = "Marcador: [LMB] saltar até ele (tocando: no próximo passo de Quantizar saltos da música)  [RMB] ação, renomear, excluir"
-# Round 165g: Fruity Mute 2, Fruity Big Clock, Tuner, Fruity HTML NoteBook
 "MUTE" = "MUDO"
 "CHANNEL" = "CANAL"
 "Bar:Beat:Tick" = "Compasso:Tempo:Tick"
@@ -5396,6 +5318,7 @@ countries: br
 "The page was not found: {0}" = "A página não foi encontrada: {0}"
 "The page has no text to show." = "A página não tem texto para mostrar."
 "Browse" = "Procurar"
+
 # --- Settings › MIDI: master sync and external clock (round 165f)
 "Output devices" = "Dispositivos de saída"
 "No MIDI output devices found." = "Nenhum dispositivo de saída MIDI encontrado."
@@ -5426,7 +5349,6 @@ countries: br
 "Clock is too fast!" = "Clock rápido demais!"
 "Receiving clock {0} BPM" = "Recebendo clock a {0} BPM"
 "Choosing an input turns it on in Input devices above. Song time will match the clock." = "Escolher uma entrada a liga em Dispositivos de entrada acima. O tempo da música segue o clock."
-# round 165e: the Visualizer's GPU layers, LYNX Dance
 "The Visualizer was drawing with the GPU (OpenGL) when it happened. It now draws without the GPU; its GPU button turns it back on." = "O Visualizer estava desenhando com a GPU (OpenGL) quando isso aconteceu. Agora ele desenha sem a GPU; o botão GPU dele a liga de novo."
 "Draw the scene with the GPU (OpenGL): needed by the shader layers (Canvas, Terrain, 3D, Feedback, Post-process) and blend modes. Off: the 2D renderer" = "Desenhar a cena com a GPU (OpenGL): necessário para as camadas de shader (Canvas, Terreno, 3D, Feedback, Pós-processamento) e os modos de mistura. Desligado: o renderizador 2D"
 "How the layer mixes with the ones below it (GPU)" = "Como a camada se mistura com as de baixo (GPU)"
@@ -5533,6 +5455,7 @@ countries: br
 "Fruity Dance's role with LYNX SHARE's own dancer: it makes no sound. Its notes pick the move; drag the dancer to place it, right-click it for its moves." = "O papel do Fruity Dance com o dançarino próprio do LYNX SHARE: não faz som. As notas escolhem o passo; arraste o dançarino para posicioná-lo, clique com o botão direito para ver os passos."
 "Move" = "Passo"
 "Keys (as in FL's Fruity Dance): {0}. From {1} down: the same moves mirrored. {2} hides the dancer, {3} shows it." = "Teclas (como no Fruity Dance do FL): {0}. De {1} para baixo: os mesmos passos espelhados. {2} esconde o dançarino, {3} mostra."
+
 # --- Audio editor: Edison's tools (round 165l)
 "Edit: Wave" = "Editar: Onda"
 "What the mouse edits: the waveform, or the volume / panning / stereo separation envelope drawn over it (E)" = "O que o mouse edita: a forma de onda, ou o envelope de volume / pan / separação estéreo desenhado sobre ela (E)"
@@ -5715,7 +5638,6 @@ countries: br
 "Time stretcher / pitch shifter" = "Esticar tempo / mudar tom"
 "New length: {0} s. With formant preservation a voice keeps its character when the pitch moves." = "Novo comprimento: {0} s. Com a preservação de formantes uma voz mantém o caráter quando o tom muda."
 "Phases" = "Fases"
-# round 165 (linuxmouse165): FL's point editing (WaveShaper, automation, curve editors)
 "Point: [LMB] drag moves, then [Shift] keeps time, [Ctrl] keeps value  [Alt] no snap  [RMB] menu" = "Ponto: [LMB] arrastar move, depois [Shift] mantém o tempo, [Ctrl] mantém o valor  [Alt] sem grade  [RMB] menu"
 "Tension: [LMB] drag up / down bends the segment ([Ctrl] fine)  [RMB] straight" = "Tensão: [LMB] arrastar para cima / baixo curva o segmento ([Ctrl] fino)  [RMB] reto"
 "[LMB] or [RMB] new point (hold and drag)  [Shift][RMB] point on the curve  [Alt][LMB] bend  [Ctrl][Wheel] zoom  [MMB] scroll" = "[LMB] ou [RMB] novo ponto (segure e arraste)  [Shift][RMB] ponto sobre a curva  [Alt][LMB] curvar  [Ctrl][Wheel] zoom  [MMB] rolar"
@@ -5738,6 +5660,7 @@ countries: br
 "Stairs" = "Escada"
 "Smooth stairs" = "Escada suave"
 "Wave" = "Onda"
+
 # --- Round 165a (issue #11: FL muscle memory)
 "Hearing the key: further right on a key = louder" = "Ouvindo a tecla: mais à direita na tecla = mais forte"
 "vel {0}" = "vel {0}"
@@ -5754,8 +5677,6 @@ countries: br
 "Renamed plugins (type the first character)" = "Plugins renomeados (digite o primeiro caractere)"
 "Track height (vertical zoom)" = "Altura das trilhas (zoom vertical)"
 "Track height (vertical zoom): [LMB] drag up / down  [Alt][Wheel] over the Playlist  [2xLMB] 100%" = "Altura das trilhas (zoom vertical): [LMB] arrastar para cima / baixo  [Alt][Wheel] sobre a Playlist  [2xLMB] 100%"
-
-# round 165c (patch165): Layer node inside a Patcher, Granulizer / SoundFont nodes
 "Layer - Level" = "Layer - Nível"
 "Layer - Pan" = "Layer - Pan"
 "Layer - Pitch" = "Layer - Afinação"
@@ -5764,7 +5685,6 @@ countries: br
 "Sample..." = "Sample..."
 "Choose the sample the Granulizer plays" = "Escolha o sample que o Granulizer toca"
 "Load into this node" = "Carregar neste nó"
-# round 165f (rea165)
 "Last {0} minutes" = "Últimos {0} minutos"
 "Score logger" = "Registro de notas"
 "Dump score log to selected pattern" = "Despejar o registro de notas no pattern selecionado"
@@ -5789,7 +5709,6 @@ countries: br
 "Black notes" = "Teclas pretas"
 "Sharps (#)" = "Sustenidos (#)"
 "Flats (b)" = "Bemóis (b)"
-# round 165f (rea165-rack): Channel Rack looping, Burn to pattern, Burn MIDI
 "Advanced looping" = "Loop avançado"
 "Burn" = "Gravar"
 "Burn MIDI to" = "Gravar MIDI em"
@@ -5855,7 +5774,6 @@ countries: br
 "Match song tempo: the sample plays once per its length in beats (the WAV's ACID beats, else Beats below). Loop is always on and Wave spacing has no effect while locked" = "Acompanhar o andamento da música: o sample toca uma vez por sua duração em tempos (os tempos ACID do WAV, senão Tempos abaixo). O loop fica sempre ligado e Wave spacing não tem efeito enquanto travado"
 "Beats (0 = the sample's own)" = "Tempos (0 = os do próprio sample)"
 "The sample's length in beats for Tempo locked and the Step keys, as FL's time-stretch TIME; a WAV with ACID beats uses its own" = "A duração do sample em tempos para Travado no andamento e as teclas Step, como o TIME do time-stretch do FL; um WAV com tempos ACID usa os seus"
-# round 165m (batch 2)
 "Prepare for performance mode..." = "Preparar para o modo performance..."
 "Prepare for performance mode" = "Preparar para o modo performance"
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Insere colunas vazias antes da música para os clipes a disparar, um marcador em cada uma e um marcador Start onde a música começa; o modo performance é ligado."
@@ -6008,6 +5926,7 @@ countries: br
 "Pick an image..." = "Escolha uma imagem..."
 "Played when LYNX SHARE starts (if Settings › General › \"Play the startup sound\" is on). Default: LYNX SHARE's own sound." = "Toca quando o LYNX SHARE abre (se Configurações › Geral › \"Tocar o som de abertura\" estiver ligado). Padrão: o som do próprio LYNX SHARE."
 "Startup sound" = "Som de abertura"
+
 # --- Round 165c (vfxfix165): VFX leftovers (Level Scaler events, Keyboard Splitter Manual mapping, Sequencer chains)
 "Event persistence: how long the notes played stay on the graph" = "Persistência dos eventos: quanto tempo as notas tocadas ficam no gráfico"
 "Manual mapping" = "Mapeamento manual"
@@ -6025,8 +5944,6 @@ countries: br
 "Play, or stop at the start of the song or pattern" = "Tocar, ou parar no início da música ou do pattern"
 "Audio track: [LMB] arm / disarm recording (its mixer track)" = "Faixa de áudio: [LMB] armar / desarmar a gravação (a faixa do mixer dela)"
 "Audio track: [LMB] audio input source and monitoring (its mixer track)" = "Faixa de áudio: [LMB] fonte de entrada de áudio e monitoramento (a faixa do mixer dela)"
-
-# Fruity Scratcher (round 165g, flscratch165)
 "Backwards" = "Para trás"
 "Stopped" = "Parado"
 "Forwards" = "Para frente"
@@ -6040,8 +5957,6 @@ countries: br
 "Smooth 2" = "Suavização 2"
 "Smooth 3" = "Suavização 3"
 "Smooth 4" = "Suavização 4"
-
-# Transmitter (round 165g, fltrans165)
 "DETECTION" = "DETECÇÃO"
 "Smooth|Balanced|Dense" = "Suave|Equilibrado|Denso"
 "TRANSIENT" = "TRANSIENTE"
@@ -6051,8 +5966,10 @@ countries: br
 "Amp curve" = "Curva de amplitude"
 "Delay curve" = "Curva do delay"
 "No settings" = "Sem ajustes"
+
 # --- FL legacy effects (round 165k): Fruity Delay (v1) value texts
 "Inverted stereo" = "Estéreo invertido"
+
 # --- Newtone editor (round 165g flnewt165)
 "Cut mode (C): click a note to slice it there; Ctrl+click a note to glue it to the one before" = "Modo corte (C): clique numa nota para cortá-la ali; Ctrl+clique numa nota para colá-la à anterior"
 "Score" = "Partitura"
@@ -6095,7 +6012,6 @@ countries: br
 "Set image wallpaper..." = "Definir imagem de fundo..."
 "Remove image wallpaper" = "Remover imagem de fundo"
 "Set background color..." = "Definir cor de fundo..."
-# round 165z-a2 (FL metronome)
 "Metronome track" = "Faixa do metrônomo"
 "Metronome target mixer track" = "Faixa do mixer de destino do metrônomo"
 "The mixer track the metronome plays through (--- is the Master). The click is never in an export." = "A faixa do mixer por onde o metrônomo toca (--- é o Master). O clique nunca entra numa exportação."
@@ -6131,8 +6047,6 @@ countries: br
 "Ghost channels" = "Canais fantasma"
 "Add multiple..." = "Adicionar vários..."
 "You can add a maximum of {0} inserts." = "Você pode adicionar no máximo {0} inserts."
-
-# round 166e (issue #16): automatic crossfades, clip gain handle, Disarm on stop / Auto-unarm
 "Clip gain: [LMB] drag up / down (the selected clips together)  [RMB] menu" = "Ganho do clipe: [LMB] arraste para cima / baixo (os clipes selecionados juntos)  [RMB] menu"
 "Automatic crossfades (current project) on/off" = "Crossfades automáticos (projeto atual) liga/desliga"
 "Automatic crossfades (current project)" = "Crossfades automáticos (projeto atual)"
@@ -6147,14 +6061,11 @@ countries: br
 "Yes" = "Sim"
 "Make clip unique?" = "Tornar o clipe único?"
 "The clip \"{0}\" is also used on another audio track.\n\nDo you want to make this instance unique and then route it to this audio track?" = "O clipe \"{0}\" também é usado em outra faixa de áudio.\n\nDeseja tornar esta instância única e então roteá-la para esta faixa de áudio?"
-# round 166c (LYNX Tune: throat, transpose in scale, created vibrato)
 "THROAT" = "GARGANTA"
 "Scale steps" = "Graus da escala"
 "In scale" = "Na escala"
 "AMPLITUDE" = "AMPLITUDE"
 "VARIATION" = "VARIAÇÃO"
-
-# round 167f: FL Emphasis
 "Delta" = "Delta"
 "Envelope order" = "Ordem do envelope"
 "Linking" = "Vinculação"
@@ -6304,6 +6215,7 @@ countries: br
 "Load preset..." = "Carregar preset..."
 "Save preset as..." = "Salvar preset como..."
 "Page {0}" = "Página {0}"
+
 # --- Wave Traveller (round 167f)
 "Smooth (cosine)" = "Suave (cosseno)"
 "Bezier" = "Bézier"
@@ -6379,7 +6291,6 @@ countries: br
 "WAV: stores the tempo, the length in beats and the meter (an acid chunk), so other programs play the file at the song's tempo" = "WAV: grava o tempo, a duração em batidas e o compasso (um chunk acid), para outros programas tocarem o arquivo no tempo da música"
 "WAV: marks the music (without the tail) as the file's loop (a smpl chunk), for samplers" = "WAV: marca a música (sem a cauda) como o loop do arquivo (um chunk smpl), para samplers"
 "WAV: the Playlist's markers become cue points with their names (cue and labl chunks)" = "WAV: os marcadores da playlist viram pontos de cue com seus nomes (chunks cue e labl)"
-# REA round 167f: FL's Transporter (transient looper)
 "LEVELS" = "NÍVEIS"
 "Loop A" = "Loop A"
 "Loop B" = "Loop B"
@@ -6398,3 +6309,58 @@ countries: br
 "Update A/B" = "Atualizar A/B"
 "Flush" = "Esvaziar"
 "Detector source" = "Fonte do detector"
+
+# Online sessions, phase 1 (round 168a)
+"Stand-in: its plugin is not installed on this PC, a render of this part plays (the plugin's settings are kept)" = "Substituto: o plugin não está instalado neste PC, toca um render desta parte (as configurações do plugin são mantidas)"
+"Send project..." = "Enviar projeto..."
+"Send my part back..." = "Devolver minha parte..."
+"Merge a part..." = "Mesclar uma parte..."
+"Online session" = "Sessão online"
+"Stand-in: a plugin of this insert is not installed on this PC, a render of its sound plays (the plugins' settings are kept)" = "Substituto: um plugin deste insert não está instalado neste PC, toca um render do som (as configurações dos plugins são mantidas)"
+"Preparing the package..." = "Preparando o pacote..."
+"Rendering {0}..." = "Renderizando {0}..."
+"Writing the package..." = "Gravando o pacote..."
+"{0} files ({1}), {2} plugin renders." = "{0} arquivos ({1}), {2} renders de plugins."
+"{0} repeated files stored once." = "{0} arquivos repetidos guardados uma vez."
+"Could not write the package:" = "Não foi possível gravar o pacote:"
+"Send project" = "Enviar projeto"
+"This is a copy of {0}'s project. Use File › Send my part back... to send him what you made." = "Esta é uma cópia do projeto de {0}. Use Arquivo › Devolver minha parte... para enviar o que você fez."
+"the host" = "o anfitrião"
+"Your friend opens the package in his LYNX SHARE, records his part and sends it back to you (File › Merge a part...). Up to {0} people in one project, you included." = "Seu amigo abre o pacote no LYNX SHARE dele, grava a parte dele e devolve para você (Arquivo › Mesclar uma parte...). Até {0} pessoas em um projeto, incluindo você."
+"Your name" = "Seu nome"
+"Your friend's name" = "Nome do seu amigo"
+"Only his own part (recommended)" = "Só a parte dele (recomendado)"
+"A full copy of the project" = "Uma cópia completa do projeto"
+"When the session ends, he keeps" = "Quando a sessão terminar, ele fica com"
+"Parts that use a third-party plugin are rendered into the package: they play on his PC even without the plugin." = "Partes que usam um plugin de terceiros são renderizadas no pacote: tocam no PC dele mesmo sem o plugin."
+"Save package..." = "Salvar pacote..."
+"Type your friend's name: his part comes back under it." = "Digite o nome do seu amigo: a parte dele volta com esse nome."
+"This project already has {0} people (the most in one session)." = "Este projeto já tem {0} pessoas (o máximo em uma sessão)."
+"for {0}" = "para {0}"
+"{0} is ready. Send it to {1} (e-mail, a shared cloud folder, a USB stick...)." = "{0} está pronto. Envie para {1} (e-mail, pasta compartilhada na nuvem, pen drive...)."
+"Send my part back" = "Devolver minha parte"
+"Only a project you received (a .lynxpack) has a part to send back. To invite someone, use File › Send project..." = "Só um projeto recebido (um .lynxpack) tem uma parte para devolver. Para convidar alguém, use Arquivo › Enviar projeto..."
+"{0}'s part" = "Parte de {0}"
+"{0} is ready. Send it to {1}: he adds it with File › Merge a part..." = "{0} está pronto. Envie para {1}: ele adiciona com Arquivo › Mesclar uma parte..."
+"{0} asked that you keep only your own part: the rest of the project was removed from your copy." = "{0} pediu que você fique só com a sua parte: o resto do projeto foi removido da sua cópia."
+"Merge a part" = "Mesclar uma parte"
+"Parts are merged by the host, in his project. This is a copy you received." = "As partes são mescladas pelo anfitrião, no projeto dele. Esta é uma cópia que você recebeu."
+"This part was made in another project. Open the project you sent to {0}, then merge it." = "Esta parte foi feita em outro projeto. Abra o projeto que você enviou para {0} e depois mescle."
+"{0}'s part is in the project: {1} channels, {2} patterns, {3} notes, {4} Playlist clips, {5} inserts. Undo takes it out again." = "A parte de {0} está no projeto: {1} canais, {2} patterns, {3} notas, {4} clipes na Playlist, {5} inserts. Desfazer a retira de novo."
+"{0} things he deleted since the last merge were removed." = "{0} itens que ele apagou desde a última mesclagem foram removidos."
+"Some of his inserts or Playlist rows were in use here: they moved to free ones." = "Alguns inserts ou linhas da Playlist dele estavam em uso aqui: foram movidos para livres."
+"Plugins not installed here (their renders play):" = "Plugins não instalados aqui (tocam os renders):"
+"Damaged in the transfer (ask for the package again):" = "Danificados na transferência (peça o pacote de novo):"
+"Open a received project" = "Abrir um projeto recebido"
+"These plugins are another version on this PC:" = "Estes plugins estão em outra versão neste PC:"
+"Play the renders that came with the project (sounds as sent), or use your version (can sound different)?" = "Tocar os renders que vieram com o projeto (som como enviado) ou usar a sua versão (pode soar diferente)?"
+"Play the renders" = "Tocar os renders"
+"Use my version" = "Usar minha versão"
+"Not installed here (their renders play, marked R):" = "Não instalados aqui (tocam os renders, marcados com R):"
+"Not on the sender's PC (left out):" = "Não estão no PC de quem enviou (ficaram de fora):"
+"This package is a whole project, not a part. Open it with File › Open..." = "Este pacote é um projeto inteiro, não uma parte. Abra com Arquivo › Abrir..."
+"{0} sent you \"{1}\"." = "{0} enviou \"{1}\" para você."
+"Record your part on your own channels, inserts (from {0}) and Playlist tracks (from {1}), then use File › Send my part back..." = "Grave sua parte nos seus próprios canais, inserts (a partir do {0}) e faixas da Playlist (a partir da {1}), depois use Arquivo › Devolver minha parte..."
+"When the session ends you may keep a full copy of the project." = "Quando a sessão terminar, você pode ficar com uma cópia completa do projeto."
+"When the session ends you keep your own part (the host's choice)." = "Quando a sessão terminar, você fica com a sua parte (escolha do anfitrião)."
+"Made with LYNX SHARE {0} (this is {1})." = "Feito com LYNX SHARE {0} (esta é a {1})."
