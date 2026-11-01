@@ -58,7 +58,15 @@ markers as there: [DECOMP] disassembly of the installation's `Transporter_x64.dl
   and `transporter-tempo-autopan.png` (Tempo, "Auto-pan 61%", "Send to 1  Insert 1"); looked at: every control, the
   push buttons unlit, texts fit.
 
-## 5. Merge with main
+## 5. Engine golden corrected
+- `tp167f_engine_matches_fl_library`'s second case (48 kHz, deterministic, flush / freeze / update / bypass switches at
+  set samples) failed against its golden 0x245f32073398ef86 — also with 167f's own unmerged engine and math. Re-run on
+  FL's library: `tlh.exe ildsp_x64.dll lcg.f32 n2_out.f32 n2.txt 48000 512 s=13,0 s=18,1 s=3,0.6 s=4,0.6 s=5,0.3
+  s=21,0.2 s@20000=12,1 s@30000=11,1 s@36000=11,0 s@40000=15,1 s@41000=15,0 s=14,0 s@44000=14,1`
+  (`/mnt/e/lynx-work/flgap167tp/t/`) gives FNV 0xeb03a3ba12a768f1 — exactly LYNX's output. The golden was stale (not
+  FL's); it is now FL's value. [EXEC]
+
+## 6. Merge with main
 - Merged origin/main (5d3f5c17: Emphasis `flEmphasis` took the previous last EffectKind) — `flTransporter` is appended
   after `flEmphasis`; the send-tap list of `RackRenderer` holds Fruity Send, Patcher, Transmitter and Transporter;
   i18n tables merged (both rounds' strings) and regenerated.

@@ -212,7 +212,7 @@ TEST (tp167f_engine_matches_fl_library)
     CHECK (runEngine (48000.0f, false, false,
                       { { -1, 13, 0 }, { -1, 18, 1 }, { -1, 3, 0.6f }, { -1, 4, 0.6f }, { -1, 5, 0.3f }, { -1, 21, 0.2f }, { 20000, 12, 1 },
                         { 30000, 11, 1 }, { 36000, 11, 0 }, { 40000, 15, 1 }, { 41000, 15, 0 }, { -1, 14, 0 }, { 44000, 14, 1 } })
-           == 0x245f32073398ef86ull);
+           == 0xeb03a3ba12a768f1ull); // FL's library (tlh.exe, round 167n; the 167f golden was stale)
 }
 
 TEST (tp167f_reset_latency_and_project_round_trip)
