@@ -1224,6 +1224,9 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("pattern.next")) selectPattern (stepPattern (engine.getSong(), 1));
     else if (is ("pattern.previous")) selectPattern (stepPattern (engine.getSong(), -1));
     else if (is ("pattern.nextEmpty")) nextEmptyPattern();
+    else if (is ("pattern.firstEmpty")) { engine.editSong ([] (Song& s) { gotoFirstEmptyPattern (s); }); showRenamePattern (engine.getSong().currentPattern); }
+    else if (is ("pattern.nextEmptyNoName")) engine.editSong ([] (Song& s) { gotoNextEmptyPattern (s); });
+    else if (is ("pattern.delete")) deleteCurrentPattern();
     else if (is ("pattern.rename")) showRenamePattern (engine.getSong().currentPattern);
     else if (is ("pattern.insert")) insertPatternHere();
     else if (is ("pattern.clone")) clonePatternNow();
@@ -1309,6 +1312,8 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("file.saveAs")) save (true);
     else if (is ("file.saveNewVersion")) saveNewVersion();
     else if (is ("file.export")) exportAudio();
+    else if (is ("file.exportMp3")) exportAudio (1);
+    else if (is ("file.exportMidi")) exportMidiFile();
     else if (is ("edit.undo")) undoRedo (false);
     else if (is ("edit.redo")) undoRedo (true);
     else if (is ("help.shortcuts")) showHelp();
@@ -1911,6 +1916,13 @@ void MainComponent::nextEmptyPattern()
 {
     engine.editSong ([] (Song& s) { gotoNextEmptyPattern (s); });
     showRenamePattern (engine.getSong().currentPattern);
+}
+
+void MainComponent::deleteCurrentPattern()
+{
+    // FL's Patterns › Delete (Ctrl+Shift+Del); the last pattern stays
+    if (engine.getSong().patterns.size() > 1)
+        engine.editSong ([] (Song& s) { s.removePattern (s.currentPattern); });
 }
 
 void MainComponent::insertPatternHere()
@@ -2726,7 +2738,9 @@ juce::PopupMenu MainComponent::makePatternMenu()
                   [this] { selectPattern (stepPattern (engine.getSong(), 1)); });
     menu.addItem (tr ("Previous pattern") + shortcutText ("pattern.previous"), index > 0, false,
                   [this] { selectPattern (stepPattern (engine.getSong(), -1)); });
+    menu.addItem (tr ("First empty pattern (and name it)") + shortcutText ("pattern.firstEmpty"), [this] { runAction ("pattern.firstEmpty"); });
     menu.addItem (tr ("Next empty pattern (and name it)") + shortcutText ("pattern.nextEmpty"), [this] { nextEmptyPattern(); });
+    menu.addItem (tr ("Next empty pattern (no naming)") + shortcutText ("pattern.nextEmptyNoName"), [this] { runAction ("pattern.nextEmptyNoName"); });
     menu.addSeparator();
     menu.addItem (tr ("Rename and color...") + shortcutText ("pattern.rename"), [this, index] { showRenamePattern (index); });
     menu.addSubMenu (tr ("Color"), colours);
@@ -2744,7 +2758,7 @@ juce::PopupMenu MainComponent::makePatternMenu()
 
     menu.addSubMenu (tr ("Song time signature"), signatures);
     menu.addSeparator();
-    menu.addItem (tr ("Delete pattern"), song.patterns.size() > 1, false,
+    menu.addItem (tr ("Delete pattern") + shortcutText ("pattern.delete"), song.patterns.size() > 1, false,
                   [this, index] { engine.editSong ([index] (Song& s) { s.removePattern (index); }); });
     return menu;
 }
@@ -4637,10 +4651,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             // FL's File › Export (REA round 139): one entry per format, then the formats of the last export
             juce::PopupMenu exports;
             exports.addItem (tr ("Wave file..."), [this] { exportAudio (0); });
-            exports.addItem (tr ("MP3 file..."), [this] { exportAudio (1); });
+            exports.addItem (tr ("MP3 file...") + shortcutText ("file.exportMp3"), [this] { exportAudio (1); });
             exports.addItem (tr ("OGG file..."), [this] { exportAudio (2); });
             exports.addItem (tr ("FLAC file..."), [this] { exportAudio (3); });
-            exports.addItem (tr ("MIDI file..."), [this] { exportMidiFile(); });
+            exports.addItem (tr ("MIDI file...") + shortcutText ("file.exportMidi"), [this] { exportMidiFile(); });
             exports.addItem (tr ("Last exported format(s)...") + shortcutText ("file.export"), [this] { exportAudio(); });
             exports.addSeparator();
             exports.addItem (tr ("Project with samples (.zip)..."), [this] { exportPackage(); });
@@ -4996,8 +5010,9 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent()
             { TR_NOOP ("Shift+drag"), TR_NOOP ("Copy") },
             { "Ctrl+A/C/X/V", TR_NOOP ("Select all, copy, cut, paste") },
             { "Ctrl+B / Ctrl+Q", TR_NOOP ("Duplicate / quantize") },
-            { "Ctrl+M / Ctrl+P", TR_NOOP ("Mute / portamento") },
-            { TR_NOOP ("Arrows"), TR_NOOP ("Move (Shift = octave/bar)") },
+            { "Alt+M / Shift+Alt+M", TR_NOOP ("Mute / unmute") },
+            { "Ctrl+P / Ctrl+D", TR_NOOP ("Portamento / deselect") },
+            { TR_NOOP ("Shift+arrows"), TR_NOOP ("Transpose a semitone / move by the grid (Ctrl+Up/Down: an octave)") },
             { TR_NOOP ("Alt / Ctrl+wheel"), TR_NOOP ("Disable snap / zoom") } } },
         { "Playlist",
           { { TR_NOOP ("Click"), TR_NOOP ("Paint the current pattern") },

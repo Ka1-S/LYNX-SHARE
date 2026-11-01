@@ -227,4 +227,32 @@ inline int nearestNote (const std::vector<Note>& notes, const std::vector<int>& 
     }
     return best;
 }
+
+// FL's editor arrow keys on a selection (ShortcutsModule EEShiftU/D, EEShiftU12/D12, EEShiftL/R, round 167j):
+// Shift+Up/Down = a semitone, Ctrl+Up/Down = an octave, Shift+Left/Right = one grid step. The plain arrows act like
+// Shift (a LYNX extra). Ctrl+Shift+Left/Right (rotate), Ctrl+Left/Right and Alt are not arrow moves.
+struct ArrowMove
+{
+    bool handled = false;
+    int keys = 0;      // semitones
+    int gridSteps = 0; // multiples of the grid
+};
+
+enum class Arrow { up, down, left, right };
+
+inline ArrowMove arrowMove (Arrow arrow, bool ctrl, bool shift, bool alt) noexcept
+{
+    if (alt)
+        return {};
+    if (arrow == Arrow::up || arrow == Arrow::down)
+    {
+        if (ctrl && shift)
+            return {};
+        const auto sign = arrow == Arrow::up ? 1 : -1;
+        return { true, sign * (ctrl ? 12 : 1), 0 };
+    }
+    if (ctrl)
+        return {};
+    return { true, 0, arrow == Arrow::right ? 1 : -1 };
+}
 } // namespace lynx::noteedit

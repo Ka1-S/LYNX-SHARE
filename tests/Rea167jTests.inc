@@ -173,3 +173,52 @@ TEST (rea167j_first_channel_with_notes)
     CHECK (lynx::firstChannelWithNotes (s, 0) == -1);
     CHECK (lynx::firstChannelWithNotes (s, 7) == -1);
 }
+
+TEST (rea167j_piano_roll_arrow_keys_are_fl_s)
+{
+    using lynx::noteedit::Arrow;
+    using lynx::noteedit::arrowMove;
+    // Shift+Up/Down = a semitone, Ctrl+Up/Down = an octave (FL EEShiftU / EEShiftU12)
+    CHECK (arrowMove (Arrow::up, false, true, false).handled && arrowMove (Arrow::up, false, true, false).keys == 1);
+    CHECK (arrowMove (Arrow::down, false, true, false).keys == -1);
+    CHECK (arrowMove (Arrow::up, true, false, false).keys == 12);
+    CHECK (arrowMove (Arrow::down, true, false, false).keys == -12);
+    CHECK (arrowMove (Arrow::up, false, false, false).keys == 1); // plain arrows = Shift (LYNX extra)
+    // Shift+Left/Right = one grid step, not a bar
+    CHECK (arrowMove (Arrow::right, false, true, false).gridSteps == 1);
+    CHECK (arrowMove (Arrow::left, false, true, false).gridSteps == -1);
+    CHECK (arrowMove (Arrow::left, false, true, false).keys == 0);
+    // Ctrl+Shift+Left/Right rotates, Ctrl+Left/Right and Alt+arrows are not moves
+    CHECK (! arrowMove (Arrow::right, true, true, false).handled);
+    CHECK (! arrowMove (Arrow::right, true, false, false).handled);
+    CHECK (! arrowMove (Arrow::up, false, false, true).handled);
+    CHECK (! arrowMove (Arrow::up, true, true, false).handled);
+}
+
+TEST (rea167j_fl_pattern_keys)
+{
+    using namespace lynx::keys;
+    KeyMap map;
+    CHECK (map.conflicts().empty());
+    // FL Patterns menu: Clone Ctrl+Shift+C, Delete Ctrl+Shift+Del, Find first empty Shift+F4, no naming Ctrl+F4
+    CHECK (map.find ({ 'C', ctrl | shift }, Context::global, false) == "pattern.clone");
+    CHECK (map.find ({ 'C', ctrl | shift }, Context::playlist, false) == "pattern.clone");
+    CHECK (map.find ({ 'C', alt }, Context::playlist, false) == "pattern.clone"); // the old key stays
+    CHECK (map.find ({ del, ctrl | shift }, Context::global, false) == "pattern.delete");
+    CHECK (map.find ({ f4, shift }, Context::global, false) == "pattern.firstEmpty");
+    CHECK (map.find ({ f4, ctrl }, Context::global, false) == "pattern.nextEmptyNoName");
+    CHECK (map.find ({ f4, none }, Context::global, false) == "pattern.nextEmpty");
+    // FL File › Export: MP3 Ctrl+Shift+R, MIDI Ctrl+Shift+M
+    CHECK (map.find ({ 'R', ctrl | shift }, Context::global, false) == "file.exportMp3");
+    CHECK (map.find ({ 'M', ctrl | shift }, Context::pianoRoll, false) == "file.exportMidi");
+
+    auto song = lynx::Song::makeDefault();
+    song.patterns.resize (4);
+    song.patterns[1].notes.push_back ({});
+    song.currentPattern = 3;
+    // the lowest-numbered empty one (pattern 0 has the default notes, 1 has a note), not the next after the current
+    CHECK (lynx::gotoFirstEmptyPattern (song) == 2 && song.currentPattern == 2);
+    song.patterns[2].notes.push_back ({});
+    song.patterns[3].notes.push_back ({});
+    CHECK (lynx::gotoFirstEmptyPattern (song) == 4 && song.patterns.size() == 5 && song.currentPattern == 4);
+}

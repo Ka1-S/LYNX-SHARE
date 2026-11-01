@@ -163,6 +163,7 @@ private:
     void selectPattern (int index);
     void nextEmptyPattern();
     void insertPatternHere();
+    void deleteCurrentPattern();
     void splitPatternByChannelNow();
     void clonePatternNow();
     void movePatternNow (int delta);
