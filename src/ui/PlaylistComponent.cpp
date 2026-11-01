@@ -4384,6 +4384,9 @@ void PlaylistComponent::addAutoMarker()
 {
     // FL (FUN_00e546a0 with FUN_00e43fa0 (snap)): the song position on the grid
     const auto tick = snap ((double) songPositionTick(), true);
+    for (const auto& m : engine.getSong().markers())
+        if (m.tick == tick)
+            return; // FL keeps the marker that is there (and no undo step)
     engine.editSong ([tick] (Song& s) { markers::addAuto (s, tick); });
 }
 

@@ -122,6 +122,11 @@ render, **[GUI]** LYNX driven on Windows (fresh profile, `LYNX_TEST_MODE=1`), **
     backwards.
   - [TEST] `rea167k_clip_pitch_and_reverse_keys`, `rea167k_clip_pitch_and_reverse_play`,
     `rea167k_clip_pitch_keeps_the_length`, `rea167k_flp_clip_pitch_and_reverse_import`.
+  - [GUI] Windows build: Ctrl+A then 8 ×3 and 9 on the clip marks the project changed and draws the clip backwards;
+    the Playlist menu lists the three items with their keys.
+  - LYNX `--render` (Windows build) of the same nine projects against FL's renders: the same envelope at every probe
+    (0.1 … 1.9 s, to the third decimal) and the same audio length. The pitch is 523.26 Hz for FL's 522.51 Hz (+3) and
+    329.63 for 329.15 (−5): FL's shifter sits about 2.4 cents low, LYNX's is exact.
 - **Not done:** the per-clip stretch (+0x40), and FL's "Create variants when stretching audio clips" switch.
 
 ## 6. Playlist › Time markers keys
@@ -142,6 +147,9 @@ render, **[GUI]** LYNX driven on Windows (fresh profile, `LYNX_TEST_MODE=1`), **
     marker (action 4) is removed (FUN_00e54b30). Unless the old one was at that spot, a new Loop marker is placed
     there, so the same key again removes it.
 - **LYNX before:** markers came only from the ruler menu, with no keys.
+- **[GUI]** Playlist focused: Ctrl+T put "Auto" at bar 1, and a second Ctrl+T there added nothing and no undo step.
+  Shift+T put a Loop marker. Ctrl+Z undid it, Ctrl+Z again redid it ("Redone: Markers"), and Ctrl+Alt+Z twice went
+  two steps back.
 - **LYNX now:** `markers::addAuto`, `markers::placeSongLoop`, `markers::addSignatureChange`, `markers::signatureAt`
   (`MarkerPlan.cpp`). Playlist actions `playlist.markerAdd/markerAuto/markerSignature/markerLoop` with FL's keys
   (Playlist focused). Ctrl+T elsewhere stays the typing piano. Time markers submenu: "Add one...", "Add auto",
@@ -159,6 +167,7 @@ render, **[GUI]** LYNX driven on Windows (fresh profile, `LYNX_TEST_MODE=1`), **
   Shift+Alt+R (Mixer focused). Each one runs the selected track's own menu item (`MixerStrips::runMenuItem`), so the
   key does exactly what the menu does. With another panel focused, F2 is still the pattern's rename. [TEST]
   `rea167k_mixer_menu_keys`.
+- **[GUI]** Insert 2 selected: S lit its solo; F2 opened "Rename track" with the name and colours.
 - **Not done:** "Alt solo selected track(s)" (Alt+S). Its FL behaviour is not proven yet.
 
 ## 8. Audio clips through the precomputed effects (167h leftover)
@@ -177,13 +186,13 @@ render, **[GUI]** LYNX driven on Windows (fresh profile, `LYNX_TEST_MODE=1`), **
   So FL applies an audio clip channel's precomputed effects as it does a Sampler's.
 - **LYNX before:** the import skipped them for audio clip channels (`def.instrument != audioClip`), Reverse included,
   and `buildInstrument` ran the precompute for samplers only ("audio clips: not yet").
-- **LYNX now:** imported for audio clip channels too. `buildInstrument` processes an audio clip's whole file (the
+- **LYNX now (LYNX `--render` against FL: the same samples for p_rev / p_normpol / p_fadein / p_fadeout):** imported for audio clip channels too. `buildInstrument` processes an audio clip's whole file (the
   region stays whole: a clip plays the whole file). [TEST] `rea167k_audio_clip_channels_keep_precomputed_effects`.
 
 ## Where I stopped
 
-- Done in the worktree (feature/flopt167k): items 1–7. Next: build + tests, Windows GUI re-check (export dialog,
-  muted notes, undo, keys 7/8/9, marker keys), land.
+- Done (feature/flopt167k): items 1–8, tests green (`tests/Rea167kTests.inc`), Windows GUI re-check (keys 7/8/9,
+  marker keys, undo, mixer keys, export dialog) and render checks against FL.
 - Left from the brief: 167h leftovers (Sampler legacy panel, declicker attacks, audio clips through precompute,
   .flp events 0x20/0x30/0x32/0xAA, 0x2B, 0xE2/0xE6, 0x26); the 167h gap table; more 167j gap rows (Ctrl+Enter /
   Ctrl+Left / Ctrl+Right time selection, export "Save tempo information (acid)", markers in exports, Alt solo).
