@@ -1,6 +1,6 @@
 # LYNX SHARE Online Sessions — design
 
-Status: **design only** (round 167r, 2026-11-01). Nothing here is implemented yet. This is a LYNX-own feature: FL
+Status: design (round 167r, 2026-11-01); **phase P1 implemented in round 168a** (see "Decisions" and §9 P1). This is a LYNX-own feature: FL
 Studio 2026 has no live collaboration (see §0). Code references point at the tree as of `origin/main` 4a5f74fc.
 
 ## The idea in one paragraph
@@ -584,6 +584,25 @@ Effort in LYNX rounds (one agent round ≈ one focused day), including tests, th
 - **Manual (user + friend)**: one LAN session, one internet session; a checklist in `docs/MANUAL_TESTING.md`.
 
 ---
+
+## Decisions (the user, 2026-11-01)
+
+The open questions of §10 are answered; where this section and the text above differ, this section wins.
+
+1. **What a guest keeps at the end: the host decides, per person.** Default = only his own part; the host can allow a
+   full copy of the project (*Send project…* and, in P2, the participant list). In P1 the choice travels in the
+   package (`to.keepFull`) and the guest's LYNX SHARE honours it after *Send my part back* (it keeps only his part
+   unless the host allowed a full copy). LYNX SHARE is open source, so this is a courtesy the program keeps, not DRM;
+   the Send dialog says so.
+2. **Same LYNX SHARE version on every computer** for live sessions (P2/P3): accepted (§1.6). P1 packages only note
+   the version they were made with (`lynxVersion` in the manifest) and open in any later version.
+3. **At most 4 participants** for now (host included): one constant, `session::maxParticipants = 4`
+   (`core/SessionIds.h`); raising it later must not need more than changing that constant.
+4. **Testing**: the user will test live sessions (P2/P3) later with his girlfriend's PC and her own plugins. Only
+   legitimately installed / licensed plugins or active trials are used; licensing is never bypassed. P1 is tested on
+   one machine with two fresh `LYNX_PROFILE_DIR`s (host and guest).
+5. **Connectivity: the free path only** — Hostinger rendezvous + public STUN, P2P, LAN / direct IP. A paid relay or
+   a VPS relay only if usage grows; not now (§9.1 option (c) until then).
 
 ## 10. Open questions for the user
 
