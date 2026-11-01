@@ -250,6 +250,7 @@ std::string toText (const Options& o)
       << "stemsMaster=" << (o.stemsIncludeMaster ? 1 : 0) << "\n"
       << "normalize=" << (o.normalize ? 1 : 0) << "\n"
       << "masterEffects=" << (o.masterEffects ? 1 : 0) << "\n"
+      << "insertEffects=" << (o.insertEffects ? 1 : 0) << "\n"
       << "trimPdc=" << (o.trimPdc ? 1 : 0) << "\n"
       << "hqAllPlugins=" << (o.hqAllPlugins ? 1 : 0) << "\n"
       << "pluginWarmUp=" << (o.pluginWarmUp ? 1 : 0) << "\n"
@@ -281,6 +282,7 @@ Options fromText (const std::string& text)
     o.stemsIncludeMaster = toInt (kv, "stemsMaster", d.stemsIncludeMaster ? 1 : 0) != 0;
     o.normalize = toInt (kv, "normalize", d.normalize ? 1 : 0) != 0;
     o.masterEffects = toInt (kv, "masterEffects", d.masterEffects ? 1 : 0) != 0;
+    o.insertEffects = toInt (kv, "insertEffects", d.insertEffects ? 1 : 0) != 0;
     o.trimPdc = toInt (kv, "trimPdc", d.trimPdc ? 1 : 0) != 0;
     o.hqAllPlugins = toInt (kv, "hqAllPlugins", d.hqAllPlugins ? 1 : 0) != 0;
     o.pluginWarmUp = toInt (kv, "pluginWarmUp", d.pluginWarmUp ? 1 : 0) != 0;
@@ -367,6 +369,9 @@ Song makeRenderSong (const Song& song, const Options& o, std::int64_t tailTicks,
 
     if (! o.masterEffects && ! base.mixer.empty())
         base.mixer[0].effects.clear();
+    if (! o.insertEffects)
+        for (std::size_t t = 1; t < base.mixer.size(); ++t)
+            base.mixer[t].effects.clear();
 
     if (o.disableMaxPolyphony) // FL: every channel's Max polyphony becomes 0 (no limit) for the render
         for (auto& c : base.channels)

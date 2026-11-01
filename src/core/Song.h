@@ -1451,4 +1451,8 @@ Song makeBounceSong (const Song& song, int track);
 // audio clip channel on a new insert with the same routing, puts the clip in the Playlist and mutes
 // the original insert. Returns the new insert.
 int applyBounce (Song& song, int track, const std::string& samplePath, std::int64_t length);
+// The first channel (rack order) with notes in pattern `pattern`, −1 if none: FL's "Select first channel with notes
+// when the pattern changes" (FLEngine FUN_00e67f20 over the channels' note counts, REA_rodada167j §5).
+int firstChannelWithNotes (const Song& song, int pattern) noexcept;
+
 } // namespace lynx

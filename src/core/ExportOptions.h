@@ -76,6 +76,9 @@ struct Options
     bool stemsIncludeMaster = false; // with stems: also the full mix
     bool normalize = false;          // peak to 0 dBFS
     bool masterEffects = true;       // the Master insert's effects
+    // FL's "Enable insert effects" (on by default; WAVRenderForm InputFXBox, REA round 167j §4): off = the inserts'
+    // effect slots (not the Master's) are bypassed for the render
+    bool insertEffects = true;
     bool trimPdc = true;             // drop the silence the delay compensation adds at the start
     // FL's "HQ for all plugins" (REA round 134): engines with a separate render quality use it and HQ switches are
     // forced on; off = the export uses the same (draft) quality as playback, so it matches what was heard

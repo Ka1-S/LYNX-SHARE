@@ -302,6 +302,13 @@ public:
     // The metronome's click for the next process() block (round 165z-a2, FL's Settings › Audio › "Metronome track"):
     // added to the input of mixer track `track` (0 = the Master, FL's "---"; an insert this song lacks = the Master),
     // so it plays through that track's effects and fader. nullptr = silent. Same thread as process().
+    // FL's Settings › Audio › Mixer: "Play truncated notes on transport" (on by default) and "Reset plugins on
+    // transport" (off by default), REA_rodada167j §2–§3. Read by the audio thread at each start of playback.
+    void setTransportOptions (bool playTruncated, bool resetPlugins) noexcept
+    {
+        playTruncatedOnTransport = playTruncated;
+        resetPluginsOnTransport = resetPlugins;
+    }
     void setMetronomeInput (const float* left, const float* right, int track) noexcept
     {
         clickLeft = left;
@@ -396,6 +403,8 @@ private:
     bool wasPlaying = false;
     double expectedTick = -1.0; // where the next block should start, to detect jumps
     bool resumeAudio = false;
+    bool chaseNotes = false; // this block starts playback: notes crossing the position play (setTransportOptions)
+    bool playTruncatedOnTransport = true, resetPluginsOnTransport = false;
     const RackState* lastState = nullptr;
     EventBuffer events;
     std::vector<float> mixBuffers; // maxMixerTracks * 2 * blockCapacity

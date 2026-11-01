@@ -112,12 +112,14 @@ void schedulePatternLoop (const Pattern& pattern,
                           double tps,
                           EventBuffer& out,
                           float swing,
-                          const std::vector<ChannelDef>* channels) noexcept
+                          const std::vector<ChannelDef>* channels,
+                          bool chase) noexcept
 {
     if (numSamples <= 0 || patternLength <= 0 || tps <= 0.0)
         return;
 
     const auto endTick = startTick + numSamples * tps;
+    const auto position = std::fmod (startTick, (double) patternLength);
 
     for (const auto& note : pattern.notes)
     {
@@ -148,6 +150,11 @@ void schedulePatternLoop (const Pattern& pattern,
         }
 
         emitOccurrences ((double) start, patternLength, startTick, endTick, tps, numSamples, on, out);
+        if (chase && (double) start + tps <= position && (double) (start + timing.length) > position)
+        {
+            on.sampleOffset = 0; // a note crossing the start position ("Play truncated notes on transport")
+            out.add (on);
+        }
 
         NoteEvent off = on;
         off.type = NoteEvent::Type::off;
@@ -204,7 +211,7 @@ namespace
 // [loopStart, loopEnd) = the block within the song loop of length `loop`.
 void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, double startTick, double endTick, int numSamples,
                    double tps, std::int64_t loop, double loopStart, double loopEnd, bool resume, const ScheduleIndex* index,
-                   EventBuffer& out) noexcept
+                   EventBuffer& out, bool chase = false) noexcept
 {
     auto overlaps = [&] (double from, double to) {
         return (from < loopEnd && to > loopStart) || (loopEnd > (double) loop && from < loopEnd - (double) loop);
@@ -315,6 +322,11 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
         }
 
         emitOccurrences ((double) on, loop, startTick, endTick, tps, numSamples, e, out);
+        if (chase && (double) on + tps <= loopStart && (double) off > loopStart)
+        {
+            e.sampleOffset = 0; // a note crossing the start position ("Play truncated notes on transport")
+            out.add (e);
+        }
 
         e.type = NoteEvent::Type::off;
         e.velocity = 0.0f;
@@ -335,7 +347,7 @@ void scheduleSingleClip (const Song& song, const Clip& clip, std::size_t clipInd
 }
 
 void scheduleSong (const Song& song, double startTick, int numSamples, double tps, EventBuffer& out, bool resume,
-                   const ScheduleIndex* index, bool wrap) noexcept
+                   const ScheduleIndex* index, bool wrap, bool chase) noexcept
 {
     if (numSamples <= 0 || tps <= 0.0 || song.playlist.empty())
         return;
@@ -360,7 +372,7 @@ void scheduleSong (const Song& song, double startTick, int numSamples, double tp
         if (clip.start < zoneEnd) // Performance mode: the zone's clips play only when launched (schedulePerformance)
             continue;
 
-        scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume, index, out);
+        scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume, index, out, chase);
     }
 
     out.sortByOffset();

@@ -343,7 +343,7 @@ public:
         combo (ditherLabel, tr ("Dither"), ditherBox, { tr ("Off"), tr ("TPDF"), tr ("TPDF + noise shaping") },
                tr ("Hides the rounding noise of 16 and 24 bit files (noise shaping moves it where the ear is least sensitive)"));
 
-        for (auto* t : { &normalizeToggle, &masterFxToggle, &trimToggle, &hqToggle, &showToggle, &polyToggle, &warmUpToggle, &realtimeToggle })
+        for (auto* t : { &normalizeToggle, &masterFxToggle, &insertFxToggle, &trimToggle, &hqToggle, &showToggle, &polyToggle, &warmUpToggle, &realtimeToggle })
         {
             t->onClick = [this] { readControls(); };
             addAndMakeVisible (t);
@@ -353,6 +353,8 @@ public:
         trimToggle.setButtonText (tr ("Trim the delay compensation's silence"));
         normalizeToggle.setTooltip (tr ("Raises or lowers the whole file so its loudest peak reaches full scale"));
         masterFxToggle.setTooltip (tr ("Off: the Master insert's effects are bypassed for the export"));
+        insertFxToggle.setButtonText (tr ("Insert effects"));
+        insertFxToggle.setTooltip (tr ("Off: the effects of the inserts (not the Master's) are bypassed for the export"));
         trimToggle.setTooltip (tr ("Removes the silence plugin latency compensation adds at the start"));
         hqToggle.setButtonText (tr ("HQ for all plugins"));
         showToggle.setButtonText (tr ("Show the file(s) when complete"));
@@ -431,6 +433,7 @@ public:
             auto row2 = mix.removeFromTop (24);
             hqToggle.setBounds (row2.removeFromLeft (170));
             polyToggle.setBounds (row2.removeFromLeft (200));
+            insertFxToggle.setBounds (row2.removeFromLeft (150));
             showToggle.setBounds (row2);
         }
         mix.removeFromTop (2);
@@ -560,6 +563,7 @@ private:
         ditherBox.setSelectedItemIndex ((int) options.dither, n);
         normalizeToggle.setToggleState (options.normalize, n);
         masterFxToggle.setToggleState (options.masterEffects, n);
+        insertFxToggle.setToggleState (options.insertEffects, n);
         trimToggle.setToggleState (options.trimPdc, n);
         hqToggle.setToggleState (options.hqAllPlugins, n);
         warmUpToggle.setToggleState (options.pluginWarmUp, n);
@@ -604,6 +608,7 @@ private:
         if (! realtime) // (while real time is ticked these show what it uses: the offline choices stay as they were)
         {
             options.masterEffects = masterFxToggle.getToggleState();
+            options.insertEffects = insertFxToggle.getToggleState();
             options.hqAllPlugins = hqToggle.getToggleState();
             options.pluginWarmUp = warmUpToggle.getToggleState();
             options.disableMaxPolyphony = polyToggle.getToggleState();
@@ -631,7 +636,7 @@ private:
         loopsBox.setEnabled (! realtime);
         // a real-time bounce (round 165c): the device's rate, the song or the selection once, the Master's effects, the
         // playback quality, no stems — the controls it doesn't use are off
-        for (auto* c : std::initializer_list<juce::Component*> { &rateBox, &stemsBox, &masterFxToggle, &hqToggle, &polyToggle, &warmUpToggle })
+        for (auto* c : std::initializer_list<juce::Component*> { &rateBox, &stemsBox, &masterFxToggle, &insertFxToggle, &hqToggle, &polyToggle, &warmUpToggle })
             c->setEnabled (! realtime);
         stemsBox.setEnabled (! realtime && onlyTracks.empty()); // a list of tracks locks the stem choice
         rangeBox.setItemEnabled (2, ! realtime);
@@ -639,6 +644,7 @@ private:
             // the boxes show what the export will use: real time = the Master's effects, the playback quality
             const auto used = realtime ? ExportJob::realtimeOptions (options, engine.getTransport().sampleRate.load()) : options;
             masterFxToggle.setToggleState (used.masterEffects, juce::dontSendNotification);
+            insertFxToggle.setToggleState (used.insertEffects, juce::dontSendNotification);
             hqToggle.setToggleState (used.hqAllPlugins, juce::dontSendNotification);
             warmUpToggle.setToggleState (used.pluginWarmUp, juce::dontSendNotification);
             polyToggle.setToggleState (used.disableMaxPolyphony, juce::dontSendNotification);
@@ -803,7 +809,7 @@ private:
     Segmented formatButtons { { "WAV", "MP3", "OGG", "FLAC" } };
     juce::Label depthLabel, bitrateLabel, compressionLabel, rateLabel, channelsLabel, ditherLabel;
     juce::ComboBox depthBox, mp3Box, oggBox, flacLevelBox, rateBox, channelsBox, ditherBox;
-    juce::ToggleButton normalizeToggle, masterFxToggle, trimToggle, hqToggle, showToggle, polyToggle, warmUpToggle, realtimeToggle;
+    juce::ToggleButton normalizeToggle, masterFxToggle, insertFxToggle, trimToggle, hqToggle, showToggle, polyToggle, warmUpToggle, realtimeToggle;
     bool realtime = false; // "Render through the hardware in real time" (round 165c; not remembered: it takes the song's length)
     juce::Label alsoLabel;
     std::array<juce::ToggleButton, 4> alsoToggles;

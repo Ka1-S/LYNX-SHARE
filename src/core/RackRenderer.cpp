@@ -1137,6 +1137,104 @@ void RackState::slotsOfTarget (const Song& song, const AutomationTarget& target,
         }
 }
 
+MixerMatrix mixerMatrix (const MixerTrack& track, float volume, float pan, bool triangular) noexcept
+{
+    // FL keeps the fader as an int (12800 = 0 dB), the pan ±6400 and the separation ±64; LYNX keeps them /16000,
+    // /6400 and /64. Float arithmetic as FL's, the circular kernel in x87 extended precision (flvp::panLaw).
+    const auto x = std::clamp (volume, 0.0f, 1.0f) * 1.25f;
+    const auto p = std::clamp (pan, -1.0f, 1.0f);
+    const auto sep = std::clamp (track.stereo, -1.0f, 1.0f);
+    MixerMatrix m;
+    if (x == 1.0f && p == 0.0f && sep == 0.0f) // FL's fast path: exactly unity
+    {
+        m.ll = m.rr = track.invertPhase ? -1.0f : 1.0f;
+        m.rl = m.lr = 0.0f;
+    }
+    else if (x == 0.0f)
+        m = { 0.0f, 0.0f, 0.0f, 0.0f };
+    else
+    {
+        constexpr float ln11 = 2.3978953f, sqrt2 = 1.4142135f, sin45 = 0.70710677f;
+        auto g = x == 1.0f ? 1.0f : (float) ((std::exp ((double) (x * ln11)) - 1.0) * (double) 0.1f);
+        if (track.invertPhase)
+            g = -g;
+        float gl, gr;
+        if (triangular) // FUN_006a39c0: the louder side keeps the level
+        {
+            const auto v = g * sqrt2 * sin45;
+            if (std::signbit (p))
+                gl = v, gr = (p + 1.0f) * v;
+            else
+                gr = v, gl = (1.0f - p) * v;
+        }
+        else
+            flvp::panLaw (p, g * sqrt2, gl, gr);
+        float fl = 0.0f, fr = 0.0f; // the share of each side that folds into the other
+        if (p != 0.0f)
+        {
+            if (p < 0.0f)
+                fl = 1.0f - gr / g;
+            else
+                fr = 1.0f - gl / g;
+        }
+        if (sep != 0.0f)
+        {
+            // narrowing (5^s − 1)/4 (up to mono), widening linear (−1: side ×2)
+            const auto s = sep < 0.0f ? sep : (float) (std::exp ((double) sep * std::log (5.0)) - 1.0) * 0.25f;
+            fl = std::min (fl + s, 1.0f);
+            fr = std::min (fr + s, 1.0f);
+        }
+        m.rl = gl * fl * 0.5f;
+        m.ll = gl * (1.0f - fl * 0.5f);
+        m.lr = gr * fr * 0.5f;
+        m.rr = gr * (1.0f - fr * 0.5f);
+    }
+    if (track.swapChannels) // the outputs trade places
+        m = { m.lr, m.rr, m.ll, m.rl };
+    return m;
+}
+
+namespace
+{
+// The matrix over a block, each coefficient gliding toward its target by at most 0.001 per sample (FL's fader / pan
+// glide, REA_rodada85 §3; the folded terms glide the same way). `from` = the previous block's matrix (NaN: none).
+// The output may be the input. Returns the matrix reached.
+MixerMatrix applyMatrix (const float* inL, const float* inR, float* outL, float* outR, int n, MixerMatrix from,
+                         const MixerMatrix& to) noexcept
+{
+    if (std::isnan (from.ll))
+        from = to;
+    constexpr float step = 0.001f;
+    auto toward = [] (float g, float target) { return target > g ? std::min (target, g + step) : std::max (target, g - step); };
+    auto m = from;
+    int i = 0;
+    for (; i < n && ! (m == to); ++i)
+    {
+        m = { toward (m.ll, to.ll), toward (m.rl, to.rl), toward (m.lr, to.lr), toward (m.rr, to.rr) };
+        const auto a = inL[i], b = inR[i];
+        outL[i] = m.ll * a + m.rl * b;
+        outR[i] = m.rr * b + m.lr * a;
+    }
+    if (i < n)
+    {
+        if (m.rl == 0.0f && m.lr == 0.0f) // no fold: two gains (the common case)
+            for (int k = i; k < n; ++k)
+            {
+                outL[k] = inL[k] * m.ll;
+                outR[k] = inR[k] * m.rr;
+            }
+        else
+            for (int k = i; k < n; ++k)
+            {
+                const auto a = inL[k], b = inR[k];
+                outL[k] = m.ll * a + m.rl * b;
+                outR[k] = m.rr * b + m.lr * a;
+            }
+    }
+    return m;
+}
+} // namespace
+
 namespace
 {
 // Constant-power pan: at center both sides are 1 (0 dB).
@@ -2222,6 +2320,15 @@ void RackRenderer::process (const RackState* state,
 
     // started playing or jumped: audio clips in progress must start mid-way
     resumeAudio = playing && (! wasPlaying || jumped);
+    // FL's "Play truncated notes on transport": at the start of playback the notes already sounding there play
+    chaseNotes = playing && ! wasPlaying && playTruncatedOnTransport;
+    // FL's "Reset plugins on transport" (FUN_011e7a10 → FUN_011c8a40 mode 2 → every plugin's reset): the effects'
+    // tails and buffers are cleared when playback starts or jumps
+    if (resetPluginsOnTransport && playing && (! wasPlaying || jumped))
+        for (auto& slots : state->effects)
+            for (auto& effect : slots)
+                if (effect != nullptr)
+                    effect->reset();
     wasPlaying = playing;
     // tempo automation: the tempo holds for the whole block (evaluated at its start)
     bpm = tempoOverride > 0.0 ? tempoOverride : state->song.bpm;
@@ -2354,6 +2461,7 @@ void RackRenderer::process (const RackState* state,
         liveInputOffset = done;
         processChunk (*state, playing, startTick + done * tps, n, left + done, right + done, meters);
         resumeAudio = false;
+        chaseNotes = false;
         done += n;
     }
     publishSoundingKeys ((int) state->song.channels.size());
@@ -2702,7 +2810,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     if (songPlaying)
     {
         scheduleSong (song, startTick, numSamples, ticksPerSample (bpm, sampleRate), events, resumeAudio, &state.schedule,
-                      liveInput == nullptr || ! liveInput->linearSong.load (std::memory_order_relaxed));
+                      liveInput == nullptr || ! liveInput->linearSong.load (std::memory_order_relaxed), chaseNotes);
     }
     // Performance mode (round 165m): the launched clips, on the Player's steady clock (the transport's ticks from
     // where playback started, never wrapping with the song loop)
@@ -2732,7 +2840,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         const auto patternIndex = std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1);
         const auto& pattern = song.patterns[(std::size_t) patternIndex];
         schedulePatternLoop (pattern, pattern.effectiveLength (song.beatsPerBar), startTick, numSamples,
-                             ticksPerSample (bpm, sampleRate), events, song.swing, &song.channels);
+                             ticksPerSample (bpm, sampleRate), events, song.swing, &song.channels, chaseNotes);
     }
 
     // FL's wrapper "Output port" (round 149): the notes a plugin sent out in the previous chunk play the plugins on
@@ -3037,104 +3145,6 @@ void RackRenderer::mixHardwareOutputs (const RackState& state, int n) noexcept
         addToOutput (l, r, route.mode, a, b, n);
     }
 }
-
-MixerMatrix mixerMatrix (const MixerTrack& track, float volume, float pan, bool triangular) noexcept
-{
-    // FL keeps the fader as an int (12800 = 0 dB), the pan ±6400 and the separation ±64; LYNX keeps them /16000,
-    // /6400 and /64. Float arithmetic as FL's, the circular kernel in x87 extended precision (flvp::panLaw).
-    const auto x = std::clamp (volume, 0.0f, 1.0f) * 1.25f;
-    const auto p = std::clamp (pan, -1.0f, 1.0f);
-    const auto sep = std::clamp (track.stereo, -1.0f, 1.0f);
-    MixerMatrix m;
-    if (x == 1.0f && p == 0.0f && sep == 0.0f) // FL's fast path: exactly unity
-    {
-        m.ll = m.rr = track.invertPhase ? -1.0f : 1.0f;
-        m.rl = m.lr = 0.0f;
-    }
-    else if (x == 0.0f)
-        m = { 0.0f, 0.0f, 0.0f, 0.0f };
-    else
-    {
-        constexpr float ln11 = 2.3978953f, sqrt2 = 1.4142135f, sin45 = 0.70710677f;
-        auto g = x == 1.0f ? 1.0f : (float) ((std::exp ((double) (x * ln11)) - 1.0) * (double) 0.1f);
-        if (track.invertPhase)
-            g = -g;
-        float gl, gr;
-        if (triangular) // FUN_006a39c0: the louder side keeps the level
-        {
-            const auto v = g * sqrt2 * sin45;
-            if (std::signbit (p))
-                gl = v, gr = (p + 1.0f) * v;
-            else
-                gr = v, gl = (1.0f - p) * v;
-        }
-        else
-            flvp::panLaw (p, g * sqrt2, gl, gr);
-        float fl = 0.0f, fr = 0.0f; // the share of each side that folds into the other
-        if (p != 0.0f)
-        {
-            if (p < 0.0f)
-                fl = 1.0f - gr / g;
-            else
-                fr = 1.0f - gl / g;
-        }
-        if (sep != 0.0f)
-        {
-            // narrowing (5^s − 1)/4 (up to mono), widening linear (−1: side ×2)
-            const auto s = sep < 0.0f ? sep : (float) (std::exp ((double) sep * std::log (5.0)) - 1.0) * 0.25f;
-            fl = std::min (fl + s, 1.0f);
-            fr = std::min (fr + s, 1.0f);
-        }
-        m.rl = gl * fl * 0.5f;
-        m.ll = gl * (1.0f - fl * 0.5f);
-        m.lr = gr * fr * 0.5f;
-        m.rr = gr * (1.0f - fr * 0.5f);
-    }
-    if (track.swapChannels) // the outputs trade places
-        m = { m.lr, m.rr, m.ll, m.rl };
-    return m;
-}
-
-namespace
-{
-// The matrix over a block, each coefficient gliding toward its target by at most 0.001 per sample (FL's fader / pan
-// glide, REA_rodada85 §3; the folded terms glide the same way). `from` = the previous block's matrix (NaN: none).
-// The output may be the input. Returns the matrix reached.
-MixerMatrix applyMatrix (const float* inL, const float* inR, float* outL, float* outR, int n, MixerMatrix from,
-                         const MixerMatrix& to) noexcept
-{
-    if (std::isnan (from.ll))
-        from = to;
-    constexpr float step = 0.001f;
-    auto toward = [] (float g, float target) { return target > g ? std::min (target, g + step) : std::max (target, g - step); };
-    auto m = from;
-    int i = 0;
-    for (; i < n && ! (m == to); ++i)
-    {
-        m = { toward (m.ll, to.ll), toward (m.rl, to.rl), toward (m.lr, to.lr), toward (m.rr, to.rr) };
-        const auto a = inL[i], b = inR[i];
-        outL[i] = m.ll * a + m.rl * b;
-        outR[i] = m.rr * b + m.lr * a;
-    }
-    if (i < n)
-    {
-        if (m.rl == 0.0f && m.lr == 0.0f) // no fold: two gains (the common case)
-            for (int k = i; k < n; ++k)
-            {
-                outL[k] = inL[k] * m.ll;
-                outR[k] = inR[k] * m.rr;
-            }
-        else
-            for (int k = i; k < n; ++k)
-            {
-                const auto a = inL[k], b = inR[k];
-                outL[k] = m.ll * a + m.rl * b;
-                outR[k] = m.rr * b + m.lr * a;
-            }
-    }
-    return m;
-}
-} // namespace
 
 void RackRenderer::mixLiveInput (const RackState& state, bool playing, int n) noexcept
 {

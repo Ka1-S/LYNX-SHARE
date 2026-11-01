@@ -1377,4 +1377,15 @@ Song Song::makeDefault()
 
     return song;
 }
+int firstChannelWithNotes (const Song& song, int pattern) noexcept
+{
+    if (pattern < 0 || pattern >= (int) song.patterns.size())
+        return -1;
+    int first = -1;
+    for (const auto& n : song.patterns[(std::size_t) pattern].notes)
+        if (n.channel >= 0 && n.channel < (int) song.channels.size() && (first < 0 || n.channel < first))
+            first = n.channel;
+    return first;
+}
+
 } // namespace lynx

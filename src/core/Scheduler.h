@@ -90,7 +90,11 @@ void schedulePatternLoop (const Pattern& pattern,
                           double ticksPerSampleValue,
                           EventBuffer& out,
                           float swing = 0.0f,
-                          const std::vector<ChannelDef>* channels = nullptr) noexcept;
+                          const std::vector<ChannelDef>* channels = nullptr,
+                          bool chase = false) noexcept;
+// `chase` (both schedulers): playback starts at startTick and FL's Settings › Audio › "Play truncated notes on
+// transport" is on (FLEngine FUN_011e7470, REA_rodada167j §2): the notes that started before startTick and still
+// sound there start on the block's first sample, with what is left of their length.
 // The range the transport loops over: in Song mode the Playlist's loop region, or else the whole song (FL plays the
 // song in a loop: at its end the position goes back to the start, issue #4). Pattern mode: none (end <= start); the
 // pattern loop is the position modulo the pattern length.
@@ -140,7 +144,8 @@ void scheduleSong (const Song& song,
                    EventBuffer& out,
                    bool resume = false,
                    const ScheduleIndex* index = nullptr,
-                   bool wrap = true) noexcept;
+                   bool wrap = true,
+                   bool chase = false) noexcept;
 // One clip played once where it is (no song loop), its events in the block (not sorted): Performance mode's passes.
 void scheduleSingleClip (const Song& song, const Clip& clip, std::size_t clipIndex, double startTick, int numSamples, double tps,
                          EventBuffer& out, const ScheduleIndex* index = nullptr) noexcept;

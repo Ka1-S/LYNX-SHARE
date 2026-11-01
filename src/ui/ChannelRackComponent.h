@@ -50,6 +50,8 @@ public:
 
     // Settings > "Keep channel editors open": opening an editor never closes the previous one.
     static bool keepEditorsOpen;
+    // FL's "Select first channel with notes when the pattern changes" (Settings › General; REA round 167j §5)
+    static bool selectFirstChannelWithNotes;
 
     void paint (juce::Graphics& g) override;
     void mouseDown (const juce::MouseEvent& e) override;

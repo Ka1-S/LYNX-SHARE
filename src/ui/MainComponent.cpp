@@ -1491,6 +1491,8 @@ void MainComponent::loadUiSettings()
             typingPiano = on;
         else if (key == "keepEditorsOpen")
             ChannelRackComponent::keepEditorsOpen = on;
+        else if (key == "selFirstChanPatChanges")
+            ChannelRackComponent::selectFirstChannelWithNotes = on;
         else if (key == "waveSpectral") // ("waveColours", the old spectral-by-default key, is ignored)
             ui::WaveformCache::spectral = on;
         else if (key == "pluginStyle") // "Automatic" or a style forced on every plugin
@@ -1544,6 +1546,10 @@ void MainComponent::loadUiSettings()
             engine.getTransport().metronomeSound.store (metronome::clampSound (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue()));
         else if (key == "metronomeTrack")
             engine.getTransport().metronomeTrack.store (juce::jlimit (0, maxMixerTracks - 1, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue()));
+        else if (key == "playTruncatedOnTransport")
+            engine.getTransport().playTruncatedOnTransport.store (on);
+        else if (key == "resetPluginsOnTransport")
+            engine.getTransport().resetPluginsOnTransport.store (on);
         else if (key == "metronomeVolume")
             engine.getTransport().metronomeVolume.store ((float) controls::clampUtilityVolume (line.fromFirstOccurrenceOf ("=", false, false).trim().getDoubleValue()));
         else if (key == "previewVolume")
@@ -1612,7 +1618,9 @@ void MainComponent::saveUiSettings()
         return;
 
     uiSettingsFile().replaceWithText ("typingPiano=" + juce::String (typingPiano ? 1 : 0) + "\nkeepEditorsOpen="
-                                      + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0) + "\neditPatternsIn="
+                                      + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
+                                      + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
+                                      + "\neditPatternsIn="
                                       + juce::String (PlaylistComponent::editPatternsIn) + "\nsplash=" + juce::String (startup.splash ? 1 : 0)
                                       + "\nstartupSound=" + juce::String (startup.sound ? 1 : 0)
                                       + "\nwaveSpectral=" + juce::String (ui::WaveformCache::spectral ? 1 : 0)
@@ -1640,6 +1648,8 @@ void MainComponent::saveUiSettings()
                                       + "\nmetronomeVolume=" + juce::String (engine.getTransport().metronomeVolume.load(), 2)
                                       + "\nmetronomeSoundFl=" + juce::String (metronome::clampSound (engine.getTransport().metronomeSound.load()))
                                       + "\nmetronomeTrack=" + juce::String (engine.getTransport().metronomeTrack.load())
+                                      + "\nplayTruncatedOnTransport=" + juce::String (engine.getTransport().playTruncatedOnTransport.load() ? 1 : 0)
+                                      + "\nresetPluginsOnTransport=" + juce::String (engine.getTransport().resetPluginsOnTransport.load() ? 1 : 0)
                                       + "\npreviewVolume=" + juce::String (engine.getPreviewVolume(), 2)
                                       + "\neditorVolume=" + juce::String (engine.getEditorVolume(), 2)
                                       + "\nrackPianoRollView=" + juce::String (rack.isPianoRollView() ? 1 : 0)
@@ -2788,6 +2798,15 @@ void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
     }
 
     const auto& song = engine.getSong();
+    // FL's "Select first channel with notes when the pattern changes" (Settings › General, REA round 167j §5)
+    if (song.currentPattern != lastCurrentPattern)
+    {
+        const auto changedPattern = lastCurrentPattern >= 0;
+        lastCurrentPattern = song.currentPattern;
+        if (changedPattern && ChannelRackComponent::selectFirstChannelWithNotes)
+            if (const auto first = firstChannelWithNotes (song, song.currentPattern); first >= 0 && first != engine.getSelectedChannel())
+                engine.setSelectedChannel (first);
+    }
     bool namesChanged = patternBox.getNumItems() != (int) song.patterns.size();
 
     for (int i = 0; ! namesChanged && i < patternBox.getNumItems(); ++i)
@@ -4071,6 +4090,7 @@ void MainComponent::openSettings (int page)
         o.scanAtStart = backgroundScanAtStart();
         o.typingPiano = safe->typingPiano;
         o.keepEditorsOpen = ChannelRackComponent::keepEditorsOpen;
+        o.selectFirstChannelWithNotes = ChannelRackComponent::selectFirstChannelWithNotes;
         o.rememberSeek = EditorGlobals::get().rememberSeek;
         o.editPatternsIn = PlaylistComponent::editPatternsIn;
         o.undoLevels = safe->engine.getUndoLevels();
@@ -4132,6 +4152,7 @@ void MainComponent::openSettings (int page)
             crashreporter::setConsent ((crashreport::Consent) juce::jlimit (0, 2, o.crashReports));
         updater::setAutomatic (o.checkUpdates);
         ChannelRackComponent::keepEditorsOpen = o.keepEditorsOpen;
+        ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
         EditorGlobals::get().rememberSeek = o.rememberSeek;
         PlaylistComponent::editPatternsIn = juce::jlimit (0, 2, o.editPatternsIn);
         self.startup.splash = o.splash;
