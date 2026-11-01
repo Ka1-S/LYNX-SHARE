@@ -7,6 +7,7 @@
 #include <tuple>
 
 #include "core/MidiControls.h"
+#include "core/MidiOut.h"
 
 namespace lynx::midiimport
 {
@@ -129,6 +130,56 @@ std::vector<Group> groups (const ParsedMidi& midi, const Options& o)
                         events.push_back ({ e.tick, value });
                 }
             }
+    // FL's import with MIDI Out channels (REA_rodada167i §1.6, FLEngine FUN_00e1d090): the controllers it knows go to
+    // the channel's volume / pan (CC 7 / 10: value × 100 of FL's 12800), to the MIDI Out's knobs (raw 0…127 on the
+    // knob's 0…127 range), program changes to its patch, the pitch bend to the bend; the other CCs are dropped
+    if (o.midiOut)
+        for (const auto& e : midi.events)
+        {
+            const auto type = e.status & 0xF0;
+            if ((type != 0xB0 && type != 0xC0 && type != 0xE0) || ! selectedTrack (o, e.track) || ! selectedChannel (o, e.status & 0x0F))
+                continue;
+            const auto key = o.perTrack ? e.track : (e.status & 0x0F);
+            const auto it = byKey.find (key);
+            if (it == byKey.end())
+                continue;
+            AutomationTarget target { AutomationTargetKind::channelParam, -1 };
+            float value = 0.0f;
+            if (type == 0xB0 && (e.data1 == 7 || e.data1 == 10))
+            {
+                target.kind = e.data1 == 7 ? AutomationTargetKind::channelVolume : AutomationTargetKind::channelPan;
+                value = std::clamp (e.data2 * 100.0f / 12800.0f, 0.0f, 1.0f);
+            }
+            else if (type == 0xB0)
+            {
+                target.param = midiout::importParamForCc (e.data1);
+                if (target.param < 0)
+                    continue;
+                value = (e.data2 & 127) / 127.0f;
+            }
+            else if (type == 0xC0)
+            {
+                target.param = midiout::programParam;
+                value = midiout::normalFromProgram ((e.data1 & 127) + 1);
+            }
+            else
+            {
+                target.param = midictl::pitchBendBase + (e.status & 0x0F);
+                value = (float) ((e.data1 & 127) | (e.data2 & 127) << 7) / 16383.0f;
+            }
+            auto& lanes = out[it->second].midiOutLanes;
+            auto lane = std::find_if (lanes.begin(), lanes.end(), [&] (const PatternEvents& l) { return l.target == target; });
+            if (lane == lanes.end())
+            {
+                lanes.push_back ({ target, {} });
+                lane = lanes.end() - 1;
+            }
+            if (! lane->events.empty() && lane->events.back().tick == e.tick)
+                lane->events.back().value = value; // one event per tick
+            else
+                lane->events.push_back ({ e.tick, value });
+        }
+
     // MIDI channel groups in channel order (FL), track groups in file order
     std::stable_sort (out.begin(), out.end(), [&] (const Group& a, const Group& b) {
         return o.perTrack ? a.track < b.track : a.midiChannel < b.midiChannel;
@@ -200,10 +251,11 @@ bool importInto (Song& song, const ParsedMidi& midi, const Options& o, const std
         c.name = g.name;
         if (o.midiOut)
         {
+            // FL's Data\System\MIDITrack.fst layout: the knobs its import fills (REA_rodada167i §1.6)
             c.instrument = InstrumentKind::midiOut;
-            midictl::MidiOutSettings settings;
-            settings.channel = g.midiChannel;
-            midictl::writeMidiOut (c.pluginState, settings);
+            auto state = midiout::importTrackState();
+            state.channel = g.midiChannel & 15;
+            c.pluginState = midiout::write (state);
         }
         else
         {
@@ -219,7 +271,14 @@ bool importInto (Song& song, const ParsedMidi& midi, const Options& o, const std
             n.start = std::max<std::int64_t> (0, n.start - shift);
             pattern.notes.push_back (n);
         }
-        addControllerLane (pattern, controllerTarget (o.controller, channel), g.controller, shift);
+        if (o.midiOut)
+            for (auto lane : g.midiOutLanes)
+            {
+                lane.target.index = channel;
+                addControllerLane (pattern, lane.target, lane.events, shift);
+            }
+        else
+            addControllerLane (pattern, controllerTarget (o.controller, channel), g.controller, shift);
     }
     pattern.sortNotes();
     song.patterns.push_back (std::move (pattern));

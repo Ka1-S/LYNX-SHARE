@@ -63,7 +63,7 @@ CORE="$CORE src/core/DynamicsSuite.cpp src/core/FabFilterStates.cpp"
 # LYNX's voice tools: Quell Denoiser, Gemini Doubler (round 119)
 CORE="$CORE src/core/VoiceTools.cpp"
 # MIDI CC automation of hosted plugins, Formula Controller (round 133, issue #3)
-CORE="$CORE src/core/MidiControls.cpp src/core/FormulaController.cpp"
+CORE="$CORE src/core/MidiControls.cpp src/core/MidiOut.cpp src/core/FormulaController.cpp"
 CORE="$CORE src/core/VoiceShift.cpp"
 # FL engines usable in native projects (round 142, issue #5)
 CORE="$CORE src/core/NativeEngines.cpp"

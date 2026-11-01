@@ -96,6 +96,8 @@ public:
     // Playback stopped: the held notes stop (hosted plugins may send "All Notes Off" or only those notes' note offs:
     // FL's wrapper option). The panic button: everything stops (a hosted plugin may also be reset).
     virtual void transportStopped() noexcept { allNotesOff(); }
+    // Playback started (FL resets its generators: a MIDI Out sends its bank, patch and controls again).
+    virtual void transportStarted() noexcept {}
     virtual void panic() noexcept { allNotesOff(); }
     // Channel settings (sampler, synth). UI thread, on every snapshot; the instrument stores them
     // so the audio thread can read without waiting.

@@ -12,11 +12,8 @@
 
 namespace lynx
 {
-// The FL instrument engines a native project can add (core/NativeEngines.h, round 142, issue #5) as items of `menu`:
-// a new one starts from the plugin's Default preset of the user's FL installation; without it the item is disabled
-// and says "(requires FL Studio)". `add` receives the new channel (mixerTrack left to it).
-void addFlEngineItems (juce::PopupMenu& menu, std::function<void (ChannelDef)> add);
-// The engine's menu name ("(beta)", "(requires FL Studio)")
+// The menu name of an FL instrument engine (core/NativeEngines.h, round 142, issue #5; the generator menus list them
+// through quickpick::generatorEntries) ("(beta)", "(requires FL Studio)")
 juce::String flEngineName (const natives::InstrumentEngine& e);
 
 // FL-style Channel Rack: one row per channel with mute, pan, volume, mixer insert, name, selector
@@ -197,7 +194,8 @@ private:
     bool cellHasNote (int channel, int step) const;
     void applyPaint (const juce::MouseEvent& e);
     void showChannelMenu (int channel);
-    void chooseSample (int channel); // channel < 0 = new channel
+    void chooseSample (int channel, int insertAt = -1); // channel < 0 = new channel (at the end, or at row insertAt)
+    void openNewGenerator (int row, InstrumentKind kind); // the window a new / replaced generator opens with
     void assignSample (int channel, const juce::File& file);
     void rename (int channel);
     void openPluginWindow (int channel);
