@@ -245,6 +245,7 @@ std::vector<Action> makeActions()
         // FL's mixer track menu keys (round 167k, the DFM's ShortCut values: F2, S, Alt+R, Shift+Alt+R)
         { "mixer.rename", TR_NOOP ("Rename and color the selected mixer track"), Context::mixer, { chord (f2) } },
         { "mixer.soloSelected", TR_NOOP ("Solo the selected mixer track(s)"), Context::mixer, { chord ('S') } },
+        { "mixer.altSoloSelected", TR_NOOP ("Alt solo the selected mixer track(s) (with the tracks that feed them)"), Context::mixer, { chord ('S', alt) } },
         { "mixer.renderArmed", TR_NOOP ("Disk recording: render the armed tracks to wave file(s)"), Context::mixer, { chord ('R', alt) } },
         { "mixer.renderSelected", TR_NOOP ("Disk recording: render the selected tracks to wave file(s)"), Context::mixer, { chord ('R', shift | alt) } },
         { "mixer.deleteEffect", TR_NOOP ("Delete the selected effect slot's plugin"), Context::mixer, { chord (del) } },

@@ -1926,11 +1926,13 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                     v.push_back (x);
             return v;
         }();
+        // FL's two solo items (REA_rodada167l §4): the plain one mutes the tracks feeding the soloed ones, the alt one
+        // keeps them; the same item again clears the solo
         menu.addItem (tr ("Solo selected track(s)") + "\tS", ! inserts.empty(), false, [this, inserts] {
-            engine.editSong ([inserts] (Song& s) {
-                for (std::size_t i = 1; i < s.mixer.size(); ++i)
-                    s.mixer[i].solo = std::find (inserts.begin(), inserts.end(), (int) i) != inserts.end();
-            });
+            engine.editSong ([inserts] (Song& s) { mixerops::soloSelected (s, inserts, false); });
+        });
+        menu.addItem (tr ("Alt solo selected track(s)") + "\tAlt+S", ! inserts.empty(), false, [this, inserts] {
+            engine.editSong ([inserts] (Song& s) { mixerops::soloSelected (s, inserts, true); });
         });
         menu.addItem (tr ("Arm selected track(s)"), ! inserts.empty(), false, [this, inserts] {
             for (auto x : inserts)
@@ -5012,6 +5014,8 @@ bool MixerComponent::runAction (const std::string& id)
         return strips.runMenuItem (tr ("Rename and color..."));
     else if (id == "mixer.soloSelected")
         return strips.runMenuItem (tr ("Solo selected track(s)"));
+    else if (id == "mixer.altSoloSelected")
+        return strips.runMenuItem (tr ("Alt solo selected track(s)"));
     else if (id == "mixer.renderArmed")
         return strips.runMenuItem (tr ("Render armed tracks to wave file(s)..."));
     else if (id == "mixer.renderSelected")

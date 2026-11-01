@@ -24,6 +24,16 @@ enum : std::uint32_t
     evChannelFxFlags = 0x46,    // u16: Sampler › Precomputed: bit 0 fade stereo, 1 reverse, 2 clip, 8 swap stereo (REA round 167h §1)
     evChannelFadeIn = 0x4C,     // u16: Precomputed › fade in (0…1024)
     evChannelFadeOut = 0x4B,    // u16: Precomputed › fade out (0…1024)
+    evChannelBoost = 0x4A,      // u16: legacy precomputed boost 0…256 (REA round 167l §1)
+    evChannelEq = 0x45,         // u16: legacy "FX" / EQ 0…256 (128 = flat)
+    evChannelRingMod = 0x83,    // u32: legacy ring modulation mix (low 16 bits) | frequency << 16
+    evChannelStereoDelay = 0x55, // u16: legacy stereo delay 0…4096 (2048 = none)
+    evChannelCutoff = 0x47,     // u16: legacy low-pass cutoff 16…1024 (1024 = off)
+    evChannelResonance = 0x53,  // u16: legacy low-pass resonance 0…640
+    evChannelReverb = 0x8B,     // u32: legacy reverb (low 16 bits) | its type << 16
+    evChannelPogo = 0x56,       // u16: legacy "FX3" / pogo 0…512 (256 = none)
+    evChannelSoloLock = 0x20,   // u8: the channel's "Lock active/mute state" (REA round 167l §5)
+    evChannelGhost = 0x32,      // u8: the channel's ghost notes shown in the Piano Roll (FUN_00e568b0 writes +0x1fc; REA round 167l §5)
     evSampleFlags = 0x8F,       // u32: bit 0 resample, 1 load regions, 2 load ACID markers, 3 use loop points, 8 keep on disk
     evSampleLoopPointsOld = 0x13, // (older files) "use loop points" on
     evSamplePingPong = 0x14,    // u8: Sampler › Ping pong loop
@@ -550,6 +560,62 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
             case evChannelFadeOut:
                 if (section == Section::channel)
                     channel().fadeOut = (int) e.value;
+                break;
+
+            case evChannelBoost:
+                if (section == Section::channel)
+                    channel().boost = (int) e.value;
+                break;
+
+            case evChannelEq:
+                if (section == Section::channel)
+                    channel().eq = (int) e.value;
+                break;
+
+            case evChannelRingMod:
+                if (section == Section::channel)
+                {
+                    channel().ringMix = (int) (e.value & 0xffff);
+                    channel().ringFreq = (int) ((e.value >> 16) & 0xffff);
+                }
+                break;
+
+            case evChannelStereoDelay:
+                if (section == Section::channel)
+                    channel().stereoDelay = (int) e.value;
+                break;
+
+            case evChannelCutoff:
+                if (section == Section::channel)
+                    channel().cutoff = (int) e.value;
+                break;
+
+            case evChannelResonance:
+                if (section == Section::channel)
+                    channel().resonance = (int) e.value;
+                break;
+
+            case evChannelReverb:
+                if (section == Section::channel)
+                {
+                    channel().reverb = (int) (e.value & 0xffff);
+                    channel().reverbType = (int) ((e.value >> 16) & 0xffff);
+                }
+                break;
+
+            case evChannelPogo:
+                if (section == Section::channel)
+                    channel().pogo = (int) e.value;
+                break;
+
+            case evChannelSoloLock:
+                if (section == Section::channel)
+                    channel().soloLock = e.value != 0;
+                break;
+
+            case evChannelGhost:
+                if (section == Section::channel)
+                    channel().ghostShown = e.value != 0;
                 break;
 
             case evSampleFlags:

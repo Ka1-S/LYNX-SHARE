@@ -1724,8 +1724,45 @@ public:
         declick.setTooltip (tr ("How fast a cut note fades out: 10 ms (out only, transient no bleeding), 20 ms (transient, generic), 100 ms (smooth), 200 ms (crossfade)"));
         declick.onChange = [this] { apply(); };
         addAndMakeVisible (declick);
+
+        // FL's legacy effects page (REA_rodada167l §1): FL's knob ranges, defaults and hints
+        legacyHeader.setText (tr ("Legacy effects"), juce::dontSendNotification);
+        legacyHeader.setFont (juce::FontOptions (13.0f, juce::Font::bold));
+        addAndMakeVisible (legacyHeader);
+        const std::tuple<juce::Slider*, juce::Label*, const char*, const char*, double, double, double> legacy[] = {
+            { &boost, &boostLabel, TR_NOOP ("Boost"), TR_NOOP ("Boosts the gain"), 0.0, 256.0, 0.0 },
+            { &eq, &eqLabel, TR_NOOP ("EQ"), TR_NOOP ("Shifts the frequency balance"), 0.0, 256.0, 128.0 },
+            { &ringMix, &ringMixLabel, TR_NOOP ("RM mix"), TR_NOOP ("Ring modulation mix"), 0.0, 256.0, 0.0 },
+            { &ringFreq, &ringFreqLabel, TR_NOOP ("RM freq"), TR_NOOP ("Ring modulation frequency"), 0.0, 256.0, 128.0 },
+            { &pogo, &pogoLabel, TR_NOOP ("Pogo"), TR_NOOP ("Pogo effect"), 0.0, 512.0, 256.0 },
+            { &cutoff, &cutoffLabel, TR_NOOP ("Cut"), TR_NOOP ("Filter cutoff"), 16.0, 1024.0, 1024.0 },
+            { &resonance, &resonanceLabel, TR_NOOP ("Res"), TR_NOOP ("Filter resonance"), 0.0, 640.0, 0.0 },
+            { &stereoDelay, &stereoDelayLabel, TR_NOOP ("Stereo delay"), TR_NOOP ("Stereo delay"), 0.0, 4096.0, 2048.0 },
+            { &reverbAmount, &reverbLabel, TR_NOOP ("Reverb"), TR_NOOP ("Reverb amount"), 0.0, 256.0, 0.0 } };
+        for (auto [k, label, text, hint, lo, hi, def] : legacy)
+        {
+            k->setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+            k->setTextBoxStyle (juce::Slider::TextBoxBelow, false, 56, 18);
+            k->setRange (lo, hi, 1.0);
+            k->setValue (def, juce::dontSendNotification);
+            k->setDoubleClickReturnValue (true, def);
+            k->setTooltip (tr (hint));
+            k->onValueChange = [this] { apply(); };
+            addAndMakeVisible (k);
+            label->setText (tr (text), juce::dontSendNotification);
+            label->setJustificationType (juce::Justification::centred);
+            addAndMakeVisible (label);
+        }
+        reverbType.addItemList ({ tr ("Type 1"), tr ("Type 2") }, 1);
+        reverbType.setTooltip (tr ("Reverb type"));
+        reverbType.onChange = [this] { apply(); };
+        addAndMakeVisible (reverbType);
+        clip.setButtonText (tr ("Clip"));
+        clip.setTooltip (tr ("Add clipping at 0dB"));
+        clip.onClick = [this] { apply(); };
+        addAndMakeVisible (clip);
         load();
-        setSize (420, 330);
+        setSize (500, 560);
     }
 
     void resized() override
@@ -1750,6 +1787,26 @@ public:
         auto row = area.removeFromTop (26);
         declickLabel.setBounds (row.removeFromLeft (140));
         declick.setBounds (row.removeFromLeft (220));
+
+        area.removeFromTop (14);
+        legacyHeader.setBounds (area.removeFromTop (20));
+        auto layoutRow = [] (juce::Rectangle<int> r, std::initializer_list<std::pair<juce::Slider*, juce::Label*>> knobs) {
+            const auto w = r.getWidth() / 5;
+            for (auto [k, label] : knobs)
+            {
+                auto column = r.removeFromLeft (w);
+                label->setBounds (column.removeFromTop (18));
+                k->setBounds (column);
+            }
+            return r;
+        };
+        layoutRow (area.removeFromTop (96), { { &boost, &boostLabel }, { &eq, &eqLabel }, { &ringMix, &ringMixLabel }, { &ringFreq, &ringFreqLabel }, { &pogo, &pogoLabel } });
+        area.removeFromTop (6);
+        auto last = layoutRow (area.removeFromTop (96), { { &cutoff, &cutoffLabel }, { &resonance, &resonanceLabel }, { &stereoDelay, &stereoDelayLabel }, { &reverbAmount, &reverbLabel } });
+        last.removeFromTop (22);
+        reverbType.setBounds (last.removeFromTop (24).reduced (4, 0));
+        last.removeFromTop (8);
+        clip.setBounds (last.removeFromTop (24).reduced (4, 0));
     }
 
 private:
@@ -1771,6 +1828,17 @@ private:
         fadeOut.setValue (p.fadeOut, juce::dontSendNotification);
         crossfade.setValue (p.crossfade, juce::dontSendNotification);
         trim.setValue (p.trim, juce::dontSendNotification);
+        boost.setValue (p.boost, juce::dontSendNotification);
+        eq.setValue (p.eq, juce::dontSendNotification);
+        ringMix.setValue (p.ringMix, juce::dontSendNotification);
+        ringFreq.setValue (p.ringFreq, juce::dontSendNotification);
+        pogo.setValue (p.pogo, juce::dontSendNotification);
+        cutoff.setValue (p.cutoff, juce::dontSendNotification);
+        resonance.setValue (p.resonance, juce::dontSendNotification);
+        stereoDelay.setValue (p.stereoDelay, juce::dontSendNotification);
+        reverbAmount.setValue (p.reverb, juce::dontSendNotification);
+        reverbType.setSelectedId (p.reverbType == 0 ? 1 : 2, juce::dontSendNotification);
+        clip.setToggleState (p.clip, juce::dontSendNotification);
         declick.setSelectedId (juce::jlimit (0, 5, c->sampler.declickMode) + 1, juce::dontSendNotification);
     }
 
@@ -1789,6 +1857,17 @@ private:
         p.fadeOut = (int) fadeOut.getValue();
         p.crossfade = (int) crossfade.getValue();
         p.trim = (int) trim.getValue();
+        p.boost = (int) boost.getValue();
+        p.eq = (int) eq.getValue();
+        p.ringMix = (int) ringMix.getValue();
+        p.ringFreq = (int) ringFreq.getValue();
+        p.pogo = (int) pogo.getValue();
+        p.cutoff = (int) cutoff.getValue();
+        p.resonance = (int) resonance.getValue();
+        p.stereoDelay = (int) stereoDelay.getValue();
+        p.reverb = (int) reverbAmount.getValue();
+        p.reverbType = reverbType.getSelectedId() == 1 ? 0 : 1;
+        p.clip = clip.getToggleState();
         const auto loops = useLoops.getToggleState();
         const auto mode = juce::jlimit (0, 5, declick.getSelectedId() - 1);
         const auto* c = ref.get (engine);
@@ -1808,6 +1887,11 @@ private:
     juce::Slider fadeIn, fadeOut, crossfade, trim;
     juce::Label fadeInLabel, fadeOutLabel, crossfadeLabel, trimLabel, declickLabel;
     juce::ComboBox declick;
+    juce::Label legacyHeader;
+    juce::Slider boost, eq, ringMix, ringFreq, pogo, cutoff, resonance, stereoDelay, reverbAmount;
+    juce::Label boostLabel, eqLabel, ringMixLabel, ringFreqLabel, pogoLabel, cutoffLabel, resonanceLabel, stereoDelayLabel, reverbLabel;
+    juce::ComboBox reverbType;
+    juce::ToggleButton clip;
 };
 
 class SettingsPanel final : public juce::Component,

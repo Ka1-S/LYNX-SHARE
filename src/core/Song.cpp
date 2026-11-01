@@ -574,9 +574,12 @@ std::vector<bool> Song::soloAudible() const
                     stack.push_back (target);
     }
 
-    // upstream: whoever feeds the soloed tracks
+    // upstream: whoever feeds the soloed tracks (those soloed with their sources: FL's plain solo leaves them out)
     std::vector<bool> feeds (n, false);
-    stack = soloed;
+    stack.clear();
+    for (auto t : soloed)
+        if (mixer[(std::size_t) t].soloSources)
+            stack.push_back (t);
 
     while (! stack.empty())
     {

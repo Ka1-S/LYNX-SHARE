@@ -36,6 +36,12 @@ public:
     void configure (const prefs::MidiPrefs& prefs, bool devices = true, bool dryRun = false);
     // message / render thread: CC 123 (All Notes Off) and CC 64 = 0 on the 16 channels of every output with the option
     void sendAllNotesOff();
+    // audio thread: the transport was set to a new position with "Reset plugins on transport" on. FL then sends CC 123
+    // (All Notes Off, no CC 64) on the 16 channels of every output with "Send all notes off" (FUN_011e7a10 →
+    // FUN_011c89c0, REA_rodada167l §6); the sender thread sends it (the audio thread never touches a device).
+    void requestTransportNotesOff() noexcept;
+    // tests: how many outputs got the transport's CC 123 burst (devices or dry run)
+    std::uint64_t transportNotesOffSent() const noexcept { return transportNotesOffCount.load(); }
 
     // --- audio thread ---
     void deviceStarted (double sampleRate, int bufferSize, int outputLatencySamples) noexcept;
@@ -91,7 +97,11 @@ private:
     };
     std::array<Slot, maxOutputs> slots;
     juce::CriticalSection outputLock;        // the devices (message, sender, render threads; never the audio thread)
-    std::atomic<bool> anySync { false }, dry { false };
+    std::atomic<bool> anySync { false }, dry { false }, anyNotesOff { false };
+    std::atomic<std::uint32_t> notesOffRequests { 0 };
+    std::uint32_t notesOffHandled = 0;       // sender thread
+    std::atomic<std::uint64_t> transportNotesOffCount { 0 };
+    void sendTransportNotesOff();            // sender thread
 
     // timing: the device block clock mapped to milliseconds (smoothed: callbacks wake up with jitter)
     double sampleRate = 44100.0, latencyMs = 0.0;

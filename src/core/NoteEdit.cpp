@@ -699,6 +699,20 @@ void soloTrack (Song& song, int track, int trackCount)
     for (int t = 0; t < (int) h.size(); ++t)
         h[(std::size_t) t].muted = alone ? false : t != track;
 }
+void soloChannel (Song& song, int channel)
+{
+    auto& c = song.channels;
+    if (channel < 0 || channel >= (int) c.size())
+        return;
+    auto alone = ! c[(std::size_t) channel].muted;
+    for (int i = 0; i < (int) c.size() && alone; ++i)
+        if (i != channel && ! c[(std::size_t) i].soloLock && ! c[(std::size_t) i].muted)
+            alone = false;
+    for (int i = 0; i < (int) c.size(); ++i)
+        if (i == channel || ! c[(std::size_t) i].soloLock)
+            c[(std::size_t) i].muted = alone ? false : i != channel;
+}
+
 // --- track groups ------------------------------------------------------------------------------------
 
 namespace
