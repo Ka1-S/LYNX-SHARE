@@ -6226,3 +6226,4 @@ countries: kr
 "Mixer presets" = "믹서 프리셋"
 "Mixer presets (FL)" = "믹서 프리셋 (FL)"
 "This file is not a mixer track state LYNX SHARE can read." = "이 파일은 LYNX SHARE가 읽을 수 있는 믹서 트랙 상태가 아닙니다."
+"Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "믹서 프리셋: [2xLMB] 선택한 믹서 트랙에 불러오기  믹서 트랙으로 드래그 (믹서의 빈 공간으로: 새 트랙)"

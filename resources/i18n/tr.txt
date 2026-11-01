@@ -6226,3 +6226,4 @@ countries: tr
 "Mixer presets" = "Mikser ön ayarları"
 "Mixer presets (FL)" = "Mikser ön ayarları (FL)"
 "This file is not a mixer track state LYNX SHARE can read." = "Bu dosya LYNX SHARE'in okuyabileceği bir mikser kanalı durumu değil."
+"Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "Mikser ön ayarı: [2xLMB] seçili mikser kanallarına yükle  bir mikser kanalına sürükle (mikserin boş alanına: yeni kanal)"

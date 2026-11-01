@@ -116,6 +116,8 @@ juce::String rowHint (const juce::File& f, bool folder, bool expanded)
         return tr ("MIDI file: [2xLMB] open it as a project");
     if (f.hasFileExtension ("lynx;flp"))
         return tr ("Project: [2xLMB] open it");
+    if (f.hasFileExtension ("lynxtrack") || (f.hasFileExtension ("fst") && f.getFullPathName().containsIgnoreCase ("Mixer presets")))
+        return tr ("Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)");
     if (f.hasFileExtension ("fst"))
         return tr ("Preset: [2xLMB] new channel with it (FL synth presets)  drag onto a mixer insert: effect preset");
     if (f.hasFileExtension ("lynxpreset;fxp;fxb;vstpreset"))

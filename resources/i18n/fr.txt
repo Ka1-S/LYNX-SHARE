@@ -6226,3 +6226,4 @@ countries: fr be ch ca lu
 "Mixer presets" = "Presets de mixeur"
 "Mixer presets (FL)" = "Presets de mixeur (FL)"
 "This file is not a mixer track state LYNX SHARE can read." = "Ce fichier n'est pas un état de piste de mixeur que LYNX SHARE peut lire."
+"Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "Preset de mixeur : [2xLMB] le charger sur les pistes de mixeur sélectionnées  glisser sur une piste de mixeur (sur l'espace vide du mixeur : une nouvelle piste)"
