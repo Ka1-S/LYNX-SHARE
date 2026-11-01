@@ -1,5 +1,8 @@
 #include "ui/PluginPresetMenu.h"
 
+#include "core/PresetCycle.h"
+#include "ui/HintBar.h"
+
 #include "engine/PluginHost.h"
 #include "engine/Vst2Format.h"
 #include "platform/Paths.h"
@@ -422,8 +425,9 @@ void PresetBar::step (int delta)
             || (currentFile != juce::File() && list[(std::size_t) i].file == currentFile))
             at = i;
     const auto n = (int) list.size();
-    at = at < 0 ? (delta > 0 ? 0 : n - 1) : ((at + delta) % n + n) % n;
+    at = presetcycle::step (at, delta, n); // FL's wrapper: no preset yet → first / last, then wraps (round 167o)
     apply (list[(std::size_t) at]);
+    ui::postHint ({ current, juce::String (presetcycle::positionText (at, n)) }, 2500); // FL's "n / N"
 }
 
 void PresetBar::apply (const Entry& entry)

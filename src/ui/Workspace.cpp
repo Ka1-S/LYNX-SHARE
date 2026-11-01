@@ -487,6 +487,7 @@ public:
           panel (p)
     {
         setUsingNativeTitleBar (true);
+        getProperties().set ("lynxPanel", true); // a panel, not a tool window: Ctrl+F12 / F12 leave it open
         setResizable (true, false);
         snapping.setSizeLimits (workspace::minWidth, workspace::minHeight + Workspace::titleHeight, 10000, 10000);
         snapping.others = [this] { return owner.otherWindowScreenBounds (panel); };

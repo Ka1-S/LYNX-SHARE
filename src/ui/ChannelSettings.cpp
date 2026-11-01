@@ -42,6 +42,8 @@
 #include "engine/SampleLibrary.h"
 #include "engine/Text.h"
 #include "core/RackOps.h"
+#include "core/NativeEngines.h"
+#include "core/PresetCycle.h"
 #include "ui/ControllerEditors.h"
 #include "ui/HintBar.h"
 #include "ui/ValueControl.h"
@@ -3606,6 +3608,149 @@ private:
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> sections;
 };
 
+// FL's preset arrows of a generator's window (round 167o, issue #24; FL's TPluginForm NextPrevPreset, FLEngine
+// 0x12b6c70): ◀ name ▶ over the .fst presets of the plugin's folder (FL's factory folder and the user's, subfolders
+// too) in FL's order; no preset yet: ▶ the first, ◀ the last; both wrap. The step loads the preset into the channel
+// (one undo step), names the channel after it and says "n / N" in the hint bar, as FL. A click on the name lists them.
+class ChannelPresetBar final : public juce::Component
+{
+public:
+    ChannelPresetBar (AudioEngine& e, int c) : engine (e), channel (c)
+    {
+        for (auto* b : { &prev, &next })
+        {
+            b->setTooltip (b == &prev ? tr ("Previous preset") : tr ("Next preset"));
+            b->setWantsKeyboardFocus (false);
+            addAndMakeVisible (*b);
+        }
+        prev.onClick = [this] { step (-1); };
+        next.onClick = [this] { step (1); };
+        ui::setHint (*this, tr ("Presets: [LMB] the list, the arrows load the previous / next one"));
+    }
+
+    // Whether this channel's instrument has an FL preset folder (the bar is shown only then)
+    static bool wanted (const AudioEngine& engine, int channel)
+    {
+        const auto& song = engine.getSong();
+        return juce::isPositiveAndBelow (channel, (int) song.channels.size())
+               && ! natives::presetFolderOf (song.channels[(std::size_t) channel].instrument).empty();
+    }
+
+    void resized() override
+    {
+        auto r = getLocalBounds();
+        prev.setBounds (r.removeFromLeft (24));
+        next.setBounds (r.removeFromRight (24));
+        nameArea = r.reduced (4, 0);
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        g.setColour (theme::colour::bg2);
+        g.fillRoundedRectangle (nameArea.toFloat(), theme::radius::sm);
+        g.setColour (current >= 0 ? theme::colour::textPrimary : theme::colour::textSecondary);
+        g.setFont (theme::font (theme::type::body));
+        g.drawText (current >= 0 ? currentName : tr ("Presets"), nameArea.reduced (6, 0), juce::Justification::centredLeft, true);
+    }
+
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        if (nameArea.contains (e.getPosition()) && ! e.mouseWasDraggedSinceMouseDown())
+            showMenu();
+    }
+
+private:
+    const ChannelDef* def() const
+    {
+        const auto& song = engine.getSong();
+        return juce::isPositiveAndBelow (channel, (int) song.channels.size()) ? &song.channels[(std::size_t) channel] : nullptr;
+    }
+
+    const std::vector<presetcycle::Preset>& list()
+    {
+        const auto* d = def();
+        const auto kind = d != nullptr ? d->instrument : InstrumentKind::synth;
+        if (! loaded || kind != listedKind)
+        {
+            presets = presetcycle::listPresets (presetcycle::pluginPresetFolders (flStudioAccess().roots, true, natives::presetFolderOf (kind)));
+            listedKind = kind;
+            loaded = true;
+            current = d != nullptr ? presetcycle::indexOfName (presets, d->name) : -1; // (a channel named after its preset)
+            currentName = current >= 0 ? juce::String::fromUTF8 (presets[(std::size_t) current].name.c_str()) : juce::String();
+        }
+        return presets;
+    }
+
+    void step (int delta)
+    {
+        const auto& all = list();
+        const auto at = presetcycle::step (current, delta, (int) all.size());
+        if (at >= 0)
+            load (at);
+    }
+
+    void load (int index)
+    {
+        const auto& all = list();
+        const auto* d = def();
+        if (d == nullptr || ! juce::isPositiveAndBelow (index, (int) all.size()))
+            return;
+        const auto& preset = all[(std::size_t) index];
+        auto changed = natives::withPreset (*d, preset.path, preset.name, flStudioAccess());
+        if (! changed)
+        {
+            ui::postHint ({ tr ("This preset could not be read: {0}", { juce::String::fromUTF8 (preset.name.c_str()) }), {} }, 2500);
+            current = index; // (the next step goes on from it)
+            return;
+        }
+        const auto kind = d->instrument;
+        engine.editSong ([ch = channel, kind, c = std::move (*changed)] (Song& s) {
+            if (ch < (int) s.channels.size() && s.channels[(std::size_t) ch].instrument == kind)
+                s.channels[(std::size_t) ch] = c;
+        });
+        current = index;
+        currentName = juce::String::fromUTF8 (preset.name.c_str());
+        ui::postHint ({ currentName, juce::String (presetcycle::positionText (index, (int) all.size())) }, 2500);
+        repaint();
+    }
+
+    void showMenu()
+    {
+        const auto& all = list();
+        juce::PopupMenu menu;
+        std::map<std::string, juce::PopupMenu> folders;
+        std::vector<std::string> order;
+        for (int i = 0; i < (int) all.size(); ++i)
+        {
+            const auto& rel = all[(std::size_t) i].relative;
+            const auto slash = rel.find_last_of ('/');
+            const auto folder = slash == std::string::npos ? std::string() : rel.substr (0, slash);
+            if (folders.find (folder) == folders.end())
+                order.push_back (folder);
+            folders[folder].addItem (juce::String::fromUTF8 (all[(std::size_t) i].name.c_str()), true, i == current, [this, i] { load (i); });
+        }
+        for (const auto& folder : order)
+            if (folder.empty())
+                for (juce::PopupMenu::MenuItemIterator it (folders[folder]); it.next();)
+                    menu.addItem (it.getItem());
+            else
+                menu.addSubMenu (juce::String::fromUTF8 (folder.c_str()), folders[folder]);
+        if (menu.getNumItems() == 0)
+            menu.addItem (tr ("No presets found (they come with FL Studio)"), false, false, [] {});
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+    }
+
+    AudioEngine& engine;
+    int channel;
+    juce::TextButton prev { juce::String::fromUTF8 ("\xe2\x97\x80") }, next { juce::String::fromUTF8 ("\xe2\x96\xb6") };
+    juce::Rectangle<int> nameArea;
+    std::vector<presetcycle::Preset> presets;
+    InstrumentKind listedKind = InstrumentKind::synth;
+    bool loaded = false;
+    int current = -1;
+    juce::String currentName;
+};
+
 // The frame: header strip (tabs on the left; ON, PAN, VOL, TRACK on the right) over the page of the selected tab.
 class ChannelFrame final : public juce::Component,
                            private juce::ChangeListener
@@ -3658,6 +3803,11 @@ public:
             });
         };
         addAndMakeVisible (on);
+        if (ChannelPresetBar::wanted (engine, channel))
+        {
+            presetBar = std::make_unique<ChannelPresetBar> (engine, channel);
+            addAndMakeVisible (*presetBar);
+        }
         const auto name = [this] { return channelNameOf (engine.getSong(), channel); };
         auto headerKnob = [this] (std::function<ui::ValueSpec()> spec, std::function<double (const ChannelDef&)> get, std::function<void (Song&, int, double)> set,
                                   const char* caption) {
@@ -3759,10 +3909,15 @@ public:
     void resized() override
     {
         auto tabsArea = getLocalBounds().removeFromTop (headerHeight).reduced (8, 6);
+        if (presetBar != nullptr) // tabs on the upper row, the preset arrows under them
+        {
+            presetBar->setBounds (tabsArea.removeFromBottom (22).removeFromLeft (juce::jmin (300, tabsArea.getWidth())));
+            tabsArea.removeFromBottom (2);
+        }
         for (auto& t : tabs)
         {
             const auto w = juce::jmax (64, (int) juce::GlyphArrangement::getStringWidth (juce::Font (theme::font (theme::type::body)), t->getButtonText()) + 24);
-            t->setBounds (tabsArea.removeFromLeft (w).withSizeKeepingCentre (w, 26));
+            t->setBounds (tabsArea.removeFromLeft (w).withSizeKeepingCentre (w, juce::jmin (26, tabsArea.getHeight())));
             tabsArea.removeFromLeft (4);
         }
         auto right = getLocalBounds().removeFromTop (headerHeight).reduced (6, 2);
@@ -3798,6 +3953,7 @@ private:
     std::vector<juce::Point<int>> sizes;
     std::vector<std::unique_ptr<FrameKnob>> header;
     juce::ToggleButton on;
+    std::unique_ptr<ChannelPresetBar> presetBar;
 };
 
 bool hasEnvelopeTab (InstrumentKind kind) noexcept
