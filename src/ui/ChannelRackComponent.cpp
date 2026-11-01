@@ -96,6 +96,7 @@ juce::String instrumentName (InstrumentKind k)
         case InstrumentKind::voltage: return "Voltage Controller";
         case InstrumentKind::vfx: return "VFX";
         case InstrumentKind::videoplayer: return "Fruity Video Player";
+        case InstrumentKind::wavetraveller: return "Wave Traveller";
     }
     return "?";
 }
@@ -1571,7 +1572,7 @@ bool ChannelRackComponent::loadSampleIntoSelected (const juce::File& file)
 
     // only channels that play a sample (or the built-in drums, which become samplers) take a file
     if (kind != InstrumentKind::sampler && kind != InstrumentKind::kick && kind != InstrumentKind::snare && kind != InstrumentKind::hat
-        && kind != InstrumentKind::clap && kind != InstrumentKind::granulizer)
+        && kind != InstrumentKind::clap && kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller)
         return false;
 
     assignSample (row, file);
@@ -2618,7 +2619,7 @@ void ChannelRackComponent::assignSample (int channel, const juce::File& file)
         if (isNew)
             c.mixerTrack = freeInsert;
         c.samplePath = path;
-        if (! isNew && c.instrument == InstrumentKind::granulizer) // FL's Granulizer keeps its engine and plays the file (round 142)
+        if (! isNew && (c.instrument == InstrumentKind::granulizer || c.instrument == InstrumentKind::wavetraveller)) // FL's Granulizer keeps its engine and plays the file (round 142); so does Wave Traveller
             return;
         c.instrument = InstrumentKind::sampler;
         c.name = name;

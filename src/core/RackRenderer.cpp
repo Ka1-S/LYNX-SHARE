@@ -190,12 +190,13 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
 
     std::shared_ptr<const SampleData> sample;
 
-    if ((kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip || kind == InstrumentKind::granulizer) && samples
+    if ((kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip || kind == InstrumentKind::granulizer
+         || kind == InstrumentKind::wavetraveller) && samples
         && ! channel.samplePath.empty())
         sample = samples (channel.samplePath);
 
     // pitch-preserving stretch: the sample comes already stretched to the current tempo
-    if (sample != nullptr && kind != InstrumentKind::granulizer && channel.sampler.keepPitch && channel.sampler.stretchBeats > 0.0f
+    if (sample != nullptr && kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller && channel.sampler.keepPitch && channel.sampler.stretchBeats > 0.0f
         && factories.stretchedSamples
         && sample->frames() > 0)
     {
@@ -350,7 +351,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
 
         if (previous != nullptr && i < previous->song.channels.size() && i < previous->instruments.size()
             && previous->song.channels[i].instrument == kind && kind != InstrumentKind::patcher
-            && (kind != InstrumentKind::granulizer || previous->song.channels[i].samplePath == channel.samplePath)
+            && ((kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller)
+                || previous->song.channels[i].samplePath == channel.samplePath)
             && (kind != InstrumentKind::soundfont
                 || (previous->song.channels[i].samplePath == channel.samplePath && previous->sampleRate == sampleRate))
             && (kind != InstrumentKind::directwave

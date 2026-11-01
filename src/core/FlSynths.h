@@ -218,9 +218,6 @@ std::optional<std::string> drumSynthLiveSound (const std::vector<std::uint8_t>& 
 // Kepler (REA_rodada13 §2, "Kepler-1" mode): saw/pulse/sub/noise, VCF with Env1, LFO, chorus.
 bool synthFromKepler (const std::vector<std::uint8_t>& state, SynthSettings& synth, float& gain);
 
-// Wave Traveller (§4): the sample (path with FL's variables) and the root note; scratching is left out.
-std::optional<std::pair<std::string, int>> waveTravellerSample (const std::vector<std::uint8_t>& state);
-
 // FLEX (§1.1): pack and preset names, from the plugin state. FLEX packs are protected and
 // LYNX does not open them: the channel gets a synth patch chosen by those names.
 std::optional<std::pair<std::string, std::string>> flexPresetName (const std::vector<std::uint8_t>& state);

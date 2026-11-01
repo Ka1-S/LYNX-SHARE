@@ -165,6 +165,7 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | Transistor Bass engine † | Transistor Bass | Near-exact | 55/128 programs bit-exact, worst −108.6 dB; CC/pitch-bend not modelled |
 | Sawer engine † | Sawer | Near-exact | 423 presets bit-identical with effects off; reverb −137 dB; modulation by aftertouch/bend not fed |
 | Granulizer engine | Fruity Granulizer | Near-exact | within −128 dB on 100 random states; slice modes and tempo sync not played |
+| Wave Traveller engine | Wave Traveller | Exact | bit-identical with the DLL: the render test, demo states, every curve segment type, mutes, the 19 presets, live and render (sinc) modes, 44.1 / 48 kHz; samples not at 16-bit / 44.1 kHz use LYNX's conversion (REA_rodada167f-wavetraveller) |
 | Autogun engine † | Autogun | Near-exact | within −127 dB on the template states (Ogun engine + Soundgoodizer stage) |
 | DrumSynth engine † | Fruity DrumSynth Live | Near-exact | all 120 patches; recorded waves need the exact engine DLL build; sends and Mod X/Y not modelled |
 | BooBass engine † | BooBass | Near-exact | needs the exact engine DLL build (otherwise a saw approximation) |
@@ -175,7 +176,7 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | GMS engine † | GMS | Close | model within −60 dB on 9/9 demo channels; FL's shared random generator makes noise/phases differ by design |
 | Morphine engine † | Morphine | Close | model within −60 dB on 7/7 demo channels; release loops and unison not modelled |
 | Sakura / Drumpad models | Sakura, Drumpad | Close | physical models rebuilt from the engines; Sakura's resonators within −72 dB; no CC sources |
-| Sampler (FL voice) | Channel sampler, FPC, Slicex, Fruity Slicer, Wave Traveller | Near-exact | FL's interpolators and sampler voice (within one 16-bit code of FL's renders); per-plugin extras partly; WAV loop points not read |
+| Sampler (FL voice) | Channel sampler, FPC, Slicex, Fruity Slicer | Near-exact | FL's interpolators and sampler voice (within one 16-bit code of FL's renders); per-plugin extras partly; WAV loop points not read |
 | LYNX Soundfont | Fruity Soundfont Player (SoundFont Player) | Close | own SF2 / SF3 player (TinySoundFont parsing, LYNX SHARE voices): FL's state read (font, preset, envelope / LFO / cut-off overrides, send levels, options; REA_rodada158); preset search over all SoundFonts in the user's folders; "send to" a mixer insert, mod-wheel knob and FL's built-in reverb / chorus sound not reproduced (LYNX SHARE's own reverb / chorus) |
 | Built-in synth | FLEX | Approximate | FLEX packs are encrypted and never opened: a synth patch chosen by preset name |
 | Silent channel | Wasp / Wasp XT | Placeholder | silent in FL Studio 2026 (64-bit placeholder); state kept |
