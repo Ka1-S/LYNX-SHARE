@@ -116,6 +116,7 @@ ExportJob::ExportJob (const Song& song, const Options& o, const juce::File& file
     auto copy = makeRenderSong (song, options, tailTicks, musicTicks, loopTicks);
     musicSeconds = copy.secondsForTicks (musicTicks);
     loopSeconds = copy.secondsForTicks (loopTicks);
+    extras = wavExtras (song, options, options.sampleRate); // FL's extra data (markers, loop, tempo) for WAV files
 
     // rate before setSong: instruments and plugins are created already prepared for it
     engine->getTransport().sampleRate.store (options.sampleRate);
@@ -134,6 +135,7 @@ ExportJob::ExportJob (AudioEngine& liveEngine, const Options& o, const juce::Fil
     const auto copy = makeRenderSong (song, options, 0, musicTicks, loopTicks);
     musicSeconds = copy.secondsForTicks (musicTicks);
     loopSeconds = copy.secondsForTicks (loopTicks);
+    extras = wavExtras (song, options, options.sampleRate);
     // where the range starts in the song (the selection: the loop region, as makeRenderSong cuts it)
     startTick = options.range == Range::selection && song.hasLoop() ? (double) song.loopStart : 0.0;
 }
@@ -339,6 +341,11 @@ bool ExportJob::run (const std::function<bool (double)>& progress, juce::String&
         error = "cancelled"; // (the temporary file goes away; an older file of that name stays)
         return false;
     }
+    if (extraData && options.format == exportopts::Format::wav && ! appendWavExtras (temp.getFile().getFullPathName().toStdString(), extras, options.sampleRate))
+    {
+        error = tr ("could not write {0}", { output.getFullPathName() });
+        return false;
+    }
 
     return replaceTarget (temp, output, error);
 }
@@ -464,7 +471,7 @@ bool ExportJob::writeFile (const Options& o, const juce::File& file, float* left
     const auto ok = writer->writeFromAudioSampleBuffer (view, 0, frames);
     writer.reset();
 
-    if (! ok)
+    if (! ok || (extraData && o.format == exportopts::Format::wav && ! appendWavExtras (temp.getFile().getFullPathName().toStdString(), extras, o.sampleRate)))
     {
         error = tr ("could not write {0}", { file.getFullPathName() });
         return false;

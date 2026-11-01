@@ -929,6 +929,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
         def.mixerTrack = std::clamp (c.mixerTrack, 0, maxMixerTracks - 1);
         def.muted = ! c.enabled; // switched off in FL's Channel Rack: its notes don't play (REA_rodada80 §3.1)
+        def.soloLock = c.soloLock;          // 0x20 "Lock active/mute state" (REA_rodada167l §5)
+        def.ghostHidden = ! c.ghostShown;   // 0x32: the channel's ghost notes in the Piano Roll (REA_rodada167l §5)
 
         if (c.colour != 0)
             def.colour = 0xFF000000u | c.colour;
@@ -1985,6 +1987,18 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             p.crossfade = std::clamp (c.crossfade, 0, 2048);
             p.trim = std::clamp (c.trim, 0, 32768);
             p.pingPong = c.pingPong;
+            // the legacy precomputed effects (REA_rodada167l §1), within the ranges of FL's knobs
+            p.boost = std::clamp (c.boost, 0, 256);
+            p.eq = std::clamp (c.eq, 0, 256);
+            p.ringMix = std::clamp (c.ringMix, 0, 256);
+            p.ringFreq = std::clamp (c.ringFreq, 0, 256);
+            p.stereoDelay = std::clamp (c.stereoDelay, 0, 4096);
+            p.cutoff = std::clamp (c.cutoff, 16, 1024);
+            p.resonance = std::clamp (c.resonance, 0, 640);
+            p.reverb = std::clamp (c.reverb, 0, 256);
+            p.reverbType = c.reverbType == 0 ? 0 : 1;
+            p.pogo = std::clamp (c.pogo, 0, 512);
+            p.clip = (c.fxFlags & 4) != 0;
             def.sampler.useLoopPoints = c.useLoopPoints();
             def.sampler.declickMode = std::clamp (c.declickMode, 0, 5);
         }
@@ -3481,6 +3495,16 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 clip.gain = item.gain;
                 clip.pitch = item.pitch;
                 clip.reversed = item.reversed;
+                // FL's clip stretch (round 167l, FL render: a 6-beat item with stretch 1.5 ends 9 beats later, the song
+                // with it): the item's length and start offset are the unstretched ones
+                clip.stretch = item.stretch;
+                if (clip.stretch != 1.0)
+                {
+                    clip.length = (std::int64_t) std::llround ((double) clip.length * clip.stretch);
+                    const auto offset = ((double) clip.offset + (double) clip.offsetFraction) * clip.stretch;
+                    clip.offset = (std::int64_t) std::llround (offset);
+                    clip.offsetFraction = (float) (offset - (double) clip.offset);
+                }
                 const auto msToTicks = [&] (float ms)
                 { return std::clamp ((std::int64_t) std::llround (ms / 1000.0 * song.bpm / 60.0 * ppq), (std::int64_t) 0, clip.length); };
                 clip.fadeIn = msToTicks (item.fadeInMs);

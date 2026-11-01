@@ -1654,6 +1654,9 @@ public:
         const auto clipFades = std::exchange (nextClip, {});
         const auto clipShape = std::exchange (nextClipShape, (std::uint8_t) 0);
         const auto clipPitch = clipMode ? (double) std::clamp (std::exchange (nextClipPitch, 0.0f), -12.0f, 12.0f) : 0.0;
+        // FL 2026's clip stretch (round 167l, FL render of a 2 s 440 Hz ramp: ×2 lasts 4 s at 220 Hz in Resample, at
+        // 440 Hz in the stretch modes; ×0.5 lasts 1 s): the clip reads its file `stretch` times slower
+        const auto clipStretch = clipMode ? (double) std::clamp (std::exchange (nextClipStretch, 1.0f), 0.01f, 100.0f) : 1.0;
         const auto* zone = clipMode ? nullptr : zoneFor (key, velocity);
         const auto* data = zone != nullptr ? zone->sample.get() : sample.get();
 
@@ -1696,7 +1699,7 @@ public:
             last = index + 1 < slices.count ? std::max (first, std::floor (total * slices.starts[(std::size_t) index + 1]) - 1.0) : total;
             sliced = true;
         }
-        const auto base = baseRate (*data);
+        const auto base = baseRate (*data) / clipStretch;
         auto startFrame = first + std::max (0.0, startSeconds * sampleRate * base);
         // a resampled (pitched) clip reads its file faster or slower: a start inside it moves with that speed (the
         // Playlist shows the file at that speed too, clipops::framesPerTick)
@@ -1843,10 +1846,11 @@ public:
                 lfos[i].start (target->lfo[i], songTicks);
         // FL 2026's clip pitch (round 167k, FL render: +3 → 522.5 Hz from 440 Hz, the 2 s clip still 2 s on a channel
         // that resamples): a shift on top of the channel's own pitch, whatever the channel's mode, the length stays
+        // (a stretched clip on a channel that keeps the pitch: read slower, shifted back up by the stretch)
         if (clipMode && ! keyShift.load (std::memory_order_relaxed))
             startKeyShift (*target, clipPitch, base, true);
         else
-            startKeyShift (*target, semitones + clipPitch, base);
+            startKeyShift (*target, semitones + clipPitch + (clipStretch != 1.0 ? 12.0 * std::log2 (clipStretch) : 0.0), base);
         nextPan = nextCents = 0.0f;
         nextPorta = false;
     }
@@ -1996,6 +2000,7 @@ public:
     void setClipShift (bool on) override { clipShift = on; }
 
     void setNextClipPitch (float semitones) noexcept override { nextClipPitch = std::isfinite (semitones) ? semitones : 0.0f; }
+    void setNextClipStretch (float stretch) noexcept override { nextClipStretch = std::isfinite (stretch) && stretch > 0.0f ? stretch : 1.0f; }
 
     void prepareKeyShift (double sr) override
     {
@@ -2871,6 +2876,7 @@ private:
     std::array<ModCoefficients, 2> modEnv {};
     std::array<float, 4> nextClip {}; // fades for the next noteOn (only the audio thread touches it)
     float nextClipPitch = 0.0f;       // the next clip's own pitch (semitones, audio thread)
+    float nextClipStretch = 1.0f;     // the next clip's own stretch (round 167l, audio thread)
     bool clipShift = false;           // pitch shifters for the clips' own pitch (set before prepareKeyShift)
     std::uint8_t nextClipShape = 0;
 

@@ -15,6 +15,7 @@
 
 #include "ui/AutomationUi.h"
 #include "core/NoteTools.h"
+#include "core/NoteEdit.h"
 #include "core/FlSynths.h"
 #include "core/MidiControls.h"
 #include "ui/ToolWindow.h"
@@ -1258,16 +1259,9 @@ void ChannelRackComponent::solo (int row)
     if (row < 0 || row >= (int) engine.getSong().channels.size())
         return;
 
-    // only this channel plays; repeating on the already-soloed channel unmutes all
-    engine.editSong ([row] (Song& s) {
-        const auto alone = ! s.channels[(std::size_t) row].muted
-                           && std::all_of (s.channels.begin(), s.channels.end(), [&] (const ChannelDef& c) {
-                                  return &c == &s.channels[(std::size_t) row] || c.muted;
-                              });
-
-        for (std::size_t i = 0; i < s.channels.size(); ++i)
-            s.channels[i].muted = alone ? false : i != (std::size_t) row;
-    });
+    // only this channel plays (the channels with "Lock active/mute state" keep theirs); repeating on the soloed channel
+    // unmutes them (FL's channel solo, REA_rodada167l §5)
+    engine.editSong ([row] (Song& s) { noteedit::soloChannel (s, row); });
 }
 
 // --- channel editors ---------------------------------------------------------------------------
@@ -2205,7 +2199,7 @@ void ChannelRackComponent::applyPaint (const juce::MouseEvent& e)
 
 // --- menus -------------------------------------------------------------------------------------
 
-void ChannelRackComponent::showChannelMenu (int channel)
+juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
 {
     const auto& c = engine.getSong().channels[(std::size_t) channel];
     // Replace › lists exactly what Insert › and "+" list (issue #18: one source, quickpick::addGeneratorMenu); the
@@ -2245,6 +2239,11 @@ void ChannelRackComponent::showChannelMenu (int channel)
         const auto& palette = lynxPalette();
         const auto colour = palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())];
         engine.editSong ([channel, colour] (Song& s) { s.channels[(std::size_t) channel].colour = colour; });
+    });
+    // FL's "Lock active/mute state" (the mute switch's menu, round 167l): soloing another channel leaves this one alone
+    menu.addItem (tr ("Lock active/mute state"), true, c.soloLock, [this, channel] {
+        if (channel < (int) engine.getSong().channels.size())
+            engine.editSong ([channel] (Song& s) { s.channels[(std::size_t) channel].soloLock = ! s.channels[(std::size_t) channel].soloLock; });
     });
     menu.addSeparator();
     menu.addItem (tr ("Load sample..."), c.instrument != InstrumentKind::audioClip, false, [this, channel] { chooseSample (channel); });
@@ -2496,8 +2495,12 @@ void ChannelRackComponent::showChannelMenu (int channel)
     }
     menu.addItem (tr ("Select unused channels"), [this] { selectUnused(); });
     menu.addItem (tr ("Group selected...") + "\tAlt+G", [this] { groupSelected(); });
+    return menu;
+}
 
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+void ChannelRackComponent::showChannelMenu (int channel)
+{
+    buildChannelMenu (channel).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
 juce::String flEngineName (const natives::InstrumentEngine& e)

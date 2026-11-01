@@ -6,6 +6,44 @@
 
 namespace lynx::mixerops
 {
+void soloSelected (Song& song, const std::vector<int>& targets, bool alt)
+{
+    std::vector<int> t;
+    for (auto x : targets)
+        if (x > 0 && x < (int) song.mixer.size())
+            t.push_back (x);
+    if (t.empty())
+        return;
+    auto fed = [&] (int to) {
+        for (int src = 1; src < (int) song.mixer.size(); ++src)
+            if (src != to && song.routes (src, to))
+                return true;
+        return false;
+    };
+    // FL: "soloed" = every target soloed; "alt state" = every target soloed with its sources heard (no source: both)
+    auto soloed = true, altState = true, anySources = false;
+    for (auto x : t)
+    {
+        const auto& m = song.mixer[(std::size_t) x];
+        const auto sources = fed (x);
+        anySources = anySources || sources;
+        soloed = soloed && m.solo;
+        altState = altState && m.solo && (m.soloSources || ! sources);
+    }
+    bool solo;
+    if (alt)
+        solo = ! (soloed && altState);
+    else
+        solo = (altState && anySources) || ! soloed;
+    for (std::size_t i = 1; i < song.mixer.size(); ++i)
+    {
+        const auto on = solo && std::find (t.begin(), t.end(), (int) i) != t.end();
+        song.mixer[i].solo = on;
+        if (on)
+            song.mixer[i].soloSources = alt;
+    }
+}
+
 namespace
 {
 bool isInsert (const Song& song, int t) noexcept

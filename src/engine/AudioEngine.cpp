@@ -3802,12 +3802,16 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
     {
         transport.positionTicks.store (0.0);
         transport.userJumps.fetch_add (1, std::memory_order_relaxed);
+        if (transport.resetPluginsOnTransport.load (std::memory_order_relaxed))
+            midiSync.requestTransportNotesOff(); // FL: CC 123 to the "Send all notes off" outputs (REA 167l §6)
     }
 
     if (const auto target = transport.seekRequest.exchange (-1.0); target >= 0.0)
     {
         transport.positionTicks.store (target);
         transport.userJumps.fetch_add (1, std::memory_order_relaxed);
+        if (transport.resetPluginsOnTransport.load (std::memory_order_relaxed))
+            midiSync.requestTransportNotesOff();
     }
 
     transport.readMarkers (rtMarkers, rtMarkerVersion); // FL's marker actions (a new table when the song changed)

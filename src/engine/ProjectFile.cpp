@@ -3,6 +3,7 @@
 #include "core/MixerOps.h"
 
 #include <algorithm>
+#include <tuple>
 #include <cmath>
 
 #include "core/Effects.h"
@@ -937,12 +938,13 @@ juce::var clipsToVar (const std::vector<Clip>& list)
                                       (juce::int64) c.offset, (int) c.kind,
                                       c.kind == ClipKind::automation ? c.automation : c.channel };
 
-        // [.., fade-in, fade-out, gain, muted, sub-tick offset, pan, pitch, reversed] up to the last value that is not
-        // the default (round 167k: FL 2026's clip pitch and clip reverse, keys 7/8/9)
+        // [.., fade-in, fade-out, gain, muted, sub-tick offset, pan, pitch, reversed, stretch] up to the last value that
+        // is not the default (round 167k: FL 2026's clip pitch and clip reverse, keys 7/8/9; 167l: the clip stretch)
         const auto fraction = juce::roundToInt (c.offsetFraction * 10000.0f) / 10000.0;
         const auto pan = juce::roundToInt (c.pan * 1000.0f) / 1000.0;
         const auto pitch = juce::roundToInt (c.pitch * 1000.0f) / 1000.0;
-        const int used = c.reversed ? 8 : pitch != 0.0 ? 7 : pan != 0.0 ? 6 : fraction != 0.0 ? 5 : c.muted ? 4
+        const auto stretch = std::round (c.stretch * 1.0e6) / 1.0e6;
+        const int used = stretch != 1.0 ? 9 : c.reversed ? 8 : pitch != 0.0 ? 7 : pan != 0.0 ? 6 : fraction != 0.0 ? 5 : c.muted ? 4
                        : (c.fadeIn > 0 || c.fadeOut > 0 || c.gain != 1.0f) ? 3 : 0;
         if (used > 0)
         {
@@ -965,6 +967,8 @@ juce::var clipsToVar (const std::vector<Clip>& list)
                 clip.add (pitch);
             if (used >= 8)
                 clip.add (c.reversed);
+            if (used >= 9)
+                clip.add (stretch);
         }
 
         clips.add (clip);
@@ -1001,6 +1005,7 @@ std::vector<Clip> clipsFromVar (const juce::var& v, const Song& song)
                 clip.pan = c.size() >= 13 ? juce::jlimit (-1.0f, 1.0f, (float) (double) c[12]) : 0.0f;
                 clip.pitch = c.size() >= 14 ? juce::jlimit (-12.0f, 12.0f, (float) (double) c[13]) : 0.0f;
                 clip.reversed = c.size() >= 15 && (bool) c[14];
+                clip.stretch = c.size() >= 16 ? juce::jlimit (0.01, 100.0, (double) c[15]) : 1.0;
             }
 
             if (c.size() >= 7 && (int) c[5] == 2)
@@ -1036,6 +1041,8 @@ juce::var channelToVar (const ChannelDef& c)
     o->setProperty ("muted", c.muted);
     if (c.ghostHidden)
         o->setProperty ("ghostHidden", true);
+    if (c.soloLock)
+        o->setProperty ("soloLock", true);
 
     if (! c.samplePath.empty())
         o->setProperty ("sample", str (c.samplePath));
@@ -1247,6 +1254,16 @@ juce::var channelToVar (const ChannelDef& c)
             for (auto [name, v] : { std::pair { "fadeIn", p.fadeIn }, { "fadeOut", p.fadeOut }, { "crossfade", p.crossfade }, { "trim", p.trim } })
                 if (v != 0)
                     pre->setProperty (name, v);
+            // the legacy effects (round 167l), only when not FL's default
+            const SamplePrecompute none;
+            for (auto [name, v, d] : { std::tuple { "boost", p.boost, none.boost }, { "eq", p.eq, none.eq }, { "ringMix", p.ringMix, none.ringMix },
+                                       { "ringFreq", p.ringFreq, none.ringFreq }, { "stereoDelay", p.stereoDelay, none.stereoDelay },
+                                       { "cutoff", p.cutoff, none.cutoff }, { "resonance", p.resonance, none.resonance },
+                                       { "reverb", p.reverb, none.reverb }, { "reverbType", p.reverbType, none.reverbType }, { "pogo", p.pogo, none.pogo } })
+                if (v != d)
+                    pre->setProperty (name, v);
+            if (p.clip)
+                pre->setProperty ("clip", true);
             sampler->setProperty ("precomputed", juce::var (pre.release()));
         }
         if (! c.sampler.useLoopPoints)
@@ -1289,6 +1306,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
     def.pan = juce::jlimit (-1.0f, 1.0f, (float) c.getProperty ("pan", 0.0));
     def.muted = (bool) c.getProperty ("muted", false);
     def.ghostHidden = (bool) c.getProperty ("ghostHidden", false);
+    def.soloLock = (bool) c.getProperty ("soloLock", false);
     def.samplePath = c["sample"].toString().toStdString();
 
     {
@@ -1539,6 +1557,17 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
             p.fadeOut = juce::jlimit (0, 1024, (int) pre.getProperty ("fadeOut", 0));
             p.crossfade = juce::jlimit (0, 2048, (int) pre.getProperty ("crossfade", 0));
             p.trim = juce::jlimit (0, 32768, (int) pre.getProperty ("trim", 0));
+            p.boost = juce::jlimit (0, 256, (int) pre.getProperty ("boost", 0));
+            p.eq = juce::jlimit (0, 256, (int) pre.getProperty ("eq", 128));
+            p.ringMix = juce::jlimit (0, 256, (int) pre.getProperty ("ringMix", 0));
+            p.ringFreq = juce::jlimit (0, 256, (int) pre.getProperty ("ringFreq", 128));
+            p.stereoDelay = juce::jlimit (0, 4096, (int) pre.getProperty ("stereoDelay", 2048));
+            p.cutoff = juce::jlimit (16, 1024, (int) pre.getProperty ("cutoff", 1024));
+            p.resonance = juce::jlimit (0, 640, (int) pre.getProperty ("resonance", 0));
+            p.reverb = juce::jlimit (0, 256, (int) pre.getProperty ("reverb", 0));
+            p.reverbType = (int) pre.getProperty ("reverbType", 1) == 0 ? 0 : 1;
+            p.pogo = juce::jlimit (0, 512, (int) pre.getProperty ("pogo", 256));
+            p.clip = (bool) pre.getProperty ("clip", false);
         }
         def.sampler.useLoopPoints = (bool) s.getProperty ("useLoopPoints", true);
         def.sampler.declickMode = juce::jlimit (0, 5, (int) s.getProperty ("declickMode", 0));
@@ -1577,6 +1606,8 @@ juce::var mixerTrackToVar (const MixerTrack& t)
     o->setProperty ("pan", t.pan);
     o->setProperty ("muted", t.muted);
     o->setProperty ("solo", t.solo);
+    if (! t.soloSources)
+        o->setProperty ("soloSources", false);
     if (! t.threaded)
         o->setProperty ("threaded", false);
     if (t.separator)
@@ -1653,6 +1684,7 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     track.pan = juce::jlimit (-1.0f, 1.0f, (float) t.getProperty ("pan", 0.0));
     track.muted = (bool) t.getProperty ("muted", false);
     track.solo = (bool) t.getProperty ("solo", false);
+    track.soloSources = (bool) t.getProperty ("soloSources", true);
     track.threaded = (bool) t.getProperty ("threaded", true);
     track.separator = (bool) t.getProperty ("separator", false);
     track.dock = t["dock"].toString() == "left" ? MixerDock::left : t["dock"].toString() == "right" ? MixerDock::right : MixerDock::middle;

@@ -61,6 +61,10 @@ bool moveEffectSlot (Song& song, int track, int from, int to);
 // "Reset selected track(s) to default": level, pan, stereo separation, phase, swap and EQ back to the defaults,
 // mute and solo off (name, colour, effects and routing stay).
 void resetToDefault (Song& song, const std::vector<int>& tracks);
+// FL's "Solo selected track(s)" (S) and "Alt solo selected track(s)" (Alt+S) (FUN_0127c2a0 → FUN_0127bb10,
+// REA_rodada167l §4): the targets play with their path to Master; the alt solo also keeps the tracks that feed them.
+// Again on the same solo clears it; one kind on the other kind switches to it.
+void soloSelected (Song& song, const std::vector<int>& targets, bool alt);
 // "Reset selected track(s) routing": each insert sends only to the Master again, at full level.
 void resetRouting (Song& song, const std::vector<int>& tracks);
 // "Unroute tracks routed to the selected track(s)": the sends into them are removed (an insert left with no

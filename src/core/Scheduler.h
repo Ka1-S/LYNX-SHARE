@@ -43,6 +43,8 @@ struct NoteEvent
     std::uint8_t fadeShape = 0;
     // audio clips: FL 2026's clip pitch in semitones (keys 7/8): a pitch shift that keeps the length (round 167k)
     float clipPitch = 0.0f;
+    // audio clips: FL 2026's clip stretch (the audio plays that many times longer; round 167l)
+    float clipStretch = 1.0f;
     // the note's Mod X / Y (0..1, 0.5 = none) and, on its "off", its release velocity (0..1) — REA round 151
     float modX = 0.5f, modY = 0.5f, release = 0.5f;
     // the note's level factor (a Layer's VOL and crossfade, round 164): the instrument scales the voice when it can,

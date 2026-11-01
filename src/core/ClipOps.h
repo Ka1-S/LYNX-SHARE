@@ -54,10 +54,11 @@ inline std::int64_t fileTicks (const ChannelDef& channel, double fileFrames, dou
 }
 
 // An audio clip's speed with FL 2026's own clip pitch (round 167k, keys 7/8): the clip pitch is a shift that keeps the
-// length (FL render: a 2 s clip pitched +3 still lasts 2 s on a channel that resamples), so only the channel's counts.
-inline double clipSpeed (const ChannelDef& channel, const Clip&) noexcept
+// length (FL render: a 2 s clip pitched +3 still lasts 2 s on a channel that resamples), so only the channel's counts;
+// FL's clip stretch (round 167l) slows it down by that factor, in every time-stretch mode
+inline double clipSpeed (const ChannelDef& channel, const Clip& clip) noexcept
 {
-    return clipSpeed (channel);
+    return clipSpeed (channel) / std::clamp (clip.stretch, 0.01, 100.0);
 }
 
 inline double framesPerTick (const ChannelDef& channel, const Clip& clip, double fileFrames, double fileRate, double bpm) noexcept

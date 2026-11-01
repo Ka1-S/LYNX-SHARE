@@ -195,4 +195,9 @@ std::string statusText (const Receiver& r, double now);
 // hysteresis: the published tempo moves only when the estimate differs by more than `threshold` BPM, so a steady
 // clock with jitter shows a steady tempo. Exposed for tests.
 double fitBpm (const double* times, int count) noexcept;
+
+// What FL sends to an output with "Send all notes off" when the transport is set to a new position with "Reset
+// plugins on transport" on (FUN_011c89c0, REA_rodada167l §6): midiOutShortMsg (0x7bb0 + ch) = CC 123 value 0 on the
+// 16 channels, nothing else (no CC 64, unlike the init / after-render reset). `out` gets 16 × 3 bytes.
+void transportNotesOff (std::array<std::uint8_t, 48>& out) noexcept;
 } // namespace lynx::midisync

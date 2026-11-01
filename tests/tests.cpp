@@ -16833,6 +16833,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Rea167hTests.inc"
 #include "Rea167jTests.inc"
 #include "Rea167kTests.inc"
+#include "Rea167lTests.inc"
 #include "Patch165Tests.inc"
 #include "FlPlugins165Tests.inc"
 #include "FlScratch165Tests.inc"

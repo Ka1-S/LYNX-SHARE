@@ -28,7 +28,7 @@ bool sameChannel (const ChannelDef& a, const ChannelDef& b) noexcept
     return a.name == b.name && a.instrument == b.instrument && sameChannelLevels (a, b) && a.muted == b.muted && a.samplePath == b.samplePath
            && a.zones == b.zones && a.mixerTrack == b.mixerTrack && a.plugin == b.plugin && a.controllerState == b.controllerState
            && a.modelParams == b.modelParams && a.pluginState == b.pluginState && a.sampler == b.sampler && a.synth == b.synth
-           && a.swingMix == b.swingMix && a.arp == b.arp && a.cutGroup == b.cutGroup && a.cutBy == b.cutBy && a.colour == b.colour;
+           && a.swingMix == b.swingMix && a.arp == b.arp && a.cutGroup == b.cutGroup && a.cutBy == b.cutBy && a.colour == b.colour && a.soloLock == b.soloLock;
 }
 
 bool sameSlot (const EffectSlot& a, const EffectSlot& b) noexcept
@@ -55,7 +55,7 @@ bool sameLatency (const MixerTrack& a, const MixerTrack& b) noexcept
 
 bool sameTrack (const MixerTrack& a, const MixerTrack& b) noexcept
 {
-    return a.name == b.name && a.volume == b.volume && a.pan == b.pan && a.muted == b.muted && a.solo == b.solo && sameEffects (a, b)
+    return a.name == b.name && a.volume == b.volume && a.pan == b.pan && a.muted == b.muted && a.solo == b.solo && a.soloSources == b.soloSources && sameEffects (a, b)
            && sameRouting (a, b) && a.stereo == b.stereo && a.colour == b.colour && a.invertPhase == b.invertPhase
            && a.swapChannels == b.swapChannels && a.eq == b.eq
            && a.inputChannel == b.inputChannel && a.inputStereo == b.inputStereo && a.monitor == b.monitor && a.recordSafe == b.recordSafe && a.recordTo == b.recordTo
@@ -67,7 +67,7 @@ bool sameClip (const Clip& a, const Clip& b) noexcept
     return a.pattern == b.pattern && a.track == b.track && a.start == b.start && a.length == b.length && a.offset == b.offset
            && a.kind == b.kind && a.channel == b.channel && a.automation == b.automation && a.fadeIn == b.fadeIn && a.fadeOut == b.fadeOut
            && a.gain == b.gain && a.pan == b.pan && a.muted == b.muted && a.offsetFraction == b.offsetFraction
-           && a.pitch == b.pitch && a.reversed == b.reversed;
+           && a.pitch == b.pitch && a.reversed == b.reversed && a.stretch == b.stretch;
 }
 
 bool sameClips (const std::vector<Clip>& a, const std::vector<Clip>& b) noexcept

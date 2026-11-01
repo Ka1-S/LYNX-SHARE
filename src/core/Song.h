@@ -216,11 +216,23 @@ struct SamplePrecompute
     bool removeDc = false, normalize = false, reversePolarity = false, fadeStereo = false, swapStereo = false;
     int fadeIn = 0, fadeOut = 0, crossfade = 0, trim = 0;
     bool pingPong = false; // Ping pong loop: the loop plays forward then backward (with loop points)
+    // FL's legacy precomputed effects (the Sampler's second effects page, REA_rodada167l §1), raw FL values with FL's
+    // defaults: boost 0…256, EQ (FL's "FX": the frequency balance) 0…256 (128 = flat), ring modulation mix 0…256 and
+    // frequency 0…256 (128), stereo delay 0…4096 (2048 = none), low-pass cutoff 16…1024 (1024 = off) and resonance
+    // 0…640, reverb 0…256 with its type 0 / 1, pogo (FL's "FX3") 0…512 (256 = none), clip at 0 dB.
+    int boost = 0, eq = 128, ringMix = 0, ringFreq = 128, stereoDelay = 2048, cutoff = 1024, resonance = 0;
+    int reverb = 0, reverbType = 1, pogo = 256;
+    bool clip = false;
 
+    bool legacy() const noexcept
+    {
+        return boost > 0 || eq != 128 || ringMix != 0 || stereoDelay != 2048 || cutoff < 1024 || resonance > 0 || reverb != 0
+               || pogo != 256 || clip;
+    }
     bool any() const noexcept
     {
         return removeDc || normalize || reversePolarity || fadeStereo || swapStereo || fadeIn > 0 || fadeOut > 0 || crossfade > 0
-               || trim > 0 || pingPong;
+               || trim > 0 || pingPong || legacy();
     }
     bool operator== (const SamplePrecompute&) const = default;
 };
@@ -599,6 +611,9 @@ struct ChannelDef
     // FL's ghost channels (the Piano Roll's ghost notes button menu, round 166d): this channel's notes are not shown as
     // ghosts in the other channels' Piano Roll
     bool ghostHidden = false;
+    // FL's "Lock active/mute state" (the mute switch's menu, .flp 0x20, REA_rodada167l §5): soloing another channel
+    // leaves this one as it is
+    bool soloLock = false;
     // FL's key region (the Channel settings keyboard's ruler, REA_rodada164a §2): the channel plays only the notes
     // from keyLow to keyHigh (MIDI keys); 0…127 = every note. Layer's "Split children" sets one key per child.
     int keyLow = 0, keyHigh = 127;
@@ -893,6 +908,9 @@ struct MixerTrack
     float pan = 0.0f;          // -1..1
     bool muted = false;
     bool solo = false;
+    // with solo: the tracks that feed this one are heard too (LYNX's solo switch, FL's "Alt solo"); off = FL's "Solo
+    // selected track(s)": only this track and its path to Master (REA_rodada167l §4)
+    bool soloSources = true;
     std::vector<EffectSlot> effects; // up to maxEffectSlots, processed in order
     bool toMaster = true;            // inserts: output to Master (besides the sends)
     float masterLevel = 1.0f;        // level of that route to Master (linear gain, 0..maxFaderGain; FL's route knob)
@@ -1111,6 +1129,10 @@ struct Clip
     // per clip, on top of the channel's own pitch and reverse (FL: the playlist item's +0x3C / +0x48 bit 0, round 167k)
     float pitch = 0.0f;
     bool reversed = false;
+    // audio clips: FL 2026's per-clip stretch (the playlist item's +0x40 double, REA_rodada167l §2): the clip plays its
+    // audio `stretch` times longer (2 = half speed). Its channel's time-stretch mode decides how: Resample changes the
+    // speed and the pitch together, the other modes keep the pitch. `length` is already the stretched length.
+    double stretch = 1.0;
     // FL's automatic crossfades (round 166e): where this audio clip overlaps the previous / next audio clip on its
     // track, the overlap in ticks — derived from the arrangement by clipops::updateCrossfades while
     // Song::autoCrossfades is on (never saved). A crossfade replaces that side's fade, with an S-shaped curve.

@@ -86,6 +86,7 @@ public:
     void setPianoRollView (bool on);
     bool isPianoRollView() const noexcept { return pianoRollView; }
     bool areGraphLanesShown() const noexcept { return graphLanes; }
+    juce::PopupMenu getChannelMenuForSnapshot (int channel) { return buildChannelMenu (channel); }
     void setGraphLevelForSnapshot (int level) { graphLevel = level; graphLanes = true; updateSize(); repaint(); }
     void rotateSelected (int steps);
     void fillSelected (int every);
@@ -195,6 +196,7 @@ private:
     juce::Rectangle<int> stepBounds (int row, int step) const;
     bool cellHasNote (int channel, int step) const;
     void applyPaint (const juce::MouseEvent& e);
+    juce::PopupMenu buildChannelMenu (int channel);
     void showChannelMenu (int channel);
     void chooseSample (int channel, int insertAt = -1); // channel < 0 = new channel (at the end, or at row insertAt)
     void openNewGenerator (int row, InstrumentKind kind); // the window a new / replaced generator opens with

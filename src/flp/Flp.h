@@ -172,6 +172,15 @@ struct Channel
     int declickMode = 0, crossfade = 0, trim = 0;
     int sampleFlags = -1;
     bool loopPointsOld = false, pingPong = false;
+    // the legacy precomputed effects (REA round 167l §1): 0x4A boost, 0x45 EQ ("FX"), 0x83 ring mod mix | freq << 16,
+    // 0x55 stereo delay, 0x47 / 0x53 low-pass cutoff / resonance, 0x8B reverb | type << 16, 0x56 pogo ("FX3"); FL's
+    // defaults when absent
+    int boost = 0, eq = 128, ringMix = 0, ringFreq = 128, stereoDelay = 2048, cutoff = 1024, resonance = 0;
+    int reverb = 0, reverbType = 1, pogo = 256;
+    // 0x20: "Lock active/mute state" (the channel keeps its state when another one is soloed; REA round 167l §5)
+    bool soloLock = false;
+    // 0x32: the channel's notes are shown as ghosts in the Piano Roll (FL's ghost channels menu; 1 = shown, FL's default)
+    bool ghostShown = true;
     bool useLoopPoints() const noexcept { return sampleFlags >= 0 ? (sampleFlags & 8) != 0 : loopPointsOld; }
 
     // Seconds for an envelope time value (docs/analise/REA_rodada3.md §1.4). With sync (flags & 1), in beats.
@@ -298,6 +307,7 @@ struct PlaylistItem
     // Audio clips, records of 80 B and more: FL 2026's clip pitch (semitones) and clip reverse (round 167k).
     float pitch = 0.0f;
     bool reversed = false;
+    double stretch = 1.0; // FL 2026's per-clip stretch (+0x40 double; round 167l)
 };
 
 struct PlaylistTrackInfo

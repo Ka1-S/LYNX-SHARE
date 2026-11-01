@@ -164,6 +164,10 @@ void removeTrack (Song& song, int track);
 void swapTracks (Song& song, int a, int b);
 // Solo: `track` plays alone (every other track muted); on the only unmuted track it unmutes all.
 void soloTrack (Song& song, int track, int trackCount);
+// FL's channel solo (FUN_00ffaaa0, REA_rodada167l §5): `channel` plays and every other channel is muted, except the
+// ones with "Lock active/mute state"; on a channel already playing alone (among the unlocked ones) every channel the
+// solo touched plays again.
+void soloChannel (Song& song, int channel);
 
 // --- Playlist track groups (FL's "Group with above track", REA round 104) -----------------------------
 // A track with `grouped` set belongs to the group of the nearest ungrouped track above it: the header.
