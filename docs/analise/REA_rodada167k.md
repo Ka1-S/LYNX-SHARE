@@ -189,10 +189,24 @@ render, **[GUI]** LYNX driven on Windows (fresh profile, `LYNX_TEST_MODE=1`), **
 - **LYNX now (LYNX `--render` against FL: the same samples for p_rev / p_normpol / p_fadein / p_fadeout):** imported for audio clip channels too. `buildInstrument` processes an audio clip's whole file (the
   region stays whole: a clip plays the whole file). [TEST] `rea167k_audio_clip_channels_keep_precomputed_effects`.
 
+## 9. Playlist › Select › time keys (167j gap row)
+
+- **FL evidence [REA]:** FL's Playlist actions `EESelAroundSelAction` (Ctrl+Enter), `EESelPrevAction` /
+  `EESelNextAction` (Ctrl+Left / Ctrl+Right, Tag −1 / +1). `FUN_00eb1b90` → `FUN_00e4ea50`: the time selection spans
+  the selected clips, or the visible range when none is selected; the same span again clears it. `FUN_00e43ea0`
+  (Tag ±1): the time selection moves by its own length, never before the song's start, the song position goes to
+  its new start and the view follows.
+- **LYNX before:** no keys; Ctrl+Left / Ctrl+Right did nothing in the Playlist.
+- **LYNX now:** `playlist.selectTimeAround`, `playlist.timePrevious`, `playlist.timeNext` (Playlist focused);
+  `PlaylistComponent::selectTimeAroundSelection` / `moveTimeSelection`. [TEST] `rea167k_select_time_keys`.
+
 ## Where I stopped
 
-- Done (feature/flopt167k): items 1–8, tests green (`tests/Rea167kTests.inc`), Windows GUI re-check (keys 7/8/9,
+- Done (feature/flopt167k): items 1–9, tests green (`tests/Rea167kTests.inc`), Windows GUI re-check (keys 7/8/9,
   marker keys, undo, mixer keys, export dialog) and render checks against FL.
-- Left from the brief: 167h leftovers (Sampler legacy panel, declicker attacks, audio clips through precompute,
-  .flp events 0x20/0x30/0x32/0xAA, 0x2B, 0xE2/0xE6, 0x26); the 167h gap table; more 167j gap rows (Ctrl+Enter /
-  Ctrl+Left / Ctrl+Right time selection, export "Save tempo information (acid)", markers in exports, Alt solo).
+- Left from the brief: 167h leftovers (Sampler legacy panel, declicker attacks, .flp events 0x20 (+0x892),
+  0x30 (+0x224), 0x32 (+0x1fc), 0xAA (+0x714 count + strings), 0x2B, 0xE2/0xE6, 0x26: they need the channel form
+  handlers traced); more 167j gap rows (export "Save tempo information (acid)", markers in exports, Alt solo not yet
+  proven, per-clip stretch at clip +0x40).
+- Seen, not fixed: the export dialog has a large empty gap above Mix; Ctrl+F4 on an empty pattern; CC123 to MIDI
+  out on a reset jump (MIDI Out is another round's area); generator level differences (plugin area, 167f).

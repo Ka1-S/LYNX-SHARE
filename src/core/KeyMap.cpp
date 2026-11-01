@@ -194,6 +194,10 @@ std::vector<Action> makeActions()
         { "playlist.ripple", TR_NOOP ("Ripple editing on/off"), Context::playlist, { chord ('S', shift) } },
         // FL's Playlist › Edit › "Automatic crossfades (current project)" (round 166e)
         { "playlist.autoCrossfades", TR_NOOP ("Automatic crossfades (current project) on/off"), Context::playlist, {} },
+        // FL's Select › time (round 167k: EESelAroundSelAction, EESelPrevAction / EESelNextAction, Playlist focused)
+        { "playlist.selectTimeAround", TR_NOOP ("Select time around selection"), Context::playlist, { chord (enter, ctrl) } },
+        { "playlist.timePrevious", TR_NOOP ("Select previous time"), Context::playlist, { chord (left, ctrl) } },
+        { "playlist.timeNext", TR_NOOP ("Select next time"), Context::playlist, { chord (right, ctrl) } },
         // FL 2026's Playlist › Time markers (round 167k: EEMarkerAdd2Menu 32852, EEMarkerAddAutoMenu 16468,
         // EEMarkerAddTSChangeMenu 41044, EEMarkerAddSongLoopMenu 8276); Ctrl+T stays the typing piano elsewhere
         { "playlist.markerAdd", TR_NOOP ("Time markers: Add one..."), Context::playlist, { chord ('T', alt) } },

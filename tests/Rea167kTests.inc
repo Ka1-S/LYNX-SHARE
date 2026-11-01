@@ -365,6 +365,18 @@ TEST (rea167k_mixer_menu_keys)
     CHECK (map.find ({ 'R', shift | alt }, Context::mixer, false) == "mixer.renderSelected");
 }
 
+TEST (rea167k_select_time_keys)
+{
+    // FL's Playlist › Select › time: Ctrl+Enter around the selection, Ctrl+Left / Ctrl+Right the previous / next time
+    // span of the same length (EESelAroundSelAction / EESelPrevAction / EESelNextAction)
+    using namespace lynx::keys;
+    KeyMap map;
+    CHECK (map.conflicts().empty());
+    CHECK (map.find ({ enter, ctrl }, Context::playlist, false) == "playlist.selectTimeAround");
+    CHECK (map.find ({ left, ctrl }, Context::playlist, false) == "playlist.timePrevious");
+    CHECK (map.find ({ right, ctrl }, Context::playlist, false) == "playlist.timeNext");
+}
+
 namespace rea167k
 {
 // a 2 s 440 Hz sine on an audio clip channel at 48 kHz (4 beats at 120 BPM), one clip of 6 beats: the rendered left

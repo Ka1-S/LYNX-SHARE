@@ -4336,6 +4336,9 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.ripple")) setRipple (! ripple);
     else if (is ("playlist.autoCrossfades")) engine.editSong ([] (Song& s) { s.autoCrossfades = ! s.autoCrossfades; });
     else if (is ("playlist.follow")) EditorGlobals::get().setFollowing (false, ! EditorGlobals::get().isFollowing (false));
+    else if (is ("playlist.selectTimeAround")) selectTimeAroundSelection();
+    else if (is ("playlist.timePrevious")) moveTimeSelection (-1);
+    else if (is ("playlist.timeNext")) moveTimeSelection (1);
     else if (is ("playlist.markerAdd")) addMarkerByKey();
     else if (is ("playlist.markerAuto")) addAutoMarker();
     else if (is ("playlist.markerSignature")) addSignatureChangeByKey();
@@ -4418,6 +4421,62 @@ void PlaylistComponent::addSignatureChangeByKey()
                                  engine.editSong ([from, to, n, d] (Song& s) { markers::addSignatureChange (s, from, to, n, d); });
                              }),
                              true);
+}
+
+void PlaylistComponent::selectTimeAroundSelection()
+{
+    // FL (FUN_00eb1b90 → FUN_00e4ea50): the time selection spans the selected clips, or the view when none is
+    // selected; the same span again clears it
+    const auto& song = engine.getSong();
+    std::int64_t from = -1, to = -1;
+    for (auto i : selection)
+        if (i >= 0 && i < (int) song.playlist.size())
+        {
+            const auto& c = song.playlist[(std::size_t) i];
+            from = from < 0 ? c.start : std::min (from, c.start);
+            to = std::max (to, c.end());
+        }
+    if (from < 0)
+    {
+        from = (std::int64_t) std::llround (std::max (0.0, scrollTicks));
+        to = (std::int64_t) std::llround (std::max (0.0, scrollTicks) + gridArea().getWidth() / pixelsPerTick);
+    }
+    const auto same = song.hasLoop() && song.loopStart == from && song.loopEnd == to;
+    engine.editSong ([from, to, same] (Song& s) {
+        s.loopStart = same ? 0 : from;
+        s.loopEnd = same ? 0 : to;
+    }, false);
+    repaint();
+}
+
+void PlaylistComponent::moveTimeSelection (int direction)
+{
+    // FL (FUN_00e43ea0, the action's Tag ±1): the time selection moves by its own length (not before the song's
+    // start) and the song position goes to its start
+    const auto& song = engine.getSong();
+    if (! song.hasLoop())
+        return;
+    const auto length = song.loopEnd - song.loopStart;
+    const auto from = song.loopStart + direction * length;
+    const auto songMode = song.mode == PlayMode::song;
+    if (from < 0)
+        return;
+    engine.editSong ([from, length] (Song& s) {
+        s.loopStart = from;
+        s.loopEnd = from + length;
+    }, false);
+    if (! songMode)
+        engine.editSong ([] (Song& s) { s.mode = PlayMode::song; }, false);
+    engine.jumpTo ((double) from);
+    playheadTick = (double) from;
+    // keep it in view
+    const auto visible = gridArea().getWidth() / pixelsPerTick;
+    if ((double) from < scrollTicks || (double) (from + length) > scrollTicks + visible)
+    {
+        scrollTicks = std::max (0.0, (double) from - visible * 0.1);
+        updateScrollBars();
+    }
+    repaint();
 }
 
 void PlaylistComponent::placeLoopMarker()
