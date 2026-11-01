@@ -12,6 +12,7 @@
 
 #include "core/MidiControls.h"
 #include "core/MidiOut.h"
+#include "core/MidiOutView.h"
 #include "engine/PluginHost.h"
 #include "engine/Text.h"
 #include "ui/AutomationUi.h"
@@ -111,7 +112,7 @@ public:
         auto setupNumber = [this] (juce::Slider& s, int lo, int hi) {
             s.setSliderStyle (juce::Slider::IncDecButtons);
             s.setRange (lo, hi, 1);
-            s.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 64, 22);
+            s.setTextBoxStyle (juce::Slider::TextBoxLeft, false, numberTextWidth, rowHeight);
             addAndMakeVisible (s);
         };
         setupNumber (number, 0, 127);
@@ -160,33 +161,46 @@ public:
         for (auto* b : { &copy, &paste, &reset, &ok })
             addAndMakeVisible (*b);
         show (control);
-        setSize (360, 300);
+        setSize (dialogWidth, dialogHeight);
     }
 
-    void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg2); }
+    // Round 167p: every number field has the same size (its - / + buttons too), the window is as tall as its rows
+    static constexpr int rowHeight = 24, rowGap = 6, padding = 14, labelWidth = 116, numberTextWidth = 52, numberWidth = 116;
+    static constexpr int rows = 7, dialogWidth = padding + labelWidth + 2 * numberWidth + 24 + padding;
+    static constexpr int dialogHeight = padding + rows * (rowHeight + rowGap) + 8 + 28 + padding;
+
+    void paint (juce::Graphics& g) override
+    {
+        g.fillAll (theme::colour::bg2);
+        g.setColour (theme::colour::textSecondary);
+        g.setFont (theme::font (theme::type::small));
+        g.drawText (juce::CharPointer_UTF8 ("\xe2\x80\x93"), rangeDash, juce::Justification::centred); // between min and max
+    }
 
     void resized() override
     {
-        auto area = getLocalBounds().reduced (12);
-        auto row = [&] (juce::Label& l, std::initializer_list<juce::Component*> cs) {
-            auto r = area.removeFromTop (26);
-            l.setBounds (r.removeFromLeft (120));
-            const auto w = r.getWidth() / (int) cs.size();
-            for (auto* c : cs)
-                c->setBounds (r.removeFromLeft (w).reduced (cs.size() > 1 ? 2 : 0, 0));
-            area.removeFromTop (6);
+        auto area = getLocalBounds().reduced (padding);
+        auto row = [&] (juce::Label& l) {
+            auto r = area.removeFromTop (rowHeight);
+            area.removeFromTop (rowGap);
+            l.setBounds (r.removeFromLeft (labelWidth));
+            return r;
         };
-        row (typeLabel, { &type });
-        row (fullLabel, { &fullName });
-        row (shortLabel, { &shortName });
-        row (numberLabel, { &number });
-        row (rangeLabel, { &minimum, &maximum });
-        row (channelLabel, { &channel });
-        row (noteOffLabel, { &noteOff });
-        auto buttons = area.removeFromBottom (26);
+        type.setBounds (row (typeLabel));
+        fullName.setBounds (row (fullLabel));
+        shortName.setBounds (row (shortLabel));
+        number.setBounds (row (numberLabel).removeFromLeft (numberWidth));
+        auto range = row (rangeLabel);
+        minimum.setBounds (range.removeFromLeft (numberWidth));
+        rangeDash = range.removeFromLeft (24);
+        maximum.setBounds (range.removeFromLeft (numberWidth));
+        channel.setBounds (row (channelLabel).removeFromLeft (numberWidth));
+        noteOff.setBounds (row (noteOffLabel).removeFromLeft (numberWidth));
+        area.removeFromTop (8);
+        auto buttons = area.removeFromTop (28);
         const auto w = buttons.getWidth() / 4;
         for (auto* b : { &copy, &paste, &reset, &ok })
-            b->setBounds (buttons.removeFromLeft (w).reduced (2, 0));
+            b->setBounds (buttons.removeFromLeft (w).reduced (3, 0));
     }
 
 private:
@@ -237,6 +251,7 @@ private:
     juce::Slider number, minimum, maximum, noteOff;
     juce::Label typeLabel, fullLabel, shortLabel, numberLabel, rangeLabel, channelLabel, noteOffLabel;
     juce::TextButton copy, paste, reset, ok;
+    juce::Rectangle<int> rangeDash;
 };
 
 // ---------------------------------------------------------------------------------------------------
@@ -343,80 +358,95 @@ public:
         connect.setVisible (channel >= 0);
         listeners.setFont (theme::font (theme::type::small));
         listeners.setColour (juce::Label::textColourId, theme::colour::textSecondary);
-        listeners.setJustificationType (juce::Justification::topLeft);
+        listeners.setJustificationType (juce::Justification::centredLeft);
+        listeners.setMinimumHorizontalScale (1.0f);
         addAndMakeVisible (listeners);
 
         engine.addChangeListener (this);
         refresh();
-        setSize (560, 560);
+        setSize (editorWidth, editorHeight);
     }
 
     ~MidiOutEditor() override { engine.removeChangeListener (this); }
 
+    // Round 167p: the editor uses the channel window's whole width (its Misc tab is 800 px wide, so a narrower page
+    // left empty margins), the page row lines up with the Channel / Patch columns, and the knob grid has room for each
+    // knob's cog (top-right) and name (under it) without touching the next row.
+    static constexpr int editorWidth = 800, margin = 16, rowGap = 10, knobRowHeight = 100;
+    static constexpr int editorHeight = margin + 44 + rowGap + 26 + rowGap + (8 + 3 * knobRowHeight + 8) + rowGap + 28 + 8 + 30 + margin;
+
     void paint (juce::Graphics& g) override
     {
         g.fillAll (theme::colour::bg2);
-        g.setColour (theme::colour::textPrimary);
-        g.setFont (theme::font (theme::type::title, true));
-        g.drawText (tr ("MIDI Out"), 14, 8, 200, 22, juce::Justification::centredLeft);
         g.setColour (theme::colour::bg3);
         g.fillRoundedRectangle (knobArea.toFloat(), 6.0f);
     }
 
     void resized() override
     {
-        auto area = getLocalBounds().reduced (14);
-        auto head = area.removeFromTop (24);
-        options.setBounds (head.removeFromRight (90));
-        head.removeFromRight (6);
-        presets.setBounds (head.removeFromRight (90));
-        area.removeFromTop (10);
+        auto area = getLocalBounds().reduced (margin);
 
         auto top = area.removeFromTop (44);
         auto column = [&] (juce::Label& l, int w, std::initializer_list<juce::Component*> cs) {
             auto c = top.removeFromLeft (w);
             l.setBounds (c.removeFromTop (18));
+            c = c.withSizeKeepingCentre (c.getWidth(), 24);
             const auto each = c.getWidth() / (int) cs.size();
             for (auto* x : cs)
-                x->setBounds (c.removeFromLeft (each).reduced (cs.size() > 1 ? 1 : 0, 0));
-            top.removeFromLeft (8);
+                x->setBounds (c.removeFromLeft (each).reduced (cs.size() > 1 ? 2 : 0, 0));
+            top.removeFromLeft (10);
+            return l.getBounds().getUnion (c);
         };
-        column (channelLabel, 60, { &midiChannel });
-        column (patchLabel, 190, { &patch });
-        column (bankLabel, 170, { &bankMsb, &bankLsb });
-        column (portLabel, juce::jmax (60, top.getWidth()), { &port });
-        area.removeFromTop (10);
+        const auto channelColumn = column (channelLabel, 64, { &midiChannel });
+        const auto patchWidth = juce::jmax (180, top.getWidth() - 236 - 10 - 120 - 10);
+        const auto patchColumn = column (patchLabel, patchWidth, { &patch });
+        column (bankLabel, 236, { &bankMsb, &bankLsb });
+        column (portLabel, top.getWidth(), { &port });
+        area.removeFromTop (rowGap);
 
+        // the page selector under Channel / Patch; Presets and Options on the right (room for the preset arrows that
+        // every plugin window header gets, right of Presets)
         auto pageRow = area.removeFromTop (26);
-        pageLabel.setBounds (pageRow.removeFromLeft (44));
-        page.setBounds (pageRow.removeFromLeft (220));
-        pageRow.removeFromLeft (6);
-        rename.setBounds (pageRow.removeFromLeft (22).reduced (2));
-        area.removeFromTop (8);
+        pageLabel.setBounds (channelColumn.getX(), pageRow.getY(), channelColumn.getWidth(), pageRow.getHeight());
+        page.setBounds (patchColumn.getX(), pageRow.getY(), patchColumn.getWidth(), pageRow.getHeight());
+        rename.setBounds (juce::Rectangle<int> (page.getRight() + 6, pageRow.getY(), 24, pageRow.getHeight()).reduced (3));
+        pageRow.removeFromRight (56);
+        presets.setBounds (pageRow.removeFromRight (90));
+        pageRow.removeFromRight (6);
+        options.setBounds (pageRow.removeFromRight (90));
+        area.removeFromTop (rowGap);
 
-        knobArea = area.removeFromTop (264);
-        auto grid = knobArea.reduced (8);
-        const auto cw = grid.getWidth() / 3, ch = grid.getHeight() / 3;
+        knobArea = area.removeFromTop (8 + 3 * knobRowHeight + 8);
+        auto grid = knobArea.reduced (24, 8);
+        const auto cw = grid.getWidth() / 3;
         for (int k = 0; k < midiout::knobsPerPage; ++k)
-            knobs[(std::size_t) k]->setBounds (grid.getX() + (k % 3) * cw, grid.getY() + (k / 3) * ch, cw, ch);
-        area.removeFromTop (8);
+            knobs[(std::size_t) k]->setBounds (grid.getX() + (k % 3) * cw, grid.getY() + (k / 3) * knobRowHeight, cw, knobRowHeight);
+        area.removeFromTop (rowGap);
 
-        auto buttons = area.removeFromTop (26);
+        // FL's bottom bar: Reset, Deactivate all, the two options
+        auto buttons = area.removeFromTop (28);
         resetButton.setBounds (buttons.removeFromLeft (80));
         buttons.removeFromLeft (6);
         deactivateAll.setBounds (buttons.removeFromLeft (120));
-        area.removeFromTop (4);
-        auto toggles = area.removeFromTop (24);
-        sendPanVol.setBounds (toggles.removeFromLeft (toggles.getWidth() / 2));
-        mapColour.setBounds (toggles);
+        buttons.removeFromLeft (16);
+        const auto toggleWidth = [] (juce::ToggleButton& b) {
+            return juce::roundToInt (juce::GlyphArrangement::getStringWidth (juce::Font (theme::font (theme::type::body)), b.getButtonText())) + 40;
+        };
+        sendPanVol.setBounds (buttons.removeFromLeft (juce::jmin (buttons.getWidth() / 2, toggleWidth (sendPanVol))));
+        buttons.removeFromLeft (8);
+        mapColour.setBounds (buttons);
         area.removeFromTop (8);
 
-        auto extra = area.removeFromTop (26);
-        connect.setBounds (extra.removeFromLeft (180));
-        extra.removeFromLeft (8);
-        automate.setBounds (extra.removeFromLeft (220));
-        area.removeFromTop (6);
-        listeners.setBounds (area);
+        // LYNX's own: send to a plugin's MIDI input, automate a controller, who plays this port
+        auto extra = area.removeFromTop (30);
+        if (connect.isVisible())
+        {
+            connect.setBounds (extra.removeFromLeft (180).withSizeKeepingCentre (180, 28));
+            extra.removeFromLeft (8);
+            automate.setBounds (extra.removeFromLeft (220).withSizeKeepingCentre (220, 28));
+            extra.removeFromLeft (12);
+        }
+        listeners.setBounds (extra);
     }
 
 private:
@@ -445,54 +475,85 @@ private:
             return s;
         }
 
-        juce::Rectangle<int> labelArea() const { return getLocalBounds().removeFromBottom (20); }
+        midiout::view::Cell cell() const { return midiout::view::layout ({ 0, 0, getWidth(), getHeight() }); }
+        static juce::Rectangle<int> rect (const midiout::view::Rect& r) { return { r.x, r.y, r.w, r.h }; }
+        juce::Rectangle<int> labelArea() const { return rect (cell().label); }
+        // the cog's click area: a little larger than the glyph
+        juce::Rectangle<int> gearArea() const { return rect (cell().gear).expanded (3); }
 
         void paint (juce::Graphics& g) override
         {
+            using midiout::view::Look;
             const auto& c = control();
-            auto area = getLocalBounds().toFloat();
-            const auto label = area.removeFromBottom (20.0f);
-            const auto size = juce::jmin (area.getWidth(), area.getHeight()) - 6.0f;
-            const auto box = juce::Rectangle<float> (size, size).withCentre (area.getCentre());
+            const auto layout = cell();
+            const auto look = midiout::view::look (c);
+            const auto box = rect (layout.knob).toFloat();
             const auto lo = (double) juce::jmin (c.min, c.max), hi = (double) juce::jmax (c.max, c.min + 1);
             const auto v = juce::jlimit (0.0, 1.0, ((double) value() - lo) / juce::jmax (1.0, hi - lo));
             constexpr float sweep = juce::MathConstants<float>::pi * 1.5f;
-            const auto live = c.sends();
+            const auto hover = isMouseOverOrDragging() && ! hoverGear && ! labelArea().contains (getMouseXYRelative());
+            const auto dim = look == Look::unassigned ? 0.45f : 1.0f;
 
-            g.setColour (theme::colour::bg4);
+            g.setColour (theme::colour::bg4.withMultipliedAlpha (dim));
             g.fillEllipse (box.reduced (6.0f));
-            juce::Path track, arc;
-            const auto radius = size * 0.5f - 2.0f;
+            juce::Path track;
+            const auto radius = box.getWidth() * 0.5f - 2.0f;
             track.addCentredArc (box.getCentreX(), box.getCentreY(), radius, radius, 0.0f, -sweep * 0.5f, sweep * 0.5f, true);
-            g.setColour (theme::colour::bg6);
+            g.setColour (theme::colour::bg6.withMultipliedAlpha (dim));
             g.strokePath (track, juce::PathStrokeType (3.5f));
-            arc.addCentredArc (box.getCentreX(), box.getCentreY(), radius, radius, 0.0f, -sweep * 0.5f, -sweep * 0.5f + sweep * (float) v, true);
-            g.setColour (! live ? theme::colour::textDisabled : isMouseOverOrDragging() ? theme::colour::accent : theme::colour::knobArc);
-            g.strokePath (arc, juce::PathStrokeType (3.5f));
-            g.setColour (live ? theme::colour::textPrimary : theme::colour::textSecondary);
-            g.setFont (theme::font (theme::type::caption));
-            g.drawText (juce::String (value()), box, juce::Justification::centred);
-
-            if (! c.assigned())
+            if (look != Look::unassigned)
             {
-                g.setColour (theme::colour::textSecondary);
-                g.fillPath (cogPath (juce::Rectangle<float> (14.0f, 14.0f).withCentre (label.getCentre())));
-                return;
+                juce::Path arc;
+                arc.addCentredArc (box.getCentreX(), box.getCentreY(), radius, radius, 0.0f, -sweep * 0.5f, -sweep * 0.5f + sweep * (float) v, true);
+                g.setColour (look == Look::sending ? (hover ? theme::colour::accent.brighter (0.25f) : theme::colour::accent)
+                                                   : (hover ? theme::colour::textSecondary : theme::colour::textDisabled));
+                g.strokePath (arc, juce::PathStrokeType (3.5f));
+                // the pointer from the centre, like the other LYNX knobs
+                const auto angle = -sweep * 0.5f + sweep * (float) v;
+                const auto inner = box.getCentre() + juce::Point<float> (std::sin (angle), -std::cos (angle)) * (radius - 9.0f);
+                const auto outer = box.getCentre() + juce::Point<float> (std::sin (angle), -std::cos (angle)) * (radius - 4.0f);
+                g.drawLine ({ inner, outer }, 2.0f);
+                g.setColour (look == Look::sending ? theme::colour::textPrimary : theme::colour::textSecondary);
+                g.setFont (theme::font (theme::type::caption, look == Look::sending));
+                g.drawText (utf (midiout::view::readout (c, value())), box.reduced (8.0f), juce::Justification::centred);
             }
-            g.setColour (live ? theme::colour::textPrimary : theme::colour::textSecondary); // (bold when it sends, FL)
-            ui::drawFittingText (g, utf (midiout::label (c)), label.reduced (2.0f, 0.0f), juce::Justification::centred,
-                                 juce::Font (theme::font (theme::type::small, live)));
+
+            // the cog: always there, always "Configure..."
+            g.setColour (hoverGear ? theme::colour::accent : look == Look::unassigned ? theme::colour::textSecondary : theme::colour::textDisabled);
+            g.fillPath (cogPath (rect (layout.gear).toFloat().reduced (1.5f)));
+
+            if (look == Look::unassigned)
+                return;
+            const auto labelHover = isMouseOver() && labelArea().contains (getMouseXYRelative());
+            g.setColour (look == Look::sending ? theme::colour::textPrimary : labelHover ? theme::colour::textSecondary : theme::colour::textDisabled);
+            ui::drawFittingText (g, utf (midiout::label (c)), labelArea().toFloat(), juce::Justification::centredTop,
+                                 juce::Font (theme::font (theme::type::small, look == Look::sending)));
         }
 
         void mouseMove (const juce::MouseEvent& e) override
         {
             const auto& c = control();
-            if (labelArea().contains (e.getPosition()))
-                ui::setHint (*this, c.assigned() ? tr ("{0}: click to activate / deactivate", { utf (midiout::label (c)) })
-                                                 : tr ("(right click to configure) Unassigned"));
+            const auto overGear = gearArea().contains (e.getPosition());
+            if (overGear != hoverGear)
+            {
+                hoverGear = overGear;
+                setMouseCursor (overGear ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+            }
+            repaint();
+            if (overGear)
+                ui::setHint (*this, tr ("Configure..."));
+            else if (labelArea().contains (e.getPosition()) && c.assigned())
+                ui::setHint (*this, tr ("{0}: click to activate / deactivate", { utf (midiout::label (c)) }));
             else
                 ui::setHint (*this, c.assigned() ? utf (midiout::description (c)) : tr ("(right click to configure) Unassigned"), true,
-                             owner.channel >= 0);
+                             c.assigned() && owner.channel >= 0);
+        }
+
+        void mouseExit (const juce::MouseEvent&) override
+        {
+            hoverGear = false;
+            setMouseCursor (juce::MouseCursor::NormalCursor);
+            repaint();
         }
 
         void mouseDown (const juce::MouseEvent& e) override
@@ -502,12 +563,16 @@ private:
                 showMenu();
                 return;
             }
+            if (gearArea().contains (e.getPosition()))
+            {
+                owner.configure (index());
+                return;
+            }
+            if (! control().assigned())
+                return; // nothing to turn: the cog (or a right-click) sets it up
             if (labelArea().contains (e.getPosition()))
             {
-                if (! control().assigned())
-                    owner.configure (index());
-                else
-                    owner.edit ([i = index()] (State& s) { s.controls[(std::size_t) i].active = ! s.controls[(std::size_t) i].active; });
+                owner.edit ([i = index()] (State& s) { s.controls[(std::size_t) i].active = ! s.controls[(std::size_t) i].active; });
                 return;
             }
             if (ui::isResetClick (e))
@@ -524,7 +589,7 @@ private:
                 return;
             const auto s = spec();
             set (drag.update (e, s));
-            ui::showValueTip (*this, getLocalBounds(), s.text (value()));
+            ui::showValueTip (*this, rect (cell().knob), s.text (value()));
         }
 
         void mouseUp (const juce::MouseEvent&) override
@@ -535,6 +600,8 @@ private:
 
         void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
         {
+            if (! control().assigned())
+                return;
             const auto s = spec();
             if (const auto v = ui::wheelValue (value(), e, wheel, s))
             {
@@ -567,6 +634,7 @@ private:
 
         MidiOutEditor& owner;
         int slot;
+        bool hoverGear = false;
         ui::ValueDrag drag;
     };
 
@@ -589,8 +657,20 @@ private:
         o.escapeKeyTriggersCloseButton = true;
         o.useNativeTitleBar = true;
         o.resizable = false;
+        // like LYNX's other dialogs (Export, Customize toolbar...): modal, above the LYNX windows, LYNX title bar
         if (auto* w = o.launchAsync())
-            applyWindowChrome (*w);
+        {
+            keepAboveMainWindow (*w);
+            // On Windows the native title bar's height came out added to the client area once the window was shown,
+            // leaving an empty band under the buttons: give the client area back the content's height
+            juce::Timer::callAfterDelay (60, [safe = juce::Component::SafePointer<juce::DialogWindow> (w)] {
+                if (safe == nullptr)
+                    return;
+                const auto extra = safe->getHeight() - safe->getContentComponentBorder().getTopAndBottom() - ControlSettings::dialogHeight;
+                if (extra > 0)
+                    safe->setSize (safe->getWidth(), safe->getHeight() - extra);
+            });
+        }
     }
 
     void renamePage()

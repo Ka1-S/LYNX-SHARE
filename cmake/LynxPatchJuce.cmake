@@ -15,6 +15,12 @@
 # 4. Every platform, juce_gui_basics/windows/juce_ComponentPeer.cpp: a file drop that no component took (an unsupported
 #    file, or dropped where nothing accepts files) kept `lastDragAndDropCompUnderMouse`, so the next drag that starts
 #    over that same component (the Playlist next to the file manager) never looked for a target and was refused.
+# 5. Every platform, juce_gui_basics/menus/juce_PopupMenu.cpp (issue #18, round 167p): LYNX opens a submenu beside its
+#    parent menu's outer edge (Theme.cpp preparePopupMenuWindow), so in a two-column menu the mouse crosses the other
+#    column on its way. JUCE keeps the open submenu only while the mouse stays in a thin triangle towards it; a pixel
+#    of drift highlighted the other column's item under the mouse and closed the submenu. The way across now also
+#    counts as "moving towards the submenu": the band of the item's row (one row above and below), between the item
+#    and the submenu, while the mouse moves towards it. Resting there (JUCE's 350 ms) still picks the item under it.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -31,7 +37,7 @@ macro(lynx_juce_fix name marker old new)
         else()
             string(REPLACE "${old_text}" "${new_text}" text "${text}")
             set(changed TRUE)
-            message(STATUS "LYNX: JUCE drag & drop fix applied: ${name}")
+            message(STATUS "LYNX: JUCE fix applied: ${name}")
         endif()
     endif()
 endmacro()
@@ -62,6 +68,10 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("no stale drop state" "LYNX patch (issue #11): not left over"
             "        dragInfo.clear();|NL|        srcMimeTypeAtomList.clear();|NL||NL|        dragAndDropCurrentMimeType = 0;"
             "        dragInfo.clear();|NL|        srcMimeTypeAtomList.clear();|NL|        finishAfterDropDataReceived = false; // LYNX patch (issue #11): not left over from a failed drop|NL||NL|        dragAndDropCurrentMimeType = 0;")
+    elseif(file MATCHES "juce_PopupMenu.cpp$")
+        lynx_juce_fix("submenu corridor" "LYNX patch (issue #18): the way across"
+            "        return areaTowardsSubMenu.contains (newGlobalPos.toFloat());|NL|    }"
+            "        if (areaTowardsSubMenu.contains (newGlobalPos.toFloat()))|NL|            return true;|NL||NL|        // LYNX patch (issue #18): the way across a two-column menu to a submenu beside its outer edge|NL|        if (auto* item = window.currentChild.getComponent())|NL|        {|NL|            const auto itemBounds = item->getScreenBounds();|NL|            const auto towardsRight = itemScreenBounds.getX() > window.getX();|NL|            const auto from = towardsRight ? itemBounds.getRight() : itemScreenBounds.getRight();|NL|            const auto to = towardsRight ? itemScreenBounds.getX() : itemBounds.getX();|NL|            return newGlobalPos.y >= itemBounds.getY() - itemBounds.getHeight() && newGlobalPos.y < itemBounds.getBottom() + itemBounds.getHeight()|NL|                   && newGlobalPos.x >= from - 2 && newGlobalPos.x <= to + 2|NL|                   && (towardsRight ? newGlobalPos.x >= lastMousePos.x : newGlobalPos.x <= lastMousePos.x);|NL|        }|NL||NL|        return false;|NL|    }")
     else()
         lynx_juce_fix("drop target search after an unused drop" "LYNX patch (issue #11): a drop nobody took"
             "bool ComponentPeer::handleDragDrop (const ComponentPeer::DragInfo& info)|NL|{|NL|    handleDragMove (info);|NL|"
@@ -77,6 +87,7 @@ endfunction()
 function(lynx_patch_juce juce_dir)
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_DragAndDrop_linux.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/windows/juce_ComponentPeer.cpp")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/menus/juce_PopupMenu.cpp")
 endfunction()
 
 # run as a script: cmake -DJUCE_DIR=<dir> -P cmake/LynxPatchJuce.cmake
