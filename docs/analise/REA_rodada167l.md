@@ -202,8 +202,18 @@ FL's command-line render, **[GUI]** LYNX driven on Windows (fresh profile, `LYNX
 
 ## Where I stopped
 
-- In progress: item 1 (Sampler legacy panel) — REA done (see §1 once written), FL test project
-  `tmp/r167l/py/mk167l.py` → `C:\Users\kauan\lynx-test\r167l\fl\l_fx.flp` (not rendered by FL yet).
-- REA notes so far: tmp/r167l/d*.c (decompiles), m*.txt (constants). Alt solo = FUN_0127c2a0 flags 3; channel lock
-  0x20 = SoloLockMenuClick 0x1213320 → FUN_00ffac40; CC 123 = FUN_011c89c0 (outputs with "Send all notes off").
-- Rerun: `tmp/r167l/g.sh <out.c> 0 <hex addr…>` (decompile), `SCRIPT=Mem.java|Dump.java|Off.java tmp/r167l/g.sh …`.
+- Done and landed: items 1–6 (§1–§6). Tests: `rea167l_*` (9 tests, 83 checks with the rest of the 167l set).
+- FL compare (take 2, `C:\Users\kauan\lynx-test\r167l\fl\l_all.flp`, FL render `/mnt/e/lynx-work/r167l/fl_take2.wav`):
+  the 24 legacy cases and the three Resample stretch cases match FL to ≤ 3e-5 RMS; the E3 / real-time stretch cases
+  have FL's length and pitch but not its waveform (élastique is not reproduced: 13–39 % error, same as LYNX's other
+  pitch-keeping stretches). The `smpl` loop end equals FL's (7661092).
+- Open:
+  - FL holds an audio clip's last sample value as DC until the clip's end (seen in every case of take 2 and in 167k
+    c_base); LYNX ends at the sample's end. Not implemented.
+  - The acid chunk's beats follow the file's length *with* its tail (FL and LYNX use the same formula), and FL's
+    tail after the music is shorter (642 frames on take 2, LYNX 22 492 frames with "Leave remainder"): FL writes 249
+    beats, LYNX 250. The difference is the tail detection, not the chunk.
+  - Export "Note markers" and the INFO/ISFT `LIST` FL writes last: not done.
+  - §5: 0x30, 0xAA, 0x2B, 0xE2/0xE6, 0x26 documented only.
+- REA material: tmp/r167l/d*.c (decompiles), m*.txt / o*.txt / r*.txt (constants, offsets, references).
+  Rerun: `tmp/r167l/g.sh <out.c> 0 <hex addr…>`, `SCRIPT=Mem.java|Dump.java|Off.java tmp/r167l/g.sh …`.
