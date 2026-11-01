@@ -2309,15 +2309,25 @@ void RackRenderer::process (const RackState* state,
 
     // started playing or jumped: audio clips in progress must start mid-way
     resumeAudio = playing && (! wasPlaying || jumped);
-    // FL's "Play truncated notes on transport": at the start of playback the notes already sounding there play
-    chaseNotes = playing && ! wasPlaying && playTruncatedOnTransport;
-    // FL's "Reset plugins on transport" (FUN_011e7a10 → FUN_011c8a40 mode 2 → every plugin's reset): the effects'
-    // tails and buffers are cleared when playback starts or jumps
+    // FL's "Play truncated notes on transport": at the start of playback, and after the user moves the position while
+    // playing (FL's set-position FUN_011e7a10 → FUN_011e78a0 → FUN_011e7470 with its catch-up flag set, round 167k),
+    // the notes already sounding there play. The loop's wrap is not a set-position and chases nothing.
+    const auto userJump = jumped && userJumpSerial != seenUserJumpSerial;
+    seenUserJumpSerial = userJumpSerial;
+    chaseNotes = playing && (! wasPlaying || userJump) && playTruncatedOnTransport;
+    // FL's "Reset plugins on transport" (FUN_011e7a10 → FUN_011c8a40 mode 2 → FUN_012b5210, every registered plugin's
+    // reset, generators included): the effects' tails and buffers are cleared and the plugin generators stop when
+    // playback starts or jumps (round 167k: instruments too, hosted plugins with their wrapper's reset option)
     if (resetPluginsOnTransport && playing && (! wasPlaying || jumped))
+    {
         for (auto& slots : state->effects)
             for (auto& effect : slots)
                 if (effect != nullptr)
-                    effect->reset();
+                    effect->transportReset();
+        for (auto& instrument : state->instruments)
+            if (instrument != nullptr)
+                instrument->transportReset();
+    }
     wasPlaying = playing;
     // tempo automation: the tempo holds for the whole block (evaluated at its start)
     bpm = tempoOverride > 0.0 ? tempoOverride : state->song.bpm;

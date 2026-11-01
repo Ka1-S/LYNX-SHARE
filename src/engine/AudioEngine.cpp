@@ -3799,10 +3799,16 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
     } measure { *this, callbackStart, numSamples };
 
     if (transport.rewindRequested.exchange (false))
+    {
         transport.positionTicks.store (0.0);
+        transport.userJumps.fetch_add (1, std::memory_order_relaxed);
+    }
 
     if (const auto target = transport.seekRequest.exchange (-1.0); target >= 0.0)
+    {
         transport.positionTicks.store (target);
+        transport.userJumps.fetch_add (1, std::memory_order_relaxed);
+    }
 
     transport.readMarkers (rtMarkers, rtMarkerVersion); // FL's marker actions (a new table when the song changed)
     // an external MIDI clock moves the transport (round 165f)
@@ -3954,6 +3960,7 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
                 position = transport.pendingJumpTo.load (std::memory_order_relaxed);
                 transport.pendingJumpAt.store (-1.0, std::memory_order_relaxed);
                 markerEvents.fetch_add (1, std::memory_order_relaxed);
+                transport.userJumps.fetch_add (1, std::memory_order_relaxed);
             }
             else if (markerJump != nullptr && position >= (double) markerJump->at - 1e-6)
             {
@@ -3966,6 +3973,7 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
                     transport.playing.store (false, std::memory_order_relaxed); // the rest of the block plays stopped
                 }
                 position = (double) markerJump->to;
+                transport.userJumps.fetch_add (1, std::memory_order_relaxed);
             }
             else if (looping && position >= loopEnd - 1e-6)
             {

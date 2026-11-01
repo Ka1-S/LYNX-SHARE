@@ -76,6 +76,7 @@ public:
     void setNextNoteRelease (float velocity) noexcept override { nextRelease = velocity; }
     void transportStopped() noexcept override;
     void panic() noexcept override;
+    void transportReset() noexcept override { panic(); }
     void render (float* left, float* right, int n, float gainLeft, float gainRight) noexcept override;
     void setParameter (int index, float value) noexcept override;
     int latencySamples() const noexcept override
@@ -149,6 +150,13 @@ public:
 
     void prepare (double) noexcept override {}
     void reset() noexcept override {}
+    // "Reset plugins on transport" (round 167k): with the wrapper's "Reset plugin when FL Studio resets", the plugin is
+    // reset before its next block
+    void transportReset() noexcept override
+    {
+        if (options.resetOnFlush)
+            resetPending.store (true, std::memory_order_relaxed);
+    }
     void process (float* left, float* right, int n, const EffectParams& params, double bpm) noexcept override;
     void setParameter (int index, float value) noexcept override;
     int latencySamples() const noexcept override
@@ -181,6 +189,7 @@ private:
     std::atomic<bool> crashed { false };
     std::unique_ptr<FixedBlock> fixed;
     HostedOptions options;
+    std::atomic<bool> resetPending { false }; // "Reset plugins on transport": reset before the next block (audio thread)
 };
 
 // Plugin formats, known-plugin list (saved in AppData) and instance creation.

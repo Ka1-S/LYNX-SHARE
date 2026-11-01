@@ -307,10 +307,13 @@ public:
     // so it plays through that track's effects and fader. nullptr = silent. Same thread as process().
     // FL's Settings › Audio › Mixer: "Play truncated notes on transport" (on by default) and "Reset plugins on
     // transport" (off by default), REA_rodada167j §2–§3. Read by the audio thread at each start of playback.
-    void setTransportOptions (bool playTruncated, bool resetPlugins) noexcept
+    // userJumps: a count the transport raises each time the user moves the position (seek, rewind, a quantized jump,
+    // a marker jump), so a jump of the position that is the loop's wrap can be told apart (round 167k).
+    void setTransportOptions (bool playTruncated, bool resetPlugins, unsigned userJumps = 0) noexcept
     {
         playTruncatedOnTransport = playTruncated;
         resetPluginsOnTransport = resetPlugins;
+        userJumpSerial = userJumps;
     }
     void setMetronomeInput (const float* left, const float* right, int track) noexcept
     {
@@ -408,6 +411,7 @@ private:
     bool resumeAudio = false;
     bool chaseNotes = false; // this block starts playback: notes crossing the position play (setTransportOptions)
     bool playTruncatedOnTransport = true, resetPluginsOnTransport = false;
+    unsigned userJumpSerial = 0, seenUserJumpSerial = 0;
     const RackState* lastState = nullptr;
     EventBuffer events;
     std::vector<float> mixBuffers; // maxMixerTracks * 2 * blockCapacity

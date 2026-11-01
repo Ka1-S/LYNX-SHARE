@@ -1500,6 +1500,8 @@ class SamplerInstrument final : public Instrument
 public:
     // clipMode: Playlist audio clip (no transposition, stops on noteOff; it follows Reverse and the stretch)
     SamplerInstrument (std::shared_ptr<const SampleData> s, bool clip) : sample (std::move (s)), clipMode (clip) {}
+    // FL's Sampler and audio clip channels are not plugins: "Reset plugins on transport" leaves their voices alone
+    void transportReset() noexcept override {}
 
     // multi-sample: called before the instrument goes to the audio thread
     void setZones (std::vector<LoadedZone> z)
@@ -2257,6 +2259,18 @@ public:
                 if (v.active && v.data != nullptr && v.flVoice)
                     if (auto& ks = shifts[(std::size_t) (&v - voices.data())]; ! ks.on || primeKeyShift (v, ks, primeBudget))
                         renderFl (v, left, right, n, chanVol, chanPan);
+        }
+
+        // the project's triangular panning law (round 167k: FL's render of FPC pads and the decompiled audio clip mixer
+        // FUN_00d0cc10 → FUN_006a3a00 follow it, 3x Osc keeps its own circular pan): the louder side keeps the centre
+        // level, the other falls linearly. The rack's gains are circular (gain·√2·cos/sin of (1 + pan)·π/4).
+        if (panTriangular.load (std::memory_order_relaxed) && (gl != gr))
+        {
+            const auto vol = (float) std::sqrt (((double) gl * gl + (double) gr * gr) * 0.5);
+            const auto pan = vol > 0.0f ? std::clamp ((float) (std::atan2 ((double) gr, (double) gl) * (4.0 / 3.141592653589793) - 1.0), -1.0f, 1.0f)
+                                        : 0.0f;
+            gl = pan > 0.0f ? (1.0f - pan) * vol : vol;
+            gr = pan < 0.0f ? (1.0f + pan) * vol : vol;
         }
 
         // the Gain knob scales the other voices with the channel's gains (FL voices apply it in renderFl)

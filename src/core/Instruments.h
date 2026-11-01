@@ -101,6 +101,11 @@ public:
     // Playback started (FL resets its generators: a MIDI Out sends its bank, patch and controls again).
     virtual void transportStarted() noexcept {}
     virtual void panic() noexcept { allNotesOff(); }
+    // FL's "Reset plugins on transport" (round 167k: FL resets every plugin it registered, generators included —
+    // FUN_012b8620 adds each opened plugin to the list FUN_012b5210 resets). The Sampler / audio clip channels are not
+    // plugins in FL and keep their voices; a plugin generator stops its voices, a hosted plugin is also reset (with its
+    // wrapper's "Reset plugin when FL Studio resets").
+    virtual void transportReset() noexcept { panic(); }
     // Channel settings (sampler, synth). UI thread, on every snapshot; the instrument stores them
     // so the audio thread can read without waiting.
     virtual void configure (const ChannelDef&, double /*bpm*/) noexcept {}

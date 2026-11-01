@@ -29,6 +29,9 @@ struct Transport
     // "Reset plugins on transport" (FL's default: off)
     std::atomic<bool> playTruncatedOnTransport { true };
     std::atomic<bool> resetPluginsOnTransport { false };
+    // raised each time the user moves the position (seek, rewind, quantized / marker jump): the renderer tells those from
+    // the loop's wrap (round 167k, "Play truncated notes on transport" after a jump). Audio thread only.
+    std::atomic<unsigned> userJumps { 0 };
     std::atomic<bool> recording { false };
     std::atomic<double> bpm { 130.0 };
     // External clock sync (round 165f): > 0 = the tempo LYNX follows from an incoming MIDI clock, over the song's

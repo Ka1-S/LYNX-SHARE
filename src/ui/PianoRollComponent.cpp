@@ -820,7 +820,9 @@ void PianoRollComponent::paint (juce::Graphics& g)
             const auto hovered = i == hover.note && drag == Drag::none;
             const auto r = juce::Rectangle<float> ((float) tickToX ((double) n.start), (float) keyToY (n.key) + 1,
                                                    juce::jmax (4.0f, (float) (n.length * pixelsPerTick) - 1.0f), (float) rowHeight - 2);
-            auto fill = selected ? accentHover.brighter (0.15f) : n.muted ? noteMuted : theme::noteGroupColour (n.colour, n.velocity);
+            // a selected muted note keeps a muted look (round 167k: Alt+M on a selection showed no change)
+            auto fill = selected ? (n.muted ? accentHover.interpolatedWith (noteMuted, 0.6f) : accentHover.brighter (0.15f))
+                                 : n.muted ? noteMuted : theme::noteGroupColour (n.colour, n.velocity);
             if (hovered)
                 fill = fill.brighter (0.18f);
             g.setColour (fill);

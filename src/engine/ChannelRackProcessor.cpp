@@ -43,7 +43,8 @@ void ChannelRackProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     }
     renderer.setMetronomeInput (clickLeft, clickRight, transport.metronomeTrack.load (std::memory_order_relaxed));
     renderer.setTransportOptions (transport.playTruncatedOnTransport.load (std::memory_order_relaxed),
-                                  transport.resetPluginsOnTransport.load (std::memory_order_relaxed));
+                                  transport.resetPluginsOnTransport.load (std::memory_order_relaxed),
+                                  transport.userJumps.load (std::memory_order_relaxed));
 
     if (buffer.getNumChannels() >= 2)
     {

@@ -104,6 +104,8 @@ std::vector<Action> makeActions()
         { "file.exportMp3", TR_NOOP ("Export an MP3 file"), Context::global, { chord ('R', ctrl | shift) } },
         { "file.exportMidi", TR_NOOP ("Export a MIDI file"), Context::global, { chord ('M', ctrl | shift) } },
         { "edit.undo", TR_NOOP ("Undo"), Context::global, { chord ('Z', ctrl) } },
+        // FL's Edit › "Undo backwards" (EditUndoBackwardsAction, Ctrl+Alt+Z; round 167k): one more step back
+        { "edit.undoBackwards", TR_NOOP ("Undo backwards"), Context::global, { chord ('Z', ctrl | alt) } },
         { "edit.redo", TR_NOOP ("Redo"), Context::global, { chord ('Y', ctrl), chord ('Z', ctrl | shift) } },
         { "edit.history", TR_NOOP ("Undo history"), Context::global, { chord ('H', ctrl) } },
         { "help.shortcuts", TR_NOOP ("Shortcut sheet"), Context::global, { chord (f1) } },
