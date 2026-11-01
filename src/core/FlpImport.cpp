@@ -1970,7 +1970,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         }
 
         // the Sampler's precomputed effects, loop flags and declicking mode (REA_rodada167h §1)
-        if (c.type == flp::ChannelType::sampler && def.instrument != InstrumentKind::audioClip)
+        // (audio clip channels: the precomputed effects and Reverse too — FL plays them, round 167k §8)
+        if (c.type == flp::ChannelType::sampler || def.instrument == InstrumentKind::audioClip)
         {
             auto& p = def.sampler.precompute;
             p.fadeStereo = (c.fxFlags & 1) != 0;

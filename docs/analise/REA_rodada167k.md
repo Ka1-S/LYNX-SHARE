@@ -161,6 +161,25 @@ render, **[GUI]** LYNX driven on Windows (fresh profile, `LYNX_TEST_MODE=1`), **
   `rea167k_mixer_menu_keys`.
 - **Not done:** "Alt solo selected track(s)" (Alt+S). Its FL behaviour is not proven yet.
 
+## 8. Audio clips through the precomputed effects (167h leftover)
+
+- **Brief:** "audio clips through precompute".
+- **FL evidence [FL render]:** `r167k/fl/clip/p_*.flp` (the same FL-saved project as §5, changes only in the audio
+  clip channel's events):
+
+  | project | change | FL plays |
+  |---|---|---|
+  | p_rev | 0x46 bit 1 (Reverse) | falling ramp, ends at 2.000 s |
+  | p_normpol | 0xD7 +0x50 Normalize, +0x51 Reverse polarity | peak 0.995 (base 0.895), inverted sign |
+  | p_fadein | 0x4C = 256 | starts at 0 and fades in |
+  | p_fadeout | 0x4B = 256 | fades out to 0 at 2 s |
+
+  So FL applies an audio clip channel's precomputed effects as it does a Sampler's.
+- **LYNX before:** the import skipped them for audio clip channels (`def.instrument != audioClip`), Reverse included,
+  and `buildInstrument` ran the precompute for samplers only ("audio clips: not yet").
+- **LYNX now:** imported for audio clip channels too. `buildInstrument` processes an audio clip's whole file (the
+  region stays whole: a clip plays the whole file). [TEST] `rea167k_audio_clip_channels_keep_precomputed_effects`.
+
 ## Where I stopped
 
 - Done in the worktree (feature/flopt167k): items 1–7. Next: build + tests, Windows GUI re-check (export dialog,

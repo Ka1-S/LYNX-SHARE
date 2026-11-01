@@ -75,7 +75,7 @@ TEST (rea167k_reset_plugins_on_transport_reaches_the_generators)
     REA167K_REQUIRE (song.channels.size() > 1);
     auto state = lynx::RackState::build (song, nullptr, 48000.0);
     auto counting = std::make_shared<rea167k::CountingInstrument>();
-    state->instruments[1] = counting;
+    const_cast<lynx::RackState&> (*state).instruments[1] = counting; // (the test swaps one generator)
     lynx::RackRenderer renderer;
     renderer.prepare (48000.0, 256);
     std::vector<float> l (256), r (256);
@@ -224,11 +224,12 @@ TEST (rea167k_clip_pitch_and_reverse_keys)
     CHECK (clipops::playsBackwards (ch, Clip { .reversed = true }) && ! clipops::playsBackwards (ch, Clip {}));
 
     // the keys (Playlist focused)
+    using namespace lynx::keys;
     KeyMap map;
     CHECK (map.conflicts().empty());
-    CHECK (map.find ({ '7', keys::none }, Context::playlist, false) == "playlist.pitchClipsDown");
-    CHECK (map.find ({ '8', keys::none }, Context::playlist, false) == "playlist.pitchClipsUp");
-    CHECK (map.find ({ '9', keys::none }, Context::playlist, false) == "playlist.reverseClips");
+    CHECK (map.find ({ '7', none }, Context::playlist, false) == "playlist.pitchClipsDown");
+    CHECK (map.find ({ '8', none }, Context::playlist, false) == "playlist.pitchClipsUp");
+    CHECK (map.find ({ '9', none }, Context::playlist, false) == "playlist.reverseClips");
 }
 
 TEST (rea167k_clip_pitch_and_reverse_play)
@@ -426,4 +427,38 @@ TEST (rea167k_clip_pitch_keeps_the_length)
         CHECK (rea167k::peakOf (x, 1.80, 1.95) > 0.2f);    // still playing near the end of the file
         CHECK (rea167k::peakOf (x, 2.15, 2.9) < 0.05f);    // and not after it
     }
+}
+
+TEST (rea167k_audio_clip_channels_keep_precomputed_effects)
+{
+    // FL renders r167k/fl/clip/p_*.flp: an audio clip channel's Reverse (0x46 bit 1), Fade in / out (0x4C / 0x4B),
+    // Normalize and Reverse polarity play in FL; LYNX dropped them for audio clip channels
+    FlpBuilder b (96);
+    b.ascii (0xC7, "25.2.5.5319");
+    b.u8 (0x40); b.u16 (0);
+    b.u8 (0x15); b.u8 (4);
+    b.utf16 (0xC4, u"C:\\samples\\ramp.wav");
+    b.u8 (0x46); b.u16 (2);
+    b.u8 (0x4C); b.u16 (256);
+    b.u8 (0x4B); b.u16 (128);
+    std::vector<std::uint8_t> params (168, 0);
+    params[0x50] = 1;
+    params[0x51] = 1;
+    b.data (0xD7, params);
+    lynx::FlpImportOptions o;
+    o.fileExists = [] (const std::string&) { return true; };
+    o.sampleSeconds = [] (const std::string&) { return 2.0; };
+    const auto song = lynx::importFlp (flp::parseProject (b.bytes), o);
+    REA167K_REQUIRE (! song.channels.empty() && song.channels[0].instrument == lynx::InstrumentKind::audioClip);
+    const auto& s = song.channels[0].sampler;
+    CHECK (s.reverse && s.precompute.fadeIn == 256 && s.precompute.fadeOut == 128 && s.precompute.normalize && s.precompute.reversePolarity);
+
+    // and they play: the ramp normalized (0.25 → 0.25 / max) with its polarity reversed
+    auto ramp = rea167k::rampSong();
+    const auto plain = rea167k::rampLevelAt (ramp, 1.0);
+    ramp.channels[0].sampler.precompute.normalize = true;
+    CHECK (std::abs (rea167k::rampLevelAt (ramp, 1.0) / plain - 96000.0f / 95999.0f) < 0.01f);
+    ramp.channels[0].sampler.precompute.normalize = false;
+    ramp.channels[0].sampler.precompute.fadeIn = 256; // a ramp over the whole file: much quieter at beat 1
+    CHECK (rea167k::rampLevelAt (ramp, 1.0) < 0.5f * plain);
 }

@@ -209,9 +209,21 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
     }
 
     // FL's Sampler › Precomputed effects (REA_rodada167h §2): the played region, processed once
-    if (sample != nullptr && kind == InstrumentKind::sampler && precompute::needed (channel.sampler)) // (audio clips: not yet)
+    // Audio clips too (round 167k, FL render r167k/fl/clip/p_*: an audio clip channel's Normalize, Reverse polarity,
+    // Fade in / out play in FL); a clip plays the whole file, so the region stays whole there
+    if (sample != nullptr && kind == InstrumentKind::sampler && precompute::needed (channel.sampler))
+    {
         if (auto processed = precompute::apply (*sample, channel.sampler))
             sample = std::move (processed);
+    }
+    else if (sample != nullptr && kind == InstrumentKind::audioClip && channel.sampler.precompute.any())
+    {
+        auto whole = channel.sampler;
+        whole.regionStart = 0.0f;
+        whole.regionEnd = 1.0f;
+        if (auto processed = precompute::apply (*sample, whole))
+            sample = std::move (processed);
+    }
 
     const loadtrace::Scope timing ("rack_instruments");
     std::shared_ptr<Instrument> instrument = makeInstrument (kind, std::move (sample));
