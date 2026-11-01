@@ -1464,22 +1464,6 @@ private:
         });
     }
 
-    // FL's Fruity Keyboard Controller state (REA_rodada16 §1.4, version 3): each key's value rising from 0 to 1 over the
-    // keyboard, note-off value 0 with auto release (LYNX's own default)
-    static std::vector<std::uint8_t> defaultKeyboardController()
-    {
-        std::vector<std::uint8_t> s (553, 0);
-        const std::uint32_t version = 3;
-        std::memcpy (s.data(), &version, 4);
-        for (int k = 0; k < 132; ++k)
-        {
-            const auto v = (float) std::min (1.0, k / 127.0);
-            std::memcpy (s.data() + 12 + k * 4, &v, 4);
-        }
-        s[552] = 1;
-        return s;
-    }
-
     // The FL Plugin picker's categories (FL Studio 2026, issue #7 screenshot): generators
     static const char* engineCategory (InstrumentKind kind)
     {

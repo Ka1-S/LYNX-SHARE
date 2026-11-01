@@ -1915,22 +1915,47 @@ private:
             }
             if (! back)
                 nativesResult = "ERROR " + error;
-            // each instrument plays a note alone (the granulizer needs a sample: it is silent here)
+            // each instrument plays a note alone. The Granulizer and Wave Traveller play the channel's sample, and a new
+            // one has none (a PC without FL Studio, macOS / Linux: FL's presets are not there either), so they get a
+            // generated one: a second of a 220 Hz tone (round 167m, PR #19: Wave Traveller was "SILENT 1" on macOS)
+            const auto toneWav = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-selftest-natives.wav");
+            {
+                juce::WavAudioFormat format;
+                juce::AudioBuffer<float> tone (1, 48000);
+                for (int i = 0; i < 48000; ++i)
+                    tone.setSample (0, i, 0.5f * std::sin (juce::MathConstants<float>::twoPi * 220.0f * (float) i / 48000.0f));
+                toneWav.deleteFile();
+                std::unique_ptr<juce::OutputStream> out (toneWav.createOutputStream().release());
+                if (auto* w = format.createWriterFor (out.get(), 48000.0, 1, 16, {}, 0))
+                {
+                    out.release();
+                    std::unique_ptr<juce::AudioFormatWriter> writer (w);
+                    writer->writeFromAudioSampleBuffer (tone, 0, 48000);
+                }
+            }
+            juce::StringArray silentNames;
             for (std::size_t i = 0; same && i < song.channels.size(); ++i)
             {
                 auto one = song;
                 one.channels = { song.channels[i] };
                 one.channels[0].mixerTrack = 1;
+                const auto kind = song.channels[i].instrument;
+                if ((kind == lynx::InstrumentKind::granulizer || kind == lynx::InstrumentKind::wavetraveller) && one.channels[0].samplePath.empty())
+                    one.channels[0].samplePath = toneWav.getFullPathName().toStdString();
                 one.mixer[2].effects.clear();
                 one.patterns[0].notes = { { 0, 1920, 0, song.channels[i].instrument == lynx::InstrumentKind::drumaxx ? 48 : 60, 0.8f } };
                 lynx::AudioEngine player (false);
                 player.setSong (std::move (one));
                 player.dispatchPendingMessages();
-                if (! (player.renderOffline (1.0, 48000.0) > 1.0e-4f) && song.channels[i].instrument != lynx::InstrumentKind::granulizer)
+                if (! (player.renderOffline (1.0, 48000.0) > 1.0e-4f))
+                {
                     ++nativesSilent;
+                    silentNames.add (juce::String::fromUTF8 (song.channels[i].name.c_str()));
+                }
             }
+            toneWav.deleteFile();
             if (nativesSilent > 0 && nativesResult == "OK")
-                nativesResult = "SILENT " + juce::String (nativesSilent);
+                nativesResult = "SILENT " + juce::String (nativesSilent) + " [" + silentNames.joinIntoString (", ") + "]";
         }
         const auto nativesOk = nativesResult == "OK";
 
