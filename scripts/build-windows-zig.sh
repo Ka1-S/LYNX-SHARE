@@ -106,6 +106,8 @@ APP_SOURCES=(src/Main.cpp
 
 # workflow shell: core (key map, workspace layout, rack operations) and UI (workspace desktop, control contract)
 APP_SOURCES+=(src/core/KeyMap.cpp src/core/Workspace.cpp src/core/RackOps.cpp src/core/ChannelMiscFx.cpp src/core/MidiImport.cpp src/ui/Workspace.cpp src/ui/ValueControl.cpp src/ui/Dialogs.cpp)
+# Wave Traveller (round 167f)
+APP_SOURCES+=(src/core/WaveTraveller.cpp src/ui/WaveTravellerEditor.cpp)
 # Windows file association (.lynx) and its icon
 APP_SOURCES+=(src/platform/FileTypes.cpp src/platform/Paths.cpp src/platform/Package.cpp src/platform/NativeEmbed.cpp)
 # SEH guard around calls into hosted plugins (round 111): the only unit built with -fms-extensions (__try / __except)
@@ -149,7 +151,7 @@ APP_SOURCES+=(src/core/DynamicsSuite.cpp src/core/FabFilterStates.cpp src/ui/Dyn
 # LYNX's voice tools: Quell Denoiser, Gemini Doubler (round 119)
 APP_SOURCES+=(src/core/VoiceTools.cpp)
 # MIDI CC automation of hosted plugins, Formula Controller (round 133, issue #3)
-APP_SOURCES+=(src/core/MidiControls.cpp src/core/FormulaController.cpp src/ui/ControllerEditors.cpp)
+APP_SOURCES+=(src/core/MidiControls.cpp src/core/MidiOut.cpp src/core/FormulaController.cpp src/ui/ControllerEditors.cpp src/ui/MidiOutEditor.cpp)
 APP_SOURCES+=(src/core/VoiceShift.cpp)
 # FL engines usable in native projects (round 142, issue #5)
 APP_SOURCES+=(src/core/NativeEngines.cpp src/ui/NewtoneEditor.cpp)

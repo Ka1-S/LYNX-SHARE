@@ -4,6 +4,7 @@
 #include "core/VoltageController.h"
 #include "core/Vfx.h"
 #include "core/VideoPlayer.h"
+#include "core/MidiOut.h"
 #include "core/Scheduler.h"
 #include "core/ClipOps.h"
 
@@ -27,6 +28,7 @@
 #include "core/Sawer.h"
 #include "core/Drumaxx.h"
 #include "core/Granulizer.h"
+#include "core/WaveTraveller.h"
 #include "core/Slayer.h"
 #include "core/Ogun.h"
 #include "core/TransistorBass.h"
@@ -282,6 +284,7 @@ private:
             case InstrumentKind::sawer:
             case InstrumentKind::flkeys:
             case InstrumentKind::granulizer:
+            case InstrumentKind::wavetraveller:
             case InstrumentKind::drumaxx:
             case InstrumentKind::slayer:
             case InstrumentKind::fruitydance:
@@ -3158,7 +3161,9 @@ std::unique_ptr<Instrument> makeInstrument (InstrumentKind kind, std::shared_ptr
 {
     if (kind == InstrumentKind::controller)
         return std::make_unique<ControllerInstrument>();
-    if (kind == InstrumentKind::midiOut || kind == InstrumentKind::layer) // (a Layer's notes go to its children)
+    if (kind == InstrumentKind::midiOut) // its knobs, patch and bank as MIDI messages (round 167i)
+        return midiout::makeInstrument();
+    if (kind == InstrumentKind::layer) // (a Layer's notes go to its children)
         return std::make_unique<MidiOutInstrument>();
     if (kind == InstrumentKind::dashboard) // its controls' values as control outputs (round 164)
         return surface::makeDashboard();
@@ -3236,6 +3241,8 @@ std::unique_ptr<Instrument> makeInstrument (InstrumentKind kind, std::shared_ptr
         return makeSawerInstrument();
     if (kind == InstrumentKind::granulizer)
         return makeGranulizerInstrument (std::move (sample));
+    if (kind == InstrumentKind::wavetraveller)
+        return makeWaveTravellerInstrument (std::move (sample));
     if (kind == InstrumentKind::drumaxx)
         return makeDrumaxxInstrument();
     if (kind == InstrumentKind::slayer)

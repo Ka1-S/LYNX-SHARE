@@ -77,6 +77,7 @@ add_library(lynx_core STATIC
     src/core/SimSynth.cpp
     src/core/Wasp.cpp
     src/core/Granulizer.cpp
+    src/core/WaveTraveller.cpp
     src/core/Drumaxx.cpp
     src/core/Slayer.cpp
     src/core/Dx10.cpp
@@ -154,6 +155,7 @@ add_library(lynx_core STATIC
     src/core/DynamicsSuite.cpp
     src/core/VoiceTools.cpp
     src/core/MidiControls.cpp
+    src/core/MidiOut.cpp
     src/core/FormulaController.cpp
     src/core/VoiceShift.cpp
     src/core/NativeEngines.cpp
@@ -363,11 +365,13 @@ if(LYNX_BUILD_APP)
         src/ui/AutoSamplerDialog.cpp
         src/ui/AutomationUi.cpp
         src/ui/ControllerEditors.cpp
+        src/ui/MidiOutEditor.cpp
         src/ui/VisualEditors.cpp
         src/ui/FlExtraEditors.cpp
         src/ui/VisualGl.cpp
         src/ui/DanceView.cpp
         src/ui/VideoPlayerView.cpp
+        src/ui/WaveTravellerEditor.cpp
         src/ui/NewtoneEditor.cpp
         src/ui/ChannelSettings.cpp
         src/ui/LayerEditor.cpp

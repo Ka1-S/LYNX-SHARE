@@ -127,6 +127,7 @@ const std::vector<InstrumentEngine>& instrumentEngines()
         { InstrumentKind::flkeys, "FL Keys", "FL Keys", fl, false },
         { InstrumentKind::slayer, "FL Slayer", "FL Slayer", fl, false },
         { InstrumentKind::granulizer, "Fruity Granulizer", "Fruity Granulizer", fl, false },
+        { InstrumentKind::wavetraveller, "Wave Traveller", "Wave Traveller", own, false },
         { InstrumentKind::drumaxx, "Drumaxx", "Drumaxx", fl, false },
         { InstrumentKind::drumpad, "Drumpad", "Drumpad", fl, false },
         { InstrumentKind::fruitkick, "Fruit Kick", "Fruit Kick", fl, false },

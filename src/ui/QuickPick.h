@@ -18,12 +18,21 @@ namespace lynx::quickpick
 
 // One generator or effect of the Plugin database. `key` is what a user name is stored under: the plugin's identifier
 // string, or "lynx:gen:<English name>" / "lynx:fx:<English name>" for LYNX's built-in ones and FL's engines.
+//
+// generatorEntries() is THE list of generators (issue #18): the Channel Rack's Insert ›, Replace › and "+" menus
+// (addGeneratorMenu), the Browser's Plugin database, the user's plugin folders and the renamed picks all read it, so
+// they never differ.
 struct GeneratorEntry
 {
     std::string key;
     juce::String label, detail;
     int folder = 0; // 0 LYNX, 1 FL engines, 2 VFX, 3 installed
     std::function<std::optional<ChannelDef>()> make;
+    // where addGeneratorMenu puts a LYNX one (folder 0): 0 the first block (Kick … Synth), 1 the tools block (Envelope
+    // Controller … Fruity Video Player), 2 after the FL engines / VFX submenus (Patcher, LYNX Soundfont)
+    int section = 1;
+    InstrumentKind kind = InstrumentKind::synth; // what make() gives (the Replace menu ticks the channel's own)
+    bool available = true; // false: an FL engine without the user's FL installation (shown disabled in the menu only)
 };
 
 struct EffectEntry
@@ -34,7 +43,16 @@ struct EffectEntry
     std::function<std::optional<EffectSlot>()> make;
 };
 
-std::vector<GeneratorEntry> generatorEntries (AudioEngine& engine);
+// `withUnavailable`: also FL engines this PC cannot make (the menu lists them disabled, "(requires FL Studio)").
+std::vector<GeneratorEntry> generatorEntries (AudioEngine& engine, bool withUnavailable = false);
+
+// The Channel Rack's generator menu, the same for Insert ›, Replace › and the "+" button (issue #18): Kick … Synth,
+// the built-in tools, FL engines ›, VFX ›, Patcher, LYNX Soundfont, Sampler (choose file)..., Plugin ›. `pick` gets
+// the new generator; `chooseSample` (may be empty) runs for "Sampler (choose file)..."; `current` (may be null) is the
+// channel being replaced, whose own generator gets a tick. `owner`: the component whose menu this is (the plugin
+// picker window calls back only while it exists).
+void addGeneratorMenu (juce::PopupMenu& menu, AudioEngine& engine, std::function<void (ChannelDef)> pick,
+                       std::function<void()> chooseSample, const ChannelDef* current, juce::Component* owner);
 std::vector<EffectEntry> effectEntries (AudioEngine& engine);
 
 // The user's name for `key`, else `original`.

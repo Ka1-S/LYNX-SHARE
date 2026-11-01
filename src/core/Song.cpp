@@ -1,6 +1,7 @@
 #include "core/Song.h"
 #include "core/FlSynths.h"
 #include "core/VoltageController.h"
+#include "core/MidiOut.h"
 
 #include <algorithm>
 #include <iterator>
@@ -933,6 +934,9 @@ float Song::targetValue (const AutomationTarget& t) const noexcept
             // the Sampler's knobs (issue #12)
             if (channels[(std::size_t) t.index].instrument == InstrumentKind::sampler && t.param >= 0 && t.param < samplerparam::count)
                 return samplerparam::get (channels[(std::size_t) t.index].sampler, t.param);
+            // a MIDI Out's patch and knobs (round 167i)
+            if (channels[(std::size_t) t.index].instrument == InstrumentKind::midiOut && t.param >= 0 && t.param <= midiout::controlCount)
+                return midiout::paramValue (midiout::stateOf (channels[(std::size_t) t.index].pluginState), t.param);
             return 0.5f;
         case AutomationTargetKind::mixerSend:
             return validTrack && routes (t.index, t.slot) ? faderPosition (routeLevel (t.index, t.slot)) : -1.0f;
@@ -1005,6 +1009,22 @@ bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
                 && t.param < samplerparam::count)
             {
                 samplerparam::set (channels[(std::size_t) t.index].sampler, t.param, v);
+                return true;
+            }
+            if (validChannel && channels[(std::size_t) t.index].instrument == InstrumentKind::midiOut && t.param >= 0
+                && t.param <= midiout::controlCount)
+            {
+                auto& ch = channels[(std::size_t) t.index];
+                try
+                {
+                    auto ms = midiout::stateOf (ch.pluginState);
+                    midiout::setParamValue (ms, t.param, v);
+                    ch.pluginState = midiout::write (ms);
+                }
+                catch (...)
+                {
+                    return false;
+                }
                 return true;
             }
             return false;

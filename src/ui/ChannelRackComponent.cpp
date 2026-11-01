@@ -96,6 +96,7 @@ juce::String instrumentName (InstrumentKind k)
         case InstrumentKind::voltage: return "Voltage Controller";
         case InstrumentKind::vfx: return "VFX";
         case InstrumentKind::videoplayer: return "Fruity Video Player";
+        case InstrumentKind::wavetraveller: return "Wave Traveller";
     }
     return "?";
 }
@@ -120,9 +121,6 @@ juce::String instrumentLabel (InstrumentKind k)
         default: return instrumentName (k);
     }
 }
-
-constexpr InstrumentKind builtInKinds[] = { InstrumentKind::kick, InstrumentKind::snare, InstrumentKind::hat,
-                                            InstrumentKind::clap, InstrumentKind::synth };
 
 void setStep (Pattern& p, int channel, int step, bool on)
 {
@@ -1575,7 +1573,7 @@ bool ChannelRackComponent::loadSampleIntoSelected (const juce::File& file)
 
     // only channels that play a sample (or the built-in drums, which become samplers) take a file
     if (kind != InstrumentKind::sampler && kind != InstrumentKind::kick && kind != InstrumentKind::snare && kind != InstrumentKind::hat
-        && kind != InstrumentKind::clap && kind != InstrumentKind::granulizer)
+        && kind != InstrumentKind::clap && kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller)
         return false;
 
     assignSample (row, file);
@@ -2210,27 +2208,19 @@ void ChannelRackComponent::applyPaint (const juce::MouseEvent& e)
 void ChannelRackComponent::showChannelMenu (int channel)
 {
     const auto& c = engine.getSong().channels[(std::size_t) channel];
+    // Replace › lists exactly what Insert › and "+" list (issue #18: one source, quickpick::addGeneratorMenu); the
+    // channel keeps its place, notes, insert, levels and colour (FL; core replaceGenerator)
     juce::PopupMenu instruments;
-
-    for (auto kind : builtInKinds)
-        instruments.addItem (instrumentLabel (kind), true, c.instrument == kind, [this, channel, kind] {
-            engine.editSong ([channel, kind] (Song& s) { s.channels[(std::size_t) channel].instrument = kind; });
-        });
-
-    instruments.addSeparator();
-    instruments.addItem (tr ("Sampler (choose file)..."), [this, channel] { chooseSample (channel); });
-
-    juce::PopupMenu plugins;
-    addPluginItems (plugins, engine, true, [this, channel] (PluginRef ref) {
-        engine.editSong ([channel, ref] (Song& s) {
-            auto& c = s.channels[(std::size_t) channel];
-            c.instrument = InstrumentKind::plugin;
-            c.plugin = ref;
-            c.name = ref.name;
-        });
-        openPluginWindow (channel);
-    }, this);
-    instruments.addSubMenu (tr ("Plugin (VST/VST3/CLAP)"), plugins);
+    quickpick::addGeneratorMenu (instruments, engine, [this, channel] (ChannelDef generator) {
+        if (channel >= (int) engine.getSong().channels.size())
+            return;
+        closeEditor (channel);
+        const auto kind = generator.instrument;
+        engine.editSong ([channel, &generator] (Song& s) { replaceGenerator (s, channel, std::move (generator)); });
+        selectionAnchor = channel;
+        selectRows ({ channel }, channel);
+        openNewGenerator (channel, kind);
+    }, [this, channel] { chooseSample (channel); }, &c, this);
 
     // FL's layout (REA round 104): two columns, the channel on the left (editors, name and colour, sample,
     // insert / replace / clone / delete) and its steps on the right (clipboard, fills, rotation); LYNX's own
@@ -2518,163 +2508,42 @@ juce::String flEngineName (const natives::InstrumentEngine& e)
     return e.beta ? tr ("{0} (beta)", { name }) : name;
 }
 
-void addFlEngineItems (juce::PopupMenu& menu, std::function<void (ChannelDef)> add)
+void ChannelRackComponent::openNewGenerator (int row, InstrumentKind kind)
 {
-    for (const auto& e : natives::instrumentEngines())
-        menu.addItem (flEngineName (e), natives::available (e, flStudioAccess()), false, [kind = e.kind, add] {
-            if (auto c = natives::makeChannel (kind, flStudioAccess()))
-                add (*c);
-            else
-                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("FL engines"),
-                                                        tr ("This engine needs the data files of an FL Studio installation, which were not found or could not be read."));
-        });
+    switch (kind)
+    {
+        case InstrumentKind::kick: case InstrumentKind::snare: case InstrumentKind::hat: case InstrumentKind::clap:
+        case InstrumentKind::synth: case InstrumentKind::sampler: case InstrumentKind::audioClip:
+            return; // (LYNX's drums and synth: no window, as before)
+        case InstrumentKind::plugin:
+            openPluginWindow (row); // the plugin opens when added
+            openEditorRow = row;
+            return;
+        case InstrumentKind::patcher:
+            PatcherWindows::openChannel (engine, row);
+            return;
+        default:
+            openChannelSettings (engine, row);
+            return;
+    }
 }
 
 void ChannelRackComponent::addInstrumentItems (juce::PopupMenu& menu, int insertAt)
 {
-    // a new channel of `kind`, at the end (insertAt < 0) or at a row
-    auto add = [this, insertAt] (ChannelDef c) {
+    // a new channel at the end (insertAt < 0) or at a row; the list is the one Replace › shows (issue #18)
+    quickpick::addGeneratorMenu (menu, engine, [this, insertAt] (ChannelDef c) {
         int index = 0;
         if (filterGroup >= 0 && c.group < 0)
             c.group = filterGroup;
+        const auto kind = c.instrument;
         engine.editSong ([&] (Song& s) {
             c.mixerTrack = s.claimFreeInsert();
             index = insertAt < 0 ? (s.channels.push_back (c), (int) s.channels.size() - 1) : insertChannel (s, insertAt, c);
         });
         selectionAnchor = index;
         selectRows ({ index }, index);
-        return index;
-    };
-
-    for (auto kind : builtInKinds)
-        menu.addItem (instrumentLabel (kind), [add, kind] {
-            ChannelDef c;
-            c.name = instrumentName (kind).toStdString();
-            c.instrument = kind;
-            add (c);
-        });
-
-    menu.addSeparator();
-    // built-in controllers (round 133, issue #3): no sound of their own
-    menu.addItem (tr ("Envelope Controller"), [this, add] {
-        ChannelDef c;
-        c.name = tr ("Envelope Controller").toStdString();
-        c.instrument = InstrumentKind::controller;
-        c.controllerState = writeEnvelopeController (defaultEnvelopeController());
-        const auto added = add (c);
-        openChannelSettings (engine, added);
-    });
-    menu.addItem (tr ("MIDI Out"), [this, add] {
-        ChannelDef c;
-        c.name = "MIDI Out";
-        c.instrument = InstrumentKind::midiOut;
-        midictl::MidiOutSettings settings;
-        // FL gives each new MIDI Out the next MIDI channel, skipping the drum channel 10
-        int count = 0;
-        for (const auto& ch : engine.getSong().channels)
-            count += ch.instrument == InstrumentKind::midiOut;
-        settings.channel = count % 15 >= 9 ? count % 15 + 1 : count % 15;
-        midictl::writeMidiOut (c.pluginState, settings);
-        const auto added = add (c);
-        openChannelSettings (engine, added);
-    });
-    // FL's Layer (round 164): plays its children (its settings open: select channels, then Set children)
-    menu.addItem (tr ("Layer"), [this, add] {
-        ChannelDef c;
-        c.name = tr ("Layer").toStdString();
-        c.instrument = InstrumentKind::layer;
-        const auto added = add (c);
-        openChannelSettings (engine, added);
-    });
-    // FL's Dashboard (round 164): a panel of knobs / sliders / buttons, each an output to link to any knob
-    menu.addItem ("Dashboard", [this, add] {
-        ChannelDef c;
-        c.name = "Dashboard";
-        c.instrument = InstrumentKind::dashboard;
-        c.patcher.surface = surface::starterControls();
-        const auto added = add (c);
-        openChannelSettings (engine, added);
-    });
-    // FL's Voltage Controller (round 164): its notes as control voltages for modular gear
-    menu.addItem ("Voltage Controller", [this, add] {
-        ChannelDef c;
-        c.name = "Voltage Controller";
-        c.instrument = InstrumentKind::voltage;
-        c.pluginState = voltage::write (voltage::Settings {});
-        const auto added = add (c);
-        openChannelSettings (engine, added);
-    });
-    // FL's Fruity Dance (round 165e): LYNX's own dancer over the workspace, its notes pick the moves (no sound)
-    menu.addItem ("Fruity Dance", [this, add] {
-        ChannelDef c;
-        c.name = "Fruity Dance";
-        c.instrument = InstrumentKind::fruitydance;
-        c.pluginState = dance::toState (dance::Settings {});
-        const auto added = add (c);
-        openChannelSettings (engine, added);
-    });
-    // FL's Fruity Video Player (round 165g): a video in sync with the song, decoded by the user's ffmpeg
-    menu.addItem ("Fruity Video Player", [this, add] {
-        ChannelDef c;
-        c.name = "Fruity Video Player";
-        c.instrument = InstrumentKind::videoplayer;
-        c.pluginState = video::write (video::Settings {});
-        const auto added = add (c);
-        openChannelSettings (engine, added);
-    });
-    // FL's own instrument engines (round 142, issue #5): their editor opens
-    {
-        juce::PopupMenu engines;
-        addFlEngineItems (engines, [this, add] (ChannelDef c) {
-            const auto added = add (c);
-            openChannelSettings (engine, added);
-        });
-        menu.addSubMenu (tr ("FL engines"), engines);
-    }
-    // FL's VFX note processors (round 164b): no sound of their own, their outputs go out on MIDI ports
-    {
-        juce::PopupMenu vfxMenu;
-        for (const auto kind : vfx::allKinds)
-            vfxMenu.addItem (vfx::flName (kind), [this, add, kind] {
-                ChannelDef c;
-                vfx::makeChannel (c, kind);
-                const auto added = add (c);
-                openChannelSettings (engine, added);
-            });
-        menu.addSubMenu (tr ("VFX (note effects)"), vfxMenu);
-    }
-    // FL's Patcher as a generator (REA_rodada141): an empty graph, its editor opens
-    menu.addItem (tr ("Patcher"), [this, add] {
-        ChannelDef c;
-        c.name = "Patcher";
-        c.instrument = InstrumentKind::patcher;
-        const auto added = add (c);
-        PatcherWindows::openChannel (engine, added);
-    });
-    // LYNX Soundfont (round 158, issue #6): SF2 / SF3 banks with a preset search; its editor opens to pick a font
-    menu.addItem ("LYNX Soundfont", [this, add] {
-        const auto added = add (sf::makeChannel());
-        openChannelSettings (engine, added);
-    });
-    menu.addSeparator();
-
-    if (insertAt < 0)
-        menu.addItem (tr ("Sampler (choose file)..."), [this] { chooseSample (-1); });
-
-    juce::PopupMenu plugins;
-    addPluginItems (plugins, engine, true, [this, add] (PluginRef ref) {
-        ChannelDef c;
-        c.name = ref.name;
-        c.instrument = InstrumentKind::plugin;
-        c.plugin = ref;
-        const auto added = add (c);
-        openPluginWindow (added); // the plugin opens when added
-        openEditorRow = added;
-    }, this, [this, add] (ChannelDef c) {
-        const auto added = add (c);
-        openChannelSettings (engine, added);
-    });
-    menu.addSubMenu (tr ("Plugin (VST/VST3/CLAP)"), plugins);
+        openNewGenerator (index, kind);
+    }, [this, insertAt] { chooseSample (-1, insertAt); }, nullptr, this);
 }
 
 void ChannelRackComponent::showAddChannelMenu (int insertAt)
@@ -2700,13 +2569,34 @@ void ChannelRackComponent::showAddChannelMenu (int insertAt)
     quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (this).withMousePosition(), std::move (picks));
 }
 
-void ChannelRackComponent::chooseSample (int channel)
+void ChannelRackComponent::chooseSample (int channel, int insertAt)
 {
     fileChooser = std::make_unique<juce::FileChooser> (tr ("Choose sample"), juce::File(), engine.getSampleLibrary().wildcard());
     fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                              [this, channel] (const juce::FileChooser& chooser) {
-                                  if (chooser.getResult().existsAsFile())
+                              [this, channel, insertAt] (const juce::FileChooser& chooser) {
+                                  if (! chooser.getResult().existsAsFile())
+                                      return;
+                                  if (channel >= 0 || insertAt < 0)
+                                  {
                                       assignSample (channel, chooser.getResult());
+                                      return;
+                                  }
+                                  // Insert › Sampler (choose file)...: a new sampler channel at the row
+                                  if (engine.getSampleLibrary().load (chooser.getResult().getFullPathName()) == nullptr)
+                                      return assignSample (channel, chooser.getResult()); // (its "could not read" message)
+                                  ChannelDef c;
+                                  c.instrument = InstrumentKind::sampler;
+                                  c.samplePath = chooser.getResult().getFullPathName().toStdString();
+                                  c.name = chooser.getResult().getFileNameWithoutExtension().toStdString();
+                                  if (filterGroup >= 0)
+                                      c.group = filterGroup;
+                                  int index = 0;
+                                  engine.editSong ([&] (Song& s) {
+                                      c.mixerTrack = s.claimFreeInsert();
+                                      index = insertChannel (s, std::min (insertAt, (int) s.channels.size()), c);
+                                  });
+                                  selectionAnchor = index;
+                                  selectRows ({ index }, index);
                               });
 }
 
@@ -2730,7 +2620,7 @@ void ChannelRackComponent::assignSample (int channel, const juce::File& file)
         if (isNew)
             c.mixerTrack = freeInsert;
         c.samplePath = path;
-        if (! isNew && c.instrument == InstrumentKind::granulizer) // FL's Granulizer keeps its engine and plays the file (round 142)
+        if (! isNew && (c.instrument == InstrumentKind::granulizer || c.instrument == InstrumentKind::wavetraveller)) // FL's Granulizer keeps its engine and plays the file (round 142); so does Wave Traveller
             return;
         c.instrument = InstrumentKind::sampler;
         c.name = name;

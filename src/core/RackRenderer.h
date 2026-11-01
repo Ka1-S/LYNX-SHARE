@@ -193,8 +193,11 @@ struct RackState
     std::vector<int> vfxPort; // [channel] (−1 = not a VFX channel)
     // generator Patchers whose VFX nodes send to "To LYNX" MIDI ports (round 165c): taken at each chunk's start
     std::vector<int> portEventChannels;
-    // Dashboard channels (round 165): what their controls send in MIDI goes to the plugins on their port (midiTargets)
+    // Dashboard and MIDI Out channels (rounds 165, 167i): what their controls send in MIDI goes to the plugins on their
+    // port (midiTargets)
     std::vector<int> dashboardChannels;
+    // [channel] a MIDI Out with "Map note color to MIDI channel" (round 167i): its notes go out on their colour's channel
+    std::vector<char> mapNoteColour;
     void buildMidiRoutes();
 
     // Loads (or fetches from cache) a file's audio; nullptr on failure.
