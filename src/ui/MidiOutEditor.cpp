@@ -659,7 +659,18 @@ private:
         o.resizable = false;
         // like LYNX's other dialogs (Export, Customize toolbar...): modal, above the LYNX windows, LYNX title bar
         if (auto* w = o.launchAsync())
+        {
             keepAboveMainWindow (*w);
+            // On Windows the native title bar's height came out added to the client area once the window was shown,
+            // leaving an empty band under the buttons: give the client area back the content's height
+            juce::Timer::callAfterDelay (60, [safe = juce::Component::SafePointer<juce::DialogWindow> (w)] {
+                if (safe == nullptr)
+                    return;
+                const auto extra = safe->getHeight() - safe->getContentComponentBorder().getTopAndBottom() - ControlSettings::dialogHeight;
+                if (extra > 0)
+                    safe->setSize (safe->getWidth(), safe->getHeight() - extra);
+            });
+        }
     }
 
     void renamePage()
