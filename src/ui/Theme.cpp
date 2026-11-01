@@ -1,9 +1,11 @@
 #include "ui/Theme.h"
 
 #include <algorithm>
+#include <limits>
 #include <unordered_map>
 #include <vector>
 
+#include "core/MenuPlacement.h"
 #include "ui/Icons.h"
 #include "ui/PluginSkin.h"
 
@@ -682,11 +684,66 @@ void LookAndFeel::positionComboBoxText (juce::ComboBox& box, juce::Label& label)
 
 void LookAndFeel::preparePopupMenuWindow (juce::Component& window)
 {
-    // A submenu opens where JUCE puts it: right beside the item that opened it, at the item's height (flipped to the
-    // left / moved up only when it does not fit on the screen). Issue #18: moving it beside the whole parent window
-    // (0.1.19…0.1.21) put a two-column menu's other column between the item and its submenu, and the mouse crossing
-    // that column opened the other items' submenus on the way.
     juce::LookAndFeel_V4::preparePopupMenuWindow (window);
+
+    // Issue #18 (round 167p): a submenu opens beside its parent menu's OUTER edge, its first item level with the item
+    // that opened it, growing downwards (core/MenuPlacement.h). JUCE put it beside the item, so in a two-column menu
+    // (Channel Rack, Playlist, Mixer, Piano Roll) it covered the other column, and grew upwards whenever the item was
+    // in the lower half of the screen. The mouse crossing that other column keeps the submenu open (the JUCE patch
+    // "submenu corridor" in cmake/LynxPatchJuce.cmake).
+    static std::vector<juce::Component::SafePointer<juce::Component>> menus;
+    menus.erase (std::remove_if (menus.begin(), menus.end(), [] (const auto& m) { return m == nullptr || ! m->isVisible(); }), menus.end());
+    const auto remember = [&window] { menus.push_back (&window); };
+    if (! window.isOnDesktop() || menus.empty())
+        return remember();
+
+    // the parent: the latest menu window still open (opening another item's submenu closes the previous one first)
+    juce::Component* parent = nullptr;
+    for (auto it = menus.rbegin(); it != menus.rend() && parent == nullptr; ++it)
+        if (auto* m = it->getComponent(); m != &window && m->isOnDesktop()
+                                          && std::abs (m->getDesktopScaleFactor() - window.getDesktopScaleFactor()) < 0.001f)
+            parent = m;
+    if (parent == nullptr)
+        return remember();
+
+    // the item that opened it: JUCE put the submenu right beside it (its right edge = the submenu's left, or the other
+    // way round), level with its top (upper half of the screen) or its bottom (lower half). The item under the mouse
+    // first (a hover), else the best match (the keyboard's right arrow).
+    const auto border = getPopupMenuBorderSize();
+    const auto sub = window.getBounds(), parentBox = parent->getBounds();
+    const auto beside = [&sub] (juce::Rectangle<int> r) { return std::abs (r.getRight() - sub.getX()) <= 2 || std::abs (r.getX() - sub.getRight()) <= 2; };
+    const auto mouse = juce::Desktop::getInstance().getMousePosition();
+    juce::Rectangle<int> item;
+    int best = std::numeric_limits<int>::max();
+    for (auto* c : parent->getChildren())
+    {
+        const auto r = c->getBounds() + parentBox.getPosition();
+        if (! c->isVisible() || ! beside (r))
+            continue;
+        if (r.contains (mouse))
+        {
+            item = r;
+            break;
+        }
+        const auto miss = juce::jmin (std::abs (r.getY() - (sub.getY() + border)), std::abs (r.getBottom() - (sub.getBottom() - border)));
+        if (miss < best)
+        {
+            best = miss;
+            item = r;
+        }
+    }
+    if (item.isEmpty())
+        return remember();
+
+    const auto scale = juce::jmax (0.01f, window.getDesktopScaleFactor() / juce::Desktop::getInstance().getGlobalScaleFactor());
+    const auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect (parentBox * scale);
+    const auto area = display != nullptr ? (display->userArea / scale).toNearestInt() : parentBox.expanded (10000);
+    using menuplace::Box;
+    const auto box = [] (juce::Rectangle<int> r) { return Box { r.getX(), r.getY(), r.getWidth(), r.getHeight() }; };
+    const auto placed = menuplace::placeSubmenu (box (parentBox), box (item), sub.getWidth(), sub.getHeight(), border, box (area));
+    if (placed != box (sub))
+        window.setBounds (placed.x, placed.y, placed.w, placed.h);
+    remember();
 }
 
 void LookAndFeel::drawPopupMenuBackground (juce::Graphics& g, int width, int height)
