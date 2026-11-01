@@ -777,7 +777,7 @@ bool squeeze (const std::vector<std::uint8_t>& d, EffectSlot& slot)
     return true;
 }
 
-bool transporter (const std::vector<std::uint8_t>& d, EffectSlot& slot)
+bool transporterApprox (const std::vector<std::uint8_t>& d, EffectSlot& slot)
 {
     if (d.size() < 8)
         return false;
@@ -1577,7 +1577,7 @@ std::optional<EffectSlot> effectFromFl (const std::string& pluginName, const std
     else if (is ("Fruity Send"))
         fruitySend (state, slot);
     else if (is ("Transporter"))
-        transporter (state, slot);
+        transporterApprox (state, slot);
     else if (is ("Fruity Squeeze"))
         squeeze (state, slot);
     else if (is ("Frequency Splitter"))
