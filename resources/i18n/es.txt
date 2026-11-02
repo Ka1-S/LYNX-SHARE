@@ -6255,6 +6255,7 @@ countries: es mx ar co cl pe ve
 "Update A/B" = "Actualizar A/B"
 "Flush" = "Vaciar"
 "Detector source" = "Fuente del detector"
+"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "Zoom: arrastra hacia arriba = más cerca, a los lados = desplazar  [Ctrl] solo zoom"
 "Add from state" = "Añadir desde estado"
 "Mixer presets" = "Presets de mezclador"
 "Mixer presets (FL)" = "Presets de mezclador (FL)"

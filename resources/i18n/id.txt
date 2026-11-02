@@ -6255,6 +6255,7 @@ countries: id
 "Update A/B" = "Perbarui A/B"
 "Flush" = "Kosongkan"
 "Detector source" = "Sumber detektor"
+"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "Zoom: seret ke atas = lebih dekat, ke samping = gulir  [Ctrl] hanya zoom"
 "Add from state" = "Tambah dari state"
 "Mixer presets" = "Preset mixer"
 "Mixer presets (FL)" = "Preset mixer (FL)"
