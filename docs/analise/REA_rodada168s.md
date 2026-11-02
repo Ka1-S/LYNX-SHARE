@@ -116,6 +116,18 @@ sequencer").
 
 ## Where I stopped
 
+- 19:30 READY: origin/main aae68291 merged; build-local with FL Data 2108504 checks, 0 failures; Windows build OK.
+  Windows GUI check (fresh profile, test mode, `C:\Users\kauan\lynx-test\r168s\g01-g14`):
+  - a click on the Playlist brings it over the Channel Rack and F6 brings the rack back (g02, g04);
+  - Backspace shows "No snap" and the hint, a second Backspace restores the snap (g03, g04);
+  - the rack track box and the TRACK wheel move 1 per notch, and 30 px of drag moves 4 (c_g05, c_g07, c_g08);
+  - the TRACK menu has "Assign to free mixer track" (c_g09), and a double-click opens the Mixer at Insert 6 (g10);
+  - the route arrow menu shows FL's 4 items, and "Route to this track only" routes Insert 1 to 2 only (c_g11, c_g13);
+  - one wheel notch on a fader is +0.6 dB (c_g12).
+  Not checked in the GUI: a third-party plugin slot move (no plugins on this PC, covered by the unit tests) and the
+  sampler Stretch menu. Seen: the channel settings title keeps "(Insert 1)" after TRACK changes (cosmetic, not
+  touched). The coordinator lands via the merge train.
+
 - RESUME (coordinator): PRs #37/#39 merged + reconciled, #36 teardown, #38 reply; origin/main aae68291 merged;
   build-local + Windows build queued. Next: tests 0 failures, GUI check, push feature/issue32s, tell coordinator "ready <hash>" (no land.sh).
 
