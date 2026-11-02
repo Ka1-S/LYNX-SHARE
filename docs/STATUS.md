@@ -872,5 +872,5 @@ which cannot change without changing output bits.
 - Maximus's Master Mid mode and linear-phase
   split; Harmor's resynthesis-mode images.
 - Workflow P2 leftovers (`docs/WORKFLOW_FL.md`): per-segment automation curve shapes, clip colour/name and track
-  colour/height (need model fields), F2/F3 search stepping, instrument drops on mixer inserts, the automation
+  colour/height (need model fields), F2/F3 search stepping, the automation
   record filter, and the remaining note tools (chop, quantise, articulate, flam, period slicing, LFO).
