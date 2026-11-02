@@ -2348,9 +2348,9 @@ public:
             paintEq (g, r, fx);
             return;
         }
-        else if (id == "grossbeat" || id == "gbinfo" || id == "gbjog")
+        else if (id == "grossbeat" || id == "gbslot" || id == "gbtools" || id == "gbjog")
         {
-            paintGrossBeat (g, id, r, fx);
+            paintGrossBeat (g, id, r, fx, item);
             return;
         }
         else if (id == "eqinfo") // the selected band, or how to use the graph
@@ -2872,100 +2872,7 @@ public:
 
 #include "ui/PluginEditorsFx.inc"
 
-    // --- Gross Beat: the selected slots' envelopes ------------------------------------------------------
-
-    void paintGrossBeat (juce::Graphics& g, const juce::String& id, juce::Rectangle<float> r, const EffectSlot& fx)
-    {
-        using namespace theme;
-        const auto s = scale();
-        std::vector<std::uint8_t> flState;
-        int ppq = 96;
-        std::optional<grossbeat::State> state;
-        if (grossbeat::unpack (fx.state, flState, ppq))
-            state = grossbeat::parseState (flState.data(), flState.size());
-        const auto timeSlot = grossbeat::rawFromParam (0, param01 ("Time slot"));
-        const auto volumeSlot = grossbeat::rawFromParam (1, param01 ("Volume slot"));
-
-        if (id == "gbjog") // a dial with the beat positions (FL's scratch indicator)
-        {
-            const auto c = r.getCentre();
-            const auto radius = juce::jmin (r.getWidth(), r.getHeight()) * 0.4f;
-            g.setColour (colour::bg3);
-            g.fillEllipse (juce::Rectangle<float> (radius * 2.0f, radius * 2.0f).withCentre (c));
-            for (int i = 0; i < 12; ++i)
-            {
-                const auto a = juce::MathConstants<float>::twoPi * (float) i / 12.0f;
-                g.setColour (i == 0 ? (fx.enabled ? accent : colour::textSecondary) : colour::textDisabled);
-                g.fillEllipse (juce::Rectangle<float> (4.0f * s, 4.0f * s).withCentre ({ c.x + std::sin (a) * radius * 0.85f, c.y - std::cos (a) * radius * 0.85f }));
-            }
-            return;
-        }
-
-        if (id == "gbinfo")
-        {
-            juce::String text = tr ("Time: {0}", { "Slot " + juce::String (timeSlot + 1) });
-            if (state)
-            {
-                const auto& slot = state->slots[(std::size_t) timeSlot];
-                if (! slot.name.empty())
-                    text = tr ("Time: {0}", { juce::String::fromUTF8 (slot.name.c_str()) });
-                static const char* const syncs[] = { "off", "1/4 beat", "1/2 beat", "1 beat", "2 beats", "4 beats" };
-                const auto sync = [] (int v) { return juce::String (syncs[juce::jlimit (0, 5, v)]); };
-                text << "     " << tr ("Hold: {0}", { slot.hold > 0 ? juce::String (slot.hold) : tr ("Off") }) << "   "
-                     << tr ("Trig sync: {0}", { sync (slot.triggerSync) }) << "   " << tr ("Pos sync: {0}", { sync (slot.positionSync) });
-            }
-            g.setColour (colour::textSecondary);
-            g.setFont (font (juce::jmax (9.0f, 11.0f * s)));
-            g.drawFittedText (text, r.reduced (6.0f * s, 0.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
-            return;
-        }
-
-        // the editor area: beat grid, then the time slot's envelope (accent) and the volume slot's (blue)
-        g.setColour (colour::bg0);
-        g.fillRoundedRectangle (r, radius::md * s);
-        const auto inner = r.reduced (8.0f * s);
-        g.setColour (colour::gridBeat);
-        for (int i = 1; i < 16; ++i)
-            g.drawVerticalLine ((int) (inner.getX() + inner.getWidth() * (float) i / 16.0f), inner.getY(), inner.getBottom());
-        g.setColour (colour::gridBar);
-        for (int i = 1; i < 4; ++i)
-            g.drawVerticalLine ((int) (inner.getX() + inner.getWidth() * (float) i / 4.0f), inner.getY(), inner.getBottom());
-        for (int i = 1; i < 8; ++i)
-            g.drawHorizontalLine ((int) (inner.getY() + inner.getHeight() * (float) i / 8.0f), inner.getX(), inner.getRight());
-        const auto drawSlot = [&] (const grossbeat::Slot& slot, juce::Colour c, bool time) {
-            if (slot.points.empty()) // an empty slot does nothing: time plays straight on, volume stays at full
-            {
-                g.setColour (c.withAlpha (0.5f));
-                if (time)
-                    g.drawLine (inner.getX(), inner.getY(), inner.getRight(), inner.getY() + inner.getHeight() * 0.5f, juce::jmax (1.0f, 1.5f * s));
-                else
-                    g.drawHorizontalLine ((int) inner.getY() + 1, inner.getX(), inner.getRight());
-                return;
-            }
-            double length = 0.0;
-            for (const auto& p : slot.points)
-                length += p.dx;
-            length = juce::jmax (length, 1.0e-6);
-            juce::Path path;
-            double x = 0.0;
-            for (std::size_t i = 0; i < slot.points.size(); ++i)
-            {
-                x += slot.points[i].dx;
-                const juce::Point<float> pt { inner.getX() + inner.getWidth() * (float) (x / length),
-                                              inner.getBottom() - inner.getHeight() * juce::jlimit (0.0f, 1.0f, slot.points[i].y) };
-                if (i == 0)
-                    path.startNewSubPath (pt);
-                else
-                    path.lineTo (pt);
-                g.setColour (c);
-                g.fillEllipse (juce::Rectangle<float> (5.0f * s, 5.0f * s).withCentre (pt));
-            }
-            g.setColour (c);
-            g.strokePath (path, juce::PathStrokeType (juce::jmax (1.5f, 2.0f * s)));
-        };
-        drawSlot (state ? state->slots[(std::size_t) (grossbeat::slotsPerKind + volumeSlot)] : grossbeat::Slot {}, colour::info.withAlpha (fx.enabled ? 0.9f : 0.3f), false);
-        drawSlot (state ? state->slots[(std::size_t) timeSlot] : grossbeat::Slot {}, (fx.enabled ? accent : colour::textDisabled), true);
-    }
+#include "ui/GrossBeatEditor.inc"
 
     // --- the parametric EQ's graph (FL's Parametric EQ 2 arrangement) -----------------------------------
 
@@ -3695,6 +3602,8 @@ public:
             anim.setHot (i);
             repaint();
         }
+        if (kind == EffectKind::grossBeat && i >= 0 && gbMouseMove (activeLayout().items[(std::size_t) i], p)) // round 168m
+            return;
         if (i >= 0 && isWaveShaperGraph (activeLayout().items[(std::size_t) i])) // round 165: points and handles light up
         {
             const auto& item = activeLayout().items[(std::size_t) i];
@@ -3755,6 +3664,9 @@ public:
 
         const auto& item = activeLayout().items[(std::size_t) index];
         const auto r = rectOf (item);
+
+        if (kind == EffectKind::grossBeat && gbMouseDown (e, item, index)) // round 168m: the envelope editor and slot settings
+            return;
 
         if (! e.mods.isPopupMenu() && isMixItem (item) && captionArea (item).contains (e.position))
         {
@@ -4082,6 +3994,11 @@ public:
             wsMouseDrag (e, activeLayout().items[(std::size_t) dragItem]);
             return;
         }
+        if (gbDragging && dragItem >= 0) // round 168m: Gross Beat's envelope
+        {
+            gbEnvelopeDrag (e, activeLayout().items[(std::size_t) dragItem]);
+            return;
+        }
         if (crossoverDrag >= 0 && dragItem >= 0)
         {
             const auto r = rectOf (activeLayout().items[(std::size_t) dragItem]);
@@ -4154,6 +4071,11 @@ public:
             wsMouseUp();
             dragItem = -1;
         }
+        if (gbDragging) // round 168m
+        {
+            gbEnvelopeUp();
+            dragItem = -1;
+        }
         tuneKeyRelease(); // LYNX Tune's keyboard without LATCH: the edit lasts while the key is held
         if (crossoverDrag >= 0)
         {
@@ -4201,7 +4123,7 @@ public:
             rhythmDoubleClick (e, item);
             return;
         }
-        if (isRhythmPatterns (item) || isWaveShaperGraph (item))
+        if (isRhythmPatterns (item) || isWaveShaperGraph (item) || isGbItem (item, "grossbeat") || isGbItem (item, "gbtools") || isGbItem (item, "gbslot"))
             return;
         if (isGeminiGraph (item)) // round 137: an EQ marker = its shelf on / off
         {
@@ -4232,7 +4154,7 @@ public:
         if (index < 0)
             return;
         const auto& item = activeLayout().items[(std::size_t) index];
-        if (isWaveShaperGraph (item))
+        if (isWaveShaperGraph (item) || isGbItem (item, "grossbeat") || isGbItem (item, "gbtools") || isGbItem (item, "gbslot"))
             return;
         if (item.type == Item::display && juce::String (item.display) == "tssenvelope") // FL's envelope view speed
         {
@@ -4330,6 +4252,8 @@ public:
             return { tr ("Load a tap pattern (LYNX SHARE's own), or go back to even spacing"), {}, false, false };
         if (isWaveShaperGraph (item)) // round 165
             return { wsHint (item, p), {}, false, true };
+        if (isGbItem (item, "grossbeat") || isGbItem (item, "gbtools") || isGbItem (item, "gbslot")) // round 168m
+            return { gbHint (item, p), {}, false, true };
         if (item.type == Item::display)
             return { tr ("Drag a handle (frequency and gain); mouse wheel = Q; right-click = type; double-click = 0 dB"), {}, false, true };
         if (hasStyle (item, plugui::pageTabs))

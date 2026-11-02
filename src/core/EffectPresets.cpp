@@ -3,12 +3,14 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <map>
 #include <sstream>
 
 #include "core/Effects.h"
 #include "core/FruityBasicFx.h"
+#include "core/GrossBeat.h"
 #include "core/EffectPresetTable.inc"
 
 namespace lynx::presets
@@ -129,9 +131,59 @@ Table parseTable()
     return table;
 }
 
+// Gross Beat (round 168m): LYNX's factory bank with a starting pair of slots selected — every preset carries the
+// whole bank, so a preset also brings the slots back to LYNX's set
+void addGrossBeat (Table& table)
+{
+    const auto bank = grossbeat::factoryContainer();
+    struct Pick
+    {
+        const char* name;
+        const char* folder;
+        int time, volume;
+    };
+    static const Pick picks[] {
+        { "Default", "", 0, 0 },
+        { "Repeat 1/2 beat", "Time", 1, 0 },
+        { "Stutter 1/8", "Time", 3, 0 },
+        { "Build-up roll", "Time", 6, 0 },
+        { "Half speed", "Time", 7, 0 },
+        { "Tape stop", "Time", 9, 0 },
+        { "Reverse beats", "Time", 11, 0 },
+        { "Scratch", "Time", 14, 0 },
+        { "Gate 1/4 beat", "Volume", 0, 3 },
+        { "Off-beat", "Volume", 0, 6 },
+        { "Pump", "Volume", 0, 9 },
+        { "Trance gate A", "Volume", 0, 11 },
+        { "Tremolo", "Volume", 0, 17 },
+        { "Build-up gate", "Volume", 0, 19 },
+        { "Stutter and gate", "Both", 3, 2 },
+        { "Half speed pump", "Both", 7, 9 },
+        { "Roll and build-up gate", "Both", 6, 19 },
+    };
+    auto& list = table.presets[EffectKind::grossBeat];
+    for (const auto& pick : picks)
+    {
+        Preset p;
+        p.name = pick.name;
+        p.folder = pick.folder;
+        char v[32];
+        std::snprintf (v, sizeof (v), "#%.9g", (double) grossbeat::paramFromRaw (0, pick.time));
+        p.values.emplace_back ("Time slot", v);
+        std::snprintf (v, sizeof (v), "#%.9g", (double) grossbeat::paramFromRaw (1, pick.volume));
+        p.values.emplace_back ("Volume slot", v);
+        p.state = bank;
+        list.push_back (std::move (p));
+    }
+}
+
 const Table& table()
 {
-    static const auto t = parseTable();
+    static const auto t = [] {
+        auto parsed = parseTable();
+        addGrossBeat (parsed);
+        return parsed;
+    }();
     return t;
 }
 
@@ -261,7 +313,49 @@ namespace
 const std::string sendSpanKey = "Send to span";
 }
 
-std::string toText (EffectKind kind, const std::string& name, const EffectParams& params)
+bool savesState (EffectKind kind)
+{
+    return kind == EffectKind::grossBeat;
+}
+
+namespace
+{
+constexpr const char* stateKey = "state (hex)";
+
+std::string toHex (const std::vector<std::uint8_t>& bytes)
+{
+    static const char digits[] = "0123456789abcdef";
+    std::string out;
+    out.reserve (bytes.size() * 2);
+    for (const auto b : bytes)
+        out += digits[b >> 4], out += digits[b & 15];
+    return out;
+}
+
+std::optional<std::vector<std::uint8_t>> fromHex (const std::string& text)
+{
+    if (text.size() % 2 != 0)
+        return std::nullopt;
+    const auto nibble = [] (char c) -> int {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        return -1;
+    };
+    std::vector<std::uint8_t> out;
+    out.reserve (text.size() / 2);
+    for (std::size_t i = 0; i < text.size(); i += 2)
+    {
+        const auto hi = nibble (text[i]), lo = nibble (text[i + 1]);
+        if (hi < 0 || lo < 0)
+            return std::nullopt;
+        out.push_back ((std::uint8_t) (hi * 16 + lo));
+    }
+    return out;
+}
+} // namespace
+
+std::string toText (EffectKind kind, const std::string& name, const EffectParams& params, const std::vector<std::uint8_t>* state)
 {
     std::ostringstream out;
     out << "LYNX preset 1\n";
@@ -279,6 +373,8 @@ std::string toText (EffectKind kind, const std::string& name, const EffectParams
         std::snprintf (value, sizeof (value), "%.6g", (double) v);
         out << info[i].name << " = " << value << "\n";
     }
+    if (state != nullptr && savesState (kind))
+        out << stateKey << " = " << toHex (*state) << "\n";
     return out.str();
 }
 
@@ -305,6 +401,14 @@ std::optional<Loaded> fromText (EffectKind kind, const std::string& text)
             loaded.name = value;
         else if (key == sendSpanKey)
             sendSpan = std::atoi (value.c_str());
+        else if (key == stateKey && savesState (kind))
+        {
+            if (auto bytes = fromHex (value))
+            {
+                loaded.state = std::move (*bytes);
+                loaded.hasState = true;
+            }
+        }
         else if (const auto p = paramByName (kind, key); p >= 0)
         {
             loaded.params[(std::size_t) p] = (float) std::clamp (std::atof (value.c_str()), 0.0, 1.0);

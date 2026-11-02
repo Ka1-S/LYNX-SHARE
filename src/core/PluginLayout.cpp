@@ -675,7 +675,7 @@ Layout grossBeat()
     // the envelope of the selected slots and the slot's settings under it
     Layout l;
     l.fl = "Gross Beat";
-    l.width = 840;
+    l.width = 836;
     l.height = 563;
     auto& v = l.items;
     static const std::string slots = [] {
@@ -703,8 +703,11 @@ Layout grossBeat()
     v.push_back (section (6, 509, 128, 46, nullptr, boxed | raised));
     v.push_back (knob (31, 531, 40, "Volume mix", nullptr, 0, noCaption));
     v.push_back (label (56, 521, 70, 20, TR_NOOP ("Volume"), alignLeft));
-    v.push_back (display (272, 4, 556, 530, "grossbeat"));
-    v.push_back (display (272, 537, 556, 22, "gbinfo"));
+    // round 168m (FL's DFM TSynthEditorForm): the tool column (Options, Snap, Envelope time / volume), the envelope
+    // editor, and the selected slot's name and settings under it
+    v.push_back (display (270, 4, 24, 555, "gbtools"));
+    v.push_back (display (298, 4, 532, 521, "grossbeat"));
+    v.push_back (display (298, 529, 532, 30, "gbslot"));
     return l;
 }
 
