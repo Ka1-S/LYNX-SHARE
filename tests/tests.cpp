@@ -160,6 +160,7 @@
 #include "core/PluginSubstitutes.h"
 #include "core/ClipOps.h"
 #include "core/PlaylistOps.h"
+#include "core/QuickRender.h"
 #include "core/TouchKeyboard.h"
 #include "core/HeldNotes.h"
 #include "core/Templates.h"

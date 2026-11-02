@@ -88,10 +88,12 @@ Result process (std::vector<float>& left, std::vector<float>& right, double samp
         return result;
     }
 
-    // the limiter takes some loudness away: correct the gain from the measured result (a few passes at most)
+    // the limiter takes loudness away the harder it works: find the gain from the measured results (a secant search
+    // on gain → loudness, a few passes at most)
     auto gain = settings.targetLufs - result.inputLufs;
+    double prevGain = 0.0, prevLufs = result.inputLufs;
     std::vector<float> outL, outR;
-    for (int pass = 0; pass < 4; ++pass)
+    for (int pass = 0; pass < 8; ++pass)
     {
         limit (left, right, outL, outR, sampleRate, gain, settings.ceilingDb);
         measure (outL, outR, sampleRate, result.outputLufs, result.outputTruePeakDb);
@@ -99,7 +101,11 @@ Result process (std::vector<float>& left, std::vector<float>& right, double samp
         const auto error = settings.targetLufs - result.outputLufs;
         if (std::abs (error) < 0.1 || gain >= 30.0)
             break;
-        gain = std::min (30.0, gain + error);
+        const auto slope = (result.outputLufs - prevLufs) / (gain - prevGain); // dB of loudness per dB of gain
+        prevGain = gain;
+        prevLufs = result.outputLufs;
+        const auto step = error / std::clamp (std::isfinite (slope) ? slope : 1.0, 0.1, 1.0);
+        gain = std::min (30.0, gain + std::clamp (step, -12.0, 12.0));
     }
     left.swap (outL);
     right.swap (outR);
