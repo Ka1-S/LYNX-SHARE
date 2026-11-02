@@ -247,3 +247,50 @@ TEST (gb168_presets_carry_the_slots)
     const auto plain = lynx::presets::toText (lynx::EffectKind::fruityDelay2, "x", params, &bytes);
     CHECK (plain.find ("state") == std::string::npos);
 }
+
+// the user's ask after the review: "tem que fazer uns presets legais" — every LYNX slot is named, distinct and moves;
+// every factory preset selects named slots; two of the classic moves checked by ear-free measurement
+TEST (gb168_factory_slots_are_named_distinct_and_used_by_presets)
+{
+    const auto state = lynx::grossbeat::factoryState();
+    std::set<std::string> names;
+    int time = 0, volume = 0;
+    for (int i = 0; i < 2 * lynx::grossbeat::slotsPerKind; ++i)
+    {
+        const auto& slot = state.slots[(std::size_t) i];
+        if (slot.name.empty())
+            continue;
+        CHECK (names.insert (slot.name).second);
+        const auto levels = lynx::grossbeat::renderSlot (slot, 256);
+        const auto [lo, hi] = std::minmax_element (levels.begin(), levels.end());
+        CHECK (*hi - *lo > 1.0e-3f && *lo >= 0.0f && *hi <= 1.0f);
+        (i < lynx::grossbeat::slotsPerKind ? time : volume) += 1;
+    }
+    CHECK (time >= 24 && volume >= 29);
+
+    const auto& factory = lynx::presets::factory (lynx::EffectKind::grossBeat);
+    CHECK (factory.size() >= 25);
+    for (const auto& p : factory)
+    {
+        const auto params = lynx::presets::apply (lynx::EffectKind::grossBeat, p);
+        const auto t = lynx::grossbeat::rawFromParam (0, params[0]), v = lynx::grossbeat::rawFromParam (1, params[1]);
+        CHECK (t >= 0 && t < 36 && v >= 0 && v < 36);
+        if (p.name != "Default")
+            CHECK (! state.slots[(std::size_t) t].name.empty() || ! state.slots[(std::size_t) (36 + v)].name.empty());
+    }
+
+    // Spin back: the last beat plays backwards (a rising ramp comes out falling); Sidechain hard: silent on the beat,
+    // back to full within the beat
+    const auto timeNames = lynx::grossbeat::slotNames (lynx::grossbeat::factoryContainer(), false);
+    const auto volumeNames = lynx::grossbeat::slotNames (lynx::grossbeat::factoryContainer(), true);
+    const auto spin = gb168Index (timeNames, "Spin back"), duck = gb168Index (volumeNames, "Sidechain hard");
+    CHECK (spin > 0 && duck > 0);
+    std::vector<float> ramp (100000);
+    for (std::size_t i = 0; i < ramp.size(); ++i)
+        ramp[i] = (float) i / (float) ramp.size();
+    const auto back = renderGrossBeat (gb168Slot (spin, 0, lynx::grossbeat::factoryContainer()), ramp, 48000.0, 120.0);
+    CHECK (back[15 + 60000] < back[15 + 70000]);  // beat 3: forwards
+    CHECK (back[15 + 80000] > back[15 + 90000]);  // beat 4: backwards
+    const auto ducked = renderGrossBeat (gb168Slot (0, duck, lynx::grossbeat::factoryContainer()), std::vector<float> (100000, 1.0f), 48000.0, 120.0);
+    CHECK (ducked[15 + 24000 + 50] < 0.3f && ducked[15 + 24000 + 20000] > 0.95f);
+}

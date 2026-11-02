@@ -12,6 +12,7 @@
     // FL's Snap selector: at creation the editor's snap flag × 3 = "1/8 beat" (FUN_0083fcf0 → FUN_0084b8f0)
     int gbSnap = 3;
     int gbDragPoint = -1, gbDragTension = -1, gbHoverPoint = -1, gbHoverHandle = -1;
+    int gbHoverCell = -1; // the slot under the mouse in a grid (kind × 36 + slot)
     bool gbDragging = false;
     std::vector<grossbeat::EditPoint> gbDragPoints;
     float gbTensionStart = 0.0f, gbTensionSign = 1.0f;
@@ -395,6 +396,7 @@
         });
         menu.addSeparator();
         menu.addItem (tr ("Rename..."), [this] { gbRename(); });
+        menu.addSubMenu (tr ("Factory slots"), gbFactorySlots());
         menu.addItem (tr ("Load LYNX SHARE's factory slots (keeps the selected slots)"), [this] { gbWriteState (gbWithFactory()); });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (at.toNearestInt())));
     }
@@ -489,6 +491,92 @@
         gbWriteSlot (slot);
     }
 
+    // --- the slot grids (FL's two 4 × 9 grids) and the tab bar over the envelope (round 168m) --------------------
+
+    static bool isGbAny (const LayoutItem& item)
+    {
+        return item.type == Item::display && item.display != nullptr && (std::strncmp (item.display, "gb", 2) == 0 || std::strcmp (item.display, "grossbeat") == 0);
+    }
+
+    static int gbGridKind (const LayoutItem& item) { return isGbItem (item, "gbtimegrid") ? 0 : isGbItem (item, "gbvolumegrid") ? 1 : -1; }
+
+    juce::Rectangle<float> gbGridCell (const LayoutItem& item, int slot) const
+    {
+        const auto r = rectOf (item);
+        const auto w = r.getWidth() / 4.0f, h = r.getHeight() / 9.0f;
+        return { r.getX() + w * (float) (slot % 4), r.getY() + h * (float) (slot / 4), w, h };
+    }
+
+    int gbGridAt (const LayoutItem& item, juce::Point<float> p) const
+    {
+        const auto r = rectOf (item);
+        if (! r.contains (p))
+            return -1;
+        const auto col = juce::jlimit (0, 3, (int) ((p.x - r.getX()) / (r.getWidth() / 4.0f)));
+        const auto row = juce::jlimit (0, 8, (int) ((p.y - r.getY()) / (r.getHeight() / 9.0f)));
+        return row * 4 + col;
+    }
+
+    // FL: clicking a slot selects it for its kind and shows its envelope
+    void gbSelect (int kindIndex, int slot)
+    {
+        gbEditKind = kindIndex;
+        const auto param = plugui::paramIndex (kind, kindIndex == 0 ? "Time slot" : "Volume slot");
+        if (param >= 0 && gbSlotOf (kindIndex) != slot)
+            setParams ({ { param, grossbeat::paramFromRaw (kindIndex, slot) } });
+        repaint();
+    }
+
+    juce::String gbSlotTitle (int kindIndex, int slot) const
+    {
+        const auto& name = gbState().slots[(std::size_t) (kindIndex * grossbeat::slotsPerKind + slot)].name;
+        return name.empty() ? tr ("Slot {0}", { juce::String (slot + 1) }) : juce::String::fromUTF8 (name.c_str());
+    }
+
+    // the factory slot browser: LYNX SHARE's slots of the shown kind; the one picked replaces the selected slot
+    juce::PopupMenu gbFactorySlots()
+    {
+        static const auto factory = grossbeat::factoryState();
+        juce::PopupMenu menu;
+        for (int i = 0; i < grossbeat::slotsPerKind; ++i)
+            if (const auto& slot = factory.slots[(std::size_t) (gbEditKind * grossbeat::slotsPerKind + i)]; ! slot.name.empty())
+                menu.addItem (juce::String::fromUTF8 (slot.name.c_str()), [this, slot] {
+                    auto now = gbState().slots[(std::size_t) gbSlotIndex()];
+                    now.name = slot.name;
+                    now.points = slot.points;
+                    gbWriteSlot (now);
+                });
+        return menu;
+    }
+
+    void gbFactoryMenu (juce::Rectangle<float> at)
+    {
+        juce::PopupMenu menu;
+        menu.addSectionHeader (gbEditKind == 0 ? tr ("Time slot {0}", { juce::String (gbSlotOf (0) + 1) }) : tr ("Volume slot {0}", { juce::String (gbSlotOf (1) + 1) }));
+        const auto slots = gbFactorySlots();
+        for (juce::PopupMenu::MenuItemIterator it (slots); it.next();)
+            menu.addItem (it.getItem());
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (at.toNearestInt())));
+    }
+
+    // tab bar parts: 0 Time tab, 1 Volume tab, 2 the factory slot browser
+    juce::Rectangle<float> gbTabCell (const LayoutItem& item, int part) const
+    {
+        const auto r = rectOf (item);
+        const auto s = scale();
+        if (part == 2)
+            return r.withLeft (r.getRight() - 150.0f * s);
+        return { r.getX() + (float) part * 92.0f * s, r.getY(), 90.0f * s, r.getHeight() };
+    }
+
+    int gbTabAt (const LayoutItem& item, juce::Point<float> p) const
+    {
+        for (int part = 0; part < 3; ++part)
+            if (gbTabCell (item, part).contains (p))
+                return part;
+        return -1;
+    }
+
     // --- the editor's mouse entry points (called by mouseDown / mouseDrag / mouseUp / mouseMove) -----------------
 
     // true = handled (a drag may follow when gbDragging is set)
@@ -518,11 +606,42 @@
             gbBarDown (item, e.position);
             return true;
         }
+        if (const auto k = gbGridKind (item); k >= 0)
+        {
+            if (const auto slot = gbGridAt (item, e.position); slot >= 0)
+            {
+                gbSelect (k, slot);
+                if (e.mods.isPopupMenu()) // right-click: the slot's menu (copy, paste, factory slots…)
+                    gbOptionsMenu (gbGridCell (item, slot));
+            }
+            return true;
+        }
+        if (isGbItem (item, "gbtabs"))
+        {
+            const auto part = gbTabAt (item, e.position);
+            if (part == 0 || part == 1)
+                gbEditKind = part, repaint();
+            else if (part == 2)
+                gbFactoryMenu (gbTabCell (item, 2));
+            return true;
+        }
         return false;
     }
 
     bool gbMouseMove (const LayoutItem& item, juce::Point<float> p)
     {
+        const auto k = gbGridKind (item);
+        const auto hoverCell = k >= 0 ? (gbGridAt (item, p) >= 0 ? k * grossbeat::slotsPerKind + gbGridAt (item, p) : -1) : -1;
+        if (hoverCell != gbHoverCell)
+        {
+            gbHoverCell = hoverCell;
+            repaint();
+        }
+        if (k >= 0 || isGbItem (item, "gbtabs"))
+        {
+            setMouseCursor (juce::MouseCursor::PointingHandCursor);
+            return true;
+        }
         if (! isGbItem (item, "grossbeat"))
         {
             if (gbHoverPoint >= 0 || gbHoverHandle >= 0)
@@ -570,6 +689,18 @@
                 case 6: return tr ("Slot position synchronization");
                 default: return {};
             }
+        }
+        if (const auto k = gbGridKind (item); k >= 0)
+        {
+            const auto slot = gbGridAt (item, p);
+            return slot < 0 ? juce::String() : (k == 0 ? tr ("Time slot {0}", { juce::String (slot + 1) }) : tr ("Volume slot {0}", { juce::String (slot + 1) }))
+                                                   + ": " + gbSlotTitle (k, slot) + "  " + tr ("[LMB] select  [RMB] copy, paste, factory slots, rename");
+        }
+        if (isGbItem (item, "gbtabs"))
+        {
+            const auto part = gbTabAt (item, p);
+            return part == 2 ? tr ("Factory slots: put one of LYNX SHARE's slots in the selected slot")
+                             : tr ("Envelope: {0}", { gbEditKind == 0 ? tr ("time travel") : tr ("volume") });
         }
         if (gbPointAt (item, p) >= 0)
             return tr ("Point: [LMB] drag moves it ([Alt] no snap)  [RMB] shape, value, delete  [Alt][RMB] delete");
@@ -620,6 +751,87 @@
                 cell (i + 1, gbSnap == i, i == 0 ? tr ("off") : juce::String (snapShort[i]));
             cell (8, gbEditKind == 0, "T");
             cell (9, gbEditKind == 1, "V");
+            return;
+        }
+
+        if (const auto k = gbGridKind (item); k >= 0) // the slot grids: each slot's name over its envelope
+        {
+            const auto colour = k == 0 ? timeColour : volumeColour;
+            const auto selected = gbSlotOf (k);
+            g.setColour (colour::bg0);
+            g.fillRoundedRectangle (r, radius::sm * s);
+            for (int i = 0; i < grossbeat::slotsPerKind; ++i)
+            {
+                const auto cell = gbGridCell (item, i).reduced (1.0f * s);
+                const auto& slot = gbState().slots[(std::size_t) (k * grossbeat::slotsPerKind + i)];
+                const auto isSel = i == selected, hot = gbHoverCell == k * grossbeat::slotsPerKind + i;
+                g.setColour (isSel ? colour.withAlpha (0.22f) : hot ? colour::bg3 : (i / 4 + i) % 2 == 0 ? colour::bg1 : colour::bg2);
+                g.fillRoundedRectangle (cell, radius::sm * s);
+                const auto levels = grossbeat::renderSlot (slot, juce::jmax (8, (int) cell.getWidth()));
+                const auto flat = std::all_of (levels.begin(), levels.end(), [&] (float v) { return std::abs (v - levels.front()) < 1.0e-4f; });
+                if (! flat) // a thumbnail of the envelope, filled
+                {
+                    const auto a = cell.reduced (2.0f * s, 2.0f * s);
+                    juce::Path line, area;
+                    for (std::size_t j = 0; j < levels.size(); ++j)
+                    {
+                        const juce::Point<float> pt { a.getX() + a.getWidth() * (float) j / (float) (levels.size() - 1), a.getBottom() - a.getHeight() * levels[j] };
+                        j == 0 ? line.startNewSubPath (pt) : line.lineTo (pt);
+                    }
+                    area = line;
+                    area.lineTo (a.getBottomRight());
+                    area.lineTo (a.getBottomLeft());
+                    area.closeSubPath();
+                    g.setColour (colour.withAlpha (isSel ? 0.30f : 0.16f));
+                    g.fillPath (area);
+                    g.setColour (colour.withAlpha (isSel ? 0.9f : 0.45f));
+                    g.strokePath (line, juce::PathStrokeType (1.0f * s));
+                }
+                const auto named = ! slot.name.empty();
+                g.setFont (font (juce::jmax (7.0f, 8.5f * s), isSel));
+                g.setColour (isSel ? colour::textPrimary : named ? colour::textPrimary.withAlpha (0.85f) : colour::textDisabled);
+                g.drawFittedText (named ? juce::String::fromUTF8 (slot.name.c_str()) : juce::String (i + 1), cell.reduced (3.0f * s, 0.0f).toNearestInt(),
+                                  juce::Justification::centred, 1, 0.65f);
+                if (isSel)
+                {
+                    g.setColour (colour);
+                    g.drawRoundedRectangle (cell, radius::sm * s, 1.4f * s);
+                }
+            }
+            return;
+        }
+
+        if (id == "gbtabs") // Time / Volume tabs, the selected slot's name, the factory slot browser
+        {
+            g.setColour (colour::bg1);
+            g.fillRoundedRectangle (r, radius::sm * s);
+            for (int part = 0; part < 2; ++part)
+            {
+                const auto c = gbTabCell (item, part).reduced (2.0f * s, 3.0f * s);
+                const auto on = gbEditKind == part;
+                const auto colour = part == 0 ? timeColour : volumeColour;
+                g.setColour (on ? colour.withAlpha (0.25f) : colour::bg2);
+                g.fillRoundedRectangle (c, radius::sm * s);
+                if (on)
+                {
+                    g.setColour (colour);
+                    g.fillRect (c.withTop (c.getBottom() - 2.0f * s));
+                }
+                g.setColour (on ? colour::textPrimary : colour::textSecondary);
+                g.setFont (font (juce::jmax (8.0f, 10.0f * s), true));
+                g.drawText (part == 0 ? tr ("TIME") : tr ("VOLUME"), c, juce::Justification::centred, false);
+            }
+            const auto browser = gbTabCell (item, 2).reduced (2.0f * s, 3.0f * s);
+            const auto title = r.withLeft (gbTabCell (item, 1).getRight() + 8.0f * s).withRight (browser.getX() - 6.0f * s);
+            g.setColour (kindColour);
+            g.setFont (font (juce::jmax (8.0f, 11.0f * s), true));
+            g.drawFittedText (juce::String (gbSlotOf (gbEditKind) + 1) + "  " + gbSlotTitle (gbEditKind, gbSlotOf (gbEditKind)), title.toNearestInt(),
+                              juce::Justification::centredLeft, 1, 0.7f);
+            g.setColour (colour::bg3);
+            g.fillRoundedRectangle (browser, radius::sm * s);
+            g.setColour (colour::textPrimary);
+            g.setFont (font (juce::jmax (8.0f, 10.0f * s)));
+            g.drawText (tr ("Factory slots") + juce::String::fromUTF8 (" \xe2\x96\xbe"), browser, juce::Justification::centred, false);
             return;
         }
 
@@ -692,10 +904,12 @@
         fill.lineTo (inner.getBottomRight());
         fill.lineTo (inner.getBottomLeft());
         fill.closeSubPath();
-        g.setColour (kindColour.withAlpha (0.16f));
+        g.setGradientFill (juce::ColourGradient (kindColour.withAlpha (0.34f), inner.getX(), inner.getY(), kindColour.withAlpha (0.03f), inner.getX(), inner.getBottom(), false));
         g.fillPath (fill);
+        g.setColour (kindColour.withAlpha (0.25f)); // a soft glow under the line
+        g.strokePath (curve, juce::PathStrokeType (juce::jmax (3.0f, 5.0f * s), juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         g.setColour (kindColour);
-        g.strokePath (curve, juce::PathStrokeType (juce::jmax (1.5f, 2.0f * s)));
+        g.strokePath (curve, juce::PathStrokeType (juce::jmax (1.5f, 2.0f * s), juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
         const auto pts = grossbeat::editPoints (shown);
         for (int i = 1; i < (int) pts.size(); ++i)
@@ -711,6 +925,21 @@
             const auto pt = gbPos (inner, pts[(std::size_t) i].x, pts[(std::size_t) i].y);
             g.setColour (hot ? colour::textPrimary : kindColour);
             g.fillEllipse (juce::Rectangle<float> ((hot ? 8.0f : 6.0f) * s, (hot ? 8.0f : 6.0f) * s).withCentre (pt));
+        }
+        // the scale: beat numbers along the top, the level on the left (time: how far back; volume: percent)
+        g.setFont (font (juce::jmax (7.5f, 9.0f * s)));
+        g.setColour (colour::textSecondary.withAlpha (0.8f));
+        for (int b = 0; b < 4; ++b)
+            g.drawText (juce::String (b + 1), juce::Rectangle<float> (gbPos (inner, b, 1.0f).x + 4.0f * s, inner.getY() + 2.0f * s, 20.0f * s, 12.0f * s),
+                        juce::Justification::centredLeft, false);
+        for (int i = 0; i <= 2; ++i)
+        {
+            const auto y = 1.0f - 0.5f * (float) i;
+            const auto text = gbEditKind == 0 ? (i == 0 ? tr ("now") : i == 1 ? tr ("1 bar back") : tr ("2 bars back"))
+                                              : juce::String (juce::roundToInt (y * 100.0f)) + "%";
+            const auto at = gbPos (inner, 0.0, y);
+            g.drawText (text, juce::Rectangle<float> (at.x + 4.0f * s, juce::jlimit (inner.getY() + 14.0f * s, inner.getBottom() - 13.0f * s, at.y - 6.0f * s), 90.0f * s, 12.0f * s),
+                        juce::Justification::centredLeft, false);
         }
         g.setColour (kindColour.withAlpha (0.8f));
         g.setFont (font (juce::jmax (8.0f, 10.0f * s), true));

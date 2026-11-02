@@ -678,25 +678,15 @@ Layout grossBeat()
     l.width = 836;
     l.height = 563;
     auto& v = l.items;
-    static const std::string slots = [] {
-        std::string out;
-        for (int i = 1; i <= 36; ++i)
-            out += (i > 1 ? "|" : "") + std::string ("Slot ") + std::to_string (i);
-        return out;
-    }();
     v.push_back (section (0, 0, 268, 563, nullptr, boxed));
     v.push_back (section (6, 7, 128, 46, nullptr, boxed | raised));
     v.push_back (knob (31, 30, 40, "Time mix", nullptr, 0, noCaption));
     v.push_back (label (56, 20, 70, 20, TR_NOOP ("Time"), alignLeft));
     v.push_back (display (189, 12, 72, 72, "gbjog"));
     v.push_back (toggle (113, 62, 62, 28, "Hold", TR_NOOP ("Hold"), boxed));
-    auto timeSlots = radio (13, 103, 246, 162, "Time slot", slots.c_str());
-    timeSlots.columns = 4;
-    v.push_back (timeSlots);
-    auto volumeSlots = radio (13, 276, 246, 162, "Volume slot", slots.c_str());
-    volumeSlots.columns = 4;
-    volumeSlots.colour = 1;
-    v.push_back (volumeSlots);
+    // round 168m: the two slot grids draw each slot's name over a thumbnail of its envelope (FL's grids of 4 × 9)
+    v.push_back (display (13, 103, 246, 162, "gbtimegrid"));
+    v.push_back (display (13, 276, 246, 162, "gbvolumegrid"));
     v.push_back (knob (80, 467, 38, "Attack", TR_NOOP ("Att"), 492));
     v.push_back (knob (130, 467, 38, "Release", TR_NOOP ("Rel"), 492));
     v.push_back (knob (186, 467, 38, "Tension", TR_NOOP ("Tns"), 492, bipolar));
@@ -706,8 +696,11 @@ Layout grossBeat()
     // round 168m (FL's DFM TSynthEditorForm): the tool column (Options, Snap, Envelope time / volume), the envelope
     // editor, and the selected slot's name and settings under it
     v.push_back (display (270, 4, 24, 555, "gbtools"));
-    v.push_back (display (298, 4, 532, 521, "grossbeat"));
+    v.push_back (display (298, 4, 532, 26, "gbtabs")); // Time / Volume tabs, the slot's name, the factory slot browser
+    v.push_back (display (298, 33, 532, 492, "grossbeat"));
     v.push_back (display (298, 529, 532, 30, "gbslot"));
+    l.editedElsewhere.push_back ("Time slot"); // the slot grids
+    l.editedElsewhere.push_back ("Volume slot");
     return l;
 }
 

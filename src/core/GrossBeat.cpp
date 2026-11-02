@@ -835,6 +835,55 @@ State factoryState()
     fill (time (15), "Echo beat 1", Shape (1.0f).step (1.0, delayLevel (1.0)).step (2.0, 1.0f).step (4.0, 1.0f));
     fill (time (16), "Repeat half bar", Shape (1.0f).step (2.0, delayLevel (2.0)).step (4.0, 1.0f));
     fill (time (17), "Repeat 1 beat", Shape (1.0f).step (1.0, delayLevel (1.0)).step (2.0, delayLevel (2.0)).step (3.0, delayLevel (3.0)).step (4.0, 1.0f));
+    {
+        Shape brake (1.0f); // round 168m: the last two beats slow down to a stop (speed 1 − u/2, d = u²/4)
+        brake.step (2.0, 1.0f);
+        for (int i = 1; i <= 16; ++i)
+        {
+            const auto u = i * 0.125;
+            brake.line (2.0 + u, delayLevel (u * u / 4.0));
+        }
+        fill (time (18), "Vinyl brake", brake);
+    }
+    // the last beat rewinds at three times the speed (a DJ's spin back), then the next bar comes in
+    fill (time (19), "Spin back", Shape (1.0f).step (3.0, 1.0f).line (4.0, delayLevel (4.0), 0.2f).step (4.0, 1.0f));
+    {
+        Shape start (1.0f); // the first beat speeds up from a stop (speed u, d = u − u²/2), then plays half a beat late
+        for (int i = 1; i <= 8; ++i)
+        {
+            const auto u = i * 0.125;
+            start.line (u, delayLevel (u - u * u / 2.0));
+        }
+        start.step (4.0, 1.0f);
+        fill (time (20), "Tape start", start);
+    }
+    // the bar's first beat and a half plays three times: 3 + 3 + 2 eighths
+    fill (time (21), "Repeat 3-3-2", Shape (1.0f).step (1.5, delayLevel (1.5)).step (3.0, delayLevel (3.0)).step (4.0, 1.0f));
+    {
+        Shape wobble (1.0f); // a slow, slight pitch wobble (worn tape): d swings between 0 and 0.03 beats every 2 beats
+        for (int i = 1; i <= 32; ++i)
+        {
+            const auto x = i * 0.125;
+            wobble.line (x, delayLevel (0.015 * (1.0 - std::cos (6.283185307179586 * x / 2.0))));
+        }
+        fill (time (22), "Lo-fi wobble", wobble);
+    }
+    {
+        Shape mix (1.0f); // beats 1–2 as they come, beat 3 stutters in eighths, beat 4 backwards
+        for (double c = 0.125; c < 1.0 - 1.0e-9; c += 0.125)
+            mix.step (2.0 + c, delayLevel (c)); // the first eighth of beat 3, again and again
+        mix.step (3.0, 1.0f).line (4.0, delayLevel (2.0)).step (4.0, 1.0f);
+        fill (time (23), "Stutter into reverse", mix);
+    }
+    {
+        Shape roll (1.0f); // beats 1–3 as they come, beat 4 in twelfths (a triplet roll)
+        roll.step (3.0, 1.0f);
+        for (int k = 1; k < 12; ++k)
+            roll.step (3.0 + k / 12.0, delayLevel (k / 12.0));
+        roll.step (4.0, 1.0f);
+        fill (time (24), "Triplet roll", roll);
+    }
+    fill (time (25), "Half speed last beat", Shape (1.0f).step (3.0, 1.0f).line (4.0, delayLevel (0.5)).step (4.0, 1.0f));
 
     // volume: slot 1 keeps the level
     fill (volume (1), "Gate 1 beat", gate (1.0, 0.5));
@@ -892,6 +941,30 @@ State factoryState()
                                                      .step (0.75, 1.0f).step (0.875, 0.0f).step (1.0, 1.0f).step (4.0, 1.0f));
     fill (volume (21), "Mute last 2 beats", Shape (1.0f).step (2.0, 0.0f).step (4.0, 1.0f));
     fill (volume (22), "Mute", Shape (0.0f).step (4.0, 0.0f));
+    {
+        Shape hard (0.0f), soft (0.3f), half (0.0f); // round 168m: sidechain-style ducking (a kick on every beat)
+        for (int b = 0; b < 4; ++b)
+        {
+            hard.line (b + 0.3, 1.0f, 0.45f).step (b + 1.0, 0.0f);
+            soft.line (b + 0.7, 1.0f, 0.3f).step (b + 1.0, 0.3f);
+        }
+        for (int h = 0; h < 8; ++h)
+            half.line (h * 0.5 + 0.2, 1.0f, 0.45f).step (h * 0.5 + 0.5, 0.0f);
+        fill (volume (23), "Sidechain hard", hard);
+        fill (volume (24), "Sidechain soft", soft);
+        fill (volume (25), "Sidechain 1/2 beat", half);
+    }
+    fill (volume (26), "Gate 3-3-2", pattern ("1101101011011010"));
+    {
+        Shape swell (0.05f), slow (0.0f); // each beat (or half bar) rises from silence, like a reversed hit
+        for (int b = 0; b < 4; ++b)
+            swell.line (b + 1.0, 1.0f, -0.45f).step (b + 1.0, 0.05f);
+        slow.line (2.0, 1.0f, -0.4f).step (2.0, 0.0f).line (4.0, 1.0f, -0.4f).step (4.0, 0.0f);
+        fill (volume (27), "Reverse swell", swell);
+        fill (volume (28), "Half-bar swell", slow);
+    }
+    fill (volume (29), "Mute last beat", Shape (1.0f).step (3.0, 0.0f).step (4.0, 1.0f));
+    fill (volume (30), "Stutter gate 1/16", gate (0.0625, 0.03125));
     return s;
 }
 

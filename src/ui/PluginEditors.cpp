@@ -2348,7 +2348,7 @@ public:
             paintEq (g, r, fx);
             return;
         }
-        else if (id == "grossbeat" || id == "gbslot" || id == "gbtools" || id == "gbjog")
+        else if (id == "grossbeat" || id.startsWith ("gb"))
         {
             paintGrossBeat (g, id, r, fx, item);
             return;
@@ -4123,7 +4123,7 @@ public:
             rhythmDoubleClick (e, item);
             return;
         }
-        if (isRhythmPatterns (item) || isWaveShaperGraph (item) || isGbItem (item, "grossbeat") || isGbItem (item, "gbtools") || isGbItem (item, "gbslot"))
+        if (isRhythmPatterns (item) || isWaveShaperGraph (item) || isGbAny (item))
             return;
         if (isGeminiGraph (item)) // round 137: an EQ marker = its shelf on / off
         {
@@ -4154,7 +4154,7 @@ public:
         if (index < 0)
             return;
         const auto& item = activeLayout().items[(std::size_t) index];
-        if (isWaveShaperGraph (item) || isGbItem (item, "grossbeat") || isGbItem (item, "gbtools") || isGbItem (item, "gbslot"))
+        if (isWaveShaperGraph (item) || isGbAny (item))
             return;
         if (item.type == Item::display && juce::String (item.display) == "tssenvelope") // FL's envelope view speed
         {
@@ -4252,7 +4252,7 @@ public:
             return { tr ("Load a tap pattern (LYNX SHARE's own), or go back to even spacing"), {}, false, false };
         if (isWaveShaperGraph (item)) // round 165
             return { wsHint (item, p), {}, false, true };
-        if (isGbItem (item, "grossbeat") || isGbItem (item, "gbtools") || isGbItem (item, "gbslot")) // round 168m
+        if (isGbAny (item)) // round 168m
             return { gbHint (item, p), {}, false, true };
         if (item.type == Item::display)
             return { tr ("Drag a handle (frequency and gain); mouse wheel = Q; right-click = type; double-click = 0 dB"), {}, false, true };
