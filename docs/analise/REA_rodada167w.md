@@ -49,16 +49,23 @@ is no FL evidence to collect: the evidence is a reproduction on `main` and the s
   30 s from a thread of its own (as the Export window), waits 1 s and checks: no overlap, no inactive block, the
   restarts happened, PDC total == the plugin's latency, no plugin crash.
 - **Windows (fresh LYNX_PROFILE_DIR + LYNX_TEST_MODE=1, CLI only, no window):**
-  - with the PR: `requests=48 activations=51 overlapped=0 inactive_blocks=0 blocks=1724`, plugin latency 192 =
-    `pdc_total=192` (3 runs: same).
-  - before (c7a2aeff reverted): see §3.
+  - **before** (main's ClapFormat.cpp, same driver; 3 runs, `C:\Users\kauan\lynx-test\pr2930\before\report-*-plugin.txt`):
+    `requests=48 activations=51 overlapped=47` (twice), `overlapped=47 inactive_blocks=1` — 47 of the 48 restarts
+    deactivated the plugin inside its own `process()` call: the bug the PR describes, reproduced on Windows.
+  - **with the PR** (`...\pr2930\fix\`): `requests=48 activations=51 overlapped=0 inactive_blocks=0`, plugin latency
+    192 = `pdc_total=192`. The rendering instance processed 1724 blocks instead of ~2918: during each restart the
+    blocks are silent (the PR's design). Offline that is many blocks because the export thread runs far faster than
+    real time while the message thread does the restart; in real-time playback a restart is about one block.
+  - (The instance that rendered was destroyed only at exit in the first driver version: it held the effect past the
+    engine reset — fixed in 5fa736d0, the check now reads every instance's line.)
 - No third-party CLAP was used: the installed ones (FabFilter) are commercial and need a GUI action to change
   latency; the brief allowed a test CLAP instead.
 
-## 3. Results
 ## Where I stopped
 
-- done: worktree ~/projetos/lynx-wt-pr2930 (feature/pr2930) = c7a2aeff (ff) + merge of d25dc86c + our 32257a2a
-  (tools/testplugin/lynx_test_restart.c + `--claprestarttest`); wip pushed to origin/wip/pr2930.
-- in progress: build-local with FL Data (/mnt/e/lynx-work/pr2930/bl.log), Windows build (win1.log), test CLAP build.
-- next: run `--claprestarttest` on Windows (fix) and with c7a2aeff reverted (before), land via land.sh pr2930.
+- done: feature/pr2930 = c7a2aeff (ff, his) + merge of d25dc86c (his) + ours 32257a2a, d2317c6a, 5fa736d0 (test CLAP,
+  `--claprestarttest`, this doc). build-local with FL Data: 1,891,019 checks, 0 failures. CI on wip/pr2930: 5/5 green.
+  Windows before/after above. Notes bullets in coord/notes-0.1.22.md.
+- in progress: land.sh pr2930 (coord/land-pr2930.out).
+- next: rerun `--claprestarttest` with the landed exe (C:\Users\kauan\lynx-test\land-pr2930\LYNX.exe) → result=OK;
+  reply drafts "## PR #29" / "## PR #30" in coord/replies-0.1.22.md; main CI; delete ~/.cache/zig-pr2930.
