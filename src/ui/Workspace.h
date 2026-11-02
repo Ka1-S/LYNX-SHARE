@@ -76,6 +76,8 @@ public:
     // Resizes a floating panel's content area to `contentWidth` x `contentHeight` (0 = keep that side),
     // keeping its top-left corner and staying inside the desktop. Ignored while maximized or detached.
     void fitPanelContent (Panel panel, int contentWidth, int contentHeight);
+    // Where a panel is in the desktop (also while hidden).
+    juce::Rectangle<int> getPanelBounds (Panel panel) const;
 
     // The Browser is the background of the desktop (docked, as in FL): the other panels always stay above it. The
     // Playlist comes to front when clicked, like FL's (round 168s, core/Workspace.h isBackground).
@@ -104,6 +106,10 @@ private:
     // when the window changes size it takes the default rects for the new size instead of scaling them,
     // so a window that opens small and is then maximised gets a sensible desktop.
     bool pristine = false;
+    // The layout is still exactly the one restored from the settings (or loaded): when the window changes size it is
+    // read again from that text for the new size instead of scaling the rects (the window is built at its design
+    // size and then sized to the screen, and scaling twice let minimum sizes pile up, round 167v).
+    juce::String restoredState;
     juce::String pendingState;
     std::array<std::unique_ptr<PanelFrame>, workspace::panelCount> frames;
     std::array<std::unique_ptr<DetachedPanelWindow>, workspace::panelCount> windows;
