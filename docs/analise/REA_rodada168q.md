@@ -104,6 +104,8 @@ and a three-note chord).
   (ModelParamList.inc, LynxBankList.inc, instrumentLayout(), build lists, tests.cpp); ModelPanel displays (BeepMap
   bitmap + Open / Paste row, Granulizer waveform + grain envelope, Transistor Bass program + sequence), the "Needs FL
   Studio's files" header for Kepler / Kepler Exo / Transistor Bass / Sawer without their engine file; translations.
+- **2026-11-02 crash (~11:10)**: worktree checked clean (no zero-length files, HEAD = wip b4fcda94); merged origin/main
+  efb8344d and the latest wip/design168n (7a9f3cee); builds re-queued.
 - **In progress**: Linux core build + `LYNX_TEST=design168` tests (`<scratchpad>/q168q/bl.sh`), Windows build to
   /mnt/e/lynx-work/design168q/build-win (`<scratchpad>/q168q/win.sh`).
 - **Next**: fix build / test failures; full test suite; Windows shots (`LYNX.exe --instrumentshot <dir>
