@@ -622,6 +622,12 @@ struct ChannelDef
     // 0 = any) play only this channel, whatever is selected in the Channel Rack. Empty = not locked.
     std::string receiveFrom;
     int receiveMidiChannel = 0;
+    // FL's Loop Starter (round 168b, core/LoopStarter.h): the channel belongs to the Loop Starter of pattern
+    // `loopStarterPattern` (-1 = not a Loop Starter channel), plays the one-shot category `loopStarterCategory` in kit slot
+    // `loopStarterSlot`; locked = "Replace all samples" leaves its sample (FL's channel menu "Locked")
+    int loopStarterPattern = -1;
+    std::string loopStarterSlot, loopStarterCategory;
+    bool loopStarterLocked = false;
 
     bool hasKeyRegion() const noexcept { return keyLow > 0 || keyHigh < 127; }
     bool inKeyRegion (int key) const noexcept { return key >= keyLow && key <= keyHigh; }
@@ -1088,6 +1094,7 @@ struct Pattern
     // FL's pattern time markers (the Piano roll's ruler; .flp 0x94 / 0x21 / 0x22 / 0xCD inside the pattern's events,
     // round 168g): plain markers, time signature changes, Loop length (11), Pattern length (6)... sorted by tick
     std::vector<Marker> markers;
+    std::string loopStarterGenre; // FL's Loop Starter genre of this pattern (round 168b); "" = no Loop Starter
 
     void sortNotes();
     std::int64_t effectiveLength (int beatsPerBar) const noexcept;
