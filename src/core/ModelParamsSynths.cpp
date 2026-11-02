@@ -369,17 +369,29 @@ namespace lynx::modelparams
 {
 namespace
 {
-// Harmless: modelParams[i]
+// Harmless: modelParams[i]. A channel saved before its parameters were kept (an empty list) plays FL's untouched patch:
+// that is what it reads, and an edit writes the whole list first.
 std::optional<float> harmlessGet (const ChannelDef& c, const EngineParam& p)
 {
-    if (c.modelParams.size() < (std::size_t) harmlessParamCount || p.index < 0 || p.index >= harmlessCustomFlagIndex)
+    if (p.index < 0 || p.index >= harmlessCustomFlagIndex)
+        return std::nullopt;
+    if (c.modelParams.empty())
+    {
+        static const auto defaults = harmlessDefaultModelParams();
+        return defaults[(std::size_t) p.index];
+    }
+    if (c.modelParams.size() < (std::size_t) harmlessParamCount)
         return std::nullopt;
     const auto v = c.modelParams[(std::size_t) p.index];
     return std::isfinite (v) ? v : p.low;
 }
 bool harmlessSet (ChannelDef& c, const EngineParam& p, float raw)
 {
-    if (c.modelParams.size() < (std::size_t) harmlessParamCount || p.index < 0 || p.index >= harmlessCustomFlagIndex)
+    if (p.index < 0 || p.index >= harmlessCustomFlagIndex)
+        return false;
+    if (c.modelParams.empty())
+        c.modelParams = harmlessDefaultModelParams();
+    if (c.modelParams.size() < (std::size_t) harmlessParamCount)
         return false;
     c.modelParams[(std::size_t) p.index] = std::round (raw);
     return true;
@@ -392,12 +404,19 @@ std::optional<float> dx10Get (const ChannelDef& c, const EngineParam& p)
 }
 bool dx10Set (ChannelDef& c, const EngineParam& p, float raw) { return dx10SetParam (c.pluginState, p.index, (int) std::lround (raw)); }
 
+// SimSynth: an empty state plays the plugin's defaults (simsynth::defaultState)
 std::optional<float> simGet (const ChannelDef& c, const EngineParam& p)
 {
-    const auto v = simsynth::hostParam (c.pluginState, p.index);
+    static const auto defaults = simsynth::defaultState();
+    const auto v = simsynth::hostParam (c.pluginState.empty() ? defaults : c.pluginState, p.index);
     return v ? std::optional<float> ((float) *v) : std::nullopt;
 }
-bool simSet (ChannelDef& c, const EngineParam& p, float raw) { return simsynth::setHostParam (c.pluginState, p.index, (int) std::lround (raw)); }
+bool simSet (ChannelDef& c, const EngineParam& p, float raw)
+{
+    if (c.pluginState.empty())
+        c.pluginState = simsynth::defaultState();
+    return simsynth::setHostParam (c.pluginState, p.index, (int) std::lround (raw));
+}
 
 std::optional<float> ogunGet (const ChannelDef& c, const EngineParam& p)
 {

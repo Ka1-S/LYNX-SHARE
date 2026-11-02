@@ -1110,7 +1110,7 @@ public:
             layout = nullptr;
         if (layout != nullptr)
         {
-            accent = flKeys ? skin::colour::azure : boobass || transistorBass ? skin::colour::ember : harmor || sytrus || harmless || morphine ? skin::colour::violet
+            accent = flKeys ? skin::colour::azure : boobass || transistorBass ? skin::colour::ember : harmor || sytrus ? skin::colour::violet
                                                                                                                                            : skin::colour::crimson;
             // round 126: the page's own style (FL Keys hardware, BooBass vivid, the synths neon)
             pageStyle = flKeys ? skin::Style::hardware : boobass || transistorBass ? skin::Style::vivid : skin::Style::neon;
