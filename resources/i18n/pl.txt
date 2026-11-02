@@ -6359,6 +6359,7 @@ countries: pl
 "sequencer on" = "sekwencer wł."
 "sequencer off" = "sekwencer wył."
 "transpose {0}" = "transpozycja {0}"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "Zamień sampel"
 "Generate steps" = "Generuj kroki"

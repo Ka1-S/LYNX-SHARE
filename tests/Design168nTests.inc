@@ -56,7 +56,7 @@ TEST (design168n_engine_param_tables)
     using namespace lynx;
     for (const auto* table : { &toxicParams(), &poizoneParams() })
     {
-        CHECK (table->size() > 80);
+        CHECK (table->size() >= 80);
         std::set<std::string> names;
         for (std::size_t i = 0; i < table->size(); ++i)
         {

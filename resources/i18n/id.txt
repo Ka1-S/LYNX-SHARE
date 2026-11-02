@@ -6359,6 +6359,7 @@ countries: id
 "sequencer on" = "sekuenser aktif"
 "sequencer off" = "sekuenser mati"
 "transpose {0}" = "transpos {0}"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "Ganti sampel"
 "Generate steps" = "Buat langkah"

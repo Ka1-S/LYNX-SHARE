@@ -6359,6 +6359,7 @@ countries: cn sg
 "sequencer on" = "音序器开"
 "sequencer off" = "音序器关"
 "transpose {0}" = "移调 {0}"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "替换采样"
 "Generate steps" = "生成步进"

@@ -6516,6 +6516,7 @@ countries: br
 "sequencer on" = "sequenciador ligado"
 "sequencer off" = "sequenciador desligado"
 "transpose {0}" = "transposição {0}"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "Substituir sample"
 "Generate steps" = "Gerar steps"

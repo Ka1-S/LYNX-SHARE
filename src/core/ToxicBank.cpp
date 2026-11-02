@@ -127,7 +127,6 @@ float vocal (int h) // two formant humps (about "ah" on C3)
     const auto f = (float) h;
     return (std::exp (-std::pow ((f - 5.5f) / 2.2f, 2.0f)) + 0.6f * std::exp (-std::pow ((f - 9.5f) / 2.5f, 2.0f)) + 0.25f / f) / std::sqrt (f);
 }
-float bell (int h) { return h == 1 ? 1.0f : h == 3 ? 0.4f : h == 5 ? 0.25f : h == 9 ? 0.15f : 0.0f; }
 
 using Recipe = void (*) (Tox&);
 
@@ -172,7 +171,7 @@ std::vector<Preset> toxicBank()
             t.spectrum (0, square);
             t.filter (1, 0.32f, 0.55f, 0.55f, 0.001f, 0.22f, 0.1f, 0.1f);
             t.master (0.001f, 0.6f, 0.5f, 0.06f);
-            t.gain (0.5f);
+            t.gain (0.633f);
         }),
         make ("Saw Reese", "Bass", { "reese", "unison", "dnb" }, [] (Tox& t) {
             t.poly (1), t.mono (0.06f);
@@ -190,7 +189,7 @@ std::vector<Preset> toxicBank()
             t.filter (1, 0.35f, 0.5f);
             t.lfo (0, 0.4f, 4), t.lfoToCutoff (0.75f);
             t.master (0.002f, 1.0f, 1.0f, 0.08f);
-            t.gain (0.45f);
+            t.gain (0.567f);
         }),
         make ("Deep Pluck Bass", "Bass", { "fm", "pluck", "deep" }, [] (Tox& t) {
             t.poly (1), t.mono (0.0f);
@@ -212,7 +211,7 @@ std::vector<Preset> toxicBank()
             t.filter (1, 0.75f, 0.25f, 0.2f, 0.001f, 0.6f, 0.6f, 0.2f);
             t.delay (0, 0.4f, 0.35f, 0.25f, 4);
             t.master (0.005f, 1.0f, 1.0f, 0.2f);
-            t.gain (0.42f);
+            t.gain (0.52f);
         }),
         make ("Square Lead", "Lead", { "chip", "square" }, [] (Tox& t) {
             t.poly (1), t.mono (0.03f);
@@ -220,7 +219,7 @@ std::vector<Preset> toxicBank()
             t.lfo (1, 0.33f), t.lfo2ToPitch (0.1f);
             t.master (0.002f, 1.0f, 1.0f, 0.1f);
             t.delay (0, 0.3f, 0.3f, 0.2f, 4);
-            t.gain (0.42f);
+            t.gain (0.537f);
         }),
         make ("Supersaw Lead", "Lead", { "unison", "trance" }, [] (Tox& t) {
             t.poly (6);
@@ -246,7 +245,7 @@ std::vector<Preset> toxicBank()
             t.drive (0.5f);
             t.filter (1, 0.7f, 0.3f);
             t.master (0.002f, 1.0f, 1.0f, 0.15f);
-            t.gain (0.38f);
+            t.gain (0.513f);
         }),
 
         // --- pad
@@ -275,7 +274,7 @@ std::vector<Preset> toxicBank()
             t.chorus (0, 0.35f, 0.3f, 0.4f);
             t.reverb (1, 0.3f, 0.6f);
             t.master (0.15f, 1.0f, 1.0f, 0.6f);
-            t.gain (0.45f);
+            t.gain (0.4f);
         }),
         make ("Dark Choir", "Pad", { "formant", "choir", "dark" }, [] (Tox& t) {
             t.poly (16);
@@ -303,7 +302,7 @@ std::vector<Preset> toxicBank()
             t.filter (1, 0.3f, 0.3f, 0.6f, 0.001f, 0.25f, 0.0f, 0.2f);
             t.reverb (0, 0.25f, 0.5f);
             t.master (0.001f, 0.5f, 0.0f, 0.25f);
-            t.gain (0.45f);
+            t.gain (0.55f);
         }),
         make ("Kalimba", "Pluck", { "fm", "mallet" }, [] (Tox& t) {
             t.poly (12);
@@ -368,7 +367,7 @@ std::vector<Preset> toxicBank()
             t.filter (1, 0.85f, 0.4f, -0.8f, 0.001f, 3.0f, 0.0f, 1.0f);
             t.reverb (0, 0.4f, 0.8f);
             t.master (0.01f, 3.0f, 0.0f, 1.0f);
-            t.gain (0.42f);
+            t.gain (0.587f);
         }),
         make ("Laser Zap", "FX", { "zap", "pitch" }, [] (Tox& t) {
             t.poly (4);
@@ -377,7 +376,7 @@ std::vector<Preset> toxicBank()
             t.p (11, 0.9f); // filter envelope to pitch: +19 semitones per unit of envelope
             t.delay (0, 0.25f, 0.45f, 0.3f, 3);
             t.master (0.001f, 0.25f, 0.0f, 0.1f);
-            t.gain (0.45f);
+            t.gain (0.583f);
         }),
         make ("Alien Texture", "FX", { "atmosphere", "lfo" }, [] (Tox& t) {
             t.poly (8);

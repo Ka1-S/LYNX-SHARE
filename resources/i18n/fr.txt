@@ -6359,6 +6359,7 @@ countries: fr be ch ca lu
 "sequencer on" = "séquenceur actif"
 "sequencer off" = "séquenceur inactif"
 "transpose {0}" = "transposition {0}"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "Remplacer le sample"
 "Generate steps" = "Générer les pas"

@@ -6359,6 +6359,7 @@ countries: tw hk mo
 "sequencer on" = "音序器開"
 "sequencer off" = "音序器關"
 "transpose {0}" = "移調 {0}"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "替換取樣"
 "Generate steps" = "產生步進"

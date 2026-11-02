@@ -73,7 +73,35 @@ Wave Candy, ZGameEditor Visualizer, X-Y / X-Y-Z controllers, Control Surface, Fo
   Wasp XT / Fruity Dance placeholders.
 - **E (effects):** the table of §1.2.
 
+## 2. Toxic Biohazard and PoiZone (this round's own items)
+
+| | Toxic Biohazard | PoiZone |
+|---|---|---|
+| Reporter's words | user: "Toxic Biohazard e etc… está sem nenhum design, tem que fazer uns presets legais"; YouTube review (168d #13): "missing the whole FM grid" | YouTube review (168d #14): "doesn't look like PoiZone, I don't even know what you can do in here" |
+| FL evidence | Parameters: the engine's own state layout already reproduced in src/core/Toxic.cpp (REA of Toxic Biohazard_x64.dll, earlier rounds): indices 0–156 (6 oscillators × envelope / wave / pitch / detune / offset / phase / free run, FM matrix 109 + 6·(dest−1) + (src−1), mix, pan, LFO 1 / 2 amounts per oscillator, master envelope, LFO 1 / 2, filter), 227–293 (effect slots, EQ bands 62 Hz … 8 kHz, configuration), 295–315 (pitch-mod and misc). Layout: FL's window as drawn in the installation's own `Plugins\Fruity\Generators\Toxic Biohazard\Artwork\background.tga`, viewed only as a reference for where each section sits (CONFIGURATION / MASTER ENVELOPE top, six oscillator panels in two columns, MOD panel with the 6 × 6 grid in the middle, LFO 1 / FILTER / LFO 2, EFFECT 1 / EQ / EFFECT 2 at the bottom). No pixel of it is copied. Effect-time sync labels come from `ToxicFx`'s syncFactor table. | The plugin's own Delphi form `TSynthEditorForm` (RCDATA resource in `PoiZone_x64.dll`, read with REA `inspect_pe_resources` and parsed by tmp/r168n/dfm.py → tmp/r168n/poizone_form.txt): every control's Left / Top / Width / Height and its `Tag` = parameter index (0–73, 75–80). LYNX uses FL's x positions and order; rows re-spaced for LYNX's section titles. Parameter ranges from src/core/PoiZone.cpp's engine defaults. |
+| LYNX before | Generic page: a short list of knobs (no FM grid, no effects / EQ), not automatable; without FL's files the engine was not offered at all. | Generic page of 20-odd knobs in one grid, no sections; no presets without FL. |
+| LYNX now | Designed 920 × 668 page in LYNX's style with every parameter of the engine (> 150 controls): the full FM grid (row modulates column), MIX / PAN / LFO rows, oscillator panels with wave pictures (or "Needs FL Studio's files" when the waves can't be read), filter, LFOs, both effect slots (knobs shown by effect type) and the EQ. Every control automatable (right-click menu, Song automation targets, live changes without restarting the voices). A LYNX bank of 26 own presets (Init + Bass / Lead / Pad / Pluck / Keys / FX), cycled by the ◀ ▶ arrows, offered also on PCs without FL (waves 0/1, which need no FL file). | Designed 856 × 378 page: unison / mode / master, MOD WHEEL, LFO, ENVELOPE, AMP, the two oscillators, FILTER, ARPEGGIATOR, DELAY, CHORUS and the 16-step GATE; every control automatable. A LYNX bank of 24 own presets (Init + Bass / Lead / Pad / Pluck / Keys / FX); PoiZone needs no FL file, so it works everywhere. |
+
+### 2.1 Shared infrastructure (for 168o–168r)
+- `src/core/EngineParams.h`: `EngineParam {index, name, low, high, stepped}` + `LiveParamQueue` (lock-free SPSC for parameter changes the audio thread applies without rebuilding the engine).
+- `src/core/ModelParams.{h,cpp}` + `ModelParamList.inc`: an engine registers its parameter table once; the channel window, automation (`channelParam` targets in Song.cpp, RackRenderer binding) and tests use it by name.
+- `src/core/LynxBanks.{h,cpp}` + `LynxBankList.inc`: LYNX's own preset banks per engine (`Preset {name, category, tags, apply}`), listed by the channel window's preset bar ("LYNX/<category>/<name>", pseudo paths `lynxbank:<i>`) and used by `natives::makeChannel` when FL's files are absent.
+- `PluginLayout` additions: `tabs` / `pageTabs` pages, `menu` items, `value` read-outs, `whenParam` conditions, `display "toxicwave"`.
+- Tools: `build-local/bankrender <dir>` renders every bank preset (a C3 chord; basses one C2, leads one C4) to WAV and prints peak / RMS / spectral centroid / tail; `LYNX.exe --instrumentshot <dir> <engine,...|banks> [lynx|fl]` pictures the channel windows at 100 / 150 / 200 %.
+
+## 3. Checks
+- Levels (build-local/bankrender, /mnt/e/lynx-work/design168n/bank-levels.txt + WAVs): every preset peaks at −3.5 dBFS or lower
+  (PoiZone's Init, the engine's own default, at −0.4); 5 PoiZone and 9 Toxic presets were re-levelled after the first
+  measurement (PoiZone Supersaw / Soft Pad were clipping at +0.8 dB). No preset is silent (the quietest, plucks and FX, have
+  RMS around −35 to −40 dBFS because they decay).
+- Pictures (/mnt/e/lynx-work/design168n/): `<engine>-before.png` (origin/main build, `--snapshot` of the same project) and
+  `after/<engine>-<lynx|fl>-<100|150|200>.png` (`--instrumentshot`). The first after-shot showed two clipped captions
+  (Toxic's LFO "Sync" over "Speed", "Vel curve" cut): fixed (LFO row re-spaced; small knobs' captions get 52 units).
+
 ## Where I stopped
-- done: inventory (§1).
-- in progress: Toxic Biohazard editor (FL's layout read from the installation's own Artwork\background.tga as a
-  reference only — nothing copied), then PoiZone, then LYNX banks.
+- done: inventory (§1); Toxic + PoiZone designed pages, LYNX banks, model-knob automation, shared infra (§2.1); tests;
+  shots; levels. Landing the whole branch via land.sh (2026-11-02).
+- next: after landing, re-shoot with the landed exe (`LYNX.exe --instrumentshot E:\lynx-work\design168n\after2 toxicbiohazard,poizone lynx`),
+  notes-0.1.23.md bullets, message the coordinator the main hash.
+- not covered: Toxic's MIDI / SEQ pages (its sequencer isn't modelled), CC slots 316–339, the Browser listing of
+  LYNX banks, effect banks; model knobs don't follow automation while playing.

@@ -6359,6 +6359,7 @@ countries: tr
 "sequencer on" = "dizici açık"
 "sequencer off" = "dizici kapalı"
 "transpose {0}" = "transpoze {0}"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "Sample'ı değiştir"
 "Generate steps" = "Adım üret"

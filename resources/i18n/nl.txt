@@ -6359,6 +6359,7 @@ countries: nl be
 "sequencer on" = "sequencer aan"
 "sequencer off" = "sequencer uit"
 "transpose {0}" = "transpositie {0}"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "Sample vervangen"
 "Generate steps" = "Stappen genereren"

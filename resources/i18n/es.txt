@@ -6359,6 +6359,7 @@ countries: es mx ar co cl pe ve
 "sequencer on" = "secuenciador activo"
 "sequencer off" = "secuenciador inactivo"
 "transpose {0}" = "transposición {0}"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "Reemplazar sample"
 "Generate steps" = "Generar pasos"

@@ -6359,6 +6359,7 @@ countries: jp
 "sequencer on" = "シーケンサー オン"
 "sequencer off" = "シーケンサー オフ"
 "transpose {0}" = "移調 {0}"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "サンプルを置き換え"
 "Generate steps" = "ステップを生成"

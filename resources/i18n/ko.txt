@@ -6359,6 +6359,7 @@ countries: kr
 "sequencer on" = "시퀀서 켜짐"
 "sequencer off" = "시퀀서 꺼짐"
 "transpose {0}" = "조옮김 {0}"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "샘플 교체"
 "Generate steps" = "스텝 생성"

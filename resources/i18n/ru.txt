@@ -6359,6 +6359,7 @@ countries: ru by kz
 "sequencer on" = "секвенсор вкл."
 "sequencer off" = "секвенсор выкл."
 "transpose {0}" = "транспозиция {0}"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "Заменить сэмпл"
 "Generate steps" = "Сгенерировать шаги"
