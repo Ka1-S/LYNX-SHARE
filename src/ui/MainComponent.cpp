@@ -1446,6 +1446,14 @@ void MainComponent::connectBrowser (BrowserComponent& b)
 {
     b.onOpenProject = [this] (const juce::File& file) { confirmDiscard ([this, file] { openFile (file); }); };
     b.onLoadIntoChannel = [this] (const juce::File& file) { return rack.loadSampleIntoSelected (file); };
+    b.onOpenMixerPreset = [this] (const juce::File& file) {
+        if (! mixerpresets::isMixerPreset (file))
+            return false;
+        if (! mixer.loadPresetOnSelection (file))
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Open mixer track state"),
+                                                    tr ("This file is not a mixer track state LYNX SHARE can read."));
+        return true;
+    };
     // the Browser's "Current project" items (REA_rodada115)
     b.onOpenPattern = [this] (int pattern) {
         selectPattern (pattern);

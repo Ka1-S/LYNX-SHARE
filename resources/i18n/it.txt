@@ -6292,3 +6292,8 @@ countries: it ch sm
 "Shaker" = "Shaker"
 "Tom" = "Tom"
 "Hand drums" = "Tamburi a mano"
+"Add from state" = "Aggiungi da stato"
+"Mixer presets" = "Preset del mixer"
+"Mixer presets (FL)" = "Preset del mixer (FL)"
+"This file is not a mixer track state LYNX SHARE can read." = "Questo file non è uno stato di traccia del mixer che LYNX SHARE può leggere."
+"Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "Preset del mixer: [2xLMB] caricalo sulle tracce del mixer selezionate  trascina su una traccia del mixer (sullo spazio vuoto del mixer: una nuova traccia)"
