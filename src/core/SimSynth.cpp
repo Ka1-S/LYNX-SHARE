@@ -14,6 +14,7 @@
 #include <cstring>
 #include <optional>
 
+#include "core/EngineParams.h"
 #include "core/FlVoiceProcessor.h" // panLaw (FL's ComputeLRVol law)
 
 namespace lynx
@@ -1701,6 +1702,13 @@ public:
         pitchCents.store (channel.sampler.pitch * 100.0f);
         if (channel.pluginState == state)
             return;
+        // only knobs / switches changed (the editor, round 168o): the playing engine takes them, the notes go on
+        if (liveChange (state, channel.pluginState))
+        {
+            state = channel.pluginState;
+            current = parseState (state);
+            return;
+        }
         state = channel.pluginState;
         current = parseState (state);
         // a new state restarts the plugin (its voices go silent, as when FL restores a state); built here, swapped in by
@@ -1712,6 +1720,15 @@ public:
     {
         nextPan = pan;
         nextCents = cents;
+    }
+
+    // automation of a host parameter (round 168o): the clip's 0…1 over the editor control's range
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        if (index < 0 || index >= simsynth::hostParamCount || ! std::isfinite (value) || eng == nullptr)
+            return;
+        eng->hostSet (index, hostRaw (index, value));
     }
 
     void noteOn (int key, float) noexcept override
@@ -1823,17 +1840,57 @@ public:
 private:
     void take() noexcept
     {
-        if (retired.load() != nullptr)
-            return;
-        if (auto* e = incoming.exchange (nullptr))
-        {
-            retired.store (eng.release());
-            eng.reset (e);
-            for (auto& h : held)
-                h = -1;
-        }
+        if (retired.load() == nullptr)
+            if (auto* e = incoming.exchange (nullptr))
+            {
+                retired.store (eng.release());
+                eng.reset (e);
+                for (auto& h : held)
+                    h = -1;
+            }
+        if (incoming.load() == nullptr) // (a newer state replaces what the queue holds)
+            liveParams.drain ([this] (int h, float v) { eng->hostSet (h, (int) v); });
+        else
+            liveParams.clear();
     }
 
+    // the engine value of host parameter h for a 0…1 position (coarse pitch: 48 semitone steps of 420)
+    static int hostRaw (int h, float value01) noexcept
+    {
+        const auto& hp = hostParams[h];
+        const auto v = std::clamp (value01, 0.0f, 1.0f);
+        if (hp.kind == 1)
+            return (h == 27 || h == 30 || h == 33) ? 420 * (int) std::lround (48.0f * v) : (int) std::lround (65535.0f * v);
+        return hp.kind == 0 ? (v >= 0.5f ? 1 : 0) : (int) std::lround ((h == 57 ? 3.0f : 4.0f) * v);
+    }
+
+    // queues the host parameters that differ when nothing but the 45 values and the 19 switches did
+    bool liveChange (const std::vector<std::uint8_t>& before, const std::vector<std::uint8_t>& after)
+    {
+        if (before.size() != after.size() || ! parseState (before) || ! parseState (after) || incoming.load() != nullptr)
+            return false;
+        constexpr std::size_t switchesAt = 0x168 + 19 * 4, switchesEnd = switchesAt + 19 * 4;
+        if (std::memcmp (before.data() + 0x168, after.data() + 0x168, switchesAt - 0x168) != 0
+            || std::memcmp (before.data() + switchesEnd, after.data() + switchesEnd, before.size() - switchesEnd) != 0)
+            return false;
+        std::array<std::pair<int, int>, simsynth::hostParamCount> changed {};
+        std::size_t n = 0;
+        for (int h = 0; h < simsynth::hostParamCount; ++h)
+        {
+            const auto a = simsynth::hostParam (before, h), b = simsynth::hostParam (after, h);
+            if (! a || ! b)
+                return false;
+            if (*a != *b)
+                changed[n++] = { h, (h == 27 || h == 30 || h == 33) ? 420 * *b : *b };
+        }
+        if (n > liveParams.space())
+            return false;
+        for (std::size_t i = 0; i < n; ++i)
+            liveParams.push (changed[i].first, (float) changed[i].second);
+        return true;
+    }
+
+    LiveParamQueue liveParams;
     std::unique_ptr<Engine> eng;
     std::atomic<Engine*> incoming { nullptr }, retired { nullptr };
     std::optional<State> current;
@@ -1879,6 +1936,57 @@ std::unique_ptr<Instrument> makeSimSynthInstrument() { return std::make_unique<S
 
 namespace simsynth
 {
+std::optional<int> hostParam (const std::vector<std::uint8_t>& state, int h)
+{
+    const auto st = parseState (state);
+    if (! st || h < 0 || h >= hostParamCount)
+        return std::nullopt;
+    const auto& hp = hostParams[h];
+    if (hp.kind == 0)
+        return st->s[hp.index] != 0 ? 1 : 0;
+    const auto x = std::clamp (st->p[hp.index], 0.0, 1.0);
+    if (hp.kind == 2)
+        return x == 0.0 ? 2 : x == 0.4 ? 3 : x == 0.2 ? 0 : x == 0.3 ? 4 : 1;
+    const auto v = (int) std::floor ((double) hp.scale * x);
+    return hp.scale == 20160 ? (int) std::nearbyint ((double) v / 420.0) : v;
+}
+
+bool setHostParam (std::vector<std::uint8_t>& state, int h, int value)
+{
+    if (! parseState (state) || h < 0 || h >= hostParamCount)
+        return false;
+    const auto& hp = hostParams[h];
+    if (hp.kind == 0)
+    {
+        const std::int32_t v = value != 0 ? 1 : 0;
+        std::memcpy (state.data() + 0x168 + 19 * 4 + 4 * (std::size_t) hp.index, &v, 4);
+        return true;
+    }
+    double x = 0.0;
+    if (hp.kind == 2)
+        x = waveSelector[std::clamp (value, 0, h == 57 ? 3 : 4)];
+    else if (hp.scale == 20160)
+        x = (double) (420 * std::clamp (value, 0, 48)) / 20160.0;
+    else
+        x = (double) std::clamp (value, 0, 65535) / 65535.0;
+    std::memcpy (state.data() + 8 * (std::size_t) hp.index, &x, 8);
+    return true;
+}
+
+std::vector<std::uint8_t> defaultState()
+{
+    std::vector<std::uint8_t> out ((std::size_t) stateBytes, 0);
+    std::memcpy (out.data(), frontDefaults, sizeof frontDefaults);
+    for (int i = 0; i < numS; ++i)
+    {
+        const std::int32_t v = frontDefaultS[i];
+        std::memcpy (out.data() + 0x168 + 19 * 4 + 4 * (std::size_t) i, &v, 4);
+    }
+    const std::int32_t version = 14;
+    std::memcpy (out.data() + stateBytes - 4, &version, 4);
+    return out;
+}
+
 std::vector<float> renderReference (const std::vector<std::uint8_t>& state, const std::vector<RefNote>& notes, double sampleRate,
                                     int length, int block, std::vector<std::int64_t>* counters)
 {

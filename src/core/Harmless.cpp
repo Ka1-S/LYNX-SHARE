@@ -1,4 +1,5 @@
 #include "core/Harmless.h"
+#include "core/ModelParamsSynths.h"
 #include "core/HostSlide.h"
 #include "core/HarmlessFx.h"
 #include "core/Song.h"
@@ -2257,6 +2258,7 @@ public:
     {
         mailbox.read (settings);
         rate = sr;
+        rackBuilt = false; // (a fresh rack)
         rebuild();
         engine.reset();
         songTicks = -1.0;
@@ -2307,6 +2309,8 @@ public:
     void noteOn (int key, float velocity) noexcept override
     {
         take();
+        if (dirty)
+            rebuild();
         const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
         // VEL → volume (p37): Final.Vol = chan.Vol·Init.Vol when on, chan.Vol when off
         const auto volFactor = engine.P.p[37] > 0 ? (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0 : 1.0;
@@ -2351,6 +2355,8 @@ public:
     void render (float* left, float* right, int n, float gl, float gr) noexcept override
     {
         take();
+        if (dirty)
+            rebuild();
         const auto vol = std::sqrt (((double) gl * gl + (double) gr * gr) * 0.5);
         channelVol = vol;
         channelPan = vol > 0.0 ? std::atan2 ((double) gr, (double) gl) * (4.0 / pi) - 1.0 : 0.0;
@@ -2377,6 +2383,23 @@ public:
         }
     }
 
+    // automation of a parameter (round 168o): the clip's 0…1 over the editor control's range; the patch is rebuilt
+    // once per block, the voices keep playing (as an edit of the knob does)
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        const auto& table = harmlessEngineParams();
+        if (const auto* p = findEngineParam (table, index); p != nullptr && std::isfinite (value))
+        {
+            const auto raw = std::round (p->raw (value));
+            if (settings.raw[(std::size_t) index] != raw)
+            {
+                settings.raw[(std::size_t) index] = raw;
+                dirty = true;
+            }
+        }
+    }
+
 private:
     void take() noexcept
     {
@@ -2385,21 +2408,38 @@ private:
             const auto changed = std::memcmp (incoming.raw.data(), settings.raw.data(), sizeof (float) * settings.raw.size()) != 0
                                  || incoming.bpm != settings.bpm || incoming.comp != settings.comp;
             settings = incoming;
-            if (changed)
-                rebuild();
+            dirty = dirty || changed;
         }
     }
 
+    // the rack's effects are rebuilt (their tails cut) only when one of their own settings changed (round 168o)
     void rebuild() noexcept
     {
+        dirty = false;
         const auto& raw = settings.raw;
         engine.P.build (raw.data(), rate, (int) std::lround (raw[(std::size_t) harmlessComboIndex + 6]), settings.bpm);
-        engine.rack.prepare (engine.P.p, engine.P.t, rate, settings.bpm, settings.comp);
+        std::array<float, 11> rackNow {};
+        for (int i = 0; i < 9; ++i)
+            rackNow[(std::size_t) i] = raw[(std::size_t) (90 + i)];
+        rackNow[9] = raw[(std::size_t) harmlessComboIndex + 3];
+        rackNow[10] = (float) settings.bpm;
+        if (! rackBuilt || rackNow != rackInputs || settings.comp != rackComp || rate != rackRate)
+        {
+            engine.rack.prepare (engine.P.p, engine.P.t, rate, settings.bpm, settings.comp);
+            rackInputs = rackNow;
+            rackComp = settings.comp;
+            rackRate = rate;
+            rackBuilt = true;
+        }
     }
 
     Engine engine;
     Settings settings, incoming;
     Mailbox<Settings> mailbox;
+    bool dirty = false, rackBuilt = false;
+    std::array<float, 11> rackInputs {};
+    std::shared_ptr<const hlfx::MaximusPreset> rackComp;
+    double rackRate = 0.0;
     double rate = 44100.0, channelVol = 1.0, channelPan = 0.0, songTicks = -1.0;
     long long sinceTicks = 0;
     float nextPan = 0.0f, nextCents = 0.0f;
@@ -2444,4 +2484,10 @@ std::optional<std::vector<float>> harmlessParams (const std::vector<std::uint8_t
 }
 
 std::unique_ptr<Instrument> makeHarmlessInstrument() { return std::make_unique<HarmlessInstrument>(); }
+
+std::vector<float> harmlessDefaultModelParams()
+{
+    const auto s = defaultSettings();
+    return std::vector<float> (s.raw.begin(), s.raw.end());
+}
 } // namespace lynx

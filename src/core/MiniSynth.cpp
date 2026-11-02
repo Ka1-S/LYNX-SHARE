@@ -1227,6 +1227,19 @@ public:
         nextCents = cents;
     }
 
+    // an automation clip on one of the 43 knobs (core/ModelParamsSynths.cpp; 0..1 is the float itself). Audio thread:
+    // the plugin takes the value as its host parameter, the sounding voices keep playing.
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        if (index < 0 || index >= paramCount || ! std::isfinite (value))
+            return;
+        const auto v = std::clamp (value, 0.0f, 1.0f);
+        setup->P[(std::size_t) index] = v;
+        plugin.eng.setParam (index, v);
+        idleKnown = false;
+    }
+
     void noteOn (int key, float velocity) noexcept override
     {
         take();
