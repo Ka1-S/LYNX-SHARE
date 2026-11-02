@@ -117,7 +117,46 @@ mkdir -p build-local/pocketpy
 obj=build-local/pocketpy/pocketpy.o
 [[ -f "$obj" && "$obj" -nt third_party/pocketpy/pocketpy.c && "$obj" -nt third_party/pocketpy/pocketpy.h ]] || $CC -c -O2 -w -std=c11 -DPK_ENABLE_OS=0 -DPK_ENABLE_WATCHDOG=1 -Ithird_party/pocketpy third_party/pocketpy/pocketpy.c -o "$obj"
 WAVPACK="$WAVPACK $obj"
-$CXX $FLAGS $CORE $WAVPACK tests/tests.cpp -o build-local/lynx_tests 2> >(grep -v 'glibc version' >&2)
+# The tests: tests/tests.cpp with its .inc files is split at build time into N translation units compiled in parallel
+# (scripts/split-tests.py; same tests, same order, same checks). LYNX_TESTS_SPLIT=0 builds the single TU as before,
+# LYNX_TESTS_SPLIT=<n> sets the number of chunks (default: the CPUs this build may use, 2 to 12).
+split="${LYNX_TESTS_SPLIT:-auto}"
+if [[ "$split" == auto ]]; then
+    split="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+    (( split < 2 )) && split=2
+    (( split > 12 )) && split=12
+fi
+tests_single() { $CXX $FLAGS $CORE $WAVPACK tests/tests.cpp -o build-local/lynx_tests 2> >(grep -v 'glibc version' >&2); }
+if [[ "$split" -ge 2 ]] && command -v python3 > /dev/null && python3 scripts/split-tests.py tests/tests.cpp build-local/split "$split"; then
+    CHUNKS="build-local/split/lynx_split_main.cpp $(ls build-local/split/chunk*.cpp | tr '\n' ' ')"
+    rc=0
+    case "$CXX" in
+        *zig*) # zig compiles every source of one command in parallel (and caches each object)
+            $CXX $FLAGS $CORE $WAVPACK $CHUNKS -o build-local/lynx_tests 2> build-local/split/errors.log || rc=$? ;;
+        *)
+            pids=""
+            for f in $CHUNKS; do
+                $CXX $FLAGS -c "$f" -o "${f%.cpp}.o" 2> "${f%.cpp}.log" &
+                pids="$pids $!"
+            done
+            for p in $pids; do wait "$p" || rc=$?; done
+            cat build-local/split/*.log > build-local/split/errors.log
+            [[ $rc == 0 ]] && { $CXX $FLAGS $CORE $WAVPACK $(echo "$CHUNKS" | sed 's/\.cpp/.o/g') -o build-local/lynx_tests 2>> build-local/split/errors.log || rc=$?; } ;;
+    esac
+    grep -v 'glibc version' build-local/split/errors.log >&2 || true
+    if [[ $rc != 0 ]]; then
+        # a failure only the split can cause (a definition the splitter did not make inline...): build the single TU
+        if grep -qE 'multiple definition|duplicate symbol|redefinition of|lynxSplit|LYNX_TEST_|LYNX_SPLIT' build-local/split/errors.log; then
+            echo "note: the split test build failed (see above), building tests/tests.cpp as one unit (LYNX_TESTS_SPLIT=0)" >&2
+            tests_single
+        else
+            exit $rc
+        fi
+    fi
+else
+    [[ "$split" -ge 2 ]] && echo "note: the test split is not available, building tests/tests.cpp as one unit" >&2
+    tests_single
+fi
 $CXX $FLAGS src/flp/Flp.cpp tools/flpdump.cpp -o build-local/flpdump 2> >(grep -v 'glibc version' >&2)
 
 $CXX $FLAGS $CORE $WAVPACK tools/renderwav.cpp -o build-local/renderwav 2> >(grep -v 'glibc version' >&2)
