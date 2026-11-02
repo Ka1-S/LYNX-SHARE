@@ -120,5 +120,6 @@ closed by PID, clean desktop).
   15 languages, tests, Windows build + GUI check, notes-0.1.22.md.
 - First build-local: 27 failures — i18n headers (expected, regenerated after the merge), the audit's reference note
   ended where it was read (now issue14's method), Toxic / PoiZone / Drumpad glide-in (fixed).
-- Merged origin/main (25fcfc65), i18n regenerated. Next: build-local, land.
+- Merged origin/main (25fcfc65), i18n regenerated. The PC crashed (2026-11-02 ~11:10) during the rebuild; worktree
+  checked clean, merged origin/main again (0e1f7f2e, i18n regenerated). Next: build-local, land.
 - Rerun: `BUILDSLOT_PRIO=1 ~/.claude/jobs/f8789b49/tmp/coord/buildslot.sh ~/.claude/jobs/f8789b49/tmp/coord/bl-wt.sh mono168l`.
