@@ -47,12 +47,18 @@ tmp/r168p/dfm/<plugin>/TSynthEditorForm.dfm.txt). Only layout and control facts 
   DrumSynth Live kits. BassDrum (FL's `sounddata`) and FL Slayer (`Slayer_Engine.dll`) need FL's files: no bank;
   BassDrum's noise display says "Needs FL Studio's files".
 
+## Pictures
+- /mnt/e/lynx-work/design168p/before/<engine>-before.png: main's exe (b7966651), `--snapshot` of the same project, channel
+  frame; drumsynth-before-kit.png with LYNX's first DSL kit.
+- /mnt/e/lynx-work/design168p/after/<engine>-lynx-<100|150|200>.png (`--instrumentshot … lynx`), bassdrum/flslayer-fl-*
+  (`… fl`, FL's files), drumsynth-after-kit.png (`--snapshot`, DSL is not in the instrument list: it comes from .flp files).
+
 ## Where I stopped
-- done: §1, layouts, tables, live automation, part selection, displays, banks designed and leveled by rendering
-  (66 presets, 0 flagged; WAVs in /mnt/e/lynx-work/design168p/banks), translations; merged origin/wip/design168n
-  (with origin/main efb8344d) after the 2026-11-02 11:10 crash (worktree checked: clean). First Windows after-shots
-  reviewed: Drumaxx voice knobs over the sequencer, Drumpad's doubled Shape caption, Sakura's ratio stepper / comb slider /
-  Lo-cut caption overlaps and clipped effect switches fixed (c940e1b8); Sakura's Str2 ratio and delay sync are now
-  labelled menus (4x … 1/4x; Off, 1/32 … 2 bars). Notes appended to coord/notes-0.1.23.md.
-- in progress: tests + Windows rebuild; before shots (main exe, `--snapshot` channel frame) in /mnt/e/lynx-work/design168p/before.
-- next: run tests, after shots (`--instrumentshot`, 100/150/200 %), land in parts after 168n lands.
+- done: §1, layouts, tables, live automation, part selection, displays, banks (66 presets, 0 flagged), translations,
+  shot review fixes (c940e1b8), before/after shots, notes in coord/notes-0.1.23.md, merged origin/main 8a788038 (d687b456).
+- Linux suite (separate-object build): 16 failures, none in 168p tests: 15 Kepler / multiband-delay bit-exact checks that
+  pass in main's own build (artefact of this build), 1 Browser162 inbox timing check.
+- A corrupt build-local/obj168p/src_core_Harmor.cpp.o made ld.lld segfault (found by bisecting the link); rebuilt.
+- next: land in parts via land.sh once 168n is on main.
+- left: a DrumSynth Live channel with no state at all (not reachable from the browser) shows the page with knobs missing;
+  FL Slayer's Type / Coils steppers show numbers (pre-existing layout).
