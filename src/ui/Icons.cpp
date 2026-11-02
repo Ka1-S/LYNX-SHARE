@@ -558,6 +558,24 @@ Shape make (Icon icon)
             arcWithHead (3.6f, 5.7f);
             break;
         }
+        case Icon::stretch: // a waveform between two outward arrows (stretching audio)
+        {
+            juce::Path w;
+            w.startNewSubPath (8.0f, 12.0f);
+            w.lineTo (9.5f, 8.0f);
+            w.lineTo (11.0f, 16.0f);
+            w.lineTo (12.5f, 6.5f);
+            w.lineTo (14.0f, 17.5f);
+            w.lineTo (16.0f, 12.0f);
+            st.addPath (w);
+            line (st, 2.5f, 12.0f, 6.0f, 12.0f);
+            line (st, 2.5f, 12.0f, 4.5f, 10.0f);
+            line (st, 2.5f, 12.0f, 4.5f, 14.0f);
+            line (st, 18.0f, 12.0f, 21.5f, 12.0f);
+            line (st, 21.5f, 12.0f, 19.5f, 10.0f);
+            line (st, 21.5f, 12.0f, 19.5f, 14.0f);
+            break;
+        }
         case Icon::tuningFork: // two prongs on a stem, with a weighted foot
         {
             juce::Path f;

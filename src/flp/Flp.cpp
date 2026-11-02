@@ -1162,6 +1162,11 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
                         if (std::isfinite (h) && h > 0.05f && h < 10.0f)
                             t.heightScale = h;
                     }
+                    if (e.data.size() >= 22)
+                    {
+                        t.lockedHeight = readLE<std::int32_t> (e.data, 17);
+                        t.lockedToContent = e.data[21] != 0;
+                    }
                     if (e.data.size() >= 46)
                     {
                         t.motion = (int) readLE<std::uint32_t> (e.data, 22);

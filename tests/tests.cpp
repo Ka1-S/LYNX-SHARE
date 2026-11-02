@@ -148,6 +148,7 @@
 #include "core/KeyMap.h"
 #include "core/SortOnce.h"
 #include "core/RackOps.h"
+#include "core/PlaylistTrackOps.h"
 #include "core/ChannelLoops.h"
 #include "core/ChannelBurn.h"
 #include "core/AutoSampler.h"
@@ -16879,3 +16880,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Transporter167fTests.inc"
 #include "Polish167pTests.inc"
 #include "Zoom167tTests.inc"
+#include "Playlist168fTests.inc"

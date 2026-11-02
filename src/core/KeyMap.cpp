@@ -227,9 +227,22 @@ std::vector<Action> makeActions()
         { "playlist.tool.slip", TR_NOOP ("Tool: Slip"), Context::playlist, { chord ('S') } },
         // FL's Performance mode (round 165m; Ctrl+P on FL's Playlist menu [DFM])
         { "playlist.performanceMode", TR_NOOP ("Performance mode on/off (launch the clips before the Start marker)"), Context::playlist, { chord ('P', ctrl) } },
-        { "playlist.zoomPerformance", TR_NOOP ("Zoom on the performance clips"), Context::playlist, {} },
+        { "playlist.zoomPerformance", TR_NOOP ("Zoom on the performance clips"), Context::playlist, { chord ('6', shift) }, true },
         { "playlist.perfClipProgress", TR_NOOP ("Show the performance clips' progress"), Context::playlist, {} },
         { "playlist.perfTrackProgress", TR_NOOP ("Show the performance tracks' progress"), Context::playlist, {} },
+        // round 168f: FL's Playlist keys and menu items ([DFM ShortcutsModule] EEMergeAction Ctrl+G, EEClonePLTracksAction
+        // Ctrl+Shift+B, EEMakeUniqueAction Ctrl+Shift+V; the STRETCH button's hint "Shift+M")
+        { "playlist.mergePatternClips", TR_NOOP ("Merge pattern clips"), Context::playlist, { chord ('G', ctrl) } },
+        { "playlist.cloneTracks", TR_NOOP ("Clone selected playlist track(s)"), Context::playlist, { chord ('B', ctrl | shift) } },
+        { "playlist.makeUnique", TR_NOOP ("Make the selected clips unique"), Context::playlist, { chord ('V', ctrl | shift) } },
+        { "playlist.stretchMode", TR_NOOP ("Stretch audio when resizing audio clips on/off"), Context::playlist, { chord ('M', shift) } },
+        { "playlist.createVariants", TR_NOOP ("Create variants when stretching audio clips on/off"), Context::playlist, {} },
+        { "playlist.lockAllToContent", TR_NOOP ("Lock all playlist tracks to content"), Context::playlist, {} },
+        { "playlist.unlockAllFromContent", TR_NOOP ("Unlock all playlist tracks from content"), Context::playlist, {} },
+        { "playlist.resetEmptyTracks", TR_NOOP ("Reset empty playlist tracks"), Context::playlist, {} },
+        { "playlist.collapseAllGroups", TR_NOOP ("Collapse all grouped tracks"), Context::playlist, {} },
+        { "playlist.expandAllGroups", TR_NOOP ("Expand all grouped tracks"), Context::playlist, {} },
+        { "playlist.purgeUnusedAudio", TR_NOOP ("Purge unused audio clips"), Context::playlist, {} },
 
         // Browser (focused)
         { "browser.previous", TR_NOOP ("Previous file (preview)"), Context::browser, { chord (up) } },

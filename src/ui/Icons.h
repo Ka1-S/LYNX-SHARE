@@ -27,10 +27,11 @@ enum class Icon
     drumBrush,  // Piano Roll: the drum paint tool
     graph,      // Channel Rack: the step graph editor (velocity, pan... bars)
     follow,     // Playlist / Piano Roll: the view follows the playhead (auto scrolling)
-    loop        // Channel Rack: channel looping (round 165f-rack)
+    loop,       // Channel Rack: channel looping (round 165f-rack)
+    stretch     // Playlist: stretch audio when resizing audio clips (round 168f)
 };
 
-constexpr int iconCount = (int) Icon::loop + 1;
+constexpr int iconCount = (int) Icon::stretch + 1;
 
 namespace icons
 {

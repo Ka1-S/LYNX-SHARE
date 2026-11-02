@@ -1203,6 +1203,12 @@ struct PlaylistTrack
     int mixerTrack = -1; // audio / instrument tracks: the linked mixer track (-1 = none)
     int channel = -1;    // instrument tracks: the channel
     TrackPerformance performance {}; // FL's Performance settings (round 165m)
+    // FL's "Lock to content" (track record +0x19, .flp 0xEE byte 21; REA round 168f): painting on the track places its
+    // own content (the clip the track holds most) instead of a source the track doesn't hold yet.
+    bool lockedToContent = false;
+    // FL's "Lock to this size" (track record +0x14 i32, .flp 0xEE bytes 17…20; REA round 168f): > 0 = the row keeps this
+    // height in px whatever the vertical zoom and the Size menu; ≤ 0 = not locked (FL keeps −the last locked height).
+    int lockedHeight = -1;
 };
 
 // Splits a clip at `tick` (absolute): the original keeps the start and the return value is the rest.
