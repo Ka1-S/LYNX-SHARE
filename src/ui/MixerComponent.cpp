@@ -247,7 +247,7 @@ int MixerStrips::stripX (int track) const noexcept
 
 bool MixerStrips::isInterestedInDragSource (const SourceDetails& details)
 {
-    if (BrowserComponent::isEffectDrag (details))
+    if (BrowserComponent::isEffectDrag (details) || BrowserComponent::isGeneratorDrag (details))
         return true;
     if (! BrowserComponent::isBrowserDrag (details))
         return false;
@@ -283,10 +283,12 @@ void MixerStrips::itemDropped (const SourceDetails& details)
         }
         return;
     }
-    if (t < 0 || t >= tracks || onEffectDropped == nullptr)
+    if (t < 0 || t >= tracks)
         return;
-    if (auto fx = BrowserComponent::draggedEffect (details))
+    if (auto fx = BrowserComponent::draggedEffect (details); fx && onEffectDropped != nullptr)
         onEffectDropped (t, std::move (*fx));
+    else if (auto c = BrowserComponent::draggedGenerator (details); c && onInstrumentDropped != nullptr)
+        onInstrumentDropped (t, std::move (*c));
 }
 
 int MixerStrips::trackAt (int x) const noexcept
@@ -4362,11 +4364,18 @@ void EffectsPanel::mouseDoubleClick (const juce::MouseEvent& e)
 bool EffectsPanel::isInterestedInDragSource (const SourceDetails& details)
 {
     return (BrowserComponent::isBrowserDrag (details) && BrowserComponent::draggedFile (details).hasFileExtension ("fst"))
-           || BrowserComponent::isEffectDrag (details);
+           || BrowserComponent::isEffectDrag (details) || BrowserComponent::isGeneratorDrag (details);
 }
 
 void EffectsPanel::itemDropped (const SourceDetails& details)
 {
+    if (BrowserComponent::isGeneratorDrag (details))
+    {
+        if (auto c = BrowserComponent::draggedGenerator (details); c && onInstrumentDropped != nullptr
+                                                                    && track >= 0 && track < (int) engine.getSong().mixer.size())
+            onInstrumentDropped (track, std::move (*c));
+        return;
+    }
     if (BrowserComponent::isEffectDrag (details))
     {
         if (auto fx = BrowserComponent::draggedEffect (details))
@@ -5134,6 +5143,12 @@ MixerComponent::MixerComponent (AudioEngine& e)
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Plugin database"),
                                                     tr ("The selected insert has no free effect slot."));
     };
+    strips.onInstrumentDropped = [this] (int track, ChannelDef c) {
+        selectTrack (track);
+        if (onInstrumentDropped != nullptr)
+            onInstrumentDropped (track, std::move (c));
+    };
+    effects.onInstrumentDropped = strips.onInstrumentDropped;
 }
 
 bool MixerComponent::runAction (const std::string& id)
