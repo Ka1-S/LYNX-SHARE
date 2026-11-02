@@ -25,6 +25,7 @@
 #include <optional>
 #include <vector>
 
+#include "core/EngineParams.h"
 #include "core/Instruments.h"
 
 namespace lynx
@@ -35,6 +36,13 @@ bool poizoneStateUsable (const std::vector<std::uint8_t>& state);
 // parameter P[index] (0…155, float) of a state, or nullopt; and its byte offset inside the state (−1 if unusable)
 std::optional<float> poizoneParam (const std::vector<std::uint8_t>& state, int index);
 int poizoneParamOffset (const std::vector<std::uint8_t>& state, int index);
+
+// The parameters the editor shows and automation clips drive (round 168n), sorted by index: P[0…80] with the raw
+// ranges of the counted settings (unison voices, polyphony, speeds, bend range, LFO sync)
+const std::vector<EngineParam>& poizoneParams();
+
+// A state with the engine's constructor values ("Ver4"): a new PoiZone without FL Studio, the base of LYNX's bank
+std::vector<std::uint8_t> poizoneDefaultState();
 
 std::unique_ptr<Instrument> makePoiZoneInstrument();
 
