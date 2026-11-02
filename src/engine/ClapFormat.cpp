@@ -362,9 +362,12 @@ public:
         const auto n = buffer.getNumSamples();
         audioThread.store (std::this_thread::get_id());
 
-        if (! active || n > maxBlock)
+        // the restart handshake (request_restart): no block starts while one is pending
+        inProcess.store (true);
+        if (restartPending.load() || ! active || n > maxBlock)
         {
             buffer.clear();
+            inProcess.store (false);
             return;
         }
 
@@ -439,6 +442,7 @@ public:
 
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
             buffer.copyFrom (ch, 0, scratch, juce::jmin (ch, outputChannels - 1), 0, n);
+        inProcess.store (false);
     }
 
     double getTailLengthSeconds() const override { return 0.0; }
@@ -656,11 +660,19 @@ private:
             self->onMainThread ([self] {
                 if (self->active)
                 {
-                    const auto rate = self->getSampleRate();
-                    const auto block = self->maxBlock;
-                    self->suspendProcessing (true);
-                    self->prepareToPlay (rate, block);
-                    self->suspendProcessing (false);
+                    // the rack calls processBlock directly (no callback lock), so suspendProcessing alone would not
+                    // stop it: hold new blocks off and wait for the one in progress before deactivating
+                    self->restartPending.store (true);
+                    const auto deadline = juce::Time::getMillisecondCounter() + 2000;
+                    while (self->inProcess.load() && juce::Time::getMillisecondCounter() < deadline)
+                        std::this_thread::yield();
+                    if (! self->inProcess.load()) // (still set: the plugin crashed inside process, leave it alone)
+                    {
+                        const auto rate = self->getSampleRate();
+                        const auto block = self->maxBlock;
+                        self->prepareToPlay (rate, block);
+                    }
+                    self->restartPending.store (false);
                 }
             });
         };
@@ -697,6 +709,7 @@ private:
     std::unordered_map<clap_id, ClapParameter*> byId;
     std::array<bool, 16 * 128> heldNotes {};
     std::atomic<std::thread::id> audioThread {};
+    std::atomic<bool> restartPending { false }, inProcess { false };
 
     clap_host_log_t hostLog { [] (const clap_host_t*, clap_log_severity, const char* msg) { juce::ignoreUnused (msg); DBG ("CLAP: " << msg); } };
     clap_host_thread_check_t hostThreadCheck {
