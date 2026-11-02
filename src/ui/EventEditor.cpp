@@ -830,7 +830,7 @@ private:
                 const auto p = engine.songPlayheadTicks();
                 for (const auto& c : song.playlist)
                     if (c.kind == ClipKind::pattern && c.pattern == song.currentPattern && p >= (double) c.start && p < (double) c.end())
-                        tick = p - (double) c.start + (double) c.offset;
+                        tick = patternTickInClip (c, p, patternLength()); // a stretched clip loops its pattern (LYNX extra, issue #25)
             }
         }
 

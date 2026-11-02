@@ -6427,3 +6427,5 @@ countries: kr
 "Unsorted" = "미분류"
 "Audio clips" = "오디오 클립"
 "Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "창: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}믹서  {4}브라우저  (또는 툴바의 창 버튼, 다시 누르면 숨김)"
+"Stretched pattern clips loop their pattern (LYNX)" = "늘린 패턴 클립이 패턴을 반복 (LYNX)"
+"On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "켜기: 패턴보다 길게 늘린 패턴 클립은 패턴을 반복합니다. 끄기: FL Studio처럼 패턴을 한 번만 재생합니다"

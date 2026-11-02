@@ -6427,3 +6427,5 @@ countries: jp
 "Unsorted" = "未分類"
 "Audio clips" = "オーディオクリップ"
 "Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "ウィンドウ: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}ミキサー  {4}ブラウザー  (またはツールバーのウィンドウボタン。もう一度で非表示)"
+"Stretched pattern clips loop their pattern (LYNX)" = "引き伸ばしたパターンクリップはパターンをループする (LYNX)"
+"On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "オン: パターンより長く引き伸ばしたパターンクリップはパターンを繰り返します。オフ: FL Studio と同じくパターンを 1 回だけ再生します"

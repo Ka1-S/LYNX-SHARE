@@ -6427,3 +6427,5 @@ countries: tr
 "Unsorted" = "Sıralanmamış"
 "Audio clips" = "Ses klipleri"
 "Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "Pencereler: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mikser  {4}Tarayıcı  (veya çubuktaki pencere düğmeleri; tekrar: gizle)"
+"Stretched pattern clips loop their pattern (LYNX)" = "Uzatılmış pattern klipleri pattern'lerini döngüye alır (LYNX)"
+"On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "Açık: pattern'inin ötesine uzatılan bir pattern klibi pattern'i tekrarlar. Kapalı: pattern'i FL Studio'daki gibi bir kez çalar"

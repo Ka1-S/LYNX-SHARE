@@ -6427,3 +6427,5 @@ countries: it ch sm
 "Unsorted" = "Non ordinati"
 "Audio clips" = "Clip audio"
 "Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "Finestre: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (o i pulsanti delle finestre nella barra; di nuovo: nascondi)"
+"Stretched pattern clips loop their pattern (LYNX)" = "Le clip di pattern allungate ripetono il loro pattern (LYNX)"
+"On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "Attivo: una clip di pattern allungata oltre il suo pattern ripete il pattern. Disattivo: suona il pattern una volta, come in FL Studio"

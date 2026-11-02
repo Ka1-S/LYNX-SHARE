@@ -6427,3 +6427,5 @@ countries: tw hk mo
 "Unsorted" = "未分類"
 "Audio clips" = "音訊片段"
 "Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "視窗：{0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}混音器  {4}瀏覽器  （或工具列中的視窗按鈕；再按一次：隱藏）"
+"Stretched pattern clips loop their pattern (LYNX)" = "拉長的樣式片段循環其樣式 (LYNX)"
+"On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "開：拉長到超出其樣式的樣式片段會重複該樣式。關：像 FL Studio 一樣只播放一次樣式"

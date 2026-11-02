@@ -6427,3 +6427,5 @@ countries: id
 "Unsorted" = "Tanpa grup"
 "Audio clips" = "Klip audio"
 "Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "Jendela: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (atau tombol jendela di bilah alat; sekali lagi: sembunyikan)"
+"Stretched pattern clips loop their pattern (LYNX)" = "Klip pattern yang diregangkan mengulang pattern-nya (LYNX)"
+"On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "Aktif: klip pattern yang diregangkan melewati pattern-nya mengulang pattern. Nonaktif: memutar pattern sekali, seperti di FL Studio"

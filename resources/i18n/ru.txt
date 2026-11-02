@@ -6427,3 +6427,5 @@ countries: ru by kz
 "Unsorted" = "Без группы"
 "Audio clips" = "Аудиоклипы"
 "Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "Окна: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Микшер  {4}Браузер  (или кнопки окон на панели; повторно: скрыть)"
+"Stretched pattern clips loop their pattern (LYNX)" = "Растянутые клипы паттернов повторяют свой паттерн (LYNX)"
+"On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "Вкл.: клип паттерна, растянутый дальше конца паттерна, повторяет паттерн. Выкл.: паттерн играет один раз, как в FL Studio"

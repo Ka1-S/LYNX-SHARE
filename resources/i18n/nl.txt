@@ -6427,3 +6427,5 @@ countries: nl be
 "Unsorted" = "Ongesorteerd"
 "Audio clips" = "Audioclips"
 "Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "Vensters: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (of de vensterknoppen in de balk; nogmaals: verbergen)"
+"Stretched pattern clips loop their pattern (LYNX)" = "Uitgerekte patroonclips herhalen hun patroon (LYNX)"
+"On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "Aan: een patroonclip die voorbij zijn patroon is uitgerekt, herhaalt het patroon. Uit: hij speelt het patroon één keer, zoals in FL Studio"

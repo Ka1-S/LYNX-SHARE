@@ -842,24 +842,29 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 // rounding does not show), notes outside the repainted area skipped
                 const auto rounded = noteHeight > 2.0f && r.getWidth() > 60.0f;
 
-                // the pattern once, from the clip's offset: a clip stretched past its pattern is empty after it, as FL
-                // plays and shows it (round 168k [EXEC]: FL's render of a 1-bar pattern in a 4-bar clip is silent
-                // after bar 1) — it used to be drawn repeating while only the first pass played
-                const auto patternStart = c.start - c.offset;
-                for (const auto& n : notes)
+                // what plays: a clip stretched past its pattern loops it with the LYNX option (issue #25, default on),
+                // else the pattern once and empty after it, as FL plays and shows it (round 168k [EXEC])
+                const auto passes = clipPasses (c, song.patterns[(std::size_t) c.pattern].effectiveLength (song.beatsPerBar));
+                for (auto pass = passes.first; pass <= passes.last; ++pass)
                 {
-                    const auto at = patternStart + n.start;
-                    if (at + n.length <= c.start || at >= c.end())
+                    const auto origin = c.start - c.offset + pass * passes.length;
+                    if (passes.loops && (tickToX ((double) origin) > visible.getRight() || tickToX ((double) (origin + passes.length)) < visible.getX()))
                         continue;
-                    const auto nx = (float) tickToX ((double) at);
-                    const auto nw = juce::jmax (rounded ? 2.0f : 1.0f, (float) (n.length * pixelsPerTick) - 1.0f);
-                    if (nx > visible.getRight() || nx + nw < visible.getX())
-                        continue;
-                    const auto ny = body.getBottom() - ((float) n.key - bottomKey + 0.5f) / rows * body.getHeight() - noteHeight * 0.5f;
-                    if (rounded)
-                        g.fillRoundedRectangle (nx, ny, nw, noteHeight, juce::jmin (1.0f, noteHeight * 0.5f));
-                    else
-                        g.fillRect (nx, ny, nw, noteHeight);
+                    for (const auto& n : notes)
+                    {
+                        const auto at = origin + n.start;
+                        if ((passes.loops && n.start >= passes.length) || at + n.length <= c.start || at >= c.end())
+                            continue;
+                        const auto nx = (float) tickToX ((double) at);
+                        const auto nw = juce::jmax (rounded ? 2.0f : 1.0f, (float) (n.length * pixelsPerTick) - 1.0f);
+                        if (nx > visible.getRight() || nx + nw < visible.getX())
+                            continue;
+                        const auto ny = body.getBottom() - ((float) n.key - bottomKey + 0.5f) / rows * body.getHeight() - noteHeight * 0.5f;
+                        if (rounded)
+                            g.fillRoundedRectangle (nx, ny, nw, noteHeight, juce::jmin (1.0f, noteHeight * 0.5f));
+                        else
+                            g.fillRect (nx, ny, nw, noteHeight);
+                    }
                 }
             }
 
@@ -1334,19 +1339,21 @@ void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, co
         const auto rows = (float) span + 1.0f;
         const auto noteHeight = juce::jlimit (1.5f, 2.5f, inner.getHeight() / rows);
         auto& marks = batch.contents[clipContentColour (base).getARGB()];
-        const auto patternStart = c.start - c.offset; // the pattern once (FL: no repeats past its end; round 168k)
-        for (const auto& n : notes)
-        {
-            const auto at = patternStart + n.start;
-            if (at + n.length <= c.start || at >= c.end())
-                continue;
-            const auto nx = juce::jmax (inner.getX(), (float) tickToX ((double) at));
-            const auto nr = juce::jmin (inner.getRight() - 1.0f, nx + juce::jmax (1.0f, (float) (n.length * pixelsPerTick) - 1.0f));
-            if (nr <= nx)
-                continue;
-            const auto ny = inner.getBottom() - ((float) n.key - bottomKey + 0.5f) / rows * inner.getHeight() - noteHeight * 0.5f;
-            marks.addWithoutMerging ({ nx, ny, nr - nx, noteHeight });
-        }
+        // what plays: looped along a stretched clip with the LYNX option (issue #25), else once (FL, round 168k)
+        const auto passes = clipPasses (c, song.patterns[(std::size_t) c.pattern].effectiveLength (song.beatsPerBar));
+        for (auto pass = passes.first; pass <= passes.last; ++pass)
+            for (const auto& n : notes)
+            {
+                const auto at = c.start - c.offset + pass * passes.length + n.start;
+                if ((passes.loops && n.start >= passes.length) || at + n.length <= c.start || at >= c.end())
+                    continue;
+                const auto nx = juce::jmax (inner.getX(), (float) tickToX ((double) at));
+                const auto nr = juce::jmin (inner.getRight() - 1.0f, nx + juce::jmax (1.0f, (float) (n.length * pixelsPerTick) - 1.0f));
+                if (nr <= nx)
+                    continue;
+                const auto ny = inner.getBottom() - ((float) n.key - bottomKey + 0.5f) / rows * inner.getHeight() - noteHeight * 0.5f;
+                marks.addWithoutMerging ({ nx, ny, nr - nx, noteHeight });
+            }
     }
 }
 

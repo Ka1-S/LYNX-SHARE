@@ -5,6 +5,8 @@
 // (see SnapshotExchange.h), so nothing here needs to be thread-safe.
 
 #include <array>
+#include <atomic>
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -1156,6 +1158,48 @@ struct Clip
     std::int64_t effectiveFadeIn() const noexcept { return crossfadeIn > 0 ? crossfadeIn : fadeIn; }
     std::int64_t effectiveFadeOut() const noexcept { return crossfadeOut > 0 ? crossfadeOut : fadeOut; }
 };
+
+// LYNX extra (issue #25; the user's choice, after round 168k showed FL plays such a clip once and is silent after its
+// pattern): a pattern clip stretched past its pattern loops the pattern until the clip ends. An app setting (Options ›
+// General, "Stretched pattern clips loop their pattern"), default on; off = FL's behaviour. Not saved in projects.
+inline std::atomic<bool>& stretchedClipsLoopFlag() noexcept
+{
+    static std::atomic<bool> on { true };
+    return on;
+}
+inline bool stretchedClipsLoop() noexcept { return stretchedClipsLoopFlag().load (std::memory_order_relaxed); }
+inline void setStretchedClipsLoop (bool on) noexcept { stretchedClipsLoopFlag().store (on, std::memory_order_relaxed); }
+
+// The pattern tick that song tick `tick` inside clip `c` plays — tick − start + offset, wrapped around `patternLength`
+// (the pattern's effectiveLength) when the clip reaches past its pattern and stretchedClipsLoop() is on.
+inline double patternTickInClip (const Clip& c, double tick, std::int64_t patternLength) noexcept
+{
+    const auto local = tick - (double) c.start + (double) c.offset;
+    if (! stretchedClipsLoop() || patternLength <= 0 || c.offset + c.length <= patternLength || local < (double) patternLength)
+        return local;
+    return std::fmod (local, (double) patternLength);
+}
+
+// The passes of a pattern clip's pattern: pattern tick 0 of pass k sits at song tick c.start − c.offset + k·length,
+// k in [first, last]; `loops` = the clip reaches past its pattern and stretchedClipsLoop() is on (then a pass plays the
+// notes before `length` only), else one pass (k = 0) of every note in [offset, offset + length).
+struct ClipPasses
+{
+    std::int64_t first = 0, last = 0, length = 1;
+    bool loops = false;
+};
+inline ClipPasses clipPasses (const Clip& c, std::int64_t patternLength) noexcept
+{
+    ClipPasses p;
+    p.length = patternLength > 0 ? patternLength : 1;
+    p.loops = stretchedClipsLoop() && c.length > 0 && c.offset + c.length > p.length;
+    if (p.loops)
+    {
+        p.first = c.offset / p.length;
+        p.last = (c.offset + c.length - 1) / p.length;
+    }
+    return p;
+}
 
 enum class PlayMode : std::uint8_t
 {
