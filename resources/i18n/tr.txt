@@ -6255,3 +6255,4 @@ countries: tr
 "Update A/B" = "A/B'yi güncelle"
 "Flush" = "Boşalt"
 "Detector source" = "Dedektör kaynağı"
+"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "Yakınlaştırma: yukarı sürükle = yaklaş, yana = kaydır  [Ctrl] yalnızca yakınlaştırma"
