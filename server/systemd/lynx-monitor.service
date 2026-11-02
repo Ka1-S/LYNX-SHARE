@@ -1,0 +1,7 @@
+[Unit]
+Description=LYNX SHARE health and resource check
+
+[Service]
+Type=oneshot
+ExecStart=/opt/lynx/ops/monitor.sh
+Nice=10

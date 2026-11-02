@@ -1,0 +1,8 @@
+[Unit]
+Description=LYNX SHARE daily backup of service data
+
+[Service]
+Type=oneshot
+ExecStart=/opt/lynx/ops/backup.sh
+Nice=15
+IOSchedulingClass=idle
