@@ -7902,7 +7902,10 @@ private:
             // where it was last time (round 167v); the first start opens maximized, the Playlist filling the screen
             // with the Browser at the left and the Channel Rack above it, like FL Studio's first start
             const auto saved = stateFile().loadFileAsString().trim();
-            maximiseOnReveal = saved.isEmpty() || saved.startsWithIgnoreCase ("fs");
+            // (LYNX_TEST_MODE keeps the fixed-size window scripted checks expect, unless LYNX_TEST_MAXIMIZE=1)
+            const auto firstStart = saved.isEmpty()
+                                    && (! lynx::platform::testMode() || juce::SystemStats::getEnvironmentVariable ("LYNX_TEST_MAXIMIZE", {}) == "1");
+            maximiseOnReveal = firstStart || saved.startsWithIgnoreCase ("fs");
             if (saved.isNotEmpty())
                 restoreWindowStateFromString (saved.startsWithIgnoreCase ("fs") ? saved.substring (2).trim() : saved);
         }
