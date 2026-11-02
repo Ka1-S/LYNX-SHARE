@@ -28,6 +28,7 @@
 #include "ui/QuickAddPalette.h"
 #include "ui/PatcherEditor.h"
 #include "ui/ToolWindow.h"
+#include "ui/LoopStarterWindow.h"
 #include "ui/WindowOwner.h"
 
 #include "engine/PluginSandbox.h"
@@ -311,6 +312,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         showPanel (Panel::mixer);
         mixer.selectTrack (insert);
     };
+    mixer.onInstrumentDropped = [this] (int insert, ChannelDef c) { rack.addChannel (std::move (c), true, insert); };
     rackViewport.setViewedComponent (&rack, false);
     rackViewport.setScrollBarsShown (true, true);
     workspace.setContent (Panel::playlist, playlistArea, "Playlist", Icon::playlist);
@@ -359,6 +361,11 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     ui::setHint (rackLoopButton, tr ("Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  "
                                      "[RMB] loop type (step channels, all channels, advanced) and Burn to pattern"));
     rackTitleTools.addAndMakeVisible (rackLoopButton);
+    // Loop Starter (round 168b; FL 25's dice in the Channel Rack): a drum loop of the genre's kit, re-rolled with dice
+    rackLoopStarterButton.setWantsKeyboardFocus (false);
+    rackLoopStarterButton.onClick = [this] { loopstarterui::open (engine); };
+    ui::setHint (rackLoopStarterButton, tr ("Loop Starter: pick a genre and get a drum loop (kit channels with steps) to re-roll and send to the Playlist"));
+    rackTitleTools.addAndMakeVisible (rackLoopStarterButton);
     // the pattern selector (issue #9): change the pattern the rack edits right from its title bar
     rackPatternSelector.onStep = [this] (int delta) { selectPattern (stepPattern (engine.getSong(), delta)); };
     rackPatternSelector.onMenu = [this] { showRackPatternList(); };
@@ -395,6 +402,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         rackFollowButton.setBounds (r.removeFromLeft (24).reduced (0, 1));
         r.removeFromLeft (4);
         rackLoopButton.setBounds (r.removeFromLeft (24).reduced (0, 1));
+        r.removeFromLeft (4);
+        rackLoopStarterButton.setBounds (r.removeFromLeft (24).reduced (0, 1));
     };
     workspace.setTitleAccessory (Panel::channelRack, &rackTitleTools, rackTitleToolsWidth);
     workspace.onPanelMenu = [this] (Panel panel, juce::PopupMenu& menu) { addPanelMenuItems (panel, menu); };
@@ -3189,6 +3198,7 @@ void MainComponent::setQuickTips()
     tip (rackGraphButton, tr ("Graph editor"));
     tip (rackPianoRollButton, tr ("Piano-roll view"), "rack.pianoRollView");
     tip (rackLoopButton, tr ("Channel looping"));
+    tip (rackLoopStarterButton, tr ("Loop Starter"));
 
     for (int i = 0; i < workspace::panelCount; ++i)
         tip (panelButtons[(std::size_t) i], tr (panelName ((Panel) i)), panelAction ((Panel) i));
