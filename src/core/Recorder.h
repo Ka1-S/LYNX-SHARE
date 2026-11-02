@@ -98,7 +98,7 @@ struct ClipPart
 std::vector<ClipPart> punchParts (const std::vector<PunchRange>& ranges, std::int64_t start, std::int64_t length, std::int64_t offset);
 
 // Song mode: makes sure a clip of `pattern` plays at `tick`. If none does, one is placed at the start of
-// that bar, on the first track that is free there. Returns true when a clip was added.
+// that bar, on the first track with nothing from there on (it grows while recording). Returns true when a clip was added.
 bool placePatternClipAt (Song& song, int pattern, std::int64_t tick);
 
 // Length of a count-in of `bars` bars at the song position `tick` (bars follow the time signature there).
@@ -155,10 +155,11 @@ std::int64_t takeOriginFor (const Song& song, std::int64_t tick, bool* fromClip 
 // Where a note played at song position `tick` goes in the current pattern: inside a clip of the pattern, that clip's
 // position; elsewhere `tick − origin` (0 at least).
 std::int64_t songNotePosition (const Song& song, std::int64_t tick, std::int64_t origin);
-// After a Song-mode take was committed: a pattern with a set length (Channel Rack › Length) grows by whole bars to the
-// notes recorded past its end (an automatic-length pattern grows by itself), and the clip at the take's origin reaches
-// the bar of the last of `notes` (the take's notes, pattern positions). Returns true when something changed.
-bool growForSongTake (Song& song, int pattern, std::int64_t origin, const std::vector<Note>& notes);
+// After a batch of a Song-mode take was committed (`notes`: its notes, pattern positions): a pattern with a set length
+// (Channel Rack › Length) grows by whole bars to the notes recorded past its end (an automatic-length pattern grows by
+// itself), and when no clip of the pattern plays at song position `reach` (the latest note placed from the origin, -1:
+// none) the clip at the take's origin grows to that bar. Returns true when something changed.
+bool growForSongTake (Song& song, int pattern, std::int64_t origin, std::int64_t reach, const std::vector<Note>& notes);
 
 class NoteRecorder;
 // One batch of a take's finished notes into the song, as AudioEngine::updateRecording commits it (the caller wraps it in
@@ -181,6 +182,8 @@ public:
     // Song mode: the take's origin (see takeOriginFor), -1 until its first note; `originFromClip` = it is a clip's.
     std::int64_t songOrigin() const noexcept { return origin; }
     bool originFromClip() const noexcept { return fromClip; }
+    // Song mode: the song position of the latest note start placed from the origin (outside every clip), -1: none.
+    std::int64_t originReach() const noexcept { return reach; }
 
     // Delivers an event; when it's the "off" of a held note, the finished note goes to finished().
     void add (const Song& song, const RecordedEvent& e);
@@ -206,6 +209,7 @@ private:
     bool linear = false;
     std::int64_t loop = 0;
     std::int64_t origin = -1;
+    std::int64_t reach = -1;
     bool fromClip = false;
     std::map<std::pair<int, int>, Held> held; // (channel, key)
     std::vector<Note> finished;
