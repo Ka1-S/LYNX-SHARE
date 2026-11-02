@@ -782,13 +782,19 @@
                     area.lineTo (a.getBottomRight());
                     area.lineTo (a.getBottomLeft());
                     area.closeSubPath();
-                    g.setColour (colour.withAlpha (isSel ? 0.30f : 0.16f));
+                    g.setColour (colour.withAlpha (isSel ? 0.22f : 0.10f));
                     g.fillPath (area);
-                    g.setColour (colour.withAlpha (isSel ? 0.9f : 0.45f));
+                    g.setColour (colour.withAlpha (isSel ? 0.65f : 0.30f));
                     g.strokePath (line, juce::PathStrokeType (1.0f * s));
                 }
                 const auto named = ! slot.name.empty();
                 g.setFont (font (juce::jmax (7.0f, 8.5f * s), isSel));
+                if (named && ! flat) // a dark backing keeps the name readable over the thumbnail
+                {
+                    const auto tw = juce::jmin (cell.getWidth() - 4.0f * s, (float) juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), juce::String::fromUTF8 (slot.name.c_str())) + 6.0f * s);
+                    g.setColour (colour::bg0.withAlpha (0.62f));
+                    g.fillRoundedRectangle (juce::Rectangle<float> (tw, 11.0f * s).withCentre (cell.getCentre()), 2.0f * s);
+                }
                 g.setColour (isSel ? colour::textPrimary : named ? colour::textPrimary.withAlpha (0.85f) : colour::textDisabled);
                 g.drawFittedText (named ? juce::String::fromUTF8 (slot.name.c_str()) : juce::String (i + 1), cell.reduced (3.0f * s, 0.0f).toNearestInt(),
                                   juce::Justification::centred, 1, 0.65f);
@@ -825,7 +831,9 @@
             const auto title = r.withLeft (gbTabCell (item, 1).getRight() + 8.0f * s).withRight (browser.getX() - 6.0f * s);
             g.setColour (kindColour);
             g.setFont (font (juce::jmax (8.0f, 11.0f * s), true));
-            g.drawFittedText (juce::String (gbSlotOf (gbEditKind) + 1) + "  " + gbSlotTitle (gbEditKind, gbSlotOf (gbEditKind)), title.toNearestInt(),
+            const auto shownSlot = gbSlotOf (gbEditKind);
+            const auto& shownName = gbState().slots[(std::size_t) (gbEditKind * grossbeat::slotsPerKind + shownSlot)].name;
+            g.drawFittedText (shownName.empty() ? gbSlotTitle (gbEditKind, shownSlot) : juce::String (shownSlot + 1) + "  " + gbSlotTitle (gbEditKind, shownSlot), title.toNearestInt(),
                               juce::Justification::centredLeft, 1, 0.7f);
             g.setColour (colour::bg3);
             g.fillRoundedRectangle (browser, radius::sm * s);
@@ -904,7 +912,7 @@
         fill.lineTo (inner.getBottomRight());
         fill.lineTo (inner.getBottomLeft());
         fill.closeSubPath();
-        g.setGradientFill (juce::ColourGradient (kindColour.withAlpha (0.34f), inner.getX(), inner.getY(), kindColour.withAlpha (0.03f), inner.getX(), inner.getBottom(), false));
+        g.setGradientFill (juce::ColourGradient (kindColour.withAlpha (0.26f), inner.getX(), inner.getY(), kindColour.withAlpha (0.0f), inner.getX(), inner.getBottom(), false));
         g.fillPath (fill);
         g.setColour (kindColour.withAlpha (0.25f)); // a soft glow under the line
         g.strokePath (curve, juce::PathStrokeType (juce::jmax (3.0f, 5.0f * s), juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
