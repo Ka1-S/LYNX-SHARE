@@ -82,3 +82,8 @@ Part B (Loop Starter, local) is its own document: `REA_rodada168b-loopstarter.md
 - Not done / next: LYNX's voice is intelligible but plainly synthetic — the letter-to-sound rules cover common
   English only (FL's engine is English-only too). A per-item
   tooltip with FL's personality hints is not shown (JUCE combo items have no tooltips); hints are in `Speech.cpp`.
+- Windows GUI check (fresh profile, test mode, real mouse): Browser › Speech (FL) lists the 71 presets (a first build
+  showed the roots empty: `.speech` was missing from the Browser's extension filter, fixed + test), a click previews
+  "Default" (2.00 s, waveform), a double-click opens Speech properties with the file's values (Robotoid, Monotone,
+  150 WPM, 92 Hz = F#2), a key click + Accept saved `Presets/Speech/TypeYourTextHere_Robotoid.speech` (Pitch=147) and
+  added that channel. The PC crashed during the first landing (2026-11-02 11:10); re-landed after merging origin/main.
