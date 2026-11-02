@@ -98,6 +98,15 @@ the scale functions, AutoPDCMenuClick, FUN_012b5e60 / FUN_012b6020), `d2.txt` (P
 
 ## Where I stopped
 
-- Done: everything above; tests green; FL render comparison and GUI check done. Next: land via coord/land.sh.
-- Not done: icon drawing (168h), Piano Roll scale UI on `Song::scaleHighlight` (168g), project data folder feature
-  (168i), E8 / E9 / E13 / E15 meanings (no writer / constant in the corpus).
+- PAUSED (coordinator, round 168w pipeline work). Done: everything above; build-local 2 105 045 checks / 0 failures and
+  the Windows build + FL render comparison + GUI check, all on the branch as of 406f55b3. The landing was only waiting
+  for the merge lock and was cancelled: nothing of 168j is on main yet. After that, origin/main was merged in again
+  (only the generated i18n headers conflicted and were regenerated; not built since).
+- Release-notes bullets are already in coord/notes-0.1.23.md ("FL project details, PDC switches, audio clip end
+  (round 168j)").
+- Next step after RESUME: `cd ~/projetos/lynx-wt-flp168j && git fetch -q origin && git merge origin/main` (on conflicts
+  in src/ui/i18n/*.h: `git checkout --theirs` them + `python3 tools/make_i18n.py`), then
+  `flock ~/projetos/lynx/.git/lynx-merge.lock ~/.claude/jobs/f8789b49/tmp/coord/land.sh flp168j` (it builds and tests).
+  Afterwards delete `~/.cache/zig-flp168j*` and `build-win-flp168j`.
+- Not done (other rounds): icon drawing (168h), Piano Roll scale UI on `Song::scaleHighlight` (168g), the project data
+  folder feature (168i), E8 / E9 / E13 / E15 meanings (no writer found / constant in the corpus).
