@@ -195,8 +195,9 @@ TEST (design168o_automation_changes_the_sound_live)
 {
     using namespace lynx;
     // an automation clip on a knob (Instrument::setParameter, 0..1) changes the held note without restarting it
-    for (const auto& [kind, index] : { std::pair { InstrumentKind::harmless, 54 }, std::pair { InstrumentKind::dx10, 5 },
-                                       std::pair { InstrumentKind::simsynth, 0 } })
+    // (DX10's modulator envelopes are taken at the note's start, as in FL: its waveform knob is a live one)
+    for (const auto& [kind, index, value] : { std::tuple { InstrumentKind::harmless, 54, 0.05f }, std::tuple { InstrumentKind::dx10, 11, 0.9f },
+                                              std::tuple { InstrumentKind::simsynth, 0, 0.05f } })
     {
         ChannelDef c;
         c.instrument = kind;
@@ -212,7 +213,7 @@ TEST (design168o_automation_changes_the_sound_live)
         std::vector<float> la (8192), ra (8192), lb (8192), rb (8192);
         a->render (la.data(), ra.data(), 4096, 1.0f, 1.0f);
         b->render (lb.data(), rb.data(), 4096, 1.0f, 1.0f);
-        b->setParameter (index, 0.05f);
+        b->setParameter (index, value);
         a->render (la.data() + 4096, ra.data() + 4096, 4096, 1.0f, 1.0f);
         b->render (lb.data() + 4096, rb.data() + 4096, 4096, 1.0f, 1.0f);
         double diff = 0.0, level = 0.0;

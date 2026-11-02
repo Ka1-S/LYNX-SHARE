@@ -2408,7 +2408,8 @@ private:
             const auto changed = std::memcmp (incoming.raw.data(), settings.raw.data(), sizeof (float) * settings.raw.size()) != 0
                                  || incoming.bpm != settings.bpm || incoming.comp != settings.comp;
             settings = incoming;
-            dirty = dirty || changed;
+            if (changed || dirty)
+                rebuild(); // (settleNew takes a new patch here, before the audio thread plays it)
         }
     }
 

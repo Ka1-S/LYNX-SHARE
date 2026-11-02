@@ -59,13 +59,75 @@ Height place it. These numbers are what core/ModelParamsSynths.cpp lists and cor
 
 Banks are registered through round 168n's `LYNX_BANK` list and appear after FL's `.fst` presets under
 "LYNX/<category>"; the channel's preset arrows step through both. Every preset was rendered (held note / chord 2 s,
-release, tail) and checked: not silent (held RMS > −50 dB), no clipping (peak < −0.1 dBFS), finite. Results in
+release, tail; pads and keys as a 4-note chord, basses on C2) on a channel at FL's default volume (78 % = gain 0.549)
+and checked: finite, not silent (held RMS > −54 dB), headroom (peak < −1 dBFS). Harmless's master volume (p36) was
+set per preset so the loud ones (chords, unison, resonance) peak near −3 dBFS; DX10's single voices stay at the
+engine's own level (about −16 dBFS, as FL's DX10). tools/bankrender renders the same banks. Results in
 §5; the WAVs are in /mnt/e/lynx-work/design168o/banks/ (not in the repository).
 
 ## 4. Where I stopped
 
-(see the end of the round)
+- Done: the eight pages (layout check: every parameter of every table is on its page, all items inside the page),
+  parameter tables + automation, the three banks (51 presets, all clean), envelope displays, notices, translations.
+- Not done: Ogun / Autogun live automation clips (knob edits work; clips need the engine to recompute its voices from
+  P without a rebuild); MiniSynth / GMS / Morphine / Ogun banks (FL data needed, see §1).
+- Built on round 168n's infrastructure merged from origin/wip/design168n (168n had not landed on main yet).
 
 ## 5. Render results
 
-(filled from the bank harness)
+Phrase peak / held RMS at gain 0.549 (zc/s = zero crossings per second of the held part, a brightness hint):
+
+```
+harmless  Init Saw               Init   peak  0.530 ( -5.5 dB) rmsOn  -11.7 dB zc/s    524 tail -240.0 dB 
+harmless  Round Sub Bass         Bass   peak  0.618 ( -4.2 dB) rmsOn  -11.7 dB zc/s    132 tail -240.0 dB 
+harmless  Rubber Pluck Bass      Bass   peak  0.636 ( -3.9 dB) rmsOn  -22.5 dB zc/s    131 tail -240.0 dB 
+harmless  Square Growl           Bass   peak  0.705 ( -3.0 dB) rmsOn  -11.0 dB zc/s    330 tail -240.0 dB 
+harmless  Acid Squelch           Bass   peak  0.700 ( -3.1 dB) rmsOn  -13.3 dB zc/s    424 tail -240.0 dB 
+harmless  Supersaw Lead          Lead   peak  0.629 ( -4.0 dB) rmsOn  -15.3 dB zc/s   1796 tail  -75.0 dB 
+harmless  Glide Mono Lead        Lead   peak  0.641 ( -3.9 dB) rmsOn  -13.1 dB zc/s    726 tail -106.9 dB 
+harmless  Hollow Square Lead     Lead   peak  0.604 ( -4.4 dB) rmsOn  -10.8 dB zc/s    524 tail  -62.7 dB 
+harmless  Velvet Pad             Pad    peak  0.703 ( -3.1 dB) rmsOn  -15.5 dB zc/s    934 tail  -38.1 dB 
+harmless  Phaser Choir           Pad    peak  0.702 ( -3.1 dB) rmsOn  -16.2 dB zc/s   2048 tail  -61.0 dB 
+harmless  Harmonized Air         Pad    peak  0.703 ( -3.1 dB) rmsOn  -15.8 dB zc/s   1858 tail  -64.5 dB 
+harmless  Shimmer Mask           Pad    peak  0.705 ( -3.0 dB) rmsOn  -14.3 dB zc/s   1180 tail  -38.8 dB 
+harmless  Dark Drone             Pad    peak  0.701 ( -3.1 dB) rmsOn  -15.5 dB zc/s    724 tail  -38.3 dB 
+harmless  Glass Pluck            Pluck  peak  0.604 ( -4.4 dB) rmsOn  -23.0 dB zc/s    633 tail  -98.9 dB 
+harmless  Soft Mallet            Pluck  peak  0.621 ( -4.1 dB) rmsOn  -23.0 dB zc/s    538 tail -240.0 dB 
+harmless  Echo Pluck             Pluck  peak  0.638 ( -3.9 dB) rmsOn  -25.0 dB zc/s    524 tail -115.2 dB 
+harmless  Tine Keys              Keys   peak  0.701 ( -3.1 dB) rmsOn  -23.1 dB zc/s    484 tail -240.0 dB 
+harmless  Drawbar Organ          Keys   peak  0.701 ( -3.1 dB) rmsOn  -13.2 dB zc/s    710 tail -154.3 dB 
+harmless  Slow Sweep             FX     peak  0.621 ( -4.1 dB) rmsOn  -14.2 dB zc/s    694 tail  -42.2 dB 
+harmless  Noise Wind             FX     peak  0.657 ( -3.6 dB) rmsOn  -21.1 dB zc/s   5724 tail  -68.4 dB 
+harmless  Grit Riser             FX     peak  0.535 ( -5.4 dB) rmsOn  -17.5 dB zc/s    533 tail  -71.8 dB 
+dx10      Init FM                Init   peak  0.152 (-16.4 dB) rmsOn  -23.8 dB zc/s    554 tail -240.0 dB 
+dx10      Tine E-Piano           Keys   peak  0.593 ( -4.5 dB) rmsOn  -15.5 dB zc/s    753 tail -240.0 dB 
+dx10      Soft Clav              Keys   peak  0.580 ( -4.7 dB) rmsOn  -20.5 dB zc/s   1529 tail -240.0 dB 
+dx10      FM Organ               Keys   peak  0.539 ( -5.4 dB) rmsOn  -15.5 dB zc/s    832 tail -240.0 dB 
+dx10      Punch FM Bass          Bass   peak  0.151 (-16.4 dB) rmsOn  -27.9 dB zc/s    326 tail -240.0 dB 
+dx10      Solid Sub FM           Bass   peak  0.161 (-15.8 dB) rmsOn  -19.1 dB zc/s    556 tail -240.0 dB 
+dx10      Slap Bass              Bass   peak  0.151 (-16.4 dB) rmsOn  -29.8 dB zc/s     83 tail -240.0 dB 
+dx10      Crystal Bell           Pluck  peak  0.152 (-16.4 dB) rmsOn  -20.4 dB zc/s   1412 tail  -88.0 dB 
+dx10      Marimba                Pluck  peak  0.151 (-16.4 dB) rmsOn  -30.9 dB zc/s    525 tail -240.0 dB 
+dx10      Glass Pluck            Pluck  peak  0.160 (-15.9 dB) rmsOn  -29.7 dB zc/s    554 tail -240.0 dB 
+dx10      FM Brass               Lead   peak  0.152 (-16.3 dB) rmsOn  -19.8 dB zc/s   2900 tail -240.0 dB 
+dx10      Reedy Lead             Lead   peak  0.171 (-15.3 dB) rmsOn  -18.1 dB zc/s   1792 tail -240.0 dB 
+dx10      Warm FM Pad            Pad    peak  0.606 ( -4.4 dB) rmsOn  -12.8 dB zc/s    804 tail  -92.9 dB 
+dx10      Metal Haze             Pad    peak  0.612 ( -4.3 dB) rmsOn  -13.4 dB zc/s    835 tail  -69.8 dB 
+dx10      Laser Drop             FX     peak  0.152 (-16.4 dB) rmsOn  -21.3 dB zc/s   3582 tail -240.0 dB 
+simsynth  Init Pulse             Init   peak  0.124 (-18.2 dB) rmsOn  -23.1 dB zc/s    524 tail -240.0 dB 
+simsynth  Analog Bass            Bass   peak  0.166 (-15.6 dB) rmsOn  -30.0 dB zc/s    200 tail -240.0 dB 
+simsynth  Warm Sine Sub          Bass   peak  0.151 (-16.4 dB) rmsOn  -24.8 dB zc/s    130 tail -240.0 dB 
+simsynth  Resonant Squelch       Bass   peak  0.282 (-11.0 dB) rmsOn  -26.6 dB zc/s    244 tail -240.0 dB 
+simsynth  Warm Sync Lead         Lead   peak  0.335 ( -9.5 dB) rmsOn  -21.9 dB zc/s   1023 tail -240.0 dB 
+simsynth  Square Chip Lead       Lead   peak  0.141 (-17.0 dB) rmsOn  -27.5 dB zc/s   1522 tail -240.0 dB 
+simsynth  Ring Lead              Lead   peak  0.331 ( -9.6 dB) rmsOn  -23.9 dB zc/s   1308 tail -240.0 dB 
+simsynth  String Pad             Pad    peak  0.599 ( -4.5 dB) rmsOn  -17.2 dB zc/s    280 tail -240.0 dB 
+simsynth  Glass Pad              Pad    peak  0.448 ( -7.0 dB) rmsOn  -18.8 dB zc/s    278 tail  -95.9 dB 
+simsynth  Sweep Pad              Pad    peak  0.555 ( -5.1 dB) rmsOn  -17.7 dB zc/s   1718 tail -240.0 dB 
+simsynth  Bright Pluck           Pluck  peak  0.302 (-10.4 dB) rmsOn  -31.4 dB zc/s    272 tail -240.0 dB 
+simsynth  Soft Keys              Keys   peak  0.612 ( -4.3 dB) rmsOn  -21.6 dB zc/s    941 tail -240.0 dB 
+simsynth  Toy Organ              Keys   peak  0.623 ( -4.1 dB) rmsOn  -15.8 dB zc/s   1356 tail -240.0 dB 
+simsynth  Noise Sweep            FX     peak  0.542 ( -5.3 dB) rmsOn  -20.9 dB zc/s   4805 tail  -78.2 dB 
+simsynth  Random Bleeps          FX     peak  0.237 (-12.5 dB) rmsOn  -22.1 dB zc/s    566 tail -240.0 dB 
+0 bad
+```
