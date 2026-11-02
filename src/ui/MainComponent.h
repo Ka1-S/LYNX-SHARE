@@ -398,10 +398,11 @@ private:
     IconButton rackGraphButton { "rackGraph", Icon::graph };
     IconButton rackPianoRollButton { "rackPianoRoll", Icon::pianoRoll };
     IconButton rackLoopButton { "rackLoop", Icon::loop }; // FL's Loop button (round 165f-rack)
+    IconButton rackLoopStarterButton { "rackLoopStarter", Icon::dice }; // Loop Starter (round 168b)
     IconButton rackFollowButton { "rackFollow", Icon::follow }; // Follow the playing step (issue #12)
     static constexpr int rackPatternSelectorWidth = 132;
     static constexpr int rackLengthBoxWidth = 40;
-    static constexpr int rackTitleToolsWidth = rackPatternSelectorWidth + 6 + 96 + 4 + 26 + 4 + rackLengthBoxWidth + 4 + 24 + 4 + 24 + 4 + 24 + 4 + 24;
+    static constexpr int rackTitleToolsWidth = rackPatternSelectorWidth + 6 + 96 + 4 + 26 + 4 + rackLengthBoxWidth + 4 + 24 + 4 + 24 + 4 + 24 + 4 + 24 + 4 + 24;
     // one icon per workspace panel (F5..F9): click toggles, right-click shows it maximized
     std::array<IconButton, workspace::panelCount> panelButtons { IconButton { "playlistPanel", Icon::playlist },
                                                                  IconButton { "rackPanel", Icon::channelRack },

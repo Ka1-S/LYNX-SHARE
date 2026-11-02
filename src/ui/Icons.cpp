@@ -558,6 +558,11 @@ Shape make (Icon icon)
             arcWithHead (3.6f, 5.7f);
             break;
         }
+        case Icon::dice: // a die showing five
+            st.addRoundedRectangle (4.5f, 4.5f, 15.0f, 15.0f, 3.0f);
+            for (const auto& [x, y] : { std::pair { 8.5f, 8.5f }, { 15.5f, 8.5f }, { 12.0f, 12.0f }, { 8.5f, 15.5f }, { 15.5f, 15.5f } })
+                fi.addEllipse (x - 1.4f, y - 1.4f, 2.8f, 2.8f);
+            break;
         case Icon::tuningFork: // two prongs on a stem, with a weighted foot
         {
             juce::Path f;

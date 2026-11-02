@@ -40,6 +40,8 @@ constexpr int minWidth = 220, minHeight = 120;
 // Default layout: room left for the Playlist's pattern picker and track names, and the smallest heights the
 // Mixer and a Piano Roll tiled above it are given.
 constexpr int playlistHeaderWidth = 260, mixerMinHeight = 400, pianoRollMinHeight = 300;
+// Default Channel Rack width: at most its usual width (a bar of steps), at least this much beside the track names.
+constexpr int rackMaxWidth = 720, rackMinWidth = 420;
 
 struct Layout
 {
@@ -72,6 +74,10 @@ struct Layout
 
     // The desktop changed size: rects scale with it (proportionally), then are clamped back in.
     void resize (int newWidth, int newHeight);
+    // The Browser at the left edge and the Playlist starting where it ends (kept so by resize()).
+    bool browserDocksPlaylist() const;
+    // The Playlist starts where the Browser (at the left edge) ends and fills the rest of the width.
+    void redockPlaylist();
     // Brings panels that ended up (mostly) outside the desktop back inside. Returns how many moved.
     int bringBackOffscreen();
 

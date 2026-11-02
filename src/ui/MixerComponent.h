@@ -27,6 +27,23 @@ std::optional<EffectSlot> newAddableEffect (EffectKind kind, double bpm = 120.0)
 bool loadMixerTrackState (AudioEngine& engine, int track, const juce::File& file, bool asNewInsert);
 bool saveMixerTrackState (AudioEngine& engine, int track, const juce::File& file);
 
+// FL's mixer presets (REA round 167q): FL's own (.fst of Data\Patches\Mixer presets and Documents\Image-Line\FL
+// Studio\Presets\Mixer presets) and LYNX's states (.lynxtrack of Documents\LYNX\Mixer states), all read here.
+namespace mixerpresets
+{
+// The folders FL lists (user's first, then FL's factory one) and LYNX's states folder; only the existing ones.
+juce::Array<juce::File> folders();
+// Every preset of these folders (subfolders too), sorted by name as FL's File › States list.
+juce::Array<juce::File> all();
+bool isMixerPreset (const juce::File& file); // .lynxtrack, or an .fst holding a mixer track
+// The preset as a track state (FL's: converted, name "" when it has none); nullopt if unreadable.
+std::optional<MixerTrack> read (const juce::File& file);
+// FL's load (FUN_012a7440): onto every track of `tracks` (one undo step); routing, input, monitoring and arm stay.
+bool loadOnTracks (AudioEngine& engine, const std::vector<int>& tracks, const juce::File& file);
+// FL's "Insert from state" (a new insert at `at`) and "Add from state" (`at` = the end): the new track, or -1.
+int insertTrack (AudioEngine& engine, int at, const juce::File& file);
+} // namespace mixerpresets
+
 // External audio input of the inserts (REA_rodada88): FL's "Audio input source" of a mixer track.
 namespace mixerinput
 {
@@ -113,6 +130,8 @@ public:
 
     // An effect dragged from the Browser's Plugin database onto a strip (round 162): it goes into that insert.
     std::function<void (int, EffectSlot)> onEffectDropped;
+    // A generator dragged onto a strip: a new channel routed to that insert.
+    std::function<void (int, ChannelDef)> onInstrumentDropped;
     bool isInterestedInDragSource (const SourceDetails& details) override;
     void itemDropped (const SourceDetails& details) override;
 
@@ -253,6 +272,9 @@ public:
     void filesDropped (const juce::StringArray& files, int x, int y) override;
     bool dropPreset (const juce::File& file, juce::Point<int> position);
     bool dropEffect (EffectSlot fx, juce::Point<int> position);
+    // A generator dragged from the Plugin database onto the panel (a slot or anywhere else): as on the strip, a new
+    // channel routed to the panel's insert; the slots don't change (FL 2026, round 167u).
+    std::function<void (int, ChannelDef)> onInstrumentDropped;
 
     explicit EffectsPanel (AudioEngine& engine);
     ~EffectsPanel() override;
@@ -396,6 +418,10 @@ public:
 
     // Adds an effect to the first free slot of the selected insert (quick-add palette). False when full.
     bool addEffectToSelected (EffectSlot slot);
+    // A mixer preset opened from the Browser (FL: onto the selected tracks)
+    bool loadPresetOnSelection (const juce::File& file);
+    // A generator dragged from the Browser onto a strip (the owner has the Channel Rack that adds the channel).
+    std::function<void (int, ChannelDef)> onInstrumentDropped;
     MixerStrips& getStripsForSnapshot() { return strips; }
 
     static constexpr int effectsWidth = 300;

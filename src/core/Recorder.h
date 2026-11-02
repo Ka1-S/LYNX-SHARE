@@ -98,7 +98,7 @@ struct ClipPart
 std::vector<ClipPart> punchParts (const std::vector<PunchRange>& ranges, std::int64_t start, std::int64_t length, std::int64_t offset);
 
 // Song mode: makes sure a clip of `pattern` plays at `tick`. If none does, one is placed at the start of
-// that bar, on the first track that is free there. Returns true when a clip was added.
+// that bar, on the first track with nothing from there on (it grows while recording). Returns true when a clip was added.
 bool placePatternClipAt (Song& song, int pattern, std::int64_t tick);
 
 // Length of a count-in of `bars` bars at the song position `tick` (bars follow the time signature there).
@@ -142,6 +142,33 @@ void commitEventPoints (Song& song, int pattern, AutomationWrite& w, std::vector
 // Removes the points between two of the same value (no change of the curve) in [from, to].
 void thinAutomation (std::vector<AutomationPoint>& points, std::int64_t from, std::int64_t to);
 
+// --- Song-mode note takes (round 168k, the YouTube review: "it just maxes out at two bars") ----------------------
+// FL (REA_rodada165z-b fh2–fh5, round 168k [EXEC]): a take recorded in Song mode goes into the current pattern at the
+// song position it was played at — nothing folds into the pattern's first bars. Where no clip of the pattern plays, the
+// pattern's start lies at the take's origin: the bar of the take's first note (its clip is placed there and grows with
+// the pattern to the last recorded bar).
+//
+// The origin of a take whose first note is played at song position `tick`: inside a clip of the current pattern, the
+// song position of that clip's pattern start (the take extends what the clip shows); elsewhere the start of that bar.
+// `fromClip` (optional) tells which one it was (a clip is placed for the take only when it was not).
+std::int64_t takeOriginFor (const Song& song, std::int64_t tick, bool* fromClip = nullptr);
+// Where a note played at song position `tick` goes in the current pattern: inside a clip of the pattern, that clip's
+// position; elsewhere `tick − origin` (0 at least).
+std::int64_t songNotePosition (const Song& song, std::int64_t tick, std::int64_t origin);
+// After a batch of a Song-mode take was committed (`notes`: its notes, pattern positions): a pattern with a set length
+// (Channel Rack › Length) grows by whole bars to the notes recorded past its end (an automatic-length pattern grows by
+// itself), and when no clip of the pattern plays at song position `reach` (the latest note placed from the origin, -1:
+// none) the clip at the take's origin grows to that bar. Returns true when something changed.
+bool growForSongTake (Song& song, int pattern, std::int64_t origin, std::int64_t reach, const std::vector<Note>& notes);
+
+class NoteRecorder;
+// One batch of a take's finished notes into the song, as AudioEngine::updateRecording commits it (the caller wraps it in
+// one undoable edit, which also lets the pattern's clips follow its length): quantised and committed into the current
+// pattern; in Song mode the take's clip is placed at its origin with the first batch (`placeClip`: the record option
+// "place a clip") and grows with the take (growForSongTake).
+void commitNoteBatch (Song& song, const NoteRecorder& recorder, std::vector<Note> notes, RecordMode mode, const TakeQuantize& q,
+                      std::vector<int>& clearedChannels, bool placeClip, bool firstBatch);
+
 class NoteRecorder
 {
 public:
@@ -149,6 +176,14 @@ public:
     // (does not change while the recorded notes grow the pattern).
     void begin (std::int64_t loopLength);
     bool isActive() const noexcept { return active; }
+
+    // Song mode: the song plays on past its end while the take records (no wrap of the positions; round 168k).
+    void setLinear (bool on) noexcept { linear = on; }
+    // Song mode: the take's origin (see takeOriginFor), -1 until its first note; `originFromClip` = it is a clip's.
+    std::int64_t songOrigin() const noexcept { return origin; }
+    bool originFromClip() const noexcept { return fromClip; }
+    // Song mode: the song position of the latest note start placed from the origin (outside every clip), -1: none.
+    std::int64_t originReach() const noexcept { return reach; }
 
     // Delivers an event; when it's the "off" of a held note, the finished note goes to finished().
     void add (const Song& song, const RecordedEvent& e);
@@ -168,8 +203,14 @@ private:
 
     void finish (const Song& song, int channel, int key, const Held& held, double endTick);
 
+    std::int64_t songTick (const Song& song, double tick) const;
+
     bool active = false;
+    bool linear = false;
     std::int64_t loop = 0;
+    std::int64_t origin = -1;
+    std::int64_t reach = -1;
+    bool fromClip = false;
     std::map<std::pair<int, int>, Held> held; // (channel, key)
     std::vector<Note> finished;
 };
