@@ -186,7 +186,9 @@ target_sources(lynx_core PRIVATE
     src/core/RackOps.cpp
     src/core/ChannelMiscFx.cpp
     src/core/MidiImport.cpp
-    src/core/StartupSound.cpp)
+    src/core/StartupSound.cpp
+    src/core/Speech.cpp
+    src/core/SpeechRules.cpp)
 
 # workflow P2 (note tools, mixer operations, history labels, browser search)
 target_sources(lynx_core PRIVATE
@@ -416,6 +418,7 @@ if(LYNX_BUILD_APP)
         src/ui/AudioEditor.cpp
         src/ui/AudioEditorTools.cpp
         src/ui/ToolWindow.cpp
+        src/ui/SpeechDialog.cpp
         src/ui/TempoTapper.cpp
         src/ui/LoopStarterWindow.cpp
         src/ui/HistoryPanel.cpp
