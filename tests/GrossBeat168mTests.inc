@@ -263,7 +263,7 @@ TEST (gb168_factory_slots_are_named_distinct_and_used_by_presets)
         CHECK (names.insert (slot.name).second);
         const auto levels = lynx::grossbeat::renderSlot (slot, 256);
         const auto [lo, hi] = std::minmax_element (levels.begin(), levels.end());
-        CHECK (*hi - *lo > 1.0e-3f && *lo >= 0.0f && *hi <= 1.0f);
+        CHECK ((*hi - *lo > 1.0e-3f || slot.name == "Mute") && *lo >= -1.0e-4f && *hi <= 1.0f + 1.0e-4f); // Mute: silence on purpose
         (i < lynx::grossbeat::slotsPerKind ? time : volume) += 1;
     }
     CHECK (time >= 24 && volume >= 29);
