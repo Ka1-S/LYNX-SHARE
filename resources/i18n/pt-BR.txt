@@ -974,8 +974,6 @@ countries: br
 "Note: [LMB] drag moves  [Shift][LMB] copies  [2xLMB] properties  [RMB] deletes  [Alt][Wheel] velocity" = "Nota: [LMB] arrastar move  [Shift][LMB] copia  [2xLMB] propriedades  [RMB] apaga  [Alt][Wheel] velocity"
 "Point: [LMB] drag moves, then [Shift] keeps time, [Ctrl] keeps value  [RMB] deletes" = "Ponto: [LMB] arrastar move, depois [Shift] mantém o tempo, [Ctrl] mantém o valor  [RMB] apaga"
 "Point: [LMB] drag moves, then [Shift] keeps time, [Ctrl] keeps value  [RMB] menu" = "Ponto: [LMB] arrastar move, depois [Shift] mantém o tempo, [Ctrl] mantém o valor  [RMB] menu"
-"Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB] drag selects the notes in a time range  [Ctrl][Wheel] zoom  [Shift][Wheel] scroll" = "Régua: [LMB] posição  [Alt] sem grade  [Ctrl][LMB] arrastar seleciona as notas num trecho  [Ctrl][Wheel] zoom  [Shift][Wheel] rolar"
-"Ruler: [LMB] song position  [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag in it: move  [2xLMB] clear  [RMB] markers  [Alt] no snap" = "Régua: [LMB] posição da música  [Ctrl][LMB] ou [2xLMB] arrastar: seleção de tempo (loop)  [Shift][LMB] arrastar nela: move  [2xLMB] limpa  [RMB] marcadores  [Alt] sem grade"
 "Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo" = "Faixa: [LMB] silencia / reativa  [Ctrl][LMB] ou [RMB] solo"
 "Track: [RMB] menu  [2xLMB] rename  [Shift][Wheel] move up / down" = "Faixa: [RMB] menu  [2xLMB] renomeia  [Shift][Wheel] move para cima / baixo"
 "[Alt] no snap" = "[Alt] sem grade"
@@ -5373,7 +5371,6 @@ countries: br
 "Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)." = "Notas neste canal levam a música a um marcador em vez de tocar: a nota 0 vai ao primeiro marcador, a seguinte ao segundo... (Playlist › Quantizar saltos da música vale durante a reprodução)."
 "Jump to the next song marker (Quantize song jumps while playing)" = "Saltar para o próximo marcador da música (Quantizar saltos da música durante a reprodução)"
 "Jump to the previous song marker" = "Saltar para o marcador anterior da música"
-"Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [RMB] action, rename, delete" = "Marcador: [LMB] saltar até ele (tocando: no próximo passo de Quantizar saltos da música)  [RMB] ação, renomear, excluir"
 # Round 165g: Fruity Mute 2, Fruity Big Clock, Tuner, Fruity HTML NoteBook
 "MUTE" = "MUDO"
 "CHANNEL" = "CANAL"
@@ -6454,3 +6451,11 @@ countries: br
 "Mixer presets (FL)" = "Presets do mixer (FL)"
 "This file is not a mixer track state LYNX SHARE can read." = "Este arquivo não é um estado de faixa do mixer que o LYNX SHARE consiga ler."
 "Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "Preset do mixer: [2xLMB] carregar nas faixas selecionadas do mixer  arrastar para uma faixa do mixer (para o espaço vazio do mixer: uma faixa nova)"
+# round 168t: FL's ruler gestures, the rack's built-in views, the windows tip
+"Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag: zoom  [RMB] click: menu  [Alt] no snap" = "Régua: [LMB] posição da música  [RMB] ou [Ctrl][LMB] ou [2xLMB] arrastar: seleção de tempo (loop)  [Shift][LMB] arrastar: move  [Ctrl][RMB] arrastar: zoom  [RMB] clique: menu  [Alt] sem grade"
+"Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] zoom  [Shift][Wheel] scroll" = "Régua: [LMB] posição  [Alt] sem grade  [Ctrl][LMB], [RMB] ou [2xLMB] arrastar seleciona as notas num trecho  [Ctrl][Wheel] zoom  [Shift][Wheel] rolar"
+"Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [Ctrl][LMB] select up to the next marker  [RMB] action, rename, delete" = "Marcador: [LMB] saltar até ele (tocando: no próximo passo de Quantizar saltos da música)  [Ctrl][LMB] seleciona até o próximo marcador  [RMB] ação, renomear, excluir"
+"Moving the time selection  [Alt] no snap" = "Movendo a seleção de tempo  [Alt] sem grade"
+"Unsorted" = "Sem grupo"
+"Audio clips" = "Clipes de áudio"
+"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (the buttons at the left of the toolbar; again: hide)" = "Janelas: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Navegador  (os botões à esquerda da barra; de novo: esconde)"

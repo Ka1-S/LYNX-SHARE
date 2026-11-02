@@ -64,6 +64,7 @@ TEST (sel168t_mac_key_names)
     CHECK (keyNames ("Ctrl+Alt+Z", Os::mac) == cmd + "+" + opt + "+Z");
     CHECK (keyNames ("Ctrl", Os::mac) == cmd); // a hint key cap
     CHECK (keyNames ("Shift", Os::mac) == "Shift");
+    CHECK (keyNames ("[Strg][LMB] Ziehen", Os::mac) == "[" + cmd + "][LMB] Ziehen");
     CHECK (keyNames ("[Ctrl] drag: select", Os::mac) == "[" + cmd + "] drag: select");
     // whole words only
     CHECK (keyNames ("Alternate Control Ctrls Salt", Os::mac) == "Alternate Control Ctrls Salt");

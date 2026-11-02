@@ -70,8 +70,8 @@ constexpr Fl map (const Raw& r, Os os) noexcept
 }
 
 // Hint / shortcut texts are written with Windows key names ("Ctrl+drag", "[Ctrl]", "Ctrl+B", "Alt"). On macOS they
-// show the Mac keys FL for Mac uses: Ctrl -> ⌘ (Cmd), Alt -> ⌥ (Opt). Only whole words are replaced ("Ctrl",
-// "Alt"; not "Alternate" or "Control"), in any language (key names are not translated). Other platforms: unchanged.
+// show the Mac keys FL for Mac uses: Ctrl -> ⌘ (Cmd), Alt -> ⌥ (Opt). Only whole words are replaced ("Ctrl" and the
+// German "Strg", "Alt"; not "Alternate" or "Control"), after translation. Other platforms: unchanged.
 inline std::string keyNames (const std::string& text, Os os)
 {
     if (os != Os::mac)
@@ -89,7 +89,7 @@ inline std::string keyNames (const std::string& text, Os os)
         auto matches = [&] (const char* word, std::size_t n) {
             return text.compare (i, n, word) == 0 && ! isWordChar (before) && (i + n >= text.size() || ! isWordChar (text[i + n]));
         };
-        if (matches ("Ctrl", 4))
+        if (matches ("Ctrl", 4) || matches ("Strg", 4)) // "Strg": the German tables' Ctrl
         {
             out += cmd;
             i += 4;
