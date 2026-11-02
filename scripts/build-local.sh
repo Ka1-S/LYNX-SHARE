@@ -3,9 +3,6 @@
 # Uses $CXX if set; otherwise tries Zig in ~/opt, then g++/clang++.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-# tests/tests.cpp is one big translation unit: at -O2 clang (zig 0.13's 18.1) needs more than the default 8 MB stack
-# for it (a segfault, exit 139 / abort 134, with no message). Raise the soft limit (no root needed) when the hard limit allows.
-ulimit -s unlimited 2>/dev/null || ulimit -s "$(ulimit -H -s)" 2>/dev/null || true
 
 if [[ -z "${CXX:-}" ]]; then
     if [[ -x "$HOME/opt/zig-linux-x86_64-0.13.0/zig" ]]; then
@@ -27,6 +24,8 @@ CORE="$CORE src/core/NoteTools.cpp src/core/PianoRollTools.cpp src/core/EventEdi
 CORE="$CORE src/core/LoopStarter.cpp"
 # start-up sound (procedural)
 CORE="$CORE src/core/StartupSound.cpp"
+# speech synthesizer: .speech files, LYNX voice (round 168b)
+CORE="$CORE src/core/Speech.cpp src/core/SpeechRules.cpp"
 # FL's 3x Osc engine (REA round 47)
 CORE="$CORE src/core/ThreeOsc.cpp"
 # FL Studio integration: plugin database and sample relocation (read-only)
@@ -71,7 +70,7 @@ CORE="$CORE src/core/VoiceTools.cpp"
 CORE="$CORE src/core/MidiControls.cpp src/core/MidiOut.cpp src/core/FormulaController.cpp"
 CORE="$CORE src/core/VoiceShift.cpp"
 # FL engines usable in native projects (round 142, issue #5)
-CORE="$CORE src/core/NativeEngines.cpp"
+CORE="$CORE src/core/NativeEngines.cpp src/core/LynxBanks.cpp src/core/ModelParams.cpp src/core/ToxicBank.cpp src/core/PoiZoneBank.cpp"
 # FL's Layer channel and the round 164 controllers
 CORE="$CORE src/core/Layer.cpp src/core/XyController.cpp src/core/FlCurve.cpp src/core/ControlSurface.cpp src/core/VoltageController.cpp"
 # crash / freeze reports: consent, anonymiser, report JSON, GitHub issue URL (round 159)
@@ -114,9 +113,7 @@ mkdir -p build-local/pocketpy
 obj=build-local/pocketpy/pocketpy.o
 [[ -f "$obj" && "$obj" -nt third_party/pocketpy/pocketpy.c && "$obj" -nt third_party/pocketpy/pocketpy.h ]] || $CC -c -O2 -w -std=c11 -DPK_ENABLE_OS=0 -DPK_ENABLE_WATCHDOG=1 -Ithird_party/pocketpy third_party/pocketpy/pocketpy.c -o "$obj"
 WAVPACK="$WAVPACK $obj"
-# (tests.cpp alone first: zig compiles a many-file command on worker threads whose stack the ulimit above can't raise)
-$CXX $FLAGS -c tests/tests.cpp -o build-local/tests.o 2> >(grep -v 'glibc version' >&2)
-$CXX $FLAGS $CORE $WAVPACK build-local/tests.o -o build-local/lynx_tests 2> >(grep -v 'glibc version' >&2)
+$CXX $FLAGS $CORE $WAVPACK tests/tests.cpp -o build-local/lynx_tests 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/flp/Flp.cpp tools/flpdump.cpp -o build-local/flpdump 2> >(grep -v 'glibc version' >&2)
 
 $CXX $FLAGS $CORE $WAVPACK tools/renderwav.cpp -o build-local/renderwav 2> >(grep -v 'glibc version' >&2)
@@ -136,6 +133,7 @@ $CXX $FLAGS src/core/Dx10.cpp tools/dx10render.cpp -o build-local/dx10render 2> 
 $CXX $FLAGS src/core/Kepler.cpp src/core/IldspMath.cpp tools/keplerrender.cpp -o build-local/keplerrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/TransistorBass.cpp tools/tbassrender.cpp -o build-local/tbassrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/PoiZone.cpp tools/poizonerender.cpp -o build-local/poizonerender 2> >(grep -v 'glibc version' >&2)
+$CXX $FLAGS src/core/Toxic.cpp src/core/ToxicFx.cpp src/core/PoiZone.cpp src/core/LynxBanks.cpp src/core/ToxicBank.cpp src/core/PoiZoneBank.cpp tools/bankrender.cpp -o build-local/bankrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/FruityDelay.cpp tools/fdelayrender.cpp -o build-local/fdelayrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS $CORE $WAVPACK tools/distructorrender.cpp -o build-local/distructorrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/ThreeOsc.cpp tools/threeoscrender.cpp -o build-local/threeoscrender 2> >(grep -v 'glibc version' >&2)
