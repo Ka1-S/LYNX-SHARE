@@ -6885,6 +6885,56 @@ TEST (workflow_send_channels_to_free_inserts)
     CHECK (added.size() == 1 && added[0] == 2 && full.mixer.size() == 3 && full.channels[1].mixerTrack == 2);
 }
 
+TEST (workflow_add_channel_routed)
+{
+    auto song = lynx::Song::makeDefault();
+    const auto count = (int) song.channels.size();
+    const auto inserts = song.mixer.size();
+    lynx::ChannelDef c;
+    c.mixerTrack = 7; // what the generator came with doesn't count
+    const auto last = (int) song.mixer.size() - 1;
+
+    CHECK (lynx::addChannelRouted (song, c, last) == count && song.channels.back().mixerTrack == last);
+    CHECK (lynx::addChannelRouted (song, c, 0) == count + 1 && song.channels.back().mixerTrack == 0); // Master
+    CHECK (song.mixer.size() == inserts); // the drop's insert is used as it is, nothing is claimed
+
+    // an insert that doesn't exist claims a free one, as a plain new channel does
+    auto expected = song;
+    const auto free = expected.claimFreeInsert();
+    CHECK (lynx::addChannelRouted (song, c, 9999) == count + 2 && song.channels.back().mixerTrack == free);
+    auto plain = expected;
+    CHECK (lynx::addChannelRouted (plain, c) == count + 2 && plain.channels.back().mixerTrack == expected.claimFreeInsert());
+}
+
+TEST (pr28_generator_dropped_on_an_insert_names_it_like_fl)
+{
+    // FL 2026 (round 167u, shots fl3-fl10): 3x Osc dropped on Insert 3, Master and Insert 5's slot 2, then FLEX on
+    // Insert 3: channels "3x Osc", "3x Osc #2", "3x Osc #3", "FLEX"; Insert 3 / Master / Insert 5 take the first
+    // three names, Insert 3 keeps "3x Osc" when FLEX comes
+    auto song = lynx::Song::makeDefault();
+    song.channels.clear();
+    while (song.mixer.size() < 6)
+        song.mixer.emplace_back().name = "Insert " + std::to_string (song.mixer.size());
+    song.mixer[4].name = "Drums"; // a name the user gave
+    lynx::ChannelDef osc;
+    osc.name = "3x Osc";
+    lynx::ChannelDef flex;
+    flex.name = "FLEX";
+
+    CHECK (lynx::addChannelRouted (song, osc, 3) == 0 && song.channels[0].name == "3x Osc" && song.mixer[3].name == "3x Osc");
+    CHECK (lynx::addChannelRouted (song, osc, 0) == 1 && song.channels[1].name == "3x Osc #2" && song.channels[1].mixerTrack == 0
+           && song.mixer[0].name == "3x Osc #2");
+    CHECK (lynx::addChannelRouted (song, osc, 5) == 2 && song.channels[2].name == "3x Osc #3" && song.mixer[5].name == "3x Osc #3");
+    CHECK (lynx::addChannelRouted (song, flex, 3) == 3 && song.channels[3].name == "FLEX" && song.channels[3].mixerTrack == 3
+           && song.mixer[3].name == "3x Osc");
+    CHECK (lynx::addChannelRouted (song, flex, 4) == 4 && song.channels[4].name == "FLEX #2" && song.mixer[4].name == "Drums");
+
+    // a plain new channel (no insert given) keeps its name and doesn't rename anything, as before
+    const auto mixerBefore = song.mixer.size();
+    CHECK (lynx::addChannelRouted (song, osc) == 5 && song.channels[5].name == "3x Osc");
+    CHECK (song.mixer.size() >= mixerBefore && song.mixer[3].name == "3x Osc" && song.mixer[0].name == "3x Osc #2");
+}
+
 TEST (workflow_palette_random_colour)
 {
     const auto& palette = lynx::lynxPalette();
@@ -16879,4 +16929,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Transporter167fTests.inc"
 #include "Polish167pTests.inc"
 #include "Zoom167tTests.inc"
+#include "FirstRun167vTests.inc"
+#include "LoopStarter168bTests.inc"
+#include "Rec168kTests.inc"
+#include "MixPre167qTests.inc"
 #include "GrossBeat168mTests.inc"
