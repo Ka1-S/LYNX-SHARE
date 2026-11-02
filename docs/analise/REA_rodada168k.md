@@ -76,7 +76,7 @@ still down (shots `C:\Users\kauan\lynx-test\rec168k\u0–u2.png`):
   `AudioEngine::songPlayheadTicks()` (folds only when the song really loops: not during a linear take, a bounce, or
   with a loop region), used by the toolbar counter / position bar, the Playlist playhead / centre / position, the
   automation and event editors' cursors.
-- the typing keyboard was off in the fresh profile (the first attempt recorded nothing: Ctrl+T had toggled it off).
+- the first attempt recorded nothing: the typing keyboard was off at that point (switched on with its toolbar button).
 
 ## Where I stopped
 
