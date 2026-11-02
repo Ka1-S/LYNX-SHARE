@@ -66,6 +66,20 @@ struct FlAccess
 std::vector<std::string> presetCandidates (const std::string& presetFolder, bool generator, const FlAccess& fl);
 std::string defaultPresetPath (const std::string& presetFolder, bool generator, const FlAccess& fl);
 
+// A channel of engine `kind` from one of its plugin's preset files (.fst, or Toxic's .tbio, GMS' .gmsynth, Morphine's
+// .mrp), named after the engine; nullopt when the file is not for this engine or LYNX can't read it (the preset arrows
+// of a channel window, round 167o).
+std::optional<ChannelDef> channelFromPresetFile (InstrumentKind kind, const std::string& path, const FlAccess& fl);
+
+// The folder under Plugin presets\Generators that holds a channel kind's presets ("" = none): the engines above and
+// MIDI Out (the ◀ ▶ arrows of a channel window, round 167o).
+std::string presetFolderOf (InstrumentKind kind);
+
+// Channel `current` with preset file `path` loaded, as FL does it from the ◀ ▶ arrows: the instrument's state comes
+// from the preset (MIDI Out keeps its channel and port), the channel keeps its own settings (mixer insert, volume, pan,
+// Misc tab, colour...) and takes the preset's name. nullopt when the file can't be read for that kind.
+std::optional<ChannelDef> withPreset (const ChannelDef& current, const std::string& path, const std::string& presetName, const FlAccess& fl);
+
 // Whether a new instance can be made on this PC
 bool available (const InstrumentEngine& e, const FlAccess& fl);
 bool available (const EffectEngine& e, const FlAccess& fl);

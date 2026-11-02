@@ -1107,6 +1107,8 @@ public:
             for (auto& v : voices)
                 v.active = false;
             lastFont = font;
+            lastSwitch = font != nullptr ? font->switchDefault : -1; // (an SFZ's sw_default)
+            seqCounters.fill (0);
         }
         if (settings.update())
             params = settings.current().p;
@@ -1125,7 +1127,10 @@ public:
             if (e.on)
                 startNote (*font, e.key, e.velocity, e.pan, e.cents);
             else
+            {
                 stopNote (e.key);
+                startReleaseRegions (*font, e.key);
+            }
         }
         pending.clear();
 
@@ -1272,6 +1277,10 @@ private:
         const auto vel = std::clamp ((int) std::lround (velocity01 * 127.0f), 1, 127);
         const auto mode = (int) param (pProgramMode);
         const auto drums = mode == 2 || (mode == 0 && preset.bank == 128);
+        noteVelocity[(std::size_t) std::clamp (key, 0, 127)] = (std::uint8_t) vel;
+        if (font.switchLo >= 0 && transposed >= font.switchLo && transposed <= font.switchHi)
+            lastSwitch = transposed; // an SFZ key switch (sw_last)
+        const auto random = nextRandom(); // one per note: SFZ's lorand / hirand
 
         // exclusive classes of this note's regions stop the voices of the same preset with that class
         for (const auto& r : preset.regions)
@@ -1290,9 +1299,12 @@ private:
             }
 
         const auto limit = std::min ((int) param (pPolyphony), polyLimit.load (std::memory_order_relaxed) > 0 ? polyLimit.load (std::memory_order_relaxed) : maxVoices);
-        for (const auto& r : preset.regions)
+        for (std::size_t ri = 0; ri < preset.regions.size(); ++ri)
         {
+            const auto& r = preset.regions[ri];
             if (transposed < r.loKey || transposed > r.hiKey || vel < r.loVel || vel > r.hiVel)
+                continue;
+            if (r.sfz && ! sfzRegionPlays (r, ri, random, false))
                 continue;
             // polyphony: the oldest living voice makes room
             int living = 0;
@@ -1316,14 +1328,78 @@ private:
         }
     }
 
+    // --- SFZ (core/Sfz.h, round 167o) -------------------------------------------------------------------------------
+
+    std::uint32_t nextRandom() noexcept
+    {
+        rng ^= rng << 13, rng ^= rng >> 17, rng ^= rng << 5;
+        return rng;
+    }
+
+    // Whether an SFZ region that matches the key and velocity plays now: its trigger, key switch, random range and
+    // round robin (the counter only moves for the notes that reach it, as sfizz does).
+    bool sfzRegionPlays (const Region& r, std::size_t index, std::uint32_t random, bool atRelease) noexcept
+    {
+        if (r.releaseTrigger != atRelease)
+            return false;
+        if (r.switchLast >= 0 && r.switchLast != lastSwitch)
+            return false;
+        const auto x = (float) (random >> 8) * (1.0f / 16777216.0f);
+        if (x < r.loRand || (x >= r.hiRand && r.hiRand < 1.0f))
+            return false;
+        if (r.seqLength > 1)
+        {
+            auto& counter = seqCounters[index % seqCounters.size()];
+            const auto at = (int) (counter++ % (std::uint32_t) r.seqLength);
+            if (at != r.seqPosition - 1)
+                return false;
+        }
+        return true;
+    }
+
+    // trigger=release regions: they start when the key is let go, with the velocity it was played with
+    void startReleaseRegions (const Font& font, int key) noexcept
+    {
+        const auto presetIndex = currentPreset (font);
+        if (presetIndex < 0)
+            return;
+        const auto& preset = font.presets[(std::size_t) presetIndex];
+        const auto transposed = std::clamp (key + (int) param (pTranspose), 0, 127);
+        const auto vel = std::max (1, (int) noteVelocity[(std::size_t) std::clamp (key, 0, 127)]);
+        const auto random = nextRandom();
+        for (std::size_t ri = 0; ri < preset.regions.size(); ++ri)
+        {
+            const auto& r = preset.regions[ri];
+            if (! r.releaseTrigger || transposed < r.loKey || transposed > r.hiKey || vel < r.loVel || vel > r.hiVel)
+                continue;
+            if (! sfzRegionPlays (r, ri, random, true))
+                continue;
+            auto* v = freeVoice();
+            if (v == nullptr)
+                return;
+            startVoice (*v, r, presetIndex, key, transposed, vel, 0.0f, 0.0f, false);
+            v->oneShot = true;    // (the key is already up: it plays its sample out, a later note-off doesn't stop it)
+            v->looping = false;
+        }
+    }
+
     void startVoice (Voice& v, const Region& r, int presetIndex, int key, int playedKey, int vel, float notePan, float noteCents, bool drums) noexcept
     {
+        if (r.sfz && r.group != 0) // SFZ: this region's group stops the voices whose off_by is that group
+            for (auto& other : voices)
+                if (other.active && ! other.dying && other.region != nullptr && other.region->sfz && other.region->offBy == r.group)
+                {
+                    if (other.region->offFast)
+                        kill (other, 0.006f);
+                    else
+                        release (other);
+                }
         v = Voice {};
         v.active = true;
         v.region = &r;
         v.key = key, v.velocity = vel, v.presetIndex = presetIndex;
         v.age = ++clock;
-        v.oneShot = drums;
+        v.oneShot = drums || r.oneShot;
         v.pos = r.start;
         const auto loops = param (pUseLoops) >= 0.5f;
         v.looping = loops && r.loop != LoopMode::none;
@@ -1349,7 +1425,9 @@ private:
             v.vibLfo.start (r.delayVibLfo, 8.176f * centsToRatio ((float) r.freqVibLfo));
 
         // level: attenuation (EMU's 0.4 scaling of centibels, as SoundFont players do), velocity, the region's pan
-        v.gainBase = dbToGain (-0.04f * r.attenuation) * velocityGain (vel);
+        const auto sfzVelocity = r.sfz && (int) param (pVelocityCurve) == 0; // SFZ's amp_veltrack curve, unless overridden
+        const auto v01 = (float) vel / 127.0f;
+        v.gainBase = dbToGain (-0.04f * r.attenuation) * (sfzVelocity ? 1.0f - r.ampVelTrack + r.ampVelTrack * v01 * v01 : velocityGain (vel));
         const auto pan = std::clamp (r.pan * 2.0f + notePan, -1.0f, 1.0f);
         const auto angle = (pan + 1.0f) * 0.25f * 3.14159265f;
         v.panL = std::cos (angle) * 1.41421356f, v.panR = std::sin (angle) * 1.41421356f;
@@ -1540,6 +1618,11 @@ private:
     float rate = 44100;
     std::array<Voice, maxVoices> voices {};
     std::uint64_t clock = 0;
+    // SFZ state: the last key switch, round-robin counters (per region), the velocity each key was played with
+    int lastSwitch = -1;
+    std::array<std::uint32_t, 4096> seqCounters {};
+    std::array<std::uint8_t, 128> noteVelocity {};
+    std::uint32_t rng = 0x9E3779B9u;
     Pending pending;
     float nextPan = 0, nextCents = 0;
     SettingsBuffer settings;

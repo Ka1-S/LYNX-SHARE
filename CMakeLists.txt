@@ -179,6 +179,8 @@ target_include_directories(lynx_core PUBLIC src third_party/sse2neon)
 # workflow shell (key map, workspace layout, rack operations)
 target_sources(lynx_core PRIVATE
     src/core/KeyMap.cpp
+    src/core/PresetCycle.cpp
+    src/core/Sfz.cpp
     src/core/Workspace.cpp
     src/core/RackOps.cpp
     src/core/ChannelMiscFx.cpp
