@@ -892,8 +892,8 @@ function renderPlugins(){
   const shown = plOpen ? list : list.filter(p => list.filter(q => q[2]===p[2]).indexOf(p) < 10);
   const more = $('#plAll'); more.style.display = shown.length < list.length ? '' : 'none';
   more.textContent = t('pl.showAll', list.length);
-  $('#plGrid').innerHTML = shown.map(([n,fl,t,s]) =>
-    `<div class="pl" title="${esc(t(st[s]))}"><i class="st ${s}"></i><div class="tx"><b>${esc(n)}</b><small>${t('pl.insp', esc(fl))}</small></div><span class="k">${t==='g'?'GEN':'FX'}</span></div>`).join('');
+  $('#plGrid').innerHTML = shown.map(([n,fl,ty,s]) =>
+    `<div class="pl" title="${esc(t(st[s]))}"><i class="st ${s}"></i><div class="tx"><b>${esc(n)}</b><small>${t('pl.insp', esc(fl))}</small></div><span class="k">${ty==='g'?'GEN':'FX'}</span></div>`).join('');
 }
 $('#plAll').onclick = () => { plOpen = true; renderPlugins(); };
 $$('.pl-f').forEach(b => b.onclick = () => { plFilter = b.dataset.f; $$('.pl-f').forEach(x => x.classList.toggle('on', x===b)); renderPlugins(); });
