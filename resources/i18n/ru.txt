@@ -6321,3 +6321,8 @@ countries: ru by kz
 "Shaker" = "Шейкер"
 "Tom" = "Том"
 "Hand drums" = "Ручные барабаны"
+"Add from state" = "Добавить из состояния"
+"Mixer presets" = "Пресеты микшера"
+"Mixer presets (FL)" = "Пресеты микшера (FL)"
+"This file is not a mixer track state LYNX SHARE can read." = "Этот файл не является состоянием дорожки микшера, которое может прочитать LYNX SHARE."
+"Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "Пресет микшера: [2xLMB] загрузить на выбранные дорожки микшера  перетащить на дорожку микшера (на пустое место микшера: новая дорожка)"
