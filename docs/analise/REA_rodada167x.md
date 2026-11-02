@@ -7,9 +7,16 @@ for now. Landed with his two commits unchanged and ours on top, after the lightn
 
 ## Where I stopped
 
-- Done: review, FL REA, fixes, measurements and the Windows GUI session (§4); merged origin/main (ee1c8b8e, i18n
-  tables regenerated). Release workflow on wip/pr31-review (run 41461808932, aa07837f): all
-  green (exe, self-test, zip, NSIS, MSIX installed with -DependencyPath VCLibs and self-tested, AppImage, dmg). Next: land with land.sh (feature/pr31), reply drafts in coord/replies-0.1.22.md.
+- PAUSED 2026-11-02 16:18 (coordinator: round 168w speeds up the pipeline). Nothing of mine is running or queued.
+- Done: review, FL REA, fixes (e2570b84, 9383b96a, abfa1d49, aa07837f), measurements + Windows GUI session (§4),
+  release workflow green on wip/pr31-review (run 41461808932), notes bullet + replies (#31, #27) in
+  coord/notes-0.1.22.md / replies-0.1.22.md. Branch merged with origin/main 8a788038 (ba90c23d, i18n regenerated).
+- Not landed yet: the merge-lock queue was long; my waiting land.sh was cancelled at the pause.
+- Exact next step on RESUME: `git fetch`; merge origin/main into pr31-review (i18n conflicts expected if design168n /
+  proll168g / gross168m landed: keep both sides of resources/i18n/*.txt, `git checkout --ours` the generated .h, then
+  `python3 tools/make_i18n.py && python3 tools/i18n_tool.py pending`, lint 0 problems); `git branch -f feature/pr31
+  HEAD`; push wip; then `BUILDSLOT_PRIO=1 flock ~/projetos/lynx/.git/lynx-merge.lock tmp/coord/land.sh pr31`.
+  Contributor commits f51f9dad / 11d4570b must stay ancestors (checked).
 
 ## 1. What FL 2026 does (FLEngine_x64.dll of FL 2026, md5 fce4ea55…, clean-room: behaviour only)
 
