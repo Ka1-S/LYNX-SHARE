@@ -96,7 +96,28 @@ sequencer").
   click. Test issue32_the_clicked_playlist_comes_to_front_like_fl. Plugin editor windows stay above the panels (owned
   top-level windows, as FL's plugin windows can be).
 
+### Contributors: PR #37, PR #39 (HighTecno), issues #36 and #38
+
+- PR #37 (7cf40fb2) and PR #39 (92a28224) merged byte-identical into feature/issue32s (their authorship).
+- #37 on top of the instance tags: `editSongStructural()` and its call sites stay (live states copied into the Song
+  first, so the undo step has them); its clearing of duplicate plugin ids in lastPublishedShape went (it forced a
+  rebuild of every duplicate: new instance + teardown of the old, the #36 path). Tag matching swaps duplicates.
+- #39 reconciled with FL's TRACK digiwheel: its `ValueSpec::wheelPerNotch` replaces round 168s' `stepsPerNotch`;
+  `ui::digitWheel` sets it to 1 and 7.5 px of drag per step (FL c_f17: 30 px = 4); one wheel step per notch (the
+  per-platform notch count makes a click one notch, a multi-notch event moves that many).
+- #36 (Presswerk segfault in `~VST3PluginInstance` from `~RackState` inside the engine's Timer callback, after a slot
+  move created a new instance): a move no longer creates or destroys the plugin (tags). Retired racks go through
+  `SnapshotExchange::dispose` to `AudioEngine::RackDisposer` (AsyncUpdater: freed from a message of its own, app only;
+  flushed in ~AudioEngine before the plugin hosts go); the orphaned plugin windows (last owner of a removed plugin) are
+  closed from a callAsync, not inside the reaper's timer callback (editor first, then the plugin). Black-box: Presswerk
+  not available here. Tests: issue32_moving_a_plugin_in_the_effect_chain_keeps_its_instance (no destruction, duplicate
+  swap), issue36_retired_racks_go_to_the_owner_not_freed_in_the_collecting_callback.
+- #38: FL uses both words (TRACK knob + "Target mixer track", "Insert N" strips, "Route to this track"): kept, reply drafted.
+
 ## Where I stopped
+
+- RESUME (coordinator): PRs #37/#39 merged + reconciled, #36 teardown, #38 reply; origin/main aae68291 merged;
+  build-local + Windows build queued. Next: tests 0 failures, GUI check, push feature/issue32s, tell coordinator "ready <hash>" (no land.sh).
 
 - 16:40 PAUSED (coordinator, round 168w pipeline). State: all 8 points coded; tests/Issue32Tests.inc 7 tests pass; the
   full suite passed except the embedded i18n tables (regenerated since). Notes are in coord/notes-0.1.23.md and the #32 reply
