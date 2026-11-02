@@ -6355,5 +6355,3 @@ countries: id
 "MODULE 2" = "MODUL 2"
 "MODULE 3" = "MODUL 3"
 "MODULE 4" = "MODUL 4"
-"Removes the DC offset" = "Menghapus offset DC"
-"Flips the polarity of a side" = "Membalik polaritas satu sisi"

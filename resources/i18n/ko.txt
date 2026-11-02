@@ -6355,5 +6355,3 @@ countries: kr
 "MODULE 2" = "모듈 2"
 "MODULE 3" = "모듈 3"
 "MODULE 4" = "모듈 4"
-"Removes the DC offset" = "DC 오프셋 제거"
-"Flips the polarity of a side" = "한쪽의 극성을 뒤집습니다"

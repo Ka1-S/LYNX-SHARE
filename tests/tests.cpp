@@ -16102,9 +16102,11 @@ TEST (plugin_layouts_name_real_parameters)
         const auto& l = plugui::layoutFor (kind);
         const auto& info = effectInfo (kind);
         CHECK (plugui::hasFlLayout (kind));
-        if (! (l.width > 100 && l.height > 60))
+        // FL's own size wins for its one-cell editors (Fruity Center, Fruity Phase Inverter: 170 x 55)
+        const auto minHeight = kind == EffectKind::flCenter || kind == EffectKind::flPhaseInverter ? 50 : 60;
+        if (! (l.width > 100 && l.height > minHeight))
             std::printf ("  %s: %d x %d\n", info.name, l.width, l.height);
-        CHECK (l.width > 100 && l.height > 60);
+        CHECK (l.width > 100 && l.height > minHeight);
         std::vector<bool> placed ((std::size_t) plugui::paramCount (kind), false);
 
         for (const auto& item : l.items)

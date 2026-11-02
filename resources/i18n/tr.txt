@@ -6355,5 +6355,3 @@ countries: tr
 "MODULE 2" = "MODÜL 2"
 "MODULE 3" = "MODÜL 3"
 "MODULE 4" = "MODÜL 4"
-"Removes the DC offset" = "DC ofsetini kaldırır"
-"Flips the polarity of a side" = "Bir tarafın polaritesini çevirir"

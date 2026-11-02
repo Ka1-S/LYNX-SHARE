@@ -169,8 +169,8 @@ The existing `plugin_layouts_name_real_parameters` now also covers the 13 FL kin
   → `=#0.5`; Lo-fi rates set to the values the engine shows (44100 / n Hz); the bank render test now runs the song
   position (Rhythmic envelope pumps were silent at position 0); the Peak Controller test's LFO base is 0 (FL's LFO
   adds base … base + amount); response test sets Bass Boost / Fast LP explicitly and prints the measured dB;
-  `ownLayoutKinds` count 24 → 38; Center and Phase Inverter cells get a 72 px body with a one-line description
-  (the generic layout test needs > 60 px); the generic layout test now prints which item leaves the body (one
+  `ownLayoutKinds` count 24 → 38; Center and Phase Inverter keep FL's 170 × 55 (coordinator: FL's size wins) — the
+  generic layout test's minimum height has a per-editor exemption for FL's one-cell editors; the generic layout test now prints which item leaves the body (one
   item of the 13 FL kinds did — find it on the next run); the DesignDisplays compile error.
 - Exact next step on RESUME: core tests (build-local with FL Data) → fix the remaining failures (the item outside the
   body, check the Bass Boost / Fast LP dB lines) → Windows build → before / after shots (`LYNX.exe --design168rshot`,

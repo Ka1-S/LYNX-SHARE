@@ -6355,5 +6355,3 @@ countries: de at ch li lu
 "MODULE 2" = "MODUL 2"
 "MODULE 3" = "MODUL 3"
 "MODULE 4" = "MODUL 4"
-"Removes the DC offset" = "Entfernt den DC-Versatz"
-"Flips the polarity of a side" = "Kehrt die Polarität einer Seite um"

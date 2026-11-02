@@ -6355,5 +6355,3 @@ countries: nl be
 "MODULE 2" = "MODULE 2"
 "MODULE 3" = "MODULE 3"
 "MODULE 4" = "MODULE 4"
-"Removes the DC offset" = "Verwijdert de DC-offset"
-"Flips the polarity of a side" = "Draait de polariteit van één kant om"

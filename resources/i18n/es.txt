@@ -6355,5 +6355,3 @@ countries: es mx ar co cl pe ve
 "MODULE 2" = "MÓDULO 2"
 "MODULE 3" = "MÓDULO 3"
 "MODULE 4" = "MÓDULO 4"
-"Removes the DC offset" = "Elimina el offset DC"
-"Flips the polarity of a side" = "Invierte la polaridad de un lado"

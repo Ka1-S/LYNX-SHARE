@@ -6355,5 +6355,3 @@ countries: fr be ch ca lu
 "MODULE 2" = "MODULE 2"
 "MODULE 3" = "MODULE 3"
 "MODULE 4" = "MODULE 4"
-"Removes the DC offset" = "Supprime le décalage DC"
-"Flips the polarity of a side" = "Inverse la polarité d'un côté"
