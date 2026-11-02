@@ -65,36 +65,62 @@ else
     echo "warning: cmake not found; JUCE's drag & drop fixes (cmake/LynxPatchJuce.cmake) are not applied" >&2
 fi
 
-export ZIG OUT JUCE_DIR TARGET GUI_BASICS_SRC
+# Shared object cache (2026-11-02): JUCE and the third-party C libraries are the same in every worktree, so each object
+# is compiled once per key into $LYNX_OBJ_CACHE (default ~/.cache/lynx-objcache) and copied from there by every other
+# build. The key hashes the zig version, the target, the whole compile command (with $OUT normalised), JuceConfig.h,
+# mingw_compat.h, the patched juce_gui_basics and the third-party sources. Concurrent builds: one compiles a key under
+# its flock, the others wait and copy; objects enter the cache by an atomic rename. LYNX_OBJ_CACHE=off disables it.
+OBJ_CACHE="${LYNX_OBJ_CACHE:-$HOME/.cache/lynx-objcache}"
+ZIG_VERSION="$("$ZIG" version)"
+tree_hash() { (cd "$1" && find . -type f | LC_ALL=C sort | xargs -d '\n' sha256sum | sha256sum | cut -c1-64); }
+# cached <obj> <key material...> -- <compile command writing <obj>...>
+cached() {
+    local obj="$1" parts=()
+    shift
+    while [[ "$1" != -- ]]; do parts+=("$1"); shift; done
+    shift
+    if [[ "$OBJ_CACHE" == off ]]; then "$@"; return; fi
+    local cmd="$*" key name
+    key="$(printf '%s\n' "$ZIG_VERSION" "$TARGET" "${parts[@]}" "${cmd//$OUT/@OUT@}" | sha256sum | cut -c1-32)"
+    name="$(basename "$obj" .o)-$key"
+    mkdir -p "$OBJ_CACHE"
+    if [[ -f "$OBJ_CACHE/$name.o" ]]; then cp "$OBJ_CACHE/$name.o" "$obj.tmp$$" && mv "$obj.tmp$$" "$obj"; return; fi
+    (
+        flock 9
+        if [[ -f "$OBJ_CACHE/$name.o" ]]; then cp "$OBJ_CACHE/$name.o" "$obj.tmp$$" && mv "$obj.tmp$$" "$obj"; exit; fi
+        "$@" || exit
+        cp "$obj" "$OBJ_CACHE/.$name.$$" && mv "$OBJ_CACHE/.$name.$$" "$OBJ_CACHE/$name.o"
+    ) 9> "$OBJ_CACHE/$name.lock"
+}
+JUCE_KEY="$JUCE_DIR $(cat "$OUT/JuceConfig.h" cmake/mingw/mingw_compat.h "$OUT/shim/Dbghelp.h" "$JUCE_DIR/modules/juce_core/system/juce_StandardHeader.h" | sha256sum | cut -c1-64)"
+GUI_BASICS_KEY="$(tree_hash "$GUI_BASICS_SRC")"
+export ZIG OUT JUCE_DIR TARGET GUI_BASICS_SRC OBJ_CACHE ZIG_VERSION JUCE_KEY GUI_BASICS_KEY
+export -f cached
 export COMMON_STR="${COMMON[*]}"
 
 echo "Compiling JUCE modules (cached)..."
-for m in "${MODULES[@]}"; do echo "$m"; done | xargs -P "$JOBS" -I{} bash -c '
+# the modules and the extra units JUCE's CMake compiles along with them, in one parallel pool
+for m in "${MODULES[@]}" juce_core_CompilationTime juce_graphics_Harfbuzz juce_graphics_Sheenbidi; do echo "$m"; done | xargs -P "$JOBS" -I{} bash -c '
     m={}; obj="$OUT/juce/$m.o"
-    if [[ ! -f "$obj" || "$OUT/JuceConfig.h" -nt "$obj" ]]; then
+    if [[ ! -f "$obj" || ( "$OUT/JuceConfig.h" -nt "$obj" && "$m" != juce_graphics_Sheenbidi ) ]]; then
         echo "  JUCE $m"
         extra=""
         # JUCE ASIO uses MSVC __try/__except: clang accepts it with -fms-extensions, but on MinGW it does not catch
         # (a driver crashing while being opened/closed is not contained in this build; the MSVC build keeps the guard)
         [[ "$m" == juce_audio_devices ]] && extra="-fms-extensions -DJUCE_DONT_AUTOLINK_TO_WIN32_LIBRARIES=1"
         src="$JUCE_DIR/modules/$m/$m.cpp"
-        [[ "$m" == juce_gui_basics ]] && src="$GUI_BASICS_SRC/$m.cpp"
-        $ZIG c++ $COMMON_STR $extra -w -c "$src" -o "$obj"
+        key="$JUCE_KEY"
+        [[ "$m" == juce_gui_basics ]] && src="$GUI_BASICS_SRC/$m.cpp" && key="$JUCE_KEY $GUI_BASICS_KEY"
+        case "$m" in
+            juce_core_CompilationTime) src="$JUCE_DIR/modules/juce_core/$m.cpp" ;;
+            juce_graphics_Harfbuzz) src="$JUCE_DIR/modules/juce_graphics/$m.cpp" ;;
+        esac
+        if [[ "$m" == juce_graphics_Sheenbidi ]]; then
+            cached "$obj" "$JUCE_DIR" -- "$ZIG" cc -target "$TARGET" -O2 -w -DJUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1 -I"$JUCE_DIR/modules" -c "$JUCE_DIR/modules/juce_graphics/juce_graphics_Sheenbidi.c" -o "$obj"
+        else
+            cached "$obj" "$key" -- $ZIG c++ $COMMON_STR $extra -w -c "$src" -o "$obj"
+        fi
     fi'
-
-# Extra units that JUCE's CMake compiles along with the modules
-for f in juce_core/juce_core_CompilationTime.cpp juce_graphics/juce_graphics_Harfbuzz.cpp; do
-    obj="$OUT/juce/$(basename "$f" .cpp).o"
-    if [[ ! -f "$obj" || "$OUT/JuceConfig.h" -nt "$obj" ]]; then
-        echo "  JUCE $(basename "$f")"
-        "$ZIG" c++ $COMMON_STR -w -c "$JUCE_DIR/modules/$f" -o "$obj"
-    fi
-done
-obj="$OUT/juce/juce_graphics_Sheenbidi.o"
-if [[ ! -f "$obj" ]]; then
-    echo "  JUCE juce_graphics_Sheenbidi.c"
-    "$ZIG" cc -target "$TARGET" -O2 -w -DJUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1 -I"$JUCE_DIR/modules" -c "$JUCE_DIR/modules/juce_graphics/juce_graphics_Sheenbidi.c" -o "$obj"
-fi
 
 APP_SOURCES=(src/Main.cpp
              src/engine/AudioEngine.cpp src/engine/ChannelRackProcessor.cpp src/engine/Metronome.cpp
@@ -179,12 +205,14 @@ APP_SOURCES+=(src/core/VisualFx.cpp src/ui/VisualEditors.cpp)
 APP_SOURCES+=(src/core/FlExtraFx.cpp src/core/Scratcher.cpp src/core/Dvs.cpp src/core/Transmitter.cpp src/ui/FlExtraEditors.cpp src/core/VideoPlayer.cpp src/ui/VideoPlayerView.cpp)
 APP_SOURCES+=(src/core/VisualFx.cpp src/core/FruityDance.cpp src/ui/VisualEditors.cpp src/ui/VisualGl.cpp src/ui/DanceView.cpp)
 
+for lib in wavpack vorbis lame pocketpy; do declare "TP_KEY_$lib=$(tree_hash third_party/$lib)"; done
+
 echo "WavPack (decoder, C)..."
 mkdir -p "$OUT/wavpack"
 for f in third_party/wavpack/src/*.c; do
     obj="$OUT/wavpack/$(basename "$f" .c).o"
     if [[ ! -f "$obj" || "$f" -nt "$obj" ]]; then
-        "$ZIG" cc -target "$TARGET" -O2 -w -DHAVE___BUILTIN_CLZ=1 -Ithird_party/wavpack/include -Ithird_party/wavpack/src -c "$f" -o "$obj"
+        cached "$obj" "$TP_KEY_wavpack" -- "$ZIG" cc -target "$TARGET" -O2 -w -DHAVE___BUILTIN_CLZ=1 -Ithird_party/wavpack/include -Ithird_party/wavpack/src -c "$f" -o "$obj"
     fi
 done
 
@@ -194,7 +222,7 @@ for f in third_party/vorbis/src/*.c; do
     [[ "$(basename "$f")" == lookup.c ]] && continue # (included by lsp.c)
     obj="$OUT/vorbis/$(basename "$f" .c).o"
     if [[ ! -f "$obj" || "$f" -nt "$obj" ]]; then
-        "$ZIG" cc -target "$TARGET" -O2 -w -ffp-contract=off -include third_party/vorbis/include/lynx_vorbis_prefix.h -Ithird_party/vorbis/include -Ithird_party/vorbis/src -c "$f" -o "$obj"
+        cached "$obj" "$TP_KEY_vorbis" -- "$ZIG" cc -target "$TARGET" -O2 -w -ffp-contract=off -include third_party/vorbis/include/lynx_vorbis_prefix.h -Ithird_party/vorbis/include -Ithird_party/vorbis/src -c "$f" -o "$obj"
     fi
 done
 
@@ -203,7 +231,7 @@ mkdir -p "$OUT/lame"
 for f in third_party/lame/src/*.c; do
     obj="$OUT/lame/$(basename "$f" .c).o"
     if [[ ! -f "$obj" || "$f" -nt "$obj" ]]; then
-        "$ZIG" cc -target "$TARGET" -O2 -w -DHAVE_CONFIG_H -Ithird_party/lame/include -Ithird_party/lame/src -c "$f" -o "$obj"
+        cached "$obj" "$TP_KEY_lame" -- "$ZIG" cc -target "$TARGET" -O2 -w -DHAVE_CONFIG_H -Ithird_party/lame/include -Ithird_party/lame/src -c "$f" -o "$obj"
     fi
 done
 
@@ -211,7 +239,7 @@ echo "pocketpy (embedded Python, C)..."
 mkdir -p "$OUT/pocketpy"
 obj="$OUT/pocketpy/pocketpy.o"
 if [[ ! -f "$obj" || third_party/pocketpy/pocketpy.c -nt "$obj" || third_party/pocketpy/pocketpy.h -nt "$obj" ]]; then
-    "$ZIG" cc -target "$TARGET" -O2 -w -std=c11 -DPK_ENABLE_OS=0 -DPK_ENABLE_WATCHDOG=1 -Ithird_party/pocketpy -c third_party/pocketpy/pocketpy.c -o "$obj"
+    cached "$obj" "$TP_KEY_pocketpy" -- "$ZIG" cc -target "$TARGET" -O2 -w -std=c11 -DPK_ENABLE_OS=0 -DPK_ENABLE_WATCHDOG=1 -Ithird_party/pocketpy -c third_party/pocketpy/pocketpy.c -o "$obj"
 fi
 
 # the commit the build comes from (crash reports name it)
