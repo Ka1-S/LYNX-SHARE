@@ -50,6 +50,9 @@ tmp/r168p/dfm/<plugin>/TSynthEditorForm.dfm.txt). Only layout and control facts 
 ## Where I stopped
 - done: §1, layouts, tables, live automation, part selection, displays, banks designed and leveled by rendering
   (66 presets, 0 flagged; WAVs in /mnt/e/lynx-work/design168p/banks), translations; merged origin/wip/design168n
-  (with origin/main efb8344d) after the 2026-11-02 11:10 crash (worktree checked: clean).
-- in progress: tests build + Windows build (re-queued after the crash).
-- next: run tests, Windows before/after shots, notes, land in parts after 168n lands.
+  (with origin/main efb8344d) after the 2026-11-02 11:10 crash (worktree checked: clean). First Windows after-shots
+  reviewed: Drumaxx voice knobs over the sequencer, Drumpad's doubled Shape caption, Sakura's ratio stepper / comb slider /
+  Lo-cut caption overlaps and clipped effect switches fixed (c940e1b8); Sakura's Str2 ratio and delay sync are now
+  labelled menus (4x … 1/4x; Off, 1/32 … 2 bars). Notes appended to coord/notes-0.1.23.md.
+- in progress: tests + Windows rebuild; before shots (main exe, `--snapshot` channel frame) in /mnt/e/lynx-work/design168p/before.
+- next: run tests, after shots (`--instrumentshot`, 100/150/200 %), land in parts after 168n lands.
