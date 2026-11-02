@@ -50,6 +50,8 @@
 #include "ui/ValueControl.h"
 #include "ui/WindowOwner.h"
 
+#include "ui/DesignDisplays.inc" // round 168r: the graphs of the designed editors
+
 namespace lynx
 {
 namespace
@@ -131,7 +133,7 @@ public:
                 && (std::strcmp (item.display, "grmeter") == 0 || std::strcmp (item.display, "grleds") == 0 || std::strcmp (item.display, "vumeter") == 0 || std::strcmp (item.display, "iometer") == 0 || std::strcmp (item.display, "outmeter") == 0 || std::strcmp (item.display, "limitpill") == 0 || std::strcmp (item.display, "gcmeter") == 0
                     || std::strcmp (item.display, "pitchgraph") == 0 || std::strcmp (item.display, "panpos") == 0 || std::strcmp (item.display, "hwping") == 0
                     || std::strcmp (item.display, "pitchtrace") == 0 || std::strcmp (item.display, "pitchring") == 0 || std::strcmp (item.display, "tssenvelope") == 0
-                    || dynui::isLive (item.display)))
+                    || dynui::isLive (item.display) || designui::isLive (item.display)))
             {
                 liveDisplays = true;
                 break;
@@ -1974,6 +1976,8 @@ public:
         const auto inner = r.reduced (6.0f * s);
         if (dynui::paint (g, id, r, s, fx, [this] (int k) { return liveMeter (k); }, dynHistory)) // the dynamics suite
             return;
+        if (designui::paint (g, id, r, s, fx, accent, designHistory, demoDisplays, item.param)) // round 168r
+            return;
         if (id == "tssenvelope")
         {
             paintTransmitterEnvelope (g, inner, fx);
@@ -3736,8 +3740,24 @@ public:
         {
             if (h == 5)
             {
-                const pluginheader::PresetBar::FlPresets fl { [this] (juce::PopupMenu& m) { addFlPresets (m); },
-                                                              [this] (int delta) { stepPreset (delta); }, [this] { return presetName; } };
+                const auto flFiles = presetFiles(); // round 168r: ◀ ▶ also run through FL's presets after LYNX's bank
+                const pluginheader::PresetBar::FlPresets fl {
+                    [this] (juce::PopupMenu& m) { addFlPresets (m); }, [this] (int delta) { stepPreset (delta); }, [this] { return presetName; },
+                    [flFiles] { return flFiles.size(); },
+                    [this, flFiles] {
+                        const auto* fx = current();
+                        for (int i = 0; i < flFiles.size(); ++i)
+                            if (flFiles[i].getFileNameWithoutExtension() == presetName && fx != nullptr && fx->presetName == presetName.toStdString())
+                                return i;
+                        return -1;
+                    },
+                    [this, flFiles] (int i) {
+                        if (i >= 0 && i < flFiles.size())
+                        {
+                            loadPreset (flFiles[i]);
+                            ui::postHint ({ presetName, juce::String (presetcycle::positionText (i, flFiles.size())) }, 2500);
+                        }
+                    } };
                 bar.click (bar.partAt (e.position), *this, &fl);
                 return;
             }
@@ -4569,8 +4589,16 @@ private:
         }
         if (history)
             dynHistory.push (liveMeter (0), liveMeter (2), liveMeter (3));
+        for (const auto& item : activeLayout().items) // round 168r: the Peak Controller's outputs scroll
+            if (item.type == Item::display && designui::isLive (item.display) && visible (item))
+            {
+                designHistory.push (liveMeter (0), liveMeter (1), liveMeter (2));
+                repaint (rectOf (item).getSmallestIntegerContainer());
+                break;
+            }
     }
 
+    designui::History designHistory; // round 168r: the Peak Controller's outputs (peakmeter)
     std::uint32_t envelopeSeen = 0; // the Transmitter's envelope columns already drawn
     AudioEngine& engine;
     int track, slot;
