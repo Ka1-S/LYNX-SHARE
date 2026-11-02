@@ -100,16 +100,15 @@ and a three-note chord).
 
 - **Done** (branch `feature/design168q`, pushed as `wip/design168q`): layouts for all seven pages; parameter tables and
   live / automation paths for Kepler, Kepler Exo, Sawer, Transistor Bass, BeepMap, Granulizer; BeepMap and Granulizer
-  banks; tests file (not yet in tests.cpp).
-- **Waiting**: round 168n's infrastructure (EngineParams.h, ModelParams.*, LynxBanks.*, ModelPanel tabs / menus / values)
-  must land on main first. Until then the new files compile against copies of its headers in the scratchpad
-  (`<scratchpad>/q168q/syn.sh`; the scratchpad is shared with other rounds — use only the q168q folder).
-- **Next**: after 168n lands — merge origin/main; register `LYNX_MODEL_PARAMS` lines (kepler, keplerExo, transistorbass,
-  sawer, beepmap, granulizer) and `LYNX_BANK` lines (beepmap, granulizer); include the engine headers in ModelParams.cpp;
-  `instrumentLayout()` cases in PluginLayout.cpp; add EngineLayouts.cpp, BeepMapBank.cpp, GranulizerBank.cpp to
-  CMakeLists.txt, scripts/build-local.sh CORE, scripts/build-windows-zig.sh; ChannelSettings displays (beepmapimage,
-  beepmapfile, granulizerwave, granulizergrains, tbsequence, tbprogram) and the "needs FL Studio's files" banner;
-  `#include "Design168qTests.inc"` in tests/tests.cpp; i18n of the new TR_NOOP strings in 15 languages; Windows shots
-  before / after in /mnt/e/lynx-work/design168q/.
+  banks; round 168n's wip infrastructure merged in (commit 6055913f) and everything registered on it
+  (ModelParamList.inc, LynxBankList.inc, instrumentLayout(), build lists, tests.cpp); ModelPanel displays (BeepMap
+  bitmap + Open / Paste row, Granulizer waveform + grain envelope, Transistor Bass program + sequence), the "Needs FL
+  Studio's files" header for Kepler / Kepler Exo / Transistor Bass / Sawer without their engine file; translations.
+- **In progress**: Linux core build + `LYNX_TEST=design168` tests (`<scratchpad>/q168q/bl.sh`), Windows build to
+  /mnt/e/lynx-work/design168q/build-win (`<scratchpad>/q168q/win.sh`).
+- **Next**: fix build / test failures; full test suite; Windows shots (`LYNX.exe --instrumentshot <dir>
+  kepler,keplerexo,transistorbass,sawer,beepmap,fruitygranulizer,wasp lynx|fl`, fresh LYNX_PROFILE_DIR,
+  LYNX_TEST_MODE=1) after, and the same from a build of commit 6055913f (before); land only after round 168n has landed
+  on main (merge origin/main first).
 - **Commands**: syntax check `BUILDSLOT_SHORT=1 coord/buildslot.sh <scratchpad>/q168q/syn.sh <files>`; bank probe
-  `<scratchpad>/q168q/probe/build.sh`.
+  `<scratchpad>/q168q/probe/build.sh`; the scratchpad is shared with other rounds — use only its q168q folder.
