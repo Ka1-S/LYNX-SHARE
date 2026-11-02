@@ -56,12 +56,21 @@ tmp/r168p/dfm/<plugin>/TSynthEditorForm.dfm.txt). Only layout and control facts 
 ## Where I stopped
 - done: §1, layouts, tables, live automation, part selection, displays, banks (66 presets, 0 flagged), translations,
   shot review fixes (c940e1b8), before/after shots, notes in coord/notes-0.1.23.md, merged origin/main 8a788038 (d687b456).
-- Linux suite (separate-object build): 16 failures, none in 168p tests: 15 Kepler / multiband-delay bit-exact checks that
-  pass in main's own build (artefact of this build), 1 Browser162 inbox timing check.
+- Linux suite (separate-object build, mkchunk.sh): 15 failures, all Kepler (kepler_chorus_like_the_dll energy
+  343.102312086 vs 343.102284005, + Kepler165k / KeplerExo167d bits) and multiband_delay_exact (tests.cpp:11543). They
+  fail deterministically, also alone (`LYNX_TEST=multiband_delay_exact`), while every other round's build-local.sh build
+  (168g, 168o, 168n wip, 168j, pr31) gets the exact values. Coordinator: not "known" — must be 0 before landing.
+  Checked without building (paused): every object is newer than all its dependencies (.d files); Kepler.o and
+  MultibandDelayFx.o have the same machine code as 168g's; no object defines a libm function; no FP-state change
+  (MXCSR / fesetround / denormals) in the branch's diff; no clash of exported names between the new objects and
+  Kepler / IldspMath / MultibandDelayFx.
 - A corrupt build-local/obj168p/src_core_Harmor.cpp.o made ld.lld segfault (found by bisecting the link); rebuilt.
 - PAUSED 2026-11-02 (coordinator, for round 168w's faster pipeline). Post-merge (d687b456) tests build linked; the suite run
   finished: 2132748 checks, 15 failures = only the known Kepler / multiband-delay bit-exact checks (tmp/r168p/tests4.log).
-- exact next step on RESUME: once 168n is on
+- exact next step on RESUME: (1) build this branch the official way (`coord/bl-wt.sh design168p`, build-local.sh, one
+  invocation): if Kepler / multiband delay pass, the failures belong to mkchunk.sh's separate-object build; (2) if not,
+  bisect origin/main..HEAD with bl-wt builds (first: the 168n wip merge fb691f7e vs my own commits), fix or report to
+  168n; land only with 0 failures. Then, once 168n is on
   main: `git merge origin/main`, and land via `flock ~/projetos/lynx/.git/lynx-merge.lock coord/land.sh design168p`
   (in parts if land.sh asks), record the hashes in the final report.
 - left: a DrumSynth Live channel with no state at all (not reachable from the browser) shows the page with knobs missing;
