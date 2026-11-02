@@ -110,12 +110,12 @@ public:
     static constexpr int rulerTop = toolbarHeight + overviewHeight;
     static constexpr int headerHeight = rulerTop + timelineHeight;
     static constexpr int velocityHeight = 72;
-    int rowHeight = 14; // vertical zoom (Ctrl+Alt+wheel): 6..32 px per key
+    int rowHeight = 14; // vertical zoom (Ctrl+middle-drag, Ctrl+Alt+wheel): gesture::minKeyHeight..maxKeyHeight px per key
     static constexpr int scrollBarSize = 12;
 
 private:
     enum class Drag { none, move, resize, resizeLeft, erase, keyboard, select, velocity, velocityLine, velocitySet, paint, muting, knife,
-                      zoomRange, listen, pan, keyZoom, keySelect, rulerSelect, seek, drumPaint, stretch, eventDraw, eventErase };
+                      zoomRange, listen, pan, keyZoom, timeZoom, keySelect, rulerSelect, seek, drumPaint, stretch, eventDraw, eventErase };
 
     // Channel selector: the wheel steps through the channels with notes (Ctrl+wheel: all channels).
     class ChannelBox final : public juce::ComboBox
@@ -279,7 +279,11 @@ private:
     std::vector<AutomationTarget> eventTargets;
     void rebuildLaneBox (std::optional<AutomationTarget> shown = std::nullopt, bool force = false);
     void drawEvents (int fromX, int toX, int y, bool erase);
-    int keyZoomKey = 60, keyZoomStartRow = 14;
+    int keyZoomKey = 60, keyZoomStartRow = 14, keyZoomCentreY = 0; // the key whose centre stays at keyZoomCentreY
+    gesture::HeightZoomDrag keyZoomDrag;
+    gesture::SpanZoomDrag timeZoomDrag;
+    void beginKeyZoom (const juce::MouseEvent&);
+    void beginTimeZoom (const juce::MouseEvent&);
 
     // smooth wheel scrolling
     gesture::Glide glideX, glideY;
