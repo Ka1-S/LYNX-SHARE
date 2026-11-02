@@ -19,6 +19,7 @@
 #include "core/FlSynths.h"
 #include "core/MidiControls.h"
 #include "ui/ToolWindow.h"
+#include "ui/LoopStarterWindow.h"
 #include "core/Slicer.h"
 #include "ui/ChannelSettings.h"
 
@@ -2271,6 +2272,8 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
         closeEditor (channel);
         engine.editSong ([channel] (Song& s) { patcherize::patcherizeChannel (s, channel); });
     });
+    // FL's Loop Starter channel menu (round 168b): Replace sample, Generate steps, Locked, One-shot category
+    loopstarterui::addChannelMenu (menu, engine, channel);
     menu.addItem (selected > 1 ? tr ("Clone {0} channels", { juce::String (selected) }) : tr ("Clone") + "\tAlt+C", [this] { cloneSelected(); });
 
     if (selected > 1)

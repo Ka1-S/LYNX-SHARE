@@ -762,12 +762,15 @@ bool hasAny (const std::vector<std::string>& w, std::initializer_list<const char
 
 std::string categoryOfWords (const std::vector<std::string>& w)
 {
-    const bool hat = hasAny (w, { "hat", "hats", "hihat", "hihats", "hh", "hi" });
+    const bool hat = hasAny (w, { "hat", "hats", "hihat", "hihats", "hh", "hi", "chat", "ohat", "phat" });
     if (hasAny (w, { "ghost" }) && hasAny (w, { "snare", "snr", "sd" }))
         return "ghost snare";
-    if (hasAny (w, { "oh", "ohh", "ophat", "openhat" }) || (hat && hasAny (w, { "open" })))
+    // a drum kit's microphones ("tom1_oh", "kick room") name the drum first: "oh" / "ch" alone are weak words
+    const bool otherDrum = hasAny (w, { "kick", "snare", "tom", "toms", "clap", "rim", "ride", "crash", "cymbal", "perc" });
+    if ((hat && hasAny (w, { "open", "oh", "ohat" })) || hasAny (w, { "ohh", "ophat", "openhat", "ohat" })
+        || (! otherDrum && hasAny (w, { "oh" })))
         return "open hat";
-    if (hasAny (w, { "ch", "chh", "clhat", "closedhat", "pedal" }) || hat)
+    if (hat || hasAny (w, { "chh", "clhat", "closedhat", "pedal" }) || (! otherDrum && hasAny (w, { "ch" })))
         return "closed hat";
     if (hasAny (w, { "ride" }))
         return "ride";
@@ -817,6 +820,11 @@ std::string classifySample (const std::string& path)
     // loops, construction kits, vocals and effects are not one-shots
     if (hasAny (name, { "loop", "loops", "bpm", "fill", "roll", "break", "breaks" })
         || hasAny (folders, { "loops", "vocals", "instruments", "risers", "flex", "shapes", "sfx", "fx", "foley" }))
+        return {};
+    // multi-microphone kits (FL's Drums/Kits/<kit>/...): the room / overhead mics and the extra round robins are not
+    // one-shots of their own
+    if (hasAny (folders, { "kits", "kit" })
+        && hasAny (name, { "oh", "room", "rooms", "overhead", "overheads", "amb", "bleed", "rr2", "rr3", "rr4", "rr5", "rr6", "rr7", "rr8" }))
         return {};
 
     if (auto c = categoryOfWords (name); ! c.empty())
@@ -971,7 +979,8 @@ std::vector<Note> generateSteps (const Sources& sources, const std::string& genr
         }
     }
     const auto* lane = candidates[pick].second;
-    const auto bars = std::max (1, (int) lane->bars.size());
+    // a 4-bar loop: bar b plays the preset's variant b % their count (or its one bar again)
+    const auto bars = loopBars;
     if (barsOut != nullptr)
         *barsOut = bars;
     if (presetOut != nullptr)

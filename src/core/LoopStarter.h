@@ -122,6 +122,8 @@ int octaveOfToken (char token);
 int semitoneOfToken (char token);
 double repeatProportionOfToken (char token); // 1 = no repeat
 
+constexpr int loopBars = 4; // the pattern length of a generated loop (bars)
+
 // The lane's notes on `bars` bars (bar b plays the lane's variant b % its count) for a channel at `key`.
 std::vector<Note> laneNotes (const Lane& lane, int bars, int channel, int key);
 
