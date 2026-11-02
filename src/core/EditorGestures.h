@@ -274,6 +274,66 @@ inline double wheelScrollPixels (double delta, bool smooth, double pixelsPerNotc
     return -delta * pixelsPerNotch * 7.0;
 }
 
+// --- middle-drag zooms (round 167t, issue #26; FL 2026 evidence in docs/analise/REA_rodada167t.md) ---------------
+// Key height range of the Piano roll. FL's is 18..116 px (16 + 2 px per zoom level 1..50); LYNX also goes
+// shorter, down to 6 px.
+constexpr int minKeyHeight = 6, maxKeyHeight = 116;
+
+// The vertical zoom drag: Ctrl+middle-drag on the Piano roll's notes (or the Playlist's clips) and middle-drag on
+// the Piano roll keyboard. Like FL's zoom knob it only follows the vertical travel: up = taller, one zoom level
+// (2 px) per 4 px of travel, per 16 px while Ctrl is held (fine). The travel is not clamped at the limits.
+struct HeightZoomDrag
+{
+    double travel = 0.0; // knob units (4 per pixel, 1 per pixel fine)
+    int lastY = 0;
+
+    void begin (int y) noexcept { travel = 0.0; lastY = y; }
+
+    void move (int y, bool fine) noexcept
+    {
+        travel += (double) (lastY - y) * (fine ? 1.0 : 4.0);
+        lastY = y;
+    }
+
+    // whole zoom levels gained since the press
+    int levels() const noexcept { return (int) std::lround (travel / 16.0); }
+
+    int height (int startHeight, int lo = minKeyHeight, int hi = maxKeyHeight) const noexcept
+    {
+        return std::clamp (startHeight + 2 * levels(), lo, hi);
+    }
+};
+
+// The horizontal zoom drag of FL's time scroll bar: middle-drag on the ruler, Alt+middle-drag in the grid.
+// Each move's vertical travel (at most 32 px a move) accumulates and the visible span becomes the span at the
+// press times 2^(-up / 100) (100 px up = twice the zoom) around the view's centre; the horizontal travel moves the
+// centre by half a view per 100 px (rightwards = later), except while Ctrl is held (zoom only).
+struct SpanZoomDrag
+{
+    double startSpan = 1.0, span = 1.0, centre = 0.0, up = 0.0;
+    int lastX = 0, lastY = 0;
+
+    void begin (double visibleSpan, double viewCentre, int x, int y) noexcept
+    {
+        startSpan = span = std::max (1.0e-9, visibleSpan);
+        centre = viewCentre;
+        up = 0.0;
+        lastX = x;
+        lastY = y;
+    }
+
+    void move (int x, int y, bool ctrl) noexcept
+    {
+        up += std::clamp ((double) (lastY - y), -32.0, 32.0);
+        span = startSpan * std::pow (2.0, -up * 0.01);
+        if (! ctrl)
+            centre += (double) (x - lastX) * span * 0.5 * 0.01;
+        centre = std::max (0.0, centre);
+        lastX = x;
+        lastY = y;
+    }
+};
+
 // A value that glides towards its target (smooth wheel scrolling). `step` advances it by one frame.
 struct Glide
 {

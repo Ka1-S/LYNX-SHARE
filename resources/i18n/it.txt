@@ -6255,6 +6255,7 @@ countries: it ch sm
 "Update A/B" = "Aggiorna A/B"
 "Flush" = "Svuota"
 "Detector source" = "Sorgente del rilevatore"
+"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "Zoom: trascina in su = più vicino, di lato = scorri  [Ctrl] solo zoom"
 
 # --- Loop Starter (round 168b)
 "Replace sample" = "Sostituisci campione"

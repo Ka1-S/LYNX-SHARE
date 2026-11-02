@@ -6255,6 +6255,7 @@ countries: kr
 "Update A/B" = "A/B 갱신"
 "Flush" = "비우기"
 "Detector source" = "검출 소스"
+"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "확대/축소: 위로 드래그 = 확대, 옆으로 = 스크롤  [Ctrl] 확대/축소만"
 
 # --- Loop Starter (round 168b)
 "Replace sample" = "샘플 교체"

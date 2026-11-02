@@ -6255,6 +6255,7 @@ countries: fr be ch ca lu
 "Update A/B" = "Mettre à jour A/B"
 "Flush" = "Vider"
 "Detector source" = "Source du détecteur"
+"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "Zoom : glisser vers le haut = plus près, sur les côtés = défiler  [Ctrl] zoom seul"
 
 # --- Loop Starter (round 168b)
 "Replace sample" = "Remplacer le sample"
