@@ -383,6 +383,10 @@ public:
     // Events of the last block (for tests and diagnostics).
     const EventBuffer& lastEvents() const noexcept { return events; }
 
+    // FL's "Compensate automations" (REA round 168j): a mixer effect whose input the delay compensation delays gets its
+    // automation clips' value at its own, delayed, position (`current` = the value at the song position)
+    float compensatedAutomation (const RackState& state, int automation, int track, int slot, float current) const noexcept;
+
 private:
     void processChunk (const RackState& state, bool playing, double startTick, int numSamples,
                        float* left, float* right, MeterBank* meters) noexcept;
@@ -400,6 +404,8 @@ private:
     static double ticksToNextEvent (const RackState& state, double tick) noexcept;
     // bindings from this automation slot on (andLive: and those of live controllers, the links)
     void applyPluginParams (const RackState& state, int firstSlot, bool andLive = false) noexcept;
+    double compensateTick = -1.0;          // the song position of this block's automation (song mode), −1 = none
+    double compensateTicksPerSample = 0.0; // > 0: compensation on in this block
     float automated (int automation, float base) const noexcept;
     float* trackBuffer (int track, int channel) noexcept;
 

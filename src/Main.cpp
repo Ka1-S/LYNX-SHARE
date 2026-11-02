@@ -1658,6 +1658,31 @@ private:
                       && plainBack->mixer[0].outputChannel == lynx::outputDefault && plainBack->mixer[1].outputChannel == lynx::outputDefault;
         }
 
+        // round 168j: FL's icons (channel / mixer track / playlist track), PDC Automatic / Compensate automations, Time
+        // settings, scale highlighting and data folder — saved only when set, old projects load with FL's defaults
+        bool flp168jOk = false;
+        {
+            auto song = lynx::Song::makeDefault();
+            const auto plain = lynx::ProjectFile::toJson (song);
+            song.channels[0].icon = 75;
+            song.mixer[2].icon = 71;
+            song.playlistTracks.resize (3);
+            song.playlistTracks[2].icon = 30;
+            song.autoPdc = false;
+            song.compensateAutomations = false;
+            song.timeSignatureMode = true;
+            song.scaleHighlight = { 10, 5 };
+            song.dataFolder = "D:\\Projects\\data";
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), error);
+            const auto plainBack = lynx::ProjectFile::fromJson (plain, error);
+            flp168jOk = back && back->channels[0].icon == 75 && back->mixer[2].icon == 71 && back->playlistTracks.size() >= 3
+                        && back->playlistTracks[2].icon == 30 && ! back->autoPdc && ! back->compensateAutomations && back->timeSignatureMode
+                        && back->scaleHighlight == song.scaleHighlight && back->dataFolder == song.dataFolder && plainBack && plainBack->autoPdc
+                        && plainBack->compensateAutomations && ! plainBack->timeSignatureMode && plainBack->scaleHighlight == lynx::Song::ScaleHighlight {}
+                        && plainBack->dataFolder.empty() && plainBack->channels[0].icon == 0 && ! plain.contains ("\"icon\"")
+                        && ! plain.contains ("autoPdc") && ! plain.contains ("scaleHighlight");
+        }
+
         // FL's track latency (REA round 165f-mixer): manual ms, bypass mode and master compensation saved only when set
         bool latencyOk = false;
         {
@@ -2032,7 +2057,7 @@ private:
         // Settings › Audio "Driver settings…" with a fake driver panel (issue #13's crash, the panel's buffer kept)
         const auto driverPanel = lynx::AudioEngine::driverPanelSelfTest();
 
-        const auto ok = audioOk && projectOk && richOk && hwOutOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
+        const auto ok = audioOk && projectOk && richOk && hwOutOk && flp168jOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk;
 
         juce::String report;
@@ -2041,6 +2066,7 @@ private:
                << "project=" << (projectOk ? "OK" : "ERROR " + error) << "\n"
                << "project_features=" << (richOk ? "OK" : "ERROR") << "\n"
                << "hardware_outputs=" << (hwOutOk ? "OK" : "ERROR") << "\n"
+               << "flp168j_fields=" << (flp168jOk ? "OK" : "ERROR") << "\n"
                << "track_latency=" << (latencyOk ? "OK" : "ERROR") << "\n"
                << "plugin_substitutes=" << (substituteOk ? "OK" : "ERROR") << "\n"
                << "patcher=" << (patcherOk ? "OK" : "ERROR") << "\n"

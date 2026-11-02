@@ -1774,6 +1774,13 @@ public:
         // FL's read speed: the rate ratio at the original pitch, else exp(cents·ln2/1200)·ratio
         target->rate = flrs::speedFor ((float) (semitones * 100.0), base);
         target->reversed = backwards;
+        if (clipMode && data != nullptr && data->frames() > 0) // the DC a clip holds after its sample (a clip resumed past it)
+        {
+            const auto end = (std::int64_t) std::min ((double) (data->frames() - 1), last);
+            const auto q = (std::size_t) std::clamp<std::int64_t> (backwards ? (std::int64_t) first : end, 0, (std::int64_t) data->frames() - 1);
+            target->holdL = data->leftData()[q];
+            target->holdR = data->rightData()[q];
+        }
         // the render quality is read at each note (round 160): the export engine prepares its instruments before it
         // switches to offline rendering, so a value taken in prepare() kept the playback quality in most exports
         target->kernel.setQuality (offlineRendering() ? flrs::renderQuality : quality);
@@ -2341,7 +2348,10 @@ public:
                     ++v.loops;
                 }
 
-                if ((double) flrs::wholeFrames (v.position) > lastFrame || v.position < v.first || (v.stolen && v.fade <= 0.0f) || (v.env <= 0.0f && v.stage >= 1))
+                const auto pastEnd = (double) flrs::wholeFrames (v.position) > lastFrame || v.position < v.first;
+                // FL holds an audio clip's last value as DC to the clip's end (its note-off): the clip does not end with
+                // the sample (FL renders, REA_rodada167l §1 / round 168j); other voices end with their region
+                if ((pastEnd && ! clipMode) || (v.stolen && v.fade <= 0.0f) || (v.env <= 0.0f && v.stage >= 1))
                 {
                     v.active = false;
                     break;
@@ -2366,10 +2376,16 @@ public:
 
                 float sl, sr;
                 auto& ks = shifts[(std::size_t) (&v - voices.data())];
-                if (ks.on)
-                    readShifted (v, ks, sl, sr);
+                if (pastEnd) // (clips only, above)
+                    sl = v.holdL, sr = v.holdR;
                 else
-                    readFrame (v, l, r, lastFrame, looping, sl, sr, v.rate * v.pitchMul * bendMul);
+                {
+                    if (ks.on)
+                        readShifted (v, ks, sl, sr);
+                    else
+                        readFrame (v, l, r, lastFrame, looping, sl, sr, v.rate * v.pitchMul * bendMul);
+                    v.holdL = sl, v.holdR = sr;
+                }
 
                 if (modulated)
                 {

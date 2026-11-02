@@ -2082,6 +2082,11 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                                                         engine.editSong ([] (Song& s) { mixerops::resetManualLatency (s); });
                                                 }));
         });
+        // FL's Automatic / Compensate automations (REA round 168j, .flp 0x1D / 0x27; FL's AutoPDCMenuClick toggles it)
+        pdc.addItem (tr ("Automatic (compensate the plugins' latencies)"), true, song.autoPdc,
+                     [this] { engine.editSong ([] (Song& s) { s.autoPdc = ! s.autoPdc; }); });
+        pdc.addItem (tr ("Compensate automations (delay a plugin's automation with its audio)"), true, song.compensateAutomations,
+                     [this] { engine.editSong ([] (Song& s) { s.compensateAutomations = ! s.compensateAutomations; }); });
         menu.addSubMenu (tr ("Plugin delay compensation"), pdc);
     }
     mixeroptions::addItems (menu, engine, false);
