@@ -60,8 +60,8 @@ tmp/r168p/dfm/<plugin>/TSynthEditorForm.dfm.txt). Only layout and control facts 
   pass in main's own build (artefact of this build), 1 Browser162 inbox timing check.
 - A corrupt build-local/obj168p/src_core_Harmor.cpp.o made ld.lld segfault (found by bisecting the link); rebuilt.
 - PAUSED 2026-11-02 (coordinator, for round 168w's faster pipeline). Post-merge (d687b456) tests build linked; the suite run
-  was already running at the pause (result: tmp/r168p/tests4.log).
-- exact next step on RESUME: check tests4.log (expect only the known 15 bit-exact + timing failures), then once 168n is on
+  finished: 2132748 checks, 15 failures = only the known Kepler / multiband-delay bit-exact checks (tmp/r168p/tests4.log).
+- exact next step on RESUME: once 168n is on
   main: `git merge origin/main`, and land via `flock ~/projetos/lynx/.git/lynx-merge.lock coord/land.sh design168p`
   (in parts if land.sh asks), record the hashes in the final report.
 - left: a DrumSynth Live channel with no state at all (not reachable from the browser) shows the page with knobs missing;
