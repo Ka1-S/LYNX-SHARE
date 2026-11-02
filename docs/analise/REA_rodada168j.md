@@ -68,18 +68,36 @@ the scale functions, AutoPDCMenuClick, FUN_012b5e60 / FUN_012b6020), `d2.txt` (P
 
 ## 4. Checks
 
-(filled in below as they are run)
+- **Tests:** build-local with FL's Data folder: 2 105 045 checks, 0 failures (`rea168j_*` all pass; the reference
+  scales are checked against FL's 37 `.fsc` files).
+- **Older clip tests updated to FL:** `rea167k_clip_pitch_keeps_the_length`, `rea167l_clip_stretch_plays_like_fl` and the
+  163c length analysis expected silence after a clip's file ends. FL's own renders of round 167k
+  (`C:\Users\kauan\lynx-test\r167k\fl\clip\*.wav`) hold a constant there in every case: c_base −0.0564, c_p3 −0.4396,
+  c_m5 −0.0061, p_normpol +0.0627, reversed / faded-out clips 0 (their last frame is 0). The tests now check "constant"
+  (FL's DC hold) instead of "silent".
+- **[FL render] vs LYNX `--export`** (Windows build, fresh profile, test mode; `tmp/r168j/lyrender.sh`, output
+  `/mnt/e/lynx-work/r168j/out`):
+
+  | project | FL hold | LYNX before | LYNX now | RMS FL − LYNX, 0–4.2 s |
+  |---|---|---|---|---|
+  | c_base | −0.0564 from frame 88199 | 0 | −0.0564 from frame 88199 | 0.0012 |
+  | p_normpol | +0.0627 | 0 | +0.0626 | 0.0014 |
+  | c_rev | 0 | 0 | 0 | 0.00001 |
+  | c_p3 / c_m5 | −0.4396 / −0.0061 | 0 | +0.1189 / +0.4294 (also from frame 88199) | 0.55 / 0.44 |
+
+  Unpitched clips match FL. On pitched clips LYNX holds its own last output frame, as FL does, but LYNX's clip pitch
+  shifter already gave a different waveform from FL's before this change (round 167k), so the held value differs too.
+  This comes from the shifter, not from the hold.
+- **GUI** (Windows build, real mouse, fresh profile, test mode, `C:\Users\kauan\lynx-test\r167k\fl\clip\c_base.flp`;
+  shots `/mnt/e/lynx-work/r168j/g6c.png`, `g7c.png`, `g9.png`, `g10c.png`, `g11c.png`): an insert's right-click menu ›
+  Plugin delay compensation shows **Automatic** and **Compensate automations** ticked; clicking Automatic unticks it
+  (Compensate automations stays as it was); Options › Project settings shows **Time settings = Set as time signature**
+  (FL saved this project with 0x23 = 1) with "Numerator" and "Denominator: 4 (the Channel Rack's step grid is 4 steps
+  per beat)." Picking "Set as time division" in the combo turns these back into "Beats per bar" and "Steps per beat". The
+  page fits the dialog. LYNX was closed by its PID.
 
 ## Where I stopped
 
-- Done (worktree `~/projetos/lynx-wt-flp168j`, branch feature/flp168j, pushed as wip/flp168j; origin/main merged after the
-  2026-11-02 11:10 reboot): parser, model, .lynx, import, PDC Automatic / Compensate automations (engine + menu), Time
-  settings combo, reference scales table, DC hold, tests `rea168j_*`, selftest `flp168j_fields`, i18n. Older clip tests
-  (167k pitch, 167l stretch, 163c length analysis) now expect FL's DC hold instead of silence — FL's own renders
-  `r167k/fl/clip/*.wav` hold the last value (c_base −0.0564, c_p3 −0.4396, c_m5 −0.0061, p_normpol +0.0627; reversed /
-  faded-out clips 0).
-- In progress: build-local (log `tmp/coord/bl-flp168j.log`) and the Windows build (`tmp/r168j/win.log`, OUT
-  build-win-flp168j); then LYNX `--export` of `r167k/fl/clip/c_*.flp` (`tmp/r168j/lyrender.sh`, bin
-  `/mnt/e/lynx-work/r168j/bin`) vs FL's wavs, and a GUI check of the two mixer menu items and the Time settings combo.
-- Rerun: `~/.claude/jobs/f8789b49/tmp/coord/buildslot.sh ~/.claude/jobs/f8789b49/tmp/coord/bl-wt.sh flp168j`;
-  Ghidra `cd ~/.claude/jobs/f8789b49/tmp/r168j && ./g.sh out.txt 0 <hex…>`.
+- Done: everything above; tests green; FL render comparison and GUI check done. Next: land via coord/land.sh.
+- Not done: icon drawing (168h), Piano Roll scale UI on `Song::scaleHighlight` (168g), project data folder feature
+  (168i), E8 / E9 / E13 / E15 meanings (no writer / constant in the corpus).
