@@ -69,9 +69,15 @@ LYNX's own); the per-effect-slot plugin preset list (round 167o's area).
 `mixpre167q_fl_factory_mixer_presets` (every factory preset of the installed FL reads; runs only where FL is
 installed).
 
+[EXEC] Windows 11, real mouse, build of this branch (fresh LYNX_PROFILE_DIR, test mode): track menu › File › States
+lists FL's 18 factory presets; "General purpose mastering" on Insert 1 → Parametric EQ + Multiband Compressor + Stereo
+Enhancer, name kept; "+" › Add from state › Reverb send → new Insert 17 "Reverb" with a reverb; Browser "Mixer presets
+(FL)" › Chorus send dragged onto Insert 3 → "Chorus" with a chorus; double-click Big meter → Wave Candy replaces the
+chain of the selected Insert 3 (name kept: the preset has none). Shots `C:\Users\kauan\lynx-test\r167q\m1–m11.png`.
+
 ## Where I stopped
 
-- B landed with A (see the commits of `feature/mixpre167q`). The crash of #25 is not reproduced; the reply asks for the
-  crash report.
-- A: the open items of the list above. The Windows GUI check of A was done only if the desktop was free (see the
-  round report).
+- B: fixed and tested; the crash of #25 is not reproduced (the reply asks for the crash report and the device).
+- A: landed as described; open: "Tree display" for the States list, "Increase number of tracks to...", a mixer preset
+  dropped on a Channel rack channel / Playlist track header, multiple presets dropped at once → consecutive tracks,
+  saving as FL .fst, FL's undo names ("load mixer state" …: LYNX's undo step is the generic edit).
