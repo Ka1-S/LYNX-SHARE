@@ -16934,3 +16934,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Rec168kTests.inc"
 #include "Issue32Tests.inc"
 #include "MixPre167qTests.inc"
+#include "Speech168bTests.inc"
