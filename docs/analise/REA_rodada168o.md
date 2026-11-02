@@ -74,6 +74,9 @@ engine's own level (about −16 dBFS, as FL's DX10). tools/bankrender renders th
 - Built on round 168n's infrastructure merged from origin/wip/design168n (168n had not landed on main yet).
 - 2026-11-02 11:10 the PC crashed during the post-merge rebuild (branch at b885a072 = 168n wip + main efb8344d, all
   pushed): rebuilt from clean build folders afterwards. Landing waits for 168n on main (then merge origin/main, land).
+- After the crash the tests compile crashed clang (rc 139 / 134): stack exhaustion on the merged tests.cpp, fixed by
+  `ulimit -s unlimited` (as round 168l). Then 2,112,991 checks, 1 failure: Feat166dTests:166 (idle-insert timing
+  under machine load, not this round). Windows build OK; after-shots retaken in /mnt/e/lynx-work/design168o/shots-after.
 - Linux tests before the crash: all 168o tests pass; the 3 remaining failures were 168n's own (Design168nTests
   59 / 187) on its wip state.
 
