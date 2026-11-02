@@ -264,8 +264,8 @@ Layout harmlessLayout()
     p.knob (389, 376, 26, "Harmonizer width LFO amount", TR_NOOP ("LFO"), bipolar);
     p.vel (424, 380, "Velocity to harmonizer width");
     p.knob (430, 322, 30, "Harmonizer strength", TR_NOOP ("Str"));
-    p.menu (472, 324, 132, 20, "Harmonizer type", TR_NOOP ("Type"), "Oct up|Oct up +1|Oct up +2|Harm up|Harm up +1");
-    p.menu (472, 370, 132, 20, "Harmonizer position", TR_NOOP ("Position"), "Pre-filter|Pre-phaser|Pre-pluck|Final");
+    p.menu (472, 332, 132, 20, "Harmonizer type", TR_NOOP ("Type"), "Oct up|Oct up +1|Oct up +2|Harm up|Harm up +1");
+    p.menu (472, 376, 132, 20, "Harmonizer position", TR_NOOP ("Position"), "Pre-filter|Pre-phaser|Pre-pluck|Final");
 
     // LFO
     p.section (614, 298, 210, 120, TR_NOOP ("LFO"));
@@ -290,7 +290,6 @@ Layout harmlessLayout()
     p.knob (632, 442, 30, "Compression level", TR_NOOP ("Level"));
     p.toggle (680, 444, 70, 14, "High quality", TR_NOOP ("HQ"));
     p.toggle (680, 464, 70, 14, "Threaded", TR_NOOP ("Threaded"));
-    p.name (752, 440, 68, 44, "Harmless");
     return std::move (p.l);
 }
 
@@ -375,7 +374,7 @@ Layout simSynthLayout()
 
     // AMP: the envelope display, attack / decay / sustain / release, velocity to volume
     p.section (332, 2, 228, 92, TR_NOOP ("Amp"));
-    p.display (436, 6, 120, 30, "simamp");
+    p.display (342, 19, 208, 20, "simamp");
     p.knob (347, 42, 30, "Attack", TR_NOOP ("Att"));
     p.knob (390, 42, 30, "Decay", TR_NOOP ("Dec"));
     p.knob (433, 42, 30, "Sustain", TR_NOOP ("Sus"));
@@ -386,7 +385,7 @@ Layout simSynthLayout()
     // high and band pass mix
     p.section (332, 98, 228, 190, TR_NOOP ("Filter"));
     p.toggle (380, 101, 28, 14, "Filter on", nullptr);
-    p.display (436, 102, 120, 30, "simfilt");
+    p.display (342, 116, 208, 20, "simfilt");
     p.knob (347, 140, 30, "Filter attack", TR_NOOP ("Att"));
     p.knob (390, 140, 30, "Filter decay", TR_NOOP ("Dec"));
     p.knob (433, 140, 30, "Filter sustain", TR_NOOP ("Sus"));
@@ -401,14 +400,14 @@ Layout simSynthLayout()
     p.knob (476, 240, 30, "Band pass", TR_NOOP ("Band"));
 
     // LFO: on, shape, rate, delay, retrigger; chorus
-    p.section (332, 292, 200, 82, TR_NOOP ("LFO"));
+    p.section (332, 292, 186, 82, TR_NOOP ("LFO"));
     p.toggle (380, 295, 28, 14, "LFO on", nullptr);
-    p.tabs (420, 297, 108, 18, "LFO shape", "Sq|Saw|Tri|S&H", { 0.0f, 1.0f / 3.0f, 2.0f / 3.0f, 1.0f });
+    p.tabs (426, 318, 88, 16, "LFO shape", "Sq|Saw|Tri|S&H", { 0.0f, 1.0f / 3.0f, 2.0f / 3.0f, 1.0f });
     p.knob (347, 320, 30, "LFO rate", TR_NOOP ("Rate"));
     p.knob (390, 320, 30, "LFO delay", TR_NOOP ("Delay"));
-    p.toggle (432, 338, 96, 16, "LFO retrigger", TR_NOOP ("Retrigger"), boxed);
-    p.section (536, 292, 24, 82, nullptr, boxed);
-    p.toggle (537, 300, 22, 60, "Chorus", TR_NOOP ("Ch"), boxed);
+    p.toggle (426, 342, 88, 16, "LFO retrigger", TR_NOOP ("Retrigger"), boxed);
+    p.section (522, 292, 38, 82, nullptr, boxed);
+    p.toggle (525, 300, 32, 66, "Chorus", TR_NOOP ("Ch"), boxed);
     p.name (6, 296, 320, 74, "SimSynth");
     return std::move (p.l);
 }
@@ -424,8 +423,8 @@ Layout ogunLayout (bool autogun)
     p.fader (69, 18, 20, 58, "Fine pitch", TR_NOOP ("Fine"), bipolar);
     p.section (98, 0, 216, 96, TR_NOOP ("Modulation"));
     p.display (104, 18, 74, 74, "xy", "Modulation X", "Modulation Y");
-    p.knob (190, 22, 26, "Modulation X", "X");
-    p.knob (190, 58, 26, "Modulation Y", "Y");
+    p.knob (188, 18, 22, "Modulation X", "X");
+    p.knob (188, 56, 22, "Modulation Y", "Y");
     p.stepper (240, 36, 66, 22, "Quality", TR_NOOP ("Quality"), 4);
     p.section (318, 0, 238, 96, nullptr, boxed);
     p.name (326, 8, 222, 50, autogun ? "Autogun" : "Ogun");
