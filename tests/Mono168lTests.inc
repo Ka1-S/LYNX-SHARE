@@ -293,7 +293,12 @@ TEST (mono168l_every_engine_plays_mono_legato_and_porta)
         setChannelMono (mono, true);
         low.length = ppq * 2;
         high.length = ppq * 2;
-        const auto ref = issue14::pitchAt (issue14::renderPattern (c, { high }, 0.0f, 1.6), 1.0);
+        // the references, as issue14's audit: C5 and G5 held 8 beats, read at 1 s (the engine's own timbre at each pitch)
+        auto held = low;
+        held.length = ppq * 8;
+        const auto base = issue14::pitchAt (issue14::renderPattern (c, { held }, 0.0f, 1.6), 1.0);
+        held.key = 67;
+        const auto ref = issue14::pitchAt (issue14::renderPattern (c, { held }, 0.0f, 1.6), 1.0);
         high.start = ppq;
         const auto legato = issue14::renderPattern (mono, { low, high }, 0.0f, 1.6);
         const auto before = issue14::pitchAt (legato, 0.3), after = issue14::pitchAt (legato, 1.1);
@@ -309,11 +314,15 @@ TEST (mono168l_every_engine_plays_mono_legato_and_porta)
                          issue14::cents (ref, before), issue14::cents (ref, after), issue14::cents (ref, mid), issue14::cents (ref, end));
         if (noSlide.count (std::string (e.name)) != 0 || ref <= 0.0)
             continue;
-        const auto near = [ref] (double hz, double cents) { return std::abs (issue14::cents (ref, hz) - cents) < 40.0; };
+        // within 40 cents of G5 + `cents`, or (an engine whose key doesn't move its pitch the plain way) of C5 + 700 + `cents`
+        const auto near = [ref, base] (double hz, double cents) {
+            return std::abs (issue14::cents (ref, hz) - cents) < 40.0 || std::abs (issue14::cents (base, hz) - 700.0 - cents) < 40.0;
+        };
         const auto monoOk = near (before, -700.0) && near (after, 0.0);
         // (mid-glide: the window at 0.6…0.685 s is a quarter of the way into the glide that started at 0.5 s)
         const auto midCents = issue14::cents (ref, mid);
-        const auto portaOk = midCents > -620.0 && midCents < -250.0 && near (end, 0.0);
+        const auto midBase = issue14::cents (base, mid) - 700.0;
+        const auto portaOk = ((midCents > -620.0 && midCents < -250.0) || (midBase > -620.0 && midBase < -250.0)) && near (end, 0.0);
         if (! monoOk || ! portaOk)
             std::printf ("  mono/porta: %s (mono %+.0f → %+.0f, porta mid %+.0f end %+.0f cents)\n", e.name, issue14::cents (ref, before),
                          issue14::cents (ref, after), midCents, issue14::cents (ref, end));

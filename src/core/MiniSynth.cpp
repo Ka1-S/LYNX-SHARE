@@ -1239,6 +1239,7 @@ public:
         plugin.noteOn (k, initVol, channelVol, std::clamp ((double) nextPan + channelPan, -1.0, 1.0),
                        (double) knob + (double) nextCents);
         plugin.held[k].slide.anchor (live.ref (knob));
+        plugin.sliding = plugin.sliding || plugin.held[k].slide.moving(); // (a porta glide-in, round 168l)
         nextPan = 0.0f;
         nextCents = 0.0f;
     }

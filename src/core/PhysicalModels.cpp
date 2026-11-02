@@ -1498,6 +1498,7 @@ public:
         noteCents = pitchCents.load() + nextCents;
         nextCents = 0.0f;
         slide = {};
+        slide.anchor (NAN); // (the channel porta's glide-in, round 168l; the live pitch is not tracked here)
         mailbox.read (raw);
         computeParams (std::sqrt (std::clamp ((double) velocity, 0.0, 1.0)));
         e = amp;
