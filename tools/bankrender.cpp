@@ -98,12 +98,13 @@ int main (int argc, char** argv)
                 continue;
             std::vector<float> out;
             const bool mono = bank[(std::size_t) i].category == "Bass" || bank[(std::size_t) i].category == "Lead";
+            const int low = bank[(std::size_t) i].category == "Bass" ? 36 : 60; // a bass at C2, a lead at C4
             if (kind == lynx::InstrumentKind::toxic)
             {
                 std::vector<lynx::toxic::RefNote> notes;
                 for (const auto key : { 48, 52, 55 })
                     if (! mono || key == 48)
-                        notes.push_back ({ 0, mono ? 36 : key, 1.0, 1.0, 0.0, 0.0, held });
+                        notes.push_back ({ 0, mono ? low : key, 1.0, 1.0, 0.0, 0.0, held });
                 out = lynx::toxic::renderReference (loaded->pluginState, notes, rate, length, "");
             }
             else
@@ -111,7 +112,7 @@ int main (int argc, char** argv)
                 std::vector<lynx::poizone::RefNote> notes;
                 for (const auto key : { 48, 52, 55 })
                     if (! mono || key == 48)
-                        notes.push_back ({ 0, mono ? 36 : key, 1.0, 1.0, 0.0, 0.0, held });
+                        notes.push_back ({ 0, mono ? low : key, 1.0, 1.0, 0.0, 0.0, held });
                 out = lynx::poizone::renderReference (loaded->pluginState, notes, rate, length);
             }
             float peak = 0.0f;

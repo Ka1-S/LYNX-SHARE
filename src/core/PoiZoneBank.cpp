@@ -134,7 +134,7 @@ std::vector<Preset> poizoneBank()
             t.filter (0, 0.2f, 0.4f, 0.4f);
             t.modEnv (0, 0.5f, 5, 160, 0.0f, 80);
             t.amp (1, 300, 0.0f, 80);
-            t.gain (0.62f);
+            t.gain (0.887f);
         }),
 
         // --- lead
@@ -162,7 +162,7 @@ std::vector<Preset> poizoneBank()
             t.amp (5, 800, 1.0f, 300);
             t.delay (0.43f, 0.43f, 0.3f, 0.2f);
             t.chorus (0.25f, 0.4f, 0.3f);
-            t.gain (0.5f);
+            t.gain (0.307f);
         }),
         make ("Sync Scream", "Lead", { "sync", "sweep" }, [] (Poi& t) {
             t.mono (0.06f), t.oscA (false), t.oscB (false, 12), t.sync (true), t.balance (0.7f);
@@ -188,7 +188,7 @@ std::vector<Preset> poizoneBank()
             t.modEnv (0, 0.2f, 1200, 2000, 0.5f, 1500);
             t.amp (900, 2000, 1.0f, 1800);
             t.chorus (0.2f, 0.5f, 0.4f);
-            t.gain (0.52f);
+            t.gain (0.327f);
         }),
         make ("PWM Strings", "Pad", { "pwm", "strings" }, [] (Poi& t) {
             t.oscA (true, 0.55f), t.oscB (true, 0, 0.1f, 0.45f), t.balance (0.5f);
@@ -196,7 +196,7 @@ std::vector<Preset> poizoneBank()
             t.filter (0, 0.55f, 0.05f);
             t.amp (500, 1000, 1.0f, 900);
             t.chorus (0.25f, 0.5f, 0.4f);
-            t.gain (0.52f);
+            t.gain (0.387f);
         }),
         make ("Sweep Pad", "Pad", { "sweep", "lfo" }, [] (Poi& t) {
             t.oscA (false), t.oscB (false, 7, 0.1f), t.balance (0.45f);
@@ -264,7 +264,7 @@ std::vector<Preset> poizoneBank()
             t.modEnv (0, 0.25f, 5, 600, 0.2f, 300);
             t.amp (2, 1200, 0.4f, 400);
             t.chorus (0.25f, 0.4f, 0.3f);
-            t.gain (0.62f);
+            t.gain (0.457f);
         }),
 
         // --- fx

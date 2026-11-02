@@ -3713,8 +3713,8 @@ Layout toxicMain()
         v.push_back (toggle (x0 + 140, 407, 56, 15, stored ("LFO " + n + " free"), TR_NOOP ("Free")));
         v.push_back (display (x0 + 8, 426, 74, 44, "toxicwave", stored ("LFO " + n + " wave")));
         v.push_back (stepper (x0 + 8, 474, 74, 36, stored ("LFO " + n + " wave"), TR_NOOP ("Wave"), 32));
-        v.push_back (knob (x0 + 116, 452, 32, stored ("LFO " + n + " speed"), TR_NOOP ("Speed"), 482));
-        v.push_back (menuOf (x0 + 94, 476, 98, 34, stored ("LFO " + n + " sync"), TR_NOOP ("Sync"), syncs));
+        v.push_back (knob (x0 + 143, 444, 28, stored ("LFO " + n + " speed"), TR_NOOP ("Speed"), 466));
+        v.push_back (menuOf (x0 + 94, 482, 98, 32, stored ("LFO " + n + " sync"), TR_NOOP ("Sync"), syncs));
     }
 
     // FILTER
