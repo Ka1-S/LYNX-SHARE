@@ -6368,3 +6368,5 @@ countries: jp
 "Mixer presets (FL)" = "ミキサープリセット (FL)"
 "This file is not a mixer track state LYNX SHARE can read." = "このファイルは LYNX SHARE が読み込めるミキサートラックの状態ではありません。"
 "Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "ミキサープリセット: [2xLMB] 選択したミキサートラックに読み込む  ミキサートラックにドラッグ (ミキサーの空き領域へ: 新しいトラック)"
+"Stretched pattern clips loop their pattern (LYNX)" = "引き伸ばしたパターンクリップはパターンをループする (LYNX)"
+"On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "オン: パターンより長く引き伸ばしたパターンクリップはパターンを繰り返します。オフ: FL Studio と同じくパターンを 1 回だけ再生します"

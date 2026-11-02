@@ -171,6 +171,7 @@ ScheduleIndex makeScheduleIndex (const Song& song)
     index.songLength = song.songLength();
     index.maxShift = maxChannelShift (song.channels);
     index.maxNoteLength.reserve (song.patterns.size());
+    index.patternLength.reserve (song.patterns.size());
 
     for (const auto& p : song.patterns)
     {
@@ -178,6 +179,7 @@ ScheduleIndex makeScheduleIndex (const Song& song)
         for (const auto& n : p.notes)
             longest = std::max (longest, n.length);
         index.maxNoteLength.push_back (longest);
+        index.patternLength.push_back (std::max<std::int64_t> (1, p.effectiveLength (song.beatsPerBar)));
     }
 
     return index;
@@ -266,74 +268,106 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
     if (! overlaps ((double) clip.start, (double) clip.end() + 1.0))
         return;
 
-    const auto& notes = song.patterns[(std::size_t) clip.pattern].notes;
-    auto first = notes.begin(), last = notes.end();
+    const auto& pattern = song.patterns[(std::size_t) clip.pattern];
+    const auto& notes = pattern.notes;
+    // LYNX extra (stretchedClipsLoop(), default on; issue #25): a pattern clip longer than its pattern loops it (FL
+    // plays it once, round 168k; the Playlist draws what plays): pass k plays the pattern's notes k·L later, L = the
+    // pattern's length. A clip within its pattern, or the option off, is one pass of the notes in [offset, offset + length).
+    const auto period = index != nullptr && (std::size_t) clip.pattern < index->patternLength.size()
+                            ? index->patternLength[(std::size_t) clip.pattern]
+                            : std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
+    const auto repeats = stretchedClipsLoop() && clip.offset + clip.length > period;
+    const auto firstPass = repeats ? clip.offset / period : 0, lastPass = repeats ? (clip.offset + clip.length - 1) / period : 0;
 
-    // with the index and without the block wrapping around the end of the song: only the notes whose "on" or "off"
-    // can fall in the block (swing delays by at most half a step)
+    // one pass: the notes `shift` ticks later (pass ticks = pattern ticks + shift)
+    auto playPass = [&] (std::int64_t shift) {
+        auto first = notes.begin(), last = notes.end();
+
+        // with the index and without the block wrapping around the end of the song: only the notes whose "on" or "off"
+        // can fall in the block (swing delays by at most half a step)
+        if (index != nullptr && loopEnd <= (double) loop && (std::size_t) clip.pattern < index->maxNoteLength.size())
+        {
+            const auto local = (double) (clip.offset - clip.start - shift);
+            const auto from = loopStart + local - (double) (ticksPerStep + index->maxNoteLength[(std::size_t) clip.pattern] + index->maxShift) - 1.0;
+            const auto to = loopEnd + local + 1.0;
+            if (to < 0.0 || (repeats && from >= (double) period))
+                return;
+            first = std::lower_bound (notes.begin(), notes.end(), from, [] (const Note& n, double t) { return (double) n.start < t; });
+            last = std::upper_bound (first, notes.end(), to, [] (double t, const Note& n) { return t < (double) n.start; });
+        }
+
+        for (auto it = first; it != last; ++it)
+        {
+            const auto& note = *it;
+            if (repeats && note.start >= period) // a pass is the pattern's length
+                continue;
+            const auto start = note.start + shift; // where the note is in the clip's passes
+
+            if (note.muted || start >= clip.offset + clip.length)
+                continue;
+
+            const auto timing = noteTiming (note, song.swing, channelOf (&song.channels, note.channel));
+            auto on = std::min (clip.start + (start - clip.offset) + (timing.start - note.start), clip.end() - 1);
+            auto off = std::min (on + timing.length, clip.end());
+
+            // FL's "Play truncated notes in clips" (FUN_010608a0): a note starting before the clip's offset keeps what is
+            // left of it from the clip's start (dropped when nothing is left); off: dropped
+            if (start < clip.offset)
+            {
+                const auto left = start + timing.length - clip.offset;
+                if (! song.playTruncatedNotes || left < 1)
+                    continue;
+                on = clip.start;
+                off = std::min (clip.start + left, clip.end());
+            }
+
+            NoteEvent e;
+            e.type = NoteEvent::Type::on;
+            e.channel = note.channel;
+            e.key = note.key;
+            e.velocity = note.velocity;
+            e.pan = note.pan;
+            e.cents = note.finePitch;
+            e.porta = note.porta;
+            e.modX = note.modX;
+            e.modY = note.modY;
+            e.release = note.release;
+            e.colour = (std::int8_t) (note.colour & 15);
+
+            if (note.slide)
+            {
+                e.type = NoteEvent::Type::slide;
+                e.slideSamples = (float) ((double) (off - on) / tps);
+                emitOccurrences ((double) on, loop, startTick, endTick, tps, numSamples, e, out);
+                continue;
+            }
+
+            emitOccurrences ((double) on, loop, startTick, endTick, tps, numSamples, e, out);
+            if (chase && (double) on + tps <= loopStart && (double) off > loopStart)
+            {
+                e.sampleOffset = 0; // a note crossing the start position ("Play truncated notes on transport")
+                out.add (e);
+            }
+
+            e.type = NoteEvent::Type::off;
+            e.velocity = 0.0f;
+            emitOccurrences ((double) off, loop, startTick, endTick, tps, numSamples, e, out);
+        }
+    };
+
+    if (! repeats)
+        return playPass (0);
+    auto from = firstPass, to = lastPass;
     if (index != nullptr && loopEnd <= (double) loop && (std::size_t) clip.pattern < index->maxNoteLength.size())
     {
-        const auto local = (double) (clip.offset - clip.start);
-        const auto from = loopStart + local - (double) (ticksPerStep + index->maxNoteLength[(std::size_t) clip.pattern] + index->maxShift) - 1.0;
-        const auto to = loopEnd + local + 1.0;
-        first = std::lower_bound (notes.begin(), notes.end(), from, [] (const Note& n, double t) { return (double) n.start < t; });
-        last = std::upper_bound (first, notes.end(), to, [] (double t, const Note& n) { return t < (double) n.start; });
+        // only the passes the block can reach (a long clip of a short pattern has many)
+        const auto slack = (double) (ticksPerStep + index->maxNoteLength[(std::size_t) clip.pattern] + index->maxShift) + 1.0;
+        const auto at = [&] (double tick) { return (std::int64_t) std::floor ((tick - (double) clip.start + (double) clip.offset) / (double) period); };
+        from = std::max (from, at (loopStart - slack));
+        to = std::min (to, at (loopEnd + 1.0));
     }
-
-    for (auto it = first; it != last; ++it)
-    {
-        const auto& note = *it;
-
-        if (note.muted || note.start >= clip.offset + clip.length)
-            continue;
-
-        const auto timing = noteTiming (note, song.swing, channelOf (&song.channels, note.channel));
-        auto on = std::min (clip.start + (note.start - clip.offset) + (timing.start - note.start), clip.end() - 1);
-        auto off = std::min (on + timing.length, clip.end());
-
-        // FL's "Play truncated notes in clips" (FUN_010608a0): a note starting before the clip's offset keeps what is
-        // left of it from the clip's start (dropped when nothing is left); off: dropped
-        if (note.start < clip.offset)
-        {
-            const auto left = note.start + timing.length - clip.offset;
-            if (! song.playTruncatedNotes || left < 1)
-                continue;
-            on = clip.start;
-            off = std::min (clip.start + left, clip.end());
-        }
-
-        NoteEvent e;
-        e.type = NoteEvent::Type::on;
-        e.channel = note.channel;
-        e.key = note.key;
-        e.velocity = note.velocity;
-        e.pan = note.pan;
-        e.cents = note.finePitch;
-        e.porta = note.porta;
-        e.modX = note.modX;
-        e.modY = note.modY;
-        e.release = note.release;
-        e.colour = (std::int8_t) (note.colour & 15);
-
-        if (note.slide)
-        {
-            e.type = NoteEvent::Type::slide;
-            e.slideSamples = (float) ((double) (off - on) / tps);
-            emitOccurrences ((double) on, loop, startTick, endTick, tps, numSamples, e, out);
-            continue;
-        }
-
-        emitOccurrences ((double) on, loop, startTick, endTick, tps, numSamples, e, out);
-        if (chase && (double) on + tps <= loopStart && (double) off > loopStart)
-        {
-            e.sampleOffset = 0; // a note crossing the start position ("Play truncated notes on transport")
-            out.add (e);
-        }
-
-        e.type = NoteEvent::Type::off;
-        e.velocity = 0.0f;
-        emitOccurrences ((double) off, loop, startTick, endTick, tps, numSamples, e, out);
-    }
+    for (auto pass = from; pass <= to; ++pass)
+        playPass (pass * period);
 }
 } // namespace
 

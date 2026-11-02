@@ -6368,3 +6368,5 @@ countries: cn sg
 "Mixer presets (FL)" = "混音器预设 (FL)"
 "This file is not a mixer track state LYNX SHARE can read." = "此文件不是 LYNX SHARE 可读取的混音器轨道状态。"
 "Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "混音器预设: [2xLMB] 加载到所选混音器轨道  拖到混音器轨道上 (拖到混音器空白处: 新轨道)"
+"Stretched pattern clips loop their pattern (LYNX)" = "拉长的样式片段循环其样式 (LYNX)"
+"On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "开：拉长到超出其样式的样式片段会重复该样式。关：像 FL Studio 一样只播放一次样式"

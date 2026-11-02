@@ -6368,3 +6368,5 @@ countries: de at ch li lu
 "Mixer presets (FL)" = "Mixer-Presets (FL)"
 "This file is not a mixer track state LYNX SHARE can read." = "Diese Datei ist kein Mixer-Insert-Zustand, den LYNX SHARE lesen kann."
 "Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "Mixer-Preset: [2xLMB] auf die ausgewählten Mixer-Inserts laden  auf ein Mixer-Insert ziehen (auf die leere Mixerfläche: ein neues Insert)"
+"Stretched pattern clips loop their pattern (LYNX)" = "Gedehnte Pattern-Clips wiederholen ihr Pattern (LYNX)"
+"On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "Ein: Ein über sein Pattern hinaus gedehnter Pattern-Clip wiederholt das Pattern. Aus: Er spielt das Pattern einmal, wie in FL Studio"

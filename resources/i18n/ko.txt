@@ -6368,3 +6368,5 @@ countries: kr
 "Mixer presets (FL)" = "믹서 프리셋 (FL)"
 "This file is not a mixer track state LYNX SHARE can read." = "이 파일은 LYNX SHARE가 읽을 수 있는 믹서 트랙 상태가 아닙니다."
 "Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "믹서 프리셋: [2xLMB] 선택한 믹서 트랙에 불러오기  믹서 트랙으로 드래그 (믹서의 빈 공간으로: 새 트랙)"
+"Stretched pattern clips loop their pattern (LYNX)" = "늘린 패턴 클립이 패턴을 반복 (LYNX)"
+"On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "켜기: 패턴보다 길게 늘린 패턴 클립은 패턴을 반복합니다. 끄기: FL Studio처럼 패턴을 한 번만 재생합니다"

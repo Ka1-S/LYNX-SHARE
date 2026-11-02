@@ -6368,3 +6368,5 @@ countries: nl be
 "Mixer presets (FL)" = "Mixerpresets (FL)"
 "This file is not a mixer track state LYNX SHARE can read." = "Dit bestand is geen mixertrackstatus die LYNX SHARE kan lezen."
 "Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "Mixerpreset: [2xLMB] laden op de geselecteerde mixertracks  naar een mixertrack slepen (naar de lege mixerruimte: een nieuwe track)"
+"Stretched pattern clips loop their pattern (LYNX)" = "Uitgerekte patroonclips herhalen hun patroon (LYNX)"
+"On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "Aan: een patroonclip die voorbij zijn patroon is uitgerekt, herhaalt het patroon. Uit: hij speelt het patroon één keer, zoals in FL Studio"

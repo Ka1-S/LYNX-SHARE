@@ -109,6 +109,8 @@ public:
                                   const std::function<bool (double)>& progress, int& latency);
 
     void play() noexcept;
+    // --cliplooptest (round 167q): the device callback, driven by hand with a stand-in device
+    juce::AudioIODeviceCallback& deviceCallback() noexcept { return *this; }
 
     // Performance mode (round 165m, core/Performance.h): launch / release / stop zone clips (message thread). The
     // clips start on the next block, quantized by their track's Performance settings; nothing launches while stopped.

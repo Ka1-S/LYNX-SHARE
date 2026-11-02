@@ -6368,3 +6368,5 @@ countries: id
 "Mixer presets (FL)" = "Preset mixer (FL)"
 "This file is not a mixer track state LYNX SHARE can read." = "File ini bukan state trek mixer yang dapat dibaca LYNX SHARE."
 "Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "Preset mixer: [2xLMB] muat ke trek mixer yang dipilih  seret ke trek mixer (ke ruang kosong mixer: trek baru)"
+"Stretched pattern clips loop their pattern (LYNX)" = "Klip pattern yang diregangkan mengulang pattern-nya (LYNX)"
+"On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "Aktif: klip pattern yang diregangkan melewati pattern-nya mengulang pattern. Nonaktif: memutar pattern sekali, seperti di FL Studio"

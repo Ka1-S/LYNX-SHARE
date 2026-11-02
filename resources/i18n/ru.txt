@@ -6368,3 +6368,5 @@ countries: ru by kz
 "Mixer presets (FL)" = "Пресеты микшера (FL)"
 "This file is not a mixer track state LYNX SHARE can read." = "Этот файл не является состоянием дорожки микшера, которое может прочитать LYNX SHARE."
 "Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "Пресет микшера: [2xLMB] загрузить на выбранные дорожки микшера  перетащить на дорожку микшера (на пустое место микшера: новая дорожка)"
+"Stretched pattern clips loop their pattern (LYNX)" = "Растянутые клипы паттернов повторяют свой паттерн (LYNX)"
+"On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "Вкл.: клип паттерна, растянутый дальше конца паттерна, повторяет паттерн. Выкл.: паттерн играет один раз, как в FL Studio"
