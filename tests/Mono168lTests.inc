@@ -278,10 +278,10 @@ TEST (mono168l_every_engine_plays_mono_legato_and_porta)
             const auto taken = HostSlide::pendingGlide().taken;
             HostSlide::pendingGlide() = {};
             if (taken != in.followsChannelPorta())
-                std::printf ("  porta: %s %s the glide at note on\n", e.name.c_str(), taken ? "takes" : "does not take");
+                std::printf ("  porta: %s %s the glide at note on\n", e.name, taken ? "takes" : "does not take");
             CHECK (taken == in.followsChannelPorta());
         }
-        if (unreadable.count (e.name) != 0)
+        if (unreadable.count (std::string (e.name)) != 0)
             continue;
         Note low;
         low.key = 60;
@@ -305,9 +305,9 @@ TEST (mono168l_every_engine_plays_mono_legato_and_porta)
         const auto glide = issue14::renderPattern (porta, { low, high }, 0.0f, 1.6);
         const auto mid = issue14::pitchAt (glide, 0.6), end = issue14::pitchAt (glide, 1.2);
         if (print)
-            std::printf ("  %-28s ref %7.1f Hz  mono %+6.0f → %+6.0f  porta mid %+6.0f end %+6.0f cents\n", e.name.c_str(), ref,
+            std::printf ("  %-28s ref %7.1f Hz  mono %+6.0f → %+6.0f  porta mid %+6.0f end %+6.0f cents\n", e.name, ref,
                          issue14::cents (ref, before), issue14::cents (ref, after), issue14::cents (ref, mid), issue14::cents (ref, end));
-        if (noSlide.count (e.name) != 0 || ref <= 0.0)
+        if (noSlide.count (std::string (e.name)) != 0 || ref <= 0.0)
             continue;
         const auto near = [ref] (double hz, double cents) { return std::abs (issue14::cents (ref, hz) - cents) < 40.0; };
         const auto monoOk = near (before, -700.0) && near (after, 0.0);
@@ -315,7 +315,7 @@ TEST (mono168l_every_engine_plays_mono_legato_and_porta)
         const auto midCents = issue14::cents (ref, mid);
         const auto portaOk = midCents > -620.0 && midCents < -250.0 && near (end, 0.0);
         if (! monoOk || ! portaOk)
-            std::printf ("  mono/porta: %s (mono %+.0f → %+.0f, porta mid %+.0f end %+.0f cents)\n", e.name.c_str(), issue14::cents (ref, before),
+            std::printf ("  mono/porta: %s (mono %+.0f → %+.0f, porta mid %+.0f end %+.0f cents)\n", e.name, issue14::cents (ref, before),
                          issue14::cents (ref, after), midCents, issue14::cents (ref, end));
         CHECK (monoOk);
         CHECK (portaOk);

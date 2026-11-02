@@ -103,11 +103,18 @@ porta takes the glide); updated `rea143b_channel_misc_functions`, `rea139_…` (
   plugin's bend range decides how far it can go — LYNX's wrapper option, default ±2 → wider jumps clamp). [INFERENCE]
 - Release tails of earlier, already released voices are left ringing on a Mono channel (FL's code does not kill
   them: the limiter is off and the mono list holds only held notes).
+- Patcher, Slayer, SoundFont and Transistor Bass follow Mono (their `slideTo`) but not Porta's glide-in (no per-voice
+  HostSlide): a Porta note starts at its own pitch there.
+- Channel echo repeats (Misc › Echo delay) never join the Mono list: FL's glide is off with echo feedback, and the
+  repeats are internal notes.
+
+## Windows check (fresh profile, LYNX_TEST_MODE=1, real mouse)
+`C:\Users\kauan\lynx-test\mono168l\`: g4 (3x Osc added from Add › FL engines), g5 (Misc tab: Max / Slide / Porta /
+Mono enabled, not greyed as on main), g6 / g7 (Porta and Mono ticked; Mono's hint in the hint bar), g8-after (LYNX
+closed by PID, clean desktop).
 
 ## Where I stopped
-- Done: REA (above), core layer, renderer (song + live), engines' glide-in, model / import / file / migration, UI
-  tooltip + 15 languages, tests written. WIP pushed as `wip/mono168l`.
-- In progress: first build-local with FL Data (`coord/bl-wt.sh mono168l`, log `coord/bl-mono168l.log`).
-- Next: fix build/test failures; Windows build + GUI check (3x Osc → Misc → Mono / Porta, play legato, fresh profile);
-  notes-0.1.22.md; regenerate i18n headers (`python3 tools/make_i18n.py`) after merging origin/main; land.
-- Rerun: `~/.claude/jobs/f8789b49/tmp/coord/buildslot.sh ~/.claude/jobs/f8789b49/tmp/coord/bl-wt.sh mono168l`.
+- Done: REA, core layer, renderer (song + live), engines' glide-in, model / import / file / migration, UI tooltip +
+  15 languages, tests, Windows build + GUI check, notes-0.1.22.md.
+- Next: build-local result (`coord/bl-mono168l.log`); merge origin/main; `python3 tools/make_i18n.py`; land.
+- Rerun: `BUILDSLOT_PRIO=1 ~/.claude/jobs/f8789b49/tmp/coord/buildslot.sh ~/.claude/jobs/f8789b49/tmp/coord/bl-wt.sh mono168l`.
