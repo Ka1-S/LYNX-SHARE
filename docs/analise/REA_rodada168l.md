@@ -77,6 +77,8 @@ generator never learns about Mono**: it only gets the Max polyphony value.
   the old voice is released and the new note starts. Porta: the note starts at the last note's pitch (its cents) and
   its voice glides home through `HostSlide::anchor` (`HostSlide::pendingGlide`, set by the rack around noteOn) — the
   21 native FL engines with per-voice HostSlide say `followsChannelPorta()`; a hosted plugin starts bent and bends back.
+  (Toxic Biohazard, PoiZone and MiniSynth only advance a slide while a slide note runs: the glide-in raises that
+  flag too; Drumpad's voice now takes the glide-in — the first test run caught both.)
 - The 10 FL engines that took LYNX's Synth mono flag as "max polyphony 1" (3x Osc, BeepMap, PoiZone, Granulizer,
   Plucked!, DX10, Sawer, Sytrus, Ogun / Autogun, Fruit Kick) now take the channel's **Max polyphony = 1**, as FL tells
   them (`FUN_00fed7c0`), never the Mono box.
@@ -116,5 +118,7 @@ closed by PID, clean desktop).
 ## Where I stopped
 - Done: REA, core layer, renderer (song + live), engines' glide-in, model / import / file / migration, UI tooltip +
   15 languages, tests, Windows build + GUI check, notes-0.1.22.md.
-- Next: build-local result (`coord/bl-mono168l.log`); merge origin/main; `python3 tools/make_i18n.py`; land.
+- First build-local: 27 failures — i18n headers (expected, regenerated after the merge), the audit's reference note
+  ended where it was read (now issue14's method), Toxic / PoiZone / Drumpad glide-in (fixed).
+- Merged origin/main (25fcfc65), i18n regenerated. Next: build-local, land.
 - Rerun: `BUILDSLOT_PRIO=1 ~/.claude/jobs/f8789b49/tmp/coord/buildslot.sh ~/.claude/jobs/f8789b49/tmp/coord/bl-wt.sh mono168l`.
