@@ -99,6 +99,30 @@ std::vector<int> exportTracks (const Song& song, bool groups);
 // the track's name or "Track N"); characters illegal in file names replaced.
 std::string trackExportName (const Song& song, const std::string& projectName, int track);
 
+// --- File › Export › "Project bones..." (FUN_011edb50 / FUN_011ecca0) ------------------------------------------------
+
+// FL writes into a sub-folder of the chosen folder: Channels\<filter group>\<channel>.fst, Effects\<plugin>.fst,
+// Mixer\<insert>.fst, Scores\<pattern> - <channel>.fsc, Automation\<pattern> - <parameter>.fsc. LYNX writes what it has
+// a file format for: Mixer\<insert>.lynxtrack (the insert's state), Effects\<effect>.lynxpreset (every effect of every
+// insert) and Scores\<pattern> - <channel>.mid (each channel's notes in each pattern).
+struct Bone
+{
+    enum class Kind
+    {
+        mixer,  // `track`: a mixer track with effects or a name
+        effect, // `track`, `slot`: an effect of it
+        score   // `pattern`, `channel`: the channel's notes in the pattern
+    };
+    Kind kind = Kind::mixer;
+    std::string folder;  // "Mixer", "Effects", "Scores"
+    std::string name;    // the file name without extension (unique within its folder; illegal characters replaced)
+    int track = -1, slot = -1, pattern = -1, channel = -1;
+};
+std::vector<Bone> projectBones (const Song& song);
+
+// A name made safe as a file name (illegal characters replaced, trimmed; `fallback` when nothing is left).
+std::string safeFileName (const std::string& name, const std::string& fallback);
+
 // The length in ticks of `seconds` of audio placed at `startTick` (the song's tempo map).
 std::int64_t ticksForSeconds (const Song& song, std::int64_t startTick, double seconds);
 } // namespace lynx::quickrender

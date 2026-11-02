@@ -6299,3 +6299,8 @@ countries: de at ch li lu
 "Can't master while recording" = "Während der Aufnahme kann nicht gemastert werden"
 "Mastering isn't possible while recording.\nPlease stop recording to master the project." = "Mastern ist während der Aufnahme nicht möglich.\nBitte die Aufnahme stoppen, um das Projekt zu mastern."
 "Master..." = "Mastern..."
+"Save project bones (channel / effect presets & scores) subdirectory in..." = "Projektknochen (Kanal-/Effekt-Presets und Noten) in einem Unterordner speichern von..."
+"Export project bones" = "Projektknochen exportieren"
+"The project has no mixer states, effects or notes to export." = "Das Projekt hat keine Mixer-Zustände, Effekte oder Noten zum Exportieren."
+"Some files could not be written:" = "Einige Dateien konnten nicht geschrieben werden:"
+"Project bones..." = "Projektknochen..."

@@ -6299,3 +6299,8 @@ countries: jp
 "Can't master while recording" = "録音中はマスタリングできません"
 "Mastering isn't possible while recording.\nPlease stop recording to master the project." = "録音中はマスタリングできません。\nプロジェクトをマスタリングするには録音を停止してください。"
 "Master..." = "マスタリング..."
+"Save project bones (channel / effect presets & scores) subdirectory in..." = "プロジェクトのボーン(チャンネル/エフェクトのプリセットとスコア)をサブフォルダーに保存..."
+"Export project bones" = "プロジェクトのボーンを書き出す"
+"The project has no mixer states, effects or notes to export." = "書き出すミキサーの状態、エフェクト、ノートがプロジェクトにありません。"
+"Some files could not be written:" = "一部のファイルを書き込めませんでした:"
+"Project bones..." = "プロジェクトのボーン..."

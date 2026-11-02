@@ -6299,3 +6299,8 @@ countries: ru by kz
 "Can't master while recording" = "Нельзя делать мастеринг во время записи"
 "Mastering isn't possible while recording.\nPlease stop recording to master the project." = "Мастеринг невозможен во время записи.\nОстановите запись, чтобы сделать мастеринг проекта."
 "Master..." = "Мастеринг..."
+"Save project bones (channel / effect presets & scores) subdirectory in..." = "Сохранить «кости» проекта (пресеты каналов / эффектов и партитуры) в подпапку в..."
+"Export project bones" = "Экспорт «костей» проекта"
+"The project has no mixer states, effects or notes to export." = "В проекте нет состояний микшера, эффектов или нот для экспорта."
+"Some files could not be written:" = "Некоторые файлы не удалось записать:"
+"Project bones..." = "«Кости» проекта..."

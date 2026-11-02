@@ -6299,3 +6299,8 @@ countries: id
 "Can't master while recording" = "Tidak bisa mastering saat merekam"
 "Mastering isn't possible while recording.\nPlease stop recording to master the project." = "Mastering tidak bisa dilakukan saat merekam.\nHentikan rekaman untuk mastering proyek."
 "Master..." = "Master..."
+"Save project bones (channel / effect presets & scores) subdirectory in..." = "Simpan tulang proyek (preset channel / efek dan partitur) di subfolder dari..."
+"Export project bones" = "Ekspor tulang proyek"
+"The project has no mixer states, effects or notes to export." = "Proyek tidak memiliki status mixer, efek, atau not untuk diekspor."
+"Some files could not be written:" = "Beberapa file tidak bisa ditulis:"
+"Project bones..." = "Tulang proyek..."

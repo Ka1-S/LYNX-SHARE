@@ -6299,3 +6299,8 @@ countries: tw hk mo
 "Can't master while recording" = "錄音時無法進行母帶處理"
 "Mastering isn't possible while recording.\nPlease stop recording to master the project." = "錄音時無法進行母帶處理。\n請停止錄音後再對專案進行母帶處理。"
 "Master..." = "母帶處理..."
+"Save project bones (channel / effect presets & scores) subdirectory in..." = "將專案骨架(通道/效果預設和樂譜)儲存到以下位置的子資料夾..."
+"Export project bones" = "匯出專案骨架"
+"The project has no mixer states, effects or notes to export." = "專案中沒有可匯出的混音器狀態、效果或音符。"
+"Some files could not be written:" = "部分檔案無法寫入:"
+"Project bones..." = "專案骨架..."

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <limits>
 
+#include "core/Effects.h"
 #include "core/NoteEdit.h"
 
 namespace lynx::quickrender
@@ -300,6 +301,75 @@ std::string trackExportName (const Song& song, const std::string& projectName, i
         if (std::string ("\\/:*?\"<>|").find (ch) != std::string::npos || (unsigned char) ch < 32)
             ch = '_';
     return name;
+}
+
+std::string safeFileName (const std::string& name, const std::string& fallback)
+{
+    auto out = name;
+    for (auto& ch : out)
+        if (std::string ("\\/:*?\"<>|").find (ch) != std::string::npos || (unsigned char) ch < 32)
+            ch = '_';
+    const auto first = out.find_first_not_of (" .");
+    const auto last = out.find_last_not_of (" .");
+    out = first == std::string::npos ? std::string() : out.substr (first, last - first + 1);
+    return out.empty() ? fallback : out;
+}
+
+std::vector<Bone> projectBones (const Song& song)
+{
+    std::vector<Bone> out;
+    std::vector<std::string> taken; // "<folder>/<name>", case kept (the tests and the file system decide the rest)
+    auto add = [&out, &taken] (Bone b) {
+        auto name = b.name;
+        for (int k = 2; std::find (taken.begin(), taken.end(), b.folder + "/" + name) != taken.end(); ++k)
+            name = b.name + " (" + std::to_string (k) + ")";
+        b.name = name;
+        taken.push_back (b.folder + "/" + name);
+        out.push_back (std::move (b));
+    };
+
+    for (int t = 0; t < (int) song.mixer.size(); ++t)
+    {
+        const auto& track = song.mixer[(std::size_t) t];
+        if (track.effects.empty() && track.name.empty())
+            continue;
+        const auto trackName = ! track.name.empty() ? track.name : (t == 0 ? std::string ("Master") : "Insert " + std::to_string (t));
+        Bone b;
+        b.kind = Bone::Kind::mixer;
+        b.folder = "Mixer";
+        b.name = safeFileName (trackName, "Insert");
+        b.track = t;
+        add (b);
+        for (int s = 0; s < (int) track.effects.size(); ++s)
+        {
+            const auto& slot = track.effects[(std::size_t) s];
+            if (slot.kind == EffectKind::parallel)
+                continue; // (a container has no preset of its own: the insert's state keeps it)
+            Bone e;
+            e.kind = Bone::Kind::effect;
+            e.folder = "Effects";
+            e.name = safeFileName (slot.kind == EffectKind::plugin ? slot.plugin.name : std::string (effectInfo (slot.kind).name), "Effect");
+            e.track = t;
+            e.slot = s;
+            add (e);
+        }
+    }
+
+    for (int p = 0; p < (int) song.patterns.size(); ++p)
+        for (int c = 0; c < (int) song.channels.size(); ++c)
+        {
+            const auto& notes = song.patterns[(std::size_t) p].notes;
+            if (std::none_of (notes.begin(), notes.end(), [c] (const Note& n) { return n.channel == c; }))
+                continue;
+            Bone b;
+            b.kind = Bone::Kind::score;
+            b.folder = "Scores";
+            b.name = safeFileName (patternName (song, p) + " - " + song.channels[(std::size_t) c].name, "Score");
+            b.pattern = p;
+            b.channel = c;
+            add (b);
+        }
+    return out;
 }
 
 std::int64_t ticksForSeconds (const Song& song, std::int64_t startTick, double seconds)

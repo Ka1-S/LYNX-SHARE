@@ -6299,3 +6299,8 @@ countries: it ch sm
 "Can't master while recording" = "Impossibile masterizzare durante la registrazione"
 "Mastering isn't possible while recording.\nPlease stop recording to master the project." = "Il mastering non è possibile durante la registrazione.\nFerma la registrazione per masterizzare il progetto."
 "Master..." = "Masterizza..."
+"Save project bones (channel / effect presets & scores) subdirectory in..." = "Salva le ossa del progetto (preset di canale / effetto e partiture) in una sottocartella di..."
+"Export project bones" = "Esporta le ossa del progetto"
+"The project has no mixer states, effects or notes to export." = "Il progetto non ha stati del mixer, effetti o note da esportare."
+"Some files could not be written:" = "Alcuni file non sono stati scritti:"
+"Project bones..." = "Ossa del progetto..."

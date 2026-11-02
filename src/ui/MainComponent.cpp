@@ -4739,6 +4739,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             exports.addSubMenu (tr ("All playlist track groups"), playlistTrackExportMenu (true));
             exports.addSeparator();
             exports.addItem (tr ("Project with samples (.zip)..."), [this] { exportPackage(); });
+            // FL's "Project bones..." (FileExportProjectBonesAction; REA round 168e)
+            exports.addItem (tr ("Project bones..."), [this] { exportProjectBones (engine, currentFile.getParentDirectory(), projectName); });
             exports.addItem (tr ("Project data files (collect the samples into a folder)..."), [this] { collectSamples(); });
             menu.addSubMenu (tr ("Export"), exports);
         }

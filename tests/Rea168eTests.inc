@@ -279,3 +279,42 @@ TEST (rea168e_mastering_target_and_ceiling)
     CHECK (std::all_of (silent.begin(), silent.end(), [] (float v) { return v == 0.0f; }));
     CHECK (mastering::targets().size() == 5 && mastering::targets()[2] == -14.0);
 }
+
+// File › Export › "Project bones..." (FUN_011ecca0): the mixer states, their effects and each channel's notes per pattern
+TEST (rea168e_project_bones)
+{
+    using namespace lynx;
+    auto song = Song::makeDefault();
+    for (auto& t : song.mixer)
+    {
+        t.effects.clear();
+        t.name.clear();
+    }
+    for (auto& p : song.patterns)
+        p.notes.clear();
+    song.mixer.resize (std::max<std::size_t> (song.mixer.size(), 4));
+    song.mixer[1].name = "Kick/Bus";
+    song.mixer[1].effects.resize (2); // two of the same effect: two files
+    song.mixer[3].effects.resize (1);
+    song.patterns.resize (2);
+    song.patterns[1].name = "Verse";
+    song.channels.resize (2);
+    song.channels[0].name = "Kick";
+    song.channels[1].name = "Hat";
+    Note n;
+    n.channel = 1;
+    song.patterns[1].notes.push_back (n);
+    song.patterns[1].notes.push_back (n);
+
+    const auto bones = quickrender::projectBones (song);
+    CHECK (bones.size() == 6);
+    if (bones.size() != 6)
+        return;
+    CHECK (bones[0].folder == "Mixer" && bones[0].name == "Kick_Bus" && bones[0].track == 1);
+    CHECK (bones[1].folder == "Effects" && bones[1].slot == 0);
+    CHECK (bones[2].folder == "Effects" && bones[2].name == bones[1].name + " (2)");
+    CHECK (bones[3].folder == "Mixer" && bones[3].name == "Insert 3");
+    CHECK (bones[4].folder == "Effects" && bones[4].name == bones[1].name + " (3)");
+    CHECK (bones[5].kind == quickrender::Bone::Kind::score && bones[5].name == "Verse - Hat" && bones[5].pattern == 1 && bones[5].channel == 1);
+    CHECK (quickrender::safeFileName (" . ", "x") == "x");
+}

@@ -3,6 +3,10 @@
 #include "core/PlaylistOps.h"
 #include "core/QuickRender.h"
 #include "core/Mastering.h"
+#include "core/EffectPresets.h"
+#include "core/PluginPresets.h"
+#include "engine/MidiFileIo.h"
+#include "engine/ProjectFile.h"
 #include "core/HardwareInsert.h"
 #include "platform/Paths.h"
 #include "ui/WindowOwner.h"
@@ -1308,6 +1312,89 @@ void exportAllPlaylistTracks (AudioEngine& engine, const juce::String& projectNa
             (new TrackExportThread (std::move (items), o, skipped, folder))->launchThread();
         };
         showClipRenderWindow (engine, groups ? tr ("Export all playlist track groups") : tr ("Export all playlist tracks"), std::move (mode));
+    });
+}
+
+int writeProjectBones (const Song& song, const juce::File& dir, juce::StringArray& failed)
+{
+    int written = 0;
+    for (const auto& bone : quickrender::projectBones (song))
+    {
+        const auto folder = dir.getChildFile (bone.folder);
+        folder.createDirectory();
+        const auto name = juce::String::fromUTF8 (bone.name.c_str());
+        bool ok = false;
+        juce::File file;
+        if (bone.kind == quickrender::Bone::Kind::mixer)
+        {
+            file = folder.getChildFile (name + ProjectFile::mixerTrackStateExtension);
+            ok = file.replaceWithText (ProjectFile::mixerTrackStateToJson (song.mixer[(std::size_t) bone.track]));
+        }
+        else if (bone.kind == quickrender::Bone::Kind::effect)
+        {
+            const auto& slot = song.mixer[(std::size_t) bone.track].effects[(std::size_t) bone.slot];
+            file = folder.getChildFile (name + pluginpresets::extension);
+            if (slot.kind == EffectKind::plugin)
+            {
+                pluginpresets::Preset preset;
+                preset.name = slot.plugin.name;
+                preset.pluginName = slot.plugin.name;
+                preset.pluginId = slot.plugin.id;
+                juce::MemoryBlock state;
+                if (state.fromBase64Encoding (juce::String (slot.plugin.state)))
+                    preset.state.assign ((const std::uint8_t*) state.getData(), (const std::uint8_t*) state.getData() + state.getSize());
+                ok = ! preset.state.empty() && file.replaceWithText (juce::String::fromUTF8 (pluginpresets::toText (preset).c_str()));
+            }
+            else
+                ok = file.replaceWithText (juce::String::fromUTF8 (presets::toText (slot.kind, bone.name, slot.params).c_str()));
+        }
+        else
+        {
+            auto copy = song;
+            auto& notes = copy.patterns[(std::size_t) bone.pattern].notes;
+            notes.erase (std::remove_if (notes.begin(), notes.end(), [&bone] (const Note& n) { return n.channel != bone.channel; }), notes.end());
+            file = folder.getChildFile (name + ".mid");
+            juce::String error;
+            ok = MidiFileIo::savePattern (copy, bone.pattern, file, error);
+        }
+        if (ok)
+            ++written;
+        else
+            failed.add (bone.folder + "/" + name);
+    }
+    return written;
+}
+
+void exportProjectBones (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& projectName)
+{
+    // FL (FUN_011edb50): "Export project bones", a folder in which the bones go to a sub-folder named after the project
+    auto chooser = std::make_shared<juce::FileChooser> (tr ("Save project bones (channel / effect presets & scores) subdirectory in..."),
+                                                        suggestedFolder.isDirectory() ? suggestedFolder : renderFolder());
+    auto* engineRef = &engine;
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+                          [engineRef, projectName, chooser] (const juce::FileChooser& fc) {
+        const auto folder = fc.getResult();
+        if (! folder.isDirectory())
+            return;
+        engineRef->capturePluginStates();
+        const auto& song = engineRef->getSong();
+        const auto base = juce::String::fromUTF8 (quickrender::safeFileName (projectName.toStdString(), "LYNX SHARE").c_str());
+        auto dir = folder.getChildFile (base);
+        if (! dir.createDirectory())
+        {
+            warn (tr ("Error"), tr ("Could not create the folder {0}", { dir.getFullPathName() }));
+            return;
+        }
+        juce::StringArray failed;
+        const auto written = writeProjectBones (song, dir, failed);
+        if (written == 0 && failed.isEmpty())
+        {
+            warn (tr ("Export project bones"), tr ("The project has no mixer states, effects or notes to export."));
+            return;
+        }
+        if (! failed.isEmpty())
+            warn (tr ("Export project bones"), tr ("Some files could not be written:") + "\n" + failed.joinIntoString ("\n"));
+        dir.startAsProcess(); // (the folder, like FL's other exports to a folder)
     });
 }
 

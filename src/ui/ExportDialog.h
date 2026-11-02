@@ -12,6 +12,11 @@ namespace lynx
 void showExportDialog (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& suggestedName, int format = -1);
 // File › Export › "Master..." (Ctrl+Alt+M; round 168e): the Export window with the render mastered on the computer
 // (core/Mastering.h: a loudness target, −1 dBTP ceiling) where FL sends it to FL Cloud; "<project> (mastered)".
+// File › Export › "Project bones..." (REA round 168e, FUN_011edb50): the project's parts as files in a sub-folder of a
+// chosen folder named after the project (core/QuickRender.h projectBones: Mixer *.lynxtrack, Effects *.lynxpreset,
+// Scores *.mid). `writeProjectBones` writes them into `dir` (returns how many; the failed ones in `failed`).
+void exportProjectBones (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& projectName);
+int writeProjectBones (const Song& song, const juce::File& dir, juce::StringArray& failed);
 void showMasterDialog (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& projectName);
 // FL's Mixer › Disk recording › "Render armed / selected tracks to wave file(s)..." (REA round 165f-mixer): the same
 // window, set to one file per insert for `tracks` only (the Master in the list = also the full mix).

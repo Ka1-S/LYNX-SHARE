@@ -6299,3 +6299,8 @@ countries: kr
 "Can't master while recording" = "녹음 중에는 마스터링할 수 없음"
 "Mastering isn't possible while recording.\nPlease stop recording to master the project." = "녹음 중에는 마스터링할 수 없습니다.\n프로젝트를 마스터링하려면 녹음을 멈추세요."
 "Master..." = "마스터링..."
+"Save project bones (channel / effect presets & scores) subdirectory in..." = "프로젝트 본(채널/이펙트 프리셋 및 스코어)을 하위 폴더에 저장..."
+"Export project bones" = "프로젝트 본 내보내기"
+"The project has no mixer states, effects or notes to export." = "프로젝트에 내보낼 믹서 상태, 이펙트 또는 노트가 없습니다."
+"Some files could not be written:" = "일부 파일을 쓸 수 없습니다:"
+"Project bones..." = "프로젝트 본..."

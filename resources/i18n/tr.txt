@@ -6299,3 +6299,8 @@ countries: tr
 "Can't master while recording" = "Kayıt sırasında masterlanamaz"
 "Mastering isn't possible while recording.\nPlease stop recording to master the project." = "Kayıt sırasında mastering yapılamaz.\nProjeyi masterlamak için kaydı durdurun."
 "Master..." = "Masterla..."
+"Save project bones (channel / effect presets & scores) subdirectory in..." = "Proje kemiklerini (kanal / efekt presetleri ve notalar) şunun alt klasörüne kaydet..."
+"Export project bones" = "Proje kemiklerini dışa aktar"
+"The project has no mixer states, effects or notes to export." = "Projede dışa aktarılacak mikser durumu, efekt veya nota yok."
+"Some files could not be written:" = "Bazı dosyalar yazılamadı:"
+"Project bones..." = "Proje kemikleri..."

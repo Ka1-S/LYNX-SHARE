@@ -6299,3 +6299,8 @@ countries: nl be
 "Can't master while recording" = "Kan niet masteren tijdens opnemen"
 "Mastering isn't possible while recording.\nPlease stop recording to master the project." = "Masteren is niet mogelijk tijdens het opnemen.\nStop de opname om het project te masteren."
 "Master..." = "Masteren..."
+"Save project bones (channel / effect presets & scores) subdirectory in..." = "Projectbotten (kanaal-/effectpresets en partituren) opslaan in een submap van..."
+"Export project bones" = "Projectbotten exporteren"
+"The project has no mixer states, effects or notes to export." = "Het project heeft geen mixerstatussen, effecten of noten om te exporteren."
+"Some files could not be written:" = "Sommige bestanden konden niet worden geschreven:"
+"Project bones..." = "Projectbotten..."
