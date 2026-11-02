@@ -7,7 +7,7 @@
 //   <kind>|<category>|<name>|<notes>|<v0,v1,...>
 //   kind: fruitkick, plucked, drumpad, sakura  (the values are the engine's parameters, see core/DrumControls)
 //   notes: "key:vel:sec;key:vel:sec;..." (start times 0.0, 0.6, 1.2 s apart unless "@t" is given: "60:100:0.5@1.0")
-// Prints: name, peak dBFS, RMS dBFS (first 1 s), length to −60 dB, spectral centroid, low-band pitch estimate.
+// Rendered at the channel's default volume (FL's 78 %, −5.2 dB). Prints: name, peak dBFS, RMS dBFS (first 1 s), length to −60 dB, spectral centroid, low-band pitch estimate.
 #include <algorithm>
 #include <cmath>
 #include <complex>
@@ -20,11 +20,6 @@
 
 #include "core/BankStates.h"
 #include "core/Instruments.h"
-
-namespace lynx
-{
-bool offlineRendering() noexcept { return true; }
-} // namespace lynx
 
 namespace
 {
@@ -173,6 +168,7 @@ int main (int argc, char** argv)
         const int total = (int) ((end + 4.0) * rate);
         std::vector<float> l ((std::size_t) total, 0.0f), r ((std::size_t) total, 0.0f);
         const int block = 256;
+        const auto gain = lynx::channelGain (def->volume);
         for (int pos = 0; pos < total; pos += block)
         {
             const double t0 = (double) pos / rate, t1 = (double) (pos + block) / rate;
@@ -183,7 +179,7 @@ int main (int argc, char** argv)
                 if (n.at + n.len >= t0 && n.at + n.len < t1)
                     inst->noteOff (n.key);
             }
-            inst->render (l.data() + pos, r.data() + pos, std::min (block, total - pos), 1.0f, 1.0f);
+            inst->render (l.data() + pos, r.data() + pos, std::min (block, total - pos), gain, gain); // (the channel's default volume)
         }
         float peak = 0;
         double sum = 0;

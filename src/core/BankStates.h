@@ -28,7 +28,7 @@ struct DrumaxxPad
 };
 // A Drumaxx kit state (DMS4 stream: name, 720 parameters, 16 empty patterns with trigger key 100, pad names, cut
 // groups, output buses); unused pads stay silent (volume 0). Master level, EQ (8 band gains, 0.5 = 0 dB) and limiter.
-std::vector<std::uint8_t> drumaxxState (const std::string& kitName, const std::vector<DrumaxxPad>& pads, float master = 0.55f,
+std::vector<std::uint8_t> drumaxxState (const std::string& kitName, const std::vector<DrumaxxPad>& pads, float master = 0.38f,
                                         bool limiter = true, float limiterDrive = 0.3f, const std::vector<float>& eq = {});
 
 // DrumSynth Live: a kit of patches on keys (each 38 raw integers, as FL's patch layout) → modelParams (patch slots for

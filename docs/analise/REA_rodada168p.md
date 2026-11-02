@@ -29,7 +29,25 @@ tmp/r168p/dfm/<plugin>/TSynthEditorForm.dfm.txt). Only layout and control facts 
   Drumpad, Sakura, Drumaxx (built states), DrumSynth Live (synth part; recorded waves need FL's DLL). BassDrum
   (FL's sounddata table) and FL Slayer (Slayer_Engine.dll) say "needs FL Studio's files" when FL is absent.
 
+## 3. What was built
+- **Pages** (`core/PluginLayoutDrums.inc`): the eight engines in FL's arrangement (§1 positions, LYNX skin). Drumaxx:
+  two pages of eight pads (pad button + name, volume, pan, mute, solo), the selected pad's Drumpad voice below, EQ and
+  limiter; DrumSynth Live: the patch knobs of the key picked on the 120-key display (4 rows of 30, keys with a sounding
+  patch lit), its send / morph targets shown read-only (FL's digit wheels).
+- **Automation** (`core/DrumControls`, `core/DrumParamRanges.h`, `core/ModelParamList.inc`): one table per engine
+  by the engine's own parameter index (Drumaxx 685 = 16 × (4 + 38) + 13, DrumSynth Live 4 320 = 120 keys × 36);
+  every knob's right-click menu makes an automation clip; every engine implements `setParameter (index, 0…1)` on the
+  running engine. A knob turned while notes sound no longer restarts Fruit Kick or BassDrum (live parameter queue);
+  Plucked!, Drumpad, Sakura, Drumaxx, DrumSynth Live and Slayer were already live.
+- **Fixes found on the way**: DrumSynth Live's voice-mode menu listed "Poly, Mono" — the engine (REA_rodada30 §1.3:
+  0 = Mono, 1 = Poly) is the other way round; a fresh Plucked! channel (empty state) showed no knobs — it now shows
+  the engine's defaults and gets a state on the first edit.
+- **Banks** (`core/DrumBanks.cpp`, values from the engines' laws REA_rodada28 §1–2, REA_rodada30 §1.4–1.5,
+  REA_rodada43 §1; checked by rendering with `tools/bankaudit`): Fruit Kick, Plucked!, Drumpad, Sakura, Drumaxx kits,
+  DrumSynth Live kits. BassDrum (FL's `sounddata`) and FL Slayer (`Slayer_Engine.dll`) need FL's files: no bank;
+  BassDrum's noise display says "Needs FL Studio's files".
+
 ## Where I stopped
-- done: DFM dumps and the control table (§1).
-- in progress: layout data, bank design; waiting for 168n's shared ModelPanel infra + core/LynxBanks API.
-- next: render-check banks with a small audit tool; UI after merging 168n's landing.
+- done: §1, layouts, tables, live automation, part selection, displays, banks (first designs), translations.
+- in progress: compile (build slot queue), bank audit by rendering, then Windows build + shots.
+- next: tune the banks from the audit numbers, before/after shots, notes, land in parts after 168n lands.

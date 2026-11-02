@@ -1641,7 +1641,8 @@ public:
         else if (id == "drumaxxpad")
         {
             const auto pad = item.steps;
-            const auto key = (int) drumaxxParam (def.pluginState, 44 * pad + 4);
+            const auto keyValue = drumaxxParam (def.pluginState, 44 * pad + 4);
+            const auto key = std::isfinite (keyValue) ? (int) keyValue : -1;
             skin::button (g, r.reduced (2.0f * f), pad == drumPart, false, accent, radius::md * f);
             g.setColour (pad == drumPart ? colour::onAccent : colour::textSecondary);
             g.setFont (font (juce::jmax (8.0f, 10.0f * f), true));
@@ -1681,7 +1682,8 @@ public:
                 const auto cell = dslKeyCell (inner, key).reduced (0.5f * f);
                 const auto slot = drumSynthKeyToSlot (key);
                 const auto level = (std::size_t) (drumSynthPatchParams * slot) < def.modelParams.size() ? def.modelParams[(std::size_t) (drumSynthPatchParams * slot)] : 0.0f;
-                const auto black = juce::String ("0101001010100").substring (key % 12, key % 12 + 1) == "1";
+                static constexpr bool blackKey[12] = { false, true, false, true, false, false, true, false, true, false, true, false };
+                const auto black = blackKey[key % 12];
                 g.setColour (key == drumPart ? accent : level > 0.0f ? accent.withAlpha (0.35f) : black ? colour::bg1 : colour::bg4);
                 g.fillRect (cell);
                 if (key % 12 == 0)
