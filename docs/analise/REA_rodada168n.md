@@ -100,8 +100,12 @@ Wave Candy, ZGameEditor Visualizer, X-Y / X-Y-Z controllers, Control Surface, Fo
 
 ## Where I stopped
 - done: inventory (§1); Toxic + PoiZone designed pages, LYNX banks, model-knob automation, shared infra (§2.1); tests;
-  shots; levels. Landing the whole branch via land.sh (2026-11-02).
-- next: after landing, re-shoot with the landed exe (`LYNX.exe --instrumentshot E:\lynx-work\design168n\after2 toxicbiohazard,poizone lynx`),
-  notes-0.1.23.md bullets, message the coordinator the main hash.
+  before/after shots; levels (§3). Branch merged with origin/main 8a788038 (fb2214b2).
+- 2026-11-02 PAUSE (round 168w): land.sh design168n was holding the merge lock and building when the pause came (its Windows
+  build passed, build-local + tests still running); result in tmp/coord/land-design168n.out / .log. If it failed or did
+  not push, re-land: `flock ~/projetos/lynx/.git/lynx-merge.lock ~/.claude/jobs/f8789b49/tmp/r168n/land168n.sh`
+  (merges origin/main, re-embeds i18n, runs coord/land.sh).
+- next after landing: re-shoot with the landed exe (`LYNX.exe --instrumentshot E:\lynx-work\design168n\after2 toxicbiohazard,poizone lynx`),
+  append tmp/r168n/notes168n.md to coord/notes-0.1.23.md, message the coordinator the main hash.
 - not covered: Toxic's MIDI / SEQ pages (its sequencer isn't modelled), CC slots 316–339, the Browser listing of
   LYNX banks, effect banks; model knobs don't follow automation while playing.
