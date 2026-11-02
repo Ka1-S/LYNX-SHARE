@@ -303,8 +303,9 @@ std::shared_ptr<const Font> parseFont (const std::vector<std::uint8_t>& bytes, s
     }
     else
     {
-        // SF3: every compressed sample's Ogg stream must lie inside the sample chunk
-        for (int i = 0; i + 1 < h.shdrNum; ++i)
+        // SF3: every compressed sample's Ogg stream must lie inside the sample chunk (the terminal record too:
+        // TinySoundFont's decoder reads every record, so an out-of-range one would be read past the chunk)
+        for (int i = 0; i < h.shdrNum; ++i)
             if ((h.shdrs[i].sampleType & 0x30) != 0 && (h.shdrs[i].start > h.shdrs[i].end || h.shdrs[i].end > c.smpl.size))
                 h.shdrs[i].start = h.shdrs[i].end = h.shdrs[i].startLoop = h.shdrs[i].endLoop = 0;
         float* decoded = nullptr;
