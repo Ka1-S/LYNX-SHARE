@@ -49,6 +49,8 @@
 #include "ui/AutomationUi.h"
 #include "ui/PluginSkin.h"
 #include "ui/ChannelSettings.h"
+#include "core/LynxBanks.h"
+#include "core/NativeEngines.h"
 #include "ui/ControllerEditors.h"
 #include "ui/NewtoneEditor.h"
 #include "core/NewtoneFx.h"
@@ -755,6 +757,14 @@ public:
             return;
         }
 
+        if (args.contains ("--claprestarttest"))
+        {
+            // LYNX.exe --claprestarttest "LYNX Test Restart.clap" report.txt (tools/testplugin/lynx_test_restart.c)
+            const auto i = args.indexOf ("--claprestarttest");
+            runClapRestartTest (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+
         if (args.contains ("--editortest"))
         {
             // LYNX.exe --editortest plugin.vst3 report.txt ["name"]: opens the plugin's own editor in a window for a few
@@ -867,6 +877,19 @@ public:
             ok = ok && shoot (lynx::makeChannelPrecomputePanel (shotEngine, 0), "-precompute.png");
             ok = ok && shoot (lynx::makeSettingsPanel (shotEngine, lynx::SettingsPage::project), "-project.png");
             setApplicationReturnValue (ok ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--instrumentshot"))
+        {
+            // LYNX.exe --instrumentshot <folder> <engine,engine...|banks> [lynx|fl]: round 168n — the channel window of
+            // each engine (its Plugin tab) at 100 %, 150 % and 200 %, as <folder>/<engine>-<source>-<scale>.png. Source
+            // "lynx" starts from the engine's LYNX bank (what a PC without FL gets), "fl" from FL's Default preset.
+            const auto i = args.indexOf ("--instrumentshot");
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            const auto source = i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].unquoted() : juce::String ("lynx");
+            setApplicationReturnValue (runInstrumentShots (juce::File (args[i + 1].unquoted()), args[i + 2].unquoted(), source) ? 0 : 1);
             quit();
             return;
         }
@@ -3120,6 +3143,129 @@ private:
         quit();
     }
 
+    // LYNX.exe --claprestarttest "LYNX Test Restart.clap" report.txt (tools/testplugin/lynx_test_restart.c, PR #29): a
+    // CLAP effect on the Master that asks for a restart every 8 blocks while an export renders on a thread of its own
+    // (the message thread is free to run the restarts, as with the Export window). The plugin counts deactivations that
+    // landed inside its process() call (must be none), the restarts must happen, and the delay compensation must end on
+    // the latency the plugin reports after its last restart.
+    void runClapRestartTest (const juce::String& pluginPath, const juce::String& reportPath)
+    {
+        struct Run
+        {
+            std::unique_ptr<lynx::AudioEngine> engine;
+            juce::String report;
+            int slot = -1;
+            std::thread render;
+            std::atomic<bool> done { false };
+            double renderSeconds = 0.0;
+        };
+        auto run = std::make_shared<Run>();
+        const auto counters = juce::File (reportPath).getSiblingFile (juce::File (reportPath).getFileNameWithoutExtension() + "-plugin.txt");
+        counters.deleteFile();
+       #if JUCE_WINDOWS
+        _putenv_s ("LYNX_TEST_RESTART_REPORT", counters.getFullPathName().toRawUTF8());
+       #else
+        setenv ("LYNX_TEST_RESTART_REPORT", counters.getFullPathName().toRawUTF8(), 1);
+       #endif
+        const auto fail = [this, reportPath] (juce::String report) {
+            report << "result=FAILED\n";
+            juce::File (reportPath).replaceWithText (report);
+            setApplicationReturnValue (1);
+            quit();
+        };
+
+        run->engine = std::make_unique<lynx::AudioEngine> (false);
+        auto& host = run->engine->getPluginHost();
+        run->report << "plugins_in_file=" << host.addPluginFile (juce::File (pluginPath)) << "\n";
+        std::optional<juce::PluginDescription> clap;
+        for (const auto& type : host.getKnownPlugins().getTypes())
+            if (type.pluginFormatName == "CLAP" && juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginPath).getFileName())
+                clap = type;
+        if (! clap)
+        {
+            fail (run->report + "no CLAP plugin in the file\n");
+            return;
+        }
+
+        auto song = lynx::Song::makeDefault();
+        lynx::EffectSlot slot;
+        slot.kind = lynx::EffectKind::plugin;
+        slot.plugin.id = clap->createIdentifierString().toStdString();
+        slot.plugin.name = clap->name.toStdString();
+        slot.smartDisable = false; // (processed every block, as with music playing: the export itself is silent)
+        song.mixer[0].effects = { slot }; // alone on the Master: the delay compensation is the plugin's latency
+        run->slot = (int) song.mixer[0].effects.size() - 1;
+        run->engine->setSong (song);
+        run->engine->renderOffline (0.1, 48000.0); // builds the rack (and the plugin) on the message thread
+        if (dynamic_cast<lynx::PluginEffect*> (run->engine->getEffect (0, run->slot).get()) == nullptr)
+        {
+            fail (run->report + "effect_loaded=no\n");
+            return;
+        }
+
+        run->render = std::thread ([run] {
+            const auto start = juce::Time::getMillisecondCounterHiRes();
+            run->engine->renderOffline (30.0, 48000.0);
+            run->renderSeconds = (juce::Time::getMillisecondCounterHiRes() - start) * 0.001;
+            run->done = true;
+        });
+
+        // after the render: a second for the restarts still queued and the engine's timer (the new PDC plan)
+        auto finish = std::make_shared<std::function<void()>>();
+        *finish = [this, run, counters, reportPath, fail, finish] {
+            if (! run->done)
+            {
+                juce::Timer::callAfterDelay (50, *finish);
+                return;
+            }
+            run->render.join();
+            juce::Timer::callAfterDelay (1000, [this, run, counters, reportPath, fail] {
+                auto report = run->report;
+                int pluginLatency = -1;
+                if (const auto effect = run->engine->getEffect (0, run->slot)) // (not held past the engine's reset)
+                    pluginLatency = effect->latencySamples();
+                const auto pdc = run->engine->getLatencySamples();
+                report << "render_seconds=" << juce::String (run->renderSeconds, 2) << "\n"
+                       << "plugin_latency=" << pluginLatency << "\npdc_total=" << pdc << "\n"
+                       << "plugin_crashes=" << lynx::pluginCrashCount() << "\n";
+                run->engine.reset(); // destroys the plugin: it writes its counters
+                // one line per plugin instance (the engine may have made more than one): none may have been
+                // deactivated inside process(), and the one that rendered must have restarted
+                int overlapped = 0, inactive = 0, requests = 0, activations = 0, lines = 0;
+                for (const auto& line : juce::StringArray::fromLines (counters.loadFileAsString()))
+                {
+                    juce::StringPairArray values;
+                    for (const auto& token : juce::StringArray::fromTokens (line, " ", ""))
+                        if (token.contains ("="))
+                            values.set (token.upToFirstOccurrenceOf ("=", false, false), token.fromFirstOccurrenceOf ("=", false, false));
+                    if (values.size() == 0)
+                        continue;
+                    ++lines;
+                    report << "instance: " << line << "\n";
+                    overlapped += values["overlapped"].getIntValue();
+                    inactive += values["inactive_blocks"].getIntValue();
+                    if (values["requests"].getIntValue() > requests)
+                    {
+                        requests = values["requests"].getIntValue();
+                        activations = values["activations"].getIntValue();
+                    }
+                }
+                const auto ok = lines > 0 && requests > 0 && activations > requests / 2 && overlapped == 0 && inactive == 0
+                                && pluginLatency > 0 && pdc == pluginLatency && lynx::pluginCrashCount() == 0;
+                if (! ok)
+                {
+                    fail (report);
+                    return;
+                }
+                report << "result=OK\n";
+                juce::File (reportPath).replaceWithText (report);
+                setApplicationReturnValue (0);
+                quit();
+            });
+        };
+        juce::Timer::callAfterDelay (50, *finish);
+    }
+
     // LYNX.exe --vst2test "LYNX Test Synth.dll" report.txt (tools/testplugin/lynx_test_vst2.c): LYNX's own VST2 host.
     // Scans the DLL, imports it the way an .flp holds it (Fruity Wrapper VST2 state with a chunk, REA_rodada89 §2),
     // renders with two saved gains (the level must follow the restored state) and checks the plugin saw the song tempo.
@@ -5211,6 +5357,54 @@ private:
                 save (*editor, name);
             }
         }
+    }
+
+    bool runInstrumentShots (const juce::File& folder, const juce::String& which, const juce::String& source)
+    {
+        folder.createDirectory();
+        auto key = [] (juce::String n) { return n.toLowerCase().removeCharacters (" -!._"); };
+        juce::StringArray wanted;
+        wanted.addTokens (which, ",", "");
+        auto ok = true;
+        for (const auto& e : lynx::natives::instrumentEngines())
+        {
+            const auto name = key (e.name);
+            const auto banked = which == "banks" && lynx::banks::hasBank (e.kind);
+            if (! banked && ! wanted.contains (name))
+                continue;
+            auto channel = source == "fl" ? lynx::natives::makeChannel (e.kind, lynx::flStudioAccess())
+                                          : lynx::banks::defaultChannel (e.kind, e.name);
+            if (! channel)
+            {
+                std::fprintf (stderr, "%s: no %s channel\n", e.name, source.toRawUTF8());
+                ok = false;
+                continue;
+            }
+            lynx::AudioEngine offline (false);
+            lynx::Song song;
+            song.mixer = lynx::Song::defaultMixer (2);
+            song.channels.push_back (*channel);
+            song.patterns.emplace_back();
+            {
+                juce::String error; // the project too, so an older build can picture the same channel (--snapshot)
+                lynx::ProjectFile::save (song, folder.getChildFile (name + "-" + source + ".lynx"), error);
+            }
+            offline.setSong (std::move (song));
+            offline.dispatchPendingMessages();
+            auto frame = lynx::makeChannelFrame (offline, 0, 0);
+            if (frame == nullptr || frame->getWidth() <= 0)
+            {
+                ok = false;
+                continue;
+            }
+            for (const auto scale : { 1.0f, 1.5f, 2.0f })
+            {
+                const auto file = folder.getChildFile (name + "-" + source + "-" + juce::String (juce::roundToInt (scale * 100)) + ".png");
+                savePng (frame->createComponentSnapshot (frame->getLocalBounds(), true, scale), file.getFullPathName());
+                std::printf ("%s %dx%d\n", file.getFullPathName().toRawUTF8(), frame->getWidth(), frame->getHeight());
+            }
+        }
+        return ok;
     }
 
     void runPluginEditorSnapshots (const juce::String& folder)

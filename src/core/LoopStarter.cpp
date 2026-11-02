@@ -45,6 +45,8 @@ double FlRand::triangular (double mode, int curvature)
 // A small JSON reader (the two FL files only).
 namespace
 {
+struct JsonMember;
+
 struct Json
 {
     enum class Type { null, boolean, number, string, array, object } type = Type::null;
@@ -52,20 +54,28 @@ struct Json
     double n = 0.0;
     std::string s;
     std::vector<Json> items;
-    std::vector<std::pair<std::string, Json>> members;
+    std::vector<JsonMember> members; // a vector of a complete-later type (std::pair<std::string, Json> is ill-formed here: clang + libstdc++ 14)
 
-    const Json* get (const std::string& key) const
-    {
-        for (const auto& [k, v] : members)
-            if (k == key)
-                return &v;
-        return nullptr;
-    }
+    const Json* get (const std::string& key) const;
     bool isString() const { return type == Type::string; }
     bool isNumber() const { return type == Type::number; }
     bool isArray() const { return type == Type::array; }
     bool isObject() const { return type == Type::object; }
 };
+
+struct JsonMember
+{
+    std::string first;
+    Json second;
+};
+
+const Json* Json::get (const std::string& key) const
+{
+    for (const auto& [k, v] : members)
+        if (k == key)
+            return &v;
+    return nullptr;
+}
 
 class JsonReader
 {
@@ -221,7 +231,7 @@ private:
                 Json member;
                 if (! value (member, depth + 1))
                     return false;
-                v.members.emplace_back (std::move (key), std::move (member));
+                v.members.push_back (JsonMember { std::move (key), std::move (member) });
                 space();
                 if (pos < text.size() && text[pos] == ',')
                 {

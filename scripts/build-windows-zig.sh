@@ -117,7 +117,7 @@ APP_SOURCES+=(src/core/NoteTools.cpp src/core/PianoRollTools.cpp src/core/EventE
 # workflow P2: UI (note tool dialogs, tool windows, undo history, quick-add palette)
 APP_SOURCES+=(src/ui/NoteToolDialogs.cpp src/ui/EventEditor.cpp src/ui/AudioEditor.cpp src/ui/AudioEditorTools.cpp src/ui/ToolWindow.cpp src/ui/TempoTapper.cpp src/ui/HistoryPanel.cpp src/ui/QuickAddPalette.cpp)
 # start-up: splash screen and its procedurally synthesised sound
-APP_SOURCES+=(src/core/StartupSound.cpp src/ui/Splash.cpp)
+APP_SOURCES+=(src/core/StartupSound.cpp src/core/Speech.cpp src/core/SpeechRules.cpp src/ui/Splash.cpp src/ui/SpeechDialog.cpp)
 # main window chrome: hint bar and toolbar widgets
 APP_SOURCES+=(src/ui/HintBar.cpp src/ui/Toolbar.cpp)
 # FL's 3x Osc engine (REA round 47)
@@ -156,7 +156,7 @@ APP_SOURCES+=(src/core/VoiceTools.cpp)
 APP_SOURCES+=(src/core/MidiControls.cpp src/core/MidiOut.cpp src/core/FormulaController.cpp src/ui/ControllerEditors.cpp src/ui/MidiOutEditor.cpp)
 APP_SOURCES+=(src/core/VoiceShift.cpp)
 # FL engines usable in native projects (round 142, issue #5)
-APP_SOURCES+=(src/core/NativeEngines.cpp src/ui/NewtoneEditor.cpp)
+APP_SOURCES+=(src/core/NativeEngines.cpp src/core/LynxBanks.cpp src/core/ModelParams.cpp src/core/ToxicBank.cpp src/core/PoiZoneBank.cpp src/ui/NewtoneEditor.cpp)
 APP_SOURCES+=(src/core/Layer.cpp src/ui/LayerEditor.cpp) # FL's Layer channel (round 164)
 APP_SOURCES+=(src/core/XyController.cpp src/core/FlCurve.cpp src/core/ControlSurface.cpp src/ui/Controllers164.cpp) # X-Y (-Z) Controller, Control Surface, Dashboard (round 164)
 APP_SOURCES+=(src/core/VoltageController.cpp src/ui/VoltageEditor.cpp) # Voltage Controller (round 164)
