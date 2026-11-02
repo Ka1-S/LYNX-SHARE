@@ -37,6 +37,7 @@
 #include "core/ThreeOsc.h"
 #include "core/BeepMap.h"
 #include "core/Sawer.h"
+#include "core/TransistorBass.h"
 #include "core/Slayer.h"
 #include "core/SytrusEngine.h"
 #include "core/SynthPresets.h"
@@ -507,6 +508,10 @@ public:
         drumaxx = def.instrument == InstrumentKind::drumaxx;
         slayer = def.instrument == InstrumentKind::slayer;
         fruityDance = def.instrument == InstrumentKind::fruitydance;
+        // round 168q: the engines that run FL's own files say so when this computer lacks them
+        engineFilesMissing = ((kepler || keplerExo) && ! keplerDllUsable (def.samplePath))
+                          || (transistorBass && ! transistorBassDllUsable (def.samplePath))
+                          || (sawer && sawerReadTable (def.samplePath).empty());
         sytrus = def.instrument == InstrumentKind::sytrus;
         // DrumSynth Live: the patch on the key selected in FL's editor (raw FL values)
         if (drumsynth)
@@ -1106,7 +1111,7 @@ public:
         // switches drawn by the panel
         layout = plugui::instrumentLayout (def.instrument);
         // a state the engine cannot read gives no knobs: keep the plain page then
-        if (layout != nullptr && std::none_of (knobs.begin(), knobs.end(), [this] (const auto& k) { return itemFor (k->getName()) != nullptr; }))
+        if (layout != nullptr && ! wasp && std::none_of (knobs.begin(), knobs.end(), [this] (const auto& k) { return itemFor (k->getName()) != nullptr; }))
             layout = nullptr;
         if (layout != nullptr)
         {
@@ -1477,6 +1482,18 @@ public:
                     break;
                 case plugui::Item::display:
                     skin::well (g, r, radius::md * f);
+                    // round 168q: BeepMap's bitmap, its file row, the Granulizer's sample and grains, Transistor Bass's
+                    // program and sequence
+                    if (juce::String (item.display) == "beepmapimage")
+                        paintBeepMapImage (g, r.reduced (3.0f * f));
+                    if (juce::String (item.display) == "beepmapfile")
+                        paintBeepMapFile (g, r, f);
+                    if (juce::String (item.display) == "granulizerwave")
+                        paintGranulizerWave (g, r.reduced (4.0f * f), f);
+                    if (juce::String (item.display) == "granulizergrains")
+                        paintGranulizerGrains (g, r.reduced (5.0f * f), f);
+                    if (juce::String (item.display) == "tbprogram" || juce::String (item.display) == "tbsequence")
+                        paintTransistorBass (g, r, f, juce::String (item.display) == "tbsequence");
                     if (juce::String (item.display) == "xy")
                         if (auto* kx = knobFor (item.param); kx != nullptr)
                             if (auto* ky = knobFor (item.param2); ky != nullptr)
@@ -1586,6 +1603,13 @@ public:
                         showPage (o);
                 return;
             }
+        for (const auto& item : layout->items) // round 168q: BeepMap's Open / Paste
+            if (item.type == plugui::Item::display && juce::String (item.display) == "beepmapfile" && layoutRect (item).contains (e.position))
+            {
+                if (const auto button = beepMapFileButton (item, e.position); button >= 0)
+                    beepMapAction (button);
+                return;
+            }
         for (const auto& item : layout->items)
         {
             auto* k = knobFor (item.param);
@@ -1658,40 +1682,51 @@ public:
             skin::canvas (g, getLocalBounds().toFloat(), accent);
         g.setColour (theme::colour::textPrimary);
         g.setFont (theme::font (layout != nullptr ? theme::type::body : theme::type::title));
-        g.drawText (drumsynth ? tr ("DrumSynth Live — FL's engine, patch on key {0}", { juce::String (editorKey) })
-                                    + (wavesFound ? tr (" (next hit; recorded waves from your FL installation)")
-                                                  : tr (" (next hit; recorded waves not found: silent)"))
-                    : harmless ? tr ("Harmless — FL's additive engine (chorus/delay/reverb/compressor rack off)")
-                    : harmor ? tr ("Harmor — FL's additive engine (effects rack off; image synthesis not decoded)")
-                    : gms ? tr ("GMS — FL's engine (waves read from your FL installation)")
-                    : morphine ? tr ("Morphine — FL's additive engine (new settings restart the voices)")
-                    : transistorBass ? tr ("Transistor Bass — FL's engine with its sequencer and effects (oscillator cycles read from your FL installation)")
-                    : autogun ? tr ("Autogun — FL's engine with its effects and Magic Dust (SG.dat read from your FL installation)")
-                    : ogun ? tr ("Ogun — FL's engine with its effects (Seed 2 Random is a fixed draw per channel)")
-                    : poizone ? tr ("PoiZone — FL's engine with its gate, chorus, delay and arpeggiator (new settings restart the voices)")
-                    : miniSynth ? tr ("MiniSynth — FL's engine with its effects (wave tables read from your FL installation)")
-                    : dx10 ? tr ("Fruity DX10 — FL's FM engine")
-                    : kepler ? tr ("Kepler — FL's engine (LFO shape and noise read from your FL installation; new settings restart the voices)")
-                    : keplerExo ? tr ("Kepler Exo — FL's engine with its effects (tables read from your FL installation; new settings restart the voices)")
-                    : fruitkick ? tr ("Fruit Kick — FL's engine (channel envelopes stepped per tick)")
-                    : bassdrum ? tr ("BassDrum — FL's engine (table and noise samples read from your FL installation)")
-                    : toxic ? tr ("Toxic Biohazard — FL's engine with its effects (waves read from your FL installation)")
-                    : threeOsc ? tr ("3x Osc — FL's engine (custom wave from the channel's sample)")
-                    : simSynth ? tr ("SimSynth — FL's engine (new settings restart the voices)")
-                    : wasp ? tr ("Wasp — FL Studio 2026 has no 64-bit Wasp: the channel keeps its settings and stays silent, as in FL")
-                    : flKeys ? tr ("FL Keys — FL's engine (wavetable read from your FL installation)")
-                    : plucked ? tr ("Plucked! — FL's plucked-string engine")
-                    : beepMap ? tr ("BeepMap — FL's engine (plays the bitmap saved with the channel)")
-                    : sawer ? tr ("Sawer — FL's engine with its effects (oscillator cycle read from your FL installation)")
-                    : granulizer ? tr ("Fruity Granulizer — FL's engine on the channel's sample")
-                    : drumaxx ? tr ("Drumaxx — FL's physical drum engine (pads on their keys; patterns not played)")
-                    : slayer ? tr ("FL Slayer — FL's engine with its effects, amp and cabinet (picks read from your FL installation; new settings restart the voices)")
-                    : sytrus ? tr ("Sytrus — FL's engine, main settings (operators, filters and effects keep the saved patch)")
-                    : fruityDance ? tr ("Fruity Dance — a visual plugin: it makes no sound, the channel keeps its settings")
-                    : boobass ? tr ("BooBass — FL's engine, its sound read from your FL installation (knobs: 3-band EQ)")
-                    : sakura ? tr ("Sakura — physical strings (FL's engine; new parameters apply to the next note)")
-                             : tr ("Drumpad — physical drum (FL's engine; new parameters apply to the next hit)"),
-                    10, 6, getWidth() - 20, 20, juce::Justification::centredLeft);
+        if (! engineFilesMissing)
+            g.drawText (drumsynth ? tr ("DrumSynth Live — FL's engine, patch on key {0}", { juce::String (editorKey) })
+                                        + (wavesFound ? tr (" (next hit; recorded waves from your FL installation)")
+                                                      : tr (" (next hit; recorded waves not found: silent)"))
+                        : harmless ? tr ("Harmless — FL's additive engine (chorus/delay/reverb/compressor rack off)")
+                        : harmor ? tr ("Harmor — FL's additive engine (effects rack off; image synthesis not decoded)")
+                        : gms ? tr ("GMS — FL's engine (waves read from your FL installation)")
+                        : morphine ? tr ("Morphine — FL's additive engine (new settings restart the voices)")
+                        : transistorBass ? tr ("Transistor Bass — FL's engine with its sequencer and effects (oscillator cycles read from your FL installation)")
+                        : autogun ? tr ("Autogun — FL's engine with its effects and Magic Dust (SG.dat read from your FL installation)")
+                        : ogun ? tr ("Ogun — FL's engine with its effects (Seed 2 Random is a fixed draw per channel)")
+                        : poizone ? tr ("PoiZone — FL's engine with its gate, chorus, delay and arpeggiator (new settings restart the voices)")
+                        : miniSynth ? tr ("MiniSynth — FL's engine with its effects (wave tables read from your FL installation)")
+                        : dx10 ? tr ("Fruity DX10 — FL's FM engine")
+                        : kepler ? tr ("Kepler — FL's engine (LFO shape and noise read from your FL installation)")
+                        : keplerExo ? tr ("Kepler Exo — FL's engine with its effects (tables read from your FL installation)")
+                        : fruitkick ? tr ("Fruit Kick — FL's engine (channel envelopes stepped per tick)")
+                        : bassdrum ? tr ("BassDrum — FL's engine (table and noise samples read from your FL installation)")
+                        : toxic ? tr ("Toxic Biohazard — FL's engine with its effects (waves read from your FL installation)")
+                        : threeOsc ? tr ("3x Osc — FL's engine (custom wave from the channel's sample)")
+                        : simSynth ? tr ("SimSynth — FL's engine (new settings restart the voices)")
+                        : wasp ? tr ("Wasp — FL Studio 2026 has no 64-bit Wasp: the channel keeps its settings and stays silent, as in FL")
+                        : flKeys ? tr ("FL Keys — FL's engine (wavetable read from your FL installation)")
+                        : plucked ? tr ("Plucked! — FL's plucked-string engine")
+                        : beepMap ? tr ("BeepMap — FL's engine (plays the bitmap saved with the channel)")
+                        : sawer ? tr ("Sawer — FL's engine with its effects (oscillator cycle read from your FL installation)")
+                        : granulizer ? tr ("Fruity Granulizer — FL's engine on the channel's sample")
+                        : drumaxx ? tr ("Drumaxx — FL's physical drum engine (pads on their keys; patterns not played)")
+                        : slayer ? tr ("FL Slayer — FL's engine with its effects, amp and cabinet (picks read from your FL installation; new settings restart the voices)")
+                        : sytrus ? tr ("Sytrus — FL's engine, main settings (operators, filters and effects keep the saved patch)")
+                        : fruityDance ? tr ("Fruity Dance — a visual plugin: it makes no sound, the channel keeps its settings")
+                        : boobass ? tr ("BooBass — FL's engine, its sound read from your FL installation (knobs: 3-band EQ)")
+                        : sakura ? tr ("Sakura — physical strings (FL's engine; new parameters apply to the next note)")
+                                 : tr ("Drumpad — physical drum (FL's engine; new parameters apply to the next hit)"),
+                        10, 6, getWidth() - 20, 20, juce::Justification::centredLeft);
+        if (engineFilesMissing) // round 168q: an engine that runs FL's own DLL / data file, which this computer lacks
+        {
+            const auto band = juce::Rectangle<float> (8.0f, 5.0f, (float) getWidth() - 16.0f, 22.0f);
+            g.setColour (accent.withAlpha (0.18f));
+            g.fillRoundedRectangle (band, 4.0f);
+            g.setColour (theme::colour::textPrimary);
+            g.setFont (theme::font (theme::type::small));
+            g.drawFittedText (tr ("Needs FL Studio's files: the engine file was not found, so the channel stays silent (its settings are kept)."),
+                              band.reduced (6.0f, 0.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.7f);
+        }
         if (layout != nullptr)
         {
             paintLayout (g);
@@ -1778,6 +1813,223 @@ private:
     }
 
     // the Granulizer plays the new sample with the same settings (FL keeps the knobs and the channel's name)
+    // --- round 168q: the displays of the group-D pages ---------------------------------------------------------
+
+    const ChannelDef* channelNow() const { return ref.get (engine); }
+
+    // BeepMap: the bitmap, stretched to the display (red = left, green = right, as the engine reads it)
+    void paintBeepMapImage (juce::Graphics& g, juce::Rectangle<float> r)
+    {
+        const auto* c = channelNow();
+        const auto pic = c != nullptr ? beepMapPicture (c->pluginState) : std::nullopt;
+        if (! pic || pic->width <= 0 || pic->height <= 0)
+            return;
+        if (beepMapCacheState != c->pluginState)
+        {
+            beepMapCacheState = c->pluginState;
+            beepMapCache = juce::Image (juce::Image::RGB, pic->width, pic->height, false);
+            for (int y = 0; y < pic->height; ++y)
+                for (int x = 0; x < pic->width; ++x)
+                {
+                    const auto* px = pic->bgr.data() + 3 * ((std::size_t) y * (std::size_t) pic->width + (std::size_t) x);
+                    beepMapCache.setPixelAt (x, y, juce::Colour (px[2], px[1], px[0]));
+                }
+        }
+        g.setImageResamplingQuality (juce::Graphics::lowResamplingQuality);
+        g.drawImage (beepMapCache, r, juce::RectanglePlacement::stretchToFit);
+        g.setImageResamplingQuality (juce::Graphics::mediumResamplingQuality);
+    }
+
+    void paintBeepMapFile (juce::Graphics& g, juce::Rectangle<float> r, float f)
+    {
+        const auto* c = channelNow();
+        const auto pic = c != nullptr ? beepMapPicture (c->pluginState) : std::nullopt;
+        auto row = r.reduced (4.0f * f);
+        const auto w = row.getWidth() / 3.2f;
+        const juce::String caps[] = { tr ("Open..."), tr ("Paste") };
+        for (int i = 0; i < 2; ++i)
+        {
+            const auto cell = row.removeFromLeft (w).reduced (2.0f * f, 0.0f);
+            skin::button (g, cell, false, false, accent, radius::sm * f);
+            g.setColour (colour::textPrimary);
+            g.setFont (font (juce::jmax (8.0f, juce::jmin (11.0f * f, cell.getHeight() * 0.5f)), true));
+            g.drawFittedText (caps[i], cell.toNearestInt(), juce::Justification::centred, 1, 0.6f);
+        }
+        g.setColour (colour::textSecondary);
+        g.setFont (font (juce::jmax (8.0f, 10.0f * f)));
+        const auto text = pic ? tr ("{0} × {1} pixels", { juce::String (pic->width), juce::String (pic->height) }) : tr ("No bitmap");
+        g.drawFittedText (text, row.reduced (4.0f * f, 0.0f).toNearestInt(), juce::Justification::centredLeft, 2, 0.7f);
+    }
+
+    // which button of the BeepMap file row is under `p` (0 open, 1 paste, −1 none)
+    int beepMapFileButton (const plugui::LayoutItem& item, juce::Point<float> p) const
+    {
+        auto row = layoutRect (item).reduced (4.0f * layoutFactor());
+        const auto w = row.getWidth() / 3.2f;
+        for (int i = 0; i < 2; ++i)
+            if (row.removeFromLeft (w).contains (p))
+                return i;
+        return -1;
+    }
+
+    void setBeepMapBitmap (const std::vector<std::uint8_t>& bmp)
+    {
+        const auto* c = channelNow();
+        if (c == nullptr)
+            return;
+        auto next = beepMapWithBitmap (c->pluginState, bmp);
+        if (next.empty())
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, juce::String ("BeepMap"),
+                                                    tr ("BeepMap reads uncompressed 24- or 32-bit BMP pictures at least 3 pixels high."));
+            return;
+        }
+        ref.edit (engine, [next = std::move (next)] (ChannelDef& d) { d.pluginState = next; });
+        repaint();
+    }
+
+    void beepMapAction (int button)
+    {
+        if (button == 1) // a BMP file path or the file itself copied in the clipboard
+        {
+            const juce::File file (juce::SystemClipboard::getTextFromClipboard().trim().unquoted());
+            juce::MemoryBlock data;
+            if (file.existsAsFile() && file.loadFileAsData (data))
+                setBeepMapBitmap (std::vector<std::uint8_t> ((const std::uint8_t*) data.getData(), (const std::uint8_t*) data.getData() + data.getSize()));
+            else
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, juce::String ("BeepMap"), tr ("Copy a .bmp file's path first, or use Open."));
+            return;
+        }
+        chooser = std::make_unique<juce::FileChooser> (tr ("Open a bitmap"), juce::File(), "*.bmp");
+        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                              [safe = juce::Component::SafePointer<ModelPanel> (this)] (const juce::FileChooser& fc) {
+                                  juce::MemoryBlock data;
+                                  if (safe == nullptr || ! fc.getResult().loadFileAsData (data))
+                                      return;
+                                  safe->setBeepMapBitmap (std::vector<std::uint8_t> ((const std::uint8_t*) data.getData(),
+                                                                                      (const std::uint8_t*) data.getData() + data.getSize()));
+                              });
+    }
+
+    // Granulizer: the channel's sample (or how to give it one) with the start point
+    void paintGranulizerWave (juce::Graphics& g, juce::Rectangle<float> r, float f)
+    {
+        const auto* c = channelNow();
+        const auto path = c != nullptr ? c->samplePath : std::string();
+        if (path.empty())
+        {
+            g.setColour (colour::textSecondary);
+            g.setFont (font (juce::jmax (9.0f, 11.0f * f)));
+            g.drawFittedText (tr ("Drop a sample here (or on the channel button)"), r.toNearestInt(), juce::Justification::centred, 2, 0.7f);
+            return;
+        }
+        if (path != granulizerPeaksPath)
+        {
+            granulizerPeaksPath = path;
+            granulizerPeaks.clear();
+            if (const auto s = engine.getSampleLibrary().load (juce::String::fromUTF8 (path.c_str())))
+            {
+                const auto n = (std::int64_t) s->left.size();
+                constexpr int columns = 400;
+                for (int i = 0; i < columns && n > 0; ++i)
+                {
+                    float peak = 0.0f;
+                    for (auto k = n * i / columns; k < n * (i + 1) / columns; ++k)
+                        peak = std::max ({ peak, std::fabs (s->left[(std::size_t) k]), s->right.empty() ? 0.0f : std::fabs (s->right[(std::size_t) k]) });
+                    granulizerPeaks.push_back (std::min (peak, 1.0f));
+                }
+            }
+        }
+        if (granulizerPeaks.empty())
+            return;
+        const auto mid = r.getCentreY();
+        juce::Path wave;
+        for (int i = 0; i < (int) granulizerPeaks.size(); ++i)
+        {
+            const auto x = r.getX() + r.getWidth() * (float) i / (float) (granulizerPeaks.size() - 1);
+            wave.addRectangle (x, mid - granulizerPeaks[(std::size_t) i] * r.getHeight() * 0.48f, juce::jmax (1.0f, r.getWidth() / (float) granulizerPeaks.size()),
+                               juce::jmax (1.0f, granulizerPeaks[(std::size_t) i] * r.getHeight() * 0.96f));
+        }
+        g.setColour (accent.withAlpha (0.65f));
+        g.fillPath (wave);
+        if (const auto* k = knobFor ("Sample start"))
+        {
+            const auto x = r.getX() + r.getWidth() * normalised (*k);
+            g.setColour (colour::textPrimary);
+            g.drawVerticalLine ((int) x, r.getY(), r.getBottom());
+        }
+        g.setColour (colour::textSecondary);
+        g.setFont (font (juce::jmax (8.0f, 9.5f * f)));
+        g.drawFittedText (juce::File (juce::String::fromUTF8 (path.c_str())).getFileName(), r.removeFromTop (14.0f * f).toNearestInt(),
+                          juce::Justification::topLeft, 1, 0.8f);
+    }
+
+    // Granulizer: one grain's envelope (attack, hold, release) and the next grain's start, from the knobs
+    void paintGranulizerGrains (juce::Graphics& g, juce::Rectangle<float> r, float)
+    {
+        const auto* att = knobFor ("Grain attack");
+        const auto* hold = knobFor ("Grain hold");
+        const auto* spacing = knobFor ("Grain spacing");
+        if (att == nullptr || hold == nullptr || spacing == nullptr)
+            return;
+        const auto a = (float) att->getValue(), h = (float) hold->getValue(), sp = (float) spacing->getValue();
+        const auto total = juce::jmax (1.0f, 2.0f * a + h + sp);
+        const auto xOf = [&] (float t) { return r.getX() + r.getWidth() * t / total; };
+        for (int grain = 0; grain < 2; ++grain)
+        {
+            const auto t0 = (float) grain * sp;
+            juce::Path p;
+            p.startNewSubPath (xOf (t0), r.getBottom());
+            p.lineTo (xOf (t0 + a), r.getY());
+            p.lineTo (xOf (t0 + a + h), r.getY());
+            p.lineTo (xOf (t0 + 2.0f * a + h), r.getBottom());
+            g.setColour ((grain == 0 ? accent : colour::textSecondary).withAlpha (0.8f));
+            g.strokePath (p, juce::PathStrokeType (1.5f));
+        }
+    }
+
+    // Transistor Bass: the current program and its sequence (16 steps: note, gate, accent, slide)
+    void paintTransistorBass (juce::Graphics& g, juce::Rectangle<float> r, float f, bool sequence)
+    {
+        const auto* c = channelNow();
+        const auto prog = c != nullptr ? transistorBassProgram (c->pluginState) : std::nullopt;
+        if (! prog)
+            return;
+        if (! sequence)
+        {
+            g.setColour (colour::textPrimary);
+            g.setFont (font (juce::jmax (9.0f, 11.0f * f), true));
+            const auto text = tr ("Program {0}", { juce::String (prog->program + 1) }) + "   "
+                            + (prog->sequencer ? tr ("sequencer on") : tr ("sequencer off"))
+                            + (prog->transpose != 0 ? "   " + tr ("transpose {0}", { juce::String (prog->transpose) }) : juce::String());
+            g.drawFittedText (text, r.reduced (6.0f * f, 0.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.7f);
+            return;
+        }
+        const auto steps = juce::jlimit (1, (int) prog->steps.size(), prog->length);
+        const auto inner = r.reduced (4.0f * f);
+        const auto w = inner.getWidth() / (float) steps;
+        static const char* const names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+        for (int i = 0; i < steps; ++i)
+        {
+            const auto& s = prog->steps[(std::size_t) i];
+            auto cell = juce::Rectangle<float> (inner.getX() + w * (float) i, inner.getY(), w, inner.getHeight()).reduced (1.5f * f, 0.0f);
+            skin::button (g, cell, s.gate, false, accent, radius::sm * f);
+            g.setColour (s.gate ? colour::onAccent : colour::textSecondary);
+            g.setFont (font (juce::jmax (8.0f, juce::jmin (11.0f * f, w * 0.4f)), true));
+            auto text = cell;
+            g.drawFittedText (s.gate ? juce::String (names[((s.note % 12) + 12) % 12]) + juce::String (s.note / 12) : juce::String ("-"),
+                              text.removeFromTop (cell.getHeight() * 0.5f).toNearestInt(), juce::Justification::centred, 1, 0.6f);
+            g.setFont (font (juce::jmax (8.0f, juce::jmin (10.0f * f, w * 0.35f))));
+            const auto flags = juce::String (s.accent ? "A" : "") + (s.slide ? "S" : "");
+            g.drawFittedText (flags, text.toNearestInt(), juce::Justification::centred, 1, 0.6f);
+        }
+    }
+
+    juce::Image beepMapCache;
+    std::vector<std::uint8_t> beepMapCacheState;
+    std::string granulizerPeaksPath;
+    std::vector<float> granulizerPeaks;
+
     void loadGranulizerSample (const juce::File& file)
     {
         if (! takesSample() || ! file.existsAsFile())
@@ -1872,7 +2124,8 @@ private:
     skin::Style pageStyle = skin::Style::glow;     // the plugin page's automatic style (round 126)
     bool sakura = true, boobass = false, drumsynth = false, harmless = false, harmor = false, gms = false, morphine = false, ogun = false, autogun = false, transistorBass = false, miniSynth = false, dx10 = false, kepler = false, keplerExo = false, poizone = false,
          fruitkick = false, bassdrum = false, toxic = false, threeOsc = false, simSynth = false, wasp = false, plucked = false, beepMap = false,
-         sawer = false, flKeys = false, granulizer = false, drumaxx = false, slayer = false, fruityDance = false, sytrus = false, wavesFound = false;
+         sawer = false, flKeys = false, granulizer = false, drumaxx = false, slayer = false, fruityDance = false, sytrus = false, wavesFound = false,
+         engineFilesMissing = false;
     int editorKey = 60;
     std::vector<std::unique_ptr<juce::Slider>> knobs;
     const plugui::Layout* layout = nullptr;

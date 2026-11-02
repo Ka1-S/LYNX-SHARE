@@ -3,3 +3,5 @@
 // scripts/build-local.sh CORE and scripts/build-windows-zig.sh next to src/core/LynxBanks.cpp).
 LYNX_BANK (toxic, toxicBank)       // core/ToxicBank.cpp (round 168n)
 LYNX_BANK (poizone, poizoneBank)   // core/PoiZoneBank.cpp (round 168n)
+LYNX_BANK (beepmap, beepMapBank)       // core/BeepMapBank.cpp (round 168q)
+LYNX_BANK (granulizer, granulizerBank) // core/GranulizerBank.cpp (round 168q)
