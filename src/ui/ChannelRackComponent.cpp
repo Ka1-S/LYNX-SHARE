@@ -6,6 +6,7 @@
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
 #include "ui/ChannelRackComponent.h"
+#include "ui/SpeechDialog.h"
 #include "core/Patcherize.h"
 #include "ui/QuickPick.h"
 #include "core/ControlSurface.h"
@@ -19,6 +20,7 @@
 #include "core/FlSynths.h"
 #include "core/MidiControls.h"
 #include "ui/ToolWindow.h"
+#include "ui/LoopStarterWindow.h"
 #include "core/Slicer.h"
 #include "ui/ChannelSettings.h"
 
@@ -1531,16 +1533,12 @@ void ChannelRackComponent::selectUnused()
     selectRows (unused, unused.front());
 }
 
-int ChannelRackComponent::addChannel (ChannelDef c, bool openEditor)
+int ChannelRackComponent::addChannel (ChannelDef c, bool openEditor, int insert)
 {
     int index = 0;
     if (filterGroup >= 0 && c.group < 0) // a new channel joins the group shown (FL)
         c.group = filterGroup;
-    engine.editSong ([&] (Song& s) {
-        c.mixerTrack = s.claimFreeInsert();
-        s.channels.push_back (c);
-        index = (int) s.channels.size() - 1;
-    });
+    engine.editSong ([&] (Song& s) { index = addChannelRouted (s, c, insert); });
     selectionAnchor = index;
     selectRows ({ index }, index);
 
@@ -2271,6 +2269,8 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
         closeEditor (channel);
         engine.editSong ([channel] (Song& s) { patcherize::patcherizeChannel (s, channel); });
     });
+    // FL's Loop Starter channel menu (round 168b): Replace sample, Generate steps, Locked, One-shot category
+    loopstarterui::addChannelMenu (menu, engine, channel);
     menu.addItem (selected > 1 ? tr ("Clone {0} channels", { juce::String (selected) }) : tr ("Clone") + "\tAlt+C", [this] { cloneSelected(); });
 
     if (selected > 1)
@@ -2605,6 +2605,21 @@ void ChannelRackComponent::chooseSample (int channel, int insertAt)
 
 void ChannelRackComponent::assignSample (int channel, const juce::File& file)
 {
+    // FL's .speech files open the Speech properties first, like FL's channel load does (round 168b); the file it
+    // returns (the edited copy, or this one) goes into the channel
+    if (file.hasFileExtension ("speech"))
+    {
+        speechui::editThenLoad (engine, file, [safe = juce::Component::SafePointer<ChannelRackComponent> (this), channel] (const juce::File& f) {
+            if (safe != nullptr)
+                safe->assignSampleNow (channel, f);
+        });
+        return;
+    }
+    assignSampleNow (channel, file);
+}
+
+void ChannelRackComponent::assignSampleNow (int channel, const juce::File& file)
+{
     if (engine.getSampleLibrary().load (file.getFullPathName()) == nullptr)
     {
         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Sample"),
@@ -2679,7 +2694,13 @@ void ChannelRackComponent::sliceChannel (int channel)
     if (sample == nullptr || sample->frames() == 0)
         return;
 
-    const auto slices = detectSlices (*sample, 0.5f);
+    // a spoken .speech sample is cut at its words (FL hands its words to the slicer as a Zero-X grid; round 168b)
+    std::vector<float> slices;
+    if (juce::File (juce::String::fromUTF8 (c.samplePath.c_str())).hasFileExtension ("speech") && ! sample->markerStarts.empty())
+        for (const auto start : sample->markerStarts)
+            slices.push_back ((float) ((double) start / (double) sample->frames()));
+    else
+        slices = detectSlices (*sample, 0.5f);
     const auto seconds = (double) sample->frames() / sample->sampleRate;
     const auto ticksPerSecond = song.bpm * ppq / 60.0;
     const auto name = c.name + " (slices)";

@@ -104,7 +104,7 @@ public:
     void burnMidi (int channel, bool toNewPattern);
 
     // Adds a channel at the end (routed to a free insert), selects it and, for plugins, opens its window.
-    int addChannel (ChannelDef channel, bool openEditor);
+    int addChannel (ChannelDef channel, bool openEditor, int insert = -1); // insert: see addChannelRouted
 
     // Loads `file` into the selected sampler channel (Browser: Enter, Shift+Up/Down). Returns false when
     // the selected channel cannot take a sample.
@@ -201,6 +201,7 @@ private:
     void chooseSample (int channel, int insertAt = -1); // channel < 0 = new channel (at the end, or at row insertAt)
     void openNewGenerator (int row, InstrumentKind kind); // the window a new / replaced generator opens with
     void assignSample (int channel, const juce::File& file);
+    void assignSampleNow (int channel, const juce::File& file); // (no Speech properties step)
     void rename (int channel);
     void openPluginWindow (int channel);
     void sliceChannel (int channel);

@@ -65,6 +65,10 @@ public:
     juce::AudioDeviceManager& getDeviceManager() noexcept { return deviceManager; }
     Transport& getTransport() noexcept { return transport; }
     const Transport& getTransport() const noexcept { return transport; }
+    // The Song-mode playhead for the UI: the position folded into the song (its end goes back to the start), except
+    // while the song plays on past its end (a Song-mode recording without a loop region, FL [EXEC] round 168k: the
+    // counter reads 8:08 after recording a 1-bar song from bar 1; a bounce) or with a loop region
+    double songPlayheadTicks() const noexcept;
     SampleLibrary& getSampleLibrary() noexcept { return samples; }
     MeterBank& getMeters() noexcept { return meters; }
     // Tools > Audio logger (REA round 153): records everything the Master plays to a WAV in the background.
@@ -723,6 +727,8 @@ private:
     // Song mode, no loop region: once a parameter moved while recording, the song plays on past its end (no wrap to
     // the start) until recording stops, and the take's clip grows with the playhead (issue #12: it cut itself)
     bool automationLinear = false;
+    // the same for the whole of a take (FL: Song mode plays on while recording; round 168k)
+    bool noteTakeLinear = false;
     std::int64_t lastAutomationTick = -1; // the song position of the take's last update (song mode)
     std::vector<AutomationWrite> takeWrites; // per target: where this take writes (its own clip grows)
     bool takeHasUndoStep = false;
@@ -730,7 +736,6 @@ private:
     void updatePerformanceRecording();
     RecordOptions recordOptions;
     std::vector<int> takeClearedChannels; // replace mode: channels already cleared in this take
-    double takeStartPosition = 0.0;
     std::atomic<bool> waitingForInput { false };
     void startOnInput() noexcept; // MIDI or UI thread: the first note while waiting starts playback
     std::vector<int> armedInserts;
@@ -850,7 +855,7 @@ private:
     // the audio thread's view of the above while takes record (false when none is open)
     void updateLinearSong() noexcept
     {
-        const auto on = (takeCount > 0 || automationLinear) && linearRecording();
+        const auto on = (takeCount > 0 || automationLinear || noteTakeLinear) && linearRecording();
         liveInput.linearSong.store (on || bouncing);
         liveInput.noLoopRegion.store ((on && song.hasLoop()) || bouncing);
     }

@@ -76,6 +76,8 @@ public:
     std::function<void (const juce::File&)> onOpenProject;
     // Enter / Shift+Up/Down: put this file into the selected channel; returns false if it can't take it.
     std::function<bool (const juce::File&)> onLoadIntoChannel;
+    // Double-click an FL mixer preset / LYNX mixer track state: onto the Mixer's selected tracks (false = not one)
+    std::function<bool (const juce::File&)> onOpenMixerPreset;
     // Current project items (set by the main window)
     std::function<void (int)> onOpenPattern;     // double-click a pattern: it opens in the Piano Roll
     std::function<void (int)> onPatternMenu;     // right-click a pattern (already selected): the pattern menu
@@ -216,6 +218,7 @@ private:
     juce::String rootId (const juce::File& folder) const; // the root's id, empty if `folder` isn't a root
     juce::StringArray starred;
     void openFile (const juce::File& file); // what a double-click does
+    void newSampleChannel (const juce::File& file); // a new Sampler channel playing `file`
     void fileSelected (const juce::File& file, bool preview);
     void showFolderMenu (const juce::File& folder, std::function<void()> expandAll = {});
     void showFileMenu (const juce::File& file);

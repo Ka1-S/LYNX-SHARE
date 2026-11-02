@@ -56,6 +56,7 @@ add_library(lynx_core STATIC
     src/core/Preferences.cpp
     src/core/MidiSync.cpp
     src/core/ThemePalette.cpp
+    src/core/LoopStarter.cpp
     src/core/PluginLayout.cpp
     src/core/StateParams.cpp
     src/core/FlEffects.cpp
@@ -185,7 +186,9 @@ target_sources(lynx_core PRIVATE
     src/core/RackOps.cpp
     src/core/ChannelMiscFx.cpp
     src/core/MidiImport.cpp
-    src/core/StartupSound.cpp)
+    src/core/StartupSound.cpp
+    src/core/Speech.cpp
+    src/core/SpeechRules.cpp)
 
 # workflow P2 (note tools, mixer operations, history labels, browser search)
 target_sources(lynx_core PRIVATE
@@ -414,7 +417,9 @@ if(LYNX_BUILD_APP)
         src/ui/AudioEditor.cpp
         src/ui/AudioEditorTools.cpp
         src/ui/ToolWindow.cpp
+        src/ui/SpeechDialog.cpp
         src/ui/TempoTapper.cpp
+        src/ui/LoopStarterWindow.cpp
         src/ui/HistoryPanel.cpp
         src/ui/MissingFilesDialog.cpp
         src/ui/SettingsDialog.cpp
