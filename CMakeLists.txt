@@ -214,6 +214,7 @@ target_sources(lynx_core PRIVATE
     src/core/PluginMonitor.cpp
     src/core/ProjectContents.cpp
     src/core/PlaylistOps.cpp
+    src/core/QuickRender.cpp
     src/core/TempoDetect.cpp
     src/core/ScoreLog.cpp
     src/core/ChannelLoops.cpp

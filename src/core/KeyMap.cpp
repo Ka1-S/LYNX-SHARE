@@ -108,6 +108,10 @@ std::vector<Action> makeActions()
         { "file.export", TR_NOOP ("Export audio"), Context::global, { chord ('R', ctrl) } },
         { "file.exportMp3", TR_NOOP ("Export an MP3 file"), Context::global, { chord ('R', ctrl | shift) } },
         { "file.exportMidi", TR_NOOP ("Export a MIDI file"), Context::global, { chord ('M', ctrl | shift) } },
+        // FL's Tools › Consolidate playlist selection (EERenderPLSelectionLengthAction Ctrl+Alt+C, EEPLRenderSongLengthAction
+        // Ctrl+Shift+Alt+C; REA round 168e)
+        { "tools.consolidateSelection", TR_NOOP ("Consolidate playlist selection (from selection start)"), Context::global, { chord ('C', ctrl | alt) } },
+        { "tools.consolidateSelectionSongStart", TR_NOOP ("Consolidate playlist selection (from song start)"), Context::global, { chord ('C', ctrl | shift | alt) } },
         { "edit.undo", TR_NOOP ("Undo"), Context::global, { chord ('Z', ctrl) } },
         // FL's Edit › "Undo backwards" (EditUndoBackwardsAction, Ctrl+Alt+Z; round 167k): one more step back
         { "edit.undoBackwards", TR_NOOP ("Undo backwards"), Context::global, { chord ('Z', ctrl | alt) } },

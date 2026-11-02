@@ -1343,6 +1343,8 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("file.export")) exportAudio();
     else if (is ("file.exportMp3")) exportAudio (1);
     else if (is ("file.exportMidi")) exportMidiFile();
+    else if (is ("tools.consolidateSelection")) consolidatePlaylistSelection (engine, playlist.getSelectedClips(), false);
+    else if (is ("tools.consolidateSelectionSongStart")) consolidatePlaylistSelection (engine, playlist.getSelectedClips(), true);
     else if (is ("edit.undo")) flUndo();
     else if (is ("edit.undoBackwards")) undoRedo (false);
     else if (is ("edit.redo")) undoRedo (true);
@@ -2027,6 +2029,15 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "playlist.reverseClips", tr ("Reverse selected audio clips"));
             action (menu, "playlist.quantizeStarts", tr ("Quantize the clips' starts"));
             action (menu, "playlist.quantizeHalf", tr ("Quantize the clips' starts 50% (halfway to the grid)"));
+            {
+                // FL's Playlist Tools › EERenderPLSelectionMenu, EEPLRenderAllTracksMenu, EEPLRenderAllTrackGroupsMenu (round 168e)
+                juce::PopupMenu consolidate;
+                action (consolidate, "tools.consolidateSelection", tr ("From selection start"));
+                action (consolidate, "tools.consolidateSelectionSongStart", tr ("From song start"));
+                menu.addSubMenu (tr ("Consolidate playlist selection"), consolidate);
+                menu.addSubMenu (tr ("Export all playlist tracks"), playlistTrackExportMenu (false));
+                menu.addSubMenu (tr ("Export all playlist track groups"), playlistTrackExportMenu (true));
+            }
             menu.addSubMenu (tr ("Zoom"), zoomMenu ("playlist."));
             menu.addSeparator();
             // FL's Performance mode (round 165m)
@@ -2750,6 +2761,19 @@ void MainComponent::PatternSelector::mouseWheelMove (const juce::MouseEvent&, co
         onStep (delta > 0.0f ? -1 : 1);
 }
 
+juce::PopupMenu MainComponent::playlistTrackExportMenu (bool groups)
+{
+    // FL: From song start... / From track start... / Time selection... (the last does nothing without a time selection)
+    juce::PopupMenu menu;
+    auto add = [&] (const juce::String& text, quickrender::Start start, bool enabled) {
+        menu.addItem (text, enabled, false, [this, start, groups] { exportAllPlaylistTracks (engine, projectName, start, groups); });
+    };
+    add (tr ("From song start..."), quickrender::Start::songStart, true);
+    add (tr ("From track start..."), quickrender::Start::clipStart, true);
+    add (tr ("Time selection..."), quickrender::Start::timeSelection, engine.getSong().hasLoop());
+    return menu;
+}
+
 juce::PopupMenu MainComponent::makePatternMenu()
 {
     const auto& song = engine.getSong();
@@ -2792,6 +2816,11 @@ juce::PopupMenu MainComponent::makePatternMenu()
     menu.addItem (tr ("Move up") + shortcutText ("pattern.moveUp"), index > 0, false, [this] { movePatternNow (-1); });
     menu.addItem (tr ("Move down") + shortcutText ("pattern.moveDown"), index + 1 < (int) song.patterns.size(), false, [this] { movePatternNow (1); });
     menu.addItem (tr ("Split by channel (one new pattern per channel)"), ! pattern.notes.empty(), false, [this] { splitPatternByChannelNow(); });
+    // FL's Patterns › PSPatQuickRenderMenu / PSPatRenderMenu / PSPatRenderReplaceMenu (PSPatQuickRenderMenuClick, tags 1 / 0 / 2;
+    // REA round 168e)
+    menu.addItem (tr ("Quick render as audio clip"), [this, index] { renderPatternAsAudioClip (engine, index, 1); });
+    menu.addItem (tr ("Render as audio clip..."), [this, index] { renderPatternAsAudioClip (engine, index, 0); });
+    menu.addItem (tr ("Render and replace..."), [this, index] { renderPatternAsAudioClip (engine, index, 2); });
     juce::PopupMenu signatures;
 
     for (int beats : { 2, 3, 4, 5, 6, 7, 8, 9, 12 })
@@ -4700,6 +4729,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             exports.addItem (tr ("FLAC file..."), [this] { exportAudio (3); });
             exports.addItem (tr ("MIDI file...") + shortcutText ("file.exportMidi"), [this] { exportMidiFile(); });
             exports.addItem (tr ("Last exported format(s)...") + shortcutText ("file.export"), [this] { exportAudio(); });
+            exports.addSeparator();
+            // FL's ExportAllPLTracksMenu / ExportAllPLTrackGroupsMenu (FileExportPLTracks… / FileExportPLGroups…, REA round 168e)
+            exports.addSubMenu (tr ("All playlist tracks"), playlistTrackExportMenu (false));
+            exports.addSubMenu (tr ("All playlist track groups"), playlistTrackExportMenu (true));
             exports.addSeparator();
             exports.addItem (tr ("Project with samples (.zip)..."), [this] { exportPackage(); });
             exports.addItem (tr ("Project data files (collect the samples into a folder)..."), [this] { collectSamples(); });

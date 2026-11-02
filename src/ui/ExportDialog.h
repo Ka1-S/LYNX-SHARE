@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/QuickRender.h"
 #include "engine/AudioEngine.h"
 
 namespace lynx
@@ -20,9 +21,21 @@ void showExportDialogForTracks (AudioEngine& engine, const juce::File& suggested
 // "Render to audio" (freeze): the insert becomes an audio clip on a new insert with the same
 // routing, and the original is muted. Runs on a background thread with progress.
 void bounceInsertToAudio (AudioEngine& engine, int track);
-// FL's Playlist track menu "Consolidate track(s)" (REA round 146a): the track's clips are rendered (through the mixer,
-// from the track's first clip or from the song start) into one audio clip that takes their place on the track.
+// FL's renders that come back into the project as audio clips (REA round 168e, core/QuickRender.h). Each opens the
+// render window in its audio-clip mode (WAV, no file dialog), renders in the background and then edits the song.
+// Playlist track menu "Consolidate this track" (From track start / From song start; Shift held = choose the folder): a
+// new track above the track holds the render, the track joins its group and its clips are muted.
 void consolidatePlaylistTrack (AudioEngine& engine, int track, bool fromSongStart);
+// Tools › "Consolidate playlist selection" (Ctrl+Alt+C From selection start, Ctrl+Shift+Alt+C From song start): the same
+// for the selected clips (`selectedClips`: indices into the Playlist), the new track above the highest one.
+void consolidatePlaylistSelection (AudioEngine& engine, const std::vector<int>& selectedClips, bool fromSongStart);
+// Patterns › "Render as audio clip..." (how 0), "Quick render as audio clip" (1: the last choices, no window), "Render and
+// replace..." (2: the pattern's Playlist clips become clips of the render): a new audio clip channel named after it.
+void renderPatternAsAudioClip (AudioEngine& engine, int pattern, int how);
+// File › Export › "All playlist tracks" / "All playlist track groups" (and the Playlist's Tools): a folder, the render
+// window once, then one WAV per track ("<project> - <track>"), from the song start, the track's start or the time
+// selection (quickrender::Start).
+void exportAllPlaylistTracks (AudioEngine& engine, const juce::String& projectName, quickrender::Start start, bool groups);
 
 // Panel only (for --snapshot mode; `format`: 0 WAV, 1 MP3, 2 OGG, 3 FLAC with loop/stem options set). Nothing is saved.
 std::unique_ptr<juce::Component> makeExportPanel (AudioEngine& engine, int format = 0);

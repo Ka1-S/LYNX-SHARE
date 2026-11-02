@@ -1,6 +1,7 @@
 #include "ui/ExportDialog.h"
 
 #include "core/PlaylistOps.h"
+#include "core/QuickRender.h"
 #include "core/HardwareInsert.h"
 #include "platform/Paths.h"
 #include "ui/WindowOwner.h"
@@ -232,6 +233,43 @@ private:
     juce::OwnedArray<juce::TextButton> buttons;
 };
 
+// FL's render window opened for a render that comes back into the project (REA round 168e: FUN_011dcf60 with flags 0x34 for
+// the pattern renders, 0x1d0 for consolidations and the exports per track; the form's FormShow FUN_00d1e180, modes 2 / 3):
+// WAV only (the format boxes locked), no mixer-track split, the range fixed (Pattern for the pattern renders), and on
+// every opening "Enable insert effects" and "Trim PDC silence" ticked, "Save tempo information" and "Show the file when
+// complete" unticked. No file dialog: the button renders and `onRender` gets the choices.
+struct ClipRenderMode
+{
+    bool pattern = false; // the range is the pattern
+    Song song;            // what is rendered (for the length line)
+    juce::String button;
+    std::function<void (const exportopts::Options&)> onRender;
+};
+
+juce::File clipRenderSettingsFile()
+{
+    return lynx::platform::settingsFile ("clip-render-settings.txt");
+}
+
+// The choices a render to an audio clip starts from: the last ones of such a render (else the Export window's), with
+// what FL's FormShow sets each time (see ClipRenderMode).
+exportopts::Options clipRenderOptions (bool pattern)
+{
+    using namespace exportopts;
+    const auto clipFile = clipRenderSettingsFile();
+    auto o = fromText ((clipFile.existsAsFile() ? clipFile : lynx::platform::settingsFile ("export-settings.txt")).loadFileAsString().toStdString());
+    o = withSingleFormat (o, Format::wav);
+    o.stems = Stems::none;
+    o.stemsIncludeMaster = false;
+    o.loops = 1;
+    o.range = pattern ? Range::pattern : Range::selection;
+    o.insertEffects = true;
+    o.trimPdc = true;
+    o.saveTempo = false;
+    o.showWhenDone = false;
+    return o;
+}
+
 // The Export window (FL's "WAV rendering", interpreted; REA_rodada84): what to render on the left, the file format on
 // the right, mix options below; the choices are remembered (%APPDATA%\LYNX\export-settings.txt).
 class ExportPanel final : public juce::Component
@@ -240,16 +278,24 @@ public:
     // initialFormat: −1 = the formats of the last export (FL's "Last exported format(s)"), else that one format only
     // onlyTracks (FL's "Render armed / selected tracks to wave file(s)", REA round 165f-mixer): one file per insert of the
     // list, the stem choice locked (and not remembered); the Master in the list = also the full mix
-    ExportPanel (AudioEngine& e, juce::File folder, juce::String name, bool remember, int initialFormat = -1, std::vector<int> tracks = {})
+    ExportPanel (AudioEngine& e, juce::File folder, juce::String name, bool remember, int initialFormat = -1, std::vector<int> tracks = {},
+                 std::shared_ptr<ClipRenderMode> clipMode = nullptr)
         : engine (e),
           suggestedFolder (std::move (folder)),
           suggestedName (std::move (name)),
           persistent (remember),
-          onlyTracks (std::move (tracks))
+          onlyTracks (std::move (tracks)),
+          clip (std::move (clipMode))
     {
         using namespace exportopts;
         if (persistent)
             options = fromText (exportSettingsFile().loadFileAsString().toStdString());
+        if (clip != nullptr)
+        {
+            persistent = false; // (the Export window's own choices stay as they are)
+            options = clipRenderOptions (clip->pattern);
+            initialFormat = -1;
+        }
         rememberedStems = options.stems;
         rememberedStemsMaster = options.stemsIncludeMaster;
         if (! onlyTracks.empty())
@@ -261,7 +307,7 @@ public:
             options = withSingleFormat (options, (Format) initialFormat);
         const auto& song = engine.getSong();
         // the range follows what is playing unless a selection was the last choice and still exists
-        if (options.range != Range::selection || ! hasSelection (song))
+        if (clip == nullptr && (options.range != Range::selection || ! hasSelection (song)))
             options.range = song.mode == PlayMode::song && ! song.playlist.empty() ? Range::song : Range::pattern;
 
         for (auto* t : { &whatTitle, &formatTitle, &optionsTitle })
@@ -399,6 +445,19 @@ public:
         addAndMakeVisible (cancelButton);
         exportButton.onClick = [this] { chooseFile(); };
         cancelButton.onClick = [this] { close(); };
+
+        if (clip != nullptr)
+        {
+            // what FL locks for a render to an audio clip: the format (WAV), the range, the split into stems
+            rangeBox.setItemEnabled (3, true);
+            for (auto* c : std::initializer_list<juce::Component*> { &rangeBox, &loopsBox, &stemsBox, &stemsMaster, &formatButtons })
+                c->setEnabled (false);
+            for (auto& t : alsoToggles)
+                t.setEnabled (false);
+            realtimeToggle.setVisible (false);
+            exportButton.setButtonText (clip->button);
+            exportButton.onClick = [this] { renderClip(); };
+        }
 
         writeControls();
         // round 167l: the height the content needs (a fixed 486 left an empty band above "Mix"): the taller column (the
@@ -681,12 +740,12 @@ private:
         depthBox.setItemEnabled (3, options.format == Format::wav);
         tailLengthBox.setEnabled (options.tail != TailMode::cut);
         stemsMaster.setEnabled (options.stems != Stems::none);
-        loopsBox.setEnabled (! realtime);
+        loopsBox.setEnabled (! realtime && clip == nullptr);
         // a real-time bounce (round 165c): the device's rate, the song or the selection once, the Master's effects, the
         // playback quality, no stems — the controls it doesn't use are off
         for (auto* c : std::initializer_list<juce::Component*> { &rateBox, &stemsBox, &masterFxToggle, &insertFxToggle, &hqToggle, &polyToggle, &warmUpToggle })
             c->setEnabled (! realtime);
-        stemsBox.setEnabled (! realtime && onlyTracks.empty()); // a list of tracks locks the stem choice
+        stemsBox.setEnabled (! realtime && onlyTracks.empty() && clip == nullptr); // a list of tracks locks the stem choice
         rangeBox.setItemEnabled (2, ! realtime);
         {
             // the boxes show what the export will use: real time = the Master's effects, the playback quality
@@ -700,13 +759,13 @@ private:
                 if (sampleRates()[(std::size_t) i] == used.sampleRate)
                     rateBox.setSelectedItemIndex (i, juce::dontSendNotification);
         }
-        stemsMaster.setEnabled (! realtime && options.stems != Stems::none);
+        stemsMaster.setEnabled (! realtime && options.stems != Stems::none && clip == nullptr);
         const auto ditherable = (options.format == Format::wav && options.wavBits != 32) || options.format == Format::flac;
         ditherBox.setEnabled (ditherable);
         ditherLabel.setEnabled (ditherable);
         const auto f = options.format;
         for (int i = 0; i < 4; ++i)
-            alsoToggles[(std::size_t) i].setEnabled (i != (int) f);
+            alsoToggles[(std::size_t) i].setEnabled (i != (int) f && clip == nullptr);
         // (WAV only: FL writes them into WAV files)
         const auto wav = f == Format::wav || (options.moreFormats & (1u << (int) Format::wav)) != 0;
         for (auto* t : { &tempoToggle, &loopMarkersToggle, &playlistMarkersToggle })
@@ -719,7 +778,7 @@ private:
         compressionLabel.setVisible (f == Format::flac);
         flacLevelBox.setVisible (f == Format::flac);
 
-        const auto& song = engine.getSong();
+        const auto& song = clip != nullptr ? clip->song : engine.getSong();
         const auto shown = realtime ? ExportJob::realtimeOptions (options, engine.getTransport().sampleRate.load()) : options;
         const auto seconds = exportMusicSeconds (song, shown);
         // FL's line: "Length: 144 bars  Total time: 3'57''  Disk space: 38.76 MB" (REA round 134)
@@ -755,6 +814,18 @@ private:
         warningLabel.setText (warning, juce::dontSendNotification);
         resized();
         repaint();
+    }
+
+    // a render to an audio clip (ClipRenderMode): no file dialog, the choices are remembered for the next one
+    void renderClip()
+    {
+        readControls();
+        clipRenderSettingsFile().replaceWithText (juce::String (exportopts::toText (options)));
+        auto mode = clip;
+        const auto o = options;
+        close(); // deletes this panel: no `this` after this point
+        if (mode->onRender)
+            mode->onRender (o);
     }
 
     void chooseFile()
@@ -851,6 +922,7 @@ private:
     juce::String suggestedName;
     bool persistent = true;
     std::vector<int> onlyTracks;
+    std::shared_ptr<ClipRenderMode> clip;
     exportopts::Stems rememberedStems = exportopts::Stems::none;
     bool rememberedStemsMaster = false;
     exportopts::Options options;
@@ -909,34 +981,280 @@ void bounceInsertToAudio (AudioEngine& engine, int track)
     }, tr ("Rendering insert to audio...")))->launchThread();
 }
 
-void consolidatePlaylistTrack (AudioEngine& engine, int track, bool fromSongStart)
+namespace
 {
-    engine.capturePluginStates();
-    const auto& song = engine.getSong();
-    Song render;
-    std::int64_t start = 0, musicTicks = 0;
-    if (! trackmodes::makeConsolidateSong (song, track, fromSongStart, render, start, musicTicks))
-        return;
-
-    const auto name = track < (int) song.playlistTracks.size() && ! song.playlistTracks[(std::size_t) track].name.empty()
-                          ? juce::String::fromUTF8 (song.playlistTracks[(std::size_t) track].name.c_str())
-                          : "Track " + juce::String (track + 1);
+// FL's default render folder (FUN_011bf050): LYNX renders into Music/LYNX/Renders
+juce::File renderFolder()
+{
     const auto folder = juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile ("LYNX/Renders");
     folder.createDirectory();
-    const auto file = folder.getNonexistentChildFile (juce::File::createLegalFileName (name + " (consolidated)"), ".wav");
+    return folder;
+}
 
-    ExportSettings settings;
-    settings.format = ExportSettings::Format::wav32Float;
-    settings.sampleRate = engine.getTransport().sampleRate.load();
-    settings.tailSeconds = 2.0;
-    const auto length = musicTicks + (std::int64_t) (settings.tailSeconds * song.tempoAt ((double) (start + musicTicks)) * ppq / 60.0);
+juce::File uniqueWav (const juce::File& folder, const std::string& name)
+{
+    return folder.getNonexistentChildFile (juce::File::createLegalFileName (juce::String::fromUTF8 (name.c_str())), ".wav", false);
+}
 
-    auto job = std::make_unique<ExportJob> (render, settings, file);
+double fileSeconds (const juce::File& file)
+{
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file));
+    return reader != nullptr && reader->sampleRate > 0.0 ? (double) reader->lengthInSamples / reader->sampleRate : 0.0;
+}
+
+void warn (const juce::String& title, const juce::String& text)
+{
+    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, title, text);
+}
+
+// the FL message of a consolidation that cannot run
+void explain (quickrender::Result r)
+{
+    using quickrender::Result;
+    if (r == Result::empty)
+        warn (tr ("Track is empty"), tr ("This track doesn't produce audio (or is completely muted). There is nothing to consolidate."));
+    else if (r == Result::nothingSelected)
+        warn (tr ("Nothing selected"), tr ("There is no unmuted playlist selection to consolidate."));
+    else if (r == Result::tempoEvents)
+        warn (tr ("Can't consolidate"), tr ("One of the selected pattern clips contain tempo events and cannot be consolidated."));
+}
+
+// the render window in clip mode (no file dialog), above the main window
+void showClipRenderWindow (AudioEngine& engine, const juce::String& title, std::shared_ptr<ClipRenderMode> mode)
+{
+    juce::DialogWindow::LaunchOptions options;
+    options.content.setOwned (fitContentToScreen (std::make_unique<ExportPanel> (engine, juce::File(), "LYNX SHARE", false, -1, std::vector<int> {}, std::move (mode))).release());
+    options.dialogTitle = title;
+    options.dialogBackgroundColour = theme::colour::bg2;
+    options.useNativeTitleBar = true;
+    options.resizable = false;
+    options.escapeKeyTriggersCloseButton = true;
+    if (auto* dialog = options.launchAsync())
+        keepAboveMainWindow (*dialog);
+}
+
+// one render in the background (progress window); `apply` runs on the message thread with the file's length (s)
+void renderInBackground (const Song& render, const exportopts::Options& o, const juce::File& file, const juce::String& title,
+                         std::function<void (double)> apply)
+{
+    auto job = std::make_unique<ExportJob> (render, o, file);
+    job->setExtraData (false); // (the file becomes a sample again: no loop / markers in it)
+    (new ExportThread (std::move (job), file, [file, apply] (bool ok) {
+        if (ok && apply)
+            apply (fileSeconds (file));
+    }, title))->launchThread();
+}
+
+void consolidate (AudioEngine& engine, const quickrender::Plan& plan, const juce::File& folder)
+{
+    engine.capturePluginStates();
+    const auto render = quickrender::makePlanRenderSong (engine.getSong(), plan);
+    auto mode = std::make_shared<ClipRenderMode>();
+    mode->song = render;
+    mode->button = tr ("Render");
     auto* engineRef = &engine;
-    (new ExportThread (std::move (job), file, [engineRef, track, file, start, length] (bool ok) {
-        if (ok)
-            engineRef->editSong ([&] (Song& s) { trackmodes::applyConsolidate (s, track, file.getFullPathName().toStdString(), start, length); });
-    }, tr ("Consolidating track...")))->launchThread();
+    mode->onRender = [engineRef, plan, render, folder] (const exportopts::Options& o) {
+        const auto file = uniqueWav (folder, plan.name);
+        renderInBackground (render, o, file, tr ("Consolidating..."), [engineRef, plan, file] (double seconds) {
+            const auto length = quickrender::ticksForSeconds (engineRef->getSong(), plan.start, seconds);
+            engineRef->editSong ([&] (Song& s) { quickrender::applyConsolidation (s, plan, file.getFullPathName().toStdString(), length); });
+        });
+    };
+    showClipRenderWindow (engine, tr ("Render to audio clip"), std::move (mode));
+}
+
+// File › Export › "All playlist tracks" / "All playlist track groups": one file per track from one set of choices
+class TrackExportThread final : public juce::ThreadWithProgressWindow
+{
+public:
+    struct Item
+    {
+        juce::String name;
+        juce::File file;
+        Song song;
+    };
+
+    TrackExportThread (std::vector<Item> list, exportopts::Options o, int skippedTracks, juce::File folder)
+        : juce::ThreadWithProgressWindow (tr ("Exporting playlist tracks..."), true, true),
+          items (std::move (list)),
+          options (o),
+          skipped (skippedTracks),
+          where (std::move (folder))
+    {
+    }
+
+    void run() override
+    {
+        for (std::size_t i = 0; i < items.size() && ! threadShouldExit(); ++i)
+        {
+            auto& item = items[i];
+            setStatusMessage (item.name);
+            std::unique_ptr<ExportJob> job;
+            juce::WaitableEvent ready;
+            juce::MessageManager::callAsync ([&] {
+                job = std::make_unique<ExportJob> (item.song, options, item.file);
+                job->setExtraData (false);
+                ready.signal();
+            });
+            ready.wait();
+
+            juce::String error;
+            const auto base = (double) i / (double) items.size();
+            if (job->run ([this, base] (double p) {
+                    setProgress (base + p / (double) items.size());
+                    return ! threadShouldExit();
+                }, error))
+                ++written;
+            else if (! threadShouldExit())
+                failed = true;
+
+            juce::WaitableEvent gone;
+            juce::MessageManager::callAsync ([&] {
+                job.reset();
+                gone.signal();
+            });
+            gone.wait();
+        }
+    }
+
+    void threadComplete (bool cancelled) override
+    {
+        // FL's messages (FUN_012fd7a0)
+        if (failed)
+            warn (tr ("Error"), tr ("Something went wrong while rendering playlist tracks."));
+        else if (! cancelled && written > 0 && skipped > 0)
+            warn (tr ("Tracks skipped"), tr ("Some tracks were skipped because they didn't have audio or were completely muted."));
+        if (! cancelled && written > 0 && options.showWhenDone)
+            where.startAsProcess();
+        juce::MessageManager::callAsync ([this] { delete this; });
+    }
+
+private:
+    std::vector<Item> items;
+    exportopts::Options options;
+    int skipped = 0, written = 0;
+    bool failed = false;
+    juce::File where;
+};
+} // namespace
+
+void consolidatePlaylistTrack (AudioEngine& engine, int track, bool fromSongStart)
+{
+    // FL's "Consolidate this track" (FUN_012ea170 → FUN_012fc180): the render window, then a new track above holding the
+    // render, the old track grouped under it and its clips muted; Shift held = a folder is asked for (FL's VK_SHIFT test)
+    quickrender::Plan plan;
+    const auto r = quickrender::planTrack (engine.getSong(), track, false, fromSongStart ? quickrender::Start::songStart : quickrender::Start::clipStart, plan);
+    if (r != quickrender::Result::ok)
+    {
+        explain (r);
+        return;
+    }
+    if (! juce::ModifierKeys::currentModifiers.isShiftDown())
+    {
+        consolidate (engine, plan, renderFolder());
+        return;
+    }
+    auto chooser = std::make_shared<juce::FileChooser> (tr ("Select a folder to consolidate to"), renderFolder());
+    auto* engineRef = &engine;
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories, [engineRef, plan, chooser] (const juce::FileChooser& fc) {
+        if (fc.getResult().isDirectory())
+            consolidate (*engineRef, plan, fc.getResult());
+    });
+}
+
+void consolidatePlaylistSelection (AudioEngine& engine, const std::vector<int>& selectedClips, bool fromSongStart)
+{
+    quickrender::Plan plan;
+    const auto r = quickrender::planSelection (engine.getSong(), selectedClips, fromSongStart, plan);
+    if (r != quickrender::Result::ok)
+    {
+        explain (r);
+        return;
+    }
+    consolidate (engine, plan, renderFolder());
+}
+
+void renderPatternAsAudioClip (AudioEngine& engine, int pattern, int how)
+{
+    const auto& song = engine.getSong();
+    if (! quickrender::patternRenderable (song, pattern))
+    {
+        warn (tr ("Warning"), tr ("Pattern is empty, nothing to render."));
+        return;
+    }
+    engine.capturePluginStates();
+    const auto render = quickrender::makePatternRenderSong (song, pattern);
+    const auto name = quickrender::patternName (song, pattern);
+    auto* engineRef = &engine;
+    const bool replace = how == 2;
+    auto go = [engineRef, render, name, pattern, replace] (const exportopts::Options& o) {
+        const auto file = uniqueWav (renderFolder(), name);
+        renderInBackground (render, o, file, tr ("Rendering pattern..."), [engineRef, file, pattern, replace] (double) {
+            engineRef->editSong ([&] (Song& s) { quickrender::applyPatternRender (s, pattern, file.getFullPathName().toStdString(), replace); });
+        });
+    };
+    if (how == 1) // FL's "Quick render as audio clip": the last choices, no window (flag 1)
+    {
+        go (clipRenderOptions (true));
+        return;
+    }
+    auto mode = std::make_shared<ClipRenderMode>();
+    mode->pattern = true;
+    mode->song = render;
+    mode->button = tr ("Render");
+    mode->onRender = go;
+    showClipRenderWindow (engine, replace ? tr ("Render and replace") : tr ("Render as audio clip"), std::move (mode));
+}
+
+void exportAllPlaylistTracks (AudioEngine& engine, const juce::String& projectName, quickrender::Start start, bool groups)
+{
+    // FL (FUN_012fd7a0): first the folder ("Select rendering folder"), then the render window once for every track
+    auto chooser = std::make_shared<juce::FileChooser> (tr ("Select the folder where output should be rendered..."), renderFolder());
+    auto* engineRef = &engine;
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+                          [engineRef, projectName, start, groups, chooser] (const juce::FileChooser& fc) {
+        const auto folder = fc.getResult();
+        if (! folder.isDirectory())
+            return;
+        auto& engine = *engineRef;
+        engine.capturePluginStates();
+        auto song = engine.getSong();
+        if (start != quickrender::Start::timeSelection)
+            song.loopStart = song.loopEnd = 0; // FL clears the time selection for the other two
+        std::vector<TrackExportThread::Item> items;
+        int skipped = 0;
+        const auto name = projectName.isNotEmpty() ? projectName.toStdString() : std::string ("LYNX SHARE");
+        juce::Array<juce::File> taken; // (two tracks of the same name get two files)
+        for (auto t : quickrender::exportTracks (song, groups))
+        {
+            quickrender::Plan plan;
+            if (quickrender::planTrack (song, t, groups, start, plan) != quickrender::Result::ok)
+            {
+                ++skipped;
+                continue;
+            }
+            const auto fileName = quickrender::trackExportName (song, name, t);
+            auto file = uniqueWav (folder, fileName);
+            for (int k = 2; taken.contains (file); ++k)
+                file = uniqueWav (folder, fileName + " (" + std::to_string (k) + ")");
+            taken.add (file);
+            items.push_back ({ juce::String::fromUTF8 (fileName.c_str()), file, quickrender::makePlanRenderSong (song, plan) });
+        }
+        if (items.empty())
+        {
+            warn (tr ("Nothing rendered"), tr ("Nothing was rendered because there are no unmuted clips in any of the selected tracks."));
+            return;
+        }
+        auto mode = std::make_shared<ClipRenderMode>();
+        mode->song = items.front().song;
+        mode->button = tr ("Render");
+        mode->onRender = [items, skipped, folder] (const exportopts::Options& o) mutable {
+            (new TrackExportThread (std::move (items), o, skipped, folder))->launchThread();
+        };
+        showClipRenderWindow (engine, groups ? tr ("Export all playlist track groups") : tr ("Export all playlist tracks"), std::move (mode));
+    });
 }
 
 std::unique_ptr<juce::Component> makeExportPanel (AudioEngine& engine, int format)
