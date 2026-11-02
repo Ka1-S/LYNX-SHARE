@@ -1480,6 +1480,8 @@ public:
         lynx::crashguard::note ("closing");
         lynx::shutdownPluginSandboxWorker();
         splash = nullptr;
+        if (mainWindow != nullptr && mainWindow->isVisible())
+            mainWindow->saveState();
         mainWindow = nullptr; // the UI goes before the engine
         lynx::updater::shutdown(); // (a check or download in flight stops)
         crashEngine = nullptr;
@@ -7896,6 +7898,16 @@ private:
             }
 
             centreWithSize (getWidth(), getHeight());
+
+            // where it was last time (round 167v); the first start opens maximized, the Playlist filling the screen
+            // with the Browser at the left and the Channel Rack above it, like FL Studio's first start
+            const auto saved = stateFile().loadFileAsString().trim();
+            // (LYNX_TEST_MODE keeps the fixed-size window scripted checks expect, unless LYNX_TEST_MAXIMIZE=1)
+            const auto firstStart = saved.isEmpty()
+                                    && (! lynx::platform::testMode() || juce::SystemStats::getEnvironmentVariable ("LYNX_TEST_MAXIMIZE", {}) == "1");
+            maximiseOnReveal = firstStart || saved.startsWithIgnoreCase ("fs");
+            if (saved.isNotEmpty())
+                restoreWindowStateFromString (saved.startsWithIgnoreCase ("fs") ? saved.substring (2).trim() : saved);
         }
 
         // Shows the window (built hidden while the splash screen is up).
@@ -7904,9 +7916,15 @@ private:
             setVisible (true);
             lynx::applyWindowChrome (*this);
             lynx::fitWindowOnScreen (*this); // a size saved at another UI zoom still fits (round 163)
+            if (maximiseOnReveal)
+                setFullScreen (true); // (a title-bar window: maximized, the taskbar stays)
             toFront (true);
             content->grabKeyboardFocus();
         }
+
+        // The window's place and maximized state for the next start (main-window.txt in the settings folder).
+        void saveState() { stateFile().replaceWithText (getWindowStateAsString()); }
+        static juce::File stateFile() { return lynx::PluginHost::settingsFolder().getChildFile ("main-window.txt"); }
 
         void openFile (const juce::File& file) { content->openFile (file); }
         lynx::MainComponent& getContent() { return *content; }
@@ -7934,6 +7952,7 @@ private:
     private:
         lynx::MainComponent* content = nullptr; // owned by the window
         double frameStart = 0.0;
+        bool maximiseOnReveal = false;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainWindow)
     };
