@@ -177,6 +177,14 @@ std::function<std::optional<double> (const juce::String&)> inverseOf (std::funct
     };
 }
 
+ValueSpec digitWheel (ValueSpec spec)
+{
+    spec.interval = juce::jmax (1.0, spec.interval);
+    spec.stepsPerNotch = 1.0;
+    spec.pixelsForRange = digitWheelPixelsPerStep * juce::jmax (1.0, (spec.maximum - spec.minimum) / spec.interval);
+    return spec;
+}
+
 // --- gestures ----------------------------------------------------------------------------------
 
 void ValueDrag::begin (const juce::MouseEvent& e, double value)
@@ -223,8 +231,17 @@ std::optional<double> wheelValue (double value, const juce::MouseEvent& e, const
     if (delta == 0.0f)
         return std::nullopt;
 
-    const auto notches = (wheel.isReversed ? -1.0 : 1.0) * (delta > 0.0f ? 1.0 : -1.0) * juce::jmax (1.0, std::abs (delta) / 0.12);
+   #if JUCE_WINDOWS
+    constexpr double notchSize = 120.0 * 0.5 / 256.0;
+   #elif JUCE_LINUX || JUCE_BSD
+    constexpr double notchSize = 50.0 / 256.0;
+   #else
+    constexpr double notchSize = 0.12;
+   #endif
+    const auto notches = (wheel.isReversed ? -1.0 : 1.0) * controls::wheelNotches (delta, notchSize);
     reportTweak (spec);
+    if (spec.stepsPerNotch > 0.0)
+        return juce::jlimit (spec.minimum, spec.maximum, value + notches * spec.stepsPerNotch * juce::jmax (1.0, spec.interval));
     return controls::wheelValue (value, notches, spec.minimum, spec.maximum, e.mods.isCtrlDown(), spec.interval);
 }
 

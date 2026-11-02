@@ -2764,13 +2764,36 @@ public:
     }
     std::uint32_t shownGeneration = 0;
 
-    ui::Hint hintAt (juce::Point<int>) override { return ui::valueHint (specOf(), getter(), ui::valueGestures()); }
+    ui::Hint hintAt (juce::Point<int>) override
+    {
+        return ui::valueHint (specOf(), getter(), doubleClicked ? tr ("[LMB] drag or [Wheel] changes  [2xLMB] show in the Mixer  [RMB] menu")
+                                                                : ui::valueGestures());
+    }
+
+    // FL's number wheel (round 168s, issue #32): the value in a box over the caption instead of a knob; the whole
+    // control is the hit area, a notch / 8 px of drag = one step (ui::digitWheel). Double-click: `doubleClicked`.
+    bool digitBox = false;
+    std::function<void()> doubleClicked;
+    std::function<void (juce::PopupMenu&)> extraMenuItems;
 
     void paint (juce::Graphics& g) override
     {
         const auto spec = specOf();
         auto area = getLocalBounds().toFloat();
         const auto caption = area.removeFromBottom (13.0f);
+        if (digitBox)
+        {
+            const auto box = area.reduced (2.0f, 4.0f).withSizeKeepingCentre (area.getWidth() - 4.0f, juce::jmin (26.0f, area.getHeight() - 6.0f));
+            const auto hot = isMouseOverOrDragging();
+            theme::fillRoundRect (g, box, theme::radius::sm, hot ? theme::colour::accentHover : theme::colour::accent);
+            g.setColour (theme::colour::onAccent);
+            g.setFont (theme::font (15.0f, true));
+            g.drawFittedText (spec.text (getter()), box.reduced (3.0f, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.6f);
+            g.setColour (theme::colour::textSecondary);
+            g.setFont (theme::font (theme::type::caption));
+            g.drawFittedText (theme::caps (label), caption.toNearestInt(), juce::Justification::centred, 1, 0.65f);
+            return;
+        }
         const auto valueArea = area.removeFromBottom (13.0f);
         const auto size = juce::jmin (area.getWidth(), area.getHeight());
         const auto shown = shownValue (spec);
@@ -2789,7 +2812,18 @@ public:
     {
         if (e.mods.isPopupMenu())
         {
-            ui::showValueMenu (*this, &engine, specOf(), getter(), setter);
+            if (! extraMenuItems)
+            {
+                ui::showValueMenu (*this, &engine, specOf(), getter(), setter);
+                return;
+            }
+            const auto spec = specOf();
+            juce::PopupMenu menu;
+            menu.addSectionHeader (spec.name + ": " + spec.text (getter()));
+            ui::addValueItems (menu, *this, &engine, spec, getter(), setter);
+            menu.addSeparator();
+            extraMenuItems (menu);
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
             return;
         }
         if (ui::isResetClick (e))
@@ -2819,6 +2853,11 @@ public:
 
     void mouseDoubleClick (const juce::MouseEvent&) override
     {
+        if (doubleClicked)
+        {
+            doubleClicked();
+            return;
+        }
         setter (specOf().defaultValue);
         repaint();
     }
@@ -3873,20 +3912,39 @@ public:
                     },
                     [] (const ChannelDef& d) { return (double) d.sampler.pitch; },
                     [] (Song& s, int ch, double v) { s.channels[(std::size_t) ch].sampler.pitch = (float) juce::jlimit (-24.0, 24.0, v); }, TR_NOOP ("Pitch"));
-        headerKnob ([name] { return countSpec (name() + " - " + tr ("Pitch knob range (semitones)"), 48, 2,
-                                               [] (int v) { return juce::String (v); }); },
+        headerKnob ([name] { return ui::digitWheel (countSpec (name() + " - " + tr ("Pitch knob range (semitones)"), 48, 2,
+                                                              [] (int v) { return juce::String (v); })); },
                     [] (const ChannelDef& d) { return (double) d.misc.pitchRange; },
                     [] (Song& s, int ch, double v) { s.channels[(std::size_t) ch].misc.pitchRange = juce::jlimit (0, 48, juce::roundToInt (v)); },
                     TR_NOOP ("Range"));
+        header.back()->digitBox = true;
+        // FL's TRACK digiwheel (round 168s, issue #32 "very small and not accurate"): a wheel notch or 8 px of drag = the
+        // next insert, double-click shows the insert in the Mixer, the menu has "Assign to free mixer track"
         headerKnob ([this, name] {
-                        return countSpec (name() + " - " + tr ("Target mixer track"), maxMixerTracks - 1, 0,
-                                          [] (int t) { return t == 0 ? tr ("Master") : juce::String (t); });
+                        return ui::digitWheel (countSpec (name() + " - " + tr ("Target mixer track"), maxMixerTracks - 1, 0,
+                                                          [] (int t) { return t == 0 ? tr ("Master") : juce::String (t); }));
                     },
                     [] (const ChannelDef& d) { return (double) d.mixerTrack; },
                     [] (Song& s, int ch, double v) {
                         mixerops::routeChannel (s, ch, juce::roundToInt (v)); // any insert (round 162): missing ones are added
                     },
                     TR_NOOP ("Track"));
+        {
+            auto& track = *header.back();
+            track.digitBox = true;
+            track.doubleClicked = [this] {
+                if (channel < (int) engine.getSong().channels.size() && openMixerInsertHandler())
+                    openMixerInsertHandler() (engine.getSong().channels[(std::size_t) channel].mixerTrack);
+            };
+            track.extraMenuItems = [this] (juce::PopupMenu& menu) {
+                menu.addItem (tr ("Assign to free mixer track"), [this] {
+                    engine.editSong ([ch = channel] (Song& s) {
+                        if (ch < (int) s.channels.size())
+                            s.channels[(std::size_t) ch].mixerTrack = s.claimFreeInsert();
+                    });
+                });
+            };
+        }
 
         int width = MiscPanel::preferredWidth, height = MiscPanel::preferredHeight;
         for (auto& p : pages)
@@ -4289,5 +4347,10 @@ std::unique_ptr<juce::Component> makeNodeChannelFrame (AudioEngine& engine, std:
         return nullptr;
     const auto kind = def->instrument;
     return std::make_unique<ChannelFrame> (engine, ref, std::move (page), hasEnvelopeTab (kind) ? std::make_unique<ModulationPanel> (engine, ref) : nullptr);
+}
+std::function<void (int)>& openMixerInsertHandler()
+{
+    static std::function<void (int)> handler;
+    return handler;
 }
 } // namespace lynx

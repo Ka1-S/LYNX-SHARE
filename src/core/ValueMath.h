@@ -24,6 +24,18 @@ inline double dragValue (double start, double pixelsUp, double minimum, double m
     return std::clamp (start + pixelsUp * perPixel, minimum, maximum);
 }
 
+// How many wheel notches a wheel event moved (never 0 for a move). `notchSize` is what one notch of a plain mouse wheel
+// gives (JUCE's deltaY: 120 × 0.5 / 256 on Windows, 50 / 256 on Linux / X11; macOS lines are smaller): a notch moves
+// a control by one wheel step, as in FL (round 168s, issue #32: one notch over an FL fader = 2 % [SHOT] r168s c_f07;
+// LYNX counted 1.95 notches on Windows and the faders jumped twice as far).
+inline double wheelNotches (double delta, double notchSize) noexcept
+{
+    if (delta == 0.0)
+        return 0.0;
+    const auto n = std::max (1.0, std::round (std::abs (delta) / std::max (1.0e-6, notchSize)));
+    return delta > 0.0 ? n : -n;
+}
+
 // Value after `notches` wheel notches (positive = up). `interval` > 0: at least one interval per notch.
 inline double wheelValue (double value, double notches, double minimum, double maximum, bool fine, double interval = 0.0) noexcept
 {

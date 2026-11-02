@@ -8,6 +8,7 @@
 #include <cmath>
 #include <functional>
 #include <limits>
+#include <set>
 
 namespace lynx
 {
@@ -611,6 +612,24 @@ std::vector<bool> Song::soloAudible() const
     }
 
     return audible;
+}
+
+void Song::uniqueInstances()
+{
+    std::set<std::uint64_t> seen;
+    const auto unique = [&seen] (InstanceTag& tag) {
+        if (! seen.insert (tag.id).second)
+        {
+            tag.renew();
+            seen.insert (tag.id);
+        }
+    };
+    for (auto& c : channels)
+        unique (c.instance);
+    seen.clear();
+    for (auto& t : mixer)
+        for (auto& slot : t.effects)
+            unique (slot.instance);
 }
 
 void Song::swapEffectSlots (int track, int a, int b)

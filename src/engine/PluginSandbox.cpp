@@ -118,6 +118,9 @@ struct SharedBlock
 
     std::uint32_t magic;
     std::int32_t frames, channels, midiCount, paramCount, paramOutCount, latency;
+    // round 168s (issue #32): before this block, the worker switches the plugin to `mode` (1 real time, 2 offline: an
+    // export renders; 0 = unchanged; it is prepared again so a VST3 takes it) and resets it when `resetFirst` is set
+    std::int32_t mode, resetFirst;
     Midi midi[maxMidi];
     Param params[maxParams], paramsOut[maxParams];
     float audio[maxChannels][maxFrames];
@@ -634,6 +637,14 @@ public:
     const juce::String getName() const override { return description.name; }
     void prepareToPlay (double, int) override {}
     void releaseResources() override {}
+    // an export renders (round 168s, issue #32: bridged plugins stayed in real-time mode, with their old voices and a
+    // 0.5 s deadline per block): the worker takes the mode and the reset with the next block, on its audio thread
+    void setNonRealtime (bool offline) noexcept override
+    {
+        AudioPluginInstance::setNonRealtime (offline);
+        pendingMode.store (offline ? 2 : 1, std::memory_order_release);
+    }
+    void reset() override { pendingReset.store (1, std::memory_order_release); }
     double getTailLengthSeconds() const override { return tail; }
     bool acceptsMidi() const override { return midiIn; }
     bool producesMidi() const override { return midiOut; }
@@ -692,9 +703,12 @@ public:
         shared->midiCount = count;
         shared->paramCount = pending.drain (shared->params, SharedBlock::maxParams);
         shared->paramOutCount = 0;
+        shared->mode = pendingMode.exchange (0, std::memory_order_acq_rel);
+        shared->resetFirst = pendingReset.exchange (0, std::memory_order_acq_rel);
 
-        // timeout: 0.5 s (a healthy plugin responds in well under one block)
-        if (! session->runBlock (500))
+        // timeout: 0.5 s (a healthy plugin responds in well under one block); an export waits for the plugin (a block
+        // dropped there was a gap in the file)
+        if (! session->runBlock (isNonRealtime() ? 30000 : 500))
         {
             buffer.clear();
             return;
@@ -714,6 +728,7 @@ public:
     }
 
 private:
+    std::atomic<int> pendingMode { 0 }, pendingReset { 0 };
     static BusesProperties busesFor (int ins, int outs)
     {
         auto set = [] (int n) { return n <= 8 ? juce::AudioChannelSet::canonicalChannelSet (n) : juce::AudioChannelSet::discreteChannels (n); };
@@ -882,7 +897,7 @@ private:
         if (xml == nullptr || ! description.loadFromXml (*xml))
             return fail ("invalid plugin description");
 
-        const auto sampleRate = (double) message["sampleRate"];
+        sampleRate = (double) message["sampleRate"];
         blockSize = juce::jlimit (16, SharedBlock::maxFrames, (int) message["blockSize"]);
         PluginHost host (false);
         if (description.pluginFormatName == "LV2")
@@ -957,6 +972,13 @@ private:
     {
         if (hang) // only in the timeout test
             Thread::sleep (3000);
+        if (shared->mode == 1 || shared->mode == 2)
+        {
+            plugin->setNonRealtime (shared->mode == 2);
+            preparePlugin (*plugin, sampleRate, blockSize); // (a VST3 takes the process mode when it is set up)
+        }
+        if (shared->resetFirst != 0)
+            plugin->reset();
         const auto frames = juce::jlimit (0, blockSize, (int) shared->frames);
         const auto& list = plugin->getParameters();
         for (int i = 0; i < std::min ((int) shared->paramCount, SharedBlock::maxParams); ++i)
@@ -996,6 +1018,7 @@ private:
     SandboxChannel channel;
     SharedBlock* shared = nullptr;
     int blockSize = 512, channels = 2;
+    double sampleRate = 44100.0;
     std::atomic<bool> hang { false };
     juce::MidiBuffer midiBuffer;
     ParamQueue changed;

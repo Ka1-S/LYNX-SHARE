@@ -1249,20 +1249,32 @@ void MixerStrips::showSendMenu (int t)
     const auto fromName = juce::String::fromUTF8 (song.mixer[(std::size_t) from].name.c_str());
     juce::PopupMenu menu;
     menu.addSectionHeader (fromName + juce::String::fromUTF8 (" \xe2\x86\x92 ") + juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()));
+    // FL's route arrow menu (round 168s, issue #32 [SHOT] r168s c_f10): route / route only / sidechain / sidechain only
     const auto on = song.routes (from, t);
-    menu.addItem (on ? tr ("Remove this send") : tr ("Send here"), on || song.canRoute (from, t), false, [this, from, t, on] {
-        engine.editSong ([from, t, on] (Song& s) { s.setRoute (from, t, ! on); });
-    });
-    menu.addItem (tr ("Send only here"), on || song.canRoute (from, t), false, [this, from, t] {
-        engine.editSong ([from, t] (Song& s) { mixerops::routeTo (s, { from }, t, true); });
-    });
-    menu.addItem (tr ("Sidechain only (no audio): the compressors here listen to it"), t > 0 && (on || song.canRoute (from, t)), false, [this, from, t] {
+    const auto can = on || song.canRoute (from, t);
+    using K = mixerops::RouteKind;
+    auto route = [this, from, t] (K kind) {
         int linked = 0;
-        engine.editSong ([from, t, &linked] (Song& s) { linked = mixerops::sidechainTo (s, from, t); });
-        if (linked == 0)
+        engine.editSong ([from, t, kind, &linked] (Song& s) {
+            mixerops::routeSelectedTo (s, { from }, t, kind);
+            for (const auto& fx : s.mixer[(std::size_t) t].effects)
+                linked += fx.sidechain == from ? 1 : 0;
+        });
+        if ((kind == K::sidechain || kind == K::sidechainOnly) && linked == 0)
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Sidechain"),
                                                     tr ("The link was made; add a compressor to this insert to use it."));
-    });
+    };
+    menu.addItem (tr ("Route to this track"), can && ! on, false, [route] { route (K::route); });
+    menu.addItem (tr ("Route to this track only"), can, false, [route] { route (K::routeOnly); });
+    menu.addSeparator();
+    menu.addItem (tr ("Sidechain to this track"), t > 0 && can, false, [route] { route (K::sidechain); });
+    menu.addItem (tr ("Sidechain to this track only"), t > 0 && can, false, [route] { route (K::sidechainOnly); });
+    if (on)
+    {
+        menu.addSeparator();
+        menu.addItem (t == 0 ? tr ("Remove the route to Master") : tr ("Remove this send"),
+                      [this, from, t] { engine.editSong ([from, t] (Song& s) { s.setRoute (from, t, false); }); });
+    }
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 

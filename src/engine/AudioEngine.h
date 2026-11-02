@@ -540,6 +540,11 @@ public:
     };
 
     float renderOffline (const RenderOptions& options);
+    // How many offline renders run now, in any engine (round 168s, issue #32). While one runs, the engine that plays
+    // through the audio device stops and outputs silence without processing (FL stops playback while it renders): the
+    // project's live plugins never run next to their export copies (plugins that share state between instances cut
+    // notes in the file) and no CPU goes to them (the glitches heard until the progress bar ended).
+    static std::atomic<int>& offlineRendersRunning() noexcept;
 
     // timings of the last renderOffline (diagnostics): the audio graph and the file writing
     struct RenderStats

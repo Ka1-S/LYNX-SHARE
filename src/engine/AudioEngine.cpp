@@ -365,8 +365,16 @@ void AudioEngine::buildInitialGraph()
     jassert (graph.getConnections().size() == 4);
 }
 
+std::atomic<int>& AudioEngine::offlineRendersRunning() noexcept
+{
+    static std::atomic<int> count { 0 };
+    return count;
+}
+
 float AudioEngine::renderOffline (const RenderOptions& options)
 {
+    offlineRendersRunning().fetch_add (1, std::memory_order_acq_rel);
+    const juce::ScopeGuard rendered { [] { offlineRendersRunning().fetch_sub (1, std::memory_order_acq_rel); } };
     const auto seconds = options.seconds;
     const auto sampleRate = options.sampleRate;
     auto* output = options.output;
@@ -2727,6 +2735,8 @@ const AutomationDisplay& AudioEngine::getAutomationDisplay()
 void AudioEngine::publishSong()
 {
     ++songStamp;
+    // pasted / duplicated channels and effect slots get their own instance (round 168s: instances follow their channel)
+    song.uniqueInstances();
     // diagnostics (round 149): with LYNX_TRACE_EDITS set, each publish's time goes to %APPDATA%\LYNX\edits.log
     static const bool traceEdits = std::getenv ("LYNX_TRACE_EDITS") != nullptr;
     const auto publishStart = juce::Time::getMillisecondCounterHiRes();
@@ -3803,6 +3813,17 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         double start;
         int samples;
     } measure { *this, callbackStart, numSamples };
+
+    // an export renders (round 168s): playback stops and nothing is processed until it ends (not while recording)
+    if (offlineRendersRunning().load (std::memory_order_acquire) > 0 && ! transport.recording.load (std::memory_order_relaxed))
+    {
+        if (transport.playing.load (std::memory_order_relaxed))
+            stop();
+        for (int ch = 0; ch < numOutputChannels; ++ch)
+            if (outputChannelData[ch] != nullptr)
+                juce::FloatVectorOperations::clear (outputChannelData[ch], numSamples);
+        return;
+    }
 
     if (transport.rewindRequested.exchange (false))
     {

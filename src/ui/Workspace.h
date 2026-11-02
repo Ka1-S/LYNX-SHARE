@@ -77,9 +77,9 @@ public:
     // keeping its top-left corner and staying inside the desktop. Ignored while maximized or detached.
     void fitPanelContent (Panel panel, int contentWidth, int contentHeight);
 
-    // The Playlist and the Browser are the background of the desktop: the floating panels (Channel Rack,
-    // Piano Roll, Mixer) always stay above them, as pop-up windows.
-    static bool isBackgroundPanel (Panel panel) noexcept { return panel == Panel::playlist || panel == Panel::browser; }
+    // The Browser is the background of the desktop (docked, as in FL): the other panels always stay above it. The
+    // Playlist comes to front when clicked, like FL's (round 168s, core/Workspace.h isBackground).
+    static bool isBackgroundPanel (Panel panel) noexcept { return workspace::isBackground (panel); }
 
     void paint (juce::Graphics& g) override;
     void resized() override;

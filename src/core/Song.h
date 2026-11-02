@@ -5,6 +5,7 @@
 // (see SnapshotExchange.h), so nothing here needs to be thread-safe.
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -34,6 +35,23 @@ constexpr float maxFaderGain = 1.9031f;
 // Channel volume with the same curve, but 1.0 = 0 dB (FL's default, 0.78, gives -5.2 dB).
 // docs/analise/REA_rodada3.md §2.
 float channelGain (float volume) noexcept;
+
+// Which running instance a channel or mixer effect slot is (round 168s, issue #32): a number given when the channel /
+// slot is made, kept by every copy (snapshots, undo, moving it in its list) and never saved. The renderer keeps an
+// instrument / effect with its channel / slot when the list order changes (inserting a channel, moving an effect up),
+// so a moved plugin keeps its live state and sounding notes. It never makes two channels or slots compare different.
+struct InstanceTag
+{
+    std::uint64_t id = next();
+
+    static std::uint64_t next() noexcept
+    {
+        static std::atomic<std::uint64_t> counter { 1 };
+        return counter.fetch_add (1, std::memory_order_relaxed);
+    }
+    void renew() noexcept { id = next(); } // a copy that is a new channel / slot (clone, duplicate)
+    bool operator== (const InstanceTag&) const noexcept { return true; }
+};
 
 enum class InstrumentKind : std::uint8_t
 {
@@ -628,6 +646,7 @@ struct ChannelDef
     int loopStarterPattern = -1;
     std::string loopStarterSlot, loopStarterCategory;
     bool loopStarterLocked = false;
+    InstanceTag instance; // runtime identity of the channel (never saved)
 
     bool hasKeyRegion() const noexcept { return keyLow > 0 || keyHigh < 127; }
     bool inKeyRegion (int key) const noexcept { return key >= keyLow && key <= keyHigh; }
@@ -810,6 +829,7 @@ struct EffectSlot
     std::vector<float> abOther;
     bool abShowingB = false;
     PatcherDoc patcher; // kind == patcher: its graph (REA_rodada141)
+    InstanceTag instance; // runtime identity of the slot (never saved, not compared)
 
     bool operator== (const EffectSlot& o) const; // every field (Song.cpp)
 
@@ -1436,6 +1456,9 @@ struct Song
 
     // Swaps/removes effect slots keeping automations pointing at the right effect.
     void swapEffectSlots (int track, int a, int b);
+    // Round 168s: gives a new instance tag to every channel / top-level effect slot whose tag an earlier one already has
+    // (a pasted or duplicated copy), so each running instrument / effect follows one channel / slot only.
+    void uniqueInstances();
     void removeEffectSlot (int track, int slot);
 
     // Removes an automation and its clips.

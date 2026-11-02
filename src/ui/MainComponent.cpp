@@ -312,6 +312,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         showPanel (Panel::mixer);
         mixer.selectTrack (insert);
     };
+    openMixerInsertHandler() = rack.onOpenMixerInsert; // and on the channel window's TRACK box (round 168s)
     mixer.onInstrumentDropped = [this] (int insert, ChannelDef c) { rack.addChannel (std::move (c), true, insert); };
     rackViewport.setViewedComponent (&rack, false);
     rackViewport.setScrollBarsShown (true, true);
@@ -598,6 +599,7 @@ MainComponent::~MainComponent()
     if (sessionLock != nullptr) // a clean exit: no "LYNX did not close properly" next time
         sessionMarker.deleteFile();
     mixerinput::openAudioSettings = nullptr;
+    openMixerInsertHandler() = nullptr;
     PatcherWindows::onBrowsePluginDatabase = nullptr;
     EditorGlobals::get().onOptionsChanged = nullptr;
     PianoRollComponent::shortcutText = nullptr;
