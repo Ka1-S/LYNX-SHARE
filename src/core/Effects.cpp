@@ -54,6 +54,7 @@
 #include "core/FlExtraFx.h"
 #include "core/Scratcher.h"
 #include "core/Transmitter.h"
+#include "core/TransporterFl.h"
 #include "core/XyController.h"
 #include "core/ControlSurface.h"
 
@@ -2992,6 +2993,24 @@ const EffectInfo& effectInfo (EffectKind kind)
             }();
             return info;
         }
+        case EffectKind::flTransporter:
+        {
+            // FL's controls over their ranges, then the state's source / stereo / send; defaults = FL's Default preset
+            static const EffectInfo info = [] {
+                float d[transporter::numParams] {};
+                transporter::toParams (transporter::State {}, d);
+                static const char* const names[transporter::numParams] {
+                    "Dry level", "Loop A level", "Loop B level", "Reverse probability", "Octave shift probability", "Octave down/up probability",
+                    "Spread / auto-pan", "Minimum length A", "A/B ratio", "Transient sensitivity", "Bouncing rate", "Freeze", "Flush",
+                    "Loop mode", "Bypass", "Update loop A", "Update loop B", "Update loops A/B", "Deterministic", "Tempo length",
+                    "Tempo trigger", "Ignore probability", "Source", "Stereo", "Send to" };
+                EffectInfo e { "Transporter", {} };
+                for (int k = 0; k < transporter::numParams; ++k)
+                    e.params.push_back ({ names[k], d[k] });
+                return e;
+            }();
+            return info;
+        }
         case EffectKind::transmitter:
         {
             // FL's Default preset (core/Transmitter.h: the 42 controls in FL's order, each over its range)
@@ -3605,6 +3624,8 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
             return scratcher::paramText (param, v);
         case EffectKind::transmitter:
             return transmitter::paramText (param, v);
+        case EffectKind::flTransporter:
+            return transporter::paramText (param, v);
         case EffectKind::waveCandy:
             return visualfx::wavecandy::paramText (param, v);
         case EffectKind::visualizer:
@@ -3893,6 +3914,7 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::htmlNotebook: return visualfx::make(); // round 165g: pass the sound, feed the editor's tap
         case EffectKind::scratcher: return scratcher::make (nullptr); // (with its sample: RackRenderer's buildEffect)
         case EffectKind::transmitter: return transmitter::make();
+        case EffectKind::flTransporter: return transporter::make(); // round 167f
         case EffectKind::waveCandy:
         case EffectKind::visualizer: return visualfx::make(); // round 164c: passes the sound, feeds the editor's display
         case EffectKind::xyController:

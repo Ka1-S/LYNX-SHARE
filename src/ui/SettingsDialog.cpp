@@ -599,6 +599,7 @@ public:
                 case SettingsPage::info: content = new InfoPage (engine); break;
             }
             tabs.addTab (name, theme::colour::bg2, content, true);
+            pages.push_back (p);
             if (p == page)
                 tabs.setCurrentTabIndex (tabs.getNumTabs() - 1, false);
         }
@@ -609,10 +610,64 @@ public:
     void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg2); }
     void resized() override { tabs.setBounds (getLocalBounds()); }
 
+    SettingsPage currentPage() const
+    {
+        const auto i = tabs.getCurrentTabIndex();
+        return juce::isPositiveAndBelow (i, (int) pages.size()) ? pages[(std::size_t) i] : SettingsPage::audio;
+    }
+
+    void showPage (SettingsPage page)
+    {
+        for (std::size_t i = 0; i < pages.size(); ++i)
+            if (pages[i] == page)
+                tabs.setCurrentTabIndex ((int) i);
+    }
+
 private:
     juce::TabbedComponent tabs { juce::TabbedButtonBar::TabsAtTop };
+    std::vector<SettingsPage> pages; // in tab order
 };
+
+SettingsPanel* openSettingsPanel()
+{
+    auto* window = findToolWindow ("settings");
+    if (window == nullptr)
+        return nullptr;
+    std::function<SettingsPanel* (juce::Component&)> find = [&find] (juce::Component& c) -> SettingsPanel* {
+        if (auto* panel = dynamic_cast<SettingsPanel*> (&c))
+            return panel;
+        for (auto* child : c.getChildren())
+            if (auto* panel = find (*child))
+                return panel;
+        return nullptr;
+    };
+    return find (*window);
+}
 } // namespace
+
+int shownSettingsPage()
+{
+    if (auto* panel = openSettingsPanel())
+        return (int) panel->currentPage();
+    return -1;
+}
+
+bool switchSettingsPage (SettingsPage page)
+{
+    auto* panel = openSettingsPanel();
+    if (panel == nullptr)
+        return false;
+    panel->showPage (page);
+    if (auto* window = findToolWindow ("settings"))
+        window->toFront (true);
+    return true;
+}
+
+void closeSettings()
+{
+    if (auto* panel = openSettingsPanel())
+        closeToolWindowOf (*panel);
+}
 
 void showSettings (AudioEngine& engine, SettingsPage page, SettingsHooks hooks)
 {

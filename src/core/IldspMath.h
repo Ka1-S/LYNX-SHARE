@@ -463,6 +463,58 @@ inline void sincosf_ (float x, float& s, float& c)
     c = vsin1 (a + 1.57079637f);
 }
 
+// tanf (round 167f, REA_rodada167f-transporter.md §A.2): double evaluation, x + x³·P(x²)/Q(x²) on |x| ≤ π/4 after a
+// two-step reduction by π/2 (odd quarter → −1/t); |x| < 2⁻¹³ uses x + x³/3, |x| < 2⁻²⁷ returns x. Reduction for
+// arguments ≥ 2²³ (never reached by the engines) falls back to the C library.
+inline double tanPoly (double r, bool fused)
+{
+    const double r2 = r * r;
+    double num, den;
+    if (fused)
+    {
+        num = fmaD (-0.017203248047148168, r2, 0.38529607126399540);
+        den = fmaD (fmaD (0.018442392569016560, r2, -0.51396505478854540), r2, 1.1558882143468838);
+        return fmaD (r2 * r, num / den, r);
+    }
+    num = -0.017203248047148168 * r2 + 0.38529607126399540;
+    den = (0.018442392569016560 * r2 + -0.51396505478854540) * r2 + 1.1558882143468838;
+    return r + (r2 * r) * (num / den);
+}
+inline float tanf_ (float xf)
+{
+    if ((fbits (xf) & 0x7f800000u) == 0x7f800000u) return xf - xf; // ±inf → NaN, NaN stays
+    const double x = xf;
+    const double ax = std::fabs (x);
+    const bool fused = useFma();
+    if (ax <= 0.78539816339744828)
+    {
+        if (ax < 0x1p-27) return xf;
+        if (ax < 0x1p-13)
+            return d2f (fused ? fmaD (x * x * x, 0.33333333333333331, x) : (x * x * x) * 0.33333333333333331 + x);
+        return d2f (tanPoly (x, fused));
+    }
+    if (ax >= 8388608.0) return (float) std::tan (x);
+    int n;
+    double r;
+    if (fused)
+    {
+        n = cvttD2I (fmaD (ax, 0.63661977236758138, 0.5));
+        const double nd = n;
+        const double a = fmaD (-nd, 1.5707963267341256, ax);
+        r = a - nd * 6.0771005065061922e-11;
+    }
+    else
+    {
+        n = cvttD2I (ax * 0.63661977236758138 + 0.5);
+        const double nd = n;
+        const double a = ax - nd * 1.5707963267341256;
+        r = a - nd * 6.0771005065061922e-11;
+    }
+    double t = tanPoly (r, fused);
+    if (n & 1) t = -1.0 / t;
+    return d2f (x < 0 ? -t : t);
+}
+
 // fminf / fmaxf of the library (NaN → the other operand; −0 < +0)
 inline float fmaxf_ (float x, float y)
 {

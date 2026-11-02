@@ -43,7 +43,7 @@ bool isAudio (const juce::File& f)
 
 bool isListed (const juce::File& f)
 {
-    return f.hasFileExtension ("wav;flac;ogg;mp3;aif;aiff;wv;mid;midi;lynx;flp;fst;sf2;sf3");
+    return f.hasFileExtension ("wav;flac;ogg;mp3;aif;aiff;wv;mid;midi;lynx;flp;fst;sf2;sf3;sfz");
 }
 
 constexpr int maxResults = 500;
@@ -99,7 +99,7 @@ Icon iconFor (const juce::File& f, bool folder)
         return Icon::pianoRoll;
     if (f.hasFileExtension ("lynx;flp"))
         return Icon::project;
-    if (f.hasFileExtension ("fst;sf2;sf3;lynxpreset;fxp;fxb;vstpreset"))
+    if (f.hasFileExtension ("fst;sf2;sf3;sfz;lynxpreset;fxp;fxb;vstpreset"))
         return Icon::preset;
     return Icon::file;
 }
@@ -122,7 +122,9 @@ juce::String rowHint (const juce::File& f, bool folder, bool expanded)
         return tr ("Preset: [2xLMB] new channel with it (FL synth presets)  drag onto a mixer insert: effect preset");
     if (f.hasFileExtension ("lynxpreset;fxp;fxb;vstpreset"))
         return tr ("Plugin preset: [2xLMB] load it into its plugin (an open plugin window, or the selected channel's plugin)");
-    if (f.hasFileExtension ("sf2;sf3"))
+    if (f.hasFileExtension ("sfz"))
+        return tr ("SFZ instrument: [LMB] preview  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack");
+    if (f.hasFileExtension ("sf2;sf3;sfz"))
         return tr ("SoundFont: [LMB] preview its first preset  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack");
     return {};
 }
@@ -3186,7 +3188,7 @@ void BrowserComponent::fileSelected (const juce::File& file, bool preview)
             resized();
     }
 
-    if (preview && file.hasFileExtension ("sf2;sf3") && file.existsAsFile())
+    if (preview && file.hasFileExtension ("sf2;sf3;sfz") && file.existsAsFile())
     {
         int bank = 0, program = 0;
         if (firstSoundFontPreset (file.getFullPathName().toStdString(), bank, program))
@@ -3274,7 +3276,7 @@ void BrowserComponent::showFileMenu (const juce::File& file)
         menu.addItem (tr ("Open MIDI file"), onOpenProject != nullptr, false, [this, file] { onOpenProject (file); });
     else if (file.hasFileExtension ("fst;gmsynth"))
         menu.addItem (tr ("Open in a new channel"), [this, file] { openFile (file); });
-    else if (file.hasFileExtension ("sf2;sf3"))
+    else if (file.hasFileExtension ("sf2;sf3;sfz"))
     {
         const auto selected = engine.getSelectedChannel();
         const auto& song = engine.getSong();
@@ -3718,7 +3720,7 @@ void BrowserComponent::loadSelected()
     if (! file.existsAsFile())
         return;
 
-    if (file.hasFileExtension ("sf2;sf3"))
+    if (file.hasFileExtension ("sf2;sf3;sfz"))
     {
         // Enter: into the selected LYNX Soundfont channel, else a new one
         if (! openSoundFontFile (engine, file, engine.getSelectedChannel()))
@@ -3788,7 +3790,7 @@ void BrowserComponent::openFile (const juce::File& file)
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Plugin preset"), message);
         return;
     }
-    if (file.hasFileExtension ("sf2;sf3"))
+    if (file.hasFileExtension ("sf2;sf3;sfz"))
     {
         if (! openSoundFontFile (engine, file))
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Load SoundFont"), tr ("This file is not a SoundFont LYNX SHARE can read."));

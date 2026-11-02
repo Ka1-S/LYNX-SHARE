@@ -420,7 +420,7 @@ public:
         ensureSoundFontIndex();
 
         load.setButtonText (tr ("Load SoundFont..."));
-        load.setTooltip (tr ("Open a .sf2 / .sf3 file"));
+        load.setTooltip (tr ("Open a .sf2 / .sf3 / .sfz file"));
         load.onClick = [this] { chooseFont(); };
         addAndMakeVisible (load);
 
@@ -595,7 +595,7 @@ public:
         top.removeFromTop (headerHeight);
         g.setColour (theme::colour::textSecondary);
         g.setFont (theme::font (11.0f));
-        g.drawFittedText (tr ("LYNX Soundfont: plays SoundFont 2 / 3 banks. Search presets across all your SoundFonts, click to preview, double-click to load."),
+        g.drawFittedText (tr ("LYNX Soundfont: plays SoundFont 2 / 3 banks and SFZ instruments. Search presets across all your SoundFonts, click to preview, double-click to load."),
                           top.toNearestInt(), juce::Justification::centredLeft, 1, 0.75f);
         // the font's name next to the load button
         g.setColour (theme::colour::textPrimary);
@@ -727,7 +727,7 @@ private:
     void chooseFont()
     {
         const auto start = currentPath().empty() ? juce::File::getSpecialLocation (juce::File::userDocumentsDirectory) : juce::File (u8 (currentPath()));
-        chooser = std::make_unique<juce::FileChooser> (tr ("Load SoundFont"), start, "*.sf2;*.sf3");
+        chooser = std::make_unique<juce::FileChooser> (tr ("Load SoundFont"), start, "*.sf2;*.sf3;*.sfz");
         chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [safe = juce::Component::SafePointer<SoundFontEditor> (this)] (const juce::FileChooser& fc) {
                                   if (safe == nullptr || fc.getResult() == juce::File())

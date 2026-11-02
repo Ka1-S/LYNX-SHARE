@@ -11,6 +11,7 @@
 #include "core/Dvs.h"
 #include "core/Scratcher.h"
 #include "core/Transmitter.h"
+#include "core/TransporterFl.h"
 #include "core/VisualFx.h"
 #include "engine/AudioEngine.h"
 #include "platform/Paths.h"
@@ -1468,6 +1469,23 @@ bool runFlExtraShots (AudioEngine& engine, const juce::File& folder)
         e.params[transmitter::transientEffect] = transmitter::paramFromRaw (transmitter::transientEffect, effectT);
         e.params[transmitter::sustainEffect] = transmitter::paramFromRaw (transmitter::sustainEffect, effectS);
         e.params[transmitter::sDelaySync] = sync;
+        setSlot (e);
+        if (auto editor = makeNativeEffectEditor (engine, 1, 0))
+            save (*editor, name);
+        else
+        {
+            ok = false;
+            report << name << " FAILED (no editor)\n";
+        }
+    }
+    // Transporter (round 167n): FL's Default preset, then Tempo mode with auto-pan and the send to insert 1
+    for (const auto& [name, mode, spread, send] : std::vector<std::tuple<juce::String, int, int, int>> {
+             { "transporter-default", 0, 512, 0 }, { "transporter-tempo-autopan", 3, 200, 1 } })
+    {
+        auto e = makeEffectSlot (EffectKind::flTransporter);
+        e.params[13] = (float) mode / 3.0f;
+        e.params[6] = (float) spread / 1024.0f;
+        e.params[transporter::sendParam] = (float) send / (float) transporter::rawMax[transporter::sendParam];
         setSlot (e);
         if (auto editor = makeNativeEffectEditor (engine, 1, 0))
             save (*editor, name);

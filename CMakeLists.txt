@@ -94,6 +94,7 @@ add_library(lynx_core STATIC
     src/core/EmphasisEngine.cpp
     src/core/FreqShifterFl.cpp
     src/core/LowLifterFl.cpp
+    src/core/TransporterFl.cpp
     src/core/FlLegacyFx.cpp
     src/core/VisualFx.cpp
     src/core/FlExtraFx.cpp
@@ -178,6 +179,8 @@ target_include_directories(lynx_core PUBLIC src third_party/sse2neon)
 # workflow shell (key map, workspace layout, rack operations)
 target_sources(lynx_core PRIVATE
     src/core/KeyMap.cpp
+    src/core/PresetCycle.cpp
+    src/core/Sfz.cpp
     src/core/Workspace.cpp
     src/core/RackOps.cpp
     src/core/ChannelMiscFx.cpp

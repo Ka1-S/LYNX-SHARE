@@ -1012,6 +1012,59 @@ Layout fruityMute2Layout()
 
 LayoutItem menuOf (float x, float y, float w, float h, const char* param, const char* caption, const char* options); // (below)
 
+Layout transporterLayout()
+{
+    // round 167f (REA_rodada167f-transporter), our arrangement of FL's sections: LEVELS (dry, loop A, loop B), LOOP
+    // (length, trigger and detection), BIAS (the probabilities); the MODE strip below with the loop mode, the tempo note
+    // values, probabilistic / deterministic, the update / freeze / flush buttons, the detector's source and stereo
+    Layout l;
+    l.fl = "Transporter";
+    l.width = 640;
+    l.height = 262;
+    auto& v = l.items;
+    v.push_back (section (0, 0, 170, 150, TR_NOOP ("LEVELS")));
+    v.push_back (knob (36, 62, 36, "Dry level", TR_NOOP ("Dry"), 92, showValue));
+    v.push_back (knob (86, 62, 36, "Loop A level", TR_NOOP ("Loop A"), 92, showValue));
+    v.push_back (knob (136, 62, 36, "Loop B level", TR_NOOP ("Loop B"), 92, showValue));
+    v.push_back (section (170, 0, 300, 150, TR_NOOP ("LOOP")));
+    v.push_back (knob (210, 62, 36, "Minimum length A", TR_NOOP ("Min length A"), 92, showValue));
+    v.push_back (knob (260, 62, 36, "A/B ratio", TR_NOOP ("A/B ratio"), 92, showValue));
+    v.push_back (knob (310, 62, 36, "Transient sensitivity", TR_NOOP ("Sensitivity"), 92, showValue));
+    v.push_back (knob (360, 62, 36, "Spread / auto-pan", TR_NOOP ("Spread"), 92, bipolar | showValue));
+    v.push_back (knob (420, 62, 36, "Bouncing rate", TR_NOOP ("Bouncing rate"), 92, bipolar | showValue));
+    v.push_back (section (470, 0, 170, 150, TR_NOOP ("BIAS")));
+    v.push_back (knob (502, 50, 30, "Reverse probability", TR_NOOP ("Reverse"), 74, showValue));
+    v.push_back (knob (566, 50, 30, "Octave shift probability", TR_NOOP ("Octave shift"), 74, showValue));
+    v.push_back (knob (502, 112, 30, "Octave down/up probability", TR_NOOP ("Down/up"), 136, showValue));
+    v.push_back (knob (566, 112, 30, "Ignore probability", TR_NOOP ("Ignore"), 136, showValue));
+    v.push_back (section (0, 150, 640, 112, TR_NOOP ("MODE")));
+    v.push_back (tabs (10, 176, 300, 24, "Loop mode", TR_NOOP ("Auto|Bouncing|Adaptive|Tempo")));
+    v.push_back (menuOf (320, 176, 150, 24, "Tempo length", TR_NOOP ("Length"),
+                         "1/1|1/2|1/4|1/8|1/16|1/32|1/1 dotted|1/2 dotted|1/4 dotted|1/8 dotted|1/16 dotted|1/1 triplet|1/2 triplet|"
+                         "1/4 triplet|1/8 triplet|1/16 triplet|1/1 quint.|1/2 quint.|1/4 quint.|1/8 quint.|1/16 quint."));
+    v.push_back (menuOf (480, 176, 150, 24, "Tempo trigger", TR_NOOP ("Tempo trigger"),
+                         "1/1|1/2|1/4|1/8|1/16|1/32|1/1 dotted|1/2 dotted|1/4 dotted|1/8 dotted|1/16 dotted|1/1 triplet|1/2 triplet|"
+                         "1/4 triplet|1/8 triplet|1/16 triplet|1/1 quint.|1/2 quint.|1/4 quint.|1/8 quint.|1/16 quint.|Off"));
+    v.push_back (tabs (10, 210, 220, 22, "Deterministic", TR_NOOP ("Probabilistic|Deterministic")));
+    v.push_back (toggle (240, 210, 70, 22, "Update loop A", TR_NOOP ("Update A"), momentary));
+    v.push_back (toggle (314, 210, 70, 22, "Update loop B", TR_NOOP ("Update B"), momentary));
+    v.push_back (toggle (388, 210, 82, 22, "Update loops A/B", TR_NOOP ("Update A/B"), momentary));
+    v.push_back (toggle (480, 210, 70, 22, "Freeze", TR_NOOP ("Freeze")));
+    v.push_back (toggle (560, 210, 70, 22, "Flush", TR_NOOP ("Flush"), momentary));
+    v.push_back (menuOf (10, 236, 220, 22, "Source", TR_NOOP ("Detector source"), TR_NOOP ("Left|Right|Left + right")));
+    v.push_back (toggle (240, 236, 100, 22, "Stereo", TR_NOOP ("Stereo")));
+    LayoutItem send; // round 167n: the loops' send (A left, B right) to a mixer insert; the editor lists the song's inserts
+    send.type = Item::menu;
+    send.x = 350, send.y = 236, send.w = 200, send.h = 22;
+    send.param = "Send to";
+    send.label = TR_NOOP ("Send to");
+    send.options = "None|Insert 1";
+    send.values = { 0.0f, 1.0f / (float) (maxMixerTracks - 1) };
+    v.push_back (send);
+    v.push_back (toggle (560, 236, 70, 22, "Bypass", TR_NOOP ("Bypass")));
+    return l;
+}
+
 Layout transmitterLayout()
 {
     // round 165g (fltrans165), FL Studio 2026's arrangement: DETECTION along the top (sensitivity, hold, release, the
@@ -3439,7 +3492,7 @@ const std::vector<EffectKind>& flLayoutKinds()
                                                  // round 165g
                                                  EffectKind::fruityMute2, EffectKind::transmitter,
                                                  // round 167f
-                                                 EffectKind::flEmphasis };
+                                                 EffectKind::flEmphasis, EffectKind::flTransporter };
     return kinds;
 }
 
@@ -3529,6 +3582,7 @@ const Layout& layoutFor (EffectKind kind)
         case EffectKind::fruitySend: l = fruitySend(); break;
         case EffectKind::fruityMute2: l = fruityMute2Layout(); break;
         case EffectKind::transmitter: l = transmitterLayout(); break;
+        case EffectKind::flTransporter: l = transporterLayout(); break;
         case EffectKind::crestCompressor: l = crestCompressor(); break;
         case EffectKind::prismMultiband: l = prismMultiband(); break;
         case EffectKind::sentryGate: l = sentryGate(); break;

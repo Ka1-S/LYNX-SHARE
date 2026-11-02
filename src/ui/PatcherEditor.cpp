@@ -1527,6 +1527,8 @@ private:
                 return "Misc";
             case EffectKind::transmitter: // round 165g (FL's Transmitter: transient shaping)
                 return "Dynamics";
+            case EffectKind::flTransporter: // round 167f (FL's Transporter: a transient looper)
+                return "Delay reverb";
             default:
                 return "Misc";
         }
