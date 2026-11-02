@@ -6255,3 +6255,4 @@ countries: cn sg
 "Update A/B" = "更新 A/B"
 "Flush" = "清空"
 "Detector source" = "检测源"
+"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "缩放：向上拖动 = 放大，左右拖动 = 滚动  [Ctrl] 仅缩放"

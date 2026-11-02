@@ -6255,3 +6255,4 @@ countries: jp
 "Update A/B" = "A/B を更新"
 "Flush" = "フラッシュ"
 "Detector source" = "検出ソース"
+"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "ズーム: 上にドラッグ = 拡大、左右 = スクロール  [Ctrl] ズームのみ"
