@@ -89,7 +89,19 @@ Wave Candy, ZGameEditor Visualizer, X-Y / X-Y-Z controllers, Control Surface, Fo
 - `PluginLayout` additions: `tabs` / `pageTabs` pages, `menu` items, `value` read-outs, `whenParam` conditions, `display "toxicwave"`.
 - Tools: `build-local/bankrender <dir>` renders every bank preset (a C3 chord; basses one C2, leads one C4) to WAV and prints peak / RMS / spectral centroid / tail; `LYNX.exe --instrumentshot <dir> <engine,...|banks> [lynx|fl]` pictures the channel windows at 100 / 150 / 200 %.
 
+## 3. Checks
+- Levels (build-local/bankrender, /mnt/e/lynx-work/design168n/bank-levels.txt + WAVs): every preset peaks at −3.5 dBFS or lower
+  (PoiZone's Init, the engine's own default, at −0.4); 5 PoiZone and 9 Toxic presets were re-levelled after the first
+  measurement (PoiZone Supersaw / Soft Pad were clipping at +0.8 dB). No preset is silent (the quietest, plucks and FX, have
+  RMS around −35 to −40 dBFS because they decay).
+- Pictures (/mnt/e/lynx-work/design168n/): `<engine>-before.png` (origin/main build, `--snapshot` of the same project) and
+  `after/<engine>-<lynx|fl>-<100|150|200>.png` (`--instrumentshot`). The first after-shot showed two clipped captions
+  (Toxic's LFO "Sync" over "Speed", "Vel curve" cut): fixed (LFO row re-spaced; small knobs' captions get 52 units).
+
 ## Where I stopped
-- done: inventory (§1).
-- in progress: Toxic Biohazard editor (FL's layout read from the installation's own Artwork\background.tga as a
-  reference only — nothing copied), then PoiZone, then LYNX banks.
+- done: inventory (§1); Toxic + PoiZone designed pages, LYNX banks, model-knob automation, shared infra (§2.1); tests;
+  shots; levels. Landing the whole branch via land.sh (2026-11-02).
+- next: after landing, re-shoot with the landed exe (`LYNX.exe --instrumentshot E:\lynx-work\design168n\after2 toxicbiohazard,poizone lynx`),
+  notes-0.1.23.md bullets, message the coordinator the main hash.
+- not covered: Toxic's MIDI / SEQ pages (its sequencer isn't modelled), CC slots 316–339, the Browser listing of
+  LYNX banks, effect banks; model knobs don't follow automation while playing.
