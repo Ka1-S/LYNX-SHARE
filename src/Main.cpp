@@ -3177,8 +3177,9 @@ private:
             run->render.join();
             juce::Timer::callAfterDelay (1000, [this, run, counters, reportPath, fail] {
                 auto report = run->report;
-                const auto effect = run->engine->getEffect (0, run->slot);
-                const auto pluginLatency = effect != nullptr ? effect->latencySamples() : -1;
+                int pluginLatency = -1;
+                if (const auto effect = run->engine->getEffect (0, run->slot)) // (not held past the engine's reset)
+                    pluginLatency = effect->latencySamples();
                 const auto pdc = run->engine->getLatencySamples();
                 report << "render_seconds=" << juce::String (run->renderSeconds, 2) << "\n"
                        << "plugin_latency=" << pluginLatency << "\npdc_total=" << pdc << "\n"
