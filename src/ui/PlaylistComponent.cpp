@@ -5,6 +5,7 @@
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
 #include "ui/PlaylistComponent.h"
+#include "ui/StemExtract.h"
 
 #include "core/KeyMap.h"
 #include "core/MarkerPlan.h"
@@ -4068,6 +4069,9 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
                 clipops::reverseAudio (s, index, clipops::fileTicks (s.channels[(std::size_t) ch], frames, rate, s.bpm));
             });
         });
+
+        menu.addItem (tr ("Extract stems from sample"), sample != nullptr, false,
+                      [this, index] { extractStemsFromClip (engine, index, [this] { sortClips(); }); });
 
         menu.addItem (tr ("Pitch... (semitones, cents, keep length)"), sample != nullptr, false,
                       [this, ch = clip.channel] { showSamplePitchDialog (engine, ch); });

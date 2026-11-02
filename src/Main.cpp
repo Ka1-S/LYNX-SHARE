@@ -104,6 +104,7 @@
 #include "platform/CrashGuard.h"
 #include "ui/CrashReporter.h"
 #include "ui/Updater.h"
+#include "ui/StemExtract.h"
 
 #include <atomic>
 #include <chrono>
@@ -1086,6 +1087,18 @@ public:
             return;
         }
 
+        if (args.contains ("--stemsplit"))
+        {
+            // LYNX.exe --stemsplit input.wav folder: the stem separation of the clip menu, without the window
+            const auto i = args.indexOf ("--stemsplit");
+            lynx::AudioEngine loader (false);
+            const auto error = lynx::extractStemsToFolder (loader, juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()));
+            juce::File (args[i + 2].unquoted()).getSiblingFile ("stemsplit.txt").replaceWithText (error.isEmpty() ? "result=OK\n" : "result=FAIL " + error + "\n");
+            setApplicationReturnValue (error.isEmpty() ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--stems"))
         {
             // LYNX.exe --stems project base.wav: one WAV per insert that has sound (like "Export stems")
@@ -1503,6 +1516,7 @@ public:
         lynx::crashguard::note ("closing");
         lynx::shutdownPluginSandboxWorker();
         splash = nullptr;
+        lynx::shutdownStemExtraction(); // (a separation in flight stops before its window and the engine go)
         if (mainWindow != nullptr && mainWindow->isVisible())
             mainWindow->saveState();
         mainWindow = nullptr; // the UI goes before the engine

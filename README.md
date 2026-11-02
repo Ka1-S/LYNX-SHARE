@@ -428,7 +428,7 @@ docs/         architecture, status, roadmap and the behavioural analysis of FL S
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | project phases |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | how the engine and the UI are organised |
 | [`docs/CODE_SIGNING.md`](docs/CODE_SIGNING.md) | how releases are built and code-signed (SignPath) |
-| [`PRIVACY.md`](PRIVACY.md) | privacy policy: no network connections of its own except an opt-in, anonymised crash report |
+| [`PRIVACY.md`](PRIVACY.md) | privacy policy: network connections: update check, opt-in anonymised crash report, stem model download on request |
 | [`docs/MANUAL_TESTING.md`](docs/MANUAL_TESTING.md) | a script for listening to and poking at what the automated tests don't cover |
 | [`docs/analise/`](docs/analise) | FL Studio's behaviour, documented round by round (clean-room) |
 
