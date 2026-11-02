@@ -108,8 +108,8 @@ TEST (rea168j_flp_import)
     REA168J_REQUIRE (! song.channels.empty() && song.mixer.size() > 1);
     CHECK (song.channels[0].icon == 75);
     CHECK (song.mixer[1].icon == 71 && song.mixer[1].colour == 0 && song.mixer[1].monitor == InputMonitor::whenArmed);
-    REA168J_REQUIRE (song.playlistTracks.size() == 4);
-    CHECK (song.playlistTracks[3].icon == 30 && song.playlistTracks[3].colour == 0);
+    REA168J_REQUIRE (song.playlistTracks.size() == 3); // FL's track 3 (1-based)
+    CHECK (song.playlistTracks[2].icon == 30 && song.playlistTracks[2].colour == 0);
 
     const auto plain = importFlp (flp::parseProject (rea168j::project (false)));
     CHECK (plain.autoPdc && plain.compensateAutomations && ! plain.timeSignatureMode && plain.scaleHighlight == Song::ScaleHighlight {});
@@ -189,7 +189,7 @@ TEST (rea168j_pdc_automatic_off)
     const std::vector<int> channels { 100, 0, 0 };
     const std::vector<std::vector<int>> slots { {}, { 50 } };
     const auto on = computePdc (s, channels, slots, 48000.0);
-    CHECK (on.total == 150 && on.channelDelay[1] == 150 && on.channelDelay[0] == 0);
+    CHECK (on.total == 150 && on.sendDelay[2][0] == 150 && on.sendDelay[1][0] == 0);
     REA168J_REQUIRE (on.slotInput.size() == s.mixer.size() && on.slotInput[1].size() == 1);
     CHECK (on.slotInput[1][0] == 100); // the slot's input: its track's alignment (the channel's latency)
 
@@ -207,13 +207,13 @@ TEST (rea168j_pdc_automatic_off)
 TEST (rea168j_compensate_automations)
 {
     using namespace lynx;
-    // insert 1: a 4800-sample latent plugin; insert 2: a LYNX effect whose input waits for it (channel 1 → insert 2)
-    Song s = latency165::impulses (2, true);
+    // insert 1: a 4800-sample latent plugin, then a LYNX effect whose input waits for it
+    Song s = latency165::impulses (1, true);
     s.bpm = 120.0; // 1 beat = 24000 samples at 48 kHz: 4800 samples = 0.2 beat
     s.mode = PlayMode::song;
-    s.mixer[2].effects.push_back (makeEffectSlot (EffectKind::utility));
+    s.mixer[1].effects.push_back (makeEffectSlot (EffectKind::utility));
     Automation a;
-    a.target = { AutomationTargetKind::effectParam, 2, 0, 1 };
+    a.target = { AutomationTargetKind::effectParam, 1, 1, 1 };
     a.points = { { 0, 0.0f }, { ppq, 1.0f } }; // a ramp over beat 1
     s.automations.push_back (a);
     Clip c;
@@ -230,7 +230,7 @@ TEST (rea168j_compensate_automations)
         std::vector<float> l (256), rr (256);
         // half a beat in: the automation is at 0.5; the delayed slot sees the song 0.2 beat earlier (0.3)
         r.process (state.get(), true, 0.5 * ppq, 256, l.data(), rr.data());
-        return r.compensatedAutomation (*state, 0, 2, 0, 0.5f);
+        return r.compensatedAutomation (*state, 0, 1, 1, 0.5f);
     };
     CHECK (std::abs (value (false) - 0.5f) < 1e-6f);
     CHECK (std::abs (value (true) - 0.3f) < 0.02f);
@@ -255,6 +255,12 @@ TEST (rea168j_audio_clip_holds_its_last_value)
     c.start = 0;
     c.length = 4 * ppq; // 2 s; the sample lasts 1 s
     s.playlist.push_back (c);
+    Clip later; // an empty pattern clip from 4 s: the song (and its loop) goes on past the audio clip
+    later.kind = ClipKind::pattern;
+    later.pattern = 0;
+    later.start = 8 * ppq;
+    later.length = 4 * ppq;
+    s.playlist.push_back (later);
     s.mode = PlayMode::song;
     auto provider = [] (const std::string&) {
         auto d = std::make_shared<SampleData>();

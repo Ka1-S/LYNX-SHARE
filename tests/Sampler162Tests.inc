@@ -14,7 +14,8 @@ std::shared_ptr<lynx::SampleData> sine (double freq, double seconds, double rate
 }
 
 // frequency of the steady part of `x` (positive-going zero crossings between 30 % and 70 % of the sounding part) and
-// the number of sounding samples (until the signal stays below -60 dB)
+// the number of sounding samples (until the signal stays below -60 dB, or at the value an audio clip holds after its
+// file's end like FL, round 168j)
 struct Heard
 {
     double freq = 0.0;
@@ -25,8 +26,9 @@ Heard analyse (const std::vector<float>& x, double rate)
 {
     Heard h;
     long last = -1;
+    const float tail = x.empty() ? 0.0f : x.back();
     for (long i = 0; i < (long) x.size(); ++i)
-        if (std::abs (x[(std::size_t) i]) > 0.001f)
+        if (std::abs (x[(std::size_t) i]) > 0.001f && std::abs (x[(std::size_t) i] - tail) > 0.001f)
             last = i;
     h.length = last + 1;
     const auto from = (long) (h.length * 0.3), to = (long) (h.length * 0.7);
