@@ -204,3 +204,58 @@ TEST (design168p_engines_take_automation_while_playing)
         e->setParameter (100000, 0.5f);
     }
 }
+
+TEST (design168p_banks_play_clean)
+{
+    using namespace lynx;
+    // LYNX's own banks of the drum / physical-model engines: every preset loads, keeps the channel's own settings and
+    // sounds (not silent, no clipping) at the channel's default volume
+    for (const auto kind : { InstrumentKind::fruitkick, InstrumentKind::plucked, InstrumentKind::drumpad, InstrumentKind::sakura,
+                             InstrumentKind::drumaxx, InstrumentKind::drumsynth })
+    {
+        const auto& bank = banks::bankOf (kind);
+        CHECK (bank.size() >= 2);
+        CHECK (! bank.empty() && (bank.front().name == "Init" || kind == InstrumentKind::drumaxx || kind == InstrumentKind::drumsynth));
+        std::set<std::string> names;
+        for (int i = 0; i < (int) bank.size(); ++i)
+        {
+            CHECK (names.insert (bank[(std::size_t) i].name).second);
+            ChannelDef c;
+            c.instrument = kind;
+            c.name = "Mine";
+            c.samplePath = "keep";
+            const auto loaded = banks::withPreset (c, i);
+            CHECK (loaded && loaded->instrument == kind && loaded->samplePath == "keep");
+            if (! loaded)
+                continue;
+            auto def = *loaded;
+            def.samplePath.clear();
+            CHECK (modelparams::rawValue (def, modelparams::tableOf (kind)->params->front().index).has_value()); // the page has knobs
+            auto inst = makeInstrument (kind);
+            inst->prepare (48000.0);
+            inst->configure (def, 120.0);
+            const auto gain = channelGain (def.volume);
+            std::vector<float> l (48000 * 2), r (48000 * 2);
+            const int keys[] = { 36, 38, 42, 60 };
+            float peak = 0.0f;
+            double sum = 0.0;
+            for (int block = 0; block < (int) l.size() / 512; ++block)
+            {
+                if (block % 24 == 0 && block / 24 < 4)
+                    inst->noteOn (kind == InstrumentKind::drumsynth ? 48 + 2 * (block / 24) : keys[block / 24], 0.8f);
+                if (block % 24 == 12 && block / 24 < 4)
+                    inst->noteOff (kind == InstrumentKind::drumsynth ? 48 + 2 * (block / 24) : keys[block / 24]);
+                inst->render (l.data() + 512 * block, r.data() + 512 * block, 512, gain, gain);
+            }
+            for (std::size_t s = 0; s < l.size(); ++s)
+            {
+                peak = std::max ({ peak, std::abs (l[s]), std::abs (r[s]) });
+                sum += (double) l[s] * l[s];
+            }
+            const auto clean = std::isfinite (peak) && peak < 0.95f && sum / (double) l.size() > 1.0e-7;
+            CHECK (clean);
+            if (! clean)
+                std::printf ("  %d / %s: peak %.3f ms %.3g\n", (int) kind, bank[(std::size_t) i].name.c_str(), peak, sum / (double) l.size());
+        }
+    }
+}
