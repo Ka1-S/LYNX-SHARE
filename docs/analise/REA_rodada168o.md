@@ -72,6 +72,10 @@ engine's own level (about −16 dBFS, as FL's DX10). tools/bankrender renders th
 - Not done: Ogun / Autogun live automation clips (knob edits work; clips need the engine to recompute its voices from
   P without a rebuild); MiniSynth / GMS / Morphine / Ogun banks (FL data needed, see §1).
 - Built on round 168n's infrastructure merged from origin/wip/design168n (168n had not landed on main yet).
+- 2026-11-02 11:10 the PC crashed during the post-merge rebuild (branch at b885a072 = 168n wip + main efb8344d, all
+  pushed): rebuilt from clean build folders afterwards. Landing waits for 168n on main (then merge origin/main, land).
+- Linux tests before the crash: all 168o tests pass; the 3 remaining failures were 168n's own (Design168nTests
+  59 / 187) on its wip state.
 
 ## 5. Render results
 
