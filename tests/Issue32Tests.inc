@@ -118,7 +118,7 @@ TEST (issue32_adding_a_channel_while_playing_keeps_every_other_channels_instrume
     auto a = lynx::RackState::build (song, nullptr, 48000.0, f);
     I32_REQUIRE (a->instruments.size() == 3);
 
-    lynx::rackops::insertChannel (song, 1, i32::samplerChannel ("snare.wav"));
+    lynx::insertChannel (song, 1, i32::samplerChannel ("snare.wav"));
     song.uniqueInstances();
     auto b = lynx::RackState::build (song, a.get(), 48000.0, f);
     I32_REQUIRE (b->instruments.size() == 4);
@@ -128,14 +128,14 @@ TEST (issue32_adding_a_channel_while_playing_keeps_every_other_channels_instrume
     CHECK (b->channelsMoved && b->channelFrom == (std::vector<int> { 0, -1, 1, 2 }));
 
     // removing it again: back where they were
-    lynx::rackops::removeChannels (song, { 1 });
+    lynx::removeChannels (song, { 1 });
     song.uniqueInstances();
     auto c = lynx::RackState::build (song, b.get(), 48000.0, f);
     I32_REQUIRE (c->instruments.size() == 3);
     CHECK (c->instruments[1].get() == a->instruments[1].get() && c->instruments[2].get() == a->instruments[2].get());
 
     // a clone (after the original) is a new channel: the original keeps its instrument
-    lynx::rackops::cloneChannel (song, 1);
+    lynx::cloneChannel (song, 1);
     song.uniqueInstances();
     auto d = lynx::RackState::build (song, c.get(), 48000.0, f);
     I32_REQUIRE (d->instruments.size() == 4);
@@ -166,7 +166,7 @@ TEST (issue32_a_note_sounding_on_a_shifted_channel_keeps_sounding)
     for (int i = 0; i < 8; ++i)
         r.process (a.get(), false, 0.0, 256, l.data(), rr.data(), &live);
     CHECK (std::abs (l[128]) > 0.01f);
-    lynx::rackops::insertChannel (song, 0, i32::samplerChannel ("kick.wav"));
+    lynx::insertChannel (song, 0, i32::samplerChannel ("kick.wav"));
     song.uniqueInstances();
     auto b = lynx::RackState::build (song, a.get(), 48000.0, f);
     r.process (b.get(), false, 0.0, 256, l.data(), rr.data(), &live);
@@ -205,7 +205,7 @@ TEST (issue32_one_wheel_notch_moves_a_fader_one_fl_step)
     CHECK (lynx::controls::wheelNotches (windowsNotch / 4, windowsNotch) == 1.0); // a fine wheel's part-notch: still a step
     CHECK (lynx::controls::wheelNotches (0.0, windowsNotch) == 0.0);
     const auto after = lynx::controls::wheelValue (lynx::unityFader, lynx::controls::wheelNotches (windowsNotch, windowsNotch), 0.0, 1.0, false);
-    CHECK (std::abs (after - 0.82) < 1e-9);
+    CHECK (std::abs (after - 0.82) < 1e-6); // (unityFader is a float)
     CHECK (std::abs (20.0 * std::log10 (lynx::faderGain ((float) after)) - 0.6) < 0.05); // FL's hint: "0.6dB"
 }
 

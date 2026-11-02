@@ -98,5 +98,9 @@ sequencer").
 
 ## Where I stopped
 
+- 11:10 PC crash; resumed: files intact. Issue32 tests built and passed except a float tolerance (fixed). Next: full
+  test run, Windows build, GUI check, notes/reply, land.
+- found: lastPublishedShape never carried the serial, so the held-note remap never ran in the app (fixed).
+
 - 04:10: all 8 points coded + tests (tests/Issue32Tests.inc), i18n done; first test build queued (prio lane).
 - started 2026-11-02 03:20: worktree from origin/main 5a9abcb8; code survey of the 8 points.

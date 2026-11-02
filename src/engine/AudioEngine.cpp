@@ -2827,6 +2827,7 @@ void AudioEngine::publishSong()
     // did not change; without it every edit rebuilt them (sample reloaded and stretch looked up, ~0.5 s on Thief)
     lastPublishedShape.song.bpm = song.bpm;
     lastPublishedShape.instruments = state->instruments;
+    lastPublishedShape.serial = state->serial; // (round 168s: the renderer moves held notes only along this chain)
     lastPublishedShape.effects = state->effects;
     lastPublishedShape.sampleRate = state->sampleRate;
     lastPublishedShape.latencies = state->latencies;
