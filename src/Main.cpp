@@ -3148,7 +3148,8 @@ private:
         slot.kind = lynx::EffectKind::plugin;
         slot.plugin.id = clap->createIdentifierString().toStdString();
         slot.plugin.name = clap->name.toStdString();
-        song.mixer[0].effects.push_back (slot);
+        slot.smartDisable = false; // (processed every block, as with music playing: the export itself is silent)
+        song.mixer[0].effects = { slot }; // alone on the Master: the delay compensation is the plugin's latency
         run->slot = (int) song.mixer[0].effects.size() - 1;
         run->engine->setSong (song);
         run->engine->renderOffline (0.1, 48000.0); // builds the rack (and the plugin) on the message thread
@@ -3183,16 +3184,29 @@ private:
                        << "plugin_latency=" << pluginLatency << "\npdc_total=" << pdc << "\n"
                        << "plugin_crashes=" << lynx::pluginCrashCount() << "\n";
                 run->engine.reset(); // destroys the plugin: it writes its counters
-                juce::StringPairArray values;
+                // one line per plugin instance (the engine may have made more than one): none may have been
+                // deactivated inside process(), and the one that rendered must have restarted
+                int overlapped = 0, inactive = 0, requests = 0, activations = 0, lines = 0;
                 for (const auto& line : juce::StringArray::fromLines (counters.loadFileAsString()))
-                    if (line.contains ("="))
-                        values.set (line.upToFirstOccurrenceOf ("=", false, false), line.fromFirstOccurrenceOf ("=", false, false));
-                report << counters.loadFileAsString();
-                const auto requests = values["requests"].getIntValue();
-                const auto activations = values["activations"].getIntValue();
-                const auto ok = values.size() > 0 && requests > 0 && activations > 1 && values["overlapped"].getIntValue() == 0
-                                && values["inactive_blocks"].getIntValue() == 0 && pluginLatency > 0 && pdc == pluginLatency
-                                && lynx::pluginCrashCount() == 0;
+                {
+                    juce::StringPairArray values;
+                    for (const auto& token : juce::StringArray::fromTokens (line, " ", ""))
+                        if (token.contains ("="))
+                            values.set (token.upToFirstOccurrenceOf ("=", false, false), token.fromFirstOccurrenceOf ("=", false, false));
+                    if (values.size() == 0)
+                        continue;
+                    ++lines;
+                    report << "instance: " << line << "\n";
+                    overlapped += values["overlapped"].getIntValue();
+                    inactive += values["inactive_blocks"].getIntValue();
+                    if (values["requests"].getIntValue() > requests)
+                    {
+                        requests = values["requests"].getIntValue();
+                        activations = values["activations"].getIntValue();
+                    }
+                }
+                const auto ok = lines > 0 && requests > 0 && activations > requests / 2 && overlapped == 0 && inactive == 0
+                                && pluginLatency > 0 && pdc == pluginLatency && lynx::pluginCrashCount() == 0;
                 if (! ok)
                 {
                     fail (report);

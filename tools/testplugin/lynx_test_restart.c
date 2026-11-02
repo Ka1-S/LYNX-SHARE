@@ -6,7 +6,7 @@
  *   LYNX.exe --claprestarttest "LYNX Test Restart.clap" report.txt
  * Each activation reports another latency (64 to 448 samples, cycling), so the host's delay
  * compensation must follow every restart. After 48 requests the plugin stops asking (the latency then stays).
- * With LYNX_TEST_RESTART_REPORT set, it writes its counters to that file when destroyed.
+ * With LYNX_TEST_RESTART_REPORT set, each instance appends a line with its counters to that file when destroyed.
  */
 #include <clap/clap.h>
 #include <stdatomic.h>
@@ -61,10 +61,10 @@ static void p_destroy (const clap_plugin_t* p)
     const char* path = getenv ("LYNX_TEST_RESTART_REPORT");
     if (path != NULL && *path != 0)
     {
-        FILE* f = fopen (path, "w");
+        FILE* f = fopen (path, "a"); /* one line per instance */
         if (f != NULL)
         {
-            fprintf (f, "requests=%d\nactivations=%d\ndeactivations=%d\noverlapped=%d\ninactive_blocks=%d\nblocks=%d\nlatency=%u\n",
+            fprintf (f, "requests=%d activations=%d deactivations=%d overlapped=%d inactive_blocks=%d blocks=%d latency=%u\n",
                      atomic_load (&r->requests), atomic_load (&r->activations), atomic_load (&r->deactivations),
                      atomic_load (&r->overlapped), atomic_load (&r->inactiveBlocks), atomic_load (&r->blocks), latency_get (p));
             fclose (f);
