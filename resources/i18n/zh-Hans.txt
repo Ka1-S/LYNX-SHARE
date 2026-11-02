@@ -6302,4 +6302,4 @@ countries: cn sg
 "Moving the time selection  [Alt] no snap" = "移动时间选区  [Alt] 不吸附"
 "Unsorted" = "未分类"
 "Audio clips" = "音频片段"
-"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (the buttons at the left of the toolbar; again: hide)" = "窗口：{0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}混音器  {4}浏览器  （工具栏左侧的按钮；再按一次：隐藏）"
+"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "窗口：{0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}混音器  {4}浏览器  （或工具栏中的窗口按钮；再按一次：隐藏）"

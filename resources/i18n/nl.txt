@@ -6302,4 +6302,4 @@ countries: nl be
 "Moving the time selection  [Alt] no snap" = "Tijdselectie verplaatsen  [Alt] geen snap"
 "Unsorted" = "Ongesorteerd"
 "Audio clips" = "Audioclips"
-"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (the buttons at the left of the toolbar; again: hide)" = "Vensters: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (de knoppen links in de balk; nogmaals: verbergen)"
+"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "Vensters: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (of de vensterknoppen in de balk; nogmaals: verbergen)"

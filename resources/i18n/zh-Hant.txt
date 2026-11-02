@@ -6302,4 +6302,4 @@ countries: tw hk mo
 "Moving the time selection  [Alt] no snap" = "移動時間選取範圍  [Alt] 不貼齊"
 "Unsorted" = "未分類"
 "Audio clips" = "音訊片段"
-"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (the buttons at the left of the toolbar; again: hide)" = "視窗：{0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}混音器  {4}瀏覽器  （工具列左側的按鈕；再按一次：隱藏）"
+"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "視窗：{0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}混音器  {4}瀏覽器  （或工具列中的視窗按鈕；再按一次：隱藏）"

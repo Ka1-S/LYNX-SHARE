@@ -6302,4 +6302,4 @@ countries: tr
 "Moving the time selection  [Alt] no snap" = "Zaman seçimi taşınıyor  [Alt] snap yok"
 "Unsorted" = "Sıralanmamış"
 "Audio clips" = "Ses klipleri"
-"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (the buttons at the left of the toolbar; again: hide)" = "Pencereler: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mikser  {4}Tarayıcı  (çubuğun solundaki düğmeler; tekrar: gizle)"
+"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "Pencereler: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mikser  {4}Tarayıcı  (veya çubuktaki pencere düğmeleri; tekrar: gizle)"

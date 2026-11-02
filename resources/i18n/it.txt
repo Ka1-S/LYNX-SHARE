@@ -6302,4 +6302,4 @@ countries: it ch sm
 "Moving the time selection  [Alt] no snap" = "Spostamento della selezione temporale  [Alt] senza snap"
 "Unsorted" = "Non ordinati"
 "Audio clips" = "Clip audio"
-"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (the buttons at the left of the toolbar; again: hide)" = "Finestre: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (i pulsanti a sinistra della barra; di nuovo: nascondi)"
+"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "Finestre: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (o i pulsanti delle finestre nella barra; di nuovo: nascondi)"

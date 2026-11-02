@@ -6302,4 +6302,4 @@ countries: kr
 "Moving the time selection  [Alt] no snap" = "시간 선택 영역 이동 중  [Alt] 스냅 없음"
 "Unsorted" = "미분류"
 "Audio clips" = "오디오 클립"
-"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (the buttons at the left of the toolbar; again: hide)" = "창: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}믹서  {4}브라우저  (툴바 왼쪽의 버튼, 다시 누르면 숨김)"
+"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "창: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}믹서  {4}브라우저  (또는 툴바의 창 버튼, 다시 누르면 숨김)"

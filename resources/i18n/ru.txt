@@ -6302,4 +6302,4 @@ countries: ru by kz
 "Moving the time selection  [Alt] no snap" = "Перемещение выделения времени  [Alt] без привязки"
 "Unsorted" = "Без группы"
 "Audio clips" = "Аудиоклипы"
-"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (the buttons at the left of the toolbar; again: hide)" = "Окна: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Микшер  {4}Браузер  (кнопки слева на панели; повторно: скрыть)"
+"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "Окна: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Микшер  {4}Браузер  (или кнопки окон на панели; повторно: скрыть)"

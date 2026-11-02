@@ -1882,7 +1882,7 @@ void MainComponent::showWindowsTip()
         return chords.empty() ? juce::String() : "[" + juce::String (keys::toString (chords.front())) + "] ";
     };
     ui::Hint hint;
-    hint.text = tr ("Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (the buttons at the left of the toolbar; again: hide)",
+    hint.text = tr ("Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)",
                     { key (Panel::playlist), key (Panel::channelRack), key (Panel::pianoRoll), key (Panel::mixer), key (Panel::browser) });
     ui::postHint (hint, 15000);
 }

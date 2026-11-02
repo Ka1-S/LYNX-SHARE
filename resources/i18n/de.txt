@@ -6302,4 +6302,4 @@ countries: de at ch li lu
 "Moving the time selection  [Alt] no snap" = "Zeitauswahl verschieben  [Alt] ohne Einrasten"
 "Unsorted" = "Unsortiert"
 "Audio clips" = "Audio-Clips"
-"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (the buttons at the left of the toolbar; again: hide)" = "Fenster: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (die Knöpfe links in der Leiste; nochmal: ausblenden)"
+"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "Fenster: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (oder die Fensterknöpfe in der Leiste; nochmal: ausblenden)"

@@ -6302,4 +6302,4 @@ countries: jp
 "Moving the time selection  [Alt] no snap" = "時間選択を移動中  [Alt] スナップなし"
 "Unsorted" = "未分類"
 "Audio clips" = "オーディオクリップ"
-"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (the buttons at the left of the toolbar; again: hide)" = "ウィンドウ: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}ミキサー  {4}ブラウザー  (ツールバー左のボタン。もう一度で非表示)"
+"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "ウィンドウ: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}ミキサー  {4}ブラウザー  (またはツールバーのウィンドウボタン。もう一度で非表示)"

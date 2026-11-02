@@ -6302,4 +6302,4 @@ countries: id
 "Moving the time selection  [Alt] no snap" = "Memindahkan pilihan waktu  [Alt] tanpa snap"
 "Unsorted" = "Tanpa grup"
 "Audio clips" = "Klip audio"
-"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (the buttons at the left of the toolbar; again: hide)" = "Jendela: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (tombol di kiri bilah alat; sekali lagi: sembunyikan)"
+"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "Jendela: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (atau tombol jendela di bilah alat; sekali lagi: sembunyikan)"

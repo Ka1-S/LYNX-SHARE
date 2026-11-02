@@ -6458,4 +6458,4 @@ countries: br
 "Moving the time selection  [Alt] no snap" = "Movendo a seleção de tempo  [Alt] sem grade"
 "Unsorted" = "Sem grupo"
 "Audio clips" = "Clipes de áudio"
-"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (the buttons at the left of the toolbar; again: hide)" = "Janelas: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Navegador  (os botões à esquerda da barra; de novo: esconde)"
+"Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "Janelas: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Navegador  (ou os botões de janela da barra; de novo: esconde)"
