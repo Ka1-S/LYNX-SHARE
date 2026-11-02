@@ -128,6 +128,9 @@ public:
                // sleep instead of spinning (ONNX Runtime's default keeps every worker busy between operators)
                && check (api->SetIntraOpNumThreads (options, stemsplit::separationThreads (juce::SystemStats::getNumPhysicalCpus(), juce::SystemStats::getNumCpus())), error)
                && check (api->SetInterOpNumThreads (options, 1), error)
+               // no arena: one 7.8 s segment needs ~4 GB of tensors for a moment; the arena kept that (and more, it
+               // grows by doubling) until the job ended, without it the RAM goes back between segments (same speed)
+               && check (api->DisableCpuMemArena (options), error)
                && check (api->AddSessionConfigEntry (options, "session.intra_op.allow_spinning", "0"), error)
                && check (api->AddSessionConfigEntry (options, "session.inter_op.allow_spinning", "0"), error);
        #if JUCE_WINDOWS
