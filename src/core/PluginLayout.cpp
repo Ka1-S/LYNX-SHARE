@@ -3467,6 +3467,7 @@ Layout generated (EffectKind kind)
         l.items.push_back (display (6, 6, (float) l.width - 12.0f, (float) l.height - 12.0f, "name"));
     return l;
 }
+#include "core/PluginLayoutDrums.inc"
 } // namespace
 
 const std::vector<EffectKind>& flLayoutKinds()
@@ -3606,13 +3607,16 @@ const Layout* instrumentLayout (InstrumentKind kind)
         case InstrumentKind::boobass: return &boo;
         case InstrumentKind::sytrus: return &sytrus;
         case InstrumentKind::harmor: return &harmor;
-        default: return nullptr;
+        default: return drumLayout (kind); // round 168p (PluginLayoutDrums.inc)
     }
 }
 
 const std::vector<InstrumentKind>& instrumentLayoutKinds()
 {
-    static const std::vector<InstrumentKind> kinds { InstrumentKind::threeosc, InstrumentKind::flkeys, InstrumentKind::boobass, InstrumentKind::sytrus, InstrumentKind::harmor };
+    static const std::vector<InstrumentKind> kinds { InstrumentKind::threeosc, InstrumentKind::flkeys, InstrumentKind::boobass, InstrumentKind::sytrus, InstrumentKind::harmor,
+                                                      // round 168p
+                                                      InstrumentKind::fruitkick, InstrumentKind::plucked, InstrumentKind::drumpad, InstrumentKind::drumaxx,
+                                                      InstrumentKind::bassdrum, InstrumentKind::drumsynth, InstrumentKind::sakura, InstrumentKind::slayer };
     return kinds;
 }
 
