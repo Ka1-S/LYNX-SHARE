@@ -1,5 +1,6 @@
 #include "core/Granulizer.h"
 #include "core/HostSlide.h"
+#include "core/ModelParams.h"
 
 #include <algorithm>
 #include <array>
@@ -1149,6 +1150,24 @@ public:
 
     bool idle() const noexcept override { return engine.count == 0; }
 
+    // automation (round 168q): the clip's 0…1 over the knob's range; "Key to" too. The transients source and tempo
+    // lock re-slice the sample: those follow the channel's state, not the clip.
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        const auto* p = findEngineParam (granulizerEngineParams(), index);
+        if (p == nullptr || ! std::isfinite (value))
+            return;
+        const auto v = (int) std::lround (p->raw (value));
+        if (index < paramCount)
+            engine.P.P[(std::size_t) index] = v, current.P.P[(std::size_t) index] = v;
+        else if (index == paramCount + 1)
+            engine.P.keyMode = v, current.P.keyMode = v;
+        else
+            return;
+        engine.update();
+    }
+
     void setSongPosition (double ticks) noexcept override
     {
         const auto playing = lastTicks >= 0.0 && ticks != lastTicks;
@@ -1292,6 +1311,66 @@ std::unique_ptr<Instrument> makeGranulizerInstrument (std::shared_ptr<const Samp
 {
     return std::make_unique<GranulizerInstrument> (std::move (sample));
 }
+
+std::vector<std::uint8_t> granulizerDefaultState()
+{
+    // version 7 with the knobs' defaults, no slicing, key to pitch, tempo lock off and the processor's defaults
+    std::vector<std::uint8_t> out ((std::size_t) stateSize, 0);
+    putI32 (out.data(), stateVersion);
+    for (int k = 0; k < paramCount; ++k)
+        putI32 (out.data() + 4 + 4 * k, defaults[(std::size_t) k]);
+    const auto snap = flvp::defaultSnapshot();
+    std::memcpy (out.data() + 64, snap.data(), (std::size_t) snapshotSize);
+    return out;
+}
+
+const std::vector<EngineParam>& granulizerEngineParams()
+{
+    // Fruity Granulizer's panel (FL's editor form, REA_rodada168q §1): the 12 knobs and switches by parameter number,
+    // then the editor's modes (12 transients source, 13 key to, 14 tempo locked)
+    static const std::vector<EngineParam> table = [] {
+        static const char* const names[paramCount] = { "Grain attack", "Grain hold", "Grain spacing", "Wave spacing",
+                                                       "Effect depth", "Effect speed", "Randomness", "Stereo separation",
+                                                       "Loop", "Hold", "Sample start", "Transient hold" };
+        std::vector<EngineParam> t;
+        const auto add = [&t] (int index, const char* name, float low, float high, bool stepped) {
+            EngineParam p;
+            p.index = index, p.name = name, p.low = low, p.high = high, p.stepped = stepped;
+            t.push_back (p);
+        };
+        for (int k = 0; k < paramCount; ++k)
+            add (k, names[k], (float) ranges[(std::size_t) k].first, (float) ranges[(std::size_t) k].second, true);
+        add (paramCount, "Transients source", 0, 2, true);
+        add (paramCount + 1, "Key to", 0, 3, true);
+        add (paramCount + 2, "Tempo locked", 0, 1, true);
+        return t;
+    }();
+    return table;
+}
+
+namespace modelparams
+{
+namespace
+{
+std::optional<float> granulizerValue (const ChannelDef& c, const EngineParam& p)
+{
+    const auto v = p.index < paramCount ? granulizerParam (c.pluginState, p.index) : granulizerMode (c.pluginState, p.index - paramCount);
+    if (! v)
+        return std::nullopt;
+    return std::clamp ((float) *v, p.low, p.high);
+}
+
+bool granulizerSetValue (ChannelDef& c, const EngineParam& p, float raw)
+{
+    if (! std::isfinite (raw))
+        return false;
+    const auto v = (int) std::lround (std::clamp (raw, p.low, p.high));
+    return p.index < paramCount ? granulizerSetParam (c.pluginState, p.index, v) : granulizerSetMode (c.pluginState, p.index - paramCount, v);
+}
+} // namespace
+
+Table granulizerModelTable() { return { &granulizerEngineParams(), &granulizerValue, &granulizerSetValue }; }
+} // namespace modelparams
 
 namespace granulizer
 {

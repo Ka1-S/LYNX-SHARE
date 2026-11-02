@@ -26,6 +26,7 @@
 #include <optional>
 #include <vector>
 
+#include "core/EngineParams.h"
 #include "core/Instruments.h"
 
 namespace lynx
@@ -39,6 +40,14 @@ std::optional<std::vector<int>> beepMapParams (const std::vector<std::uint8_t>& 
 int beepMapParamOffset (const std::vector<std::uint8_t>& state, int index);
 
 std::unique_ptr<Instrument> makeBeepMapInstrument();
+
+// The automatable settings of the designed page (round 168q), by setting number (sorted)
+const std::vector<EngineParam>& beepMapEngineParams();
+namespace modelparams
+{
+struct Table;
+Table beepMapModelTable();
+} // namespace modelparams
 
 namespace beepmap
 {

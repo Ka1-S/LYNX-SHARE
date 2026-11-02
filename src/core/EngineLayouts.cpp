@@ -76,7 +76,7 @@ LayoutItem tabs (float x, float y, float w, float h, const char* param, const ch
     return i;
 }
 
-LayoutItem pageTabs (float x, float y, float w, float h, const char* options)
+LayoutItem pageBar (float x, float y, float w, float h, const char* options)
 {
     return tabs (x, y, w, h, nullptr, options, {}, plugui::pageTabs);
 }
@@ -224,7 +224,7 @@ Layout keplerExoLayout()
     v.push_back (section (326, 406, 224, 164, TR_NOOP ("Matrix")));
     v.push_back (section (552, 406, 86, 164, TR_NOOP ("Chorus")));
     v.push_back (section (640, 406, 422, 164, TR_NOOP ("Effects")));
-    v.push_back (pageTabs (724, 407, 334, 16, TR_NOOP ("Saturation|Chorus|EQ|Delay|Reverb")));
+    v.push_back (pageBar (724, 407, 334, 16, TR_NOOP ("Saturation|Chorus|EQ|Delay|Reverb")));
     v.push_back (onPage (label (666, 438, 36, 14, TR_NOOP ("Low")), 2));
     v.push_back (onPage (label (697, 438, 36, 14, TR_NOOP ("Mid")), 2));
     v.push_back (onPage (label (728, 438, 36, 14, TR_NOOP ("High")), 2));
@@ -625,6 +625,84 @@ Layout transistorBassLayout()
     v.push_back (dial (589, 372, 46, "Reverb early", TR_NOOP ("ER")));
     v.push_back (dial (645, 372, 46, "Reverb wet", TR_NOOP ("Wet")));
     v.push_back (toggle (88, 94, 34, 28, "303 pulse", TR_NOOP ("303"), boxed));
+    return l;
+}
+
+// --- BeepMap --------------------------------------------------------------------------------------------------
+// FL's panel (380 × 170): Freq and Length wheels, the Scale combo, the four switches, the bitmap's Open / Copy /
+// Paste row with Max height, the bitmap below. Values: the int32 settings (Frequency 24…9600 cents / Hz, Length
+// 0…4096, Scale 0 Log / 1 Linear / 2 Harmonics, switches 0 / 1, Max height 3…999 rows).
+Layout beepMapLayout()
+{
+    Layout l;
+    l.fl = "BeepMap";
+    l.width = 380;
+    l.height = 176;
+    auto& v = l.items;
+    v.push_back (dial (27, 35, 40, "Frequency", TR_NOOP ("Freq")));
+    v.push_back (dial (79, 35, 40, "Length", TR_NOOP ("Length")));
+    v.push_back (menu (117, 18, 98, 32, "Scale", TR_NOOP ("Scale"), TR_NOOP ("Log|Linear|Harmonics")));
+    v.push_back (toggle (228, 20, 68, 14, "Use blue", TR_NOOP ("Use blue")));
+    v.push_back (toggle (301, 20, 72, 14, "Grainy", TR_NOOP ("Grainy")));
+    v.push_back (toggle (228, 40, 68, 14, "Loop", TR_NOOP ("Loop")));
+    v.push_back (toggle (301, 40, 72, 14, "Widen", TR_NOOP ("Widen")));
+    // the bitmap's actions (open a .bmp / paste), its name and size: drawn and handled by the editor
+    v.push_back (display (6, 82, 230, 34, "beepmapfile"));
+    v.push_back (label (244, 88, 88, 22, "BEEP · MAP", dim));
+    v.push_back (stepper (336, 80, 38, 36, "Max height", TR_NOOP ("Rows")));
+    v.push_back (display (6, 124, 368, 46, "beepmapimage"));
+    return l;
+}
+
+// --- Fruity Granulizer ----------------------------------------------------------------------------------------
+// FL's panel (392 × 429): GRAINS and EFFECTS rows of four wheels, TRANSIENTS (hold, source) and TIME (start, Loop,
+// Hold, Key to, Tempo locked), the sample's waveform at the bottom. Values: the plugin's whole-number knob values.
+Layout granulizerLayout()
+{
+    Layout l;
+    l.fl = "Fruity Granulizer";
+    l.width = 392;
+    l.height = 429;
+    auto& v = l.items;
+    v.push_back (section (6, 6, 380, 99, TR_NOOP ("Grains")));
+    v.push_back (dial (47, 58, 46, "Grain attack", TR_NOOP ("Attack")));
+    v.push_back (dial (111, 58, 46, "Grain hold", TR_NOOP ("Hold")));
+    v.push_back (dial (177, 58, 46, "Grain spacing", TR_NOOP ("Gr. spacing")));
+    v.push_back (dial (246, 58, 46, "Wave spacing", TR_NOOP ("Wave spacing"), bipolar));
+    v.push_back (display (305, 27, 71, 66, "granulizergrains"));
+    v.push_back (section (6, 112, 380, 99, TR_NOOP ("Effects")));
+    v.push_back (dial (47, 164, 46, "Stereo separation", TR_NOOP ("Pan")));
+    v.push_back (dial (111, 164, 46, "Effect depth", TR_NOOP ("Depth")));
+    v.push_back (dial (177, 164, 46, "Effect speed", TR_NOOP ("Speed")));
+    v.push_back (dial (246, 164, 46, "Randomness", TR_NOOP ("Rand")));
+    v.push_back (section (6, 218, 184, 99, TR_NOOP ("Transients")));
+    v.push_back (dial (47, 270, 46, "Transient hold", TR_NOOP ("Hold")));
+    v.push_back (radio (100, 240, 84, 60, "Transients source", TR_NOOP ("Off|Markers|Auto slice")));
+    v.push_back (section (196, 218, 190, 99, TR_NOOP ("Time")));
+    v.push_back (dial (236, 270, 46, "Sample start", TR_NOOP ("Start")));
+    v.push_back (toggle (270, 236, 52, 14, "Loop", TR_NOOP ("Loop")));
+    v.push_back (toggle (312, 252, 64, 22, "Hold", TR_NOOP ("Hold"), boxed));
+    v.push_back (toggle (270, 220, 112, 14, "Tempo locked", TR_NOOP ("Tempo locked")));
+    v.push_back (menu (306, 278, 74, 34, "Key to", TR_NOOP ("Key to"), TR_NOOP ("Pitch|Percent|Step|Transient")));
+    v.push_back (display (6, 324, 380, 99, "granulizerwave"));
+    return l;
+}
+
+// --- Wasp / Wasp XT -------------------------------------------------------------------------------------------
+// FL 2026 ships Wasp and Wasp XT as a 64-bit placeholder (its "Dummy x64" form, 356 × 201: the plugin's name and three
+// lines saying it has no 64-bit version, the settings are kept, and the project opens in 32-bit FL). LYNX keeps the
+// state the same way and says so.
+Layout waspLayout()
+{
+    Layout l;
+    l.fl = "Wasp";
+    l.width = 356;
+    l.height = 201;
+    auto& v = l.items;
+    v.push_back (label (5, 40, 346, 24, "Wasp", 0));
+    v.push_back (label (5, 72, 346, 16, TR_NOOP ("This plugin has no 64-bit version: it makes no sound.")));
+    v.push_back (label (5, 92, 346, 16, TR_NOOP ("Its settings are kept in the project."), dim));
+    v.push_back (label (5, 112, 346, 16, TR_NOOP ("Open the project in 32-bit FL Studio to play it."), dim));
     return l;
 }
 } // namespace lynx::plugui
