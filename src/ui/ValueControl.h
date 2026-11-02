@@ -27,6 +27,7 @@ struct ValueSpec
     double minimum = 0.0, maximum = 1.0, defaultValue = 0.0;
     double interval = 0.0;             // > 0: integer-like controls (route box)
     double pixelsForRange = 150.0;     // drag distance that sweeps the whole range
+    double wheelPerNotch = 0.0;        // > 0: value change per wheel notch; 0 = 2% of the range (a 500-wide range moved 10)
     // shown value <-> stored value (e.g. 0..1 volume shown as "78%"). Both optional.
     std::function<juce::String (double)> toText;
     std::function<std::optional<double> (const juce::String&)> fromText;

@@ -225,6 +225,14 @@ std::optional<double> wheelValue (double value, const juce::MouseEvent& e, const
 
     const auto notches = (wheel.isReversed ? -1.0 : 1.0) * (delta > 0.0f ? 1.0 : -1.0) * juce::jmax (1.0, std::abs (delta) / 0.12);
     reportTweak (spec);
+
+    if (spec.wheelPerNotch > 0.0)
+    {
+        const auto step = juce::jmax (spec.wheelPerNotch * (e.mods.isCtrlDown() ? controls::fineFactor : 1.0), spec.interval);
+        // one step per wheel event: the notch count above follows the wheel's delta, which made a click move 2 inserts
+        return juce::jlimit (spec.minimum, spec.maximum, value + (notches > 0.0 ? 1.0 : -1.0) * step);
+    }
+
     return controls::wheelValue (value, notches, spec.minimum, spec.maximum, e.mods.isCtrlDown(), spec.interval);
 }
 

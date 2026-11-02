@@ -1004,6 +1004,7 @@ ui::ValueSpec ChannelRackComponent::specFor (Area area, int row) const
     spec.maximum = maxMixerTracks - 1; // every insert, like FL (round 162: the inserts past the mixer's last one are added)
     spec.interval = 1.0;
     spec.pixelsForRange = 3.0 * juce::jmax (1.0, spec.maximum);
+    spec.wheelPerNotch = 1.0; // one insert per notch (the default 2% of the range moved 10)
     spec.toText = [] (double v) { return v < 0.5 ? tr ("Master") : tr ("Insert {0}", { juce::String (juce::roundToInt (v)) }); };
     spec.fromText = [] (const juce::String& t) -> std::optional<double> {
         if (t.trim().startsWithIgnoreCase ("m"))

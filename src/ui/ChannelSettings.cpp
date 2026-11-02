@@ -3879,8 +3879,13 @@ public:
                     [] (Song& s, int ch, double v) { s.channels[(std::size_t) ch].misc.pitchRange = juce::jlimit (0, 48, juce::roundToInt (v)); },
                     TR_NOOP ("Range"));
         headerKnob ([this, name] {
-                        return countSpec (name() + " - " + tr ("Target mixer track"), maxMixerTracks - 1, 0,
-                                          [] (int t) { return t == 0 ? tr ("Master") : juce::String (t); });
+                        auto s = countSpec (name() + " - " + tr ("Target mixer track"), maxMixerTracks - 1, 0,
+                                            [] (int t) { return t == 0 ? tr ("Master") : juce::String (t); });
+                        // countSpec caps the drag at 400 px: with 500 inserts that was under 1 px per insert, so a
+                        // specific one could hardly be picked (issue #32). 3 px per insert, like the Channel Rack's box.
+                        s.pixelsForRange = 3.0 * juce::jmax (1.0, s.maximum);
+                        s.wheelPerNotch = 1.0; // the wheel's default (2% of the range) moved 10 inserts per notch
+                        return s;
                     },
                     [] (const ChannelDef& d) { return (double) d.mixerTrack; },
                     [] (Song& s, int ch, double v) {
