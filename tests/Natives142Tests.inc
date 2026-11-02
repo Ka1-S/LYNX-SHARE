@@ -108,7 +108,7 @@ TEST (natives142_lists_and_no_fl_installation)
         {
             CHECK (c->instrument == e.kind && c->name == e.name);
             CHECK (e.kind == InstrumentKind::wavetraveller // (plays the channel's sample: none yet, silent as FL)
-                   || natives142::renderChannel (*c, none) > 1.0e-3);
+                   || natives142::renderChannel (*c, none, e.kind == InstrumentKind::drumaxx ? 36 : 60) > 1.0e-3); // (Drumaxx: pad 1's key)
         }
     }
     for (const auto& e : natives::effectEngines())
