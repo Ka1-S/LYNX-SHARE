@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 
+#include "core/EngineParams.h"
 #include "core/Instruments.h"
 
 namespace lynx
@@ -45,6 +46,15 @@ int toxicParamOffset (const std::vector<std::uint8_t>& state, int index);
 // a state with the plugin's constructor values (TBi2 layout, no drawn waves): used to create a fresh channel and by the
 // tests
 std::vector<std::uint8_t> toxicDefaultState();
+
+// One cycle of the wave an operator (slot 0…5) or LFO (6, 7) plays, peak-normalised, `points` long (the editor's wave
+// displays); empty when its wave needs the DLL and `dllPath` isn't usable, or the state can't be read
+std::vector<float> toxicWaveShape (const std::vector<std::uint8_t>& state, const std::string& dllPath, int slot, int points);
+
+// The parameters the editor shows and automation clips drive (round 168n), sorted by index: P[0…156], the EQ and
+// effect fields P[227…293] (0…1), and the raw-integer settings P[295…315] (LFO sync, filter mode, polyphony, unison,
+// glide mode, delay sync, waves, effect types) with their ranges
+const std::vector<EngineParam>& toxicParams();
 
 std::unique_ptr<Instrument> makeToxicInstrument();
 
