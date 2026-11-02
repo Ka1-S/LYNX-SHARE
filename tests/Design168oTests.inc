@@ -44,9 +44,11 @@ struct Level
     bool finite = true;
 };
 
-// the preset's phrase: a held note (a chord for pads / keys) for 1 s, released, 0.5 s of tail at 44.1 kHz
+// the preset's phrase: a held note (a chord for pads / keys) for 1 s, released, 0.5 s of tail at 44.1 kHz, on a channel
+// at FL's default volume (78 %: channelGain 0.549)
 Level play (lynx::Instrument& inst, const std::string& category)
 {
+    const auto gain = lynx::channelGain (0.78f);
     const int sr = 44100, len = sr * 3 / 2, offAt = sr;
     std::vector<int> keys { 60 };
     if (category == "Bass")
@@ -62,7 +64,7 @@ Level play (lynx::Instrument& inst, const std::string& category)
         if (pos <= offAt && pos + n > offAt)
             for (const auto k : keys)
                 inst.noteOff (k);
-        inst.render (L.data() + pos, R.data() + pos, n, 1.0f, 1.0f);
+        inst.render (L.data() + pos, R.data() + pos, n, gain, gain);
     }
     Level l;
     double sum = 0.0;
@@ -153,8 +155,8 @@ TEST (design168o_banks_play_clean)
             inst->settleNew();
             const auto l = design168o::play (*inst, preset.category);
             CHECK (l.finite);
-            CHECK (l.rmsHeld > 0.003); // not silent
-            CHECK (l.peak < 0.99);     // no clipping
+            CHECK (l.rmsHeld > 0.002); // not silent (−54 dB)
+            CHECK (l.peak < 0.89);     // headroom: under −1 dBFS
         }
     }
 }

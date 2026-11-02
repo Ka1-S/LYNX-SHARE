@@ -58,7 +58,7 @@ Preset make (const char* name, const char* category, std::vector<std::string> ta
 std::vector<Preset> simSynthBank()
 {
     std::vector<Preset> b;
-    b.push_back (make ("Init Pulse", "Init", { "init" }, { { wave1, 0 }, { shape1, 0.5f }, { att, 0.0f }, { dec, 0.5f }, { sus, 0.8f }, { rel, 0.15f } }));
+    b.push_back (make ("Init Pulse", "Init", { "init" }, { { wave1, 0 }, { shape1, 0.5f }, { lvl1, 0.9f }, { att, 0.0f }, { dec, 0.5f }, { sus, 0.8f }, { rel, 0.15f } }));
     // --- bass
     b.push_back (make ("Analog Bass", "Bass", { "analog", "punchy" },
                        { { wave1, 0 }, { shape1, 0.4f }, { on2, 1 }, { wave2, 0 }, { lvl2, 0.55f }, { coarse2, -12 }, { cutoff, 0.32f },
@@ -80,12 +80,12 @@ std::vector<Preset> simSynthBank()
                        { { wave1, 0 }, { shape1, 0.5f }, { oct1a, 1 }, { cutoff, 0.9f }, { att, 0.0f }, { dec, 0.4f }, { sus, 0.7f },
                          { rel, 0.12f }, { lfoOn, 1 }, { lfoShape, 0 }, { lfoRate, 0.6f }, { lfoDelay, 0.5f }, { lfo1, 0.52f } }));
     b.push_back (make ("Ring Lead", "Lead", { "ring", "metallic" },
-                       { { wave1, 2 }, { on2, 1 }, { wave2, 2 }, { lvl2, 0.6f }, { coarse2, 7 }, { ring, 1 }, { cutoff, 0.7f },
+                       { { wave1, 2 }, { lvl1, 1.0f }, { on2, 1 }, { wave2, 2 }, { lvl2, 0.95f }, { coarse2, 7 }, { ring, 1 }, { cutoff, 0.7f },
                          { emphasis, 0.2f }, { att, 0.0f }, { dec, 0.45f }, { sus, 0.7f }, { rel, 0.2f } }));
     // --- pad
     b.push_back (make ("String Pad", "Pad", { "strings", "slow" },
-                       { { wave1, 0 }, { shape1, 0.25f }, { warm1, 1 }, { on2, 1 }, { wave2, 0 }, { shape2, 0.35f }, { warm2, 1 },
-                         { lvl2, 0.6f }, { fine2, 0.53f }, { cutoff, 0.55f }, { emphasis, 0.1f }, { att, 0.62f }, { dec, 0.6f },
+                       { { wave1, 0 }, { shape1, 0.25f }, { lvl1, 0.6f }, { warm1, 1 }, { on2, 1 }, { wave2, 0 }, { shape2, 0.35f }, { warm2, 1 },
+                         { lvl2, 0.52f }, { fine2, 0.53f }, { cutoff, 0.55f }, { emphasis, 0.1f }, { att, 0.62f }, { dec, 0.6f },
                          { sus, 0.85f }, { rel, 0.45f }, { lfoOn, 1 }, { lfoShape, 2 }, { lfoRate, 0.3f }, { lfo1, 0.52f },
                          { chorus, 1 } }));
     b.push_back (make ("Glass Pad", "Pad", { "airy", "bright" },
@@ -93,12 +93,12 @@ std::vector<Preset> simSynthBank()
                          { fine2, 0.54f }, { cutoff, 0.6f }, { high, 0.25f }, { att, 0.55f }, { dec, 0.6f }, { sus, 0.8f },
                          { rel, 0.5f }, { lfoOn, 1 }, { lfoShape, 2 }, { lfoRate, 0.25f }, { fLfo, 0.6f }, { chorus, 1 } }));
     b.push_back (make ("Sweep Pad", "Pad", { "sweep", "filter" },
-                       { { wave1, 0 }, { shape1, 0.45f }, { warm1, 1 }, { on2, 1 }, { wave2, 0 }, { lvl2, 0.55f }, { coarse2, -12 },
+                       { { wave1, 0 }, { shape1, 0.45f }, { lvl1, 0.62f }, { warm1, 1 }, { on2, 1 }, { wave2, 0 }, { lvl2, 0.5f }, { coarse2, -12 },
                          { cutoff, 0.3f }, { emphasis, 0.45f }, { fEnv, 0.72f }, { fAtt, 0.6f }, { fDec, 0.7f }, { fSus, 0.4f },
                          { fRel, 0.5f }, { att, 0.45f }, { dec, 0.6f }, { sus, 0.9f }, { rel, 0.45f }, { chorus, 1 } }));
     // --- pluck / keys
     b.push_back (make ("Bright Pluck", "Pluck", { "pluck", "short" },
-                       { { wave1, 0 }, { shape1, 0.35f }, { on2, 1 }, { wave2, 2 }, { lvl2, 0.5f }, { coarse2, 12 }, { cutoff, 0.3f },
+                       { { wave1, 0 }, { shape1, 0.35f }, { lvl1, 0.95f }, { on2, 1 }, { wave2, 2 }, { lvl2, 0.7f }, { coarse2, 12 }, { cutoff, 0.3f },
                          { emphasis, 0.3f }, { fEnv, 0.88f }, { fDec, 0.25f }, { fSus, 0.0f }, { fRel, 0.2f }, { att, 0.0f },
                          { dec, 0.32f }, { sus, 0.0f }, { rel, 0.25f }, { chorus, 1 } }));
     b.push_back (make ("Soft Keys", "Keys", { "keys", "soft" },
@@ -110,11 +110,11 @@ std::vector<Preset> simSynthBank()
                          { lfoOn, 1 }, { lfoShape, 2 }, { lfoRate, 0.55f }, { lfo1, 0.52f }, { lfo2, 0.52f }, { chorus, 1 } }));
     // --- fx
     b.push_back (make ("Noise Sweep", "FX", { "noise", "sweep" },
-                       { { wave1, 3 }, { lvl1, 0.6f }, { cutoff, 0.15f }, { emphasis, 0.6f }, { band, 0.4f }, { fEnv, 0.85f },
+                       { { wave1, 3 }, { lvl1, 0.46f }, { cutoff, 0.15f }, { emphasis, 0.6f }, { band, 0.4f }, { fEnv, 0.85f },
                          { fAtt, 0.65f }, { fDec, 0.75f }, { fSus, 0.2f }, { fRel, 0.6f }, { att, 0.3f }, { dec, 0.7f }, { sus, 0.8f },
                          { rel, 0.55f } }));
     b.push_back (make ("Random Bleeps", "FX", { "s&h", "random" },
-                       { { wave1, 2 }, { cutoff, 0.5f }, { emphasis, 0.55f }, { lfoOn, 1 }, { lfoShape, 3 }, { lfoRate, 0.62f },
+                       { { wave1, 2 }, { lvl1, 1.0f }, { cutoff, 0.5f }, { emphasis, 0.55f }, { lfoOn, 1 }, { lfoShape, 3 }, { lfoRate, 0.62f },
                          { fLfo, 0.85f }, { lfo1, 0.62f }, { att, 0.0f }, { dec, 0.5f }, { sus, 0.8f }, { rel, 0.3f }, { chorus, 1 } }));
     return b;
 }

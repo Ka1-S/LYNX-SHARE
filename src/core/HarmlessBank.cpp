@@ -60,19 +60,19 @@ std::vector<Preset> harmlessBank()
                        { { sub1, 900 }, { freq, 2600 }, { width, 600 }, { fEnv, 300 }, { fDec, 260 }, { mono, 1 }, { porta, 1 },
                          { portaTime, 300 }, { rel, 180 }, { vol, 900 }, { velVol, 1 } }));
     b.push_back (make ("Rubber Pluck Bass", "Bass", { "pluck", "punchy" },
-                       { { freq, 2200 }, { fEnv, 700 }, { fDec, 230 }, { fDecSlope, -400 }, { res, 300 }, { pluck, 380 },
+                       { { vol, 1200 }, { freq, 2200 }, { fEnv, 700 }, { fDec, 230 }, { fDecSlope, -400 }, { res, 300 }, { pluck, 380 },
                          { dec, 420 }, { rel, 160 }, { mono, 1 }, { velFEnv, 1 } }));
     b.push_back (make ("Square Growl", "Bass", { "square", "gritty" },
                        { { colour, 5 }, { freq, 3000 }, { fEnv, 450 }, { fDec, 300 }, { res, 450 }, { grit, 350 }, { rel, 200 },
                          { mono, 1 } }));
     b.push_back (make ("Acid Squelch", "Bass", { "acid", "resonant" },
-                       { { freq, 1900 }, { width, 350 }, { fEnv, 820 }, { fDec, 280 }, { res, 780 }, { selfOsc, 300 }, { dec, 1000 },
+                       { { vol, 760 }, { freq, 1900 }, { width, 350 }, { fEnv, 820 }, { fDec, 280 }, { res, 780 }, { selfOsc, 300 }, { dec, 1000 },
                          { rel, 120 }, { mono, 1 }, { porta, 1 }, { portaTime, 200 }, { velFEnv, 1 } }));
     // --- lead
     b.push_back (make ("Supersaw Lead", "Lead", { "unison", "bright" },
                        { { uniOrder, 7 }, { uniPitch, 150 }, { uniPan, 128 }, { freq, 6400 }, { rel, 300 }, { vib, 120 },
                          { chType, 1 }, { chMix, 300 }, { delType, 2 }, { delVol, 300 }, { delFb, 350 }, { delTime, 144 },
-                         { vol, 820 } }));
+                         { vol, 1100 } }));
     b.push_back (make ("Glide Mono Lead", "Lead", { "mono", "portamento" },
                        { { colour, 1 }, { freq, 5200 }, { fEnv, 300 }, { fDec, 400 }, { res, 250 }, { mono, 1 }, { porta, 1 },
                          { portaTime, 380 }, { vib, 220 }, { lfoSpeed, 3800 }, { rel, 260 }, { delType, 1 }, { delVol, 250 },
@@ -83,18 +83,18 @@ std::vector<Preset> harmlessBank()
     // --- pad
     {
         Values v { { uniOrder, 5 }, { uniPitch, 130 }, { att, 560 }, { rel, 700 }, { freq, 4300 }, { width, 650 }, { fEnv, 250 },
-                   { fAtt, 520 }, { fDec, 640 }, { chType, 1 }, { chMix, 450 }, { revType, 3 }, { revWet, 380 }, { vol, 800 } };
+                   { fAtt, 520 }, { fDec, 640 }, { chType, 1 }, { chMix, 450 }, { revType, 3 }, { revWet, 380 }, { vol, 690 } };
         b.push_back (make ("Velvet Pad", "Pad", { "warm", "unison", "slow" }, v));
     }
     b.push_back (make ("Phaser Choir", "Pad", { "phaser", "airy" },
                        { { att, 420 }, { rel, 650 }, { phMix, 850 }, { phWidth, 2600 }, { phOfs, 300 }, { phSpeed, 1600 },
-                         { phaserType, 1 }, { uniOrder, 3 }, { uniPitch, 110 }, { revType, 2 }, { revWet, 350 }, { vol, 820 } }));
+                         { phaserType, 1 }, { uniOrder, 3 }, { uniPitch, 110 }, { revType, 2 }, { revWet, 350 }, { vol, 615 } }));
     b.push_back (make ("Harmonized Air", "Pad", { "harmonizer", "bright", "wide" },
                        { { att, 380 }, { rel, 720 }, { hzMix, 650 }, { hzWidth, 420 }, { hzStrength, 700 }, { hzType, 1 },
-                         { freq, 5800 }, { chType, 2 }, { chMix, 500 }, { revType, 4 }, { revWet, 400 }, { vol, 760 } }));
+                         { freq, 5800 }, { chType, 2 }, { chMix, 500 }, { revType, 4 }, { revWet, 400 }, { vol, 545 } }));
     {
         std::vector<std::pair<int, float>> v { { maskMix, 900 }, { maskLfo, 500 }, { lfoSpeed, 1500 }, { att, 500 }, { rel, 750 },
-                                               { uniOrder, 3 }, { uniPitch, 120 }, { revType, 3 }, { revWet, 420 }, { vol, 800 } };
+                                               { uniOrder, 3 }, { uniPitch, 120 }, { revType, 3 }, { revWet, 420 }, { vol, 715 } };
         mask (v, { 1000, 300, 900, 200, 800, 150, 700, 150, 600, 100, 500, 100 });
         b.push_back ({ "Shimmer Mask", "Pad", { "mask", "moving" }, [v] (ChannelDef& c) {
                           c.modelParams = harmlessDefaultModelParams();
@@ -104,23 +104,23 @@ std::vector<Preset> harmlessBank()
     }
     b.push_back (make ("Dark Drone", "Pad", { "dark", "drone", "resonant" },
                        { { colour, 3 }, { att, 650 }, { rel, 800 }, { freq, 2500 }, { res, 600 }, { fLfo, 350 }, { lfoSpeed, 600 },
-                         { sub1, 600 }, { uniOrder, 3 }, { uniPitch, 90 }, { revType, 3 }, { revWet, 450 }, { vol, 850 } }));
+                         { sub1, 600 }, { uniOrder, 3 }, { uniPitch, 90 }, { revType, 3 }, { revWet, 450 }, { vol, 595 } }));
     // --- pluck
     b.push_back (make ("Glass Pluck", "Pluck", { "pluck", "bright" },
-                       { { pluck, 330 }, { dec, 380 }, { rel, 300 }, { freq, 7000 }, { revType, 2 }, { revWet, 300 },
+                       { { vol, 1250 }, { pluck, 330 }, { dec, 380 }, { rel, 300 }, { freq, 7000 }, { revType, 2 }, { revWet, 300 },
                          { delType, 2 }, { delVol, 260 }, { delFb, 320 }, { delTime, 144 } }));
     b.push_back (make ("Soft Mallet", "Pluck", { "mallet", "soft" },
-                       { { colour, 6 }, { pluck, 280 }, { pluckAlt, 1 }, { dec, 330 }, { rel, 260 }, { freq, 4400 }, { velFEnv, 1 },
+                       { { vol, 1250 }, { colour, 6 }, { pluck, 280 }, { pluckAlt, 1 }, { dec, 330 }, { rel, 260 }, { freq, 4400 }, { velFEnv, 1 },
                          { fEnv, 350 }, { fDec, 200 }, { revType, 6 }, { revWet, 280 } }));
     b.push_back (make ("Echo Pluck", "Pluck", { "delay", "rhythmic" },
-                       { { pluck, 300 }, { dec, 300 }, { rel, 220 }, { freq, 4800 }, { fEnv, 400 }, { fDec, 220 }, { res, 300 },
+                       { { vol, 1200 }, { pluck, 300 }, { dec, 300 }, { rel, 220 }, { freq, 4800 }, { fEnv, 400 }, { fDec, 220 }, { res, 300 },
                          { delType, 2 }, { delVol, 450 }, { delFb, 500 }, { delTime, 96 } }));
     // --- keys
     b.push_back (make ("Tine Keys", "Keys", { "electric", "tremolo" },
-                       { { colour, 7 }, { pluck, 450 }, { pluckMask, 1 }, { dec, 500 }, { rel, 260 }, { trem, 350 }, { freq, 5000 },
+                       { { vol, 485 }, { colour, 7 }, { pluck, 450 }, { pluckMask, 1 }, { dec, 500 }, { rel, 260 }, { trem, 350 }, { freq, 5000 },
                          { velVol, 1 }, { chType, 1 }, { chMix, 300 } }));
     {
-        std::vector<std::pair<int, float>> v { { maskMix, 1000 }, { rel, 120 }, { freq, 6000 }, { vib, 140 }, { lfoSpeed, 4200 },
+        std::vector<std::pair<int, float>> v { { vol, 390 }, { maskMix, 1000 }, { rel, 120 }, { freq, 6000 }, { vib, 140 }, { lfoSpeed, 4200 },
                                                { chType, 9 }, { chMix, 500 }, { revType, 6 }, { revWet, 220 } };
         // odd harmonics stronger: a drawbar-like organ colour
         mask (v, { 1000, 250, 1000, 200, 800, 150, 700, 100, 500, 80, 400, 60 });
@@ -139,7 +139,7 @@ std::vector<Preset> harmlessBank()
                          { rel, 700 }, { revType, 4 }, { revWet, 450 }, { vol, 900 } }));
     b.push_back (make ("Grit Riser", "FX", { "riser", "gritty" },
                        { { grit, 600 }, { fEnv, 700 }, { fAtt, 700 }, { fDec, 1000 }, { freq, 1500 }, { res, 500 }, { att, 600 },
-                         { rel, 500 }, { uniOrder, 5 }, { uniPitch, 180 }, { revType, 4 }, { revWet, 400 }, { vol, 780 } }));
+                         { rel, 500 }, { uniOrder, 5 }, { uniPitch, 180 }, { revType, 4 }, { revWet, 400 }, { vol, 1400 } }));
     return b;
 }
 } // namespace lynx::banks
