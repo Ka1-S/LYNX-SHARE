@@ -115,3 +115,14 @@ TEST (speech168b_render_words_as_slices)
     CHECK (spellNumber (10) == "ten");
     CHECK (lynx::isSampleExtension (".SPEECH"));
 }
+
+#include "core/BrowserView.h"
+
+TEST (speech168b_browser_lists_speech)
+{
+    using namespace lynx::browserview;
+    CHECK (listed ("Default.speech", ContentFilter::all));
+    CHECK (listed ("Default.SPEECH", ContentFilter::audio));
+    CHECK (listed ("Default.speech", ContentFilter::samples));
+    CHECK (! listed ("Default.speech", ContentFilter::projects));
+}
