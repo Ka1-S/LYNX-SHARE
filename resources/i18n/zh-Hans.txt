@@ -3885,7 +3885,7 @@ countries: cn sg
 "Maximum polyphony (-- = no limit)" = "最大复音数（-- = 无限制）"
 "{0} beats" = "{0}拍"
 "Portamento: each note glides from the previous one's pitch (the Slide knob sets the time)" = "滑奏：每个音符从上一个音符的音高滑过来（滑音旋钮设置时间）"
-"Mono: one voice; a new note takes over the sounding one" = "单声部：一个发声；新音符接替正在发声的音符"
+"Mono: one voice; a note played over a held one glides to it (Slide time) without a new attack" = "单声部：一个发声；在按住的音符上弹奏的音符会滑向它（Slide 时间），不产生新的起音"
 "Cut: notes of this channel stop the channels cut by this group" = "切断：此通道的音符会停止被此组切断的通道"
 "By: this channel is cut by the channels of this group" = "被切断：此通道会被此组的通道切断"
 "Cut group" = "切断组"

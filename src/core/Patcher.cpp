@@ -1544,6 +1544,7 @@ public:
         graph.voicePropertyPort (port, key, prop, value, midiChannel);
     }
     int takePortEvents (PortEvent* out, int max) noexcept override { return graph.takeHostEvents (out, max); }
+    bool followsSlides() const noexcept override { return true; } // (round 168l: a Mono channel's notes)
     void slideTo (int key, float cents, float samples) noexcept override { graph.slideTo (key, cents, samples); }
     void setNextNoteExpression (float pan, float cents, bool porta) noexcept override { graph.setNextNoteExpression (pan, cents, porta); }
     void setNextNoteModulation (float modX, float modY) noexcept override { graph.setNextNoteModulation (modX, modY); }

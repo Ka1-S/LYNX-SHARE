@@ -14,6 +14,7 @@
 
 #include "core/Arpeggiator.h"
 #include "core/ChannelMiscFx.h"
+#include "core/ChannelPoly.h"
 #include "core/VoiceLimit.h"
 #include "core/Biquad.h"
 #include "core/Effects.h"
@@ -435,6 +436,10 @@ private:
     int publishedTop = 0;                                   // channels past it have nothing published
     void publishSoundingKeys (int channels) noexcept;
     std::array<VoiceOrder, maxChannels> voiceOrders {};      // sounding notes in order, for the channels' Max polyphony
+    // FL's channel Mono / Porta in front of every instrument (round 168l, core/ChannelPoly.h): one per channel (prepare)
+    std::vector<channelpoly::Layer> polyLayers;
+    channelpoly::Mode polyMode (const ChannelDef& c, const Instrument& instrument) const noexcept;
+    void clearPolyLayers() noexcept;
     static constexpr int chunkCapacity = 512;               // chunks processed at once
     std::vector<float> channelBuffers;                      // maxChannels * 2 * chunkCapacity
     std::vector<float> trackScratchBuffers;                 // maxMixerTracks * 2 * chunkCapacity

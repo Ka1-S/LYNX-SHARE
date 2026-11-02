@@ -3885,7 +3885,7 @@ countries: nl be
 "Maximum polyphony (-- = no limit)" = "Maximale polyfonie (-- = geen limiet)"
 "{0} beats" = "{0} tellen"
 "Portamento: each note glides from the previous one's pitch (the Slide knob sets the time)" = "Portamento: elke noot glijdt vanaf de toonhoogte van de vorige (de Slide-knop bepaalt de tijd)"
-"Mono: one voice; a new note takes over the sounding one" = "Mono: één voice; een nieuwe noot neemt de klinkende over"
+"Mono: one voice; a note played over a held one glides to it (Slide time) without a new attack" = "Mono: één voice; een noot gespeeld over een vastgehouden noot glijdt ernaartoe (Slide-tijd) zonder nieuwe aanslag"
 "Cut: notes of this channel stop the channels cut by this group" = "Cut: noten van dit kanaal stoppen de kanalen die door deze groep worden afgekapt"
 "By: this channel is cut by the channels of this group" = "Afgekapt door: dit kanaal wordt afgekapt door de kanalen van deze groep"
 "Cut group" = "Cut-groep"

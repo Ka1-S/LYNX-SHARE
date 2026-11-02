@@ -90,7 +90,7 @@ PlayedTiming playedTiming (const Note& note, float swing, const ChannelDef* c) n
         t.start += (std::int64_t) std::llround ((double) c->misc.shiftBeats * ppq);
     if (c->misc.gateBeats > 0.0f)
     {
-        const auto porta = (c->instrument == InstrumentKind::synth ? c->synth.porta : c->instrument == InstrumentKind::sampler && c->sampler.porta) != note.porta;
+        const auto porta = (c->instrument == InstrumentKind::synth ? c->synth.porta : c->instrument == InstrumentKind::sampler ? c->sampler.porta : c->misc.porta) != note.porta;
         if (! (porta && c->misc.fullPorta))
             t.length = std::min (t.length, std::max<std::int64_t> (1, (std::int64_t) std::llround ((double) c->misc.gateBeats * ppq)));
     }

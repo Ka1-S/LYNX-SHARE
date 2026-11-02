@@ -3499,7 +3499,7 @@ public:
         delete retired.exchange (nullptr);
         const auto b = bpm > 0.0 ? bpm : 120.0;
         channelCents.store (channel.sampler.pitch * 100.0f);
-        mono.store (channel.synth.mono);
+        mono.store (channel.maxPolyphony == 1); // FL tells the generator its Max polyphony, never the Mono box (round 168l: 0xf6f240 → 0xfed7c0)
         const bool render = offlineRendering();
         const std::lock_guard<std::mutex> lock (buildMutex);
         const bool sgChanged = autogun && channel.samplePath != loadedSgPath;
@@ -3554,6 +3554,7 @@ public:
             engine->followPitch (live.now());
     }
 
+    bool followsChannelPorta() const noexcept override { return true; } // (round 168l: HostSlide::anchor)
     void slideTo (int key, float cents, float samples) noexcept override
     {
         take();

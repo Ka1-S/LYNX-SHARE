@@ -3885,7 +3885,7 @@ countries: it ch sm
 "Maximum polyphony (-- = no limit)" = "Polifonia massima (-- = nessun limite)"
 "{0} beats" = "{0} beat"
 "Portamento: each note glides from the previous one's pitch (the Slide knob sets the time)" = "Portamento: ogni nota scivola dall'altezza della precedente (la manopola Slide imposta il tempo)"
-"Mono: one voice; a new note takes over the sounding one" = "Mono: una voce; una nuova nota sostituisce quella che suona"
+"Mono: one voice; a note played over a held one glides to it (Slide time) without a new attack" = "Mono: una voce; una nota suonata sopra una tenuta scivola fino a essa (tempo di Slide) senza un nuovo attacco"
 "Cut: notes of this channel stop the channels cut by this group" = "Cut: le note di questo canale fermano i canali tagliati da questo gruppo"
 "By: this channel is cut by the channels of this group" = "By: questo canale viene tagliato dai canali di questo gruppo"
 "Cut group" = "Gruppo"

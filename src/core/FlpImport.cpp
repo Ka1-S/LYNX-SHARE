@@ -986,6 +986,11 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             const auto ticks = std::round ((std::pow (27.0, std::clamp (c.slideTime, 0, 1660) / 1024.0) - 1.0) * 48.0 / 26.0);
             def.synth.portaBeats = def.sampler.portaBeats = (float) std::max (1.0, ticks) / 192.0f;
             def.synth.porta = def.sampler.porta = c.portaFlag;
+            // FL's channel layer plays Mono / Porta for every generator (round 168l): 0xDD's flags as they are (a Max of
+            // 1 is not Mono: FL's limiter releases the older voice, VoiceLimit.h)
+            def.misc.mono = c.monoFlag;
+            def.misc.porta = c.portaFlag;
+            def.misc.portaBeats = def.synth.portaBeats;
         }
 
         // the Misc tab (REA round 146b [EXEC: FL renders and saves]): time shift / gate, echo delay, tracking, main
