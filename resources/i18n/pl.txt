@@ -6302,3 +6302,8 @@ countries: pl
 "Snap on: {0}. [Backspace] turns it off" = "Przyciąganie włączone: {0}. [Backspace] je wyłącza"
 "Autodetect" = "Wykryj automatycznie"
 "Project tempo" = "Tempo projektu"
+"Add from state" = "Dodaj ze stanu"
+"Mixer presets" = "Presety miksera"
+"Mixer presets (FL)" = "Presety miksera (FL)"
+"This file is not a mixer track state LYNX SHARE can read." = "Ten plik nie jest stanem ścieżki miksera, który LYNX SHARE potrafi odczytać."
+"Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "Preset miksera: [2xLMB] wczytaj na zaznaczone ścieżki miksera  przeciągnij na ścieżkę miksera (na puste miejsce miksera: nowa ścieżka)"

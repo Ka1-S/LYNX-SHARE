@@ -6302,3 +6302,8 @@ countries: de at ch li lu
 "Snap on: {0}. [Backspace] turns it off" = "Einrasten an: {0}. [Backspace] schaltet es aus"
 "Autodetect" = "Automatisch erkennen"
 "Project tempo" = "Projekttempo"
+"Add from state" = "Aus Zustand hinzufügen"
+"Mixer presets" = "Mixer-Presets"
+"Mixer presets (FL)" = "Mixer-Presets (FL)"
+"This file is not a mixer track state LYNX SHARE can read." = "Diese Datei ist kein Mixer-Insert-Zustand, den LYNX SHARE lesen kann."
+"Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "Mixer-Preset: [2xLMB] auf die ausgewählten Mixer-Inserts laden  auf ein Mixer-Insert ziehen (auf die leere Mixerfläche: ein neues Insert)"

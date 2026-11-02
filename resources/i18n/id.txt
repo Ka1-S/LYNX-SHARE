@@ -6302,3 +6302,8 @@ countries: id
 "Snap on: {0}. [Backspace] turns it off" = "Snap nyala: {0}. [Backspace] mematikannya"
 "Autodetect" = "Deteksi otomatis"
 "Project tempo" = "Tempo proyek"
+"Add from state" = "Tambah dari state"
+"Mixer presets" = "Preset mixer"
+"Mixer presets (FL)" = "Preset mixer (FL)"
+"This file is not a mixer track state LYNX SHARE can read." = "File ini bukan state trek mixer yang dapat dibaca LYNX SHARE."
+"Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "Preset mixer: [2xLMB] muat ke trek mixer yang dipilih  seret ke trek mixer (ke ruang kosong mixer: trek baru)"

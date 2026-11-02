@@ -6302,3 +6302,8 @@ countries: jp
 "Snap on: {0}. [Backspace] turns it off" = "スナップオン: {0}。[Backspace] でオフ"
 "Autodetect" = "自動検出"
 "Project tempo" = "プロジェクトテンポ"
+"Add from state" = "状態から追加"
+"Mixer presets" = "ミキサープリセット"
+"Mixer presets (FL)" = "ミキサープリセット (FL)"
+"This file is not a mixer track state LYNX SHARE can read." = "このファイルは LYNX SHARE が読み込めるミキサートラックの状態ではありません。"
+"Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "ミキサープリセット: [2xLMB] 選択したミキサートラックに読み込む  ミキサートラックにドラッグ (ミキサーの空き領域へ: 新しいトラック)"
