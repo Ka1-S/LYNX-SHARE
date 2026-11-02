@@ -208,3 +208,31 @@ TEST (issue32_one_wheel_notch_moves_a_fader_one_fl_step)
     CHECK (std::abs (after - 0.82) < 1e-9);
     CHECK (std::abs (20.0 * std::log10 (lynx::faderGain ((float) after)) - 0.6) < 0.05); // FL's hint: "0.6dB"
 }
+
+TEST (issue32_fit_to_tempo_keeps_a_loop_in_time)
+{
+    // #7 "Fit to project tempo stretch sometimes out of tempo": main assumed 1, 2, 4, 8... beats, so a 3-bar loop came
+    // out 16 beats long and a loop with a tail was squeezed so its beats came early
+    using lynx::clipops::fitBeats;
+    const auto threeBars = 12.0 * 60.0 / 100.0; // 3 bars at 100 BPM in a 128 BPM project
+    CHECK (std::abs (fitBeats (threeBars, 128.0, 0.0f, 100.0) - 12.0f) < 1e-4f); // main: 16
+    const auto withTail = 16.0 * 60.0 / 90.0 + 0.3; // 4 bars at 90 BPM + a 0.3 s tail, at 100 BPM
+    CHECK (std::abs (fitBeats (withTail, 100.0, 0.0f, 90.0) - 16.45f) < 1e-3f); // main: 16 (the loop 2.7 % short)
+    CHECK (fitBeats (withTail, 100.0, 6.0f, 90.0) == 6.0f); // a WAV's ACID beats win ("embedded")
+    CHECK (std::abs (fitBeats (16.0 * 60.0 / 90.0, 140.0, 0.0f, 90.0) - 32.0f) < 1e-3f); // the octave nearest 140: 180 BPM
+    CHECK (fitBeats (2.4, 128.0) == 4.0f); // nothing known: a power of two, as before
+    const auto presets = lynx::clipops::timePresetBeats (4);
+    CHECK (presets == (std::vector<float> { 1.0f, 2.0f, 4.0f, 8.0f, 12.0f, 16.0f }));
+
+    // the whole path: a click loop of 3 bars at 100 BPM with a tail, detected (no ACID chunk)
+    lynx::SampleData s;
+    s.sampleRate = 44100.0;
+    const auto beatFrames = 44100.0 * 60.0 / 100.0;
+    s.left.assign ((std::size_t) (12 * beatFrames + 0.25 * 44100.0), 0.0f);
+    for (int b = 0; b < 12; ++b)
+        for (int i = 0; i < 600; ++i)
+            s.left[(std::size_t) (b * beatFrames) + (std::size_t) i] = (b % 4 == 0 ? 0.9f : 0.5f) * std::exp (-i / 120.0f) * (i % 20 < 10 ? 1.0f : -1.0f);
+    const auto got = lynx::tempodetect::fitBeatsOf (&s, 128.0);
+    const auto want = (float) ((double) s.left.size() / 44100.0 * 100.0 / 60.0); // 12.42 beats: the loop stays 12 beats long
+    CHECK (std::abs (got - want) < 0.05f);
+}

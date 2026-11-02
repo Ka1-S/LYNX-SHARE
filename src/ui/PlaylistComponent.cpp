@@ -4024,8 +4024,7 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
 
         // stretching the channel's file to a whole number of beats at the project tempo
         juce::PopupMenu fit;
-        const auto seconds = frames / juce::jmax (1.0, rate);
-        const auto beats = clipops::fitBeats (seconds, song.bpm);
+        const auto beats = tempodetect::fitBeatsOf (sample.get(), song.bpm);
         auto fitTo = [this, index, frames, rate] (float toBeats, bool keepPitch) {
             engine.editSong ([index, frames, rate, toBeats, keepPitch] (Song& s) {
                 const auto ch = s.playlist[(std::size_t) index].channel;
@@ -4042,7 +4041,8 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
         };
         if (beats > 0.0f)
         {
-            const auto label = juce::String (beats, 0) + " " + (beats == 1.0f ? tr ("beat") : tr ("beats"));
+            const auto whole = std::abs (beats - std::round (beats)) < 0.005f;
+            const auto label = juce::String (beats, whole ? 0 : 2) + " " + (beats == 1.0f ? tr ("beat") : tr ("beats"));
             fit.addItem (tr ("Fit to tempo, keep pitch ({0})", { label }), true, channel.sampler.stretchBeats == beats && channel.sampler.keepPitch,
                          [fitTo, beats] { fitTo (beats, true); });
             fit.addItem (tr ("Fit to tempo, resample ({0})", { label }), true, channel.sampler.stretchBeats == beats && ! channel.sampler.keepPitch,
@@ -4053,6 +4053,15 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
                          [fitTo, b = channel.sampler.stretchBeats, kp = channel.sampler.keepPitch] { fitTo (juce::jmin (1024.0f, b * 2.0f), kp); });
             fit.addSeparator();
         }
+        // FL's TIME presets (r168s c_f20): the whole file lasts exactly this long
+        for (const auto preset : clipops::timePresetBeats (song.beatsPerBar))
+        {
+            const auto bars = song.beatsPerBar > 0 && preset >= (float) song.beatsPerBar ? preset / (float) song.beatsPerBar : 0.0f;
+            const auto label = bars > 0.0f ? (bars == 1.0f ? tr ("1 bar") : tr ("{0} bars", { juce::String (bars, 0) }))
+                                           : (preset == 1.0f ? tr ("1 beat") : tr ("{0} beats", { juce::String (preset, 0) }));
+            fit.addItem (label, true, channel.sampler.stretchBeats == preset, [fitTo, preset, kp = channel.sampler.keepPitch] { fitTo (preset, kp); });
+        }
+        fit.addSeparator();
         fit.addItem (tr ("Original speed (no stretch)"), true, channel.sampler.stretchBeats <= 0.0f, [fitTo, kp = channel.sampler.keepPitch] { fitTo (0.0f, kp); });
         menu.addSubMenu (tr ("Fit to tempo"), fit, sample != nullptr);
 
@@ -4061,7 +4070,7 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
         {
             juce::PopupMenu detect;
             struct Range { double low, high; };
-            for (const auto r : { Range { 70.0, 140.0 }, Range { 90.0, 180.0 }, Range { 60.0, 200.0 } })
+            for (const auto r : { Range { 50.0, 100.0 }, Range { 75.0, 150.0 }, Range { 100.0, 200.0 }, Range { 150.0, 300.0 } }) // FL's ranges (r168s)
                 detect.addItem (tr ("{0}-{1} BPM", { juce::String (r.low, 0), juce::String (r.high, 0) }), [this, sample, fitTo, r] {
                     if (sample == nullptr)
                         return;
@@ -4087,7 +4096,7 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
                     window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
                     window->enterModalState (true, juce::ModalCallbackFunction::create ([this, found, fitTo] (int result) {
                                                  if (result == 1)
-                                                     fitTo ((float) (std::round (found.beats * 4.0) / 4.0), true);
+                                                     fitTo ((float) found.beats, true); // exact (issue #32 #7: was rounded to 1/4 beat)
                                                  else if (result == 2 || result == 3)
                                                  {
                                                      const auto bpm = juce::jlimit (minTempo, maxTempo, result == 3 ? std::round (found.bpm) : found.bpm);
