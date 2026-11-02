@@ -8,8 +8,8 @@ for now. Landed with his two commits unchanged and ours on top, after the lightn
 ## Where I stopped
 
 - Done: review, FL REA, fixes, measurements and the Windows GUI session (§4); merged origin/main (ee1c8b8e, i18n
-  tables regenerated). Release workflow dispatched on wip/pr31-review (run 41461808932; GitHub's queue was stuck
-  at the time). Next: land with land.sh (feature/pr31), reply drafts in coord/replies-0.1.22.md.
+  tables regenerated). Release workflow on wip/pr31-review (run 41461808932, aa07837f): all
+  green (exe, self-test, zip, NSIS, MSIX installed with -DependencyPath VCLibs and self-tested, AppImage, dmg). Next: land with land.sh (feature/pr31), reply drafts in coord/replies-0.1.22.md.
 
 ## 1. What FL 2026 does (FLEngine_x64.dll of FL 2026, md5 fce4ea55…, clean-room: behaviour only)
 
@@ -140,4 +140,7 @@ Lightness audit (requirement of the user):
   - the main window's close button does nothing while the progress window is up (JUCE ignores closing a window
     blocked by a modal component; the PR's ThreadWithProgressWindow was modal too): Cancel first. The test process
     was ended by its PID.
+- Release workflow (workflow_dispatch on wip/pr31-review, run 41461808932 at aa07837f): every job green. The
+  ONNX Runtime archives passed their SHA-256 on all three runners, onnxruntime.dll is in the zip, the installer and
+  both MSIX layouts, and the test MSIX installed with Microsoft.VCLibs as its dependency and passed the self-test.
 
