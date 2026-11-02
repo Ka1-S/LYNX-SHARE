@@ -81,6 +81,7 @@ void drumpadVoice (std::vector<LayoutItem>& v, float dx, float dy)
     sec (494, 58, TR_NOOP ("High"));
     sec (556, 60, TR_NOOP ("Output"));
     sec (618, 140, TR_NOOP ("Velocity"));
+    v.push_back (section (dx + 260, dy + 171, 54, 47, nullptr, boxed)); // (FL: the membrane's last knob sits under LOW)
     v.push_back (toggle (dx + 97, dy + 166, 34, 20, "Mallet retrig", TR_NOOP ("Retrig")));
     v.push_back (knob (dx + 62, dy + 78, 30, "Mallet amp", TR_NOOP ("Amp"), dy + 100));
     v.push_back (knob (dx + 114, dy + 78, 30, "Mallet decay", TR_NOOP ("Decay"), dy + 100));
@@ -119,7 +120,6 @@ void drumpadVoice (std::vector<LayoutItem>& v, float dx, float dy)
     v.push_back (knob (dx + 586, dy + 77, 32, "Hold", TR_NOOP ("Hold"), dy + 100));
     v.push_back (knob (dx + 586, dy + 127, 32, "Lo-fi", TR_NOOP ("Lo-fi"), dy + 150));
     v.push_back (knob (dx + 587, dy + 178, 32, "Pitch", TR_NOOP ("Pitch"), dy + 201, bipolar));
-    v.push_back (label (dx + 266, dy + 168, 44, 12, TR_NOOP ("Shape"), dim)); // (the membrane's last knob sits under LOW)
 }
 
 Layout drumpad()
@@ -176,8 +176,8 @@ Layout drumaxx()
         v.push_back (onPage (toggle (x + 102, y + 52, 26, 18, names[pad][3], "S", boxed), page));
     }
     drumpadVoice (v, -16, 255);
-    v.push_back (section (14, 456, 744, 88, TR_NOOP ("Sequencer")));
-    v.push_back (label (24, 486, 724, 40, TR_NOOP ("Drumaxx's pattern sequencer is not played by LYNX: play the pads from the Piano roll or the Channel rack"), dim));
+    v.push_back (section (14, 478, 744, 66, TR_NOOP ("Sequencer")));
+    v.push_back (label (24, 498, 724, 40, TR_NOOP ("Drumaxx's pattern sequencer is not played by LYNX: play the pads from the Piano roll or the Channel rack"), dim));
     v.push_back (section (14, 548, 468, 64, TR_NOOP ("Equalizer")));
     v.push_back (section (488, 548, 270, 64, TR_NOOP ("Master")));
     v.push_back (knob (52, 576, 32, "EQ band 1", "63", 599, bipolar));
@@ -311,8 +311,8 @@ Layout sakura()
     v.push_back (section (560, 6, 290, 70, nullptr, boxed));
     v.push_back (knob (713, 34, 36, "Master", TR_NOOP ("Master"), 64));
     v.push_back (section (6, 92, 66, 254, TR_NOOP ("Exciter")));
-    v.push_back (section (76, 92, 126, 254, TR_NOOP ("Hi-cut")));
-    v.push_back (label (80, 279, 118, 10, TR_NOOP ("Lo-cut"), dim));
+    v.push_back (section (76, 92, 126, 176, TR_NOOP ("Hi-cut")));
+    v.push_back (section (76, 274, 126, 72, TR_NOOP ("Lo-cut")));
     v.push_back (section (206, 92, 278, 122, TR_NOOP ("String 1")));
     v.push_back (section (206, 224, 278, 122, TR_NOOP ("String 2")));
     v.push_back (section (488, 92, 64, 254, TR_NOOP ("Comb")));
@@ -325,22 +325,22 @@ Layout sakura()
     v.push_back (section (652, 452, 198, 76, TR_NOOP ("Reverb")));
     v.push_back (label (12, 270, 54, 10, TR_NOOP ("Noise"), dim));
     v.push_back (label (560, 268, 54, 10, TR_NOOP ("Stereo"), dim));
-    v.push_back (label (369, 196, 106, 10, TR_NOOP ("Comb ratio"), dim));
+    v.push_back (label (369, 184, 106, 10, TR_NOOP ("Comb ratio"), dim));
     v.push_back (knob (648.5, 128.5, 45, "Amp attack", TR_NOOP ("Attack"), 158));
     v.push_back (knob (588.5, 128.5, 45, "String mix", TR_NOOP ("Mix"), 158, bipolar));
-    v.push_back (knob (168.5, 128.5, 45, "Hi-cut attack", TR_NOOP ("Attack"), 158));
+    v.push_back (knob (168.5, 124, 40, "Hi-cut attack", TR_NOOP ("Attack"), 148));
     v.push_back (knob (648.5, 188.5, 45, "Amp decay", TR_NOOP ("Decay"), 218));
-    v.push_back (knob (108.5, 128.5, 45, "Hi-cut", TR_NOOP ("Cutoff"), 158));
-    v.push_back (knob (108.5, 188.5, 45, "Hi-cut res", TR_NOOP ("Res"), 218));
-    v.push_back (knob (168.5, 188.5, 45, "Hi-cut decay", TR_NOOP ("Decay"), 218));
+    v.push_back (knob (108.5, 124, 40, "Hi-cut", TR_NOOP ("Cutoff"), 148));
+    v.push_back (knob (108.5, 176, 40, "Hi-cut res", TR_NOOP ("Res"), 200));
+    v.push_back (knob (168.5, 176, 40, "Hi-cut decay", TR_NOOP ("Decay"), 200));
     v.push_back (knob (713, 148, 20, "Res 2 feedback", nullptr, 0, noCaption));
     v.push_back (knob (713, 176, 20, "Res 3 feedback", nullptr, 0, noCaption));
     v.push_back (knob (713, 204, 20, "Res 4 feedback", nullptr, 0, noCaption));
-    v.push_back (knob (108.5, 248.5, 45, "Hi-cut drive", TR_NOOP ("Drive"), 278));
-    v.push_back (knob (168.5, 248.5, 45, "Hi-cut sustain", TR_NOOP ("Sustain"), 278));
-    v.push_back (knob (108.5, 308.5, 45, "Lo-cut", TR_NOOP ("Cutoff"), 338));
+    v.push_back (knob (108.5, 228, 40, "Hi-cut drive", TR_NOOP ("Drive"), 252));
+    v.push_back (knob (168.5, 228, 40, "Hi-cut sustain", TR_NOOP ("Sustain"), 252));
+    v.push_back (knob (108.5, 306, 40, "Lo-cut", TR_NOOP ("Cutoff"), 330));
     v.push_back (knob (648.5, 248.5, 45, "Amp sustain", TR_NOOP ("Sustain"), 278));
-    v.push_back (knob (168.5, 308.5, 45, "Lo-cut res", TR_NOOP ("Res"), 338));
+    v.push_back (knob (168.5, 306, 40, "Lo-cut res", TR_NOOP ("Res"), 330));
     v.push_back (knob (648.5, 308.5, 45, "Amp release", TR_NOOP ("Release"), 338));
     v.push_back (knob (713, 260, 20, "Res 6 feedback", nullptr, 0, noCaption));
     v.push_back (knob (713, 234, 20, "Res 5 feedback", nullptr, 0, noCaption));
@@ -378,21 +378,23 @@ Layout sakura()
     v.push_back (toggle (652, 397, 22, 14, "Mod 6 negative", nullptr));
     v.push_back (toggle (725, 397, 22, 14, "Mod 7 negative", nullptr));
     v.push_back (knob (48.5, 487.5, 47, "Delay time", TR_NOOP ("Time"), 518));
-    v.push_back (stepper (89, 485, 33, 17, "Delay sync", TR_NOOP ("Sync"), 10));
+    // tempo sync: off, then delay = 1/32 … 2 bars (PhysicalModels.cpp SakuraDelay: t = 0.5 / (bpm · ratio))
+    v.push_back (menuOf (78, 488, 62, 18, "Delay sync", nullptr, "Off|1/32|1/16|1/16.|1/8|1/4|1/4.|1/2|1 bar|2 bars"));
+    v.push_back (label (78, 508, 62, 10, TR_NOOP ("Sync"), dim));
     v.push_back (knob (227.5, 487.5, 47, "Delay speed", TR_NOOP ("Speed"), 518));
     v.push_back (knob (167.5, 487.5, 47, "Delay feedback", TR_NOOP ("Feedback"), 518));
     v.push_back (knob (347.5, 487.5, 47, "Delay blur", TR_NOOP ("Blur"), 518));
     v.push_back (knob (287.5, 487.5, 47, "Delay depth", TR_NOOP ("Depth"), 518));
-    v.push_back (knob (487.5, 487.5, 47, "Chorus depth", TR_NOOP ("Depth"), 518));
+    v.push_back (knob (474, 487.5, 47, "Chorus depth", TR_NOOP ("Depth"), 518));
     v.push_back (knob (407.5, 487.5, 47, "Delay wet", TR_NOOP ("Wet"), 518));
-    v.push_back (knob (608.5, 487.5, 47, "Chorus wet", TR_NOOP ("Wet"), 518));
-    v.push_back (knob (547.5, 487.5, 47, "Chorus rate", TR_NOOP ("Rate"), 518));
-    v.push_back (knob (686.5, 487.5, 47, "Reverb decay", TR_NOOP ("Decay"), 518));
-    v.push_back (knob (808.5, 487.5, 47, "Reverb mix", TR_NOOP ("Mix"), 518));
-    v.push_back (knob (747.5, 487.5, 47, "Reverb color", TR_NOOP ("Color"), 518));
-    v.push_back (toggle (427, 508, 18, 18, "Delay on", TR_NOOP ("Delay")));
-    v.push_back (toggle (627, 508, 18, 18, "Chorus on", TR_NOOP ("Chorus")));
-    v.push_back (toggle (827, 508, 18, 18, "Reverb on", TR_NOOP ("Reverb")));
+    v.push_back (knob (582, 487.5, 47, "Chorus wet", TR_NOOP ("Wet"), 518));
+    v.push_back (knob (528, 487.5, 47, "Chorus rate", TR_NOOP ("Rate"), 518));
+    v.push_back (knob (680, 487.5, 47, "Reverb decay", TR_NOOP ("Decay"), 518));
+    v.push_back (knob (788, 487.5, 47, "Reverb mix", TR_NOOP ("Mix"), 518));
+    v.push_back (knob (734, 487.5, 47, "Reverb color", TR_NOOP ("Color"), 518));
+    v.push_back (toggle (86, 464, 46, 16, "Delay on", TR_NOOP ("On"), boxed));
+    v.push_back (toggle (610, 470, 34, 16, "Chorus on", TR_NOOP ("On"), boxed));
+    v.push_back (toggle (812, 470, 34, 16, "Reverb on", TR_NOOP ("On"), boxed));
     v.push_back (toggle (830, 111, 18, 18, "Res 1 on", nullptr));
     v.push_back (toggle (830, 139, 18, 18, "Res 2 on", nullptr));
     v.push_back (toggle (830, 167, 18, 18, "Res 3 on", nullptr));
@@ -416,8 +418,9 @@ Layout sakura()
     v.push_back (toggle (228, 250, 30, 15, "Str2 decay inv", TR_NOOP ("Inv")));
     v.push_back (toggle (494, 167, 30, 15, "Comb level inv", TR_NOOP ("Inv")));
     v.push_back (toggle (494, 250, 30, 15, "Comb feedback inv", TR_NOOP ("Inv")));
-    v.push_back (stepper (226, 215, 33, 17, "Str2 ratio", TR_NOOP ("Ratio"), 7));
-    v.push_back (slider (Item::hslider, 369, 209, 106, 20, "Comb ratio", TR_NOOP ("Comb ratio"), noCaption));
+    v.push_back (label (214, 192, 36, 18, TR_NOOP ("Ratio"), dim));
+    v.push_back (menuOf (250, 192, 54, 18, "Str2 ratio", nullptr, "4x|3x|2x|1x|1/2x|1/3x|1/4x")); // string 2 pitch = this x string 1 (REA_rodada28 §1.3)
+    v.push_back (slider (Item::hslider, 369, 196, 106, 16, "Comb ratio", TR_NOOP ("Comb ratio"), noCaption));
     v.push_back (knob (303, 128, 38, "Str1 damp", TR_NOOP ("Damp"), 154));
     v.push_back (knob (303, 308, 38, "Str2 damp", TR_NOOP ("Damp"), 334));
     v.push_back (knob (780.5, 404.5, 33, "Mod 8 amount", nullptr, 0, noCaption));
