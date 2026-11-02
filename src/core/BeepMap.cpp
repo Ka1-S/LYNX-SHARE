@@ -787,6 +787,50 @@ std::optional<std::vector<int>> beepMapParams (const std::vector<std::uint8_t>& 
     return std::vector<int> (p.P.begin(), p.P.end());
 }
 
+namespace
+{
+// where the bitmap stream (int32 size + BMP) starts in a state of version 0 / 1, or 0
+std::size_t bitmapAt (const std::vector<std::uint8_t>& d)
+{
+    if (d.size() < 4)
+        return 0;
+    const auto version = i32At (d.data());
+    if (version < 0 || version > 1)
+        return 0;
+    const std::size_t at = 4 + (version == 0 ? 0x3c : 0x1a8);
+    return d.size() >= at + 4 ? at : 0;
+}
+} // namespace
+
+std::optional<BeepMapPicture> beepMapPicture (const std::vector<std::uint8_t>& state)
+{
+    const auto at = bitmapAt (state);
+    if (at == 0)
+        return std::nullopt;
+    const auto len = i32At (state.data() + at);
+    Image img;
+    if (len <= 0 || (std::size_t) len > state.size() - at - 4 || ! decodeBmp (state.data() + at + 4, (std::size_t) len, img))
+        return std::nullopt;
+    BeepMapPicture p;
+    p.width = img.width, p.height = img.height, p.bgr = std::move (img.bgr);
+    return p;
+}
+
+std::vector<std::uint8_t> beepMapWithBitmap (const std::vector<std::uint8_t>& state, const std::vector<std::uint8_t>& bmp)
+{
+    const auto at = bitmapAt (state);
+    Image img;
+    if (at == 0 || bmp.size() > (std::size_t) 0x7fffffff || ! decodeBmp (bmp.data(), bmp.size(), img) || img.height <= 2)
+        return {};
+    std::vector<std::uint8_t> out (state.begin(), state.begin() + (std::ptrdiff_t) at);
+    const auto len = (std::int32_t) bmp.size();
+    std::uint8_t b[4];
+    std::memcpy (b, &len, 4);
+    out.insert (out.end(), b, b + 4);
+    out.insert (out.end(), bmp.begin(), bmp.end());
+    return beepMapStateUsable (out) ? out : std::vector<std::uint8_t> {};
+}
+
 int beepMapParamOffset (const std::vector<std::uint8_t>& state, int index)
 {
     Params p;

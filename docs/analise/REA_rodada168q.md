@@ -81,7 +81,8 @@ channel state only: they re-shape the bitmap / re-slice the sample).
   Flute Stop, Reed Organ, Click Organ), Lead (Additive Saw / Square), Bass (Sub Bass, Pluck Bass), Keys (Music Box,
   Tubular Bell, Glass Keys), Pad (Breathing Pad, Beating Choir), Arp (Major Arp, Minor Arp), Chord (Minor Stab, Seventh
   Pad), FX (Rising Sweep, Grain Sparkle). Each column is scaled so its levels sum to at most 0.55 (the oscillators'
-  worst case in phase): no preset clips on its own.
+  worst case in phase): no preset clips on its own. Probe (one held note, 44.1 kHz, keys 36 / 60 / 84): peaks
+  0.09…0.38, RMS 0.012 (the short plucks and bells over 3 s) … 0.125; every state usable.
 - **Fruity Granulizer** (core/GranulizerBank.cpp, 12 presets): settings over the channel's own sample (Init Grains,
   Smooth Stretch, Half Time, Double Time, Frozen Pad, Shimmer Cloud, Tape Wobble, Backwards, Stutter Glitch, Grain
   Spray, Key Scrub, Slice Player); every preset starts from the plugin's defaults and keeps the channel snapshot.
@@ -102,7 +103,7 @@ and a three-note chord).
   banks; tests file (not yet in tests.cpp).
 - **Waiting**: round 168n's infrastructure (EngineParams.h, ModelParams.*, LynxBanks.*, ModelPanel tabs / menus / values)
   must land on main first. Until then the new files compile against copies of its headers in the scratchpad
-  (`syn.sh`).
+  (`<scratchpad>/q168q/syn.sh`; the scratchpad is shared with other rounds — use only the q168q folder).
 - **Next**: after 168n lands — merge origin/main; register `LYNX_MODEL_PARAMS` lines (kepler, keplerExo, transistorbass,
   sawer, beepmap, granulizer) and `LYNX_BANK` lines (beepmap, granulizer); include the engine headers in ModelParams.cpp;
   `instrumentLayout()` cases in PluginLayout.cpp; add EngineLayouts.cpp, BeepMapBank.cpp, GranulizerBank.cpp to
@@ -110,5 +111,5 @@ and a three-note chord).
   beepmapfile, granulizerwave, granulizergrains, tbsequence, tbprogram) and the "needs FL Studio's files" banner;
   `#include "Design168qTests.inc"` in tests/tests.cpp; i18n of the new TR_NOOP strings in 15 languages; Windows shots
   before / after in /mnt/e/lynx-work/design168q/.
-- **Commands**: syntax check `BUILDSLOT_SHORT=1 coord/buildslot.sh <scratchpad>/syn.sh <files>`; bank probe
-  `<scratchpad>/probe/build.sh`.
+- **Commands**: syntax check `BUILDSLOT_SHORT=1 coord/buildslot.sh <scratchpad>/q168q/syn.sh <files>`; bank probe
+  `<scratchpad>/q168q/probe/build.sh`.

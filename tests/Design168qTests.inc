@@ -186,6 +186,16 @@ TEST (design168q_model_params_read_and_write_the_state)
     CHECK (modelparams::setValue01 (b, 2, 0.5f) && (*beepMapParams (b.pluginState))[2] == 1);
     CHECK (! modelparams::setValue01 (b, 9, 0.5f)); // (settings 7…13 are unused: not listed)
     CHECK (beepMapStateUsable (b.pluginState));
+    // the bitmap: shown by the page, replaced by Open / Paste (the settings stay)
+    const auto pic = beepMapPicture (b.pluginState);
+    CHECK (pic && pic->width == 1 && pic->height == 32 && pic->bgr.size() == 96);
+    ChannelDef saw;
+    beeps[6].apply (saw); // "Additive Saw": 64 rows
+    const std::vector<std::uint8_t> bmp (saw.pluginState.begin() + 4 + 0x3c + 4, saw.pluginState.end());
+    const auto swapped = beepMapWithBitmap (b.pluginState, bmp);
+    CHECK (beepMapStateUsable (swapped) && beepMapPicture (swapped)->height == 64);
+    CHECK ((*beepMapParams (swapped))[1] == 2048 && (*beepMapParams (swapped))[5] == 0);
+    CHECK (beepMapWithBitmap (b.pluginState, { 'B', 'M', 0, 0 }).empty());
 
     // Granulizer: the knobs and the modes
     ChannelDef g;
