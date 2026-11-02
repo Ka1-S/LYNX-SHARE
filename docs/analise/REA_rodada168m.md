@@ -81,6 +81,27 @@ Beat state of FL's demo projects is read, written and read again with the same s
 The running effect takes an edit in place (`acceptState` → `Engine::update`, no allocation on the audio thread; each
 slot keeps room for 512 points, more = the effect is rebuilt).
 
+## 4b. Design and a richer factory bank (user's follow-up: "está sem nenhum design, tem que fazer uns presets legais")
+
+FL's layout is the reference (two 4 × 9 slot grids on the left, the envelope on the right with its tool column and the
+slot bar), drawn in LYNX's own style:
+
+- **Slot grids** (`gbtimegrid`, `gbvolumegrid`, replacing the plain "Slot 1…36" radio lists): each cell shows the slot's
+  name over a filled thumbnail of its envelope (time in the plugin's accent, volume in the info blue — FL also tells
+  the two kinds apart by colour, `$A8FF70` / `$FFB870`); empty slots show only their number. Left-click selects (FL),
+  right-click opens the slot's menu (copy, paste, flip, reset, rename, **Factory slots ▸**).
+- **Tab bar** over the envelope (`gbtabs`): TIME / VOLUME tabs, the selected slot's number and name, and a **Factory
+  slots ▾** browser that puts one of LYNX SHARE's slots into the selected slot (LYNX-own: FL browses its slot presets
+  from the Options menu).
+- **Envelope**: gradient fill, a soft glow under the line, beat numbers along the top, the level scale on the left
+  (time: now / 1 bar back / 2 bars back; volume: 100 / 50 / 0 %).
+
+Factory bank grown to **25 time + 30 volume slots** (clean-room shapes, written as steps and lines in `factoryState`):
+new time slots Vinyl brake (the last two beats slow to a stop), Spin back (the last beat rewinds at 3× speed), Tape
+start, Repeat 3-3-2, Lo-fi wobble (a slight slow pitch wobble), Stutter into reverse, Triplet roll, Half speed last
+beat; new volume slots Sidechain hard / soft / 1/2 beat, Gate 3-3-2, Reverse swell, Half-bar swell, Mute last beat,
+Stutter gate 1/16. **29 factory presets** (Time / Volume / Both, e.g. Lo-fi tape, Trap stutter, Spin back pump).
+
 ## 5. Tests
 
 `tests/GrossBeat168mTests.inc`: the video's two cases first (a new instance sounds with its factory slots; a right-click
@@ -90,7 +111,9 @@ in-place edit, presets with the bank.
 ## Where I stopped
 
 - Done: REA (§1–§4), core (writer, defaults, factory bank, editing API, in-place update), presets with state, editor UI
-  (tool column, envelope gestures, slot bar), tests written.
-- In progress: build-local + Linux/Windows GUI build, then the Windows GUI check of the video's flow.
-- Next: 15-language strings, notes-0.1.22, land.
-- Rerun: `~/.claude/jobs/f8789b49/tmp/coord/bl-wt.sh gross168m` (log tmp/coord/bl-gross168m.log).
+  (tool column, envelope gestures, slot bar), designed grids / tabs / envelope (§4b), tests, 15-language strings.
+- In progress: build-local + Windows build, then the Windows GUI check of the video's flow with before/after shots
+  (before: /mnt/e/lynx-work/gross168m/before/plugui/Gross Beat.png).
+- Next: notes-0.1.22 (done, update if the design changes), land.
+- Rerun: `~/.claude/jobs/f8789b49/tmp/coord/bl-wt.sh gross168m` (log tmp/coord/bl-gross168m.log); Windows:
+  `OUT=build-win JOBS=3 coord/winbuild.sh scripts/build-windows-zig.sh`.
