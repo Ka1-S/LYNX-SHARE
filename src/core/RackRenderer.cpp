@@ -1930,7 +1930,8 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                 const auto mode = polyMode (c, instrument);
                 const auto glideSamples = (float) (channelpoly::glideBeats (mode.portaBeats) * ppq / std::max (1.0e-9, chunkTps));
                 auto& poly = polyLayers[(std::size_t) i];
-                const auto on = poly.noteOn (mode, e.key, noteCents, e.porta, e.colour);
+                // (an echo delay's repeats are FL's generated voices: they don't enter the Mono list)
+                const auto on = e.echo ? channelpoly::On {} : poly.noteOn (mode, e.key, noteCents, e.porta, e.colour);
                 if (on.release >= 0)
                 {
                     instrument.noteOff (on.release);
@@ -1989,7 +1990,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
             instrument.setNextNoteRelease (e.release);
             // a Mono channel (round 168l): the voice ends with the last held note, else it glides back to the newest
             const auto mode = polyMode (c, instrument);
-            const auto off = polyLayers[(std::size_t) i].noteOff (mode, e.key, e.colour);
+            const auto off = e.echo ? channelpoly::Off { e.key } : polyLayers[(std::size_t) i].noteOff (mode, e.key, e.colour);
             if (off.slide)
                 instrument.slideTo (off.key, off.cents,
                                     (float) (channelpoly::glideBeats (mode.portaBeats) * ppq / std::max (1.0e-9, chunkTps)));
