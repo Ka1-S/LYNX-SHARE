@@ -2216,6 +2216,31 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     publishSong();
 }
 
+void AudioEngine::editSongStructural (const std::function<void (Song&)>& edit)
+{
+    capturePluginStates();
+
+    // a plugin is kept when the same plugin sat in the same place; for duplicates that would keep the old order
+    std::map<std::string, int> uses;
+    for (const auto& c : lastPublishedShape.song.channels)
+        if (c.instrument == InstrumentKind::plugin && ! c.plugin.id.empty())
+            ++uses[c.plugin.id];
+    for (const auto& track : lastPublishedShape.song.mixer)
+        for (const auto& slot : track.effects)
+            if (slot.kind == EffectKind::plugin && ! slot.plugin.id.empty())
+                ++uses[slot.plugin.id];
+
+    for (auto& c : lastPublishedShape.song.channels)
+        if (c.instrument == InstrumentKind::plugin && uses[c.plugin.id] > 1)
+            c.plugin.id.clear();
+    for (auto& track : lastPublishedShape.song.mixer)
+        for (auto& slot : track.effects)
+            if (slot.kind == EffectKind::plugin && uses[slot.plugin.id] > 1)
+                slot.plugin.id.clear();
+
+    editSong (edit);
+}
+
 void AudioEngine::undo()
 {
     if (undoStack.empty())

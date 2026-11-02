@@ -1246,7 +1246,7 @@ bool MixerStrips::moveSelected (int delta)
 {
     auto moved = selection;
     bool ok = false;
-    engine.editSong ([&] (Song& s) { ok = mixerops::moveTracks (s, moved, delta); });
+    engine.editSongStructural ([&] (Song& s) { ok = mixerops::moveTracks (s, moved, delta); });
 
     if (ok)
         setSelection (moved, juce::jlimit (1, (int) engine.getSong().mixer.size() - 1, selected + (delta < 0 ? -1 : 1)));
@@ -4072,7 +4072,7 @@ void EffectsPanel::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseW
     {
         const auto to = slot + ((wheel.deltaY != 0.0f ? wheel.deltaY : -wheel.deltaX) > 0.0f ? -1 : 1);
         bool moved = false;
-        engine.editSong ([t = track, slot, to, &moved] (Song& song) { moved = mixerops::moveEffectSlot (song, t, slot, to); });
+        engine.editSongStructural ([t = track, slot, to, &moved] (Song& song) { moved = mixerops::moveEffectSlot (song, t, slot, to); });
         if (moved)
             selectedSlot = to;
         repaint();
@@ -4322,7 +4322,7 @@ void EffectsPanel::mouseUp (const juce::MouseEvent&)
     if (dragSlot >= 0 && dropSlot >= 0 && dropSlot != dragSlot)
     {
         bool moved = false;
-        engine.editSong ([t = track, from = dragSlot, to = dropSlot, &moved] (Song& song) { moved = mixerops::moveEffectSlot (song, t, from, to); });
+        engine.editSongStructural ([t = track, from = dragSlot, to = dropSlot, &moved] (Song& song) { moved = mixerops::moveEffectSlot (song, t, from, to); });
         if (moved)
             selectedSlot = dropSlot;
     }
@@ -4799,11 +4799,11 @@ void EffectsPanel::showSlotMenu (int slot)
     });
     menu.addSeparator();
     menu.addItem (tr ("Move up"), slot > 0, false, [this, slot] {
-        engine.editSong ([t = track, slot] (Song& song) { song.swapEffectSlots (t, slot, slot - 1); });
+        engine.editSongStructural ([t = track, slot] (Song& song) { song.swapEffectSlots (t, slot, slot - 1); });
         selectedSlot = slot - 1;
     });
     menu.addItem (tr ("Move down"), slot < count - 1, false, [this, slot] {
-        engine.editSong ([t = track, slot] (Song& song) { song.swapEffectSlots (t, slot, slot + 1); });
+        engine.editSongStructural ([t = track, slot] (Song& song) { song.swapEffectSlots (t, slot, slot + 1); });
         selectedSlot = slot + 1;
     });
     if ((*slots())[(std::size_t) slot].kind == EffectKind::plugin)
@@ -4861,7 +4861,7 @@ void EffectsPanel::deleteSlot (int slot)
     const auto* s = slots();
     if (s == nullptr || slot < 0 || slot >= (int) s->size())
         return;
-    engine.editSong ([t = track, slot] (Song& song) { song.removeEffectSlot (t, slot); });
+    engine.editSongStructural ([t = track, slot] (Song& song) { song.removeEffectSlot (t, slot); });
     selectedSlot = juce::jmin (slot, (int) slots()->size() - 1);
     repaint();
 }

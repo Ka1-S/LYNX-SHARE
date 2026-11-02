@@ -434,6 +434,12 @@ public:
     // (dragging a note, turning a knob) become a single step.
     void editSong (const std::function<void (Song&)>& edit, bool undoable = true);
 
+    // For an edit that moves or removes channels, mixer tracks or effect slots (issue #32): hosted plugins are reused
+    // by position, so the ones that end up elsewhere are built again from the Song's saved state. That state is only
+    // refreshed on save, so the live settings are copied in first (or a moved plugin came back with its parameters
+    // reset), and two instances of one plugin are never kept in each other's place.
+    void editSongStructural (const std::function<void (Song&)>& edit);
+
     // Changes since the last save/open (for the "*" in the title and the "save changes?" prompt).
     bool isModified() const noexcept { return modified; }
     void markSaved() noexcept { modified = false; sendChangeMessage(); }
