@@ -294,3 +294,10 @@ TEST (gb168_factory_slots_are_named_distinct_and_used_by_presets)
     const auto ducked = renderGrossBeat (gb168Slot (0, duck, lynx::grossbeat::factoryContainer()), std::vector<float> (100000, 1.0f), 48000.0, 120.0);
     CHECK (ducked[15 + 24000 + 50] < 0.3f && ducked[15 + 24000 + 20000] > 0.95f);
 }
+
+// with FL installed, FL's own Gross Beat presets are listed beside LYNX SHARE's (the preset menu asks flPluginsForEffect)
+TEST (gb168_fl_presets_are_listed)
+{
+    CHECK (lynx::flPluginsForEffect (lynx::EffectKind::grossBeat) == std::vector<std::string> { "Gross Beat" });
+    CHECK (lynx::effectForFlPlugin ("Gross Beat") == lynx::EffectKind::grossBeat);
+}

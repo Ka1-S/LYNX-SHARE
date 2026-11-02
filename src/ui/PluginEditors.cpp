@@ -308,7 +308,8 @@ public:
                                                                     || juce::String (item.display) == "pitchring" || juce::String (item.display) == "waveshaper"
                                                                     || juce::String (item.display) == "tssenvelope" || juce::String (item.display) == "tsssend0"
                                                                     || juce::String (item.display) == "tsssend1"
-                                                                    || isBars (item) || isRhythmEdit (item) || isRhythmPatterns (item)))
+                                                                    || isBars (item) || isRhythmEdit (item) || isRhythmPatterns (item)
+                                                                    || isGbAny (item))) // round 168m: Gross Beat's editor parts
                 return i;
             if (item.type == Item::display || (item.param == nullptr && ! hasStyle (item, plugui::pageTabs)))
                 continue;

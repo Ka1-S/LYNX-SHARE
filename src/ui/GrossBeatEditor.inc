@@ -495,7 +495,7 @@
 
     static bool isGbAny (const LayoutItem& item)
     {
-        return item.type == Item::display && item.display != nullptr && (std::strncmp (item.display, "gb", 2) == 0 || std::strcmp (item.display, "grossbeat") == 0);
+        return item.type == Item::display && item.display != nullptr && ((std::strncmp (item.display, "gb", 2) == 0 && std::strcmp (item.display, "gbjog") != 0) || std::strcmp (item.display, "grossbeat") == 0);
     }
 
     static int gbGridKind (const LayoutItem& item) { return isGbItem (item, "gbtimegrid") ? 0 : isGbItem (item, "gbvolumegrid") ? 1 : -1; }
