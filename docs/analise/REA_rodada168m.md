@@ -102,6 +102,24 @@ start, Repeat 3-3-2, Lo-fi wobble (a slight slow pitch wobble), Stutter into rev
 beat; new volume slots Sidechain hard / soft / 1/2 beat, Gate 3-3-2, Reverse swell, Half-bar swell, Mute last beat,
 Stutter gate 1/16. **29 factory presets** (Time / Volume / Both, e.g. Lo-fi tape, Trap stutter, Spin back pump).
 
+## 4c. Windows GUI check (real mouse, fresh profile, 2026-11-02)
+
+Flow: F9 › Master › empty slot › Gross Beat › Editor. Found and fixed during the check:
+
+- **The editor's displays never got the mouse**: `NativeEffectEditor::itemAt` only hit-tests the display ids it lists,
+  so the envelope, grids and tabs ignored clicks (the video's "clicking does nothing" also had this cause). Gross
+  Beat's parts (`isGbAny`) are now hit-tested.
+- **FL's own presets were not listed**: `flPluginsForEffect (grossBeat)` was empty; it is now `{ "Gross Beat" }`
+  (test `gb168_fl_presets_are_listed`), so the preset menu has "FL Studio presets" next to LYNX SHARE's.
+
+With FL installed a new Gross Beat loads FL's `Default.fst` (LYNX's rule for FL engines: FL loads a plugin's Default
+preset for a new instance); FL's Default is an empty 72-slot bank (7 060 bytes, all slots unnamed and flat), so on an
+FL machine the grids start empty as in FL, and LYNX's slots come from the LYNX SHARE presets or Factory slots ▾. Without
+FL (the reviewer's Mac) the new instance has LYNX's factory bank.
+
+Shots: /mnt/e/lynx-work/gross168m/shots/ (before-video.png, before-plugui.png; after-plugui-factory.png,
+after-gui-h1 fresh / h2 right-drag added point / h3 Factory slots / h5 preset menu with FL presets / h6 Lo-fi tape).
+
 ## 5. Tests
 
 `tests/GrossBeat168mTests.inc`: the video's two cases first (a new instance sounds with its factory slots; a right-click
