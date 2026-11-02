@@ -27,6 +27,12 @@ workspace::Rect toRect (juce::Rectangle<int> r)
     return { r.getX(), r.getY(), r.getWidth(), r.getHeight() };
 }
 
+void ltrace (const juce::String& what) // TEMP firstrun167v
+{
+    if (juce::SystemStats::getEnvironmentVariable ("LYNX_LAYOUT_TRACE", {}).isNotEmpty())
+        PluginHost::settingsFolder().getChildFile ("layout-trace.txt").appendText (juce::Time::getCurrentTime().toString (false, true, true, true) + " " + what + "\n");
+}
+
 juce::File stateFile()
 {
     return PluginHost::settingsFolder().getChildFile ("workspace.txt");
@@ -616,6 +622,7 @@ void Workspace::toggleMaximised (Panel panel)
 void Workspace::setDetached (Panel panel, bool detached)
 {
     pristine = false;
+    restoredState.clear();
     layout[panel].detached = detached;
 
     if (detached)
@@ -646,6 +653,11 @@ void Workspace::activate (Panel panel)
     setFocusedPanel (panel);
 }
 
+juce::Rectangle<int> Workspace::getPanelBounds (Panel panel) const
+{
+    return toJuce (layout[panel].bounds);
+}
+
 void Workspace::fitPanelContent (Panel panel, int contentWidth, int contentHeight)
 {
     auto& state = layout[panel];
@@ -653,6 +665,7 @@ void Workspace::fitPanelContent (Panel panel, int contentWidth, int contentHeigh
     if (! layoutReady || state.maximised || state.detached)
         return;
 
+    restoredState.clear(); // (sized to its content now: scaled from here on)
     auto r = state.bounds;
     if (contentWidth > 0)
         r.w = contentWidth + 2 * edge;
@@ -684,7 +697,11 @@ void Workspace::setFocusedPanel (Panel panel)
 void Workspace::frameMoved (Panel panel, juce::Rectangle<int> bounds)
 {
     if (! (layout[panel].bounds == toRect (bounds)))
+    {
+        ltrace ("frameMoved " + juce::String (workspace::panelId (panel)) + " " + bounds.toString() + " was " + toJuce (layout[panel].bounds).toString() + " pristine=" + juce::String ((int) pristine));
         pristine = false; // moved or resized by hand
+        restoredState.clear();
+    }
 
     layout[panel].bounds = toRect (bounds);
 }
@@ -787,6 +804,7 @@ void Workspace::resized()
 {
     if (getWidth() <= 0 || getHeight() <= 0)
         return;
+    ltrace ("resized " + getLocalBounds().toString() + " ready=" + juce::String ((int) layoutReady) + " pristine=" + juce::String ((int) pristine) + " pending=" + juce::String ((int) pendingState.isNotEmpty()));
 
     if (! layoutReady)
     {
@@ -799,6 +817,7 @@ void Workspace::resized()
             {
                 layout = *saved;
                 restored = true;
+                restoredState = pendingState;
             }
 
         layoutReady = true;
@@ -819,6 +838,17 @@ void Workspace::resized()
             onDefaultLayout();
         return;
     }
+
+    if (restoredState.isNotEmpty())
+        if (const auto saved = workspace::Layout::parse (restoredState.toStdString(), getWidth(), getHeight()))
+        {
+            for (int i = 0; i < workspace::panelCount; ++i) // the rects only: what was shown/hidden since stays
+                layout.panels[(std::size_t) i].bounds = saved->panels[(std::size_t) i].bounds;
+            layout.width = saved->width;
+            layout.height = saved->height;
+            applyLayout();
+            return;
+        }
 
     layout.resize (getWidth(), getHeight());
     applyLayout();
@@ -848,6 +878,7 @@ void Workspace::resetLayout()
     layout = workspace::Layout::makeDefault (juce::jmax (1, getWidth()), juce::jmax (1, getHeight()));
     layoutReady = true;
     pristine = true;
+    restoredState.clear();
     applyLayout();
 
     if (onDefaultLayout)
@@ -884,6 +915,7 @@ bool Workspace::applyLayoutText (const juce::String& text)
 
     layout = *parsed;
     pristine = false;
+    restoredState = text;
     applyLayout();
     return true;
 }
@@ -915,6 +947,7 @@ void Workspace::setPersistent (bool shouldPersist)
 
 void Workspace::saveState()
 {
+    ltrace ("saveState\n" + getLayoutText());
     if (persistent && layoutReady)
         stateFile().replaceWithText (getLayoutText());
 }
