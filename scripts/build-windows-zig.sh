@@ -84,18 +84,41 @@ cached() {
     key="$(printf '%s\n' "$ZIG_VERSION" "$TARGET" "${parts[@]}" "${cmd//$OUT/@OUT@}" | sha256sum | cut -c1-32)"
     name="$(basename "$obj" .o)-$key"
     mkdir -p "$OBJ_CACHE"
-    if [[ -f "$OBJ_CACHE/$name.o" ]]; then cp "$OBJ_CACHE/$name.o" "$obj.tmp$$" && mv "$obj.tmp$$" "$obj"; return; fi
+    # a hit replays the compiler's warnings and refreshes the entry's date (entries unused for 10 days are pruned)
+    if [[ -f "$OBJ_CACHE/$name.o" ]] && cp "$OBJ_CACHE/$name.o" "$obj.tmp$$" && mv "$obj.tmp$$" "$obj"; then
+        touch "$OBJ_CACHE/$name.o"; cat "$OBJ_CACHE/$name.err" 2>/dev/null >&2 || true; return 0
+    fi
     (
         flock 9
-        if [[ -f "$OBJ_CACHE/$name.o" ]]; then cp "$OBJ_CACHE/$name.o" "$obj.tmp$$" && mv "$obj.tmp$$" "$obj"; exit; fi
-        "$@" || exit
+        if [[ -f "$OBJ_CACHE/$name.o" ]]; then cp "$OBJ_CACHE/$name.o" "$obj.tmp$$" && mv "$obj.tmp$$" "$obj" && { cat "$OBJ_CACHE/$name.err" 2>/dev/null >&2 || true; }; exit; fi
+        "$@" 2> "$obj.err$$"; rc=$?
+        cat "$obj.err$$" >&2
+        [[ $rc == 0 ]] || { rm -f "$obj.err$$"; exit $rc; }
+        mv "$obj.err$$" "$OBJ_CACHE/$name.err"
         cp "$obj" "$OBJ_CACHE/.$name.$$" && mv "$OBJ_CACHE/.$name.$$" "$OBJ_CACHE/$name.o"
     ) 9> "$OBJ_CACHE/$name.lock"
+}
+# cached_pp <obj> -- <compile command>: for the app sources, keyed by the preprocessed source (-E -P: every header it
+# includes, every macro), so an unchanged file is copied from the cache in any worktree and a header change recompiles
+# exactly the files that see it. (zig does not cache -c compiles: before this, every Windows build recompiled ~260 files.)
+cached_pp() {
+    local obj="$1" pp=() skip=0 a h
+    shift 2
+    if [[ "$OBJ_CACHE" == off ]]; then "$@"; return; fi
+    for a in "$@"; do
+        if [[ $skip == 1 ]]; then skip=0; continue; fi
+        case "$a" in -c) ;; -o) skip=1 ;; *) pp+=("$a") ;; esac
+    done
+    h="$("${pp[@]}" -E -P -w -o - 2>/dev/null | sha256sum | cut -c1-64)"
+    # (no output: the preprocessor failed, let the compiler report it)
+    [[ -n "$h" && "$h" != e3b0c44298fc1c14* ]] || { "$@"; return; }
+    cached "$obj" "pp=$h" -- "$@"
 }
 JUCE_KEY="$JUCE_DIR $(cat "$OUT/JuceConfig.h" cmake/mingw/mingw_compat.h "$OUT/shim/Dbghelp.h" "$JUCE_DIR/modules/juce_core/system/juce_StandardHeader.h" | sha256sum | cut -c1-64)"
 GUI_BASICS_KEY="$(tree_hash "$GUI_BASICS_SRC")"
 export ZIG OUT JUCE_DIR TARGET GUI_BASICS_SRC OBJ_CACHE ZIG_VERSION JUCE_KEY GUI_BASICS_KEY
-export -f cached
+export -f cached cached_pp
+mkdir -p "$OBJ_CACHE" && find "$OBJ_CACHE" -maxdepth 1 -type f -mtime +10 -delete 2>/dev/null || true
 export COMMON_STR="${COMMON[*]}"
 
 echo "Compiling JUCE modules (cached)..."
@@ -252,7 +275,7 @@ printf '%s\n' "${APP_SOURCES[@]}" | xargs -P "$JOBS" -I{} bash -c '
     src={}; obj="$OUT/app/$(echo "$src" | tr / _).o"
     extra=""; [[ "$src" == src/platform/CrashGuard.cpp ]] && extra="-fms-extensions"
     [[ "$src" == src/ui/CrashReporter.cpp ]] && extra="-iquote $OUT"
-    $ZIG c++ $COMMON_STR $extra -Wall -Wextra -c "$src" -o "$obj"'
+    cached_pp "$obj" -- $ZIG c++ $COMMON_STR $extra -Wall -Wextra -c "$src" -o "$obj"'
 
 echo "Resources (manifest, icons, version $VERSION)..."
 OUT_ABS="$(cd "$OUT" && pwd)"
