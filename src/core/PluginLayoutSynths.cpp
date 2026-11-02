@@ -468,6 +468,7 @@ Layout ogunLayout (bool autogun)
     // the articulators (13 point-curve envelopes / LFOs / maps): FL's curve editor, kept as saved
     p.section (4, 220, 438, 210, TR_NOOP ("Articulators"));
     p.label (16, 300, 414, 16, TR_NOOP ("Envelopes, LFOs and maps keep the saved patch"), dim);
+    p.label (16, 324, 414, 16, TR_NOOP ("Plays FL Studio's own presets and data files: no LYNX presets for this engine"), dim);
     // EFFECTS: chorus, delay, reverb
     p.section (4, 434, 168, 114, TR_NOOP ("Chorus"));
     p.stepper (8, 466, 26, 22, "Chorus order", TR_NOOP ("Ord"), 9);
@@ -626,7 +627,8 @@ Layout miniSynthLayout()
     p.knob (634, 210, 40, "Phaser mix", TR_NOOP ("Mix"));
     p.knob (590, 280, 40, "Phaser frequency", TR_NOOP ("Freq"));
     on (5, from);
-    p.name (8, 360, 701, 36, "MiniSynth");
+    p.name (8, 360, 200, 36, "MiniSynth");
+    p.label (220, 370, 489, 16, TR_NOOP ("Plays FL Studio's own presets and data files: no LYNX presets for this engine"), dim);
     return std::move (p.l);
 }
 
@@ -636,7 +638,8 @@ Layout miniSynthLayout()
 
 Layout gmsLayout()
 {
-    Page p ("GMS", 1000, 420);
+    Page p ("GMS", 1000, 440);
+    p.label (4, 420, 992, 16, TR_NOOP ("Plays FL Studio's own presets and data files: no LYNX presets for this engine"), dim);
     static const char* const fx[10] = { TR_NOOP ("Distortion"), TR_NOOP ("Crusher"), TR_NOOP ("Flanger"), TR_NOOP ("Phaser"), TR_NOOP ("Low pass"),
                                         TR_NOOP ("High pass"), TR_NOOP ("Delay"), TR_NOOP ("Reverb"), TR_NOOP ("Panner"), TR_NOOP ("Trancer") };
     p.l.pages.assign (fx, fx + 10);
@@ -812,7 +815,7 @@ Layout morphineLayout()
 
     p.section (4, 104, 600, 180, TR_NOOP ("Generators"));
     p.label (20, 180, 568, 16, TR_NOOP ("Generators, morph line and modulation keep the saved patch"), dim);
-    p.display (20, 124, 568, 40, "morphnoise");
+    p.label (20, 204, 568, 16, TR_NOOP ("Plays FL Studio's own presets and data files: no LYNX presets for this engine"), dim);
     p.section (608, 104, 274, 180, TR_NOOP ("Noise"));
     p.knob (624, 130, 40, "Noise mix", TR_NOOP ("Mix"));
     p.knob (690, 130, 40, "Noise pan", TR_NOOP ("Pan"), bipolar);

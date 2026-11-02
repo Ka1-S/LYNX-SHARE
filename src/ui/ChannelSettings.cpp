@@ -1523,6 +1523,65 @@ public:
                             g.strokePath (wave, juce::PathStrokeType (1.3f * f));
                         }
                     }
+                    // round 168o: the envelopes of the synth group's pages, drawn from their knobs (attack, decay, sustain, release;
+                    // a missing stage is skipped, a missing sustain is the level the decay falls to: none)
+                    {
+                        struct Env
+                        {
+                            const char* id;
+                            const char* a;
+                            const char* d;
+                            const char* s;
+                            const char* r;
+                            const char* start; // a modulator's initial level (DX10)
+                        };
+                        static const Env envs[] = {
+                            { "dx10amp", "Attack", "Decay", nullptr, "Release", nullptr },
+                            { "dx10mod1", nullptr, "Mod 1 time", "Mod 1 sustain", "Mod 1 release", "Mod 1 init" },
+                            { "dx10mod2", nullptr, "Mod 2 time", "Mod 2 sustain", "Mod 2 release", "Mod 2 init" },
+                            { "simamp", "Attack", "Decay", "Sustain", "Release", nullptr },
+                            { "simfilt", "Filter attack", "Filter decay", "Filter sustain", "Filter release", nullptr },
+                            { "ministenv", "Attack", "Decay", "Sustain", "Release", nullptr },
+                        };
+                        for (const auto& e : envs)
+                            if (juce::String (item.display) == e.id)
+                            {
+                                const auto value = [&] (const char* name, float otherwise) {
+                                    auto* kn = name != nullptr ? knobFor (name) : nullptr;
+                                    return kn != nullptr ? juce::jlimit (0.0f, 1.0f, normalised (*kn)) : otherwise;
+                                };
+                                const auto inner = r.reduced (5.0f * f, 5.0f * f);
+                                const auto a = value (e.a, 0.0f), d = value (e.d, 0.5f), su = value (e.s, 0.0f), rl = value (e.r, 0.3f);
+                                const auto peak = e.start != nullptr ? value (e.start, 1.0f) : 1.0f;
+                                const auto unit = inner.getWidth() / 4.0f;
+                                const auto y = [&] (float level) { return inner.getBottom() - inner.getHeight() * level; };
+                                juce::Path env;
+                                auto x = inner.getX();
+                                env.startNewSubPath (x, y (e.start != nullptr ? peak : 0.0f));
+                                x += unit * a;
+                                env.lineTo (x, y (peak));
+                                // DX10's amp decay ≥ 0.98 holds the note
+                                const auto hold = e.s != nullptr ? su : (d >= 0.98f ? peak : 0.0f);
+                                x += unit * (0.15f + 0.85f * d);
+                                env.lineTo (x, y (hold));
+                                env.lineTo (inner.getRight() - unit * (0.15f + 0.85f * rl), y (hold));
+                                env.lineTo (inner.getRight(), y (0.0f));
+                                g.setColour (colour::gridBeat);
+                                g.drawHorizontalLine ((int) inner.getBottom(), inner.getX(), inner.getRight());
+                                g.setColour (accent.withAlpha (0.25f));
+                                g.strokePath (env, juce::PathStrokeType (3.0f * f));
+                                g.setColour (accent.brighter (0.3f));
+                                g.strokePath (env, juce::PathStrokeType (1.3f * f));
+                            }
+                    }
+                    if (juce::String (item.display) == "gmswaves") // round 168o: GMS's waves are read from FL Studio's folder
+                    {
+                        g.setColour (colour::textSecondary);
+                        g.setFont (font (juce::jmax (8.0f, 9.5f * f)));
+                        const auto text = def.samplePath.empty() ? tr ("Needs FL Studio's files")
+                                                                 : juce::File (juce::String::fromUTF8 (def.samplePath.c_str())).getFileName();
+                        g.drawFittedText (text, r.reduced (6.0f * f).toNearestInt(), juce::Justification::centred, 3, 0.7f);
+                    }
                     if (juce::String (item.display) == "flkeysname")
                         if (const auto st = flkeys::parseState (def.pluginState))
                         {
