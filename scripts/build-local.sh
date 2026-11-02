@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 # tests/tests.cpp is one big translation unit: at -O2 clang (zig 0.13's 18.1) needs more than the default 8 MB stack
-# for it (a segfault, exit 139, with no message). Raise the soft limit (no root needed) when the hard limit allows.
+# for it (a segfault, exit 139 / abort 134, with no message). Raise the soft limit (no root needed) when the hard limit allows.
 ulimit -s unlimited 2>/dev/null || ulimit -s "$(ulimit -H -s)" 2>/dev/null || true
 
 if [[ -z "${CXX:-}" ]]; then
@@ -114,7 +114,9 @@ mkdir -p build-local/pocketpy
 obj=build-local/pocketpy/pocketpy.o
 [[ -f "$obj" && "$obj" -nt third_party/pocketpy/pocketpy.c && "$obj" -nt third_party/pocketpy/pocketpy.h ]] || $CC -c -O2 -w -std=c11 -DPK_ENABLE_OS=0 -DPK_ENABLE_WATCHDOG=1 -Ithird_party/pocketpy third_party/pocketpy/pocketpy.c -o "$obj"
 WAVPACK="$WAVPACK $obj"
-$CXX $FLAGS $CORE $WAVPACK tests/tests.cpp -o build-local/lynx_tests 2> >(grep -v 'glibc version' >&2)
+# (tests.cpp alone first: zig compiles a many-file command on worker threads whose stack the ulimit above can't raise)
+$CXX $FLAGS -c tests/tests.cpp -o build-local/tests.o 2> >(grep -v 'glibc version' >&2)
+$CXX $FLAGS $CORE $WAVPACK build-local/tests.o -o build-local/lynx_tests 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/flp/Flp.cpp tools/flpdump.cpp -o build-local/flpdump 2> >(grep -v 'glibc version' >&2)
 
 $CXX $FLAGS $CORE $WAVPACK tools/renderwav.cpp -o build-local/renderwav 2> >(grep -v 'glibc version' >&2)
