@@ -1493,6 +1493,7 @@ public:
         lynx::crashguard::note ("closing");
         lynx::shutdownPluginSandboxWorker();
         splash = nullptr;
+        lynx::shutdownStemExtraction(); // (a separation in flight stops before its window and the engine go)
         mainWindow = nullptr; // the UI goes before the engine
         lynx::updater::shutdown(); // (a check or download in flight stops)
         crashEngine = nullptr;

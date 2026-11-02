@@ -23,6 +23,13 @@ inline constexpr std::array<const char*, numStems> stemNames { "drums", "bass", 
 
 using Stems = std::array<std::array<std::vector<float>, 2>, numStems>;
 
+// ONNX Runtime's worker threads (round 167x): the physical cores minus one, and never more than the logical CPUs minus
+// two, so the audio callback and the UI always keep a core while a playing project is being separated.
+inline int separationThreads (int physicalCores, int logicalCpus) noexcept
+{
+    return std::clamp (physicalCores - 1, 1, std::max (1, logicalCpus - 2));
+}
+
 inline std::int64_t numSegments (std::int64_t frames) noexcept
 {
     const auto stride = segmentFrames - overlapFrames;

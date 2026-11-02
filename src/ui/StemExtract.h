@@ -11,6 +11,9 @@ namespace lynx
 // step. `done` runs on the message thread after the stems were added.
 void extractStemsFromClip (AudioEngine& engine, int clipIndex, std::function<void()> done);
 
+// App shutdown: a job still running stops at its next check and is waited for (before the engine goes).
+void shutdownStemExtraction();
+
 // --stemsplit: separates `input` into `folder` with the model already installed. Empty, or what went wrong.
 juce::String extractStemsToFolder (AudioEngine& engine, const juce::File& input, const juce::File& folder);
 } // namespace lynx

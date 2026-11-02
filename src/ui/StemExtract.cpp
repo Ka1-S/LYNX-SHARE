@@ -1,6 +1,7 @@
 #include "ui/StemExtract.h"
 
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #include <mutex>
@@ -25,18 +26,37 @@ constexpr const char* modelUrl = "https://huggingface.co/adowu/htdemucs-onnx/res
 constexpr const char* modelSha256 = "d05c269d0178d2a72ad484b10b11dd370193fc923201c3b27a99f848745db70a";
 constexpr std::int64_t modelBytes = 165612636;
 
-juce::File modelFile() { return platform::settingsFile ("models").getChildFile ("htdemucs_fp16weights.onnx"); }
+// Not the settings folder (round 167x): on Windows that is the roaming %APPDATA%, no place for 166 MB.
+juce::File modelFolder()
+{
+    if (platform::profileOverride() != juce::File())
+        return platform::settingsFile ("models"); // (a test profile keeps everything inside it)
+   #if JUCE_WINDOWS
+    return juce::File::getSpecialLocation (juce::File::windowsLocalAppData).getChildFile ("LYNX").getChildFile ("models");
+   #elif JUCE_MAC
+    return platform::settingsFile ("models"); // ~/Library/Application Support/LYNX (Caches may be purged)
+   #else
+    const auto xdg = juce::SystemStats::getEnvironmentVariable ("XDG_DATA_HOME", {});
+    const auto data = xdg.startsWithChar ('/') ? juce::File (xdg) : juce::File::getSpecialLocation (juce::File::userHomeDirectory).getChildFile (".local/share");
+    return data.getChildFile ("LYNX").getChildFile ("models");
+   #endif
+}
+
+juce::File modelFile() { return modelFolder().getChildFile ("htdemucs_fp16weights.onnx"); }
+
+// (a truncated or damaged copy counts as missing: it is downloaded again, after the same question)
+bool modelInstalled() { return modelFile().getSize() == modelBytes; }
 
 // ONNX Runtime, shipped next to LYNX and loaded by its full path (never a copy from the system's search path).
 juce::File runtimeFile()
 {
-    const auto folder = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
    #if JUCE_MAC
-    return folder.getSiblingFile ("Frameworks").getChildFile ("libonnxruntime.1.23.2.dylib");
+    return juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory().getSiblingFile ("Frameworks").getChildFile ("libonnxruntime.1.23.2.dylib");
    #elif JUCE_WINDOWS
-    return folder.getChildFile ("onnxruntime.dll");
+    return juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory().getChildFile ("onnxruntime.dll");
    #else
-    return folder.getChildFile ("libonnxruntime.so.1.23.2");
+    // /proc/self/exe: started by name from PATH, argv[0] (currentExecutableFile) would point at the current folder
+    return juce::File::getSpecialLocation (juce::File::hostApplicationPath).getParentDirectory().getChildFile ("libonnxruntime.so.1.23.2");
    #endif
 }
 
@@ -45,14 +65,40 @@ juce::String runtimeLoadError()
    #if JUCE_MAC
     return tr ("ONNX Runtime could not be loaded. Stem extraction needs macOS 13.4 or newer.");
    #elif JUCE_WINDOWS
-    return tr ("ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) and try again.");
+    return tr ("ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe and try again.");
    #else
     return tr ("ONNX Runtime could not be loaded. Stem extraction needs the system's libstdc++.");
    #endif
 }
 
-// One loaded model. Its C API comes from the library at run time: the Windows build is cross-compiled with MinGW and
-// can't link Microsoft's import library.
+// ONNX Runtime's C API, from the library at run time (the Windows build is cross-compiled with MinGW and can't link
+// Microsoft's import library). Only loaded while "Extract stems" runs: nothing of it is in memory at start-up.
+struct Runtime
+{
+    bool load (juce::String& error)
+    {
+        const auto path = runtimeFile();
+        if (! path.existsAsFile())
+        {
+            error = tr ("Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip.", { path.getFileName() });
+            return false;
+        }
+        const auto getBase = library.open (path.getFullPathName()) ? (const OrtApiBase* (ORT_API_CALL*) (void) noexcept) library.getFunction ("OrtGetApiBase") : nullptr;
+        api = getBase != nullptr ? getBase()->GetApi (ORT_API_VERSION) : nullptr;
+        if (api == nullptr)
+        {
+            error = runtimeLoadError();
+            library.close();
+            return false;
+        }
+        return true;
+    }
+
+    juce::DynamicLibrary library;
+    const OrtApi* api = nullptr;
+};
+
+// One loaded model.
 class StemModel
 {
 public:
@@ -63,28 +109,27 @@ public:
             api->ReleaseRunOptions (runOptions);
             api->ReleaseSession (session);
             api->ReleaseMemoryInfo (memory);
-            api->ReleaseEnv (env);
+            api->ReleaseEnv (env); // (its threads end here: nothing keeps running after the job)
         }
     }
 
     bool open (const juce::File& model, juce::String& error)
     {
-        const auto path = runtimeFile();
-        const auto getBase = library.open (path.getFullPathName()) ? (const OrtApiBase* (ORT_API_CALL*) (void) noexcept) library.getFunction ("OrtGetApiBase") : nullptr;
-        api = getBase != nullptr ? getBase()->GetApi (ORT_API_VERSION) : nullptr;
-        if (api == nullptr)
-        {
-            error = runtimeLoadError();
+        if (! runtime.load (error))
             return false;
-        }
+        api = runtime.api;
 
         OrtSessionOptions* options = nullptr;
         auto ok = check (api->CreateEnv (ORT_LOGGING_LEVEL_ERROR, "LYNX", &env), error)
                && check (api->CreateCpuMemoryInfo (OrtArenaAllocator, OrtMemTypeDefault, &memory), error)
                && check (api->CreateRunOptions (&runOptions), error)
                && check (api->CreateSessionOptions (&options), error)
-               // one core stays free for the audio thread: the project may be playing
-               && check (api->SetIntraOpNumThreads (options, juce::jmax (1, juce::SystemStats::getNumCpus() - 1)), error);
+               // the project may be playing: cores stay free for the audio callback and the UI, and idle workers
+               // sleep instead of spinning (ONNX Runtime's default keeps every worker busy between operators)
+               && check (api->SetIntraOpNumThreads (options, stemsplit::separationThreads (juce::SystemStats::getNumPhysicalCpus(), juce::SystemStats::getNumCpus())), error)
+               && check (api->SetInterOpNumThreads (options, 1), error)
+               && check (api->AddSessionConfigEntry (options, "session.intra_op.allow_spinning", "0"), error)
+               && check (api->AddSessionConfigEntry (options, "session.inter_op.allow_spinning", "0"), error);
        #if JUCE_WINDOWS
         ok = ok && check (api->CreateSession (env, model.getFullPathName().toWideCharPointer(), options, &session), error);
        #else
@@ -92,6 +137,8 @@ public:
        #endif
         if (options != nullptr)
             api->ReleaseSessionOptions (options);
+        if (! ok && session == nullptr && error.isNotEmpty())
+            error = tr ("could not read {0}", { model.getFullPathName() }) + "\n\n" + error;
         return ok;
     }
 
@@ -140,7 +187,7 @@ private:
         return false;
     }
 
-    juce::DynamicLibrary library; // (first member: unloaded last)
+    Runtime runtime; // (first member: unloaded last)
     const OrtApi* api = nullptr;
     OrtEnv* env = nullptr;
     OrtMemoryInfo* memory = nullptr;
@@ -179,12 +226,16 @@ bool separateToFiles (StemModel& model, const SampleData& sample, const juce::St
     const auto outFrames = juce::jmax<std::int64_t> (1, std::llround ((double) frames * sampleRate / sample.sampleRate));
     std::vector<float> left (sample.leftData(), sample.leftData() + frames);
     std::vector<float> right = sample.isStereo() ? std::vector<float> (sample.rightData(), sample.rightData() + frames) : left;
-    left = audioedit::resampleChannel (left, outFrames);
-    right = audioedit::resampleChannel (right, outFrames);
+    left = audioedit::resampleChannel (left, outFrames, cancelled); // (a long file takes a while: Cancel works here too)
+    right = audioedit::resampleChannel (right, outFrames, cancelled);
+    if (cancelled())
+        return false;
 
     Stems stems;
     if (! separate (left, right, [&] (const float* in, float* out) { return ! cancelled() && model.run (in, out, error) && ! cancelled(); }, progress, stems))
         return false;
+    left = {}; // (the mix is no longer needed while the stems are written)
+    right = {};
 
     if (! folder.createDirectory())
     {
@@ -195,9 +246,10 @@ bool separateToFiles (StemModel& model, const SampleData& sample, const juce::St
     {
         auto& file = files[(std::size_t) s];
         file = folder.getNonexistentChildFile (name + " - " + stemNames[(std::size_t) s], ".wav", false);
-        if (! writeWav (file, stems[(std::size_t) s]))
+        if (cancelled() || ! writeWav (file, stems[(std::size_t) s]))
         {
-            error = tr ("can't write {0}", { file.getFullPathName() });
+            if (! cancelled())
+                error = tr ("can't write {0}", { file.getFullPathName() });
             for (int k = 0; k <= s; ++k)
                 files[(std::size_t) k].deleteFile();
             return false;
@@ -206,66 +258,127 @@ bool separateToFiles (StemModel& model, const SampleData& sample, const juce::St
     return true;
 }
 
-class StemThread final : public juce::ThreadWithProgressWindow,
-                         private juce::Thread::Listener
+// One "Extract stems" job (round 167x): the download, the separation and the WAVs on a low-priority worker, a progress
+// window that never blocks the message thread. Cancel closes the window at once and the job winds down behind it
+// (ONNX Runtime's terminate flag ends a running segment; a thread is never killed). The result lands as one undo step.
+class StemJob final : private juce::Thread,
+                      private juce::Timer
 {
 public:
-    StemThread (AudioEngine& e, int clip, std::string path, std::string sampleName, juce::File targetFolder, std::shared_ptr<const SampleData> data, std::function<void()> done)
-        : juce::ThreadWithProgressWindow (tr ("Extracting stems..."), true, true, 30000),
+    StemJob (AudioEngine& e, int clip, std::string path, std::string sampleName, juce::File targetFolder, std::shared_ptr<const SampleData> data, std::function<void()> done)
+        : juce::Thread ("LYNX stem extraction"),
           engine (e), clipIndex (clip), sourcePath (std::move (path)), name (std::move (sampleName)), folder (std::move (targetFolder)), sample (std::move (data)), onDone (std::move (done))
     {
-        addListener (this);
+        active() = this;
+        window = std::make_unique<juce::AlertWindow> (tr ("Extract stems from sample"), tr ("Extracting stems..."), juce::MessageBoxIconType::NoIcon);
+        window->addProgressBarComponent (shownProgress);
+        window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        // modal, as the song must not change under the job. The callback comes asynchronously, also after finish()
+        // closed the window: it only acts while the window (owned by this job) still exists
+        juce::Component::SafePointer<juce::AlertWindow> alive (window.get());
+        window->enterModalState (true, juce::ModalCallbackFunction::create ([this, alive] (int) {
+                                     if (alive != nullptr)
+                                         cancel();
+                                 }), false);
+        startThread (juce::Thread::Priority::low);
+        startTimer (100);
     }
 
-    ~StemThread() override { removeListener (this); }
+    ~StemJob() override
+    {
+        stopTimer();
+        window.reset();
+        active() = nullptr;
+    }
 
+    static StemJob*& active()
+    {
+        static StemJob* job = nullptr; // (message thread only)
+        return job;
+    }
+
+    // App shutdown: stops at the next check (ONNX Runtime's terminate, the download's cancel) and waits for it.
+    void abandon()
+    {
+        finishing = true;
+        cancel (true);
+        waitForThreadToExit (-1);
+        deleteFiles();
+        delete this;
+    }
+
+private:
     void run() override
     {
-        if (! modelFile().existsAsFile() && ! downloadModel())
+        if (! modelInstalled() && ! downloadModel())
             return;
-        setStatusMessage (tr ("Extracting stems..."));
-        setProgress (-1.0);
+        if (threadShouldExit())
+            return;
+        setStatus (tr ("Extracting stems..."));
+        progress = -1.0;
         StemModel local;
         if (! local.open (modelFile(), error))
             return;
         {
-            const std::lock_guard<std::mutex> lock (active);
+            const std::lock_guard<std::mutex> lock (active_);
             model = &local;
         }
-        finished = separateToFiles (local, *sample, juce::String::fromUTF8 (name.c_str()), folder, [this] { return threadShouldExit(); },
-                                    [this] (double p) { setProgress (p); }, files, error);
-        const std::lock_guard<std::mutex> lock (active);
+        if (! threadShouldExit())
+            finished = separateToFiles (local, *sample, juce::String::fromUTF8 (name.c_str()), folder, [this] { return threadShouldExit(); },
+                                        [this] (double p) { progress = p; }, files, error);
+        const std::lock_guard<std::mutex> lock (active_);
         model = nullptr;
+    } // (the session, its threads and the library are released here: RAM goes back once the job ends)
+
+    void timerCallback() override
+    {
+        shownProgress = progress.load();
+        {
+            const std::lock_guard<std::mutex> lock (statusLock);
+            if (window != nullptr && status != shownStatus)
+                window->setMessage (shownStatus = status);
+        }
+        if (isThreadRunning())
+            return;
+        finish();
     }
 
-    void threadComplete (bool cancelled) override
+    void finish()
     {
-        std::array<std::string, stemsplit::numStems> paths;
-        for (std::size_t s = 0; s < paths.size(); ++s)
-            paths[s] = files[s].getFullPathName().toStdString();
+        stopTimer();
+        finishing = true;
+        if (window != nullptr)
+            window->exitModalState (0);
+        window.reset();
 
         if (cancelled || ! finished)
         {
-            if (finished) // cancelled after the last segment
-                for (auto& f : files)
-                    f.deleteFile();
+            deleteFiles();
             if (! cancelled && error.isNotEmpty())
                 juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Extract stems from sample"), error);
         }
         else
         {
+            std::array<std::string, stemsplit::numStems> paths;
+            for (std::size_t s = 0; s < paths.size(); ++s)
+                paths[s] = files[s].getFullPathName().toStdString();
             bool added = false;
             engine.editSong ([&] (Song& s) { added = stemsplit::addStemClips (s, clipIndex, sourcePath, paths); });
             if (added && onDone)
                 onDone();
         }
-        juce::MessageManager::callAsync ([this] { delete this; });
+        delete this; // (a Timer may be deleted in its own callback)
     }
 
-private:
-    void exitSignalSent() override
+    void cancel (bool wait = false)
     {
-        const std::lock_guard<std::mutex> lock (active);
+        if (finishing && ! wait)
+            return; // (finish() closing the window)
+        cancelled = true;
+        if (window != nullptr)
+            window->setVisible (false); // the window goes at once; the worker stops behind it
+        signalThreadShouldExit();
+        const std::lock_guard<std::mutex> lock (active_);
         if (model != nullptr)
             model->terminate();
        #if ! (JUCE_LINUX || JUCE_BSD)
@@ -274,12 +387,27 @@ private:
        #endif
     }
 
+    void deleteFiles()
+    {
+        if (finished)
+            for (auto& f : files)
+                f.deleteFile();
+    }
+
+    void setStatus (const juce::String& text)
+    {
+        const std::lock_guard<std::mutex> lock (statusLock);
+        status = text;
+    }
+
     bool downloadModel()
     {
-        setStatusMessage (tr ("Downloading the stem model..."));
+        setStatus (tr ("Downloading the stem model..."));
+        progress = 0.0;
         const auto target = modelFile();
         const auto part = target.withFileExtension ("part");
         target.getParentDirectory().createDirectory();
+        target.deleteFile(); // (a damaged copy of the wrong size)
         const auto ok = download (part) && verify (part) && part.moveFileTo (target);
         if (! ok)
         {
@@ -292,7 +420,8 @@ private:
 
     bool verify (const juce::File& file)
     {
-        setStatusMessage (tr ("Checking the stem model..."));
+        setStatus (tr ("Checking the stem model..."));
+        progress = -1.0;
         juce::FileInputStream in (file);
         update::Sha256Stream hash;
         juce::HeapBlock<char> buffer (65536);
@@ -316,7 +445,8 @@ private:
        #if JUCE_LINUX || JUCE_BSD
         // (LYNX is built without libcurl, JUCE_USE_CURL=0: the curl program fetches it, as in the updater)
         juce::ChildProcess child;
-        if (! child.start ({ "curl", "-fsSL", "--connect-timeout", "8", "--speed-limit", "1", "--speed-time", "30", "-o", dest.getFullPathName(), modelUrl }, 0))
+        if (! child.start ({ "curl", "-fsSL", "--connect-timeout", "8", "--speed-limit", "1", "--speed-time", "30",
+                             "--max-filesize", juce::String (modelBytes), "-o", dest.getFullPathName(), modelUrl }, 0))
         {
             error = tr ("the curl program is missing");
             return false;
@@ -328,7 +458,7 @@ private:
                 child.kill();
                 return false;
             }
-            setProgress ((double) dest.getSize() / (double) modelBytes);
+            progress = (double) dest.getSize() / (double) modelBytes;
             juce::Thread::sleep (150);
         }
         if (child.getExitCode() != 0)
@@ -341,15 +471,15 @@ private:
         juce::WebInputStream web (juce::URL (modelUrl), false);
         web.withConnectionTimeout (20000).withNumRedirectsToFollow (5);
         {
-            const std::lock_guard<std::mutex> lock (active);
+            const std::lock_guard<std::mutex> lock (active_);
             stream = threadShouldExit() ? nullptr : &web;
         }
         struct Clear
         {
-            StemThread& t;
+            StemJob& t;
             ~Clear()
             {
-                const std::lock_guard<std::mutex> lock (t.active);
+                const std::lock_guard<std::mutex> lock (t.active_);
                 t.stream = nullptr;
             }
         } clear { *this };
@@ -386,7 +516,12 @@ private:
                 return false;
             }
             got += n;
-            setProgress ((double) got / (double) modelBytes);
+            if (got > modelBytes)
+            {
+                error = tr ("The downloaded model failed its checksum, so it was not used."); // (more than the pinned file)
+                return false;
+            }
+            progress = (double) got / (double) modelBytes;
         }
         out.flush();
         return out.getStatus().wasOk();
@@ -401,8 +536,15 @@ private:
     std::function<void()> onDone;
     std::array<juce::File, stemsplit::numStems> files;
     juce::String error;
-    bool finished = false;
-    std::mutex active; // guards `model` and `stream` for exitSignalSent
+    std::atomic<bool> finished { false };
+    std::atomic<bool> cancelled { false };
+    bool finishing = false; // (message thread)
+    std::atomic<double> progress { -1.0 };
+    double shownProgress = -1.0; // (message thread: the progress bar reads it)
+    std::mutex statusLock;
+    juce::String status, shownStatus;
+    std::unique_ptr<juce::AlertWindow> window;
+    std::mutex active_; // guards `model` and `stream` for cancel()
     StemModel* model = nullptr;
     juce::WebInputStream* stream = nullptr;
 };
@@ -410,6 +552,12 @@ private:
 
 void extractStemsFromClip (AudioEngine& engine, int clipIndex, std::function<void()> done)
 {
+    if (StemJob::active() != nullptr)
+    {
+        // (a cancelled job still winding down: one separation at a time)
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Extract stems from sample"), tr ("Stems are still being extracted. Try again when that has finished."));
+        return;
+    }
     const auto& song = engine.getSong();
     if (clipIndex < 0 || clipIndex >= (int) song.playlist.size())
         return;
@@ -422,19 +570,31 @@ void extractStemsFromClip (AudioEngine& engine, int clipIndex, std::function<voi
     if (sample == nullptr)
         return;
 
+    // the runtime first: a computer that can't run it gets the reason before any download (unloaded again right away)
+    {
+        Runtime runtime;
+        juce::String error;
+        if (! runtime.load (error))
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Extract stems from sample"), error);
+            return;
+        }
+    }
+
     // next to the project: <project>/Audio/Recorded/Stems (the global recordings folder for an unsaved project)
     const auto folder = engine.getRecordingFolder().getChildFile ("Stems");
     auto start = [&engine, clipIndex, path, name = juce::File (source).getFileNameWithoutExtension().toStdString(), folder, sample, done] {
-        (new StemThread (engine, clipIndex, path, name, folder, sample, done))->launchThread();
+        if (StemJob::active() == nullptr)
+            new StemJob (engine, clipIndex, path, name, folder, sample, done); // (deletes itself when it ends)
     };
-    if (modelFile().existsAsFile())
+    if (modelInstalled())
     {
         start();
         return;
     }
 
     // the first time: the source and the licence, before anything is downloaded
-    const auto text = tr ("Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in the settings folder.", { juce::String (modelBytes / 1000000) })
+    const auto text = tr ("Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in {1}.", { juce::String (modelBytes / 1000000), modelFolder().getFullPathName() })
                     + "\n\n" + tr ("Source: {0} (ONNX export of Demucs v4 by Meta AI Research)", { juce::String (modelPage) })
                     + "\n\n" + tr ("Licence: the Demucs code is MIT. The licence of the trained weights is not clear, as the authors say: the training data includes MUSDB18-HQ, parts of which were for research use only. Decide for yourself whether that fits your use, commercial use above all.");
     juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, tr ("Extract stems from sample"), text, tr ("Download"), tr ("Cancel"), nullptr,
@@ -444,12 +604,18 @@ void extractStemsFromClip (AudioEngine& engine, int clipIndex, std::function<voi
                                         }));
 }
 
+void shutdownStemExtraction()
+{
+    if (auto* job = StemJob::active())
+        job->abandon();
+}
+
 juce::String extractStemsToFolder (AudioEngine& engine, const juce::File& input, const juce::File& folder)
 {
     const auto sample = engine.getSampleLibrary().load (input.getFullPathName());
     if (sample == nullptr)
         return "can't read " + input.getFullPathName();
-    if (! modelFile().existsAsFile())
+    if (! modelInstalled())
         return "no model at " + modelFile().getFullPathName();
     juce::String error;
     StemModel model;

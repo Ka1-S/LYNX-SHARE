@@ -98,3 +98,32 @@ TEST (stemsplit_clips_are_aligned_on_new_tracks)
     }
     CHECK (song.channels[(std::size_t) song.playlist.back().channel].name == "song - vocals");
 }
+
+// --- round 167x: the separation leaves cores to the audio callback; a long resample can be cancelled -----------------
+
+#include "core/AudioEdit.h"
+
+TEST (stemsplit_threads_leave_cores_for_audio_167x)
+{
+    using lynx::stemsplit::separationThreads;
+    CHECK (separationThreads (6, 12) == 5);   // physical − 1
+    CHECK (separationThreads (8, 8) == 6);    // logical − 2 caps it without SMT
+    CHECK (separationThreads (16, 32) == 15);
+    CHECK (separationThreads (2, 4) == 1);
+    CHECK (separationThreads (1, 1) == 1);    // never 0
+    CHECK (separationThreads (0, 0) == 1);    // (unknown counts)
+    CHECK (separationThreads (4, 2) == 1);
+}
+
+TEST (stemsplit_resample_stops_when_asked_167x)
+{
+    std::vector<float> in (200000, 0.25f);
+    int asked = 0;
+    const auto stopped = lynx::audioedit::resampleChannel (in, 183750, [&] { return ++asked >= 2; });
+    CHECK (stopped.empty());
+    CHECK (asked == 2);
+    const auto whole = lynx::audioedit::resampleChannel (in, 183750, [] { return false; });
+    CHECK (whole.size() == 183750);
+    CHECK (std::abs (whole[90000] - 0.25f) < 1.0e-4f);
+    CHECK (lynx::audioedit::resampleChannel (in, 183750) == whole); // the old overload is unchanged
+}
