@@ -3883,7 +3883,7 @@ countries: ru by kz
 "Maximum polyphony (-- = no limit)" = "Максимальная полифония (-- = без ограничения)"
 "{0} beats" = "Долей: {0}"
 "Portamento: each note glides from the previous one's pitch (the Slide knob sets the time)" = "Портаменто: каждая нота скользит от высоты предыдущей (время задает ручка Slide)"
-"Mono: one voice; a new note takes over the sounding one" = "Моно: один голос; новая нота заменяет звучащую"
+"Mono: one voice; a note played over a held one glides to it (Slide time) without a new attack" = "Моно: один голос; нота, сыгранная поверх удерживаемой, плавно скользит к ней (время Slide) без новой атаки"
 "Cut: notes of this channel stop the channels cut by this group" = "Cut: ноты этого канала останавливают каналы, обрезаемые этой группой"
 "By: this channel is cut by the channels of this group" = "By: этот канал обрезается каналами этой группы"
 "Cut group" = "Группа обрезки"

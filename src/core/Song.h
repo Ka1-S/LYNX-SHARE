@@ -550,6 +550,12 @@ struct ChannelMisc
     float shiftBeats = 0.0f; // Time › Shift: every note starts (and ends) this much later
     float gateBeats = 0.0f;  // Time › Gate: notes last at most this long (0 = off)
     bool fullPorta = true;   // Time › Full porta: a porta note glides the whole way (off: FL's partial slide)
+    // Polyphony › Mono / Porta / Slide for every generator (round 168l, core/ChannelPoly.h; .flp 0xDD): the rack's
+    // channel layer applies them. The LYNX Synth keeps them in SynthSettings, the Sampler its porta in SamplerSettings
+    // (RackOps' setChannelMono / setChannelPortamento write every copy)
+    bool mono = false;
+    bool porta = false;
+    float portaBeats = 0.125f; // FL's Slide knob (default 820 = half a step)
     EchoSettings echo;
     NoteTracking velocity { 100 }, key { 60 };
     int pitchRange = 2;      // the header's PITCH knob range, semitones (FL default 2)

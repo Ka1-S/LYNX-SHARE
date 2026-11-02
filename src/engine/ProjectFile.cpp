@@ -1108,6 +1108,12 @@ juce::var channelToVar (const ChannelDef& c)
         misc->setProperty ("shift", m.shiftBeats);
         misc->setProperty ("gate", m.gateBeats);
         misc->setProperty ("fullPorta", m.fullPorta);
+        if (m.mono) // Polyphony › Mono / Porta / Slide (round 168l)
+            misc->setProperty ("mono", true);
+        if (m.porta)
+            misc->setProperty ("porta", true);
+        if (m.portaBeats != ChannelMisc {}.portaBeats)
+            misc->setProperty ("portaTime", m.portaBeats);
         misc->setProperty ("echo", juce::Array<juce::var> { m.echo.feedback, m.echo.pan, m.echo.pitch, m.echo.modX, m.echo.modY, m.echo.echoes,
                                                             m.echo.timeBeats, m.echo.pingPong, m.echo.fat });
         misc->setProperty ("velocityTracking", juce::Array<juce::var> { m.velocity.mid, m.velocity.pan, m.velocity.modX, m.velocity.modY });
@@ -1421,6 +1427,9 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         m.shiftBeats = juce::jlimit (0.0f, 1.0f, (float) (double) misc.getProperty ("shift", 0.0));
         m.gateBeats = juce::jlimit (0.0f, 4.0f, (float) (double) misc.getProperty ("gate", 0.0));
         m.fullPorta = (bool) misc.getProperty ("fullPorta", true);
+        m.mono = (bool) misc.getProperty ("mono", false);
+        m.porta = (bool) misc.getProperty ("porta", false);
+        m.portaBeats = juce::jlimit (0.0f, 8.0f, (float) (double) misc.getProperty ("portaTime", (double) ChannelMisc {}.portaBeats));
         if (const auto& e = misc["echo"]; e.isArray() && e.size() >= 9)
         {
             m.echo.feedback = juce::jlimit (0.0f, 2.0f, (float) (double) e[0]);
@@ -1603,6 +1612,14 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
 
     if ((def.instrument == InstrumentKind::patcher || def.instrument == InstrumentKind::dashboard) && c.hasProperty ("patcher"))
         def.patcher = patcherFromVar (c["patcher"], song);
+    // projects saved before round 168l: an FL engine's (or another generator's) Mono / Porta, imported from FL, was
+    // only in the LYNX Synth's settings (the Mono box came from FL's Mono flag or a Max of 1; a Max of 1 is not Mono)
+    if (const auto& misc = c["misc"]; def.instrument != InstrumentKind::synth && ! misc.hasProperty ("mono") && ! misc.hasProperty ("porta"))
+    {
+        def.misc.mono = def.synth.mono && def.maxPolyphony != 1;
+        def.misc.porta = def.instrument == InstrumentKind::sampler ? def.sampler.porta : def.synth.porta;
+        def.misc.portaBeats = def.instrument == InstrumentKind::sampler ? def.sampler.portaBeats : def.synth.portaBeats;
+    }
     return def;
 }
 

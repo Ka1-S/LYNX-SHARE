@@ -3883,7 +3883,7 @@ countries: id
 "Maximum polyphony (-- = no limit)" = "Polifoni maksimum (-- = tanpa batas)"
 "{0} beats" = "{0} beat"
 "Portamento: each note glides from the previous one's pitch (the Slide knob sets the time)" = "Portamento: setiap not meluncur dari pitch not sebelumnya (knob Slide mengatur waktunya)"
-"Mono: one voice; a new note takes over the sounding one" = "Mono: satu voice; not baru menggantikan yang sedang berbunyi"
+"Mono: one voice; a note played over a held one glides to it (Slide time) without a new attack" = "Mono: satu voice; not yang dimainkan di atas not yang ditahan meluncur ke sana (waktu Slide) tanpa attack baru"
 "Cut: notes of this channel stop the channels cut by this group" = "Cut: not channel ini menghentikan channel yang dipotong grup ini"
 "By: this channel is cut by the channels of this group" = "By: channel ini dipotong oleh channel di grup ini"
 "Cut group" = "Grup cut"

@@ -3883,7 +3883,7 @@ countries: jp
 "Maximum polyphony (-- = no limit)" = "最大ポリフォニー (-- = 制限なし)"
 "{0} beats" = "{0}拍"
 "Portamento: each note glides from the previous one's pitch (the Slide knob sets the time)" = "ポルタメント: 各ノートは前のノートのピッチからグライドします (スライドノブで時間を設定)"
-"Mono: one voice; a new note takes over the sounding one" = "モノ: 1ボイス。新しいノートが鳴っているノートを引き継ぎます"
+"Mono: one voice; a note played over a held one glides to it (Slide time) without a new attack" = "モノ: 1ボイス。押さえているノートの上で弾いたノートへ、新しいアタックなしでグライドします(Slideの時間)"
 "Cut: notes of this channel stop the channels cut by this group" = "カット: このチャンネルのノートが、このグループでカットされるチャンネルを停止します"
 "By: this channel is cut by the channels of this group" = "カット元: このチャンネルはこのグループのチャンネルによってカットされます"
 "Cut group" = "カットグループ"

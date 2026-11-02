@@ -3883,7 +3883,7 @@ countries: tr
 "Maximum polyphony (-- = no limit)" = "Maksimum polifoni (-- = sınırsız)"
 "{0} beats" = "{0} vuruş"
 "Portamento: each note glides from the previous one's pitch (the Slide knob sets the time)" = "Portamento: her nota öncekinin pitch'inden kayar (Slide knob'u süreyi ayarlar)"
-"Mono: one voice; a new note takes over the sounding one" = "Mono: tek ses; yeni nota çalmakta olanın yerini alır"
+"Mono: one voice; a note played over a held one glides to it (Slide time) without a new attack" = "Mono: tek ses; basılı bir notanın üzerine çalınan nota ona kayar (Slide süresi), yeni atak olmadan"
 "Cut: notes of this channel stop the channels cut by this group" = "Kes: bu kanalın notaları bu grubun kestiği kanalları durdurur"
 "By: this channel is cut by the channels of this group" = "Kesen: bu kanal bu grubun kanalları tarafından kesilir"
 "Cut group" = "Kesme grubu"

@@ -1697,6 +1697,32 @@ private:
                       && plainBack->mixer[0].outputChannel == lynx::outputDefault && plainBack->mixer[1].outputChannel == lynx::outputDefault;
         }
 
+        // Misc › Mono / Porta / Slide on every generator (round 168l): kept in the file; a project saved before (an
+        // imported engine's flags in its synth settings) gets them back, a Max polyphony of 1 is not Mono
+        bool polyOk = false;
+        {
+            auto song = lynx::Song::makeDefault();
+            lynx::ChannelDef osc;
+            osc.instrument = lynx::InstrumentKind::threeosc;
+            osc.misc.mono = osc.misc.porta = true;
+            osc.misc.portaBeats = 0.25f;
+            song.channels.push_back (osc);
+            auto old = osc;
+            old.misc = {};
+            old.synth.mono = old.synth.porta = true;
+            old.synth.portaBeats = 0.5f;
+            song.channels.push_back (old);
+            old.maxPolyphony = 1;
+            song.channels.push_back (old);
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), error);
+            const auto n = song.channels.size();
+            polyOk = back && back->channels.size() == n && back->channels[n - 3].misc.mono && back->channels[n - 3].misc.porta
+                     && std::abs (back->channels[n - 3].misc.portaBeats - 0.25f) < 1e-6f && back->channels[n - 2].misc.mono
+                     && back->channels[n - 2].misc.porta && std::abs (back->channels[n - 2].misc.portaBeats - 0.5f) < 1e-6f
+                     && ! back->channels[n - 1].misc.mono && back->channels[n - 1].maxPolyphony == 1
+                     && ! back->channels[4].misc.mono; // (the LYNX Synth keeps its own flags)
+        }
+
         // FL's track latency (REA round 165f-mixer): manual ms, bypass mode and master compensation saved only when set
         bool latencyOk = false;
         {
@@ -2071,7 +2097,7 @@ private:
         // Settings › Audio "Driver settings…" with a fake driver panel (issue #13's crash, the panel's buffer kept)
         const auto driverPanel = lynx::AudioEngine::driverPanelSelfTest();
 
-        const auto ok = audioOk && projectOk && richOk && hwOutOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
+        const auto ok = audioOk && projectOk && richOk && hwOutOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk;
 
         juce::String report;
@@ -2080,6 +2106,7 @@ private:
                << "project=" << (projectOk ? "OK" : "ERROR " + error) << "\n"
                << "project_features=" << (richOk ? "OK" : "ERROR") << "\n"
                << "hardware_outputs=" << (hwOutOk ? "OK" : "ERROR") << "\n"
+               << "channel_polyphony=" << (polyOk ? "OK" : "ERROR") << "\n"
                << "track_latency=" << (latencyOk ? "OK" : "ERROR") << "\n"
                << "plugin_substitutes=" << (substituteOk ? "OK" : "ERROR") << "\n"
                << "patcher=" << (patcherOk ? "OK" : "ERROR") << "\n"

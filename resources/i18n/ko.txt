@@ -3883,7 +3883,7 @@ countries: kr
 "Maximum polyphony (-- = no limit)" = "최대 폴리포니(-- = 제한 없음)"
 "{0} beats" = "{0}박"
 "Portamento: each note glides from the previous one's pitch (the Slide knob sets the time)" = "포르타멘토: 각 노트가 이전 노트의 피치에서 미끄러지듯 이어집니다(슬라이드 노브로 시간 설정)"
-"Mono: one voice; a new note takes over the sounding one" = "모노: 보이스 하나. 새 노트가 울리는 노트를 대체합니다"
+"Mono: one voice; a note played over a held one glides to it (Slide time) without a new attack" = "모노: 보이스 하나. 누르고 있는 노트 위에 친 노트로 새 어택 없이 글라이드합니다 (Slide 시간)"
 "Cut: notes of this channel stop the channels cut by this group" = "컷: 이 채널의 노트가 이 그룹에 의해 컷되는 채널을 멈춥니다"
 "By: this channel is cut by the channels of this group" = "컷 대상: 이 그룹의 채널이 이 채널을 컷합니다"
 "Cut group" = "컷 그룹"
