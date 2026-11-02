@@ -76,6 +76,8 @@ public:
     std::function<void (const juce::File&)> onOpenProject;
     // Enter / Shift+Up/Down: put this file into the selected channel; returns false if it can't take it.
     std::function<bool (const juce::File&)> onLoadIntoChannel;
+    // Double-click an FL mixer preset / LYNX mixer track state: onto the Mixer's selected tracks (false = not one)
+    std::function<bool (const juce::File&)> onOpenMixerPreset;
     // Current project items (set by the main window)
     std::function<void (int)> onOpenPattern;     // double-click a pattern: it opens in the Piano Roll
     std::function<void (int)> onPatternMenu;     // right-click a pattern (already selected): the pattern menu

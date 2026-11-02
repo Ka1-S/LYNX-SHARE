@@ -830,7 +830,6 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 const auto bottomKey = (low + high) / 2.0f - span / 2.0f;
                 const auto rows = (float) span + 1.0f;
                 const auto noteHeight = juce::jlimit (1.5f, 2.5f, body.getHeight() / rows);
-                const auto patternLength = juce::jmax<std::int64_t> (1, song.patterns[(std::size_t) c.pattern].effectiveLength (song.beatsPerBar));
                 g.setColour (clipContentColour (base));
 
                 juce::Graphics::ScopedSaveState clip (g);
@@ -840,28 +839,24 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 // rounding does not show), notes outside the repainted area skipped
                 const auto rounded = noteHeight > 2.0f && r.getWidth() > 60.0f;
 
-                // the pattern repeats along a clip longer than it (FL loops pattern clips that are stretched)
-                for (auto loopStart = c.start - c.offset % patternLength; loopStart < c.end(); loopStart += patternLength)
+                // the pattern once, from the clip's offset: a clip stretched past its pattern is empty after it, as FL
+                // plays and shows it (round 168k [EXEC]: FL's render of a 1-bar pattern in a 4-bar clip is silent
+                // after bar 1) — it used to be drawn repeating while only the first pass played
+                const auto patternStart = c.start - c.offset;
+                for (const auto& n : notes)
                 {
-                    if (tickToX ((double) loopStart) > visible.getRight())
-                        break;
-                    if (tickToX ((double) (loopStart + patternLength)) < visible.getX())
+                    const auto at = patternStart + n.start;
+                    if (at + n.length <= c.start || at >= c.end())
                         continue;
-                    for (const auto& n : notes)
-                    {
-                        const auto at = loopStart + n.start;
-                        if (at + n.length <= c.start || at >= c.end())
-                            continue;
-                        const auto nx = (float) tickToX ((double) at);
-                        const auto nw = juce::jmax (rounded ? 2.0f : 1.0f, (float) (n.length * pixelsPerTick) - 1.0f);
-                        if (nx > visible.getRight() || nx + nw < visible.getX())
-                            continue;
-                        const auto ny = body.getBottom() - ((float) n.key - bottomKey + 0.5f) / rows * body.getHeight() - noteHeight * 0.5f;
-                        if (rounded)
-                            g.fillRoundedRectangle (nx, ny, nw, noteHeight, juce::jmin (1.0f, noteHeight * 0.5f));
-                        else
-                            g.fillRect (nx, ny, nw, noteHeight);
-                    }
+                    const auto nx = (float) tickToX ((double) at);
+                    const auto nw = juce::jmax (rounded ? 2.0f : 1.0f, (float) (n.length * pixelsPerTick) - 1.0f);
+                    if (nx > visible.getRight() || nx + nw < visible.getX())
+                        continue;
+                    const auto ny = body.getBottom() - ((float) n.key - bottomKey + 0.5f) / rows * body.getHeight() - noteHeight * 0.5f;
+                    if (rounded)
+                        g.fillRoundedRectangle (nx, ny, nw, noteHeight, juce::jmin (1.0f, noteHeight * 0.5f));
+                    else
+                        g.fillRect (nx, ny, nw, noteHeight);
                 }
             }
 
@@ -1335,21 +1330,20 @@ void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, co
         const auto bottomKey = (low + high) / 2.0f - span / 2.0f;
         const auto rows = (float) span + 1.0f;
         const auto noteHeight = juce::jlimit (1.5f, 2.5f, inner.getHeight() / rows);
-        const auto patternLength = juce::jmax<std::int64_t> (1, song.patterns[(std::size_t) c.pattern].effectiveLength (song.beatsPerBar));
         auto& marks = batch.contents[clipContentColour (base).getARGB()];
-        for (auto loopStart = c.start - c.offset % patternLength; loopStart < c.end(); loopStart += patternLength)
-            for (const auto& n : notes)
-            {
-                const auto at = loopStart + n.start;
-                if (at + n.length <= c.start || at >= c.end())
-                    continue;
-                const auto nx = juce::jmax (inner.getX(), (float) tickToX ((double) at));
-                const auto nr = juce::jmin (inner.getRight() - 1.0f, nx + juce::jmax (1.0f, (float) (n.length * pixelsPerTick) - 1.0f));
-                if (nr <= nx)
-                    continue;
-                const auto ny = inner.getBottom() - ((float) n.key - bottomKey + 0.5f) / rows * inner.getHeight() - noteHeight * 0.5f;
-                marks.addWithoutMerging ({ nx, ny, nr - nx, noteHeight });
-            }
+        const auto patternStart = c.start - c.offset; // the pattern once (FL: no repeats past its end; round 168k)
+        for (const auto& n : notes)
+        {
+            const auto at = patternStart + n.start;
+            if (at + n.length <= c.start || at >= c.end())
+                continue;
+            const auto nx = juce::jmax (inner.getX(), (float) tickToX ((double) at));
+            const auto nr = juce::jmin (inner.getRight() - 1.0f, nx + juce::jmax (1.0f, (float) (n.length * pixelsPerTick) - 1.0f));
+            if (nr <= nx)
+                continue;
+            const auto ny = inner.getBottom() - ((float) n.key - bottomKey + 0.5f) / rows * inner.getHeight() - noteHeight * 0.5f;
+            marks.addWithoutMerging ({ nx, ny, nr - nx, noteHeight });
+        }
     }
 }
 
@@ -1939,6 +1933,28 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 
     if (e.mods.isMiddleButtonDown() && e.x >= headerWidth) // middle-drag pans, in every tool
     {
+        const auto onClips = gridArea().contains (e.getPosition());
+        const auto onRuler = e.y >= rulerTop && e.y < headerHeight;
+        if (onClips && e.mods.isCtrlDown() && ! e.mods.isAltDown()) // FL: Ctrl+middle-drag = vertical zoom
+        {
+            drag = Drag::heightZoom;
+            const auto track = yToTrack (e.y);
+            heightZoomTrackY = trackToY (track); // the top of the track under the mouse stays where it is
+            heightZoomStartHeight = juce::jmax (1, heightOf (track));
+            trackZoomStart = trackZoom;
+            heightZoomDrag.begin (e.y);
+            e.source.enableUnboundedMouseMovement (true);
+            return;
+        }
+        if (onRuler || (onClips && e.mods.isAltDown())) // FL: middle-drag on the ruler / Alt+middle-drag = time zoom
+        {
+            drag = Drag::timeZoom;
+            const auto width = (double) juce::jmax (1, gridArea().getWidth());
+            timeZoomDrag.begin (width / pixelsPerTick, scrollTicks + width * 0.5 / pixelsPerTick, e.x, e.y);
+            e.source.enableUnboundedMouseMovement (true);
+            return;
+        }
+
         drag = Drag::pan;
         panStartTicks = scrollTicks;
         panStartY = scrollY;
@@ -2539,6 +2555,27 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
         return;
     }
 
+    if (drag == Drag::heightZoom)
+    {
+        heightZoomDrag.move (e.y, e.mods.isCtrlDown());
+        const auto height = heightZoomDrag.height (heightZoomStartHeight, 8, 640);
+        setTrackZoom (trackZoomStart * (double) height / (double) heightZoomStartHeight, heightZoomTrackY);
+        return;
+    }
+
+    if (drag == Drag::timeZoom)
+    {
+        const auto width = (double) juce::jmax (1, gridArea().getWidth());
+        timeZoomDrag.move (e.x, e.y, e.mods.isCtrlDown());
+        pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), width / timeZoomDrag.span);
+        scrollTicks = juce::jmax (0.0, timeZoomDrag.centre - width * 0.5 / pixelsPerTick);
+        zoomBeforeAll = 0.0;
+        updateScrollBars();
+        repaint();
+        ui::postHint ({ tr ("Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only"), {}, false, false });
+        return;
+    }
+
     if (drag == Drag::trackResize)
     {
         // the size shown, kept at 100% zoom (the vertical zoom scales every track)
@@ -2573,6 +2610,8 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
         case Drag::none:
         case Drag::trackResize:
         case Drag::trackZoom:
+        case Drag::heightZoom:
+        case Drag::timeZoom:
         case Drag::preview:
             return;
 
@@ -2963,6 +3002,8 @@ void PlaylistComponent::postDragHint()
         case Drag::zoomRange:
         case Drag::trackResize:
         case Drag::trackZoom:
+        case Drag::heightZoom:
+        case Drag::timeZoom:
         case Drag::preview:
         case Drag::none: return;
     }

@@ -142,7 +142,7 @@ public:
 
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, autoPoint, autoTension,
-                      trackResize, preview, trackZoom, perfLaunch, clipGain };
+                      trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain };
     // Performance mode (round 165m): the clip a click launched (its release goes with the mouse button)
     int perfTrack = -1;
     std::int64_t perfClip = -1;
@@ -174,6 +174,11 @@ private:
     juce::Rectangle<int> trackZoomHandle() const;
     void setTrackZoom (double zoom, int anchorY);
     double trackZoomStart = 1.0;
+    // FL 2026 middle-drag zooms (round 167t, issue #26): Ctrl+middle-drag on the clips = track height around the
+    // track under the mouse; middle-drag on the ruler / Alt+middle-drag on the clips = time zoom
+    gesture::HeightZoomDrag heightZoomDrag;
+    gesture::SpanZoomDrag timeZoomDrag;
+    int heightZoomTrackY = 0, heightZoomStartHeight = 1;
     bool trackZoomHover = false;
     int tracksHeight() const;            // all tracks, top to bottom
     int dividerAt (juce::Point<int> p) const; // the track whose bottom edge (in the headers) is under p, or -1

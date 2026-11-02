@@ -117,6 +117,8 @@ juce::String rowHint (const juce::File& f, bool folder, bool expanded)
         return tr ("MIDI file: [2xLMB] open it as a project");
     if (f.hasFileExtension ("lynx;flp"))
         return tr ("Project: [2xLMB] open it");
+    if (f.hasFileExtension ("lynxtrack") || (f.hasFileExtension ("fst") && f.getFullPathName().containsIgnoreCase ("Mixer presets")))
+        return tr ("Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)");
     if (f.hasFileExtension ("fst"))
         return tr ("Preset: [2xLMB] new channel with it (FL synth presets)  drag onto a mixer insert: effect preset");
     if (f.hasFileExtension ("lynxpreset;fxp;fxb;vstpreset"))
@@ -2956,6 +2958,10 @@ void BrowserComponent::rebuildRoots()
     add (tr ("Speech (FL)"), data.getChildFile ("Patches").getChildFile ("Speech"), RootKind::speech);
     speechui::userSpeechFolder().createDirectory(); // (the Speech properties save there; round 168b)
     add (tr ("Speech"), speechui::userSpeechFolder(), RootKind::speech);
+    // FL's Browser folder "Mixer presets" (REA round 167q, FUN_009db5b0: the user's and the installation's)
+    if (const auto userData = findFlStudio().userData; userData.isDirectory())
+        add (tr ("Mixer presets"), userData.getChildFile ("Presets").getChildFile ("Mixer presets"), RootKind::flPresets);
+    add (tr ("Mixer presets (FL)"), data.getChildFile ("Patches").getChildFile ("Mixer presets"), RootKind::flPresets);
     pluginpresetui::presetsRoot().createDirectory(); // (the plugin window saves presets there; round 162d)
     add (tr ("Plugin presets"), pluginpresetui::presetsRoot(), RootKind::pluginPresets);
     add (tr ("Documents"), juce::File::getSpecialLocation (juce::File::userDocumentsDirectory), RootKind::documents);
@@ -3826,6 +3832,10 @@ void BrowserComponent::openFile (const juce::File& file)
         newSampleChannel (file);
         return;
     }
+
+    // FL's mixer preset (REA round 167q) or LYNX's mixer track state: onto the selected mixer tracks
+    if (file.hasFileExtension ("fst;lynxtrack") && onOpenMixerPreset && onOpenMixerPreset (file))
+        return;
 
     // preset of an FL synth that LYNX converts (3x Osc, Sytrus, GMS...): new channel with the built-in synth
     if (file.hasFileExtension ("fst;gmsynth"))

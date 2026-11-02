@@ -104,7 +104,7 @@ public:
     void burnMidi (int channel, bool toNewPattern);
 
     // Adds a channel at the end (routed to a free insert), selects it and, for plugins, opens its window.
-    int addChannel (ChannelDef channel, bool openEditor);
+    int addChannel (ChannelDef channel, bool openEditor, int insert = -1); // insert: see addChannelRouted
 
     // Loads `file` into the selected sampler channel (Browser: Enter, Shift+Up/Down). Returns false when
     // the selected channel cannot take a sample.

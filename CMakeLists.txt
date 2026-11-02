@@ -56,6 +56,7 @@ add_library(lynx_core STATIC
     src/core/Preferences.cpp
     src/core/MidiSync.cpp
     src/core/ThemePalette.cpp
+    src/core/LoopStarter.cpp
     src/core/PluginLayout.cpp
     src/core/StateParams.cpp
     src/core/FlEffects.cpp
@@ -418,6 +419,7 @@ if(LYNX_BUILD_APP)
         src/ui/ToolWindow.cpp
         src/ui/SpeechDialog.cpp
         src/ui/TempoTapper.cpp
+        src/ui/LoopStarterWindow.cpp
         src/ui/HistoryPanel.cpp
         src/ui/MissingFilesDialog.cpp
         src/ui/SettingsDialog.cpp

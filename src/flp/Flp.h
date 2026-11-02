@@ -418,6 +418,12 @@ struct Project
 // without the new-channel event.
 Project parseProject (std::span<const std::uint8_t> file, bool channelPreset = false);
 
+// FL mixer track preset (.fst of Data\Patches\Mixer presets and Documents\...\Presets\Mixer presets, REA round
+// 167q): one insert, as `mixer[1]` (mixer[0] is an empty Master), its controls moved to track 1.
+Project parseMixerPreset (std::span<const std::uint8_t> file);
+// The events of an FL mixer track preset (an insert's events, no channel or pattern); false for other .fst / bad data.
+bool looksLikeMixerPreset (std::span<const std::uint8_t> file);
+
 // The FL version that saved a project ("21.2.3.4060"), read from the start of the file only (event 0xC7 comes among
 // the first events; the Browser's details box, REA round 139). "" when the bytes are not an FL project / no version.
 std::string readSavedVersion (std::span<const std::uint8_t> head);
