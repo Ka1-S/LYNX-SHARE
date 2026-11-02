@@ -12,6 +12,7 @@ STAGE="$(mktemp -d)/LYNX"
 mkdir -p "$STAGE" "$OUTDIR"
 
 ditto "$APP" "$STAGE/LYNX.app"
+./scripts/fetch-onnxruntime.sh macos "$STAGE/LYNX.app/Contents/Frameworks"
 # ad-hoc signature over the whole bundle: Apple Silicon refuses to run unsigned code, and a consistent bundle
 # signature turns "LYNX is damaged" into the normal "unidentified developer" prompt
 codesign --force --deep --sign - "$STAGE/LYNX.app"

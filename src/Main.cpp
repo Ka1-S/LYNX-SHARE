@@ -102,6 +102,7 @@
 #include "platform/CrashGuard.h"
 #include "ui/CrashReporter.h"
 #include "ui/Updater.h"
+#include "ui/StemExtract.h"
 
 #include <atomic>
 #include <chrono>
@@ -1060,6 +1061,18 @@ public:
         {
             const auto i = args.indexOf ("--snapshot");
             runSnapshot (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+
+        if (args.contains ("--stemsplit"))
+        {
+            // LYNX.exe --stemsplit input.wav folder: the stem separation of the clip menu, without the window
+            const auto i = args.indexOf ("--stemsplit");
+            lynx::AudioEngine loader (false);
+            const auto error = lynx::extractStemsToFolder (loader, juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()));
+            juce::File (args[i + 2].unquoted()).getSiblingFile ("stemsplit.txt").replaceWithText (error.isEmpty() ? "result=OK\n" : "result=FAIL " + error + "\n");
+            setApplicationReturnValue (error.isEmpty() ? 0 : 1);
+            quit();
             return;
         }
 

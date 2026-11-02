@@ -102,6 +102,7 @@ jobs:
           ZIG="$HOME/opt/zig-x86_64-linux-$ZIG_VERSION/zig" JUCE_DIR="$HOME/opt/juce-$JUCE_VERSION" OUT=build-win \
             ./scripts/build-windows-zig.sh 2>&1 | grep -v '^1 warning generated\.$'
           sha256sum build-win/LYNX.exe
+          ./scripts/fetch-onnxruntime.sh windows build-win
 
       - name: Upload unsigned LYNX.exe
         id: upload
@@ -112,6 +113,7 @@ jobs:
             build-win/LYNX.exe
             build-win/lynx-asio.dll
             build-win/lynx-asio32.dll
+            build-win/onnxruntime.dll
           if-no-files-found: error
 
       # the build's symbols (round 157a): a user's crash / hang file lists LYNX.exe+offset frames; with this LYNX.pdb
@@ -163,6 +165,7 @@ jobs:
             signed/LYNX.exe
             signed/lynx-asio.dll
             signed/lynx-asio32.dll
+            signed/onnxruntime.dll
           if-no-files-found: error
 
   package:
@@ -216,7 +219,7 @@ jobs:
           New-Item -ItemType Directory -Force "pkg\$name" | Out-Null
           $p = Start-Process bin\LYNX.exe -ArgumentList '--showcase', "$PWD\pkg\$name\Demo.lynx" -Wait -PassThru
           if (-not (Test-Path "pkg\$name\Demo.lynx")) { throw "showcase did not write Demo.lynx (exit $($p.ExitCode))" }
-          Copy-Item bin\LYNX.exe, LICENSE, THIRD_PARTY.md, PRIVACY.md "pkg\$name\"
+          Copy-Item bin\LYNX.exe, bin\onnxruntime.dll, LICENSE, THIRD_PARTY.md, PRIVACY.md "pkg\$name\"
           # LYNX ASIO driver and its registration helpers (REA round 97)
           if (Test-Path bin\lynx-asio.dll) { Copy-Item bin\lynx-asio.dll, "asio\Register LYNX ASIO.bat", "asio\Unregister LYNX ASIO.bat" "pkg\$name\" }
           if (Test-Path bin\lynx-asio32.dll) { Copy-Item bin\lynx-asio32.dll "pkg\$name\" }  # 32-bit hosts (round 106)

@@ -428,7 +428,9 @@ if(LYNX_BUILD_APP)
         src/ui/QuickAddPalette.cpp
         src/ui/PluginPicker.cpp
         src/ui/CrashReporter.cpp
-        src/ui/Updater.cpp)
+        src/ui/Updater.cpp
+        src/ui/StemExtract.cpp)
+    target_include_directories(LYNX PRIVATE third_party/onnxruntime) # loaded at run time, never linked
 
     target_include_directories(LYNX PRIVATE third_party/clap/include)
     # the commit the build comes from (crash reports name it, round 159)
