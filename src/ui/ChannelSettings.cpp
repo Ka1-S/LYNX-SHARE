@@ -2816,7 +2816,7 @@ public:
     }
 
     // FL's number wheel (round 168s, issue #32): the value in a box over the caption instead of a knob; the whole
-    // control is the hit area, a notch / 8 px of drag = one step (ui::digitWheel). Double-click: `doubleClicked`.
+    // control is the hit area, a notch / 7.5 px of drag = one step (ui::digitWheel). Double-click: `doubleClicked`.
     bool digitBox = false;
     std::function<void()> doubleClicked;
     std::function<void (juce::PopupMenu&)> extraMenuItems;
@@ -3963,7 +3963,7 @@ public:
                     [] (Song& s, int ch, double v) { s.channels[(std::size_t) ch].misc.pitchRange = juce::jlimit (0, 48, juce::roundToInt (v)); },
                     TR_NOOP ("Range"));
         header.back()->digitBox = true;
-        // FL's TRACK digiwheel (round 168s, issue #32 "very small and not accurate"): a wheel notch or 8 px of drag = the
+        // FL's TRACK digiwheel (round 168s, issue #32 "very small and not accurate"): a wheel notch or 7.5 px of drag = the
         // next insert, double-click shows the insert in the Mixer, the menu has "Assign to free mixer track"
         headerKnob ([this, name] {
                         return ui::digitWheel (countSpec (name() + " - " + tr ("Target mixer track"), maxMixerTracks - 1, 0,

@@ -27,9 +27,8 @@ struct ValueSpec
     double minimum = 0.0, maximum = 1.0, defaultValue = 0.0;
     double interval = 0.0;             // > 0: integer-like controls (route box)
     double pixelsForRange = 150.0;     // drag distance that sweeps the whole range
-    // > 0: FL's number wheels (digiwheels: the mixer track boxes, ranges): a wheel notch moves this many intervals
-    // (whatever the range), the drag takes pixelsForRange as set by digitWheel() (round 168s, issue #32)
-    double stepsPerNotch = 0.0;
+    double wheelPerNotch = 0.0;        // > 0: value change per wheel notch; 0 = 2% of the range (a 500-wide range moved 10)
+                                       // (FL's number wheels, digitWheel(): one interval per notch, round 168s)
     // shown value <-> stored value (e.g. 0..1 volume shown as "78%"). Both optional.
     std::function<juce::String (double)> toText;
     std::function<std::optional<double> (const juce::String&)> fromText;
@@ -40,8 +39,8 @@ struct ValueSpec
 };
 
 // FL's number wheel on an integer spec (TVectorDigiWheel, round 168s [SHOT] r168s c_f14 / c_f17): one wheel notch = one
-// step, a drag moves one step every 8 pixels (FL: 30 px up = 4 steps), so a track number can be picked exactly.
-constexpr double digitWheelPixelsPerStep = 8.0;
+// step, a drag moves one step every 7.5 pixels (FL: 30 px up = 4 steps), so a track number can be picked exactly.
+constexpr double digitWheelPixelsPerStep = 7.5; // FL: 30 px of drag = 4 steps (r168s c_f17)
 ValueSpec digitWheel (ValueSpec spec);
 
 // The usual specs.

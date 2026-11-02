@@ -180,7 +180,7 @@ std::function<std::optional<double> (const juce::String&)> inverseOf (std::funct
 ValueSpec digitWheel (ValueSpec spec)
 {
     spec.interval = juce::jmax (1.0, spec.interval);
-    spec.stepsPerNotch = 1.0;
+    spec.wheelPerNotch = 1.0; // (PR #39's field: one insert per notch)
     spec.pixelsForRange = digitWheelPixelsPerStep * juce::jmax (1.0, (spec.maximum - spec.minimum) / spec.interval);
     return spec;
 }
@@ -240,8 +240,15 @@ std::optional<double> wheelValue (double value, const juce::MouseEvent& e, const
    #endif
     const auto notches = (wheel.isReversed ? -1.0 : 1.0) * controls::wheelNotches (delta, notchSize);
     reportTweak (spec);
-    if (spec.stepsPerNotch > 0.0)
-        return juce::jlimit (spec.minimum, spec.maximum, value + notches * spec.stepsPerNotch * juce::jmax (1.0, spec.interval));
+
+    if (spec.wheelPerNotch > 0.0)
+    {
+        const auto step = juce::jmax (spec.wheelPerNotch * (e.mods.isCtrlDown() ? controls::fineFactor : 1.0), spec.interval);
+        // one step per wheel notch (round 168s: `notches` now counts a click as one notch on every platform; a fast
+        // spin that the system sends as one event of several notches moves that many steps)
+        return juce::jlimit (spec.minimum, spec.maximum, value + notches * step);
+    }
+
     return controls::wheelValue (value, notches, spec.minimum, spec.maximum, e.mods.isCtrlDown(), spec.interval);
 }
 
