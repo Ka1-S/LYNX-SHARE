@@ -7,9 +7,10 @@ namespace i32
 // a hosted plugin effect stand-in: counts how many were made, keeps a "live setting" that only the instance knows
 struct FakePluginFx final : lynx::Effect
 {
-    static inline int made = 0;
+    static inline int made = 0, destroyed = 0;
     float liveSetting = 0.0f;
     FakePluginFx() { ++made; }
+    ~FakePluginFx() override { ++destroyed; }
     void prepare (double) noexcept override {}
     void reset() noexcept override {}
     void process (float*, float*, int, const lynx::EffectParams&, double) noexcept override {}
@@ -56,7 +57,7 @@ TEST (issue32_moving_a_plugin_in_the_effect_chain_keeps_its_instance)
     song.mixer = lynx::Song::defaultMixer (3);
     song.mixer[1].effects = { i32::pluginSlot ("SynthMaster FX"), i32::pluginSlot ("Vital FX") };
     const auto f = i32::fakePluginFactories();
-    i32::FakePluginFx::made = 0;
+    i32::FakePluginFx::made = i32::FakePluginFx::destroyed = 0;
     auto a = lynx::RackState::build (song, nullptr, 48000.0, f);
     I32_REQUIRE (a->effects.size() > 1 && a->effects[1].size() == 2 && i32::FakePluginFx::made == 2);
     auto* first = a->effects[1][0].get();
@@ -78,6 +79,50 @@ TEST (issue32_moving_a_plugin_in_the_effect_chain_keeps_its_instance)
     auto c = lynx::RackState::build (song, b.get(), 48000.0, f);
     CHECK (i32::FakePluginFx::made == 2);
     CHECK (c->effects[2].size() == 1 && c->effects[2][0].get() == first && c->effects[1][0].get() == second);
+
+    // issue #36 (Presswerk crashed in its teardown after a slot move): with every older rack freed, no plugin was torn
+    // down for the moves (main / PR #37 alone: a new instance was made and the old one destroyed)
+    a.reset();
+    b.reset();
+    CHECK (i32::FakePluginFx::destroyed == 0);
+    // two of the same plugin swapped (PR #37's duplicate case): each keeps its own instance
+    song.mixer[1].effects.push_back (i32::pluginSlot ("SynthMaster FX"));
+    song.uniqueInstances();
+    auto d = lynx::RackState::build (song, c.get(), 48000.0, f);
+    auto* x = d->effects[1][0].get();
+    auto* y = d->effects[1][1].get();
+    song.swapEffectSlots (1, 0, 1);
+    song.uniqueInstances();
+    auto e = lynx::RackState::build (song, d.get(), 48000.0, f);
+    CHECK (e->effects[1][0].get() == y && e->effects[1][1].get() == x && i32::FakePluginFx::destroyed == 0);
+}
+
+TEST (issue36_retired_racks_go_to_the_owner_not_freed_in_the_collecting_callback)
+{
+    // issue #36: the racks the audio thread returns are handed to `dispose` (the engine frees them from a message of
+    // their own) instead of being deleted inside collectGarbage(), which ran in the engine's timer callback
+    struct Probe
+    {
+        int* alive;
+        explicit Probe (int* a) : alive (a) { ++*alive; }
+        ~Probe() { --*alive; }
+    };
+    int alive = 0;
+    std::vector<const Probe*> handed;
+    {
+        lynx::SnapshotExchange<Probe> x;
+        x.dispose = [&handed] (const Probe* p) { handed.push_back (p); };
+        x.publish (std::make_unique<Probe> (&alive));
+        x.acquire();
+        x.publish (std::make_unique<Probe> (&alive));
+        x.acquire(); // the first one is returned
+        x.collectGarbage();
+        CHECK (handed.size() == 1 && alive == 2); // not freed by collectGarbage
+        for (const auto* p : handed)
+            delete p;
+        CHECK (alive == 1);
+    }
+    CHECK (alive == 0); // the exchange still frees what it holds itself
 }
 
 TEST (issue32_a_pasted_copy_of_a_plugin_slot_gets_its_own_instance_once)

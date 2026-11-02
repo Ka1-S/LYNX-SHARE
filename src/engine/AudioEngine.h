@@ -434,10 +434,9 @@ public:
     // (dragging a note, turning a knob) become a single step.
     void editSong (const std::function<void (Song&)>& edit, bool undoable = true);
 
-    // For an edit that moves or removes channels, mixer tracks or effect slots (issue #32): hosted plugins are reused
-    // by position, so the ones that end up elsewhere are built again from the Song's saved state. That state is only
-    // refreshed on save, so the live settings are copied in first (or a moved plugin came back with its parameters
-    // reset), and two instances of one plugin are never kept in each other's place.
+    // For an edit that moves or removes channels, mixer tracks or effect slots (issue #32, PR #37): the live plugin
+    // settings are copied into the Song first, so the undo step has them; the moved plugins keep their instances (the
+    // rack matches them by instance tag, round 168s).
     void editSongStructural (const std::function<void (Song&)>& edit);
 
     // Changes since the last save/open (for the "*" in the title and the "save changes?" prompt).
@@ -899,6 +898,41 @@ private:
     juce::Time lastUndoPress; // mouse click that already produced an undo step
     SnapshotExchange<RackState> rackExchange;
     RackState lastPublishedShape; // channels + instruments of the last snapshot, to reuse voices
+    // Issue #36 (u-he Presswerk crashed in its VST3 teardown, freed from the engine's timer callback): the racks the
+    // audio thread let go of are freed from a message of their own, not inside the timer callback that collected them.
+    // A plugin whose editor is open dies when its window goes (the window closes the editor first). Declared after the
+    // rack members: freed first, while the plugin hosts still exist. In the app only (tests have no message loop).
+    struct RackDisposer final : private juce::AsyncUpdater
+    {
+        ~RackDisposer() override
+        {
+            cancelPendingUpdate();
+            flush();
+        }
+        void add (const RackState* rack)
+        {
+            {
+                const juce::ScopedLock sl (lock);
+                items.push_back (rack);
+            }
+            triggerAsyncUpdate();
+        }
+        void flush()
+        {
+            std::vector<const RackState*> now;
+            {
+                const juce::ScopedLock sl (lock);
+                now.swap (items);
+            }
+            for (const auto* rack : now)
+                delete rack;
+        }
+
+    private:
+        void handleAsyncUpdate() override { flush(); }
+        juce::CriticalSection lock;
+        std::vector<const RackState*> items;
+    } rackDisposer;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioEngine)
 };

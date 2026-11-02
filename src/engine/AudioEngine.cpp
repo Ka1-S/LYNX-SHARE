@@ -229,6 +229,8 @@ AudioEngine::AudioEngine (bool openAudioDevice)
     vfx::script::setRealtime (openAudioDevice);
     const auto mark = [] (const char* step) { if (startupMark != nullptr) startupMark (step); };
     mark ("  engine: workers + default song");
+    if (juce::JUCEApplicationBase::getInstance() != nullptr) // issue #36: retired racks are freed from their own message
+        rackExchange.dispose = [this] (const RackState* rack) { rackDisposer.add (rack); };
     publishSong();
     buildInitialGraph();
     mark ("  engine: graph");
@@ -298,6 +300,8 @@ AudioLogger& AudioEngine::getAudioLogger()
 AudioEngine::~AudioEngine()
 {
     stopTimer();
+    rackExchange.dispose = nullptr; // (from here the racks are freed at once)
+    rackDisposer.flush();
     audioLogger.reset(); // closes the log file
 
     // the takes in progress are closed as they are (complete WAVs); their journals stay, so the next start offers to
@@ -2218,26 +2222,11 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
 
 void AudioEngine::editSongStructural (const std::function<void (Song&)>& edit)
 {
+    // (PR #37) the live plugin states go into the Song first: the undo step then holds them, and a plugin that can't be
+    // matched to its old instance comes back with its current settings. Round 168s: the rebuild matches channels and
+    // effect slots by their instance tag (RackState::build), so a moved plugin, duplicates included, keeps its running
+    // instance and is not built again (issue #36: no second instance created and the old one torn down for a move).
     capturePluginStates();
-
-    // a plugin is kept when the same plugin sat in the same place; for duplicates that would keep the old order
-    std::map<std::string, int> uses;
-    for (const auto& c : lastPublishedShape.song.channels)
-        if (c.instrument == InstrumentKind::plugin && ! c.plugin.id.empty())
-            ++uses[c.plugin.id];
-    for (const auto& track : lastPublishedShape.song.mixer)
-        for (const auto& slot : track.effects)
-            if (slot.kind == EffectKind::plugin && ! slot.plugin.id.empty())
-                ++uses[slot.plugin.id];
-
-    for (auto& c : lastPublishedShape.song.channels)
-        if (c.instrument == InstrumentKind::plugin && uses[c.plugin.id] > 1)
-            c.plugin.id.clear();
-    for (auto& track : lastPublishedShape.song.mixer)
-        for (auto& slot : track.effects)
-            if (slot.kind == EffectKind::plugin && uses[slot.plugin.id] > 1)
-                slot.plugin.id.clear();
-
     editSong (edit);
 }
 
