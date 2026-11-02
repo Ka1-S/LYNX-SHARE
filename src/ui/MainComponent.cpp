@@ -1450,6 +1450,14 @@ void MainComponent::connectBrowser (BrowserComponent& b)
 {
     b.onOpenProject = [this] (const juce::File& file) { confirmDiscard ([this, file] { openFile (file); }); };
     b.onLoadIntoChannel = [this] (const juce::File& file) { return rack.loadSampleIntoSelected (file); };
+    b.onOpenMixerPreset = [this] (const juce::File& file) {
+        if (! mixerpresets::isMixerPreset (file))
+            return false;
+        if (! mixer.loadPresetOnSelection (file))
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Open mixer track state"),
+                                                    tr ("This file is not a mixer track state LYNX SHARE can read."));
+        return true;
+    };
     // the Browser's "Current project" items (REA_rodada115)
     b.onOpenPattern = [this] (int pattern) {
         selectPattern (pattern);
@@ -1848,7 +1856,9 @@ void MainComponent::fitChannelRack (bool width)
     const auto scrollbar = rackViewport.getScrollBarThickness();
     // compact like FL's rack: at most two bars of steps are shown, longer patterns scroll sideways, so the
     // rack does not cover the Playlist after a project with long patterns is opened
-    const auto maxWidth = juce::jmin (juce::jmax (300, workspace.getWidth() - 2 * 16 - 260), rack.widthForSteps (32));
+    // and never past the desktop's right edge from where the rack is (the default layout keeps the Playlist's track
+    // names uncovered on a small desktop, round 167v)
+    const auto maxWidth = juce::jmin (juce::jmax (300, workspace.getWidth() - 16 - workspace.getPanelBounds (Panel::channelRack).getX() - scrollbar - 8), rack.widthForSteps (32));
     const auto contentWidth = juce::jmin (rack.naturalWidth(), maxWidth); // the ghost steps only fill a wider rack
     const auto needsHorizontal = rack.naturalWidth() > contentWidth;
     workspace.fitPanelContent (Panel::channelRack, width ? contentWidth + scrollbar : 0, rack.getHeight() + (needsHorizontal ? scrollbar : 0));

@@ -6344,3 +6344,8 @@ countries: cn sg
 "Shaker" = "沙锤"
 "Tom" = "通鼓"
 "Hand drums" = "手鼓"
+"Add from state" = "从状态添加"
+"Mixer presets" = "混音器预设"
+"Mixer presets (FL)" = "混音器预设 (FL)"
+"This file is not a mixer track state LYNX SHARE can read." = "此文件不是 LYNX SHARE 可读取的混音器轨道状态。"
+"Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)" = "混音器预设: [2xLMB] 加载到所选混音器轨道  拖到混音器轨道上 (拖到混音器空白处: 新轨道)"

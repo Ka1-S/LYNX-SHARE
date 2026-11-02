@@ -3687,4 +3687,24 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     clipops::updateCrossfades (song); // the project's "Automatic crossfades" on its overlapping audio clips (round 167a)
     return song;
 }
+std::optional<MixerTrack> mixerTrackFromFlPreset (std::span<const std::uint8_t> fileBytes, const FlpImportOptions& options)
+{
+    if (! flp::looksLikeMixerPreset (fileBytes))
+        return std::nullopt;
+    try
+    {
+        const auto project = flp::parseMixerPreset (fileBytes);
+        auto song = importFlp (project, options);
+        if (song.mixer.size() < 2)
+            return std::nullopt;
+        auto track = song.mixer[1];
+        track.name = project.mixer[1].name; // (the import's "Insert 1" when the preset has no name)
+        track.colour = project.mixer[1].colour != 0 && project.mixer[1].colour != 0x485156 ? 0xFF000000u | project.mixer[1].colour : 0u;
+        return track;
+    }
+    catch (const std::exception&)
+    {
+        return std::nullopt;
+    }
+}
 } // namespace lynx

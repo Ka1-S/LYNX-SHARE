@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <map>
 
 namespace flp
 {
@@ -432,13 +433,19 @@ std::string readSavedVersion (std::span<const std::uint8_t> head)
     return {};
 }
 
-Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
+namespace
 {
+enum class FileKind { project, channelPreset, mixerPreset };
+
+Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
+{
+    const auto channelPreset = kind == FileKind::channelPreset;
+    const auto mixerPreset = kind == FileKind::mixerPreset;
     EventReader reader (file);
     Project project;
     project.header = reader.header();
 
-    if (project.header.format != 0 && ! channelPreset)
+    if (project.header.format != 0 && kind == FileKind::project)
         project.warnings.push_back ("format " + std::to_string (project.header.format) + " is not a project");
 
     // Events are contextual: a NewChannel/NewPattern/Arrangement determines
@@ -455,6 +462,17 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
     {
         section = Section::channel;
         currentChannel = 0;
+    }
+    // FL's mixer track preset (.fst of Data\Patches\Mixer presets, REA round 167q): the events of ONE insert, in the
+    // order of the project's mixer section but without the 0xEC that opens it in some files (Reverb send) and with the
+    // name/colour after the slots; the slots and controls keep the track the preset was saved from.
+    int presetSourceTrack = -1;
+    bool presetHasName = false;
+    if (mixerPreset)
+    {
+        section = Section::mixer;
+        project.mixer.resize (2);
+        project.mixer[1].index = 1;
     }
     bool hasFineTempo = false;
     bool hasTimeSignature = false;
@@ -939,6 +957,8 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
                 // 0x20 "Smart disable", 0x40 threaded, 0x100 hide settings)
                 if (section == Section::mixer && e.data.size() >= 8)
                 {
+                    if (mixerPreset && presetSourceTrack < 0)
+                        presetSourceTrack = readLE<std::int32_t> (e.data, 0);
                     pendingSlotIndex = readLE<std::int32_t> (e.data, 4);
                     pendingSlotFlags = e.data.size() >= 18 ? (int) readLE<std::uint16_t> (e.data, 16) : -1;
                 }
@@ -1222,8 +1242,26 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
 
             case evControlValues:
                 for (std::size_t o = 0; o + 12 <= e.data.size(); o += 12)
-                    project.controls.push_back ({ normalizeControlId (readLE<std::uint32_t> (e.data, o + 4)),
-                                                  readLE<std::int32_t> (e.data, o + 8) });
+                {
+                    auto raw = readLE<std::uint32_t> (e.data, o + 4);
+                    auto value = readLE<std::int32_t> (e.data, o + 8);
+                    // FL's mixer presets saved before 8.0 (Reverb/Chorus/Flanger send 3.6.5, the mastering ones 5.3.3):
+                    // the track's level/pan/separation/EQ block sits at 0x1F60 (0x1FC0 from 8.0 on: Big meter 8.0.2) and
+                    // level, pan and a slot's mix count to 128 instead of 12800; the 0x1F40 block is the sends
+                    if (mixerPreset && project.versionNumber < version (8, 0, 0) && ((raw >> 28) == 2 || (raw >> 28) == 3))
+                    {
+                        const auto param = raw & 0xFFFF;
+                        if (param >= 0x1F60 && param < 0x1FA0)
+                        {
+                            raw = (raw & 0xFFFF0000u) | (param + 0x60);
+                            if (param <= 0x1F61) // (the separation counts ±64 in both)
+                                value *= 100;
+                        }
+                        else if (param == 0x1F01)
+                            value *= 100;
+                    }
+                    project.controls.push_back ({ normalizeControlId (raw), value });
+                }
                 break;
 
             case evAutomationLink:
@@ -1321,26 +1359,36 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
 
             case evMixerInsertColour:
                 pendingInsertColour = ((e.value & 0xFF) << 16) | (e.value & 0xFF00) | ((e.value >> 16) & 0xFF);
+                if (mixerPreset)
+                    project.mixer[1].colour = pendingInsertColour;
                 break;
 
             case evMixerInsertName:
                 // The name comes before the event that opens the insert it belongs to
                 // (confirmed by cross-checking with the channel routing in the demos).
                 pendingInsertName = text (e);
+                if (mixerPreset)
+                {
+                    project.mixer[1].name = pendingInsertName;
+                    presetHasName = true;
+                }
                 break;
 
             case evMixerInsertParams:
             {
-                if (section == Section::mixer)
+                if (section == Section::mixer && ! mixerPreset)
                     closeOldSlot();
                 inPattern = false;
                 lastMarkers = nullptr;
                 section = Section::mixer;
-                auto& insert = project.mixer.emplace_back();
-                insert.index = (int) project.mixer.size() - 1;
-                insert.name = std::move (pendingInsertName);
+                auto& insert = mixerPreset ? project.mixer[1] : project.mixer.emplace_back();
+                if (! mixerPreset)
+                {
+                    insert.index = (int) project.mixer.size() - 1;
+                    insert.name = std::move (pendingInsertName);
+                    insert.colour = pendingInsertColour;
+                }
                 pendingInsertName.clear();
-                insert.colour = pendingInsertColour;
                 pendingInsertColour = 0;
 
                 if (e.data.size() >= 8)
@@ -1363,6 +1411,37 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
     if (section == Section::mixer)
         closeOldSlot();
 
+    if (mixerPreset)
+    {
+        // the controls of the track the preset was saved from (the slots' 0xD4, else the track most controls name)
+        // become insert 1's; the others (other tracks' sends to it...) are not part of it
+        if (presetSourceTrack < 0)
+        {
+            std::map<int, int> count;
+            for (const auto& c : project.controls)
+                if (c.id.isMixer())
+                    ++count[c.id.track()];
+            int most = 0;
+            for (const auto& [track, n] : count)
+                if (n > most)
+                {
+                    most = n;
+                    presetSourceTrack = track;
+                }
+        }
+        std::vector<ControlValue> kept;
+        for (auto c : project.controls)
+            if (c.id.isMixer() && c.id.track() == presetSourceTrack)
+            {
+                c.id.raw = c.id.raw - ((std::uint32_t) presetSourceTrack << 22) + (1u << 22);
+                kept.push_back (c);
+            }
+        project.controls = std::move (kept);
+        if (! presetHasName)
+            project.mixer[1].name.clear();
+        project.mixer.resize (2); // (a stray 0xEC never adds inserts)
+    }
+
     // the stretch time is int in files without bit 0 of 0xA9, float in newer ones
     for (auto& ch : project.channels)
     {
@@ -1379,5 +1458,39 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
         std::stable_sort (p.notes.begin(), p.notes.end(), [] (auto& a, auto& b) { return a.position < b.position; });
 
     return project;
+}
+} // namespace
+
+Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
+{
+    return parseEvents (file, channelPreset ? FileKind::channelPreset : FileKind::project);
+}
+
+Project parseMixerPreset (std::span<const std::uint8_t> file)
+{
+    return parseEvents (file, FileKind::mixerPreset);
+}
+
+bool looksLikeMixerPreset (std::span<const std::uint8_t> file)
+{
+    // a mixer track preset has the mixer's own events (insert params, slot index, insert name) and no channel
+    try
+    {
+        EventReader reader (file);
+        Event e;
+        bool mixer = false;
+        while (reader.next (e))
+        {
+            if (e.id == evNewChannel || e.id == evNewPattern)
+                return false;
+            if (e.id == evMixerInsertParams || e.id == evMixerSlotIndex || e.id == evMixerInsertName)
+                mixer = true;
+        }
+        return mixer;
+    }
+    catch (const std::exception&)
+    {
+        return false;
+    }
 }
 } // namespace flp
