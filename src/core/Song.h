@@ -624,6 +624,12 @@ struct ChannelDef
     int receiveMidiChannel = 0;
     // FL's channel icon (.flp 0x9B, REA round 168j): FL's icon index, 0 = none. Kept and saved; drawn by the icon UI.
     int icon = 0;
+    // FL's Loop Starter (round 168b, core/LoopStarter.h): the channel belongs to the Loop Starter of pattern
+    // `loopStarterPattern` (-1 = not a Loop Starter channel), plays the one-shot category `loopStarterCategory` in kit slot
+    // `loopStarterSlot`; locked = "Replace all samples" leaves its sample (FL's channel menu "Locked")
+    int loopStarterPattern = -1;
+    std::string loopStarterSlot, loopStarterCategory;
+    bool loopStarterLocked = false;
 
     bool hasKeyRegion() const noexcept { return keyLow > 0 || keyHigh < 127; }
     bool inKeyRegion (int key) const noexcept { return key >= keyLow && key <= keyHigh; }
@@ -1068,6 +1074,7 @@ struct Pattern
     bool loopOn = false;
     RackLoopMode loopMode = RackLoopMode::steps;
     std::vector<ChannelLoop> channelLoops; // at most one per channel
+    std::string loopStarterGenre; // FL's Loop Starter genre of this pattern (round 168b); "" = no Loop Starter
 
     void sortNotes();
     std::int64_t effectiveLength (int beatsPerBar) const noexcept;

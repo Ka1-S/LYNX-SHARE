@@ -59,11 +59,16 @@ Layout Layout::makeDefault (int width, int height)
     l[Panel::browser] = state ({ 0, 0, browserWidth, h }, true);
     l[Panel::playlist] = state ({ browserWidth, 0, w - browserWidth, h }, true);
 
-    // The Channel Rack floats over the Playlist (UI fits its size to the rows afterwards), below the
-    // Playlist's toolbar row and to the right of its pattern picker and track names, so the arrangement
-    // stays readable; on a narrow desktop it moves left to keep its usual width.
+    // The Channel Rack floats over the Playlist (FL's View › Arrange windows › Desktop (default): the Browser at the
+    // left, the Playlist filling the rest, the rack a window above it; UI fits its size to the rows afterwards),
+    // below the Playlist's toolbar row and to the right of its pattern picker and track names, so the arrangement
+    // stays readable. On a small desktop (a laptop at 125/150 % scaling) it gets narrower (its steps scroll) rather
+    // than covering the track names and the whole arrangement (round 167v); only when even rackMinWidth does not fit
+    // there does it move left over the track names.
     const auto gap = 16;
-    const auto rackWidth = std::min (w - browserWidth - 2 * gap, 720);
+    const auto besideHeaders = w - gap - (browserWidth + playlistHeaderWidth);
+    const auto rackWidth = besideHeaders >= rackMinWidth ? std::min (besideHeaders, rackMaxWidth)
+                                                         : std::min (w - browserWidth - 2 * gap, rackMinWidth);
     const auto rackHeight = std::min (h - 2 * gap, std::max (240, h * 55 / 100));
     const auto rackTop = std::min (40, h / 10);
     const auto rackLeft = std::max (browserWidth + gap, std::min (browserWidth + playlistHeaderWidth, w - gap - rackWidth));
@@ -162,6 +167,7 @@ void Layout::resize (int newWidth, int newHeight)
 {
     newWidth = std::max (1, newWidth);
     newHeight = std::max (1, newHeight);
+    const auto dockedPlaylist = width > 0 && browserDocksPlaylist();
 
     if (width > 0 && height > 0 && (newWidth != width || newHeight != height))
     {
@@ -183,6 +189,31 @@ void Layout::resize (int newWidth, int newHeight)
 
     for (auto& p : panels)
         p.bounds = clampInto (p.bounds, width, height);
+
+    if (dockedPlaylist)
+        redockPlaylist();
+}
+
+// The Browser at the desktop's left edge with the Playlist starting where it ends (the default arrangement):
+// they stay side by side however the desktop is resized (the Browser's minimum width must not push it over the
+// Playlist's pattern picker, round 167v).
+bool Layout::browserDocksPlaylist() const
+{
+    const auto& b = (*this)[Panel::browser].bounds;
+    const auto& p = (*this)[Panel::playlist].bounds;
+    return b.x == 0 && p.x == b.right() && p.right() >= width;
+}
+
+void Layout::redockPlaylist()
+{
+    const auto& b = (*this)[Panel::browser].bounds;
+    auto& p = (*this)[Panel::playlist].bounds;
+
+    if (b.x != 0 || b.right() > width - minWidth)
+        return;
+
+    p.x = b.right();
+    p.w = width - p.x;
 }
 
 int Layout::bringBackOffscreen()
@@ -293,6 +324,16 @@ std::optional<Layout> Layout::parse (const std::string& text, int width, int hei
 
     if (panelsRead == 0)
         return std::nullopt;
+
+    // A layout saved by 0.1.21 or earlier could have the Browser (at the left edge) wider than where the Playlist
+    // starts, covering its pattern picker (a minimum width applied while the window was still small, then scaled):
+    // the Playlist starts where the Browser ends again.
+    {
+        const auto& b = layout[Panel::browser].bounds;
+        const auto& p = layout[Panel::playlist].bounds;
+        if (b.x == 0 && p.x > 0 && p.x < b.right() && p.right() >= layout.width)
+            layout.redockPlaylist();
+    }
 
     return layout;
 }
