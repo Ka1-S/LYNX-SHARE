@@ -1192,7 +1192,7 @@ bool ChannelRackComponent::moveSelected (int delta)
     bool moved = false;
     std::vector<int> after;
 
-    engine.editSong ([&] (Song& s) {
+    engine.editSongStructural ([&] (Song& s) {
         after = rows;
         moved = moveChannels (s, after, delta);
     });
