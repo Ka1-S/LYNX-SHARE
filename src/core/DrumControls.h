@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "core/ModelParams.h"
 #include "core/Song.h"
 
 namespace lynx::drumcontrols
@@ -36,7 +37,29 @@ std::optional<float> value (const ChannelDef& def, const Control& c, int part = 
 // Sets it (clamped to the range, rounded for integer controls); false when the state can't hold it.
 bool setValue (ChannelDef& def, const Control& c, float v, int part = 0);
 
+// The engine parameter index of a control for a part (−1: no such part), and the raw values by engine index (the
+// automation table below uses the same numbers)
+int absoluteIndex (InstrumentKind kind, const Control& c, int part);
+std::optional<float> rawValue (const ChannelDef& def, int index);
+bool setRawValue (ChannelDef& def, int index, float raw);
+
+// Every automatable parameter of the engine, by engine index (sorted): the controls above, Drumaxx's for each of the
+// 16 pads ("Pad 3 Pitch"), DrumSynth Live's for each key ("C5 Level"); listed in core/ModelParamList.inc
+const std::vector<EngineParam>& params (InstrumentKind kind);
+
 // DrumSynth Live: the key selected in the editor (stored after the 120 patches), Drumaxx: no stored selection (the
 // panel remembers it); default part of a channel
 int defaultPart (const ChannelDef& def);
 } // namespace lynx::drumcontrols
+
+namespace lynx::modelparams
+{
+Table fruitKickModelTable();
+Table pluckedModelTable();
+Table drumpadModelTable();
+Table drumaxxModelTable();
+Table bassDrumModelTable();
+Table drumSynthModelTable();
+Table sakuraModelTable();
+Table slayerModelTable();
+} // namespace lynx::modelparams

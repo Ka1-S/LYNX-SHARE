@@ -185,6 +185,7 @@ target_sources(lynx_core PRIVATE
     src/core/KeyMap.cpp
     src/core/PresetCycle.cpp
     src/core/DrumControls.cpp
+    src/core/DrumBanks.cpp
     src/core/BankStates.cpp
     src/core/Sfz.cpp
     src/core/Workspace.cpp

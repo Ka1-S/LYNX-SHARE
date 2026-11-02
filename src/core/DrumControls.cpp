@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <map>
 
 #include "core/BassDrum.h"
 #include "core/DrumSynthLive.h"
@@ -131,6 +132,9 @@ const std::vector<Control> empty;
 
 int dslSlot (int key) { return drumSynthKeyToSlot (key); }
 
+// Plucked!'s knobs when the channel has no state yet (the engine's defaults: decay 128, color 64, normalize, widen)
+constexpr int pluckedDefaults[5] = { 128, 64, 1, 0, 1 };
+
 std::int32_t i32 (const std::vector<std::uint8_t>& s, std::size_t at)
 {
     std::int32_t v = 0;
@@ -197,56 +201,24 @@ int defaultPart (const ChannelDef& def)
     return 0;
 }
 
+int absoluteIndex (InstrumentKind kind, const Control& c, int partIndex)
+{
+    if (! c.perPart)
+        return c.index;
+    if (kind == InstrumentKind::drumaxx)
+        return c.index + 44 * std::clamp (partIndex, 0, 15);
+    if (kind == InstrumentKind::drumsynth)
+    {
+        const auto slot = dslSlot (partIndex);
+        return slot < 0 ? -1 : drumSynthPatchParams * slot + c.index;
+    }
+    return c.index;
+}
+
 std::optional<float> value (const ChannelDef& def, const Control& c, int partIndex)
 {
-    const auto& s = def.pluginState;
-    const auto& m = def.modelParams;
-    switch (def.instrument)
-    {
-        case InstrumentKind::fruitkick:
-            if (! fruitKickStateUsable (s))
-                return std::nullopt;
-            return (float) fruitKickParam (s, c.index);
-        case InstrumentKind::plucked:
-            if (s.size() < 20)
-                return std::nullopt;
-            return (float) i32 (s, 4 * (std::size_t) c.index);
-        case InstrumentKind::drumpad:
-        case InstrumentKind::sakura:
-            if (c.index >= (int) m.size())
-                return std::nullopt;
-            return m[(std::size_t) c.index];
-        case InstrumentKind::drumsynth:
-        {
-            const auto slot = dslSlot (partIndex);
-            const auto at = drumSynthPatchParams * std::max (0, slot) + c.index;
-            if (slot < 0 || at >= (int) m.size())
-                return std::nullopt;
-            return m[(std::size_t) at];
-        }
-        case InstrumentKind::drumaxx:
-        {
-            const auto v = drumaxxParam (s, c.index + (c.perPart ? 44 * std::clamp (partIndex, 0, 15) : 0));
-            return std::isfinite (v) ? std::optional<float> (v) : std::nullopt;
-        }
-        case InstrumentKind::bassdrum:
-        {
-            const auto at = bassDrumParamOffset (s, c.index);
-            if (at < 0)
-                return std::nullopt;
-            float v = 0.0f;
-            std::memcpy (&v, s.data() + at, 4);
-            return v;
-        }
-        case InstrumentKind::slayer:
-        {
-            const auto at = 4 + 4 * (std::size_t) c.index;
-            if (! slayerStateUsable (s) || at + 4 > s.size())
-                return std::nullopt;
-            return (float) i32 (s, at);
-        }
-        default: return std::nullopt;
-    }
+    const auto index = absoluteIndex (def.instrument, c, partIndex);
+    return index < 0 ? std::nullopt : rawValue (def, index);
 }
 
 bool setValue (ChannelDef& def, const Control& c, float v, int partIndex)
@@ -256,43 +228,95 @@ bool setValue (ChannelDef& def, const Control& c, float v, int partIndex)
     v = std::clamp (v, c.low, c.high);
     if (c.integer)
         v = std::round (v);
+    const auto index = absoluteIndex (def.instrument, c, partIndex);
+    return index >= 0 && setRawValue (def, index, v);
+}
+
+std::optional<float> rawValue (const ChannelDef& def, int index)
+{
+    const auto& s = def.pluginState;
+    const auto& m = def.modelParams;
+    if (index < 0)
+        return std::nullopt;
+    switch (def.instrument)
+    {
+        case InstrumentKind::fruitkick:
+            if (! fruitKickStateUsable (s) || index >= 6)
+                return std::nullopt;
+            return (float) fruitKickParam (s, index);
+        case InstrumentKind::plucked:
+            if (index >= 5)
+                return std::nullopt;
+            if (s.empty()) // a fresh channel: the engine's own defaults
+                return (float) pluckedDefaults[index];
+            if (s.size() < 20)
+                return std::nullopt;
+            return (float) i32 (s, 4 * (std::size_t) index);
+        case InstrumentKind::drumpad:
+        case InstrumentKind::sakura:
+        case InstrumentKind::drumsynth:
+            if (index >= (int) m.size())
+                return std::nullopt;
+            return std::isfinite (m[(std::size_t) index]) ? m[(std::size_t) index] : 0.0f;
+        case InstrumentKind::drumaxx:
+        {
+            const auto v = drumaxxParam (s, index);
+            return std::isfinite (v) ? std::optional<float> (v) : std::nullopt;
+        }
+        case InstrumentKind::bassdrum:
+        {
+            const auto at = bassDrumParamOffset (s, index);
+            if (at < 0)
+                return std::nullopt;
+            float v = 0.0f;
+            std::memcpy (&v, s.data() + at, 4);
+            return std::isfinite (v) ? v : 0.0f;
+        }
+        case InstrumentKind::slayer:
+        {
+            const auto at = 4 + 4 * (std::size_t) index;
+            if (! slayerStateUsable (s) || at + 4 > s.size())
+                return std::nullopt;
+            return (float) i32 (s, at);
+        }
+        default: return std::nullopt;
+    }
+}
+
+bool setRawValue (ChannelDef& def, int index, float v)
+{
     auto& s = def.pluginState;
     auto& m = def.modelParams;
+    if (index < 0 || ! std::isfinite (v))
+        return false;
     const auto put32 = [&s] (std::size_t at, std::int32_t x) { std::memcpy (s.data() + at, &x, 4); };
     switch (def.instrument)
     {
-        case InstrumentKind::fruitkick: return fruitKickSetParam (s, c.index, (int) v);
+        case InstrumentKind::fruitkick: return fruitKickSetParam (s, index, (int) std::lround (v));
         case InstrumentKind::plucked:
-            if (s.size() < 20)
+            if (s.empty() && index < 5) // a fresh channel gets the five knobs (the engine's defaults) on the first edit
+                for (const auto d : pluckedDefaults)
+                    for (int b = 0; b < 4; ++b)
+                        s.push_back ((std::uint8_t) ((std::uint32_t) d >> (8 * b)));
+            if (s.size() < 20 || index >= 5)
                 return false;
-            put32 (4 * (std::size_t) c.index, (std::int32_t) v);
+            put32 (4 * (std::size_t) index, (std::int32_t) std::lround (v));
             return true;
         case InstrumentKind::drumpad:
         case InstrumentKind::sakura:
-            if (c.index >= (int) m.size())
-                return false;
-            m[(std::size_t) c.index] = v;
-            return true;
         case InstrumentKind::drumsynth:
-        {
-            const auto slot = dslSlot (partIndex);
-            const auto at = drumSynthPatchParams * std::max (0, slot) + c.index;
-            if (slot < 0 || at >= (int) m.size())
+            if (index >= (int) m.size())
                 return false;
-            m[(std::size_t) at] = v;
+            m[(std::size_t) index] = v;
             return true;
-        }
         case InstrumentKind::drumaxx:
-        {
-            const auto index = c.index + (c.perPart ? 44 * std::clamp (partIndex, 0, 15) : 0);
             if (! std::isfinite (drumaxxParam (s, index)))
                 return false;
             drumaxxSetParam (s, index, v);
             return true;
-        }
         case InstrumentKind::bassdrum:
         {
-            const auto at = bassDrumParamOffset (s, c.index);
+            const auto at = bassDrumParamOffset (s, index);
             if (at < 0)
                 return false;
             std::memcpy (s.data() + at, &v, 4);
@@ -300,13 +324,62 @@ bool setValue (ChannelDef& def, const Control& c, float v, int partIndex)
         }
         case InstrumentKind::slayer:
         {
-            const auto at = 4 + 4 * (std::size_t) c.index;
+            const auto at = 4 + 4 * (std::size_t) index;
             if (! slayerStateUsable (s) || at + 4 > s.size())
                 return false;
-            put32 (at, (std::int32_t) v);
+            put32 (at, (std::int32_t) std::lround (v));
             return true;
         }
         default: return false;
     }
 }
+
+const std::vector<EngineParam>& params (InstrumentKind kind)
+{
+    static const std::map<InstrumentKind, std::vector<EngineParam>> all = [] {
+        std::map<InstrumentKind, std::vector<EngineParam>> out;
+        static const char* const notes[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+        for (const auto k : { InstrumentKind::fruitkick, InstrumentKind::plucked, InstrumentKind::drumpad, InstrumentKind::drumaxx,
+                              InstrumentKind::bassdrum, InstrumentKind::drumsynth, InstrumentKind::sakura, InstrumentKind::slayer })
+        {
+            auto& t = out[k];
+            for (const auto& c : controls (k))
+            {
+                if (! c.perPart)
+                    t.push_back ({ c.index, c.name, c.low, c.high, c.integer });
+                else if (k == InstrumentKind::drumaxx)
+                    for (int pad = 0; pad < 16; ++pad)
+                        t.push_back ({ c.index + 44 * pad, "Pad " + std::to_string (pad + 1) + " " + c.name, c.low, c.high, c.integer });
+                else // DrumSynth Live: every key's patch ("C5 Level"; FL's octave numbers, key 60 = C5)
+                    for (int key = 0; key < drumSynthPatches; ++key)
+                        t.push_back ({ drumSynthPatchParams * dslSlot (key) + c.index, std::string (notes[key % 12]) + std::to_string (key / 12) + " " + c.name,
+                                       c.low, c.high, c.integer });
+            }
+            std::sort (t.begin(), t.end(), [] (const EngineParam& a, const EngineParam& b) { return a.index < b.index; });
+        }
+        return out;
+    }();
+    static const std::vector<EngineParam> none;
+    const auto it = all.find (kind);
+    return it != all.end() ? it->second : none;
+}
 } // namespace lynx::drumcontrols
+
+namespace lynx::modelparams
+{
+namespace
+{
+std::optional<float> getDrum (const ChannelDef& c, const EngineParam& p) { return drumcontrols::rawValue (c, p.index); }
+bool setDrum (ChannelDef& c, const EngineParam& p, float raw) { return drumcontrols::setRawValue (c, p.index, raw); }
+Table drumTable (InstrumentKind kind) { return { &drumcontrols::params (kind), &getDrum, &setDrum }; }
+} // namespace
+
+Table fruitKickModelTable() { return drumTable (InstrumentKind::fruitkick); }
+Table pluckedModelTable() { return drumTable (InstrumentKind::plucked); }
+Table drumpadModelTable() { return drumTable (InstrumentKind::drumpad); }
+Table drumaxxModelTable() { return drumTable (InstrumentKind::drumaxx); }
+Table bassDrumModelTable() { return drumTable (InstrumentKind::bassdrum); }
+Table drumSynthModelTable() { return drumTable (InstrumentKind::drumsynth); }
+Table sakuraModelTable() { return drumTable (InstrumentKind::sakura); }
+Table slayerModelTable() { return drumTable (InstrumentKind::slayer); }
+} // namespace lynx::modelparams

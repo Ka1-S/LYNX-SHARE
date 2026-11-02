@@ -19,7 +19,7 @@ constexpr const char* sakuraSources = "(none)|Envelope|LFO|Mod wheel|Pitch wheel
 constexpr const char* sakuraTargets = "LFO amount|Level|Pan|Pitch|Lo-cut cutoff|Hi-cut cutoff|Hi-cut attack|Hi-cut decay|"
                                       "String 1 decay|String 2 decay|Strings decay|String 1 damp|String 2 damp|Strings damp|Noise rate";
 // DrumSynth Live's voice modes (TRIG digit wheel 0…5: the front-end's mute groups, REA_rodada30 §1.3)
-constexpr const char* dslVoiceModes = "Poly|Mono|Group 1|Group 2|Group 3|Group 4";
+constexpr const char* dslVoiceModes = "Mono|Poly|Group 1|Group 2|Group 3|Group 4";
 // FL Slayer's playing aids and effects (the form's own lists)
 constexpr const char* slayerModes = "None|Auto chords|Power chords|Strumming|Solo fixed|Solo dynamic";
 constexpr const char* slayerEffects = "Dry|Amp: Phaser|Amp: Tremolo|Amp: Wah-wah|Amp: Wah-wah LFO|Amp: Ring mod|Amp: Fuzz box|"
@@ -76,7 +76,7 @@ void drumpadVoice (std::vector<LayoutItem>& v, float dx, float dy)
     sec (30, 116, TR_NOOP ("Mallet"));
     sec (148, 110, TR_NOOP ("Membrane"));
     sec (260, 54, TR_NOOP ("Low"), 136);
-    sec (312, 54, TR_NOOP ("SOF"));
+    sec (312, 54, "SOF");
     sec (366, 126, TR_NOOP ("Mid"));
     sec (494, 58, TR_NOOP ("High"));
     sec (556, 60, TR_NOOP ("Output"));
@@ -172,22 +172,22 @@ Layout drumaxx()
         v.push_back (onPage (name, page));
         v.push_back (onPage (knob (x + 24, y + 40, 32, names[pad][0], nullptr, 0, noCaption), page));
         v.push_back (onPage (knob (x + 24, y + 78, 26, names[pad][1], nullptr, 0, noCaption | bipolar), page));
-        v.push_back (onPage (toggle (x + 102, y + 29, 26, 18, names[pad][2], TR_NOOP ("M"), boxed | inverted), page));
-        v.push_back (onPage (toggle (x + 102, y + 52, 26, 18, names[pad][3], TR_NOOP ("S"), boxed), page));
+        v.push_back (onPage (toggle (x + 102, y + 29, 26, 18, names[pad][2], "M", boxed | inverted), page));
+        v.push_back (onPage (toggle (x + 102, y + 52, 26, 18, names[pad][3], "S", boxed), page));
     }
     drumpadVoice (v, -16, 255);
     v.push_back (section (14, 456, 744, 88, TR_NOOP ("Sequencer")));
     v.push_back (label (24, 486, 724, 40, TR_NOOP ("Drumaxx's pattern sequencer is not played by LYNX: play the pads from the Piano roll or the Channel rack"), dim));
     v.push_back (section (14, 548, 468, 64, TR_NOOP ("Equalizer")));
     v.push_back (section (488, 548, 270, 64, TR_NOOP ("Master")));
-    v.push_back (knob (52, 576, 32, "EQ band 1", TR_NOOP ("63"), 599, bipolar));
-    v.push_back (knob (107, 576, 32, "EQ band 2", TR_NOOP ("125"), 599, bipolar));
-    v.push_back (knob (164, 576, 32, "EQ band 3", TR_NOOP ("250"), 599, bipolar));
-    v.push_back (knob (219, 576, 32, "EQ band 4", TR_NOOP ("500"), 599, bipolar));
-    v.push_back (knob (274, 576, 32, "EQ band 5", TR_NOOP ("1k"), 599, bipolar));
-    v.push_back (knob (331, 576, 32, "EQ band 6", TR_NOOP ("2k"), 599, bipolar));
-    v.push_back (knob (394, 576, 32, "EQ band 7", TR_NOOP ("4k"), 599, bipolar));
-    v.push_back (knob (451, 576, 32, "EQ band 8", TR_NOOP ("8k"), 599, bipolar));
+    v.push_back (knob (52, 576, 32, "EQ band 1", "63", 599, bipolar));
+    v.push_back (knob (107, 576, 32, "EQ band 2", "125", 599, bipolar));
+    v.push_back (knob (164, 576, 32, "EQ band 3", "250", 599, bipolar));
+    v.push_back (knob (219, 576, 32, "EQ band 4", "500", 599, bipolar));
+    v.push_back (knob (274, 576, 32, "EQ band 5", "1k", 599, bipolar));
+    v.push_back (knob (331, 576, 32, "EQ band 6", "2k", 599, bipolar));
+    v.push_back (knob (394, 576, 32, "EQ band 7", "4k", 599, bipolar));
+    v.push_back (knob (451, 576, 32, "EQ band 8", "8k", 599, bipolar));
     v.push_back (knob (652, 576, 32, "Limiter gain", TR_NOOP ("Gain"), 599));
     v.push_back (knob (709, 576, 32, "Limiter release", TR_NOOP ("Release"), 599));
     v.push_back (toggle (495, 565, 34, 22, "EQ on", TR_NOOP ("EQ")));
@@ -219,7 +219,7 @@ Layout bassDrum()
     v.push_back (knob (330, 70, 46, "Sampling", TR_NOOP ("Sampling"), 100));
     v.push_back (knob (244, 256, 24, "Noise start", TR_NOOP ("Start"), 275));
     v.push_back (knob (172, 256, 24, "Noise D", TR_NOOP ("D"), 275));
-    v.push_back (knob (204, 256, 24, "Noise S", TR_NOOP ("S"), 275));
+    v.push_back (knob (204, 256, 24, "Noise S", "S", 275));
     v.push_back (knob (68, 281, 36, "Var peak", TR_NOOP ("Var peak"), 306));
     v.push_back (knob (98, 327, 36, "Var slide", TR_NOOP ("Var slide"), 352));
     v.push_back (knob (144, 355, 36, "Var phase", TR_NOOP ("Var phase"), 380));
@@ -360,7 +360,7 @@ Layout sakura()
     v.push_back (slider (Item::vslider, 575, 177, 27, 86, "Stereo sep", TR_NOOP ("Stereo"), noCaption));
     v.push_back (knob (32.5, 404.5, 33, "EG attack", TR_NOOP ("A"), 428));
     v.push_back (knob (72.5, 404.5, 33, "EG decay", TR_NOOP ("D"), 428));
-    v.push_back (knob (112.5, 404.5, 33, "EG sustain", TR_NOOP ("S"), 428));
+    v.push_back (knob (112.5, 404.5, 33, "EG sustain", "S", 428));
     v.push_back (knob (152.5, 404.5, 33, "EG release", TR_NOOP ("R"), 428));
     v.push_back (knob (205.5, 404.5, 33, "LFO rate", TR_NOOP ("LFO"), 428));
     v.push_back (knob (254.5, 404.5, 33, "Mod 1 amount", nullptr, 0, noCaption));

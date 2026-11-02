@@ -4,6 +4,7 @@
 #include <cstring>
 #include <map>
 
+#include "core/DrumControls.h"
 #include "core/PoiZone.h"
 #include "core/Toxic.h"
 

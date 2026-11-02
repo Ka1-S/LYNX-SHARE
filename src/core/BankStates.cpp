@@ -1,6 +1,7 @@
 #include "core/BankStates.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 #include "core/DrumSynthLive.h"
@@ -124,7 +125,7 @@ std::vector<float> drumSynthParams (const std::vector<DrumSynthPatch>& patches)
     return m;
 }
 
-std::optional<ChannelDef> channelFor (const std::string& kind, const std::vector<float>& v)
+std::optional<ChannelDef> channelFor (const std::string& kind, const std::vector<float>& v, const std::string& name)
 {
     ChannelDef def;
     auto ints = [&v] {
@@ -153,6 +154,35 @@ std::optional<ChannelDef> channelFor (const std::string& kind, const std::vector
         def.instrument = InstrumentKind::sakura;
         def.modelParams.assign ((std::size_t) sakuraParamCount, 0.0f);
         std::copy (v.begin(), v.begin() + 114, def.modelParams.begin());
+    }
+    else if (kind == "drumaxx" && ! v.empty() && v.size() % 41 == 0)
+    {
+        // per pad: key, volume, pan, the 38 voice values (Drumpad's)
+        std::vector<DrumaxxPad> pads;
+        for (std::size_t at = 0; at + 41 <= v.size() && pads.size() < 16; at += 41)
+        {
+            DrumaxxPad pad;
+            pad.key = (int) v[at], pad.volume = v[at + 1], pad.pan = v[at + 2];
+            pad.voice.assign (v.begin() + (long) at + 3, v.begin() + (long) at + 41);
+            pads.push_back (pad);
+        }
+        def.instrument = InstrumentKind::drumaxx;
+        def.pluginState = drumaxxState (name.empty() ? std::string ("LYNX") : name, pads);
+    }
+    else if (kind == "drumsynth" && ! v.empty() && v.size() % 39 == 0)
+    {
+        // per patch: key, the 38 patch integers
+        std::vector<DrumSynthPatch> patches;
+        for (std::size_t at = 0; at + 39 <= v.size(); at += 39)
+        {
+            DrumSynthPatch patch;
+            patch.key = (int) v[at];
+            for (std::size_t i = 0; i < 38; ++i)
+                patch.values.push_back ((int) std::lround (v[at + 1 + i]));
+            patches.push_back (patch);
+        }
+        def.instrument = InstrumentKind::drumsynth;
+        def.modelParams = drumSynthParams (patches);
     }
     else
         return std::nullopt;

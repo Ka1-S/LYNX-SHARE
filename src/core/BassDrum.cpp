@@ -3,6 +3,8 @@
 // engine's own CRT powf/sincosf algorithms where their last bits matter, and long double for FL's x87 pan law.
 
 #include "core/BassDrum.h"
+#include "core/DrumParamRanges.h"
+#include "core/EngineParams.h"
 #include "core/HostSlide.h"
 
 #include <algorithm>
@@ -391,6 +393,13 @@ public:
     }
 
     float param (int i) const { return std::clamp (patch.P[i], 0.0f, 1.0f); }
+
+    // a live knob change (round 168p): the voices read the knobs as they render
+    void setParam (int i, float v)
+    {
+        if (i >= 0 && i < 23)
+            patch.P[i] = v;
+    }
 
     void noteOn (int note, int vel7)
     {
@@ -842,9 +851,35 @@ public:
         pitchCents.store (channel.sampler.pitch * 100.0f);
         if (channel.pluginState == state && channel.samplePath == dir)
             return;
+        // a knob turned on the page (round 168p): only the 23 knobs differ → the running engine takes them
+        constexpr std::size_t knobs = 0x50C, knobsEnd = 0x50C + 23 * 4;
+        if (channel.samplePath == dir && builtPlugin && incoming.load() == nullptr && channel.pluginState.size() == state.size()
+            && state.size() >= knobsEnd && std::memcmp (state.data(), channel.pluginState.data(), knobs) == 0
+            && std::memcmp (state.data() + knobsEnd, channel.pluginState.data() + knobsEnd, state.size() - knobsEnd) == 0
+            && liveParams.space() >= 23)
+        {
+            for (int i = 0; i < 23; ++i)
+                if (std::memcmp (state.data() + knobs + 4 * i, channel.pluginState.data() + knobs + 4 * i, 4) != 0)
+                {
+                    float v = 0.0f;
+                    std::memcpy (&v, channel.pluginState.data() + knobs + 4 * i, 4);
+                    liveParams.push (i, v);
+                }
+            state = channel.pluginState;
+            return;
+        }
         state = channel.pluginState;
         dir = channel.samplePath;
         rebuild();
+    }
+
+    // automation (round 168p): the clip's 0…1 over the knob's range
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        const auto r = drumranges::bassDrum (index);
+        if (plugin != nullptr && r.valid && std::isfinite (value))
+            plugin->eng.setParam (index, r.raw (value));
     }
 
     void setNextNoteExpression (float pan, float cents, bool) noexcept override
@@ -936,6 +971,7 @@ private:
                 if (pl->eng.init (p, table, noise, s->rate))
                     s->plugin = std::move (pl);
             }
+            builtPlugin = s->plugin != nullptr;
             delete incoming.exchange (s.release());
         }
         catch (...)
@@ -954,8 +990,14 @@ private:
             plugin = current->plugin.get();
             if (plugin != nullptr)
                 plugin->setLevels (channelVol, channelPan, notePan);
+            liveParams.clear(); // (built from the newest state)
         }
+        if (plugin != nullptr)
+            liveParams.drain ([this] (int i, float v) { plugin->eng.setParam (i, v); });
     }
+
+    LiveParamQueue liveParams;
+    bool builtPlugin = false; // (UI side: the last rebuild made a running engine)
 
     Setup* current = nullptr;
     Plugin* plugin = nullptr;

@@ -1,4 +1,5 @@
 #include "core/DrumSynthLive.h"
+#include "core/DrumParamRanges.h"
 #include "core/Sha256.h"
 
 #include <algorithm>
@@ -606,6 +607,16 @@ public:
     }
 
     void setNextNoteExpression (float pan, float, bool) noexcept override { nextPan = pan; }
+
+    // automation (round 168p): a knob of a key's patch (slot·38 + j), 0…1 over its range; sounding voices keep the
+    // patch they were triggered with, the level / pan follow at once
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        const auto r = drumranges::drumSynth (index);
+        if (r.valid && std::isfinite (value))
+            settings.patches[(std::size_t) index] = (std::int32_t) r.raw (value);
+    }
 
     void noteOn (int key, float velocity) noexcept override
     {

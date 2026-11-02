@@ -16882,4 +16882,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Design168nTests.inc"
 #include "core/BankStates.h"
 #include "core/DrumControls.h"
+#include "core/DrumParamRanges.h"
 #include "Design168pTests.inc"

@@ -42,5 +42,5 @@ std::vector<float> drumSynthParams (const std::vector<DrumSynthPatch>& patches);
 
 // A channel of `kind` ("fruitkick", "plucked", "drumpad", "sakura") from a list of parameter values (the bank audit
 // tool's text format); nullopt for another kind or too few values.
-std::optional<ChannelDef> channelFor (const std::string& kind, const std::vector<float>& values);
+std::optional<ChannelDef> channelFor (const std::string& kind, const std::vector<float>& values, const std::string& name = {});
 } // namespace lynx::bankstates
