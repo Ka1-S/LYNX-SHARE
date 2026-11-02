@@ -599,7 +599,7 @@ private:
 
         if (song.mode == PlayMode::song && engine.getTransport().playing.load())
         {
-            const auto position = std::fmod (engine.getTransport().positionTicks.load(), (double) juce::jmax<std::int64_t> (1, song.songLength()));
+            const auto position = engine.songPlayheadTicks();
 
             for (const auto& c : song.playlist)
                 if (c.kind == ClipKind::automation && c.automation == automation && position >= (double) c.start && position < (double) c.end())

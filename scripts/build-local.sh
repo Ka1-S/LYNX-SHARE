@@ -24,6 +24,8 @@ CORE="$CORE src/core/NoteTools.cpp src/core/PianoRollTools.cpp src/core/EventEdi
 CORE="$CORE src/core/LoopStarter.cpp"
 # start-up sound (procedural)
 CORE="$CORE src/core/StartupSound.cpp"
+# speech synthesizer: .speech files, LYNX voice (round 168b)
+CORE="$CORE src/core/Speech.cpp src/core/SpeechRules.cpp"
 # FL's 3x Osc engine (REA round 47)
 CORE="$CORE src/core/ThreeOsc.cpp"
 # FL Studio integration: plugin database and sample relocation (read-only)

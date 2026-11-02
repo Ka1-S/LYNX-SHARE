@@ -827,7 +827,7 @@ private:
                 tick = std::fmod (position, (double) patternLength());
             else
             {
-                const auto p = std::fmod (position, (double) juce::jmax<std::int64_t> (1, song.songLength()));
+                const auto p = engine.songPlayheadTicks();
                 for (const auto& c : song.playlist)
                     if (c.kind == ClipKind::pattern && c.pattern == song.currentPattern && p >= (double) c.start && p < (double) c.end())
                         tick = p - (double) c.start + (double) c.offset;
