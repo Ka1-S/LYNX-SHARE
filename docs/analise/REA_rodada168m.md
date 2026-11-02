@@ -110,10 +110,11 @@ in-place edit, presets with the bank.
 
 ## Where I stopped
 
-- Done: REA (§1–§4), core (writer, defaults, factory bank, editing API, in-place update), presets with state, editor UI
-  (tool column, envelope gestures, slot bar), designed grids / tabs / envelope (§4b), tests, 15-language strings.
-- In progress: build-local + Windows build, then the Windows GUI check of the video's flow with before/after shots
-  (before: /mnt/e/lynx-work/gross168m/before/plugui/Gross Beat.png).
-- Next: notes-0.1.22 (done, update if the design changes), land.
-- Rerun: `~/.claude/jobs/f8789b49/tmp/coord/bl-wt.sh gross168m` (log tmp/coord/bl-gross168m.log); Windows:
-  `OUT=build-win JOBS=3 coord/winbuild.sh scripts/build-windows-zig.sh`.
+- 2026-11-02 after the crash/reboot: commits intact (pushed to wip/gross168m), origin/main efb8344d merged (i18n
+  tables union-merged and regenerated, test includes kept from both sides).
+- Done: REA (§1–§4), core, presets with state, editor UI, design (§4b), tests, 15-language strings, notes-0.1.22.
+- In progress: build-local + Windows build (release lane), then plugui after-shot and the Windows GUI check of the
+  video's flow (before: /mnt/e/lynx-work/gross168m/before/plugui/Gross Beat.png; after: …/after/).
+- Next: land via `flock ~/projetos/lynx/.git/lynx-merge.lock coord/land.sh gross168m` (BUILDSLOT_PRIO=1).
+- Rerun: `BUILDSLOT_PRIO=1 coord/buildslot.sh coord/bl-wt.sh gross168m`; Windows:
+  `OUT=build-win JOBS=3 BUILDSLOT_PRIO=1 coord/winbuild.sh scripts/build-windows-zig.sh`.
