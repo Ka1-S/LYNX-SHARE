@@ -67,7 +67,7 @@ juce::String contextName (keys::Context c)
     return {};
 }
 
-juce::String chordText (const keys::Chord& c) { return juce::String (keys::toString (c)); }
+juce::String chordText (const keys::Chord& c) { return juce::String (keys::displayString (c)); }
 
 // key caps: "Ctrl+Shift+F4" drawn as one rounded pill per chord; returns the width used
 int drawChord (juce::Graphics& g, const keys::Chord& chord, int x, int centreY, bool strong)
