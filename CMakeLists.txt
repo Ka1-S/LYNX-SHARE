@@ -160,6 +160,10 @@ add_library(lynx_core STATIC
     src/core/FormulaController.cpp
     src/core/VoiceShift.cpp
     src/core/NativeEngines.cpp
+    src/core/LynxBanks.cpp
+    src/core/ModelParams.cpp
+    src/core/ToxicBank.cpp
+    src/core/PoiZoneBank.cpp
     src/core/Layer.cpp
     src/core/XyController.cpp
     src/core/FlCurve.cpp

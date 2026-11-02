@@ -68,7 +68,7 @@ CORE="$CORE src/core/VoiceTools.cpp"
 CORE="$CORE src/core/MidiControls.cpp src/core/MidiOut.cpp src/core/FormulaController.cpp"
 CORE="$CORE src/core/VoiceShift.cpp"
 # FL engines usable in native projects (round 142, issue #5)
-CORE="$CORE src/core/NativeEngines.cpp"
+CORE="$CORE src/core/NativeEngines.cpp src/core/LynxBanks.cpp src/core/ModelParams.cpp src/core/ToxicBank.cpp src/core/PoiZoneBank.cpp"
 # FL's Layer channel and the round 164 controllers
 CORE="$CORE src/core/Layer.cpp src/core/XyController.cpp src/core/FlCurve.cpp src/core/ControlSurface.cpp src/core/VoltageController.cpp"
 # crash / freeze reports: consent, anonymiser, report JSON, GitHub issue URL (round 159)
