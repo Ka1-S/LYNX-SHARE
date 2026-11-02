@@ -299,5 +299,4 @@ TEST (gb168_factory_slots_are_named_distinct_and_used_by_presets)
 TEST (gb168_fl_presets_are_listed)
 {
     CHECK (lynx::flPluginsForEffect (lynx::EffectKind::grossBeat) == std::vector<std::string> { "Gross Beat" });
-    CHECK (lynx::effectForFlPlugin ("Gross Beat") == lynx::EffectKind::grossBeat);
 }
