@@ -51,6 +51,8 @@ pattern signature markers do not yet change the Piano roll's bar grid or playbac
 
 - Done: M10–M12, M13 markers + Note properties colour / Reset; `tests/Proll168gTests.inc` 69 checks, 0 failures
   (mini test binary with FL's Data: all 609 factory .fsc read); Windows syntax check of the changed UI files clean.
+- 2026-11-02: two landings hit i18n merge conflicts (other rounds landed first), then the PC crashed at 11:10 during
+  the queue; branch intact at 6af86edf. Now: merge + land inside the merge lock (scratchpad/mergeland168g.sh).
 - Next: merge origin/main, land.sh (full build-local + Windows + selftest), then the GUI check with the landed
   LYNX.exe (fresh LYNX_PROFILE_DIR, LYNX_TEST_MODE=1).
 - Rerun the tests: `BUILDSLOT_SHORT=1 coord/buildslot.sh scratchpad/mini168g.sh` (needs tests/mini168g.cpp: tests.cpp
