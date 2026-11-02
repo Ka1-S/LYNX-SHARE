@@ -6,6 +6,7 @@
 // DLL's, so contraction stays off. Clean-room: behaviour described in our own words; no Image-Line code.
 
 #include "core/Sawer.h"
+#include "core/ModelParams.h"
 #include "core/HostSlide.h"
 
 #include <algorithm>
@@ -2510,6 +2511,12 @@ public:
         const std::lock_guard<std::mutex> lock (buildMutex);
         if (channel.pluginState == loadedState && loadedRate == rate.load() && mp == loadedPoly && channel.samplePath == tablePath)
             return;
+        // only parameters changed (a knob of the editor, round 168q): the playing engine takes them, the notes go on
+        if (channel.samplePath == tablePath && mp == loadedPoly && loadedRate == rate.load() && liveChange (loadedState, channel.pluginState))
+        {
+            loadedState = channel.pluginState;
+            return;
+        }
         if (channel.samplePath != tablePath)
         {
             tablePath = channel.samplePath;
@@ -2573,6 +2580,14 @@ public:
 
     bool idle() const noexcept override { return plugin == nullptr || plugin->idle(); }
 
+    // automation of a parameter (round 168q): the clip's 0…1 over the parameter's range, as the editor's knob
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        if (const auto* p = findEngineParam (sawerParams(), index); p != nullptr && std::isfinite (value) && plugin != nullptr)
+            plugin->eng.setParam (index, p->raw (value));
+    }
+
     void render (float* left, float* right, int n, float gl, float gr) noexcept override
     {
         take();
@@ -2625,10 +2640,38 @@ private:
             plugin.reset (p);
             for (int k = 0; k < 128; ++k)
                 plugin->setLevels (k, channelVol, channelPan);
+            liveParams.clear(); // (the new engine was built from the newest state)
         }
+        if (plugin != nullptr)
+            liveParams.drain ([this] (int index, float v) { plugin->eng.setParam (index, v); });
+    }
+
+    // queues the parameters that differ between two states with the same header and size (UI thread, buildMutex held)
+    bool liveChange (const std::vector<std::uint8_t>& before, const std::vector<std::uint8_t>& after)
+    {
+        std::size_t n = 0;
+        if (plugin == nullptr || before.size() != after.size() || ! stateHeader (before) || ! stateHeader (after, &n)
+            || std::memcmp (before.data(), after.data(), 12) != 0)
+            return false;
+        n = std::min<std::size_t> (n, (std::size_t) paramCount);
+        std::vector<std::pair<int, float>> changed;
+        for (std::size_t i = 0; i < n; ++i)
+            if (std::memcmp (before.data() + 12 + 4 * i, after.data() + 12 + 4 * i, 4) != 0)
+            {
+                float v = 0.0f;
+                std::memcpy (&v, after.data() + 12 + 4 * i, 4);
+                changed.push_back ({ (int) i, v });
+            }
+        const auto tail = 12 + 4 * n;
+        if ((tail < after.size() && std::memcmp (before.data() + tail, after.data() + tail, after.size() - tail) != 0) || changed.size() > liveParams.space())
+            return false;
+        for (const auto& [i, v] : changed)
+            liveParams.push (i, v);
+        return true;
     }
 
     std::unique_ptr<Plugin> plugin;
+    LiveParamQueue liveParams;
     std::atomic<Plugin*> incoming { nullptr }, retired { nullptr };
     std::atomic<bool> clearPlugin { false };
     std::mutex buildMutex;
@@ -2666,6 +2709,85 @@ std::optional<float> sawerParam (const std::vector<std::uint8_t>& state, int ind
 }
 
 std::unique_ptr<Instrument> makeSawerInstrument() { return std::make_unique<SawerInstrument>(); }
+
+const std::vector<EngineParam>& sawerParams()
+{
+    // the controls of Sawer's panel (FL's editor form, REA_rodada168q §1) by parameter number: 0…1 floats, the whole
+    // numbers of the polyphony / bend / arp division menus and of the matrix's destinations (−1 none) and sources
+    static const std::vector<EngineParam> table = [] {
+        struct Row { int index; const char* name; float low, high; bool stepped; };
+        static const Row rows[] = {
+        { 0, "Level", 0, 1, false }, { 1, "Pan", 0, 1, false }, { 2, "Attack", 0, 1, false },
+        { 3, "Decay", 0, 1, false }, { 4, "Sustain", 0, 1, false }, { 5, "Release", 0, 1, false },
+        { 6, "Transpose", 0, 1, false }, { 7, "Fine tune", 0, 1, false }, { 8, "Mono", 0, 1, false },
+        { 9, "Glide time mode", 0, 1, false }, { 10, "Glide key mode", 0, 1, false },
+        { 11, "Glide time", 0, 1, false }, { 12, "Octaver", 0, 1, false }, { 13, "Unison retrig", 0, 1, false },
+        { 14, "Unison voices", 0, 1, false }, { 15, "Unison detune", 0, 1, false }, { 16, "Unison pan", 0, 1, false },
+        { 17, "Sub phase", 0, 1, false }, { 18, "Sub harmonic", 0, 1, false }, { 19, "Sub level", 0, 1, false },
+        { 20, "Sub detune", 0, 1, false }, { 21, "Sub retrig", 0, 1, false }, { 22, "Sub invert", 0, 1, false },
+        { 23, "Sub pulse", 0, 1, false }, { 24, "Sync frequency", 0, 1, false }, { 25, "Sync on", 0, 1, false },
+        { 26, "Noise", 0, 1, false }, { 27, "Cutoff", 0, 1, false }, { 28, "Resonance", 0, 1, false },
+        { 29, "Key tracking", 0, 1, false }, { 30, "Velocity tracking", 0, 1, false },
+        { 31, "Filter mode", 0, 1, false }, { 32, "EGF attack", 0, 1, false }, { 33, "EGF decay", 0, 1, false },
+        { 34, "EGF sustain", 0, 1, false }, { 35, "EGF release", 0, 1, false }, { 36, "EGF amount", 0, 1, false },
+        { 37, "EGF destination", 0, 1, false }, { 38, "LFO shape", 0, 1, false }, { 39, "LFO speed", 0, 1, false },
+        { 40, "LFO tempo sync", 0, 1, false }, { 41, "LFO attack", 0, 1, false }, { 42, "LFO release", 0, 1, false },
+        { 43, "LFO retrig", 0, 1, false }, { 44, "LFO invert", 0, 1, false }, { 45, "LFO amount", 0, 1, false },
+        { 46, "LFO destination", 0, 1, false }, { 47, "Chorus on", 0, 1, false }, { 48, "Chorus depth", 0, 1, false },
+        { 49, "Chorus rate", 0, 1, false }, { 50, "Chorus mix", 0, 1, false }, { 51, "Phaser on", 0, 1, false },
+        { 52, "Phaser center", 0, 1, false }, { 53, "Phaser rate", 0, 1, false }, { 54, "Phaser depth", 0, 1, false },
+        { 55, "Phaser feedback", 0, 1, false }, { 56, "Phaser mix", 0, 1, false }, { 57, "Delay on", 0, 1, false },
+        { 58, "Delay left", 0, 1, false }, { 59, "Delay right", 0, 1, false }, { 60, "Delay feedback", 0, 1, false },
+        { 61, "Delay depth", 0, 1, false }, { 62, "Delay low cut", 0, 1, false },
+        { 63, "Delay high cut", 0, 1, false }, { 64, "Delay mix", 0, 1, false }, { 65, "Reverb on", 0, 1, false },
+        { 66, "Reverb decay", 0, 1, false }, { 67, "Reverb high cut", 0, 1, false },
+        { 68, "Reverb damp", 0, 1, false }, { 69, "Reverb mix", 0, 1, false }, { 70, "Arp on", 0, 1, false },
+        { 71, "Arp mode", 0, 1, false }, { 72, "Arp range", 0, 1, false }, { 74, "Arp division", 0, 6, true },
+        { 75, "Polyphony", 0, 5, true }, { 76, "Bend range", 0, 11, true }, { 78, "Mod 1 amount", 0, 1, false },
+        { 79, "Mod 2 amount", 0, 1, false }, { 80, "Mod 3 amount", 0, 1, false }, { 81, "Mod 4 amount", 0, 1, false },
+        { 82, "Mod 5 amount", 0, 1, false }, { 83, "Mod 6 amount", 0, 1, false },
+        { 84, "Mod 1 destination", -1, 72, true }, { 85, "Mod 2 destination", -1, 72, true },
+        { 86, "Mod 3 destination", -1, 72, true }, { 87, "Mod 4 destination", -1, 72, true },
+        { 88, "Mod 5 destination", -1, 72, true }, { 89, "Mod 6 destination", -1, 72, true },
+        { 90, "Mod 1 source", 0, 131, true }, { 91, "Mod 2 source", 0, 131, true },
+        { 92, "Mod 3 source", 0, 131, true }, { 93, "Mod 4 source", 0, 131, true },
+        { 94, "Mod 5 source", 0, 131, true }, { 95, "Mod 6 source", 0, 131, true } };
+        std::vector<EngineParam> t;
+        for (const auto& r : rows)
+        {
+            EngineParam p;
+            p.index = r.index, p.name = r.name, p.low = r.low, p.high = r.high, p.stepped = r.stepped;
+            t.push_back (p);
+        }
+        return t;
+    }();
+    return table;
+}
+
+namespace modelparams
+{
+namespace
+{
+std::optional<float> sawerValue (const ChannelDef& c, const EngineParam& p)
+{
+    const auto v = sawerParam (c.pluginState, p.index);
+    if (! v)
+        return std::nullopt;
+    return std::isfinite (*v) ? std::clamp (*v, p.low, p.high) : p.low;
+}
+
+bool sawerSetValue (ChannelDef& c, const EngineParam& p, float raw)
+{
+    const auto at = sawerParamOffset (c.pluginState, p.index);
+    if (at < 0 || ! std::isfinite (raw))
+        return false;
+    std::memcpy (c.pluginState.data() + at, &raw, 4);
+    return true;
+}
+} // namespace
+
+Table sawerModelTable() { return { &sawerParams(), &sawerValue, &sawerSetValue }; }
+} // namespace modelparams
 
 std::vector<float> sawerReadTable (const std::string& path)
 {

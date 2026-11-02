@@ -2,6 +2,7 @@
 // layouts and formulas described in that document. Section numbers (§) below refer to it.
 
 #include "core/TransistorBass.h"
+#include "core/ModelParams.h"
 #include "core/HostSlide.h"
 
 #include <algorithm>
@@ -2065,6 +2066,7 @@ struct State
     float seqTranspose = 0.0f;
     std::array<Program, 128> programs {};
     std::vector<std::array<float, 100>> patches; // the working copies (the second of each stored pair)
+    std::array<std::size_t, 128> workingAt {};    // the byte offset of each working copy's first value (round 168q)
     std::vector<Sequence> sequences;
 };
 
@@ -2140,6 +2142,8 @@ State parseState (const std::vector<std::uint8_t>& s)
         {
             e.skipString();
             std::array<float, 100> v {};
+            if (c == 1)
+                st.workingAt[(std::size_t) k] = e.at;
             for (auto& x : v)
                 x = e.get<float>();
             if (c == 1)
@@ -2353,6 +2357,15 @@ public:
     }
 
     bool silent() const noexcept { return engine->silent(); }
+
+    // a parameter of the current program's patch moved while playing (the designed page, automation; round 168q)
+    void hostParam (int i, float v) noexcept
+    {
+        if (i < 0 || i >= 0x2A || ! std::isfinite (v))
+            return;
+        st.patches[(std::size_t) st.programs[(std::size_t) program].patch][(std::size_t) i] = v;
+        setParam (i, (double) v);
+    }
 
 private:
     void applyPatch() noexcept
@@ -2610,6 +2623,13 @@ public:
         channelCents.store (channel.sampler.pitch * 100.0f);
         if (channel.pluginState == state && channel.samplePath == dllPath)
             return;
+        // only the current patch's values changed (a knob of the editor, round 168q): the playing engine takes them
+        if (channel.samplePath == dllPath && plugin != nullptr && liveChange (state, channel.pluginState))
+        {
+            state = channel.pluginState;
+            parsed = parseState (state);
+            return;
+        }
         state = channel.pluginState;
         dllPath = channel.samplePath;
         parsed = parseState (state);
@@ -2739,10 +2759,50 @@ private:
             plugin.reset (s);
             sounding.fill (false);
             quiet = 0;
+            liveParams.clear(); // (built from the newest state)
         }
+        if (plugin != nullptr)
+            liveParams.drain ([this] (int i, float v) { plugin->hostParam (i, v); });
     }
 
+    // queues the values of the current program's working patch that differ, when nothing else did (UI thread)
+    bool liveChange (const std::vector<std::uint8_t>& before, const std::vector<std::uint8_t>& after)
+    {
+        if (before.size() != after.size() || ! parsed.usable)
+            return false;
+        const auto first = transistorBassParamOffset (after, 0);
+        if (first < 0 || first != transistorBassParamOffset (before, 0))
+            return false;
+        const auto end = (std::size_t) first + 4 * 0x2A;
+        if (std::memcmp (before.data(), after.data(), (std::size_t) first) != 0
+            || std::memcmp (before.data() + end, after.data() + end, after.size() - end) != 0)
+            return false;
+        std::vector<std::pair<int, float>> changed;
+        for (int i = 0; i < 0x2A; ++i)
+            if (std::memcmp (before.data() + first + 4 * i, after.data() + first + 4 * i, 4) != 0)
+            {
+                float v = 0.0f;
+                std::memcpy (&v, after.data() + first + 4 * i, 4);
+                changed.emplace_back (i, v);
+            }
+        if (changed.size() > liveParams.space())
+            return false;
+        for (const auto& [i, v] : changed)
+            liveParams.push (i, v);
+        return true;
+    }
+
+public:
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        if (plugin != nullptr && std::isfinite (value))
+            plugin->hostParam (index, std::clamp (value, 0.0f, 1.0f));
+    }
+
+private:
     std::unique_ptr<Plugin> plugin;
+    LiveParamQueue liveParams;
     std::atomic<Plugin*> incoming { nullptr }, retired { nullptr };
     State parsed;
     std::shared_ptr<const DllData> data;
@@ -2765,6 +2825,87 @@ bool transistorBassStateUsable (const std::vector<std::uint8_t>& state) { return
 bool transistorBassDllUsable (const std::string& path) { return loadDll (path) != nullptr; }
 
 std::unique_ptr<Instrument> makeTransistorBassInstrument() { return std::make_unique<TransistorBassInstrument>(); }
+
+int transistorBassParamOffset (const std::vector<std::uint8_t>& state, int index)
+{
+    if (index < 0 || index >= 0x2A)
+        return -1;
+    const auto st = parseState (state);
+    if (! st.usable)
+        return -1;
+    return (int) st.workingAt[(std::size_t) st.programs[(std::size_t) st.program].patch] + 4 * index;
+}
+
+std::optional<TransistorBassProgram> transistorBassProgram (const std::vector<std::uint8_t>& state)
+{
+    const auto st = parseState (state);
+    if (! st.usable)
+        return std::nullopt;
+    TransistorBassProgram out;
+    const auto& pr = st.programs[(std::size_t) st.program];
+    out.program = st.program;
+    out.transpose = pr.transpose;
+    out.sequencer = st.sequencerMode != 0;
+    const auto& q = st.sequences[(std::size_t) pr.sequence];
+    out.length = q.length;
+    for (std::size_t i = 0; i < out.steps.size() && i < q.steps.size(); ++i)
+        out.steps[i] = { q.steps[i].note, q.steps[i].gate, q.steps[i].slide, q.steps[i].accent };
+    return out;
+}
+
+const std::vector<EngineParam>& transistorBassParams()
+{
+    // parameters 0…41 of a patch (REA_rodada57 §2.2), named after the controls of FL's panel (0…1 each)
+    static const std::vector<EngineParam> table = [] {
+        static const std::pair<int, const char*> rows[] = {
+        { 0, "Tuning" }, { 1, "Waveform" }, { 2, "Cutoff" }, { 3, "Key follow" }, { 4, "Resonance" }, { 5, "Env mod" },
+        { 6, "Decay" }, { 7, "Accent" }, { 8, "Volume" }, { 9, "High-pass" }, { 10, "Min decay" },
+        { 11, "Pulse width" }, { 12, "LFO rate" }, { 13, "LFO to PW" }, { 14, "Reverb on" }, { 15, "Reverb low cut" },
+        { 16, "Reverb high cut" }, { 17, "Reverb predelay" }, { 18, "Reverb predelay feedback" },
+        { 19, "Reverb size" }, { 20, "Reverb diffusion" }, { 21, "Reverb decay" }, { 22, "Reverb damping" },
+        { 23, "Reverb width" }, { 24, "Reverb dry" }, { 25, "Reverb early" }, { 26, "Reverb wet" },
+        { 27, "Distortion on" }, { 28, "Distortion HP" }, { 29, "Drive" }, { 30, "Distortion tone" },
+        { 31, "Distortion volume" }, { 32, "Delay on" }, { 33, "Delay sync" }, { 34, "Delay amount" },
+        { 35, "Delay time" }, { 36, "Delay right tap" }, { 37, "Delay feedback" }, { 38, "Delay tone" },
+        { 39, "Delay stereo" }, { 40, "Clicks" }, { 41, "303 pulse" } };
+        std::vector<EngineParam> t;
+        for (const auto& [index, name] : rows)
+        {
+            EngineParam p;
+            p.index = index, p.name = name;
+            t.push_back (p);
+        }
+        return t;
+    }();
+    return table;
+}
+
+namespace modelparams
+{
+namespace
+{
+std::optional<float> tbValue (const ChannelDef& c, const EngineParam& p)
+{
+    const auto at = transistorBassParamOffset (c.pluginState, p.index);
+    if (at < 0)
+        return std::nullopt;
+    float v = 0.0f;
+    std::memcpy (&v, c.pluginState.data() + at, 4);
+    return std::isfinite (v) ? std::clamp (v, 0.0f, 1.0f) : 0.0f;
+}
+
+bool tbSetValue (ChannelDef& c, const EngineParam& p, float raw)
+{
+    const auto at = transistorBassParamOffset (c.pluginState, p.index);
+    if (at < 0 || ! std::isfinite (raw))
+        return false;
+    std::memcpy (c.pluginState.data() + at, &raw, 4);
+    return true;
+}
+} // namespace
+
+Table transistorBassModelTable() { return { &transistorBassParams(), &tbValue, &tbSetValue }; }
+} // namespace modelparams
 
 namespace tbass
 {
