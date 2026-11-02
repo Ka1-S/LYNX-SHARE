@@ -16930,3 +16930,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Polish167pTests.inc"
 #include "Zoom167tTests.inc"
 #include "LoopStarter168bTests.inc"
+#include "Rec168kTests.inc"
