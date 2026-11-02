@@ -66,13 +66,21 @@ Standard: docs/analise/REA_rodada165-issue11c.md (per item: reporter's words | F
 
 ## 4. Verification
 
-(see "Where I stopped")
+- [GUI, Windows build of this branch, real mouse, fresh LYNX_PROFILE_DIR + LYNX_TEST_MODE, closed with Save changes? ›
+  Discard] shots in `E:\lynx-work\pr28\s\`: `ly4` FL engines › 3x Osc dropped on Insert 7 → channel "3x Osc" routed
+  to 7, editor "3x Osc (3x Osc)", the effects panel reads "Effects: 3x Osc"; `ly5` on Master → "3x Osc #2" routed to
+  Master, editor "(Master)"; `ly6b` Insert 9 selected, dropped on its Slot 2 → "3x Osc #3" routed to 9, slots still
+  empty, "Effects: 3x Osc #3", Master strip reads "3x Osc #2"; `ly8` BassDrum dropped on Insert 7 → routed to 7,
+  editor "BassDrum (3x Osc)", Insert 7 keeps "3x Osc" — rack and strips as in FL's `fl10`; `ly9` Ctrl+Z → "Undone:
+  Add channel" (one step, BassDrum gone); `ly12` desktop clean.
+- [CI] wip/pr28 Tests run 41370379629 (both commits): Core ubuntu g++/clang++, Core macos-15, App ubuntu-24.04,
+  App macos-15 — all green (the Linux and macOS app builds compile the UI part).
+- [TEST] build-local with FL Data: 1,891,005 checks, 1 failure = `s166d_idle_inserts_cost_almost_nothing` (a CPU-time
+  bound, 603 us > 400 us with the machine at load ~25; unrelated to this change). The PR's
+  `workflow_add_channel_routed` and the new `pr28_generator_dropped_on_an_insert_names_it_like_fl` pass.
 
 ## Where I stopped
 
-- Done: review; REA + one FL session (shots above); follow-up commit on top of c9259b88 (his commit untouched);
-  docs/WORKFLOW_FL.md B4 updated.
-- Next: build-local with FL Data, Windows build, Windows GUI drag check (strip, Master, effect slot), land with
-  `flock ~/projetos/lynx/.git/lynx-merge.lock ~/.claude/jobs/f8789b49/tmp/coord/land.sh pr28`, notes + reply draft.
-- Commands: `~/.claude/jobs/f8789b49/tmp/coord/buildslot.sh ~/.claude/jobs/f8789b49/tmp/coord/bl-wt.sh pr28`,
-  `OUT=build-win ~/.claude/jobs/f8789b49/tmp/coord/winbuild.sh scripts/build-windows-zig.sh` (zig caches ~/.cache/zig-pr28*).
+- Done: review, REA + one FL session, follow-up commit, docs, Windows GUI check, CI green.
+- Next: land with `flock ~/projetos/lynx/.git/lynx-merge.lock ~/.claude/jobs/f8789b49/tmp/coord/land.sh pr28`;
+  then check main CI, delete ~/.cache/zig-pr28*, remove the worktree.
