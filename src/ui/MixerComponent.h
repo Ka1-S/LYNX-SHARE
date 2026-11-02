@@ -255,6 +255,9 @@ public:
     void filesDropped (const juce::StringArray& files, int x, int y) override;
     bool dropPreset (const juce::File& file, juce::Point<int> position);
     bool dropEffect (EffectSlot fx, juce::Point<int> position);
+    // A generator dragged from the Plugin database onto the panel (a slot or anywhere else): as on the strip, a new
+    // channel routed to the panel's insert; the slots don't change (FL 2026, round 167u).
+    std::function<void (int, ChannelDef)> onInstrumentDropped;
 
     explicit EffectsPanel (AudioEngine& engine);
     ~EffectsPanel() override;

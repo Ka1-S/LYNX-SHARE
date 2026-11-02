@@ -599,7 +599,25 @@ bool moveChannels (Song& song, std::vector<int>& selection, int delta)
 
 int addChannelRouted (Song& song, ChannelDef channel, int insert)
 {
-    channel.mixerTrack = insert >= 0 && insert < (int) song.mixer.size() ? insert : song.claimFreeInsert();
+    if (insert >= 0 && insert < (int) song.mixer.size())
+    {
+        // a generator dropped on a mixer strip or one of its effect slots (FL 2026, round 167u shots): the channel's
+        // name is made unique ("3x Osc #2") and an insert that still has its default name takes it
+        const auto taken = [&song] (const std::string& name) {
+            return std::any_of (song.channels.begin(), song.channels.end(), [&] (const ChannelDef& c) { return c.name == name; });
+        };
+        if (! channel.name.empty() && taken (channel.name))
+            channel.name = nextCopyName (channel.name, taken);
+
+        auto& track = song.mixer[(std::size_t) insert].name;
+        if (! channel.name.empty() && (track.empty() || track == (insert == 0 ? std::string ("Master") : "Insert " + std::to_string (insert))))
+            track = channel.name;
+
+        channel.mixerTrack = insert;
+    }
+    else
+        channel.mixerTrack = song.claimFreeInsert();
+
     song.channels.push_back (std::move (channel));
     return (int) song.channels.size() - 1;
 }

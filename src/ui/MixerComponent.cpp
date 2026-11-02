@@ -4227,11 +4227,18 @@ void EffectsPanel::mouseDoubleClick (const juce::MouseEvent& e)
 bool EffectsPanel::isInterestedInDragSource (const SourceDetails& details)
 {
     return (BrowserComponent::isBrowserDrag (details) && BrowserComponent::draggedFile (details).hasFileExtension ("fst"))
-           || BrowserComponent::isEffectDrag (details);
+           || BrowserComponent::isEffectDrag (details) || BrowserComponent::isGeneratorDrag (details);
 }
 
 void EffectsPanel::itemDropped (const SourceDetails& details)
 {
+    if (BrowserComponent::isGeneratorDrag (details))
+    {
+        if (auto c = BrowserComponent::draggedGenerator (details); c && onInstrumentDropped != nullptr
+                                                                    && track >= 0 && track < (int) engine.getSong().mixer.size())
+            onInstrumentDropped (track, std::move (*c));
+        return;
+    }
     if (BrowserComponent::isEffectDrag (details))
     {
         if (auto fx = BrowserComponent::draggedEffect (details))
@@ -5004,6 +5011,7 @@ MixerComponent::MixerComponent (AudioEngine& e)
         if (onInstrumentDropped != nullptr)
             onInstrumentDropped (track, std::move (c));
     };
+    effects.onInstrumentDropped = strips.onInstrumentDropped;
 }
 
 bool MixerComponent::runAction (const std::string& id)

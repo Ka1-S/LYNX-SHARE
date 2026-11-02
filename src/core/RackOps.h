@@ -151,6 +151,9 @@ int insertChannel (Song& song, int index, ChannelDef channel);
 
 // Adds `channel` at the end of the rack, routed to `insert` (0 = Master). An insert that doesn't exist (the default, -1)
 // claims a free one instead. Returns the new channel's index.
+// With an existing insert (a generator dropped on a mixer strip or effect slot) it does what FL 2026 does (round 167u):
+// a name another channel has gets " #2", " #3"..., and the insert takes the channel's name while it still has its
+// default one ("Insert N", Master's "Master"); a name the user gave the insert stays.
 int addChannelRouted (Song& song, ChannelDef channel, int insert = -1);
 
 // Removes several channels (any order). Returns how many were removed.
