@@ -3,6 +3,10 @@
 # Uses $CXX if set; otherwise tries Zig in ~/opt, then g++/clang++.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# tests/tests.cpp is one big translation unit: at -O2 clang (zig 0.13's 18.1) needs more than the default 8 MB stack
+# for it (a segfault, exit 139 / abort 134, with no message). Raise the soft limit (no root needed) to 1 GiB: a FINITE
+# value, because with "unlimited" glibc gives new threads only the default 8 MB and zig compiles on worker threads.
+ulimit -s 1048576 2>/dev/null || ulimit -s "$(ulimit -H -s)" 2>/dev/null || true
 
 if [[ -z "${CXX:-}" ]]; then
     if [[ -x "$HOME/opt/zig-linux-x86_64-0.13.0/zig" ]]; then
