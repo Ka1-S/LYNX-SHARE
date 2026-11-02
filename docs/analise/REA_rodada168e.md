@@ -109,5 +109,13 @@ ticks for seconds, mastering (target ±0.5 LU, true peak ≤ −0.9 dBTP, silenc
 | M3 | Export › Master… Ctrl+Alt+M; Project bones | §1, §2.4, §2.5 | none | Master: LYNX-own local mastering; Project bones: mixer / effects / scores in LYNX formats |
 | M4 | Tools › Consolidate playlist selection, Ctrl+Alt+C / Ctrl+Shift+Alt+C | §1, §2.2 | track-level only | done (and "Consolidate this track" rebuilt on the same core) |
 
-Open: Windows GUI check of every item with a fresh profile (see the round's notes); no FL session was used for an
-audio comparison of the renders in this round.
+State (2026-11-02, paused by the coordinator for round 168w): origin/main (efb8344d) merged in; Linux core build +
+all tests green (1 631 180 checks, 0 failures); the Windows build had one compile error in Project bones (fixed,
+not rebuilt yet). Notes in coord/notes-0.1.23.md.
+
+Next step: Windows build (OUT=build-win) → GUI check with a fresh profile and test mode (Patterns › Quick render /
+Render as audio clip / Render and replace, Playlist Tools › Consolidate (Ctrl+Alt+C), File › Export › All playlist
+tracks, Master... (Ctrl+Alt+M), Project bones...; screenshots looked at) → merge origin/main → land.sh.
+Decisions for the user: Export › Master is LYNX-own local mastering (FL uses its online FL Cloud service); Project
+bones writes LYNX formats and leaves out channel presets / automation (no LYNX format yet). No FL session was used
+for an audio comparison of the renders.
