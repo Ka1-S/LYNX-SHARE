@@ -16929,6 +16929,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Transporter167fTests.inc"
 #include "Polish167pTests.inc"
 #include "Zoom167tTests.inc"
+#include "FirstRun167vTests.inc"
 #include "LoopStarter168bTests.inc"
 #include "Rec168kTests.inc"
 #include "Mono168lTests.inc"
+#include "MixPre167qTests.inc"
