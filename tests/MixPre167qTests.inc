@@ -1,6 +1,4 @@
-// Round 167q: issue #25 (a pattern clip stretched past its pattern repeats the pattern, as in FL) and FL mixer presets.
-#include "core/ExportOptions.h"
-#include "core/TransportEdit.h"
+// Round 167q: issue #25 (a stretched pattern clip plays once, as in FL; no crash) and FL mixer presets.
 
 namespace mixpre167q
 {
@@ -43,11 +41,10 @@ inline lynx::Song oneBarSong()
 }
 } // namespace mixpre167q
 
-// Issue #25 (Disar): "create a clip, extend it beyond its length to repeat, play" — the Playlist drew the repeats but
-// the song played the pattern once. FL repeats it: its own demo projects place 4- and 8-bar clips of a 1-bar pattern
-// back to back (Exoplanet.flp, pattern 14), and clips split from such a clip keep offsets past the pattern (LIFE.flp,
-// 8448..9216 of a 384-tick pattern).
-TEST (mixpre167q_pattern_clip_repeats_its_pattern)
+// Issue #25 (Disar): "create a clip, extend it beyond its length, play" — FL 2026 plays a pattern clip stretched past
+// its pattern ONCE: the extended part is silent (round 168k: FL command-line render of a 1-bar pattern clip stretched to
+// 4 bars: onsets at 0.0 / 1.0 s only, silence after). LYNX does the same (round 167q briefly made it repeat; reverted).
+TEST (mixpre167q_stretched_pattern_clip_plays_once)
 {
     auto s = mixpre167q::oneBarSong();
     lynx::Clip c;
@@ -62,41 +59,10 @@ TEST (mixpre167q_pattern_clip_repeats_its_pattern)
     s.playlist.push_back (o);
 
     const auto ppq = (long) lynx::ppq;
-    const std::vector<std::pair<long, int>> expected {
-        { 0, 60 }, { 2 * ppq, 72 }, { 4 * ppq, 60 }, { 6 * ppq, 72 }, { 8 * ppq, 60 }, { 10 * ppq, 72 }, { 12 * ppq, 60 }, { 14 * ppq, 72 },
-        // the offset clip: pattern beat 2 at song beat 21, then the pattern again from song beat 23
-        { 21 * ppq, 72 }, { 23 * ppq, 60 }, { 25 * ppq, 72 }, { 27 * ppq, 60 },
-    };
+    const std::vector<std::pair<long, int>> expected { { 0, 60 }, { 2 * ppq, 72 }, { 21 * ppq, 72 } };
     for (const auto block : { 64, 480, 512, 4096 })
         for (const auto withIndex : { false, true })
-        {
-            const auto ons = mixpre167q::songOns (s, 32 * lynx::ppq, block, withIndex);
-            CHECK (ons == expected);
-        }
-
-    // a clip within its pattern plays it once, as before
-    s.playlist.resize (1);
-    s.playlist[0].length = 3 * lynx::ppq;
-    CHECK ((mixpre167q::songOns (s, 8 * lynx::ppq, 512, true) == std::vector<std::pair<long, int>> { { 0, 60 }, { 2 * ppq, 72 } }));
-
-    // an offset past the pattern's length (a piece split from a long clip): the pass it falls in
-    s.playlist[0].offset = 6 * lynx::ppq; // pattern beat 2 of the second pass
-    s.playlist[0].length = 4 * lynx::ppq;
-    CHECK ((mixpre167q::songOns (s, 4 * lynx::ppq, 512, true) == std::vector<std::pair<long, int>> { { 0, 72 }, { 2 * ppq, 60 } }));
-
-    // MIDI export takes the repeats too
-    s.mode = lynx::PlayMode::song;
-    s.playlist[0].offset = 0;
-    s.playlist[0].length = 8 * lynx::ppq;
-    const auto notes = lynx::exportopts::midiExportNotes (s);
-    CHECK (notes.size() == 4);
-    if (notes.size() == 4)
-        CHECK (notes[2].start == 4 * lynx::ppq && notes[2].key == 60 && notes[3].start == 6 * lynx::ppq && notes[3].key == 72);
-
-    // the Piano roll's playhead and recording wrap with the passes
-    CHECK (lynx::patternTickInClip (s.playlist[0], 5.0 * lynx::ppq, 4 * lynx::ppq) == 1.0 * lynx::ppq);
-    CHECK (lynx::transportedit::patternPlayhead (s, 0, 5.0 * lynx::ppq) == 1.0 * lynx::ppq);
-    CHECK (lynx::patternPositionForTick (s, 5.0 * lynx::ppq, 4 * lynx::ppq) == lynx::ppq);
+            CHECK (mixpre167q::songOns (s, 32 * lynx::ppq, block, withIndex) == expected);
 }
 
 // Many clips of many shapes, scheduled block by block: the same events with and without the index, nothing dropped,

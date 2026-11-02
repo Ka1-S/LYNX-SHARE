@@ -1589,9 +1589,8 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
                     if (tick < (double) c.start)
                         break;
 
-                    // the pattern repeats along a clip longer than it (issue #25), its events too
-                    const auto period = (std::size_t) lane.pattern < state.schedule.patternLength.size() ? state.schedule.patternLength[(std::size_t) lane.pattern] : 0;
-                    value = events.valueAt (patternTickInClip (c, tick < (double) c.end() ? tick : (double) c.end() - 1.0, period));
+                    value = tick < (double) c.end() ? events.valueAt (tick - (double) c.start + (double) c.offset)
+                                                    : events.valueAt ((double) (c.offset + c.length) - 1.0);
                 }
 
                 automationValues[(std::size_t) lane.slot] = value;
@@ -2582,12 +2581,8 @@ double RackRenderer::ticksToNextEvent (const RackState& state, double tick) noex
                 best = std::min (best, (double) c.start - t);
                 break;
             }
-            const auto period = (std::size_t) lane.pattern < state.schedule.patternLength.size() ? state.schedule.patternLength[(std::size_t) lane.pattern] : 0;
-            const auto local = patternTickInClip (c, t, period);
-            auto ahead = after (events, local) - local;
-            if (period > 0 && c.offset + c.length > period) // the next pass restarts at the first event's value
-                ahead = std::min (ahead, (double) period - local);
-            best = std::min (best, std::min (t + ahead, (double) c.end()) - t);
+            const auto next = after (events, t - (double) c.start + (double) c.offset) - (double) c.offset + (double) c.start;
+            best = std::min (best, std::min (next, (double) c.end()) - t);
         }
     }
     return best;

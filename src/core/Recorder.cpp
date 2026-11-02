@@ -17,8 +17,7 @@ std::int64_t patternPositionForTick (const Song& song, double tick, std::int64_t
 
         for (const auto& c : song.playlist)
             if (c.kind == ClipKind::pattern && c.pattern == song.currentPattern && inSong >= c.start && inSong < c.end())
-                return (std::int64_t) patternTickInClip (c, (double) inSong,
-                                                         song.patterns[(std::size_t) c.pattern].effectiveLength (song.beatsPerBar));
+                return inSong - c.start + c.offset;
     }
 
     return position % std::max<std::int64_t> (1, loopLength);
