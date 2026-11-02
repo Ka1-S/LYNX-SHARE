@@ -1477,9 +1477,9 @@ public:
                     else
                         caption (item.label, r, dimmed, (item.style & plugui::alignLeft) != 0 ? juce::Justification::centredLeft : juce::Justification::centred);
                     break;
-                case plugui::Item::knob:
+                case plugui::Item::knob: // (a small knob's caption may use some room on both sides, as a fader's does)
                     if ((item.style & plugui::noCaption) == 0)
-                        caption (item.label, r.withTop (r.getBottom() - 12.0f * f), dimmed, juce::Justification::centred);
+                        caption (item.label, r.withTop (r.getBottom() - 12.0f * f).expanded (juce::jmax (0.0f, 52.0f * f - r.getWidth()) * 0.5f, 0.0f), dimmed, juce::Justification::centred);
                     break;
                 case plugui::Item::vslider:
                 case plugui::Item::hslider:
