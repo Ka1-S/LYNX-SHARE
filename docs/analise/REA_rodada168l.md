@@ -118,15 +118,8 @@ closed by PID, clean desktop).
 ## Where I stopped
 - Done: REA, core layer, renderer (song + live), engines' glide-in, model / import / file / migration, UI tooltip +
   15 languages, tests, Windows build + GUI check, notes-0.1.22.md.
-- First build-local: 27 failures — i18n headers (expected), the audit's reference note ended where it was read (now
-  issue14's method), Toxic / PoiZone / MiniSynth / Drumpad glide-in (fixed, not yet re-run).
-- PC crash 2026-11-02 ~11:10: worktree checked clean; merged origin/main efb8344d (0e1f7f2e), i18n regenerated.
-- After the merge tests.cpp crashed clang at -O2 (8 MB stack; it compiles without Mono168lTests.inc or with
-  `ulimit -s unlimited` on one file). scripts/build-local.sh now raises the stack limit and compiles tests.cpp on its
-  own (zig's many-file worker threads ignore ulimit). Round 168w (coordinator) may supersede this: drop my
-  build-local.sh commits if 168w's split TUs land first.
-- Paused by the coordinator (round 168w). The build-local that was running: 2105025 checks, 4 failures, all in the
-  engine audit — BeepMap and Transistor Bass, whose sound follows the voice's own timeline (now left out of the timed
-  pitch reads, kept in the glide-in check; not re-run yet).
-- Next on RESUME: merge origin/main (keep 168w's build-local.sh), build-local, fix failures, land via coord/land.sh.
+- Full build-local before the last merge: 2105025 checks, 4 failures (BeepMap / Transistor Bass in the engine audit,
+  then left out of the timed pitch reads). Merged origin/main aae68291 (166f02e6), i18n regenerated, own
+  build-local.sh changes dropped (round 168w). `LYNX_TEST=mono168l` build-local: 127 checks, 0 failures.
+- Landing: the coordinator's merge train (no land.sh by this round).
 - Rerun: `BUILDSLOT_PRIO=1 ~/.claude/jobs/f8789b49/tmp/coord/buildslot.sh ~/.claude/jobs/f8789b49/tmp/coord/bl-wt.sh mono168l`.
