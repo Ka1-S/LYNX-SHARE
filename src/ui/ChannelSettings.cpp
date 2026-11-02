@@ -1842,6 +1842,7 @@ private:
 
     void paintBeepMapFile (juce::Graphics& g, juce::Rectangle<float> r, float f)
     {
+        using namespace theme;
         const auto* c = channelNow();
         const auto pic = c != nullptr ? beepMapPicture (c->pluginState) : std::nullopt;
         auto row = r.reduced (4.0f * f);
@@ -1914,6 +1915,7 @@ private:
     // Granulizer: the channel's sample (or how to give it one) with the start point
     void paintGranulizerWave (juce::Graphics& g, juce::Rectangle<float> r, float f)
     {
+        using namespace theme;
         const auto* c = channelNow();
         const auto path = c != nullptr ? c->samplePath : std::string();
         if (path.empty())
@@ -1967,6 +1969,7 @@ private:
     // Granulizer: one grain's envelope (attack, hold, release) and the next grain's start, from the knobs
     void paintGranulizerGrains (juce::Graphics& g, juce::Rectangle<float> r, float)
     {
+        using namespace theme;
         const auto* att = knobFor ("Grain attack");
         const auto* hold = knobFor ("Grain hold");
         const auto* spacing = knobFor ("Grain spacing");
@@ -1991,6 +1994,7 @@ private:
     // Transistor Bass: the current program and its sequence (16 steps: note, gate, accent, slide)
     void paintTransistorBass (juce::Graphics& g, juce::Rectangle<float> r, float f, bool sequence)
     {
+        using namespace theme;
         const auto* c = channelNow();
         const auto prog = c != nullptr ? transistorBassProgram (c->pluginState) : std::nullopt;
         if (! prog)
