@@ -1360,7 +1360,7 @@ int writeProjectBones (const Song& song, const juce::File& dir, juce::StringArra
         if (ok)
             ++written;
         else
-            failed.add (bone.folder + "/" + name);
+            failed.add (juce::String::fromUTF8 (bone.folder.c_str()) + "/" + name);
     }
     return written;
 }
