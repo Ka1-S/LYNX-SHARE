@@ -94,9 +94,11 @@ TEST (design168r_every_engine_has_a_lynx_bank_that_renders)
     for (const auto kind : design168r::kinds())
     {
         const auto& bank = presets::factory (kind);
-        if (bank.size() < 4)
+        // (Center is a switch: on / off; Phase Inverter has three states)
+        const auto wanted = kind == EffectKind::flCenter ? 2u : kind == EffectKind::flPhaseInverter ? 3u : 4u;
+        if (bank.size() < wanted)
             std::printf ("  %s: only %d presets\n", effectInfo (kind).name, (int) bank.size());
-        CHECK (bank.size() >= 4);
+        CHECK (bank.size() >= wanted);
         for (const auto& preset : bank)
         {
             std::vector<std::string> unresolved;
@@ -113,8 +115,12 @@ TEST (design168r_every_engine_has_a_lynx_bank_that_renders)
             fx->reset();
             auto l = inL, r = inR;
             constexpr int block = 256;
+            fx->setPlaying (true);
             for (std::size_t at = 0; at + block <= l.size(); at += block)
+            {
+                fx->setSongPosition ((double) at / sr * 2.0 * 960.0); // 120 BPM, 960 ticks per beat
                 fx->process (l.data() + at, r.data() + at, block, slot.params, 120.0);
+            }
             double sum = 0.0, peak = 0.0;
             bool finite = true;
             for (std::size_t i = l.size() / 4; i < l.size(); ++i)
@@ -143,7 +149,7 @@ TEST (design168r_peak_controller_lfo_ramp_mute)
     CHECK (formatEffectParam (EffectKind::peakController, 8, 0.25f, 120.0) == "Triangle");
     auto& p = slot.params;
     p[1] = 0.5f;  // no peak amount
-    p[4] = 0.5f;  // LFO base ½
+    p[4] = 0.0f;  // LFO base 0: the LFO adds base … base + amount
     p[5] = 1.0f;  // LFO amount +100 %
     p[7] = (8600.0f - 200.0f) / 65336.0f; // a short period
     auto run = [&] (int blocks, bool playing, std::vector<float>* lfo, std::vector<float>* audio = nullptr) {
@@ -173,7 +179,7 @@ TEST (design168r_peak_controller_lfo_ramp_mute)
     p[5] = 0.5f;
     lfo.clear();
     run (50, false, &lfo);
-    CHECK (std::abs (lfo.back() - 0.5f) < 1e-4f);
+    CHECK (std::abs (lfo.back()) < 1e-4f);
     // Ramp: a jump of the base moves at most 1/8 of the range per host tick
     p[5] = 1.0f;
     p[8] = 0.5f; // square: jumps
@@ -240,11 +246,17 @@ TEST (design168r_response_and_transfer_pictures)
     // the measured pictures of the editors: Bass Boost lifts the lows, the Fast LP cuts the highs, a flat 7-band EQ
     // is flat, distortion bends the sine
     auto boost = makeEffectSlot (EffectKind::flBassBoost);
-    boost.params = presets::apply (EffectKind::flBassBoost, presets::factory (EffectKind::flBassBoost).front());
+    boost.params[(std::size_t) plugui::paramIndex (EffectKind::flBassBoost, "Amount")] = 1.0f;
+    boost.params[(std::size_t) plugui::paramIndex (EffectKind::flBassBoost, "Frequency")] = 0.3f;
     const auto b = fxresponse::responseDb (boost, { 60.0, 5000.0 });
+    if (b.size() == 2)
+        std::printf ("  bass boost: %.2f dB at 60 Hz, %.2f dB at 5 kHz\n", b[0], b[1]);
     CHECK (b.size() == 2 && b[0] > b[1] + 2.0f);
     auto lp = makeEffectSlot (EffectKind::fruityFastLP);
+    lp.params[(std::size_t) plugui::paramIndex (EffectKind::fruityFastLP, "Cutoff")] = 0.3f;
     const auto f = fxresponse::responseDb (lp, { 100.0, 18000.0 });
+    if (f.size() == 2)
+        std::printf ("  fast LP: %.2f dB at 100 Hz, %.2f dB at 18 kHz\n", f[0], f[1]);
     CHECK (f.size() == 2 && f[0] > f[1]);
     const auto flat = fxresponse::responseDb (makeEffectSlot (EffectKind::fl7BandEq), { 63.0, 1000.0, 8000.0 });
     CHECK (flat.size() == 3);

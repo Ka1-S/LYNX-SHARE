@@ -6355,3 +6355,5 @@ countries: tw hk mo
 "MODULE 2" = "模組 2"
 "MODULE 3" = "模組 3"
 "MODULE 4" = "模組 4"
+"Removes the DC offset" = "去除直流偏移"
+"Flips the polarity of a side" = "翻轉一側的極性"

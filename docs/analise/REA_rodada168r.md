@@ -161,10 +161,18 @@ The existing `plugin_layouts_name_real_parameters` now also covers the 13 FL kin
 
 ## Where I stopped
 
-- 2026-11-02: code, tests, translations (15 languages) and this document written (wip bb8e155c). The PC crashed at
-  ~11:10 before the core tests ran; after the reboot the branch was checked (tree intact), merged with origin/main
-  efb8344d (i18n / tests list conflicts resolved, this round's translations re-applied) and the builds restarted from
-  clean build folders.
-- Next: core tests to 0 failures, Windows build, before / after shots (`LYNX.exe --design168rshot`, before with
-  `LYNX_GENERATED_LAYOUTS=1`) in `/mnt/e/lynx-work/design168r/{before,after}`, review at 100 % / 200 %, land after
-  168n's shared infrastructure is on main.
+- 2026-11-02 (paused by the coordinator for round 168w's faster pipeline). Code, tests, translations (15 languages)
+  and this document are on wip/design168r, merged with origin/main efb8344d.
+- Last results (before the fixes below): core tests 2108424 checks, 81 failures, all from this round; Windows build
+  failed on one error in `ui/DesignDisplays.inc` (`auto` deduced as double / float in one declaration).
+- Fixed since, not yet rebuilt: bank values written `= #0.5` were cut by the table's comment rule (`#` after a space)
+  → `=#0.5`; Lo-fi rates set to the values the engine shows (44100 / n Hz); the bank render test now runs the song
+  position (Rhythmic envelope pumps were silent at position 0); the Peak Controller test's LFO base is 0 (FL's LFO
+  adds base … base + amount); response test sets Bass Boost / Fast LP explicitly and prints the measured dB;
+  `ownLayoutKinds` count 24 → 38; Center and Phase Inverter cells get a 72 px body with a one-line description
+  (the generic layout test needs > 60 px); the generic layout test now prints which item leaves the body (one
+  item of the 13 FL kinds did — find it on the next run); the DesignDisplays compile error.
+- Exact next step on RESUME: core tests (build-local with FL Data) → fix the remaining failures (the item outside the
+  body, check the Bass Boost / Fast LP dB lines) → Windows build → before / after shots (`LYNX.exe --design168rshot`,
+  before with `LYNX_GENERATED_LAYOUTS=1`) in `/mnt/e/lynx-work/design168r/{before,after}` → review at 100 % / 200 %
+  → land via coord/land.sh after 168n's shared infrastructure is on main.

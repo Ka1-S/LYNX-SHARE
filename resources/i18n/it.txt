@@ -6355,3 +6355,5 @@ countries: it ch sm
 "MODULE 2" = "MODULO 2"
 "MODULE 3" = "MODULO 3"
 "MODULE 4" = "MODULO 4"
+"Removes the DC offset" = "Rimuove l'offset DC"
+"Flips the polarity of a side" = "Inverte la polarità di un lato"

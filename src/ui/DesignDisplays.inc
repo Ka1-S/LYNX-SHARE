@@ -419,7 +419,8 @@ inline void paintReverbSpace (juce::Graphics& g, juce::Rectangle<float> a, float
 // Chorus: the delay line's sweep (rate, depth) of the two voices (left / right in opposite phase)
 inline void paintChorus (juce::Graphics& g, juce::Rectangle<float> a, float s, const EffectSlot& fx, juce::Colour c)
 {
-    const auto rate = shownNumber (fx, "Rate"), depth = p01 (fx, "Depth"), fb = p01 (fx, "Feedback");
+    const auto rate = shownNumber (fx, "Rate");
+    const auto depth = p01 (fx, "Depth"), fb = p01 (fx, "Feedback");
     g.setColour (colour::gridBar);
     g.drawHorizontalLine ((int) a.getCentreY(), a.getX(), a.getRight());
     for (int voice = 0; voice < 2; ++voice)

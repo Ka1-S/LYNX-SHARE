@@ -63,54 +63,54 @@ Narrower             | Width = 30 %; Separation = 0 %
 Separation only      | Width = 50 %; Separation = 70 %
 
 [Frequency Shifter]
-Gentle detune        | Type = Frequency shifter; Range = 200 Hz; Frequency = #0.53; Mix = 40 %; Feedback = 0 %
-Barber-pole rise     | Type = Frequency shifter; Range = 200 Hz; Frequency = #0.56; Feedback = 55 %; Mix = 60 %
-Falling spiral       | Type = Frequency shifter; Range = 200 Hz; Frequency = #0.44; Feedback = 50 %; Mix = 60 %
-Stereo swirl         | Type = Frequency shifter; Range = 200 Hz; Frequency = #0.52; L/R phase offset = 90°; Mix = 50 %
-Metallic ring        | Type = Ring modulator; Range = 20 kHz; Frequency = #0.72; Mix = 45 %
-Robot voice          | Type = Ring modulator; Range = 20 kHz; Frequency = #0.66; Mix = 70 %
-Bright shift up      | Type = Frequency shifter HQ; Range = 20 kHz; Frequency = #0.70; Mix = 35 %
+Gentle detune        | Type = Frequency shifter; Range = 200 Hz; Frequency =#0.53; Mix = 40 %; Feedback = 0 %
+Barber-pole rise     | Type = Frequency shifter; Range = 200 Hz; Frequency =#0.56; Feedback = 55 %; Mix = 60 %
+Falling spiral       | Type = Frequency shifter; Range = 200 Hz; Frequency =#0.44; Feedback = 50 %; Mix = 60 %
+Stereo swirl         | Type = Frequency shifter; Range = 200 Hz; Frequency =#0.52; L/R phase offset = 90°; Mix = 50 %
+Metallic ring        | Type = Ring modulator; Range = 20 kHz; Frequency =#0.72; Mix = 45 %
+Robot voice          | Type = Ring modulator; Range = 20 kHz; Frequency =#0.66; Mix = 70 %
+Bright shift up      | Type = Frequency shifter HQ; Range = 20 kHz; Frequency =#0.70; Mix = 35 %
 
 [Low Lifter]
-Gentle lift          | On = On; Dry/Wet = 50 %; Low band gain = #0.5; Slope = #0.7; Pre gain = #0.5
-Fuller bass          | On = On; Dry/Wet = 75 %; Low band gain = #0.6; Slope = #0.6; Pre gain = #0.55
-Small speakers       | On = On; Dry/Wet = 100 %; Low band gain = #0.45; Slope = #0.5; Pre gain = #0.6
-Multiband, tight     | On = On; Multiband = On; Dry/Wet = 80 %; Low band gain = #0.55; High band gain = #0.9; Crossover = #0.85; Slope = #0.7
-Diffused warmth      | On = On; Dry/Wet = 70 %; Diffuser mix = 40 %; Diffuser depth = #0.6; Slope = #0.65
+Gentle lift          | On = On; Dry/Wet = 50 %; Low band gain =#0.5; Slope =#0.7; Pre gain =#0.5
+Fuller bass          | On = On; Dry/Wet = 75 %; Low band gain =#0.6; Slope =#0.6; Pre gain =#0.55
+Small speakers       | On = On; Dry/Wet = 100 %; Low band gain =#0.45; Slope =#0.5; Pre gain =#0.6
+Multiband, tight     | On = On; Multiband = On; Dry/Wet = 80 %; Low band gain =#0.55; High band gain =#0.9; Crossover =#0.85; Slope =#0.7
+Diffused warmth      | On = On; Dry/Wet = 70 %; Diffuser mix = 40 %; Diffuser depth =#0.6; Slope =#0.65
 
 [Peak Controller]
-Follow the peaks     | Base = 0 %; Amount = #0.85; Tension = #0.5; Decay = #0.5; LFO amount = #0.5
-Duck (inverted peak) | Base = 100 %; Amount = #0.15; Tension = #0.5; Decay = #0.45; LFO amount = #0.5
-Slow release         | Base = 0 %; Amount = #0.85; Decay = #0.3
-Slow sine LFO        | LFO base = #0.5; LFO amount = #0.75; LFO speed = #0.62; LFO shape = Sine; Amount = #0.5
-Fast LFO             | LFO base = #0.5; LFO amount = #0.75; LFO speed = #0.2; LFO shape = Triangle; Amount = #0.5
-Random steps         | LFO amount = #1; LFO speed = #0.2; LFO shape = Random; Ramp = on; Amount = #0.5
+Follow the peaks     | Base = 0 %; Amount =#0.85; Tension =#0.5; Decay =#0.5; LFO amount =#0.5
+Duck (inverted peak) | Base = 100 %; Amount =#0.15; Tension =#0.5; Decay =#0.45; LFO amount =#0.5
+Slow release         | Base = 0 %; Amount =#0.85; Decay =#0.3
+Slow sine LFO        | LFO base =#0.5; LFO amount =#0.75; LFO speed =#0.62; LFO shape = Sine; Amount =#0.5
+Fast LFO             | LFO base =#0.5; LFO amount =#0.75; LFO speed =#0.2; LFO shape = Triangle; Amount =#0.5
+Random steps         | LFO amount =#1; LFO speed =#0.2; LFO shape = Random; Ramp = on; Amount =#0.5
 
 [Pitch correction]
 folder Correction
-Natural              | Speed = #0.55; Fine = #0.5; Formant = off
-Fast                 | Speed = #0.85; Fine = #0.5
-Hard tune            | Speed = instant; Fine = #0.5
-Formant-safe         | Speed = #0.7; Formant = on
+Natural              | Speed =#0.55; Fine =#0.5; Formant = off
+Fast                 | Speed =#0.85; Fine =#0.5
+Hard tune            | Speed = instant; Fine =#0.5
+Formant-safe         | Speed =#0.7; Formant = on
 folder Major keys
-C major              | C = yes; C# = no; D = yes; D# = no; E = yes; F = yes; F# = no; G = yes; G# = no; A = yes; A# = no; B = yes; Speed = #0.8
-G major              | C = yes; C# = no; D = yes; D# = no; E = yes; F = no; F# = yes; G = yes; G# = no; A = yes; A# = no; B = yes; Speed = #0.8
-D major              | C = no; C# = yes; D = yes; D# = no; E = yes; F = no; F# = yes; G = yes; G# = no; A = yes; A# = no; B = yes; Speed = #0.8
-A major              | C = no; C# = yes; D = yes; D# = no; E = yes; F = no; F# = yes; G = no; G# = yes; A = yes; A# = no; B = yes; Speed = #0.8
-E major              | C = no; C# = yes; D = no; D# = yes; E = yes; F = no; F# = yes; G = no; G# = yes; A = yes; A# = no; B = yes; Speed = #0.8
-F major              | C = yes; C# = no; D = yes; D# = no; E = yes; F = yes; F# = no; G = yes; G# = no; A = yes; A# = yes; B = no; Speed = #0.8
-Bb major             | C = yes; C# = no; D = yes; D# = yes; E = no; F = yes; F# = no; G = yes; G# = no; A = yes; A# = yes; B = no; Speed = #0.8
-Eb major             | C = yes; C# = no; D = yes; D# = yes; E = no; F = yes; F# = no; G = yes; G# = yes; A = no; A# = yes; B = no; Speed = #0.8
+C major              | C = yes; C# = no; D = yes; D# = no; E = yes; F = yes; F# = no; G = yes; G# = no; A = yes; A# = no; B = yes; Speed =#0.8
+G major              | C = yes; C# = no; D = yes; D# = no; E = yes; F = no; F# = yes; G = yes; G# = no; A = yes; A# = no; B = yes; Speed =#0.8
+D major              | C = no; C# = yes; D = yes; D# = no; E = yes; F = no; F# = yes; G = yes; G# = no; A = yes; A# = no; B = yes; Speed =#0.8
+A major              | C = no; C# = yes; D = yes; D# = no; E = yes; F = no; F# = yes; G = no; G# = yes; A = yes; A# = no; B = yes; Speed =#0.8
+E major              | C = no; C# = yes; D = no; D# = yes; E = yes; F = no; F# = yes; G = no; G# = yes; A = yes; A# = no; B = yes; Speed =#0.8
+F major              | C = yes; C# = no; D = yes; D# = no; E = yes; F = yes; F# = no; G = yes; G# = no; A = yes; A# = yes; B = no; Speed =#0.8
+Bb major             | C = yes; C# = no; D = yes; D# = yes; E = no; F = yes; F# = no; G = yes; G# = no; A = yes; A# = yes; B = no; Speed =#0.8
+Eb major             | C = yes; C# = no; D = yes; D# = yes; E = no; F = yes; F# = no; G = yes; G# = yes; A = no; A# = yes; B = no; Speed =#0.8
 folder Minor keys
-A minor              | C = yes; C# = no; D = yes; D# = no; E = yes; F = yes; F# = no; G = yes; G# = no; A = yes; A# = no; B = yes; Speed = #0.8
-E minor              | C = yes; C# = no; D = yes; D# = no; E = yes; F = no; F# = yes; G = yes; G# = no; A = yes; A# = no; B = yes; Speed = #0.8
-D minor              | C = yes; C# = no; D = yes; D# = no; E = yes; F = yes; F# = no; G = yes; G# = no; A = yes; A# = yes; B = no; Speed = #0.8
-C minor              | C = yes; C# = no; D = yes; D# = yes; E = no; F = yes; F# = no; G = yes; G# = yes; A = no; A# = yes; B = no; Speed = #0.8
-F# minor             | C = no; C# = yes; D = yes; D# = no; E = yes; F = no; F# = yes; G = no; G# = yes; A = yes; A# = no; B = yes; Speed = #0.8
-G minor              | C = yes; C# = no; D = yes; D# = no; E = no; F = yes; F# = no; G = yes; G# = no; A = yes; A# = yes; B = no; Speed = #0.8
+A minor              | C = yes; C# = no; D = yes; D# = no; E = yes; F = yes; F# = no; G = yes; G# = no; A = yes; A# = no; B = yes; Speed =#0.8
+E minor              | C = yes; C# = no; D = yes; D# = no; E = yes; F = no; F# = yes; G = yes; G# = no; A = yes; A# = no; B = yes; Speed =#0.8
+D minor              | C = yes; C# = no; D = yes; D# = no; E = yes; F = yes; F# = no; G = yes; G# = no; A = yes; A# = yes; B = no; Speed =#0.8
+C minor              | C = yes; C# = no; D = yes; D# = yes; E = no; F = yes; F# = no; G = yes; G# = yes; A = no; A# = yes; B = no; Speed =#0.8
+F# minor             | C = no; C# = yes; D = yes; D# = no; E = yes; F = no; F# = yes; G = no; G# = yes; A = yes; A# = no; B = yes; Speed =#0.8
+G minor              | C = yes; C# = no; D = yes; D# = no; E = no; F = yes; F# = no; G = yes; G# = no; A = yes; A# = yes; B = no; Speed =#0.8
 folder Effects
-Lower voice          | Gender = #0.3; Formant = on; Speed = #0.6
-Higher voice         | Gender = #0.7; Formant = on; Speed = #0.6
+Lower voice          | Gender =#0.3; Formant = on; Speed =#0.6
+Higher voice         | Gender =#0.7; Formant = on; Speed =#0.6
 
 [EQ]
 Flat                 | Low = 0 dB; Mid = 0 dB; High = 0 dB; Output = 0 dB
@@ -125,14 +125,14 @@ De-box               | Mid = -3 dB; Mid freq. = 500 Hz
 Hi-hat tame          | High = -4 dB
 
 [Delay]
-Eighth echo          | Time = #0.19; Feedback = 35 %; Mix = 25 %; Ping-pong = off; Damping = 30 %
-Dotted eighth        | Time = #0.31; Feedback = 40 %; Mix = 25 %; Ping-pong = off; Damping = 40 %
-Quarter ping-pong    | Time = #0.44; Feedback = 45 %; Mix = 25 %; Ping-pong = on; Damping = 35 %
-Slapback             | Time = #0.06; Feedback = 8 %; Mix = 30 %; Ping-pong = off; Damping = 20 %
-Dub tail             | Time = #0.56; Feedback = 70 %; Mix = 30 %; Ping-pong = on; Damping = 70 %
-Half-note wash       | Time = #0.69; Feedback = 60 %; Mix = 22 %; Ping-pong = on; Damping = 60 %
-Vocal throw          | Time = #0.44; Feedback = 30 %; Mix = 20 %; Ping-pong = off; Damping = 55 %
-One-bar repeat       | Time = #0.94; Feedback = 40 %; Mix = 25 %; Ping-pong = off; Damping = 30 %
+Eighth echo          | Time =#0.19; Feedback = 35 %; Mix = 25 %; Ping-pong = off; Damping = 30 %
+Dotted eighth        | Time =#0.31; Feedback = 40 %; Mix = 25 %; Ping-pong = off; Damping = 40 %
+Quarter ping-pong    | Time =#0.44; Feedback = 45 %; Mix = 25 %; Ping-pong = on; Damping = 35 %
+Slapback             | Time =#0.06; Feedback = 8 %; Mix = 30 %; Ping-pong = off; Damping = 20 %
+Dub tail             | Time =#0.56; Feedback = 70 %; Mix = 30 %; Ping-pong = on; Damping = 70 %
+Half-note wash       | Time =#0.69; Feedback = 60 %; Mix = 22 %; Ping-pong = on; Damping = 60 %
+Vocal throw          | Time =#0.44; Feedback = 30 %; Mix = 20 %; Ping-pong = off; Damping = 55 %
+One-bar repeat       | Time =#0.94; Feedback = 40 %; Mix = 25 %; Ping-pong = off; Damping = 30 %
 
 [Reverb]
 Small room           | Room = 30 %; Damping = 55 %; Width = 80 %; Mix = 18 %; Dry = 100 %; Predelay = 5 ms
@@ -188,10 +188,10 @@ Side only            | L -> L = 0.50; R -> L = -0.50; L -> R = -0.50; R -> R = 0
 
 [Lo-fi]
 Light grit           | Rate = 22050 Hz; Bits = 12.0 bits; Mix = 60 %
-Retro sampler        | Rate = 16000 Hz; Bits = 12.0 bits; Mix = 100 %
+Retro sampler        | Rate = 14700 Hz; Bits = 12.0 bits; Mix = 100 %
 8-bit console        | Rate = 11025 Hz; Bits = 8.0 bits; Mix = 100 %
-Crushed              | Rate = 6000 Hz; Bits = 6.0 bits; Mix = 80 %
-Phone line           | Rate = 8000 Hz; Bits = 10.0 bits; Mix = 100 %
+Crushed              | Rate = 6300 Hz; Bits = 6.0 bits; Mix = 80 %
+Phone line           | Rate = 8820 Hz; Bits = 10.0 bits; Mix = 100 %
 
 [Crossover]
 Low band (< 200 Hz)  | High-pass = off; Low-pass = on; LP cutoff = 200 Hz; LP slope = 24 dB/oct

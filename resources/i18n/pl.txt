@@ -6355,3 +6355,5 @@ countries: pl
 "MODULE 2" = "MODUŁ 2"
 "MODULE 3" = "MODUŁ 3"
 "MODULE 4" = "MODUŁ 4"
+"Removes the DC offset" = "Usuwa składową stałą"
+"Flips the polarity of a side" = "Odwraca polaryzację jednej strony"

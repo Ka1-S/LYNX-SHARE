@@ -6355,3 +6355,5 @@ countries: cn sg
 "MODULE 2" = "模块 2"
 "MODULE 3" = "模块 3"
 "MODULE 4" = "模块 4"
+"Removes the DC offset" = "去除直流偏移"
+"Flips the polarity of a side" = "翻转一侧的极性"

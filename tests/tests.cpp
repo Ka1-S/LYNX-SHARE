@@ -16102,11 +16102,15 @@ TEST (plugin_layouts_name_real_parameters)
         const auto& l = plugui::layoutFor (kind);
         const auto& info = effectInfo (kind);
         CHECK (plugui::hasFlLayout (kind));
+        if (! (l.width > 100 && l.height > 60))
+            std::printf ("  %s: %d x %d\n", info.name, l.width, l.height);
         CHECK (l.width > 100 && l.height > 60);
         std::vector<bool> placed ((std::size_t) plugui::paramCount (kind), false);
 
         for (const auto& item : l.items)
         {
+            if (! (item.x >= 0.0f && item.y >= 0.0f && item.x + item.w <= (float) l.width + 0.5f && item.y + item.h <= (float) l.height + 0.5f))
+                std::printf ("  %s: item '%s' leaves the body\n", info.name, item.param != nullptr ? item.param : item.label != nullptr ? item.label : "");
             CHECK (item.x >= 0.0f && item.y >= 0.0f && item.x + item.w <= (float) l.width + 0.5f && item.y + item.h <= (float) l.height + 0.5f);
             if (item.param != nullptr)
             {

@@ -6355,3 +6355,5 @@ countries: jp
 "MODULE 2" = "モジュール 2"
 "MODULE 3" = "モジュール 3"
 "MODULE 4" = "モジュール 4"
+"Removes the DC offset" = "DC オフセットを除去"
+"Flips the polarity of a side" = "片側の極性を反転"

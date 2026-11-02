@@ -6355,3 +6355,5 @@ countries: ru by kz
 "MODULE 2" = "МОДУЛЬ 2"
 "MODULE 3" = "МОДУЛЬ 3"
 "MODULE 4" = "МОДУЛЬ 4"
+"Removes the DC offset" = "Убирает постоянную составляющую"
+"Flips the polarity of a side" = "Переворачивает полярность одной стороны"

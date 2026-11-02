@@ -53,6 +53,8 @@ Layout flCenter()
     v.push_back (section (6, 5, 160, 45, nullptr, boxed));
     v.push_back (label (60, 8, 102, 15, TR_NOOP ("Status"), boxed));
     v.push_back (tabs (12, 25, 150, 20, "On", TR_NOOP ("Off|On")));
+    l.height = 72; // (a line under FL's 55 px cell says what it does)
+    v.push_back (label (6, 54, 160, 14, TR_NOOP ("Removes the DC offset"), dim));
     return l;
 }
 
@@ -64,6 +66,8 @@ Layout flPhaseInverter()
     v.push_back (section (6, 5, 160, 45, nullptr, boxed));
     v.push_back (label (60, 8, 102, 15, TR_NOOP ("State"), boxed));
     v.push_back (tabs (12, 25, 150, 20, "Invert", TR_NOOP ("None|Left|Right"), { 0.0f, 0.5f, 1.0f }));
+    l.height = 72;
+    v.push_back (label (6, 54, 160, 14, TR_NOOP ("Flips the polarity of a side"), dim));
     return l;
 }
 
