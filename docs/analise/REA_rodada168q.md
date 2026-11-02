@@ -106,8 +106,8 @@ and a three-note chord).
   Studio's files" header for Kepler / Kepler Exo / Transistor Bass / Sawer without their engine file; translations.
 - **2026-11-02 crash (~11:10)**: worktree checked clean (no zero-length files, HEAD = wip b4fcda94); merged origin/main
   efb8344d and the latest wip/design168n (7a9f3cee); builds re-queued.
-- **In progress**: Linux core build + `LYNX_TEST=design168` tests (`<scratchpad>/q168q/bl.sh`), Windows build to
-  /mnt/e/lynx-work/design168q/build-win (`<scratchpad>/q168q/win.sh`).
+- **In progress**: Linux core build + `LYNX_TEST=design168` tests (`~/.claude/jobs/f8789b49/tmp/r168q/run/bl.sh`), Windows build to
+  /mnt/e/lynx-work/design168q/build-win (`~/.claude/jobs/f8789b49/tmp/r168q/run/win.sh`).
 - **Next**: fix build / test failures; full test suite; Windows shots (`LYNX.exe --instrumentshot <dir>
   kepler,keplerexo,transistorbass,sawer,beepmap,fruitygranulizer,wasp lynx|fl`, fresh LYNX_PROFILE_DIR,
   LYNX_TEST_MODE=1) after, and the same from a build of commit 6055913f (before); land only after round 168n has landed
