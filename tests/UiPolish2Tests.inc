@@ -62,7 +62,8 @@ TEST (polish_clip_ghost_notes)
     other.channel = 3;
     song.patterns[1].notes.push_back (other);
 
-    // pattern 0 (the one being edited) plays bars 2-3; pattern 1 (one bar long) plays bars 1-4, so it repeats
+    // pattern 0 (the one being edited) plays bars 2-3; pattern 1 (one bar long) has a clip stretched over bars 1-4,
+    // which plays it once (FL, round 168k: no repeats → nothing in bars 2-3), and a 1-bar clip at bar 3
     lynx::Clip home;
     home.pattern = 0;
     home.start = bar;
@@ -71,18 +72,23 @@ TEST (polish_clip_ghost_notes)
     clip1.pattern = 1;
     clip1.start = 0;
     clip1.length = 4 * bar;
-    song.playlist = { clip1, home };
+    lynx::Clip clip2;
+    clip2.pattern = 1;
+    clip2.start = 2 * bar;
+    clip2.length = bar;
+    clip2.track = 2;
+    song.playlist = { clip1, home, clip2 };
 
     auto ghosts = lynx::polish::clipGhostNotes (song, 0, 0);
-    CHECK (ghosts.size() == 2); // the passes in bars 2 and 3
-    CHECK (ghosts.size() == 2 && ghosts[0].start == lynx::ppq && ghosts[1].start == bar + lynx::ppq);
-    CHECK (ghosts.size() == 2 && ghosts[0].key == 60 && ghosts[0].channel == 0);
+    CHECK (ghosts.size() == 1); // only the clip at bar 3
+    CHECK (ghosts.size() == 1 && ghosts[0].start == bar + lynx::ppq);
+    CHECK (ghosts.size() == 1 && ghosts[0].key == 60 && ghosts[0].channel == 0);
 
     // not in the Playlist: nothing
     CHECK (lynx::polish::clipGhostNotes (song, 2, 0).empty());
 
     // a muted clip is not heard: no ghosts from it
-    song.playlist[0].muted = true;
+    song.playlist[2].muted = true;
     CHECK (lynx::polish::clipGhostNotes (song, 0, 0).empty());
 }
 
