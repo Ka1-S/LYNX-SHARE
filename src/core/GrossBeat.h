@@ -56,6 +56,52 @@ struct State
 // FL's state (0xD5) → parsed slots; nullopt when it is not a Gross Beat state this engine reads.
 std::optional<State> parseState (const std::uint8_t* data, std::size_t size);
 
+// The state written back in FL's own layout (version 8, REA_rodada14 §2.1), so an edited slot travels in the LXGB
+// container and reads again with parseState (and in FL).
+std::vector<std::uint8_t> writeState (const State& state);
+
+// A new FL instance before its default preset loads (constructor FUN_0083fcf0, REA_rodada168m §2): every slot unnamed,
+// trigger and position sync on 4 beats, a flat bar of two hold points at level 1; parameters and options at FL's
+// defaults (high quality and declick on).
+State emptyState();
+
+// LYNX's own factory bank (round 168m): empty slot 1 on both sides, then time and volume slots made for LYNX from the
+// behaviour FL documents (stutters, half speed, tape stop, reverse, gates, pumps, fades); nothing copied from FL's files.
+State factoryState();
+// factoryState() packed in the LXGB container (PPQ 96): what a new Gross Beat starts with.
+std::vector<std::uint8_t> factoryContainer();
+
+// The state of a container to show and edit: the saved one, else (empty or unreadable) the factory bank.
+State editableState (const std::vector<std::uint8_t>& container, int* ppq = nullptr);
+// `state` written back into a container (keeps the container's PPQ, 96 for a new one).
+std::vector<std::uint8_t> withState (const std::vector<std::uint8_t>& container, const State& state);
+
+// ---- point editing (FL's MEnvEditor on a slot: x in beats 0…4, level 0…1) ----------------------------------------
+struct EditPoint
+{
+    double x = 0.0;
+    float y = 1.0f, tension = 0.0f;
+    std::uint8_t type = 2; // FL's curve type of the segment that ends at the point (Gross Beat adds hold points)
+};
+constexpr double barBeats = 4.0;
+constexpr int maxEditPoints = 512; // the running engine takes edits of up to this many points per slot in place
+
+std::vector<EditPoint> editPoints (const Slot& slot);
+// replaces the slot's points: x kept in order inside 0…4, the first at 0 and the last at 4; coefficients recomputed
+void setPoints (Slot& slot, const std::vector<EditPoint>& points);
+// a point at x (after the points at or before x); its index
+int addPoint (std::vector<EditPoint>& points, double x, float y, std::uint8_t type = 2, float tension = 0.0f);
+// FL keeps the first point and at least two points; the last one is the end of the bar
+bool removePoint (std::vector<EditPoint>& points, int index);
+// moves a point between its neighbours (the first and the last only up and down)
+void movePoint (std::vector<EditPoint>& points, int index, double x, float y);
+// the slot's level at `beat` (0…4) as the engine plays it
+float levelAt (const Slot& slot, double beat);
+// n levels over the bar (for drawing)
+std::vector<float> renderSlot (const Slot& slot, int n);
+// FL's snap selector (off, 1/16, 1/12, 1/8, 1/6, 1/4, 1/3 beat — table 0x8b6ae8): the step in beats (0 = off)
+double snapStep (int selector) noexcept;
+
 // Container helpers
 std::vector<std::uint8_t> pack (const std::vector<std::uint8_t>& flState, int ppq);
 bool unpack (const std::vector<std::uint8_t>& container, std::vector<std::uint8_t>& flState, int& ppq);
@@ -81,6 +127,10 @@ public:
     Engine& operator= (const Engine&) = delete;
 
     bool load (const State& state, int ppq);
+    // an edited state (same PPQ) taken while running: slots, options and per-slot settings change in place, the
+    // buffer and the playing slots' positions are kept. Audio thread, no allocation: false when a slot has more points
+    // than maxEditPoints (rebuild the engine instead).
+    bool update (const State& state) noexcept;
     void prepare (int sampleRate, int maxBlock);
     void setTempo (float bpm);
     void setParam (int index, int raw); // FL's ProcessParam
