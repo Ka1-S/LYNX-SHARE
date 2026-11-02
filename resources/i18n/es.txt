@@ -6255,3 +6255,4 @@ countries: es mx ar co cl pe ve
 "Update A/B" = "Actualizar A/B"
 "Flush" = "Vaciar"
 "Detector source" = "Fuente del detector"
+"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "Zoom: arrastra hacia arriba = más cerca, a los lados = desplazar  [Ctrl] solo zoom"
