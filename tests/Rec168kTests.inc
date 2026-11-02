@@ -346,3 +346,82 @@ TEST (rec168k_auto_length_pattern_stretched_clip_8_bars)
     CHECK (s.patterns[1].notes.back().start == 7 * bar);
     CHECK (rec168k::clipsOf (s, 1).size() == 1);
 }
+
+TEST (rec168k_take_inside_a_long_clip_keeps_the_clip)
+{
+    // a take inside a pattern clip longer than its pattern grows the pattern only to the last recorded bar; the clip
+    // keeps its length and place (FL plays it once: empty after the pattern's end); takes into another pattern leave
+    // it alone
+    auto s = lynx::Song::makeDefault();
+    const std::int64_t bar = (std::int64_t) lynx::ppq * s.beatsPerBar;
+    s.mode = lynx::PlayMode::song;
+    s.patterns[0].notes.clear();
+    lynx::Note kick;
+    kick.length = lynx::ticksPerStep;
+    s.patterns[0].notes.push_back (kick); // 1 bar
+    s.patterns.resize (2);
+    s.patterns[1] = lynx::Pattern {};
+    lynx::Clip loop;
+    loop.kind = lynx::ClipKind::pattern;
+    loop.pattern = 0;
+    loop.length = 8 * bar; // the 1-bar pattern 8 times
+    s.playlist = { loop };
+
+    // a take into Pattern 2 elsewhere: the loop clip and its pattern are untouched
+    s.currentPattern = 1;
+    {
+        rec168k::Take take (s);
+        take.note ((double) (3 * bar), lynx::ppq, 60);
+        take.stop ((double) (4 * bar));
+    }
+    CHECK (s.playlist[0].length == 8 * bar && s.patterns[0].effectiveLength (s.beatsPerBar) == bar);
+
+    // a take inside the long clip, in its second bar: the pattern becomes 2 bars, the clip stays 8 bars
+    s.currentPattern = 0;
+    {
+        rec168k::Take take (s);
+        take.note ((double) (bar + lynx::ppq), lynx::ppq, 64);
+        take.stop ((double) (2 * bar));
+    }
+    const auto clips = rec168k::clipsOf (s, 0);
+    CHECK (clips.size() == 1 && clips[0]->length == 8 * bar && clips[0]->offset == 0);
+    CHECK (s.patterns[0].effectiveLength (s.beatsPerBar) == 2 * bar);
+    CHECK (s.patterns[0].notes.size() == 2 && s.patterns[0].notes.back().start == bar + lynx::ppq);
+}
+
+TEST (rec168k_stretched_pattern_clip_plays_its_pattern_once)
+{
+    // FL 2026 [EXEC rec168k q168k.wav, command-line render]: a 1-bar pattern (notes at beats 1 and 3) in a clip
+    // stretched to 4 bars sounds at 0.0 s and 1.0 s only (120 BPM), then silence to the clip's end; a 1-bar control clip
+    // at 10 s sounds at 10.0 and 11.0 s. LYNX plays it the same: once, nothing after the pattern's end.
+    using namespace lynx;
+    auto s = Song::makeDefault();
+    s.bpm = 120.0;
+    s.mode = PlayMode::song;
+    const std::int64_t bar = (std::int64_t) ppq * s.beatsPerBar;
+    s.patterns[0].notes.clear();
+    Note a;
+    a.length = ppq / 2;
+    s.patterns[0].notes.push_back (a);
+    a.start = 2 * ppq;
+    a.key = 72;
+    s.patterns[0].notes.push_back (a);
+    Clip c;
+    c.kind = ClipKind::pattern;
+    c.pattern = 0;
+    c.length = 4 * bar;
+    s.playlist = { c };
+    const auto sr = 48000.0;
+    const auto tps = ticksPerSample (s.bpm, sr);
+    const auto index = makeScheduleIndex (s);
+    int ons = 0;
+    for (double t = 0.0; t < (double) (4 * bar); t += 512 * tps)
+    {
+        EventBuffer ev;
+        scheduleSong (s, t, 512, tps, ev, t == 0.0, &index, false);
+        for (const auto& e : ev)
+            if (e.type == NoteEvent::Type::on)
+                ++ons;
+    }
+    CHECK (ons == 2);
+}

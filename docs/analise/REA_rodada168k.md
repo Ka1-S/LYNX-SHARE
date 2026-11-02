@@ -21,6 +21,8 @@ recent-color list and the Channel rack window height, and those three were writt
 | fl2 | same take | one short note just before bars 3, 4, 5, 6, 7 and 8 (D4…B4), the last one **held through Stop** (~8:3, released 0.4 s after Stop) | a **Pattern 2 clip on Track 2 from bar 2 to bar 9**: it starts at the bar of the first note (that note fell at ~2:04:15, just before bar 3) and ends at the pattern's whole bars; every note sits **where it was played** (no folding to bar 1); the held note is kept, ending at the Stop | `c_m1b.png`, `z_m1b.png` |
 | fl3 | Pattern 3 = one kick step (1 bar); its clip on Track 3 from bar 1 **stretched to bar 5** (4 bars, the clip repeats the 1-bar pattern) | notes at 2:1, 3:3 and 4:2 | the notes stay at 2:1, 3:3 and 4:2 of the clip; the Piano roll of Pattern 3 shows the kick at 1:1 and **D4 at the pattern's bar 2**: FL **grows the pattern** to the recorded position, it does **not fold** by the pattern's length; no new clip | `z_m2b.png`, `f12.png` |
 
+| fl4 | [EXEC] FL command-line render (`FL64.exe /R /Ewav`, FL closed by itself) of a generated project `C:\Users\kauan\lynx-test\rec168k\fl\q168k.flp` (120 BPM): a 1-bar pattern (clicks at beats 1 and 3) in a clip **stretched to 4 bars** at 0 s, and a 1-bar control clip at 10 s — every Playlist item in ONE 0xE9 event (round 167q's render wrote several 0xE9 events; FL keeps only the last, so it was inconclusive) | — | `q168k.wav`: onsets at **0.0, 1.0, 10.0, 11.0 s only**, silence from 2 to 8 s: **a pattern clip longer than its pattern plays it once and is empty after it — FL does not repeat it** | `fl\q168k.wav` (generator `~/.claude/jobs/f8789b49/tmp/rec168k/py/mk168k.py`) |
+
 Earlier evidence agrees: REA_rodada165z-b fh2–fh5 (automation recorded from 2.3 on an empty Playlist: a Pattern 1 clip
 placed at Stop from bar 2, "the bar of the first move", to the pattern's whole bars; the song played on to 7.1).
 
@@ -33,11 +35,17 @@ placed at Stop from bar 2, "the bar of the first move", to the pattern's whole b
 | held notes at Stop | fl2: kept, ending at the Stop | kept (to the last playing position) | unchanged, now covered by a test with the note past the song's end |
 | "Like it just doesn't play my notes right" (#16, pitch wheel) | FL writes the wheel with the notes (REA_rodada165z-b, pattern events) | the wheel went to an automation clip at its real song position while the notes were folded into bar 1–2: they no longer lined up | the notes are at their real song positions, the wheel's automation clip too (both linear for the whole take): they line up. The storage difference (automation clip instead of pattern events in Song mode) stays as decided in 0.1.20 (REA_rodada165z-b) |
 
+### Stretched pattern clips (user, 2026-11-02: the "looping" the YouTuber praised at 2:41 was the bug — "fix it")
+
+| Reporter's words | FL evidence | LYNX before | LYNX now |
+|---|---|---|---|
+| "it just keeps on looping … a feature that FL Studio does not have" (#3, the recorded clip dragged from 4 to 8 bars) | fl4: FL plays a stretched pattern clip once, empty after the pattern; fl3: recording there grows the pattern | the Playlist **drew** the pattern repeating along the clip (and the Piano roll's clip ghost notes repeated it) while playback played it once — what you saw was not what you heard | drawn once, as it plays (`PlaylistComponent` clip body and the small-clip batch, `polish::clipGhostNotes`); playback unchanged (once). FL's Alt+drag in the Playlist = snap off, as LYNX already does (no loop gesture) |
+
+Round 167q's repeat playback (issue #25, not on main) is dropped by the coordinator on this evidence.
+
 Not changed: Pattern mode (loops the pattern, positions within the loop); loop regions in Song mode keep looping —
 a take whose first note is inside the region uses the bar of the region's start as its origin, so every pass lands
-in the same bars (FL's "MIDI loop recording (song mode)" option is off here and was not measured). Round 167q's
-`patternTickInClip` fold for recording (not on main yet when this round was written) is superseded for notes by fl3:
-recording never folds.
+in the same bars (FL's "MIDI loop recording (song mode)" option is off here and was not measured). Recording never folds (fl3).
 
 ## Code
 
@@ -57,7 +65,8 @@ respected_on_the_first_recording_in_song_mode` now expects FL's placement (clip 
 
 ## Where I stopped
 
-- Done: FL session (fl1–fl3), code, tests written.
+- Done: FL session (fl1–fl3), FL render (fl4), code, tests (mini harness 133 checks, 0 failures), stretched clips
+  drawn once.
 - Next: build the tests (mini harness `~/.claude/jobs/f8789b49/tmp/rec168k/mini/build.sh`, then `scripts/build-local.sh`
   with FL Data), the probe against the new code, the Windows build + GUI check of the user's flow (fresh profile), notes,
   land.

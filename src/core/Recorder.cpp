@@ -185,14 +185,14 @@ const Clip* currentPatternClipAt (const Song& song, std::int64_t tick)
     return found;
 }
 
-// FL grows the pattern when a take is played inside a clip longer than it (round 168k [EXEC]: a 1-bar pattern's clip
-// stretched to 4 bars, notes played at bars 2.1 / 3.3 / 4.2 stayed there and the pattern became 4 bars): no fold by
-// the pattern's length while recording, even though such a clip plays its pattern over and over.
 bool inCurrentPatternClip (const Song& song, std::int64_t tick)
 {
     return currentPatternClipAt (song, tick) != nullptr;
 }
 
+// FL grows the pattern when a take is played inside a clip longer than it (round 168k [EXEC]: a 1-bar pattern's clip
+// stretched to 4 bars, notes played at bars 2.1 / 3.3 / 4.2 stayed there and the pattern became 4 bars): no fold by
+// the pattern's length while recording (such a clip plays its pattern once and is empty after it, as FL).
 std::int64_t clipPatternTick (const Clip& c, std::int64_t tick)
 {
     return tick - c.start + c.offset;
