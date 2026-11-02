@@ -28,7 +28,10 @@ collaboration feature). The user pays a VPS since 2026-11-02 ("put everything LY
 
 ## Where I stopped
 
-- Done: everything above deployed and tested; docs written; landed on main (see report).
+- Done: everything above deployed and tested on the VPS; docs written; committed on feature/vps168v (pushed as wip/vps168v).
+- PAUSED 2026-11-02 by the coordinator (round 168w speeds up landings) before landing: the land-safe.sh waiter was
+  cancelled while waiting on the merge lock. On RESUME: `~/.claude/jobs/f8789b49/tmp/coord/land-safe.sh vps168v`.
+  The VPS services keep running (not affected by the pause).
 - Next (other rounds): app side of P1 (SHARE_API.md §2.6), crash move steps 1–2, off-machine backups, AAAA records,
   SSH `PasswordAuthentication no` after the user changes the root password.
 - Rerun: `server/deploy.sh` then `python3 server/tests/smoke.py` (aiohttp needed locally, e.g. a venv).
