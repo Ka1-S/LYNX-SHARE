@@ -65,6 +65,10 @@ public:
     juce::AudioDeviceManager& getDeviceManager() noexcept { return deviceManager; }
     Transport& getTransport() noexcept { return transport; }
     const Transport& getTransport() const noexcept { return transport; }
+    // The Song-mode playhead for the UI: the position folded into the song (its end goes back to the start), except
+    // while the song plays on past its end (a Song-mode recording without a loop region, FL [EXEC] round 168k: the
+    // counter reads 8:08 after recording a 1-bar song from bar 1; a bounce) or with a loop region
+    double songPlayheadTicks() const noexcept;
     SampleLibrary& getSampleLibrary() noexcept { return samples; }
     MeterBank& getMeters() noexcept { return meters; }
     // Tools > Audio logger (REA round 153): records everything the Master plays to a WAV in the background.
