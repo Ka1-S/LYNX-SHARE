@@ -116,6 +116,7 @@ not rebuilt yet). Notes in coord/notes-0.1.23.md.
 Next step: Windows build (OUT=build-win) → GUI check with a fresh profile and test mode (Patterns › Quick render /
 Render as audio clip / Render and replace, Playlist Tools › Consolidate (Ctrl+Alt+C), File › Export › All playlist
 tracks, Master... (Ctrl+Alt+M), Project bones...; screenshots looked at) → merge origin/main → land.sh.
-Decisions for the user: Export › Master is LYNX-own local mastering (FL uses its online FL Cloud service); Project
-bones writes LYNX formats and leaves out channel presets / automation (no LYNX format yet). No FL session was used
+Decisions (approved by the user, 2026-11-02): (1) Export › Master stays LYNX-own local mastering instead of FL
+Cloud; (2) Project bones ships without channel presets / automation for now. Follow-up: add Channels\ and
+Automation\ to Project bones once LYNX has a channel preset format and an automation score writer. No FL session was used
 for an audio comparison of the renders.
