@@ -4354,8 +4354,7 @@ void PlaylistComponent::zoomToSelection()
 
 void PlaylistComponent::centreOnPlayhead()
 {
-    const auto& song = engine.getSong();
-    const auto tick = std::fmod (engine.getTransport().positionTicks.load(), (double) juce::jmax<std::int64_t> (1, song.songLength()));
+    const auto tick = engine.songPlayheadTicks();
     scrollTicks = juce::jmax (0.0, tick - gridArea().getWidth() / pixelsPerTick / 2.0);
     updateScrollBars();
     repaint();
@@ -4401,9 +4400,7 @@ bool PlaylistComponent::runAction (const std::string& id)
 
 std::int64_t PlaylistComponent::songPositionTick() const
 {
-    const auto& song = engine.getSong();
-    const auto tick = engine.getTransport().positionTicks.load();
-    return (std::int64_t) std::max (0.0, song.hasLoop() ? tick : std::fmod (tick, (double) juce::jmax<std::int64_t> (1, song.songLength())));
+    return (std::int64_t) engine.songPlayheadTicks();
 }
 
 void PlaylistComponent::addMarkerByKey()
@@ -5343,7 +5340,7 @@ void PlaylistComponent::timerCallback()
     auto tick = -1.0;
 
     if (song.mode == PlayMode::song && (transport.playing.load() || transport.positionTicks.load() > 0.0))
-        tick = std::fmod (transport.positionTicks.load(), (double) song.songLength());
+        tick = engine.songPlayheadTicks();
 
     if (tick != playheadTick && isShowing())
     {

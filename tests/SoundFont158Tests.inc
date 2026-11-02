@@ -170,6 +170,31 @@ TEST (soundfont158_damaged_files)
     CHECK (missing->finished() && missing->font() == nullptr && ! missing->error().empty());
 }
 
+TEST (soundfont158_sf3_terminal_sample_out_of_range)
+{
+    // an SF3 whose terminal (EOS) sample header is flagged compressed and points far outside the sample chunk
+    auto bytes = lynx::sf::makeTestFont ({ { "A", 0, 0 } });
+    std::size_t shdr = 0;
+    for (std::size_t i = 0; i + 8 <= bytes.size(); ++i)
+        if (std::memcmp (bytes.data() + i, "shdr", 4) == 0)
+            shdr = i + 8;
+    CHECK (shdr != 0);
+    const auto put32 = [&bytes] (std::size_t at, std::uint32_t v) {
+        for (int b = 0; b < 4; ++b)
+            bytes[at + (std::size_t) b] = (std::uint8_t) (v >> (8 * b));
+    };
+    const auto records = (std::size_t) (bytes[shdr - 4] | bytes[shdr - 3] << 8 | bytes[shdr - 2] << 16 | bytes[shdr - 1] << 24) / 46;
+    bytes[shdr + 44] = 0x10; // the first sample: compressed, no Ogg stream
+    const auto eos = shdr + 46 * (records - 1);
+    put32 (eos + 20, 0xFFFFFF00u), put32 (eos + 24, 0xFFFFFFFFu);
+    bytes[eos + 44] = 0x10;
+    // rejected or parsed, never read out of range
+    if (auto font = lynx::sf::parseFont (bytes))
+        for (const auto& p : font->presets)
+            for (const auto& r : p.regions)
+                CHECK (r.start < r.end && r.end <= font->samples.size());
+}
+
 TEST (soundfont158_note_on_off_and_loops)
 {
     const auto path = sft::testFont ("notes", { { "Looped", 0, 0, 0, true }, { "Unlooped", 0, 1, 0, false } });
