@@ -61,14 +61,14 @@ remain:
 | E7 | **0xA4** pattern u32 | pattern record +0x44 [DECOMP loader + saver]; 0 in 754 patterns, **1536** (= 16 beats × 96 PPQ) in one → a fixed pattern length in ticks [HYP] | ignored (LYNX patterns are as long as their content / the rack's steps) | M (trace + import) | M | 168d |
 | E8 | 0x9D / 0x9E pattern u32 | pattern record +0x10 / +0x18 (−1 default; 0x9D 0 / 1 / 2, 0x9E up to 251) [DECOMP]; 35 projects | ignored; meaning not traced (candidates: pattern group, "Edit patterns in" target) | M | L | 168d |
 | E9 | 0x19, 0x34, 0xAB, 0xFC / 0xFD pattern | +0x1c, +0xa4 (bool), +0xa8, +0xac (text), +0xb4 (48-byte list) [DECOMP]; 2–8 projects | ignored | M | L | 168d (trace only) |
-| E10 | **0x2A** insert u8 | loader → mixer track record +0x00 (bool) [DECOMP]; 1 on 896 of 4 209 inserts | ignored | M (trace) | M [HYP: a per-insert switch every project writes] | 168d |
-| E11 | **0xA6** insert u32 0…3 | loader → mixer track +0x30, clamped to 3 [DECOMP]; written after 0xA5 (record source point) [DATA ctx]: 1 on 3 157 inserts, 3 on 123 | ignored | M (trace) | M [HYP: the disk-recording / input mode next to the record source] | 168d |
+| E10 | **0x2A** insert u8 | the mixer saver FUN_00f3d620 writes the track record's first byte (+0x00), the loader stores it back as a bool [DECOMP both]; 1 on 896 of 4 209 inserts | ignored | M (trace) | M [HYP: a per-insert switch every project writes] | 168d |
+| E11 | **0xA6** insert u32 0…3 | the mixer saver writes track +0x30 right after +0x2f = 0xA5, the record source point [DECOMP FUN_00f3d620]; loader clamps to 0…3: 1 on 3 157 inserts, 3 on 123 | ignored | M (trace) | M [HYP: the disk-recording / input mode next to the record source] | 168d |
 | E12 | 0x2B playlist track u8 | track +0x70; 0 → loader sets a default in +0x2c (167g #8); 823 of 27 000 | ignored | M | L | 168d |
 | E13 | 0x24 arrangement u8 | arrangement record +0x10, after its name 0xF1 [DECOMP saver/loader]; 0 or 91 | ignored | S | L | 168d |
 | E14a | **0x1D** u8 project | the global the mixer's PDC menu item "Automatic" toggles: `AutoPDCMenuClick` 0x129f0c0 [RTTI method table → Mem: its only writer besides the loader and the reset FUN_011d3790]; read by the PDC planner FUN_010ff3b0 (round 165f-mixer §1.3) [Mem]; 1 in 159 of 165 projects [DATA] | ignored; LYNX's PDC is always automatic, so the 6 projects with 0 (PDC off) play compensated | S (+1 FL render of a 0 project) | M | 168d (+ the menu item in 168h) |
 | E14b | **0x27** u8 project | the global of the mixer's PDC item "Compensate automations": `CompensateAutomationsMenuClick` 0x129efb0 [RTTI → Mem]; read by the mixer's per-slot processing next to the plugin's latency (FUN_01046a70, FUN_012b5e60…) [Mem, DECOMP r167h/r4790.c 21310]; 1 in 52, 0 in 21 projects | ignored (LYNX does not shift automation by plugin latency) | M | L–M | 168h |
 | E14c | **0x23** u8 project | written by `TimeSettingComboChange` 0x13659d0 [RTTI → Mem], the Options › Project combo `timesettingcombo` with the items "Set as time division" ("Original FL Studio system") / "Set as time signature" ("Traditional time signatures") [DFM TMIDIForm]; read by `TimeDivision_Update` 0xeccbd0; 1 (= time signature) in 80 projects | ignored; LYNX shows "beats per bar" only (with 0x12 the denominator, 167g #11) | M | L–M | 168i |
-| E14d | 0x2F, 0x85, 0xF3 project | 0x2F = byte +0x1b of the song object; 0x85 = a u32 got from the main-form object by FUN_00609830 (every project, 110…958); 0xF3 = two u32 globals also written by `EEMenuScaleClick` 0x11f87e0 (the editors' Scale menu) [RTTI → Mem] → the editors' scale (root, scale) [HYP: the Piano Roll's scale highlighting] | ignored | M | L–M | 168d (trace) / 168g (scale) |
+| E14d | 0x2F, 0x85, 0xF3 project | 0x2F = byte +0x1b of the song object; 0x85 = a u32 got from the main-form object by FUN_00609830 (every project, 110…958); 0xF3 = the two u32 globals of the editors' Scale menu: `EEMenuScaleClick` 0x11f87e0 takes the item's tag and the second global (clamped ≥ 0) through FUN_00eae670 into the editor's scale (FUN_00e90670), the first one is a root / mode index (−1…−3 or < the list count, FUN_00e370c0) [RTTI → DECOMP] → the Piano Roll's **scale highlighting** (root + scale) saved with the project | ignored | M | L–M | 168d (trace) / 168g (scale) |
 | E15 | 0xAA channel u32 | saver: the channel's +0x714 as a plain u32 (not a string list as 167l wrote) [DECOMP FUN_00f3e190]; 0 or −1 in 1 003 channels of 15 projects | ignored | S | L | 168d |
 | E16 | 0x30, 0x33 channel; 0x2D / 0x2E / 0xA8 / 0x65 marker fields | always 0 in the corpus [DATA] | ignored | — | — | nothing to import |
 | E17 | 0xE2 / 0xE6 second link list | 167g #10 / 167l §5 | ignored | M | L | not planned |
@@ -95,7 +95,7 @@ remain:
 | M4 | **Tools › Consolidate playlist selection** (from selection / song start), Ctrl+Alt+C / Ctrl+Shift+Alt+C | [DFM 167j] | track-level "Consolidate track" only | M | M | 168e |
 | M5 | Playlist track menu: Lock to content, Lock to this size, Send pattern instances here, Auto name clips, Change icon, Select audio input / Arm / Disarm | PLTrackMenu [DFM 167j] | none of these | M | M | 168f (icon: 168h) |
 | M6 | Playlist Tools: Lock / Unlock all tracks to content, Reset empty tracks, Collapse / Expand all grouped tracks, Purge unused audio clips, Switch all / selected audio clip stretch modes | [DFM 167j] | none | M | L–M | 168f |
-| M7 | Playlist Edit: Delete all, Trim selection, Insert / Delete space items, Turn into automation clip, Allow clip nudging, Dropping locks to content, Create new clips with manual fades, Snap fade handles, Create variants when stretching | [DFM 167j, TEventEditForm "Create variants when stretching audio clips"] | keys only for insert/delete space; the rest missing | M | M | 168f |
+| M7 | Playlist Edit (FL storage: "Create variants when stretching" = one global flipped by `CreateVariantsMenuClick` 0xe3a090; "Lock to content" = byte +0x19 of the playlist track record (0x114 B per track), undo name "lock/unlock to content" (`EEPLTrackClipLockMenuClick` 0x12236c0 → FUN_012e7a90); "Lock to this size" = +0x10 size with the sign of +0x14 (`EEPLTrackSize1MenuClick` 0x1228f10) [RTTI → DECOMP]): Delete all, Trim selection, Insert / Delete space items, Turn into automation clip, Allow clip nudging, Dropping locks to content, Create new clips with manual fades, Snap fade handles, Create variants when stretching | [DFM 167j, TEventEditForm "Create variants when stretching audio clips"] | keys only for insert/delete space; the rest missing | M | M | 168f |
 | M8 | Playlist keys: Ctrl+G merge pattern clips, Ctrl+Shift+G / Ctrl+Alt+G merge similar / automation clips, Ctrl+Shift+B clone tracks, Ctrl+Shift+V make unique, Shift+6 zoom on performance clips | [DFM ShortcutsModule 167j] | menu items without keys or missing | S | M | 168f |
 | M9 | Playlist view: Hide collapsed grouped tracks, fade / gain previews, mini playlist preview, precise time indicator, continuous autoscroll, marker "Move content left / right" | [DFM 167j] | none | M | L | 168f |
 | M10 | **Piano Roll: Show chord name for selection**, note grid highlights Alt+B, scale highlighting, background waveform Alt+N | [DFM 167j] | none (scale snap / fold exist) | M | M | 168g |
@@ -196,11 +196,11 @@ Slicer 2 / FL Studio Mobile / Fruity LSD (167f) — each waits for the decision 
 
 ## 5. Where I stopped
 
-- Done: §1–§4 (inventory refresh, corpus event census, gap table, plan, decisions). Ghidra results of this round
-  are in §2.1 (E1, E2, E4, E7–E11, E13, E15 from the loader / savers already decompiled in rounds 167g/167h).
-- Pending at the time of writing: the Mem / Dec run on the project globals of E14 (0x23, 0x1D, 0x27, 0x67, 0x85,
-  0xF3) and the mixer saver `FUN_00f3d620` (for E10 / E11). Rerun:
-  `cd ~/.claude/jobs/f8789b49/tmp/r168c && SCRIPT=Mem.java ./g.sh m1.txt 15e37c8 15e3448 15e0568 15e2198 15e14a0 15e3a90 15e3da8`
-  and `./g.sh d1.txt 0 f3d620 609830` (g.sh writes into its own folder's `last_*.log`; the Ghidra lock serializes
-  the runs).
-- Next: round 168d takes E1–E18 from here.
+- Done: §1–§4. Ghidra this round (read-only on the 167g FLEngine project): Mem on the project globals (E14a–d),
+  Dec of the mixer saver FUN_00f3d620 (E2, E10, E11), the PDC / Time settings / Scale handlers, and the playlist
+  track menu handlers (M5 / M7 storage). Handler names from the Delphi method tables (`r167h/py/mtab.py '.*'`,
+  16 372 entries). Outputs: `~/.claude/jobs/f8789b49/tmp/r168c/` (m1.txt, d2.txt, d3.txt, allmeth.txt).
+- Still [HYP]: E5 (0xCA = data folder), E7 (0xA4 = fixed pattern length), E8/E9 pattern fields, E10/E11 meanings
+  (storage proven, the UI control not), E12 (0x2B), 0x2F / 0x85.
+- Rerun: `cd ~/.claude/jobs/f8789b49/tmp/r168c && SCRIPT=Mem.java ./g.sh m1.txt <ptr hex…>` / `./g.sh d.txt <depth> <fn hex…>`.
+- Next: round 168d takes E1–E18 from here; 168e–168i as in §3.
