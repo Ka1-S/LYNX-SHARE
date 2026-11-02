@@ -54,8 +54,8 @@ inline bool hasNoteInCell (const Pattern& pattern, int channel, int key, std::in
 // --- Piano Roll: hollow ghost notes from other clips (R12) -------------------------------------------
 
 // The notes of `channel` that play at the same time as the first Playlist clip of `pattern`, coming from
-// other pattern clips, mapped into `pattern`'s own time. FL draws these hollow. Muted clips are skipped,
-// and a clip longer than its pattern repeats it. Empty when the pattern is not in the Playlist.
+// other pattern clips, mapped into `pattern`'s own time. FL draws these hollow. Muted clips are skipped; a clip longer
+// than its pattern plays it once (FL, round 168k). Empty when the pattern is not in the Playlist.
 inline std::vector<Note> clipGhostNotes (const Song& song, int pattern, int channel, std::size_t limit = 2000)
 {
     std::vector<Note> out;
@@ -82,31 +82,27 @@ inline std::vector<Note> clipGhostNotes (const Song& song, int pattern, int chan
             continue;
 
         const auto& other = song.patterns[(std::size_t) c.pattern];
-        const auto length = std::max<std::int64_t> (1, other.effectiveLength (song.beatsPerBar));
         const auto origin = c.start - c.offset;
 
-        // the loop passes of the other pattern that reach [from, to)
-        const auto firstPass = std::max<std::int64_t> (0, (from - origin) / length - 1);
+        // the other pattern once from its clip's offset (FL: a clip longer than its pattern does not repeat it; round 168k)
+        for (const auto& n : other.notes)
+        {
+            if (n.channel != channel)
+                continue;
 
-        for (auto pass = firstPass; origin + pass * length < to; ++pass)
-            for (const auto& n : other.notes)
-            {
-                if (n.channel != channel || n.start >= length)
-                    continue;
+            const auto at = origin + n.start;
 
-                const auto at = origin + pass * length + n.start;
+            if (at < from || at >= to)
+                continue;
 
-                if (at < from || at >= to)
-                    continue;
+            auto ghost = n;
+            ghost.start = at - homeOrigin;
+            ghost.length = std::min (n.length, to - at);
+            out.push_back (ghost);
 
-                auto ghost = n;
-                ghost.start = at - homeOrigin;
-                ghost.length = std::min (n.length, to - at);
-                out.push_back (ghost);
-
-                if (out.size() >= limit)
-                    return out;
-            }
+            if (out.size() >= limit)
+                return out;
+        }
     }
 
     return out;

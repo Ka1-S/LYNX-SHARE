@@ -66,6 +66,11 @@ struct FlpImportOptions
 // by name. Patterns are rescaled to our PPQ. Plugins not yet.
 Song importFlp (const flp::Project& project, const FlpImportOptions& options = {});
 
+// An FL mixer track preset (.fst, flp::parseMixerPreset) as a LYNX mixer track: its effects (converted as an .flp
+// import does), level, pan, stereo separation, EQ, phase/swap, name ("" = the preset has none) and colour (0 = none).
+// nullopt if the bytes are not a mixer preset.
+std::optional<MixerTrack> mixerTrackFromFlPreset (std::span<const std::uint8_t> fileBytes, const FlpImportOptions& options = {});
+
 // FL's dates (Delphi TDateTime: days since 1899-12-30, the saving machine's local time) → seconds since 1970 UTC, read
 // in this machine's time zone; 0 for no date / out of range (REA round 167g: event 0xED)
 double flDateTimeToUnix (double days);
