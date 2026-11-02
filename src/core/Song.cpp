@@ -130,6 +130,13 @@ void Song::removePattern (int index)
                 --c.pattern;
     });
 
+    // Loop Starter channels follow their pattern (round 168b)
+    for (auto& c : channels)
+        if (c.loopStarterPattern == index)
+            c.loopStarterPattern = -1;
+        else if (c.loopStarterPattern > index)
+            --c.loopStarterPattern;
+
     if (patterns.empty())
         patterns.emplace_back().name = "Pattern 1";
 
