@@ -125,6 +125,8 @@ closed by PID, clean desktop).
   `ulimit -s unlimited` on one file). scripts/build-local.sh now raises the stack limit and compiles tests.cpp on its
   own (zig's many-file worker threads ignore ulimit). Round 168w (coordinator) may supersede this: drop my
   build-local.sh commits if 168w's split TUs land first.
-- Paused by the coordinator (round 168w) while that build-local ran; its result goes here.
+- Paused by the coordinator (round 168w). The build-local that was running: 2105025 checks, 4 failures, all in the
+  engine audit — BeepMap and Transistor Bass, whose sound follows the voice's own timeline (now left out of the timed
+  pitch reads, kept in the glide-in check; not re-run yet).
 - Next on RESUME: merge origin/main (keep 168w's build-local.sh), build-local, fix failures, land via coord/land.sh.
 - Rerun: `BUILDSLOT_PRIO=1 ~/.claude/jobs/f8789b49/tmp/coord/buildslot.sh ~/.claude/jobs/f8789b49/tmp/coord/bl-wt.sh mono168l`.

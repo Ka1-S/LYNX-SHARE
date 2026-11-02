@@ -251,6 +251,9 @@ TEST (mono168l_every_engine_plays_mono_legato_and_porta)
     // when a voice starts, so FL can't glide it either)
     const std::set<std::string> unreadable { "FL Slayer", "Fruity Granulizer", "Wave Traveller", "Drumaxx", "Fruit Kick", "BassDrum", "Drumpad", "Sakura", "Ogun" };
     const std::set<std::string> noSlide { "Plucked!" };
+    // their sound follows the voice's own timeline (BeepMap scans its image left to right, a Transistor Bass preset runs
+    // its own sequencer): a pitch read at another moment of the voice can't be compared with the reference
+    const std::set<std::string> ownTimeline { "BeepMap", "Transistor Bass" };
     const auto fl = natives142::flAccess();
     for (const auto& e : natives::instrumentEngines())
     {
@@ -281,7 +284,7 @@ TEST (mono168l_every_engine_plays_mono_legato_and_porta)
                 std::printf ("  porta: %s %s the glide at note on\n", e.name, taken ? "takes" : "does not take");
             CHECK (taken == in.followsChannelPorta());
         }
-        if (unreadable.count (std::string (e.name)) != 0)
+        if (unreadable.count (std::string (e.name)) != 0 || ownTimeline.count (std::string (e.name)) != 0)
             continue;
         Note low;
         low.key = 60;
