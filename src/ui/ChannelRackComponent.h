@@ -201,6 +201,7 @@ private:
     void chooseSample (int channel, int insertAt = -1); // channel < 0 = new channel (at the end, or at row insertAt)
     void openNewGenerator (int row, InstrumentKind kind); // the window a new / replaced generator opens with
     void assignSample (int channel, const juce::File& file);
+    void assignSampleNow (int channel, const juce::File& file); // (no Speech properties step)
     void rename (int channel);
     void openPluginWindow (int channel);
     void sliceChannel (int channel);

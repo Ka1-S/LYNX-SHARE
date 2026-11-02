@@ -6,6 +6,7 @@
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
 #include "ui/ChannelRackComponent.h"
+#include "ui/SpeechDialog.h"
 #include "core/Patcherize.h"
 #include "ui/QuickPick.h"
 #include "core/ControlSurface.h"
@@ -2605,6 +2606,21 @@ void ChannelRackComponent::chooseSample (int channel, int insertAt)
 
 void ChannelRackComponent::assignSample (int channel, const juce::File& file)
 {
+    // FL's .speech files open the Speech properties first, like FL's channel load does (round 168b); the file it
+    // returns (the edited copy, or this one) goes into the channel
+    if (file.hasFileExtension ("speech"))
+    {
+        speechui::editThenLoad (engine, file, [safe = juce::Component::SafePointer<ChannelRackComponent> (this), channel] (const juce::File& f) {
+            if (safe != nullptr)
+                safe->assignSampleNow (channel, f);
+        });
+        return;
+    }
+    assignSampleNow (channel, file);
+}
+
+void ChannelRackComponent::assignSampleNow (int channel, const juce::File& file)
+{
     if (engine.getSampleLibrary().load (file.getFullPathName()) == nullptr)
     {
         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Sample"),
@@ -2679,7 +2695,13 @@ void ChannelRackComponent::sliceChannel (int channel)
     if (sample == nullptr || sample->frames() == 0)
         return;
 
-    const auto slices = detectSlices (*sample, 0.5f);
+    // a spoken .speech sample is cut at its words (FL hands its words to the slicer as a Zero-X grid; round 168b)
+    std::vector<float> slices;
+    if (juce::File (juce::String::fromUTF8 (c.samplePath.c_str())).hasFileExtension ("speech") && ! sample->markerStarts.empty())
+        for (const auto start : sample->markerStarts)
+            slices.push_back ((float) ((double) start / (double) sample->frames()));
+    else
+        slices = detectSlices (*sample, 0.5f);
     const auto seconds = (double) sample->frames() / sample->sampleRate;
     const auto ticksPerSecond = song.bpm * ppq / 60.0;
     const auto name = c.name + " (slices)";

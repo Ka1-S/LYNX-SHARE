@@ -2,6 +2,7 @@
 #include "ui/QuickPick.h"
 #include "engine/FlStudio.h"
 #include "ui/BrowserComponent.h"
+#include "ui/SpeechDialog.h"
 #include "ui/UiTrace.h"
 
 #include "core/ControlSurface.h"
@@ -2952,6 +2953,9 @@ void BrowserComponent::rebuildRoots()
     add (tr ("FL MIDI"), data.getChildFile ("Patches").getChildFile ("Scores"), RootKind::flMidi);
     add (tr ("3x Osc presets (FL)"), data.getChildFile ("Patches").getChildFile ("Channel presets").getChildFile ("3x Osc"), RootKind::flPresets);
     add (tr ("Synth presets (FL)"), data.getChildFile ("Patches").getChildFile ("Plugin presets").getChildFile ("Generators"), RootKind::flPresets);
+    add (tr ("Speech (FL)"), data.getChildFile ("Patches").getChildFile ("Speech"), RootKind::speech);
+    speechui::userSpeechFolder().createDirectory(); // (the Speech properties save there; round 168b)
+    add (tr ("Speech"), speechui::userSpeechFolder(), RootKind::speech);
     pluginpresetui::presetsRoot().createDirectory(); // (the plugin window saves presets there; round 162d)
     add (tr ("Plugin presets"), pluginpresetui::presetsRoot(), RootKind::pluginPresets);
     add (tr ("Documents"), juce::File::getSpecialLocation (juce::File::userDocumentsDirectory), RootKind::documents);
@@ -3774,6 +3778,21 @@ int BrowserComponent::draggedPattern (const juce::DragAndDropTarget::SourceDetai
     return -1;
 }
 
+void BrowserComponent::newSampleChannel (const juce::File& file)
+{
+    const auto path = file.getFullPathName().toStdString();
+    const auto name = file.getFileNameWithoutExtension().toStdString();
+    engine.editSong ([&] (Song& s) {
+        ChannelDef c;
+        c.name = name;
+        c.instrument = InstrumentKind::sampler;
+        c.samplePath = path;
+        c.mixerTrack = s.claimFreeInsert();
+        s.channels.push_back (c);
+    });
+    engine.setSelectedChannel ((int) engine.getSong().channels.size() - 1);
+}
+
 void BrowserComponent::openFile (const juce::File& file)
 {
     // a hosted plugin's preset (round 162d, issue #8): into the plugin it belongs to
@@ -3790,19 +3809,21 @@ void BrowserComponent::openFile (const juce::File& file)
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Load SoundFont"), tr ("This file is not a SoundFont LYNX SHARE can read."));
         return;
     }
+    if (isAudio (file) && file.hasFileExtension ("speech"))
+    {
+        // FL's .speech: the Speech properties first, then a new channel with the file it returns (round 168b)
+        speechui::editThenLoad (engine, file, [safe = juce::Component::SafePointer<BrowserComponent> (this)] (const juce::File& f) {
+            if (safe != nullptr && f.existsAsFile())
+            {
+                safe->newSampleChannel (f);
+                safe->rebuildTree(); // (an edited copy appears in the Speech folder)
+            }
+        });
+        return;
+    }
     if (isAudio (file))
     {
-        const auto path = file.getFullPathName().toStdString();
-        const auto name = file.getFileNameWithoutExtension().toStdString();
-        engine.editSong ([&] (Song& s) {
-            ChannelDef c;
-            c.name = name;
-            c.instrument = InstrumentKind::sampler;
-            c.samplePath = path;
-            c.mixerTrack = s.claimFreeInsert();
-            s.channels.push_back (c);
-        });
-        engine.setSelectedChannel ((int) engine.getSong().channels.size() - 1);
+        newSampleChannel (file);
         return;
     }
 

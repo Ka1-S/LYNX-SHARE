@@ -216,6 +216,7 @@ private:
     juce::String rootId (const juce::File& folder) const; // the root's id, empty if `folder` isn't a root
     juce::StringArray starred;
     void openFile (const juce::File& file); // what a double-click does
+    void newSampleChannel (const juce::File& file); // a new Sampler channel playing `file`
     void fileSelected (const juce::File& file, bool preview);
     void showFolderMenu (const juce::File& folder, std::function<void()> expandAll = {});
     void showFileMenu (const juce::File& file);
