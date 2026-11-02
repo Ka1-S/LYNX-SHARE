@@ -1483,7 +1483,7 @@ bool PluginHost::isInstalled (const PluginRef& ref)
     return d != nullptr && fileStillThere (d->fileOrIdentifier);
 }
 
-std::optional<PluginHost::Identity> PluginHost::identityOf (const PluginRef& ref) const
+std::optional<PluginHost::Identity> PluginHost::portableIdentity (const PluginRef& ref) const
 {
     const auto d = find (juce::String::fromUTF8 (ref.id.c_str()));
     if (d == nullptr)

@@ -1812,12 +1812,14 @@ private:
             }
             auto host = lynx::Song::makeDefault();
             host.mode = lynx::PlayMode::song;
-            for (const auto* name : { "Hit", "Hit 2" })
+            const auto copyOfWav = dir.getChildFile ("src/hit copy.wav"); // the same bytes under another name: stored once
+            wav.copyFileTo (copyOfWav);
+            for (const auto& [name, file] : { std::pair<const char*, juce::File> { "Hit", wav }, { "Hit 2", copyOfWav } })
             {
                 lynx::ChannelDef c;
                 c.name = name;
                 c.instrument = lynx::InstrumentKind::sampler;
-                c.samplePath = wav.getFullPathName().toStdString();
+                c.samplePath = file.getFullPathName().toStdString();
                 host.channels.push_back (c);
             }
             const auto hitChannel = (int) host.channels.size() - 2;
@@ -1891,6 +1893,9 @@ private:
                               && host.channels[(std::size_t) hitChannel].name == "Hit";
                 }
             }
+            if (! packOk && e.isEmpty())
+                e = "media " + juce::String (written.media) + ", duplicates " + juce::String (written.duplicates) + ", missing "
+                    + written.missing.joinIntoString (";");
             sessionResult = mergeOk ? juce::String ("OK")
                                     : "ERROR (" + juce::String (renderedOk ? packOk ? openOk ? "merge" : "open" : "pack" : "render") + (e.isEmpty() ? "" : ": " + e) + ")";
             dir.deleteRecursively();

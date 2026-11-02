@@ -897,6 +897,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             if (engine.playsStandIn (row))
             {
                 badgeWidth = 16.0f;
+                juce::Graphics::ScopedSaveState keepFont (g);
                 const auto tag = juce::Rectangle<float> (nameArea.getRight() - (locked ? 34.0f : 18.0f), nameArea.getCentreY() - 6.5f, 14.0f, 13.0f);
                 theme::fillRoundRect (g, tag, 3.0f, warning.withAlpha (0.85f));
                 g.setColour (bg1);

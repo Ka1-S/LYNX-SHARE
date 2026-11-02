@@ -95,7 +95,7 @@ exportopts::Options stemOptions (double sampleRate, double tailSeconds)
     exportopts::Options o;
     o.format = exportopts::Format::wav;
     o.wavBits = 32;          // float: an insert's output before its fader can pass 0 dBFS
-    o.dither = DitherMode::none;
+    o.dither = exportopts::DitherMode::none;
     o.sampleRate = sampleRate;
     o.range = exportopts::Range::song;
     o.tail = exportopts::TailMode::leave;
@@ -568,7 +568,7 @@ bool write (const Song& song, Manifest manifest, PluginHost& host, const juce::F
     std::set<std::string> seen;
     for (const auto* r : refs)
         if (seen.insert (r->id).second)
-            if (auto id = host.identityOf (*r))
+            if (auto id = host.portableIdentity (*r))
                 manifest.plugins.push_back (*id);
     manifest.standIns = 0;
     for (const auto& c : song.channels)
@@ -644,6 +644,12 @@ std::optional<Opened> open (const juce::File& file, const juce::File& destinatio
     opened.manifest = *manifest;
     opened.folder = folder;
     opened.project = folder.getChildFile ("project.lynx");
+    // the project file takes the project's name (the window title and Recent projects show it)
+    if (const auto named = folder.getChildFile (juce::File::createLegalFileName (manifest->projectName.isNotEmpty() ? manifest->projectName
+                                                                                                                 : file.getFileNameWithoutExtension())
+                                                  + ".lynx");
+        ! named.exists() && opened.project.moveFileTo (named))
+        opened.project = named;
     for (const auto& m : manifest->media)
     {
         const auto f = folder.getChildFile (m.entry);

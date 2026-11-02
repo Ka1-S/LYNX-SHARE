@@ -292,7 +292,7 @@ public:
         int uniqueId = 0, deprecatedUid = 0;
         bool instrument = false;
     };
-    std::optional<Identity> identityOf (const PluginRef& ref) const;
+    std::optional<Identity> portableIdentity (const PluginRef& ref) const;
     // The installed plugin of an identity: the same format and unique id, else the same name and vendor in the same
     // role (another format: its state may not carry over).
     std::optional<juce::PluginDescription> findByIdentity (const Identity& identity, bool* sameFormat = nullptr);

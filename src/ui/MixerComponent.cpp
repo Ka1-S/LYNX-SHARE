@@ -583,7 +583,8 @@ void MixerStrips::paint (juce::Graphics& g)
         // Online Sessions (round 168a): a plugin of this insert is not installed here, its stand-in render plays
         if (engine.insertPlaysStandIn (t))
         {
-            const auto tag = juce::Rectangle<float> ((float) x + 4.0f, 6.0f, 14.0f, 13.0f);
+            // (left of the FX count: the arm button is at the left edge)
+            const auto tag = juce::Rectangle<float> ((float) (x + w - 48), 6.0f, 14.0f, 13.0f);
             theme::fillRoundRect (g, tag, 3.0f, colour::warning.withAlpha (0.85f));
             g.setColour (colour::bg1);
             g.setFont (font (9.0f, true));
