@@ -72,10 +72,14 @@ the scale functions, AutoPDCMenuClick, FUN_012b5e60 / FUN_012b6020), `d2.txt` (P
 
 ## Where I stopped
 
-- Done (in the worktree `~/projetos/lynx-wt-flp168j`, branch feature/flp168j, pushed as wip/flp168j): parser, model,
-  .lynx, import, PDC Automatic / Compensate automations (engine + menu), Time settings combo, reference scales table,
-  DC hold, tests `rea168j_*`, selftest `flp168j_fields`, i18n.
-- In progress: build-local with FL Data; then the Windows build, LYNX `--export` of `r167k/fl/clip/c_base.flp` vs FL's
-  `c_base.wav` (DC hold), a GUI check of the two menu items and the combo (fresh profile, wingui lock).
+- Done (worktree `~/projetos/lynx-wt-flp168j`, branch feature/flp168j, pushed as wip/flp168j; origin/main merged after the
+  2026-11-02 11:10 reboot): parser, model, .lynx, import, PDC Automatic / Compensate automations (engine + menu), Time
+  settings combo, reference scales table, DC hold, tests `rea168j_*`, selftest `flp168j_fields`, i18n. Older clip tests
+  (167k pitch, 167l stretch, 163c length analysis) now expect FL's DC hold instead of silence — FL's own renders
+  `r167k/fl/clip/*.wav` hold the last value (c_base −0.0564, c_p3 −0.4396, c_m5 −0.0061, p_normpol +0.0627; reversed /
+  faded-out clips 0).
+- In progress: build-local (log `tmp/coord/bl-flp168j.log`) and the Windows build (`tmp/r168j/win.log`, OUT
+  build-win-flp168j); then LYNX `--export` of `r167k/fl/clip/c_*.flp` (`tmp/r168j/lyrender.sh`, bin
+  `/mnt/e/lynx-work/r168j/bin`) vs FL's wavs, and a GUI check of the two mixer menu items and the Time settings combo.
 - Rerun: `~/.claude/jobs/f8789b49/tmp/coord/buildslot.sh ~/.claude/jobs/f8789b49/tmp/coord/bl-wt.sh flp168j`;
   Ghidra `cd ~/.claude/jobs/f8789b49/tmp/r168j && ./g.sh out.txt 0 <hex…>`.
