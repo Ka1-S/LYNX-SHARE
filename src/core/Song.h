@@ -1052,6 +1052,27 @@ struct ChannelLoop
     bool operator== (const ChannelLoop&) const = default;
 };
 
+// Playlist marker (like FL's "time markers"). With numerator > 0 it is a time signature
+// change: a new bar starts there, with numerator/denominator.
+struct Marker
+{
+    std::int64_t tick = 0;
+    std::string name;
+    int numerator = 0, denominator = 4;
+    // FL's marker action = the .flp's marker type (REA_rodada6 §5, REA_rodada165f-markers §1): 0 plain marker,
+    // 1 marker loop, 2 marker skip, 3 marker pause, 4 (song) loop, 5 start, 6 pattern length, 7 bar override,
+    // 8 time signature (also numerator > 0), 9 start recording (punch in), 10 stop recording (punch out),
+    // 11 loop length (pattern markers), 12 key/scale. Playback follows them: core/MarkerPlan.h.
+    int action = 0;
+    static constexpr int none = 0, markerLoop = 1, markerSkip = 2, markerPause = 3, songLoop = 4, start = 5,
+                         patternLength = 6, barOverride = 7, timeSignature = 8, punchIn = 9, punchOut = 10,
+                         loopLength = 11, keyScale = 12;
+    static constexpr int songStart = start; // (round 165m's name) Performance mode's zone ends here
+
+    bool isSignature() const noexcept { return numerator > 0; }
+    bool operator== (const Marker&) const = default;
+};
+
 struct Pattern
 {
     std::string name;
@@ -1064,6 +1085,9 @@ struct Pattern
     bool loopOn = false;
     RackLoopMode loopMode = RackLoopMode::steps;
     std::vector<ChannelLoop> channelLoops; // at most one per channel
+    // FL's pattern time markers (the Piano roll's ruler; .flp 0x94 / 0x21 / 0x22 / 0xCD inside the pattern's events,
+    // round 168g): plain markers, time signature changes, Loop length (11), Pattern length (6)... sorted by tick
+    std::vector<Marker> markers;
 
     void sortNotes();
     std::int64_t effectiveLength (int beatsPerBar) const noexcept;
@@ -1210,27 +1234,6 @@ struct PlaylistTrack
 Clip splitClip (Clip& clip, std::int64_t tick);
 
 // A Playlist arrangement (FL allows several per project).
-// Playlist marker (like FL's "time markers"). With numerator > 0 it is a time signature
-// change: a new bar starts there, with numerator/denominator.
-struct Marker
-{
-    std::int64_t tick = 0;
-    std::string name;
-    int numerator = 0, denominator = 4;
-    // FL's marker action = the .flp's marker type (REA_rodada6 §5, REA_rodada165f-markers §1): 0 plain marker,
-    // 1 marker loop, 2 marker skip, 3 marker pause, 4 (song) loop, 5 start, 6 pattern length, 7 bar override,
-    // 8 time signature (also numerator > 0), 9 start recording (punch in), 10 stop recording (punch out),
-    // 11 loop length (pattern markers), 12 key/scale. Playback follows them: core/MarkerPlan.h.
-    int action = 0;
-    static constexpr int none = 0, markerLoop = 1, markerSkip = 2, markerPause = 3, songLoop = 4, start = 5,
-                         patternLength = 6, barOverride = 7, timeSignature = 8, punchIn = 9, punchOut = 10,
-                         loopLength = 11, keyScale = 12;
-    static constexpr int songStart = start; // (round 165m's name) Performance mode's zone ends here
-
-    bool isSignature() const noexcept { return numerator > 0; }
-    bool operator== (const Marker&) const = default;
-};
-
 // A bar on the ruler: where it starts, how many beats (quarter notes) it has and its number (1, 2, ...).
 struct Bar
 {

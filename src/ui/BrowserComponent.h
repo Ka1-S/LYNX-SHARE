@@ -126,6 +126,7 @@ public:
     // --snapshot: the PROJECT tab with the patterns, generators and samples open, a sample selected
     void showProjectForSnapshot();
     void showPluginDatabaseForSnapshot();
+    void showScores();         // the Piano roll's File › Browse scores: FL's Data/Patches/Scores ("FL MIDI")
     void showPluginDatabase(); // FL's Shift+F8: the All tab with the Plugin database opened and scrolled into view
     // --snapshot (round 164): only `folder`, opened, listed under `filter` (folders with nothing to list left out)
     void showFilterForSnapshot (const juce::File& folder, browserview::ContentFilter filter);

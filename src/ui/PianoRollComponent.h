@@ -8,6 +8,7 @@
 #include "ui/NoteToolDialogs.h"
 #include "ui/ValueControl.h"
 #include "core/NoteEdit.h"
+#include "core/MidiImport.h"
 
 namespace lynx
 {
@@ -33,6 +34,8 @@ namespace lynx
 class PianoRollComponent final : public juce::Component,
                                  public SharesTitleBar,
                                  public ui::HintSource,
+                                 public juce::FileDragAndDropTarget,
+                                 public juce::DragAndDropTarget,
                                  private juce::ChangeListener,
                                  private juce::Timer,
                                  private juce::ScrollBar::Listener
@@ -92,6 +95,41 @@ public:
 
     // For tests/snapshots: selects all of the channel's notes.
     void selectAll();
+
+    // --- round 168g (FL's Piano roll menu, docs/analise/REA_rodada168g.md) ---------------------------------------------
+    // View › Note grid highlights (Alt+B; FL's ini "BlackKeys", on by default): the rows of the black keys (or of the keys
+    // out of the chosen scale) are shaded; off, every row looks the same. View › Show chord name for selection (off by
+    // default): a selection of 2 to 10 different keys shows its chord name over the grid's top-left corner. The main
+    // window saves both with the UI options.
+    static inline bool gridHighlights = true, showChordName = false;
+    // View › Background waveform (Alt+N): an audio file dropped on the Piano roll is drawn behind the notes from the
+    // pattern's start at the song tempo (FL's FUN_00e70bf0 / FUN_00e45a00); one for every editor, not saved.
+    static bool isBackgroundWaveShown() noexcept;
+    void setBackgroundWaveShown (bool on);
+    void loadBackgroundWave (const juce::File& file); // (and shows it)
+    // FL's drop on the editor (FUN_00e70bf0): a score (.fsc) opens (replacing the channel's notes), a MIDI file goes
+    // through the MIDI import window, an audio file becomes the background waveform. False: not one of those.
+    bool loadFile (const juce::File& file);
+    // File › Open score (replaces the channel's notes in the pattern, FUN_00ff85c0) / Save score as (the channel's notes)
+    bool openScore (const juce::File& file);
+    bool saveScore (const juce::File& file) const;
+    // File › Copy to / Paste from MIDI clipboard (a Standard MIDI File of the channel's notes; Ctrl+Shift+V pastes)
+    bool copyToMidiClipboard() const;
+    void pasteFromMidiClipboard();
+    // File › Browse scores: the main window opens the Browser at FL's score folder
+    std::function<void()> onBrowseScores;
+    // The time selection (Ctrl+drag on the ruler; -1 = none) that Insert / Delete space and Trim use.
+    void setTimeSelection (std::int64_t from, std::int64_t to);
+    std::int64_t timeSelectionFrom() const noexcept { return timeFrom; }
+    std::int64_t timeSelectionTo() const noexcept { return timeTo; }
+    std::vector<int> selectionForTests() const { return selection; }
+    std::int64_t markerKeyTickForTests() const { return markerKeyTick(); }
+    juce::String chordBubbleTextForTests() const { return chordBubble.isVisible() ? chordBubble.getText() : juce::String(); }
+
+    bool isInterestedInFileDrag (const juce::StringArray& files) override;
+    void filesDropped (const juce::StringArray& files, int x, int y) override;
+    bool isInterestedInDragSource (const juce::DragAndDropTarget::SourceDetails& details) override;
+    void itemDropped (const juce::DragAndDropTarget::SourceDetails& details) override;
 
     // For snapshots: the tool in use and the Note inspector of the selection.
     void setToolForSnapshot (EditTool tool) { tools.setTool (tool); }
@@ -345,6 +383,28 @@ private:
     std::size_t knownNoteCount = 0;
 
     static inline std::vector<Note> clipboard;
+
+    // round 168g
+    std::int64_t timeFrom = -1, timeTo = -1;   // the time selection (ticks; -1 = none)
+    juce::Label chordBubble;                   // "Show chord name for selection"
+    juce::uint32 chordBubbleUntil = 0;
+    std::vector<int> chordBubbleSelection;     // the selection it was shown for
+    void updateChordBubble();
+    void paintBackgroundWave (juce::Graphics& g, juce::Rectangle<int> grid);
+    void spaceOperation (int kind);            // 0 insert, 1 slice & insert, 2 delete, 3 trim
+    void insertControllerValue();              // Ctrl+I: the event lane's control at the song position
+    void deleteAllNotes();
+    void importMidi (const midiimport::ParsedMidi& midi, const juce::String& name);
+    juce::PopupMenu fileMenu();
+    juce::PopupMenu editMenu();
+    juce::PopupMenu viewMenu();
+    // FL's Piano roll › Time markers on the pattern's own markers (round 168g)
+    juce::PopupMenu markersMenu();
+    std::int64_t markerKeyTick() const;   // Alt+T / Ctrl+T: the time selection's start, the playhead in view, else a bar
+    void editPatternMarker (std::int64_t tick, int existing); // the name dialog (existing < 0: a new marker)
+    void addPatternSignatureByKey();
+    int markerAtX (int x) const;          // the pattern marker drawn under x on the ruler, or -1
+    void showPatternMarkerMenu (int index);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRollComponent)
 };

@@ -3019,6 +3019,22 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
     const auto filePpq = project.header.ppq > 0 ? (std::int64_t) project.header.ppq : 96;
     auto rescale = [filePpq] (std::int64_t ticks) { return ticks * ppq / filePpq; };
+    auto importMarker = [&rescale] (const flp::TimeMarker& m) {
+        Marker marker;
+        marker.tick = rescale (m.position);
+        marker.name = m.name;
+        marker.name.erase (0, marker.name.find_first_not_of (' '));
+        marker.name.erase (marker.name.find_last_not_of (' ') + 1);
+
+        if (m.type != 8 && m.type > 0 && m.type < 256)
+            marker.action = m.type; // FL's marker action (9 Start recording, 10 Stop recording, 11 Loop length, ...)
+        if (m.type == 8 && m.numerator >= 1 && m.numerator <= 32 && m.denominator >= 1 && m.denominator <= 32)
+        {
+            marker.numerator = m.numerator;
+            marker.denominator = m.denominator;
+        }
+        return marker;
+    };
 
     std::map<int, int> patternMap; // FL index -> our dense index
 
@@ -3031,6 +3047,11 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             p.colour = 0xFF000000u | *src.colour;
 
         // the Channel Rack's looping (round 165f-rack): FL keeps the loop points of every channel, by FL index
+        // the Piano roll's pattern markers (round 168g)
+        for (const auto& m : src.markers)
+            p.markers.push_back (importMarker (m));
+        std::stable_sort (p.markers.begin(), p.markers.end(), [] (const Marker& x, const Marker& y) { return x.tick < y.tick; });
+
         p.loopOn = src.loopOn;
         p.loopMode = (RackLoopMode) std::clamp (src.loopMode, 1, 3);
         for (const auto& [flChannel, setting] : src.channelLoops)
@@ -3064,7 +3085,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
         p.sortNotes();
 
-        if (! p.notes.empty() || ! src.controlEvents.empty()) // a pattern of events only still plays them
+        if (! p.notes.empty() || ! src.controlEvents.empty() || ! p.markers.empty()) // a pattern of events (or markers) only stays
         {
             patternMap[src.index] = (int) song.patterns.size();
             song.patterns.push_back (std::move (p));
@@ -3552,24 +3573,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
         // markers; type 8 changes the time signature; the other types are FL's marker actions (core/MarkerPlan.h)
         for (const auto& m : arrangement.markers)
-        {
-            Marker marker;
-            marker.tick = rescale (m.position);
-            marker.name = m.name;
-            marker.name.erase (0, marker.name.find_first_not_of (' '));
-            marker.name.erase (marker.name.find_last_not_of (' ') + 1);
-
-            if (m.type != 8 && m.type > 0 && m.type < 256)
-                marker.action = m.type; // FL's marker action (9 Start recording, 10 Stop recording, ...)
-            if (m.type == 8 && m.numerator >= 1 && m.numerator <= 32 && m.denominator >= 1 && m.denominator <= 32)
-            {
-                marker.numerator = m.numerator;
-                marker.denominator = m.denominator;
-            }
-
-            // (unnamed action markers show their action's name on the ruler, as in FL)
-            a.markers.push_back (std::move (marker));
-        }
+            a.markers.push_back (importMarker (m)); // (unnamed action markers show their action's name on the ruler, as in FL)
 
         std::stable_sort (a.markers.begin(), a.markers.end(), [] (const Marker& x, const Marker& y) { return x.tick < y.tick; });
         importedTracks.push_back (&arrangement.tracks);

@@ -259,4 +259,37 @@ inline ArrowMove arrowMove (Arrow arrow, bool ctrl, bool shift, bool alt) noexce
         return {};
     return { true, 0, arrow == Arrow::right ? 1 : -1 };
 }
+
+// --- Piano roll Select / Edit items of FL's editor menu (round 168g, docs/analise/REA_rodada168g.md) -------------------
+// Select one at random (Shift+R) / more at random (Shift+M) (EESelRndAction → FUN_00eb2510): adds random notes of
+// `channelNotes` that are not selected yet to `selection`: one, or (more) half as many as the channel has (rounded
+// down, at least the ones left). Returns the new selection (sorted).
+std::vector<int> selectRandomMore (const Pattern& pattern, const std::vector<int>& channelNotes, std::vector<int> selection, bool more,
+                                   std::uint32_t seed);
+// Select odd (Shift+O, EESelSwingAction → FUN_00eb2b70: "Select odd (swung) notes"): adds the notes whose start rounds to
+// an odd multiple of `step` (FL: one step = PPQ / 4) to `selection`. Returns the new selection (sorted).
+std::vector<int> selectOddSteps (const Pattern& pattern, const std::vector<int>& channelNotes, std::vector<int> selection, std::int64_t step);
+
+// Insert space / Slice & insert space / Delete space / Trim (EEInsSpaceAction → FUN_00eb35f0 / FUN_00e3b2b0) on the
+// time selection [from, to) of the notes `channelNotes`. Insert: every note starting at or after `from` moves right by
+// to - from (`slice`: the notes crossing `from` are cut there first, so their tails move). Delete: the notes crossing
+// `from` and `to` are cut there, the ones starting inside are removed and the later ones move left. Returns the
+// indices of the notes that moved (FL selects them); pattern markers follow (moved / removed like the notes).
+std::vector<int> insertSpace (Pattern& pattern, const std::vector<int>& channelNotes, std::int64_t from, std::int64_t to, bool slice);
+std::vector<int> deleteSpace (Pattern& pattern, const std::vector<int>& channelNotes, std::int64_t from, std::int64_t to);
+// Trim (FUN_00eb35f0, the "trim space" branch): deletes the space after `to` (to the pattern's end `end`) and before
+// `from`, so only the time selection is left, at the start of the pattern.
+void trimToSelection (Pattern& pattern, int channel, std::int64_t from, std::int64_t to, std::int64_t end);
+
+// The Piano roll's pattern time markers (FL's Piano roll › Time markers, the same EEMarker* items as the Playlist's on
+// the pattern's own list, editor +0xd84; .flp: inside the pattern's events). Add one (Alt+T, FUN_0122b0d0 Tag 0: the
+// name dialog, then FUN_00e543b0 type 0): the new marker's index.
+int addPatternMarker (Pattern& pattern, const Marker& marker);
+// Ctrl+T "Add auto": "Auto", "Auto #2"... at `tick`; a marker already there is kept (its index is returned)
+int addPatternAutoMarker (Pattern& pattern, std::int64_t tick);
+// Shift+Alt+T (FUN_0122b0d0 Tag 2): a num/den change at `from` (floored to a beat) named "num/den" (FL's "%d/%d"); with a
+// time selection ending at `to`, the signature in force before comes back there (unless a change is already there)
+void addPatternSignatureChange (Pattern& pattern, std::int64_t from, std::int64_t to, int numerator, int denominator, int beatsPerBar);
+// the pattern's signature at `tick`: its last signature marker at or before it, else beatsPerBar / 4
+std::pair<int, int> patternSignatureAt (const Pattern& pattern, std::int64_t tick, int beatsPerBar);
 } // namespace lynx::noteedit

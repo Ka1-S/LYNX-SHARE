@@ -445,6 +445,11 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
     // who the following events belong to, until the next selector.
     enum class Section { global, channel, arrangement, mixer } section = Section::global;
     int currentChannel = -1, currentPattern = -1, currentArrangement = -1;
+    // round 168g: 0x94 markers right after a pattern's 0x41 (before the next channel / playlist / arrangement / mixer
+    // section) are that pattern's Piano roll markers, not the Playlist's (FL's demos: Edlan & Ella Noël pattern 10,
+    // Sid De La Cruz's patterns' time signatures)
+    bool inPattern = false;
+    std::vector<TimeMarker>* lastMarkers = nullptr;
 
     if (channelPreset)
     {
@@ -846,6 +851,8 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
             case evNewPattern:
                 currentPattern = (int) e.value;
                 pattern();
+                inPattern = true;
+                lastMarkers = nullptr;
                 break;
 
             case evPatternName:
@@ -915,6 +922,8 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
             }
 
             case evNewChannel:
+                inPattern = false;
+                lastMarkers = nullptr;
                 section = Section::channel;
                 currentChannel = (int) e.value;
                 channel();
@@ -995,6 +1004,8 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
                 break;
 
             case evArrangement:
+                inPattern = false;
+                lastMarkers = nullptr;
                 section = Section::arrangement;
                 currentArrangement = (int) e.value;
                 arrangement();
@@ -1006,28 +1017,35 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
                 break;
 
             case evTimeMarker:
-                if (currentArrangement < 0)
+                if (inPattern && currentPattern >= 0)
+                    lastMarkers = &pattern().markers;
+                else
                 {
-                    currentArrangement = 0;
-                    arrangement();
+                    if (currentArrangement < 0)
+                    {
+                        currentArrangement = 0;
+                        arrangement();
+                    }
+                    lastMarkers = &arrangement().markers;
                 }
-                arrangement().markers.push_back ({ e.value & 0xFFFFFFu, (int) (e.value >> 24), 4, 4, {} });
+                lastMarkers->push_back ({ e.value & 0xFFFFFFu, (int) (e.value >> 24), 4, 4, {} });
                 break;
 
             case evTimeMarkerNumerator:
             case evTimeMarkerDenominator:
-                if (currentArrangement >= 0 && ! arrangement().markers.empty())
-                    (e.id == evTimeMarkerNumerator ? arrangement().markers.back().numerator : arrangement().markers.back().denominator)
-                        = (int) e.value;
+                if (lastMarkers != nullptr && ! lastMarkers->empty())
+                    (e.id == evTimeMarkerNumerator ? lastMarkers->back().numerator : lastMarkers->back().denominator) = (int) e.value;
                 break;
 
             case evTimeMarkerName:
-                if (currentArrangement >= 0 && ! arrangement().markers.empty())
-                    arrangement().markers.back().name = text (e);
+                if (lastMarkers != nullptr && ! lastMarkers->empty())
+                    lastMarkers->back().name = text (e);
                 break;
 
             case evPlaylistItems:
             {
+                inPattern = false;
+                lastMarkers = nullptr;
                 if (currentArrangement < 0)
                 {
                     currentArrangement = 0;
@@ -1315,6 +1333,8 @@ Project parseProject (std::span<const std::uint8_t> file, bool channelPreset)
             {
                 if (section == Section::mixer)
                     closeOldSlot();
+                inPattern = false;
+                lastMarkers = nullptr;
                 section = Section::mixer;
                 auto& insert = project.mixer.emplace_back();
                 insert.index = (int) project.mixer.size() - 1;

@@ -1829,6 +1829,20 @@ juce::String toJson (const Song& song)
             o->setProperty ("channelLoops", loops);
         }
 
+        // the Piano roll's pattern markers (round 168g): [tick, name, numerator, denominator(, action)] like the Playlist's
+        if (! p.markers.empty())
+        {
+            juce::Array<juce::var> markers;
+            for (const auto& m : p.markers)
+            {
+                juce::Array<juce::var> one { (juce::int64) m.tick, str (m.name), m.numerator, m.denominator };
+                if (m.action != 0)
+                    one.add (m.action);
+                markers.add (one);
+            }
+            o->setProperty ("markers", markers);
+        }
+
         juce::Array<juce::var> notes;
 
         for (const auto& n : p.notes)
@@ -2123,6 +2137,14 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
                 for (const auto& l : *loops)
                     if (l.isArray() && l.size() >= 2 && (int) l[0] >= 0)
                         pattern.channelLoops.push_back ({ (int) l[0], juce::jmax (-3, (int) l[1]) });
+
+            if (auto* markers = p["markers"].getArray())
+                for (const auto& m : *markers)
+                    if (m.isArray() && (m.size() == 4 || m.size() == 5))
+                        pattern.markers.push_back ({ juce::jmax<juce::int64> (0, (juce::int64) m[0]), m[1].toString().toStdString(),
+                                                     juce::jlimit (0, 32, (int) m[2]), juce::jlimit (1, 32, (int) m[3]),
+                                                     m.size() == 5 ? juce::jlimit (0, 255, (int) m[4]) : 0 });
+            std::stable_sort (pattern.markers.begin(), pattern.markers.end(), [] (const Marker& x, const Marker& y) { return x.tick < y.tick; });
 
             if (auto* notes = p["notes"].getArray())
                 for (const auto& n : *notes)
