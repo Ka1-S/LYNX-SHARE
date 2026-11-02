@@ -6255,3 +6255,4 @@ countries: nl be
 "Update A/B" = "A/B vernieuwen"
 "Flush" = "Legen"
 "Detector source" = "Detectorbron"
+"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "Zoomen: omhoog slepen = dichterbij, opzij = scrollen  [Ctrl] alleen zoomen"
