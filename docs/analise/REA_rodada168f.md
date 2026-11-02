@@ -47,5 +47,9 @@ pattern clips, clone tracks, stretch with / without variants, keys + `.flp` impo
 
 ## Where I stopped
 
-2026-11-02: code, tests (all 10 pl168f pass locally), 15-language strings and docs on `wip/playlist168f`. The PC
-rebooted at ~11:10 during the Windows build; resuming: merge origin/main, rebuild local + Windows, GUI check, land.
+2026-11-02 (paused by the coordinator for round 168w): merged origin/main efb8344d+ into the branch; local build-local
+with FL Data: 2 105 073 checks, 0 failures (all 10 pl168f tests pass). First Windows build found one compile error in
+the track menu (Auto name block nested in the Random color lambda) — fixed, not rebuilt yet. Next: Windows build
+(`OUT=build-win scripts/build-windows-zig.sh` via winbuild.sh), GUI check with the real mouse on
+`/mnt/e/lynx-work/playlist168f/demo.lynx` (scripts drag.ps1 / keys.ps1 / front.ps1 there, fresh profile), then land
+via `coord/land.sh playlist168f`.

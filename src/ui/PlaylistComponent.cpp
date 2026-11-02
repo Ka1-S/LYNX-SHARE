@@ -3347,32 +3347,13 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         const auto& palette = lynxPalette();
         const auto c = palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())];
         editTrack (track, [c] (PlaylistTrack& t) { t.colour = c; });
-    // FL's "Auto name" (EEPLTrackAutoNameMenuClick → FUN_012ef490, round 168f): the name and colour of what the track plays
+    });
+    // FL's "Auto name" (EEPLTrackAutoNameMenuClick → FUN_012ef490, round 168f): the name and colour of what the track plays most
     menu.addItem (tr ("Auto name"), [this, tracks = tracksForMenu (track)] {
         engine.editSong ([tracks] (Song& s) {
             for (const auto t : tracks)
                 pltracks::autoName (s, t);
         });
-    });
-    });
-    menu.addItem (tr ("Auto name"), [this, track] {
-        // the name of the source of the track's first clip (pattern, audio or automation channel)
-        const auto& s = engine.getSong();
-        const Clip* first = nullptr;
-        for (const auto& c : s.playlist)
-            if (c.track == track && (first == nullptr || c.start < first->start))
-                first = &c;
-        if (first == nullptr)
-            return;
-        std::string name;
-        if (first->kind == ClipKind::pattern && first->pattern >= 0 && first->pattern < (int) s.patterns.size())
-            name = s.patterns[(std::size_t) first->pattern].name;
-        else if (first->kind == ClipKind::audio && first->channel >= 0 && first->channel < (int) s.channels.size())
-            name = s.channels[(std::size_t) first->channel].name;
-        else if (first->kind == ClipKind::automation && first->automation >= 0 && first->automation < (int) s.automations.size())
-            name = s.automations[(std::size_t) first->automation].name;
-        if (! name.empty())
-            editTrack (track, [name] (PlaylistTrack& t) { t.name = name; });
     });
     menu.addItem (tr ("Reset"), [this, track] {
         editTrack (track, [] (PlaylistTrack& t) {
