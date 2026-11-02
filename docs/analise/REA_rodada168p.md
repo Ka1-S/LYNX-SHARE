@@ -64,13 +64,14 @@ tmp/r168p/dfm/<plugin>/TSynthEditorForm.dfm.txt). Only layout and control facts 
   MultibandDelayFx.o have the same machine code as 168g's; no object defines a libm function; no FP-state change
   (MXCSR / fesetround / denormals) in the branch's diff; no clash of exported names between the new objects and
   Kepler / IldspMath / MultibandDelayFx.
+  Cause (168w, confirmed here): zig c++ -O2 does full LTO when it compiles and links in one invocation (build-local.sh);
+  mkchunk.sh's `-c` objects are native ELF (no LTO), and without LTO exactly these 15 x87 bit-exact goldens fail.
 - A corrupt build-local/obj168p/src_core_Harmor.cpp.o made ld.lld segfault (found by bisecting the link); rebuilt.
 - PAUSED 2026-11-02 (coordinator, for round 168w's faster pipeline). Post-merge (d687b456) tests build linked; the suite run
   finished: 2132748 checks, 15 failures = only the known Kepler / multiband-delay bit-exact checks (tmp/r168p/tests4.log).
-- exact next step on RESUME: (1) build this branch the official way (`coord/bl-wt.sh design168p`, build-local.sh, one
-  invocation): if Kepler / multiband delay pass, the failures belong to mkchunk.sh's separate-object build; (2) if not,
-  bisect origin/main..HEAD with bl-wt builds (first: the 168n wip merge fb691f7e vs my own commits), fix or report to
-  168n; land only with 0 failures. Then, once 168n is on
+- exact next step on RESUME: build this branch the official way (`coord/bl-wt.sh design168p` or 168w's new pipeline, with LTO)
+  and confirm 0 failures; only if Kepler / multiband delay still fail, bisect origin/main..HEAD (first: the 168n wip
+  merge fb691f7e vs my own commits). Land only with 0 failures. Then, once 168n is on
   main: `git merge origin/main`, and land via `flock ~/projetos/lynx/.git/lynx-merge.lock coord/land.sh design168p`
   (in parts if land.sh asks), record the hashes in the final report.
 - left: a DrumSynth Live channel with no state at all (not reachable from the browser) shows the page with knobs missing;
