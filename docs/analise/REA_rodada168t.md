@@ -74,6 +74,13 @@ clean after each: `after-*.png`):
 - Done: everything above; build-local with FL Data 2,104,984 checks, 0 failures (first try: clang aborted on
   tests.cpp with no diagnostic — faulty RAM pattern — the retry was clean); Windows build (OUT inside Linux: an OUT
   on /mnt/e breaks the case-sensitive Dbghelp.h shim) and GUI check.
-- Next: land via `flock ~/projetos/lynx/.git/lynx-merge.lock ~/.claude/jobs/f8789b49/tmp/coord/land.sh sel168t`.
+- PAUSED (coordinator, round 168w pipeline work): the landing was only waiting for the merge lock and was cancelled;
+  nothing of 168t is on main. Branch merged with origin/main at 962f822d (build-local / Windows build / GUI check were
+  done before that merge). The release-notes bullets were taken back out of coord/notes-0.1.22.md; they are kept in
+  `~/.claude/jobs/f8789b49/tmp/r168t/notes.md`.
+- Next step after RESUME: `git merge origin/main` (regenerate i18n with `python3 tools/make_i18n.py` on conflicts in
+  src/ui/i18n/*.h, keep both lines in tests/tests.cpp), check the source-scan test (no new `.isPopupMenu()` /
+  `.isCtrlDown()` in the 8 editor files), append tmp/r168t/notes.md to coord/notes-0.1.22.md under the release lock,
+  then `flock ~/projetos/lynx/.git/lynx-merge.lock ~/.claude/jobs/f8789b49/tmp/coord/land.sh sel168t` (BUILDSLOT_PRIO=1).
 - Rerun Ghidra: `~/.claude/jobs/f8789b49/tmp/r168t/g.sh <out> 0 <hex addr>...` (SCRIPT=Refs.java / Find.java for xrefs /
   byte search). GUI: `flock ~/.cache/lynx-wingui.lock ~/.claude/jobs/f8789b49/tmp/r168t/session.sh NAME "cmds"`.
