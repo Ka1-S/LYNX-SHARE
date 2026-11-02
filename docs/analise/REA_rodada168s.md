@@ -98,6 +98,17 @@ sequencer").
 
 ## Where I stopped
 
+- 16:40 PAUSED (coordinator, round 168w pipeline). State: all 8 points coded; tests/Issue32Tests.inc 7 tests pass; the
+  full suite passed except the embedded i18n tables (regenerated since). Notes are in coord/notes-0.1.23.md and the #32 reply
+  draft in coord/replies-0.1.23.md (done). Not landed: the merge lock waiter was cancelled for the pause. Two earlier
+  landings failed on generated i18n header conflicts (src/ui/I18nData.h, src/ui/i18n/*.h). Fix:
+  r168s/merge-land.sh (under the merge lock: merge origin/main, take theirs for the headers, run make_i18n.py, commit,
+  then run land.sh). The Windows work build build-win-x crashed clang (139, random), so no GUI check yet.
+- NEXT on RESUME: `flock ~/projetos/lynx/.git/lynx-merge.lock ~/.claude/jobs/f8789b49/tmp/r168s/merge-land.sh`, then
+  run the GUI check on C:\Users\kauan\lynx-test\land-issue32s\LYNX.exe (r168s/gui-start.sh, wingui lock): Playlist z-order,
+  route arrow menu, fader wheel, TRACK digiwheel, Backspace hint, plugin slot move, Stretch TIME menu. Then delete
+  ~/.cache/zig-issue32s and the worktree.
+
 - 11:10 PC crash; resumed: files intact. Issue32 tests built and passed except a float tolerance (fixed). Next: full
   test run, Windows build, GUI check, notes/reply, land.
 - found: lastPublishedShape never carried the serial, so the held-note remap never ran in the app (fixed).
