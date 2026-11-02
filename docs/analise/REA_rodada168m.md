@@ -128,11 +128,14 @@ in-place edit, presets with the bank.
 
 ## Where I stopped
 
-- 2026-11-02 after the crash/reboot: commits intact (pushed to wip/gross168m), origin/main efb8344d merged (i18n
-  tables union-merged and regenerated, test includes kept from both sides).
-- Done: REA (§1–§4), core, presets with state, editor UI, design (§4b), tests, 15-language strings, notes-0.1.22.
-- In progress: build-local + Windows build (release lane), then plugui after-shot and the Windows GUI check of the
-  video's flow (before: /mnt/e/lynx-work/gross168m/before/plugui/Gross Beat.png; after: …/after/).
-- Next: land via `flock ~/projetos/lynx/.git/lynx-merge.lock coord/land.sh gross168m` (BUILDSLOT_PRIO=1).
-- Rerun: `BUILDSLOT_PRIO=1 coord/buildslot.sh coord/bl-wt.sh gross168m`; Windows:
-  `OUT=build-win JOBS=3 BUILDSLOT_PRIO=1 coord/winbuild.sh scripts/build-windows-zig.sh`.
+- 2026-11-02, PAUSED by the coordinator (round 168w pipeline work). Branch feature/gross168m is complete: REA, core,
+  presets, designed editor (§4b), GUI fixes (§4c), tests, 15 languages, notes-0.1.22.
+- Last results: build-local with all tests passed except one wrong assertion that was then removed
+  (gb168_fl_presets_are_listed now only checks the listing); Windows build OK; Windows GUI check passed (shots in
+  /mnt/e/lynx-work/gross168m/shots/).
+- First landing: merge conflict with a newer main (i18n tables / headers / tests.cpp includes), aborted cleanly; second
+  landing was still waiting for the merge lock and was cancelled for the pause. Nothing landed yet.
+- Exact next step on RESUME: merge origin/main into the worktree (union of the i18n .txt sections and the test
+  includes, then `python3 tools/make_i18n.py` and `python3 tools/i18n_tool.py pending`), commit, push wip, then
+  `cd ~/projetos/lynx && BUILDSLOT_PRIO=1 flock .git/lynx-merge.lock coord/land.sh gross168m`
+  (helper with the merge step: scratchpad remerge.sh of the round agent).
