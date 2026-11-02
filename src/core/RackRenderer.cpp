@@ -1,4 +1,5 @@
 #include "core/RackRenderer.h"
+#include "core/ModelParams.h"
 #include "core/SamplePrecompute.h"
 #include "core/MetronomeVoice.h"
 
@@ -1157,7 +1158,9 @@ void RackState::buildAutomationTables()
                                       && t.param < voltage::paramCount)
                                   // the Sampler's knobs (issue #12)
                                   || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::sampler && t.param >= 0
-                                      && t.param < samplerparam::count)))
+                                      && t.param < samplerparam::count)
+                                  // the knobs of an FL engine kept in the channel's state (round 168n)
+                                  || modelparams::find (song.channels[(std::size_t) t.index].instrument, t.param) != nullptr))
                     pluginParams.push_back ({ a, t.index, 0, 0, t.param });
                 else
                     used = false;
