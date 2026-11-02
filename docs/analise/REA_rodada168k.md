@@ -63,10 +63,23 @@ pattern — then FL's measured cases fl1–fl3, the held note at Stop, a take co
 length growing, a loop region keeping one origin, the wheel landing with the notes). `bugs131_pattern_length_is_
 respected_on_the_first_recording_in_song_mode` now expects FL's placement (clip from the first note's bar).
 
+## GUI check (Windows, landed build 5a9abcb8, fresh profile, 2026-11-02 02:52–03:00)
+
+The reviewer's flow: Song mode, a 1-bar Pattern 1 clip at bar 1, new Pattern 2 (empty, no clip), typing keyboard on,
+Record › "Notes and automation", Space, X C V B N played just before bars 3–7, M held from bar 8, Space while M is
+still down (shots `C:\Users\kauan\lynx-test\rec168k\u0–u2.png`):
+
+- recorded: Pattern 2 clip on Track 2 from bar 2 (the first note fell at 2:4) to bar 9, the six notes at their song
+  positions, the held M kept to the Stop — as FL fl2.
+- found: the **counter and the Playlist playhead still folded the position into the song** (1:2:3 at 13.7 s, about
+  bar 8.4) although the engine played on: the UI read `positionTicks % songLength`. Fixed in 7117820d:
+  `AudioEngine::songPlayheadTicks()` (folds only when the song really loops: not during a linear take, a bounce, or
+  with a loop region), used by the toolbar counter / position bar, the Playlist playhead / centre / position, the
+  automation and event editors' cursors.
+- the typing keyboard was off in the fresh profile (the first attempt recorded nothing: Ctrl+T had toggled it off).
+
 ## Where I stopped
 
-- Done: FL session (fl1–fl3), FL render (fl4), code, tests (mini harness 133 checks, 0 failures), stretched clips
-  drawn once.
-- Next: build the tests (mini harness `~/.claude/jobs/f8789b49/tmp/rec168k/mini/build.sh`, then `scripts/build-local.sh`
-  with FL Data), the probe against the new code, the Windows build + GUI check of the user's flow (fresh profile), notes,
-  land.
+- Done: FL session (fl1–fl3), FL render (fl4), code, tests, landed 5a9abcb8; GUI check of the flow (above); playhead
+  fix 7117820d.
+- Next: Windows build of 7117820d, GUI re-check that the counter reads past bar 2 during the take, land.
