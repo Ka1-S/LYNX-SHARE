@@ -1531,16 +1531,12 @@ void ChannelRackComponent::selectUnused()
     selectRows (unused, unused.front());
 }
 
-int ChannelRackComponent::addChannel (ChannelDef c, bool openEditor)
+int ChannelRackComponent::addChannel (ChannelDef c, bool openEditor, int insert)
 {
     int index = 0;
     if (filterGroup >= 0 && c.group < 0) // a new channel joins the group shown (FL)
         c.group = filterGroup;
-    engine.editSong ([&] (Song& s) {
-        c.mixerTrack = s.claimFreeInsert();
-        s.channels.push_back (c);
-        index = (int) s.channels.size() - 1;
-    });
+    engine.editSong ([&] (Song& s) { index = addChannelRouted (s, c, insert); });
     selectionAnchor = index;
     selectRows ({ index }, index);
 

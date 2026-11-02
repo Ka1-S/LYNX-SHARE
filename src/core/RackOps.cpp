@@ -597,6 +597,13 @@ bool moveChannels (Song& song, std::vector<int>& selection, int delta)
     return true;
 }
 
+int addChannelRouted (Song& song, ChannelDef channel, int insert)
+{
+    channel.mixerTrack = insert >= 0 && insert < (int) song.mixer.size() ? insert : song.claimFreeInsert();
+    song.channels.push_back (std::move (channel));
+    return (int) song.channels.size() - 1;
+}
+
 int insertChannel (Song& song, int index, ChannelDef channel)
 {
     const auto count = (int) song.channels.size();

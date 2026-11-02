@@ -149,6 +149,10 @@ bool replaceGenerator (Song& song, int index, ChannelDef generator);
 // Inserts `channel` at `index` (shifting the others down). Returns the index.
 int insertChannel (Song& song, int index, ChannelDef channel);
 
+// Adds `channel` at the end of the rack, routed to `insert` (0 = Master). An insert that doesn't exist (the default, -1)
+// claims a free one instead. Returns the new channel's index.
+int addChannelRouted (Song& song, ChannelDef channel, int insert = -1);
+
 // Removes several channels (any order). Returns how many were removed.
 int removeChannels (Song& song, std::vector<int> channels);
 

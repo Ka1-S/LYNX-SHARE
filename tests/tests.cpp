@@ -6885,6 +6885,27 @@ TEST (workflow_send_channels_to_free_inserts)
     CHECK (added.size() == 1 && added[0] == 2 && full.mixer.size() == 3 && full.channels[1].mixerTrack == 2);
 }
 
+TEST (workflow_add_channel_routed)
+{
+    auto song = lynx::Song::makeDefault();
+    const auto count = (int) song.channels.size();
+    const auto inserts = song.mixer.size();
+    lynx::ChannelDef c;
+    c.mixerTrack = 7; // what the generator came with doesn't count
+    const auto last = (int) song.mixer.size() - 1;
+
+    CHECK (lynx::addChannelRouted (song, c, last) == count && song.channels.back().mixerTrack == last);
+    CHECK (lynx::addChannelRouted (song, c, 0) == count + 1 && song.channels.back().mixerTrack == 0); // Master
+    CHECK (song.mixer.size() == inserts); // the drop's insert is used as it is, nothing is claimed
+
+    // an insert that doesn't exist claims a free one, as a plain new channel does
+    auto expected = song;
+    const auto free = expected.claimFreeInsert();
+    CHECK (lynx::addChannelRouted (song, c, 9999) == count + 2 && song.channels.back().mixerTrack == free);
+    auto plain = expected;
+    CHECK (lynx::addChannelRouted (plain, c) == count + 2 && plain.channels.back().mixerTrack == expected.claimFreeInsert());
+}
+
 TEST (workflow_palette_random_colour)
 {
     const auto& palette = lynx::lynxPalette();

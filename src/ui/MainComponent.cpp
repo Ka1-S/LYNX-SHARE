@@ -311,6 +311,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         showPanel (Panel::mixer);
         mixer.selectTrack (insert);
     };
+    mixer.onInstrumentDropped = [this] (int insert, ChannelDef c) { rack.addChannel (std::move (c), true, insert); };
     rackViewport.setViewedComponent (&rack, false);
     rackViewport.setScrollBarsShown (true, true);
     workspace.setContent (Panel::playlist, playlistArea, "Playlist", Icon::playlist);
