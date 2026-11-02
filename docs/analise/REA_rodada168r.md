@@ -161,6 +161,10 @@ The existing `plugin_layouts_name_real_parameters` now also covers the 13 FL kin
 
 ## Where I stopped
 
-- Code, tests, translations (15 languages) and this document written; core tests and the Windows build queued.
+- 2026-11-02: code, tests, translations (15 languages) and this document written (wip bb8e155c). The PC crashed at
+  ~11:10 before the core tests ran; after the reboot the branch was checked (tree intact), merged with origin/main
+  efb8344d (i18n / tests list conflicts resolved, this round's translations re-applied) and the builds restarted from
+  clean build folders.
 - Next: core tests to 0 failures, Windows build, before / after shots (`LYNX.exe --design168rshot`, before with
-  `LYNX_GENERATED_LAYOUTS=1`) in `/mnt/e/lynx-work/design168r/{before,after}`, review at 100 % / 200 %, land.
+  `LYNX_GENERATED_LAYOUTS=1`) in `/mnt/e/lynx-work/design168r/{before,after}`, review at 100 % / 200 %, land after
+  168n's shared infrastructure is on main.
