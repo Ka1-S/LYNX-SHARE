@@ -66,6 +66,7 @@ is no FL evidence to collect: the evidence is a reproduction on `main` and the s
 - done: feature/pr2930 = c7a2aeff (ff, his) + merge of d25dc86c (his) + ours 32257a2a, d2317c6a, 5fa736d0 (test CLAP,
   `--claprestarttest`, this doc). build-local with FL Data: 1,891,019 checks, 0 failures. CI on wip/pr2930: 5/5 green.
   Windows before/after above. Notes bullets in coord/notes-0.1.22.md.
-- in progress: land.sh pr2930 (coord/land-pr2930.out).
+- 2026-11-02 ~11:10 the PC crashed during the first land.sh (nothing pushed). Branch intact; origin/main efb8344d merged
+  into feature/pr2930; land.sh pr2930 re-run (coord/land-pr2930.out).
 - next: rerun `--claprestarttest` with the landed exe (C:\Users\kauan\lynx-test\land-pr2930\LYNX.exe) → result=OK;
   reply drafts "## PR #29" / "## PR #30" in coord/replies-0.1.22.md; main CI; delete ~/.cache/zig-pr2930.
