@@ -55,11 +55,25 @@ review gesture end to end (Control or Cmd+drag on the ruler → time selection),
 views, and a source scan that the editors no longer call `isPopupMenu()` / `isCtrlDown()`. On main they fail to
 compile (the headers are new).
 
+## Windows GUI check (real mouse, fresh LYNX_PROFILE_DIR + LYNX_TEST_MODE=1)
+
+Shots in `C:\Users\kauan\lynx-test\sel168t\` (driver `drive.ps1`, sessions a–e, each closed by its PID, desktop
+clean after each: `after-*.png`):
+- a1: first start shows the windows tip in the hint bar (text before the wording fix "or the window buttons").
+- b1 right-drag bars 9–11 → time selection; b2 right-drag near its end → end moved to 14 (nearer edge); b3
+  Shift+drag → the selection moved by a bar (10–15); b4 right click in place near the start → start moved to 9.
+- c1 right click in place with no selection → LYNX's ruler menu; c2 Ctrl+right-drag on the ruler → zoomed to the
+  range (bars 10–11); c3 Ctrl+right-click on the grid → zoom to everything (unchanged).
+- d1 Ctrl+click clears the selection; d2/d3 right click → menu again.
+- e1 Channel Rack filter menu: All / Unsorted / Audio clips, then the groups' items.
+- Observation: in session b the right click right after a Ctrl+click and the Ctrl+right-drag after it did not react
+  once (b5/b6); the same steps in sessions c and d worked. Not reproduced again.
+
 ## Where I stopped
 
-- Done: REA (ruler, grid, filter groups), ModifierMap + FlMods sweep, ruler gestures (Playlist + Piano Roll), Mac key
-  names in hints / tips / menus, rack views, windows tip, 15 languages, tests.
-- In progress: build-local with FL Data (`BUILDSLOT_PRIO=1 tmp/coord/buildslot.sh tmp/coord/bl-wt.sh sel168t`, log
-  tmp/coord/bl-sel168t.log), then Windows build + GUI check, notes, landing.
+- Done: everything above; build-local with FL Data 2,104,984 checks, 0 failures (first try: clang aborted on
+  tests.cpp with no diagnostic — faulty RAM pattern — the retry was clean); Windows build (OUT inside Linux: an OUT
+  on /mnt/e breaks the case-sensitive Dbghelp.h shim) and GUI check.
+- Next: land via `flock ~/projetos/lynx/.git/lynx-merge.lock ~/.claude/jobs/f8789b49/tmp/coord/land.sh sel168t`.
 - Rerun Ghidra: `~/.claude/jobs/f8789b49/tmp/r168t/g.sh <out> 0 <hex addr>...` (SCRIPT=Refs.java / Find.java for xrefs /
-  byte search).
+  byte search). GUI: `flock ~/.cache/lynx-wingui.lock ~/.claude/jobs/f8789b49/tmp/r168t/session.sh NAME "cmds"`.
