@@ -536,7 +536,7 @@ gesture or reduced scope · **No** = absent (searched, not found). Locations are
 | B1 | **Done** | A click on an audio file previews it (again on every click); the **preview strip** under the tree shows its waveform, length, rate and the playback position, and can be clicked (hear again) or dragged like the file. The tree is LYNX's own (`BrowserComponent::FileTree`): one click opens / closes a folder, hover highlight, per-type icons, the playing file in red, Left/Right close / open folders, right-click folder menu (collapse all, show in the file manager, add folder), and every row explains itself in the hint bar [DOC][br-use] |
 | B2 | **Done** | Browser focused: Up/Down step and preview; **Shift+Up/Down step and load each file into the selected channel** (sampler or built-in drum); also through the search results |
 | B3 | **Done** | **Enter loads the selected file into the selected channel** (or opens it like a double-click when the channel can't take it); double-click still makes a new channel |
-| B4 | Partial | Rack and Playlist accept drops (tree and search results); dropping onto a rack row replaces that channel's sample; **effect presets (.fst) drop on the effects panel**. **a generator dropped on a mixer strip adds a channel routed to that insert** |
+| B4 | Partial | Rack and Playlist accept drops (tree and search results); dropping onto a rack row replaces that channel's sample; **effect presets (.fst) drop on the effects panel**. **a generator dropped on a mixer strip or one of its effect slots adds a channel routed to that insert** (the insert takes its name while it has its default one). No drop on the empty mixer space (FL 2026: a new instrument track) |
 | B6 | **Done** | **Search box (Ctrl+F)** under the folder list: searches the current folder and below in the background (up to 500 results), words AND-ed, OR, NOT / -word, "exact phrase", * and ? wildcards (`core/SearchQuery`); Esc clears. No F2/F3 stepping |
 | B7 | Partial | Root-folder combo (`BrowserComponent.cpp:80-91`); no tabs, user folders, tags or favourites |
 | B8 | No | — |
@@ -704,7 +704,7 @@ search stepping, instrument drops on mixer inserts, record filters for automatio
     loads it there.
   - Drop targets on mixer inserts and slots (effects, plugin presets).
   - User folders.
-  - **Status:** Done (effect presets drop on the effects panel, generators on a strip). Plain Up/Down
+  - **Status:** Done (effect presets drop on the effects panel, generators on a strip or its effect slots). Plain Up/Down
     preview, Shift+Up/Down load into the selected channel (checked on [DOC][br]).
 - **Quick-add palette (B9).** A searchable plugin list (F8 in LYNX) with instruments and effects. Double-click
   adds it to a new channel or to the selected insert, depending on which panel is focused.
