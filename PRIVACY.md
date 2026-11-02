@@ -21,7 +21,9 @@ user or the person installing or operating it.
   leaves your computer only when you choose to send it.
 - **Local files only.** LYNX SHARE writes only to files you choose (projects, exports) and to its own settings folder
   `%APPDATA%\LYNX` (language, plugin list, autosaves and similar preferences). Delete that folder to remove them.
-  Extracted stems go to the project's `Audio/Recorded/Stems` folder, and the stem model to `models` in the settings folder.
+  Extracted stems go to the project's `Audio/Recorded/Stems` folder. The stem model (166 MB) is kept in
+  `%LOCALAPPDATA%\LYNX\models` (macOS: `~/Library/Application Support/LYNX/models`, Linux: `~/.local/share/LYNX/models`);
+  delete it to free the space, it is downloaded again (after asking) the next time you extract stems.
   It also registers the `.lynx` file type for the current user (`HKEY_CURRENT_USER\Software\Classes`) so project
   files open in LYNX SHARE.
   The Microsoft Store version keeps that folder in its own app-data folder instead

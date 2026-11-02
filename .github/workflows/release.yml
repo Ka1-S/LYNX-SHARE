@@ -279,7 +279,9 @@ jobs:
         shell: pwsh
         continue-on-error: true
         run: |
-          Add-AppxPackage -Path msix\LYNX-test.msix -AllowUnsigned
+          # the package depends on Microsoft's VC++ runtime framework (onnxruntime.dll): the Store installs it, here we do
+          Invoke-WebRequest https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx -OutFile msix\vclibs.appx
+          Add-AppxPackage -Path msix\LYNX-test.msix -AllowUnsigned -DependencyPath msix\vclibs.appx
           $pkg = Get-AppxPackage | Where-Object { $_.Name -eq ([xml](Get-Content msix\test\AppxManifest.xml)).Package.Identity.Name } | Select-Object -First 1
           if (-not $pkg) { throw "package not installed" }
           "installed: $($pkg.PackageFullName) at $($pkg.InstallLocation)"
