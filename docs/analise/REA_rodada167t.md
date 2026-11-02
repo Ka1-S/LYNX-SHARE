@@ -8,7 +8,7 @@ the notes better".
 - Done: FL measured statically (REA/Ghidra on FLEngine_x64.dll, no FL launch), implemented in the Piano roll and the
   Playlist, tests in tests/Zoom167tTests.inc.
 - Windows build (OUT inside Linux: an OUT on NTFS breaks the case-sensitive Dbghelp.h shim) checked by hand (3).
-- In progress: build-local with FL Data, landing.
+- build-local with FL Data: 1890888 checks, only the embedded i18n table was stale (regenerated). Landing via land.sh.
 - Rerun: `tmp/coord/buildslot.sh tmp/coord/bl-wt.sh zoom167t`; Windows: `OUT=/mnt/e/lynx-work/zoom167t/build-win
   tmp/coord/winbuild.sh scripts/build-windows-zig.sh`. Ghidra project copy: /mnt/e/lynx-work/zoom167t (flea, fle.dll);
   scripts and decompiles in tmp/zoom167t (g.sh, d1..d10.c, py/meth.py, fields.py, dyn.py, props.py, dfm.py).
