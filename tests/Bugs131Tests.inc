@@ -46,17 +46,19 @@ TEST (bugs131_pattern_length_is_respected_on_the_first_recording_in_song_mode)
     CHECK (s.songLength() == 2 * bar);
     CHECK (lynx::playbackLoop (true, 0.0, 0.0, (double) s.songLength()).end == (double) (2 * bar));
 
-    // a note recorded on bar 2 stays on bar 2 and the clip placed for the take is 2 bars long
+    // a note recorded on bar 2 stays on bar 2 of the song and the clip placed for the take is 2 bars long; FL places
+    // the take's clip from the bar of its first note (round 168k, REA_rodada165z-b fh2–fh5), so it starts at bar 2
     lynx::NoteRecorder recorder;
     recorder.begin (s.patterns[0].effectiveLength (s.beatsPerBar));
     recorder.add (s, { (double) (bar + lynx::ppq), 0, 60, 0.8f, true });
     recorder.add (s, { (double) (bar + 2 * lynx::ppq), 0, 60, 0.0f, false });
-    const auto notes = recorder.takeFinished();
-    CHECK (notes.size() == 1 && notes[0].start == bar + lynx::ppq && notes[0].length == lynx::ppq);
+    auto notes = recorder.takeFinished();
+    CHECK (notes.size() == 1 && notes[0].start == lynx::ppq && notes[0].length == lynx::ppq);
+    CHECK (recorder.songOrigin() == bar && ! recorder.originFromClip());
     std::vector<int> cleared;
-    lynx::commitTake (s.patterns[0], notes, lynx::RecordMode::overdub, 0, cleared);
-    CHECK (lynx::placePatternClipAt (s, 0, 0));
-    CHECK (s.playlist.size() == 1 && s.playlist[0].length == 2 * bar && s.songLength() == 2 * bar);
+    lynx::commitNoteBatch (s, recorder, std::move (notes), lynx::RecordMode::overdub, {}, cleared, true, true);
+    CHECK (s.playlist.size() == 1 && s.playlist[0].start == bar && s.playlist[0].length == 2 * bar && s.songLength() == 3 * bar);
+    CHECK (s.playlist[0].start + s.patterns[0].notes[0].start == bar + lynx::ppq);
 }
 
 TEST (bugs131_pattern_clips_follow_their_pattern_length)

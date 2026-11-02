@@ -1127,6 +1127,8 @@ juce::var channelToVar (const ChannelDef& c)
         o->setProperty ("keyRegion", juce::Array<juce::var> { c.keyLow, c.keyHigh });
     if (! c.receiveFrom.empty()) // FL's "Receive notes from" (round 165f-rack)
         o->setProperty ("receiveFrom", juce::Array<juce::var> { str (c.receiveFrom), c.receiveMidiChannel });
+    if (c.loopStarterPattern >= 0) // FL's Loop Starter (round 168b): [pattern, slot, category, locked]
+        o->setProperty ("loopStarter", juce::Array<juce::var> { c.loopStarterPattern, str (c.loopStarterSlot), str (c.loopStarterCategory), c.loopStarterLocked });
     if (c.instrument == InstrumentKind::layer)
     {
         auto l = std::make_unique<juce::DynamicObject>();
@@ -1389,6 +1391,13 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
     {
         def.receiveFrom = from[0].toString().toStdString();
         def.receiveMidiChannel = juce::jlimit (0, 16, (int) from[1]);
+    }
+    if (const auto& ls = c["loopStarter"]; ls.isArray() && ls.size() >= 4 && (int) ls[0] >= 0)
+    {
+        def.loopStarterPattern = (int) ls[0];
+        def.loopStarterSlot = ls[1].toString().toStdString();
+        def.loopStarterCategory = ls[2].toString().toStdString();
+        def.loopStarterLocked = (bool) ls[3];
     }
     if (const auto& region = c["keyRegion"]; region.isArray() && region.size() >= 2)
     {
@@ -1819,6 +1828,8 @@ juce::String toJson (const Song& song)
         // the Channel Rack's looping (round 165f-rack): on, type, and the loop points [channel, setting]
         if (p.loopOn)
             o->setProperty ("loopOn", true);
+        if (! p.loopStarterGenre.empty()) // FL's Loop Starter genre (round 168b)
+            o->setProperty ("loopStarterGenre", str (p.loopStarterGenre));
         if (p.loopMode != RackLoopMode::steps)
             o->setProperty ("loopMode", (int) p.loopMode);
         if (! p.channelLoops.empty())
@@ -2127,6 +2138,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
                 pattern.colour = 0xFF000000u | (std::uint32_t) p["colour"].toString().getHexValue32();
 
             pattern.loopOn = (bool) p.getProperty ("loopOn", false);
+            pattern.loopStarterGenre = p.getProperty ("loopStarterGenre", "").toString().toStdString();
             pattern.loopMode = (RackLoopMode) juce::jlimit (1, 3, (int) p.getProperty ("loopMode", 1));
             if (auto* loops = p["channelLoops"].getArray())
                 for (const auto& l : *loops)
