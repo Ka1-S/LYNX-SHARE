@@ -145,12 +145,12 @@ TEST (pl168f_send_pattern_instances_here)
     song.playlist.push_back (pl168f::audioClip (ch, 2, 0, bar));
     // no selection: every clip of the current pattern, positions kept, the unnamed track auto-named
     song.currentPattern = 1;
-    CHECK (pltracks::sendPatternInstancesHere (song, 5, {}) == 2);
+    CHECK ((pltracks::sendPatternInstancesHere (song, 5, {}) == 2));
     CHECK (song.playlist[0].track == 5 && song.playlist[1].track == 5 && song.playlist[1].start == bar);
     CHECK (song.playlist[2].track == 1);
     CHECK (song.playlistTracks.size() > 5 && song.playlistTracks[5].name == "P2");
     // a selection: its pattern clips (any pattern), not the audio clip
-    CHECK (pltracks::sendPatternInstancesHere (song, 7, { 2, 3 }) == 1);
+    CHECK ((pltracks::sendPatternInstancesHere (song, 7, { 2, 3 }) == 1));
     CHECK (song.playlist[2].track == 7 && song.playlist[3].track == 2);
 }
 
@@ -222,10 +222,10 @@ TEST (pl168f_merge_pattern_clips)
     const auto ch = pl168f::addAudioChannel (song, "Loop");
     song.playlist.push_back (pl168f::audioClip (ch, 0, 0, bar));
 
-    CHECK (pltracks::mergePatternClips (song, { 0 }) == pltracks::MergeResult::notEnough);
-    CHECK (pltracks::mergePatternClips (song, { 0, 2 }) == pltracks::MergeResult::mixedKinds);
+    CHECK ((pltracks::mergePatternClips (song, { 0 }) == pltracks::MergeResult::notEnough));
+    CHECK ((pltracks::mergePatternClips (song, { 0, 2 }) == pltracks::MergeResult::mixedKinds));
     int added = -1;
-    CHECK (pltracks::mergePatternClips (song, { 0, 1 }, &added) == pltracks::MergeResult::merged);
+    CHECK ((pltracks::mergePatternClips (song, { 0, 1 }, &added) == pltracks::MergeResult::merged));
     // the new pattern sits after the lowest one involved (pattern 0) → index 1; old pattern 1 moved to 2
     CHECK (song.patterns.size() == 4 && song.patterns[1].name == "P1 #2" && song.patterns[1].colour == song.patterns[0].colour);
     CHECK (song.patterns[2].name == "P2");
@@ -243,7 +243,7 @@ TEST (pl168f_merge_pattern_clips)
     // the audio clip kept its channel (index shift does not touch it)
     CHECK (song.playlist[0].kind == ClipKind::audio && song.playlist[0].channel == ch);
     // no selection = every clip (FL's selection mask), so the audio clip makes it mixed
-    CHECK (pltracks::mergeCandidates (song, {}).size() == 2);
+    CHECK ((pltracks::mergeCandidates (song, {}).size() == 2));
 }
 
 TEST (pl168f_clone_tracks)
@@ -262,7 +262,7 @@ TEST (pl168f_clone_tracks)
     song.playlist.push_back (pl168f::patternClip (0, 2, 0, bar));
 
     // every track empty → nothing to clone
-    CHECK (pltracks::cloneTracks (song, { 4 }, {}) == -1);
+    CHECK ((pltracks::cloneTracks (song, { 4 }, {}) == -1));
 
     pltracks::CloneOptions o;
     o.audioClips = false;
@@ -275,7 +275,7 @@ TEST (pl168f_clone_tracks)
             (c.kind == ClipKind::audio ? audio : patterns) += 1;
     CHECK (patterns == 1 && audio == 0);
     // the old track 2 moved down
-    CHECK (std::any_of (song.playlist.begin(), song.playlist.end(), [] (const Clip& c) { return c.track == 3 && c.pattern == 0; }));
+    CHECK ((std::any_of (song.playlist.begin(), song.playlist.end(), [] (const Clip& c) { return c.track == 3 && c.pattern == 0; })));
     CHECK (pltracks::uniqueTrackName (song, "Solo", -1) == "Solo");
 
     // a group header with Grouped tracks: its members come along, after the group
@@ -284,9 +284,9 @@ TEST (pl168f_clone_tracks)
     g.playlistTracks[1].grouped = true;
     g.playlist.push_back (pl168f::patternClip (0, 0, 0, bar));
     g.playlist.push_back (pl168f::patternClip (0, 1, 0, bar));
-    CHECK (pltracks::tracksToClone (g, { 0 }, true) == std::vector<int> { 0, 1 });
-    CHECK (pltracks::tracksToClone (g, { 0 }, false) == std::vector<int> { 0 });
-    CHECK (pltracks::cloneTracks (g, { 0, 1 }, {}) == 2);
+    CHECK ((pltracks::tracksToClone (g, { 0 }, true) == std::vector<int> { 0, 1 }));
+    CHECK ((pltracks::tracksToClone (g, { 0 }, false) == std::vector<int> { 0 }));
+    CHECK ((pltracks::cloneTracks (g, { 0, 1 }, {}) == 2));
     CHECK (! g.playlistTracks[2].grouped && g.playlistTracks[3].grouped);
 }
 
