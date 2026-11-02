@@ -113,6 +113,8 @@ public:
 
     // An effect dragged from the Browser's Plugin database onto a strip (round 162): it goes into that insert.
     std::function<void (int, EffectSlot)> onEffectDropped;
+    // A generator dragged onto a strip: a new channel routed to that insert.
+    std::function<void (int, ChannelDef)> onInstrumentDropped;
     bool isInterestedInDragSource (const SourceDetails& details) override;
     void itemDropped (const SourceDetails& details) override;
 
@@ -253,6 +255,9 @@ public:
     void filesDropped (const juce::StringArray& files, int x, int y) override;
     bool dropPreset (const juce::File& file, juce::Point<int> position);
     bool dropEffect (EffectSlot fx, juce::Point<int> position);
+    // A generator dragged from the Plugin database onto the panel (a slot or anywhere else): as on the strip, a new
+    // channel routed to the panel's insert; the slots don't change (FL 2026, round 167u).
+    std::function<void (int, ChannelDef)> onInstrumentDropped;
 
     explicit EffectsPanel (AudioEngine& engine);
     ~EffectsPanel() override;
@@ -396,6 +401,8 @@ public:
 
     // Adds an effect to the first free slot of the selected insert (quick-add palette). False when full.
     bool addEffectToSelected (EffectSlot slot);
+    // A generator dragged from the Browser onto a strip (the owner has the Channel Rack that adds the channel).
+    std::function<void (int, ChannelDef)> onInstrumentDropped;
     MixerStrips& getStripsForSnapshot() { return strips; }
 
     static constexpr int effectsWidth = 300;
