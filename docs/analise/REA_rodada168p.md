@@ -48,6 +48,8 @@ tmp/r168p/dfm/<plugin>/TSynthEditorForm.dfm.txt). Only layout and control facts 
   BassDrum's noise display says "Needs FL Studio's files".
 
 ## Where I stopped
-- done: §1, layouts, tables, live automation, part selection, displays, banks (first designs), translations.
-- in progress: compile (build slot queue), bank audit by rendering, then Windows build + shots.
-- next: tune the banks from the audit numbers, before/after shots, notes, land in parts after 168n lands.
+- done: §1, layouts, tables, live automation, part selection, displays, banks designed and leveled by rendering
+  (66 presets, 0 flagged; WAVs in /mnt/e/lynx-work/design168p/banks), translations; merged origin/wip/design168n
+  (with origin/main efb8344d) after the 2026-11-02 11:10 crash (worktree checked: clean).
+- in progress: tests build + Windows build (re-queued after the crash).
+- next: run tests, Windows before/after shots, notes, land in parts after 168n lands.
