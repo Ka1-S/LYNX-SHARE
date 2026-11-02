@@ -170,6 +170,116 @@ bool placePatternClipAt (Song& song, int pattern, std::int64_t tick)
     return true;
 }
 
+namespace
+{
+// The clip of the current pattern playing at song position `tick` (the last one in the list, as the Playlist draws it).
+const Clip* currentPatternClipAt (const Song& song, std::int64_t tick)
+{
+    const Clip* found = nullptr;
+    for (const auto& c : song.playlist)
+        if (c.kind == ClipKind::pattern && c.pattern == song.currentPattern && tick >= c.start && tick < c.end())
+            found = &c;
+    return found;
+}
+
+// FL grows the pattern when a take is played inside a clip longer than it (round 168k [EXEC]: a 1-bar pattern's clip
+// stretched to 4 bars, notes played at bars 2.1 / 3.3 / 4.2 stayed there and the pattern became 4 bars): no fold by
+// the pattern's length while recording, even though such a clip plays its pattern over and over.
+std::int64_t clipPatternTick (const Clip& c, std::int64_t tick)
+{
+    return tick - c.start + c.offset;
+}
+} // namespace
+
+std::int64_t takeOriginFor (const Song& song, std::int64_t tick, bool* fromClip)
+{
+    tick = std::max<std::int64_t> (0, tick);
+    if (const auto* c = currentPatternClipAt (song, tick))
+    {
+        if (fromClip != nullptr)
+            *fromClip = true;
+        return c->start - c->offset;
+    }
+    if (fromClip != nullptr)
+        *fromClip = false;
+    auto origin = song.barAt (tick).tick;
+    // a loop region plays over and over: its notes keep one origin, the bar the region starts in
+    if (song.hasLoop() && tick >= song.loopStart && tick < song.loopEnd)
+        origin = std::min (origin, song.barAt (song.loopStart).tick);
+    return origin;
+}
+
+std::int64_t songNotePosition (const Song& song, std::int64_t tick, std::int64_t origin)
+{
+    tick = std::max<std::int64_t> (0, tick);
+    if (const auto* c = currentPatternClipAt (song, tick))
+        return std::max<std::int64_t> (0, clipPatternTick (*c, tick));
+    auto local = tick - std::max<std::int64_t> (0, origin);
+    if (local < 0) // played after the song (or the loop region) went back to its start: the take goes on after it
+        local += song.hasLoop() ? song.loopEnd - song.loopStart : std::max<std::int64_t> (1, song.songLength());
+    return std::max<std::int64_t> (0, local);
+}
+
+bool growForSongTake (Song& song, int pattern, std::int64_t origin, const std::vector<Note>& notes)
+{
+    if (pattern < 0 || pattern >= (int) song.patterns.size() || notes.empty() || origin < 0)
+        return false;
+
+    auto& p = song.patterns[(std::size_t) pattern];
+    bool changed = false;
+    std::int64_t lastStart = -1;
+    for (const auto& n : notes)
+        lastStart = std::max (lastStart, n.start);
+
+    // a set length grows by whole bars to the notes recorded past it (FL's pattern length follows its notes)
+    const std::int64_t bar = (std::int64_t) ppq * std::max (1, song.beatsPerBar);
+    if (p.lengthTicks > 0 && lastStart >= p.lengthTicks)
+    {
+        p.lengthTicks = (lastStart / bar + 1) * bar;
+        changed = true;
+    }
+
+    // the take's clip (the one whose pattern start is the origin) reaches the bar of the last note when no clip of the
+    // pattern plays there: from its pattern position on, the whole pattern (it stays an automatic-length clip)
+    const auto lastSong = origin + lastStart;
+    const auto covered = std::any_of (song.playlist.begin(), song.playlist.end(), [&] (const Clip& c) {
+        return c.kind == ClipKind::pattern && c.pattern == pattern && lastSong >= c.start && lastSong < c.end();
+    });
+    if (covered)
+        return changed;
+    Clip* take = nullptr;
+    for (auto& c : song.playlist)
+        if (c.kind == ClipKind::pattern && c.pattern == pattern && c.start - c.offset == origin && c.start <= lastSong
+            && (take == nullptr || c.end() > take->end()))
+            take = &c;
+    if (take == nullptr)
+        return changed;
+    const auto lastBar = song.barAt (lastSong);
+    const auto end = std::max (lastBar.tick + std::max<std::int64_t> (1, lastBar.length), origin + p.effectiveLength (song.beatsPerBar));
+    if (end > take->end())
+    {
+        take->length = end - take->start;
+        changed = true;
+    }
+    return changed;
+}
+
+void commitNoteBatch (Song& song, const NoteRecorder& recorder, std::vector<Note> notes, RecordMode mode, const TakeQuantize& q,
+                      std::vector<int>& clearedChannels, bool placeClip, bool firstBatch)
+{
+    const auto pattern = song.currentPattern;
+    if (pattern < 0 || pattern >= (int) song.patterns.size() || notes.empty())
+        return;
+    quantizeTake (notes, q);
+    commitTake (song.patterns[(std::size_t) pattern], notes, mode, 0, clearedChannels);
+
+    if (song.mode != PlayMode::song || recorder.songOrigin() < 0)
+        return;
+    if (placeClip && firstBatch && ! recorder.originFromClip())
+        placePatternClipAt (song, pattern, recorder.songOrigin());
+    growForSongTake (song, pattern, recorder.songOrigin(), notes);
+}
+
 std::int64_t countInLength (const Song& song, int bars, std::int64_t tick)
 {
     return std::max (0, bars) * std::max<std::int64_t> (1, song.barAt (std::max<std::int64_t> (0, tick)).length);
@@ -408,8 +518,19 @@ void commitEventPoints (Song& song, int patternIndex, AutomationWrite& w, std::v
 void NoteRecorder::begin (std::int64_t loopLength)
 {
     active = true;
+    linear = false;
     loop = std::max<std::int64_t> (1, loopLength);
+    origin = -1;
+    fromClip = false;
     held.clear();
+}
+
+std::int64_t NoteRecorder::songTick (const Song& song, double tick) const
+{
+    const auto position = (std::int64_t) std::floor (std::max (0.0, tick));
+    if (linear || song.hasLoop()) // (a loop region: the transport wraps it itself)
+        return position;
+    return position % std::max<std::int64_t> (1, song.songLength()); // the song plays in a loop
 }
 
 void NoteRecorder::add (const Song& song, const RecordedEvent& e)
@@ -421,6 +542,10 @@ void NoteRecorder::add (const Song& song, const RecordedEvent& e)
 
     if (e.on)
     {
+        // Song mode: the take's first note sets where the pattern's start lies for the notes outside its clips
+        if (song.mode == PlayMode::song && origin < 0)
+            origin = takeOriginFor (song, songTick (song, e.tick), &fromClip);
+
         // repeated note without an "off" in between: close the previous one
         if (auto it = held.find (id); it != held.end())
             finish (song, e.channel, e.key, it->second, e.tick);
@@ -448,7 +573,17 @@ void NoteRecorder::end (const Song& song, double tick)
 void NoteRecorder::finish (const Song& song, int channel, int key, const Held& h, double endTick)
 {
     Note n;
-    n.start = patternPositionForTick (song, h.tick, loop);
+    if (song.mode == PlayMode::song)
+    {
+        const auto at = songTick (song, h.tick);
+        if (origin < 0)
+            origin = takeOriginFor (song, at, &fromClip);
+        n.start = songNotePosition (song, at, origin);
+    }
+    else
+    {
+        n.start = patternPositionForTick (song, h.tick, loop);
+    }
     // Song mode loops (the loop region, or the whole song): a note held across the loop's end ends after the wrap
     auto played = endTick - h.tick;
     if (played < 0.0 && song.mode == PlayMode::song)
