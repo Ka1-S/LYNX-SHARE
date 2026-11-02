@@ -94,7 +94,7 @@ public:
     int getToolbarAndTrayHeightForSnapshot() const { return toolbarHeight + (toolbarEditor != nullptr ? toolbar::EditOverlay::trayHeight : 0); }
     juce::Rectangle<int> getToolStripAreaForSnapshot (bool playlistStrip);
     void setMetersForSnapshot (double cpu, std::int64_t memory, int polyphony) { perfMeter.setValues (cpu, memory, polyphony); }
-    static std::unique_ptr<juce::Component> makeHelpContent();
+    static std::unique_ptr<juce::Component> makeHelpContent (const keys::KeyMap* keyMap = nullptr); // nullptr: the defaults
     static std::unique_ptr<juce::AlertWindow> makeAboutWindow();
     std::unique_ptr<juce::AlertWindow> makeConfirmDiscardWindow();
     PianoRollComponent& getPianoRollForSnapshot() { return pianoRoll; }
@@ -132,6 +132,9 @@ private:
     int scansSeen = 0; // background plugin scans already announced in the hint bar
     int pluginCrashesSeen = 0; // hosted plugins that crashed (engine/PluginHost.h) and were already announced
     void showHelp();
+    void closeUnfocusedWindows();
+    void closeHelp();
+    juce::Component::SafePointer<juce::DialogWindow> helpWindow; // the shortcut sheet (F1 toggles it)
 
     // transport
     void playStop();     // Space: play, or stop and go back to where playback started
@@ -396,10 +399,11 @@ private:
     IconButton rackGraphButton { "rackGraph", Icon::graph };
     IconButton rackPianoRollButton { "rackPianoRoll", Icon::pianoRoll };
     IconButton rackLoopButton { "rackLoop", Icon::loop }; // FL's Loop button (round 165f-rack)
+    IconButton rackLoopStarterButton { "rackLoopStarter", Icon::dice }; // Loop Starter (round 168b)
     IconButton rackFollowButton { "rackFollow", Icon::follow }; // Follow the playing step (issue #12)
     static constexpr int rackPatternSelectorWidth = 132;
     static constexpr int rackLengthBoxWidth = 40;
-    static constexpr int rackTitleToolsWidth = rackPatternSelectorWidth + 6 + 96 + 4 + 26 + 4 + rackLengthBoxWidth + 4 + 24 + 4 + 24 + 4 + 24 + 4 + 24;
+    static constexpr int rackTitleToolsWidth = rackPatternSelectorWidth + 6 + 96 + 4 + 26 + 4 + rackLengthBoxWidth + 4 + 24 + 4 + 24 + 4 + 24 + 4 + 24 + 4 + 24;
     // one icon per workspace panel (F5..F9): click toggles, right-click shows it maximized
     std::array<IconButton, workspace::panelCount> panelButtons { IconButton { "playlistPanel", Icon::playlist },
                                                                  IconButton { "rackPanel", Icon::channelRack },

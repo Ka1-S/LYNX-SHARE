@@ -5,6 +5,7 @@
 #include "core/Effects.h"
 #include "core/FlEffects.h"
 #include "core/GrossBeat.h"
+#include "core/MidiOut.h"
 #include "core/PhysicalModels.h"
 #include "flp/Flp.h"
 
@@ -208,6 +209,57 @@ std::string booBassDll (const FlAccess& access)
     return ! dll.empty() && access.fileExists && access.fileExists (dll) ? dll : std::string();
 }
 } // namespace
+
+std::optional<ChannelDef> channelFromPresetFile (InstrumentKind kind, const std::string& path, const FlAccess& access)
+{
+    const auto* engine = instrumentEngine (kind);
+    return engine != nullptr ? channelFromPreset (kind, *engine, path, access) : std::nullopt;
+}
+
+std::string presetFolderOf (InstrumentKind kind)
+{
+    if (kind == InstrumentKind::midiOut)
+        return "MIDI Out";
+    const auto* engine = instrumentEngine (kind);
+    return engine != nullptr ? engine->presetFolder : "";
+}
+
+std::optional<ChannelDef> withPreset (const ChannelDef& current, const std::string& path, const std::string& presetName, const FlAccess& access)
+{
+    ChannelDef out;
+    if (current.instrument == InstrumentKind::midiOut)
+    {
+        const auto loaded = midiout::parse (midiout::stateFromFst (readPreset (path, access)));
+        if (! loaded)
+            return std::nullopt;
+        auto state = *loaded;
+        const auto now = midiout::stateOf (current.pluginState); // (FL keeps where it plays: channel and port)
+        state.channel = now.channel;
+        state.port = now.port;
+        out = current;
+        out.pluginState = midiout::write (state);
+    }
+    else
+    {
+        auto def = channelFromPresetFile (current.instrument, path, access);
+        if (! def)
+            return std::nullopt;
+        // a plugin preset holds the plugin's state only: the channel's own settings stay (FL's wrapper loads the
+        // .fst into the plugin)
+        out = current;
+        out.instrument = def->instrument;
+        out.samplePath = def->samplePath;
+        out.zones = def->zones;
+        out.modelParams = def->modelParams;
+        out.pluginState = def->pluginState;
+        out.controllerState = def->controllerState;
+        out.synth = def->synth;
+        out.keyLabels = def->keyLabels;
+    }
+    if (! presetName.empty())
+        out.name = presetName; // FL names the channel after the preset (measured, round 167o)
+    return out;
+}
 
 bool available (const InstrumentEngine& e, const FlAccess& access)
 {

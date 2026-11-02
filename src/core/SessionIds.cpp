@@ -161,6 +161,9 @@ void forEachPatternRef (Song& song, const IndexFn& fn)
             if (c.kind == ClipKind::pattern)
                 fn (c.pattern);
     });
+    for (auto& c : song.channels) // a Loop Starter channel's pattern (round 168b)
+        if (c.loopStarterPattern >= 0)
+            fn (c.loopStarterPattern);
     fn (song.currentPattern);
 }
 

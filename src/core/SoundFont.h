@@ -63,6 +63,18 @@ struct Region
     int freqModLfo = 0, freqVibLfo = 0;     // absolute cents (8.176 Hz · 2^(c/1200))
     int modLfoToPitch = 0, vibLfoToPitch = 0;
     float chorusSend = 0, reverbSend = 0;   // 0…1
+
+    // SFZ regions (core/Sfz.h, round 167o): what SF2 has no generator for. `sfz` false = a SoundFont region (none of
+    // these apply).
+    bool sfz = false;
+    bool oneShot = false;          // loop_mode=one_shot: a note-off doesn't stop it
+    bool releaseTrigger = false;   // trigger=release: starts at the note-off, with the note-on's velocity
+    bool offFast = true;           // off_mode: fast (a few ms) or normal (its release)
+    int group = 0, offBy = 0;      // group / off_by: starting a region of group G stops the voices whose off_by is G
+    int seqLength = 1, seqPosition = 1; // round robin: plays on the seqPosition-th of every seqLength matching notes
+    float loRand = 0, hiRand = 1;  // random: plays when the note's random number is in [loRand, hiRand)
+    int switchLast = -1;           // sw_last: plays only while that key switch is the last one pressed
+    float ampVelTrack = 1.0f;      // amp_veltrack (0…1): gain = 1 − t + t · (velocity / 127)²
 };
 
 struct Preset
@@ -75,6 +87,7 @@ struct Preset
 struct Font
 {
     std::string path, name; // name: the file's INAM (or the file name)
+    int switchLo = -1, switchHi = -1, switchDefault = -1; // an SFZ's key switch range (sw_lokey / sw_hikey / sw_default)
     std::vector<Preset> presets; // sorted by bank, then program
     std::vector<std::int16_t> samples; // all samples, mono, plus 8 frames of silence at the end (interpolation)
 

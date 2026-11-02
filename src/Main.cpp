@@ -59,6 +59,7 @@
 #include "core/MidiControls.h"
 #include "core/FlSynths.h"
 #include "core/SoundFont.h"
+#include "core/Sfz.h"
 #include "ui/Dialogs.h"
 #include "core/RackOps.h"
 #include "core/Layer.h"
@@ -292,6 +293,25 @@ public:
 
         // a crash in any mode (UI, command line) writes its backtrace to %APPDATA%\LYNX\autosave
         juce::SystemStats::setApplicationCrashHandler (onCrash);
+
+        // SFZ instruments (round 167o): their FLAC / OGG / AIFF / MP3 samples through JUCE's readers
+        lynx::sfz::setDecoder ([] (const std::string& path, lynx::sfz::Audio& out) {
+            juce::AudioFormatManager formats;
+            formats.registerBasicFormats();
+            std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (juce::File (juce::String::fromUTF8 (path.c_str()))));
+            if (reader == nullptr || reader->lengthInSamples <= 0 || reader->lengthInSamples > (1 << 28) || reader->numChannels == 0)
+                return false;
+            const auto frames = (int) reader->lengthInSamples;
+            juce::AudioBuffer<float> buffer ((int) std::min (2u, reader->numChannels), frames);
+            if (! reader->read (&buffer, 0, frames, 0, true, buffer.getNumChannels() > 1))
+                return false;
+            out.channels.clear();
+            for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+                out.channels.emplace_back (buffer.getReadPointer (ch), buffer.getReadPointer (ch) + frames);
+            out.sampleRate = reader->sampleRate;
+            out.loopStart = out.loopEnd = -1;
+            return true;
+        });
 
         // child process of a sandboxed plugin: no window or audio of its own
         if (lynx::runPluginSandboxWorker (commandLine))
@@ -1463,6 +1483,8 @@ public:
         lynx::crashguard::note ("closing");
         lynx::shutdownPluginSandboxWorker();
         splash = nullptr;
+        if (mainWindow != nullptr && mainWindow->isVisible())
+            mainWindow->saveState();
         mainWindow = nullptr; // the UI goes before the engine
         lynx::updater::shutdown(); // (a check or download in flight stops)
         crashEngine = nullptr;
@@ -7993,6 +8015,16 @@ private:
             }
 
             centreWithSize (getWidth(), getHeight());
+
+            // where it was last time (round 167v); the first start opens maximized, the Playlist filling the screen
+            // with the Browser at the left and the Channel Rack above it, like FL Studio's first start
+            const auto saved = stateFile().loadFileAsString().trim();
+            // (LYNX_TEST_MODE keeps the fixed-size window scripted checks expect, unless LYNX_TEST_MAXIMIZE=1)
+            const auto firstStart = saved.isEmpty()
+                                    && (! lynx::platform::testMode() || juce::SystemStats::getEnvironmentVariable ("LYNX_TEST_MAXIMIZE", {}) == "1");
+            maximiseOnReveal = firstStart || saved.startsWithIgnoreCase ("fs");
+            if (saved.isNotEmpty())
+                restoreWindowStateFromString (saved.startsWithIgnoreCase ("fs") ? saved.substring (2).trim() : saved);
         }
 
         // Shows the window (built hidden while the splash screen is up).
@@ -8001,9 +8033,15 @@ private:
             setVisible (true);
             lynx::applyWindowChrome (*this);
             lynx::fitWindowOnScreen (*this); // a size saved at another UI zoom still fits (round 163)
+            if (maximiseOnReveal)
+                setFullScreen (true); // (a title-bar window: maximized, the taskbar stays)
             toFront (true);
             content->grabKeyboardFocus();
         }
+
+        // The window's place and maximized state for the next start (main-window.txt in the settings folder).
+        void saveState() { stateFile().replaceWithText (getWindowStateAsString()); }
+        static juce::File stateFile() { return lynx::PluginHost::settingsFolder().getChildFile ("main-window.txt"); }
 
         void openFile (const juce::File& file) { content->openFile (file); }
         lynx::MainComponent& getContent() { return *content; }
@@ -8031,6 +8069,7 @@ private:
     private:
         lynx::MainComponent* content = nullptr; // owned by the window
         double frameStart = 0.0;
+        bool maximiseOnReveal = false;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainWindow)
     };

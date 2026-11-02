@@ -487,6 +487,7 @@ public:
           panel (p)
     {
         setUsingNativeTitleBar (true);
+        getProperties().set ("lynxPanel", true); // a panel, not a tool window: Ctrl+F12 / F12 leave it open
         setResizable (true, false);
         snapping.setSizeLimits (workspace::minWidth, workspace::minHeight + Workspace::titleHeight, 10000, 10000);
         snapping.others = [this] { return owner.otherWindowScreenBounds (panel); };
@@ -615,6 +616,7 @@ void Workspace::toggleMaximised (Panel panel)
 void Workspace::setDetached (Panel panel, bool detached)
 {
     pristine = false;
+    restoredState.clear();
     layout[panel].detached = detached;
 
     if (detached)
@@ -645,6 +647,11 @@ void Workspace::activate (Panel panel)
     setFocusedPanel (panel);
 }
 
+juce::Rectangle<int> Workspace::getPanelBounds (Panel panel) const
+{
+    return toJuce (layout[panel].bounds);
+}
+
 void Workspace::fitPanelContent (Panel panel, int contentWidth, int contentHeight)
 {
     auto& state = layout[panel];
@@ -652,6 +659,7 @@ void Workspace::fitPanelContent (Panel panel, int contentWidth, int contentHeigh
     if (! layoutReady || state.maximised || state.detached)
         return;
 
+    restoredState.clear(); // (sized to its content now: scaled from here on)
     auto r = state.bounds;
     if (contentWidth > 0)
         r.w = contentWidth + 2 * edge;
@@ -683,7 +691,10 @@ void Workspace::setFocusedPanel (Panel panel)
 void Workspace::frameMoved (Panel panel, juce::Rectangle<int> bounds)
 {
     if (! (layout[panel].bounds == toRect (bounds)))
+    {
         pristine = false; // moved or resized by hand
+        restoredState.clear();
+    }
 
     layout[panel].bounds = toRect (bounds);
 }
@@ -798,6 +809,7 @@ void Workspace::resized()
             {
                 layout = *saved;
                 restored = true;
+                restoredState = pendingState;
             }
 
         layoutReady = true;
@@ -818,6 +830,17 @@ void Workspace::resized()
             onDefaultLayout();
         return;
     }
+
+    if (restoredState.isNotEmpty())
+        if (const auto saved = workspace::Layout::parse (restoredState.toStdString(), getWidth(), getHeight()))
+        {
+            for (int i = 0; i < workspace::panelCount; ++i) // the rects only: what was shown/hidden since stays
+                layout.panels[(std::size_t) i].bounds = saved->panels[(std::size_t) i].bounds;
+            layout.width = saved->width;
+            layout.height = saved->height;
+            applyLayout();
+            return;
+        }
 
     layout.resize (getWidth(), getHeight());
     applyLayout();
@@ -847,6 +870,7 @@ void Workspace::resetLayout()
     layout = workspace::Layout::makeDefault (juce::jmax (1, getWidth()), juce::jmax (1, getHeight()));
     layoutReady = true;
     pristine = true;
+    restoredState.clear();
     applyLayout();
 
     if (onDefaultLayout)
@@ -883,6 +907,7 @@ bool Workspace::applyLayoutText (const juce::String& text)
 
     layout = *parsed;
     pristine = false;
+    restoredState = text;
     applyLayout();
     return true;
 }

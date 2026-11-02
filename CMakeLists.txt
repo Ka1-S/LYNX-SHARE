@@ -59,6 +59,7 @@ add_library(lynx_core STATIC
     src/core/Preferences.cpp
     src/core/MidiSync.cpp
     src/core/ThemePalette.cpp
+    src/core/LoopStarter.cpp
     src/core/PluginLayout.cpp
     src/core/StateParams.cpp
     src/core/FlEffects.cpp
@@ -182,6 +183,8 @@ target_include_directories(lynx_core PUBLIC src third_party/sse2neon)
 # workflow shell (key map, workspace layout, rack operations)
 target_sources(lynx_core PRIVATE
     src/core/KeyMap.cpp
+    src/core/PresetCycle.cpp
+    src/core/Sfz.cpp
     src/core/Workspace.cpp
     src/core/RackOps.cpp
     src/core/ChannelMiscFx.cpp
@@ -418,6 +421,7 @@ if(LYNX_BUILD_APP)
         src/ui/AudioEditorTools.cpp
         src/ui/ToolWindow.cpp
         src/ui/TempoTapper.cpp
+        src/ui/LoopStarterWindow.cpp
         src/ui/HistoryPanel.cpp
         src/ui/MissingFilesDialog.cpp
         src/ui/SettingsDialog.cpp

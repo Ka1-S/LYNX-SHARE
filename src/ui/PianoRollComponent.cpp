@@ -1327,6 +1327,24 @@ void PianoRollComponent::paintNoteAt (std::int64_t start, int key, bool monophon
     });
 }
 
+void PianoRollComponent::beginKeyZoom (const juce::MouseEvent& e)
+{
+    drag = Drag::keyZoom;
+    keyZoomKey = yToKey (e.y);
+    keyZoomStartRow = rowHeight;
+    keyZoomCentreY = keyToY (keyZoomKey) + rowHeight / 2;
+    keyZoomDrag.begin (e.y);
+    e.source.enableUnboundedMouseMovement (true); // FL hides the pointer while the zoom follows the travel
+}
+
+void PianoRollComponent::beginTimeZoom (const juce::MouseEvent& e)
+{
+    drag = Drag::timeZoom;
+    const auto width = (double) juce::jmax (1, gridArea().getWidth());
+    timeZoomDrag.begin (width / pixelsPerTick, scrollTicks + width * 0.5 / pixelsPerTick, e.x, e.y);
+    e.source.enableUnboundedMouseMovement (true);
+}
+
 void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
 {
     if (engine.getSong().channels.empty())
@@ -1341,12 +1359,19 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
 
     if (e.mods.isMiddleButtonDown())
     {
-        if (onKeyboard) // middle-drag on the keyboard zooms vertically around the clicked key
+        // FL 2026 (round 167t, issue #26): middle-drag on the keyboard and Ctrl+middle-drag on the notes zoom
+        // vertically around the key under the mouse; middle-drag on the ruler and Alt+middle-drag on the notes
+        // zoom the time (drag up = zoom in, sideways = scroll)
+        const auto onNotes = gridArea().contains (e.getPosition());
+        const auto onRuler = e.y >= rulerTop && e.y < headerHeight && e.x >= keyboardWidth;
+        if (onKeyboard || (onNotes && e.mods.isCtrlDown() && ! e.mods.isAltDown()))
         {
-            drag = Drag::keyZoom;
-            keyZoomKey = yToKey (e.y);
-            keyZoomStartRow = rowHeight;
-            setMouseCursor (juce::MouseCursor::UpDownResizeCursor);
+            beginKeyZoom (e);
+            return;
+        }
+        if (onRuler || (onNotes && e.mods.isAltDown()))
+        {
+            beginTimeZoom (e);
             return;
         }
 
@@ -1733,10 +1758,22 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
 
         case Drag::keyZoom:
         {
-            // up = taller keys; the clicked key stays under the mouse
-            const auto offset = e.getMouseDownY() - headerHeight;
-            rowHeight = juce::jlimit (6, 32, keyZoomStartRow - e.getDistanceFromDragStartY() / 8);
-            scrollY = juce::jmax (0, rowFor (keyZoomKey) * rowHeight + rowHeight / 2 - offset);
+            // up = taller keys (Ctrl: fine); the centre of the clicked key stays where it was
+            keyZoomDrag.move (e.y, e.mods.isCtrlDown());
+            rowHeight = keyZoomDrag.height (keyZoomStartRow);
+            scrollY = juce::jlimit (0, juce::jmax (0, rows.count * rowHeight - gridArea().getHeight()),
+                                    rowFor (keyZoomKey) * rowHeight + rowHeight / 2 - (keyZoomCentreY - headerHeight));
+            updateScrollBars();
+            repaint();
+            return;
+        }
+
+        case Drag::timeZoom:
+        {
+            const auto width = (double) juce::jmax (1, gridArea().getWidth());
+            timeZoomDrag.move (e.x, e.y, e.mods.isCtrlDown());
+            pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, width / timeZoomDrag.span);
+            scrollTicks = juce::jmax (0.0, timeZoomDrag.centre - width * 0.5 / pixelsPerTick);
             updateScrollBars();
             repaint();
             return;
@@ -2114,6 +2151,7 @@ void PianoRollComponent::postDragHint (const juce::MouseEvent& e)
             break;
         }
         case Drag::keyZoom: hint.text = tr ("Key height"); hint.value = juce::String (rowHeight) + " px"; break;
+        case Drag::timeZoom: hint.text = tr ("Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only"); break;
         case Drag::keyboard:
             hint.text = tr ("Hearing the key: further right on a key = louder");
             hint.value = keyName (previewKey) + "  " + tr ("vel {0}", { juce::String (juce::roundToInt (keyVelocityAt (e.x, previewKey) * 127.0f)) });
@@ -2699,8 +2737,8 @@ void PianoRollComponent::showMoreMenu()
         zoom.addItem (tr ("Zoom to the selection") + "\tShift+5", [this] { runAction ("pianoRoll.zoomSelection"); });
         zoom.addItem (tr ("Centre the view on the playhead") + "\tShift+0", [this] { runAction ("pianoRoll.centrePlayhead"); });
         zoom.addSeparator();
-        zoom.addItem (tr ("Taller keys") + "\tCtrl+Alt+Wheel", [this] { rowHeight = juce::jmin (32, rowHeight + 2); updateScrollBars(); repaint(); });
-        zoom.addItem (tr ("Shorter keys"), [this] { rowHeight = juce::jmax (6, rowHeight - 2); updateScrollBars(); repaint(); });
+        zoom.addItem (tr ("Taller keys") + "\tCtrl+Alt+Wheel", [this] { rowHeight = juce::jmin (gesture::maxKeyHeight, rowHeight + 2); updateScrollBars(); repaint(); });
+        zoom.addItem (tr ("Shorter keys"), [this] { rowHeight = juce::jmax (gesture::minKeyHeight, rowHeight - 2); updateScrollBars(); repaint(); });
         menu.addSubMenu (tr ("Zoom"), zoom);
     }
     menu.addSeparator();
@@ -3292,7 +3330,7 @@ void PianoRollComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::
         // vertical zoom keeping the key under the mouse in place
         const auto key = yToKey (e.y);
         const auto offset = e.y - keyToY (key);
-        rowHeight = juce::jlimit (6, 32, rowHeight + (wheel.deltaY > 0 ? 2 : -2));
+        rowHeight = juce::jlimit (gesture::minKeyHeight, gesture::maxKeyHeight, rowHeight + (wheel.deltaY > 0 ? 2 : -2));
         scrollY = juce::jmax (0, rowFor (key) * rowHeight + offset - (e.y - headerHeight));
     }
     else if (ctrl)

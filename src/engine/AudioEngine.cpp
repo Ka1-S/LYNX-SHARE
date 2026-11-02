@@ -2047,7 +2047,15 @@ void AudioEngine::updateRecording()
         recorder.begin (pattern.effectiveLength (song.beatsPerBar));
         takeHasUndoStep = false;
         takeClearedChannels.clear();
-        takeStartPosition = lastPlayingTick;
+        // Song mode without a loop region: while recording, the song plays on past its end until recording stops (FL,
+        // round 168k [EXEC]: a 1-bar song recorded from bar 1 counted on to bar 8 instead of going back to bar 1), so
+        // the notes stay where they were played
+        if (song.mode == PlayMode::song && ! song.hasLoop())
+        {
+            noteTakeLinear = true;
+            recorder.setLinear (true);
+            updateLinearSong();
+        }
     };
 
     if (active)
@@ -2063,7 +2071,7 @@ void AudioEngine::updateRecording()
         if (punch.empty() || ! ev.on)
             return false;
         auto tick = ev.tick;
-        if (! song.hasLoop())
+        if (! song.hasLoop() && ! noteTakeLinear)
             tick = std::fmod (std::max (0.0, tick), (double) std::max<std::int64_t> (1, song.songLength()));
         return ! inPunchRanges (punch, tick);
     };
@@ -2095,25 +2103,23 @@ void AudioEngine::updateRecording()
 
     auto notes = recorder.takeFinished();
 
+    if (! recorder.isActive() && std::exchange (noteTakeLinear, false))
+        updateLinearSong();
+
     if (notes.empty())
         return;
 
-    // the whole take is a single undo step: overdub or replace, quantised to the record grid; in song mode a
-    // clip of the pattern is placed where recording started if none plays there
+    // the whole take is a single undo step: overdub or replace, quantised to the record grid; in song mode the notes
+    // go where they were played and a clip of the pattern is placed from the bar of the take's first note (FL; round
+    // 168k: they used to fold into the pattern's first bars)
     const auto options = recordOptions;
-    auto placeClipAt = (std::int64_t) takeStartPosition;
-    if (song.mode == PlayMode::song && ! song.hasLoop()) // (the position loops over the song)
-        placeClipAt %= std::max<std::int64_t> (1, song.songLength());
     editSong ([&] (Song& s) {
         TakeQuantize q;
         q.grid = options.quantise;
         q.starts = options.quantiseStarts;
         q.end = options.noteEnd;
         q.stepSequencer = options.toStepSequencer;
-        commitTake (s.patterns[(std::size_t) s.currentPattern], notes, options.mode, q, takeClearedChannels);
-
-        if (options.placeSongClip && s.mode == PlayMode::song && ! takeHasUndoStep)
-            placePatternClipAt (s, s.currentPattern, placeClipAt);
+        commitNoteBatch (s, recorder, std::move (notes), options.mode, q, takeClearedChannels, options.placeSongClip, ! takeHasUndoStep);
     }, ! takeHasUndoStep);
     takeHasUndoStep = true;
 }
@@ -3031,7 +3037,7 @@ void AudioEngine::updateAutomationRecording (bool active)
                     auto& w = writeFor (t.target);
                     recordedAutomationPoints += (int) t.pending.size();
                     if (songMode)
-                        commitAutomationPoints (s, w, std::move (t.pending), grid, automationLinear);
+                        commitAutomationPoints (s, w, std::move (t.pending), grid, automationLinear || noteTakeLinear);
                     else
                         commitEventPoints (s, automationPattern, w, std::move (t.pending), automationLoopLength, grid);
                     t.pending.clear();
@@ -3131,7 +3137,7 @@ void AudioEngine::updateAutomationRecording (bool active)
             updateLinearSong();
         }
     if (song.mode == PlayMode::song)
-        lastAutomationTick = songTickForRecorded (song, tick, automationLinear);
+        lastAutomationTick = songTickForRecorded (song, tick, automationLinear || noteTakeLinear);
 
     if (! ended.empty() || --automationCommitCountdown <= 0)
     {

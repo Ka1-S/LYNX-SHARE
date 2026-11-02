@@ -128,7 +128,25 @@ public:
     // Pairs of actions bound to the same chord in overlapping contexts (for the help sheet / tests).
     std::vector<std::pair<std::string, std::string>> conflicts() const;
 
+    // Every binding on F1…F12 (any context, the user's own keys included), ordered F1 → F12 and per key plain, Shift,
+    // Ctrl, Alt, then the combinations (the shortcut sheet's "Function keys" column, issue #23).
+    struct Binding
+    {
+        Chord chord;
+        std::string actionId;
+        Context context;
+    };
+    std::vector<Binding> functionKeyBindings() const;
+
 private:
     std::vector<std::vector<Chord>> chords; // parallel to actions()
 };
+
+// F10 / F11 (MIDI settings / Project info), FL's rule (FLEngine 0x13545f0, round 167o): when the Settings window is
+// open on the asked page the key closes it; open on another page it switches to the asked one; closed, it opens.
+enum class SettingsKey { open, switchPage, close };
+constexpr SettingsKey settingsKeyPress (bool windowOpen, int shownPage, int askedPage) noexcept
+{
+    return ! windowOpen ? SettingsKey::open : (shownPage == askedPage ? SettingsKey::close : SettingsKey::switchPage);
+}
 } // namespace lynx::keys

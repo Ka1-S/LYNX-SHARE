@@ -105,7 +105,7 @@ APP_SOURCES=(src/Main.cpp
              src/platform/MingwFixes.cpp)
 
 # workflow shell: core (key map, workspace layout, rack operations) and UI (workspace desktop, control contract)
-APP_SOURCES+=(src/core/KeyMap.cpp src/core/Workspace.cpp src/core/RackOps.cpp src/core/ChannelMiscFx.cpp src/core/MidiImport.cpp src/ui/Workspace.cpp src/ui/ValueControl.cpp src/ui/Dialogs.cpp)
+APP_SOURCES+=(src/core/KeyMap.cpp src/core/PresetCycle.cpp src/core/Sfz.cpp src/core/Workspace.cpp src/core/RackOps.cpp src/core/ChannelMiscFx.cpp src/core/MidiImport.cpp src/ui/Workspace.cpp src/ui/ValueControl.cpp src/ui/Dialogs.cpp)
 # Wave Traveller (round 167f)
 APP_SOURCES+=(src/core/WaveTraveller.cpp src/ui/WaveTravellerEditor.cpp)
 # Windows file association (.lynx) and its icon
@@ -132,6 +132,8 @@ APP_SOURCES+=(src/core/SessionIds.cpp src/core/SessionParts.cpp src/core/StandIn
 APP_SOURCES+=(src/core/PluginSubstitutes.cpp)
 # settings pages (General/Audio/MIDI), plugin manager, shortcut manager (round 82)
 APP_SOURCES+=(src/core/ThemePalette.cpp src/ui/ThemeSettings.cpp src/ui/ColourPicker.cpp)
+# Loop Starter, local (round 168b)
+APP_SOURCES+=(src/core/LoopStarter.cpp src/ui/LoopStarterWindow.cpp)
 APP_SOURCES+=(src/core/Preferences.cpp src/core/MidiSync.cpp src/engine/MidiSyncIo.cpp src/ui/SettingsPages.cpp src/ui/PluginManager.cpp src/ui/ShortcutManager.cpp)
 # spectral waveforms: band analysis, background cache and drawing
 APP_SOURCES+=(src/core/WaveAnalysis.cpp src/ui/WaveformView.cpp)

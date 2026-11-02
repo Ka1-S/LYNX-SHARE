@@ -19,6 +19,7 @@
 #include "core/FlSynths.h"
 #include "core/MidiControls.h"
 #include "ui/ToolWindow.h"
+#include "ui/LoopStarterWindow.h"
 #include "core/Slicer.h"
 #include "ui/ChannelSettings.h"
 
@@ -1543,16 +1544,12 @@ void ChannelRackComponent::selectUnused()
     selectRows (unused, unused.front());
 }
 
-int ChannelRackComponent::addChannel (ChannelDef c, bool openEditor)
+int ChannelRackComponent::addChannel (ChannelDef c, bool openEditor, int insert)
 {
     int index = 0;
     if (filterGroup >= 0 && c.group < 0) // a new channel joins the group shown (FL)
         c.group = filterGroup;
-    engine.editSong ([&] (Song& s) {
-        c.mixerTrack = s.claimFreeInsert();
-        s.channels.push_back (c);
-        index = (int) s.channels.size() - 1;
-    });
+    engine.editSong ([&] (Song& s) { index = addChannelRouted (s, c, insert); });
     selectionAnchor = index;
     selectRows ({ index }, index);
 
@@ -2285,6 +2282,8 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
         closeEditor (channel);
         engine.editSong ([channel] (Song& s) { patcherize::patcherizeChannel (s, channel); });
     });
+    // FL's Loop Starter channel menu (round 168b): Replace sample, Generate steps, Locked, One-shot category
+    loopstarterui::addChannelMenu (menu, engine, channel);
     menu.addItem (selected > 1 ? tr ("Clone {0} channels", { juce::String (selected) }) : tr ("Clone") + "\tAlt+C", [this] { cloneSelected(); });
 
     if (selected > 1)
@@ -2725,7 +2724,7 @@ void ChannelRackComponent::sliceChannel (int channel)
 bool ChannelRackComponent::isInterestedInFileDrag (const juce::StringArray& files)
 {
     for (const auto& f : files)
-        if (SampleLibrary::isSampleFile (juce::File (f)) || juce::File (f).hasFileExtension ("sf2;sf3"))
+        if (SampleLibrary::isSampleFile (juce::File (f)) || juce::File (f).hasFileExtension ("sf2;sf3;sfz"))
             return true;
 
     return false;
@@ -2741,7 +2740,7 @@ void ChannelRackComponent::filesDropped (const juce::StringArray& files, int x, 
     {
         const juce::File file (f);
 
-        if (file.hasFileExtension ("sf2;sf3"))
+        if (file.hasFileExtension ("sf2;sf3;sfz"))
         {
             // a SoundFont: into the LYNX Soundfont channel it was dropped on, else a new channel
             openSoundFontFile (engine, file, target);

@@ -28,6 +28,7 @@
 #include "ui/QuickAddPalette.h"
 #include "ui/PatcherEditor.h"
 #include "ui/ToolWindow.h"
+#include "ui/LoopStarterWindow.h"
 #include "ui/WindowOwner.h"
 
 #include "engine/PluginSandbox.h"
@@ -313,6 +314,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         showPanel (Panel::mixer);
         mixer.selectTrack (insert);
     };
+    mixer.onInstrumentDropped = [this] (int insert, ChannelDef c) { rack.addChannel (std::move (c), true, insert); };
     rackViewport.setViewedComponent (&rack, false);
     rackViewport.setScrollBarsShown (true, true);
     workspace.setContent (Panel::playlist, playlistArea, "Playlist", Icon::playlist);
@@ -361,6 +363,11 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     ui::setHint (rackLoopButton, tr ("Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  "
                                      "[RMB] loop type (step channels, all channels, advanced) and Burn to pattern"));
     rackTitleTools.addAndMakeVisible (rackLoopButton);
+    // Loop Starter (round 168b; FL 25's dice in the Channel Rack): a drum loop of the genre's kit, re-rolled with dice
+    rackLoopStarterButton.setWantsKeyboardFocus (false);
+    rackLoopStarterButton.onClick = [this] { loopstarterui::open (engine); };
+    ui::setHint (rackLoopStarterButton, tr ("Loop Starter: pick a genre and get a drum loop (kit channels with steps) to re-roll and send to the Playlist"));
+    rackTitleTools.addAndMakeVisible (rackLoopStarterButton);
     // the pattern selector (issue #9): change the pattern the rack edits right from its title bar
     rackPatternSelector.onStep = [this] (int delta) { selectPattern (stepPattern (engine.getSong(), delta)); };
     rackPatternSelector.onMenu = [this] { showRackPatternList(); };
@@ -397,6 +404,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         rackFollowButton.setBounds (r.removeFromLeft (24).reduced (0, 1));
         r.removeFromLeft (4);
         rackLoopButton.setBounds (r.removeFromLeft (24).reduced (0, 1));
+        r.removeFromLeft (4);
+        rackLoopStarterButton.setBounds (r.removeFromLeft (24).reduced (0, 1));
     };
     workspace.setTitleAccessory (Panel::channelRack, &rackTitleTools, rackTitleToolsWidth);
     workspace.onPanelMenu = [this] (Panel panel, juce::PopupMenu& menu) { addPanelMenuItems (panel, menu); };
@@ -1243,7 +1252,14 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("pattern.moveUp")) movePatternNow (-1);
     else if (is ("pattern.moveDown")) movePatternNow (1);
     else if (id.rfind ("pattern.select", 0) == 0) selectPattern (std::stoi (id.substr (14)) - 1);
-    else if (is ("panel.quickAdd")) showQuickAdd();
+    else if (is ("panel.quickAdd"))
+    {
+        // FL's F8 opens the plugin picker or closes it (FLEngine 0xebf510, round 167o)
+        if (auto* open = findToolWindow ("quickadd"))
+            closeToolWindowOf (*open->getContentComponent());
+        else
+            showQuickAdd();
+    }
     else if (is ("edit.history")) showHistory();
     else if (is ("browser.search"))
     {
@@ -1285,8 +1301,21 @@ bool MainComponent::runAction (const std::string& id)
         showPanel (Panel::browser);
         browser.showPluginDatabase();
     }
-    else if (is ("view.midiSettings")) openSettings ((int) SettingsPage::midi);
-    else if (is ("view.projectInfo")) openSettings ((int) SettingsPage::info);
+    else if (is ("view.midiSettings") || is ("view.projectInfo"))
+    {
+        // FL's F10 / F11 (round 167o, issue #23): the same key closes Settings showing that page; on another page it
+        // switches in place
+        const auto page = is ("view.midiSettings") ? SettingsPage::midi : SettingsPage::info;
+        const auto shown = shownSettingsPage();
+        switch (keys::settingsKeyPress (shown >= 0, shown, (int) page))
+        {
+            case keys::SettingsKey::close: closeSettings(); break;
+            case keys::SettingsKey::switchPage: switchSettingsPage (page); break;
+            case keys::SettingsKey::open: openSettings ((int) page); break;
+        }
+    }
+    else if (is ("view.closeUnfocusedWindows")) closeUnfocusedWindows();
+    else if (is ("view.touchKeyboard")) toggleTouchKeyboard (engine);
     else if (is ("view.closePluginWindows") || is ("view.closeWindows"))
     {
         PluginWindows::closeAll();
@@ -1296,6 +1325,7 @@ bool MainComponent::runAction (const std::string& id)
             closeAutomationEditors();
             closeChannelSettings();
             closeAllToolWindows();
+            closeHelp();
         }
     }
     else if (is ("rack.groupSelected")) rack.groupSelected();
@@ -1327,7 +1357,13 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("edit.undo")) flUndo();
     else if (is ("edit.undoBackwards")) undoRedo (false);
     else if (is ("edit.redo")) undoRedo (true);
-    else if (is ("help.shortcuts")) showHelp();
+    else if (is ("help.shortcuts"))
+    {
+        if (helpWindow != nullptr) // F1 again closes the sheet (issue #23)
+            closeHelp();
+        else
+            showHelp();
+    }
     else if (is ("rack.selectPrevious")) rack.selectRelative (-1, false);
     else if (is ("rack.selectNext")) rack.selectRelative (1, false);
     else if (is ("rack.extendUp")) rack.selectRelative (-1, true);
@@ -1412,6 +1448,14 @@ void MainComponent::connectBrowser (BrowserComponent& b)
 {
     b.onOpenProject = [this] (const juce::File& file) { confirmDiscard ([this, file] { openFile (file); }); };
     b.onLoadIntoChannel = [this] (const juce::File& file) { return rack.loadSampleIntoSelected (file); };
+    b.onOpenMixerPreset = [this] (const juce::File& file) {
+        if (! mixerpresets::isMixerPreset (file))
+            return false;
+        if (! mixer.loadPresetOnSelection (file))
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Open mixer track state"),
+                                                    tr ("This file is not a mixer track state LYNX SHARE can read."));
+        return true;
+    };
     // the Browser's "Current project" items (REA_rodada115)
     b.onOpenPattern = [this] (int pattern) {
         selectPattern (pattern);
@@ -1804,7 +1848,9 @@ void MainComponent::fitChannelRack (bool width)
     const auto scrollbar = rackViewport.getScrollBarThickness();
     // compact like FL's rack: at most two bars of steps are shown, longer patterns scroll sideways, so the
     // rack does not cover the Playlist after a project with long patterns is opened
-    const auto maxWidth = juce::jmin (juce::jmax (300, workspace.getWidth() - 2 * 16 - 260), rack.widthForSteps (32));
+    // and never past the desktop's right edge from where the rack is (the default layout keeps the Playlist's track
+    // names uncovered on a small desktop, round 167v)
+    const auto maxWidth = juce::jmin (juce::jmax (300, workspace.getWidth() - 16 - workspace.getPanelBounds (Panel::channelRack).getX() - scrollbar - 8), rack.widthForSteps (32));
     const auto contentWidth = juce::jmin (rack.naturalWidth(), maxWidth); // the ghost steps only fill a wider rack
     const auto needsHorizontal = rack.naturalWidth() > contentWidth;
     workspace.fitPanelContent (Panel::channelRack, width ? contentWidth + scrollbar : 0, rack.getHeight() + (needsHorizontal ? scrollbar : 0));
@@ -3162,6 +3208,7 @@ void MainComponent::setQuickTips()
     tip (rackGraphButton, tr ("Graph editor"));
     tip (rackPianoRollButton, tr ("Piano-roll view"), "rack.pianoRollView");
     tip (rackLoopButton, tr ("Channel looping"));
+    tip (rackLoopStarterButton, tr ("Loop Starter"));
 
     for (int i = 0; i < workspace::panelCount; ++i)
         tip (panelButtons[(std::size_t) i], tr (panelName ((Panel) i)), panelAction ((Panel) i));
@@ -4783,6 +4830,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Bring back off-screen panels"), [this] { workspace.bringBackOffscreen(); });
         menu.addItem (tr ("Close all windows (plugins, channel settings, tools)") + shortcutText ("view.closeWindows"), [this] { runAction ("view.closeWindows"); });
         menu.addItem (tr ("Close all plugin windows") + shortcutText ("view.closePluginWindows"), [this] { runAction ("view.closePluginWindows"); });
+        menu.addItem (tr ("Close all windows except the focused one") + shortcutText ("view.closeUnfocusedWindows"), [this] { runAction ("view.closeUnfocusedWindows"); });
         menu.addSeparator();
         menu.addItem (tr ("Plugin database (in the Browser)") + shortcutText ("view.pluginDatabase"), [this] { runAction ("view.pluginDatabase"); });
         menu.addItem (tr ("Audio editor") + shortcutText ("view.audioEditor"), [this] { openAudioEditorForSelection(); });
@@ -4791,7 +4839,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                       [this] { toggleSampleBrowser(); });
         menu.addSeparator();
         menu.addItem (tr ("Typing keyboard as a piano") + shortcutText ("view.typingPiano"), true, typingPiano, [this] { setTypingPiano (! typingPiano); });
-        menu.addItem (tr ("Touch keyboard"), true, isTouchKeyboardOpen(), [this] { toggleTouchKeyboard (engine); });
+        menu.addItem (tr ("Touch keyboard") + shortcutText ("view.touchKeyboard"), true, isTouchKeyboardOpen(), [this] { toggleTouchKeyboard (engine); });
         {
             // FL's View › Background (audit round 165z-a): the workspace image and colour of Options › Theme
             juce::PopupMenu background;
@@ -5003,7 +5051,7 @@ void MainComponent::rememberRecent (const juce::File& file)
     menuItemsChanged();
 }
 
-std::unique_ptr<juce::Component> MainComponent::makeHelpContent()
+std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::KeyMap* keyMapIn)
 {
     // shortcut sheet: sections of "keys - action" rows, in two columns
     struct Row
@@ -5025,12 +5073,11 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent()
             { "Ctrl+N / Ctrl+O", TR_NOOP ("New project / open") },
             { "Ctrl+S / Ctrl+Shift+S", TR_NOOP ("Save / save as") },
             { "Ctrl+R", TR_NOOP ("Export audio") },
-            { "F5 F6 F7 F9 F8", TR_NOOP ("Panels: Playlist, Channel Rack, Piano Roll, Mixer, Browser") },
             { "Enter", TR_NOOP ("Maximize or restore the Playlist") },
             { "L", TR_NOOP ("Pattern / song mode") },
             { "Ctrl+T", TR_NOOP ("Typing keyboard as a piano on/off") },
             { "Z..M  Q..P", TR_NOOP ("PC keyboard as a piano (selected channels)") },
-            { TR_NOOP ("Numpad +/-  F4  F2"), TR_NOOP ("Next/previous pattern, next empty, rename and color") },
+            { "Numpad +/-", TR_NOOP ("Next / previous pattern") },
             { "Ctrl+Shift+Ins", TR_NOOP ("Insert an empty pattern before the current one") } } },
         { TR_NOOP ("Workspace"),
           { { TR_NOOP ("Drag a panel title"), TR_NOOP ("Move (snaps; Alt: free)") },
@@ -5069,15 +5116,36 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent()
             { "Ctrl+A/C/X/V  Ctrl+B", TR_NOOP ("Edit and duplicate") } } },
     };
 
+    // the fourth column: every F-key of the live key map (issue #23: the sheet listed no F-keys), custom keys included
+    const keys::KeyMap defaults;
+    const auto& map = keyMapIn != nullptr ? *keyMapIn : defaults;
+    std::vector<std::pair<juce::String, juce::String>> functionKeys;
+    for (const auto& b : map.functionKeyBindings())
+        if (const auto* action = keys::findAction (b.actionId))
+        {
+            auto text = tr (action->description);
+            if (b.context != keys::Context::global)
+                text << " (" << tr (b.context == keys::Context::browser       ? "Browser"
+                                    : b.context == keys::Context::mixer       ? "Mixer"
+                                    : b.context == keys::Context::playlist    ? "Playlist"
+                                    : b.context == keys::Context::pianoRoll   ? "Piano Roll"
+                                                                               : "Channel Rack")
+                     << ")";
+            functionKeys.push_back ({ juce::String (keys::toString (b.chord)), text });
+        }
+
     struct Sheet final : juce::Component
     {
-        Sheet() { setSize (1180, 520); }
+        explicit Sheet (std::vector<std::pair<juce::String, juce::String>> f) : fkeys (std::move (f))
+        {
+            setSize (1500, juce::jmax (520, 20 + 28 + (int) fkeys.size() * 22 + 20));
+        }
 
         void paint (juce::Graphics& g) override
         {
             using namespace theme;
             g.fillAll (colour::bg2);
-            const auto columnWidth = (getWidth() - 4 * 24) / 3;
+            const auto columnWidth = (getWidth() - 5 * 24) / 4;
             int column = 0, y = 20;
 
             for (std::size_t i = 0; i < sections.size(); ++i)
@@ -5114,23 +5182,80 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent()
 
                 y += 14;
             }
+
+            // Function keys
+            const auto x = 24 + 3 * (columnWidth + 24);
+            y = 20;
+            g.setColour (colour::accent);
+            g.fillRoundedRectangle ((float) x, (float) y + 4.0f, 3.0f, 12.0f, 1.5f);
+            g.setColour (colour::textPrimary);
+            g.setFont (font (type::title, true));
+            g.drawText (tr ("Function keys"), x + 10, y, columnWidth - 10, 20, juce::Justification::centredLeft);
+            y += 28;
+            g.setFont (font (type::small, true));
+            int keyWidth = 0;
+            for (const auto& [keys, text] : fkeys)
+                keyWidth = juce::jmax (keyWidth, juce::roundToInt (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), keys)) + 14);
+            for (const auto& [keys, text] : fkeys)
+            {
+                g.setFont (font (type::small, true));
+                g.setColour (colour::bg4);
+                g.fillRoundedRectangle ((float) x, (float) y + 1.0f, (float) keyWidth, 18.0f, radius::sm);
+                g.setColour (colour::textPrimary);
+                g.drawText (keys, x, y + 1, keyWidth, 18, juce::Justification::centred);
+                g.setColour (colour::textSecondary);
+                g.setFont (font (type::body));
+                g.drawFittedText (text, x + keyWidth + 10, y, columnWidth - keyWidth - 10, 20, juce::Justification::centredLeft, 1, 0.8f);
+                y += 22;
+            }
         }
+
+        std::vector<std::pair<juce::String, juce::String>> fkeys;
     };
 
-    return std::make_unique<Sheet>();
+    return std::make_unique<Sheet> (std::move (functionKeys));
 }
 
 void MainComponent::showHelp()
 {
     juce::DialogWindow::LaunchOptions options;
-    options.content.setOwned (makeHelpContent().release());
+    options.content.setOwned (makeHelpContent (&keyMap).release());
     options.dialogTitle = tr ("LYNX SHARE shortcuts");
     options.dialogBackgroundColour = theme::colour::bg2;
     options.useNativeTitleBar = true;
     options.resizable = true;
     options.escapeKeyTriggersCloseButton = true;
     if (auto* dialog = options.launchAsync())
+    {
         keepAboveMainWindow (*dialog);
+        helpWindow = dialog;
+    }
+}
+
+void MainComponent::closeHelp()
+{
+    // (the key may come from the sheet itself: delete it after this call stack)
+    if (helpWindow == nullptr)
+        return;
+    helpWindow->setVisible (false);
+    juce::MessageManager::callAsync ([w = helpWindow] { delete w.getComponent(); });
+    helpWindow = nullptr;
+}
+
+void MainComponent::closeUnfocusedWindows()
+{
+    // FL's Ctrl+F12 (CloseAllUnfocusedWindowsAction, round 167o): every window but the focused one closes. LYNX's
+    // docked or detached panels and dialogs that wait for an answer stay, as for F12.
+    auto* focused = juce::TopLevelWindow::getActiveTopLevelWindow();
+    auto* main = getTopLevelComponent();
+    juce::Array<juce::Component::SafePointer<juce::DocumentWindow>> close;
+    for (int i = 0; i < juce::TopLevelWindow::getNumTopLevelWindows(); ++i)
+        if (auto* w = dynamic_cast<juce::DocumentWindow*> (juce::TopLevelWindow::getTopLevelWindow (i)))
+            if (w != focused && w != main && w->isVisible() && ! w->isCurrentlyModal() && ! (bool) w->getProperties()["lynxPanel"])
+                close.add (w);
+    for (auto& w : close)
+        if (w != nullptr)
+            w->closeButtonPressed();
 }
 
 void MainComponent::showSetupWizard()
