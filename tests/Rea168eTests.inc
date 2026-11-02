@@ -2,7 +2,10 @@
 // Tools › Consolidate playlist selection, the track menu's Consolidate this track, File › Export › All playlist tracks /
 // track groups). docs/analise/REA_rodada168e.md.
 
+#include "core/Mastering.h"
 #include "core/QuickRender.h"
+#include <algorithm>
+#include <cmath>
 
 namespace
 {
@@ -241,4 +244,38 @@ TEST (rea168e_ticks_for_seconds)
     CHECK (quickrender::ticksForSeconds (song, 0, 2.0) == ppq * 4); // 2 s at 120 BPM = 4 beats
     CHECK (quickrender::ticksForSeconds (song, ppq * 8, 0.5) == ppq);
     CHECK (quickrender::ticksForSeconds (song, 0, 0.0) == 0);
+}
+
+// File › Export › Master... (LYNX's own mastering where FL uses FL Cloud): the loudness reaches the target and the
+// true peak stays under the ceiling; silence is left alone
+TEST (rea168e_mastering_target_and_ceiling)
+{
+    using namespace lynx;
+    const double sr = 48000.0;
+    std::vector<float> l ((std::size_t) (sr * 6.0)), r (l.size());
+    for (std::size_t i = 0; i < l.size(); ++i)
+    {
+        // a quiet tone with a loud transient every half second (the limiter has peaks to hold)
+        const auto t = (double) i / sr;
+        const auto hit = std::fmod (t, 0.5) < 0.01 ? 0.9 : 0.0;
+        l[i] = (float) (0.05 * std::sin (2.0 * 3.14159265358979 * 220.0 * t) + hit * std::sin (2.0 * 3.14159265358979 * 1000.0 * t));
+        r[i] = l[i];
+    }
+    for (auto target : { -14.0, -9.0, -23.0 })
+    {
+        auto a = l, b = r;
+        mastering::Settings s;
+        s.targetLufs = target;
+        const auto res = mastering::process (a, b, sr, s);
+        double lufs = 0.0, tp = 0.0;
+        mastering::measure (a, b, sr, lufs, tp);
+        CHECK (a.size() == l.size());
+        CHECK (std::abs (lufs - target) < 0.5);
+        CHECK (tp <= -0.9);
+        CHECK (std::abs (res.outputLufs - lufs) < 0.01);
+    }
+    std::vector<float> silent (48000, 0.0f), silent2 = silent;
+    mastering::process (silent, silent2, sr, {});
+    CHECK (std::all_of (silent.begin(), silent.end(), [] (float v) { return v == 0.0f; }));
+    CHECK (mastering::targets().size() == 5 && mastering::targets()[2] == -14.0);
 }

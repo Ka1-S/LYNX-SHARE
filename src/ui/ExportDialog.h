@@ -10,6 +10,9 @@ namespace lynx
 // format(s) of the last export (FL's File › Export › "Last exported format(s)"), 0 WAV, 1 MP3, 2 OGG, 3 FLAC = that
 // format alone (FL's "Wave file...", "MP3 file"...; REA round 139).
 void showExportDialog (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& suggestedName, int format = -1);
+// File › Export › "Master..." (Ctrl+Alt+M; round 168e): the Export window with the render mastered on the computer
+// (core/Mastering.h: a loudness target, −1 dBTP ceiling) where FL sends it to FL Cloud; "<project> (mastered)".
+void showMasterDialog (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& projectName);
 // FL's Mixer › Disk recording › "Render armed / selected tracks to wave file(s)..." (REA round 165f-mixer): the same
 // window, set to one file per insert for `tracks` only (the Master in the list = also the full mix).
 // `afterRender` (optional) runs on the message thread once the files are written, with the files (FL's "Auto-unarm",

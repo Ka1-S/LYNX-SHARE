@@ -132,6 +132,7 @@ Options clamped (Options o)
     if ((int) o.stems < 0 || (int) o.stems > 2) o.stems = d.stems;
     if ((int) o.channels < 0 || (int) o.channels > 3) o.channels = d.channels;
     o.moreFormats &= 0xFu & ~(1u << (int) o.format);
+    if (! (o.masterLufs >= -30.0 && o.masterLufs <= -5.0)) o.masterLufs = d.masterLufs;
     return o;
 }
 
@@ -262,7 +263,8 @@ std::string toText (const Options& o)
       << "channels=" << (int) o.channels << "\n"
       << "saveTempo=" << (o.saveTempo ? 1 : 0) << "\n"
       << "loopMarkers=" << (o.loopMarkers ? 1 : 0) << "\n"
-      << "playlistMarkers=" << (o.playlistMarkers ? 1 : 0) << "\n";
+      << "playlistMarkers=" << (o.playlistMarkers ? 1 : 0) << "\n"
+      << "masterLufs=" << o.masterLufs << "\n";
     return s.str();
 }
 
@@ -298,6 +300,7 @@ Options fromText (const std::string& text)
     o.saveTempo = toInt (kv, "saveTempo", d.saveTempo ? 1 : 0) != 0;
     o.loopMarkers = toInt (kv, "loopMarkers", d.loopMarkers ? 1 : 0) != 0;
     o.playlistMarkers = toInt (kv, "playlistMarkers", d.playlistMarkers ? 1 : 0) != 0;
+    o.masterLufs = toDouble (kv, "masterLufs", d.masterLufs);
     return clamped (o);
 }
 

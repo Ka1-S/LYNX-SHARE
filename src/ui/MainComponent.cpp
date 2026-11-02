@@ -1341,6 +1341,7 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("file.saveAs")) save (true);
     else if (is ("file.saveNewVersion")) saveNewVersion();
     else if (is ("file.export")) exportAudio();
+    else if (is ("file.exportMaster")) showMasterDialog (engine, currentFile.getParentDirectory(), projectName);
     else if (is ("file.exportMp3")) exportAudio (1);
     else if (is ("file.exportMidi")) exportMidiFile();
     else if (is ("tools.consolidateSelection")) consolidatePlaylistSelection (engine, playlist.getSelectedClips(), false);
@@ -4729,6 +4730,9 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             exports.addItem (tr ("FLAC file..."), [this] { exportAudio (3); });
             exports.addItem (tr ("MIDI file...") + shortcutText ("file.exportMidi"), [this] { exportMidiFile(); });
             exports.addItem (tr ("Last exported format(s)...") + shortcutText ("file.export"), [this] { exportAudio(); });
+            exports.addSeparator();
+            // FL's FileExportMasterAction ("Render the project to a file and master it"; FL Cloud there, on the computer here)
+            exports.addItem (tr ("Master...") + shortcutText ("file.exportMaster"), [this] { showMasterDialog (engine, currentFile.getParentDirectory(), projectName); });
             exports.addSeparator();
             // FL's ExportAllPLTracksMenu / ExportAllPLTrackGroupsMenu (FileExportPLTracks… / FileExportPLGroups…, REA round 168e)
             exports.addSubMenu (tr ("All playlist tracks"), playlistTrackExportMenu (false));

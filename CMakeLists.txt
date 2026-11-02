@@ -153,6 +153,7 @@ add_library(lynx_core STATIC
     src/core/HardcoreFx.cpp
     src/core/FacetEq.cpp
     src/core/ApexLimiter.cpp
+    src/core/Mastering.cpp
     src/core/DynamicsSuite.cpp
     src/core/VoiceTools.cpp
     src/core/MidiControls.cpp

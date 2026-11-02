@@ -108,6 +108,8 @@ std::vector<Action> makeActions()
         { "file.export", TR_NOOP ("Export audio"), Context::global, { chord ('R', ctrl) } },
         { "file.exportMp3", TR_NOOP ("Export an MP3 file"), Context::global, { chord ('R', ctrl | shift) } },
         { "file.exportMidi", TR_NOOP ("Export a MIDI file"), Context::global, { chord ('M', ctrl | shift) } },
+        // FL's File › Export › Master... (FileExportMasterAction, Ctrl+Alt+M; REA round 168e)
+        { "file.exportMaster", TR_NOOP ("Export and master the project"), Context::global, { chord ('M', ctrl | alt) } },
         // FL's Tools › Consolidate playlist selection (EERenderPLSelectionLengthAction Ctrl+Alt+C, EEPLRenderSongLengthAction
         // Ctrl+Shift+Alt+C; REA round 168e)
         { "tools.consolidateSelection", TR_NOOP ("Consolidate playlist selection (from selection start)"), Context::global, { chord ('C', ctrl | alt) } },

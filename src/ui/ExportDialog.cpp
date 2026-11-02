@@ -2,6 +2,7 @@
 
 #include "core/PlaylistOps.h"
 #include "core/QuickRender.h"
+#include "core/Mastering.h"
 #include "core/HardwareInsert.h"
 #include "platform/Paths.h"
 #include "ui/WindowOwner.h"
@@ -53,6 +54,7 @@ public:
                                                     tr ("Export complete"),
                                                     file.getFullPathName() + "\n\n"
                                                         + tr ("Peak: {0} dBFS", { juce::String (juce::Decibels::gainToDecibels (job->getPeak()), 1) })
+                                                        + (job->getInfo().isEmpty() ? juce::String() : "\n" + job->getInfo())
                                                         + (job->getNotice().isEmpty() ? juce::String() : "\n\n" + job->getNotice()));
         else if (! userPressedCancel)
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not export"), error);
@@ -480,6 +482,30 @@ public:
         writeControls();
     }
 
+    // File › Export › "Master..." (round 168e): the same window, the render mastered (core/Mastering.h) to the target
+    // chosen in the row of the stems (no stems: one mastered file)
+    void enableMaster()
+    {
+        masterMode = true;
+        beforeMaster = options; // (what the plain export keeps: its stems and normalising)
+        options.master = true;
+        options.stems = exportopts::Stems::none;
+        options.stemsIncludeMaster = false;
+        settingsui::styleLabel (masterLabel, tr ("Loudness"));
+        addAndMakeVisible (masterLabel);
+        for (auto t : mastering::targets())
+            masterBox.addItem (tr ("{0} LUFS", { juce::String ((int) t) }), (int) -t);
+        masterBox.setTooltip (tr ("The integrated loudness of the mastered file (-14 LUFS: what streaming services play at); "
+                                  "the peaks stay under -1 dB true peak"));
+        masterBox.onChange = [this] { options.masterLufs = -(double) masterBox.getSelectedId(); refresh(); };
+        addAndMakeVisible (masterBox);
+        stemsLabel.setVisible (false);
+        stemsBox.setVisible (false);
+        stemsMaster.setVisible (false);
+        realtimeToggle.setVisible (false);
+        writeControls();
+    }
+
     void resized() override
     {
         auto area = getLocalBounds().reduced (16, 12);
@@ -550,7 +576,10 @@ public:
         row (left, loopsLabel, loopsBox);
         row (left, tailLabel, tailBox);
         row (left, tailLengthLabel, tailLengthBox);
-        row (left, stemsLabel, stemsBox);
+        if (masterMode)
+            row (left, masterLabel, masterBox);
+        else
+            row (left, stemsLabel, stemsBox);
         stemsMaster.setBounds (left.removeFromTop (22).withTrimmedLeft (labelWidth));
         if (! onlyTracks.empty())
         {
@@ -649,6 +678,14 @@ private:
                 tailIndex = i;
         tailLengthBox.setSelectedItemIndex (tailIndex, n);
         stemsBox.setSelectedItemIndex ((int) options.stems, n);
+        if (masterMode)
+        {
+            int best = (int) -mastering::targets().front();
+            for (auto t : mastering::targets())
+                if (std::abs (t - options.masterLufs) < std::abs (-(double) best - options.masterLufs))
+                    best = (int) -t;
+            masterBox.setSelectedId (best, n);
+        }
         stemsMaster.setToggleState (options.stemsIncludeMaster, n);
         formatButtons.setSelected ((int) options.format);
         depthBox.setSelectedItemIndex (options.format == Format::flac ? (options.flacBits == 16 ? 0 : 1) : (options.wavBits == 16 ? 0 : options.wavBits == 24 ? 1 : 2), n);
@@ -706,7 +743,12 @@ private:
             options.sampleRate = sampleRates()[(std::size_t) juce::jlimit (0, (int) sampleRates().size() - 1, rateBox.getSelectedItemIndex())];
         options.channels = (Channels) juce::jmax (0, channelsBox.getSelectedItemIndex());
         options.dither = (DitherMode) juce::jmax (0, ditherBox.getSelectedItemIndex());
-        options.normalize = normalizeToggle.getToggleState();
+        options.normalize = normalizeToggle.getToggleState() && ! masterMode;
+        if (masterMode)
+        {
+            options.master = true;
+            options.stems = Stems::none;
+        }
         options.trimPdc = trimToggle.getToggleState();
         options.showWhenDone = showToggle.getToggleState();
         options.saveTempo = tempoToggle.getToggleState();
@@ -760,6 +802,7 @@ private:
                     rateBox.setSelectedItemIndex (i, juce::dontSendNotification);
         }
         stemsMaster.setEnabled (! realtime && options.stems != Stems::none && clip == nullptr);
+        normalizeToggle.setEnabled (! masterMode); // (the mastering sets the level)
         const auto ditherable = (options.format == Format::wav && options.wavBits != 32) || options.format == Format::flac;
         ditherBox.setEnabled (ditherable);
         ditherLabel.setEnabled (ditherable);
@@ -838,6 +881,13 @@ private:
             {
                 remembered.stems = rememberedStems;
                 remembered.stemsIncludeMaster = rememberedStemsMaster;
+            }
+            if (masterMode)
+            {
+                remembered.master = false;
+                remembered.stems = beforeMaster.stems;
+                remembered.stemsIncludeMaster = beforeMaster.stemsIncludeMaster;
+                remembered.normalize = beforeMaster.normalize;
             }
             exportSettingsFile().replaceWithText (juce::String (exportopts::toText (remembered)));
         }
@@ -923,6 +973,10 @@ private:
     bool persistent = true;
     std::vector<int> onlyTracks;
     std::shared_ptr<ClipRenderMode> clip;
+    bool masterMode = false;
+    exportopts::Options beforeMaster;
+    juce::Label masterLabel;
+    juce::ComboBox masterBox;
     exportopts::Stems rememberedStems = exportopts::Stems::none;
     bool rememberedStemsMaster = false;
     exportopts::Options options;
@@ -1277,6 +1331,27 @@ void showExportDialogForTracks (AudioEngine& engine, const juce::File& suggested
     panel->afterRender = std::move (afterRender);
     options.content.setOwned (fitContentToScreen (std::move (panel)).release());
     options.dialogTitle = tr ("Render mixer tracks to audio files");
+    options.dialogBackgroundColour = theme::colour::bg2;
+    options.useNativeTitleBar = true;
+    options.resizable = false;
+    options.escapeKeyTriggersCloseButton = true;
+    if (auto* dialog = options.launchAsync())
+        keepAboveMainWindow (*dialog);
+}
+
+void showMasterDialog (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& projectName)
+{
+    // FL: "Can't master while recording" (FUN_00edf6a0); the file is "<project> (mastered)" (FUN_00edfda0)
+    if (engine.isRecording())
+    {
+        warn (tr ("Can't master while recording"), tr ("Mastering isn't possible while recording.\nPlease stop recording to master the project."));
+        return;
+    }
+    juce::DialogWindow::LaunchOptions options;
+    auto panel = std::make_unique<ExportPanel> (engine, suggestedFolder, (projectName.isNotEmpty() ? projectName : juce::String ("LYNX SHARE")) + " (mastered)", true);
+    panel->enableMaster();
+    options.content.setOwned (fitContentToScreen (std::move (panel)).release());
+    options.dialogTitle = tr ("Master");
     options.dialogBackgroundColour = theme::colour::bg2;
     options.useNativeTitleBar = true;
     options.resizable = false;
