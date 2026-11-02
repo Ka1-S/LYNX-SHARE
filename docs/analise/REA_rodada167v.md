@@ -74,12 +74,27 @@ then whatever they leave it as.
 desktop, 420–720 px), Browser/Playlist docking across resizes (and an undocked Playlist left alone), the 0.1.21
 broken `workspace.txt` repaired at two sizes, a sound layout read back unchanged.
 
+## 5. Windows GUI check after the change (build of this branch, fresh profiles)
+
+Shots in `E:\lynx-work\firstrun167v\shots\`:
+
+| shot | result |
+|---|---|
+| `after-max-run1-start.png` (first start, LYNX_TEST_MAXIMIZE=1) | window maximized (1920x1032 work area); Browser left, Playlist with picker and track names visible, Channel Rack floating beside the track names |
+| `after-max-run1-961x540.png` (≈1366x768 @150 %) | rack stays right of the track names and inside the window (steps scroll sideways) — before: `before-small-961x540.png`, rack over the whole Playlist |
+| `after-max-run1-1093x574.png`, `-1280x688.png` | same, rack beside the track names |
+| `after-max-run2-start.png` (second start, same profile) | window restored at the last size (1280x688), layout unchanged, Browser and Playlist side by side |
+| `after-notest-run1-start.png`, `after-notest-run2-start.png` (normal mode, two starts) | maximized both times; saved `workspace.txt` has browser width 0.13542 = playlist x 0.13542 (before: 0.1865 vs 0.1545, Browser over the picker) |
+
+Desktop checked clean after every run (`*-after.png`).
+
 ## Where I stopped
 
-- done: reproduction (0.1.21 zip), FL REA (0xF1BE40 / 0x11FAB80), core + UI changes, tests (standalone run: 48 + 83
-  checks pass).
-- in progress: Windows build with the change (`OUT=build-win-firstrun`), GUI check before/after at 1920x1080 and
-  1366x728 / 945x440 window sizes.
-- next: remove the temporary `ltrace` (LYNX_LAYOUT_TRACE) in src/ui/Workspace.cpp, build-local, notes, land.
-- rerun: `/mnt/e/lynx-work/firstrun167v/gui.sh <exe win path> <tag> <test 0|1> [WxH,…]`,
-  `/mnt/e/lynx-work/firstrun167v/gui2.sh <exe> <tag> <test>` (two starts on one profile).
+- done: reproduction, FL REA, core + UI changes, tests, Windows build + GUI check before/after, temporary
+  layout trace removed, notes in coord/notes-0.1.22.md.
+- next: land via coord/land.sh.
+- left open: FL's arranged form identities (globals 0x16BA808 / 0x16BD450) not resolved; the trigger of the
+  close-time resize to ~1180 px seen in 0.1.21 is not pinned down, but a restored layout is now re-read at each size
+  until edited by hand, so it can no longer skew the saved layout.
+- rerun: `/mnt/e/lynx-work/firstrun167v/gui3.sh <exe win path> <tag> [WxH,…]` (test mode, maximized first start + second
+  start), `/mnt/e/lynx-work/firstrun167v/gui2.sh <exe> <tag> <test>` (two starts on one profile).

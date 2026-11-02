@@ -27,12 +27,6 @@ workspace::Rect toRect (juce::Rectangle<int> r)
     return { r.getX(), r.getY(), r.getWidth(), r.getHeight() };
 }
 
-void ltrace (const juce::String& what) // TEMP firstrun167v
-{
-    if (juce::SystemStats::getEnvironmentVariable ("LYNX_LAYOUT_TRACE", {}).isNotEmpty())
-        PluginHost::settingsFolder().getChildFile ("layout-trace.txt").appendText (juce::Time::getCurrentTime().toString (false, true, true, true) + " " + what + "\n");
-}
-
 juce::File stateFile()
 {
     return PluginHost::settingsFolder().getChildFile ("workspace.txt");
@@ -698,7 +692,6 @@ void Workspace::frameMoved (Panel panel, juce::Rectangle<int> bounds)
 {
     if (! (layout[panel].bounds == toRect (bounds)))
     {
-        ltrace ("frameMoved " + juce::String (workspace::panelId (panel)) + " " + bounds.toString() + " was " + toJuce (layout[panel].bounds).toString() + " pristine=" + juce::String ((int) pristine));
         pristine = false; // moved or resized by hand
         restoredState.clear();
     }
@@ -804,7 +797,6 @@ void Workspace::resized()
 {
     if (getWidth() <= 0 || getHeight() <= 0)
         return;
-    ltrace ("resized " + getLocalBounds().toString() + " ready=" + juce::String ((int) layoutReady) + " pristine=" + juce::String ((int) pristine) + " pending=" + juce::String ((int) pendingState.isNotEmpty()));
 
     if (! layoutReady)
     {
@@ -947,7 +939,6 @@ void Workspace::setPersistent (bool shouldPersist)
 
 void Workspace::saveState()
 {
-    ltrace ("saveState\n" + getLayoutText());
     if (persistent && layoutReady)
         stateFile().replaceWithText (getLayoutText());
 }
