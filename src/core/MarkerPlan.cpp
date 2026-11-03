@@ -95,10 +95,10 @@ MarkerStep markerStep (const MarkerPlan& plan, double position, int n, double tp
         // the user's jump comes first; a marker after it is reached from the new place
         step.jump = nullptr;
         step.userJump = true;
-        step.samples = std::clamp ((int) std::ceil (std::max (0.0, pendingAt - position) / tps), 1, n);
+        step.samples = transportSamplesUntil (position, pendingAt, tps, n);
     }
     else if (step.jump != nullptr)
-        step.samples = std::clamp ((int) std::ceil (((double) step.jump->at - position) / tps), 1, n);
+        step.samples = transportSamplesUntil (position, (double) step.jump->at, tps, n);
     return step;
 }
 

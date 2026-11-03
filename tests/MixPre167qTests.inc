@@ -393,13 +393,13 @@ inline std::vector<float> render (lynx::Song s, double from, int samples, int bl
         auto n = std::min (block, samples - done);
         if (changeAt > done)
             n = std::min (n, changeAt - done);
-        if (jump.at >= 0.0 && position < jump.at)
-            n = std::clamp ((int) std::ceil ((jump.at - position) / tps - 1e-9), 1, n);
+        if (jump.at >= 0.0 && ! lynx::transportReached (position, jump.at))
+            n = lynx::transportSamplesUntil (position, jump.at, tps, n);
         std::vector<float> l ((std::size_t) n), rr ((std::size_t) n);
         r.process (state.get(), true, position, n, l.data(), rr.data(), nullptr);
         out.insert (out.end(), l.begin(), l.end());
         position += n * tps;
-        if (jump.at >= 0.0 && position >= jump.at - 1e-6)
+        if (jump.at >= 0.0 && lynx::transportReached (position, jump.at))
         {
             position = jump.to;
             if (! jump.repeat)
@@ -560,10 +560,10 @@ TEST (mixpre167q_stretched_clip_repeats_sound_through_jumps_and_loops)
         const auto x = render (song, 0.0, 2 * barSamples, 512, { 7 * ppq, 14 * ppq, false });
         const auto y = render (copies, 0.0, 2 * barSamples, 512, { 7 * ppq, 14 * ppq, false });
         dump (x, "jump");
-        // what played after the jump: bar 4 beat 3 (= bar 1 beat 3). After any jump (plain clips too) a note on the jump's
-        // target tick starts 1 sample late (21 µs): compared 1 sample later
+        // what played after the jump: bar 4 beat 3 (= bar 1 beat 3), on the jump's sample (round 167q loopwrap: this
+        // harness split the block before the jump with a ceil that could round up, so it played one sample too many)
         const auto at = (std::size_t) (7 * beatSamples);
-        const auto d = maxDiff (x, at + 1, reference, 2 * (std::size_t) beatSamples, (std::size_t) beatSamples - 1);
+        const auto d = maxDiff (x, at, reference, 2 * (std::size_t) beatSamples, (std::size_t) beatSamples);
         const auto c = maxDiff (x, 0, y, 0, x.size());
         const auto ratio = rms (x, at, (std::size_t) beatSamples) / rms (reference, 2 * (std::size_t) beatSamples, (std::size_t) beatSamples);
         report ("jump mid-clip", rms (x, at, (std::size_t) beatSamples), d, c);
@@ -578,9 +578,9 @@ TEST (mixpre167q_stretched_clip_repeats_sound_through_jumps_and_loops)
         const auto x = render (song, 0.0, 7 * barSamples, 512, { 12 * ppq, 4 * ppq, true });
         const auto y = render (copies, 0.0, 7 * barSamples, 512, { 12 * ppq, 4 * ppq, true });
         dump (x, "loop");
-        double d = 0.0; // (bars 4-7 follow a wrap: 1 sample late, as after any jump)
+        double d = 0.0; // (every bar on its sample: no sample gained at the wraps)
         for (int k = 1; k < 7; ++k)
-            d = std::max (d, maxDiff (x, (std::size_t) k * barSamples + (k >= 3 ? 1 : 0), reference, 0, (std::size_t) barSamples - 1));
+            d = std::max (d, maxDiff (x, (std::size_t) k * barSamples, reference, 0, (std::size_t) barSamples));
         const auto c = maxDiff (x, 0, y, 0, x.size());
         report ("loop region bars 2-3", rms (x, (std::size_t) barSamples, 6 * (std::size_t) barSamples), d, c);
         for (int k = 1; k < 7; ++k)

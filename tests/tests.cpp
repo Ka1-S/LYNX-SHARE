@@ -16954,6 +16954,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "MixPre167qTests.inc"
 #include "Playlist168fTests.inc"
 #include "RecFold167qTests.inc"
+#include "LoopWrap167qTests.inc"
 #include "Sel168tTests.inc"
 #include "Speech168bTests.inc"
 #include "Typing168tTests.inc"
