@@ -292,6 +292,10 @@ Some distributions need libfuse2 to run AppImages (`libfuse2` on Ubuntu 22.04, `
 use the `.tar.gz`: extract it and run `./install.sh`, which installs LYNX SHARE for your user under `~/.local` with a menu
 entry, an icon and the `.lynx` file type (`./install.sh --uninstall` removes it again).
 
+The AppImage carries its update information (the newest release, pre-releases included) and every release ships its
+`.zsync`, so [Gear Lever](https://github.com/mijorus/gearlever) and AppImageUpdate update it in place, downloading
+only what changed.
+
 ### Platform notes
 
 | | Windows | macOS | Linux |

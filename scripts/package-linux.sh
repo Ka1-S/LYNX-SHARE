@@ -70,4 +70,18 @@ if [[ -n "$UPDATE_INFO" && ! -f "$OUTDIR/$APPIMAGE.zsync" ]]; then
         || { echo "no $APPIMAGE.zsync written"; cat "$WORK/appimagetool.log"; exit 1; }
 fi
 chmod 755 "$OUTDIR/$APPIMAGE"
+# issue #48 (Gear Lever, AppImageUpdate): what they read must stay right. The embedded update information is ours,
+# the release asset name matches its file pattern, and the .zsync points at the AppImage beside it.
+if [[ -n "$UPDATE_INFO" ]]; then
+    if command -v readelf > /dev/null; then
+        embedded="$(readelf --string-dump=.upd_info --wide "$OUTDIR/$APPIMAGE" | sed -n 's/^ *\[ *0\] *//p' | sed 's/ *$//')"
+        [[ "$embedded" == "$UPDATE_INFO" ]] || { echo "update information is '$embedded', not '$UPDATE_INFO'"; exit 1; }
+    fi
+    # shellcheck disable=SC2254
+    case "$APPIMAGE.zsync" in ${UPDATE_INFO##*|}) ;; *) echo "$APPIMAGE.zsync does not match ${UPDATE_INFO##*|}"; exit 1 ;; esac
+    if [[ -f "$OUTDIR/$APPIMAGE.zsync" ]]; then
+        url="$(head -c 4096 "$OUTDIR/$APPIMAGE.zsync" | sed -n 's/^URL: //p' | head -1)"
+        [[ "$url" == "$APPIMAGE" ]] || { echo "$APPIMAGE.zsync points at '$url'"; exit 1; }
+    fi
+fi
 ls -la "$OUTDIR/$NAME.tar.gz" "$OUTDIR/$APPIMAGE"*
