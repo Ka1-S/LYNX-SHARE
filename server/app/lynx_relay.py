@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 
 from aiohttp import WSMsgType, web
@@ -25,6 +26,9 @@ MAX_FRAME = env_int("LYNX_RELAY_MAX_FRAME", 1024 * 1024)   # bytes per WebSocket
 PEER_BYTES_PER_SEC = env_int("LYNX_RELAY_PEER_BPS", 4 * 1024 * 1024)
 ROOMS_PER_HOUR = env_int("LYNX_RELAY_ROOMS_PER_HOUR", 10)
 SUBPROTOCOL = "lynx-relay.v1"
+# A room token the host chose (LYNX derives it from the invite code, so a guest who has the code can connect without the
+# server ever handing the token out). Only its SHA-256 is kept, like every token here.
+CHOSEN_TOKEN = re.compile(r"^[A-Za-z0-9_-]{43,128}$")
 
 STARTED = time.time()
 room_limiter = RateLimiter(ROOMS_PER_HOUR, 3600)
@@ -80,15 +84,27 @@ async def create_room(request: web.Request) -> web.Response:
         return fail(429, "too many rooms, try again later", {"Retry-After": "600"})
     if len(rooms) >= MAX_ROOMS:
         return fail(503, "relay is full, try again later", {"Retry-After": "300"})
+    # optional body {"token": "<43..128 url-safe chars>"}: the room token the host chose (SHARE_API.md §3.1)
+    chosen = ""
+    if request.can_read_body:
+        try:
+            body = await request.json()
+        except ValueError:
+            return fail(400, "the body must be JSON")
+        if not isinstance(body, dict):
+            return fail(400, "the body must be a JSON object")
+        chosen = body.get("token") or ""
+        if chosen and (not isinstance(chosen, str) or not CHOSEN_TOKEN.match(chosen)):
+            return fail(400, "token: 43 to 128 characters A-Z a-z 0-9 _ -")
     rid = random_id(7)[:10]
     while rid in rooms:
         rid = random_id(7)[:10]
-    token, host_token = random_token(), random_token()
+    token, host_token = chosen or random_token(), random_token()
     room = Room(rid, token, host_token)
     rooms[rid] = room
     log.info("room created %s… (%d rooms)", rid[:4], len(rooms))
     base = env_str("LYNX_RELAY_PUBLIC_URL", "wss://relay.lynx-share.com").rstrip("/")
-    return json_response(201, {"ok": True, "room": rid, "token": token, "hostToken": host_token,
+    return json_response(201, {"ok": True, "room": rid, "token": "" if chosen else token, "hostToken": host_token,
                                "maxPeers": MAX_PEERS, "expires": int(room.expires()),
                                "ws": f"{base}/v1/rooms/{rid}/ws", "subprotocol": SUBPROTOCOL})
 
