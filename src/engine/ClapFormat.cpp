@@ -329,6 +329,17 @@ public:
 
     void prepareToPlay (double sampleRate, int blockSize) override
     {
+        // already active with these settings: nothing to do. (LYNX prepares a plugin again to switch it to offline
+        // rendering, on the export's thread; a CLAP has no process mode in activate, and activate / deactivate belong
+        // on the main thread: issue #46)
+        if (active && sampleRate == activeRate && juce::jmax (1, blockSize) == maxBlock)
+            return;
+        reactivate (sampleRate, blockSize);
+    }
+
+    // deactivates (when active) and activates the plugin again
+    void reactivate (double sampleRate, int blockSize)
+    {
         if (! holdProcessing())
             return; // (a process call never returned: the plugin crashed inside it, leave it alone)
 
@@ -339,6 +350,7 @@ public:
         if (plugin->activate (plugin, sampleRate, 1, (uint32_t) juce::jmax (1, blockSize)))
         {
             active = true;
+            activeRate = sampleRate;
             maxBlock = juce::jmax (1, blockSize);
             scratch.setSize (juce::jmax (2, outputChannels), maxBlock);
 
@@ -727,10 +739,10 @@ private:
             auto* self = from (hh);
             self->onMainThread ([self] {
                 // the rack calls processBlock directly (no callback lock), so suspendProcessing alone would not
-                // stop it: prepareToPlay holds new blocks off, has the audio thread stop processing and waits for
-                // the block in progress before deactivating (holdProcessing)
+                // stop it: reactivate holds new blocks off, has the audio thread stop processing and waits for the
+                // block in progress before deactivating (holdProcessing)
                 if (self->active)
-                    self->prepareToPlay (self->getSampleRate(), self->maxBlock);
+                    self->reactivate (self->activeRate, self->maxBlock);
             });
         };
         h.request_process = [] (const clap_host_t*) {};
@@ -757,6 +769,7 @@ private:
     bool initialised = false;
 
     bool active = false;
+    double activeRate = 0.0;
     int maxBlock = 0;
     int inputChannels = 0, outputChannels = 2;
     int64_t steadyTime = 0;
