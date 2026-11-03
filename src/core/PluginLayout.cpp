@@ -1,5 +1,7 @@
 #include "core/PluginLayout.h"
 
+#include <list>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -676,36 +678,32 @@ Layout grossBeat()
     // the envelope of the selected slots and the slot's settings under it
     Layout l;
     l.fl = "Gross Beat";
-    l.width = 840;
+    l.width = 836;
     l.height = 563;
     auto& v = l.items;
-    static const std::string slots = [] {
-        std::string out;
-        for (int i = 1; i <= 36; ++i)
-            out += (i > 1 ? "|" : "") + std::string ("Slot ") + std::to_string (i);
-        return out;
-    }();
     v.push_back (section (0, 0, 268, 563, nullptr, boxed));
     v.push_back (section (6, 7, 128, 46, nullptr, boxed | raised));
     v.push_back (knob (31, 30, 40, "Time mix", nullptr, 0, noCaption));
     v.push_back (label (56, 20, 70, 20, TR_NOOP ("Time"), alignLeft));
     v.push_back (display (189, 12, 72, 72, "gbjog"));
     v.push_back (toggle (113, 62, 62, 28, "Hold", TR_NOOP ("Hold"), boxed));
-    auto timeSlots = radio (13, 103, 246, 162, "Time slot", slots.c_str());
-    timeSlots.columns = 4;
-    v.push_back (timeSlots);
-    auto volumeSlots = radio (13, 276, 246, 162, "Volume slot", slots.c_str());
-    volumeSlots.columns = 4;
-    volumeSlots.colour = 1;
-    v.push_back (volumeSlots);
+    // round 168m: the two slot grids draw each slot's name over a thumbnail of its envelope (FL's grids of 4 × 9)
+    v.push_back (display (13, 103, 246, 162, "gbtimegrid"));
+    v.push_back (display (13, 276, 246, 162, "gbvolumegrid"));
     v.push_back (knob (80, 467, 38, "Attack", TR_NOOP ("Att"), 492));
     v.push_back (knob (130, 467, 38, "Release", TR_NOOP ("Rel"), 492));
     v.push_back (knob (186, 467, 38, "Tension", TR_NOOP ("Tns"), 492, bipolar));
     v.push_back (section (6, 509, 128, 46, nullptr, boxed | raised));
     v.push_back (knob (31, 531, 40, "Volume mix", nullptr, 0, noCaption));
     v.push_back (label (56, 521, 70, 20, TR_NOOP ("Volume"), alignLeft));
-    v.push_back (display (272, 4, 556, 530, "grossbeat"));
-    v.push_back (display (272, 537, 556, 22, "gbinfo"));
+    // round 168m (FL's DFM TSynthEditorForm): the tool column (Options, Snap, Envelope time / volume), the envelope
+    // editor, and the selected slot's name and settings under it
+    v.push_back (display (270, 4, 24, 555, "gbtools"));
+    v.push_back (display (298, 4, 532, 26, "gbtabs")); // Time / Volume tabs, the slot's name, the factory slot browser
+    v.push_back (display (298, 33, 532, 492, "grossbeat"));
+    v.push_back (display (298, 529, 532, 30, "gbslot"));
+    l.editedElsewhere.push_back ("Time slot"); // the slot grids
+    l.editedElsewhere.push_back ("Volume slot");
     return l;
 }
 
@@ -3641,11 +3639,305 @@ const Layout& layoutFor (EffectKind kind)
     return cache.emplace (kind, std::move (l)).first->second;
 }
 
+namespace
+{
+// a parameter name built at run time, kept for the program's life (layout items hold const char*)
+const char* stored (std::string text)
+{
+    static std::list<std::string> names;
+    for (const auto& n : names)
+        if (n == text)
+            return n.c_str();
+    names.push_back (std::move (text));
+    return names.back().c_str();
+}
+
+const char* osc (int o, const char* field) { return stored ("Osc " + std::to_string (o + 1) + " " + field); }
+const char* fx (int s, const char* field) { return stored ("FX " + std::to_string (s + 1) + " " + field); }
+
+// Toxic Biohazard (round 168n): FL's arrangement — CONFIGURATION and MASTER ENVELOPE across the top, the six
+// oscillators in two columns (envelope faders, wave, pitch, detune, frequency offset, phase, free run), the MOD panel
+// in the middle (the 6 × 6 FM grid "row modulates column", MIX / PAN, LFO 1 / 2 per oscillator, master pitch
+// modulation), LFO 1 / FILTER / LFO 2 below and the effect slots around the 8-band EQ at the bottom. Reference: FL's own
+// window (its installation's Artwork\background.tga, read as a layout only); drawn in LYNX's style.
+Layout toxicMain()
+{
+    Layout l;
+    l.fl = "Toxic Biohazard";
+    l.width = 920;
+    l.height = 668;
+    auto& v = l.items;
+
+    // CONFIGURATION
+    v.push_back (section (0, 0, 330, 58, TR_NOOP ("Configuration")));
+    v.push_back (knob (26, 33, 24, "Transpose", TR_NOOP ("Transp."), 53, bipolar));
+    v.push_back (stepper (50, 18, 44, 36, "Polyphony", TR_NOOP ("Poly"), 32));
+    v.push_back (stepper (98, 18, 44, 36, "Unison voices", TR_NOOP ("Voices"), 7));
+    v.push_back (knob (168, 33, 24, "Unison detune", TR_NOOP ("Detune"), 53));
+    v.push_back (knob (210, 33, 24, "Unison pan", TR_NOOP ("Spread"), 53));
+    v.push_back (menuOf (234, 18, 52, 36, "Glide mode", TR_NOOP ("Glide"), "Bend VT|Held VT|Bend ST|Held ST"));
+    v.push_back (knob (308, 33, 24, "Glide time", TR_NOOP ("Time"), 53));
+
+    v.push_back (label (340, 6, 240, 46, "TOXIC BIOHAZARD", dim));
+
+    // MASTER ENVELOPE
+    v.push_back (section (590, 0, 330, 58, TR_NOOP ("Master envelope")));
+    static const char* const master[] = { "Attack", "Decay", "Sustain", "Release" };
+    static const char* const masterCaps[] = { TR_NOOP ("Att"), TR_NOOP ("Dec"), TR_NOOP ("Sus"), TR_NOOP ("Rel") };
+    for (int i = 0; i < 4; ++i)
+        v.push_back (knob (614 + 38 * (float) i, 33, 24, master[i], masterCaps[i], 53));
+    v.push_back (knob (772, 33, 24, "Velocity curve", TR_NOOP ("Vel curve"), 53));
+    v.push_back (knob (830, 33, 24, "Distortion", TR_NOOP ("Drive"), 53));
+    v.push_back (knob (888, 33, 24, "Gain", TR_NOOP ("Master"), 53));
+
+    // the six oscillators
+    static const char* const titles[] = { "Osc 1", "Osc 2", "Osc 3", "Osc 4", "Osc 5", "Osc 6" };
+    static const char* const faders[] = { "velocity", "init", "attack", "decay", "sustain", "release" };
+    static const char* const faderCaps[] = { TR_NOOP ("Vel"), TR_NOOP ("Init"), TR_NOOP ("Att"), TR_NOOP ("Dec"), TR_NOOP ("Sus"), TR_NOOP ("Rel") };
+    for (int o = 0; o < 6; ++o)
+    {
+        const auto x0 = o < 3 ? 0.0f : 620.0f, y0 = 64.0f + 112.0f * (float) (o % 3);
+        v.push_back (section (x0, y0, 300, 106, titles[o]));
+        v.push_back (toggle (x0 + 186, y0 + 1, 52, 15, osc (o, "free run"), TR_NOOP ("Free")));
+        v.push_back (toggle (x0 + 244, y0 + 1, 52, 15, osc (o, "on"), TR_NOOP ("On")));
+        for (int f = 0; f < 6; ++f)
+            v.push_back (slider (Item::vslider, x0 + 6 + 20 * (float) f, y0 + 22, 18, 80, osc (o, faders[f]), faderCaps[f]));
+        v.push_back (display (x0 + 130, y0 + 22, 72, 44, "toxicwave", osc (o, "wave")));
+        v.push_back (stepper (x0 + 130, y0 + 68, 72, 34, osc (o, "wave"), TR_NOOP ("Wave"), 32));
+        v.push_back (knob (x0 + 228, y0 + 38, 26, osc (o, "coarse"), TR_NOOP ("Pitch"), y0 + 60, bipolar));
+        v.push_back (knob (x0 + 272, y0 + 38, 26, osc (o, "fine"), TR_NOOP ("Detune"), y0 + 60, bipolar));
+        v.push_back (knob (x0 + 228, y0 + 80, 26, osc (o, "freq shift"), TR_NOOP ("Freq ofs"), y0 + 101, bipolar));
+        v.push_back (knob (x0 + 272, y0 + 80, 26, osc (o, "phase"), TR_NOOP ("Phase"), y0 + 101));
+    }
+
+    // MOD: the FM grid (row = the modulating oscillator, column = the modulated one), mix, pan, LFO amounts, pitch
+    v.push_back (section (308, 64, 304, 336, TR_NOOP ("Modulation")));
+    static const char* const digits[] = { "1", "2", "3", "4", "5", "6" };
+    v.push_back (label (314, 80, 40, 14, TR_NOOP ("FM"), alignLeft));
+    for (int j = 0; j < 6; ++j)
+        v.push_back (label (352 + 38 * (float) j, 80, 30, 14, digits[j]));
+    for (int i = 0; i < 6; ++i)
+    {
+        v.push_back (label (318, 98 + 25 * (float) i, 24, 16, digits[i]));
+        for (int j = 0; j < 6; ++j)
+            v.push_back (knob (367 + 38 * (float) j, 106 + 25 * (float) i, 21,
+                               stored ("FM " + std::to_string (i + 1) + " to " + std::to_string (j + 1)), nullptr, 0, noCaption));
+    }
+    struct Row { const char* caption; const char* field; float cy; std::uint16_t style; };
+    const Row rows[] = { { TR_NOOP ("Mix"), "mix", 262, 0 }, { TR_NOOP ("Pan"), "pan", 288, bipolar } };
+    for (const auto& r : rows)
+    {
+        v.push_back (label (312, r.cy - 8, 40, 16, r.caption, alignLeft));
+        for (int o = 0; o < 6; ++o)
+            v.push_back (knob (367 + 38 * (float) o, r.cy, 21, osc (o, r.field), nullptr, 0, noCaption | r.style));
+    }
+    for (int lfo = 0; lfo < 2; ++lfo)
+    {
+        const auto cy = 318.0f + 26.0f * (float) lfo;
+        v.push_back (label (312, cy - 8, 44, 16, lfo == 0 ? TR_NOOP ("LFO 1") : TR_NOOP ("LFO 2"), alignLeft));
+        for (int o = 0; o < 6; ++o)
+            v.push_back (knob (367 + 38 * (float) o, cy, 21, stored ("LFO " + std::to_string (lfo + 1) + " to osc " + std::to_string (o + 1)),
+                               nullptr, 0, noCaption | bipolar));
+    }
+    v.push_back (label (312, 360, 84, 32, TR_NOOP ("Pitch mod"), alignLeft));
+    v.push_back (knob (430, 372, 20, "LFO 2 to pitch", TR_NOOP ("LFO 2"), 393));
+    v.push_back (knob (490, 372, 20, "Filter env to pitch", TR_NOOP ("Filter env"), 393, bipolar));
+    v.push_back (knob (550, 372, 20, "Bend range", TR_NOOP ("Bend"), 393));
+
+    // LFO 1 / LFO 2
+    static const char* const syncs = "Off|1/16|1/8|3/16|1/4|1/2|3/4|1 bar|2 bars|4 bars";
+    for (int lfo = 0; lfo < 2; ++lfo)
+    {
+        const auto x0 = lfo == 0 ? 0.0f : 720.0f;
+        const auto n = std::to_string (lfo + 1);
+        v.push_back (section (x0, 406, 200, 112, lfo == 0 ? TR_NOOP ("LFO 1") : TR_NOOP ("LFO 2")));
+        v.push_back (toggle (x0 + 140, 407, 56, 15, stored ("LFO " + n + " free"), TR_NOOP ("Free")));
+        v.push_back (display (x0 + 8, 426, 74, 44, "toxicwave", stored ("LFO " + n + " wave")));
+        v.push_back (stepper (x0 + 8, 474, 74, 36, stored ("LFO " + n + " wave"), TR_NOOP ("Wave"), 32));
+        v.push_back (knob (x0 + 143, 444, 28, stored ("LFO " + n + " speed"), TR_NOOP ("Speed"), 466));
+        v.push_back (menuOf (x0 + 94, 482, 98, 32, stored ("LFO " + n + " sync"), TR_NOOP ("Sync"), syncs));
+    }
+
+    // FILTER
+    v.push_back (section (208, 406, 504, 112, TR_NOOP ("Filter")));
+    v.push_back (tabs (216, 426, 176, 20, "Filter mode", "Off|LP|BP|HP"));
+    struct K { float cx; const char* param; const char* caption; std::uint16_t style; };
+    const K filter[] = { { 238, "Cutoff", TR_NOOP ("Cutoff"), big }, { 296, "Resonance", TR_NOOP ("Reso"), 0 },
+                         { 350, "Key tracking", TR_NOOP ("Key trk"), 0 }, { 404, "Velocity tracking", TR_NOOP ("Vel trk"), 0 },
+                         { 458, "Filter env amount", TR_NOOP ("EG amount"), bipolar }, { 512, "Filter LFO 1 amount", TR_NOOP ("LFO 1"), 0 } };
+    for (const auto& k : filter)
+        v.push_back (knob (k.cx, 474, 34, k.param, k.caption, 508, k.style));
+    static const char* const fenv[] = { "Filter attack", "Filter decay", "Filter sustain", "Filter release" };
+    for (int i = 0; i < 4; ++i)
+        v.push_back (slider (Item::vslider, 566 + 34 * (float) i, 424, 20, 88, fenv[i], masterCaps[i]));
+
+    // the effect slots and the EQ
+    static const char* const delaySyncs = "Off|1/32|1/16|3/32|1/8|1/4|3/8|1/2|1 bar|2 bars";
+    for (int s = 0; s < 2; ++s)
+    {
+        const auto x0 = s == 0 ? 0.0f : 620.0f;
+        v.push_back (section (x0, 524, 300, 144, s == 0 ? TR_NOOP ("Effect 1") : TR_NOOP ("Effect 2")));
+        v.push_back (toggle (x0 + 244, 525, 52, 15, fx (s, "on"), TR_NOOP ("On")));
+        v.push_back (tabs (x0 + 6, 544, 288, 20, fx (s, "type"), "Delay|Chorus|Reverb|Flanger|Phaser|Lo-fi"));
+        const auto type = fx (s, "type");
+        auto add = [&] (int t, std::initializer_list<std::pair<const char*, const char*>> knobs) {
+            float cx = x0 + 30;
+            for (const auto& [field, caption] : knobs)
+            {
+                v.push_back (when (knob (cx, 594, 30, fx (s, field), caption, 622), type, (float) t / 5.0f - 0.1f, (float) t / 5.0f + 0.1f));
+                cx += 48;
+            }
+        };
+        add (0, { { "delay time", TR_NOOP ("Time") }, { "delay feedback", TR_NOOP ("Feedback") }, { "delay rate", TR_NOOP ("Rate") },
+                  { "delay depth", TR_NOOP ("Depth") }, { "delay blur", TR_NOOP ("Blur") }, { "delay mix", TR_NOOP ("Mix") } });
+        v.push_back (when (menuOf (x0 + 8, 630, 110, 34, fx (s, "delay sync"), TR_NOOP ("Sync"), delaySyncs), type, -0.1f, 0.1f));
+        add (1, { { "chorus depth", TR_NOOP ("Depth") }, { "chorus rate", TR_NOOP ("Rate") }, { "chorus mix", TR_NOOP ("Mix") } });
+        add (2, { { "reverb mix", TR_NOOP ("Mix") }, { "reverb decay", TR_NOOP ("Decay") }, { "reverb damping", TR_NOOP ("Damping") },
+                  { "reverb high cut", TR_NOOP ("High cut") } });
+        add (3, { { "flanger delay", TR_NOOP ("Delay") }, { "flanger feedback", TR_NOOP ("Feedback") }, { "flanger depth", TR_NOOP ("Depth") },
+                  { "flanger rate", TR_NOOP ("Rate") }, { "flanger mix", TR_NOOP ("Mix") } });
+        v.push_back (when (toggle (x0 + 8, 638, 120, 16, fx (s, "flanger invert feedback"), TR_NOOP ("Invert feedback")), type, 0.5f, 0.7f));
+        v.push_back (when (toggle (x0 + 140, 638, 120, 16, fx (s, "flanger invert mix"), TR_NOOP ("Invert mix")), type, 0.5f, 0.7f));
+        add (4, { { "phaser frequency", TR_NOOP ("Freq") }, { "phaser rate", TR_NOOP ("Rate") }, { "phaser depth", TR_NOOP ("Depth") },
+                  { "phaser feedback", TR_NOOP ("Feedback") }, { "phaser mix", TR_NOOP ("Mix") } });
+        add (5, { { "lo-fi bits", TR_NOOP ("Bits") }, { "lo-fi rate", TR_NOOP ("Rate") }, { "lo-fi filter", TR_NOOP ("Filter") } });
+    }
+    v.push_back (section (308, 524, 304, 144, TR_NOOP ("EQ")));
+    v.push_back (toggle (552, 525, 56, 15, "EQ on", TR_NOOP ("On")));
+    static const char* const bands[] = { "EQ 62", "EQ 125", "EQ 250", "EQ 500", "EQ 1k", "EQ 2k", "EQ 4k", "EQ 8k" };
+    static const char* const bandCaps[] = { "62", "125", "250", "500", "1k", "2k", "4k", "8k" };
+    for (int b = 0; b < 8; ++b)
+        v.push_back (slider (Item::vslider, 318 + 36 * (float) b, 546, 22, 116, bands[b], bandCaps[b], bipolar));
+    return l;
+}
+
+// PoiZone (round 168n): FL's arrangement, read from the plugin's own form (TSynthEditorForm in PoiZone_x64.dll: each
+// control's position and the parameter it edits, docs/analise/REA_rodada168n.md §2) — unison / mode switches / master
+// across the top, MOD WHEEL, LFO, ENVELOPE and AMP envelopes, the two oscillators, FILTER and ARPEGGIATOR, then DELAY,
+// CHORUS and the 16-step GATE. FL's x positions; the rows are re-spaced for LYNX's section titles. Drawn in LYNX's style.
+Layout poizoneMain()
+{
+    Layout l;
+    l.fl = "PoiZone";
+    l.width = 856;
+    l.height = 378;
+    auto& v = l.items;
+    // a 40-pixel FL wheel at (left, top of the row) → LYNX knob with its caption
+    auto wheel = [&v] (float left, float rowTop, const char* param, const char* caption, std::uint16_t style = 0) {
+        v.push_back (knob (left + 20, rowTop + 18, 34, param, caption, rowTop + 46, style));
+    };
+    auto button = [&v] (float left, float rowTop, const char* param, const char* caption) {
+        v.push_back (toggle (left - 4, rowTop + 4, 40, 28, param, caption, boxed));
+    };
+
+    // row 1: name, unison / polyphony, the mode switches, master
+    v.push_back (label (12, 10, 250, 60, "POIZONE", dim | alignLeft));
+    v.push_back (section (276, 4, 210, 76, TR_NOOP ("Unison")));
+    v.push_back (menuOf (284, 26, 48, 34, "Unison voices", TR_NOOP ("Voices"), "1|2|3|4|8|12|16"));
+    v.push_back (stepper (338, 26, 48, 34, "Polyphony", TR_NOOP ("Poly"), 63));
+    wheel (392, 24, "Unison detune", TR_NOOP ("Detune"));
+    wheel (438, 24, "Unison pan", TR_NOOP ("Pan"));
+    v.push_back (section (490, 4, 146, 76, TR_NOOP ("Mode")));
+    button (497, 26, "Octaver", TR_NOOP ("Oct"));
+    button (531, 26, "Mono", TR_NOOP ("Mono"));
+    button (565, 26, "Glide held", TR_NOOP ("Held"));
+    button (601, 26, "Glide static", TR_NOOP ("Static"));
+    v.push_back (section (640, 4, 212, 76, TR_NOOP ("Master")));
+    wheel (643, 24, "Glide time", TR_NOOP ("Glide"));
+    wheel (695, 24, "Transpose", TR_NOOP ("Transp."), bipolar);
+    wheel (745, 24, "Fine", TR_NOOP ("Fine"), bipolar);
+    wheel (800, 24, "Gain", TR_NOOP ("Gain"));
+
+    // row 2: mod wheel, LFO, modulation envelope, amplifier envelope
+    const float r2 = 86;
+    auto fader = [&v, r2] (float left, const char* param, const char* caption, std::uint16_t style = 0) {
+        v.push_back (slider (Item::vslider, left, r2 + 22, 25, 86, param, caption, style));
+    };
+    auto selector = [&v, r2] (float left, float w, const char* param, const char* options) {
+        v.push_back (radio (left, r2 + 22, w, 74, param, options));
+    };
+    v.push_back (section (6, r2, 134, 112, TR_NOOP ("Mod wheel")));
+    selector (12, 58, "Mod wheel destination", "Cutoff|LFO amt|Frq A|PW A|PW AB");
+    wheel (80, r2 + 18, "Mod wheel amount", TR_NOOP ("Amount"), bipolar);
+    v.push_back (stepper (80, r2 + 72, 52, 34, "Bend range", TR_NOOP ("Bend"), 23));
+    v.push_back (section (144, r2, 262, 112, TR_NOOP ("LFO")));
+    selector (150, 58, "LFO destination", "Cutoff|Frq A|Frq AB|PW A|PW AB|Pan");
+    fader (215, "LFO amount", TR_NOOP ("Amount"), bipolar);
+    fader (257, "LFO rate", TR_NOOP ("Rate"));
+    selector (292, 54, "LFO shape", "Saw|Pulse|Tri|Sine|Rnd");
+    button (362, r2 + 18, "LFO retrigger", TR_NOOP ("Retrig"));
+    v.push_back (menuOf (352, r2 + 66, 50, 34, "LFO sync", TR_NOOP ("Sync"), "Free|1|2|3|4|8|12|16|32|64|128"));
+    v.push_back (section (410, r2, 258, 112, TR_NOOP ("Envelope")));
+    selector (416, 58, "Mod env destination", "Cutoff|Frq A|Frq AB|PW A|PW AB");
+    fader (483, "Mod env amount", TR_NOOP ("Amount"), bipolar);
+    fader (526, "Mod env attack", TR_NOOP ("Att"));
+    fader (561, "Mod env decay", TR_NOOP ("Dec"));
+    fader (597, "Mod env sustain", TR_NOOP ("Sus"));
+    fader (633, "Mod env release", TR_NOOP ("Rel"));
+    v.push_back (section (672, r2, 180, 112, TR_NOOP ("Amp")));
+    fader (690, "Amp attack", TR_NOOP ("Att"));
+    fader (728, "Amp decay", TR_NOOP ("Dec"));
+    fader (766, "Amp sustain", TR_NOOP ("Sus"));
+    fader (804, "Amp release", TR_NOOP ("Rel"));
+
+    // row 3: oscillators, filter, arpeggiator
+    const float r3 = 204;
+    v.push_back (section (6, r3, 456, 80, TR_NOOP ("Oscillators")));
+    wheel (14, r3 + 20, "Osc balance", TR_NOOP ("A / B"), bipolar);
+    wheel (62, r3 + 20, "Noise", TR_NOOP ("Noise"));
+    wheel (116, r3 + 20, "Osc A pulse width", TR_NOOP ("PW A"));
+    v.push_back (tabs (160, r3 + 26, 46, 24, "Osc A shape", "Saw|Sq"));
+    button (212, r3 + 22, "Ring mod", TR_NOOP ("Ring"));
+    button (248, r3 + 22, "Sync", TR_NOOP ("Sync"));
+    wheel (286, r3 + 20, "Osc B pulse width", TR_NOOP ("PW B"));
+    v.push_back (tabs (330, r3 + 26, 46, 24, "Osc B shape", "Saw|Sq"));
+    wheel (378, r3 + 20, "Osc B semitones", TR_NOOP ("Pitch B"), bipolar);
+    wheel (420, r3 + 20, "Osc B detune", TR_NOOP ("Detune B"));
+    v.push_back (section (466, r3, 232, 80, TR_NOOP ("Filter")));
+    wheel (472, r3 + 20, "Cutoff", TR_NOOP ("Cutoff"));
+    wheel (514, r3 + 20, "Resonance", TR_NOOP ("Reso"));
+    wheel (556, r3 + 20, "Key tracking", TR_NOOP ("Key trk"));
+    wheel (598, r3 + 20, "Velocity tracking", TR_NOOP ("Vel trk"));
+    v.push_back (radio (646, r3 + 20, 46, 58, "Filter mode", "LP|BP|HP"));
+    v.push_back (section (702, r3, 150, 80, TR_NOOP ("Arpeggiator")));
+    v.push_back (radio (708, r3 + 18, 50, 62, "Arpeggiator mode", "Off|Up|Down|Up-dn|Rnd"));
+    v.push_back (radio (762, r3 + 18, 32, 62, "Arpeggiator range", "1|2|3|4"));
+    v.push_back (menuOf (798, r3 + 24, 50, 34, "Arpeggiator speed", TR_NOOP ("Speed"), "1/2|1|2|3|4|8|16"));
+
+    // row 4: delay, chorus, gate
+    const float r4 = 290;
+    v.push_back (section (6, r4, 364, 86, TR_NOOP ("Delay")));
+    button (16, r4 + 24, "Delay on", TR_NOOP ("On"));
+    wheel (52, r4 + 22, "Delay time L", TR_NOOP ("Time L"));
+    wheel (97, r4 + 22, "Delay time R", TR_NOOP ("Time R"));
+    wheel (142, r4 + 22, "Delay feedback", TR_NOOP ("Feedback"));
+    wheel (187, r4 + 22, "Delay modulation", TR_NOOP ("Mod"));
+    wheel (232, r4 + 22, "Delay low cut", TR_NOOP ("Low cut"));
+    wheel (277, r4 + 22, "Delay high cut", TR_NOOP ("High cut"));
+    wheel (322, r4 + 22, "Delay wet", TR_NOOP ("Wet"));
+    v.push_back (section (374, r4, 182, 86, TR_NOOP ("Chorus")));
+    button (382, r4 + 24, "Chorus on", TR_NOOP ("On"));
+    wheel (418, r4 + 22, "Chorus depth", TR_NOOP ("Depth"));
+    wheel (463, r4 + 22, "Chorus rate", TR_NOOP ("Rate"));
+    wheel (508, r4 + 22, "Chorus wet", TR_NOOP ("Wet"));
+    v.push_back (section (560, r4, 292, 86, TR_NOOP ("Gate")));
+    wheel (565, r4 + 22, "Gate smooth", TR_NOOP ("Smooth"));
+    wheel (610, r4 + 22, "Gate mix", TR_NOOP ("Mix"));
+    v.push_back (menuOf (656, r4 + 26, 46, 34, "Gate speed", TR_NOOP ("Speed"), "1/2|1|2|3|4|8|16"));
+    for (int i = 0; i < 16; ++i)
+        v.push_back (toggle (712 + 17 * (float) (i % 8), r4 + 26 + 24 * (float) (i / 8), 16, 22,
+                             stored ("Gate step " + std::to_string (i + 1)), nullptr, boxed));
+    return l;
+}
+} // namespace
+
 const Layout* instrumentLayout (InstrumentKind kind)
 {
-    static const Layout osc = threeOsc(), keys = flKeys(), boo = booBass(), sytrus = sytrusMain(), harmor = harmorMain();
+    static const Layout osc = threeOsc(), keys = flKeys(), boo = booBass(), sytrus = sytrusMain(), harmor = harmorMain(), toxic = toxicMain(), poizone = poizoneMain();
     switch (kind)
     {
+        case InstrumentKind::toxic: return &toxic;
+        case InstrumentKind::poizone: return &poizone;
         case InstrumentKind::threeosc: return &osc;
         case InstrumentKind::flkeys: return &keys;
         case InstrumentKind::boobass: return &boo;
@@ -3657,7 +3949,8 @@ const Layout* instrumentLayout (InstrumentKind kind)
 
 const std::vector<InstrumentKind>& instrumentLayoutKinds()
 {
-    static const std::vector<InstrumentKind> kinds { InstrumentKind::threeosc, InstrumentKind::flkeys, InstrumentKind::boobass, InstrumentKind::sytrus, InstrumentKind::harmor };
+    static const std::vector<InstrumentKind> kinds { InstrumentKind::threeosc, InstrumentKind::flkeys, InstrumentKind::boobass, InstrumentKind::sytrus, InstrumentKind::harmor,
+                                                     InstrumentKind::toxic, InstrumentKind::poizone };
     return kinds;
 }
 
@@ -3665,6 +3958,18 @@ const Layout& soundgoodizerLayout()
 {
     static const Layout l = soundgoodizer();
     return l;
+}
+
+bool displayTakesMouse (const char* display)
+{
+    if (display == nullptr)
+        return false;
+    static const char* const ids[] { "eq", "xy", "sgamount", "sgpresets", "prismbands", "emberbands", "tunekeys", "tuneautokey",
+                                     "pitchring", "waveshaper", "tssenvelope", "tsssend0", "tsssend1", "maxcurve" };
+    for (const auto* id : ids)
+        if (std::strcmp (id, display) == 0)
+            return true;
+    return false;
 }
 
 bool hasFlLayout (EffectKind kind)

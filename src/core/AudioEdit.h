@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <functional>
 #include <vector>
 
 namespace lynx::audioedit
@@ -147,6 +148,8 @@ void swapChannels (Document& doc);
 // --- time --------------------------------------------------------------------------------------------------------
 // Windowed-sinc resampling of one channel to `outFrames` frames (band-limited when shortening).
 std::vector<float> resampleChannel (const std::vector<float>& in, std::int64_t outFrames);
+// The same, asking `stop` every 65 536 output frames: an empty vector when it returned true (a long file, Cancel).
+std::vector<float> resampleChannel (const std::vector<float>& in, std::int64_t outFrames, const std::function<bool()>& stop);
 // New sample rate, same pitch and duration (the number of frames changes; markers follow).
 void resample (Document& doc, double newRate);
 // Time stretch of the range without changing pitch (ratio = new length / old length; WSOLA, core/TimeStretch).

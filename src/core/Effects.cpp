@@ -3790,6 +3790,8 @@ EffectSlot makeEffectSlot (EffectKind kind)
         slot.patcher.wires.push_back ({});
     if (kind == EffectKind::visualizer) // round 164c: LYNX's default scene
         slot.state = visualfx::scene::toState (visualfx::scene::defaultScene());
+    if (kind == EffectKind::grossBeat) // round 168m: a new Gross Beat starts with LYNX's factory slots (FL loads its default bank)
+        slot.state = grossbeat::factoryContainer();
 
     return slot;
 }
@@ -3957,7 +3959,7 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::fruityChorus: return fruitychorusfx::make();
         case EffectKind::hyperChorus: return hyperchorusfx::make();
         case EffectKind::vintageChorus: return vintagechorusfx::make();
-        case EffectKind::grossBeat: return grossbeat::make ({}); // without a state: passes the signal; use makeEffect (slot)
+        case EffectKind::grossBeat: return grossbeat::make ({}); // without a state: LYNX's factory bank (round 168m); use makeEffect (slot)
         case EffectKind::lovePhilter: return philter::make (EffectSlot {}); // without a state: passes the signal
         case EffectKind::fruityDelayBank: return fldbank::make ({}); // a new FL instance; use makeEffect (slot) for a state
         case EffectKind::fruityMultiband: return flmb::make();

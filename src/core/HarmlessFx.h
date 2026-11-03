@@ -142,5 +142,23 @@ private:
 // points; empty when the state cannot be read
 std::vector<std::vector<std::pair<double, float>>> maximusEnvelopes (const std::vector<std::uint8_t>& state);
 
+// --- editing a Maximus curve (round 168x, issue #40) ---
+// One point of a Maximus envelope as the state stores it (FL's map stream: Δx f64, level f64, tension f32, type)
+struct MaximusCurvePoint
+{
+    double dx = 0.0;
+    float y = 0.0f, tension = 0.0f;
+    std::uint8_t type = 0;
+};
+// envelope 0…7 (2·band = the band's compression curve); empty when the state cannot be read
+std::vector<MaximusCurvePoint> maximusCurve (const std::vector<std::uint8_t>& state, int envelope);
+// the state with envelope `envelope` replaced by these points (FL's layout: the map's header and trailer kept, the
+// direction cache byte recomputed); the state unchanged when it cannot be read or the points are empty
+std::vector<std::uint8_t> withMaximusCurve (const std::vector<std::uint8_t>& state, int envelope, const std::vector<MaximusCurvePoint>& points);
+// the curve as the engine steps it (FUN_007885d0), sampled at n + 1 evenly spaced x over 0…1; empty when a segment
+// type is not played by LYNX's engine (only FL's types 0 "single curve" and 7 "single curve 2" are)
+std::vector<float> maximusCurveShape (const std::vector<MaximusCurvePoint>& points, int n);
+bool maximusCurveTypeSupported (int type) noexcept;
+
 std::vector<std::uint8_t> withMaximusParams (std::vector<std::uint8_t> state, const std::vector<std::pair<int, int>>& params);
 } // namespace lynx::hlfx

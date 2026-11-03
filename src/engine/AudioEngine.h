@@ -65,6 +65,10 @@ public:
     juce::AudioDeviceManager& getDeviceManager() noexcept { return deviceManager; }
     Transport& getTransport() noexcept { return transport; }
     const Transport& getTransport() const noexcept { return transport; }
+    // The Song-mode playhead for the UI: the position folded into the song (its end goes back to the start), except
+    // while the song plays on past its end (a Song-mode recording without a loop region, FL [EXEC] round 168k: the
+    // counter reads 8:08 after recording a 1-bar song from bar 1; a bounce) or with a loop region
+    double songPlayheadTicks() const noexcept;
     SampleLibrary& getSampleLibrary() noexcept { return samples; }
     MeterBank& getMeters() noexcept { return meters; }
     // Tools > Audio logger (REA round 153): records everything the Master plays to a WAV in the background.
@@ -105,6 +109,8 @@ public:
                                   const std::function<bool (double)>& progress, int& latency);
 
     void play() noexcept;
+    // --cliplooptest (round 167q): the device callback, driven by hand with a stand-in device
+    juce::AudioIODeviceCallback& deviceCallback() noexcept { return *this; }
 
     // Performance mode (round 165m, core/Performance.h): launch / release / stop zone clips (message thread). The
     // clips start on the next block, quantized by their track's Performance settings; nothing launches while stopped.
@@ -321,6 +327,9 @@ public:
     // Sets an insert's input source (undoable; -1 = none) and opens the device input when needed.
     void setInsertInput (int track, int channel, bool stereo);
     void setInsertMonitor (int track, InputMonitor mode);
+    // FL's "Record" position of an insert and LYNX's "also record the dry input" (round 168x, issue #41); undoable
+    void setInsertRecordSource (int track, RecordSource source);
+    void setInsertRecordDryToo (int track, bool on);
 
     // --- hardware output targets (REA round 156) ---
     // Names of the open device's output channels (all of them, open or not); empty without a device.
@@ -790,6 +799,14 @@ private:
         int track = 0;      // insert it plays through (0 = a new free insert)
         int first = 0;      // device input channel
         int channels = 0;   // 1 or 2
+        // round 168x (issue #41): a take tapped inside its insert (FL's "Record" positions after the input) reads
+        // liveInput.taps[tap] after the block was rendered (−1 = the device input itself). Its first `skip` frames are
+        // dropped (the latency of the insert's effects up to the tap) and as many frames of silence close it, so it
+        // lines up with the input to the sample.
+        int tap = -1;
+        int skip = 0;
+        int skipped = 0;    // audio thread
+        int playThrough = 0; // the insert the take's clip plays through (0 = a new free insert)
         juce::File file;
         std::unique_ptr<takes::TakeStream> stream;
         takes::WavTakeWriter writer;

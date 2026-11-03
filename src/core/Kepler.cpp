@@ -3922,6 +3922,7 @@ public:
     }
 
     // a slide note (issue #14): the sounding keys glide their Final.Pitch to the slide's pitch
+    bool followsChannelPorta() const noexcept override { return true; } // (round 168l: HostSlide::anchor)
     void slideTo (int key, float cents, float samples) noexcept override
     {
         take();

@@ -1639,6 +1639,7 @@ std::vector<std::string> flPluginsForEffect (EffectKind kind)
         case EffectKind::fruityFastLP: return { "Fruity Fast LP" };
         case EffectKind::fruityFreeFilter: return { "Fruity Free Filter" };
         case EffectKind::fruityFilter: return { "Fruity Filter" };
+        case EffectKind::grossBeat: return { "Gross Beat" }; // round 168m: FL's Gross Beat presets in the preset menu
         case EffectKind::newtone: return { "Newtone" };
         case EffectKind::newtime: return { "Newtime" };
         case EffectKind::facetEq:
