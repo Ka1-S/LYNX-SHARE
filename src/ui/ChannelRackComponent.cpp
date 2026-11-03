@@ -129,10 +129,10 @@ juce::String instrumentLabel (InstrumentKind k)
     }
 }
 
-void setStep (Pattern& p, int channel, int step, bool on)
+void setStep (Pattern& p, int channel, int step, bool on, bool muteRemoved = false)
 {
     if (p.hasStep (channel, step) != on)
-        p.toggleStep (channel, step);
+        p.toggleStep (channel, step, muteRemoved);
 }
 
 juce::String channelName (const Song& song, int row)
@@ -143,6 +143,7 @@ juce::String channelName (const Song& song, int row)
 
 bool ChannelRackComponent::keepEditorsOpen = false;
 bool ChannelRackComponent::selectFirstChannelWithNotes = false;
+bool ChannelRackComponent::muteRemovedSteps = false;
 
 ChannelRackComponent::ChannelRackComponent (AudioEngine& e)
     : engine (e)
@@ -2212,9 +2213,9 @@ void ChannelRackComponent::applyPaint (const juce::MouseEvent& e)
     const auto on = paintMode == PaintMode::add;
 
     // FL: setting a step is silent, stopped or playing (issue #11; Ctrl+click on the channel button auditions it)
-    engine.editSong ([row, step, on] (Song& s) {
+    engine.editSong ([row, step, on, mute = muteRemovedSteps] (Song& s) {
         auto& p = s.patterns[(std::size_t) s.currentPattern];
-        setStep (p, row, step, on);
+        setStep (p, row, step, on, mute);
         // a ghost step of a pattern with a set length: the length grows to the bar holding it (automatic lengths
         // follow the notes by themselves)
         if (on)

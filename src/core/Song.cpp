@@ -36,10 +36,10 @@ bool Pattern::hasStep (int channel, int step) const noexcept
 {
     const auto tick = (std::int64_t) step * ticksPerStep;
     return std::any_of (notes.begin(), notes.end(),
-                        [&] (const Note& n) { return n.channel == channel && n.start == tick; });
+                        [&] (const Note& n) { return n.channel == channel && n.start == tick && ! n.muted; });
 }
 
-void Pattern::toggleStep (int channel, int step)
+void Pattern::toggleStep (int channel, int step, bool muteRemoved)
 {
     const auto tick = (std::int64_t) step * ticksPerStep;
     const auto it = std::find_if (notes.begin(), notes.end(),
@@ -47,7 +47,10 @@ void Pattern::toggleStep (int channel, int step)
 
     if (it != notes.end())
     {
-        notes.erase (it);
+        if (it->muted || muteRemoved)
+            it->muted = ! it->muted;
+        else
+            notes.erase (it);
         return;
     }
 

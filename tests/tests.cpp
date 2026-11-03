@@ -2388,6 +2388,22 @@ TEST (pattern_toggle_step_and_length)
     CHECK (! p.hasStep (0, 4) && p.notes.size() == 1);
 }
 
+TEST (pattern_mute_removed_steps)
+{
+    lynx::Pattern p;
+    p.toggleStep (0, 2);
+    p.notes[0].velocity = 0.3f;
+    p.toggleStep (0, 2, true); // off: muted, kept
+    CHECK (! p.hasStep (0, 2) && p.notes.size() == 1 && p.notes[0].muted);
+    p.toggleStep (0, 2, true); // on again: the same note back
+    CHECK (p.hasStep (0, 2) && p.notes.size() == 1 && ! p.notes[0].muted && p.notes[0].velocity == 0.3f);
+    p.toggleStep (0, 2, true);
+    p.toggleStep (0, 2); // option off: a muted step still comes back rather than doubling
+    CHECK (p.hasStep (0, 2) && p.notes.size() == 1);
+    p.toggleStep (0, 2); // option off: deleted
+    CHECK (p.notes.empty());
+}
+
 TEST (scheduler_places_events_at_exact_samples)
 {
     lynx::Pattern p;

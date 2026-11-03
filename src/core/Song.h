@@ -1177,7 +1177,9 @@ struct Pattern
     std::int64_t effectiveLength (int beatsPerBar) const noexcept;
 
     bool hasStep (int channel, int step) const noexcept;
-    void toggleStep (int channel, int step);
+    // A muted note on the step counts as an empty step. Turning a step off deletes its note, or with `muteRemoved` (FL's
+    // Channel Rack option "Mute removed steps") mutes it; turning a muted step on unmutes that note, data and all.
+    void toggleStep (int channel, int step, bool muteRemoved = false);
 };
 
 enum class ClipKind : std::uint8_t
