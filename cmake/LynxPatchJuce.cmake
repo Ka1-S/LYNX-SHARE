@@ -21,6 +21,18 @@
 #    of drift highlighted the other column's item under the mouse and closed the submenu. The way across now also
 #    counts as "moving towards the submenu": the band of the item's row (one row above and below), between the item
 #    and the submenu, while the mouse moves towards it. Resting there (JUCE's 350 ms) still picks the item under it.
+# 6. Every platform, juce_PopupMenu.cpp (issue #45, round 168z): a submenu took the display under the item that opened
+#    it, so a tall submenu reaching into the monitor below (or a confused XWayland display list) sent the next submenu
+#    to another monitor. A submenu now stays on the display of its ROOT menu, i.e. of the window the menu came from.
+# 7. Linux/BSD only, juce_PopupMenu.cpp (issue #45): JUCE closes a menu ("the app lost the focus") as soon as none of
+#    its windows has the X focus and the mouse is not over the menu. With KWin/XWayland and more than one LYNX window
+#    (an undocked panel, a settings window) the focus moves between our windows, and through the menu window itself
+#    (fix 8), for a moment after the click that opens a menu, so most menus closed before they were seen. The mouse
+#    over one of LYNX's own windows now also counts as "still LYNX's".
+# 8. Linux/BSD only, juce_gui_basics/native/juce_Windowing_linux.cpp (issue #45): a window that ignores key presses
+#    (a popup menu, a tooltip) never takes the X focus. When a LYNX window got the focus while a menu was open, JUCE
+#    handed the focus to the menu's override-redirect window, which the compositor gives back: the focus ping-ponged
+#    between the two and the menu saw "no focus". Keys still reach the menu (JUCE sends them to the modal component).
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -72,6 +84,18 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("submenu corridor" "LYNX patch (issue #18): the way across"
             "        return areaTowardsSubMenu.contains (newGlobalPos.toFloat());|NL|    }"
             "        if (areaTowardsSubMenu.contains (newGlobalPos.toFloat()))|NL|            return true;|NL||NL|        // LYNX patch (issue #18): the way across a two-column menu to a submenu beside its outer edge|NL|        if (auto* item = window.currentChild.getComponent())|NL|        {|NL|            const auto itemBounds = item->getScreenBounds();|NL|            const auto towardsRight = itemScreenBounds.getX() > window.getX();|NL|            const auto from = towardsRight ? itemBounds.getRight() : itemScreenBounds.getRight();|NL|            const auto to = towardsRight ? itemScreenBounds.getX() : itemBounds.getX();|NL|            return newGlobalPos.y >= itemBounds.getY() - itemBounds.getHeight() && newGlobalPos.y < itemBounds.getBottom() + itemBounds.getHeight()|NL|                   && newGlobalPos.x >= from - 2 && newGlobalPos.x <= to + 2|NL|                   && (towardsRight ? newGlobalPos.x >= lastMousePos.x : newGlobalPos.x <= lastMousePos.x);|NL|        }|NL||NL|        return false;|NL|    }")
+
+        lynx_juce_fix("submenu on the root menu's display" "LYNX patch (issue #45): a submenu stays"
+            "    Rectangle<int> getParentArea (Point<int> targetPoint, Component* relativeTo = nullptr)|NL|    {|NL|"
+            "    Rectangle<int> getParentArea (Point<int> targetPoint, Component* relativeTo = nullptr)|NL|    {|NL|        // LYNX patch (issue #45): a submenu stays on the display of its root menu (the window it came from)|NL|        if (parent != nullptr && relativeTo == nullptr && options.getParentComponent() == nullptr)|NL|        {|NL|            auto* root = parent;|NL|            while (root->parent != nullptr)|NL|                root = root->parent;|NL|            targetPoint = root->getBounds().getCentre();|NL|        }|NL||NL|")
+
+        lynx_juce_fix("menu kept while the mouse is over LYNX" "LYNX patch (issue #45): the mouse over"
+            "    bool doesAnyJuceCompHaveFocus()|NL|    {|NL|"
+            "    bool doesAnyJuceCompHaveFocus()|NL|    {|NL|       #if JUCE_LINUX || JUCE_BSD|NL|        // LYNX patch (issue #45): the mouse over one of our windows = still ours (X focus moving between them)|NL|        {|NL|            const auto mousePos = Desktop::getInstance().getMainMouseSource().getScreenPosition();|NL||NL|            for (int i = ComponentPeer::getNumPeers(); --i >= 0;)|NL|            {|NL|                auto& comp = ComponentPeer::getPeer (i)->getComponent();|NL||NL|                if (comp.isShowing() && comp.getLocalBounds().toFloat().contains (comp.getLocalPoint (nullptr, mousePos)))|NL|                    return true;|NL|            }|NL|        }|NL|       #endif|NL||NL|")
+    elseif(file MATCHES "juce_Windowing_linux.cpp$")
+        lynx_juce_fix("no X focus for menu windows" "LYNX patch (issue #45): never takes the X focus"
+            "    void grabFocus() override|NL|    {|NL|"
+            "    void grabFocus() override|NL|    {|NL|        // LYNX patch (issue #45): never takes the X focus when it ignores key presses (a popup menu, a tooltip)|NL|        if ((getStyleFlags() & windowIgnoresKeyPresses) != 0)|NL|            return;|NL||NL|")
     else()
         lynx_juce_fix("drop target search after an unused drop" "LYNX patch (issue #11): a drop nobody took"
             "bool ComponentPeer::handleDragDrop (const ComponentPeer::DragInfo& info)|NL|{|NL|    handleDragMove (info);|NL|"
@@ -88,6 +112,7 @@ function(lynx_patch_juce juce_dir)
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_DragAndDrop_linux.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/windows/juce_ComponentPeer.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/menus/juce_PopupMenu.cpp")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_Windowing_linux.cpp")
 endfunction()
 
 # run as a script: cmake -DJUCE_DIR=<dir> -P cmake/LynxPatchJuce.cmake
