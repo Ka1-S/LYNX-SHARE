@@ -6788,3 +6788,5 @@ countries: tr
 "When the session ends you may keep a full copy of the project." = "Oturum bitince projenin tam kopyasını tutabilirsin."
 "When the session ends you keep your own part (the host's choice)." = "Oturum bitince yalnızca kendi partini tutarsın (ev sahibinin seçimi)."
 "Made with LYNX SHARE {0} (this is {1})." = "LYNX SHARE {0} ile yapıldı (bu sürüm {1})."
+"Mute the selected clips (all when none is selected)" = "Seçili klipleri sessize al (hiçbiri seçili değilse hepsini)"
+"Unmute the selected clips (all when none is selected)" = "Seçili kliplerin sesini aç (hiçbiri seçili değilse hepsinin)"

@@ -6788,3 +6788,5 @@ countries: ru by kz
 "When the session ends you may keep a full copy of the project." = "Когда сессия закончится, вы можете оставить полную копию проекта."
 "When the session ends you keep your own part (the host's choice)." = "Когда сессия закончится, у вас останется ваша партия (выбор хоста)."
 "Made with LYNX SHARE {0} (this is {1})." = "Сделано в LYNX SHARE {0} (это {1})."
+"Mute the selected clips (all when none is selected)" = "Заглушить выбранные клипы (все, если ничего не выбрано)"
+"Unmute the selected clips (all when none is selected)" = "Включить звук выбранных клипов (всех, если ничего не выбрано)"

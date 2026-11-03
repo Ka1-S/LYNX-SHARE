@@ -4514,6 +4514,8 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.zoomPerformance")) zoomOnPerformanceClips();
     else if (is ("playlist.perfClipProgress")) { showClipProgress = ! showClipProgress; repaint(); }
     else if (is ("playlist.perfTrackProgress")) { showTrackProgress = ! showTrackProgress; repaint(); }
+    else if (is ("playlist.muteClips") || is ("playlist.unmuteClips"))
+        engine.editSong ([chosen = selection, mute = is ("playlist.muteClips")] (Song& s) { clipops::setClipsMuted (s, chosen, mute); });
     else if (is ("playlist.mergePatternClips")) mergePatternClipsByKey();
     else if (is ("playlist.cloneTracks")) cloneTracksWithDialog (! selectedTracks.empty() ? selectedTracks : std::vector<int> { juce::jmax (0, currentTrack) });
     else if (is ("playlist.makeUnique")) makeSelectionUnique();

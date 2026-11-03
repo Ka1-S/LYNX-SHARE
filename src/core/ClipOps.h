@@ -327,6 +327,31 @@ inline std::vector<int> mutedClips (const Song& song)
     return out;
 }
 
+// FL's Alt+M / Shift+Alt+M in the Playlist (EEMuteAction / EEUnmuteAction → FUN_00e3cc70, undo "mute" / "unmute";
+// issue #53): sets (not toggles) the clip mute of the selected clips, or of every clip when nothing is selected
+// (FUN_01061e80 walks the selected items, else all of them). Returns how many clips changed.
+inline int setClipsMuted (Song& song, const std::vector<int>& selection, bool mute)
+{
+    int changed = 0;
+    auto apply = [&] (int i) {
+        if (i < 0 || i >= (int) song.playlist.size())
+            return;
+        auto& c = song.playlist[(std::size_t) i];
+        if (c.muted != mute)
+        {
+            c.muted = mute;
+            ++changed;
+        }
+    };
+    if (selection.empty())
+        for (int i = 0; i < (int) song.playlist.size(); ++i)
+            apply (i);
+    else
+        for (const auto i : selection)
+            apply (i);
+    return changed;
+}
+
 // Audio "Make unique": the clips get their own copy of the audio channel (so reversing, stretching or renaming
 // them leaves the other clips of that sample alone). Returns the new channel, or -1.
 inline int makeAudioUnique (Song& song, const std::vector<int>& clips)

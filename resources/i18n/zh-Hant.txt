@@ -6788,3 +6788,5 @@ countries: tw hk mo
 "When the session ends you may keep a full copy of the project." = "工作階段結束時，你可以保留專案的完整副本。"
 "When the session ends you keep your own part (the host's choice)." = "工作階段結束時，你保留自己的部分（主持人的選擇）。"
 "Made with LYNX SHARE {0} (this is {1})." = "使用LYNX SHARE {0}製作（目前為{1}）。"
+"Mute the selected clips (all when none is selected)" = "將選取的片段靜音 (未選取時為全部)"
+"Unmute the selected clips (all when none is selected)" = "取消選取片段的靜音 (未選取時為全部)"

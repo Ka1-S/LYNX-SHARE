@@ -6788,3 +6788,5 @@ countries: jp
 "When the session ends you may keep a full copy of the project." = "セッション終了時にプロジェクトの完全なコピーを保持できます。"
 "When the session ends you keep your own part (the host's choice)." = "セッション終了時には自分のパートのみ保持します (ホストの選択)。"
 "Made with LYNX SHARE {0} (this is {1})." = "LYNX SHARE {0}で作成 (これは{1}です)。"
+"Mute the selected clips (all when none is selected)" = "選択したクリップをミュート (未選択ならすべて)"
+"Unmute the selected clips (all when none is selected)" = "選択したクリップのミュートを解除 (未選択ならすべて)"

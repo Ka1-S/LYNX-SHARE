@@ -6788,3 +6788,5 @@ countries: fr be ch ca lu
 "When the session ends you may keep a full copy of the project." = "À la fin de la session, vous pouvez garder une copie complète du projet."
 "When the session ends you keep your own part (the host's choice)." = "À la fin de la session, vous gardez votre propre partie (choix de l'hôte)."
 "Made with LYNX SHARE {0} (this is {1})." = "Créé avec LYNX SHARE {0} (ceci est {1})."
+"Mute the selected clips (all when none is selected)" = "Rendre muets les clips sélectionnés (tous si aucun n'est sélectionné)"
+"Unmute the selected clips (all when none is selected)" = "Réactiver le son des clips sélectionnés (tous si aucun n'est sélectionné)"
