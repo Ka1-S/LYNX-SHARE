@@ -10,6 +10,7 @@ Windows, macOS and Linux.</p>
 
 <p align="center">
   <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><img src="https://img.shields.io/badge/Download-0.1.22%20alpha-d9534f?style=for-the-badge" alt="Download LYNX SHARE"></a>
+  <a href="https://apps.microsoft.com/detail/9NQRFBFDCX6N"><img src="https://get.microsoft.com/images/en-us%20dark.svg" height="28" alt="Get it from Microsoft"></a>
   <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><img src="https://img.shields.io/github/downloads/Ka1-S/LYNX-SHARE/total?style=for-the-badge&label=downloads&color=24292f" alt="Total downloads"></a>
   <a href="https://github.com/Ka1-S/LYNX-SHARE/stargazers"><img src="https://img.shields.io/github/stars/Ka1-S/LYNX-SHARE?style=for-the-badge&color=24292f" alt="GitHub stars"></a>
 </p>
@@ -260,6 +261,9 @@ platforms (`<v>` is the version, e.g. `0.1.10-alpha`):
 | **macOS** 11 Big Sur or newer | `LYNX-<v>-macos-universal.dmg` | universal: Apple Silicon and Intel |
 | **Linux** x86_64, glibc 2.35+ | `LYNX-<v>-x86_64.AppImage` or `LYNX-<v>-linux-x86_64.tar.gz` | Ubuntu 22.04+, Debian 12+, Fedora 36+, current Arch / Manjaro |
 
+**Windows, Microsoft Store:** LYNX SHARE is also on the [Microsoft Store](https://apps.microsoft.com/detail/9NQRFBFDCX6N)
+(Windows 10 / 11), which installs it and keeps it updated automatically.
+
 Release files are built from the tagged source by GitHub Actions ([`release.yml`](.github/workflows/release.yml)) and
 listed with their SHA-256 in `SHA256SUMS.txt`. Releases up to 0.1.7 are Windows-only; up to 0.1.12 the AppImage was named
 `LYNX-<v>-linux-x86_64.AppImage` and needed glibc 2.39.
@@ -291,6 +295,10 @@ chmod +x LYNX-*.AppImage
 Some distributions need libfuse2 to run AppImages (`libfuse2` on Ubuntu 22.04, `libfuse2t64` on 24.04, `fuse2` on Arch, `fuse-libs` on Fedora); otherwise
 use the `.tar.gz`: extract it and run `./install.sh`, which installs LYNX SHARE for your user under `~/.local` with a menu
 entry, an icon and the `.lynx` file type (`./install.sh --uninstall` removes it again).
+
+The AppImage carries its update information (the newest release, pre-releases included) and every release ships its
+`.zsync`, so [Gear Lever](https://github.com/mijorus/gearlever) and AppImageUpdate update it in place, downloading
+only what changed.
 
 ### Platform notes
 

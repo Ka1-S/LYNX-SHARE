@@ -60,6 +60,8 @@
 "dl.portWinP": "任意のフォルダに解凍して<code>LYNX.exe</code>を開きます。",
 "dl.portLin": "Linux AppImage",
 "dl.portLinP": "ファイルひとつだけ。<code>chmod +x</code>して起動します。",
+"dl.store": "<b>Windows 10 / 11：</b>Microsoft Store でも入手でき、自動で更新されます。",
+"dl.storeAlt": "Microsoft から入手",
 "mq.auto": "オートメーションクリップ",
 "mq.flp": ".flpインポート",
 "mq.disk": "ディスクストリーミング",

@@ -60,6 +60,8 @@
 "dl.portWinP": "Rozpakuj do dowolnego folderu i otwórz <code>LYNX.exe</code>.",
 "dl.portLin": "Linux AppImage",
 "dl.portLinP": "Jeden plik: nadaj mu <code>chmod +x</code> i uruchom.",
+"dl.store": "<b>Windows 10 / 11:</b> także w Microsoft Store, z automatycznymi aktualizacjami.",
+"dl.storeAlt": "Pobierz z Microsoft",
 "mq.auto": "Klipy automatyki",
 "mq.flp": "Import .flp",
 "mq.disk": "Streaming z dysku",
