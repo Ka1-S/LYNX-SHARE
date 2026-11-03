@@ -1,6 +1,8 @@
 #include "ui/FlMods.h"
 #include "core/RulerGestures.h"
 #include "ui/ColourPicker.h"
+#include "ui/TrackIcons.h"
+#include "core/TrackIcons.h"
 #include "ui/ClipProperties.h"
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
@@ -1161,9 +1163,18 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 textRight = juce::jmin (textRight, (float) arrow.getX());
             }
 
+            // the track's icon before its name, as FL's track header shows it (round 168h)
+            auto textLeft = (int) left + 6;
+            if (const auto icon = trackicons::iconFor (t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].icon : 0);
+                icon != trackicons::Icon::none && trackHeight >= 14)
+            {
+                const auto size = (float) juce::jmin (14, trackHeight - 4);
+                ui::drawTrackIcon (g, icon, juce::Rectangle<float> ((float) textLeft, (float) y + ((float) trackHeight - size) * 0.5f, size, size),
+                                   muted ? colour::textDisabled : colour::textSecondary.brighter (0.3f));
+                textLeft += (int) size + 4;
+            }
             g.setColour (muted ? colour::textDisabled : (custom ? colour::textPrimary : colour::textSecondary));
             g.setFont (font (type::small, groupHead));
-            const auto textLeft = (int) left + 6;
             textcache::drawFittedText (g, custom ? juce::String::fromUTF8 (song.playlistTracks[(std::size_t) t].name.c_str())
                                      : tr ("Track {0}", { juce::String (t + 1) }),
                               textLeft, y, juce::jmax (8, (int) textRight - textLeft - 2), trackHeight, juce::Justification::centredLeft,
@@ -3420,6 +3431,12 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         const auto& palette = lynxPalette();
         const auto c = palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())];
         editTrack (track, [c] (PlaylistTrack& t) { t.colour = c; });
+    });
+    // FL's "Change icon" (EEPLTrackIconMenuClick, REA round 168h); LYNX's own icon set
+    menu.addItem (tr ("Change icon..."), [this, track, current = info.icon] {
+        ui::showTrackIconPicker (juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1), current, [this, track] (int icon) {
+            editTrack (track, [icon] (PlaylistTrack& t) { t.icon = icon; });
+        });
     });
     // FL's "Auto name" (EEPLTrackAutoNameMenuClick → FUN_012ef490, round 168f): the name and colour of what the track plays most
     menu.addItem (tr ("Auto name"), [this, tracks = tracksForMenu (track)] {

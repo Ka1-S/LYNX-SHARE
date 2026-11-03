@@ -64,6 +64,7 @@
 #include "core/SoundFont.h"
 #include "core/Sfz.h"
 #include "ui/Dialogs.h"
+#include "ui/TrackIcons.h"
 #include "core/RackOps.h"
 #include "core/Layer.h"
 #include "core/XyController.h"
@@ -7489,6 +7490,18 @@ private:
                 offline.dispatchPendingMessages();
             }
             saveSnapshot (ui, prefix + "-mixer.png");
+            // round 168h (issue #52): FL's 8 Mixer layouts
+            {
+                const auto before = lynx::MixerStrips::layout;
+                for (int l = 0; l < lynx::mixerlayout::layoutCount; ++l)
+                {
+                    ui.getMixerForSnapshot().getStripsForSnapshot().setLayout ((lynx::mixerlayout::Layout) l);
+                    offline.dispatchPendingMessages();
+                    saveSnapshot (ui, prefix + "-mixer168h-" + juce::String (l) + ".png");
+                }
+                ui.getMixerForSnapshot().getStripsForSnapshot().setLayout (before);
+                offline.dispatchPendingMessages();
+            }
             // round 163: the Mixer at short heights (UI zoom 150%+): the EQ folds, then the effects panel scrolls
             {
                 const auto size = ui.getBounds();
@@ -7565,6 +7578,7 @@ private:
             saveIconSheet (prefix + "-icons.png", 1.0f);
             saveIconSheet (prefix + "-icons-150.png", 1.5f);
             saveWindow (lynx::MainComponent::makeHelpContent(), "-help.png");
+            saveWindow (lynx::ui::makeTrackIconGrid (5, {}), "-trackicons168h.png"); // round 168h: the icon picker
             saveWindow (std::make_unique<lynx::toolbar::CustomizePanel> (lynx::toolbarlayout::Layout::makeDefault()), "-customize-toolbar.png");
             // two moved controls: Tools › Last tweaked and Add › Automation for last tweaked parameter show them (REA round 143)
             offline.noteTweaked ({ lynx::AutomationTargetKind::channelVolume, 0 });

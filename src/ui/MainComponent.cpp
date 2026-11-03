@@ -414,6 +414,12 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         rackLoopStarterButton.setBounds (r.removeFromLeft (24).reduced (0, 1));
     };
     workspace.setTitleAccessory (Panel::channelRack, &rackTitleTools, rackTitleToolsWidth);
+    workspace.setTitleAccessory (Panel::mixer, &mixer.getLayoutBox(), MixerLayoutBox::width); // FL's "Mixer layout" (issue #52)
+    mixer.getStripsForSnapshot().onLayoutChanged = [this] {
+        mixer.getLayoutBox().repaint();
+        mixer.selectTrack (mixer.getStripsForSnapshot().getSelectedTrack()); // keep the selected strip in view
+        saveUiSettings();
+    };
     workspace.onPanelMenu = [this] (Panel panel, juce::PopupMenu& menu) { addPanelMenuItems (panel, menu); };
     workspace.onFocusChanged = [this] (Panel panel) {
         refreshPanelButtons();
@@ -1706,6 +1712,11 @@ void MainComponent::loadUiSettings()
             newProjectDefaults().readKey (key.toStdString(), line.fromFirstOccurrenceOf ("=", false, false).trim().toStdString());
         else if (key == "mixerUsedOnly")
             MixerStrips::showUsedOnly = on;
+        else if (key == "mixerLayout") // FL's FXViewMode numbering (issue #52)
+        {
+            MixerStrips::layout = mixerlayout::parse (line.fromFirstOccurrenceOf ("=", false, false).trim().toStdString());
+            mixer.getStripsForSnapshot().updateSize();
+        }
         else if (key == "quantizeSongJumps")
             engine.quantizeSongJumps.store (juce::jlimit (0, 5, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue()));
     }
@@ -1778,7 +1789,7 @@ void MainComponent::saveUiSettings()
                                       + "\nrecordQuantiseAutomation=" + juce::String (engine.getRecordOptions().quantiseAutomation ? 1 : 0)
                                       + "\nrecordPunchLoop=" + juce::String (engine.getRecordOptions().punchLoopRegion ? 1 : 0)
                                       + "\nrecordPreRoll=" + juce::String (engine.getRecordOptions().preRollBars)
-                                      + "\nrecordPostRoll=" + juce::String (engine.getRecordOptions().postRollBars) + "\nmixerUsedOnly=" + juce::String (MixerStrips::showUsedOnly ? 1 : 0)
+                                      + "\nrecordPostRoll=" + juce::String (engine.getRecordOptions().postRollBars) + "\nmixerUsedOnly=" + juce::String (MixerStrips::showUsedOnly ? 1 : 0) + "\nmixerLayout=" + juce::String ((int) MixerStrips::layout)
                                       + "\nquantizeSongJumps=" + juce::String (engine.quantizeSongJumps.load()) + "\n"
                                       + juce::String (newProjectDefaults().toText()));
 }
