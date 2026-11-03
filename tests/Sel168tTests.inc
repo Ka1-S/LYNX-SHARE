@@ -13,7 +13,7 @@
 TEST (sel168t_windows_linux_keep_juce_meaning)
 {
     using namespace lynx::modmap;
-    for (auto os : { Os::windows, Os::linux })
+    for (auto os : { Os::windows, Os::linuxOs })
     {
         Raw r;
         r.control = true;
@@ -59,7 +59,7 @@ TEST (sel168t_mac_key_names)
     using namespace lynx::modmap;
     const std::string cmd = "\xe2\x8c\x98", opt = "\xe2\x8c\xa5";
     CHECK (keyNames ("Ctrl+B", Os::windows) == "Ctrl+B");
-    CHECK (keyNames ("Ctrl+B", Os::linux) == "Ctrl+B");
+    CHECK (keyNames ("Ctrl+B", Os::linuxOs) == "Ctrl+B");
     CHECK (keyNames ("Ctrl+B", Os::mac) == cmd + "+B");
     CHECK (keyNames ("Ctrl+Alt+Z", Os::mac) == cmd + "+" + opt + "+Z");
     CHECK (keyNames ("Ctrl", Os::mac) == cmd); // a hint key cap

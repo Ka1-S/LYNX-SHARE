@@ -26,7 +26,7 @@ namespace lynx::modmap
 enum class Os
 {
     windows,
-    linux,
+    linuxOs, // not "linux": GNU mode predefines linux as a macro
     mac
 };
 
@@ -37,7 +37,7 @@ constexpr Os hostOs() noexcept
 #elif defined(_WIN32)
     return Os::windows;
 #else
-    return Os::linux;
+    return Os::linuxOs;
 #endif
 }
 
