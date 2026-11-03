@@ -686,8 +686,8 @@ bool ChannelRackComponent::cellHasNote (int channel, int step) const
     const auto from = (std::int64_t) step * ticksPerStep;
     const auto to = from + ticksPerStep;
 
-    for (const auto& n : p.notes)
-        if (n.channel == channel && n.start >= from && n.start < to)
+    for (const auto& n : p.notes) // (a muted note leaves its step looking off, as in FL: round 169f, FL session)
+        if (n.channel == channel && n.start >= from && n.start < to && ! n.muted)
             return true;
 
     return false;
