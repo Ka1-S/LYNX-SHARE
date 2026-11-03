@@ -2398,10 +2398,23 @@ TEST (pattern_mute_removed_steps)
     p.toggleStep (0, 2, true); // on again: the same note back
     CHECK (p.hasStep (0, 2) && p.notes.size() == 1 && ! p.notes[0].muted && p.notes[0].velocity == 0.3f);
     p.toggleStep (0, 2, true);
-    p.toggleStep (0, 2); // option off: a muted step still comes back rather than doubling
-    CHECK (p.hasStep (0, 2) && p.notes.size() == 1);
-    p.toggleStep (0, 2); // option off: deleted
+    // option off (FL's SetStep, round 169f): turning the muted step on adds a new note and leaves the muted one alone...
+    p.toggleStep (0, 2);
+    CHECK (p.hasStep (0, 2) && p.notes.size() == 2 && p.notes[0].muted != p.notes[1].muted);
+    p.toggleStep (0, 2); // ...and turning it off deletes every note of the step, the muted one too
     CHECK (p.notes.empty());
+    // option on with two notes on the step: both muted, both back
+    p.toggleStep (0, 3);
+    p.notes.push_back (p.notes[0]);
+    p.notes[1].key = 64;
+    p.toggleStep (0, 3, true);
+    CHECK (! p.hasStep (0, 3) && p.notes.size() == 2 && p.notes[0].muted && p.notes[1].muted);
+    p.toggleStep (0, 3, true);
+    CHECK (p.hasStep (0, 3) && p.notes.size() == 2 && ! p.notes[0].muted && ! p.notes[1].muted);
+    // another channel's note on the same step is never touched
+    p.toggleStep (1, 3);
+    p.toggleStep (0, 3, true);
+    CHECK (p.hasStep (1, 3) && ! p.hasStep (0, 3));
 }
 
 TEST (scheduler_places_events_at_exact_samples)

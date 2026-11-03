@@ -7004,3 +7004,4 @@ countries: jp
 "{0} files arriving" = "{0}個のファイルを受信中"
 "Live session with {0}" = "{0}さんとのライブセッション"
 "Undo left alone what someone else changed since: {0}" = "元に戻すは、その後に他の人が変更したものには触れませんでした: {0}"
+"Mute removed steps" = "削除したステップをミュート"

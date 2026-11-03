@@ -41,16 +41,27 @@ bool Pattern::hasStep (int channel, int step) const noexcept
 
 void Pattern::toggleStep (int channel, int step, bool muteRemoved)
 {
+    // FL's SetStep (FLEngine FUN_012d4140, REA round 169f): with "Mute removed steps" on, turning a step off mutes its
+    // notes and turning it on unmutes them; with the option off, turning it off deletes them (muted ones too) and
+    // turning it on adds a new note (a muted one there stays as it is).
     const auto tick = (std::int64_t) step * ticksPerStep;
-    const auto it = std::find_if (notes.begin(), notes.end(),
-                                  [&] (const Note& n) { return n.channel == channel && n.start == tick; });
+    const auto onStep = [&] (const Note& n) { return n.channel == channel && n.start == tick; };
 
-    if (it != notes.end())
+    if (hasStep (channel, step))
     {
-        if (it->muted || muteRemoved)
-            it->muted = ! it->muted;
+        if (muteRemoved)
+            for (auto& n : notes)
+                n.muted = n.muted || onStep (n);
         else
-            notes.erase (it);
+            notes.erase (std::remove_if (notes.begin(), notes.end(), onStep), notes.end());
+        return;
+    }
+
+    if (muteRemoved && std::any_of (notes.begin(), notes.end(), onStep))
+    {
+        for (auto& n : notes)
+            if (onStep (n))
+                n.muted = false;
         return;
     }
 

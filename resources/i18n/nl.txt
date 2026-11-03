@@ -7004,3 +7004,4 @@ countries: nl be
 "{0} files arriving" = "{0} bestanden onderweg"
 "Live session with {0}" = "Livesessie met {0}"
 "Undo left alone what someone else changed since: {0}" = "Ongedaan maken liet ongemoeid wat iemand anders sindsdien wijzigde: {0}"
+"Mute removed steps" = "Verwijderde steps dempen"

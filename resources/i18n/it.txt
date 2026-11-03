@@ -7004,3 +7004,4 @@ countries: it ch sm
 "{0} files arriving" = "{0} file in arrivo"
 "Live session with {0}" = "Sessione live con {0}"
 "Undo left alone what someone else changed since: {0}" = "Annulla non ha toccato ciò che un'altra persona ha modificato nel frattempo: {0}"
+"Mute removed steps" = "Silenzia gli step rimossi"

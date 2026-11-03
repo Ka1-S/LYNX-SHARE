@@ -2141,7 +2141,7 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             menu.addSubMenu (tr ("Sort channels"), sort);
             menu.addItem (tr ("Select unused channels"), [this] { rack.selectUnused(); });
             action (menu, "rack.groupSelected", tr ("Group selected..."));
-            menu.addSeparator();
+            menu.addSectionHeader (tr ("Options")); // (FL's SSMenu: "Mute removed steps" is in its Options part)
             menu.addItem (tr ("Mute removed steps"), true, ChannelRackComponent::muteRemovedSteps, [this] {
                 ChannelRackComponent::muteRemovedSteps = ! ChannelRackComponent::muteRemovedSteps;
                 saveUiSettings();
