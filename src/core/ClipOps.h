@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdint>
 #include <string>
+#include <limits>
 #include <vector>
 
 #include "core/Song.h"
@@ -329,14 +330,19 @@ inline std::vector<int> mutedClips (const Song& song)
 
 // FL's Alt+M / Shift+Alt+M in the Playlist (EEMuteAction / EEUnmuteAction → FUN_00e3cc70, undo "mute" / "unmute";
 // issue #53): sets (not toggles) the clip mute of the selected clips, or of every clip when nothing is selected
-// (FUN_01061e80 walks the selected items, else all of them). Returns how many clips changed.
-inline int setClipsMuted (Song& song, const std::vector<int>& selection, bool mute)
+// (FUN_01061e80 walks the selected items, else all of them). With a time selection only the clips that start inside
+// it, ends included (FUN_00e3cb60 against the range FUN_00e87aa0 sets from the editor's time selection). Returns how
+// many clips changed.
+inline int setClipsMuted (Song& song, const std::vector<int>& selection, bool mute, std::int64_t from = 0,
+                          std::int64_t to = std::numeric_limits<std::int64_t>::max())
 {
     int changed = 0;
     auto apply = [&] (int i) {
         if (i < 0 || i >= (int) song.playlist.size())
             return;
         auto& c = song.playlist[(std::size_t) i];
+        if (c.start < from || c.start > to)
+            return;
         if (c.muted != mute)
         {
             c.muted = mute;

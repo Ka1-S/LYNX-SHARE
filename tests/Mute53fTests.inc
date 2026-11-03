@@ -23,6 +23,10 @@ TEST (mute53f_alt_m_mutes_and_shift_alt_m_unmutes_clips)
     CHECK (std::none_of (song.playlist.begin(), song.playlist.end(), [] (const Clip& c) { return c.muted; }));
     CHECK (clipops::setClipsMuted (song, { 99, -1 }, true) == 0); // stale indices are ignored
 
+    // a time selection: only the clips that start inside it (ends included)
+    CHECK (clipops::setClipsMuted (song, {}, true, bar, 2 * bar) == 2);
+    CHECK (! song.playlist[0].muted && song.playlist[1].muted && song.playlist[2].muted && ! song.playlist[3].muted);
+
     // FL's keys (ShortcutsModule: Alt+M Mute, Shift+Alt+M Unmute), free of conflicts in the Playlist
     const auto* mute = keys::findAction ("playlist.muteClips");
     const auto* unmute = keys::findAction ("playlist.unmuteClips");

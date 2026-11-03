@@ -4515,7 +4515,13 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.perfClipProgress")) { showClipProgress = ! showClipProgress; repaint(); }
     else if (is ("playlist.perfTrackProgress")) { showTrackProgress = ! showTrackProgress; repaint(); }
     else if (is ("playlist.muteClips") || is ("playlist.unmuteClips"))
-        engine.editSong ([chosen = selection, mute = is ("playlist.muteClips")] (Song& s) { clipops::setClipsMuted (s, chosen, mute); });
+    {
+        // FL limits it to the time selection when there is one
+        const auto& song = engine.getSong();
+        const auto from = song.hasLoop() ? song.loopStart : (std::int64_t) 0;
+        const auto to = song.hasLoop() ? song.loopEnd : std::numeric_limits<std::int64_t>::max();
+        engine.editSong ([chosen = selection, mute = is ("playlist.muteClips"), from, to] (Song& s) { clipops::setClipsMuted (s, chosen, mute, from, to); });
+    }
     else if (is ("playlist.mergePatternClips")) mergePatternClipsByKey();
     else if (is ("playlist.cloneTracks")) cloneTracksWithDialog (! selectedTracks.empty() ? selectedTracks : std::vector<int> { juce::jmax (0, currentTrack) });
     else if (is ("playlist.makeUnique")) makeSelectionUnique();
