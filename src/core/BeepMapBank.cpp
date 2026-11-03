@@ -135,13 +135,13 @@ float drawbarLevel (int d) { return d <= 0 ? 0.0f : std::pow (10.0f, -3.0f * (fl
 int harmonicRow (int n, int h) { return h - n; }
 
 // an organ registration ("888000000") held: one looped column
-std::vector<std::uint8_t> organ (const char* drawbars, int attackLength, bool widen)
+std::vector<std::uint8_t> organ (const char* drawbars, int attackLength, bool widen, float peak = 0.55f)
 {
     Picture p (1, organRows);
     for (int i = 0; i < 9 && drawbars[i] != 0; ++i)
         p.set (0, harmonicRow (drawbarHarmonic[i], organRows), drawbarLevel (drawbars[i] - '0'));
     Beep b;
-    b.scale = 2, b.frequency = 9600, b.length = attackLength, b.widen = widen;
+    b.scale = 2, b.frequency = 9600, b.length = attackLength, b.widen = widen, b.peak = peak;
     return b.state (p);
 }
 
@@ -220,7 +220,7 @@ std::vector<Preset> beepMapBank()
     bank.push_back (make ("Gospel Full", "Organ", { "drawbar", "full" }, [] { return organ ("888800000", 300, false); }));
     bank.push_back (make ("Stops Out", "Organ", { "drawbar", "bright" }, [] { return organ ("888888888", 300, false); }));
     bank.push_back (make ("Soft Flute Stop", "Organ", { "drawbar", "soft" }, [] { return organ ("008400000", 1279, false); }));
-    bank.push_back (make ("Reed Organ", "Organ", { "drawbar", "reed" }, [] { return organ ("806000088", 600, true); }));
+    bank.push_back (make ("Reed Organ", "Organ", { "drawbar", "reed" }, [] { return organ ("806000088", 600, true, 0.4f); } // (its odd partials peak high in chords)));
     // the percussion click: 2⅔' fading over the first columns, the registration held for a long image
     bank.push_back (make ("Click Organ", "Organ", { "drawbar", "percussion" }, [] {
         Picture p (48, organRows);
