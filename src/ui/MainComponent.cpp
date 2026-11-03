@@ -710,12 +710,12 @@ void MainComponent::paint (juce::Graphics& g)
     if (! titleArea.isEmpty())
     {
         // the people of a live session first (round 169b), the project's name after them
-        const auto people = live != nullptr ? liveui::paintPresence (g, titleArea.withWidth (titleArea.getWidth() * 3 / 4), *live) : 0;
+        const auto people = live != nullptr ? liveui::paintPresence (g, titleArea, *live) : 0;
         const auto name = projectName.isNotEmpty() ? projectName : tr ("Untitled");
         g.setFont (font (type::small, true));
         g.setColour (colour::textSecondary);
-        g.drawFittedText ((engine.isModified() ? juce::String ("* ") : juce::String()) + name, titleArea.withTrimmedLeft (people > 0 ? people + 10 : 0),
-                          juce::Justification::centredRight, 1, 0.8f);
+        if (const auto rest = titleArea.withTrimmedLeft (people > 0 ? people + 10 : 0); rest.getWidth() >= 50)
+            g.drawFittedText ((engine.isModified() ? juce::String ("* ") : juce::String()) + name, rest, juce::Justification::centredRight, 1, 0.8f);
     }
 
     // captions that name the snap and pattern selectors
@@ -3933,6 +3933,18 @@ void MainComponent::startLiveFromCommandLine()
         if (code.startsWith ("@"))
             code = juce::File (code.substring (1)).loadFileAsString().trim();
         live->join (code, o);
+        // --live-edit: once in, add a channel of one's own (the GUI check sees it arrive on the host)
+        if (cli.contains ("--live-edit"))
+            juce::Timer::callAfterDelay (8000, [safe = juce::Component::SafePointer<MainComponent> (this), name = o.name] {
+                if (safe == nullptr || safe->live->getState() != LiveSessionManager::State::live)
+                    return;
+                safe->engine.editSong ([&] (Song& s) {
+                    ChannelDef c;
+                    c.name = (name + " synth").toStdString();
+                    c.instrument = InstrumentKind::synth;
+                    s.channels.push_back (c);
+                });
+            });
     }
 }
 

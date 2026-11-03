@@ -207,12 +207,32 @@ int paintPresence (juce::Graphics& g, juce::Rectangle<int> area, const LiveSessi
     g.setFont (f);
     g.drawText (badge, b, juce::Justification::centred, false);
     r.removeFromLeft (6);
+    // names when they fit, else each person's initial in their colour
+    int full = 0;
+    for (const auto& p : people)
+        full += 14 + juce::GlyphArrangement::getStringWidthInt (f, p.name + (p.me ? " (" + tr ("you") + ")" : juce::String())) + (p.recording ? 26 : 0) + 8;
+    const bool compact = full > r.getWidth();
     for (const auto& p : people)
     {
+        if (compact)
+        {
+            if (r.getWidth() < 20)
+                break;
+            auto dot = r.removeFromLeft (20).toFloat().withSizeKeepingCentre (16.0f, 16.0f);
+            g.setColour (juce::Colour (p.colour));
+            g.fillEllipse (dot);
+            if (p.me || p.recording)
+            {
+                g.setColour (p.recording ? colour::accent : colour::textPrimary);
+                g.drawEllipse (dot.expanded (1.5f), 1.5f);
+            }
+            g.setColour (juce::Colours::white);
+            g.drawText (p.name.substring (0, 1).toUpperCase(), dot, juce::Justification::centred, false);
+            r.removeFromLeft (2);
+            continue;
+        }
         const auto name = p.name + (p.me ? " (" + tr ("you") + ")" : juce::String());
         const auto w = 14 + juce::GlyphArrangement::getStringWidthInt (f, name) + (p.recording ? 26 : 0) + 8;
-        if (w > r.getWidth())
-            break;
         auto cell = r.removeFromLeft (w);
         const auto dot = cell.removeFromLeft (14).toFloat().withSizeKeepingCentre (9.0f, 9.0f);
         g.setColour (juce::Colour (p.colour));

@@ -12,6 +12,7 @@
 #include "core/SessionParts.h"
 #include "engine/AudioEngine.h"
 #include "engine/LiveSessions.h"
+#include "engine/ProjectFile.h"
 #include "engine/SessionPack.h"
 
 namespace lynx::livetest
@@ -306,7 +307,51 @@ int run (const juce::StringArray& args)
     auto explain = [&] (std::initializer_list<Peer*> list) {
         for (auto* p : list)
             if (const auto d = differences (host.engine->getSong(), p->engine->getSong()); d.isNotEmpty())
+            {
                 line ("     " + p->name + " differs on " + d.substring (0, 400));
+                // the first differing line of the JSON of an insert that differs (what the format and the replica disagree on)
+                for (const auto& key : juce::StringArray::fromTokens (d, ",", ""))
+                    if (key.startsWith ("m:"))
+                    {
+                        const auto i = (std::size_t) key.substring (2).getLargeIntValue();
+                        const auto& hs = host.engine->getSong();
+                        const auto& ps = p->engine->getSong();
+                        if (i >= hs.mixer.size() || i >= ps.mixer.size())
+                            continue;
+                        const auto &x = hs.mixer[i], &y = ps.mixer[i];
+                        juce::StringArray f;
+#define LYNX_FIELD(n) if (! (x.n == y.n)) f.add (#n);
+                        LYNX_FIELD (name) LYNX_FIELD (volume) LYNX_FIELD (pan) LYNX_FIELD (muted) LYNX_FIELD (solo) LYNX_FIELD (soloSources) LYNX_FIELD (effects)
+                        LYNX_FIELD (toMaster) LYNX_FIELD (masterLevel) LYNX_FIELD (stereo) LYNX_FIELD (colour) LYNX_FIELD (invertPhase) LYNX_FIELD (swapChannels)
+                        LYNX_FIELD (sends) LYNX_FIELD (eq) LYNX_FIELD (inputChannel) LYNX_FIELD (inputStereo) LYNX_FIELD (monitor) LYNX_FIELD (recordSafe)
+                        LYNX_FIELD (recordTo) LYNX_FIELD (recordSource) LYNX_FIELD (recordDryToo) LYNX_FIELD (flInput) LYNX_FIELD (outputChannel) LYNX_FIELD (outputMode)
+                        LYNX_FIELD (threaded) LYNX_FIELD (separator) LYNX_FIELD (dock) LYNX_FIELD (latencyMs) LYNX_FIELD (latencyBypass)
+                        LYNX_FIELD (compensateMasterLatency) LYNX_FIELD (standIns) LYNX_FIELD (icon)
+#undef LYNX_FIELD
+                        for (std::size_t e = 0; e < x.effects.size() && e < y.effects.size(); ++e)
+                        {
+                            const auto &ex = x.effects[e], &ey = y.effects[e];
+#define LYNX_FIELD(n) if (! (ex.n == ey.n)) f.add ("fx" + juce::String ((int) e) + "." #n);
+                            LYNX_FIELD (kind) LYNX_FIELD (enabled) LYNX_FIELD (params) LYNX_FIELD (mix) LYNX_FIELD (plugin) LYNX_FIELD (sidechain) LYNX_FIELD (sidechain2)
+                            LYNX_FIELD (sendTracks) LYNX_FIELD (state) LYNX_FIELD (samplePath) LYNX_FIELD (substituteFor) LYNX_FIELD (presetName) LYNX_FIELD (abOther)
+                            LYNX_FIELD (abShowingB) LYNX_FIELD (patcher)
+#undef LYNX_FIELD
+                            if (! (ex.params == ey.params))
+                                for (std::size_t q = 0; q < ex.params.size(); ++q)
+                                    if (! (ex.params[q] == ey.params[q]))
+                                    {
+                                        f.add ("p" + juce::String ((int) q) + "=" + juce::String (ex.params[q], 9) + "/" + juce::String (ey.params[q], 9));
+                                        break;
+                                    }
+                            if (ex.state != ey.state)
+                                f.add ("state " + juce::String ((int) ex.state.size()) + "/" + juce::String ((int) ey.state.size()));
+                            if (ex.samplePath != ey.samplePath)
+                                f.add ("path " + juce::String (ex.samplePath) + " / " + juce::String (ey.samplePath));
+                        }
+                        line ("       fields: " + f.joinIntoString (",") + " host recordTo=" + juce::String (x.recordTo) + " / " + juce::String (y.recordTo)
+                              + " out=" + juce::String (x.outputChannel) + "/" + juce::String (y.outputChannel) + " in=" + juce::String (x.inputChannel) + "/" + juce::String (y.inputChannel));
+                    }
+            }
     };
 
     // the host's project: a sampler with its own sample

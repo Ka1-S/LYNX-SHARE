@@ -197,6 +197,13 @@ void LiveSessionManager::start (const Options& o)
                 mine->colour = colourOf (session::hostTag);
         },
         false);
+    {
+        // the song in the form the guests receive it (the .lynx JSON rounds a few values, e.g. floats a computation
+        // made): from now on every copy, this one included, holds exactly the same values
+        Song rounded = engine.getSong();
+        live::apply (rounded, roundTrip (live::diff (Song(), rounded)));
+        engine.applyRemote (std::move (rounded));
+    }
     const auto& song = engine.getSong();
     authority = std::make_unique<live::Authority> (song, &roundTrip);
     replica = std::make_unique<live::Replica> (song, 0, session::hostTag, &roundTrip);
