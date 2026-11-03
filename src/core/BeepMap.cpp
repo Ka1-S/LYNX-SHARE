@@ -2,6 +2,7 @@
 
 #include "core/BeepMap.h"
 #include "core/HostSlide.h"
+#include "core/ModelParams.h"
 
 #include <algorithm>
 #include <array>
@@ -570,8 +571,17 @@ public:
         if (channel.pluginState == state && ppq == lastPpq && tempo == lastTempo)
             return;
         Params p;
-        if (! parse (channel.pluginState, p))
+        std::size_t at = 0;
+        if (! parse (channel.pluginState, p, &at))
             return;
+        // a knob of the editor (round 168q) leaves the bitmap as it was: keep the decoded image, so the voices go on
+        // (FL kills them only when a new bitmap is loaded)
+        const auto tail = at + 4 * (std::size_t) settingCount;
+        if (lastImage != nullptr && p.P[14] == lastMaxHeight && state.size() == channel.pluginState.size() && tail <= state.size()
+            && std::memcmp (state.data() + tail, channel.pluginState.data() + tail, state.size() - tail) == 0)
+            p.image = lastImage;
+        lastImage = p.image;
+        lastMaxHeight = p.P[14];
         auto s = std::make_unique<Setup>();
         s->P = std::move (p);
         s->ppq = ppq, s->tempo = tempo;
@@ -595,6 +605,22 @@ public:
     {
         nextPan = pan;
         nextCents = cents;
+    }
+
+    // automation of a setting (round 168q): the clip's 0…1 over the setting's range (Max height reshapes the image:
+    // that one follows the channel's state, not the clip)
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        const auto* p = findEngineParam (beepMapEngineParams(), index);
+        if (p == nullptr || index >= 14 || ! std::isfinite (value))
+            return;
+        const auto v = (std::int32_t) std::lround (p->raw (value));
+        if (engine->P.P[(std::size_t) index] == v)
+            return;
+        engine->P.P[(std::size_t) index] = v;
+        current.P.P[(std::size_t) index] = v;
+        engine->update();
     }
 
     // FL's PITCH knob and main pitch move the sounding notes too (round 167a)
@@ -736,6 +762,8 @@ private:
     LiveChannelPitch live; // (audio thread)
     std::atomic<int> maxPoly { 0 };
     std::vector<std::uint8_t> state;
+    std::shared_ptr<const Image> lastImage; // (UI thread)
+    int lastMaxHeight = -1;
     int lastPpq = -1;
     double lastTempo = -1.0;
     std::array<float, blockSize> bufL {}, bufR {};
@@ -760,6 +788,50 @@ std::optional<std::vector<int>> beepMapParams (const std::vector<std::uint8_t>& 
     return std::vector<int> (p.P.begin(), p.P.end());
 }
 
+namespace
+{
+// where the bitmap stream (int32 size + BMP) starts in a state of version 0 / 1, or 0
+std::size_t bitmapAt (const std::vector<std::uint8_t>& d)
+{
+    if (d.size() < 4)
+        return 0;
+    const auto version = i32At (d.data());
+    if (version < 0 || version > 1)
+        return 0;
+    const std::size_t at = 4 + (version == 0 ? 0x3c : 0x1a8);
+    return d.size() >= at + 4 ? at : 0;
+}
+} // namespace
+
+std::optional<BeepMapPicture> beepMapPicture (const std::vector<std::uint8_t>& state)
+{
+    const auto at = bitmapAt (state);
+    if (at == 0)
+        return std::nullopt;
+    const auto len = i32At (state.data() + at);
+    Image img;
+    if (len <= 0 || (std::size_t) len > state.size() - at - 4 || ! decodeBmp (state.data() + at + 4, (std::size_t) len, img))
+        return std::nullopt;
+    BeepMapPicture p;
+    p.width = img.width, p.height = img.height, p.bgr = std::move (img.bgr);
+    return p;
+}
+
+std::vector<std::uint8_t> beepMapWithBitmap (const std::vector<std::uint8_t>& state, const std::vector<std::uint8_t>& bmp)
+{
+    const auto at = bitmapAt (state);
+    Image img;
+    if (at == 0 || bmp.size() > (std::size_t) 0x7fffffff || ! decodeBmp (bmp.data(), bmp.size(), img) || img.height <= 2)
+        return {};
+    std::vector<std::uint8_t> out (state.begin(), state.begin() + (std::ptrdiff_t) at);
+    const auto len = (std::int32_t) bmp.size();
+    std::uint8_t b[4];
+    std::memcpy (b, &len, 4);
+    out.insert (out.end(), b, b + 4);
+    out.insert (out.end(), bmp.begin(), bmp.end());
+    return beepMapStateUsable (out) ? out : std::vector<std::uint8_t> {};
+}
+
 int beepMapParamOffset (const std::vector<std::uint8_t>& state, int index)
 {
     Params p;
@@ -770,6 +842,55 @@ int beepMapParamOffset (const std::vector<std::uint8_t>& state, int index)
 }
 
 std::unique_ptr<Instrument> makeBeepMapInstrument() { return std::make_unique<BeepMapInstrument>(); }
+
+const std::vector<EngineParam>& beepMapEngineParams()
+{
+    // BeepMap's panel (FL's editor form, REA_rodada168q §1): the int32 settings and their knob ranges
+    static const std::vector<EngineParam> table = [] {
+        std::vector<EngineParam> t;
+        const auto add = [&t] (int index, const char* name, float low, float high, bool stepped) {
+            EngineParam p;
+            p.index = index, p.name = name, p.low = low, p.high = high, p.stepped = stepped;
+            t.push_back (p);
+        };
+        add (0, "Frequency", 24, 9600, true);
+        add (1, "Length", 0, 4096, true);
+        add (2, "Scale", 0, 2, true);
+        add (3, "Use blue", 0, 1, true);
+        add (4, "Grainy", 0, 1, true);
+        add (5, "Loop", 0, 1, true);
+        add (6, "Widen", 0, 1, true);
+        add (14, "Max height", 3, 999, true);
+        return t;
+    }();
+    return table;
+}
+
+namespace modelparams
+{
+namespace
+{
+std::optional<float> beepMapValue (const ChannelDef& c, const EngineParam& p)
+{
+    const auto v = beepMapParams (c.pluginState);
+    if (! v || p.index < 0 || p.index >= (int) v->size())
+        return std::nullopt;
+    return std::clamp ((float) (*v)[(std::size_t) p.index], p.low, p.high);
+}
+
+bool beepMapSetValue (ChannelDef& c, const EngineParam& p, float raw)
+{
+    const auto at = beepMapParamOffset (c.pluginState, p.index);
+    if (at < 0 || ! std::isfinite (raw))
+        return false;
+    const auto v = (std::int32_t) std::lround (std::clamp (raw, p.low, p.high));
+    std::memcpy (c.pluginState.data() + at, &v, 4);
+    return true;
+}
+} // namespace
+
+Table beepMapModelTable() { return { &beepMapEngineParams(), &beepMapValue, &beepMapSetValue }; }
+} // namespace modelparams
 
 namespace beepmap
 {

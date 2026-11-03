@@ -10,3 +10,9 @@ LYNX_MODEL_PARAMS (autogun, autogunModelTable)       // round 168o
 LYNX_MODEL_PARAMS (minisynth, miniSynthModelTable)   // round 168o
 LYNX_MODEL_PARAMS (gms, gmsModelTable)               // round 168o
 LYNX_MODEL_PARAMS (morphine, morphineModelTable)     // round 168o
+LYNX_MODEL_PARAMS (kepler, keplerModelTable)                 // round 168q
+LYNX_MODEL_PARAMS (keplerExo, keplerExoModelTable)           // round 168q
+LYNX_MODEL_PARAMS (transistorbass, transistorBassModelTable) // round 168q
+LYNX_MODEL_PARAMS (sawer, sawerModelTable)                   // round 168q
+LYNX_MODEL_PARAMS (beepmap, beepMapModelTable)               // round 168q
+LYNX_MODEL_PARAMS (granulizer, granulizerModelTable)         // round 168q
