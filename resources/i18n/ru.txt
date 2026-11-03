@@ -7004,3 +7004,5 @@ countries: ru by kz
 "{0} files arriving" = "Поступает файлов: {0}"
 "Live session with {0}" = "Live-сессия с {0}"
 "Undo left alone what someone else changed since: {0}" = "Отмена не затронула то, что с тех пор изменил кто-то другой: {0}"
+"Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Паттерн: [LMB] рисовать им карандашом  [Ctrl+LMB] / [Shift+LMB] выбрать несколько  [2xLMB] открыть  [RMB] меню"
+"Empty patterns were ignored." = "Пустые паттерны пропущены."

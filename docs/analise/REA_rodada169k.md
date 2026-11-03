@@ -80,13 +80,31 @@ are closed and reopened at the new place.
 
 ## 3. LYNX work this round
 
-(filled as items land)
+### 3.1 #1 + #2 Picker multi-selection and multi-pattern render (branch feature/gap169k-patrender)
+
+| | |
+|---|---|
+| FL evidence | §2.1, §2.2 |
+| LYNX before | the picker chose one pattern; the Patterns-menu renders took the current pattern only |
+| LYNX now | `core/PickerSelection.h` (FL's press / release rules, the render plan and its two warnings); `PatternPicker` keeps the picked patterns (click, Ctrl+click, Shift+click, right-click keeps them), outlines them in red when several are picked; the pattern menu opened from the picker passes them to `renderPatternsAsAudioClips` (ui/ExportDialog): the window once, then one render after the other with the same choices, empty ones skipped with FL's warning, every result in one undo step, a cancel keeps what was rendered. One pattern = the old path. |
+| Tests | `gap169k_picker_selection_like_fl`, `gap169k_render_plan_and_warnings` (tests/Gap169kTests.inc) |
+| Not done | FL's render-done sound (RenderSnd.wv); other pattern-menu items that may act on the picker selection were not traced |
+
+### 3.2 #7 Align all channel editors (branch feature/gap169k-align)
+
+| | |
+|---|---|
+| FL evidence | §2.4; ShortCut 8315 = Shift+F12 [DFM] |
+| LYNX before | none |
+| LYNX now | View menu + Shift+F12 (`view.alignChannelEditors`): every open Channel settings window moves to the focused one's place (else the selected channel's, else the first open one); windows opened later come up there too (FL stores the place per channel). Envelope windows are left alone. |
+| Tests | `gap169k_align_channel_editors_key` (Shift+F12, no conflicts) |
+| Not done | plugin (VST) editor windows of channels are not moved; per-channel window places are not saved in the project |
 
 ## 4. Needs user decision
 
 - **32-bit VST2 plugins (bridge).** FL hosts them through `ilbridge.exe` (32-bit). LYNX could build its sandbox worker
   (`--plugin-host`, shared-memory audio, already used for "Make bridged") as a separate 32-bit `LYNX-bridge32.exe`
-  (zig can target x86-windows), plus a 32-bit scan.
+  (the Windows build already makes a 32-bit `lynx-asio32.dll` with zig, so the toolchain is there), plus a 32-bit scan.
   Pros: old freeware / discontinued VST2 synths work, a common FL-migrant ask. Cons: a second Windows binary to build,
   sign and ship (+~15 MB), cross-bitness IPC structs and editor embedding to verify, 3–5 days; Windows only.
 

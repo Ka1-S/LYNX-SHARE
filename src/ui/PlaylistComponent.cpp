@@ -6035,6 +6035,12 @@ void PatternPicker::paint (juce::Graphics& g)
                 }
             }
 
+            if (row.kind == ClipKind::pattern && picked.contains (row.index) && picked.items.size() > 1) // picked with others
+            {
+                g.setColour (colour::accent.withAlpha (0.8f));
+                g.drawRoundedRectangle (box.reduced (0.5f), radius::sm, 1.2f);
+            }
+
             if (current) // the current source: the accent strip
             {
                 g.setColour (colour::accent);
@@ -6087,10 +6093,49 @@ void PatternPicker::mouseDown (const juce::MouseEvent& e)
     if (row.kind == ClipKind::pattern && row.index != engine.getSong().currentPattern)
         engine.editSong ([p = row.index] (Song& s) { s.currentPattern = p; }, false);
 
+    // FL's picker selection (PickerPanelMouseDown FUN_00e4d5d0, REA_rodada169k §2.2)
+    pressedRow = -1;
+    if (row.kind == ClipKind::pattern)
+    {
+        pickersel::clamp (picked, (int) engine.getSong().patterns.size());
+        if (flmods::popup (e.mods))
+            pickersel::rightDown (picked, row.index, flmods::ctrl (e.mods));
+        else
+        {
+            deselectOnUp = pickersel::leftDownDeselects (picked, row.index, flmods::ctrl (e.mods));
+            pressedRow = i;
+        }
+    }
+
     if (flmods::popup (e.mods) && row.kind == ClipKind::pattern && onPatternMenu)
         onPatternMenu();
 
     repaint();
+}
+
+void PatternPicker::mouseUp (const juce::MouseEvent& e)
+{
+    // FL's PickerPanelMouseUp FUN_00e4e080: plain = only this one, Ctrl = toggle, Shift = the range from the first picked
+    const auto i = rowAt (e.y);
+    if (pressedRow < 0 || i != pressedRow)
+    {
+        pressedRow = -1;
+        return;
+    }
+    pressedRow = -1;
+    const auto list = rows();
+    if (i >= (int) list.size() || list[(std::size_t) i].kind != ClipKind::pattern)
+        return;
+    pickersel::leftUp (picked, list[(std::size_t) i].index, flmods::ctrl (e.mods), e.mods.isShiftDown(), deselectOnUp);
+    deselectOnUp = false;
+    repaint();
+}
+
+std::vector<int> PatternPicker::pickedPatterns() const
+{
+    auto s = picked;
+    pickersel::clamp (s, (int) engine.getSong().patterns.size());
+    return s.items;
 }
 
 void PatternPicker::mouseDoubleClick (const juce::MouseEvent& e)
@@ -6150,7 +6195,7 @@ ui::Hint PatternPicker::hintAt (juce::Point<int> p)
     {
         hint.value = list[(std::size_t) i].name;
         hint.text = list[(std::size_t) i].kind == ClipKind::pattern
-                        ? tr ("Pattern: [LMB] paint it with the pencil  [2xLMB] open  [RMB] menu")
+                        ? tr ("Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu")
                         : tr ("Clip source: [LMB] paint it with the pencil");
         hint.hasMenu = list[(std::size_t) i].kind == ClipKind::pattern;
     }

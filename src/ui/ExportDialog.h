@@ -40,6 +40,9 @@ void consolidatePlaylistSelection (AudioEngine& engine, const std::vector<int>& 
 // Patterns › "Render as audio clip..." (how 0), "Quick render as audio clip" (1: the last choices, no window), "Render and
 // replace..." (2: the pattern's Playlist clips become clips of the render): a new audio clip channel named after it.
 void renderPatternAsAudioClip (AudioEngine& engine, int pattern, int how);
+// The same for several patterns (FL, from the Playlist picker's selection, round 169k): rendered one after the other in
+// that order, the window only for the first, empty ones skipped with FL's warning, all results in one undo step.
+void renderPatternsAsAudioClips (AudioEngine& engine, const std::vector<int>& patterns, int how);
 // File › Export › "All playlist tracks" / "All playlist track groups" (and the Playlist's Tools): a folder, the render
 // window once, then one WAV per track ("<project> - <track>"), from the song start, the track's start or the time
 // selection (quickrender::Start).
