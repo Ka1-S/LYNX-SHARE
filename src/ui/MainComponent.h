@@ -151,6 +151,7 @@ private:
     bool typingPiano = false; // off by default so single-letter editor tools work (the manual does not state a default)
     int lastCurrentPattern = -1; // ("Select first channel with notes when the pattern changes")
     void setTypingPiano (bool on);
+    void toggleTypingPiano(); // the user's toggle (button, menus, Ctrl+T): also says so in the hint bar
     juce::String shortcutText (const char* actionId) const; // "\tF5" for menus ("" when unbound)
 
     // panels

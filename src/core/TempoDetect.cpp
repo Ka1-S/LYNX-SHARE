@@ -1,5 +1,8 @@
 #include "core/TempoDetect.h"
 
+#include "core/ClipOps.h"
+#include "core/Instruments.h"
+
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -206,4 +209,21 @@ Result detect (const float* left, const float* right, std::size_t frames, double
     result.beats = seconds * result.bpm / 60.0;
     return result;
 }
+
+float fitBeatsOf (const SampleData* sample, double bpm)
+{
+    if (sample == nullptr || sample->frames() == 0 || ! (sample->sampleRate > 0.0))
+        return 0.0f;
+    const auto seconds = (double) sample->frames() / sample->sampleRate;
+    double found = 0.0;
+    if (sample->acidBeats <= 0.0f && seconds <= 120.0)
+    {
+        Options options;
+        options.minBpm = 75.0; // FL's middle range; fitBeats takes the octave nearest the project tempo
+        options.maxBpm = 150.0;
+        found = detect (sample->leftData(), sample->isStereo() ? sample->rightData() : nullptr, sample->frames(), sample->sampleRate, options).bpm;
+    }
+    return clipops::fitBeats (seconds, bpm, sample->acidBeats, found);
+}
 } // namespace lynx::tempodetect
+

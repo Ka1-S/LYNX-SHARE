@@ -153,7 +153,7 @@ public:
         label (fadeOutLabel, tr ("Fade out"));
         slider (fadeOut, 0.0, 16.0, 0.01, " " + tr ("beats"));
         label (stretchLabel, tr ("Stretch to"));
-        slider (stretch, 0.0, 256.0, 0.25, " " + tr ("beats"));
+        slider (stretch, 0.0, 1024.0, 0.01, " " + tr ("beats"));
         stretch.setTooltip (tr ("0: the file plays at its own speed; otherwise the whole file lasts this many beats at the project tempo"));
         keepPitch.setButtonText (tr ("Keep length (stretch engine)"));
         keepPitch.setTooltip (tr ("On: the stretch and the pitch change separately (the stretch keeps the pitch, the pitch keeps the length). Off: resample, pitch and speed change together"));
@@ -328,6 +328,7 @@ private:
         fadeIn.setValue ((double) props.fadeIn / ppq, n);
         fadeOut.setValue ((double) props.fadeOut / ppq, n);
         stretch.setValue (props.stretchBeats, n);
+        shownStretch = stretch.getValue();
         keepPitch.setToggleState (props.keepPitch, n);
         for (auto* c : std::initializer_list<juce::Component*> { &levelsTitle, &gainLabel, &gain, &panLabel, &pan, &pitchLabel, &pitch, &fadeInLabel, &fadeIn,
                                                                   &fadeOutLabel, &fadeOut, &stretchLabel, &stretch, &keepPitch })
@@ -364,7 +365,8 @@ private:
         p.pitch = (float) pitch.getValue();
         p.fadeIn = (std::int64_t) std::llround (fadeIn.getValue() * ppq);
         p.fadeOut = (std::int64_t) std::llround (fadeOut.getValue() * ppq);
-        p.stretchBeats = (float) stretch.getValue();
+        if (stretch.getValue() != shownStretch) // issue #32 #7: unmoved keeps the exact value Fit to tempo set
+            p.stretchBeats = (float) stretch.getValue();
         p.keepPitch = keepPitch.getToggleState();
         if (p == props)
         {
@@ -433,6 +435,7 @@ private:
 
     SectionTitle sourceTitle, timeTitle, levelsTitle, groupTitle;
     juce::Label nameLabel, colourLabel, sourceLabel, trackLabel, startLabel, lengthLabel, offsetLabel;
+    double shownStretch = 0.0;
     juce::Label gainLabel, panLabel, pitchLabel, fadeInLabel, fadeOutLabel, stretchLabel, groupMuteLabel, groupGainLabel;
     juce::TextEditor name, start, length, offset;
     ColourRow colours;

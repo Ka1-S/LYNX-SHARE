@@ -166,6 +166,11 @@ add_library(lynx_core STATIC
     src/core/ModelParams.cpp
     src/core/ToxicBank.cpp
     src/core/PoiZoneBank.cpp
+    src/core/ModelParamsSynths.cpp
+    src/core/PluginLayoutSynths.cpp
+    src/core/HarmlessBank.cpp
+    src/core/Dx10Bank.cpp
+    src/core/SimSynthBank.cpp
     src/core/Layer.cpp
     src/core/XyController.cpp
     src/core/FlCurve.cpp

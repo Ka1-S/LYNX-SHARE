@@ -368,6 +368,12 @@ void EditorGlobals::setGridOption (int option)
 void EditorGlobals::toggleGrid()
 {
     setGridOption (gridOption == grid::noneOption ? lastGridOption : grid::noneOption);
+    // FL does the same (Backspace in the Playlist toggles the toolbar snap to "(none)", r168s f05), but the only sign is
+    // the toolbar box: issue #32 #3 read it as "snap stops working until relaunch". Say it in the hint bar too.
+    ui::Hint h;
+    h.text = gridOption == grid::noneOption ? tr ("Snap off: notes and clips move freely. [Backspace] turns snap back on")
+                                            : tr ("Snap on: {0}. [Backspace] turns it off", { tr (grid::options()[(std::size_t) gridOption].name) });
+    ui::postHint (h, 3000);
 }
 
 void EditorGlobals::setDefaultNoteLength (std::int64_t ticks)
