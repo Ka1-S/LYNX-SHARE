@@ -445,19 +445,21 @@ const Action* findAction (const std::string& id)
     return nullptr;
 }
 
-int typingPianoNote (int key) noexcept
+int typingPianoNote (int key, int octave, int root) noexcept
 {
+    const auto base = 12 * typingpiano::clampOctave (octave) + typingpiano::clampRoot (root); // octave 4 -> 48
+    const auto inRange = [] (int n) { return n >= 0 && n <= 127 ? n : -1; };
     static const char lowerRow[] = "ZSXDCVGBHNJM";
     static const char upperRow[] = "Q2W3ER5T6Y7UI9O0P";
     const auto c = key >= 'a' && key <= 'z' ? key - 'a' + 'A' : key;
 
     for (int i = 0; lowerRow[i] != 0; ++i)
         if (lowerRow[i] == c)
-            return 60 + i;
+            return inRange (base + i);
 
     for (int i = 0; upperRow[i] != 0; ++i)
         if (upperRow[i] == c)
-            return 72 + i;
+            return inRange (base + 12 + i);
 
     return -1;
 }

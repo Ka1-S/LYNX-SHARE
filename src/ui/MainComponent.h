@@ -148,7 +148,10 @@ private:
     keys::Context focusContext() const;
     void loadKeyMap();
     keys::KeyMap keyMap;
-    bool typingPiano = false; // off by default so single-letter editor tools work (the manual does not state a default)
+    // On by default, as FL 2026 (OptionsTypingKbToPianoAction: Checked = True; measured round 168t2). While it is on, FL
+    // too takes the plain letter keys for the piano: P / E / R played notes and K (next channel) did nothing.
+    bool typingPiano = true;
+    int typingOctave = keys::typingpiano::defaultOctave, typingRoot = 0; // the button's right-click menu, as FL's
     int lastCurrentPattern = -1; // ("Select first channel with notes when the pattern changes")
     void setTypingPiano (bool on);
     void toggleTypingPiano(); // the user's toggle (button, menus, Ctrl+T): also says so in the hint bar
@@ -290,6 +293,7 @@ private:
     void showRecordMenu();
     // right-click on the metronome: on/off, its volume, count-in (FL keeps the metronome's options there)
     void showMetronomeMenu();
+    void showTypingPianoMenu();
     // the metronome volume knob in a callout under the metronome button
     void showMetronomeVolume();
     void dumpScoreLog (int minutes); // Tools › Score logger (REA round 165f)
