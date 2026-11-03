@@ -67,12 +67,9 @@ tmp/r168p/dfm/<plugin>/TSynthEditorForm.dfm.txt). Only layout and control facts 
   Cause (168w, confirmed here): zig c++ -O2 does full LTO when it compiles and links in one invocation (build-local.sh);
   mkchunk.sh's `-c` objects are native ELF (no LTO), and without LTO exactly these 15 x87 bit-exact goldens fail.
 - A corrupt build-local/obj168p/src_core_Harmor.cpp.o made ld.lld segfault (found by bisecting the link); rebuilt.
-- PAUSED 2026-11-02 (coordinator, for round 168w's faster pipeline). Post-merge (d687b456) tests build linked; the suite run
-  finished: 2132748 checks, 15 failures = only the known Kepler / multiband-delay bit-exact checks (tmp/r168p/tests4.log).
-- exact next step on RESUME: build this branch the official way (`coord/bl-wt.sh design168p` or 168w's new pipeline, with LTO)
-  and confirm 0 failures; only if Kepler / multiband delay still fail, bisect origin/main..HEAD (first: the 168n wip
-  merge fb691f7e vs my own commits). Land only with 0 failures. Then, once 168n is on
-  main: `git merge origin/main`, and land via `flock ~/projetos/lynx/.git/lynx-merge.lock coord/land.sh design168p`
-  (in parts if land.sh asks), record the hashes in the final report.
+- RESUMED 2026-11-03: merged origin/main e45e6550 (0.1.22 + 168n landed); Design168p's header includes moved into its
+  .inc (automerge-friendly); bankrender now links the core (the drum banks need BankStates). Official build-local (full
+  LTO): 2423426 checks, 0 failures (Kepler energy exact again: the 15 earlier failures were the non-LTO object build).
+- next: landing via coord/train.sh design168p.
 - left: a DrumSynth Live channel with no state at all (not reachable from the browser) shows the page with knobs missing;
   FL Slayer's Type / Coils steppers show numbers (pre-existing layout).
