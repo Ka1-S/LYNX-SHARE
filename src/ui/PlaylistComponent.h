@@ -117,6 +117,8 @@ public:
     // For snapshots: the tool in use and a time selection over [fromBar, toBar).
     void setToolForSnapshot (EditTool tool) { tools.setTool (tool); }
     void setTimeSelectionForSnapshot (int fromBar, int toBar);
+    // the selected clips (indices into the Playlist), for Tools › Consolidate playlist selection (round 168e)
+    const std::vector<int>& getSelectedClips() const noexcept { return selection; }
     // zoom (pixels per bar) and scroll (first bar, first track in view)
     void setViewForSnapshot (double pixelsPerBar, int firstBar, int firstTrack);
     juce::PopupMenu getClipMenuForSnapshot (int index); // --snapshot: the clip menu of that clip

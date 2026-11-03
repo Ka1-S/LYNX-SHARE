@@ -1,5 +1,7 @@
 #include "engine/Exporter.h"
 
+#include "core/Mastering.h"
+
 #include "core/Dither.h"
 #include "core/Mp3Encoder.h"
 #include "engine/AudioEngine.h"
@@ -269,7 +271,7 @@ bool ExportJob::run (const std::function<bool (double)>& progress, juce::String&
         }
 
     // streaming straight into the file when nothing needs the whole render first (the classic WAV/FLAC/OGG export)
-    const auto streaming = options.format != exportopts::Format::mp3 && options.channels == Channels::stereo && ! options.normalize
+    const auto streaming = options.format != exportopts::Format::mp3 && options.channels == Channels::stereo && ! options.normalize && ! options.master
                            && options.tail == TailMode::leave && formatsOf (options).size() == 1;
 
     if (! streaming)
@@ -355,8 +357,17 @@ bool ExportJob::writeBuffered (std::vector<float>& left, std::vector<float>& rig
     // tail, then normalising (the peak of what is kept), then mono; dither per file (each format has its own bits)
     applyTail (left, right, options.tail == TailMode::leave ? 0 : (std::int64_t) std::llround (musicSeconds * options.sampleRate), options.tail);
 
+    if (options.master) // round 168e: File › Export › Master... (LYNX's own mastering, core/Mastering.h)
+    {
+        mastering::Settings m;
+        m.targetLufs = options.masterLufs;
+        const auto r = mastering::process (left, right, options.sampleRate, m);
+        info = tr ("Mastered: {0} LUFS → {1} LUFS, true peak {2} dBTP",
+                     { juce::String (r.inputLufs, 1), juce::String (r.outputLufs, 1), juce::String (r.outputTruePeakDb, 1) });
+    }
+
     const auto frames = (int) left.size();
-    if (options.normalize)
+    if (options.normalize && ! options.master)
     {
         float p = 0.0f;
         for (int i = 0; i < frames; ++i)

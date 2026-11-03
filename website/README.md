@@ -29,3 +29,8 @@ The download buttons read the GitHub releases at runtime, so a new release needs
   progress) and rewrites the `INSPIRED` data block here and the matching sections of `README.md` and `docs/PLUGINS.md`.
   Rerun it whenever an engine lands (release step); `--check` fails when a block is stale. A new LYNX SHARE engine without an
   entry in `inspired-by.json` is printed as a warning: add its description there.
+- **Languages:** the same 15 as the app (ids and native names from `src/ui/I18n.cpp`). English is in the page; the
+  others are `i18n/<id>.json` (`ui` strings, `featured` and `insp` plugin descriptions), fetched only for the chosen
+  language. Order: `?lang=` (`pt` still works) > saved choice > `navigator.languages` > English. CJK pages use the
+  system font first and fetch Noto Sans only when it is missing. `scripts/check-site-i18n.py` checks every file
+  against the English (missing keys, tags, placeholders); new English strings need a translation in all 14 files.

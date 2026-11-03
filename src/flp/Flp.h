@@ -181,6 +181,8 @@ struct Channel
     bool soloLock = false;
     // 0x32: the channel's notes are shown as ghosts in the Piano Roll (FL's ghost channels menu; 1 = shown, FL's default)
     bool ghostShown = true;
+    // 0x9B: the channel's icon (FL's icon index, 0 = none; the loader stores it in the channel's +0x7c, REA round 168j)
+    int icon = 0;
     bool useLoopPoints() const noexcept { return sampleFlags >= 0 ? (sampleFlags & 8) != 0 : loopPointsOld; }
 
     // Seconds for an envelope time value (docs/analise/REA_rodada3.md §1.4). With sync (flags & 1), in beats.
@@ -267,6 +269,17 @@ struct Note
     bool slide() const noexcept { return (flags & 0xF) == 8; }
 };
 
+// Playlist time marker: 0x94 (u32: type << 24 | position in ticks), followed by
+// 0x21/0x22 (numerator/denominator) and 0xCD (name). Type 8 = time signature change (seen in the demos:
+// 7/4, 6/4, 3/4); 0 = ordinary marker; the others are actions (loop, pause...).
+struct TimeMarker
+{
+    std::uint32_t position = 0;
+    int type = 0;
+    int numerator = 4, denominator = 4;
+    std::string name;
+};
+
 struct Pattern
 {
     int index = 0;
@@ -279,6 +292,12 @@ struct Pattern
     bool loopOn = false;
     int loopMode = 1;
     std::vector<std::pair<int, int>> channelLoops; // (FL channel index, setting)
+    // the Piano roll's pattern time markers (round 168g): the same 0x94 / 0x21 / 0x22 / 0xCD events as the
+    // Playlist's, written between the pattern's 0x41 and the next pattern / channel / playlist section
+    std::vector<TimeMarker> markers;
+    // 0xA4: the Channel Rack's pattern length selector (pattern +0x44, FL's PatternLengthSelectChange; REA round 168j):
+    // the pattern's length in ticks of the file's PPQ, 0 = automatic
+    std::uint32_t fixedLength = 0;
 };
 
 struct PlaylistItem
@@ -326,21 +345,11 @@ struct PlaylistTrackInfo
     // track mode (REA round 146a): u32 at 49 (0 none, 1 audio track, 3 instrument track), i32 mixer track at 53, i32
     // FL channel index at 57 (-1 = none)
     int mode = 0, mixerTrack = -1, channel = -1;
+    int icon = 0;          // u32 at 8: FL's icon index (0 = none)
     // Performance settings (round 165m, bytes 22…45, FL's menu numbers): u32 motion, press, trigger sync, queue,
     // tolerant, position sync. FL's defaults: Stay, Retrigger, 4 beats, no queue, tolerant, position sync off.
     int motion = 0, press = 0, triggerSync = 5, positionSync = 0;
     bool queue = false, tolerant = true;
-};
-
-// Playlist time marker: 0x94 (u32: type << 24 | position in ticks), followed by
-// 0x21/0x22 (numerator/denominator) and 0xCD (name). Type 8 = time signature change (seen in the demos:
-// 7/4, 6/4, 3/4); 0 = ordinary marker; the others are actions (loop, pause...).
-struct TimeMarker
-{
-    std::uint32_t position = 0;
-    int type = 0;
-    int numerator = 4, denominator = 4;
-    std::string name;
 };
 
 struct Arrangement
@@ -366,6 +375,13 @@ struct MixerInsert
     float latencyMs = 0.0f;       // 0xEC f32 at +0: the manual track latency in ms (REA round 165f-mixer)
     int latencyBypass = 0;        // 0x31: Bypass track latency compensation 0 Never / 1 Always / 2 When recording or not playing
     int recordSource = -1;        // −1 = no 0xA5 event; 0xA5: 0 External input only, 1 + mixer input, 2 Post effects, 3 Post EQ, 4 Post level/pan, 5 Post track
+    // 0xA6 "Monitor external input" (track +0x30, FL's ExtInputMonitorOffMenuClick tags; REA round 168j): 0 Off, 1 When armed,
+    // 2 Auto, 3 On; -1 = not in the file
+    int monitor = -1;
+    int icon = 0;                 // 0x5F: FL's icon index (track +0x14; 0 = none)
+    // 0x2A: the track's "own colour" flag (track +0x00; the loader's 0x95 sets it to colour != default, 0x2A then
+    // overrides it; FL draws the default colour when it is off). -1 = not in the file
+    int colourSet = -1;
 
     struct Slot
     {
@@ -392,6 +408,17 @@ struct Project
     int currentArrangement = -1; // event 0x64: index (0x63) of the arrangement open when saved (−1 = not in the file)
     int mainPitch = 0;
     bool playTruncatedNotes = false; // event 0x1E (FL writes it only when on)
+    // events 0x1D / 0x27: the mixer menu's Plugin delay compensation › "Automatic" (FL's AutoPDCMenuClick; off = the PDC
+    // planner FUN_010ff3b0 ignores the plugins' latencies, the manual track latencies stay) and "Compensate automations"
+    // (CompensateAutomationsMenuClick; automation sent to a delayed plugin is delayed with its audio). REA round 168j
+    bool autoPdc = true, compensateAutomations = true;
+    bool timeSignatureMode = false; // event 0x23 = 1: Options › Project › Time settings "Set as time signature" (TimeSettingComboChange)
+    int mixerTrackCount = 0;        // event 0x67: the mixer track records saved (Master + inserts + FL's "current"); 0 = not in the file
+    // event 0xF3 (2 × i32, the Piano Roll's View › scale highlighting, FL's EEMenuScaleClick): the scale (≥ 0 = FL's
+    // "Reference scales" list in alphabetical order; −1 Default, −2 Black notes, −3 Automatic) and its root (0 = C … 11 = B)
+    int scaleHighlight = -1, scaleRoot = 0;
+    bool hasScaleHighlight = false;
+    std::string dataFolder; // event 0xCA: Options › Project › "Data folder" (ProjDataPathBtnClick)
     bool fastDeclick = false;        // event 0x28: Options › Project › "Fast declick for cut groups" (REA round 167h §3)
     // event 0xED (2 × f64 Delphi TDateTime, days since 1899-12-30): the creation date and the working time in days
     double createdDays = 0.0, workDays = 0.0;   // event 0x50 (i16): the main pitch knob in cents (FL saves it in FUN_00f40840, REA round 167g)

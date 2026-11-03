@@ -71,6 +71,7 @@ TEST (pl168f_lock_to_content_paints_the_dominant_clip)
     // locked: an unnamed track is auto-named after what it plays most (FL's FUN_012e7a90 → FUN_012ef490)
     pltracks::toggleLockToContent (song, { 2 });
     CHECK (song.playlistTracks.size() > 2 && song.playlistTracks[2].lockedToContent);
+    CHECK (song.playlistTracks[2].icon == 93); // FL's lock icon on an icon-less track
     CHECK (song.playlistTracks[2].name == "P2" && song.playlistTracks[2].colour == song.patterns[1].colour);
     // a source the track doesn't hold becomes the dominant clip (length too), at the click
     CHECK (pltracks::applyLockToContent (song, c));
@@ -90,6 +91,7 @@ TEST (pl168f_lock_to_content_paints_the_dominant_clip)
     song.playlistTracks[2].name = "Drums";
     pltracks::toggleLockToContent (song, { 2 });
     CHECK (song.playlistTracks[2].name == "Drums");
+    CHECK (! song.playlistTracks[2].lockedToContent && song.playlistTracks[2].icon == 0); // unlocking takes FL's lock icon away
 }
 
 TEST (pl168f_lock_all_and_the_resize_answer)

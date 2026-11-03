@@ -154,6 +154,7 @@ add_library(lynx_core STATIC
     src/core/HardcoreFx.cpp
     src/core/FacetEq.cpp
     src/core/ApexLimiter.cpp
+    src/core/Mastering.cpp
     src/core/DynamicsSuite.cpp
     src/core/VoiceTools.cpp
     src/core/MidiControls.cpp
@@ -165,6 +166,11 @@ add_library(lynx_core STATIC
     src/core/ModelParams.cpp
     src/core/ToxicBank.cpp
     src/core/PoiZoneBank.cpp
+    src/core/ModelParamsSynths.cpp
+    src/core/PluginLayoutSynths.cpp
+    src/core/HarmlessBank.cpp
+    src/core/Dx10Bank.cpp
+    src/core/SimSynthBank.cpp
     src/core/Layer.cpp
     src/core/XyController.cpp
     src/core/FlCurve.cpp
@@ -222,6 +228,7 @@ target_sources(lynx_core PRIVATE
     src/core/PluginMonitor.cpp
     src/core/ProjectContents.cpp
     src/core/PlaylistOps.cpp
+    src/core/QuickRender.cpp
     src/core/TempoDetect.cpp
     src/core/ScoreLog.cpp
     src/core/ChannelLoops.cpp
@@ -418,6 +425,7 @@ if(LYNX_BUILD_APP)
     # workflow P2: note tool dialogs, tool windows, undo history, quick-add palette
     target_sources(LYNX PRIVATE
         src/ui/NoteToolDialogs.cpp
+        src/ui/MidiClipboard.cpp
         src/ui/EventEditor.cpp
         src/ui/AudioEditor.cpp
         src/ui/AudioEditorTools.cpp

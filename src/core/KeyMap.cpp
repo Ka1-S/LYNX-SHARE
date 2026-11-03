@@ -54,7 +54,7 @@ std::vector<Action> makeActions()
         { "transport.toggleMode", TR_NOOP ("Pattern / song mode"), Context::global, { chord ('L') }, true },
         { "transport.nextMarker", TR_NOOP ("Jump to the next song marker (Quantize song jumps while playing)"), Context::global, { chord (numpadMultiply, alt) } },
         { "transport.previousMarker", TR_NOOP ("Jump to the previous song marker"), Context::global, { chord (numpadDivide, alt) } },
-        { "view.typingPiano", TR_NOOP ("Typing keyboard as a piano on/off"), Context::global, { chord ('T', ctrl) } },
+        { "view.typingPiano", TR_NOOP ("Typing keyboard to piano on/off"), Context::global, { chord ('T', ctrl) } },
         { "view.toolbar", TR_NOOP ("Show or hide the toolbar panels"), Context::global, { chord (f11, ctrl) } },
         { "view.audioEditor", TR_NOOP ("Open the audio editor"), Context::global, {} },
         { "view.tempoTapper", TR_NOOP ("Tempo tapper (tap the tempo)"), Context::global, { chord (f5, ctrl) } },
@@ -109,6 +109,12 @@ std::vector<Action> makeActions()
         { "file.export", TR_NOOP ("Export audio"), Context::global, { chord ('R', ctrl) } },
         { "file.exportMp3", TR_NOOP ("Export an MP3 file"), Context::global, { chord ('R', ctrl | shift) } },
         { "file.exportMidi", TR_NOOP ("Export a MIDI file"), Context::global, { chord ('M', ctrl | shift) } },
+        // FL's File › Export › Master... (FileExportMasterAction, Ctrl+Alt+M; REA round 168e)
+        { "file.exportMaster", TR_NOOP ("Export and master the project"), Context::global, { chord ('M', ctrl | alt) } },
+        // FL's Tools › Consolidate playlist selection (EERenderPLSelectionLengthAction Ctrl+Alt+C, EEPLRenderSongLengthAction
+        // Ctrl+Shift+Alt+C; REA round 168e)
+        { "tools.consolidateSelection", TR_NOOP ("Consolidate playlist selection (from selection start)"), Context::global, { chord ('C', ctrl | alt) } },
+        { "tools.consolidateSelectionSongStart", TR_NOOP ("Consolidate playlist selection (from song start)"), Context::global, { chord ('C', ctrl | shift | alt) } },
         { "edit.undo", TR_NOOP ("Undo"), Context::global, { chord ('Z', ctrl) } },
         // FL's Edit › "Undo backwards" (EditUndoBackwardsAction, Ctrl+Alt+Z; round 167k): one more step back
         { "edit.undoBackwards", TR_NOOP ("Undo backwards"), Context::global, { chord ('Z', ctrl | alt) } },
@@ -170,6 +176,32 @@ std::vector<Action> makeActions()
         { "pianoRoll.quantizeStarts", TR_NOOP ("Quantize starts"), Context::pianoRoll, { chord ('Q', shift) }, true },
         { "pianoRoll.quantizeHalf", TR_NOOP ("Quantize starts 50% (halfway to the grid)"), Context::pianoRoll, {} },
         { "pianoRoll.follow", TR_NOOP ("Follow the playhead (auto scrolling) on/off"), Context::pianoRoll, {} },
+        // FL's Piano roll menu (round 168g, REA_rodada168g.md: the ShortcutsModule / EEMenu keys): View, Select, Stamp,
+        // Edit and File items
+        { "pianoRoll.gridHighlights", TR_NOOP ("Note grid highlights on/off"), Context::pianoRoll, { chord ('B', alt) } },
+        { "pianoRoll.backgroundWave", TR_NOOP ("Background waveform on/off"), Context::pianoRoll, { chord ('N', alt) } },
+        { "pianoRoll.showChordName", TR_NOOP ("Show chord name for selection on/off"), Context::pianoRoll, {} },
+        { "pianoRoll.selectRandomOne", TR_NOOP ("Select one at random"), Context::pianoRoll, { chord ('R', shift) }, true },
+        { "pianoRoll.selectRandomMore", TR_NOOP ("Select more at random"), Context::pianoRoll, { chord ('M', shift) }, true },
+        { "pianoRoll.selectOddSteps", TR_NOOP ("Select odd (swung) notes"), Context::pianoRoll, { chord ('O', shift) }, true },
+        { "pianoRoll.stampNone", TR_NOOP ("Stamp: none (single notes)"), Context::pianoRoll, { chord ('N', shift) }, true },
+        { "pianoRoll.insertSpace", TR_NOOP ("Insert space (the time selection)"), Context::pianoRoll, { chord (insert, ctrl) } },
+        { "pianoRoll.sliceInsertSpace", TR_NOOP ("Slice & insert space"), Context::pianoRoll, { chord (insert, ctrl | alt) } },
+        { "pianoRoll.deleteSpace", TR_NOOP ("Delete space (the time selection)"), Context::pianoRoll, { chord (del, ctrl) } },
+        { "pianoRoll.trimSpace", TR_NOOP ("Trim to the time selection"), Context::pianoRoll, {} },
+        { "pianoRoll.deleteAll", TR_NOOP ("Delete all the channel's notes"), Context::pianoRoll, {} },
+        { "pianoRoll.insertControllerValue", TR_NOOP ("Insert current controller value"), Context::pianoRoll, { chord ('I', ctrl) } },
+        { "pianoRoll.importMidi", TR_NOOP ("Import MIDI file..."), Context::pianoRoll, { chord ('M', ctrl) } },
+        { "pianoRoll.exportMidi", TR_NOOP ("Export as MIDI file..."), Context::pianoRoll, { chord ('M', ctrl | shift) } },
+        { "pianoRoll.pasteMidiClipboard", TR_NOOP ("Paste from MIDI clipboard..."), Context::pianoRoll, { chord ('V', ctrl | shift) } },
+        { "pianoRoll.copyMidiClipboard", TR_NOOP ("Copy to MIDI clipboard"), Context::pianoRoll, {} },
+        { "pianoRoll.openScore", TR_NOOP ("Open score..."), Context::pianoRoll, {} },
+        { "pianoRoll.saveScore", TR_NOOP ("Save score as..."), Context::pianoRoll, {} },
+        { "pianoRoll.browseScores", TR_NOOP ("Browse scores"), Context::pianoRoll, {} },
+        // FL's Piano roll › Time markers: the same EEMarker* items as the Playlist's, on the pattern's markers (round 168g)
+        { "pianoRoll.markerAdd", TR_NOOP ("Pattern time markers: Add one..."), Context::pianoRoll, { chord ('T', alt) } },
+        { "pianoRoll.markerAuto", TR_NOOP ("Pattern time markers: Add auto"), Context::pianoRoll, { chord ('T', ctrl) } },
+        { "pianoRoll.markerSignature", TR_NOOP ("Pattern time markers: Add time signature change..."), Context::pianoRoll, { chord ('T', shift | alt) } },
         // the tools and the other single letters (FL's keys; issue #12: they were fixed in the editor and won over a
         // global shortcut given the same key)
         { "pianoRoll.tool.pencil", TR_NOOP ("Tool: Pencil"), Context::pianoRoll, { chord ('P') } },

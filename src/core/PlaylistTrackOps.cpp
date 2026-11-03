@@ -111,6 +111,16 @@ void autoName (Song& song, int track)
     t.colour = colour;
 }
 
+// FL (FUN_012e7a90): locking gives an icon-less track FL's lock icon (index 93), unlocking takes that icon away again
+static void setLockIcon (PlaylistTrack& track, bool on)
+{
+    constexpr int flLockIcon = 93;
+    if (on && track.icon == 0)
+        track.icon = flLockIcon;
+    else if (! on && track.icon == flLockIcon)
+        track.icon = 0;
+}
+
 void toggleLockToContent (Song& song, const std::vector<int>& tracks)
 {
     if (tracks.empty() || tracks.front() < 0)
@@ -121,7 +131,9 @@ void toggleLockToContent (Song& song, const std::vector<int>& tracks)
     {
         if (t < 0)
             continue;
-        trackAt (song, t).lockedToContent = on;
+        auto& track = trackAt (song, t);
+        track.lockedToContent = on;
+        setLockIcon (track, on);
         if (on && song.playlistTracks[(std::size_t) t].name.empty())
             autoName (song, t);
     }
@@ -153,6 +165,7 @@ void lockAll (Song& song, int count, bool lock, bool resize)
     {
         auto& track = trackAt (song, t);
         track.lockedToContent = lock;
+        setLockIcon (track, lock);
         if (lock && track.name.empty())
             autoName (song, t);
         if (resize)
@@ -226,7 +239,7 @@ int resetEmptyTracks (Song& song)
         const auto& track = song.playlistTracks[(std::size_t) t];
         if (anyClipOn (song, t) || track.mode != PlaylistTrackMode::unassigned)
             continue;
-        if (track.name.empty() && track.colour == 0 && ! track.lockedToContent)
+        if (track.name.empty() && track.colour == 0 && track.icon == 0 && ! track.lockedToContent)
             continue;
         song.playlistTracks[(std::size_t) t] = PlaylistTrack {};
         ++reset;
@@ -436,6 +449,7 @@ int cloneTracks (Song& song, const std::vector<int>& tracks, const CloneOptions&
         PlaylistTrack clone;
         clone.colour = info.colour;
         clone.lockedToContent = info.lockedToContent;
+        clone.icon = info.icon;
         clone.lockedHeight = info.lockedHeight;
         clone.height = info.height;
         clone.muted = info.muted;

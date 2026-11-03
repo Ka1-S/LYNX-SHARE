@@ -36,4 +36,7 @@ constexpr int harmlessCompIndex = harmlessParamCount; // optional: byte count, t
 std::optional<std::vector<float>> harmlessParams (const std::vector<std::uint8_t>& state);
 
 std::unique_ptr<Instrument> makeHarmlessInstrument();
+
+// modelParams of a new LYNX instance (round 168o): FL's untouched patch (Saw, open filter, no modulation, effects off)
+std::vector<float> harmlessDefaultModelParams();
 } // namespace lynx

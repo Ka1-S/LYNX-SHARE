@@ -170,44 +170,7 @@ TEST (rea146a_flp_playlist_track_modes)
     }
 }
 
-TEST (rea146a_consolidate_track)
-{
-    using namespace lynx;
-    auto song = Song::makeDefault();
-    song.playlist.clear();
-    Clip c;
-    c.pattern = 0;
-    c.track = 1;
-    c.start = 2 * ppq * 4;
-    c.length = ppq * 4;
-    song.playlist.push_back (c);
-    c.start = 4 * ppq * 4;
-    song.playlist.push_back (c);
-    c.track = 0;
-    c.start = 0;
-    song.playlist.push_back (c);
-    c.track = 1;
-    c.muted = true;
-    c.start = 6 * ppq * 4;
-    song.playlist.push_back (c); // muted: not rendered and kept
-
-    Song render;
-    std::int64_t start = 0, length = 0;
-    CHECK (! trackmodes::makeConsolidateSong (song, 5, false, render, start, length));
-    CHECK (trackmodes::makeConsolidateSong (song, 1, false, render, start, length));
-    CHECK (start == 2 * ppq * 4 && length == 3 * ppq * 4 && render.playlist.size() == 2 && render.playlist[0].start == 0);
-    CHECK (render.mixer[0].effects.empty() && render.mode == PlayMode::song);
-    CHECK (trackmodes::makeConsolidateSong (song, 1, true, render, start, length) && start == 0 && length == 5 * ppq * 4);
-
-    const auto channel = trackmodes::applyConsolidate (song, 1, "/tmp/x.wav", 2 * ppq * 4, 3 * ppq * 4);
-    CHECK (channel == (int) song.channels.size() - 1 && song.channels.back().instrument == InstrumentKind::audioClip);
-    CHECK (song.channels.back().name == "Track 2 (consolidated)" && song.channels.back().mixerTrack == 0);
-    int onTrack = 0;
-    for (const auto& clip : song.playlist)
-        if (clip.track == 1)
-            ++onTrack;
-    CHECK (onTrack == 2 && song.playlist.size() == 3); // the new clip and the muted one; track 0 keeps its clip
-}
+// rea146a_consolidate_track: replaced by the FL-exact rea168e_consolidate_track (tests/Rea168eTests.inc)
 
 #include "core/FlWrapper.h"
 
