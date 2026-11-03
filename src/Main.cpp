@@ -2,6 +2,7 @@
 #include "engine/FileSort.h"
 #include "platform/Paths.h"
 
+#include "core/Drumaxx.h"
 #include "core/LoadTrace.h"
 #include "core/Patcherize.h"
 #include "core/Performance.h"
@@ -2304,7 +2305,15 @@ private:
                 if ((kind == lynx::InstrumentKind::granulizer || kind == lynx::InstrumentKind::wavetraveller) && one.channels[0].samplePath.empty())
                     one.channels[0].samplePath = toneWav.getFullPathName().toStdString();
                 one.mixer[2].effects.clear();
-                one.patterns[0].notes = { { 0, 1920, 0, song.channels[i].instrument == lynx::InstrumentKind::drumaxx ? 48 : 60, 0.8f } };
+                // Drumaxx plays pad 1's key: FL's default kit has a pad at 48, LYNX's own bank kits (a PC without FL,
+                // macOS / Linux; round 168p) start at 36 (round 169d: "SILENT 1 [Drumaxx]" on the Linux / macOS CI)
+                auto key = 60;
+                if (kind == lynx::InstrumentKind::drumaxx)
+                {
+                    const auto padKey = lynx::drumaxxParam (one.channels[0].pluginState, 4);
+                    key = std::isfinite (padKey) && padKey >= 0.0f && padKey <= 127.0f ? (int) padKey : 48;
+                }
+                one.patterns[0].notes = { { 0, 1920, 0, key, 0.8f } };
                 lynx::AudioEngine player (false);
                 player.setSong (std::move (one));
                 player.dispatchPendingMessages();

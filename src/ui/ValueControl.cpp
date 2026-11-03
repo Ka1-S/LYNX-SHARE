@@ -22,7 +22,8 @@ constexpr const char* sensitivityProperty = "lynxDragPixels";
 
 juce::String number (double v, int decimals)
 {
-    auto s = juce::String (v, decimals);
+    // juce::String (v, 0) prints every digit ("96.1953%" on the channel's VOL knob): 0 decimals = a whole number
+    auto s = decimals <= 0 ? juce::String (juce::roundToInt (v)) : juce::String (v, decimals);
     if (s.containsChar ('.'))
         s = s.trimCharactersAtEnd ("0").trimCharactersAtEnd (".");
     return s == "-0" ? juce::String ("0") : s;
@@ -224,11 +225,23 @@ bool isResetClick (const juce::MouseEvent& e) noexcept
     return e.mods.isMiddleButtonDown() || (e.mods.isLeftButtonDown() && e.mods.isAltDown() && ! e.mods.isCtrlDown());
 }
 
+namespace
+{
+controls::WheelScrollLatch& wheelLatch() noexcept
+{
+    static controls::WheelScrollLatch latch;
+    return latch;
+}
+}
+
+void noteWheelScroll() noexcept { wheelLatch().scrolled (juce::Time::getMillisecondCounterHiRes()); }
+bool wheelScrolling() noexcept { return wheelLatch().scrolling (juce::Time::getMillisecondCounterHiRes()); }
+
 std::optional<double> wheelValue (double value, const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel, const ValueSpec& spec)
 {
     const auto delta = std::abs (wheel.deltaY) >= std::abs (wheel.deltaX) ? wheel.deltaY : -wheel.deltaX;
 
-    if (delta == 0.0f)
+    if (delta == 0.0f || wheelScrolling())
         return std::nullopt;
 
    #if JUCE_WINDOWS

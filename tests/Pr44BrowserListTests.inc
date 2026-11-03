@@ -8,6 +8,7 @@
 #include "core/SearchIndex.h"
 
 #include <algorithm>
+#include <cerrno>
 #include <filesystem>
 #include <thread>
 
@@ -80,11 +81,22 @@ TEST (pr44_listing_skips_names_nsstring_rejects_and_keeps_the_rest)
     CHECK (::symlink ("kick.wav", (dir + "/link to kick.wav").c_str()) == 0);
     CHECK (::symlink ("sub folder", (dir + "/link to sub").c_str()) == 0);
     CHECK (::symlink ("nowhere.wav", (dir + "/broken link.wav").c_str()) == 0);
-    int made = 0;
+    // Linux file systems take every odd name (the case JUCE's macOS iterator died on: an SMB / FAT / ext4 drive mounted
+    // on a Mac); APFS / HFS+ refuse a name that is not UTF-8 with EILSEQ (round 169d: the macOS CI), so there the listing
+    // has none to skip: count what the disk took, and any refusal must be that one
+    int made = 0, refusedOther = 0;
     for (const auto& b : bad)
+    {
+        errno = 0;
         if (b.rfind ("bad folder", 0) == 0 ? ::mkdir ((dir + "/" + b).c_str(), 0755) == 0 : pr44::makeFile (dir + "/" + b))
             ++made;
-    CHECK (made == (int) bad.size()); // the disk took every odd name (the case JUCE's macOS iterator died on)
+        else if (errno != EILSEQ)
+            ++refusedOther;
+    }
+    CHECK (refusedOther == 0);
+   #ifdef __linux__
+    CHECK (made == (int) bad.size());
+   #endif
 
     bool opened = false;
     int skipped = -1;
@@ -93,7 +105,7 @@ TEST (pr44_listing_skips_names_nsstring_rejects_and_keeps_the_rest)
     auto want = good;
     std::sort (want.begin(), want.end());
     CHECK (opened);
-    CHECK (skipped == (int) bad.size());
+    CHECK (skipped == made);
     CHECK (names == want); // no ".", "..", nothing invalid; the NFD name kept byte for byte
     for (const auto& n : names)
         CHECK (lynx::search::isWellFormedUtf8 (n.data(), n.size()));
@@ -126,7 +138,7 @@ TEST (pr44_listing_skips_names_nsstring_rejects_and_keeps_the_rest)
                 auto got = lynx::search::listFolderNames (dir, nullptr, &sk);
                 std::sort (got.begin(), got.end());
                 got.erase (std::remove (got.begin(), got.end(), std::string ("locked")), got.end());
-                if (got == want && sk == (int) bad.size())
+                if (got == want && sk == made)
                     ++same;
             }
         });

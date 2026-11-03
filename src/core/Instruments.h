@@ -230,8 +230,80 @@ struct HostTimeline
     std::atomic<double> sampleRate { 44100.0 };
     std::atomic<bool> playing { false };
     std::atomic<int> beatsPerBar { 4 };
+    // round 169c (issue #32): the chunk's tempo in ticks per sample (0 = stopped) and a count raised for each chunk.
+    // A generator is called once per stretch between its notes, so one chunk can be several plugin blocks: each block
+    // reports the position where it starts (tickAt), not the chunk's start again. Before, every block of a chunk said
+    // the same position, so a synced sequencer / arpeggiator / LFO saw the song stand still and jump back (it went
+    // out of time or restarted its step).
+    std::atomic<double> ticksPerSample { 0.0 };
+    std::atomic<std::uint64_t> chunk { 0 };
+    double tickAt (int sampleOffset) const noexcept
+    {
+        return tick.load (std::memory_order_relaxed) + (double) sampleOffset * ticksPerSample.load (std::memory_order_relaxed);
+    }
 };
 HostTimeline& hostTimeline() noexcept;
+// Where in the current chunk the plugin block this thread is about to process starts (samples). Set by the hosted
+// generator around its blocks and read by its play head; 0 everywhere else (effects get the whole chunk).
+void setHostBlockOffset (int samples) noexcept;
+int hostBlockOffset() noexcept;
+
+// A hosted generator's sample position within the renderer's chunk (round 169c): render() is called for consecutive
+// stretches of the chunk, so the offset of each stretch is the sum of the ones before it in the same chunk.
+struct HostBlockClock
+{
+    std::uint64_t seenChunk = ~std::uint64_t { 0 };
+    int offset = 0;
+    int start (std::uint64_t chunk) noexcept
+    {
+        if (chunk != seenChunk)
+        {
+            seenChunk = chunk;
+            offset = 0;
+        }
+        return offset;
+    }
+    void advance (int samples) noexcept { offset += samples; }
+};
+
+// The keys a hosted plugin was sent a note on for, per MIDI channel (round 169c, issue #32). Stopping or jumping sends
+// each of them a note off: a VST3 plugin never gets All Notes Off (CC 123) or All Sound Off (CC 120), because VST3 has
+// no MIDI controller events (a CC reaches a VST3 plugin only as a parameter the plugin maps it to, and most synths
+// map neither), so the notes sounding before a jump kept playing under the ones started after it.
+struct HostedKeys
+{
+    std::array<std::array<std::uint64_t, 2>, 16> bits {};
+    void set (int channel, int key, bool on) noexcept
+    {
+        if (channel < 0 || channel > 15 || key < 0 || key > 127)
+            return;
+        auto& word = bits[(std::size_t) channel][(std::size_t) (key >> 6)];
+        const auto bit = std::uint64_t { 1 } << (key & 63);
+        word = on ? (word | bit) : (word & ~bit);
+    }
+    bool held (int channel, int key) const noexcept
+    {
+        return channel >= 0 && channel < 16 && key >= 0 && key < 128
+               && ((bits[(std::size_t) channel][(std::size_t) (key >> 6)] >> (key & 63)) & 1u) != 0;
+    }
+    bool any() const noexcept
+    {
+        for (const auto& c : bits)
+            if (c[0] != 0 || c[1] != 0)
+                return true;
+        return false;
+    }
+    // calls noteOff (channel 0..15, key) for every held key, then forgets them
+    template <typename NoteOff>
+    void releaseAll (NoteOff&& noteOff) noexcept
+    {
+        for (int ch = 0; ch < 16; ++ch)
+            for (int key = 0; key < 128; ++key)
+                if (held (ch, key))
+                    noteOff (ch, key);
+        bits = {};
+    }
+};
 
 // `sample` is only used by the sampler; without a sample the sampler is silent.
 // The Sampler's Gain knob (SamplerSettings::gainDb) as a factor: dB clamped to -24..+24, exactly 1 at 0 dB.

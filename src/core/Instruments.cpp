@@ -3148,6 +3148,13 @@ HostTimeline& hostTimeline() noexcept
 
 namespace
 {
+thread_local int hostBlockOffsetValue = 0;
+}
+void setHostBlockOffset (int samples) noexcept { hostBlockOffsetValue = samples; }
+int hostBlockOffset() noexcept { return hostBlockOffsetValue; }
+
+namespace
+{
 // FL's MIDI Out: makes no sound itself (its notes are routed to the plugins on its port by the renderer)
 class MidiOutInstrument final : public Instrument
 {

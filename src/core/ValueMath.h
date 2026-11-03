@@ -47,6 +47,19 @@ inline double wheelValue (double value, double notches, double minimum, double m
     return std::clamp (value + delta, minimum, maximum);
 }
 
+// A wheel that scrolls a view keeps scrolling it (round 169c, issue #32: "the mixer faders react to the mouse wheel
+// accidentally while scrolling"). LYNX's mixer scrolls its strips with the wheel over the parts that are no control
+// (FL's mixer does not scroll there at all [SHOT] r169c f03–f05), so a spin that started on a strip's blank part and
+// then passed over a fader, knob or the EQ moved that control. The scroll goes on while the wheel keeps turning (events
+// less than `holdMs` apart); a wheel over a control after a pause changes it, as in FL.
+struct WheelScrollLatch
+{
+    static constexpr double holdMs = 400.0;
+    double lastScrollMs = -1.0e12;
+    void scrolled (double nowMs) noexcept { lastScrollMs = nowMs; }
+    bool scrolling (double nowMs) const noexcept { return nowMs >= lastScrollMs && nowMs - lastScrollMs < holdMs; }
+};
+
 inline double snapToInterval (double value, double minimum, double interval) noexcept
 {
     return interval > 0.0 ? minimum + std::round ((value - minimum) / interval) * interval : value;
