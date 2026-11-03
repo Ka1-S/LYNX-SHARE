@@ -5,7 +5,7 @@ Piano Roll, Playlist, Mixer) see [WORKFLOW_FL.md](WORKFLOW_FL.md); for the built
 
 ## Online sessions: make a song with a friend (phase 1, packages)
 
-Send your project to a friend, he records his part in his own LYNX SHARE with his own plugins, sends it back, and you
+Send your project to a friend, who records their part in their own LYNX SHARE with their own plugins and sends it back; you
 merge it into your project. Phase 1 works with files only: no network, no account, no server. Send the package however
 you like (e-mail, WhatsApp, a shared cloud folder, a USB stick). The live version (both of you in the same project at
 the same time) is planned, see [design/ONLINE_SESSIONS.md](design/ONLINE_SESSIONS.md).
@@ -14,10 +14,10 @@ the same time) is planned, see [design/ONLINE_SESSIONS.md](design/ONLINE_SESSION
 
 1. Open your project and choose **File › Online session › Send project...**
 2. Type **your name** and **your friend's name**.
-3. Choose what he keeps when the session ends:
-   - **Only his own part** (recommended): after he sends his part back, his copy of the project is reduced to what he
-     made.
-   - **A full copy of the project**: he keeps everything.
+3. Choose what your friend keeps when the session ends:
+   - **Only their own part** (recommended): after they send their part back, their copy of the project is reduced to
+     what they made.
+   - **A full copy of the project**: they keep everything.
 
    This is a courtesy between musicians, not copy protection: the package is a normal zip.
 4. Click **Save package...** and choose where to save the `.lynxpack`.
@@ -26,13 +26,13 @@ the same time) is planned, see [design/ONLINE_SESSIONS.md](design/ONLINE_SESSION
    uses (each file once, checked with SHA-256), the stand-ins and a manifest (the plugins used, with versions).
 6. Send the `.lynxpack` file to your friend.
 
-Up to 4 people take part in one project (you included): each guest gets his own colour, his own mixer inserts (20 of
-them, after the ones you use) and his own Playlist tracks (16 of them).
+Up to 4 people take part in one project (you included): each guest gets their own colour, their own mixer inserts (20
+of them, after the ones you use) and their own Playlist tracks (16 of them).
 
-### 2. The friend opens it and records his part
+### 2. The friend opens it and records their part
 
 1. In LYNX SHARE, **File › Open...** the `.lynxpack` (or double-click it on Windows).
-2. A summary shows who sent it, which mixer inserts and Playlist tracks are his, and what he keeps at the end. Click
+2. A summary shows who sent it, which mixer inserts and Playlist tracks are theirs, and what they keep at the end. Click
    **Open**. The project is unpacked into `Documents/LYNX/Projects/Received/<package name>/`.
 3. The song plays the same as on the host's PC. A channel or insert whose plugin is not installed here plays its
    stand-in and has an amber **R** badge in the Channel Rack and the Mixer (the hint bar explains it). Its plugin
@@ -43,24 +43,24 @@ them, after the ones you use) and his own Playlist tracks (16 of them).
    patterns you make are yours; the host's are left as they are.
 6. Save as usual (**File › Save**) while working.
 
-### 3. The friend sends his part back
+### 3. The friend sends their part back
 
 1. **File › Online session › Send my part back...** and choose where to save the package.
 2. LYNX SHARE renders stand-ins for **your** parts that use third-party plugins (so the host hears them even without
    your plugins) and writes a small package with only your area: your channels, your notes, your patterns and
    automations, your Playlist clips, your inserts, your recordings and samples, and your stand-ins.
-3. Send it to the host. If he chose "Only his own part", your copy is now reduced to your part.
+3. Send it to the host. If the host chose "Only their own part", your copy is now reduced to your part.
 
 ### 4. The host merges the part
 
 1. Open the project you sent (the same one: the package checks it) and choose **File › Online session › Merge a
    part...** (or open the part's `.lynxpack` with **File › Open...**).
-2. The friend's part is added in his colour: his channels, patterns, notes, clips and inserts. Nothing of yours is
-   changed. If you used one of his inserts or Playlist tracks meanwhile, his moved to free ones (the message says so).
+2. The friend's part is added in their colour: their channels, patterns, notes, clips and inserts. Nothing of yours is
+   changed. If you used one of their inserts or Playlist tracks meanwhile, theirs moved to free ones (the message says so).
 3. Merging is **one undo step**: **Edit › Undo** takes it out again.
-4. His media are copied next to your project (`<project folder>/Session media/<his name>/`); his stand-ins play where
-   you lack his plugins (amber **R** badge).
-5. Merging a newer part from the same friend replaces his earlier part (the things he deleted are removed too).
+4. Their media are copied next to your project (`<project folder>/Session media/<their name>/`); their stand-ins play
+   where you lack their plugins (amber **R** badge).
+5. Merging a newer part from the same friend replaces their earlier part (the things they deleted are removed too).
 
 ### Good to know
 
