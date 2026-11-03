@@ -25,6 +25,13 @@ struct RecordedEvent
 // playing there (or, without a clip, as if it were the pattern loop).
 std::int64_t patternPositionForTick (const Song& song, double tick, std::int64_t loopLength);
 
+// Song mode, a take inside pattern clip `c` at song `tick`: its place in the pattern. With stretchedClipsLoop() on and
+// `c` longer than its pattern, folded into the pattern (modulo its length, from the clip's offset; 0.1.23); else the
+// place along the clip (FL: the pattern grows, round 168k). clipLoopLength = the pattern's length when `c` loops it
+// that way, else 0.
+std::int64_t clipPatternTick (const Song& song, const Clip& c, std::int64_t tick);
+std::int64_t clipLoopLength (const Song& song, const Clip& c);
+
 // --- recording options (docs/WORKFLOW_FL.md P2: recording set) ---------------------------------
 
 enum class RecordMode : std::uint8_t

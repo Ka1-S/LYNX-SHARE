@@ -1133,6 +1133,8 @@ juce::var channelToVar (const ChannelDef& c)
         o->setProperty ("keyRegion", juce::Array<juce::var> { c.keyLow, c.keyHigh });
     if (! c.receiveFrom.empty()) // FL's "Receive notes from" (round 165f-rack)
         o->setProperty ("receiveFrom", juce::Array<juce::var> { str (c.receiveFrom), c.receiveMidiChannel });
+    if (c.icon != 0) // FL's channel icon index (round 168j)
+        o->setProperty ("icon", c.icon);
     if (c.loopStarterPattern >= 0) // FL's Loop Starter (round 168b): [pattern, slot, category, locked]
         o->setProperty ("loopStarter", juce::Array<juce::var> { c.loopStarterPattern, str (c.loopStarterSlot), str (c.loopStarterCategory), c.loopStarterLocked });
     if (c.instrument == InstrumentKind::layer)
@@ -1393,6 +1395,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
             def.arp.octaveRepeat = juce::jlimit (0, 16, (int) fl.getProperty ("octaveRepeat", 1));
         }
     }
+    def.icon = juce::jlimit (0, 0xFFFF, (int) c.getProperty ("icon", 0));
     if (const auto& from = c["receiveFrom"]; from.isArray() && from.size() >= 2)
     {
         def.receiveFrom = from[0].toString().toStdString();
@@ -1676,6 +1679,8 @@ juce::var mixerTrackToVar (const MixerTrack& t)
         o->setProperty ("latencyBypass", t.latencyBypass == LatencyBypass::always ? "always" : "whenIdle");
     if (! t.compensateMasterLatency)
         o->setProperty ("compensateMaster", false);
+    if (t.icon != 0) // FL's mixer track icon index (round 168j)
+        o->setProperty ("icon", t.icon);
     if (t.outputChannel != outputDefault) // hardware output target (REA round 156): -1 = none, else device channel
     {
         o->setProperty ("output", t.outputChannel);
@@ -1740,6 +1745,7 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     else if (bypass == "whenIdle")
         track.latencyBypass = LatencyBypass::whenRecordingOrStopped;
     track.compensateMasterLatency = (bool) t.getProperty ("compensateMaster", true);
+    track.icon = juce::jlimit (0, 0xFFFF, (int) t.getProperty ("icon", 0));
     track.outputChannel = juce::jlimit (outputDefault, 255, (int) t.getProperty ("output", outputDefault));
     if (const auto mode = t["outputMode"].toString(); mode == "mono")
         track.outputMode = OutputMode::monoSum;
@@ -1806,6 +1812,17 @@ juce::String toJson (const Song& song)
         root->setProperty ("fastDeclick", true);
     if (song.panTriangular)
         root->setProperty ("panLaw", "triangular");
+    // FL's mixer › Plugin delay compensation, Time settings, Piano Roll scale highlighting, data folder (round 168j)
+    if (! song.autoPdc)
+        root->setProperty ("autoPdc", false);
+    if (! song.compensateAutomations)
+        root->setProperty ("compensateAutomations", false);
+    if (song.timeSignatureMode)
+        root->setProperty ("timeSettings", "signature");
+    if (song.scaleHighlight != Song::ScaleHighlight {})
+        root->setProperty ("scaleHighlight", juce::Array<juce::var> { song.scaleHighlight.scale, song.scaleHighlight.root });
+    if (! song.dataFolder.empty())
+        root->setProperty ("dataFolder", juce::String::fromUTF8 (song.dataFolder.c_str()));
     if (! song.info.empty())
     {
         auto info = std::make_unique<juce::DynamicObject>();
@@ -2036,6 +2053,14 @@ juce::String toJson (const Song& song)
                                                           p.tolerant ? 1 : 0, (int) p.positionSync });
         if (! performance.isEmpty())
             root->setProperty ("playlistTrackPerformance", performance);
+
+        // FL's playlist track icons (round 168j): [index, FL icon index]
+        juce::Array<juce::var> icons;
+        for (std::size_t i = 0; i < song.playlistTracks.size(); ++i)
+            if (song.playlistTracks[i].icon != 0)
+                icons.add (juce::Array<juce::var> { (int) i, song.playlistTracks[i].icon });
+        if (! icons.isEmpty())
+            root->setProperty ("playlistTrackIcons", icons);
     }
 
     const auto anyMarkers = std::any_of (song.arrangements.begin(), song.arrangements.end(), [] (const Arrangement& a) { return ! a.markers.empty(); });
@@ -2132,6 +2157,12 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
     song.playTruncatedNotes = (bool) root.getProperty ("playTruncatedNotes", false);
     song.fastDeclick = (bool) root.getProperty ("fastDeclick", false);
     song.panTriangular = root.getProperty ("panLaw", "circular").toString() == "triangular";
+    song.autoPdc = (bool) root.getProperty ("autoPdc", true);
+    song.compensateAutomations = (bool) root.getProperty ("compensateAutomations", true);
+    song.timeSignatureMode = root.getProperty ("timeSettings", "division").toString() == "signature";
+    if (const auto& sh = root["scaleHighlight"]; sh.isArray() && sh.size() >= 2)
+        song.scaleHighlight = { juce::jlimit (-3, 255, (int) sh[0]), juce::jlimit (0, 11, (int) sh[1]) };
+    song.dataFolder = root.getProperty ("dataFolder", {}).toString().toStdString();
     if (const auto info = root.getProperty ("info", {}); info.isObject())
     {
         auto get = [&info] (const char* key) { return info.getProperty (key, {}).toString().toStdString(); };
@@ -2344,6 +2375,16 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
                 p.queue = (int) t[4] != 0;
                 p.tolerant = (int) t[5] != 0;
                 p.positionSync = (TrackPerformance::Sync) juce::jlimit (0, 6, (int) t[6]);
+            }
+
+    if (auto* icons = root["playlistTrackIcons"].getArray())
+        for (const auto& t : *icons)
+            if (t.isArray() && t.size() >= 2 && (int) t[0] >= 0 && (int) t[0] < 500)
+            {
+                const auto index = (std::size_t) (int) t[0];
+                if (song.playlistTracks.size() <= index)
+                    song.playlistTracks.resize (index + 1);
+                song.playlistTracks[index].icon = juce::jlimit (0, 0xFFFF, (int) t[1]);
             }
 
     if (auto* modes = root["playlistTrackModes"].getArray())

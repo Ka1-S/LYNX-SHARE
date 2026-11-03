@@ -1,4 +1,5 @@
 #include "core/PluginLayout.h"
+#include "core/PluginLayoutSynths.h"
 
 #include <list>
 
@@ -3898,7 +3899,7 @@ const Layout* instrumentLayout (InstrumentKind kind)
         case InstrumentKind::boobass: return &boo;
         case InstrumentKind::sytrus: return &sytrus;
         case InstrumentKind::harmor: return &harmor;
-        default: return nullptr;
+        default: return synthGroupLayout (kind); // round 168o (core/PluginLayoutSynths.cpp)
     }
 }
 
@@ -3906,7 +3907,13 @@ const std::vector<InstrumentKind>& instrumentLayoutKinds()
 {
     static const std::vector<InstrumentKind> kinds { InstrumentKind::threeosc, InstrumentKind::flkeys, InstrumentKind::boobass, InstrumentKind::sytrus, InstrumentKind::harmor,
                                                      InstrumentKind::toxic, InstrumentKind::poizone };
-    return kinds;
+    static const std::vector<InstrumentKind> all = [] {
+        auto k = kinds;
+        for (const auto s : synthGroupLayoutKinds())
+            k.push_back (s);
+        return k;
+    }();
+    return all;
 }
 
 const Layout& soundgoodizerLayout()

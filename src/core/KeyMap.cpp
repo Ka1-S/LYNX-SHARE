@@ -54,7 +54,7 @@ std::vector<Action> makeActions()
         { "transport.toggleMode", TR_NOOP ("Pattern / song mode"), Context::global, { chord ('L') }, true },
         { "transport.nextMarker", TR_NOOP ("Jump to the next song marker (Quantize song jumps while playing)"), Context::global, { chord (numpadMultiply, alt) } },
         { "transport.previousMarker", TR_NOOP ("Jump to the previous song marker"), Context::global, { chord (numpadDivide, alt) } },
-        { "view.typingPiano", TR_NOOP ("Typing keyboard as a piano on/off"), Context::global, { chord ('T', ctrl) } },
+        { "view.typingPiano", TR_NOOP ("Typing keyboard to piano on/off"), Context::global, { chord ('T', ctrl) } },
         { "view.toolbar", TR_NOOP ("Show or hide the toolbar panels"), Context::global, { chord (f11, ctrl) } },
         { "view.audioEditor", TR_NOOP ("Open the audio editor"), Context::global, {} },
         { "view.tempoTapper", TR_NOOP ("Tempo tapper (tap the tempo)"), Context::global, { chord (f5, ctrl) } },

@@ -784,10 +784,8 @@ void Workspace::applyLayout()
     }
 
     // stacking order (back to front): the background panels first, then the floating ones
-    for (auto background : { true, false })
-        for (auto panel : layout.order)
-            if (! layout[panel].detached && isBackgroundPanel (panel) == background)
-                frames[(std::size_t) panel]->toFront (false);
+    for (auto panel : layout.stacking())
+        frames[(std::size_t) panel]->toFront (false);
 
     setFocusedPanel (layout.focused);
     repaint();

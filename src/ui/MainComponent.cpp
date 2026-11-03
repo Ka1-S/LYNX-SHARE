@@ -237,7 +237,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
     typingPianoButton.setOnColour (theme::colour::bg6);
     typingPianoButton.setIconColourWhenOn (theme::colour::accent);
-    typingPianoButton.onClick = [this] { setTypingPiano (! typingPiano); };
+    typingPianoButton.onClick = [this] { toggleTypingPiano(); };
 
     // count-in and wait-for-input switches next to the metronome, as in FL's recording panel
     for (auto* b : { &countInButton, &waitInputButton })
@@ -316,6 +316,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         showPanel (Panel::mixer);
         mixer.selectTrack (insert);
     };
+    openMixerInsertHandler() = rack.onOpenMixerInsert; // and on the channel window's TRACK box (round 168s)
     mixer.onInstrumentDropped = [this] (int insert, ChannelDef c) { rack.addChannel (std::move (c), true, insert); };
     rackViewport.setViewedComponent (&rack, false);
     rackViewport.setScrollBarsShown (true, true);
@@ -610,6 +611,7 @@ MainComponent::~MainComponent()
     if (sessionLock != nullptr) // a clean exit: no "LYNX did not close properly" next time
         sessionMarker.deleteFile();
     mixerinput::openAudioSettings = nullptr;
+    openMixerInsertHandler() = nullptr;
     PatcherWindows::onBrowsePluginDatabase = nullptr;
     EditorGlobals::get().onOptionsChanged = nullptr;
     PianoRollComponent::shortcutText = nullptr;
@@ -1228,7 +1230,7 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("transport.toggleMode")) toggleMode();
     else if (is ("transport.nextMarker")) engine.jumpToNextMarker (true);
     else if (is ("transport.previousMarker")) engine.jumpToNextMarker (false);
-    else if (is ("view.typingPiano")) setTypingPiano (! typingPiano);
+    else if (is ("view.typingPiano")) toggleTypingPiano();
     else if (is ("view.toolbar"))
     {
         auto layout = toolbarLayout;
@@ -1414,13 +1416,23 @@ juce::String MainComponent::shortcutText (const char* actionId) const
     return chords.empty() ? juce::String() : "\t" + juce::String (keys::displayString (chords.front()));
 }
 
+void MainComponent::toggleTypingPiano()
+{
+    setTypingPiano (! typingPiano);
+    // say what changed in the hint bar (issue #34: people did not find the typing piano; Ctrl+T gave no feedback)
+    ui::Hint hint;
+    hint.text = typingPiano ? tr ("Typing keyboard to piano: on (Z..M and Q..P play the selected channels)")
+                            : tr ("Typing keyboard to piano: off (letter and number keys are shortcuts)");
+    ui::postHint (hint, 2500);
+}
+
 void MainComponent::setTypingPiano (bool on)
 {
     typingPiano = on;
     EditorGlobals::get().typingPiano = on; // the editors' single-letter tool keys only work while it is off
     typingPianoButton.setToggleState (on, juce::dontSendNotification);
-    typingPianoButton.setTooltip ((on ? tr ("Typing keyboard as a piano: on (Z..M and Q..P play the selected channels)")
-                                      : tr ("Typing keyboard as a piano: off (letter and number keys are shortcuts)"))
+    typingPianoButton.setTooltip ((on ? tr ("Typing keyboard to piano: on (Z..M and Q..P play the selected channels)")
+                                      : tr ("Typing keyboard to piano: off (letter and number keys are shortcuts)"))
                                   + juce::String (" (") + juce::String (keys::displayString (keyMap.chordsFor ("view.typingPiano").empty() ? keys::Chord {}
                                                                                                                                  : keyMap.chordsFor ("view.typingPiano").front()))
                                   + ")");
@@ -3165,7 +3177,7 @@ void MainComponent::setControlHints()
     ui::setHint (metronomeButton, with (tr ("Metronome: clicks on every beat while playing  [RMB] volume and options"), "transport.metronome"), true);
     ui::setHint (countInButton, with (tr ("Count-in: one bar of clicks before recording starts (the menu has more lengths)"), "record.countIn"));
     ui::setHint (waitInputButton, with (tr ("Wait for input: recording starts with the first note you play"), "record.waitForInput"));
-    ui::setHint (typingPianoButton, with (tr ("Typing keyboard as a piano: Z..M and Q..P play the selected channels; letter shortcuts pause"),
+    ui::setHint (typingPianoButton, with (tr ("Typing keyboard to piano: Z..M and Q..P play the selected channels; letter shortcuts pause"),
                                           "view.typingPiano"));
     ui::setHint (gridBox, tr ("Global snap: the grid of the Piano Roll and Playlist (when they follow it) and the quantise of recorded notes  "
                               "[LMB] choose  [Wheel] step  [RMB] length of new notes  [Backspace] snap on/off  [Alt] while dragging: no snap"),
@@ -4856,7 +4868,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Sample browser (separate window)") + shortcutText ("view.sampleBrowser"), true, findToolWindow ("sampleBrowser") != nullptr,
                       [this] { toggleSampleBrowser(); });
         menu.addSeparator();
-        menu.addItem (tr ("Typing keyboard as a piano") + shortcutText ("view.typingPiano"), true, typingPiano, [this] { setTypingPiano (! typingPiano); });
+        menu.addItem (tr ("Typing keyboard to piano") + shortcutText ("view.typingPiano"), true, typingPiano, [this] { toggleTypingPiano(); });
         menu.addItem (tr ("Touch keyboard") + shortcutText ("view.touchKeyboard"), true, isTouchKeyboardOpen(), [this] { toggleTouchKeyboard (engine); });
         {
             // FL's View › Background (audit round 165z-a): the workspace image and colour of Options › Theme
@@ -4907,6 +4919,9 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Record input audio"), true, engine.isAudioRecordingArmed(), [this] {
             engine.setAudioRecordingArmed (! engine.isAudioRecordingArmed());
         });
+        // FL's Options menu, "Switches" section (TFruityLoopsMainForm DFM: KBToMIDIMenu = OptionsTypingKbToPianoAction,
+        // "Typing keyboard to piano", Ctrl+T, checkable, right before Metronome; round 168t, issue #34)
+        menu.addItem (tr ("Typing keyboard to piano") + shortcutText ("view.typingPiano"), true, typingPiano, [this] { toggleTypingPiano(); });
         menu.addItem (tr ("Metronome") + shortcutText ("transport.metronome"), true, engine.getTransport().metronome.load(), [this] {
             metronomeButton.setToggleState (! metronomeButton.getToggleState(), juce::sendNotification);
         });
@@ -5093,7 +5108,7 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
             { "Ctrl+R", TR_NOOP ("Export audio") },
             { "Enter", TR_NOOP ("Maximize or restore the Playlist") },
             { "L", TR_NOOP ("Pattern / song mode") },
-            { "Ctrl+T", TR_NOOP ("Typing keyboard as a piano on/off") },
+            { "Ctrl+T", TR_NOOP ("Typing keyboard to piano on/off") },
             { "Z..M  Q..P", TR_NOOP ("PC keyboard as a piano (selected channels)") },
             { "Numpad +/-", TR_NOOP ("Next / previous pattern") },
             { "Ctrl+Shift+Ins", TR_NOOP ("Insert an empty pattern before the current one") } } },

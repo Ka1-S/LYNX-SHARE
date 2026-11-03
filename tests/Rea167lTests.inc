@@ -417,20 +417,20 @@ TEST (rea167l_clip_stretch_plays_like_fl)
 {
     using namespace lynx;
     auto s = rea167k::rampSong();
-    s.playlist[0].length = 12 * ppq; // 6 s at 120 BPM
+    s.playlist[0].length = 12 * ppq; // 6 s at 120 BPM; after the file's end the clip holds its last value (FL, round 168j)
     // Resample: ×2 = 4 s at 220 Hz, ×0.5 = 1 s at 880 Hz (FL: st_r_2 / st_r_05)
     s.playlist[0].stretch = 2.0;
     auto x = rea167l::renderSine (s, 5.0);
     CHECK (std::abs (rea167k::frequencyOf (x, 0.5, 1.5) - 220.0) < 1.5);
-    CHECK (rea167k::peakOf (x, 3.7, 3.95) > 0.2f && rea167k::peakOf (x, 4.15, 4.9) < 0.05f);
+    CHECK (rea167k::peakOf (x, 3.7, 3.95) > 0.2f && rea167k::spreadOf (x, 4.15, 4.9) < 1.0e-4f);
     s.playlist[0].stretch = 0.5;
     x = rea167l::renderSine (s, 2.0);
     CHECK (std::abs (rea167k::frequencyOf (x, 0.2, 0.8) - 880.0) < 3.0);
-    CHECK (rea167k::peakOf (x, 0.85, 0.97) > 0.2f && rea167k::peakOf (x, 1.1, 1.9) < 0.05f);
+    CHECK (rea167k::peakOf (x, 0.85, 0.97) > 0.2f && rea167k::spreadOf (x, 1.1, 1.9) < 1.0e-4f);
     // a stretch mode (FL: st_e3_2 / st_rt_2): ×2 = 4 s, the pitch stays 440 Hz
     s.channels[0].sampler.keepPitch = true;
     s.playlist[0].stretch = 2.0;
     x = rea167l::renderSine (s, 5.0);
     CHECK (std::abs (rea167k::frequencyOf (x, 0.5, 3.0) - 440.0) < 3.0);
-    CHECK (rea167k::peakOf (x, 3.6, 3.9) > 0.1f && rea167k::peakOf (x, 4.3, 4.9) < 0.05f);
+    CHECK (rea167k::peakOf (x, 3.6, 3.9) > 0.1f && rea167k::spreadOf (x, 4.3, 4.9) < 1.0e-4f);
 }

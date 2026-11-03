@@ -835,6 +835,15 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
     song.fastDeclick = project.fastDeclick;               // 0x28 (REA round 167h)
     song.panTriangular = (project.panLaw >> 1) == 1;       // 0x17: FL saves 2 × its pan-law mode (REA round 167j §1)
+    // REA round 168j: PDC "Automatic" 0x1D / "Compensate automations" 0x27, Time settings 0x23, the Piano Roll's scale
+    // highlighting 0xF3, the data folder 0xCA
+    song.autoPdc = project.autoPdc;
+    song.compensateAutomations = project.compensateAutomations;
+    song.timeSignatureMode = project.timeSignatureMode;
+    if (project.hasScaleHighlight)
+        song.scaleHighlight = { project.scaleHighlight >= -3 && project.scaleHighlight < 256 ? project.scaleHighlight : -2,
+                                std::clamp (project.scaleRoot, 0, 11) };
+    song.dataFolder = project.dataFolder;
     song.masterPitch = (float) std::clamp (project.mainPitch, -1200, 1200); // FL's render follows it (REA round 167g §1)
     song.channelGroups = project.filterGroups;
     song.info.title = project.title;
@@ -934,6 +943,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         def.muted = ! c.enabled; // switched off in FL's Channel Rack: its notes don't play (REA_rodada80 §3.1)
         def.soloLock = c.soloLock;          // 0x20 "Lock active/mute state" (REA_rodada167l §5)
         def.ghostHidden = ! c.ghostShown;   // 0x32: the channel's ghost notes in the Piano Roll (REA_rodada167l §5)
+        def.icon = std::clamp (c.icon, 0, 0xFFFF); // 0x9B (REA round 168j)
 
         if (c.colour != 0)
             def.colour = 0xFF000000u | c.colour;
@@ -2109,7 +2119,9 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
     // Mixer: names, mute/solo, routing and levels from the .flp; enough inserts for all
     // routes (minimum 16, like a new project). FL's extra tracks (500/501) are left out.
-    int highestTrack = 16;
+    // FL's mixer track count (0x67, REA round 168j: FLP_FXTrackCount = the track records saved — Master, the inserts and
+    // FL's "current" track): FL shows that many inserts; files without it: 16 or as many as are used
+    int highestTrack = project.mixerTrackCount >= 3 ? project.mixerTrackCount - 2 : 16;
     for (const auto& c : song.channels)
         highestTrack = std::max (highestTrack, c.mixerTrack);
 
@@ -2132,8 +2144,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         if (insert.index > 0 && ! insert.name.empty())
             track.name = insert.name;
 
-        if (insert.colour != 0 && insert.colour != 0x485156) // FL's default gray
+        // (0x2A off = FL draws the default colour whatever 0x95 holds; REA round 168j)
+        if (insert.colour != 0 && insert.colour != 0x485156 && insert.colourSet != 0) // FL's default gray
             track.colour = 0xFF000000u | insert.colour;
+        track.icon = std::clamp (insert.icon, 0, 0xFFFF); // 0x5F (REA round 168j)
 
         track.muted = (insert.flags & 0x08) == 0;
         track.invertPhase = (insert.flags & 0x01) != 0;
@@ -2167,6 +2181,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             track.flInput = insert.input;
             track.monitor = InputMonitor::on;
         }
+        // 0xA6 "Monitor external input" (REA round 168j: ExtInputMonitorOffMenuClick's tags = LYNX's order); files
+        // without it keep the rule above
+        if (insert.monitor >= 0)
+            track.monitor = (InputMonitor) std::clamp (insert.monitor, 0, 3);
 
         if (insert.index > 0 && insert.hasRoutes)
         {
@@ -3061,6 +3079,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         std::stable_sort (p.markers.begin(), p.markers.end(), [] (const Marker& x, const Marker& y) { return x.tick < y.tick; });
 
         p.loopOn = src.loopOn;
+        // the Channel Rack's pattern length selector (0xA4, REA round 168j): a fixed length, else automatic
+        p.lengthTicks = src.fixedLength > 0 ? rescale ((std::int64_t) src.fixedLength) : 0;
         p.loopMode = (RackLoopMode) std::clamp (src.loopMode, 1, 3);
         for (const auto& [flChannel, setting] : src.channelLoops)
             if (const auto it = channelMap.find (flChannel); it != channelMap.end())
@@ -3637,7 +3657,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 performance.positionSync = (TrackPerformance::Sync) std::clamp (t.positionSync, 0, 6);
 
                 if (t.index >= 0 && t.index < 500 && (! t.name.empty() || ! t.enabled || coloured || t.grouped || ! t.expanded || sized || t.mode != 0
-                                                       || ! performance.isDefault()))
+                                                       || ! performance.isDefault() || t.icon != 0))
                 {
                     if ((int) song.playlistTracks.size() <= t.index)
                         song.playlistTracks.resize ((std::size_t) t.index + 1);
@@ -3650,6 +3670,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     track.grouped = t.index > 0 && t.grouped;
                     track.performance = performance; // Performance mode's track settings (round 165m)
                     track.collapsed = ! t.expanded;
+                    track.icon = std::clamp (t.icon, 0, 0xFFFF); // (REA round 168j)
                     // track modes (REA round 146a): an audio track's mixer track, an instrument track's channel
                     const auto mixerOk = t.mixerTrack > 0 && t.mixerTrack < (int) song.mixer.size();
                     if (t.mode == 1 && mixerOk)

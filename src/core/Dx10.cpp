@@ -606,6 +606,18 @@ public:
             engine.voices[(std::size_t) engine.order[(std::size_t) i]].slide.follow (live.now());
     }
 
+    // automation of a parameter (round 168o): the clip's 0…1 over the knob's range; the voices take it at once, as
+    // they take a new state
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        if (index < 0 || index >= paramCount || ! std::isfinite (value))
+            return;
+        const auto v = std::clamp (value, 0.0f, 1.0f);
+        engine.P.raw[(std::size_t) index] = index == 21 ? (int) std::lround (-3.0f + 6.0f * v) : (int) std::lround (65536.0f * v);
+        engine.update();
+    }
+
     void noteOn (int key, float velocity) noexcept override
     {
         take();
