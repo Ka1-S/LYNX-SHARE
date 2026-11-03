@@ -58,14 +58,14 @@ TEST (mx168_curve_edits_are_written_in_fl_layout)
         CHECK (maximusfx::withCurve (slot, band, pts) == slot); // nothing moved: the same bytes
     }
 
-    // FL's "add point" (right-click): a point under the identity at −12 dB in → −6 dB out raises the quiet part
+    // FL's "add point" (right-click): a point above the identity raises the quiet part
     auto pts = maximusfx::curveForEditing (slot, 3);
-    const auto at = maximusfx::addCurvePoint (pts, 0.25, 0.32f);
+    const auto at = maximusfx::addCurvePoint (pts, 0.25, 0.45f);
     CHECK (at == 1 && pts.size() == 4 && pts[1].x == 0.25);
     const auto edited = maximusfx::withCurve (slot, 3, pts);
     CHECK (edited != slot);
     const auto back = maximusfx::curveForEditing (edited, 3);
-    CHECK (back.size() == 4 && std::abs (back[1].x - 0.25) < 1e-12 && back[1].y == 0.32f && back[3].x == 1.0);
+    CHECK (back.size() == 4 && std::abs (back[1].x - 0.25) < 1e-12 && back[1].y == 0.45f && back[3].x == 1.0);
     CHECK (maximusfx::curveForEditing (edited, 0).size() == 3); // the other bands' curves untouched
     CHECK (maximusfx::withCurve (edited, 3, back) == edited);    // write → read → write is bit-identical
     const auto blob = maximusfx::unpack (edited);

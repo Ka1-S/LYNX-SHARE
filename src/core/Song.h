@@ -892,6 +892,20 @@ enum class InputMonitor : std::uint8_t
 
 enum class MixerDock : std::uint8_t { left, middle, right };
 
+// What an armed insert records (FL's "Record" menu of the insert's input box, AudioRecorderRoutingMenu; track byte
+// +0x2F, .flp 0xA5; REA_rodada2 §2.1, REA_rodada165f-mixer §4, REA_rodada168x §2). FL 2026's new inserts record Post EQ
+// (the FL 2026 demo projects save 3 on every insert; the Playlist hint of a fresh insert: "Recording: Post EQ").
+// The taps sit in FL's insert order: input → effect slots → EQ → level / pan / separation → mute → routes.
+enum class RecordSource : std::uint8_t
+{
+    externalInput,    // "External input only": the device input as it comes in (no effects)
+    externalAndMixer, // "External and mixer input": the insert's input (device input + what is routed to it), before the slots
+    postEffects,      // "Post effects": after the effect slots
+    postEq,           // "Post EQ": after the insert's built-in EQ (FL's default)
+    postLevel,        // "Post level and panning": after the fader, pan, separation, polarity and swap (not muted)
+    postTrack         // "Post track": the insert's output as it leaves it (muted too)
+};
+
 // FL's mixer track latency menu "Bypass track latency compensation" (REA round 165f-mixer; .flp event 0x31): a bypassed
 // track's outputs get no PDC delay (its own latency still makes the other paths wait), so a live input monitored
 // through it is not delayed to line up with slow plugins elsewhere (FL 24.2's per-track low-latency monitoring).
@@ -945,6 +959,11 @@ struct MixerTrack
     // FL's "Record <insert> to" (the arm button's right-click, round 167a [SHOT s20–s27]): the file this insert records
     // and renders to (empty = an automatic name). Saved.
     std::string recordTo;
+    // FL's "Record" position (round 168x, issue #41): where the take is tapped. Saved.
+    RecordSource recordSource = RecordSource::postEq;
+    // LYNX extra (issue #41, "(LYNX)" in the menu): with a position after the slots, also record the dry device input as
+    // a second take at the same time (DI + processed, for re-amping). Saved.
+    bool recordDryToo = false;
     // an FL project's input (.flp 0x9A, REA round 157c): the index in FL's list of its own device's inputs, which only
     // the open device can turn into a channel — AudioEngine::setSong resolves it (flInputSource) when the project opens,
     // if inputChannel is still -1. -1 = none. Not saved.

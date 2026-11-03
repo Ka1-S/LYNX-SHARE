@@ -6429,3 +6429,17 @@ countries: tr
 "Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "Pencereler: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mikser  {4}Tarayıcı  (veya çubuktaki pencere düğmeleri; tekrar: gizle)"
 "Stretched pattern clips loop their pattern (LYNX)" = "Uzatılmış pattern klipleri pattern'lerini döngüye alır (LYNX)"
 "On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "Açık: pattern'inin ötesine uzatılan bir pattern klibi pattern'i tekrarlar. Kapalı: pattern'i FL Studio'daki gibi bir kez çalar"
+
+# --- round 168x: Maximus curve editor (issue #40), insert record positions (issue #41)
+"Point: [LMB] drag moves  [RMB] shape, value, delete  [Alt][RMB] delete" = "Nokta: [LMB] sürükleyerek taşı  [RMB] şekil, değer, sil  [Alt][RMB] sil"
+"Compression curve (input across, output up): [RMB] add a point (hold and drag to place it)  [LMB] drag a point" = "Sıkıştırma eğrisi (giriş yatay, çıkış dikey): [RMB] nokta ekler (yerleştirmek için basılı tutup sürükleyin)  [LMB] noktayı sürükler"
+"External input only" = "Yalnızca harici giriş"
+"External and mixer input" = "Harici ve mikser girişi"
+"Post effects" = "Efektlerden sonra"
+"Post EQ" = "EQ'dan sonra"
+"Post level and panning" = "Seviye ve pan'dan sonra"
+"Post track" = "Kanaldan sonra"
+"Also record the dry input as a second take (LYNX)" = "Kuru girişi de ikinci kayıt olarak al (LYNX)"
+"Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file" = "Kayda hazır: Rec + Play bu insert'i bir Playlist klibine kaydeder  [RMB] dosyaya kaydet"
+"Recording: {0}" = "Kaydediliyor: {0}"
+"dry input" = "kuru giriş"

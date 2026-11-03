@@ -6429,3 +6429,17 @@ countries: fr be ch ca lu
 "Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "Fenêtres : {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixeur  {4}Navigateur  (ou les boutons de fenêtre de la barre ; à nouveau : masquer)"
 "Stretched pattern clips loop their pattern (LYNX)" = "Les clips de pattern étirés bouclent leur pattern (LYNX)"
 "On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "Activé : un clip de pattern étiré au-delà de son pattern répète le pattern. Désactivé : il joue le pattern une seule fois, comme dans FL Studio"
+
+# --- round 168x: Maximus curve editor (issue #40), insert record positions (issue #41)
+"Point: [LMB] drag moves  [RMB] shape, value, delete  [Alt][RMB] delete" = "Point : [LMB] glisser déplace  [RMB] forme, valeur, supprimer  [Alt][RMB] supprimer"
+"Compression curve (input across, output up): [RMB] add a point (hold and drag to place it)  [LMB] drag a point" = "Courbe de compression (entrée en abscisse, sortie en ordonnée) : [RMB] ajoute un point (maintenir et glisser pour le placer)  [LMB] glisse un point"
+"External input only" = "Entrée externe seule"
+"External and mixer input" = "Entrée externe et du mixeur"
+"Post effects" = "Après les effets"
+"Post EQ" = "Après l'EQ"
+"Post level and panning" = "Après le niveau et le panoramique"
+"Post track" = "Après la piste"
+"Also record the dry input as a second take (LYNX)" = "Enregistrer aussi l'entrée sèche en seconde prise (LYNX)"
+"Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file" = "Armement : Rec + Play enregistre cet insert dans un clip de la Playlist  [RMB] enregistrer dans un fichier"
+"Recording: {0}" = "Enregistrement : {0}"
+"dry input" = "entrée sèche"

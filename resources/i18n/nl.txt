@@ -6429,3 +6429,17 @@ countries: nl be
 "Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "Vensters: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (of de vensterknoppen in de balk; nogmaals: verbergen)"
 "Stretched pattern clips loop their pattern (LYNX)" = "Uitgerekte patroonclips herhalen hun patroon (LYNX)"
 "On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "Aan: een patroonclip die voorbij zijn patroon is uitgerekt, herhaalt het patroon. Uit: hij speelt het patroon één keer, zoals in FL Studio"
+
+# --- round 168x: Maximus curve editor (issue #40), insert record positions (issue #41)
+"Point: [LMB] drag moves  [RMB] shape, value, delete  [Alt][RMB] delete" = "Punt: [LMB] slepen verplaatst  [RMB] vorm, waarde, verwijderen  [Alt][RMB] verwijderen"
+"Compression curve (input across, output up): [RMB] add a point (hold and drag to place it)  [LMB] drag a point" = "Compressiecurve (ingang horizontaal, uitgang verticaal): [RMB] voegt een punt toe (ingedrukt houden en slepen om te plaatsen)  [LMB] sleept een punt"
+"External input only" = "Alleen externe ingang"
+"External and mixer input" = "Externe en mixeringang"
+"Post effects" = "Na de effecten"
+"Post EQ" = "Na de EQ"
+"Post level and panning" = "Na niveau en panning"
+"Post track" = "Na de track"
+"Also record the dry input as a second take (LYNX)" = "Ook de droge ingang als tweede take opnemen (LYNX)"
+"Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file" = "Opname-arm: Rec + Play neemt deze insert op in een Playlist-clip  [RMB] opnemen naar een bestand"
+"Recording: {0}" = "Opname: {0}"
+"dry input" = "droge ingang"

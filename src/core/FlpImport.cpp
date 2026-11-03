@@ -2156,6 +2156,9 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         // set to none (the project would play silent)
         if (insert.output == 0 && insert.index > 0)
             track.outputChannel = 0;
+        // 0xA5 the "Record" position (round 168x); a file without it keeps FL 2026's default, Post EQ
+        if (insert.recordSource >= 0)
+            track.recordSource = (RecordSource) std::clamp (insert.recordSource, 0, 5);
         // 0x9A "Audio input source" (REA round 157c): resolved against the open device when the project opens
         // (AudioEngine::setSong). FL plays an insert's input through it whether the insert is armed or not, stopped or
         // playing ([FL] FL Studio 2026, meters of unarmed inserts with an input): monitoring On

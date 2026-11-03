@@ -6429,3 +6429,17 @@ countries: kr
 "Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "창: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}믹서  {4}브라우저  (또는 툴바의 창 버튼, 다시 누르면 숨김)"
 "Stretched pattern clips loop their pattern (LYNX)" = "늘린 패턴 클립이 패턴을 반복 (LYNX)"
 "On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "켜기: 패턴보다 길게 늘린 패턴 클립은 패턴을 반복합니다. 끄기: FL Studio처럼 패턴을 한 번만 재생합니다"
+
+# --- round 168x: Maximus curve editor (issue #40), insert record positions (issue #41)
+"Point: [LMB] drag moves  [RMB] shape, value, delete  [Alt][RMB] delete" = "포인트: [LMB] 드래그로 이동  [RMB] 모양, 값, 삭제  [Alt][RMB] 삭제"
+"Compression curve (input across, output up): [RMB] add a point (hold and drag to place it)  [LMB] drag a point" = "컴프레션 커브 (가로 입력, 세로 출력): [RMB] 포인트 추가 (누른 채 드래그해 배치)  [LMB] 포인트 드래그"
+"External input only" = "외부 입력만"
+"External and mixer input" = "외부 및 믹서 입력"
+"Post effects" = "이펙트 후"
+"Post EQ" = "EQ 후"
+"Post level and panning" = "레벨 및 패닝 후"
+"Post track" = "트랙 후"
+"Also record the dry input as a second take (LYNX)" = "드라이 입력도 두 번째 테이크로 녹음 (LYNX)"
+"Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file" = "녹음 대기: Rec + Play로 이 인서트를 Playlist 클립에 녹음  [RMB] 파일로 녹음"
+"Recording: {0}" = "녹음: {0}"
+"dry input" = "드라이 입력"
