@@ -3971,13 +3971,13 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
             // before the loop, play normally until reaching it; past the end, jump back to the start
             auto position = transport.positionTicks.load (std::memory_order_relaxed);
 
-            if (position >= loopEnd)
+            if (transportReached (position, loopEnd))
             {
                 position = songWrap;
                 transport.positionTicks.store (position, std::memory_order_relaxed);
             }
 
-            n = juce::jlimit (1, n, (int) std::ceil ((loopEnd - position) / tps));
+            n = transportSamplesUntil (position, loopEnd, tps, n);
         }
 
         // FL's marker actions (Song mode): the block ends where the position reaches a marker jump / pause, or a
@@ -4102,14 +4102,14 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         {
             auto position = transport.positionTicks.load (std::memory_order_relaxed) + n * tps;
 
-            if (pendingDue && position >= pendingAt - 1e-6)
+            if (pendingDue && transportReached (position, pendingAt))
             {
                 position = transport.pendingJumpTo.load (std::memory_order_relaxed);
                 transport.pendingJumpAt.store (-1.0, std::memory_order_relaxed);
                 markerEvents.fetch_add (1, std::memory_order_relaxed);
                 transport.userJumps.fetch_add (1, std::memory_order_relaxed);
             }
-            else if (markerJump != nullptr && position >= (double) markerJump->at - 1e-6)
+            else if (markerJump != nullptr && transportReached (position, (double) markerJump->at))
             {
                 markerEvents.fetch_add (1, std::memory_order_relaxed);
                 if (markerJump->kind == MarkerJump::Kind::pause)
@@ -4122,7 +4122,7 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
                 position = (double) markerJump->to;
                 transport.userJumps.fetch_add (1, std::memory_order_relaxed);
             }
-            else if (looping && position >= loopEnd - 1e-6)
+            else if (looping && transportReached (position, loopEnd))
             {
                 position = songWrap;
                 // loop recording: where this pass ends in the takes (round 163)

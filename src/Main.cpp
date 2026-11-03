@@ -4468,13 +4468,14 @@ private:
                     if (k == jumpBlock)
                         engine->seek (14 * ppq);
                 });
-                // (the best of 0-2 samples late: the core render puts a note on a jump's target tick 1 sample late)
+                // (the best of 0-2 samples late: anything but 0 fails)
                 const auto at = (jumpBlock + 1) * 512;
                 int lag = 0;
                 auto d = 1.0e9;
                 for (int l = 0; l <= 2; ++l)
                     if (const auto dl = diff (x, at + l, a, 2 * beat, beat - 2); dl < d)
                         d = dl, lag = l;
+                d = lag == 0 ? d : 1.0;
                 const auto ratio = rms (x, at, beat) / rms (a, 2 * beat, beat);
                 check (std::abs (ratio - 1.0) < 1.0e-3 && d < 1.0e-4,
                        "jump mid-clip to bar 4 beat 3: RMS " + num (rms (x, at, beat)) + " (x" + num (ratio) + " of bar 1 beat 3), max diff "
@@ -4495,13 +4496,30 @@ private:
                     for (int l = 0; l <= 2; ++l)
                         if (const auto dl = diff (x, k * bar + l, a, 0, bar - 2); dl < best)
                             best = dl, lag = l;
-                    d = juce::jmax (d, best);
+                    d = juce::jmax (d, lag == 0 ? best : 1.0); // a sample gained at a wrap fails (round 167q loopwrap)
                     lags << (k > 1 ? "," : "") << lag;
                 }
                 const auto r = rms (x, bar, 6 * bar);
                 check (std::abs (r / bar1 - 1.0) < 1.0e-3 && d < 1.0e-4,
                        "loop region bars 2-3, played 3 times: RMS " + num (r) + " (x" + num (r / bar1) + "), max diff of each bar vs bar 1 " + juce::String (d, 9)
                            + " (samples late, bars 2-7: " + lags + ")");
+                engine->editSong ([] (lynx::Song& s) { s.loopStart = s.loopEnd = 0; }, false);
+            }
+            {
+                // 100 wraps of a 1-bar loop region (bar 2): every pass on its sample, none gained (round 167q loopwrap: each
+                // wrap used to play one sample more)
+                engine->editSong ([ppq] (lynx::Song& s) {
+                    s.loopStart = (std::int64_t) (4 * ppq);
+                    s.loopEnd = (std::int64_t) (8 * ppq);
+                }, false);
+                const auto x = play (0.0, 101 * bar);
+                double d = 0.0;
+                int worst = 0;
+                for (int k = 1; k <= 100; ++k)
+                    if (const auto dk = diff (x, k * bar, a, 0, bar); dk > d)
+                        d = dk, worst = k + 1;
+                check (d < 1.0e-4, "loop region bar 2, 100 wraps: max diff of every pass vs bar 1 " + juce::String (d, 9)
+                                       + (d < 1.0e-4 ? juce::String() : " (worst: bar " + juce::String (worst) + ")"));
                 engine->editSong ([] (lynx::Song& s) { s.loopStart = s.loopEnd = 0; }, false);
             }
             lynx::setStretchedClipsLoop (false);

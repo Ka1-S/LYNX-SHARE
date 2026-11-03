@@ -2,7 +2,9 @@
 
 #include <utility>
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <vector>
 
@@ -52,6 +54,22 @@ struct MarkerPlan
 };
 
 MarkerPlan makeMarkerPlan (const Song& song);
+
+// The transport's position is a double that moves by n · ticksPerSample per block, so a point it must stop at (the loop
+// region's end, a marker jump, a quantized jump) is reached up to a rounding error early or late. Both the "how many
+// samples until it" and the "has it been reached" tests take positions within transportTickEpsilon of the point as the
+// point: before (round 167q), the remaining 192000.00000001 samples of a loop pass were rounded up, so every wrap played
+// one sample more (100 wraps = 100 samples late).
+constexpr double transportTickEpsilon = 1.0e-6;
+inline bool transportReached (double position, double point) noexcept { return position >= point - transportTickEpsilon; }
+// The samples to play from `position` until `point` (1 at least, `n` at most).
+inline int transportSamplesUntil (double position, double point, double ticksPerSample, int n) noexcept
+{
+    if (ticksPerSample <= 0.0 || n <= 1)
+        return std::max (1, n);
+    const auto samples = std::ceil ((point - position - transportTickEpsilon) / ticksPerSample);
+    return samples >= (double) n ? n : std::max (1, (int) samples);
+}
 
 // One step of the audio thread's transport (Song mode, playing): how many of the `n` samples to play before a marker
 // jump / pause or the user's quantized jump (`pendingAt`, < 0 = none) falls due, and what happens after them.
