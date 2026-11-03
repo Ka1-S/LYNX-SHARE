@@ -58,7 +58,14 @@ void setPluginRenderMode (juce::AudioPluginInstance& plugin, bool offline, int b
         return;
     plugin.setNonRealtime (offline);
     if (plugin.getSampleRate() > 0.0)
-        plugin.prepareToPlay (plugin.getSampleRate(), blockSize); // VST3 reads the process mode in its setup
+    {
+        // VST3 reads the process mode in its setup (setupProcessing). JUCE's VST3 host skips prepareToPlay when the
+        // plugin is active at the same rate and block size, so the plugin was never told: an export ran it in
+        // real-time mode (round 169c, issue #32 [LOG] the LYNX Test Synth saw kRealtime through a whole export). It is
+        // set up again from scratch.
+        plugin.releaseResources();
+        plugin.prepareToPlay (plugin.getSampleRate(), blockSize);
+    }
 }
 
 namespace
@@ -85,7 +92,8 @@ public:
         const auto& t = hostTimeline();
         const auto bpm = t.bpm.load (std::memory_order_relaxed);
         const auto rate = t.sampleRate.load (std::memory_order_relaxed);
-        const auto quarters = t.tick.load (std::memory_order_relaxed) / (double) ppq;
+        // (the block's own start: a generator's chunk is split at its notes, round 169c)
+        const auto quarters = t.tickAt (hostBlockOffset()) / (double) ppq;
         const auto beatsPerBar = juce::jmax (1, t.beatsPerBar.load (std::memory_order_relaxed));
         PositionInfo info;
         info.setBpm (bpm);
@@ -244,13 +252,9 @@ PluginInstrument::PluginInstrument (std::unique_ptr<juce::AudioPluginInstance> i
     producesMidi = plugin->producesMidi(); // only then is what the buffer holds after processing the plugin's output
 }
 
-void PluginInstrument::hold (int channel, int key, bool on) noexcept
+void PluginInstrument::releaseHeldKeys() noexcept
 {
-    if (channel < 0 || channel > 15 || key < 0 || key > 127)
-        return;
-    auto& word = heldKeys[(std::size_t) channel][(std::size_t) (key >> 6)];
-    const auto bit = std::uint64_t { 1 } << (key & 63);
-    word = on ? (word | bit) : (word & ~bit);
+    heldKeys.releaseAll ([this] (int ch, int key) { midi.addEvent (juce::MidiMessage::noteOff (ch + 1, key), 0); });
 }
 
 void PluginInstrument::transportStopped() noexcept
@@ -261,11 +265,7 @@ void PluginInstrument::transportStopped() noexcept
         allNotesOff();
         return;
     }
-    for (int ch = 0; ch < 16; ++ch)
-        for (int key = 0; key < 128; ++key)
-            if ((heldKeys[(std::size_t) ch][(std::size_t) (key >> 6)] >> (key & 63)) & 1u)
-                midi.addEvent (juce::MidiMessage::noteOff (ch + 1, key), 0);
-    heldKeys = {};
+    releaseHeldKeys();
 }
 
 void PluginInstrument::panic() noexcept
@@ -429,9 +429,12 @@ void PluginInstrument::noteOff (int key) noexcept
 
 void PluginInstrument::allNotesOff() noexcept
 {
+    // each held key's own note off first (round 169c, issue #32): a VST3 plugin never sees CC 123 / CC 120 (JUCE's VST3
+    // host passes a controller only as the parameter the plugin maps it to, and drops it otherwise), so a jump while
+    // playing left SynthMaster's notes sounding under the chased ones: doubled notes, a sequence out of time
+    releaseHeldKeys();
     midi.addEvent (juce::MidiMessage::allNotesOff (1), 0);
     midi.addEvent (juce::MidiMessage::allSoundOff (1), 0);
-    heldKeys = {};
 }
 
 void PluginInstrument::setParameter (int index, float value) noexcept
@@ -467,6 +470,10 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
             midi.addEvent (m, 0); // (the first render comes before any note: the plugin is new)
     }
     flushMidiControls();
+    // the play head reports where each block starts in the chunk (round 169c); put back to 0 for the effects after it
+    const auto chunkOffset = blockClock.start (hostTimeline().chunk.load (std::memory_order_relaxed));
+    blockClock.advance (n);
+    const juce::ScopeGuard offsetBack { [] { setHostBlockOffset (0); } };
 
     if (fixed != nullptr)
     {
@@ -497,6 +504,7 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         {
             const auto count = juce::jmin (blockSize, n - done);
             float* io[2] = { scratch.data(), scratch.data() + blockSize };
+            setHostBlockOffset (chunkOffset + done);
             fixed->run (io, count, false, process);
 
             for (int i = 0; i < count; ++i)
@@ -515,6 +523,7 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         juce::AudioBuffer<float> view (buffer.getArrayOfWritePointers(), buffer.getNumChannels(), count);
         view.clear();
         bendBlock (midi, 0, count);
+        setHostBlockOffset (chunkOffset + done);
         if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }); code != 0)
         {
             midi.clear();

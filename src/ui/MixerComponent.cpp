@@ -1510,7 +1510,8 @@ void MixerStrips::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWh
             return;
         }
 
-    if (t >= 0 && t < (int) engine.getSong().mixer.size())
+    // (a spin that is scrolling the strips goes on scrolling over the faders and knobs, round 169c)
+    if (t >= 0 && t < (int) engine.getSong().mixer.size() && ! ui::wheelScrolling())
         if (const auto part = partAt (t, e.getPosition()); part == Part::pan || part == Part::fader || part == Part::stereo || part == Part::send)
         {
             if (const auto v = ui::wheelValue (valueOf (part, t), e, wheel, specFor (part, t)))
@@ -1521,6 +1522,7 @@ void MixerStrips::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWh
             return;
         }
 
+    ui::noteWheelScroll(); // the wheel scrolls the strips (the viewport)
     juce::Component::mouseWheelMove (e, wheel);
 }
 
@@ -4228,6 +4230,14 @@ int EffectsPanel::mixKnobAt (juce::Point<int> p) const
 
 void EffectsPanel::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
 {
+    // a spin that is scrolling the mixer goes on scrolling over the EQ, the knobs and the slot names (round 169c)
+    if (ui::wheelScrolling())
+    {
+        ui::noteWheelScroll();
+        juce::Component::mouseWheelMove (e, wheel);
+        return;
+    }
+
     if (auto eqControl = eqControlAt (e.getPosition()); eqControl != 0)
     {
         if (isEqPoint (eqControl)) // the wheel over a handle changes the band's width
@@ -4272,6 +4282,7 @@ void EffectsPanel::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseW
         return;
     }
 
+    ui::noteWheelScroll();
     juce::Component::mouseWheelMove (e, wheel);
 }
 

@@ -80,8 +80,15 @@ void reportTweak (const ValueSpec& spec);
 // Alt+left-click or middle-click.
 bool isResetClick (const juce::MouseEvent& e) noexcept;
 
-// Value after a wheel move over the control (nothing if the wheel did not move vertically).
+// Value after a wheel move over the control (nothing if the wheel did not move vertically, or while the wheel is
+// scrolling a view: wheelScrolling).
 std::optional<double> wheelValue (double value, const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel, const ValueSpec& spec);
+
+// Round 169c (issue #32): a view that scrolled with the wheel calls noteWheelScroll(); while the wheel keeps turning
+// (controls::WheelScrollLatch), wheelScrolling() is true and the controls the pointer passes over keep scrolling the
+// view instead of changing (wheelValue gives nothing).
+void noteWheelScroll() noexcept;
+bool wheelScrolling() noexcept;
 
 // The right-click menu. `set` receives the new value (typed or reset). `engine` may be null when the
 // control cannot be automated.

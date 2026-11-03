@@ -225,11 +225,23 @@ bool isResetClick (const juce::MouseEvent& e) noexcept
     return e.mods.isMiddleButtonDown() || (e.mods.isLeftButtonDown() && e.mods.isAltDown() && ! e.mods.isCtrlDown());
 }
 
+namespace
+{
+controls::WheelScrollLatch& wheelLatch() noexcept
+{
+    static controls::WheelScrollLatch latch;
+    return latch;
+}
+}
+
+void noteWheelScroll() noexcept { wheelLatch().scrolled (juce::Time::getMillisecondCounterHiRes()); }
+bool wheelScrolling() noexcept { return wheelLatch().scrolling (juce::Time::getMillisecondCounterHiRes()); }
+
 std::optional<double> wheelValue (double value, const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel, const ValueSpec& spec)
 {
     const auto delta = std::abs (wheel.deltaY) >= std::abs (wheel.deltaX) ? wheel.deltaY : -wheel.deltaX;
 
-    if (delta == 0.0f)
+    if (delta == 0.0f || wheelScrolling())
         return std::nullopt;
 
    #if JUCE_WINDOWS

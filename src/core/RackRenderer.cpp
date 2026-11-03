@@ -3068,6 +3068,8 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         timeline.looping.store (song.hasLoop(), std::memory_order_relaxed);
         timeline.loopStart.store ((double) song.loopStart, std::memory_order_relaxed);
         timeline.loopEnd.store ((double) song.loopEnd, std::memory_order_relaxed);
+        timeline.ticksPerSample.store (playing ? chunkTps : 0.0, std::memory_order_relaxed);
+        timeline.chunk.fetch_add (1, std::memory_order_relaxed);
     }
 
     for (int t = 0; t < tracks; ++t)
