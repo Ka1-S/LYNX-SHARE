@@ -120,8 +120,16 @@ Not done: FL's global "Apply track level and mute when recording" (`PostFXRecApp
 — LYNX's Post level and Post track positions already give both; the rolling buffer (`RollingAudioBufferPreFX`) is
 another feature.
 
+## GUI checks (Windows, real mouse) [SHOT]
+
+- #40: Maximus opened from an FL project. Right-drag on empty space added a point that followed the mouse. Left-drag moved a point. Dragging a tension handle bent the segment. Right-clicking a point opened "Point 3/4: In … Out …" with Delete, the two modes, Copy/Paste value and Type in value. Delete removed the point.
+- #41: 3x Osc → insert 1 (Maximus), no audio input. The insert's input box menu showed FL's Record section with Post EQ ticked. I picked Post effects; the arm hint read "Insert 1 - Recording: Post effects". Rec + Play (record "Everything"), then Stop, gave "Insert 1_Take1" on a new Playlist track that plays through a free insert (Insert 2).
+  - The WAV holds the limited Maximus output: RMS 0.79 at a 0.9997 peak while the notes played, then silence.
+  - "External input only" would have recorded nothing, because the insert had no audio input.
+- I closed LYNX through its window (Discard, Keep recording). Nothing of mine was left on the desktop.
+
 ## Where I stopped
 
-- 2026-11-02: #40 and #41 implemented with tests; first build hit a corrupted header read (faulty RAM), rebuilt.
-- Next: build-local with FL Data green → Linux GUI check (Maximus graph, Xvfb + xdotool) → Windows build + GUI check
-  (record a test tone through an effect) → notes / replies → merge origin/main → push feature/issues4041x.
+- 2026-11-02: #40 and #41 implemented with tests. The first build hit a corrupted header read (faulty RAM), so I rebuilt.
+- 2026-11-03: Both Windows GUI checks pass. In build-local, the latency test failed because it gave latencies to slots that held no effects. I fixed the test.
+- Then: notes and replies written. Final build-local, then push feature/issues4041x. The coordinator lands it after 0.1.22.
