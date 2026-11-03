@@ -3384,7 +3384,7 @@ public:
         porta.setTooltip (tr ("Portamento: each note glides from the previous one's pitch (the Slide knob sets the time)"));
         porta.onClick = [this] { edit ([on = porta.getToggleState()] (ChannelDef& d) { setChannelPortamento (d, on, channelPortamentoBeats (d)); }); };
         mono.setButtonText (tr ("Mono"));
-        mono.setTooltip (tr ("Mono: one voice; a new note takes over the sounding one"));
+        mono.setTooltip (tr ("Mono: one voice; a note played over a held one glides to it (Slide time) without a new attack"));
         mono.onClick = [this] { edit ([on = mono.getToggleState()] (ChannelDef& d) { setChannelMono (d, on); }); };
         // Time
         swing = knob ([name] { return ui::percentSpec (name() + " - " + tr ("Swing mix"), 1.0); },

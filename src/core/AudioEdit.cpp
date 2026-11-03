@@ -488,6 +488,11 @@ void swapChannels (Document& doc)
 
 std::vector<float> resampleChannel (const std::vector<float>& in, std::int64_t outFrames)
 {
+    return resampleChannel (in, outFrames, {});
+}
+
+std::vector<float> resampleChannel (const std::vector<float>& in, std::int64_t outFrames, const std::function<bool()>& stop)
+{
     std::vector<float> out ((std::size_t) std::max<std::int64_t> (0, outFrames), 0.0f);
     const auto n = (std::int64_t) in.size();
     if (n == 0 || outFrames <= 0)
@@ -501,6 +506,8 @@ std::vector<float> resampleChannel (const std::vector<float>& in, std::int64_t o
 
     for (std::int64_t o = 0; o < outFrames; ++o)
     {
+        if ((o & 0xffff) == 0 && stop && stop())
+            return {};
         const auto t = ((double) o + 0.5) * step - 0.5; // centres map to centres
         const auto first = (std::int64_t) std::ceil (t - halfWidth);
         const auto last = (std::int64_t) std::floor (t + halfWidth);

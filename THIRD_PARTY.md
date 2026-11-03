@@ -17,7 +17,13 @@ LYNX is distributed under the [GNU AGPL-3.0](LICENSE). It uses the components be
 | [PipeWire 1.6.2](https://gitlab.freedesktop.org/pipewire/pipewire) headers (the `pipewire-0.3` / `spa-0.2` headers LYNX includes, in `third_party/pipewire/include`, unmodified) | LYNX's native PipeWire audio driver on Linux; `libpipewire-0.3.so.0` itself is loaded from the system at run time, never shipped | MIT (`third_party/pipewire/LICENSE`) |
 | [VST 3 SDK](https://github.com/steinbergmedia/vst3sdk) (the copy bundled with JUCE 8.0.4) | VST3 plugin hosting | GPLv3 option of Steinberg's dual licence (`VST3_SDK/LICENSE.txt` in JUCE) |
 | [ASIO SDK 2.3.4](https://www.steinberg.net/developers/) (interface headers in `third_party/asiosdk`) | ASIO audio drivers on Windows | GPLv3 option of Steinberg's dual licence (`third_party/asiosdk/LICENSE.txt`) |
+| [ONNX Runtime 1.23.2](https://github.com/microsoft/onnxruntime) (C API headers in `third_party/onnxruntime`, unmodified; Microsoft's release library ships next to LYNX and is loaded at run time) | running the stem separation model of "Extract stems from sample" | MIT (`third_party/onnxruntime/LICENSE`) |
 | Libraries bundled inside JUCE's modules | text shaping, image and audio codecs, zip | HarfBuzz (MIT), SheenBidi (Apache-2.0), FLAC (BSD-3-Clause), Ogg/Vorbis (BSD-3-Clause), libpng (libpng/zlib licence), IJG libjpeg (IJG licence), zlib (zlib licence) |
+
+The HT-Demucs model is not part of LYNX: on first use of "Extract stems from sample" LYNX shows its source and licence
+and downloads it only if you agree. The Demucs code is MIT; its authors state that the licence of the trained weights
+is not clear. On Windows, ONNX Runtime uses the Microsoft Visual C++ Redistributable already on the computer; LYNX does
+not ship it.
 
 Every component is available under an OSI-approved open-source licence, and LYNX uses each of them under that
 licence; no proprietary or closed-source code is compiled into or shipped with LYNX. Where Steinberg offers a

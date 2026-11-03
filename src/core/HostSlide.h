@@ -27,11 +27,34 @@ struct HostSlide
     float liveApplied = 0.0f;
     float jump = 0.0f;
 
-    // the note on: the channel's pitch the voice was started with (knob + fine tune + main pitch, cents)
-    void anchor (float ref) noexcept
+    // FL's channel porta (round 168l, ChannelPoly.h): the rack starts a note `fromCents` away from its pitch (the note's
+    // cents already hold it) and sets this around the engine's noteOn; the voice that note starts glides back to its own
+    // pitch over `samples` (host samples). Audio thread only: one per thread, set and cleared by the rack.
+    struct GlideIn
+    {
+        float fromCents = 0.0f;
+        float samples = 0.0f;
+        bool taken = false; // (a voice took it: tests check every engine that says it follows the channel porta)
+    };
+    static GlideIn& pendingGlide() noexcept
+    {
+        static thread_local GlideIn glide;
+        return glide;
+    }
+
+    // the note on: the channel's pitch the voice was started with (knob + fine tune + main pitch, cents); `rate` =
+    // the engine's samples per host sample (an engine that runs at its own rate)
+    void anchor (float ref, float rate = 1.0f) noexcept
     {
         liveRef = ref;
         liveApplied = 0.0f;
+        if (auto& g = pendingGlide(); g.samples > 0.0f)
+        {
+            jump = 0.0f;
+            cents = 0.0f;
+            start (-g.fromCents, g.samples * rate);
+            g.taken = true;
+        }
     }
     // the channel's pitch now: the voice jumps to it (applied at the next advance())
     void follow (float now) noexcept

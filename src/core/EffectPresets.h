@@ -10,6 +10,7 @@
 // User presets are small text files (`toText` / `fromText`): the engine's name, the preset's name and every parameter
 // by name as its normalised value; the editor keeps them in <settings>/Presets/<engine>/<name>.lynxpreset.
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <utility>
@@ -24,7 +25,11 @@ struct Preset
     std::string name;
     std::string folder;                               // the sub-menu it is listed in ("" = top level)
     std::vector<std::pair<std::string, std::string>> values; // parameter name -> value text ("#0.25" = normalised)
+    std::vector<std::uint8_t> state; // engines whose settings live in EffectSlot::state (Gross Beat's slots): the whole state
 };
+
+// Engines whose presets carry EffectSlot::state as well as the parameters (round 168m: Gross Beat's 72 slots).
+bool savesState (EffectKind kind);
 
 // The factory presets of an engine, in menu order (empty for engines without any).
 const std::vector<Preset>& factory (EffectKind kind);
@@ -52,11 +57,14 @@ int paramByName (EffectKind kind, const std::string& name);
 
 // A user preset as text and back. fromText returns nullopt for a file of another engine or no preset at all;
 // parameters missing from the file keep the engine's defaults, unknown names are ignored.
-std::string toText (EffectKind kind, const std::string& name, const EffectParams& params);
+// `state` (optional) is written for engines that save it (savesState).
+std::string toText (EffectKind kind, const std::string& name, const EffectParams& params, const std::vector<std::uint8_t>* state = nullptr);
 struct Loaded
 {
     std::string name;
     EffectParams params {};
+    bool hasState = false;
+    std::vector<std::uint8_t> state;
 };
 std::optional<Loaded> fromText (EffectKind kind, const std::string& text);
 
