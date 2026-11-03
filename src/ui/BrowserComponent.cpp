@@ -3448,6 +3448,29 @@ void BrowserComponent::showPluginDatabase()
     }
 }
 
+void BrowserComponent::showScores()
+{
+    // the Piano roll's File › Browse scores (round 168g; FL: FUN_0123a580 opens its browser at the Scores folder): the
+    // "FL MIDI" root (Data/Patches/Scores) shown, opened and selected
+    for (int i = 0; i < allRoots.size(); ++i)
+        if (i < (int) allRootKinds.size() && allRootKinds[(std::size_t) i] == browserview::RootKind::flMidi)
+        {
+            const auto folder = allRoots[i];
+            if (const auto id = rootId (folder); id.isNotEmpty())
+                setRootShown (id, true);
+            setTab (allTab);
+            rebuildTree();
+            tree->expandTop (folder, 1);
+            if (const auto row = tree->rowLabelled (allRootNames[i]); row >= 0)
+            {
+                tree->select (row, false);
+                tree->grabKeyboardFocus();
+            }
+            return;
+        }
+    showNote (tr ("FL Studio's scores were not found (FL Studio is not installed)"));
+}
+
 void BrowserComponent::showProjectForSnapshot()
 {
     setTab (projectTab);

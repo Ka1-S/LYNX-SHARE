@@ -1592,6 +1592,14 @@ TEST (flp_real_files)
                     signatures += m.isSignature();
                     CHECK (m.tick >= 0);
                 }
+            // (round 168g: the patterns' own markers are no longer counted as the Playlist's)
+            for (const auto& p : song.patterns)
+                for (const auto& m : p.markers)
+                {
+                    ++markers;
+                    signatures += m.isSignature();
+                    CHECK (m.tick >= 0);
+                }
 
             // Fruity Wrapper (channels and mixer slots): every blob in the demos is read
             auto countWrapper = [&] (const std::string& plugin, const std::vector<std::uint8_t>& state) {
@@ -16931,6 +16939,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Polish167pTests.inc"
 #include "StemSplitTests.inc"
 #include "Zoom167tTests.inc"
+#include "Proll168gTests.inc"
 #include "Design168nTests.inc"
 #include "FirstRun167vTests.inc"
 #include "LoopStarter168bTests.inc"

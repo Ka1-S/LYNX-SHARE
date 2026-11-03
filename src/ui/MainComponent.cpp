@@ -158,6 +158,10 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         };
     }
     PianoRollComponent::shortcutText = [this] (const std::string& id) { return shortcutText (id.c_str()); };
+    pianoRoll.onBrowseScores = [this] { // (round 168g: the Piano roll's File › Browse scores)
+        showPanel (Panel::browser);
+        browser.showScores();
+    };
 
     newButton.setTooltip (tr ("New project") + " (Ctrl+N)");
     newButton.onClick = [this] { newProject(); };
@@ -1592,6 +1596,10 @@ void MainComponent::loadUiSettings()
             notenames::currentFlats.store (on);
         else if (key == "rememberSeek")
             EditorGlobals::get().rememberSeek = on;
+        else if (key == "prGridHighlights") // (round 168g: the Piano roll's View items)
+            PianoRollComponent::gridHighlights = on;
+        else if (key == "prShowChordName")
+            PianoRollComponent::showChordName = on;
         else if (key == "stretchedClipsLoop")
             setStretchedClipsLoop (on);
         else if (key == "followPlaylist" || key == "followPianoRoll")
@@ -1714,6 +1722,8 @@ void MainComponent::saveUiSettings()
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
                                       + "\npluginStyleOverrides=" + skin::overridesToString()
                                       + "\nrememberSeek=" + juce::String (EditorGlobals::get().rememberSeek ? 1 : 0)
+                                      + "\nprGridHighlights=" + juce::String (PianoRollComponent::gridHighlights ? 1 : 0)
+                                      + "\nprShowChordName=" + juce::String (PianoRollComponent::showChordName ? 1 : 0)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
                                       + "\nfollowPianoRoll=" + juce::String (EditorGlobals::get().isFollowing (true) ? 1 : 0)

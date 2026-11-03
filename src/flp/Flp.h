@@ -269,6 +269,17 @@ struct Note
     bool slide() const noexcept { return (flags & 0xF) == 8; }
 };
 
+// Playlist time marker: 0x94 (u32: type << 24 | position in ticks), followed by
+// 0x21/0x22 (numerator/denominator) and 0xCD (name). Type 8 = time signature change (seen in the demos:
+// 7/4, 6/4, 3/4); 0 = ordinary marker; the others are actions (loop, pause...).
+struct TimeMarker
+{
+    std::uint32_t position = 0;
+    int type = 0;
+    int numerator = 4, denominator = 4;
+    std::string name;
+};
+
 struct Pattern
 {
     int index = 0;
@@ -281,6 +292,9 @@ struct Pattern
     bool loopOn = false;
     int loopMode = 1;
     std::vector<std::pair<int, int>> channelLoops; // (FL channel index, setting)
+    // the Piano roll's pattern time markers (round 168g): the same 0x94 / 0x21 / 0x22 / 0xCD events as the
+    // Playlist's, written between the pattern's 0x41 and the next pattern / channel / playlist section
+    std::vector<TimeMarker> markers;
     // 0xA4: the Channel Rack's pattern length selector (pattern +0x44, FL's PatternLengthSelectChange; REA round 168j):
     // the pattern's length in ticks of the file's PPQ, 0 = automatic
     std::uint32_t fixedLength = 0;
@@ -332,17 +346,6 @@ struct PlaylistTrackInfo
     // tolerant, position sync. FL's defaults: Stay, Retrigger, 4 beats, no queue, tolerant, position sync off.
     int motion = 0, press = 0, triggerSync = 5, positionSync = 0;
     bool queue = false, tolerant = true;
-};
-
-// Playlist time marker: 0x94 (u32: type << 24 | position in ticks), followed by
-// 0x21/0x22 (numerator/denominator) and 0xCD (name). Type 8 = time signature change (seen in the demos:
-// 7/4, 6/4, 3/4); 0 = ordinary marker; the others are actions (loop, pause...).
-struct TimeMarker
-{
-    std::uint32_t position = 0;
-    int type = 0;
-    int numerator = 4, denominator = 4;
-    std::string name;
 };
 
 struct Arrangement

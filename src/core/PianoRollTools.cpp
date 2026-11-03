@@ -179,6 +179,9 @@ std::optional<Score> parseScore (std::span<const std::uint8_t> bytes)
                 if (version != 0 && version < 6005000u)
                     release = 64;
                 n.colour = version != 0 && version < 5003000u ? ((extra & 0x0F) << 2) & 0x0F : extra & 0x0F;
+                n.muted = (extra & 0x20) != 0;
+                n.porta = (extra & 0x10) != 0;
+                n.group = oldRecords ? 0 : u16 (o + 14);
                 n.velocity = velocity / 128.0f;
                 n.pan = std::clamp ((pan - 64) / 64.0f, -1.0f, 1.0f);
                 n.release = release / 128.0f;
@@ -200,6 +203,102 @@ std::optional<Score> parseScore (std::span<const std::uint8_t> bytes)
     }
 
     return std::nullopt;
+}
+
+std::vector<Note> notesFromScore (const Score& score, int channel)
+{
+    std::vector<Note> out;
+    out.reserve (score.notes.size());
+    for (const auto& s : score.notes)
+    {
+        Note n;
+        n.start = std::max<std::int64_t> (0, s.start);
+        n.length = std::max<std::int64_t> (1, s.length > 0 ? s.length : ticksPerStep);
+        n.channel = channel;
+        n.key = std::clamp (s.key, 0, 127);
+        n.velocity = std::clamp (s.velocity, 0.0f, 1.0f);
+        n.pan = std::clamp (s.pan, -1.0f, 1.0f);
+        n.release = std::clamp (s.release, 0.0f, 1.0f);
+        n.finePitch = std::clamp (s.finePitch, -120.0f, 120.0f);
+        n.modX = std::clamp (s.modX, 0.0f, 1.0f);
+        n.modY = std::clamp (s.modY, 0.0f, 1.0f);
+        n.colour = std::clamp (s.colour, 0, noteColourCount - 1);
+        n.slide = s.slide;
+        n.muted = s.muted;
+        n.porta = s.porta;
+        n.group = s.group;
+        out.push_back (n);
+    }
+    return out;
+}
+
+std::vector<std::uint8_t> writeScore (const std::vector<Note>& notes)
+{
+    std::vector<std::uint8_t> out;
+    auto u8 = [&out] (int v) { out.push_back ((std::uint8_t) v); };
+    auto u16 = [&u8] (int v) { u8 (v & 0xFF); u8 ((v >> 8) & 0xFF); };
+    auto u32 = [&u16] (std::uint32_t v) { u16 ((int) (v & 0xFFFF)); u16 ((int) (v >> 16)); };
+    auto byteOf = [] (double v, int lo, int hi) { return std::clamp ((int) std::lround (v), lo, hi); };
+
+    // header: "FLhd", 6, format 0x10 (FL's score mode, the saver's param_2), one channel, the PPQ
+    for (auto c : { 'F', 'L', 'h', 'd' })
+        u8 (c);
+    u32 (6);
+    u16 (0x10);
+    u16 (1);
+    u16 (ppq);
+    for (auto c : { 'F', 'L', 'd', 't' })
+        u8 (c);
+    const auto sizeAt = out.size();
+    u32 (0);
+
+    auto dataEvent = [&] (int id, const std::vector<std::uint8_t>& data) {
+        u8 (id);
+        auto size = data.size();
+        do
+        {
+            auto b = (int) (size & 0x7F);
+            size >>= 7;
+            u8 (size != 0 ? b | 0x80 : b);
+        } while (size != 0);
+        out.insert (out.end(), data.begin(), data.end());
+    };
+
+    // the version text the 24-byte note records come with (parseScore reads it the way FL does)
+    const std::string version = "20.9.0";
+    dataEvent (0xC7, std::vector<std::uint8_t> (version.c_str(), version.c_str() + version.size() + 1));
+    u8 (0x41); // the pattern (0)
+    u16 (0);
+
+    auto sorted = notes;
+    std::stable_sort (sorted.begin(), sorted.end(), [] (const Note& a, const Note& b) { return a.start < b.start; });
+    std::vector<std::uint8_t> records;
+    records.reserve (sorted.size() * 24);
+    for (const auto& n : sorted)
+    {
+        auto r32 = [&records] (std::uint32_t v) { for (int k = 0; k < 4; ++k) records.push_back ((std::uint8_t) (v >> (8 * k))); };
+        auto r16 = [&records] (int v) { records.push_back ((std::uint8_t) (v & 0xFF)); records.push_back ((std::uint8_t) ((v >> 8) & 0xFF)); };
+        r32 ((std::uint32_t) std::max<std::int64_t> (0, n.start));
+        r16 (0x4000 | (n.slide ? 8 : 0)); // flags (0x4000 on every note FL writes; 8 = slide)
+        r16 (0);                          // channel: FL sets it to 0 in a score (FUN_012dfdb0 (list, 0))
+        r32 ((std::uint32_t) std::max<std::int64_t> (1, n.length));
+        r16 (std::clamp (n.key, 0, 127));
+        r16 (std::clamp (n.group, 0, 0xFFFF));
+        records.push_back ((std::uint8_t) byteOf (120.0 + n.finePitch, 0, 240));
+        records.push_back (0); // repeats
+        records.push_back ((std::uint8_t) byteOf (n.release * 128.0, 0, 128));
+        records.push_back ((std::uint8_t) ((std::clamp (n.colour, 0, 15)) | (n.porta ? 0x10 : 0) | (n.muted ? 0x20 : 0)));
+        records.push_back ((std::uint8_t) byteOf (64.0 + n.pan * 64.0, 0, 128));
+        records.push_back ((std::uint8_t) byteOf (n.velocity * 128.0, 0, 128));
+        records.push_back ((std::uint8_t) byteOf (n.modX * 255.0, 0, 255));
+        records.push_back ((std::uint8_t) byteOf (n.modY * 255.0, 0, 255));
+    }
+    dataEvent (0xE0, records);
+
+    const auto size = (std::uint32_t) (out.size() - sizeAt - 4);
+    for (int k = 0; k < 4; ++k)
+        out[sizeAt + (std::size_t) k] = (std::uint8_t) (size >> (8 * k));
+    return out;
 }
 
 Score gridScore (std::int64_t step, float swing)
