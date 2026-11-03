@@ -7,6 +7,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/KeyMap.h"
+#include "core/Performance.h"
 #include "ui/UiTrace.h"
 #include "core/ToolbarLayout.h"
 #include "core/ValueMath.h"
@@ -155,6 +156,13 @@ private:
     bool typingPiano = true;
     int typingOctave = keys::typingpiano::defaultOctave, typingRoot = 0; // the button's right-click menu, as FL's
     int typingLayout = keys::typingpiano::pianoLayout();
+    // the typing keyboard's notes launching performance clips (FL: they are MIDI channel 1, see keyPressed): its own
+    // offsets and modifier keys (notes 120..127), and the keys held down with the notes they launched
+    perf::MidiMapping typingPerformance;
+    std::map<int, std::vector<int>> typingLaunches;
+    static bool isPlainKey (const keys::Chord& chord) noexcept; // no Ctrl / Alt / Shift
+    keys::TypingKey typingKey (const keys::Chord& chord) const; // what the typing keyboard does with it (nothing when off)
+    void releaseTypingLaunches (bool all); // the released keys' launches (all: every one)
     int lastCurrentPattern = -1; // ("Select first channel with notes when the pattern changes")
     void setTypingPiano (bool on);
     void toggleTypingPiano(); // the user's toggle (button, menus, Ctrl+T): also says so in the hint bar
