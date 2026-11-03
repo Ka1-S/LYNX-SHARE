@@ -96,21 +96,21 @@ its engine and lies inside the page, BeepMap / Granulizer state read and write, 
 knob moved under a playing note keeps the voice, both banks render clean (finite, peak < 1, RMS > 0.002 for one note
 and a three-note chord).
 
+## Results
+
+- Full Linux build + test suite: 1 927 484 checks, 0 failures.
+- Bank levels (`LYNX_BANK_LEVELS`): BeepMap single notes peak 0.12 to 0.38, three-key chords at most 0.93 (Reed Organ
+  was lowered after a chord peaked at 1.07); Granulizer presets on the test sample peak 0.39 to 0.70.
+- Windows shots (`LYNX.exe --instrumentshot`, fresh LYNX_PROFILE_DIR, LYNX_TEST_MODE=1) at 100 / 150 / 200 %:
+  before (main 3bba059e) in `/mnt/e/lynx-work/design168q/shots-before/`, after in
+  `/mnt/e/lynx-work/design168q/shots-after/` (`<engine>-<lynx|fl>-<scale>.png`). BeepMap and Granulizer had no LYNX
+  channel before. The Granulizer TIME toggles were moved below the section title after the first after-shots.
+
 ## Where I stopped
 
-- **Done** (branch `feature/design168q`, pushed as `wip/design168q`): layouts for all seven pages; parameter tables and
-  live / automation paths for Kepler, Kepler Exo, Sawer, Transistor Bass, BeepMap, Granulizer; BeepMap and Granulizer
-  banks; round 168n's wip infrastructure merged in (commit 6055913f) and everything registered on it
-  (ModelParamList.inc, LynxBankList.inc, instrumentLayout(), build lists, tests.cpp); ModelPanel displays (BeepMap
-  bitmap + Open / Paste row, Granulizer waveform + grain envelope, Transistor Bass program + sequence), the "Needs FL
-  Studio's files" header for Kepler / Kepler Exo / Transistor Bass / Sawer without their engine file; translations.
-- **2026-11-02 crash (~11:10)**: worktree checked clean (no zero-length files, HEAD = wip b4fcda94); merged origin/main
-  efb8344d and the latest wip/design168n (7a9f3cee); builds re-queued.
-- **In progress**: Linux core build + `LYNX_TEST=design168` tests (`~/.claude/jobs/f8789b49/tmp/r168q/run/bl.sh`), Windows build to
-  /mnt/e/lynx-work/design168q/build-win (`~/.claude/jobs/f8789b49/tmp/r168q/run/win.sh`).
-- **Next**: fix build / test failures; full test suite; Windows shots (`LYNX.exe --instrumentshot <dir>
-  kepler,keplerexo,transistorbass,sawer,beepmap,fruitygranulizer,wasp lynx|fl`, fresh LYNX_PROFILE_DIR,
-  LYNX_TEST_MODE=1) after, and the same from a build of commit 6055913f (before); land only after round 168n has landed
-  on main (merge origin/main first).
-- **Commands**: syntax check `BUILDSLOT_SHORT=1 coord/buildslot.sh <scratchpad>/q168q/syn.sh <files>`; bank probe
-  `<scratchpad>/q168q/probe/build.sh`; the scratchpad is shared with other rounds — use only its q168q folder.
+- **Done**: all seven pages, parameter tables, live / automation paths, BeepMap and Granulizer banks, ModelPanel
+  displays, "Needs FL Studio's files" header, translations, tests, shots; merged with origin/main after round 168n
+  landed. Landing through `coord/train.sh design168q`.
+- **Left**: nothing in scope. Possible follow-ups: Wasp / Wasp XT stay message pages (FL 2026 ships them as 64-bit
+  placeholders); Kepler / Kepler Exo / Transistor Bass / Sawer have no LYNX bank because they need FL Studio's engine
+  files.
