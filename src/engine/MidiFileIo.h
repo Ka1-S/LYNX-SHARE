@@ -26,6 +26,11 @@ using ImportOptions = midiimport::Options;
 
 // The file's raw events (notes, controllers; ticks at LYNX's PPQ), track names, first tempo and time signature.
 std::optional<midiimport::ParsedMidi> parseFile (const juce::File& file, juce::String& error);
+// The same from a Standard MIDI File in memory (the Piano roll's "Paste from MIDI clipboard", round 168g).
+std::optional<midiimport::ParsedMidi> parseBytes (const void* data, std::size_t size, juce::String& error);
+// A Standard MIDI File of `notes` (muted ones left out): a tempo / time signature track and one track named
+// `trackName` (FL's "Copy to MIDI clipboard": the channel's notes, FUN_01214510 → FUN_010d5e70).
+juce::MemoryBlock writeNotes (const Song& song, const std::vector<Note>& notes, const std::string& trackName);
 
 bool importInto (Song& song, const juce::File& file, const ImportOptions& options, juce::String& error);
 

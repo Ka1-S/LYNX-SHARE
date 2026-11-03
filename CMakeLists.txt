@@ -422,6 +422,7 @@ if(LYNX_BUILD_APP)
     # workflow P2: note tool dialogs, tool windows, undo history, quick-add palette
     target_sources(LYNX PRIVATE
         src/ui/NoteToolDialogs.cpp
+        src/ui/MidiClipboard.cpp
         src/ui/EventEditor.cpp
         src/ui/AudioEditor.cpp
         src/ui/AudioEditorTools.cpp
