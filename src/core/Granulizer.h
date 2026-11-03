@@ -32,6 +32,7 @@
 #include <utility>
 #include <vector>
 
+#include "core/EngineParams.h"
 #include "core/Instruments.h"
 
 namespace lynx
@@ -58,6 +59,16 @@ std::pair<int, int> granulizerParamRange (int index) noexcept; // the editor kno
 
 // The instrument; `sample` is the channel's sample (silent without one, as FL: TriggerVoice refuses the note)
 std::unique_ptr<Instrument> makeGranulizerInstrument (std::shared_ptr<const SampleData> sample);
+
+// A version-7 state with the plugin's defaults (a new channel without FL Studio's "Default" preset, round 168q)
+std::vector<std::uint8_t> granulizerDefaultState();
+// The automatable parameters of the designed page (round 168q): 0…11 the knobs, 12…14 the modes (sorted)
+const std::vector<EngineParam>& granulizerEngineParams();
+namespace modelparams
+{
+struct Table;
+Table granulizerModelTable();
+} // namespace modelparams
 
 namespace granulizer
 {

@@ -165,6 +165,9 @@ add_library(lynx_core STATIC
     src/core/LynxBanks.cpp
     src/core/ModelParams.cpp
     src/core/ToxicBank.cpp
+    src/core/BeepMapBank.cpp
+    src/core/GranulizerBank.cpp
+    src/core/EngineLayouts.cpp
     src/core/PoiZoneBank.cpp
     src/core/ModelParamsSynths.cpp
     src/core/PluginLayoutSynths.cpp

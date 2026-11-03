@@ -21,10 +21,13 @@
 // host's sample-rate call and the state load is FL's own (the reference follows the EXEC harness: state, then rate).
 
 #include <cstdint>
+#include <array>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
+#include "core/EngineParams.h"
 #include "core/Instruments.h"
 
 namespace lynx
@@ -36,6 +39,28 @@ bool transistorBassStateUsable (const std::vector<std::uint8_t>& state);
 bool transistorBassDllUsable (const std::string& path);
 
 std::unique_ptr<Instrument> makeTransistorBassInstrument();
+
+// The designed page (round 168q): parameter `index` (0…41) of the current program's working patch — its byte offset
+// in a usable state (−1 otherwise) — and the program's sequence for the sequence display.
+int transistorBassParamOffset (const std::vector<std::uint8_t>& state, int index);
+struct TransistorBassProgram
+{
+    struct Step
+    {
+        int note = 0;
+        bool gate = false, slide = false, accent = false;
+    };
+    int program = 0, transpose = 0, length = 16;
+    bool sequencer = false;
+    std::array<Step, 32> steps {};
+};
+std::optional<TransistorBassProgram> transistorBassProgram (const std::vector<std::uint8_t>& state);
+const std::vector<EngineParam>& transistorBassParams();
+namespace modelparams
+{
+struct Table;
+Table transistorBassModelTable();
+} // namespace modelparams
 
 namespace tbass
 {
