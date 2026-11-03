@@ -163,20 +163,20 @@ void sendProject (Context c)
     if (song.session.isGuestCopy())
     {
         const auto* host = song.session.find (session::hostTag);
-        warn (tr ("Send project"), tr ("This is a copy of {0}'s project. Use File › Send my part back... to send him what you made.",
+        warn (tr ("Send project"), tr ("This is a copy of {0}'s project. Use File › Send my part back... to send them what you made.",
                                        { host != nullptr ? str (host->name) : tr ("the host") }));
         return;
     }
     const auto guests = std::max (0, (int) song.session.participants.size() - 1);
     auto* w = new juce::AlertWindow (tr ("Send project"),
-                                     tr ("Your friend opens the package in his LYNX SHARE, records his part and sends it back to you "
+                                     tr ("Your friend opens the package in their LYNX SHARE, records their part and sends it back to you "
                                          "(File › Merge a part...). Up to {0} people in one project, you included.",
                                          { juce::String (session::maxParticipants) }),
                                      juce::MessageBoxIconType::NoIcon);
     w->addTextEditor ("me", myName(), tr ("Your name"));
     w->addTextEditor ("friend", {}, tr ("Your friend's name"));
-    w->addComboBox ("keep", { tr ("Only his own part (recommended)"), tr ("A full copy of the project") }, tr ("When the session ends, he keeps"));
-    w->addTextBlock (tr ("Parts that use a third-party plugin are rendered into the package: they play on his PC even without the plugin."));
+    w->addComboBox ("keep", { tr ("Only their own part (recommended)"), tr ("A full copy of the project") }, tr ("When the session ends, your friend keeps"));
+    w->addTextBlock (tr ("Parts that use a third-party plugin are rendered into the package: they play on their PC even without the plugin."));
     w->addButton (tr ("Save package..."), 1, juce::KeyPress (juce::KeyPress::returnKey));
     w->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
     w->enterModalState (true, juce::ModalCallbackFunction::create ([c, w, guests] (int result) {
@@ -187,7 +187,7 @@ void sendProject (Context c)
                             const auto keepFull = w->getComboBoxComponent ("keep")->getSelectedItemIndex() == 1;
                             if (guest.isEmpty())
                             {
-                                warn (tr ("Send project"), tr ("Type your friend's name: his part comes back under it."));
+                                warn (tr ("Send project"), tr ("Type your friend's name: their part comes back under it."));
                                 return;
                             }
                             rememberName (me);
@@ -273,7 +273,7 @@ void sendPartBack (Context c)
             writePackage (c, tr ("Send my part back"), sessionpack::planRenders (song, c.engine.getPluginHost(), me),
                           [me] (const Song& s) { return parts::extract (s, me); }, m, file,
                           [c, file, hostName, keepFull] (const sessionpack::WriteResult& r, const std::vector<sessionpack::Rendered>& rendered) {
-                              auto text = tr ("{0} is ready. Send it to {1}: he adds it with File › Merge a part...", { file.getFileName(), hostName })
+                              auto text = tr ("{0} is ready. Send it to {1}, who adds it with File › Merge a part...", { file.getFileName(), hostName })
                                           + "\n\n" + summaryOf (r, rendered);
                               if (! keepFull)
                               {
@@ -298,7 +298,7 @@ void mergeFile (Context c, const juce::File& file, const sessionpack::Manifest& 
     const auto& song = c.engine.getSong();
     if (song.session.isGuestCopy())
     {
-        warn (title, tr ("Parts are merged by the host, in his project. This is a copy you received."));
+        warn (title, tr ("Parts are merged by the host, in the host's project. This is a copy you received."));
         return;
     }
     const auto* guest = song.session.find (manifest.from.tag);
@@ -334,9 +334,9 @@ void mergeFile (Context c, const juce::File& file, const sessionpack::Manifest& 
                     { str (report.guest), juce::String (report.channels), juce::String (report.patterns), juce::String (report.notes),
                       juce::String (report.clips), juce::String (report.inserts) });
     if (report.removed > 0)
-        text << "\n" << tr ("{0} things he deleted since the last merge were removed.", { juce::String (report.removed) });
+        text << "\n" << tr ("{0} things deleted since the last merge were removed.", { juce::String (report.removed) });
     if (report.rowShift > 0 || ! report.movedInserts.empty())
-        text << "\n" << tr ("Some of his inserts or Playlist rows were in use here: they moved to free ones.");
+        text << "\n" << tr ("Some of their inserts or Playlist rows were in use here: they moved to free ones.");
     if (! plugins.missing.isEmpty() || ! plugins.otherVersion.isEmpty())
         text << "\n\n" << tr ("Plugins not installed here (their renders play):") << "\n"
              << juce::StringArray (plugins.missing).joinIntoString ("\n") << (plugins.otherVersion.isEmpty() ? "" : "\n")
@@ -412,7 +412,7 @@ void mergePart (Context c)
 {
     if (c.engine.getSong().session.isGuestCopy())
     {
-        warn (tr ("Merge a part"), tr ("Parts are merged by the host, in his project. This is a copy you received."));
+        warn (tr ("Merge a part"), tr ("Parts are merged by the host, in the host's project. This is a copy you received."));
         return;
     }
     chooser() = std::make_unique<juce::FileChooser> (tr ("Merge a part"), platform::documentsFolder(), juce::String ("*") + sessionpack::extension);
