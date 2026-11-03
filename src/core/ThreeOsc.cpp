@@ -966,7 +966,7 @@ public:
     {
         delete retired.exchange (nullptr);
         pitchCents.store (channel.sampler.pitch * 100.0f);
-        maxPoly.store (channel.synth.mono ? 1 : 0);
+        maxPoly.store (channel.maxPolyphony == 1 ? 1 : 0 /* FL tells the generator its Max polyphony, not the Mono box (round 168l) */);
         const auto ppq = channel.modelParams.empty() ? 96 : std::clamp ((int) channel.modelParams[0], 1, 1 << 16);
         const auto tempo = bpm > 0.0 ? bpm : 140.0;
         if (channel.pluginState == state && ppq == lastPpq && tempo == lastTempo && channel.samplePath == wavePath)
@@ -991,6 +991,7 @@ public:
         delete incoming.exchange (s.release());
     }
 
+    bool followsChannelPorta() const noexcept override { return true; } // (round 168l: HostSlide::anchor)
     void slideTo (int key, float cents, float samples) noexcept override
     {
         const auto to = (float) (100.0 * (std::clamp (key, 0, 127) - 60) + (double) pitchCents.load() + (double) cents);

@@ -1,3 +1,4 @@
+#include "ui/FlMods.h"
 #include "ui/WindowOwner.h"
 #include "ui/AutomationUi.h"
 #include "core/LastTweaked.h"
@@ -271,7 +272,7 @@ public:
 
         const auto handle = hit < 0 ? handleAt (e.position) : -1;
 
-        if (e.mods.isPopupMenu())
+        if (flmods::popup (e.mods))
         {
             if (hit >= 0)
             {
@@ -367,7 +368,7 @@ public:
 
         if (tensionPoint >= 0 && tensionPoint < (int) a->points.size())
         {
-            const auto up = -(float) e.getDistanceFromDragStartY() / (e.mods.isCtrlDown() ? 400.0f : 100.0f);
+            const auto up = -(float) e.getDistanceFromDragStartY() / (flmods::ctrl (e.mods) ? 400.0f : 100.0f);
             const auto tension = juce::jlimit (-1.0f, 1.0f, tensionStart + tensionSign * up); // the segment follows the mouse
             edit ([i = tensionPoint, tension] (Automation& x) { x.points[(std::size_t) i].tension = tension; });
             return;
@@ -387,7 +388,7 @@ public:
         // locks: Shift pressed after the click keeps the time, Ctrl keeps the value
         if (e.mods.isShiftDown() && ! downMods.isShiftDown())
             tick = points[(std::size_t) dragPoint].tick;
-        if (e.mods.isCtrlDown() && ! downMods.isCtrlDown())
+        if (flmods::ctrl (e.mods) && ! flmods::ctrl (downMods))
             value = points[(std::size_t) dragPoint].value;
 
         edit ([i = dragPoint, tick, value] (Automation& x) {
@@ -406,7 +407,7 @@ public:
 
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
     {
-        if (e.mods.isCtrlDown())
+        if (flmods::ctrl (e.mods))
         {
             const auto anchor = xToTick (e.x);
             juce::ignoreUnused (anchor);
@@ -598,7 +599,7 @@ private:
 
         if (song.mode == PlayMode::song && engine.getTransport().playing.load())
         {
-            const auto position = std::fmod (engine.getTransport().positionTicks.load(), (double) juce::jmax<std::int64_t> (1, song.songLength()));
+            const auto position = engine.songPlayheadTicks();
 
             for (const auto& c : song.playlist)
                 if (c.kind == ClipKind::automation && c.automation == automation && position >= (double) c.start && position < (double) c.end())

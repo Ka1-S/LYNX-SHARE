@@ -2677,6 +2677,7 @@ public:
 
     // a piano-roll slide note (issue #14): FL's host glides the sounding note's Final.Pitch (the bass is monophonic:
     // one pitch expression), separate from Transistor Bass's own sequencer slides
+    bool followsSlides() const noexcept override { return true; } // (round 168l: a Mono channel's notes)
     void slideTo (int key, float cents, float samples) noexcept override
     {
         take();

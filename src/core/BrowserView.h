@@ -41,6 +41,7 @@ enum class RootKind
     flMidi,         // FL's MIDI scores
     flPresets,      // FL's channel / plugin presets (3x Osc, synth presets)
     pluginPresets,  // LYNX's own plugin presets folder
+    speech,         // speech files (.speech): FL's Data/Patches/Speech and LYNX's own (round 168b)
     documents,
     music,
     desktop,

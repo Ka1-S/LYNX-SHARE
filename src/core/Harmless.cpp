@@ -2298,6 +2298,7 @@ public:
         engine.followPitch (live.now());
     }
 
+    bool followsChannelPorta() const noexcept override { return true; } // (round 168l: HostSlide::anchor)
     void slideTo (int key, float cents, float samples) noexcept override
     {
         take();

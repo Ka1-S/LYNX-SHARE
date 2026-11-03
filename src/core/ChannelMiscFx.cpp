@@ -149,6 +149,7 @@ void NoteEcho::process (int channel, const NoteEvent* in, int inCount, double st
                 {
                     gain = s.fat ? feedback : gain * feedback;
                     auto echo = e;
+                    echo.echo = true;
                     const auto cents = sign * (double) s.pitch * k;
                     const auto semis = (int) std::trunc (cents / 100.0);
                     echo.key = std::clamp (e.key + semis, 0, 127);
@@ -190,6 +191,7 @@ void NoteEcho::process (int channel, const NoteEvent* in, int inCount, double st
             for (int i = 0; i < h.count; ++i)
             {
                 auto off = e;
+                off.echo = true;
                 off.key = h.echoKeys[(std::size_t) i];
                 const auto k = echoes > 0 ? i % echoes + 1 : 1;
                 schedule ({ tick + k * delay, off, 1.0f }); // the echo keeps the note's length

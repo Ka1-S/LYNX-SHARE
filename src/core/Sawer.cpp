@@ -2507,7 +2507,7 @@ public:
         delete retired.exchange (nullptr);
         pitchCents.store (channel.sampler.pitch * 100.0f);
         tempo.store (bpm > 0.0 ? bpm : 120.0);
-        const int mp = channel.synth.mono ? 1 : 0;
+        const int mp = channel.maxPolyphony == 1 ? 1 : 0 /* FL tells the generator its Max polyphony, not the Mono box (round 168l) */;
         const std::lock_guard<std::mutex> lock (buildMutex);
         if (channel.pluginState == loadedState && loadedRate == rate.load() && mp == loadedPoly && channel.samplePath == tablePath)
             return;
@@ -2541,6 +2541,7 @@ public:
             plugin->followPitch (live.now());
     }
 
+    bool followsChannelPorta() const noexcept override { return true; } // (round 168l: HostSlide::anchor)
     void slideTo (int key, float cents, float samples) noexcept override
     {
         take();
