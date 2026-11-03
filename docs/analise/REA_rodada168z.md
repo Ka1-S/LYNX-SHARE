@@ -43,7 +43,7 @@ LYNX-own fix (no FL parity question: FL has no Linux build). JUCE 8.0.4 talks X1
   every CC row and 3 submenu sizes, right/bottom monitors, overlapping lists, negative coordinates, no display).
 
 ## Checks
-- build-local: 1 934 006 checks, 0 failures (before the "first display" tie-break tweak; rerun before landing).
+- build-local: 1 934 007 checks, 0 failures. Linux GUI rebuilt after the last change; Xvfb run repeated.
 - Linux GUI build of this branch (system g++, patched JUCE copy): all four JUCE fixes applied and compiled.
 - Xvfb :93 with two Xinerama screens (1600x900 + 1280x1024, JUCE reads them as a 1600x900 main + a phantom 0,0 one):
   channel menu → Insert (flipped left, no room on the right) → FL engines (moved up to the 900 px display bottom, not
@@ -56,4 +56,4 @@ LYNX-own fix (no FL parity question: FL has no Linux build). JUCE 8.0.4 talks X1
 
 ## Where I stopped
 - Done: code + tests, wip pushed (wip/menus45z).
-- Next: build-local, Linux GUI build (scratchpad linuxbuild.sh, JUCE copy), Xvfb check, Windows GUI check, train.sh menus45z.
+- Done: build-local, Linux GUI build + Xvfb, Windows GUI check. Next: land with train.sh menus45z; reporter to test 0.1.23 for (a).
