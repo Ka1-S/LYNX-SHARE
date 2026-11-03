@@ -220,7 +220,7 @@ std::vector<Preset> beepMapBank()
     bank.push_back (make ("Gospel Full", "Organ", { "drawbar", "full" }, [] { return organ ("888800000", 300, false); }));
     bank.push_back (make ("Stops Out", "Organ", { "drawbar", "bright" }, [] { return organ ("888888888", 300, false); }));
     bank.push_back (make ("Soft Flute Stop", "Organ", { "drawbar", "soft" }, [] { return organ ("008400000", 1279, false); }));
-    bank.push_back (make ("Reed Organ", "Organ", { "drawbar", "reed" }, [] { return organ ("806000088", 600, true, 0.4f); } // (its odd partials peak high in chords)));
+    bank.push_back (make ("Reed Organ", "Organ", { "drawbar", "reed" }, [] { return organ ("806000088", 600, true, 0.4f); })); // (lower: its chords peak high)
     // the percussion click: 2⅔' fading over the first columns, the registration held for a long image
     bank.push_back (make ("Click Organ", "Organ", { "drawbar", "percussion" }, [] {
         Picture p (48, organRows);
