@@ -372,7 +372,8 @@ public:
         if (processing.load())
         {
             const auto now = juce::Time::getMillisecondCounter();
-            if (now - lastBlockMs.load() < 250) // blocks are flowing: the next one stops processing
+            // blocks are flowing (on another thread: an offline render on this one is over): the next one stops it
+            if (now - lastBlockMs.load() < 250 && audioThread.load() != std::this_thread::get_id())
             {
                 stopRequest.store (true);
                 while (processing.load() && juce::Time::getMillisecondCounter() - now < 500)
