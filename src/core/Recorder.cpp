@@ -192,7 +192,8 @@ bool inCurrentPatternClip (const Song& song, std::int64_t tick)
 
 // FL grows the pattern when a take is played inside a clip longer than it (round 168k [EXEC]: a 1-bar pattern's clip
 // stretched to 4 bars, notes played at bars 2.1 / 3.3 / 4.2 stayed there and the pattern became 4 bars): no fold by
-// the pattern's length while recording (such a clip plays its pattern once and is empty after it, as FL).
+// the pattern's length while recording, in both modes of stretchedClipsLoop() (FL plays such a clip once; with LYNX's
+// loop option on, the grown pattern is what the clip then loops).
 std::int64_t clipPatternTick (const Clip& c, std::int64_t tick)
 {
     return tick - c.start + c.offset;

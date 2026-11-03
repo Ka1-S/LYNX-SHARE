@@ -76,7 +76,8 @@ inline double patternPlayhead (const Song& song, int pattern, double transportTi
             if (best == nullptr || c.track < best->track)
                 best = &c;
 
-    return best != nullptr ? inSong - (double) best->start + (double) best->offset : -1.0;
+    // a stretched clip loops its pattern (LYNX extra stretchedClipsLoop, issue #25): the playhead wraps with it
+    return best != nullptr ? patternTickInClip (*best, inSong, song.patterns[(std::size_t) pattern].effectiveLength (song.beatsPerBar)) : -1.0;
 }
 
 // Where the transport goes when the Piano Roll's ruler is clicked at `patternTick` (round 163, FL: clicking the

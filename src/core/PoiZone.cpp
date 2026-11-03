@@ -1944,10 +1944,16 @@ public:
         delete retired.exchange (nullptr);
         pitchCents.store (channel.sampler.pitch * 100.0f);
         tempo.store (bpm > 0.0 ? bpm : 120.0);
-        const int mp = channel.synth.mono ? 1 : 0;
+        const int mp = channel.maxPolyphony == 1 ? 1 : 0 /* FL tells the generator its Max polyphony, not the Mono box (round 168l) */;
         const std::lock_guard<std::mutex> lock (buildMutex);
         if (channel.pluginState == loadedState && loadedRate == rate.load() && mp == loadedPoly)
             return;
+        // only parameters changed (a knob of the editor): the playing engine takes them, the notes go on (round 168n)
+        if (mp == loadedPoly && loadedRate == rate.load() && liveChange (loadedState, channel.pluginState))
+        {
+            loadedState = channel.pluginState;
+            return;
+        }
         loadedState = channel.pluginState;
         loadedPoly = mp;
         rebuild (rate.load());
@@ -1957,6 +1963,14 @@ public:
     {
         nextPan = pan;
         nextCents = cents;
+    }
+
+    // automation of a parameter (round 168n): the clip's 0…1 over the parameter's range, as the editor's knob
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        if (const auto* p = findEngineParam (poizoneParams(), index); p != nullptr && std::isfinite (value) && plugin != nullptr)
+            plugin->eng.setParam (index, p->raw (value));
     }
 
     void noteOn (int key, float velocity) noexcept override
@@ -1971,6 +1985,7 @@ public:
         const auto knob = pitchCents.load();
         plugin->noteOn (k, initVol, channelVol, std::clamp ((double) nextPan + channelPan, -1.0, 1.0), (double) knob + (double) nextCents);
         plugin->slots[k].slide.anchor (live.ref (knob));
+        plugin->sliding = plugin->sliding || plugin->slots[k].slide.moving(); // (a porta glide-in, round 168l)
         nextPan = 0.0f, nextCents = 0.0f;
     }
 
@@ -1989,6 +2004,7 @@ public:
             plugin->followPitch (live.now());
     }
 
+    bool followsChannelPorta() const noexcept override { return true; } // (round 168l: HostSlide::anchor)
     void slideTo (int key, float cents, float samples) noexcept override
     {
         take();
@@ -2064,10 +2080,36 @@ private:
             plugin.reset (p);
             for (int k = 0; k < 128; ++k)
                 plugin->setLevels (k, channelVol, channelPan);
+            liveParams.clear(); // (the new engine was built from the newest state)
         }
+        if (plugin != nullptr)
+            liveParams.drain ([this] (int index, float v) { plugin->eng.setParam (index, v); });
+    }
+
+    // queues the parameters that differ between two states with the same header and size (UI thread, buildMutex held)
+    bool liveChange (const std::vector<std::uint8_t>& before, const std::vector<std::uint8_t>& after)
+    {
+        std::size_t n = 0;
+        if (before.size() != after.size() || ! stateHeader (before) || ! stateHeader (after, &n) || std::memcmp (before.data(), after.data(), 12) != 0)
+            return false;
+        std::vector<std::pair<int, float>> changed;
+        for (std::size_t i = 0; i < n; ++i)
+            if (std::memcmp (before.data() + 12 + 4 * i, after.data() + 12 + 4 * i, 4) != 0)
+            {
+                float v = 0.0f;
+                std::memcpy (&v, after.data() + 12 + 4 * i, 4);
+                changed.push_back ({ (int) i, v });
+            }
+        const auto tail = 12 + 4 * n;
+        if ((tail < after.size() && std::memcmp (before.data() + tail, after.data() + tail, after.size() - tail) != 0) || changed.size() > liveParams.space())
+            return false;
+        for (const auto& [i, v] : changed)
+            liveParams.push (i, v);
+        return true;
     }
 
     std::unique_ptr<Plugin> plugin;
+    LiveParamQueue liveParams;
     std::atomic<Plugin*> incoming { nullptr }, retired { nullptr };
     std::atomic<bool> clearPlugin { false };
     std::mutex buildMutex; // configure (UI thread) and prepare build plugins; the audio thread only takes them
@@ -2105,6 +2147,102 @@ std::optional<float> poizoneParam (const std::vector<std::uint8_t>& state, int i
 }
 
 std::unique_ptr<Instrument> makePoiZoneInstrument() { return std::make_unique<PoiZoneInstrument>(); }
+
+const std::vector<EngineParam>& poizoneParams()
+{
+    static const std::vector<EngineParam> table = [] {
+        std::vector<EngineParam> t;
+        auto add = [&t] (int index, std::string name, float low = 0.0f, float high = 1.0f, bool stepped = false) {
+            t.push_back ({ index, std::move (name), low, high, stepped });
+        };
+        auto sw = [&add] (int index, std::string name) { add (index, std::move (name), 0.0f, 1.0f, true); };
+        // REA_rodada44 §1.3
+        sw (0, "Osc A shape");
+        add (1, "Osc A pulse width");
+        sw (2, "Sync");
+        sw (3, "Ring mod");
+        sw (4, "Osc B shape");
+        add (5, "Osc B pulse width");
+        add (6, "Osc B semitones");
+        add (7, "Osc B detune");
+        add (8, "Osc balance");
+        add (9, "Noise");
+        add (10, "Mod env amount");
+        add (11, "Mod env attack");
+        add (12, "Mod env decay");
+        add (13, "Mod env sustain");
+        add (14, "Mod env release");
+        add (15, "Gain");
+        add (16, "Fine");
+        add (17, "Transpose");
+        add (18, "Cutoff");
+        add (19, "Resonance");
+        add (20, "Key tracking");
+        add (21, "Velocity tracking");
+        add (22, "Amp attack");
+        add (23, "Amp decay");
+        add (24, "Amp sustain");
+        add (25, "Amp release");
+        add (26, "LFO amount");
+        sw (27, "LFO retrigger");
+        add (28, "LFO rate");
+        add (29, "Unison detune");
+        add (30, "Unison pan");
+        sw (31, "Delay on");
+        add (32, "Delay time L");
+        add (33, "Delay time R");
+        add (34, "Delay feedback");
+        add (35, "Delay modulation");
+        add (36, "Delay low cut");
+        add (37, "Delay high cut");
+        add (38, "Delay wet");
+        sw (39, "Chorus on");
+        add (40, "Chorus rate");
+        add (41, "Chorus depth");
+        add (42, "Chorus wet");
+        add (43, "Mod wheel amount");
+        sw (44, "Mono");
+        sw (45, "Octaver");
+        add (46, "Glide time");
+        add (47, "Gate mix");
+        add (48, "Gate smooth");
+        for (int i = 0; i < 16; ++i)
+            add (49 + i, "Gate step " + std::to_string (i + 1));
+        add (65, "Mod env destination");
+        add (66, "Filter mode");
+        add (67, "LFO destination");
+        add (68, "LFO shape");
+        add (69, "Arpeggiator mode");
+        add (70, "Arpeggiator range");
+        add (71, "Mod wheel destination");
+        sw (72, "Glide held");
+        sw (73, "Glide static");
+        add (75, "Unison voices", 0.0f, 6.0f, true);
+        add (76, "Polyphony", 0.0f, 63.0f, true);
+        add (77, "Arpeggiator speed", 0.0f, 6.0f, true);
+        add (78, "Bend range", 0.0f, 23.0f, true);
+        add (79, "Gate speed", 0.0f, 6.0f, true);
+        add (80, "LFO sync", 0.0f, 10.0f, true);
+        return t;
+    }();
+    return table;
+}
+
+std::vector<std::uint8_t> poizoneDefaultState()
+{
+    // the engine's constructor values (§1.3): "SSLF" + size + "Ver4" + 156 floats (the MIDI-controller slots −1)
+    std::vector<std::uint8_t> s (12 + 4 * (std::size_t) paramCount, 0);
+    std::memcpy (s.data(), "SSLF", 4);
+    const std::uint32_t size = (std::uint32_t) s.size() - 8;
+    std::memcpy (s.data() + 4, &size, 4);
+    std::memcpy (s.data() + 8, "4reV", 4);
+    for (int i = 0; i < paramCount; ++i)
+    {
+        const auto v = i >= 0x51 && i < 0x51 + 0x4a ? -1.0f : Engine::defaultParam (i);
+        std::memcpy (s.data() + 12 + 4 * i, &v, 4);
+    }
+    return s;
+}
 
 namespace poizone
 {

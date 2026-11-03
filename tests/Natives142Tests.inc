@@ -1,6 +1,7 @@
 // Round 142 (issue #5): FL engines usable in native LYNX projects (core/NativeEngines.h, REA_rodada142)
 
 #include "../tools/WavReader.h"
+#include "core/LynxBanks.h"
 #include "core/NativeEngines.h"
 #include "core/VocalPitch.h"
 
@@ -94,13 +95,15 @@ TEST (natives142_lists_and_no_fl_installation)
     CHECK (natives::instrumentEngine (InstrumentKind::sytrus) != nullptr && natives::instrumentEngine (InstrumentKind::synth) == nullptr);
     CHECK (natives::effectEngine (EffectKind::newtone) != nullptr && natives::effectEngine (EffectKind::eq) == nullptr);
 
-    // without FL: the engines with LYNX's own defaults are made and play, the others are not available
+    // without FL: the engines with LYNX's own defaults or a LYNX preset bank (round 168n) are made and play, the
+    // others are not available
     natives::FlAccess none;
     for (const auto& e : natives::instrumentEngines())
     {
         const auto c = natives::makeChannel (e.kind, none);
-        CHECK (natives::available (e, none) == (e.needs == natives::Needs::nothing));
-        CHECK (c.has_value() == (e.needs == natives::Needs::nothing));
+        const auto own = e.needs == natives::Needs::nothing || lynx::banks::hasBank (e.kind);
+        CHECK (natives::available (e, none) == own);
+        CHECK (c.has_value() == own);
         if (c)
         {
             CHECK (c->instrument == e.kind && c->name == e.name);

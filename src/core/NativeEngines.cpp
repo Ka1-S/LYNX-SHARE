@@ -5,6 +5,7 @@
 #include "core/Effects.h"
 #include "core/FlEffects.h"
 #include "core/GrossBeat.h"
+#include "core/LynxBanks.h"
 #include "core/MidiOut.h"
 #include "core/PhysicalModels.h"
 #include "flp/Flp.h"
@@ -265,7 +266,8 @@ bool available (const InstrumentEngine& e, const FlAccess& access)
 {
     if (e.kind == InstrumentKind::boobass)
         return ! booBassDll (access).empty();
-    return e.needs == Needs::nothing || ! defaultPresetPath (e.presetFolder, true, access).empty();
+    // an engine with a LYNX preset bank starts from it without FL (round 168n)
+    return e.needs == Needs::nothing || banks::hasBank (e.kind) || ! defaultPresetPath (e.presetFolder, true, access).empty();
 }
 
 bool available (const EffectEngine& e, const FlAccess& access)
@@ -301,6 +303,10 @@ std::optional<ChannelDef> makeChannel (InstrumentKind kind, const FlAccess& acce
         if (auto def = channelFromPreset (kind, *engine, path, access))
             return def;
     }
+
+    // without FL: the first preset of LYNX's own bank (round 168n)
+    if (auto def = banks::defaultChannel (kind, engine->name))
+        return def;
 
     if (engine->needs != Needs::nothing)
         return std::nullopt;
