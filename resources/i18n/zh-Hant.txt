@@ -6696,3 +6696,4 @@ countries: tw hk mo
 "Vel sens" = "力度靈敏"
 "Vib" = "顫音"
 "Voice mode" = "發音模式"
+"Sequencer" = "音序器"

@@ -6696,3 +6696,4 @@ countries: es mx ar co cl pe ve
 "Vel sens" = "Sens vel"
 "Vib" = "Vib"
 "Voice mode" = "Modo de voz"
+"Sequencer" = "Secuenciador"

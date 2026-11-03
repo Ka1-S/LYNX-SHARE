@@ -6696,3 +6696,4 @@ countries: kr
 "Vel sens" = "벨로 감도"
 "Vib" = "비브라토"
 "Voice mode" = "보이스 모드"
+"Sequencer" = "시퀀서"

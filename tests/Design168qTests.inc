@@ -115,7 +115,7 @@ TEST (design168q_engine_param_tables)
     }
     CHECK (keplerParams().size() == 36);
     CHECK (sawerParams().size() == 94);
-    CHECK (transistorBassParams().size() == 42);
+    CHECK (transistorBassParams().size() == 42 + 2 + 5 * 16); // (the sequence rows: round 168q2)
     const auto* scale = findEngineParam (beepMapEngineParams(), 2);
     CHECK (scale != nullptr && scale->stepped && scale->raw (1.0f) == 2.0f && scale->raw (0.5f) == 1.0f);
     const auto* wave = findEngineParam (granulizerEngineParams(), 3);
@@ -130,7 +130,7 @@ TEST (design168q_layouts_name_real_parameters)
     struct Page { InstrumentKind kind; plugui::Layout (*make)(); int controls; };
     const Page pages[] = { { InstrumentKind::kepler, &plugui::keplerLayout, 34 },
                            { InstrumentKind::keplerExo, &plugui::keplerExoLayout, 120 },
-                           { InstrumentKind::transistorbass, &plugui::transistorBassLayout, 40 },
+                           { InstrumentKind::transistorbass, &plugui::transistorBassLayout, 40 + 2 + 5 * 16 },
                            { InstrumentKind::sawer, &plugui::sawerLayout, 90 },
                            { InstrumentKind::beepmap, &plugui::beepMapLayout, 8 },
                            { InstrumentKind::granulizer, &plugui::granulizerLayout, 15 } };
@@ -306,4 +306,162 @@ TEST (design168q_banks_play_clean)
     CHECK (banks::hasBank (InstrumentKind::beepmap) && banks::hasBank (InstrumentKind::granulizer));
     const auto fresh = banks::defaultChannel (InstrumentKind::beepmap, "BeepMap");
     CHECK (fresh && beepMapStateUsable (fresh->pluginState));
+}
+
+// Round 168q2: Transistor Bass's sequence on the page — FL's 16-step editor (per step note, octave, gate, slide,
+// accent; length, sequencer switch; CLEAR and the octave buttons), saved in the state and automatable.
+namespace design168q
+{
+// a minimal engine stream (REA_rodada57 §2.2): version 5, 128 programs, 128 patch pairs, 128 sequences; the
+// sequences' steps are saved as step version `stepVersion` (0 = without the accent byte)
+std::vector<std::uint8_t> tbassState (std::int16_t stepVersion)
+{
+    std::vector<std::uint8_t> e;
+    auto put = [&e] (auto v) { e.insert (e.end(), (const std::uint8_t*) &v, (const std::uint8_t*) &v + sizeof (v)); };
+    auto str = [&put] () { put ((std::int32_t) 0); };
+    put ((std::int16_t) 5);
+    put ((std::int32_t) 3); // the current program
+    put ((std::int32_t) 0);
+    put ((std::uint8_t) 0);
+    for (int k = 0; k < 128; ++k)
+    {
+        put ((std::int16_t) 0);
+        str();
+        put ((std::int32_t) k); // sequence
+        put ((std::int32_t) k); // patch
+        put ((std::int32_t) 0); // transpose
+    }
+    for (int k = 0; k < 256; ++k)
+    {
+        str();
+        for (int i = 0; i < 100; ++i)
+            put (0.5f);
+    }
+    for (int k = 0; k < 128; ++k)
+    {
+        put ((std::int16_t) 1);
+        str();
+        put ((std::int16_t) 0);
+        put ((std::int32_t) 16);
+        for (int i = 0; i < 32; ++i)
+        {
+            put (stepVersion);
+            put ((std::int8_t) (i == 2 ? 1 : 0)); // slide
+            put ((std::int32_t) (48 + i));        // note
+            put ((std::int8_t) (i % 2 == 0 ? 1 : 0)); // gate
+            put (0.5);
+            put (0.75f);
+            if (stepVersion == 1)
+                put ((std::int8_t) (i == 4 ? 1 : 0)); // accent
+        }
+        put (125.0);
+        put ((std::int8_t) 0);
+        put (0.0);
+        put (0.66);
+    }
+    put ((std::int32_t) 1); // sequencer on
+    for (int i = 0; i < 4; ++i)
+        put ((std::int32_t) 0);
+    put ((std::int32_t) 4); // oversampling
+    put ((std::int32_t) 0); // engine
+    std::vector<std::uint8_t> out;
+    auto put2 = [&out] (auto v) { out.insert (out.end(), (const std::uint8_t*) &v, (const std::uint8_t*) &v + sizeof (v)); };
+    put2 ((std::uint32_t) 2);
+    put2 ((std::uint32_t) 2);                       // chunk id 2: the engine
+    put2 ((std::uint64_t) (12 + e.size()));
+    put2 ((std::uint32_t) 0);
+    put2 ((std::uint64_t) e.size());
+    out.insert (out.end(), e.begin(), e.end());
+    return out;
+}
+} // namespace design168q
+
+TEST (design168q2_transistor_bass_sequence_parameters)
+{
+    using namespace lynx;
+    for (const std::int16_t version : { (std::int16_t) 1, (std::int16_t) 0 })
+    {
+        ChannelDef c;
+        c.instrument = InstrumentKind::transistorbass;
+        c.pluginState = design168q::tbassState (version);
+        CHECK (transistorBassStateUsable (c.pluginState));
+        auto step = [] (int i, int field) { return tbseq::firstStep + 5 * i + field; };
+        // read: the saved program's (3) sequence
+        CHECK (modelparams::rawValue (c, tbseq::length) == 16.0f);
+        CHECK (modelparams::rawValue (c, tbseq::sequencer) == 1.0f);
+        CHECK (modelparams::rawValue (c, step (0, 0)) == 48.0f && modelparams::rawValue (c, step (0, 1)) == 4.0f);
+        CHECK (modelparams::rawValue (c, step (0, 2)) == 1.0f && modelparams::rawValue (c, step (1, 2)) == 0.0f);
+        CHECK (modelparams::rawValue (c, step (2, 3)) == 1.0f);
+        CHECK (modelparams::rawValue (c, step (4, 4)) == (version == 1 ? 1.0f : 0.0f));
+        // write: note, octave (keeps the note name), gate, slide, length, sequencer
+        CHECK (modelparams::setRawValue (c, step (5, 0), 62.0f) && modelparams::rawValue (c, step (5, 0)) == 62.0f);
+        CHECK (modelparams::setRawValue (c, step (5, 1), 6.0f) && modelparams::rawValue (c, step (5, 0)) == 74.0f);
+        CHECK (modelparams::setRawValue (c, step (1, 2), 1.0f) && modelparams::rawValue (c, step (1, 2)) == 1.0f);
+        CHECK (modelparams::setRawValue (c, step (7, 3), 1.0f) && modelparams::rawValue (c, step (7, 3)) == 1.0f);
+        CHECK (modelparams::setRawValue (c, tbseq::length, 12.0f) && modelparams::rawValue (c, tbseq::length) == 12.0f);
+        CHECK (modelparams::setValue01 (c, tbseq::sequencer, 0.0f) && modelparams::rawValue (c, tbseq::sequencer) == 0.0f);
+        // accent: a version-0 step gains its accent byte (the state grows by one, still readable)
+        const auto size = c.pluginState.size();
+        CHECK (modelparams::setRawValue (c, step (9, 4), 1.0f) && modelparams::rawValue (c, step (9, 4)) == 1.0f);
+        CHECK (c.pluginState.size() == size + (version == 0 ? 1u : 0u));
+        CHECK (transistorBassStateUsable (c.pluginState));
+        CHECK (modelparams::rawValue (c, step (5, 0)) == 74.0f && modelparams::rawValue (c, tbseq::length) == 12.0f);
+        CHECK (modelparams::setRawValue (c, step (9, 4), 0.0f) && modelparams::rawValue (c, step (9, 4)) == 0.0f);
+        // the page's program display reads the same sequence
+        const auto prog = transistorBassProgram (c.pluginState);
+        CHECK (prog && prog->program == 3 && prog->length == 12 && ! prog->sequencer && prog->steps[5].note == 74 && prog->steps[7].slide);
+        // octave buttons and CLEAR
+        CHECK (transistorBassShiftSequence (c.pluginState, 1) && modelparams::rawValue (c, step (0, 0)) == 60.0f);
+        CHECK (transistorBassShiftSequence (c.pluginState, -2) && modelparams::rawValue (c, step (0, 0)) == 36.0f);
+        CHECK (transistorBassClearSequence (c.pluginState));
+        for (int i = 0; i < tbseq::steps; ++i)
+            CHECK (modelparams::rawValue (c, step (i, 0)) == 60.0f && modelparams::rawValue (c, step (i, 2)) == 0.0f
+                   && modelparams::rawValue (c, step (i, 3)) == 0.0f && modelparams::rawValue (c, step (i, 4)) == 0.0f);
+        CHECK (transistorBassStateUsable (c.pluginState));
+    }
+    std::vector<std::uint8_t> broken { 1, 2, 3 };
+    CHECK (! transistorBassClearSequence (broken) && ! transistorBassShiftSequence (broken, 1));
+}
+
+TEST (design168q2_transistor_bass_sequence_edits_play_live)
+{
+    using namespace lynx;
+    const auto dll = tbassDll();
+    if (dll.empty() || ! transistorBassDllUsable (dll))
+        return; // (no FL installation)
+    ChannelDef c;
+    c.instrument = InstrumentKind::transistorbass;
+    c.pluginState = design168q::tbassState (1);
+    c.samplePath = dll;
+    auto inst = makeTransistorBassInstrument();
+    inst->prepare (44100.0);
+    inst->configure (c, 140.0);
+    std::vector<float> l (4096), r (4096);
+    inst->noteOn (3, 1.0f); // (sequencer mode: the key picks the program)
+    float before = 0.0f;
+    for (int b = 0; b < 8; ++b)
+    {
+        std::fill (l.begin(), l.end(), 0.0f);
+        inst->render (l.data(), r.data(), 4096, 1.0f, 1.0f);
+        for (const auto v : l)
+            before = std::max (before, std::fabs (v));
+    }
+    CHECK (before > 1.0e-3f);
+    // a step's gate and the length edited while the sequence plays: the engine takes them without a rebuild
+    for (int i = 0; i < 16; ++i)
+        CHECK (modelparams::setRawValue (c, tbseq::firstStep + 5 * i + 2, 1.0f));
+    CHECK (modelparams::setRawValue (c, tbseq::length, 8.0f));
+    inst->configure (c, 140.0);
+    float after = 0.0f;
+    for (int b = 0; b < 8; ++b)
+    {
+        std::fill (l.begin(), l.end(), 0.0f);
+        inst->render (l.data(), r.data(), 4096, 1.0f, 1.0f);
+        for (const auto v : l)
+            after = std::max (after, std::fabs (v));
+    }
+    CHECK (after > 1.0e-3f && std::isfinite (after));
+    inst->setParameter (tbseq::firstStep + 2, 0.0f); // automation of a step's gate
+    inst->render (l.data(), r.data(), 4096, 1.0f, 1.0f);
+    inst->allNotesOff();
 }

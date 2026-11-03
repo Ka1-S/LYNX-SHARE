@@ -6696,3 +6696,4 @@ countries: ru by kz
 "Vel sens" = "Чувств скор"
 "Vib" = "Виб"
 "Voice mode" = "Режим голосов"
+"Sequencer" = "Секвенсор"

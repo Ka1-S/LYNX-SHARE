@@ -6696,3 +6696,4 @@ countries: fr be ch ca lu
 "Vel sens" = "Sens vél"
 "Vib" = "Vib"
 "Voice mode" = "Mode de voix"
+"Sequencer" = "Séquenceur"

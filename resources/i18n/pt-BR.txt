@@ -6852,3 +6852,4 @@ countries: br
 "Vel sens" = "Sens vel"
 "Vib" = "Vib"
 "Voice mode" = "Modo de vozes"
+"Sequencer" = "Sequenciador"

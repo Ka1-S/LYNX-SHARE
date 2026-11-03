@@ -2046,9 +2046,18 @@ struct Step
     float velocity = 0.5f;
 };
 
+// byte offsets of a step's fields in the saved state (round 168q2: the page edits the sequence); accent 0 = the step
+// was saved without its accent byte (step version 0)
+struct StepAt
+{
+    std::size_t version = 0, slide = 0, note = 0, gate = 0, accent = 0, end = 0;
+};
+
 struct Sequence
 {
     std::array<Step, 32> steps {};
+    std::array<StepAt, 32> at {};
+    std::size_t lengthAt = 0;
     int length = 16;
     double bpm = 125.0, shuffle = 0.0, gateLength = 0.66;
     bool internalBpm = false;
@@ -2068,6 +2077,7 @@ struct State
     std::vector<std::array<float, 100>> patches; // the working copies (the second of each stored pair)
     std::array<std::size_t, 128> workingAt {};    // the byte offset of each working copy's first value (round 168q)
     std::vector<Sequence> sequences;
+    std::size_t engineAt = 0, sequencerModeAt = 0; // (round 168q2)
 };
 
 struct Reader
@@ -2117,6 +2127,7 @@ State parseState (const std::vector<std::uint8_t>& s)
     }
     if (engineAt == 0)
         return st;
+    st.engineAt = engineAt;
     Reader e { s, engineAt };
     e.get<std::uint32_t>();
     const auto n = e.get<std::uint64_t>();
@@ -2155,17 +2166,28 @@ State parseState (const std::vector<std::uint8_t>& s)
         const auto ver = e.get<std::int16_t>();
         e.skipString();
         e.get<std::int16_t>();
+        q.lengthAt = e.at;
         q.length = e.get<std::int32_t>();
-        for (auto& stp : q.steps)
+        for (std::size_t k = 0; k < q.steps.size(); ++k)
         {
+            auto& stp = q.steps[k];
+            auto& at = q.at[k];
+            at.version = e.at;
             const auto sv = e.get<std::int16_t>();
+            at.slide = e.at;
             stp.slide = e.get<std::int8_t>() > 0;
+            at.note = e.at;
             stp.note = e.get<std::int32_t>();
+            at.gate = e.at;
             stp.gate = e.get<std::int8_t>() > 0;
             stp.length = e.get<double>();
             stp.velocity = e.get<float>();
             if (sv == 1)
+            {
+                at.accent = e.at;
                 stp.accent = e.get<std::int8_t>() > 0;
+            }
+            at.end = e.at;
         }
         q.bpm = e.get<double>();
         q.internalBpm = e.get<std::int8_t>() > 0;
@@ -2174,6 +2196,7 @@ State parseState (const std::vector<std::uint8_t>& s)
         if (ver > 0)
             q.gateLength = e.get<double>();
     }
+    st.sequencerModeAt = e.at;
     st.sequencerMode = e.get<std::int32_t>() != 0 ? 4 : 0;
     if (st.version >= 2)
     {
@@ -2365,6 +2388,32 @@ public:
             return;
         st.patches[(std::size_t) st.programs[(std::size_t) program].patch][(std::size_t) i] = v;
         setParam (i, (double) v);
+    }
+
+    // the saved program's sequence edited while playing (the page's step rows, automation; round 168q2): `raw` in the
+    // parameter's own range
+    void seqParam (int index, float raw) noexcept
+    {
+        if (! std::isfinite (raw))
+            return;
+        auto& q = st.sequences[(std::size_t) st.programs[(std::size_t) st.program].sequence];
+        const auto v = (int) std::lround (raw);
+        if (index == tbseq::length)
+            q.length = std::clamp (v, 1, 16);
+        else if (index == tbseq::sequencer)
+            st.sequencerMode = seqMode = v != 0 ? 4 : 0;
+        else if (index >= tbseq::firstStep && index < tbseq::firstStep + 5 * tbseq::steps)
+        {
+            auto& stp = q.steps[(std::size_t) ((index - tbseq::firstStep) / 5)];
+            switch ((index - tbseq::firstStep) % 5)
+            {
+                case 0: stp.note = std::clamp (v, 0, 131); break;
+                case 1: stp.note = std::min (131, stp.note % 12 + 12 * std::clamp (v, 0, 10)); break;
+                case 2: stp.gate = v != 0; break;
+                case 3: stp.slide = v != 0; break;
+                default: stp.accent = v != 0; break;
+            }
+        }
     }
 
 private:
@@ -2595,6 +2644,116 @@ int velocityFromInitVol (double initVol) noexcept
     return (int) v;
 }
 
+// ----------------------------------------------------------------------------- the sequence parameters (round 168q2)
+template <typename T>
+T peek (const std::vector<std::uint8_t>& b, std::size_t at) noexcept
+{
+    T v {};
+    if (at + sizeof (T) <= b.size())
+        std::memcpy (&v, b.data() + at, sizeof (T));
+    return v;
+}
+
+template <typename T>
+void poke (std::vector<std::uint8_t>& b, std::size_t at, T v) noexcept
+{
+    if (at + sizeof (T) <= b.size())
+        std::memcpy (b.data() + at, &v, sizeof (T));
+}
+
+const Sequence& savedSequence (const State& st) { return st.sequences[(std::size_t) st.programs[(std::size_t) st.program].sequence]; }
+
+// a sequence parameter's raw value in a parsed state (nullopt: not a sequence parameter)
+std::optional<float> seqValue (const State& st, int index)
+{
+    if (! st.usable)
+        return std::nullopt;
+    const auto& q = savedSequence (st);
+    if (index == tbseq::length)
+        return (float) std::clamp (q.length, 1, 16);
+    if (index == tbseq::sequencer)
+        return st.sequencerMode != 0 ? 1.0f : 0.0f;
+    if (index < tbseq::firstStep || index >= tbseq::firstStep + 5 * tbseq::steps)
+        return std::nullopt;
+    const auto& stp = q.steps[(std::size_t) ((index - tbseq::firstStep) / 5)];
+    switch ((index - tbseq::firstStep) % 5)
+    {
+        case 0: return (float) std::clamp (stp.note, 0, 131);
+        case 1: return (float) std::clamp (stp.note / 12, 0, 10);
+        case 2: return stp.gate ? 1.0f : 0.0f;
+        case 3: return stp.slide ? 1.0f : 0.0f;
+        default: return stp.accent ? 1.0f : 0.0f;
+    }
+}
+
+// writes a sequence parameter in place; false when it needs bytes the state lacks (a version-0 step's accent)
+bool seqWriteInPlace (std::vector<std::uint8_t>& b, const State& st, int index, float raw)
+{
+    if (! st.usable || ! std::isfinite (raw))
+        return false;
+    const auto& q = savedSequence (st);
+    const auto v = (int) std::lround (raw);
+    if (index == tbseq::length)
+        return poke<std::int32_t> (b, q.lengthAt, std::clamp (v, 1, 16)), true;
+    if (index == tbseq::sequencer)
+        return poke<std::int32_t> (b, st.sequencerModeAt, v != 0 ? 1 : 0), true;
+    if (index < tbseq::firstStep || index >= tbseq::firstStep + 5 * tbseq::steps)
+        return false;
+    const auto k = (std::size_t) ((index - tbseq::firstStep) / 5);
+    const auto& at = q.at[k];
+    switch ((index - tbseq::firstStep) % 5)
+    {
+        case 0: poke<std::int32_t> (b, at.note, std::clamp (v, 0, 131)); return true;
+        case 1: poke<std::int32_t> (b, at.note, std::min (131, std::clamp (q.steps[k].note, 0, 131) % 12 + 12 * std::clamp (v, 0, 10))); return true;
+        case 2: poke<std::int8_t> (b, at.gate, (std::int8_t) (v != 0 ? 1 : 0)); return true;
+        case 3: poke<std::int8_t> (b, at.slide, (std::int8_t) (v != 0 ? 1 : 0)); return true;
+        default:
+            if (at.accent == 0)
+                return false;
+            poke<std::int8_t> (b, at.accent, (std::int8_t) (v != 0 ? 1 : 0));
+            return true;
+    }
+}
+
+// a version-0 step (no accent byte) becomes version 1 with its accent: one byte more in the engine's chunk and in
+// the wrapper's chunk that holds it
+bool addAccentByte (std::vector<std::uint8_t>& b, const State& st, std::size_t step, bool on)
+{
+    const auto& at = savedSequence (st).at[step];
+    if (at.accent != 0 || at.end == 0 || st.engineAt < 8 || at.end > b.size())
+        return false;
+    b.insert (b.begin() + (std::ptrdiff_t) at.end, (std::uint8_t) (on ? 1 : 0));
+    poke<std::int16_t> (b, at.version, 1);
+    poke<std::uint64_t> (b, st.engineAt - 8, peek<std::uint64_t> (b, st.engineAt - 8) + 1);
+    poke<std::uint64_t> (b, st.engineAt + 4, peek<std::uint64_t> (b, st.engineAt + 4) + 1);
+    return true;
+}
+
+// any parameter of the table (patch 0…41 or sequence): raw value / in-place write
+std::optional<float> anyValue (const State& st, const std::vector<std::uint8_t>& b, int index)
+{
+    if (index >= 0 && index < 0x2A)
+    {
+        if (! st.usable)
+            return std::nullopt;
+        const auto at = st.workingAt[(std::size_t) st.programs[(std::size_t) st.program].patch] + 4 * (std::size_t) index;
+        return peek<float> (b, at);
+    }
+    return seqValue (st, index);
+}
+
+bool anyWriteInPlace (std::vector<std::uint8_t>& b, const State& st, int index, float raw)
+{
+    if (index >= 0 && index < 0x2A)
+    {
+        if (! st.usable)
+            return false;
+        poke<float> (b, st.workingAt[(std::size_t) st.programs[(std::size_t) st.program].patch] + 4 * (std::size_t) index, raw);
+        return true;
+    }
+    return seqWriteInPlace (b, st, index, raw);
+}
+
 // ------------------------------------------------------------------------------------------------ LYNX instrument
 class TransistorBassInstrument final : public Instrument
 {
@@ -2763,30 +2922,37 @@ private:
             liveParams.clear(); // (built from the newest state)
         }
         if (plugin != nullptr)
-            liveParams.drain ([this] (int i, float v) { plugin->hostParam (i, v); });
+            liveParams.drain ([this] (int i, float v) {
+                if (i < 0x2A)
+                    plugin->hostParam (i, v);
+                else
+                    plugin->seqParam (i, v);
+            });
     }
 
-    // queues the values of the current program's working patch that differ, when nothing else did (UI thread)
+    // queues the values of the current program's working patch and of its saved sequence that differ, when nothing
+    // else did (UI thread; round 168q, sequence round 168q2)
     bool liveChange (const std::vector<std::uint8_t>& before, const std::vector<std::uint8_t>& after)
     {
         if (before.size() != after.size() || ! parsed.usable)
             return false;
-        const auto first = transistorBassParamOffset (after, 0);
-        if (first < 0 || first != transistorBassParamOffset (before, 0))
+        const auto a = parseState (before), b = parseState (after);
+        if (! a.usable || ! b.usable || a.program != b.program)
             return false;
-        const auto end = (std::size_t) first + 4 * 0x2A;
-        if (std::memcmp (before.data(), after.data(), (std::size_t) first) != 0
-            || std::memcmp (before.data() + end, after.data() + end, after.size() - end) != 0)
-            return false;
+        auto expected = before;
         std::vector<std::pair<int, float>> changed;
-        for (int i = 0; i < 0x2A; ++i)
-            if (std::memcmp (before.data() + first + 4 * i, after.data() + first + 4 * i, 4) != 0)
-            {
-                float v = 0.0f;
-                std::memcpy (&v, after.data() + first + 4 * i, 4);
-                changed.emplace_back (i, v);
-            }
-        if (changed.size() > liveParams.space())
+        for (const auto& p : transistorBassParams())
+        {
+            const auto va = anyValue (a, before, p.index), vb = anyValue (b, after, p.index);
+            if (! va || ! vb)
+                return false;
+            if (std::memcmp (&*va, &*vb, sizeof (float)) == 0)
+                continue;
+            if (! anyWriteInPlace (expected, a, p.index, *vb))
+                return false;
+            changed.emplace_back (p.index, *vb);
+        }
+        if (expected != after || changed.size() > liveParams.space())
             return false;
         for (const auto& [i, v] : changed)
             liveParams.push (i, v);
@@ -2797,8 +2963,12 @@ public:
     void setParameter (int index, float value) noexcept override
     {
         take();
-        if (plugin != nullptr && std::isfinite (value))
+        if (plugin == nullptr || ! std::isfinite (value))
+            return;
+        if (index < 0x2A)
             plugin->hostParam (index, std::clamp (value, 0.0f, 1.0f));
+        else if (const auto* p = findEngineParam (transistorBassParams(), index))
+            plugin->seqParam (index, p->raw (value));
     }
 
 private:
@@ -2876,6 +3046,23 @@ const std::vector<EngineParam>& transistorBassParams()
             p.index = index, p.name = name;
             t.push_back (p);
         }
+        auto add = [&t] (int index, std::string name, float low, float high) {
+            EngineParam p;
+            p.index = index, p.name = std::move (name), p.low = low, p.high = high, p.stepped = true;
+            t.push_back (p);
+        };
+        // the saved program's sequence (round 168q2)
+        add (tbseq::length, "Sequence length", 1.0f, 16.0f);
+        add (tbseq::sequencer, "Sequencer", 0.0f, 1.0f);
+        for (int i = 0; i < tbseq::steps; ++i)
+        {
+            const auto step = "Step " + std::to_string (i + 1) + " ";
+            add (tbseq::firstStep + 5 * i, step + "note", 0.0f, 131.0f);
+            add (tbseq::firstStep + 5 * i + 1, step + "octave", 0.0f, 10.0f);
+            add (tbseq::firstStep + 5 * i + 2, step + "gate", 0.0f, 1.0f);
+            add (tbseq::firstStep + 5 * i + 3, step + "slide", 0.0f, 1.0f);
+            add (tbseq::firstStep + 5 * i + 4, step + "accent", 0.0f, 1.0f);
+        }
         return t;
     }();
     return table;
@@ -2887,6 +3074,8 @@ namespace
 {
 std::optional<float> tbValue (const ChannelDef& c, const EngineParam& p)
 {
+    if (p.index >= 0x2A) // the sequence (round 168q2)
+        return seqValue (parseState (c.pluginState), p.index);
     const auto at = transistorBassParamOffset (c.pluginState, p.index);
     if (at < 0)
         return std::nullopt;
@@ -2897,6 +3086,15 @@ std::optional<float> tbValue (const ChannelDef& c, const EngineParam& p)
 
 bool tbSetValue (ChannelDef& c, const EngineParam& p, float raw)
 {
+    if (p.index >= 0x2A)
+    {
+        const auto st = parseState (c.pluginState);
+        if (seqWriteInPlace (c.pluginState, st, p.index, raw))
+            return true;
+        const auto field = (p.index - tbseq::firstStep) % 5;
+        return st.usable && p.index >= tbseq::firstStep && field == 4 && std::isfinite (raw)
+            && addAccentByte (c.pluginState, st, (std::size_t) ((p.index - tbseq::firstStep) / 5), raw >= 0.5f);
+    }
     const auto at = transistorBassParamOffset (c.pluginState, p.index);
     if (at < 0 || ! std::isfinite (raw))
         return false;
@@ -2907,6 +3105,41 @@ bool tbSetValue (ChannelDef& c, const EngineParam& p, float raw)
 
 Table transistorBassModelTable() { return { &transistorBassParams(), &tbValue, &tbSetValue }; }
 } // namespace modelparams
+
+bool transistorBassClearSequence (std::vector<std::uint8_t>& state)
+{
+    const auto st = parseState (state);
+    if (! st.usable)
+        return false;
+    for (int i = 0; i < tbseq::steps; ++i)
+    {
+        const auto base = tbseq::firstStep + 5 * i;
+        seqWriteInPlace (state, st, base, 60.0f);
+        seqWriteInPlace (state, st, base + 2, 0.0f);
+        seqWriteInPlace (state, st, base + 3, 0.0f);
+        seqWriteInPlace (state, st, base + 4, 0.0f); // (a version-0 step has no accent: already off)
+    }
+    return true;
+}
+
+bool transistorBassShiftSequence (std::vector<std::uint8_t>& state, int octaves)
+{
+    const auto st = parseState (state);
+    if (! st.usable)
+        return false;
+    const auto& q = savedSequence (st);
+    for (int i = 0; i < tbseq::steps; ++i)
+    {
+        const auto note = std::clamp (q.steps[(std::size_t) i].note, 0, 131);
+        auto next = note + 12 * octaves;
+        while (next > 131)
+            next -= 12;
+        while (next < 0)
+            next += 12;
+        seqWriteInPlace (state, st, tbseq::firstStep + 5 * i, (float) next);
+    }
+    return true;
+}
 
 namespace tbass
 {

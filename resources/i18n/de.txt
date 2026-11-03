@@ -6696,3 +6696,4 @@ countries: de at ch li lu
 "Vel sens" = "Vel-Empf"
 "Vib" = "Vib"
 "Voice mode" = "Stimmenmodus"
+"Sequencer" = "Sequenzer"

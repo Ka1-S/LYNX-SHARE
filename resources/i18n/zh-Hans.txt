@@ -6696,3 +6696,4 @@ countries: cn sg
 "Vel sens" = "力度灵敏"
 "Vib" = "颤音"
 "Voice mode" = "发音模式"
+"Sequencer" = "音序器"

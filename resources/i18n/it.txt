@@ -6696,3 +6696,4 @@ countries: it ch sm
 "Vel sens" = "Sens vel"
 "Vib" = "Vib"
 "Voice mode" = "Modalità voci"
+"Sequencer" = "Sequencer"
