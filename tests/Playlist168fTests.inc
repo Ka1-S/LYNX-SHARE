@@ -87,11 +87,12 @@ TEST (pl168f_lock_to_content_paints_the_dominant_clip)
     // the menu's track decides the new state for the other selected tracks (FL's mask 4)
     pltracks::toggleLockToContent (song, { 2, 6 });
     CHECK (! song.playlistTracks[2].lockedToContent && ! song.playlistTracks[6].lockedToContent);
+    CHECK (song.playlistTracks[2].icon == 0); // unlocking takes FL's lock icon away
     // a named track keeps its name
     song.playlistTracks[2].name = "Drums";
     pltracks::toggleLockToContent (song, { 2 });
     CHECK (song.playlistTracks[2].name == "Drums");
-    CHECK (! song.playlistTracks[2].lockedToContent && song.playlistTracks[2].icon == 0); // unlocking takes FL's lock icon away
+    CHECK (song.playlistTracks[2].lockedToContent && song.playlistTracks[2].icon == 93);
 }
 
 TEST (pl168f_lock_all_and_the_resize_answer)
