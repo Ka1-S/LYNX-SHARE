@@ -98,7 +98,7 @@ the scale functions, AutoPDCMenuClick, FUN_012b5e60 / FUN_012b6020), `d2.txt` (P
 
 ## Where I stopped
 
-- PAUSED (coordinator, round 168w pipeline work). Done: everything above; build-local 2 105 045 checks / 0 failures and
+- RESUMED 2026-11-03: origin/main merged (aa7d6047), build-local 2 399 289 checks / 0 failures, Windows build OK; queued on coord/train.sh. Earlier state:
   the Windows build + FL render comparison + GUI check, all on the branch as of 406f55b3. The landing was only waiting
   for the merge lock and was cancelled: nothing of 168j is on main yet. After that, origin/main was merged in again
   (only the generated i18n headers conflicted and were regenerated; not built since).
