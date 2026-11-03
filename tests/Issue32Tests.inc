@@ -281,3 +281,24 @@ TEST (issue32_fit_to_tempo_keeps_a_loop_in_time)
     const auto want = (float) ((double) s.left.size() / 44100.0 * 100.0 / 60.0); // 12.42 beats: the loop stays 12 beats long
     CHECK (std::abs (got - want) < 0.05f);
 }
+
+TEST (digiwheel168s_number_boxes_are_dark_displays_red_only_while_touched)
+{
+    // RANGE / TRACK in the channel settings header and the rack's insert box: FL draws its digiwheels as small dark
+    // displays, not filled buttons; in the LYNX skin the accent (red) shows only while hovered or dragged
+    using namespace lynx::themes;
+    for (const auto& t : builtInThemes())
+    {
+        const auto p = derivePalette (t.accent, t.background);
+        const auto at = [&p] (bool hot, bool dimmed)
+        { return digitDisplayColours (p.bg0, p.border, p.accent, p.accentHover, p.textPrimary, p.textDisabled, hot, dimmed); };
+        const auto rest = at (false, false);
+        CHECK (rest.fill == p.bg0 && rest.edge == p.border && rest.text == p.textPrimary); // no red at rest
+        CHECK (rest.fill != p.accent && rest.edge != p.accent && rest.text != p.accent);
+        CHECK (contrastRatio (rest.text, rest.fill) >= 7.0);
+        CHECK (at (false, true).text == p.textDisabled); // "-": no insert
+        const auto hot = at (true, true);
+        CHECK (hot.fill == p.bg0 && hot.edge == p.accent && hot.text == p.accentHover); // red while touched, still dark
+        CHECK (contrastRatio (hot.text, hot.fill) >= 3.0);
+    }
+}
