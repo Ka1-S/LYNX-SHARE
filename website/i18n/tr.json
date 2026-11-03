@@ -60,6 +60,8 @@
 "dl.portWinP": "Herhangi bir klasöre çıkarın ve <code>LYNX.exe</code> dosyasını açın.",
 "dl.portLin": "Linux AppImage",
 "dl.portLinP": "Tek bir dosya: <code>chmod +x</code> yapın ve çalıştırın.",
+"dl.store": "<b>Windows 10 / 11:</b> Microsoft Store’da da var, otomatik güncellemelerle.",
+"dl.storeAlt": "Microsoft’tan edinin",
 "mq.auto": "Otomasyon klipleri",
 "mq.flp": ".flp içe aktarma",
 "mq.disk": "Diskten akış",
