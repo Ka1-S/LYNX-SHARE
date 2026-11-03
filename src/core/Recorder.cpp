@@ -17,7 +17,7 @@ std::int64_t patternPositionForTick (const Song& song, double tick, std::int64_t
 
         for (const auto& c : song.playlist)
             if (c.kind == ClipKind::pattern && c.pattern == song.currentPattern && inSong >= c.start && inSong < c.end())
-                return inSong - c.start + c.offset;
+                return clipPatternTick (song, c, inSong);
     }
 
     return position % std::max<std::int64_t> (1, loopLength);
@@ -190,15 +190,27 @@ bool inCurrentPatternClip (const Song& song, std::int64_t tick)
     return currentPatternClipAt (song, tick) != nullptr;
 }
 
-// FL grows the pattern when a take is played inside a clip longer than it (round 168k [EXEC]: a 1-bar pattern's clip
-// stretched to 4 bars, notes played at bars 2.1 / 3.3 / 4.2 stayed there and the pattern became 4 bars): no fold by
-// the pattern's length while recording, in both modes of stretchedClipsLoop() (FL plays such a clip once; with LYNX's
-// loop option on, the grown pattern is what the clip then loops).
-std::int64_t clipPatternTick (const Clip& c, std::int64_t tick)
-{
-    return tick - c.start + c.offset;
-}
 } // namespace
+
+// Where a take played at song `tick` inside clip `c` lands in its pattern. With LYNX's "Stretched pattern clips loop
+// their pattern" on (stretchedClipsLoop(); 0.1.23, the user's decision) a clip longer than its pattern loops it, so a
+// note played in a repeat folds into the pattern (its place modulo the pattern's length, from the clip's offset): it
+// then plays in every repeat and the pattern does not grow. Off, FL's rule (round 168k [EXEC]: a 1-bar pattern's clip
+// stretched to 4 bars, notes played at bars 2.1 / 3.3 / 4.2 stayed there and the pattern became 4 bars): no fold.
+std::int64_t clipPatternTick (const Song& song, const Clip& c, std::int64_t tick)
+{
+    if (c.pattern < 0 || c.pattern >= (int) song.patterns.size())
+        return tick - c.start + c.offset;
+    return (std::int64_t) std::floor (patternTickInClip (c, (double) tick, clipLoopLength (song, c)));
+}
+
+std::int64_t clipLoopLength (const Song& song, const Clip& c)
+{
+    if (! stretchedClipsLoop() || c.pattern < 0 || c.pattern >= (int) song.patterns.size())
+        return 0;
+    const auto length = song.patterns[(std::size_t) c.pattern].effectiveLength (song.beatsPerBar);
+    return length > 0 && c.offset + c.length > length ? length : 0;
+}
 
 std::int64_t takeOriginFor (const Song& song, std::int64_t tick, bool* fromClip)
 {
@@ -222,7 +234,7 @@ std::int64_t songNotePosition (const Song& song, std::int64_t tick, std::int64_t
 {
     tick = std::max<std::int64_t> (0, tick);
     if (const auto* c = currentPatternClipAt (song, tick))
-        return std::max<std::int64_t> (0, clipPatternTick (*c, tick));
+        return std::max<std::int64_t> (0, clipPatternTick (song, *c, tick));
     auto local = tick - std::max<std::int64_t> (0, origin);
     if (local < 0) // played after the song (or the loop region) went back to its start: the take goes on after it
         local += song.hasLoop() ? song.loopEnd - song.loopStart : std::max<std::int64_t> (1, song.songLength());
@@ -282,6 +294,20 @@ void commitNoteBatch (Song& song, const NoteRecorder& recorder, std::vector<Note
     if (pattern < 0 || pattern >= (int) song.patterns.size() || notes.empty())
         return;
     quantizeTake (notes, q);
+    // a take folded into a looping clip (stretchedClipsLoop()): a note quantized onto the pattern's end goes to its start,
+    // the next repeat's first beat, and a note held across the end is cut there (the pattern keeps its length)
+    if (song.mode == PlayMode::song && recorder.originFromClip())
+        for (const auto& c : song.playlist)
+            if (c.kind == ClipKind::pattern && c.pattern == pattern && c.start - c.offset == recorder.songOrigin())
+                if (const auto length = clipLoopLength (song, c); length > 0)
+                {
+                    for (auto& n : notes)
+                    {
+                        n.start %= length;
+                        n.length = std::clamp<std::int64_t> (n.length, 1, length - n.start);
+                    }
+                    break;
+                }
     commitTake (song.patterns[(std::size_t) pattern], notes, mode, 0, clearedChannels);
 
     if (song.mode != PlayMode::song || recorder.songOrigin() < 0)

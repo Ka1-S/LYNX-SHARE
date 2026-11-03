@@ -7,6 +7,7 @@
 #include "core/BeepMap.h"
 #include "core/Granulizer.h"
 #include "core/Kepler.h"
+#include "core/ModelParamsSynths.h"
 #include "core/PoiZone.h"
 #include "core/Sawer.h"
 #include "core/Toxic.h"

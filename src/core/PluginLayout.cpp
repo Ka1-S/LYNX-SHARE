@@ -1,4 +1,5 @@
 #include "core/PluginLayout.h"
+#include "core/PluginLayoutSynths.h"
 
 #include <list>
 
@@ -3913,7 +3914,7 @@ const Layout* instrumentLayout (InstrumentKind kind)
         case InstrumentKind::beepmap: return &beepMap;
         case InstrumentKind::granulizer: return &granulizer;
         case InstrumentKind::wasp: return &wasp;
-        default: return nullptr;
+        default: return synthGroupLayout (kind); // round 168o (core/PluginLayoutSynths.cpp)
     }
 }
 
@@ -3923,7 +3924,13 @@ const std::vector<InstrumentKind>& instrumentLayoutKinds()
                                                      InstrumentKind::toxic, InstrumentKind::poizone,
                                                      InstrumentKind::kepler, InstrumentKind::keplerExo, InstrumentKind::transistorbass, InstrumentKind::sawer,
                                                      InstrumentKind::beepmap, InstrumentKind::granulizer, InstrumentKind::wasp }; // (round 168q)
-    return kinds;
+    static const std::vector<InstrumentKind> all = [] {
+        auto k = kinds;
+        for (const auto s : synthGroupLayoutKinds())
+            k.push_back (s);
+        return k;
+    }();
+    return all;
 }
 
 const Layout& soundgoodizerLayout()

@@ -37,6 +37,23 @@ constexpr float maxFaderGain = 1.9031f;
 // docs/analise/REA_rodada3.md §2.
 float channelGain (float volume) noexcept;
 
+// Which running instance a channel or mixer effect slot is (round 168s, issue #32): a number given when the channel /
+// slot is made, kept by every copy (snapshots, undo, moving it in its list) and never saved. The renderer keeps an
+// instrument / effect with its channel / slot when the list order changes (inserting a channel, moving an effect up),
+// so a moved plugin keeps its live state and sounding notes. It never makes two channels or slots compare different.
+struct InstanceTag
+{
+    std::uint64_t id = next();
+
+    static std::uint64_t next() noexcept
+    {
+        static std::atomic<std::uint64_t> counter { 1 };
+        return counter.fetch_add (1, std::memory_order_relaxed);
+    }
+    void renew() noexcept { id = next(); } // a copy that is a new channel / slot (clone, duplicate)
+    bool operator== (const InstanceTag&) const noexcept { return true; }
+};
+
 enum class InstrumentKind : std::uint8_t
 {
     kick,
@@ -630,12 +647,15 @@ struct ChannelDef
     // 0 = any) play only this channel, whatever is selected in the Channel Rack. Empty = not locked.
     std::string receiveFrom;
     int receiveMidiChannel = 0;
+    // FL's channel icon (.flp 0x9B, REA round 168j): FL's icon index, 0 = none. Kept and saved; drawn by the icon UI.
+    int icon = 0;
     // FL's Loop Starter (round 168b, core/LoopStarter.h): the channel belongs to the Loop Starter of pattern
     // `loopStarterPattern` (-1 = not a Loop Starter channel), plays the one-shot category `loopStarterCategory` in kit slot
     // `loopStarterSlot`; locked = "Replace all samples" leaves its sample (FL's channel menu "Locked")
     int loopStarterPattern = -1;
     std::string loopStarterSlot, loopStarterCategory;
     bool loopStarterLocked = false;
+    InstanceTag instance; // runtime identity of the channel (never saved)
 
     bool hasKeyRegion() const noexcept { return keyLow > 0 || keyHigh < 127; }
     bool inKeyRegion (int key) const noexcept { return key >= keyLow && key <= keyHigh; }
@@ -818,6 +838,7 @@ struct EffectSlot
     std::vector<float> abOther;
     bool abShowingB = false;
     PatcherDoc patcher; // kind == patcher: its graph (REA_rodada141)
+    InstanceTag instance; // runtime identity of the slot (never saved, not compared)
 
     bool operator== (const EffectSlot& o) const; // every field (Song.cpp)
 
@@ -990,6 +1011,8 @@ struct MixerTrack
     // "Compensate for master latency" (.flp 0xEC flag 0x4000 = off): with a hardware output target, that output is
     // delayed to line up with the Master's (PDC total)
     bool compensateMasterLatency = true;
+    // FL's mixer track icon ("Change icon…", .flp 0x5F, REA round 168j): FL's icon index, 0 = none. Kept and saved.
+    int icon = 0;
 };
 
 constexpr float maxTrackLatencyMs = 5000.0f; // FL's clamp (FUN_012a7230)
@@ -1279,6 +1302,7 @@ struct PlaylistTrack
     int mixerTrack = -1; // audio / instrument tracks: the linked mixer track (-1 = none)
     int channel = -1;    // instrument tracks: the channel
     TrackPerformance performance {}; // FL's Performance settings (round 165m)
+    int icon = 0; // FL's playlist track icon (.flp 0xEE u32 at 8, REA round 168j): FL's icon index, 0 = none. Kept and saved.
 };
 
 // Splits a clip at `tick` (absolute): the original keeps the start and the return value is the rest.
@@ -1441,6 +1465,27 @@ struct Song
     // mixer's centre 0 dB, +3 dB on the side panned to), triangular = linear (the louder side stays at the level, the
     // other falls to 0). It sets the mixer inserts' pan (FLEngine FUN_0127b050) and the FL Sampler voices' pan.
     bool panTriangular = false;
+    // FL's mixer menu › Plugin delay compensation (REA round 168j, .flp 0x1D / 0x27): "Automatic" off = the delay
+    // compensation ignores the plugins' latencies (FL's planner FUN_010ff3b0 skips the generators' and the effects'
+    // latencies; the tracks' manual latencies still apply); "Compensate automations" = automation of a mixer effect
+    // whose input the compensation delays is delayed with it (the value it gets is the one at its delayed position).
+    bool autoPdc = true;
+    bool compensateAutomations = true;
+    // FL's Options › Project › Time settings (REA round 168j, .flp 0x23, TimeSettingComboChange): show the project's time
+    // settings as a time signature (beats per bar / beat unit) instead of FL's time division (beats per bar, steps per beat)
+    bool timeSignatureMode = false;
+    // FL's Piano Roll scale highlighting (View › scale menu, .flp 0xF3, REA round 168j): `scale` ≥ 0 = FL's reference
+    // scale (notetools::flReferenceScales(), FL's alphabetical list), −1 Default, −2 Black notes, −3 Automatic;
+    // `root` 0 = C … 11 = B. Saved with the project.
+    struct ScaleHighlight
+    {
+        int scale = -2, root = 0;
+        bool operator== (const ScaleHighlight&) const = default;
+    };
+    ScaleHighlight scaleHighlight;
+    // FL's Options › Project › Data folder (.flp 0xCA, ProjDataPathBtnClick "Select the directory where your project data
+    // is to be stored..."): kept and saved (empty = FL's default next to the project)
+    std::string dataFolder;
     // whether an effect slot processes: switched on, and not a substitute while the substitutes are bypassed
     bool slotActive (const EffectSlot& slot) const noexcept { return slot.enabled && ! (substitutesBypassed && slot.isSubstitute()); }
     std::vector<Automation> automations;
@@ -1505,6 +1550,9 @@ struct Song
 
     // Swaps/removes effect slots keeping automations pointing at the right effect.
     void swapEffectSlots (int track, int a, int b);
+    // Round 168s: gives a new instance tag to every channel / top-level effect slot whose tag an earlier one already has
+    // (a pasted or duplicated copy), so each running instrument / effect follows one channel / slot only.
+    void uniqueInstances();
     void removeEffectSlot (int track, int slot);
 
     // Removes an automation and its clips.
