@@ -92,6 +92,7 @@ Section "!$(SecApp)" SecMain
     !insertmacro CheckNotRunning
     SetOutPath "$INSTDIR"
     File "${STAGE}\LYNX.exe"
+    File /nonfatal "${STAGE}\onnxruntime.dll" ; Extract stems from sample
     File "${STAGE}\LICENSE"
     File "${STAGE}\THIRD_PARTY.md"
     File /nonfatal "${STAGE}\PRIVACY.md"
@@ -174,6 +175,7 @@ Section "Uninstall"
     ${AndIf} ${FileExists} "$INSTDIR\lynx-asio32.dll"
         ExecShellWait "runas" "$WINDIR\SysWOW64\regsvr32.exe" '/u /s "$INSTDIR\lynx-asio32.dll"'
     ${EndIf}
+    Delete "$INSTDIR\onnxruntime.dll"
     Delete "$INSTDIR\lynx-asio.dll"
     Delete "$INSTDIR\lynx-asio32.dll"
     Delete "$INSTDIR\Register LYNX ASIO.bat"

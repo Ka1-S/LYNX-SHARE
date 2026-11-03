@@ -10,6 +10,8 @@
 #include "core/FlSynths.h"
 #include "core/HardwareInsert.h"
 #include "core/Layer.h"
+#include "core/RackOps.h"
+#include "core/HostSlide.h"
 #include "core/Vfx.h"
 #include "core/FacetEq.h"
 #include "core/MidiControls.h"
@@ -1442,6 +1444,7 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
 {
     automationValues.fill (std::numeric_limits<float>::quiet_NaN());
     lastTrackGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
+    lastTapGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     channelBuffers.assign ((std::size_t) maxChannels * 2 * chunkCapacity, 0.0f);
     smartDisable.assign ((std::size_t) maxMixerTracks * maxEffectSlots, {});
     trackEqs.assign ((std::size_t) maxMixerTracks, {});
@@ -1452,6 +1455,7 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
     mixBuffers.assign ((std::size_t) maxMixerTracks * 2 * (std::size_t) blockCapacity, 0.0f);
     hwScratch.assign (2 * (std::size_t) blockCapacity, 0.0f);
     layerPick.assign ((std::size_t) maxChannels * 128, (std::int16_t) -1);
+    polyLayers.assign ((std::size_t) maxChannels, {});
 
     if (lastState != nullptr)
     {
@@ -1592,8 +1596,9 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
                     if (tick < (double) c.start)
                         break;
 
-                    value = tick < (double) c.end() ? events.valueAt (tick - (double) c.start + (double) c.offset)
-                                                    : events.valueAt ((double) (c.offset + c.length) - 1.0);
+                    // a stretched clip loops its pattern (LYNX extra stretchedClipsLoop, issue #25), its events too
+                    const auto period = (std::size_t) lane.pattern < state.schedule.patternLength.size() ? state.schedule.patternLength[(std::size_t) lane.pattern] : 0;
+                    value = events.valueAt (patternTickInClip (c, tick < (double) c.end() ? tick : (double) c.end() - 1.0, period));
                 }
 
                 automationValues[(std::size_t) lane.slot] = value;
@@ -1737,6 +1742,26 @@ float* RackRenderer::trackScratch (int track, int side) noexcept
 
 // A whole channel over the chunk: notes at the exact sample (only its own events), volume/pan and the
 // PDC delay. Each channel only touches its own instrument and buffer: it can run in parallel.
+channelpoly::Mode RackRenderer::polyMode (const ChannelDef& c, const Instrument& instrument) const noexcept
+{
+    channelpoly::Mode m;
+    // (the LYNX Synth plays its own Mono / Porta, the Sampler its own Porta: the layer leaves those to them)
+    m.mono = c.instrument != InstrumentKind::synth && channelMono (c);
+    m.porta = channelPortamento (c);
+    m.portaBeats = channelPortamentoBeats (c);
+    m.arpeggiator = c.arp.direction != 0;
+    m.echo = c.misc.echo.feedback > 0.0f;
+    m.slides = instrument.followsSlides();
+    m.glidesIn = instrument.followsChannelPorta();
+    return m;
+}
+
+void RackRenderer::clearPolyLayers() noexcept
+{
+    for (auto& layer : polyLayers)
+        layer.clear();
+}
+
 void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
 {
     const auto& c = state.song.channels[(std::size_t) i];
@@ -1903,15 +1928,34 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
             const auto inRegion = c.instrument == InstrumentKind::audioClip || c.inKeyRegion (list[index].key);
             if (! c.muted && inRegion)
             {
+                // (an audio clip follows its fine tune, not the main pitch: LYNX never moved clips with it)
+                const auto noteCents = e.cents + c.misc.fineTune
+                                       + (c.misc.mainPitch && c.instrument != InstrumentKind::audioClip ? state.song.masterPitch : 0.0f);
+                // FL's channel Mono / Porta (round 168l): a Mono note over a held one moves the sounding voice instead
+                const auto mode = polyMode (c, instrument);
+                const auto glideSamples = (float) (channelpoly::glideBeats (mode.portaBeats) * ppq / std::max (1.0e-9, chunkTps));
+                auto& poly = polyLayers[(std::size_t) i];
+                // (an echo delay's repeats are FL's generated voices: they don't enter the Mono list)
+                const auto on = e.echo ? channelpoly::On {} : poly.noteOn (mode, e.key, noteCents, e.porta, e.colour);
+                if (on.release >= 0)
+                {
+                    instrument.noteOff (on.release);
+                    voiceOrders[(std::size_t) i].noteOff (on.release);
+                }
+                if (! on.start)
+                {
+                    if (on.slide)
+                        instrument.slideTo (e.key, noteCents, glideSamples);
+                    continue;
+                }
                 // Max polyphony: the oldest note is released first
-                if (const auto limit = voiceLimitFor (c.maxPolyphony, c.synth.mono); limit > 0)
+                if (const auto limit = voiceLimitFor (c.maxPolyphony, channelMono (c)); limit > 0)
                     if (const auto victim = voiceOrders[(std::size_t) i].noteOn (e.key, limit); victim >= 0)
                         instrument.noteOff (victim);
                 const auto pan = tracking ? channelmisc::trackedPan (c.misc, e.key, e.velocity, e.pan) : e.pan;
-                // (an audio clip follows its fine tune, not the main pitch: LYNX never moved clips with it)
-                instrument.setNextNoteExpression (pan, e.cents + c.misc.fineTune
-                                                           + (c.misc.mainPitch && c.instrument != InstrumentKind::audioClip ? state.song.masterPitch : 0.0f),
-                                                  e.porta);
+                // (porta: the voice starts at the group's last note and glides to its own pitch, HostSlide::anchor)
+                instrument.setNextNoteExpression (pan, noteCents + (on.glide ? on.glideFrom : 0.0f), e.porta);
+                HostSlide::pendingGlide() = { on.glide ? on.glideFrom : 0.0f, on.glide ? glideSamples : 0.0f, false };
                 {
                     const auto [modX, modY] = modTracking ? channelmisc::trackedModulation (c.misc, e.key, e.velocity, e.modX, e.modY)
                                                           : std::pair<float, float> { e.modX, e.modY };
@@ -1932,6 +1976,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                 if (gain != 1.0f && ! instrument.setNextNoteGain (gain))
                     velocity *= gain;
                 instrument.noteOnAt (e.key, velocity, e.startSeconds);
+                HostSlide::pendingGlide() = {};
             }
         }
         else if (e.type == NoteEvent::Type::slide)
@@ -1943,12 +1988,22 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
             instrument.cut(); // short fade, like FL's "cut"
             held = {};
             voiceOrders[(std::size_t) i].clear();
+            polyLayers[(std::size_t) i].clear();
         }
         else
         {
             instrument.setNextNoteRelease (e.release);
-            instrument.noteOff (e.key);
-            voiceOrders[(std::size_t) i].noteOff (e.key);
+            // a Mono channel (round 168l): the voice ends with the last held note, else it glides back to the newest
+            const auto mode = polyMode (c, instrument);
+            const auto off = e.echo ? channelpoly::Off { e.key } : polyLayers[(std::size_t) i].noteOff (mode, e.key, e.colour);
+            if (off.slide)
+                instrument.slideTo (off.key, off.cents,
+                                    (float) (channelpoly::glideBeats (mode.portaBeats) * ppq / std::max (1.0e-9, chunkTps)));
+            if (off.release >= 0)
+            {
+                instrument.noteOff (off.release);
+                voiceOrders[(std::size_t) i].noteOff (off.release);
+            }
             if (e.key >= 0 && e.key < 128)
                 held[(std::size_t) (e.key >> 6)] &= ~bit;
         }
@@ -2330,6 +2385,7 @@ void RackRenderer::process (const RackState* state,
             else
                 instrument->transportStopped(); // (a hosted plugin: FL's "Send All Notes Off when playback stops")
         heldNotes.fill ({});
+        clearPolyLayers();
 
         for (auto& arp : state->arpeggiators)
             if (arp != nullptr)
@@ -2401,6 +2457,7 @@ void RackRenderer::process (const RackState* state,
                 heldNotes.fill ({});
                 for (auto& order : voiceOrders)
                     order.clear();
+                clearPolyLayers();
                 continue;
             }
 
@@ -2449,35 +2506,67 @@ void RackRenderer::process (const RackState* state,
             if (e.type == NoteEvent::Type::on && (std::size_t) e.channel < state->song.channels.size()
                 && ! state->song.channels[(std::size_t) e.channel].inKeyRegion (e.key))
                 continue; // outside the channel's key region (round 164)
+            const auto& def = state->song.channels;
+            auto& poly = polyLayers[(std::size_t) std::min (e.channel, maxChannels - 1)];
             if (e.type == NoteEvent::Type::on)
             {
-                const auto& def = state->song.channels;
-                if ((std::size_t) e.channel < def.size())
-                    if (const auto limit = voiceLimitFor (def[(std::size_t) e.channel].maxPolyphony, def[(std::size_t) e.channel].synth.mono); limit > 0)
-                        if (const auto victim = order.noteOn (e.key, limit); victim >= 0)
-                            instrument.noteOff (victim);
-                // a played note is tuned like the song's notes: Misc › Fine tune and the main pitch (round 162, issue
-                // #9: the fine tune did nothing to the keys played live)
-                if ((std::size_t) e.channel < def.size())
-                {
-                    const auto& misc = def[(std::size_t) e.channel].misc;
-                    const auto cents = misc.fineTune + (misc.mainPitch ? state->song.masterPitch : 0.0f);
-                    if (cents != 0.0f)
-                        instrument.setNextNoteExpression (0.0f, cents, false);
-                }
-                instrument.noteOn (e.key, e.velocity);
                 if (inRange)
                 {
                     held[(std::size_t) (e.key >> 6)] |= bit;
                     struckNotes[(std::size_t) std::min (e.channel, maxChannels - 1)][(std::size_t) (e.key >> 6)] |= bit;
                 }
+                if ((std::size_t) e.channel >= def.size())
+                {
+                    instrument.noteOn (e.key, e.velocity);
+                    continue;
+                }
+                const auto& c = def[(std::size_t) e.channel];
+                // a played note is tuned like the song's notes: Misc › Fine tune and the main pitch (round 162, issue
+                // #9: the fine tune did nothing to the keys played live)
+                const auto cents = c.misc.fineTune + (c.misc.mainPitch ? state->song.masterPitch : 0.0f);
+                // FL's channel Mono / Porta (round 168l), as for the song's notes
+                const auto mode = polyMode (c, instrument);
+                const auto glideSamples = (float) (channelpoly::glideBeats (mode.portaBeats) * ppq / std::max (1.0e-9, tps));
+                const auto on = poly.noteOn (mode, e.key, cents, false, e.colour);
+                if (on.release >= 0)
+                {
+                    order.noteOff (on.release);
+                    instrument.noteOff (on.release);
+                }
+                if (! on.start)
+                {
+                    if (on.slide)
+                        instrument.slideTo (e.key, cents, glideSamples);
+                    continue;
+                }
+                if (const auto limit = voiceLimitFor (c.maxPolyphony, channelMono (c)); limit > 0)
+                    if (const auto victim = order.noteOn (e.key, limit); victim >= 0)
+                        instrument.noteOff (victim);
+                if (const auto from = on.glide ? on.glideFrom : 0.0f; cents != 0.0f || from != 0.0f)
+                    instrument.setNextNoteExpression (0.0f, cents + from, false);
+                HostSlide::pendingGlide() = { on.glide ? on.glideFrom : 0.0f, on.glide ? glideSamples : 0.0f, false };
+                instrument.noteOn (e.key, e.velocity);
+                HostSlide::pendingGlide() = {};
             }
             else
             {
-                order.noteOff (e.key);
-                instrument.noteOff (e.key);
                 if (inRange)
                     held[(std::size_t) (e.key >> 6)] &= ~bit;
+                if ((std::size_t) e.channel >= def.size())
+                {
+                    order.noteOff (e.key);
+                    instrument.noteOff (e.key);
+                    continue;
+                }
+                const auto mode = polyMode (def[(std::size_t) e.channel], instrument);
+                const auto off = poly.noteOff (mode, e.key, e.colour);
+                if (off.slide)
+                    instrument.slideTo (off.key, off.cents, (float) (channelpoly::glideBeats (mode.portaBeats) * ppq / std::max (1.0e-9, tps)));
+                if (off.release >= 0)
+                {
+                    order.noteOff (off.release);
+                    instrument.noteOff (off.release);
+                }
             }
         }
     }
@@ -2584,8 +2673,12 @@ double RackRenderer::ticksToNextEvent (const RackState& state, double tick) noex
                 best = std::min (best, (double) c.start - t);
                 break;
             }
-            const auto next = after (events, t - (double) c.start + (double) c.offset) - (double) c.offset + (double) c.start;
-            best = std::min (best, std::min (next, (double) c.end()) - t);
+            const auto period = (std::size_t) lane.pattern < state.schedule.patternLength.size() ? state.schedule.patternLength[(std::size_t) lane.pattern] : 0;
+            const auto local = patternTickInClip (c, t, period);
+            auto ahead = after (events, local) - local;
+            if (stretchedClipsLoop() && period > 0 && c.offset + c.length > period) // the next pass restarts at the first event's value
+                ahead = std::min (ahead, (double) period - local);
+            best = std::min (best, std::min (t + ahead, (double) c.end()) - t);
         }
     }
     return best;
@@ -3427,36 +3520,48 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     const auto& track = state.song.mixer[(std::size_t) t];
     pullInputs (state, t, n);
 
+    // recording taps on this insert (round 168x, issue #41): FL's "Record" positions after the input
+    const auto taps = liveInput != nullptr && t > 0 ? liveInput->tappedPoints (t) : 0u;
+    auto tap = [&] (RecordSource point, const float* l, const float* r) {
+        if ((taps & (1u << (unsigned) point)) != 0)
+            liveInput->tap (t, point, l, r, liveInputOffset, n);
+    };
+
     const auto silent = track.muted || ! state.mixerAudible[(std::size_t) t];
 
     // target matrix; the ramp from the previous block avoids clicks on mute and fader
     MixerMatrix target { 0.0f, 0.0f, 0.0f, 0.0f };
+    MixerMatrix level { 0.0f, 0.0f, 0.0f, 0.0f }; // the same without the mute (the "Post level and panning" tap)
 
-    if (! silent)
+    if (! silent || (taps & (1u << (unsigned) RecordSource::postLevel)) != 0)
     {
         const auto volume = state.hasAutomation ? automated (state.mixerVolumeAuto[(std::size_t) t], track.volume) : track.volume;
         const auto pan = state.hasAutomation ? automated (state.mixerPanAuto[(std::size_t) t], (track.pan + 1.0f) * 0.5f) * 2.0f - 1.0f
                                              : track.pan;
-        target = mixerMatrix (track, volume, pan, state.song.panTriangular);
+        level = mixerMatrix (track, volume, pan, state.song.panTriangular);
+        if (! silent)
+            target = level;
     }
 
     auto& last = lastTrackGain[(std::size_t) t];
     const auto from = std::isnan (last.ll) ? target : last;
     constexpr MixerMatrix zero { 0.0f, 0.0f, 0.0f, 0.0f };
 
-    if (silent && from == zero)
+    auto* l = trackBuffer (t, 0);
+    auto* r = trackBuffer (t, 1);
+
+    if (silent && from == zero && taps == 0) // (a muted insert being recorded still runs its effects for the take)
     {
         if (meters != nullptr)
             meters->capture.pushSilence (t, n);
         return; // stays inactive: nobody pulls anything from it
     }
 
-    auto* l = trackBuffer (t, 0);
-    auto* r = trackBuffer (t, 1);
+    tap (RecordSource::externalAndMixer, l, r);
 
     // an idle insert (round 166d, up to 500 of them): no effects, no built-in EQ and nothing came in this block. Its
     // output is silence whatever the fader does, so it stays inactive and the tracks it feeds skip it (the same
-    // samples: adding zeros changes nothing)
+    // samples: adding zeros changes nothing; a tap stays silent too)
     if (track.effects.empty() && (state.song.cleanMixer || ! track.eq.active()) && isSilentBlock (l, r, n))
     {
         if (t < (int) trackEqs.size() && trackEqs[(std::size_t) t].running)
@@ -3468,8 +3573,19 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     }
 
     runEffects (state, t, n);
+    tap (RecordSource::postEffects, l, r);
     applyTrackEq (track, t, state.song.cleanMixer, l, r, n);
+    tap (RecordSource::postEq, l, r);
+    if ((taps & (1u << (unsigned) RecordSource::postLevel)) != 0)
+        if (const auto dest = liveInput->tapDestination (t, RecordSource::postLevel, liveInputOffset, n); dest.first != nullptr)
+        {
+            // the fader, pan and separation without the mute, with their own ramp
+            auto& lastLevel = lastTapGain[(std::size_t) t];
+            const auto fromLevel = std::isnan (lastLevel.ll) ? level : lastLevel;
+            lastLevel = applyMatrix (l, r, dest.first, dest.second, n, fromLevel, level);
+        }
     last = applyMatrix (l, r, l, r, n, from, target);
+    tap (RecordSource::postTrack, l, r);
 
     trackActive[(std::size_t) t] = 1;
 

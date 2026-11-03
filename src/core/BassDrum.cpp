@@ -904,6 +904,7 @@ public:
     }
 
     // slide notes and the live PITCH knob / main pitch move the sounding hit (round 167a; a slide doesn't retrigger)
+    bool followsChannelPorta() const noexcept override { return true; } // (round 168l: HostSlide::anchor)
     void slideTo (int key, float cents, float samples) noexcept override
     {
         take();

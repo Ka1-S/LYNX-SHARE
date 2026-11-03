@@ -331,7 +331,7 @@ public:
     void configure (const ChannelDef& channel, double) noexcept override
     {
         pitchCents.store (channel.sampler.pitch * 100.0f);
-        maxPoly.store (channel.synth.mono ? 1 : 0);
+        maxPoly.store (channel.maxPolyphony == 1 ? 1 : 0 /* FL tells the generator its Max polyphony, not the Mono box (round 168l) */);
         Params p;
         if (parse (channel.pluginState, p))
         {

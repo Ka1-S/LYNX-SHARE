@@ -104,6 +104,7 @@
 #include "platform/CrashGuard.h"
 #include "ui/CrashReporter.h"
 #include "ui/Updater.h"
+#include "ui/StemExtract.h"
 
 #include <atomic>
 #include <chrono>
@@ -354,6 +355,18 @@ public:
             const auto option = [&args] (const char* name) { return args.contains (name) ? args[args.indexOf (name) + 1].unquoted() : juce::String(); };
             runRealtimeStress (juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()), seconds > 0.0 ? seconds : 30.0, buffer,
                                option ("--type"), option ("--device"), option ("--record"));
+            return;
+        }
+
+        if (args.contains ("--cliplooptest"))
+        {
+            // LYNX --cliplooptest report.txt [export.wav] (round 167q, issue #25: 0.1.21 drew the repeats of a stretched
+            // pattern clip but played the pattern once). The real engine's device callback (a stand-in device, driven
+            // block by block) plays a synth's 1-bar pattern in a 4-bar clip: every repeat must sound as bar 1, also
+            // starting inside a repeat, after a jump mid-clip and in a loop region; the WAV export (written to
+            // export.wav and read back) the same. With the LYNX extra off, bars 2-4 must be silent (FL's behaviour).
+            const auto i = args.indexOf ("--cliplooptest");
+            runClipLoopTest (juce::File (args[i + 1].unquoted()), args.size() > i + 2 && ! args[i + 2].startsWith ("--") ? juce::File (args[i + 2].unquoted()) : juce::File());
             return;
         }
 
@@ -1086,6 +1099,18 @@ public:
             return;
         }
 
+        if (args.contains ("--stemsplit"))
+        {
+            // LYNX.exe --stemsplit input.wav folder: the stem separation of the clip menu, without the window
+            const auto i = args.indexOf ("--stemsplit");
+            lynx::AudioEngine loader (false);
+            const auto error = lynx::extractStemsToFolder (loader, juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()));
+            juce::File (args[i + 2].unquoted()).getSiblingFile ("stemsplit.txt").replaceWithText (error.isEmpty() ? "result=OK\n" : "result=FAIL " + error + "\n");
+            setApplicationReturnValue (error.isEmpty() ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--stems"))
         {
             // LYNX.exe --stems project base.wav: one WAV per insert that has sound (like "Export stems")
@@ -1503,6 +1528,7 @@ public:
         lynx::crashguard::note ("closing");
         lynx::shutdownPluginSandboxWorker();
         splash = nullptr;
+        lynx::shutdownStemExtraction(); // (a separation in flight stops before its window and the engine go)
         if (mainWindow != nullptr && mainWindow->isVisible())
             mainWindow->saveState();
         mainWindow = nullptr; // the UI goes before the engine
@@ -1681,6 +1707,32 @@ private:
                       && back->mixer[2].outputMode == lynx::OutputMode::stereo && back->mixer[3].outputMode == lynx::OutputMode::monoSum
                       && back->mixer[4].outputChannel == lynx::outputDefault && ! plain.contains ("\"output\"") && plainBack
                       && plainBack->mixer[0].outputChannel == lynx::outputDefault && plainBack->mixer[1].outputChannel == lynx::outputDefault;
+        }
+
+        // Misc › Mono / Porta / Slide on every generator (round 168l): kept in the file; a project saved before (an
+        // imported engine's flags in its synth settings) gets them back, a Max polyphony of 1 is not Mono
+        bool polyOk = false;
+        {
+            auto song = lynx::Song::makeDefault();
+            lynx::ChannelDef osc;
+            osc.instrument = lynx::InstrumentKind::threeosc;
+            osc.misc.mono = osc.misc.porta = true;
+            osc.misc.portaBeats = 0.25f;
+            song.channels.push_back (osc);
+            auto old = osc;
+            old.misc = {};
+            old.synth.mono = old.synth.porta = true;
+            old.synth.portaBeats = 0.5f;
+            song.channels.push_back (old);
+            old.maxPolyphony = 1;
+            song.channels.push_back (old);
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), error);
+            const auto n = song.channels.size();
+            polyOk = back && back->channels.size() == n && back->channels[n - 3].misc.mono && back->channels[n - 3].misc.porta
+                     && std::abs (back->channels[n - 3].misc.portaBeats - 0.25f) < 1e-6f && back->channels[n - 2].misc.mono
+                     && back->channels[n - 2].misc.porta && std::abs (back->channels[n - 2].misc.portaBeats - 0.5f) < 1e-6f
+                     && ! back->channels[n - 1].misc.mono && back->channels[n - 1].maxPolyphony == 1
+                     && ! back->channels[4].misc.mono; // (the LYNX Synth keeps its own flags)
         }
 
         // FL's track latency (REA round 165f-mixer): manual ms, bypass mode and master compensation saved only when set
@@ -2057,7 +2109,7 @@ private:
         // Settings › Audio "Driver settings…" with a fake driver panel (issue #13's crash, the panel's buffer kept)
         const auto driverPanel = lynx::AudioEngine::driverPanelSelfTest();
 
-        const auto ok = audioOk && projectOk && richOk && hwOutOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
+        const auto ok = audioOk && projectOk && richOk && hwOutOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk;
 
         juce::String report;
@@ -2066,6 +2118,7 @@ private:
                << "project=" << (projectOk ? "OK" : "ERROR " + error) << "\n"
                << "project_features=" << (richOk ? "OK" : "ERROR") << "\n"
                << "hardware_outputs=" << (hwOutOk ? "OK" : "ERROR") << "\n"
+               << "channel_polyphony=" << (polyOk ? "OK" : "ERROR") << "\n"
                << "track_latency=" << (latencyOk ? "OK" : "ERROR") << "\n"
                << "plugin_substitutes=" << (substituteOk ? "OK" : "ERROR") << "\n"
                << "patcher=" << (patcherOk ? "OK" : "ERROR") << "\n"
@@ -4248,6 +4301,239 @@ private:
             });
         };
         juce::Timer::callAfterDelay (300, *tick);
+    }
+
+    // --cliplooptest (round 167q): see the command line above.
+    void runClipLoopTest (const juce::File& report, const juce::File& wavFile)
+    {
+        engine = std::make_unique<lynx::AudioEngine>();
+        engine->getDeviceManager().closeAudioDevice(); // the engine's callback is driven by hand below
+        struct StandIn final : juce::AudioIODevice
+        {
+            StandIn() : juce::AudioIODevice ("cliploop", "test") {}
+            juce::StringArray getOutputChannelNames() override { return { "L", "R" }; }
+            juce::StringArray getInputChannelNames() override { return {}; }
+            juce::Array<double> getAvailableSampleRates() override { return { 48000.0 }; }
+            juce::Array<int> getAvailableBufferSizes() override { return { 512 }; }
+            int getDefaultBufferSize() override { return 512; }
+            juce::String open (const juce::BigInteger&, const juce::BigInteger&, double, int) override { return {}; }
+            void close() override {}
+            bool isOpen() override { return true; }
+            void start (juce::AudioIODeviceCallback*) override {}
+            void stop() override {}
+            bool isPlaying() override { return true; }
+            juce::String getLastError() override { return {}; }
+            int getCurrentBufferSizeSamples() override { return 512; }
+            double getCurrentSampleRate() override { return 48000.0; }
+            int getCurrentBitDepth() override { return 32; }
+            juce::BigInteger getActiveOutputChannels() const override
+            {
+                juce::BigInteger b;
+                b.setRange (0, 2, true);
+                return b;
+            }
+            juce::BigInteger getActiveInputChannels() const override { return {}; }
+            int getOutputLatencyInSamples() override { return 0; }
+            int getInputLatencyInSamples() override { return 0; }
+        };
+        auto device = std::make_shared<StandIn>();
+        auto text = std::make_shared<juce::String>();
+        auto step = [report, text] (const juce::String& line) { *text << line << "\n"; report.replaceWithText (*text); };
+
+        constexpr int bar = 96000, beat = bar / 4; // 120 BPM, 48 kHz
+        const auto ppq = (double) lynx::ppq;
+        lynx::Song song;
+        song.bpm = 120.0;
+        song.mixer = lynx::Song::defaultMixer (2);
+        song.channels.resize (1); // the synth of a new channel: deterministic
+        song.channels[0].mixerTrack = 1;
+        auto& pattern = song.patterns.emplace_back(); // 1 bar: C5 on beat 0, C6 on beat 2
+        for (auto [b, key] : { std::pair { 0, 60 }, std::pair { 2, 72 } })
+        {
+            lynx::Note n;
+            n.start = b * lynx::ppq;
+            n.length = lynx::ppq / 4;
+            n.key = key;
+            pattern.notes.push_back (n);
+        }
+        lynx::Clip clip;
+        clip.pattern = 0;
+        clip.length = 16 * lynx::ppq; // stretched to 4 bars
+        song.playlist.push_back (clip);
+        song.mode = lynx::PlayMode::song;
+        {
+            // the Windows GUI check's project: the same song with a 1-bar clip, to stretch with the mouse
+            auto gui = song;
+            gui.playlist[0].length = 4 * lynx::ppq;
+            juce::String error;
+            lynx::ProjectFile::save (gui, report.getSiblingFile ("cliploop-gui.lynx"), error);
+        }
+        engine->setSong (song);
+        auto& callback = engine->deviceCallback();
+        callback.audioDeviceAboutToStart (device.get());
+        step ("song=1-bar synth pattern, clip stretched to 4 bars, 120 BPM, 48 kHz, blocks of 512");
+
+        // the graph is (re)built on the message thread: the scenarios run once it has settled
+        juce::Timer::callAfterDelay (1500, [this, device, step, wavFile, ppq] {
+            if (engine == nullptr)
+                return;
+            auto& cb = engine->deviceCallback();
+            // plays `samples` from tick `from` through the device callback; `between` runs after each block (block index)
+            auto play = [this, &cb] (double from, int samples, const std::function<void (int)>& between = {}) {
+                engine->stop();
+                engine->seek (from);
+                std::vector<float> l (512), r (512), out;
+                float* outs[] = { l.data(), r.data() };
+                juce::AudioIODeviceCallbackContext context;
+                cb.audioDeviceIOCallbackWithContext (nullptr, 0, outs, 2, 512, context); // (the seek, stopped)
+                engine->play();
+                for (int k = 0; (int) out.size() < samples; ++k)
+                {
+                    cb.audioDeviceIOCallbackWithContext (nullptr, 0, outs, 2, 512, context);
+                    out.insert (out.end(), l.begin(), l.end());
+                    if (between)
+                        between (k);
+                }
+                engine->stop();
+                for (int k = 0; k < 400; ++k) // the tails of the scenario die out
+                    cb.audioDeviceIOCallbackWithContext (nullptr, 0, outs, 2, 512, context);
+                out.resize ((std::size_t) samples);
+                return out;
+            };
+            auto rms = [] (const std::vector<float>& x, int from, int count) {
+                double sum = 0.0;
+                for (int i = from; i < from + count && i < (int) x.size(); ++i)
+                    sum += (double) x[(std::size_t) i] * x[(std::size_t) i];
+                return std::sqrt (sum / juce::jmax (1, count));
+            };
+            auto diff = [] (const std::vector<float>& a, int aFrom, const std::vector<float>& b, int bFrom, int count) {
+                double m = 0.0;
+                for (int i = 0; i < count && aFrom + i < (int) a.size() && bFrom + i < (int) b.size(); ++i)
+                    m = juce::jmax (m, (double) std::abs (a[(std::size_t) (aFrom + i)] - b[(std::size_t) (bFrom + i)]));
+                return m;
+            };
+            auto num = [] (double v) { return juce::String (v, 6); };
+            bool ok = true;
+            auto check = [&ok, step] (bool good, const juce::String& what) {
+                ok = ok && good;
+                step ((good ? "ok   " : "FAIL ") + what);
+            };
+
+            lynx::setStretchedClipsLoop (true);
+            const auto a = play (0.0, 4 * bar);
+            const auto bar1 = rms (a, 0, bar);
+            check (bar1 > 0.01, "play from the start: bar 1 RMS " + num (bar1));
+            for (int k = 1; k < 4; ++k)
+            {
+                const auto rk = rms (a, k * bar, bar), d = diff (a, k * bar, a, 0, bar);
+                check (std::abs (rk / bar1 - 1.0) < 1.0e-3 && d < 1.0e-4,
+                       "bar " + juce::String (k + 1) + " RMS " + num (rk) + " (x" + num (rk / bar1) + " of bar 1), max |bar - bar 1| " + juce::String (d, 9));
+            }
+            {
+                const auto x = play (10 * ppq, bar + bar / 2);
+                const auto d = juce::jmax (diff (x, 0, a, 2 * beat, bar / 2), diff (x, bar / 2, a, 0, bar));
+                check (rms (x, 0, bar / 2) > 0.01 && d < 1.0e-4,
+                       "start inside a repeat (bar 3, beat 3): RMS " + num (rms (x, 0, (int) x.size())) + ", max diff vs bar 1 " + juce::String (d, 9));
+            }
+            {
+                // a seek while playing, after 6.99 beats, to bar 4 beat 3 (a ruler click)
+                const auto jumpBlock = 7 * beat / 512 - 1;
+                const auto x = play (0.0, 2 * bar, [this, jumpBlock, ppq] (int k) {
+                    if (k == jumpBlock)
+                        engine->seek (14 * ppq);
+                });
+                // (the best of 0-2 samples late: the core render puts a note on a jump's target tick 1 sample late)
+                const auto at = (jumpBlock + 1) * 512;
+                int lag = 0;
+                auto d = 1.0e9;
+                for (int l = 0; l <= 2; ++l)
+                    if (const auto dl = diff (x, at + l, a, 2 * beat, beat - 2); dl < d)
+                        d = dl, lag = l;
+                const auto ratio = rms (x, at, beat) / rms (a, 2 * beat, beat);
+                check (std::abs (ratio - 1.0) < 1.0e-3 && d < 1.0e-4,
+                       "jump mid-clip to bar 4 beat 3: RMS " + num (rms (x, at, beat)) + " (x" + num (ratio) + " of bar 1 beat 3), max diff "
+                           + juce::String (d, 9) + " (" + juce::String (lag) + " sample(s) late)");
+            }
+            {
+                engine->editSong ([ppq] (lynx::Song& s) {
+                    s.loopStart = (std::int64_t) (4 * ppq);
+                    s.loopEnd = (std::int64_t) (12 * ppq);
+                }, false);
+                const auto x = play (0.0, 7 * bar);
+                double d = 0.0;
+                juce::String lags;
+                for (int k = 1; k < 7; ++k) // (the best of 0-2 samples late after a wrap, as after a jump)
+                {
+                    auto best = 1.0e9;
+                    int lag = 0;
+                    for (int l = 0; l <= 2; ++l)
+                        if (const auto dl = diff (x, k * bar + l, a, 0, bar - 2); dl < best)
+                            best = dl, lag = l;
+                    d = juce::jmax (d, best);
+                    lags << (k > 1 ? "," : "") << lag;
+                }
+                const auto r = rms (x, bar, 6 * bar);
+                check (std::abs (r / bar1 - 1.0) < 1.0e-3 && d < 1.0e-4,
+                       "loop region bars 2-3, played 3 times: RMS " + num (r) + " (x" + num (r / bar1) + "), max diff of each bar vs bar 1 " + juce::String (d, 9)
+                           + " (samples late, bars 2-7: " + lags + ")");
+                engine->editSong ([] (lynx::Song& s) { s.loopStart = s.loopEnd = 0; }, false);
+            }
+            lynx::setStretchedClipsLoop (false);
+            {
+                const auto x = play (0.0, 4 * bar);
+                const auto r = juce::jmax (rms (x, bar, bar), juce::jmax (rms (x, 2 * bar, bar), rms (x, 3 * bar, bar)));
+                check (diff (x, 0, a, 0, bar) < 1.0e-4 && r < 1.0e-5, "option off (FL): bar 1 the same, bars 2-4 RMS at most " + juce::String (r, 9));
+            }
+            lynx::setStretchedClipsLoop (true);
+            cb.audioDeviceStopped();
+
+            // the export: a WAV of the 4 bars, read back from the file
+            if (wavFile != juce::File())
+            {
+                for (const auto loops : { true, false })
+                {
+                    lynx::setStretchedClipsLoop (loops);
+                    const auto file = loops ? wavFile : wavFile.getSiblingFile (wavFile.getFileNameWithoutExtension() + "-off.wav");
+                    file.deleteFile();
+                    {
+                        juce::WavAudioFormat wav;
+                        std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (file.createOutputStream().release(), 48000.0, 2, 32, {}, 0));
+                        engine->stop();
+                        engine->seek (0.0);
+                        lynx::AudioEngine::RenderOptions o;
+                        o.seconds = 8.0;
+                        o.sampleRate = 48000.0;
+                        o.output = writer.get();
+                        engine->renderOffline (o);
+                    }
+                    juce::WavAudioFormat wav;
+                    std::unique_ptr<juce::AudioFormatReader> reader (wav.createReaderFor (file.createInputStream().release(), true));
+                    std::vector<float> x;
+                    if (reader != nullptr)
+                    {
+                        juce::AudioBuffer<float> buffer (2, (int) reader->lengthInSamples);
+                        reader->read (&buffer, 0, (int) reader->lengthInSamples, 0, true, true);
+                        x.assign (buffer.getReadPointer (0), buffer.getReadPointer (0) + buffer.getNumSamples());
+                    }
+                    const auto b1 = rms (x, 0, bar);
+                    juce::String line = juce::String (loops ? "export" : "export, option off") + " (" + file.getFileName() + ", " + juce::String ((int) x.size()) + " samples): bar 1 RMS " + num (b1);
+                    bool good = x.size() >= (std::size_t) 4 * bar && b1 > 0.01;
+                    for (int k = 1; k < 4; ++k)
+                    {
+                        const auto rk = rms (x, k * bar, bar);
+                        line << ", bar " << (k + 1) << " " << num (rk);
+                        good = good && (loops ? std::abs (rk / b1 - 1.0) < 1.0e-3 && diff (x, k * bar, x, 0, bar) < 1.0e-4 : rk < 1.0e-5);
+                    }
+                    if (loops)
+                        line << ", max |bar - bar 1| " << juce::String (juce::jmax (diff (x, bar, x, 0, bar), juce::jmax (diff (x, 2 * bar, x, 0, bar), diff (x, 3 * bar, x, 0, bar))), 9);
+                    check (good, line);
+                }
+                lynx::setStretchedClipsLoop (true);
+            }
+            step (ok ? "result=OK" : "result=FAILED");
+            setApplicationReturnValue (ok ? 0 : 1);
+            quit();
+        });
     }
 
     // --rectest (round 163): see the command line above. Writes report lines step by step (a driver that ends the

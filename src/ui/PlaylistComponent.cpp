@@ -1,8 +1,11 @@
+#include "ui/FlMods.h"
+#include "core/RulerGestures.h"
 #include "ui/ColourPicker.h"
 #include "ui/ClipProperties.h"
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
 #include "ui/PlaylistComponent.h"
+#include "ui/StemExtract.h"
 
 #include "core/KeyMap.h"
 #include "core/MarkerPlan.h"
@@ -839,24 +842,29 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 // rounding does not show), notes outside the repainted area skipped
                 const auto rounded = noteHeight > 2.0f && r.getWidth() > 60.0f;
 
-                // the pattern once, from the clip's offset: a clip stretched past its pattern is empty after it, as FL
-                // plays and shows it (round 168k [EXEC]: FL's render of a 1-bar pattern in a 4-bar clip is silent
-                // after bar 1) — it used to be drawn repeating while only the first pass played
-                const auto patternStart = c.start - c.offset;
-                for (const auto& n : notes)
+                // what plays: a clip stretched past its pattern loops it with the LYNX option (issue #25, default on),
+                // else the pattern once and empty after it, as FL plays and shows it (round 168k [EXEC])
+                const auto passes = clipPasses (c, song.patterns[(std::size_t) c.pattern].effectiveLength (song.beatsPerBar));
+                for (auto pass = passes.first; pass <= passes.last; ++pass)
                 {
-                    const auto at = patternStart + n.start;
-                    if (at + n.length <= c.start || at >= c.end())
+                    const auto origin = c.start - c.offset + pass * passes.length;
+                    if (passes.loops && (tickToX ((double) origin) > visible.getRight() || tickToX ((double) (origin + passes.length)) < visible.getX()))
                         continue;
-                    const auto nx = (float) tickToX ((double) at);
-                    const auto nw = juce::jmax (rounded ? 2.0f : 1.0f, (float) (n.length * pixelsPerTick) - 1.0f);
-                    if (nx > visible.getRight() || nx + nw < visible.getX())
-                        continue;
-                    const auto ny = body.getBottom() - ((float) n.key - bottomKey + 0.5f) / rows * body.getHeight() - noteHeight * 0.5f;
-                    if (rounded)
-                        g.fillRoundedRectangle (nx, ny, nw, noteHeight, juce::jmin (1.0f, noteHeight * 0.5f));
-                    else
-                        g.fillRect (nx, ny, nw, noteHeight);
+                    for (const auto& n : notes)
+                    {
+                        const auto at = origin + n.start;
+                        if ((passes.loops && n.start >= passes.length) || at + n.length <= c.start || at >= c.end())
+                            continue;
+                        const auto nx = (float) tickToX ((double) at);
+                        const auto nw = juce::jmax (rounded ? 2.0f : 1.0f, (float) (n.length * pixelsPerTick) - 1.0f);
+                        if (nx > visible.getRight() || nx + nw < visible.getX())
+                            continue;
+                        const auto ny = body.getBottom() - ((float) n.key - bottomKey + 0.5f) / rows * body.getHeight() - noteHeight * 0.5f;
+                        if (rounded)
+                            g.fillRoundedRectangle (nx, ny, nw, noteHeight, juce::jmin (1.0f, noteHeight * 0.5f));
+                        else
+                            g.fillRect (nx, ny, nw, noteHeight);
+                    }
                 }
             }
 
@@ -1331,19 +1339,21 @@ void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, co
         const auto rows = (float) span + 1.0f;
         const auto noteHeight = juce::jlimit (1.5f, 2.5f, inner.getHeight() / rows);
         auto& marks = batch.contents[clipContentColour (base).getARGB()];
-        const auto patternStart = c.start - c.offset; // the pattern once (FL: no repeats past its end; round 168k)
-        for (const auto& n : notes)
-        {
-            const auto at = patternStart + n.start;
-            if (at + n.length <= c.start || at >= c.end())
-                continue;
-            const auto nx = juce::jmax (inner.getX(), (float) tickToX ((double) at));
-            const auto nr = juce::jmin (inner.getRight() - 1.0f, nx + juce::jmax (1.0f, (float) (n.length * pixelsPerTick) - 1.0f));
-            if (nr <= nx)
-                continue;
-            const auto ny = inner.getBottom() - ((float) n.key - bottomKey + 0.5f) / rows * inner.getHeight() - noteHeight * 0.5f;
-            marks.addWithoutMerging ({ nx, ny, nr - nx, noteHeight });
-        }
+        // what plays: looped along a stretched clip with the LYNX option (issue #25), else once (FL, round 168k)
+        const auto passes = clipPasses (c, song.patterns[(std::size_t) c.pattern].effectiveLength (song.beatsPerBar));
+        for (auto pass = passes.first; pass <= passes.last; ++pass)
+            for (const auto& n : notes)
+            {
+                const auto at = c.start - c.offset + pass * passes.length + n.start;
+                if ((passes.loops && n.start >= passes.length) || at + n.length <= c.start || at >= c.end())
+                    continue;
+                const auto nx = juce::jmax (inner.getX(), (float) tickToX ((double) at));
+                const auto nr = juce::jmin (inner.getRight() - 1.0f, nx + juce::jmax (1.0f, (float) (n.length * pixelsPerTick) - 1.0f));
+                if (nr <= nx)
+                    continue;
+                const auto ny = inner.getBottom() - ((float) n.key - bottomKey + 0.5f) / rows * inner.getHeight() - noteHeight * 0.5f;
+                marks.addWithoutMerging ({ nx, ny, nr - nx, noteHeight });
+            }
     }
 }
 
@@ -1935,7 +1945,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
     {
         const auto onClips = gridArea().contains (e.getPosition());
         const auto onRuler = e.y >= rulerTop && e.y < headerHeight;
-        if (onClips && e.mods.isCtrlDown() && ! e.mods.isAltDown()) // FL: Ctrl+middle-drag = vertical zoom
+        if (onClips && flmods::ctrl (e.mods) && ! e.mods.isAltDown()) // FL: Ctrl+middle-drag = vertical zoom
         {
             drag = Drag::heightZoom;
             const auto track = yToTrack (e.y);
@@ -1990,7 +2000,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 
         if (noteedit::isFoldedAway (engine.getSong(), track)) // a thin row of a folded group: only its menu
         {
-            if (e.mods.isPopupMenu())
+            if (flmods::popup (e.mods))
                 showTrackMenu (track);
             return;
         }
@@ -2005,7 +2015,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         if (onArm || onInput)
         {
             const auto insert = trackmodes::armableInsert (engine.getSong(), track);
-            if (! e.mods.isPopupMenu() && insert > 0)
+            if (! flmods::popup (e.mods) && insert > 0)
             {
                 if (onArm)
                     mixerinput::toggleArm (engine, insert, this);
@@ -2016,9 +2026,9 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             return;
         }
 
-        if (onLed && (e.mods.isPopupMenu() || e.mods.isCtrlDown()))
+        if (onLed && (flmods::popup (e.mods) || flmods::ctrl (e.mods)))
             engine.editSong ([track, count = numTracks()] (Song& s) { noteedit::soloTrack (s, track, count); });
-        else if (e.mods.isPopupMenu())
+        else if (flmods::popup (e.mods))
             showTrackMenu (track);
         else if (onLed)
             editTrack (track, [] (PlaylistTrack& t) { t.muted = ! t.muted; });
@@ -2031,7 +2041,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         {
             // Ctrl+click adds / removes a track, Shift+click selects the tracks from the last clicked one (round 165m:
             // FL's track menu settings, e.g. Performance settings, apply to every selected track)
-            if (e.mods.isCtrlDown())
+            if (flmods::ctrl (e.mods))
             {
                 if (selectedTracks.empty() && currentTrack >= 0)
                     selectedTracks.push_back (currentTrack);
@@ -2054,61 +2064,102 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
-    // ruler: click = position; Ctrl+drag = time selection (Ctrl+click or double click clears it)
+    // ruler, FL 2026's rules (core/RulerGestures.h, docs/analise/REA_rodada168t.md): click = position; Ctrl / Shift /
+    // double-click drag, the Select tool or a right-drag = time selection; Ctrl+right-drag or the Zoom tool = zoom to
+    // a range; Shift+drag moves the selection. On a Mac, FL's Ctrl is Cmd (or Control, which is not a right click here)
     if (e.y >= rulerTop && e.y < headerHeight && e.x >= headerWidth)
     {
-        if (e.mods.isPopupMenu())
-        {
-            showRulerMenu (e.x);
-            return;
-        }
+        const auto fl = flmods::of (e.mods);
+        const auto& song = engine.getSong();
+        const auto snapOn = ! e.mods.isAltDown();
+        const auto tick = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn));
+        const auto markerHit = markerTagAt (e.x, e.y);
 
-        loopAnchor = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), ! e.mods.isAltDown()));
+        ruler::Press press;
+        press.mods = fl;
+        press.clicks = e.getNumberOfClicks();
+        press.tool = tools.getTool();
+        press.onMarkerTag = markerHit >= 0;
+        press.hasSelection = song.hasLoop();
+        press.insideSelection = song.hasLoop() && xToTick (e.x) >= (double) song.loopStart && xToTick (e.x) < (double) song.loopEnd;
 
-        // FL 2026 [SHOT round 166e]: a double click held and dragged draws a time selection (as Ctrl+drag), selecting
-        // the clips in it, with the song position at its start; a double click released in place clears it
+        loopAnchor = tick;
         rulerDoubleDrag = false;
-        if (e.getNumberOfClicks() >= 2)
-        {
-            drag = Drag::loop;
-            rulerDoubleDrag = true;
-            return;
-        }
+        rulerMenuOnClick = false;
 
-        // Shift+drag inside the time selection moves it with what it holds (Ctrl+Shift: a copy)
-        if (const auto& song = engine.getSong(); e.mods.isShiftDown() && song.hasLoop() && xToTick (e.x) >= (double) song.loopStart
-                                                    && xToTick (e.x) < (double) song.loopEnd)
+        switch (ruler::press (press))
         {
-            drag = Drag::timeMove;
-            timeMoveOriginals = song.playlist;
-            timeMoveFrom = song.loopStart;
-            timeMoveTo = song.loopEnd;
-            timeMoveAnchor = loopAnchor;
-            timeMoveCopy = e.mods.isCtrlDown();
-            return;
-        }
+            case ruler::Action::markerMenu:
+                showRulerMenu (e.x);
+                return;
 
-        if (e.mods.isCtrlDown())
-        {
-            drag = Drag::loop;
-            return;
-        }
+            case ruler::Action::zoomRange:
+                drag = Drag::zoomRange;
+                rubberBand = {};
+                return;
 
-        // a click on a marker's tag goes to the marker (FL), quantized while playing like any song jump
-        if (const auto hit = markerTagAt (e.x, e.y); hit >= 0)
-        {
-            const auto tick = engine.getSong().markers()[(std::size_t) hit].tick;
-            const auto waits = engine.getTransport().playing.load() && engine.quantizeSongJumps.load() > 0;
-            engine.jumpToMarker (hit);
-            if (! waits)
-                playheadTick = (double) tick;
-            repaint();
-            return;
+            case ruler::Action::adjust:
+                drag = Drag::loop;
+                loopAnchor = ruler::adjustAnchor (song.loopStart, song.loopEnd, tick);
+                setTimeSelection (juce::jmin (loopAnchor, tick), juce::jmax (loopAnchor, tick));
+                return;
+
+            case ruler::Action::select:
+                drag = Drag::loop;
+                // FL 2026 [SHOT round 166e]: a double click held and dragged draws a time selection, with the song
+                // position at its start; released in place it clears it (as a Ctrl+click does)
+                rulerDoubleDrag = press.clicks >= 2 && ! fl.right;
+                // LYNX: a right click released in place with no selection opens the ruler menu (FL: does nothing)
+                rulerMenuOnClick = fl.right;
+                return;
+
+            case ruler::Action::markerSpan:
+            {
+                const auto from = song.markers()[(std::size_t) markerHit].tick;
+                auto to = juce::jmax (from, song.songLength());
+                for (const auto& m : song.markers())
+                    if (m.tick > from)
+                        to = juce::jmin (to, m.tick);
+                if (to > from)
+                    setTimeSelection (from, to);
+                return;
+            }
+
+            case ruler::Action::moveSelection:
+                drag = Drag::timeShift;
+                timeMoveFrom = song.loopStart;
+                timeMoveTo = song.loopEnd;
+                timeMoveAnchor = tick;
+                return;
+
+            case ruler::Action::moveWithClips:
+                drag = Drag::timeMove;
+                timeMoveOriginals = song.playlist;
+                timeMoveFrom = song.loopStart;
+                timeMoveTo = song.loopEnd;
+                timeMoveAnchor = tick;
+                timeMoveCopy = false;
+                return;
+
+            case ruler::Action::marker:
+            {
+                // a click on a marker's tag goes to the marker (LYNX), quantized while playing like any song jump
+                const auto markerTick = song.markers()[(std::size_t) markerHit].tick;
+                const auto waits = engine.getTransport().playing.load() && engine.quantizeSongJumps.load() > 0;
+                engine.jumpToMarker (markerHit);
+                if (! waits)
+                    playheadTick = (double) markerTick;
+                repaint();
+                return;
+            }
+
+            case ruler::Action::seek:
+                break;
         }
 
         drag = Drag::seek;
-        seekTo (e.x, ! e.mods.isAltDown());
-        EditorGlobals::get().seekMark = (std::int64_t) juce::jmax (0.0, (double) snap (xToTick (e.x), ! e.mods.isAltDown()));
+        seekTo (e.x, snapOn);
+        EditorGlobals::get().seekMark = tick;
         return;
     }
 
@@ -2122,13 +2173,13 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
     // Performance mode (round 165m): while the song plays, a click on a clip of the performance zone launches it (the
     // button's release is the release of the Hold modes) and a right-click stops its track; Ctrl / Alt edit as usual
     if (const auto& song = engine.getSong(); hit >= 0 && song.mode == PlayMode::song && song.inPerformanceZone (song.playlist[(std::size_t) hit])
-                                            && engine.getTransport().playing.load() && ! e.mods.isCtrlDown() && ! e.mods.isAltDown())
+                                            && engine.getTransport().playing.load() && ! flmods::ctrl (e.mods) && ! e.mods.isAltDown())
     {
         const auto& clip = song.playlist[(std::size_t) hit];
         perf::Command c;
         c.track = clip.track;
         c.clipStart = clip.start;
-        c.type = e.mods.isPopupMenu() ? perf::Command::Type::stopTrack : perf::Command::Type::press;
+        c.type = flmods::popup (e.mods) ? perf::Command::Type::stopTrack : perf::Command::Type::press;
         engine.performanceCommand (c);
         if (c.type == perf::Command::Type::press)
         {
@@ -2140,7 +2191,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
     }
 
     // Ctrl+right-click on empty space: zoom to show everything; again: back to the previous view
-    if (e.mods.isRightButtonDown() && e.mods.isCtrlDown() && hit < 0)
+    if (e.mods.isRightButtonDown() && flmods::ctrl (e.mods) && hit < 0)
     {
         if (zoomBeforeAll > 0.0)
         {
@@ -2160,7 +2211,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
     }
 
     // the menu button in a clip's title strip
-    if (hit >= 0 && e.mods.isLeftButtonDown() && ! e.mods.isCtrlDown() && clipMenuButton (hit).contains (e.getPosition()))
+    if (hit >= 0 && e.mods.isLeftButtonDown() && ! flmods::ctrl (e.mods) && clipMenuButton (hit).contains (e.getPosition()))
     {
         showClipMenu (hit);
         return;
@@ -2272,7 +2323,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
     }
 
     // every tool: Ctrl+click on a clip adds/removes it from the selection; Ctrl+drag selects (Shift adds)
-    if (hit >= 0 && e.mods.isCtrlDown())
+    if (hit >= 0 && flmods::ctrl (e.mods))
     {
         auto s = selection;
 
@@ -2285,7 +2336,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
-    if ((hit < 0 && e.mods.isCtrlDown()) || tool == EditTool::lasso
+    if ((hit < 0 && flmods::ctrl (e.mods)) || tool == EditTool::lasso
         || (hit < 0 && e.mods.isShiftDown() && tool != EditTool::brush))
     {
         drag = Drag::select;
@@ -2557,7 +2608,7 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
 
     if (drag == Drag::heightZoom)
     {
-        heightZoomDrag.move (e.y, e.mods.isCtrlDown());
+        heightZoomDrag.move (e.y, flmods::ctrl (e.mods));
         const auto height = heightZoomDrag.height (heightZoomStartHeight, 8, 640);
         setTrackZoom (trackZoomStart * (double) height / (double) heightZoomStartHeight, heightZoomTrackY);
         return;
@@ -2566,7 +2617,7 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
     if (drag == Drag::timeZoom)
     {
         const auto width = (double) juce::jmax (1, gridArea().getWidth());
-        timeZoomDrag.move (e.x, e.y, e.mods.isCtrlDown());
+        timeZoomDrag.move (e.x, e.y, flmods::ctrl (e.mods));
         pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), width / timeZoomDrag.span);
         scrollTicks = juce::jmax (0.0, timeZoomDrag.centre - width * 0.5 / pixelsPerTick);
         zoomBeforeAll = 0.0;
@@ -2644,7 +2695,7 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
 
             if (e.mods.isShiftDown() && ! downMods.isShiftDown())
                 tick = points[(std::size_t) autoPoint].tick;
-            if (e.mods.isCtrlDown() && ! downMods.isCtrlDown())
+            if (flmods::ctrl (e.mods) && ! flmods::ctrl (downMods))
                 value = points[(std::size_t) autoPoint].value;
 
             engine.editSong ([a = c.automation, i = autoPoint, tick, value] (Song& s) {
@@ -2664,7 +2715,7 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
             if (a < 0 || a >= (int) song.automations.size() || autoPoint < 0 || autoPoint + 1 >= (int) song.automations[(std::size_t) a].points.size())
                 return;
             // the handle follows the mouse: a drag over the curve's height bends the segment fully (Ctrl: 4× finer)
-            const auto range = juce::jmax (30.0f, automationBody (song.playlist[(std::size_t) autoClip]).getHeight()) * (e.mods.isCtrlDown() ? 4.0f : 1.0f);
+            const auto range = juce::jmax (30.0f, automationBody (song.playlist[(std::size_t) autoClip]).getHeight()) * (flmods::ctrl (e.mods) ? 4.0f : 1.0f);
             const auto up = -(float) e.getDistanceFromDragStartY() / range;
             const auto tension = juce::jlimit (-1.0f, 1.0f, tensionStart + tensionSign * up);
             engine.editSong ([a, i = autoPoint, tension] (Song& s) { s.automations[(std::size_t) a].points[(std::size_t) i].tension = tension; });
@@ -2683,6 +2734,14 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
                 s.loopEnd = timeMoveTo + delta;
             });
             setSelection (moved);
+            return;
+        }
+
+        case Drag::timeShift: // FL: Shift+drag on the ruler moves the time selection (its length kept)
+        {
+            const auto here = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn));
+            const auto r = ruler::moved (timeMoveFrom, timeMoveTo, here - timeMoveAnchor);
+            setTimeSelection (r.from, r.to);
             return;
         }
 
@@ -2740,14 +2799,17 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
                 return;
 
             const auto area = gridArea();
-            rubberBand = juce::Rectangle<int> (e.getMouseDownPosition(), e.getPosition()).getIntersection (area);
 
-            if (drag == Drag::zoomRange)
+            if (drag == Drag::zoomRange) // a time range over the whole height (also when dragged on the ruler)
             {
-                rubberBand = rubberBand.withY (area.getY()).withHeight (area.getHeight());
+                const auto x0 = juce::jlimit (area.getX(), area.getRight(), juce::jmin (e.getMouseDownX(), e.x));
+                const auto x1 = juce::jlimit (area.getX(), area.getRight(), juce::jmax (e.getMouseDownX(), e.x));
+                rubberBand = juce::Rectangle<int>::leftTopRightBottom (x0, area.getY(), x1, area.getBottom());
                 repaint();
                 return;
             }
+
+            rubberBand = juce::Rectangle<int> (e.getMouseDownPosition(), e.getPosition()).getIntersection (area);
 
             const auto t0 = xToTick (rubberBand.getX()), t1 = xToTick (rubberBand.getRight());
             const auto tr0 = yToTrack (rubberBand.getY()), tr1 = yToTrack (rubberBand.getBottom());
@@ -2993,6 +3055,10 @@ void PlaylistComponent::postDragHint()
         case Drag::knife: hint.text = tr ("Cutting along the line  [Alt] no snap"); break;
         case Drag::paint: hint.text = tr ("Painting clips  [Alt] no snap"); break;
         case Drag::timeMove: hint.text = tr ("Moving the time selection with its clips  [Alt] no snap"); break;
+        case Drag::timeShift:
+            hint.text = tr ("Moving the time selection  [Alt] no snap");
+            hint.value = position (song.loopStart) + " - " + position (song.loopEnd);
+            break;
         case Drag::seek:
             hint.text = tr ("Song position  [Alt] no snap");
             hint.value = position ((std::int64_t) playheadTick);
@@ -3046,9 +3112,15 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
         setSelection (s);
     }
 
-    // Ctrl+click on the ruler without dragging clears the time selection (and so does a double click)
-    if (drag == Drag::loop && e.getDistanceFromDragStart() < 3)
+    // Ctrl+click on the ruler without dragging clears the time selection (and so does a double click); a right click
+    // in place keeps what it did (FL: moved the nearer edge) and, with no selection, opens LYNX's ruler menu
+    if (drag == Drag::loop && e.getDistanceFromDragStart() < 3 && ! flmods::of (downMods).right)
         setTimeSelection (0, 0);
+    else if (drag == Drag::loop && rulerMenuOnClick && ruler::isClick (e.getDistanceFromDragStartX(), e.getDistanceFromDragStartY()))
+    {
+        rulerMenuOnClick = false;
+        showRulerMenu (e.getMouseDownX());
+    }
     else if (drag == Drag::loop && rulerDoubleDrag && engine.getSong().hasLoop())
     {
         const auto start = (double) engine.getSong().loopStart;
@@ -3058,6 +3130,7 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
             playheadTick = start;
     }
     rulerDoubleDrag = false;
+    rulerMenuOnClick = false;
 
     if (drag == Drag::listen)
         engine.stop();
@@ -4004,6 +4077,9 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
             });
         });
 
+        menu.addItem (tr ("Extract stems from sample"), sample != nullptr, false,
+                      [this, index] { extractStemsFromClip (engine, index, [this] { sortClips(); }); });
+
         menu.addItem (tr ("Pitch... (semitones, cents, keep length)"), sample != nullptr, false,
                       [this, ch = clip.channel] { showSamplePitchDialog (engine, ch); });
         menu.addItem (tr ("Normalize"), [this, targets] { normalizeClips (targets); });
@@ -4915,12 +4991,12 @@ void PlaylistComponent::updateCursor (juce::ModifierKeys mods)
         cursor = hover.led || hover.arrow || hover.arm || hover.input ? gesture::Cursor::point : gesture::Cursor::normal;
     else if (gridArea().contains (p))
     {
-        const gesture::Mods m { mods.isShiftDown(), mods.isCtrlDown(), mods.isAltDown() };
+        const gesture::Mods m { mods.isShiftDown(), flmods::ctrl (mods), mods.isAltDown() };
         const auto tool = tools.getTool();
         cursor = gesture::cursorFor (gesture::leftAction (tool, hover.target, m, true), tool);
     }
     else if (p.y >= rulerTop && p.y < headerHeight && p.x >= headerWidth)
-        cursor = mods.isCtrlDown() ? gesture::Cursor::select : gesture::Cursor::point;
+        cursor = flmods::ctrl (mods) ? gesture::Cursor::select : gesture::Cursor::point;
 
     setMouseCursor (editorCursor (cursor));
 }
@@ -4972,14 +5048,14 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
         if (const auto m = markerTagAt (p.x, p.y); m >= 0)
         {
             const auto& marker = song.markers()[(std::size_t) m];
-            hint.text = tr ("Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [RMB] action, rename, delete");
+            hint.text = tr ("Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [Ctrl][LMB] select up to the next marker  [RMB] action, rename, delete");
             hint.value = markerLabel (marker);
             if (const auto* action = markers::actionName (marker.isSignature() ? Marker::timeSignature : marker.action); *action != 0)
                 hint.value += " (" + tr (action) + ")";
             hint.hasMenu = true;
             return hint;
         }
-        hint.text = tr ("Ruler: [LMB] song position  [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag in it: move  [2xLMB] clear  [RMB] markers  [Alt] no snap");
+        hint.text = tr ("Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag: zoom  [RMB] click: menu  [Alt] no snap");
         hint.hasMenu = true;
         return hint;
     }
@@ -4987,7 +5063,7 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
     if (! gridArea().contains (p))
         return hint;
 
-    const gesture::Mods m { mods.isShiftDown(), mods.isCtrlDown(), mods.isAltDown() };
+    const gesture::Mods m { mods.isShiftDown(), flmods::ctrl (mods), mods.isAltDown() };
     hint.text = actionHint (gesture::leftAction (tools.getTool(), h.target, m, true), true);
 
     if (h.clip >= 0)
@@ -5225,7 +5301,7 @@ void PlaylistComponent::glideFrame()
 
 void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
 {
-    const auto ctrl = e.mods.isCtrlDown(), alt = e.mods.isAltDown(), shift = e.mods.isShiftDown();
+    const auto ctrl = flmods::ctrl (e.mods), alt = e.mods.isAltDown(), shift = e.mods.isShiftDown();
 
     // Shift+wheel over a track header: moves the track up / down
     if (shift && ! ctrl && e.x < headerWidth && e.y >= headerHeight && wheel.deltaY != 0.0f)
@@ -5706,7 +5782,7 @@ void PatternPicker::mouseDown (const juce::MouseEvent& e)
     if (row.kind == ClipKind::pattern && row.index != engine.getSong().currentPattern)
         engine.editSong ([p = row.index] (Song& s) { s.currentPattern = p; }, false);
 
-    if (e.mods.isPopupMenu() && row.kind == ClipKind::pattern && onPatternMenu)
+    if (flmods::popup (e.mods) && row.kind == ClipKind::pattern && onPatternMenu)
         onPatternMenu();
 
     repaint();

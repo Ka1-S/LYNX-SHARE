@@ -373,7 +373,7 @@ public:
     {
         delete retired.exchange (nullptr);
         channelCents.store (channel.sampler.pitch * 100.0f);
-        mono.store (channel.synth.mono);
+        mono.store (channel.maxPolyphony == 1); // FL tells the generator its Max polyphony, never the Mono box (round 168l: 0xf6f240 → 0xfed7c0)
         const auto b = bpm > 0.0 ? bpm : 120.0;
         if (channel.pluginState == state && b == tempo.load())
             return;

@@ -965,6 +965,7 @@ public:
                 v.slide.follow (live.now());
     }
 
+    bool followsChannelPorta() const noexcept override { return true; } // (round 168l: HostSlide::anchor)
     void slideTo (int key, float cents, float samples) noexcept override
     {
         const auto to = 100.0f * (float) (key - 60) + pitchCents.load() + cents;
@@ -989,7 +990,7 @@ public:
         const auto knob = pitchCents.load();
         target->noteCents = knob + nextCents;
         target->slide = {};
-        target->slide.anchor (live.ref (knob));
+        target->slide.anchor (live.ref (knob), (float) (fs / hostRate));
         nextCents = 0.0f;
     }
 
@@ -1503,6 +1504,7 @@ public:
     void setNextNoteExpression (float, float cents, bool) noexcept override { nextCents = cents; }
 
     // a slide note moves Final.Pitch: Drumpad follows it like the channel pitch (round 28 §4, issue #14)
+    bool followsChannelPorta() const noexcept override { return true; } // (round 168l: HostSlide::anchor)
     void slideTo (int key, float cents, float samples) noexcept override
     {
         if (sounding && noteKey >= 0)
@@ -1517,6 +1519,7 @@ public:
         noteCents = pitchCents.load() + nextCents;
         nextCents = 0.0f;
         slide = {};
+        slide.anchor (NAN); // (the channel porta's glide-in, round 168l; the live pitch is not tracked here)
         mailbox.read (raw);
         computeParams (std::sqrt (std::clamp ((double) velocity, 0.0, 1.0)));
         e = amp;
@@ -1940,6 +1943,7 @@ public:
     }
 
     // a slide note moves Final.Pitch, which BooBass reads every block (REA_rodada29 §4.2; issue #14)
+    bool followsChannelPorta() const noexcept override { return true; } // (round 168l: HostSlide::anchor)
     void slideTo (int key, float cents, float samples) noexcept override
     {
         if (active && stage < 3)
