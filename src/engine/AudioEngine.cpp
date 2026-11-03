@@ -1,5 +1,7 @@
 #include "engine/AudioEngine.h"
 
+#include "core/LiveSession.h"
+
 #include "core/SessionIds.h"
 #include "core/StandIns.h"
 
@@ -2202,6 +2204,9 @@ void AudioEngine::setSong (Song newSong)
 {
     undoStack.clear();
     redoStack.clear();
+    sessionUndo.clear();
+    sessionRedo.clear();
+    sessionAfterOpen = false;
     song = std::move (newSong);
     workSince = (double) juce::Time::currentTimeMillis();
     clipops::updateCrossfades (song);
@@ -2264,7 +2269,17 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
 
             if (undoStack.size() > maxUndoSteps)
                 undoStack.pop_front();
+            if (sessionHistory)
+            {
+                closeSessionStep();
+                sessionUndo.push_back ({ song, song });
+                sessionRedo.clear();
+                if (sessionUndo.size() > maxUndoSteps)
+                    sessionUndo.pop_front();
+            }
         }
+        if (sessionHistory)
+            sessionAfterOpen = true;
     }
 
     if (undoable)
@@ -2287,8 +2302,59 @@ void AudioEngine::editSongStructural (const std::function<void (Song&)>& edit)
     editSong (edit);
 }
 
+void AudioEngine::closeSessionStep()
+{
+    if (sessionAfterOpen && ! sessionUndo.empty())
+        sessionUndo.back().second = song;
+    sessionAfterOpen = false;
+}
+
+void AudioEngine::sessionStep (bool redo)
+{
+    closeSessionStep();
+    auto& from = redo ? sessionRedo : sessionUndo;
+    auto& to = redo ? sessionUndo : sessionRedo;
+    if (from.empty())
+        return;
+    auto step = std::move (from.back());
+    from.pop_back();
+    std::vector<live::Key> skipped;
+    // undo: the step's entities back to "before" (where they still are as "after" left them); redo the other way
+    auto next = redo ? live::selectiveRevert (song, step.second, step.first, &skipped) : live::selectiveRevert (song, step.first, step.second, &skipped);
+    juce::StringArray names;
+    for (const auto& k : skipped)
+        names.addIfNotAlreadyThere (juce::String::fromUTF8 (live::describe (k, song).c_str()));
+    to.push_back (std::move (step));
+    song = std::move (next);
+    modified = true;
+    lastUndoPress = {};
+    clipops::updateCrossfades (song);
+    publishSong();
+    if (! names.isEmpty() && onSessionUndoSkipped)
+        onSessionUndoSkipped (names);
+}
+
+void AudioEngine::setSessionHistory (bool on)
+{
+    sessionHistory = on;
+    sessionAfterOpen = false;
+    sessionUndo.clear();
+    sessionRedo.clear();
+}
+
+void AudioEngine::applyRemote (Song remote)
+{
+    closeSessionStep();
+    lastUndoPress = {}; // (a drag that goes on after this is a new step: its "before" has the remote change)
+    song = std::move (remote);
+    clipops::updateCrossfades (song);
+    publishSong();
+}
+
 void AudioEngine::undo()
 {
+    if (sessionHistory)
+        return sessionStep (false);
     if (undoStack.empty())
         return;
 
@@ -2302,6 +2368,8 @@ void AudioEngine::undo()
 
 void AudioEngine::redo()
 {
+    if (sessionHistory)
+        return sessionStep (true);
     if (redoStack.empty())
         return;
 
@@ -2329,6 +2397,12 @@ ChangeLabel AudioEngine::getHistoryLabel (int index) const
 {
     if (index <= 0 || index >= getHistorySize())
         return { TR_NOOP ("Start"), {} };
+    if (sessionHistory) // (a live session: one's own steps, each named by its own before / after)
+    {
+        const auto i = (std::size_t) index - 1;
+        const auto& step = i < sessionUndo.size() ? sessionUndo[i] : sessionRedo[sessionRedo.size() - 1 - (i - sessionUndo.size())];
+        return describeChange (step.first, i + 1 == sessionUndo.size() && sessionAfterOpen ? song : step.second);
+    }
 
     return describeChange (historyState (undoStack, song, redoStack, index - 1), historyState (undoStack, song, redoStack, index));
 }
@@ -2339,6 +2413,14 @@ void AudioEngine::jumpToHistory (int index)
 
     if (index == getHistoryPosition())
         return;
+    if (sessionHistory)
+    {
+        while (getHistoryPosition() > index && ! sessionUndo.empty())
+            sessionStep (false);
+        while (getHistoryPosition() < index && ! sessionRedo.empty())
+            sessionStep (true);
+        return;
+    }
 
     // move through the stacks, then publish once
     while (getHistoryPosition() > index && ! undoStack.empty())
