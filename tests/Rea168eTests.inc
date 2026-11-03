@@ -296,6 +296,7 @@ TEST (rea168e_project_bones)
     song.mixer[1].name = "Kick/Bus";
     song.mixer[1].effects.resize (2); // two of the same effect: two files
     song.mixer[3].effects.resize (1);
+    song.mixer[2].name = "Insert 2"; // (a default name alone: not exported)
     song.patterns.resize (2);
     song.patterns[1].name = "Verse";
     song.channels.resize (2);
@@ -317,4 +318,18 @@ TEST (rea168e_project_bones)
     CHECK (bones[4].folder == "Effects" && bones[4].name == bones[1].name + " (3)");
     CHECK (bones[5].kind == quickrender::Bone::Kind::score && bones[5].name == "Verse - Hat" && bones[5].pattern == 1 && bones[5].channel == 1);
     CHECK (quickrender::safeFileName (" . ", "x") == "x");
+}
+
+// The keys (FL's ShortcutsModule): Ctrl+Alt+C / Ctrl+Shift+Alt+C consolidate, Ctrl+Alt+M masters, from any panel
+TEST (rea168e_keys)
+{
+    using namespace lynx::keys;
+    KeyMap map;
+    CHECK (map.conflicts().empty());
+    for (auto focus : { Context::global, Context::playlist, Context::pianoRoll, Context::mixer })
+    {
+        CHECK (map.find ({ 'C', ctrl | alt }, focus, false) == "tools.consolidateSelection");
+        CHECK (map.find ({ 'C', ctrl | shift | alt }, focus, false) == "tools.consolidateSelectionSongStart");
+        CHECK (map.find ({ 'M', ctrl | alt }, focus, false) == "file.exportMaster");
+    }
 }

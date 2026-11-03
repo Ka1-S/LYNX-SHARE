@@ -4822,7 +4822,7 @@ bool PlaylistComponent::handleKey (const juce::KeyPress& key)
         return true;
     }
 
-    if (cmd && ! mods.isShiftDown() && letter == 'C') // (Ctrl+Shift+C: pattern.clone)
+    if (cmd && ! mods.isShiftDown() && ! mods.isAltDown() && letter == 'C') // (Ctrl+Shift+C: pattern.clone; Ctrl+Alt+C: consolidate)
     {
         copySelection();
         return true;

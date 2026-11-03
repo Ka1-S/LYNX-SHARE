@@ -331,9 +331,10 @@ std::vector<Bone> projectBones (const Song& song)
     for (int t = 0; t < (int) song.mixer.size(); ++t)
     {
         const auto& track = song.mixer[(std::size_t) t];
-        if (track.effects.empty() && track.name.empty())
-            continue;
-        const auto trackName = ! track.name.empty() ? track.name : (t == 0 ? std::string ("Master") : "Insert " + std::to_string (t));
+        const auto defaultName = t == 0 ? std::string ("Master") : "Insert " + std::to_string (t);
+        if (track.effects.empty() && (track.name.empty() || track.name == defaultName))
+            continue; // (an untouched insert has nothing to keep)
+        const auto trackName = ! track.name.empty() ? track.name : defaultName;
         Bone b;
         b.kind = Bone::Kind::mixer;
         b.folder = "Mixer";
