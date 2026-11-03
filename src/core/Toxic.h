@@ -55,6 +55,10 @@ std::vector<float> toxicWaveShape (const std::vector<std::uint8_t>& state, const
 // effect fields P[227…293] (0…1), and the raw-integer settings P[295…315] (LFO sync, filter mode, polyphony, unison,
 // glide mode, delay sync, waves, effect types) with their ranges
 const std::vector<EngineParam>& toxicParams();
+// a sequencer step's text: "---" (rest), "SUS" (hold) or the scale degree (FUN_18003b1b0; round 169h)
+std::string toxicStepText (int unit);
+// a modulation slot's source: 0 none, 1 velocity, 2/3 LFO 1/2, 4 aftertouch, 5 pitch wheel, 7…134 MIDI CC 0…127
+std::string toxicModSourceName (int source);
 
 std::unique_ptr<Instrument> makeToxicInstrument();
 
@@ -74,5 +78,22 @@ struct RefNote
 std::vector<float> renderReference (const std::vector<std::uint8_t>& state, const std::vector<RefNote>& notes, double sampleRate,
                                     int length, const std::string& dllPath, int block = 512, double bpm = 125.0, int maxPoly = 0,
                                     bool effects = true);
+
+// Round 169h probes of the MIDI and SEQ pages (tests): MIDI input at a sample (status 0xB0 CC / 0xD0 channel pressure)
+struct RefMidi
+{
+    int at = 0, status = 0xB0, data1 = 0, data2 = 0;
+};
+// the notes the engine starts and stops (velocity 0 = off) at the sample of the engine chunk that played them
+struct SeqEvent
+{
+    long long sample = 0;
+    int key = 0;
+    float velocity = 0.0f;
+};
+std::vector<SeqEvent> sequencerEvents (const std::vector<std::uint8_t>& state, const std::vector<RefNote>& notes,
+                                       const std::vector<RefMidi>& midi, double sampleRate, int length, double bpm = 125.0);
+// parameter `index` as the engine reads it (the modulation slots applied) after the MIDI input
+float modulatedParam (const std::vector<std::uint8_t>& state, const std::vector<RefMidi>& midi, int index);
 } // namespace toxic
 } // namespace lynx

@@ -1566,10 +1566,12 @@ public:
                         // a Transistor Bass step's note reads as a note name (60 = C5, FL's naming; round 168q2)
                         static const char* const noteNames[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
                         const auto whole = (int) std::lround (k->getValue());
-                        const auto text = juce::String (item.param).containsIgnoreCase ("oversampling") ? juce::String (1 << juce::jlimit (0, 8, (int) k->getValue())) + "x"
+                        const auto* units = unitParam (*k); // (round 169h: a 0…1 number box in whole units)
+                        const auto text = units != nullptr ? juce::String (units->unitString (units->unitOf ((float) k->getValue())))
+                                        : juce::String (item.param).containsIgnoreCase ("oversampling") ? juce::String (1 << juce::jlimit (0, 8, (int) k->getValue())) + "x"
                                         : juce::String (item.param).endsWith (" note") ? juce::String (noteNames[((whole % 12) + 12) % 12]) + juce::String (whole / 12)
                                                                                        : juce::String (whole);
-                        g.drawText (text, box.withTrimmedRight (8.0f * f), juce::Justification::centred, false);
+                        g.drawFittedText (text, box.withTrimmedRight (8.0f * f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
                         g.setColour (colour::textSecondary);
                         g.drawText (juce::String::fromUTF8 ("\xe2\x96\xb4"), box.withTrimmedLeft (box.getWidth() - 10.0f * f).withHeight (box.getHeight() * 0.5f), juce::Justification::centred, false);
                         g.drawText (juce::String::fromUTF8 ("\xe2\x96\xbe"), box.withTrimmedLeft (box.getWidth() - 10.0f * f).withTrimmedTop (box.getHeight() * 0.5f), juce::Justification::centred, false);
@@ -1842,8 +1844,51 @@ public:
         }
     }
 
+    // a stepper's number moves one unit (the engine's own units for a 0…1 number box, round 169h)
+    const EngineParam* unitParam (const juce::Slider& k) const
+    {
+        const auto* p = modelparams::findByName (instrumentKind, k.getName().toStdString());
+        return p != nullptr && p->hasUnits() ? p : nullptr;
+    }
+    void stepBy (juce::Slider& k, int delta)
+    {
+        if (const auto* p = unitParam (k))
+            k.setValue (p->rawOfUnit (p->unitOf ((float) k.getValue()) + delta), juce::sendNotificationSync);
+        else
+            k.setValue (k.getValue() + delta, juce::sendNotificationSync);
+    }
+
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
+    {
+        if (layout != nullptr && wheel.deltaY != 0.0f)
+            for (const auto& item : layout->items)
+                if (item.type == plugui::Item::stepper && layoutRect (item).contains (e.position) && conditionHolds (item))
+                    if (auto* k = knobFor (item.param))
+                    {
+                        stepBy (*k, wheel.deltaY > 0.0f ? 1 : -1);
+                        repaint();
+                        return;
+                    }
+        juce::Component::mouseWheelMove (e, wheel);
+    }
+
     void mouseDrag (const juce::MouseEvent& e) override
     {
+        if (stepperDrag != nullptr)
+        {
+            if (auto* k = knobFor (stepperDrag->param))
+            {
+                const auto pixels = 6.0f * layoutFactor();
+                const auto units = (int) ((stepperDragY - e.position.y) / pixels);
+                if (units != stepperDragged)
+                {
+                    stepBy (*k, units - stepperDragged);
+                    stepperDragged = units;
+                    repaint();
+                }
+            }
+            return;
+        }
         if (xyItem == nullptr)
             return;
         const auto r = layoutRect (*xyItem);
@@ -1854,7 +1899,11 @@ public:
         repaint();
     }
 
-    void mouseUp (const juce::MouseEvent&) override { xyItem = nullptr; }
+    void mouseUp (const juce::MouseEvent&) override
+    {
+        xyItem = nullptr;
+        stepperDrag = nullptr;
+    }
 
     void mouseDown (const juce::MouseEvent& e) override
     {
@@ -1935,7 +1984,10 @@ public:
             {
                 const auto r = layoutRect (item);
                 const auto up = e.position.y < r.getY() + (item.label != nullptr ? 12.0f * layoutFactor() : 0.0f) + (r.getHeight() - (item.label != nullptr ? 12.0f * layoutFactor() : 0.0f)) * 0.5f;
-                k->setValue (k->getValue() + (up ? 1.0 : -1.0), juce::sendNotificationSync);
+                stepBy (*k, up ? 1 : -1);
+                stepperDrag = &item; // (round 169h) a vertical drag moves the number too
+                stepperDragY = e.position.y;
+                stepperDragged = 0;
             }
             else if (item.type == plugui::Item::toggle)
                 setNormalised (*k, normalised (*k) >= 0.5f ? 0.0f : 1.0f);
@@ -2454,6 +2506,9 @@ private:
     const plugui::Layout* layout = nullptr;
     const modelparams::Table* modelTable = nullptr; // the engine's listed parameters (round 168n)
     InstrumentKind instrumentKind = InstrumentKind::synth;
+    const plugui::LayoutItem* stepperDrag = nullptr; // (round 169h)
+    float stepperDragY = 0.0f;
+    int stepperDragged = 0;
     int page = 0; // the layout's page shown (pageTabs items switch it; round 168n)
     const plugui::LayoutItem* xyItem = nullptr; // the pad being dragged
     juce::TextButton sampleButton; // (a Granulizer node: round 165c)
