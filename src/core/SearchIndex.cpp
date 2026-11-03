@@ -4,8 +4,90 @@
 #include <cstdlib>
 #include <sstream>
 
+#ifndef _WIN32
+ #include <dirent.h>
+#endif
+
 namespace lynx::search
 {
+bool isWellFormedUtf8 (const char* text, std::size_t size) noexcept
+{
+    const auto* s = reinterpret_cast<const unsigned char*> (text);
+    for (std::size_t i = 0; i < size;)
+    {
+        const unsigned c = s[i];
+        if (c == 0)
+            return false;
+        if (c < 0x80)
+        {
+            ++i;
+            continue;
+        }
+        int extra = 0;
+        unsigned lo = 0x80, hi = 0xbf; // allowed range of the second byte
+        if (c >= 0xc2 && c <= 0xdf)
+            extra = 1;
+        else if (c >= 0xe0 && c <= 0xef)
+        {
+            extra = 2;
+            if (c == 0xe0)
+                lo = 0xa0; // overlong
+            else if (c == 0xed)
+                hi = 0x9f; // surrogates U+D800..U+DFFF
+        }
+        else if (c >= 0xf0 && c <= 0xf4)
+        {
+            extra = 3;
+            if (c == 0xf0)
+                lo = 0x90; // overlong
+            else if (c == 0xf4)
+                hi = 0x8f; // past U+10FFFF
+        }
+        else
+            return false; // continuation byte, overlong C0/C1, or F5..FF
+        if (size - i <= (std::size_t) extra)
+            return false;
+        if (s[i + 1] < lo || s[i + 1] > hi)
+            return false;
+        for (int k = 2; k <= extra; ++k)
+            if (s[i + k] < 0x80 || s[i + k] > 0xbf)
+                return false;
+        i += (std::size_t) extra + 1;
+    }
+    return true;
+}
+
+std::vector<std::string> listFolderNames (const std::string& folder, bool* opened, int* skipped)
+{
+    std::vector<std::string> names;
+    if (opened != nullptr)
+        *opened = false;
+    if (skipped != nullptr)
+        *skipped = 0;
+#ifndef _WIN32
+    DIR* dir = opendir (folder.c_str());
+    if (dir == nullptr)
+        return names;
+    if (opened != nullptr)
+        *opened = true;
+    while (const auto* e = readdir (dir))
+    {
+        const std::string name (e->d_name);
+        if (name == "." || name == "..")
+            continue;
+        if (! isWellFormedUtf8 (name.data(), name.size()))
+        {
+            if (skipped != nullptr)
+                ++*skipped;
+            continue;
+        }
+        names.push_back (name);
+    }
+    closedir (dir);
+#endif
+    return names;
+}
+
 std::string Index::join (const std::string& folder, const std::string& name, char separator)
 {
     if (! folder.empty() && (folder.back() == '/' || folder.back() == '\\'))
