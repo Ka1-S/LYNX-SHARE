@@ -16936,6 +16936,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Rec168kTests.inc"
 #include "Mono168lTests.inc"
 #include "MixPre167qTests.inc"
+#include "RecFold167qTests.inc"
 #include "Sel168tTests.inc"
 #include "Speech168bTests.inc"
 #include "GrossBeat168mTests.inc"
