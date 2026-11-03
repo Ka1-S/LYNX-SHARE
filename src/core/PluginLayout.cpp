@@ -3915,6 +3915,18 @@ const Layout& soundgoodizerLayout()
     return l;
 }
 
+bool displayTakesMouse (const char* display)
+{
+    if (display == nullptr)
+        return false;
+    static const char* const ids[] { "eq", "xy", "sgamount", "sgpresets", "prismbands", "emberbands", "tunekeys", "tuneautokey",
+                                     "pitchring", "waveshaper", "tssenvelope", "tsssend0", "tsssend1", "maxcurve" };
+    for (const auto* id : ids)
+        if (std::strcmp (id, display) == 0)
+            return true;
+    return false;
+}
+
 bool hasFlLayout (EffectKind kind)
 {
     return *layoutFor (kind).fl != 0;

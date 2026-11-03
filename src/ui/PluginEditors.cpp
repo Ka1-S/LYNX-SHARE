@@ -301,15 +301,10 @@ public:
             const auto& item = items[(std::size_t) i];
             if (! visible (item) || item.type == Item::section || item.type == Item::label)
                 continue;
-            if (item.type == Item::display && rectOf (item).contains (p) && (juce::String (item.display) == "eq" || juce::String (item.display) == "xy"
-                                                                    || juce::String (item.display) == "sgamount" || juce::String (item.display) == "sgpresets"
-                                                                    || juce::String (item.display) == "prismbands" || juce::String (item.display) == "emberbands"
-                                                                    || juce::String (item.display) == "tunekeys" || juce::String (item.display) == "tuneautokey"
-                                                                    || juce::String (item.display) == "pitchring" || juce::String (item.display) == "waveshaper"
-                                                                    || juce::String (item.display) == "tssenvelope" || juce::String (item.display) == "tsssend0"
-                                                                    || juce::String (item.display) == "tsssend1"
-                                                                    || isBars (item) || isRhythmEdit (item) || isRhythmPatterns (item)
-                                                                    || isGbAny (item))) // round 168m: Gross Beat's editor parts
+            if (item.type == Item::display && rectOf (item).contains (p)
+                && (plugui::displayTakesMouse (item.display) // round 168x: the list lives in PluginLayout (Maximus' curve added)
+                    || isBars (item) || isRhythmEdit (item) || isRhythmPatterns (item)
+                    || isGbAny (item))) // round 168m: Gross Beat's editor parts
                 return i;
             if (item.type == Item::display || (item.param == nullptr && ! hasStyle (item, plugui::pageTabs)))
                 continue;
@@ -2274,39 +2269,8 @@ public:
                 g.drawRoundedRectangle (box, 4.0f * s, juce::jmax (1.0f, 1.5f * s));
             }
         }
-        else if (id == "maxcurve") // Maximus: the selected band's drawn compression curve (input → output, 0.5 = 0 dBFS)
-        {
-            grid (4, 4);
-            const auto band = juce::jlimit (0, 3, page);
-            const auto c = fx.enabled ? peqview::bandColour (band) : colour::textDisabled;
-            g.setColour (colour::gridBar);
-            g.drawLine ({ inner.getBottomLeft(), inner.getTopRight() }, 1.0f);
-            g.drawVerticalLine ((int) inner.getCentreX(), inner.getY(), inner.getBottom());
-            g.drawHorizontalLine ((int) inner.getCentreY(), inner.getX(), inner.getRight());
-            const auto pts = maximusfx::curvePoints (fx.state, band);
-            if (pts.size() >= 2)
-            {
-                juce::Path p;
-                auto at = [&] (const std::pair<float, float>& q) { return juce::Point<float> (inner.getX() + inner.getWidth() * q.first, inner.getBottom() - inner.getHeight() * q.second); };
-                p.startNewSubPath (at (pts.front()));
-                for (std::size_t i = 1; i < pts.size(); ++i)
-                    p.lineTo (at (pts[i]));
-                auto fill = p;
-                fill.lineTo (at (pts.back()).withY (inner.getBottom()));
-                fill.lineTo (at (pts.front()).withY (inner.getBottom()));
-                fill.closeSubPath();
-                g.setColour (c.withAlpha (0.14f));
-                g.fillPath (fill);
-                g.setColour (c);
-                g.strokePath (p, juce::PathStrokeType (juce::jmax (1.5f, 2.0f * s)));
-                for (const auto& q : pts)
-                    g.fillEllipse (juce::Rectangle<float> (5.0f * s, 5.0f * s).withCentre (at (q)));
-            }
-            g.setColour (colour::textSecondary);
-            g.setFont (font (juce::jmax (8.0f, 9.0f * s)));
-            g.drawText (tr ("Out"), inner.withHeight (12.0f * s).toNearestInt(), juce::Justification::topLeft, false);
-            g.drawText (tr ("In"), inner.withTop (inner.getBottom() - 12.0f * s).toNearestInt(), juce::Justification::bottomRight, false);
-        }
+        else if (id == "maxcurve") // Maximus: the selected band's compression curve, edited with FL's gestures (round 168x)
+            paintMaximusCurve (g, inner, fx);
         else if (id == "maxbands") // Maximus: the three bands over 20 Hz…20 kHz with their crossovers and the low cut
         {
             const auto raw = [&] (int p) { return maximusfx::stateParam (fx.state, p).value_or (maximusfx::stateParams()[(std::size_t) p].defaultValue); };
@@ -2874,6 +2838,7 @@ public:
 #include "ui/PluginEditorsFx.inc"
 
 #include "ui/GrossBeatEditor.inc"
+#include "ui/MaximusCurveEditor.inc"
 
     // --- the parametric EQ's graph (FL's Parametric EQ 2 arrangement) -----------------------------------
 
@@ -3605,6 +3570,8 @@ public:
         }
         if (kind == EffectKind::grossBeat && i >= 0 && gbMouseMove (activeLayout().items[(std::size_t) i], p)) // round 168m
             return;
+        if (kind == EffectKind::maximus && mxMouseMove (i >= 0 ? activeLayout().items[(std::size_t) i] : LayoutItem {}, p)) // round 168x
+            return;
         if (i >= 0 && isWaveShaperGraph (activeLayout().items[(std::size_t) i])) // round 165: points and handles light up
         {
             const auto& item = activeLayout().items[(std::size_t) i];
@@ -3693,6 +3660,12 @@ public:
         if (isWaveShaperGraph (item)) // round 165: FL's point editor
         {
             if (wsMouseDown (e, item))
+                dragItem = index;
+            return;
+        }
+        if (isMaximusCurve (item)) // round 168x: FL's envelope editor on Maximus' In/Out graph (issue #40)
+        {
+            if (mxMouseDown (e, item))
                 dragItem = index;
             return;
         }
@@ -3990,6 +3963,11 @@ public:
 
     void mouseDrag (const juce::MouseEvent& e) override
     {
+        if (mxDragging && dragItem >= 0) // round 168x: Maximus' curve
+        {
+            mxMouseDrag (e, activeLayout().items[(std::size_t) dragItem]);
+            return;
+        }
         if (wsDragState && dragItem >= 0) // round 165: the WaveShaper's curve
         {
             wsMouseDrag (e, activeLayout().items[(std::size_t) dragItem]);
@@ -4072,6 +4050,11 @@ public:
             wsMouseUp();
             dragItem = -1;
         }
+        if (mxDragging) // round 168x
+        {
+            mxMouseUp();
+            dragItem = -1;
+        }
         if (gbDragging) // round 168m
         {
             gbEnvelopeUp();
@@ -4124,7 +4107,7 @@ public:
             rhythmDoubleClick (e, item);
             return;
         }
-        if (isRhythmPatterns (item) || isWaveShaperGraph (item) || isGbAny (item))
+        if (isRhythmPatterns (item) || isWaveShaperGraph (item) || isGbAny (item) || isMaximusCurve (item))
             return;
         if (isGeminiGraph (item)) // round 137: an EQ marker = its shelf on / off
         {
@@ -4155,7 +4138,7 @@ public:
         if (index < 0)
             return;
         const auto& item = activeLayout().items[(std::size_t) index];
-        if (isWaveShaperGraph (item) || isGbAny (item))
+        if (isWaveShaperGraph (item) || isGbAny (item) || isMaximusCurve (item))
             return;
         if (item.type == Item::display && juce::String (item.display) == "tssenvelope") // FL's envelope view speed
         {
@@ -4253,6 +4236,8 @@ public:
             return { tr ("Load a tap pattern (LYNX SHARE's own), or go back to even spacing"), {}, false, false };
         if (isWaveShaperGraph (item)) // round 165
             return { wsHint (item, p), {}, false, true };
+        if (isMaximusCurve (item)) // round 168x
+            return { mxHint (item, p), {}, false, true };
         if (isGbAny (item)) // round 168m
             return { gbHint (item, p), {}, false, true };
         if (item.type == Item::display)
