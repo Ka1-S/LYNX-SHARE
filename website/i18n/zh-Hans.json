@@ -60,6 +60,8 @@
 "dl.portWinP": "解压到任意文件夹，打开 <code>LYNX.exe</code> 即可。",
 "dl.portLin": "Linux AppImage",
 "dl.portLinP": "单个文件：<code>chmod +x</code> 后直接运行。",
+"dl.store": "<b>Windows 10 / 11：</b>也可从 Microsoft Store 获取，自动更新。",
+"dl.storeAlt": "从 Microsoft 获取",
 "mq.auto": "自动化片段",
 "mq.flp": ".flp 导入",
 "mq.disk": "磁盘流式读取",

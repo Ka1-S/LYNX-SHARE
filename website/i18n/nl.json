@@ -60,6 +60,8 @@
 "dl.portWinP": "Pak uit in een willekeurige map en open <code>LYNX.exe</code>.",
 "dl.portLin": "Linux AppImage",
 "dl.portLinP": "Eén bestand: <code>chmod +x</code> en starten.",
+"dl.store": "<b>Windows 10 / 11:</b> ook in de Microsoft Store, met automatische updates.",
+"dl.storeAlt": "Downloaden via Microsoft",
 "mq.auto": "Automation clips",
 "mq.flp": ".flp-import",
 "mq.disk": "Disk-streaming",

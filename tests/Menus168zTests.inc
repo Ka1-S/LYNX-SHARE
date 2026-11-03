@@ -52,3 +52,59 @@ TEST (menus168z_submenu_display_is_the_root_menus)
     // negative coordinates (a monitor on the left of the primary)
     CHECK (displayFor ({ { 0, 0, 1920, 1080 }, { -1920, 0, 1920, 1080 } }, { -900, 300, 300, 400 }) == 1);
 }
+
+// Round 168z2: the reporter's exact setup with its scale factors (KDE Plasma Wayland: 2560 x 1440 @ 115 % primary at
+// the top left, 1920 x 1080 @ 100 % on its right, top-aligned, 1920 x 1080 @ 115 % below it, starting ~269 logical px in).
+// LYNX (JUCE) talks X11 to XWayland, so the rectangles JUCE works with depend on KDE's "Legacy applications (X11)"
+// setting and on JUCE's per-monitor scale; the menus must stay on the root menu's monitor in every variant.
+TEST (menus168z2_reporter_layout_with_scales)
+{
+    using lynx::menuplace::Box;
+    using lynx::menuplace::displayFor;
+    using lynx::menuplace::placeSubmenu;
+    // `k`: JUCE's logical coordinates = X pixels / k (k = JUCE's scale: the monitor scale it reads, times the UI zoom)
+    const auto scaled = [] (std::vector<Box> d, double k) {
+        for (auto& b : d)
+            b = { (int) (b.x / k), (int) (b.y / k), (int) (b.w / k), (int) (b.h / k) };
+        return d;
+    };
+    const std::vector<std::vector<Box>> layouts {
+        // "Apply scaling themselves" (Plasma's default): X pixels = logical x 1.15, the 100 % monitor drawn 2208 x 1242
+        { { 0, 0, 2560, 1440 }, { 2560, 0, 2208, 1242 }, { 309, 1440, 1920, 1080 } },
+        // "Scaled by the system": X pixels = KDE's logical pixels
+        { { 0, 0, 2226, 1252 }, { 2226, 0, 1920, 1080 }, { 269, 1252, 1670, 939 } },
+        // JUCE reading 1 for the 27" monitors and 2 for a dense laptop panel below (round(dpi / 96) per output)
+        { { 0, 0, 2560, 1440 }, { 2560, 0, 1920, 1080 }, { 309, 1440, 960, 540 } },
+    };
+    for (const auto zoom : { 1.0, 1.15, 1.25, 2.0 }) // LYNX's UI zoom (JUCE's global scale)
+        for (const auto& physical : layouts)
+        {
+            const auto displays = scaled (physical, zoom);
+            for (size_t m = 0; m < displays.size(); ++m)
+            {
+                const auto& screen = displays[m];
+                // a window's two-column menu near the monitor's bottom right (Channel Rack of an undocked window)
+                const auto rootW = std::min (800, screen.w / 2), rootH = std::min (640, screen.h * 2 / 3);
+                const Box root { screen.x + screen.w - rootW - 10, screen.y + screen.h - rootH - 10, rootW, rootH };
+                CHECK (displayFor (displays, root) == (int) m);
+                // the chain: Automate MIDI controller > MIDI CC 0-31 > MIDI CC #nn, each one beside the previous
+                Box parent = root;
+                for (int level = 0; level < 3; ++level)
+                {
+                    const auto h = std::min (level == 1 ? 32 * 23 : 9 * 23, screen.h);
+                    for (int row = 0; row * 23 + 23 <= parent.h; row += 7)
+                    {
+                        const Box item { parent.x + 4, parent.y + 4 + row * 23, parent.w - 8, 23 };
+                        const auto s = placeSubmenu (parent, item, 380, h, 4, screen);
+                        CHECK (s.x >= screen.x && s.x + s.w <= screen.x + screen.w);
+                        CHECK (s.y >= screen.y && s.y + s.h <= screen.y + screen.h);
+                    }
+                    parent = placeSubmenu (parent, { parent.x + 4, parent.y + parent.h / 2, parent.w - 8, 23 }, 380, h, 4, screen);
+                }
+            }
+        }
+    // the phantom JUCE 8.0.4 made of a monitor touching no other (JUCE fix 9 now places it; Theme.cpp skips empty
+    // ones): a root menu on the real right monitor is not pulled onto the primary by a 0,0 copy
+    const std::vector<Box> withGap { { 0, 0, 2560, 1440 }, { 2562, 0, 2208, 1242 } };
+    CHECK (displayFor (withGap, { 3000, 400, 600, 400 }) == 1);
+}

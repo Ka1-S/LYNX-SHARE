@@ -15,6 +15,9 @@
 #   macos    (macos)    CMake universal (arm64 + x86_64) build, self-test, ad-hoc signature (no Apple Developer ID,
 #                       not notarized), .dmg (scripts/package-macos.sh)
 #   publish  (ubuntu)   SHA256SUMS.txt over every file; on a tag push attaches everything to the (draft) GitHub release
+#   store    (windows)  on a tag (push, or a manual store_build resubmission run on the tag): the .msix as a new Microsoft
+#                       Store submission (msstore CLI); skipped with a notice until the MSSTORE_* secrets exist
+#                       (docs/STORE.md › Automatic Store submission)
 name: Release
 
 on:
@@ -475,3 +478,70 @@ jobs:
               --notes "Built from \`$GITHUB_SHA\` by [this workflow run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)."
           fi
           gh release upload "$tag" dist/* --clobber
+
+  # Microsoft Store (round 168y): the release's LYNX-<label>-store.msix as a new submission of product 9NQRFBFDCX6N. The
+  # msstore CLI clones the last published submission (listings, pricing, "What's new" untouched), replaces its package
+  # with this one and commits it to certification. A pending (unpublished) submission is deleted first.
+  store:
+    name: Microsoft Store submission
+    needs: [version, publish]
+    if: ${{ !cancelled() && needs.publish.result == 'success' }}
+    runs-on: windows-2025
+    env:
+      LABEL: ${{ needs.version.outputs.label }}
+      STORE_PRODUCT_ID: 9NQRFBFDCX6N
+    steps:
+      - name: Store credentials
+        id: creds
+        shell: bash
+        env:
+          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+        run: |
+          if [[ "$GITHUB_REF_TYPE" != tag ]]; then
+            echo "::notice title=Microsoft Store::not a tag ($GITHUB_REF_NAME): no Store submission (run the workflow on the release tag)"
+            echo "run=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          missing=""
+          for n in MSSTORE_TENANT_ID MSSTORE_CLIENT_ID MSSTORE_CLIENT_SECRET MSSTORE_SELLER_ID; do
+            [[ -n "${!n}" ]] || missing="$missing $n"
+          done
+          if [[ -n "$missing" ]]; then
+            echo "::notice title=Microsoft Store::secrets not set:$missing — Store submission skipped (docs/STORE.md › Automatic Store submission)"
+            echo "run=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          echo "run=true" >> "$GITHUB_OUTPUT"
+
+      - name: Download the Store package
+        if: steps.creds.outputs.run == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: LYNX-${{ env.LABEL }}-windows-x64
+          path: store
+
+      - name: Microsoft Store CLI
+        if: steps.creds.outputs.run == 'true'
+        uses: microsoft/microsoft-store-apppublisher@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0 # v1.4 (setup-msstore-cli)
+        with:
+          version: v0.4.4
+
+      - name: Submit to the Microsoft Store
+        if: steps.creds.outputs.run == 'true'
+        shell: pwsh
+        env:
+          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+        run: |
+          $msix = Get-Item "store\LYNX-$env:LABEL-store.msix" -ErrorAction Stop
+          Write-Host "Store package: $($msix.Name) ($($msix.Length) bytes)"
+          # (the secrets go in from the environment, never in the script text; GitHub masks them in the log)
+          msstore reconfigure --tenantId $env:MSSTORE_TENANT_ID --sellerId $env:MSSTORE_SELLER_ID `
+            --clientId $env:MSSTORE_CLIENT_ID --clientSecret $env:MSSTORE_CLIENT_SECRET
+          if ($LASTEXITCODE -ne 0) { throw "msstore reconfigure failed ($LASTEXITCODE)" }
+          msstore publish $msix.FullName --appId $env:STORE_PRODUCT_ID --output-stream stdout
+          if ($LASTEXITCODE -ne 0) { throw "msstore publish failed ($LASTEXITCODE)" }
+          msstore submission status $env:STORE_PRODUCT_ID
