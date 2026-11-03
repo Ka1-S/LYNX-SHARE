@@ -269,3 +269,33 @@ TEST (design168r_response_and_transfer_pictures)
     const auto top = *std::max_element (curve.begin(), curve.end());
     CHECK (top > 0.05f);
 }
+
+TEST (design168r_value_knobs_keep_their_size_inside_their_section)
+{
+    using namespace lynx;
+    // release 0.1.23 re-shot: the Reverb's High cut knob was squeezed to 15 px (its caption row too close under it) and
+    // its value ran past the TONE section. A knob that writes its caption and value keeps at least 70 % of its size,
+    // and that text stays inside the section it sits in.
+    for (const auto kind : design168r::kinds())
+    {
+        const auto& l = plugui::layoutFor (kind);
+        for (const auto& item : l.items)
+        {
+            if (item.type != plugui::Item::knob || (item.style & plugui::showValue) == 0
+                || (item.style & (plugui::noCaption | plugui::captionAbove | plugui::valueAbove)) != 0)
+                continue;
+            const auto circle = std::min (item.w, item.h - 26.0f);
+            if (circle < item.w * 0.7f)
+                std::printf ("  %s: knob '%s' squeezed to %.0f of %.0f px\n", effectInfo (kind).name, item.param, circle, item.w);
+            CHECK (circle >= item.w * 0.7f);
+            for (const auto& s : l.items)
+                if (s.type == plugui::Item::section && item.x >= s.x && item.x + item.w <= s.x + s.w && item.y >= s.y
+                    && item.y < s.y + s.h)
+                {
+                    if (item.y + item.h > s.y + s.h + 0.5f)
+                        std::printf ("  %s: knob '%s' text past its section\n", effectInfo (kind).name, item.param);
+                    CHECK (item.y + item.h <= s.y + s.h + 0.5f);
+                }
+        }
+    }
+}

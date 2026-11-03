@@ -296,21 +296,23 @@ Layout lynxReverb()
 {
     Layout l;
     l.width = 460;
-    l.height = 250;
+    l.height = 270;
     auto& v = l.items;
     v.push_back (display (8, 8, 444, 100, "reverbspace"));
-    v.push_back (section (8, 116, 220, 126, TR_NOOP ("SPACE")));
+    v.push_back (section (8, 116, 220, 146, TR_NOOP ("SPACE")));
     v.push_back (knob (48, 160, 34, "Predelay", TR_NOOP ("Predelay"), 190, showValue));
     v.push_back (knob (118, 160, 34, "Room", TR_NOOP ("Size"), 190, showValue | big));
     v.push_back (knob (188, 160, 34, "Damping", TR_NOOP ("Damping"), 190, showValue));
-    v.push_back (knob (118, 218, 26, "Width", TR_NOOP ("Width"), 236, noCaption));
-    v.push_back (label (24, 212, 70, 14, TR_NOOP ("Width"), dim));
-    v.push_back (section (232, 116, 110, 126, TR_NOOP ("TONE")));
-    v.push_back (knob (287, 160, 34, "Low cut", TR_NOOP ("Low cut"), 190, showValue));
-    v.push_back (knob (287, 216, 26, "High cut", TR_NOOP ("High cut"), 238, showValue));
-    v.push_back (section (346, 116, 106, 126, TR_NOOP ("MIX")));
-    v.push_back (slider (Item::vslider, 360, 140, 34, 96, "Dry", TR_NOOP ("Dry")));
-    v.push_back (slider (Item::vslider, 404, 140, 34, 96, "Mix", TR_NOOP ("Wet")));
+    v.push_back (knob (118, 228, 26, "Width", TR_NOOP ("Width"), 246, noCaption));
+    v.push_back (label (24, 222, 70, 14, TR_NOOP ("Width"), dim));
+    // TONE: each knob keeps its full size above its caption and value (rel 0.1.23: High cut was squeezed to 15 px and
+    // its value ran past the section)
+    v.push_back (section (232, 116, 110, 146, TR_NOOP ("TONE")));
+    v.push_back (knob (287, 158, 30, "Low cut", TR_NOOP ("Low cut"), 194, showValue));
+    v.push_back (knob (287, 218, 30, "High cut", TR_NOOP ("High cut"), 252, showValue));
+    v.push_back (section (346, 116, 106, 146, TR_NOOP ("MIX")));
+    v.push_back (slider (Item::vslider, 360, 140, 34, 116, "Dry", TR_NOOP ("Dry")));
+    v.push_back (slider (Item::vslider, 404, 140, 34, 116, "Mix", TR_NOOP ("Wet")));
     return l;
 }
 
