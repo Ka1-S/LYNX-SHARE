@@ -232,6 +232,8 @@ AudioEngine::AudioEngine (bool openAudioDevice)
     vfx::script::setRealtime (openAudioDevice);
     const auto mark = [] (const char* step) { if (startupMark != nullptr) startupMark (step); };
     mark ("  engine: workers + default song");
+    if (juce::JUCEApplicationBase::getInstance() != nullptr) // issue #36: retired racks are freed from their own message
+        rackExchange.dispose = [this] (const RackState* rack) { rackDisposer.add (rack); };
     publishSong();
     buildInitialGraph();
     mark ("  engine: graph");
@@ -301,6 +303,8 @@ AudioLogger& AudioEngine::getAudioLogger()
 AudioEngine::~AudioEngine()
 {
     stopTimer();
+    rackExchange.dispose = nullptr; // (from here the racks are freed at once)
+    rackDisposer.flush();
     audioLogger.reset(); // closes the log file
 
     // the takes in progress are closed as they are (complete WAVs); their journals stay, so the next start offers to
@@ -368,8 +372,16 @@ void AudioEngine::buildInitialGraph()
     jassert (graph.getConnections().size() == 4);
 }
 
+std::atomic<int>& AudioEngine::offlineRendersRunning() noexcept
+{
+    static std::atomic<int> count { 0 };
+    return count;
+}
+
 float AudioEngine::renderOffline (const RenderOptions& options)
 {
+    offlineRendersRunning().fetch_add (1, std::memory_order_acq_rel);
+    const juce::ScopeGuard rendered { [] { offlineRendersRunning().fetch_sub (1, std::memory_order_acq_rel); } };
     const auto seconds = options.seconds;
     const auto sampleRate = options.sampleRate;
     auto* output = options.output;
@@ -2265,6 +2277,16 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     publishSong();
 }
 
+void AudioEngine::editSongStructural (const std::function<void (Song&)>& edit)
+{
+    // (PR #37) the live plugin states go into the Song first: the undo step then holds them, and a plugin that can't be
+    // matched to its old instance comes back with its current settings. Round 168s: the rebuild matches channels and
+    // effect slots by their instance tag (RackState::build), so a moved plugin, duplicates included, keeps its running
+    // instance and is not built again (issue #36: no second instance created and the old one torn down for a move).
+    capturePluginStates();
+    editSong (edit);
+}
+
 void AudioEngine::undo()
 {
     if (undoStack.empty())
@@ -2794,6 +2816,8 @@ void AudioEngine::publishSong()
     ++songStamp;
     // Online Sessions (round 168a): every entity has its stable id after any edit, import or load
     uids::normalize (song);
+    // pasted / duplicated channels and effect slots get their own instance (round 168s: instances follow their channel)
+    song.uniqueInstances();
     // diagnostics (round 149): with LYNX_TRACE_EDITS set, each publish's time goes to %APPDATA%\LYNX\edits.log
     static const bool traceEdits = std::getenv ("LYNX_TRACE_EDITS") != nullptr;
     const auto publishStart = juce::Time::getMillisecondCounterHiRes();
@@ -2894,6 +2918,7 @@ void AudioEngine::publishSong()
     // did not change; without it every edit rebuilt them (sample reloaded and stretch looked up, ~0.5 s on Thief)
     lastPublishedShape.song.bpm = song.bpm;
     lastPublishedShape.instruments = state->instruments;
+    lastPublishedShape.serial = state->serial; // (round 168s: the renderer moves held notes only along this chain)
     lastPublishedShape.effects = state->effects;
     lastPublishedShape.sampleRate = state->sampleRate;
     lastPublishedShape.latencies = state->latencies;
@@ -3880,6 +3905,17 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         double start;
         int samples;
     } measure { *this, callbackStart, numSamples };
+
+    // an export renders (round 168s): playback stops and nothing is processed until it ends (not while recording)
+    if (offlineRendersRunning().load (std::memory_order_acquire) > 0 && ! transport.recording.load (std::memory_order_relaxed))
+    {
+        if (transport.playing.load (std::memory_order_relaxed))
+            stop();
+        for (int ch = 0; ch < numOutputChannels; ++ch)
+            if (outputChannelData[ch] != nullptr)
+                juce::FloatVectorOperations::clear (outputChannelData[ch], numSamples);
+        return;
+    }
 
     if (transport.rewindRequested.exchange (false))
     {

@@ -160,6 +160,10 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         };
     }
     PianoRollComponent::shortcutText = [this] (const std::string& id) { return shortcutText (id.c_str()); };
+    pianoRoll.onBrowseScores = [this] { // (round 168g: the Piano roll's File › Browse scores)
+        showPanel (Panel::browser);
+        browser.showScores();
+    };
 
     newButton.setTooltip (tr ("New project") + " (Ctrl+N)");
     newButton.onClick = [this] { newProject(); };
@@ -235,7 +239,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
     typingPianoButton.setOnColour (theme::colour::bg6);
     typingPianoButton.setIconColourWhenOn (theme::colour::accent);
-    typingPianoButton.onClick = [this] { setTypingPiano (! typingPiano); };
+    typingPianoButton.onClick = [this] { toggleTypingPiano(); };
 
     // count-in and wait-for-input switches next to the metronome, as in FL's recording panel
     for (auto* b : { &countInButton, &waitInputButton })
@@ -314,6 +318,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         showPanel (Panel::mixer);
         mixer.selectTrack (insert);
     };
+    openMixerInsertHandler() = rack.onOpenMixerInsert; // and on the channel window's TRACK box (round 168s)
     mixer.onInstrumentDropped = [this] (int insert, ChannelDef c) { rack.addChannel (std::move (c), true, insert); };
     rackViewport.setViewedComponent (&rack, false);
     rackViewport.setScrollBarsShown (true, true);
@@ -608,6 +613,7 @@ MainComponent::~MainComponent()
     if (sessionLock != nullptr) // a clean exit: no "LYNX did not close properly" next time
         sessionMarker.deleteFile();
     mixerinput::openAudioSettings = nullptr;
+    openMixerInsertHandler() = nullptr;
     PatcherWindows::onBrowsePluginDatabase = nullptr;
     EditorGlobals::get().onOptionsChanged = nullptr;
     PianoRollComponent::shortcutText = nullptr;
@@ -1226,7 +1232,7 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("transport.toggleMode")) toggleMode();
     else if (is ("transport.nextMarker")) engine.jumpToNextMarker (true);
     else if (is ("transport.previousMarker")) engine.jumpToNextMarker (false);
-    else if (is ("view.typingPiano")) setTypingPiano (! typingPiano);
+    else if (is ("view.typingPiano")) toggleTypingPiano();
     else if (is ("view.toolbar"))
     {
         auto layout = toolbarLayout;
@@ -1360,8 +1366,11 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("file.saveAs")) save (true);
     else if (is ("file.saveNewVersion")) saveNewVersion();
     else if (is ("file.export")) exportAudio();
+    else if (is ("file.exportMaster")) showMasterDialog (engine, currentFile.getParentDirectory(), projectName);
     else if (is ("file.exportMp3")) exportAudio (1);
     else if (is ("file.exportMidi")) exportMidiFile();
+    else if (is ("tools.consolidateSelection")) consolidatePlaylistSelection (engine, playlist.getSelectedClips(), false);
+    else if (is ("tools.consolidateSelectionSongStart")) consolidatePlaylistSelection (engine, playlist.getSelectedClips(), true);
     else if (is ("edit.undo")) flUndo();
     else if (is ("edit.undoBackwards")) undoRedo (false);
     else if (is ("edit.redo")) undoRedo (true);
@@ -1412,13 +1421,23 @@ juce::String MainComponent::shortcutText (const char* actionId) const
     return chords.empty() ? juce::String() : "\t" + juce::String (keys::displayString (chords.front()));
 }
 
+void MainComponent::toggleTypingPiano()
+{
+    setTypingPiano (! typingPiano);
+    // say what changed in the hint bar (issue #34: people did not find the typing piano; Ctrl+T gave no feedback)
+    ui::Hint hint;
+    hint.text = typingPiano ? tr ("Typing keyboard to piano: on (Z..M and Q..P play the selected channels)")
+                            : tr ("Typing keyboard to piano: off (letter and number keys are shortcuts)");
+    ui::postHint (hint, 2500);
+}
+
 void MainComponent::setTypingPiano (bool on)
 {
     typingPiano = on;
     EditorGlobals::get().typingPiano = on; // the editors' single-letter tool keys only work while it is off
     typingPianoButton.setToggleState (on, juce::dontSendNotification);
-    typingPianoButton.setTooltip ((on ? tr ("Typing keyboard as a piano: on (Z..M and Q..P play the selected channels)")
-                                      : tr ("Typing keyboard as a piano: off (letter and number keys are shortcuts)"))
+    typingPianoButton.setTooltip ((on ? tr ("Typing keyboard to piano: on (Z..M and Q..P play the selected channels)")
+                                      : tr ("Typing keyboard to piano: off (letter and number keys are shortcuts)"))
                                   + juce::String (" (") + juce::String (keys::displayString (keyMap.chordsFor ("view.typingPiano").empty() ? keys::Chord {}
                                                                                                                                  : keyMap.chordsFor ("view.typingPiano").front()))
                                   + ")");
@@ -1582,6 +1601,10 @@ void MainComponent::loadUiSettings()
             notenames::currentFlats.store (on);
         else if (key == "rememberSeek")
             EditorGlobals::get().rememberSeek = on;
+        else if (key == "prGridHighlights") // (round 168g: the Piano roll's View items)
+            PianoRollComponent::gridHighlights = on;
+        else if (key == "prShowChordName")
+            PianoRollComponent::showChordName = on;
         else if (key == "stretchedClipsLoop")
             setStretchedClipsLoop (on);
         else if (key == "followPlaylist" || key == "followPianoRoll")
@@ -1704,6 +1727,8 @@ void MainComponent::saveUiSettings()
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
                                       + "\npluginStyleOverrides=" + skin::overridesToString()
                                       + "\nrememberSeek=" + juce::String (EditorGlobals::get().rememberSeek ? 1 : 0)
+                                      + "\nprGridHighlights=" + juce::String (PianoRollComponent::gridHighlights ? 1 : 0)
+                                      + "\nprShowChordName=" + juce::String (PianoRollComponent::showChordName ? 1 : 0)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
                                       + "\nfollowPianoRoll=" + juce::String (EditorGlobals::get().isFollowing (true) ? 1 : 0)
@@ -2077,6 +2102,15 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "playlist.reverseClips", tr ("Reverse selected audio clips"));
             action (menu, "playlist.quantizeStarts", tr ("Quantize the clips' starts"));
             action (menu, "playlist.quantizeHalf", tr ("Quantize the clips' starts 50% (halfway to the grid)"));
+            {
+                // FL's Playlist Tools › EERenderPLSelectionMenu, EEPLRenderAllTracksMenu, EEPLRenderAllTrackGroupsMenu (round 168e)
+                juce::PopupMenu consolidate;
+                action (consolidate, "tools.consolidateSelection", tr ("From selection start"));
+                action (consolidate, "tools.consolidateSelectionSongStart", tr ("From song start"));
+                menu.addSubMenu (tr ("Consolidate playlist selection"), consolidate);
+                menu.addSubMenu (tr ("Export all playlist tracks"), playlistTrackExportMenu (false));
+                menu.addSubMenu (tr ("Export all playlist track groups"), playlistTrackExportMenu (true));
+            }
             menu.addSubMenu (tr ("Zoom"), zoomMenu ("playlist."));
             menu.addSeparator();
             // FL's Performance mode (round 165m)
@@ -2800,6 +2834,19 @@ void MainComponent::PatternSelector::mouseWheelMove (const juce::MouseEvent&, co
         onStep (delta > 0.0f ? -1 : 1);
 }
 
+juce::PopupMenu MainComponent::playlistTrackExportMenu (bool groups)
+{
+    // FL: From song start... / From track start... / Time selection... (the last does nothing without a time selection)
+    juce::PopupMenu menu;
+    auto add = [&] (const juce::String& text, quickrender::Start start, bool enabled) {
+        menu.addItem (text, enabled, false, [this, start, groups] { exportAllPlaylistTracks (engine, projectName, start, groups); });
+    };
+    add (tr ("From song start..."), quickrender::Start::songStart, true);
+    add (tr ("From track start..."), quickrender::Start::clipStart, true);
+    add (tr ("Time selection..."), quickrender::Start::timeSelection, engine.getSong().hasLoop());
+    return menu;
+}
+
 juce::PopupMenu MainComponent::makePatternMenu()
 {
     const auto& song = engine.getSong();
@@ -2842,6 +2889,11 @@ juce::PopupMenu MainComponent::makePatternMenu()
     menu.addItem (tr ("Move up") + shortcutText ("pattern.moveUp"), index > 0, false, [this] { movePatternNow (-1); });
     menu.addItem (tr ("Move down") + shortcutText ("pattern.moveDown"), index + 1 < (int) song.patterns.size(), false, [this] { movePatternNow (1); });
     menu.addItem (tr ("Split by channel (one new pattern per channel)"), ! pattern.notes.empty(), false, [this] { splitPatternByChannelNow(); });
+    // FL's Patterns › PSPatQuickRenderMenu / PSPatRenderMenu / PSPatRenderReplaceMenu (PSPatQuickRenderMenuClick, tags 1 / 0 / 2;
+    // REA round 168e)
+    menu.addItem (tr ("Quick render as audio clip"), [this, index] { renderPatternAsAudioClip (engine, index, 1); });
+    menu.addItem (tr ("Render as audio clip..."), [this, index] { renderPatternAsAudioClip (engine, index, 0); });
+    menu.addItem (tr ("Render and replace..."), [this, index] { renderPatternAsAudioClip (engine, index, 2); });
     juce::PopupMenu signatures;
 
     for (int beats : { 2, 3, 4, 5, 6, 7, 8, 9, 12 })
@@ -3157,7 +3209,7 @@ void MainComponent::setControlHints()
     ui::setHint (metronomeButton, with (tr ("Metronome: clicks on every beat while playing  [RMB] volume and options"), "transport.metronome"), true);
     ui::setHint (countInButton, with (tr ("Count-in: one bar of clicks before recording starts (the menu has more lengths)"), "record.countIn"));
     ui::setHint (waitInputButton, with (tr ("Wait for input: recording starts with the first note you play"), "record.waitForInput"));
-    ui::setHint (typingPianoButton, with (tr ("Typing keyboard as a piano: Z..M and Q..P play the selected channels; letter shortcuts pause"),
+    ui::setHint (typingPianoButton, with (tr ("Typing keyboard to piano: Z..M and Q..P play the selected channels; letter shortcuts pause"),
                                           "view.typingPiano"));
     ui::setHint (gridBox, tr ("Global snap: the grid of the Piano Roll and Playlist (when they follow it) and the quantise of recorded notes  "
                               "[LMB] choose  [Wheel] step  [RMB] length of new notes  [Backspace] snap on/off  [Alt] while dragging: no snap"),
@@ -4773,7 +4825,16 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             exports.addItem (tr ("MIDI file...") + shortcutText ("file.exportMidi"), [this] { exportMidiFile(); });
             exports.addItem (tr ("Last exported format(s)...") + shortcutText ("file.export"), [this] { exportAudio(); });
             exports.addSeparator();
+            // FL's FileExportMasterAction ("Render the project to a file and master it"; FL Cloud there, on the computer here)
+            exports.addItem (tr ("Master...") + shortcutText ("file.exportMaster"), [this] { showMasterDialog (engine, currentFile.getParentDirectory(), projectName); });
+            exports.addSeparator();
+            // FL's ExportAllPLTracksMenu / ExportAllPLTrackGroupsMenu (FileExportPLTracks… / FileExportPLGroups…, REA round 168e)
+            exports.addSubMenu (tr ("All playlist tracks"), playlistTrackExportMenu (false));
+            exports.addSubMenu (tr ("All playlist track groups"), playlistTrackExportMenu (true));
+            exports.addSeparator();
             exports.addItem (tr ("Project with samples (.zip)..."), [this] { exportPackage(); });
+            // FL's "Project bones..." (FileExportProjectBonesAction; REA round 168e)
+            exports.addItem (tr ("Project bones..."), [this] { exportProjectBones (engine, currentFile.getParentDirectory(), projectName); });
             exports.addItem (tr ("Project data files (collect the samples into a folder)..."), [this] { collectSamples(); });
             menu.addSubMenu (tr ("Export"), exports);
         }
@@ -4873,7 +4934,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Sample browser (separate window)") + shortcutText ("view.sampleBrowser"), true, findToolWindow ("sampleBrowser") != nullptr,
                       [this] { toggleSampleBrowser(); });
         menu.addSeparator();
-        menu.addItem (tr ("Typing keyboard as a piano") + shortcutText ("view.typingPiano"), true, typingPiano, [this] { setTypingPiano (! typingPiano); });
+        menu.addItem (tr ("Typing keyboard to piano") + shortcutText ("view.typingPiano"), true, typingPiano, [this] { toggleTypingPiano(); });
         menu.addItem (tr ("Touch keyboard") + shortcutText ("view.touchKeyboard"), true, isTouchKeyboardOpen(), [this] { toggleTouchKeyboard (engine); });
         {
             // FL's View › Background (audit round 165z-a): the workspace image and colour of Options › Theme
@@ -4924,6 +4985,9 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Record input audio"), true, engine.isAudioRecordingArmed(), [this] {
             engine.setAudioRecordingArmed (! engine.isAudioRecordingArmed());
         });
+        // FL's Options menu, "Switches" section (TFruityLoopsMainForm DFM: KBToMIDIMenu = OptionsTypingKbToPianoAction,
+        // "Typing keyboard to piano", Ctrl+T, checkable, right before Metronome; round 168t, issue #34)
+        menu.addItem (tr ("Typing keyboard to piano") + shortcutText ("view.typingPiano"), true, typingPiano, [this] { toggleTypingPiano(); });
         menu.addItem (tr ("Metronome") + shortcutText ("transport.metronome"), true, engine.getTransport().metronome.load(), [this] {
             metronomeButton.setToggleState (! metronomeButton.getToggleState(), juce::sendNotification);
         });
@@ -5110,7 +5174,7 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
             { "Ctrl+R", TR_NOOP ("Export audio") },
             { "Enter", TR_NOOP ("Maximize or restore the Playlist") },
             { "L", TR_NOOP ("Pattern / song mode") },
-            { "Ctrl+T", TR_NOOP ("Typing keyboard as a piano on/off") },
+            { "Ctrl+T", TR_NOOP ("Typing keyboard to piano on/off") },
             { "Z..M  Q..P", TR_NOOP ("PC keyboard as a piano (selected channels)") },
             { "Numpad +/-", TR_NOOP ("Next / previous pattern") },
             { "Ctrl+Shift+Ins", TR_NOOP ("Insert an empty pattern before the current one") } } },

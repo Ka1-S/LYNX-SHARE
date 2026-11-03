@@ -97,11 +97,9 @@ Wave Candy, ZGameEditor Visualizer, X-Y / X-Y-Z controllers, Control Surface, Fo
 - Pictures (/mnt/e/lynx-work/design168n/): `<engine>-before.png` (origin/main build, `--snapshot` of the same project) and
   `after/<engine>-<lynx|fl>-<100|150|200>.png` (`--instrumentshot`). The first after-shot showed two clipped captions
   (Toxic's LFO "Sync" over "Speed", "Vel curve" cut): fixed (LFO row re-spaced; small knobs' captions get 52 units).
+  Re-shot on main e45e6550 (2026-11-03, `after2/`): every caption whole at 100 / 150 / 200 %, both sources (lynx bank, FL Default).
 
 ## Where I stopped
-- done: inventory (§1); Toxic + PoiZone designed pages, LYNX banks, model-knob automation, shared infra (§2.1); tests;
-  shots; levels. Landing the whole branch via land.sh (2026-11-02).
-- next: after landing, re-shoot with the landed exe (`LYNX.exe --instrumentshot E:\lynx-work\design168n\after2 toxicbiohazard,poizone lynx`),
-  notes-0.1.23.md bullets, message the coordinator the main hash.
+- done: everything in §1–§3; landed as 78fb4bb4 (2026-11-02); after-shots re-taken on main e45e6550 (after2/).
 - not covered: Toxic's MIDI / SEQ pages (its sequencer isn't modelled), CC slots 316–339, the Browser listing of
   LYNX banks, effect banks; model knobs don't follow automation while playing.

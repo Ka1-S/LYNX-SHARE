@@ -120,6 +120,8 @@ ChangeLabel describeChange (const Song& before, const Song& after)
             return label (TR_NOOP ("Pattern length: {0}"), b.name);
         if (a.loopOn != b.loopOn || a.loopMode != b.loopMode || a.channelLoops != b.channelLoops)
             return label (TR_NOOP ("Channel looping: {0}"), b.name);
+        if (a.markers != b.markers)
+            return label (TR_NOOP ("Pattern markers: {0}"), b.name);
 
         const auto sameEvents = a.events.size() == b.events.size()
                                 && std::equal (a.events.begin(), a.events.end(), b.events.begin(), [] (const PatternEvents& x, const PatternEvents& y) {

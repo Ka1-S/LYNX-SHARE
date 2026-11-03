@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "core/Instruments.h"
@@ -35,6 +36,17 @@ std::unique_ptr<Instrument> makeSimSynthInstrument();
 
 namespace simsynth
 {
+// FL's host parameters of SimSynth (the editor's Tags, round 168o): 0…25 and 26…35 knobs (0…65535; 27, 30, 33 the
+// coarse pitch in 48 semitone steps), 36…53 switches (0 / 1), 54…56 the oscillator waves and 57 the LFO shape
+// (0 pulse / square, 1 half cosine / saw, 2 triangle, 3 noise / sample & hold, 4 sine–sine⁴ mix)
+constexpr int hostParamCount = 58;
+// the value of host parameter h in a state as FL's editor shows it (nullopt: unusable state, bad index)
+std::optional<int> hostParam (const std::vector<std::uint8_t>& state, int h);
+// writes host parameter h into a state (clamped to its range); false when the state can't be read
+bool setHostParam (std::vector<std::uint8_t>& state, int h, int value);
+// a complete state for a new LYNX instance: the plugin as FL creates it (the editor's default patch), version 14
+std::vector<std::uint8_t> defaultState();
+
 // One note for the reference renderer (the verification harness drives the engine exactly like run/ssx.exe drives
 // the DLL). SimSynth takes FL's old voice-parameter record: Final.Pan is an integer −64…64, Final.Pitch an integer in
 // cents (100·(key − 60) + pitchCents); Final.Vol, Final.FCut and Final.FRes are floats.

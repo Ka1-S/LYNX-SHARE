@@ -29,6 +29,8 @@ struct ScoreNote
     float modX = 128.0f / 255.0f, modY = 128.0f / 255.0f;
     int colour = 0;                     // FL note colour / MIDI channel 0..15
     bool slide = false;
+    bool muted = false, porta = false;  // the record's extra byte 0x20 / 0x10 (round 168g: Open score keeps them)
+    int group = 0;                      // note group (24-byte records only)
 };
 
 struct Score
@@ -45,6 +47,13 @@ std::optional<Score> parseScore (std::span<const std::uint8_t> bytes);
 // One note per `step` over one beat (quantizer default), with `swing` (0..1) delaying every other step by
 // up to half a step.
 Score gridScore (std::int64_t step, float swing = 0.0f);
+
+// The Piano roll's File › Open score / Save score as (round 168g, REA_rodada168g.md §3): the score's notes as notes of
+// `channel` (all of them, at their own times), and an .fsc of `notes` as FL writes one from the piano roll
+// (FUN_0121b1b0 → the project saver in score mode 0x10: the version text, 0x41 = 0, then every note as a 24-byte 0xE0
+// record with the channel field 0; header format 0x10, one channel, LYNX's PPQ).
+std::vector<Note> notesFromScore (const Score& score, int channel);
+std::vector<std::uint8_t> writeScore (const std::vector<Note>& notes);
 
 // Per-level strengths (0..1) used when a template's levels are blended into the notes (quantizer, chopper).
 struct LevelStrengths

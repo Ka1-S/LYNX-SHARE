@@ -368,6 +368,12 @@ void EditorGlobals::setGridOption (int option)
 void EditorGlobals::toggleGrid()
 {
     setGridOption (gridOption == grid::noneOption ? lastGridOption : grid::noneOption);
+    // FL does the same (Backspace in the Playlist toggles the toolbar snap to "(none)", r168s f05), but the only sign is
+    // the toolbar box: issue #32 #3 read it as "snap stops working until relaunch". Say it in the hint bar too.
+    ui::Hint h;
+    h.text = gridOption == grid::noneOption ? tr ("Snap off: notes and clips move freely. [Backspace] turns snap back on")
+                                            : tr ("Snap on: {0}. [Backspace] turns it off", { tr (grid::options()[(std::size_t) gridOption].name) });
+    ui::postHint (h, 3000);
 }
 
 void EditorGlobals::setDefaultNoteLength (std::int64_t ticks)
@@ -638,6 +644,8 @@ public:
         addRow (finePitch, TR_NOOP ("Fine pitch"), -120.0, 120.0, " ct");
         addRow (modX, TR_NOOP ("Mod X"), 0.0, 100.0, "%");
         addRow (modY, TR_NOOP ("Mod Y"), 0.0, 100.0, "%");
+        // FL's Note properties also have the colour group (its "Color group / MIDI channel" button, 1..16; round 168g)
+        addRow (colour, TR_NOOP ("Colour group"), 1.0, (double) noteColourCount, "");
         release.slider.setTooltip (tr ("Release velocity (kept with the note; instruments do not use it yet)"));
         modX.slider.setTooltip (tr ("Free modulation value (kept with the note; not routed yet)"));
         modY.slider.setTooltip (modX.slider.getTooltip());
@@ -672,11 +680,16 @@ public:
         applyButton.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
         applyButton.onClick = [this] { apply(); };
         revertButton.onClick = [this] { load(); };
+        // FL's Reset (TPRNotePropForm ResetBtn): the levels back to their defaults (FL's wheel defaults VEL 100/128,
+        // PAN / REL 64, MOD 128, PITCH 120 = LYNX's note defaults)
+        resetButton.setButtonText (tr ("Reset"));
+        resetButton.onClick = [this] { resetLevels(); };
         addAndMakeVisible (applyButton);
         addAndMakeVisible (revertButton);
+        addAndMakeVisible (resetButton);
 
         load();
-        setSize (320, 34 + 6 * rowHeight + rowHeight + (single ? 2 * rowHeight : 0) + 44);
+        setSize (320, 34 + 7 * rowHeight + rowHeight + (single ? 2 * rowHeight : 0) + 44);
     }
 
     void paint (juce::Graphics& g) override
@@ -689,7 +702,7 @@ public:
         auto area = getLocalBounds().reduced (12, 8);
         title.setBounds (area.removeFromTop (26));
 
-        for (auto* row : { &velocity, &pan, &release, &finePitch, &modX, &modY })
+        for (auto* row : { &velocity, &pan, &release, &finePitch, &modX, &modY, &colour })
         {
             auto r = area.removeFromTop (rowHeight);
             row->label.setBounds (r.removeFromLeft (80));
@@ -712,6 +725,22 @@ public:
         applyButton.setBounds (buttons.removeFromRight (90));
         buttons.removeFromRight (8);
         revertButton.setBounds (buttons.removeFromRight (90));
+        resetButton.setBounds (buttons.removeFromLeft (80));
+    }
+
+    void resetLevels()
+    {
+        const Note defaults;
+        const auto set = [] (SliderRow& row, double v) {
+            row.slider.setValue (v, juce::dontSendNotification);
+            row.touched = true;
+        };
+        set (velocity, std::round (defaults.velocity * 100.0f));
+        set (pan, 0.0);
+        set (release, std::round (defaults.release * 100.0f));
+        set (finePitch, 0.0);
+        set (modX, std::round (defaults.modX * 100.0f));
+        set (modY, std::round (defaults.modY * 100.0f));
     }
 
 private:
@@ -757,6 +786,7 @@ private:
         set (finePitch, std::round (shown.finePitch));
         set (modX, std::round (shown.modX * 100.0f));
         set (modY, std::round (shown.modY * 100.0f));
+        set (colour, (double) (shown.colour + 1));
         slide.setToggleState (shown.slide, juce::dontSendNotification);
         porta.setToggleState (shown.porta, juce::dontSendNotification);
         slideTouched = portaTouched = false;
@@ -813,6 +843,7 @@ private:
                 if (finePitch.touched) n.finePitch = (float) finePitch.slider.getValue();
                 if (modX.touched) n.modX = (float) modX.slider.getValue() / 100.0f;
                 if (modY.touched) n.modY = (float) modY.slider.getValue() / 100.0f;
+                if (colour.touched) n.colour = juce::jlimit (0, noteColourCount - 1, (int) colour.slider.getValue() - 1);
                 if (slideTouched) n.slide = slide.getToggleState();
                 if (portaTouched) n.porta = porta.getToggleState();
                 if (single)
@@ -837,10 +868,10 @@ private:
     Note shown;
     bool single = false, slideTouched = false, portaTouched = false;
     juce::Label title;
-    SliderRow velocity, pan, release, finePitch, modX, modY;
+    SliderRow velocity, pan, release, finePitch, modX, modY, colour;
     juce::ToggleButton slide, porta;
     TextRow time, length;
-    juce::TextButton applyButton, revertButton;
+    juce::TextButton applyButton, revertButton, resetButton;
 };
 } // namespace
 

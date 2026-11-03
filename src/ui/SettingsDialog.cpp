@@ -50,6 +50,17 @@ public:
         setup (swing, 0.0, 100.0, 1.0, "%", 0.0);
         setup (pitch, -1200.0, 1200.0, 1.0, " " + tr ("cents"), 0.0);
         tempo.setNumDecimalPlacesToDisplay (3);
+        // FL's Options › Project › Time settings combo (REA round 168j, .flp 0x23): how the time settings are shown
+        styleLabel (timeModeLabel, tr ("Time settings"));
+        addAndMakeVisible (timeModeLabel);
+        timeMode.addItem (tr ("Set as time division"), 1);
+        timeMode.addItem (tr ("Set as time signature"), 2);
+        timeMode.setTooltip (tr ("Time division: FL Studio's original system (beats per bar, steps per beat). Time signature: traditional time signatures (numerator / denominator)."));
+        timeMode.onChange = [this] {
+            edit ([on = timeMode.getSelectedId() == 2] (Song& s) { s.timeSignatureMode = on; });
+            showTimeMode (timeMode.getSelectedId() == 2);
+        };
+        addAndMakeVisible (timeMode);
 
         tempo.onValueChange = [this] { edit ([v = tempo.getValue()] (Song& s) { s.bpm = v; }); };
         beats.onValueChange = [this] { edit ([v = (int) beats.getValue()] (Song& s) { s.beatsPerBar = v; }); };
@@ -64,7 +75,6 @@ public:
         }
         ppqText.setText (tr ("Timebase: {0} ticks per quarter note (PPQ). Projects from FL Studio are converted to it.", { juce::String (ppq) }),
                          juce::dontSendNotification);
-        stepsText.setText (tr ("Steps per beat: {0} (the Channel Rack's step grid).", { juce::String (stepsPerBeat) }), juce::dontSendNotification);
         signatureText.setText (tr ("Time signature changes along the song: add a time signature marker on the Playlist ruler."),
                                juce::dontSendNotification);
 
@@ -118,6 +128,12 @@ public:
         };
         timeTitle.setBounds (area.removeFromTop (28));
         area.removeFromTop (8);
+        {
+            auto r = area.removeFromTop (28);
+            timeModeLabel.setBounds (r.removeFromLeft (150));
+            timeMode.setBounds (r.removeFromLeft (260));
+            area.removeFromTop (8);
+        }
         row (tempoLabel, tempo);
         row (beatsLabel, beats);
         grooveTitle.setBounds (area.removeFromTop (28));
@@ -161,6 +177,18 @@ private:
         truncated.setToggleState (s.playTruncatedNotes, juce::dontSendNotification);
         fastDeclick.setToggleState (s.fastDeclick, juce::dontSendNotification);
         panLaw.setSelectedId (s.panTriangular ? 2 : 1, juce::dontSendNotification);
+        timeMode.setSelectedId (s.timeSignatureMode ? 2 : 1, juce::dontSendNotification);
+        showTimeMode (s.timeSignatureMode);
+    }
+
+    // FL's time signature mode (FUN_00eccbd0): the numerator is the beats per bar, the denominator sets the steps per
+    // beat (16 / denominator); LYNX's step grid is 4 per beat, so the denominator is 4
+    void showTimeMode (bool signature)
+    {
+        beatsLabel.setText (signature ? tr ("Numerator") : tr ("Beats per bar"), juce::dontSendNotification);
+        stepsText.setText (signature ? tr ("Denominator: {0} (the Channel Rack's step grid is {1} steps per beat).", { juce::String (16 / stepsPerBeat), juce::String (stepsPerBeat) })
+                                     : tr ("Steps per beat: {0} (the Channel Rack's step grid).", { juce::String (stepsPerBeat) }),
+                           juce::dontSendNotification);
     }
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override
@@ -174,10 +202,10 @@ private:
     bool loading = false;
     SectionTitle timeTitle { tr ("Time settings") }, grooveTitle { tr ("Groove and tuning") }, gridTitle { tr ("Timebase") },
         playlistTitle { tr ("Playlist") };
-    juce::Label tempoLabel, beatsLabel, swingLabel, pitchLabel, ppqText, stepsText, signatureText, panLawLabel;
+    juce::Label tempoLabel, beatsLabel, swingLabel, pitchLabel, ppqText, stepsText, signatureText, panLawLabel, timeModeLabel;
     juce::Slider tempo, beats, swing, pitch;
     juce::ToggleButton crossfades, crossfadesNew, truncated, fastDeclick;
-    juce::ComboBox panLaw;
+    juce::ComboBox panLaw, timeMode;
 };
 
 // --- Info page -------------------------------------------------------------------------------------

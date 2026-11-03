@@ -152,6 +152,7 @@ private:
     bool typingPiano = false; // off by default so single-letter editor tools work (the manual does not state a default)
     int lastCurrentPattern = -1; // ("Select first channel with notes when the pattern changes")
     void setTypingPiano (bool on);
+    void toggleTypingPiano(); // the user's toggle (button, menus, Ctrl+T): also says so in the hint bar
     juce::String shortcutText (const char* actionId) const; // "\tF5" for menus ("" when unbound)
 
     // panels
@@ -196,6 +197,7 @@ private:
     void menuItemSelected (int, int) override {}
     void rememberRecent (const juce::File& file);
     juce::PopupMenu makePatternMenu();
+    juce::PopupMenu playlistTrackExportMenu (bool groups); // File › Export / Playlist Tools: the three starts (round 168e)
     // Tools › Last tweaked / Next to last tweaked (REA round 143): the parameter menu of a recently moved control
     juce::PopupMenu makeLastTweakedMenu (int which);
     // File › Import › MIDI file... (REA round 143)

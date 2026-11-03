@@ -42,7 +42,11 @@ PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, co
     plan.channelDelay.assign (song.channels.size(), 0);
     plan.sendDelay.assign ((std::size_t) tracks, {});
 
-    auto channelLat = [&] (std::size_t c) { return c < channelLatency.size() ? std::max (0, channelLatency[c]) : 0; };
+    // FL's Plugin delay compensation › Automatic off (REA round 168j, FUN_010ff3b0 behind the 0x1D global): the plan leaves
+    // out the instruments' and the effects' latencies; the manual track latencies and the routing still count
+    const auto automatic = song.autoPdc;
+    auto channelLat = [&] (std::size_t c) { return automatic && c < channelLatency.size() ? std::max (0, channelLatency[c]) : 0; };
+    auto slotLat = [&] (int t, std::size_t s) { return automatic ? std::max (0, slotLatency[(std::size_t) t][s]) : 0; };
     auto trackOf = [&] (const ChannelDef& c) { return std::clamp (c.mixerTrack, 0, tracks - 1); };
 
     // own input latency: the slowest instrument feeding the track
@@ -61,7 +65,7 @@ PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, co
 
             for (std::size_t s = 0; s < slots.size() && s < slotLatency[(std::size_t) t].size(); ++s)
                 if (song.slotActive (slots[s]))
-                    sum += std::max (0, slotLatency[(std::size_t) t][s]);
+                    sum += slotLat (t, s);
         }
 
         return sum;
@@ -76,7 +80,7 @@ PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, co
             const auto end = afterSlot ? slot + 1 : slot; // (a Transmitter's sends leave after its own latency)
             for (int s = 0; s < end && s < (int) slots.size() && s < (int) slotLatency[(std::size_t) t].size(); ++s)
                 if (song.slotActive (slots[(std::size_t) s]))
-                    sum += std::max (0, slotLatency[(std::size_t) t][(std::size_t) s]);
+                    sum += slotLat (t, (std::size_t) s);
         }
         return sum;
     };
@@ -105,6 +109,21 @@ PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, co
 
     plan.outLat[0] = plan.inAlign[0] + effectsLatency (0) + manual (0);
     plan.total = std::max (0, plan.outLat[0]);
+
+    plan.slotInput.assign ((std::size_t) tracks, {});
+    for (int t = 0; t < (int) song.mixer.size(); ++t)
+    {
+        const auto& slots = song.mixer[(std::size_t) t].effects;
+        auto& lags = plan.slotInput[(std::size_t) t];
+        lags.assign (slots.size(), 0);
+        auto run = plan.inAlign[(std::size_t) t];
+        for (std::size_t s = 0; s < slots.size(); ++s)
+        {
+            lags[s] = run;
+            if (song.slotActive (slots[s]) && t < (int) slotLatency.size() && s < slotLatency[(std::size_t) t].size())
+                run += slotLat (t, s);
+        }
+    }
 
     // per-edge delays (what's missing to reach the destination's alignment)
     for (std::size_t c = 0; c < song.channels.size(); ++c)

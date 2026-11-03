@@ -210,7 +210,9 @@ TEST (rea167j_fl_pattern_keys)
     CHECK (map.find ({ f4, none }, Context::global, false) == "pattern.nextEmpty");
     // FL File › Export: MP3 Ctrl+Shift+R, MIDI Ctrl+Shift+M
     CHECK (map.find ({ 'R', ctrl | shift }, Context::global, false) == "file.exportMp3");
-    CHECK (map.find ({ 'M', ctrl | shift }, Context::pianoRoll, false) == "file.exportMidi");
+    CHECK (map.find ({ 'M', ctrl | shift }, Context::global, false) == "file.exportMidi");
+    // (round 168g: in the Piano roll FL's own EEExportMIDIAction, ShortCut 0x604D, exports the edited score)
+    CHECK (map.find ({ 'M', ctrl | shift }, Context::pianoRoll, false) == "pianoRoll.exportMidi");
 
     auto song = lynx::Song::makeDefault();
     song.patterns.resize (4);
