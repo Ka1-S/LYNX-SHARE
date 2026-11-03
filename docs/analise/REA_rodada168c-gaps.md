@@ -89,10 +89,10 @@ remain:
 
 | # | Item | FL behaviour (evidence) | LYNX state [CODE grep] | Effort | Value | Round |
 |---|---|---|---|---|---|---|
-| M1 | **Patterns › Quick render / Render as audio clip / Render and replace** | Patterns menu [DFM 167j] | none | M | H | 168e |
-| M2 | **Export › All playlist tracks / track groups** (song start / track start / time selection) | File › Export [DFM 167j] | none (mixer-insert stems exist) | M | H | 168e |
-| M3 | Export › Master… Ctrl+Alt+M; Project bones | [DFM 167j] | none | M | L–M | 168e |
-| M4 | **Tools › Consolidate playlist selection** (from selection / song start), Ctrl+Alt+C / Ctrl+Shift+Alt+C | [DFM 167j] | track-level "Consolidate track" only | M | M | 168e |
+| M1 | **Patterns › Quick render / Render as audio clip / Render and replace** | Patterns menu [DFM 167j] | **done in 168e** (REA_rodada168e §2.1; current pattern only) | M | H | 168e ✔ |
+| M2 | **Export › All playlist tracks / track groups** (song start / track start / time selection) | File › Export [DFM 167j] | **done in 168e** (REA_rodada168e §2.3) | M | H | 168e ✔ |
+| M3 | Export › Master… Ctrl+Alt+M; Project bones | [DFM 167j] | **done in 168e**: local mastering (FL uses FL Cloud), bones in LYNX formats (REA_rodada168e §2.4–2.5) | M | L–M | 168e ✔ |
+| M4 | **Tools › Consolidate playlist selection** (from selection / song start), Ctrl+Alt+C / Ctrl+Shift+Alt+C | [DFM 167j] | **done in 168e** (REA_rodada168e §2.2) | M | M | 168e ✔ |
 | M5 | Playlist track menu: Lock to content, Lock to this size, Send pattern instances here, Auto name clips, Change icon, Select audio input / Arm / Disarm | PLTrackMenu [DFM 167j] | none of these | M | M | 168f (icon: 168h) |
 | M6 | Playlist Tools: Lock / Unlock all tracks to content, Reset empty tracks, Collapse / Expand all grouped tracks, Purge unused audio clips, Switch all / selected audio clip stretch modes | [DFM 167j] | none | M | L–M | 168f |
 | M7 | Playlist Edit (FL storage: "Create variants when stretching" = one global flipped by `CreateVariantsMenuClick` 0xe3a090; "Lock to content" = byte +0x19 of the playlist track record (0x114 B per track), undo name "lock/unlock to content" (`EEPLTrackClipLockMenuClick` 0x12236c0 → FUN_012e7a90); "Lock to this size" = +0x10 size with the sign of +0x14 (`EEPLTrackSize1MenuClick` 0x1228f10) [RTTI → DECOMP]): Delete all, Trim selection, Insert / Delete space items, Turn into automation clip, Allow clip nudging, Dropping locks to content, Create new clips with manual fades, Snap fade handles, Create variants when stretching | [DFM 167j, TEventEditForm "Create variants when stretching audio clips"] | keys only for insert/delete space; the rest missing | M | M | 168f |

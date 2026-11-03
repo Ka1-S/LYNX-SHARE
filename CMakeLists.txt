@@ -154,6 +154,7 @@ add_library(lynx_core STATIC
     src/core/HardcoreFx.cpp
     src/core/FacetEq.cpp
     src/core/ApexLimiter.cpp
+    src/core/Mastering.cpp
     src/core/DynamicsSuite.cpp
     src/core/VoiceTools.cpp
     src/core/MidiControls.cpp
@@ -226,6 +227,7 @@ target_sources(lynx_core PRIVATE
     src/core/PluginMonitor.cpp
     src/core/ProjectContents.cpp
     src/core/PlaylistOps.cpp
+    src/core/QuickRender.cpp
     src/core/TempoDetect.cpp
     src/core/ScoreLog.cpp
     src/core/ChannelLoops.cpp

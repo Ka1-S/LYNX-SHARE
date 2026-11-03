@@ -244,13 +244,15 @@ TEST (rea149_consolidate_keeps_the_tempo_map)
     c.start = 6 * ppq * 4;
     c.length = ppq * 4;
     song.playlist.push_back (c);
-    Song render;
-    std::int64_t start = 0, length = 0;
-    CHECK (trackmodes::makeConsolidateSong (song, 1, false, render, start, length));
+    // (round 168e: the consolidation core moved to core/QuickRender; the render plays the song's own range, so the
+    // tempo there is the song's)
+    quickrender::Plan plan;
+    CHECK (quickrender::planTrack (song, 1, false, quickrender::Start::clipStart, plan) == quickrender::Result::ok);
+    const auto render = quickrender::makePlanRenderSong (song, plan);
+    const auto start = plan.start;
     CHECK (start == 6 * ppq * 4 && render.playlist.size() == 2);
-    // the tempo at the render's start is the song's there (140), before and after the cut
-    CHECK (std::abs (render.tempoAt (0.0) - 140.0) < 0.5 && std::abs (song.tempoAt ((double) start) - 140.0) < 0.5);
-    CHECK (std::abs (render.bpm - 140.0) < 0.5);
+    CHECK (render.loopStart == start && render.loopEnd == start + ppq * 4);
+    CHECK (std::abs (render.tempoAt ((double) start) - 140.0) < 0.5 && std::abs (song.tempoAt ((double) start) - 140.0) < 0.5);
 }
 
 TEST (rea149_create_group_names_unnamed_tracks)
