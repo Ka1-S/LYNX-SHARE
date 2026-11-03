@@ -126,8 +126,10 @@ private:
     float nextModX = 0.5f, nextRelease = 0.5f;
     bool bendRangeSent = false;
     std::atomic<bool> resetPending { false };     // panic with "Reset plugin": reset at the next render (audio thread)
-    std::array<std::array<std::uint64_t, 2>, 16> heldKeys {}; // per MIDI channel: the notes on (for stop without All Notes Off)
-    void hold (int channel, int key, bool on) noexcept;
+    HostedKeys heldKeys; // per MIDI channel: the notes on (their note offs on stop / jump, round 169c)
+    void hold (int channel, int key, bool on) noexcept { heldKeys.set (channel, key, on); }
+    void releaseHeldKeys() noexcept; // a note off for each held key
+    HostBlockClock blockClock; // where each plugin block starts in the renderer's chunk (the play head's position)
 
     std::unique_ptr<juce::AudioPluginInstance> plugin;
     juce::AudioBuffer<float> buffer;
