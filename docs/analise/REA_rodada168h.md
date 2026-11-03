@@ -53,7 +53,15 @@ at once, released the locks, checked that `FXViewMode` was still 3 and that no F
 (one session, when the desktop is free): open any project, click the Mixer's layout drop-down and pick each of the 8
 items, one screenshot each; compare with LYNX's `--snapshot` of the mixer in each layout.
 
+## Checks
+
+- build-local: 2 408 795 checks, 0 failures (the 3 new tests included).
+- Windows build + `LYNX.exe --snapshot` (fresh LYNX_PROFILE_DIR, LYNX_TEST_MODE=1, off-screen: the user was on the
+  desktop), FL demo "Astes - Bien Duro" imported: the 8 layouts `/mnt/e/lynx-work/mixer168h/shots/s-mixer168h-0..7.png`
+  (icons in the headers, names up the strips, alt names low, Extra large horizontal) and the picker
+  `s-trackicons168h.png`. Looked at: Compact, Wide, Wide alt, Extra large, the picker.
+
 ## Where I stopped
 
-- Done: core + UI + tests + i18n committed on feature/mixer168h (b1731705); build-local and Windows build started.
-- Next: fix build errors if any, Windows GUI check (fresh profile, each layout + icon picker), land with train.sh.
+- Done: core + UI + tests + i18n + snapshots on feature/mixer168h; queued for landing with train.sh.
+- Open: the FL screenshots of the 7 other layouts (one FL session, §5); an icon button in the rename dialog.
