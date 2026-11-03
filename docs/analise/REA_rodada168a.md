@@ -37,7 +37,7 @@ FL to match.
 
 ## Verification
 
-- Core tests (build-local): see "Where I stopped" for the run of this round.
+- Core tests (build-local): 2 399 233 checks, 0 failures (after the last merge with origin/main).
 - `tests/Session168aTests.inc`: stand-ins rendered the way SessionPack cuts them and played through the projection
   match the channel itself within 3e-8 (Song mode with a clip that starts inside its pattern and a tail into the next
   clip; Pattern mode from the second pass); insert stand-in: exact.
@@ -71,15 +71,10 @@ arm button (now left of the FX count); the received project was called "project.
 
 ## Where I stopped
 
-- **State (2026-11-02, paused for round 168w)**: branch `feature/online168a` = P1 code + docs + 15 languages, merged
-  with origin/main efb8344d after the reboot; NOT landed yet. Before the reboot: Windows build OK, `--selftest` all OK
-  (`online_session=OK`), core tests 1 890 962 checks with only the stale embedded-i18n check failing (the tables were
-  regenerated after that test binary was compiled; `make_i18n.py` now gives no diff), Windows GUI check passed.
-  After the merge: a Windows build was running when the pause came; core tests not re-run yet.
-- **Exact next step on RESUME**: rebuild Windows (`winbuild.sh scripts/build-windows-zig.sh`) and core tests
-  (`bl-wt.sh online168a`) on the merged branch; re-run `--selftest` (fresh profile); optionally re-shoot
-  `guest-rack.png` / `guest-mixer.png` with the badge fixes (open `E:` test package `%TEMP%\lynx168a\projects\host -
-  for Ana.lynxpack` in a fresh guest profile); then `land.sh online168a`.
+- **State (2026-11-03)**: merged with origin/main again; core tests 2 399 233 checks, 0 failures; Windows build OK,
+  `--selftest` all OK (`online_session=OK`); badges re-shot in a fresh guest profile (`guest-rack.png`,
+  `guest-mixer.png`: the Mixer's R now sits on the name row, it covered the insert number) and the open summary's
+  version line (`open-summary-version.png`); desktop clean (`clean2.png`). Landed through the merge train.
 - P1 complete as described above (round 168a), merged with origin/main after the 2026-11-02 reboot (Loop
   Starter's `loopStarterPattern` added to the pattern-reference visitor).
 - Not done in P1 (next): "Send my part back" offers no choice of which Playlist row / take to include (his whole
