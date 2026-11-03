@@ -11,6 +11,7 @@
 #include "core/SessionIds.h"
 #include "core/Sha256.h"
 #include "core/StandIns.h"
+#include "engine/AudioEngine.h"
 #include "engine/Exporter.h"
 #include "engine/ProjectFile.h"
 #include "platform/Paths.h"
@@ -667,16 +668,35 @@ std::optional<Opened> open (const juce::File& file, const juce::File& destinatio
         return std::nullopt;
     // a received project may only use its own media: a path anywhere else on this computer would be copied
     // into the project and sent on with the next package. It becomes a missing file under its own name.
+    auto within = [] (const std::string& path, const juce::File& root) {
+        const auto p = str (path);
+        return root != juce::File() && ! juce::StringArray::fromTokens (p, "/\\", "").contains ("..") && fileOf (path).isAChildOf (root);
+    };
+    auto missing = [&] (const std::string& path) {
+        const auto p = str (path);
+        const auto name = juce::File::createLegalFileName (p.fromLastOccurrenceOf ("/", false, false).fromLastOccurrenceOf ("\\", false, false));
+        return utf8 (folder.getChildFile ("missing").getChildFile (name).getFullPathName());
+    };
     std::map<std::string, std::string> outside;
     for (const auto& path : safety::referencedSamples (*song))
-    {
-        const auto p = str (path);
-        if (! juce::StringArray::fromTokens (p, "/\\", "").contains ("..") && fileOf (path).isAChildOf (folder))
-            continue;
-        const auto name = juce::File::createLegalFileName (p.fromLastOccurrenceOf ("/", false, false).fromLastOccurrenceOf ("\\", false, false));
-        outside[path] = utf8 (folder.getChildFile ("missing").getChildFile (name).getFullPathName());
-    }
+        if (! within (path, folder))
+            outside[path] = missing (path);
     applyRelocations (*song, outside);
+    // the engine also reads these, outside the media list (never packed). FL Keys' wavetables are FL Studio's own files.
+    const auto flInstall = findFlStudioRoots().factoryData;
+    const auto fl = flInstall.empty() ? juce::File() : juce::File (str (flInstall));
+    auto engineOnly = [&] (std::string& path) {
+        if (! path.empty() && ! within (path, folder) && ! within (path, fl))
+            path = missing (path);
+    };
+    for (auto& c : song->channels)
+    {
+        if (c.instrument == InstrumentKind::flkeys || c.instrument == InstrumentKind::directwave)
+            engineOnly (c.samplePath);
+        if (c.instrument == InstrumentKind::flkeys)
+            for (auto& z : c.zones)
+                engineOnly (z.path);
+    }
     opened.song = std::move (*song);
     return opened;
 }

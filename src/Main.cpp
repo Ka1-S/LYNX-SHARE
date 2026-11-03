@@ -2026,6 +2026,11 @@ private:
                 c.instrument = lynx::InstrumentKind::sampler;
                 c.samplePath = secret.getFullPathName().toStdString();
                 evil.channels.push_back (c);
+                lynx::ChannelDef keys; // (FL Keys' zones are read by the engine but are not in the media list)
+                keys.instrument = lynx::InstrumentKind::flkeys;
+                keys.zones.push_back ({});
+                keys.zones.back().path = c.samplePath;
+                evil.channels.push_back (keys);
                 const auto evilProject = dir.getChildFile ("evil.lynx");
                 lynx::sessionpack::Manifest em;
                 em.part = true;
@@ -2043,7 +2048,10 @@ private:
                 auto evilOpened = zipped ? lynx::sessionpack::open (evilPack, dir.getChildFile ("evil"), e) : std::nullopt;
                 const auto media = dir.getChildFile ("Session media/Evil");
                 mergeOk = evilOpened && lynx::sessionpack::adoptMedia (evilOpened->song, media, e)
-                          && juce::File (juce::String::fromUTF8 (evilOpened->song.channels.back().samplePath.c_str())) != secret
+                          && std::none_of (evilOpened->song.channels.begin(), evilOpened->song.channels.end(), [&] (const lynx::ChannelDef& ch) {
+                                 return juce::File (juce::String::fromUTF8 (ch.samplePath.c_str())) == secret
+                                        || std::any_of (ch.zones.begin(), ch.zones.end(), [&] (const lynx::SampleZone& z) { return juce::File (juce::String::fromUTF8 (z.path.c_str())) == secret; });
+                             })
                           && media.findChildFiles (juce::File::findFiles, true).isEmpty();
                 if (! mergeOk && e.isEmpty())
                     e = "a received package reached a file outside it";
