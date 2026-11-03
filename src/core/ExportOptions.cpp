@@ -213,14 +213,24 @@ std::vector<Note> midiExportNotes (const Song& song)
             if (c.kind != ClipKind::pattern || c.muted || c.length <= 0 || trackMuted (c.track) || c.pattern < 0
                 || c.pattern >= (int) song.patterns.size())
                 continue;
-            for (auto n : song.patterns[(std::size_t) c.pattern].notes)
-            {
-                if (n.muted || n.start < c.offset || n.start >= c.offset + c.length)
-                    continue;
-                n.start = c.start + (n.start - c.offset);
-                n.length = std::max<std::int64_t> (1, std::min (n.length, c.end() - n.start));
-                out.push_back (n);
-            }
+        {
+            // the pattern repeats along a clip longer than it (LYNX extra stretchedClipsLoop, issue #25)
+            const auto& pattern = song.patterns[(std::size_t) c.pattern];
+            const auto period = std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
+            const auto repeats = stretchedClipsLoop() && c.offset + c.length > period;
+            for (auto pass = repeats ? c.offset / period : 0; pass <= (repeats ? (c.offset + c.length - 1) / period : 0); ++pass)
+                for (auto n : pattern.notes)
+                {
+                    if (repeats && n.start >= period)
+                        continue;
+                    const auto at = n.start + (repeats ? pass * period : 0);
+                    if (n.muted || at < c.offset || at >= c.offset + c.length)
+                        continue;
+                    n.start = c.start + (at - c.offset);
+                    n.length = std::max<std::int64_t> (1, std::min (n.length, c.end() - n.start));
+                    out.push_back (n);
+                }
+        }
         }
 
     if (out.empty() && (song.mode != PlayMode::song || std::none_of (song.playlist.begin(), song.playlist.end(),

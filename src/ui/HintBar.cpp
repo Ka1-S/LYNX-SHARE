@@ -1,3 +1,4 @@
+#include "ui/FlMods.h"
 #include "ui/HintBar.h"
 
 #include <cmath>
@@ -68,7 +69,8 @@ std::vector<Item> makeItems (const juce::String& text, const juce::Font& font, c
 
     for (const auto& segment : hintmarkup::parse (text.toStdString()))
     {
-        const auto value = juce::String::fromUTF8 (segment.value.c_str());
+        // macOS: FL-for-Mac key names (Ctrl -> ⌘, Alt -> ⌥), in the key caps and in the words (core/ModifierMap.h)
+        const auto value = flmods::keyNames (juce::String::fromUTF8 (segment.value.c_str()));
 
         if (segment.kind != hintmarkup::Segment::Kind::text)
         {
@@ -81,7 +83,7 @@ std::vector<Item> makeItems (const juce::String& text, const juce::Font& font, c
                              : juce::GlyphArrangement::getStringWidth (keyFont, value) + 8.0f;
             items.push_back (item);
             pendingGap = 0.0f;
-            consumed += value.length() + 2;
+            consumed += (int) segment.value.size() + 2;
             continue;
         }
 
@@ -259,7 +261,7 @@ juce::String plainHint (const juce::String& markup)
 {
     const std::vector<std::string> words { tr ("click").toStdString(), tr ("double-click").toStdString(), tr ("right-click").toStdString(),
                                            tr ("middle-click").toStdString(), tr ("wheel").toStdString() };
-    return juce::String::fromUTF8 (hintmarkup::plain (markup.toStdString(), words).c_str());
+    return flmods::keyNames (juce::String::fromUTF8 (hintmarkup::plain (markup.toStdString(), words).c_str()));
 }
 
 juce::String withMarkup (const juce::String& text)
@@ -361,7 +363,7 @@ constexpr int tipHeight = 20;
 
 void setQuickTip (juce::Component& c, const juce::String& name, const juce::String& shortcut)
 {
-    c.getProperties().set (quickTipProperty, shortcut.trim().isEmpty() ? name : name + "\t" + shortcut.trim());
+    c.getProperties().set (quickTipProperty, shortcut.trim().isEmpty() ? name : name + "\t" + flmods::keyNames (shortcut.trim()));
 }
 
 juce::String quickTipOf (const juce::Component& c)

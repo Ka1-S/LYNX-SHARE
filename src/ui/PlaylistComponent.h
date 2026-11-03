@@ -143,7 +143,7 @@ public:
     void showSongAfterOpen();
 
 private:
-    enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, autoPoint, autoTension,
+    enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
                       trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain };
     // Performance mode (round 165m): the clip a click launched (its release goes with the mouse button)
     int perfTrack = -1;
@@ -323,6 +323,7 @@ private:
     static inline bool hasCopiedGain = false;
     // FL: a double click held on the ruler drags a time selection (as Ctrl+drag); released without moving it clears
     bool rulerDoubleDrag = false;
+    bool rulerMenuOnClick = false; // a right press on the ruler: the ruler menu if released in place (round 168t)
     juce::Rectangle<float> automationBody (const Clip& clip) const;
     int automationPointAt (int clip, juce::Point<int> p) const;
     bool isOnAutomationCurve (int clip, juce::Point<int> p) const;

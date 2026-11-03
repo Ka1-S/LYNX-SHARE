@@ -25,6 +25,7 @@ struct GeneralOptions
     bool splash = true, startupSound = true, scanAtStart = true;
     bool menuEntry = false;     // Linux AppImage: LYNX in the applications menu + the .lynx file type (round 161)
     bool typingPiano = false, keepEditorsOpen = false, rememberSeek = false;
+    bool stretchedClipsLoop = true; // LYNX extra (issue #25): a stretched pattern clip loops its pattern; off = FL (once)
     // FL's General › "Select first channel with notes when the pattern changes" (off by default; REA round 167j §5)
     bool selectFirstChannelWithNotes = false;
     int editPatternsIn = 0;     // 0 = Piano Roll when it has notes, 1 = Channel Rack, 2 = Piano Roll

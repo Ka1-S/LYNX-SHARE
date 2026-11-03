@@ -47,6 +47,8 @@ double loopLength (const Song& song)
 
 double playheadTicks (AudioEngine& engine)
 {
+    if (engine.getSong().mode == PlayMode::song)
+        return engine.songPlayheadTicks(); // (counts on past the song's end while a take records, like FL)
     return std::fmod (juce::jmax (0.0, engine.getTransport().positionTicks.load()), loopLength (engine.getSong()));
 }
 

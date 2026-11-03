@@ -251,7 +251,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         b.setFlat (true);
         b.setOnColour (theme::colour::bg5);
         b.setIconColourWhenOn (theme::colour::textPrimary);
-        b.setTooltip (panelName (panel) + " (" + keys::toString (keyMap.chordsFor (panelAction (panel)).empty() ? keys::Chord {}
+        b.setTooltip (panelName (panel) + " (" + keys::displayString (keyMap.chordsFor (panelAction (panel)).empty() ? keys::Chord {}
                                                                                                           : keyMap.chordsFor (panelAction (panel)).front()) + ")\n"
                       + tr ("Click: show, focus or hide.  Right-click: show maximized"));
         b.onClick = [this, panel] { togglePanel (panel); };
@@ -583,6 +583,14 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         juce::Timer::callAfterDelay (4000, [safe = juce::Component::SafePointer<MainComponent> (this)] {
             if (safe != nullptr)
                 safe->engine.getPluginHost().startBackgroundScan();
+        });
+
+    // round 168t (the YouTube review, 168d #9: "How do we get back to the playlist? Where is the playlist?"): the first
+    // three starts name the window buttons and their keys in the hint bar for a while
+    if (persistent)
+        juce::Timer::callAfterDelay (2500, [safe = juce::Component::SafePointer<MainComponent> (this)] {
+            if (safe != nullptr)
+                safe->showWindowsTip();
         });
 
     // the keys a secondary window (tool, plugin, channel window) leaves unused run the global shortcuts, as in FL
@@ -1402,7 +1410,7 @@ bool MainComponent::keyStateChanged (bool)
 juce::String MainComponent::shortcutText (const char* actionId) const
 {
     const auto& chords = keyMap.chordsFor (actionId);
-    return chords.empty() ? juce::String() : "\t" + juce::String (keys::toString (chords.front()));
+    return chords.empty() ? juce::String() : "\t" + juce::String (keys::displayString (chords.front()));
 }
 
 void MainComponent::setTypingPiano (bool on)
@@ -1412,7 +1420,7 @@ void MainComponent::setTypingPiano (bool on)
     typingPianoButton.setToggleState (on, juce::dontSendNotification);
     typingPianoButton.setTooltip ((on ? tr ("Typing keyboard as a piano: on (Z..M and Q..P play the selected channels)")
                                       : tr ("Typing keyboard as a piano: off (letter and number keys are shortcuts)"))
-                                  + juce::String (" (") + juce::String (keys::toString (keyMap.chordsFor ("view.typingPiano").empty() ? keys::Chord {}
+                                  + juce::String (" (") + juce::String (keys::displayString (keyMap.chordsFor ("view.typingPiano").empty() ? keys::Chord {}
                                                                                                                                  : keyMap.chordsFor ("view.typingPiano").front()))
                                   + ")");
 
@@ -1436,7 +1444,7 @@ void MainComponent::loadKeyMap()
 
     auto keyOf = [this] (const std::string& id) {
         const auto& chords = keyMap.chordsFor (id);
-        return chords.empty() ? juce::String() : juce::String (keys::toString (chords.front()));
+        return chords.empty() ? juce::String() : juce::String (keys::displayString (chords.front()));
     };
     pianoRoll.refreshToolKeys (keyOf);
     playlist.refreshToolKeys (keyOf);
@@ -1575,6 +1583,8 @@ void MainComponent::loadUiSettings()
             notenames::currentFlats.store (on);
         else if (key == "rememberSeek")
             EditorGlobals::get().rememberSeek = on;
+        else if (key == "stretchedClipsLoop")
+            setStretchedClipsLoop (on);
         else if (key == "followPlaylist" || key == "followPianoRoll")
             EditorGlobals::get().setFollowing (key == "followPianoRoll", on, false);
         else if (key == "followChannelRack" || key == "followAudioEditor")
@@ -1695,6 +1705,7 @@ void MainComponent::saveUiSettings()
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
                                       + "\npluginStyleOverrides=" + skin::overridesToString()
                                       + "\nrememberSeek=" + juce::String (EditorGlobals::get().rememberSeek ? 1 : 0)
+                                      + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
                                       + "\nfollowPianoRoll=" + juce::String (EditorGlobals::get().isFollowing (true) ? 1 : 0)
                                       + "\nfollowChannelRack=" + juce::String (EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::channelRack) ? 1 : 0)
@@ -1862,6 +1873,24 @@ void MainComponent::showPanel (Panel panel)
 {
     workspace.show (panel);
     refreshPanelButtons();
+}
+
+void MainComponent::showWindowsTip()
+{
+    const auto counter = PluginHost::settingsFolder().getChildFile ("windows-tip.txt");
+    const auto shown = counter.existsAsFile() ? counter.loadFileAsString().trim().getIntValue() : 0;
+    if (shown >= 3)
+        return;
+    counter.replaceWithText (juce::String (shown + 1));
+
+    auto key = [this] (Panel p) {
+        const auto chords = keyMap.chordsFor (panelAction (p));
+        return chords.empty() ? juce::String() : "[" + juce::String (keys::toString (chords.front())) + "] ";
+    };
+    ui::Hint hint;
+    hint.text = tr ("Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)",
+                    { key (Panel::playlist), key (Panel::channelRack), key (Panel::pianoRoll), key (Panel::mixer), key (Panel::browser) });
+    ui::postHint (hint, 15000);
 }
 
 void MainComponent::refreshPanelButtons()
@@ -3115,7 +3144,7 @@ juce::String MainComponent::keyMarkup (const char* actionId) const
         return {};
 
     // "Ctrl+Shift+S" -> "[Ctrl][Shift][S]"; a key name that is not markup stays as text
-    const auto text = juce::String (keys::toString (chords.front()));
+    const auto text = juce::String (keys::displayString (chords.front()));
     juce::String out;
 
     for (const auto& part : juce::StringArray::fromTokens (text, "+", ""))
@@ -4199,6 +4228,7 @@ void MainComponent::openSettings (int page)
         o.selectFirstChannelWithNotes = ChannelRackComponent::selectFirstChannelWithNotes;
         o.alternateUndo = safe->alternateUndo;
         o.rememberSeek = EditorGlobals::get().rememberSeek;
+        o.stretchedClipsLoop = stretchedClipsLoop();
         o.editPatternsIn = PlaylistComponent::editPatternsIn;
         o.undoLevels = safe->engine.getUndoLevels();
         o.autosaveMinutes = safe->autosaveMinutes;
@@ -4262,6 +4292,11 @@ void MainComponent::openSettings (int page)
         ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
         self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;
+        if (o.stretchedClipsLoop != stretchedClipsLoop())
+        {
+            setStretchedClipsLoop (o.stretchedClipsLoop);
+            self.repaint(); // the Playlist draws what plays
+        }
         PlaylistComponent::editPatternsIn = juce::jlimit (0, 2, o.editPatternsIn);
         self.startup.splash = o.splash;
         self.startup.sound = o.startupSound;
@@ -5143,7 +5178,7 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
                                     : b.context == keys::Context::pianoRoll   ? "Piano Roll"
                                                                                : "Channel Rack")
                      << ")";
-            functionKeys.push_back ({ juce::String (keys::toString (b.chord)), text });
+            functionKeys.push_back ({ juce::String (keys::displayString (b.chord)), text });
         }
 
     struct Sheet final : juce::Component

@@ -2420,6 +2420,7 @@ public:
 
     // a slide note (issue #14): FL hands this MIDI-driven plugin its pitch as a pitch bend (ProcessEvent 4), so the
     // glide from the last note to the slide's pitch goes out the same way, on top of the channel pitch
+    bool followsSlides() const noexcept override { return true; } // (round 168l: a Mono channel's notes)
     void slideTo (int key, float cents, float samples) noexcept override
     {
         if (lastKey < 0 || std::none_of (sounding.begin(), sounding.end(), [] (int k) { return k >= 0; }))

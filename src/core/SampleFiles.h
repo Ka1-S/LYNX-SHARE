@@ -6,11 +6,12 @@
 
 namespace lynx
 {
-// The audio files LYNX loads as samples, by extension: wav, aif(f), flac, ogg, mp3 and FL's WavPack (.wv, FL's own
-// sample packs). Every drop target (Channel Rack, Playlist, Newtone...) and the Browser ask this through
+// The audio files LYNX loads as samples, by extension: wav, aif(f), flac, ogg, mp3, FL's WavPack (.wv, FL's own
+// sample packs) and FL's speech files (.speech: spoken by LYNX's speech synthesizer, core/Speech.h, like FL's sample
+// loader speaks them; round 168b). Every drop target (Channel Rack, Playlist, Newtone...) and the Browser ask this through
 // SampleLibrary::isSampleFile, so they all take what the Browser lists (round 165q: the Channel Rack ignored the .wv
 // pack samples dropped from the Browser).
-inline constexpr std::array<std::string_view, 7> sampleFileExtensions { "wav", "aif", "aiff", "flac", "ogg", "mp3", "wv" };
+inline constexpr std::array<std::string_view, 8> sampleFileExtensions { "wav", "aif", "aiff", "flac", "ogg", "mp3", "wv", "speech" };
 
 // `extension` with or without its leading dot, in any case ("WAV", ".wv").
 inline bool isSampleExtension (std::string_view extension)
