@@ -185,7 +185,7 @@ public:
                 [this] (bool on) { options.menuEntry = on; });
         menuEntry.setVisible (runningAsAppImage());
 
-        toggle (typingPiano, tr ("Typing keyboard as a piano"), options.typingPiano, [this] (bool on) { options.typingPiano = on; });
+        toggle (typingPiano, tr ("Typing keyboard to piano"), options.typingPiano, [this] (bool on) { options.typingPiano = on; });
         toggle (keepEditors, tr ("Keep channel editors open (a channel button click doesn't close the previous editor)"), options.keepEditorsOpen,
                 [this] (bool on) { options.keepEditorsOpen = on; });
         toggle (firstChannel, tr ("Select first channel with notes when the pattern changes"), options.selectFirstChannelWithNotes,
