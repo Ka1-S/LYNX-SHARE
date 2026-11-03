@@ -29,6 +29,8 @@
 #include "core/Dx10.h"
 #include "core/Kepler.h"
 #include "core/PoiZone.h"
+#include "core/LynxBanks.h"
+#include "core/ModelParams.h"
 #include "core/BassDrum.h"
 #include "core/FruitKick.h"
 #include "core/Toxic.h"
@@ -433,6 +435,36 @@ private:
     LfoEditor lfos;
 };
 
+// A Sampler knob: right-click opens its automation menu instead of moving it (issue #12)
+class MenuSlider final : public juce::Slider
+{
+public:
+    std::function<void()> onMenu;
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        menuClick = e.mods.isPopupMenu() && onMenu != nullptr;
+        if (menuClick)
+            onMenu();
+        else
+            juce::Slider::mouseDown (e);
+    }
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (! menuClick)
+            juce::Slider::mouseDrag (e);
+    }
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        if (! menuClick)
+            juce::Slider::mouseUp (e);
+        menuClick = false;
+    }
+
+private:
+    bool menuClick = false;
+};
+
 // Physical-model channels (Sakura, Drumpad; REA_rodada28): knobs for the main raw FL parameters (0..1)
 class ModelPanel final : public juce::Component,
                          public juce::DragAndDropTarget,
@@ -572,21 +604,11 @@ public:
             { 0, "Output" }, { 6, "Base" }, { 7, "Peak" }, { 8, "Slide" }, { 2, "Duration" }, { 5, "Attack" }, { 4, "Drive" },
             { 3, "Butt" }, { 15, "Click level" }, { 14, "Click freq" }, { 13, "Click cut" }, { 21, "Noise mix" }, { 22, "Noise filter" },
             { 20, "Noise pitch" }, { 19, "Noise start" }, { 1, "Sampling" } };
-        // Toxic Biohazard: the plugin's 0…1 parameters P[i] inside the saved state (REA_rodada45)
-        static const FloatKnob toxicKnobs[] = {
-            { 0, "Gain" }, { 1, "Distortion" }, { 3, "Attack" }, { 4, "Decay" }, { 5, "Sustain" }, { 6, "Release" },
-            { 15, "Cutoff" }, { 16, "Resonance" }, { 23, "Filter env" }, { 8, "Uni detune" }, { 9, "Uni pan" },
-            { 10, "Glide" }, { 7, "Vel curve" }, { 2, "Transpose" } };
         // MiniSynth: its 43 floats 0…1 inside the saved state (REA_rodada41 §1.2)
         static const FloatKnob miniSynthKnobs[] = {
             { 5, "Osc kind" }, { 6, "Osc mod" }, { 7, "Noise" }, { 1, "Transpose" }, { 8, "Cutoff" }, { 9, "Resonance" },
             { 16, "Filter env" }, { 21, "Attack" }, { 22, "Decay" }, { 23, "Sustain" }, { 24, "Release" }, { 20, "LFO amount" },
             { 19, "LFO rate" }, { 2, "Slide time" } };
-        // PoiZone: the plugin's own floats P[i] inside the saved state (REA_rodada44 §1.3)
-        static const FloatKnob poizoneKnobs[] = {
-            { 15, "Gain" }, { 8, "Osc balance" }, { 9, "Noise" }, { 18, "Cutoff" }, { 19, "Resonance" }, { 10, "EG amount" },
-            { 22, "Attack" }, { 23, "Decay" }, { 24, "Sustain" }, { 25, "Release" }, { 26, "LFO amount" }, { 28, "LFO rate" },
-            { 46, "Glide" }, { 38, "Delay wet" }, { 42, "Chorus wet" }, { 47, "Gate mix" } };
         auto paramOffset = [this] (const std::vector<std::uint8_t>& st, int index) {
             return gms ? gmsParamOffset (st, index)
                        : miniSynth ? miniSynthParamOffset (st, index)
@@ -950,7 +972,24 @@ public:
             addAndMakeVisible (*knob);
             knobs.push_back (std::move (knob));
         };
-        if (flKeys)
+        // an engine whose parameters are listed (core/ModelParams.h, round 168n): one knob per parameter, automatable
+        // (right-click: FL's parameter menu; a move is a tweak)
+        instrumentKind = def.instrument;
+        modelTable = modelparams::tableOf (def.instrument);
+        if (modelTable != nullptr && ! modelparams::rawValue (def, modelTable->params->front().index))
+            modelTable = nullptr; // (a state the engine can't read: the plain page)
+        if (modelTable != nullptr)
+        {
+            for (const auto& p : *modelTable->params)
+                addModelParam (def, p);
+            // Toxic Biohazard without the user's DLL: the drawn wave (0) and the sine (1) only — the built-in waves
+            // 2…32 are FL's files
+            if (toxic && ! toxicDllUsable (def.samplePath))
+                for (auto& k : knobs)
+                    if (k->getName().endsWith (" wave"))
+                        k->setRange (0.0, 1.0, 1.0);
+        }
+        else if (flKeys)
             for (int i = 0; i < 15; ++i)
                 addFlKeys (i);
         else if (plucked)
@@ -998,9 +1037,6 @@ public:
         else if (morphine)
             for (const auto& k : morphineKnobs)
                 addFloat (k);
-        else if (poizone)
-            for (const auto& k : poizoneKnobs)
-                addFloat (k);
         else if (miniSynth)
             for (const auto& k : miniSynthKnobs)
                 addFloat (k);
@@ -1015,9 +1051,6 @@ public:
         else if (sytrus)
             for (int i = 0; i < (int) sytrus::settings().size(); ++i)
                 addSytrus (i);
-        else if (toxic)
-            for (const auto& k : toxicKnobs)
-                addFloat (k);
         else if (ogun)
         {
             for (const auto& k : ogunKnobs)
@@ -1099,10 +1132,75 @@ public:
                 k->setPopupDisplayEnabled (true, true, this);
                 k->setTooltip (k->getName());
             }
+            updateConditional();
             // FL's size × 1.25, at most about 1200 × 760 (big pages such as Harmor's fit a laptop screen)
             const auto f = juce::jmin (layoutScale, 1200.0f / (float) layout->width, 720.0f / (float) layout->height);
             setSize ((int) std::ceil (f * (float) layout->width) + 16, (int) std::ceil (f * (float) layout->height) + layoutTop + 8);
         }
+    }
+
+    // a knob of a listed engine parameter (round 168n): raw range of the state, automation target channelParam
+    void addModelParam (const ChannelDef& def, const EngineParam& p)
+    {
+        auto knob = std::make_unique<MenuSlider>();
+        knob->setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+        knob->setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 16);
+        knob->setRange (p.low, p.high, p.stepped ? 1.0 : 0.0);
+        knob->setValue (modelparams::rawValue (def, p.index).value_or (p.low), juce::dontSendNotification);
+        knob->setDoubleClickReturnValue (false, 0.0);
+        knob->setName (juce::String::fromUTF8 (p.name.c_str()));
+        const auto index = p.index;
+        knob->onValueChange = [this, index, s = knob.get()] {
+            ref.edit (engine, [index, v = (float) s->getValue()] (ChannelDef& c) { modelparams::setRawValue (c, index, v); });
+            if (layout != nullptr)
+            {
+                updateConditional();
+                repaint();
+            }
+        };
+        if (ref.index >= 0) // (a Patcher node: no automation target)
+        {
+            const auto target = [this, index] { return AutomationTarget { AutomationTargetKind::channelParam, ref.index, 0, index }; };
+            ui::setOwnMenu (*knob);
+            knob->onMenu = [this, k = knob.get(), target] { ui::showSliderMenu (*k, &engine, target()); };
+            knob->onDragStart = [this, target] { engine.noteTweaked (target(), true); };
+            knob->onDragEnd = [this, target] { engine.tweakReleased (target()); };
+        }
+        addAndMakeVisible (*knob);
+        knobs.push_back (std::move (knob));
+    }
+
+    // the items shown only while another control is within a range (LayoutItem::whenParam, e.g. an effect slot's
+    // fields for its type): their knobs follow
+    bool conditionHolds (const plugui::LayoutItem& item) const
+    {
+        auto holds = [this] (const char* param, float lo, float hi) {
+            if (param == nullptr)
+                return true;
+            const auto* k = knobFor (param);
+            if (k == nullptr)
+                return true;
+            const auto v = normalised (*k); // (0…1 over the knob's range, as the effect layouts' conditions)
+            return v >= lo && (v < hi || (hi >= 1.0f && v <= hi));
+        };
+        return (item.page < 0 || item.page == page) && holds (item.whenParam, item.whenMin, item.whenMax)
+               && holds (item.when2Param, item.when2Min, item.when2Max);
+    }
+
+    void showPage (int p)
+    {
+        page = p;
+        updateConditional();
+        repaint();
+    }
+
+    void updateConditional()
+    {
+        if (layout == nullptr)
+            return;
+        for (auto& k : knobs)
+            if (const auto* item = itemFor (k->getName()); item != nullptr && (item->type == plugui::Item::knob || item->type == plugui::Item::vslider || item->type == plugui::Item::hslider))
+                k->setVisible (conditionHolds (*item));
     }
 
     // --- FL's arrangement ------------------------------------------------------------------------------
@@ -1168,6 +1266,14 @@ public:
         return { r.getX() + w * (float) (o % columns), r.getY() + h * (float) (o / columns), w, h };
     }
 
+    // a tabs item's segment o of `count` (left to right)
+    juce::Rectangle<float> tabCell (const plugui::LayoutItem& item, int o, int count) const
+    {
+        const auto r = layoutRect (item);
+        const auto w = r.getWidth() / (float) juce::jmax (1, count);
+        return { r.getX() + w * (float) o, r.getY(), w, r.getHeight() };
+    }
+
     // a small drawing of an oscillator shape (3x Osc's shape buttons)
     static void drawShape (juce::Graphics& g, juce::Rectangle<float> r, const juce::String& name)
     {
@@ -1214,11 +1320,67 @@ public:
 
         for (const auto& item : layout->items)
         {
+            if (! conditionHolds (item))
+                continue;
             const auto r = layoutRect (item);
             const auto dimmed = (item.style & plugui::dim) != 0;
             auto* k = knobFor (item.param);
             switch (item.type)
             {
+                case plugui::Item::tabs: // a row of segmented buttons (round 168n); pageTabs: the layout's pages
+                    if ((item.style & plugui::pageTabs) != 0)
+                    {
+                        const auto labels = plugui::optionLabels (item);
+                        for (int o = 0; o < (int) labels.size(); ++o)
+                        {
+                            const auto cell = tabCell (item, o, (int) labels.size()).reduced (1.5f * f, 2.0f * f);
+                            skin::button (g, cell, o == page, false, accent, radius::sm * f);
+                            g.setColour (o == page ? colour::onAccent : colour::textSecondary);
+                            g.setFont (font (juce::jmax (8.0f, juce::jmin (11.0f * f, cell.getHeight() * 0.62f)), true));
+                            g.drawFittedText (tr (labels[(std::size_t) o]), cell.reduced (2.0f * f, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.6f);
+                        }
+                    }
+                    else if (k != nullptr)
+                    {
+                        const auto labels = plugui::optionLabels (item);
+                        const auto chosen = plugui::optionAt (item, normalised (*k));
+                        for (int o = 0; o < (int) labels.size(); ++o)
+                        {
+                            const auto cell = tabCell (item, o, (int) labels.size()).reduced (1.5f * f, 2.0f * f);
+                            skin::button (g, cell, o == chosen, false, accent, radius::sm * f);
+                            g.setColour (o == chosen ? colour::onAccent : colour::textSecondary);
+                            g.setFont (font (juce::jmax (8.0f, juce::jmin (11.0f * f, cell.getHeight() * 0.62f)), true));
+                            g.drawFittedText (tr (labels[(std::size_t) o]), cell.reduced (2.0f * f, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.6f);
+                        }
+                    }
+                    break;
+                case plugui::Item::menu: // a choice list: the current option and ▾ (round 168n)
+                    if (k != nullptr)
+                    {
+                        const auto labels = plugui::optionLabels (item);
+                        const auto chosen = plugui::optionAt (item, normalised (*k));
+                        auto box = r;
+                        if (item.label != nullptr && (item.style & plugui::noCaption) == 0)
+                            caption (item.label, box.removeFromTop (12.0f * f), dimmed, juce::Justification::centredLeft);
+                        skin::valuePlate (g, box, radius::sm * f);
+                        g.setColour (colour::textPrimary);
+                        g.setFont (font (juce::jmax (8.0f, juce::jmin (11.0f * f, box.getHeight() * 0.62f)), true));
+                        const auto text = juce::isPositiveAndBelow (chosen, (int) labels.size()) ? tr (labels[(std::size_t) chosen]) : juce::String();
+                        g.drawFittedText (text, box.reduced (4.0f * f, 0.0f).withTrimmedRight (10.0f * f).toNearestInt(), juce::Justification::centredLeft, 1, 0.6f);
+                        g.setColour (colour::textSecondary);
+                        g.drawText (juce::String::fromUTF8 ("\xe2\x96\xbe"), box.withTrimmedLeft (box.getWidth() - 12.0f * f), juce::Justification::centred, false);
+                    }
+                    break;
+                case plugui::Item::value: // the control's value as text (round 168n)
+                    if (k != nullptr)
+                    {
+                        skin::valuePlate (g, r, radius::sm * f);
+                        g.setColour (colour::textPrimary);
+                        g.setFont (font (juce::jmax (8.0f, juce::jmin (11.0f * f, r.getHeight() * 0.7f)), true));
+                        g.drawFittedText (k->getTextFromValue (k->getValue()), r.reduced (3.0f * f, 0.0f).toNearestInt(),
+                                          (item.style & plugui::alignLeft) != 0 ? juce::Justification::centredLeft : juce::Justification::centred, 1, 0.6f);
+                    }
+                    break;
                 case plugui::Item::section:
                     skin::section (g, r, radius::lg * f, (item.style & plugui::raised) != 0, accent);
                     if (item.label != nullptr && (item.style & plugui::boxed) == 0)
@@ -1241,9 +1403,9 @@ public:
                     else
                         caption (item.label, r, dimmed, (item.style & plugui::alignLeft) != 0 ? juce::Justification::centredLeft : juce::Justification::centred);
                     break;
-                case plugui::Item::knob:
+                case plugui::Item::knob: // (a small knob's caption may use some room on both sides, as a fader's does)
                     if ((item.style & plugui::noCaption) == 0)
-                        caption (item.label, r.withTop (r.getBottom() - 12.0f * f), dimmed, juce::Justification::centred);
+                        caption (item.label, r.withTop (r.getBottom() - 12.0f * f).expanded (juce::jmax (0.0f, 52.0f * f - r.getWidth()) * 0.5f, 0.0f), dimmed, juce::Justification::centred);
                     break;
                 case plugui::Item::vslider:
                 case plugui::Item::hslider:
@@ -1328,6 +1490,39 @@ public:
                                 g.setColour (accent);
                                 g.drawEllipse (juce::Rectangle<float> (10.0f * f, 10.0f * f).withCentre (pt), 2.0f);
                             }
+                    if (juce::String (item.display) == "toxicwave" && item.param != nullptr) // round 168n: the wave's cycle
+                    {
+                        const juce::String name (item.param);
+                        const auto n = name.fromFirstOccurrenceOf (" ", false, false).getIntValue();
+                        const auto slot = name.startsWith ("LFO") ? 5 + n : n - 1;
+                        const auto inner = r.reduced (5.0f * f, 6.0f * f);
+                        const auto shape = toxicWaveShape (def.pluginState, def.samplePath, slot, 96);
+                        if (shape.empty())
+                        {
+                            g.setColour (colour::textSecondary);
+                            g.setFont (font (juce::jmax (8.0f, 9.5f * f)));
+                            g.drawFittedText (tr ("Needs FL Studio's files"), inner.toNearestInt(), juce::Justification::centred, 2, 0.7f);
+                        }
+                        else
+                        {
+                            g.setColour (colour::gridBeat);
+                            g.drawHorizontalLine ((int) inner.getCentreY(), inner.getX(), inner.getRight());
+                            juce::Path wave;
+                            for (int i = 0; i < (int) shape.size(); ++i)
+                            {
+                                const juce::Point<float> pt { inner.getX() + inner.getWidth() * (float) i / (float) (shape.size() - 1),
+                                                              inner.getCentreY() - inner.getHeight() * 0.5f * shape[(std::size_t) i] };
+                                if (i == 0)
+                                    wave.startNewSubPath (pt);
+                                else
+                                    wave.lineTo (pt);
+                            }
+                            g.setColour (accent.withAlpha (0.25f));
+                            g.strokePath (wave, juce::PathStrokeType (3.0f * f));
+                            g.setColour (accent.brighter (0.3f));
+                            g.strokePath (wave, juce::PathStrokeType (1.3f * f));
+                        }
+                    }
                     if (juce::String (item.display) == "flkeysname")
                         if (const auto st = flkeys::parseState (def.pluginState))
                         {
@@ -1382,11 +1577,54 @@ public:
     {
         if (layout == nullptr)
             return;
+        for (const auto& item : layout->items) // the page switches first (they edit no parameter)
+            if (item.type == plugui::Item::tabs && (item.style & plugui::pageTabs) != 0 && layoutRect (item).contains (e.position) && conditionHolds (item))
+            {
+                const auto count = (int) plugui::optionLabels (item).size();
+                for (int o = 0; o < count; ++o)
+                    if (tabCell (item, o, count).contains (e.position))
+                        showPage (o);
+                return;
+            }
         for (const auto& item : layout->items)
         {
             auto* k = knobFor (item.param);
-            if (k == nullptr || ! layoutRect (item).contains (e.position))
+            if (k == nullptr || ! layoutRect (item).contains (e.position) || ! conditionHolds (item)
+                || item.type == plugui::Item::knob || item.type == plugui::Item::vslider || item.type == plugui::Item::hslider
+                || item.type == plugui::Item::section || item.type == plugui::Item::label)
                 continue;
+            if (e.mods.isPopupMenu() && ref.index >= 0 && modelTable != nullptr) // a switch / tabs: FL's parameter menu
+            {
+                if (const auto* p = modelparams::findByName (instrumentKind, k->getName().toStdString()))
+                    ui::showSliderMenu (*k, &engine, AutomationTarget { AutomationTargetKind::channelParam, ref.index, 0, p->index });
+                return;
+            }
+            if (item.type == plugui::Item::menu)
+            {
+                const auto labels = plugui::optionLabels (item);
+                const auto chosen = plugui::optionAt (item, normalised (*k));
+                juce::PopupMenu menu;
+                for (int o = 0; o < (int) labels.size(); ++o)
+                    menu.addItem (tr (labels[(std::size_t) o]), true, o == chosen,
+                                  [safe = juce::Component::SafePointer<ModelPanel> (this), name = k->getName(), value = plugui::optionValue (item, o)] {
+                                      if (safe == nullptr)
+                                          return;
+                                      if (auto* knob = safe->knobFor (name.toRawUTF8()))
+                                          setNormalised (*knob, value);
+                                      safe->repaint();
+                                  });
+                menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea (localAreaToGlobal (layoutRect (item).toNearestInt())));
+                return;
+            }
+            if (item.type == plugui::Item::tabs)
+            {
+                const auto count = (int) plugui::optionLabels (item).size();
+                for (int o = 0; o < count; ++o)
+                    if (tabCell (item, o, count).contains (e.position))
+                        setNormalised (*k, plugui::optionValue (item, o));
+                repaint();
+                return;
+            }
             if (item.type == plugui::Item::display && juce::String (item.display) == "xy")
             {
                 xyItem = &item;
@@ -1638,39 +1876,12 @@ private:
     int editorKey = 60;
     std::vector<std::unique_ptr<juce::Slider>> knobs;
     const plugui::Layout* layout = nullptr;
+    const modelparams::Table* modelTable = nullptr; // the engine's listed parameters (round 168n)
+    InstrumentKind instrumentKind = InstrumentKind::synth;
+    int page = 0; // the layout's page shown (pageTabs items switch it; round 168n)
     const plugui::LayoutItem* xyItem = nullptr; // the pad being dragged
     juce::TextButton sampleButton; // (a Granulizer node: round 165c)
     std::unique_ptr<juce::FileChooser> chooser;
-};
-
-// A Sampler knob: right-click opens its automation menu instead of moving it (issue #12)
-class MenuSlider final : public juce::Slider
-{
-public:
-    std::function<void()> onMenu;
-
-    void mouseDown (const juce::MouseEvent& e) override
-    {
-        menuClick = e.mods.isPopupMenu() && onMenu != nullptr;
-        if (menuClick)
-            onMenu();
-        else
-            juce::Slider::mouseDown (e);
-    }
-    void mouseDrag (const juce::MouseEvent& e) override
-    {
-        if (! menuClick)
-            juce::Slider::mouseDrag (e);
-    }
-    void mouseUp (const juce::MouseEvent& e) override
-    {
-        if (! menuClick)
-            juce::Slider::mouseUp (e);
-        menuClick = false;
-    }
-
-private:
-    bool menuClick = false;
 };
 
 // FL's Sampler › "Precomputed effects", the loop flags and the declicking mode (REA_rodada167h §1–§3): computed once on
@@ -3114,7 +3325,7 @@ public:
         porta.setTooltip (tr ("Portamento: each note glides from the previous one's pitch (the Slide knob sets the time)"));
         porta.onClick = [this] { edit ([on = porta.getToggleState()] (ChannelDef& d) { setChannelPortamento (d, on, channelPortamentoBeats (d)); }); };
         mono.setButtonText (tr ("Mono"));
-        mono.setTooltip (tr ("Mono: one voice; a new note takes over the sounding one"));
+        mono.setTooltip (tr ("Mono: one voice; a note played over a held one glides to it (Slide time) without a new attack"));
         mono.onClick = [this] { edit ([on = mono.getToggleState()] (ChannelDef& d) { setChannelMono (d, on); }); };
         // Time
         swing = knob ([name] { return ui::percentSpec (name() + " - " + tr ("Swing mix"), 1.0); },
@@ -3635,8 +3846,10 @@ public:
     static bool wanted (const AudioEngine& engine, int channel)
     {
         const auto& song = engine.getSong();
-        return juce::isPositiveAndBelow (channel, (int) song.channels.size())
-               && ! natives::presetFolderOf (song.channels[(std::size_t) channel].instrument).empty();
+        if (! juce::isPositiveAndBelow (channel, (int) song.channels.size()))
+            return false;
+        const auto kind = song.channels[(std::size_t) channel].instrument;
+        return ! natives::presetFolderOf (kind).empty() || banks::hasBank (kind);
     }
 
     void resized() override
@@ -3675,7 +3888,13 @@ private:
         const auto kind = d != nullptr ? d->instrument : InstrumentKind::synth;
         if (! loaded || kind != listedKind)
         {
-            presets = presetcycle::listPresets (presetcycle::pluginPresetFolders (flStudioAccess().roots, true, natives::presetFolderOf (kind)));
+            const auto folder = natives::presetFolderOf (kind);
+            presets = folder.empty() ? std::vector<presetcycle::Preset>()
+                                     : presetcycle::listPresets (presetcycle::pluginPresetFolders (flStudioAccess().roots, true, folder));
+            // LYNX's own bank after FL's presets (round 168n): the only presets without FL Studio
+            const auto& bank = banks::bankOf (kind);
+            for (int i = 0; i < (int) bank.size(); ++i)
+                presets.push_back ({ banks::pathOf (i), banks::relativeOf (bank[(std::size_t) i]), bank[(std::size_t) i].name });
             listedKind = kind;
             loaded = true;
             current = d != nullptr ? presetcycle::indexOfName (presets, d->name) : -1; // (a channel named after its preset)
@@ -3706,7 +3925,8 @@ private:
         if (d == nullptr || ! juce::isPositiveAndBelow (index, (int) all.size()))
             return false;
         const auto& preset = all[(std::size_t) index];
-        auto changed = natives::withPreset (*d, preset.path, preset.name, flStudioAccess());
+        const auto bankIndex = banks::indexOfPath (preset.path);
+        auto changed = bankIndex >= 0 ? banks::withPreset (*d, bankIndex) : natives::withPreset (*d, preset.path, preset.name, flStudioAccess());
         if (! changed)
         {
             if (reportFailure)

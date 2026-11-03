@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.22)
 # macOS: Big Sur or newer (universal builds pass -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"); set before project()
 set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version")
 
-project(LYNX VERSION 0.1.21 LANGUAGES C CXX)
+project(LYNX VERSION 0.1.22 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -161,6 +161,10 @@ add_library(lynx_core STATIC
     src/core/FormulaController.cpp
     src/core/VoiceShift.cpp
     src/core/NativeEngines.cpp
+    src/core/LynxBanks.cpp
+    src/core/ModelParams.cpp
+    src/core/ToxicBank.cpp
+    src/core/PoiZoneBank.cpp
     src/core/Layer.cpp
     src/core/XyController.cpp
     src/core/FlCurve.cpp
@@ -434,7 +438,9 @@ if(LYNX_BUILD_APP)
         src/ui/QuickAddPalette.cpp
         src/ui/PluginPicker.cpp
         src/ui/CrashReporter.cpp
-        src/ui/Updater.cpp)
+        src/ui/Updater.cpp
+        src/ui/StemExtract.cpp)
+    target_include_directories(LYNX PRIVATE third_party/onnxruntime) # loaded at run time, never linked
 
     target_include_directories(LYNX PRIVATE third_party/clap/include)
     # the commit the build comes from (crash reports name it, round 159)

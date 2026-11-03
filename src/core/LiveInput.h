@@ -7,6 +7,7 @@
 #include <array>
 #include <atomic>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "core/Meters.h"
@@ -127,6 +128,62 @@ struct LiveInput
 
     // audio -> UI: peak of each insert's input source, monitored or not
     MeterBank meters;
+
+    // Recording taps (round 168x, issue #41: FL's "Record" positions after the input). While a take records insert
+    // `track` at `point` (RecordSource), the renderer copies the insert's signal at that point into `data` (the audio
+    // callback's block: sample i of the block at index i). The UI sets track / point before the takes are published
+    // and clears them after; the buffers are allocated once here and never resized.
+    struct Tap
+    {
+        std::atomic<int> track { -1 };
+        std::atomic<int> point { 0 };
+        std::array<std::vector<float>, 2> data;
+    };
+    static constexpr int maxTaps = 16;
+    static constexpr int tapCapacity = 16384; // frames per callback block (more: the block is lost to silence)
+    std::array<Tap, maxTaps> taps;
+    std::atomic<int> tapCount { 0 }; // taps in use; 0 = the renderer does no tap work at all
+
+    LiveInput()
+    {
+        for (auto& t : taps)
+            for (auto& d : t.data)
+                d.assign ((std::size_t) tapCapacity, 0.0f);
+    }
+
+    // renderer (audio thread): insert t's signal at `point`, samples [offset, offset + n) of the callback block
+    void tap (int t, RecordSource point, const float* l, const float* r, int offset, int n) noexcept
+    {
+        if (offset < 0 || offset + n > tapCapacity)
+            return;
+        for (auto& k : taps)
+            if (k.track.load (std::memory_order_relaxed) == t && k.point.load (std::memory_order_relaxed) == (int) point)
+            {
+                std::copy (l, l + n, k.data[0].data() + offset);
+                std::copy (r, r + n, k.data[1].data() + offset);
+            }
+    }
+    // where the tap of insert t at `point` takes samples [offset, offset + n) of the block (nullptrs: not tapped)
+    std::pair<float*, float*> tapDestination (int t, RecordSource point, int offset, int n) noexcept
+    {
+        if (offset < 0 || offset + n > tapCapacity)
+            return { nullptr, nullptr };
+        for (auto& k : taps)
+            if (k.track.load (std::memory_order_relaxed) == t && k.point.load (std::memory_order_relaxed) == (int) point)
+                return { k.data[0].data() + offset, k.data[1].data() + offset };
+        return { nullptr, nullptr };
+    }
+    // whether insert t is tapped at all (and at which points, as a bit set of RecordSource values)
+    unsigned tappedPoints (int t) const noexcept
+    {
+        unsigned bits = 0;
+        if (tapCount.load (std::memory_order_relaxed) == 0)
+            return 0;
+        for (const auto& k : taps)
+            if (k.track.load (std::memory_order_relaxed) == t)
+                bits |= 1u << k.point.load (std::memory_order_relaxed);
+        return bits;
+    }
 
     const float* channel (int c, int offset) const noexcept
     {

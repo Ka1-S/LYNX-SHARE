@@ -39,8 +39,9 @@ TEST (rea139_max_polyphony_releases_the_oldest_and_export_lifts_it)
     order.noteOff (64);
     CHECK (order.noteOn (70, 2) == -1 && order.oldest() == 67);
     CHECK (order.noteOn (67, 2) == -1 && order.oldest() == 70); // played again: the newest
+    // (round 168l: FL's limiter does not run on a Mono channel at all, FLEngine 0xd293d0)
     CHECK (lynx::voiceLimitFor (0, false) == 0 && lynx::voiceLimitFor (1, true) == 0 && lynx::voiceLimitFor (1, false) == 1
-           && lynx::voiceLimitFor (4, true) == 4);
+           && lynx::voiceLimitFor (4, true) == 0);
 
     // in the renderer: a chord of 4 on a channel limited to 2 keeps 2 voices
     auto song = lynx::Song::makeDefault();

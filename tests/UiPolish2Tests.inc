@@ -63,7 +63,8 @@ TEST (polish_clip_ghost_notes)
     song.patterns[1].notes.push_back (other);
 
     // pattern 0 (the one being edited) plays bars 2-3; pattern 1 (one bar long) has a clip stretched over bars 1-4,
-    // which plays it once (FL, round 168k: no repeats → nothing in bars 2-3), and a 1-bar clip at bar 3
+    // which plays it once in FL (round 168k: no repeats → nothing in bars 2-3) and loops it with the LYNX extra
+    // "Stretched pattern clips loop their pattern" (on by default), and a 1-bar clip at bar 3
     lynx::Clip home;
     home.pattern = 0;
     home.start = bar;
@@ -79,6 +80,8 @@ TEST (polish_clip_ghost_notes)
     clip2.track = 2;
     song.playlist = { clip1, home, clip2 };
 
+    const auto wasLooping = lynx::stretchedClipsLoop();
+    lynx::setStretchedClipsLoop (false); // FL's behaviour (the LYNX extra off)
     auto ghosts = lynx::polish::clipGhostNotes (song, 0, 0);
     CHECK (ghosts.size() == 1); // only the clip at bar 3
     CHECK (ghosts.size() == 1 && ghosts[0].start == bar + lynx::ppq);
@@ -87,9 +90,21 @@ TEST (polish_clip_ghost_notes)
     // not in the Playlist: nothing
     CHECK (lynx::polish::clipGhostNotes (song, 2, 0).empty());
 
-    // a muted clip is not heard: no ghosts from it
+    // the LYNX extra on (the default, issue #25): the stretched clip loops its pattern, so its passes in bars 2 and 3
+    // are ghosts too
+    lynx::setStretchedClipsLoop (true);
     song.playlist[2].muted = true;
+    ghosts = lynx::polish::clipGhostNotes (song, 0, 0);
+    CHECK (ghosts.size() == 2 && ghosts[0].start == lynx::ppq && ghosts[1].start == bar + lynx::ppq);
+    CHECK (ghosts.size() == 2 && ghosts[0].key == 60 && ghosts[0].channel == 0);
+
+    // a muted clip is not heard: no ghosts from it
+    lynx::setStretchedClipsLoop (false);
     CHECK (lynx::polish::clipGhostNotes (song, 0, 0).empty());
+    song.playlist[0].muted = true;
+    lynx::setStretchedClipsLoop (true);
+    CHECK (lynx::polish::clipGhostNotes (song, 0, 0).empty());
+    lynx::setStretchedClipsLoop (wasLooping);
 }
 
 TEST (polish_track_layout)

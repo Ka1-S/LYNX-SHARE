@@ -1,3 +1,4 @@
+#include "ui/FlMods.h"
 #include "ui/PianoRollComponent.h"
 #include "core/KeyMap.h"
 #include "core/NoteNames.h"
@@ -1455,7 +1456,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
         // zoom the time (drag up = zoom in, sideways = scroll)
         const auto onNotes = gridArea().contains (e.getPosition());
         const auto onRuler = e.y >= rulerTop && e.y < headerHeight && e.x >= keyboardWidth;
-        if (onKeyboard || (onNotes && e.mods.isCtrlDown() && ! e.mods.isAltDown()))
+        if (onKeyboard || (onNotes && flmods::ctrl (e.mods) && ! e.mods.isAltDown()))
         {
             beginKeyZoom (e);
             return;
@@ -1475,7 +1476,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
 
     if (onKeyboard)
     {
-        if (e.mods.isCtrlDown()) // Ctrl+click / drag: selects the notes of a key (range)
+        if (flmods::ctrl (e.mods)) // Ctrl+click / drag: selects the notes of a key (range)
         {
             drag = Drag::keySelect;
             selectionBefore = e.mods.isShiftDown() ? selection : std::vector<int> {};
@@ -1497,18 +1498,21 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
-    // ruler: right-click = the Time markers menu (on a marker: its own items), as FL's
-    if (e.y >= rulerTop && e.y < headerHeight && e.x >= keyboardWidth && e.mods.isPopupMenu())
-    {
-        if (const auto m = markerAtX (e.x); m >= 0)
-            showPatternMarkerMenu (m);
-        else
-            markersMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
-        return;
-    }
+    // ruler: a right press on a pattern marker opens its menu (FL's TimePanelMouseDown: the marker menu when the press
+    // is on the marker lane, REA_rodada168t.md table); the Time markers items are also in the More menu (round 168g)
+    if (e.y >= rulerTop && e.y < headerHeight && e.x >= keyboardWidth && e.mods.isRightButtonDown() && ! flmods::ctrl (e.mods))
+        if (const auto mk = markerAtX (e.x); mk >= 0)
+        {
+            showPatternMarkerMenu (mk);
+            return;
+        }
 
-    // ruler: Ctrl+drag selects the notes in a time range
-    if (e.y >= rulerTop && e.y < headerHeight && e.x >= keyboardWidth && e.mods.isCtrlDown() && e.mods.isLeftButtonDown())
+    // ruler: a time-range drag selects the notes in it. FL 2026 (one ruler handler for the Piano roll and the Playlist,
+    // TimePanelMouseDown 0xe56bf0, REA_rodada168t.md): Ctrl+drag, a double click held and dragged, the Select tool, or
+    // a right-drag (on a Mac Cmd or Control: core/ModifierMap.h)
+    if (e.y >= rulerTop && e.y < headerHeight && e.x >= keyboardWidth
+        && ((e.mods.isLeftButtonDown() && (flmods::ctrl (e.mods) || e.getNumberOfClicks() >= 2 || tools.getTool() == EditTool::lasso))
+            || (e.mods.isRightButtonDown() && ! flmods::ctrl (e.mods))))
     {
         drag = Drag::rulerSelect;
         selectionBefore = e.mods.isShiftDown() ? selection : std::vector<int> {};
@@ -1572,7 +1576,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
         return;
 
     // the selection's stretch handle: drag scales the selected notes in time from the selection's start
-    if (e.mods.isLeftButtonDown() && ! e.mods.isCtrlDown() && stretchHandle().expanded (2.0f).contains (e.position))
+    if (e.mods.isLeftButtonDown() && ! flmods::ctrl (e.mods) && stretchHandle().expanded (2.0f).contains (e.position))
     {
         const auto& notes = currentPattern (engine.getSong()).notes;
         dragIndices.clear();
@@ -1597,7 +1601,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
     const auto tool = tools.getTool();
 
     // editable ghost notes (Ctrl+Alt+V): a left press on one switches to its channel and grabs the note there
-    if (hit < 0 && editGhosts && e.mods.isLeftButtonDown() && ! e.mods.isCtrlDown())
+    if (hit < 0 && editGhosts && e.mods.isLeftButtonDown() && ! flmods::ctrl (e.mods))
         if (const auto ghost = ghostAt (e.x, e.y); ghost >= 0)
         {
             engine.setSelectedChannel (currentPattern (engine.getSong()).notes[(std::size_t) ghost].channel);
@@ -1607,7 +1611,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
         }
 
     // Zoom tool: right-click zooms out around the point (a click zooms in, a drag zooms to the range)
-    if (tool == EditTool::zoom && e.mods.isRightButtonDown() && ! e.mods.isCtrlDown())
+    if (tool == EditTool::zoom && e.mods.isRightButtonDown() && ! flmods::ctrl (e.mods))
     {
         zoomOut (e.x);
         return;
@@ -1645,7 +1649,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
     }
 
     // every tool: Ctrl+click on a note adds/removes it from the selection; Ctrl+drag selects (Shift adds)
-    if (hit >= 0 && e.mods.isCtrlDown())
+    if (hit >= 0 && flmods::ctrl (e.mods))
     {
         auto s = selection;
 
@@ -1658,7 +1662,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
-    if ((hit < 0 && e.mods.isCtrlDown()) || tool == EditTool::lasso
+    if ((hit < 0 && flmods::ctrl (e.mods)) || tool == EditTool::lasso
         || (hit < 0 && e.mods.isShiftDown() && tool != EditTool::brush && tool != EditTool::drumPaint))
     {
         drag = Drag::select;
@@ -1860,7 +1864,7 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
         case Drag::keyZoom:
         {
             // up = taller keys (Ctrl: fine); the centre of the clicked key stays where it was
-            keyZoomDrag.move (e.y, e.mods.isCtrlDown());
+            keyZoomDrag.move (e.y, flmods::ctrl (e.mods));
             rowHeight = keyZoomDrag.height (keyZoomStartRow);
             scrollY = juce::jlimit (0, juce::jmax (0, rows.count * rowHeight - gridArea().getHeight()),
                                     rowFor (keyZoomKey) * rowHeight + rowHeight / 2 - (keyZoomCentreY - headerHeight));
@@ -1872,7 +1876,7 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
         case Drag::timeZoom:
         {
             const auto width = (double) juce::jmax (1, gridArea().getWidth());
-            timeZoomDrag.move (e.x, e.y, e.mods.isCtrlDown());
+            timeZoomDrag.move (e.x, e.y, flmods::ctrl (e.mods));
             pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, width / timeZoomDrag.span);
             scrollTicks = juce::jmax (0.0, timeZoomDrag.centre - width * 0.5 / pixelsPerTick);
             updateScrollBars();
@@ -2087,7 +2091,7 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
             // locks: Shift pressed after the click keeps the pitch, Ctrl keeps the time
             if (e.mods.isShiftDown() && ! downMods.isShiftDown())
                 deltaKeys = rawKeys = 0;
-            if (e.mods.isCtrlDown() && ! downMods.isCtrlDown())
+            if (flmods::ctrl (e.mods) && ! flmods::ctrl (downMods))
                 deltaTicks = 0;
 
             const auto& current = currentPattern (engine.getSong()).notes[(std::size_t) dragNote];
@@ -2436,20 +2440,20 @@ void PianoRollComponent::updateCursor (juce::ModifierKeys mods)
     auto cursor = gesture::Cursor::normal;
 
     if (p.x < keyboardWidth && p.y >= headerHeight && p.y < gridArea().getBottom())
-        cursor = mods.isCtrlDown() ? gesture::Cursor::select : gesture::Cursor::point;
+        cursor = flmods::ctrl (mods) ? gesture::Cursor::select : gesture::Cursor::point;
     else if (velocityArea().contains (p))
         cursor = gesture::Cursor::draw;
-    else if (gridArea().contains (p) && hover.stretch && ! mods.isCtrlDown())
+    else if (gridArea().contains (p) && hover.stretch && ! flmods::ctrl (mods))
         cursor = gesture::Cursor::resizeH;
-    else if (gridArea().contains (p) && editGhosts && hover.note < 0 && hover.ghost >= 0 && ! mods.isCtrlDown())
+    else if (gridArea().contains (p) && editGhosts && hover.note < 0 && hover.ghost >= 0 && ! flmods::ctrl (mods))
         cursor = gesture::Cursor::move;
     else if (gridArea().contains (p))
     {
-        const gesture::Mods m { mods.isShiftDown(), mods.isCtrlDown(), mods.isAltDown() };
+        const gesture::Mods m { mods.isShiftDown(), flmods::ctrl (mods), mods.isAltDown() };
         const auto tool = tools.getTool();
         cursor = gesture::cursorFor (gesture::leftAction (tool, targetAt (hover), m, false), tool);
     }
-    else if (p.y >= rulerTop && p.y < headerHeight && p.x >= keyboardWidth && mods.isCtrlDown())
+    else if (p.y >= rulerTop && p.y < headerHeight && p.x >= keyboardWidth && flmods::ctrl (mods))
         cursor = gesture::Cursor::select;
 
     setMouseCursor (editorCursor (cursor));
@@ -2485,7 +2489,7 @@ ui::Hint PianoRollComponent::hintAt (juce::Point<int> p)
 
     if (p.y >= rulerTop && p.y < headerHeight && p.x >= keyboardWidth)
     {
-        hint.text = tr ("Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB] drag selects the notes in a time range  [Ctrl][Wheel] zoom  [Shift][Wheel] scroll");
+        hint.text = tr ("Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] zoom  [Shift][Wheel] scroll");
         return hint;
     }
 
@@ -2513,7 +2517,7 @@ ui::Hint PianoRollComponent::hintAt (juce::Point<int> p)
         return hint;
     }
 
-    const gesture::Mods m { mods.isShiftDown(), mods.isCtrlDown(), mods.isAltDown() };
+    const gesture::Mods m { mods.isShiftDown(), flmods::ctrl (mods), mods.isAltDown() };
     hint.text = actionHint (gesture::leftAction (tools.getTool(), targetAt (h), m, false), false);
     hint.value = h.note >= 0 ? noteValue (h.note) : keyName (h.key);
     return hint;
@@ -2521,7 +2525,7 @@ ui::Hint PianoRollComponent::hintAt (juce::Point<int> p)
 
 void PianoRollComponent::mouseDoubleClick (const juce::MouseEvent& e)
 {
-    if (! gridArea().contains (e.getPosition()) || e.mods.isRightButtonDown() || e.mods.isCtrlDown())
+    if (! gridArea().contains (e.getPosition()) || e.mods.isRightButtonDown() || flmods::ctrl (e.mods))
         return;
 
     // the first click of this double click created the note: that was drawing, not opening it
@@ -3525,7 +3529,7 @@ void PianoRollComponent::glideFrame()
 
 void PianoRollComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
 {
-    const auto ctrl = e.mods.isCtrlDown(), alt = e.mods.isAltDown(), shift = e.mods.isShiftDown();
+    const auto ctrl = flmods::ctrl (e.mods), alt = e.mods.isAltDown(), shift = e.mods.isShiftDown();
     const auto overGrid = gridArea().contains (e.getPosition()) || velocityArea().contains (e.getPosition());
 
     // Alt+wheel: the velocity (or the lane's property) of the selected notes wherever the mouse is, with nothing

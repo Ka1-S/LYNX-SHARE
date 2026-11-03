@@ -1,4 +1,5 @@
 #include "core/KeyMap.h"
+#include "core/ModifierMap.h"
 
 #include <algorithm>
 #include <cctype>
@@ -364,6 +365,11 @@ struct Json
 bool Chord::isPrintable() const noexcept
 {
     return key > ' ' && key < 0x7f;
+}
+
+std::string displayString (const Chord& c)
+{
+    return modmap::keyNames (toString (c), modmap::hostOs());
 }
 
 std::string toString (const Chord& c)

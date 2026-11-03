@@ -1,4 +1,5 @@
 #include "core/Song.h"
+#include "core/ModelParams.h"
 #include "core/FlSynths.h"
 #include "core/VoltageController.h"
 #include "core/MidiOut.h"
@@ -952,6 +953,9 @@ float Song::targetValue (const AutomationTarget& t) const noexcept
             // a MIDI Out's patch and knobs (round 167i)
             if (channels[(std::size_t) t.index].instrument == InstrumentKind::midiOut && t.param >= 0 && t.param <= midiout::controlCount)
                 return midiout::paramValue (midiout::stateOf (channels[(std::size_t) t.index].pluginState), t.param);
+            // the knobs of an FL engine kept in the channel's state (round 168n)
+            if (const auto v = modelparams::value01 (channels[(std::size_t) t.index], t.param))
+                return *v;
             return 0.5f;
         case AutomationTargetKind::mixerSend:
             return validTrack && routes (t.index, t.slot) ? faderPosition (routeLevel (t.index, t.slot)) : -1.0f;
@@ -1042,6 +1046,9 @@ bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
                 }
                 return true;
             }
+            // the knobs of an FL engine kept in the channel's state (round 168n)
+            if (validChannel && modelparams::find (channels[(std::size_t) t.index].instrument, t.param) != nullptr)
+                return modelparams::setValue01 (channels[(std::size_t) t.index], t.param, v);
             return false;
         case AutomationTargetKind::none: break;
     }
