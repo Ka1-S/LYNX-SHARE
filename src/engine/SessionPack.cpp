@@ -682,20 +682,47 @@ std::optional<Opened> open (const juce::File& file, const juce::File& destinatio
         if (! within (path, folder))
             outside[path] = missing (path);
     applyRelocations (*song, outside);
-    // the engine also reads these, outside the media list (never packed). FL Keys' wavetables are FL Studio's own files.
+    // every other path the engine reads, also inside Patcher graphs (not in the media list, never packed): only the
+    // package or FL Studio's own files (FL Keys' wavetables, the engines' DLLs)
     const auto flInstall = findFlStudioRoots().factoryData;
     const auto fl = flInstall.empty() ? juce::File() : juce::File (str (flInstall));
     auto engineOnly = [&] (std::string& path) {
         if (! path.empty() && ! within (path, folder) && ! within (path, fl))
             path = missing (path);
     };
+    std::function<void (EffectSlot&)> slot;
+    std::function<void (PatcherDoc&)> doc;
+    std::function<void (ChannelDef&)> channel;
+    slot = [&] (EffectSlot& s) {
+        engineOnly (s.samplePath);
+        for (auto& b : s.branches)
+            for (auto& child : b.chain)
+                slot (child);
+        doc (s.patcher);
+    };
+    doc = [&] (PatcherDoc& d) {
+        for (auto& n : d.nodes)
+            if (n.generator)
+                channel (n.channel);
+            else
+                slot (n.effect);
+    };
+    channel = [&] (ChannelDef& c) {
+        engineOnly (c.samplePath);
+        for (auto& z : c.zones)
+            engineOnly (z.path);
+        for (auto& s : c.standIns)
+            engineOnly (s.path);
+        doc (c.patcher);
+    };
     for (auto& c : song->channels)
+        channel (c);
+    for (auto& t : song->mixer)
     {
-        if (c.instrument == InstrumentKind::flkeys || c.instrument == InstrumentKind::directwave)
-            engineOnly (c.samplePath);
-        if (c.instrument == InstrumentKind::flkeys)
-            for (auto& z : c.zones)
-                engineOnly (z.path);
+        for (auto& s : t.effects)
+            slot (s);
+        for (auto& s : t.standIns)
+            engineOnly (s.path);
     }
     opened.song = std::move (*song);
     return opened;

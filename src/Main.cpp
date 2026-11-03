@@ -2031,6 +2031,13 @@ private:
                 keys.zones.push_back ({});
                 keys.zones.back().path = c.samplePath;
                 evil.channels.push_back (keys);
+                lynx::ChannelDef patch; // (a Patcher's nodes are not in the media list either)
+                patch.instrument = lynx::InstrumentKind::patcher;
+                patch.patcher.nodes.resize (2);
+                patch.patcher.nodes[0].generator = true;
+                patch.patcher.nodes[0].channel = c;
+                patch.patcher.nodes[1].effect.samplePath = c.samplePath;
+                evil.channels.push_back (patch);
                 const auto evilProject = dir.getChildFile ("evil.lynx");
                 lynx::sessionpack::Manifest em;
                 em.part = true;
@@ -2052,6 +2059,9 @@ private:
                                  return juce::File (juce::String::fromUTF8 (ch.samplePath.c_str())) == secret
                                         || std::any_of (ch.zones.begin(), ch.zones.end(), [&] (const lynx::SampleZone& z) { return juce::File (juce::String::fromUTF8 (z.path.c_str())) == secret; });
                              })
+                          && evilOpened->song.channels.back().patcher.nodes.size() == 2
+                          && juce::File (juce::String::fromUTF8 (evilOpened->song.channels.back().patcher.nodes[0].channel.samplePath.c_str())) != secret
+                          && juce::File (juce::String::fromUTF8 (evilOpened->song.channels.back().patcher.nodes[1].effect.samplePath.c_str())) != secret
                           && media.findChildFiles (juce::File::findFiles, true).isEmpty();
                 if (! mergeOk && e.isEmpty())
                     e = "a received package reached a file outside it";
