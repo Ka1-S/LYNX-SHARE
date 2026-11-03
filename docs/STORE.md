@@ -141,6 +141,35 @@ over Partner Center's limits.
 
 ## Updating the Store version
 
+With the four `MSSTORE_*` secrets set (next section), the Release workflow does this by itself: its **Microsoft Store
+submission** job sends `LYNX-<version>-store.msix` as a new submission after *Checksums and release*. By hand:
+
 1. Release as usual (`docs/RELEASE.md`); the workflow attaches `LYNX-<version>-store.msix`.
 2. Partner Center › LYNX SHARE › *Start update* → *Packages*: upload the new `.msix` (and remove the old one) → *What's new*
    from the release notes → *Submit to the Store*. Certification usually takes 1–3 working days.
+
+## Automatic Store submission (round 168y)
+
+The `store` job of `.github/workflows/release.yml` runs on a release tag (the tag push, or a manual run of the workflow
+**on the tag** with `store_build` 1..9 for a resubmission). It sets up Microsoft's Store Developer CLI (`msstore` v0.4.4,
+through `microsoft/microsoft-store-apppublisher` v1.4, pinned by commit), signs in with the secrets and runs
+`msstore publish LYNX-<label>-store.msix --appId 9NQRFBFDCX6N`: a new submission cloned from the last published one
+(listings, screenshots, pricing and "What's new" stay as they are), its old package replaced by the new one, committed
+to certification. A pending submission that was never published is deleted first, so finish or delete one you are
+editing in Partner Center before a release. Without the secrets (or on a branch run) the job only prints a notice.
+The secrets go to the CLI through the environment and GitHub masks them in the log.
+
+One-time setup (Partner Center, then GitHub):
+
+1. Partner Center › ⚙ **Account settings › Organization profile › Tenants**: if no Microsoft Entra tenant is listed,
+   *Associate* your account's tenant or *Create* a new one (free).
+2. **Account settings › User management › Microsoft Entra applications** › *Create Microsoft Entra application* (or
+   *Add Microsoft Entra application* for an existing one), for example "LYNX SHARE release". Role: **Manager**. Save.
+3. Open the application: copy the **Tenant ID** and the **Client ID**, then *Add new key* and copy the **client
+   secret** at once (it is shown only once; note its expiry date: a new key is needed before it runs out).
+4. **Account settings › Legal info › Developer** tab (or *Account settings › Developer account*): copy the **Seller ID**.
+5. GitHub › the repository › *Settings › Secrets and variables › Actions › New repository secret*, four times:
+   `MSSTORE_TENANT_ID`, `MSSTORE_CLIENT_ID`, `MSSTORE_CLIENT_SECRET`, `MSSTORE_SELLER_ID`.
+
+The next release tag then submits to the Store by itself; the job's log shows the submission and its status. The
+first submission of a product can't be made this way (the CLI needs one published submission to clone).

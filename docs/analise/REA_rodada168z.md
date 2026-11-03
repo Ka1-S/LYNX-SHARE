@@ -42,6 +42,22 @@ LYNX-own fix (no FL parity question: FL has no Linux build). JUCE 8.0.4 talks X1
 - Tests: tests/Menus168zTests.inc (the reporter's 3-monitor layout: CC #22's submenu inside the primary, a sweep of
   every CC row and 3 submenu sizes, right/bottom monitors, overlapping lists, negative coordinates, no display).
 
+## Round 168z2: mixed scale factors (coordinator follow-up)
+- The reporter's monitors: 2560x1440 @115 % (primary), 1920x1080 @100 % (right, top-aligned), 1920x1080 @115 % (below).
+- How JUCE sees them (JUCE 8.0.4 sources): XWayland gives X11 clients one pixel space; with Plasma's default "apply
+  scaling themselves" X pixels = logical x 1.15 (the 100 % monitor is 2208x1242 there), with "scaled by the system"
+  X pixels = KDE's logical pixels. JUCE's per-monitor scale on Linux comes from XSettings Gdk/WindowScalingFactor
+  (KDE: integer), else dconf/gsettings, else round(dpi / 96) per output, times LYNX's UI zoom; then
+  Displays::updateToLogical lays the monitors out by exact physical contact. Menus, windows and Displays all use those
+  logical coordinates, so the placement math is scale-independent as long as the display list is right.
+- Gap found: a monitor that touches no other one exactly (rounding of fractional scaling, or Xvfb's overlapping
+  Xinerama screens) is never reached by updateToLogical: totalArea 0,0,0,0 and userArea at 0,0 over the primary (seen
+  in our Xvfb ui.log). JUCE fix 9 (cmake/LynxPatchJuce.cmake, juce_Displays.cpp, all platforms, only that case) now gives
+  it its physical rectangle / its scale; Theme.cpp still skips empty displays.
+- Tests: menus168z2_reporter_layout_with_scales: both KDE X11 modes and a JUCE per-monitor 2x case, UI zoom 1/1.15/
+  1.25/2, a root menu on each monitor, a 3-level submenu chain from every 7th row: every submenu inside the root's
+  monitor; a 2 px gap layout keeps a right-monitor menu on the right monitor.
+
 ## Checks
 - build-local: 1 934 007 checks, 0 failures. Linux GUI rebuilt after the last change; Xvfb run repeated.
 - Linux GUI build of this branch (system g++, patched JUCE copy): all four JUCE fixes applied and compiled.
