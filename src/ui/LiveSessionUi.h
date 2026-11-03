@@ -29,6 +29,9 @@ void start (Context context);
 void join (Context context);
 void showInvite (Context context);
 void leave (Context context);
+// At start-up (round 169j): the host's LYNX SHARE closed during a live session (a crash, the computer restarted):
+// offer to resume it from its journal (the guests are waiting and reconnect by themselves).
+void offerResume (Context context);
 
 // The manager's questions and messages as windows and hints (the host's "let them in?", the end of the session).
 void attach (LiveSessionManager& live);

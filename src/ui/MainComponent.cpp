@@ -51,6 +51,7 @@
 #include "engine/SessionPack.h"
 #include "ui/SessionDialogs.h"
 #include "engine/LiveSessions.h"
+#include "ui/LiveChat.h"
 #include "core/ProjectSafety.h"
 #include "core/MissingFiles.h"
 #include "ui/AutomationUi.h"
@@ -627,6 +628,19 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         safe->projectName = hostName.isNotEmpty() ? tr ("Live session with {0}", { hostName }) : tr ("Live session");
         safe->updateTitle();
     };
+    // round 169j: the host's LYNX SHARE restarted during a session: its journal's song becomes the open project again
+    live->onResumed = [safe = juce::Component::SafePointer<MainComponent> (this)] (Song song) {
+        if (safe == nullptr)
+            return;
+        const auto journal = LiveSessionManager::readJournal (LiveSessionManager::defaultJournal());
+        safe->startNewProject (std::move (song), {});
+        if (journal && journal->projectFile.existsAsFile())
+        {
+            safe->currentFile = journal->projectFile;
+            safe->projectName = journal->projectFile.getFileNameWithoutExtension();
+        }
+        safe->updateTitle();
+    };
     engine.onSessionUndoSkipped = [] (const juce::StringArray& skipped) {
         ui::postHint ({ tr ("Undo left alone what someone else changed since: {0}", { skipped.joinIntoString (", ") }), {} }, 4000);
     };
@@ -644,6 +658,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 MainComponent::~MainComponent()
 {
     engine.onSessionUndoSkipped = nullptr;
+    liveui::closeChat();
     live.reset(); // (a session still on ends: the others are told)
     setSecondaryWindowKeyHandler (nullptr);
     cancelProjectLoad(); // an open in progress uses the engine from its thread
@@ -3908,6 +3923,35 @@ void MainComponent::startLiveFromCommandLine()
     o.projectFile = currentFile;
     if (const auto relay = value ("--live-relay"); relay.isNotEmpty())
         o.relay = relay;
+    // round 169j: --live-chat "text" (sent once in), --live-follow (follow the host's transport), --live-resume (the
+    // host resumes its interrupted session without asking)
+    if (const auto text = value ("--live-chat"); text.isNotEmpty())
+        juce::Timer::callAfterDelay (9000, [safe = juce::Component::SafePointer<MainComponent> (this), text] {
+            if (safe != nullptr)
+            {
+                safe->live->sendChat (text);
+                liveui::showChat (*safe->live);
+            }
+        });
+    if (cli.contains ("--live-follow"))
+        juce::Timer::callAfterDelay (8500, [safe = juce::Component::SafePointer<MainComponent> (this)] {
+            if (safe != nullptr)
+                safe->live->setFollowTransport (true);
+        });
+    if (cli.contains ("--live-resume"))
+    {
+        o.projectFile = {};
+        o.autoAccept = true;
+        if (! live->resumeHost (LiveSessionManager::defaultJournal(), o))
+            platform::testModeLog ("live session: nothing to resume");
+        return;
+    }
+    if (! cli.contains ("--live-host") && ! cli.contains ("--live-join"))
+    {
+        if (! platform::testMode())
+            liveui::offerResume (liveContext());
+        return;
+    }
     if (const auto codeFile = value ("--live-host"); codeFile.isNotEmpty())
     {
         o.autoAccept = true; // (scripted: nobody to click "Let them in")

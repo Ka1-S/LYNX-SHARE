@@ -16,6 +16,7 @@
 //   (§2.2) and conflicts (§1.3) and commits them. Undo per user (§1.4) is selectiveRevert.
 
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <map>
 #include <optional>
@@ -27,7 +28,10 @@
 
 namespace lynx::live
 {
-constexpr int protocolVersion = 1;
+// 2 (round 169j): resume after a drop, chat, transport, permissions during the session, live stand-ins, FLAC media
+constexpr int protocolVersion = 2;
+// how many commits the host keeps to replay to someone who reconnects (§1.5; older: a fresh snapshot)
+constexpr std::size_t replayLimit = 4096;
 
 enum class Kind : std::uint8_t
 {
@@ -84,6 +88,8 @@ struct Permissions
 {
     bool editEverything = false; // the host's "Edit everything" for this participant
     bool listener = false;       // no edits at all
+    bool settings = false;       // "Tempo & project settings": the globals and the arrangements' markers (§2.3)
+    bool operator== (const Permissions&) const = default;
 };
 // Whether participant `tag` may change (or create / delete) `key`, judged on the state `song`, with `proposed` the
 // song the change comes from (a new entity is judged by its uid there). The host may change everything.
@@ -119,13 +125,28 @@ using Codec = std::function<Patch (const Patch&)>;
 class Authority
 {
 public:
-    Authority (Song initial, Codec codec);
+    // `startRev`: the revision `initial` is at (a host that restarted from its journal goes on counting from there)
+    Authority (Song initial, Codec codec, std::uint64_t startRev = 0);
 
     const Song& confirmed() const noexcept { return state; }
     std::uint64_t revision() const noexcept { return rev; }
 
     void setPermissions (std::uint32_t tag, Permissions p) { perms[tag] = p; }
     Permissions permissionsOf (std::uint32_t tag) const;
+
+    // The commits after revision `rev` (to replay to someone who reconnects), oldest first; nullopt when they are no
+    // longer all kept (replayLimit) or `rev` is not one of ours: that peer needs a fresh snapshot.
+    std::optional<std::vector<Commit>> since (std::uint64_t rev) const;
+
+    // Who changed each entity last (the conflict check, §1.3): kept in the host's journal so a restarted host judges
+    // the edits that were waiting the same way.
+    struct Change
+    {
+        std::uint64_t rev = 0;
+        std::uint32_t origin = 0;
+    };
+    const std::map<Key, Change>& changes() const noexcept { return lastChange; }
+    void restoreChanges (std::map<Key, Change> c) { lastChange = std::move (c); }
 
     // Orders one proposal: checks permissions and conflicts per entity, applies what passes, runs the normalisations
     // every edit runs (pattern lengths move their clips) and returns the commit to broadcast (rev + 1 when anything
@@ -140,12 +161,8 @@ private:
     std::uint64_t rev = 0;
     Codec codec;
     std::map<std::uint32_t, Permissions> perms;
-    struct Change
-    {
-        std::uint64_t rev = 0;
-        std::uint32_t origin = 0;
-    };
     std::map<Key, Change> lastChange;
+    std::deque<Commit> log; // the last replayLimit commits that changed something
     Commit commitPatch (std::uint32_t origin, std::uint32_t seq, Patch patch);
 };
 
@@ -180,6 +197,16 @@ public:
     // Puts the commits held back so far into the working song.
     Update release (const Song& working);
 
+    // Reconnect (§1.5), after the host replayed what this peer missed: the edits sent but never confirmed (lost with
+    // the connection) are proposed again at the next poll, with the oldest base they had, so the host's conflict check
+    // judges them as it would have the first time.
+    void resend();
+    // Reconnect with a fresh snapshot instead (the host no longer had the commits, or restarted): the confirmed state
+    // becomes `snapshot` at `rev`; this peer's unconfirmed edits go on top of it (and, when the host is behind this
+    // peer — it lost commits in a crash —, the changes of this peer's own area it no longer has). Returns the new
+    // working song; the next poll proposes what it has on top of the snapshot.
+    Song resume (Song snapshot, std::uint64_t rev, const Song& working);
+
 private:
     Song state;          // C
     Song applied;        // the C the working song was last rebased on
@@ -188,6 +215,8 @@ private:
     std::uint32_t tag = 0, seq = 0;
     Codec codec;
     std::map<std::uint32_t, Patch> inflight; // sent, not committed yet (unrounded values, to recognise them)
+    std::map<std::uint32_t, std::uint64_t> inflightBase; // their base revisions
+    std::optional<std::uint64_t> resendBase;  // the next proposal's base after a reconnect
     std::vector<std::pair<std::uint32_t, Commit>> acks; // own commits applied to C but not yet to W (hold)
     Update rebase (const Song& working);
 };
@@ -198,4 +227,49 @@ private:
 // when it still is as the step left it; entities someone else changed since are kept and listed in `skipped`. Redo
 // is the same call with before and after swapped.
 Song selectiveRevert (const Song& current, const Song& before, const Song& after, std::vector<Key>* skipped = nullptr);
+
+// --- session chat (round 169j) ----------------------------------------------------------------------------------------
+
+constexpr std::size_t chatMaxBytes = 600; // one message (UTF-8)
+constexpr std::size_t chatKeep = 300;     // lines each computer keeps
+// The text as it is sent / shown: control characters out (a line break stays), spaces trimmed, at most chatMaxBytes
+// (never cutting a UTF-8 sequence); empty = nothing to send.
+std::string cleanChat (const std::string& text);
+
+// --- follow the host's transport (round 169j) ------------------------------------------------------------------------
+
+struct HostTransport
+{
+    bool playing = false;
+    bool songMode = true;
+    double ticks = 0.0;   // the host's playhead when it sent this
+    double bpm = 120.0;
+    double atMs = 0.0;    // this computer's clock when it arrived
+};
+struct FollowAction
+{
+    enum class Type
+    {
+        none,
+        play, // seek to `ticks` and play
+        stop,
+        seek  // playing already: jump to `ticks`
+    };
+    Type type = Type::none;
+    double ticks = 0.0;
+    bool songMode = true;
+};
+// Where the host's playhead is now (it moves on at its tempo while playing).
+double hostTicksAt (const HostTransport& host, double nowMs) noexcept;
+// What this computer does to follow: start / stop with the host, and jump when it is more than `toleranceTicks` (one
+// beat by default) away from where the host's playhead is now.
+FollowAction follow (const HostTransport& host, double nowMs, bool playing, bool songMode, double ticks, double toleranceTicks = ppq);
+
+// --- live stand-ins (round 169j, ONLINE_SESSIONS.md §4.2) -------------------------------------------------------------
+
+// The channels (Kind::channel, a = uid) and inserts (Kind::insert, a = index) of `song` that this computer cannot play
+// (`missing` says a plugin is not installed here): someone else's stand-ins must play them.
+std::set<Key> unplayable (const Song& song, const std::function<bool (const PluginRef&)>& missing);
+// Of the parts someone needs (`needed`), the ones participant `me` renders: his own, all of whose plugins are here.
+std::vector<Key> toRender (const Song& song, const std::set<Key>& needed, std::uint32_t me, const std::function<bool (const PluginRef&)>& missing);
 } // namespace lynx::live
