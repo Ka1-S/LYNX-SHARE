@@ -70,6 +70,30 @@ LYNX-own fix (no FL parity question: FL has no Linux build). JUCE 8.0.4 talks X1
   FL engines third level moved up to fit; with the Channel Rack at the right edge the menu shifts left and the
   submenus still open beside it. Shots `/mnt/e/lynx-work/menus45z/s/w2s..w8s.png`.
 
+## Round 168z3: (a) reproduced with KWin and fixed (coordinator follow-up)
+- Setup (VPS, Ubuntu 26.04): Xvfb 1920x1080 + kwin_x11 as the window manager, LYNX with a fresh profile and test
+  mode, main window 1900x1060, Channel Rack undocked (≡ > Detached). xdotool clicks the rack (or an empty spot of the
+  main window), then File on the main menu bar (press and release 0.1 s apart); a menu = a new visible X window.
+  The realtime-hint flag is pre-created (the "Real-time priority" notice is modal and blocked menus at random).
+- Results (File menus opened):
+
+  | build | docked | rack clicked first | main clicked first |
+  |---|---|---|---|
+  | 0.1.22 (AppImage binary) | 10/10 | 0/20 | 1/10 |
+  | main 05f38e80 (JUCE fixes 6-9) | 10/10 | 0/20 | 0/10 |
+  | + fix 10 only | 10/10 | 0/20 | 0/10 |
+  | + fixes 10 and 11 (this branch) | 10/10 | 20/20 | 10/10 |
+
+- Cause 1 (fix 10): LYNX keeps undocked panels above the main window (matchWindowOrderToScreen, toFront (false)
+  after every click in the main window). JUCE's X11 toFront ignores "false" and always sends _NET_ACTIVE_WINDOW, so
+  KWin activated the panel: the keyboard focus left the main window after each click there. Now toFront (false) only
+  raises (XMapRaised). After the fix the focus stays on the main window; the panel still stays above it.
+- Cause 2 (fix 11), found with a traced build: the menu was created, then dismissed at once by
+  inputAttemptWhenModal. JUCE calls it for every ConfigureNotify on a window with a native title bar, or on the WM
+  frame around one of our windows ("the title bar is being dragged"); KWin sends those for the undocked panel while the
+  menu opens (restack, re-sent geometry). Now only a window/frame whose geometry really changed dismisses the menus.
+- Screens: `/mnt/e/lynx-work/menus45z3/` (dbg2-rack-open.png: File menu open with the undocked rack above).
+
 ## Where I stopped
-- Done: code + tests, wip pushed (wip/menus45z).
-- Done: build-local, Linux GUI build + Xvfb, Windows GUI check. Next: land with train.sh menus45z; reporter to test 0.1.23 for (a).
+- 168z/168z2 landed (387df51d, 05f38e80). 168z3: fixes 10 and 11 verified on the VPS (table above); land with
+  train.sh menus45z3; the reporter to test 0.1.23.
