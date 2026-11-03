@@ -1,6 +1,7 @@
 // FL Studio's Plucked! (REA_rodada65 §1). See Plucked.h.
 
 #include "core/Plucked.h"
+#include "core/DrumParamRanges.h"
 
 #include <algorithm>
 #include <array>
@@ -343,6 +344,14 @@ public:
     {
         nextPan = pan;
         nextCents = cents;
+    }
+
+    // automation (round 168p): the clip's 0…1 over the knob's range (the engine reads the knobs every block)
+    void setParameter (int index, float value) noexcept override
+    {
+        const auto r = drumranges::plucked (index);
+        if (r.valid && std::isfinite (value))
+            knobs[(std::size_t) index].store ((int) r.raw (value));
     }
 
     void noteOn (int key, float velocity) noexcept override

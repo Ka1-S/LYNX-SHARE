@@ -4,6 +4,7 @@
 #include <cstring>
 #include <map>
 
+#include "core/DrumControls.h"
 #include "core/BeepMap.h"
 #include "core/Granulizer.h"
 #include "core/Kepler.h"

@@ -31,6 +31,8 @@ bool drumaxxStateUsable (const std::vector<std::uint8_t>& state);
 
 // The kit name stored in the state (empty if none)
 std::string drumaxxKitName (const std::vector<std::uint8_t>& state);
+// a pad's name (the kit's 16 names; empty when the state has none)
+std::string drumaxxPadName (const std::vector<std::uint8_t>& state, int pad);
 
 // Parameter `index` (0…719: 16 pads × 44, then the master; REA_rodada67 §6) of the state, 0…1 (NaN if unusable) / set it
 float drumaxxParam (const std::vector<std::uint8_t>& state, int index);

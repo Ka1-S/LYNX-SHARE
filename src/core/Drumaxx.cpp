@@ -1,4 +1,5 @@
 #include "core/Drumaxx.h"
+#include "core/DrumParamRanges.h"
 #include "core/HostSlide.h"
 
 #include <algorithm>
@@ -605,6 +606,20 @@ public:
     void load (const Kit& k)
     {
         kit = k;
+        derive();
+    }
+
+    // a live knob change (automation, round 168p): the pads read their parameters at every hit / block
+    void setParam (int i, float v)
+    {
+        if (i < 0 || i >= (int) kit.P.size())
+            return;
+        kit.P[(std::size_t) i] = v;
+        derive();
+    }
+
+    void derive()
+    {
         for (int i = 0; i < padCount; ++i)
         {
             const auto v = p (i * padParams);
@@ -1183,6 +1198,23 @@ std::string drumaxxKitName (const std::vector<std::uint8_t>& state)
     return parseState (state, k) ? k.name : std::string {};
 }
 
+std::string drumaxxPadName (const std::vector<std::uint8_t>& state, int pad)
+{
+    Kit k;
+    if (pad < 0 || pad >= padCount || ! parseState (state, k))
+        return {};
+    // the 0x800-byte block after the patterns: 16 pad names of 128 bytes (round 168p)
+    const std::size_t at = 8 + 0x104 + 4 * (std::size_t) paramCount + (std::size_t) padCount * 0x402 + 128 * (std::size_t) pad;
+    if ((long) u32At (state.data() + 4) - 4 <= 0x100 || at + 128 > state.size() || at + 128 > 8 + (std::size_t) u32At (state.data() + 4))
+        return {};
+    const auto* n = reinterpret_cast<const char*> (state.data() + at);
+    std::string name (n, strnlen (n, 128));
+    for (const auto c : name)
+        if ((unsigned char) c < 0x20)
+            return {};
+    return name;
+}
+
 namespace
 {
 // the byte offset of parameter `index` in a usable state with its kit name (−1 otherwise)
@@ -1241,6 +1273,15 @@ public:
     }
 
     void setNextNoteExpression (float, float cents, bool) noexcept override { nextCents = cents; }
+
+    // automation (round 168p): the clip's 0…1 over the knob's range, on the running kit
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        const auto r = drumranges::drumaxx (index);
+        if (r.valid && std::isfinite (value))
+            engine->setParam (index, r.raw (value));
+    }
 
     void noteOn (int key, float velocity) noexcept override
     {

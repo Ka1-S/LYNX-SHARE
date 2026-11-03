@@ -4,6 +4,8 @@
 #include "core/FruitKick.h"
 #include "core/FlVoiceProcessor.h"
 #include "core/FlangusFastDist.h"
+#include "core/DrumParamRanges.h"
+#include "core/EngineParams.h"
 
 #include <algorithm>
 #include <array>
@@ -89,6 +91,11 @@ struct Params
     {
         for (int i = 0; i < 6; ++i)
             p[i] = i32At (state, 4 + 4 * (std::size_t) i);
+        derive (fs);
+    }
+
+    void derive (double fs)
+    {
         e4 = (float) (2247346493527.166 / fs); // 2³² · 523.25 Hz / fs
         r154 = (float) (44100.0 / fs);
         const double ln1001 = std::log (1001.0);
@@ -124,6 +131,7 @@ public:
         if (! fruitKickStateUsable (state))
             return false;
         P.init (state, fs);
+        this->fs = fs;
         // the end fade: 441 entries at every rate (built while the framework's rate object still holds 44 100 Hz, as
         // in DX10) with IPP's cosine (REA_rodada74 §1-2)
         const auto& table = flvp::endTable();
@@ -134,6 +142,16 @@ public:
         S.build (snap ? state.data() + 32 : defaults.data(), ppq, tempo);
         voices.reserve (maxVoices);
         return true;
+    }
+
+    // a live knob change: the decays / floor / distortion apply to the sounding kicks, the start pitch and click
+    // phase to the next ones
+    void setParam (int i, int v)
+    {
+        if (i < 0 || i >= 6 || P.p[i] == v)
+            return;
+        P.p[i] = v;
+        P.derive (fs);
     }
 
     Voice* trigger (int key, double initVol, float fvol, float fpan, double pitchCents)
@@ -282,6 +300,7 @@ public:
     }
 
     Params P;
+    double fs = 44100.0;
     flvp::Settings S;
     std::vector<float> bufA = std::vector<float> (2 * maxBlock), bufB = std::vector<float> (2 * maxBlock);
     std::vector<float> fade;
@@ -358,6 +377,24 @@ public:
         const auto b = bpm > 0.0 ? bpm : 120.0;
         if (channel.pluginState == state && b == tempo.load())
             return;
+        // a knob turned on the page (round 168p): only the six parameters differ → the running engine takes them,
+        // the sounding kicks keep playing
+        if (b == tempo.load() && incoming.load() == nullptr && channel.pluginState.size() == state.size() && fruitKickStateUsable (state)
+            && fruitKickStateUsable (channel.pluginState) && std::memcmp (state.data(), channel.pluginState.data(), 4) == 0
+            && std::memcmp (state.data() + 28, channel.pluginState.data() + 28, state.size() - 28) == 0)
+        {
+            std::vector<std::pair<int, float>> changed;
+            for (int i = 0; i < 6; ++i)
+                if (fruitKickParam (state, i) != fruitKickParam (channel.pluginState, i))
+                    changed.push_back ({ i, (float) fruitKickParam (channel.pluginState, i) });
+            if (changed.size() <= liveParams.space())
+            {
+                for (const auto& [i, v] : changed)
+                    liveParams.push (i, v);
+                state = channel.pluginState;
+                return;
+            }
+        }
         state = channel.pluginState;
         tempo.store (b);
         rebuild();
@@ -367,6 +404,15 @@ public:
     {
         nextPan = pan;
         nextCents = cents;
+    }
+
+    // automation (round 168p): the clip's 0…1 over the knob's range, on the running engine
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        const auto r = drumranges::fruitKick (index);
+        if (engine != nullptr && r.valid && std::isfinite (value))
+            engine->setParam (index, (int) r.raw (value));
     }
 
     void noteOn (int key, float velocity) noexcept override
@@ -469,8 +515,13 @@ private:
             engine = e->fade.empty() ? nullptr : e; // an empty engine stands for an unusable state
             if (engine == nullptr)
                 delete e;
+            liveParams.clear(); // (the new engine was built from the newest state)
         }
+        if (engine != nullptr)
+            liveParams.drain ([this] (int i, float v) { engine->setParam (i, (int) v); });
     }
+
+    LiveParamQueue liveParams;
 
     Engine* engine = nullptr;
     std::atomic<Engine*> incoming { nullptr }, retired { nullptr };

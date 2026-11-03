@@ -3467,6 +3467,7 @@ Layout generated (EffectKind kind)
         l.items.push_back (display (6, 6, (float) l.width - 12.0f, (float) l.height - 12.0f, "name"));
     return l;
 }
+#include "core/PluginLayoutDrums.inc"
 } // namespace
 
 const std::vector<EffectKind>& flLayoutKinds()
@@ -3914,6 +3915,12 @@ const Layout* instrumentLayout (InstrumentKind kind)
         case InstrumentKind::beepmap: return &beepMap;
         case InstrumentKind::granulizer: return &granulizer;
         case InstrumentKind::wasp: return &wasp;
+        default: break;
+    }
+    if (const auto* d = drumLayout (kind)) // round 168p (PluginLayoutDrums.inc)
+        return d;
+    switch (kind)
+    {
         default: return synthGroupLayout (kind); // round 168o (core/PluginLayoutSynths.cpp)
     }
 }
@@ -3923,7 +3930,10 @@ const std::vector<InstrumentKind>& instrumentLayoutKinds()
     static const std::vector<InstrumentKind> kinds { InstrumentKind::threeosc, InstrumentKind::flkeys, InstrumentKind::boobass, InstrumentKind::sytrus, InstrumentKind::harmor,
                                                      InstrumentKind::toxic, InstrumentKind::poizone,
                                                      InstrumentKind::kepler, InstrumentKind::keplerExo, InstrumentKind::transistorbass, InstrumentKind::sawer,
-                                                     InstrumentKind::beepmap, InstrumentKind::granulizer, InstrumentKind::wasp }; // (round 168q)
+                                                     InstrumentKind::beepmap, InstrumentKind::granulizer, InstrumentKind::wasp, // (round 168q)
+                                                     // round 168p
+                                                     InstrumentKind::fruitkick, InstrumentKind::plucked, InstrumentKind::drumpad, InstrumentKind::drumaxx,
+                                                     InstrumentKind::bassdrum, InstrumentKind::drumsynth, InstrumentKind::sakura, InstrumentKind::slayer };
     static const std::vector<InstrumentKind> all = [] {
         auto k = kinds;
         for (const auto s : synthGroupLayoutKinds())

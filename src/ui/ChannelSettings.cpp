@@ -25,6 +25,8 @@
 #include "core/MiniSynth.h"
 #include "core/SimSynth.h"
 #include "core/Drumaxx.h"
+#include "core/DrumControls.h"
+#include <map>
 #include "core/Granulizer.h"
 #include "core/Morphine.h"
 #include "core/Ogun.h"
@@ -985,7 +987,18 @@ public:
         modelTable = modelparams::tableOf (def.instrument);
         if (modelTable != nullptr && ! modelparams::rawValue (def, modelTable->params->front().index))
             modelTable = nullptr; // (a state the engine can't read: the plain page)
-        if (modelTable != nullptr)
+        if (modelTable != nullptr && (drumaxx || drumsynth))
+        {
+            // round 168p: Drumaxx's pad voice / DrumSynth Live's patch: one knob per control, editing the selected
+            // pad's / key's parameter (the pad buttons / the key display pick the part); the rest as listed
+            drumPart = drumsynth ? editorKey : drumaxxPadOf (ref.index);
+            for (const auto& c : drumcontrols::controls (def.instrument))
+                if (c.perPart)
+                    addPartParam (def, c);
+                else if (const auto* p = modelparams::find (def.instrument, c.index))
+                    addModelParam (def, *p);
+        }
+        else if (modelTable != nullptr)
         {
             for (const auto& p : *modelTable->params)
                 addModelParam (def, p);
@@ -1177,6 +1190,67 @@ public:
         }
         addAndMakeVisible (*knob);
         knobs.push_back (std::move (knob));
+    }
+
+    // round 168p: a knob of Drumaxx's selected pad / DrumSynth Live's selected key (drumcontrols' per-part control):
+    // named as the control (the layout places it), editing and automating the part's engine parameter
+    void addPartParam (const ChannelDef& def, const drumcontrols::Control& c)
+    {
+        auto knob = std::make_unique<MenuSlider>();
+        knob->setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+        knob->setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 16);
+        knob->setRange (c.low, c.high, c.integer ? 1.0 : 0.0);
+        knob->setValue (drumcontrols::value (def, c, drumPart).value_or (c.low), juce::dontSendNotification);
+        knob->setDoubleClickReturnValue (false, 0.0);
+        knob->setName (c.name);
+        const auto* control = &c;
+        knob->onValueChange = [this, control, s = knob.get()] {
+            ref.edit (engine, [control, part = drumPart, v = (float) s->getValue()] (ChannelDef& d) { drumcontrols::setValue (d, *control, v, part); });
+            if (layout != nullptr)
+                repaint();
+        };
+        if (ref.index >= 0)
+        {
+            const auto target = [this, control] {
+                return AutomationTarget { AutomationTargetKind::channelParam, ref.index, 0, drumcontrols::absoluteIndex (instrumentKind, *control, drumPart) };
+            };
+            ui::setOwnMenu (*knob);
+            knob->onMenu = [this, k = knob.get(), target] { ui::showSliderMenu (*k, &engine, target()); };
+            knob->onDragStart = [this, target] { engine.noteTweaked (target(), true); };
+            knob->onDragEnd = [this, target] { engine.tweakReleased (target()); };
+        }
+        partKnobs.push_back ({ knob.get(), control });
+        addAndMakeVisible (*knob);
+        knobs.push_back (std::move (knob));
+    }
+
+    // the pad remembered for each Drumaxx channel while LYNX runs (FL's editor keeps it, not the state)
+    static int& drumaxxPadOf (int channel)
+    {
+        static std::map<int, int> pads;
+        return pads[channel];
+    }
+
+    // another pad / key selected: the part's knobs show its values (no rebuild)
+    void selectPart (int part)
+    {
+        const auto* def = ref.get (engine);
+        if (def == nullptr || part == drumPart)
+            return;
+        drumPart = part;
+        if (drumaxx)
+            drumaxxPadOf (ref.index) = part;
+        if (drumsynth)
+        {
+            editorKey = part;
+            ref.edit (engine, [part] (ChannelDef& d) { // FL keeps the selected key in the state
+                if (lynx::drumSynthEditorKeyIndex < (int) d.modelParams.size())
+                    d.modelParams[(std::size_t) lynx::drumSynthEditorKeyIndex] = (float) part;
+            });
+        }
+        for (const auto& [k, c] : partKnobs)
+            k->setValue (drumcontrols::value (*def, *c, drumPart).value_or (c->low), juce::dontSendNotification);
+        repaint();
     }
 
     // the listed parameters' knobs read the channel's state again (an edit that moved other values: Transistor Bass's
@@ -1565,6 +1639,7 @@ public:
                             g.strokePath (wave, juce::PathStrokeType (1.3f * f));
                         }
                     }
+                    paintDrumDisplay (g, item, r, def, f);
                     // round 168o: the envelopes of the synth group's pages, drawn from their knobs (attack, decay, sustain, release;
                     // a missing stage is skipped, a missing sustain is the level the decay falls to: none)
                     {
@@ -1639,6 +1714,113 @@ public:
         }
     }
 
+    // round 168p: the displays of the drum pages (Drumaxx's kit / pads, BassDrum's noise sample, DrumSynth Live's
+    // selected patch and its key display)
+    static juce::String keyName (int key) { return juce::String (notenames::keyName (key)); }
+
+    juce::Rectangle<float> dslKeyCell (juce::Rectangle<float> r, int key) const
+    {
+        // the 120 patch keys in 4 rows of 30 (C0 … B9, FL's octave numbers)
+        const auto w = r.getWidth() / 30.0f, h = r.getHeight() / 4.0f;
+        return { r.getX() + w * (float) (key % 30), r.getY() + h * (float) (key / 30), w, h };
+    }
+
+    void paintDrumDisplay (juce::Graphics& g, const plugui::LayoutItem& item, juce::Rectangle<float> r, const ChannelDef& def, float f)
+    {
+        using namespace theme;
+        const juce::String id (item.display);
+        auto text = [&] (const juce::String& t, juce::Colour c, juce::Justification j = juce::Justification::centred) {
+            g.setColour (c);
+            g.setFont (font (juce::jmax (8.0f, juce::jmin (12.0f * f, r.getHeight() * 0.62f))));
+            g.drawFittedText (t, r.reduced (4.0f * f, 1.0f).toNearestInt(), j, 1, 0.7f);
+        };
+        if (id == "drumaxxkit")
+        {
+            const auto name = juce::String::fromUTF8 (drumaxxKitName (def.pluginState).c_str());
+            text (name.isEmpty() ? tr ("(no kit name)") : name, colour::textPrimary, juce::Justification::centredLeft);
+        }
+        else if (id == "drumaxxpad")
+        {
+            const auto pad = item.steps;
+            const auto keyValue = drumaxxParam (def.pluginState, 44 * pad + 4);
+            const auto key = std::isfinite (keyValue) ? (int) keyValue : -1;
+            skin::button (g, r.reduced (2.0f * f), pad == drumPart, false, accent, radius::md * f);
+            g.setColour (pad == drumPart ? colour::onAccent : colour::textSecondary);
+            g.setFont (font (juce::jmax (8.0f, 10.0f * f), true));
+            g.drawFittedText (juce::String (pad + 1) + "\n" + (key >= 0 && key < 128 ? keyName (key) : juce::String()), r.toNearestInt(),
+                              juce::Justification::centred, 2, 0.7f);
+        }
+        else if (id == "drumaxxpadname")
+        {
+            const auto name = juce::String::fromUTF8 (drumaxxPadName (def.pluginState, item.steps).c_str());
+            text (name.isEmpty() ? tr ("Pad {0}", { juce::String (item.steps + 1) }) : name, item.steps == drumPart ? accent.brighter (0.4f) : colour::textSecondary,
+                  juce::Justification::centredLeft);
+        }
+        else if (id == "bassdrumnoise")
+        {
+            if (! bassDrumStateUsable (def.pluginState) || def.samplePath.empty())
+                text (tr ("Needs FL Studio's files"), colour::textSecondary);
+            else
+            {
+                const auto name = juce::String::fromUTF8 (bassDrumNoiseName (def.pluginState).c_str());
+                text (name.isEmpty() ? tr ("(no noise sample)") : name, colour::textPrimary, juce::Justification::centredLeft);
+            }
+        }
+        else if (id == "dslpatch")
+            text (keyName (drumPart) + "  (" + juce::String (drumPart) + ")", colour::textPrimary);
+        else if (id == "dslsend" || id == "dslmorph")
+        {
+            const auto slot = drumSynthKeyToSlot (drumPart);
+            const auto at = drumSynthPatchParams * slot + (id == "dslsend" ? 34 : 36);
+            const auto v = slot >= 0 && at < (int) def.modelParams.size() ? (int) std::lround (def.modelParams[(std::size_t) at]) : -1;
+            text (id == "dslsend" ? (v < 0 ? juce::String ("-") : juce::String (v)) : (v < 0 || v > 119 ? tr ("(none)") : keyName (v)), colour::textPrimary);
+        }
+        else if (id == "dslkeys")
+        {
+            const auto inner = r.reduced (3.0f * f);
+            for (int key = 0; key < drumSynthPatches; ++key)
+            {
+                const auto cell = dslKeyCell (inner, key).reduced (0.5f * f);
+                const auto slot = drumSynthKeyToSlot (key);
+                const auto level = (std::size_t) (drumSynthPatchParams * slot) < def.modelParams.size() ? def.modelParams[(std::size_t) (drumSynthPatchParams * slot)] : 0.0f;
+                static constexpr bool blackKey[12] = { false, true, false, true, false, false, true, false, true, false, true, false };
+                const auto black = blackKey[key % 12];
+                g.setColour (key == drumPart ? accent : level > 0.0f ? accent.withAlpha (0.35f) : black ? colour::bg1 : colour::bg4);
+                g.fillRect (cell);
+                if (key % 12 == 0)
+                {
+                    g.setColour (key == drumPart ? colour::onAccent : colour::textSecondary);
+                    g.setFont (font (juce::jmax (6.5f, juce::jmin (8.0f * f, cell.getHeight() * 0.6f))));
+                    g.drawText (juce::String (key / 12), cell, juce::Justification::centred, false);
+                }
+            }
+        }
+    }
+
+    // a click on a pad button / the key display selects the part the knobs edit; true when handled
+    bool clickDrumDisplay (const plugui::LayoutItem& item, juce::Point<float> at)
+    {
+        if (item.type != plugui::Item::display || item.display == nullptr || ! layoutRect (item).contains (at) || ! conditionHolds (item))
+            return false;
+        const juce::String id (item.display);
+        if (drumaxx && (id == "drumaxxpad" || id == "drumaxxpadname"))
+        {
+            selectPart (item.steps);
+            return true;
+        }
+        if (drumsynth && id == "dslkeys")
+        {
+            const auto inner = layoutRect (item).reduced (3.0f * layoutFactor());
+            for (int key = 0; key < drumSynthPatches; ++key)
+                if (dslKeyCell (inner, key).contains (at))
+                {
+                    selectPart (key);
+                    return true;
+                }
+        }
+        return false;
+    }
+
     void resizeLayout()
     {
         for (auto& k : knobs)
@@ -1678,6 +1860,9 @@ public:
     {
         if (layout == nullptr)
             return;
+        for (const auto& item : layout->items) // round 168p: Drumaxx's pads, DrumSynth Live's keys
+            if (clickDrumDisplay (item, e.position))
+                return;
         for (const auto& item : layout->items) // the page switches first (they edit no parameter)
             if (item.type == plugui::Item::tabs && (item.style & plugui::pageTabs) != 0 && layoutRect (item).contains (e.position) && conditionHolds (item))
             {
@@ -2263,6 +2448,8 @@ private:
          sawer = false, flKeys = false, granulizer = false, drumaxx = false, slayer = false, fruityDance = false, sytrus = false, wavesFound = false,
          engineFilesMissing = false;
     int editorKey = 60;
+    int drumPart = 0; // round 168p: the Drumaxx pad / DrumSynth Live key the per-part knobs edit
+    std::vector<std::pair<juce::Slider*, const drumcontrols::Control*>> partKnobs;
     std::vector<std::unique_ptr<juce::Slider>> knobs;
     const plugui::Layout* layout = nullptr;
     const modelparams::Table* modelTable = nullptr; // the engine's listed parameters (round 168n)

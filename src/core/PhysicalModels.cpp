@@ -1,4 +1,5 @@
 #include "core/PhysicalModels.h"
+#include "core/DrumParamRanges.h"
 #include "core/HostSlide.h"
 #include "core/Sha256.h"
 
@@ -942,6 +943,17 @@ public:
         pitchCents.store (channel.sampler.pitch * 100.0f);
     }
 
+    // automation (round 168p): the clip's 0…1 over the knob's range; the static coefficients and effects follow
+    void setParameter (int index, float value) noexcept override
+    {
+        readSettings();
+        const auto r = drumranges::sakura (index);
+        if (! r.valid || ! std::isfinite (value) || index >= sakuraParamCount)
+            return;
+        params[(std::size_t) index] = r.raw (value);
+        computeStatic();
+    }
+
     void setNextNoteExpression (float, float cents, bool) noexcept override { nextCents = cents; }
 
     // FL's PITCH knob and main pitch move the sounding notes too (round 167a)
@@ -1478,6 +1490,15 @@ public:
             p[i] = std::isfinite (channel.modelParams[i]) ? channel.modelParams[i] : 0.0f;
         mailbox.write (p);
         pitchCents.store (channel.sampler.pitch * 100.0f);
+    }
+
+    // automation (round 168p): the clip's 0…1 over the knob's range, taken at the next hit (as the page's knobs)
+    void setParameter (int index, float value) noexcept override
+    {
+        mailbox.read (raw);
+        const auto r = drumranges::drumpad (index);
+        if (r.valid && std::isfinite (value) && index < (int) raw.size())
+            raw[(std::size_t) index] = r.raw (value);
     }
 
     void setNextNoteExpression (float, float cents, bool) noexcept override { nextCents = cents; }
