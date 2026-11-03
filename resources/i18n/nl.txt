@@ -6379,7 +6379,6 @@ countries: nl be
 "Click a key to see the pitch of the voice" = "Klik op een toets om de toonhoogte van de stem in te stellen"
 "Apply the speech preset to the generator/effect selected" = "Past de spraakpreset toe op de geselecteerde generator/effect"
 "Pitch: {0} Hz ({1})" = "Toonhoogte: {0} Hz ({1})"
-"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "Zoomen: omhoog slepen = dichterbij, opzij = scrollen  [Ctrl] alleen zoomen"
 "Note grid highlights on/off" = "Notenraster-markering aan/uit"
 "Background waveform on/off" = "Achtergrondgolfvorm aan/uit"
 "Show chord name for selection on/off" = "Akkoordnaam van selectie tonen aan/uit"

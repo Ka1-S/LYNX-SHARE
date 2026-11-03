@@ -6379,7 +6379,6 @@ countries: it ch sm
 "Click a key to see the pitch of the voice" = "Clicca un tasto per impostare l'altezza della voce"
 "Apply the speech preset to the generator/effect selected" = "Applica il preset vocale al generatore/effetto selezionato"
 "Pitch: {0} Hz ({1})" = "Altezza: {0} Hz ({1})"
-"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "Zoom: trascina in su = più vicino, di lato = scorri  [Ctrl] solo zoom"
 "Note grid highlights on/off" = "Evidenziazione griglia note sì/no"
 "Background waveform on/off" = "Forma d'onda di sfondo sì/no"
 "Show chord name for selection on/off" = "Mostra nome accordo della selezione sì/no"

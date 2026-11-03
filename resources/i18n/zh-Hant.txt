@@ -6379,7 +6379,6 @@ countries: tw hk mo
 "Click a key to see the pitch of the voice" = "點擊琴鍵設定聲音的音高"
 "Apply the speech preset to the generator/effect selected" = "將語音預設套用到所選的產生器/效果"
 "Pitch: {0} Hz ({1})" = "音高：{0} Hz ({1})"
-"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "縮放：向上拖曳 = 放大，左右拖曳 = 捲動  [Ctrl] 僅縮放"
 "Note grid highlights on/off" = "音符網格醒目提示 開/關"
 "Background waveform on/off" = "背景波形 開/關"
 "Show chord name for selection on/off" = "顯示所選內容的和弦名稱 開/關"

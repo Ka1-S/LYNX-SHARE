@@ -6379,7 +6379,6 @@ countries: kr
 "Click a key to see the pitch of the voice" = "건반을 클릭해 목소리 피치를 설정"
 "Apply the speech preset to the generator/effect selected" = "선택한 제너레이터/이펙트에 음성 프리셋 적용"
 "Pitch: {0} Hz ({1})" = "피치: {0} Hz ({1})"
-"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "확대/축소: 위로 드래그 = 확대, 옆으로 = 스크롤  [Ctrl] 확대/축소만"
 "Note grid highlights on/off" = "노트 그리드 강조 켜기/끄기"
 "Background waveform on/off" = "배경 파형 켜기/끄기"
 "Show chord name for selection on/off" = "선택 영역의 코드 이름 표시 켜기/끄기"

@@ -6379,7 +6379,6 @@ countries: tr
 "Click a key to see the pitch of the voice" = "Sesin perdesini ayarlamak için bir tuşa tıklayın"
 "Apply the speech preset to the generator/effect selected" = "Konuşma presetini seçili üretece/efekte uygular"
 "Pitch: {0} Hz ({1})" = "Perde: {0} Hz ({1})"
-"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "Yakınlaştırma: yukarı sürükle = yaklaş, yana = kaydır  [Ctrl] yalnızca yakınlaştırma"
 "Note grid highlights on/off" = "Nota ızgarası vurgusu aç/kapat"
 "Background waveform on/off" = "Arka plan dalga formu aç/kapat"
 "Show chord name for selection on/off" = "Seçimin akor adını göster aç/kapat"

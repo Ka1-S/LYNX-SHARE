@@ -6379,7 +6379,6 @@ countries: cn sg
 "Click a key to see the pitch of the voice" = "点击琴键设置声音的音高"
 "Apply the speech preset to the generator/effect selected" = "将语音预设应用到所选的发生器/效果"
 "Pitch: {0} Hz ({1})" = "音高：{0} Hz ({1})"
-"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "缩放：向上拖动 = 放大，左右拖动 = 滚动  [Ctrl] 仅缩放"
 "Note grid highlights on/off" = "音符网格高亮 开/关"
 "Background waveform on/off" = "背景波形 开/关"
 "Show chord name for selection on/off" = "显示所选内容的和弦名 开/关"

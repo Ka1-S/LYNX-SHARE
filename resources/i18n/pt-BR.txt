@@ -6551,7 +6551,6 @@ countries: br
 "Click a key to see the pitch of the voice" = "Clique numa tecla para definir a altura da voz"
 "Apply the speech preset to the generator/effect selected" = "Aplica o preset de fala ao gerador/efeito selecionado"
 "Pitch: {0} Hz ({1})" = "Altura: {0} Hz ({1})"
-"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "Zoom: arraste para cima = mais perto, para os lados = rolar  [Ctrl] só zoom"
 "Note grid highlights on/off" = "Destaques da grade de notas liga/desliga"
 "Background waveform on/off" = "Forma de onda de fundo liga/desliga"
 "Show chord name for selection on/off" = "Mostrar nome do acorde da seleção liga/desliga"

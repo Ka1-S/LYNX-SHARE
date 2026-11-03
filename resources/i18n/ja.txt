@@ -6379,7 +6379,6 @@ countries: jp
 "Click a key to see the pitch of the voice" = "鍵盤をクリックして声のピッチを設定"
 "Apply the speech preset to the generator/effect selected" = "選択中のジェネレーター/エフェクトにスピーチのプリセットを適用"
 "Pitch: {0} Hz ({1})" = "ピッチ: {0} Hz ({1})"
-"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "ズーム: 上にドラッグ = 拡大、左右 = スクロール  [Ctrl] ズームのみ"
 "Note grid highlights on/off" = "ノートグリッドのハイライト オン/オフ"
 "Background waveform on/off" = "背景波形 オン/オフ"
 "Show chord name for selection on/off" = "選択範囲のコード名を表示 オン/オフ"

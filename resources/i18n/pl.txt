@@ -6379,7 +6379,6 @@ countries: pl
 "Click a key to see the pitch of the voice" = "Kliknij klawisz, aby ustawić wysokość głosu"
 "Apply the speech preset to the generator/effect selected" = "Stosuje preset mowy do wybranego generatora/efektu"
 "Pitch: {0} Hz ({1})" = "Wysokość: {0} Hz ({1})"
-"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "Powiększanie: przeciągnij w górę = bliżej, na boki = przewijanie  [Ctrl] tylko powiększenie"
 "Note grid highlights on/off" = "Podświetlenie siatki nut wł./wył."
 "Background waveform on/off" = "Przebieg w tle wł./wył."
 "Show chord name for selection on/off" = "Pokaż nazwę akordu zaznaczenia wł./wył."

@@ -6379,7 +6379,6 @@ countries: ru by kz
 "Click a key to see the pitch of the voice" = "Нажмите клавишу, чтобы задать высоту голоса"
 "Apply the speech preset to the generator/effect selected" = "Применить пресет речи к выбранному генератору/эффекту"
 "Pitch: {0} Hz ({1})" = "Высота: {0} Гц ({1})"
-"Zooming: drag up = closer, sideways = scroll  [Ctrl] zoom only" = "Масштаб: тяните вверх = ближе, в стороны = прокрутка  [Ctrl] только масштаб"
 "Note grid highlights on/off" = "Подсветка сетки нот вкл/выкл"
 "Background waveform on/off" = "Фоновая форма волны вкл/выкл"
 "Show chord name for selection on/off" = "Показывать название аккорда выделения вкл/выкл"
