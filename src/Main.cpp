@@ -5867,7 +5867,9 @@ private:
                             g.fillAll (lynx::theme::panel);
                             editor->paintEntireComponent (g, false);
                         }
-                        const auto file = out.getChildFile (juce::String (lynx::effectInfo (kind).name).replaceCharacters ("/\\:", "---")
+                        // (FL's "Frequency Shifter" and LYNX's "Frequency shifter" differ only in case: FL editors get "FL ")
+                        const auto file = out.getChildFile ((lynx::plugui::hasFlLayout (kind) ? "FL " : "")
+                                                            + juce::String (lynx::effectInfo (kind).name).replaceCharacters ("/\\:", "---")
                                                             + (pass == 1 ? "-preset" : "") + (page > 0 ? "-p" + juce::String (page + 1) : juce::String())
                                                             + (scale > 1.5f ? "-200" : "-100") + ".png");
                         file.deleteFile();

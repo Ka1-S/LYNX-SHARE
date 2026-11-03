@@ -157,11 +157,12 @@ Layout lowLifterFl()
     v.push_back (knob (273, 242, 34, "Diffuser depth", TR_NOOP ("Depth"), 270, bipolar));
     v.push_back (knob (325, 242, 34, "Diffuser mix", TR_NOOP ("Mix"), 270));
     v.push_back (section (356, 202, 200, 74, TR_NOOP ("Bands"), raised));
-    v.push_back (toggle (362, 258, 40, 14, "Low band", TR_NOOP ("Low"), boxed));
-    v.push_back (knob (402, 242, 34, "Low band gain", TR_NOOP ("Low"), 270, bipolar));
-    v.push_back (knob (454, 242, 34, "Crossover", TR_NOOP ("X-over"), 270));
-    v.push_back (knob (506, 242, 34, "High band gain", TR_NOOP ("High"), 270, bipolar));
-    v.push_back (toggle (512, 258, 40, 14, "High band", TR_NOOP ("High"), boxed));
+    // the solo switches of the two bands at the section's sides, their gains and the crossover between them
+    v.push_back (toggle (361, 236, 36, 14, "Low band", TR_NOOP ("Low"), boxed));
+    v.push_back (knob (419, 242, 34, "Low band gain", TR_NOOP ("Low"), 270, bipolar));
+    v.push_back (knob (456, 242, 34, "Crossover", TR_NOOP ("X-over"), 270));
+    v.push_back (knob (493, 242, 34, "High band gain", TR_NOOP ("High"), 270, bipolar));
+    v.push_back (toggle (515, 236, 36, 14, "High band", TR_NOOP ("High"), boxed));
     v.push_back (knob (584, 242, 34, "Low cut", TR_NOOP ("Low cut"), 270));
     v.push_back (toggle (606, 206, 66, 16, "On", TR_NOOP ("On")));
     v.push_back (knob (645, 242, 34, "Dry/Wet", TR_NOOP ("Mix"), 270));
@@ -245,8 +246,9 @@ Layout pitcherLayout()
     v.push_back (section (196, 196, 130, 92, TR_NOOP ("Gender"), raised));
     v.push_back (knob (261, 248, 52, "Gender", nullptr, 0, bipolar | noCaption));
     v.push_back (value (206, 270, 110, 14, "Gender", 0));
-    v.push_back (toggle (340, 220, 80, 22, "Formant", TR_NOOP ("Formant"), boxed));
-    v.push_back (menuOf (340, 252, 80, 22, "Pitch ref.", TR_NOOP ("Reference"), TR_NOOP ("Left|Independent|Right")));
+    v.push_back (toggle (340, 214, 80, 22, "Formant", TR_NOOP ("Formant"), boxed));
+    v.push_back (menuOf (340, 244, 80, 22, "Pitch ref.", TR_NOOP ("Reference"), TR_NOOP ("Left|Independent|Right")));
+    v.push_back (label (330, 267, 100, 12, TR_NOOP ("Reference"), dim)); // FL: the channel the pitch is read from
     v.push_back (knob (468, 232, 44, "Fine", TR_NOOP ("Fine tune"), 266, bipolar | showValue));
     v.push_back (toggle (196, 298, 50, 22, "MIDI", TR_NOOP ("MIDI"), boxed));
     v.push_back (toggle (250, 298, 70, 22, "Octaves", TR_NOOP ("Octaves"), boxed));
