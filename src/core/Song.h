@@ -647,6 +647,8 @@ struct ChannelDef
     // 0 = any) play only this channel, whatever is selected in the Channel Rack. Empty = not locked.
     std::string receiveFrom;
     int receiveMidiChannel = 0;
+    // FL's channel icon (.flp 0x9B, REA round 168j): FL's icon index, 0 = none. Kept and saved; drawn by the icon UI.
+    int icon = 0;
     // FL's Loop Starter (round 168b, core/LoopStarter.h): the channel belongs to the Loop Starter of pattern
     // `loopStarterPattern` (-1 = not a Loop Starter channel), plays the one-shot category `loopStarterCategory` in kit slot
     // `loopStarterSlot`; locked = "Replace all samples" leaves its sample (FL's channel menu "Locked")
@@ -1009,6 +1011,8 @@ struct MixerTrack
     // "Compensate for master latency" (.flp 0xEC flag 0x4000 = off): with a hardware output target, that output is
     // delayed to line up with the Master's (PDC total)
     bool compensateMasterLatency = true;
+    // FL's mixer track icon ("Change icon…", .flp 0x5F, REA round 168j): FL's icon index, 0 = none. Kept and saved.
+    int icon = 0;
 };
 
 constexpr float maxTrackLatencyMs = 5000.0f; // FL's clamp (FUN_012a7230)
@@ -1298,6 +1302,7 @@ struct PlaylistTrack
     int mixerTrack = -1; // audio / instrument tracks: the linked mixer track (-1 = none)
     int channel = -1;    // instrument tracks: the channel
     TrackPerformance performance {}; // FL's Performance settings (round 165m)
+    int icon = 0; // FL's playlist track icon (.flp 0xEE u32 at 8, REA round 168j): FL's icon index, 0 = none. Kept and saved.
 };
 
 // Splits a clip at `tick` (absolute): the original keeps the start and the return value is the rest.
@@ -1460,6 +1465,27 @@ struct Song
     // mixer's centre 0 dB, +3 dB on the side panned to), triangular = linear (the louder side stays at the level, the
     // other falls to 0). It sets the mixer inserts' pan (FLEngine FUN_0127b050) and the FL Sampler voices' pan.
     bool panTriangular = false;
+    // FL's mixer menu › Plugin delay compensation (REA round 168j, .flp 0x1D / 0x27): "Automatic" off = the delay
+    // compensation ignores the plugins' latencies (FL's planner FUN_010ff3b0 skips the generators' and the effects'
+    // latencies; the tracks' manual latencies still apply); "Compensate automations" = automation of a mixer effect
+    // whose input the compensation delays is delayed with it (the value it gets is the one at its delayed position).
+    bool autoPdc = true;
+    bool compensateAutomations = true;
+    // FL's Options › Project › Time settings (REA round 168j, .flp 0x23, TimeSettingComboChange): show the project's time
+    // settings as a time signature (beats per bar / beat unit) instead of FL's time division (beats per bar, steps per beat)
+    bool timeSignatureMode = false;
+    // FL's Piano Roll scale highlighting (View › scale menu, .flp 0xF3, REA round 168j): `scale` ≥ 0 = FL's reference
+    // scale (notetools::flReferenceScales(), FL's alphabetical list), −1 Default, −2 Black notes, −3 Automatic;
+    // `root` 0 = C … 11 = B. Saved with the project.
+    struct ScaleHighlight
+    {
+        int scale = -2, root = 0;
+        bool operator== (const ScaleHighlight&) const = default;
+    };
+    ScaleHighlight scaleHighlight;
+    // FL's Options › Project › Data folder (.flp 0xCA, ProjDataPathBtnClick "Select the directory where your project data
+    // is to be stored..."): kept and saved (empty = FL's default next to the project)
+    std::string dataFolder;
     // whether an effect slot processes: switched on, and not a substitute while the substitutes are bypassed
     bool slotActive (const EffectSlot& slot) const noexcept { return slot.enabled && ! (substitutesBypassed && slot.isSubstitute()); }
     std::vector<Automation> automations;

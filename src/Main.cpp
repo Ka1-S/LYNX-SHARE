@@ -1709,6 +1709,31 @@ private:
                       && plainBack->mixer[0].outputChannel == lynx::outputDefault && plainBack->mixer[1].outputChannel == lynx::outputDefault;
         }
 
+        // round 168j: FL's icons (channel / mixer track / playlist track), PDC Automatic / Compensate automations, Time
+        // settings, scale highlighting and data folder — saved only when set, old projects load with FL's defaults
+        bool flp168jOk = false;
+        {
+            auto song = lynx::Song::makeDefault();
+            const auto plain = lynx::ProjectFile::toJson (song);
+            song.channels[0].icon = 75;
+            song.mixer[2].icon = 71;
+            song.playlistTracks.resize (3);
+            song.playlistTracks[2].icon = 30;
+            song.autoPdc = false;
+            song.compensateAutomations = false;
+            song.timeSignatureMode = true;
+            song.scaleHighlight = { 10, 5 };
+            song.dataFolder = "D:\\Projects\\data";
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), error);
+            const auto plainBack = lynx::ProjectFile::fromJson (plain, error);
+            flp168jOk = back && back->channels[0].icon == 75 && back->mixer[2].icon == 71 && back->playlistTracks.size() >= 3
+                        && back->playlistTracks[2].icon == 30 && ! back->autoPdc && ! back->compensateAutomations && back->timeSignatureMode
+                        && back->scaleHighlight == song.scaleHighlight && back->dataFolder == song.dataFolder && plainBack && plainBack->autoPdc
+                        && plainBack->compensateAutomations && ! plainBack->timeSignatureMode && plainBack->scaleHighlight == lynx::Song::ScaleHighlight {}
+                        && plainBack->dataFolder.empty() && plainBack->channels[0].icon == 0 && ! plain.contains ("\"icon\"")
+                        && ! plain.contains ("autoPdc") && ! plain.contains ("scaleHighlight");
+        }
+
         // Misc › Mono / Porta / Slide on every generator (round 168l): kept in the file; a project saved before (an
         // imported engine's flags in its synth settings) gets them back, a Max polyphony of 1 is not Mono
         bool polyOk = false;
@@ -2109,7 +2134,7 @@ private:
         // Settings › Audio "Driver settings…" with a fake driver panel (issue #13's crash, the panel's buffer kept)
         const auto driverPanel = lynx::AudioEngine::driverPanelSelfTest();
 
-        const auto ok = audioOk && projectOk && richOk && hwOutOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
+        const auto ok = audioOk && projectOk && richOk && hwOutOk && flp168jOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk;
 
         juce::String report;
@@ -2118,6 +2143,7 @@ private:
                << "project=" << (projectOk ? "OK" : "ERROR " + error) << "\n"
                << "project_features=" << (richOk ? "OK" : "ERROR") << "\n"
                << "hardware_outputs=" << (hwOutOk ? "OK" : "ERROR") << "\n"
+               << "flp168j_fields=" << (flp168jOk ? "OK" : "ERROR") << "\n"
                << "channel_polyphony=" << (polyOk ? "OK" : "ERROR") << "\n"
                << "track_latency=" << (latencyOk ? "OK" : "ERROR") << "\n"
                << "plugin_substitutes=" << (substituteOk ? "OK" : "ERROR") << "\n"

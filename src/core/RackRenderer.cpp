@@ -1707,6 +1707,7 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
     // in pattern mode the Playlist does not play: values stay as they were
     if (song.mode != PlayMode::song)
     {
+        compensateTick = -1.0;
         clearOverriddenValues();
         // only the plugin parameters driven by pattern events and by live controllers (links: FL's work in any mode,
         // round 165)
@@ -1734,8 +1735,26 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
             automationValues[(std::size_t) v.automation] = song.automations[(std::size_t) v.automation].valueAt (local + (double) v.offset);
         }
 
+    compensateTick = tick;
+    compensateTicksPerSample = song.autoPdc && song.compensateAutomations && ! perfRunning && ! state.pdc.slotInput.empty() && state.sampleRate > 0.0
+                                   ? bpm / 60.0 * (double) ppq / state.sampleRate
+                                   : 0.0;
     clearOverriddenValues();
     applyPluginParams (state, 0);
+}
+
+float RackRenderer::compensatedAutomation (const RackState& state, int automation, int track, int slot, float current) const noexcept
+{
+    if (compensateTicksPerSample <= 0.0 || compensateTick < 0.0 || automation < 0 || std::isnan (current)
+        || (std::size_t) track >= state.pdc.slotInput.size() || (std::size_t) slot >= state.pdc.slotInput[(std::size_t) track].size()
+        || (std::size_t) automation >= state.automationClips.size() || state.automationClips[(std::size_t) automation].empty()
+        || automation >= RackState::maxAutomations || std::isnan (automationValues[(std::size_t) automation]))
+        return current;
+    const auto lag = state.pdc.slotInput[(std::size_t) track][(std::size_t) slot];
+    if (lag <= 0)
+        return current;
+    return automationValueAt (state.song, state.song.automations[(std::size_t) automation], state.automationClips[(std::size_t) automation],
+                              std::max (0.0, compensateTick - lag * compensateTicksPerSample));
 }
 
 void RackRenderer::applyPluginParams (const RackState& state, int firstSlot, bool andLive) noexcept
@@ -1786,7 +1805,9 @@ void RackRenderer::applyPluginParams (const RackState& state, int firstSlot, boo
                         state.instruments[(std::size_t) t]->setParameter (b.param, v);
         }
         else if (b.track < (int) state.effects.size() && b.slot < (int) state.effects[(std::size_t) b.track].size())
-            state.effects[(std::size_t) b.track][(std::size_t) b.slot]->setParameter (b.param, v);
+        {
+            state.effects[(std::size_t) b.track][(std::size_t) b.slot]->setParameter (b.param, compensatedAutomation (state, b.automation, b.track, b.slot, v));
+        }
     }
 }
 
@@ -2353,7 +2374,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             const auto used = std::min (params.size(), effectInfo (slots[i].kind).params.size());
 
             for (std::size_t p = 0; p < used; ++p)
-                params[p] = automated (autos[p], params[p]);
+                params[p] = compensatedAutomation (state, autos[p], track, (int) i, automated (autos[p], params[p]));
 
             effects[i]->setSongPosition (chunkTick);
             effects[i]->setPlaying (chunkPlaying);
