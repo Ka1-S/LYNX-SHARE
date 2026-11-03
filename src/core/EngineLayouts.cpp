@@ -680,9 +680,9 @@ Layout granulizerLayout()
     v.push_back (radio (100, 240, 84, 60, "Transients source", TR_NOOP ("Off|Markers|Auto slice")));
     v.push_back (section (196, 218, 190, 99, TR_NOOP ("Time")));
     v.push_back (dial (236, 270, 46, "Sample start", TR_NOOP ("Start")));
-    v.push_back (toggle (270, 236, 52, 14, "Loop", TR_NOOP ("Loop")));
-    v.push_back (toggle (312, 252, 64, 22, "Hold", TR_NOOP ("Hold"), boxed));
-    v.push_back (toggle (270, 220, 112, 14, "Tempo locked", TR_NOOP ("Tempo locked")));
+    v.push_back (toggle (270, 252, 40, 14, "Loop", TR_NOOP ("Loop")));
+    v.push_back (toggle (316, 252, 62, 20, "Hold", TR_NOOP ("Hold"), boxed));
+    v.push_back (toggle (270, 234, 112, 14, "Tempo locked", TR_NOOP ("Tempo locked")));
     v.push_back (menu (306, 278, 74, 34, "Key to", TR_NOOP ("Key to"), TR_NOOP ("Pitch|Percent|Step|Transient")));
     v.push_back (display (6, 324, 380, 99, "granulizerwave"));
     return l;
