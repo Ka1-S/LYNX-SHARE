@@ -1,4 +1,5 @@
 #include "ui/MissingFilesDialog.h"
+#include "core/SearchIndex.h"
 
 #include "engine/PluginHost.h"
 #include "ui/I18n.h"
@@ -49,6 +50,19 @@ public:
     {
         std::vector<std::string> hits;
         auto list = [this] (const std::string& folder, const std::function<bool (const std::string&, bool)>& onEntry) {
+           #if JUCE_MAC
+            // not JUCE's iterator on macOS: one name NSString rejects would end the app (issue #42)
+            const juce::File dir (u8 (folder));
+            for (const auto& name : search::listFolderNames (folder))
+            {
+                const auto f = dir.getChildFile (juce::String::fromUTF8 (name.data(), (int) name.size()).convertToPrecomposedUnicode());
+                if (f.isHidden() || name[0] == '.')
+                    continue;
+                ++scanned;
+                if (! onEntry (f.getFullPathName().toStdString(), f.isDirectory()))
+                    return;
+            }
+           #else
             for (const auto& entry : juce::RangedDirectoryIterator (juce::File (u8 (folder)), false, "*",
                                                                     juce::File::findFilesAndDirectories | juce::File::ignoreHiddenFiles))
             {
@@ -56,6 +70,7 @@ public:
                 if (! onEntry (entry.getFile().getFullPathName().toStdString(), entry.isDirectory()))
                     return;
             }
+           #endif
         };
         for (const auto& folder : folders)
         {
