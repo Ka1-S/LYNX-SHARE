@@ -393,8 +393,10 @@ TEST (rec168k_stretched_pattern_clip_plays_its_pattern_once)
 {
     // FL 2026 [EXEC rec168k q168k.wav, command-line render]: a 1-bar pattern (notes at beats 1 and 3) in a clip
     // stretched to 4 bars sounds at 0.0 s and 1.0 s only (120 BPM), then silence to the clip's end; a 1-bar control clip
-    // at 10 s sounds at 10.0 and 11.0 s. LYNX plays it the same: once, nothing after the pattern's end.
+    // at 10 s sounds at 10.0 and 11.0 s. LYNX plays it the same with its extra "Stretched pattern clips loop their
+    // pattern" off; on (the default, issue #25) the pattern plays 4 times.
     using namespace lynx;
+    const auto wasLooping = stretchedClipsLoop();
     auto s = Song::makeDefault();
     s.bpm = 120.0;
     s.mode = PlayMode::song;
@@ -414,14 +416,19 @@ TEST (rec168k_stretched_pattern_clip_plays_its_pattern_once)
     const auto sr = 48000.0;
     const auto tps = ticksPerSample (s.bpm, sr);
     const auto index = makeScheduleIndex (s);
-    int ons = 0;
-    for (double t = 0.0; t < (double) (4 * bar); t += 512 * tps)
+    for (const auto loops : { false, true })
     {
-        EventBuffer ev;
-        scheduleSong (s, t, 512, tps, ev, t == 0.0, &index, false);
-        for (const auto& e : ev)
-            if (e.type == NoteEvent::Type::on)
-                ++ons;
+        setStretchedClipsLoop (loops);
+        int ons = 0;
+        for (double t = 0.0; t < (double) (4 * bar); t += 512 * tps)
+        {
+            EventBuffer ev;
+            scheduleSong (s, t, 512, tps, ev, t == 0.0, &index, false);
+            for (const auto& e : ev)
+                if (e.type == NoteEvent::Type::on)
+                    ++ons;
+        }
+        CHECK (ons == (loops ? 8 : 2));
     }
-    CHECK (ons == 2);
+    setStretchedClipsLoop (wasLooping);
 }

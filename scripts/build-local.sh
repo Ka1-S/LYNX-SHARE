@@ -3,6 +3,10 @@
 # Uses $CXX if set; otherwise tries Zig in ~/opt, then g++/clang++.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# tests/tests.cpp is one big translation unit: at -O2 clang (zig 0.13's 18.1) needs more than the default 8 MB stack
+# for it (a segfault, exit 139 / abort 134, with no message). Raise the soft limit (no root needed) to 1 GiB: a FINITE
+# value, because with "unlimited" glibc gives new threads only the default 8 MB and zig compiles on worker threads.
+ulimit -s 1048576 2>/dev/null || ulimit -s "$(ulimit -H -s)" 2>/dev/null || true
 
 if [[ -z "${CXX:-}" ]]; then
     if [[ -x "$HOME/opt/zig-linux-x86_64-0.13.0/zig" ]]; then
@@ -14,6 +18,9 @@ fi
 
 FLAGS="-std=c++20 -O2 -g -ffp-contract=off -Wall -Wextra -Wpedantic -Isrc -Ithird_party/wavpack/include -Ithird_party/vorbis/include -Ithird_party/lame/include -Ithird_party/sse2neon -Ithird_party/pocketpy"
 CORE="src/flp/Flp.cpp src/core/Song.cpp src/core/MarkerPlan.cpp src/core/NoteEdit.cpp src/core/Recorder.cpp src/core/TakeRecording.cpp src/core/Pdc.cpp src/core/WorkerPool.cpp src/core/TimeStretch.cpp src/core/Arpeggiator.cpp src/core/SynthPresets.cpp src/core/Slicer.cpp src/core/Templates.cpp src/core/FlWrapper.cpp src/core/FlEffects.cpp src/core/Effector.cpp src/core/VintagePhaser.cpp src/core/EmphasizerFx.cpp src/core/EmphasisFx.cpp src/core/TransporterFl.cpp src/core/EmphasisEngine.cpp src/core/FreqShifterFl.cpp src/core/LowLifterFl.cpp src/core/FlLegacyFx.cpp src/core/VisualFx.cpp src/core/FlExtraFx.cpp src/core/Scratcher.cpp src/core/Dvs.cpp src/core/Transmitter.cpp src/core/VideoPlayer.cpp src/core/FruityDance.cpp src/core/Reeverb2.cpp src/core/LuxeVerb.cpp src/core/IldspMath.cpp src/core/ConvolverFx.cpp src/core/EquoFx.cpp src/core/PitchShifterFl.cpp src/core/SimSynth.cpp src/core/Wasp.cpp src/core/Granulizer.cpp src/core/Drumaxx.cpp src/core/FruityFilters.cpp src/core/NewtoneFx.cpp src/core/VocalPitch.cpp src/core/LynxTune.cpp src/core/LynxVerbs.cpp src/core/MixSuite.cpp src/core/VoiceMatch.cpp src/core/EchoSuite.cpp src/core/LovePhilter.cpp src/core/DistructorFx.cpp src/core/MultibandDelayFx.cpp src/core/FrequencySplitter.cpp src/core/Slayer.cpp src/core/FlangusFastDist.cpp src/core/FruityPhaser.cpp src/core/FruityDelayBank.cpp src/core/FruityMultiband.cpp src/core/Vocodex.cpp src/core/FruityVocoder.cpp src/core/DelphiMath.cpp src/core/MaximusFx.cpp src/core/ParametricEqFl.cpp src/core/ParametricEqLinear.cpp src/core/FruityBasicFx.cpp src/core/TransistorBass.cpp src/core/GrossBeat.cpp src/core/StereoFx.cpp src/core/FruityDelay.cpp src/core/FruityShapers.cpp src/core/ChorusFx.cpp src/core/FruityDynamics.cpp src/core/FlSamplers.cpp src/core/FlSynths.cpp src/core/FlSytrus.cpp src/core/FlGenerators.cpp src/core/PhysicalModels.cpp src/core/DrumSynthLive.cpp src/core/SytrusEngine.cpp src/core/Harmless.cpp src/core/HarmlessFx.cpp src/core/Harmor.cpp src/core/Gms.cpp src/core/Morphine.cpp src/core/Ogun.cpp src/core/Toxic.cpp src/core/ToxicFx.cpp src/core/FruitKick.cpp src/core/BassDrum.cpp src/core/MiniSynth.cpp src/core/Dx10.cpp src/core/Kepler.cpp src/core/PoiZone.cpp src/core/FlPatcher.cpp src/core/Patcher.cpp src/core/Vfx.cpp src/core/VfxSequencer.cpp src/core/Inflate.cpp src/core/WavPack.cpp src/core/Scheduler.cpp src/core/Performance.cpp src/core/Patcherize.cpp src/core/Instruments.cpp src/core/RackRenderer.cpp src/core/LoadTrace.cpp src/core/ModuleWarmup.cpp src/core/FlpImport.cpp src/core/Effects.cpp src/core/EmberClassic.cpp src/core/RhythmPan.cpp src/core/VoxStrip.cpp src/core/WaveTraveller.cpp"
+
+# (the generated test chunks include tests/*.inc; the same flags everywhere keep one cached object per core file)
+FLAGS="$FLAGS -iquote tests"
 
 mkdir -p build-local build-local/wavpack
 # workflow shell (key map, workspace layout, rack operations)
@@ -113,7 +120,67 @@ mkdir -p build-local/pocketpy
 obj=build-local/pocketpy/pocketpy.o
 [[ -f "$obj" && "$obj" -nt third_party/pocketpy/pocketpy.c && "$obj" -nt third_party/pocketpy/pocketpy.h ]] || $CC -c -O2 -w -std=c11 -DPK_ENABLE_OS=0 -DPK_ENABLE_WATCHDOG=1 -Ithird_party/pocketpy third_party/pocketpy/pocketpy.c -o "$obj"
 WAVPACK="$WAVPACK $obj"
-$CXX $FLAGS $CORE $WAVPACK tests/tests.cpp -o build-local/lynx_tests 2> >(grep -v 'glibc version' >&2)
+# The tests: tests/tests.cpp with its .inc files is split at build time into N translation units compiled in parallel
+# (scripts/split-tests.py; same tests, same order, same checks). LYNX_TESTS_SPLIT=0 builds the single TU as before,
+# LYNX_TESTS_SPLIT=<n> sets the number of chunks (default: the CPUs this build may use, 2 to 12).
+split="${LYNX_TESTS_SPLIT:-auto}"
+if [[ "$split" == auto ]]; then
+    split="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+    (( split < 2 )) && split=2
+    (( split > 12 )) && split=12
+fi
+tests_single() { $CXX $FLAGS $CORE $WAVPACK tests/tests.cpp -o build-local/lynx_tests 2> >(grep -v 'glibc version' >&2); }
+if [[ "$split" -ge 2 ]] && command -v python3 > /dev/null && python3 scripts/split-tests.py tests/tests.cpp build-local/split "$split"; then
+    CHUNKS="build-local/split/lynx_split_main.cpp $(ls build-local/split/chunk*.cpp | tr '\n' ' ')"
+    rc=0
+    case "$CXX" in
+        *zig*) # zig compiles every source of one command in parallel (and caches each object)
+            $CXX $FLAGS $CORE $WAVPACK $CHUNKS -o build-local/lynx_tests 2> build-local/split/errors.log || rc=$? ;;
+        *)
+            pids=""
+            for f in $CHUNKS; do
+                $CXX $FLAGS -c "$f" -o "${f%.cpp}.o" 2> "${f%.cpp}.log" &
+                pids="$pids $!"
+            done
+            for p in $pids; do wait "$p" || rc=$?; done
+            cat build-local/split/*.log > build-local/split/errors.log
+            [[ $rc == 0 ]] && { $CXX $FLAGS $CORE $WAVPACK $(echo "$CHUNKS" | sed 's/\.cpp/.o/g') -o build-local/lynx_tests 2>> build-local/split/errors.log || rc=$?; } ;;
+    esac
+    grep -v 'glibc version' build-local/split/errors.log >&2 || true
+    if [[ $rc != 0 ]]; then
+        # a failure only the split can cause (a definition the splitter did not make inline...): build the single TU
+        if grep -qE 'multiple definition|duplicate symbol|redefinition of|lynxSplit|LYNX_TEST_|LYNX_SPLIT' build-local/split/errors.log; then
+            echo "note: the split test build failed (see above), building tests/tests.cpp as one unit (LYNX_TESTS_SPLIT=0)" >&2
+            tests_single
+        else
+            exit $rc
+        fi
+    fi
+else
+    [[ "$split" -ge 2 ]] && echo "note: the test split is not available, building tests/tests.cpp as one unit" >&2
+    tests_single
+fi
+# The tools: zig keys its per-file object cache on the output file name, so every tool that links the core recompiled
+# all of it (7 times per cold build), and each one ran its own single-threaded LTO link, one after the other. With zig
+# the lines below only queue the tools (build-local/.bin/cxx): each is linked as build-local/.bin/<tool>/lynx_tests
+# (the tests' name, so the cached core objects are reused) and they are built in parallel before the tests run.
+TOOLS_QUEUE=
+case "$CXX" in
+    *zig*)
+        mkdir -p build-local/.bin
+        TOOLS_QUEUE=build-local/.bin/queue
+        rm -f "$TOOLS_QUEUE"
+        cat > build-local/.bin/cxx << EOF
+#!/usr/bin/env bash
+args=(); out=
+while [[ \$# -gt 0 ]]; do [[ "\$1" == -o ]] && { out="\$2"; shift 2; continue; }; args+=("\$1"); shift; done
+[[ -n "\$out" ]] || exec $CXX "\${args[@]}"
+d="build-local/.bin/\$(basename "\$out")"; mkdir -p "\$d"
+{ printf '%q ' $CXX "\${args[@]}" -o "\$d/lynx_tests"; printf '2> >(grep -v "glibc version" >&2) && mv -f %q %q\n' "\$d/lynx_tests" "\$out"; } >> $TOOLS_QUEUE
+EOF
+        chmod +x build-local/.bin/cxx
+        CXX=build-local/.bin/cxx ;;
+esac
 $CXX $FLAGS src/flp/Flp.cpp tools/flpdump.cpp -o build-local/flpdump 2> >(grep -v 'glibc version' >&2)
 
 $CXX $FLAGS $CORE $WAVPACK tools/renderwav.cpp -o build-local/renderwav 2> >(grep -v 'glibc version' >&2)
@@ -140,4 +207,10 @@ $CXX $FLAGS src/core/ThreeOsc.cpp tools/threeoscrender.cpp -o build-local/threeo
 $CXX $FLAGS src/core/Slayer.cpp tools/slayerrender.cpp -o build-local/slayerrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS $CORE $WAVPACK tools/wavetravellerrender.cpp -o build-local/wavetravellerrender 2> >(grep -v 'glibc version' >&2)
 
+# (the tools queued above: build them in parallel, at most half the cores at once, an LTO link takes ~4 GB)
+if [[ -n "$TOOLS_QUEUE" && -f "$TOOLS_QUEUE" ]]; then
+    tools_jobs=$(( $(nproc 2>/dev/null || echo 4) / 2 )); (( tools_jobs < 2 )) && tools_jobs=2; (( tools_jobs > 6 )) && tools_jobs=6
+    xargs -P "$tools_jobs" -d '\n' -I{} bash -c '{}' < "$TOOLS_QUEUE"
+    rm -f "$TOOLS_QUEUE"
+fi
 ./build-local/lynx_tests "$@"

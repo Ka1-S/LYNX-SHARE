@@ -56,11 +56,11 @@ private:
     int count = 0;
 };
 
-// The limit the renderer applies to a channel: 0 = none. A Mono channel with a limit of 1 is left to its own mono
-// handling (glides and legato need the previous note), so no extra release is sent.
+// The limit the renderer applies to a channel: 0 = none. FL's limiter does not run on a Mono channel (FLEngine
+// 0xd293d0: only with the Mono bit off, round 168l): its notes share one voice anyway (core/ChannelPoly.h).
 inline int voiceLimitFor (int maxPolyphony, bool mono) noexcept
 {
-    if (maxPolyphony <= 0 || (maxPolyphony == 1 && mono))
+    if (maxPolyphony <= 0 || mono)
         return 0;
     return maxPolyphony;
 }

@@ -19,7 +19,6 @@
 "Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)."
 "Jump to the next song marker (Quantize song jumps while playing)"
 "Jump to the previous song marker"
-"Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [RMB] action, rename, delete"
 "Advanced looping"
 "Burn"
 "Burn MIDI to"

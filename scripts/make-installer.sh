@@ -27,6 +27,7 @@ STAGE="$DIST/stage/$NAME"
 rm -rf "$DIST/stage"
 mkdir -p "$STAGE"
 cp "$EXE" "$STAGE/LYNX.exe"
+[[ -f "$(dirname "$EXE")/onnxruntime.dll" ]] && cp "$(dirname "$EXE")/onnxruntime.dll" "$STAGE/"
 cp LICENSE THIRD_PARTY.md "$STAGE/"
 # LYNX ASIO driver (built next to LYNX.exe by build-windows-zig.sh) and its registration helpers
 if [[ -f "$(dirname "$EXE")/lynx-asio.dll" ]]; then

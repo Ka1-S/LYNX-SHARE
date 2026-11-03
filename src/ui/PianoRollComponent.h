@@ -5,6 +5,7 @@
 #include "core/NoteTools.h"
 #include "engine/AudioEngine.h"
 #include "ui/EditorTools.h"
+#include "ui/FlMods.h"
 #include "ui/NoteToolDialogs.h"
 #include "ui/ValueControl.h"
 #include "core/NoteEdit.h"
@@ -125,7 +126,7 @@ private:
         void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
         {
             if (onStep && wheel.deltaY != 0.0f)
-                onStep (wheel.deltaY < 0 ? 1 : -1, e.mods.isCtrlDown());
+                onStep (wheel.deltaY < 0 ? 1 : -1, flmods::ctrl (e.mods));
         }
     };
 

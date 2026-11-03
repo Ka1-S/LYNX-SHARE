@@ -22,6 +22,7 @@ PKG="$WORK/$NAME"
 mkdir -p "$PKG"
 install -m 755 "$BIN" "$PKG/LYNX"
 strip --strip-unneeded "$PKG/LYNX" 2> /dev/null || true
+./scripts/fetch-onnxruntime.sh linux "$PKG"
 install -m 644 resources/linux/lynx.desktop resources/linux/lynx-mime.xml LICENSE THIRD_PARTY.md PRIVACY.md "$PKG/"
 install -m 644 resources/lynx_icon_256.png "$PKG/lynx.png"
 install -m 755 resources/linux/install.sh "$PKG/install.sh"
@@ -32,7 +33,7 @@ tar -C "$WORK" -czf "$OUTDIR/$NAME.tar.gz" "$NAME"
 APPDIR="$WORK/LYNX.AppDir"
 mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications" "$APPDIR/usr/share/icons/hicolor/256x256/apps" \
     "$APPDIR/usr/share/mime/packages" "$APPDIR/usr/share/metainfo"
-install -m 755 "$PKG/LYNX" "$APPDIR/usr/bin/LYNX"
+install -m 755 "$PKG/LYNX" "$PKG"/libonnxruntime.so.* "$APPDIR/usr/bin/"
 install -m 644 resources/linux/lynx.desktop "$APPDIR/usr/share/applications/$APPID.desktop"
 install -m 644 resources/linux/lynx.desktop "$APPDIR/$APPID.desktop"
 # AppStream metadata with this build's version and date (validated by appimagetool when appstreamcli is installed)
