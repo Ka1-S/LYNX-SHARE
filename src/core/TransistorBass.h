@@ -21,10 +21,13 @@
 // host's sample-rate call and the state load is FL's own (the reference follows the EXEC harness: state, then rate).
 
 #include <cstdint>
+#include <array>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
+#include "core/EngineParams.h"
 #include "core/Instruments.h"
 
 namespace lynx
@@ -36,6 +39,39 @@ bool transistorBassStateUsable (const std::vector<std::uint8_t>& state);
 bool transistorBassDllUsable (const std::string& path);
 
 std::unique_ptr<Instrument> makeTransistorBassInstrument();
+
+// The designed page (round 168q): parameter `index` (0…41) of the current program's working patch — its byte offset
+// in a usable state (−1 otherwise) — and the program's sequence for the sequence display.
+int transistorBassParamOffset (const std::vector<std::uint8_t>& state, int index);
+struct TransistorBassProgram
+{
+    struct Step
+    {
+        int note = 0;
+        bool gate = false, slide = false, accent = false;
+    };
+    int program = 0, transpose = 0, length = 16;
+    bool sequencer = false;
+    std::array<Step, 32> steps {};
+};
+std::optional<TransistorBassProgram> transistorBassProgram (const std::vector<std::uint8_t>& state);
+// The page's sequence rows (round 168q2, FL's 16-step editor): parameters after the patch's 0…41 — the saved
+// program's sequence length (1…16), the sequencer switch, then per step i (0…15) firstStep + 5i + {0 note 0…131,
+// 1 octave 0…10 (the note's octave: note / 12), 2 gate, 3 slide, 4 accent}.
+namespace tbseq
+{
+constexpr int length = 100, sequencer = 101, firstStep = 110, steps = 16;
+}
+// Clear (gates, slides and accents off, notes C5) or move every step an octave (±1) — FL's CLEAR and octave buttons;
+// false when the state can't be read
+bool transistorBassClearSequence (std::vector<std::uint8_t>& state);
+bool transistorBassShiftSequence (std::vector<std::uint8_t>& state, int octaves);
+const std::vector<EngineParam>& transistorBassParams();
+namespace modelparams
+{
+struct Table;
+Table transistorBassModelTable();
+} // namespace modelparams
 
 namespace tbass
 {

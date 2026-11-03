@@ -2231,6 +2231,18 @@ public:
         nextCents = cents;
     }
 
+    // an automation clip on one of GMS's knobs (core/ModelParamsSynths.cpp; 0..1 is the float itself). Audio thread:
+    // the engine reads P as it renders, so the value plays at once.
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        if (index < 0 || index >= paramCount || ! std::isfinite (value))
+            return;
+        const auto v = std::clamp (value, 0.0f, 1.0f);
+        setup->P[(std::size_t) index] = v;
+        plugin.eng.P[(std::size_t) index] = v;
+    }
+
     // FL's PITCH knob and main pitch move the sounding notes too (round 167a)
     void setChannelPitchNow (float knob, float rest) noexcept override
     {

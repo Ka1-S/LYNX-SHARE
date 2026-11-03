@@ -110,6 +110,19 @@ enum : std::uint32_t
     evTimeMarkerNumerator = 0x21, // u8
     evTimeMarkerDenominator = 0x22,
     evTimeMarkerName = 0xCD,
+    // REA round 168j (loader FUN_00f46490, saver FUN_00f40840 / FUN_00f3d620)
+    evChannelIcon = 0x9B,         // u32: the channel's icon (+0x7c)
+    evMixerInsertIcon = 0x5F,     // u16: the next insert's icon (track +0x14; written only when > 0)
+    evMixerInsertColourSet = 0x2A, // u8: the next insert's "own colour" flag (track +0x00)
+    evMixerInsertMonitor = 0xA6,  // u32: "Monitor external input" of the insert opened by the last 0xEC (track +0x30)
+    evPlaylistTrackColourSet = 0x2B, // u8: the playlist track's "own colour" flag (0: FL resets it to the default colour)
+    evAutoPdc = 0x1D,             // u8: Plugin delay compensation › Automatic
+    evCompensateAutomations = 0x27, // u8: Plugin delay compensation › Compensate automations
+    evTimeSetting = 0x23,         // u8: 1 = Time settings "Set as time signature"
+    evMixerTrackCount = 0x67,     // u16: mixer track records in the file (3…502, FL's FLP_FXTrackCount)
+    evScaleHighlight = 0xF3,      // 8 B: i32 scale, i32 root (the Piano Roll's scale highlighting)
+    evDataFolder = 0xCA,          // text: Options › Project › Data folder
+    evPatternLength = 0xA4,       // u32: the pattern's fixed length in ticks (0 = automatic; pattern +0x44)
 };
 
 constexpr std::size_t noteRecordSize = 24;
@@ -452,6 +465,11 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
     // who the following events belong to, until the next selector.
     enum class Section { global, channel, arrangement, mixer } section = Section::global;
     int currentChannel = -1, currentPattern = -1, currentArrangement = -1;
+    // round 168g: 0x94 markers right after a pattern's 0x41 (before the next channel / playlist / arrangement / mixer
+    // section) are that pattern's Piano roll markers, not the Playlist's (FL's demos: Edlan & Ella Noël pattern 10,
+    // Sid De La Cruz's patterns' time signatures)
+    bool inPattern = false;
+    std::vector<TimeMarker>* lastMarkers = nullptr;
 
     if (channelPreset)
     {
@@ -488,6 +506,7 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
         pendingSlotFlags = -1;
     };
     std::uint32_t pendingInsertColour = 0;
+    int pendingInsertIcon = 0, pendingInsertColourSet = -1;
 
     auto text = [&] (const Event& e)
     {
@@ -563,6 +582,46 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
 
             case evFastDeclick: // (FL saves it after the Playlist tracks; its loader reads it in any context)
                 project.fastDeclick = e.value > 0;
+                break;
+
+            case evChannelIcon:
+                if (section == Section::channel)
+                    channel().icon = (int) e.value;
+                break;
+
+            case evAutoPdc:
+                project.autoPdc = e.value > 0;
+                break;
+
+            case evCompensateAutomations:
+                project.compensateAutomations = e.value > 0;
+                break;
+
+            case evTimeSetting:
+                project.timeSignatureMode = e.value == 1;
+                break;
+
+            case evMixerTrackCount: // (FL aborts the load outside 3…502)
+                if (e.value >= 3 && e.value <= 502)
+                    project.mixerTrackCount = (int) e.value;
+                break;
+
+            case evScaleHighlight:
+                if (e.data.size() >= 8)
+                {
+                    project.scaleHighlight = readLE<std::int32_t> (e.data, 0);
+                    project.scaleRoot = readLE<std::int32_t> (e.data, 4);
+                    project.hasScaleHighlight = true;
+                }
+                break;
+
+            case evDataFolder:
+                project.dataFolder = text (e);
+                break;
+
+            case evPatternLength:
+                if (currentPattern >= 0)
+                    pattern().fixedLength = e.value;
                 break;
 
             case evChannelFxFlags:
@@ -864,6 +923,8 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
             case evNewPattern:
                 currentPattern = (int) e.value;
                 pattern();
+                inPattern = true;
+                lastMarkers = nullptr;
                 break;
 
             case evPatternName:
@@ -933,6 +994,8 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
             }
 
             case evNewChannel:
+                inPattern = false;
+                lastMarkers = nullptr;
                 section = Section::channel;
                 currentChannel = (int) e.value;
                 channel();
@@ -1015,6 +1078,8 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                 break;
 
             case evArrangement:
+                inPattern = false;
+                lastMarkers = nullptr;
                 section = Section::arrangement;
                 currentArrangement = (int) e.value;
                 arrangement();
@@ -1026,28 +1091,35 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                 break;
 
             case evTimeMarker:
-                if (currentArrangement < 0)
+                if (inPattern && currentPattern >= 0)
+                    lastMarkers = &pattern().markers;
+                else
                 {
-                    currentArrangement = 0;
-                    arrangement();
+                    if (currentArrangement < 0)
+                    {
+                        currentArrangement = 0;
+                        arrangement();
+                    }
+                    lastMarkers = &arrangement().markers;
                 }
-                arrangement().markers.push_back ({ e.value & 0xFFFFFFu, (int) (e.value >> 24), 4, 4, {} });
+                lastMarkers->push_back ({ e.value & 0xFFFFFFu, (int) (e.value >> 24), 4, 4, {} });
                 break;
 
             case evTimeMarkerNumerator:
             case evTimeMarkerDenominator:
-                if (currentArrangement >= 0 && ! arrangement().markers.empty())
-                    (e.id == evTimeMarkerNumerator ? arrangement().markers.back().numerator : arrangement().markers.back().denominator)
-                        = (int) e.value;
+                if (lastMarkers != nullptr && ! lastMarkers->empty())
+                    (e.id == evTimeMarkerNumerator ? lastMarkers->back().numerator : lastMarkers->back().denominator) = (int) e.value;
                 break;
 
             case evTimeMarkerName:
-                if (currentArrangement >= 0 && ! arrangement().markers.empty())
-                    arrangement().markers.back().name = text (e);
+                if (lastMarkers != nullptr && ! lastMarkers->empty())
+                    lastMarkers->back().name = text (e);
                 break;
 
             case evPlaylistItems:
             {
+                inPattern = false;
+                lastMarkers = nullptr;
                 if (currentArrangement < 0)
                 {
                     currentArrangement = 0;
@@ -1174,6 +1246,7 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                     const auto c = readLE<std::uint32_t> (e.data, 4);
                     t.colour = ((c & 0xFF) << 16) | (c & 0xFF00) | ((c >> 16) & 0xFF);
                     t.enabled = e.data[12] != 0;
+                    t.icon = (int) readLE<std::uint32_t> (e.data, 8);
                     // FL 20+ layout (70 bytes; REA round 104): f32 size at 13, u8 "grouped with above" at 46,
                     // u8 "group expanded" at 61 (cleared when FL collapses the group)
                     if (e.data.size() >= 17)
@@ -1181,6 +1254,11 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                         const auto h = readLE<float> (e.data, 13);
                         if (std::isfinite (h) && h > 0.05f && h < 10.0f)
                             t.heightScale = h;
+                    }
+                    if (e.data.size() >= 22)
+                    {
+                        t.lockedHeight = readLE<std::int32_t> (e.data, 17);
+                        t.lockedToContent = e.data[21] != 0;
                     }
                     if (e.data.size() >= 46)
                     {
@@ -1201,6 +1279,11 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                     }
                     arrangement().tracks.push_back (t);
                 }
+                break;
+
+            case evPlaylistTrackColourSet: // (FL's loader: 0 puts the default colour back)
+                if (currentArrangement >= 0 && ! arrangement().tracks.empty() && e.value == 0)
+                    arrangement().tracks.back().colour = 0x485156;
                 break;
 
             case evPlaylistTrackName:
@@ -1345,6 +1428,19 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                     project.mixer[1].colour = pendingInsertColour;
                 break;
 
+            case evMixerInsertIcon:
+                pendingInsertIcon = (int) e.value;
+                break;
+
+            case evMixerInsertColourSet:
+                pendingInsertColourSet = e.value != 0 ? 1 : 0;
+                break;
+
+            case evMixerInsertMonitor: // (FL's loader: any other value is On)
+                if (section == Section::mixer && ! project.mixer.empty())
+                    project.mixer.back().monitor = (int) std::min<std::uint32_t> (e.value, 3);
+                break;
+
             case evMixerInsertName:
                 // The name comes before the event that opens the insert it belongs to
                 // (confirmed by cross-checking with the channel routing in the demos).
@@ -1360,6 +1456,8 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
             {
                 if (section == Section::mixer && ! mixerPreset)
                     closeOldSlot();
+                inPattern = false;
+                lastMarkers = nullptr;
                 section = Section::mixer;
                 auto& insert = mixerPreset ? project.mixer[1] : project.mixer.emplace_back();
                 if (! mixerPreset)
@@ -1370,6 +1468,10 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                 }
                 pendingInsertName.clear();
                 pendingInsertColour = 0;
+                insert.icon = pendingInsertIcon;
+                insert.colourSet = pendingInsertColourSet;
+                pendingInsertIcon = 0;
+                pendingInsertColourSet = -1;
 
                 if (e.data.size() >= 8)
                     insert.flags = readLE<std::uint32_t> (e.data, 4);

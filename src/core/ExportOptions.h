@@ -101,6 +101,11 @@ struct Options
     bool saveTempo = false;
     bool loopMarkers = true;
     bool playlistMarkers = true;
+    // File › Export › "Master..." (Ctrl+Alt+M; round 168e: LYNX's own mastering where FL sends the render to FL Cloud):
+    // the render is brought to `masterLufs` integrated under a −1 dBTP ceiling (core/Mastering.h). `master` is set by
+    // that item only (not remembered); the target is remembered.
+    bool master = false;
+    double masterLufs = -14.0;
 
     bool operator== (const Options&) const = default;
 };

@@ -9,6 +9,8 @@
 #include "ui/BrowserComponent.h"
 
 #include "core/MixerOps.h"
+#include "core/ClipOps.h"
+#include "core/TempoDetect.h"
 
 #include <cstring>
 #include <functional>
@@ -39,6 +41,7 @@
 #include "core/ThreeOsc.h"
 #include "core/BeepMap.h"
 #include "core/Sawer.h"
+#include "core/TransistorBass.h"
 #include "core/Slayer.h"
 #include "core/SytrusEngine.h"
 #include "core/SynthPresets.h"
@@ -509,6 +512,10 @@ public:
         drumaxx = def.instrument == InstrumentKind::drumaxx;
         slayer = def.instrument == InstrumentKind::slayer;
         fruityDance = def.instrument == InstrumentKind::fruitydance;
+        // round 168q: the engines that run FL's own files say so when this computer lacks them
+        engineFilesMissing = ((kepler || keplerExo) && ! keplerDllUsable (def.samplePath))
+                          || (transistorBass && ! transistorBassDllUsable (def.samplePath))
+                          || (sawer && sawerReadTable (def.samplePath).empty());
         sytrus = def.instrument == InstrumentKind::sytrus;
         // DrumSynth Live: the patch on the key selected in FL's editor (raw FL values)
         if (drumsynth)
@@ -1119,11 +1126,11 @@ public:
         // switches drawn by the panel
         layout = plugui::instrumentLayout (def.instrument);
         // a state the engine cannot read gives no knobs: keep the plain page then
-        if (layout != nullptr && std::none_of (knobs.begin(), knobs.end(), [this] (const auto& k) { return itemFor (k->getName()) != nullptr; }))
+        if (layout != nullptr && ! wasp && std::none_of (knobs.begin(), knobs.end(), [this] (const auto& k) { return itemFor (k->getName()) != nullptr; }))
             layout = nullptr;
         if (layout != nullptr)
         {
-            accent = flKeys ? skin::colour::azure : boobass || transistorBass ? skin::colour::ember : harmor || sytrus || harmless || morphine ? skin::colour::violet
+            accent = flKeys ? skin::colour::azure : boobass || transistorBass ? skin::colour::ember : harmor || sytrus ? skin::colour::violet
                                                                                                                                            : skin::colour::crimson;
             // round 126: the page's own style (FL Keys hardware, BooBass vivid, the synths neon)
             pageStyle = flKeys ? skin::Style::hardware : boobass || transistorBass ? skin::Style::vivid : skin::Style::neon;
@@ -1165,6 +1172,8 @@ public:
         const auto index = p.index;
         knob->onValueChange = [this, index, s = knob.get()] {
             ref.edit (engine, [index, v = (float) s->getValue()] (ChannelDef& c) { modelparams::setRawValue (c, index, v); });
+            if (instrumentKind == InstrumentKind::transistorbass && index >= tbseq::length) // (a step's note moves its octave)
+                syncKnobs();
             if (layout != nullptr)
             {
                 updateConditional();
@@ -1242,6 +1251,19 @@ public:
         for (const auto& [k, c] : partKnobs)
             k->setValue (drumcontrols::value (*def, *c, drumPart).value_or (c->low), juce::dontSendNotification);
         repaint();
+    }
+
+    // the listed parameters' knobs read the channel's state again (an edit that moved other values: Transistor Bass's
+    // note / octave, CLEAR, octave buttons; round 168q2)
+    void syncKnobs()
+    {
+        const auto* c = channelNow();
+        if (c == nullptr || modelTable == nullptr)
+            return;
+        for (auto& k : knobs)
+            if (const auto* p = modelparams::findByName (instrumentKind, k->getName().toStdString()); p != nullptr && p->index >= tbseq::length)
+                if (const auto v = modelparams::rawValue (*c, p->index))
+                    k->setValue (*v, juce::dontSendNotification);
     }
 
     // the items shown only while another control is within a range (LayoutItem::whenParam, e.g. an effect slot's
@@ -1467,9 +1489,9 @@ public:
                         g.setFont (font (r.getHeight() * 0.9f, true));
                         g.drawText (item.label, r, juce::Justification::centred, false);
                     }
-                    else if (dimmed && r.getHeight() > 30.0f * f) // the plugin's name, big and quiet
+                    else if (dimmed && r.getHeight() > 30.0f * f) // the plugin's name, big and readable (round 168q2)
                     {
-                        g.setColour (colour::bg4);
+                        g.setColour (colour::textSecondary);
                         g.setFont (font (r.getHeight() * 0.6f, true));
                         g.drawFittedText (item.label, r.toNearestInt(),
                                           (item.style & plugui::alignLeft) != 0 ? juce::Justification::centredLeft : juce::Justification::centredRight, 1, 0.8f);
@@ -1541,8 +1563,12 @@ public:
                         g.setColour (colour::textPrimary);
                         g.setFont (font (juce::jmax (9.0f, 12.0f * f), true));
                         // oversampling orders read as FL shows them (0 → 1x … 3 → 8x)
+                        // a Transistor Bass step's note reads as a note name (60 = C5, FL's naming; round 168q2)
+                        static const char* const noteNames[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+                        const auto whole = (int) std::lround (k->getValue());
                         const auto text = juce::String (item.param).containsIgnoreCase ("oversampling") ? juce::String (1 << juce::jlimit (0, 8, (int) k->getValue())) + "x"
-                                                                                                       : juce::String ((int) k->getValue());
+                                        : juce::String (item.param).endsWith (" note") ? juce::String (noteNames[((whole % 12) + 12) % 12]) + juce::String (whole / 12)
+                                                                                       : juce::String (whole);
                         g.drawText (text, box.withTrimmedRight (8.0f * f), juce::Justification::centred, false);
                         g.setColour (colour::textSecondary);
                         g.drawText (juce::String::fromUTF8 ("\xe2\x96\xb4"), box.withTrimmedLeft (box.getWidth() - 10.0f * f).withHeight (box.getHeight() * 0.5f), juce::Justification::centred, false);
@@ -1551,6 +1577,22 @@ public:
                     break;
                 case plugui::Item::display:
                     skin::well (g, r, radius::md * f);
+                    // round 168q: BeepMap's bitmap, its file row, the Granulizer's sample and grains, Transistor Bass's
+                    // program and sequence
+                    if (juce::String (item.display) == "beepmapimage")
+                        paintBeepMapImage (g, r.reduced (3.0f * f));
+                    if (juce::String (item.display) == "beepmapfile")
+                        paintBeepMapFile (g, r, f);
+                    if (juce::String (item.display) == "granulizerwave")
+                        paintGranulizerWave (g, r.reduced (4.0f * f), f);
+                    if (juce::String (item.display) == "granulizergrains")
+                        paintGranulizerGrains (g, r.reduced (5.0f * f), f);
+                    if (juce::String (item.display) == "tbprogram")
+                        paintTransistorBass (g, r, f);
+                    if (juce::String (item.display) == "tbsteps")
+                        paintTransistorBassSteps (g, r, f);
+                    if (juce::String (item.display) == "tbseqtools")
+                        paintTransistorBassTools (g, r, f);
                     if (juce::String (item.display) == "xy")
                         if (auto* kx = knobFor (item.param); kx != nullptr)
                             if (auto* ky = knobFor (item.param2); ky != nullptr)
@@ -1598,6 +1640,65 @@ public:
                         }
                     }
                     paintDrumDisplay (g, item, r, def, f);
+                    // round 168o: the envelopes of the synth group's pages, drawn from their knobs (attack, decay, sustain, release;
+                    // a missing stage is skipped, a missing sustain is the level the decay falls to: none)
+                    {
+                        struct Env
+                        {
+                            const char* id;
+                            const char* a;
+                            const char* d;
+                            const char* s;
+                            const char* r;
+                            const char* start; // a modulator's initial level (DX10)
+                        };
+                        static const Env envs[] = {
+                            { "dx10amp", "Attack", "Decay", nullptr, "Release", nullptr },
+                            { "dx10mod1", nullptr, "Mod 1 time", "Mod 1 sustain", "Mod 1 release", "Mod 1 init" },
+                            { "dx10mod2", nullptr, "Mod 2 time", "Mod 2 sustain", "Mod 2 release", "Mod 2 init" },
+                            { "simamp", "Attack", "Decay", "Sustain", "Release", nullptr },
+                            { "simfilt", "Filter attack", "Filter decay", "Filter sustain", "Filter release", nullptr },
+                            { "ministenv", "Attack", "Decay", "Sustain", "Release", nullptr },
+                        };
+                        for (const auto& e : envs)
+                            if (juce::String (item.display) == e.id)
+                            {
+                                const auto value = [&] (const char* name, float otherwise) {
+                                    auto* kn = name != nullptr ? knobFor (name) : nullptr;
+                                    return kn != nullptr ? juce::jlimit (0.0f, 1.0f, normalised (*kn)) : otherwise;
+                                };
+                                const auto inner = r.reduced (5.0f * f, 5.0f * f);
+                                const auto a = value (e.a, 0.0f), d = value (e.d, 0.5f), su = value (e.s, 0.0f), rl = value (e.r, 0.3f);
+                                const auto peak = e.start != nullptr ? value (e.start, 1.0f) : 1.0f;
+                                const auto unit = inner.getWidth() / 4.0f;
+                                const auto y = [&] (float level) { return inner.getBottom() - inner.getHeight() * level; };
+                                juce::Path env;
+                                auto x = inner.getX();
+                                env.startNewSubPath (x, y (e.start != nullptr ? peak : 0.0f));
+                                x += unit * a;
+                                env.lineTo (x, y (peak));
+                                // DX10's amp decay ≥ 0.98 holds the note
+                                const auto hold = e.s != nullptr ? su : (d >= 0.98f ? peak : 0.0f);
+                                x += unit * (0.15f + 0.85f * d);
+                                env.lineTo (x, y (hold));
+                                env.lineTo (inner.getRight() - unit * (0.15f + 0.85f * rl), y (hold));
+                                env.lineTo (inner.getRight(), y (0.0f));
+                                g.setColour (colour::gridBeat);
+                                g.drawHorizontalLine ((int) inner.getBottom(), inner.getX(), inner.getRight());
+                                g.setColour (accent.withAlpha (0.25f));
+                                g.strokePath (env, juce::PathStrokeType (3.0f * f));
+                                g.setColour (accent.brighter (0.3f));
+                                g.strokePath (env, juce::PathStrokeType (1.3f * f));
+                            }
+                    }
+                    if (juce::String (item.display) == "gmswaves") // round 168o: GMS's waves are read from FL Studio's folder
+                    {
+                        g.setColour (colour::textSecondary);
+                        g.setFont (font (juce::jmax (8.0f, 9.5f * f)));
+                        const auto text = def.samplePath.empty() ? tr ("Needs FL Studio's files")
+                                                                 : juce::File (juce::String::fromUTF8 (def.samplePath.c_str())).getFileName();
+                        g.drawFittedText (text, r.reduced (6.0f * f).toNearestInt(), juce::Justification::centred, 3, 0.7f);
+                    }
                     if (juce::String (item.display) == "flkeysname")
                         if (const auto st = flkeys::parseState (def.pluginState))
                         {
@@ -1771,6 +1872,20 @@ public:
                         showPage (o);
                 return;
             }
+        for (const auto& item : layout->items) // round 168q2: Transistor Bass's CLEAR / octave up / octave down
+            if (item.type == plugui::Item::display && juce::String (item.display) == "tbseqtools" && layoutRect (item).contains (e.position))
+            {
+                if (const auto button = transistorBassToolButton (item, e.position); button >= 0)
+                    transistorBassToolAction (button);
+                return;
+            }
+        for (const auto& item : layout->items) // round 168q: BeepMap's Open / Paste
+            if (item.type == plugui::Item::display && juce::String (item.display) == "beepmapfile" && layoutRect (item).contains (e.position))
+            {
+                if (const auto button = beepMapFileButton (item, e.position); button >= 0)
+                    beepMapAction (button);
+                return;
+            }
         for (const auto& item : layout->items)
         {
             auto* k = knobFor (item.param);
@@ -1843,40 +1958,51 @@ public:
             skin::canvas (g, getLocalBounds().toFloat(), accent);
         g.setColour (theme::colour::textPrimary);
         g.setFont (theme::font (layout != nullptr ? theme::type::body : theme::type::title));
-        g.drawText (drumsynth ? tr ("DrumSynth Live — FL's engine, patch on key {0}", { juce::String (editorKey) })
-                                    + (wavesFound ? tr (" (next hit; recorded waves from your FL installation)")
-                                                  : tr (" (next hit; recorded waves not found: silent)"))
-                    : harmless ? tr ("Harmless — FL's additive engine (chorus/delay/reverb/compressor rack off)")
-                    : harmor ? tr ("Harmor — FL's additive engine (effects rack off; image synthesis not decoded)")
-                    : gms ? tr ("GMS — FL's engine (waves read from your FL installation)")
-                    : morphine ? tr ("Morphine — FL's additive engine (new settings restart the voices)")
-                    : transistorBass ? tr ("Transistor Bass — FL's engine with its sequencer and effects (oscillator cycles read from your FL installation)")
-                    : autogun ? tr ("Autogun — FL's engine with its effects and Magic Dust (SG.dat read from your FL installation)")
-                    : ogun ? tr ("Ogun — FL's engine with its effects (Seed 2 Random is a fixed draw per channel)")
-                    : poizone ? tr ("PoiZone — FL's engine with its gate, chorus, delay and arpeggiator (new settings restart the voices)")
-                    : miniSynth ? tr ("MiniSynth — FL's engine with its effects (wave tables read from your FL installation)")
-                    : dx10 ? tr ("Fruity DX10 — FL's FM engine")
-                    : kepler ? tr ("Kepler — FL's engine (LFO shape and noise read from your FL installation; new settings restart the voices)")
-                    : keplerExo ? tr ("Kepler Exo — FL's engine with its effects (tables read from your FL installation; new settings restart the voices)")
-                    : fruitkick ? tr ("Fruit Kick — FL's engine (channel envelopes stepped per tick)")
-                    : bassdrum ? tr ("BassDrum — FL's engine (table and noise samples read from your FL installation)")
-                    : toxic ? tr ("Toxic Biohazard — FL's engine with its effects (waves read from your FL installation)")
-                    : threeOsc ? tr ("3x Osc — FL's engine (custom wave from the channel's sample)")
-                    : simSynth ? tr ("SimSynth — FL's engine (new settings restart the voices)")
-                    : wasp ? tr ("Wasp — FL Studio 2026 has no 64-bit Wasp: the channel keeps its settings and stays silent, as in FL")
-                    : flKeys ? tr ("FL Keys — FL's engine (wavetable read from your FL installation)")
-                    : plucked ? tr ("Plucked! — FL's plucked-string engine")
-                    : beepMap ? tr ("BeepMap — FL's engine (plays the bitmap saved with the channel)")
-                    : sawer ? tr ("Sawer — FL's engine with its effects (oscillator cycle read from your FL installation)")
-                    : granulizer ? tr ("Fruity Granulizer — FL's engine on the channel's sample")
-                    : drumaxx ? tr ("Drumaxx — FL's physical drum engine (pads on their keys; patterns not played)")
-                    : slayer ? tr ("FL Slayer — FL's engine with its effects, amp and cabinet (picks read from your FL installation; new settings restart the voices)")
-                    : sytrus ? tr ("Sytrus — FL's engine, main settings (operators, filters and effects keep the saved patch)")
-                    : fruityDance ? tr ("Fruity Dance — a visual plugin: it makes no sound, the channel keeps its settings")
-                    : boobass ? tr ("BooBass — FL's engine, its sound read from your FL installation (knobs: 3-band EQ)")
-                    : sakura ? tr ("Sakura — physical strings (FL's engine; new parameters apply to the next note)")
-                             : tr ("Drumpad — physical drum (FL's engine; new parameters apply to the next hit)"),
-                    10, 6, getWidth() - 20, 20, juce::Justification::centredLeft);
+        if (! engineFilesMissing)
+            g.drawText (drumsynth ? tr ("DrumSynth Live — FL's engine, patch on key {0}", { juce::String (editorKey) })
+                                        + (wavesFound ? tr (" (next hit; recorded waves from your FL installation)")
+                                                      : tr (" (next hit; recorded waves not found: silent)"))
+                        : harmless ? tr ("Harmless — FL's additive engine (chorus/delay/reverb/compressor rack off)")
+                        : harmor ? tr ("Harmor — FL's additive engine (effects rack off; image synthesis not decoded)")
+                        : gms ? tr ("GMS — FL's engine (waves read from your FL installation)")
+                        : morphine ? tr ("Morphine — FL's additive engine (new settings restart the voices)")
+                        : transistorBass ? tr ("Transistor Bass — FL's engine with its sequencer and effects (oscillator cycles read from your FL installation)")
+                        : autogun ? tr ("Autogun — FL's engine with its effects and Magic Dust (SG.dat read from your FL installation)")
+                        : ogun ? tr ("Ogun — FL's engine with its effects (Seed 2 Random is a fixed draw per channel)")
+                        : poizone ? tr ("PoiZone — FL's engine with its gate, chorus, delay and arpeggiator (new settings restart the voices)")
+                        : miniSynth ? tr ("MiniSynth — FL's engine with its effects (wave tables read from your FL installation)")
+                        : dx10 ? tr ("Fruity DX10 — FL's FM engine")
+                        : kepler ? tr ("Kepler — FL's engine (LFO shape and noise read from your FL installation)")
+                        : keplerExo ? tr ("Kepler Exo — FL's engine with its effects (tables read from your FL installation)")
+                        : fruitkick ? tr ("Fruit Kick — FL's engine (channel envelopes stepped per tick)")
+                        : bassdrum ? tr ("BassDrum — FL's engine (table and noise samples read from your FL installation)")
+                        : toxic ? tr ("Toxic Biohazard — FL's engine with its effects (waves read from your FL installation)")
+                        : threeOsc ? tr ("3x Osc — FL's engine (custom wave from the channel's sample)")
+                        : simSynth ? tr ("SimSynth — FL's engine (new settings restart the voices)")
+                        : wasp ? tr ("Wasp — FL Studio 2026 has no 64-bit Wasp: the channel keeps its settings and stays silent, as in FL")
+                        : flKeys ? tr ("FL Keys — FL's engine (wavetable read from your FL installation)")
+                        : plucked ? tr ("Plucked! — FL's plucked-string engine")
+                        : beepMap ? tr ("BeepMap — FL's engine (plays the bitmap saved with the channel)")
+                        : sawer ? tr ("Sawer — FL's engine with its effects (oscillator cycle read from your FL installation)")
+                        : granulizer ? tr ("Fruity Granulizer — FL's engine on the channel's sample")
+                        : drumaxx ? tr ("Drumaxx — FL's physical drum engine (pads on their keys; patterns not played)")
+                        : slayer ? tr ("FL Slayer — FL's engine with its effects, amp and cabinet (picks read from your FL installation; new settings restart the voices)")
+                        : sytrus ? tr ("Sytrus — FL's engine, main settings (operators, filters and effects keep the saved patch)")
+                        : fruityDance ? tr ("Fruity Dance — a visual plugin: it makes no sound, the channel keeps its settings")
+                        : boobass ? tr ("BooBass — FL's engine, its sound read from your FL installation (knobs: 3-band EQ)")
+                        : sakura ? tr ("Sakura — physical strings (FL's engine; new parameters apply to the next note)")
+                                 : tr ("Drumpad — physical drum (FL's engine; new parameters apply to the next hit)"),
+                        10, 6, getWidth() - 20, 20, juce::Justification::centredLeft);
+        if (engineFilesMissing) // round 168q: an engine that runs FL's own DLL / data file, which this computer lacks
+        {
+            const auto band = juce::Rectangle<float> (8.0f, 5.0f, (float) getWidth() - 16.0f, 22.0f);
+            g.setColour (accent.withAlpha (0.18f));
+            g.fillRoundedRectangle (band, 4.0f);
+            g.setColour (theme::colour::textPrimary);
+            g.setFont (theme::font (theme::type::small));
+            g.drawFittedText (tr ("Needs FL Studio's files: the engine file was not found, so the channel stays silent (its settings are kept)."),
+                              band.reduced (6.0f, 0.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.7f);
+        }
         if (layout != nullptr)
         {
             paintLayout (g);
@@ -1963,6 +2089,268 @@ private:
     }
 
     // the Granulizer plays the new sample with the same settings (FL keeps the knobs and the channel's name)
+    // --- round 168q: the displays of the group-D pages ---------------------------------------------------------
+
+    const ChannelDef* channelNow() const { return ref.get (engine); }
+
+    // BeepMap: the bitmap, stretched to the display (red = left, green = right, as the engine reads it)
+    void paintBeepMapImage (juce::Graphics& g, juce::Rectangle<float> r)
+    {
+        const auto* c = channelNow();
+        const auto pic = c != nullptr ? beepMapPicture (c->pluginState) : std::nullopt;
+        if (! pic || pic->width <= 0 || pic->height <= 0)
+            return;
+        if (beepMapCacheState != c->pluginState)
+        {
+            beepMapCacheState = c->pluginState;
+            beepMapCache = juce::Image (juce::Image::RGB, pic->width, pic->height, false);
+            for (int y = 0; y < pic->height; ++y)
+                for (int x = 0; x < pic->width; ++x)
+                {
+                    const auto* px = pic->bgr.data() + 3 * ((std::size_t) y * (std::size_t) pic->width + (std::size_t) x);
+                    beepMapCache.setPixelAt (x, y, juce::Colour (px[2], px[1], px[0]));
+                }
+        }
+        g.setImageResamplingQuality (juce::Graphics::lowResamplingQuality);
+        g.drawImage (beepMapCache, r, juce::RectanglePlacement::stretchToFit);
+        g.setImageResamplingQuality (juce::Graphics::mediumResamplingQuality);
+    }
+
+    void paintBeepMapFile (juce::Graphics& g, juce::Rectangle<float> r, float f)
+    {
+        using namespace theme;
+        const auto* c = channelNow();
+        const auto pic = c != nullptr ? beepMapPicture (c->pluginState) : std::nullopt;
+        auto row = r.reduced (4.0f * f);
+        const auto w = row.getWidth() / 3.2f;
+        const juce::String caps[] = { tr ("Open..."), tr ("Paste") };
+        for (int i = 0; i < 2; ++i)
+        {
+            const auto cell = row.removeFromLeft (w).reduced (2.0f * f, 0.0f);
+            skin::button (g, cell, false, false, accent, radius::sm * f);
+            g.setColour (colour::textPrimary);
+            g.setFont (font (juce::jmax (8.0f, juce::jmin (11.0f * f, cell.getHeight() * 0.5f)), true));
+            g.drawFittedText (caps[i], cell.toNearestInt(), juce::Justification::centred, 1, 0.6f);
+        }
+        g.setColour (colour::textSecondary);
+        g.setFont (font (juce::jmax (8.0f, 10.0f * f)));
+        const auto text = pic ? tr ("{0} × {1} pixels", { juce::String (pic->width), juce::String (pic->height) }) : tr ("No bitmap");
+        g.drawFittedText (text, row.reduced (4.0f * f, 0.0f).toNearestInt(), juce::Justification::centredLeft, 2, 0.7f);
+    }
+
+    // which button of the BeepMap file row is under `p` (0 open, 1 paste, −1 none)
+    int beepMapFileButton (const plugui::LayoutItem& item, juce::Point<float> p) const
+    {
+        auto row = layoutRect (item).reduced (4.0f * layoutFactor());
+        const auto w = row.getWidth() / 3.2f;
+        for (int i = 0; i < 2; ++i)
+            if (row.removeFromLeft (w).contains (p))
+                return i;
+        return -1;
+    }
+
+    void setBeepMapBitmap (const std::vector<std::uint8_t>& bmp)
+    {
+        const auto* c = channelNow();
+        if (c == nullptr)
+            return;
+        auto next = beepMapWithBitmap (c->pluginState, bmp);
+        if (next.empty())
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, juce::String ("BeepMap"),
+                                                    tr ("BeepMap reads uncompressed 24- or 32-bit BMP pictures at least 3 pixels high."));
+            return;
+        }
+        ref.edit (engine, [next = std::move (next)] (ChannelDef& d) { d.pluginState = next; });
+        repaint();
+    }
+
+    void beepMapAction (int button)
+    {
+        if (button == 1) // a BMP file path or the file itself copied in the clipboard
+        {
+            const juce::File file (juce::SystemClipboard::getTextFromClipboard().trim().unquoted());
+            juce::MemoryBlock data;
+            if (file.existsAsFile() && file.loadFileAsData (data))
+                setBeepMapBitmap (std::vector<std::uint8_t> ((const std::uint8_t*) data.getData(), (const std::uint8_t*) data.getData() + data.getSize()));
+            else
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, juce::String ("BeepMap"), tr ("Copy a .bmp file's path first, or use Open."));
+            return;
+        }
+        chooser = std::make_unique<juce::FileChooser> (tr ("Open a bitmap"), juce::File(), "*.bmp");
+        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                              [safe = juce::Component::SafePointer<ModelPanel> (this)] (const juce::FileChooser& fc) {
+                                  juce::MemoryBlock data;
+                                  if (safe == nullptr || ! fc.getResult().loadFileAsData (data))
+                                      return;
+                                  safe->setBeepMapBitmap (std::vector<std::uint8_t> ((const std::uint8_t*) data.getData(),
+                                                                                      (const std::uint8_t*) data.getData() + data.getSize()));
+                              });
+    }
+
+    // Granulizer: the channel's sample (or how to give it one) with the start point
+    void paintGranulizerWave (juce::Graphics& g, juce::Rectangle<float> r, float f)
+    {
+        using namespace theme;
+        const auto* c = channelNow();
+        const auto path = c != nullptr ? c->samplePath : std::string();
+        if (path.empty())
+        {
+            g.setColour (colour::textSecondary);
+            g.setFont (font (juce::jmax (9.0f, 11.0f * f)));
+            g.drawFittedText (tr ("Drop a sample here (or on the channel button)"), r.toNearestInt(), juce::Justification::centred, 2, 0.7f);
+            return;
+        }
+        if (path != granulizerPeaksPath)
+        {
+            granulizerPeaksPath = path;
+            granulizerPeaks.clear();
+            if (const auto s = engine.getSampleLibrary().load (juce::String::fromUTF8 (path.c_str())))
+            {
+                const auto n = (std::int64_t) s->left.size();
+                constexpr int columns = 400;
+                for (int i = 0; i < columns && n > 0; ++i)
+                {
+                    float peak = 0.0f;
+                    for (auto k = n * i / columns; k < n * (i + 1) / columns; ++k)
+                        peak = std::max ({ peak, std::fabs (s->left[(std::size_t) k]), s->right.empty() ? 0.0f : std::fabs (s->right[(std::size_t) k]) });
+                    granulizerPeaks.push_back (std::min (peak, 1.0f));
+                }
+            }
+        }
+        if (granulizerPeaks.empty())
+            return;
+        const auto mid = r.getCentreY();
+        juce::Path wave;
+        for (int i = 0; i < (int) granulizerPeaks.size(); ++i)
+        {
+            const auto x = r.getX() + r.getWidth() * (float) i / (float) (granulizerPeaks.size() - 1);
+            wave.addRectangle (x, mid - granulizerPeaks[(std::size_t) i] * r.getHeight() * 0.48f, juce::jmax (1.0f, r.getWidth() / (float) granulizerPeaks.size()),
+                               juce::jmax (1.0f, granulizerPeaks[(std::size_t) i] * r.getHeight() * 0.96f));
+        }
+        g.setColour (accent.withAlpha (0.65f));
+        g.fillPath (wave);
+        if (const auto* k = knobFor ("Sample start"))
+        {
+            const auto x = r.getX() + r.getWidth() * normalised (*k);
+            g.setColour (colour::textPrimary);
+            g.drawVerticalLine ((int) x, r.getY(), r.getBottom());
+        }
+        g.setColour (colour::textSecondary);
+        g.setFont (font (juce::jmax (8.0f, 9.5f * f)));
+        g.drawFittedText (juce::File (juce::String::fromUTF8 (path.c_str())).getFileName(), r.removeFromTop (14.0f * f).toNearestInt(),
+                          juce::Justification::topLeft, 1, 0.8f);
+    }
+
+    // Granulizer: one grain's envelope (attack, hold, release) and the next grain's start, from the knobs
+    void paintGranulizerGrains (juce::Graphics& g, juce::Rectangle<float> r, float)
+    {
+        using namespace theme;
+        const auto* att = knobFor ("Grain attack");
+        const auto* hold = knobFor ("Grain hold");
+        const auto* spacing = knobFor ("Grain spacing");
+        if (att == nullptr || hold == nullptr || spacing == nullptr)
+            return;
+        const auto a = (float) att->getValue(), h = (float) hold->getValue(), sp = (float) spacing->getValue();
+        const auto total = juce::jmax (1.0f, 2.0f * a + h + sp);
+        const auto xOf = [&] (float t) { return r.getX() + r.getWidth() * t / total; };
+        for (int grain = 0; grain < 2; ++grain)
+        {
+            const auto t0 = (float) grain * sp;
+            juce::Path p;
+            p.startNewSubPath (xOf (t0), r.getBottom());
+            p.lineTo (xOf (t0 + a), r.getY());
+            p.lineTo (xOf (t0 + a + h), r.getY());
+            p.lineTo (xOf (t0 + 2.0f * a + h), r.getBottom());
+            g.setColour ((grain == 0 ? accent : colour::textSecondary).withAlpha (0.8f));
+            g.strokePath (p, juce::PathStrokeType (1.5f));
+        }
+    }
+
+    // Transistor Bass: the current program and its sequence (16 steps: note, gate, accent, slide)
+    void paintTransistorBass (juce::Graphics& g, juce::Rectangle<float> r, float f)
+    {
+        using namespace theme;
+        const auto* c = channelNow();
+        const auto prog = c != nullptr ? transistorBassProgram (c->pluginState) : std::nullopt;
+        if (! prog)
+            return;
+        g.setColour (colour::textPrimary);
+        g.setFont (font (juce::jmax (9.0f, 11.0f * f), true));
+        const auto text = tr ("Program {0}", { juce::String (prog->program + 1) }) + "   "
+                        + (prog->sequencer ? tr ("sequencer on") : tr ("sequencer off"))
+                        + (prog->transpose != 0 ? "   " + tr ("transpose {0}", { juce::String (prog->transpose) }) : juce::String());
+        g.drawFittedText (text, r.reduced (6.0f * f, 0.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.7f);
+    }
+
+    // the step numbers under the sequence, lit up to its length (round 168q2)
+    void paintTransistorBassSteps (juce::Graphics& g, juce::Rectangle<float> r, float f)
+    {
+        using namespace theme;
+        const auto* c = channelNow();
+        const auto prog = c != nullptr ? transistorBassProgram (c->pluginState) : std::nullopt;
+        const auto length = prog ? juce::jlimit (1, 16, prog->length) : 16;
+        const auto w = r.getWidth() / 16.0f;
+        g.setFont (font (juce::jmax (8.0f, 10.0f * f), true));
+        for (int i = 0; i < 16; ++i)
+        {
+            const auto cell = juce::Rectangle<float> (r.getX() + w * (float) i, r.getY(), w, r.getHeight()).reduced (2.0f * f, 4.0f * f);
+            const auto in = i < length;
+            g.setColour (in ? accent.withAlpha (0.22f) : colour::bg3);
+            g.fillRoundedRectangle (cell, radius::sm * f);
+            g.setColour (in ? colour::textPrimary : colour::textDisabled);
+            g.drawText (juce::String (i + 1), cell, juce::Justification::centred, false);
+        }
+    }
+
+    static constexpr int transistorBassTools = 3;
+    juce::Rectangle<float> transistorBassToolCell (juce::Rectangle<float> r, int i) const
+    {
+        const auto h = r.getHeight() / (float) transistorBassTools;
+        return juce::Rectangle<float> (r.getX(), r.getY() + h * (float) i, r.getWidth(), h).reduced (2.0f * layoutFactor());
+    }
+
+    void paintTransistorBassTools (juce::Graphics& g, juce::Rectangle<float> r, float f)
+    {
+        using namespace theme;
+        const juce::String caps[] = { tr ("Clear"), juce::String::fromUTF8 ("Oct +"), juce::String::fromUTF8 ("Oct \xe2\x88\x92") };
+        for (int i = 0; i < transistorBassTools; ++i)
+        {
+            const auto cell = transistorBassToolCell (r, i);
+            skin::button (g, cell, false, false, accent, radius::sm * f);
+            g.setColour (colour::textPrimary);
+            g.setFont (font (juce::jmax (8.0f, juce::jmin (10.0f * f, cell.getHeight() * 0.45f)), true));
+            g.drawFittedText (caps[i], cell.toNearestInt(), juce::Justification::centred, 1, 0.6f);
+        }
+    }
+
+    int transistorBassToolButton (const plugui::LayoutItem& item, juce::Point<float> p) const
+    {
+        for (int i = 0; i < transistorBassTools; ++i)
+            if (transistorBassToolCell (layoutRect (item), i).contains (p))
+                return i;
+        return -1;
+    }
+
+    // FL's CLEAR (gates, slides and accents off, notes C5) and its octave up / down buttons on the whole sequence
+    void transistorBassToolAction (int button)
+    {
+        const auto* c = channelNow();
+        if (c == nullptr)
+            return;
+        auto next = c->pluginState;
+        if (! (button == 0 ? transistorBassClearSequence (next) : transistorBassShiftSequence (next, button == 1 ? 1 : -1)))
+            return;
+        ref.edit (engine, [next = std::move (next)] (ChannelDef& d) { d.pluginState = next; });
+        syncKnobs();
+        repaint();
+    }
+
+    juce::Image beepMapCache;
+    std::vector<std::uint8_t> beepMapCacheState;
+    std::string granulizerPeaksPath;
+    std::vector<float> granulizerPeaks;
+
     void loadGranulizerSample (const juce::File& file)
     {
         if (! takesSample() || ! file.existsAsFile())
@@ -2034,7 +2422,7 @@ private:
         label (granBeatsLabel, tr ("Beats (0 = the sample's own)"));
         granBeats.setSliderStyle (juce::Slider::LinearHorizontal);
         granBeats.setTextBoxStyle (juce::Slider::TextBoxRight, false, 56, 20);
-        granBeats.setRange (0.0, 64.0, 0.25);
+        granBeats.setRange (0.0, 1024.0, 0.01);
         granBeats.setValue (def.sampler.stretchBeats, juce::dontSendNotification);
         granBeats.setTooltip (tr ("The sample's length in beats for Tempo locked and the Step keys, as FL's time-stretch "
                                   "TIME; a WAV with ACID beats uses its own"));
@@ -2057,7 +2445,8 @@ private:
     skin::Style pageStyle = skin::Style::glow;     // the plugin page's automatic style (round 126)
     bool sakura = true, boobass = false, drumsynth = false, harmless = false, harmor = false, gms = false, morphine = false, ogun = false, autogun = false, transistorBass = false, miniSynth = false, dx10 = false, kepler = false, keplerExo = false, poizone = false,
          fruitkick = false, bassdrum = false, toxic = false, threeOsc = false, simSynth = false, wasp = false, plucked = false, beepMap = false,
-         sawer = false, flKeys = false, granulizer = false, drumaxx = false, slayer = false, fruityDance = false, sytrus = false, wavesFound = false;
+         sawer = false, flKeys = false, granulizer = false, drumaxx = false, slayer = false, fruityDance = false, sytrus = false, wavesFound = false,
+         engineFilesMissing = false;
     int editorKey = 60;
     int drumPart = 0; // round 168p: the Drumaxx pad / DrumSynth Live key the per-part knobs edit
     std::vector<std::pair<juce::Slider*, const drumcontrols::Control*>> partKnobs;
@@ -2316,7 +2705,11 @@ public:
         setup (release, releaseLabel, TR_NOOP ("Release"), 0.0, 4.0, 0.001, " s");
         setup (decay, decayLabel, TR_NOOP ("Decay"), 0.0, 10.0, 0.001, " s");
         setup (sustain, sustainLabel, TR_NOOP ("Sustain"), 0.0, 1.0, 0.01, "");
-        setup (stretch, stretchLabel, TR_NOOP ("Stretch"), 0.0, 64.0, 0.25, " beats");
+        setup (stretch, stretchLabel, TR_NOOP ("Stretch"), 0.0, 1024.0, 0.01, " beats");
+        // issue #32 #7: "Fit to tempo" sets exact lengths (16.45 beats for a loop with a tail, 128 for 32 bars); the knob used
+        // to round them to 0.25 and cap them at 64, and every other edit in this panel wrote the rounded value back
+        stretch.setSkewFactorFromMidPoint (16.0);
+        stretch.addMouseListener (&stretchMenu, false);
         setup (regionStart, regionStartLabel, TR_NOOP ("Start"), 0.0, 1.0, 0.001, "");
         setup (regionEnd, regionEndLabel, TR_NOOP ("End"), 0.0, 1.0, 0.001, "");
         setup (cutoff, cutoffLabel, TR_NOOP ("Cutoff"), 20.0, 20000.0, 1.0, " Hz");
@@ -2554,6 +2947,7 @@ private:
             decay.setValue (c->sampler.decay, juce::dontSendNotification);
             sustain.setValue (c->sampler.sustain, juce::dontSendNotification);
             stretch.setValue (c->sampler.stretchBeats, juce::dontSendNotification);
+            shownStretch = stretch.getValue();
             keepPitch.setToggleState (c->sampler.keepPitch, juce::dontSendNotification);
             stretchMethod.setSelectedId ((int) c->sampler.stretchMethod + 1, juce::dontSendNotification);
             stretchMethod.setEnabled (c->sampler.keepPitch);
@@ -2649,7 +3043,8 @@ private:
         s.attack = (float) attack.getValue();
         s.decay = (float) decay.getValue();
         s.sustain = (float) sustain.getValue();
-        s.stretchBeats = (float) stretch.getValue();
+        if (changed == &stretch || stretch.getValue() != shownStretch) // (unmoved: keep the exact value, not the knob's)
+            s.stretchBeats = (float) (shownStretch = stretch.getValue());
         s.keepPitch = keepPitch.getToggleState();
         s.stretchMethod = (StretchMethod) juce::jlimit (0, 2, stretchMethod.getSelectedId() - 1);
         stretchMethod.setEnabled (s.keepPitch);
@@ -2705,6 +3100,43 @@ private:
     ChannelRef ref;
     bool updating = false;
     juce::Slider pitch, gain, stretch;
+    double shownStretch = 0.0;
+
+    // FL's TIME knob menu (r168s c_f20): (none), Autodetect, Project tempo, 1 beat, 2 beats, 1 bar, 2 bars, 3 bars, 4 bars
+    struct StretchMenu final : juce::MouseListener
+    {
+        explicit StretchMenu (SettingsPanel& p) : panel (p) {}
+        void mouseDown (const juce::MouseEvent& e) override
+        {
+            if (e.mods.isPopupMenu())
+                panel.showStretchMenu();
+        }
+        SettingsPanel& panel;
+    } stretchMenu { *this };
+
+    void showStretchMenu()
+    {
+        const auto* c = current();
+        if (c == nullptr)
+            return;
+        const auto& song = engine.getSong();
+        const auto sample = engine.getSampleLibrary().load (juce::String::fromUTF8 (c->samplePath.c_str()));
+        const auto now = c->sampler.stretchBeats;
+        auto set = [this] (float beats) { ref.edit (engine, [beats] (ChannelDef& d) { d.sampler.stretchBeats = beats; }); };
+        juce::PopupMenu m;
+        m.addItem (tr ("(none)"), true, now <= 0.0f, [set] { set (0.0f); });
+        m.addItem (tr ("Autodetect"), sample != nullptr, false, [set, sample, bpm = song.bpm] { set (tempodetect::fitBeatsOf (sample.get(), bpm)); });
+        const auto atTempo = sample != nullptr && sample->sampleRate > 0.0 ? (float) ((double) sample->frames() / sample->sampleRate * song.bpm / 60.0) : 0.0f;
+        m.addItem (tr ("Project tempo"), atTempo > 0.0f, false, [set, atTempo] { set (atTempo); });
+        for (const auto preset : clipops::timePresetBeats (song.beatsPerBar))
+        {
+            const auto bars = song.beatsPerBar > 0 && preset >= (float) song.beatsPerBar ? preset / (float) song.beatsPerBar : 0.0f;
+            const auto label = bars > 0.0f ? (bars == 1.0f ? tr ("1 bar") : tr ("{0} bars", { juce::String (bars, 0) }))
+                                           : (preset == 1.0f ? tr ("1 beat") : tr ("{0} beats", { juce::String (preset, 0) }));
+            m.addItem (label, true, now == preset, [set, preset] { set (preset); });
+        }
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&stretch));
+    }
     MenuSlider attack, release, decay, sustain, regionStart, regionEnd, cutoff, resonance;
     std::vector<std::pair<MenuSlider*, int>> tweakTargets; // knob -> samplerparam
     std::vector<juce::Slider*> automatedShown;             // knobs showing their automation's value now
@@ -3162,13 +3594,37 @@ public:
     }
     std::uint32_t shownGeneration = 0;
 
-    ui::Hint hintAt (juce::Point<int>) override { return ui::valueHint (specOf(), getter(), ui::valueGestures()); }
+    ui::Hint hintAt (juce::Point<int>) override
+    {
+        return ui::valueHint (specOf(), getter(), doubleClicked ? tr ("[LMB] drag or [Wheel] changes  [2xLMB] show in the Mixer  [RMB] menu")
+                                                                : ui::valueGestures());
+    }
+
+    // FL's number wheel (round 168s, issue #32): the value in a box over the caption instead of a knob; the whole
+    // control is the hit area, a notch / 7.5 px of drag = one step (ui::digitWheel). Double-click: `doubleClicked`.
+    bool digitBox = false;
+    std::function<void()> doubleClicked;
+    std::function<void (juce::PopupMenu&)> extraMenuItems;
 
     void paint (juce::Graphics& g) override
     {
         const auto spec = specOf();
         auto area = getLocalBounds().toFloat();
         const auto caption = area.removeFromBottom (13.0f);
+        if (digitBox)
+        {
+            // FL's digiwheel (c_f14): a display about 22 px high, the value right-aligned before up / down marks; here dark,
+            // red only while touched
+            const auto box = area.withSizeKeepingCentre (juce::jmin (area.getWidth() - 2.0f, 48.0f), juce::jmin (22.0f, area.getHeight() - 4.0f));
+            g.setColour (theme::drawDigitDisplay (g, box, isMouseOverOrDragging() || drag.isActive(), false, true));
+            g.setFont (theme::font (13.0f, true));
+            g.drawFittedText (spec.text (getter()), box.withTrimmedRight (theme::digitMarksWidth).reduced (3.0f, 0.0f).toNearestInt(),
+                              juce::Justification::centredRight, 1, 0.6f);
+            g.setColour (theme::colour::textSecondary);
+            g.setFont (theme::font (theme::type::caption));
+            g.drawFittedText (theme::caps (label), caption.toNearestInt(), juce::Justification::centred, 1, 0.65f);
+            return;
+        }
         const auto valueArea = area.removeFromBottom (13.0f);
         const auto size = juce::jmin (area.getWidth(), area.getHeight());
         const auto shown = shownValue (spec);
@@ -3187,7 +3643,18 @@ public:
     {
         if (e.mods.isPopupMenu())
         {
-            ui::showValueMenu (*this, &engine, specOf(), getter(), setter);
+            if (! extraMenuItems)
+            {
+                ui::showValueMenu (*this, &engine, specOf(), getter(), setter);
+                return;
+            }
+            const auto spec = specOf();
+            juce::PopupMenu menu;
+            menu.addSectionHeader (spec.name + ": " + spec.text (getter()));
+            ui::addValueItems (menu, *this, &engine, spec, getter(), setter);
+            menu.addSeparator();
+            extraMenuItems (menu);
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
             return;
         }
         if (ui::isResetClick (e))
@@ -3217,6 +3684,11 @@ public:
 
     void mouseDoubleClick (const juce::MouseEvent&) override
     {
+        if (doubleClicked)
+        {
+            doubleClicked();
+            return;
+        }
         setter (specOf().defaultValue);
         repaint();
     }
@@ -4280,20 +4752,39 @@ public:
                     },
                     [] (const ChannelDef& d) { return (double) d.sampler.pitch; },
                     [] (Song& s, int ch, double v) { s.channels[(std::size_t) ch].sampler.pitch = (float) juce::jlimit (-24.0, 24.0, v); }, TR_NOOP ("Pitch"));
-        headerKnob ([name] { return countSpec (name() + " - " + tr ("Pitch knob range (semitones)"), 48, 2,
-                                               [] (int v) { return juce::String (v); }); },
+        headerKnob ([name] { return ui::digitWheel (countSpec (name() + " - " + tr ("Pitch knob range (semitones)"), 48, 2,
+                                                              [] (int v) { return juce::String (v); })); },
                     [] (const ChannelDef& d) { return (double) d.misc.pitchRange; },
                     [] (Song& s, int ch, double v) { s.channels[(std::size_t) ch].misc.pitchRange = juce::jlimit (0, 48, juce::roundToInt (v)); },
                     TR_NOOP ("Range"));
+        header.back()->digitBox = true;
+        // FL's TRACK digiwheel (round 168s, issue #32 "very small and not accurate"): a wheel notch or 7.5 px of drag = the
+        // next insert, double-click shows the insert in the Mixer, the menu has "Assign to free mixer track"
         headerKnob ([this, name] {
-                        return countSpec (name() + " - " + tr ("Target mixer track"), maxMixerTracks - 1, 0,
-                                          [] (int t) { return t == 0 ? tr ("Master") : juce::String (t); });
+                        return ui::digitWheel (countSpec (name() + " - " + tr ("Target mixer track"), maxMixerTracks - 1, 0,
+                                                          [] (int t) { return t == 0 ? tr ("Master") : juce::String (t); }));
                     },
                     [] (const ChannelDef& d) { return (double) d.mixerTrack; },
                     [] (Song& s, int ch, double v) {
                         mixerops::routeChannel (s, ch, juce::roundToInt (v)); // any insert (round 162): missing ones are added
                     },
                     TR_NOOP ("Track"));
+        {
+            auto& track = *header.back();
+            track.digitBox = true;
+            track.doubleClicked = [this] {
+                if (channel < (int) engine.getSong().channels.size() && openMixerInsertHandler())
+                    openMixerInsertHandler() (engine.getSong().channels[(std::size_t) channel].mixerTrack);
+            };
+            track.extraMenuItems = [this] (juce::PopupMenu& menu) {
+                menu.addItem (tr ("Assign to free mixer track"), [this] {
+                    engine.editSong ([ch = channel] (Song& s) {
+                        if (ch < (int) s.channels.size())
+                            s.channels[(std::size_t) ch].mixerTrack = s.claimFreeInsert();
+                    });
+                });
+            };
+        }
 
         int width = MiscPanel::preferredWidth, height = MiscPanel::preferredHeight;
         for (auto& p : pages)
@@ -4696,5 +5187,10 @@ std::unique_ptr<juce::Component> makeNodeChannelFrame (AudioEngine& engine, std:
         return nullptr;
     const auto kind = def->instrument;
     return std::make_unique<ChannelFrame> (engine, ref, std::move (page), hasEnvelopeTab (kind) ? std::make_unique<ModulationPanel> (engine, ref) : nullptr);
+}
+std::function<void (int)>& openMixerInsertHandler()
+{
+    static std::function<void (int)> handler;
+    return handler;
 }
 } // namespace lynx

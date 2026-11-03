@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "engine/AudioEngine.h"
 
 namespace lynx
@@ -7,6 +9,8 @@ namespace lynx
 // Sampler settings window for a channel (pitch, attack, release, reverse,
 // "cut itself"), like FL's Channel settings. One window per channel.
 void openChannelSettings (AudioEngine& engine, int channel);
+// Shows insert `insert` in the Mixer (the main window sets it): a double-click on the channel window's TRACK box, as in FL.
+std::function<void (int insert)>& openMixerInsertHandler();
 void closeChannelSettings();
 
 // Channel button toggle (Channel Rack): which kinds have a settings window, and whether it is open.

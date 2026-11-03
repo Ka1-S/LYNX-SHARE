@@ -28,6 +28,7 @@
 #include <string>
 #include <vector>
 
+#include "core/EngineParams.h"
 #include "core/Instruments.h"
 
 namespace lynx
@@ -45,6 +46,17 @@ bool keplerExoDllUsable (const std::string& path);
 int keplerPanelOffset (const std::vector<std::uint8_t>& state, int k);
 
 std::unique_ptr<Instrument> makeKeplerInstrument();
+
+// The automatable parameters of the designed pages (round 168q): Kepler's 36 panel floats by panel position k
+// ("Kepler-1" order), Kepler Exo's by internal index (the "Kepler-2" list); every value 0…1 as stored.
+const std::vector<EngineParam>& keplerParams();
+const std::vector<EngineParam>& keplerExoParams();
+namespace modelparams
+{
+struct Table;
+Table keplerModelTable();
+Table keplerExoModelTable();
+} // namespace modelparams
 
 namespace kepler
 {

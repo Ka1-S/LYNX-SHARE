@@ -120,6 +120,8 @@ ChangeLabel describeChange (const Song& before, const Song& after)
             return label (TR_NOOP ("Pattern length: {0}"), b.name);
         if (a.loopOn != b.loopOn || a.loopMode != b.loopMode || a.channelLoops != b.channelLoops)
             return label (TR_NOOP ("Channel looping: {0}"), b.name);
+        if (a.markers != b.markers)
+            return label (TR_NOOP ("Pattern markers: {0}"), b.name);
 
         const auto sameEvents = a.events.size() == b.events.size()
                                 && std::equal (a.events.begin(), a.events.end(), b.events.begin(), [] (const PatternEvents& x, const PatternEvents& y) {
@@ -221,11 +223,12 @@ ChangeLabel describeChange (const Song& before, const Song& after)
     for (std::size_t i = 0; i < after.playlistTracks.size(); ++i)
         if (before.playlistTracks[i].name != after.playlistTracks[i].name || before.playlistTracks[i].muted != after.playlistTracks[i].muted
             || before.playlistTracks[i].colour != after.playlistTracks[i].colour || before.playlistTracks[i].grouped != after.playlistTracks[i].grouped
-            || before.playlistTracks[i].collapsed != after.playlistTracks[i].collapsed)
+            || before.playlistTracks[i].collapsed != after.playlistTracks[i].collapsed
+            || before.playlistTracks[i].lockedToContent != after.playlistTracks[i].lockedToContent)
             return label (TR_NOOP ("Playlist tracks"));
 
     for (std::size_t i = 0; i < after.playlistTracks.size(); ++i)
-        if (before.playlistTracks[i].height != after.playlistTracks[i].height)
+        if (before.playlistTracks[i].height != after.playlistTracks[i].height || before.playlistTracks[i].lockedHeight != after.playlistTracks[i].lockedHeight)
             return label (TR_NOOP ("Track height"));
 
     if (before.mode != after.mode)

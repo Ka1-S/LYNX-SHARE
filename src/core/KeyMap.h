@@ -73,9 +73,18 @@ struct Action
 const std::vector<Action>& actions();
 const Action* findAction (const std::string& id);
 
-// PC keyboard as a piano: MIDI note of a key (upper-case code), or -1. Two rows from C5 (Z S X D C V G
-// B H N J M) and from C6 (Q 2 W 3 E R 5 T 6 Y 7 U I 9 O 0 P), with C5 = MIDI 60.
-int typingPianoNote (int key) noexcept;
+// PC keyboard as a piano: MIDI note of a key (upper-case code), or -1. Two rows, Z S X D C V G B H N J M and
+// Q 2 W 3 E R 5 T 6 Y 7 U I 9 O 0 P, the upper one an octave above. As FL 2026 (round 168t2, measured in FL:
+// R plays F5, E plays E5, P plays E6 in FL's names, where C5 = MIDI 60): the lower row starts at `octave` (FL's
+// "Octave" 2..6 in the typing keyboard button's right-click menu, default 4: Z = MIDI 48), shifted up by
+// `root` semitones (FL's "Root note", C..B = 0..11). Notes outside 0..127 give -1.
+namespace typingpiano
+{
+    constexpr int defaultOctave = 4, minOctave = 2, maxOctave = 6;
+    constexpr int clampOctave (int o) noexcept { return o < minOctave ? minOctave : (o > maxOctave ? maxOctave : o); }
+    constexpr int clampRoot (int r) noexcept { return r < 0 ? 0 : (r > 11 ? 11 : r); }
+}
+int typingPianoNote (int key, int octave = typingpiano::defaultOctave, int root = 0) noexcept;
 
 // The upper-case printable character of a key code (JUCE's getKeyCode()), or 0 for any other key. On Windows JUCE's
 // F-keys, numpad keys and arrows are VK | 0x10000: a plain towupper() of them (16-bit) gave F4 -> 'S', F1 -> 'P',

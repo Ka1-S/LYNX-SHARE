@@ -8,6 +8,11 @@
 #include <cstdint>
 #include <vector>
 
+namespace lynx
+{
+struct SampleData;
+}
+
 namespace lynx::tempodetect
 {
 struct Options
@@ -29,4 +34,8 @@ Result detect (const float* left, const float* right, std::size_t frames, double
 
 // The onset-strength curve (one value per hop of `hopSeconds`), exposed for tests.
 std::vector<float> onsetCurve (const float* left, const float* right, std::size_t frames, double sampleRate, double hopSeconds);
+
+// "Fit to tempo" of a whole sample (issue #32 #7): clipops::fitBeats with the WAV's ACID beats, else the tempo detected
+// in it (samples up to 2 minutes), else its power-of-two length at `bpm`. 0 for no sample.
+float fitBeatsOf (const SampleData* sample, double bpm);
 } // namespace lynx::tempodetect

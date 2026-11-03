@@ -153,6 +153,12 @@ public:
     bool rememberSeek = false;
     std::int64_t seekMark = -1;
 
+    // The Playlist's STRETCH switch (FL's ClipStretchBtn "Stretch audio when resizing audio clips", Shift+M) and Edit ›
+    // "Create variants when stretching audio clips" (FL's global 0x15452e5, on by default; REA round 168f). The second
+    // is saved with the UI options.
+    bool stretchOnResize = false;
+    bool createVariants = true;
+
     // "Follow" (FL's auto scrolling, round 162 / issue #9): the Playlist (Song mode) and the Piano Roll page along
     // with the playhead while playing; off, they stay where the user scrolled. Saved with the UI options.
     bool isFollowing (bool pianoRoll) const noexcept { return pianoRoll ? followPianoRoll : followPlaylist; }

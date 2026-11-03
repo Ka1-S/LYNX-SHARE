@@ -2,6 +2,7 @@
 // formulas described in that document. Section numbers (§) below refer to it.
 
 #include "core/Kepler.h"
+#include "core/ModelParams.h"
 #include "core/HostSlide.h"
 #include "core/KeplerExoDelay.h"
 #include "core/KeplerExoChorus.h"
@@ -1131,6 +1132,26 @@ public:
     }
 
     explicit Synth (std::shared_ptr<const Tables> t) : tabs (std::move (t)) {}
+
+    // a parameter moved while the engine plays (a knob of the designed page, an automation clip; round 168q): Kepler's
+    // panel position `k` goes through its setters as the loader would apply it, Kepler Exo's internal index through the
+    // forwarder (the matrix still drives its destinations). Outside the render, in the setters' rounding mode.
+    void hostParam (int k, float x) noexcept
+    {
+        if (! std::isfinite (x))
+            return;
+        NearestMode m;
+        if (exo)
+        {
+            if (k >= 0 && k < 0x9b)
+            {
+                host[(std::size_t) k] = x;
+                forwardExo (k, x);
+            }
+        }
+        else if (k >= 0 && k < 36)
+            setParam (panelToInternal (k), x, false);
+    }
 
     // ---------------------------------------------------------------- host side (FL wrapper, §5)
     void setTempo (double bpm) noexcept { tempo = bpm; }
@@ -3862,6 +3883,13 @@ public:
         channelCents.store (channel.sampler.pitch * 100.0f);
         if (channel.pluginState == state && channel.samplePath == dll)
             return;
+        // only panel values changed (a knob of the editor, round 168q): the playing engine takes them, notes go on
+        if (channel.samplePath == dll && synth != nullptr && liveChange (state, channel.pluginState))
+        {
+            state = channel.pluginState;
+            patch = parseState (state); // (a later rebuild at another rate starts from the new values)
+            return;
+        }
         state = channel.pluginState;
         dll = channel.samplePath;
         patch = parseState (state);
@@ -4027,10 +4055,51 @@ private:
             sounding.fill (false);
             quiet = 0;
             sentVolume = sentMidiPan = -1000; // a new engine: the levels are sent again (snapped)
+            liveParams.clear(); // (built from the newest state)
         }
+        if (synth != nullptr)
+            liveParams.drain ([this] (int k, float v) { synth->hostParam (k, v); });
     }
 
+    // queues the panel values that differ between two states of the same layout (UI thread)
+    bool liveChange (const std::vector<std::uint8_t>& before, const std::vector<std::uint8_t>& after)
+    {
+        if (before.size() != after.size() || ! patch.usable)
+            return false;
+        const auto first = keplerPanelOffset (before, 0), again = keplerPanelOffset (after, 0);
+        if (first < 0 || first != again)
+            return false;
+        auto count = 0;
+        while (keplerPanelOffset (after, count) >= 0)
+            ++count;
+        const auto end = (std::size_t) first + 4 * (std::size_t) count;
+        if (std::memcmp (before.data(), after.data(), (std::size_t) first) != 0
+            || std::memcmp (before.data() + end, after.data() + end, after.size() - end) != 0)
+            return false;
+        std::vector<std::pair<int, float>> changed;
+        for (int k = 0; k < count; ++k)
+            if (std::memcmp (before.data() + first + 4 * k, after.data() + first + 4 * k, 4) != 0)
+                changed.emplace_back (k, f32At (after, (std::size_t) first + 4 * (std::size_t) k));
+        if (changed.size() > liveParams.space())
+            return false;
+        for (const auto& [k, v] : changed)
+            liveParams.push (k, v);
+        return true;
+    }
+
+public:
+    // automation (round 168q): the clip's 0…1 is the stored value itself
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        if (synth != nullptr)
+            synth->hostParam (index, std::clamp (value, 0.0f, 1.0f));
+    }
+
+private:
+
     std::unique_ptr<Synth> synth;
+    LiveParamQueue liveParams;
     std::atomic<Synth*> incoming { nullptr }, retired { nullptr };
     Patch patch;
     std::shared_ptr<const Tables> tables;
@@ -4075,6 +4144,114 @@ int keplerPanelOffset (const std::vector<std::uint8_t>& state, int k)
 }
 
 std::unique_ptr<Instrument> makeKeplerInstrument() { return std::make_unique<KeplerInstrument>(); }
+
+namespace
+{
+std::vector<EngineParam> named (std::initializer_list<std::pair<int, const char*>> list)
+{
+    std::vector<EngineParam> out;
+    for (const auto& [index, name] : list)
+    {
+        EngineParam p;
+        p.index = index;
+        p.name = name;
+        out.push_back (p);
+    }
+    std::sort (out.begin(), out.end(), [] (const EngineParam& a, const EngineParam& b) { return a.index < b.index; });
+    return out;
+}
+
+template <bool exoTable>
+std::optional<float> keplerValue (const ChannelDef& c, const EngineParam& p)
+{
+    if (keplerExoState (c.pluginState) != exoTable)
+        return std::nullopt;
+    const auto at = keplerPanelOffset (c.pluginState, p.index);
+    if (at < 0)
+        return std::nullopt;
+    const auto v = f32At (c.pluginState, (std::size_t) at);
+    return std::isfinite (v) ? std::clamp (v, 0.0f, 1.0f) : 0.0f;
+}
+
+template <bool exoTable>
+bool keplerSetValue (ChannelDef& c, const EngineParam& p, float raw)
+{
+    if (keplerExoState (c.pluginState) != exoTable)
+        return false;
+    const auto at = keplerPanelOffset (c.pluginState, p.index);
+    if (at < 0 || ! std::isfinite (raw))
+        return false;
+    std::memcpy (c.pluginState.data() + at, &raw, 4);
+    return true;
+}
+} // namespace
+
+const std::vector<EngineParam>& keplerParams()
+{
+    // the panel positions of a "Kepler-1" state (REA_rodada46 §1.1), named after the editor's controls
+    static const auto table = named ({
+        { 0, "Arp on" }, { 1, "Arp mode" }, { 2, "Arp range" }, { 3, "Arp rate" }, { 4, "Arp sync" }, { 5, "LFO rate" },
+        { 6, "LFO sync" }, { 7, "LFO delay" }, { 8, "LFO trig mode" }, { 9, "LFO trigger" }, { 10, "DCO LFO" }, { 11, "PW" },
+        { 12, "PW source" }, { 13, "Pulse" }, { 14, "Saw" }, { 15, "Sub" }, { 16, "Sub level" }, { 17, "Noise" },
+        { 18, "High-pass" }, { 19, "Cutoff" }, { 20, "Resonance" }, { 21, "Env polarity" }, { 22, "Env amount" },
+        { 23, "VCF LFO" }, { 24, "Key follow" }, { 25, "VCA source" }, { 26, "Attack" }, { 27, "Decay" }, { 28, "Sustain" },
+        { 29, "Release" }, { 30, "Chorus" }, { 31, "Hold" }, { 32, "Octave" }, { 33, "Volume" }, { 34, "LFO retrig" },
+        { 35, "LFO phase" } });
+    return table;
+}
+
+const std::vector<EngineParam>& keplerExoParams()
+{
+    // the "Kepler-2" list by internal index (REA_rodada167d §1), the controls of Kepler Exo's panel (pitch-bend range
+    // 0x54 and the hidden Juno-index option 0x5b are not on it)
+    static const auto table = named ({
+        { 0x00, "DCO1 LFO1" }, { 0x01, "DCO1 LFO1 wide" }, { 0x02, "DCO1 LFO2" }, { 0x03, "DCO1 LFO2 wide" },
+        { 0x04, "DCO1 env2" }, { 0x05, "DCO1 PW" }, { 0x06, "DCO1 PW source" }, { 0x07, "DCO1 pulse" },
+        { 0x08, "DCO1 saw" }, { 0x09, "DCO1 sub" }, { 0x0a, "DCO1 sub level" }, { 0x0b, "DCO1 sub phase" },
+        { 0x0c, "DCO2 on" }, { 0x0d, "DCO2 semitones" }, { 0x0e, "DCO2 detune" }, { 0x0f, "DCO2 saw" },
+        { 0x10, "DCO2 sub" }, { 0x11, "DCO2 sub level" }, { 0x12, "DCO2 sub phase" }, { 0x13, "DCO2 PW" },
+        { 0x14, "DCO2 LFO1" }, { 0x15, "DCO2 LFO1 wide" }, { 0x16, "DCO2 LFO2" }, { 0x17, "DCO2 LFO2 wide" },
+        { 0x18, "DCO2 env2" }, { 0x19, "DCO2 PW source" }, { 0x1a, "DCO2 pulse" }, { 0x1b, "DCO2 sync" },
+        { 0x1c, "Cross mod 1>2" }, { 0x1d, "Cross mod 2>1" }, { 0x1e, "Cross mod 1>2 shape" },
+        { 0x1f, "Cross mod 2>1 shape" }, { 0x20, "DCO1 level" }, { 0x21, "DCO2 level" }, { 0x22, "Noise" },
+        { 0x23, "AM" }, { 0x24, "High-pass" }, { 0x25, "Cutoff" }, { 0x26, "Resonance" }, { 0x27, "Key follow" },
+        { 0x28, "Filter slope" }, { 0x29, "Filter FM" }, { 0x2a, "Filter FM shape" }, { 0x2b, "Env polarity" },
+        { 0x2c, "Env amount" }, { 0x2d, "VCF LFO1" }, { 0x2e, "VCF LFO2" }, { 0x2f, "VCA source" },
+        { 0x30, "LFO1 rate" }, { 0x31, "LFO1 sync" }, { 0x32, "LFO1 delay" }, { 0x33, "LFO1 trig mode" },
+        { 0x34, "LFO1 retrig" }, { 0x35, "LFO1 phase" }, { 0x36, "LFO2 rate" }, { 0x37, "LFO2 sync" },
+        { 0x38, "LFO2 delay" }, { 0x39, "LFO2 trig mode" }, { 0x3a, "LFO2 shape" }, { 0x3b, "LFO2 retrig" },
+        { 0x3c, "LFO2 phase" }, { 0x3d, "Env1 attack" }, { 0x3e, "Env1 decay" }, { 0x3f, "Env1 sustain" },
+        { 0x40, "Env1 release" }, { 0x41, "Env2 attack" }, { 0x42, "Env2 decay" }, { 0x43, "Env2 sustain" },
+        { 0x44, "Env2 release" }, { 0x45, "Chorus" }, { 0x46, "Chorus noise" }, { 0x47, "Chorus gate" },
+        { 0x48, "Volume" }, { 0x49, "Velocity to volume" }, { 0x4a, "Pan" }, { 0x4b, "Mono" }, { 0x4c, "Legato" },
+        { 0x4d, "Retrigger" }, { 0x4e, "Release mode" }, { 0x4f, "Portamento mode" }, { 0x50, "Portamento" },
+        { 0x51, "LFO trigger" }, { 0x52, "Hold" }, { 0x53, "Octave" }, { 0x55, "Arp on" }, { 0x56, "Arp rate" },
+        { 0x57, "Arp sync" }, { 0x58, "Arp range" }, { 0x59, "Arp mode" }, { 0x5a, "Arp gate" },
+        { 0x5c, "Mod 1 amount" }, { 0x5d, "Mod 2 amount" }, { 0x5e, "Mod 3 amount" }, { 0x5f, "Mod 4 amount" },
+        { 0x60, "Mod 5 amount" }, { 0x61, "Mod 6 amount" }, { 0x62, "Mod 7 amount" }, { 0x63, "Mod 8 amount" },
+        { 0x64, "EQ on" }, { 0x65, "EQ low Q" }, { 0x66, "EQ mid Q" }, { 0x67, "EQ high Q" }, { 0x68, "EQ low gain" },
+        { 0x69, "EQ mid gain" }, { 0x6a, "EQ high gain" }, { 0x6b, "EQ low freq" }, { 0x6c, "EQ mid freq" },
+        { 0x6d, "EQ high freq" }, { 0x6e, "Delay on" }, { 0x6f, "Delay sync" }, { 0x70, "Delay amount" },
+        { 0x71, "Delay time" }, { 0x72, "Delay right tap" }, { 0x73, "Delay feedback" },
+        { 0x74, "Delay feedback cutoff" }, { 0x75, "Delay feedback filter" }, { 0x76, "Delay stereo" },
+        { 0x77, "Delay blur" }, { 0x78, "Delay tone" }, { 0x79, "Reverb on" }, { 0x7a, "Reverb low cut" },
+        { 0x7b, "Reverb high cut" }, { 0x7c, "Reverb predelay" }, { 0x7d, "Reverb predelay feedback" },
+        { 0x7e, "Reverb size" }, { 0x7f, "Reverb diffusion" }, { 0x80, "Reverb decay" }, { 0x81, "Reverb damping" },
+        { 0x82, "Reverb width" }, { 0x83, "Reverb dry" }, { 0x84, "Reverb early" }, { 0x85, "Reverb wet" },
+        { 0x86, "Saturation on" }, { 0x87, "Saturation" }, { 0x88, "Saturation post" }, { 0x89, "Hyper chorus on" },
+        { 0x8a, "Hyper chorus delay" }, { 0x8b, "Hyper chorus feedback" }, { 0x8c, "Hyper chorus rate" },
+        { 0x8d, "Hyper chorus depth" }, { 0x8e, "Hyper chorus movement" }, { 0x8f, "Hyper chorus movement rate" },
+        { 0x90, "Hyper chorus lines" }, { 0x91, "Hyper chorus high cut" }, { 0x92, "Hyper chorus low cut" },
+        { 0x93, "Hyper chorus mix" }, { 0x94, "Hyper chorus spread" }, { 0x95, "X offset" }, { 0x96, "Y offset" },
+        { 0x97, "VCA smooth" }, { 0x98, "Saturation HQ" }, { 0x99, "Master detune" }, { 0x9a, "HPF on" } });
+    return table;
+}
+
+namespace modelparams
+{
+Table keplerModelTable() { return { &keplerParams(), &keplerValue<false>, &keplerSetValue<false> }; }
+Table keplerExoModelTable() { return { &keplerExoParams(), &keplerValue<true>, &keplerSetValue<true> }; }
+} // namespace modelparams
 
 namespace kepler
 {

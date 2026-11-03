@@ -107,8 +107,8 @@ TEST (natives142_lists_and_no_fl_installation)
         if (c)
         {
             CHECK (c->instrument == e.kind && c->name == e.name);
-            CHECK (e.kind == InstrumentKind::wavetraveller // (plays the channel's sample: none yet, silent as FL)
-                   || natives142::renderChannel (*c, none, e.kind == InstrumentKind::drumaxx ? 36 : 60) > 1.0e-3); // (Drumaxx: pad 1's key)
+            CHECK (e.kind == InstrumentKind::wavetraveller || e.kind == InstrumentKind::granulizer // (play the channel's sample:
+                   || natives142::renderChannel (*c, none, e.kind == InstrumentKind::drumaxx ? 36 : 60) > 1.0e-3); // none yet, silent as FL; Drumaxx: pad 1's key
         }
     }
     for (const auto& e : natives::effectEngines())
@@ -137,14 +137,8 @@ TEST (natives167m_sample_engines_play_a_sample_without_fl)
     for (const auto kind : { InstrumentKind::wavetraveller, InstrumentKind::granulizer })
     {
         auto c = natives::makeChannel (kind, none);
-        if (kind == InstrumentKind::granulizer)
-        {
-            CHECK (! c.has_value()); // (needs FL's default preset)
-            ChannelDef g;
-            g.name = "Fruity Granulizer";
-            g.instrument = kind;
-            c = g;
-        }
+        if (kind == InstrumentKind::granulizer) // (round 168q: LYNX's bank gives it a default state without FL)
+            CHECK (c.has_value() && granulizerStateUsable (c->pluginState));
         CHECK (c.has_value() && c->samplePath.empty());
         CHECK (natives142::renderChannel (*c, none) < 1.0e-6); // no sample: silent, as FL
         c->samplePath = "tone.wav";

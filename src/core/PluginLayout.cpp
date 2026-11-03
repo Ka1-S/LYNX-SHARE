@@ -1,4 +1,5 @@
 #include "core/PluginLayout.h"
+#include "core/PluginLayoutSynths.h"
 
 #include <list>
 
@@ -12,6 +13,7 @@
 #include <string>
 
 #include "core/EchoSuite.h"
+#include "core/EngineLayouts.h"
 #include "core/Effects.h"
 #include "core/MaximusFx.h"
 #include "core/MultibandDelayFx.h"
@@ -3899,18 +3901,46 @@ const Layout* instrumentLayout (InstrumentKind kind)
         case InstrumentKind::boobass: return &boo;
         case InstrumentKind::sytrus: return &sytrus;
         case InstrumentKind::harmor: return &harmor;
-        default: return drumLayout (kind); // round 168p (PluginLayoutDrums.inc)
+        default: break;
+    }
+    // round 168q (core/EngineLayouts.cpp)
+    static const Layout kepler = keplerLayout(), keplerExo = keplerExoLayout(), tb = transistorBassLayout(), sawer = sawerLayout(),
+                        beepMap = beepMapLayout(), granulizer = granulizerLayout(), wasp = waspLayout();
+    switch (kind)
+    {
+        case InstrumentKind::kepler: return &kepler;
+        case InstrumentKind::keplerExo: return &keplerExo;
+        case InstrumentKind::transistorbass: return &tb;
+        case InstrumentKind::sawer: return &sawer;
+        case InstrumentKind::beepmap: return &beepMap;
+        case InstrumentKind::granulizer: return &granulizer;
+        case InstrumentKind::wasp: return &wasp;
+        default: break;
+    }
+    if (const auto* d = drumLayout (kind)) // round 168p (PluginLayoutDrums.inc)
+        return d;
+    switch (kind)
+    {
+        default: return synthGroupLayout (kind); // round 168o (core/PluginLayoutSynths.cpp)
     }
 }
 
 const std::vector<InstrumentKind>& instrumentLayoutKinds()
 {
     static const std::vector<InstrumentKind> kinds { InstrumentKind::threeosc, InstrumentKind::flkeys, InstrumentKind::boobass, InstrumentKind::sytrus, InstrumentKind::harmor,
-                                                      InstrumentKind::toxic, InstrumentKind::poizone,
-                                                      // round 168p
-                                                      InstrumentKind::fruitkick, InstrumentKind::plucked, InstrumentKind::drumpad, InstrumentKind::drumaxx,
-                                                      InstrumentKind::bassdrum, InstrumentKind::drumsynth, InstrumentKind::sakura, InstrumentKind::slayer };
-    return kinds;
+                                                     InstrumentKind::toxic, InstrumentKind::poizone,
+                                                     InstrumentKind::kepler, InstrumentKind::keplerExo, InstrumentKind::transistorbass, InstrumentKind::sawer,
+                                                     InstrumentKind::beepmap, InstrumentKind::granulizer, InstrumentKind::wasp, // (round 168q)
+                                                     // round 168p
+                                                     InstrumentKind::fruitkick, InstrumentKind::plucked, InstrumentKind::drumpad, InstrumentKind::drumaxx,
+                                                     InstrumentKind::bassdrum, InstrumentKind::drumsynth, InstrumentKind::sakura, InstrumentKind::slayer };
+    static const std::vector<InstrumentKind> all = [] {
+        auto k = kinds;
+        for (const auto s : synthGroupLayoutKinds())
+            k.push_back (s);
+        return k;
+    }();
+    return all;
 }
 
 const Layout& soundgoodizerLayout()
