@@ -160,6 +160,22 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         };
     }
     PianoRollComponent::shortcutText = [this] (const std::string& id) { return shortcutText (id.c_str()); };
+    pianoRoll.onPlayPause = [this] {
+        const auto playing = engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn();
+        if (! playing && engine.getSong().mode != PlayMode::pattern) // FL's hint: "Play / pause pattern"
+            toggleMode();
+        playPause();
+    };
+    pianoRoll.onPlayRightClick = [this] {
+        const auto playing = engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn();
+        const auto target = transportedit::rollPlayRightClickTarget (playing, engine.getTransport().positionTicks.load(), playStartTicks);
+        engine.stop();
+        if (target > 0)
+            engine.seek (target);
+        else
+            engine.rewind();
+        playStartTicks = target;
+    };
     pianoRoll.onBrowseScores = [this] { // (round 168g: the Piano roll's File › Browse scores)
         showPanel (Panel::browser);
         browser.showScores();
