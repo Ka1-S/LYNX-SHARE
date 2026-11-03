@@ -863,15 +863,8 @@ void ChannelRackComponent::paint (juce::Graphics& g)
 
             // small box with the mixer insert ("-" = straight to Master)
             const auto routeArea = controlBounds (Area::route, row).toFloat();
-            theme::fillRoundRect (g, routeArea, theme::radius::sm, hovered (Area::route) || (touched && knobDrag == Area::route) ? bg4 : bg0);
-
-            if (hovered (Area::route))
-            {
-                g.setColour (borderStrong);
-                g.drawRoundedRectangle (routeArea.reduced (0.5f), theme::radius::sm, 1.0f);
-            }
-
-            g.setColour (channel.mixerTrack > 0 ? textPrimary : textDisabled);
+            g.setColour (theme::drawDigitDisplay (g, routeArea, hovered (Area::route) || (touched && knobDrag == Area::route),
+                                                  channel.mixerTrack <= 0));
             g.setFont (theme::font (theme::type::caption, true));
             textcache::drawText (g, channel.mixerTrack > 0 ? juce::String (channel.mixerTrack) : juce::String ("-"), routeArea.toNearestInt(),
                         juce::Justification::centred);
@@ -905,9 +898,21 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 g.strokePath (shackle, juce::PathStrokeType (1.4f));
                 g.fillRoundedRectangle (lockBox.withTrimmedTop (4.5f), 1.5f);
             }
+            // Online Sessions (round 168a): the plugin is not installed here, its stand-in render plays (an amber tag)
+            auto badgeWidth = 0.0f;
+            if (engine.playsStandIn (row))
+            {
+                badgeWidth = 16.0f;
+                juce::Graphics::ScopedSaveState keepFont (g);
+                const auto tag = juce::Rectangle<float> (nameArea.getRight() - (locked ? 34.0f : 18.0f), nameArea.getCentreY() - 6.5f, 14.0f, 13.0f);
+                theme::fillRoundRect (g, tag, 3.0f, warning.withAlpha (0.85f));
+                g.setColour (bg1);
+                g.setFont (theme::font (10.0f, true));
+                g.drawText ("R", tag, juce::Justification::centred, false);
+            }
             g.setColour (channel.muted ? textDisabled : textPrimary);
-            textcache::drawText (g, juce::String::fromUTF8 (channel.name.c_str()), nameArea.withTrimmedLeft (14).withTrimmedRight (locked ? 18 : 6).toNearestInt(),
-                        juce::Justification::centredLeft, true);
+            textcache::drawText (g, juce::String::fromUTF8 (channel.name.c_str()),
+                                 nameArea.withTrimmedLeft (14).withTrimmedRight ((locked ? 18 : 6) + badgeWidth).toNearestInt(), juce::Justification::centredLeft, true);
 
             // selector: a slim pill, lit when the row is selected
             const auto pill = juce::Rectangle<float> ((float) selectLeft() + 3.0f, (float) y + 7.0f, (float) selectWidth - 6.0f, (float) rowHeight - 14.0f);
@@ -1015,7 +1020,6 @@ ui::ValueSpec ChannelRackComponent::specFor (Area area, int row) const
     spec.name = name + " - " + tr ("Target mixer track");
     spec.maximum = maxMixerTracks - 1; // every insert, like FL (round 162: the inserts past the mixer's last one are added)
     spec.interval = 1.0;
-    spec.pixelsForRange = 3.0 * juce::jmax (1.0, spec.maximum);
     spec.toText = [] (double v) { return v < 0.5 ? tr ("Master") : tr ("Insert {0}", { juce::String (juce::roundToInt (v)) }); };
     spec.fromText = [] (const juce::String& t) -> std::optional<double> {
         if (t.trim().startsWithIgnoreCase ("m"))
@@ -1023,7 +1027,7 @@ ui::ValueSpec ChannelRackComponent::specFor (Area area, int row) const
         const auto digits = t.retainCharacters ("0123456789");
         return digits.isEmpty() ? std::nullopt : std::optional<double> (digits.getDoubleValue());
     };
-    return spec;
+    return ui::digitWheel (spec); // FL's channel rack mixer-track digiwheel (round 168s)
 }
 
 double ChannelRackComponent::valueOf (Area area, int row) const
@@ -1204,7 +1208,7 @@ bool ChannelRackComponent::moveSelected (int delta)
     bool moved = false;
     std::vector<int> after;
 
-    engine.editSong ([&] (Song& s) {
+    engine.editSongStructural ([&] (Song& s) {
         after = rows;
         moved = moveChannels (s, after, delta);
     });
@@ -2122,6 +2126,8 @@ ui::Hint ChannelRackComponent::hintAt (juce::Point<int> p)
                 h.text << "  " << tr ("(pitch: [RMB] › Pitch...)");
             if (row >= 0 && row < (int) song.channels.size() && ! song.channels[(std::size_t) row].receiveFrom.empty())
                 h.text << "  " << tr ("(locked: receives the notes of {0})", { juce::String::fromUTF8 (song.channels[(std::size_t) row].receiveFrom.c_str()) });
+            if (engine.playsStandIn (row))
+                h.text = name + " - " + tr ("Stand-in: its plugin is not installed on this PC, a render of this part plays (the plugin's settings are kept)");
             h.hasMenu = true;
             // FL's hint bar names what the channel is ("Audio Clip", the plugin's name) on the right (REA round 143b)
             if (row >= 0 && row < (int) song.channels.size())

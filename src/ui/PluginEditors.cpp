@@ -675,8 +675,8 @@ public:
             case Item::label:
                 if (hasStyle (item, plugui::dim) && ! hasStyle (item, plugui::boxed) && item.h > 30.0f && item.label != nullptr)
                 {
-                    // the plugin's name, big and quiet (FL's logos are not reproduced)
-                    g.setColour (colour::bg4);
+                    // the plugin's name, big and readable (FL's logos are not reproduced; round 168q2)
+                    g.setColour (colour::textSecondary);
                     ui::drawFittingText (g, item.label, r, hasStyle (item, plugui::alignLeft) ? juce::Justification::centredLeft : juce::Justification::centredRight,
                                          font (r.getHeight() * 0.62f, true), r.getHeight() * 0.25f, 0.0f, 0.8f); // (smaller, never "Wav...")
                     break;

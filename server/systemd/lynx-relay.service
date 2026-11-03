@@ -1,0 +1,31 @@
+[Unit]
+Description=LYNX SHARE relay (Online Sessions WebSocket rooms)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=lynx
+Group=lynx
+EnvironmentFile=/etc/lynx/lynx.env
+WorkingDirectory=/opt/lynx/app
+ExecStart=/usr/bin/python3 -s /opt/lynx/app/lynx_relay.py
+Restart=always
+RestartSec=3
+MemoryMax=512M
+TasksMax=64
+Nice=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=yes
+ReadOnlyPaths=/opt/lynx
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

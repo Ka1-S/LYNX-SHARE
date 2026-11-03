@@ -578,11 +578,29 @@ public:
     void timerCallback() override
     {
         auto& open = windows();
-        for (auto it = open.begin(); it != open.end();)
-            it = it->second->orphaned() ? open.erase (it) : std::next (it);
-        if (open.empty())
+        bool any = false;
+        for (const auto& [key, window] : open)
+            any = any || window->orphaned();
+        // issue #36: the window is the plugin's last owner here, so closing it frees the plugin; that happens from a
+        // message of its own (editor first, then the plugin), not inside this timer callback while timers are running
+        if (any && ! reaping)
+        {
+            reaping = true;
+            juce::MessageManager::callAsync ([this] {
+                reaping = false;
+                auto& all = windows();
+                for (auto it = all.begin(); it != all.end();)
+                    it = it->second->orphaned() ? all.erase (it) : std::next (it);
+                if (all.empty())
+                    stopTimer();
+            });
+        }
+        else if (open.empty())
             stopTimer();
     }
+
+private:
+    bool reaping = false;
 };
 
 OrphanReaper& reaper()

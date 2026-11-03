@@ -42,6 +42,17 @@ struct ScaleInfo
 };
 
 const std::vector<ScaleInfo>& scales(); // [0] = no scale
+// FL Studio's Piano Roll reference scales (its Data/Patches/Scores/Reference scales folder; the index in this list, FL's
+// alphabetical order, is what FL saves in .flp event 0xF3 — REA round 168j): FL's name and the degrees above the root
+struct FlReferenceScale
+{
+    const char* name;
+    std::vector<int> intervals;
+};
+const std::vector<FlReferenceScale>& flReferenceScales();
+// The scales() index with the same degrees as FL's reference scale `flIndex`; 0 = none (also FL's −1 Default,
+// −2 Black notes, −3 Automatic and the scales LYNX does not list)
+int scaleForFlReference (int flIndex) noexcept;
 bool inScale (int key, int root, int scale) noexcept;
 // The in-scale key nearest to `key` (a tie goes down); `key` itself without a scale. Stays in 0..127.
 int snapToScale (int key, int root, int scale) noexcept;

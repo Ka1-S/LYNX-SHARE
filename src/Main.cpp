@@ -30,6 +30,9 @@
 #include "engine/PluginHost.h"
 #include "engine/PluginSandbox.h"
 #include "engine/ProjectFile.h"
+#include "engine/SessionPack.h"
+#include "core/SessionIds.h"
+#include "core/SessionParts.h"
 #include "engine/SampleLibrary.h"
 #include "engine/Text.h"
 #include "platform/FileTypes.h"
@@ -1721,6 +1724,31 @@ private:
                       && plainBack->mixer[0].outputChannel == lynx::outputDefault && plainBack->mixer[1].outputChannel == lynx::outputDefault;
         }
 
+        // round 168j: FL's icons (channel / mixer track / playlist track), PDC Automatic / Compensate automations, Time
+        // settings, scale highlighting and data folder — saved only when set, old projects load with FL's defaults
+        bool flp168jOk = false;
+        {
+            auto song = lynx::Song::makeDefault();
+            const auto plain = lynx::ProjectFile::toJson (song);
+            song.channels[0].icon = 75;
+            song.mixer[2].icon = 71;
+            song.playlistTracks.resize (3);
+            song.playlistTracks[2].icon = 30;
+            song.autoPdc = false;
+            song.compensateAutomations = false;
+            song.timeSignatureMode = true;
+            song.scaleHighlight = { 10, 5 };
+            song.dataFolder = "D:\\Projects\\data";
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), error);
+            const auto plainBack = lynx::ProjectFile::fromJson (plain, error);
+            flp168jOk = back && back->channels[0].icon == 75 && back->mixer[2].icon == 71 && back->playlistTracks.size() >= 3
+                        && back->playlistTracks[2].icon == 30 && ! back->autoPdc && ! back->compensateAutomations && back->timeSignatureMode
+                        && back->scaleHighlight == song.scaleHighlight && back->dataFolder == song.dataFolder && plainBack && plainBack->autoPdc
+                        && plainBack->compensateAutomations && ! plainBack->timeSignatureMode && plainBack->scaleHighlight == lynx::Song::ScaleHighlight {}
+                        && plainBack->dataFolder.empty() && plainBack->channels[0].icon == 0 && ! plain.contains ("\"icon\"")
+                        && ! plain.contains ("autoPdc") && ! plain.contains ("scaleHighlight");
+        }
+
         // Misc › Mono / Porta / Slide on every generator (round 168l): kept in the file; a project saved before (an
         // imported engine's flags in its synth settings) gets them back, a Max polyphony of 1 is not Mono
         bool polyOk = false;
@@ -1892,6 +1920,118 @@ private:
                     packageOk = back.existsAsFile() && back.isAChildOf (project.getParentDirectory()) && back.getSize() == wav.getSize();
                 }
             }
+            dir.deleteRecursively();
+        }
+
+        // Online Sessions (round 168a): a project sent as a .lynxpack (one sample used twice is stored once, the uids
+        // survive), a stand-in rendered through an ExportJob, the guest's part sent back and merged by the host
+        juce::String sessionResult = "ERROR";
+        {
+            const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-selftest-session");
+            dir.deleteRecursively();
+            dir.getChildFile ("src").createDirectory();
+            const auto wav = dir.getChildFile ("src/hit.wav");
+            {
+                juce::WavAudioFormat format;
+                juce::AudioBuffer<float> hit (1, 4800);
+                for (int i = 0; i < 4800; ++i)
+                    hit.setSample (0, i, 0.5f * std::sin (0.05f * (float) i) * (1.0f - (float) i / 4800.0f));
+                std::unique_ptr<juce::OutputStream> out (wav.createOutputStream().release());
+                if (auto* w = format.createWriterFor (out.get(), 48000.0, 1, 16, {}, 0))
+                {
+                    out.release();
+                    std::unique_ptr<juce::AudioFormatWriter> writer (w);
+                    writer->writeFromAudioSampleBuffer (hit, 0, 4800);
+                }
+            }
+            auto host = lynx::Song::makeDefault();
+            host.mode = lynx::PlayMode::song;
+            const auto copyOfWav = dir.getChildFile ("src/hit copy.wav"); // the same bytes under another name: stored once
+            wav.copyFileTo (copyOfWav);
+            for (const auto& [name, file] : { std::pair<const char*, juce::File> { "Hit", wav }, { "Hit 2", copyOfWav } })
+            {
+                lynx::ChannelDef c;
+                c.name = name;
+                c.instrument = lynx::InstrumentKind::sampler;
+                c.samplePath = file.getFullPathName().toStdString();
+                host.channels.push_back (c);
+            }
+            const auto hitChannel = (int) host.channels.size() - 2;
+            lynx::Note hitNote;
+            hitNote.channel = hitChannel;
+            hitNote.length = 480;
+            host.patterns[0].notes.push_back (hitNote);
+            host.playlist.push_back ({ 0, 0, 0, host.patterns[0].effectiveLength (host.beatsPerBar), 0 });
+            lynx::uids::normalize (host);
+            const auto* guest = lynx::parts::invite (host, "Host", "Ana", 0xFF3D9BE9, false);
+            juce::String e;
+            std::vector<lynx::sessionpack::Rendered> rendered;
+            // (a sampler stands in for a plugin channel here: render() renders whatever it is given)
+            const std::vector<lynx::sessionpack::RenderItem> items { { false, hitChannel, false, "Hit", "Test" } };
+            const auto renderedOk = guest != nullptr && lynx::sessionpack::render (host, items, 44100.0, dir.getChildFile ("stems"), "Host", rendered, {}, e)
+                                    && rendered.size() == 1 && rendered[0].standIns.size() == 2
+                                    && juce::File (juce::String::fromUTF8 (rendered[0].standIns[0].path.c_str())).getSize() > 1000;
+            if (renderedOk)
+                lynx::sessionpack::apply (host, rendered);
+            lynx::sessionpack::Manifest m;
+            m.projectName = "Selftest";
+            m.from = *host.session.find (lynx::session::hostTag);
+            m.to = *host.session.find (2);
+            lynx::sessionpack::WriteResult written;
+            const auto pack = dir.getChildFile (juce::String ("Selftest") + lynx::sessionpack::extension);
+            const auto packOk = renderedOk && lynx::sessionpack::write (lynx::parts::guestCopy (host, 2), m, offline.getPluginHost(), pack, written, e)
+                                && written.media == 3 && written.duplicates == 1; // the sample once (used twice), the stand-in pair
+            auto opened = packOk ? lynx::sessionpack::open (pack, dir.getChildFile ("received"), e) : std::nullopt;
+            bool openOk = false, mergeOk = false;
+            if (opened && opened->corrupt.isEmpty())
+            {
+                const auto& g = opened->song;
+                const juce::File sample (juce::String::fromUTF8 (g.channels[(std::size_t) hitChannel].samplePath.c_str()));
+                openOk = g.session.me == 2 && g.projectId == host.projectId && g.channels[(std::size_t) hitChannel].uid == host.channels[(std::size_t) hitChannel].uid
+                         && sample.existsAsFile() && sample.isAChildOf (opened->folder) && g.channels[(std::size_t) hitChannel].standIns.size() == 2
+                         && juce::File (juce::String::fromUTF8 (g.channels[(std::size_t) hitChannel].standIns[1].path.c_str())).existsAsFile();
+                // the guest adds a channel and a pattern of his own, sends his part back
+                auto copy = g;
+                lynx::ChannelDef mine;
+                mine.name = "Ana's hit";
+                mine.instrument = lynx::InstrumentKind::sampler;
+                mine.samplePath = sample.getFullPathName().toStdString();
+                copy.channels.push_back (mine);
+                lynx::Pattern p;
+                p.name = "Ana";
+                lynx::Note note;
+                note.channel = (int) copy.channels.size() - 1;
+                note.length = 240;
+                note.key = 64;
+                p.notes.push_back (note);
+                copy.patterns.push_back (p);
+                lynx::uids::normalize (copy);
+                // its uids survive a save and a load
+                const auto saved = dir.getChildFile ("guest.lynx");
+                auto reloaded = lynx::ProjectFile::save (copy, saved, e) ? lynx::ProjectFile::load (saved, e) : std::nullopt;
+                lynx::sessionpack::Manifest back;
+                back.part = true;
+                back.from = *copy.session.self();
+                const auto partFile = dir.getChildFile (juce::String ("Ana part") + lynx::sessionpack::extension);
+                lynx::sessionpack::WriteResult partWritten;
+                auto part = reloaded && reloaded->channels.back().uid == copy.channels.back().uid && lynx::uids::tagOf (reloaded->channels.back().uid) == 2
+                                ? lynx::sessionpack::write (lynx::parts::extract (*reloaded, 2), back, offline.getPluginHost(), partFile, partWritten, e)
+                                : false;
+                auto partOpened = part ? lynx::sessionpack::open (partFile, dir.getChildFile ("parts"), e) : std::nullopt;
+                if (partOpened && partOpened->manifest.part && lynx::sessionpack::adoptMedia (partOpened->song, dir.getChildFile ("Session media/Ana"), e))
+                {
+                    const auto report = lynx::parts::merge (host, partOpened->song, 2);
+                    const auto& added = host.channels.back();
+                    mergeOk = report.ok && report.channels >= 1 && added.name == "Ana's hit" && lynx::uids::tagOf (added.uid) == 2
+                              && juce::File (juce::String::fromUTF8 (added.samplePath.c_str())).isAChildOf (dir.getChildFile ("Session media/Ana"))
+                              && host.channels[(std::size_t) hitChannel].name == "Hit";
+                }
+            }
+            if (! packOk && e.isEmpty())
+                e = "media " + juce::String (written.media) + ", duplicates " + juce::String (written.duplicates) + ", missing "
+                    + written.missing.joinIntoString (";");
+            sessionResult = mergeOk ? juce::String ("OK")
+                                    : "ERROR (" + juce::String (renderedOk ? packOk ? openOk ? "merge" : "open" : "pack" : "render") + (e.isEmpty() ? "" : ": " + e) + ")";
             dir.deleteRecursively();
         }
 
@@ -2121,7 +2261,8 @@ private:
         // Settings › Audio "Driver settings…" with a fake driver panel (issue #13's crash, the panel's buffer kept)
         const auto driverPanel = lynx::AudioEngine::driverPanelSelfTest();
 
-        const auto ok = audioOk && projectOk && richOk && hwOutOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
+        const auto ok = audioOk && projectOk && richOk && hwOutOk && flp168jOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
+                        && sessionResult == "OK"
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk;
 
         juce::String report;
@@ -2130,6 +2271,7 @@ private:
                << "project=" << (projectOk ? "OK" : "ERROR " + error) << "\n"
                << "project_features=" << (richOk ? "OK" : "ERROR") << "\n"
                << "hardware_outputs=" << (hwOutOk ? "OK" : "ERROR") << "\n"
+               << "flp168j_fields=" << (flp168jOk ? "OK" : "ERROR") << "\n"
                << "channel_polyphony=" << (polyOk ? "OK" : "ERROR") << "\n"
                << "track_latency=" << (latencyOk ? "OK" : "ERROR") << "\n"
                << "plugin_substitutes=" << (substituteOk ? "OK" : "ERROR") << "\n"
@@ -2139,6 +2281,7 @@ private:
                << "recording=" << (recordOk && recordUndoOk ? "OK" : "ERROR") << "\n"
                << "midi=" << (midiOk ? "OK" : "ERROR") << "\n"
                << "package=" << (packageOk ? "OK" : "ERROR") << "\n"
+               << "online_session=" << sessionResult << "\n"
                << "wavpack=" << wavpack << "\n"
                << "effects=" << (effectsOk ? "OK" : "NONFINITE") << "\n"
                << "driver_panel=" << driverPanel << "\n"
@@ -3183,7 +3326,9 @@ private:
 
     // LYNX.exe --claprestarttest "LYNX Test Restart.clap" report.txt (tools/testplugin/lynx_test_restart.c, PR #29): a
     // CLAP effect on the Master that asks for a restart every 8 blocks while an export renders on a thread of its own
-    // (the message thread is free to run the restarts, as with the Export window). The plugin counts deactivations that
+    // (the message thread is free to run the restarts, as with the Export window). The plugin aborts the process when
+    // start / stop_processing run off the audio thread or activate / deactivate off the main thread (issue #46, as u-he
+    // Presswerk does; an export at 44.1 kHz and prepare calls from the export's thread check the latter) and counts deactivations that
     // landed inside its process() call (must be none), the restarts must happen, and the delay compensation must end on
     // the latency the plugin reports after its last restart.
     void runClapRestartTest (const juce::String& pluginPath, const juce::String& reportPath)
@@ -3241,10 +3386,18 @@ private:
             return;
         }
 
-        run->render = std::thread ([run] {
+        auto effect = std::dynamic_pointer_cast<lynx::PluginEffect> (run->engine->getEffect (0, run->slot));
+        run->render = std::thread ([run, effect] {
             const auto start = juce::Time::getMillisecondCounterHiRes();
             run->engine->renderOffline (30.0, 48000.0);
             run->renderSeconds = (juce::Time::getMillisecondCounterHiRes() - start) * 0.001;
+            // issue #46: an export at another rate / block size prepares the plugin from the export's thread; the
+            // plugin aborts unless activate / deactivate reach the main thread
+            auto& instance = effect->getInstance();
+            instance.prepareToPlay (44100.0, 1024);
+            instance.releaseResources();
+            instance.prepareToPlay (48000.0, 512);
+            run->engine->renderOffline (3.0, 44100.0); // (the engine rebuilds its rack at that rate)
             run->done = true;
         });
 
@@ -3269,7 +3422,8 @@ private:
                 run->engine.reset(); // destroys the plugin: it writes its counters
                 // one line per plugin instance (the engine may have made more than one): none may have been
                 // deactivated inside process(), and the one that rendered must have restarted
-                int overlapped = 0, inactive = 0, requests = 0, activations = 0, lines = 0;
+                int overlapped = 0, inactive = 0, requests = 0, activations = 0, lines = 0, wrongThread = 0, misordered = 0, unstopped = 0;
+                bool otherRate = false;
                 for (const auto& line : juce::StringArray::fromLines (counters.loadFileAsString()))
                 {
                     juce::StringPairArray values;
@@ -3282,13 +3436,22 @@ private:
                     report << "instance: " << line << "\n";
                     overlapped += values["overlapped"].getIntValue();
                     inactive += values["inactive_blocks"].getIntValue();
+                    // issue #46: activate / deactivate on the main thread, start / stop_processing on the audio thread
+                    // (the plugin aborts the process otherwise, as u-he's do), in order, every start stopped
+                    wrongThread += values["wrong_thread"].getIntValue();
+                    misordered += values["misordered"].getIntValue();
+                    unstopped += values["starts"].getIntValue() - values["stops"].getIntValue();
+                    otherRate = otherRate || values["last_rate"].getIntValue() == 44100;
                     if (values["requests"].getIntValue() > requests)
                     {
                         requests = values["requests"].getIntValue();
                         activations = values["activations"].getIntValue();
                     }
                 }
+                report << "wrong_thread=" << wrongThread << "\nmisordered=" << misordered << "\nunstopped=" << unstopped
+                       << "\nactivated_at_44100=" << (otherRate ? "yes" : "no") << "\n";
                 const auto ok = lines > 0 && requests > 0 && activations > requests / 2 && overlapped == 0 && inactive == 0
+                                && wrongThread == 0 && misordered == 0 && unstopped == 0 && otherRate
                                 && pluginLatency > 0 && pdc == pluginLatency && lynx::pluginCrashCount() == 0;
                 if (! ok)
                 {
@@ -4454,13 +4617,14 @@ private:
                     if (k == jumpBlock)
                         engine->seek (14 * ppq);
                 });
-                // (the best of 0-2 samples late: the core render puts a note on a jump's target tick 1 sample late)
+                // (the best of 0-2 samples late: anything but 0 fails)
                 const auto at = (jumpBlock + 1) * 512;
                 int lag = 0;
                 auto d = 1.0e9;
                 for (int l = 0; l <= 2; ++l)
                     if (const auto dl = diff (x, at + l, a, 2 * beat, beat - 2); dl < d)
                         d = dl, lag = l;
+                d = lag == 0 ? d : 1.0;
                 const auto ratio = rms (x, at, beat) / rms (a, 2 * beat, beat);
                 check (std::abs (ratio - 1.0) < 1.0e-3 && d < 1.0e-4,
                        "jump mid-clip to bar 4 beat 3: RMS " + num (rms (x, at, beat)) + " (x" + num (ratio) + " of bar 1 beat 3), max diff "
@@ -4481,13 +4645,30 @@ private:
                     for (int l = 0; l <= 2; ++l)
                         if (const auto dl = diff (x, k * bar + l, a, 0, bar - 2); dl < best)
                             best = dl, lag = l;
-                    d = juce::jmax (d, best);
+                    d = juce::jmax (d, lag == 0 ? best : 1.0); // a sample gained at a wrap fails (round 167q loopwrap)
                     lags << (k > 1 ? "," : "") << lag;
                 }
                 const auto r = rms (x, bar, 6 * bar);
                 check (std::abs (r / bar1 - 1.0) < 1.0e-3 && d < 1.0e-4,
                        "loop region bars 2-3, played 3 times: RMS " + num (r) + " (x" + num (r / bar1) + "), max diff of each bar vs bar 1 " + juce::String (d, 9)
                            + " (samples late, bars 2-7: " + lags + ")");
+                engine->editSong ([] (lynx::Song& s) { s.loopStart = s.loopEnd = 0; }, false);
+            }
+            {
+                // 100 wraps of a 1-bar loop region (bar 2): every pass on its sample, none gained (round 167q loopwrap: each
+                // wrap used to play one sample more)
+                engine->editSong ([ppq] (lynx::Song& s) {
+                    s.loopStart = (std::int64_t) (4 * ppq);
+                    s.loopEnd = (std::int64_t) (8 * ppq);
+                }, false);
+                const auto x = play (0.0, 101 * bar);
+                double d = 0.0;
+                int worst = 0;
+                for (int k = 1; k <= 100; ++k)
+                    if (const auto dk = diff (x, k * bar, a, 0, bar); dk > d)
+                        d = dk, worst = k + 1;
+                check (d < 1.0e-4, "loop region bar 2, 100 wraps: max diff of every pass vs bar 1 " + juce::String (d, 9)
+                                       + (d < 1.0e-4 ? juce::String() : " (worst: bar " + juce::String (worst) + ")"));
                 engine->editSong ([] (lynx::Song& s) { s.loopStart = s.loopEnd = 0; }, false);
             }
             lynx::setStretchedClipsLoop (false);

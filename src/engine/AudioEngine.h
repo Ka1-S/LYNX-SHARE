@@ -74,6 +74,16 @@ public:
     // Tools > Audio logger (REA round 153): records everything the Master plays to a WAV in the background.
     AudioLogger& getAudioLogger();
     PluginHost& getPluginHost() noexcept { return plugins; }
+    // Online Sessions (round 168a): the channels / inserts whose third-party plugin is missing here and that play their
+    // stand-in render instead (core/StandIns.h), as of the last publish — the Channel Rack and the Mixer badge them.
+    bool playsStandIn (int channel) const noexcept
+    {
+        return std::find (standInChannels.begin(), standInChannels.end(), channel) != standInChannels.end();
+    }
+    bool insertPlaysStandIn (int track) const noexcept
+    {
+        return std::find (standInInserts.begin(), standInInserts.end(), track) != standInInserts.end();
+    }
 
     // Third-party plugins from the last imported .flp that were not found among the scanned ones.
     const juce::StringArray& getMissingPlugins() const noexcept { return missingPlugins; }
@@ -439,6 +449,11 @@ public:
     // (dragging a note, turning a knob) become a single step.
     void editSong (const std::function<void (Song&)>& edit, bool undoable = true);
 
+    // For an edit that moves or removes channels, mixer tracks or effect slots (issue #32, PR #37): the live plugin
+    // settings are copied into the Song first, so the undo step has them; the moved plugins keep their instances (the
+    // rack matches them by instance tag, round 168s).
+    void editSongStructural (const std::function<void (Song&)>& edit);
+
     // Changes since the last save/open (for the "*" in the title and the "save changes?" prompt).
     bool isModified() const noexcept { return modified; }
     void markSaved() noexcept { modified = false; sendChangeMessage(); }
@@ -549,6 +564,11 @@ public:
     };
 
     float renderOffline (const RenderOptions& options);
+    // How many offline renders run now, in any engine (round 168s, issue #32). While one runs, the engine that plays
+    // through the audio device stops and outputs silence without processing (FL stops playback while it renders): the
+    // project's live plugins never run next to their export copies (plugins that share state between instances cut
+    // notes in the file) and no CPU goes to them (the glitches heard until the progress bar ended).
+    static std::atomic<int>& offlineRendersRunning() noexcept;
 
     // timings of the last renderOffline (diagnostics): the audio graph and the file writing
     struct RenderStats
@@ -901,6 +921,42 @@ private:
     juce::Time lastUndoPress; // mouse click that already produced an undo step
     SnapshotExchange<RackState> rackExchange;
     RackState lastPublishedShape; // channels + instruments of the last snapshot, to reuse voices
+    std::vector<int> standInChannels, standInInserts; // (playsStandIn)
+    // Issue #36 (u-he Presswerk crashed in its VST3 teardown, freed from the engine's timer callback): the racks the
+    // audio thread let go of are freed from a message of their own, not inside the timer callback that collected them.
+    // A plugin whose editor is open dies when its window goes (the window closes the editor first). Declared after the
+    // rack members: freed first, while the plugin hosts still exist. In the app only (tests have no message loop).
+    struct RackDisposer final : private juce::AsyncUpdater
+    {
+        ~RackDisposer() override
+        {
+            cancelPendingUpdate();
+            flush();
+        }
+        void add (const RackState* rack)
+        {
+            {
+                const juce::ScopedLock sl (lock);
+                items.push_back (rack);
+            }
+            triggerAsyncUpdate();
+        }
+        void flush()
+        {
+            std::vector<const RackState*> now;
+            {
+                const juce::ScopedLock sl (lock);
+                now.swap (items);
+            }
+            for (const auto* rack : now)
+                delete rack;
+        }
+
+    private:
+        void handleAsyncUpdate() override { flush(); }
+        juce::CriticalSection lock;
+        std::vector<const RackState*> items;
+    } rackDisposer;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioEngine)
 };

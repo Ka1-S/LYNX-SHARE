@@ -11,6 +11,7 @@
 
 #include <array>
 #include <atomic>
+#include <functional>
 #include <memory>
 
 namespace lynx
@@ -25,6 +26,7 @@ public:
 
     ~SnapshotExchange()
     {
+        dispose = nullptr;
         delete incoming.exchange (nullptr);
         delete active;
         collectGarbage();
@@ -41,8 +43,18 @@ public:
     void collectGarbage()
     {
         for (auto& slot : retired)
-            delete slot.exchange (nullptr, std::memory_order_acq_rel);
+            if (const auto* old = slot.exchange (nullptr, std::memory_order_acq_rel))
+            {
+                if (dispose)
+                    dispose (old);
+                else
+                    delete old;
+            }
     }
+
+    // UI: set, the objects the audio thread returned go here instead of being deleted at once (the owner frees them
+    // later, e.g. outside the timer callback that collected them: issue #36). Set before the first publish.
+    std::function<void (const T*)> dispose;
 
     // Audio: returns the current snapshot (may be nullptr before the first publish).
     const T* acquire() noexcept

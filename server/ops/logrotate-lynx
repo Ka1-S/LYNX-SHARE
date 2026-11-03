@@ -1,0 +1,11 @@
+# /etc/logrotate.d/lynx (installed by server/setup.sh). Caddy rolls its own access log (Caddyfile); the services log
+# to the journal (capped by /etc/systemd/journald.conf.d/lynx.conf).
+/var/log/lynx/*.log {
+	weekly
+	rotate 8
+	compress
+	delaycompress
+	missingok
+	notifempty
+	create 0640 root adm
+}

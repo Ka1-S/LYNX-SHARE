@@ -26,6 +26,7 @@
 #include <optional>
 #include <vector>
 
+#include "core/EngineParams.h"
 #include "core/Instruments.h"
 
 namespace lynx
@@ -38,7 +39,25 @@ std::optional<std::vector<int>> beepMapParams (const std::vector<std::uint8_t>& 
 // byte offset of setting i inside the state (for the channel settings panel), or −1
 int beepMapParamOffset (const std::vector<std::uint8_t>& state, int index);
 
+// The state's bitmap as saved (before "Max height"), top row first, 3 bytes (blue, green, red) a pixel
+struct BeepMapPicture
+{
+    int width = 0, height = 0;
+    std::vector<std::uint8_t> bgr;
+};
+std::optional<BeepMapPicture> beepMapPicture (const std::vector<std::uint8_t>& state);
+// The state with another bitmap (a .bmp file's bytes; FL's Open / Paste), settings kept; empty if the file is unusable
+std::vector<std::uint8_t> beepMapWithBitmap (const std::vector<std::uint8_t>& state, const std::vector<std::uint8_t>& bmp);
+
 std::unique_ptr<Instrument> makeBeepMapInstrument();
+
+// The automatable settings of the designed page (round 168q), by setting number (sorted)
+const std::vector<EngineParam>& beepMapEngineParams();
+namespace modelparams
+{
+struct Table;
+Table beepMapModelTable();
+} // namespace modelparams
 
 namespace beepmap
 {

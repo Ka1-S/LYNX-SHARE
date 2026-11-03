@@ -23,6 +23,7 @@
 #include <string>
 #include <vector>
 
+#include "core/EngineParams.h"
 #include "core/Instruments.h"
 
 namespace lynx
@@ -38,6 +39,14 @@ int sawerParamOffset (const std::vector<std::uint8_t>& state, int index);
 std::vector<float> sawerReadTable (const std::string& path);
 
 std::unique_ptr<Instrument> makeSawerInstrument();
+
+// The automatable parameters of the designed page (round 168q), by P index (sorted)
+const std::vector<EngineParam>& sawerParams();
+namespace modelparams
+{
+struct Table;
+Table sawerModelTable();
+} // namespace modelparams
 
 namespace sawer
 {

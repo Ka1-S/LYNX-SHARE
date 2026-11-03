@@ -420,6 +420,15 @@ inline float peakOf (const std::vector<float>& x, double from, double to)
         m = std::max (m, std::abs (x[i]));
     return m;
 }
+
+// max − min of `x` between `from` and `to` seconds: 0 for silence and for FL's DC hold after an audio clip's file ends
+inline float spreadOf (const std::vector<float>& x, double from, double to)
+{
+    float lo = 1.0e9f, hi = -1.0e9f;
+    for (auto i = (std::size_t) (from * 48000.0); i < (std::size_t) (to * 48000.0) && i < x.size(); ++i)
+        lo = std::min (lo, x[i]), hi = std::max (hi, x[i]);
+    return hi >= lo ? hi - lo : 0.0f;
+}
 } // namespace rea167k
 
 TEST (rea167k_clip_pitch_keeps_the_length)
@@ -437,7 +446,7 @@ TEST (rea167k_clip_pitch_keeps_the_length)
         const auto x = rea167k::renderSine (s);
         CHECK (std::abs (rea167k::frequencyOf (x, 0.3, 0.8) - hz) < 2.0);
         CHECK (rea167k::peakOf (x, 1.80, 1.95) > 0.2f);    // still playing near the end of the file
-        CHECK (rea167k::peakOf (x, 2.15, 2.9) < 0.05f);    // and not after it
+        CHECK (rea167k::spreadOf (x, 2.15, 2.9) < 1.0e-4f); // and not after it: FL holds the file's last value (round 168j)
     }
 }
 

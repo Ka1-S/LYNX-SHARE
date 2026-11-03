@@ -49,6 +49,22 @@ bool isListed (const juce::File& f)
 
 constexpr int maxResults = 500;
 
+juce::Array<juce::File> childrenOf (const juce::File& folder)
+{
+   #if JUCE_MAC
+    // JUCE's macOS iterator makes an NSURL of every entry to read its hidden flag, and a name NSString rejects
+    // throws an Objective-C exception that ends the app (issue #42). readdir has no such step; names that are
+    // not valid UTF-8 are skipped, the rest precomposed like JUCE does.
+    // The listing itself is search::listFolderNames (JUCE-free, so the core tests run it on odd names).
+    juce::Array<juce::File> children;
+    for (const auto& name : search::listFolderNames (folder.getFullPathName().toStdString()))
+        children.add (folder.getChildFile (juce::String::fromUTF8 (name.data(), (int) name.size()).convertToPrecomposedUnicode()));
+    return children;
+   #else
+    return folder.findChildFiles (juce::File::findFilesAndDirectories, false, "*");
+   #endif
+}
+
 search::FileSystem diskFileSystem()
 {
     search::FileSystem fs;
@@ -64,7 +80,7 @@ search::FileSystem diskFileSystem()
             return listing;
         listing.exists = true;
         listing.time = folder.getLastModificationTime().toMilliseconds();
-        auto children = folder.findChildFiles (juce::File::findFilesAndDirectories, false, "*");
+        auto children = childrenOf (folder);
         children.sort();
         for (const auto& c : children)
         {
@@ -1314,8 +1330,15 @@ private:
             return;
         }
 
+       #if JUCE_MAC
+        // not JUCE's iterator on macOS: one name NSString rejects would end the app as the folder opens (issue #42)
+        juce::Array<juce::File> folders, files;
+        for (const auto& c : childrenOf (n.file))
+            (c.isDirectory() ? folders : files).add (c);
+       #else
         auto folders = n.file.findChildFiles (juce::File::findDirectories, false, "*", juce::File::FollowSymlinks::noCycles);
         auto files = n.file.findChildFiles (juce::File::findFiles, false, "*", juce::File::FollowSymlinks::noCycles);
+       #endif
         auto byName = [] (const juce::File& a, const juce::File& b) { return a.getFileName().compareNatural (b.getFileName()) < 0; };
         std::sort (folders.begin(), folders.end(), byName);
         std::sort (files.begin(), files.end(), byName);
@@ -3446,6 +3469,29 @@ void BrowserComponent::showPluginDatabase()
         tree->select (row, false);
         tree->grabKeyboardFocus();
     }
+}
+
+void BrowserComponent::showScores()
+{
+    // the Piano roll's File › Browse scores (round 168g; FL: FUN_0123a580 opens its browser at the Scores folder): the
+    // "FL MIDI" root (Data/Patches/Scores) shown, opened and selected
+    for (int i = 0; i < allRoots.size(); ++i)
+        if (i < (int) allRootKinds.size() && allRootKinds[(std::size_t) i] == browserview::RootKind::flMidi)
+        {
+            const auto folder = allRoots[i];
+            if (const auto id = rootId (folder); id.isNotEmpty())
+                setRootShown (id, true);
+            setTab (allTab);
+            rebuildTree();
+            tree->expandTop (folder, 1);
+            if (const auto row = tree->rowLabelled (allRootNames[i]); row >= 0)
+            {
+                tree->select (row, false);
+                tree->grabKeyboardFocus();
+            }
+            return;
+        }
+    showNote (tr ("FL Studio's scores were not found (FL Studio is not installed)"));
 }
 
 void BrowserComponent::showProjectForSnapshot()

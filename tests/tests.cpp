@@ -148,6 +148,7 @@
 #include "core/KeyMap.h"
 #include "core/SortOnce.h"
 #include "core/RackOps.h"
+#include "core/PlaylistTrackOps.h"
 #include "core/ChannelLoops.h"
 #include "core/ChannelBurn.h"
 #include "core/AutoSampler.h"
@@ -160,6 +161,7 @@
 #include "core/PluginSubstitutes.h"
 #include "core/ClipOps.h"
 #include "core/PlaylistOps.h"
+#include "core/QuickRender.h"
 #include "core/TouchKeyboard.h"
 #include "core/HeldNotes.h"
 #include "core/Templates.h"
@@ -1587,6 +1589,14 @@ TEST (flp_real_files)
 
             for (const auto& a : song.arrangements)
                 for (const auto& m : a.markers)
+                {
+                    ++markers;
+                    signatures += m.isSignature();
+                    CHECK (m.tick >= 0);
+                }
+            // (round 168g: the patterns' own markers are no longer counted as the Playlist's)
+            for (const auto& p : song.patterns)
+                for (const auto& m : p.markers)
                 {
                     ++markers;
                     signatures += m.isSignature();
@@ -6967,7 +6977,7 @@ TEST (workflow_key_map)
     CHECK (map.find ({ '1', none }, rack, false) == "rack.mute1" && map.find ({ '0', none }, rack, false) == "rack.mute10");
     CHECK (map.find ({ '1', none }, rack, true).empty()); // a plain digit is not a shortcut while the piano is on
     CHECK (map.find ({ '2', ctrl }, rack, true) == "rack.solo2");
-    CHECK (typingPianoNote ('Z') == 60 && typingPianoNote ('q') == 72 && typingPianoNote ('P') == 88 && typingPianoNote ('L') == -1);
+    CHECK (typingPianoNote ('Z') == 48 && typingPianoNote ('q') == 60 && typingPianoNote ('P') == 76 && typingPianoNote ('L') == -1);
     CHECK (map.conflicts().empty());
 
     // chord text
@@ -16908,6 +16918,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Kepler165kTests.inc"
 #include "KeplerExo167dTests.inc"
 #include "MixerLatency165Tests.inc"
+#include "Rea168jTests.inc"
 #include "Audit165Tests.inc"
 #include "Vfx165cTests.inc"
 #include "HarmorBeta165hTests.inc"
@@ -16934,17 +16945,29 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "MidiOut167iTests.inc"
 #include "Transporter167fTests.inc"
 #include "Polish167pTests.inc"
+#include "Menus168zTests.inc"
+#include "Session168aTests.inc"
 #include "StemSplitTests.inc"
 #include "Zoom167tTests.inc"
+#include "Proll168gTests.inc"
+#include "Rea168eTests.inc"
 #include "Design168nTests.inc"
+#include "Design168qTests.inc"
 #include "FirstRun167vTests.inc"
 #include "LoopStarter168bTests.inc"
 #include "Rec168kTests.inc"
+#include "Issue32Tests.inc"
 #include "Mono168lTests.inc"
 #include "MixPre167qTests.inc"
 #include "Design168rTests.inc"
+#include "Playlist168fTests.inc"
+#include "RecFold167qTests.inc"
+#include "LoopWrap167qTests.inc"
 #include "Sel168tTests.inc"
 #include "Speech168bTests.inc"
+#include "Typing168tTests.inc"
 #include "GrossBeat168mTests.inc"
 #include "Maximus168xTests.inc"
 #include "Rec168xTests.inc"
+#include "Design168oTests.inc"
+#include "Pr44BrowserListTests.inc"

@@ -76,6 +76,15 @@ lynx::Song videoSong()
     return s;
 }
 
+// FL's rule for takes inside a clip longer than its pattern (the pattern grows) is LYNX's with "Stretched pattern clips
+// loop their pattern" off; on (the default) the take folds into the pattern (RecFold167qTests.inc)
+struct FlClipRule
+{
+    FlClipRule() : was (lynx::stretchedClipsLoop()) { lynx::setStretchedClipsLoop (false); }
+    ~FlClipRule() { lynx::setStretchedClipsLoop (was); }
+    bool was;
+};
+
 std::vector<const lynx::Clip*> clipsOf (const lynx::Song& s, int pattern)
 {
     std::vector<const lynx::Clip*> out;
@@ -268,6 +277,7 @@ TEST (rec168k_fl_measured_take_in_a_one_bar_song)
 
 TEST (rec168k_take_inside_a_stretched_clip_grows_the_pattern)
 {
+    const rec168k::FlClipRule flRule;
     // FL 2026 [EXEC rec168k z_m2b, f12]: Pattern 3 = one kick step (1 bar), its clip stretched to bars 1–5; notes at
     // 2.1, 3.3 and 4.2 stay there (D4 at the pattern's bar 2 in the Piano roll) — the pattern grows, nothing folds
     auto s = lynx::Song::makeDefault();
@@ -297,6 +307,7 @@ TEST (rec168k_take_inside_a_stretched_clip_grows_the_pattern)
 
 TEST (rec168k_probe_case_b_set_length_pattern_in_an_8_bar_clip)
 {
+    const rec168k::FlClipRule flRule;
     // the video's other case (probe "8 B"): Pattern 2 set to 2 bars, its clip stretched to 8 bars, 8 bars recorded →
     // the notes of bars 3–8 used to be stored past the pattern's 2 bars, never shown nor played. Now the pattern grows to
     // 8 bars (as FL's does), so the clip shows and plays all 8 bars once
@@ -324,6 +335,7 @@ TEST (rec168k_probe_case_b_set_length_pattern_in_an_8_bar_clip)
 
 TEST (rec168k_auto_length_pattern_stretched_clip_8_bars)
 {
+    const rec168k::FlClipRule flRule;
     // the video's moment 7: Pattern 1 recorded as 2 bars, its clip dragged to 8 bars, recorded again over the 8 bars
     auto s = rec168k::videoSong();
     const std::int64_t bar = (std::int64_t) lynx::ppq * s.beatsPerBar;
@@ -349,6 +361,7 @@ TEST (rec168k_auto_length_pattern_stretched_clip_8_bars)
 
 TEST (rec168k_take_inside_a_long_clip_keeps_the_clip)
 {
+    const rec168k::FlClipRule flRule;
     // a take inside a pattern clip longer than its pattern grows the pattern only to the last recorded bar; the clip
     // keeps its length and place (FL plays it once: empty after the pattern's end); takes into another pattern leave
     // it alone

@@ -27,6 +27,19 @@ struct Palette
     bool operator== (const Palette&) const = default;
 };
 
+// FL's number wheels ("digiwheels": channel RANGE / TRACK, the channel rack's insert box) in the LYNX skin (round
+// 168s): a dark inset display with light text, red (the accent) only while hovered or dragged. C = a colour type.
+template <typename C>
+struct DigitDisplayColours
+{
+    C fill, edge, text;
+};
+template <typename C>
+DigitDisplayColours<C> digitDisplayColours (C bg0, C border, C accent, C accentHover, C textPrimary, C textDisabled, bool hot, bool dimmed)
+{
+    return { bg0, hot ? accent : border, hot ? accentHover : dimmed ? textDisabled : textPrimary };
+}
+
 // The palette for an accent and a background (alpha is ignored: both are opaque).
 Palette derivePalette (std::uint32_t accent, std::uint32_t background);
 // LYNX's built-in palette (= derivePalette (defaultAccent, defaultBackground)).

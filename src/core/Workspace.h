@@ -43,6 +43,11 @@ constexpr int playlistHeaderWidth = 260, mixerMinHeight = 400, pianoRollMinHeigh
 // Default Channel Rack width: at most its usual width (a bar of steps), at least this much beside the track names.
 constexpr int rackMaxWidth = 720, rackMinWidth = 420;
 
+// The panels that stay behind the others whatever is clicked: only the Browser, docked at the side as in FL. The
+// Playlist is a window like the others: clicking it brings it to front over the Channel Rack, and F6 brings the rack
+// back (FL 2026, round 168s / issue #32 [SHOT] r168s f02 → f03 → f04; it used to stay behind everything).
+constexpr bool isBackground (Panel p) noexcept { return p == Panel::browser; }
+
 struct Layout
 {
     std::array<PanelState, panelCount> panels {};
@@ -54,7 +59,7 @@ struct Layout
     const PanelState& operator[] (Panel p) const noexcept { return panels[(std::size_t) p]; }
 
     // LYNX's default arrangement for a desktop of this size (FL's fresh-install desktop): Browser on the left,
-    // the Playlist filling the rest as the background, the Channel Rack floating over the Playlist; Piano Roll
+    // the Playlist filling the rest (at the back of the stacking order), the Channel Rack floating over the Playlist; Piano Roll
     // and Mixer hidden with sensible rects for when they are first shown (Mixer at the bottom, Piano Roll above).
     static Layout makeDefault (int width, int height);
     // The desktop changed size while the layout is still the untouched default: take the default rects for
@@ -63,6 +68,9 @@ struct Layout
 
     void bringToFront (Panel p);
     bool isFrontmost (Panel p) const; // topmost visible, attached panel
+    // The attached panels as they are drawn, back to front: the background panels (isBackground) first, then the
+    // others in `order`.
+    std::vector<Panel> stacking() const;
 
     // F-key behaviour: a hidden panel is shown and focused; a visible panel that is not focused is
     // brought to front and focused; the focused panel is hidden (focus moves to the next visible one).

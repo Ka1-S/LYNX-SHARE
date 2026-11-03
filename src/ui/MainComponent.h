@@ -18,6 +18,7 @@
 #include "ui/PianoRollComponent.h"
 #include "ui/MixerComponent.h"
 #include "ui/PlaylistComponent.h"
+#include "ui/SessionDialogs.h"
 #include "ui/HintBar.h"
 #include "ui/Splash.h"
 #include "ui/Toolbar.h"
@@ -148,9 +149,13 @@ private:
     keys::Context focusContext() const;
     void loadKeyMap();
     keys::KeyMap keyMap;
-    bool typingPiano = false; // off by default so single-letter editor tools work (the manual does not state a default)
+    // On by default, as FL 2026 (OptionsTypingKbToPianoAction: Checked = True; measured round 168t2). While it is on, FL
+    // too takes the plain letter keys for the piano: P / E / R played notes and K (next channel) did nothing.
+    bool typingPiano = true;
+    int typingOctave = keys::typingpiano::defaultOctave, typingRoot = 0; // the button's right-click menu, as FL's
     int lastCurrentPattern = -1; // ("Select first channel with notes when the pattern changes")
     void setTypingPiano (bool on);
+    void toggleTypingPiano(); // the user's toggle (button, menus, Ctrl+T): also says so in the hint bar
     juce::String shortcutText (const char* actionId) const; // "\tF5" for menus ("" when unbound)
 
     // panels
@@ -195,6 +200,7 @@ private:
     void menuItemSelected (int, int) override {}
     void rememberRecent (const juce::File& file);
     juce::PopupMenu makePatternMenu();
+    juce::PopupMenu playlistTrackExportMenu (bool groups); // File › Export / Playlist Tools: the three starts (round 168e)
     // Tools › Last tweaked / Next to last tweaked (REA round 143): the parameter menu of a recently moved control
     juce::PopupMenu makeLastTweakedMenu (int which);
     // File › Import › MIDI file... (REA round 143)
@@ -247,6 +253,7 @@ private:
     void saveNewVersion();
     void revertToLastBackup();
     void exportPackage();
+    sessionui::Context sessionContext(); // the File › Online session commands (round 168a)
     void collectSamples();
     void keepOverwrittenCopy (const juce::File& file); // the previous file of a save, kept in the backup folder
     void rotateBackups (const juce::String& stem);
@@ -289,6 +296,7 @@ private:
     void showRecordMenu();
     // right-click on the metronome: on/off, its volume, count-in (FL keeps the metronome's options there)
     void showMetronomeMenu();
+    void showTypingPianoMenu();
     // the metronome volume knob in a callout under the metronome button
     void showMetronomeVolume();
     void dumpScoreLog (int minutes); // Tools › Score logger (REA round 165f)

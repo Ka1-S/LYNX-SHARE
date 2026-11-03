@@ -6,6 +6,7 @@
 // only each known folder's modification time is read, and only the folders whose time changed (files added, removed
 // or renamed in them) are listed again - FL's "dirty folders". No JUCE: the file system goes through callbacks.
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -52,6 +53,18 @@ struct FileSystem
     std::function<FolderListing (const std::string& folder)> list;
     char separator = '/';
 };
+
+// The names in `folder` (POSIX opendir/readdir, no "." / ".."), for the Browser on macOS (issue #42, PR #44): JUCE's
+// macOS iterator turns every name into an NSString/NSURL and a name that can't become one throws an Objective-C
+// exception that ends the app. Names that are not valid UTF-8 (bad bytes, overlong forms, surrogates, past U+10FFFF:
+// the cases NSString rejects) are skipped and counted in `skipped`. Hidden files and links are kept (the caller decides);
+// a folder that can't be opened (missing, no permission) gives an empty list and opened = false. Thread-safe (no
+// shared state). Not available on Windows (returns empty, opened = false).
+std::vector<std::string> listFolderNames (const std::string& folder, bool* opened = nullptr, int* skipped = nullptr);
+
+// True when the `size` bytes at `text` are well-formed UTF-8 (RFC 3629: no overlong forms, no surrogates, at most
+// U+10FFFF) without a NUL byte.
+bool isWellFormedUtf8 (const char* text, std::size_t size) noexcept;
 
 class Index
 {

@@ -93,6 +93,8 @@ public:
 
     // The key map's playlist.* actions (zoom presets, ripple editing). False for unknown ids.
     bool runAction (const std::string& id);
+    // FL's "Clone — What do you want to clone along with the track?" window (round 168f), for --snapshot too.
+    static std::unique_ptr<juce::AlertWindow> makeCloneTracksDialog (bool groupHeaderSelected);
 
     // Ripple editing: resizing a clip's end moves the later clips on its track, deleting closes the gap.
     bool isRippleOn() const noexcept { return ripple; }
@@ -115,6 +117,8 @@ public:
     // For snapshots: the tool in use and a time selection over [fromBar, toBar).
     void setToolForSnapshot (EditTool tool) { tools.setTool (tool); }
     void setTimeSelectionForSnapshot (int fromBar, int toBar);
+    // the selected clips (indices into the Playlist), for Tools › Consolidate playlist selection (round 168e)
+    const std::vector<int>& getSelectedClips() const noexcept { return selection; }
     // zoom (pixels per bar) and scroll (first bar, first track in view)
     void setViewForSnapshot (double pixelsPerBar, int firstBar, int firstTrack);
     juce::PopupMenu getClipMenuForSnapshot (int index); // --snapshot: the clip menu of that clip
@@ -150,6 +154,15 @@ private:
     void paintPerformance (juce::Graphics& g, juce::Rectangle<int> grid);
     void togglePerformanceMode();
     void zoomOnPerformanceClips();
+    // round 168f: FL's Playlist track tools (core/PlaylistTrackOps.h)
+    void mergePatternClipsByKey();               // Ctrl+G
+    void makeSelectionUnique();                  // Ctrl+Shift+V
+    void cloneTracksWithDialog (std::vector<int> tracks); // Ctrl+Shift+B, track menu "Clone..."
+    void lockAllTracks (bool lock);              // Tools › Lock / Unlock all playlist tracks (to / from) content
+    void resetEmptyTracksAsked();                // Tools › Reset empty playlist tracks
+    void setStretchOnResize (bool on);           // the STRETCH switch (Shift+M)
+    std::vector<Clip> stretchOriginals;          // the clips when a stretching resize started
+    IconButton stretchButton { "stretch", Icon::stretch };
     bool showClipProgress = true, showTrackProgress = true; // FL's View › Performance clip / track progress
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;

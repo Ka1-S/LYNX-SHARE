@@ -24,6 +24,9 @@ struct PdcPlan
     std::vector<std::vector<int>> sendDelay;   // [track][k]: k = 0 Master, k = 1 + i for sends[i], then one per
                                                // Fruity Send slot (fruitySendsOf order): k = 1 + sends.size() + j
     std::vector<int> inAlign, outLat;          // per track
+    // [track][slot]: how late a slot's input is (the track's inAlign plus the active slots before it), in samples —
+    // FL's per-slot delay that "Compensate automations" shifts the slot's automation by (REA round 168j)
+    std::vector<std::vector<int>> slotInput;
     int total = 0;                              // latency at the Master output
 
     bool any() const noexcept;
