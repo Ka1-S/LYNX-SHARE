@@ -5,19 +5,25 @@ user or the person installing or operating it.
 
 ## What LYNX SHARE does and does not do
 
-- **Two network connections, both disclosed and switchable.** LYNX SHARE contains no telemetry, analytics,
-  advertising, online account or licence check. It connects to the network for exactly two things:
+- **Three network connections, all disclosed and under your control.** LYNX SHARE contains no telemetry, analytics,
+  advertising, online account or licence check. It connects to the network for exactly three things:
   1. **The update check** (below): a version query to GitHub, on by default, off in *Settings › General › Updates*.
   2. **Crash reports**: sending a crash / freeze report to `https://lynx-share.com/api/crash.php`, only with your
      consent (below).
-  The source code is public, so this can be verified: the update check in `src/ui/Updater.cpp` and the report upload
-  in `src/ui/CrashReporter.cpp` are the only uses of a network API (JUCE's `URL` / `WebInputStream`; on Linux the
+  3. **The stem model download**: only after you choose *Extract stems from sample* on an audio clip and agree to the
+     download, once, from `https://huggingface.co` (a plain file request; Hugging Face sees your IP address). Your audio
+     is never uploaded: separation runs on your computer.
+  The source code is public, so this can be verified: the update check in `src/ui/Updater.cpp`, the report upload
+  in `src/ui/CrashReporter.cpp` and the model download in `src/ui/StemExtract.cpp` are the only uses of a network API (JUCE's `URL` / `WebInputStream`; on Linux the
   `curl` program), and JUCE's web browser component and its curl support are disabled at build time
   (`JUCE_WEB_BROWSER=0`, `JUCE_USE_CURL=0`).
 - **No personal data is collected.** The update check sends nothing about you or your computer; a crash report
   leaves your computer only when you choose to send it.
 - **Local files only.** LYNX SHARE writes only to files you choose (projects, exports) and to its own settings folder
   `%APPDATA%\LYNX` (language, plugin list, autosaves and similar preferences). Delete that folder to remove them.
+  Extracted stems go to the project's `Audio/Recorded/Stems` folder. The stem model (166 MB) is kept in
+  `%LOCALAPPDATA%\LYNX\models` (macOS: `~/Library/Application Support/LYNX/models`, Linux: `~/.local/share/LYNX/models`);
+  delete it to free the space, it is downloaded again (after asking) the next time you extract stems.
   It also registers the `.lynx` file type for the current user (`HKEY_CURRENT_USER\Software\Classes`) so project
   files open in LYNX SHARE.
   The Microsoft Store version keeps that folder in its own app-data folder instead

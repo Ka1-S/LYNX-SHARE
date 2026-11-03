@@ -6,7 +6,10 @@
 #include "core/GrossBeat.h"
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <cmath>
+#include <thread>
 #include <cstring>
 #include <limits>
 
@@ -615,6 +618,500 @@ void setPpq (std::vector<std::uint8_t>& c, int ppq)
         std::memcpy (c.data() + 8, &ppq, 4);
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// writing, defaults and point editing (round 168m)
+
+namespace
+{
+template <typename T>
+void put (std::vector<std::uint8_t>& b, T v)
+{
+    const auto* p = reinterpret_cast<const std::uint8_t*> (&v);
+    b.insert (b.end(), p, p + sizeof (T));
+}
+
+void finishSlot (Slot& slot)
+{
+    if (slot.points.empty())
+        slot.points = { Point { 0.0, 1.0f, 0.0f, 2 }, Point { barLength, 1.0f, 0.0f, 2 } };
+    normalise (slot.points);
+    precompute (slot.points);
+    slot.flat = true;
+    for (const auto& p : slot.points)
+        if (floatBits (p.y) != floatBits (slot.points[0].y))
+            slot.flat = false;
+    if ((double) slot.points[0].y != 1.0)
+        slot.flat = false;
+}
+} // namespace
+
+std::vector<std::uint8_t> writeState (const State& st)
+{
+    std::vector<std::uint8_t> b;
+    b.reserve (72 * 96);
+    put<std::int32_t> (b, 0x00080003); // version 8 in the high half, as FL's demo projects
+    for (const auto v : st.params)
+        put<std::int32_t> (b, v);
+    b.insert (b.end(), st.options.begin(), st.options.end());
+    for (const auto& slot : st.slots)
+    {
+        const auto len = slot.name.size();
+        if (len < 0xff)
+            b.push_back ((std::uint8_t) len);
+        else
+        {
+            b.push_back (0xff);
+            put<std::int32_t> (b, (std::int32_t) len);
+        }
+        b.insert (b.end(), slot.name.begin(), slot.name.end());
+        put<std::int32_t> (b, slot.triggerSync);
+        put<std::int32_t> (b, slot.positionSync);
+        put<std::int32_t> (b, slot.hold);
+        b.push_back (slot.link ? 1 : 0);
+        b.push_back (slot.keyHeld ? 1 : 0);
+        b.push_back (slot.oneShot ? 1 : 0);
+        // TCustomMEnvelope "map" stream, version 3: Δx, level, tension, curve type, two zero bytes, direction cache
+        put<std::int32_t> (b, 3);
+        put<std::int32_t> (b, 3);
+        put<std::int32_t> (b, (std::int32_t) slot.points.size());
+        for (const auto& p : slot.points)
+        {
+            put<double> (b, p.dx);
+            put<double> (b, (double) p.y);
+            put<float> (b, p.tension);
+            b.push_back (p.type);
+            b.push_back (0);
+            b.push_back (0);
+            b.push_back ((std::uint8_t) p.dir);
+        }
+        put<std::int32_t> (b, 0); // flags, then no sustain / loop points
+        for (int i = 0; i < 4; ++i)
+            put<std::int32_t> (b, -1);
+    }
+    return b;
+}
+
+State emptyState()
+{
+    State s;
+    s.version = 8;
+    s.params = { 0, 0, 256, 256, 1765, 5000, 0, 0, 0x10000 };
+    s.options = { 0, 0, 0, 0, 0, 0, 1, 1, 1 }; // FUN_0083fcf0: high quality (byte 6), byte 7 and declick (byte 8) on
+    for (auto& slot : s.slots)
+    {
+        slot.triggerSync = slot.positionSync = 5;
+        slot.points.clear();
+        finishSlot (slot);
+    }
+    return s;
+}
+
+namespace
+{
+// a slot drawn as LYNX's own steps and lines (x in beats): `step` jumps to y at x (FL's hold segment), `line` reaches y
+// at x in a straight (or bent) segment
+struct Shape
+{
+    std::vector<EditPoint> pts;
+    explicit Shape (float y0) { pts.push_back ({ 0.0, y0, 0.0f, 2 }); }
+    Shape& step (double x, float y) { pts.push_back ({ x, y, 0.0f, 2 }); return *this; }
+    Shape& line (double x, float y, float tension = 0.0f) { pts.push_back ({ x, y, tension, 0 }); return *this; }
+};
+
+// time travel: a delay of d beats behind the present is level 1 − d/8 (level 0 = two bars back, REA_rodada53 §2.2)
+float delayLevel (double beats) { return (float) (1.0 - beats / 8.0); }
+
+// every `period` beats the first `cell` beats of the period play again (a stutter repeating the period's start)
+Shape stutter (double period, double cell)
+{
+    Shape s (1.0f);
+    for (double start = 0.0; start < barBeats - 1.0e-9; start += period)
+    {
+        for (double c = cell; c < period - 1.0e-9; c += cell)
+            s.step (start + c, delayLevel (c));
+        s.step (start + period, 1.0f);
+    }
+    return s;
+}
+
+// a gate: in every period the sound plays during `open` of it (from the period's start, or after `shift`)
+Shape gate (double period, double open, double shift = 0.0)
+{
+    Shape s (shift > 0.0 ? 0.0f : 1.0f);
+    for (double start = 0.0; start < barBeats - 1.0e-9; start += period)
+    {
+        if (shift > 0.0)
+        {
+            s.step (start + shift, 1.0f);
+            if (shift + open < period - 1.0e-9)
+                s.step (start + shift + open, 0.0f);
+            s.step (start + period, 0.0f);
+        }
+        else
+        {
+            s.step (start + open, 0.0f);
+            s.step (start + period, 1.0f);
+        }
+    }
+    return s;
+}
+
+// sixteen steps of a bar, on/off
+Shape pattern (const char* bits)
+{
+    Shape s (bits[0] == '1' ? 1.0f : 0.0f);
+    for (int i = 1; i <= 16; ++i)
+    {
+        const auto on = i < 16 ? bits[i] == '1' : bits[0] == '1';
+        s.step (i * 0.25, on ? 1.0f : 0.0f);
+    }
+    return s;
+}
+
+void fill (Slot& slot, const char* name, const Shape& shape)
+{
+    slot.name = name;
+    setPoints (slot, shape.pts);
+}
+} // namespace
+
+State factoryState()
+{
+    auto s = emptyState();
+    auto time = [&s] (int i) -> Slot& { return s.slots[(std::size_t) i]; };
+    auto volume = [&s] (int i) -> Slot& { return s.slots[(std::size_t) (slotsPerKind + i)]; };
+
+    // time travel: slot 1 plays the input as it comes
+    fill (time (1), "Repeat 1/2 beat", stutter (1.0, 0.5));
+    fill (time (2), "Repeat 1/4 beat", stutter (0.5, 0.25));
+    fill (time (3), "Stutter 1/8", stutter (1.0, 0.125));
+    fill (time (4), "Stutter 1/16", stutter (0.5, 0.0625));
+    fill (time (5), "Stutter triplet", stutter (1.0, 1.0 / 3.0));
+    {
+        Shape roll (1.0f); // beats 1–2 as they come, beat 3 in quarters, beat 4 in sixteenths of a beat
+        for (double c = 0.25; c < 1.0 - 1.0e-9; c += 0.25)
+            roll.step (2.0 + c, delayLevel (c));
+        roll.step (3.0, 1.0f);
+        for (double c = 0.0625; c < 1.0 - 1.0e-9; c += 0.0625)
+            roll.step (3.0 + c, delayLevel (c));
+        roll.step (4.0, 1.0f);
+        fill (time (6), "Build-up roll", roll);
+    }
+    fill (time (7), "Half speed", Shape (1.0f).line (4.0, delayLevel (2.0))); // read at half speed through the bar
+    fill (time (8), "Half speed 2 beats", Shape (1.0f).line (2.0, delayLevel (1.0)).step (2.0, 1.0f).line (4.0, delayLevel (1.0)));
+    {
+        Shape stop (1.0f); // the speed falls from 1 to 0 over the bar: d = t²/8
+        for (int i = 1; i <= 16; ++i)
+        {
+            const auto t = i * 0.25;
+            stop.line (t, delayLevel (t * t / 8.0));
+        }
+        fill (time (9), "Tape stop", stop);
+    }
+    {
+        Shape stop (1.0f); // the last beat slows to a stop: d = u²/2
+        stop.step (3.0, 1.0f);
+        for (int i = 1; i <= 8; ++i)
+        {
+            const auto u = i * 0.125;
+            stop.line (3.0 + u, delayLevel (u * u / 2.0));
+        }
+        fill (time (10), "Tape stop last beat", stop);
+    }
+    {
+        Shape rev (1.0f); // every beat backwards: d = 2u
+        for (int b = 0; b < 4; ++b)
+            rev.line (b + 1.0, delayLevel (2.0)).step (b + 1.0, 1.0f);
+        fill (time (11), "Reverse beats", rev);
+    }
+    fill (time (12), "Reverse 2 beats", Shape (1.0f).line (2.0, delayLevel (4.0)).step (2.0, 1.0f).line (4.0, delayLevel (4.0)).step (4.0, 1.0f));
+    fill (time (13), "Reverse last beat", Shape (1.0f).step (3.0, 1.0f).line (4.0, delayLevel (2.0)).step (4.0, 1.0f));
+    {
+        Shape scratch (1.0f); // back for half a beat, forward again for the other half
+        for (int b = 0; b < 4; ++b)
+            scratch.line (b + 0.5, delayLevel (1.0), 0.25f).line (b + 1.0, 1.0f, -0.25f);
+        fill (time (14), "Scratch", scratch);
+    }
+    fill (time (15), "Echo beat 1", Shape (1.0f).step (1.0, delayLevel (1.0)).step (2.0, 1.0f).step (4.0, 1.0f));
+    fill (time (16), "Repeat half bar", Shape (1.0f).step (2.0, delayLevel (2.0)).step (4.0, 1.0f));
+    fill (time (17), "Repeat 1 beat", Shape (1.0f).step (1.0, delayLevel (1.0)).step (2.0, delayLevel (2.0)).step (3.0, delayLevel (3.0)).step (4.0, 1.0f));
+    {
+        Shape brake (1.0f); // round 168m: the last two beats slow down to a stop (speed 1 − u/2, d = u²/4)
+        brake.step (2.0, 1.0f);
+        for (int i = 1; i <= 16; ++i)
+        {
+            const auto u = i * 0.125;
+            brake.line (2.0 + u, delayLevel (u * u / 4.0));
+        }
+        fill (time (18), "Vinyl brake", brake);
+    }
+    // the last beat rewinds at three times the speed (a DJ's spin back), then the next bar comes in
+    fill (time (19), "Spin back", Shape (1.0f).step (3.0, 1.0f).line (4.0, delayLevel (4.0), 0.2f).step (4.0, 1.0f));
+    {
+        Shape start (1.0f); // the first beat speeds up from a stop (speed u, d = u − u²/2), then plays half a beat late
+        for (int i = 1; i <= 8; ++i)
+        {
+            const auto u = i * 0.125;
+            start.line (u, delayLevel (u - u * u / 2.0));
+        }
+        start.step (4.0, 1.0f);
+        fill (time (20), "Tape start", start);
+    }
+    // the bar's first beat and a half plays three times: 3 + 3 + 2 eighths
+    fill (time (21), "Repeat 3-3-2", Shape (1.0f).step (1.5, delayLevel (1.5)).step (3.0, delayLevel (3.0)).step (4.0, 1.0f));
+    {
+        Shape wobble (1.0f); // a slow, slight pitch wobble (worn tape): d swings between 0 and 0.03 beats every 2 beats
+        for (int i = 1; i <= 32; ++i)
+        {
+            const auto x = i * 0.125;
+            wobble.line (x, delayLevel (0.015 * (1.0 - std::cos (6.283185307179586 * x / 2.0))));
+        }
+        fill (time (22), "Lo-fi wobble", wobble);
+    }
+    {
+        Shape mix (1.0f); // beats 1–2 as they come, beat 3 stutters in eighths, beat 4 backwards
+        for (double c = 0.125; c < 1.0 - 1.0e-9; c += 0.125)
+            mix.step (2.0 + c, delayLevel (c)); // the first eighth of beat 3, again and again
+        mix.step (3.0, 1.0f).line (4.0, delayLevel (2.0)).step (4.0, 1.0f);
+        fill (time (23), "Stutter into reverse", mix);
+    }
+    {
+        Shape roll (1.0f); // beats 1–3 as they come, beat 4 in twelfths (a triplet roll)
+        roll.step (3.0, 1.0f);
+        for (int k = 1; k < 12; ++k)
+            roll.step (3.0 + k / 12.0, delayLevel (k / 12.0));
+        roll.step (4.0, 1.0f);
+        fill (time (24), "Triplet roll", roll);
+    }
+    fill (time (25), "Half speed last beat", Shape (1.0f).step (3.0, 1.0f).line (4.0, delayLevel (0.5)).step (4.0, 1.0f));
+
+    // volume: slot 1 keeps the level
+    fill (volume (1), "Gate 1 beat", gate (1.0, 0.5));
+    fill (volume (2), "Gate 1/2 beat", gate (0.5, 0.25));
+    fill (volume (3), "Gate 1/4 beat", gate (0.25, 0.125));
+    fill (volume (4), "Gate 1/8 beat", gate (0.125, 0.0625));
+    fill (volume (5), "Gate triplet", gate (1.0 / 3.0, 1.0 / 6.0));
+    fill (volume (6), "Off-beat", gate (1.0, 0.5, 0.5));
+    fill (volume (7), "Swing gate", gate (1.0, 2.0 / 3.0));
+    fill (volume (8), "Dotted gate", gate (0.75, 0.375));
+    {
+        Shape pump (0.0f); // each beat: down at the beat, back up quickly (a sidechain-style pump)
+        for (int b = 0; b < 4; ++b)
+        {
+            pump.line (b + 0.75, 1.0f, 0.35f);
+            pump.step (b + 1.0, 0.0f);
+        }
+        fill (volume (9), "Pump", pump);
+    }
+    {
+        Shape pump (0.0f);
+        for (int h = 0; h < 8; ++h)
+        {
+            pump.line (h * 0.5 + 0.375, 1.0f, 0.35f);
+            pump.step (h * 0.5 + 0.5, 0.0f);
+        }
+        fill (volume (10), "Pump 1/2 beat", pump);
+    }
+    fill (volume (11), "Trance gate A", pattern ("1101101101101011"));
+    fill (volume (12), "Trance gate B", pattern ("1011011010110110"));
+    fill (volume (13), "Trance gate C", pattern ("1110111011101010"));
+    fill (volume (14), "Fade in", Shape (0.0f).line (4.0, 1.0f, -0.3f).step (4.0, 0.0f));
+    fill (volume (15), "Fade out", Shape (1.0f).line (4.0, 0.0f, 0.3f).step (4.0, 1.0f));
+    fill (volume (16), "Dip and back", Shape (1.0f).line (2.0, 0.0f).line (4.0, 1.0f));
+    {
+        Shape trem (1.0f), fast (1.0f);
+        for (int i = 0; i < 8; ++i)
+            trem.line (i * 0.5 + 0.25, 0.35f, 0.4f).line (i * 0.5 + 0.5, 1.0f, -0.4f);
+        for (int i = 0; i < 16; ++i)
+            fast.line (i * 0.25 + 0.125, 0.35f, 0.4f).line (i * 0.25 + 0.25, 1.0f, -0.4f);
+        fill (volume (17), "Tremolo", trem);
+        fill (volume (18), "Tremolo fast", fast);
+    }
+    {
+        Shape build (1.0f); // beat 1 in halves, beat 2 in quarters, beat 3 in eighths, beat 4 in sixteenths of a beat
+        for (int b = 0; b < 4; ++b)
+        {
+            const auto period = 0.5 / (double) (1 << b);
+            for (double start = b; start < b + 1.0 - 1.0e-9; start += period)
+                build.step (start + period * 0.5, 0.0f).step (start + period, 1.0f);
+        }
+        fill (volume (19), "Build-up gate", build);
+    }
+    fill (volume (20), "Stutter first beat", Shape (1.0f).step (0.125, 0.0f).step (0.25, 1.0f).step (0.375, 0.0f).step (0.5, 1.0f).step (0.625, 0.0f)
+                                                     .step (0.75, 1.0f).step (0.875, 0.0f).step (1.0, 1.0f).step (4.0, 1.0f));
+    fill (volume (21), "Mute last 2 beats", Shape (1.0f).step (2.0, 0.0f).step (4.0, 1.0f));
+    fill (volume (22), "Mute", Shape (0.0f).step (4.0, 0.0f));
+    {
+        Shape hard (0.0f), soft (0.3f), half (0.0f); // round 168m: sidechain-style ducking (a kick on every beat)
+        for (int b = 0; b < 4; ++b)
+        {
+            hard.line (b + 0.3, 1.0f, 0.45f).step (b + 1.0, 0.0f);
+            soft.line (b + 0.7, 1.0f, 0.3f).step (b + 1.0, 0.3f);
+        }
+        for (int h = 0; h < 8; ++h)
+            half.line (h * 0.5 + 0.2, 1.0f, 0.45f).step (h * 0.5 + 0.5, 0.0f);
+        fill (volume (23), "Sidechain hard", hard);
+        fill (volume (24), "Sidechain soft", soft);
+        fill (volume (25), "Sidechain 1/2 beat", half);
+    }
+    fill (volume (26), "Gate 3-3-2", pattern ("1101101011011010"));
+    {
+        Shape swell (0.05f), slow (0.0f); // each beat (or half bar) rises from silence, like a reversed hit
+        for (int b = 0; b < 4; ++b)
+            swell.line (b + 1.0, 1.0f, -0.45f).step (b + 1.0, 0.05f);
+        slow.line (2.0, 1.0f, -0.4f).step (2.0, 0.0f).line (4.0, 1.0f, -0.4f).step (4.0, 0.0f);
+        fill (volume (27), "Reverse swell", swell);
+        fill (volume (28), "Half-bar swell", slow);
+    }
+    fill (volume (29), "Mute last beat", Shape (1.0f).step (3.0, 0.0f).step (4.0, 1.0f));
+    fill (volume (30), "Stutter gate 1/16", gate (0.0625, 0.03125));
+    return s;
+}
+
+std::vector<std::uint8_t> factoryContainer()
+{
+    static const auto bytes = pack (writeState (factoryState()), 96);
+    return bytes;
+}
+
+State editableState (const std::vector<std::uint8_t>& container, int* ppq)
+{
+    std::vector<std::uint8_t> fl;
+    int q = 96;
+    if (unpack (container, fl, q))
+        if (auto s = parseState (fl.data(), fl.size()))
+        {
+            if (ppq != nullptr)
+                *ppq = q;
+            return *s;
+        }
+    if (ppq != nullptr)
+        *ppq = 96;
+    return factoryState();
+}
+
+std::vector<std::uint8_t> withState (const std::vector<std::uint8_t>& container, const State& state)
+{
+    std::vector<std::uint8_t> fl;
+    int q = 96;
+    if (! unpack (container, fl, q))
+        q = 96;
+    return pack (writeState (state), q);
+}
+
+std::vector<EditPoint> editPoints (const Slot& slot)
+{
+    std::vector<EditPoint> out;
+    double x = 0.0;
+    for (const auto& p : slot.points)
+    {
+        x += p.dx;
+        out.push_back ({ std::clamp (x, 0.0, barLength), p.y, p.tension, p.type });
+    }
+    return out;
+}
+
+void setPoints (Slot& slot, const std::vector<EditPoint>& points)
+{
+    slot.points.clear();
+    double prev = 0.0;
+    for (std::size_t i = 0; i < points.size(); ++i)
+    {
+        auto x = std::clamp (points[i].x, prev, barLength);
+        if (i == 0)
+            x = 0.0;
+        if (i + 1 == points.size() && points.size() > 1)
+            x = barLength;
+        Point p;
+        p.dx = x - prev;
+        p.y = std::clamp (points[i].y, 0.0f, 1.0f);
+        p.tension = std::clamp (points[i].tension, -1.0f, 1.0f);
+        p.type = points[i].type;
+        slot.points.push_back (p);
+        prev = x;
+    }
+    // the Δx add up to exactly one bar, so loading normalises nothing (a write / read round trip keeps every bit)
+    if (slot.points.size() > 1)
+        for (int pass = 0; pass < 4; ++pass)
+        {
+            double total = 0.0;
+            for (const auto& p : slot.points)
+                total += p.dx;
+            if (total == barLength)
+                break;
+            slot.points.back().dx = std::max (0.0, slot.points.back().dx + (barLength - total));
+        }
+    finishSlot (slot);
+}
+
+int addPoint (std::vector<EditPoint>& points, double x, float y, std::uint8_t type, float tension)
+{
+    x = std::clamp (x, 0.0, barLength);
+    std::size_t at = points.size();
+    for (std::size_t i = 1; i < points.size(); ++i)
+        if (x < points[i].x || i + 1 == points.size())
+        {
+            at = i;
+            break;
+        }
+    if (points.empty())
+        at = 0;
+    points.insert (points.begin() + (std::ptrdiff_t) at, EditPoint { x, std::clamp (y, 0.0f, 1.0f), tension, type });
+    return (int) at;
+}
+
+bool removePoint (std::vector<EditPoint>& points, int index)
+{
+    if (index <= 0 || index + 1 >= (int) points.size() || points.size() <= 2)
+        return false;
+    points.erase (points.begin() + index);
+    return true;
+}
+
+void movePoint (std::vector<EditPoint>& points, int index, double x, float y)
+{
+    if (index < 0 || index >= (int) points.size())
+        return;
+    auto& p = points[(std::size_t) index];
+    p.y = std::clamp (y, 0.0f, 1.0f);
+    if (index == 0 || index + 1 == (int) points.size())
+        return;
+    p.x = std::clamp (x, points[(std::size_t) index - 1].x, points[(std::size_t) index + 1].x);
+}
+
+float levelAt (const Slot& slot, double beat)
+{
+    if (slot.points.empty())
+        return 1.0f;
+    Player player;
+    player.reset (slot.points);
+    auto inc = std::clamp (beat, 0.0, barLength) * player.rate;
+    return (float) player.step (slot.points, inc, beat);
+}
+
+std::vector<float> renderSlot (const Slot& slot, int n)
+{
+    std::vector<float> out ((std::size_t) std::max (n, 0), 1.0f);
+    if (slot.points.empty() || n <= 0)
+        return out;
+    Player player;
+    player.reset (slot.points);
+    const auto adv = barLength / (double) n;
+    out[0] = (float) player.start;
+    auto inc = 0.0;
+    out[0] = (float) player.step (slot.points, inc, adv);
+    inc = adv * player.rate;
+    for (int i = 1; i < n; ++i)
+        out[(std::size_t) i] = (float) player.step (slot.points, inc, adv);
+    return out;
+}
+
+double snapStep (int selector) noexcept
+{
+    static constexpr int per[7] { 0, 16, 12, 8, 6, 4, 3 };
+    return selector > 0 && selector < 7 ? 1.0 / (double) per[selector] : 0.0;
+}
+
 namespace
 {
 constexpr std::array<int, paramCount> rawMin { 0, 0, 0, 0, 0, 0, -256, 0 };
@@ -824,9 +1321,63 @@ struct Engine::Impl
         quality = st.options[6] != 0 ? 16 : 8;
     }
 
+    // beats into the bar of a kind's player (to keep the place when its slot's points change)
+    static double playerBeats (const Player& pl, const std::vector<Point>& p) noexcept
+    {
+        double x = 0.0;
+        const auto idx = std::clamp (pl.idx, 0, (int) p.size() - 1);
+        for (int i = 0; i < idx; ++i)
+            x += p[(std::size_t) i].dx;
+        const auto ph = std::clamp (pl.phase, 0.0, 1.0);
+        return x + ph * p[(std::size_t) idx].dx;
+    }
+
+    bool update (const State& s) noexcept
+    {
+        for (const auto& slot : s.slots)
+            if (slot.points.empty() || slot.points.size() > (std::size_t) maxEditPoints)
+                return false;
+        std::array<double, 2> at {};
+        for (int k = 0; k < 2; ++k)
+            if (kinds[(std::size_t) k].current >= 0)
+                at[(std::size_t) k] = playerBeats (kinds[(std::size_t) k].player, currentSlot (k).points);
+        for (std::size_t i = 0; i < st.slots.size(); ++i)
+        {
+            auto& d = st.slots[i];
+            const auto& from = s.slots[i];
+            if (d.points.capacity() < from.points.size())
+                return false; // cannot happen after load(): every slot keeps maxEditPoints
+            d.points.assign (from.points.begin(), from.points.end());
+            d.triggerSync = from.triggerSync;
+            d.positionSync = from.positionSync;
+            d.hold = from.hold;
+            d.link = from.link;
+            d.keyHeld = from.keyHeld;
+            d.oneShot = from.oneShot;
+            d.flat = from.flat;
+        }
+        const auto oldOptions = st.options;
+        st.options = s.options;
+        if (oldOptions[5] != st.options[5])
+            setFollowers();
+        quality = st.options[6] != 0 ? 16 : 8;
+        for (int k = 0; k < 2; ++k)
+        {
+            auto& K = kinds[(std::size_t) k];
+            if (K.current < 0)
+                continue;
+            const auto& pts = currentSlot (k).points;
+            K.player.reset (pts);
+            K.player.advance (pts, at[(std::size_t) k]);
+        }
+        return true;
+    }
+
     void load (const State& s, int q)
     {
         st = s;
+        for (auto& slot : st.slots)
+            slot.points.reserve ((std::size_t) std::max<int> (maxEditPoints, (int) slot.points.size()));
         ppq = q > 0 ? q : 96;
         syncTicks = { 0, ppq / 4, ppq / 2, ppq, ppq * 2, ppq * 4 };
         P = s.params;
@@ -1416,6 +1967,8 @@ bool Engine::load (const State& state, int ppq)
     return true;
 }
 
+bool Engine::update (const State& state) noexcept { return impl->loaded && impl->update (state); }
+
 void Engine::prepare (int sampleRate, int maxBlock) { impl->prepare (sampleRate, maxBlock); }
 
 void Engine::setTempo (float bpm)
@@ -1461,13 +2014,11 @@ std::vector<std::string> slotNames (const std::vector<std::uint8_t>& container, 
     std::vector<std::uint8_t> fl;
     int ppq = 96;
     std::vector<std::string> names;
-    if (! unpack (container, fl, ppq))
+    if (! container.empty() && (! unpack (container, fl, ppq) || ! parseState (fl.data(), fl.size())))
         return names;
-    const auto s = parseState (fl.data(), fl.size());
-    if (! s)
-        return names;
+    const auto s = editableState (container); // round 168m: an empty container shows LYNX's factory slots
     for (int i = 0; i < slotsPerKind; ++i)
-        names.push_back (s->slots[(std::size_t) ((volume ? slotsPerKind : 0) + i)].name);
+        names.push_back (s.slots[(std::size_t) ((volume ? slotsPerKind : 0) + i)].name);
     return names;
 }
 
@@ -1478,17 +2029,47 @@ class GrossBeatEffect final : public Effect
 public:
     explicit GrossBeatEffect (const std::vector<std::uint8_t>& container)
     {
-        std::vector<std::uint8_t> fl;
+        // round 168m: an empty (new) or unreadable container plays LYNX's factory bank instead of passing the signal
         int ppq = 96;
-        if (unpack (container, fl, ppq))
-            if (auto s = parseState (fl.data(), fl.size()))
+        state = editableState (container, &ppq);
+        flPpq = ppq;
+        ok = true;
+        engine.load (state, flPpq);
+        raw = state.params;
+    }
+
+    // the editor changed a slot (points, settings, a preset's bank): the new bank is parsed here, off the audio thread,
+    // and copied into the running engine at the start of a later block (buffer and slot positions kept)
+    bool acceptState (const std::vector<std::uint8_t>& bytes) noexcept override
+    {
+        try
+        {
+            std::vector<std::uint8_t> fl;
+            int ppq = 96;
+            std::optional<State> s;
+            if (bytes.empty())
+                s = factoryState();
+            else if (unpack (bytes, fl, ppq))
+                s = parseState (fl.data(), fl.size());
+            if (! s || ppq != flPpq)
+                return false;
+            for (const auto& slot : s->slots)
+                if (slot.points.empty() || slot.points.size() > (std::size_t) maxEditPoints)
+                    return false;
+            for (int wait = 0; incomingFull.load (std::memory_order_acquire); ++wait)
             {
-                state = *s;
-                flPpq = ppq;
-                ok = true;
-                engine.load (state, flPpq);
-                raw = state.params;
+                if (wait >= 30)
+                    return false;
+                std::this_thread::sleep_for (std::chrono::milliseconds (1));
             }
+            incoming = std::move (*s);
+            incomingFull.store (true, std::memory_order_release);
+            return true;
+        }
+        catch (...)
+        {
+            return false;
+        }
     }
 
     void prepare (double sr) noexcept override
@@ -1512,6 +2093,11 @@ public:
     {
         if (! ok)
             return;
+        if (incomingFull.load (std::memory_order_acquire))
+        {
+            engine.update (incoming);
+            incomingFull.store (false, std::memory_order_release);
+        }
         for (int i = 0; i < paramCount; ++i)
         {
             const auto v = rawFromParam (i, p[(std::size_t) i]);
@@ -1538,7 +2124,8 @@ public:
     }
 
 private:
-    State state;
+    State state, incoming;
+    std::atomic<bool> incomingFull { false };
     Engine engine;
     bool ok = false;
     int flPpq = 96, sampleRate = 44100;

@@ -263,6 +263,110 @@ std::vector<std::pair<float, float>> curvePoints (const std::vector<std::uint8_t
     return out;
 }
 
+std::vector<CurveEditPoint> curveForEditing (const std::vector<std::uint8_t>& slotState, int band)
+{
+    std::vector<CurveEditPoint> out;
+    const auto blob = unpack (slotState);
+    if (! blob || band < 0 || band > 3)
+        return out;
+    double x = 0.0;
+    for (const auto& p : hlfx::maximusCurve (blob->state, 2 * band))
+    {
+        x += p.dx;
+        out.push_back ({ x, p.y, p.tension, p.type });
+    }
+    return out;
+}
+
+std::vector<std::uint8_t> withCurve (const std::vector<std::uint8_t>& slotState, int band, const std::vector<CurveEditPoint>& points)
+{
+    auto blob = unpack (slotState);
+    if (! blob || band < 0 || band > 3 || points.empty())
+        return slotState;
+    const auto old = hlfx::maximusCurve (blob->state, 2 * band);
+    std::vector<double> oldX;
+    double x = 0.0;
+    for (const auto& p : old)
+        oldX.push_back (x += p.dx);
+    std::vector<hlfx::MaximusCurvePoint> pts;
+    for (std::size_t i = 0; i < points.size(); ++i)
+    {
+        hlfx::MaximusCurvePoint p;
+        const auto prev = i == 0 ? 0.0 : points[i - 1].x;
+        p.dx = std::max (0.0, points[i].x - prev);
+        // a segment whose two ends did not move keeps its stored Δx (no rounding drift on write → read → write)
+        if (i < old.size() && points[i].x == oldX[i] && (i == 0 || points[i - 1].x == oldX[i - 1]))
+            p.dx = old[i].dx;
+        p.y = std::max (0.0f, std::min (1.0f, points[i].y));
+        p.tension = std::max (-1.0f, std::min (1.0f, points[i].tension));
+        p.type = points[i].type;
+        pts.push_back (p);
+    }
+    blob->state = hlfx::withMaximusCurve (blob->state, 2 * band, pts);
+    return pack (*blob);
+}
+
+int addCurvePoint (std::vector<CurveEditPoint>& points, double x, float y, float tension, std::uint8_t type)
+{
+    if (points.size() < 2)
+        return -1;
+    x = std::max (0.0, std::min (1.0, x));
+    // after the last point at the same x (FL inserts behind equal times)
+    std::size_t at = 1;
+    while (at < points.size() - 1 && points[at].x <= x)
+        ++at;
+    x = std::max (points[at - 1].x, std::min (points[at].x, x));
+    points.insert (points.begin() + (std::ptrdiff_t) at, CurveEditPoint { x, std::max (0.0f, std::min (1.0f, y)), tension, type });
+    return (int) at;
+}
+
+int moveCurvePoint (std::vector<CurveEditPoint>& points, int index, double x, float y)
+{
+    if (index < 0 || index >= (int) points.size())
+        return -1;
+    auto& p = points[(std::size_t) index];
+    p.y = std::max (0.0f, std::min (1.0f, y));
+    if (index == 0)
+        p.x = 0.0;
+    else if (index == (int) points.size() - 1)
+        p.x = std::max (p.x, points[(std::size_t) index - 1].x); // stays at the end
+    else
+        p.x = std::max (points[(std::size_t) index - 1].x, std::min (points[(std::size_t) index + 1].x, x));
+    return index;
+}
+
+bool removeCurvePoint (std::vector<CurveEditPoint>& points, int index)
+{
+    // FL: "The first point of the envelope can't be removed."; the last one holds the curve's end at x = 1
+    if (index <= 0 || index >= (int) points.size() - 1)
+        return false;
+    points.erase (points.begin() + index);
+    return true;
+}
+
+std::vector<float> curveShape (const std::vector<CurveEditPoint>& points, int n)
+{
+    std::vector<hlfx::MaximusCurvePoint> pts;
+    double prev = 0.0;
+    for (const auto& p : points)
+    {
+        pts.push_back ({ std::max (0.0, p.x - prev), p.y, p.tension, p.type });
+        prev = p.x;
+    }
+    return hlfx::maximusCurveShape (pts, n);
+}
+
+std::string curveLevelText (double v)
+{
+    const auto level = (std::pow (3.0, 2.0 * std::max (0.0, v)) - 1.0) * 0.5;
+    if (level <= 1.0e-6)
+        return "-inf dB";
+    char t[32];
+    const auto db = 20.0 * std::log10 (level);
+    std::snprintf (t, sizeof (t), "%+.1f dB", std::fabs (db) < 0.05 ? 0.0 : db);
+    return t;
+}
+
 int selectedBand (const std::vector<std::uint8_t>& slotState)
 {
     const auto blob = unpack (slotState);

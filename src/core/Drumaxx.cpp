@@ -1268,6 +1268,7 @@ public:
 
     // Drumaxx reads the host's per-note pitch every block (FUN_180034280, REA_rodada67 §7): a slide note or a live
     // PITCH knob / main pitch move bends the pads still ringing on that key (round 167a; a slide doesn't retrigger)
+    bool followsChannelPorta() const noexcept override { return true; } // (round 168l: HostSlide::anchor)
     void slideTo (int key, float cents, float samples) noexcept override
     {
         const auto to = 100.0 * (std::clamp (key, 0, 127) - 60) + (double) pitchCents.load() + (double) cents;

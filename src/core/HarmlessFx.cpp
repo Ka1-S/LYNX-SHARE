@@ -210,6 +210,34 @@ struct MaximusPreset
 
 namespace
 {
+Point makePoint (double dx, double y, float ten, int type, bool first)
+{
+    Point pt;
+    pt.dx = std::isfinite (dx) && dx > 0.0 ? dx : 0.0;
+    pt.y = std::isfinite (y) ? (float) y : 0.0f;
+    pt.tension = std::isfinite (ten) ? ten : 0.0f;
+    pt.type = type;
+    pt.sign = pt.tension == 0.0f ? 0 : (pt.tension < 0.0f ? -1 : 1);
+    if (! first)
+    {
+        if (pt.type < 2)
+        {
+            auto q = f32 (std::exp ((double) std::fabs (pt.tension) * std::log (1000001.0)) - 1.0);
+            if (pt.tension < 0.0f)
+                q = -q;
+            pt.q = q;
+            if (q != 0.0f)
+            {
+                pt.b = f32 (1.0 / std::fabs ((double) q));
+                pt.c = f32 (std::log (std::fabs ((double) q) + 1.0));
+            }
+        }
+        if ((pt.type == 0 || pt.type == 7) && pt.tension == 0.0f)
+            pt.sign = 2; // straight segment
+    }
+    return pt;
+}
+
 std::vector<Point> readCurve (const std::vector<std::uint8_t>& d, std::size_t& pos, bool& ok)
 {
     std::vector<Point> pts;
@@ -227,30 +255,7 @@ std::vector<Point> readCurve (const std::vector<std::uint8_t>& d, std::size_t& p
         std::memcpy (&dx, d.data() + at, 8);
         std::memcpy (&y, d.data() + at + 8, 8);
         std::memcpy (&ten, d.data() + at + 16, 4);
-        Point pt;
-        pt.dx = std::isfinite (dx) && dx > 0.0 ? dx : 0.0;
-        pt.y = std::isfinite (y) ? (float) y : 0.0f;
-        pt.tension = std::isfinite (ten) ? ten : 0.0f;
-        pt.type = d[at + 20];
-        pt.sign = pt.tension == 0.0f ? 0 : (pt.tension < 0.0f ? -1 : 1);
-        if (k > 0)
-        {
-            if (pt.type < 2)
-            {
-                auto q = f32 (std::exp ((double) std::fabs (pt.tension) * std::log (1000001.0)) - 1.0);
-                if (pt.tension < 0.0f)
-                    q = -q;
-                pt.q = q;
-                if (q != 0.0f)
-                {
-                    pt.b = f32 (1.0 / std::fabs ((double) q));
-                    pt.c = f32 (std::log (std::fabs ((double) q) + 1.0));
-                }
-            }
-            if ((pt.type == 0 || pt.type == 7) && pt.tension == 0.0f)
-                pt.sign = 2; // straight segment
-        }
-        pts.push_back (pt);
+        pts.push_back (makePoint (dx, y, ten, d[at + 20], k == 0));
     }
     pos += 12 + 24 * (std::size_t) n + 20;
     return pts;
@@ -493,6 +498,146 @@ std::shared_ptr<const MaximusPreset> makeMaximusPreset (const std::vector<std::u
     }
     m->valid = true;
     return m;
+}
+
+namespace
+{
+// where envelope `envelope` (0…7) of a Maximus state starts (its 12-byte map header) and ends (after its trailer)
+bool maximusEnvelopeSpan (const std::vector<std::uint8_t>& d, int envelope, std::size_t& start, std::size_t& end)
+{
+    if (envelope < 0 || envelope > 7 || d.size() < 0x1fe + 12)
+        return false;
+    const auto header = (std::uint32_t) i32At (d, 0);
+    const auto version = header > 0xFFFFu ? (int) (header >> 16) : (int) header;
+    if (version < 3)
+        return false;
+    const std::size_t block = version >= 7 ? 0x1fa : version == 6 ? 0x1f9 : version == 5 ? 0x1f5 : version == 4 ? 0x1f1 : 0x1ee;
+    auto pos = 4 + block;
+    if (version >= 14)
+        pos += 9 + 20;
+    if (version >= 15)
+        pos += 4;
+    bool ok = true;
+    for (int e = 0; e <= envelope; ++e)
+    {
+        start = pos;
+        readCurve (d, pos, ok);
+        if (! ok)
+            return false;
+    }
+    end = pos;
+    return true;
+}
+} // namespace
+
+std::vector<MaximusCurvePoint> maximusCurve (const std::vector<std::uint8_t>& d, int envelope)
+{
+    std::vector<MaximusCurvePoint> out;
+    std::size_t start = 0, end = 0;
+    if (! maximusEnvelopeSpan (d, envelope, start, end))
+        return out;
+    const auto n = i32At (d, start + 8);
+    for (int k = 0; k < n; ++k)
+    {
+        const auto at = start + 12 + 24 * (std::size_t) k;
+        MaximusCurvePoint p;
+        double y = 0.0;
+        std::memcpy (&p.dx, d.data() + at, 8);
+        std::memcpy (&y, d.data() + at + 8, 8);
+        std::memcpy (&p.tension, d.data() + at + 16, 4);
+        p.type = d[at + 20];
+        if (! std::isfinite (p.dx) || p.dx < 0.0)
+            p.dx = 0.0;
+        p.y = std::isfinite (y) ? (float) y : 0.0f;
+        if (! std::isfinite (p.tension))
+            p.tension = 0.0f;
+        out.push_back (p);
+    }
+    return out;
+}
+
+std::vector<std::uint8_t> withMaximusCurve (const std::vector<std::uint8_t>& d, int envelope, const std::vector<MaximusCurvePoint>& points)
+{
+    std::size_t start = 0, end = 0;
+    if (points.empty() || points.size() > 4096 || ! maximusEnvelopeSpan (d, envelope, start, end))
+        return d;
+    const auto n = i32At (d, start + 8);
+    std::vector<std::uint8_t> out (d.begin(), d.begin() + (std::ptrdiff_t) start + 8); // the map's kind and version
+    auto put = [&out] (const void* v, std::size_t len) { const auto* b = (const std::uint8_t*) v; out.insert (out.end(), b, b + len); };
+    const auto count = (std::int32_t) points.size();
+    put (&count, 4);
+    // a point read from the state and given back unchanged keeps its stored record bit for bit (the level is a double
+    // there; the direction cache as FL wrote it), searched in order so inserted / removed points don't shift the rest
+    std::size_t next = 0;
+    auto unchanged = [&] (const MaximusCurvePoint& p, std::size_t& at) {
+        for (auto j = next; j < (std::size_t) std::max (0, n); ++j)
+        {
+            const auto rec = start + 12 + 24 * j;
+            double dx = 0.0, y = 0.0;
+            float ten = 0.0f;
+            std::memcpy (&dx, d.data() + rec, 8);
+            std::memcpy (&y, d.data() + rec + 8, 8);
+            std::memcpy (&ten, d.data() + rec + 16, 4);
+            if (dx == p.dx && (float) y == p.y && ten == p.tension && d[rec + 20] == p.type)
+            {
+                at = rec;
+                next = j + 1;
+                return true;
+            }
+        }
+        return false;
+    };
+    for (std::size_t k = 0; k < points.size(); ++k)
+    {
+        const auto& p = points[k];
+        if (std::size_t rec = 0; unchanged (p, rec))
+        {
+            out.insert (out.end(), d.begin() + (std::ptrdiff_t) rec, d.begin() + (std::ptrdiff_t) rec + 24);
+            continue;
+        }
+        const auto y = (double) p.y;
+        put (&p.dx, 8);
+        put (&y, 8);
+        put (&p.tension, 4);
+        out.push_back (p.type);
+        out.push_back (0);
+        out.push_back (0);
+        // FL's direction cache: 2 = straight (types 0 / 7 without tension), else the tension's sign
+        std::uint8_t dir = p.tension == 0.0f ? 0 : (p.tension < 0.0f ? 0xff : 1);
+        if (k > 0 && (p.type == 0 || p.type == 7) && p.tension == 0.0f)
+            dir = 2;
+        out.push_back (dir);
+    }
+    const auto trailer = start + 12 + 24 * (std::size_t) n;
+    out.insert (out.end(), d.begin() + (std::ptrdiff_t) trailer, d.end());
+    return out;
+}
+
+bool maximusCurveTypeSupported (int type) noexcept { return type == 0 || type == 7; }
+
+std::vector<float> maximusCurveShape (const std::vector<MaximusCurvePoint>& points, int n)
+{
+    std::vector<float> out;
+    if (points.empty() || n < 1)
+        return out;
+    std::vector<Point> pts;
+    for (std::size_t k = 0; k < points.size(); ++k)
+    {
+        if (k > 0 && ! maximusCurveTypeSupported (points[k].type))
+            return out;
+        pts.push_back (makePoint (points[k].dx, (double) points[k].y, points[k].tension, points[k].type, k == 0));
+    }
+    Curve curve (std::move (pts));
+    curve.start();
+    out.reserve ((std::size_t) n + 1);
+    double prev = 0.0;
+    for (int i = 0; i <= n; ++i)
+    {
+        const auto x = (double) i / (double) n;
+        out.push_back ((float) curve.step (x - prev));
+        prev = x;
+    }
+    return out;
 }
 
 std::vector<std::vector<std::pair<double, float>>> maximusEnvelopes (const std::vector<std::uint8_t>& d)

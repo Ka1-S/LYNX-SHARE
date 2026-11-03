@@ -51,6 +51,9 @@ struct Chord
 
 // "Ctrl+Shift+F4", "Alt+Up", "Numpad +", "Space"... (English key names, used in the JSON file and menus)
 std::string toString (const Chord& chord);
+// toString for the screen: on macOS with FL-for-Mac's key names (Ctrl -> ⌘, Alt -> ⌥; core/ModifierMap.h). The saved
+// keymap always uses toString.
+std::string displayString (const Chord& chord);
 std::optional<Chord> parseChord (const std::string& text);
 
 // Where a binding applies. Global bindings work everywhere; the others only while that panel has focus

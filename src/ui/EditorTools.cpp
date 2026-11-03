@@ -1,3 +1,4 @@
+#include "ui/FlMods.h"
 #include "ui/EditorTools.h"
 
 #include "core/NoteEdit.h"
@@ -432,7 +433,7 @@ GlobalGridBox::~GlobalGridBox()
 
 void GlobalGridBox::mouseDown (const juce::MouseEvent& e)
 {
-    if (e.mods.isPopupMenu())
+    if (flmods::popup (e.mods))
     {
         showDefaultLengthMenu (this);
         return;

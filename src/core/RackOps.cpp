@@ -743,50 +743,71 @@ std::vector<int> sendChannelsToFreeInserts (Song& song, const std::vector<int>& 
 
 // --- Channel settings "Misc" tab ------------------------------------------------------------------------------
 
+// FL's Misc › Polyphony exists on every generator channel (REA_rodada143 B2) and FL's channel layer applies it before
+// the generator (REA_rodada168l): every LYNX channel that plays notes into a sound has it. The channels that make no
+// sound of their own (controllers, MIDI Out, Layer, VFX, Dashboard, Voltage, Fruity Dance, Wasp's placeholder, the
+// video player) and the audio clip channels have nothing to make mono.
 bool channelHasMono (const ChannelDef& c) noexcept
 {
-    return c.instrument == InstrumentKind::synth;
+    switch (c.instrument)
+    {
+        case InstrumentKind::audioClip:
+        case InstrumentKind::controller:
+        case InstrumentKind::midiOut:
+        case InstrumentKind::layer:
+        case InstrumentKind::dashboard:
+        case InstrumentKind::voltage:
+        case InstrumentKind::vfx:
+        case InstrumentKind::videoplayer:
+        case InstrumentKind::fruitydance:
+        case InstrumentKind::wasp:
+            return false;
+        default:
+            return true;
+    }
 }
 
 bool channelHasPortamento (const ChannelDef& c) noexcept
 {
-    return c.instrument == InstrumentKind::synth || c.instrument == InstrumentKind::sampler;
+    return channelHasMono (c);
 }
 
 bool channelMono (const ChannelDef& c) noexcept
 {
-    return c.instrument == InstrumentKind::synth && c.synth.mono;
+    return c.instrument == InstrumentKind::synth ? c.synth.mono : channelHasMono (c) && c.misc.mono;
 }
 
 void setChannelMono (ChannelDef& c, bool on) noexcept
 {
-    if (c.instrument == InstrumentKind::synth)
-        c.synth.mono = on;
+    // (every copy: the LYNX Synth's own, and the one FL's engines that take the channel's mono read, Sytrus / Ogun /
+    // Fruit Kick's max polyphony)
+    c.misc.mono = on;
+    c.synth.mono = on;
 }
 
 bool channelPortamento (const ChannelDef& c) noexcept
 {
-    return c.instrument == InstrumentKind::synth ? c.synth.porta : c.instrument == InstrumentKind::sampler && c.sampler.porta;
+    if (c.instrument == InstrumentKind::synth)
+        return c.synth.porta;
+    if (c.instrument == InstrumentKind::sampler)
+        return c.sampler.porta;
+    return channelHasPortamento (c) && c.misc.porta;
 }
 
 float channelPortamentoBeats (const ChannelDef& c) noexcept
 {
-    return c.instrument == InstrumentKind::sampler ? c.sampler.portaBeats : c.synth.portaBeats;
+    if (c.instrument == InstrumentKind::synth)
+        return c.synth.portaBeats;
+    if (c.instrument == InstrumentKind::sampler)
+        return c.sampler.portaBeats;
+    return c.misc.portaBeats;
 }
 
 void setChannelPortamento (ChannelDef& c, bool on, float beats) noexcept
 {
     beats = std::clamp (beats, 0.0f, 4.0f);
-    if (c.instrument == InstrumentKind::synth)
-    {
-        c.synth.porta = on;
-        c.synth.portaBeats = beats;
-    }
-    else if (c.instrument == InstrumentKind::sampler)
-    {
-        c.sampler.porta = on;
-        c.sampler.portaBeats = beats;
-    }
+    c.misc.porta = c.synth.porta = c.sampler.porta = on;
+    c.misc.portaBeats = c.synth.portaBeats = c.sampler.portaBeats = beats;
 }
 
 bool channelCutsItself (const ChannelDef& c) noexcept
