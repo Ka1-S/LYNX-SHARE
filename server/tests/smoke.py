@@ -157,6 +157,27 @@ async def relay(s: aiohttp.ClientSession) -> None:
             break
     check(m["t"] == 7, "ping/pong")
 
+    # a room whose token the host chose (LYNX derives it from the invite code): not echoed back, and it works
+    chosen = "lynx-smoke-" + os.urandom(24).hex()
+    async with s.post(f"{RELAY_HTTP}/v1/rooms", json={"token": "short"}) as r:
+        check(r.status == 400, f"a too short chosen token refused ({r.status})")
+    async with s.post(f"{RELAY_HTTP}/v1/rooms", json={"token": chosen}) as r:
+        room2 = await r.json()
+        check(r.status == 201 and room2["token"] == "", f"room with a chosen token ({r.status})")
+    url2 = f"{RELAY}/v1/rooms/{room2['room']}/ws"
+    try:
+        async with s.ws_connect(url2, headers=auth):
+            check(False, "the other room's token refused")
+    except aiohttp.WSServerHandshakeError as e:
+        check(e.status == 401, f"the other room's token refused ({e.status})")
+    ws2 = await s.ws_connect(url2, headers={"Authorization": f"Bearer {chosen}"}, protocols=("lynx-relay.v1",))
+    w = await ws2.receive_json(timeout=5)
+    check(w["type"] == "welcome" and w["peer"] == 1, f"chosen token connects {w}")
+    async with s.delete(f"{RELAY_HTTP}/v1/rooms/{room2['room']}",
+                        headers={"Authorization": f"Bearer {room2['hostToken']}"}) as r:
+        check(r.status == 204, f"room 2 closed ({r.status})")
+    await ws2.close()
+
     async with s.delete(f"{RELAY_HTTP}/v1/rooms/{room['room']}") as r:
         check(r.status == 401, f"close without host token refused ({r.status})")
     async with s.delete(f"{RELAY_HTTP}/v1/rooms/{room['room']}",
