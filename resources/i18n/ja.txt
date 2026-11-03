@@ -6429,3 +6429,17 @@ countries: jp
 "Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "ウィンドウ: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}ミキサー  {4}ブラウザー  (またはツールバーのウィンドウボタン。もう一度で非表示)"
 "Stretched pattern clips loop their pattern (LYNX)" = "引き伸ばしたパターンクリップはパターンをループする (LYNX)"
 "On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "オン: パターンより長く引き伸ばしたパターンクリップはパターンを繰り返します。オフ: FL Studio と同じくパターンを 1 回だけ再生します"
+
+# --- round 168x: Maximus curve editor (issue #40), insert record positions (issue #41)
+"Point: [LMB] drag moves  [RMB] shape, value, delete  [Alt][RMB] delete" = "ポイント: [LMB] ドラッグで移動  [RMB] 形状、値、削除  [Alt][RMB] 削除"
+"Compression curve (input across, output up): [RMB] add a point (hold and drag to place it)  [LMB] drag a point" = "コンプレッションカーブ (横が入力、縦が出力): [RMB] ポイントを追加 (押したままドラッグで配置)  [LMB] ポイントをドラッグ"
+"External input only" = "外部入力のみ"
+"External and mixer input" = "外部入力とミキサー入力"
+"Post effects" = "エフェクト後"
+"Post EQ" = "EQ 後"
+"Post level and panning" = "レベルとパン後"
+"Post track" = "トラック後"
+"Also record the dry input as a second take (LYNX)" = "ドライ入力も 2 つ目のテイクとして録音 (LYNX)"
+"Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file" = "録音待機: Rec + Play でこのインサートを Playlist クリップに録音  [RMB] ファイルに録音"
+"Recording: {0}" = "録音: {0}"
+"dry input" = "ドライ入力"

@@ -6429,3 +6429,17 @@ countries: tw hk mo
 "Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "視窗：{0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}混音器  {4}瀏覽器  （或工具列中的視窗按鈕；再按一次：隱藏）"
 "Stretched pattern clips loop their pattern (LYNX)" = "拉長的樣式片段循環其樣式 (LYNX)"
 "On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "開：拉長到超出其樣式的樣式片段會重複該樣式。關：像 FL Studio 一樣只播放一次樣式"
+
+# --- round 168x: Maximus curve editor (issue #40), insert record positions (issue #41)
+"Point: [LMB] drag moves  [RMB] shape, value, delete  [Alt][RMB] delete" = "點：[LMB] 拖曳移動  [RMB] 形狀、數值、刪除  [Alt][RMB] 刪除"
+"Compression curve (input across, output up): [RMB] add a point (hold and drag to place it)  [LMB] drag a point" = "壓縮曲線（橫向為輸入，縱向為輸出）：[RMB] 新增點（按住並拖曳以放置）  [LMB] 拖曳點"
+"External input only" = "僅外部輸入"
+"External and mixer input" = "外部與混音器輸入"
+"Post effects" = "效果後"
+"Post EQ" = "EQ 後"
+"Post level and panning" = "電平與聲像後"
+"Post track" = "軌道後"
+"Also record the dry input as a second take (LYNX)" = "同時將乾輸入錄為第二個錄音（LYNX）"
+"Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file" = "錄音預備：Rec + Play 將此 insert 錄入 Playlist 片段  [RMB] 錄到檔案"
+"Recording: {0}" = "錄音：{0}"
+"dry input" = "乾輸入"

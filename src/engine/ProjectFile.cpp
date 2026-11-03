@@ -1666,6 +1666,10 @@ juce::var mixerTrackToVar (const MixerTrack& t)
         o->setProperty ("recordSafe", true);
     if (! t.recordTo.empty())
         o->setProperty ("recordTo", juce::String::fromUTF8 (t.recordTo.c_str()));
+    if (t.recordSource != RecordSource::postEq) // round 168x: FL's "Record" position (Post EQ, FL's default, not written)
+        o->setProperty ("recordSource", (int) t.recordSource);
+    if (t.recordDryToo)
+        o->setProperty ("recordDryToo", true);
     if (t.latencyMs != 0.0f) // FL's manual track latency, ms (REA round 165f-mixer)
         o->setProperty ("latencyMs", juce::roundToInt (t.latencyMs * 1000.0f) / 1000.0);
     if (t.latencyBypass != LatencyBypass::never)
@@ -1728,6 +1732,8 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     track.monitor = (InputMonitor) juce::jlimit (0, 3, (int) t.getProperty ("monitor", (int) InputMonitor::automatic));
     track.recordSafe = (bool) t.getProperty ("recordSafe", false);
     track.recordTo = t.getProperty ("recordTo", "").toString().toStdString();
+    track.recordSource = (RecordSource) juce::jlimit (0, 5, (int) t.getProperty ("recordSource", (int) RecordSource::postEq));
+    track.recordDryToo = (bool) t.getProperty ("recordDryToo", false);
     track.latencyMs = juce::jlimit (-maxTrackLatencyMs, maxTrackLatencyMs, (float) (double) t.getProperty ("latencyMs", 0.0));
     if (const auto bypass = t["latencyBypass"].toString(); bypass == "always")
         track.latencyBypass = LatencyBypass::always;

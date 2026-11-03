@@ -424,6 +424,8 @@ private:
     std::atomic<bool> anyOverridden { false };
     void clearOverriddenValues() noexcept;
     std::array<MixerMatrix, maxMixerTracks> lastTrackGain {}; // the level matrix of the previous block, for the ramp
+    // round 168x: the "Post level and panning" recording tap's own ramp (the insert's level matrix without the mute)
+    std::array<MixerMatrix, maxMixerTracks> lastTapGain {};
     std::array<char, maxMixerTracks> trackActive {};        // the track output has sound in this block
     std::vector<float> tapBuffers;                          // RackState::maxSendTaps * 2 * chunkCapacity
     std::array<char, RackState::maxSendTaps> tapActive {};  // the Fruity Send slot sent something this block

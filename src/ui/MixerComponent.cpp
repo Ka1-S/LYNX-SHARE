@@ -5015,6 +5015,23 @@ void showMenu (AudioEngine& engine, int track, juce::Component* target, std::fun
                       });
     }
 
+    if (track > 0) // FL's "Record" positions (round 168x, issue #41; FL's AudioRecorderRoutingMenu, in its order)
+    {
+        menu.addSectionHeader (tr ("Record"));
+        const std::pair<RecordSource, const char*> points[] = { { RecordSource::externalInput, TR_NOOP ("External input only") },
+                                                               { RecordSource::externalAndMixer, TR_NOOP ("External and mixer input") },
+                                                               { RecordSource::postEffects, TR_NOOP ("Post effects") },
+                                                               { RecordSource::postEq, TR_NOOP ("Post EQ") },
+                                                               { RecordSource::postLevel, TR_NOOP ("Post level and panning") },
+                                                               { RecordSource::postTrack, TR_NOOP ("Post track") } };
+        for (const auto& [point, label] : points)
+            menu.addItem (tr (label), true, mt.recordSource == point, [&engine, track, point = point] { engine.setInsertRecordSource (track, point); });
+        // LYNX extra: the dry device input as a second take beside a processed one (DI + amp, for re-amping)
+        menu.addItem (tr ("Also record the dry input as a second take (LYNX)"), mt.recordSource != RecordSource::externalInput,
+                      mt.recordDryToo && mt.recordSource != RecordSource::externalInput,
+                      [&engine, track, on = mt.recordDryToo] { engine.setInsertRecordDryToo (track, ! on); });
+    }
+
     menu.addSectionHeader (tr ("Monitor external input"));
     const std::pair<InputMonitor, const char*> modes[] = { { InputMonitor::off, TR_NOOP ("Off") },
                                                           { InputMonitor::whenArmed, TR_NOOP ("When armed") },
@@ -5050,8 +5067,16 @@ void showMenu (AudioEngine& engine, int track, juce::Component* target, std::fun
 
 juce::String armHint (const AudioEngine& engine, int track)
 {
-    const auto text = tr ("Record arm: Rec + Play records this insert's audio input into a Playlist clip  [RMB] record to a file");
-    if (track <= 0 || track >= (int) engine.getSong().mixer.size() || engine.getSong().mixer[(std::size_t) track].recordTo.empty())
+    auto text = tr ("Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file");
+    if (track <= 0 || track >= (int) engine.getSong().mixer.size())
+        return text;
+    // FL's hint names the position: "Recording: Post EQ" (round 168x; changed in the input box's menu)
+    static const char* const points[] { TR_NOOP ("External input only"), TR_NOOP ("External and mixer input"), TR_NOOP ("Post effects"),
+                                        TR_NOOP ("Post EQ"), TR_NOOP ("Post level and panning"), TR_NOOP ("Post track") };
+    const auto& mt = engine.getSong().mixer[(std::size_t) track];
+    text = tr ("Recording: {0}", { tr (points[juce::jlimit (0, 5, (int) mt.recordSource)]) })
+           + (mt.recordDryToo && mt.recordSource != RecordSource::externalInput ? " + " + tr ("dry input") : juce::String()) + "  " + text;
+    if (mt.recordTo.empty())
         return text;
     const auto file = juce::File (juce::String::fromUTF8 (engine.getSong().mixer[(std::size_t) track].recordTo.c_str()));
     return tr ("Record to: {0}", { file.getFileName() }) + "  " + text;

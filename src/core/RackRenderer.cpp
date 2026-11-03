@@ -1444,6 +1444,7 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
 {
     automationValues.fill (std::numeric_limits<float>::quiet_NaN());
     lastTrackGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
+    lastTapGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     channelBuffers.assign ((std::size_t) maxChannels * 2 * chunkCapacity, 0.0f);
     smartDisable.assign ((std::size_t) maxMixerTracks * maxEffectSlots, {});
     trackEqs.assign ((std::size_t) maxMixerTracks, {});
@@ -3519,36 +3520,48 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     const auto& track = state.song.mixer[(std::size_t) t];
     pullInputs (state, t, n);
 
+    // recording taps on this insert (round 168x, issue #41): FL's "Record" positions after the input
+    const auto taps = liveInput != nullptr && t > 0 ? liveInput->tappedPoints (t) : 0u;
+    auto tap = [&] (RecordSource point, const float* l, const float* r) {
+        if ((taps & (1u << (unsigned) point)) != 0)
+            liveInput->tap (t, point, l, r, liveInputOffset, n);
+    };
+
     const auto silent = track.muted || ! state.mixerAudible[(std::size_t) t];
 
     // target matrix; the ramp from the previous block avoids clicks on mute and fader
     MixerMatrix target { 0.0f, 0.0f, 0.0f, 0.0f };
+    MixerMatrix level { 0.0f, 0.0f, 0.0f, 0.0f }; // the same without the mute (the "Post level and panning" tap)
 
-    if (! silent)
+    if (! silent || (taps & (1u << (unsigned) RecordSource::postLevel)) != 0)
     {
         const auto volume = state.hasAutomation ? automated (state.mixerVolumeAuto[(std::size_t) t], track.volume) : track.volume;
         const auto pan = state.hasAutomation ? automated (state.mixerPanAuto[(std::size_t) t], (track.pan + 1.0f) * 0.5f) * 2.0f - 1.0f
                                              : track.pan;
-        target = mixerMatrix (track, volume, pan, state.song.panTriangular);
+        level = mixerMatrix (track, volume, pan, state.song.panTriangular);
+        if (! silent)
+            target = level;
     }
 
     auto& last = lastTrackGain[(std::size_t) t];
     const auto from = std::isnan (last.ll) ? target : last;
     constexpr MixerMatrix zero { 0.0f, 0.0f, 0.0f, 0.0f };
 
-    if (silent && from == zero)
+    auto* l = trackBuffer (t, 0);
+    auto* r = trackBuffer (t, 1);
+
+    if (silent && from == zero && taps == 0) // (a muted insert being recorded still runs its effects for the take)
     {
         if (meters != nullptr)
             meters->capture.pushSilence (t, n);
         return; // stays inactive: nobody pulls anything from it
     }
 
-    auto* l = trackBuffer (t, 0);
-    auto* r = trackBuffer (t, 1);
+    tap (RecordSource::externalAndMixer, l, r);
 
     // an idle insert (round 166d, up to 500 of them): no effects, no built-in EQ and nothing came in this block. Its
     // output is silence whatever the fader does, so it stays inactive and the tracks it feeds skip it (the same
-    // samples: adding zeros changes nothing)
+    // samples: adding zeros changes nothing; a tap stays silent too)
     if (track.effects.empty() && (state.song.cleanMixer || ! track.eq.active()) && isSilentBlock (l, r, n))
     {
         if (t < (int) trackEqs.size() && trackEqs[(std::size_t) t].running)
@@ -3560,8 +3573,19 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     }
 
     runEffects (state, t, n);
+    tap (RecordSource::postEffects, l, r);
     applyTrackEq (track, t, state.song.cleanMixer, l, r, n);
+    tap (RecordSource::postEq, l, r);
+    if ((taps & (1u << (unsigned) RecordSource::postLevel)) != 0)
+        if (const auto dest = liveInput->tapDestination (t, RecordSource::postLevel, liveInputOffset, n); dest.first != nullptr)
+        {
+            // the fader, pan and separation without the mute, with their own ramp
+            auto& lastLevel = lastTapGain[(std::size_t) t];
+            const auto fromLevel = std::isnan (lastLevel.ll) ? level : lastLevel;
+            lastLevel = applyMatrix (l, r, dest.first, dest.second, n, fromLevel, level);
+        }
     last = applyMatrix (l, r, l, r, n, from, target);
+    tap (RecordSource::postTrack, l, r);
 
     trackActive[(std::size_t) t] = 1;
 

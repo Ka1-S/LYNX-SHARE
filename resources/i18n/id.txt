@@ -6429,3 +6429,17 @@ countries: id
 "Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "Jendela: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (atau tombol jendela di bilah alat; sekali lagi: sembunyikan)"
 "Stretched pattern clips loop their pattern (LYNX)" = "Klip pattern yang diregangkan mengulang pattern-nya (LYNX)"
 "On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "Aktif: klip pattern yang diregangkan melewati pattern-nya mengulang pattern. Nonaktif: memutar pattern sekali, seperti di FL Studio"
+
+# --- round 168x: Maximus curve editor (issue #40), insert record positions (issue #41)
+"Point: [LMB] drag moves  [RMB] shape, value, delete  [Alt][RMB] delete" = "Titik: [LMB] seret memindahkan  [RMB] bentuk, nilai, hapus  [Alt][RMB] hapus"
+"Compression curve (input across, output up): [RMB] add a point (hold and drag to place it)  [LMB] drag a point" = "Kurva kompresi (input mendatar, output tegak): [RMB] tambah titik (tahan dan seret untuk menempatkannya)  [LMB] seret titik"
+"External input only" = "Hanya input eksternal"
+"External and mixer input" = "Input eksternal dan mixer"
+"Post effects" = "Setelah efek"
+"Post EQ" = "Setelah EQ"
+"Post level and panning" = "Setelah level dan panning"
+"Post track" = "Setelah track"
+"Also record the dry input as a second take (LYNX)" = "Rekam juga input kering sebagai take kedua (LYNX)"
+"Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file" = "Siap rekam: Rec + Play merekam insert ini ke klip Playlist  [RMB] rekam ke file"
+"Recording: {0}" = "Merekam: {0}"
+"dry input" = "input kering"

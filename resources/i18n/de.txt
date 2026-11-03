@@ -6429,3 +6429,17 @@ countries: de at ch li lu
 "Windows: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (or the window buttons in the toolbar; again: hide)" = "Fenster: {0}Playlist  {1}Channel Rack  {2}Piano Roll  {3}Mixer  {4}Browser  (oder die Fensterknöpfe in der Leiste; nochmal: ausblenden)"
 "Stretched pattern clips loop their pattern (LYNX)" = "Gedehnte Pattern-Clips wiederholen ihr Pattern (LYNX)"
 "On: a pattern clip stretched past its pattern repeats the pattern. Off: it plays the pattern once, as in FL Studio" = "Ein: Ein über sein Pattern hinaus gedehnter Pattern-Clip wiederholt das Pattern. Aus: Er spielt das Pattern einmal, wie in FL Studio"
+
+# --- round 168x: Maximus curve editor (issue #40), insert record positions (issue #41)
+"Point: [LMB] drag moves  [RMB] shape, value, delete  [Alt][RMB] delete" = "Punkt: [LMB] ziehen verschiebt  [RMB] Form, Wert, löschen  [Alt][RMB] löschen"
+"Compression curve (input across, output up): [RMB] add a point (hold and drag to place it)  [LMB] drag a point" = "Kompressionskurve (Eingang waagerecht, Ausgang senkrecht): [RMB] fügt einen Punkt hinzu (halten und ziehen zum Platzieren)  [LMB] zieht einen Punkt"
+"External input only" = "Nur externer Eingang"
+"External and mixer input" = "Externer und Mixer-Eingang"
+"Post effects" = "Nach den Effekten"
+"Post EQ" = "Nach dem EQ"
+"Post level and panning" = "Nach Pegel und Panorama"
+"Post track" = "Nach der Spur"
+"Also record the dry input as a second take (LYNX)" = "Zusätzlich den trockenen Eingang als zweiten Take aufnehmen (LYNX)"
+"Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file" = "Aufnahmebereit: Rec + Play nimmt diesen Insert in einen Playlist-Clip auf  [RMB] in eine Datei aufnehmen"
+"Recording: {0}" = "Aufnahme: {0}"
+"dry input" = "trockener Eingang"
