@@ -200,6 +200,7 @@ target_sources(lynx_core PRIVATE
     src/core/Sfz.cpp
     src/core/Workspace.cpp
     src/core/RackOps.cpp
+    src/core/PlaylistTrackOps.cpp
     src/core/ChannelMiscFx.cpp
     src/core/MidiImport.cpp
     src/core/StartupSound.cpp

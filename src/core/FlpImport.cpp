@@ -3657,7 +3657,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 performance.positionSync = (TrackPerformance::Sync) std::clamp (t.positionSync, 0, 6);
 
                 if (t.index >= 0 && t.index < 500 && (! t.name.empty() || ! t.enabled || coloured || t.grouped || ! t.expanded || sized || t.mode != 0
-                                                       || ! performance.isDefault() || t.icon != 0))
+                                                       || ! performance.isDefault() || t.lockedToContent || t.lockedHeight > 0 || t.icon != 0))
                 {
                     if ((int) song.playlistTracks.size() <= t.index)
                         song.playlistTracks.resize ((std::size_t) t.index + 1);
@@ -3670,6 +3670,9 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     track.grouped = t.index > 0 && t.grouped;
                     track.performance = performance; // Performance mode's track settings (round 165m)
                     track.collapsed = ! t.expanded;
+                    // FL's track locks (round 168f): a locked size is in FL's pixels, clamped to LYNX's row limits
+                    track.lockedToContent = t.lockedToContent;
+                    track.lockedHeight = t.lockedHeight > 0 ? polish::clampTrackHeight (t.lockedHeight) : -1;
                     track.icon = std::clamp (t.icon, 0, 0xFFFF); // (REA round 168j)
                     // track modes (REA round 146a): an audio track's mixer track, an instrument track's channel
                     const auto mixerOk = t.mixerTrack > 0 && t.mixerTrack < (int) song.mixer.size();

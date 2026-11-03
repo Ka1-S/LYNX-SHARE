@@ -338,6 +338,10 @@ struct PlaylistTrackInfo
     float heightScale = 1.0f; // the track's size (FL's Size menu: 0.33 .. 2.0; 1 = 100 %)
     bool grouped = false;     // "Group with above track"
     bool expanded = true;     // a group header's members are shown (false = "Collapse grouped tracks")
+    // FL's track locks (REA round 168f; track record +0x14 / +0x19): i32 at 17 = "Lock to this size" (> 0 locked at that
+    // many px, else not locked — FL keeps −the last size), u8 at 21 = "Lock to content"
+    int lockedHeight = -1;
+    bool lockedToContent = false;
     // track mode (REA round 146a): u32 at 49 (0 none, 1 audio track, 3 instrument track), i32 mixer track at 53, i32
     // FL channel index at 57 (-1 = none)
     int mode = 0, mixerTrack = -1, channel = -1;

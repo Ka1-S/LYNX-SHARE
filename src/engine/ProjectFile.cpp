@@ -2099,6 +2099,15 @@ juce::String toJson (const Song& song)
         if (! groups.isEmpty())
             root->setProperty ("playlistTrackGroups", groups);
 
+        // FL's track locks (round 168f): [index, lock to content 0/1, locked height (px; <= 0 = not locked)]
+        juce::Array<juce::var> locks;
+        for (std::size_t i = 0; i < song.playlistTracks.size(); ++i)
+            if (const auto& t = song.playlistTracks[i]; t.lockedToContent || t.lockedHeight != -1)
+                locks.add (juce::Array<juce::var> { (int) i, t.lockedToContent ? 1 : 0, t.lockedHeight });
+
+        if (! locks.isEmpty())
+            root->setProperty ("playlistTrackLocks", locks);
+
         // track modes (round 146a): [index, "audio" | "instrument", mixer track, channel]
         juce::Array<juce::var> modes;
         for (std::size_t i = 0; i < song.playlistTracks.size(); ++i)
@@ -2461,6 +2470,17 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
 
                 song.playlistTracks[index].grouped = index > 0 && (int) t[1] != 0;
                 song.playlistTracks[index].collapsed = (int) t[2] != 0;
+            }
+
+    if (auto* locks = root["playlistTrackLocks"].getArray())
+        for (const auto& t : *locks)
+            if (t.isArray() && t.size() >= 3 && (int) t[0] >= 0 && (int) t[0] < 500)
+            {
+                const auto index = (std::size_t) (int) t[0];
+                if (song.playlistTracks.size() <= index)
+                    song.playlistTracks.resize (index + 1);
+                song.playlistTracks[index].lockedToContent = (int) t[1] != 0;
+                song.playlistTracks[index].lockedHeight = juce::jlimit (-1000, 1000, (int) t[2]);
             }
 
     if (auto* performance = root["playlistTrackPerformance"].getArray())

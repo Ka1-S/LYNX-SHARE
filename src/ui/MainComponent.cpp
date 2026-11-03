@@ -1601,6 +1601,8 @@ void MainComponent::loadUiSettings()
             notenames::currentFlats.store (on);
         else if (key == "rememberSeek")
             EditorGlobals::get().rememberSeek = on;
+        else if (key == "createVariants")
+            EditorGlobals::get().createVariants = on;
         else if (key == "prGridHighlights") // (round 168g: the Piano roll's View items)
             PianoRollComponent::gridHighlights = on;
         else if (key == "prShowChordName")
@@ -1727,6 +1729,7 @@ void MainComponent::saveUiSettings()
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
                                       + "\npluginStyleOverrides=" + skin::overridesToString()
                                       + "\nrememberSeek=" + juce::String (EditorGlobals::get().rememberSeek ? 1 : 0)
+                                      + "\ncreateVariants=" + juce::String (EditorGlobals::get().createVariants ? 1 : 0)
                                       + "\nprGridHighlights=" + juce::String (PianoRollComponent::gridHighlights ? 1 : 0)
                                       + "\nprShowChordName=" + juce::String (PianoRollComponent::showChordName ? 1 : 0)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
@@ -2102,6 +2105,22 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "playlist.reverseClips", tr ("Reverse selected audio clips"));
             action (menu, "playlist.quantizeStarts", tr ("Quantize the clips' starts"));
             action (menu, "playlist.quantizeHalf", tr ("Quantize the clips' starts 50% (halfway to the grid)"));
+            // round 168f: FL's Playlist Edit / Tools items ([DFM] EEMenu)
+            action (menu, "playlist.makeUnique", tr ("Make unique"));
+            action (menu, "playlist.mergePatternClips", tr ("Merge pattern clips"));
+            action (menu, "playlist.purgeUnusedAudio", tr ("Purge unused audio clips"));
+            action (menu, "playlist.stretchMode", tr ("Stretch audio when resizing audio clips"), true, EditorGlobals::get().stretchOnResize);
+            action (menu, "playlist.createVariants", tr ("Create variants when stretching audio clips"), true, EditorGlobals::get().createVariants);
+            {
+                juce::PopupMenu trackTools;
+                action (trackTools, "playlist.cloneTracks", tr ("Clone selected playlist track(s)"));
+                action (trackTools, "playlist.lockAllToContent", tr ("Lock all playlist tracks to content"));
+                action (trackTools, "playlist.unlockAllFromContent", tr ("Unlock all playlist tracks from content"));
+                action (trackTools, "playlist.resetEmptyTracks", tr ("Reset empty playlist tracks"));
+                action (trackTools, "playlist.collapseAllGroups", tr ("Collapse all grouped tracks"));
+                action (trackTools, "playlist.expandAllGroups", tr ("Expand all grouped tracks"));
+                menu.addSubMenu (tr ("Tools"), trackTools);
+            }
             {
                 // FL's Playlist Tools › EERenderPLSelectionMenu, EEPLRenderAllTracksMenu, EEPLRenderAllTrackGroupsMenu (round 168e)
                 juce::PopupMenu consolidate;
@@ -4773,6 +4792,12 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         });
         menu.addItem (tr ("Switch smart disable for all plugins"), [this] { switchSmartDisableForAll(); });
         menu.addItem (tr ("Prepare for performance mode..."), [this] { prepareForPerformance(); });
+        // FL's Macros order ([DFM] mainmenu): ... Purge unused audio clips ... Lock / Unlock all playlist tracks, Reset
+        // empty playlist tracks (round 168f)
+        menu.addItem (tr ("Purge unused audio clips"), [this] { playlist.runAction ("playlist.purgeUnusedAudio"); });
+        menu.addItem (tr ("Lock all playlist tracks to content"), [this] { playlist.runAction ("playlist.lockAllToContent"); });
+        menu.addItem (tr ("Unlock all playlist tracks from content"), [this] { playlist.runAction ("playlist.unlockAllFromContent"); });
+        menu.addItem (tr ("Reset empty playlist tracks"), [this] { playlist.runAction ("playlist.resetEmptyTracks"); });
         menu.addItem (tr ("Delete unused recordings and save project..."), [this] { deleteUnusedRecordingsAndSave(); });
         menu.addItem (tr ("Collect project samples into a folder..."), [this] { collectSamples(); });
         return menu;
