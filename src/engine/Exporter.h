@@ -57,6 +57,8 @@ public:
     static exportopts::Options realtimeOptions (exportopts::Options o, double deviceRate);
     // A message for the user after run() (dropouts during a real-time bounce); empty when nothing to say
     juce::String getNotice() const { return notice; }
+    // what the export did besides writing the file (the mastering's loudness, round 168e); empty when nothing to say
+    juce::String getInfo() const { return info; }
 
     // progress(0..1) returns false to cancel. On error or cancellation the file is deleted. With several formats
     // (Options::moreFormats) every file is written from the one render: `output`, then the same name per extension.
@@ -79,7 +81,7 @@ private:
     std::unique_ptr<AudioEngine> engine;
     AudioEngine* live = nullptr; // a real-time bounce
     double startTick = 0.0;
-    juce::String notice;
+    juce::String notice, info;
     exportopts::Options options;
     juce::File output;
     std::string title, artist;

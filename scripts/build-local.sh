@@ -66,9 +66,9 @@ CORE="$CORE src/core/SoundFont.cpp src/core/SoundFontLoad.cpp src/core/SoundFont
 # Ogg Vorbis decoding as FL does (REA round 77)
 CORE="$CORE src/core/OggVorbis.cpp"
 # export options, MP3 encoding, plugin performance monitor, clip properties / arrangements (round 84)
-CORE="$CORE src/core/ExportOptions.cpp src/core/Mp3Encoder.cpp src/core/Mp3Decoder.cpp src/core/PluginMonitor.cpp src/core/PlaylistOps.cpp src/core/ProjectContents.cpp src/core/TempoDetect.cpp src/core/ScoreLog.cpp src/core/ChannelLoops.cpp src/core/ChannelBurn.cpp src/core/AutoSampler.cpp"
+CORE="$CORE src/core/ExportOptions.cpp src/core/Mp3Encoder.cpp src/core/Mp3Decoder.cpp src/core/PluginMonitor.cpp src/core/PlaylistOps.cpp src/core/QuickRender.cpp src/core/ProjectContents.cpp src/core/TempoDetect.cpp src/core/ScoreLog.cpp src/core/ChannelLoops.cpp src/core/ChannelBurn.cpp src/core/AutoSampler.cpp"
 # LYNX's Facet EQ and Apex Limiter (round 99)
-CORE="$CORE src/core/FacetEq.cpp src/core/ApexLimiter.cpp"
+CORE="$CORE src/core/FacetEq.cpp src/core/ApexLimiter.cpp src/core/Mastering.cpp"
 # LYNX's dynamics suite and FabFilter state translation (round 108)
 CORE="$CORE src/core/DynamicsSuite.cpp src/core/FabFilterStates.cpp"
 # LYNX's voice tools: Quell Denoiser, Gemini Doubler (round 119)
@@ -77,7 +77,7 @@ CORE="$CORE src/core/VoiceTools.cpp"
 CORE="$CORE src/core/MidiControls.cpp src/core/MidiOut.cpp src/core/FormulaController.cpp"
 CORE="$CORE src/core/VoiceShift.cpp"
 # FL engines usable in native projects (round 142, issue #5)
-CORE="$CORE src/core/NativeEngines.cpp src/core/LynxBanks.cpp src/core/ModelParams.cpp src/core/ToxicBank.cpp src/core/PoiZoneBank.cpp src/core/ModelParamsSynths.cpp src/core/PluginLayoutSynths.cpp src/core/HarmlessBank.cpp src/core/Dx10Bank.cpp src/core/SimSynthBank.cpp"
+CORE="$CORE src/core/NativeEngines.cpp src/core/LynxBanks.cpp src/core/ModelParams.cpp src/core/ToxicBank.cpp src/core/PoiZoneBank.cpp src/core/ModelParamsSynths.cpp src/core/PluginLayoutSynths.cpp src/core/HarmlessBank.cpp src/core/Dx10Bank.cpp src/core/SimSynthBank.cpp src/core/BeepMapBank.cpp src/core/GranulizerBank.cpp src/core/EngineLayouts.cpp"
 # FL's Layer channel and the round 164 controllers
 CORE="$CORE src/core/Layer.cpp src/core/XyController.cpp src/core/FlCurve.cpp src/core/ControlSurface.cpp src/core/VoltageController.cpp"
 # crash / freeze reports: consent, anonymiser, report JSON, GitHub issue URL (round 159)

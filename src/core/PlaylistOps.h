@@ -146,12 +146,5 @@ int followAudioTracks (Song& song, const std::vector<int>& touched, bool makeUni
 // (see above), each once, in clip order.
 std::vector<int> audioTrackConflicts (const Song& song, const std::vector<int>& touched);
 
-// The copy of the song rendered by "Consolidate track(s)": only the (unmuted) clips of `track` play, moved so the render
-// starts at `start` (the track's first clip, or 0 with `fromSongStart`); the Master without effects, at unity.
-// `musicLength` receives the length of the music from `start` (ticks). False when the track has no clips.
-bool makeConsolidateSong (const Song& song, int track, bool fromSongStart, Song& out, std::int64_t& start, std::int64_t& musicLength);
-// After the render: a new audio clip channel with `samplePath` (named "<track> (consolidated)", on the track's mixer
-// track for an audio track, else the Master) and one clip of `length` ticks at `start` on the track, in place of the
-// track's clips. Returns the new channel.
-int applyConsolidate (Song& song, int track, const std::string& samplePath, std::int64_t start, std::int64_t length);
+// "Consolidate track(s)" moved to core/QuickRender.h (round 168e: FL's new track above, the old one grouped and muted).
 } // namespace lynx::trackmodes

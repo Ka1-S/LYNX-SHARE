@@ -196,6 +196,7 @@ private:
     void menuItemSelected (int, int) override {}
     void rememberRecent (const juce::File& file);
     juce::PopupMenu makePatternMenu();
+    juce::PopupMenu playlistTrackExportMenu (bool groups); // File › Export / Playlist Tools: the three starts (round 168e)
     // Tools › Last tweaked / Next to last tweaked (REA round 143): the parameter menu of a recently moved control
     juce::PopupMenu makeLastTweakedMenu (int which);
     // File › Import › MIDI file... (REA round 143)
