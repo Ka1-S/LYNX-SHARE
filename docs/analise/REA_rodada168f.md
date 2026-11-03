@@ -45,11 +45,17 @@ macros, the M9 view items.
 answer, lock to this size, send pattern instances here, reset empty tracks + groups, purge unused audio clips, merge
 pattern clips, clone tracks, stretch with / without variants, keys + `.flp` import.
 
+## Windows GUI check (2026-11-03, real mouse, fresh profile, test mode)
+
+On the demo project (`/mnt/e/lynx-work/playlist168f/g0–g17.png`): the track menu shows Auto name, Lock to this size,
+Lock to content, Send pattern instances here, Clone...; with Lock to content on Drums, painting the Hook brush on
+Drums painted a Beat clip; Ctrl+Shift+B opened the Clone dialog (Patterns, Audio clips, Automations, Effects ticked;
+Mixer track routing, Grouped tracks off) and OK made "Drums 2" with its clips; Ctrl+G on everything (automation
+included) showed "Can't merge", on one clip "Could not find enough valid pattern clips...", on three Melody clips
+made one "Melody #2" clip (new pattern right after Melody); the panel options menu lists Make unique Ctrl+Shift+V,
+Merge pattern clips Ctrl+G, Purge, Stretch Shift+M, Create variants (ticked) and the Tools submenu; Lock all asked
+"Resize tracks?" Yes / No / Cancel and Yes shrank and locked every row.
+
 ## Where I stopped
 
-2026-11-02 (paused by the coordinator for round 168w): merged origin/main efb8344d+ into the branch; local build-local
-with FL Data: 2 105 073 checks, 0 failures (all 10 pl168f tests pass). First Windows build found one compile error in
-the track menu (Auto name block nested in the Random color lambda; Windows build rc=123, no other error reported) — fixed in 83dc3eaf, not rebuilt yet. Next: Windows build
-(`OUT=build-win scripts/build-windows-zig.sh` via winbuild.sh), GUI check with the real mouse on
-`/mnt/e/lynx-work/playlist168f/demo.lynx` (scripts drag.ps1 / keys.ps1 / front.ps1 there, fresh profile), then land
-via `coord/land.sh playlist168f`.
+2026-11-03: merged origin/main, Windows build OK, GUI check done; landing through coord/train.sh.
