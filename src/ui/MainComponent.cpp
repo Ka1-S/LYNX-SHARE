@@ -1612,6 +1612,9 @@ void MainComponent::loadUiSettings()
             PianoRollComponent::gridHighlights = on;
         else if (key == "prShowChordName")
             PianoRollComponent::showChordName = on;
+        else if (key == "prKeyLabels")
+            PianoRollComponent::keyLabelMode = (PianoRollComponent::KeyLabelMode) juce::jlimit (0, 3,
+                line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "stretchedClipsLoop")
             setStretchedClipsLoop (on);
         else if (key == "followPlaylist" || key == "followPianoRoll")
@@ -1738,6 +1741,7 @@ void MainComponent::saveUiSettings()
                                       + "\ncreateVariants=" + juce::String (EditorGlobals::get().createVariants ? 1 : 0)
                                       + "\nprGridHighlights=" + juce::String (PianoRollComponent::gridHighlights ? 1 : 0)
                                       + "\nprShowChordName=" + juce::String (PianoRollComponent::showChordName ? 1 : 0)
+                                      + "\nprKeyLabels=" + juce::String ((int) PianoRollComponent::keyLabelMode)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
                                       + "\nfollowPianoRoll=" + juce::String (EditorGlobals::get().isFollowing (true) ? 1 : 0)

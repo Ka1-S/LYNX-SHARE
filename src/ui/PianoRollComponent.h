@@ -103,6 +103,8 @@ public:
     // default): a selection of 2 to 10 different keys shows its chord name over the grid's top-left corner. The main
     // window saves both with the UI options.
     static inline bool gridHighlights = true, showChordName = false;
+    enum class KeyLabelMode { rootNotes = 0, whiteNotes = 1, allNotes = 2, none = 3 };
+    static inline KeyLabelMode keyLabelMode = KeyLabelMode::rootNotes;
     // View › Background waveform (Alt+N): an audio file dropped on the Piano roll is drawn behind the notes from the
     // pattern's start at the song tempo (FL's FUN_00e70bf0 / FUN_00e45a00); one for every editor, not saved.
     static bool isBackgroundWaveShown() noexcept;

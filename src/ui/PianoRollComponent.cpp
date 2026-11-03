@@ -1171,8 +1171,27 @@ void PianoRollComponent::paint (juce::Graphics& g)
             g.drawHorizontalLine (y + rowHeight - 1, 0.0f, (float) width);
 
             const auto isC = key % 12 == 0;
+            bool showName = false;
+            switch (keyLabelMode)
+            {
+                case KeyLabelMode::allNotes:
+                    showName = rowHeight >= 8;
+                    break;
+                case KeyLabelMode::whiteNotes:
+                    showName = ! black && rowHeight >= (list ? 8 : 12);
+                    break;
+                case KeyLabelMode::none:
+                    showName = false;
+                    break;
+                case KeyLabelMode::rootNotes:
+                default:
+                    showName = isC || (! black && rowHeight >= (list ? 8 : 16));
+                    break;
+            }
+            if (isC && keyLabelMode != KeyLabelMode::none)
+                showName = true;
 
-            if (isC || hovered || pressed || (! black && rowHeight >= (list ? 8 : 16)))
+            if (showName || hovered || pressed)
             {
                 g.setFont (theme::font (fontHeight, isC));
                 g.setColour (pressed ? onAccent : black ? textPrimary : isC ? bg0 : bg0.withAlpha (0.55f));
@@ -3242,6 +3261,13 @@ void PianoRollComponent::showKeyMenu (int key)
     });
     menu.addItem (tr ("Remove all key labels of this channel"), ! labels.empty(), false,
                   [setLabels] { setLabels ([] (std::map<int, std::string>& l) { l.clear(); }); });
+    menu.addSeparator();
+    juce::PopupMenu labelsMenu;
+    labelsMenu.addItem (tr ("Root notes"), true, keyLabelMode == KeyLabelMode::rootNotes, [this] { runAction ("pianoRoll.keyLabelsRoot"); });
+    labelsMenu.addItem (tr ("White notes"), true, keyLabelMode == KeyLabelMode::whiteNotes, [this] { runAction ("pianoRoll.keyLabelsWhite"); });
+    labelsMenu.addItem (tr ("All notes"), true, keyLabelMode == KeyLabelMode::allNotes, [this] { runAction ("pianoRoll.keyLabelsAll"); });
+    labelsMenu.addItem (tr ("None"), true, keyLabelMode == KeyLabelMode::none, [this] { runAction ("pianoRoll.keyLabelsNone"); });
+    menu.addSubMenu (tr ("Key labels"), labelsMenu);
     menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
 }
 
@@ -3347,6 +3373,16 @@ bool PianoRollComponent::runAction (const std::string& id)
         if (EditorGlobals::get().onOptionsChanged)
             EditorGlobals::get().onOptionsChanged();
         repaint();
+    }
+    else if (is ("pianoRoll.keyLabelsRoot") || is ("pianoRoll.keyLabelsWhite") || is ("pianoRoll.keyLabelsAll") || is ("pianoRoll.keyLabelsNone"))
+    {
+        if (is ("pianoRoll.keyLabelsRoot")) keyLabelMode = KeyLabelMode::rootNotes;
+        else if (is ("pianoRoll.keyLabelsWhite")) keyLabelMode = KeyLabelMode::whiteNotes;
+        else if (is ("pianoRoll.keyLabelsAll")) keyLabelMode = KeyLabelMode::allNotes;
+        else if (is ("pianoRoll.keyLabelsNone")) keyLabelMode = KeyLabelMode::none;
+        if (EditorGlobals::get().onOptionsChanged)
+            EditorGlobals::get().onOptionsChanged();
+        repaint (0, headerHeight, keyboardWidth, getHeight() - headerHeight);
     }
     else if (is ("pianoRoll.backgroundWave")) setBackgroundWaveShown (! isBackgroundWaveShown());
     else if (is ("pianoRoll.showChordName"))
@@ -4488,6 +4524,14 @@ juce::PopupMenu PianoRollComponent::viewMenu()
             backgroundWaveOn() = false;
             repaint();
         });
+
+    juce::PopupMenu keyLabelsMenu;
+    keyLabelsMenu.addItem (tr ("Root notes"), true, keyLabelMode == KeyLabelMode::rootNotes, [this] { runAction ("pianoRoll.keyLabelsRoot"); });
+    keyLabelsMenu.addItem (tr ("White notes"), true, keyLabelMode == KeyLabelMode::whiteNotes, [this] { runAction ("pianoRoll.keyLabelsWhite"); });
+    keyLabelsMenu.addItem (tr ("All notes"), true, keyLabelMode == KeyLabelMode::allNotes, [this] { runAction ("pianoRoll.keyLabelsAll"); });
+    keyLabelsMenu.addItem (tr ("None"), true, keyLabelMode == KeyLabelMode::none, [this] { runAction ("pianoRoll.keyLabelsNone"); });
+    menu.addSubMenu (tr ("Key labels"), keyLabelsMenu);
+
     return menu;
 }
 
