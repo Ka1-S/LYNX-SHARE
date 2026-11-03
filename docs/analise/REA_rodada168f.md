@@ -19,7 +19,7 @@ In the `.flp` the 0xEE "playlist track" event carries the same: i32 at byte 17 =
 
 | Item | FL (evidence) | LYNX before | LYNX now |
 |---|---|---|---|
-| Track menu › **Lock to content** | `EEPLTrackClipLockMenuClick` 0x12236c0, undo "lock/unlock to content" → FUN_012e7a90 toggles +0x19; on: icon 0 → 93 and auto name when the track has no name (FUN_012ef490); off: icon 93 → 0; mask 4 of FUN_012eafa0 applies the menu track's new state to every selected track. Paint loop FUN_00e5cd20 → FUN_01220fe0: painting on a locked track whose clips don't use the brush's source copies the track's most frequent clip template (0x54 B) and puts it at the click | missing | same toggle, selected tracks follow, auto name; painting on a locked track paints its dominant clip (`pltracks::applyLockToContent`). Saved (`playlistTrackLocks`), imported from `.flp` (byte 21). Icon change waits for the icon model of 168h |
+| Track menu › **Lock to content** | `EEPLTrackClipLockMenuClick` 0x12236c0, undo "lock/unlock to content" → FUN_012e7a90 toggles +0x19; on: icon 0 → 93 and auto name when the track has no name (FUN_012ef490); off: icon 93 → 0; mask 4 of FUN_012eafa0 applies the menu track's new state to every selected track. Paint loop FUN_00e5cd20 → FUN_01220fe0: painting on a locked track whose clips don't use the brush's source copies the track's most frequent clip template (0x54 B) and puts it at the click | missing | same toggle, selected tracks follow, auto name; painting on a locked track paints its dominant clip (`pltracks::applyLockToContent`). Saved (`playlistTrackLocks`), imported from `.flp` (byte 21). Icon 0 ↔ 93 set on the track (drawn by 168h's icon work) |
 | Track menu › **Lock to this size** | `EEPLTrackLockMenuClick` 0x1228cb0: +0x14 < 1 → +0x14 = shown height (+0x94), else negated (unlock keeps the value). Size submenu `EEPLTrackSize1MenuClick` 0x1228f10 sets +0x10 from {0.333, 0.5, 1, 1.5, 2} and unlocks (−abs); reset FUN_012e6760 → −1 | missing | `lockedHeight` per track; a locked row keeps its pixel height whatever the vertical zoom; the Size menu / track resize unlocks. Saved and imported (byte 17) |
 | Track menu › **Auto name** | FUN_012233c0 → FUN_012ef490: name and colour of the source most clips on the track play | missing | `pltracks::autoName` (pattern / audio channel / automation) |
 | Track menu › **Send pattern instances here** | 0x1228ea0 → FUN_012db4e0(−2, …, track): with a selection the selected pattern clips, else every clip of the current pattern, move to the track (positions kept); a nameless track is auto-named | missing | `pltracks::sendPatternInstancesHere`, one undo step |
@@ -58,4 +58,5 @@ Merge pattern clips Ctrl+G, Purge, Stretch Shift+M, Create variants (ticked) and
 
 ## Where I stopped
 
-2026-11-03: merged origin/main, Windows build OK, GUI check done; landing through coord/train.sh.
+2026-11-03: merged origin/main again (168j's track `icon` field now exists, so Lock to content also sets / clears FL's
+lock icon 93 like FUN_012e7a90); build-local 2 404 631 checks, 0 failures; landing through coord/train.sh.
