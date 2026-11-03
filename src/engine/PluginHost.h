@@ -104,6 +104,8 @@ public:
     // wrapper's pitch bend range), and a slide note bends the sounding notes to its key over its length
     void setLivePitch (float cents) noexcept override { livePitch = cents; }
     void slideTo (int key, float cents, float samples) noexcept override;
+    // FL's channel Porta / Mono (round 168l): a new note starts bent from the previous note's pitch and bends back
+    bool followsChannelPorta() const noexcept override { return true; }
     int sentPitchBend() const noexcept { return sentBend; } // the last 14-bit bend sent (8192 = centre), for the tests
 
 private:

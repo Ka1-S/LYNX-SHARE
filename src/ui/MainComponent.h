@@ -160,6 +160,7 @@ private:
     int fittedChannelCount = -1;
     void showPanel (Panel panel);
     void refreshPanelButtons();
+    void showWindowsTip(); // the first starts name the window buttons in the hint bar (round 168t)
     void saveLayoutAs();
     juce::PopupMenu layoutsMenu();
 

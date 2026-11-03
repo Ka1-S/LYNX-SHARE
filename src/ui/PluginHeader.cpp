@@ -414,8 +414,9 @@ void PresetBar::loadFactory (int index)
         return;
     gesture = true;
     willEdit();
-    restore (withMixLock (kind, presets::apply (kind, list[(std::size_t) index], engine.getSong().bpm, nullptr, &fx->params), fx->params), fx->state,
-             list[(std::size_t) index].name);
+    const auto& preset = list[(std::size_t) index];
+    restore (withMixLock (kind, presets::apply (kind, preset, engine.getSong().bpm, nullptr, &fx->params), fx->params),
+             preset.state.empty() ? fx->state : preset.state, preset.name); // round 168m: Gross Beat presets bring their slots
     gesture = true;
 }
 
@@ -429,7 +430,8 @@ void PresetBar::loadUser (const juce::File& file)
         return;
     gesture = true;
     willEdit();
-    restore (withMixLock (kind, loaded->params, fx->params), fx->state, loaded->name.empty() ? file.getFileNameWithoutExtension().toStdString() : loaded->name);
+    restore (withMixLock (kind, loaded->params, fx->params), loaded->hasState ? loaded->state : fx->state,
+             loaded->name.empty() ? file.getFileNameWithoutExtension().toStdString() : loaded->name);
     gesture = true;
 }
 
@@ -560,7 +562,7 @@ void PresetBar::saveAs (juce::Component& owner)
         const auto folder = userFolder (kind);
         folder.createDirectory();
         const auto file = folder.getChildFile (utf8 (presets::fileNameFor (name.toStdString()).c_str()) + ".lynxpreset");
-        file.replaceWithText (utf8 (presets::toText (kind, name.toStdString(), slotNow->params).c_str()));
+        file.replaceWithText (utf8 (presets::toText (kind, name.toStdString(), slotNow->params, &slotNow->state).c_str()));
         engine.editSong ([t = track, s = slot, n = name.toStdString()] (Song& song) { song.mixer[(std::size_t) t].effects[(std::size_t) s].presetName = n; }, false);
         safe->repaint();
     }), true);

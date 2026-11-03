@@ -18,6 +18,7 @@
 #include "engine/FlStudio.h"
 #include "platform/CrashGuard.h"
 #include "core/Denormals.h"
+#include "core/HostSlide.h"
 #include "ui/I18n.h"
 
 #if JUCE_WINDOWS
@@ -398,6 +399,13 @@ void PluginInstrument::noteOn (int key, float velocity) noexcept
     // a new note starts at its own key: a slide's bend is undone before it
     lastKey = k;
     slideNow = slideTarget = slideLeft = 0.0f;
+    // FL's channel porta (round 168l): the note starts bent to the previous note's pitch and bends back to its own
+    if (auto& glide = HostSlide::pendingGlide(); glide.samples > 0.0f)
+    {
+        slideNow = glide.fromCents / 100.0f;
+        slideLeft = glide.samples;
+        glide.taken = true;
+    }
     addBend (0);
     midi.addEvent (juce::MidiMessage::noteOn (1, k, juce::jlimit (0.0f, 1.0f, velocity)), 0);
     hold (0, k, true);

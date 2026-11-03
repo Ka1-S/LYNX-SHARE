@@ -9,19 +9,19 @@ TEST (rea143b_channel_misc_functions)
     sampler.instrument = InstrumentKind::sampler;
     ChannelDef plugin;
     plugin.instrument = InstrumentKind::plugin;
-    // Mono exists for the synth; Portamento for the synth and the sampler; neither for a plugin
-    CHECK (channelHasMono (synth) && ! channelHasMono (sampler) && ! channelHasMono (plugin));
-    CHECK (channelHasPortamento (synth) && channelHasPortamento (sampler) && ! channelHasPortamento (plugin));
+    // Mono / Porta exist on every generator, a hosted plugin's too (round 168l: FL's channel layer plays them)
+    CHECK (channelHasMono (synth) && channelHasMono (sampler) && channelHasMono (plugin));
+    CHECK (channelHasPortamento (synth) && channelHasPortamento (sampler) && channelHasPortamento (plugin));
     setChannelMono (synth, true);
     CHECK (channelMono (synth) && synth.synth.mono);
     setChannelMono (plugin, true);
-    CHECK (! channelMono (plugin));
+    CHECK (channelMono (plugin));
     setChannelPortamento (sampler, true, 0.5f);
     CHECK (channelPortamento (sampler) && sampler.sampler.porta && std::abs (channelPortamentoBeats (sampler) - 0.5f) < 1e-6f);
     setChannelPortamento (synth, true, 9.0f); // clamped to 4 beats
     CHECK (synth.synth.porta && std::abs (synth.synth.portaBeats - 4.0f) < 1e-6f);
     setChannelPortamento (plugin, true, 1.0f);
-    CHECK (! channelPortamento (plugin));
+    CHECK (channelPortamento (plugin));
     // "Cut self": the channel's own group (1000 + channel) for both Cut and By, as the rack menu's "Cut itself"
     ChannelDef hat;
     setChannelCutsItself (hat, 3, true);

@@ -27,7 +27,7 @@ DEFAULT_NAME = "KA1WARE.LYNXSHARE"
 DEFAULT_PUBLISHER = "CN=BACBB786-A595-4AC3-9807-A70EAA268E4C"
 DEFAULT_DISPLAY = "KA1WARE"
 UNSIGNED_OID = "OID.2.25.311729368913984317654407730594956997722=1"
-APP_FILES = ("LYNX.exe", "lynx-asio.dll")  # (lynx-asio32.dll is for registering with 32-bit hosts: not in the package)
+APP_FILES = ("LYNX.exe", "lynx-asio.dll", "onnxruntime.dll")  # (lynx-asio32.dll is for registering with 32-bit hosts: not in the package)
 
 
 def msix_version(version, store_build=0):

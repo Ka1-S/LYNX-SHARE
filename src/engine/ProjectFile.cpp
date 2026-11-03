@@ -1159,6 +1159,12 @@ juce::var channelToVar (const ChannelDef& c)
         misc->setProperty ("shift", m.shiftBeats);
         misc->setProperty ("gate", m.gateBeats);
         misc->setProperty ("fullPorta", m.fullPorta);
+        if (m.mono) // Polyphony › Mono / Porta / Slide (round 168l)
+            misc->setProperty ("mono", true);
+        if (m.porta)
+            misc->setProperty ("porta", true);
+        if (m.portaBeats != ChannelMisc {}.portaBeats)
+            misc->setProperty ("portaTime", m.portaBeats);
         misc->setProperty ("echo", juce::Array<juce::var> { m.echo.feedback, m.echo.pan, m.echo.pitch, m.echo.modX, m.echo.modY, m.echo.echoes,
                                                             m.echo.timeBeats, m.echo.pingPong, m.echo.fat });
         misc->setProperty ("velocityTracking", juce::Array<juce::var> { m.velocity.mid, m.velocity.pan, m.velocity.modX, m.velocity.modY });
@@ -1476,6 +1482,9 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         m.shiftBeats = juce::jlimit (0.0f, 1.0f, (float) (double) misc.getProperty ("shift", 0.0));
         m.gateBeats = juce::jlimit (0.0f, 4.0f, (float) (double) misc.getProperty ("gate", 0.0));
         m.fullPorta = (bool) misc.getProperty ("fullPorta", true);
+        m.mono = (bool) misc.getProperty ("mono", false);
+        m.porta = (bool) misc.getProperty ("porta", false);
+        m.portaBeats = juce::jlimit (0.0f, 8.0f, (float) (double) misc.getProperty ("portaTime", (double) ChannelMisc {}.portaBeats));
         if (const auto& e = misc["echo"]; e.isArray() && e.size() >= 9)
         {
             m.echo.feedback = juce::jlimit (0.0f, 2.0f, (float) (double) e[0]);
@@ -1660,6 +1669,14 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         def.patcher = patcherFromVar (c["patcher"], song);
     def.uid = uidFrom (c.getProperty ("uid", {}));
     def.standIns = standInsFromVar (c["standIns"]);
+    // projects saved before round 168l: an FL engine's (or another generator's) Mono / Porta, imported from FL, was
+    // only in the LYNX Synth's settings (the Mono box came from FL's Mono flag or a Max of 1; a Max of 1 is not Mono)
+    if (const auto& misc = c["misc"]; def.instrument != InstrumentKind::synth && ! misc.hasProperty ("mono") && ! misc.hasProperty ("porta"))
+    {
+        def.misc.mono = def.synth.mono && def.maxPolyphony != 1;
+        def.misc.porta = def.instrument == InstrumentKind::sampler ? def.sampler.porta : def.synth.porta;
+        def.misc.portaBeats = def.instrument == InstrumentKind::sampler ? def.sampler.portaBeats : def.synth.portaBeats;
+    }
     return def;
 }
 
@@ -1706,6 +1723,10 @@ juce::var mixerTrackToVar (const MixerTrack& t)
         o->setProperty ("recordSafe", true);
     if (! t.recordTo.empty())
         o->setProperty ("recordTo", juce::String::fromUTF8 (t.recordTo.c_str()));
+    if (t.recordSource != RecordSource::postEq) // round 168x: FL's "Record" position (Post EQ, FL's default, not written)
+        o->setProperty ("recordSource", (int) t.recordSource);
+    if (t.recordDryToo)
+        o->setProperty ("recordDryToo", true);
     if (t.latencyMs != 0.0f) // FL's manual track latency, ms (REA round 165f-mixer)
         o->setProperty ("latencyMs", juce::roundToInt (t.latencyMs * 1000.0f) / 1000.0);
     if (t.latencyBypass != LatencyBypass::never)
@@ -1770,6 +1791,8 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     track.monitor = (InputMonitor) juce::jlimit (0, 3, (int) t.getProperty ("monitor", (int) InputMonitor::automatic));
     track.recordSafe = (bool) t.getProperty ("recordSafe", false);
     track.recordTo = t.getProperty ("recordTo", "").toString().toStdString();
+    track.recordSource = (RecordSource) juce::jlimit (0, 5, (int) t.getProperty ("recordSource", (int) RecordSource::postEq));
+    track.recordDryToo = (bool) t.getProperty ("recordDryToo", false);
     track.latencyMs = juce::jlimit (-maxTrackLatencyMs, maxTrackLatencyMs, (float) (double) t.getProperty ("latencyMs", 0.0));
     if (const auto bypass = t["latencyBypass"].toString(); bypass == "always")
         track.latencyBypass = LatencyBypass::always;

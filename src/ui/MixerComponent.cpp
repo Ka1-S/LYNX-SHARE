@@ -1,3 +1,4 @@
+#include "ui/FlMods.h"
 #include "platform/Paths.h"
 #include "ui/ColourPicker.h"
 #include "ui/MixerComponent.h"
@@ -863,7 +864,7 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
     headerDragTrack = -1;
     headerDragged = false;
 
-    if (part == Part::add && e.mods.isPopupMenu())
+    if (part == Part::add && flmods::popup (e.mods))
     {
         // FL's "+" menu (round 166d [SHOT]): Add one / Add multiple...
         juce::PopupMenu menu;
@@ -923,7 +924,7 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
 
     if (part == Part::arm)
     {
-        if (e.mods.isPopupMenu()) // FL: "Record <insert> to" (round 167a); the input box keeps the input menu
+        if (flmods::popup (e.mods)) // FL: "Record <insert> to" (round 167a); the input box keeps the input menu
             mixerinput::chooseRecordTo (engine, t);
         else
             mixerinput::toggleArm (engine, t, this);
@@ -937,7 +938,7 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
-    if (part == Part::meter && ! e.mods.isPopupMenu()) // clears the clip latch and the peak hold, and selects (as FL)
+    if (part == Part::meter && ! flmods::popup (e.mods)) // clears the clip latch and the peak hold, and selects (as FL)
     {
         for (int ch = 0; ch < 2; ++ch)
             if (const auto i = (std::size_t) t * 2 + (std::size_t) ch; i < levels.size())
@@ -945,7 +946,7 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
         repaint (meterArea (t).expanded (2));
     }
 
-    if (part == Part::route && e.mods.isPopupMenu())
+    if (part == Part::route && flmods::popup (e.mods))
     {
         showSendMenu (t);
         return;
@@ -954,7 +955,7 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
     if (part == Part::send)
     {
         const auto from = selected;
-        if (e.mods.isPopupMenu())
+        if (flmods::popup (e.mods))
         {
             juce::PopupMenu menu;
             const auto spec = specFor (Part::send, t);
@@ -981,7 +982,7 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
-    if (part == Part::mute && (e.mods.isPopupMenu() || e.mods.isCtrlDown())) // solo on the same LED
+    if (part == Part::mute && (flmods::popup (e.mods) || flmods::ctrl (e.mods))) // solo on the same LED
     {
         soloExclusive (t);
         return;
@@ -1007,7 +1008,7 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
-    if ((part == Part::body || part == Part::header || part == Part::meter) && ! e.mods.isPopupMenu() && (e.mods.isCtrlDown() || e.mods.isShiftDown()) && t > 0)
+    if ((part == Part::body || part == Part::header || part == Part::meter) && ! flmods::popup (e.mods) && (flmods::ctrl (e.mods) || e.mods.isShiftDown()) && t > 0)
     {
         auto s = selection;
         if (e.mods.isShiftDown())
@@ -1033,7 +1034,7 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
 
     if (part == Part::pan || part == Part::fader || part == Part::stereo)
     {
-        if (e.mods.isPopupMenu())
+        if (flmods::popup (e.mods))
         {
             ui::showValueMenu (*this, part == Part::stereo ? nullptr : &engine, specFor (part, t), valueOf (part, t),
                                [this, part, t] (double v) { setValue (part, t, v); });
@@ -1048,7 +1049,7 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
         }
     }
 
-    if (e.mods.isPopupMenu())
+    if (flmods::popup (e.mods))
     {
         showMenu (t);
         return;
@@ -1086,7 +1087,7 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
             dragTrack = t;
             dragStartValue = part == Part::pan ? track.pan : track.volume;
 
-            if (part == Part::fader && ! e.mods.isCtrlDown()) // clicking the track jumps the fader there
+            if (part == Part::fader && ! flmods::ctrl (e.mods)) // clicking the track jumps the fader there
             {
                 const auto area = faderRail (t);
                 const auto capY = area.getBottom() - track.volume * (float) area.getHeight();
@@ -3744,7 +3745,7 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
             setEqFromGraph (eqPointBase - eqControl, e.getPosition());
             return;
         }
-        if (e.mods.isPopupMenu())
+        if (flmods::popup (e.mods))
             ui::showValueMenu (*this, &engine, specFor (eqControl, -1), valueOf (eqControl, -1), [this, eqControl] (double v) { setValue (eqControl, -1, v); });
         else if (ui::isResetClick (e))
             setValue (eqControl, -1, specFor (eqControl, -1).defaultValue);
@@ -3759,7 +3760,7 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
 
     if (track > 0 && armBounds().contains (e.getPosition()))
     {
-        if (e.mods.isPopupMenu()) // FL: "Record <insert> to" (round 167a)
+        if (flmods::popup (e.mods)) // FL: "Record <insert> to" (round 167a)
             mixerinput::chooseRecordTo (engine, track);
         else
             mixerinput::toggleArm (engine, track, this);
@@ -3775,7 +3776,7 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
 
     if (! s->empty() && fxSwitchBounds().contains (e.getPosition()))
     {
-        if (e.mods.isPopupMenu())
+        if (flmods::popup (e.mods))
             toggleAllWindows();
         else
         {
@@ -3811,7 +3812,7 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
 
         if (mixBounds (i).contains (e.getPosition()))
         {
-            if (e.mods.isPopupMenu())
+            if (flmods::popup (e.mods))
                 ui::showValueMenu (*this, &engine, specFor (mixParam, i), valueOf (mixParam, i), [this, i] (double v) { setValue (mixParam, i, v); });
             else if (ui::isResetClick (e))
             {
@@ -3828,7 +3829,7 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
             return;
         }
 
-        if (e.mods.isPopupMenu())
+        if (flmods::popup (e.mods))
             showSlotMenu (i);
         else if (ledBounds (i).contains (e.getPosition())) // LED: bypass
             engine.editSong ([t = track, i] (Song& song) {
@@ -3878,7 +3879,7 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
 
     if (vocoderSelected() && bandLevelsBounds().contains (e.getPosition()))
     {
-        if (e.mods.isPopupMenu())
+        if (flmods::popup (e.mods))
             showBandLevelMenu();
         else
         {
@@ -3896,7 +3897,7 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
 
     if (gateSelected() && gateStepsBounds().contains (e.getPosition()))
     {
-        if (e.mods.isPopupMenu())
+        if (flmods::popup (e.mods))
             showGatePatterns();
         else
         {
@@ -3908,7 +3909,7 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
 
     dragParam = knobAt (e.getPosition());
 
-    if (dragParam >= 0 && e.mods.isPopupMenu())
+    if (dragParam >= 0 && flmods::popup (e.mods))
     {
         const auto p = dragParam;
         ui::showValueMenu (*this, &engine, specFor (p, selectedSlot), valueOf (p, selectedSlot),
@@ -5026,6 +5027,23 @@ void showMenu (AudioEngine& engine, int track, juce::Component* target, std::fun
                       });
     }
 
+    if (track > 0) // FL's "Record" positions (round 168x, issue #41; FL's AudioRecorderRoutingMenu, in its order)
+    {
+        menu.addSectionHeader (tr ("Record"));
+        const std::pair<RecordSource, const char*> points[] = { { RecordSource::externalInput, TR_NOOP ("External input only") },
+                                                               { RecordSource::externalAndMixer, TR_NOOP ("External and mixer input") },
+                                                               { RecordSource::postEffects, TR_NOOP ("Post effects") },
+                                                               { RecordSource::postEq, TR_NOOP ("Post EQ") },
+                                                               { RecordSource::postLevel, TR_NOOP ("Post level and panning") },
+                                                               { RecordSource::postTrack, TR_NOOP ("Post track") } };
+        for (const auto& [point, label] : points)
+            menu.addItem (tr (label), true, mt.recordSource == point, [&engine, track, point = point] { engine.setInsertRecordSource (track, point); });
+        // LYNX extra: the dry device input as a second take beside a processed one (DI + amp, for re-amping)
+        menu.addItem (tr ("Also record the dry input as a second take (LYNX)"), mt.recordSource != RecordSource::externalInput,
+                      mt.recordDryToo && mt.recordSource != RecordSource::externalInput,
+                      [&engine, track, on = mt.recordDryToo] { engine.setInsertRecordDryToo (track, ! on); });
+    }
+
     menu.addSectionHeader (tr ("Monitor external input"));
     const std::pair<InputMonitor, const char*> modes[] = { { InputMonitor::off, TR_NOOP ("Off") },
                                                           { InputMonitor::whenArmed, TR_NOOP ("When armed") },
@@ -5061,8 +5079,16 @@ void showMenu (AudioEngine& engine, int track, juce::Component* target, std::fun
 
 juce::String armHint (const AudioEngine& engine, int track)
 {
-    const auto text = tr ("Record arm: Rec + Play records this insert's audio input into a Playlist clip  [RMB] record to a file");
-    if (track <= 0 || track >= (int) engine.getSong().mixer.size() || engine.getSong().mixer[(std::size_t) track].recordTo.empty())
+    auto text = tr ("Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file");
+    if (track <= 0 || track >= (int) engine.getSong().mixer.size())
+        return text;
+    // FL's hint names the position: "Recording: Post EQ" (round 168x; changed in the input box's menu)
+    static const char* const points[] { TR_NOOP ("External input only"), TR_NOOP ("External and mixer input"), TR_NOOP ("Post effects"),
+                                        TR_NOOP ("Post EQ"), TR_NOOP ("Post level and panning"), TR_NOOP ("Post track") };
+    const auto& mt = engine.getSong().mixer[(std::size_t) track];
+    text = tr ("Recording: {0}", { tr (points[juce::jlimit (0, 5, (int) mt.recordSource)]) })
+           + (mt.recordDryToo && mt.recordSource != RecordSource::externalInput ? " + " + tr ("dry input") : juce::String()) + "  " + text;
+    if (mt.recordTo.empty())
         return text;
     const auto file = juce::File (juce::String::fromUTF8 (engine.getSong().mixer[(std::size_t) track].recordTo.c_str()));
     return tr ("Record to: {0}", { file.getFileName() }) + "  " + text;

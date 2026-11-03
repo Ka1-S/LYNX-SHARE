@@ -24,7 +24,8 @@ bool among (const std::string& ext, std::initializer_list<const char*> list)
     return std::any_of (list.begin(), list.end(), [&ext] (const char* e) { return ext == e; });
 }
 
-bool isAudioExt (const std::string& ext) { return among (ext, { "wav", "flac", "ogg", "mp3", "aif", "aiff", "wv" }); }
+// (".speech": FL's speech presets, spoken into a sample by core/Speech.h; round 168b)
+bool isAudioExt (const std::string& ext) { return among (ext, { "wav", "flac", "ogg", "mp3", "aif", "aiff", "wv", "speech" }); }
 bool isFontExt (const std::string& ext) { return among (ext, { "sf2", "sf3" }); }
 bool isPresetExt (const std::string& ext) { return among (ext, { "fst" }); }
 bool isProjectExt (const std::string& ext) { return among (ext, { "lynx", "flp", "mid", "midi" }); }

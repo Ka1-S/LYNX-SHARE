@@ -1018,6 +1018,14 @@ void AudioEngine::panic()
         w.store (0);
 }
 
+double AudioEngine::songPlayheadTicks() const noexcept
+{
+    const auto tick = juce::jmax (0.0, transport.positionTicks.load (std::memory_order_relaxed));
+    if (song.hasLoop() || liveInput.linearSong.load (std::memory_order_relaxed))
+        return tick;
+    return std::fmod (tick, (double) juce::jmax<std::int64_t> (1, song.songLength()));
+}
+
 double AudioEngine::estimatedPositionNow() const noexcept
 {
     // the position only moves block by block; interpolate by the time since the last block
@@ -1240,9 +1248,14 @@ void AudioEngine::startAudioTake()
 
     // one take per armed insert that has an input source; without armed inserts (Settings' "Record input audio"),
     // the first two input channels into a new insert
+    // round 168x (issue #41): FL's "Record" position of each insert. "External input only" records the device input;
+    // the other positions tap the insert (stereo, after the render) and need no input of their own; LYNX's "also the
+    // dry input" adds the device input as a second take
     struct Wanted
     {
         int track, first, channels;
+        RecordSource point = RecordSource::externalInput;
+        bool dry = false; // the second, dry take of "also record the dry input (LYNX)"
     };
     std::vector<Wanted> wanted;
     std::vector<int> withoutInput;
@@ -1251,7 +1264,15 @@ void AudioEngine::startAudioTake()
     {
         if (t <= 0 || t >= (int) song.mixer.size() || (int) wanted.size() >= maxTakes)
             continue;
-        const auto [first, count] = inputChannelsOf (song.mixer[(std::size_t) t], deviceChannels);
+        const auto& mt = song.mixer[(std::size_t) t];
+        const auto [first, count] = inputChannelsOf (mt, deviceChannels);
+        if (mt.recordSource != RecordSource::externalInput)
+        {
+            wanted.push_back ({ t, 0, 2, mt.recordSource, false });
+            if (mt.recordDryToo && count > 0 && (int) wanted.size() < maxTakes && (int) wanted.size() < LiveInput::maxTaps)
+                wanted.push_back ({ t, first, count, RecordSource::externalInput, true });
+            continue;
+        }
         if (count == 0)
             withoutInput.push_back (t);
         else
@@ -1298,14 +1319,19 @@ void AudioEngine::startAudioTake()
     const auto now = juce::Time::getCurrentTime();
     std::vector<std::shared_ptr<Take>> made;
 
+    int tapsUsed = 0;
     for (const auto& w : wanted)
     {
         juce::String insert;
         if (w.track > 0)
             insert = song.mixer[(std::size_t) w.track].name.empty() ? "Insert " + juce::String (w.track)
                                                                     : juce::String::fromUTF8 (song.mixer[(std::size_t) w.track].name.c_str());
+        if (w.dry)
+            insert += " DI"; // the dry take of "also record the dry input (LYNX)"
         juce::File file;
-        const auto recordTo = w.track > 0 ? juce::String::fromUTF8 (song.mixer[(std::size_t) w.track].recordTo.c_str()) : juce::String();
+        auto recordTo = w.track > 0 ? juce::String::fromUTF8 (song.mixer[(std::size_t) w.track].recordTo.c_str()) : juce::String();
+        if (w.dry && recordTo.isNotEmpty())
+            recordTo = juce::File (recordTo).getSiblingFile (juce::File (recordTo).getFileNameWithoutExtension() + " DI.wav").getFullPathName();
         if (recordTo.isNotEmpty() && juce::File::isAbsolutePath (recordTo))
         {
             // FL's "Record <insert> to" file (round 167a): that file; LYNX never overwrites an earlier take, the next
@@ -1345,6 +1371,22 @@ void AudioEngine::startAudioTake()
         take->first = w.first;
         take->channels = w.channels;
         take->file = file;
+        if (w.point != RecordSource::externalInput && tapsUsed < LiveInput::maxTaps)
+        {
+            take->tap = tapsUsed++;
+            // the effects' latency up to the tap: the slots' (the planned output latency minus the input alignment and
+            // the manual track latency, which delays nothing inside the insert)
+            if (w.point >= RecordSource::postEffects)
+                take->skip = insertEffectsLatency (getPdcPlan(), song, w.track, takeSampleRate);
+            auto& slot = liveInput.taps[(std::size_t) take->tap];
+            slot.point.store ((int) w.point);
+            slot.track.store (w.track);
+        }
+        // a tap after the slots plays back through a new insert (through its own one it would get the effects twice)
+        if (w.point >= RecordSource::postEffects)
+            take->playThrough = 0;
+        else
+            take->playThrough = w.track;
         // ~22 s at 48 kHz of room between the audio thread and the disk
         take->stream = std::make_unique<takes::TakeStream> (w.channels, 1 << 20);
         if (! take->writer.open (file.getFullPathName().toStdString(), takeSampleRate, w.channels, format))
@@ -1375,6 +1417,7 @@ void AudioEngine::startAudioTake()
         recordThread.startThread (juce::Thread::Priority::high);
     recordThread.addTimeSliceClient (drainer.get());
 
+    liveInput.tapCount.store (tapsUsed);
     const juce::SpinLock::ScopedLockType lock (takeLock);
     takeCount = 0;
     for (auto& take : made)
@@ -1396,7 +1439,7 @@ void AudioEngine::writeJournals()
         j.ticksPerSample = takeTicksPerSample;
         j.sampleRate = takeSampleRate;
         j.latency = takeLatency;
-        j.insert = take->track;
+        j.insert = take->playThrough;
         j.playlistTrack = -1;
         j.project = recordingStem.toStdString();
         const auto journal = journalFor (take->file);
@@ -1424,9 +1467,16 @@ void AudioEngine::finishAudioTake()
         draining.clear();
     }
 
+    // the recording taps are free again (the audio thread let go of the takes under takeLock above)
+    liveInput.tapCount.store (0);
+    for (auto& tap : liveInput.taps)
+        tap.track.store (-1);
+
     std::vector<std::shared_ptr<Take>> kept;
     for (auto& take : done)
     {
+        if (take->tap >= 0 && take->skipped > 0) // a tapped take: the frames it dropped at its start close it
+            take->stream->pushSilence (take->skipped);
         take->stream->finish(); // the audio thread let go of it (takeLock above)
         const juce::ScopedLock lock (take->drainMutex);
         take->drain();
@@ -1511,7 +1561,7 @@ void AudioEngine::finishAudioTake()
 
     std::vector<takes::TakeFile> made;
     for (const auto& take : kept)
-        made.push_back ({ take->file.getFullPathName().toStdString(), take->file.getFileNameWithoutExtension().toStdString(), take->track });
+        made.push_back ({ take->file.getFullPathName().toStdString(), take->file.getFileNameWithoutExtension().toStdString(), take->playThrough });
 
     editSong ([made, parts] (Song& s) { takes::placeTakeClips (s, made, parts); });
     dropJournals();
@@ -1747,6 +1797,18 @@ void AudioEngine::setInsertMonitor (int track, InputMonitor mode)
 {
     if (track >= 0 && track < (int) song.mixer.size())
         editSong ([=] (Song& s) { s.mixer[(std::size_t) track].monitor = mode; });
+}
+
+void AudioEngine::setInsertRecordSource (int track, RecordSource source)
+{
+    if (track > 0 && track < (int) song.mixer.size() && song.mixer[(std::size_t) track].recordSource != source)
+        editSong ([=] (Song& s) { s.mixer[(std::size_t) track].recordSource = source; });
+}
+
+void AudioEngine::setInsertRecordDryToo (int track, bool on)
+{
+    if (track > 0 && track < (int) song.mixer.size() && song.mixer[(std::size_t) track].recordDryToo != on)
+        editSong ([=] (Song& s) { s.mixer[(std::size_t) track].recordDryToo = on; });
 }
 
 void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& m)
@@ -3925,15 +3987,27 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
 
         // audio recording: this block's input goes to the takes' streams (without waiting on a lock). Every take gets
         // every block (silence for an input channel missing now), so all of them keep the same timeline (round 163).
+        // The lock is held through the render when takes are tapped inside their inserts (round 168x): their part of
+        // this block is pushed after the render, and every take must get every block.
+        auto takesLocked = false;
+        auto tappedTakes = false;
         if (playing && transport.recording.load (std::memory_order_relaxed))
         {
-            const juce::SpinLock::ScopedTryLockType lock (takeLock);
+            takesLocked = takeLock.tryEnter();
 
-            if (lock.isLocked() && takeCount > 0)
+            if (takesLocked && takeCount > 0)
             {
                 for (int k = 0; k < takeCount; ++k)
                 {
                     auto* take = takes[(std::size_t) k];
+                    if (take->tap >= 0) // filled by the renderer: silence until it writes the tap
+                    {
+                        tappedTakes = true;
+                        if (n <= LiveInput::tapCapacity)
+                            for (auto& d : liveInput.taps[(std::size_t) take->tap].data)
+                                std::fill (d.begin(), d.begin() + n, 0.0f);
+                        continue;
+                    }
                     const std::array<const float*, 2> data { liveInput.channel (take->first, 0), liveInput.channel (take->first + take->channels - 1, 0) };
                     if (data[0] == nullptr || data[1] == nullptr)
                         take->stream->pushSilence (n);
@@ -3946,6 +4020,11 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
                 takeFrames.fetch_add (n, std::memory_order_relaxed);
                 takeTicks.store (takeTicks.load (std::memory_order_relaxed) + n * tps, std::memory_order_relaxed);
             }
+            if (takesLocked && ! tappedTakes)
+            {
+                takeLock.exit();
+                takesLocked = false;
+            }
         }
 
         for (int ch = 0; ch < numOutputChannels; ++ch)
@@ -3956,6 +4035,28 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
 
         player.audioDeviceIOCallbackWithContext (inputs.data(), numInputChannels, outputs.data(), numOutputChannels, n, context);
         routeOutputs (outputs.data(), numOutputChannels, n);
+
+        if (takesLocked) // the tapped takes' part of this block, now rendered (round 168x)
+        {
+            for (int k = 0; k < takeCount; ++k)
+                if (auto* take = takes[(std::size_t) k]; take->tap >= 0)
+                {
+                    if (n > LiveInput::tapCapacity)
+                    {
+                        take->stream->pushSilence (n);
+                        continue;
+                    }
+                    auto& tap = liveInput.taps[(std::size_t) take->tap];
+                    const auto drop = juce::jmin (n, take->skip - take->skipped); // the effects' latency at the start
+                    take->skipped += drop;
+                    if (drop < n)
+                    {
+                        const std::array<const float*, 2> data { tap.data[0].data() + drop, tap.data[1].data() + drop };
+                        take->stream->push (data.data(), n - drop);
+                    }
+                }
+            takeLock.exit();
+        }
 
         for (int ch = 0; ch < numOutputChannels; ++ch)
             if (outputs[(std::size_t) ch] != nullptr)
