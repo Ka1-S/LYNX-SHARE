@@ -32,10 +32,12 @@ TEST (typing168t2_fl_octave_root_and_ctrl_t_in_playlist)
     CHECK (typingPianoNote ('K') == -1 && typingPianoNote ('A') == -1);
 
     KeyMap map;
-    // Ctrl+T: the Playlist's "Add auto" marker wins while it has the focus, piano on or off; elsewhere the toggle
+    // Ctrl+T: the editors' "Add auto" marker wins while they have the focus (Playlist measured in FL; the Piano roll's
+    // own Ctrl+T marker is round 168g's), piano on or off; elsewhere the toggle
     CHECK (map.find ({ 'T', ctrl }, Context::playlist, true) == "playlist.markerAuto");
+    CHECK (map.find ({ 'T', ctrl }, Context::pianoRoll, true) == "pianoRoll.markerAuto");
     CHECK (map.find ({ 'T', ctrl }, Context::channelRack, true) == "view.typingPiano");
-    CHECK (map.find ({ 'T', ctrl }, Context::pianoRoll, true) == "view.typingPiano");
+    CHECK (map.find ({ 'T', ctrl }, Context::mixer, true) == "view.typingPiano");
     // piano on: a non-note letter is swallowed too (FL: K, next channel, did nothing in the Piano roll)
     CHECK (map.find ({ 'K', none }, Context::pianoRoll, false) == "pianoRoll.nextChannel");
     CHECK (map.find ({ 'K', none }, Context::pianoRoll, true).empty());
