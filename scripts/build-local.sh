@@ -202,7 +202,7 @@ $CXX $FLAGS src/core/Dx10.cpp tools/dx10render.cpp -o build-local/dx10render 2> 
 $CXX $FLAGS src/core/Kepler.cpp src/core/IldspMath.cpp tools/keplerrender.cpp -o build-local/keplerrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/TransistorBass.cpp tools/tbassrender.cpp -o build-local/tbassrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/PoiZone.cpp tools/poizonerender.cpp -o build-local/poizonerender 2> >(grep -v 'glibc version' >&2)
-$CXX $FLAGS src/core/Toxic.cpp src/core/ToxicFx.cpp src/core/PoiZone.cpp src/core/LynxBanks.cpp src/core/ToxicBank.cpp src/core/PoiZoneBank.cpp tools/bankrender.cpp -o build-local/bankrender 2> >(grep -v 'glibc version' >&2)
+$CXX $FLAGS $CORE $WAVPACK tools/bankrender.cpp -o build-local/bankrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/FruityDelay.cpp tools/fdelayrender.cpp -o build-local/fdelayrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS $CORE $WAVPACK tools/distructorrender.cpp -o build-local/distructorrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/ThreeOsc.cpp tools/threeoscrender.cpp -o build-local/threeoscrender 2> >(grep -v 'glibc version' >&2)
