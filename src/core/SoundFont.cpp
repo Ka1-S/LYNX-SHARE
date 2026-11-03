@@ -1060,6 +1060,7 @@ public:
         chorus.reset();
     }
 
+    bool followsSlides() const noexcept override { return true; } // (round 168l: a Mono channel's notes)
     void slideTo (int key, float cents, float samples) noexcept override
     {
         // the sounding voices glide to the new key (FL's slide notes)

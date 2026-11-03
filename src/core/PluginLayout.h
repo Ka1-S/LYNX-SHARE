@@ -89,6 +89,9 @@ struct Layout
 // of knobs (sections of up to 6) so that every native effect gets a window.
 const Layout& layoutFor (EffectKind kind);
 bool hasFlLayout (EffectKind kind);
+// the display graphs that take the mouse in the plugin window (edited there: EQ bands, pads, point editors…); the
+// other displays are pictures. Round 168x (issue #40): Maximus' In/Out curve "maxcurve" joined them.
+bool displayTakesMouse (const char* display);
 
 // The kinds that have an FL arrangement (in the order of docs/analise/UI_STUDY_plugins93.md).
 const std::vector<EffectKind>& flLayoutKinds();

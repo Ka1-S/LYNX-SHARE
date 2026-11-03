@@ -19,6 +19,7 @@
 #include "core/LoadTrace.h"
 #include "engine/Mp3Format.h"
 #include "engine/WavPackFormat.h"
+#include "core/Speech.h"
 
 namespace lynx
 {
@@ -171,7 +172,7 @@ bool SampleLibrary::isSampleFile (const juce::File& file)
 
 juce::String SampleLibrary::wildcard() const
 {
-    return formats.getWildcardForAllFormats();
+    return formats.getWildcardForAllFormats() + ";*.speech"; // FL's speech files are samples too (round 168b)
 }
 
 std::unique_ptr<juce::AudioFormatReader> SampleLibrary::createReader (const juce::File& file)
@@ -669,6 +670,23 @@ std::shared_ptr<const SampleData> SampleLibrary::decode (const juce::String& pat
 
     if (! file.existsAsFile())
         return nullptr;
+
+    // FL's .speech files: spoken by LYNX's speech synthesizer, one slice (marker) per word (round 168b; FL's sample
+    // loader speaks them too and hands the words over as a Zero-X grid)
+    if (file.hasFileExtension ("speech"))
+    {
+        speech::Settings settings;
+        if (! speech::parse (file.loadFileAsString().toStdString(), settings))
+            return nullptr;
+        auto spoken = speech::render (settings, 44100.0);
+        if (spoken.samples.empty())
+            return nullptr;
+        auto data = std::make_shared<SampleData>();
+        data->sampleRate = spoken.sampleRate;
+        data->left = std::move (spoken.samples);
+        data->markerStarts = std::move (spoken.wordStarts);
+        return data;
+    }
 
     auto reader = createReader (file);
 

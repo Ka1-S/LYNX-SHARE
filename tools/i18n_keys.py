@@ -27,7 +27,7 @@ def source_keys():
     keys = {}
     call = re.compile(r'(?<![A-Za-z0-9_])(tr|trc|TR_NOOP)\s*\(\s*')
     literal = re.compile(r'"((?:[^"\\\n]|\\.)*)"\s*')
-    for path in sorted(list((root / "src").rglob("*.cpp")) + list((root / "src").rglob("*.h"))):
+    for path in sorted(list((root / "src").rglob("*.cpp")) + list((root / "src").rglob("*.h")) + list((root / "src").rglob("*.inc"))):
         text = path.read_text(encoding="utf-8", errors="replace")
         text = "\n".join("" if l.strip().startswith("//") else l for l in text.split("\n"))
         for m in call.finditer(text):

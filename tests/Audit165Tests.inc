@@ -9,5 +9,5 @@ TEST (audit165_drop_targets_take_every_sample_the_browser_lists)
         CHECK (isSampleExtension (ext));
     for (const auto* ext : { "", ".", "mid", ".sf2", "flp", "wave", "w", "txt", "mp" })
         CHECK (! isSampleExtension (ext));
-    CHECK (lynx::sampleFileExtensions.size() == 7);
+    CHECK (lynx::sampleFileExtensions.size() == 8); // + FL's .speech (round 168b)
 }
