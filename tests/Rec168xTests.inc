@@ -113,6 +113,9 @@ TEST (rec168_wet_take_latency_is_the_slots_latency)
     std::vector<std::vector<int>> slots (4);
     slots[2] = { 64, 128 };
     slots[1] = { 500 };
+    for (int k = 0; k < 2; ++k)
+        song.mixer[2].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::utility));
+    song.mixer[1].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::utility));
     song.mixer[1].sends.push_back ({ 2, 1.0f });
     const auto plan = lynx::computePdc (song, {}, slots, 48000.0);
     CHECK (lynx::insertEffectsLatency (plan, song, 2, 48000.0) == 192);
