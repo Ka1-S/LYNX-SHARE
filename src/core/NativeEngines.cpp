@@ -186,6 +186,24 @@ std::vector<std::string> presetCandidates (const std::string& presetFolder, bool
         if (const auto path = resolveFlPath (folder + "\\" + name, access.roots); exists (path))
             out.push_back (path);
 
+    // then the plugin's entry in FL's Plugin database (Generators\<category>\<plugin>.fst): the state FL itself adds
+    // when the plugin is picked (Drumaxx' "Default Kit", REA_rodada169e §1; FL ships no Default.fst for Drumaxx,
+    // Drumpad, BassDrum, Sakura...). Before any other preset of the folder.
+    if (generator && access.listPresets)
+    {
+        const auto wanted = lower (presetFolder + ".fst");
+        for (const auto& path : access.listPresets (resolveFlPath ("%FLStudioData%\\Patches\\Plugin database\\Generators", access.roots)))
+        {
+            const auto cut = path.find_last_of ("\\/");
+            if (lower (cut == std::string::npos ? path : path.substr (cut + 1)) == wanted
+                && std::find (out.begin(), out.end(), path) == out.end())
+            {
+                out.push_back (path);
+                break;
+            }
+        }
+    }
+
     if (access.listPresets)
         for (const auto& path : access.listPresets (resolveFlPath (folder, access.roots)))
             if ((endsWith (path, ".fst") || endsWith (path, ".tbio") || endsWith (path, ".gmsynth") || endsWith (path, ".mrp"))

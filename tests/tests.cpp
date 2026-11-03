@@ -17016,3 +17016,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Mixer168hTests.inc"
 #include "Mute53fTests.inc"
 #include "Issue32cTests.inc"
+#include "Drumaxx169eTests.inc"
