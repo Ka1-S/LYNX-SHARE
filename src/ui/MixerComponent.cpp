@@ -1247,7 +1247,7 @@ bool MixerStrips::moveSelected (int delta)
 {
     auto moved = selection;
     bool ok = false;
-    engine.editSong ([&] (Song& s) { ok = mixerops::moveTracks (s, moved, delta); });
+    engine.editSongStructural ([&] (Song& s) { ok = mixerops::moveTracks (s, moved, delta); });
 
     if (ok)
         setSelection (moved, juce::jlimit (1, (int) engine.getSong().mixer.size() - 1, selected + (delta < 0 ? -1 : 1)));
@@ -1294,20 +1294,32 @@ void MixerStrips::showSendMenu (int t)
     const auto fromName = juce::String::fromUTF8 (song.mixer[(std::size_t) from].name.c_str());
     juce::PopupMenu menu;
     menu.addSectionHeader (fromName + juce::String::fromUTF8 (" \xe2\x86\x92 ") + juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()));
+    // FL's route arrow menu (round 168s, issue #32 [SHOT] r168s c_f10): route / route only / sidechain / sidechain only
     const auto on = song.routes (from, t);
-    menu.addItem (on ? tr ("Remove this send") : tr ("Send here"), on || song.canRoute (from, t), false, [this, from, t, on] {
-        engine.editSong ([from, t, on] (Song& s) { s.setRoute (from, t, ! on); });
-    });
-    menu.addItem (tr ("Send only here"), on || song.canRoute (from, t), false, [this, from, t] {
-        engine.editSong ([from, t] (Song& s) { mixerops::routeTo (s, { from }, t, true); });
-    });
-    menu.addItem (tr ("Sidechain only (no audio): the compressors here listen to it"), t > 0 && (on || song.canRoute (from, t)), false, [this, from, t] {
+    const auto can = on || song.canRoute (from, t);
+    using K = mixerops::RouteKind;
+    auto route = [this, from, t] (K kind) {
         int linked = 0;
-        engine.editSong ([from, t, &linked] (Song& s) { linked = mixerops::sidechainTo (s, from, t); });
-        if (linked == 0)
+        engine.editSong ([from, t, kind, &linked] (Song& s) {
+            mixerops::routeSelectedTo (s, { from }, t, kind);
+            for (const auto& fx : s.mixer[(std::size_t) t].effects)
+                linked += fx.sidechain == from ? 1 : 0;
+        });
+        if ((kind == K::sidechain || kind == K::sidechainOnly) && linked == 0)
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Sidechain"),
                                                     tr ("The link was made; add a compressor to this insert to use it."));
-    });
+    };
+    menu.addItem (tr ("Route to this track"), can && ! on, false, [route] { route (K::route); });
+    menu.addItem (tr ("Route to this track only"), can, false, [route] { route (K::routeOnly); });
+    menu.addSeparator();
+    menu.addItem (tr ("Sidechain to this track"), t > 0 && can, false, [route] { route (K::sidechain); });
+    menu.addItem (tr ("Sidechain to this track only"), t > 0 && can, false, [route] { route (K::sidechainOnly); });
+    if (on)
+    {
+        menu.addSeparator();
+        menu.addItem (t == 0 ? tr ("Remove the route to Master") : tr ("Remove this send"),
+                      [this, from, t] { engine.editSong ([from, t] (Song& s) { s.setRoute (from, t, false); }); });
+    }
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
@@ -4061,7 +4073,7 @@ void EffectsPanel::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseW
     {
         const auto to = slot + ((wheel.deltaY != 0.0f ? wheel.deltaY : -wheel.deltaX) > 0.0f ? -1 : 1);
         bool moved = false;
-        engine.editSong ([t = track, slot, to, &moved] (Song& song) { moved = mixerops::moveEffectSlot (song, t, slot, to); });
+        engine.editSongStructural ([t = track, slot, to, &moved] (Song& song) { moved = mixerops::moveEffectSlot (song, t, slot, to); });
         if (moved)
             selectedSlot = to;
         repaint();
@@ -4311,7 +4323,7 @@ void EffectsPanel::mouseUp (const juce::MouseEvent&)
     if (dragSlot >= 0 && dropSlot >= 0 && dropSlot != dragSlot)
     {
         bool moved = false;
-        engine.editSong ([t = track, from = dragSlot, to = dropSlot, &moved] (Song& song) { moved = mixerops::moveEffectSlot (song, t, from, to); });
+        engine.editSongStructural ([t = track, from = dragSlot, to = dropSlot, &moved] (Song& song) { moved = mixerops::moveEffectSlot (song, t, from, to); });
         if (moved)
             selectedSlot = dropSlot;
     }
@@ -4788,11 +4800,11 @@ void EffectsPanel::showSlotMenu (int slot)
     });
     menu.addSeparator();
     menu.addItem (tr ("Move up"), slot > 0, false, [this, slot] {
-        engine.editSong ([t = track, slot] (Song& song) { song.swapEffectSlots (t, slot, slot - 1); });
+        engine.editSongStructural ([t = track, slot] (Song& song) { song.swapEffectSlots (t, slot, slot - 1); });
         selectedSlot = slot - 1;
     });
     menu.addItem (tr ("Move down"), slot < count - 1, false, [this, slot] {
-        engine.editSong ([t = track, slot] (Song& song) { song.swapEffectSlots (t, slot, slot + 1); });
+        engine.editSongStructural ([t = track, slot] (Song& song) { song.swapEffectSlots (t, slot, slot + 1); });
         selectedSlot = slot + 1;
     });
     if ((*slots())[(std::size_t) slot].kind == EffectKind::plugin)
@@ -4850,7 +4862,7 @@ void EffectsPanel::deleteSlot (int slot)
     const auto* s = slots();
     if (s == nullptr || slot < 0 || slot >= (int) s->size())
         return;
-    engine.editSong ([t = track, slot] (Song& song) { song.removeEffectSlot (t, slot); });
+    engine.editSongStructural ([t = track, slot] (Song& song) { song.removeEffectSlot (t, slot); });
     selectedSlot = juce::jmin (slot, (int) slots()->size() - 1);
     repaint();
 }

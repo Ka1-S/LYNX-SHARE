@@ -39,6 +39,11 @@ struct RackState
     std::vector<std::shared_ptr<Instrument>> instruments; // one per channel
     std::vector<std::vector<std::shared_ptr<Effect>>> effects; // [mixer track][slot]
     double sampleRate = 44100.0; // rate the new instruments were prepared with
+    // Round 168s (issue #32): this snapshot's number, the one it was built from, and for each channel the channel of
+    // that snapshot it is (−1 = new): the renderer moves its per-channel note state along when channels moved
+    std::uint64_t serial = 0, builtFrom = 0;
+    std::vector<int> channelFrom;
+    bool channelsMoved = false;
 
     // Automation, preprocessed so the audio thread only does table lookups.
     // Indices into song.automations, or -1 = no automation.
@@ -414,6 +419,9 @@ private:
     bool playTruncatedOnTransport = true, resetPluginsOnTransport = false;
     unsigned userJumpSerial = 0, seenUserJumpSerial = 0;
     const RackState* lastState = nullptr;
+    std::uint64_t lastSerial = 0;
+    std::vector<VoiceOrder> voiceOrderScratch;   // (round 168s: moving the note state with moved channels)
+    std::vector<NoteMask> heldScratch;
     EventBuffer events;
     std::vector<float> mixBuffers; // maxMixerTracks * 2 * blockCapacity
     std::array<float, RackState::maxAutomations> automationValues {}; // NaN = not evaluated yet
@@ -440,6 +448,7 @@ private:
     std::array<VoiceOrder, maxChannels> voiceOrders {};      // sounding notes in order, for the channels' Max polyphony
     // FL's channel Mono / Porta in front of every instrument (round 168l, core/ChannelPoly.h): one per channel (prepare)
     std::vector<channelpoly::Layer> polyLayers;
+    std::vector<channelpoly::Layer> polyScratch; // (round 168s: channels moved, see process)
     channelpoly::Mode polyMode (const ChannelDef& c, const Instrument& instrument) const noexcept;
     void clearPolyLayers() noexcept;
     static constexpr int chunkCapacity = 512;               // chunks processed at once

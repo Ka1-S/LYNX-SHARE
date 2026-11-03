@@ -1,0 +1,10 @@
+[Unit]
+Description=LYNX SHARE daily backup
+
+[Timer]
+OnCalendar=*-*-* 04:20:00
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

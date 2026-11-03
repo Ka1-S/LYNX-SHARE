@@ -1015,7 +1015,6 @@ ui::ValueSpec ChannelRackComponent::specFor (Area area, int row) const
     spec.name = name + " - " + tr ("Target mixer track");
     spec.maximum = maxMixerTracks - 1; // every insert, like FL (round 162: the inserts past the mixer's last one are added)
     spec.interval = 1.0;
-    spec.pixelsForRange = 3.0 * juce::jmax (1.0, spec.maximum);
     spec.toText = [] (double v) { return v < 0.5 ? tr ("Master") : tr ("Insert {0}", { juce::String (juce::roundToInt (v)) }); };
     spec.fromText = [] (const juce::String& t) -> std::optional<double> {
         if (t.trim().startsWithIgnoreCase ("m"))
@@ -1023,7 +1022,7 @@ ui::ValueSpec ChannelRackComponent::specFor (Area area, int row) const
         const auto digits = t.retainCharacters ("0123456789");
         return digits.isEmpty() ? std::nullopt : std::optional<double> (digits.getDoubleValue());
     };
-    return spec;
+    return ui::digitWheel (spec); // FL's channel rack mixer-track digiwheel (round 168s)
 }
 
 double ChannelRackComponent::valueOf (Area area, int row) const
@@ -1204,7 +1203,7 @@ bool ChannelRackComponent::moveSelected (int delta)
     bool moved = false;
     std::vector<int> after;
 
-    engine.editSong ([&] (Song& s) {
+    engine.editSongStructural ([&] (Song& s) {
         after = rows;
         moved = moveChannels (s, after, delta);
     });
