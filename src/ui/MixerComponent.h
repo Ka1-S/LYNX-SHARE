@@ -9,6 +9,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/MeterBallistics.h"
+#include "core/MixerLayout.h"
 #include "engine/AudioEngine.h"
 #include "ui/ValueControl.h"
 
@@ -154,8 +155,13 @@ public:
     static inline bool showUsedOnly = false;
     bool isHidden (int track) const noexcept { return track > 0 && track < (int) hidden.size() && hidden[(std::size_t) track]; }
 
-    static constexpr int stripWidth = 60;
-    static constexpr int masterWidth = 76;
+    // FL's "Mixer layout" (issue #52, REA round 168h; ui-options.txt "mixerLayout", per user like FL's FXViewMode):
+    // the strip widths and arrangement of every mixer view (core/MixerLayout.h).
+    static inline mixerlayout::Layout layout = mixerlayout::defaultLayout;
+    static const mixerlayout::Spec& spec() noexcept;
+    void setLayout (mixerlayout::Layout newLayout);
+    std::function<void()> onLayoutChanged; // the main window saves ui-options.txt
+    int widthOf (int track) const noexcept { return stripWidthOf (track); }
     // x of a strip (`track` == the number of tracks: the "+" button), after the docks and separators (round 146a)
     int stripLeft (int track) const noexcept { return stripX (track); }
 
@@ -194,7 +200,19 @@ private:
     MixerDock dockOf (int track) const noexcept;
     void moved() override { repaint(); }
     static constexpr int dockGap = 14, separatorGap = 8;
-    int stripWidthOf (int track) const noexcept { return track == 0 ? masterWidth : stripWidth; }
+    int stripWidthOf (int track) const noexcept { return track == 0 ? spec().masterWidth : spec().stripWidth; }
+    // the strip's rows for the current layout and height (top to bottom)
+    struct Rows
+    {
+        int numberY = 4, iconY = 19, header = 38;        // number, icon, end of the header (with a horizontal name)
+        int nameTop = 0, nameHeight = 0;                // the vertical name column (alt layouts: low in the strip)
+        int knobsTop = 0, knobsHeight = 0, buttonsTop = 0, buttonsHeight = 0;
+        int faderTop = 0, faderBottom = 0, readoutHeight = 0;
+        int armY = -1;                                  // compact layouts: the arm button's row under the fader
+    };
+    Rows rows() const noexcept;
+    juce::Rectangle<int> nameArea (int track) const;
+    juce::Rectangle<int> iconArea (int track) const;
     int trackAt (int x) const noexcept;
     Part partAt (int track, juce::Point<int> p) const;
     juce::Rectangle<int> faderArea (int track) const;
@@ -395,6 +413,24 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (EffectsPanel)
 };
 
+// FL's "Mixer layout" drop-down in the Mixer's title bar (issue #52, REA round 168h): the current layout's name and a
+// chevron; a click lists Compact, Compact 2, Compact alt | Wide, Wide 2, Wide 3, Wide alt | Extra large.
+class MixerLayoutBox final : public juce::Component,
+                             public juce::SettableTooltipClient
+{
+public:
+    explicit MixerLayoutBox (MixerStrips& strips);
+    void paint (juce::Graphics& g) override;
+    void mouseDown (const juce::MouseEvent& e) override;
+    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    static juce::PopupMenu menu (MixerStrips& strips); // also in the mixer menu's View section
+    static constexpr int width = 96;
+
+private:
+    MixerStrips& strips;
+};
+
 class MixerComponent final : public juce::Component
 {
 public:
@@ -423,6 +459,7 @@ public:
     // A generator dragged from the Browser onto a strip (the owner has the Channel Rack that adds the channel).
     std::function<void (int, ChannelDef)> onInstrumentDropped;
     MixerStrips& getStripsForSnapshot() { return strips; }
+    MixerLayoutBox& getLayoutBox() { return layoutBox; } // the main window puts it in the Mixer's title bar
 
     static constexpr int effectsWidth = 300;
 
@@ -432,5 +469,6 @@ private:
     juce::Viewport viewport;
     juce::Viewport effectsView; // the effects panel scrolls when the mixer is short (round 163)
     EffectsPanel effects;
+    MixerLayoutBox layoutBox { strips };
 };
 } // namespace lynx

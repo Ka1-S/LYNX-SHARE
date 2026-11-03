@@ -116,6 +116,11 @@ void swapTracks (Song& song, int a, int b)
         return;
 
     std::swap (song.mixer[(std::size_t) a], song.mixer[(std::size_t) b]);
+    // a default name follows the position, as in FL (its unnamed tracks show "Insert <number>"): moving insert 16 to
+    // 8 shows "Insert 8" there, not "Insert 16" (issue #47 screenshot, round 168h)
+    for (const auto [now, was] : { std::pair { a, b }, std::pair { b, a } })
+        if (auto& name = song.mixer[(std::size_t) now].name; name == "Insert " + std::to_string (was))
+            name = "Insert " + std::to_string (now);
     remapTrackReferences (song, [a, b] (int t) { return t == a ? b : t == b ? a : t; });
 }
 

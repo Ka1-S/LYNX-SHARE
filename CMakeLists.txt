@@ -409,6 +409,7 @@ if(LYNX_BUILD_APP)
         src/ui/Theme.cpp
         src/ui/ThemeSettings.cpp
         src/ui/ColourPicker.cpp
+        src/ui/TrackIcons.cpp
         src/ui/Icons.cpp
         src/ui/I18n.cpp
         src/ui/EditorTools.cpp)

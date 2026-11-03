@@ -180,7 +180,7 @@ APP_SOURCES+=(src/core/SessionIds.cpp src/core/SessionParts.cpp src/core/StandIn
 # LYNX substitutes for missing third-party plugins (round 98)
 APP_SOURCES+=(src/core/PluginSubstitutes.cpp)
 # settings pages (General/Audio/MIDI), plugin manager, shortcut manager (round 82)
-APP_SOURCES+=(src/core/ThemePalette.cpp src/ui/ThemeSettings.cpp src/ui/ColourPicker.cpp)
+APP_SOURCES+=(src/core/ThemePalette.cpp src/ui/ThemeSettings.cpp src/ui/ColourPicker.cpp src/ui/TrackIcons.cpp)
 # Loop Starter, local (round 168b)
 APP_SOURCES+=(src/core/LoopStarter.cpp src/ui/LoopStarterWindow.cpp)
 APP_SOURCES+=(src/core/Preferences.cpp src/core/MidiSync.cpp src/engine/MidiSyncIo.cpp src/ui/SettingsPages.cpp src/ui/PluginManager.cpp src/ui/ShortcutManager.cpp)

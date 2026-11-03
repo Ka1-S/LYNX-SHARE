@@ -4,6 +4,8 @@
 #include "core/FruityDance.h"
 #include "core/VideoPlayer.h"
 #include "ui/ColourPicker.h"
+#include "ui/TrackIcons.h"
+#include "core/TrackIcons.h"
 #include "ui/PatcherEditor.h"
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
@@ -910,9 +912,17 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 g.setFont (theme::font (10.0f, true));
                 g.drawText ("R", tag, juce::Justification::centred, false);
             }
+            // the channel's icon before its name, as FL's channel button shows it (round 168h)
+            auto iconWidth = 0;
+            if (const auto icon = trackicons::iconFor (channel.icon); icon != trackicons::Icon::none)
+            {
+                iconWidth = 16;
+                ui::drawTrackIcon (g, icon, juce::Rectangle<float> (nameArea.getX() + 12.0f, nameArea.getCentreY() - 7.0f, 14.0f, 14.0f),
+                                   channel.muted ? textDisabled : textSecondary.brighter (0.3f));
+            }
             g.setColour (channel.muted ? textDisabled : textPrimary);
             textcache::drawText (g, juce::String::fromUTF8 (channel.name.c_str()),
-                                 nameArea.withTrimmedLeft (14).withTrimmedRight ((locked ? 18 : 6) + badgeWidth).toNearestInt(), juce::Justification::centredLeft, true);
+                                 nameArea.withTrimmedLeft ((float) (14 + iconWidth)).withTrimmedRight ((locked ? 18 : 6) + badgeWidth).toNearestInt(), juce::Justification::centredLeft, true);
 
             // selector: a slim pill, lit when the row is selected
             const auto pill = juce::Rectangle<float> ((float) selectLeft() + 3.0f, (float) y + 7.0f, (float) selectWidth - 6.0f, (float) rowHeight - 14.0f);
@@ -2254,6 +2264,15 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
         const auto& palette = lynxPalette();
         const auto colour = palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())];
         engine.editSong ([channel, colour] (Song& s) { s.channels[(std::size_t) channel].colour = colour; });
+    });
+    // FL's "Change icon" (SetPlugIconMenuClick, REA round 168h); LYNX's own icon set
+    menu.addItem (tr ("Change icon..."), [this, channel] {
+        if (channel >= (int) engine.getSong().channels.size())
+            return;
+        ui::showTrackIconPicker (juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1), engine.getSong().channels[(std::size_t) channel].icon, [this, channel] (int icon) {
+            if (channel < (int) engine.getSong().channels.size())
+                engine.editSong ([channel, icon] (Song& s) { s.channels[(std::size_t) channel].icon = icon; });
+        });
     });
     // FL's "Lock active/mute state" (the mute switch's menu, round 167l): soloing another channel leaves this one alone
     menu.addItem (tr ("Lock active/mute state"), true, c.soloLock, [this, channel] {
