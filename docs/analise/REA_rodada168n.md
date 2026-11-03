@@ -97,15 +97,9 @@ Wave Candy, ZGameEditor Visualizer, X-Y / X-Y-Z controllers, Control Surface, Fo
 - Pictures (/mnt/e/lynx-work/design168n/): `<engine>-before.png` (origin/main build, `--snapshot` of the same project) and
   `after/<engine>-<lynx|fl>-<100|150|200>.png` (`--instrumentshot`). The first after-shot showed two clipped captions
   (Toxic's LFO "Sync" over "Speed", "Vel curve" cut): fixed (LFO row re-spaced; small knobs' captions get 52 units).
+  Re-shot on main e45e6550 (2026-11-03, `after2/`): every caption whole at 100 / 150 / 200 %, both sources (lynx bank, FL Default).
 
 ## Where I stopped
-- done: inventory (§1); Toxic + PoiZone designed pages, LYNX banks, model-knob automation, shared infra (§2.1); tests;
-  before/after shots; levels (§3). Branch merged with origin/main 8a788038 (fb2214b2).
-- 2026-11-02 PAUSE (round 168w): land.sh design168n was holding the merge lock and building when the pause came (its Windows
-  build passed, build-local + tests still running); result in tmp/coord/land-design168n.out / .log. If it failed or did
-  not push, re-land: `flock ~/projetos/lynx/.git/lynx-merge.lock ~/.claude/jobs/f8789b49/tmp/r168n/land168n.sh`
-  (merges origin/main, re-embeds i18n, runs coord/land.sh).
-- next after landing: re-shoot with the landed exe (`LYNX.exe --instrumentshot E:\lynx-work\design168n\after2 toxicbiohazard,poizone lynx`),
-  append tmp/r168n/notes168n.md to coord/notes-0.1.23.md, message the coordinator the main hash.
+- done: everything in §1–§3; landed as 78fb4bb4 (2026-11-02); after-shots re-taken on main e45e6550 (after2/).
 - not covered: Toxic's MIDI / SEQ pages (its sequencer isn't modelled), CC slots 316–339, the Browser listing of
   LYNX banks, effect banks; model knobs don't follow automation while playing.
