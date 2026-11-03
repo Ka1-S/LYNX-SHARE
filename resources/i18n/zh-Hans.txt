@@ -6732,6 +6732,7 @@ countries: cn sg
 "Vel sens" = "力度灵敏"
 "Vib" = "颤音"
 "Voice mode" = "发音模式"
+"Sequencer" = "音序器"
 
 # Online sessions, phase 1 (round 168a)
 "Stand-in: its plugin is not installed on this PC, a render of this part plays (the plugin's settings are kept)" = "替身：此插件未安装在这台电脑上，将播放此部分的渲染音频（插件设置会保留）"

@@ -6732,6 +6732,7 @@ countries: fr be ch ca lu
 "Vel sens" = "Sens vél"
 "Vib" = "Vib"
 "Voice mode" = "Mode de voix"
+"Sequencer" = "Séquenceur"
 
 # Online sessions, phase 1 (round 168a)
 "Stand-in: its plugin is not installed on this PC, a render of this part plays (the plugin's settings are kept)" = "Substitut : son plugin n'est pas installé sur ce PC, un rendu de cette partie est joué (les réglages du plugin sont conservés)"

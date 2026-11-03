@@ -106,6 +106,24 @@ and a three-note chord).
   `/mnt/e/lynx-work/design168q/shots-after/` (`<engine>-<lynx|fl>-<scale>.png`). BeepMap and Granulizer had no LYNX
   channel before. The Granulizer TIME toggles were moved below the section title after the first after-shots.
 
+## Round 168q2: polish before 0.1.23
+
+- **Transistor Bass sequence.** FL's form (`Transistor Bass_x64.dll` DFM): per step (16 columns from x 58, 36 apart)
+  `SeqPitchN` (digit wheel 0…131, the note), the hidden `seqOctaveN` (0…10, shown by the pitch-editor button),
+  `GateBtnN`, `SlideBtnN`, `AccentBtnN` and the `SeqLedN` step lights; `SequencerCheckBox`, `PatternLengthDigiWheel`
+  (1…16), `ClearBtn` "Clear sequence", `OctavePlusBtn` / `OctaveMinusBtn` "Up / Down one octave". LYNX's page now has
+  these rows (note as a name, octave, gate, slide, accent), the sequencer switch and length, CLEAR and Oct + / Oct −,
+  and step numbers lit up to the length. They are model parameters (`tbseq::length` 100, `sequencer` 101, steps
+  110 + 5i + field), so they are saved in the state, automatable and played live: the engine applies them through
+  its parameter queue without a rebuild. A step saved without its accent byte (step version 0) gets the byte added
+  when its accent is set, and both chunk sizes grow by one.
+- **Titles.** The big plugin name on the designed pages was drawn in `bg4` (nearly invisible). It is now
+  `textSecondary`, in the instrument and the effect editors.
+- **Overlaps found in the after-shots**: Sawer's oscillator "On" and arpeggio "On" sat on their section titles;
+  Kepler Exo's effect tabs sat on the "Effects" title, its chorus "Noise" caption sat on the "Off" option, and its
+  arpeggio mode menu was 8 px tall; Kepler's arpeggio "Sync" crossed the section border. All are fixed.
+- Shots: `/mnt/e/lynx-work/design168q/shots-after2/` (all 8 pages, 100 / 150 / 200 %).
+
 ## Where I stopped
 
 - **Done**: all seven pages, parameter tables, live / automation paths, BeepMap and Granulizer banks, ModelPanel

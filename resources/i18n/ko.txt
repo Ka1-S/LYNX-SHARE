@@ -6732,6 +6732,7 @@ countries: kr
 "Vel sens" = "벨로 감도"
 "Vib" = "비브라토"
 "Voice mode" = "보이스 모드"
+"Sequencer" = "시퀀서"
 
 # Online sessions, phase 1 (round 168a)
 "Stand-in: its plugin is not installed on this PC, a render of this part plays (the plugin's settings are kept)" = "대체 음원: 이 플러그인이 이 PC에 설치되어 있지 않아 이 파트의 렌더링이 재생됩니다(플러그인 설정은 유지됨)"

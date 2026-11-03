@@ -149,12 +149,12 @@ Layout keplerLayout()
     v.push_back (dial (896, 28, 24, "Volume", nullptr));
 
     v.push_back (toggle (17, 128, 33, 33, "Arp on", TR_NOOP ("On"), boxed));
-    v.push_back (label (56, 68, 44, 14, TR_NOOP ("Mode")));
-    v.push_back (radio (58, 88, 42, 76, "Arp mode", TR_NOOP ("Up|Up/dn|Down"), three));
-    v.push_back (label (100, 68, 34, 14, TR_NOOP ("Range")));
-    v.push_back (radio (102, 88, 32, 76, "Arp range", "1|2|3", three));
+    v.push_back (label (50, 68, 44, 14, TR_NOOP ("Mode")));
+    v.push_back (radio (52, 88, 42, 76, "Arp mode", TR_NOOP ("Up|Up/dn|Down"), three));
+    v.push_back (label (92, 68, 34, 14, TR_NOOP ("Range")));
+    v.push_back (radio (94, 88, 32, 76, "Arp range", "1|2|3", three));
     v.push_back (fader (139, 93, 23, 104, "Arp rate", TR_NOOP ("Rate")));
-    v.push_back (toggle (137, 68, 30, 16, "Arp sync", TR_NOOP ("Sync")));
+    v.push_back (toggle (127, 68, 38, 16, "Arp sync", TR_NOOP ("Sync"))); // (inside the section, round 168q2)
 
     v.push_back (fader (178, 93, 23, 104, "LFO rate", TR_NOOP ("Rate")));
     v.push_back (toggle (172, 68, 30, 16, "LFO sync", TR_NOOP ("Sync")));
@@ -223,7 +223,7 @@ Layout keplerExoLayout()
     v.push_back (section (144, 406, 180, 164, TR_NOOP ("Arpeggio")));
     v.push_back (section (326, 406, 224, 164, TR_NOOP ("Matrix")));
     v.push_back (section (552, 406, 86, 164, TR_NOOP ("Chorus")));
-    v.push_back (section (640, 406, 422, 164, TR_NOOP ("Effects")));
+    v.push_back (section (640, 406, 422, 164, nullptr)); // (the page tabs are its header, round 168q2)
     v.push_back (pageBar (724, 407, 334, 16, TR_NOOP ("Saturation|Chorus|EQ|Delay|Reverb")));
     v.push_back (onPage (label (666, 438, 36, 14, TR_NOOP ("Low")), 2));
     v.push_back (onPage (label (697, 438, 36, 14, TR_NOOP ("Mid")), 2));
@@ -325,11 +325,11 @@ Layout keplerExoLayout()
     v.push_back (toggle (82, 539, 56, 14, "Release mode", TR_NOOP ("Release")));
     v.push_back (toggle (151, 459, 33, 33, "Arp on", TR_NOOP ("On"), boxed));
     v.push_back (radio (152, 498, 32, 62, "Arp range", "1|2|3", three));
-    v.push_back (menu (190, 436, 62, 20, "Arp mode", TR_NOOP ("Mode"), TR_NOOP ("Up|Up/down|Down|Random 1|Random 2|Random 3|As played up|As played up/down|As played down"), nine));
+    v.push_back (menu (190, 428, 62, 36, "Arp mode", TR_NOOP ("Mode"), TR_NOOP ("Up|Up/down|Down|Random 1|Random 2|Random 3|As played up|As played up/down|As played down"), nine));
     v.push_back (fader (263, 453, 23, 104, "Arp rate", TR_NOOP ("Rate")));
     v.push_back (toggle (256, 424, 38, 14, "Arp sync", TR_NOOP ("Sync")));
     v.push_back (fader (291, 453, 23, 104, "Arp gate", TR_NOOP ("Gate")));
-    v.push_back (dial (577, 469, 34, "Chorus noise", TR_NOOP ("Noise")));
+    v.push_back (dial (577, 453, 30, "Chorus noise", TR_NOOP ("Noise"))); // (its caption clear of the modes, round 168q2)
     v.push_back (toggle (596, 424, 38, 14, "Chorus gate", TR_NOOP ("Gate")));
     v.push_back (radio (560, 488, 70, 74, "Chorus", TR_NOOP ("Off|I|II|I+II"), four));
     v.push_back (dial (349, 459, 26, "Mod 1 amount", "1"));
@@ -485,7 +485,7 @@ Layout sawerLayout()
     v.push_back (dial (837, 107, 52, "Unison pan", TR_NOOP ("Spread")));
     v.push_back (dial (61, 223, 52, "Noise", TR_NOOP ("Noise")));
     v.push_back (dial (125, 223, 52, "Sync frequency", TR_NOOP ("Sync")));
-    v.push_back (toggle (152, 183, 34, 14, "Sync on", TR_NOOP ("On")));
+    v.push_back (toggle (250, 180, 44, 14, "Sync on", TR_NOOP ("On"))); // (clear of the section title, round 168q2)
     v.push_back (radio (188, 200, 36, 60, "Sub retrig", TR_NOOP ("Free|Sync"), two));
     v.push_back (radio (228, 200, 30, 60, "Sub invert", "+|-", two));
     v.push_back (radio (262, 200, 36, 60, "Sub pulse", TR_NOOP ("Saw|Pulse"), two));
@@ -536,10 +536,10 @@ Layout sawerLayout()
     v.push_back (dial (765, 483, 36, "Reverb high cut", TR_NOOP ("HiCut")));
     v.push_back (dial (807, 483, 36, "Reverb damp", TR_NOOP ("Damp")));
     v.push_back (dial (850, 483, 36, "Reverb mix", TR_NOOP ("Mix")));
-    v.push_back (toggle (752, 528, 40, 14, "Arp on", TR_NOOP ("On")));
-    v.push_back (radio (682, 528, 52, 74, "Arp mode", TR_NOOP ("Up|Down|Up/dn|Rnd"), four));
-    v.push_back (radio (818, 528, 36, 74, "Arp range", "1|2|3|4", four));
-    v.push_back (menu (746, 566, 58, 22, "Arp division", nullptr, "1/32|1/16|2/16|3/16|1/4|2/4|3/4", {}));
+    v.push_back (toggle (748, 542, 50, 14, "Arp on", TR_NOOP ("On"))); // (below the section title, round 168q2)
+    v.push_back (radio (682, 536, 52, 74, "Arp mode", TR_NOOP ("Up|Down|Up/dn|Rnd"), four));
+    v.push_back (radio (818, 536, 36, 74, "Arp range", "1|2|3|4", four));
+    v.push_back (menu (746, 568, 58, 22, "Arp division", nullptr, "1/32|1/16|2/16|3/16|1/4|2/4|3/4", {}));
     v.push_back (menu (720, 14, 48, 20, "Polyphony", nullptr, "4|8|12|16|20|24", {}));
     v.push_back (menu (820, 14, 48, 20, "Bend range", nullptr, "---|1|2|3|4|5|6|7|8|9|10|12", {}));
     v.push_back (menu (34, 536, 60, 22, "Mod 1 source", nullptr, sources, {}));
@@ -582,7 +582,36 @@ Layout transistorBassLayout()
     v.push_back (section (10, 264, 230, 148, nullptr));
     v.push_back (section (328, 264, 362, 148, nullptr));
     v.push_back (section (10, 416, 680, 178, TR_NOOP ("Sequence")));
-    v.push_back (display (16, 436, 668, 152, "tbsequence"));
+    // FL's 16-step editor (round 168q2): the sequencer switch and the length on top, per step the note (its octave
+    // below, FL's pitch editor), gate, slide and accent; CLEAR and the octave buttons at the right, the step numbers
+    // (lit up to the length) under the steps
+    v.push_back (toggle (20, 436, 96, 14, "Sequencer", TR_NOOP ("Sequencer")));
+    v.push_back (label (500, 434, 80, 18, TR_NOOP ("Length"), dim | alignLeft));
+    v.push_back (stepper (580, 433, 50, 20, "Sequence length", nullptr));
+    static const char* const rows[] = { TR_NOOP ("Pitch"), TR_NOOP ("Octave"), TR_NOOP ("Gate"), TR_NOOP ("Slide"), TR_NOOP ("Accent") };
+    static const float rowY[] = { 458, 479, 499, 519, 539 };
+    for (int r = 0; r < 5; ++r)
+        v.push_back (label (14, rowY[r], 42, 18, rows[r], dim | alignLeft));
+    static const std::vector<std::string> names = [] {
+        std::vector<std::string> n;
+        static const char* const fields[] = { "note", "octave", "gate", "slide", "accent" };
+        for (int i = 0; i < 16; ++i)
+            for (const auto* f : fields)
+                n.push_back ("Step " + std::to_string (i + 1) + " " + f);
+        return n;
+    }();
+    for (int i = 0; i < 16; ++i)
+    {
+        const auto x = 58.0f + 36.0f * (float) i;
+        const auto* step = &names[(std::size_t) (5 * i)];
+        v.push_back (stepper (x, 458, 34, 19, step[0].c_str(), nullptr));
+        v.push_back (stepper (x, 479, 34, 18, step[1].c_str(), nullptr));
+        v.push_back (toggle (x, 499, 34, 19, step[2].c_str(), nullptr, boxed));
+        v.push_back (toggle (x, 519, 34, 19, step[3].c_str(), nullptr, boxed));
+        v.push_back (toggle (x, 539, 34, 19, step[4].c_str(), nullptr, boxed));
+    }
+    v.push_back (display (58, 562, 576, 26, "tbsteps"));
+    v.push_back (display (640, 458, 44, 130, "tbseqtools"));
     v.push_back (dial (52, 108, 56, "Tuning", TR_NOOP ("Tune"), bipolar));
     v.push_back (dial (156, 108, 56, "Waveform", TR_NOOP ("Wave")));
     v.push_back (dial (228, 108, 56, "Cutoff", TR_NOOP ("Cutoff")));

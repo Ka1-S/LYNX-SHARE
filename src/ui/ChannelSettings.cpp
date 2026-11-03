@@ -1159,6 +1159,8 @@ public:
         const auto index = p.index;
         knob->onValueChange = [this, index, s = knob.get()] {
             ref.edit (engine, [index, v = (float) s->getValue()] (ChannelDef& c) { modelparams::setRawValue (c, index, v); });
+            if (instrumentKind == InstrumentKind::transistorbass && index >= tbseq::length) // (a step's note moves its octave)
+                syncKnobs();
             if (layout != nullptr)
             {
                 updateConditional();
@@ -1175,6 +1177,19 @@ public:
         }
         addAndMakeVisible (*knob);
         knobs.push_back (std::move (knob));
+    }
+
+    // the listed parameters' knobs read the channel's state again (an edit that moved other values: Transistor Bass's
+    // note / octave, CLEAR, octave buttons; round 168q2)
+    void syncKnobs()
+    {
+        const auto* c = channelNow();
+        if (c == nullptr || modelTable == nullptr)
+            return;
+        for (auto& k : knobs)
+            if (const auto* p = modelparams::findByName (instrumentKind, k->getName().toStdString()); p != nullptr && p->index >= tbseq::length)
+                if (const auto v = modelparams::rawValue (*c, p->index))
+                    k->setValue (*v, juce::dontSendNotification);
     }
 
     // the items shown only while another control is within a range (LayoutItem::whenParam, e.g. an effect slot's
@@ -1400,9 +1415,9 @@ public:
                         g.setFont (font (r.getHeight() * 0.9f, true));
                         g.drawText (item.label, r, juce::Justification::centred, false);
                     }
-                    else if (dimmed && r.getHeight() > 30.0f * f) // the plugin's name, big and quiet
+                    else if (dimmed && r.getHeight() > 30.0f * f) // the plugin's name, big and readable (round 168q2)
                     {
-                        g.setColour (colour::bg4);
+                        g.setColour (colour::textSecondary);
                         g.setFont (font (r.getHeight() * 0.6f, true));
                         g.drawFittedText (item.label, r.toNearestInt(),
                                           (item.style & plugui::alignLeft) != 0 ? juce::Justification::centredLeft : juce::Justification::centredRight, 1, 0.8f);
@@ -1474,8 +1489,12 @@ public:
                         g.setColour (colour::textPrimary);
                         g.setFont (font (juce::jmax (9.0f, 12.0f * f), true));
                         // oversampling orders read as FL shows them (0 → 1x … 3 → 8x)
+                        // a Transistor Bass step's note reads as a note name (60 = C5, FL's naming; round 168q2)
+                        static const char* const noteNames[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+                        const auto whole = (int) std::lround (k->getValue());
                         const auto text = juce::String (item.param).containsIgnoreCase ("oversampling") ? juce::String (1 << juce::jlimit (0, 8, (int) k->getValue())) + "x"
-                                                                                                       : juce::String ((int) k->getValue());
+                                        : juce::String (item.param).endsWith (" note") ? juce::String (noteNames[((whole % 12) + 12) % 12]) + juce::String (whole / 12)
+                                                                                       : juce::String (whole);
                         g.drawText (text, box.withTrimmedRight (8.0f * f), juce::Justification::centred, false);
                         g.setColour (colour::textSecondary);
                         g.drawText (juce::String::fromUTF8 ("\xe2\x96\xb4"), box.withTrimmedLeft (box.getWidth() - 10.0f * f).withHeight (box.getHeight() * 0.5f), juce::Justification::centred, false);
@@ -1494,8 +1513,12 @@ public:
                         paintGranulizerWave (g, r.reduced (4.0f * f), f);
                     if (juce::String (item.display) == "granulizergrains")
                         paintGranulizerGrains (g, r.reduced (5.0f * f), f);
-                    if (juce::String (item.display) == "tbprogram" || juce::String (item.display) == "tbsequence")
-                        paintTransistorBass (g, r, f, juce::String (item.display) == "tbsequence");
+                    if (juce::String (item.display) == "tbprogram")
+                        paintTransistorBass (g, r, f);
+                    if (juce::String (item.display) == "tbsteps")
+                        paintTransistorBassSteps (g, r, f);
+                    if (juce::String (item.display) == "tbseqtools")
+                        paintTransistorBassTools (g, r, f);
                     if (juce::String (item.display) == "xy")
                         if (auto* kx = knobFor (item.param); kx != nullptr)
                             if (auto* ky = knobFor (item.param2); ky != nullptr)
@@ -1662,6 +1685,13 @@ public:
                 for (int o = 0; o < count; ++o)
                     if (tabCell (item, o, count).contains (e.position))
                         showPage (o);
+                return;
+            }
+        for (const auto& item : layout->items) // round 168q2: Transistor Bass's CLEAR / octave up / octave down
+            if (item.type == plugui::Item::display && juce::String (item.display) == "tbseqtools" && layoutRect (item).contains (e.position))
+            {
+                if (const auto button = transistorBassToolButton (item, e.position); button >= 0)
+                    transistorBassToolAction (button);
                 return;
             }
         for (const auto& item : layout->items) // round 168q: BeepMap's Open / Paste
@@ -2053,41 +2083,82 @@ private:
     }
 
     // Transistor Bass: the current program and its sequence (16 steps: note, gate, accent, slide)
-    void paintTransistorBass (juce::Graphics& g, juce::Rectangle<float> r, float f, bool sequence)
+    void paintTransistorBass (juce::Graphics& g, juce::Rectangle<float> r, float f)
     {
         using namespace theme;
         const auto* c = channelNow();
         const auto prog = c != nullptr ? transistorBassProgram (c->pluginState) : std::nullopt;
         if (! prog)
             return;
-        if (! sequence)
+        g.setColour (colour::textPrimary);
+        g.setFont (font (juce::jmax (9.0f, 11.0f * f), true));
+        const auto text = tr ("Program {0}", { juce::String (prog->program + 1) }) + "   "
+                        + (prog->sequencer ? tr ("sequencer on") : tr ("sequencer off"))
+                        + (prog->transpose != 0 ? "   " + tr ("transpose {0}", { juce::String (prog->transpose) }) : juce::String());
+        g.drawFittedText (text, r.reduced (6.0f * f, 0.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.7f);
+    }
+
+    // the step numbers under the sequence, lit up to its length (round 168q2)
+    void paintTransistorBassSteps (juce::Graphics& g, juce::Rectangle<float> r, float f)
+    {
+        using namespace theme;
+        const auto* c = channelNow();
+        const auto prog = c != nullptr ? transistorBassProgram (c->pluginState) : std::nullopt;
+        const auto length = prog ? juce::jlimit (1, 16, prog->length) : 16;
+        const auto w = r.getWidth() / 16.0f;
+        g.setFont (font (juce::jmax (8.0f, 10.0f * f), true));
+        for (int i = 0; i < 16; ++i)
         {
+            const auto cell = juce::Rectangle<float> (r.getX() + w * (float) i, r.getY(), w, r.getHeight()).reduced (2.0f * f, 4.0f * f);
+            const auto in = i < length;
+            g.setColour (in ? accent.withAlpha (0.22f) : colour::bg3);
+            g.fillRoundedRectangle (cell, radius::sm * f);
+            g.setColour (in ? colour::textPrimary : colour::textDisabled);
+            g.drawText (juce::String (i + 1), cell, juce::Justification::centred, false);
+        }
+    }
+
+    static constexpr int transistorBassTools = 3;
+    juce::Rectangle<float> transistorBassToolCell (juce::Rectangle<float> r, int i) const
+    {
+        const auto h = r.getHeight() / (float) transistorBassTools;
+        return juce::Rectangle<float> (r.getX(), r.getY() + h * (float) i, r.getWidth(), h).reduced (2.0f * layoutFactor());
+    }
+
+    void paintTransistorBassTools (juce::Graphics& g, juce::Rectangle<float> r, float f)
+    {
+        using namespace theme;
+        const juce::String caps[] = { tr ("Clear"), juce::String::fromUTF8 ("Oct +"), juce::String::fromUTF8 ("Oct \xe2\x88\x92") };
+        for (int i = 0; i < transistorBassTools; ++i)
+        {
+            const auto cell = transistorBassToolCell (r, i);
+            skin::button (g, cell, false, false, accent, radius::sm * f);
             g.setColour (colour::textPrimary);
-            g.setFont (font (juce::jmax (9.0f, 11.0f * f), true));
-            const auto text = tr ("Program {0}", { juce::String (prog->program + 1) }) + "   "
-                            + (prog->sequencer ? tr ("sequencer on") : tr ("sequencer off"))
-                            + (prog->transpose != 0 ? "   " + tr ("transpose {0}", { juce::String (prog->transpose) }) : juce::String());
-            g.drawFittedText (text, r.reduced (6.0f * f, 0.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.7f);
+            g.setFont (font (juce::jmax (8.0f, juce::jmin (10.0f * f, cell.getHeight() * 0.45f)), true));
+            g.drawFittedText (caps[i], cell.toNearestInt(), juce::Justification::centred, 1, 0.6f);
+        }
+    }
+
+    int transistorBassToolButton (const plugui::LayoutItem& item, juce::Point<float> p) const
+    {
+        for (int i = 0; i < transistorBassTools; ++i)
+            if (transistorBassToolCell (layoutRect (item), i).contains (p))
+                return i;
+        return -1;
+    }
+
+    // FL's CLEAR (gates, slides and accents off, notes C5) and its octave up / down buttons on the whole sequence
+    void transistorBassToolAction (int button)
+    {
+        const auto* c = channelNow();
+        if (c == nullptr)
             return;
-        }
-        const auto steps = juce::jlimit (1, (int) prog->steps.size(), prog->length);
-        const auto inner = r.reduced (4.0f * f);
-        const auto w = inner.getWidth() / (float) steps;
-        static const char* const names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-        for (int i = 0; i < steps; ++i)
-        {
-            const auto& s = prog->steps[(std::size_t) i];
-            auto cell = juce::Rectangle<float> (inner.getX() + w * (float) i, inner.getY(), w, inner.getHeight()).reduced (1.5f * f, 0.0f);
-            skin::button (g, cell, s.gate, false, accent, radius::sm * f);
-            g.setColour (s.gate ? colour::onAccent : colour::textSecondary);
-            g.setFont (font (juce::jmax (8.0f, juce::jmin (11.0f * f, w * 0.4f)), true));
-            auto text = cell;
-            g.drawFittedText (s.gate ? juce::String (names[((s.note % 12) + 12) % 12]) + juce::String (s.note / 12) : juce::String ("-"),
-                              text.removeFromTop (cell.getHeight() * 0.5f).toNearestInt(), juce::Justification::centred, 1, 0.6f);
-            g.setFont (font (juce::jmax (8.0f, juce::jmin (10.0f * f, w * 0.35f))));
-            const auto flags = juce::String (s.accent ? "A" : "") + (s.slide ? "S" : "");
-            g.drawFittedText (flags, text.toNearestInt(), juce::Justification::centred, 1, 0.6f);
-        }
+        auto next = c->pluginState;
+        if (! (button == 0 ? transistorBassClearSequence (next) : transistorBassShiftSequence (next, button == 1 ? 1 : -1)))
+            return;
+        ref.edit (engine, [next = std::move (next)] (ChannelDef& d) { d.pluginState = next; });
+        syncKnobs();
+        repaint();
     }
 
     juce::Image beepMapCache;
