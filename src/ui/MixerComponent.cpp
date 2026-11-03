@@ -615,20 +615,22 @@ void MixerStrips::paint (juce::Graphics& g)
             g.setFont (font (9.0f, true));
             textcache::drawText (g, "FX" + juce::String ((int) track.effects.size()), x + w - 30, 6, 23, 13, juce::Justification::centredRight);
         }
-        // Online Sessions (round 168a): a plugin of this insert is not installed here, its stand-in render plays
-        if (engine.insertPlaysStandIn (t))
+
+        g.setColour (track.muted ? colour::textDisabled : (hovered (Part::header) ? colour::textPrimary : colour::textPrimary.withAlpha (0.9f)));
+        g.setFont (font (type::small, isSelected));
+        // Online Sessions (round 168a): a plugin of this insert is not installed here, its stand-in render plays (an
+        // amber R at the left of the name row; the name keeps the middle)
+        const auto standIn = engine.insertPlaysStandIn (t);
+        textcache::drawFittedText (g, juce::String::fromUTF8 (track.name.c_str()), x + (standIn ? 19 : 3), 20, w - (standIn ? 42 : 10), 14,
+                                   juce::Justification::centred, 1, 0.7f);
+        if (standIn)
         {
-            // (left of the FX count: the arm button is at the left edge)
-            const auto tag = juce::Rectangle<float> ((float) (x + w - 48), 6.0f, 14.0f, 13.0f);
+            const auto tag = juce::Rectangle<float> ((float) x + 4.0f, 20.5f, 13.0f, 13.0f);
             theme::fillRoundRect (g, tag, 3.0f, colour::warning.withAlpha (0.85f));
             g.setColour (colour::bg1);
             g.setFont (font (9.0f, true));
             g.drawText ("R", tag, juce::Justification::centred, false);
         }
-
-        g.setColour (track.muted ? colour::textDisabled : (hovered (Part::header) ? colour::textPrimary : colour::textPrimary.withAlpha (0.9f)));
-        g.setFont (font (type::small, isSelected));
-        textcache::drawFittedText (g, juce::String::fromUTF8 (track.name.c_str()), x + 3, 20, w - 10, 14, juce::Justification::centred, 1, 0.7f);
 
         // compensated latency (PDC) on the Master
         if (t == 0 && engine.getLatencySamples() > 0)
