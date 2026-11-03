@@ -9,6 +9,8 @@
 #include "ui/BrowserComponent.h"
 
 #include "core/MixerOps.h"
+#include "core/ClipOps.h"
+#include "core/TempoDetect.h"
 
 #include <cstring>
 #include <functional>
@@ -1849,7 +1851,7 @@ private:
         label (granBeatsLabel, tr ("Beats (0 = the sample's own)"));
         granBeats.setSliderStyle (juce::Slider::LinearHorizontal);
         granBeats.setTextBoxStyle (juce::Slider::TextBoxRight, false, 56, 20);
-        granBeats.setRange (0.0, 64.0, 0.25);
+        granBeats.setRange (0.0, 1024.0, 0.01);
         granBeats.setValue (def.sampler.stretchBeats, juce::dontSendNotification);
         granBeats.setTooltip (tr ("The sample's length in beats for Tempo locked and the Step keys, as FL's time-stretch "
                                   "TIME; a WAV with ACID beats uses its own"));
@@ -2129,7 +2131,11 @@ public:
         setup (release, releaseLabel, TR_NOOP ("Release"), 0.0, 4.0, 0.001, " s");
         setup (decay, decayLabel, TR_NOOP ("Decay"), 0.0, 10.0, 0.001, " s");
         setup (sustain, sustainLabel, TR_NOOP ("Sustain"), 0.0, 1.0, 0.01, "");
-        setup (stretch, stretchLabel, TR_NOOP ("Stretch"), 0.0, 64.0, 0.25, " beats");
+        setup (stretch, stretchLabel, TR_NOOP ("Stretch"), 0.0, 1024.0, 0.01, " beats");
+        // issue #32 #7: "Fit to tempo" sets exact lengths (16.45 beats for a loop with a tail, 128 for 32 bars); the knob used
+        // to round them to 0.25 and cap them at 64, and every other edit in this panel wrote the rounded value back
+        stretch.setSkewFactorFromMidPoint (16.0);
+        stretch.addMouseListener (&stretchMenu, false);
         setup (regionStart, regionStartLabel, TR_NOOP ("Start"), 0.0, 1.0, 0.001, "");
         setup (regionEnd, regionEndLabel, TR_NOOP ("End"), 0.0, 1.0, 0.001, "");
         setup (cutoff, cutoffLabel, TR_NOOP ("Cutoff"), 20.0, 20000.0, 1.0, " Hz");
@@ -2367,6 +2373,7 @@ private:
             decay.setValue (c->sampler.decay, juce::dontSendNotification);
             sustain.setValue (c->sampler.sustain, juce::dontSendNotification);
             stretch.setValue (c->sampler.stretchBeats, juce::dontSendNotification);
+            shownStretch = stretch.getValue();
             keepPitch.setToggleState (c->sampler.keepPitch, juce::dontSendNotification);
             stretchMethod.setSelectedId ((int) c->sampler.stretchMethod + 1, juce::dontSendNotification);
             stretchMethod.setEnabled (c->sampler.keepPitch);
@@ -2462,7 +2469,8 @@ private:
         s.attack = (float) attack.getValue();
         s.decay = (float) decay.getValue();
         s.sustain = (float) sustain.getValue();
-        s.stretchBeats = (float) stretch.getValue();
+        if (changed == &stretch || stretch.getValue() != shownStretch) // (unmoved: keep the exact value, not the knob's)
+            s.stretchBeats = (float) (shownStretch = stretch.getValue());
         s.keepPitch = keepPitch.getToggleState();
         s.stretchMethod = (StretchMethod) juce::jlimit (0, 2, stretchMethod.getSelectedId() - 1);
         stretchMethod.setEnabled (s.keepPitch);
@@ -2518,6 +2526,43 @@ private:
     ChannelRef ref;
     bool updating = false;
     juce::Slider pitch, gain, stretch;
+    double shownStretch = 0.0;
+
+    // FL's TIME knob menu (r168s c_f20): (none), Autodetect, Project tempo, 1 beat, 2 beats, 1 bar, 2 bars, 3 bars, 4 bars
+    struct StretchMenu final : juce::MouseListener
+    {
+        explicit StretchMenu (SettingsPanel& p) : panel (p) {}
+        void mouseDown (const juce::MouseEvent& e) override
+        {
+            if (e.mods.isPopupMenu())
+                panel.showStretchMenu();
+        }
+        SettingsPanel& panel;
+    } stretchMenu { *this };
+
+    void showStretchMenu()
+    {
+        const auto* c = current();
+        if (c == nullptr)
+            return;
+        const auto& song = engine.getSong();
+        const auto sample = engine.getSampleLibrary().load (juce::String::fromUTF8 (c->samplePath.c_str()));
+        const auto now = c->sampler.stretchBeats;
+        auto set = [this] (float beats) { ref.edit (engine, [beats] (ChannelDef& d) { d.sampler.stretchBeats = beats; }); };
+        juce::PopupMenu m;
+        m.addItem (tr ("(none)"), true, now <= 0.0f, [set] { set (0.0f); });
+        m.addItem (tr ("Autodetect"), sample != nullptr, false, [set, sample, bpm = song.bpm] { set (tempodetect::fitBeatsOf (sample.get(), bpm)); });
+        const auto atTempo = sample != nullptr && sample->sampleRate > 0.0 ? (float) ((double) sample->frames() / sample->sampleRate * song.bpm / 60.0) : 0.0f;
+        m.addItem (tr ("Project tempo"), atTempo > 0.0f, false, [set, atTempo] { set (atTempo); });
+        for (const auto preset : clipops::timePresetBeats (song.beatsPerBar))
+        {
+            const auto bars = song.beatsPerBar > 0 && preset >= (float) song.beatsPerBar ? preset / (float) song.beatsPerBar : 0.0f;
+            const auto label = bars > 0.0f ? (bars == 1.0f ? tr ("1 bar") : tr ("{0} bars", { juce::String (bars, 0) }))
+                                           : (preset == 1.0f ? tr ("1 beat") : tr ("{0} beats", { juce::String (preset, 0) }));
+            m.addItem (label, true, now == preset, [set, preset] { set (preset); });
+        }
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&stretch));
+    }
     MenuSlider attack, release, decay, sustain, regionStart, regionEnd, cutoff, resonance;
     std::vector<std::pair<MenuSlider*, int>> tweakTargets; // knob -> samplerparam
     std::vector<juce::Slider*> automatedShown;             // knobs showing their automation's value now
@@ -2975,13 +3020,36 @@ public:
     }
     std::uint32_t shownGeneration = 0;
 
-    ui::Hint hintAt (juce::Point<int>) override { return ui::valueHint (specOf(), getter(), ui::valueGestures()); }
+    ui::Hint hintAt (juce::Point<int>) override
+    {
+        return ui::valueHint (specOf(), getter(), doubleClicked ? tr ("[LMB] drag or [Wheel] changes  [2xLMB] show in the Mixer  [RMB] menu")
+                                                                : ui::valueGestures());
+    }
+
+    // FL's number wheel (round 168s, issue #32): the value in a box over the caption instead of a knob; the whole
+    // control is the hit area, a notch / 7.5 px of drag = one step (ui::digitWheel). Double-click: `doubleClicked`.
+    bool digitBox = false;
+    std::function<void()> doubleClicked;
+    std::function<void (juce::PopupMenu&)> extraMenuItems;
 
     void paint (juce::Graphics& g) override
     {
         const auto spec = specOf();
         auto area = getLocalBounds().toFloat();
         const auto caption = area.removeFromBottom (13.0f);
+        if (digitBox)
+        {
+            const auto box = area.reduced (2.0f, 4.0f).withSizeKeepingCentre (area.getWidth() - 4.0f, juce::jmin (26.0f, area.getHeight() - 6.0f));
+            const auto hot = isMouseOverOrDragging();
+            theme::fillRoundRect (g, box, theme::radius::sm, hot ? theme::colour::accentHover : theme::colour::accent);
+            g.setColour (theme::colour::onAccent);
+            g.setFont (theme::font (15.0f, true));
+            g.drawFittedText (spec.text (getter()), box.reduced (3.0f, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.6f);
+            g.setColour (theme::colour::textSecondary);
+            g.setFont (theme::font (theme::type::caption));
+            g.drawFittedText (theme::caps (label), caption.toNearestInt(), juce::Justification::centred, 1, 0.65f);
+            return;
+        }
         const auto valueArea = area.removeFromBottom (13.0f);
         const auto size = juce::jmin (area.getWidth(), area.getHeight());
         const auto shown = shownValue (spec);
@@ -3000,7 +3068,18 @@ public:
     {
         if (e.mods.isPopupMenu())
         {
-            ui::showValueMenu (*this, &engine, specOf(), getter(), setter);
+            if (! extraMenuItems)
+            {
+                ui::showValueMenu (*this, &engine, specOf(), getter(), setter);
+                return;
+            }
+            const auto spec = specOf();
+            juce::PopupMenu menu;
+            menu.addSectionHeader (spec.name + ": " + spec.text (getter()));
+            ui::addValueItems (menu, *this, &engine, spec, getter(), setter);
+            menu.addSeparator();
+            extraMenuItems (menu);
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
             return;
         }
         if (ui::isResetClick (e))
@@ -3030,6 +3109,11 @@ public:
 
     void mouseDoubleClick (const juce::MouseEvent&) override
     {
+        if (doubleClicked)
+        {
+            doubleClicked();
+            return;
+        }
         setter (specOf().defaultValue);
         repaint();
     }
@@ -4093,20 +4177,39 @@ public:
                     },
                     [] (const ChannelDef& d) { return (double) d.sampler.pitch; },
                     [] (Song& s, int ch, double v) { s.channels[(std::size_t) ch].sampler.pitch = (float) juce::jlimit (-24.0, 24.0, v); }, TR_NOOP ("Pitch"));
-        headerKnob ([name] { return countSpec (name() + " - " + tr ("Pitch knob range (semitones)"), 48, 2,
-                                               [] (int v) { return juce::String (v); }); },
+        headerKnob ([name] { return ui::digitWheel (countSpec (name() + " - " + tr ("Pitch knob range (semitones)"), 48, 2,
+                                                              [] (int v) { return juce::String (v); })); },
                     [] (const ChannelDef& d) { return (double) d.misc.pitchRange; },
                     [] (Song& s, int ch, double v) { s.channels[(std::size_t) ch].misc.pitchRange = juce::jlimit (0, 48, juce::roundToInt (v)); },
                     TR_NOOP ("Range"));
+        header.back()->digitBox = true;
+        // FL's TRACK digiwheel (round 168s, issue #32 "very small and not accurate"): a wheel notch or 7.5 px of drag = the
+        // next insert, double-click shows the insert in the Mixer, the menu has "Assign to free mixer track"
         headerKnob ([this, name] {
-                        return countSpec (name() + " - " + tr ("Target mixer track"), maxMixerTracks - 1, 0,
-                                          [] (int t) { return t == 0 ? tr ("Master") : juce::String (t); });
+                        return ui::digitWheel (countSpec (name() + " - " + tr ("Target mixer track"), maxMixerTracks - 1, 0,
+                                                          [] (int t) { return t == 0 ? tr ("Master") : juce::String (t); }));
                     },
                     [] (const ChannelDef& d) { return (double) d.mixerTrack; },
                     [] (Song& s, int ch, double v) {
                         mixerops::routeChannel (s, ch, juce::roundToInt (v)); // any insert (round 162): missing ones are added
                     },
                     TR_NOOP ("Track"));
+        {
+            auto& track = *header.back();
+            track.digitBox = true;
+            track.doubleClicked = [this] {
+                if (channel < (int) engine.getSong().channels.size() && openMixerInsertHandler())
+                    openMixerInsertHandler() (engine.getSong().channels[(std::size_t) channel].mixerTrack);
+            };
+            track.extraMenuItems = [this] (juce::PopupMenu& menu) {
+                menu.addItem (tr ("Assign to free mixer track"), [this] {
+                    engine.editSong ([ch = channel] (Song& s) {
+                        if (ch < (int) s.channels.size())
+                            s.channels[(std::size_t) ch].mixerTrack = s.claimFreeInsert();
+                    });
+                });
+            };
+        }
 
         int width = MiscPanel::preferredWidth, height = MiscPanel::preferredHeight;
         for (auto& p : pages)
@@ -4509,5 +4612,10 @@ std::unique_ptr<juce::Component> makeNodeChannelFrame (AudioEngine& engine, std:
         return nullptr;
     const auto kind = def->instrument;
     return std::make_unique<ChannelFrame> (engine, ref, std::move (page), hasEnvelopeTab (kind) ? std::make_unique<ModulationPanel> (engine, ref) : nullptr);
+}
+std::function<void (int)>& openMixerInsertHandler()
+{
+    static std::function<void (int)> handler;
+    return handler;
 }
 } // namespace lynx

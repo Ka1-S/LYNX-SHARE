@@ -120,6 +120,16 @@ bool Layout::isFrontmost (Panel p) const
     return false;
 }
 
+std::vector<Panel> Layout::stacking() const
+{
+    std::vector<Panel> out;
+    for (auto background : { true, false })
+        for (auto p : order)
+            if (! (*this)[p].detached && isBackground (p) == background)
+                out.push_back (p);
+    return out;
+}
+
 void Layout::show (Panel p)
 {
     (*this)[p].visible = true;

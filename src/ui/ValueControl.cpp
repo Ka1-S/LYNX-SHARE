@@ -177,6 +177,14 @@ std::function<std::optional<double> (const juce::String&)> inverseOf (std::funct
     };
 }
 
+ValueSpec digitWheel (ValueSpec spec)
+{
+    spec.interval = juce::jmax (1.0, spec.interval);
+    spec.wheelPerNotch = 1.0; // (PR #39's field: one insert per notch)
+    spec.pixelsForRange = digitWheelPixelsPerStep * juce::jmax (1.0, (spec.maximum - spec.minimum) / spec.interval);
+    return spec;
+}
+
 // --- gestures ----------------------------------------------------------------------------------
 
 void ValueDrag::begin (const juce::MouseEvent& e, double value)
@@ -223,8 +231,24 @@ std::optional<double> wheelValue (double value, const juce::MouseEvent& e, const
     if (delta == 0.0f)
         return std::nullopt;
 
-    const auto notches = (wheel.isReversed ? -1.0 : 1.0) * (delta > 0.0f ? 1.0 : -1.0) * juce::jmax (1.0, std::abs (delta) / 0.12);
+   #if JUCE_WINDOWS
+    constexpr double notchSize = 120.0 * 0.5 / 256.0;
+   #elif JUCE_LINUX || JUCE_BSD
+    constexpr double notchSize = 50.0 / 256.0;
+   #else
+    constexpr double notchSize = 0.12;
+   #endif
+    const auto notches = (wheel.isReversed ? -1.0 : 1.0) * controls::wheelNotches (delta, notchSize);
     reportTweak (spec);
+
+    if (spec.wheelPerNotch > 0.0)
+    {
+        const auto step = juce::jmax (spec.wheelPerNotch * (e.mods.isCtrlDown() ? controls::fineFactor : 1.0), spec.interval);
+        // one step per wheel notch (round 168s: `notches` now counts a click as one notch on every platform; a fast
+        // spin that the system sends as one event of several notches moves that many steps)
+        return juce::jlimit (spec.minimum, spec.maximum, value + notches * step);
+    }
+
     return controls::wheelValue (value, notches, spec.minimum, spec.maximum, e.mods.isCtrlDown(), spec.interval);
 }
 
