@@ -459,15 +459,28 @@ public:
     void markSaved() noexcept { modified = false; sendChangeMessage(); }
     void markModified() noexcept { modified = true; sendChangeMessage(); } // e.g. a backup was opened in place of the project
 
-    bool canUndo() const noexcept { return ! undoStack.empty(); }
-    bool canRedo() const noexcept { return ! redoStack.empty(); }
+    bool canUndo() const noexcept { return sessionHistory ? ! sessionUndo.empty() : ! undoStack.empty(); }
+    bool canRedo() const noexcept { return sessionHistory ? ! sessionRedo.empty() : ! redoStack.empty(); }
     void undo();
     void redo();
 
+    // Online Sessions P2 (round 169b): a live session's copy of the song changed by someone else's edit — like setSong,
+    // but the history stays, the project stays modified and nothing becomes an undo step.
+    void applyRemote (Song remote);
+    // Undo per user (ONLINE_SESSIONS.md §1.4): while on, undo / redo bring back only this person's own entities (each one
+    // still as his step left it), never other people's edits made since. `onSkipped` names what had to stay.
+    void setSessionHistory (bool on);
+    bool hasSessionHistory() const noexcept { return sessionHistory; }
+    std::function<void (const juce::StringArray& skipped)> onSessionUndoSkipped;
+    std::uint64_t getSongStamp() const noexcept { return songStamp; }
+
     // Undo history as a list of states, oldest first: the undo steps, the current state, then the redo
     // steps. Each entry is named after what changed from the previous one (core/History.h).
-    int getHistorySize() const noexcept { return (int) (undoStack.size() + 1 + redoStack.size()); }
-    int getHistoryPosition() const noexcept { return (int) undoStack.size(); }
+    int getHistorySize() const noexcept
+    {
+        return sessionHistory ? (int) (sessionUndo.size() + 1 + sessionRedo.size()) : (int) (undoStack.size() + 1 + redoStack.size());
+    }
+    int getHistoryPosition() const noexcept { return sessionHistory ? (int) sessionUndo.size() : (int) undoStack.size(); }
     ChangeLabel getHistoryLabel (int index) const; // index 0 = the oldest state kept
     void jumpToHistory (int index);
 
@@ -918,6 +931,12 @@ private:
 
     std::size_t maxUndoSteps = prefs::defaultUndoLevels;
     std::deque<Song> undoStack, redoStack;
+    // undo per user (round 169b): each local step as (before, after); `sessionAfterOpen` = the last step's "after" is
+    // still the song (it is taken when the next step starts, a remote change comes in, or undo is used)
+    bool sessionHistory = false, sessionAfterOpen = false;
+    std::deque<std::pair<Song, Song>> sessionUndo, sessionRedo;
+    void closeSessionStep();
+    void sessionStep (bool redo);
     juce::Time lastUndoPress; // mouse click that already produced an undo step
     SnapshotExchange<RackState> rackExchange;
     RackState lastPublishedShape; // channels + instruments of the last snapshot, to reuse voices

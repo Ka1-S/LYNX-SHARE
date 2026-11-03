@@ -114,6 +114,13 @@ juce::File receivedRoot(); // Documents/LYNX/Projects/Received
 juce::File standInFolder (const juce::File& projectFile, const Song& song);
 // Where a merged part's media go: "<project folder>/Session media/<guest>", or Documents/LYNX/Session media/<projectId>/<guest>.
 juce::File sessionMediaFolder (const juce::File& projectFile, const Song& song, const juce::String& guest);
+// A received song may only read its own media: every sample outside `folder`, and every other path the engine reads
+// (effect samples, Patcher graphs) outside `folder` and `engineFiles` (FL Studio's own data: FL Keys' wavetables, the
+// engines' DLLs), becomes "<folder>/missing/<name>"; a file an insert records to outside them is cleared, and the
+// sender's data folder goes. open() does it to a package, live sessions to every change they receive.
+void confine (Song& song, const juce::File& folder, const juce::File& engineFiles);
+// A file's SHA-256 (64 hex digits; empty when it cannot be read), read in 1 MiB pieces.
+juce::String hashFile (const juce::File& file);
 // Copies the part's media into `folder` (by hash: a file already there is reused) and points the song at the copies.
 bool adoptMedia (Song& song, const juce::File& folder, juce::String& error);
 } // namespace lynx::sessionpack
