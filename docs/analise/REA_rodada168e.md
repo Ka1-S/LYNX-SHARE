@@ -109,13 +109,21 @@ ticks for seconds, mastering (target ±0.5 LU, true peak ≤ −0.9 dBTP, silenc
 | M3 | Export › Master… Ctrl+Alt+M; Project bones | §1, §2.4, §2.5 | none | Master: LYNX-own local mastering; Project bones: mixer / effects / scores in LYNX formats |
 | M4 | Tools › Consolidate playlist selection, Ctrl+Alt+C / Ctrl+Shift+Alt+C | §1, §2.2 | track-level only | done (and "Consolidate this track" rebuilt on the same core) |
 
-State (2026-11-02, paused by the coordinator for round 168w): origin/main (efb8344d) merged in; Linux core build +
-all tests green (1 631 180 checks, 0 failures); the Windows build had one compile error in Project bones (fixed,
-not rebuilt yet). Notes in coord/notes-0.1.23.md.
+State (2026-11-03): origin/main merged; Linux build + all tests green; Windows build OK. Windows GUI check (fresh
+profile, test mode, real mouse, screenshots looked at, desktop left clean):
+- Patterns › Render and replace... on "Beat": the render window (range / loops / files locked), the Beat clips became
+  audio clips at the same places.
+- Two Melody clips selected (Ctrl+drag), Playlist menu › Consolidate playlist selection › From selection start: a new
+  track above with "Melody (consolidated)", the originals muted and grouped under it.
+- File › Export › Master...: "Loudness −14 LUFS" row; the end message "Mastered: −8.0 LUFS → −14.0 LUFS".
+- File › Export › Project bones...: Mixer / Effects / Scores folders written, the folder opened.
+- File › Export › All playlist tracks › From song start: six "demo - <track>.wav", then FL's "Tracks skipped" (the
+  automation-only track).
+- Found and fixed: Ctrl+Alt+C was taken by the Playlist's Copy (Ctrl+C ignored Alt). Ctrl+Alt+M did nothing on the
+  test PC because another program holds it as a system-wide hotkey (RegisterHotKey fails for it); the key map is right
+  (test rea168e_keys) and the menu item works.
 
-Next step: Windows build (OUT=build-win) → GUI check with a fresh profile and test mode (Patterns › Quick render /
-Render as audio clip / Render and replace, Playlist Tools › Consolidate (Ctrl+Alt+C), File › Export › All playlist
-tracks, Master... (Ctrl+Alt+M), Project bones...; screenshots looked at) → merge origin/main → land.sh.
+Next step: land with coord/train.sh.
 Decisions (approved by the user, 2026-11-02): (1) Export › Master stays LYNX-own local mastering instead of FL
 Cloud; (2) Project bones ships without channel presets / automation for now. Follow-up: add Channels\ and
 Automation\ to Project bones once LYNX has a channel preset format and an automation score writer. No FL session was used
