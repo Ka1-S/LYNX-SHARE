@@ -702,10 +702,15 @@ std::optional<Opened> open (const juce::File& file, const juce::File& destinatio
     };
     doc = [&] (PatcherDoc& d) {
         for (auto& n : d.nodes)
+        {
             if (n.generator)
                 channel (n.channel);
             else
                 slot (n.effect);
+            for (auto& h : n.busHeads)
+                if (h.head)
+                    slot (*h.head);
+        }
     };
     channel = [&] (ChannelDef& c) {
         engineOnly (c.samplePath);
@@ -723,7 +728,11 @@ std::optional<Opened> open (const juce::File& file, const juce::File& destinatio
             slot (s);
         for (auto& s : t.standIns)
             engineOnly (s.path);
+        // a file the insert records and renders to: written, so only inside the package (else the automatic name)
+        if (! t.recordTo.empty() && ! within (t.recordTo, folder))
+            t.recordTo.clear();
     }
+    song->dataFolder.clear(); // the sender's folder: nothing to do with this computer
     opened.song = std::move (*song);
     return opened;
 }

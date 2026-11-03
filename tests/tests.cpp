@@ -15416,6 +15416,47 @@ TEST (missing_files_find_in_song)
     CHECK (lynx::applyRelocations (copy, { { "C:\\gone\\tune.wav", "/t.wav" } }) == 1 && copy.mixer[2].effects[0].branches[0].chain[0].samplePath == "/t.wav");
 }
 
+TEST (missing_files_inside_patcher)
+{
+    // a Patcher's instruments and effects (any depth) are the song's samples too: listed, packed and relinked
+    lynx::Song song;
+    lynx::ChannelDef inner;
+    inner.name = "Pad", inner.instrument = lynx::InstrumentKind::sampler, inner.samplePath = "C:\\gone\\pad.wav";
+    lynx::ChannelDef nested;
+    nested.instrument = lynx::InstrumentKind::patcher;
+    nested.patcher.nodes.resize (1);
+    nested.patcher.nodes[0].generator = true;
+    nested.patcher.nodes[0].channel = inner;
+    lynx::ChannelDef patch;
+    patch.name = "Rack", patch.instrument = lynx::InstrumentKind::patcher;
+    patch.patcher.nodes.resize (2);
+    patch.patcher.nodes[0].generator = true;
+    patch.patcher.nodes[0].channel = nested;
+    patch.patcher.nodes[1].effect.samplePath = "C:\\gone\\tune.wav";
+    patch.patcher.nodes[1].busHeads.push_back ({});
+    patch.patcher.nodes[1].busHeads[0].head = lynx::EffectSlot();
+    patch.patcher.nodes[1].busHeads[0].head->samplePath = "C:\\gone\\tune.wav"; // same file: one entry
+    song.channels = { patch };
+    song.mixer.resize (2);
+    lynx::EffectSlot fxPatcher;
+    fxPatcher.patcher.nodes.resize (1);
+    fxPatcher.patcher.nodes[0].generator = true;
+    fxPatcher.patcher.nodes[0].channel = inner;
+    fxPatcher.patcher.nodes[0].channel.samplePath = "C:\\gone\\hit.wav";
+    song.mixer[1].effects.push_back (fxPatcher);
+
+    const auto missing = lynx::findMissingSamples (song, [] (const std::string&) { return false; });
+    CHECK (missing.size() == 3);
+    CHECK (missing.size() == 3 && missing[0].path == "C:\\gone\\pad.wav" && missing[0].usedBy[0] == "Rack (Patcher)");
+    CHECK (missing.size() == 3 && missing[1].path == "C:\\gone\\tune.wav" && missing[1].usedBy[0] == "Rack (Patcher): effect");
+    CHECK (missing.size() == 3 && missing[2].path == "C:\\gone\\hit.wav" && missing[2].usedBy[0] == "Insert 1 (Patcher)");
+    CHECK (lynx::applyRelocations (song, { { "C:\\gone\\pad.wav", "/p.wav" }, { "C:\\gone\\tune.wav", "/t.wav" }, { "C:\\gone\\hit.wav", "/h.wav" } }) == 4);
+    CHECK (song.channels[0].patcher.nodes[1].busHeads[0].head->samplePath == "/t.wav");
+    CHECK (song.channels[0].patcher.nodes[0].channel.patcher.nodes[0].channel.samplePath == "/p.wav");
+    CHECK (song.channels[0].patcher.nodes[1].effect.samplePath == "/t.wav");
+    CHECK (song.mixer[1].effects[0].patcher.nodes[0].channel.samplePath == "/h.wav");
+}
+
 TEST (missing_files_folder_search)
 {
     namespace fs = std::filesystem;

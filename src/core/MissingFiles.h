@@ -40,7 +40,7 @@ void addMissingFile (std::vector<MissingFile>& list, const std::string& path, co
 
 // The user samples a .lynx song references that `fileExists` says are gone: channel samples (sampler, audio clip,
 // Granulizer, 3x Osc custom wave), sampler zones (not FL Keys' installation wavetables) and effect samples
-// (Newtone/Newtime). FL Studio installation data some engines keep in samplePath (DLLs, wave folders) is left out.
+// (Newtone/Newtime), also inside parallel containers and Patcher graphs. FL Studio installation data some engines keep in samplePath (DLLs, wave folders) is left out.
 std::vector<MissingFile> findMissingSamples (const Song& song, const std::function<bool (const std::string&)>& fileExists);
 
 // How well a found file matches a missing path: 0 = different file name; otherwise 1 + the number of trailing folder
@@ -65,7 +65,7 @@ std::map<std::string, std::string> relocationMap (const std::vector<MissingFile>
 std::string relocatedPath (const std::map<std::string, std::string>& relocations, const std::string& path);
 
 // Points every reference to a relocated file at its new place (channel samples, zones, effect samples, also inside
-// parallel containers); a channel whose sampler had lost its sample keeps its kind. Returns how many references changed.
+// parallel containers and Patcher graphs); a channel whose sampler had lost its sample keeps its kind. Returns how many references changed.
 int applyRelocations (Song& song, const std::map<std::string, std::string>& relocations);
 
 // The search folders list as saved (one folder per line): duplicates and empty lines dropped, order kept.

@@ -2038,6 +2038,7 @@ private:
                 patch.patcher.nodes[0].channel = c;
                 patch.patcher.nodes[1].effect.samplePath = c.samplePath;
                 evil.channels.push_back (patch);
+                evil.mixer[1].recordTo = dir.getChildFile ("overwritten.wav").getFullPathName().toStdString();
                 const auto evilProject = dir.getChildFile ("evil.lynx");
                 lynx::sessionpack::Manifest em;
                 em.part = true;
@@ -2062,6 +2063,7 @@ private:
                           && evilOpened->song.channels.back().patcher.nodes.size() == 2
                           && juce::File (juce::String::fromUTF8 (evilOpened->song.channels.back().patcher.nodes[0].channel.samplePath.c_str())) != secret
                           && juce::File (juce::String::fromUTF8 (evilOpened->song.channels.back().patcher.nodes[1].effect.samplePath.c_str())) != secret
+                          && evilOpened->song.mixer[1].recordTo.empty()
                           && media.findChildFiles (juce::File::findFiles, true).isEmpty();
                 if (! mergeOk && e.isEmpty())
                     e = "a received package reached a file outside it";

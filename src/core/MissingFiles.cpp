@@ -54,14 +54,69 @@ bool usesChannelSample (InstrumentKind kind)
            || kind == InstrumentKind::threeosc || kind == InstrumentKind::soundfont;
 }
 
-template <typename Fn>
-void forEachEffectSlot (std::vector<EffectSlot>& chain, Fn&& fn)
+// Every user sample of a channel / an effect slot, also inside parallel branches and Patcher graphs (any depth):
+// fn (path, user). Templates so one walk serves `const Song&` (finding) and `Song&` (relinking).
+template <typename Doc, typename Fn>
+void docSamples (Doc& doc, const std::string& user, Fn& fn);
+
+// "Rack (Patcher)" once, however deep the Patcher
+std::string inPatcher (const std::string& user)
 {
-    for (auto& slot : chain)
+    const std::string tag = " (Patcher)";
+    return user.size() >= tag.size() && user.compare (user.size() - tag.size(), tag.size(), tag) == 0 ? user : user + tag;
+}
+
+template <typename Slot, typename Fn>
+void slotSamples (Slot& slot, const std::string& user, Fn& fn)
+{
+    fn (slot.samplePath, user + ": effect");
+    for (auto& branch : slot.branches)
+        for (auto& child : branch.chain)
+            slotSamples (child, user, fn);
+    docSamples (slot.patcher, inPatcher (user), fn);
+}
+
+template <typename Channel, typename Fn>
+void channelSamples (Channel& c, const std::string& user, Fn& fn)
+{
+    if (usesChannelSample (c.instrument))
+        fn (c.samplePath, user.empty() ? channelUser (c) : user);
+    if (c.instrument != InstrumentKind::flkeys)
+        for (auto& z : c.zones)
+            fn (z.path, user.empty() ? c.name : user);
+    for (auto& s : c.standIns) // Online Sessions' renders (round 168a)
+        fn (s.path, (user.empty() ? c.name : user) + ": stand-in");
+    docSamples (c.patcher, inPatcher (user.empty() ? c.name : user), fn);
+}
+
+template <typename Doc, typename Fn>
+void docSamples (Doc& doc, const std::string& user, Fn& fn)
+{
+    for (auto& n : doc.nodes)
     {
-        fn (slot);
-        for (auto& branch : slot.branches)
-            forEachEffectSlot (branch.chain, fn);
+        if (n.generator)
+            channelSamples (n.channel, user, fn);
+        else
+            slotSamples (n.effect, user, fn);
+        for (auto& h : n.busHeads)
+            if (h.head)
+                slotSamples (*h.head, user, fn);
+    }
+}
+
+template <typename SongT, typename Fn>
+void forEachSample (SongT& song, Fn&& fn)
+{
+    for (auto& c : song.channels)
+        channelSamples (c, {}, fn);
+    for (std::size_t t = 0; t < song.mixer.size(); ++t)
+    {
+        auto& track = song.mixer[t];
+        for (auto& s : track.standIns)
+            fn (s.path, (track.name.empty() ? "Insert " + std::to_string (t) : track.name) + ": stand-in");
+        const auto name = track.name.empty() ? (t == 0 ? std::string ("Master") : "Insert " + std::to_string (t)) : track.name;
+        for (auto& slot : track.effects)
+            slotSamples (slot, name, fn);
     }
 }
 } // namespace
@@ -108,31 +163,10 @@ std::vector<MissingFile> findMissingSamples (const Song& song, const std::functi
         return known[key] = ! fileExists (path);
     };
 
-    for (const auto& c : song.channels)
-    {
-        if (usesChannelSample (c.instrument) && gone (c.samplePath))
-            addMissingFile (list, c.samplePath, channelUser (c));
-        if (c.instrument != InstrumentKind::flkeys)
-            for (const auto& z : c.zones)
-                if (gone (z.path))
-                    addMissingFile (list, z.path, c.name);
-        for (const auto& s : c.standIns) // Online Sessions' renders (round 168a)
-            if (gone (s.path))
-                addMissingFile (list, s.path, c.name + ": stand-in");
-    }
-
-    for (std::size_t t = 0; t < song.mixer.size(); ++t)
-    {
-        for (const auto& s : song.mixer[t].standIns)
-            if (gone (s.path))
-                addMissingFile (list, s.path, (song.mixer[t].name.empty() ? "Insert " + std::to_string (t) : song.mixer[t].name) + ": stand-in");
-        auto chain = song.mixer[t].effects; // (a copy: the walker takes non-const slots)
-        const auto track = song.mixer[t].name.empty() ? (t == 0 ? std::string ("Master") : "Insert " + std::to_string (t)) : song.mixer[t].name;
-        forEachEffectSlot (chain, [&] (EffectSlot& slot) {
-            if (gone (slot.samplePath))
-                addMissingFile (list, slot.samplePath, track + ": effect");
-        });
-    }
+    forEachSample (song, [&] (const std::string& path, const std::string& user) {
+        if (gone (path))
+            addMissingFile (list, path, user);
+    });
     return list;
 }
 
@@ -253,22 +287,7 @@ int applyRelocations (Song& song, const std::map<std::string, std::string>& relo
         }
     };
 
-    for (auto& c : song.channels)
-    {
-        if (usesChannelSample (c.instrument))
-            relocate (c.samplePath);
-        if (c.instrument != InstrumentKind::flkeys)
-            for (auto& z : c.zones)
-                relocate (z.path);
-        for (auto& s : c.standIns)
-            relocate (s.path);
-    }
-    for (auto& track : song.mixer)
-    {
-        forEachEffectSlot (track.effects, [&] (EffectSlot& slot) { relocate (slot.samplePath); });
-        for (auto& s : track.standIns)
-            relocate (s.path);
-    }
+    forEachSample (song, [&] (std::string& path, const std::string&) { relocate (path); });
     return changed;
 }
 
