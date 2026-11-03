@@ -5376,7 +5376,7 @@ void MixerLayoutBox::paint (juce::Graphics& g)
 {
     using namespace theme;
     const auto hot = isMouseOverOrDragging();
-    const auto box = getLocalBounds().toFloat().reduced (1.0f, 2.0f);
+    auto box = getLocalBounds().toFloat().reduced (1.0f, 2.0f);
     theme::fillRoundRect (g, box, radius::sm, hot ? colour::bg4 : colour::bg2);
     g.setColour (hot ? colour::borderStrong : colour::border);
     g.drawRoundedRectangle (box.reduced (0.5f), radius::sm, 1.0f);
