@@ -7004,3 +7004,4 @@ countries: kr
 "{0} files arriving" = "파일 {0}개 수신 중"
 "Live session with {0}" = "{0} 님과의 라이브 세션"
 "Undo left alone what someone else changed since: {0}" = "실행 취소는 그 후 다른 사람이 변경한 것은 건드리지 않았습니다: {0}"
+"Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "플러그인 피커: 모든 제너레이터와 이펙트, 카테고리는 탭으로 (다시 누르면 닫힘)"

@@ -7004,3 +7004,4 @@ countries: ru by kz
 "{0} files arriving" = "Поступает файлов: {0}"
 "Live session with {0}" = "Live-сессия с {0}"
 "Undo left alone what someone else changed since: {0}" = "Отмена не затронула то, что с тех пор изменил кто-то другой: {0}"
+"Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Выбор плагинов: все генераторы и эффекты, категории — вкладками (нажмите ещё раз, чтобы закрыть)"

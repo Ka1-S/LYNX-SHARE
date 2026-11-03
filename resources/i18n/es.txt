@@ -7004,3 +7004,4 @@ countries: es mx ar co cl pe ve
 "{0} files arriving" = "Recibiendo {0} archivos"
 "Live session with {0}" = "Sesión en vivo con {0}"
 "Undo left alone what someone else changed since: {0}" = "Deshacer no tocó lo que otra persona cambió desde entonces: {0}"
+"Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Selector de plugins: todos los generadores y efectos, las categorías como pestañas (pulsa de nuevo para cerrar)"
