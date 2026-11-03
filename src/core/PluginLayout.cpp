@@ -3443,6 +3443,8 @@ Layout latticeLayout()
     return l;
 }
 
+#include "core/PluginLayout168r.inc" // round 168r: the FL effects that had a generated page, LYNX's simple built-ins
+
 Layout generated (EffectKind kind)
 {
     // knobs in rows of up to 6 (FL's wrapper shows unknown plugins as a list of knobs too)
@@ -3493,7 +3495,12 @@ const std::vector<EffectKind>& flLayoutKinds()
                                                  // round 165g
                                                  EffectKind::fruityMute2, EffectKind::transmitter,
                                                  // round 167f
-                                                 EffectKind::flEmphasis, EffectKind::flTransporter };
+                                                 EffectKind::flEmphasis, EffectKind::flTransporter,
+                                                 // round 168r
+                                                 EffectKind::pitchCorrect, EffectKind::peakController, EffectKind::spreader,
+                                                 EffectKind::fruityFastLP, EffectKind::flFrequencyShifter, EffectKind::flLowLifter,
+                                                 EffectKind::flBassBoost, EffectKind::flDelay1, EffectKind::fl7BandEq, EffectKind::flCenter,
+                                                 EffectKind::flPhaseInverter, EffectKind::lovePhilter, EffectKind::distructor };
     return kinds;
 }
 
@@ -3505,9 +3512,21 @@ const std::vector<EffectKind>& ownLayoutKinds()
                                                  EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod,
                                                  EffectKind::crestCompressor, EffectKind::prismMultiband, EffectKind::sentryGate,
                                                  EffectKind::quellDenoiser, EffectKind::geminiDoubler, EffectKind::compressor,
-                                                 EffectKind::voiceShift, EffectKind::autoPan, EffectKind::hardwareInsert };
+                                                 EffectKind::voiceShift, EffectKind::autoPan, EffectKind::hardwareInsert,
+                                                 // round 168r: the simple built-ins
+                                                 EffectKind::eq, EffectKind::delay, EffectKind::reverb, EffectKind::limiter, EffectKind::filter,
+                                                 EffectKind::distortion, EffectKind::chorus, EffectKind::utility, EffectKind::lofi,
+                                                 EffectKind::crossover, EffectKind::pitchShift, EffectKind::freqShift, EffectKind::rhythmGain,
+                                                 EffectKind::volumeGate };
     return kinds;
 }
+
+namespace
+{
+bool generatedOnly = false;
+}
+
+void showGeneratedLayoutsOnly (bool on) { generatedOnly = on; }
 
 const Layout& layoutFor (EffectKind kind)
 {
@@ -3517,6 +3536,9 @@ const Layout& layoutFor (EffectKind kind)
 
     if (auto it = cache.find (kind); it != cache.end())
         return it->second;
+
+    if (generatedOnly) // round 168r: screenshots of the "before" state
+        return cache.emplace (kind, generated (kind)).first->second;
 
     Layout l;
     switch (kind)
@@ -3592,6 +3614,34 @@ const Layout& layoutFor (EffectKind kind)
         case EffectKind::voiceShift: l = voiceShiftLayout(); break;
         case EffectKind::hardwareInsert: l = hardwareInsertLayout(); break;
         case EffectKind::autoPan: l = withRhythmVoicing (autoPanLayout()); break;
+        // round 168r
+        case EffectKind::pitchCorrect: l = pitcherLayout(); break;
+        case EffectKind::peakController: l = peakControllerFl(); break;
+        case EffectKind::spreader: l = spreaderLayout(); break;
+        case EffectKind::fruityFastLP: l = fruityFastLP(); break;
+        case EffectKind::flFrequencyShifter: l = freqShifterFl(); break;
+        case EffectKind::flLowLifter: l = lowLifterFl(); break;
+        case EffectKind::flBassBoost: l = flBassBoost(); break;
+        case EffectKind::flDelay1: l = flDelay1(); break;
+        case EffectKind::fl7BandEq: l = fl7BandEq(); break;
+        case EffectKind::flCenter: l = flCenter(); break;
+        case EffectKind::flPhaseInverter: l = flPhaseInverter(); break;
+        case EffectKind::lovePhilter: l = lovePhilterLayout(); break;
+        case EffectKind::distructor: l = distructorLayout(); break;
+        case EffectKind::eq: l = lynxEq(); break;
+        case EffectKind::delay: l = lynxDelay(); break;
+        case EffectKind::reverb: l = lynxReverb(); break;
+        case EffectKind::limiter: l = lynxLimiter(); break;
+        case EffectKind::filter: l = lynxFilter(); break;
+        case EffectKind::distortion: l = lynxDistortion(); break;
+        case EffectKind::chorus: l = lynxChorus(); break;
+        case EffectKind::utility: l = lynxUtility(); break;
+        case EffectKind::lofi: l = lynxLofi(); break;
+        case EffectKind::crossover: l = lynxCrossover(); break;
+        case EffectKind::pitchShift: l = lynxPitchShift(); break;
+        case EffectKind::freqShift: l = lynxFreqShift(); break;
+        case EffectKind::rhythmGain: l = lynxRhythm(); break;
+        case EffectKind::volumeGate: l = lynxStepGate(); break;
         default: l = generated (kind); break;
     }
     return cache.emplace (kind, std::move (l)).first->second;

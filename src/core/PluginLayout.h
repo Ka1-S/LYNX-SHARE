@@ -88,6 +88,8 @@ struct Layout
 // The editor layout of an effect: FL's arrangement for the plugins studied so far, otherwise a generated grid
 // of knobs (sections of up to 6) so that every native effect gets a window.
 const Layout& layoutFor (EffectKind kind);
+// Screenshots of the "before" state only (round 168r): every editor shows its generated page. Call before any editor opens.
+void showGeneratedLayoutsOnly (bool on);
 bool hasFlLayout (EffectKind kind);
 // the display graphs that take the mouse in the plugin window (edited there: EQ bands, pads, point editors…); the
 // other displays are pictures. Round 168x (issue #40): Maximus' In/Out curve "maxcurve" joined them.

@@ -677,6 +677,14 @@ bool peakController (const std::vector<std::uint8_t>& d, EffectSlot& slot)
     slot.params[2] = clamp01 ((std::clamp (i32At (d, 8), -128, 128) / 128.0 + 1.0) / 2.0);
     slot.params[3] = clamp01 ((std::clamp (i32At (d, 12), 5, 128) - 5) / 123.0);
     slot.params[4] = clamp01 (i32At (d, 16) / 65536.0); // LFO base
+    // round 168r: the LFO (amount, tension, speed, shape, phase) and the Mute / Ramp flags after the ten controls
+    slot.params[5] = clamp01 ((std::clamp (i32At (d, 20), -256, 256) / 256.0 + 1.0) / 2.0);
+    slot.params[6] = clamp01 ((std::clamp (i32At (d, 24), -128, 128) / 128.0 + 1.0) / 2.0);
+    slot.params[7] = clamp01 ((std::clamp (i32At (d, 28), 200, 65536) - 200) / 65336.0);
+    slot.params[8] = clamp01 (std::clamp (i32At (d, 32), 0, 4) / 4.0);
+    slot.params[9] = clamp01 (std::clamp (i32At (d, 36), 0, 65535) / 65536.0);
+    slot.params[10] = d.size() > 40 && d[40] != 0 ? 1.0f : 0.0f;
+    slot.params[11] = d.size() > 41 && d[41] != 0 ? 1.0f : 0.0f;
     return true;
 }
 

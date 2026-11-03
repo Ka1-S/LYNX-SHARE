@@ -98,6 +98,7 @@
 #include "ui/ParametricEqEditor.h"
 #include "ui/PluginEditors.h"
 #include "core/PluginLayout.h"
+#include "core/EffectPresets.h"
 #include "core/Vfx.h"
 #include "ui/Splash.h"
 #include "ui/Theme.h"
@@ -844,6 +845,19 @@ public:
             // loaded with the FL plugin's Default preset when the FL installation has one
             const auto i = args.indexOf ("--plugui");
             runPluginEditorSnapshots (args[i + 1].unquoted());
+            return;
+        }
+
+        if (args.contains ("--design168rshot"))
+        {
+            // LYNX.exe --design168rshot <folder>: round 168r's editors (FL effects that had a generated page and LYNX's own
+            // simple built-ins) at 100 % and 200 %, with their default settings and, when they have one, the first
+            // preset of LYNX's own bank. "--design168rshot <folder> generated": the generated pages they had before
+            const auto i = args.indexOf ("--design168rshot");
+            if (i + 2 < args.size() && args[i + 2] == "generated")
+                lynx::plugui::showGeneratedLayoutsOnly (true);
+            runDesign168rShots (args[i + 1].unquoted());
+            quit();
             return;
         }
 
@@ -5896,6 +5910,76 @@ private:
                 auto editor = lynx::makeFacetEqEditor (offline, 1, 0, false);
                 feed (*editor, true, 90);
                 save (*editor, name);
+            }
+        }
+    }
+
+    void runDesign168rShots (const juce::String& folder)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        const juce::File out (folder);
+        out.createDirectory();
+        lynx::AudioEngine offline (false);
+        using K = lynx::EffectKind;
+        for (const auto kind : { K::pitchCorrect, K::lovePhilter, K::peakController, K::spreader, K::fruityFastLP, K::flFrequencyShifter,
+                                 K::flLowLifter, K::distructor, K::flBassBoost, K::flDelay1, K::fl7BandEq, K::flCenter, K::flPhaseInverter,
+                                 K::eq, K::delay, K::reverb, K::limiter, K::filter, K::distortion, K::chorus, K::utility, K::lofi,
+                                 K::crossover, K::pitchShift, K::freqShift, K::rhythmGain, K::volumeGate })
+        {
+            const auto& bank = lynx::presets::factory (kind);
+            // Love Philter / Distructor play FL's state: their second picture is FL's default preset (when installed)
+            std::optional<lynx::EffectSlot> flPreset;
+            if (kind == K::lovePhilter || kind == K::distructor)
+            {
+                const auto roots = lynx::findFlStudioRoots();
+                const auto file = juce::File (juce::String::fromUTF8 (roots.data.c_str()))
+                                      .getChildFile ("Patches/Plugin presets/Effects")
+                                      .getChildFile (kind == K::lovePhilter ? "Fruity Love Philter/Default.fst" : "Distructor/Default.fst");
+                juce::MemoryBlock bytes;
+                if (file.loadFileAsData (bytes))
+                    flPreset = lynx::effectFromFlPreset (std::vector<std::uint8_t> ((const std::uint8_t*) bytes.getData(),
+                                                                                    (const std::uint8_t*) bytes.getData() + bytes.getSize()));
+            }
+            for (int pass = 0; pass < (bank.empty() && ! flPreset ? 1 : 2); ++pass)
+            {
+                auto fx = lynx::makeEffectSlot (kind);
+                if (pass == 1 && flPreset)
+                    fx = *flPreset;
+                else if (pass == 1)
+                {
+                    fx.params = lynx::presets::apply (kind, bank.front(), 120.0);
+                    fx.presetName = bank.front().name;
+                }
+                lynx::Song song;
+                song.mixer.resize (2);
+                song.mixer[0].name = "Master";
+                song.mixer[1].name = "Insert 1";
+                song.mixer[1].effects.push_back (fx);
+                offline.setSong (std::move (song));
+                offline.dispatchPendingMessages();
+                const auto pages = juce::jmax (1, (int) lynx::plugui::layoutFor (kind).pages.size());
+                for (const auto scale : { 1.0f, 2.0f })
+                    for (int page = 0; page < pages; ++page)
+                    {
+                        auto editor = lynx::makeNativeEffectEditor (offline, 1, 0, scale, page);
+                        if (editor == nullptr)
+                            continue;
+                        juce::Image image (juce::Image::ARGB, juce::jmax (1, editor->getWidth()), juce::jmax (1, editor->getHeight()), true);
+                        {
+                            juce::Graphics g (image);
+                            g.fillAll (lynx::theme::panel);
+                            editor->paintEntireComponent (g, false);
+                        }
+                        // (FL's "Frequency Shifter" and LYNX's "Frequency shifter" differ only in case: FL editors get "FL ")
+                        const auto file = out.getChildFile ((lynx::plugui::hasFlLayout (kind) ? "FL " : "")
+                                                            + juce::String (lynx::effectInfo (kind).name).replaceCharacters ("/\\:", "---")
+                                                            + (pass == 1 ? "-preset" : "") + (page > 0 ? "-p" + juce::String (page + 1) : juce::String())
+                                                            + (scale > 1.5f ? "-200" : "-100") + ".png");
+                        file.deleteFile();
+                        juce::PNGImageFormat png;
+                        if (auto stream = file.createOutputStream())
+                            png.writeImageToStream (image, *stream);
+                    }
             }
         }
     }

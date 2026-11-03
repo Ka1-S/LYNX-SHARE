@@ -448,10 +448,15 @@ void PresetBar::stepPreset (int delta, const FlPresets* flPresets)
         return;
     const auto& factory = presets::factory (kind);
     const auto users = userPresets (kind);
-    const auto count = (int) factory.size() + users.size();
+    const auto own = (int) factory.size() + users.size();
+    const auto fl = flPresets != nullptr && flPresets->count && flPresets->load ? flPresets->count() : 0; // round 168r
+    const auto count = own + fl;
     if (count == 0)
         return;
     int at = -1;
+    if (fl > 0 && flPresets->index)
+        if (const auto i = flPresets->index(); i >= 0 && i < fl)
+            at = own + i;
     for (int i = 0; i < (int) factory.size() && at < 0; ++i)
         if (factory[(std::size_t) i].name == fx->presetName)
             at = i;
@@ -461,8 +466,10 @@ void PresetBar::stepPreset (int delta, const FlPresets* flPresets)
     at = at < 0 ? (delta > 0 ? 0 : count - 1) : (at + delta + count) % count;
     if (at < (int) factory.size())
         loadFactory (at);
-    else
+    else if (at < own)
         loadUser (users[at - (int) factory.size()]);
+    else
+        flPresets->load (at - own);
 }
 
 void PresetBar::showPresetMenu (juce::Component& owner, const FlPresets* flPresets)

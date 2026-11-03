@@ -53,6 +53,10 @@ public:
         std::function<void (juce::PopupMenu&)> addTo;
         std::function<void (int delta)> step;
         std::function<juce::String()> name;
+        // round 168r: ◀ ▶ run through LYNX's bank, the user's presets and then FL's (an engine with both)
+        std::function<int()> count;       // FL's presets of this plugin
+        std::function<int()> index;       // the FL preset loaded now (−1 = none)
+        std::function<void (int)> load;   // loads FL preset i
     };
     void click (Part part, juce::Component& owner, const FlPresets* flPresets = nullptr);
 

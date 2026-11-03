@@ -2283,9 +2283,57 @@ private:
 // 2 = LFO (its LFO is not generated yet: the LFO base is used). Parameters = FL raw values, normalized.
 class PeakController final : public Effect
 {
+    // FL's Fruity Peak Controller (REA_rodada17 §5, REA_rodada168r §4): the peak detector (instantaneous attack, linear
+    // decay per quarter note), its base / amount / tension, and the LFO (base, amount, tension, speed in quarter notes,
+    // shape, phase) running on FL's host ticks (96 per quarter note): locked to the song position while it plays, free
+    // otherwise. Ramp limits each output's change to 1/8 of the range per tick; Mute silences the audio it passes.
 public:
     void prepare (double sr) noexcept override { sampleRate = sr; }
-    void reset() noexcept override { detector = 0.0; }
+    void reset() noexcept override
+    {
+        detector = 0.0;
+        freePhase = 0.0;
+        for (auto& o : out)
+            o = -1.0f;
+    }
+    void setSongPosition (double ticks) noexcept override { songBeats = ticks / (double) ppq; }
+    void setPlaying (bool on) noexcept override { playing = on; }
+
+    // shaped value of x (0…1) with FL's tension t (raw −128…128): the X-Y curve, divided back by k
+    static double tension (double x, double t) noexcept
+    {
+        if (std::abs (t) < 1e-9)
+            return x;
+        const auto k = (std::pow (1001.0, std::abs (t) / 128.0) - 1.0) * 0.1;
+        const auto y = t > 0.0 ? k - (std::pow (k + 1.0, 1.0 - x) - 1.0) : std::pow (k + 1.0, x) - 1.0;
+        return y / k;
+    }
+    // FL's LFO period in quarter notes from the speed control (raw 200…65536)
+    static double periodBeats (double speedRaw) noexcept { return std::max (3.0 / 96.0, (std::pow (1001.0, speedRaw / 65536.0) - 1.0) * 0.128); }
+    // the LFO's wave at phase φ (0…1) as 0…1. FL reads the host's LFO tables (sine, triangle, square, saw; LFOShape.bmp
+    // shows their shapes); Random steps to a new value every period
+    static double wave (int shape, double phase, std::uint32_t period) noexcept
+    {
+        constexpr auto twoPi = 6.283185307179586;
+        double w = 0.0;
+        switch (shape)
+        {
+            case 1: w = 1.0 - 2.0 * std::abs (2.0 * phase - 1.0); w = -w; break; // triangle: low, up to the top at ½, low
+            case 2: w = phase < 0.5 ? 1.0 : -1.0; break;
+            case 3: w = 2.0 * phase - 1.0; break;
+            case 4:
+            {
+                auto h = period * 2654435761u;
+                h ^= h >> 15;
+                h *= 2246822519u;
+                h ^= h >> 13;
+                w = (double) (h & 0xffffff) / (double) 0x800000 - 1.0;
+                break;
+            }
+            default: w = std::sin (twoPi * phase); break;
+        }
+        return (w + 1.0) * 0.5;
+    }
 
     void process (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept override
     {
@@ -2293,33 +2341,60 @@ public:
         const auto tensionRaw = (std::clamp ((double) p[2], 0.0, 1.0) * 2.0 - 1.0) * 128.0;
         const auto decayRaw = 5.0 + 123.0 * std::clamp ((double) p[3], 0.0, 1.0);
         const auto perBeat = (std::pow (10001.0, decayRaw / 128.0) - 1.0) * 0.0192;
+        const auto beats = std::max (1.0, bpm) / 60.0 * n / sampleRate;
 
         float blockPeak = 0.0f;
         for (int i = 0; i < n; ++i)
             blockPeak = std::max ({ blockPeak, std::abs (l[i]), std::abs (r[i]) });
-        detector = std::max (0.0, detector - perBeat * std::max (1.0, bpm) / 60.0 * n / sampleRate);
+        detector = std::max (0.0, detector - perBeat * beats);
         detector = std::max (detector, (double) blockPeak);
 
         const auto amount = (amountRaw < 0.0 ? -1.0 : 1.0) * (std::pow (6.0, std::abs (amountRaw) / 256.0) - 1.0) * 0.4;
-        double shaped = detector;
-        if (std::abs (tensionRaw) > 1e-9)
+        const auto peak = std::clamp (p[0] + amount * tension (detector, tensionRaw), 0.0, 1.0);
+
+        // the LFO
+        const auto lfoAmountRaw = (std::clamp ((double) p[5], 0.0, 1.0) * 2.0 - 1.0) * 256.0;
+        const auto lfoTension = (std::clamp ((double) p[6], 0.0, 1.0) * 2.0 - 1.0) * 128.0;
+        const auto period = periodBeats (200.0 + std::clamp ((double) p[7], 0.0, 1.0) * 65336.0);
+        const auto shape = std::clamp ((int) std::lround (p[8] * 4.0f), 0, 4);
+        const auto phaseOffset = std::clamp ((double) p[9], 0.0, 1.0);
+        double cycles = 0.0;
+        if (playing)
+            cycles = songBeats / period;
+        else
         {
-            const auto k = (std::pow (1001.0, std::abs (tensionRaw) / 128.0) - 1.0) * 0.1;
-            const auto y = tensionRaw > 0.0 ? k - (std::pow (k + 1.0, 1.0 - detector) - 1.0) : std::pow (k + 1.0, detector) - 1.0;
-            shaped = y / k;
+            freePhase += beats / period;
+            cycles = freePhase;
         }
-        peakOut = (float) std::clamp (p[0] + amount * shaped, 0.0, 1.0);
-        lfoOut = std::clamp (p[4], 0.0f, 1.0f);
+        cycles += phaseOffset;
+        if (playing)
+            songBeats += beats;
+        const auto whole = std::floor (cycles);
+        const auto lfoAmount = (lfoAmountRaw < 0.0 ? -1.0 : 1.0) * (std::pow (6.0, std::abs (lfoAmountRaw) / 256.0) - 1.0) * 0.2;
+        const auto lfo = std::clamp (p[4] + lfoAmount * tension (wave (shape, cycles - whole, (std::uint32_t) (std::int64_t) whole), lfoTension), 0.0, 1.0);
+
+        // outputs 0 = peak + LFO, 1 = peak, 2 = LFO; Ramp: at most 1/8 of the range per host tick (96 per quarter note)
+        const double targets[3] { std::min (1.0, peak + lfo), peak, lfo };
+        const auto ramp = p[11] >= 0.5f;
+        const auto step = (float) (beats * 96.0 * 0.125);
+        for (int o = 0; o < 3; ++o)
+        {
+            const auto t = (float) targets[o];
+            out[o] = ! ramp || out[o] < 0.0f ? t : std::clamp (t, out[o] - step, out[o] + step);
+        }
+        if (p[10] >= 0.5f) // Mute
+        {
+            std::fill (l, l + n, 0.0f);
+            std::fill (r, r + n, 0.0f);
+        }
     }
 
-    float controlOutput (int output) const noexcept override
-    {
-        return output == 1 ? peakOut : output == 2 ? lfoOut : std::clamp (peakOut + lfoOut, 0.0f, 1.0f);
-    }
+    float controlOutput (int output) const noexcept override { return std::max (0.0f, out[(std::size_t) std::clamp (output, 0, 2)]); }
 
 private:
-    double sampleRate = 44100.0, detector = 0.0;
-    float peakOut = 0.0f, lfoOut = 0.0f;
+    double sampleRate = 44100.0, detector = 0.0, songBeats = 0.0, freePhase = 0.0;
+    bool playing = false;
+    float out[3] { -1.0f, -1.0f, -1.0f };
 };
 
 class Utility final : public Effect
@@ -2757,8 +2832,12 @@ const EffectInfo& effectInfo (EffectKind kind)
                                                          { "Mod rate", 0.5f }, { "Tempo red.", 0.0f }, { "Mod X", 0.5f }, { "Mod Y", 0.5f },
                                                          { "LFO shape", 0.0f }, { "Input", 1.0f }, { "Output", 0.5f } } };
     static const EffectInfo formulaControllerInfo { "Formula Controller", { { "a", 0.0f }, { "b", 0.0f }, { "c", 0.0f } } };
+    // round 168r: FL's LFO controls, Mute and Ramp after the round-17 five (FL's own order: the state's 10 ints + 2 flags)
     static const EffectInfo peakController { "Peak Controller", { { "Base", 0.0f }, { "Amount", 0.8496f }, { "Tension", 0.5f },
-                                                                  { "Decay", 0.4959f }, { "LFO base", 0.0f } } };
+                                                                  { "Decay", 0.4959f }, { "LFO base", 0.0f }, { "LFO amount", 0.5f },
+                                                                  { "LFO tension", 0.5f }, { "LFO speed", 32750.0f / 65336.0f },
+                                                                  { "LFO shape", 0.0f }, { "LFO phase", 0.0f }, { "Mute", 0.0f },
+                                                                  { "Ramp", 0.0f } } };
     static const EffectInfo parametric = [] {
         // bands as in a mixing EQ: low shelf, 5 peaks and high shelf, all at 0 dB
         constexpr peq::BandType types[] = { peq::BandType::lowShelf, peq::BandType::peak, peq::BandType::peak, peq::BandType::peak,
@@ -3337,8 +3416,30 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
             }
             else if (param == 3)
                 std::snprintf (text, sizeof (text), "%.2f / beat", (std::pow (10001.0, (5.0 + 123.0 * v) / 128.0) - 1.0) * 0.0192);
-            else if (param == 2)
+            else if (param == 2 || param == 6)
                 std::snprintf (text, sizeof (text), "%+.0f", (v * 2.0f - 1.0f) * 128.0f);
+            else if (param == 5)
+            {
+                const auto raw = (v * 2.0 - 1.0) * 256.0;
+                std::snprintf (text, sizeof (text), "%+.0f%%", (raw < 0.0 ? -1.0 : 1.0) * (std::pow (6.0, std::abs (raw) / 256.0) - 1.0) * 20.0);
+            }
+            else if (param == 7)
+            {
+                const auto beats = std::max (3.0 / 96.0, (std::pow (1001.0, (200.0 + v * 65336.0) / 65536.0) - 1.0) * 0.128);
+                if (beats >= 4.0)
+                    std::snprintf (text, sizeof (text), "%.1f bars", beats / 4.0);
+                else
+                    std::snprintf (text, sizeof (text), "%.2f beats", beats);
+            }
+            else if (param == 8)
+            {
+                static const char* const shapes[5] = { "Sine", "Triangle", "Square", "Saw", "Random" };
+                return shapes[std::clamp ((int) std::lround (v * 4.0f), 0, 4)];
+            }
+            else if (param == 9)
+                std::snprintf (text, sizeof (text), "%.0f\xc2\xb0", v * 360.0f);
+            else if (param >= 10)
+                return v >= 0.5f ? "on" : "off";
             else
                 std::snprintf (text, sizeof (text), "%.0f%%", v * 100.0f);
             return text;

@@ -16153,11 +16153,17 @@ TEST (plugin_layouts_name_real_parameters)
         const auto& l = plugui::layoutFor (kind);
         const auto& info = effectInfo (kind);
         CHECK (plugui::hasFlLayout (kind));
-        CHECK (l.width > 100 && l.height > 60);
+        // FL's own size wins for its one-cell editors (Fruity Center, Fruity Phase Inverter: 170 x 55)
+        const auto minHeight = kind == EffectKind::flCenter || kind == EffectKind::flPhaseInverter ? 50 : 60;
+        if (! (l.width > 100 && l.height > minHeight))
+            std::printf ("  %s: %d x %d\n", info.name, l.width, l.height);
+        CHECK (l.width > 100 && l.height > minHeight);
         std::vector<bool> placed ((std::size_t) plugui::paramCount (kind), false);
 
         for (const auto& item : l.items)
         {
+            if (! (item.x >= 0.0f && item.y >= 0.0f && item.x + item.w <= (float) l.width + 0.5f && item.y + item.h <= (float) l.height + 0.5f))
+                std::printf ("  %s: item '%s' leaves the body\n", info.name, item.param != nullptr ? item.param : item.label != nullptr ? item.label : "");
             CHECK (item.x >= 0.0f && item.y >= 0.0f && item.x + item.w <= (float) l.width + 0.5f && item.y + item.h <= (float) l.height + 0.5f);
             if (item.param != nullptr)
             {
@@ -16994,6 +17000,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issue32Tests.inc"
 #include "Mono168lTests.inc"
 #include "MixPre167qTests.inc"
+#include "Design168rTests.inc"
 #include "Playlist168fTests.inc"
 #include "RecFold167qTests.inc"
 #include "LoopWrap167qTests.inc"

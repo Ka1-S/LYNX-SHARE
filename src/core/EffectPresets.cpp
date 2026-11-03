@@ -12,6 +12,7 @@
 #include "core/FruityBasicFx.h"
 #include "core/GrossBeat.h"
 #include "core/EffectPresetTable.inc"
+#include "core/EffectBanks168r.inc" // round 168r: LYNX's banks for the FL effects and the simple built-ins
 
 namespace lynx::presets
 {
@@ -68,6 +69,10 @@ constexpr int grid = 2000;
 
 EffectKind kindNamed (const std::string& name)
 {
+    // the exact name first: LYNX's "Frequency shifter" and FL's "Frequency Shifter" differ only in case (round 168r)
+    for (int k = 0; k <= (int) lastEffectKind; ++k)
+        if (name == effectInfo ((EffectKind) k).name)
+            return (EffectKind) k;
     for (int k = 0; k <= (int) lastEffectKind; ++k)
         if (folded (effectInfo ((EffectKind) k).name) == folded (name))
             return (EffectKind) k;
@@ -85,7 +90,7 @@ int paramIndexOf (EffectKind kind, const std::string& name);
 Table parseTable()
 {
     Table table;
-    std::istringstream in (builtInTable);
+    std::istringstream in (std::string (builtInTable) + effectBanks168r);
     std::string line, folder;
     auto kind = EffectKind::plugin;
     while (std::getline (in, line))
