@@ -3315,7 +3315,8 @@ private:
     // LYNX.exe --claprestarttest "LYNX Test Restart.clap" report.txt (tools/testplugin/lynx_test_restart.c, PR #29): a
     // CLAP effect on the Master that asks for a restart every 8 blocks while an export renders on a thread of its own
     // (the message thread is free to run the restarts, as with the Export window). The plugin aborts the process when
-    // start / stop_processing run off the audio thread (issue #46, as u-he Presswerk does) and counts deactivations that
+    // start / stop_processing run off the audio thread or activate / deactivate off the main thread (issue #46, as u-he
+    // Presswerk does; an export at 44.1 kHz and prepare calls from the export's thread check the latter) and counts deactivations that
     // landed inside its process() call (must be none), the restarts must happen, and the delay compensation must end on
     // the latency the plugin reports after its last restart.
     void runClapRestartTest (const juce::String& pluginPath, const juce::String& reportPath)
@@ -3373,10 +3374,18 @@ private:
             return;
         }
 
-        run->render = std::thread ([run] {
+        auto effect = std::dynamic_pointer_cast<lynx::PluginEffect> (run->engine->getEffect (0, run->slot));
+        run->render = std::thread ([run, effect] {
             const auto start = juce::Time::getMillisecondCounterHiRes();
             run->engine->renderOffline (30.0, 48000.0);
             run->renderSeconds = (juce::Time::getMillisecondCounterHiRes() - start) * 0.001;
+            // issue #46: an export at another rate / block size prepares the plugin from the export's thread; the
+            // plugin aborts unless activate / deactivate reach the main thread
+            auto& instance = effect->getInstance();
+            instance.prepareToPlay (44100.0, 1024);
+            instance.releaseResources();
+            instance.prepareToPlay (48000.0, 512);
+            run->engine->renderOffline (3.0, 44100.0); // (the engine rebuilds its rack at that rate)
             run->done = true;
         });
 
@@ -3402,6 +3411,7 @@ private:
                 // one line per plugin instance (the engine may have made more than one): none may have been
                 // deactivated inside process(), and the one that rendered must have restarted
                 int overlapped = 0, inactive = 0, requests = 0, activations = 0, lines = 0, wrongThread = 0, misordered = 0, unstopped = 0;
+                bool otherRate = false;
                 for (const auto& line : juce::StringArray::fromLines (counters.loadFileAsString()))
                 {
                     juce::StringPairArray values;
@@ -3419,15 +3429,17 @@ private:
                     wrongThread += values["wrong_thread"].getIntValue();
                     misordered += values["misordered"].getIntValue();
                     unstopped += values["starts"].getIntValue() - values["stops"].getIntValue();
+                    otherRate = otherRate || values["last_rate"].getIntValue() == 44100;
                     if (values["requests"].getIntValue() > requests)
                     {
                         requests = values["requests"].getIntValue();
                         activations = values["activations"].getIntValue();
                     }
                 }
-                report << "wrong_thread=" << wrongThread << "\nmisordered=" << misordered << "\nunstopped=" << unstopped << "\n";
+                report << "wrong_thread=" << wrongThread << "\nmisordered=" << misordered << "\nunstopped=" << unstopped
+                       << "\nactivated_at_44100=" << (otherRate ? "yes" : "no") << "\n";
                 const auto ok = lines > 0 && requests > 0 && activations > requests / 2 && overlapped == 0 && inactive == 0
-                                && wrongThread == 0 && misordered == 0 && unstopped == 0
+                                && wrongThread == 0 && misordered == 0 && unstopped == 0 && otherRate
                                 && pluginLatency > 0 && pdc == pluginLatency && lynx::pluginCrashCount() == 0;
                 if (! ok)
                 {

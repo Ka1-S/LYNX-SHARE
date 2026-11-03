@@ -312,12 +312,73 @@ public:
         fds.clear();
        #endif
 
-        // (stop_processing on an audio thread, never here: issue #46; a plugin stuck inside process is left alone)
-        if (active && holdProcessing())
-            plugin->deactivate (plugin);
+        // (stop_processing on an audio thread, never here: issue #46; a plugin stuck inside process is left alone).
+        // Deleted on another thread: deactivate and destroy go to the message thread, which this waits for (done
+        // here only when the message thread does not answer in 10 s: it is blocked, and the plugin can't wait).
+        auto teardown = [this] {
+            if (active && holdProcessing())
+                plugin->deactivate (plugin);
+            if (plugin != nullptr)
+                plugin->destroy (plugin);
+        };
+        if (isMessageThread())
+            teardown();
+        else if (auto call = MainCall::post (teardown); ! call->waitOrCancel (10000))
+            teardown();
+    }
 
-        if (plugin != nullptr)
-            plugin->destroy (plugin);
+    // A call made on the message thread for another thread, which waits for it (CLAP: activate / deactivate on the
+    // main thread, issue #46).
+    struct MainCall
+    {
+        std::mutex lock;
+        bool started = false, cancelled = false;
+        juce::WaitableEvent done;
+        std::function<void()> fn;
+
+        static std::shared_ptr<MainCall> post (std::function<void()> fn)
+        {
+            auto call = std::make_shared<MainCall>();
+            call->fn = std::move (fn);
+            if (! juce::MessageManager::callAsync ([call] { call->run(); }))
+                call->run(); // (no message loop any more: here)
+            return call;
+        }
+
+        void run()
+        {
+            {
+                const std::lock_guard<std::mutex> l (lock);
+                if (cancelled)
+                    return;
+                started = true;
+            }
+            fn();
+            done.signal();
+        }
+
+        // true when it ran within timeoutMs, or was running then (waited for); false when it was cancelled unrun
+        bool waitOrCancel (int timeoutMs)
+        {
+            if (done.wait (timeoutMs))
+                return true;
+            {
+                const std::lock_guard<std::mutex> l (lock);
+                if (! started)
+                {
+                    cancelled = true;
+                    return false;
+                }
+            }
+            done.wait (-1);
+            return true;
+        }
+    };
+
+    static bool isMessageThread()
+    {
+        auto* mm = juce::MessageManager::getInstanceWithoutCreating();
+        return mm == nullptr || mm->isThisTheMessageThread();
     }
 
     static const clap_host_t* hostFor (ClapInstance* self) { return &self->host; }
@@ -334,7 +395,23 @@ public:
         // on the main thread: issue #46)
         if (active && sampleRate == activeRate && juce::jmax (1, blockSize) == maxBlock)
             return;
-        reactivate (sampleRate, blockSize);
+        onMessageThreadFor ([this, sampleRate, blockSize] { reactivate (sampleRate, blockSize); });
+    }
+
+    // Runs fn here on the message thread; from another thread (an export at another rate or block size) on the
+    // message thread, waiting up to 5 s for it. A message thread that doesn't answer in time is busy: fn then runs
+    // when it gets there; until then the plugin keeps its current activation.
+    void onMessageThreadFor (std::function<void()> fn)
+    {
+        if (isMessageThread())
+        {
+            fn();
+            return;
+        }
+        MainCall::post ([alive = alive, fn = std::move (fn)] {
+            if (*alive)
+                fn();
+        })->done.wait (5000);
     }
 
     // deactivates (when active) and activates the plugin again
@@ -363,12 +440,15 @@ public:
 
     void releaseResources() override
     {
-        if (! active || ! holdProcessing())
+        if (! active)
             return;
-
-        plugin->deactivate (plugin);
-        active = false;
-        releaseProcessing();
+        onMessageThreadFor ([this] {
+            if (! active || ! holdProcessing())
+                return;
+            plugin->deactivate (plugin);
+            active = false;
+            releaseProcessing();
+        });
     }
 
     // CLAP's threading rules (issue #46: u-he plugins abort when they are broken): activate / deactivate on the main
@@ -768,9 +848,9 @@ private:
     bool midiDialect = false;
     bool initialised = false;
 
-    bool active = false;
-    double activeRate = 0.0;
-    int maxBlock = 0;
+    std::atomic<bool> active { false }; // (atomic: prepareToPlay reads them on the export's thread)
+    std::atomic<double> activeRate { 0.0 };
+    std::atomic<int> maxBlock { 0 };
     int inputChannels = 0, outputChannels = 2;
     int64_t steadyTime = 0;
     juce::AudioBuffer<float> scratch;
