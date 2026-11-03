@@ -41,6 +41,11 @@ PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, co
 // A track's manual latency in samples (FL rounds ms × rate / 1000).
 int manualLatencySamples (const MixerTrack& track, double sampleRate) noexcept;
 
+// The latency the effect slots of insert `track` add to what passes through it (round 168x: a take tapped after the
+// slots is that late against the device input): outLat − inAlign without the manual track latency, which delays
+// nothing inside the insert. 0 for a track the plan doesn't have.
+int insertEffectsLatency (const PdcPlan& plan, const Song& song, int track, double sampleRate) noexcept;
+
 // Stereo delay line with an integer delay, allocated on creation. process() does not allocate.
 class DelayLine
 {

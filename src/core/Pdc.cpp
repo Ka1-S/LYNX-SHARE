@@ -24,6 +24,14 @@ int manualLatencySamples (const MixerTrack& track, double sampleRate) noexcept
     return ms == 0.0f || ! (sampleRate > 0.0) ? 0 : (int) std::lround ((double) ms * sampleRate * 0.001);
 }
 
+int insertEffectsLatency (const PdcPlan& plan, const Song& song, int track, double sampleRate) noexcept
+{
+    if (track < 0 || (std::size_t) track >= plan.outLat.size() || (std::size_t) track >= plan.inAlign.size() || (std::size_t) track >= song.mixer.size())
+        return 0;
+    return std::max (0, plan.outLat[(std::size_t) track] - plan.inAlign[(std::size_t) track]
+                            - manualLatencySamples (song.mixer[(std::size_t) track], sampleRate));
+}
+
 PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, const std::vector<std::vector<int>>& slotLatency,
                     double sampleRate)
 {

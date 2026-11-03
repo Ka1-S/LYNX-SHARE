@@ -5,6 +5,8 @@
 // (see SnapshotExchange.h), so nothing here needs to be thread-safe.
 
 #include <array>
+#include <atomic>
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -550,6 +552,12 @@ struct ChannelMisc
     float shiftBeats = 0.0f; // Time › Shift: every note starts (and ends) this much later
     float gateBeats = 0.0f;  // Time › Gate: notes last at most this long (0 = off)
     bool fullPorta = true;   // Time › Full porta: a porta note glides the whole way (off: FL's partial slide)
+    // Polyphony › Mono / Porta / Slide for every generator (round 168l, core/ChannelPoly.h; .flp 0xDD): the rack's
+    // channel layer applies them. The LYNX Synth keeps them in SynthSettings, the Sampler its porta in SamplerSettings
+    // (RackOps' setChannelMono / setChannelPortamento write every copy)
+    bool mono = false;
+    bool porta = false;
+    float portaBeats = 0.125f; // FL's Slide knob (default 820 = half a step)
     EchoSettings echo;
     NoteTracking velocity { 100 }, key { 60 };
     int pitchRange = 2;      // the header's PITCH knob range, semitones (FL default 2)
@@ -886,6 +894,20 @@ enum class InputMonitor : std::uint8_t
 
 enum class MixerDock : std::uint8_t { left, middle, right };
 
+// What an armed insert records (FL's "Record" menu of the insert's input box, AudioRecorderRoutingMenu; track byte
+// +0x2F, .flp 0xA5; REA_rodada2 §2.1, REA_rodada165f-mixer §4, REA_rodada168x §2). FL 2026's new inserts record Post EQ
+// (the FL 2026 demo projects save 3 on every insert; the Playlist hint of a fresh insert: "Recording: Post EQ").
+// The taps sit in FL's insert order: input → effect slots → EQ → level / pan / separation → mute → routes.
+enum class RecordSource : std::uint8_t
+{
+    externalInput,    // "External input only": the device input as it comes in (no effects)
+    externalAndMixer, // "External and mixer input": the insert's input (device input + what is routed to it), before the slots
+    postEffects,      // "Post effects": after the effect slots
+    postEq,           // "Post EQ": after the insert's built-in EQ (FL's default)
+    postLevel,        // "Post level and panning": after the fader, pan, separation, polarity and swap (not muted)
+    postTrack         // "Post track": the insert's output as it leaves it (muted too)
+};
+
 // FL's mixer track latency menu "Bypass track latency compensation" (REA round 165f-mixer; .flp event 0x31): a bypassed
 // track's outputs get no PDC delay (its own latency still makes the other paths wait), so a live input monitored
 // through it is not delayed to line up with slow plugins elsewhere (FL 24.2's per-track low-latency monitoring).
@@ -939,6 +961,11 @@ struct MixerTrack
     // FL's "Record <insert> to" (the arm button's right-click, round 167a [SHOT s20–s27]): the file this insert records
     // and renders to (empty = an automatic name). Saved.
     std::string recordTo;
+    // FL's "Record" position (round 168x, issue #41): where the take is tapped. Saved.
+    RecordSource recordSource = RecordSource::postEq;
+    // LYNX extra (issue #41, "(LYNX)" in the menu): with a position after the slots, also record the dry device input as
+    // a second take at the same time (DI + processed, for re-amping). Saved.
+    bool recordDryToo = false;
     // an FL project's input (.flp 0x9A, REA round 157c): the index in FL's list of its own device's inputs, which only
     // the open device can turn into a channel — AudioEngine::setSong resolves it (flInputSource) when the project opens,
     // if inputChannel is still -1. -1 = none. Not saved.
@@ -1154,6 +1181,48 @@ struct Clip
     std::int64_t effectiveFadeIn() const noexcept { return crossfadeIn > 0 ? crossfadeIn : fadeIn; }
     std::int64_t effectiveFadeOut() const noexcept { return crossfadeOut > 0 ? crossfadeOut : fadeOut; }
 };
+
+// LYNX extra (issue #25; the user's choice, after round 168k showed FL plays such a clip once and is silent after its
+// pattern): a pattern clip stretched past its pattern loops the pattern until the clip ends. An app setting (Options ›
+// General, "Stretched pattern clips loop their pattern"), default on; off = FL's behaviour. Not saved in projects.
+inline std::atomic<bool>& stretchedClipsLoopFlag() noexcept
+{
+    static std::atomic<bool> on { true };
+    return on;
+}
+inline bool stretchedClipsLoop() noexcept { return stretchedClipsLoopFlag().load (std::memory_order_relaxed); }
+inline void setStretchedClipsLoop (bool on) noexcept { stretchedClipsLoopFlag().store (on, std::memory_order_relaxed); }
+
+// The pattern tick that song tick `tick` inside clip `c` plays — tick − start + offset, wrapped around `patternLength`
+// (the pattern's effectiveLength) when the clip reaches past its pattern and stretchedClipsLoop() is on.
+inline double patternTickInClip (const Clip& c, double tick, std::int64_t patternLength) noexcept
+{
+    const auto local = tick - (double) c.start + (double) c.offset;
+    if (! stretchedClipsLoop() || patternLength <= 0 || c.offset + c.length <= patternLength || local < (double) patternLength)
+        return local;
+    return std::fmod (local, (double) patternLength);
+}
+
+// The passes of a pattern clip's pattern: pattern tick 0 of pass k sits at song tick c.start − c.offset + k·length,
+// k in [first, last]; `loops` = the clip reaches past its pattern and stretchedClipsLoop() is on (then a pass plays the
+// notes before `length` only), else one pass (k = 0) of every note in [offset, offset + length).
+struct ClipPasses
+{
+    std::int64_t first = 0, last = 0, length = 1;
+    bool loops = false;
+};
+inline ClipPasses clipPasses (const Clip& c, std::int64_t patternLength) noexcept
+{
+    ClipPasses p;
+    p.length = patternLength > 0 ? patternLength : 1;
+    p.loops = stretchedClipsLoop() && c.length > 0 && c.offset + c.length > p.length;
+    if (p.loops)
+    {
+        p.first = c.offset / p.length;
+        p.last = (c.offset + c.length - 1) / p.length;
+    }
+    return p;
+}
 
 enum class PlayMode : std::uint8_t
 {

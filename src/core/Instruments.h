@@ -82,6 +82,11 @@ public:
     virtual int latencySamples() const noexcept { return 0; }
     // "Slide" note: sounding notes glide to `key` over `samples`, without retriggering. Ignored if unsupported.
     virtual void slideTo (int /*key*/, float /*cents*/, float /*samples*/) noexcept {}
+    // FL's channel Porta / Mono for this instrument (round 168l, core/ChannelPoly.h): whether the rack's porta can start
+    // its voices from the previous note's pitch (its voices take HostSlide::pendingGlide() at note on) and whether its
+    // sounding voice can follow a Mono channel's notes (slideTo). Engines that do neither: the rack retriggers instead.
+    virtual bool followsChannelPorta() const noexcept { return false; }
+    virtual bool followsSlides() const noexcept { return followsChannelPorta(); }
     // Audio clip: fades and in-clip position of the next note (before noteOn), in samples.
     // FL 2026's clip pitch (round 167k): the next audio clip note's own transposition, shifted keeping its length;
     // setClipShift (UI thread, before prepareKeyShift) asks for the pitch shifters even without "keep pitch"

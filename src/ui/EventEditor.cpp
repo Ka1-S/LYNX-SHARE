@@ -1,3 +1,4 @@
+#include "ui/FlMods.h"
 #include "ui/EventEditor.h"
 #include "core/MidiControls.h"
 
@@ -448,7 +449,7 @@ public:
 
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
     {
-        if (e.mods.isCtrlDown())
+        if (flmods::ctrl (e.mods))
         {
             const auto at = xToTick (e.x);
             pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, 80.0 / ticksPerStep, pixelsPerTick * (w.deltaY > 0 ? 1.2 : 1.0 / 1.2));
@@ -829,7 +830,7 @@ private:
                 const auto p = engine.songPlayheadTicks();
                 for (const auto& c : song.playlist)
                     if (c.kind == ClipKind::pattern && c.pattern == song.currentPattern && p >= (double) c.start && p < (double) c.end())
-                        tick = p - (double) c.start + (double) c.offset;
+                        tick = patternTickInClip (c, p, patternLength()); // a stretched clip loops its pattern (LYNX extra, issue #25)
             }
         }
 
