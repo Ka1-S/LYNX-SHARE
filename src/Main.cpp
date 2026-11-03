@@ -850,8 +850,10 @@ public:
         {
             // LYNX.exe --design168rshot <folder>: round 168r's editors (FL effects that had a generated page and LYNX's own
             // simple built-ins) at 100 % and 200 %, with their default settings and, when they have one, the first
-            // preset of LYNX's own bank
+            // preset of LYNX's own bank. "--design168rshot <folder> generated": the generated pages they had before
             const auto i = args.indexOf ("--design168rshot");
+            if (i + 2 < args.size() && args[i + 2] == "generated")
+                lynx::plugui::showGeneratedLayoutsOnly (true);
             runDesign168rShots (args[i + 1].unquoted());
             quit();
             return;

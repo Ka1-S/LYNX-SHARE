@@ -9,7 +9,6 @@
 #include <cstdio>
 #include <cstring>
 #include <map>
-#include <cstdlib>
 #include <mutex>
 #include <string>
 
@@ -3521,6 +3520,13 @@ const std::vector<EffectKind>& ownLayoutKinds()
     return kinds;
 }
 
+namespace
+{
+bool generatedOnly = false;
+}
+
+void showGeneratedLayoutsOnly (bool on) { generatedOnly = on; }
+
 const Layout& layoutFor (EffectKind kind)
 {
     static std::mutex lock;
@@ -3530,8 +3536,7 @@ const Layout& layoutFor (EffectKind kind)
     if (auto it = cache.find (kind); it != cache.end())
         return it->second;
 
-    // round 168r: LYNX_GENERATED_LAYOUTS=1 (screenshots of the "before" state only) shows every editor as its generated page
-    if (const auto* before = std::getenv ("LYNX_GENERATED_LAYOUTS"); before != nullptr && before[0] == '1')
+    if (generatedOnly) // round 168r: screenshots of the "before" state
         return cache.emplace (kind, generated (kind)).first->second;
 
     Layout l;
