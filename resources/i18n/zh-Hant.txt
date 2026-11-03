@@ -7004,3 +7004,6 @@ countries: tw hk mo
 "{0} files arriving" = "{0} 個檔案正在傳入"
 "Live session with {0}" = "與{0}的即時工作階段"
 "Undo left alone what someone else changed since: {0}" = "復原未變動其他人此後修改的內容：{0}"
+"Seq" = "音序"
+"Number of steps" = "步數"
+"Dual" = "雙軌"

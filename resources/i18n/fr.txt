@@ -7004,3 +7004,6 @@ countries: fr be ch ca lu
 "{0} files arriving" = "{0} fichiers en cours d'arrivée"
 "Live session with {0}" = "Session en direct avec {0}"
 "Undo left alone what someone else changed since: {0}" = "Annuler n'a pas touché à ce que quelqu'un d'autre a modifié depuis : {0}"
+"Seq" = "Séq"
+"Number of steps" = "Nombre de pas"
+"Dual" = "Double"

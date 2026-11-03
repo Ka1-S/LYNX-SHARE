@@ -7004,3 +7004,6 @@ countries: de at ch li lu
 "{0} files arriving" = "{0} Dateien kommen an"
 "Live session with {0}" = "Live-Session mit {0}"
 "Undo left alone what someone else changed since: {0}" = "Rückgängig hat nicht angetastet, was jemand anderes seitdem geändert hat: {0}"
+"Seq" = "Seq"
+"Number of steps" = "Anzahl der Schritte"
+"Dual" = "Doppelt"

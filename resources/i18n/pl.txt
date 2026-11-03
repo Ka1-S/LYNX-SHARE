@@ -7004,3 +7004,6 @@ countries: pl
 "{0} files arriving" = "Przychodzące pliki: {0}"
 "Live session with {0}" = "Sesja na żywo z: {0}"
 "Undo left alone what someone else changed since: {0}" = "Cofanie nie ruszyło tego, co ktoś inny zmienił od tamtej pory: {0}"
+"Seq" = "Sekw."
+"Number of steps" = "Liczba kroków"
+"Dual" = "Podwójny"

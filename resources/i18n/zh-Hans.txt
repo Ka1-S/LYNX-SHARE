@@ -7004,3 +7004,6 @@ countries: cn sg
 "{0} files arriving" = "{0} 个文件正在传入"
 "Live session with {0}" = "与{0}的实时会话"
 "Undo left alone what someone else changed since: {0}" = "撤销未改动其他人此后修改的内容：{0}"
+"Seq" = "音序"
+"Number of steps" = "步数"
+"Dual" = "双轨"
