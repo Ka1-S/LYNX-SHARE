@@ -60,6 +60,8 @@
 "dl.portWinP": "Ekstrak ke folder mana saja dan buka <code>LYNX.exe</code>.",
 "dl.portLin": "Linux AppImage",
 "dl.portLinP": "Cukup satu file: <code>chmod +x</code> lalu jalankan.",
+"dl.store": "<b>Windows 10 / 11:</b> juga tersedia di Microsoft Store, dengan pembaruan otomatis.",
+"dl.storeAlt": "Dapatkan dari Microsoft",
 "mq.auto": "Clip otomasi",
 "mq.flp": "Impor .flp",
 "mq.disk": "Streaming dari disk",

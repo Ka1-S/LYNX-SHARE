@@ -60,6 +60,8 @@
 "dl.portWinP": "아무 폴더에나 압축을 풀고 <code>LYNX.exe</code>를 여세요.",
 "dl.portLin": "Linux AppImage",
 "dl.portLinP": "파일 하나: <code>chmod +x</code> 후 실행하세요.",
+"dl.store": "<b>Windows 10 / 11:</b> Microsoft Store에서도 받을 수 있으며 자동으로 업데이트됩니다.",
+"dl.storeAlt": "Microsoft에서 다운로드",
 "mq.auto": "오토메이션 클립",
 "mq.flp": ".flp 가져오기",
 "mq.disk": "디스크 스트리밍",

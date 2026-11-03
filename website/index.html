@@ -352,6 +352,11 @@ input[type=range]{accent-color:var(--red);width:130px}
 .dl-hint:empty{display:none}
 .dl-hint b{color:var(--text);font-weight:600}
 .dl-hint code,.dl-plat code,.dl-port code{font:500 12px var(--mono);background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:#c9ccd4;overflow-wrap:anywhere;display:inline-block;max-width:100%;vertical-align:middle}
+.dl-store{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px 14px;max-width:640px;margin:0 auto 18px;font-size:13px;color:var(--muted)}
+.dl-store:empty{display:none}
+.dl-store a{display:inline-flex;border-radius:6px;transition:transform .2s}
+.dl-store a:hover{transform:translateY(-2px)}
+.dl-store b{color:var(--text);font-weight:600}
 .dl-other{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px;margin:0 auto 22px;font-size:13px;color:var(--dim)}
 .dl-other a{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:4px 12px;background:rgba(255,255,255,.03);color:var(--muted);transition:color .2s,border-color .2s}
 .dl-other a:hover{color:var(--text);border-color:var(--dim)}
@@ -668,6 +673,7 @@ html.shot .ft,html.shot .cl,html.shot .cl-vh,html.shot .cl-alt{opacity:1!importa
       <div class="os-btns" style="position:relative;margin-bottom:22px" data-os-btns>
         <a class="btn btn-red" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><span>Download</span></a>
       </div>
+      <div class="dl-store" id="dlStore" style="position:relative"></div>
       <div class="dl-hint" id="dlHint" style="position:relative"></div>
       <div class="dl-port" id="dlPort" style="position:relative"></div>
       <div class="dl-other" id="dlOther" style="position:relative"><span>Windows · macOS · Linux</span></div>
@@ -743,6 +749,7 @@ const EN = {
  'dl.fInstaller':'Installer', 'dl.fPortable':'Portable', 'dl.fUniversal':'Universal', 'dl.fAppImage':'AppImage', 'dl.fArchive':'Archive',
  'dl.portTitle':'Portable versions (no install)', 'dl.portLead':'Download, unzip and run: nothing to install, no admin rights needed.',
  'dl.portWin':'Windows portable (.zip)', 'dl.portWinP':'Unzip to any folder and open <code>LYNX.exe</code>.',
+ 'dl.store':'<b>Windows 10 / 11:</b> also on the Microsoft Store, with automatic updates.', 'dl.storeAlt':'Get it from Microsoft',
  'dl.portLin':'Linux AppImage', 'dl.portLinP':'A single file: <code>chmod +x</code> it and run.',
  'mq.auto':'Automation clips', 'mq.flp':'.flp import', 'mq.disk':'Disk streaming', 'mq.eq':'Parametric EQ', 'mq.ts':'Time-stretch',
  'mq.midi':'MIDI controllers', 'mq.stems':'Stems export'
@@ -944,6 +951,7 @@ $('#clTabs').addEventListener('click', e => { const b = e.target.closest('[data-
 $('#clGroups').addEventListener('pointermove', e => { const c = e.target.closest('.cl'); if (!c) return; const r = c.getBoundingClientRect(); c.style.setProperty('--x',(e.clientX-r.left)+'px'); c.style.setProperty('--y',(e.clientY-r.top)+'px'); });
 /* ---------- download: visitor's OS + per-OS assets (resolved from the GitHub API below) ---------- */
 const RELEASES = 'https://github.com/Ka1-S/LYNX-SHARE/releases/latest';
+const STORE = 'https://apps.microsoft.com/detail/9NQRFBFDCX6N';
 // main = primary package, alt = second format; tests run on asset names, newest release with a match wins
 const DL = {
   win:  {name:'Windows', main:{re:[/setup.*\.exe$/i, /\.exe$/i], key:'dl.fInstaller', ext:'.exe'},
@@ -989,6 +997,9 @@ function renderDownload(){
   const row = `<span>${T.more}</span>` + alts.map(o => chip(o,'alt')).join('');
   $$('[data-os-btns]').forEach(e => e.innerHTML = btns);
   $('#dlHint').innerHTML = hint; $('#dlOther').innerHTML = row;
+  // Microsoft's own localized "Get it from Microsoft" badge (light theme for a dark page), linked to the Store listing
+  const badge = {'en':'en-us','zh-Hans':'zh-cn','zh-Hant':'zh-tw','pt-BR':'pt-br'}[lang] || lang;
+  $('#dlStore').innerHTML = `<a href="${STORE}" target="_blank" rel="noopener"><img src="https://get.microsoft.com/images/${badge}%20light.svg" alt="${t('dl.storeAlt')}" width="161" height="44" loading="lazy"></a><span>${t('dl.store')}</span>`;
 }
 setLang(langSel.value);
 
