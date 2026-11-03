@@ -40,10 +40,11 @@ TEST (menus168z_submenu_display_is_the_root_menus)
     CHECK (displayFor (displays, { 2300, 400, 600, 300 }) == 1);
 
     // a confused display list (overlapping rectangles, as XWayland with mixed scale factors may report): the display
-    // holding most of the root menu, then the smaller one
+    // holding most of the root menu, then the first one (JUCE lists the main display first)
     const std::vector<Box> overlapping { { 0, 0, 1920, 1080 }, { 0, 0, 2560, 1440 } };
     CHECK (displayFor (overlapping, { 1000, 600, 1200, 600 }) == 1);
     CHECK (displayFor (overlapping, { 100, 100, 400, 300 }) == 0);
+    CHECK (displayFor ({ { 0, 0, 2560, 1440 }, { 0, 0, 1920, 1080 } }, { 100, 100, 400, 300 }) == 0);
     // a root menu outside every display: the nearest; no display at all: none
     CHECK (displayFor (displays, { 5000, 200, 100, 100 }) == 1);
     CHECK (displayFor ({}, root) == -1);

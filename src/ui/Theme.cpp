@@ -748,6 +748,10 @@ void LookAndFeel::preparePopupMenuWindow (juce::Component& window)
     std::vector<menuplace::Box> screens;
     for (const auto& d : displays)
     {
+        // JUCE 8.0.4 on Linux leaves a display it could not place beside the others (Displays::updateToLogical) with
+        // an empty totalArea and a userArea at 0,0 over the main display (seen with Xvfb + Xinerama): not a screen
+        if (d.totalArea.isEmpty())
+            continue;
         const auto a = (d.userArea.toFloat() / scale).toNearestInt();
         screens.push_back ({ a.getX(), a.getY(), a.getWidth(), a.getHeight() });
     }

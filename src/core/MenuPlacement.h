@@ -44,8 +44,8 @@ inline Box placeSubmenu (Box parent, Box item, int w, int h, int border, Box scr
 // server display list (XWayland with mixed scale factors), sent the next submenu to another monitor, where it closed
 // as soon as the mouse left its parent menu.
 // The display that contains the root menu's centre; several (overlapping rectangles from the X server): the one that
-// holds most of the root menu, then the smallest; none: the one that holds most of it; none at all: the nearest.
-// -1 when there is no display.
+// holds most of the root menu, then the first (JUCE lists the main display first); none: the one that holds most of
+// it; none at all: the nearest. Empty rectangles are skipped. -1 when there is no display.
 inline int displayFor (const std::vector<Box>& displays, Box root)
 {
     const auto cx = (std::int64_t) root.x + root.w / 2, cy = (std::int64_t) root.y + root.h / 2;
@@ -60,15 +60,13 @@ inline int displayFor (const std::vector<Box>& displays, Box root)
         return dx * dx + dy * dy;
     };
     int best = -1;
-    // rank: contains the centre, then most overlap, then smallest area, then nearest
+    // rank: contains the centre, then most overlap, then nearest (ties: the first)
     const auto better = [&] (const Box& a, const Box& b) {
         const auto ca = distance (a) == 0, cb = distance (b) == 0;
         if (ca != cb)
             return ca;
         if (overlap (a) != overlap (b))
             return overlap (a) > overlap (b);
-        if (ca && (std::int64_t) a.w * a.h != (std::int64_t) b.w * b.h)
-            return (std::int64_t) a.w * a.h < (std::int64_t) b.w * b.h;
         return distance (a) < distance (b);
     };
     for (int i = 0; i < (int) displays.size(); ++i)
