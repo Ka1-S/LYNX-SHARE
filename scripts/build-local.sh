@@ -43,6 +43,8 @@ CORE="$CORE src/core/MissingFiles.cpp"
 CORE="$CORE src/core/PluginCatalog.cpp"
 # project safety: backups, versions, packages (REA round 118)
 CORE="$CORE src/core/ProjectSafety.cpp"
+# Online Sessions P1: stable ids, parts, stand-ins (round 168a)
+CORE="$CORE src/core/SessionIds.cpp src/core/SessionParts.cpp src/core/StandIns.cpp"
 # LYNX substitutes for missing third-party plugins (round 98)
 CORE="$CORE src/core/PluginSubstitutes.cpp"
 # settings pages, plugin manager and shortcut manager logic (round 82)

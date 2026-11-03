@@ -116,10 +116,16 @@ std::vector<MissingFile> findMissingSamples (const Song& song, const std::functi
             for (const auto& z : c.zones)
                 if (gone (z.path))
                     addMissingFile (list, z.path, c.name);
+        for (const auto& s : c.standIns) // Online Sessions' renders (round 168a)
+            if (gone (s.path))
+                addMissingFile (list, s.path, c.name + ": stand-in");
     }
 
     for (std::size_t t = 0; t < song.mixer.size(); ++t)
     {
+        for (const auto& s : song.mixer[t].standIns)
+            if (gone (s.path))
+                addMissingFile (list, s.path, (song.mixer[t].name.empty() ? "Insert " + std::to_string (t) : song.mixer[t].name) + ": stand-in");
         auto chain = song.mixer[t].effects; // (a copy: the walker takes non-const slots)
         const auto track = song.mixer[t].name.empty() ? (t == 0 ? std::string ("Master") : "Insert " + std::to_string (t)) : song.mixer[t].name;
         forEachEffectSlot (chain, [&] (EffectSlot& slot) {
@@ -254,9 +260,15 @@ int applyRelocations (Song& song, const std::map<std::string, std::string>& relo
         if (c.instrument != InstrumentKind::flkeys)
             for (auto& z : c.zones)
                 relocate (z.path);
+        for (auto& s : c.standIns)
+            relocate (s.path);
     }
     for (auto& track : song.mixer)
+    {
         forEachEffectSlot (track.effects, [&] (EffectSlot& slot) { relocate (slot.samplePath); });
+        for (auto& s : track.standIns)
+            relocate (s.path);
+    }
     return changed;
 }
 

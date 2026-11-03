@@ -1,6 +1,6 @@
 # LYNX SHARE Online Sessions — design
 
-Status: **design only** (round 167r, 2026-11-01). Nothing here is implemented yet. This is a LYNX-own feature: FL
+Status: design (round 167r, 2026-11-01); **phase P1 implemented in round 168a** (see "Decisions" and §9 P1). This is a LYNX-own feature: FL
 Studio 2026 has no live collaboration (see §0). Code references point at the tree as of `origin/main` 4a5f74fc.
 
 ## The idea in one paragraph
@@ -555,6 +555,37 @@ Effort in LYNX rounds (one agent round ≈ one focused day), including tests, th
 | **P3 — Invite code over the internet** | The `LYNX-7F3K-Q9WM` flow from anywhere, no router setup for most connections | libjuice + KCP `IceLink`, rendezvous PHP on lynx-share.com (deploy only when the user OKs), link page, `lynx://` handler, PRIVACY.md / Store changes, FLAC transfer | **3** |
 | **P4 — Optional extras** | Relay for the connections that fail; voice chat; host hand-over; mixed-version sessions | TURN (`RelayLink`, libjuice already speaks TURN), Opus voice (BSD-3), hand-over protocol | **3+**, and the relay **may cost money** (§9.1) |
 
+### P1 as built (round 168a)
+
+User-facing steps: [USER_GUIDE.md](../USER_GUIDE.md#online-sessions-make-a-song-with-a-friend-phase-1-packages).
+Where it differs from the plan above:
+
+- **Menu**: *File › Online session ›* Send project... / Send my part back... / Merge a part... (a received
+  `.lynxpack` also opens with *File › Open...*; a part opened that way is merged). Each guest's colour is picked
+  automatically (blue, green, amber, purple) instead of a colour field.
+- **Code**: `core/SessionIds` (uids, `normalize`, the index-reference visitors), `core/SessionParts` (`invite`,
+  `guestCopy`, `extract`, `merge`, `keepOnlyPart`), `core/StandIns` (what is rendered, how it is cut, the projection
+  the engine plays), `engine/SessionPack` (render through `ExportJob`, package write / open / verify, plugin identity
+  matching, media adoption), `ui/SessionDialogs`. The package is its own format (not `ProjectPackage::exportZip`):
+  `manifest.json` + `project.lynx` + `media/<sha256>.<ext>`.
+- **No `InstrumentKind::standIn`**: stand-ins are data on the channel / insert (`ChannelDef::standIns`,
+  `MixerTrack::standIns`). Where the plugin is missing, the audio engine plays a *projection* of the song (never saved
+  or shown): the channel becomes hidden audio-clip channels at its pattern clips (Song mode) or its loop stem (Pattern
+  mode); an insert's timeline stem replaces its chain and inputs (Song mode). The original plugin and its state stay in
+  the project untouched.
+- **Pattern stems** come from one render of the channel per package (each pattern once + 4 bars of tail, then twice;
+  the loop stem is the second pass); a channel with song-level automation of its plugin, or a song with tempo
+  automation, gets a timeline stem. Stems are 32-bit float WAV at 44.1 kHz, rendered at playback quality; an unchanged
+  part (same source hash) is not rendered again.
+- **Merge** is `parts::merge` (by uid, the guest's area only, moved inserts / rows when the host used them meanwhile),
+  one `AudioEngine::editSong` = one undo step. The P2 wire diff is not written yet; P2 can reuse `merge` for late joins.
+- **Plugin matching** on the other PC: format + unique id (else name + vendor) from the manifest; another version asks
+  "play the renders" or "use my version".
+- Tests: `tests/Session168aTests.inc` (uids, reference visitors, invite ranges, part round trip without clobbering,
+  stand-ins play like the part within 1e-4 in Song and Pattern mode, insert stand-ins, streaming SHA-256) and
+  `--selftest` `online_session=` (pack with a real `ExportJob` render, hash dedupe, open on another folder, uid
+  persistence through save / load, part back, adopt media, merge).
+
 ### 9.1 What is free and what might cost money
 
 - **Free**: P1, P2, P3 entirely. The rendezvous runs on the Hostinger plan the user already pays for (tiny traffic:
@@ -584,6 +615,25 @@ Effort in LYNX rounds (one agent round ≈ one focused day), including tests, th
 - **Manual (user + friend)**: one LAN session, one internet session; a checklist in `docs/MANUAL_TESTING.md`.
 
 ---
+
+## Decisions (the user, 2026-11-01)
+
+The open questions of §10 are answered; where this section and the text above differ, this section wins.
+
+1. **What a guest keeps at the end: the host decides, per person.** Default = only his own part; the host can allow a
+   full copy of the project (*Send project…* and, in P2, the participant list). In P1 the choice travels in the
+   package (`to.keepFull`) and the guest's LYNX SHARE honours it after *Send my part back* (it keeps only his part
+   unless the host allowed a full copy). LYNX SHARE is open source, so this is a courtesy the program keeps, not DRM;
+   the Send dialog says so.
+2. **Same LYNX SHARE version on every computer** for live sessions (P2/P3): accepted (§1.6). P1 packages only note
+   the version they were made with (`lynxVersion` in the manifest) and open in any later version.
+3. **At most 4 participants** for now (host included): one constant, `session::maxParticipants = 4`
+   (`core/SessionIds.h`); raising it later must not need more than changing that constant.
+4. **Testing**: the user will test live sessions (P2/P3) later with his girlfriend's PC and her own plugins. Only
+   legitimately installed / licensed plugins or active trials are used; licensing is never bypassed. P1 is tested on
+   one machine with two fresh `LYNX_PROFILE_DIR`s (host and guest).
+5. **Connectivity: the free path only** — Hostinger rendezvous + public STUN, P2P, LAN / direct IP. A paid relay or
+   a VPS relay only if usage grows; not now (§9.1 option (c) until then).
 
 ## 10. Open questions for the user
 

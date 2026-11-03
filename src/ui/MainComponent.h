@@ -18,6 +18,7 @@
 #include "ui/PianoRollComponent.h"
 #include "ui/MixerComponent.h"
 #include "ui/PlaylistComponent.h"
+#include "ui/SessionDialogs.h"
 #include "ui/HintBar.h"
 #include "ui/Splash.h"
 #include "ui/Toolbar.h"
@@ -249,6 +250,7 @@ private:
     void saveNewVersion();
     void revertToLastBackup();
     void exportPackage();
+    sessionui::Context sessionContext(); // the File › Online session commands (round 168a)
     void collectSamples();
     void keepOverwrittenCopy (const juce::File& file); // the previous file of a save, kept in the backup folder
     void rotateBackups (const juce::String& stem);
