@@ -8,9 +8,10 @@
  * compensation must follow every restart. After 48 requests the plugin stops asking (the latency then stays).
  * With LYNX_TEST_RESTART_REPORT set, each instance appends a line with its counters to that file when destroyed.
  * Threads (issue #46): like u-he's plugins (Presswerk), it asks the host's thread_check whether start_processing /
- * stop_processing run on the audio thread and aborts the process when they don't ("Host called the method
- * clap_plugin.stop_processing() on wrong thread!"). Activate / deactivate off the main thread, deactivate while
- * processing and start / stop out of order are counted (wrong_thread, misordered).
+ * stop_processing run on the audio thread and activate / deactivate on the main thread, and aborts the process
+ * when they don't ("Host called the method clap_plugin.stop_processing() on wrong thread!"). Deactivate while
+ * processing and start / stop out of order are counted (misordered). The last activation's rate and block size
+ * are reported (last_rate, last_block).
  */
 #include <clap/clap.h>
 #include <stdatomic.h>
@@ -34,7 +35,7 @@ typedef struct
     atomic_int inProcess;
     atomic_int active;
     atomic_int activations, deactivations, overlapped, inactiveBlocks, requests, blocks;
-    atomic_int processing, starts, stops, wrongThread, misordered;
+    atomic_int processing, starts, stops, wrongThread, misordered, lastRate, lastBlock;
     const clap_host_thread_check_t* threads;
     float* dsp; /* allocated in activate, freed in deactivate (what makes a mid-process deactivate crash) */
 } Restart;
@@ -67,14 +68,16 @@ static bool on_thread (Restart* r, int main)
         return true;
     return main ? r->threads->is_main_thread (r->host) : r->threads->is_audio_thread (r->host);
 }
-static void must_be_audio_thread (Restart* r, const char* method)
+static void must_be_on (Restart* r, int main, const char* method)
 {
-    if (on_thread (r, 0))
+    if (on_thread (r, main))
         return;
-    fprintf (stderr, "[CLAP] Host called the method clap_plugin.%s() on wrong thread! It must be called on audio thread!\n", method);
+    fprintf (stderr, "[CLAP] Host called the method clap_plugin.%s() on wrong thread! It must be called on %s thread!\n", method,
+             main ? "main" : "audio");
     fflush (stderr);
     abort(); /* what u-he's plugins do (issue #46) */
 }
+static void must_be_audio_thread (Restart* r, const char* method) { must_be_on (r, 0, method); }
 
 static bool p_init (const clap_plugin_t* p)
 {
@@ -94,10 +97,11 @@ static void p_destroy (const clap_plugin_t* p)
         if (f != NULL)
         {
             fprintf (f, "requests=%d activations=%d deactivations=%d overlapped=%d inactive_blocks=%d blocks=%d latency=%u "
-                        "starts=%d stops=%d wrong_thread=%d misordered=%d\n",
+                        "starts=%d stops=%d wrong_thread=%d misordered=%d last_rate=%d last_block=%d\n",
                      atomic_load (&r->requests), atomic_load (&r->activations), atomic_load (&r->deactivations),
                      atomic_load (&r->overlapped), atomic_load (&r->inactiveBlocks), atomic_load (&r->blocks), latency_get (p),
-                     atomic_load (&r->starts), atomic_load (&r->stops), atomic_load (&r->wrongThread), atomic_load (&r->misordered));
+                     atomic_load (&r->starts), atomic_load (&r->stops), atomic_load (&r->wrongThread), atomic_load (&r->misordered),
+                     atomic_load (&r->lastRate), atomic_load (&r->lastBlock));
             fclose (f);
         }
     }
@@ -107,11 +111,14 @@ static void p_destroy (const clap_plugin_t* p)
 static bool p_activate (const clap_plugin_t* p, double rate, uint32_t minFrames, uint32_t maxFrames)
 {
     Restart* r = self (p);
-    (void) rate; (void) minFrames;
+    (void) minFrames;
     if (! on_thread (r, 1))
         atomic_fetch_add (&r->wrongThread, 1);
+    must_be_on (r, 1, "activate");
     if (atomic_load (&r->active) != 0)
         atomic_fetch_add (&r->misordered, 1);
+    atomic_store (&r->lastRate, (int) rate);
+    atomic_store (&r->lastBlock, (int) maxFrames);
     free (r->dsp);
     r->dsp = (float*) calloc (maxFrames > 0 ? maxFrames : 1, sizeof (float));
     atomic_fetch_add (&r->activations, 1);
@@ -125,6 +132,7 @@ static void p_deactivate (const clap_plugin_t* p)
         atomic_fetch_add (&r->overlapped, 1);
     if (! on_thread (r, 1))
         atomic_fetch_add (&r->wrongThread, 1);
+    must_be_on (r, 1, "deactivate");
     if (atomic_load (&r->processing) != 0 || atomic_load (&r->active) == 0)
         atomic_fetch_add (&r->misordered, 1); /* deactivated while processing (or twice) */
     atomic_store (&r->active, 0);
