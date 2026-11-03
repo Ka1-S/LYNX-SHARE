@@ -75,6 +75,13 @@ sequencer").
   TRACK double-click opens the Mixer at the insert, right-click adds "Assign to free mixer track"; the Channel Rack's
   route control uses the same spec.
 
+- Look (digiwheel168s polish): FL's digiwheel (c_f14, C:\Users\kauan\lynx-test\r168s\c_f14.png) is a display about
+  22 px high (RANGE ~32 px, TRACK ~40 px wide), the value right-aligned before small up/down marks, in a muted
+  tone of the skin. LYNX: theme::drawDigitDisplay, a dark inset bg0 box with light text and the marks; the accent only
+  while hovered or dragged (edge + text). Same box for the Channel Rack insert box (no marks: 27 x 16 px). Test
+  digiwheel168s_number_boxes_are_dark_displays_red_only_while_touched; shots
+  C:\Users\kauan\lynx-test\dw168s\shots\beepmap-lynx-{100,150}.png and dw168s\snap\p-rack.png.
+
 ### 7. "When selecting (Fit to project tempo) sometimes its out of tempo"
 
 - FL (c_f20): the sampler TIME knob menu "(none), Autodetect..., Project tempo, 1 beat, 2 beats, 1 bar, 2 bars, 3 bars,

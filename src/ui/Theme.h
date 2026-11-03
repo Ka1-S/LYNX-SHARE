@@ -192,6 +192,12 @@ inline juce::String caps (const juce::String& text)
 // clip, a plain rectangle when the clip misses the corners, the shape (or a big one's corners) from a cached sprite.
 void fillRoundRect (juce::Graphics& g, juce::Rectangle<float> r, float corner, juce::Colour colour);
 
+// FL's number wheel ("digiwheel": channel RANGE / TRACK, the rack's insert box) in the LYNX skin: a dark inset display,
+// red only while hovered or dragged. Draws the box (with FL's small up / down marks at its right when `marks`); returns
+// the colour for its value text, which goes in box.withTrimmedRight (digitMarksWidth) when marked (round 168s).
+constexpr float digitMarksWidth = 9.0f;
+juce::Colour drawDigitDisplay (juce::Graphics& g, juce::Rectangle<float> box, bool hot, bool dimmed = false, bool marks = false);
+
 // Draws a rotary value arc in the LYNX style (used by custom-painted knobs too).
 void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, bool bipolar, juce::Colour arc, bool hover = false);
 

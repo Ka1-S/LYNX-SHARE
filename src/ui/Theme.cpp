@@ -263,6 +263,32 @@ void fillRoundRect (juce::Graphics& g, juce::Rectangle<float> r, float corner, j
     rect (xl, (float) ya, xr, (float) yc);          // middle, full width
 }
 
+juce::Colour drawDigitDisplay (juce::Graphics& g, juce::Rectangle<float> box, bool hot, bool dimmed, bool marks)
+{
+    const auto c = lynx::themes::digitDisplayColours (colour::bg0, colour::border, colour::accent, colour::accentHover,
+                                                      colour::textPrimary, colour::textDisabled, hot, dimmed);
+    fillRoundRect (g, box, radius::sm, c.fill);
+    // the inset: a shade under the top edge, a hairline outline (red while touched)
+    g.setColour (juce::Colours::black.withAlpha (0.35f));
+    g.fillRect (box.reduced (radius::sm, 0.0f).withHeight (1.0f).translated (0.0f, 1.0f));
+    g.setColour (c.edge);
+    g.drawRoundedRectangle (box.reduced (0.5f), radius::sm, 1.0f);
+    if (marks) // FL's up / down marks: the value turns with the wheel or a vertical drag
+    {
+        const auto m = box.removeFromRight (digitMarksWidth).reduced (2.0f, 0.0f).withSizeKeepingCentre (5.0f, 11.0f);
+        juce::Path p;
+        p.startNewSubPath (m.getX(), m.getY() + 2.5f);
+        p.lineTo (m.getCentreX(), m.getY());
+        p.lineTo (m.getRight(), m.getY() + 2.5f);
+        p.startNewSubPath (m.getX(), m.getBottom() - 2.5f);
+        p.lineTo (m.getCentreX(), m.getBottom());
+        p.lineTo (m.getRight(), m.getBottom() - 2.5f);
+        g.setColour ((hot ? c.edge : colour::textSecondary).withAlpha (0.8f));
+        g.strokePath (p, juce::PathStrokeType (1.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+    return c.text;
+}
+
 void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, bool bipolar, juce::Colour arcColour, bool hover)
 {
     if (! g.clipRegionIntersects (bounds.getSmallestIntegerContainer().expanded (1)))
