@@ -154,9 +154,10 @@ TEST (pr44_listing_skips_names_nsstring_rejects_and_keeps_the_rest)
     lynx::search::Index index;
     index.refresh (dir, disk);
     bool truncated = false;
-    CHECK (index.find ("wav", { dir }, 100, truncated).size() == 6); // kick, .hidden, Café x2, the two .wav links
-    CHECK (index.find ("bad", { dir }, 100, truncated).empty());
-    CHECK (index.find ("surrogate", { dir }, 100, truncated).empty());
+    CHECK (index.find ("kick", { dir }, 100, truncated).size() == 2); // kick.wav and its link
+    CHECK (index.find ("keys", { dir }, 100, truncated).size() == 1);
+    for (const auto* q : { "bad", "surrogate", "overlong", "past", "cut" })
+        CHECK (index.find (q, { dir }, 100, truncated).empty());
     CHECK (index.contains (dir + "/sub folder"));
     CHECK (! index.contains (dir + "/bad folder \xFE"));
 
