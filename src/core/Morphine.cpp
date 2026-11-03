@@ -1176,6 +1176,16 @@ struct Reverb
         L.init (fs, 0);
         R.init (fs, 1);
     }
+    // an automated knob: the same coefficients, the running tail kept
+    void setLive (double decay, double size, double mx, double onv) noexcept
+    {
+        fb = F (F (std::pow ((double) (float) decay, (double) 0.25f)) * 0.67 + 0.3);
+        const auto s = F (F (std::pow ((double) (float) size, (double) 0.25f)) * 0.8 + 0.2);
+        damp = s > 1.0 ? 1.0 : s;
+        const auto m = clampD (mx, 0.0, 1.0);
+        mix = F (F (F (m * m) * m) * 0.2);
+        on = onv != 0.0;
+    }
     void process (float* l, float* r, int n) noexcept
     {
         if (! on)
@@ -1374,6 +1384,8 @@ struct Synth
     void setLevels (int key, double fvol, double fpan) noexcept;
     void render (float* L, float* R, int n) noexcept;
     bool idle() const noexcept;
+    // global knob i (A[i]) changed by an automation clip: the values init() derives from it, recomputed live
+    void liveGlobal (int i) noexcept;
 };
 
 struct Voice
@@ -1891,6 +1903,44 @@ void Voice::resynthUpdate (double b) noexcept // FUN_1801001c0 (+ FUN_1801054b0 
     res.update (amp, pan, rat, b, f0, panmod, fs);
 }
 
+void Synth::liveGlobal (int i) noexcept
+{
+    if (p == nullptr)
+        return;
+    const auto* A = p->A;
+    switch (i)
+    {
+        case 0: level = F (std::pow (10.0, F (F (A[0] * F (2.4000000953674316)) - F (1.2000000476837158)))); break;
+        case 1:
+        {
+            const auto g = F (F (A[1] * A[1]) * A[1]);
+            glidet = g >= 0.0001 ? g : 9.999999747378752e-05;
+            break;
+        }
+        case 4: velcurve = std::max (F (A[4] * 5.0), 0.0); break;
+        case 5:
+        case 6:
+        {
+            transpose = pyInt (F (F (A[5] - 0.5) * 48.0));
+            const auto fine = pyInt (F (F (A[6] - 0.5) * 200.0));
+            finetr = F (fine * 0.01 + transpose);
+            break;
+        }
+        case 7: fx.od.set (A[7]); break;
+        case 8: bendrange = (double) pyInt (F (A[8] * 12.0)); break;
+        default:
+            if (i >= 13 && i <= 16)
+                fx.ch.set (A[13], A[14], A[15], A[16], false);
+            else if (i >= 17 && i <= 22)
+                fx.dl.set (A[17], A[18], A[19], A[20], A[21], A[22]);
+            else if (i >= 23 && i <= 26)
+                fx.rv.setLive (A[23], A[24], A[25], A[26]);
+            else if (i >= 27 && i <= 35)
+                fx.eq.set (A + 27, A[35]);
+            break; // 9…12 (envelope) and 36…39 (noise) are read at each note
+    }
+}
+
 void Synth::init (const Patch* patch, std::shared_ptr<const NoiseSample> ns, double rate, double bpm, bool rateChange)
 {
     p = patch;
@@ -2174,6 +2224,18 @@ public:
     {
         nextPan = pan;
         nextCents = cents;
+    }
+
+    // an automation clip on one of the global knobs A0…A39 (core/ModelParamsSynths.cpp; 0..1 is the float). Audio
+    // thread: the patch the synth plays takes the value and the synth recomputes what it derives from it.
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        if (index < 0 || index >= 40 || index == 2 || index == 3 || ! std::isfinite (value) || setup == nullptr || setup->patch == nullptr)
+            return;
+        setup->patch->A[index] = (double) std::clamp (value, 0.0f, 1.0f);
+        if (synth != nullptr)
+            synth->liveGlobal (index);
     }
 
     // FL's PITCH knob and main pitch move the sounding notes too (round 167a)
