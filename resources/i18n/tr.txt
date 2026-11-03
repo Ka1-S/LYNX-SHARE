@@ -7004,3 +7004,4 @@ countries: tr
 "{0} files arriving" = "{0} dosya geliyor"
 "Live session with {0}" = "{0} ile canlı oturum"
 "Undo left alone what someone else changed since: {0}" = "Geri al, o zamandan beri başka birinin değiştirdiğine dokunmadı: {0}"
+"Align all channel editors" = "Tüm kanal düzenleyicilerini hizala"

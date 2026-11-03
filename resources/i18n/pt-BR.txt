@@ -7160,3 +7160,4 @@ countries: br
 "{0} files arriving" = "{0} arquivos chegando"
 "Live session with {0}" = "Sessão ao vivo com {0}"
 "Undo left alone what someone else changed since: {0}" = "Desfazer não mexeu no que outra pessoa alterou desde então: {0}"
+"Align all channel editors" = "Alinhar todos os editores de canal"

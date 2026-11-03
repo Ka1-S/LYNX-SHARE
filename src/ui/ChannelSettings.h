@@ -12,6 +12,9 @@ void openChannelSettings (AudioEngine& engine, int channel);
 // Shows insert `insert` in the Mixer (the main window sets it): a double-click on the channel window's TRACK box, as in FL.
 std::function<void (int insert)>& openMixerInsertHandler();
 void closeChannelSettings();
+// FL's View › Align all channel editors (Shift+F12): every open channel editor moves to the focused one's place (else the
+// selected channel's), and channel editors opened later come up there too (round 169k).
+void alignAllChannelEditors (int selectedChannel);
 
 // Channel button toggle (Channel Rack): which kinds have a settings window, and whether it is open.
 bool hasChannelSettings (InstrumentKind kind) noexcept;

@@ -1,3 +1,4 @@
+#include <optional>
 #include "ui/WindowOwner.h"
 #include "core/NoteNames.h"
 #include "ui/ChannelSettings.h"
@@ -4945,6 +4946,14 @@ std::unique_ptr<juce::Component> makeInstrumentPage (AudioEngine& engine, const 
     return nullptr;
 }
 
+// Where "Align all channel editors" put every channel editor (FL stores it per channel, so editors opened later come
+// up there too); empty = centred, as before.
+std::optional<juce::Point<int>>& alignedChannelEditorPosition()
+{
+    static std::optional<juce::Point<int>> at;
+    return at;
+}
+
 class SettingsWindow final : public juce::DocumentWindow
 {
 public:
@@ -4975,6 +4984,9 @@ public:
             setContentOwned (makeChannelFrame (engine, channel).release(), true);
 
         centreWithSize (getWidth(), getHeight());
+        if (! modulation)
+            if (const auto& at = alignedChannelEditorPosition(); at.has_value())
+                setTopLeftPosition (*at); // "Align all channel editors" set every channel's place (round 169k)
         setVisible (true);
         keepAboveMainWindow (*this);
     }
@@ -5018,6 +5030,31 @@ void openWindow (AudioEngine& engine, int channel, bool modulation)
     windows().push_back (std::make_unique<SettingsWindow> (engine, channel, modulation));
 }
 } // namespace
+
+void alignAllChannelEditors (int selectedChannel)
+{
+    // FL's AlignAllChannelEditorsAction (FUN_012317c0, REA_rodada169k §2.4): the focused channel editor (else the
+    // selected channel's, else the first open one) gives the place; every channel editor goes there.
+    auto& open = windows();
+    SettingsWindow* reference = nullptr;
+    for (auto& w : open)
+        if (! w->isModulation() && w->isActiveWindow())
+            reference = w.get();
+    for (auto& w : open)
+        if (reference == nullptr && ! w->isModulation() && w->getChannel() == selectedChannel)
+            reference = w.get();
+    for (auto& w : open)
+        if (reference == nullptr && ! w->isModulation())
+            reference = w.get();
+    if (reference == nullptr)
+        return;
+    const auto at = reference->getPosition();
+    alignedChannelEditorPosition() = at;
+    for (auto& w : open)
+        if (! w->isModulation())
+            w->setTopLeftPosition (at);
+    reference->toFront (true);
+}
 
 void openChannelSettings (AudioEngine& engine, int channel)
 {
