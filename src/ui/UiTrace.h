@@ -8,6 +8,7 @@
 // Off (the default), a Scope costs one relaxed atomic load.
 
 #include <juce_events/juce_events.h>
+#include <juce_gui_basics/juce_gui_basics.h>
 
 #include "../platform/Paths.h"
 
@@ -162,7 +163,12 @@ public:
         if (! enabled())
             return;
         state().summary = std::move (summary);
-        platform::settingsFile ("ui.log").replaceWithText ("LYNX UI trace: stalls > 16 ms, scopes > 8 ms, a summary per second\n");
+        // the displays as JUCE sees them (issue #45: menus on the wrong monitor of a multi-monitor setup)
+        juce::String displays;
+        for (const auto& d : juce::Desktop::getInstance().getDisplays().displays)
+            displays << "display " << d.totalArea.toString() << " user " << d.userArea.toString() << " scale " << d.scale
+                     << (d.isMain ? " main" : "") << "\n";
+        platform::settingsFile ("ui.log").replaceWithText ("LYNX UI trace: stalls > 16 ms, scopes > 8 ms, a summary per second\n" + displays);
         startThread();
     }
 

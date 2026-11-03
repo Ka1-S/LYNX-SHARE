@@ -706,9 +706,9 @@ void LookAndFeel::preparePopupMenuWindow (juce::Component& window)
     if (parent == nullptr)
         return remember();
 
-    // the item that opened it: JUCE put the submenu right beside it (its right edge = the submenu's left, or the other
-    // way round), level with its top (upper half of the screen) or its bottom (lower half). The item under the mouse
-    // first (a hover), else the best match (the keyboard's right arrow).
+    // the item that opened it: the item under the mouse (a hover), else the one JUCE put the submenu right beside
+    // (its right edge = the submenu's left, or the other way round) level with its top or bottom (the keyboard's
+    // right arrow). Neither: JUCE's own place stays (kept on the root menu's display by the JUCE patch, issue #45).
     const auto border = getPopupMenuBorderSize();
     const auto sub = window.getBounds(), parentBox = parent->getBounds();
     const auto beside = [&sub] (juce::Rectangle<int> r) { return std::abs (r.getRight() - sub.getX()) <= 2 || std::abs (r.getX() - sub.getRight()) <= 2; };
@@ -718,7 +718,7 @@ void LookAndFeel::preparePopupMenuWindow (juce::Component& window)
     for (auto* c : parent->getChildren())
     {
         const auto r = c->getBounds() + parentBox.getPosition();
-        if (! c->isVisible() || ! beside (r))
+        if (! c->isVisible() || r.getHeight() <= 0)
             continue;
         if (r.contains (mouse))
         {
@@ -726,7 +726,7 @@ void LookAndFeel::preparePopupMenuWindow (juce::Component& window)
             break;
         }
         const auto miss = juce::jmin (std::abs (r.getY() - (sub.getY() + border)), std::abs (r.getBottom() - (sub.getBottom() - border)));
-        if (miss < best)
+        if (beside (r) && miss < best)
         {
             best = miss;
             item = r;
@@ -735,9 +735,26 @@ void LookAndFeel::preparePopupMenuWindow (juce::Component& window)
     if (item.isEmpty())
         return remember();
 
+    // the screen: the display of the ROOT menu, i.e. of the window the menu came from (issue #45, core/MenuPlacement.h)
+    juce::Component* root = parent;
+    for (const auto& m : menus)
+        if (m != nullptr && m.getComponent() != &window && m->isOnDesktop())
+        {
+            root = m.getComponent();
+            break;
+        }
     const auto scale = juce::jmax (0.01f, window.getDesktopScaleFactor() / juce::Desktop::getInstance().getGlobalScaleFactor());
-    const auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect (parentBox * scale);
-    const auto area = display != nullptr ? (display->userArea / scale).toNearestInt() : parentBox.expanded (10000);
+    const auto& displays = juce::Desktop::getInstance().getDisplays().displays;
+    std::vector<menuplace::Box> screens;
+    for (const auto& d : displays)
+    {
+        const auto a = (d.userArea.toFloat() / scale).toNearestInt();
+        screens.push_back ({ a.getX(), a.getY(), a.getWidth(), a.getHeight() });
+    }
+    const auto rootBox = root->getBounds();
+    const auto at = menuplace::displayFor (screens, { rootBox.getX(), rootBox.getY(), rootBox.getWidth(), rootBox.getHeight() });
+    const auto area = at >= 0 ? juce::Rectangle<int> (screens[(size_t) at].x, screens[(size_t) at].y, screens[(size_t) at].w, screens[(size_t) at].h)
+                              : parentBox.expanded (10000);
     using menuplace::Box;
     const auto box = [] (juce::Rectangle<int> r) { return Box { r.getX(), r.getY(), r.getWidth(), r.getHeight() }; };
     const auto placed = menuplace::placeSubmenu (box (parentBox), box (item), sub.getWidth(), sub.getHeight(), border, box (area));
