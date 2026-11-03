@@ -55,7 +55,7 @@ SessionParticipant participantFromVar (const juce::var& o)
 }
 
 // a file's SHA-256, read in 1 MiB pieces
-juce::String hashFile (const juce::File& file)
+juce::String hashFileImpl (const juce::File& file)
 {
     juce::FileInputStream in (file);
     if (! in.openedOk())
@@ -551,7 +551,7 @@ bool write (const Song& song, Manifest manifest, PluginHost& host, const juce::F
             result.missing.add (str (original));
             continue; // (the project keeps the old path)
         }
-        const auto hash = hashFile (source);
+        const auto hash = hashFileImpl (source);
         if (hash.isEmpty())
         {
             result.missing.add (str (original));
@@ -614,6 +614,77 @@ bool write (const Song& song, Manifest manifest, PluginHost& host, const juce::F
     return true;
 }
 
+juce::String hashFile (const juce::File& file)
+{
+    return hashFileImpl (file);
+}
+
+void confine (Song& song, const juce::File& folder, const juce::File& engineFiles)
+{
+    // a path anywhere else on this computer would be copied into the project and sent on with the next package: it
+    // becomes a missing file under its own name
+    auto inside = [&] (const std::string& path) { return insideFolder (path, folder); };
+    auto within = [&] (const std::string& path) { return inside (path) || (engineFiles != juce::File() && insideFolder (path, engineFiles)); };
+    auto missing = [&] (const std::string& path) {
+        const auto p = str (path);
+        const auto name = juce::File::createLegalFileName (p.fromLastOccurrenceOf ("/", false, false).fromLastOccurrenceOf ("\\", false, false));
+        return utf8 (folder.getChildFile ("missing").getChildFile (name).getFullPathName());
+    };
+    std::map<std::string, std::string> outside;
+    for (const auto& path : safety::referencedSamples (song))
+        if (! inside (path))
+            outside[path] = missing (path);
+    applyRelocations (song, outside);
+    // every other path the engine reads, also inside Patcher graphs (not in the media list, never packed)
+    auto engineOnly = [&] (std::string& path) {
+        if (! path.empty() && ! within (path))
+            path = missing (path);
+    };
+    std::function<void (EffectSlot&)> slot;
+    std::function<void (PatcherDoc&)> doc;
+    std::function<void (ChannelDef&)> channel;
+    slot = [&] (EffectSlot& s) {
+        engineOnly (s.samplePath);
+        for (auto& b : s.branches)
+            for (auto& child : b.chain)
+                slot (child);
+        doc (s.patcher);
+    };
+    doc = [&] (PatcherDoc& d) {
+        for (auto& n : d.nodes)
+        {
+            if (n.generator)
+                channel (n.channel);
+            else
+                slot (n.effect);
+            for (auto& h : n.busHeads)
+                if (h.head)
+                    slot (*h.head);
+        }
+    };
+    channel = [&] (ChannelDef& c) {
+        engineOnly (c.samplePath);
+        for (auto& z : c.zones)
+            engineOnly (z.path);
+        for (auto& s : c.standIns)
+            engineOnly (s.path);
+        doc (c.patcher);
+    };
+    for (auto& c : song.channels)
+        channel (c);
+    for (auto& t : song.mixer)
+    {
+        for (auto& s : t.effects)
+            slot (s);
+        for (auto& s : t.standIns)
+            engineOnly (s.path);
+        // a file the insert records and renders to: written, so only inside the folder (else the automatic name)
+        if (! t.recordTo.empty() && ! inside (t.recordTo))
+            t.recordTo.clear();
+    }
+    song.dataFolder.clear(); // the sender's folder: nothing to do with this computer
+}
+
 std::optional<Manifest> readManifest (const juce::File& file, juce::String& error)
 {
     juce::ZipFile zip (file);
@@ -674,76 +745,15 @@ std::optional<Opened> open (const juce::File& file, const juce::File& destinatio
     for (const auto& m : manifest->media)
     {
         const auto f = folder.getChildFile (m.entry); // (the manifest is the sender's too: "../" or "/dev/zero" is never read)
-        if (! insideFolder (utf8 (f.getFullPathName()), folder) || ! f.existsAsFile() || "sha256-" + hashFile (f) != m.id)
+        if (! insideFolder (utf8 (f.getFullPathName()), folder) || ! f.existsAsFile() || "sha256-" + hashFileImpl (f) != m.id)
             opened.corrupt.add (m.name);
     }
     auto song = ProjectFile::load (opened.project, error);
     if (! song)
         return std::nullopt;
-    // a received project may only use its own media: a path anywhere else on this computer would be copied
-    // into the project and sent on with the next package. It becomes a missing file under its own name.
-    auto within = [] (const std::string& path, const juce::File& root) { return insideFolder (path, root); };
-    auto missing = [&] (const std::string& path) {
-        const auto p = str (path);
-        const auto name = juce::File::createLegalFileName (p.fromLastOccurrenceOf ("/", false, false).fromLastOccurrenceOf ("\\", false, false));
-        return utf8 (folder.getChildFile ("missing").getChildFile (name).getFullPathName());
-    };
-    std::map<std::string, std::string> outside;
-    for (const auto& path : safety::referencedSamples (*song))
-        if (! within (path, folder))
-            outside[path] = missing (path);
-    applyRelocations (*song, outside);
-    // every other path the engine reads, also inside Patcher graphs (not in the media list, never packed): only the
-    // package or FL Studio's own files (FL Keys' wavetables, the engines' DLLs)
+    // a received project may only use its own media (or FL Studio's own files: FL Keys' wavetables, the engines' DLLs)
     const auto flInstall = findFlStudioRoots().factoryData;
-    const auto fl = flInstall.empty() ? juce::File() : juce::File (str (flInstall));
-    auto engineOnly = [&] (std::string& path) {
-        if (! path.empty() && ! within (path, folder) && ! within (path, fl))
-            path = missing (path);
-    };
-    std::function<void (EffectSlot&)> slot;
-    std::function<void (PatcherDoc&)> doc;
-    std::function<void (ChannelDef&)> channel;
-    slot = [&] (EffectSlot& s) {
-        engineOnly (s.samplePath);
-        for (auto& b : s.branches)
-            for (auto& child : b.chain)
-                slot (child);
-        doc (s.patcher);
-    };
-    doc = [&] (PatcherDoc& d) {
-        for (auto& n : d.nodes)
-        {
-            if (n.generator)
-                channel (n.channel);
-            else
-                slot (n.effect);
-            for (auto& h : n.busHeads)
-                if (h.head)
-                    slot (*h.head);
-        }
-    };
-    channel = [&] (ChannelDef& c) {
-        engineOnly (c.samplePath);
-        for (auto& z : c.zones)
-            engineOnly (z.path);
-        for (auto& s : c.standIns)
-            engineOnly (s.path);
-        doc (c.patcher);
-    };
-    for (auto& c : song->channels)
-        channel (c);
-    for (auto& t : song->mixer)
-    {
-        for (auto& s : t.effects)
-            slot (s);
-        for (auto& s : t.standIns)
-            engineOnly (s.path);
-        // a file the insert records and renders to: written, so only inside the package (else the automatic name)
-        if (! t.recordTo.empty() && ! within (t.recordTo, folder))
-            t.recordTo.clear();
-    }
-    song->dataFolder.clear(); // the sender's folder: nothing to do with this computer
+    confine (*song, folder, flInstall.empty() ? juce::File() : juce::File (str (flInstall)));
     opened.song = std::move (*song);
     return opened;
 }
@@ -843,13 +853,13 @@ bool adoptMedia (Song& song, const juce::File& folder, juce::String& error)
     std::map<std::string, std::string> relink;
     std::map<juce::String, juce::File> byHash;
     for (const auto& f : folder.findChildFiles (juce::File::findFiles, false))
-        byHash.emplace (hashFile (f), f);
+        byHash.emplace (hashFileImpl (f), f);
     for (const auto& original : safety::referencedSamples (song))
     {
         const auto source = fileOf (original);
         if (! source.existsAsFile() || source.isAChildOf (folder))
             continue;
-        const auto hash = hashFile (source);
+        const auto hash = hashFileImpl (source);
         if (auto it = byHash.find (hash); it != byHash.end())
         {
             relink[original] = utf8 (it->second.getFullPathName());

@@ -55,6 +55,8 @@ add_library(lynx_core STATIC
     src/core/SessionIds.cpp
     src/core/SessionParts.cpp
     src/core/StandIns.cpp
+    src/core/LiveSession.cpp
+    src/core/LiveCrypto.cpp
     src/core/PluginSubstitutes.cpp
     src/core/Preferences.cpp
     src/core/MidiSync.cpp
@@ -267,6 +269,13 @@ set_target_properties(pocketpy PROPERTIES C_STANDARD 11)
 target_compile_options(pocketpy PRIVATE $<$<NOT:$<C_COMPILER_ID:MSVC>>:-w>)
 target_link_libraries(lynx_core PUBLIC pocketpy)
 
+# Monocypher 4.0.2 (BSD-2 / CC0; third_party/monocypher): Argon2id, BLAKE2b and XChaCha20-Poly1305 for the live
+# sessions' end-to-end encryption (round 169b)
+add_library(monocypher STATIC third_party/monocypher/monocypher.c)
+target_include_directories(monocypher PUBLIC third_party/monocypher)
+target_compile_options(monocypher PRIVATE $<$<NOT:$<C_COMPILER_ID:MSVC>>:-w>)
+target_link_libraries(lynx_core PUBLIC monocypher)
+
 # LAME's libmp3lame (LGPL; third_party/lame, encoder only, configured by third_party/lame/src/config.h)
 file(GLOB LAME_SOURCES third_party/lame/src/*.c)
 add_library(lame_encoder STATIC ${LAME_SOURCES})
@@ -358,6 +367,10 @@ if(LYNX_BUILD_APP)
         src/engine/ProjectPackage.cpp
         src/engine/SessionPack.cpp
         src/ui/SessionDialogs.cpp
+        src/engine/LiveLink.cpp
+        src/engine/LiveSessions.cpp
+        src/engine/LiveTest.cpp
+        src/ui/LiveSessionUi.cpp
         src/engine/PluginHost.cpp
         src/engine/FlStudio.cpp
         src/engine/PluginSandbox.cpp
@@ -482,8 +495,10 @@ if(LYNX_BUILD_APP)
     if(WIN32)
         target_include_directories(LYNX PRIVATE third_party/asiosdk/common)
         target_compile_definitions(LYNX PRIVATE JUCE_ASIO=1) # ASIO SDK headers in third_party/asiosdk (GPLv3 option)
+        target_link_libraries(LYNX PRIVATE winhttp) # live sessions' WebSocket (engine/LiveLink.cpp)
     elseif(APPLE)
         target_compile_definitions(LYNX PRIVATE JUCE_PLUGINHOST_AU=1)
+        target_link_libraries(LYNX PRIVATE ${CMAKE_DL_LIBS}) # (libcurl loaded at run time: engine/LiveLink.cpp)
     else()
         # ALSA (linked) + JACK (loaded at run time; PipeWire serves JACK clients through pipewire-jack)
         target_compile_definitions(LYNX PRIVATE JUCE_ALSA=1 JUCE_JACK=1 JUCE_PLUGINHOST_LV2=1)
