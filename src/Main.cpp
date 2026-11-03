@@ -2015,6 +2015,39 @@ private:
                               && host.channels[(std::size_t) hitChannel].name == "Hit";
                 }
             }
+            // a crafted package whose project points at a file elsewhere on this computer: opening it must not
+            // reach that file, or merging would copy it into the project and the next package would send it on
+            if (mergeOk)
+            {
+                const auto secret = dir.getChildFile ("secret.wav");
+                wav.copyFileTo (secret);
+                auto evil = lynx::Song::makeDefault();
+                lynx::ChannelDef c;
+                c.instrument = lynx::InstrumentKind::sampler;
+                c.samplePath = secret.getFullPathName().toStdString();
+                evil.channels.push_back (c);
+                const auto evilProject = dir.getChildFile ("evil.lynx");
+                lynx::sessionpack::Manifest em;
+                em.part = true;
+                juce::ZipFile::Builder b;
+                const auto json = lynx::sessionpack::manifestToJson (em);
+                b.addEntry (new juce::MemoryInputStream (json.toRawUTF8(), json.getNumBytesAsUTF8(), true), 0, "manifest.json", {});
+                const auto evilPack = dir.getChildFile (juce::String ("Evil") + lynx::sessionpack::extension);
+                bool zipped = false;
+                if (lynx::ProjectFile::save (evil, evilProject, e))
+                {
+                    b.addFile (evilProject, 0, "project.lynx");
+                    juce::FileOutputStream out (evilPack);
+                    zipped = out.openedOk() && b.writeToStream (out, nullptr);
+                }
+                auto evilOpened = zipped ? lynx::sessionpack::open (evilPack, dir.getChildFile ("evil"), e) : std::nullopt;
+                const auto media = dir.getChildFile ("Session media/Evil");
+                mergeOk = evilOpened && lynx::sessionpack::adoptMedia (evilOpened->song, media, e)
+                          && juce::File (juce::String::fromUTF8 (evilOpened->song.channels.back().samplePath.c_str())) != secret
+                          && media.findChildFiles (juce::File::findFiles, true).isEmpty();
+                if (! mergeOk && e.isEmpty())
+                    e = "a received package reached a file outside it";
+            }
             if (! packOk && e.isEmpty())
                 e = "media " + juce::String (written.media) + ", duplicates " + juce::String (written.duplicates) + ", missing "
                     + written.missing.joinIntoString (";");

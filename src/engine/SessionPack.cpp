@@ -635,6 +635,12 @@ std::optional<Opened> open (const juce::File& file, const juce::File& destinatio
         error = "could not create " + folder.getFullPathName();
         return std::nullopt;
     }
+    for (int i = 0; i < zip.getNumEntries(); ++i)
+        if (zip.getEntry (i)->isSymbolicLink) // (JUCE would create it, and copying "media" through it reads any file here)
+        {
+            error = "the package contains a link";
+            return std::nullopt;
+        }
     if (const auto r = zip.uncompressTo (folder, false); r.failed()) // (JUCE refuses entries outside the folder)
     {
         error = r.getErrorMessage();
@@ -659,6 +665,18 @@ std::optional<Opened> open (const juce::File& file, const juce::File& destinatio
     auto song = ProjectFile::load (opened.project, error);
     if (! song)
         return std::nullopt;
+    // a received project may only use its own media: a path anywhere else on this computer would be copied
+    // into the project and sent on with the next package. It becomes a missing file under its own name.
+    std::map<std::string, std::string> outside;
+    for (const auto& path : safety::referencedSamples (*song))
+    {
+        const auto p = str (path);
+        if (! juce::StringArray::fromTokens (p, "/\\", "").contains ("..") && fileOf (path).isAChildOf (folder))
+            continue;
+        const auto name = juce::File::createLegalFileName (p.fromLastOccurrenceOf ("/", false, false).fromLastOccurrenceOf ("\\", false, false));
+        outside[path] = utf8 (folder.getChildFile ("missing").getChildFile (name).getFullPathName());
+    }
+    applyRelocations (*song, outside);
     opened.song = std::move (*song);
     return opened;
 }
