@@ -359,6 +359,40 @@ void prepareKeyShifts (const std::vector<Instrument*>& list, double sampleRate)
         h.join();
 }
 
+// Round 168s (issue #32): for each item of `now`, the index of the item of `before` it was (its instance tag), or the
+// same position when the item that was there is gone from `now`; −1 = a new item. Each old item goes to one new item
+// only (the first with its tag: a copy that kept the tag gets a new instance). Only indexes below `usable` are given.
+template <typename T>
+std::vector<long> matchByInstance (const std::vector<T>& now, const std::vector<T>* before, std::size_t usable)
+{
+    std::vector<long> origin (now.size(), -1);
+    if (before == nullptr)
+        return origin;
+    usable = std::min (usable, before->size());
+    std::map<std::uint64_t, std::size_t> wasAt;
+    for (std::size_t k = 0; k < usable; ++k)
+        wasAt.emplace ((*before)[k].instance.id, k);
+    std::map<std::uint64_t, int> stillThere;
+    for (const auto& item : now)
+        ++stillThere[item.instance.id];
+    std::vector<bool> taken (usable, false);
+
+    for (std::size_t i = 0; i < now.size(); ++i)
+        if (const auto it = wasAt.find (now[i].instance.id); it != wasAt.end() && ! taken[it->second])
+        {
+            origin[i] = (long) it->second;
+            taken[it->second] = true;
+        }
+
+    for (std::size_t i = 0; i < now.size() && i < usable; ++i)
+        if (origin[i] < 0 && ! taken[i] && stillThere.count ((*before)[i].instance.id) == 0)
+        {
+            origin[i] = (long) i;
+            taken[i] = true;
+        }
+    return origin;
+}
+
 } // namespace
 
 std::unique_ptr<const RackState> RackState::build (Song song,
@@ -372,42 +406,58 @@ std::unique_ptr<const RackState> RackState::build (Song song,
     state->instruments.reserve (song.channels.size());
     std::vector<Instrument*> keyShiftLater; // new instruments only: none is visible to the audio thread yet
 
+    // which previous channel each channel was (round 168s, issue #32): by its instance tag, so inserting, removing or
+    // moving channels keeps every other channel's running instrument (voices, loops, a plugin's live state); by position
+    // only when the channel there is gone from the song (another project loaded over it, the old behaviour)
+    const auto channelOrigin = matchByInstance (song.channels, previous != nullptr ? &previous->song.channels : nullptr,
+                                                previous != nullptr ? previous->instruments.size() : 0);
+    {
+        static std::atomic<std::uint64_t> serials { 1 };
+        state->serial = serials.fetch_add (1, std::memory_order_relaxed);
+        state->builtFrom = previous != nullptr ? previous->serial : 0;
+        state->channelFrom.assign (channelOrigin.begin(), channelOrigin.end());
+        for (std::size_t c = 0; c < channelOrigin.size(); ++c)
+            state->channelsMoved = state->channelsMoved || channelOrigin[c] != (long) c;
+        state->channelsMoved = state->channelsMoved || (previous != nullptr && previous->song.channels.size() != channelOrigin.size());
+    }
+
     for (std::size_t i = 0; i < song.channels.size(); ++i)
     {
         const auto& channel = song.channels[i];
         const auto kind = channel.instrument;
+        const auto p = channelOrigin[i] >= 0 ? (std::size_t) channelOrigin[i] : std::numeric_limits<std::size_t>::max();
 
-        if (previous != nullptr && i < previous->song.channels.size() && i < previous->instruments.size()
-            && previous->song.channels[i].instrument == kind && kind != InstrumentKind::patcher
+        if (previous != nullptr && p < previous->song.channels.size() && p < previous->instruments.size()
+            && previous->song.channels[p].instrument == kind && kind != InstrumentKind::patcher
             && ((kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller)
-                || previous->song.channels[i].samplePath == channel.samplePath)
+                || previous->song.channels[p].samplePath == channel.samplePath)
             && (kind != InstrumentKind::soundfont
-                || (previous->song.channels[i].samplePath == channel.samplePath && previous->sampleRate == sampleRate))
+                || (previous->song.channels[p].samplePath == channel.samplePath && previous->sampleRate == sampleRate))
             && (kind != InstrumentKind::directwave
-                || (previous->song.channels[i].zones == channel.zones && previous->song.channels[i].modelParams == channel.modelParams
-                    && previous->song.channels[i].pluginState == channel.pluginState && previous->sampleRate == sampleRate))
+                || (previous->song.channels[p].zones == channel.zones && previous->song.channels[p].modelParams == channel.modelParams
+                    && previous->song.channels[p].pluginState == channel.pluginState && previous->sampleRate == sampleRate))
             && ((kind != InstrumentKind::sampler && kind != InstrumentKind::audioClip && kind != InstrumentKind::flkeys)
-                || (previous->song.channels[i].samplePath == channel.samplePath && previous->song.channels[i].zones == channel.zones
-                    && previous->song.channels[i].modelParams == channel.modelParams
-                    && previous->song.channels[i].sampler.keepPitch == channel.sampler.keepPitch
-                    && clipShiftWanted (previous->song, i) == clipShiftWanted (song, i)
+                || (previous->song.channels[p].samplePath == channel.samplePath && previous->song.channels[p].zones == channel.zones
+                    && previous->song.channels[p].modelParams == channel.modelParams
+                    && previous->song.channels[p].sampler.keepPitch == channel.sampler.keepPitch
+                    && clipShiftWanted (previous->song, p) == clipShiftWanted (song, i)
                     // FL's precomputed effects (round 167h): the sample is processed when the channel is built
-                    && previous->song.channels[i].sampler.precompute == channel.sampler.precompute
-                    && previous->song.channels[i].sampler.useLoopPoints == channel.sampler.useLoopPoints
+                    && previous->song.channels[p].sampler.precompute == channel.sampler.precompute
+                    && previous->song.channels[p].sampler.useLoopPoints == channel.sampler.useLoopPoints
                     && (! precompute::needed (channel.sampler)
-                        || (previous->song.channels[i].sampler.regionStart == channel.sampler.regionStart
-                            && previous->song.channels[i].sampler.regionEnd == channel.sampler.regionEnd
-                            && previous->song.channels[i].sampler.reverse == channel.sampler.reverse
-                            && precompute::needed (previous->song.channels[i].sampler)))
+                        || (previous->song.channels[p].sampler.regionStart == channel.sampler.regionStart
+                            && previous->song.channels[p].sampler.regionEnd == channel.sampler.regionEnd
+                            && previous->song.channels[p].sampler.reverse == channel.sampler.reverse
+                            && precompute::needed (previous->song.channels[p].sampler)))
                     && (! channel.sampler.keepPitch
-                        || (previous->song.channels[i].sampler.stretchBeats == channel.sampler.stretchBeats
-                            && previous->song.channels[i].sampler.stretchMethod == channel.sampler.stretchMethod
+                        || (previous->song.channels[p].sampler.stretchBeats == channel.sampler.stretchBeats
+                            && previous->song.channels[p].sampler.stretchMethod == channel.sampler.stretchMethod
                             && previous->song.bpm == song.bpm))))
             && (kind != InstrumentKind::plugin
-                || (previous->song.channels[i].plugin.id == channel.plugin.id && previous->sampleRate == sampleRate
-                    && samePluginProcessing (previous->song.channels[i].plugin, channel.plugin))))
+                || (previous->song.channels[p].plugin.id == channel.plugin.id && previous->sampleRate == sampleRate
+                    && samePluginProcessing (previous->song.channels[p].plugin, channel.plugin))))
         {
-            state->instruments.push_back (previous->instruments[i]);
+            state->instruments.push_back (previous->instruments[p]);
             state->instruments.back()->configure (channel, song.bpm);
             continue;
         }
@@ -415,11 +465,11 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         // FL's Patcher as a generator (REA_rodada141): same structure keeps the running graph (it takes the values)
         if (kind == InstrumentKind::patcher)
         {
-            const auto* old = previous != nullptr && i < previous->instruments.size() ? previous->instruments[i].get() : nullptr;
-            if (old != nullptr && previous->song.channels[i].instrument == kind && previous->sampleRate == sampleRate
-                && patcher::sameStructure (previous->song.channels[i].patcher, channel.patcher))
+            const auto* old = previous != nullptr && p < previous->instruments.size() ? previous->instruments[p].get() : nullptr;
+            if (old != nullptr && previous->song.channels[p].instrument == kind && previous->sampleRate == sampleRate
+                && patcher::sameStructure (previous->song.channels[p].patcher, channel.patcher))
             {
-                state->instruments.push_back (previous->instruments[i]);
+                state->instruments.push_back (previous->instruments[p]);
                 state->instruments.back()->configure (channel, song.bpm);
                 continue;
             }
@@ -447,6 +497,46 @@ std::unique_ptr<const RackState> RackState::build (Song song,
 
     state->effects.resize (song.mixer.size());
 
+    // which previous slot each effect slot was (round 168s, issue #32): by its instance tag, so moving an effect up /
+    // down its insert (or to another insert) keeps its running effect — a hosted plugin keeps every setting made since
+    // the project was saved; by position only when the slot there is gone (the old behaviour)
+    std::vector<std::vector<std::pair<long, long>>> slotOrigin (song.mixer.size());
+    {
+        std::map<std::uint64_t, std::pair<std::size_t, std::size_t>> wasAt;
+        std::map<std::uint64_t, int> stillThere;
+        std::map<std::pair<std::size_t, std::size_t>, bool> taken;
+        const auto usable = [previous] (std::size_t t) {
+            return previous == nullptr || t >= previous->song.mixer.size() || t >= previous->effects.size()
+                       ? std::size_t { 0 }
+                       : std::min (previous->song.mixer[t].effects.size(), previous->effects[t].size());
+        };
+        if (previous != nullptr)
+            for (std::size_t t = 0; t < previous->song.mixer.size(); ++t)
+                for (std::size_t i = 0; i < usable (t); ++i)
+                    wasAt.emplace (previous->song.mixer[t].effects[i].instance.id, std::make_pair (t, i));
+        for (const auto& track : song.mixer)
+            for (const auto& slot : track.effects)
+                ++stillThere[slot.instance.id];
+        for (std::size_t t = 0; t < song.mixer.size(); ++t)
+        {
+            const auto& slots = song.mixer[t].effects;
+            slotOrigin[t].assign (slots.size(), { -1, -1 });
+            for (std::size_t i = 0; i < slots.size(); ++i)
+                if (const auto it = wasAt.find (slots[i].instance.id); it != wasAt.end() && ! taken[it->second])
+                {
+                    slotOrigin[t][i] = { (long) it->second.first, (long) it->second.second };
+                    taken[it->second] = true;
+                }
+        }
+        for (std::size_t t = 0; t < song.mixer.size(); ++t)
+            for (std::size_t i = 0; i < song.mixer[t].effects.size() && i < usable (t); ++i)
+                if (slotOrigin[t][i].first < 0 && ! taken[{ t, i }] && stillThere.count (previous->song.mixer[t].effects[i].instance.id) == 0)
+                {
+                    slotOrigin[t][i] = { (long) t, (long) i };
+                    taken[{ t, i }] = true;
+                }
+    }
+
     for (std::size_t t = 0; t < song.mixer.size(); ++t)
     {
         const auto& slots = song.mixer[t].effects;
@@ -454,38 +544,41 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         for (std::size_t i = 0; i < slots.size() && i < (std::size_t) maxEffectSlots; ++i)
         {
             const auto kind = slots[i].kind;
+            const auto none = std::numeric_limits<std::size_t>::max();
+            const auto pt = slotOrigin[t][i].first >= 0 ? (std::size_t) slotOrigin[t][i].first : none;
+            const auto pi = slotOrigin[t][i].second >= 0 ? (std::size_t) slotOrigin[t][i].second : none;
 
-            if (previous != nullptr && t < previous->song.mixer.size() && t < previous->effects.size()
-                && i < previous->song.mixer[t].effects.size() && i < previous->effects[t].size()
-                && previous->song.mixer[t].effects[i].kind == kind && kind != EffectKind::patcher
-                && (kind != EffectKind::parallel || sameContainer (previous->song.mixer[t].effects[i], slots[i])) // children are built in
-                && previous->song.mixer[t].effects[i].samplePath == slots[i].samplePath
+            if (previous != nullptr && pt < previous->song.mixer.size() && pt < previous->effects.size()
+                && pi < previous->song.mixer[pt].effects.size() && pi < previous->effects[pt].size()
+                && previous->song.mixer[pt].effects[pi].kind == kind && kind != EffectKind::patcher
+                && (kind != EffectKind::parallel || sameContainer (previous->song.mixer[pt].effects[pi], slots[i])) // children are built in
+                && previous->song.mixer[pt].effects[pi].samplePath == slots[i].samplePath
                 // round 144: Facet EQ's buffers are sized by its linear-phase resolution: a new one, a new instance
                 && (kind != EffectKind::facetEq
-                    || facet::resolution (previous->song.mixer[t].effects[i].params[(std::size_t) facet::resolutionParam])
+                    || facet::resolution (previous->song.mixer[pt].effects[pi].params[(std::size_t) facet::resolutionParam])
                            == facet::resolution (slots[i].params[(std::size_t) facet::resolutionParam]))
                 && (kind != EffectKind::plugin
-                    || (previous->song.mixer[t].effects[i].plugin.id == slots[i].plugin.id && previous->sampleRate == sampleRate
-                        && samePluginProcessing (previous->song.mixer[t].effects[i].plugin, slots[i].plugin)))
-                && (previous->song.mixer[t].effects[i].state == slots[i].state
-                    || (previous->sampleRate == sampleRate && previous->effects[t][i] != nullptr && previous->effects[t][i]->acceptState (slots[i].state))))
+                    || (previous->song.mixer[pt].effects[pi].plugin.id == slots[i].plugin.id && previous->sampleRate == sampleRate
+                        && samePluginProcessing (previous->song.mixer[pt].effects[pi].plugin, slots[i].plugin)))
+                && (previous->song.mixer[pt].effects[pi].state == slots[i].state
+                    || (previous->sampleRate == sampleRate && previous->effects[pt][pi] != nullptr && previous->effects[pt][pi]->acceptState (slots[i].state))))
             {
-                state->effects[t].push_back (previous->effects[t][i]);
+                state->effects[t].push_back (previous->effects[pt][pi]);
                 continue;
             }
 
             // FL's Patcher (REA_rodada141): same structure keeps the running graph (it takes the values)
             if (kind == EffectKind::patcher)
             {
-                const auto* old = previous != nullptr && t < previous->effects.size() && i < previous->effects[t].size()
-                                          && i < previous->song.mixer[t].effects.size() && previous->song.mixer[t].effects[i].kind == kind
-                                      ? previous->effects[t][i].get()
+                const auto* old = previous != nullptr && pt < previous->effects.size() && pi < previous->effects[pt].size()
+                                          && pi < previous->song.mixer[pt].effects.size() && previous->song.mixer[pt].effects[pi].kind == kind
+                                      ? previous->effects[pt][pi].get()
                                       : nullptr;
                 if (old != nullptr && previous->sampleRate == sampleRate
-                    && patcher::sameStructure (previous->song.mixer[t].effects[i].patcher, slots[i].patcher)
-                    && patcher::acceptValues (previous->effects[t][i].get(), slots[i]))
+                    && patcher::sameStructure (previous->song.mixer[pt].effects[pi].patcher, slots[i].patcher)
+                    && patcher::acceptValues (previous->effects[pt][pi].get(), slots[i]))
                 {
-                    state->effects[t].push_back (previous->effects[t][i]);
+                    state->effects[t].push_back (previous->effects[pt][pi]);
                     continue;
                 }
                 std::shared_ptr<Effect> effect = patcher::makeEffect (slots[i], sampleRate, patcherFactories (sampleRate, song.bpm, factories), old);
@@ -524,15 +617,17 @@ std::unique_ptr<const RackState> RackState::build (Song song,
 
     for (std::size_t c = 0; c < channels.size(); ++c)
         if (channels[c].arp.enabled())
-            state->arpeggiators[c] = previous != nullptr && c < previous->arpeggiators.size() && previous->arpeggiators[c] != nullptr
-                                         ? previous->arpeggiators[c]
+            state->arpeggiators[c] = previous != nullptr && channelOrigin[c] >= 0 && (std::size_t) channelOrigin[c] < previous->arpeggiators.size()
+                                             && previous->arpeggiators[(std::size_t) channelOrigin[c]] != nullptr
+                                         ? previous->arpeggiators[(std::size_t) channelOrigin[c]]
                                          : std::make_shared<Arpeggiator>();
 
     state->echoes.assign (channels.size(), nullptr);
     for (std::size_t c = 0; c < channels.size(); ++c)
         if (channels[c].misc.echo.enabled())
-            state->echoes[c] = previous != nullptr && c < previous->echoes.size() && previous->echoes[c] != nullptr
-                                   ? previous->echoes[c]
+            state->echoes[c] = previous != nullptr && channelOrigin[c] >= 0 && (std::size_t) channelOrigin[c] < previous->echoes.size()
+                                       && previous->echoes[(std::size_t) channelOrigin[c]] != nullptr
+                                   ? previous->echoes[(std::size_t) channelOrigin[c]]
                                    : std::make_shared<channelmisc::NoteEcho>();
 
     // (FL's Kepler keeps sounding when its cut group cuts it: FL's renders with and without "cut itself" are the same
@@ -1455,7 +1550,10 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
     mixBuffers.assign ((std::size_t) maxMixerTracks * 2 * (std::size_t) blockCapacity, 0.0f);
     hwScratch.assign (2 * (std::size_t) blockCapacity, 0.0f);
     layerPick.assign ((std::size_t) maxChannels * 128, (std::int16_t) -1);
+    voiceOrderScratch.assign ((std::size_t) maxChannels, {});
+    heldScratch.assign ((std::size_t) maxChannels, {});
     polyLayers.assign ((std::size_t) maxChannels, {});
+    polyScratch.assign ((std::size_t) maxChannels, {});
 
     if (lastState != nullptr)
     {
@@ -2359,7 +2457,28 @@ void RackRenderer::process (const RackState* state,
                 effect->prepare (sampleRate);
     }
 
+    // channels inserted, removed or moved (round 168s): their held keys and voice order go with them
+    if (state != lastState && lastState != nullptr && state->builtFrom == lastSerial && state->channelsMoved
+        && voiceOrderScratch.size() == (std::size_t) maxChannels && heldScratch.size() == (std::size_t) maxChannels)
+    {
+        for (std::size_t c = 0; c < (std::size_t) maxChannels; ++c)
+        {
+            voiceOrderScratch[c] = voiceOrders[c];
+            heldScratch[c] = heldNotes[c];
+            if (c < polyLayers.size() && c < polyScratch.size())
+                polyScratch[c] = polyLayers[c];
+        }
+        for (std::size_t c = 0; c < (std::size_t) maxChannels; ++c)
+        {
+            const auto from = c < state->channelFrom.size() ? state->channelFrom[c] : -1;
+            voiceOrders[c] = from >= 0 && from < maxChannels ? voiceOrderScratch[(std::size_t) from] : VoiceOrder {};
+            heldNotes[c] = from >= 0 && from < maxChannels ? heldScratch[(std::size_t) from] : NoteMask {};
+            if (c < polyLayers.size() && c < polyScratch.size()) // (round 168l's mono / porta layers move too)
+                polyLayers[c] = from >= 0 && (std::size_t) from < polyScratch.size() ? polyScratch[(std::size_t) from] : channelpoly::Layer {};
+        }
+    }
     lastState = state; // so prepare() knows which instruments to reconfigure
+    lastSerial = state->serial;
 
     // Stopping, or jumping to another position (seek/rewind), releases held notes:
     // their "off" events will no longer happen.

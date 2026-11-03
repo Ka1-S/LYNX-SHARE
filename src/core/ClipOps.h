@@ -154,15 +154,37 @@ inline void setChannelPitch (Song& song, int channel, double semitones, double c
         rescaleClipsOf (song, channel, before, fileTicks (ch, fileFrames, fileRate, song.bpm));
 }
 
-// "Fit to tempo": the number of beats a loop of `seconds` most likely spans, assuming it is a power-of-two
-// number of beats (1, 2, 4, 8 ... 256) recorded at some other tempo; picks the nearest at the project's tempo.
-inline float fitBeats (double seconds, double bpm) noexcept
+// "Fit to tempo": the number of beats a sample of `seconds` spans, so that at the project's `bpm` it keeps in time.
+// Issue #32 #7: this used to assume a power-of-two number of beats (1, 2, 4 ... 256) and round to it, so a 3-bar or
+// 6-beat loop and a loop with a reverb tail came out of tempo. Now, as FL's TIME knob does ("%s (embedded)",
+// "%s (estimated)", FL strings r168s): the WAV's ACID beat count when it has one (`embeddedBeats`); else the sample's
+// own tempo (`sourceBpm`, detected) taken in the octave nearest the project tempo (the least stretch: a 90 BPM loop in
+// a 120 project stays 90, at 140 it is read as 180), the exact count (a tail stays a fraction of a beat); else (no
+// pulse) the power-of-two count nearest its length at the project tempo.
+inline float fitBeats (double seconds, double bpm, float embeddedBeats = 0.0f, double sourceBpm = 0.0) noexcept
 {
-    const auto beats = seconds * std::max (1.0, bpm) / 60.0;
-    if (! (beats > 0.0))
+    if (embeddedBeats > 0.0f)
+        return embeddedBeats;
+    bpm = std::max (1.0, bpm);
+    if (! (seconds > 0.0))
         return 0.0f;
-    const auto power = std::clamp (std::round (std::log2 (beats)), 0.0, 8.0);
-    return (float) std::pow (2.0, power);
+    if (sourceBpm > 0.0)
+    {
+        while (sourceBpm < bpm / std::sqrt (2.0))
+            sourceBpm *= 2.0;
+        while (sourceBpm >= bpm * std::sqrt (2.0))
+            sourceBpm *= 0.5;
+        return (float) std::clamp (seconds * sourceBpm / 60.0, 0.01, 1024.0);
+    }
+    const auto beats = seconds * bpm / 60.0; // no tempo known (no pulse found): a power-of-two loop, as before
+    return (float) std::pow (2.0, std::clamp (std::round (std::log2 (beats)), 0.0, 8.0));
+}
+
+// FL's TIME knob presets (its right-click menu, r168s c_f20): "1 beat, 2 beats, 1 bar, 2 bars, 3 bars, 4 bars" in beats.
+inline std::vector<float> timePresetBeats (int beatsPerBar)
+{
+    const auto bar = (float) std::max (1, beatsPerBar);
+    return { 1.0f, 2.0f, bar, 2.0f * bar, 3.0f * bar, 4.0f * bar };
 }
 
 // Clips (indices into song.playlist) that use the same source as `clip`: the same pattern, the same audio
