@@ -30,6 +30,7 @@
 #include "engine/PluginHost.h"
 #include "engine/PluginSandbox.h"
 #include "engine/ProjectFile.h"
+#include "core/Sha256.h"
 #include "engine/SessionPack.h"
 #include "core/SessionIds.h"
 #include "core/SessionParts.h"
@@ -2067,6 +2068,52 @@ private:
                           && media.findChildFiles (juce::File::findFiles, true).isEmpty();
                 if (! mergeOk && e.isEmpty())
                     e = "a received package reached a file outside it";
+            }
+            // ... nor through its own folder: "..", Windows' dotted names (". ." climbs like ".." there), and a manifest
+            // media entry outside the package (it must not even be read: "/dev/zero" would never end)
+            if (mergeOk)
+            {
+                const auto secret = dir.getChildFile ("secret.wav");
+                const auto folder = dir.getChildFile ("evil2").getChildFile ("Evil2"); // (where open() will unpack it)
+                const auto climb = folder.getFullPathName() + "/media/../../../secret.wav";
+                const auto dotted = folder.getFullPathName() + "/. ./.. ./secret.wav";
+                auto evil = lynx::Song::makeDefault();
+                for (const auto& path : { climb, dotted })
+                {
+                    lynx::ChannelDef c;
+                    c.instrument = lynx::InstrumentKind::sampler;
+                    c.samplePath = path.toStdString();
+                    evil.channels.push_back (c);
+                }
+                juce::MemoryBlock secretBytes;
+                secret.loadFileAsData (secretBytes);
+                lynx::sessionpack::Manifest em;
+                em.part = true;
+                em.media.push_back ({ "sha256-" + juce::String (lynx::sha256Hex ((const std::uint8_t*) secretBytes.getData(), secretBytes.getSize())),
+                                      "secret.wav", (juce::int64) secretBytes.getSize(), "../../secret.wav" });
+                const auto evilProject = dir.getChildFile ("evil2.lynx");
+                juce::ZipFile::Builder b;
+                const auto json = lynx::sessionpack::manifestToJson (em);
+                b.addEntry (new juce::MemoryInputStream (json.toRawUTF8(), json.getNumBytesAsUTF8(), true), 0, "manifest.json", {});
+                const auto evilPack = dir.getChildFile (juce::String ("Evil2") + lynx::sessionpack::extension);
+                bool zipped = false;
+                if (lynx::ProjectFile::save (evil, evilProject, e))
+                {
+                    b.addFile (evilProject, 0, "project.lynx");
+                    juce::FileOutputStream out (evilPack);
+                    zipped = out.openedOk() && b.writeToStream (out, nullptr);
+                }
+                auto evilOpened = zipped ? lynx::sessionpack::open (evilPack, dir.getChildFile ("evil2"), e) : std::nullopt;
+                const auto media = dir.getChildFile ("Session media/Evil2");
+                mergeOk = evilOpened && evilOpened->folder == folder && evilOpened->corrupt.contains ("secret.wav")
+                          && lynx::sessionpack::adoptMedia (evilOpened->song, media, e) && evilOpened->song.channels.size() >= 2
+                          && std::none_of (evilOpened->song.channels.begin(), evilOpened->song.channels.end(), [&] (const lynx::ChannelDef& ch) {
+                                 const auto p = juce::String::fromUTF8 (ch.samplePath.c_str());
+                                 return p == climb || p == dotted || (juce::File::isAbsolutePath (p) && juce::File (p) == secret);
+                             })
+                          && media.findChildFiles (juce::File::findFiles, true).isEmpty();
+                if (! mergeOk && e.isEmpty())
+                    e = "a received package climbed out of its folder";
             }
             if (! packOk && e.isEmpty())
                 e = "media " + juce::String (written.media) + ", duplicates " + juce::String (written.duplicates) + ", missing "
