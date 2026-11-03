@@ -28,10 +28,11 @@ enum class Icon
     graph,      // Channel Rack: the step graph editor (velocity, pan... bars)
     follow,     // Playlist / Piano Roll: the view follows the playhead (auto scrolling)
     loop,       // Channel Rack: channel looping (round 165f-rack)
-    dice        // Channel Rack: Loop Starter (round 168b)
+    dice,       // Channel Rack: Loop Starter (round 168b)
+    stretch     // Playlist: stretch audio when resizing audio clips (round 168f)
 };
 
-constexpr int iconCount = (int) Icon::dice + 1;
+constexpr int iconCount = (int) Icon::stretch + 1;
 
 namespace icons
 {

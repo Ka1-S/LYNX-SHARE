@@ -604,6 +604,25 @@ struct LayerSettings
     bool operator== (const LayerSettings&) const = default;
 };
 
+// Online Sessions (docs/design/ONLINE_SESSIONS.md §4.2, round 168a): a render of a third-party plugin part, made by the
+// computer that has the plugin, for the computers that don't. A channel's stand-ins are its instrument's output before
+// its mixer insert (the channel's own volume and pan are left out, they still apply live); an insert's is its output
+// after its effect chain, before the fader. Saved with the project, so a project sent to a friend and the host's final
+// project keep them as the fallback; they only play where the plugin is missing (standins::project).
+struct StandIn
+{
+    std::uint64_t pattern = 0; // pattern uid; 0 = the whole song (a timeline stem, Song mode)
+    // pattern stems: false = the pattern played once with its tail (Song mode, placed at its clips), true = one loop
+    // pass of the pattern looping (the previous pass's tail sounds over its start: Pattern mode)
+    bool loop = false;
+    std::string path;               // the WAV
+    std::string sourceHash;         // what it was rendered from (standins' source hash): differs = out of date
+    std::int64_t lengthTicks = 0;   // the stem's length (the music and its tail)
+    std::string plugin;             // the plugin it stands in for (for the badge)
+    std::string by;                 // who rendered it (the participant's name)
+    bool operator== (const StandIn&) const = default;
+};
+
 struct ChannelDef
 {
     std::string name;
@@ -647,6 +666,10 @@ struct ChannelDef
     // 0 = any) play only this channel, whatever is selected in the Channel Rack. Empty = not locked.
     std::string receiveFrom;
     int receiveMidiChannel = 0;
+    // Online Sessions (round 168a): the channel's stable id (uids::normalize; its participant tag in the top bits says
+    // whose it is) and the renders of its third-party plugin for computers without it
+    std::uint64_t uid = 0;
+    std::vector<StandIn> standIns;
     // FL's channel icon (.flp 0x9B, REA round 168j): FL's icon index, 0 = none. Kept and saved; drawn by the icon UI.
     int icon = 0;
     // FL's Loop Starter (round 168b, core/LoopStarter.h): the channel belongs to the Loop Starter of pattern
@@ -1011,6 +1034,9 @@ struct MixerTrack
     // "Compensate for master latency" (.flp 0xEC flag 0x4000 = off): with a hardware output target, that output is
     // delayed to line up with the Master's (PDC total)
     bool compensateMasterLatency = true;
+    // Online Sessions (round 168a): the render of this insert's output (after its effects, before the fader) for
+    // computers without one of its third-party plugins — a timeline stem (StandIn::pattern 0)
+    std::vector<StandIn> standIns;
     // FL's mixer track icon ("Change icon…", .flp 0x5F, REA round 168j): FL's icon index, 0 = none. Kept and saved.
     int icon = 0;
 };
@@ -1141,6 +1167,7 @@ struct Pattern
     bool loopOn = false;
     RackLoopMode loopMode = RackLoopMode::steps;
     std::vector<ChannelLoop> channelLoops; // at most one per channel
+    std::uint64_t uid = 0; // stable id (Online Sessions, round 168a)
     // FL's pattern time markers (the Piano roll's ruler; .flp 0x94 / 0x21 / 0x22 / 0xCD inside the pattern's events,
     // round 168g): plain markers, time signature changes, Loop length (11), Pattern length (6)... sorted by tick
     std::vector<Marker> markers;
@@ -1184,6 +1211,7 @@ struct Automation
     } source;
     std::vector<float> curve;
     bool isLive() const noexcept { return source.track >= 0 || source.channel >= 0; }
+    std::uint64_t uid = 0; // stable id (Online Sessions, round 168a)
     float mapLive (float v) const noexcept; // applies the curve
 
     // Value at `tick` (before the first point = first value; after the last = last).
@@ -1219,6 +1247,7 @@ struct Clip
     // track, the overlap in ticks — derived from the arrangement by clipops::updateCrossfades while
     // Song::autoCrossfades is on (never saved). A crossfade replaces that side's fade, with an S-shaped curve.
     std::int64_t crossfadeIn = 0, crossfadeOut = 0;
+    std::uint64_t uid = 0; // stable id (Online Sessions, round 168a): whose clip it is
 
     std::int64_t end() const noexcept { return start + length; }
     std::int64_t effectiveFadeIn() const noexcept { return crossfadeIn > 0 ? crossfadeIn : fadeIn; }
@@ -1326,6 +1355,12 @@ struct PlaylistTrack
     int mixerTrack = -1; // audio / instrument tracks: the linked mixer track (-1 = none)
     int channel = -1;    // instrument tracks: the channel
     TrackPerformance performance {}; // FL's Performance settings (round 165m)
+    // FL's "Lock to content" (track record +0x19, .flp 0xEE byte 21; REA round 168f): painting on the track places its
+    // own content (the clip the track holds most) instead of a source the track doesn't hold yet.
+    bool lockedToContent = false;
+    // FL's "Lock to this size" (track record +0x14 i32, .flp 0xEE bytes 17…20; REA round 168f): > 0 = the row keeps this
+    // height in px whatever the vertical zoom and the Size menu; ≤ 0 = not locked (FL keeps −the last locked height).
+    int lockedHeight = -1;
     int icon = 0; // FL's playlist track icon (.flp 0xEE u32 at 8, REA round 168j): FL's icon index, 0 = none. Kept and saved.
 };
 
@@ -1347,6 +1382,7 @@ struct Arrangement
     std::vector<Clip> clips;               // empty for the current arrangement: its clips live in Song::playlist
     std::int64_t loopStart = 0, loopEnd = 0;
     std::vector<Marker> markers;           // sorted by tick (stay here even for the current arrangement)
+    std::uint64_t uid = 0;                 // stable id (Online Sessions, round 168a)
 };
 
 // The project's credits (FL's Settings › Info page): shown and edited in Settings › Info, kept in .lynx, imported from .flp.
@@ -1368,6 +1404,63 @@ struct ProjectInfo
     bool operator== (const ProjectInfo&) const = default;
 };
 
+// Online Sessions (docs/design/ONLINE_SESSIONS.md §2, round 168a): who works on a project. The host (the project's
+// owner) has tag 1; each friend the project is sent to gets the next tag, and the entities he creates carry it in
+// their uid (uids::tagOf), so "his area" needs no table. Inserts and Playlist rows are positional: each guest gets a
+// reserved range of them.
+namespace session
+{
+constexpr int maxParticipants = 4;     // the host included (the user's decision 3, 2026-11-01)
+constexpr std::uint32_t hostTag = 1;
+constexpr int insertsPerGuest = 20;    // reserved inserts per guest (grown on demand past them)
+constexpr int rowsPerGuest = 16;       // reserved Playlist rows per guest
+} // namespace session
+
+struct SessionParticipant
+{
+    std::uint32_t tag = 0;
+    std::string name;
+    std::uint32_t colour = 0;          // 0xFFRRGGBB: his area's stripe / header colour
+    int insertFirst = 0, insertCount = 0; // reserved inserts [first, first + count)
+    int rowFirst = 0, rowCount = 0;       // reserved Playlist rows
+    bool keepFull = false;             // the host lets him keep a full copy of the project at the end (decision 1)
+    bool ownsInsert (int t) const noexcept { return insertCount > 0 && t >= insertFirst && t < insertFirst + insertCount; }
+    bool ownsRow (int r) const noexcept { return rowCount > 0 && r >= rowFirst && r < rowFirst + rowCount; }
+    bool operator== (const SessionParticipant&) const = default;
+};
+
+struct SessionInfo
+{
+    std::uint32_t me = session::hostTag; // who edits this copy of the project (the host, or the guest it was sent to)
+    std::vector<SessionParticipant> participants; // the host first, then the guests
+    const SessionParticipant* find (std::uint32_t tag) const noexcept
+    {
+        for (const auto& p : participants)
+            if (p.tag == tag)
+                return &p;
+        return nullptr;
+    }
+    SessionParticipant* find (std::uint32_t tag) noexcept
+    {
+        for (auto& p : participants)
+            if (p.tag == tag)
+                return &p;
+        return nullptr;
+    }
+    const SessionParticipant* self() const noexcept { return find (me); }
+    bool isGuestCopy() const noexcept { return me != session::hostTag; }
+    // insert / row `i` is in another participant's reserved range (this copy's own new things don't go there)
+    bool reservedForOther (bool insert, int i) const noexcept
+    {
+        for (const auto& p : participants)
+            if (p.tag != me && (insert ? p.ownsInsert (i) : p.ownsRow (i)))
+                return true;
+        return false;
+    }
+    bool empty() const noexcept { return me == session::hostTag && participants.empty(); }
+    bool operator== (const SessionInfo&) const = default;
+};
+
 struct Song
 {
     double bpm = 130.0;
@@ -1376,6 +1469,11 @@ struct Song
     std::vector<std::string> channelGroups; // the Channel Rack's filter groups (FL's "All" dropdown), by name
     float masterPitch = 0.0f; // cents, -1200..1200: shifts every note of the built-in instruments (the toolbar's master pitch)
     ProjectInfo info;
+    // Online Sessions (round 168a): the project's lineage (random 128-bit hex, kept by copies and packages), the last
+    // uid counter used and who works on it (uids::normalize fills the first two)
+    std::string projectId;
+    std::uint64_t nextUid = 0;
+    SessionInfo session;
     std::vector<ChannelDef> channels;
     std::vector<Pattern> patterns;
     int currentPattern = 0;

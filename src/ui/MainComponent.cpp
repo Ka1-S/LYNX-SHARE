@@ -48,6 +48,8 @@
 #include "engine/MidiFileIo.h"
 #include "engine/ProjectFile.h"
 #include "engine/ProjectPackage.h"
+#include "engine/SessionPack.h"
+#include "ui/SessionDialogs.h"
 #include "core/ProjectSafety.h"
 #include "core/MissingFiles.h"
 #include "ui/AutomationUi.h"
@@ -1599,6 +1601,8 @@ void MainComponent::loadUiSettings()
             notenames::currentFlats.store (on);
         else if (key == "rememberSeek")
             EditorGlobals::get().rememberSeek = on;
+        else if (key == "createVariants")
+            EditorGlobals::get().createVariants = on;
         else if (key == "prGridHighlights") // (round 168g: the Piano roll's View items)
             PianoRollComponent::gridHighlights = on;
         else if (key == "prShowChordName")
@@ -1725,6 +1729,7 @@ void MainComponent::saveUiSettings()
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
                                       + "\npluginStyleOverrides=" + skin::overridesToString()
                                       + "\nrememberSeek=" + juce::String (EditorGlobals::get().rememberSeek ? 1 : 0)
+                                      + "\ncreateVariants=" + juce::String (EditorGlobals::get().createVariants ? 1 : 0)
                                       + "\nprGridHighlights=" + juce::String (PianoRollComponent::gridHighlights ? 1 : 0)
                                       + "\nprShowChordName=" + juce::String (PianoRollComponent::showChordName ? 1 : 0)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
@@ -2100,6 +2105,22 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "playlist.reverseClips", tr ("Reverse selected audio clips"));
             action (menu, "playlist.quantizeStarts", tr ("Quantize the clips' starts"));
             action (menu, "playlist.quantizeHalf", tr ("Quantize the clips' starts 50% (halfway to the grid)"));
+            // round 168f: FL's Playlist Edit / Tools items ([DFM] EEMenu)
+            action (menu, "playlist.makeUnique", tr ("Make unique"));
+            action (menu, "playlist.mergePatternClips", tr ("Merge pattern clips"));
+            action (menu, "playlist.purgeUnusedAudio", tr ("Purge unused audio clips"));
+            action (menu, "playlist.stretchMode", tr ("Stretch audio when resizing audio clips"), true, EditorGlobals::get().stretchOnResize);
+            action (menu, "playlist.createVariants", tr ("Create variants when stretching audio clips"), true, EditorGlobals::get().createVariants);
+            {
+                juce::PopupMenu trackTools;
+                action (trackTools, "playlist.cloneTracks", tr ("Clone selected playlist track(s)"));
+                action (trackTools, "playlist.lockAllToContent", tr ("Lock all playlist tracks to content"));
+                action (trackTools, "playlist.unlockAllFromContent", tr ("Unlock all playlist tracks from content"));
+                action (trackTools, "playlist.resetEmptyTracks", tr ("Reset empty playlist tracks"));
+                action (trackTools, "playlist.collapseAllGroups", tr ("Collapse all grouped tracks"));
+                action (trackTools, "playlist.expandAllGroups", tr ("Expand all grouped tracks"));
+                menu.addSubMenu (tr ("Tools"), trackTools);
+            }
             {
                 // FL's Playlist Tools › EERenderPLSelectionMenu, EEPLRenderAllTracksMenu, EEPLRenderAllTrackGroupsMenu (round 168e)
                 juce::PopupMenu consolidate;
@@ -3783,6 +3804,14 @@ void MainComponent::revertToLastBackup()
                         true);
 }
 
+sessionui::Context MainComponent::sessionContext()
+{
+    return { engine, currentFile, projectName, [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::File& project) {
+                if (safe != nullptr)
+                    safe->openLynxProject (project);
+            } };
+}
+
 void MainComponent::exportPackage()
 {
     // FL's zipped loop package: the project and every sample it uses in one .zip
@@ -4073,7 +4102,7 @@ void MainComponent::chooseFileToOpen()
 void MainComponent::chooseFileToOpenNow()
 {
     fileChooser = std::make_unique<juce::FileChooser> (tr ("Open project"), currentFile.getParentDirectory(),
-                                                       juce::String ("*") + ProjectFile::extension + ";*.dawproj;*.flp;*.zip;*.mid;*.midi");
+                                                       juce::String ("*") + ProjectFile::extension + ";*.dawproj;*.flp;*.zip;*.lynxpack;*.mid;*.midi");
 
     fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [this] (const juce::FileChooser& chooser) {
@@ -4098,6 +4127,13 @@ void MainComponent::openFile (const juce::File& file)
             return;
         }
         openFile (project);
+        return;
+    }
+
+    if (file.hasFileExtension (sessionpack::extension))
+    {
+        // Online Sessions (round 168a): a project a friend sent (opened after a summary) or a part sent back (merged)
+        sessionui::openPackage (sessionContext(), file);
         return;
     }
 
@@ -4756,6 +4792,12 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         });
         menu.addItem (tr ("Switch smart disable for all plugins"), [this] { switchSmartDisableForAll(); });
         menu.addItem (tr ("Prepare for performance mode..."), [this] { prepareForPerformance(); });
+        // FL's Macros order ([DFM] mainmenu): ... Purge unused audio clips ... Lock / Unlock all playlist tracks, Reset
+        // empty playlist tracks (round 168f)
+        menu.addItem (tr ("Purge unused audio clips"), [this] { playlist.runAction ("playlist.purgeUnusedAudio"); });
+        menu.addItem (tr ("Lock all playlist tracks to content"), [this] { playlist.runAction ("playlist.lockAllToContent"); });
+        menu.addItem (tr ("Unlock all playlist tracks from content"), [this] { playlist.runAction ("playlist.unlockAllFromContent"); });
+        menu.addItem (tr ("Reset empty playlist tracks"), [this] { playlist.runAction ("playlist.resetEmptyTracks"); });
         menu.addItem (tr ("Delete unused recordings and save project..."), [this] { deleteUnusedRecordingsAndSave(); });
         menu.addItem (tr ("Collect project samples into a folder..."), [this] { collectSamples(); });
         return menu;
@@ -4820,6 +4862,16 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             exports.addItem (tr ("Project bones..."), [this] { exportProjectBones (engine, currentFile.getParentDirectory(), projectName); });
             exports.addItem (tr ("Project data files (collect the samples into a folder)..."), [this] { collectSamples(); });
             menu.addSubMenu (tr ("Export"), exports);
+        }
+        {
+            // Online Sessions, phase 1 (docs/design/ONLINE_SESSIONS.md, round 168a): a project goes to a friend as a
+            // .lynxpack, his part comes back the same way
+            const auto guestCopy = engine.getSong().session.isGuestCopy();
+            juce::PopupMenu online;
+            online.addItem (tr ("Send project..."), ! guestCopy, false, [this] { sessionui::sendProject (sessionContext()); });
+            online.addItem (tr ("Send my part back..."), guestCopy, false, [this] { sessionui::sendPartBack (sessionContext()); });
+            online.addItem (tr ("Merge a part..."), ! guestCopy, false, [this] { sessionui::mergePart (sessionContext()); });
+            menu.addSubMenu (tr ("Online session"), online);
         }
 
         menu.addSectionHeader (tr ("Recent projects"));

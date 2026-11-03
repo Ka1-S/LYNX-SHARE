@@ -22,6 +22,7 @@
 
 #include "core/NoteEdit.h"
 #include "core/PlaylistOps.h"
+#include "core/PlaylistTrackOps.h"
 #include "core/TempoDetect.h"
 #include "core/TakeRecording.h"
 #include "ui/ExportDialog.h"
@@ -266,6 +267,18 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     followButton.setWantsKeyboardFocus (false);
     followButton.setMouseClickGrabsKeyboardFocus (false);
     addAndMakeVisible (followButton);
+    // FL's STRETCH switch (ClipStretchBtn [DFM]: "Stretch audio when resizing audio clips", Shift+M; round 168f)
+    stretchButton.setOnColour (theme::colour::bg6);
+    stretchButton.setIconColourWhenOn (theme::colour::accent);
+    stretchButton.setFlat (true);
+    stretchButton.setClickingTogglesState (false);
+    stretchButton.setToggleState (EditorGlobals::get().stretchOnResize, juce::dontSendNotification);
+    stretchButton.setTooltip (tr ("Stretch: resizing an audio clip stretches its audio instead of cutting it (Shift+M)"));
+    ui::setQuickTip (stretchButton, tr ("Stretch audio when resizing audio clips"));
+    stretchButton.onClick = [this] { runAction ("playlist.stretchMode"); };
+    stretchButton.setWantsKeyboardFocus (false);
+    stretchButton.setMouseClickGrabsKeyboardFocus (false);
+    addAndMakeVisible (stretchButton);
 
     arrangementBox.setTooltip (tr ("Arrangement (as in FL, a project can have several)"));
     arrangementBox.setWantsKeyboardFocus (false);
@@ -413,6 +426,9 @@ int PlaylistComponent::heightOf (int track) const
     if (noteedit::isFoldedAway (engine.getSong(), track))
         return foldedHeight;
     const auto h = track >= 0 && track < (int) tracks.size() ? tracks[(std::size_t) track].height : 0;
+    // "Lock to this size" (FL +0x14, round 168f): the row keeps its px height whatever the vertical zoom
+    if (const auto locked = track >= 0 && track < (int) tracks.size() ? tracks[(std::size_t) track].lockedHeight : -1; locked > 0)
+        return polish::clampTrackHeight (locked);
     return scaledHeight (h > 0 ? polish::clampTrackHeight (h) : trackHeight);
 }
 
@@ -502,6 +518,7 @@ void PlaylistComponent::setTrackHeights (std::vector<int> tracks, int height)
             if ((int) s.playlistTracks.size() <= t)
                 s.playlistTracks.resize ((std::size_t) t + 1);
             s.playlistTracks[(std::size_t) t].height = height == trackHeight ? 0 : polish::clampTrackHeight (height);
+            pltracks::unlockSize (s.playlistTracks[(std::size_t) t]); // a new size unlocks it (FL's Size menu)
         }
     });
     refreshTrackLayout();
@@ -607,6 +624,7 @@ void PlaylistComponent::resized()
     tools.setBounds (arrangementBox.getRight() + 8, 3, tools.getIdealWidth (h), h);
     snapBox.setBounds (tools.getRight() + 8, 3, 128, h);
     followButton.setBounds (snapBox.getRight() + 6, 3, h, h);
+    stretchButton.setBounds (followButton.getRight() + 2, 3, h, h);
     overview.setBounds (headerWidth, toolbarHeight, getWidth() - headerWidth - scrollBarSize, overviewHeight);
     vBar.setBounds (getWidth() - scrollBarSize, headerHeight, scrollBarSize, getHeight() - headerHeight);
     updateScrollBars();
@@ -2541,6 +2559,9 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
     if (hit >= 0)
     {
         grabClips (rightEdge ? Drag::resize : leftEdge ? Drag::trimLeft : Drag::move);
+        stretchOriginals.clear();
+        if (EditorGlobals::get().stretchOnResize && (rightEdge || leftEdge))
+            stretchOriginals = engine.getSong().playlist;
 
         if (drag == Drag::resize && ripple)
         {
@@ -2570,10 +2591,12 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         engine.setSelectedChannel (engine.getSong().playlistTracks[(std::size_t) track].channel); // its piano roll is the channel's
     }
 
-    const auto c = makeBrushClip (yToTrack (e.y), snap (xToTick (e.x), snapOn));
+    auto c = makeBrushClip (yToTrack (e.y), snap (xToTick (e.x), snapOn));
 
     if (c.kind == ClipKind::pattern)
         brush = {};
+    // a track locked to content places its own content (FL: the paint loop of FUN_00e5cd20 → FUN_01220fe0, round 168f)
+    pltracks::applyLockToContent (engine.getSong(), c);
 
     engine.editSong ([c] (Song& s) {
         s.playlist.push_back (c);
@@ -2956,6 +2979,19 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
             if (engine.getSong().playlist[(std::size_t) dragClip].length == grabbed.length + delta)
                 return;
 
+            // the STRETCH switch (FL's ClipStretchBtn, round 168f): an audio clip's audio stretches with its edge
+            if (EditorGlobals::get().stretchOnResize && grabbed.kind == ClipKind::audio && ! stretchOriginals.empty())
+            {
+                engine.editSong ([this, delta, minimum] (Song& s) {
+                    s.playlist = stretchOriginals;
+                    for (std::size_t j = 0; j < dragIndices.size(); ++j)
+                        if (const auto& o = dragOriginals[j]; o.kind == ClipKind::audio)
+                            pltracks::stretchAudioClip (s, stretchOriginals, dragIndices[j], o.start, juce::jmax (minimum, o.length + delta),
+                                                        EditorGlobals::get().createVariants);
+                });
+                return;
+            }
+
             if (ripple && ! rippleOriginals.empty()) // the later clips on the track follow the end
             {
                 engine.editSong ([this, length = juce::jmax (minimum, grabbed.length + delta)] (Song& s) {
@@ -2990,6 +3026,22 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
 
             if (engine.getSong().playlist[(std::size_t) dragClip].start == probe.start)
                 return;
+
+            if (EditorGlobals::get().stretchOnResize && grabbed.kind == ClipKind::audio && ! stretchOriginals.empty())
+            {
+                // stretching from the start: the end stays (round 168f)
+                engine.editSong ([this, delta, minimum] (Song& s) {
+                    s.playlist = stretchOriginals;
+                    for (std::size_t j = 0; j < dragIndices.size(); ++j)
+                        if (const auto& o = dragOriginals[j]; o.kind == ClipKind::audio)
+                        {
+                            const auto newStart = juce::jlimit<std::int64_t> (0, o.end() - minimum, o.start + delta);
+                            pltracks::stretchAudioClip (s, stretchOriginals, dragIndices[j], newStart, o.end() - newStart,
+                                                        EditorGlobals::get().createVariants);
+                        }
+                });
+                return;
+            }
 
             engine.editSong ([this, delta, minimum] (Song& s) {
                 for (std::size_t j = 0; j < dragIndices.size(); ++j)
@@ -3369,24 +3421,12 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         const auto c = palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())];
         editTrack (track, [c] (PlaylistTrack& t) { t.colour = c; });
     });
-    menu.addItem (tr ("Auto name"), [this, track] {
-        // the name of the source of the track's first clip (pattern, audio or automation channel)
-        const auto& s = engine.getSong();
-        const Clip* first = nullptr;
-        for (const auto& c : s.playlist)
-            if (c.track == track && (first == nullptr || c.start < first->start))
-                first = &c;
-        if (first == nullptr)
-            return;
-        std::string name;
-        if (first->kind == ClipKind::pattern && first->pattern >= 0 && first->pattern < (int) s.patterns.size())
-            name = s.patterns[(std::size_t) first->pattern].name;
-        else if (first->kind == ClipKind::audio && first->channel >= 0 && first->channel < (int) s.channels.size())
-            name = s.channels[(std::size_t) first->channel].name;
-        else if (first->kind == ClipKind::automation && first->automation >= 0 && first->automation < (int) s.automations.size())
-            name = s.automations[(std::size_t) first->automation].name;
-        if (! name.empty())
-            editTrack (track, [name] (PlaylistTrack& t) { t.name = name; });
+    // FL's "Auto name" (EEPLTrackAutoNameMenuClick → FUN_012ef490, round 168f): the name and colour of what the track plays most
+    menu.addItem (tr ("Auto name"), [this, tracks = tracksForMenu (track)] {
+        engine.editSong ([tracks] (Song& s) {
+            for (const auto t : tracks)
+                pltracks::autoName (s, t);
+        });
     });
     menu.addItem (tr ("Reset"), [this, track] {
         editTrack (track, [] (PlaylistTrack& t) {
@@ -3489,6 +3529,14 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         size.addSubMenu (tr ("Every track"), all);
         menu.addSubMenu (tr ("Size"), size);
     }
+    // FL's "Lock to this size" (EEPLTrackLockMenuClick 0x1228cb0, round 168f): the row keeps the height it has now
+    menu.addItem (tr ("Lock to this size"), true, info.lockedHeight > 0, [this, track, tracks = tracksForMenu (track)] {
+        const auto shown = heightOf (track);
+        engine.editSong ([tracks, shown] (Song& s) { pltracks::toggleSizeLock (s, tracks, shown); });
+        refreshTrackLayout();
+        updateScrollBars();
+        repaint();
+    });
     menu.addSeparator();
     {
         const auto header = noteedit::groupHeaderOf (song, track);
@@ -3533,6 +3581,11 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
             });
         }
         menu.addSubMenu (tr ("Current clip source"), sources, ! seen.empty());
+        // FL's "Lock to content" (EEPLTrackClipLockMenuClick → FUN_012e7a90, round 168f): painting on the track places
+        // its own content
+        menu.addItem (tr ("Lock to content"), true, info.lockedToContent, [this, tracks = tracksForMenu (track)] {
+            engine.editSong ([tracks] (Song& s) { pltracks::toggleLockToContent (s, tracks); });
+        });
         auto muteAll = [this, track] (bool mute) {
             engine.editSong ([track, mute] (Song& s) {
                 for (auto& c : s.playlist)
@@ -3553,6 +3606,13 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
             engine.editSong ([track] (Song& s) { clipops::mergeTrackClips (s, track); });
             sortClips();
         });
+        // FL's "Send pattern instances here" (EEPLTrackSendPatMenuClick → FUN_012db4e0, round 168f): the selected pattern
+        // clips, or every clip of the current pattern, move to this track
+        menu.addItem (tr ("Send pattern instances here"), [this, track] {
+            const auto chosen = selection;
+            engine.editSong ([track, chosen] (Song& s) { pltracks::sendPatternInstancesHere (s, track, chosen); });
+            sortClips();
+        });
         menu.addItem (tr ("Mute all clips"), hasClips, false, [muteAll] { muteAll (true); });
         menu.addItem (tr ("Unmute all clips"), hasClips, false, [muteAll] { muteAll (false); });
     }
@@ -3561,30 +3621,7 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         setSelection ({});
         engine.editSong ([track] (Song& s) { noteedit::insertTrack (s, track); });
     });
-    menu.addItem (tr ("Clone"), [this, track] {
-        // a copy of the track (name, colour, size, group) and its clips, right below it
-        setSelection ({});
-        engine.editSong ([track] (Song& s) {
-            noteedit::insertTrack (s, track + 1);
-            if (track < (int) s.playlistTracks.size())
-            {
-                auto copy = s.playlistTracks[(std::size_t) track];
-                copy.collapsed = false;
-                if (noteedit::isGroupHeader (s, track) || copy.grouped)
-                    copy.grouped = true; // stays in the same group
-                s.playlistTracks[(std::size_t) track + 1] = copy;
-            }
-            std::vector<Clip> copies;
-            for (const auto& c : s.playlist)
-                if (c.track == track)
-                {
-                    copies.push_back (c);
-                    copies.back().track = track + 1;
-                }
-            s.playlist.insert (s.playlist.end(), copies.begin(), copies.end());
-        });
-        sortClips();
-    });
+    menu.addItem (tr ("Clone..."), [this, track] { cloneTracksWithDialog (tracksForMenu (track)); });
     menu.addItem (tr ("Delete"), [this, track] {
         setSelection ({});
         engine.editSong ([track] (Song& s) { noteedit::removeTrack (s, track); });
@@ -4477,10 +4514,244 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.zoomPerformance")) zoomOnPerformanceClips();
     else if (is ("playlist.perfClipProgress")) { showClipProgress = ! showClipProgress; repaint(); }
     else if (is ("playlist.perfTrackProgress")) { showTrackProgress = ! showTrackProgress; repaint(); }
+    else if (is ("playlist.mergePatternClips")) mergePatternClipsByKey();
+    else if (is ("playlist.cloneTracks")) cloneTracksWithDialog (! selectedTracks.empty() ? selectedTracks : std::vector<int> { juce::jmax (0, currentTrack) });
+    else if (is ("playlist.makeUnique")) makeSelectionUnique();
+    else if (is ("playlist.stretchMode")) setStretchOnResize (! EditorGlobals::get().stretchOnResize);
+    else if (is ("playlist.createVariants"))
+    {
+        EditorGlobals::get().createVariants = ! EditorGlobals::get().createVariants;
+        if (EditorGlobals::get().onOptionsChanged)
+            EditorGlobals::get().onOptionsChanged();
+    }
+    else if (is ("playlist.lockAllToContent")) lockAllTracks (true);
+    else if (is ("playlist.unlockAllFromContent")) lockAllTracks (false);
+    else if (is ("playlist.resetEmptyTracks")) resetEmptyTracksAsked();
+    else if (is ("playlist.collapseAllGroups")) engine.editSong ([] (Song& s) { pltracks::setAllGroupsCollapsed (s, true); });
+    else if (is ("playlist.expandAllGroups")) engine.editSong ([] (Song& s) { pltracks::setAllGroupsCollapsed (s, false); });
+    else if (is ("playlist.purgeUnusedAudio"))
+    {
+        setSelection ({});
+        engine.editSong ([] (Song& s) { pltracks::purgeUnusedAudioClips (s); });
+        sortClips();
+    }
     else
         return false;
 
     return true;
+}
+
+namespace
+{
+// FL's Clone window (FUN_012edbe0 [DECOMP]: TaskDialog "Clone" / "What do you want to clone along with the track?",
+// six check boxes, the first four ticked; "Grouped tracks" ticked when a group header is selected)
+class CloneTracksWindow final : public juce::AlertWindow
+{
+public:
+    explicit CloneTracksWindow (bool groupHeaderSelected)
+        : juce::AlertWindow (tr ("Clone"), tr ("What do you want to clone along with the track?"), juce::MessageBoxIconType::QuestionIcon)
+    {
+        const std::pair<juce::ToggleButton*, const char*> boxes[] = {
+            { &patterns, TR_NOOP ("Patterns") }, { &audio, TR_NOOP ("Audio clips") }, { &automations, TR_NOOP ("Automations") },
+            { &effects, TR_NOOP ("Effects") },   { &routing, TR_NOOP ("Mixer track routing") }, { &grouped, TR_NOOP ("Grouped tracks") }
+        };
+        for (const auto& [box, text] : boxes)
+        {
+            box->setButtonText (tr (text));
+            box->setSize (300, 24);
+            addCustomComponent (box);
+        }
+        for (auto* b : { &patterns, &audio, &automations, &effects })
+            b->setToggleState (true, juce::dontSendNotification);
+        grouped.setToggleState (groupHeaderSelected, juce::dontSendNotification);
+        addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    }
+
+    pltracks::CloneOptions options() const
+    {
+        pltracks::CloneOptions o;
+        o.patterns = patterns.getToggleState();
+        o.audioClips = audio.getToggleState();
+        o.automations = automations.getToggleState();
+        o.effects = effects.getToggleState();
+        o.routing = routing.getToggleState();
+        o.groupedTracks = grouped.getToggleState();
+        return o;
+    }
+
+private:
+    juce::ToggleButton patterns, audio, automations, effects, routing, grouped;
+};
+} // namespace
+
+std::unique_ptr<juce::AlertWindow> PlaylistComponent::makeCloneTracksDialog (bool groupHeaderSelected)
+{
+    return std::make_unique<CloneTracksWindow> (groupHeaderSelected);
+}
+
+void PlaylistComponent::cloneTracksWithDialog (std::vector<int> tracks)
+{
+    const auto& song = engine.getSong();
+    tracks.erase (std::remove_if (tracks.begin(), tracks.end(), [] (int t) { return t < 0; }), tracks.end());
+    if (tracks.empty())
+        return;
+    // FL: at most 250 at once; all empty → "Nothing to clone"
+    if (tracks.size() > 250)
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Error"),
+                                                tr ("It isn't possible to clone more than {0} playlist tracks at once. Please select fewer tracks and try again.",
+                                                    { juce::String (250) }));
+        return;
+    }
+    const auto header = std::any_of (tracks.begin(), tracks.end(), [&song] (int t) { return noteedit::isGroupHeader (song, t); });
+    {
+        auto probe = song;
+        if (pltracks::cloneTracks (probe, tracks, {}) < 0)
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Nothing to clone"),
+                                                    tr ("All selected playlist tracks are empty. Since empty tracks can't be cloned, there is nothing to do."));
+            return;
+        }
+    }
+    auto* window = new CloneTracksWindow (header);
+    juce::Component::SafePointer<PlaylistComponent> safe (this);
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([safe, window, tracks] (int result) {
+                                 if (result != 1 || safe == nullptr)
+                                     return;
+                                 const auto options = window->options();
+                                 auto run = [safe, tracks, options] {
+                                     if (safe == nullptr)
+                                         return;
+                                     safe->setSelection ({});
+                                     safe->engine.editSong ([tracks, options] (Song& s) {
+                                         pltracks::cloneTracks (s, pltracks::tracksToClone (s, tracks, options.groupedTracks), options);
+                                     });
+                                     safe->sortClips();
+                                     safe->refreshTrackLayout();
+                                     safe->repaint();
+                                 };
+                                 // FL asks before cloning more than four tracks
+                                 if (tracks.size() > 4)
+                                     juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, tr ("This may take a while"),
+                                                                         tr ("Are you sure you want to clone {0} playlist tracks at once? Cloning multiple tracks may take a long time.",
+                                                                             { juce::String ((int) tracks.size()) }),
+                                                                         tr ("Yes"), tr ("No"), nullptr,
+                                                                         juce::ModalCallbackFunction::create ([run] (int r) { if (r != 0) run(); }));
+                                 else
+                                     run();
+                             }),
+                             true);
+}
+
+void PlaylistComponent::mergePatternClipsByKey()
+{
+    const auto& song = engine.getSong();
+    const auto clips = pltracks::mergeCandidates (song, selection);
+    // FL merges only pattern clips; a selection of other kinds is refused, an unselected playlist uses its pattern clips
+    std::vector<int> patterns;
+    for (const auto i : clips)
+        if (i >= 0 && i < (int) song.playlist.size() && song.playlist[(std::size_t) i].kind == ClipKind::pattern)
+            patterns.push_back (i);
+    if (! selection.empty() && patterns.size() != clips.size())
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Can't merge"),
+                                                tr ("The selection contains different clip types, can't merge."));
+        return;
+    }
+    if (patterns.size() < 2)
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Error"),
+                                                tr ("Could not find enough valid pattern clips or instances to merge."));
+        return;
+    }
+    int added = -1;
+    setSelection ({});
+    engine.editSong ([patterns, &added] (Song& s) { pltracks::mergePatternClips (s, patterns, &added); });
+    sortClips();
+}
+
+void PlaylistComponent::makeSelectionUnique()
+{
+    if (selection.empty())
+        return;
+    auto run = [this, chosen = selection] {
+        engine.editSong ([chosen] (Song& s) {
+            std::vector<int> patterns, audio;
+            for (const auto i : chosen)
+                if (i >= 0 && i < (int) s.playlist.size())
+                {
+                    const auto kind = s.playlist[(std::size_t) i].kind;
+                    (kind == ClipKind::audio ? audio : patterns).push_back (i);
+                }
+            polish::makeClipsUnique (s, patterns);
+            // each audio source of the selection gets its own channel copy
+            std::vector<int> channels;
+            for (const auto i : audio)
+                if (const auto ch = s.playlist[(std::size_t) i].channel; std::find (channels.begin(), channels.end(), ch) == channels.end())
+                    channels.push_back (ch);
+            for (const auto ch : channels)
+            {
+                std::vector<int> group;
+                for (const auto i : audio)
+                    if (s.playlist[(std::size_t) i].channel == ch)
+                        group.push_back (i);
+                clipops::makeAudioUnique (s, group);
+            }
+        });
+    };
+    // FL (FUN_0123d640): asks from 20 selected clips on
+    if (selection.size() >= 20)
+    {
+        juce::Component::SafePointer<PlaylistComponent> safe (this);
+        juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, tr ("Make all selected clips unique?"),
+                                            tr ("Are you sure you want to make all {0} selected clips unique?", { juce::String ((int) selection.size()) }),
+                                            tr ("Yes"), tr ("No"), nullptr,
+                                            juce::ModalCallbackFunction::create ([safe, run] (int r) { if (r != 0 && safe != nullptr) run(); }));
+        return;
+    }
+    run();
+}
+
+void PlaylistComponent::lockAllTracks (bool lock)
+{
+    // FL (FUN_011c2190): "Resize tracks?|Also resize all playlist tracks to their minimum / default size?" Yes / No / Cancel
+    juce::Component::SafePointer<PlaylistComponent> safe (this);
+    juce::AlertWindow::showYesNoCancelBox (juce::MessageBoxIconType::QuestionIcon, tr ("Resize tracks?"),
+                                           lock ? tr ("Also resize all playlist tracks to their minimum size?")
+                                                : tr ("Also resize all playlist tracks to their default size?"),
+                                           tr ("Yes"), tr ("No"), tr ("Cancel"), nullptr,
+                                           juce::ModalCallbackFunction::create ([safe, lock] (int result) {
+                                               if (result == 0 || safe == nullptr) // 1 = yes, 2 = no, 0 = cancel
+                                                   return;
+                                               const auto count = safe->numTracks();
+                                               safe->engine.editSong ([count, lock, resize = result == 1] (Song& s) { pltracks::lockAll (s, count, lock, resize); });
+                                               safe->refreshTrackLayout();
+                                               safe->updateScrollBars();
+                                               safe->repaint();
+                                           }));
+}
+
+void PlaylistComponent::resetEmptyTracksAsked()
+{
+    juce::Component::SafePointer<PlaylistComponent> safe (this);
+    juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, tr ("Reset empty tracks?"),
+                                        tr ("Reset all empty playlist tracks in the current arrangement?"), tr ("OK"), tr ("Cancel"), nullptr,
+                                        juce::ModalCallbackFunction::create ([safe] (int result) {
+                                            if (result == 0 || safe == nullptr)
+                                                return;
+                                            safe->engine.editSong ([] (Song& s) { pltracks::resetEmptyTracks (s); });
+                                            safe->refreshTrackLayout();
+                                            safe->repaint();
+                                        }));
+}
+
+void PlaylistComponent::setStretchOnResize (bool on)
+{
+    EditorGlobals::get().stretchOnResize = on;
+    stretchButton.setToggleState (on, juce::dontSendNotification);
+    ui::postHint ({ tr ("Stretch audio when resizing audio clips"), on ? tr ("On") : tr ("Off"), false, false });
+    repaint();
 }
 
 std::int64_t PlaylistComponent::songPositionTick() const
@@ -4844,13 +5115,13 @@ bool PlaylistComponent::handleKey (const juce::KeyPress& key)
         return true;
     }
 
-    if (cmd && letter == 'V')
+    if (cmd && ! mods.isShiftDown() && letter == 'V') // (Ctrl+Shift+V: playlist.makeUnique)
     {
         pasteClips();
         return true;
     }
 
-    if (cmd && letter == 'B')
+    if (cmd && ! mods.isShiftDown() && letter == 'B') // (Ctrl+Shift+B: playlist.cloneTracks)
     {
         duplicateSelection();
         return true;

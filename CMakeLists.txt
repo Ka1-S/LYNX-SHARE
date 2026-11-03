@@ -52,6 +52,9 @@ add_library(lynx_core STATIC
     src/core/MissingFiles.cpp
     src/core/PluginCatalog.cpp
     src/core/ProjectSafety.cpp
+    src/core/SessionIds.cpp
+    src/core/SessionParts.cpp
+    src/core/StandIns.cpp
     src/core/PluginSubstitutes.cpp
     src/core/Preferences.cpp
     src/core/MidiSync.cpp
@@ -197,6 +200,7 @@ target_sources(lynx_core PRIVATE
     src/core/Sfz.cpp
     src/core/Workspace.cpp
     src/core/RackOps.cpp
+    src/core/PlaylistTrackOps.cpp
     src/core/ChannelMiscFx.cpp
     src/core/MidiImport.cpp
     src/core/StartupSound.cpp
@@ -349,6 +353,8 @@ if(LYNX_BUILD_APP)
     src/engine/Mp3Format.cpp
         src/engine/ProjectFile.cpp
         src/engine/ProjectPackage.cpp
+        src/engine/SessionPack.cpp
+        src/ui/SessionDialogs.cpp
         src/engine/PluginHost.cpp
         src/engine/FlStudio.cpp
         src/engine/PluginSandbox.cpp

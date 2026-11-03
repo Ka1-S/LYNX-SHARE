@@ -197,8 +197,14 @@ bool Song::insertInUse (int t) const
 
 int Song::nextFreeInsert() const
 {
+    // Online Sessions (round 168a): a guest's new channels take the inserts reserved for him first, and nobody's new
+    // channel takes an insert reserved for another participant
+    if (const auto* me = session.self(); me != nullptr && me->insertCount > 0)
+        for (int t = me->insertFirst; t < me->insertFirst + me->insertCount && t < (int) mixer.size(); ++t)
+            if (t > 0 && ! insertInUse (t))
+                return t;
     for (int t = 1; t < (int) mixer.size(); ++t)
-        if (! insertInUse (t))
+        if (! insertInUse (t) && ! session.reservedForOther (true, t))
             return t;
 
     return 0; // every insert is in use: Master (FL's default for a new channel)
@@ -206,13 +212,28 @@ int Song::nextFreeInsert() const
 
 int Song::claimFreeInsert()
 {
+    // a guest's reserved range may lie past the mixer's end: it grows to reach it
+    if (const auto* me = session.self(); me != nullptr && me->insertCount > 0 && ! mixer.empty())
+        for (int t = std::max (1, me->insertFirst); t < me->insertFirst + me->insertCount && t < maxMixerTracks; ++t)
+        {
+            while ((int) mixer.size() <= t)
+                mixer.emplace_back().name = "Insert " + std::to_string (mixer.size());
+            if (! insertInUse (t))
+                return t;
+        }
     if (const auto t = nextFreeInsert(); t > 0)
         return t;
     if (mixer.empty() || (int) mixer.size() >= maxMixerTracks)
         return 0;
-    const auto name = "Insert " + std::to_string (mixer.size());
-    mixer.emplace_back().name = name;
-    return (int) mixer.size() - 1;
+    // a new insert past the end, skipping other participants' reserved ones (they are added as plain inserts)
+    while ((int) mixer.size() < maxMixerTracks)
+    {
+        const auto name = "Insert " + std::to_string (mixer.size());
+        mixer.emplace_back().name = name;
+        if (! session.reservedForOther (true, (int) mixer.size() - 1))
+            return (int) mixer.size() - 1;
+    }
+    return 0;
 }
 
 void Song::removeChannel (int index)

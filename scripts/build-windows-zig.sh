@@ -154,7 +154,7 @@ APP_SOURCES=(src/Main.cpp
              src/platform/MingwFixes.cpp)
 
 # workflow shell: core (key map, workspace layout, rack operations) and UI (workspace desktop, control contract)
-APP_SOURCES+=(src/core/KeyMap.cpp src/core/PresetCycle.cpp src/core/Sfz.cpp src/core/Workspace.cpp src/core/RackOps.cpp src/core/ChannelMiscFx.cpp src/core/MidiImport.cpp src/ui/Workspace.cpp src/ui/ValueControl.cpp src/ui/Dialogs.cpp)
+APP_SOURCES+=(src/core/KeyMap.cpp src/core/PresetCycle.cpp src/core/Sfz.cpp src/core/Workspace.cpp src/core/RackOps.cpp src/core/PlaylistTrackOps.cpp src/core/ChannelMiscFx.cpp src/core/MidiImport.cpp src/ui/Workspace.cpp src/ui/ValueControl.cpp src/ui/Dialogs.cpp)
 # Wave Traveller (round 167f)
 APP_SOURCES+=(src/core/WaveTraveller.cpp src/ui/WaveTravellerEditor.cpp)
 # Windows file association (.lynx) and its icon
@@ -175,6 +175,8 @@ APP_SOURCES+=(src/core/ThreeOsc.cpp)
 APP_SOURCES+=(src/core/FlPluginDb.cpp src/engine/FlStudio.cpp src/ui/SetupWizard.cpp)
 APP_SOURCES+=(src/core/PluginCatalog.cpp src/ui/PluginPicker.cpp)
 APP_SOURCES+=(src/core/MissingFiles.cpp src/core/ProjectSafety.cpp src/ui/MissingFilesDialog.cpp src/ui/SettingsDialog.cpp)
+# Online Sessions P1: stable ids, parts, stand-ins, packages and their dialogs (round 168a)
+APP_SOURCES+=(src/core/SessionIds.cpp src/core/SessionParts.cpp src/core/StandIns.cpp src/engine/SessionPack.cpp src/ui/SessionDialogs.cpp)
 # LYNX substitutes for missing third-party plugins (round 98)
 APP_SOURCES+=(src/core/PluginSubstitutes.cpp)
 # settings pages (General/Audio/MIDI), plugin manager, shortcut manager (round 82)
