@@ -568,7 +568,7 @@ Layout lovePhilterLayout()
         v.push_back (label (176, 42.0f + 56.0f * (float) r, 40, 14, rows[r], dim | alignLeft));
     for (int u = 0; u < 8; ++u)
     {
-        const auto cx = 246.0f + 58.0f * (float) u;
+        const auto cx = 240.0f + 56.0f * (float) u;
         v.push_back (label (cx - 24.0f, 22, 48, 14, numbers[u]));
         for (int r = 0; r < 5; ++r)
             v.push_back (knob (cx, 56.0f + 56.0f * (float) r, 30, names[u][r], nullptr, 0, noCaption | (r == 3 ? bipolar : 0)));
