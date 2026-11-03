@@ -22,7 +22,8 @@ constexpr const char* sensitivityProperty = "lynxDragPixels";
 
 juce::String number (double v, int decimals)
 {
-    auto s = juce::String (v, decimals);
+    // juce::String (v, 0) prints every digit ("96.1953%" on the channel's VOL knob): 0 decimals = a whole number
+    auto s = decimals <= 0 ? juce::String (juce::roundToInt (v)) : juce::String (v, decimals);
     if (s.containsChar ('.'))
         s = s.trimCharactersAtEnd ("0").trimCharactersAtEnd (".");
     return s == "-0" ? juce::String ("0") : s;

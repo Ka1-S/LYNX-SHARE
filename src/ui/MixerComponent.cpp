@@ -370,8 +370,10 @@ MixerStrips::Rows MixerStrips::rows() const noexcept
     }
     if (sp.verticalName && sp.nameLow)
     {
-        r.nameTop = bottom - r.nameHeight;
-        bottom = r.nameTop - 4;
+        // the alt layouts: the name runs up from the strip's bottom; the dB read-out stays under the fader, above the
+        // name (rel 0.1.23: the read-out was drawn over the name's top)
+        r.nameTop = bottom + r.readoutHeight - r.nameHeight;
+        bottom = r.nameTop - 4 - r.readoutHeight;
     }
     r.faderBottom = juce::jmax (r.faderTop + 40, bottom);
     return r;
