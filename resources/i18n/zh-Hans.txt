@@ -7004,3 +7004,4 @@ countries: cn sg
 "{0} files arriving" = "{0} 个文件正在传入"
 "Live session with {0}" = "与{0}的实时会话"
 "Undo left alone what someone else changed since: {0}" = "撤销未改动其他人此后修改的内容：{0}"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "播放 / 暂停样式  [RMB] 停止并回到开始播放的位置 (再按一次: 回到样式开头)"

@@ -7004,3 +7004,4 @@ countries: tr
 "{0} files arriving" = "{0} dosya geliyor"
 "Live session with {0}" = "{0} ile canlı oturum"
 "Undo left alone what someone else changed since: {0}" = "Geri al, o zamandan beri başka birinin değiştirdiğine dokunmadı: {0}"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Pattern'i çal / duraklat  [RMB] durdur ve çalmanın başladığı yere dön (tekrar: pattern'in başına)"

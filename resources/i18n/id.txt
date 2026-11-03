@@ -7004,3 +7004,4 @@ countries: id
 "{0} files arriving" = "{0} file sedang tiba"
 "Live session with {0}" = "Sesi live dengan {0}"
 "Undo left alone what someone else changed since: {0}" = "Urungkan tidak menyentuh yang diubah orang lain sejak itu: {0}"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Putar / jeda pattern  [RMB] hentikan dan kembali ke tempat pemutaran dimulai (lagi: ke awal pattern)"

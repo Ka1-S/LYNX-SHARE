@@ -7004,3 +7004,4 @@ countries: it ch sm
 "{0} files arriving" = "{0} file in arrivo"
 "Live session with {0}" = "Sessione live con {0}"
 "Undo left alone what someone else changed since: {0}" = "Annulla non ha toccato ciò che un'altra persona ha modificato nel frattempo: {0}"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Riproduci / metti in pausa il pattern  [RMB] ferma e torna dove è iniziata la riproduzione (di nuovo: all'inizio del pattern)"

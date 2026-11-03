@@ -7004,3 +7004,4 @@ countries: es mx ar co cl pe ve
 "{0} files arriving" = "Recibiendo {0} archivos"
 "Live session with {0}" = "Sesión en vivo con {0}"
 "Undo left alone what someone else changed since: {0}" = "Deshacer no tocó lo que otra persona cambió desde entonces: {0}"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Reproducir / pausar el patrón  [RMB] detener y volver a donde empezó la reproducción (otra vez: al inicio del patrón)"

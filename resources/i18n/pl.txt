@@ -7004,3 +7004,4 @@ countries: pl
 "{0} files arriving" = "Przychodzące pliki: {0}"
 "Live session with {0}" = "Sesja na żywo z: {0}"
 "Undo left alone what someone else changed since: {0}" = "Cofanie nie ruszyło tego, co ktoś inny zmienił od tamtej pory: {0}"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Odtwórz / wstrzymaj pattern  [RMB] zatrzymaj i wróć tam, gdzie zaczęło się odtwarzanie (ponownie: na początek patternu)"
