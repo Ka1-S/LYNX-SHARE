@@ -6931,3 +6931,5 @@ countries: de at ch li lu
 "Good" = "Gut"
 "Gear" = "Zahnrad"
 "Lock" = "Schloss"
+"Mute the selected clips (all when none is selected)" = "Ausgewählte Clips stummschalten (alle, wenn keiner ausgewählt ist)"
+"Unmute the selected clips (all when none is selected)" = "Stummschaltung der ausgewählten Clips aufheben (alle, wenn keiner ausgewählt ist)"

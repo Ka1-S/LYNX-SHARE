@@ -6931,3 +6931,5 @@ countries: it ch sm
 "Good" = "Buono"
 "Gear" = "Ingranaggio"
 "Lock" = "Lucchetto"
+"Mute the selected clips (all when none is selected)" = "Silenzia le clip selezionate (tutte se nessuna è selezionata)"
+"Unmute the selected clips (all when none is selected)" = "Riattiva le clip selezionate (tutte se nessuna è selezionata)"

@@ -268,6 +268,9 @@ std::vector<Action> makeActions()
         { "playlist.mergePatternClips", TR_NOOP ("Merge pattern clips"), Context::playlist, { chord ('G', ctrl) } },
         { "playlist.cloneTracks", TR_NOOP ("Clone selected playlist track(s)"), Context::playlist, { chord ('B', ctrl | shift) } },
         { "playlist.makeUnique", TR_NOOP ("Make the selected clips unique"), Context::playlist, { chord ('V', ctrl | shift) } },
+        // FL's Alt+M / Shift+Alt+M (EEMuteAction / EEUnmuteAction, issue #53): the selected clips, or all of them
+        { "playlist.muteClips", TR_NOOP ("Mute the selected clips (all when none is selected)"), Context::playlist, { chord ('M', alt) } },
+        { "playlist.unmuteClips", TR_NOOP ("Unmute the selected clips (all when none is selected)"), Context::playlist, { chord ('M', shift | alt) } },
         { "playlist.stretchMode", TR_NOOP ("Stretch audio when resizing audio clips on/off"), Context::playlist, { chord ('M', shift) } },
         { "playlist.createVariants", TR_NOOP ("Create variants when stretching audio clips on/off"), Context::playlist, {} },
         { "playlist.lockAllToContent", TR_NOOP ("Lock all playlist tracks to content"), Context::playlist, {} },

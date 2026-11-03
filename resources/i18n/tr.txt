@@ -6931,3 +6931,5 @@ countries: tr
 "Good" = "İyi"
 "Gear" = "Dişli"
 "Lock" = "Kilit"
+"Mute the selected clips (all when none is selected)" = "Seçili klipleri sessize al (hiçbiri seçili değilse hepsini)"
+"Unmute the selected clips (all when none is selected)" = "Seçili kliplerin sesini aç (hiçbiri seçili değilse hepsinin)"

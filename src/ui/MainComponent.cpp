@@ -2123,6 +2123,8 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "playlist.quantizeStarts", tr ("Quantize the clips' starts"));
             action (menu, "playlist.quantizeHalf", tr ("Quantize the clips' starts 50% (halfway to the grid)"));
             // round 168f: FL's Playlist Edit / Tools items ([DFM] EEMenu)
+            action (menu, "playlist.muteClips", tr ("Mute"));     // FL's Alt+M / Shift+Alt+M (issue #53)
+            action (menu, "playlist.unmuteClips", tr ("Unmute"));
             action (menu, "playlist.makeUnique", tr ("Make unique"));
             action (menu, "playlist.mergePatternClips", tr ("Merge pattern clips"));
             action (menu, "playlist.purgeUnusedAudio", tr ("Purge unused audio clips"));

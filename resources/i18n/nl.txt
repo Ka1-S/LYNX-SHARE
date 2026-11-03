@@ -6931,3 +6931,5 @@ countries: nl be
 "Good" = "Goed"
 "Gear" = "Tandwiel"
 "Lock" = "Slot"
+"Mute the selected clips (all when none is selected)" = "Geselecteerde clips dempen (alle als er geen geselecteerd is)"
+"Unmute the selected clips (all when none is selected)" = "Demping van geselecteerde clips opheffen (alle als er geen geselecteerd is)"

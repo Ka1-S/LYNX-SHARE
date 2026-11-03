@@ -6931,3 +6931,5 @@ countries: es mx ar co cl pe ve
 "Good" = "Bueno"
 "Gear" = "Engranaje"
 "Lock" = "Candado"
+"Mute the selected clips (all when none is selected)" = "Silenciar los clips seleccionados (todos si no hay ninguno seleccionado)"
+"Unmute the selected clips (all when none is selected)" = "Quitar el silencio de los clips seleccionados (todos si no hay ninguno seleccionado)"

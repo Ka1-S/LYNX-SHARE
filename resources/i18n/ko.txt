@@ -6931,3 +6931,5 @@ countries: kr
 "Good" = "좋음"
 "Gear" = "톱니바퀴"
 "Lock" = "자물쇠"
+"Mute the selected clips (all when none is selected)" = "선택한 클립 음소거 (선택이 없으면 모두)"
+"Unmute the selected clips (all when none is selected)" = "선택한 클립 음소거 해제 (선택이 없으면 모두)"

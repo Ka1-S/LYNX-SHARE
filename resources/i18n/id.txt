@@ -6931,3 +6931,5 @@ countries: id
 "Good" = "Bagus"
 "Gear" = "Roda gigi"
 "Lock" = "Gembok"
+"Mute the selected clips (all when none is selected)" = "Bisukan klip terpilih (semua jika tidak ada yang dipilih)"
+"Unmute the selected clips (all when none is selected)" = "Batalkan bisu klip terpilih (semua jika tidak ada yang dipilih)"

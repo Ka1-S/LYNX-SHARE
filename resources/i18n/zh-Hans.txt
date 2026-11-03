@@ -6931,3 +6931,5 @@ countries: cn sg
 "Good" = "好"
 "Gear" = "齿轮"
 "Lock" = "锁"
+"Mute the selected clips (all when none is selected)" = "静音选中的剪辑 (未选中时为全部)"
+"Unmute the selected clips (all when none is selected)" = "取消静音选中的剪辑 (未选中时为全部)"

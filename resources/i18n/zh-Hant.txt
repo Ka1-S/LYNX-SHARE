@@ -6931,3 +6931,5 @@ countries: tw hk mo
 "Good" = "好"
 "Gear" = "齒輪"
 "Lock" = "鎖"
+"Mute the selected clips (all when none is selected)" = "將選取的片段靜音 (未選取時為全部)"
+"Unmute the selected clips (all when none is selected)" = "取消選取片段的靜音 (未選取時為全部)"

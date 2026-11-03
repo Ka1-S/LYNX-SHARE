@@ -6931,3 +6931,5 @@ countries: pl
 "Good" = "Dobre"
 "Gear" = "Zębatka"
 "Lock" = "Kłódka"
+"Mute the selected clips (all when none is selected)" = "Wycisz zaznaczone klipy (wszystkie, gdy nic nie jest zaznaczone)"
+"Unmute the selected clips (all when none is selected)" = "Wyłącz wyciszenie zaznaczonych klipów (wszystkich, gdy nic nie jest zaznaczone)"

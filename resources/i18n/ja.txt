@@ -6931,3 +6931,5 @@ countries: jp
 "Good" = "良い"
 "Gear" = "歯車"
 "Lock" = "ロック"
+"Mute the selected clips (all when none is selected)" = "選択したクリップをミュート (未選択ならすべて)"
+"Unmute the selected clips (all when none is selected)" = "選択したクリップのミュートを解除 (未選択ならすべて)"

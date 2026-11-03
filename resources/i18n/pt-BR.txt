@@ -7087,3 +7087,5 @@ countries: br
 "Good" = "Bom"
 "Gear" = "Engrenagem"
 "Lock" = "Cadeado"
+"Mute the selected clips (all when none is selected)" = "Silenciar os clipes selecionados (todos quando nenhum estiver selecionado)"
+"Unmute the selected clips (all when none is selected)" = "Tirar do mudo os clipes selecionados (todos quando nenhum estiver selecionado)"

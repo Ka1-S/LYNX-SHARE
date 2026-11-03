@@ -6931,3 +6931,5 @@ countries: ru by kz
 "Good" = "Хорошо"
 "Gear" = "Шестерёнка"
 "Lock" = "Замок"
+"Mute the selected clips (all when none is selected)" = "Заглушить выбранные клипы (все, если ничего не выбрано)"
+"Unmute the selected clips (all when none is selected)" = "Включить звук выбранных клипов (всех, если ничего не выбрано)"

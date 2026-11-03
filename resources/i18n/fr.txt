@@ -6931,3 +6931,5 @@ countries: fr be ch ca lu
 "Good" = "Bien"
 "Gear" = "Engrenage"
 "Lock" = "Cadenas"
+"Mute the selected clips (all when none is selected)" = "Rendre muets les clips sélectionnés (tous si aucun n'est sélectionné)"
+"Unmute the selected clips (all when none is selected)" = "Réactiver le son des clips sélectionnés (tous si aucun n'est sélectionné)"
