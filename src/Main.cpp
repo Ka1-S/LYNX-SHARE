@@ -3314,7 +3314,8 @@ private:
 
     // LYNX.exe --claprestarttest "LYNX Test Restart.clap" report.txt (tools/testplugin/lynx_test_restart.c, PR #29): a
     // CLAP effect on the Master that asks for a restart every 8 blocks while an export renders on a thread of its own
-    // (the message thread is free to run the restarts, as with the Export window). The plugin counts deactivations that
+    // (the message thread is free to run the restarts, as with the Export window). The plugin aborts the process when
+    // start / stop_processing run off the audio thread (issue #46, as u-he Presswerk does) and counts deactivations that
     // landed inside its process() call (must be none), the restarts must happen, and the delay compensation must end on
     // the latency the plugin reports after its last restart.
     void runClapRestartTest (const juce::String& pluginPath, const juce::String& reportPath)
@@ -3400,7 +3401,7 @@ private:
                 run->engine.reset(); // destroys the plugin: it writes its counters
                 // one line per plugin instance (the engine may have made more than one): none may have been
                 // deactivated inside process(), and the one that rendered must have restarted
-                int overlapped = 0, inactive = 0, requests = 0, activations = 0, lines = 0;
+                int overlapped = 0, inactive = 0, requests = 0, activations = 0, lines = 0, wrongThread = 0, misordered = 0, unstopped = 0;
                 for (const auto& line : juce::StringArray::fromLines (counters.loadFileAsString()))
                 {
                     juce::StringPairArray values;
@@ -3413,13 +3414,20 @@ private:
                     report << "instance: " << line << "\n";
                     overlapped += values["overlapped"].getIntValue();
                     inactive += values["inactive_blocks"].getIntValue();
+                    // issue #46: activate / deactivate on the main thread, start / stop_processing on the audio thread
+                    // (the plugin aborts the process otherwise, as u-he's do), in order, every start stopped
+                    wrongThread += values["wrong_thread"].getIntValue();
+                    misordered += values["misordered"].getIntValue();
+                    unstopped += values["starts"].getIntValue() - values["stops"].getIntValue();
                     if (values["requests"].getIntValue() > requests)
                     {
                         requests = values["requests"].getIntValue();
                         activations = values["activations"].getIntValue();
                     }
                 }
+                report << "wrong_thread=" << wrongThread << "\nmisordered=" << misordered << "\nunstopped=" << unstopped << "\n";
                 const auto ok = lines > 0 && requests > 0 && activations > requests / 2 && overlapped == 0 && inactive == 0
+                                && wrongThread == 0 && misordered == 0 && unstopped == 0
                                 && pluginLatency > 0 && pdc == pluginLatency && lynx::pluginCrashCount() == 0;
                 if (! ok)
                 {

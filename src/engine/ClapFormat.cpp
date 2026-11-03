@@ -6,6 +6,7 @@
 #include <atomic>
 #include <map>
 #include <mutex>
+#include <thread>
 #include <unordered_map>
 
 #include <juce_gui_extra/juce_gui_extra.h>
@@ -311,12 +312,9 @@ public:
         fds.clear();
        #endif
 
-        if (active)
-        {
-            if (processing)
-                plugin->stop_processing (plugin);
+        // (stop_processing on an audio thread, never here: issue #46; a plugin stuck inside process is left alone)
+        if (active && holdProcessing())
             plugin->deactivate (plugin);
-        }
 
         if (plugin != nullptr)
             plugin->destroy (plugin);
@@ -331,48 +329,117 @@ public:
 
     void prepareToPlay (double sampleRate, int blockSize) override
     {
-        releaseResources();
+        if (! holdProcessing())
+            return; // (a process call never returned: the plugin crashed inside it, leave it alone)
 
-        if (! plugin->activate (plugin, sampleRate, 1, (uint32_t) juce::jmax (1, blockSize)))
-            return;
+        if (active)
+            plugin->deactivate (plugin);
+        active = false;
 
-        active = true;
-        maxBlock = juce::jmax (1, blockSize);
-        scratch.setSize (juce::jmax (2, outputChannels), maxBlock);
+        if (plugin->activate (plugin, sampleRate, 1, (uint32_t) juce::jmax (1, blockSize)))
+        {
+            active = true;
+            maxBlock = juce::jmax (1, blockSize);
+            scratch.setSize (juce::jmax (2, outputChannels), maxBlock);
 
-        if (latency != nullptr)
-            setLatencySamples ((int) latency->get (plugin));
+            if (latency != nullptr)
+                setLatencySamples ((int) latency->get (plugin));
+        }
+
+        releaseProcessing();
     }
 
     void releaseResources() override
     {
-        if (! active)
+        if (! active || ! holdProcessing())
             return;
 
-        if (processing)
-            plugin->stop_processing (plugin);
-
         plugin->deactivate (plugin);
-        processing = false;
         active = false;
+        releaseProcessing();
+    }
+
+    // CLAP's threading rules (issue #46: u-he plugins abort when they are broken): activate / deactivate on the main
+    // thread, start_processing / stop_processing on the audio thread, and never deactivate while processing. Main
+    // thread side: holds every block off (they output silence), has the audio thread call stop_processing at its next
+    // block when blocks are flowing, and waits for the block in progress to end. When no block comes (playback
+    // stopped, the export finished, the plugin is being deleted), the audio thread is idle: a short-lived thread then
+    // stands in for it (thread_check reports it as the audio thread while it calls stop_processing). Returns false,
+    // still holding the blocks off, when a block never ends (the plugin crashed inside process).
+    bool holdProcessing()
+    {
+        restartPending.store (true);
+        if (processing.load())
+        {
+            const auto now = juce::Time::getMillisecondCounter();
+            if (now - lastBlockMs.load() < 250) // blocks are flowing: the next one stops processing
+            {
+                stopRequest.store (true);
+                while (processing.load() && juce::Time::getMillisecondCounter() - now < 500)
+                    std::this_thread::yield();
+            }
+        }
+
+        const auto start = juce::Time::getMillisecondCounter();
+        while (gate.exchange (true))
+        {
+            if (juce::Time::getMillisecondCounter() - start > 2000)
+            {
+                stopRequest.store (false);
+                return false;
+            }
+            std::this_thread::yield();
+        }
+        stopRequest.store (false);
+
+        if (processing.load()) // no block came: stop it from a stand-in audio thread
+        {
+            const auto previous = audioThread.load();
+            std::thread standIn ([this] {
+                audioThread.store (std::this_thread::get_id());
+                plugin->stop_processing (plugin);
+            });
+            standIn.join();
+            audioThread.store (previous);
+            processing.store (false);
+        }
+        return true;
+    }
+
+    void releaseProcessing()
+    {
+        gate.store (false);
+        restartPending.store (false);
     }
 
     void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override
     {
         const auto n = buffer.getNumSamples();
-        audioThread.store (std::this_thread::get_id());
 
-        // the restart handshake (request_restart): no block starts while one is pending
-        inProcess.store (true);
+        // the restart handshake (request_restart, holdProcessing): no block starts while the main thread holds them off
+        if (gate.exchange (true))
+        {
+            buffer.clear();
+            return;
+        }
+        audioThread.store (std::this_thread::get_id());
+        lastBlockMs.store (juce::Time::getMillisecondCounter());
+
+        if (stopRequest.load() && processing.load())
+        {
+            plugin->stop_processing (plugin); // (on this, the audio thread: issue #46)
+            processing.store (false);
+        }
+
         if (restartPending.load() || ! active || n > maxBlock)
         {
             buffer.clear();
-            inProcess.store (false);
+            gate.store (false);
             return;
         }
 
-        if (! processing)
-            processing = plugin->start_processing (plugin);
+        if (! processing.load())
+            processing.store (plugin->start_processing (plugin));
 
         events.clear();
 
@@ -442,7 +509,7 @@ public:
 
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
             buffer.copyFrom (ch, 0, scratch, juce::jmin (ch, outputChannels - 1), 0, n);
-        inProcess.store (false);
+        gate.store (false);
     }
 
     double getTailLengthSeconds() const override { return 0.0; }
@@ -658,22 +725,11 @@ private:
             // restart on the UI thread with the same settings (new latency, ports...)
             auto* self = from (hh);
             self->onMainThread ([self] {
+                // the rack calls processBlock directly (no callback lock), so suspendProcessing alone would not
+                // stop it: prepareToPlay holds new blocks off, has the audio thread stop processing and waits for
+                // the block in progress before deactivating (holdProcessing)
                 if (self->active)
-                {
-                    // the rack calls processBlock directly (no callback lock), so suspendProcessing alone would not
-                    // stop it: hold new blocks off and wait for the one in progress before deactivating
-                    self->restartPending.store (true);
-                    const auto deadline = juce::Time::getMillisecondCounter() + 2000;
-                    while (self->inProcess.load() && juce::Time::getMillisecondCounter() < deadline)
-                        std::this_thread::yield();
-                    if (! self->inProcess.load()) // (still set: the plugin crashed inside process, leave it alone)
-                    {
-                        const auto rate = self->getSampleRate();
-                        const auto block = self->maxBlock;
-                        self->prepareToPlay (rate, block);
-                    }
-                    self->restartPending.store (false);
-                }
+                    self->prepareToPlay (self->getSampleRate(), self->maxBlock);
             });
         };
         h.request_process = [] (const clap_host_t*) {};
@@ -699,7 +755,7 @@ private:
     bool midiDialect = false;
     bool initialised = false;
 
-    bool active = false, processing = false;
+    bool active = false;
     int maxBlock = 0;
     int inputChannels = 0, outputChannels = 2;
     int64_t steadyTime = 0;
@@ -709,7 +765,10 @@ private:
     std::unordered_map<clap_id, ClapParameter*> byId;
     std::array<bool, 16 * 128> heldNotes {};
     std::atomic<std::thread::id> audioThread {};
-    std::atomic<bool> restartPending { false }, inProcess { false };
+    // gate: held by the block in progress, or by the main thread while it (de)activates (holdProcessing);
+    // processing: start_processing succeeded and stop_processing was not called yet
+    std::atomic<bool> restartPending { false }, gate { false }, stopRequest { false }, processing { false };
+    std::atomic<juce::uint32> lastBlockMs { 0 };
 
     clap_host_log_t hostLog { [] (const clap_host_t*, clap_log_severity, const char* msg) { juce::ignoreUnused (msg); DBG ("CLAP: " << msg); } };
     clap_host_thread_check_t hostThreadCheck {
