@@ -32,6 +32,7 @@
 #include "engine/ProjectFile.h"
 #include "core/Sha256.h"
 #include "engine/SessionPack.h"
+#include "engine/LiveTest.h"
 #include "core/SessionIds.h"
 #include "core/SessionParts.h"
 #include "engine/SampleLibrary.h"
@@ -429,6 +430,14 @@ public:
             const auto i = args.indexOf ("--uiperf");
             juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
             runUiPerf (juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()));
+            return;
+        }
+
+        if (args.contains ("--livetest"))
+        {
+            // LYNX --livetest report.txt [--relay URL]: a live session of four peers over the relay (round 169b)
+            setApplicationReturnValue (lynx::livetest::run (args));
+            quit();
             return;
         }
 
@@ -2364,8 +2373,12 @@ private:
         // Settings › Audio "Driver settings…" with a fake driver panel (issue #13's crash, the panel's buffer kept)
         const auto driverPanel = lynx::AudioEngine::driverPanelSelfTest();
 
+        // Online Sessions P2 (round 169b): live sessions without a network (the JSON round trip of every entity, replicas
+        // through it, the invite code's keys)
+        const auto liveResult = lynx::livetest::selfTest (&rich);
+
         const auto ok = audioOk && projectOk && richOk && hwOutOk && flp168jOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
-                        && sessionResult == "OK"
+                        && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk;
 
         juce::String report;
@@ -2385,6 +2398,7 @@ private:
                << "midi=" << (midiOk ? "OK" : "ERROR") << "\n"
                << "package=" << (packageOk ? "OK" : "ERROR") << "\n"
                << "online_session=" << sessionResult << "\n"
+               << "live_session=" << liveResult << "\n"
                << "wavpack=" << wavpack << "\n"
                << "effects=" << (effectsOk ? "OK" : "NONFINITE") << "\n"
                << "driver_panel=" << driverPanel << "\n"

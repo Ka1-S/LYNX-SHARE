@@ -4,8 +4,8 @@
 // end-to-end encryption of a live session.
 //
 // The invite code LYNX-ABCDE-FGHIJ-KLMN-OPQR-STUV-WXYZ is the relay room (10 characters the relay chose) and an 80-bit
-// secret the host's LYNX SHARE made (16 characters, never sent to any server). Argon2id (Monocypher) turns the whole
-// code into two values with different BLAKE2b domains: the session key (XChaCha20-Poly1305, every frame) and the relay
+// secret the host's LYNX SHARE made (16 characters, never sent to any server). Argon2id (Monocypher, fixed salt) turns the
+// secret into two values with different BLAKE2b domains: the session key (bound to the room too; XChaCha20-Poly1305, every frame) and the relay
 // room token (what the relay checks before it lets a peer into the room). The relay sees the token, never the key, and
 // cannot get one from the other. Every frame carries the sender's random id and a counter: a frame replayed by anyone
 // on the way is dropped.

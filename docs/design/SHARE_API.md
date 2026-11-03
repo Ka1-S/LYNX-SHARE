@@ -132,13 +132,17 @@ room). Today it only forwards/echoes; the session protocol on top is the app's (
 
 ### 3.1 Rooms
 
-`POST /v1/rooms` (no body) → `201`
+`POST /v1/rooms` (no body, or `{"token": "<43..128 characters A-Z a-z 0-9 _ ->"}`) → `201`
 
 ```json
 {"ok":true,"room":"2syq75e66t","token":"<room token>","hostToken":"<host token>","maxPeers":4,
  "expires":1793688858,"ws":"wss://relay.lynx-share.com/v1/rooms/2syq75e66t/ws","subprotocol":"lynx-relay.v1"}
 ```
 
+- **A token the host chose** (round 169b, how LYNX SHARE's live sessions use it): the body's `token` becomes the room
+  token and the answer's `token` is `""` (the relay never hands it back). LYNX derives it from the invite code's
+  secret (ONLINE_SESSIONS.md §6.4 as built), so every guest computes the same token from the code alone and the relay
+  never learns the secret or the session key. `400` for a body that is not a JSON object or a token of the wrong shape.
 - The **room token** goes to everyone the host invites (inside the encrypted invite / knock flow, never in clear on
   a public channel); the **host token** stays with the host and closes the room:
   `DELETE /v1/rooms/<room>` with `Authorization: Bearer <hostToken>` → `204` (every peer is disconnected, close code

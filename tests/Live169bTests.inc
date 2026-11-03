@@ -662,6 +662,11 @@ TEST (live169b_invite_code_and_encryption)
     otherInvite.secret[0] = otherInvite.secret[0] == 'a' ? 'b' : 'a';
     const auto other = derive (otherInvite);
     CHECK (other.key != keys.key && other.relayToken != keys.relayToken);
+    // the token depends on the secret only (the host creates the room with it); the key on the room too
+    auto otherRoom = invite;
+    otherRoom.room[0] = otherRoom.room[0] == 'a' ? 'b' : 'a';
+    const auto moved = derive (otherRoom);
+    CHECK (moved.relayToken == keys.relayToken && moved.key != keys.key);
     // the relay token tells nothing about the key (different domains of the same Argon2 result)
     CHECK (std::string (keys.key.begin(), keys.key.end()).find (keys.relayToken.substr (0, 8)) == std::string::npos);
 

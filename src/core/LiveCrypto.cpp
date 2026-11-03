@@ -101,14 +101,16 @@ std::optional<Invite> parseCode (const std::string& text)
 Keys derive (const Invite& invite)
 {
     Keys keys;
-    const auto salt = "lynx-live-v1:" + invite.room;
-    const auto pass = invite.room + ":" + invite.secret;
+    // The salt is fixed and the secret alone goes into Argon2, so the host knows the relay token before the relay has
+    // chosen the room (it creates the room with it); the room id goes into the session key's domain.
+    const std::string salt = "LYNX SHARE live session salt v1";
+    const auto pass = invite.secret;
     crypto_argon2_config config { CRYPTO_ARGON2_ID, 8192, 3, 1 }; // 8 MiB, 3 passes: ~50 ms once per join
     crypto_argon2_inputs inputs { (const std::uint8_t*) pass.data(), (const std::uint8_t*) salt.data(), (std::uint32_t) pass.size(), (std::uint32_t) salt.size() };
     std::vector<std::uint8_t> work ((std::size_t) config.nb_blocks * 1024);
     std::uint8_t master[32];
     crypto_argon2 (master, sizeof master, work.data(), config, inputs, crypto_argon2_no_extras);
-    const std::string keyDomain = "session key", tokenDomain = "relay room token";
+    const std::string keyDomain = "session key:" + invite.room, tokenDomain = "relay room token";
     crypto_blake2b_keyed (keys.key.data(), 32, master, 32, (const std::uint8_t*) keyDomain.data(), keyDomain.size());
     std::uint8_t token[32];
     crypto_blake2b_keyed (token, 32, master, 32, (const std::uint8_t*) tokenDomain.data(), tokenDomain.size());

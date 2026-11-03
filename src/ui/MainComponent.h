@@ -19,6 +19,7 @@
 #include "ui/MixerComponent.h"
 #include "ui/PlaylistComponent.h"
 #include "ui/SessionDialogs.h"
+#include "ui/LiveSessionUi.h"
 #include "ui/HintBar.h"
 #include "ui/Splash.h"
 #include "ui/Toolbar.h"
@@ -254,6 +255,8 @@ private:
     void revertToLastBackup();
     void exportPackage();
     sessionui::Context sessionContext(); // the File › Online session commands (round 168a)
+    liveui::Context liveContext();       // the live session's (round 169b)
+    void startLiveFromCommandLine();     // --live-host code.txt / --live-join CODE|@code.txt (scripted GUI checks)
     void collectSamples();
     void keepOverwrittenCopy (const juce::File& file); // the previous file of a save, kept in the backup folder
     void rotateBackups (const juce::String& stem);
@@ -468,6 +471,8 @@ private:
     juce::String importedSuffix; // " (imported from FL Studio)" in the title until saved as .lynx
     juce::String projectName; // suggested name for export (also from an imported .flp)
     HeldNotes heldKeys; // notes the typing piano is playing (tag: the key code)
+    // Online Sessions P2 (round 169b): the live session (last: it ends, and tells the others, before anything goes)
+    std::unique_ptr<LiveSessionManager> live;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };

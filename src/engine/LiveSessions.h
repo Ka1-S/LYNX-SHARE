@@ -10,11 +10,14 @@
 // end / resync. Sample paths travel as "lynx-media:<sha256>/<name>"; a received change may only point at this
 // session's media folder (sessionpack::confine), and media are only sent when the sender's own song uses them.
 
+#include <deque>
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <set>
+#include <thread>
 
 #include <juce_core/juce_core.h>
 #include <juce_events/juce_events.h>
@@ -88,8 +91,8 @@ public:
     std::function<void (const juce::String&)> onHint;          // a short message for the hint bar
     std::function<void (const juce::String& name, std::function<void (bool accept)> answer)> onKnock; // host: ask
     std::function<void (const juce::String& message)> onEnded; // the session is over (why, what is kept)
-    // A guest's project arrived (the caller makes it the open project: no file yet, unsaved).
-    std::function<void()> onJoined;
+    // A guest's project arrived: the caller makes it the open project (no file yet, unsaved; default: engine.setSong).
+    std::function<void (Song song)> onJoined;
 
     // tests / scripted runs: a message to every guest (as the host) is counted here
     struct Stats
@@ -98,6 +101,9 @@ public:
         juce::int64 bytesSent = 0, bytesReceived = 0;
     };
     Stats getStats() const noexcept { return stats; }
+    // Does what the timer does (network events, local edits, presence, media): command-line runs without a message
+    // loop call it themselves.
+    void pump();
     // the confirmed revision (host: the authority's)
     std::uint64_t revision() const;
 
@@ -157,9 +163,27 @@ private:
     std::map<juce::String, Hashed> hashCache;      // path -> its hash
     std::map<juce::String, Want> wanted;           // sha -> what is arriving
     std::map<juce::String, std::vector<int>> forward; // sha -> peers waiting for it (host: a guest's file not here yet)
-    juce::int64 lastPresenceMs = 0, lastPeopleMs = 0;
+    struct Upload
+    {
+        int peer = 0;
+        juce::String sha;
+        juce::File file;
+        int next = 0;
+    };
+    std::deque<Upload> uploads;
+    std::vector<Person> people;   // as of the last "people" (guests) / recomputed (host)
+    std::shared_ptr<bool> alive = std::make_shared<bool> (true);
+    bool keepFull = false, editEverything = false;
+    juce::int64 lastPresenceMs = 0, lastPeopleMs = 0, lastPollMs = 0;
     juce::String lastPresence, lastPeople;
     std::thread httpThread;
+    struct RoomAnswer
+    {
+        bool done = false;
+        juce::String room, hostToken, error;
+    };
+    std::mutex roomLock;
+    RoomAnswer roomAnswer;
     Stats stats;
 
     void timerCallback() override;
@@ -196,5 +220,12 @@ private:
     void finishMedia (const juce::String& sha);
     juce::String nameOf (std::uint32_t tag) const;
     void releaseHeld();
+    bool holding() const;
+    void onRoomCreated (const juce::String& room, const juce::String& hostToken);
+    void connect();
+    void request (const juce::String& sha, const juce::String& name, int fromPeer);
+    void pumpUploads();
+    void deny (int to, const juce::String& reason);
+    juce::String hostName() const;
 };
 } // namespace lynx
