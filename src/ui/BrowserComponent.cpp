@@ -16,7 +16,11 @@
 #include "core/Vfx.h"
 #include "platform/Paths.h"
 
+#include <cstring>
 #include <mutex>
+#if JUCE_MAC
+ #include <dirent.h>
+#endif
 #include "engine/PluginHost.h"
 #include "engine/Text.h"
 #include "ui/HintBar.h"
@@ -49,6 +53,30 @@ bool isListed (const juce::File& f)
 
 constexpr int maxResults = 500;
 
+juce::Array<juce::File> childrenOf (const juce::File& folder)
+{
+   #if JUCE_MAC
+    // JUCE's macOS iterator makes an NSURL of every entry to read its hidden flag, and a name NSString rejects
+    // throws an Objective-C exception that ends the app (issue #42). readdir has no such step; names that are
+    // not valid UTF-8 are skipped, the rest precomposed like JUCE does.
+    juce::Array<juce::File> children;
+    if (auto* dir = opendir (folder.getFullPathName().toRawUTF8()))
+    {
+        while (const auto* e = readdir (dir))
+        {
+            const auto len = (int) std::strlen (e->d_name);
+            if (std::strcmp (e->d_name, ".") != 0 && std::strcmp (e->d_name, "..") != 0
+                && juce::CharPointer_UTF8::isValidString (e->d_name, len))
+                children.add (folder.getChildFile (juce::String::fromUTF8 (e->d_name, len).convertToPrecomposedUnicode()));
+        }
+        closedir (dir);
+    }
+    return children;
+   #else
+    return folder.findChildFiles (juce::File::findFilesAndDirectories, false, "*");
+   #endif
+}
+
 search::FileSystem diskFileSystem()
 {
     search::FileSystem fs;
@@ -64,7 +92,7 @@ search::FileSystem diskFileSystem()
             return listing;
         listing.exists = true;
         listing.time = folder.getLastModificationTime().toMilliseconds();
-        auto children = folder.findChildFiles (juce::File::findFilesAndDirectories, false, "*");
+        auto children = childrenOf (folder);
         children.sort();
         for (const auto& c : children)
         {
