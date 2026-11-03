@@ -240,6 +240,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     typingPianoButton.setOnColour (theme::colour::bg6);
     typingPianoButton.setIconColourWhenOn (theme::colour::accent);
     typingPianoButton.onClick = [this] { toggleTypingPiano(); };
+    typingPianoButton.onRightClick = [this] { showTypingPianoMenu(); };
 
     // count-in and wait-for-input switches next to the metronome, as in FL's recording panel
     for (auto* b : { &countInButton, &waitInputButton })
@@ -1176,7 +1177,7 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     // 1. the typing piano (its keys win over plain-letter shortcuts while it is on)
     if (keys::KeyMap::playsNote (chord, typingPiano))
     {
-        const auto note = keys::typingPianoNote (chord.key);
+        const auto note = keys::typingPianoNote (chord.key, typingOctave, typingRoot);
 
         if (! heldKeys.hasTag (key.getKeyCode())) // key repeat: the note is already sounding
             for (auto c : engine.getSelectedChannels())
@@ -1576,6 +1577,10 @@ void MainComponent::loadUiSettings()
 
         if (key == "typingPiano")
             typingPiano = on;
+        else if (key == "typingOctave")
+            typingOctave = keys::typingpiano::clampOctave (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
+        else if (key == "typingRoot")
+            typingRoot = keys::typingpiano::clampRoot (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "keepEditorsOpen")
             ChannelRackComponent::keepEditorsOpen = on;
         else if (key == "selFirstChanPatChanges")
@@ -1714,7 +1719,8 @@ void MainComponent::saveUiSettings()
     if (! persistent)
         return;
 
-    uiSettingsFile().replaceWithText ("typingPiano=" + juce::String (typingPiano ? 1 : 0) + "\nkeepEditorsOpen="
+    uiSettingsFile().replaceWithText ("typingPiano=" + juce::String (typingPiano ? 1 : 0) + "\ntypingOctave=" + juce::String (typingOctave)
+                                      + "\ntypingRoot=" + juce::String (typingRoot) + "\nkeepEditorsOpen="
                                       + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
                                       + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
                                       + "\nalternateUndo=" + juce::String (alternateUndo ? 1 : 0)
@@ -2432,6 +2438,30 @@ void MainComponent::showMetronomeMenu()
             saveUiSettings();
         });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&metronomeButton));
+}
+
+void MainComponent::showTypingPianoMenu()
+{
+    // FL 2026's right-click on the typing keyboard button (KbToMIDIPopup, measured round 168t2): Root note C..B,
+    // Octave 2..6 (where the Z row starts), Options › Reset. FL's "Layout" list (FPC, Janko, Performance mode,
+    // Slicex, scales...) is not here yet: LYNX plays the Piano layout, FL's default.
+    static const char* const names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+    juce::PopupMenu menu;
+    menu.addSectionHeader (tr ("Root note"));
+    for (int r = 0; r < 12; ++r)
+        menu.addItem (names[r], true, typingRoot == r, [this, r] { typingRoot = r; saveUiSettings(); });
+    menu.addSectionHeader (tr ("Octave"));
+    for (int o = keys::typingpiano::minOctave; o <= keys::typingpiano::maxOctave; ++o)
+        menu.addItem (juce::String (o), true, typingOctave == o, [this, o] { typingOctave = o; saveUiSettings(); });
+    menu.addSectionHeader (tr ("Options"));
+    menu.addItem (tr ("Reset"), [this] {
+        typingOctave = keys::typingpiano::defaultOctave;
+        typingRoot = 0;
+        saveUiSettings();
+    });
+    menu.addSectionHeader (tr ("Layout"));
+    menu.addItem (tr ("Piano"), true, true, [] {});
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&typingPianoButton));
 }
 
 void MainComponent::dumpScoreLog (int minutes)

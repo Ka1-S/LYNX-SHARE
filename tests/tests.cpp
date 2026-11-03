@@ -6977,7 +6977,7 @@ TEST (workflow_key_map)
     CHECK (map.find ({ '1', none }, rack, false) == "rack.mute1" && map.find ({ '0', none }, rack, false) == "rack.mute10");
     CHECK (map.find ({ '1', none }, rack, true).empty()); // a plain digit is not a shortcut while the piano is on
     CHECK (map.find ({ '2', ctrl }, rack, true) == "rack.solo2");
-    CHECK (typingPianoNote ('Z') == 60 && typingPianoNote ('q') == 72 && typingPianoNote ('P') == 88 && typingPianoNote ('L') == -1);
+    CHECK (typingPianoNote ('Z') == 48 && typingPianoNote ('q') == 60 && typingPianoNote ('P') == 76 && typingPianoNote ('L') == -1);
     CHECK (map.conflicts().empty());
 
     // chord text
