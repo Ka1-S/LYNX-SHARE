@@ -1512,6 +1512,12 @@ public:
         tempo.store (bpm > 0.0 ? (float) bpm : 125.0f);
         if (channel.pluginState == state && channel.samplePath == dllPath)
             return;
+        // only plain parameters changed (a knob of the editor): the playing engine takes them, the notes go on
+        if (channel.samplePath == dllPath && liveChange (state, channel.pluginState))
+        {
+            state = channel.pluginState;
+            return;
+        }
         state = channel.pluginState;
         dllPath = channel.samplePath;
         auto s = std::make_unique<Setup>();
@@ -1536,6 +1542,14 @@ public:
         nextCents = cents;
     }
 
+    // automation of a parameter (round 168n): the clip's 0…1 over the parameter's range, as the editor's knob
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        if (const auto* p = findEngineParam (toxicParams(), index); p != nullptr && std::isfinite (value) && isLive (index))
+            applyLive (index, p->raw (value));
+    }
+
     void noteOn (int key, float velocity) noexcept override
     {
         take();
@@ -1547,6 +1561,7 @@ public:
         plugin->noteOn (k, initVol, channelVol, std::clamp ((double) nextPan + channelPan, -1.0, 1.0),
                         (double) knob + (double) nextCents);
         plugin->held[k].slide.anchor (live.ref (knob));
+        plugin->sliding = plugin->sliding || plugin->held[k].slide.moving(); // (a porta glide-in, round 168l)
         nextPan = 0.0f;
         nextCents = 0.0f;
     }
@@ -1565,6 +1580,7 @@ public:
             plugin->followPitch (live.now());
     }
 
+    bool followsChannelPorta() const noexcept override { return true; } // (round 168l: HostSlide::anchor)
     void slideTo (int key, float cents, float samples) noexcept override
     {
         take();
@@ -1612,17 +1628,53 @@ private:
     }
     void take() noexcept
     {
-        if (retired.load() != nullptr)
-            return;
-        if (auto* s = incoming.exchange (nullptr))
-        {
-            retired.store (setup);
-            setup = s;
-            applySetup();
-        }
+        if (retired.load() == nullptr)
+            if (auto* s = incoming.exchange (nullptr))
+            {
+                retired.store (setup);
+                setup = s;
+                applySetup();
+            }
+        liveParams.drain ([this] (int index, float x) { applyLive (index, x); });
+    }
+
+    // parameters a playing engine can take at once: everything but the waves (their tables are built off the audio
+    // thread), the effect types (they rebuild the slots' lines), the sequencer and the modulation slots
+    static bool isLive (int index) noexcept { return index >= 0 && index < 306 && index != 294 && (index < 157 || index >= 227); }
+
+    void applyLive (int index, float x) noexcept
+    {
+        plugin->eng.raw[(std::size_t) index] = x;
+        plugin->eng.setParam (index, x);
+    }
+
+    // queues the parameters that differ when nothing else did (same drawn waves, header, waves and effect types)
+    bool liveChange (const std::vector<std::uint8_t>& before, const std::vector<std::uint8_t>& after)
+    {
+        if (before.size() != after.size() || before.size() < paramsAt + 4 * paramCount || ! parseState (after))
+            return false;
+        if (std::memcmp (before.data(), after.data(), paramsAt) != 0
+            || std::memcmp (before.data() + paramsAt + 4 * paramCount, after.data() + paramsAt + 4 * paramCount, before.size() - paramsAt - 4 * paramCount) != 0)
+            return false;
+        std::vector<std::pair<int, float>> changed;
+        for (int i = 0; i < paramCount; ++i)
+            if (std::memcmp (before.data() + paramsAt + 4 * i, after.data() + paramsAt + 4 * i, 4) != 0)
+            {
+                if (! isLive (i))
+                    return false;
+                float x = 0.0f;
+                std::memcpy (&x, after.data() + paramsAt + 4 * i, 4);
+                changed.push_back ({ i, std::isfinite (x) ? x : 0.0f });
+            }
+        if (changed.size() > liveParams.space())
+            return false;
+        for (const auto& [i, x] : changed)
+            liveParams.push (i, x);
+        return true;
     }
 
     std::unique_ptr<Plugin> plugin;
+    LiveParamQueue liveParams;
     Setup* setup = nullptr;
     std::atomic<Setup*> incoming { nullptr }, retired { nullptr };
     std::array<std::shared_ptr<const WaveTable>, 8> warm {};
@@ -1667,6 +1719,108 @@ std::vector<std::uint8_t> toxicDefaultState()
 }
 
 std::unique_ptr<Instrument> makeToxicInstrument() { return std::make_unique<ToxicInstrument>(); }
+
+std::vector<float> toxicWaveShape (const std::vector<std::uint8_t>& state, const std::string& dllPath, int slot, int points)
+{
+    const auto p = parseState (state);
+    if (! p || slot < 0 || slot > 7 || points < 2)
+        return {};
+    const auto w = waveOf (*p, slot);
+    if (w < 0 || w > 32)
+        return {};
+    const Spectrum* spectrum = nullptr;
+    std::shared_ptr<const BuiltinSpectra> builtins;
+    if (w == 0)
+        spectrum = &p->drawn[(std::size_t) slot];
+    else
+    {
+        builtins = builtinSpectra (w == 1 ? std::string() : dllPath);
+        if (w > 1 && ! builtins->fromDll)
+            return {};
+        spectrum = &builtins->waves[(std::size_t) w];
+    }
+    std::vector<float> out ((std::size_t) points, 0.0f);
+    for (int h = 0; h < 128; ++h)
+    {
+        const auto a = spectrum->amp[(std::size_t) h];
+        if (a == 0.0f)
+            continue;
+        for (int n = 0; n < points; ++n)
+            out[(std::size_t) n] += a * (float) std::sin (6.283185307179586 * ((double) (h + 1) * n / points + spectrum->phase[(std::size_t) h]));
+    }
+    float peak = 0.0f;
+    for (auto v : out)
+        peak = std::max (peak, std::fabs (v));
+    if (peak > 0.0f)
+        for (auto& v : out)
+            v /= peak;
+    return out;
+}
+
+const std::vector<EngineParam>& toxicParams()
+{
+    static const std::vector<EngineParam> table = [] {
+        std::vector<EngineParam> t;
+        auto add = [&t] (int index, std::string name, float low = 0.0f, float high = 1.0f, bool stepped = false) {
+            t.push_back ({ index, std::move (name), low, high, stepped });
+        };
+        static const char* const head[] = { "Gain", "Distortion", "Transpose", "Attack", "Decay", "Sustain", "Release",
+                                            "Velocity curve", "Unison detune", "Unison pan", "Glide time", "Filter env to pitch",
+                                            "LFO 2 to pitch", "LFO 1 speed", "LFO 2 speed", "Cutoff", "Resonance", "Key tracking",
+                                            "Velocity tracking", "Filter attack", "Filter decay", "Filter sustain", "Filter release",
+                                            "Filter env amount", "Filter LFO 1 amount" };
+        for (int i = 0; i < 25; ++i)
+            add (i, head[i]);
+        // the six operators, one block of six per field (REA_rodada45 §2.2)
+        static const char* const fields[] = { "on", "coarse", "fine", "freq shift", "free run", "phase", "velocity", "init",
+                                              "attack", "decay", "sustain", "release", "pan", "mix" };
+        for (int f = 0; f < 14; ++f)
+            for (int o = 0; o < 6; ++o)
+                add (25 + 6 * f + o, "Osc " + std::to_string (o + 1) + " " + fields[f], 0.0f, 1.0f, f == 0 || f == 4);
+        for (int j = 0; j < 6; ++j) // "Oi Fm j": operator i modulates operator j (§3.6)
+            for (int i = 0; i < 6; ++i)
+                add (109 + 6 * j + i, "FM " + std::to_string (i + 1) + " to " + std::to_string (j + 1));
+        for (int l = 0; l < 2; ++l)
+            for (int o = 0; o < 6; ++o)
+                add (145 + 6 * l + o, "LFO " + std::to_string (l + 1) + " to osc " + std::to_string (o + 1));
+        add (227, "EQ on", 0.0f, 1.0f, true);
+        static const char* const bands[] = { "62", "125", "250", "500", "1k", "2k", "4k", "8k" };
+        for (int b = 0; b < 8; ++b)
+            add (228 + b, std::string ("EQ ") + bands[b]);
+        add (236, "FX 1 on", 0.0f, 1.0f, true);
+        add (237, "FX 2 on", 0.0f, 1.0f, true);
+        // the two effect slots' fields (even = slot 1, odd = slot 2; §5.1)
+        static const char* const slot[] = { "flanger delay", "flanger feedback", "flanger depth", "flanger rate", "flanger mix",
+                                            "flanger invert feedback", "flanger invert mix", "chorus depth", "chorus rate",
+                                            "chorus mix", "reverb mix", "reverb decay", "reverb damping", "reverb high cut",
+                                            "delay time", "delay feedback", "delay rate", "delay depth", "delay blur", "delay mix",
+                                            "lo-fi bits", "lo-fi rate", "lo-fi filter", "phaser frequency", "phaser rate",
+                                            "phaser depth", "phaser feedback", "phaser mix" };
+        for (int f = 0; f < 28; ++f)
+            for (int s = 0; s < 2; ++s)
+                add (238 + 2 * f + s, "FX " + std::to_string (s + 1) + " " + slot[f], 0.0f, 1.0f, f == 5 || f == 6);
+        add (295, "Bend range");
+        add (296, "LFO 1 sync", 0.0f, 9.0f, true);
+        add (297, "LFO 1 free", 0.0f, 1.0f, true);
+        add (298, "LFO 2 sync", 0.0f, 9.0f, true);
+        add (299, "LFO 2 free", 0.0f, 1.0f, true);
+        add (300, "Filter mode", 0.0f, 3.0f, true);
+        add (301, "Polyphony", 0.0f, 32.0f, true);
+        add (302, "Unison voices", 0.0f, 7.0f, true);
+        add (303, "Glide mode", 0.0f, 3.0f, true);
+        add (304, "FX 1 delay sync", 0.0f, 9.0f, true);
+        add (305, "FX 2 delay sync", 0.0f, 9.0f, true);
+        for (int o = 0; o < 6; ++o)
+            add (306 + o, "Osc " + std::to_string (o + 1) + " wave", 0.0f, 32.0f, true);
+        add (312, "LFO 1 wave", 0.0f, 32.0f, true);
+        add (313, "LFO 2 wave", 0.0f, 32.0f, true);
+        add (314, "FX 1 type", 0.0f, 5.0f, true);
+        add (315, "FX 2 type", 0.0f, 5.0f, true);
+        std::sort (t.begin(), t.end(), [] (const EngineParam& a, const EngineParam& b) { return a.index < b.index; });
+        return t;
+    }();
+    return table;
+}
 
 namespace toxic
 {

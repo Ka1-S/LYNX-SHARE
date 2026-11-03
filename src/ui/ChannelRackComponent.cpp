@@ -1,3 +1,5 @@
+#include "core/RackFilter.h"
+#include "ui/FlMods.h"
 #include "ui/EditorTools.h"
 #include "core/FruityDance.h"
 #include "core/VideoPlayer.h"
@@ -194,13 +196,12 @@ int ChannelRackComponent::shownSteps() const
 
 bool ChannelRackComponent::isShown (int row) const
 {
-    const auto& channels = engine.getSong().channels;
-    return filterGroup < 0 || row < 0 || row >= (int) channels.size() || channels[(std::size_t) row].group == filterGroup;
+    return rackfilter::shows (engine.getSong(), row, filterGroup);
 }
 
 int ChannelRackComponent::visibleIndex (int row) const
 {
-    if (filterGroup < 0)
+    if (filterGroup == rackfilter::all)
         return row;
 
     int index = 0;
@@ -216,8 +217,7 @@ int ChannelRackComponent::shownCount() const
 
 void ChannelRackComponent::setFilterGroup (int group)
 {
-    const auto groups = (int) engine.getSong().channelGroups.size();
-    group = group >= 0 && group < groups ? group : -1;
+    group = rackfilter::clamp (engine.getSong(), group);
 
     if (group == filterGroup)
         return;
@@ -233,6 +233,10 @@ void ChannelRackComponent::setFilterGroup (int group)
 juce::String ChannelRackComponent::filterName() const
 {
     const auto& groups = engine.getSong().channelGroups;
+    if (filterGroup == rackfilter::audioClips)
+        return tr ("Audio clips");
+    if (filterGroup == rackfilter::unsorted)
+        return tr ("Unsorted");
     return filterGroup >= 0 && filterGroup < (int) groups.size() ? juce::String::fromUTF8 (groups[(std::size_t) filterGroup].c_str()) : tr ("All");
 }
 
@@ -240,13 +244,20 @@ void ChannelRackComponent::showFilterMenu (juce::Component* target)
 {
     const auto& song = engine.getSong();
     juce::PopupMenu menu;
-    menu.addItem (tr ("All"), true, filterGroup < 0, [this] { setFilterGroup (-1); });
+    menu.addItem (tr ("All"), true, filterGroup == rackfilter::all, [this] { setFilterGroup (rackfilter::all); });
+    // FL's built-in views (round 168t, REA_rodada168t.md §3): the audio clip channels, and the channels in no group
+    menu.addItem (tr ("Unsorted"), true, filterGroup == rackfilter::unsorted, [this] { setFilterGroup (rackfilter::unsorted); });
+    menu.addItem (tr ("Audio clips"), true, filterGroup == rackfilter::audioClips, [this] { setFilterGroup (rackfilter::audioClips); });
 
-    if (! song.channelGroups.empty())
-        menu.addSeparator();
-
+    bool separated = false;
     for (int g = 0; g < (int) song.channelGroups.size(); ++g)
+    {
+        if (rackfilter::isBuiltinName (song.channelGroups[(std::size_t) g]))
+            continue; // FL's own "Audio clips" / "Unsorted" groups: the two views above
+        if (! std::exchange (separated, true))
+            menu.addSeparator();
         menu.addItem (juce::String::fromUTF8 (song.channelGroups[(std::size_t) g].c_str()), true, filterGroup == g, [this, g] { setFilterGroup (g); });
+    }
 
     menu.addSeparator();
     menu.addItem (tr ("Group selected...") + "\tAlt+G", [this] { groupSelected(); });
@@ -365,7 +376,7 @@ int ChannelRackComponent::rowAtY (int y) const
 
     const auto index = (y - 4) / rowHeight;
 
-    if (filterGroup < 0)
+    if (filterGroup == rackfilter::all)
         return index;
 
     // the index-th shown row (the "add channel" row after the last one)
@@ -1145,7 +1156,7 @@ void ChannelRackComponent::clickSelector (int row, const juce::ModifierKeys& mod
 
     if (mods.isShiftDown())
         selection.extendTo (row);
-    else if (mods.isCtrlDown() || mods.isPopupMenu())
+    else if (flmods::ctrl (mods) || flmods::popup (mods))
         selection.toggle (row);
     else
         selection.selectOnly (row);
@@ -1727,7 +1738,7 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
 
         case Area::loop: // the advanced looping control: drag sets the loop point in steps, right-click its menu
         {
-            if (e.mods.isPopupMenu())
+            if (flmods::popup (e.mods))
             {
                 showLoopPointMenu (row);
                 return;
@@ -1768,7 +1779,7 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
         }
 
         case Area::mute:
-            if (e.mods.isPopupMenu() || e.mods.isCtrlDown())
+            if (flmods::popup (e.mods) || flmods::ctrl (e.mods))
                 solo (row);
             else
                 toggleMute (row);
@@ -1780,7 +1791,7 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
         {
             const auto spec = specFor (area, row);
 
-            if (e.mods.isPopupMenu())
+            if (flmods::popup (e.mods))
             {
                 juce::PopupMenu menu;
                 menu.addSectionHeader (spec.name + ": " + spec.text (valueOf (area, row)));
@@ -1821,7 +1832,7 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
         }
 
         case Area::name:
-            if (e.mods.isPopupMenu())
+            if (flmods::popup (e.mods))
             {
                 if (! std::binary_search (engine.getSelectedChannels().begin(), engine.getSelectedChannels().end(), row))
                     clickSelector (row, {});
@@ -1844,7 +1855,7 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
                 selectRows ({ row }, row);
             }
 
-            if (e.mods.isCtrlDown()) // audition without opening anything
+            if (flmods::ctrl (e.mods)) // audition without opening anything
             {
                 previews.press (row, 60, 0.8f); // stops on release
                 return;
@@ -1860,13 +1871,13 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
         case Area::select:
             clickSelector (row, e.mods);
 
-            if (e.mods.isPopupMenu()) // right-drag adds the rows it crosses
+            if (flmods::popup (e.mods)) // right-drag adds the rows it crosses
             {
                 selectDownRow = row;
                 selectDragAdds = true;
                 selectDragBase = engine.getSelectedChannels();
             }
-            else if (! e.mods.isShiftDown() && ! e.mods.isCtrlDown()) // left-drag selects a range
+            else if (! e.mods.isShiftDown() && ! flmods::ctrl (e.mods)) // left-drag selects a range
             {
                 selectDownRow = row;
                 selectDragAdds = false;
@@ -1882,7 +1893,7 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
 
             if (showsNotePreview (pattern, row, pianoRollView)) // the miniature opens the Piano Roll (steps would break the melody)
             {
-                if (! e.mods.isPopupMenu())
+                if (! flmods::popup (e.mods))
                 {
                     selectionAnchor = row;
                     selectRows ({ row }, row);
@@ -2033,9 +2044,9 @@ void ChannelRackComponent::mouseDoubleClick (const juce::MouseEvent& e)
         else
             engine.editSong ([row] (Song& s) { s.channels[(std::size_t) row].mixerTrack = s.claimFreeInsert(); });
     }
-    else if (area == Area::loop && ! e.mods.isPopupMenu())
+    else if (area == Area::loop && ! flmods::popup (e.mods))
         setLoopPoint (row, ChannelLoop::nextBar);
-    else if (area == Area::select && ! e.mods.isPopupMenu())
+    else if (area == Area::select && ! flmods::popup (e.mods))
         selectAll();
     // a double-click on a channel's name is two clicks, as in FL: its window opens and closes again (FL 2026, checked
     // round 165q F7). It no longer opens the Piano Roll — the hint promised that, but FL's channel button does not.

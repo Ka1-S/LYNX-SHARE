@@ -36,6 +36,7 @@ struct NoteEvent
     float cents = 0.0f;        // note's fine pitch
     float slideSamples = 0.0f; // slide: glide duration
     bool porta = false;        // the note inverts the channel's porta
+    bool echo = false;         // a repeat of the channel's echo delay (FL's generated voices: not in the Mono list, round 168l)
     // audio clips: fades (in samples) and the position within the clip when the note starts
     float clipElapsed = 0.0f, clipRemaining = 0.0f, fadeIn = 0.0f, fadeOut = 0.0f;
     // bit 0: the fade-in is a crossfade (FL's S curve, clipops::crossfadeCurve), bit 1: the fade-out (round 166e);
@@ -121,6 +122,7 @@ struct ScheduleIndex
 {
     std::int64_t songLength = 0;
     std::vector<std::int64_t> maxNoteLength; // per pattern
+    std::vector<std::int64_t> patternLength; // per pattern: effectiveLength, the period of a long clip's repeats
     std::int64_t maxShift = 0;               // the largest channel time shift (FL's Misc › Shift), ticks
 };
 
@@ -138,8 +140,8 @@ std::int64_t maxChannelShift (const std::vector<ChannelDef>& channels) noexcept;
 ScheduleIndex makeScheduleIndex (const Song& song);
 
 // Generates the Playlist's events (playing the whole song in a loop). Each pattern clip
-// plays the pattern's notes that fall in [offset, offset + length); notes are cut at the
-// end of the clip. With Song::playTruncatedNotes, a note that started before the offset plays from the clip's start. Audio clips trigger the channel's sample at the start and stop at the end.
+// plays the pattern's notes that fall in [offset, offset + length), the pattern repeating along a clip longer than
+// it when stretchedClipsLoop() (LYNX extra, issue #25; off = FL: once); notes are cut at the end of the clip. With Song::playTruncatedNotes, a note that started before the offset plays from the clip's start. Audio clips trigger the channel's sample at the start and stop at the end.
 // `resume` = playback started or jumped to startTick: audio clips that were already
 // in progress at that point start in the middle, on the first sample of the block.
 void scheduleSong (const Song& song,

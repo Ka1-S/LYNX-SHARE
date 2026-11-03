@@ -7,6 +7,7 @@
 #include "core/MidiOut.h"
 #include "core/Scheduler.h"
 #include "core/ClipOps.h"
+#include "core/ChannelPoly.h"
 
 #include "core/DirectWave.h"
 #include "core/FlSynths.h"
@@ -926,6 +927,7 @@ public:
             }
     }
 
+    bool followsSlides() const noexcept override { return true; } // (round 168l: a Mono channel's notes)
     void slideTo (int key, float cents, float samples) noexcept override
     {
         const auto target = midiToHz (key) / sampleRate * std::pow (2.0, (cents + channelPitch.load (std::memory_order_relaxed)) / 1200.0);
@@ -1779,9 +1781,10 @@ public:
         target->kernel.setQuality (offlineRendering() ? flrs::renderQuality : quality);
 
         // portamento (channel porta, inverted by the note): starts from the previous note's pitch
-        if (! clipMode && (porta.load() != nextPorta) && lastRate != 0.0)
+        // (FL's glide: porta ticks + 1 ticks at 96 PPQ, none under 1 tick; round 168l, core/ChannelPoly.h)
+        if (! clipMode && (porta.load() != nextPorta) && lastRate != 0.0 && channelpoly::portaTicks (portaBeats.load()) >= 1)
         {
-            const auto steps = (int) (portaBeats.load() * 60.0 / bpm.load() * sampleRate);
+            const auto steps = (int) (channelpoly::glideBeats (portaBeats.load()) * 60.0 / bpm.load() * sampleRate);
             const auto from = std::abs (lastRate);
 
             if (steps >= 1 && from != 0.0)
@@ -2087,6 +2090,7 @@ public:
         return true;
     }
 
+    bool followsSlides() const noexcept override { return true; } // (round 168l: a Mono channel's notes)
     void slideTo (int key, float cents, float samples) noexcept override
     {
         if (clipMode)
