@@ -3426,12 +3426,13 @@ public:
         const auto caption = area.removeFromBottom (13.0f);
         if (digitBox)
         {
-            const auto box = area.reduced (2.0f, 4.0f).withSizeKeepingCentre (area.getWidth() - 4.0f, juce::jmin (26.0f, area.getHeight() - 6.0f));
-            const auto hot = isMouseOverOrDragging();
-            theme::fillRoundRect (g, box, theme::radius::sm, hot ? theme::colour::accentHover : theme::colour::accent);
-            g.setColour (theme::colour::onAccent);
-            g.setFont (theme::font (15.0f, true));
-            g.drawFittedText (spec.text (getter()), box.reduced (3.0f, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.6f);
+            // FL's digiwheel (c_f14): a display about 22 px high, the value right-aligned before up / down marks; here dark,
+            // red only while touched
+            const auto box = area.withSizeKeepingCentre (juce::jmin (area.getWidth() - 2.0f, 48.0f), juce::jmin (22.0f, area.getHeight() - 4.0f));
+            g.setColour (theme::drawDigitDisplay (g, box, isMouseOverOrDragging() || drag.isActive(), false, true));
+            g.setFont (theme::font (13.0f, true));
+            g.drawFittedText (spec.text (getter()), box.withTrimmedRight (theme::digitMarksWidth).reduced (3.0f, 0.0f).toNearestInt(),
+                              juce::Justification::centredRight, 1, 0.6f);
             g.setColour (theme::colour::textSecondary);
             g.setFont (theme::font (theme::type::caption));
             g.drawFittedText (theme::caps (label), caption.toNearestInt(), juce::Justification::centred, 1, 0.65f);

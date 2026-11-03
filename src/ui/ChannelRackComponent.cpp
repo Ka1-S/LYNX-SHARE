@@ -863,15 +863,8 @@ void ChannelRackComponent::paint (juce::Graphics& g)
 
             // small box with the mixer insert ("-" = straight to Master)
             const auto routeArea = controlBounds (Area::route, row).toFloat();
-            theme::fillRoundRect (g, routeArea, theme::radius::sm, hovered (Area::route) || (touched && knobDrag == Area::route) ? bg4 : bg0);
-
-            if (hovered (Area::route))
-            {
-                g.setColour (borderStrong);
-                g.drawRoundedRectangle (routeArea.reduced (0.5f), theme::radius::sm, 1.0f);
-            }
-
-            g.setColour (channel.mixerTrack > 0 ? textPrimary : textDisabled);
+            g.setColour (theme::drawDigitDisplay (g, routeArea, hovered (Area::route) || (touched && knobDrag == Area::route),
+                                                  channel.mixerTrack <= 0));
             g.setFont (theme::font (theme::type::caption, true));
             textcache::drawText (g, channel.mixerTrack > 0 ? juce::String (channel.mixerTrack) : juce::String ("-"), routeArea.toNearestInt(),
                         juce::Justification::centred);
