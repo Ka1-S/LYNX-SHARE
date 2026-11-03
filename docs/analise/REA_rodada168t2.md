@@ -44,5 +44,5 @@ Z starts at C4 = MIDI 48 at the default octave 4.
 
 ## Left
 
-- FL's other layouts (FPC, Janko, Performance mode, Slicex, the scale layouts) are not in LYNX.
+- FL's other layouts: done (discussion #43, `keys::typingPianoNotes`) except Performance mode, which launches Playlist clips. LYNX's Piano keeps its two rows: FL's Piano.scr also plays L ; , . / [ ] = (L is LYNX's whilePiano pattern/song key).
 - `L` (pattern/song) is marked `whilePiano` in LYNX; FL was not measured for it in this session.

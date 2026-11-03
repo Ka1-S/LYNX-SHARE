@@ -43,3 +43,37 @@ TEST (typing168t2_fl_octave_root_and_ctrl_t_in_playlist)
     CHECK (map.find ({ 'K', none }, Context::pianoRoll, true).empty());
     CHECK (KeyMap::playsNote ({ 'P', none }, true) && KeyMap::playsNote ({ 'R', none }, true));
 }
+
+// FL's typing keyboard layouts (discussion #43): the Layout list of the button's right-click menu, from FL 2026's
+// System/Config/Typing to piano/*.scr. Note names as FL's (C5 = 60).
+TEST (typing_fl_layouts_from_scr_files)
+{
+    using namespace lynx::keys;
+    namespace tp = typingpiano;
+    CHECK (tp::layoutCount() == 30); // FL's 31 files without Performance mode
+    CHECK (std::string (tp::layoutName (0)) == "Layout FPC (C4)" && std::string (tp::layoutName (tp::pianoLayout())) == "Layout Piano");
+    CHECK (tp::layoutIndex ("Major") >= 0 && tp::layoutIndex ("nope") == tp::pianoLayout() && std::string (tp::layoutName (99)).empty());
+
+    // Piano is LYNX's own two rows
+    const auto piano = tp::pianoLayout();
+    CHECK (typingPianoNotes ('Z', 4, 0, piano) == std::vector<int> { 48 } && typingPianoNotes ('K', 4, 0, piano).empty());
+
+    // Major.scr: Z row C4.., A row C5.., Q row C6.., number row C7..
+    const auto major = tp::layoutIndex ("Major");
+    CHECK (typingPianoNotes ('Z', 4, 0, major) == std::vector<int> { 48 } && typingPianoNotes ('/', 4, 0, major) == std::vector<int> { 64 });
+    CHECK (typingPianoNotes ('a', 4, 0, major) == std::vector<int> { 60 } && typingPianoNotes ('\'', 4, 0, major) == std::vector<int> { 77 });
+    CHECK (typingPianoNotes ('Q', 4, 0, major) == std::vector<int> { 72 } && typingPianoNotes ('1', 4, 0, major) == std::vector<int> { 84 });
+    CHECK (typingPianoNotes ('=', 4, 0, major) == std::vector<int> { 103 } && typingPianoNotes (' ', 4, 0, major).empty());
+    // moved by Octave and Root note like the Piano; notes past 127 are dropped
+    CHECK (typingPianoNotes ('Z', 5, 2, major) == std::vector<int> { 62 } && typingPianoNotes ('=', 6, 11, major).empty());
+
+    // a chord layout plays all the notes of the line; FREE / LOCK play none
+    CHECK (typingPianoNotes ('1', 4, 0, tp::layoutIndex ("Major + Chords")) == (std::vector<int> { 60, 64, 67 }));
+    CHECK (typingPianoNotes ('P', 4, 0, tp::layoutIndex ("Layout Slicex (C4)")).empty());
+    CHECK (typingPianoNotes ('1', 4, 0, tp::layoutIndex ("Layout Janko")) == std::vector<int> { 57 });
+
+    // every layout has a token for each of the 45 keys (the last one, '/', parses)
+    for (int l = 0; l < tp::layoutCount(); ++l)
+        if (l != piano)
+            CHECK (! typingPianoNotes ('/', 4, 0, l).empty() || ! typingPianoNotes ('.', 4, 0, l).empty() || std::string (tp::layoutName (l)).find ("Layout") == 0);
+}

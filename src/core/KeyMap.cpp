@@ -3,6 +3,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
+#include <cstring>
+#include <iterator>
 
 namespace lynx::keys
 {
@@ -510,6 +513,105 @@ int typingPianoNote (int key, int octave, int root) noexcept
             return inRange (base + 12 + i);
 
     return -1;
+}
+
+namespace
+{
+struct TypingLayout
+{
+    const char* name;
+    const char* notes; // MIDI notes of layoutKeys at octave 4, root C ("60,64,67" a chord, "-" none); nullptr = Piano
+};
+
+// The printable keys of FL's .scr files, in their line order (their Backspace, Tab, Enter, Caps, Shift and ISO '#'
+// lines are FREE in every file, so they are left out). FL's FREE and LOCK keys are both "-": no note.
+constexpr char layoutKeys[] = "1234567890-=QWERTYUIOP[]ASDFGHJKL;'ZXCVBNM,./";
+
+// Generated from FL 2026's System/Config/Typing to piano/*.scr (note names converted with C5 = 60).
+const TypingLayout typingLayouts[] = {
+        { "Layout FPC (C4)", "49 55 51 53 88 89 90 91 - - - - 48 47 45 43 84 85 86 87 - - - - 40 38 46 44 80 81 82 83 - - - 37 36 42 54 76 77 78 79 - -" },
+        { "Layout Janko", "57 59 61 63 65 67 69 71 73 75 77 79 58 60 62 64 66 68 70 72 74 76 78 80 59 61 63 65 67 69 71 73 75 77 79 60 62 64 66 68 70 72 74 76 78" },
+        { "Layout Piano", nullptr }, // LYNX's own two rows (typingPianoNote)
+        { "Layout Slicex (C4)", "84 85 86 87 88 89 90 91 - - - - 76 77 78 79 80 81 82 83 - - - - 68 69 70 71 72 73 74 75 - - - 60 61 62 63 64 65 66 67 - -" },
+        { "Major + Chords", "60,64,67 62,65,69 64,67,71 65,69,72 67,71,74 69,72,76 71,74,77 72,76,79 74,77,81 76,79,83 77,81,84 79,83,86 72 74 76 77 79 81 83 84 86 88 89 91 60 62 64 65 67 69 71 72 74 76 77 48 50 52 53 55 57 59 60 62 64" },
+        { "Major Bebop", "84 86 88 89 91 92 93 95 96 98 100 101 72 74 76 77 79 80 81 83 84 86 88 89 60 62 64 65 67 68 69 71 72 74 76 48 50 52 53 55 56 57 59 60 62" },
+        { "Major Chordmap", "64,67,72 65,69,74 64,67,71 65,69,72 62,67,71 64,69,72 62,65,71 64,67,72 65,69,74 64,67,71 65,69,72 62,67,71 60,64,67 62,65,69 59,64,67 60,65,69 59,62,67 60,64,69 59,62,65 60,64,67 62,65,69 59,64,67 60,65,69 59,62,67 55,60,64 57,62,65 55,59,64 57,60,65 55,59,62 57,60,64 53,59,62 55,60,64 57,62,65 55,59,64 57,60,65 36 38 40 41 43 45 47 48 50 52" },
+        { "Major Pentatonic", "84 86 88 91 93 96 98 100 103 105 108 110 72 74 76 79 81 84 86 88 91 93 96 98 60 62 64 67 69 72 74 76 79 81 84 48 50 52 55 57 60 62 64 67 69" },
+        { "Major", "84 86 88 89 91 93 95 96 98 100 101 103 72 74 76 77 79 81 83 84 86 88 89 91 60 62 64 65 67 69 71 72 74 76 77 48 50 52 53 55 57 59 60 62 64" },
+        { "Minor Harmonic", "84 86 87 89 91 92 95 96 98 99 101 103 72 74 75 77 79 80 83 84 86 87 89 91 60 62 63 65 67 68 71 72 74 75 77 48 50 51 53 55 56 59 60 62 63" },
+        { "Minor Hungarian", "84 86 87 90 91 92 95 96 98 99 102 103 72 74 75 78 79 80 83 84 86 87 90 91 60 62 63 66 67 68 71 72 74 75 78 48 50 51 54 55 56 59 60 62 63" },
+        { "Minor Melodic", "84 86 87 89 91 93 95 96 98 99 101 103 72 74 75 77 79 81 83 84 86 87 89 91 60 62 63 65 67 69 71 72 74 75 77 48 50 51 53 55 57 59 60 62 63" },
+        { "Minor Natural (Aeolian)", "84 86 87 89 91 92 94 96 98 99 101 103 72 74 75 77 79 80 82 84 86 87 89 91 60 62 63 65 67 68 70 72 74 75 77 48 50 51 53 55 56 58 60 62 63" },
+        { "Minor Natural + Chords", "60,63,67 62,65,68 63,67,70 65,68,72 67,70,74 68,72,75 70,74,77 72,75,79 74,77,80 75,79,82 77,80,84 79,82,86 72 74 75 77 79 80 82 84 86 87 89 91 60 62 63 65 67 68 70 72 74 75 77 48 50 51 53 55 56 58 60 62 63" },
+        { "Minor Natural Chordmap", "63,67,72 65,68,74 63,67,70 65,68,72 62,67,70 63,68,72 62,65,70 63,67,72 65,68,74 63,67,70 65,68,72 62,67,70 60,63,67 62,65,68 58,63,67 60,65,68 58,62,67 60,63,68 58,62,65 60,63,67 62,65,68 58,63,67 60,65,68 58,62,67 55,60,63 56,62,65 55,58,63 56,60,65 55,58,62 56,60,63 53,58,62 55,60,63 56,62,65 55,58,63 56,60,65 36 38 39 41 43 44 46 48 50 51" },
+        { "Minor Neopolitan", "84 85 87 89 91 92 95 96 97 99 101 103 72 73 75 77 79 80 83 84 85 87 89 91 60 61 63 65 67 68 71 72 73 75 77 48 49 51 53 55 56 59 60 61 63" },
+        { "Minor Pentatonic", "84 87 89 91 94 96 99 101 103 106 108 111 72 75 77 79 82 84 87 89 91 94 96 99 60 63 65 67 70 72 75 77 79 82 84 48 51 53 55 58 60 63 65 67 70" },
+        { "Other Arabic", "84 85 88 89 91 92 95 96 97 100 101 103 72 73 76 77 79 80 83 84 85 88 89 91 60 61 64 65 67 68 71 72 73 76 77 48 49 52 53 55 56 59 60 61 64" },
+        { "Other Blues", "84 87 89 90 91 94 96 99 101 102 103 106 72 75 77 78 79 82 84 87 89 90 91 94 60 63 65 66 67 70 72 75 77 78 79 48 51 53 54 55 58 60 63 65 66" },
+        { "Other Diminished", "84 86 87 89 90 92 93 95 96 98 99 101 72 74 75 77 78 80 81 83 84 86 87 89 60 62 63 65 66 68 69 71 72 74 75 48 50 51 53 54 56 57 59 60 62" },
+        { "Other Dominant Bebop", "84 86 88 89 91 93 94 95 96 98 100 101 72 74 76 77 79 81 82 83 84 86 88 89 60 62 64 65 67 69 70 71 72 74 76 48 50 52 53 55 57 58 59 60 62" },
+        { "Other Dorian", "84 86 87 89 91 93 94 96 98 99 101 103 72 74 75 77 79 81 82 84 86 87 89 91 60 62 63 65 67 69 70 72 74 75 77 48 50 51 53 55 57 58 60 62 63" },
+        { "Other Enigmatic", "84 85 88 90 92 94 95 97 98 101 103 105 72 73 76 78 80 82 83 85 86 89 91 93 60 61 64 66 68 70 71 73 74 77 79 48 49 52 54 56 58 59 61 62 65" },
+        { "Other Japanese Insen", "84 85 89 91 94 96 97 101 103 106 108 109 72 73 77 79 82 84 85 89 91 94 96 97 60 61 65 67 70 72 73 77 79 82 84 48 49 53 55 58 60 61 65 67 70" },
+        { "Other Locrian", "84 85 87 89 90 92 94 96 97 99 101 102 72 73 75 77 78 80 82 84 85 87 89 90 60 61 63 65 66 68 70 72 73 75 77 48 49 51 53 54 56 58 60 61 63" },
+        { "Other Lydian", "84 86 88 90 91 93 95 96 98 100 102 103 72 74 76 78 79 81 83 84 86 88 90 91 60 62 64 66 67 69 71 72 74 76 78 48 50 52 54 55 57 59 60 62 64" },
+        { "Other Mixolydian", "84 86 88 89 91 93 94 96 98 100 101 103 72 74 76 77 79 81 82 84 86 88 89 91 60 62 64 65 67 69 70 72 74 76 77 48 50 52 53 55 57 58 60 62 64" },
+        { "Other Neopolitan", "84 85 87 89 91 93 95 96 97 99 101 103 72 73 75 77 79 81 83 84 85 87 89 91 60 61 63 65 67 69 71 72 73 75 77 48 49 51 53 55 57 59 60 61 63" },
+        { "Other Phrygian", "84 85 87 89 91 92 94 96 97 99 101 103 72 73 75 77 79 80 82 84 85 87 89 91 60 61 63 65 67 68 70 72 73 75 77 48 49 51 53 55 56 58 60 61 63" },
+        { "Other Whole Tone", "84 86 88 90 92 94 96 98 100 102 104 106 72 74 76 78 80 82 84 86 88 90 92 94 60 62 64 66 68 70 72 74 76 78 80 48 50 52 54 56 58 60 62 64 66" },
+};
+} // namespace
+
+int typingpiano::layoutCount() noexcept
+{
+    return (int) std::size (typingLayouts);
+}
+
+const char* typingpiano::layoutName (int layout) noexcept
+{
+    return layout >= 0 && layout < layoutCount() ? typingLayouts[layout].name : "";
+}
+
+int typingpiano::layoutIndex (const std::string& name) noexcept
+{
+    for (int i = 0; i < layoutCount(); ++i)
+        if (name == typingLayouts[i].name)
+            return i;
+    return pianoLayout();
+}
+
+int typingpiano::pianoLayout() noexcept
+{
+    for (int i = 0; i < layoutCount(); ++i)
+        if (typingLayouts[i].notes == nullptr)
+            return i;
+    return 0;
+}
+
+std::vector<int> typingPianoNotes (int key, int octave, int root, int layout)
+{
+    const auto* notes = layout >= 0 && layout < typingpiano::layoutCount() ? typingLayouts[layout].notes : nullptr;
+    if (notes == nullptr)
+    {
+        const auto note = typingPianoNote (key, octave, root);
+        return note < 0 ? std::vector<int> {} : std::vector<int> { note };
+    }
+
+    const auto c = key >= 'a' && key <= 'z' ? key - 'a' + 'A' : key;
+    const auto* found = c > 0 && c < 0x7f ? std::strchr (layoutKeys, c) : nullptr;
+    if (found == nullptr)
+        return {};
+
+    // the token of this key: skip one space-separated token per key before it
+    for (auto i = found - layoutKeys; i > 0; --i)
+        notes = std::strchr (notes, ' ') + 1;
+
+    const auto shift = 12 * (typingpiano::clampOctave (octave) - typingpiano::defaultOctave) + typingpiano::clampRoot (root);
+    std::vector<int> result;
+    for (char* end = nullptr; *notes >= '0' && *notes <= '9'; notes = *end == ',' ? end + 1 : end)
+        if (const auto n = (int) std::strtol (notes, &end, 10) + shift; n >= 0 && n <= 127)
+            result.push_back (n);
+    return result;
 }
 
 KeyMap::KeyMap()

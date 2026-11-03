@@ -153,6 +153,7 @@ private:
     // too takes the plain letter keys for the piano: P / E / R played notes and K (next channel) did nothing.
     bool typingPiano = true;
     int typingOctave = keys::typingpiano::defaultOctave, typingRoot = 0; // the button's right-click menu, as FL's
+    int typingLayout = keys::typingpiano::pianoLayout();
     int lastCurrentPattern = -1; // ("Select first channel with notes when the pattern changes")
     void setTypingPiano (bool on);
     void toggleTypingPiano(); // the user's toggle (button, menus, Ctrl+T): also says so in the hint bar

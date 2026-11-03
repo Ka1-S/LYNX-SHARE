@@ -86,6 +86,20 @@ namespace typingpiano
 }
 int typingPianoNote (int key, int octave = typingpiano::defaultOctave, int root = 0) noexcept;
 
+// FL's "Layout" list in the same menu, from FL 2026's System/Config/Typing to piano/*.scr (named and ordered as
+// FL's files): FPC, Janko, Piano, Slicex, then the scales and chord maps. "Layout Piano" is typingPianoNote above;
+// FL's "Layout Performance mode" (it launches Playlist clips) is left out.
+namespace typingpiano
+{
+    int layoutCount() noexcept;
+    const char* layoutName (int layout) noexcept; // "" outside 0..layoutCount()-1
+    int layoutIndex (const std::string& name) noexcept; // the Piano layout for an unknown name
+    int pianoLayout() noexcept;
+}
+// The notes `key` plays in `layout` (several for FL's chord layouts), empty for none. The other layouts' notes are
+// FL's at octave 4, root C, moved by `octave` and `root` as the Piano's.
+std::vector<int> typingPianoNotes (int key, int octave, int root, int layout);
+
 // The upper-case printable character of a key code (JUCE's getKeyCode()), or 0 for any other key. On Windows JUCE's
 // F-keys, numpad keys and arrows are VK | 0x10000: a plain towupper() of them (16-bit) gave F4 -> 'S', F1 -> 'P',
 // Numpad1 -> 'A', so the editors took them for tool letters (issue #12, found by round 165q).
