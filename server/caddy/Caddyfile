@@ -1,0 +1,54 @@
+# LYNX SHARE server: Caddy reverse proxy with automatic HTTPS (Let's Encrypt / ZeroSSL).
+# Installed to /etc/caddy/Caddyfile by server/setup.sh. The services listen on 127.0.0.1 only.
+{
+	# no admin endpoint on a public port (default is localhost:2019, kept)
+	servers {
+		protocols h1 h2 h3
+	}
+}
+
+(common) {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+	# Access log without client addresses or headers (privacy: same rule as the crash-report API, PRIVACY.md).
+	log {
+		output file /var/log/caddy/lynx-access.log {
+			roll_size 20MiB
+			roll_keep 10
+			roll_keep_for 720h
+		}
+		format filter {
+			wrap json
+			fields {
+				request>remote_ip delete
+				request>remote_port delete
+				request>client_ip delete
+				request>headers delete
+				resp_headers delete
+			}
+		}
+	}
+}
+
+api.lynx-share.com {
+	import common
+	# share uploads: at most 2 GiB per file (the service checks the declared size too)
+	request_body {
+		max_size 2100MB
+	}
+	reverse_proxy 127.0.0.1:8081 {
+		flush_interval -1
+	}
+}
+
+relay.lynx-share.com {
+	import common
+	request_body {
+		max_size 64KB
+	}
+	reverse_proxy 127.0.0.1:8082
+}
