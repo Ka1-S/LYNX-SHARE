@@ -1,5 +1,9 @@
 // Round 168p: the designed pages of FL's drum and physical-model generators and LYNX's own banks for them.
 
+#include "core/BankStates.h"
+#include "core/DrumControls.h"
+#include "core/DrumParamRanges.h"
+
 namespace design168p
 {
 const lynx::InstrumentKind kinds[] = { lynx::InstrumentKind::fruitkick, lynx::InstrumentKind::plucked, lynx::InstrumentKind::drumpad,
