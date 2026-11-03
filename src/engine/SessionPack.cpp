@@ -11,6 +11,7 @@
 #include "core/SessionIds.h"
 #include "core/Sha256.h"
 #include "core/StandIns.h"
+#include "engine/AudioEngine.h"
 #include "engine/Exporter.h"
 #include "engine/ProjectFile.h"
 #include "platform/Paths.h"
@@ -180,6 +181,20 @@ juce::File fileOf (const std::string& path)
 }
 
 bool samePath (const juce::File& a, const juce::File& b) { return a.getFullPathName().equalsIgnoreCase (b.getFullPathName()); }
+
+// `path` (absolute) names a file inside `root`. No "..", and no folder named only with dots and spaces either:
+// Windows drops a name's trailing dots and spaces, so ". ." or "... " can climb like "..". Compared as text (case
+// as the file system: JUCE's File ==), so a path spelled any other way than the folder (another Unicode form, an
+// 8.3 short name, \\?\ prefix) counts as outside: a missing file, never a file elsewhere.
+bool insideFolder (const std::string& path, const juce::File& root)
+{
+    if (root == juce::File() || path.empty())
+        return false;
+    for (const auto& part : juce::StringArray::fromTokens (str (path), "/\\", ""))
+        if (part.isNotEmpty() && part.trimCharactersAtEnd (". ").isEmpty())
+            return false;
+    return fileOf (path).isAChildOf (root);
+}
 } // namespace
 
 juce::String manifestToJson (const Manifest& m)
@@ -628,6 +643,12 @@ std::optional<Opened> open (const juce::File& file, const juce::File& destinatio
         error = "the package has no project";
         return std::nullopt;
     }
+    for (int i = 0; i < zip.getNumEntries(); ++i)
+        if (zip.getEntry (i)->isSymbolicLink) // (JUCE would create it, and copying "media" through it reads any file here)
+        {
+            error = "the package contains a link";
+            return std::nullopt;
+        }
     destinationRoot.createDirectory();
     const auto folder = destinationRoot.getNonexistentChildFile (juce::File::createLegalFileName (file.getFileNameWithoutExtension()), {}, false);
     if (! folder.createDirectory())
@@ -652,13 +673,77 @@ std::optional<Opened> open (const juce::File& file, const juce::File& destinatio
         opened.project = named;
     for (const auto& m : manifest->media)
     {
-        const auto f = folder.getChildFile (m.entry);
-        if (! f.existsAsFile() || "sha256-" + hashFile (f) != m.id)
+        const auto f = folder.getChildFile (m.entry); // (the manifest is the sender's too: "../" or "/dev/zero" is never read)
+        if (! insideFolder (utf8 (f.getFullPathName()), folder) || ! f.existsAsFile() || "sha256-" + hashFile (f) != m.id)
             opened.corrupt.add (m.name);
     }
     auto song = ProjectFile::load (opened.project, error);
     if (! song)
         return std::nullopt;
+    // a received project may only use its own media: a path anywhere else on this computer would be copied
+    // into the project and sent on with the next package. It becomes a missing file under its own name.
+    auto within = [] (const std::string& path, const juce::File& root) { return insideFolder (path, root); };
+    auto missing = [&] (const std::string& path) {
+        const auto p = str (path);
+        const auto name = juce::File::createLegalFileName (p.fromLastOccurrenceOf ("/", false, false).fromLastOccurrenceOf ("\\", false, false));
+        return utf8 (folder.getChildFile ("missing").getChildFile (name).getFullPathName());
+    };
+    std::map<std::string, std::string> outside;
+    for (const auto& path : safety::referencedSamples (*song))
+        if (! within (path, folder))
+            outside[path] = missing (path);
+    applyRelocations (*song, outside);
+    // every other path the engine reads, also inside Patcher graphs (not in the media list, never packed): only the
+    // package or FL Studio's own files (FL Keys' wavetables, the engines' DLLs)
+    const auto flInstall = findFlStudioRoots().factoryData;
+    const auto fl = flInstall.empty() ? juce::File() : juce::File (str (flInstall));
+    auto engineOnly = [&] (std::string& path) {
+        if (! path.empty() && ! within (path, folder) && ! within (path, fl))
+            path = missing (path);
+    };
+    std::function<void (EffectSlot&)> slot;
+    std::function<void (PatcherDoc&)> doc;
+    std::function<void (ChannelDef&)> channel;
+    slot = [&] (EffectSlot& s) {
+        engineOnly (s.samplePath);
+        for (auto& b : s.branches)
+            for (auto& child : b.chain)
+                slot (child);
+        doc (s.patcher);
+    };
+    doc = [&] (PatcherDoc& d) {
+        for (auto& n : d.nodes)
+        {
+            if (n.generator)
+                channel (n.channel);
+            else
+                slot (n.effect);
+            for (auto& h : n.busHeads)
+                if (h.head)
+                    slot (*h.head);
+        }
+    };
+    channel = [&] (ChannelDef& c) {
+        engineOnly (c.samplePath);
+        for (auto& z : c.zones)
+            engineOnly (z.path);
+        for (auto& s : c.standIns)
+            engineOnly (s.path);
+        doc (c.patcher);
+    };
+    for (auto& c : song->channels)
+        channel (c);
+    for (auto& t : song->mixer)
+    {
+        for (auto& s : t.effects)
+            slot (s);
+        for (auto& s : t.standIns)
+            engineOnly (s.path);
+        // a file the insert records and renders to: written, so only inside the package (else the automatic name)
+        if (! t.recordTo.empty() && ! within (t.recordTo, folder))
+            t.recordTo.clear();
+    }
+    song->dataFolder.clear(); // the sender's folder: nothing to do with this computer
     opened.song = std::move (*song);
     return opened;
 }
