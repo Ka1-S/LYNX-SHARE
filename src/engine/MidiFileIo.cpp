@@ -137,11 +137,10 @@ std::optional<Song> loadSong (const juce::File& file, juce::String& error)
     return song;
 }
 
-std::optional<midiimport::ParsedMidi> parseFile (const juce::File& file, juce::String& error)
+static std::optional<midiimport::ParsedMidi> parseStream (juce::InputStream& in, bool opened, juce::String& error)
 {
-    juce::FileInputStream in (file);
     juce::MidiFile midi;
-    if (! in.openedOk() || ! midi.readFrom (in))
+    if (! opened || ! midi.readFrom (in))
     {
         error = utf8 ("not a valid MIDI file");
         return std::nullopt;
@@ -185,6 +184,45 @@ std::optional<midiimport::ParsedMidi> parseFile (const juce::File& file, juce::S
         out.trackNames.push_back (name);
     }
     return out;
+}
+
+std::optional<midiimport::ParsedMidi> parseFile (const juce::File& file, juce::String& error)
+{
+    juce::FileInputStream in (file);
+    return parseStream (in, in.openedOk(), error);
+}
+
+std::optional<midiimport::ParsedMidi> parseBytes (const void* data, std::size_t size, juce::String& error)
+{
+    juce::MemoryInputStream in (data, size, false);
+    return parseStream (in, size > 0, error);
+}
+
+juce::MemoryBlock writeNotes (const Song& song, const std::vector<Note>& notes, const std::string& trackName)
+{
+    juce::MidiMessageSequence seq;
+    for (const auto& n : notes)
+    {
+        if (n.muted)
+            continue;
+        const auto velocity = (juce::uint8) juce::jlimit (1, 127, juce::roundToInt (n.velocity * 127.0f));
+        const auto midiChannel = juce::jlimit (1, 16, n.colour + 1); // FL: the note colour is the MIDI channel
+        seq.addEvent (juce::MidiMessage::noteOn (midiChannel, n.key, velocity), (double) n.start);
+        seq.addEvent (juce::MidiMessage::noteOff (midiChannel, n.key), (double) (n.start + std::max<std::int64_t> (1, n.length)));
+    }
+    juce::MidiFile midi;
+    midi.setTicksPerQuarterNote (ppq);
+    juce::MidiMessageSequence tempo;
+    tempo.addEvent (juce::MidiMessage::tempoMetaEvent (juce::roundToInt (60'000'000.0 / juce::jmax (1.0, song.bpm))), 0.0);
+    tempo.addEvent (juce::MidiMessage::timeSignatureMetaEvent (juce::jmax (1, song.beatsPerBar), 4), 0.0);
+    midi.addTrack (tempo);
+    seq.addEvent (juce::MidiMessage::textMetaEvent (3, juce::String::fromUTF8 (trackName.c_str())), 0.0);
+    seq.sort();
+    seq.updateMatchedPairs();
+    midi.addTrack (seq);
+    juce::MemoryOutputStream out;
+    midi.writeTo (out);
+    return out.getMemoryBlock();
 }
 
 bool importInto (Song& song, const juce::File& file, const ImportOptions& o, juce::String& error)
