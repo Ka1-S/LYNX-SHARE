@@ -7094,3 +7094,4 @@ countries: nl be
 "Seq" = "Seq"
 "Number of steps" = "Aantal stappen"
 "Dual" = "Dubbel"
+"Align all channel editors" = "Alle kanaaleditors uitlijnen"

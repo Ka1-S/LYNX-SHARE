@@ -7094,3 +7094,4 @@ countries: es mx ar co cl pe ve
 "Seq" = "Sec"
 "Number of steps" = "Número de pasos"
 "Dual" = "Doble"
+"Align all channel editors" = "Alinear todos los editores de canal"

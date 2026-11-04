@@ -7094,3 +7094,4 @@ countries: tr
 "Seq" = "Sek"
 "Number of steps" = "Adım sayısı"
 "Dual" = "Çift"
+"Align all channel editors" = "Tüm kanal düzenleyicilerini hizala"

@@ -7250,3 +7250,4 @@ countries: br
 "Seq" = "Seq"
 "Number of steps" = "Número de passos"
 "Dual" = "Duplo"
+"Align all channel editors" = "Alinhar todos os editores de canal"

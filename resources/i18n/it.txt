@@ -7094,3 +7094,4 @@ countries: it ch sm
 "Seq" = "Seq"
 "Number of steps" = "Numero di passi"
 "Dual" = "Doppio"
+"Align all channel editors" = "Allinea tutti gli editor dei canali"

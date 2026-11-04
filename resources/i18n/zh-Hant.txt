@@ -7094,3 +7094,4 @@ countries: tw hk mo
 "Seq" = "音序"
 "Number of steps" = "步數"
 "Dual" = "雙軌"
+"Align all channel editors" = "對齊所有通道編輯器"

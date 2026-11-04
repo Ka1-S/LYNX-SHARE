@@ -7094,3 +7094,4 @@ countries: kr
 "Seq" = "시퀀스"
 "Number of steps" = "스텝 수"
 "Dual" = "듀얼"
+"Align all channel editors" = "모든 채널 편집기 정렬"

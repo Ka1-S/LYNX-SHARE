@@ -7094,3 +7094,4 @@ countries: cn sg
 "Seq" = "音序"
 "Number of steps" = "步数"
 "Dual" = "双轨"
+"Align all channel editors" = "对齐所有通道编辑器"

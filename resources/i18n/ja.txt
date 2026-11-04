@@ -7094,3 +7094,4 @@ countries: jp
 "Seq" = "シーケンス"
 "Number of steps" = "ステップ数"
 "Dual" = "デュアル"
+"Align all channel editors" = "すべてのチャンネルエディターを揃える"

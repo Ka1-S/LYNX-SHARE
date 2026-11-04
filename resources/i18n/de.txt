@@ -7094,3 +7094,4 @@ countries: de at ch li lu
 "Seq" = "Seq"
 "Number of steps" = "Anzahl der Schritte"
 "Dual" = "Doppelt"
+"Align all channel editors" = "Alle Kanaleditoren ausrichten"

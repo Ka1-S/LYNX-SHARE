@@ -7094,3 +7094,4 @@ countries: id
 "Seq" = "Seq"
 "Number of steps" = "Jumlah langkah"
 "Dual" = "Ganda"
+"Align all channel editors" = "Ratakan semua editor channel"

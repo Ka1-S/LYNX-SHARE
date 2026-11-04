@@ -7094,3 +7094,4 @@ countries: pl
 "Seq" = "Sekw."
 "Number of steps" = "Liczba kroków"
 "Dual" = "Podwójny"
+"Align all channel editors" = "Wyrównaj wszystkie edytory kanałów"

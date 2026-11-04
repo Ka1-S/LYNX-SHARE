@@ -7094,3 +7094,4 @@ countries: ru by kz
 "Seq" = "Секв."
 "Number of steps" = "Число шагов"
 "Dual" = "Двойной"
+"Align all channel editors" = "Выровнять все редакторы каналов"
