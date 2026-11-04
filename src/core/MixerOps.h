@@ -65,8 +65,27 @@ int soleSidechainSender (const Song& song, int to);
 // Returns whether it was linked.
 bool linkAddedSidechain (Song& song, int to, int slot);
 
-// Moves effect slot `from` to position `to` of the same insert (the others shift); automations follow.
+// Moves effect slot `from` to position `to` of the same insert (the others shift); automations follow. The rows the
+// effects showed in stay in use (the moved effect takes the row of the one it lands on).
 bool moveEffectSlot (Song& song, int track, int from, int to);
+
+// --- FL's slot places (round 170b, REA FUN_01233b30 / FUN_012ab750) --------------------------------------------------
+// The mixer row of each effect of a chain (EffectSlot::row; -1 = right after the previous one); rows always grow along
+// the chain and stay below maxEffectSlots (the last ones are pulled up when needed).
+std::vector<int> effectRows (const std::vector<EffectSlot>& effects);
+// The index of the effect in `row`, or -1 (an empty slot).
+int effectAtRow (const std::vector<EffectSlot>& effects, int row);
+// FL's move: effect `index` goes to `row`; an effect already there takes its old row (the two swap), an empty row
+// just takes it. The chain order follows the rows; automations follow the effects. False when nothing changed.
+bool moveEffectToRow (Song& song, int track, int index, int row);
+// FL's Move up / Move down and the wheel over a slot: one row up (-1) or down (+1), wrapping around the 10 slots as FL
+// does (slot 1 up = slot 10). Returns the effect's new index, or -1.
+int moveEffectBy (Song& song, int track, int index, int delta);
+// Adds `fx` into the empty `row` (FL: a plugin picked on an empty slot lands in that slot). Returns its index, or -1
+// (row taken, insert full).
+int insertEffectAtRow (Song& song, int track, EffectSlot fx, int row);
+// Removes effect `index`; the others keep their rows (FL leaves the slot empty).
+void removeEffectKeepRows (Song& song, int track, int index);
 
 // --- FL's mixer track menu (REA round 143) ---------------------------------------------------------------
 // "Reset selected track(s) to default": level, pan, stereo separation, phase, swap and EQ back to the defaults,
@@ -116,6 +135,10 @@ enum class RouteKind
 // "Selected tracks to this track": every selected insert but `to` is routed into `to`. Returns how many were routed
 // (sources that would make a cycle are skipped).
 int routeSelectedTo (Song& song, const std::vector<int>& selected, int to, RouteKind kind);
+// FL's route arrow under `to` (round 170b, REA FUN_012aa110): a plain click switches the route of EVERY selected insert
+// to `to` to `on` (a new route starts at unity); Ctrl / Shift / Ctrl+Shift are routeOnly / sidechain / sidechainOnly
+// for all of them (routeSelectedTo). Returns how many routes changed.
+int switchSelectedRoute (Song& song, const std::vector<int>& selected, int to, bool on);
 // "This track to selected tracks": `from` is routed into every selected track but itself (0 = the Master).
 int routeToSelected (Song& song, int from, const std::vector<int>& selected, RouteKind kind);
 // "Create submix...": the selected inserts are routed only into `to`; `to` is renamed "<name> master" (when `name` is

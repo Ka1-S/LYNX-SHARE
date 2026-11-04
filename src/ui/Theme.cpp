@@ -967,7 +967,8 @@ void LookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int width, 
                          && std::abs (slider.getMinimum() + slider.getMaximum()) < 1e-6 * (slider.getMaximum() - slider.getMinimum());
     if (const auto* skinned = slider.getProperties().getVarPointer (skin::sliderProperty)) // a plugin page's knob (ui/PluginSkin.h)
     {
-        const skin::StyleScope styleScope (skin::resolve ((skin::Style) (int) slider.getProperties().getWithDefault (skin::styleProperty, 0)));
+        const auto packed = (int) slider.getProperties().getWithDefault (skin::styleProperty, 0);
+        const skin::StyleScope styleScope (skin::resolve (skin::unpackStyle (packed), skin::unpackArt (packed)), skin::unpackArt (packed));
         skin::KnobLook look;
         look.value = pos;
         look.bipolar = bipolar;
@@ -1007,7 +1008,8 @@ void LookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int width, 
     const auto bounds = juce::Rectangle<int> (x, y, width, height).toFloat();
     if (const auto* skinned = slider.getProperties().getVarPointer (skin::sliderProperty)) // a plugin page's fader
     {
-        const skin::StyleScope styleScope (skin::resolve ((skin::Style) (int) slider.getProperties().getWithDefault (skin::styleProperty, 0)));
+        const auto packed = (int) slider.getProperties().getWithDefault (skin::styleProperty, 0);
+        const skin::StyleScope styleScope (skin::resolve (skin::unpackStyle (packed), skin::unpackArt (packed)), skin::unpackArt (packed));
         const auto v = vertical ? (bounds.getBottom() - sliderPos) / juce::jmax (1.0f, bounds.getHeight()) : (sliderPos - bounds.getX()) / juce::jmax (1.0f, bounds.getWidth());
         const auto track = vertical ? bounds.withSizeKeepingCentre (4.0f, bounds.getHeight()) : bounds.withSizeKeepingCentre (bounds.getWidth(), 4.0f);
         const auto bip = slider.getMinimum() < 0.0 && slider.getMaximum() > 0.0;

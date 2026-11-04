@@ -386,6 +386,17 @@ juce::var patcherToVar (const PatcherDoc& doc)
             }
             v->setProperty ("busHeads", heads);
         }
+        // the activated parameter ports (round 171b)
+        auto list = [] (const std::vector<int>& from) {
+            juce::Array<juce::var> a;
+            for (const auto p : from)
+                a.add (p);
+            return a;
+        };
+        if (! n.paramIns.empty())
+            v->setProperty ("paramIns", list (n.paramIns));
+        if (! n.paramOuts.empty())
+            v->setProperty ("paramOuts", list (n.paramOuts));
         nodes.add (juce::var (v.release()));
     }
     o->setProperty ("nodes", nodes);
@@ -484,6 +495,15 @@ PatcherDoc patcherFromVar (const juce::var& v, const Song& song)
                         head.head = effectFromVar (h["head"]);
                     node.busHeads.push_back (std::move (head));
                 }
+            auto readParams = [] (const juce::var& a, std::vector<int>& out) {
+                if (auto* list = a.getArray())
+                    for (const auto& p : *list)
+                        if (const auto x = (int) p; x >= 0 && x < patchParamOutputBase
+                                                     && std::find (out.begin(), out.end(), x) == out.end())
+                            out.insert (std::upper_bound (out.begin(), out.end(), x), x);
+            };
+            readParams (n["paramIns"], node.paramIns);
+            readParams (n["paramOuts"], node.paramOuts);
             doc.nodes.push_back (std::move (node));
         }
     const auto count = (int) doc.nodes.size();
@@ -726,6 +746,8 @@ juce::var effectToVar (const EffectSlot& slot)
         e->setProperty ("mix", juce::roundToInt (slot.mix * 10000.0f) / 10000.0);
     if (! slot.smartDisable)
         e->setProperty ("smartDisable", false);
+    if (slot.row >= 0) // the mixer row (FL's slot places, round 170b); absent = right after the previous effect
+        e->setProperty ("row", slot.row);
     if (slot.sidechain >= 0)
         e->setProperty ("sidechain", slot.sidechain);
     if (slot.sidechain2 >= 0)
@@ -807,6 +829,7 @@ std::optional<EffectSlot> effectFromVar (const juce::var& e)
     slot.enabled = (bool) e.getProperty ("on", true);
     slot.mix = juce::jlimit (0.0f, 1.0f, (float) (double) e.getProperty ("mix", 1.0));
     slot.smartDisable = (bool) e.getProperty ("smartDisable", true);
+    slot.row = juce::jlimit (-1, maxEffectSlots - 1, (int) e.getProperty ("row", -1));
 
     if (auto* params = e["params"].getArray())
     {
@@ -1330,6 +1353,8 @@ juce::var channelToVar (const ChannelDef& c)
         }
         if (! c.sampler.useLoopPoints)
             sampler->setProperty ("useLoopPoints", false);
+        if (c.sampler.flVelocityLaw)
+            sampler->setProperty ("flVelocityLaw", true);
         if (c.sampler.declickMode != 0)
             sampler->setProperty ("declickMode", c.sampler.declickMode);
         if (! c.sampler.flVolumeEnvelope.empty())
@@ -1647,6 +1672,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
             p.clip = (bool) pre.getProperty ("clip", false);
         }
         def.sampler.useLoopPoints = (bool) s.getProperty ("useLoopPoints", true);
+        def.sampler.flVelocityLaw = (bool) s.getProperty ("flVelocityLaw", false);
         def.sampler.declickMode = juce::jlimit (0, 5, (int) s.getProperty ("declickMode", 0));
 
         if (auto* env = s["flVolumeEnvelope"].getArray(); env != nullptr && env->size() == 18)

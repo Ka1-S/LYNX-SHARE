@@ -308,6 +308,9 @@ private:
     IconButton typingPianoButton { "typingPiano", Icon::keyboard };
     IconButton countInButton { "countIn", Icon::countIn };
     IconButton waitInputButton { "waitInput", Icon::waitInput };
+    // FL's recording panel toggles (round 170e2): Blend recorded notes (overdub, off = replace) and the tempo tapper
+    IconButton blendButton { "blend", Icon::blend };
+    IconButton tapTempoButton { "tapTempo", Icon::tapTempo };
     void refreshRecordOptionButtons();
     void showRecordMenu();
     // right-click on the metronome: on/off, its volume, count-in (FL keeps the metronome's options there)
@@ -446,7 +449,8 @@ private:
     IconButton rackFollowButton { "rackFollow", Icon::follow }; // Follow the playing step (issue #12)
     static constexpr int rackPatternSelectorWidth = 132;
     static constexpr int rackLengthBoxWidth = 40;
-    static constexpr int rackTitleToolsWidth = rackPatternSelectorWidth + 6 + 96 + 4 + 26 + 4 + rackLengthBoxWidth + 4 + 24 + 4 + 24 + 4 + 24 + 4 + 24 + 4 + 24;
+    static constexpr int rackFilterBoxWidth = 108;
+    static constexpr int rackTitleToolsWidth = rackPatternSelectorWidth + 6 + rackFilterBoxWidth + 4 + 26 + 4 + rackLengthBoxWidth + 4 + 24 + 4 + 24 + 4 + 24 + 4 + 24 + 4 + 24;
     // one icon per workspace panel (F5..F9): click toggles, right-click shows it maximized
     std::array<IconButton, workspace::panelCount> panelButtons { IconButton { "playlistPanel", Icon::playlist },
                                                                  IconButton { "rackPanel", Icon::channelRack },

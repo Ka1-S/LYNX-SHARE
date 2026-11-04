@@ -7059,8 +7059,17 @@ countries: tr
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] kalemle boya  [Ctrl+LMB] / [Shift+LMB] birden çok seç  [2xLMB] aç  [RMB] menü"
 "Empty patterns were ignored." = "Boş pattern'ler yok sayıldı."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Eklenti seçici: tüm jeneratörler ve efektler, kategoriler sekme olarak (kapatmak için tekrar basın)"
+"{0} selected tracks" = "{0} seçili kanal"
+"Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu" = "Seçili insert'leri buraya yönlendirir (açtıktan sonra sürükle: seviye). Ctrl+tık: yalnız bu kanal, Shift: sidechain, Ctrl+Shift: yalnız sidechain, sağ tık: menü"
+"[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] seçer  [Ctrl]+[LMB] veya üzerinden sürükle: aralık  [Ctrl]+[Shift]+[LMB] ekler veya çıkarır  [LMB] yana sürüklemek sıralar  [RMB] insert menüsü"
+"Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "Tık insert'i seçer (Ctrl+tık veya üzerinden sürükle: aralık, Ctrl+Shift: ekle veya çıkar), sağ tık menüsünü açar; Alt+Sol/Sağ seçimi taşır"
+"Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "Efekt slotu: tık penceresini (ve alttaki düğmelerini) gösterir veya gizler, LED baypas eder, tekerlek veya sürükleme yukarı ya da aşağı taşır, sağ tık: seçenekler"
+"Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "Efektin penceresini açar (FL'deki gibi tüm kontroller); slot adına tıklamak da aynısını yapar"
+"Themed" = "Temalı"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Eklenti çizimini canlandır (düşen yapraklar, parıltılar; Temalı stil)"
 "click to step, drag or mouse wheel to change" = "adım için tıklayın, değiştirmek için sürükleyin veya fare tekerleğini kullanın"
 "no effect with the current mode (another engine is in use)" = "geçerli modda etkisiz (başka bir motor kullanılıyor)"
+"arrows step, click for the list, drag or mouse wheel to change" = "oklar bir adım ilerletir, liste için tıklayın, değiştirmek için sürükleyin veya fare tekerleğini kullanın"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Ana: {0}"
@@ -7095,6 +7104,18 @@ countries: tr
 "Number of steps" = "Adım sayısı"
 "Dual" = "Çift"
 "Align all channel editors" = "Tüm kanal düzenleyicilerini hizala"
+"Disconnect" = "Bağlantıyı kes"
+"Inputs" = "Girişler"
+"Outputs" = "Çıkışlar"
+"Last tweaked ({0})" = "Son ayarlanan ({0})"
+"Deactivate" = "Devre dışı bırak"
+"Automate Patcher parameter" = "Patcher parametresini otomatikleştir"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Kaydedilen notaları harmanla: açık (yeni notalar pattern'deki notalara eklenir)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Kaydedilen notaları harmanla: kapalı (kaydedilen kanalın eski notaları değiştirilir)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Kaydedilen notaları harmanla: açıkken bir kayıt notalarını pattern'e ekler (overdub); kapalıyken kaydedilen kanalın eski notaları değiştirilir"
+"Tempo tapper: tap the beat to set the tempo" = "Tempo tıklayıcı: tempoyu ayarlamak için vuruşa dokunun"
+"Blend recorded notes" = "Kaydedilen notaları harmanla"
 
 # --- round 170a (Channel Rack cut/copy/paste, note names on every key)
 "Cut the selected channels' steps" = "Seçili kanalların adımlarını kes"

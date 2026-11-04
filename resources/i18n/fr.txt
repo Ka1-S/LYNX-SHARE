@@ -7059,8 +7059,17 @@ countries: fr be ch ca lu
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern : [LMB] le peindre au crayon  [Ctrl+LMB] / [Shift+LMB] en choisir plusieurs  [2xLMB] ouvrir  [RMB] menu"
 "Empty patterns were ignored." = "Les patterns vides ont été ignorés."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Sélecteur de plugins : tous les générateurs et effets, les catégories en onglets (appuyez à nouveau pour fermer)"
+"{0} selected tracks" = "{0} pistes sélectionnées"
+"Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu" = "Route les inserts sélectionnés vers celui-ci (glisser après activation : niveau). Ctrl+clic : cette piste seulement, Maj : sidechain, Ctrl+Maj : sidechain seulement, clic droit : menu"
+"[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] sélectionne  [Ctrl]+[LMB] ou glisser dessus : plage  [Ctrl]+[Shift]+[LMB] ajoute ou retire  [LMB] glisser de côté réordonne  [RMB] menu de l'insert"
+"Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "Clic sélectionne l'insert (Ctrl+clic ou glisser dessus : plage, Ctrl+Maj : ajouter ou retirer), clic droit ouvre son menu ; Alt+Gauche/Droite déplace la sélection"
+"Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "Slot d'effet : clic affiche ou masque sa fenêtre (et ses boutons dessous), la LED le contourne, la molette ou un glisser le déplace vers le haut ou le bas, clic droit : options"
+"Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "Ouvre la fenêtre de l'effet (tous ses réglages, comme dans FL) ; cliquer sur le nom du slot fait de même"
+"Themed" = "Thématique"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Animer l'illustration des plugins (pétales qui tombent, lueurs ; style Thématique)"
 "click to step, drag or mouse wheel to change" = "cliquer pour avancer, glisser ou molette pour changer"
 "no effect with the current mode (another engine is in use)" = "sans effet dans le mode actuel (un autre moteur est utilisé)"
+"arrows step, click for the list, drag or mouse wheel to change" = "les flèches avancent d'un pas, cliquer pour la liste, glisser ou molette pour changer"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Principal : {0}"
@@ -7095,6 +7104,18 @@ countries: fr be ch ca lu
 "Number of steps" = "Nombre de pas"
 "Dual" = "Double"
 "Align all channel editors" = "Aligner tous les éditeurs de canal"
+"Disconnect" = "Déconnecter"
+"Inputs" = "Entrées"
+"Outputs" = "Sorties"
+"Last tweaked ({0})" = "Dernier réglé ({0})"
+"Deactivate" = "Désactiver"
+"Automate Patcher parameter" = "Automatiser un paramètre du Patcher"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Mélanger les notes enregistrées : oui (les nouvelles notes s'ajoutent à celles du pattern)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Mélanger les notes enregistrées : non (les anciennes notes d'un canal enregistré sont remplacées)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Mélanger les notes enregistrées : activé, une prise ajoute ses notes au pattern (overdub) ; désactivé, les anciennes notes d'un canal enregistré sont remplacées"
+"Tempo tapper: tap the beat to set the tempo" = "Tap tempo : tapez la pulsation pour régler le tempo"
+"Blend recorded notes" = "Mélanger les notes enregistrées"
 
 # --- round 170a (Channel Rack cut/copy/paste, note names on every key)
 "Cut the selected channels' steps" = "Couper les pas des canaux sélectionnés"

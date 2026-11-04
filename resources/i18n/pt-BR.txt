@@ -7215,8 +7215,17 @@ countries: br
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] pinta com o lápis  [Ctrl+LMB] / [Shift+LMB] escolhe vários  [2xLMB] abre  [RMB] menu"
 "Empty patterns were ignored." = "Os patterns vazios foram ignorados."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Seletor de plugins: todos os geradores e efeitos, as categorias como abas (aperte de novo para fechar)"
+"{0} selected tracks" = "{0} faixas selecionadas"
+"Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu" = "Roteia os inserts selecionados para este (arraste depois de ativar: nível). Ctrl+clique: só esta faixa, Shift: sidechain, Ctrl+Shift: só sidechain, clique direito: menu"
+"[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] seleciona  [Ctrl]+[LMB] ou arrastar por cima: intervalo  [Ctrl]+[Shift]+[LMB] adiciona ou remove  [LMB] arrastar para o lado reordena  [RMB] menu do insert"
+"Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "Clique seleciona o insert (Ctrl+clique ou arrastar por cima: intervalo, Ctrl+Shift: adiciona ou remove), clique direito abre o menu; Alt+Esquerda/Direita move a seleção"
+"Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "Slot de efeito: clique mostra ou esconde a janela (e os knobs abaixo), o LED faz bypass, a roda ou arrastar move para cima ou para baixo, clique direito: opções"
+"Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "Abre a janela do efeito (todos os controles, como no FL); clicar no nome do slot faz o mesmo"
+"Themed" = "Temático"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Animar a arte dos plugins (pétalas caindo, brilhos; estilo Temático)"
 "click to step, drag or mouse wheel to change" = "clique para avançar, arraste ou use a roda do mouse para mudar"
 "no effect with the current mode (another engine is in use)" = "sem efeito no modo atual (outro motor está em uso)"
+"arrows step, click for the list, drag or mouse wheel to change" = "as setas avançam um passo, clique para a lista, arraste ou use a roda do mouse para mudar"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Principal: {0}"
@@ -7251,6 +7260,18 @@ countries: br
 "Number of steps" = "Número de passos"
 "Dual" = "Duplo"
 "Align all channel editors" = "Alinhar todos os editores de canal"
+"Disconnect" = "Desconectar"
+"Inputs" = "Entradas"
+"Outputs" = "Saídas"
+"Last tweaked ({0})" = "Último ajustado ({0})"
+"Deactivate" = "Desativar"
+"Automate Patcher parameter" = "Automatizar parâmetro do Patcher"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Mesclar notas gravadas: ligado (as notas novas se somam às do pattern)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Mesclar notas gravadas: desligado (as notas antigas de um canal gravado são substituídas)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Mesclar notas gravadas: ligado, uma tomada soma as notas ao pattern (overdub); desligado, as notas antigas de um canal gravado são substituídas"
+"Tempo tapper: tap the beat to set the tempo" = "Tap tempo: toque no ritmo para definir o andamento"
+"Blend recorded notes" = "Mesclar notas gravadas"
 
 # --- round 170a (Channel Rack cut/copy/paste, note names on every key)
 "Cut the selected channels' steps" = "Recortar os steps dos canais selecionados"

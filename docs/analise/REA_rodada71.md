@@ -69,7 +69,7 @@ box types = 0, everything else 0.5.
 FL's `ProcessParam` takes 0…256 integers (`×1/256`, clamped) and only calls `setParameter` when the value changes
 (`FUN_1800034a0`) **[DECOMP + EXEC]**.
 
-Installation use **[DATA]**: 2 mixer slots — the render test `System/Render tests/Hardcore.flp` (box 1 empty, box 5 delay,
+Installation use **[DATA]**: 2 mixer slots — the render test `System/Render tests/Hardcore.flp` (box 1 empty, box 5 delay [corrected in REA_rodada170i §5: boxes 1–5 = distortion, gate, chorus, delay, empty],
 cabinet 4, preset "80s lead") and *Treben – Umziky – All the same* (box 1 distortion Model A, cabinet off).
 
 ### 1.2 Block **[DECOMP `FUN_18002a740` + asm]**

@@ -97,3 +97,25 @@ TEST (atrium_round170c_early_mod_rate_and_depth_move_the_early_taps)
     const auto again = mixsuite96::run (EffectKind::atrium, p, x);
     CHECK (again == still || [&] { double d = 0; for (std::size_t i = 0; i < x.size(); ++i) d = std::max (d, (double) std::abs (again[i] - still[i])); return d < 1e-6; }());
 }
+
+TEST (waveshaper_round170c_oversampling_lowers_aliasing)
+{
+    // issue #14: FL's OverSelect (Off, 2x, 4x, 8x, 16x) must change the sound — a 7 kHz sine driven into the end of the
+    // default curve clips; its 5th and 7th harmonics fold back to 9.1 kHz and 4.9 kHz without oversampling
+    using lynx::EffectKind;
+    auto p = mixsuite96::defaults (EffectKind::fruityWaveShaper);
+    p[0] = 1.0f; // Pre amp at its top
+    const auto x = mixsuite96::sine (7000.0, 0.95, 32768);
+    double alias[5] {};
+    for (int o = 0; o <= 4; ++o)
+    {
+        p[3] = (float) o / 4.0f;
+        const auto y = mixsuite96::run (EffectKind::fruityWaveShaper, p, x);
+        const auto f = mixsuite96::amplitude (y, 7000.0, 16384, 16384);
+        alias[o] = std::max (mixsuite96::amplitude (y, 9100.0, 16384, 16384), mixsuite96::amplitude (y, 4900.0, 16384, 16384)) / std::max (1e-12, f);
+        std::printf ("  WaveShaper oversampling %d: strongest alias %.1f dB\n", o, mixsuite96::db (alias[o]));
+    }
+    CHECK (alias[0] > 1e-3);                  // without oversampling the clipped sine aliases (above -60 dB)
+    CHECK (alias[2] < alias[0] * 0.25);       // 4x: at least 12 dB less
+    CHECK (alias[4] < alias[0] * 0.25);       // 16x
+}

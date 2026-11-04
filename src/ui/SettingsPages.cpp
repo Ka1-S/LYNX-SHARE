@@ -103,7 +103,7 @@ public:
 
         for (auto* c : std::initializer_list<juce::Component*> { &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
-                                                                 &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &pluginStyleLabel, &pluginStyleBox, &reducedEffects, &gpuRendering, &splash, &startupSound, &scanAtStart, &menuEntry,
+                                                                 &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &gpuRendering, &splash, &startupSound, &scanAtStart, &menuEntry,
                                                                  &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &firstChannel, &editInLabel, &editInBox, &undoLabel,
                                                                  &undoBox, &alternateUndo, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &unusedTakes,
                                                                  &sandbox, &sandboxNote, &substitutes, &substitutesNote, &managePlugins, &manageShortcuts, &shortcutsNote,
@@ -170,6 +170,8 @@ public:
             pluginStyleBox.addItem (tr ("{0} for every plugin", { tr (skin::styleName ((skin::Style) i)) }), i + 2);
         pluginStyleBox.setSelectedId (juce::jlimit (-1, skin::styleCount - 1, options.pluginStyle) + 2, juce::dontSendNotification);
         pluginStyleBox.onChange = [this] { change ([&] { options.pluginStyle = pluginStyleBox.getSelectedId() - 2; }); };
+        toggle (artMotion, tr ("Animate the plugin art (falling petals, glows; Themed style)"), options.artMotion,
+                [this] (bool on) { options.artMotion = on; });
         toggle (reducedEffects, tr ("Reduced effects in plugin editors (no glows or animations, for slower graphics cards)"), options.reducedEffects,
                 [this] (bool on) { options.reducedEffects = on; });
         toggle (gpuRendering, tr ("Draw with the GPU (Direct2D). Turn off if LYNX SHARE crashes in the graphics driver or the screen flickers"),
@@ -297,6 +299,7 @@ private:
         everyKeyNames.setBounds (r.indented (24));
         rackColumn.setBounds (r.full (24));
         pluginStyleBox.setBounds (r.row (pluginStyleLabel, 300));
+        artMotion.setBounds (r.full (24));
         reducedEffects.setBounds (r.full (24));
        #if JUCE_WINDOWS
         gpuRendering.setBounds (r.full (24));
@@ -405,7 +408,7 @@ private:
     juce::Label languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote;
     juce::HyperlinkButton translationLink;
     juce::ComboBox crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox;
-    juce::ToggleButton stereoWaves, everyKeyNames, rackColumn, reducedEffects, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, firstChannel, alternateUndo, sandbox, substitutes, unusedTakes, checkUpdates;
+    juce::ToggleButton stereoWaves, everyKeyNames, rackColumn, artMotion, reducedEffects, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, firstChannel, alternateUndo, sandbox, substitutes, unusedTakes, checkUpdates;
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
         checkNow { tr ("Check now") };
 };
