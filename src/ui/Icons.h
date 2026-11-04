@@ -29,10 +29,15 @@ enum class Icon
     follow,     // Playlist / Piano Roll: the view follows the playhead (auto scrolling)
     loop,       // Channel Rack: channel looping (round 165f-rack)
     dice,       // Channel Rack: Loop Starter (round 168b)
-    stretch     // Playlist: stretch audio when resizing audio clips (round 168f)
+    stretch,    // Playlist: stretch audio when resizing audio clips (round 168f)
+    scaleSnap,  // Piano Roll: snap to the scale (a small magnet over keys; round 170e)
+    tweak,      // the toolbar's last tweaked parameter: a knob with a turning arrow (round 170e)
+    slide,      // Piano Roll: new notes slide (a note with a glide arrow; round 170e)
+    chord,      // Piano Roll: the chord stamp (three stacked notes; round 170e)
+    span        // Channel Rack: the pattern length (an arrow between two bar lines; round 170e)
 };
 
-constexpr int iconCount = (int) Icon::stretch + 1;
+constexpr int iconCount = (int) Icon::span + 1;
 
 namespace icons
 {

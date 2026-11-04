@@ -87,8 +87,10 @@ samples, impulses or tables, LYNX SHARE reads them at run time from **your own**
 
 The plugins FL Studio users reach for most, all shipping in LYNX SHARE at **Exact** or **Near-exact** quality, plus LYNX SHARE's
 own reverbs fitted to black-box measurements of the third-party reverbs producers use most (see
-[LYNX SHARE originals: reverbs](#lynx-originals-reverbs)). (Sytrus and Harmor are not featured yet: both are *Close* — see
-[Generators](#generators).)
+[LYNX SHARE originals: reverbs](#lynx-originals-reverbs)). Sytrus and Harmor are left out of this list only because their
+match is *Close* rather than Exact: both work in LYNX SHARE today — they play `.flp` projects and `.fst` presets on
+engines rebuilt from the plugin's saved state, and a new one starts from your FL Studio installation's default preset —
+see [Generators](#generators).
 
 <!-- Featured list: add a row for any engine that reaches Exact/Near-exact. Engines inspired by third-party plugins
      are listed in "Inspired by the classics" above (generated: src/core/PluginSubstitutes.cpp + docs/inspired-by.json
@@ -162,14 +164,14 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | MiniSynth engine † | MiniSynth | Near-exact | 11/12 project states and 47/91 presets bit-identical, the rest −107…−147 dB |
 | Kepler engine † | Kepler | Near-exact | default patch bit-exact, demo channels −124 dB; self-oscillating presets drift in phase; Kepler Exo falls back to the synth |
 | PoiZone engine | PoiZone | Near-exact | 384/385 presets bit-identical with the delay off; delay filters median −79 dB |
-| Transistor Bass engine † | Transistor Bass | Near-exact | 55/128 programs bit-exact, worst −108.6 dB; CC/pitch-bend not modelled |
+| Transistor Bass engine † | Transistor Bass | Near-exact | 55/128 programs bit-exact, worst −108.6 dB; CC/pitch-bend not modelled; needs the oscillator cycles of FL's `engine_x64.dll` (FL 2025 and 2026 builds; before 0.1.24 only FL 2026's) |
 | Sawer engine † | Sawer | Near-exact | 423 presets bit-identical with effects off; reverb −137 dB; modulation by aftertouch/bend not fed |
 | Granulizer engine | Fruity Granulizer | Near-exact | within −128 dB on 100 random states; slice modes and tempo sync not played |
 | Wave Traveller engine | Wave Traveller | Exact | bit-identical with the DLL: the render test, demo states, every curve segment type, mutes, the 19 presets, live and render (sinc) modes, 44.1 / 48 kHz; samples not at 16-bit / 44.1 kHz use LYNX's conversion (REA_rodada167f-wavetraveller) |
 | Autogun engine † | Autogun | Near-exact | within −127 dB on the template states (Ogun engine + Soundgoodizer stage) |
 | DrumSynth engine † | Fruity DrumSynth Live | Near-exact | all 120 patches; recorded waves need the exact engine DLL build; sends and Mod X/Y not modelled |
 | BooBass engine † | BooBass | Near-exact | needs the exact engine DLL build (otherwise a saw approximation) |
-| Sytrus engine | Sytrus | Close | median −117 dB on 268 demo channels, 265 within −60 dB; chaotic FM patches can't be sample-exact; states older than v17 use the synth conversion |
+| Sytrus engine | Sytrus | Close | plays imported projects and presets; a new instance starts from FL's Default preset (FL installed); median −117 dB on 268 demo channels, 265 within −60 dB; chaotic FM patches can't be sample-exact; states older than v17 use the synth conversion |
 | Harmor engine † | Harmor | Close | 97/99 demo channels within −60 dB (median −80 dB) incl. image synthesis and the effects rack; resynthesis images and some filter shapes missing |
 | Harmless engine † | Harmless | Close | 135/139 demo channels within −60 dB with the effects rack |
 | Ogun engine | Ogun | Close | 20/20 demo channels within −60 dB; Random spectra are deterministic |

@@ -1,6 +1,7 @@
 #include "ui/ExportDialog.h"
 
 #include "core/PatternBlocks.h"
+#include "core/MessageThreadOwned.h"
 #include "core/PlaylistOps.h"
 #include "core/PickerSelection.h"
 #include "core/QuickRender.h"
@@ -15,6 +16,7 @@
 
 #include "engine/Exporter.h"
 #include "engine/Text.h"
+#include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/SettingsPages.h"
 #include "ui/Theme.h"
@@ -23,6 +25,16 @@ namespace lynx
 {
 namespace
 {
+// the job of one stem / playlist track: made and deleted on the message thread, a Cancel never waits for it (round 169g)
+struct JobOnMessageThread : MessageThreadOwned<ExportJob>
+{
+    explicit JobOnMessageThread (juce::Thread& t)
+        : MessageThreadOwned<ExportJob> ([] (std::function<void()> f) { juce::MessageManager::callAsync (std::move (f)); },
+                                         [&t] { return t.threadShouldExit(); })
+    {
+    }
+};
+
 class ExportThread final : public juce::ThreadWithProgressWindow
 {
 public:
@@ -55,6 +67,13 @@ public:
         }
         else if (ok && reveal)
             file.revealToUser(); // "Show the file(s) when complete"
+        else if (ok && job->getNotice().isEmpty())
+            // FL closes its render window and says nothing (round 170h, FL 2026 driven): no box to click away, the
+            // result goes to the hint bar for a few seconds; a box stays for a notice that needs reading
+            ui::postHint ({ tr ("Export complete") + ": " + file.getFullPathName()
+                                + (job->getInfo().isEmpty() ? juce::String() : "  " + job->getInfo()),
+                            tr ("Peak: {0} dBFS", { juce::String (juce::Decibels::gainToDecibels (job->getPeak()), 1) }) },
+                          8000);
         else if (ok)
             juce::AlertWindow::showMessageBoxAsync (job->getNotice().isEmpty() ? juce::MessageBoxIconType::InfoIcon : juce::MessageBoxIconType::WarningIcon,
                                                     tr ("Export complete"),
@@ -131,14 +150,14 @@ public:
             auto& item = items[i];
             setStatusMessage (item.name);
 
-            std::unique_ptr<ExportJob> job;
-            juce::WaitableEvent ready;
-            juce::MessageManager::callAsync ([&] {
-                job = std::make_unique<ExportJob> (item.song, options, item.file);
-                job->setExtraData (true);
-                ready.signal();
+            JobOnMessageThread slot (*this);
+            auto* job = slot.create ([&item, this] {
+                auto j = std::make_unique<ExportJob> (item.song, options, item.file);
+                j->setExtraData (true);
+                return j;
             });
-            ready.wait();
+            if (job == nullptr)
+                break; // (cancelled)
 
             juce::String error;
             const auto base = (double) i / (double) items.size();
@@ -153,12 +172,7 @@ public:
                 files.push_back (item.file);
             }
 
-            juce::WaitableEvent gone;
-            juce::MessageManager::callAsync ([&] {
-                job.reset();
-                gone.signal();
-            });
-            gone.wait();
+            slot.release();
         }
     }
 
@@ -168,6 +182,9 @@ public:
             afterRender (files);
         if (! cancelled && options.showWhenDone && written > 0)
             baseFile.getParentDirectory().startAsProcess();
+        else if (! cancelled && written > 0)
+            ui::postHint ({ tr ("Stems exported") + ": " + tr ("{0} file(s) in {1}", { juce::String (written), baseFile.getParentDirectory().getFullPathName() }), {} },
+                          8000);
         else if (! cancelled)
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Stems exported"),
                                                     tr ("{0} file(s) in {1}", { juce::String (written), baseFile.getParentDirectory().getFullPathName() }));
@@ -1151,14 +1168,14 @@ public:
         {
             auto& item = items[i];
             setStatusMessage (item.name);
-            std::unique_ptr<ExportJob> job;
-            juce::WaitableEvent ready;
-            juce::MessageManager::callAsync ([&] {
-                job = std::make_unique<ExportJob> (item.song, options, item.file);
-                job->setExtraData (false);
-                ready.signal();
+            JobOnMessageThread slot (*this);
+            auto* job = slot.create ([&item, this] {
+                auto j = std::make_unique<ExportJob> (item.song, options, item.file);
+                j->setExtraData (false);
+                return j;
             });
-            ready.wait();
+            if (job == nullptr)
+                break; // (cancelled)
 
             juce::String error;
             const auto base = (double) i / (double) items.size();
@@ -1170,12 +1187,7 @@ public:
             else if (! threadShouldExit())
                 failed = true;
 
-            juce::WaitableEvent gone;
-            juce::MessageManager::callAsync ([&] {
-                job.reset();
-                gone.signal();
-            });
-            gone.wait();
+            slot.release();
         }
     }
 

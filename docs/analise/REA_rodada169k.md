@@ -21,11 +21,11 @@ L > 1 day. Rank = impact × 1/effort, user requests first among equals.
 |---|---|---|---|---|---|---|
 | 1 | **Render several patterns at once** from the Playlist picker (Quick render / Render as audio clip / Render and replace on the picked patterns) | §2.1 [DECOMP 0x11884b0 `PSPatQuickRenderMenuClick`] | current pattern only (`renderPatternAsAudioClip`, REA_rodada168e §3.2) | M | M | **this round** |
 | 2 | **Picker multi-selection** (click / Ctrl+click / Shift+click / right-click keeps the selection) — needed by #1 | §2.2 [DECOMP 0xe4d5d0 `PickerPanelMouseDown`, 0xe4e080 `PickerPanelMouseUp`] | single click only (`PatternPicker`) | M | S | **this round** (with #1) |
-| 3 | **Plugin picker as FL's full view** (§2.5) (the "tab scroll" a user asked for): every plugin of the Plugin database as a tile, grouped by category | View › Plugin picker, `ShowPluginPickerAction` → FUN_00ebf510(0, -1, -10) [DECOMP 0xf1c240]; Channel menu "Open plugin picker" → same call with the channel kind [DECOMP 0x11ffcb0]; [STR] "To make a favorite plugin in the Plugin database, Plugin picker & Plugin list menus…" | a dialog with a category column and a list (`ui/PluginPicker.cpp`, round 151) | H (request) | M–L | layout needs one planned FL session (the picker is drawn at run time, no DFM: `TPlugListForm` is empty [DFM]) → §3 |
+| 3 | **Plugin picker as FL's full view** (§2.5) (the "tab scroll" a user asked for): every plugin of the Plugin database as a tile, grouped by category | View › Plugin picker, `ShowPluginPickerAction` → FUN_00ebf510(0, -1, -10) [DECOMP 0xf1c240]; Channel menu "Open plugin picker" → same call with the channel kind [DECOMP 0x11ffcb0]; [STR] "To make a favorite plugin in the Plugin database, Plugin picker & Plugin list menus…" | a dialog with a category column and a list (`ui/PluginPicker.cpp`, round 151) | H (request) | M–L | **this round** (§3.3) |
 | 4 | **Step edit** (Options, Ctrl+E): with the transport stopped, played notes are typed into the Piano roll at the cursor, which advances by the snap | `OptionsStepEditAction` "Step edit" ShortCut 16453 = Ctrl+E [DFM]; handler passes the checked state to the editor object (vtable +0xb0) [DECOMP 0xf1e740]; toolbar `StepEditBtn` [DFM] | none | M–H | M | next (Piano roll owner after 169f lands) |
 | 5 | **Multilink to controllers** (Ctrl+J): move several parameters, then several controls, they link in order | `OptionsToggleMultiLinkAction` ShortCut 16458 = Ctrl+J, toolbar `MultiLinkBtn` [DFM] | "Link to controller" one at a time | M–H (controller owners) | M | next |
-| 6 | **Tools › Cancel recording**: drops this pass's recorded notes / automation / audio takes, turns record off, keeps the arming | §2.3 [DECOMP 0xf1d7e0] | none | M | S–M | this round if time |
-| 7 | **View › Align all channel editors** (Shift+F12): every channel editor takes the focused one's position | §2.4 [DECOMP 0xf18a80 → 0x12317c0] | none (Ctrl+F12 / F12 / Alt+F12 exist, round 167o) | L | S | this round if time |
+| 6 | **Tools › Cancel recording**: drops this pass's recorded notes / automation / audio takes, turns record off, keeps the arming | §2.3 [DECOMP 0xf1d7e0] | none | M | S–M | next (after 169c lands: it touches recording note-offs) |
+| 7 | **View › Align all channel editors** (Shift+F12): every channel editor takes the focused one's position | §2.4 [DECOMP 0xf18a80 → 0x12317c0] | none (Ctrl+F12 / F12 / Alt+F12 exist, round 167o) | L | S | **this round** (§3.2) |
 | 8 | Options › General: **Restore previous state after solo** (off), **Create automation clips at the playback position** (on), **Monophonic painting in piano roll** (off), **Auto zip empty channels** (off) | `RememberMuteStateBox`, `CreateAutoClipsAtCursorBox` "Checked": true, `PRPaintModeBox`, `AutoZipBox` "Zip empty channels on pattern change" [DFM MIDIForm/GeneralPage/MiscPanel] | none of the four | L–M | S each | later (each needs its handler traced) |
 | 9 | FL's own templates in File › New from template (Data/Templates: 35 .flp) | REA_rodada168c F1 [FILES] | LYNX templates only | M | S–M | later |
 | 10 | **Enable groups** (Alt+Shift+G) | `OptionsEnableGroupsAction` "Checked": true, ShortCut 41031 [DFM] | none | L–M | M | later |
@@ -117,7 +117,19 @@ has no controls in its DFM).
 | LYNX before | none |
 | LYNX now | View menu + Shift+F12 (`view.alignChannelEditors`): every open Channel settings window moves to the focused one's place (else the selected channel's, else the first open one); windows opened later come up there too (FL stores the place per channel). Envelope windows are left alone. |
 | Tests | `gap169k_align_channel_editors_key` (Shift+F12, no conflicts) |
+| Windows GUI | Kick and Clap editors at different places (`C:\Users\kauan\lynx-test\r169k\a2.png`); Shift+F12 with Kick focused puts Clap exactly under Kick (`a6.png`), with Clap focused the other way round (`a3.png`/`a4.png`) |
 | Not done | plugin (VST) editor windows of channels are not moved; per-channel window places are not saved in the project |
+
+### 3.3 #3 FL-style Plugin picker (branch feature/gap169k-pickerview)
+
+| | |
+|---|---|
+| FL evidence | §2.5 (one FL session, shots p1–p7) |
+| LYNX before | F8 opened the quick-add palette (a searchable list) |
+| LYNX now | `core/PickerView.h` (tab strip: generator categories, "All", effect categories; wheel step clamped at both ends; tile flow) and `ui/PluginPickerView` (veil over the main window, every generator and effect as a tile from the plugin catalog, "Generators" / "Effects" halves in All, bottom tab strip with a mark over the shown tab, pointing at a tab shows it, the wheel or Left/Right steps, a click on a tile adds it — generator = new channel, effect = selected mixer insert — and closes; Esc / F8 close). F8 = `view.pluginPicker` (View › Plugin picker), as in FL; the quick-add palette keeps its toolbar button and View menu item (no default key). |
+| Tests | tests/Gap169kPickerTests.inc (tabs, wheel clamp, tile flow, F8 binding, no conflicts); Issues167o / WorkflowP2 tests now expect F8 → `view.pluginPicker` |
+| Windows GUI | `C:\Users\kauan\lynx-test\r169k\k1.png` (All), `k2.png` (3 wheel notches → Analyzer), `k3.png` (pointing at "Drum" shows Kick, Drumaxx, Drumpad, Fruit Kick, BassDrum) |
+| Not done | FL shows plugin screenshots on the tiles (LYNX draws name + maker; FL's art is not shipped); FL keeps the strip centred on the shown tab with "..." at the ends — LYNX lays the whole strip out once |
 
 ## 4. Needs user decision
 
@@ -129,7 +141,12 @@ has no controls in its DFM).
 
 ## Where I stopped
 
-- Done: §1 ranking, §2 FL evidence for #1, #2, #6, #7.
-- In progress: #1 + #2 on branch feature/gap169k-patrender.
-- Next: #6, #7 (feature/gap169k-recview), then the plugin picker layout (#3) with one planned FL session.
-- Rerun: `~/.claude/jobs/f8789b49/tmp/r169k/g.sh <out.c> <depth> <hex addr…>` (Ghidra, read-only, under the lock).
+- Done: §1 ranking, §2 FL evidence (#1, #2, #3, #6, #7). Landed: #1+#2 feature/gap169k-patrender (48513ed1; Windows GUI
+  check on NewStuff.flp: 3 picked patterns → 3 audio clip channels, one Undo removes all three; shots
+  `C:\Users\kauan\lynx-test\r169k\g2.png`, `g5c.png`, `g8c.png`). #3
+  feature/gap169k-pickerview (2c313486). #7 feature/gap169k-align: queued on the train with the Windows GUI check done.
+- Next (not started): #4 Step edit, #5 Multilink, #6 Cancel recording (needs care around 169c's note-off work), #8 the
+  Options › General switches, #9 FL templates. Ctrl+B "Blend recorded notes" left out: LYNX's Playlist / Piano roll use
+  Ctrl+B for Duplicate (as FL's editors do) and the global key would fight them.
+- Rerun: `~/.claude/jobs/f8789b49/tmp/r169k/g.sh <out.c> <depth> <hex addr…>` (Ghidra, read-only, under the lock);
+  GUI helpers `C:\Users\kauan\lynx-test\r169k\lx.ps1` (fresh profile + test mode) and `in.ps1` (clicks, keys, shots).

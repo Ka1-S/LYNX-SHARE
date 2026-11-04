@@ -2357,6 +2357,14 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             }
         }
 
+        // round 170c: the slot's input peak for an editor's level meter (only while an editor asks)
+        const bool levels = key < times->levelWanted.size() && times->levelWanted[key].load (std::memory_order_relaxed) > 0;
+        if (levels)
+        {
+            auto& in = times->slotLevels[key * 2];
+            in.store (std::max (in.load (std::memory_order_relaxed), std::max (peakOf (l, n), peakOf (r, n))), std::memory_order_relaxed);
+        }
+
         if (slots[i].kind == EffectKind::hardwareInsert && wet < 0.999f)
         {
             auto params = slots[i].params; // copy without allocation
@@ -2414,6 +2422,12 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
                 l[k] = dl[k] + (l[k] - dl[k]) * wet;
                 r[k] = dr[k] + (r[k] - dr[k]) * wet;
             }
+        }
+
+        if (levels) // round 170c: and its output peak
+        {
+            auto& out = times->slotLevels[key * 2 + 1];
+            out.store (std::max (out.load (std::memory_order_relaxed), std::max (peakOf (l, n), peakOf (r, n))), std::memory_order_relaxed);
         }
 
         // ... and its output

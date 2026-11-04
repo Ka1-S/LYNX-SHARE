@@ -254,7 +254,8 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     addChildComponent (*blocksView);
 
     grid::fillEditorBox (snapBox);
-    snapBox.setTooltip (tr ("Playlist grid: follows the global grid in the toolbar, or its own; hold Alt while dragging to ignore it"));
+    snapBox.setTooltip (tr ("Playlist snap (magnet): \"Main\" follows the snap in the toolbar, or pick this window's own; hold Alt while dragging to ignore it"));
+    ui::setQuickTip (snapBox, tr ("Playlist snap"));
     snapBox.setWantsKeyboardFocus (false);
     snapBox.setMouseClickGrabsKeyboardFocus (false);
     snapBox.onChange = [this] { repaint(); };
@@ -5450,7 +5451,7 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
             hint.hasMenu = true;
             return hint;
         }
-        hint.text = tr ("Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag: zoom  [RMB] click: menu  [Alt] no snap");
+        hint.text = tr ("Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap");
         hint.hasMenu = true;
         return hint;
     }
@@ -5658,7 +5659,7 @@ void PlaylistComponent::addAudioClipAtPlayhead (const juce::File& file)
     addAudioClip (engine, file, start, track, true);
 }
 
-void PlaylistComponent::glideBy (double ticks, double pixels)
+void PlaylistComponent::glideBy (double ticks, double pixels, bool immediate)
 {
     if (! gliding)
     {
@@ -5670,6 +5671,17 @@ void PlaylistComponent::glideBy (double ticks, double pixels)
     const auto grid = gridArea();
     glideX.target = juce::jlimit (0.0, juce::jmax (0.0, hBar.getMaximumRangeLimit() - grid.getWidth() / pixelsPerTick), glideX.target + ticks);
     glideY.target = juce::jlimit (0.0, juce::jmax (0.0, (double) tracksHeight() - grid.getHeight()), glideY.target + pixels);
+    if (immediate)
+    {
+        scrollTicks = glideX.target;
+        scrollY = (int) std::round (glideY.target);
+        gliding = false;
+        updateScrollBars();
+        glideX.jumpTo (scrollTicks); // the scroll bar may have clamped it
+        glideY.jumpTo (scrollY);
+        repaint();
+        return;
+    }
     glideFrame();
 }
 
@@ -5694,8 +5706,27 @@ void PlaylistComponent::glideFrame()
     repaint();
 }
 
-void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
+void PlaylistComponent::mouseMagnify (const juce::MouseEvent& e, float scale)
 {
+    gliding = false;
+    const auto factor = gesture::pinchZoomFactor (scale);
+    if (e.mods.isAltDown()) // the track heights, around the pointer
+    {
+        setTrackZoom (trackZoom * factor, e.y);
+        return;
+    }
+    const auto anchorPixels = (double) juce::jmax (0, e.x - headerWidth);
+    const auto zoomed = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), pixelsPerTick * factor);
+    scrollTicks = gesture::zoomAnchored (scrollTicks, pixelsPerTick, zoomed, anchorPixels);
+    pixelsPerTick = zoomed;
+    zoomBeforeAll = 0.0;
+    updateScrollBars();
+    repaint();
+}
+
+void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& rawWheel)
+{
+    const auto wheel = flmods::normalisedWheel (rawWheel); // Windows touchpads: pieces of a notch (round 170e)
     const auto ctrl = flmods::ctrl (e.mods), alt = e.mods.isAltDown(), shift = e.mods.isShiftDown();
 
     // Shift+wheel over a track header: moves the track up / down
@@ -5755,12 +5786,12 @@ void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::M
         return;
     }
 
-    // plain wheel: up/down (Shift: left/right); a horizontal wheel or trackpad swipe scrolls sideways
+    // plain wheel: up/down (Shift: left/right); a horizontal wheel or trackpad swipe scrolls sideways (a trackpad at once)
     if (shift)
-        glideBy (gesture::wheelScrollPixels (wheel.deltaY, wheel.isSmooth, 120.0) / pixelsPerTick, 0.0);
+        glideBy (gesture::wheelScrollPixels (wheel.deltaY, wheel.isSmooth, 120.0) / pixelsPerTick, 0.0, wheel.isSmooth);
     else
         glideBy (gesture::wheelScrollPixels (wheel.deltaX, wheel.isSmooth, 80.0) / pixelsPerTick,
-                 gesture::wheelScrollPixels (wheel.deltaY, wheel.isSmooth, 2.0 * defaultRowHeight()));
+                 gesture::wheelScrollPixels (wheel.deltaY, wheel.isSmooth, 2.0 * defaultRowHeight()), wheel.isSmooth);
 }
 
 void PlaylistComponent::scrollBarMoved (juce::ScrollBar* bar, double start)

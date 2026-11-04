@@ -220,7 +220,9 @@ $CXX $FLAGS $CORE $WAVPACK tools/wavetravellerrender.cpp -o build-local/wavetrav
 
 # (the tools queued above: build them in parallel, at most half the cores at once, an LTO link takes ~4 GB)
 if [[ -n "$TOOLS_QUEUE" && -f "$TOOLS_QUEUE" ]]; then
-    tools_jobs=$(( $(nproc 2>/dev/null || echo 4) / 2 )); (( tools_jobs < 2 )) && tools_jobs=2; (( tools_jobs > 6 )) && tools_jobs=6
+    # 2026-11-04: in parallel the tools deadlocked inside zig's shared object cache (every zig process waiting on a
+    # manifest lock another one held, 0 % CPU for hours). One at a time by default; LYNX_TOOLS_JOBS=n to try more.
+    tools_jobs=${LYNX_TOOLS_JOBS:-1}
     xargs -P "$tools_jobs" -d '\n' -I{} bash -c '{}' < "$TOOLS_QUEUE"
     rm -f "$TOOLS_QUEUE"
 fi

@@ -7,9 +7,9 @@ namespace lynx::scorelog
 {
 Log::Log (std::size_t capacity) : ring (std::max<std::size_t> (1, capacity)) {}
 
-void Log::noteOn (double ms, int channel, int key, float velocity) noexcept
+void Log::noteOn (double ms, int channel, int key, float velocity, double tick, bool recorded) noexcept
 {
-    ring[head] = { ms, -1.0, channel, key, velocity };
+    ring[head] = { ms, -1.0, channel, key, velocity, tick, recorded };
     head = (head + 1) % ring.size();
     count = std::min (count + 1, ring.size());
 }

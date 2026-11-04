@@ -165,4 +165,78 @@ std::optional<std::vector<std::uint8_t>> Opener::open (const std::vector<std::ui
         *senderOut = sender;
     return std::vector<std::uint8_t> (inner.begin() + 16, inner.end());
 }
+// --- the host's identity -------------------------------------------------------------------------------------------
+
+namespace
+{
+std::vector<std::uint8_t> hostMessage (const std::string& room, const std::string& nonce)
+{
+    const std::string text = "LYNX SHARE live host v1|" + room + "|" + nonce;
+    return { text.begin(), text.end() };
+}
+} // namespace
+
+Seed newSeed()
+{
+    Seed s {};
+    randomBytes (s.data(), s.size());
+    return s;
+}
+
+PublicKey publicKeyOf (const Seed& seed)
+{
+    auto copy = seed; // (Monocypher wipes the seed it is given)
+    std::uint8_t secret[64];
+    PublicKey pub {};
+    crypto_eddsa_key_pair (secret, pub.data(), copy.data());
+    crypto_wipe (secret, sizeof secret);
+    return pub;
+}
+
+Signature signHost (const Seed& seed, const std::string& room, const std::string& nonce)
+{
+    auto copy = seed;
+    std::uint8_t secret[64];
+    PublicKey pub {};
+    crypto_eddsa_key_pair (secret, pub.data(), copy.data());
+    const auto m = hostMessage (room, nonce);
+    Signature sig {};
+    crypto_eddsa_sign (sig.data(), secret, m.data(), m.size());
+    crypto_wipe (secret, sizeof secret);
+    return sig;
+}
+
+bool checkHost (const PublicKey& key, const std::string& room, const std::string& nonce, const Signature& signature)
+{
+    const auto m = hostMessage (room, nonce);
+    return crypto_eddsa_check (signature.data(), key.data(), m.data(), m.size()) == 0;
+}
+
+std::string toHex (const std::uint8_t* data, std::size_t size)
+{
+    static const char* digits = "0123456789abcdef";
+    std::string out;
+    out.reserve (size * 2);
+    for (std::size_t i = 0; i < size; ++i)
+        out += digits[data[i] >> 4], out += digits[data[i] & 15];
+    return out;
+}
+
+bool fromHex (const std::string& hex, std::uint8_t* out, std::size_t size)
+{
+    if (hex.size() != size * 2)
+        return false;
+    auto nibble = [] (char c) {
+        return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
+    };
+    for (std::size_t i = 0; i < size; ++i)
+    {
+        const int hi = nibble (hex[2 * i]), lo = nibble (hex[2 * i + 1]);
+        if (hi < 0 || lo < 0)
+            return false;
+        out[i] = (std::uint8_t) (hi << 4 | lo);
+    }
+    return true;
+}
 } // namespace lynx::livecrypto
+

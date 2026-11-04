@@ -67,7 +67,7 @@ TEST (design168n_engine_param_tables)
             CHECK (findEngineParam (*table, p.index) == &p);
         }
     }
-    CHECK (findEngineParam (toxicParams(), 200) == nullptr); // (the sequencer is not modelled)
+    CHECK (findEngineParam (toxicParams(), 294) == nullptr); // (an internal value; round 169h listed the sequencer)
     const auto* poly = findEngineParam (toxicParams(), 301);
     CHECK (poly != nullptr && poly->stepped && poly->raw (1.0f) == 32.0f && poly->raw (0.5f) == 16.0f);
     const auto* unison = findEngineParam (poizoneParams(), 75);
@@ -117,7 +117,7 @@ TEST (design168n_model_params_read_and_write_the_state)
     CHECK (modelparams::rawValue (c, 301) == 8.0f); // polyphony 8
     CHECK (modelparams::setValue01 (c, 15, 0.25f) && modelparams::rawValue (c, 15) == 0.25f);
     CHECK (modelparams::setValue01 (c, 300, 1.0f) && modelparams::rawValue (c, 300) == 3.0f); // filter mode HP
-    CHECK (! modelparams::setValue01 (c, 200, 0.5f));                                           // not listed
+    CHECK (! modelparams::setValue01 (c, 294, 0.5f));                                           // not listed
 
     // automation clips: the Song reads and writes them like any target
     Song s;

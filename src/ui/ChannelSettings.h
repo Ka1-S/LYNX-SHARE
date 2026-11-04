@@ -12,6 +12,9 @@ void openChannelSettings (AudioEngine& engine, int channel);
 // Shows insert `insert` in the Mixer (the main window sets it): a double-click on the channel window's TRACK box, as in FL.
 std::function<void (int insert)>& openMixerInsertHandler();
 void closeChannelSettings();
+// FL's View › Align all channel editors (Shift+F12): every open channel editor moves to the focused one's place (else the
+// selected channel's), and channel editors opened later come up there too (round 169k).
+void alignAllChannelEditors (int selectedChannel);
 
 // Channel button toggle (Channel Rack): which kinds have a settings window, and whether it is open.
 bool hasChannelSettings (InstrumentKind kind) noexcept;
@@ -33,6 +36,9 @@ std::unique_ptr<juce::Component> makeChannelPrecomputePanel (AudioEngine& engine
 // The whole channel window (REA round 143b): FL's header strip (tabs; On, Pan, Vol, Track) over the instrument page,
 // the "Envelope / instrument" tab (synth, sampler) and the "Misc" tab. `tab` < 0 = the Misc tab.
 std::unique_ptr<juce::Component> makeChannelFrame (AudioEngine& engine, int channel, int tab = 0);
+// The designed plugin page inside a channel window shows page `page` (screenshots, round 169h); returns the page count
+// of its layout (0 = no pages)
+int showChannelLayoutPage (juce::Component& frame, int page);
 
 // A Patcher node's built-in generator (round 164f): the same pages as on a channel — the instrument's page and, for
 // the synth and the sampler, the Envelope / instrument tab — editing the node `locate` finds. Null: no page for it.

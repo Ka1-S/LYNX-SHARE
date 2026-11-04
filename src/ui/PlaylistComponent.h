@@ -87,6 +87,8 @@ public:
     ui::Hint hintAt (juce::Point<int> position) override;
     void mouseDoubleClick (const juce::MouseEvent& e) override;
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
+    // trackpad pinch (macOS; Windows touch screens): time zoom around the pointer, with Alt the vertical zoom (round 170e)
+    void mouseMagnify (const juce::MouseEvent& e, float scale) override;
 
     // Editing shortcuts; the main window forwards keys when the Playlist is visible.
     bool handleKey (const juce::KeyPress& key);
@@ -385,7 +387,8 @@ private:
     // smooth wheel scrolling
     gesture::Glide glideX, glideY;
     bool gliding = false;
-    void glideBy (double ticks, double pixels);
+    // `immediate`: a trackpad's smooth scroll moves the view at once (the fingers carry it; round 170e)
+    void glideBy (double ticks, double pixels, bool immediate = false);
     void glideFrame();
     juce::VBlankAttachment vblank { this, [this] { glideFrame(); } };
 

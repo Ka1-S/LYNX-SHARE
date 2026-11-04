@@ -1785,6 +1785,9 @@ struct BooBassTables
 };
 
 constexpr const char* booBassSha256 = "4e10efcd9f945860911e7cdff9c4065c4f193b58ddffc8304b45add1db51705f";
+// FL Studio 2025.1.6's build (peImageSha256Hex, round 169g): 38 bytes differ from 2026's (link time stamps, the debug
+// directory), not the multisample: tests/Crash169gTests.inc renders both alike
+constexpr const char* booBassImageSha256Fl25 = "ed3affa1bf8e0fef431857a4f2d38d831512531f410ef091fa87a888574ac323";
 
 std::unique_ptr<BooBassTables> loadBooBassTables (const std::string& path)
 {
@@ -1798,8 +1801,10 @@ std::unique_ptr<BooBassTables> loadBooBassTables (const std::string& path)
     if (! in)
         return nullptr;
     const std::vector<std::uint8_t> b ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
-    if (b.size() < 0x1000 || sha256Hex (b.data(), b.size()) != booBassSha256)
-        return nullptr; // only the decoded build
+    if (b.size() < 0x1000)
+        return nullptr;
+    if (const auto image = peImageSha256Hex (b); image != booBassSha256 && image != booBassImageSha256Fl25)
+        return nullptr; // only the decoded builds
     auto rd = [&] (std::size_t off, auto& v) { if (off + sizeof (v) <= b.size()) std::memcpy (&v, b.data() + off, sizeof (v)); };
     std::uint32_t pe = 0;
     rd (0x3c, pe);
