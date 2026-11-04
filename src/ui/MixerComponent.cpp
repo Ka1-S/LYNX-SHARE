@@ -1480,8 +1480,8 @@ void MixerStrips::showSendMenu (int t)
                 linked += fx.sidechain == from ? 1 : 0;
         });
         if ((kind == K::sidechain || kind == K::sidechainOnly) && linked == 0)
-            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Sidechain"),
-                                                    tr ("The link was made; add a compressor to this insert to use it."));
+            // (round 170h: in the hint bar, not a box — FL says nothing here; adding the compressor links it)
+            ui::postHint ({ tr ("Sidechain") + ": " + tr ("The link was made; add a compressor to this insert to use it."), {} }, 6000);
     };
     menu.addItem (tr ("Route to this track"), can && ! on, false, [route] { route (K::route); });
     menu.addItem (tr ("Route to this track only"), can, false, [route] { route (K::routeOnly); });
@@ -4761,13 +4761,13 @@ void EffectsPanel::showAddMenu (int)
             {
                 effects.push_back (std::move (fx));
                 added = true;
+                mixerops::linkAddedSidechain (song, t, (int) effects.size() - 1);
             }
         });
         if (! added)
             return;
         selectedSlot = (int) slots()->size() - 1;
-        if ((*slots())[(std::size_t) selectedSlot].kind == EffectKind::plugin)
-            openPluginWindow (selectedSlot);
+        openEditor (selectedSlot); // FL opens the effect's window when it is loaded (round 170h, fl-09)
         repaint();
     };
     auto picks = quickpick::renamedEffects (engine, addFx);
@@ -4781,12 +4781,18 @@ void EffectsPanel::showAddMenu (int)
             const auto made = newAddableEffect (kind, engine.getSong().bpm);
             if (! made)
                 return;
+            const auto before = slots()->size();
             engine.editSong ([t = track, fx = *made] (Song& song) {
                 auto& effects = song.mixer[(std::size_t) t].effects;
                 if ((int) effects.size() < maxEffectSlots)
+                {
                     effects.push_back (fx);
+                    mixerops::linkAddedSidechain (song, t, (int) effects.size() - 1); // round 170h
+                }
             });
             selectedSlot = (int) slots()->size() - 1;
+            if (slots()->size() > before)
+                openEditor (selectedSlot); // (round 170h: FL opens a new effect's window, Fruity Parametric EQ 2 in fl-09)
             repaint();
         });
 
@@ -4796,12 +4802,18 @@ void EffectsPanel::showAddMenu (int)
         if (! entry.instrument)
             equivalents.addItem (juce::String::fromUTF8 (entry.product.c_str()) + juce::String::fromUTF8 (" \xe2\x86\x92 ") + juce::String::fromUTF8 (effectInfo (entry.effect).name),
                                  [this, entry] {
+                                     const auto before = slots()->size();
                                      engine.editSong ([t = track, entry] (Song& song) {
                                          auto& effects = song.mixer[(std::size_t) t].effects;
                                          if ((int) effects.size() < maxEffectSlots)
+                                         {
                                              effects.push_back (makeSubstituteSlot (entry));
+                                             mixerops::linkAddedSidechain (song, t, (int) effects.size() - 1);
+                                         }
                                      });
                                      selectedSlot = (int) slots()->size() - 1;
+                                     if (slots()->size() > before)
+                                         openEditor (selectedSlot);
                                      repaint();
                                  });
     if (equivalents.getNumItems() > 0)
@@ -5393,9 +5405,11 @@ void MixerLayoutBox::paint (juce::Graphics& g)
     theme::fillRoundRect (g, box, radius::sm, hot ? colour::bg4 : colour::bg2);
     g.setColour (hot ? colour::borderStrong : colour::border);
     g.drawRoundedRectangle (box.reduced (0.5f), radius::sm, 1.0f);
+    // round 170e: the strips icon names what the box is (it showed only "Wide")
+    icons::draw (g, Icon::mixer, box.withWidth (24.0f).withSizeKeepingCentre (14.0f, 14.0f), hot ? colour::textPrimary : colour::textSecondary);
     g.setColour (colour::accent);
     g.setFont (font (type::small, true));
-    g.drawFittedText (tr (juce::String (std::string (mixerlayout::nameOf (MixerStrips::layout)))), getLocalBounds().reduced (8, 0).withTrimmedRight (14),
+    g.drawFittedText (tr (juce::String (std::string (mixerlayout::nameOf (MixerStrips::layout)))), getLocalBounds().reduced (8, 0).withTrimmedLeft (18).withTrimmedRight (14),
                       juce::Justification::centredLeft, 1, 0.8f);
     icons::draw (g, Icon::chevronDown, box.removeFromRight (18.0f).withSizeKeepingCentre (12.0f, 12.0f), hot ? colour::textPrimary : colour::textSecondary);
 }

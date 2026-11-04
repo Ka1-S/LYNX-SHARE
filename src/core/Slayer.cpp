@@ -121,6 +121,9 @@ inline float bitsF (std::uint32_t u) noexcept
 
 // ------------------------------------------------------------------------------------------------ installation data
 constexpr const char* engineSha256 = "84b64c43cc6528401e1c4e84074785e100e8453c4db4c8322a5d5f608de724a9";
+// the same engine without its signature (peImageSha256Hex, round 169g): FL Studio 2025 ships this image signed with
+// another certificate, so its whole-file hash differs while every byte LYNX reads is the same
+constexpr const char* engineImageSha256 = "f33fd40e8fd530a25715dab192c8b5cb05b319f04b14b691c210ae562c73a07d";
 
 struct DllData
 {
@@ -146,7 +149,7 @@ std::shared_ptr<const DllData> loadDll (const std::string& path)
     if (! in)
         return nullptr;
     const std::vector<std::uint8_t> b ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
-    if (b.size() < 0x1000 || sha256Hex (b.data(), b.size()) != engineSha256)
+    if (b.size() < 0x1000 || (sha256Hex (b.data(), b.size()) != engineSha256 && peImageSha256Hex (b) != engineImageSha256))
         return nullptr;
     auto rd = [&] (std::size_t off, auto& v) { if (off + sizeof (v) <= b.size()) std::memcpy (&v, b.data() + off, sizeof (v)); };
     std::uint32_t pe = 0;

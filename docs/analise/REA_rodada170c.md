@@ -157,8 +157,9 @@ Fruity Delay 3 / Delay Bank dividers and repeats, Gross Beat, Patcher MIDI chann
   state cannot be edited (`stateparams::Table::with` leaves it unchanged): on a machine without FL those controls are
   dead. Open: a built-in default state for Maximus / Vocodex (a new instance without FL), see the audit table.
 - macOS: CI app job (artifact editor-pictures-macOS, steppertest.txt).
-Before the change the same probe failed the body click (nothing), the trackpad (one tiny event = a whole step,
-so a scroll jumped several values) and, on captioned steppers, the lower part of the up arrow.
+What was wrong before (from the code, not re-run): a click on the value did nothing (0.1.23; part 1 made it step),
+every tiny trackpad event counted as a whole wheel notch, and on captioned steppers the up / down split sat half a
+caption too low, so the lower part of the up arrow stepped down.
 Instrument editors (Sytrus, Toxic, 3x Osc...) have their own steppers (the generator editor), not covered by this
 probe yet.
 

@@ -7,6 +7,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/KeyMap.h"
+#include "core/Performance.h"
 #include "ui/UiTrace.h"
 #include "core/ToolbarLayout.h"
 #include "core/ValueMath.h"
@@ -55,6 +56,7 @@ public:
     void openFile (const juce::File& file);
     void showSetupWizard(); // first run, or Options > Setup wizard (an overlay over this component)
     void closeSetupWizardForSnapshot() { setupOverlay.reset(); }
+    void refreshTweakReadoutForSnapshot() { refreshTweakReadout(); resized(); }
 
     // Asks "save changes?" if there are any; `then` runs unless the user cancels.
     void confirmDiscard (std::function<void()> then);
@@ -154,6 +156,14 @@ private:
     // too takes the plain letter keys for the piano: P / E / R played notes and K (next channel) did nothing.
     bool typingPiano = true;
     int typingOctave = keys::typingpiano::defaultOctave, typingRoot = 0; // the button's right-click menu, as FL's
+    int typingLayout = keys::typingpiano::pianoLayout();
+    // the typing keyboard's notes launching performance clips (FL: they are MIDI channel 1, see keyPressed): its own
+    // offsets and modifier keys (notes 120..127), and the keys held down with the notes they launched
+    perf::MidiMapping typingPerformance;
+    std::map<int, std::vector<int>> typingLaunches;
+    static bool isPlainKey (const keys::Chord& chord) noexcept; // no Ctrl / Alt / Shift
+    keys::TypingKey typingKey (const keys::Chord& chord) const; // what the typing keyboard does with it (nothing when off)
+    void releaseTypingLaunches (bool all); // the released keys' launches (all: every one)
     int lastCurrentPattern = -1; // ("Select first channel with notes when the pattern changes")
     void setTypingPiano (bool on);
     void toggleTypingPiano(); // the user's toggle (button, menus, Ctrl+T): also says so in the hint bar
@@ -425,6 +435,9 @@ private:
                                                                  IconButton { "browserPanel", Icon::browser } };
     IconButton pluginPickerButton { "pluginPicker", Icon::pluginPicker };
     GlobalGridBox gridBox; // global grid of the editors (see ui/EditorTools.h)
+    // FL's Snap panel: the magnet before the snap box (TToolbarForm.SnapLabel, a click toggles the snap like Backspace;
+    // round 170e, Busy Works review #5)
+    IconButton snapToggleButton { "snapToggle", Icon::magnet };
     std::vector<int> dividers; // x positions of the toolbar panel separators
     juce::Rectangle<int> snapLabelArea, patternLabelArea, titleArea, transportArea;
     std::unique_ptr<ui::QuickTipWindow> quickTips; // the tool names under the mouse (ui/HintBar.h)
