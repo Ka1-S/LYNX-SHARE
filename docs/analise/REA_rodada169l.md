@@ -149,4 +149,5 @@ the glide itself is right: −700 → 0 cents relative).
 
 - Done: §1–§5 code + tests; one fresh FL render of `g169l.flp` compared against LYNX `renderwav` (§5).
 - Done: the Windows `--export` vs FL's `g169l.wav` (§5).
-- In progress: full build-local after merging origin/main, then the landing train.
+- Done: build-local after merging origin/main (1 963 900 checks, 0 failures); with FL's Data dir `gen169l`, `mono168l_every`,
+  `natives142`, `drumaxx169e` pass. Next: the landing train.
