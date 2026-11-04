@@ -2610,6 +2610,182 @@ inline const Theme& waspTheme()
     return t;
 }
 
+// === LYNX Soundfont: a sound library — deep navy, shelves of preset cartridges, azure and mint ======================
+
+inline void canvasSoundFont (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    if (! reduced) bloom (g, { a.getRight() - a.getWidth() * 0.15f, a.getY() }, a.getWidth() * 0.4f, p.accent, 0.10f);
+    if (display) return;
+    // shelves of cartridges, each with its own little waveform, fading out to the left
+    juce::Random rnd (158);
+    const auto cw = 34.0f, ch = 22.0f;
+    for (int shelf = 0; shelf < 3; ++shelf)
+    {
+        const auto y = a.getY() + 10.0f + (float) shelf * (ch + 12.0f);
+        g.setColour (p.accent.withAlpha (0.10f));
+        g.fillRect (Rectangle<float> (a.getX() + a.getWidth() * 0.35f, y + ch + 3.0f, a.getWidth() * 0.63f, 1.5f));
+        for (auto x = a.getRight() - cw - 12.0f; x > a.getX() + a.getWidth() * 0.35f; x -= cw + 6.0f)
+        {
+            const auto fade = juce::jlimit (0.0f, 1.0f, (x - a.getX() - a.getWidth() * 0.35f) / (a.getWidth() * 0.3f));
+            const auto card = Rectangle<float> (x, y, cw, ch);
+            const auto col = rnd.nextFloat() < 0.25f ? p.accent2 : p.accent;
+            g.setColour (col.withAlpha (0.08f * fade));
+            g.fillRoundedRectangle (card, 3.0f);
+            g.setColour (col.withAlpha (0.22f * fade));
+            g.drawRoundedRectangle (card, 3.0f, 1.0f);
+            const auto f = 1.0f + (float) rnd.nextInt (4);
+            const auto wave = curve (24, [&] (float u) { return Point<float> (card.getX() + 4.0f + (cw - 8.0f) * u, card.getCentreY() - std::sin (u * f * 6.283f) * std::exp (-u * 2.0f) * ch * 0.3f); });
+            g.setColour (col.withAlpha (0.35f * fade));
+            g.strokePath (wave, juce::PathStrokeType (1.0f));
+        }
+    }
+}
+
+inline void soundFontEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    g.drawRoundedRectangle (Rectangle<float> (r * 2.0f, r * 1.4f).withCentre (c), 2.0f, 1.3f);
+    const auto wave = curve (16, [&] (float u) { return Point<float> (c.x - r * 0.7f + r * 1.4f * u, c.y - std::sin (u * 12.566f) * r * 0.35f); });
+    g.setColour (p.accent2);
+    g.strokePath (wave, juce::PathStrokeType (1.1f));
+}
+
+inline const Theme& soundFontTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "LYNX Soundfont";
+        x.base = Style::glow;
+        x.pal = { Colour (0xff10192c), Colour (0xff050912), Colour (0xff3fa9ff), Colour (0xff5ff2c6), Colour (0xc8121c30), Colour (0xe0080e1a),
+                  Colour (0xff4a6f9a), Colour (0xffe8f3ff), Colour (0xff04070e), Colour (0xffd2e6fb), Colour (0xff5a7a9c), Colour (0xff1c2a40),
+                  Colour (0xff0e2440), Colour (0xff16223a) };
+        x.canvas = canvasSoundFont;
+        x.titleEmblem = soundFontEmblem;
+        x.cap = Cap::orb;
+        x.arcGlow = 0.2f;
+        return x;
+    }();
+    return t;
+}
+
+// === LYNX Synth: the LYNX lab — graphite, LYNX crimson, three oscillator rings and a filter sweep ===================
+
+inline void canvasLynxSynth (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    if (! reduced)
+    {
+        bloom (g, { a.getRight() - a.getWidth() * 0.1f, a.getY() + a.getHeight() * 0.05f }, a.getWidth() * 0.45f, p.accent, 0.10f);
+        bloom (g, { a.getX(), a.getBottom() }, a.getWidth() * 0.35f, p.accent2, 0.05f);
+    }
+    if (display) return;
+    // three oscillators as interlocking rings, each carrying its wave around it
+    const auto R = juce::jmin (a.getWidth(), a.getHeight()) * 0.11f;
+    const auto c0 = Point<float> (a.getRight() - R * 3.2f, a.getY() + R * 1.4f);
+    for (int k = 0; k < 3; ++k)
+    {
+        const auto c = c0.translated ((float) k * R * 1.1f, (k == 1 ? R * 0.5f : 0.0f));
+        const auto ring = curve (180, [&] (float u) {
+            const auto ang = u * juce::MathConstants<float>::twoPi;
+            const auto ph = std::fmod (u * 8.0f, 1.0f);
+            const auto v = k == 0 ? std::sin (ph * 6.283f) : k == 1 ? 1.0f - 2.0f * ph : (ph < 0.5f ? 1.0f : -1.0f);
+            const auto rr = R * (1.0f + 0.08f * v);
+            return Point<float> (c.x + std::cos (ang) * rr, c.y + std::sin (ang) * rr);
+        });
+        g.setColour ((k == 1 ? p.accent2 : p.accent).withAlpha (0.20f));
+        g.strokePath (ring, juce::PathStrokeType (1.3f));
+    }
+    // a filter sweep along the bottom
+    const auto sweep = curve (160, [&] (float u) { return Point<float> (a.getX() + a.getWidth() * u, a.getBottom() - a.getHeight() * 0.06f - squelch (u, 0.7f, 0.5f) * a.getHeight() * 0.1f); });
+    g.setColour (p.accent.withAlpha (0.14f));
+    g.strokePath (sweep, stroke (1.3f));
+}
+
+inline void lynxSynthEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    for (int k = 0; k < 3; ++k)
+    {
+        g.setColour (k == 1 ? p.accent2 : p.accent);
+        g.drawEllipse (Rectangle<float> (r * 1.1f, r * 1.1f).withCentre (c.translated (((float) k - 1.0f) * r * 0.6f, 0.0f)), 1.2f);
+    }
+}
+
+inline const Theme& lynxSynthTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "LYNX Synth";
+        x.base = Style::glow;
+        x.pal = { Colour (0xff1e1f25), Colour (0xff0a0a0d), Colour (0xffe5383b), Colour (0xffff9f80), Colour (0xd0202128), Colour (0xe40e0e12),
+                  Colour (0xff6a5a60), Colour (0xfff3eeee), Colour (0xff070709), Colour (0xff3a3b42), Colour (0xff17181c), Colour (0xff2e2f36),
+                  Colour (0xfffff2ee), Colour (0xff24252c) };
+        x.canvas = canvasLynxSynth;
+        x.titleEmblem = lynxSynthEmblem;
+        x.drawCap = machinedCap;
+        x.arcGlow = 0.25f;
+        return x;
+    }();
+    return t;
+}
+
+// === Wave Traveller: travelling through a recording — a ribbon of waveform spiralling into a vanishing point ========
+
+inline void canvasWaveTraveller (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    if (! reduced) bloom (g, { a.getRight() - a.getWidth() * 0.2f, a.getY() + a.getHeight() * 0.2f }, a.getWidth() * 0.35f, p.accent2, 0.12f);
+    if (display) return;
+    // a waveform ribbon coiling towards a vanishing point: the playhead travelling back and forth through time
+    const auto vp = Point<float> (a.getRight() - a.getWidth() * 0.2f, a.getY() + a.getHeight() * 0.2f);
+    const auto ribbon = curve (700, [&] (float u) {
+        const auto ang = u * 18.0f;
+        const auto rad = a.getWidth() * 0.5f * std::pow (1.0f - u, 1.6f);
+        const auto wob = std::sin (u * 380.0f) * 6.0f * (1.0f - u);
+        return Point<float> (vp.x - std::cos (ang) * (rad + wob), vp.y + std::sin (ang) * (rad + wob) * 0.45f);
+    });
+    g.setColour (p.accent.withAlpha (0.10f));
+    g.strokePath (ribbon, juce::PathStrokeType (1.0f));
+    g.setColour (p.accent2.withAlpha (0.5f));
+    g.fillEllipse (Rectangle<float> (5.0f, 5.0f).withCentre (vp));
+}
+
+inline void waveTravellerEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    const auto sp = curve (40, [&] (float u) { const auto ang = u * 9.0f; const auto rr = r * (1.0f - u); return Point<float> (c.x + std::cos (ang) * rr, c.y + std::sin (ang) * rr * 0.7f); });
+    g.setColour (p.accent);
+    g.strokePath (sp, juce::PathStrokeType (1.2f));
+    g.setColour (p.accent2);
+    g.fillEllipse (Rectangle<float> (r * 0.4f, r * 0.4f).withCentre (c));
+}
+
+inline const Theme& waveTravellerTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Wave Traveller";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff111a26), Colour (0xff05080d), Colour (0xff35e0d0), Colour (0xffff5fb0), Colour (0xc8131d2a), Colour (0xe0080d14),
+                  Colour (0xff4a7a8a), Colour (0xffe6fbff), Colour (0xa804070c), Colour (0xff2a4450), Colour (0xff0e1820), Colour (0xff1c2c38),
+                  Colour (0xfff0ffff), Colour (0xff16222e) };
+        x.canvas = canvasWaveTraveller;
+        x.titleEmblem = waveTravellerEmblem;
+        x.cap = Cap::orb;
+        x.pointer = Pointer::glowLine;
+        return x;
+    }();
+    return t;
+}
+
 // === the registry =================================================================================================
 
 const Theme* generatorTheme (Art a)
@@ -2646,6 +2822,9 @@ const Theme* generatorTheme (Art a)
         case Art::slayer: return &slayerTheme();
         case Art::fruitKick: return &fruitKickTheme();
         case Art::wasp: return &waspTheme();
+        case Art::soundFont: return &soundFontTheme();
+        case Art::lynxSynth: return &lynxSynthTheme();
+        case Art::waveTraveller: return &waveTravellerTheme();
         default: return nullptr;
     }
 }
@@ -2685,6 +2864,9 @@ Art artForInstrument (InstrumentKind kind)
         case InstrumentKind::slayer: return Art::slayer;
         case InstrumentKind::fruitkick: return Art::fruitKick;
         case InstrumentKind::wasp: return Art::wasp;
+        case InstrumentKind::soundfont: return Art::soundFont;
+        case InstrumentKind::synth: return Art::lynxSynth;
+        case InstrumentKind::wavetraveller: return Art::waveTraveller;
         default: return Art::none;
     }
 }
