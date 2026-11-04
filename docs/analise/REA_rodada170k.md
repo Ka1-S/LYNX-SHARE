@@ -39,19 +39,22 @@ Controllers and visual tools keep their automatic style: Peak Controller, Formul
 Spectroman, XY / XYZ Controller, Control Surface, Hardware Insert, Big Clock, Tuner, HTML Notebook, Scratcher,
 Transporter. Newtone / Newtime have their own full editors (not the effect panel): a later pass.
 
-## Perf (real Windows windows, `--artgui`, % of one core over 6 s; machine load average 14-16, so very noisy)
+## Perf (real Windows windows, `--artgui`, process CPU % of one core over 6 s, two runs, load average ~4-5)
 
-| editor (animated) | before | Themed, animating | Themed, motion off |
+| editor (animated) | before (old style) | Themed, animating | Themed, motion off |
 |---|---|---|---|
-| Halo (10 rising sparkles) | 4.9 | 14.8 | 7.0 |
-| Echoform (two turning reels) | 6.5 | 9.3 | 2.6 |
-| Orbit (orbiting electron) | 10.7 | 9.6 | 3.6 |
-| Hyper Chorus (scrolling grid) | 1.8 | 12.0 | 20.8 (noise) |
-| Vintage Phaser (sweep) | 3.6 | 15.9 | 3.6 |
+| Halo (10 rising sparkles, 15 fps) | 2.6-2.9 | 4.4-5.5 | 0.8-2.9 |
+| Echoform (two turning reels, 12 fps) | 1.6-2.3 | 4.2-4.4 | 1.6 |
+| Orbit (orbiting electron, 12 fps) | 3.4-3.6 | 1.8-2.9 | 3.1-5.5 |
+| Fruity Delay 3 (lamp, 10 fps, lamp corner only) | 2.1-3.6 | 4.2-4.4 | 0.5-2.9 |
+| Hyper Chorus (grid, 12 fps, right 120 px only) | 1.6-4.4 | 4.7 (one 15.8 outlier) | 1.8-2.1 |
+| Vintage Phaser (lamp, 12 fps, lamp corner only) | 2.3-2.9 | 5.2 | 1.8 (one 14.3 outlier) |
+| Gross Beat (record, 12 fps, record corner only) | 2.6-3.6 | 1.8-2.3 | 1.8-3.9 |
 
-Static-only themes read the same as before (1-5 %, single-run noise up to 20 %). A re-measure on a quiet machine is
-pending; the stage-repaint themes (Echoform, Orbit, Delay 3, Hyper Chorus, Vintage Phaser, Gross Beat) repaint only
-the stage strip right of the menus at 20 Hz.
+The first measurement (20 fps, the whole stage strip repainted) cost Gross Beat +20-28 % and Delay 3 / Vintage Phaser
++6-7 %: the editor under the strip redrew at every frame. Fixed with `Theme::hz` (170j) and a new optional
+`Theme::motionArea` (the corner the painter animates; self-tested: inside the stage, under half of it). Static themes
+cost nothing extra (the canvas is cached).
 
 ## Where I stopped
 
