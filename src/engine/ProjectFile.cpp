@@ -1333,6 +1333,8 @@ juce::var channelToVar (const ChannelDef& c)
         }
         if (! c.sampler.useLoopPoints)
             sampler->setProperty ("useLoopPoints", false);
+        if (c.sampler.flVelocityLaw)
+            sampler->setProperty ("flVelocityLaw", true);
         if (c.sampler.declickMode != 0)
             sampler->setProperty ("declickMode", c.sampler.declickMode);
         if (! c.sampler.flVolumeEnvelope.empty())
@@ -1650,6 +1652,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
             p.clip = (bool) pre.getProperty ("clip", false);
         }
         def.sampler.useLoopPoints = (bool) s.getProperty ("useLoopPoints", true);
+        def.sampler.flVelocityLaw = (bool) s.getProperty ("flVelocityLaw", false);
         def.sampler.declickMode = juce::jlimit (0, 5, (int) s.getProperty ("declickMode", 0));
 
         if (auto* env = s["flVolumeEnvelope"].getArray(); env != nullptr && env->size() == 18)

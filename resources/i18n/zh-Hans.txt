@@ -7065,8 +7065,11 @@ countries: cn sg
 "Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "单击选择插入轨道 (Ctrl+单击或横向拖过: 范围, Ctrl+Shift: 添加或移除), 右键打开菜单; Alt+左/右移动选择"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "效果槽: 单击显示或隐藏其窗口 (及下方旋钮), LED 旁通, 滚轮或拖动将其上移或下移, 右键: 选项"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "打开效果器窗口 (完整控件, 与 FL 相同); 单击槽名称效果相同"
+"Themed" = "主题"
+"Animate the plugin art (falling petals, glows; Themed style)" = "插件美术动画（飘落的花瓣、光晕；主题样式）"
 "click to step, drag or mouse wheel to change" = "单击切换，拖动或滚动鼠标滚轮更改"
 "no effect with the current mode (another engine is in use)" = "在当前模式下无效（正在使用另一个引擎）"
+"arrows step, click for the list, drag or mouse wheel to change" = "箭头逐步切换，单击显示列表，拖动或滚动鼠标滚轮更改"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "主：{0}"
@@ -7101,3 +7104,9 @@ countries: cn sg
 "Number of steps" = "步数"
 "Dual" = "双轨"
 "Align all channel editors" = "对齐所有通道编辑器"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "混合录制的音符：开（新音符加入模式中的音符）"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "混合录制的音符：关（替换已录制通道的旧音符）"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "混合录制的音符：开启时，一次录制会把音符加入模式（叠录）；关闭时，替换已录制通道的旧音符"
+"Tempo tapper: tap the beat to set the tempo" = "节拍速度敲击器：敲击节拍来设置速度"
+"Blend recorded notes" = "混合录制的音符"

@@ -7065,8 +7065,11 @@ countries: kr
 "Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "클릭하면 인서트 선택 (Ctrl+클릭 또는 가로질러 드래그: 범위, Ctrl+Shift: 추가 또는 제거), 우클릭하면 메뉴; Alt+왼쪽/오른쪽으로 선택 이동"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "이펙트 슬롯: 클릭하면 창 (과 아래 노브) 표시/숨김, LED는 바이패스, 휠 또는 드래그로 위아래 이동, 우클릭: 옵션"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "이펙트 창 열기 (FL처럼 모든 컨트롤); 슬롯 이름을 클릭해도 같음"
+"Themed" = "테마"
+"Animate the plugin art (falling petals, glows; Themed style)" = "플러그인 아트 애니메이션 (떨어지는 꽃잎, 빛; 테마 스타일)"
 "click to step, drag or mouse wheel to change" = "클릭하면 다음 값, 드래그나 마우스 휠로 변경"
 "no effect with the current mode (another engine is in use)" = "현재 모드에서는 효과 없음 (다른 엔진 사용 중)"
+"arrows step, click for the list, drag or mouse wheel to change" = "화살표로 한 단계씩, 클릭하면 목록, 드래그나 마우스 휠로 변경"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "메인: {0}"
@@ -7101,3 +7104,9 @@ countries: kr
 "Number of steps" = "스텝 수"
 "Dual" = "듀얼"
 "Align all channel editors" = "모든 채널 편집기 정렬"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "녹음 노트 섞기: 켬 (새 노트가 패턴의 노트에 더해짐)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "녹음 노트 섞기: 끔 (녹음한 채널의 이전 노트를 대체)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "녹음 노트 섞기: 켜면 테이크의 노트를 패턴에 더하고(오버더브), 끄면 녹음한 채널의 이전 노트를 대체합니다"
+"Tempo tapper: tap the beat to set the tempo" = "탭 템포: 박자를 두드려 템포를 설정"
+"Blend recorded notes" = "녹음 노트 섞기"

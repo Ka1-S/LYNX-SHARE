@@ -6,6 +6,8 @@
 //   LYNX_BLOCK=n      block size (default 256)
 //   LYNX_THREADS=n    n worker threads, as the app's audio engine uses
 //   LYNX_REALTIME=1   paces the blocks at real time (the workers sleep between blocks, as with a sound card)
+//   LYNX_WARMUP=n     n samples of stopped-transport silence before the song, like FL's render warm-up (1536–2304
+//                     samples, REA round 154): the effects' parameter glides settle as in a running app (round 170i)
 //   LYNX_PROFILE=1    per-channel / per-insert-effect CPU time, heaviest first
 //   LYNX_ALLOCS=1     counts the heap allocations made while a block is processed (the audio thread and the
 //                     workers; round 167e) and prints where the first distinct ones came from (Linux: addresses for
@@ -354,6 +356,18 @@ int main (int argc, char** argv)
         return ts.tv_sec * 1000.0 + ts.tv_nsec * 1e-6;
 #endif
     };
+
+    if (const char* w = std::getenv ("LYNX_WARMUP"); w != nullptr && std::atoi (w) > 0)
+    {
+        std::vector<float> wl ((std::size_t) blockSize), wr ((std::size_t) blockSize);
+        for (int done = 0, total = std::atoi (w); done < total; done += blockSize)
+        {
+            const int n = std::min (blockSize, total - done);
+            std::fill (wl.begin(), wl.end(), 0.0f);
+            std::fill (wr.begin(), wr.end(), 0.0f);
+            renderer.process (state.get(), false, 0.0, n, wl.data(), wr.data());
+        }
+    }
 
     for (std::size_t pos = 0; pos < totalSamples; pos += blockSize)
     {

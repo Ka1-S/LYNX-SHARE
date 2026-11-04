@@ -4,7 +4,7 @@
 // signals from WAV files and records the outputs. Nothing inside the plugin is inspected (round 99 rule: black-box
 // only); the plugin's own editor is only opened by `editor`, to screenshot it as a user would see it (round 108 UI rule). Build: tools/fxmeasure/build.sh. Analysis scripts: tools/fxmeasure/py.
 //
-//   fxmeasure.exe script.txt          (one command per line; '#' starts a comment)
+//   fxmeasure.exe script.txt          (one command per line; '#' at the start of a line or " # " starts a comment)
 //
 // Commands:
 //   load <file.vst3> [rate] [block] [name]   load the first effect in the file (default 48000 Hz, 512 samples), or in a
@@ -87,6 +87,18 @@ struct Host
             layout.inputBuses.getReference (0) = juce::AudioChannelSet::stereo();
         if (layout.getMainOutputChannels() == 0 && layout.outputBuses.size() > 0)
             layout.outputBuses.getReference (0) = juce::AudioChannelSet::stereo();
+        // round 170c: a shell plugin (Waves "CLA-2A Stereo") may come up with a 5-channel main bus and then passes the
+        // audio through untouched: ask for stereo whenever the plugin supports it
+        if (! layout.inputBuses.isEmpty() && ! layout.outputBuses.isEmpty()
+            && (layout.inputBuses[0].size() > 2 || layout.outputBuses[0].size() > 2))
+        {
+            auto stereo = layout;
+            stereo.inputBuses.getReference (0) = juce::AudioChannelSet::stereo();
+            stereo.outputBuses.getReference (0) = juce::AudioChannelSet::stereo();
+            if (plugin->checkBusesLayoutSupported (stereo) || plugin->setBusesLayout (stereo))
+                layout = plugin->getBusesLayout();
+            log ("stereo request: in=" + juce::String (layout.getMainInputChannels()) + " out=" + juce::String (layout.getMainOutputChannels()));
+        }
         if (! plugin->checkBusesLayoutSupported (layout) && layout.inputBuses.size() > 0)
         {
             auto mono = layout;
@@ -350,7 +362,12 @@ struct Host
     {
         for (auto line : lines)
         {
-            line = line.upToFirstOccurrenceOf ("#", false, false).trim();
+            // '#' starts a comment at the start of a line or after a space when a space follows ("# note"), so that
+            // `set #12 0.5` (a parameter by index) works (round 170c)
+            line = line.trim();
+            if (line.startsWithChar ('#'))
+                continue;
+            line = line.upToFirstOccurrenceOf (" # ", false, false).trim();
             if (line.isEmpty()) continue;
             juce::StringArray a;
             a.addTokens (line, " \t", "\"");
@@ -360,6 +377,22 @@ struct Host
 
             pump (0);
             if (cmd == "pump") { pump (a[1].getIntValue()); continue; }
+            if (cmd == "buses") // round 170c: which main layouts the plugin accepts (1…8 channels in / out)
+            {
+                if (plugin == nullptr) { log ("error: no plugin"); continue; }
+                juce::String ok;
+                for (int i = 1; i <= 8; ++i)
+                    for (int o = 1; o <= 8; ++o)
+                    {
+                        auto l = plugin->getBusesLayout();
+                        if (l.inputBuses.isEmpty() || l.outputBuses.isEmpty()) continue;
+                        l.inputBuses.getReference (0) = juce::AudioChannelSet::canonicalChannelSet (i);
+                        l.outputBuses.getReference (0) = juce::AudioChannelSet::canonicalChannelSet (o);
+                        if (plugin->checkBusesLayoutSupported (l)) ok << " " << i << "/" << o;
+                    }
+                log ("buses now in=" + juce::String (plugin->getMainBusNumInputChannels()) + " out=" + juce::String (plugin->getMainBusNumOutputChannels()) + " supported:" + ok);
+                continue;
+            }
             if (cmd == "echo") { log (line.fromFirstOccurrenceOf (" ", false, false)); continue; }
             if (cmd == "editor" && ! a[1].endsWithIgnoreCase (".png")) // `editor <out.png> …` is the PrintWindow shot below
             {
@@ -413,7 +446,26 @@ struct Host
                 }
                 juce::String err;
                 plugin = formats.createPluginInstance (*types[pick], rate, block, err);
+                // round 170c: a Waves shell's first instance in a process comes up as another of its plugins (LYNX's
+                // createRightInstance, PluginHost.cpp): created again it is the right one (the wrong ones stay alive
+                // until then). Without this every Waves measurement ran a surround meter (bit-identical output).
+                {
+                    std::vector<std::unique_ptr<juce::AudioPluginInstance>> wrong;
+                    for (int attempt = 0; attempt < 3 && plugin != nullptr && plugin->getName() != types[pick]->name; ++attempt)
+                    {
+                        log ("mismatch: asked " + types[pick]->name + ", got " + plugin->getName() + " (again)");
+                        wrong.push_back (std::move (plugin));
+                        plugin = formats.createPluginInstance (*types[pick], rate, block, err);
+                    }
+                    if (plugin != nullptr && plugin->getName() != types[pick]->name)
+                    {
+                        log ("error: the shell handed out " + plugin->getName() + " for " + types[pick]->name);
+                        plugin.reset();
+                        continue;
+                    }
+                }
                 if (plugin == nullptr) { log ("error: " + err); continue; }
+                log ("instance " + plugin->getName());
                 log ("loaded " + types[pick]->name + " by " + types[pick]->manufacturerName + " v" + types[pick]->version + " params=" + juce::String (plugin->getParameters().size())
                      + " inBuses=" + juce::String (plugin->getBusCount (true)) + " outBuses=" + juce::String (plugin->getBusCount (false)));
                 prepare();

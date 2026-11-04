@@ -645,6 +645,34 @@ Shape make (Icon icon)
             polyline (st, { { 9.0f, 9.5f }, { 6.5f, 12.0f }, { 9.0f, 14.5f } });
             polyline (st, { { 15.0f, 9.5f }, { 17.5f, 12.0f }, { 15.0f, 14.5f } });
             break;
+        case Icon::blend: // two takes (notes) merging into one line (overdub)
+        {
+            fi.addRoundedRectangle (3.0f, 4.5f, 5.5f, 3.5f, 1.0f);
+            fi.addRoundedRectangle (3.0f, 16.0f, 5.5f, 3.5f, 1.0f);
+            juce::Path m;
+            m.startNewSubPath (8.5f, 6.25f);
+            m.quadraticTo (12.5f, 6.25f, 13.5f, 12.0f);
+            m.startNewSubPath (8.5f, 17.75f);
+            m.quadraticTo (12.5f, 17.75f, 13.5f, 12.0f);
+            st.addPath (m);
+            line (st, 13.5f, 12.0f, 20.5f, 12.0f);
+            polyline (st, { { 17.5f, 9.0f }, { 20.5f, 12.0f }, { 17.5f, 15.0f } });
+            break;
+        }
+        case Icon::filter: // a funnel
+        {
+            juce::Path f;
+            polyline (f, { { 4.0f, 5.0f }, { 20.0f, 5.0f }, { 14.0f, 12.5f }, { 14.0f, 19.0f }, { 10.0f, 17.0f }, { 10.0f, 12.5f } }, true);
+            st.addPath (f.createPathWithRoundedCorners (1.25f));
+            break;
+        }
+        case Icon::tapTempo: // a fingertip tapping a pad, with the tap's two impact marks
+            fi.addRoundedRectangle (4.0f, 16.0f, 16.0f, 4.0f, 1.5f);
+            st.addRoundedRectangle (9.5f, 2.5f, 5.0f, 11.0f, 2.5f);
+            line (st, 10.5f, 9.5f, 13.5f, 9.5f);
+            line (st, 4.5f, 10.5f, 7.0f, 13.0f);
+            line (st, 19.5f, 10.5f, 17.0f, 13.0f);
+            break;
     }
 
     return s;
