@@ -26,6 +26,14 @@ User direction (2026-11-04): match FL where an FL user would get stuck or lost; 
 See the tracker table: FX and instrument menus (170b #16), 
 Ctrl+H Stop sound and Ctrl+N Save new version (user decisions), rack items (170a), toolbar/snap/zoom (170e).
 
+## Round 170h2 (user decisions 2026-11-04, branch feature/wfqa170h2)
+
+| Item | FL evidence | LYNX before | LYNX now |
+|---|---|---|---|
+| Ctrl+H | DFM `ShortcutsModule/MainMenuActions/MacroStopSoundAction` ShortCut 16456 (= Ctrl+H), Tools › Macros › Stop sound, toolbar StopSoundBtn hint "Ctrl+H". Handler: published method `MacroStopSoundActionExecute` (method table at file 0xb16110) → code 0xf1de20 → FUN_011c8d10: (a) a global double at 0x15e2cf0 set back to 1.0 when it is not (FUN_011c8be0, with a hint; likely a playback-speed multiplier, not confirmed); (b) FUN_011c89c0: for each MIDI output device, CC 123 (status 0xB0+ch, 0x7B = All notes off) on its 16 channels; (c) FUN_011c8a40 (1, 1, 1): every channel's voices killed (FUN_00fe8f70 per channel), every mixer track's state reset (FUN_0127b530), and mode 1 → FUN_012b5210 = every registered plugin's reset (vtable +0x48; the same reset FL's "Reset plugins on transport" uses, round 167k) | Ctrl+H = Undo history; Stop sound only in Tools › Macros, = the panic (notes off, no effect reset) | Ctrl+H = `tools.stopSound` → `AudioEngine::stopSound`: the panic (every instrument's all-notes-off, plugin generators reset with their wrapper option, MIDI outs cut) and then `RackRenderer::stopSoundChannel`: every effect's `transportReset` (native effects cleared, hosted effects reset with their wrapper option). (a) not mapped (its meaning is not confirmed). Undo history → Ctrl+Alt+H (free in FL's DFM shortcut list and in LYNX's KeyMap). Menu, Stop-button hint and F1 sheet follow the KeyMap |
+| Default new project | fl-02: FL's template, 808 channels with empty steps | Kick / Clap / Hat steps pre-programmed | `makeNewProject()` = the "Empty" template: same channels, inserts, Master limiter, no steps ("Basic beat" keeps the beat; `Song::makeDefault` unchanged for the tests and the self-test) |
+| Double-click an audio clip (lo-fi 85 session, l-05) | DFM `ShortcutEditorForm/BackPanel/AudioClipsPanel` "Double-click on audio clips": Show clip properties / Show channel settings, modifier (none) or Alt | nothing (hint: "[2xLMB] opens"); `openClipSource` had no audio branch | channel settings; Alt: clip properties |
+
 ## Where I stopped
 - Done: LYNX trap session + FL session, tracker table, batch 1 + batch 2 (effect window opens on add) with tests.
   build-local 1963861 checks / 0 failures; Windows build OK.
