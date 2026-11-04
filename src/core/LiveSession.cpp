@@ -6,6 +6,7 @@
 #include <unordered_set>
 
 #include "core/ClipOps.h"
+#include "core/PatternBlocks.h"
 #include "core/SessionIds.h"
 
 namespace lynx::live
@@ -127,6 +128,8 @@ U canon (const Song& in)
     const auto current = std::clamp (s.currentArrangement, 0, (int) s.arrangements.size() - 1);
     s.arrangements[(std::size_t) current].clips = std::move (s.playlist);
     s.playlist.clear();
+    s.arrangements[(std::size_t) current].blocks = std::move (s.blocks); // Pattern Blocks (round 170f) likewise
+    s.blocks.clear();
 
     // the local view and derived data
     s.currentPattern = 0;
@@ -207,6 +210,8 @@ Song decode (U&& u)
     s.currentArrangement = 0;
     s.playlist = std::move (s.arrangements[0].clips);
     s.arrangements[0].clips.clear();
+    s.blocks = std::move (s.arrangements[0].blocks);
+    s.arrangements[0].blocks.clear();
     auto mapper = [] (const std::unordered_map<int, int>& at) {
         return [&at] (int& i) {
             if (isCode (i))
@@ -219,6 +224,7 @@ Song decode (U&& u)
     refs::forEachChannelRef (s, mapper (channelAt));
     refs::forEachPatternRef (s, mapper (patternAt));
     refs::forEachAutomationRef (s, mapper (automationAt));
+    s.forEachBlockList ([&s] (std::vector<PatternBlock>& list) { patternblocks::normalize (list, (int) s.patterns.size()); });
     s.currentPattern = 0;
     for (auto& p : s.patterns)
         p.sortNotes();
@@ -235,7 +241,7 @@ bool sameGlobals (const Song& a, const Song& b)
            && a.cleanMixer == b.cleanMixer && a.autoCrossfades == b.autoCrossfades && a.playTruncatedNotes == b.playTruncatedNotes
            && a.fastDeclick == b.fastDeclick && a.panTriangular == b.panTriangular && a.autoPdc == b.autoPdc
            && a.compensateAutomations == b.compensateAutomations && a.timeSignatureMode == b.timeSignatureMode && a.scaleHighlight == b.scaleHighlight
-           && a.dataFolder == b.dataFolder;
+           && a.dataFolder == b.dataFolder && a.patternBlocksOn == b.patternBlocksOn;
 }
 
 void copyGlobals (const Song& from, Song& to)
@@ -261,6 +267,7 @@ void copyGlobals (const Song& from, Song& to)
     to.timeSignatureMode = from.timeSignatureMode;
     to.scaleHighlight = from.scaleHighlight;
     to.dataFolder = from.dataFolder;
+    to.patternBlocksOn = from.patternBlocksOn; // (round 170f; the blocks travel in their arrangement's header)
 }
 
 template <typename T>

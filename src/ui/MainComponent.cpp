@@ -2153,6 +2153,9 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "playlist.ripple", tr ("Ripple editing (resizing and deleting move the later clips)"), true, playlist.isRippleOn());
             action (menu, "playlist.rippleDelete", tr ("Delete the selected clips and close the gaps"));
             action (menu, "playlist.autoCrossfades", tr ("Automatic crossfades (current project)"), true, engine.getSong().autoCrossfades);
+            // FL's legacy Pattern Blocks (round 170f, issue #60): FL 10's "Enable legacy pattern blocks", per project here
+            action (menu, "playlist.patternBlocks", tr ("Pattern blocks (current project)"), true, engine.getSong().patternBlocksOn);
+            action (menu, "playlist.blocksToClips", tr ("Turn pattern blocks into clips"), ! engine.getSong().blocks.empty());
             action (menu, "playlist.follow", tr ("Follow the playhead (auto scrolling)"), true, EditorGlobals::get().isFollowing (false));
             action (menu, "playlist.pitchClipsDown", tr ("Pitch selected audio clips one semitone down"));
             action (menu, "playlist.pitchClipsUp", tr ("Pitch selected audio clips one semitone up"));

@@ -7,6 +7,8 @@
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
 #include "ui/PlaylistComponent.h"
+#include "ui/PatternBlocksView.h"
+#include "core/PatternBlocks.h"
 #include "ui/StemExtract.h"
 
 #include "core/KeyMap.h"
@@ -247,6 +249,10 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     overview.onShowAll = [this] { zoomAll(); };
     addAndMakeVisible (overview);
 
+    // FL's legacy Pattern Blocks (round 170f): shown under the clip tracks while the project's option is on
+    blocksView = std::make_unique<PatternBlocksView> (engine, *this);
+    addChildComponent (*blocksView);
+
     grid::fillEditorBox (snapBox);
     snapBox.setTooltip (tr ("Playlist grid: follows the global grid in the toolbar, or its own; hold Alt while dragging to ignore it"));
     snapBox.setWantsKeyboardFocus (false);
@@ -417,7 +423,80 @@ juce::Colour PlaylistComponent::patternColour (const Song& song, int pattern)
 juce::Rectangle<int> PlaylistComponent::gridArea() const
 {
     return getLocalBounds().withTrimmedLeft (headerWidth).withTrimmedTop (headerHeight)
-        .withTrimmedRight (scrollBarSize);
+        .withTrimmedRight (scrollBarSize).withTrimmedBottom (blocksSectionHeight());
+}
+
+int PlaylistComponent::blocksSectionHeight() const
+{
+    if (! engine.getSong().patternBlocksOn)
+        return 0;
+    const auto available = getHeight() - headerHeight;
+    const auto least = PatternBlocksView::dividerHeight + 3 * PatternBlocksView::rowHeight;
+    const auto most = juce::jmax (least, available - 2 * trackHeight); // the clip tracks keep two rows
+    const auto wanted = blocksHeight > 0 ? blocksHeight : available / 3;
+    return juce::jlimit (least, most, wanted);
+}
+
+void PlaylistComponent::setBlocksHeight (int height)
+{
+    blocksHeight = juce::jmax (1, height);
+    resized();
+    repaint();
+}
+
+void PlaylistComponent::scrollTicksBy (double ticks)
+{
+    scrollTicks = juce::jmax (0.0, scrollTicks + ticks);
+    updateScrollBars();
+    repaint();
+}
+
+void PlaylistComponent::togglePatternBlocks()
+{
+    const auto& song = engine.getSong();
+    if (! song.patternBlocksOn)
+    {
+        engine.editSong ([] (Song& s) { s.patternBlocksOn = true; });
+        return;
+    }
+    auto any = false;
+    for (const auto& a : song.arrangements)
+        any = any || ! a.blocks.empty();
+    if (song.blocks.empty() && ! any)
+    {
+        engine.editSong ([] (Song& s) { s.patternBlocksOn = false; });
+        return;
+    }
+    // blocks that stay hidden would still be in the project but silent: FL's own way out was to turn them into clips
+    auto options = juce::MessageBoxOptions()
+                       .withIconType (juce::MessageBoxIconType::QuestionIcon)
+                       .withTitle (tr ("Pattern blocks"))
+                       .withMessage (tr ("This project has pattern blocks. Turn them into clips (one track per pattern) so they keep playing, or delete them?"))
+                       .withButton (tr ("Turn them into clips"))
+                       .withButton (tr ("Delete them"))
+                       .withButton (tr ("Cancel"))
+                       .withAssociatedComponent (this);
+    juce::AlertWindow::showAsync (options, [safe = juce::Component::SafePointer<PlaylistComponent> (this)] (int result) {
+        if (safe == nullptr || result == 0)
+            return;
+        safe->engine.editSong ([result] (Song& s) {
+            if (result == 1)
+                patternblocks::toClipsInEveryArrangement (s);
+            s.forEachBlockList ([] (std::vector<PatternBlock>& list) { list.clear(); });
+            s.patternBlocksOn = false;
+        });
+    });
+}
+
+void PlaylistComponent::turnBlocksIntoClips()
+{
+    if (engine.getSong().blocks.empty())
+    {
+        ui::postHint ({ tr ("No pattern blocks to turn into clips"), {} }, 3000);
+        return;
+    }
+    setSelection ({});
+    engine.editSong ([] (Song& s) { patternblocks::toClips (s); });
 }
 
 double PlaylistComponent::tickToX (double tick) const { return headerWidth + (tick - scrollTicks) * pixelsPerTick; }
@@ -628,7 +707,11 @@ void PlaylistComponent::resized()
     followButton.setBounds (snapBox.getRight() + 6, 3, h, h);
     stretchButton.setBounds (followButton.getRight() + 2, 3, h, h);
     overview.setBounds (headerWidth, toolbarHeight, getWidth() - headerWidth - scrollBarSize, overviewHeight);
-    vBar.setBounds (getWidth() - scrollBarSize, headerHeight, scrollBarSize, getHeight() - headerHeight);
+    const auto blocks = blocksSectionHeight();
+    blocksShown = blocks > 0;
+    vBar.setBounds (getWidth() - scrollBarSize, headerHeight, scrollBarSize, getHeight() - headerHeight - blocks);
+    blocksView->setBounds (0, getHeight() - blocks, getWidth(), blocks);
+    blocksView->setVisible (blocksShown);
     updateScrollBars();
 
     if (fitSongPending)
@@ -3882,6 +3965,9 @@ void PlaylistComponent::showRulerMenu (int x)
         menu.addItem (tr ("Reverse selected audio clips") + "\t9", anyAudio, false, [this] { runAction ("playlist.reverseClips"); });
     }
     menu.addItem (tr ("Automatic crossfades (current project)"), true, engine.getSong().autoCrossfades, [this] { runAction ("playlist.autoCrossfades"); });
+    // FL's legacy Pattern Blocks (round 170f)
+    menu.addItem (tr ("Pattern blocks (current project)"), true, engine.getSong().patternBlocksOn, [this] { runAction ("playlist.patternBlocks"); });
+    menu.addItem (tr ("Turn pattern blocks into clips"), ! engine.getSong().blocks.empty(), false, [this] { runAction ("playlist.blocksToClips"); });
     {
         juce::PopupMenu zoom;
         zoom.addItem (tr ("Zoom in") + "\tPageUp", [this] { runAction ("playlist.zoomIn"); });
@@ -4514,6 +4600,8 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.rippleDelete")) rippleDeleteSelection();
     else if (is ("playlist.ripple")) setRipple (! ripple);
     else if (is ("playlist.autoCrossfades")) engine.editSong ([] (Song& s) { s.autoCrossfades = ! s.autoCrossfades; });
+    else if (is ("playlist.patternBlocks")) togglePatternBlocks();
+    else if (is ("playlist.blocksToClips")) turnBlocksIntoClips();
     else if (is ("playlist.follow")) EditorGlobals::get().setFollowing (false, ! EditorGlobals::get().isFollowing (false));
     else if (is ("playlist.selectTimeAround")) selectTimeAroundSelection();
     else if (is ("playlist.timePrevious")) moveTimeSelection (-1);
@@ -5710,6 +5798,9 @@ void PlaylistComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
     followButton.setToggleState (EditorGlobals::get().isFollowing (false), juce::dontSendNotification);
     refreshArrangementBox();
     refreshTrackLayout();
+    if (engine.getSong().patternBlocksOn != blocksShown) // Pattern Blocks turned on / off (menu, undo, another project)
+        resized();
+    blocksView->refresh();
     updateScrollBars();
     repaint();
 }

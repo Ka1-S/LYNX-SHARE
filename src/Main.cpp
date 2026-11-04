@@ -3,6 +3,7 @@
 #include "platform/Paths.h"
 
 #include "core/Drumaxx.h"
+#include "core/PatternBlocks.h"
 #include "core/LoadTrace.h"
 #include "core/Patcherize.h"
 #include "core/Performance.h"
@@ -1763,6 +1764,27 @@ private:
                         && ! plain.contains ("autoPdc") && ! plain.contains ("scaleHighlight");
         }
 
+        // FL's legacy Pattern Blocks (round 170f): the option and every arrangement's blocks are saved; a project without
+        // them has neither in its file and loads with the option off
+        bool blocksOk = false;
+        {
+            auto song = lynx::Song::makeDefault();
+            const auto plain = lynx::ProjectFile::toJson (song);
+            song.patternBlocksOn = true;
+            lynx::patternblocks::place (song, 0, 0);
+            lynx::patternblocks::place (song, 0, 4 * 4 * lynx::ppq);
+            song.addArrangement ("Second");
+            lynx::patternblocks::place (song, 0, 2 * 4 * lynx::ppq);
+            song.selectArrangement (0);
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), error);
+            const auto plainBack = lynx::ProjectFile::fromJson (plain, error);
+            blocksOk = back && back->patternBlocksOn && back->blocks == song.blocks && song.blocks.size() == 2
+                       && back->arrangements.size() == 2 && back->arrangements[1].blocks == song.arrangements[1].blocks
+                       && song.arrangements[1].blocks.size() == 1 && back->songLength() == song.songLength() && plainBack
+                       && ! plainBack->patternBlocksOn && plainBack->blocks.empty() && ! plain.contains ("blocks")
+                       && ! plain.contains ("patternBlocks");
+        }
+
         // Misc › Mono / Porta / Slide on every generator (round 168l): kept in the file; a project saved before (an
         // imported engine's flags in its synth settings) gets them back, a Max polyphony of 1 is not Mono
         bool polyOk = false;
@@ -2386,7 +2408,7 @@ private:
         // through it, the invite code's keys)
         const auto liveResult = lynx::livetest::selfTest (&rich);
 
-        const auto ok = audioOk && projectOk && richOk && hwOutOk && flp168jOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
+        const auto ok = audioOk && projectOk && richOk && hwOutOk && flp168jOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk;
 
@@ -2397,6 +2419,7 @@ private:
                << "project_features=" << (richOk ? "OK" : "ERROR") << "\n"
                << "hardware_outputs=" << (hwOutOk ? "OK" : "ERROR") << "\n"
                << "flp168j_fields=" << (flp168jOk ? "OK" : "ERROR") << "\n"
+               << "pattern_blocks=" << (blocksOk ? "OK" : "ERROR") << "\n"
                << "channel_polyphony=" << (polyOk ? "OK" : "ERROR") << "\n"
                << "track_latency=" << (latencyOk ? "OK" : "ERROR") << "\n"
                << "plugin_substitutes=" << (substituteOk ? "OK" : "ERROR") << "\n"
@@ -8094,6 +8117,22 @@ private:
             ui.getPlaylistForSnapshot().setRipple (true);
             saveSnapshot (ui, prefix + "-playlist-ripple.png");
             ui.getPlaylistForSnapshot().setRipple (false);
+
+            // FL's legacy Pattern Blocks (round 170f, issue #60): the section under the clip tracks, a row per pattern
+            {
+                const auto saved = offline.getSong();
+                offline.editSong ([] (lynx::Song& s) {
+                    s.patternBlocksOn = true;
+                    const auto rows = juce::jmin (6, (int) s.patterns.size());
+                    for (int r = 0; r < rows; ++r)
+                        lynx::patternblocks::paintRange (s, r, (std::int64_t) (r % 3) * 4 * lynx::ppq * 2,
+                                                         (std::int64_t) (8 + r * 2) * 4 * lynx::ppq);
+                }, false);
+                offline.dispatchPendingMessages();
+                saveSnapshot (ui, prefix + "-playlist-blocks.png");
+                offline.editSong ([saved] (lynx::Song& s) { s = saved; }, false);
+                offline.dispatchPendingMessages();
+            }
 
             // quick-add palette, and the Browser searching
             saveWindow (ui.makeQuickAddForSnapshot(), "-quickadd.png");

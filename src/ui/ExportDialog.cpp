@@ -1,5 +1,6 @@
 #include "ui/ExportDialog.h"
 
+#include "core/PatternBlocks.h"
 #include "core/PlaylistOps.h"
 #include "core/PickerSelection.h"
 #include "core/QuickRender.h"
@@ -315,7 +316,7 @@ public:
         const auto& song = engine.getSong();
         // the range follows what is playing unless a selection was the last choice and still exists
         if (clip == nullptr && (options.range != Range::selection || ! hasSelection (song)))
-            options.range = song.mode == PlayMode::song && ! song.playlist.empty() ? Range::song : Range::pattern;
+            options.range = song.mode == PlayMode::song && (! song.playlist.empty() || patternblocks::active (song)) ? Range::song : Range::pattern;
 
         for (auto* t : { &whatTitle, &formatTitle, &optionsTitle })
             addAndMakeVisible (t);

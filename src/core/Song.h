@@ -1387,6 +1387,16 @@ struct Bar
     int number = 1;
 };
 
+// FL's legacy Pattern Blocks (FL ≤ 9, FL 10's "Enable legacy pattern blocks"; issue #60, docs/analise/REA_rodada170f.md):
+// one row per pattern under the clip tracks; a block is a whole instance of its pattern starting on a bar. Its length
+// is never stored: always the pattern's effectiveLength (core/PatternBlocks.h).
+struct PatternBlock
+{
+    int pattern = 0;
+    std::int64_t start = 0; // ticks: the start of a bar
+    bool operator== (const PatternBlock&) const = default;
+};
+
 struct Arrangement
 {
     std::string name;
@@ -1394,6 +1404,7 @@ struct Arrangement
     std::int64_t loopStart = 0, loopEnd = 0;
     std::vector<Marker> markers;           // sorted by tick (stay here even for the current arrangement)
     std::uint64_t uid = 0;                 // stable id (Online Sessions, round 168a)
+    std::vector<PatternBlock> blocks;      // Pattern Blocks (round 170f); empty for the current one: Song::blocks
     bool operator== (const Arrangement&) const = default;
 };
 
@@ -1491,6 +1502,10 @@ struct Song
     int currentPattern = 0;
 
     std::vector<Clip> playlist;
+    // FL's legacy Pattern Blocks (round 170f, issue #60): the per-project option (Playlist menu "Pattern blocks") and the
+    // current arrangement's blocks, sorted by pattern then start (core/PatternBlocks.h). They play only while it is on.
+    bool patternBlocksOn = false;
+    std::vector<PatternBlock> blocks;
     PlayMode mode = PlayMode::pattern;
     std::int64_t loopStart = 0, loopEnd = 0; // looped section in the Playlist (ticks); loopEnd <= loopStart = off
 
@@ -1533,6 +1548,16 @@ struct Song
         for (std::size_t i = 0; i < arrangements.size(); ++i)
             if ((int) i != currentArrangement)
                 fn (arrangements[i].clips);
+    }
+
+    // Applies `fn` to all Pattern Block lists (the current arrangement's and the stored ones).
+    template <typename Fn>
+    void forEachBlockList (Fn&& fn)
+    {
+        fn (blocks);
+        for (std::size_t i = 0; i < arrangements.size(); ++i)
+            if ((int) i != currentArrangement)
+                fn (arrangements[i].blocks);
     }
 
     bool hasLoop() const noexcept { return loopEnd > loopStart; }

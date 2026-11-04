@@ -243,6 +243,7 @@ target_sources(lynx_core PRIVATE
     src/core/TempoDetect.cpp
     src/core/ScoreLog.cpp
     src/core/ChannelLoops.cpp
+    src/core/PatternBlocks.cpp
     src/core/ChannelBurn.cpp
     src/core/AutoSampler.cpp)
 
@@ -389,6 +390,7 @@ if(LYNX_BUILD_APP)
         src/ui/ChannelRackComponent.cpp
         src/ui/PianoRollComponent.cpp
         src/ui/PlaylistComponent.cpp
+        src/ui/PatternBlocksView.cpp
         src/ui/MixerComponent.cpp
         src/ui/QuickPick.cpp
         src/ui/PluginWindow.cpp
