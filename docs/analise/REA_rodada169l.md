@@ -45,6 +45,64 @@ without a state was the synth channel and is saved as such).
   the Plugin database `.fst` state.
 - FLEngine never loads a generator's `Plugin presets\…\Default.fst` (its four "Default.fst" references are the mixer
   track reset / instrument-track paths, REA_rodada169e §1).
-- Inventory of the FL engines LYNX has (`Data/Patches`, MD5 of the plugin state):
+- Inventory of the FL engines LYNX has, with FL installed [DATA][CODE] (`Data/Patches`; "same" = the Plugin database
+  state is byte-identical to the Default preset's):
 
-(table filled below)
+| Engine | FL's `Plugin presets\…\Default.*` | Plugin database entry | LYNX before | LYNX now |
+|---|---|---|---|---|
+| Drumaxx, BassDrum | none | `Drum\<name>.fst` | DB (169e) | DB |
+| Drumpad | only a `Default\` folder of single drums | `Drum\Drumpad.fst` | DB (169e) | DB |
+| GMS | none | `Synth classic\GMS.fst` | first preset `Basses\Agressive TE.gmsynth` | **DB** |
+| Morphine | none | `Synth special\Morphine.fst` | first preset `Bass\BAS Acoustic 1 FG.mrp` | **DB** |
+| Transistor Bass | none | `Synth classic\Transistor Bass.fst` (= the "Factory programs" preset, sequencer on) | first preset `Empty.fst` | **DB** |
+| Sakura | only a `Default\` folder (the DB state = `Default\Bowed 6.fst`) | `Synth special\Sakura.fst` | first preset `Atmosphere\ATM ChainSaw Symphony FG.fst` | **DB** |
+| Ogun | `Default.fst` (version 12, ≠ DB) | `Synth special\Ogun.fst` = `Drum\Ogun.fst` (version 11) | neither readable → first readable preset `Atmospheric\300 Ft Glass Bowl.fst` | **DB** (§4) |
+| FL Slayer | none | **none** (FL 2026's picker doesn't list it) | first preset `AUTO Chorus Chords.fst` | unchanged (no FL counterpart; LYNX can't play a stateless Slayer) |
+| BooBass | (no preset folder) | `Misc\BooBass.fst`: version 1, knobs 0x7fff | knobs 32768 | knobs **32767** |
+| Kepler, Kepler Exo, SimSynth, Fruity DX10, Plucked!, Fruit Kick | `Default.fst` | same | Default.fst | unchanged (= FL) |
+| BeepMap | `Default.fst` | 1 byte differs | Default.fst | unchanged |
+| 3x Osc, Sytrus, Harmor, Harmless, PoiZone, MiniSynth, Sawer, FL Keys, Fruity Granulizer, Toxic Biohazard (`Default.tbio`) | `Default.*` | **different state** (12 … 36 355 bytes differ) | Default.* | unchanged — **for the user to decide** (below) |
+| Wave Traveller | `Default.fst` (LYNX can't read it) | `Sampler\Wave Traveller.fst` (36 508 B) | first readable preset `classic kick.fst` | unchanged (see "left") |
+
+**For the user (decision):** by the evidence above, FL's own new 3x Osc, Sytrus, Harmor, Harmless, PoiZone, MiniSynth,
+Sawer, FL Keys, Granulizer and Toxic Biohazard are their Plugin database state, which differs from the
+`Default.*` preset LYNX starts them from (since round 142). Switching them to the Plugin database state is the FL-exact
+choice but changes their fresh sound in LYNX; not done without a yes.
+
+## 4. Ogun states of versions 10–13 [DECOMP]
+
+FL's Plugin database Ogun is a **version-11** state (`Default.fst` is version 12); LYNX read 14 and up only. Ogun's
+SaveRestoreState (`Ogun_x64.dll` `FUN_00864d00`), for a state of version v < 14 (≥ 0x130004 and 0x7fffffff refused):
+after the parameter reset it sets plugin bytes `+0x20f…+0x228` (0, 0, 1, 0, 0, 16 × 0 at `+0x214`, 0, 0, –, 0, i32 430
+at `+0x228`), reads **12 bytes** into `+0x12c` (8 below version 8) and **0xf4 − 1 (v < 1) − 3 (v < 2) − 1 (v < 7) − 16
+(v < 9) − 1 (v < 11) − 1 (v < 12) − 6 (v < 13)** bytes into `+0x138`, clears `+0x226` below version 14, then reads the
+rest exactly like version 14 (3 delay bytes, 3 EQ types, the comment as u32 count + bytes below 18, the 13 articulators —
+all of them from version 10 on —, the 4 curves). For versions 10–13 every byte of the 256-byte parameter block is thus
+either read or one of those explicit values. LYNX (`core/Ogun.cpp` `parseState`) now builds that block the same way and
+the importer stores such a state rewritten in version 14's layout (`ogunCurrentLayout`), so the editor's knobs
+(`ogunParam`) see today's offsets.
+
+## 5. FL render [FL render]
+
+One FL launch (`FL64.exe /R /Ewav`, both locks, FL exited by itself), project `C:\Users\kauan\lynx-test\gen169l\fl\
+g169l.flp` built at run time from `dmx169e.flp` and the user's Plugin database files (`mk169l.py`): Drumaxx centred
+(FL's default volume 10000), Drumaxx at pan −50 % (3200) and volume 8000, Drumaxx without a state, then GMS, Morphine,
+Transistor Bass, Sakura, BassDrum, Drumpad, Ogun with their Plugin database states (keys 60, 48, 72). Per-note peaks
+L / R in dB (FL `g169l.wav` vs LYNX `renderwav`, LYNX de-normalised), and the RMS difference relative to FL's:
+
+| channel | FL | LYNX | rel. diff |
+|---|---|---|---|
+| Drumaxx centre, 36 / 38 / 43 | −16.3 −16.3 / −19.1 −19.9 / −19.9 −23.7 | identical | 0.000 / 0.001 / 0.002 |
+| Drumaxx pan −50 %, vol 8000, 36 / 38 / 43 | −18.0 −25.6 / −20.8 −29.3 / −21.6 −33.1 | identical | 0.000 / 0.002 / 0.002 |
+| Drumaxx, keys 60 / 48 (both) | silent | silent | |
+| Drumaxx without a state, all 10 keys | silent | silent (before: the stand-in synth) | |
+| BassDrum 60 / 48 / 72 | −10.0 | −10.0 | 0.004 / 0.000 / 0.000 |
+| Drumpad 60 / 48 / 72 | −16.5 | −16.5 / −16.5 / −16.4 | 0.001 / 0.03 / 0.03 |
+| GMS 60 / 48 / 72 | −21.3 −21.9 / −20.1 −21.1 / −19.4 −19.4 | −21.3 −21.7 / −20.0 −21.0 / −19.3 −19.5 | 0.05–0.07 |
+| Morphine 60 / 48 / 72 | −30.5 −29.9 / −34.0 −31.5 / −27.3 −27.8 | −31.2 −26.6 / −33.8 −31.2 / −27.7 −26.6 | 0.6–1.0 (same level, different waveform: see "left") |
+| Sakura 60 / 48 / 72 | −16.3 −14.1 / −16.2 −14.1 / −20.0 −14.2 | −16.7 −14.3 / −17.0 −14.5 / −19.3 −15.5 | 0.2–0.3 |
+| Transistor Bass 60 / 48 / 72 | −7.5 / −19.0 / −15.2 | −9.5 / −22.0 / −18.2 | 1.3 (LYNX 2–3 dB lower) |
+| Ogun 60 / 48 / 72 | −3.4 −4.6 / −3.7 −3.2 / −5.2 −5.1 | (this render: before §4, the stand-in synth) | |
+
+The 16-bit render's LSB is 3·10⁻⁵: Drumaxx, BassDrum and Drumpad are bit-close. The Drumaxx channel at pan −50 %
+proves Final.Pan's law A (L/R −7.6 dB apart = 20·log10(tan(π/8))).
