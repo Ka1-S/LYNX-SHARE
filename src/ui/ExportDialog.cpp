@@ -1,5 +1,6 @@
 #include "ui/ExportDialog.h"
 
+#include "core/MessageThreadOwned.h"
 #include "core/PlaylistOps.h"
 #include "core/PickerSelection.h"
 #include "core/QuickRender.h"
@@ -22,6 +23,16 @@ namespace lynx
 {
 namespace
 {
+// the job of one stem / playlist track: made and deleted on the message thread, a Cancel never waits for it (round 169g)
+struct JobOnMessageThread : MessageThreadOwned<ExportJob>
+{
+    explicit JobOnMessageThread (juce::Thread& t)
+        : MessageThreadOwned<ExportJob> ([] (std::function<void()> f) { juce::MessageManager::callAsync (std::move (f)); },
+                                         [&t] { return t.threadShouldExit(); })
+    {
+    }
+};
+
 class ExportThread final : public juce::ThreadWithProgressWindow
 {
 public:
@@ -130,14 +141,14 @@ public:
             auto& item = items[i];
             setStatusMessage (item.name);
 
-            std::unique_ptr<ExportJob> job;
-            juce::WaitableEvent ready;
-            juce::MessageManager::callAsync ([&] {
-                job = std::make_unique<ExportJob> (item.song, options, item.file);
-                job->setExtraData (true);
-                ready.signal();
+            JobOnMessageThread slot (*this);
+            auto* job = slot.create ([&item, this] {
+                auto j = std::make_unique<ExportJob> (item.song, options, item.file);
+                j->setExtraData (true);
+                return j;
             });
-            ready.wait();
+            if (job == nullptr)
+                break; // (cancelled)
 
             juce::String error;
             const auto base = (double) i / (double) items.size();
@@ -152,12 +163,7 @@ public:
                 files.push_back (item.file);
             }
 
-            juce::WaitableEvent gone;
-            juce::MessageManager::callAsync ([&] {
-                job.reset();
-                gone.signal();
-            });
-            gone.wait();
+            slot.release();
         }
     }
 
@@ -1150,14 +1156,14 @@ public:
         {
             auto& item = items[i];
             setStatusMessage (item.name);
-            std::unique_ptr<ExportJob> job;
-            juce::WaitableEvent ready;
-            juce::MessageManager::callAsync ([&] {
-                job = std::make_unique<ExportJob> (item.song, options, item.file);
-                job->setExtraData (false);
-                ready.signal();
+            JobOnMessageThread slot (*this);
+            auto* job = slot.create ([&item, this] {
+                auto j = std::make_unique<ExportJob> (item.song, options, item.file);
+                j->setExtraData (false);
+                return j;
             });
-            ready.wait();
+            if (job == nullptr)
+                break; // (cancelled)
 
             juce::String error;
             const auto base = (double) i / (double) items.size();
@@ -1169,12 +1175,7 @@ public:
             else if (! threadShouldExit())
                 failed = true;
 
-            juce::WaitableEvent gone;
-            juce::MessageManager::callAsync ([&] {
-                job.reset();
-                gone.signal();
-            });
-            gone.wait();
+            slot.release();
         }
     }
 

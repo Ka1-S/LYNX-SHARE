@@ -595,7 +595,7 @@ std::shared_ptr<const Tables> loadTables (const std::string& path)
     const std::vector<std::uint8_t> b ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
     if (b.size() < 0x1000)
         return nullptr;
-    const auto hash = sha256Hex (b.data(), b.size());
+    const auto hash = peImageSha256Hex (b); // (a re-signed copy of the same build is the same image, round 169g)
     const bool exo = hash == exoEngineSha256;
     if (! exo && hash != engineSha256)
         return nullptr;
