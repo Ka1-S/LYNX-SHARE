@@ -213,8 +213,14 @@ void TimeDisplay::paint (juce::Graphics& g)
     }
 
     g.setColour (colour::textPrimary);
-    g.setFont (monoFont (juce::jmin (17.0f, (float) area.getHeight() * 0.45f)));
-    g.drawText (shown.isEmpty() ? text() : shown, area.withTrimmedBottom (11), juce::Justification::centred, false);
+    // round 170e3: the song position is the toolbar's centre (FL users look there first): a larger readout
+    const auto readout = shown.isEmpty() ? text() : shown;
+    auto readoutFont = monoFont (juce::jmin (26.0f, (float) area.getHeight() * 0.52f));
+    // a narrow display (the compact toolbar) shrinks the digits instead of cutting them off
+    for (int i = 0; i < 12 && juce::GlyphArrangement::getStringWidth (readoutFont, readout) > (float) area.getWidth() - 8.0f; ++i)
+        readoutFont = readoutFont.withHeight (readoutFont.getHeight() * 0.92f);
+    g.setFont (readoutFont);
+    g.drawText (readout, area.withTrimmedBottom (11), juce::Justification::centred, false);
     g.setColour (colour::textDisabled);
     g.setFont (font (type::caption - 1.0f));
     g.drawText (mode == Mode::clock   ? tr ("MIN : SEC : CS")
@@ -348,11 +354,26 @@ void MasterKnob::paint (juce::Graphics& g)
 {
     using namespace theme;
     auto area = getLocalBounds().toFloat();
-    const auto knob = area.removeFromLeft (juce::jmin (area.getHeight(), 26.0f));
     const auto s = spec();
     const auto v = value();
     const auto hover = isMouseOver() || drag.isActive();
     const auto value01 = (float) ((v - s.minimum) / (s.maximum - s.minimum));
+    // round 170e3: on the toolbar's two rows the knob is big, its name and value under it
+    if (area.getHeight() >= 48.0f)
+    {
+        const auto text = area.removeFromBottom (22.0f);
+        const auto side = juce::jmin (area.getHeight(), area.getWidth());
+        drawKnob (g, area.withSizeKeepingCentre (side, side), value01, kind == Kind::pitch,
+                  available() ? colour::knobArc : colour::textDisabled, hover && available());
+        g.setColour (colour::textDisabled);
+        g.setFont (font (type::caption - 1.0f, true));
+        g.drawText (kind == Kind::volume ? tr ("MASTER") : tr ("PITCH"), text.withHeight (10.0f).translated (0.0f, 1.0f), juce::Justification::centred, true);
+        g.setColour (drag.isActive() ? colour::textPrimary : colour::textSecondary);
+        g.setFont (font (type::caption));
+        g.drawText (available() ? s.text (v) : tr ("no mixer"), text.withTrimmedTop (11.0f), juce::Justification::centred, true);
+        return;
+    }
+    const auto knob = area.removeFromLeft (juce::jmin (area.getHeight(), 26.0f));
     drawKnob (g, knob, value01, kind == Kind::pitch, available() ? colour::knobArc : colour::textDisabled, hover && available());
 
     area.removeFromLeft (5.0f);

@@ -78,8 +78,8 @@ TEST (toolbar_icon_sizes_grow)
 {
     using namespace lynx::toolbarlayout;
     CHECK (rowHeight (IconSize::small) < rowHeight (IconSize::medium) && rowHeight (IconSize::medium) < rowHeight (IconSize::large));
-    // medium: 16 px icons with room around them (a light header)
-    CHECK (std::min ((float) rowHeight (IconSize::medium) * iconFraction (IconSize::medium), iconMaxPx (IconSize::medium)) == 16.0f);
+    // medium: 19 px icons with room around them (round 170e3; 16 px read as tiny at 1920)
+    CHECK (std::min ((float) rowHeight (IconSize::medium) * iconFraction (IconSize::medium), iconMaxPx (IconSize::medium)) == 19.0f);
     CHECK (iconMaxPx (IconSize::large) <= (float) rowHeight (IconSize::large) * 0.62f);
     CHECK (toolIconPx (IconSize::small) < toolIconPx (IconSize::large));
     CHECK (toolButtonWidth (IconSize::large, 22) > 22);

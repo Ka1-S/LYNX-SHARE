@@ -7116,3 +7116,24 @@ countries: jp
 "Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "録音ノートをブレンド: オンでテイクのノートをパターンに追加 (オーバーダブ)、オフで録音したチャンネルの古いノートを置き換えます"
 "Tempo tapper: tap the beat to set the tempo" = "テンポタッパー: ビートをタップしてテンポを設定"
 "Blend recorded notes" = "録音ノートをブレンド"
+
+# round 170e3: recording switches (loop record, step edit, punch)
+"Blend recorded notes on/off (off: replace)" = "録音ノートのブレンド オン/オフ（オフ: 置き換え）"
+"Loop record on/off" = "ループ録音 オン/オフ"
+"Step edit on/off" = "ステップ入力 オン/オフ"
+"Punch in/out on the loop region on/off" = "ループ範囲でのパンチイン/アウト オン/オフ"
+"Loop record" = "ループ録音"
+"Step edit" = "ステップ入力"
+"Loop record: on (Song mode recording loops the loop region, one take per pass)" = "ループ録音: オン（ソングモードではループ範囲を繰り返して録音、1周ごとに1テイク）"
+"Loop record: off (recording plays straight through the loop region)" = "ループ録音: オフ（録音はループ範囲を通り過ぎて進みます）"
+"Step edit: on (stopped, played notes go into the pattern one snap step after another)" = "ステップ入力: オン（停止中、弾いたノートがスナップ1ステップずつパターンに入ります）"
+"Step edit: off" = "ステップ入力: オフ"
+"Punch in/out: on (audio is kept only inside the loop region)" = "パンチイン/アウト: オン（オーディオはループ範囲内だけ残ります）"
+"Punch in/out: off" = "パンチイン/アウト: オフ"
+"Loop record: on, Song mode recording loops the loop region (one take per pass); off, it plays straight through and keeps everything where it was played" = "ループ録音: オンではソングモードの録音がループ範囲を繰り返し（1周ごとに1テイク）、オフでは通り過ぎて弾いた位置にすべて残します"
+"Step edit: with the transport stopped, notes you play go into the current pattern at the position, a snap step long; release the keys and the position moves on one step (chords: hold them together)" = "ステップ入力: トランスポート停止中、弾いたノートが現在のパターンの位置にスナップ1ステップの長さで入ります。キーを離すと位置が1ステップ進みます（和音: 同時に押さえる）"
+"Punch in/out: audio recording keeps only the loop region (playback runs through it; pre- and post-roll in the recording options)" = "パンチイン/アウト: オーディオ録音はループ範囲だけを残します（再生はそこを通過、プリロール/ポストロールは録音オプションで）"
+"Punch in/out" = "パンチイン/アウト"
+
+# round 170e3: the idle hint on one line
+"Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "何かを指すとヘルプ  [F1] ショートカット  [F5]-[F9] ウィンドウ  [Space] 再生/停止"
