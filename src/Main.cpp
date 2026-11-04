@@ -874,6 +874,63 @@ public:
             return;
         }
 
+        if (args.contains ("--steppertest"))
+        {
+            // LYNX.exe --steppertest <report.txt>: round 170c (#14) — every value stepper of every generated effect editor
+            // driven by synthetic input (arrows, click on the value, drag, wheel, trackpad); ends with result=OK / FAIL
+            const auto i = args.indexOf ("--steppertest");
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            juce::String report;
+            int fails = 0, count = 0, skips = 0;
+            {
+                lynx::AudioEngine offline (false);
+                auto kinds = lynx::plugui::flLayoutKinds();
+                for (const auto own : lynx::plugui::ownLayoutKinds())
+                    kinds.push_back (own);
+                // FL's Default preset when the installation has one (the state-backed controls need FL's state)
+                const auto roots = lynx::findFlStudioRoots();
+                const auto presets = juce::File (juce::String::fromUTF8 (roots.data.c_str())).getChildFile ("Patches/Plugin presets/Effects");
+                for (const auto kind : kinds)
+                {
+                    auto fx = lynx::makeEffectSlot (kind);
+                    for (const auto& plugin : lynx::flPluginsForEffect (kind))
+                    {
+                        juce::MemoryBlock data;
+                        const auto file = presets.getChildFile (juce::String::fromUTF8 (plugin.c_str())).getChildFile ("Default.fst");
+                        if (file.existsAsFile() && file.loadFileAsData (data))
+                        {
+                            const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
+                            if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0); loaded && loaded->kind == kind)
+                                fx = *loaded;
+                        }
+                        break;
+                    }
+                    lynx::Song song;
+                    song.mixer.resize (2);
+                    song.mixer[0].name = "Master";
+                    song.mixer[1].name = "Insert 1";
+                    song.mixer[1].effects.push_back (fx);
+                    offline.setSong (std::move (song));
+                    offline.dispatchPendingMessages();
+                    const auto lines = lynx::stepperSelfTest (offline, 1, 0, (int) lynx::plugui::layoutFor (kind).pages.size());
+                    for (const auto& line : juce::StringArray::fromLines (lines))
+                        if (line.isNotEmpty())
+                        {
+                            ++count;
+                            fails += line.contains (": FAIL") ? 1 : 0;
+                            skips += line.contains (": SKIP") ? 1 : 0;
+                        }
+                    report << lines;
+                    juce::PopupMenu::dismissAllActiveMenus();
+                    offline.dispatchPendingMessages();
+                }
+            }
+            report << "steppers=" << count << " failures=" << fails << " skipped=" << skips << "\nresult=" << (fails == 0 && count > 0 ? "OK" : "FAIL") << "\n";
+            juce::File (args[i + 1].unquoted()).replaceWithText (report);
+            quit();
+            return;
+        }
+
         if (args.contains ("--plugui"))
         {
             // LYNX.exe --plugui <folder>: the native effect editors at FL's size (one PNG per editor and page), each

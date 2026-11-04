@@ -3993,6 +3993,11 @@ public:
             return;
         }
 
+        if (e.mods.isPopupMenu() && listedStepper (item)) // round 170c (#14): its values, then the parameter items
+        {
+            showStepperMenu (item, true);
+            return;
+        }
         if (e.mods.isPopupMenu())
         {
             ui::showValueMenu (*this, &engine, spec, valueOf (param), [this, param] (double v) { setValue (param, (float) v); });
@@ -4025,14 +4030,15 @@ public:
                 setValue (param, valueOf (param) >= 0.5f ? 0.0f : 1.0f);
                 return;
             case Item::stepper:
-                if (e.position.x > r.getRight() - juce::jmin (12.0f * scale(), r.getWidth() * 0.4f))
+                // round 170c (#14): the arrows' halves split at the value box's centre (the caption above it moved the
+                // split down before), and a small stepper's arrows get a 10 px hit area
+                if (const auto arrow = stepperArrowAt (item, e.position); arrow != 0)
                 {
-                    const auto up = e.position.y < r.getY() + (item.label != nullptr ? 12.0f * scale() : 0.0f) + (r.getBottom() - r.getY()) * 0.5f;
-                    const auto step = item.steps > 0 ? 1.0f / (float) item.steps : 0.01f;
-                    setValue (param, valueOf (param) + (up ? step : -step));
-                    ui::flashValueTip (*this, r.toNearestInt(), valueText (param, valueOf (param)));
+                    stepStepper (item, arrow);
                     return;
                 }
+                stepperDragIndex = listedStepper (item) ? stepperIndex (item, valueOf (param)) : -1;
+                stepperMoved = false;
                 break;
             case Item::hslider:
             case Item::vslider:
@@ -4120,6 +4126,14 @@ public:
         const auto& item = activeLayout().items[(std::size_t) dragItem];
         const auto param = paramOf (item);
         const auto spec = specFor (item);
+        if (listedStepper (item) && stepperDragIndex >= 0) // round 170c (#14): one value per stepperDragPixels
+        {
+            stepperMoved = stepperMoved || std::abs (e.getDistanceFromDragStartY()) >= 3;
+            const auto v = stepperValue (item, stepperDragIndex + (int) std::trunc (-(float) e.getDistanceFromDragStartY() / stepperDragPixels));
+            setValue (param, v);
+            ui::showValueTip (*this, rectOf (item).toNearestInt(), spec.text (v));
+            return;
+        }
         auto v = drag.update (e, spec);
         if (item.type == Item::hslider) // horizontal sliders follow the mouse sideways too
         {
@@ -4180,20 +4194,19 @@ public:
         if (dragItem >= 0)
         {
             drag.end();
-            // round 170c (issue #14: "Oversampling: off" looked dead): a click on a stepper's value (not only on its
-            // small arrows) steps it up, and past its last value back to the first; a drag or the wheel still sets it
+            // round 170c (issue #14: "Oversampling: Off" could not be changed): a click on a stepper's value (no drag)
+            // lists its values, as FL's value selectors do; the arrows step, a drag or the wheel moves it
+            stepperDragIndex = -1;
             if (const auto& item = activeLayout().items[(std::size_t) dragItem];
-                item.type == Item::stepper && item.steps > 0 && item.steps <= 64 && e.mouseWasClicked() && ! e.mods.isPopupMenu())
-                if (const auto param = paramOf (item); param >= 0)
-                {
-                    const auto step = 1.0f / (float) item.steps;
-                    const auto now = valueOf (param);
-                    setValue (param, now >= 1.0f - step * 0.5f ? 0.0f : juce::jlimit (0.0f, 1.0f, now + step));
-                    ui::flashValueTip (*this, rectOf (item).toNearestInt(), valueText (param, valueOf (param)));
-                    dragItem = -1;
-                    repaint();
-                    return;
-                }
+                listedStepper (item) && ! stepperMoved && ! e.mods.isPopupMenu())
+            {
+                dragItem = -1;
+                ui::hideValueTip();
+                ++stepperMenusShown;
+                showStepperMenu (item, false);
+                repaint();
+                return;
+            }
             dragItem = -1;
             ui::hideValueTip();
             repaint();
@@ -4235,6 +4248,218 @@ public:
         const auto spec = specFor (item);
         setValue (paramOf (item), (float) spec.defaultValue);
     }
+
+    // --- steppers (round 170c, issue #14: "Oversampling: Off" could not be changed on a Mac) --------------------
+    // A stepper with a short list of values (its `steps` = the last value's index, 1…64) works like FL's value selectors:
+    // the arrows step one value, a click on the value lists them all (a menu; the right-click menu lists them too, above
+    // the usual parameter items), a vertical drag moves one value per stepperDragPixels, the wheel one value per notch and a
+    // trackpad one value per stepperTrackpadDelta of accumulated scroll (a Mac trackpad sends many tiny smooth deltas).
+    static constexpr float stepperDragPixels = 10.0f, stepperTrackpadDelta = 0.12f;
+    static bool listedStepper (const LayoutItem& item) noexcept { return item.type == Item::stepper && item.steps > 0 && item.steps <= 64; }
+
+    juce::Rectangle<float> stepperBox (const LayoutItem& item) const
+    {
+        auto box = rectOf (item);
+        if (item.label != nullptr && ! hasStyle (item, plugui::noCaption))
+            box.removeFromTop (12.0f * scale());
+        return box;
+    }
+
+    juce::Rectangle<float> stepperArrows (const LayoutItem& item) const
+    {
+        auto box = stepperBox (item);
+        return box.removeFromRight (juce::jmin (12.0f * scale(), box.getWidth() * 0.4f));
+    }
+
+    // the arrows' hit area: at least 10 px wide (the drawn arrows of a small stepper are narrower), never the whole box
+    int stepperArrowAt (const LayoutItem& item, juce::Point<float> p) const
+    {
+        const auto box = stepperBox (item);
+        const auto drawn = stepperArrows (item);
+        const auto hit = box.withLeft (juce::jmax (box.getX() + box.getWidth() * 0.5f, juce::jmin (drawn.getX(), box.getRight() - 10.0f * scale())));
+        if (! hit.contains (p))
+            return 0;
+        return p.y < box.getCentreY() ? 1 : -1;
+    }
+
+    float stepperValue (const LayoutItem& item, int index) const { return juce::jlimit (0.0f, 1.0f, (float) index / (float) item.steps); }
+    int stepperIndex (const LayoutItem& item, float value) const { return juce::jlimit (0, item.steps, juce::roundToInt (value * (float) item.steps)); }
+
+    void stepStepper (const LayoutItem& item, int delta)
+    {
+        const auto param = paramOf (item);
+        if (param < 0 || delta == 0)
+            return;
+        const auto step = item.steps > 0 ? 1.0f / (float) item.steps : 0.01f;
+        const auto v = listedStepper (item) ? stepperValue (item, stepperIndex (item, valueOf (param)) + delta)
+                                            : juce::jlimit (0.0f, 1.0f, valueOf (param) + (float) delta * step);
+        setValue (param, v);
+        ui::reportTweak (specFor (item));
+        ui::flashValueTip (*this, rectOf (item).toNearestInt(), valueText (param, valueOf (param)));
+    }
+
+    // every value of a listed stepper, the current one ticked (FL's value selectors list theirs)
+    juce::PopupMenu stepperMenu (const LayoutItem& item)
+    {
+        juce::PopupMenu menu;
+        const auto param = paramOf (item);
+        if (param < 0 || ! listedStepper (item))
+            return menu;
+        const auto now = stepperIndex (item, valueOf (param));
+        for (int k = 0; k <= item.steps; ++k)
+            menu.addItem (valueText (param, stepperValue (item, k)), true, k == now,
+                          [safe = juce::Component::SafePointer<NativeEffectEditor> (this), param, v = stepperValue (item, k)] {
+                              if (safe != nullptr)
+                                  safe->setValue (param, v);
+                          });
+        return menu;
+    }
+
+    void showStepperMenu (const LayoutItem& item, bool withParameterItems)
+    {
+        auto menu = stepperMenu (item);
+        if (menu.getNumItems() == 0)
+            return;
+        const auto param = paramOf (item);
+        const auto spec = specFor (item);
+        if (withParameterItems)
+        {
+            menu.addSeparator();
+            ui::addValueItems (menu, *this, &engine, spec, valueOf (param), [safe = juce::Component::SafePointer<NativeEffectEditor> (this), param] (double v) {
+                if (safe != nullptr)
+                    safe->setValue (param, (float) v);
+            });
+        }
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (stepperBox (item).toNearestInt())));
+    }
+
+public:
+    // Round 170c (#14): every stepper of the current page driven by synthetic input — a click on each arrow, a click on
+    // the value (its menu), a drag up and down, wheel notches, trackpad scrolls. One line per stepper: OK / FAIL and why.
+    juce::String stepperSelfTest()
+    {
+        juce::String report;
+        const auto source = juce::Desktop::getInstance().getMainMouseSource();
+        const auto& items = activeLayout().items;
+        for (std::size_t i = 0; i < items.size(); ++i)
+        {
+            const auto& item = items[i];
+            if (item.type != Item::stepper || ! visible (item))
+                continue;
+            const auto param = paramOf (item);
+            juce::String line = juce::String (effectInfo (kind).name) + " / " + (item.param != nullptr ? item.param : "?") + " (steps " + juce::String (item.steps) + "): ";
+            if (param < 0)
+            {
+                report << line << "FAIL no parameter\n";
+                continue;
+            }
+            // a control kept in FL's state (Maximus, Vocodex...) is editable only once the slot has FL's state
+            if (isStateParam (param) && current() != nullptr && ! stateTable().get (current()->state, plugui::stateIndex (kind, param)))
+            {
+                report << line << "SKIP state-backed, the slot has no FL state\n";
+                continue;
+            }
+            juce::StringArray fails;
+            const auto now = juce::Time::getCurrentTime();
+            auto event = [&] (juce::Point<float> p, juce::ModifierKeys mods, std::optional<juce::Point<float>> down = {}) {
+                return juce::MouseEvent (source, p, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, this, this, now, down.value_or (p), now, 1, false);
+            };
+            const auto left = juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier);
+            // (a state parameter's edit reaches the slot through the engine's message queue)
+            auto settle = [this] { engine.dispatchPendingMessages(); };
+            auto set = [&] (float v) { setValue (param, v); settle(); };
+            auto click = [&] (juce::Point<float> p) {
+                mouseDown (event (p, left));
+                mouseUp (event (p, juce::ModifierKeys()));
+                juce::PopupMenu::dismissAllActiveMenus();
+                settle();
+            };
+            const auto box = stepperBox (item);
+            const auto arrows = stepperArrows (item);
+            const auto upAt = juce::Point<float> (arrows.getCentreX(), box.getY() + box.getHeight() * 0.25f);
+            const auto downAt = juce::Point<float> (arrows.getCentreX(), box.getY() + box.getHeight() * 0.75f);
+            const auto body = juce::Point<float> (box.getX() + juce::jmax (2.0f, (arrows.getX() - box.getX()) * 0.5f), box.getCentreY());
+            const auto start = valueOf (param);
+            const auto low = 0.0f;
+
+            // arrows: from the lowest value, up then down
+            set (low);
+            click (upAt);
+            const auto afterUp = valueOf (param);
+            if (! (afterUp > low))
+                fails.add ("up arrow");
+            click (downAt);
+            if (std::abs (valueOf (param) - low) > 1.0e-4f)
+                fails.add ("down arrow (" + valueText (param, low) + " -> " + valueText (param, afterUp) + " -> " + valueText (param, valueOf (param))
+                           + ", raw " + juce::String (afterUp, 4) + " / " + juce::String (valueOf (param), 4) + ")");
+
+            if (listedStepper (item))
+            {
+                // the value's menu: every value, choosing the last one sets it
+                auto menu = stepperMenu (item);
+                if (menu.getNumItems() != item.steps + 1)
+                    fails.add ("menu has " + juce::String (menu.getNumItems()) + " items");
+                std::function<void()> last;
+                for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                    last = it.getItem().action;
+                if (last)
+                    last();
+                settle();
+                if (std::abs (valueOf (param) - 1.0f) > 1.0e-4f)
+                    fails.add ("menu choice");
+                // a click on the value opens it (and changes nothing by itself)
+                set (low);
+                stepperMenusShown = 0;
+                click (body);
+                if (stepperMenusShown != 1)
+                    fails.add ("click on the value shows no menu");
+                if (std::abs (valueOf (param) - low) > 1.0e-4f)
+                    fails.add ("click on the value changed it");
+
+                // drag up three values, then back down
+                set (low);
+                mouseDown (event (body, left));
+                mouseDrag (event (body.translated (0.0f, -3.4f * stepperDragPixels), left, body));
+                settle();
+                const auto dragged = stepperIndex (item, valueOf (param));
+                mouseDrag (event (body, left, body));
+                mouseUp (event (body, juce::ModifierKeys(), body));
+                juce::PopupMenu::dismissAllActiveMenus();
+                settle();
+                if (dragged != juce::jmin (3, item.steps))
+                    fails.add ("drag up gave value " + juce::String (dragged));
+                if (stepperIndex (item, valueOf (param)) != 0)
+                    fails.add ("drag back");
+
+                // a wheel notch up, then a trackpad scroll (many small smooth deltas) up
+                set (low);
+                juce::MouseWheelDetails notch { 0.0f, 0.15f, false, false, false };
+                mouseWheelMove (event (body, juce::ModifierKeys()), notch);
+                settle();
+                if (stepperIndex (item, valueOf (param)) != 1)
+                    fails.add ("wheel notch gave value " + juce::String (stepperIndex (item, valueOf (param))));
+                set (low);
+                stepperWheel = 0.0f;
+                juce::MouseWheelDetails pad { 0.0f, 0.02f, false, true, false };
+                for (int k = 0; k < 7; ++k)
+                {
+                    mouseWheelMove (event (body, juce::ModifierKeys()), pad);
+                    settle();
+                }
+                if (stepperIndex (item, valueOf (param)) != 1)
+                    fails.add ("trackpad scroll gave value " + juce::String (stepperIndex (item, valueOf (param))));
+            }
+            set (start);
+            report << line << (fails.isEmpty() ? juce::String ("OK") : "FAIL " + fails.joinIntoString (", ")) << "\n";
+        }
+        return report;
+    }
+
+private:
+    int stepperMenusShown = 0;     // (the self-test counts the menus a click opens)
+    float stepperWheel = 0.0f;     // a trackpad's accumulated scroll over a listed stepper
+    int stepperDragIndex = -1;     // the value a drag started from (-1 = no stepper drag)
+    bool stepperMoved = false;     // that drag moved (then its mouse-up opens no menu)
 
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
     {
@@ -4281,6 +4506,25 @@ public:
             const auto n = (int) plugui::optionLabels (item).size();
             const auto o = plugui::optionAt (item, valueOf (param)) + (wheel.deltaY > 0 ? (item.type == Item::radio ? -1 : 1) : (item.type == Item::radio ? 1 : -1));
             setValue (param, plugui::optionValue (item, juce::jlimit (0, n - 1, o)));
+            return;
+        }
+        if (listedStepper (item)) // round 170c (#14): one value per notch; a trackpad's small deltas add up to one
+        {
+            const auto delta = std::abs (wheel.deltaY) >= std::abs (wheel.deltaX) ? wheel.deltaY : -wheel.deltaX;
+            if (delta == 0.0f || ui::wheelScrolling())
+                return;
+            const auto sign = wheel.isReversed ? -1.0f : 1.0f;
+            if (! wheel.isSmooth)
+            {
+                stepStepper (item, delta * sign > 0.0f ? 1 : -1);
+                return;
+            }
+            stepperWheel += delta * sign;
+            if (std::abs (stepperWheel) >= stepperTrackpadDelta)
+            {
+                stepStepper (item, stepperWheel > 0.0f ? 1 : -1);
+                stepperWheel = 0.0f;
+            }
             return;
         }
         if (item.type == Item::stepper && item.steps > 1000 && wheel.deltaY != 0.0f) // a fine count (the hardware insert's delay in samples): one per notch, Shift ×10
@@ -4354,7 +4598,7 @@ public:
         if (const auto* fx = current(); fx != nullptr && plugui::isIdle (kind, item, fx->params)) // round 170c
             return { juce::String (spec.name) + ": " + tr ("no effect with the current mode (another engine is in use)"), spec.text (valueOf (paramOf (item))), false, false };
         if (item.type == Item::stepper && item.steps > 0 && item.steps <= 64) // round 170c (issue #14)
-            return { juce::String (spec.name) + ": " + tr ("click to step, drag or mouse wheel to change"), spec.text (valueOf (paramOf (item))), false, false };
+            return { juce::String (spec.name) + ": " + tr ("arrows step, click for the list, drag or mouse wheel to change"), spec.text (valueOf (paramOf (item))), false, false };
         return ui::valueHint (spec, valueOf (paramOf (item)));
     }
 
@@ -4771,6 +5015,17 @@ bool tickNativeEffectEditor (juce::Component& editor)
 std::unique_ptr<juce::Component> makeNativeEffectEditor (AudioEngine& engine, int track, int slot, float scale, int page)
 {
     return std::make_unique<NativeEffectEditor> (engine, track, slot, scale, page);
+}
+
+juce::String stepperSelfTest (AudioEngine& engine, int track, int slot, int pages)
+{
+    juce::String report;
+    for (int page = 0; page < juce::jmax (1, pages); ++page)
+    {
+        NativeEffectEditor editor (engine, track, slot, 1.0f, page);
+        report << editor.stepperSelfTest();
+    }
+    return report;
 }
 
 std::unique_ptr<juce::Component> makeNodeEffectEditor (AudioEngine& engine, std::function<EffectSlot* (Song&)> locate,

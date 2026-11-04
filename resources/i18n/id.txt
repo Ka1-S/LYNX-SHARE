@@ -7063,6 +7063,7 @@ countries: id
 "Animate the plugin art (falling petals, glows; Themed style)" = "Animasikan seni plugin (kelopak berjatuhan, cahaya; gaya Bertema)"
 "click to step, drag or mouse wheel to change" = "klik untuk melangkah, seret atau roda mouse untuk mengubah"
 "no effect with the current mode (another engine is in use)" = "tidak berpengaruh pada mode saat ini (mesin lain sedang dipakai)"
+"arrows step, click for the list, drag or mouse wheel to change" = "panah untuk melangkah, klik untuk daftar, seret atau roda mouse untuk mengubah"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Utama: {0}"

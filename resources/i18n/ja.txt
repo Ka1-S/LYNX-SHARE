@@ -7063,6 +7063,7 @@ countries: jp
 "Animate the plugin art (falling petals, glows; Themed style)" = "プラグインのアートをアニメーション（舞い散る花びら、光；テーマスタイル）"
 "click to step, drag or mouse wheel to change" = "クリックで切り替え、ドラッグまたはマウスホイールで変更"
 "no effect with the current mode (another engine is in use)" = "現在のモードでは効果なし（別のエンジンを使用中）"
+"arrows step, click for the list, drag or mouse wheel to change" = "矢印で1段ずつ、クリックで一覧、ドラッグまたはマウスホイールで変更"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "メイン: {0}"

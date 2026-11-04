@@ -7063,6 +7063,7 @@ countries: tr
 "Animate the plugin art (falling petals, glows; Themed style)" = "Eklenti çizimini canlandır (düşen yapraklar, parıltılar; Temalı stil)"
 "click to step, drag or mouse wheel to change" = "adım için tıklayın, değiştirmek için sürükleyin veya fare tekerleğini kullanın"
 "no effect with the current mode (another engine is in use)" = "geçerli modda etkisiz (başka bir motor kullanılıyor)"
+"arrows step, click for the list, drag or mouse wheel to change" = "oklar bir adım ilerletir, liste için tıklayın, değiştirmek için sürükleyin veya fare tekerleğini kullanın"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Ana: {0}"

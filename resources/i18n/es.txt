@@ -7063,6 +7063,7 @@ countries: es mx ar co cl pe ve
 "Animate the plugin art (falling petals, glows; Themed style)" = "Animar el arte de los plugins (pétalos que caen, brillos; estilo Temático)"
 "click to step, drag or mouse wheel to change" = "clic para avanzar, arrastra o usa la rueda del ratón para cambiar"
 "no effect with the current mode (another engine is in use)" = "sin efecto en el modo actual (otro motor está en uso)"
+"arrows step, click for the list, drag or mouse wheel to change" = "las flechas avanzan un paso, clic para la lista, arrastra o usa la rueda del ratón para cambiar"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Principal: {0}"

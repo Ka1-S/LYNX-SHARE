@@ -7063,6 +7063,7 @@ countries: cn sg
 "Animate the plugin art (falling petals, glows; Themed style)" = "插件美术动画（飘落的花瓣、光晕；主题样式）"
 "click to step, drag or mouse wheel to change" = "单击切换，拖动或滚动鼠标滚轮更改"
 "no effect with the current mode (another engine is in use)" = "在当前模式下无效（正在使用另一个引擎）"
+"arrows step, click for the list, drag or mouse wheel to change" = "箭头逐步切换，单击显示列表，拖动或滚动鼠标滚轮更改"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "主：{0}"
