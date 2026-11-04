@@ -20,13 +20,28 @@ match, so no FL reverse engineering. Design and what was built: [docs/design/ONL
 
 ## Results
 
-(filled in as the runs finish)
+- **Core** (`tests/Live169jTests.inc`, build-local): 24/24 seeded sessions over links that drop, with host restarts,
+  converge (67 replays, 58 resume snapshots, 33 host restarts) and keep 183/183 offline edits; whole suite 1963796
+  checks, 0 failures. Before host epochs only 16 of 24 converged (a host restarted from an older journal reused
+  revision numbers its guests had already seen).
+- **Windows `--selftest`**: `live_session=OK`, FLAC packs s16 17 %, s24 35 % of the WAV (byte-exact), f32 and tiny
+  sent raw.
+- **Windows `--livetest` on relay.lynx-share.com with `--plugin` (LYNX Test Synth.vst3)**: 37/37 ok, three runs in
+  a row (31.7 s, 31.2 s, 31.4 s). Typical numbers: room 1.1–1.5 s, two guests in 1.6 s, late guest 1.8 s, chat to
+  everyone 0.29 s, Ana's 1.2 MB WAV hashed off the thread and sent as a FLAC pack (955 KiB saved), guest drop →
+  resumed by replay 2.65 s, host drop → everyone resumed 2.6 s, live stand-in rendered and at Rui 5.1 s, re-rendered
+  after a note change 4.4 s, host crash → restarted from its journal (2 guests, revision 17) and both guests resumed
+  in 1.8 s, journal deleted at the end.
+- **Bug found by the livetest** (1 run in 3 before the fix): a local edit made between two 100 ms polls was
+  swallowed when a commit or an arriving file updated the working song (the poll stamp moved on), so Lia's refused
+  edit never went out. `applyUpdate` / `finishMedia` now move the stamp only when nothing local was waiting.
+- **Windows GUI, two instances** (Kauan hosts with `--live-chat`, Ana joins with `--live-edit --live-follow
+  --live-chat`; screenshots in E:\lynx-work\online169j): chat window with both lines in order; host killed →
+  Ana's title *[Waiting for the host...]* within 4 s; `--live-resume` → host *[LIVE]* again, Ana *[LIVE]*; both
+  closed by PID, desktop clean. The presence badge is not drawn when the toolbar layout has no room beside the menus
+  (the 1690-px window here), so the session state now also goes in the window title.
+- No relay change (rooms outlive their connections for 12 h already).
 
 ## Where I stopped
 
-- Done: core, engine, UI, core tests, docs, translations; build-local bl2 green (live169j: 24/24 sessions converge
-  over dropping links, 183/183 offline edits kept; 1963796 checks, 0 failures).
-- Windows `--livetest` live2 found a real bug (a local edit made between two 100 ms polls was swallowed when a commit
-  or an arriving file updated the working song: Lia's refused edit never went out, 3 FAILs). Fixed in
-  `applyUpdate` / `finishMedia` (the poll stamp moves on only when nothing local waited); live3 passed.
-- Next: Windows rebuild (win5) + livetest ×3, `--selftest`, GUI two-instance check, commit, `coord/train.sh online169j`.
+- Everything above done; next: commit, `coord/train.sh online169j`, notes-0.1.24.

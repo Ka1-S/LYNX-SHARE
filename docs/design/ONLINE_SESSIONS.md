@@ -686,7 +686,9 @@ presence, the resume question).
 - **Reconnect (§1.5 as built).** A computer whose WebSocket closes (or goes silent for 35 s: relay pings every 10 s)
   goes to *Reconnecting...* and connects again by itself, 1, 2, 4 … 30 s apart, for up to 15 minutes; it keeps
   working meanwhile (a guest's edits wait: nothing is polled while there is no host). A guest who sees the host's
-  peer leave goes to *Waiting for the host...* instead of ending. Coming back:
+  peer leave goes to *Waiting for the host...* instead of ending (the state shows in the presence badge and, since a
+  narrow toolbar layout has no room for the badge, in the window title too: `[LIVE]`, `[Reconnecting...]`, `[Waiting
+  for the host...]`). Coming back:
   - the host's own connection: it broadcasts `back`; every waiting guest proves who the host is before talking to it:
     `seek {nonce}` → `host {nonce, sig}` (Ed25519 over `room|nonce`; the public key came in the snapshot as
     `hostKey`, the seed stays in the host's journal) — anyone with the invite code has the session key, so the key
@@ -704,7 +706,7 @@ presence, the resume question).
     `resume`), `Authority::since (rev, epoch)` replays only within the guest's own epoch (a guest of an earlier run gets a
     resume snapshot), and `lostCommitsOf (epoch, rev)` (another epoch, past the revision the journal restarted
     from) tells the host that a guest saw commits it no longer has (the snapshot then says `lost: true`, and the guest's own-area changes are kept on top).
-    Found by the seeded drop/restart test (16 of 24 sessions diverged before epochs; 24 of 24 converge with them).
+    Found by the seeded drop/restart test (only 16 of 24 sessions converged before epochs; 24 of 24 with them).
   - A local edit made between two polls is never swallowed by a remote update or an arriving file: the poll stamp
     moves on only when nothing local was waiting (found by `--livetest` on the real relay).
   - A dropped guest keeps its place: the host lists it greyed (hollow dot), its tag, area, permissions and resume

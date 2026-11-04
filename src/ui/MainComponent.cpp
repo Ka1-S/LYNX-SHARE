@@ -617,6 +617,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         {
             safe->repaint (safe->titleArea);
             safe->menuItemsChanged();
+            safe->updateTitle(); // (the session's state is in the window title too: narrow layouts hide the badge)
         }
     };
     live->onJoined = [safe = juce::Component::SafePointer<MainComponent> (this)] (Song song) {
@@ -3595,8 +3596,18 @@ void MainComponent::updateTitle()
         savedSamples = safety::referencedSamples (engine.getSong());
 
     if (auto* window = getTopLevelComponent())
+    {
+        // a live session's state (round 169j): LIVE, or what it is waiting for
+        juce::String liveState;
+        if (live != nullptr && live->isActive())
+        {
+            using S = LiveSessionManager::State;
+            const auto st = live->getState();
+            liveState = " [" + (st == S::live ? tr ("LIVE") : st == S::reconnecting ? tr ("Reconnecting...") : st == S::waitingHost ? tr ("Waiting for the host...") : tr ("Connecting...")) + "]";
+        }
         window->setName ((engine.isModified() ? "* " : "")
-                         + (projectName.isNotEmpty() ? "LYNX SHARE - " + projectName : juce::String ("LYNX SHARE")) + importedSuffix);
+                         + (projectName.isNotEmpty() ? "LYNX SHARE - " + projectName : juce::String ("LYNX SHARE")) + importedSuffix + liveState);
+    }
 }
 
 std::unique_ptr<juce::AlertWindow> MainComponent::makeConfirmDiscardWindow()
