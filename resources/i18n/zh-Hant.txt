@@ -7065,6 +7065,8 @@ countries: tw hk mo
 "Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "按一下選取插入軌道 (Ctrl+按一下或橫向拖過: 範圍, Ctrl+Shift: 新增或移除), 右鍵開啟選單; Alt+左/右移動選取"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "效果槽: 按一下顯示或隱藏其視窗 (及下方旋鈕), LED 旁通, 滾輪或拖曳將其上移或下移, 右鍵: 選項"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "開啟效果器視窗 (完整控制項, 與 FL 相同); 按一下槽名稱效果相同"
+"Themed" = "主題"
+"Animate the plugin art (falling petals, glows; Themed style)" = "外掛美術動畫（飄落的花瓣、光暈；主題樣式）"
 "click to step, drag or mouse wheel to change" = "按一下切換，拖曳或捲動滑鼠滾輪變更"
 "no effect with the current mode (another engine is in use)" = "在目前模式下無效（正在使用另一個引擎）"
 

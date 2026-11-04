@@ -7065,6 +7065,8 @@ countries: tr
 "Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "Tık insert'i seçer (Ctrl+tık veya üzerinden sürükle: aralık, Ctrl+Shift: ekle veya çıkar), sağ tık menüsünü açar; Alt+Sol/Sağ seçimi taşır"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "Efekt slotu: tık penceresini (ve alttaki düğmelerini) gösterir veya gizler, LED baypas eder, tekerlek veya sürükleme yukarı ya da aşağı taşır, sağ tık: seçenekler"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "Efektin penceresini açar (FL'deki gibi tüm kontroller); slot adına tıklamak da aynısını yapar"
+"Themed" = "Temalı"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Eklenti çizimini canlandır (düşen yapraklar, parıltılar; Temalı stil)"
 "click to step, drag or mouse wheel to change" = "adım için tıklayın, değiştirmek için sürükleyin veya fare tekerleğini kullanın"
 "no effect with the current mode (another engine is in use)" = "geçerli modda etkisiz (başka bir motor kullanılıyor)"
 

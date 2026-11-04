@@ -7065,6 +7065,8 @@ countries: nl be
 "Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "Klik selecteert het insert (Ctrl+klik of eroverheen slepen: bereik, Ctrl+Shift: toevoegen of verwijderen), rechtsklik opent het menu; Alt+Links/Rechts verplaatst de selectie"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "Effectslot: klik toont of verbergt het venster (en de knoppen eronder), de LED omzeilt het, het wiel of slepen verplaatst het omhoog of omlaag, rechtsklik: opties"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "Opent het venster van het effect (alle regelaars, zoals in FL); klikken op de slotnaam doet hetzelfde"
+"Themed" = "Thematisch"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Plugin-illustratie animeren (vallende bloemblaadjes, gloed; stijl Thematisch)"
 "click to step, drag or mouse wheel to change" = "klik om te verspringen, sleep of scrollwiel om te wijzigen"
 "no effect with the current mode (another engine is in use)" = "geen effect in de huidige modus (een andere engine is actief)"
 

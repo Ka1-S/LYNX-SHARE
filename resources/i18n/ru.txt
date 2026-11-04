@@ -7065,6 +7065,8 @@ countries: ru by kz
 "Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "Клик выбирает инсерт (Ctrl+клик или протянуть: диапазон, Ctrl+Shift: добавить или убрать), правый клик открывает меню; Alt+Влево/Вправо сдвигает выбор"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "Слот эффекта: клик показывает или скрывает его окно (и ручки под ним), светодиод обходит его, колесо или перетаскивание двигает вверх или вниз, правый клик: опции"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "Открывает окно эффекта (все его регуляторы, как в FL); клик по имени слота делает то же"
+"Themed" = "Тематический"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Анимировать оформление плагинов (падающие лепестки, свечение; стиль «Тематический»)"
 "click to step, drag or mouse wheel to change" = "щелчок — следующее значение, перетаскивание или колесо мыши — изменить"
 "no effect with the current mode (another engine is in use)" = "не действует в текущем режиме (используется другой движок)"
 

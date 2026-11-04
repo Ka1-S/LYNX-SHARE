@@ -7065,6 +7065,8 @@ countries: jp
 "Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "クリックでインサートを選択 (Ctrl+クリックまたはなぞるようにドラッグ: 範囲、Ctrl+Shift: 追加または解除)、右クリックでメニュー、Alt+左/右で選択を移動"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "エフェクトスロット: クリックでウィンドウ (と下のノブ) を表示/非表示、LED でバイパス、ホイールまたはドラッグで上下に移動、右クリック: オプション"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "エフェクトのウィンドウを開く (FL と同じく全コントロール)。スロット名のクリックでも同じ"
+"Themed" = "テーマ"
+"Animate the plugin art (falling petals, glows; Themed style)" = "プラグインのアートをアニメーション（舞い散る花びら、光；テーマスタイル）"
 "click to step, drag or mouse wheel to change" = "クリックで切り替え、ドラッグまたはマウスホイールで変更"
 "no effect with the current mode (another engine is in use)" = "現在のモードでは効果なし（別のエンジンを使用中）"
 

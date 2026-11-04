@@ -7065,6 +7065,8 @@ countries: es mx ar co cl pe ve
 "Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "Clic selecciona el insert (Ctrl+clic o arrastrar por encima: rango, Ctrl+Shift: añadir o quitar), clic derecho abre su menú; Alt+Izquierda/Derecha mueve la selección"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "Slot de efecto: clic muestra u oculta su ventana (y sus perillas debajo), el LED lo omite, la rueda o arrastrar lo mueve arriba o abajo, clic derecho: opciones"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "Abre la ventana del efecto (todos sus controles, como en FL); hacer clic en el nombre del slot hace lo mismo"
+"Themed" = "Temático"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Animar el arte de los plugins (pétalos que caen, brillos; estilo Temático)"
 "click to step, drag or mouse wheel to change" = "clic para avanzar, arrastra o usa la rueda del ratón para cambiar"
 "no effect with the current mode (another engine is in use)" = "sin efecto en el modo actual (otro motor está en uso)"
 

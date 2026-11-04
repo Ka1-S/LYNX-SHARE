@@ -7065,6 +7065,8 @@ countries: id
 "Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "Klik memilih insert (Ctrl+klik atau seret melintasi: rentang, Ctrl+Shift: tambah atau hapus), klik kanan membuka menunya; Alt+Kiri/Kanan memindahkan pilihan"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "Slot efek: klik menampilkan atau menyembunyikan jendelanya (dan kenopnya di bawah), LED mem-bypass, roda atau seret memindahkannya ke atas atau ke bawah, klik kanan: opsi"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "Membuka jendela efek (semua kontrolnya, seperti di FL); mengklik nama slot melakukan hal yang sama"
+"Themed" = "Bertema"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Animasikan seni plugin (kelopak berjatuhan, cahaya; gaya Bertema)"
 "click to step, drag or mouse wheel to change" = "klik untuk melangkah, seret atau roda mouse untuk mengubah"
 "no effect with the current mode (another engine is in use)" = "tidak berpengaruh pada mode saat ini (mesin lain sedang dipakai)"
 
