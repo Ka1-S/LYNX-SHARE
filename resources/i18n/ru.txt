@@ -7067,3 +7067,4 @@ countries: ru by kz
 "Note names on every key" = "Названия нот на всех клавишах"
 "Note names on every Piano roll key" = "Названия нот на всех клавишах Piano Roll"
 "[LMB] drag up / down: step through the patterns" = "[LMB] тянуть вверх / вниз: листать паттерны"
+"Playhead column in the Channel Rack" = "Столбец позиции воспроизведения в Channel Rack"

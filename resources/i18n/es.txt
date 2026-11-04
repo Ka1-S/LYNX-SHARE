@@ -7067,3 +7067,4 @@ countries: es mx ar co cl pe ve
 "Note names on every key" = "Nombres de nota en todas las teclas"
 "Note names on every Piano roll key" = "Nombres de nota en todas las teclas del Piano Roll"
 "[LMB] drag up / down: step through the patterns" = "[LMB] arrastrar arriba / abajo: recorrer los patterns"
+"Playhead column in the Channel Rack" = "Columna del cabezal en el Channel Rack"

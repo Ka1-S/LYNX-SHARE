@@ -7067,3 +7067,4 @@ countries: kr
 "Note names on every key" = "모든 건반에 음 이름 표시"
 "Note names on every Piano roll key" = "Piano Roll의 모든 건반에 음 이름 표시"
 "[LMB] drag up / down: step through the patterns" = "[LMB] 위 / 아래로 드래그: 패턴 넘기기"
+"Playhead column in the Channel Rack" = "채널 랙의 재생 위치 열"

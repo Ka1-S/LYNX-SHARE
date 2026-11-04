@@ -7223,3 +7223,4 @@ countries: br
 "Note names on every key" = "Nomes das notas em todas as teclas"
 "Note names on every Piano roll key" = "Nomes das notas em todas as teclas do Piano Roll"
 "[LMB] drag up / down: step through the patterns" = "[LMB] arrastar para cima / baixo: percorrer os patterns"
+"Playhead column in the Channel Rack" = "Coluna do cursor de reprodução no Channel Rack"

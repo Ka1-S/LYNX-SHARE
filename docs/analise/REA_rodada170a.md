@@ -11,7 +11,7 @@ in the round 167g Ghidra project, headless decompilation; DFM resources dumped i
 | 4 | 03:50 "by default we should have every key labeled" | FL labels the Cs (LYNX extra) | Cs only (white keys too when rows ≥ 16 px) | every key named (≥ 8 px rows), on by default; Settings › General + Piano roll menu switch |
 | 6 | 09:57 "in FL Studio you can left click and drag ... dropdowns take a long time" | §3 | dropdown; rack selector had arrows + wheel | left-drag up / wheel up = next pattern, down = previous, on the toolbar box and the rack selector; past the last one a new pattern is made (one); a click still opens the list (LYNX) |
 | 7 | 12:41 "too close of a color ... dramatically different" | §5 | groups 0x2a2d34 / 0x33363f | every other group = the off step tinted 28 % with the accent (0x5e3036 on the default theme), every theme |
-| 8 | 13:18, 20:48 "can't see where the playhead is", "the sound lighting up when it hits" | §2 | playhead only in Pattern mode, a 28 % tint | Pattern and Song mode; FL's "Playing step" LED strip under the steps, a column with a bright top bar, the hit step glows, the channel's selector flashes on its hit |
+| 8 | 13:18, 20:48 "can't see where the playhead is", "the sound lighting up when it hits" | §2 | playhead only in Pattern mode, a 28 % tint | Pattern and Song mode; FL's "Playing step" LED strip under the steps, the hit step glows, the channel's selector flashes on its hit; LYNX extras: a soft playing column under every row, bar marks on the strip (one option) |
 | 9 | 11:43 "right clicking and hitting shortcut key like D" | §4 | no letters | FL's letters in the Channel Rack, Playlist and Piano roll menus |
 
 ## 1. Ctrl+X / C / V in the Channel Rack
@@ -44,7 +44,7 @@ in the round 167g Ghidra project, headless decompilation; DFM resources dumped i
   pattern clip playing); an on-step's own small LED turns red while the playhead is on it; the channel's selector
   strip (between the name and the steps) flashes white as that channel's note hits.
 - LYNX look: the strip sits at the top of the "add channel" row (9 px, beat groups alternating, the playing cell in
-  the playhead colour); the playing column keeps a 20 % tint plus a 2 px top bar; an on-step (or a loop repeat) at
+  the playhead colour); an on-step (or a loop repeat) at
   the playhead is filled white 55 % with a playhead outline; the channel's selector pill flashes white.
 
 ## 3. The pattern selector
@@ -86,6 +86,13 @@ in the round 167g Ghidra project, headless decompilation; DFM resources dumped i
 - LYNX before: 0x2a2d34 / 0x33363f (grey vs slightly lighter grey). Now: themes::derivePalette sets
   `stepOffAlt = mix (stepOff, accent, stepGroupTint = 0.28)` for every palette (light themes and other accents too);
   the default theme's built-in table and theme::colour::stepOffAlt = 0x5e3036. Test rack170a_step_groups_clearly_apart.
+
+## LYNX extras on the playhead (coordinator + user, 2026-11-04)
+
+On top of FL's strip and hits (kept FL-exact), on by default, Settings › General "Playhead column in the Channel
+Rack" turns both off (settings key rackPlayheadColumn): (1) a soft column (playhead colour, 20 %) under every row's
+step buttons at the playing step, so the time reads on row 12 without looking at the strip; (2) on the strip, each
+bar's first step carries a 2 px accent mark (32 / 64-step patterns). FL has neither (its rack shows only the strip).
 
 ## LYNX verification (Windows, build cfea95e2, fresh profile, LYNX_TEST_MODE, Demo.lynx)
 

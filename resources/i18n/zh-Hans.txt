@@ -7067,3 +7067,4 @@ countries: cn sg
 "Note names on every key" = "在每个琴键上显示音名"
 "Note names on every Piano roll key" = "在 Piano Roll 的每个琴键上显示音名"
 "[LMB] drag up / down: step through the patterns" = "[LMB] 上下拖动：逐个切换 pattern"
+"Playhead column in the Channel Rack" = "通道机架中的播放位置列"

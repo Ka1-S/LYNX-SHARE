@@ -7067,3 +7067,4 @@ countries: pl
 "Note names on every key" = "Nazwy nut na każdym klawiszu"
 "Note names on every Piano roll key" = "Nazwy nut na każdym klawiszu Piano Roll"
 "[LMB] drag up / down: step through the patterns" = "[LMB] przeciągnij w górę / w dół: przełączaj patterny"
+"Playhead column in the Channel Rack" = "Kolumna głowicy odtwarzania w Channel Rack"

@@ -1690,6 +1690,8 @@ void MainComponent::loadUiSettings()
             notenames::currentFlats.store (on);
         else if (key == "noteNamesEveryKey")
             notenames::everyKey.store (on);
+        else if (key == "rackPlayheadColumn")
+            ChannelRackComponent::playheadColumn.store (on);
         else if (key == "rememberSeek")
             EditorGlobals::get().rememberSeek = on;
         else if (key == "createVariants")
@@ -1824,6 +1826,7 @@ void MainComponent::saveUiSettings()
                                       + "\nnoteNames=" + juce::String (notenames::currentStyle.load())
                                       + "\nnoteFlats=" + juce::String (notenames::currentFlats.load() ? 1 : 0)
                                       + "\nnoteNamesEveryKey=" + juce::String (notenames::everyKey.load() ? 1 : 0)
+                                      + "\nrackPlayheadColumn=" + juce::String (ChannelRackComponent::playheadColumn.load() ? 1 : 0)
                                       + "\nreducedEffects=" + juce::String (skin::reducedEffects() ? 1 : 0)
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
                                       + "\npluginStyleOverrides=" + skin::overridesToString()
@@ -4615,6 +4618,7 @@ void MainComponent::openSettings (int page)
         o.noteNames = notenames::currentStyle.load();
         o.noteFlats = notenames::currentFlats.load();
         o.noteNamesEveryKey = notenames::everyKey.load();
+        o.rackPlayheadColumn = ChannelRackComponent::playheadColumn.load();
         o.reducedEffects = skin::reducedEffects();
         o.gpuRendering = gpuRenderingEnabled();
         o.pluginStyle = skin::forcedStyle();
@@ -4666,6 +4670,11 @@ void MainComponent::openSettings (int page)
             notenames::everyKey.store (o.noteNamesEveryKey);
             for (int i = 0; i < juce::Desktop::getInstance().getNumComponents(); ++i) // the keyboards redraw with the new names
                 if (auto* c = juce::Desktop::getInstance().getComponent (i)) c->repaint();
+        }
+        if (o.rackPlayheadColumn != ChannelRackComponent::playheadColumn.load())
+        {
+            ChannelRackComponent::playheadColumn.store (o.rackPlayheadColumn);
+            self.rack.repaint();
         }
         if (o.gpuRendering != gpuRenderingEnabled())
             setGpuRenderingEnabled (o.gpuRendering);

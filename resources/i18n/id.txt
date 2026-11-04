@@ -7067,3 +7067,4 @@ countries: id
 "Note names on every key" = "Nama not di setiap tuts"
 "Note names on every Piano roll key" = "Nama not di setiap tuts Piano Roll"
 "[LMB] drag up / down: step through the patterns" = "[LMB] seret ke atas / bawah: telusuri pattern"
+"Playhead column in the Channel Rack" = "Kolom playhead di Channel Rack"

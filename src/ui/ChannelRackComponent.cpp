@@ -728,6 +728,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
     const auto clip = g.getClipBounds();
     const auto primary = engine.getSelectedChannel();
     const auto& selection = engine.getSelectedChannels();
+    const auto column = playheadColumn.load (std::memory_order_relaxed) && playheadStep >= 0 && playheadStep < steps;
     g.setFont (theme::font (theme::type::body));
 
     for (int row = 0; row < (int) song.channels.size(); ++row)
@@ -744,6 +745,12 @@ void ChannelRackComponent::paint (juce::Graphics& g)
         {
             g.setColour (bg3);
             g.fillRect (0, y + 1, getWidth(), rowHeight - 2);
+        }
+
+        if (column) // LYNX: the playing column, soft, under the step buttons (their colours and groups stay readable)
+        {
+            g.setColour (playhead.withAlpha (0.2f));
+            g.fillRect (gridLeft() + playheadStep * stepWidth - 1, y, stepWidth, rowHeight);
         }
 
         if (channel.instrument == InstrumentKind::audioClip)
@@ -836,6 +843,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
     textcache::drawText (g, tr ("or drop an audio file here"), gridLeft() + 4, addY + positionStripHeight, 400, rowHeight - positionStripHeight,
                          juce::Justification::centredLeft);
 
+    const auto stepsPerBar = std::max (1, song.beatsPerBar) * (int) (ppq / ticksPerStep);
     // FL's "Playing step" strip (PosLEDPanel, REA round 170a §2): a slim LED row under the steps, beat groups
     // alternating, the playing step lit — in Pattern mode and whenever the shown pattern plays in Song mode
     for (int step = 0; step < realSteps; ++step)
@@ -845,14 +853,12 @@ void ChannelRackComponent::paint (juce::Graphics& g)
         if (cell.getRight() < (float) clip.getX() || cell.getX() > (float) clip.getRight())
             continue;
         theme::fillRoundRect (g, cell, 1.5f, step == playheadStep ? playhead : theme::stepOff (step).brighter (0.12f));
-    }
-
-    if (playheadStep >= 0 && playheadStep < steps) // the playing column, over every row
-    {
-        theme::fillRoundRect (g, juce::Rectangle<float> ((float) (gridLeft() + playheadStep * stepWidth), 2.0f, (float) stepWidth - 2.0f,
-                                                        (float) addY - 2.0f), theme::radius::sm, playhead.withAlpha (0.2f));
-        g.setColour (playhead.withAlpha (0.85f));
-        g.fillRect ((float) (gridLeft() + playheadStep * stepWidth), 2.0f, (float) stepWidth - 2.0f, 2.0f);
+        // LYNX: each bar's first step marked (finding the bars on 32 / 64-step patterns)
+        if (playheadColumn.load (std::memory_order_relaxed) && step % stepsPerBar == 0 && step != playheadStep)
+        {
+            g.setColour (accent.withAlpha (0.7f));
+            g.fillRect (cell.withHeight (2.0f));
+        }
     }
 
     // the controls column stays put while the steps scroll sideways (FL's rack keeps the channel buttons in
@@ -2888,7 +2894,7 @@ void ChannelRackComponent::timerCallback()
     {
         auto dirty = [this] (int s) {
             if (s >= 0)
-                repaint (gridLeft() + s * stepWidth, 0, stepWidth, getHeight());
+                repaint (gridLeft() + s * stepWidth - 1, 0, stepWidth + 1, getHeight());
         };
         dirty (playheadStep);
         playheadStep = step;

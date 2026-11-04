@@ -7067,3 +7067,4 @@ countries: jp
 "Note names on every key" = "すべての鍵盤に音名を表示"
 "Note names on every Piano roll key" = "Piano Roll のすべての鍵盤に音名を表示"
 "[LMB] drag up / down: step through the patterns" = "[LMB] 上下にドラッグ: パターンを切り替え"
+"Playhead column in the Channel Rack" = "チャンネルラックの再生位置の列"

@@ -7067,3 +7067,4 @@ countries: nl be
 "Note names on every key" = "Nootnamen op elke toets"
 "Note names on every Piano roll key" = "Nootnamen op elke toets van de Piano Roll"
 "[LMB] drag up / down: step through the patterns" = "[LMB] omhoog / omlaag slepen: door de patterns bladeren"
+"Playhead column in the Channel Rack" = "Afspeelkolom in de Channel Rack"

@@ -7067,3 +7067,4 @@ countries: de at ch li lu
 "Note names on every key" = "Notennamen auf jeder Taste"
 "Note names on every Piano roll key" = "Notennamen auf jeder Taste der Piano Roll"
 "[LMB] drag up / down: step through the patterns" = "[LMB] nach oben / unten ziehen: durch die Patterns blättern"
+"Playhead column in the Channel Rack" = "Abspielspalte im Channel Rack"

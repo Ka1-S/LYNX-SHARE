@@ -7067,3 +7067,4 @@ countries: tr
 "Note names on every key" = "Her tuşta nota adları"
 "Note names on every Piano roll key" = "Piano Roll'un her tuşunda nota adları"
 "[LMB] drag up / down: step through the patterns" = "[LMB] yukarı / aşağı sürükle: pattern'ler arasında gez"
+"Playhead column in the Channel Rack" = "Channel Rack içinde çalma sütunu"
