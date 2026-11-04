@@ -7059,8 +7059,11 @@ countries: ru by kz
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Паттерн: [LMB] рисовать им карандашом  [Ctrl+LMB] / [Shift+LMB] выбрать несколько  [2xLMB] открыть  [RMB] меню"
 "Empty patterns were ignored." = "Пустые паттерны пропущены."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Выбор плагинов: все генераторы и эффекты, категории — вкладками (нажмите ещё раз, чтобы закрыть)"
+"Themed" = "Тематический"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Анимировать оформление плагинов (падающие лепестки, свечение; стиль «Тематический»)"
 "click to step, drag or mouse wheel to change" = "щелчок — следующее значение, перетаскивание или колесо мыши — изменить"
 "no effect with the current mode (another engine is in use)" = "не действует в текущем режиме (используется другой движок)"
+"arrows step, click for the list, drag or mouse wheel to change" = "стрелки — шаг, щелчок — список значений, перетаскивание или колесо мыши — изменить"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Основная: {0}"
@@ -7095,3 +7098,9 @@ countries: ru by kz
 "Number of steps" = "Число шагов"
 "Dual" = "Двойной"
 "Align all channel editors" = "Выровнять все редакторы каналов"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Смешивать записанные ноты: вкл. (новые ноты добавляются к нотам паттерна)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Смешивать записанные ноты: выкл. (старые ноты записанного канала заменяются)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Смешивать записанные ноты: вкл. — дубль добавляет ноты в паттерн (overdub); выкл. — старые ноты записанного канала заменяются"
+"Tempo tapper: tap the beat to set the tempo" = "Тап-темп: отстучите долю, чтобы задать темп"
+"Blend recorded notes" = "Смешивать записанные ноты"

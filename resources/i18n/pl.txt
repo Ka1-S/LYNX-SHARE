@@ -7059,8 +7059,11 @@ countries: pl
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] maluj nim ołówkiem  [Ctrl+LMB] / [Shift+LMB] wybierz kilka  [2xLMB] otwórz  [RMB] menu"
 "Empty patterns were ignored." = "Puste patterny zostały pominięte."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Wybór wtyczek: wszystkie generatory i efekty, kategorie jako karty (naciśnij ponownie, aby zamknąć)"
+"Themed" = "Tematyczny"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Animuj grafikę wtyczek (spadające płatki, poświata; styl Tematyczny)"
 "click to step, drag or mouse wheel to change" = "kliknij, aby przejść dalej, przeciągnij lub użyj kółka myszy, aby zmienić"
 "no effect with the current mode (another engine is in use)" = "bez efektu w bieżącym trybie (używany jest inny silnik)"
+"arrows step, click for the list, drag or mouse wheel to change" = "strzałki przechodzą o krok, kliknij, aby zobaczyć listę, przeciągnij lub użyj kółka myszy, aby zmienić"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Główna: {0}"
@@ -7095,3 +7098,9 @@ countries: pl
 "Number of steps" = "Liczba kroków"
 "Dual" = "Podwójny"
 "Align all channel editors" = "Wyrównaj wszystkie edytory kanałów"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Łącz nagrane nuty: wł. (nowe nuty dochodzą do nut patternu)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Łącz nagrane nuty: wył. (stare nuty nagranego kanału są zastępowane)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Łącz nagrane nuty: wł. — nagranie dodaje nuty do patternu (overdub); wył. — stare nuty nagranego kanału są zastępowane"
+"Tempo tapper: tap the beat to set the tempo" = "Tap tempo: wystukaj rytm, aby ustawić tempo"
+"Blend recorded notes" = "Łącz nagrane nuty"

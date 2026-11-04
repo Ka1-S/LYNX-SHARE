@@ -7059,8 +7059,11 @@ countries: jp
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "パターン: [LMB] ペンシルでペイント  [Ctrl+LMB] / [Shift+LMB] 複数選択  [2xLMB] 開く  [RMB] メニュー"
 "Empty patterns were ignored." = "空のパターンは無視されました。"
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "プラグインピッカー: すべてのジェネレーターとエフェクト、カテゴリをタブで表示（もう一度押すと閉じる）"
+"Themed" = "テーマ"
+"Animate the plugin art (falling petals, glows; Themed style)" = "プラグインのアートをアニメーション（舞い散る花びら、光；テーマスタイル）"
 "click to step, drag or mouse wheel to change" = "クリックで切り替え、ドラッグまたはマウスホイールで変更"
 "no effect with the current mode (another engine is in use)" = "現在のモードでは効果なし（別のエンジンを使用中）"
+"arrows step, click for the list, drag or mouse wheel to change" = "矢印で1段ずつ、クリックで一覧、ドラッグまたはマウスホイールで変更"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "メイン: {0}"
@@ -7095,3 +7098,9 @@ countries: jp
 "Number of steps" = "ステップ数"
 "Dual" = "デュアル"
 "Align all channel editors" = "すべてのチャンネルエディターを揃える"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "録音ノートをブレンド: オン (新しいノートをパターンのノートに追加)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "録音ノートをブレンド: オフ (録音したチャンネルの古いノートを置き換え)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "録音ノートをブレンド: オンでテイクのノートをパターンに追加 (オーバーダブ)、オフで録音したチャンネルの古いノートを置き換えます"
+"Tempo tapper: tap the beat to set the tempo" = "テンポタッパー: ビートをタップしてテンポを設定"
+"Blend recorded notes" = "録音ノートをブレンド"

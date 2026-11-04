@@ -7215,8 +7215,11 @@ countries: br
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] pinta com o lápis  [Ctrl+LMB] / [Shift+LMB] escolhe vários  [2xLMB] abre  [RMB] menu"
 "Empty patterns were ignored." = "Os patterns vazios foram ignorados."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Seletor de plugins: todos os geradores e efeitos, as categorias como abas (aperte de novo para fechar)"
+"Themed" = "Temático"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Animar a arte dos plugins (pétalas caindo, brilhos; estilo Temático)"
 "click to step, drag or mouse wheel to change" = "clique para avançar, arraste ou use a roda do mouse para mudar"
 "no effect with the current mode (another engine is in use)" = "sem efeito no modo atual (outro motor está em uso)"
+"arrows step, click for the list, drag or mouse wheel to change" = "as setas avançam um passo, clique para a lista, arraste ou use a roda do mouse para mudar"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Principal: {0}"
@@ -7251,3 +7254,9 @@ countries: br
 "Number of steps" = "Número de passos"
 "Dual" = "Duplo"
 "Align all channel editors" = "Alinhar todos os editores de canal"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Mesclar notas gravadas: ligado (as notas novas se somam às do pattern)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Mesclar notas gravadas: desligado (as notas antigas de um canal gravado são substituídas)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Mesclar notas gravadas: ligado, uma tomada soma as notas ao pattern (overdub); desligado, as notas antigas de um canal gravado são substituídas"
+"Tempo tapper: tap the beat to set the tempo" = "Tap tempo: toque no ritmo para definir o andamento"
+"Blend recorded notes" = "Mesclar notas gravadas"

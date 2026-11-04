@@ -7059,8 +7059,11 @@ countries: fr be ch ca lu
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern : [LMB] le peindre au crayon  [Ctrl+LMB] / [Shift+LMB] en choisir plusieurs  [2xLMB] ouvrir  [RMB] menu"
 "Empty patterns were ignored." = "Les patterns vides ont été ignorés."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Sélecteur de plugins : tous les générateurs et effets, les catégories en onglets (appuyez à nouveau pour fermer)"
+"Themed" = "Thématique"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Animer l'illustration des plugins (pétales qui tombent, lueurs ; style Thématique)"
 "click to step, drag or mouse wheel to change" = "cliquer pour avancer, glisser ou molette pour changer"
 "no effect with the current mode (another engine is in use)" = "sans effet dans le mode actuel (un autre moteur est utilisé)"
+"arrows step, click for the list, drag or mouse wheel to change" = "les flèches avancent d'un pas, cliquer pour la liste, glisser ou molette pour changer"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Principal : {0}"
@@ -7095,3 +7098,9 @@ countries: fr be ch ca lu
 "Number of steps" = "Nombre de pas"
 "Dual" = "Double"
 "Align all channel editors" = "Aligner tous les éditeurs de canal"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Mélanger les notes enregistrées : oui (les nouvelles notes s'ajoutent à celles du pattern)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Mélanger les notes enregistrées : non (les anciennes notes d'un canal enregistré sont remplacées)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Mélanger les notes enregistrées : activé, une prise ajoute ses notes au pattern (overdub) ; désactivé, les anciennes notes d'un canal enregistré sont remplacées"
+"Tempo tapper: tap the beat to set the tempo" = "Tap tempo : tapez la pulsation pour régler le tempo"
+"Blend recorded notes" = "Mélanger les notes enregistrées"
