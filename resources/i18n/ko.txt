@@ -7007,3 +7007,11 @@ countries: kr
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "패턴: [LMB] 연필로 칠하기  [Ctrl+LMB] / [Shift+LMB] 여러 개 선택  [2xLMB] 열기  [RMB] 메뉴"
 "Empty patterns were ignored." = "빈 패턴은 무시되었습니다."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "플러그인 피커: 모든 제너레이터와 이펙트, 카테고리는 탭으로 (다시 누르면 닫힘)"
+
+# --- round 170a (Channel Rack cut/copy/paste, note names on every key)
+"Cut the selected channels' steps" = "선택한 채널의 스텝 잘라내기"
+"Copy the selected channels' steps" = "선택한 채널의 스텝 복사"
+"Paste steps into the selected channels" = "선택한 채널에 스텝 붙여넣기"
+"Note names on every key" = "모든 건반에 음 이름 표시"
+"Note names on every Piano roll key" = "Piano Roll의 모든 건반에 음 이름 표시"
+"[LMB] drag up / down: step through the patterns" = "[LMB] 위 / 아래로 드래그: 패턴 넘기기"

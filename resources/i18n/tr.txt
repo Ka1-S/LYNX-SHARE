@@ -7007,3 +7007,11 @@ countries: tr
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] kalemle boya  [Ctrl+LMB] / [Shift+LMB] birden çok seç  [2xLMB] aç  [RMB] menü"
 "Empty patterns were ignored." = "Boş pattern'ler yok sayıldı."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Eklenti seçici: tüm jeneratörler ve efektler, kategoriler sekme olarak (kapatmak için tekrar basın)"
+
+# --- round 170a (Channel Rack cut/copy/paste, note names on every key)
+"Cut the selected channels' steps" = "Seçili kanalların adımlarını kes"
+"Copy the selected channels' steps" = "Seçili kanalların adımlarını kopyala"
+"Paste steps into the selected channels" = "Adımları seçili kanallara yapıştır"
+"Note names on every key" = "Her tuşta nota adları"
+"Note names on every Piano roll key" = "Piano Roll'un her tuşunda nota adları"
+"[LMB] drag up / down: step through the patterns" = "[LMB] yukarı / aşağı sürükle: pattern'ler arasında gez"

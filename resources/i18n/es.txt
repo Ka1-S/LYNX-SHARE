@@ -7007,3 +7007,11 @@ countries: es mx ar co cl pe ve
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Patrón: [LMB] pintarlo con el lápiz  [Ctrl+LMB] / [Shift+LMB] elegir varios  [2xLMB] abrir  [RMB] menú"
 "Empty patterns were ignored." = "Se ignoraron los patrones vacíos."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Selector de plugins: todos los generadores y efectos, las categorías como pestañas (pulsa de nuevo para cerrar)"
+
+# --- round 170a (Channel Rack cut/copy/paste, note names on every key)
+"Cut the selected channels' steps" = "Cortar los pasos de los canales seleccionados"
+"Copy the selected channels' steps" = "Copiar los pasos de los canales seleccionados"
+"Paste steps into the selected channels" = "Pegar los pasos en los canales seleccionados"
+"Note names on every key" = "Nombres de nota en todas las teclas"
+"Note names on every Piano roll key" = "Nombres de nota en todas las teclas del Piano Roll"
+"[LMB] drag up / down: step through the patterns" = "[LMB] arrastrar arriba / abajo: recorrer los patterns"

@@ -7007,3 +7007,11 @@ countries: ru by kz
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Паттерн: [LMB] рисовать им карандашом  [Ctrl+LMB] / [Shift+LMB] выбрать несколько  [2xLMB] открыть  [RMB] меню"
 "Empty patterns were ignored." = "Пустые паттерны пропущены."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Выбор плагинов: все генераторы и эффекты, категории — вкладками (нажмите ещё раз, чтобы закрыть)"
+
+# --- round 170a (Channel Rack cut/copy/paste, note names on every key)
+"Cut the selected channels' steps" = "Вырезать шаги выбранных каналов"
+"Copy the selected channels' steps" = "Копировать шаги выбранных каналов"
+"Paste steps into the selected channels" = "Вставить шаги в выбранные каналы"
+"Note names on every key" = "Названия нот на всех клавишах"
+"Note names on every Piano roll key" = "Названия нот на всех клавишах Piano Roll"
+"[LMB] drag up / down: step through the patterns" = "[LMB] тянуть вверх / вниз: листать паттерны"

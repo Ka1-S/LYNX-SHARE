@@ -7007,3 +7007,11 @@ countries: jp
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "パターン: [LMB] ペンシルでペイント  [Ctrl+LMB] / [Shift+LMB] 複数選択  [2xLMB] 開く  [RMB] メニュー"
 "Empty patterns were ignored." = "空のパターンは無視されました。"
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "プラグインピッカー: すべてのジェネレーターとエフェクト、カテゴリをタブで表示（もう一度押すと閉じる）"
+
+# --- round 170a (Channel Rack cut/copy/paste, note names on every key)
+"Cut the selected channels' steps" = "選択したチャンネルのステップを切り取り"
+"Copy the selected channels' steps" = "選択したチャンネルのステップをコピー"
+"Paste steps into the selected channels" = "選択したチャンネルにステップを貼り付け"
+"Note names on every key" = "すべての鍵盤に音名を表示"
+"Note names on every Piano roll key" = "Piano Roll のすべての鍵盤に音名を表示"
+"[LMB] drag up / down: step through the patterns" = "[LMB] 上下にドラッグ: パターンを切り替え"

@@ -7007,3 +7007,11 @@ countries: tw hk mo
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "樣式：[LMB] 用鉛筆繪製  [Ctrl+LMB] / [Shift+LMB] 選擇多個  [2xLMB] 開啟  [RMB] 選單"
 "Empty patterns were ignored." = "已忽略空樣式。"
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "外掛選擇器：所有產生器與效果器，類別顯示為分頁（再按一次關閉）"
+
+# --- round 170a (Channel Rack cut/copy/paste, note names on every key)
+"Cut the selected channels' steps" = "剪下所選通道的步進"
+"Copy the selected channels' steps" = "複製所選通道的步進"
+"Paste steps into the selected channels" = "將步進貼上到所選通道"
+"Note names on every key" = "在每個琴鍵上顯示音名"
+"Note names on every Piano roll key" = "在 Piano Roll 的每個琴鍵上顯示音名"
+"[LMB] drag up / down: step through the patterns" = "[LMB] 上下拖曳：逐一切換 pattern"

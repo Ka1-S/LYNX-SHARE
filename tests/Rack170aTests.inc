@@ -69,26 +69,26 @@ TEST (rack170a_cut_copy_paste_selected_channels)
 
 TEST (rack170a_menu_mnemonics)
 {
-    using namespace lynx::menumnemonic;
-    CHECK (apply ("Delete...", 'D') == std::string ("\x01") + "Delete...");
-    CHECK (apply ("Cut\tCtrl+X", 't') == std::string ("Cu\x01t\tCtrl+X"));
-    CHECK (apply ("Copy", 'o') == std::string ("C\x01opy"));
+    namespace mm = lynx::menumnemonic;
+    CHECK (mm::apply ("Delete...", 'D') == std::string ("\x01") + "Delete...");
+    CHECK (mm::apply ("Cut\tCtrl+X", 't') == std::string ("Cu\x01t\tCtrl+X"));
+    CHECK (mm::apply ("Copy", 'o') == std::string ("C\x01opy"));
     // a word's first letter is preferred ("Receive &notes from")
-    CHECK (apply ("Receive notes from", 'n') == std::string ("Receive \x01notes from"));
-    CHECK (apply ("Fill each 4 steps", '4') == std::string ("Fill each \x01" "4 steps"));
+    CHECK (mm::apply ("Receive notes from", 'n') == std::string ("Receive \x01notes from"));
+    CHECK (mm::apply ("Fill each 4 steps", '4') == std::string ("Fill each \x01" "4 steps"));
     // a translation without the letter: FL's key in brackets
-    CHECK (apply ("Excluir...", 'D') == std::string ("Excluir... (\x01" "D)"));
-    CHECK (apply ("Excluir...\tAlt+Del", 'D') == std::string ("Excluir... (\x01" "D)\tAlt+Del"));
+    CHECK (mm::apply ("Excluir...", 'D') == std::string ("Excluir... (\x01" "D)"));
+    CHECK (mm::apply ("Excluir...\tAlt+Del", 'D') == std::string ("Excluir... (\x01" "D)\tAlt+Del"));
     // UTF-8 text is never split
-    CHECK (apply ("Löschen", 'l') == std::string ("\x01Löschen"));
+    CHECK (mm::apply ("Löschen", 'l') == std::string ("\x01Löschen"));
     // already marked / no key: unchanged
-    CHECK (apply (apply ("Paste", 'p'), 'a') == apply ("Paste", 'p'));
-    CHECK (apply ("Paste", ' ') == "Paste");
+    CHECK (mm::apply (mm::apply ("Paste", 'p'), 'a') == mm::apply ("Paste", 'p'));
+    CHECK (mm::apply ("Paste", ' ') == "Paste");
     int at = 0;
-    CHECK (strip (apply ("Cut", 't'), &at) == "Cut" && at == 2);
-    CHECK (strip ("Cut", &at) == "Cut" && at == -1);
-    CHECK (keyOf (apply ("Delete", 'D')) == 'd');
-    CHECK (keyOf ("Delete") == 0);
+    CHECK (mm::strip (mm::apply ("Cut", 't'), &at) == "Cut" && at == 2);
+    CHECK (mm::strip ("Cut", &at) == "Cut" && at == -1);
+    CHECK (mm::keyOf (mm::apply ("Delete", 'D')) == 'd');
+    CHECK (mm::keyOf ("Delete") == 0);
 }
 
 TEST (rack170a_pattern_selector_drag_and_wheel)

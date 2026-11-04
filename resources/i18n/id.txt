@@ -7007,3 +7007,11 @@ countries: id
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] lukis dengan pensil  [Ctrl+LMB] / [Shift+LMB] pilih beberapa  [2xLMB] buka  [RMB] menu"
 "Empty patterns were ignored." = "Pattern kosong diabaikan."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Pemilih plugin: semua generator dan efek, kategori sebagai tab (tekan lagi untuk menutup)"
+
+# --- round 170a (Channel Rack cut/copy/paste, note names on every key)
+"Cut the selected channels' steps" = "Potong langkah kanal yang dipilih"
+"Copy the selected channels' steps" = "Salin langkah kanal yang dipilih"
+"Paste steps into the selected channels" = "Tempel langkah ke kanal yang dipilih"
+"Note names on every key" = "Nama not di setiap tuts"
+"Note names on every Piano roll key" = "Nama not di setiap tuts Piano Roll"
+"[LMB] drag up / down: step through the patterns" = "[LMB] seret ke atas / bawah: telusuri pattern"

@@ -380,7 +380,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     // the pattern selector (issue #9): change the pattern the rack edits right from its title bar
     rackPatternSelector.onStep = [this] (int delta) { selectPattern (stepPattern (engine.getSong(), delta)); };
     rackPatternSelector.onMenu = [this] { showRackPatternList(); };
-    ui::setHint (rackPatternSelector, tr ("Pattern the Channel Rack edits: [LMB] on the name: the list of patterns, on the arrows: previous / next  [Wheel] step"));
+    ui::setHint (rackPatternSelector, tr ("Pattern the Channel Rack edits: [LMB] on the name: the list of patterns, on the arrows: previous / next  [Wheel] step") + "  " + tr ("[LMB] drag up / down: step through the patterns"));
     rackTitleTools.addAndMakeVisible (rackPatternSelector);
     rackTitleTools.addAndMakeVisible (rackFilterBox);
     rackTitleTools.addAndMakeVisible (swingSlider);
@@ -3420,7 +3420,7 @@ void MainComponent::setControlHints()
                               "[LMB] choose  [Wheel] step  [RMB] length of new notes  [Backspace] snap on/off  [Alt] while dragging: no snap"),
                  true);
     ui::setHint (patternBox, tr ("Current pattern: what the Channel Rack and Piano Roll edit and Pattern mode plays  [LMB] choose  [Wheel] step  "
-                                 "[F4] next empty  [F2] rename"));
+                                 "[F4] next empty  [F2] rename") + "  " + tr ("[LMB] drag up / down: step through the patterns"));
     ui::setHint (newPatternButton, tr ("New pattern: an empty pattern after the last one"));
     ui::setHint (patternMenuButton, tr ("Pattern menu: rename, color, length, clone, insert, split by channel, delete"), true);
 
