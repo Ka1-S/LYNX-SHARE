@@ -111,4 +111,25 @@ std::string groupHeading (const std::string& path); // "Stock › EQ" (a path sh
 // many plugins were placed.
 int importFlFolders (Folders& folders, bool instruments, const std::vector<std::string>& files,
                      const std::vector<std::pair<std::string, std::string>>& keyAndName);
+
+// --- Default categories (round 170b, Busy Works' "FX list is random order") ---------------------------------------------
+// FL Studio 2026's own Plugin database folders (Data\Patches\Plugin database\Effects | Generators, read from the install
+// 2026-11-04): FL's mixer slot and Add menus show every plugin under its folder's heading, A-Z. `name` is a plugin's
+// English name, with or without FL's "Fruity " prefix ("Compressor" is not FL's, "Fruity Compressor" / "Fruity
+// Limiter" / "Peak Controller" are); "" = not one of FL's plugins. FL's legacy effects that its database leaves out
+// (Fruity 7 Band EQ, Fruity Delay, ...) get the folder of their family (LYNX's choice, FL lists them under More plugins).
+// `fruityPrefix`: "Limiter" may also be "Fruity Limiter" (only for plugins known to be FL's own).
+std::string flCategory (const std::string& name, bool instruments, bool fruityPrefix = true);
+// The heading of LYNX's own plugins in those menus; it comes first.
+inline const char* const lynxCategory = "LYNX SHARE";
+// `user` plus a folder for every built-in plugin (`keyAndName`: its key and English name) the user did not file:
+// FL's category (by the exact name; with `flPlugin`, an FL plugin of LYNX, also without "Fruity " and "Misc" when FL
+// has no folder for it), else lynxCategory.
+struct BuiltinPlugin
+{
+    std::string key, name;
+    bool fruityPrefix = false; // the name may lack FL's "Fruity "
+    bool flPlugin = false;     // one of FL's plugins: "Misc" when FL has no folder for it
+};
+Folders withDefaultCategories (const Folders& user, bool instruments, const std::vector<BuiltinPlugin>& builtins);
 } // namespace lynx::plugincatalog

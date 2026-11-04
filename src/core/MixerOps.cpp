@@ -383,6 +383,23 @@ int routeSelectedTo (Song& song, const std::vector<int>& selected, int to, Route
     return routed;
 }
 
+int switchSelectedRoute (Song& song, const std::vector<int>& selected, int to, bool on)
+{
+    int changed = 0;
+    for (auto from : selected)
+    {
+        if (! isInsert (song, from) || from == to || to < 0 || to >= (int) song.mixer.size() || song.routes (from, to) == on)
+            continue;
+        if (on && to != 0 && ! song.canRoute (from, to))
+            continue; // (a cycle)
+        song.setRoute (from, to, on);
+        if (on)
+            song.setRouteLevel (from, to, 1.0f);
+        ++changed;
+    }
+    return changed;
+}
+
 int routeToSelected (Song& song, int from, const std::vector<int>& selected, RouteKind kind)
 {
     if (! isInsert (song, from))
@@ -472,6 +489,124 @@ int resetManualLatency (Song& song)
     return count;
 }
 
+namespace
+{
+// rows back to "packed" (-1) when they are exactly 0, 1, 2... (old projects compare and save unchanged)
+void tidyRows (std::vector<EffectSlot>& fx)
+{
+    for (int i = 0; i < (int) fx.size(); ++i)
+        if (fx[(std::size_t) i].row != i && fx[(std::size_t) i].row != -1)
+            return;
+    for (auto& e : fx)
+        e.row = -1;
+}
+
+// puts the effects of `track` in the order of `rows` (one row per effect, all different) and stores the rows
+void applyRows (Song& song, int track, std::vector<int> rows)
+{
+    auto& fx = song.mixer[(std::size_t) track].effects;
+    const auto n = (int) fx.size();
+    std::vector<int> order (n);
+    for (int i = 0; i < n; ++i)
+        order[(std::size_t) i] = i;
+    std::stable_sort (order.begin(), order.end(), [&] (int a, int b) { return rows[(std::size_t) a] < rows[(std::size_t) b]; });
+    std::vector<int> at (n); // at[position] = original index now there
+    for (int i = 0; i < n; ++i)
+        at[(std::size_t) i] = i;
+    for (int pos = 0; pos < n; ++pos)
+    {
+        const auto want = order[(std::size_t) pos];
+        const auto k = (int) (std::find (at.begin() + pos, at.end(), want) - at.begin());
+        if (k != pos)
+        {
+            song.swapEffectSlots (track, pos, k); // (automations follow)
+            std::swap (at[(std::size_t) pos], at[(std::size_t) k]);
+        }
+    }
+    for (int pos = 0; pos < n; ++pos)
+        fx[(std::size_t) pos].row = rows[(std::size_t) at[(std::size_t) pos]];
+    tidyRows (fx);
+}
+} // namespace
+
+std::vector<int> effectRows (const std::vector<EffectSlot>& effects)
+{
+    const auto n = (int) effects.size();
+    std::vector<int> rows ((std::size_t) n);
+    int previous = -1;
+    for (int i = 0; i < n; ++i)
+    {
+        const auto wanted = effects[(std::size_t) i].row;
+        previous = wanted > previous ? wanted : previous + 1;
+        rows[(std::size_t) i] = previous;
+    }
+    for (int i = n - 1; i >= 0; --i) // (never past the last slot)
+        rows[(std::size_t) i] = std::min (rows[(std::size_t) i], i == n - 1 ? maxEffectSlots - 1 : rows[(std::size_t) i + 1] - 1);
+    return rows;
+}
+
+int effectAtRow (const std::vector<EffectSlot>& effects, int row)
+{
+    const auto rows = effectRows (effects);
+    const auto it = std::find (rows.begin(), rows.end(), row);
+    return it == rows.end() ? -1 : (int) (it - rows.begin());
+}
+
+bool moveEffectToRow (Song& song, int track, int index, int row)
+{
+    if (track < 0 || track >= (int) song.mixer.size() || row < 0 || row >= maxEffectSlots)
+        return false;
+    auto& fx = song.mixer[(std::size_t) track].effects;
+    if (index < 0 || index >= (int) fx.size())
+        return false;
+    auto rows = effectRows (fx);
+    if (rows[(std::size_t) index] == row)
+        return false;
+    if (const auto other = effectAtRow (fx, row); other >= 0)
+        rows[(std::size_t) other] = rows[(std::size_t) index];
+    rows[(std::size_t) index] = row;
+    applyRows (song, track, rows);
+    return true;
+}
+
+int moveEffectBy (Song& song, int track, int index, int delta)
+{
+    if (track < 0 || track >= (int) song.mixer.size() || index < 0 || index >= (int) song.mixer[(std::size_t) track].effects.size() || delta == 0)
+        return -1;
+    const auto from = effectRows (song.mixer[(std::size_t) track].effects)[(std::size_t) index];
+    const auto to = ((from + delta) % maxEffectSlots + maxEffectSlots) % maxEffectSlots; // (FL wraps around)
+    if (! moveEffectToRow (song, track, index, to))
+        return -1;
+    return effectAtRow (song.mixer[(std::size_t) track].effects, to); // (the moved effect is the one there now)
+}
+
+int insertEffectAtRow (Song& song, int track, EffectSlot fx, int row)
+{
+    if (track < 0 || track >= (int) song.mixer.size() || row < 0 || row >= maxEffectSlots)
+        return -1;
+    auto& effects = song.mixer[(std::size_t) track].effects;
+    if ((int) effects.size() >= maxEffectSlots || effectAtRow (effects, row) >= 0)
+        return -1;
+    auto rows = effectRows (effects);
+    effects.push_back (std::move (fx));
+    rows.push_back (row);
+    applyRows (song, track, rows);
+    return effectAtRow (song.mixer[(std::size_t) track].effects, row);
+}
+
+void removeEffectKeepRows (Song& song, int track, int index)
+{
+    if (track < 0 || track >= (int) song.mixer.size() || index < 0 || index >= (int) song.mixer[(std::size_t) track].effects.size())
+        return;
+    auto rows = effectRows (song.mixer[(std::size_t) track].effects);
+    song.removeEffectSlot (track, index);
+    rows.erase (rows.begin() + index);
+    auto& fx = song.mixer[(std::size_t) track].effects;
+    for (int i = 0; i < (int) fx.size(); ++i)
+        fx[(std::size_t) i].row = rows[(std::size_t) i];
+    tidyRows (fx);
+}
+
 bool moveEffectSlot (Song& song, int track, int from, int to)
 {
     if (track < 0 || track >= (int) song.mixer.size())
@@ -482,8 +617,13 @@ bool moveEffectSlot (Song& song, int track, int from, int to)
     if (from < 0 || from >= count || to < 0 || to >= count || from == to)
         return false;
 
+    const auto rows = effectRows (song.mixer[(std::size_t) track].effects);
     for (auto s = from; s != to; s += to > from ? 1 : -1)
         song.swapEffectSlots (track, s, s + (to > from ? 1 : -1));
+    auto& fx = song.mixer[(std::size_t) track].effects;
+    for (int i = 0; i < count; ++i) // (the rows stay where they were)
+        fx[(std::size_t) i].row = rows[(std::size_t) i];
+    tidyRows (fx);
 
     return true;
 }

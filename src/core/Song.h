@@ -861,6 +861,10 @@ struct EffectSlot
     std::vector<float> abOther;
     bool abShowingB = false;
     PatcherDoc patcher; // kind == patcher: its graph (REA_rodada141)
+    // The mixer row (0..maxEffectSlots-1) the effect sits in (round 170b): FL's slots are places, an effect can sit in
+    // slot 5 with slots 1-4 empty. -1 = right after the previous effect (every effect of an old project). The chain
+    // order is the vector's order; the rows only grow along it (core/MixerOps.h effectRows).
+    int row = -1;
     InstanceTag instance; // runtime identity of the slot (never saved, not compared)
 
     bool operator== (const EffectSlot& o) const; // every field (Song.cpp)

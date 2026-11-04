@@ -10,6 +10,7 @@
 
 #include "core/MeterBallistics.h"
 #include "core/MixerLayout.h"
+#include "core/MixerOps.h"
 #include "engine/AudioEngine.h"
 #include "ui/ValueControl.h"
 
@@ -20,6 +21,9 @@ const std::vector<EffectKind>& addableEffects();
 // The FL engines among them need the user's FL installation (core/NativeEngines.h, round 142): whether one can be
 // added here, its menu name ("(beta)", "(requires FL Studio)") and a new slot (nullopt = not available here)
 bool addableEffectAvailable (EffectKind kind);
+// One of FL Studio's own effects (by its FL name, even when LYNX made it): the plugin menus file it under FL's category
+// (round 170b); LYNX's own effects go under "LYNX SHARE".
+bool isFlEffect (EffectKind kind);
 juce::String addableEffectName (EffectKind kind);
 std::optional<EffectSlot> newAddableEffect (EffectKind kind, double bpm = 120.0);
 
@@ -239,8 +243,14 @@ private:
     Part hoverPart = Part::none;
     int hoverTrack = -1;
     int headerDragTrack = -1;   // dragging a header sideways reorders the inserts
+    // Ctrl(+Shift)+click / drag across the strips (FL): the range from the anchor to the mouse is selected (or removed)
+    int selectAnchor = -1;
+    bool selectAdding = true;
+    std::vector<int> selectBase; // the selection kept under the range (Ctrl+Shift)
+    void dragSelectTo (int track);
     bool headerDragged = false;
     void showSendMenu (int track);
+    void routeSelection (int track, mixerops::RouteKind kind); // the selected inserts into `track` (FL's route arrow)
     void soloExclusive (int track);
     std::vector<int> selection { 0 };
     std::vector<std::pair<int, float>> groupStart; // (track, value) of the selection when a group drag starts
@@ -393,12 +403,19 @@ private:
     void showSlotMenu (int slot);
     juce::Rectangle<int> pluginButtonBounds() const;
     void openEditor (int slot);
+    void toggleEditor (int slot); // FL: a click on the slot's name shows or hides its window (round 170b)
     juce::Rectangle<int> editorButtonBounds() const;
     void openPluginWindow (int slot);
     juce::Rectangle<int> fxSwitchBounds() const; // all effects on/off; right-click opens/closes their windows
     void toggleAllWindows();
     int slotAt (juce::Point<int> p) const;
-    int dragSlot = -1, dropSlot = -1; // dragging a slot to reorder it
+    int dragSlot = -1, dropSlot = -1; // dragging a slot (an effect index) to another slot (a row)
+    // the rows of FL's slot places (round 170b): the row an effect shows in, the effect in a row (-1 = empty)
+    int rowOf (int index) const;
+    int effectIn (int row) const;
+    double wheelAccumulator = 0.0; // a trackpad's small wheel steps over a slot, added up
+    int wheelSlot = -1;
+    juce::uint32 wheelTime = 0;
     // A/B compare: a spare state per (insert, slot), swapped with the live one on request (not saved)
     std::map<std::pair<int, int>, EffectSlot> spare;
     std::unique_ptr<juce::FileChooser> sampleChooser; // Newtone / Newtime source sample
