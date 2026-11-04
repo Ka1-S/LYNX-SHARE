@@ -81,7 +81,14 @@ Pro-L 2 2, Halo 3, Orbit 3, Sentry 3, Nebula 3, ValhallaPlate 3 — added to /mn
 with the trial deadlines (FabFilter ~11-16, Soundtoys ~11-22).
 
 ## Where I stopped
-- done: diagnosis #11, skin fix, gfxprobe, CI editor pictures step, Facet analyser grid, Ember Tube curve, stepper click.
-- in progress: Linux build of the worktree (build-linux), first CI run (wip/plugq170c-probe) without the JUCE patch.
-- next: JUCE patch 12, tests, PARITY.md Sound / Stability columns, audit table, notes, train.
-- rerun: scratchpad linbuild.sh (buildslot), tool/em.cpp measurements.
+- done: #11 diagnosis + skin fix + JUCE patch 12 (CoreGraphics empty path), `--gfxprobe`, CI editor pictures step
+  (Linux + macOS app jobs), Facet analyser grid; #15 Ember Tube curve (measured before / after); #14 stepper click;
+  audit fixes (meter wells, limiter trail, Echoform idle controls, Crest Drive, Hush guard, Atrium early modulation);
+  PARITY.md Sound / Stability columns; tests (tests/PlugQ170cTests.inc), build-local 1 963 870 checks, 0 failures;
+  Linux app build + `--plugui` pictures (Facet EQ draws; /mnt/e/lynx-work/plugq170c/plugui-linux).
+- pending: the macOS CI pictures (runs on wip/plugq170c-probe = without patch 12, wip/plugq170c = with it) were still
+  queued at landing; check the editor-pictures-macOS artifact and `gfxprobe.txt` (raw drawText > 0, drawFilledText 0).
+- next (audit, open rows): Fruity Limiter scrolling envelope, Ember dimming of overridden controls + Voicing switch,
+  Toxic Bend (pitch bend to native generators), 3x Osc default page, Sytrus operator / filter pages, ProEditor partial
+  repaints, one analyser tap per slot; Parametric EQ 2 law on new instances = user decision.
+- rerun: scratchpad linbuild.sh (buildslot), tool/em.cpp measurements (/mnt/e/lynx-work/plugq170c/ember-*.txt).
