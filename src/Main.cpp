@@ -6546,6 +6546,7 @@ private:
         engine.dispatchPendingMessages();
         if (p.instrument) return lynx::makeChannelFrame (engine, 0, 0);
         if (p.effectKind == lynx::EffectKind::facetEq) return lynx::makeFacetEqEditor (engine, 1, 0, true);
+        if (lynx::ProEditorWindows::handles (p.effectKind)) return lynx::makeProEditor (engine, 1, 0, true); // display-first editors, demo signal
         return lynx::makeNativeEffectEditor (engine, 1, 0, 1.0f, 0);
     }
 
