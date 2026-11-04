@@ -274,7 +274,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     }
 
     patternBox.setTooltip (tr ("Current pattern (Numpad +/-: next/previous, F4: next empty, F2: rename)"));
-    patternBox.onStep = [this] (int delta) { selectPattern (stepPattern (engine.getSong(), delta)); };
+    patternBox.onStep = [this] (int delta) { stepPatternFromSelector (delta); };
     gridBox.setScrollWheelEnabled (true);
     patternBox.onChange = [this]
     {
@@ -378,7 +378,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     ui::setHint (rackLoopStarterButton, tr ("Loop Starter: pick a genre and get a drum loop (kit channels with steps) to re-roll and send to the Playlist"));
     rackTitleTools.addAndMakeVisible (rackLoopStarterButton);
     // the pattern selector (issue #9): change the pattern the rack edits right from its title bar
-    rackPatternSelector.onStep = [this] (int delta) { selectPattern (stepPattern (engine.getSong(), delta)); };
+    rackPatternSelector.onStep = [this] (int delta) { stepPatternFromSelector (delta); };
     rackPatternSelector.onMenu = [this] { showRackPatternList(); };
     ui::setHint (rackPatternSelector, tr ("Pattern the Channel Rack edits: [LMB] on the name: the list of patterns, on the arrows: previous / next  [Wheel] step") + "  " + tr ("[LMB] drag up / down: step through the patterns"));
     rackTitleTools.addAndMakeVisible (rackPatternSelector);
@@ -2088,6 +2088,17 @@ void MainComponent::selectPattern (int index)
 {
     if (index >= 0 && index < (int) engine.getSong().patterns.size() && index != engine.getSong().currentPattern)
         engine.editSong ([index] (Song& s) { s.currentPattern = index; }, false);
+}
+
+void MainComponent::stepPatternFromSelector (int delta)
+{
+    // FL's selector goes on past the last pattern (rack ops stepPatternCreating: one new empty pattern at most)
+    const auto& song = engine.getSong();
+    const auto last = (int) song.patterns.size() - 1;
+    if (delta > 0 && last >= 0 && song.currentPattern + delta > last && ! isPatternEmpty (song.patterns[(std::size_t) last]))
+        engine.editSong ([delta] (Song& s) { s.currentPattern = stepPatternCreating (s, delta); });
+    else
+        selectPattern (stepPattern (song, delta));
 }
 
 void MainComponent::nextEmptyPattern()

@@ -36,8 +36,8 @@ inline constexpr int threshold = 3;              // px a press moves before it i
 inline constexpr float pixelsPerPattern = 10.0f; // drag distance per pattern
 // Patterns stepped by a drag `dragY` px from where it started (screen y grows downwards): up = the next patterns.
 inline int steps (float dragY) noexcept { return (int) (-dragY / pixelsPerPattern); }
-// The wheel: one pattern per notch (a trackpad's small deltas add up to a notch); up = the previous pattern, as a
-// list scrolls.
+// The wheel: one pattern per notch (a trackpad's small deltas add up to a notch); up = the next pattern, as FL's
+// selector ([SHOT] round 170a: a notch up on "Pattern 769" gave "Pattern 770").
 struct Wheel
 {
     float pending = 0.0f;
@@ -47,14 +47,14 @@ struct Wheel
         if (delta >= notch || delta <= -notch) // a mouse wheel's notch (JUCE: 0.23 on Windows): one pattern
         {
             pending = 0.0f;
-            return delta > 0.0f ? -1 : 1;
+            return delta > 0.0f ? 1 : -1;
         }
         if ((delta > 0.0f) != (pending > 0.0f) && pending != 0.0f)
             pending = 0.0f; // a turn the other way starts over
         pending += delta;
         if (pending >= notch || pending <= -notch)
         {
-            const auto n = pending > 0.0f ? -1 : 1;
+            const auto n = pending > 0.0f ? 1 : -1;
             pending = 0.0f;
             return n;
         }
@@ -62,6 +62,11 @@ struct Wheel
     }
 };
 } // namespace patterndrag
+
+// The pattern selector's step (drag / wheel): FL's selector goes on past the last pattern and creates the one it lands
+// on ([SHOT] round 170a: a drag up from "Pattern 1" made "Pattern 769"). LYNX creates at most one: stepping forward
+// from the last pattern appends a new empty one unless the last one is already empty. Returns the index to select.
+int stepPatternCreating (Song& song, int delta);
 
 // The first empty pattern after `from` (wrapping around, never `from` itself); -1 if there is none.
 int findNextEmptyPattern (const Song& song, int from) noexcept;

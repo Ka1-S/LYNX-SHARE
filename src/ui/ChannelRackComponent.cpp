@@ -693,6 +693,24 @@ bool ChannelRackComponent::cellHasNote (int channel, int step) const
     return false;
 }
 
+bool ChannelRackComponent::channelHitsNow (int row) const
+{
+    if (playheadStep < 0 || playheadStep >= numSteps())
+        return false;
+    const auto& song = engine.getSong();
+    const auto& p = song.patterns[(std::size_t) song.currentPattern];
+    const auto loopSteps = loopStepsOf (row);
+    const auto step = loopSteps > 0 && playheadStep >= loopSteps ? playheadStep % loopSteps : playheadStep;
+    return p.hasStep (row, step) || cellHasNote (row, step);
+}
+
+void ChannelRackComponent::paintStepHit (juce::Graphics& g, juce::Rectangle<float> r)
+{
+    theme::fillRoundRect (g, r, theme::radius::sm, juce::Colours::white.withAlpha (0.55f));
+    g.setColour (theme::colour::playhead);
+    g.drawRoundedRectangle (r.reduced (0.75f), theme::radius::sm, 1.5f);
+}
+
 void ChannelRackComponent::paint (juce::Graphics& g)
 {
     const uitrace::Scope trace ("ChannelRackComponent paint", true, g.getClipBounds());
@@ -767,6 +785,8 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 const auto repeated = pattern.hasStep (row, source) || cellHasNote (row, source);
                 auto fill = repeated ? stepOn : theme::stepOff (step);
                 theme::fillRoundRect (g, r.toFloat(), theme::radius::sm, fill.withMultipliedAlpha (hoverStepHere ? 0.75f : repeated ? 0.45f : 0.3f));
+                if (repeated && step == playheadStep) // the repeat plays: lit as a hit (below)
+                    paintStepHit (g, r.toFloat());
                 if (any)
                 {
                     g.setColour (textDisabled);
@@ -790,6 +810,10 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             else
                 theme::fillRoundRect (g, r.toFloat(), theme::radius::sm, hoverStepHere ? fill.brighter (any ? 0.15f : 0.35f) : fill);
 
+            // FL lights the step as the playhead hits it (its LED turns red, round 170a [SHOT]): a step that plays now glows
+            if (any && step == playheadStep && step < realSteps)
+                paintStepHit (g, r.toFloat());
+
             if (hoverStepHere)
             {
                 g.setColour (textSecondary.withAlpha (0.7f));
@@ -808,12 +832,26 @@ void ChannelRackComponent::paint (juce::Graphics& g)
     const auto addY = rowY ((int) song.channels.size());
     g.setColour (textDisabled);
     g.setFont (theme::font (theme::type::small));
-    textcache::drawText (g, tr ("or drop an audio file here"), gridLeft() + 4, addY, 400, rowHeight, juce::Justification::centredLeft);
+    textcache::drawText (g, tr ("or drop an audio file here"), gridLeft() + 4, addY + positionStripHeight, 400, rowHeight - positionStripHeight,
+                         juce::Justification::centredLeft);
 
-    if (playheadStep >= 0 && playheadStep < steps)
+    // FL's "Playing step" strip (PosLEDPanel, REA round 170a §2): a slim LED row under the steps, beat groups
+    // alternating, the playing step lit — in Pattern mode and whenever the shown pattern plays in Song mode
+    for (int step = 0; step < realSteps; ++step)
+    {
+        const auto cell = juce::Rectangle<float> ((float) (gridLeft() + step * stepWidth) + 1.0f, (float) addY + 2.0f, (float) stepWidth - 4.0f,
+                                                  (float) positionStripHeight - 3.0f);
+        if (cell.getRight() < (float) clip.getX() || cell.getX() > (float) clip.getRight())
+            continue;
+        theme::fillRoundRect (g, cell, 1.5f, step == playheadStep ? playhead : theme::stepOff (step).brighter (0.12f));
+    }
+
+    if (playheadStep >= 0 && playheadStep < steps) // the playing column, over every row
     {
         theme::fillRoundRect (g, juce::Rectangle<float> ((float) (gridLeft() + playheadStep * stepWidth), 2.0f, (float) stepWidth - 2.0f,
-                                                        (float) addY - 2.0f), theme::radius::sm, playhead.withAlpha (0.28f));
+                                                        (float) addY - 2.0f), theme::radius::sm, playhead.withAlpha (0.2f));
+        g.setColour (playhead.withAlpha (0.85f));
+        g.fillRect ((float) (gridLeft() + playheadStep * stepWidth), 2.0f, (float) stepWidth - 2.0f, 2.0f);
     }
 
     // the controls column stays put while the steps scroll sideways (FL's rack keeps the channel buttons in
@@ -928,6 +966,9 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             // selector: a slim pill, lit when the row is selected
             const auto pill = juce::Rectangle<float> ((float) selectLeft() + 3.0f, (float) y + 7.0f, (float) selectWidth - 6.0f, (float) rowHeight - 14.0f);
             theme::fillRoundRect (g, pill, 3.0f, selected ? (hovered (Area::select) ? accentHover : accent) : hovered (Area::select) ? textDisabled : ledOff);
+            // FL flashes the channel's selector as its note plays (round 170a [SHOT]): the "sound lighting up when it hits"
+            if (! channel.muted && channelHitsNow (row))
+                theme::fillRoundRect (g, pill.expanded (1.0f, 0.0f), 3.0f, juce::Colours::white.withAlpha (selected ? 0.75f : 0.9f));
         }
 
         paintLane (g);
@@ -2851,6 +2892,7 @@ void ChannelRackComponent::timerCallback()
         dirty (playheadStep);
         playheadStep = step;
         dirty (playheadStep);
+        repaint (stickyX + selectLeft(), 0, selectWidth, getHeight()); // the selectors flash with the hits
         followPlayhead();
     }
 }

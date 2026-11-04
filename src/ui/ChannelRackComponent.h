@@ -240,6 +240,9 @@ private:
 
     AudioEngine& engine;
     int playheadStep = -1;
+    static constexpr int positionStripHeight = 9; // FL's "Playing step" LED strip, at the top of the add row
+    bool channelHitsNow (int row) const;
+    static void paintStepHit (juce::Graphics&, juce::Rectangle<float>);
 
     enum class PaintMode { none, add, remove } paintMode = PaintMode::none;
     int lastPaintedRow = -1, lastPaintedStep = -1;

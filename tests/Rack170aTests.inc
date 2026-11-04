@@ -100,10 +100,29 @@ TEST (rack170a_pattern_selector_drag_and_wheel)
     CHECK (steps (-3.0f * pixelsPerPattern) == 3);
     CHECK (steps (2.0f * pixelsPerPattern) == -2); // down: the previous ones
     Wheel w;
-    CHECK (w.take (0.23f) == -1);  // a mouse notch up: the previous pattern
-    CHECK (w.take (-0.23f) == 1);
-    CHECK (w.take (0.04f) == 0 && w.take (0.04f) == 0 && w.take (0.04f) == -1); // trackpad deltas add up
+    CHECK (w.take (0.23f) == 1);  // a mouse notch up: the next pattern (FL)
+    CHECK (w.take (-0.23f) == -1);
+    CHECK (w.take (0.04f) == 0 && w.take (0.04f) == 0 && w.take (0.04f) == 1); // trackpad deltas add up
     CHECK (w.take (0.05f) == 0 && w.take (-0.05f) == 0); // the other way starts over
+}
+
+TEST (rack170a_pattern_selector_past_the_last)
+{
+    using namespace lynx;
+    Song s;
+    s.patterns.resize (2);
+    s.patterns[0].name = "Pattern 1";
+    s.patterns[1].name = "Pattern 2";
+    s.currentPattern = 1;
+    // the last pattern is empty: no new one
+    CHECK (stepPatternCreating (s, 1) == 1 && s.patterns.size() == 2);
+    Note n;
+    s.patterns[1].notes.push_back (n);
+    // with notes: one new empty pattern, named after the others
+    CHECK (stepPatternCreating (s, 3) == 2 && s.patterns.size() == 3 && s.patterns[2].name == "Pattern 3");
+    s.currentPattern = 2;
+    CHECK (stepPatternCreating (s, 1) == 2 && s.patterns.size() == 3);
+    CHECK (stepPatternCreating (s, -5) == 0);
 }
 
 TEST (rack170a_playhead_in_song_mode_and_note_names)
@@ -125,4 +144,26 @@ TEST (rack170a_playhead_in_song_mode_and_note_names)
     CHECK (transportedit::patternPlayhead (s, 0, 5.0 * ppq) < 0.0);
     // every Piano roll key is named by default (LYNX)
     CHECK (notenames::everyKey.load());
+}
+
+TEST (rack170a_step_groups_clearly_apart)
+{
+    using namespace lynx::themes;
+    // Busy Works Beats: "too close of a color ... dramatically different" — FL's groups are grey / red-tinted
+    const auto& d = defaultPalette();
+    CHECK (d.stepOffAlt != d.stepOff);
+    const auto r = [] (std::uint32_t c) { return (int) ((c >> 16) & 255); };
+    const auto gch = [] (std::uint32_t c) { return (int) ((c >> 8) & 255); };
+    CHECK (r (d.stepOffAlt) - r (d.stepOff) >= 30);              // clearly redder
+    CHECK (r (d.stepOffAlt) - gch (d.stepOffAlt) >= 25);         // a tint, not a lighter grey
+    // every theme (light ones too, and other accents) keeps the groups apart
+    for (const auto bg : { 0xff1c1e23u, 0xfff2f3f5u, 0xff3a3d44u })
+        for (const auto accent : { 0xffe5383bu, 0xff3a8ee5u })
+        {
+            const auto p = derivePalette (accent, bg);
+            int diff = 0;
+            for (const int shift : { 16, 8, 0 })
+                diff += std::abs ((int) ((p.stepOffAlt >> shift) & 255) - (int) ((p.stepOff >> shift) & 255));
+            CHECK (diff >= 45);
+        }
 }

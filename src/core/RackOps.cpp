@@ -934,4 +934,20 @@ bool pasteChannelSteps (Pattern& pattern, const ChannelStepsClipboard& clipboard
     return true;
 }
 
+int stepPatternCreating (Song& song, int delta)
+{
+    if (song.patterns.empty())
+        return 0;
+    const auto last = (int) song.patterns.size() - 1;
+    const auto target = song.currentPattern + delta;
+    if (delta > 0 && target > last && ! isPatternEmpty (song.patterns[(std::size_t) last]))
+    {
+        Pattern p;
+        p.name = newPatternName (song);
+        song.patterns.push_back (std::move (p));
+        return last + 1;
+    }
+    return std::clamp (target, 0, last);
+}
+
 } // namespace lynx
