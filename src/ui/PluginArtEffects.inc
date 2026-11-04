@@ -4835,7 +4835,7 @@ LYNX_LITE_THEME (bassBoostTheme, "Fruity Bass Boost", Style::vivid, Colour (0xff
 LYNX_LITE_THEME (convolverTheme, "Fruity Convolver", Style::glow, Colour (0xff1c1a24), Colour (0xff08070c), Colour (0xffd8c08a), Colour (0xffb8a8ff), canvasCathedral, Cap::flat, capStone)
 LYNX_LITE_THEME (volumeGateTheme, "Volume gate", Style::vivid, Colour (0xff1a1430), Colour (0xff07050f), Colour (0xffff4fa3), Colour (0xff4fe0ff), canvasGate, Cap::rubber)
 LYNX_LITE_THEME (rhythmGainTheme, "Rhythmic envelope", Style::vivid, Colour (0xff201628), Colour (0xff0a060d), Colour (0xffff7a5a), Colour (0xffffd0a0), canvasGate, Cap::rubber)
-LYNX_LITE_THEME (freqShiftTheme, "Frequency shifter", Style::neon, Colour (0xff102224), Colour (0xff04090a), Colour (0xff3ae0c0), Colour (0xffff8a6a), canvasShift, Cap::orb)
+LYNX_LITE_THEME (freqShiftTheme, "Freq Shift", Style::neon, Colour (0xff102224), Colour (0xff04090a), Colour (0xff3ae0c0), Colour (0xffff8a6a), canvasShift, Cap::orb)
 LYNX_LITE_THEME (pitchShiftTheme, "Pitch shift", Style::neon, Colour (0xff181a36), Colour (0xff06070f), Colour (0xff6ab8ff), Colour (0xffd0a8ff), canvasShift, Cap::orb)
 LYNX_LITE_THEME (phaseInverterTheme, "Fruity Phase Inverter", Style::glow, Colour (0xff1e1e24), Colour (0xff09090c), Colour (0xff9ad0ff), Colour (0xffff9a9a), canvasSine, Cap::flat)
 LYNX_LITE_THEME (centerTheme, "Fruity Center", Style::glow, Colour (0xff1e2024), Colour (0xff09090b), Colour (0xffd0d4da), Colour (0xff9ad0ff), canvasUtility, Cap::flat)
