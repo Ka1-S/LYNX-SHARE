@@ -1410,13 +1410,21 @@ public:
     bool themedNow() const { return pageArt != skin::Art::none && skin::resolve (pageStyle, pageArt) == skin::Style::themed; }
     juce::Colour pageAccent() const { return themedNow() ? skin::artAccent (pageArt) : accent; }
 
-    // where the art's moving part lives: next to the plugin's big name (Toxic's trefoil, Sytrus's figure); Sakura's
-    // petals fall over the whole page
+    // where the art's moving part lives: next to the plugin's big name (Toxic's trefoil, Sytrus's figure, 3x Osc's
+    // scope); Sakura's petals fall in the band of the branch, above the first row of sections (a small area to repaint)
     juce::Rectangle<float> artStage() const
     {
-        if (layout == nullptr || pageArt == skin::Art::sakura)
+        if (layout == nullptr)
             return {};
         const auto f = layoutFactor();
+        if (pageArt == skin::Art::sakura)
+        {
+            auto top = (float) getHeight();
+            for (const auto& item : layout->items)
+                if (item.type == plugui::Item::section && layoutRect (item).getY() > (float) getHeight() * 0.18f)
+                    top = juce::jmin (top, layoutRect (item).getY());
+            return { 0.0f, 30.0f, (float) getWidth(), juce::jmax (40.0f, top - 30.0f) };
+        }
         for (const auto& item : layout->items)
             if (item.type == plugui::Item::label && item.label != nullptr && (item.style & plugui::dim) != 0 && item.h * f > 30.0f * f
                 && juce::String (item.label).length() > 2)

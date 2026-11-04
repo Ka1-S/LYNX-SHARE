@@ -1092,7 +1092,7 @@ struct ArtLayer::Impl
             m.y = s.getY() + rnd.nextFloat() * s.getHeight();
             m.size = a == Art::sakura ? 6.0f + rnd.nextFloat() * 5.0f : a == Art::toxic ? 2.0f + rnd.nextFloat() * 4.0f : 1.0f + rnd.nextFloat() * 1.8f;
             m.vx = a == Art::sakura ? 6.0f + rnd.nextFloat() * 10.0f : 0.0f;
-            m.vy = a == Art::sakura ? 14.0f + rnd.nextFloat() * 16.0f : a == Art::toxic ? -(10.0f + rnd.nextFloat() * 14.0f) : 0.0f;
+            m.vy = a == Art::sakura ? 10.0f + rnd.nextFloat() * 12.0f : a == Art::toxic ? -(10.0f + rnd.nextFloat() * 14.0f) : 0.0f;
             m.rot = rnd.nextFloat() * 6.28f;
             m.spin = (rnd.nextFloat() - 0.5f) * 2.4f;
             m.phase = rnd.nextFloat() * 6.28f;
@@ -1153,7 +1153,7 @@ void ArtLayer::kick()
     if (run && ! isTimerRunning())
     {
         lastMs = juce::Time::getMillisecondCounterHiRes();
-        startTimerHz (artId == Art::sakura ? 25 : 20);
+        startTimerHz (20);
     }
     else if (! run && isTimerRunning())
         stopTimer();
@@ -1203,10 +1203,10 @@ void ArtLayer::timerCallback()
                 m.x += (m.vx + 9.0f * std::sin ((float) t * 1.3f + m.phase)) * dt;
                 m.y += m.vy * dt;
                 m.rot += m.spin * dt;
-                if (m.y > area.getBottom() + 10.0f || m.x > area.getRight() + 10.0f)
+                if (m.y > s.getBottom() + 6.0f || m.x > s.getRight() + 10.0f)
                 {
-                    m.y = area.getY() - 8.0f;
-                    m.x = area.getX() + impl->rnd.nextFloat() * area.getWidth() * 0.9f;
+                    m.y = s.getY() - 6.0f;
+                    m.x = s.getX() + impl->rnd.nextFloat() * s.getWidth() * 0.9f;
                 }
                 break;
             case Art::toxic: // bubbles rising in the stage, popping at its top
@@ -1243,8 +1243,9 @@ void ArtLayer::paint (juce::Graphics& g)
     switch (artId)
     {
         case Art::sakura:
-            for (const auto& m : impl->motes)
-                artkit::petal (g, { m.x, m.y }, m.size, m.rot, 0.35f + 0.65f * std::abs (std::sin (tt * 1.7f + m.phase)), p.accent2, 0.72f);
+            for (const auto& m : impl->motes) // (they fade out as they reach the bottom of the band)
+                artkit::petal (g, { m.x, m.y }, m.size, m.rot, 0.35f + 0.65f * std::abs (std::sin (tt * 1.7f + m.phase)), p.accent2,
+                               0.75f * juce::jlimit (0.0f, 1.0f, (s.getBottom() - m.y) / 30.0f));
             break;
         case Art::toxic:
         {
