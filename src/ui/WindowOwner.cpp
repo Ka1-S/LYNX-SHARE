@@ -233,6 +233,16 @@ public:
             applyOwnership (c);
     }
 
+    // round 170h: an owned window that goes away while it is the active one (closed, hidden, deleted) gives the
+    // activation back to the main window, not to whatever program Windows picks next (the shortcuts and Space did
+    // nothing after closing a dialog until a click in LYNX). Windows that do it themselves first are not affected.
+    void componentVisibilityChanged (juce::Component& c) override
+    {
+        if (! c.isVisible())
+            if (auto* top = dynamic_cast<juce::TopLevelWindow*> (&c); top != nullptr && top->isActiveWindow())
+                activateMainWindow();
+    }
+
     void componentBeingDeleted (juce::Component& c) override;
 
     juce::Component* window;
@@ -246,6 +256,11 @@ std::map<juce::Component*, std::unique_ptr<OwnershipKeeper>>& keepers()
 
 void OwnershipKeeper::componentBeingDeleted (juce::Component& c)
 {
+   #if JUCE_WINDOWS
+    // (deleted while still shown and active: hand the activation over before its native window goes)
+    if (c.isVisible() && c.getPeer() != nullptr && GetForegroundWindow() == (HWND) c.getWindowHandle())
+        activateMainWindow();
+   #endif
     c.removeComponentListener (this);
     window = nullptr;
     keepers().erase (&c); // deletes this
@@ -365,19 +380,38 @@ void applyRenderingChoice (juce::Component& window)
 
 namespace
 {
+bool closeOnEscape (juce::Component* window);
+
 struct SecondaryKeyForwarder final : juce::KeyListener
 {
     std::function<bool (const juce::KeyPress&)> handler;
 
     bool keyPressed (const juce::KeyPress& key, juce::Component* window) override
     {
-        if (handler == nullptr || key == juce::KeyPress::escapeKey)
-            return false;
         if (window != nullptr && (bool) window->getProperties().getWithDefault ("lynxOwnKeys", false))
+            return false;
+        if (key == juce::KeyPress::escapeKey)
+            return closeOnEscape (window);
+        if (handler == nullptr)
             return false;
         return handler (key);
     }
 };
+
+// FL closes the focused plugin / channel / tool window with Esc (round 170h, FL 2026 driven: a 808 HiHat channel
+// window, Sawer, Fruity Parametric EQ 2). LYNX's own editors that use Esc (a text field, a selection) take it first;
+// only an Esc nothing in the window used closes it. Async: the window may delete itself in closeButtonPressed.
+bool closeOnEscape (juce::Component* window)
+{
+    auto* doc = dynamic_cast<juce::DocumentWindow*> (window);
+    if (doc == nullptr || ! doc->isVisible())
+        return false;
+    juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<juce::DocumentWindow> (doc)] {
+        if (auto* w = safe.getComponent(); w != nullptr && w->isVisible())
+            w->closeButtonPressed();
+    });
+    return true;
+}
 
 SecondaryKeyForwarder& keyForwarder()
 {
