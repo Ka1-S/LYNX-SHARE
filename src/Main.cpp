@@ -4659,12 +4659,13 @@ private:
         };
 
         constexpr std::int64_t bar = 4 * lynx::ppq; // 120 BPM, 4/4
-        auto song = lynx::Song::makeDefault();
+        lynx::Song song; // (as --cliplooptest: one synth channel on insert 1, an empty pattern)
         song.bpm = 120.0;
+        song.mixer = lynx::Song::defaultMixer (2);
+        song.channels.resize (1);
+        song.channels[0].mixerTrack = 1;
+        song.patterns.emplace_back();
         song.mode = lynx::PlayMode::song;
-        for (auto& p : song.patterns)
-            p.notes.clear();
-        song.playlist.clear();
         song.currentPattern = 0;
         engine->setSong (song);
         engine->getTransport().metronome.store (true);
