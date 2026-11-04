@@ -2388,6 +2388,35 @@ TEST (pattern_toggle_step_and_length)
     CHECK (! p.hasStep (0, 4) && p.notes.size() == 1);
 }
 
+TEST (pattern_mute_removed_steps)
+{
+    lynx::Pattern p;
+    p.toggleStep (0, 2);
+    p.notes[0].velocity = 0.3f;
+    p.toggleStep (0, 2, true); // off: muted, kept
+    CHECK (! p.hasStep (0, 2) && p.notes.size() == 1 && p.notes[0].muted);
+    p.toggleStep (0, 2, true); // on again: the same note back
+    CHECK (p.hasStep (0, 2) && p.notes.size() == 1 && ! p.notes[0].muted && p.notes[0].velocity == 0.3f);
+    p.toggleStep (0, 2, true);
+    // option off (FL's SetStep, round 169f): turning the muted step on adds a new note and leaves the muted one alone...
+    p.toggleStep (0, 2);
+    CHECK (p.hasStep (0, 2) && p.notes.size() == 2 && p.notes[0].muted != p.notes[1].muted);
+    p.toggleStep (0, 2); // ...and turning it off deletes every note of the step, the muted one too
+    CHECK (p.notes.empty());
+    // option on with two notes on the step: both muted, both back
+    p.toggleStep (0, 3);
+    p.notes.push_back (p.notes[0]);
+    p.notes[1].key = 64;
+    p.toggleStep (0, 3, true);
+    CHECK (! p.hasStep (0, 3) && p.notes.size() == 2 && p.notes[0].muted && p.notes[1].muted);
+    p.toggleStep (0, 3, true);
+    CHECK (p.hasStep (0, 3) && p.notes.size() == 2 && ! p.notes[0].muted && ! p.notes[1].muted);
+    // another channel's note on the same step is never touched
+    p.toggleStep (1, 3);
+    p.toggleStep (0, 3, true);
+    CHECK (p.hasStep (1, 3) && ! p.hasStep (0, 3));
+}
+
 TEST (scheduler_places_events_at_exact_samples)
 {
     lynx::Pattern p;
@@ -16989,6 +17018,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Menus168zTests.inc"
 #include "Session168aTests.inc"
 #include "Live169bTests.inc"
+#include "Live169jTests.inc"
 #include "StemSplitTests.inc"
 #include "Zoom167tTests.inc"
 #include "Proll168gTests.inc"
@@ -17021,3 +17051,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Mute53fTests.inc"
 #include "Issue32cTests.inc"
 #include "Drumaxx169eTests.inc"
+#include "Inst169hTests.inc"
