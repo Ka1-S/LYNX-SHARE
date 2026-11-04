@@ -55,12 +55,38 @@ first-call glide from its defaults (REA_rodada63 §1.3) happened before the song
 silence before a render (REA_rodada154). In the app this does not matter (the engines run while the transport is
 stopped); `renderwav` now takes `LYNX_WARMUP=n` to do the same before the song.
 
+## 3. Fruity Granulizer (and 3x Osc's custom wave) lost their sample on macOS / Linux
+
+**FL evidence [FL render]:** FL's render of `Render tests/Fruity Granulizer.flp` plays the channel's sample
+(`%FLStudioFactoryData%\Data\Patches\Packs\Drums\Kicks\808 Kick.wav`, an Ogg-in-WAV) at −11 dB RMS.
+
+**LYNX before:** silent (score 0). Cause [debug build]: the importer treated any plugin sample path starting with `\`
+or `/` as an old preset's path relative to FL's Data folder and prefixed `<FL>\Data` again. On Windows the resolved
+path starts with a drive letter, but with a POSIX FL root (macOS, Linux, a Wine prefix, renderwav on Linux) every
+resolved path starts with `/`, so the Granulizer and 3x Osc (custom wave, shape 6) channels lost their sample. A
+second bug showed up on the way: with no sample the Granulizer refuses the note (voice −1) and the instrument wrote
+the pitch-slide anchor into voice −1 before checking it (out-of-bounds write, a crash risk).
+
+**LYNX now:** the Data-relative rule applies only when the path does not exist as it is (`dataRelativeSample`,
+`core/FlpImport.cpp`); the Granulizer checks the voice before touching it. Tests:
+`flq170i_granulizer_and_3xosc_samples_on_posix_roots`, `flq170i_old_data_relative_plugin_sample_still_found`.
+
+## 4. FPC's level (open)
+
+The render test plays −4.57 dB too quietly in LYNX, a pure gain (gain-fitted ESR −39 dB) except on the hi-hat pad
+(−5.25 dB). **[DECOMP FPC_x64.dll `FUN_0086b480` (voice start), constant at `0x8E0FA0` = 20.526958 (f32, read-only:
+2 read references)]:** a layer's gain is `(exp(ln(21.526958) · v/127) − 1)/10` (v = layer volume, 99 ≈ unity) and the
+pad's gain the same law on the pad volume (`pad+0x14E`); LYNX uses `(11^(v/127) − 1)/10` for both. The difference
+between the two pads (0.68 dB measured; 0.76 dB predicted by the new law for layers 99 and 117) confirms the layer
+law. The absolute level is still not explained (pad volume 128 under the same law would make FL 6.5 dB louder than
+measured), so the law is **not** changed yet: the voice's host level (`TVoiceParams`) and FPC's output stage need
+one more REA pass.
+
 ## Where I stopped
 
-- Done: §1 code + tests (`tests/FlQ170iTests.inc`), `LYNX_WARMUP` in renderwav.
+- Done: §1 and §3 code + tests (`tests/FlQ170iTests.inc`), `LYNX_WARMUP` in renderwav.
 - In progress: build-local, rescore, land batch 1.
 - Next: FPC level (−4.6 dB; REA: layer and pad volume law `(21.527^(v/127) − 1)/10`, constant at FPC_x64.dll
-  `0x8E0FA0`, used by `FUN_0086b480`), Slicex level (−2.2 dB), Fruity Granulizer render test silent in LYNX,
-  Hardcore (env corr 0.04).
+  `0x8E0FA0`, used by `FUN_0086b480`), Slicex level (−2.2 dB), Hardcore (env corr 0.04).
 - Commands: `scripts/flref-lynx.sh /mnt/e/lynx-work/flq170i/rt.list <out> build-local/renderwav 2`, then
   `python3 scripts/flref_compare.py batch /mnt/e/lynx-work/flq170i/flref <out> <out>/report.md`.
