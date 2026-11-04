@@ -900,7 +900,7 @@ void MainComponent::resized()
 
     auto hintWidth = juce::jlimit (juce::jmin (minHint, juce::jmax (160, room - used)), maxHint, room - used);
     // round 170e3: the spare room goes to useful things first (a wider output monitor, snap and pattern boxes, song
-    // position and hint bar), then evenly between the panels, so no dead zone opens anywhere on a wide window
+    // position and hint bar), then a little air between the panels, so no dead zone opens anywhere on a wide window
     auto spare = juce::jmax (0, room - used - hintWidth);
     auto grant = [&spare] (int share, int most) {
         const auto g = juce::jmax (0, juce::jmin (most, spare * share / 100));
@@ -918,8 +918,16 @@ void MainComponent::resized()
     }
     hintWidth += grant (25, 500);
     const auto shownGroups = (int) std::count (visible.begin(), visible.end(), true);
-    const auto extra = toolbarlayout::extraGap (spare, shownGroups, std::numeric_limits<int>::max() / 4);
+    // at most twice the normal gap between the panels; what is still left goes to the output monitor and the hint bar
+    const auto extra = toolbarlayout::extraGap (spare, shownGroups, gap);
     spare -= extra * shownGroups;
+    if (spare > 0)
+    {
+        const auto toOutput = visible[(std::size_t) Group::output] ? spare / 2 : 0;
+        widths[(std::size_t) Group::output] += toOutput;
+        hintWidth += spare - toOutput;
+        spare = 0;
+    }
 
     auto take = [&toolbar] (int width) { return toolbar.removeFromLeft (juce::jmin (width, toolbar.getWidth())); };
     auto divide = [&] {

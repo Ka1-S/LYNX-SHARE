@@ -9,7 +9,8 @@ clone). Builds on 170e / 170e2.
 
 ## Where I stopped
 
-- Done: everything below; sheet /mnt/e/lynx-work/toolbar170e3/compare-170e3.png (FL strip, before = main after 170e2,
+- Waiting for the coordinator's look at /mnt/e/lynx-work/toolbar170e4/compare-170e4.png before landing (do not queue).
+- Done: everything below; first sheet /mnt/e/lynx-work/toolbar170e3/compare-170e3.png (FL strip, before = main after 170e2,
   after = this branch; 1920, 1366, light, 3840 in two halves, Piano roll and Playlist headers).
 - Rerun: `tmp/coord/buildslot.sh tmp/coord/bl-wt.sh toolbar170e3`; Windows `OUT=~/projetos/lynx-wt-toolbar170e3/build-win
   tmp/coord/winbuild.sh scripts/build-windows-zig.sh`; pictures `LYNX.exe --snapshot` (fresh LYNX_PROFILE_DIR,
@@ -49,6 +50,19 @@ clone). Builds on 170e / 170e2.
 | 3 | Punch | in the record menu only | a toolbar switch (same option) |
 | 4 | tempo tapper | a button in the recording grid | beside the BPM display |
 | 5 | headers | tool strips loose in the title row | the tools sit in one well, bigger icons; snap boxes have the magnet (170e) |
+
+## Second pass (coordinator review of compare-170e3.png)
+
+| asked | now |
+|---|---|
+| 4K: no dead zone | the spare width goes to the output monitor (40 %, up to 900 px), the snap / pattern boxes (20 %, up to 220), the song position (15 %, up to 120) and the hint bar (25 %, up to 500), then evenly between the panels (no cap): nothing is left at the right end |
+| editor headers | title rows 32 px (were 28), tool icons 20 px (were 16), the tools in three wells: drawing (pencil, brush, drum brush) / changing (delete, mute, knife, slip) / looking (select, zoom, listen); the tool in use has a 30 % red wash; tooltips name the tool and its key |
+| transport the visual centre | play / stop / record 45 px buttons (were 37 x 34), the song position 26 px digits in a 140 px display (were 17 px / 110), shrinking to fit when the toolbar is compact |
+| Pattern / Song | drawn as one switch of two halves (a shared outlined well, the playing mode lit) |
+| master knobs | two big knobs side by side, name and value under each (compact toolbar: the small knobs over each other) |
+| one-line hint | the idle hint is "Point at anything for help [F1] shortcuts [F5]-[F9] windows [Space] play/stop" (the typing piano's state shows on its button) |
+
+Sheet: /mnt/e/lynx-work/toolbar170e4/compare-170e4.png (+ full-1920-*.png, full-3840-*.png).
 
 ## Checks
 
