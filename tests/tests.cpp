@@ -17007,6 +17007,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "LoopWrap167qTests.inc"
 #include "Sel168tTests.inc"
 #include "Gap169kTests.inc"
+#include "Gap169kPickerTests.inc"
 #include "Speech168bTests.inc"
 #include "Design168pTests.inc"
 #include "Typing168tTests.inc"
