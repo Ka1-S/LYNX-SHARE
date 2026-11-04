@@ -7059,6 +7059,8 @@ countries: cn sg
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "样式：[LMB] 用铅笔绘制  [Ctrl+LMB] / [Shift+LMB] 选择多个  [2xLMB] 打开  [RMB] 菜单"
 "Empty patterns were ignored." = "已忽略空样式。"
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "插件选择器：所有发生器和效果器，类别显示为标签（再按一次关闭）"
+"Themed" = "主题"
+"Animate the plugin art (falling petals, glows; Themed style)" = "插件美术动画（飘落的花瓣、光晕；主题样式）"
 "click to step, drag or mouse wheel to change" = "单击切换，拖动或滚动鼠标滚轮更改"
 "no effect with the current mode (another engine is in use)" = "在当前模式下无效（正在使用另一个引擎）"
 

@@ -948,6 +948,36 @@ public:
             return;
         }
 
+        if (args.contains ("--artshot"))
+        {
+            // LYNX.exe --artshot <folder> [before|after] [name,name...]: every editor with art of its own (round 170j/170k: the
+            // Themed style; or only the named ones, e.g. "sakura,facet-eq") drawn off-screen at 100 % and 200 % as
+            // <folder>/<plugin>-<before|after>-<scale>.png. "before" draws each in the style it had before the Themed style
+            const auto i = args.indexOf ("--artshot");
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            const auto mode = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String ("after");
+            if (i + 3 < args.size() && ! args[i + 3].startsWith ("--")) // [name,name...]: only these arts
+                artOnly().addTokens (args[i + 3].unquoted(), ",", "");
+            setApplicationReturnValue (runArtShots (juce::File (args[i + 1].unquoted()), mode == "before") ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--artgui"))
+        {
+            // LYNX.exe --artgui <folder> [before|after|still] [name,name...]: the same editors in REAL windows on the desktop, one at a
+            // time (always on top, no focus taken), each held while an outside script screenshots it (it writes
+            // <folder>/<plugin>.ready with the window's bounds and waits up to 10 s for <folder>/<plugin>.done), then the
+            // process CPU it costs over 6 s is written to <folder>/cpu-<mode>.txt. "still": Themed with the motion off
+            const auto i = args.indexOf ("--artgui");
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            const auto mode = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String ("after");
+            if (i + 3 < args.size() && ! args[i + 3].startsWith ("--")) // [name,name...]: only these arts
+                artOnly().addTokens (args[i + 3].unquoted(), ",", "");
+            runArtGui (juce::File (args[i + 1].unquoted()), mode);
+            return;
+        }
+
         if (args.contains ("--instrumentshot"))
         {
             // LYNX.exe --instrumentshot <folder> <engine,engine...|banks> [lynx|fl]: round 168n — the channel window of
@@ -2411,9 +2441,12 @@ private:
         // through it, the invite code's keys)
         const auto liveResult = lynx::livetest::selfTest (&rich);
 
+        // round 170j: the Themed plugin style (its resolution with and without art; every art draws)
+        const auto artResult = lynx::skin::artSelfTest();
+
         const auto ok = audioOk && projectOk && richOk && hwOutOk && flp168jOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
-                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk;
+                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK";
 
         juce::String report;
         report << "connections=" << offline.getNumGraphConnections() << "\n"
@@ -2436,6 +2469,7 @@ private:
                << "wavpack=" << wavpack << "\n"
                << "effects=" << (effectsOk ? "OK" : "NONFINITE") << "\n"
                << "driver_panel=" << driverPanel << "\n"
+               << "plugin_art=" << artResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n"
                << "result=" << (ok ? "OK" : "FAILED") << "\n";
@@ -6350,6 +6384,230 @@ private:
             }
         }
         return ok;
+    }
+
+    // --- round 170j: the pilot editors with their own art -------------------------------------------------
+    struct ArtPilot
+    {
+        std::string file; // the art's name as a file name: "toxic-biohazard"
+        bool instrument;
+        lynx::InstrumentKind instrumentKind;
+        lynx::EffectKind effectKind;
+        lynx::skin::Style before; // the automatic style it had before the Themed style
+    };
+    static juce::StringArray& artOnly() // --artshot / --artgui: only these (file names), all when empty
+    {
+        static juce::StringArray only;
+        return only;
+    }
+    // every plugin with art of its own (round 170j/170k): generators first, then effects; built from the art
+    // registries, so a new theme is shot without touching this list
+    static const std::vector<ArtPilot>& artPilots()
+    {
+        using I = lynx::InstrumentKind;
+        using E = lynx::EffectKind;
+        static const std::vector<ArtPilot> list = [] {
+            std::vector<ArtPilot> all;
+            auto slug = [] (lynx::skin::Art a) {
+                return juce::String (lynx::skin::artName (a)).toLowerCase().replaceCharacters (" ", "-").removeCharacters ("!.()'").toStdString();
+            };
+            for (const auto& e : lynx::natives::instrumentEngines()) // (the engines' order first)
+                if (const auto a = lynx::skin::artForInstrument (e.kind); a != lynx::skin::Art::none)
+                    all.push_back ({ slug (a), true, e.kind, E::reverb, lynx::skin::Style::neon });
+            for (int k = 0; k <= (int) I::wavetraveller; ++k) // then every other kind with art (DrumSynth, Autogun, Wasp...)
+                if (const auto a = lynx::skin::artForInstrument ((I) k); a != lynx::skin::Art::none)
+                    all.push_back ({ slug (a), true, (I) k, E::reverb, lynx::skin::Style::neon });
+            for (int k = 0; k <= (int) lynx::lastEffectKind; ++k)
+                if (const auto a = lynx::skin::artForEffect ((E) k); a != lynx::skin::Art::none)
+                    all.push_back ({ slug (a), false, I::synth, (E) k, lynx::skin::plainStyleFor (k) });
+            std::vector<ArtPilot> kept;
+            for (auto& p : all)
+                if (artOnly().isEmpty() || artOnly().contains (juce::String (p.file)))
+                    if (std::none_of (kept.begin(), kept.end(), [&] (const ArtPilot& q) { return q.file == p.file; }))
+                        kept.push_back (p);
+            return kept;
+        }();
+        return list;
+    }
+
+    // the song and the editor of a pilot (an instrument: the channel window on its Plugin tab)
+    static std::unique_ptr<juce::Component> makeArtPilot (lynx::AudioEngine& engine, const ArtPilot& p)
+    {
+        lynx::Song song;
+        song.mixer = lynx::Song::defaultMixer (2);
+        if (p.instrument)
+        {
+            for (const auto& e : lynx::natives::instrumentEngines())
+                if (e.kind == p.instrumentKind)
+                {
+                    auto channel = lynx::natives::makeChannel (e.kind, lynx::flStudioAccess());
+                    if (! channel) channel = lynx::banks::defaultChannel (e.kind, e.name);
+                    if (! channel) return nullptr;
+                    song.channels.push_back (*channel);
+                    break;
+                }
+            if (song.channels.empty()) // a kind without an engine entry: its LYNX default, else an empty channel of that kind
+            {
+                const std::string name = lynx::skin::artName (lynx::skin::artForInstrument (p.instrumentKind));
+                auto channel = lynx::banks::defaultChannel (p.instrumentKind, name);
+                if (! channel)
+                {
+                    channel = lynx::ChannelDef {};
+                    channel->instrument = p.instrumentKind;
+                    channel->name = name;
+                }
+                song.channels.push_back (*channel);
+            }
+            song.patterns.emplace_back();
+        }
+        else
+        {
+            song.mixer[1].effects.push_back (lynx::makeEffectSlot (p.effectKind));
+        }
+        engine.setSong (std::move (song));
+        engine.dispatchPendingMessages();
+        if (p.instrument) return lynx::makeChannelFrame (engine, 0, 0);
+        if (p.effectKind == lynx::EffectKind::facetEq) return lynx::makeFacetEqEditor (engine, 1, 0, true);
+        return lynx::makeNativeEffectEditor (engine, 1, 0, 1.0f, 0);
+    }
+
+    // "before": the style each pilot had (forced for its run); "after": automatic (the pilots are Themed)
+    static void artPilotStyle (const ArtPilot& p, const juce::String& mode)
+    {
+        lynx::skin::setForcedStyle (mode == "before" ? (int) p.before : -1);
+        lynx::skin::setArtMotion (mode != "still");
+    }
+
+    bool runArtShots (const juce::File& folder, bool before)
+    {
+        folder.createDirectory();
+        auto ok = true;
+        for (const auto& p : artPilots())
+        {
+            artPilotStyle (p, before ? "before" : "after");
+            lynx::AudioEngine offline (false);
+            auto editor = makeArtPilot (offline, p);
+            if (editor == nullptr || editor->getWidth() <= 0)
+            {
+                std::fprintf (stderr, "%s: no editor\n", p.file.c_str());
+                ok = false;
+                continue;
+            }
+            if (p.effectKind == lynx::EffectKind::facetEq) lynx::tickFacetEqEditor (*editor);
+            for (const auto scale : { 1.0f, 2.0f })
+            {
+                const auto file = folder.getChildFile (juce::String (p.file) + "-" + (before ? "before" : "after") + "-" + juce::String (juce::roundToInt (scale * 100)) + ".png");
+                savePng (editor->createComponentSnapshot (editor->getLocalBounds(), true, scale), file.getFullPathName());
+                std::printf ("%s %dx%d\n", file.getFullPathName().toRawUTF8(), editor->getWidth(), editor->getHeight());
+            }
+        }
+        lynx::skin::setForcedStyle (-1);
+        return ok;
+    }
+
+    struct ArtGuiRun final : juce::Timer
+    {
+        juce::File folder;
+        juce::String mode, report;
+        std::size_t at = 0;
+        int phase = 0;
+        double t0 = 0.0, c0 = 0.0;
+        std::unique_ptr<lynx::AudioEngine> engine;
+        std::unique_ptr<juce::DocumentWindow> window;
+        std::function<void()> done;
+
+        void start()
+        {
+            engine = std::make_unique<lynx::AudioEngine> (false);
+            report << "editor\tmode\tcpu % of one core\tart layer animating\n";
+            open();
+            startTimer (100);
+        }
+        void open()
+        {
+            window.reset();
+            const auto& pilots = artPilots();
+            if (at >= pilots.size())
+            {
+                folder.getChildFile ("cpu-" + mode + ".txt").replaceWithText (report);
+                stopTimer();
+                lynx::skin::setForcedStyle (-1);
+                lynx::skin::setArtMotion (true);
+                if (done) done();
+                return;
+            }
+            const auto& p = pilots[at];
+            artPilotStyle (p, mode);
+            auto editor = makeArtPilot (*engine, p);
+            if (editor == nullptr) { ++at; open(); return; }
+            window = std::make_unique<juce::DocumentWindow> (juce::String ("LYNX art - ") + juce::String (p.file), lynx::theme::colour::bg1, 0);
+            window->setUsingNativeTitleBar (true);
+            window->setContentOwned (editor.release(), true);
+            const auto area = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->userArea;
+            window->setTopLeftPosition (area.getX() + 24, area.getY() + 24);
+            window->setAlwaysOnTop (true);
+            window->setVisible (true);
+            phase = 0;
+            t0 = juce::Time::getMillisecondCounterHiRes();
+        }
+        bool animating() const
+        {
+            if (window == nullptr || window->getContentComponent() == nullptr) return false;
+            std::function<bool (juce::Component&)> find = [&] (juce::Component& c) {
+                if (auto* l = dynamic_cast<lynx::skin::ArtLayer*> (&c); l != nullptr && l->animating()) return true;
+                for (auto* child : c.getChildren())
+                    if (find (*child)) return true;
+                return false;
+            };
+            return find (*window->getContentComponent());
+        }
+        void timerCallback() override
+        {
+            const auto now = juce::Time::getMillisecondCounterHiRes();
+            const auto& p = artPilots()[at];
+            const auto ready = folder.getChildFile (juce::String (p.file) + "-" + mode + ".ready");
+            const auto shotDone = folder.getChildFile (juce::String (p.file) + "-" + mode + ".done");
+            if (phase == 0 && now - t0 > 1500.0)
+            {
+                // the window's content on screen, in physical pixels, for the outside screenshot to crop
+                auto* c = window->getContentComponent();
+                const auto scale = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->scale;
+                const auto b = c->getScreenBounds();
+                shotDone.deleteFile();
+                ready.replaceWithText (juce::String (juce::roundToInt (b.getX() * scale)) + " " + juce::String (juce::roundToInt (b.getY() * scale)) + " "
+                                       + juce::String (juce::roundToInt (b.getWidth() * scale)) + " " + juce::String (juce::roundToInt (b.getHeight() * scale)));
+                phase = 1;
+                t0 = now;
+                return;
+            }
+            if (phase == 1 && (shotDone.existsAsFile() || now - t0 > 10000.0))
+            {
+                ready.deleteFile();
+                shotDone.deleteFile();
+                phase = 2;
+                t0 = now;
+                c0 = lynx::processCpuSeconds();
+                return;
+            }
+            if (phase == 2 && now - t0 > 6000.0)
+            {
+                const auto cpu = (lynx::processCpuSeconds() - c0) / ((now - t0) * 0.001) * 100.0;
+                report << juce::String (p.file) << "\t" << mode << "\t" << juce::String (cpu, 2) << "\t" << (animating() ? "yes" : "no") << "\n";
+                ++at;
+                open();
+            }
+        }
+    };
+    std::unique_ptr<ArtGuiRun> artGui;
+
+    void runArtGui (const juce::File& folder, const juce::String& mode)
+    {
+        folder.createDirectory();
+        artGui = std::make_unique<ArtGuiRun>();
+        artGui->folder = folder;
+        artGui->mode = mode;
+        artGui->done = [this] { juce::MessageManager::callAsync ([this] { artGui.reset(); quit(); }); };
+        artGui->start();
     }
 
     void runPluginEditorSnapshots (const juce::String& folder)
