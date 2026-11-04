@@ -129,9 +129,11 @@ FL [SHOT f0–f5]: FL's Master fader follows the mouse during playback with the 
 
 ## Where I stopped
 
-- 2026-11-04 19:10. feature/fader171c: done (tests 16 checks / 0 failures, full suite passed before), measured (3.3),
-  going through the merge train.
-- feature/picker171c: picker works on Windows (shots p01–p19, q01–q06 in /mnt/e/lynx-work/picker171c/gui/): F8,
-  background pictures, hover, typed search, Enter / double-click, drag to the Channel Rack and to a mixer insert, tab
-  click → Browser, right-click on empty space closes, Ctrl+wheel. Perf fixes (fit off the paint, bilinear halving,
-  list-order walk) in the next Windows build; then the final screenshots, and the picker waits for the user's OK.
+- 2026-11-04 21:00. feature/fader171c LANDED (merge 27d3e6cc, train head bc3b4e24).
+- feature/picker171c: merged with origin/main (now includes 170b's categories and 170k's art), Windows-checked,
+  screenshots in /mnt/e/lynx-work/picker171c/final/. **Waiting for the user's OK on the screenshots before landing**
+  (brief). To land: re-merge origin/main, build-local + tests, `coord/train.sh picker171c`.
+- Not done / LYNX differences left: LYNX's Browser has no per-category Plugin database folders, so a tab click opens
+  Generators / Effects (FL opens the category folder); "Open plugin picker" targeted from Insert / Replace menus and
+  mixer slots (FL's 0x70000000 / channel targets) not wired; hover Preview sound (FL: only when a .nfo has Preview=,
+  stock FL has none).
