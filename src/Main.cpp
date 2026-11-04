@@ -923,17 +923,16 @@ public:
             return;
         }
 
-        if (const auto si = args.indexOf ("--artset"); si >= 0 && si + 1 < args.size()) // round 170k: --artset fx1 (the effects' batches)
-            artSet() = args[si + 1].unquoted();
-
         if (args.contains ("--artshot"))
         {
-            // LYNX.exe --artshot <folder> [before|after]: round 170j's six pilot editors with their own art (Sakura,
-            // Toxic Biohazard, Sytrus, 3x Osc, Facet EQ, Nebula) drawn off-screen at 100 % and 200 % as
+            // LYNX.exe --artshot <folder> [before|after] [name,name...]: every editor with art of its own (round 170j/170k: the
+            // Themed style; or only the named ones, e.g. "sakura,facet-eq") drawn off-screen at 100 % and 200 % as
             // <folder>/<plugin>-<before|after>-<scale>.png. "before" draws each in the style it had before the Themed style
             const auto i = args.indexOf ("--artshot");
             juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
             const auto mode = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String ("after");
+            if (i + 3 < args.size() && ! args[i + 3].startsWith ("--")) // [name,name...]: only these arts
+                artOnly().addTokens (args[i + 3].unquoted(), ",", "");
             setApplicationReturnValue (runArtShots (juce::File (args[i + 1].unquoted()), mode == "before") ? 0 : 1);
             quit();
             return;
@@ -941,13 +940,15 @@ public:
 
         if (args.contains ("--artgui"))
         {
-            // LYNX.exe --artgui <folder> [before|after|still]: the same six editors in REAL windows on the desktop, one at a
+            // LYNX.exe --artgui <folder> [before|after|still] [name,name...]: the same editors in REAL windows on the desktop, one at a
             // time (always on top, no focus taken), each held while an outside script screenshots it (it writes
             // <folder>/<plugin>.ready with the window's bounds and waits up to 10 s for <folder>/<plugin>.done), then the
             // process CPU it costs over 6 s is written to <folder>/cpu-<mode>.txt. "still": Themed with the motion off
             const auto i = args.indexOf ("--artgui");
             juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
             const auto mode = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String ("after");
+            if (i + 3 < args.size() && ! args[i + 3].startsWith ("--")) // [name,name...]: only these arts
+                artOnly().addTokens (args[i + 3].unquoted(), ",", "");
             runArtGui (juce::File (args[i + 1].unquoted()), mode);
             return;
         }
@@ -6114,63 +6115,41 @@ private:
     // --- round 170j: the pilot editors with their own art -------------------------------------------------
     struct ArtPilot
     {
-        const char* file;
+        std::string file; // the art's name as a file name: "toxic-biohazard"
         bool instrument;
         lynx::InstrumentKind instrumentKind;
         lynx::EffectKind effectKind;
         lynx::skin::Style before; // the automatic style it had before the Themed style
     };
-    static juce::String& artSet() { static juce::String set; return set; } // --artset <name>: which editors --artshot / --artgui show
-
+    static juce::StringArray& artOnly() // --artshot / --artgui: only these (file names), all when empty
+    {
+        static juce::StringArray only;
+        return only;
+    }
+    // every plugin with art of its own (round 170j/170k): generators first, then effects; built from the art
+    // registries, so a new theme is shot without touching this list
     static const std::vector<ArtPilot>& artPilots()
     {
         using I = lynx::InstrumentKind;
         using E = lynx::EffectKind;
-        using S = lynx::skin::Style;
-        static const std::vector<ArtPilot> list { { "sakura", true, I::sakura, E::reverb, S::neon },           { "toxic-biohazard", true, I::toxic, E::reverb, S::neon },
-                                                  { "sytrus", true, I::sytrus, E::reverb, S::neon },           { "3x-osc", true, I::threeosc, E::reverb, S::neon },
-                                                  { "facet-eq", false, I::synth, E::facetEq, S::glow },      { "nebula", false, I::synth, E::nebula, S::neon } };
-        // round 170k: the effects' themes, one set per batch (--artset fx1...)
-        static const std::vector<ArtPilot> fx1 { { "ridge-strip", false, I::synth, E::ridgeStrip, S::hardware },        { "crest-compressor", false, I::synth, E::crestCompressor, S::glow },
-                                                 { "apex-limiter", false, I::synth, E::apexLimiter, S::glow },          { "prism-multiband", false, I::synth, E::prismMultiband, S::glow },
-                                                 { "sentry-gate", false, I::synth, E::sentryGate, S::neon },            { "glow-leveler", false, I::synth, E::glowLeveler, S::hardware },
-                                                 { "hush-de-esser", false, I::synth, E::hushDeEsser, S::glow } };
-        static const std::vector<ArtPilot> fx2 { { "epoch-verb", false, I::synth, E::epochVerb, S::hardware }, { "atrium", false, I::synth, E::atrium, S::neon },
-                                                 { "foil-plate", false, I::synth, E::foilPlate, S::hardware },  { "halo", false, I::synth, E::halo, S::neon },
-                                                 { "horizon", false, I::synth, E::horizon, S::vivid },          { "fruity-reeverb-2", false, I::synth, E::reeverb2, S::hardware },
-                                                 { "luxeverb", false, I::synth, E::luxeVerb, S::glow },         { "fruity-reeverb", false, I::synth, E::reeverb1, S::glow } };
-        static const std::vector<ArtPilot> fx3 { { "echoform", false, I::synth, E::echoform, S::hardware },    { "spiral-echo", false, I::synth, E::spiralEcho, S::neon },
-                                                 { "orbit", false, I::synth, E::orbit, S::neon },              { "lattice-mod", false, I::synth, E::latticeMod, S::neon },
-                                                 { "gemini-doubler", false, I::synth, E::geminiDoubler, S::vivid }, { "fruity-delay-2", false, I::synth, E::fruityDelay2, S::glow },
-                                                 { "fruity-delay-3", false, I::synth, E::fruityDelay3, S::vivid }, { "fruity-delay-bank", false, I::synth, E::fruityDelayBank, S::neon } };
-        static const std::vector<ArtPilot> fx4 { { "ember-saturator", false, I::synth, E::ember, S::vivid },   { "aether", false, I::synth, E::aether, S::hardware },
-                                                 { "fruity-blood-overdrive", false, I::synth, E::fruityBloodOverdrive, S::hardware },
-                                                 { "fruity-fast-dist", false, I::synth, E::fruityFastDist, S::vivid },
-                                                 { "fruity-waveshaper", false, I::synth, E::fruityWaveShaper, S::neon },
-                                                 { "fruity-soft-clipper", false, I::synth, E::fruitySoftClipper, S::glow },
-                                                 { "hardcore", false, I::synth, E::hardcore, S::neon },        { "distructor", false, I::synth, E::distructor, S::vivid } };
-        static const std::vector<ArtPilot> fx5 { { "fruity-chorus", false, I::synth, E::fruityChorus, S::glow },   { "hyper-chorus", false, I::synth, E::hyperChorus, S::vivid },
-                                                 { "vintage-chorus", false, I::synth, E::vintageChorus, S::hardware }, { "fruity-flanger", false, I::synth, E::fruityFlanger, S::vivid },
-                                                 { "fruity-flangus", false, I::synth, E::fruityFlangus, S::neon },  { "fruity-phaser", false, I::synth, E::fruityPhaser, S::neon },
-                                                 { "vintage-phaser", false, I::synth, E::vintagePhaser, S::hardware },
-                                                 { "frequency-shifter", false, I::synth, E::flFrequencyShifter, S::glow } };
-        static const std::vector<ArtPilot> fx6 { { "fruity-parametric-eq-2", false, I::synth, E::parametricEq, S::neon }, { "fruity-limiter", false, I::synth, E::fruityLimiter, S::hardware },
-                                                 { "fruity-compressor", false, I::synth, E::fruityCompressor, S::hardware },
-                                                 { "fruity-multiband-compressor", false, I::synth, E::fruityMultiband, S::glow },
-                                                 { "maximus", false, I::synth, E::maximus, S::hardware },          { "transient-processor", false, I::synth, E::transientProcessor, S::vivid },
-                                                 { "fruity-stereo-shaper", false, I::synth, E::stereoShaper, S::neon },
-                                                 { "fruity-stereo-enhancer", false, I::synth, E::stereoEnhancer, S::neon },
-                                                 { "spreader", false, I::synth, E::spreader, S::neon } };
-        static const std::vector<ArtPilot> fx7 { { "gross-beat", false, I::synth, E::grossBeat, S::vivid }, { "vocodex", false, I::synth, E::vocodex, S::neon }, { "fruity-vocoder", false, I::synth, E::vocoder, S::hardware }, { "pitcher", false, I::synth, E::pitchCorrect, S::glow }, { "lynx-tune", false, I::synth, E::lynxTune, S::vivid }, { "voice-shift", false, I::synth, E::voiceShift, S::vivid }, { "quell-denoiser", false, I::synth, E::quellDenoiser, S::glow }, { "pitch-shifter", false, I::synth, E::flPitchShifter, S::vivid }, { "fruity-love-philter", false, I::synth, E::lovePhilter, S::glow }, { "effector", false, I::synth, E::effector, S::vivid }, { "squeeze", false, I::synth, E::squeeze, S::vivid }, { "lo-fi", false, I::synth, E::lofi, S::glow } };
-        static const std::vector<ArtPilot> fx8 { { "basicEq", false, I::synth, E::eq, S::glow }, { "basicComp", false, I::synth, E::compressor, S::glow }, { "basicDelay", false, I::synth, E::delay, S::glow }, { "basicReverb", false, I::synth, E::reverb, S::glow }, { "basicLimiter", false, I::synth, E::limiter, S::glow }, { "basicDistortion", false, I::synth, E::distortion, S::glow }, { "basicFilter", false, I::synth, E::filter, S::glow }, { "basicChorus", false, I::synth, E::chorus, S::glow }, { "autoPan", false, I::synth, E::autoPan, S::glow }, { "panOMatic", false, I::synth, E::fruityPanOMatic, S::glow }, { "balance", false, I::synth, E::fruityBalance, S::glow }, { "utility", false, I::synth, E::utility, S::glow }, { "send", false, I::synth, E::fruitySend, S::glow }, { "splitter", false, I::synth, E::frequencySplitter, S::glow }, { "crossover", false, I::synth, E::crossover, S::glow }, { "multibandDelay", false, I::synth, E::multibandDelay, S::vivid }, { "equo", false, I::synth, E::equo, S::neon }, { "emphasizer", false, I::synth, E::emphasizer, S::glow }, { "lowLifter", false, I::synth, E::flLowLifter, S::glow }, { "fastLp", false, I::synth, E::fruityFastLP, S::glow }, { "fruityFilter", false, I::synth, E::fruityFilter, S::neon }, { "freeFilter", false, I::synth, E::fruityFreeFilter, S::neon }, { "sevenBand", false, I::synth, E::fl7BandEq, S::glow }, { "bassBoost", false, I::synth, E::flBassBoost, S::glow }, { "convolver", false, I::synth, E::convolver, S::glow }, { "volumeGate", false, I::synth, E::volumeGate, S::glow }, { "rhythmGain", false, I::synth, E::rhythmGain, S::glow }, { "freqShift", false, I::synth, E::freqShift, S::glow }, { "pitchShift", false, I::synth, E::pitchShift, S::neon }, { "phaseInverter", false, I::synth, E::flPhaseInverter, S::glow }, { "center", false, I::synth, E::flCenter, S::glow }, { "delay1", false, I::synth, E::flDelay1, S::glow }, { "mute2", false, I::synth, E::fruityMute2, S::glow } };
-        if (artSet() == "fx1") return fx1;
-        if (artSet() == "fx7") return fx7;
-        if (artSet() == "fx8") return fx8;
-        if (artSet() == "fx5") return fx5;
-        if (artSet() == "fx6") return fx6;
-        if (artSet() == "fx4") return fx4;
-        if (artSet() == "fx3") return fx3;
-        if (artSet() == "fx2") return fx2;
+        static const std::vector<ArtPilot> list = [] {
+            std::vector<ArtPilot> all;
+            auto slug = [] (lynx::skin::Art a) {
+                return juce::String (lynx::skin::artName (a)).toLowerCase().replaceCharacters (" ", "-").removeCharacters ("!.()'").toStdString();
+            };
+            for (const auto& e : lynx::natives::instrumentEngines())
+                if (const auto a = lynx::skin::artForInstrument (e.kind); a != lynx::skin::Art::none)
+                    all.push_back ({ slug (a), true, e.kind, E::reverb, lynx::skin::Style::neon });
+            for (int k = 0; k <= (int) lynx::lastEffectKind; ++k)
+                if (const auto a = lynx::skin::artForEffect ((E) k); a != lynx::skin::Art::none)
+                    all.push_back ({ slug (a), false, I::synth, (E) k, lynx::skin::plainStyleFor (k) });
+            std::vector<ArtPilot> kept;
+            for (auto& p : all)
+                if (artOnly().isEmpty() || artOnly().contains (juce::String (p.file)))
+                    if (std::none_of (kept.begin(), kept.end(), [&] (const ArtPilot& q) { return q.file == p.file; }))
+                        kept.push_back (p);
+            return kept;
+        }();
         return list;
     }
 
@@ -6223,7 +6202,7 @@ private:
             auto editor = makeArtPilot (offline, p);
             if (editor == nullptr || editor->getWidth() <= 0)
             {
-                std::fprintf (stderr, "%s: no editor\n", p.file);
+                std::fprintf (stderr, "%s: no editor\n", p.file.c_str());
                 ok = false;
                 continue;
             }
@@ -6274,7 +6253,7 @@ private:
             artPilotStyle (p, mode);
             auto editor = makeArtPilot (*engine, p);
             if (editor == nullptr) { ++at; open(); return; }
-            window = std::make_unique<juce::DocumentWindow> (juce::String ("LYNX art - ") + p.file, lynx::theme::colour::bg1, 0);
+            window = std::make_unique<juce::DocumentWindow> (juce::String ("LYNX art - ") + juce::String (p.file), lynx::theme::colour::bg1, 0);
             window->setUsingNativeTitleBar (true);
             window->setContentOwned (editor.release(), true);
             const auto area = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->userArea;
@@ -6326,7 +6305,7 @@ private:
             if (phase == 2 && now - t0 > 6000.0)
             {
                 const auto cpu = (lynx::processCpuSeconds() - c0) / ((now - t0) * 0.001) * 100.0;
-                report << p.file << "\t" << mode << "\t" << juce::String (cpu, 2) << "\t" << (animating() ? "yes" : "no") << "\n";
+                report << juce::String (p.file) << "\t" << mode << "\t" << juce::String (cpu, 2) << "\t" << (animating() ? "yes" : "no") << "\n";
                 ++at;
                 open();
             }

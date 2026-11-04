@@ -40,12 +40,31 @@ repaints drawing only the layout items they touch (generator page and effect pan
 branch's band above the controls, 20 Hz. Static art is cached (one image per size), so idle editors cost nothing extra.
 GPU: plugin editors draw with GDI (software) since round 157a, so no GPU load.
 
+## The split (after the user's approval, 2026-11-04)
+
+The art is data now, so two rounds can add themes without touching the same lines:
+- `src/ui/PluginArt.inc`: the framework — `artkit::Theme` (palette, base style, knob family `Cap`, `Pointer`, scale
+  ticks, flags `thin` / `twoTone` / `buttTrack` / `thumbPointer`, arc glow, knob scale, mote motion) and optional hooks
+  (`canvas`, `headerDeco`, `sectionDeco`, `titleEmblem`, `drawCap`, `tipDeco`, `paintMotion`); shared motifs; the
+  themed surfaces and controls read the theme's fields (no `switch (art)` left); `ArtLayer` moves motes generically
+  (`Drift::still/fall/rise`) and calls the theme's painter; the self-test walks every id.
+- `src/ui/PluginArtGenerators.inc` + `PluginArtGeneratorIds.inc` (ids 1..127, `artForInstrument`) — this round.
+- `src/ui/PluginArtEffects.inc` + `PluginArtEffectIds.inc` (ids 128..255, `artForEffect`) — round 170k.
+- `skin::Art` is built from the two id files (X-macro), `plainStyleFor()` gives an effect's style without its art.
+- `--artshot` / `--artgui` list every plugin with art from the registries (optional `name,name` filter): nobody edits
+  a list in Main.cpp to shoot a new theme.
+- Verified: the six pilots' shots are pixel-identical to the approved ones (only the motes' positions differ in Toxic and
+  Nebula: the generic drift), self-test plugin_art=OK / result=OK.
+- Style guide for every theme: the tracker's plugin-art-0.1.24.md ("Reply from 170j").
+
 ## Where I stopped
 
-- 2026-11-04 ~04:00: pilot done and pushed (feature/art170j + wip/art170j, merged with origin/main); Windows build
-  clean; self-test plugin_art=OK; shots + review page in /mnt/e/lynx-work/tracker/plugin-art/. NOT landed: waiting for
-  the user's approval relayed by the coordinator. Next: keep merging origin/main; after approval run build-local +
-  coord/train.sh art170j; then roll out art to the other plugins.
+- 2026-11-04: split done (feature/art170j), Windows build + shots + self-test OK; landing via the train. Generator
+  batches G1 (Harmor, Harmless, GMS, Morphine, Ogun, PoiZone, Kepler, Kepler Exo) and G2 (Transistor Bass, Sawer,
+  BeepMap, FL Keys, Granulizer, Drumaxx, Drumpad, BassDrum) written in worktree ~/projetos/lynx-wt-art170jb
+  (feature/art170jb); next: build, shots, review, land; then G3 (BooBass, DrumSynth, DX10, MiniSynth, Plucked!,
+  SimSynth, Autogun, FL Slayer, Fruit Kick, Wasp) and G4 (own-editor ones: DirectWave, Wave Traveller, Fruity Dance,
+  sampler, SoundFont, LYNX's synth and drums, Video Player...).
 - Commands: `OUT=build-win ~/.claude/jobs/f8789b49/tmp/coord/winbuild.sh scripts/build-windows-zig.sh`;
-  `LYNX.exe --artshot <dir> before|after`; `/mnt/e/lynx-work/art170j/artgui.sh before|after|still` under
+  `LYNX.exe --artshot <dir> before|after [name,name]`; `/mnt/e/lynx-work/art170j/artgui.sh before|after|still` under
   `flock ~/.cache/lynx-wingui.lock`; page: `python3 -I /mnt/e/lynx-work/art170j/mkpage.py`.
