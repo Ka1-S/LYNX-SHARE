@@ -1710,7 +1710,7 @@ const char* voiceName (int k) noexcept
 }
 Style voiceStyle (int k) noexcept
 {
-    static const Style st[voices + 1] { Style::tube, Style::tube, Style::console, Style::transistor, Style::tube, Style::tape };
+    static const Style st[voices + 1] { Style::tube, Style::tubeBiased, Style::console, Style::transistor, Style::tubeBiased, Style::tape };
     return st[std::clamp (k, 0, voices)];
 }
 double lowCutWideHz (float v) noexcept { return v <= 0.0f ? 0.0 : logMap (v, 20.0, 1000.0); }
@@ -1910,6 +1910,15 @@ float shape (Style s, float x) noexcept
     switch (s)
     {
         case Style::tube:
+        {
+            // round 170c: a biased tanh with its knee at 2 (6 dB more headroom) and a milder bias (0.15): at +10 dB of
+            // drive a −12 dBFS tone gets 3 % THD with the 2nd harmonic leading (was 12 %), the 3 kHz / 50 Hz
+            // intermodulation drops from −6 to −15 dB (the "garbly" sound of a beat through it), unit slope at 0
+            constexpr float bias = 0.15f, knee = 2.0f;
+            const float tb = std::tanh (bias);
+            return knee * (std::tanh (x / knee + bias) - tb) / (1.0f - tb * tb);
+        }
+        case Style::tubeBiased:
         {
             // asymmetric: a biased tanh (even and odd harmonics, like a single-ended triode stage), unit slope at 0
             constexpr float bias = 0.35f;

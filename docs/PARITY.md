@@ -21,46 +21,63 @@ Scores are 0–10 (10 = a user of the original finds every control and every pie
 Round 128 covers the FabFilter / Slate / Antares roles (below). Round 129 covers the Waves / SSL / Valhalla roles
 (its own section).
 
-## Current scores (config / design) — one table, the latest round per pair
+## Current scores (config / design / sound / stability) — one table, the latest round per pair
 
 Kept current by the parity rounds (round 165h onwards). "Since" = the round that last changed the pair; "165" = this round's
 before → after (blank = not touched in round 165). Lowest first.
 
-| LYNX engine | Original | Config | Design | Since | Round 165 |
-|---|---|---|---|---|---|
-| Ridge Strip | SSL E-Channel (Waves) | 9 | 8 | 165 | 8 → 9 / 7 → 8 |
-| LYNX Tune | Auto-Tune Pro | 8 | 7 | 135 | 165j: sound only (highs kept, measured; scores unchanged) |
-| Ridge Strip (Vocal strip) | SSL Native Vocalstrip 2 | 9 | 7 | 145 | |
-| Halo | ValhallaShimmer | 8 | 9 | 135 | |
-| Horizon | ValhallaFutureVerb | 8 | 9 | 135 | |
-| Orbit | ValhallaSpaceModulator | 8 | 9 | 135 | |
-| Facet EQ | Pro-Q 4 | 9 | 8 | 152c | |
-| Crest Compressor | Pro-C 3 | 9 | 8 | 137 | |
-| Sentry Gate | Pro-G | 9 | 8 | 135 | |
-| Ember Saturator | Saturn 2 | 9 | 8 | 152b | |
-| Aether | Fresh Air | 9 | 8 | 128 | |
-| Glow Leveler | CLA-2A (Waves) | 10 | 8 | 165x | 9 → 9 → 10 / 8 → 8 (165w: the measured release; 165x: the measured attack, Auto Makeup's reference, the VU display saved and translated) |
-| Hush De-esser | DeEsser (Waves) | 10 | 8 | 165 | 9 → 10 / 8 → 8 |
-| Echoform | H-Delay (Waves) | 9 | 8 | 137 | |
-| Echoform | ValhallaDelay | 9 | 8 | 137 | |
-| Atrium | ValhallaRoom | 9 | 8 | 135 | |
-| Auto-pan (stand-in) | PanMan | 9 | 8 | 152 | |
-| Foil Plate | Little Plate | 9 | 8 | 152 | |
-| Ember Saturator | Decapitator | 9 | 9 | 165a | 8 → 9 / 7 → 9 |
-| Apex Limiter | Pro-L 2 | 9 | 9 | 135 | |
-| Epoch Verb | ValhallaVintageVerb | 9 | 9 | 135 | |
-| Nebula | Valhalla Supermassive | 9 | 9 | 135 | |
-| Spiral Echo | ValhallaFreqEcho | 9 | 9 | 129 | |
-| Lattice Mod | ValhallaUberMod | 9 | 9 | 144 | |
-| Quell Denoiser | NS1 (Waves) | 9 | 9 | 137 | |
-| Hush De-esser | Pro-DS | 10 | 9 | 165x | 8 → 9 → 10 / 8 → 8 → 9 (165w: pans, state levels; 165x: ranges, the 0 … 200 % link knob) |
-| Foil Plate | ValhallaPlate | 9 | 10 | 135 | |
-| Gemini Doubler | Doubler2 / Doubler4 (Waves) | 10 | 8 | 165w | 9 → 10 / 8 → 8 (defaults; 165w: shelf range −88 … +12 and law) |
-| Compressor (stand-in) | Renaissance Compressor (Waves) | 10 | 8 | 152 | |
-| LYNX Tune | Waves Tune Real-Time | 10 | 8 | 152b | 165j: sound only (measured; scores unchanged) |
-| Echoform | EchoBoy / PrimalTap | 10 | 8 | 150 | |
-| Voice Shift | Little AlterBoy | 10 | 8 | 137 | |
-| Prism Multiband | Pro-MB | 10 | 10 | 152 | |
+**Sound** and **Stability** (round 170c, the user's request after Facet EQ — Config 9 / Design 8 — drew nothing on
+macOS): Config and Design score only the controls and the layout, and proved optimistic. **Sound** = the audio measured
+against the original (black-box, our own host): null / residual, curves, THD, gain-reduction trajectory — 10 = a deep
+null at every setting, 7–8 = within ~1 dB on the main controls (or a deep null only at the measured states), 4–6 =
+partial (some modes, static curves only), ≤ 3 = no audio comparison on record (only laws / config). No pair reaches 10:
+the −60 dB nulls were measured on her saved states, not across every setting. **Stability / real use** = the editor
+draws on Windows, Linux and macOS (CI pictures, `--plugui`, artifact *editor-pictures-<os>*), the analyser / meters
+are steady, automation sweeps, sample-rate and buffer changes, no clicks / NaN / crashes, no control that silently does
+nothing; 8 = no known problem (not yet proven on macOS for every pair), lower = the problem in the notes below.
+"(ref expired)": the Waves and Auto-Tune trials expired (10-25 / 10-31), so the score rests on the earlier
+measurements (docs/analise, rounds 123–165) and cannot be raised without a new trial. FabFilter runs until ~11-16 and
+Soundtoys until ~11-22: Pro-L 2, Pro-G and Pro-C 3 (no programme comparison yet) should be measured before then.
+
+Stability notes (round 170c): **Facet EQ** 5: blank on macOS until 170c; analyser reworked 170c (fixed grid, smoothing); one analyser tap per engine (two open EQs take turns); **Apex Limiter** 6: blank on macOS until 170c; ProEditor repaints the whole window at 30 Hz; **Prism Multiband** 6: blank on macOS until 170c; whole-window repaint at 30 Hz; **Hush De-esser** 6: blank on macOS until 170c; empty wave path guarded 170c; **Crest Compressor** 6: blank on macOS until 170c; Drive had no control until 170c; **Quell Denoiser** 6: blank on macOS until 170c; **Echoform** 6: ~22 controls did nothing with Hybrid / a tape voicing on: dimmed since 170c; **Ember Saturator** 6: Tube (the first mode) garbled at +10 dB until 170c; Style / Auto gain silently overridden by a character; Classic voicing has no switch in the editor; **Atrium** 6: Early mod rate / depth do nothing. The lowest Sound scores (Horizon,
+Apex / Pro-L 2, Halo, Orbit, Sentry, Nebula, ValhallaPlate) have no audio comparison at all: the next parity rounds start
+there.
+
+| LYNX engine | Original | Config | Design | Sound | Stability | Since | Round 165 |
+|---|---|---|---|---|---|---|---|
+| Ridge Strip | SSL E-Channel (Waves) | 9 | 8 | 7 (ref expired) | 8 | 165 | 8 → 9 / 7 → 8 |
+| LYNX Tune | Auto-Tune Pro | 8 | 7 | 6 (ref expired) | 8 | 135 | 165j: sound only (highs kept, measured; scores unchanged) |
+| Ridge Strip (Vocal strip) | SSL Native Vocalstrip 2 | 9 | 7 | 8 (ref expired) | 8 | 145 |  |
+| Halo | ValhallaShimmer | 8 | 9 | 3 | 8 | 135 |  |
+| Horizon | ValhallaFutureVerb | 8 | 9 | 2 | 8 | 135 |  |
+| Orbit | ValhallaSpaceModulator | 8 | 9 | 3 | 8 | 135 |  |
+| Facet EQ | Pro-Q 4 | 9 | 8 | 8 | 5 | 152c |  |
+| Crest Compressor | Pro-C 3 | 9 | 8 | 5 | 6 | 137 |  |
+| Sentry Gate | Pro-G | 9 | 8 | 3 | 8 | 135 |  |
+| Ember Saturator | Saturn 2 | 9 | 8 | 5 | 6 | 152b |  |
+| Aether | Fresh Air | 9 | 8 | 8 | 8 | 128 |  |
+| Glow Leveler | CLA-2A (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165x | 9 → 9 → 10 / 8 → 8 (165w: the measured release; 165x: the measured attack, Auto Makeup's reference, the VU display saved and translated) |
+| Hush De-esser | DeEsser (Waves) | 10 | 8 | 7 (ref expired) | 6 | 165 | 9 → 10 / 8 → 8 |
+| Echoform | H-Delay (Waves) | 9 | 8 | 7 (ref expired) | 6 | 137 |  |
+| Echoform | ValhallaDelay | 9 | 8 | 4 | 6 | 137 |  |
+| Atrium | ValhallaRoom | 9 | 8 | 4 | 6 | 135 |  |
+| Auto-pan (stand-in) | PanMan | 9 | 8 | 6 | 8 | 152 |  |
+| Foil Plate | Little Plate | 9 | 8 | 6 | 8 | 152 |  |
+| Ember Saturator | Decapitator | 9 | 9 | 5 | 6 | 165a | 8 → 9 / 7 → 9 |
+| Apex Limiter | Pro-L 2 | 9 | 9 | 2 | 6 | 135 |  |
+| Epoch Verb | ValhallaVintageVerb | 9 | 9 | 5 | 8 | 135 |  |
+| Nebula | Valhalla Supermassive | 9 | 9 | 3 | 8 | 135 |  |
+| Spiral Echo | ValhallaFreqEcho | 9 | 9 | 7 | 8 | 129 |  |
+| Lattice Mod | ValhallaUberMod | 9 | 9 | 4 | 8 | 144 |  |
+| Quell Denoiser | NS1 (Waves) | 9 | 9 | 4 (ref expired) | 6 | 137 |  |
+| Hush De-esser | Pro-DS | 10 | 9 | 5 | 6 | 165x | 8 → 9 → 10 / 8 → 8 → 9 (165w: pans, state levels; 165x: ranges, the 0 … 200 % link knob) |
+| Foil Plate | ValhallaPlate | 9 | 10 | 3 | 8 | 135 |  |
+| Gemini Doubler | Doubler2 / Doubler4 (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165w | 9 → 10 / 8 → 8 (defaults; 165w: shelf range −88 … +12 and law) |
+| Compressor (stand-in) | Renaissance Compressor (Waves) | 10 | 8 | 6 (ref expired) | 8 | 152 |  |
+| LYNX Tune | Waves Tune Real-Time | 10 | 8 | 6 (ref expired) | 8 | 152b | 165j: sound only (measured; scores unchanged) |
+| Echoform | EchoBoy / PrimalTap | 10 | 8 | 6 | 6 | 150 |  |
+| Voice Shift | Little AlterBoy | 10 | 8 | 4 | 8 | 137 |  |
+| Prism Multiband | Pro-MB | 10 | 10 | 8 | 6 | 152 |  |
 
 ## Round 165j: LYNX Tune sound quality, before → after (measured)
 
@@ -135,7 +152,7 @@ Round 147 (`docs/analise/REA_rodada147.md`, sub-rounds `REA_rodada147a.md` / `RE
 |---|---|---|---|---|
 | Prism Multiband | Pro-MB | 9 → 10 | 8 → 9 | Dynamic phase measured and rebuilt (minimum-phase bands in cascade; older projects keep the classic engine), expert panel: side-chain filtering band / free, stereo link + mid / side-only, each crossover its own slope; translated |
 | Echoform | EchoBoy / PrimalTap | 9 → 10 | 8 → 8 | 31 echo voicings measured from EchoBoy's styles (LYNX names), saturation type menu, PrimalTap's Multiply 1x–8x |
-| Ember Saturator | Saturn 2 | 6 → 7 | 7 → 7 | channel mode L/R \| M/S, each band's drive pan and pan (measured), translated |
+| Ember Saturator | Saturn 2 | 6 → 7 | 7 → 7 | 5 | 6 | channel mode L/R \ | M/S, each band's drive pan and pan (measured), translated |
 | LYNX Tune | Waves Tune Real-Time | 8 → 9 | 6 → 7 | keyboard strip: Bypass / Remove modes, note status with direction, range bar and presets, octaves, scroll, latch |
 | Ridge Strip | SSL E-Channel | 7 → 8 | 7 → 7 | ANALOG (measured noise floor), auto make-up for Ridge's own compressor, translated |
 | Hush De-esser | DeEsser | 9 → 9 | 7 → 8 | the energy-detector bar beside the threshold arrow |
@@ -559,24 +576,24 @@ range buttons — see its table). Our host still shows their demo banner.
 
 | LYNX engine | Original (trial here) | Config before | Design before | Config after | Design after |
 |---|---|---|---|---|---|
-| Glow Leveler | CLA-2A (Waves) | 5 | 6 | 7 | 7 |
-| Ridge Strip | SSL E-Channel (Waves) | 6 | 6 | 7 | 7 |
-| Compressor (stand-in) | Renaissance Compressor (Waves) | 2 | 1 | 5 | 5 |
-| Hush De-esser | DeEsser (Waves) | 7 | 5 | 8 | 5 |
-| Quell Denoiser | NS1 (Waves) | 8 | 8 | 9 | 8 |
-| Gemini Doubler | Doubler2 / Doubler4 (Waves) | 7 / 4 | 6 | 8 / 5 | 7 |
-| Echoform | H-Delay (Waves) | 5 | 4 | 7 | 5 |
-| LYNX Tune | Waves Tune Real-Time | 4 | 5 | 5 | 5 |
-| Epoch Verb | ValhallaVintageVerb | 7 | 8 | 9 | 8 → 9 (r135) |
-| Atrium | ValhallaRoom | 7 | 6 | 9 | 8 |
-| Foil Plate | ValhallaPlate | 8 | 9 | 9 | 9 → 10 (r135) |
-| Nebula | Valhalla Supermassive | 7 | 8 | 9 | 9 |
-| Halo | ValhallaShimmer | 6 | 8 | 7 → 8 (r135) | 8 → 9 (r135) |
-| Horizon | ValhallaFutureVerb | 6 | 7 | 7 → 8 (r135) | 7 → 9 (r135) |
-| Echoform | ValhallaDelay | 6 | 6 | 7 | 7 |
-| Spiral Echo | ValhallaFreqEcho | 9 | 9 | 9 | 9 |
-| Orbit | ValhallaSpaceModulator | 7 | 7 | 8 | 7 → 9 (r135) |
-| Lattice Mod | ValhallaUberMod | 6 | 7 | 7 | 7 → 9 (r135) |
+| Glow Leveler | CLA-2A (Waves) | 5 | 6 | 6 (ref expired) | 8 | 7 | 7 |
+| Ridge Strip | SSL E-Channel (Waves) | 6 | 6 | 7 (ref expired) | 8 | 7 | 7 |
+| Compressor (stand-in) | Renaissance Compressor (Waves) | 2 | 1 | 6 (ref expired) | 8 | 5 | 5 |
+| Hush De-esser | DeEsser (Waves) | 7 | 5 | 7 (ref expired) | 6 | 8 | 5 |
+| Quell Denoiser | NS1 (Waves) | 8 | 8 | 4 (ref expired) | 6 | 9 | 8 |
+| Gemini Doubler | Doubler2 / Doubler4 (Waves) | 7 / 4 | 6 | 6 (ref expired) | 8 | 8 / 5 | 7 |
+| Echoform | H-Delay (Waves) | 5 | 4 | 7 (ref expired) | 6 | 7 | 5 |
+| LYNX Tune | Waves Tune Real-Time | 4 | 5 | 6 (ref expired) | 8 | 5 | 5 |
+| Epoch Verb | ValhallaVintageVerb | 7 | 8 | 5 | 8 | 9 | 8 → 9 (r135) |
+| Atrium | ValhallaRoom | 7 | 6 | 4 | 6 | 9 | 8 |
+| Foil Plate | ValhallaPlate | 8 | 9 | 3 | 8 | 9 | 9 → 10 (r135) |
+| Nebula | Valhalla Supermassive | 7 | 8 | 3 | 8 | 9 | 9 |
+| Halo | ValhallaShimmer | 6 | 8 | 3 | 8 | 7 → 8 (r135) | 8 → 9 (r135) |
+| Horizon | ValhallaFutureVerb | 6 | 7 | 2 | 8 | 7 → 8 (r135) | 7 → 9 (r135) |
+| Echoform | ValhallaDelay | 6 | 6 | 4 | 6 | 7 | 7 |
+| Spiral Echo | ValhallaFreqEcho | 9 | 9 | 7 | 8 | 9 | 9 |
+| Orbit | ValhallaSpaceModulator | 7 | 7 | 3 | 8 | 8 | 7 → 9 (r135) |
+| Lattice Mod | ValhallaUberMod | 6 | 7 | 4 | 8 | 7 | 7 → 9 (r135) |
 | Ember Saturator | Decapitator (Soundtoys; trial measured in round 135) | 4 | 4 | 5 → **8** (r135) | 4 → **7** (r135) |
 | Fruity Delay 3 (stand-in) | EchoBoy / PrimalTap (Soundtoys; trial measured in round 135) | 2 | 2 | 5 → **7** (Echoform, r135) | 5 → **6** (Echoform, r135) |
 | Auto-pan (stand-in) | PanMan (Soundtoys; trial measured in round 135) | 2 | 2 | 3 → **7** (r135) | 2 → **6** (r135) |

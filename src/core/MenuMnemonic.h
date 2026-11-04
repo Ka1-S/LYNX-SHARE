@@ -9,7 +9,7 @@
 // mnemonic (text, 'D'), which puts the mark character U+0001 before the first matching letter (a word's first
 // letter preferred). A translation without that letter gets it appended in brackets ("Excluir... (D)", as Windows
 // does in East Asian menus), so the key is FL's in every language. The LookAndFeel draws the marked letter
-// underlined and hides the mark; the patched juce::PopupMenu (cmake/LynxPatchJuce.cmake fix 12) picks the item when
+// underlined and hides the mark; the patched juce::PopupMenu (cmake/LynxPatchJuce.cmake fix 13) picks the item when
 // the key is typed. Pure (no JUCE), UTF-8.
 
 #include <cctype>

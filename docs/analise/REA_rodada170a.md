@@ -73,7 +73,7 @@ in the round 167g Ghidra project, headless decompilation; DFM resources dumped i
   "&Import MIDI file...", "&Export as MIDI file...", "&Paste from MIDI clipboard...", "&Copy to MIDI clipboard..."),
   "&Edit", "&Tools", "&View", "&Select".
 - LYNX: core/MenuMnemonic.h marks the letter (U+0001) in the translated caption (a translation without the letter
-  gets " (D)"), the LookAndFeel underlines it, JUCE fix 12 (cmake/LynxPatchJuce.cmake) picks the item on the key:
+  gets " (D)"), the LookAndFeel underlines it, JUCE fix 13 (cmake/LynxPatchJuce.cmake) picks the item on the key:
   the first item with the key in menu order runs (a submenu opens).
 - [SHOT r170a m1–m4] FL draws the letter with a dotted underline; 'D' in the channel menu ran "Delete..." at once (its
   confirm dialog); a letter shared by two items ('t': "Cu&t itself", "Cu&t") ran the FIRST one and closed the menu.

@@ -187,6 +187,21 @@ private:
 
     void timerCallback() override
     {
+        // round 169g (crash reports, 5 in 3 days): a plugin that runs the message loop while it is created or prepared
+        // (Auto-Key pumps DispatchMessage in its setupIO / prepareToPlay) fired this timer again from inside
+        // preloadNextPlugin: the nested turn created the next plugin of the same queue and refreshed the panel under
+        // the outer one, which then crashed on freed strings. One turn at a time; the nested ticks are skipped.
+        if (inTurn)
+            return;
+        inTurn = true;
+        const juce::Component::SafePointer<LoadPanel> alive (this);
+        turn();
+        if (alive != nullptr) // (finish() deletes the panel)
+            inTurn = false;
+    }
+
+    void turn()
+    {
         if (auto* parent = getParentComponent(); parent != nullptr && getBounds() != parent->getLocalBounds())
             setBounds (parent->getLocalBounds()); // (the main window may still be settling its size at start-up)
         if (step == Step::scanning && stageDone)
@@ -260,6 +275,17 @@ private:
 
     void refresh()
     {
+        if (inRefresh) // (performAnyPendingRepaintsNow can run a plugin's own messages, and onInstantiate calls this)
+            return;
+        inRefresh = true;
+        const juce::Component::SafePointer<LoadPanel> alive (this);
+        refreshNow();
+        if (alive != nullptr)
+            inRefresh = false;
+    }
+
+    void refreshNow()
+    {
         const auto target = loadtrace::progress();
         shown = juce::jmax (shown, target);
         const auto st = loadtrace::status();
@@ -302,6 +328,7 @@ private:
     bool slowWait = false;
     std::chrono::steady_clock::time_point modulesWaitStarted = std::chrono::steady_clock::now();
     int created = 0; // hosted plugins created so far
+    bool inTurn = false, inRefresh = false; // (re-entry from a plugin that pumps messages, round 169g)
     juce::String statusText;
 };
 } // namespace

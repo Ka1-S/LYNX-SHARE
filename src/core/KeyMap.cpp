@@ -3,6 +3,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
+#include <cstring>
+#include <iterator>
 
 namespace lynx::keys
 {
@@ -80,6 +83,8 @@ std::vector<Action> makeActions()
         { "view.closePluginWindows", TR_NOOP ("Close all plugin windows"), Context::global, { chord (f12, alt) } },
         // FL's CloseAllUnfocusedWindowsAction (Ctrl+F12) and ShowTouchControllerAction (Alt+F7), round 167o
         { "view.closeUnfocusedWindows", TR_NOOP ("Close all windows except the focused one"), Context::global, { chord (f12, ctrl) } },
+        // FL's AlignAllChannelEditorsAction, ShortCut 8315 = Shift+F12 (round 169k)
+        { "view.alignChannelEditors", TR_NOOP ("Align all channel editors"), Context::global, { chord (f12, shift) } },
         { "view.touchKeyboard", TR_NOOP ("Show or hide the Touch keyboard"), Context::global, { chord (f7, alt) } },
         { "panel.maximisePlaylist", TR_NOOP ("Maximize or restore the Playlist"), Context::global, { chord (enter) } },
 
@@ -102,6 +107,7 @@ std::vector<Action> makeActions()
         { "record.countIn", TR_NOOP ("Count-in before recording on/off"), Context::global, { chord ('P', ctrl) } },
         { "record.waitForInput", TR_NOOP ("Recording waits for the first note on/off"), Context::global, { chord ('I', ctrl) } },
         { "record.quickAudio", TR_NOOP ("Record audio now: arm the selected insert and record (press again to stop)"), Context::global, { chord ('R', shift) } },
+        { "record.captureMidi", TR_NOOP ("Capture MIDI: the notes just played without recording into the pattern"), Context::global, { chord ('R', ctrl | shift | alt) } },
 
         // files and history
         { "file.new", TR_NOOP ("New project"), Context::global, { chord ('N', ctrl) } },
@@ -517,6 +523,127 @@ int typingPianoNote (int key, int octave, int root) noexcept
             return inRange (base + 12 + i);
 
     return -1;
+}
+
+namespace
+{
+struct TypingLayout
+{
+    const char* name;
+    const char* keys; // one token per layoutKeys character: notes at octave 4, root C ("60,64,67" a chord), "-" LOCK, "~" FREE
+};
+
+// The printable keys of FL's .scr files, in their line order (FL reads a file's lines as the scan codes 2..0x35 of a US
+// keyboard: number row, Q row, A row with ` , \ then the Z row; the Backspace, Tab, Enter, Ctrl / Caps and Shift lines
+// are FREE in every file, so they are left out). LYNX matches the keys by character.
+constexpr char layoutKeys[] = "1234567890-=QWERTYUIOP[]ASDFGHJKL;'`\\ZXCVBNM,./";
+
+// FL 2026's System/Config/Typing to piano/*.scr, written as data (note names converted with C5 = 60), in the order of
+// FL's Layout menu (by name). FL's parser (FUN_00661f70) reads FREE as -2: the key sends no note and stays a shortcut;
+// LOCK as -1: no note and no shortcut. A key missing from a file is FREE (FUN_01182670 fills the table with -2 first).
+const TypingLayout typingLayouts[] = {
+        { "Layout FPC (C4)", "49 55 51 53 88 89 90 91 - - - - 48 47 45 43 84 85 86 87 - - - - 40 38 46 44 80 81 82 83 - - - ~ ~ 37 36 42 54 76 77 78 79 - -" },
+        { "Layout Janko", "57 59 61 63 65 67 69 71 73 75 77 79 58 60 62 64 66 68 70 72 74 76 78 80 59 61 63 65 67 69 71 73 75 77 79 ~ ~ 60 62 64 66 68 70 72 74 76 78" },
+        { "Layout Performance mode", "0 1 2 3 4 48 49 50 51 52 - - 12 13 14 15 16 60 61 62 63 64 - - 24 25 26 27 28 72 73 74 75 76 - ~ ~ 36 37 38 39 40 84 85 86 87 88" },
+        { "Layout Piano", "- 61 63 - 66 68 70 - 73 75 - 78 60 62 64 65 67 69 71 72 74 76 77 79 ~ 49 51 - 54 56 58 - 61 63 - ~ ~ 48 50 52 53 55 57 59 60 62 64" },
+        { "Layout Slicex (C4)", "84 85 86 87 88 89 90 91 - - - - 76 77 78 79 80 81 82 83 - - - - 68 69 70 71 72 73 74 75 - - - ~ ~ 60 61 62 63 64 65 66 67 - -" },
+        { "Major", "84 86 88 89 91 93 95 96 98 100 101 103 72 74 76 77 79 81 83 84 86 88 89 91 60 62 64 65 67 69 71 72 74 76 77 ~ ~ 48 50 52 53 55 57 59 60 62 64" },
+        { "Major + Chords", "60,64,67 62,65,69 64,67,71 65,69,72 67,71,74 69,72,76 71,74,77 72,76,79 74,77,81 76,79,83 77,81,84 79,83,86 72 74 76 77 79 81 83 84 86 88 89 91 60 62 64 65 67 69 71 72 74 76 77 ~ ~ 48 50 52 53 55 57 59 60 62 64" },
+        { "Major Bebop", "84 86 88 89 91 92 93 95 96 98 100 101 72 74 76 77 79 80 81 83 84 86 88 89 60 62 64 65 67 68 69 71 72 74 76 ~ ~ 48 50 52 53 55 56 57 59 60 62" },
+        { "Major Chordmap", "64,67,72 65,69,74 64,67,71 65,69,72 62,67,71 64,69,72 62,65,71 64,67,72 65,69,74 64,67,71 65,69,72 62,67,71 60,64,67 62,65,69 59,64,67 60,65,69 59,62,67 60,64,69 59,62,65 60,64,67 62,65,69 59,64,67 60,65,69 59,62,67 55,60,64 57,62,65 55,59,64 57,60,65 55,59,62 57,60,64 53,59,62 55,60,64 57,62,65 55,59,64 57,60,65 ~ ~ 36 38 40 41 43 45 47 48 50 52" },
+        { "Major Pentatonic", "84 86 88 91 93 96 98 100 103 105 108 110 72 74 76 79 81 84 86 88 91 93 96 98 60 62 64 67 69 72 74 76 79 81 84 ~ ~ 48 50 52 55 57 60 62 64 67 69" },
+        { "Minor Harmonic", "84 86 87 89 91 92 95 96 98 99 101 103 72 74 75 77 79 80 83 84 86 87 89 91 60 62 63 65 67 68 71 72 74 75 77 ~ ~ 48 50 51 53 55 56 59 60 62 63" },
+        { "Minor Hungarian", "84 86 87 90 91 92 95 96 98 99 102 103 72 74 75 78 79 80 83 84 86 87 90 91 60 62 63 66 67 68 71 72 74 75 78 ~ ~ 48 50 51 54 55 56 59 60 62 63" },
+        { "Minor Melodic", "84 86 87 89 91 93 95 96 98 99 101 103 72 74 75 77 79 81 83 84 86 87 89 91 60 62 63 65 67 69 71 72 74 75 77 ~ ~ 48 50 51 53 55 57 59 60 62 63" },
+        { "Minor Natural (Aeolian)", "84 86 87 89 91 92 94 96 98 99 101 103 72 74 75 77 79 80 82 84 86 87 89 91 60 62 63 65 67 68 70 72 74 75 77 ~ ~ 48 50 51 53 55 56 58 60 62 63" },
+        { "Minor Natural + Chords", "60,63,67 62,65,68 63,67,70 65,68,72 67,70,74 68,72,75 70,74,77 72,75,79 74,77,80 75,79,82 77,80,84 79,82,86 72 74 75 77 79 80 82 84 86 87 89 91 60 62 63 65 67 68 70 72 74 75 77 ~ ~ 48 50 51 53 55 56 58 60 62 63" },
+        { "Minor Natural Chordmap", "63,67,72 65,68,74 63,67,70 65,68,72 62,67,70 63,68,72 62,65,70 63,67,72 65,68,74 63,67,70 65,68,72 62,67,70 60,63,67 62,65,68 58,63,67 60,65,68 58,62,67 60,63,68 58,62,65 60,63,67 62,65,68 58,63,67 60,65,68 58,62,67 55,60,63 56,62,65 55,58,63 56,60,65 55,58,62 56,60,63 53,58,62 55,60,63 56,62,65 55,58,63 56,60,65 ~ ~ 36 38 39 41 43 44 46 48 50 51" },
+        { "Minor Neopolitan", "84 85 87 89 91 92 95 96 97 99 101 103 72 73 75 77 79 80 83 84 85 87 89 91 60 61 63 65 67 68 71 72 73 75 77 ~ ~ 48 49 51 53 55 56 59 60 61 63" },
+        { "Minor Pentatonic", "84 87 89 91 94 96 99 101 103 106 108 111 72 75 77 79 82 84 87 89 91 94 96 99 60 63 65 67 70 72 75 77 79 82 84 ~ ~ 48 51 53 55 58 60 63 65 67 70" },
+        { "Other Arabic", "84 85 88 89 91 92 95 96 97 100 101 103 72 73 76 77 79 80 83 84 85 88 89 91 60 61 64 65 67 68 71 72 73 76 77 ~ ~ 48 49 52 53 55 56 59 60 61 64" },
+        { "Other Blues", "84 87 89 90 91 94 96 99 101 102 103 106 72 75 77 78 79 82 84 87 89 90 91 94 60 63 65 66 67 70 72 75 77 78 79 ~ ~ 48 51 53 54 55 58 60 63 65 66" },
+        { "Other Diminished", "84 86 87 89 90 92 93 95 96 98 99 101 72 74 75 77 78 80 81 83 84 86 87 89 60 62 63 65 66 68 69 71 72 74 75 ~ ~ 48 50 51 53 54 56 57 59 60 62" },
+        { "Other Dominant Bebop", "84 86 88 89 91 93 94 95 96 98 100 101 72 74 76 77 79 81 82 83 84 86 88 89 60 62 64 65 67 69 70 71 72 74 76 ~ ~ 48 50 52 53 55 57 58 59 60 62" },
+        { "Other Dorian", "84 86 87 89 91 93 94 96 98 99 101 103 72 74 75 77 79 81 82 84 86 87 89 91 60 62 63 65 67 69 70 72 74 75 77 ~ ~ 48 50 51 53 55 57 58 60 62 63" },
+        { "Other Enigmatic", "84 85 88 90 92 94 95 97 98 101 103 105 72 73 76 78 80 82 83 85 86 89 91 93 60 61 64 66 68 70 71 73 74 77 79 ~ ~ 48 49 52 54 56 58 59 61 62 65" },
+        { "Other Japanese Insen", "84 85 89 91 94 96 97 101 103 106 108 109 72 73 77 79 82 84 85 89 91 94 96 97 60 61 65 67 70 72 73 77 79 82 84 ~ ~ 48 49 53 55 58 60 61 65 67 70" },
+        { "Other Locrian", "84 85 87 89 90 92 94 96 97 99 101 102 72 73 75 77 78 80 82 84 85 87 89 90 60 61 63 65 66 68 70 72 73 75 77 ~ ~ 48 49 51 53 54 56 58 60 61 63" },
+        { "Other Lydian", "84 86 88 90 91 93 95 96 98 100 102 103 72 74 76 78 79 81 83 84 86 88 90 91 60 62 64 66 67 69 71 72 74 76 78 ~ ~ 48 50 52 54 55 57 59 60 62 64" },
+        { "Other Mixolydian", "84 86 88 89 91 93 94 96 98 100 101 103 72 74 76 77 79 81 82 84 86 88 89 91 60 62 64 65 67 69 70 72 74 76 77 ~ ~ 48 50 52 53 55 57 58 60 62 64" },
+        { "Other Neopolitan", "84 85 87 89 91 93 95 96 97 99 101 103 72 73 75 77 79 81 83 84 85 87 89 91 60 61 63 65 67 69 71 72 73 75 77 ~ ~ 48 49 51 53 55 57 59 60 61 63" },
+        { "Other Phrygian", "84 85 87 89 91 92 94 96 97 99 101 103 72 73 75 77 79 80 82 84 85 87 89 91 60 61 63 65 67 68 70 72 73 75 77 ~ ~ 48 49 51 53 55 56 58 60 61 63" },
+        { "Other Whole Tone", "84 86 88 90 92 94 96 98 100 102 104 106 72 74 76 78 80 82 84 86 88 90 92 94 60 62 64 66 68 70 72 74 76 78 80 ~ ~ 48 50 52 54 56 58 60 62 64 66" },
+};
+
+// The token of `key` in `layout` (pointing into its string), nullptr when the key is not one of layoutKeys.
+const char* layoutToken (int key, int layout) noexcept
+{
+    const auto c = key >= 'a' && key <= 'z' ? key - 'a' + 'A' : key;
+    const auto* found = c > 0 && c < 0x7f ? std::strchr (layoutKeys, c) : nullptr;
+    if (found == nullptr || layout < 0 || layout >= (int) std::size (typingLayouts))
+        return nullptr;
+
+    const auto* token = typingLayouts[layout].keys;
+    for (auto i = found - layoutKeys; i > 0 && token != nullptr; --i) // skip one space-separated token per key before it
+        if ((token = std::strchr (token, ' ')) != nullptr)
+            ++token;
+    return token;
+}
+} // namespace
+
+int typingpiano::layoutCount() noexcept
+{
+    return (int) std::size (typingLayouts);
+}
+
+const char* typingpiano::layoutName (int layout) noexcept
+{
+    return layout >= 0 && layout < layoutCount() ? typingLayouts[layout].name : "";
+}
+
+int typingpiano::layoutIndex (const std::string& name) noexcept
+{
+    for (int i = 0; i < layoutCount(); ++i)
+        if (name == typingLayouts[i].name)
+            return i;
+    return pianoLayout();
+}
+
+int typingpiano::pianoLayout() noexcept
+{
+    for (int i = 0; i < layoutCount(); ++i)
+        if (std::strcmp (typingLayouts[i].name, "Layout Piano") == 0)
+            return i;
+    return 0;
+}
+
+int typingpiano::performanceLayout() noexcept
+{
+    for (int i = 0; i < layoutCount(); ++i)
+        if (std::strcmp (typingLayouts[i].name, "Layout Performance mode") == 0)
+            return i;
+    return -1;
+}
+
+TypingKey typingPianoKey (int key, int octave, int root, int layout)
+{
+    TypingKey out;
+    const auto* token = layoutToken (key, layout);
+    if (token == nullptr || *token == '~') // FREE (or not in the layout): the key stays a shortcut
+        return out;
+
+    out.taken = true; // (FL's key handler FUN_011828c0 reports any token but FREE as handled, even with no note)
+    // FL's note: the table's + root + 12 x the octave offset (KbC2..KbC6 = -2..2), for every layout (FUN_011828c0)
+    const auto shift = 12 * (typingpiano::clampOctave (octave) - typingpiano::defaultOctave) + typingpiano::clampRoot (root);
+    for (char* end = nullptr; *token >= '0' && *token <= '9'; token = *end == ',' ? end + 1 : end)
+        if (const auto n = (int) std::strtol (token, &end, 10) + shift; n >= 0 && n <= 127)
+            out.notes.push_back (n);
+    return out;
+}
+
+std::vector<int> typingPianoNotes (int key, int octave, int root, int layout)
+{
+    return typingPianoKey (key, octave, root, layout).notes;
 }
 
 KeyMap::KeyMap()

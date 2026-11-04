@@ -61,7 +61,8 @@ float bitsF (std::uint32_t u) noexcept
 }
 
 // ------------------------------------------------------------------------------------------------ installation data (§2.3)
-constexpr const char* engineSha256 = "4cc72470063a0a9f8f126102415cbb1ef2b91abb2995cd9fbdf2c8e676c6907f";
+// (FL Studio 2026's engine_x64.dll, SHA-256 4cc72470…6907f, was the build decoded in REA_rodada57; any build with the
+// same two cycle sets plays the same, see loadDll)
 
 struct Wave
 {
@@ -128,35 +129,13 @@ std::shared_ptr<const DllData> loadDll (const std::string& path)
     if (! in)
         return nullptr;
     const std::vector<std::uint8_t> b ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
-    if (b.size() < 0x1000 || sha256Hex (b.data(), b.size()) != engineSha256)
+    if (b.size() < 0x1000 || b[0] != 'M' || b[1] != 'Z')
         return nullptr;
     auto rd = [&] (std::size_t off, auto& v) { if (off + sizeof (v) <= b.size()) std::memcpy (&v, b.data() + off, sizeof (v)); };
-    std::uint32_t pe = 0;
-    rd (0x3c, pe);
-    std::uint16_t sections = 0, optSize = 0;
-    rd (pe + 6, sections);
-    rd (pe + 20, optSize);
-    struct Section { std::uint32_t va, vs, ro, rs; };
-    std::vector<Section> secs;
-    for (std::uint32_t i = 0, o = pe + 24 + optSize; i < sections; ++i, o += 40)
-    {
-        Section s {};
-        rd (o + 8, s.vs);
-        rd (o + 12, s.va);
-        rd (o + 16, s.rs);
-        rd (o + 20, s.ro);
-        secs.push_back (s);
-    }
-    auto offset = [&] (std::uint32_t rva) -> std::size_t {
-        for (const auto& s : secs)
-            if (rva >= s.va && rva < s.va + std::min (s.vs, s.rs))
-                return (std::size_t) (s.ro + rva - s.va);
-        return b.size();
-    };
     auto t = std::make_shared<DllData>();
     // recorded cycles: count, then [size][RIFF bytes] (§2.3); each: (x − 0.63)·6.3157892, mean removed, guard point
-    auto readSet = [&] (std::uint32_t rva, int expected, std::vector<Wave>& out) {
-        auto at = offset (rva);
+    auto readSet = [&] (std::size_t at, int expected, std::vector<Wave>& out) {
+        out.clear();
         std::int32_t count = 0;
         rd (at, count);
         if (count != expected)
@@ -187,7 +166,22 @@ std::shared_ptr<const DllData> loadDll (const std::string& path)
         }
         return true;
     };
-    if (! readSet (0xFEAF0, 57, t->recorded) || ! readSet (0x15B2F0, 55, t->recorded2))
+    // round 169g (discussion #56): the two sets are found by their shape, [count][size]["RIFF"...], wherever the build put
+    // them. Only FL Studio 2026's DLL was accepted before (a whole-file hash and fixed addresses), so with any other FL
+    // version (2025's engine_x64.dll has the same 57 + 55 cycles, byte for byte, 0x400 bytes earlier) Transistor Bass
+    // could not be added and stayed silent in imported projects.
+    auto findSet = [&] (int expected, std::vector<Wave>& out) {
+        for (std::size_t at = 0; at + 16 <= b.size(); at += 4) // (the sets start 4-byte aligned)
+        {
+            std::int32_t count = 0;
+            rd (at, count);
+            if (count == expected && std::memcmp (b.data() + at + 8, "RIFF", 4) == 0 && readSet (at, expected, out))
+                return true;
+        }
+        out.clear();
+        return false;
+    };
+    if (! findSet (57, t->recorded) || ! findSet (55, t->recorded2))
         return nullptr;
     cache[path] = t;
     return t;

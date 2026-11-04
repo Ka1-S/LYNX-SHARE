@@ -46,6 +46,9 @@ bool ogunStateUsable (const std::vector<std::uint8_t>& state);
 bool autogunStateUsable (const std::vector<std::uint8_t>& state);
 
 // Raw integer parameter P[index] (0…63) of a state, or nullopt
+// An Ogun state of version 10…13 (FL's Plugin database Ogun is version 11) rewritten in version 14's layout, as Ogun's
+// own loader reads it (round 169l); newer or unreadable states unchanged. Keeps ogunParam / ogunSetParam valid.
+std::vector<std::uint8_t> ogunCurrentLayout (const std::vector<std::uint8_t>& state);
 std::optional<int> ogunParam (const std::vector<std::uint8_t>& state, int index);
 // Writes P[index] (the state is re-wrapped as zlib with stored blocks); false if the state can't be read
 bool ogunSetParam (std::vector<std::uint8_t>& state, int index, int value);

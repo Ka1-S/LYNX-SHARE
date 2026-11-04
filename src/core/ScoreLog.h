@@ -19,6 +19,10 @@ struct Entry
     int channel = 0;
     int key = 60;
     float velocity = 0.78f;
+    // round 170d (Capture MIDI): the transport position it was played at while playing (-1: stopped), and whether it
+    // went into a recorded take
+    double startTick = -1.0;
+    bool recorded = false;
 };
 
 // A fixed-capacity ring of played notes (no allocation after construction). Not thread-safe: the owner locks.
@@ -27,7 +31,7 @@ class Log
 public:
     explicit Log (std::size_t capacity = 65536);
 
-    void noteOn (double ms, int channel, int key, float velocity) noexcept;
+    void noteOn (double ms, int channel, int key, float velocity, double tick = -1.0, bool recorded = false) noexcept;
     // Closes the most recent open note of (channel, key); a release without a note-on is ignored.
     void noteOff (double ms, int channel, int key) noexcept;
     void clear() noexcept;
