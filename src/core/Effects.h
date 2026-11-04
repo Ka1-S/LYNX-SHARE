@@ -40,6 +40,12 @@ EffectSlot makeEffectSlot (EffectKind kind);
 // A slot loaded from a project that stored `savedCount` parameters: parameters added later that switch an engine
 // to a newer construction get the value that keeps the old sound (round 147: Prism's measured Dynamic phase).
 void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexcept;
+// How many of a slot's parameters a project / preset saves (issue #67): the named ones plus any hidden ones after them
+// that hold a value (the Parametric EQ's FL law, processing, band mask and FL's own values: ParametricEqFl.h [36…47]).
+std::size_t savedEffectParamCount (const EffectSlot& slot) noexcept;
+// A parameter value as written to a file: rounded to 4 decimals when that reads back as the same float, else the
+// shortest decimal that does (FL's raw values, e.g. a frequency of raw/65536, survive a save and reload bit for bit)
+double savedEffectParamValue (float v) noexcept;
 
 // 7-band parametric EQ. Parameters: band b uses [4b .. 4b+3] = type, frequency, gain, Q;
 // [28] = output; [29 + b] = cut slope (1 to 4 biquads: 12/24/36/48 dB per octave).

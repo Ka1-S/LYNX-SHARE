@@ -2284,12 +2284,12 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
     menu.addItem (tr ("Load sample..."), c.instrument != InstrumentKind::audioClip, false, [this, channel] { chooseSample (channel); });
     {
         // "Cut itself": a new note cuts the channel's own sounding note (its cut group and "cut by" are its own)
-        const auto self = 1000 + channel;
-        const auto cutsItself = c.cutGroup != 0 && c.cutGroup == c.cutBy;
-        menu.addItem (tr ("Cut itself"), true, cutsItself, [this, channel, self, cutsItself] {
-            engine.editSong ([channel, self, cutsItself] (Song& s) {
-                auto& ch = s.channels[(std::size_t) channel];
-                ch.cutGroup = ch.cutBy = cutsItself ? 0 : self;
+        // (issue #68: the same state as the sample panel's checkbox and the Misc page's "Cut self")
+        const auto cutsItself = channelCutsItself (c);
+        menu.addItem (tr ("Cut itself"), true, cutsItself, [this, channel, cutsItself] {
+            engine.editSong ([channel, cutsItself] (Song& s) {
+                if (channel < (int) s.channels.size())
+                    setChannelCutsItself (s.channels[(std::size_t) channel], channel, ! cutsItself);
             });
         });
     }

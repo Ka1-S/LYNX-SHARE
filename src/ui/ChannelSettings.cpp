@@ -3029,7 +3029,7 @@ private:
             filterType.setSelectedId (c->sampler.filterType + 1, juce::dontSendNotification);
             release.setValue (c->sampler.release, juce::dontSendNotification);
             reverse.setToggleState (c->sampler.reverse, juce::dontSendNotification);
-            cut.setToggleState (c->sampler.cut, juce::dontSendNotification);
+            cut.setToggleState (channelCutsItself (*c), juce::dontSendNotification); // (issue #68: the rack menu's state too)
             porta.setToggleState (c->sampler.porta, juce::dontSendNotification);
             updating = false;
             showAutomation (true);
@@ -3124,6 +3124,7 @@ private:
         s.release = (float) release.getValue();
         s.reverse = reverse.getToggleState();
         s.cut = cut.getToggleState();
+        const auto cutChanged = s.cut != channelCutsItself (*current()); // (issue #68: the rack menu's cut-itself too)
         s.porta = porta.getToggleState();
         s.cutoff = (float) cutoff.getValue();
         s.resonance = (float) resonance.getValue();
@@ -3142,11 +3143,15 @@ private:
             if (adsr || moved (s.cutoff, old.cutoff) || moved (s.resonance, old.resonance) || s.filterType != old.filterType)
                 s.flChannel.clear();
         }
-        if (s == current()->sampler)
+        if (s == current()->sampler && ! cutChanged)
             return;
 
         const auto before = current()->sampler;
-        ref.edit (engine, [s] (ChannelDef& channelDef) { channelDef.sampler = s; });
+        ref.edit (engine, [s, cutChanged, index = ref.index] (ChannelDef& channelDef) {
+            channelDef.sampler = s;
+            if (cutChanged)
+                setChannelCutsItself (channelDef, index, s.cut);
+        });
         for (const auto& [slider, param] : tweakTargets)
             if (std::abs (samplerparam::get (before, param) - samplerparam::get (s, param)) > 1.0e-6f)
                 engine.noteTweaked ({ AutomationTargetKind::channelParam, ref.index, 0, param });

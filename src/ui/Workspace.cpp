@@ -478,7 +478,7 @@ public:
     }
 };
 
-class DetachedPanelWindow final : public juce::DocumentWindow
+class DetachedPanelWindow final : public juce::DocumentWindow, private juce::Timer
 {
 public:
     DetachedPanelWindow (Workspace& w, Panel p, PanelFrame& frame, juce::Rectangle<int> screenBounds)
@@ -497,12 +497,31 @@ public:
         if (screenBounds.isEmpty() || juce::Desktop::getInstance().getDisplays().getDisplayForRect (screenBounds) == nullptr)
             centreWithSize (juce::jmax (500, frame.getWidth()), juce::jmax (300, frame.getHeight()));
         else
+        {
             setBounds (screenBounds);
+            wanted = screenBounds;
+        }
 
         getProperties().set ("lynxOwnKeys", true); // (its keyPressed hands every key to the main window itself)
         setVisible (true);
         keepAboveMainWindow (*this);
+        if (! wanted.isEmpty())
+            startTimer (150); // (settle: below)
     }
+
+    ~DetachedPanelWindow() override { stopTimer(); }
+
+    // Issue #62: a window manager places a new window where it likes (WSLg put a Mixer saved at 300,200 at 6,27, and that
+    // place was then saved): until the window has settled, its saved place is put back and the manager's is not saved
+    void settle()
+    {
+        if (wanted.isEmpty())
+            return;
+        if (getBounds() != wanted && juce::Desktop::getInstance().getDisplays().getDisplayForRect (wanted) != nullptr)
+            setBounds (wanted);
+    }
+
+    bool settling() const noexcept { return ! wanted.isEmpty(); }
 
     void closeButtonPressed() override { owner.hide (panel); }
 
@@ -514,13 +533,22 @@ public:
     void moved() override
     {
         juce::DocumentWindow::moved();
-        owner.detachedWindowMoved (panel, getBounds());
+        if (! settling())
+            owner.detachedWindowMoved (panel, getBounds());
     }
 
     void resized() override
     {
         juce::DocumentWindow::resized();
-        owner.detachedWindowMoved (panel, getBounds());
+        if (! settling())
+            owner.detachedWindowMoved (panel, getBounds());
+    }
+
+    // the user moves or resizes it: that is the place now
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        wanted = {};
+        juce::DocumentWindow::mouseDown (e);
     }
 
     void activeWindowStatusChanged() override
@@ -530,9 +558,33 @@ public:
     }
 
 private:
+    void timerCallback() override
+    {
+        settle();
+        if (++settleTicks >= 14) // ~2 s after it opened (or after the main window came up): settled
+        {
+            stopTimer();
+            wanted = {};
+            owner.detachedWindowMoved (panel, getBounds());
+        }
+    }
+
+public:
+    void settleAgain() // (the main window came up: the manager may have moved it again)
+    {
+        if (wanted.isEmpty())
+            return;
+        settleTicks = 0;
+        settle();
+        startTimer (150);
+    }
+
+private:
     Workspace& owner;
     Panel panel;
     SnapConstrainer snapping;
+    juce::Rectangle<int> wanted; // the saved place, until the window has settled
+    int settleTicks = 0;
 };
 
 // --- the desktop -------------------------------------------------------------------------------
@@ -632,6 +684,7 @@ void Workspace::setDetached (Panel panel, bool detached)
 
     layout.show (panel);
     applyLayout();
+    saveState(); // issue #62: remembered at once (a session that does not close cleanly keeps it too)
 }
 
 void Workspace::activate (Panel panel)
@@ -728,6 +781,17 @@ std::vector<juce::Rectangle<int>> Workspace::otherPanelBounds (Panel panel) cons
             out.push_back (frames[(std::size_t) i]->getBounds());
 
     return out;
+}
+
+void Workspace::restoreDetachedWindows()
+{
+    for (int i = 0; i < workspace::panelCount; ++i)
+        if (auto& w = windows[(std::size_t) i]; w != nullptr && layout[(Panel) i].detached && layout[(Panel) i].visible)
+        {
+            w->settleAgain();
+            keepAboveMainWindow (*w); // (Windows: owned by the main window, which did not exist when it was built)
+            w->toFront (false);
+        }
 }
 
 bool Workspace::isDetachedWindowActive() const
