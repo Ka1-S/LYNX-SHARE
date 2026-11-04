@@ -87,12 +87,41 @@ VST / VST3 / CLAP plugins get a tile with their maker and name until their edito
   paint (8 per tick), the hovered one is that picture drawn bigger, and the backdrop is composed once.
   Second build: see 3.3.
 
+### 3.2 Fader drag while playing [MEAS] (uiperf, Ryzen 5 3600, Windows 11, Master muted by LYNX_UIPERF_MUTE)
+
+60 frames with 4 fader moves each on insert 1 (the old path = editSong per move, the new = editLevels):
+
+| Project | old path: wall time / paint mean | live levels (first build) |
+|---|---|---|
+| oxygen.flp | 3.1 s / 24.2 ms | 1.7 s / 23.4 ms |
+| thief.flp | 2.0 s / 19.3 ms | 1.3 s / 16.3 ms |
+
+The rebuild is gone from the move (wall time −35…45 %), but each frame still painted ~20 ms: every engine listener
+(~45 views) repainted at each move. Second build: editLevels notifies only a levels broadcaster that the Mixer strips
+and the Channel Rack listen to; the rest catch up with the full publish when the mouse is released. See 3.3.
+
+### 3.3 Fader, final build [MEAS]
+
+Same run, editLevels notifying only the level views:
+
+| Project | old path: wall time / paint mean / frames >16 ms | live levels |
+|---|---|---|
+| oxygen.flp | 2.6 s / 17.9 ms / 59 of 60 | **1.2 s / 13.2 ms / 31 of 59** |
+| thief.flp | 1.8 s / 17.2 ms / 43 of 60 | **1.1 s / 10.9 ms / 11 of 53** |
+
+60 frames at the 16-ms frame timer take ~1.0 s, so a drag now runs at about the frame rate with 4 moves per frame,
+where the old path ran at ~23–33 fps here (on the reporter's slower machine and bigger song: the 4–6 Hz of the clip).
+The sound: the engine glides each gain at FL's 0.001 per sample (engine test
+`fader171c_a_live_fader_move_glides_without_a_rebuild`: the worst step per sample stays ≤ 0.001 × the input level),
+so with new values arriving every frame instead of every 160–280 ms the staircase is gone.
+
+FL [SHOT f0–f5]: FL's Master fader follows the mouse during playback with the hint updating live; LYNX now does the same.
+
 ## Where I stopped
 
-- feature/fader171c: code + engine tests written (tests/Fader171cTests.inc), uiperf steps "mixer fader drag" (old
-  path vs live levels) added; build-local and Windows build running (logs /mnt/e/lynx-work/picker171c/logs/).
-- feature/picker171c (origin/main + feature/mixfx170b + feature/art170k merged in, not yet on main): PluginThumbs
-  (background `--pluginthumbs` drawing, disk cache, third-party capture), picker view rewrite, core helpers + tests
-  (tests/Picker171cTests.inc). Windows build running. Translations not done yet.
-- Next: results of the builds; Windows uiperf before/after on a real project; Windows GUI check + picker screenshots
-  into /mnt/e/lynx-work/picker171c/; translations; notes + reply draft.
+- 2026-11-04 19:10. feature/fader171c: done (tests 16 checks / 0 failures, full suite passed before), measured (3.3),
+  going through the merge train.
+- feature/picker171c: picker works on Windows (shots p01–p19, q01–q06 in /mnt/e/lynx-work/picker171c/gui/): F8,
+  background pictures, hover, typed search, Enter / double-click, drag to the Channel Rack and to a mixer insert, tab
+  click → Browser, right-click on empty space closes, Ctrl+wheel. Perf fixes (fit off the paint, bilinear halving,
+  list-order walk) in the next Windows build; then the final screenshots, and the picker waits for the user's OK.
