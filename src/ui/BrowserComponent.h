@@ -131,7 +131,9 @@ public:
     void showProjectForSnapshot();
     void showPluginDatabaseForSnapshot();
     void showScores();         // the Piano roll's File › Browse scores: FL's Data/Patches/Scores ("FL MIDI")
-    void showPluginDatabase(); // FL's Shift+F8: the All tab with the Plugin database opened and scrolled into view
+    // FL's Shift+F8: the All tab with the Plugin database opened and scrolled into view; with a folder (the Plugin
+    // picker's tab, round 171c; `generators` 1 / 0, -1 = none) that folder of the Generators / Effects opened
+    void showPluginDatabase (const juce::String& folder = {}, int generators = -1);
     // --snapshot (round 164): only `folder`, opened, listed under `filter` (folders with nothing to list left out)
     void showFilterForSnapshot (const juce::File& folder, browserview::ContentFilter filter);
     void resetViewForSnapshot(); // its Generators / Effects FL engines open (round 142)

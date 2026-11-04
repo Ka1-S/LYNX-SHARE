@@ -7103,3 +7103,10 @@ countries: tw hk mo
 "Number of steps" = "步數"
 "Dual" = "雙軌"
 "Align all channel editors" = "對齊所有通道編輯器"
+
+# Round 171c: the Plugin picker
+"Plugin picker: every plugin as a picture; drag one onto the Channel Rack or the Mixer (right-click: quick-add palette)" = "外掛選擇器：每個外掛顯示為圖片；拖到 Channel Rack 或混音台（右鍵：快速新增面板）"
+"double-click, right-click or Enter: a new channel; drag it onto the Channel Rack (onto a channel: replaces its instrument)" = "雙擊、右鍵或 Enter：新增通道；拖到 Channel Rack（拖到通道上：取代其樂器）"
+"double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "雙擊、右鍵或 Enter：加入所選混音插入軌；拖到混音插入軌或其插槽"
+"point at a category to show it; click it to open it in the Browser" = "指向分類即顯示；點擊在瀏覽器中開啟"
+"start to type to search plugins...." = "開始輸入以搜尋外掛...."

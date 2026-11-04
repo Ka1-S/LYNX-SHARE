@@ -26,33 +26,61 @@ TEST (picker171c_categories_are_round_170b_folders)
     CHECK (folders.of.at ("lynx:fx:Facet EQ") == lynxCategory);
 }
 
-TEST (picker171c_search_every_word_any_field)
+TEST (picker171c_search_like_fl)
 {
-    using lynx::pickerview::matches;
-    const std::vector<std::string> limiter { "Fruity Limiter", "built-in FL engine", "Dynamics", "LYNX SHARE" };
-    CHECK (matches ("", limiter));
-    CHECK (matches ("lim", limiter));
-    CHECK (matches ("LIMITER dyn", limiter));          // two words, two fields, any case
-    CHECK (matches ("  fruity   lim ", limiter));      // extra spaces
-    CHECK (! matches ("limiter reverb", limiter));     // every word must be found
-    CHECK (matches ("fabfilter", { "Pro-Q 3", "FabFilter · VST3", "Installed", "FabFilter" }));
+    using namespace lynx::pickerview;
+    // FL (REA_rodada171c §2): the text anywhere in the name, ignoring case; the others are dimmed
+    CHECK (nameMatches ("del", "Multiband Delay") && nameMatches ("DEL", "Fruity Delay 3") && ! nameMatches ("del", "Fruity Limiter"));
+    CHECK (nameMatches ("", "anything"));
+    // the pointed-at tile: the first name that starts with the text, else the last one that contains it (FL's "del" →
+    // Multiband Delay when no name starts with "del")
+    const std::vector<std::string> names { "Fruity Delay 2", "Fruity Delay 3", "Fruity Limiter", "Multiband Delay" };
+    CHECK (searchJump ("del", names) == 3);
+    CHECK (searchJump ("fruity", names) == 0);
+    CHECK (searchJump ("LIM", names) == 2);
+    CHECK (searchJump ("xyz", names) == -1 && searchJump ("", names) == -1);
+    // Ctrl+Backspace: back to the previous space
+    CHECK (dropLastWord ("fruity del") == "fruity ");
+    CHECK (dropLastWord ("fruity del  ") == "fruity ");
+    CHECK (dropLastWord ("fruity") == "" && dropLastWord ("") == "");
 }
 
-TEST (picker171c_keyboard_moves_like_a_grid)
+TEST (picker171c_up_down_wrap_and_skip_dimmed)
 {
-    using lynx::pickerview::Box;
-    using lynx::pickerview::moveSelection;
-    // 3 + 2 tiles in two rows; index 5 is not shown
-    const std::vector<Box> boxes { { 0, 0, 100, 60 }, { 110, 0, 100, 60 }, { 220, 0, 100, 60 }, { 0, 70, 100, 60 }, { 110, 70, 100, 60 }, {} };
-    CHECK (moveSelection (boxes, -1, 1, 0) == 0);  // nothing selected: the first
-    CHECK (moveSelection (boxes, 0, 1, 0) == 1);
-    CHECK (moveSelection (boxes, 2, 1, 0) == 3);   // reading order: the end of a row goes on to the next
-    CHECK (moveSelection (boxes, 3, -1, 0) == 2);
-    CHECK (moveSelection (boxes, 0, -1, 0) == 0);  // stops at the ends
-    CHECK (moveSelection (boxes, 4, 1, 0) == 4);
-    CHECK (moveSelection (boxes, 1, 0, 1) == 4);   // down: the nearest centre in the next row
-    CHECK (moveSelection (boxes, 2, 0, 1) == 4);
-    CHECK (moveSelection (boxes, 3, 0, -1) == 0);  // up
-    CHECK (moveSelection (boxes, 0, 0, -1) == 0);  // no row above: stays
-    CHECK (moveSelection ({}, 3, 1, 0) == 3);      // nothing shown: stays
+    using lynx::pickerview::stepWrapping;
+    const std::vector<char> usable { 1, 0, 1, 1 };
+    CHECK (stepWrapping (usable, -1, 1) == 0);  // nothing pointed at: the first
+    CHECK (stepWrapping (usable, -1, -1) == 3); // or the last
+    CHECK (stepWrapping (usable, 0, 1) == 2);   // a dimmed one is skipped
+    CHECK (stepWrapping (usable, 3, 1) == 0);   // wraps around
+    CHECK (stepWrapping (usable, 0, -1) == 3);
+    CHECK (stepWrapping (usable, 0, 3) == 0);   // three Ctrl+wheel notches
+    CHECK (stepWrapping ({ 0, 0 }, 0, 1) == -1);
+    CHECK (stepWrapping ({}, 2, 1) == 2);
+}
+
+TEST (picker171c_tiles_share_one_scale_like_fl)
+{
+    using namespace lynx::pickerview;
+    // a big editor is a big tile: every picture at the same scale, the largest that fits
+    const std::vector<Box> sizes { { 0, 0, 1000, 700 }, { 0, 0, 500, 350 }, { 0, 0, 400, 200 }, { 0, 0, 300, 600 } };
+    const auto p = packRows (sizes, 600, 400, 10, 0.05, 0.45);
+    CHECK (p.boxes.size() == 4 && p.height <= 400 && p.scale > 0.05);
+    CHECK (p.boxes.size() == 4 && std::abs (p.boxes[0].w - 2 * p.boxes[1].w) <= 1); // the same scale for all
+    for (const auto& b : p.boxes)
+        CHECK (b.x >= 0 && b.x + b.w <= 600);
+    // the largest scale: a bigger area never makes the tiles smaller, and maxScale caps them
+    const auto roomy = packRows (sizes, 2000, 2000, 10, 0.05, 0.45);
+    CHECK (roomy.scale == 0.45 && roomy.rowSlack.size() == 1);
+    // rows: tiles centred in their row's height, and a row's slack for centring
+    const auto rows = packAt ({ { 0, 0, 100, 100 }, { 0, 0, 100, 50 }, { 0, 0, 100, 100 } }, 220, 10, 1.0);
+    CHECK (rows.rowOf.size() == 3 && rows.rowOf[0] == 0 && rows.rowOf[1] == 0 && rows.rowOf[2] == 1);
+    CHECK (rows.boxes.size() == 3 && rows.boxes[1].y == 25 && rows.boxes[2].y == 110 && rows.boxes[2].x == 0);
+    CHECK (rows.rowSlack.size() == 2 && rows.rowSlack[0] == 10 && rows.rowSlack[1] == 120);
+    CHECK (rows.height == 210);
+    // too many: the smallest scale (the view scrolls)
+    std::vector<Box> many (400, Box { 0, 0, 500, 300 });
+    const auto tight = packRows (many, 600, 300, 10, 0.06, 0.45);
+    CHECK (tight.scale == 0.06 && tight.height > 300);
+    CHECK (packRows ({}, 600, 300, 10, 0.06, 0.45).boxes.empty());
 }

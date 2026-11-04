@@ -3456,15 +3456,23 @@ void BrowserComponent::showPluginDatabaseForSnapshot()
     rebuildTree();
 }
 
-void BrowserComponent::showPluginDatabase()
+void BrowserComponent::showPluginDatabase (const juce::String& folder, int generators)
 {
     const auto db = tr ("Plugin database");
     openPluginFolders.insert (db);
     openPluginFolders.insert (db + "/" + tr ("Generators"));
     openPluginFolders.insert (db + "/" + tr ("Effects"));
+    // the Plugin picker's tab clicked (round 171c, FL opens its Browser on that category): that folder of the user's,
+    // else the Generators / Effects heading
+    const auto kind = generators > 0 ? tr ("Generators") : tr ("Effects");
+    if (generators >= 0 && folder.isNotEmpty())
+        openPluginFolders.insert (kind + "/" + folder);
     setTab (allTab);
     rebuildTree();
-    if (const auto row = tree->rowLabelled (db); row >= 0)
+    auto row = generators >= 0 && folder.isNotEmpty() ? tree->rowLabelled (folder) : -1;
+    if (row < 0)
+        row = tree->rowLabelled (generators >= 0 ? kind : db);
+    if (row >= 0)
     {
         tree->select (row, false);
         tree->grabKeyboardFocus();

@@ -205,8 +205,11 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     redoButton.setTooltip (withKey (tr ("Redo"), "edit.redo"));
     redoButton.onClick = [this] { undoRedo (true); };
     redoButton.onRightClick = [this] { showHistory(); };
-    pluginPickerButton.setTooltip (withKey (tr ("Plugin picker: add an instrument or plugin as a new channel"), "panel.quickAdd"));
-    pluginPickerButton.onClick = [this] { showQuickAdd(); };
+    // FL's toolbar picker button (round 171c): a click opens the Plugin picker (F8); a right-click LYNX's quick-add palette
+    pluginPickerButton.setTooltip (withKey (tr ("Plugin picker: every plugin as a picture; drag one onto the Channel Rack or the Mixer (right-click: quick-add palette)"),
+                                            "view.pluginPicker"));
+    pluginPickerButton.onClick = [this] { togglePluginPicker(); };
+    pluginPickerButton.onRightClick = [this] { showQuickAdd(); };
 
     // transport: Play toggles play / stop-and-back; Stop returns to the start; double-click Stop = all notes off
     playButton.setTooltip (tr ("Play; pressed again, stops and goes back to where it started") + " (Space; Ctrl+Space pauses)");
@@ -2399,6 +2402,16 @@ void MainComponent::togglePluginPicker()
     targets.close = [safe] {
         if (safe != nullptr && safe->pluginPickerView != nullptr)
             safe->togglePluginPicker();
+    };
+    targets.showMixer = [safe] { // (an effect dragged out of the picker: FL brings up the Mixer)
+        if (safe != nullptr)
+            safe->showPanel (Panel::mixer);
+    };
+    targets.openBrowser = [safe] (const std::string& category, bool generators) {
+        if (safe == nullptr)
+            return;
+        safe->showPanel (Panel::browser);
+        safe->browser.showPluginDatabase (category.empty() ? juce::String() : tr (category.c_str()), category.empty() ? -1 : (generators ? 1 : 0));
     };
     pluginPickerView = makePluginPickerView (engine, std::move (targets));
     addAndMakeVisible (*pluginPickerView);

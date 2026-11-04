@@ -20,8 +20,10 @@ class AudioEngine;
 
 namespace lynx::pluginthumbs
 {
-// The largest picture kept (pixels): enough for a 190-px tile on a 200 % display.
-constexpr int maxWidth = 384, maxHeight = 288;
+// The pictures are kept at this fraction of the editor's size (pixels per logical pixel), so the picker knows each
+// editor's size from its picture alone and lays them all out at one scale, as FL does; at most maxWidth × maxHeight.
+constexpr float pictureScale = 0.45f;
+constexpr int maxWidth = 900, maxHeight = 700;
 
 // <cache>/plugin-thumbs/<LYNX version>: the pictures of LYNX's own plugins (redrawn by each version: the art changes)
 juce::File nativeFolder();
@@ -32,8 +34,9 @@ juce::String fileNameFor (const std::string& key);
 // Where the picture of `key` is (it may not exist yet)
 juce::File fileFor (const std::string& key, bool native);
 
-// `image` scaled down (never up) to fit maxWidth × maxHeight, high-quality resampling
-juce::Image shrink (const juce::Image& image);
+// `image` (drawn at `pixelsPerUnit` pixels per logical pixel) scaled to pictureScale, at most maxWidth × maxHeight,
+// high-quality resampling
+juce::Image shrink (const juce::Image& image, float pixelsPerUnit = 1.0f);
 
 // --pluginthumbs <folder> [key,key...]: draws the editor of every LYNX generator and effect (or only those keys) into
 // `folder`, skipping the pictures that exist. `progress` gets one line per plugin. Returns the number drawn.

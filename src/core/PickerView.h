@@ -91,83 +91,143 @@ inline std::vector<std::string> orderTabs (std::vector<std::string> names, const
     return names;
 }
 
-// The search box: every word of `query` (spaces between words) appears in one of `fields`, ignoring case. An empty
-// query matches everything.
-inline bool matches (const std::string& query, const std::vector<std::string>& fields)
+// FL's search (TPlugListForm.FormKeyPress, REA_rodada171c §2): the typed text is found anywhere in a plugin's name,
+// ignoring case (ASCII); the tiles that don't match are dimmed, not removed.
+inline std::string upperAscii (std::string s)
 {
-    auto lower = [] (std::string s) {
-        for (auto& c : s)
-            c = (char) std::tolower ((unsigned char) c);
-        return s;
-    };
-    std::vector<std::string> haystack;
-    for (const auto& f : fields)
-        haystack.push_back (lower (f));
-    std::string word;
-    auto found = [&] {
-        if (word.empty())
-            return true;
-        for (const auto& h : haystack)
-            if (h.find (word) != std::string::npos)
-                return true;
-        return false;
-    };
-    for (const auto c : lower (query) + " ")
-    {
-        if (c == ' ')
-        {
-            if (! found())
-                return false;
-            word.clear();
-        }
-        else
-            word += c;
-    }
-    return true;
+    for (auto& c : s)
+        if (c >= 'a' && c <= 'z')
+            c = (char) (c - 'a' + 'A');
+    return s;
 }
 
-// Keyboard navigation over the tiles shown (their boxes; an empty box = not shown): Left / Right step in reading
-// order (top to bottom, left to right), Up / Down go to the row above / below, to the tile whose centre is nearest.
-// `at` < 0: the first tile. Returns the new index (`at` when there is nowhere to go).
+inline bool nameMatches (const std::string& query, const std::string& name)
+{
+    return query.empty() || upperAscii (name).find (upperAscii (query)) != std::string::npos;
+}
+
+// Where the pointed-at tile jumps as the text changes: the first name (in the list's order) that starts with it, else
+// the last one that contains it; -1 = none.
+inline int searchJump (const std::string& query, const std::vector<std::string>& names)
+{
+    if (query.empty())
+        return -1;
+    const auto q = upperAscii (query);
+    int last = -1;
+    for (int i = 0; i < (int) names.size(); ++i)
+    {
+        const auto n = upperAscii (names[(std::size_t) i]);
+        if (n.rfind (q, 0) == 0)
+            return i;
+        if (n.find (q) != std::string::npos)
+            last = i;
+    }
+    return last;
+}
+
+// Ctrl+Backspace: the trailing spaces, then back to the previous space (the space stays)
+inline std::string dropLastWord (std::string text)
+{
+    while (! text.empty() && text.back() == ' ')
+        text.pop_back();
+    while (! text.empty() && text.back() != ' ')
+        text.pop_back();
+    return text;
+}
+
+// Up / Down and Ctrl+wheel: the next / previous usable entry of the list, wrapping around; `at` < 0 starts before the
+// first (down) or after the last (up). -1 when none is usable.
+inline int stepWrapping (const std::vector<char>& usable, int at, int delta)
+{
+    const auto n = (int) usable.size();
+    if (n == 0 || delta == 0)
+        return at;
+    auto k = at < 0 ? (delta > 0 ? -1 : n) : at;
+    const auto dir = delta > 0 ? 1 : -1;
+    for (int steps = std::abs (delta); steps > 0; --steps)
+    {
+        int tries = 0;
+        do
+        {
+            k = ((k + dir) % n + n) % n;
+        } while (! usable[(std::size_t) k] && ++tries < n);
+        if (! usable[(std::size_t) k])
+            return -1;
+    }
+    return k;
+}
+
+// The tiles of one half laid out like FL's: every editor at the same scale `k` (a big editor is a big tile), in rows
+// left to right, each tile centred in its row's height; the largest k in [minScale, maxScale] that fits `height`
+// (else minScale and the content is taller). `sizes` hold the editors' sizes (w, h).
 struct Box
 {
     int x = 0, y = 0, w = 0, h = 0;
-    bool empty() const noexcept { return w <= 0 || h <= 0; }
 };
 
-inline int moveSelection (const std::vector<Box>& boxes, int at, int dx, int dy)
+struct Packed
 {
-    std::vector<int> order;
-    for (int i = 0; i < (int) boxes.size(); ++i)
-        if (! boxes[(std::size_t) i].empty())
-            order.push_back (i);
-    if (order.empty())
-        return at;
-    std::stable_sort (order.begin(), order.end(), [&] (int a, int b) {
-        const auto& p = boxes[(std::size_t) a];
-        const auto& q = boxes[(std::size_t) b];
-        return p.y != q.y ? p.y < q.y : p.x < q.x;
-    });
-    const auto pos = std::find (order.begin(), order.end(), at);
-    if (at < 0 || pos == order.end())
-        return order.front();
-    const auto k = (int) (pos - order.begin());
-    if (dx != 0)
-        return order[(std::size_t) std::clamp (k + (dx > 0 ? 1 : -1), 0, (int) order.size() - 1)];
-    if (dy == 0)
-        return at;
-    const auto& from = boxes[(std::size_t) at];
-    const auto cx = from.x + from.w / 2;
-    int best = at, bestRow = 0, bestDistance = 0;
-    for (const auto i : order)
+    std::vector<Box> boxes;    // one per size
+    std::vector<int> rowOf;    // the row of each
+    std::vector<int> rowSlack; // per row: width left over (to centre it)
+    int height = 0;
+    double scale = 0.0;
+};
+
+inline Packed packAt (const std::vector<Box>& sizes, int width, int gap, double k)
+{
+    Packed p;
+    p.scale = k;
+    int x = 0, y = 0, rowHeight = 0, rowStart = 0;
+    auto endRow = [&] (std::size_t end) {
+        for (auto i = (std::size_t) rowStart; i < end; ++i)
+            p.boxes[i].y = y + (rowHeight - p.boxes[i].h) / 2;
+        p.rowSlack.push_back (std::max (0, width - (x - gap)));
+        y += rowHeight + gap;
+    };
+    for (std::size_t i = 0; i < sizes.size(); ++i)
     {
-        const auto& b = boxes[(std::size_t) i];
-        const auto rowDistance = dy > 0 ? b.y - from.y : from.y - b.y;
-        if (rowDistance <= from.h / 2) // (same row, or the wrong way)
-            continue;
-        const auto distance = std::abs (b.x + b.w / 2 - cx);
-        if (best == at || rowDistance < bestRow || (rowDistance == bestRow && distance < bestDistance))
-            best = i, bestRow = rowDistance, bestDistance = distance;
+        const auto w = std::max (16, (int) (sizes[i].w * k + 0.5)), h = std::max (12, (int) (sizes[i].h * k + 0.5));
+        if (x > 0 && x + w > width)
+        {
+            endRow (i);
+            x = 0;
+            rowHeight = 0;
+            rowStart = (int) i;
+        }
+        p.boxes.push_back ({ x, 0, w, h });
+        p.rowOf.push_back ((int) p.rowSlack.size());
+        x += w + gap;
+        rowHeight = std::max (rowHeight, h);
+    }
+    if (! sizes.empty())
+        endRow (sizes.size());
+    p.height = std::max (0, y - gap);
+    return p;
+}
+
+inline Packed packRows (const std::vector<Box>& sizes, int width, int height, int gap, double minScale, double maxScale)
+{
+    if (sizes.empty() || width <= 0)
+        return {};
+    auto best = packAt (sizes, width, gap, maxScale);
+    if (best.height <= height)
+        return best;
+    double lo = minScale, hi = maxScale;
+    best = packAt (sizes, width, gap, lo);
+    if (best.height > height)
+        return best; // (too many: the smallest, scrolled)
+    for (int i = 0; i < 24; ++i)
+    {
+        const auto mid = (lo + hi) / 2.0;
+        auto p = packAt (sizes, width, gap, mid);
+        if (p.height <= height)
+        {
+            best = std::move (p);
+            lo = mid;
+        }
+        else
+            hi = mid;
     }
     return best;
 }

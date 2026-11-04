@@ -118,11 +118,12 @@ juce::File fileFor (const std::string& key, bool native)
     return (native ? nativeFolder() : capturedFolder()).getChildFile (fileNameFor (key));
 }
 
-juce::Image shrink (const juce::Image& image)
+juce::Image shrink (const juce::Image& image, float pixelsPerUnit)
 {
     if (! image.isValid())
         return {};
-    const auto scale = juce::jmin (1.0, (double) maxWidth / image.getWidth(), (double) maxHeight / image.getHeight());
+    const auto scale = juce::jmin ((double) pictureScale / juce::jmax (0.01f, pixelsPerUnit), (double) maxWidth / image.getWidth(),
+                                   (double) maxHeight / image.getHeight());
     if (scale >= 1.0)
         return image.convertedToFormat (juce::Image::ARGB);
     const auto w = juce::jmax (1, juce::roundToInt (image.getWidth() * scale));
@@ -263,10 +264,10 @@ void captureEditor (const std::string& key, juce::Component& editor)
     ReleaseDC (nullptr, screen);
 
     // the editor's part only (not the window's own LYNX bar): its area in the window, in physical pixels
+    const auto scale = (float) w / (float) juce::jmax (1, peer->getComponent().getWidth());
     if (picture.isValid())
     {
         const auto& top = peer->getComponent();
-        const auto scale = (float) w / (float) juce::jmax (1, top.getWidth());
         const auto area = (top.getLocalArea (&editor, editor.getLocalBounds()).toFloat() * scale).toNearestInt().getIntersection ({ 0, 0, w, h });
         if (area.getWidth() < 16 || area.getHeight() < 16)
             return;
@@ -283,7 +284,12 @@ void captureEditor (const std::string& key, juce::Component& editor)
             for (int x = 0; x < pw && flat; x += juce::jmax (1, pw / 16))
                 flat = data.getPixelColour (x, y) == first;
         if (! flat)
-            savePng (shrink (picture), file);
+        {
+            // (a clipped image shares its pixels: copy it out so the PNG writer and the scaler see only the editor)
+            juce::Image own (juce::Image::RGB, pw, ph, false);
+            juce::Graphics (own).drawImageAt (picture, 0, 0);
+            savePng (shrink (own, scale), file);
+        }
     }
    #else
     juce::ignoreUnused (key, editor);
