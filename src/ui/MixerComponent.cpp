@@ -4766,8 +4766,7 @@ void EffectsPanel::showAddMenu (int)
         if (! added)
             return;
         selectedSlot = (int) slots()->size() - 1;
-        if ((*slots())[(std::size_t) selectedSlot].kind == EffectKind::plugin)
-            openPluginWindow (selectedSlot);
+        openEditor (selectedSlot); // FL opens the effect's window when it is loaded (round 170h, fl-09)
         repaint();
     };
     auto picks = quickpick::renamedEffects (engine, addFx);
@@ -4781,12 +4780,15 @@ void EffectsPanel::showAddMenu (int)
             const auto made = newAddableEffect (kind, engine.getSong().bpm);
             if (! made)
                 return;
+            const auto before = slots()->size();
             engine.editSong ([t = track, fx = *made] (Song& song) {
                 auto& effects = song.mixer[(std::size_t) t].effects;
                 if ((int) effects.size() < maxEffectSlots)
                     effects.push_back (fx);
             });
             selectedSlot = (int) slots()->size() - 1;
+            if (slots()->size() > before)
+                openEditor (selectedSlot); // (round 170h: FL opens a new effect's window, Fruity Parametric EQ 2 in fl-09)
             repaint();
         });
 
@@ -4796,12 +4798,15 @@ void EffectsPanel::showAddMenu (int)
         if (! entry.instrument)
             equivalents.addItem (juce::String::fromUTF8 (entry.product.c_str()) + juce::String::fromUTF8 (" \xe2\x86\x92 ") + juce::String::fromUTF8 (effectInfo (entry.effect).name),
                                  [this, entry] {
+                                     const auto before = slots()->size();
                                      engine.editSong ([t = track, entry] (Song& song) {
                                          auto& effects = song.mixer[(std::size_t) t].effects;
                                          if ((int) effects.size() < maxEffectSlots)
                                              effects.push_back (makeSubstituteSlot (entry));
                                      });
                                      selectedSlot = (int) slots()->size() - 1;
+                                     if (slots()->size() > before)
+                                         openEditor (selectedSlot);
                                      repaint();
                                  });
     if (equivalents.getNumItems() > 0)
