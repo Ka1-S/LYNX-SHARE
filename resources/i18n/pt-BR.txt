@@ -7260,3 +7260,6 @@ countries: br
 "Step edit: with the transport stopped, notes you play go into the current pattern at the position, a snap step long; release the keys and the position moves on one step (chords: hold them together)" = "Edição por passos: com o transporte parado, as notas que você toca entram no pattern atual na posição, com um passo do snap de duração; solte as teclas e a posição avança um passo (acordes: segure as notas juntas)"
 "Punch in/out: audio recording keeps only the loop region (playback runs through it; pre- and post-roll in the recording options)" = "Punch in/out: a gravação de áudio mantém só a região de loop (a reprodução passa por ela; pré e pós-roll nas opções de gravação)"
 "Punch in/out" = "Punch in/out"
+
+# round 170e3: the idle hint on one line
+"Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "Aponte para qualquer coisa para ver ajuda  [F1] atalhos  [F5]-[F9] janelas  [Space] tocar/parar"

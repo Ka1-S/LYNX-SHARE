@@ -769,6 +769,15 @@ void MainComponent::paint (juce::Graphics& g)
             g.fillRect (x, bar.getY() + 12, 1, bar.getHeight() - 24);
     }
 
+    // Pattern / Song: one switch of two halves (round 170e3), the playing mode lit
+    if (! modeArea.isEmpty())
+    {
+        g.setColour (colour::bg2);
+        g.fillRoundedRectangle (modeArea.toFloat(), radius::lg);
+        g.setColour (colour::borderStrong);
+        g.drawRoundedRectangle (modeArea.toFloat().reduced (0.5f), radius::lg, 1.0f);
+    }
+
     // play, stop and record share one quiet well
     if (! transportArea.isEmpty())
     {
@@ -819,8 +828,8 @@ void MainComponent::resized()
     const auto bar = juce::Rectangle<int> (0, 0, getWidth(), toolbarHeight);
     auto toolbar = bar.reduced (8, toolbarLayout.visible ? 5 : 3);
     const auto row1 = toolbar.getY(), row2 = toolbar.getY() + rowHeight + 2, h = rowHeight;
-    const auto big = h + 6;                                   // transport buttons: one slim row, centred on both
-    const auto bigWidth = h + 4;
+    auto big = h + 14;                                        // transport buttons: big, centred on both rows (round 170e3)
+    auto bigWidth = h + 14;
     int gap = 17;                                             // a divider and the space around it (13 when compact)
     const auto grow = h - toolbarlayout::rowHeight (toolbarlayout::IconSize::medium); // wider panels for bigger rows
 
@@ -841,7 +850,7 @@ void MainComponent::resized()
     }
 
     const auto modeWidth = juce::jmax (patternModeButton.getIdealWidth (h - 2), songModeButton.getIdealWidth (h - 2));
-    int tempoWidth = 90 + grow, timeWidth = 110 + grow;
+    int tempoWidth = 96 + grow, timeWidth = 140 + grow;
     const int gridWidth = 148;
     // the snap and pattern captions: an icon (the magnet button / the pattern icon) and the longer of the two names
     const juce::Font captionFont (theme::font (theme::type::caption - 1.0f, true));
@@ -851,7 +860,7 @@ void MainComponent::resized()
     std::array<int, toolbarlayout::groupCount> widths {};
     const int tapWidth = juce::roundToInt (h * 0.8f); // the tempo tapper, right of the tempo (round 170e3)
     widths[(std::size_t) Group::transport] = modeWidth + 8 + 3 * (bigWidth + 4) + 4 + tempoWidth + 2 + tapWidth + 4 + timeWidth;
-    widths[(std::size_t) Group::master] = 92;
+    widths[(std::size_t) Group::master] = 2 * (h + 26) + 4; // two big knobs side by side (round 170e3)
     widths[(std::size_t) Group::record] = 5 * h + 8; // five per row (round 170e3)
     widths[(std::size_t) Group::snap] = captionWidth + gridWidth;
     widths[(std::size_t) Group::windows] = 3 * h + 4;
@@ -870,9 +879,13 @@ void MainComponent::resized()
     if (toolbarLayout.visible && toolbarLayout.isShown (Group::record) && ! visible[(std::size_t) Group::record])
     {
         compactRecord = true;
-        tempoWidth -= 6;
-        timeWidth -= 10;
-        widths[(std::size_t) Group::transport] -= 16;
+        const auto before = 3 * (bigWidth + 4) + tempoWidth + timeWidth;
+        big = h + 6;
+        bigWidth = h + 4;
+        tempoWidth = 84 + grow;
+        timeWidth = 104 + grow;
+        widths[(std::size_t) Group::transport] -= before - (3 * (bigWidth + 4) + tempoWidth + timeWidth);
+        widths[(std::size_t) Group::master] = 92; // the knobs over each other, as before
         widths[(std::size_t) Group::record] = 4 * h + 6;
         widths[(std::size_t) Group::snap] -= 16;
         gap = 13;
@@ -885,23 +898,28 @@ void MainComponent::resized()
     for (int i = 0; i < toolbarlayout::groupCount; ++i)
         used += visible[(std::size_t) i] ? widths[(std::size_t) i] + gap : 0;
 
-    const auto hintWidth = juce::jlimit (juce::jmin (minHint, juce::jmax (160, room - used)), maxHint, room - used);
-    // the spare room: first a little more air between the panels (round 170e3: a wide window reads as groups
-    // instead of one row with a hole), then the rest before the first of the meters / output (they sit on the right)
+    auto hintWidth = juce::jlimit (juce::jmin (minHint, juce::jmax (160, room - used)), maxHint, room - used);
+    // round 170e3: the spare room goes to useful things first (a wider output monitor, snap and pattern boxes, song
+    // position and hint bar), then evenly between the panels, so no dead zone opens anywhere on a wide window
     auto spare = juce::jmax (0, room - used - hintWidth);
-    const auto shownGroups = (int) std::count (visible.begin(), visible.end(), true);
-    const auto extra = toolbarlayout::extraGap (spare, shownGroups);
-    spare -= extra * shownGroups;
-    // then a wider output monitor, and what is left either before the meters (right-aligned) or, on a very wide
-    // window, after them, so no hole opens in the middle of the toolbar
-    if (visible[(std::size_t) Group::output] && spare > 0)
+    auto grant = [&spare] (int share, int most) {
+        const auto g = juce::jmax (0, juce::jmin (most, spare * share / 100));
+        spare -= g;
+        return g;
+    };
+    if (visible[(std::size_t) Group::output])
+        widths[(std::size_t) Group::output] += grant (40, 900);
+    if (visible[(std::size_t) Group::snap])
+        widths[(std::size_t) Group::snap] += grant (20, 220);
+    if (const auto more = grant (15, 120); more > 0)
     {
-        const auto more = juce::jmin (240, spare / 3);
-        widths[(std::size_t) Group::output] += more;
-        spare -= more;
+        timeWidth += more;
+        widths[(std::size_t) Group::transport] += more;
     }
-    if (spare > room / 5)
-        spare = 0;
+    hintWidth += grant (25, 500);
+    const auto shownGroups = (int) std::count (visible.begin(), visible.end(), true);
+    const auto extra = toolbarlayout::extraGap (spare, shownGroups, std::numeric_limits<int>::max() / 4);
+    spare -= extra * shownGroups;
 
     auto take = [&toolbar] (int width) { return toolbar.removeFromLeft (juce::jmin (width, toolbar.getWidth())); };
     auto divide = [&] {
@@ -953,7 +971,7 @@ void MainComponent::resized()
         fixedToolbarArea = juce::Rectangle<int> (column.getX() - 4, 0, column.getWidth() + 8, toolbarHeight);
     }
 
-    snapLabelArea = patternLabelArea = transportArea = {};
+    snapLabelArea = patternLabelArea = transportArea = modeArea = {};
 
     for (const auto& entry : toolbarLayout.entries)
     {
@@ -997,6 +1015,7 @@ void MainComponent::resized()
             case Group::transport: // Pattern/Song switch, play, stop, record, tempo, time display with the song position under it
             {
                 auto mode = panel.removeFromLeft (modeWidth);
+                modeArea = mode.withY (row1).withHeight (2 * h + 2).expanded (3, 2);
                 put (patternModeButton, mode.withY (row1).withHeight (h).reduced (0, 1));
                 put (songModeButton, mode.withY (row2).withHeight (h).reduced (0, 1));
                 panel.removeFromLeft (8);
@@ -1018,10 +1037,19 @@ void MainComponent::resized()
                 put (songPosition, displays.withTop (displays.getY() + displayHeight + 1).withWidth (tempoWidth + 2 + tapWidth + 4 + timeWidth));
                 break;
             }
-            case Group::master: // master volume over master pitch
-                put (masterVolume, panel.withY (row1).withHeight (h).reduced (0, 1));
-                put (masterPitch, panel.withY (row2).withHeight (h).reduced (0, 1));
+            case Group::master: // master volume beside master pitch, each a big knob with its name and value under it
+            {
+                if (compactRecord)
+                {
+                    put (masterVolume, panel.withY (row1).withHeight (h).reduced (0, 1));
+                    put (masterPitch, panel.withY (row2).withHeight (h).reduced (0, 1));
+                    break;
+                }
+                const auto both = panel.withY (row1).withHeight (2 * h + 2);
+                put (masterVolume, both.withWidth (both.getWidth() / 2 - 2));
+                put (masterPitch, both.withTrimmedLeft (both.getWidth() / 2 + 2));
                 break;
+            }
             case Group::record: // the recording switches (round 170e3, as FL's recording panel): metronome, wait for input, count-in,
                                 // blend and the typing piano over loop record, step edit, punch, the recording options menu and the MIDI light
                 if (compactRecord)
@@ -1105,8 +1133,8 @@ void MainComponent::applyIconSizing (toolbarlayout::IconSize size)
         b->setIconSizing (fraction, maxPx);
     for (auto& b : panelButtons)
         b.setIconSizing (fraction, maxPx);
-    for (auto* b : { &playButton, &stopButton, &recordButton }) // solid transport glyphs, a little smaller than the line icons
-        b->setIconSizing (0.5f, maxPx - 2.0f);
+    for (auto* b : { &playButton, &stopButton, &recordButton }) // solid transport glyphs on big buttons (round 170e3)
+        b->setIconSizing (0.42f, maxPx + 2.0f);
 
     ToolStrip::iconSize = size;
     pianoRoll.resized();
@@ -3533,8 +3561,8 @@ juce::String MainComponent::idleHint() const
     if (const auto scan = engine.getPluginHost().backgroundScan(); scan.running)
         return tr ("Scanning for plugins in the background: {0}% {1}", { juce::String (juce::roundToInt (scan.progress * 100.0f)), scan.file });
 
-    return tr ("Point at anything to see what it does here.  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop  "
-               "[Ctrl][T] typing piano: {0}", { typingPiano ? tr ("on") : tr ("off") });
+    // round 170e3: one line at 1920 (the typing piano's state shows on its own button)
+    return tr ("Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop");
 }
 
 juce::String MainComponent::keyMarkup (const char* actionId) const

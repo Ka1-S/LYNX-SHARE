@@ -80,6 +80,7 @@ private:
     EditTool tool = EditTool::pencil;
     std::vector<std::unique_ptr<IconButton>> buttons;
     std::vector<EditTool> tools;
+    std::vector<juce::Rectangle<int>> wells; // one per tool group (round 170e3)
 };
 
 // --- grid --------------------------------------------------------------------------------

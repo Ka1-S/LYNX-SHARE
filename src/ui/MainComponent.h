@@ -233,7 +233,8 @@ private:
     int rowHeight = toolbarlayout::rowHeight (toolbarlayout::IconSize::medium);
     int toolbarHeight = 2 * rowHeight + 12;
     toolbarlayout::IconSize appliedIconSize = toolbarlayout::IconSize::medium;
-    bool compactRecord = false; // a narrow window: four recording switches per row (round 170e3)
+    bool compactRecord = false;
+    juce::Rectangle<int> modeArea; // the Pattern / Song switch (painted as one control) // a narrow window: four recording switches per row (round 170e3)
     void applyIconSizing (toolbarlayout::IconSize size);
     void setToolbarLayout (const toolbarlayout::Layout& layout, bool save = true);
     juce::PopupMenu makeToolbarMenu();

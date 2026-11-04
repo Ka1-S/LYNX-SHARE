@@ -78,7 +78,7 @@ inline int rowHeight (IconSize s) { return s == IconSize::small ? 26 : s == Icon
 inline float iconFraction (IconSize) { return 0.62f; }
 inline float iconMaxPx (IconSize s) { return s == IconSize::small ? 15.0f : s == IconSize::medium ? 19.0f : 22.0f; }
 // Editor tool strips (inside the panel title row): icon box in px and button width.
-inline float toolIconPx (IconSize s) { return s == IconSize::small ? 15.0f : s == IconSize::medium ? 18.0f : 21.0f; }
+inline float toolIconPx (IconSize s) { return s == IconSize::small ? 16.0f : s == IconSize::medium ? 20.0f : 22.0f; }
 inline int toolButtonWidth (IconSize s, int height) { return height + (s == IconSize::small ? 0 : s == IconSize::medium ? 2 : 4); }
 
 // Round 170e3: on a very wide window (a 4K screen at 100 %) the default size grows one step, so the toolbar and the

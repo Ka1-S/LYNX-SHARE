@@ -65,6 +65,27 @@ void setKeyTip (IconButton& button, const EditToolInfo& info, const juce::String
 }
 } // namespace
 
+namespace
+{
+// Round 170e3: the tools in three groups, each in its own well (FL users look for them the same way): drawing
+// (pencil, brushes), changing (delete, mute, cut, slip) and looking (select, zoom, listen).
+int toolGroup (EditTool t)
+{
+    switch (t)
+    {
+        case EditTool::pencil:
+        case EditTool::brush:
+        case EditTool::drumPaint: return 0;
+        case EditTool::eraser:
+        case EditTool::mute:
+        case EditTool::knife:
+        case EditTool::slip: return 1;
+        default: return 2;
+    }
+}
+constexpr int toolGroupGap = 6;
+} // namespace
+
 void ToolStrip::refreshKeys (const std::function<juce::String (EditTool)>& keyOf)
 {
     for (std::size_t i = 0; i < tools.size() && i < buttons.size(); ++i)
@@ -73,10 +94,13 @@ void ToolStrip::refreshKeys (const std::function<juce::String (EditTool)>& keyOf
 
 ToolStrip::ToolStrip (bool includeSlip)
 {
+    for (int group = 0; group < 3; ++group)
     for (const auto& info : editTools())
     {
         // the Playlist has Slip, the Piano Roll the drum brush
         if ((info.tool == EditTool::slip && ! includeSlip) || (info.tool == EditTool::drumPaint && includeSlip))
+            continue;
+        if (toolGroup (info.tool) != group) // drawing, changing, looking (round 170e3)
             continue;
 
         auto button = std::make_unique<IconButton> (info.name, info.icon);
@@ -85,7 +109,7 @@ ToolStrip::ToolStrip (bool includeSlip)
         button->setFlat (true);
         button->setWantsKeyboardFocus (false);
         button->setMouseClickGrabsKeyboardFocus (false);
-        button->setOnColour (theme::colour::accent.withAlpha (0.16f)); // the light header style: a faint accent wash
+        button->setOnColour (theme::colour::accent.withAlpha (0.3f)); // round 170e3: the tool in use reads at once
         button->setIconColourWhenOn (theme::colour::accentHover);
         setKeyTip (*button, info, juce::String::charToString ((juce::juce_wchar) info.key));
         button->setToggleState (info.tool == tool, juce::dontSendNotification);
@@ -121,9 +145,13 @@ void ToolStrip::setTool (EditTool newTool)
         }
 }
 
+
 int ToolStrip::getIdealWidth (int height) const
 {
-    return (int) buttons.size() * toolbarlayout::toolButtonWidth (iconSize, height);
+    int groups = 0;
+    for (std::size_t i = 0; i < tools.size(); ++i)
+        groups += (i == 0 || toolGroup (tools[i]) != toolGroup (tools[i - 1])) ? 1 : 0;
+    return (int) buttons.size() * toolbarlayout::toolButtonWidth (iconSize, height) + juce::jmax (0, groups - 1) * toolGroupGap;
 }
 
 void ToolStrip::resized()
@@ -132,10 +160,18 @@ void ToolStrip::resized()
     const auto width = toolbarlayout::toolButtonWidth (iconSize, size);
     const auto icon = toolbarlayout::toolIconPx (iconSize);
 
+    wells.clear();
+    int x = 0;
     for (std::size_t i = 0; i < buttons.size(); ++i)
     {
+        if (i > 0 && toolGroup (tools[i]) != toolGroup (tools[i - 1]))
+            x += toolGroupGap;
+        if (i == 0 || toolGroup (tools[i]) != toolGroup (tools[i - 1]))
+            wells.push_back ({ x, 0, 0, size });
         buttons[i]->setIconSizing (1.0f, icon);
-        buttons[i]->setBounds ((int) i * width, 0, width, size);
+        buttons[i]->setBounds (x, 0, width, size);
+        x += width;
+        wells.back().setRight (x);
     }
 }
 
@@ -143,11 +179,14 @@ void ToolStrip::paint (juce::Graphics& g)
 {
     if (buttons.empty())
         return;
-    const auto well = getLocalBounds().toFloat().reduced (0.5f);
-    g.setColour (theme::colour::bg1.withAlpha (0.55f));
-    g.fillRoundedRectangle (well, theme::radius::md);
-    g.setColour (theme::colour::border);
-    g.drawRoundedRectangle (well, theme::radius::md, 1.0f);
+    for (const auto& r : wells)
+    {
+        const auto well = r.toFloat().reduced (0.5f);
+        g.setColour (theme::colour::bg1.withAlpha (0.55f));
+        g.fillRoundedRectangle (well, theme::radius::md);
+        g.setColour (theme::colour::border);
+        g.drawRoundedRectangle (well, theme::radius::md, 1.0f);
+    }
 }
 
 void ToolStrip::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
