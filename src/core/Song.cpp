@@ -1284,6 +1284,7 @@ bool PatchNode::BusHead::operator== (const BusHead& o) const { return bus == o.b
 bool PatchNode::operator== (const PatchNode& o) const
 {
     return generator == o.generator && label == o.label && x == o.x && y == o.y && busHeads == o.busHeads
+           && paramIns == o.paramIns && paramOuts == o.paramOuts
            && (generator ? channel == o.channel : effect == o.effect);
 }
 

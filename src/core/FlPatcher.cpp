@@ -244,7 +244,7 @@ std::optional<PatcherGraph> parsePatcher (const std::vector<std::uint8_t>& state
                                                              (int) at<std::uint32_t> (x.first, 0) };
                     graph.ports.push_back ({ at<std::uint64_t> (x.first, 8),
                                              { index, (at<std::uint32_t> (x.first, 16) & 1) != 0, (int) at<std::uint32_t> (x.first, 4),
-                                               (int) at<std::uint32_t> (x.first, 0), {} } });
+                                               (int) at<std::uint32_t> (x.first, 0), {}, at<std::uint32_t> (x.first, 16) } });
                 }
             graph.nodes.push_back (std::move (node));
         }

@@ -810,6 +810,21 @@ std::vector<std::uint8_t> wrappedFruityState (const ForeignPlugin& plugin)
 }
 } // namespace
 
+// A Patcher node's parameter port p in FL's numbering → LYNX's parameter of that node (round 171b): a hosted plugin
+// keeps its index, a built-in effect goes through effectParamFromFl; −1 = no LYNX equivalent
+static int flPatcherParam (const PatchNode& node, const std::string& flPlugin, int p)
+{
+    if (p < 0)
+        return -1;
+    if (node.generator)
+        return node.channel.instrument == InstrumentKind::plugin ? p : -1;
+    if (node.effect.kind == EffectKind::plugin)
+        return p;
+    if (const auto map = effectParamFromFl (canonicalFlEffectName (flPlugin), p))
+        return map->param;
+    return -1;
+}
+
 Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 {
     // Patcher used as an instrument: the channel becomes the main generator inside it (REA_rodada14 §1)
@@ -2531,11 +2546,23 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 w.kind = PatchWire::Kind::control;
                 if (w.from < 0 || w.to < 0)
                     continue; // (the Patcher's own published parameters)
-                w.fromPort = src->index >= 0x10000000 ? src->index - 0x10000000 : std::max (0, src->index);
                 const auto& source = doc.nodes[(std::size_t) w.from];
-                if (! source.generator && source.effect.kind == EffectKind::peakController) // FL: peak, LFO, peak + LFO
+                if (src->index >= 0 && src->index < 0x10000000) // a node's parameter output (round 171b): parameter p
+                {
+                    const auto p = flPatcherParam (source, graph->nodes[(std::size_t) src->node].plugin, src->index);
+                    if (p < 0)
+                    {
+                        if (options.report != nullptr)
+                            ++options.report->partialEffects["Patcher: parameter output of " + graph->nodes[(std::size_t) src->node].plugin + " (not mapped)"];
+                        continue;
+                    }
+                    w.fromPort = patchParamOutput (p);
+                }
+                else
+                    w.fromPort = src->index >= 0x10000000 ? src->index - 0x10000000 : 0;
+                if (! isPatchParamOutput (w.fromPort) && ! source.generator && source.effect.kind == EffectKind::peakController) // FL: peak, LFO, peak + LFO
                     w.fromPort = w.fromPort == 0 ? 1 : w.fromPort == 1 ? 2 : 0;
-                if (w.fromPort >= patcher::nodePorts (source).controlOuts)
+                if (! isPatchParamOutput (w.fromPort) && w.fromPort >= patcher::nodePorts (source).controlOuts)
                 {
                     // the source has no such output in LYNX (an X-Y controller, a Control Surface…): its target keeps the
                     // value FL saved instead of being pinned to 0
@@ -2572,6 +2599,22 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 }
             }
             doc.wires.push_back (std::move (w));
+        }
+
+        // the parameter ports FL shows (round 171b): class-2 node ports with the "visible" flag, parameter p (not a
+        // controller output, 0x10000000 + k) — FL's node menu › Inputs / Outputs › Parameters, ticked
+        for (const auto& [pid, port] : graph->ports)
+        {
+            if (port.node < 0 || port.kind != 2 || (port.flags & 2) == 0 || port.index < 0 || port.index >= 0x10000000
+                || (std::size_t) port.node >= nodeOf.size() || nodeOf[(std::size_t) port.node] < 0)
+                continue;
+            auto& node = doc.nodes[(std::size_t) nodeOf[(std::size_t) port.node]];
+            const auto p = flPatcherParam (node, graph->nodes[(std::size_t) port.node].plugin, port.index);
+            if (p < 0)
+                continue;
+            auto& list = port.input ? node.paramIns : node.paramOuts;
+            if (std::find (list.begin(), list.end(), p) == list.end())
+                list.insert (std::upper_bound (list.begin(), list.end(), p), p);
         }
 
         // the Patcher's published parameters (record 1100): Patcher parameter k → the node's parameter behind that port

@@ -17059,3 +17059,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Wfqa170hTests.inc"
 #include "Toxic169hTests.inc"
 #include "Gen169lTests.inc"
+#include "Patcher171bTests.inc"

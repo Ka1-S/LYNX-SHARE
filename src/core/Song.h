@@ -483,6 +483,13 @@ struct PatchWire
 constexpr int patchMidiPortPin (int port) noexcept { return 1 + port; }
 constexpr int patchPinMidiPort (int pin) noexcept { return pin - 1; }
 constexpr int patchMidiPorts = 256;
+// A node's parameter output (round 171b, FL's node menu › Outputs › Parameters): a control cable from a node with
+// fromPort = patchParamOutput (p) carries that node's parameter p (its current value, 0..1) to the destination.
+// (FL numbers it the other way round: parameter p = p, controller output k = 0x10000000 + k, REA_rodada14 §1.3.1.)
+constexpr int patchParamOutputBase = 0x100000;
+constexpr int patchParamOutput (int param) noexcept { return patchParamOutputBase + param; }
+constexpr bool isPatchParamOutput (int port) noexcept { return port >= patchParamOutputBase; }
+constexpr int patchOutputParam (int port) noexcept { return port - patchParamOutputBase; }
 
 // A parameter the Patcher publishes (FL's record 1100): automating the Patcher's parameter k moves this node parameter
 // (through `curve`, as a control cable). node −1 = an unused index.
@@ -886,6 +893,11 @@ struct PatchNode
         bool operator== (const BusHead& o) const;
     };
     std::vector<BusHead> busHeads;
+    // The parameter (event) ports the user activated (round 171b, FL's node menu › Inputs / Outputs › Parameters, the
+    // node's class-2 ports with the "visible" flag): sorted parameter indices (LYNX's own for built-in effects, the
+    // plugin's for hosted plugins). A port with a cable is always shown. An active input is also one of the Patcher's
+    // published parameters (FL gives every active parameter input a Patcher parameter, record 1100).
+    std::vector<int> paramIns, paramOuts;
 
     bool operator== (const PatchNode& o) const;
 };

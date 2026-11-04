@@ -60,4 +60,8 @@ void addMidiParameterItems (juce::PopupMenu& menu, AudioEngine& engine, const Au
 // Submenu with a plugin's parameters (channel instrument or slot effect).
 void addPluginParameterItems (juce::PopupMenu& menu, AudioEngine& engine, juce::AudioPluginInstance& plugin,
                               const AutomationTarget& base);
+
+// Submenu with a Patcher's published parameters (round 171b, issue #65: the parameter inputs activated inside it,
+// FL's record 1100), each with the automation / link items. Nothing when it publishes none.
+void addPatcherParameterItems (juce::PopupMenu& menu, AudioEngine& engine, const PatcherDoc& doc, const AutomationTarget& base);
 } // namespace lynx

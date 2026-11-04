@@ -386,6 +386,17 @@ juce::var patcherToVar (const PatcherDoc& doc)
             }
             v->setProperty ("busHeads", heads);
         }
+        // the activated parameter ports (round 171b)
+        auto list = [] (const std::vector<int>& from) {
+            juce::Array<juce::var> a;
+            for (const auto p : from)
+                a.add (p);
+            return a;
+        };
+        if (! n.paramIns.empty())
+            v->setProperty ("paramIns", list (n.paramIns));
+        if (! n.paramOuts.empty())
+            v->setProperty ("paramOuts", list (n.paramOuts));
         nodes.add (juce::var (v.release()));
     }
     o->setProperty ("nodes", nodes);
@@ -484,6 +495,15 @@ PatcherDoc patcherFromVar (const juce::var& v, const Song& song)
                         head.head = effectFromVar (h["head"]);
                     node.busHeads.push_back (std::move (head));
                 }
+            auto readParams = [] (const juce::var& a, std::vector<int>& out) {
+                if (auto* list = a.getArray())
+                    for (const auto& p : *list)
+                        if (const auto x = (int) p; x >= 0 && x < patchParamOutputBase
+                                                     && std::find (out.begin(), out.end(), x) == out.end())
+                            out.insert (std::upper_bound (out.begin(), out.end(), x), x);
+            };
+            readParams (n["paramIns"], node.paramIns);
+            readParams (n["paramOuts"], node.paramOuts);
             doc.nodes.push_back (std::move (node));
         }
     const auto count = (int) doc.nodes.size();

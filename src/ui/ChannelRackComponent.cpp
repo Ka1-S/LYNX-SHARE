@@ -2345,6 +2345,8 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
         menu.addItem (tr ("Channel settings..."), [this, channel] { openChannelSettings (engine, channel); });
     // FL's wrench tab of the channel window, for every channel (REA round 143b)
     menu.addItem (tr ("Miscellaneous functions (polyphony, cut groups, arpeggiator)..."), [this, channel] { openChannelMisc (engine, channel); });
+    if (c.instrument == InstrumentKind::patcher) // its published parameters (round 171b)
+        addPatcherParameterItems (menu, engine, c.patcher, { AutomationTargetKind::channelParam, channel, 0, 0 });
 
     if (c.instrument == InstrumentKind::plugin)
     {

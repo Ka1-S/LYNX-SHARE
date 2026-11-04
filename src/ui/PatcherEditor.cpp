@@ -28,7 +28,9 @@
 #include "ui/ChannelRackComponent.h"
 #include "ui/ChannelSettings.h"
 #include "ui/ControllerEditors.h"
+#include "ui/AutomationUi.h"
 #include "ui/PluginPicker.h"
+#include "ui/PluginPresetMenu.h"
 #include "ui/PluginWindow.h"
 #include "ui/LayerEditor.h"
 #include "ui/PluginEditors.h"
@@ -205,7 +207,10 @@ public:
         const auto world = toWorld (e.position);
         if (e.mods.isPopupMenu())
         {
-            if (const auto n = nodeAt (*doc, world); n != noNode)
+            if (const auto pin = pinAt (*doc, world); pin && pin->node >= 0 && pin->kind == PatchWire::Kind::control
+                                                      && (! pin->output || isPatchParamOutput (pin->port)))
+                showParamPinMenu (*pin);
+            else if (const auto n = nodeAt (*doc, world); n != noNode)
                 showNodeMenu (n);
             else if (const auto w = wireAt (*doc, e.position); w >= 0)
                 showWireMenu (w);
@@ -640,6 +645,8 @@ private:
     void timerCallback() override
     {
         const auto* doc = currentDoc();
+        if (doc != nullptr && ! surfaceView)
+            watchTweaks (*doc); // (FL's "Last tweaked" of each node, round 171b)
         if (doc == nullptr ? ! shown.empty() : ! (*doc == shown))
         {
             shown = doc != nullptr ? *doc : PatcherDoc {};
@@ -870,6 +877,9 @@ private:
         }
         for (int i = 0; i < ports.audioIns; ++i)
             add (false, PatchWire::Kind::audio, i, i == 0 ? tr ("In") : tr ("Side-chain"));
+        // the activated parameter (event) inputs (round 171b, FL's Inputs › Parameters): a control cable ends on one
+        for (const auto p : patcher::shownParamInputs (d, n))
+            add (false, PatchWire::Kind::control, p, parameterLabel (node, n, p));
         const auto splitter = ! node.generator && node.effect.kind == EffectKind::frequencySplitter && node.busHeads.empty();
         for (int o = 0; o < ports.audioOuts; ++o)
             add (true, PatchWire::Kind::audio, o,
@@ -880,6 +890,9 @@ private:
                                            : tr ("Out {0}", { juce::String (o + 1) }));
         for (int c = 0; c < ports.controlOuts; ++c)
             add (true, PatchWire::Kind::control, c, tr ("Control {0}", { juce::String (c + 1) }));
+        // the activated parameter outputs (round 171b, FL's Outputs › Parameters): the parameter's value goes out
+        for (const auto p : patcher::shownParamOutputs (d, n))
+            add (true, PatchWire::Kind::control, patchParamOutput (p), parameterLabel (node, n, p));
         return pins;
     }
 
@@ -931,7 +944,8 @@ private:
         {
             const auto ports = patcher::nodePorts (d.nodes[(std::size_t) n]);
             const auto midiOuts = midiOutputsShown (d, n);
-            rows = std::max ({ 1, ports.audioIns + (ports.midiIn ? 1 : 0), ports.audioOuts + ports.controlOuts + midiOuts });
+            rows = std::max ({ 1, ports.audioIns + (ports.midiIn ? 1 : 0) + (int) patcher::shownParamInputs (d, n).size(),
+                               ports.audioOuts + ports.controlOuts + midiOuts + (int) patcher::shownParamOutputs (d, n).size() });
         }
         return { at.x, at.y, nodeWidth, headerHeight + (float) rows * pinSpacing + 4.0f };
     }
@@ -980,7 +994,8 @@ private:
         {
             if (w.to < 0 || w.to >= (int) d.nodes.size())
                 return false;
-            b = controlTarget (d, w.to);
+            const auto* to = findPin (pins, w.to, false, w.kind, w.toPort); // its parameter input (round 171b)
+            b = to != nullptr ? to->at : controlTarget (d, w.to);
             return true;
         }
         const auto* to = findPin (pins, w.to, false, w.kind, w.toPort);
@@ -1035,8 +1050,9 @@ private:
         juce::String text;
         if (w.kind == PatchWire::Kind::audio && std::abs (w.gain - 1.0f) > 1e-4f)
             text = juce::String (w.gain, 2) + "x";
-        if (w.kind == PatchWire::Kind::control && w.to >= 0 && w.to < (int) d.nodes.size())
-            text = paramName (d.nodes[(std::size_t) w.to], w.toPort);
+        if (w.kind == PatchWire::Kind::control && w.to >= 0 && w.to < (int) d.nodes.size()
+            && findPin (pins, w.to, false, w.kind, w.toPort) == nullptr) // (on a pin, the pin names it)
+            text = parameterName (d.nodes[(std::size_t) w.to], w.to, w.toPort);
         if (text.isNotEmpty())
         {
             g.setFont (theme::type::caption);
@@ -1085,6 +1101,13 @@ private:
         g.setColour (p.adds ? col::textDisabled : wireColour (p.kind));
         if (p.kind == PatchWire::Kind::midi)
             g.fillRect (juce::Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (s));
+        else if (p.kind == PatchWire::Kind::control) // event (parameter / controller) ports: diamonds (round 171b)
+        {
+            juce::Path diamond;
+            const auto e = r * 1.25f;
+            diamond.addQuadrilateral (s.x, s.y - e, s.x + e, s.y, s.x, s.y + e, s.x - e, s.y);
+            g.fillPath (diamond);
+        }
         else
             g.fillEllipse (juce::Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (s));
         if (zoom >= 0.6f)
@@ -1117,6 +1140,21 @@ private:
         const auto from = dragFrom;
         if (from.kind == PatchWire::Kind::control)
         {
+            // on a parameter input (round 171b, FL's event link): cabled at once
+            if (const auto pin = pinAt (d, world); pin && ! pin->output && pin->kind == PatchWire::Kind::control && pin->node >= 0)
+            {
+                if (pin->node == from.node && pin->port == (isPatchParamOutput (from.port) ? patchOutputParam (from.port) : -1))
+                    return; // (a parameter into itself)
+                PatchWire w;
+                w.kind = PatchWire::Kind::control;
+                w.from = from.node;
+                w.fromPort = from.port;
+                w.to = pin->node;
+                w.toPort = pin->port;
+                edit ([w] (PatcherDoc& doc) { patcher::connect (doc, w); });
+                return;
+            }
+            // on a node: which parameter (it becomes an active parameter input, as if ticked in Inputs › Parameters)
             const auto n = nodeAt (d, world);
             if (n < 0 || n == from.node)
                 return;
@@ -1127,7 +1165,12 @@ private:
                 w.fromPort = from.port;
                 w.to = n;
                 w.toPort = param;
-                edit ([w] (PatcherDoc& doc) { patcher::connect (doc, w); });
+                const auto* doc = currentDoc();
+                const auto name = doc != nullptr && n < (int) doc->nodes.size() ? publishedName (doc->nodes[(std::size_t) n], n, param) : std::string();
+                edit ([w, name] (PatcherDoc& doc) {
+                    patcher::setParamInput (doc, w.to, w.toPort, true, name);
+                    patcher::connect (doc, w);
+                });
             });
             return;
         }
@@ -1216,6 +1259,115 @@ private:
         if (target.channel)
             return patcher::graphOf (engine.getChannelInstrument (target.index).get());
         return patcher::graphOf (engine.getEffect (target.index, target.slot).get());
+    }
+
+    // --- a node's parameters (round 171b, issue #65: FL's node menu › Inputs / Outputs › Parameters) -----------------
+    // The running hosted plugin of node n (null: not a plugin, not running, crashed)
+    juce::AudioPluginInstance* runningPlugin (int n) const
+    {
+        if (const auto* graph = runningGraph(); graph != nullptr && n >= 0 && n < graph->nodeCount())
+        {
+            if (auto* fx = dynamic_cast<PluginEffect*> (graph->effectAt (n).get()))
+                return fx->hasCrashed() ? nullptr : &fx->getInstance();
+            if (auto* in = dynamic_cast<PluginInstrument*> (graph->instrumentAt (n).get()))
+                return in->hasCrashed() ? nullptr : &in->getInstance();
+        }
+        return nullptr;
+    }
+    static bool hostedPlugin (const PatchNode& node)
+    {
+        return node.generator ? node.channel.instrument == InstrumentKind::plugin : node.effect.kind == EffectKind::plugin;
+    }
+    // The parameters a node offers as ports: a built-in effect's, an Envelope Controller's Mod X / Y, a running plugin's
+    std::vector<int> nodeParameters (const PatchNode& node, int n) const
+    {
+        std::vector<int> out;
+        if (isEnvelopeControllerNode (node))
+            return { envelopeControllerModXParam, envelopeControllerModYParam };
+        if (! node.generator && node.effect.kind != EffectKind::plugin)
+        {
+            const auto count = std::min ((int) effectInfo (node.effect.kind).params.size(), maxEffectParams);
+            for (int p = 0; p < count; ++p)
+                out.push_back (p);
+            return out;
+        }
+        if (auto* plugin = hostedPlugin (node) ? runningPlugin (n) : nullptr)
+            for (int p = 0; p < std::min (plugin->getParameters().size(), 4096); ++p)
+                out.push_back (p);
+        return out;
+    }
+    juce::String parameterName (const PatchNode& node, int n, int param) const
+    {
+        if (auto* plugin = hostedPlugin (node) ? runningPlugin (n) : nullptr)
+            if (param >= 0 && param < plugin->getParameters().size())
+                return plugin->getParameters()[param]->getName (60);
+        return paramName (node, param);
+    }
+    // as FL lists them: "1. Gain" (FL's "%d. %s", Patcher_x64 0x7f8c20)
+    juce::String parameterLabel (const PatchNode& node, int n, int param) const
+    {
+        if (isEnvelopeControllerNode (node))
+            return parameterName (node, n, param);
+        return juce::String (param + 1) + ". " + parameterName (node, n, param);
+    }
+    // the name of the Patcher parameter an activated input publishes ("Limiter - Gain")
+    std::string publishedName (const PatchNode& node, int n, int param) const
+    {
+        return patcher::nodeName (node) + " - " + parameterName (node, n, param).toStdString();
+    }
+
+    // FL's "Last tweaked" of a node (Patcher_x64 FUN_00839fc0 / FUN_00839ab0): the parameter last moved by hand —
+    // watched here at the editor's timer: a built-in effect's values in the song, a plugin's own values (the ones its
+    // control cables move are left out)
+    struct TweakWatch
+    {
+        const void* id = nullptr; // what was watched (a plugin instance, a built-in kind): another one starts over
+        std::vector<float> values;
+        int last = -1;
+    };
+    std::vector<TweakWatch> tweaks;
+
+    void watchTweaks (const PatcherDoc& d)
+    {
+        tweaks.resize (d.nodes.size());
+        for (int n = 0; n < (int) d.nodes.size(); ++n)
+        {
+            const auto& node = d.nodes[(std::size_t) n];
+            auto& w = tweaks[(std::size_t) n];
+            const void* id = nullptr;
+            std::vector<float> now;
+            if (auto* plugin = hostedPlugin (node) ? runningPlugin (n) : nullptr)
+            {
+                id = plugin;
+                const auto& params = plugin->getParameters();
+                now.resize ((std::size_t) std::min (params.size(), 4096));
+                for (std::size_t p = 0; p < now.size(); ++p)
+                    now[p] = params[(int) p]->getValue();
+            }
+            else if (! node.generator && node.effect.kind != EffectKind::plugin)
+            {
+                id = reinterpret_cast<const void*> ((std::uintptr_t) node.effect.kind + 1);
+                now.assign (node.effect.params.begin(), node.effect.params.end());
+            }
+            if (id != w.id || now.size() != w.values.size())
+            {
+                w = { id, std::move (now), -1 };
+                continue;
+            }
+            for (std::size_t p = 0; p < now.size(); ++p)
+                if (std::abs (now[p] - w.values[p]) > 1e-6f
+                    && std::none_of (d.wires.begin(), d.wires.end(), [n, p] (const PatchWire& c) {
+                           return c.kind == PatchWire::Kind::control && c.to == n && c.toPort == (int) p;
+                       }))
+                    w.last = (int) p;
+            w.values = std::move (now);
+        }
+    }
+    int lastTweaked (int n) const { return n >= 0 && n < (int) tweaks.size() ? tweaks[(std::size_t) n].last : -1; }
+    void forgetTweaks (int removed)
+    {
+        if (removed >= 0 && removed < (int) tweaks.size())
+            tweaks.erase (tweaks.begin() + removed);
     }
 
     void addNode (PatchNode node, juce::Point<float> at)
@@ -1557,24 +1709,207 @@ private:
         }
         if (n < 0)
             return;
+        if (const auto* d = currentDoc(); d != nullptr && n < (int) d->nodes.size())
+            nodeMenu (n).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+
+public:
+    // FL's node menu (round 171b, issue #65; Patcher_x64 FUN_0083bdc0): Rename..., Save preset as... (plugins),
+    // Disconnect, Delete, Inputs ›, Outputs › (each: Audio / Events / Parameters / Controllers, FUN_00839fc0), with
+    // LYNX's own Open editor on top and Bypass at the end. FL's "Allow threaded processing" / "Align" are not here
+    // (LYNX runs a Patcher's nodes on one thread; no multi-selection yet).
+    juce::PopupMenu nodeMenu (int n)
+    {
         const auto* d = currentDoc();
+        if (d == nullptr || n < 0 || n >= (int) d->nodes.size())
+            return {};
         const auto& node = d->nodes[(std::size_t) n];
+        const auto ports = patcher::nodePorts (node);
         juce::PopupMenu menu;
         menu.addItem (tr ("Open editor"), [this, n] { openNodeEditor (n); });
+        menu.addSeparator();
         menu.addItem (tr ("Rename..."), [this, n] { renameNode (n); });
+        if (hostedPlugin (node))
+            menu.addItem (tr ("Save preset as..."), runningPlugin (n) != nullptr, false, [this, n] { savePresetAs (n); });
+        menu.addSeparator();
+        menu.addItem (tr ("Disconnect"), patcher::nodeHasCables (*d, n), false, [this, n] { edit ([n] (PatcherDoc& doc) { patcher::disconnectNode (doc, n); }); });
+        menu.addItem (tr ("Delete"), [this, n] {
+            selectedNode = noNode;
+            forgetTweaks (n);
+            edit ([n] (PatcherDoc& doc) { patcher::removeNode (doc, n); });
+        });
+        menu.addSeparator();
+
+        // Inputs › / Outputs ›: LYNX's audio and note ports are fixed (listed, ticked); the parameters are FL's
+        auto fixed = [] (const std::vector<juce::String>& names) {
+            juce::PopupMenu m;
+            for (const auto& name : names)
+                m.addItem (name, false, true, nullptr);
+            return m;
+        };
+        auto side = [&] (bool inputs) {
+            juce::PopupMenu m;
+            std::vector<juce::String> audio, events, controllers;
+            if (inputs)
+            {
+                for (int i = 0; i < ports.audioIns; ++i)
+                    audio.push_back (i == 0 ? tr ("In") : tr ("Side-chain"));
+                if (ports.midiIn)
+                    events.push_back (tr ("Notes"));
+            }
+            else
+            {
+                for (int o = 0; o < ports.audioOuts; ++o)
+                    audio.push_back (o == 0 ? tr ("Out") : tr ("Out {0}", { juce::String (o + 1) }));
+                for (int o = 0; o < midiOutputsShown (*d, n); ++o)
+                    events.push_back (tr ("MIDI out"));
+                for (int c = 0; c < ports.controlOuts; ++c)
+                    controllers.push_back (tr ("Control {0}", { juce::String (c + 1) }));
+            }
+            if (! audio.empty())
+                m.addSubMenu (tr ("Audio"), fixed (audio));
+            if (! events.empty())
+                m.addSubMenu (tr ("Events"), fixed (events));
+            if (auto params = parametersMenu (n, inputs); params.getNumItems() > 0)
+                m.addSubMenu (tr ("Parameters"), params);
+            if (! controllers.empty())
+                m.addSubMenu (tr ("Controllers"), fixed (controllers));
+            return m;
+        };
+        auto inputs = side (true), outputs = side (false);
+        menu.addSubMenu (tr ("Inputs"), inputs, inputs.getNumItems() > 0);
+        menu.addSubMenu (tr ("Outputs"), outputs, outputs.getNumItems() > 0);
         if (! node.generator)
+        {
+            menu.addSeparator();
             menu.addItem (tr ("Bypass"), true, ! node.effect.enabled, [this, n] {
                 edit ([n] (PatcherDoc& doc) {
                     if (n < (int) doc.nodes.size())
                         doc.nodes[(std::size_t) n].effect.enabled = ! doc.nodes[(std::size_t) n].effect.enabled;
                 });
             });
-        menu.addSeparator();
-        menu.addItem (tr ("Delete"), [this, n] {
-            selectedNode = noNode;
-            edit ([n] (PatcherDoc& doc) { patcher::removeNode (doc, n); });
+        }
+        return menu;
+    }
+
+    // FL's Parameters submenu (FUN_00839ab0): Activate all, Deactivate all, Deactivate unused, Last tweaked (its name),
+    // then every parameter as a check item ("1. Gain"). Empty: the node offers no parameters (submenu left out).
+    juce::PopupMenu parametersMenu (int n, bool inputs)
+    {
+        juce::PopupMenu m;
+        const auto* d = currentDoc();
+        if (d == nullptr || n < 0 || n >= (int) d->nodes.size())
+            return m;
+        const auto& node = d->nodes[(std::size_t) n];
+        const auto params = nodeParameters (node, n);
+        if (params.empty())
+            return m;
+        const auto shown = inputs ? patcher::shownParamInputs (*d, n) : patcher::shownParamOutputs (*d, n);
+        auto on = [&shown] (int p) { return std::find (shown.begin(), shown.end(), p) != shown.end(); };
+        std::vector<std::string> names;
+        for (const auto p : params)
+            names.push_back (inputs ? publishedName (node, n, p) : std::string());
+        auto set = [n, inputs] (PatcherDoc& doc, int p, bool active, const std::string& name) {
+            inputs ? patcher::setParamInput (doc, n, p, active, name) : patcher::setParamOutput (doc, n, p, active);
+        };
+        m.addItem (tr ("Activate all"), shown.size() < params.size(), false, [this, params, names, set] {
+            edit ([params, names, set] (PatcherDoc& doc) {
+                for (std::size_t i = 0; i < params.size(); ++i)
+                    set (doc, params[i], true, names[i]);
+            });
         });
+        m.addItem (tr ("Deactivate all"), ! shown.empty(), false, [this, shown, set] {
+            edit ([shown, set] (PatcherDoc& doc) {
+                for (const auto p : shown)
+                    set (doc, p, false, {});
+            });
+        });
+        m.addItem (tr ("Deactivate unused"), ! shown.empty(), false, [this, n, inputs] { edit ([n, inputs] (PatcherDoc& doc) { patcher::deactivateUnusedParams (doc, n, inputs); }); });
+        m.addSeparator();
+        const auto last = lastTweaked (n);
+        const auto lastOk = last >= 0 && std::find (params.begin(), params.end(), last) != params.end();
+        m.addItem (lastOk ? tr ("Last tweaked ({0})", { parameterLabel (node, n, last) }) : tr ("Last tweaked"), lastOk, lastOk && on (last),
+                   [this, last, active = lastOk && on (last), name = lastOk && inputs ? publishedName (node, n, last) : std::string(), set] {
+                       edit ([last, active, name, set] (PatcherDoc& doc) { set (doc, last, ! active, name); });
+                   });
+        m.addSeparator();
+        for (std::size_t i = 0; i < params.size(); ++i)
+        {
+            const auto p = params[i];
+            m.addItem (parameterLabel (node, n, p), true, on (p), [this, p, active = on (p), name = names[i], set] {
+                edit ([p, active, name, set] (PatcherDoc& doc) { set (doc, p, ! active, name); });
+            });
+        }
+        return m;
+    }
+
+private:
+    // a parameter (event) port's menu (round 171b; FL's port menu, FUN_0083ce50: Deactivate, Disconnect all, then the
+    // host's items): an input is a Patcher parameter, so it can be automated / linked from outside the Patcher
+    void showParamPinMenu (const Pin& pin)
+    {
+        const auto* d = currentDoc();
+        if (d == nullptr || pin.node < 0 || pin.node >= (int) d->nodes.size())
+            return;
+        const auto n = pin.node;
+        const auto input = ! pin.output;
+        const auto param = input ? pin.port : patchOutputParam (pin.port);
+        auto touches = [n, input, port = pin.port] (const PatchWire& w) {
+            return w.kind == PatchWire::Kind::control && (input ? (w.to == n && w.toPort == port) : (w.from == n && w.fromPort == port));
+        };
+        juce::PopupMenu menu;
+        menu.addItem (tr ("Deactivate"), [this, n, input, param] {
+            edit ([n, input, param] (PatcherDoc& doc) {
+                input ? patcher::setParamInput (doc, n, param, false) : patcher::setParamOutput (doc, n, param, false);
+            });
+        });
+        menu.addItem (tr ("Disconnect all"), std::any_of (d->wires.begin(), d->wires.end(), touches), false,
+                      [this, touches] { edit ([touches] (PatcherDoc& doc) { std::erase_if (doc.wires, touches); }); });
+        if (input)
+        {
+            auto k = patcher::publishedIndex (*d, n, param);
+            if (k < 0) // (a cabled port never activated: publish it first)
+            {
+                const auto name = publishedName (d->nodes[(std::size_t) n], n, param);
+                edit ([n, param, name] (PatcherDoc& doc) { patcher::setParamInput (doc, n, param, true, name); });
+                if (const auto* now = currentDoc())
+                    k = patcher::publishedIndex (*now, n, param);
+            }
+            if (k >= 0)
+            {
+                menu.addSeparator();
+                const AutomationTarget t = target.channel ? AutomationTarget { AutomationTargetKind::channelParam, target.index, 0, k }
+                                                          : AutomationTarget { AutomationTargetKind::effectParam, target.index, target.slot, k };
+                addAutomationItem (menu, engine, t);
+            }
+        }
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+
+    std::unique_ptr<juce::FileChooser> presetChooser; // node menu › Save preset as...
+    void savePresetAs (int n)
+    {
+        const auto* d = currentDoc();
+        auto* plugin = runningPlugin (n);
+        if (d == nullptr || plugin == nullptr || n >= (int) d->nodes.size())
+            return;
+        const auto pluginName = plugin->getName();
+        const auto folder = pluginpresetui::folderFor (pluginName);
+        folder.createDirectory();
+        presetChooser = std::make_unique<juce::FileChooser> (tr ("Save preset as..."), folder.getChildFile (juce::String::fromUTF8 (patcher::nodeName (d->nodes[(std::size_t) n]).c_str()) + ".lynxpreset"),
+                                                             pluginpresetui::saveWildcard (*plugin));
+        juce::Component::SafePointer<PatcherEditor> safe (this);
+        presetChooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting, [safe, n] (const juce::FileChooser& chooser) {
+            const auto file = chooser.getResult();
+            if (safe == nullptr || file == juce::File())
+                return;
+            if (auto* p = safe->runningPlugin (n))
+            {
+                juce::String error;
+                if (! pluginpresetui::save (*p, file, file.getFileNameWithoutExtension(), error))
+                    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save preset as..."), error);
+            }
+        });
     }
 
     // FL's I/O node menu (round 162, Patcher_x64 FUN_00839ab0 / FUN_0083ce50): Disconnect all, and per kind of pin
@@ -2127,6 +2462,16 @@ void shootMenus (AudioEngine& engine, bool channel, int index, int slot, std::fu
     menus.emplace_back ("from-events", events);
     menus.emplace_back ("to-node", editor.hostMenu (false, &events));
     menus.emplace_back ("to-events", events);
+    // round 171b (issue #65): FL's node menu and its Inputs › Parameters of the first node that has parameters
+    if (const auto* doc = Target { channel, index, slot }.doc (engine.getSong()))
+        for (int n = 0; n < (int) doc->nodes.size(); ++n)
+            if (auto params = editor.parametersMenu (n, true); params.getNumItems() > 0)
+            {
+                menus.emplace_back ("node", editor.nodeMenu (n));
+                menus.emplace_back ("node-inputs-parameters", params);
+                menus.emplace_back ("node-outputs-parameters", editor.parametersMenu (n, false));
+                break;
+            }
     for (auto& [name, menu] : menus)
     {
         auto& desktop = juce::Desktop::getInstance();

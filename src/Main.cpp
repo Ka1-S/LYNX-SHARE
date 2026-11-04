@@ -7550,6 +7550,20 @@ private:
                 wire (lynx::patchFromHost, 1, 3, 0);
                 wire (3, 1, 2, 2, 1.0f, lynx::PatchWire::Kind::control);
                 wire (0, 2, lynx::patchToHost, 1, 0.7f);
+                // round 171b (issue #65): a Surface knob on the reverb's parameter input 1, the reverb's parameter 0 out to
+                // the delay's parameter input 2 (FL's Inputs / Outputs › Parameters)
+                {
+                    lynx::SurfaceControl knob;
+                    knob.name = "Knob 1";
+                    knob.value = 0.6f;
+                    slot.patcher.surface = { knob };
+                    slot.patcher.surfaceX = 200.0f, slot.patcher.surfaceY = 380.0f;
+                    lynx::patcher::setParamInput (slot.patcher, 1, 1, true, "Reverb - 2");
+                    lynx::patcher::setParamOutput (slot.patcher, 1, 0, true);
+                    lynx::patcher::setParamInput (slot.patcher, 2, 2, true, "Delay - 3");
+                    wire (lynx::patchSurface, 0, 1, 1, 1.0f, lynx::PatchWire::Kind::control);
+                    wire (1, lynx::patchParamOutput (0), 2, 2, 1.0f, lynx::PatchWire::Kind::control);
+                }
                 slot.patcher.outputTracks = { 3 };
                 slot.patcher.inputX = -20.0f;
                 slot.patcher.outputX = 660.0f;
