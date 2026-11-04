@@ -138,23 +138,34 @@ null / response / THD / GR-curve comparisons without the plugins.
 
 **fxmeasure fixes found on the way** (tools/fxmeasure):
 - a Waves shell's first instance in a process comes up as another of its plugins (LYNX's PluginHost has handled it
-  since round 121, fxmeasure did not): every Waves measurement so far ran **Dorrough360 5.0**, a surround meter whose
-  output is the input — round 170g's Waves rows ("identical: true") and any earlier fxmeasure Waves data must be
-  re-checked. Now created again until the right one comes (as LYNX does);
+  since round 121, fxmeasure did not): today "CLA-2A Stereo" came up as **Dorrough360 5.0**, a surround meter whose
+  output is the input — round 170g's Waves rows ("identical: true", 5-channel buses) measured that meter, not the
+  plugins. Earlier rounds' Waves data show real processing (165x's CLA-2A gain-reduction curves, 152's RComp), so the
+  swap does not happen every time; the log now names the instance, and fxmeasure creates it again until the right
+  one comes (as LYNX does);
 - a 5-channel main bus is asked for stereo;
 - `#` started a comment anywhere, so `set #12 0.5` (by index) never worked: now only at the line start or " # ";
 - `buses` prints the layouts a plugin accepts.
 With the fix and the new licence, CLA-2A runs (gain +8.5 dB at its default) with no demo dropout over 75 s.
 
+### Stepper audit (`--steppertest`)
+45 steppers in the generated effect editors (all pages): Fruity WaveShaper Oversampling, Fruity Limiter attack /
+release / comp. curves, Envelope sidechain, Maximus' six band curves (×2 pages), Vocodex Mod / Car input and Bands,
+Fruity Delay 3 / Delay Bank dividers and repeats, Gross Beat, Patcher MIDI channel, hardware insert round trip...
+- Windows (FL installed, its Default presets loaded): 45 OK, 0 failures (/mnt/e/lynx-work/plugq170c/win/steppertest-win.txt).
+- Linux (no FL): 34 OK, 11 SKIP — Maximus' curves and Vocodex' inputs live in FL's state, and a slot without FL's
+  state cannot be edited (`stateparams::Table::with` leaves it unchanged): on a machine without FL those controls are
+  dead. Open: a built-in default state for Maximus / Vocodex (a new instance without FL), see the audit table.
+- macOS: CI app job (artifact editor-pictures-macOS, steppertest.txt).
+Before the change the same probe failed the body click (nothing), the trackpad (one tiny event = a whole step,
+so a scroll jumped several values) and, on captioned steppers, the lower part of the up arrow.
+Instrument editors (Sytrus, Toxic, 3x Osc...) have their own steppers (the generator editor), not covered by this
+probe yet.
+
 ## Where I stopped
-- done: #11 diagnosis + skin fix + JUCE patch 12 (CoreGraphics empty path), `--gfxprobe`, CI editor pictures step
-  (Linux + macOS app jobs), Facet analyser grid; #15 Ember Tube curve (measured before / after); #14 stepper click;
-  audit fixes (meter wells, limiter trail, Echoform idle controls, Crest Drive, Hush guard, Atrium early modulation);
-  PARITY.md Sound / Stability columns; tests (tests/PlugQ170cTests.inc), build-local 1 963 870 checks, 0 failures;
-  Linux app build + `--plugui` pictures (Facet EQ draws; /mnt/e/lynx-work/plugq170c/plugui-linux).
-- pending: the macOS CI pictures (runs on wip/plugq170c-probe = without patch 12, wip/plugq170c = with it) were still
-  queued at landing; check the editor-pictures-macOS artifact and `gfxprobe.txt` (raw drawText > 0, drawFilledText 0).
-- next (audit, open rows): Fruity Limiter scrolling envelope, Ember dimming of overridden controls + Voicing switch,
-  Toxic Bend (pitch bend to native generators), 3x Osc default page, Sytrus operator / filter pages, ProEditor partial
-  repaints, one analyser tap per slot; Parametric EQ 2 law on new instances = user decision.
-- rerun: scratchpad linbuild.sh (buildslot), tool/em.cpp measurements (/mnt/e/lynx-work/plugq170c/ember-*.txt).
+- part 1 (feature/plugq170c): in the merge train (queued 02:45, batch of 6).
+- part 2 (feature/plugq170c2): steppers + --steppertest (Linux 34 OK / 11 SKIP, Windows 45 OK), fxmeasure fixes,
+  Saturn 2 comparison, PARITY Facet / Atrium stability 7, build-local 1 963 936 checks 0 failures, Windows build OK
+  (gfxprobe 0 on Windows, Linux, macOS CI). Train next.
+- running outside git: /mnt/e/lynx-work/refcap0124 captures (run_all.sh, waves_run.sh, redo.sh); README there.
+- next: Maximus / Vocodex default state without FL; instrument-editor steppers; re-measure the Waves pairs from refcap.
