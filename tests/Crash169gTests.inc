@@ -57,6 +57,13 @@ std::vector<std::uint8_t> fakePe (std::uint32_t checksum, std::uint32_t certAt, 
     put32 (0x80 + 24 + 112 + 36, certAt != 0 ? (std::uint32_t) (size - certAt) : 0u);
     return b;
 }
+struct Job
+{
+    explicit Job (std::atomic<int>& l) : live (l) { ++live; }
+    ~Job() { --live; deletedOn = std::this_thread::get_id(); }
+    std::atomic<int>& live;
+    static inline std::thread::id deletedOn {};
+};
 } // namespace crash169g
 
 TEST (crash169g_pe_image_hash_ignores_the_signature)
@@ -189,13 +196,7 @@ TEST (crash169g_other_engine_dlls_of_fl_2025)
 // waiting for the worker; the object is still made and deleted by the posted calls only
 TEST (crash169g_message_thread_owned_cancel)
 {
-    struct Job
-    {
-        explicit Job (std::atomic<int>& l) : live (l) { ++live; }
-        ~Job() { --live; deletedOn = std::this_thread::get_id(); }
-        std::atomic<int>& live;
-        static inline std::thread::id deletedOn {};
-    };
+    using Job = crash169g::Job;
     std::mutex lock;
     std::vector<std::function<void()>> queue; // the "message thread": runs only when the test says so
     auto post = [&] (std::function<void()> f) {
