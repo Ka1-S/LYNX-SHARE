@@ -944,7 +944,8 @@ juce::String artSelfTest()
     expect (styleFor (EffectKind::facetEq) == Style::themed && styleFor (EffectKind::nebula) == Style::themed, "pilots are Themed");
     expect (styleFor (EffectKind::peakController) == Style::glow, "others keep their style");
     for (const auto k : { EffectKind::ridgeStrip, EffectKind::crestCompressor, EffectKind::apexLimiter, EffectKind::prismMultiband, EffectKind::sentryGate,
-                          EffectKind::glowLeveler, EffectKind::hushDeEsser }) // round 170k: the effects' themes, batch 1
+                          EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::epochVerb, EffectKind::atrium, EffectKind::foilPlate,
+                          EffectKind::halo, EffectKind::horizon, EffectKind::reeverb2, EffectKind::luxeVerb, EffectKind::reeverb1 }) // round 170k: the effects' themes
         expect (artForEffect (k) != Art::none && styleFor (k) == Style::themed, "effect themes (170k)");
     expect (resolve (Style::themed, Art::sakura) == Style::themed && resolve (Style::neon, Art::none) == Style::neon, "automatic");
     setForcedStyle ((int) Style::themed); // Themed everywhere: only plugins with art

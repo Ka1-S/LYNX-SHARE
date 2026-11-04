@@ -6135,7 +6135,12 @@ private:
                                                  { "apex-limiter", false, I::synth, E::apexLimiter, S::glow },          { "prism-multiband", false, I::synth, E::prismMultiband, S::glow },
                                                  { "sentry-gate", false, I::synth, E::sentryGate, S::neon },            { "glow-leveler", false, I::synth, E::glowLeveler, S::hardware },
                                                  { "hush-de-esser", false, I::synth, E::hushDeEsser, S::glow } };
+        static const std::vector<ArtPilot> fx2 { { "epoch-verb", false, I::synth, E::epochVerb, S::hardware }, { "atrium", false, I::synth, E::atrium, S::neon },
+                                                 { "foil-plate", false, I::synth, E::foilPlate, S::hardware },  { "halo", false, I::synth, E::halo, S::neon },
+                                                 { "horizon", false, I::synth, E::horizon, S::vivid },          { "fruity-reeverb-2", false, I::synth, E::reeverb2, S::hardware },
+                                                 { "luxeverb", false, I::synth, E::luxeVerb, S::glow },         { "fruity-reeverb", false, I::synth, E::reeverb1, S::glow } };
         if (artSet() == "fx1") return fx1;
+        if (artSet() == "fx2") return fx2;
         return list;
     }
 
