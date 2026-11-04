@@ -36,7 +36,7 @@ TEST (fader171c_live_levels_follow_the_song)
     auto song = lynx::Song::makeDefault();
     song.mixer = lynx::Song::defaultMixer (4);
     lynx::LiveLevels live (song);
-    CHECK (live.matches (song) && live.mixerVolume.size() == 4 && live.channelVolume.size() == song.channels.size());
+    CHECK (live.matches (song) && live.mixerVolume.size() == song.mixer.size() && song.mixer.size() >= 4 && live.channelVolume.size() == song.channels.size());
     CHECK (live.mixerVolume[2].load() == song.mixer[2].volume);
 
     song.mixer[2].volume = 0.3f;

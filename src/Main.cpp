@@ -4248,6 +4248,10 @@ private:
             return;
         }
 
+        // LYNX_UIPERF_MUTE=1: the Master fader down (the meters of the inserts still move): a run on a desktop someone uses
+        if (juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_MUTE", {}) == "1")
+            engine->editSong ([] (lynx::Song& s) { if (! s.mixer.empty()) s.mixer[0].volume = 0.0f; }, false);
+
         struct Step
         {
             juce::String name;
