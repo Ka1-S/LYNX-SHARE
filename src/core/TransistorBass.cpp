@@ -2299,6 +2299,8 @@ public:
         gainL = std::sqrt (1.0f - p);
     }
     void setPitchExpression (float semis) noexcept { engine->pitchExpr = semis * 0.009999999776482582f; }
+    // MIDI CC 7 (FUN_18000d780: value/127, applied before the reverb; round 169g2)
+    void setMidiVolume (int cc7) noexcept { midiVolume = (float) ((double) std::clamp (cc7, 0, 127) / 127.0); }
     void setCutExpression (float x) noexcept { engine->cutExpr = x; }
     void setResExpression (float y) noexcept { engine->resExpr = y; }
 
@@ -2885,6 +2887,16 @@ public:
                 sent[(std::size_t) k] = true;
             }
         plugin->setTempo (tempo.load());
+        // FL's channel volume reaches the plugin only as MIDI CC 7 (Final.Vol is not read, §2.10): raw volume
+        // (0…12800)·128/12800 truncated, at most 127, as Kepler's host (REA_rodada165g-flbeta165k §3); LYNX's gains are
+        // channelGain(v) = (11^v − 1)/10, so v comes back as log(10·g + 1)/log 11 (round 169g2: was the channel gain on
+        // the output, 3 dB below FL at the default volume)
+        {
+            const auto v = vol > 0.0 ? std::log (10.0 * vol + 1.0) / std::log (11.0) : 0.0;
+            const auto cc7 = (int) std::min<long long> (127, std::max<long long> (0, std::llround (v * 12800.0) / 100));
+            if (cc7 != sentVolume)
+                plugin->setMidiVolume (sentVolume = cc7);
+        }
         float peak = 0.0f;
         for (int done = 0; done < n;)
         {
@@ -2897,11 +2909,10 @@ public:
                 slide.advance ((float) m);
             }
             plugin->render (scratchL.data(), scratchR.data(), m);
-            const auto g = (float) vol;
             for (int i = 0; i < m; ++i)
             {
-                left[done + i] += scratchL[(std::size_t) i] * g;
-                right[done + i] += scratchR[(std::size_t) i] * g;
+                left[done + i] += scratchL[(std::size_t) i];
+                right[done + i] += scratchR[(std::size_t) i];
                 peak = std::max ({ peak, std::fabs (scratchL[(std::size_t) i]), std::fabs (scratchR[(std::size_t) i]) });
             }
             done += m;
@@ -2931,6 +2942,7 @@ private:
             sounding.fill (false);
             quiet = 0;
             liveParams.clear(); // (built from the newest state)
+            sentVolume = -1;
             selected.store (plugin != nullptr ? plugin->editedProgram() : -1);
         }
         if (plugin != nullptr)
@@ -3007,6 +3019,7 @@ private:
     std::atomic<double> rate { 44100.0 }, tempo { 140.0 };
     std::atomic<float> channelCents { 0.0f };
     std::atomic<int> selected { -1 }; // the plugin's program (selectedProgram)
+    int sentVolume = -1;              // the MIDI volume sent to the plugin
     std::vector<std::uint8_t> state;
     std::string dllPath;
     int quiet = 0;

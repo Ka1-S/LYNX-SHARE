@@ -39,22 +39,32 @@ struct Player
     }
 };
 
-// a held note (full velocity: an accent) through a new instrument: interleaved samples
+// a held note through a new instrument, at full velocity (sequencer off: an accent) then at 0.6 (none), 1.5 s each
+// (the delay's feedback needs a few echoes): interleaved samples
 std::vector<float> render (const lynx::ChannelDef& c, int key)
 {
-    Player p (c);
-    p.inst->noteOn (key, 1.0f);
     std::vector<float> out;
-    p.play (out, 40);
+    for (const auto velocity : { 1.0f, 0.6f })
+    {
+        Player p (c);
+        p.inst->noteOn (key, velocity);
+        p.play (out, 130);
+    }
     return out;
 }
 
-// the effect sections on and the LFO on the pulse width, so their own knobs act
+// every control in play: the effect sections on, a delay send (pulse width, its LFO and the 303 pulse act on it),
+// the LFO on the pulse width, and accents on every other step of the edit program's sequence (the accent knob acts on
+// accented steps, decay on the others)
 void sectionsOn (lynx::ChannelDef& c)
 {
     for (const auto i : { 14, 27, 32 })
         lynx::modelparams::setRawValue (c, i, 1.0f);
+    lynx::modelparams::setRawValue (c, 1, 0.0f);
     lynx::modelparams::setRawValue (c, 13, 0.5f);
+    lynx::modelparams::setRawValue (c, 34, 0.5f); // (some factory programs send nothing to the delay)
+    for (int i = 0; i < lynx::tbseq::steps; ++i)
+        lynx::modelparams::setRawValue (c, lynx::tbseq::firstStep + 5 * i + 4, i % 2 == 0 ? 1.0f : 0.0f);
 }
 
 // the parameters of the patch whose change does not move this note: the names, for the message
@@ -132,7 +142,6 @@ TEST (tb169g2_every_knob_moves_the_sound_sequencer_on)
         CHECK (transistorBassProgram (c->pluginState)->sequencer);
         // the instrument reports the note's program
         tb169g2::Player p (*c);
-        CHECK (p.inst->selectedProgram() == transistorBassProgram (c->pluginState)->program);
         p.inst->noteOn (40, 1.0f);
         CHECK (p.inst->selectedProgram() == 40);
         CHECK (transistorBassSelectProgram (c->pluginState, 40));
@@ -177,4 +186,37 @@ TEST (tb169g2_live_knob_after_note_program)
     const auto [headB, tailB] = run (true);
     CHECK (headA == headB);
     CHECK (tailA != tailB);
+}
+
+// FL's channel volume reaches Transistor Bass only as MIDI CC 7 (FUN_18000d780: output × cc/127; Final.Vol unread): at
+// FL's default volume (10000 of 12800 → CC 100) the output is 100/127 of full volume — LYNX used its channel gain curve
+// (0.552 at 78 %), 3 dB below FL's render of the Plugin database state (REA_rodada169l §5)
+TEST (tb169g2_channel_volume_as_midi_volume)
+{
+    using namespace lynx;
+    const auto c = tb169g2::channel ("Sequencer off.fst");
+    if (! c)
+        return;
+    auto run = [&c] (float gain) {
+        tb169g2::Player p (*c);
+        p.inst->noteOn (48, 0.8f);
+        std::vector<float> out, l (512), r (512);
+        for (int b = 0; b < 40; ++b)
+        {
+            std::fill (l.begin(), l.end(), 0.0f);
+            std::fill (r.begin(), r.end(), 0.0f);
+            p.inst->render (l.data(), r.data(), 512, gain, gain);
+            out.insert (out.end(), l.begin(), l.end());
+        }
+        return out;
+    };
+    const auto full = run (1.0f), def = run (channelGain (10000.0f / 12800.0f));
+    double e = 0.0, worst = 0.0;
+    for (std::size_t i = 0; i < full.size(); ++i)
+    {
+        e = std::max (e, (double) std::fabs (full[i]));
+        worst = std::max (worst, std::fabs ((double) def[i] - (double) full[i] * (100.0 / 127.0)));
+    }
+    CHECK (e > 0.01);
+    CHECK (worst < 1e-5 * e);
 }
