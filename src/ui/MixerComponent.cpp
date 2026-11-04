@@ -135,12 +135,15 @@ MixerStrips::MixerStrips (AudioEngine& e)
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
     engine.addChangeListener (this);
+    engine.getLevelsBroadcaster().addChangeListener (this);
     updateSize();
-    startTimerHz (30);
+    // 60 Hz: faders that follow their automation move every frame (round 171c); the meters keep their 30 Hz ballistics
+    startTimerHz (60);
 }
 
 MixerStrips::~MixerStrips()
 {
+    engine.getLevelsBroadcaster().removeChangeListener (this);
     engine.removeChangeListener (this);
 }
 
@@ -1423,7 +1426,7 @@ void MixerStrips::setValue (Part part, int t, double value)
 
     if (part == Part::stereo)
     {
-        engine.editSong ([t, v = (float) value] (Song& s) { s.mixer[(std::size_t) t].stereo = v; });
+        engine.editLevels ([t, v = (float) value] (Song& s) { s.mixer[(std::size_t) t].stereo = v; });
         return;
     }
 
@@ -1432,14 +1435,14 @@ void MixerStrips::setValue (Part part, int t, double value)
     const auto group = dragTrack == t && dragPart == part ? groupStart : std::vector<std::pair<int, float>> {};
 
     if (part == Part::pan)
-        engine.editSong ([t, v = (float) value, group, delta] (Song& s) {
+        engine.editLevels ([t, v = (float) value, group, delta] (Song& s) {
             s.mixer[(std::size_t) t].pan = v;
             for (auto [other, start] : group)
                 if (other < (int) s.mixer.size())
                     s.mixer[(std::size_t) other].pan = juce::jlimit (-1.0f, 1.0f, start + delta);
         });
     else if (part == Part::fader)
-        engine.editSong ([t, v = (float) value, group, delta] (Song& s) {
+        engine.editLevels ([t, v = (float) value, group, delta] (Song& s) {
             s.mixer[(std::size_t) t].volume = v;
             for (auto [other, start] : group)
                 if (other < (int) s.mixer.size())
@@ -2494,6 +2497,27 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
 
 void MixerStrips::changeListenerCallback (juce::ChangeBroadcaster*)
 {
+    // only levels moved since the last call (a fader / knob drag, AudioEngine::editLevels; round 171c): repaint just
+    // the strips whose fader, pan or separation changed instead of the whole mixer at every mouse move
+    const auto& mixer = engine.getSong().mixer;
+    if (engine.getPublishCount() == seenPublish && shownLevels.size() == mixer.size())
+    {
+        for (std::size_t t = 0; t < mixer.size(); ++t)
+        {
+            const std::array<float, 3> now { mixer[t].volume, mixer[t].pan, mixer[t].stereo };
+            if (now != shownLevels[t])
+            {
+                shownLevels[t] = now;
+                repaint (stripX ((int) t), 0, stripWidthOf ((int) t), getHeight());
+            }
+        }
+        return;
+    }
+    seenPublish = engine.getPublishCount();
+    shownLevels.resize (mixer.size());
+    for (std::size_t t = 0; t < mixer.size(); ++t)
+        shownLevels[t] = { mixer[t].volume, mixer[t].pan, mixer[t].stereo };
+
     selected = juce::jlimit (0, juce::jmax (0, (int) engine.getSong().mixer.size() - 1), selected);
     const auto count = (int) engine.getSong().mixer.size();
     selection.erase (std::remove_if (selection.begin(), selection.end(), [count] (int t) { return t >= count; }), selection.end());
@@ -2545,6 +2569,8 @@ void MixerStrips::timerCallback()
     auto& meters = engine.getMeters();
     const auto showing = isShowing();
     repaintAutomatedStrips();
+    if ((++timerTicks & 1) != 0) // (the meters and input bars: every other tick, 30 Hz)
+        return;
     const auto& mixer = engine.getSong().mixer;
     inputLevels.resize (mixer.size(), 0.0f);
 

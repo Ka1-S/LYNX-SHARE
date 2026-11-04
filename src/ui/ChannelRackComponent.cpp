@@ -151,6 +151,7 @@ ChannelRackComponent::ChannelRackComponent (AudioEngine& e)
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
     engine.addChangeListener (this);
+    engine.getLevelsBroadcaster().addChangeListener (this);
     previews.setSender ([this] (int channel, int key, float velocity, bool on) { engine.sendLiveNote (channel, key, velocity, on); });
     updateSize();
     startTimerHz (30);
@@ -159,6 +160,7 @@ ChannelRackComponent::ChannelRackComponent (AudioEngine& e)
 ChannelRackComponent::~ChannelRackComponent()
 {
     previews.releaseAll();
+    engine.getLevelsBroadcaster().removeChangeListener (this);
     engine.removeChangeListener (this);
 }
 
@@ -1053,9 +1055,9 @@ void ChannelRackComponent::setValue (Area area, int row, double value)
         return;
 
     if (area == Area::pan)
-        engine.editSong ([row, v = (float) value] (Song& s) { s.channels[(std::size_t) row].pan = v; });
+        engine.editLevels ([row, v = (float) value] (Song& s) { s.channels[(std::size_t) row].pan = v; });
     else if (area == Area::volume)
-        engine.editSong ([row, v = (float) value] (Song& s) { s.channels[(std::size_t) row].volume = v; });
+        engine.editLevels ([row, v = (float) value] (Song& s) { s.channels[(std::size_t) row].volume = v; });
     else if (area == Area::route)
     {
         const auto track = juce::roundToInt (value);

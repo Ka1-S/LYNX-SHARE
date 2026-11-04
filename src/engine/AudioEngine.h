@@ -480,6 +480,19 @@ public:
     // settings are copied into the Song first, so the undo step has them; the moved plugins keep their instances (the
     // rack matches them by instance tag, round 168s).
     void editSongStructural (const std::function<void (Song&)>& edit);
+    // An edit that changes only levels (mixer volume / pan / separation, channel volume / pan), e.g. a fader drag: one
+    // undo step per press like editSong, but the playing snapshot takes the values at once without a rebuild (round
+    // 171c); the full publish follows when the mouse is released. Anything else falls back to editSong.
+    void editLevels (const std::function<void (Song&)>& edit, bool undoable = true);
+    // the publish editLevels deferred, now (tests; the timer does it after a drag)
+    void flushLevels();
+    std::uint64_t getLevelEditCount() const noexcept { return levelEdits; }
+    // editLevels notifies this one only (the engine's own change message follows with the full publish after the drag):
+    // the ~45 views listening to the engine would otherwise all repaint at every mouse move. The views that show
+    // levels (Mixer strips, Channel Rack) listen to it too.
+    juce::ChangeBroadcaster& getLevelsBroadcaster() noexcept { return levelsChanged; }
+    // + 1 at every full publish (not at a level-only edit): listeners can tell a drag's level change from the rest
+    std::uint64_t getPublishCount() const noexcept { return publishCount; }
 
     // Changes since the last save/open (for the "*" in the title and the "save changes?" prompt).
     bool isModified() const noexcept { return modified; }
@@ -972,6 +985,12 @@ private:
     void sessionStep (bool redo);
     juce::Time lastUndoPress; // mouse click that already produced an undo step
     SnapshotExchange<RackState> rackExchange;
+    std::shared_ptr<LiveLevels> publishedLevels; // the last snapshot's live levels (editLevels writes them)
+    bool levelsPending = false;                  // editLevels changed the Song since the last publish
+    juce::ChangeBroadcaster levelsChanged;
+    std::uint64_t levelEdits = 0;                // (diagnostics / tests)
+    std::uint64_t publishCount = 0;
+    void saveUndoStep();
     RackState lastPublishedShape; // channels + instruments of the last snapshot, to reuse voices
     std::vector<int> standInChannels, standInInserts; // (playsStandIn)
     // Issue #36 (u-he Presswerk crashed in its VST3 teardown, freed from the engine's timer callback): the racks the
