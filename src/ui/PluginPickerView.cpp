@@ -740,11 +740,9 @@ private:
         if (hover)
         {
             // FL's dark label under it: the name, then the category
-            const auto category = (t.generator ? tr ("Generators") : tr ("Effects")) + " / " + tr (t.category.c_str());
+            const auto category = categoryText (t);
             const auto nameFont = juce::Font (font (17.0f, true)), catFont = juce::Font (font (type::body));
-            const auto w = juce::jmax (juce::GlyphArrangement::getStringWidthInt (nameFont, t.name), juce::GlyphArrangement::getStringWidthInt (catFont, category)) + 16;
-            auto box = juce::Rectangle<float> ((float) w, 44.0f).withCentre ({ cell.getCentreX(), cell.getBottom() + 26.0f });
-            box = box.constrainedWithin (tileArea().toFloat().withTrimmedBottom (-headerHeight));
+            const auto box = labelBox (t, cell);
             g.setColour (colour::bg0.withAlpha (0.94f));
             g.fillRoundedRectangle (box, radius::md);
             g.setColour (colour::border);
@@ -757,6 +755,20 @@ private:
             g.setFont (catFont);
             g.drawText (category, lines, juce::Justification::centredLeft);
         }
+    }
+
+    juce::String categoryText (const Tile& t) const
+    {
+        return (t.generator ? tr ("Generators") : tr ("Effects")) + " / " + tr (t.category.c_str());
+    }
+
+    // the label under the tile pointed at (`cell` = the tile as drawn, 8 % bigger), kept inside the tile area
+    juce::Rectangle<float> labelBox (const Tile& t, juce::Rectangle<float> cell) const
+    {
+        const auto nameFont = juce::Font (theme::font (17.0f, true)), catFont = juce::Font (theme::font (theme::type::body));
+        const auto w = juce::jmax (juce::GlyphArrangement::getStringWidthInt (nameFont, t.name), juce::GlyphArrangement::getStringWidthInt (catFont, categoryText (t))) + 16;
+        return juce::Rectangle<float> ((float) w, 44.0f).withCentre ({ cell.getCentreX(), cell.getBottom() + 26.0f })
+            .constrainedWithin (tileArea().toFloat().withTrimmedBottom (-headerHeight));
     }
 
     void paintStrip (juce::Graphics& g)
@@ -909,7 +921,11 @@ private:
     {
         if (i == hoverTile)
             return;
-        auto area = [this] (int k) { return tiles[(std::size_t) k].bounds.expanded (tiles[(std::size_t) k].bounds.getWidth() / 10 + 14, 80); };
+        auto area = [this] (int k) {
+            const auto& t = tiles[(std::size_t) k];
+            const auto cell = t.bounds.toFloat().withSizeKeepingCentre (t.bounds.getWidth() * 1.08f, t.bounds.getHeight() * 1.08f);
+            return t.bounds.expanded (t.bounds.getWidth() / 10 + 14, 14).getUnion (labelBox (t, cell).expanded (4.0f).getSmallestIntegerContainer());
+        };
         if (juce::isPositiveAndBelow (hoverTile, (int) tiles.size()))
             repaint (area (hoverTile));
         hoverTile = i;
@@ -918,7 +934,7 @@ private:
     }
 
     // Up / Down, Ctrl+wheel (FL): the next / previous tile in the list, wrapping, skipping dimmed ones; it is shown
-    // as pointed at (FL moves the mouse pointer onto it; LYNX leaves the pointer where it is)
+    // as pointed at and the mouse pointer moves onto it (FL)
     void stepTile (int delta)
     {
         const auto order = shownInOrder();
