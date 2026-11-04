@@ -69,5 +69,7 @@ reads and writes the parameters and now also reads the link map.
 
 ## 5. Where I stopped
 
-- REA complete (items 1–16). Engine, parameters, layout pages, stepper units, tests written.
-- Next: full build + tests, i18n, Windows build, shots, wip push, train.
+- Done: REA (items 1–16), engine, parameters, the Mod / MIDI / Seq pages (the panel's old "Modulation" title replaced
+  by the tabs, as FL), stepper units (click, drag, wheel), translations, tests (`tests/Toxic169hTests.inc`, green),
+  Windows build, shots (`/mnt/e/lynx-work/r169h/toxic`, `--instrumentshot` now also saves each extra layout page).
+- Remaining: §4.
