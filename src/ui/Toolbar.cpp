@@ -214,8 +214,13 @@ void TimeDisplay::paint (juce::Graphics& g)
 
     g.setColour (colour::textPrimary);
     // round 170e3: the song position is the toolbar's centre (FL users look there first): a larger readout
-    g.setFont (monoFont (juce::jmin (26.0f, (float) area.getHeight() * 0.52f)));
-    g.drawText (shown.isEmpty() ? text() : shown, area.withTrimmedBottom (11), juce::Justification::centred, false);
+    const auto readout = shown.isEmpty() ? text() : shown;
+    auto readoutFont = monoFont (juce::jmin (26.0f, (float) area.getHeight() * 0.52f));
+    // a narrow display (the compact toolbar) shrinks the digits instead of cutting them off
+    for (int i = 0; i < 12 && juce::GlyphArrangement::getStringWidth (readoutFont, readout) > (float) area.getWidth() - 8.0f; ++i)
+        readoutFont = readoutFont.withHeight (readoutFont.getHeight() * 0.92f);
+    g.setFont (readoutFont);
+    g.drawText (readout, area.withTrimmedBottom (11), juce::Justification::centred, false);
     g.setColour (colour::textDisabled);
     g.setFont (font (type::caption - 1.0f));
     g.drawText (mode == Mode::clock   ? tr ("MIN : SEC : CS")
