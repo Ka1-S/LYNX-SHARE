@@ -942,10 +942,13 @@ juce::String artSelfTest()
     expect (unpackStyle (packStyle (Style::themed, Art::toxic)) == Style::themed && unpackArt (packStyle (Style::themed, Art::toxic)) == Art::toxic, "pack");
     setForcedStyle (-1);
     expect (styleFor (EffectKind::facetEq) == Style::themed && styleFor (EffectKind::nebula) == Style::themed, "pilots are Themed");
-    expect (styleFor (EffectKind::epochVerb) == Style::hardware && styleFor (EffectKind::crestCompressor) == Style::glow, "others keep their style");
+    expect (styleFor (EffectKind::peakController) == Style::glow, "others keep their style");
+    for (const auto k : { EffectKind::ridgeStrip, EffectKind::crestCompressor, EffectKind::apexLimiter, EffectKind::prismMultiband, EffectKind::sentryGate,
+                          EffectKind::glowLeveler, EffectKind::hushDeEsser }) // round 170k: the effects' themes, batch 1
+        expect (artForEffect (k) != Art::none && styleFor (k) == Style::themed, "effect themes (170k)");
     expect (resolve (Style::themed, Art::sakura) == Style::themed && resolve (Style::neon, Art::none) == Style::neon, "automatic");
     setForcedStyle ((int) Style::themed); // Themed everywhere: only plugins with art
-    expect (styleFor (EffectKind::facetEq) == Style::themed && styleFor (EffectKind::epochVerb) == Style::hardware, "forced Themed");
+    expect (styleFor (EffectKind::facetEq) == Style::themed && styleFor (EffectKind::peakController) == Style::glow, "forced Themed");
     expect (resolve (Style::neon, Art::none) == Style::neon && resolve (Style::themed, Art::none) == Style::glow, "forced Themed without art");
     setForcedStyle ((int) Style::vivid);
     expect (styleFor (EffectKind::facetEq) == Style::vivid && resolve (Style::themed, Art::toxic) == Style::vivid, "forced Vivid");
@@ -953,7 +956,7 @@ juce::String artSelfTest()
     expect (artForInstrument (InstrumentKind::sakura) == Art::sakura && artForInstrument (InstrumentKind::threeosc) == Art::threeOsc
                 && artForInstrument (InstrumentKind::kick) == Art::none,
             "instrument art");
-    expect (artForEffect (EffectKind::facetEq) == Art::facet && artForEffect (EffectKind::epochVerb) == Art::none, "effect art");
+    expect (artForEffect (EffectKind::facetEq) == Art::facet && artForEffect (EffectKind::peakController) == Art::none, "effect art");
     for (const auto a : allArts()) // every id has exactly one theme, with a name and a canvas
     {
         const auto* gt = artkit::generatorTheme (a);

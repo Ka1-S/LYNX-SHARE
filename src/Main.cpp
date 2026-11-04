@@ -923,6 +923,9 @@ public:
             return;
         }
 
+        if (const auto si = args.indexOf ("--artset"); si >= 0 && si + 1 < args.size()) // round 170k: --artset fx1 (the effects' batches)
+            artSet() = args[si + 1].unquoted();
+
         if (args.contains ("--artshot"))
         {
             // LYNX.exe --artshot <folder> [before|after]: round 170j's six pilot editors with their own art (Sakura,
@@ -6117,6 +6120,8 @@ private:
         lynx::EffectKind effectKind;
         lynx::skin::Style before; // the automatic style it had before the Themed style
     };
+    static juce::String& artSet() { static juce::String set; return set; } // --artset <name>: which editors --artshot / --artgui show
+
     static const std::vector<ArtPilot>& artPilots()
     {
         using I = lynx::InstrumentKind;
@@ -6125,6 +6130,12 @@ private:
         static const std::vector<ArtPilot> list { { "sakura", true, I::sakura, E::reverb, S::neon },           { "toxic-biohazard", true, I::toxic, E::reverb, S::neon },
                                                   { "sytrus", true, I::sytrus, E::reverb, S::neon },           { "3x-osc", true, I::threeosc, E::reverb, S::neon },
                                                   { "facet-eq", false, I::synth, E::facetEq, S::glow },      { "nebula", false, I::synth, E::nebula, S::neon } };
+        // round 170k: the effects' themes, one set per batch (--artset fx1...)
+        static const std::vector<ArtPilot> fx1 { { "ridge-strip", false, I::synth, E::ridgeStrip, S::hardware },        { "crest-compressor", false, I::synth, E::crestCompressor, S::glow },
+                                                 { "apex-limiter", false, I::synth, E::apexLimiter, S::glow },          { "prism-multiband", false, I::synth, E::prismMultiband, S::glow },
+                                                 { "sentry-gate", false, I::synth, E::sentryGate, S::neon },            { "glow-leveler", false, I::synth, E::glowLeveler, S::hardware },
+                                                 { "hush-de-esser", false, I::synth, E::hushDeEsser, S::glow } };
+        if (artSet() == "fx1") return fx1;
         return list;
     }
 
@@ -6155,6 +6166,7 @@ private:
         engine.dispatchPendingMessages();
         if (p.instrument) return lynx::makeChannelFrame (engine, 0, 0);
         if (p.effectKind == lynx::EffectKind::facetEq) return lynx::makeFacetEqEditor (engine, 1, 0, true);
+        if (lynx::ProEditorWindows::handles (p.effectKind)) return lynx::makeProEditor (engine, 1, 0, true); // display-first editors, demo signal
         return lynx::makeNativeEffectEditor (engine, 1, 0, 1.0f, 0);
     }
 
