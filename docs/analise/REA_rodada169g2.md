@@ -42,7 +42,38 @@ anything. It is practically as if it's just loading samples."
   (Factory programs, Empty; after the note's program is followed); live: a knob turned after the follow changes the
   sound at once without a rebuild.
 
+## 4. Level against FL (coordinator, from REA_rodada169l §5) **[DECOMP + FL render]**
+
+- `FUN_18000d780` (MyPlugin render): MIDI CC 7 sets `+0x3c330 = value / 127` (float of a double division); every
+  sample is (engine × pan gains, delay) × that factor; the reverb runs on the block afterwards. Final.Vol is not read
+  (REA_rodada57 §2.10), so FL's channel volume reaches the plugin only as CC 7 — the same host protocol as Kepler's
+  (REA_rodada165g-flbeta165k §3: raw volume·128/12800 truncated, at most 127; FL's default 10000 → 100).
+- LYNX before: its channel gain curve (11^v − 1)/10 on the output = 0.552 at 78 %, i.e. 3.0 dB under 100/127.
+- LYNX now: the instrument recovers v from its gains and sends CC 7 = trunc(v·128) to the plugin
+  (`Plugin::setMidiVolume`), no other output gain.
+- Check: FL's own render `C:\Users\kauan\lynx-test\gen169l\fl\g169l.wav` (round 169l, Plugin database state, keys
+  60 / 48 / 72) vs the Windows `LYNX.exe --export` of the same .flp (fresh profile, test mode;
+  `C:\Users\kauan\lynx-test\r169g\g2level\lynx.wav`):
+
+| key | FL peak / RMS dB | LYNX before | LYNX now |
+|---|---|---|---|
+| 60 | −7.4 / −29.3 | −9.9 / −32.1 | −6.8 / −29.0 |
+| 48 | −19.0 / −33.5 | −21.7 / −36.6 | −18.6 / −33.5 |
+| 72 | −15.1 / −32.6 | −18.3 / −35.8 | −15.2 / −32.7 |
+
+  The 10 ms envelopes line up step for step (same sequencer timing). The other channels of the project render
+  unchanged (≤ 3·10⁻⁵, the 16-bit LSB). Test `tb169g2_channel_volume_as_midi_volume`.
+
+## 5. Windows check (fresh LYNX_PROFILE_DIR, LYNX_TEST_MODE=1)
+
+| Run | Result |
+|---|---|
+| FL 2026, `LYNX_NO_FL=0` | new TB = Factory programs ("Program 66, sequencer on"), knobs at FL's values: `C:\Users\kauan\lynx-test\r169g\run-g2-fl26\shots\transistorbass-fl-100.png`; render OK |
+| FL 2025.1.6 files (`fl25sim`), `LYNX_NO_FL=0` | same shot and WAV byte-identical to FL 2026's |
+| `LYNX_NO_FL=1` | no channel ("requires FL Studio"), as designed |
+| bug found | round 169g's `LYNX_NO_FL` hook treated `0` as "no FL" (any non-empty value): now only a non-empty value other than `0` |
+
 ## Where I stopped
 
-- Done: diagnosis (0.1.22 page, sequencer-on edit program), FL REA (§2), fix + tests.
+- Done: diagnosis (0.1.22 page, sequencer-on edit program), FL REA (§2), fix + tests, level (§4), Windows check (§5).
 - Next / rerun: `LYNX_TEST=tb169g2 coord/buildslot.sh scripts/build-local.sh "/mnt/c/Program Files/Image-Line/FL Studio 2026/Data"`.
