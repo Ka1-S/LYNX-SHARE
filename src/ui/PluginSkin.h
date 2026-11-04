@@ -120,7 +120,14 @@ enum class Style { glow = 0, neon, hardware, vivid, themed };
 inline constexpr int styleCount = 5;
 
 // the per-plugin art of the Themed style (none: the plugin has no theme of its own)
-enum class Art { none = 0, sakura, toxic, sytrus, threeOsc, facet, nebula };
+enum class Art // ids: generators 1..127 (ui/PluginArtGeneratorIds.inc), effects 128..255 (ui/PluginArtEffectIds.inc)
+{
+    none = 0,
+   #define LYNX_ART(id, value) id = value,
+   #include "ui/PluginArtGeneratorIds.inc"
+   #include "ui/PluginArtEffectIds.inc"
+   #undef LYNX_ART
+};
 Art art();                                 // the art the kit draws with right now (Style::themed only)
 Art artForEffect (EffectKind);
 Art artForInstrument (InstrumentKind);
