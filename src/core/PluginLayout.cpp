@@ -18,6 +18,7 @@
 #include "core/MaximusFx.h"
 #include "core/MultibandDelayFx.h"
 #include "core/StateParams.h"
+#include "core/Toxic.h"
 
 // (the i18n test scans the sources for TR_NOOP: captions below are translated by the editor)
 #ifndef TR_NOOP
@@ -3301,6 +3302,27 @@ Layout echoformLayout()
         v.push_back (withVoicing (slider (Item::hslider, 642, 322, 70, 16, "L/R offset", nullptr, noCaption)));
         v.push_back (withVoicing (value (714, 320, 52, 20, "L/R offset")));
     }
+    // round 170c (the "shell" audit): the Hybrid engine and the tape voicings run their own loops, which read only
+    // the times, feedback, mix, output, style and phase — every colour, modulation, diffusion, filter and groove control
+    // is dimmed while one of them is on (it used to look live and do nothing)
+    {
+        namespace ef = echosuite::echoform;
+        static constexpr int idleParams[] { ef::width, ef::drive, ef::age, ef::diffusion, ef::diffSize, ef::lowCut, ef::highCut, ef::modRate,
+                                            ef::modDepth, ef::wow, ef::flutter, ef::shift, ef::shiftDetune, ef::pitch, ef::pitchDetune, ef::mode,
+                                            ef::ducking, ef::groove, ef::feel, ef::accent, ef::primes, ef::crossFeedback };
+        for (auto& item : v)
+        {
+            if (item.param == nullptr || ! isValueControl (item.type)) continue;
+            const auto k = paramIndex (EffectKind::echoform, item.param);
+            if (std::find (std::begin (idleParams), std::end (idleParams), k) == std::end (idleParams)) continue;
+            item.idleParam = "Hybrid";
+            item.idleMin = 0.25f;
+            item.idleMax = 1.0f;
+            item.idle2Param = "Tape voicing";
+            item.idle2Min = 1.0f / 6.0f;
+            item.idle2Max = 1.0f;
+        }
+    }
     return l;
 }
 
@@ -3719,7 +3741,12 @@ Layout toxicMain()
     }
 
     // MOD: the FM grid (row = the modulating oscillator, column = the modulated one), mix, pan, LFO amounts, pitch
-    v.push_back (section (308, 64, 304, 336, TR_NOOP ("Modulation")));
+    // FL's centre panel has three pages and no title, only its MOD / MIDI / SEQ tabs (round 169h): MOD, MIDI (the eight
+    // modulation slots) and SEQ (the step sequencer)
+    v.push_back (section (308, 64, 304, 336, nullptr));
+    l.pages = { TR_NOOP ("Mod"), TR_NOOP ("MIDI"), TR_NOOP ("Seq") };
+    v.push_back (pageTabs (385, 66, 150, 15, "Mod|MIDI|Seq"));
+    const auto modFrom = v.size();
     static const char* const digits[] = { "1", "2", "3", "4", "5", "6" };
     v.push_back (label (314, 80, 40, 14, TR_NOOP ("FM"), alignLeft));
     for (int j = 0; j < 6; ++j)
@@ -3751,6 +3778,72 @@ Layout toxicMain()
     v.push_back (knob (430, 372, 20, "LFO 2 to pitch", TR_NOOP ("LFO 2"), 393));
     v.push_back (knob (490, 372, 20, "Filter env to pitch", TR_NOOP ("Filter env"), 393, bipolar));
     v.push_back (knob (550, 372, 20, "Bend range", TR_NOOP ("Bend"), 393));
+    for (auto i = modFrom; i < v.size(); ++i)
+        v[i].page = 0;
+
+    // MIDI: source, amount and destination of each modulation slot (FL: FUN_1800304b0, eight rows)
+    {
+        static const std::string sources = [] {
+            std::string o;
+            for (int t = 0; t < 135; ++t)
+                if (t != 6) // (FL's "Channel Controllers" submenu header)
+                    o += (o.empty() ? "" : "|") + toxicModSourceName (t);
+            return o;
+        }();
+        static const std::vector<float> sourceValues = [] {
+            std::vector<float> o;
+            for (int t = 0; t < 135; ++t)
+                if (t != 6)
+                    o.push_back ((float) t / 134.0f);
+            return o;
+        }();
+        static const std::string targets = [] {
+            std::string o = "---";
+            for (int i = 0; i < 294; ++i)
+            {
+                const auto* p = findEngineParam (toxicParams(), i);
+                o += "|" + (p != nullptr ? p->name : "Parameter " + std::to_string (i));
+            }
+            return o;
+        }();
+        v.push_back (onPage (label (316, 84, 112, 14, TR_NOOP ("Source"), alignLeft | dim), 1));
+        v.push_back (onPage (label (432, 84, 52, 14, TR_NOOP ("Amount"), dim), 1));
+        v.push_back (onPage (label (490, 84, 116, 14, TR_NOOP ("Destination"), alignLeft | dim), 1));
+        for (int k = 0; k < 8; ++k)
+        {
+            const auto y = 102.0f + 36.0f * (float) k;
+            const auto n = std::to_string (k + 1);
+            v.push_back (onPage (menuOf (314, y, 112, 28, stored ("Mod " + n + " source"), nullptr, sources.c_str(), sourceValues), 1));
+            v.push_back (onPage (stepper (432, y, 52, 28, stored ("Mod " + n + " amount"), nullptr, 200), 1));
+            v.push_back (onPage (menuOf (490, y, 116, 28, stored ("Mod " + n + " destination"), nullptr, targets.c_str()), 1));
+        }
+    }
+
+    // SEQ: the 64 steps in eight rows (two blocks of four rows, as FL's FUN_180030f30), the number of steps and the
+    // Play / Swing / Dual / Ping-pong / Random switches
+    {
+        static const char* const rowLabels[] = { "0", "4", "8", "12", "16", "20", "24", "28", "32", "36", "40", "44", "48", "52", "56", "60" };
+        for (int row = 0; row < 8; ++row)
+        {
+            const auto y = 86.0f + 25.0f * (float) row + (row >= 4 ? 8.0f : 0.0f);
+            for (int half = 0; half < 2; ++half)
+            {
+                const auto x0 = half == 0 ? 314.0f : 462.0f;
+                v.push_back (onPage (label (x0, y + 4, 16, 14, rowLabels[2 * row + half], dim), 2));
+                for (int j = 0; j < 4; ++j)
+                {
+                    const auto step = 8 * row + 4 * half + j;
+                    v.push_back (onPage (stepper (x0 + 18 + 33 * (float) j, y, 31, 22, stored ("Seq step " + std::to_string (step + 1)), nullptr, 50), 2));
+                }
+            }
+        }
+        v.push_back (onPage (stepper (314, 300, 104, 40, "Seq steps", TR_NOOP ("Number of steps"), 63), 2));
+        v.push_back (onPage (toggle (436, 306, 52, 16, "Seq play", TR_NOOP ("Play")), 2));
+        v.push_back (onPage (toggle (494, 306, 56, 16, "Seq swing", TR_NOOP ("Swing")), 2));
+        v.push_back (onPage (toggle (556, 306, 50, 16, "Seq dual", TR_NOOP ("Dual")), 2));
+        v.push_back (onPage (toggle (436, 328, 80, 16, "Seq ping-pong", TR_NOOP ("Ping-pong")), 2));
+        v.push_back (onPage (toggle (522, 328, 70, 16, "Seq random", TR_NOOP ("Random")), 2));
+    }
 
     // LFO 1 / LFO 2
     static const char* const syncs = "Off|1/16|1/8|3/16|1/4|1/2|3/4|1 bar|2 bars|4 bars";
@@ -4132,6 +4225,18 @@ bool isShown (EffectKind kind, const LayoutItem& item, int page, const EffectPar
         return v >= lo && (v < hi || hi >= 1.0f); // [lo, hi), the top end included at 1
     };
     return inRange (item.whenParam, item.whenMin, item.whenMax) && inRange (item.when2Param, item.when2Min, item.when2Max);
+}
+
+bool isIdle (EffectKind kind, const LayoutItem& item, const EffectParams& params)
+{
+    const auto inRange = [&] (const char* param, float lo, float hi) {
+        if (param == nullptr)
+            return false;
+        const auto i = paramIndex (kind, param);
+        const auto v = i >= 0 && i < (int) params.size() ? params[(std::size_t) i] : 0.0f;
+        return v >= lo && (v < hi || hi >= 1.0f);
+    };
+    return inRange (item.idleParam, item.idleMin, item.idleMax) || inRange (item.idle2Param, item.idle2Min, item.idle2Max);
 }
 
 bool isValueControl (Item type) noexcept

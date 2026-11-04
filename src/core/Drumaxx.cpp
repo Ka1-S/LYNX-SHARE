@@ -1101,6 +1101,9 @@ public:
             }
             if (! any)
             {
+                // (the DLL leaves the host's buffer as it is, zeros in FL: LYNX's own buffers are reused, so clear them)
+                std::fill (l + done, l + done + m, 0.0f);
+                std::fill (r + done, r + done + m, 0.0f);
                 for (auto& b : eqL)
                     b.reset();
                 for (auto& b : eqR)
@@ -1272,7 +1275,7 @@ public:
         delete incoming.exchange (k.release());
     }
 
-    void setNextNoteExpression (float, float cents, bool) noexcept override { nextCents = cents; }
+    void setNextNoteExpression (float pan, float cents, bool) noexcept override { nextPan = pan, nextCents = cents; }
 
     // automation (round 168p): the clip's 0…1 over the knob's range, on the running kit
     void setParameter (int index, float value) noexcept override
@@ -1289,7 +1292,9 @@ public:
         const auto k = std::clamp (key, 0, 127);
         const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
         const auto initVol = (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0;
-        engine->keyL[(std::size_t) k] = engine->keyR[(std::size_t) k] = (float) channelVol;
+        notePan[(std::size_t) k] = nextPan;
+        notePlayed[(std::size_t) k] = true;
+        keyLevels (k);
         const auto knob = pitchCents.load();
         keyCents[(std::size_t) k] = (double) knob + (double) nextCents;
         keyDown[(std::size_t) k] = true;
@@ -1297,7 +1302,7 @@ public:
         keySlide[(std::size_t) k].anchor (live.ref (knob));
         engine->keyPitch[(std::size_t) k] = (float) (keyCents[(std::size_t) k] / 100.0);
         engine->noteOn (k, (float) midiVelocity (initVol) * inv127);
-        nextCents = 0.0f;
+        nextCents = 0.0f, nextPan = 0.0f;
     }
 
     // (one-shot pads; note-offs only stop patterns — and end the key's slides, round 167a)
@@ -1336,9 +1341,19 @@ public:
     void render (float* left, float* right, int n, float gl, float gr) noexcept override
     {
         take();
-        // FL's channel volume reaches the plugin as Final.Vol (the plugin ignores Final.Pan)
+        // FL's channel volume and pan reach the plugin as Final.Vol / Final.Pan (round 169l: through the host's
+        // ComputeLRVol, see keyLevels); LYNX's channel gains are √2·V·cos/sin((1 + p)π/4), V and p recovered exactly
         const auto vol = std::sqrt (((double) gl * gl + (double) gr * gr) * 0.5);
-        channelVol = vol;
+        auto pan = vol > 0.0 ? std::atan2 ((double) gr, (double) gl) * (4.0 / 3.141592653589793) - 1.0 : 0.0;
+        if (std::fabs (pan) < 1e-9)
+            pan = 0.0;
+        if (vol != channelVol || pan != channelPan)
+        {
+            channelVol = vol, channelPan = pan;
+            for (int k = 0; k < 128; ++k) // (FL refreshes the per-key levels every block: a ringing pad follows the channel)
+                if (notePlayed[(std::size_t) k])
+                    keyLevels (k);
+        }
         for (int k = 0; k < 128; ++k) // slides (round 167a): the key's Final.Pitch offset this block
             if (auto& sl = keySlide[(std::size_t) k]; sl.moving())
             {
@@ -1359,11 +1374,32 @@ public:
     }
 
 private:
+    // The wrapper's per-key gains (engine_x64.dll FUN_180003e60, REA_rodada169l §1): every block it hands each held
+    // voice's (Final.Pan, Final.Vol) to the host's ComputeLRVol (host slot 31, FL's law A: L = Vol·cos((1 + pan)π/4),
+    // R = Vol·sin(…), 0.7071·Vol each at the centre) and stores L / R in the key tables the pads' gains scale by.
+    // Final.Pan = the note's pan + the channel's, clamped.
+    void keyLevels (int k) noexcept
+    {
+        const auto p = (float) std::clamp ((double) notePan[(std::size_t) k] + channelPan, -1.0, 1.0);
+        const long double t = (1.0L + (long double) p) * (long double) 0.78539816339744828;
+        engine->keyL[(std::size_t) k] = (float) (std::cos (t) * (long double) (float) channelVol);
+        engine->keyR[(std::size_t) k] = (float) (std::sin (t) * (long double) (float) channelVol);
+    }
+
     // FL renders the plugin from the moment it is loaded: its output gain has long reached the master level
     void settle() noexcept
     {
+        // (round 169l: where FL's float glide from 0 comes to rest, a few ulps short of the target, not the target)
         const auto t = (engine->level * 1.0f) * 0.5f;
-        engine->outG[0] = engine->outG[1] = t;
+        float g = 0.0f;
+        for (int i = 0; i < 1 << 20; ++i)
+        {
+            const auto next = (t - g) * 0.005f + g;
+            if (next == g)
+                break;
+            g = next;
+        }
+        engine->outG[0] = engine->outG[1] = g;
     }
 
     void take() noexcept
@@ -1388,8 +1424,10 @@ private:
     LiveChannelPitch live; // (audio thread)
     std::vector<std::uint8_t> state;
     std::array<float, blockSize> bufL {}, bufR {};
-    double rate = 44100.0, channelVol = 1.0;
-    float nextCents = 0.0f;
+    double rate = 44100.0, channelVol = 1.0, channelPan = 0.0;
+    float nextCents = 0.0f, nextPan = 0.0f;
+    std::array<float, 128> notePan {}; // each key's last note pan (FL's Init.Pan)
+    std::array<bool, 128> notePlayed {};
 
 public:
     ~DrumaxxInstrument() override

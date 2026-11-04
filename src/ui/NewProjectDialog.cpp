@@ -86,6 +86,7 @@ class TemplateList final : public juce::ListBox,
 public:
     std::vector<TemplateItem> items;
     std::function<void()> onPick;
+    std::function<void()> onActivate; // Enter or a double click on a template: create the project (round 170h)
 
     TemplateList()
     {
@@ -129,6 +130,18 @@ public:
         if (onPick)
             onPick();
     }
+
+    void returnKeyPressed (int) override
+    {
+        if (onActivate)
+            onActivate();
+    }
+
+    void listBoxItemDoubleClicked (int, const juce::MouseEvent&) override
+    {
+        if (onActivate)
+            onActivate();
+    }
 };
 
 class NewProjectPanel final : public juce::Component
@@ -151,6 +164,7 @@ public:
         templates.updateContent();
         templates.selectRow (0);
         templates.onPick = [this] { templateChosen(); };
+        templates.onActivate = [this] { createProject(); };
         addAndMakeVisible (templates);
         templatesFolder.setTooltip (tr ("Templates are .lynx projects in this folder (File › Save as template... puts one there)"));
         templatesFolder.onClick = [] {
@@ -165,6 +179,7 @@ public:
         };
         auto editor = [this] (juce::TextEditor& e, const juce::String& placeholder = {}) {
             styleEditor (e);
+            e.onReturnKey = [this] { if (persistent) createProject(); }; // Enter = Create (round 170h)
             e.setTextToShowWhenEmpty (placeholder, theme::colour::textDisabled);
             addAndMakeVisible (e);
         };
@@ -307,6 +322,28 @@ public:
     }
 
     void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg2); }
+
+    // round 170h: Enter creates the project (the dialog's default button), wherever the focus is in it; before, Enter
+    // went on to the main window's shortcuts (it maximised the Playlist behind the dialog) and nothing was created
+    bool keyPressed (const juce::KeyPress& key) override
+    {
+        if (key == juce::KeyPress::returnKey && persistent)
+        {
+            createProject();
+            return true;
+        }
+        return false;
+    }
+
+    // the template list takes the keyboard focus when the dialog opens, so Enter and the arrow keys work at once
+    void parentHierarchyChanged() override
+    {
+        if (persistent)
+            juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<juce::Component> (&templates)] {
+                if (auto* list = safe.getComponent(); list != nullptr && list->isShowing())
+                    list->grabKeyboardFocus();
+            });
+    }
 
 private:
     void templateChosen()

@@ -1185,7 +1185,10 @@ struct Pattern
     std::int64_t effectiveLength (int beatsPerBar) const noexcept;
 
     bool hasStep (int channel, int step) const noexcept;
-    void toggleStep (int channel, int step);
+    // A muted note on the step counts as an empty step. Turning a step off deletes its notes, or with `muteRemoved` (FL's
+    // Channel Rack option "Mute removed steps") mutes them; turning it on with `muteRemoved` unmutes them, data and all,
+    // without it adds a new note (as FL's SetStep, REA round 169f: a muted note there is left alone).
+    void toggleStep (int channel, int step, bool muteRemoved = false);
     bool operator== (const Pattern&) const = default;
 };
 

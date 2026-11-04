@@ -179,7 +179,7 @@ APP_SOURCES+=(src/core/MissingFiles.cpp src/core/ProjectSafety.cpp src/ui/Missin
 # Online Sessions P1: stable ids, parts, stand-ins, packages and their dialogs (round 168a)
 APP_SOURCES+=(src/core/SessionIds.cpp src/core/SessionParts.cpp src/core/StandIns.cpp src/engine/SessionPack.cpp src/ui/SessionDialogs.cpp)
 # Online Sessions P2: live sessions over the relay (round 169b)
-APP_SOURCES+=(src/core/LiveSession.cpp src/core/LiveCrypto.cpp src/engine/LiveLink.cpp src/engine/LiveSessions.cpp src/engine/LiveTest.cpp src/ui/LiveSessionUi.cpp)
+APP_SOURCES+=(src/core/LiveSession.cpp src/core/LiveCrypto.cpp src/engine/LiveLink.cpp src/engine/LiveSessions.cpp src/engine/MediaPack.cpp src/ui/LiveChat.cpp src/engine/LiveTest.cpp src/ui/LiveSessionUi.cpp)
 # LYNX substitutes for missing third-party plugins (round 98)
 APP_SOURCES+=(src/core/PluginSubstitutes.cpp)
 # settings pages (General/Audio/MIDI), plugin manager, shortcut manager (round 82)
@@ -289,6 +289,11 @@ printf '%s\n' "${APP_SOURCES[@]}" | xargs -P "$JOBS" -I{} bash -c '
     [[ "$src" == src/ui/CrashReporter.cpp ]] && extra="-iquote $OUT"
     cached_pp "$obj" -- $ZIG c++ $COMMON_STR $extra -Wall -Wextra -c "$src" -o "$obj"'
 
+# 2026-11-04: an object whose source left APP_SOURCES (another branch's build in this folder) must not be linked
+# by the app/*.o glob below: it broke unrelated landings with undefined symbols.
+declare -A KEEP_OBJ=(); for src in "${APP_SOURCES[@]}"; do KEEP_OBJ["$OUT/app/$(echo "$src" | tr / _).o"]=1; done
+for obj in "$OUT"/app/*.o; do [[ -n "${KEEP_OBJ[$obj]:-}" ]] || { echo "removing stale object $obj"; rm -f "$obj"; }; done
+
 echo "Resources (manifest, icons, version $VERSION)..."
 OUT_ABS="$(cd "$OUT" && pwd)"
 IFS=. read -r VMAJ VMIN VPAT <<< "$VERSION"
@@ -302,7 +307,11 @@ IFS=. read -r VMAJ VMIN VPAT <<< "$VERSION"
 ( cd resources && "$ZIG" rc /i "$OUT_ABS" /fo "$OUT_ABS/LYNX.res" LYNX.rc )
 
 echo "Linking..."
-"$ZIG" c++ -target "$TARGET" -O2 -o "$OUT/LYNX.exe" "$OUT"/juce/*.o "$OUT"/app/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT/LYNX.res" \
+# only the objects of this tree's sources: an object left in $OUT/app by a build of another branch (a merge-train
+# bisect step without that branch) must never be linked in
+APP_OBJECTS=()
+for src in "${APP_SOURCES[@]}"; do APP_OBJECTS+=("$OUT/app/$(echo "$src" | tr / _).o"); done
+"$ZIG" c++ -target "$TARGET" -O2 -o "$OUT/LYNX.exe" "$OUT"/juce/*.o "${APP_OBJECTS[@]}" "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT/LYNX.res" \
     -Wl,--subsystem,windows \
     -lole32 -loleaut32 -luuid -lwinmm -lws2_32 -lshlwapi -lversion -lwininet -limm32 -lcomdlg32 \
     -lgdi32 -luser32 -lcomctl32 -lshell32 -ladvapi32 -lrpcrt4 -ldbghelp -lsetupapi -luxtheme -ldwmapi \

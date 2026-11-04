@@ -2388,6 +2388,35 @@ TEST (pattern_toggle_step_and_length)
     CHECK (! p.hasStep (0, 4) && p.notes.size() == 1);
 }
 
+TEST (pattern_mute_removed_steps)
+{
+    lynx::Pattern p;
+    p.toggleStep (0, 2);
+    p.notes[0].velocity = 0.3f;
+    p.toggleStep (0, 2, true); // off: muted, kept
+    CHECK (! p.hasStep (0, 2) && p.notes.size() == 1 && p.notes[0].muted);
+    p.toggleStep (0, 2, true); // on again: the same note back
+    CHECK (p.hasStep (0, 2) && p.notes.size() == 1 && ! p.notes[0].muted && p.notes[0].velocity == 0.3f);
+    p.toggleStep (0, 2, true);
+    // option off (FL's SetStep, round 169f): turning the muted step on adds a new note and leaves the muted one alone...
+    p.toggleStep (0, 2);
+    CHECK (p.hasStep (0, 2) && p.notes.size() == 2 && p.notes[0].muted != p.notes[1].muted);
+    p.toggleStep (0, 2); // ...and turning it off deletes every note of the step, the muted one too
+    CHECK (p.notes.empty());
+    // option on with two notes on the step: both muted, both back
+    p.toggleStep (0, 3);
+    p.notes.push_back (p.notes[0]);
+    p.notes[1].key = 64;
+    p.toggleStep (0, 3, true);
+    CHECK (! p.hasStep (0, 3) && p.notes.size() == 2 && p.notes[0].muted && p.notes[1].muted);
+    p.toggleStep (0, 3, true);
+    CHECK (p.hasStep (0, 3) && p.notes.size() == 2 && ! p.notes[0].muted && ! p.notes[1].muted);
+    // another channel's note on the same step is never touched
+    p.toggleStep (1, 3);
+    p.toggleStep (0, 3, true);
+    CHECK (p.hasStep (1, 3) && ! p.hasStep (0, 3));
+}
+
 TEST (scheduler_places_events_at_exact_samples)
 {
     lynx::Pattern p;
@@ -9094,7 +9123,7 @@ TEST (ogun_engine)
     broken.resize (broken.size() - 300);
     CHECK (! lynx::ogunStateUsable (broken));
     auto old = blob;
-    old[0] = 13; // the articulator layout is from version 14
+    old[0] = 13; // a version-18 body read as version 13 (a u32 comment count; versions 10…13: Gen169lTests)
     CHECK (! lynx::ogunStateUsable (old));
 
     // reference model (REA round 37 ogmodel.Plugin(state).run: C5 velocity 0.75 released at 6144, G5 velocity 0.625 at 2048
@@ -16989,6 +17018,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Menus168zTests.inc"
 #include "Session168aTests.inc"
 #include "Live169bTests.inc"
+#include "Live169jTests.inc"
 #include "StemSplitTests.inc"
 #include "Zoom167tTests.inc"
 #include "Proll168gTests.inc"
@@ -16998,6 +17028,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FirstRun167vTests.inc"
 #include "LoopStarter168bTests.inc"
 #include "Rec168kTests.inc"
+#include "Rec170dTests.inc"
 #include "Issue32Tests.inc"
 #include "Mono168lTests.inc"
 #include "MixPre167qTests.inc"
@@ -17008,6 +17039,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Sel168tTests.inc"
 #include "Gap169kTests.inc"
 #include "Gap169kPickerTests.inc"
+#include "Gap169kAlignTests.inc"
 #include "FlQ170iTests.inc"
 #include "Speech168bTests.inc"
 #include "Design168pTests.inc"
@@ -17021,3 +17053,10 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Mute53fTests.inc"
 #include "Issue32cTests.inc"
 #include "Drumaxx169eTests.inc"
+#include "PlugQ170cTests.inc"
+#include "Toolbar170eTests.inc"
+#include "Inst169hTests.inc"
+#include "Crash169gTests.inc"
+#include "Wfqa170hTests.inc"
+#include "Toxic169hTests.inc"
+#include "Gen169lTests.inc"

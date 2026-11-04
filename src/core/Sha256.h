@@ -60,6 +60,29 @@ inline std::string sha256Hex (const std::uint8_t* data, std::size_t size)
     return out;
 }
 
+// SHA-256 of a Windows DLL's image without its Authenticode signature (round 169g, discussion #56): the bytes up to the
+// certificate table, with the PE checksum and the certificate directory entry zeroed. Image-Line ships the same engine
+// DLL signed in one installer and unsigned (or signed again) in another: the whole-file hash then changed although the
+// code and data LYNX reads were identical (FL Slayer's engine in FL Studio 2025 vs 2026). For an unsigned file whose
+// checksum is 0 this equals the whole-file hash, so hashes taken from such files stay valid.
+inline std::string peImageSha256Hex (const std::vector<std::uint8_t>& b)
+{
+    auto u16 = [&b] (std::size_t at) { return at + 2 <= b.size() ? (std::uint32_t) b[at] | (std::uint32_t) b[at + 1] << 8 : 0u; };
+    auto u32 = [&] (std::size_t at) { return u16 (at) | u16 (at + 2) << 16; };
+    const auto pe = (std::size_t) u32 (0x3c);
+    if (b.size() < 0x100 || pe + 24 + 0x90 > b.size() || u32 (pe) != 0x00004550u)
+        return sha256Hex (b.data(), b.size());
+    const auto opt = pe + 24;
+    const auto security = opt + (u16 (opt) == 0x20b ? 112u : 96u) + 4 * 8; // data directory 4
+    if (security + 8 > b.size())
+        return sha256Hex (b.data(), b.size());
+    const auto certAt = (std::size_t) u32 (security);
+    std::vector<std::uint8_t> image (b.begin(), b.begin() + (std::ptrdiff_t) (certAt > security + 8 && certAt <= b.size() ? certAt : b.size()));
+    std::fill (image.begin() + (std::ptrdiff_t) (opt + 64), image.begin() + (std::ptrdiff_t) (opt + 68), (std::uint8_t) 0);
+    std::fill (image.begin() + (std::ptrdiff_t) security, image.begin() + (std::ptrdiff_t) (security + 8), (std::uint8_t) 0);
+    return sha256Hex (image.data(), image.size());
+}
+
 // The same SHA-256 fed in pieces (round 168a: the media of a project package are hashed while they are read, without
 // holding a whole recording in memory).
 class Sha256Stream

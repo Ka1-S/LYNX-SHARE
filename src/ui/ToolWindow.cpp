@@ -33,6 +33,11 @@ public:
 
     void closeSoon()
     {
+        // round 170h: hiding the active window let Windows activate another program (seen: the terminal), so after
+        // File › New › Create, Esc or a note tool's Accept the shortcuts and Space did nothing until a click in LYNX.
+        // The main window takes the activation first, as a closing plugin window does (round 165q).
+        if (isActiveWindow())
+            activateMainWindow();
         setVisible (false);
         juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<juce::Component> (this)] { delete safe.getComponent(); });
     }

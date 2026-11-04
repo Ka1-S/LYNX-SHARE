@@ -12,6 +12,7 @@
 #include "core/SessionParts.h"
 #include "engine/AudioEngine.h"
 #include "engine/LiveSessions.h"
+#include "engine/MediaPack.h"
 #include "engine/ProjectFile.h"
 #include "engine/SessionPack.h"
 
@@ -209,7 +210,67 @@ juce::String selfTest (const Song* rich)
     moved.room = "abcdefghik";
     const bool cryptoOk = livecrypto::derive (moved).relayToken == keys.relayToken && livecrypto::derive (moved).key != keys.key;
 
-    const bool ok = unstable.isEmpty() && diverged.isEmpty() && editsOk && cryptoOk;
+    // 5. FLAC packs (round 169j): 16- and 24-bit PCM come back byte for byte (with chunks around the samples);
+    // 32-bit float and tiny files are sent as they are
+    juce::String packReport;
+    bool packOk = true;
+    {
+        const auto tmp = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-livepack");
+        tmp.deleteRecursively();
+        tmp.createDirectory();
+        auto make = [&] (const juce::String& name, int bits, int channels, int frames, bool floating) {
+            const auto f = tmp.getChildFile (name);
+            juce::WavAudioFormat wav;
+            juce::AudioBuffer<float> b (channels, frames);
+            for (int c = 0; c < channels; ++c)
+                for (int i = 0; i < frames; ++i)
+                    b.setSample (c, i, 0.5f * std::sin ((110.0f + 55.0f * (float) c) * (float) i / 48000.0f * 6.2831853f) * (1.0f - (float) i / (float) frames));
+            juce::StringPairArray meta;
+            meta.set ("bwav description", "LYNX pack test"); // (a bext chunk before the samples)
+            std::unique_ptr<juce::OutputStream> out (f.createOutputStream().release());
+            if (auto* w = wav.createWriterFor (out.get(), 48000.0, (unsigned) channels, floating ? 32 : bits, meta, 0))
+            {
+                out.release();
+                std::unique_ptr<juce::AudioFormatWriter> writer (w);
+                writer->writeFromAudioSampleBuffer (b, 0, frames);
+            }
+            return f;
+        };
+        struct Case
+        {
+            const char* name;
+            int bits, channels, frames;
+            bool floating, packs;
+        };
+        for (const auto& c : { Case { "s16.wav", 16, 1, 300000, false, true }, Case { "s24.wav", 24, 2, 200000, false, true },
+                               Case { "f32.wav", 32, 2, 100000, true, false }, Case { "tiny.wav", 16, 1, 1000, false, false } })
+        {
+            const auto wavFile = make (c.name, c.bits, c.channels, c.frames, c.floating);
+            const auto packFile = tmp.getChildFile (juce::String (c.name) + ".lxf"), back = tmp.getChildFile (juce::String (c.name) + ".back");
+            const bool packed = mediapack::pack (wavFile, packFile);
+            bool same = true;
+            if (packed)
+            {
+                same = mediapack::isPack (packFile) && mediapack::unpack (packFile, back) && sessionpack::hashFile (back) == sessionpack::hashFile (wavFile);
+                packReport << c.name << " " << (int) (100 * packFile.getSize() / std::max<juce::int64> (1, wavFile.getSize())) << "% ";
+            }
+            else
+                packReport << c.name << " raw ";
+            packOk = packOk && packed == c.packs && same;
+        }
+        // a damaged pack is refused
+        if (tmp.getChildFile ("s16.wav.lxf").existsAsFile())
+        {
+            juce::MemoryBlock m;
+            tmp.getChildFile ("s16.wav.lxf").loadFileAsData (m);
+            ((char*) m.getData())[20] ^= 0x55;
+            tmp.getChildFile ("bad.lxf").replaceWithData (m.getData(), m.getSize());
+            packOk = packOk && ! mediapack::unpack (tmp.getChildFile ("bad.lxf"), tmp.getChildFile ("bad.wav"));
+        }
+        tmp.deleteRecursively();
+    }
+
+    const bool ok = unstable.isEmpty() && diverged.isEmpty() && editsOk && cryptoOk && packOk;
     juce::String out = ok ? "OK" : "ERROR";
     out << " (" << (int) live::keysOf (song).size() << " entities, " << lost.size() << " not kept by the format";
     if (! lost.isEmpty())
@@ -222,6 +283,7 @@ juce::String selfTest (const Song* rich)
         out << "; edits wrong";
     if (! cryptoOk)
         out << "; keys wrong";
+    out << "; flac packs " << packReport.trim() << (packOk ? "" : " WRONG");
     return out + ")";
 }
 
@@ -234,6 +296,10 @@ int run (const juce::StringArray& args)
     juce::String relay = "https://relay.lynx-share.com";
     if (const auto r = args.indexOf ("--relay"); r >= 0)
         relay = args[r + 1].unquoted();
+    // round 169j: --plugin <a .vst3>: Ana plays that instrument, Rui does not have it (live stand-ins)
+    juce::String pluginFile;
+    if (const auto r = args.indexOf ("--plugin"); r >= 0)
+        pluginFile = args[r + 1].unquoted();
     juce::String log;
     bool ok = true;
     auto line = [&] (const juce::String& s) {
@@ -279,7 +345,8 @@ int run (const juce::StringArray& args)
         while (juce::Time::getMillisecondCounter() < until)
         {
             for (auto& p : peers)
-                p->live->pump();
+                if (p->live != nullptr) // (the host's, while it "restarts")
+                    p->live->pump();
             if (done())
                 return true;
             juce::Thread::sleep (5);
@@ -293,6 +360,11 @@ int run (const juce::StringArray& args)
         o.name = p.name;
         o.autoAccept = true;
         o.folder = dir.getChildFile (p.name + " media");
+        o.journal = dir.getChildFile ("host journal.json");
+        o.inlineWork = true;
+        o.standInDelayMs = 300;
+        if (&p == peers[3].get())
+            o.missing = [] (const PluginRef&) { return true; }; // (Rui has none of the third-party plugins)
         return o;
     };
     auto converged = [&] (std::initializer_list<Peer*> list) {
@@ -511,9 +583,205 @@ int run (const juce::StringArray& args)
     });
     check (pumpUntil ([&] { return converged ({ &ana, &rui }) && patternIndex (ana.engine->getSong(), "Rui fill") >= 0; }, 15000), "the session goes on after a guest left");
 
+    // --- round 169j ------------------------------------------------------------------------------------------------
+    using S = LiveSessionManager::State;
+    // big samples are hashed off the message thread; PCM WAVs travel as lossless FLAC packs
+    check (ana.live->getStats().hashedOffThread >= 1, "Ana's 1.2 MB sample was hashed off the message thread (" + juce::String (ana.live->getStats().hashedOffThread) + ")");
+    check (ana.live->getStats().packedSent >= 1 && ana.live->getStats().packedSaved > 0,
+           "Ana's WAV went as a FLAC pack: " + juce::String (ana.live->getStats().packedSent) + " sent, "
+               + juce::String (ana.live->getStats().packedSaved / 1024) + " KiB saved; the host forwarded " + juce::String (host.live->getStats().packedSent) + " pack(s)");
+
+    // chat: a guest's line reaches everyone through the host, in one order; the host's too
+    ana.live->sendChat ("  hello from Ana \x01 ");
+    host.live->sendChat ("hi Ana");
+    {
+        const auto t = juce::Time::getMillisecondCounterHiRes();
+        auto has = [] (Peer& p, const juce::String& text) {
+            for (const auto& l : p.live->getChat())
+                if (l.text == text)
+                    return true;
+            return false;
+        };
+        const bool ok = pumpUntil ([&] { return has (rui, "hello from Ana") && has (host, "hello from Ana") && has (ana, "hello from Ana") && has (ana, "hi Ana") && has (rui, "hi Ana"); }, 10000);
+        auto order = [] (Peer& p) {
+            juce::StringArray lines;
+            for (const auto& l : p.live->getChat())
+                lines.add (l.name + ": " + l.text);
+            return lines.joinIntoString (" | ");
+        };
+        check (ok && rui.live->unreadChat() >= 2 && order (rui) == order (host) && order (ana) == order (host),
+               "chat order everywhere: " + order (host));
+        check (ok,
+               "chat: Ana's and the host's lines reached everyone in " + juce::String ((int) (juce::Time::getMillisecondCounterHiRes() - t)) + " ms (Rui has "
+                   + juce::String (rui.live->unreadChat()) + " unread)");
+    }
+
+    // follow the host's transport: Rui plays, jumps and stops with the host
+    rui.live->setFollowTransport (true);
+    host.engine->seek ((double) ppq);
+    host.engine->getTransport().positionTicks.store ((double) ppq); // (no audio device here: the playhead is set by hand)
+    host.engine->play();
+    const auto hostAt = host.engine->songPlayheadTicks();
+    pumpUntil ([&] { return rui.engine->getTransport().playing.load(); }, 8000);
+    const auto ruiSeek = rui.engine->getTransport().seekRequest.load();
+    check (rui.engine->getTransport().playing.load() && hostAt > 0.0 && ruiSeek >= hostAt && ruiSeek < hostAt + 4 * ppq,
+           "Rui follows the host: playing from " + juce::String (ruiSeek, 0) + " ticks (the host's " + juce::String (hostAt, 0) + " plus the time on the way)");
+    host.engine->stop();
+    check (pumpUntil ([&] { return ! rui.engine->getTransport().playing.load(); }, 8000) && ! ana.engine->getTransport().playing.load(),
+           "the host stopped: Rui stopped too, Ana (not following) never played");
+    rui.live->setFollowTransport (false);
+
+    // permissions during the session: tempo for Ana, listen-only for Rui
+    host.live->setPermissions (anaTag, [] { live::Permissions p; p.settings = true; return p; }(), false);
+    pumpUntil ([&] { return ana.live->myPermissions().settings; }, 8000);
+    ana.engine->editSong ([] (Song& s) { s.bpm = 97.0; });
+    const auto ruiTag = rui.live->myTag();
+    host.live->setPermissions (ruiTag, [] { live::Permissions p; p.listener = true; return p; }(), false);
+    pumpUntil ([&] { return rui.live->myPermissions().listener; }, 8000);
+    rui.engine->editSong ([] (Song& s) { s.patterns.emplace_back().name = "Rui listens"; });
+    pumpUntil ([&] { return converged ({ &ana, &rui }) && host.engine->getSong().bpm == 97.0 && patternIndex (rui.engine->getSong(), "Rui listens") < 0; }, 15000);
+    check (host.engine->getSong().bpm == 97.0 && rui.engine->getSong().bpm == 97.0 && patternIndex (host.engine->getSong(), "Rui listens") < 0
+               && patternIndex (rui.engine->getSong(), "Rui listens") < 0,
+           "the host gave Ana the tempo (97 BPM everywhere) and made Rui a listener (his new pattern was undone)");
+    host.live->setPermissions (anaTag, {}, false);
+    host.live->setPermissions (ruiTag, {}, false);
+    pumpUntil ([&] { return ! rui.live->myPermissions().listener && ! ana.live->myPermissions().settings; }, 8000);
+
+    // a guest's connection drops: she keeps working; back by herself, nothing lost on either side
+    {
+        const auto t = juce::Time::getMillisecondCounterHiRes();
+        ana.live->dropConnection();
+        check (ana.live->getState() == S::reconnecting, "Ana's connection dropped: " + ana.live->getStatus());
+        ana.engine->editSong ([] (Song& s) { s.patterns.emplace_back().name = "Ana offline"; });
+        auto anaOffline = [&] {
+            for (const auto& person : host.live->getPeople())
+                if (person.tag == anaTag)
+                    return ! person.online;
+            return false;
+        };
+        pumpUntil (anaOffline, 8000);
+        check (anaOffline(), "the host shows Ana offline (her place is kept)");
+        host.engine->editSong ([] (Song& s) { s.patterns.emplace_back().name = "Host while Ana is away"; });
+        const bool back = pumpUntil ([&] { return converged ({ &ana, &rui }) && patternIndex (host.engine->getSong(), "Ana offline") >= 0
+                                                  && patternIndex (ana.engine->getSong(), "Host while Ana is away") >= 0; },
+                                     30000);
+        check (back && ana.live->getStats().reconnects >= 1 && host.live->getStats().replayed >= 1,
+               "Ana reconnected and resumed in " + juce::String ((int) (juce::Time::getMillisecondCounterHiRes() - t)) + " ms: her offline pattern reached everyone, "
+                   + "the host replayed what she missed (" + juce::String (host.live->getStats().replayed) + " replay)");
+        explain ({ &ana, &rui });
+    }
+
+    // the host's connection drops: the guests wait, edit on, and resume when it is back
+    {
+        const auto t = juce::Time::getMillisecondCounterHiRes();
+        host.live->dropConnection();
+        pumpUntil ([&] { return ana.live->getState() == S::waitingHost || host.live->getState() == S::live; }, 8000);
+        rui.engine->editSong ([] (Song& s) { s.patterns.emplace_back().name = "Rui while the host is away"; });
+        const bool back = pumpUntil ([&] { return converged ({ &ana, &rui }) && patternIndex (host.engine->getSong(), "Rui while the host is away") >= 0; }, 40000);
+        check (back && host.live->getStats().reconnects >= 1,
+               "the host's connection dropped and came back: everyone resumed in " + juce::String ((int) (juce::Time::getMillisecondCounterHiRes() - t)) + " ms, Rui's edit made meanwhile arrived");
+        explain ({ &ana, &rui });
+    }
+
+    // live stand-ins: Ana plays a third-party instrument Rui does not have; she renders it, Rui gets the render, and a
+    // new one when her part changes
+    if (pluginFile.isEmpty())
+        line ("skip live stand-ins (no --plugin <file.vst3>)");
+    else
+    {
+        auto& anaHost = ana.engine->getPluginHost();
+        const auto added = anaHost.addPluginFile (juce::File (pluginFile));
+        juce::PluginDescription instrument;
+        bool found = false;
+        for (const auto& type : anaHost.getKnownPlugins().getTypes())
+            if (type.isInstrument && juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginFile).getFileName())
+                instrument = type, found = true;
+        if (check (found, "Ana's computer has the plugin (" + juce::String (added) + " in the file): " + instrument.name))
+        {
+            const auto t = juce::Time::getMillisecondCounterHiRes();
+            ana.engine->editSong ([&] (Song& s) {
+                ChannelDef c;
+                c.name = "Ana plugin";
+                c.instrument = InstrumentKind::plugin;
+                c.plugin.id = instrument.createIdentifierString().toStdString();
+                c.plugin.name = instrument.name.toStdString();
+                const auto* me = s.session.find (s.session.me);
+                c.mixerTrack = me != nullptr ? me->insertFirst : 0;
+                s.channels.push_back (c);
+                Pattern p;
+                p.name = "Ana plugin riff";
+                for (int n = 0; n < 4; ++n)
+                    p.notes.push_back ({ (std::int64_t) n * ppq, ppq / 2, (int) s.channels.size() - 1, 60 + n, 0.9f });
+                s.patterns.push_back (p);
+            });
+            auto standInOf = [&] (Peer& p) -> juce::String {
+                const auto& song = p.engine->getSong();
+                const auto c = channelIndex (song, "Ana plugin");
+                if (c < 0 || song.channels[(std::size_t) c].standIns.empty())
+                    return {};
+                juce::String all;
+                for (const auto& st : song.channels[(std::size_t) c].standIns)
+                {
+                    const juce::File f (str (st.path));
+                    if (! f.existsAsFile())
+                        return {};
+                    all << sessionpack::hashFile (f) << ";";
+                }
+                return all;
+            };
+            const bool arrived = pumpUntil ([&] { return standInOf (rui).isNotEmpty() && converged ({ &ana, &rui }); }, 60000);
+            const auto first = standInOf (rui);
+            check (arrived && first == standInOf (ana) && ana.live->getStats().standInsRendered >= 1,
+                   "Ana rendered her plugin part for Rui (" + juce::String (ana.live->getStats().standInsRendered) + " part(s)), Rui has the same stems in "
+                       + juce::String ((int) (juce::Time::getMillisecondCounterHiRes() - t)) + " ms");
+            explain ({ &ana, &rui });
+            // her part changes: a new render follows; Lia's… Rui's copy gets it
+            const auto t2 = juce::Time::getMillisecondCounterHiRes();
+            ana.engine->editSong ([&] (Song& s) {
+                const auto p = patternIndex (s, "Ana plugin riff");
+                if (p >= 0)
+                    s.patterns[(std::size_t) p].notes.front().key = 48;
+            });
+            const bool updated = pumpUntil ([&] { const auto now = standInOf (rui); return now.isNotEmpty() && now != first && converged ({ &ana, &rui }); }, 60000);
+            check (updated && standInOf (rui) == standInOf (ana),
+                   "her notes changed: the stand-in was rendered again and reached Rui in " + juce::String ((int) (juce::Time::getMillisecondCounterHiRes() - t2)) + " ms");
+            // the host has the plugin list of its own (not Ana's): whether it needed the render or not, it has the same song
+            explain ({ &ana, &rui });
+        }
+    }
+
+    // the host's LYNX SHARE "crashes" and restarts: it resumes from its journal, the guests come back by themselves
+    {
+        pumpUntil ([] { return false; }, 2600); // (the journal is written at most every 2 s)
+        const auto journal = dir.getChildFile ("host journal.json");
+        const auto info = LiveSessionManager::readJournal (journal);
+        check (info.has_value() && info->guests == 2 && info->code == code, "the host's journal: " + juce::String (info ? info->guests : 0) + " guests, revision "
+                                                                              + juce::String ((juce::int64) (info ? info->revision : 0)));
+        const auto t = juce::Time::getMillisecondCounterHiRes();
+        host.live->abandon();
+        host.live.reset();
+        pumpUntil ([&] { return ana.live->getState() == S::waitingHost && rui.live->getState() == S::waitingHost; }, 10000);
+        check (ana.live->getState() == S::waitingHost, "the guests wait for the host: " + ana.live->getStatus());
+        ana.engine->editSong ([] (Song& s) { s.patterns.emplace_back().name = "Ana while the host restarts"; });
+        host.live = std::make_unique<LiveSessionManager> (*host.engine);
+        host.live->onHint = [raw = &host] (const juce::String& h) { raw->hints.add (h); };
+        const bool resumed = host.live->resumeHost (journal, options (host));
+        const bool back = resumed && pumpUntil ([&] { return host.live->getState() == S::live && converged ({ &ana, &rui })
+                                                             && patternIndex (host.engine->getSong(), "Ana while the host restarts") >= 0
+                                                             && host.live->getPeople().size() == 3 && host.live->getPeople().back().online; },
+                                                40000);
+        check (back, "the host restarted from its journal; both guests resumed and Ana's edit made meanwhile arrived in "
+                         + juce::String ((int) (juce::Time::getMillisecondCounterHiRes() - t)) + " ms (" + host.live->getStatus() + ")");
+        explain ({ &ana, &rui });
+        host.engine->editSong ([] (Song& s) { s.patterns.emplace_back().name = "After the restart"; });
+        check (pumpUntil ([&] { return converged ({ &ana, &rui }) && patternIndex (rui.engine->getSong(), "After the restart") >= 0; }, 15000),
+               "the session goes on after the host's restart");
+    }
+
     // the host ends it: the guests keep their parts
     const auto stats = host.live->getStats();
     host.live->leave();
+    check (! dir.getChildFile ("host journal.json").existsAsFile(), "the host ended the session: its journal is gone");
     pumpUntil ([&] { return ! ana.live->isActive() && ! rui.live->isActive(); }, 10000);
     {
         const auto& a = ana.engine->getSong();
@@ -525,7 +793,8 @@ int run (const juce::StringArray& args)
     }
     line ("     host: " + juce::String (stats.sent) + " frames sent (" + juce::String (stats.bytesSent / 1024) + " KiB), " + juce::String (stats.received) + " received, "
           + juce::String (stats.commits) + " commits, " + juce::String (stats.rejected) + " refused, " + juce::String (stats.mediaSent) + " media sent");
-    line ("     ana: " + juce::String (ana.live->getStats().mediaSent) + " media sent, " + juce::String (ana.live->getStats().mediaReceived) + " received");
+    line ("     ana: " + juce::String (ana.live->getStats().mediaSent) + " media sent, " + juce::String (ana.live->getStats().mediaReceived) + " received, "
+          + juce::String (ana.live->getStats().reconnects) + " reconnects, " + juce::String (ana.live->getStats().standInsRendered) + " stand-ins rendered");
     line ("     total " + juce::String ((int) (juce::Time::getMillisecondCounterHiRes() - t0)) + " ms");
     for (auto& p : peers)
         p->live.reset();

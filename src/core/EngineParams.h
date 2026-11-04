@@ -16,6 +16,27 @@ struct EngineParam
     std::string name;        // unique within the engine, English ("Osc 1 attack"); the knob's name and the clip's name
     float low = 0.0f, high = 1.0f; // raw range stored in the state
     bool stepped = false;    // whole numbers only
+    // a 0…1 parameter the engine reads in whole units, trunc((unitHigh − unitLow)·x + unitLow) clamped (FL's number
+    // boxes, e.g. Toxic Biohazard's sequencer steps; round 169h): the editor's stepper shows and moves these units
+    int unitLow = 0, unitHigh = 0;
+    std::string (*unitText) (int unit) = nullptr; // the unit's text (nullptr = the number)
+
+    bool hasUnits() const noexcept { return unitHigh > unitLow; }
+    int unitOf (float raw) const noexcept
+    {
+        const auto v = (float) (unitHigh - unitLow) * raw + (float) unitLow;
+        const auto u = v != v ? unitLow : v >= 2147483647.0f ? unitHigh : v <= -2147483647.0f ? unitLow : (int) v;
+        return u < unitLow ? unitLow : u > unitHigh ? unitHigh : u;
+    }
+    // the raw value whose unit is `unit` (the middle of its interval, so that truncation toward zero lands on it)
+    float rawOfUnit (int unit) const noexcept
+    {
+        unit = unit < unitLow ? unitLow : unit > unitHigh ? unitHigh : unit;
+        const auto target = (double) unit + (unit >= 0 ? 0.5 : -0.5);
+        const auto x = (float) ((target - unitLow) / (double) (unitHigh - unitLow));
+        return x <= 0.0f ? 0.0f : x >= 1.0f ? 1.0f : x;
+    }
+    std::string unitString (int unit) const { return unitText != nullptr ? unitText (unit) : std::to_string (unit); }
 
     float normalised (float raw) const noexcept
     {
