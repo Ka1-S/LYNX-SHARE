@@ -121,6 +121,8 @@ public:
     std::function<void()> onBrowseScores;
     // "Note names on every key" was switched in the menu (the main window saves its settings)
     std::function<void()> onNoteNamesChanged;
+    // The play button: click plays / pauses the pattern, right-click stops back at the last start (the main window's transport)
+    std::function<void()> onPlayPause, onPlayRightClick;
     // The time selection (Ctrl+drag on the ruler; -1 = none) that Insert / Delete space and Trim use.
     void setTimeSelection (std::int64_t from, std::int64_t to);
     std::int64_t timeSelectionFrom() const noexcept { return timeFrom; }
@@ -243,6 +245,7 @@ private:
     IconButton ghostButton { "ghosts", Icon::ghost };
     IconButton scaleSnapButton { "scaleSnap", Icon::magnet }; // snap to the scale (next to the scale box)
     IconButton moreButton { "more", Icon::more }; // note operations, left-edge resize, MIDI import/export
+    IconButton playButton { "play", Icon::play }; // FL's "Play / pause pattern" (EEPlayBtn); right-click: back to the last start
     IconButton followButton { "follow", Icon::follow }; // Follow (auto scrolling) on/off, EditorGlobals (round 162)
     void quantizeOperation (int kind); // 0 = starts, 1 = starts and lengths (quick quantize), 2 = starts 50% toward the grid
     juce::ComboBox laneBox; // what the bottom lane edits: velocity, pan or fine pitch

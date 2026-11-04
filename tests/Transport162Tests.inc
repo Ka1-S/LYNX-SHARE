@@ -153,6 +153,11 @@ TEST (transport162_follow_and_stop)
     CHECK (stopTarget (false, true, 5000) == 5000);
     CHECK (stopTarget (false, true, -1) == 0);
     CHECK (stopTarget (true, true, 5000) == 0); // the second Stop: the very start
+
+    using lynx::transportedit::rollPlayRightClickTarget;
+    CHECK (rollPlayRightClickTarget (true, 9000.0, 3000.0) == 3000.0);  // playing: back to the last start
+    CHECK (rollPlayRightClickTarget (false, 9000.0, 3000.0) == 3000.0); // paused elsewhere: the same
+    CHECK (rollPlayRightClickTarget (false, 3000.0, 3000.0) == 0.0);    // already there: the pattern start
 }
 
 TEST (transport162_meter_scale_marks)
