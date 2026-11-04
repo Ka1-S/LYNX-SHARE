@@ -1671,8 +1671,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             else if (name == "drumaxx")
             {
                 // FL's Drumaxx engine from the raw state (REA_rodada67 §6–§9); it needs no installation data. A state the
-                // engine can't read keeps the channel unsupported (there is no conversion to fall back to)
-                if (drumaxxStateUsable (c.pluginState))
+                // engine can't read keeps the channel unsupported (there is no conversion to fall back to). A channel
+                // with no state at all is the DLL's own defaults, which FL renders silent on every key
+                // (REA_rodada169e §2, round 169l): a Drumaxx without a kit, silent like FL (not the stand-in synth)
+                if (drumaxxStateUsable (c.pluginState) || c.pluginState.empty())
                 {
                     def.instrument = InstrumentKind::drumaxx;
                     def.pluginState = c.pluginState;
