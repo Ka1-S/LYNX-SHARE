@@ -41,7 +41,7 @@ public:
             tiles.push_back ({ name, g.detail, plugincatalog::categoryOf (probe), true, [add = targets.addInstrument, make = g.make] {
                                   if (auto c = make(); c.has_value() && add)
                                       add (*c);
-                              } });
+                              }, {} });
         }
         for (auto& f : quickpick::effectEntries (engine))
         {
@@ -52,7 +52,7 @@ public:
             tiles.push_back ({ name, f.detail, plugincatalog::categoryOf (probe), false, [add = targets.addEffect, make = f.make] {
                                   if (auto s = make(); s.has_value() && add)
                                       add (*s);
-                              } });
+                              }, {} });
         }
         // the tabs: only the categories that hold something, in the catalog's order
         for (const auto instruments : { true, false })
