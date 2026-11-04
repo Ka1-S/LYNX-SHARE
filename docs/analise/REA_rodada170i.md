@@ -117,10 +117,12 @@ being ruled by its stretch pre-processing (licensed engine, REA_rodada69 §7), s
 
 ## Where I stopped
 
-- Done: §1 and §3 code + tests (`tests/FlQ170iTests.inc`), `LYNX_WARMUP` in renderwav.
-- Verified: build-local 1963871 checks / 0 failures; rescore of the 82 render tests (`E:\lynx-work\flq170i\b2`): 12
-  improved, no regressions. Tracker regenerated. Landing batch 1+2.
-- Next: FPC level (−4.6 dB; REA: layer and pad volume law `(21.527^(v/127) − 1)/10`, constant at FPC_x64.dll
-  `0x8E0FA0`, used by `FUN_0086b480`), Slicex level (−2.2 dB), Hardcore (env corr 0.04).
+- Done: §1, §3 (batch 1–2: build-local 1963871 checks / 0 failures, queued on the merge train), §5 and §6 (batch 3:
+  1963902 checks / 0 failures). Rescore of the 82 render tests (`E:\lynx-work\flq170i\b3`): 14 improved, no
+  regressions; mean sound score 6.64 → 7.78 (81 scorable), 38 at the 16-bit floor (was 28). Tracker regenerated.
+- Open: FPC (§4), Slicex's remaining −24 dB (slice edges), EQUO (send not routed, lag 341), Fruity Scratcher (r167c
+  area), FL Keys (FL's own render is silent: needs one FL re-render), random-phase engines (not defects), FLEX and Fruity
+  Slicer's stretch (permanent decisions). fxfuzz not re-run this round.
 - Commands: `scripts/flref-lynx.sh /mnt/e/lynx-work/flq170i/rt.list <out> build-local/renderwav 2`, then
-  `python3 scripts/flref_compare.py batch /mnt/e/lynx-work/flq170i/flref <out> <out>/report.md`.
+  `python3 scripts/flref_compare.py batch /mnt/e/lynx-work/flq170i/flref <out> <out>/report.md`;
+  tracker: `python3 /mnt/e/lynx-work/flq170i/py/mkdoc.py <out>/compare.jsonl`.
