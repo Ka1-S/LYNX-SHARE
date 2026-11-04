@@ -588,8 +588,9 @@ public:
 
         const auto& items = activeLayout().items;
         for (int i = 0; i < (int) items.size(); ++i)
-            if (visible (items[(std::size_t) i]))
-                paintItem (g, items[(std::size_t) i], i, *fx);
+            if (visible (items[(std::size_t) i])
+                && (artLayer == nullptr || g.clipRegionIntersects (rectOf (items[(std::size_t) i]).expanded (40.0f, 24.0f).getSmallestIntegerContainer())))
+                paintItem (g, items[(std::size_t) i], i, *fx); // (round 170j: a partial repaint of the art draws only what it touches)
         if (hasHelpLine())
             paintHelpLine (g);
     }

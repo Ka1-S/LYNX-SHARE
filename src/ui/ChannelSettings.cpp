@@ -1455,6 +1455,10 @@ public:
             if (! conditionHolds (item))
                 continue;
             const auto r = layoutRect (item);
+            // round 170j: a partial repaint (the art's petals) draws only the items it touches (captions may hang
+            // up to ~26 units past an item's sides)
+            if (! g.clipRegionIntersects (r.expanded (32.0f * f, 8.0f * f).getSmallestIntegerContainer()))
+                continue;
             const auto dimmed = (item.style & plugui::dim) != 0;
             auto* k = knobFor (item.param);
             switch (item.type)

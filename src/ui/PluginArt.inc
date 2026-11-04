@@ -1079,7 +1079,7 @@ struct ArtLayer::Impl
         int n = 0;
         switch (a)
         {
-            case Art::sakura: n = 14; break;
+            case Art::sakura: n = 12; break;
             case Art::toxic: n = 9; break;
             case Art::nebula: n = 22; break;
             case Art::sytrus: n = 6; break;
@@ -1153,7 +1153,7 @@ void ArtLayer::kick()
     if (run && ! isTimerRunning())
     {
         lastMs = juce::Time::getMillisecondCounterHiRes();
-        startTimerHz (artId == Art::sakura ? 30 : 20);
+        startTimerHz (artId == Art::sakura ? 25 : 20);
     }
     else if (! run && isTimerRunning())
         stopTimer();
