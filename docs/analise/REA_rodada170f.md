@@ -87,9 +87,23 @@ host's blocks travel with the project).
 | Clip area above, blocks below, divider | E2, E3 | — | section under the tracks, draggable divider |
 | Blocks → clips | E2, E6 | — | Turn pattern blocks into clips |
 
+## 5. Verification
+
+- Core tests (tests/PatternBlocks170fTests.inc): paint/drag/erase, playback through RackState::build,
+  blocks + clips together, grown pattern cut at the next block, time-signature bars, pattern
+  delete/move/clone remapping, arrangements (switch + copy), turn into clips (one and every
+  arrangement), WAV/stem/MIDI export, undo labels, key-map actions.
+- Selftest (Windows, LYNX.exe --selftest): `pattern_blocks=OK` (save/load round trip incl. arrangements).
+- Snapshot: `--snapshot` writes `-playlist-blocks.png` (5 pattern rows under the clip tracks).
+- Real-mouse GUI pass on Windows (fresh LYNX_PROFILE_DIR, LYNX_TEST_MODE=1): click paints at the
+  bar, left-drag paints a row, right-click / right-drag erase, a click inside a block is a no-op,
+  a 2-bar pattern spans 2 bars, playback crosses the blocks with meter activity, Save writes
+  `"patternBlocks": true` + `"blocks"` (13 blocks checked in the saved JSON).
+- Screenshots: /mnt/e/lynx-work/patblocks170f (g1-g9.png, shots/s-playlist-blocks.png).
+
 ## Where I stopped
 
-- Done: research + design (this file).
-- Next: core (src/core/PatternBlocks.*), Song/ProjectFile/RackOps hooks, tests (tests/PatternBlocksTests.inc),
-  UI (src/ui/PatternBlocksView.*), i18n, screenshots, land via coord/train.sh.
-- Worktree ~/projetos/lynx-wt-patblocks170f, branch feature/patblocks170f (wip/patblocks170f on origin).
+- Done: research, design, core + UI + i18n (15 languages), tests, selftest, snapshot, GUI pass.
+- Not done (follow-ups): importing legacy FL <=11 .flp pattern-block data; FL 8's "swap blocks
+  above/below clip tracks" toggle; a clean GUI check of Ctrl+Z on a plugin-free project
+  (undo is covered by the core test, SendKeys focus during the GUI pass was unreliable).
