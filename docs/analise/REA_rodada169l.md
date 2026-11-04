@@ -107,6 +107,12 @@ L / R in dB (FL `g169l.wav` vs LYNX `renderwav`, LYNX de-normalised), and the RM
 The 16-bit render's LSB is 3·10⁻⁵: Drumaxx, BassDrum and Drumpad are bit-close. The Drumaxx channel at pan −50 %
 proves Final.Pan's law A (L/R −7.6 dB apart = 20·log10(tan(π/8))).
 
+The Windows build's `LYNX.exe --export` of the same project (fresh `LYNX_PROFILE_DIR`, `LYNX_TEST_MODE=1`) gives the same
+table to 0.1 dB (Drumaxx rows 0.000–0.014, BassDrum ≤ 0.004, Drumpad ≤ 0.03). The project's last channel, "Drumaxx DB"
+(FL's Plugin database Drumaxx state, kit "Default Kit"), plays keys 60 / 48 / 72, which are not pads of that kit:
+silent in both (checked standalone; pad 36 of that kit equals the DLL-reference renderer). What its segment shows
+(−47 dB) is Ogun's release tail, and that tail decays faster in LYNX: −47 → −87 dB in 1.15 s vs FL's −47 → −72 dB.
+
 ## 6. LYNX before / now
 
 | | before | now |
@@ -135,11 +141,12 @@ the glide itself is right: −700 → 0 cents relative).
   ("Factory programs", sequencer on) LYNX renders 2–3 dB below FL on keys 60 / 48 / 72 (§5).
 - Morphine, Sakura, GMS, Ogun: same levels as FL but not sample-compared (their random phases / unison); Wave
   Traveller's `Default.fst` and Plugin database state (with an embedded sample) are not read by LYNX yet.
+- Ogun's release: after note-off with its Plugin database state LYNX's tail falls ≈ 15 dB more than FL's within 1.15 s (§5).
 - The decision of §3 (engines whose Default preset differs from FL's Plugin database state).
 - FL Slayer: FL 2026 has no Plugin database entry for it; LYNX keeps its first preset.
 
 ## Where I stopped
 
 - Done: §1–§5 code + tests; one fresh FL render of `g169l.flp` compared against LYNX `renderwav` (§5).
-- In progress: full build-local after merging origin/main, the Windows build, the Windows `--export` of
-  `C:\Users\kauan\lynx-test\gen169l\fl\g169l.flp` (fresh profile, test mode) vs FL's `g169l.wav`, then the landing train.
+- Done: the Windows `--export` vs FL's `g169l.wav` (§5).
+- In progress: full build-local after merging origin/main, then the landing train.
