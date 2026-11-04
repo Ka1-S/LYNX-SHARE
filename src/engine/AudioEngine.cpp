@@ -4103,19 +4103,22 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
     numInputChannels = juce::jmin (numInputChannels, (int) inputs.size());
     numOutputChannels = juce::jmin (numOutputChannels, (int) outputs.size());
 
-    // count-in: the metronome counts the pre-roll down, then playback starts
-    if (const auto countIn = transport.countIn.load (std::memory_order_relaxed); countIn > 0.0 && ! transport.playing.load (std::memory_order_relaxed))
-    {
-        const auto left = countIn - numSamples * transport.ticksPerSample();
-        transport.countIn.store (juce::jmax (0.0, left), std::memory_order_relaxed);
+    // count-in: the metronome counts the pre-roll down, then playback starts — to the sample (round 170d: the song
+    // started at the next block boundary and the count-in's clicks ran a block early, so the downbeat flammed ~5 ms
+    // after the last count-in click and the take's notes were late against it): the block is split where the count-in
+    // ends, the part before it counts in (the metronome's clock = the start minus what is left at that sample)
+    const auto countInAtStart = transport.countIn.load (std::memory_order_relaxed);
+    const auto countingIn = countInAtStart > 0.0 && ! transport.playing.load (std::memory_order_relaxed);
+    const auto countInSamples = ! countingIn ? 0
+                                : (int) juce::jmin ((double) numSamples, std::ceil (countInAtStart / juce::jmax (1.0e-9, transport.ticksPerSample()) - 1.0e-6));
 
-        if (left <= 0.0)
-            transport.playing.store (true, std::memory_order_relaxed);
-    }
+    auto countInNow = countInAtStart;
 
     for (int done = 0; done < numSamples;)
     {
         auto n = numSamples - done;
+        if (countInSamples > done)
+            n = juce::jmin (n, countInSamples - done);
         const auto playing = transport.playing.load (std::memory_order_relaxed);
         const auto tps = transport.ticksPerSample();
         // Song mode: the loop region, or else the whole song (back to the start at its end, like FL)
@@ -4307,6 +4310,22 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
             transport.positionTicks.store (position, std::memory_order_relaxed);
         }
 
+        // the count-in's part of the block is over: what is left of it, or playback from here
+        // (a compare-exchange: a Stop pressed meanwhile set it to 0 and must win)
+        if (countInSamples > done)
+        {
+            const auto rawLeft = countInAtStart - (done + n) * transport.ticksPerSample();
+            const auto left = juce::jmax (0.0, rawLeft);
+            const auto ends = done + n >= countInSamples && rawLeft <= 1.0e-6;
+            auto expected = countInNow;
+            if (transport.countIn.compare_exchange_strong (expected, ends ? 0.0 : left, std::memory_order_relaxed))
+            {
+                countInNow = ends ? 0.0 : left;
+                if (ends)
+                    transport.playing.store (true, std::memory_order_relaxed);
+            }
+        }
+
         done += n;
     }
 
@@ -4330,14 +4349,14 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         workers->park();
 
     // the live clock (round 170d): the next block's musical position — during the count-in the metronome's count before
-    // the start (the next block starts the song when the count-in left runs out in it)
+    // the start (the start minus the count-in left)
     {
         const auto tps = transport.ticksPerSample();
         const auto nowPlaying = transport.playing.load (std::memory_order_relaxed);
         const auto left = transport.countIn.load (std::memory_order_relaxed);
         const auto counting = left > 0.0 && ! nowPlaying;
         const auto position = transport.positionTicks.load (std::memory_order_relaxed);
-        clockTick.store (counting ? position - juce::jmax (0.0, left - numSamples * tps) : position, std::memory_order_relaxed);
+        clockTick.store (counting ? position - left : position, std::memory_order_relaxed);
         clockTicksPerMs.store (tps * transport.sampleRate.load (std::memory_order_relaxed) * 0.001, std::memory_order_relaxed);
         clockRunning.store (nowPlaying || counting, std::memory_order_relaxed);
     }
