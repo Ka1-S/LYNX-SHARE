@@ -61,6 +61,13 @@ void headerBar (juce::Graphics&, juce::Rectangle<float> area, juce::Colour accen
 void brandMark (juce::Graphics&, juce::Rectangle<float> area);
 // the plugin's name in the header (bold, with a short accent underline); returns the width used
 float titleText (juce::Graphics&, juce::Rectangle<float> area, const juce::String& name, juce::Colour accent, bool underline = true);
+// one line of text in the current gradient (or image) fill, drawn as its glyph outlines; the empty outlines (spaces)
+// are left out (round 170c: JUCE 8.0.4's CoreGraphics renderer took an empty outline as "no clip" and flooded the
+// whole component with the gradient, Facet EQ's blank pink window on macOS, issue #11). A plain colour fill draws
+// the text as usual.
+void drawFilledText (juce::Graphics&, const juce::String& text, juce::Rectangle<float> area, juce::Justification justification);
+// --gfxprobe: does a gradient-filled text or an empty gradient-filled path stay inside its shape on this platform?
+juce::String rendererProbeReport();
 // a power LED with a halo when on
 void powerLed (juce::Graphics&, juce::Point<float> centre, float diameter, bool on);
 // a raised section (group of controls) and its title strip (caps, with an accent dot)

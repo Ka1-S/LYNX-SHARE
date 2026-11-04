@@ -343,6 +343,31 @@ std::optional<ChannelDef> makeChannel (InstrumentKind kind, const FlAccess& acce
     return def;
 }
 
+std::optional<ChannelDef> autogunShotChannel (const FlAccess& access)
+{
+    if (access.roots.data.empty() || ! access.readFile)
+        return std::nullopt;
+    const auto bytes = access.readFile (access.roots.data + "\\System\\Render tests\\Autogun.flp");
+    if (bytes.empty())
+        return std::nullopt;
+    try
+    {
+        const auto song = importFlp (flp::parseProject (bytes, true), importOptions (access));
+        for (const auto& c : song.channels)
+            if (c.instrument == InstrumentKind::autogun)
+            {
+                auto def = c;
+                def.name = "Autogun";
+                def.mixerTrack = 0;
+                return def;
+            }
+    }
+    catch (const flp::Error&)
+    {
+    }
+    return std::nullopt;
+}
+
 std::optional<EffectSlot> makeSlot (EffectKind kind, const FlAccess& access, double bpm)
 {
     const auto* engine = effectEngine (kind);

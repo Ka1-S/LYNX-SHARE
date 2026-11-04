@@ -378,6 +378,19 @@ public:
             return;
         }
 
+        if (args.contains ("--countinrectest"))
+        {
+            // LYNX --countinrectest report.txt (round 170d, the Busy Works video: the chord on the downbeat after the
+            // pre-count was lost). The real engine's device callback (a stand-in device: 48 kHz, blocks of 512, 256
+            // samples of output latency) records a Song-mode take from bar 3 with a 1-bar count-in. Pass 1 finds where
+            // the metronome's bar-3 click is heard; pass 2 plays MIDI notes stamped at the times they are heard around
+            // it (a chord 15 ms early, a note in the count-in, one 3 ms after beat 2, one a bar for 6 bars) through
+            // LYNX's MIDI input. Every note must land on the tick it was heard at (the chord on bar 3).
+            const auto i = args.indexOf ("--countinrectest");
+            runCountInRecordTest (juce::File (args[i + 1].unquoted()));
+            return;
+        }
+
         if (args.contains ("--bendrectest"))
         {
             // LYNX --bendrectest report.txt [song|pattern] (round 167a, issue #12): pitch bend recording end to end. A
@@ -847,6 +860,18 @@ public:
                 const auto name = args[i + 1].unquoted();
                 lynx::skin::setForcedStyle (name.equalsIgnoreCase ("auto") ? -1 : (int) lynx::skin::styleFromName (name));
             }
+        }
+
+        if (args.contains ("--gfxprobe"))
+        {
+            // LYNX.exe --gfxprobe report.txt (round 170c, issue #11): renderer checks on this platform's native images —
+            // text drawn with a gradient fill (a word with a space in it) and an empty path filled with a gradient must
+            // stay inside their shapes. JUCE 8.0.4's CoreGraphics renderer (macOS) clipped to an empty glyph or path as
+            // "no clip" and flooded the whole component (Facet EQ's blank pink window).
+            const auto i = args.indexOf ("--gfxprobe");
+            juce::File (args[i + 1].unquoted()).replaceWithText (lynx::skin::rendererProbeReport());
+            quit();
+            return;
         }
 
         if (args.contains ("--plugui"))
@@ -4604,6 +4629,247 @@ private:
         juce::Timer::callAfterDelay (300, *tick);
     }
 
+    // --countinrectest (round 170d): see the command line above.
+    void runCountInRecordTest (const juce::File& report)
+    {
+        engine = std::make_unique<lynx::AudioEngine>();
+        engine->getDeviceManager().closeAudioDevice(); // the engine's callback is driven by hand below
+        struct StandIn final : juce::AudioIODevice
+        {
+            StandIn() : juce::AudioIODevice ("countin", "test") {}
+            juce::StringArray getOutputChannelNames() override { return { "L", "R" }; }
+            juce::StringArray getInputChannelNames() override { return {}; }
+            juce::Array<double> getAvailableSampleRates() override { return { 48000.0 }; }
+            juce::Array<int> getAvailableBufferSizes() override { return { 512 }; }
+            int getDefaultBufferSize() override { return 512; }
+            juce::String open (const juce::BigInteger&, const juce::BigInteger&, double, int) override { return {}; }
+            void close() override {}
+            bool isOpen() override { return true; }
+            void start (juce::AudioIODeviceCallback*) override {}
+            void stop() override {}
+            bool isPlaying() override { return true; }
+            juce::String getLastError() override { return {}; }
+            int getCurrentBufferSizeSamples() override { return 512; }
+            double getCurrentSampleRate() override { return 48000.0; }
+            int getCurrentBitDepth() override { return 32; }
+            juce::BigInteger getActiveOutputChannels() const override
+            {
+                juce::BigInteger b;
+                b.setRange (0, 2, true);
+                return b;
+            }
+            juce::BigInteger getActiveInputChannels() const override { return {}; }
+            int getOutputLatencyInSamples() override { return 256; }
+            int getInputLatencyInSamples() override { return 0; }
+        };
+        auto device = std::make_shared<StandIn>();
+        auto text = std::make_shared<juce::String>();
+        auto step = [report, text] (const juce::String& line) { *text << line << "\n"; report.replaceWithText (*text); };
+        auto finish = [this] (int code) {
+            setApplicationReturnValue (code);
+            quit();
+        };
+
+        constexpr std::int64_t bar = 4 * lynx::ppq; // 120 BPM, 4/4
+        lynx::Song song; // (as --cliplooptest: one synth channel on insert 1, an empty pattern)
+        song.bpm = 120.0;
+        song.mixer = lynx::Song::defaultMixer (2);
+        song.channels.resize (1);
+        song.channels[0].mixerTrack = 1;
+        song.patterns.emplace_back();
+        song.mode = lynx::PlayMode::song;
+        song.currentPattern = 0;
+        engine->setSong (song);
+        engine->getTransport().metronome.store (true);
+        auto o = engine->getRecordOptions();
+        o.countInBars = 1;
+        o.catchWindow = lynx::ppq / 4;
+        o.compensateOutput = true;
+        o.recordNotes = true;
+        o.recordAudio = false;
+        o.recordAutomation = false;
+        o.waitForInput = false;
+        o.quantise = 0;
+        o.placeSongClip = true;
+        o.recordingMarkers = false;
+        o.punchLoopRegion = false;
+        o.preRollBars = o.postRollBars = 0;
+        engine->setRecordOptions (o);
+        engine->deviceCallback().audioDeviceAboutToStart (device.get());
+        step ("stand-in device: 48 kHz, blocks of 512, output latency 256 samples; Song mode, 120 BPM, take from bar 3, count-in 1 bar");
+
+        // an event heard at output sample `heard` (counted from the first block after Play), sent as MIDI input
+        struct Event
+        {
+            std::int64_t heard;
+            juce::MidiMessage message;
+        };
+        struct Pass
+        {
+            std::vector<float> out;
+            std::vector<Event> events;
+            std::int64_t playingAt = -1; // the first sample of the block the song started in
+            int block = 0, blocks = 0;
+            std::function<void()> done;
+        };
+        constexpr int n = 512;
+        constexpr double rate = 48000.0;
+        // one pass: the take recorded from bar 3, `blocks` blocks driven by hand, 8 at a time between the engine's timer
+        // ticks (the take is committed there); then stopped and its results left to the timer
+        auto runPass = std::make_shared<std::function<void (std::shared_ptr<Pass>)>>();
+        *runPass = [this] (std::shared_ptr<Pass> pass) {
+            auto& cb = engine->deviceCallback();
+            std::vector<float> l (n), r (n);
+            float* outs[] = { l.data(), r.data() };
+            juce::AudioIODeviceCallbackContext context;
+            if (pass->block == 0)
+            {
+                engine->stop();
+                engine->seek ((double) (2 * bar));
+                cb.audioDeviceIOCallbackWithContext (nullptr, 0, outs, 2, n, context); // (the seek, stopped)
+                engine->setRecording (true);
+                engine->startPlayback(); // the count-in starts
+            }
+            for (int k = 0; k < 8 && pass->block < pass->blocks; ++k, ++pass->block)
+            {
+                // the events heard in this block: stamped the way the engine's clock maps time to heard samples
+                const auto blockStart = (std::int64_t) pass->block * n;
+                const auto clock = engine->liveClock();
+                const auto compMs = 1000.0 * (n + 256) / rate;
+                for (auto& e : pass->events)
+                    if (e.heard >= blockStart && e.heard < blockStart + n)
+                    {
+                        auto m = e.message;
+                        m.setTimeStamp ((clock.timeMs + compMs + (double) (e.heard - blockStart) * 1000.0 / rate) * 0.001);
+                        engine->injectMidiInput (m);
+                    }
+                cb.audioDeviceIOCallbackWithContext (nullptr, 0, outs, 2, n, context);
+                pass->out.insert (pass->out.end(), l.begin(), l.end());
+                if (pass->playingAt < 0 && engine->getTransport().playing.load())
+                    pass->playingAt = blockStart;
+            }
+        };
+        // (the recursion through the message loop; written out so each step lets the engine's timer run)
+        auto drive = std::make_shared<std::function<void (std::shared_ptr<Pass>)>>();
+        *drive = [this, runPass, drive, device] (std::shared_ptr<Pass> pass) { // (the stand-in lives while the passes run)
+            if (engine == nullptr)
+                return;
+            (*runPass) (pass);
+            if (pass->block < pass->blocks)
+            {
+                juce::Timer::callAfterDelay (40, [pass, drive] { (*drive) (pass); });
+                return;
+            }
+            engine->stop();
+            juce::Timer::callAfterDelay (300, [this, pass] {
+                if (engine == nullptr)
+                    return;
+                engine->setRecording (false);
+                juce::Timer::callAfterDelay (200, [pass] { pass->done(); });
+            });
+        };
+
+        auto onsets = [] (const std::vector<float>& out) {
+            std::vector<std::int64_t> at;
+            std::int64_t last = -100000;
+            for (std::size_t i = 0; i < out.size(); ++i)
+                if (std::abs (out[i]) > 0.02f && (std::int64_t) i - last > 4000)
+                {
+                    at.push_back ((std::int64_t) i);
+                    last = (std::int64_t) i;
+                }
+                else if (std::abs (out[i]) > 0.02f)
+                    last = (std::int64_t) i;
+            return at;
+        };
+
+        // the graph is (re)built on the message thread: start once it has settled
+        juce::Timer::callAfterDelay (1500, [this, step, finish, drive, onsets] {
+            if (engine == nullptr)
+                return;
+            auto first = std::make_shared<Pass>();
+            first->blocks = (int) (rate * 18.0 / n); // count-in + 8 bars
+            first->done = [this, first, step, finish, drive, onsets] {
+                const auto clicks = onsets (first->out);
+                juce::String list;
+                for (std::size_t i = 0; i < std::min<std::size_t> (clicks.size(), 8); ++i)
+                    list << clicks[i] << " ";
+                step ("pass 1: clicks heard at samples " + list + "…, the song started in the block at " + juce::String (first->playingAt));
+                // the bar-3 downbeat: the click at the block the song started in
+                std::int64_t down = -1;
+                for (auto c : clicks)
+                    if (std::abs (c - first->playingAt) < n)
+                        down = c;
+                if (down < 0 || engine->getSong().patterns[0].notes.size() != 0)
+                {
+                    step ("result=FAILED no downbeat click found (or notes recorded without input)");
+                    finish (1);
+                    return;
+                }
+                const auto ms = [down] (double t) { return down + (std::int64_t) std::llround (t * rate / 1000.0); };
+                auto second = std::make_shared<Pass>();
+                second->blocks = first->blocks;
+                auto add = [&second] (std::int64_t at, int key, bool on) {
+                    second->events.push_back ({ at, on ? juce::MidiMessage::noteOn (1, key, (juce::uint8) 100) : juce::MidiMessage::noteOff (1, key) });
+                };
+                for (int key : { 60, 64, 67 }) // the chord, 15 ms early, held half a second
+                {
+                    add (ms (-15.0), key, true);
+                    add (ms (500.0), key, false);
+                }
+                add (ms (-1500.0), 62, true); // beat 2 of the count-in bar (bar 2)
+                add (ms (-1250.0), 62, false);
+                add (ms (503.0), 77, true); // 3 ms after beat 2
+                add (ms (603.0), 77, false);
+                for (int b = 1; b <= 6; ++b) // a note a bar ("it stopped after two bars")
+                {
+                    add (ms (b * 2000.0), 70 + b, true);
+                    add (ms (b * 2000.0 + 250.0), 70 + b, false);
+                }
+                second->done = [this, step, finish] {
+                    const auto& s = engine->getSong();
+                    const auto& p = s.patterns[0];
+                    const lynx::Clip* clip = nullptr;
+                    for (const auto& c : s.playlist)
+                        if (c.kind == lynx::ClipKind::pattern && c.pattern == 0)
+                            clip = &c;
+                    const auto origin = clip != nullptr ? clip->start - clip->offset : -1;
+                    step ("pass 2: " + juce::String ((int) p.notes.size()) + " notes recorded, clip at " + juce::String (clip != nullptr ? clip->start : -1));
+                    auto ok = clip != nullptr && origin == bar && p.notes.size() == 11;
+                    // where each one was heard (song ticks): 0.5 ms = ~1 tick
+                    const std::vector<std::pair<int, double>> want = { { 60, 2.0 * bar }, { 64, 2.0 * bar }, { 67, 2.0 * bar },
+                                                                       { 62, 2.0 * bar - 3 * lynx::ppq }, { 77, 2.0 * bar + lynx::ppq + 3.0 * 1.92 },
+                                                                       { 71, 3.0 * bar }, { 72, 4.0 * bar }, { 73, 5.0 * bar },
+                                                                       { 74, 6.0 * bar }, { 75, 7.0 * bar }, { 76, 8.0 * bar } };
+                    for (const auto& [key, tick] : want)
+                    {
+                        const lynx::Note* found = nullptr;
+                        for (const auto& note : p.notes)
+                            if (note.key == key)
+                                found = &note;
+                        const auto at = found != nullptr ? (double) (origin + found->start) : -1.0;
+                        const auto good = found != nullptr && std::abs (at - tick) <= 2.0;
+                        ok = ok && good;
+                        step ("key " + juce::String (key) + ": heard at tick " + juce::String (tick, 2) + ", recorded at " + juce::String (at, 0)
+                              + (good ? "  ok" : "  WRONG"));
+                    }
+                    const auto* chord = [&p] () -> const lynx::Note* {
+                        for (const auto& note : p.notes)
+                            if (note.key == 60)
+                                return &note;
+                        return nullptr;
+                    }();
+                    if (chord != nullptr)
+                        step ("chord length " + juce::String (chord->length) + " ticks (caught 15 ms early, released 500 ms after bar 3: 960)");
+                    step (ok ? "result=OK" : "result=FAILED");
+                    finish (ok ? 0 : 1);
+                };
+                (*drive) (second);
+            };
+            (*drive) (first);
+        });
+    }
+
     // --cliplooptest (round 167q): see the command line above.
     void runClipLoopTest (const juce::File& report, const juce::File& wavFile)
     {
@@ -6014,6 +6280,12 @@ private:
         juce::StringArray wanted;
         wanted.addTokens (which, ",", "");
         auto ok = true;
+        struct Shot
+        {
+            juce::String name;
+            std::optional<lynx::ChannelDef> channel;
+        };
+        std::vector<Shot> shots;
         for (const auto& e : lynx::natives::instrumentEngines())
         {
             const auto name = key (e.name);
@@ -6028,6 +6300,23 @@ private:
                 ok = false;
                 continue;
             }
+            shots.push_back ({ name, std::move (channel) });
+        }
+        // Autogun (round 169h): not in the Add menus (no preset files); FL's own render-test channel, either source
+        if (wanted.contains ("autogun"))
+        {
+            if (auto channel = lynx::natives::autogunShotChannel (lynx::flStudioAccess()))
+                shots.push_back ({ "autogun", std::move (channel) });
+            else
+            {
+                std::fprintf (stderr, "Autogun: no channel (FL Studio's Render tests\\Autogun.flp)\n");
+                ok = false;
+            }
+        }
+        for (auto& shot : shots)
+        {
+            const auto& name = shot.name;
+            auto& channel = shot.channel;
             lynx::AudioEngine offline (false);
             lynx::Song song;
             song.mixer = lynx::Song::defaultMixer (2);
@@ -7473,6 +7762,19 @@ private:
                     layout.setShown (lynx::toolbarlayout::Group::meters, false);
                     ui.setToolbarLayoutForSnapshot (layout);
                     saveArea (ui, ui.getToolbarBoundsForSnapshot(), prefix + "-toolbar-custom-1600.png");
+                }
+                {
+                    // round 170e: the toolbar after a knob was moved: the last tweaked read-out (its caption) and the snap magnet
+                    ui.setSize (1920, 1080); // the read-out needs room beside the hint bar
+                    ui.setToolbarLayoutForSnapshot (lynx::toolbarlayout::Layout::makeDefault());
+                    lynx::AutomationTarget t;
+                    t.kind = lynx::AutomationTargetKind::mixerVolume;
+                    t.index = 0;
+                    offline.noteTweaked (t);
+                    ui.refreshTweakReadoutForSnapshot();
+                    offline.dispatchPendingMessages();
+                    saveArea (ui, ui.getToolbarBoundsForSnapshot(), prefix + "-toolbar-tweak-1920.png");
+                    ui.setSize (1600, 900);
                 }
                 {
                     // the toolbar's edit mode (round 115): outlined panels and the tray of panels under it

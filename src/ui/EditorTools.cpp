@@ -277,10 +277,18 @@ const std::vector<Option>& options()
     return list;
 }
 
+juce::String mainText()
+{
+    const auto& option = options()[(std::size_t) juce::jlimit (0, (int) options().size() - 1, EditorGlobals::get().getGridOption())];
+    return tr ("Main: {0}", { tr (option.name).upToFirstOccurrenceOf (" (", false, false) });
+}
+
 void fillEditorBox (juce::ComboBox& box)
 {
     box.clear (juce::dontSendNotification);
-    box.addItem (tr ("Main (toolbar snap)"), followId);
+    // the snap in the toolbar it follows, by name ("Main: Line"; round 170e: "Main (toolbar snap)" did not say
+    // what it snaps to, and Busy Works could not tell it was a snap at all)
+    box.addItem (mainText(), followId);
     box.addSeparator();
 
     for (int i = 0; i < (int) options().size(); ++i)
@@ -320,9 +328,77 @@ juce::String describe (const Option& option)
 }
 } // namespace grid
 
-SnapBox::SnapBox (bool isEditor) : editor (isEditor)
+// --- icon drop-down (round 170e) ---------------------------------------------------------------------
+
+void IconComboBox::setIcon (Icon newIcon)
+{
+    if (icon != newIcon)
+    {
+        icon = newIcon;
+        resized();
+        repaint();
+    }
+}
+
+juce::Rectangle<float> IconComboBox::iconArea() const
+{
+    if (icon == Icon::none)
+        return {};
+    const auto size = juce::jlimit (12.0f, 16.0f, (float) getHeight() - 8.0f);
+    return { 7.0f, ((float) getHeight() - size) * 0.5f, size, size };
+}
+
+void IconComboBox::paint (juce::Graphics& g)
+{
+    juce::ComboBox::paint (g);
+    if (icon == Icon::none)
+        return;
+    const auto lit = iconLit != nullptr && iconLit();
+    const auto colour = ! isEnabled() ? theme::colour::textDisabled : lit ? theme::colour::accent : theme::colour::textSecondary;
+    icons::draw (g, icon, iconArea(), colour);
+}
+
+void IconComboBox::resized()
+{
+    juce::ComboBox::resized();
+    if (icon == Icon::none)
+        return;
+    // the text starts after the icon
+    for (auto* child : getChildren())
+        if (auto* label = dynamic_cast<juce::Label*> (child))
+        {
+            const auto right = juce::roundToInt (iconArea().getRight()) + 1;
+            if (label->getX() < right)
+                label->setBounds (label->getBounds().withLeft (right));
+        }
+}
+
+SnapBox::SnapBox (bool isEditor) : IconComboBox (isEditor ? Icon::magnet : Icon::none), editor (isEditor)
 {
     setScrollWheelEnabled (true);
+    if (editor)
+    {
+        // FL's editor snap is a magnet button (TEventEditForm.SnapBtn, "Snap to grid"): the magnet, lit while it snaps
+        iconLit = [this] { return getSelectedId() > 0 && grid::resolve (*this).kind != grid::Kind::none; };
+        watch.owner = this;
+        EditorGlobals::get().addChangeListener (&watch);
+    }
+}
+
+SnapBox::~SnapBox()
+{
+    if (editor)
+        EditorGlobals::get().removeChangeListener (&watch);
+}
+
+void SnapBox::refreshMainText()
+{
+    if (! editor || getNumItems() == 0)
+        return;
+    changeItemText (grid::followId, grid::mainText());
+    if (getSelectedId() == grid::followId) // the label shows the new name
+        setSelectedId (grid::followId, juce::dontSendNotification);
+    repaint();
 }
 
 ui::Hint SnapBox::hintAt (juce::Point<int>)

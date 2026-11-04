@@ -59,6 +59,8 @@ struct Settings
     double earlyDecay = 3.0;       // tap amplitudes fall by e^(−earlyDecay) over the span
     double earlyDiffusion = 0.0;   // 0..1: two all-passes smearing the taps
     double earlySend = 0.0;        // 0..1: early pattern fed into the late tank as well
+    double earlyModRateHz = 0.5;   // round 170c: the early taps' modulation (Atrium's Early mod rate / depth;
+    double earlyModDepthMs = 0.0;  //   0 = fixed taps, every other front-end)
     // build-up: the tank is fed through taps spread over buildSec (0 = fed at once)
     double buildSec = 0.0;
     // late tank (8-line FDN)

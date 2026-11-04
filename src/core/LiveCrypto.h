@@ -62,5 +62,25 @@ private:
     std::map<std::uint64_t, std::uint64_t> last; // sender -> highest counter
 };
 
+// The host's identity in a session (round 169j): when a host comes back after a drop or a restart, the guests check it
+// is the same host — anyone with the invite code has the session key, so the key alone cannot tell. The host keeps a
+// random seed (in its journal); its Ed25519 public key travels in the snapshot; a returning host signs the room and a
+// nonce the guest chose.
+using Seed = std::array<std::uint8_t, 32>;
+using PublicKey = std::array<std::uint8_t, 32>;
+using Signature = std::array<std::uint8_t, 64>;
+Seed newSeed();
+PublicKey publicKeyOf (const Seed& seed);
+Signature signHost (const Seed& seed, const std::string& room, const std::string& nonce);
+bool checkHost (const PublicKey& key, const std::string& room, const std::string& nonce, const Signature& signature);
+
+std::string toHex (const std::uint8_t* data, std::size_t size);
+template <std::size_t N>
+std::string toHex (const std::array<std::uint8_t, N>& a) { return toHex (a.data(), N); }
+// false when `hex` is not exactly 2 * N hex digits
+bool fromHex (const std::string& hex, std::uint8_t* out, std::size_t size);
+template <std::size_t N>
+bool fromHex (const std::string& hex, std::array<std::uint8_t, N>& out) { return fromHex (hex, out.data(), N); }
+
 constexpr std::size_t overhead = 2 + 24 + 16 + 16; // magic + version, nonce, MAC, sender + counter
 } // namespace lynx::livecrypto

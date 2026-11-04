@@ -416,7 +416,10 @@ double toneDb (float v) noexcept;       // ±18 dB: bass (low shelf 120 Hz), mid
 double feedbackAmount (float v) noexcept; // 0 … 1: the band-passed output fed back into the shaper (loop gain up to 0.9)
 double feedbackHz (float v) noexcept;   // 10 Hz … 1 kHz (log): the feedback band's centre
 double dynamicsAmount (float v) noexcept; // −1 (compress) … +1 (expand) the band's level after the drive
-enum class Style { tube, tape, transistor, fuzz, console }; // console: only through a voice (round 135)
+// console: only through a voice (round 135). tubeBiased (round 170c): the Tube curve of rounds 96 … 169 (a tanh biased
+// by 0.35, the knee at the curve's unit level), kept for the Tape pre and Triode voicings and Voice Shift; the Style
+// menu's Tube has 6 dB more headroom and a milder bias since round 170c (issue: "the first mode sounds garbly")
+enum class Style { tube, tape, transistor, fuzz, console, tubeBiased };
 constexpr int styles = 4; // the Style parameter's choices
 Style styleOf (float v) noexcept;
 double driveDb (float v) noexcept;     // 0 .. +36 dB
