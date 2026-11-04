@@ -413,6 +413,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     };
     rackLengthBox.onMenu = [this] { showPatternLengthMenu(); };
     ui::setHint (rackLengthBox, tr ("Pattern length in bars: [LMB] drag or [Wheel] change it  [2xLMB] automatic (from the notes)  [RMB] menu"));
+    ui::setQuickTip (rackLengthBox, tr ("Pattern length (bars)"));
     rackTitleTools.addAndMakeVisible (rackLengthBox);
     rackTitleTools.addAndMakeVisible (rackGraphButton);
     rackTitleTools.layout = [this] {
@@ -583,6 +584,17 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     };
     engine.nameAutomation = [this] (const AutomationTarget& t) { return describeAutomationTarget (engine, t).toStdString(); };
     addAndMakeVisible (gridBox); // global grid (editors)
+    snapToggleButton.setFlat (true);
+    snapToggleButton.setOnColour (juce::Colours::transparentBlack);
+    snapToggleButton.setIconColourWhenOn (theme::colour::accent);
+    snapToggleButton.setWantsKeyboardFocus (false);
+    snapToggleButton.setMouseClickGrabsKeyboardFocus (false);
+    snapToggleButton.setToggleState (EditorGlobals::get().getGridOption() != grid::noneOption, juce::dontSendNotification);
+    snapToggleButton.onClick = [this] {
+        EditorGlobals::get().toggleGrid();
+        snapToggleButton.setToggleState (EditorGlobals::get().getGridOption() != grid::noneOption, juce::dontSendNotification);
+    };
+    addAndMakeVisible (snapToggleButton);
     engine.addChangeListener (this);
     setTypingPiano (typingPiano);
     refreshRecordOptionButtons();
@@ -754,13 +766,17 @@ void MainComponent::paint (juce::Graphics& g)
             g.drawFittedText ((engine.isModified() ? juce::String ("* ") : juce::String()) + name, rest, juce::Justification::centredRight, 1, 0.8f);
     }
 
-    // captions that name the snap and pattern selectors
+    // captions that name the snap and pattern selectors, after their icons (the magnet is a button)
     g.setFont (font (type::caption - 1.0f, true));
     g.setColour (colour::textDisabled);
     if (! snapLabelArea.isEmpty())
-        g.drawText (tr ("SNAP"), snapLabelArea, juce::Justification::centredLeft, true);
+        g.drawText (tr ("SNAP"), snapLabelArea.withTrimmedLeft (rowHeight + 1), juce::Justification::centredLeft, true);
     if (! patternLabelArea.isEmpty())
-        g.drawText (tr ("PATTERN"), patternLabelArea, juce::Justification::centredLeft, true);
+    {
+        const auto iconBox = patternLabelArea.withWidth (rowHeight).toFloat();
+        icons::draw (g, Icon::pattern, iconBox.withSizeKeepingCentre (14.0f, 14.0f), colour::textDisabled);
+        g.drawText (tr ("PATTERN"), patternLabelArea.withTrimmedLeft (rowHeight + 1), juce::Justification::centredLeft, true);
+    }
 }
 
 void MainComponent::resized()
@@ -792,7 +808,11 @@ void MainComponent::resized()
     }
 
     const auto modeWidth = juce::jmax (patternModeButton.getIdealWidth (h - 2), songModeButton.getIdealWidth (h - 2));
-    const int tempoWidth = 90 + grow, timeWidth = 110 + grow, captionWidth = 50, gridWidth = 148;
+    const int tempoWidth = 90 + grow, timeWidth = 110 + grow, gridWidth = 148;
+    // the snap and pattern captions: an icon (the magnet button / the pattern icon) and the longer of the two names
+    const juce::Font captionFont (theme::font (theme::type::caption - 1.0f, true));
+    const int captionWidth = h + 3 + juce::jlimit (30, 80, juce::roundToInt (juce::jmax (juce::GlyphArrangement::getStringWidth (captionFont, tr ("SNAP")),
+                                                                                           juce::GlyphArrangement::getStringWidth (captionFont, tr ("PATTERN"))))) + 6;
 
     std::array<int, toolbarlayout::groupCount> widths {};
     widths[(std::size_t) Group::transport] = modeWidth + 8 + 3 * (bigWidth + 4) + 4 + tempoWidth + 6 + timeWidth;
@@ -883,7 +903,7 @@ void MainComponent::resized()
                     break;
                 case Group::master: hide ({ &masterVolume, &masterPitch }); break;
                 case Group::record: hide ({ &metronomeButton, &typingPianoButton, &recordMenuButton, &countInButton, &waitInputButton, &midiLight }); break;
-                case Group::snap: hide ({ &gridBox, &patternBox, &newPatternButton, &patternMenuButton }); break;
+                case Group::snap: hide ({ &gridBox, &snapToggleButton, &patternBox, &newPatternButton, &patternMenuButton }); break;
                 case Group::windows:
                     for (auto& b : panelButtons)
                         hide ({ &b });
@@ -943,6 +963,7 @@ void MainComponent::resized()
             {
                 auto first = juce::Rectangle<int> (panel.getX(), row1, panel.getWidth(), h);
                 snapLabelArea = first.removeFromLeft (captionWidth);
+                put (snapToggleButton, snapLabelArea.withWidth (h));
                 put (gridBox, first.reduced (0, 1));
                 auto second = juce::Rectangle<int> (panel.getX(), row2, panel.getWidth(), h);
                 patternLabelArea = second.removeFromLeft (captionWidth);
@@ -1004,7 +1025,7 @@ void MainComponent::setToolbarLayout (const toolbarlayout::Layout& layout, bool 
 
     const auto fraction = toolbarlayout::iconFraction (size), maxPx = toolbarlayout::iconMaxPx (size);
     for (auto* b : { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &recordMenuButton, &newPatternButton,
-                     &patternMenuButton, &pluginPickerButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton })
+                     &patternMenuButton, &pluginPickerButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &snapToggleButton })
         b->setIconSizing (fraction, maxPx);
     for (auto& b : panelButtons)
         b.setIconSizing (fraction, maxPx);
@@ -2928,9 +2949,9 @@ void MainComponent::PatternLengthBox::paint (juce::Graphics& g)
     g.setColour (hovered ? colour::borderStrong : colour::border);
     g.drawRoundedRectangle (area.reduced (0.5f), radius::sm, 1.0f);
     auto r = getLocalBounds().reduced (3, 0);
-    g.setFont (font (type::caption - 1.0f, true));
-    g.setColour (colour::textSecondary);
-    g.drawText (automatic ? "A" : "L", r.removeFromLeft (9), juce::Justification::centred, false);
+    // round 170e: a length icon instead of the letters "A" / "L" (unreadable); dim = automatic (from the notes)
+    icons::draw (g, Icon::span, r.removeFromLeft (13).toFloat().withSizeKeepingCentre (13.0f, 13.0f),
+                 automatic ? colour::textDisabled : colour::textSecondary);
     g.setFont (font (type::small, true));
     g.setColour (automatic ? colour::textSecondary : colour::textPrimary);
     g.drawText (juce::String (bars), r, juce::Justification::centred, false);
@@ -3444,6 +3465,8 @@ void MainComponent::setControlHints()
     ui::setHint (waitInputButton, with (tr ("Wait for input: recording starts with the first note you play"), "record.waitForInput"));
     ui::setHint (typingPianoButton, with (tr ("Typing keyboard to piano: Z..M and Q..P play the selected channels; letter shortcuts pause"),
                                           "view.typingPiano"));
+    ui::setHint (snapToggleButton, tr ("Snap (magnet): [LMB] turns the snap off and back on (as [Backspace]); lit while it snaps. "
+                                       "The Playlist and Piano Roll snap boxes show the same magnet"));
     ui::setHint (gridBox, tr ("Global snap: the grid of the Piano Roll and Playlist (when they follow it) and the quantise of recorded notes  "
                               "[LMB] choose  [Wheel] step  [RMB] length of new notes  [Backspace] snap on/off  [Alt] while dragging: no snap"),
                  true);
@@ -3512,6 +3535,7 @@ void MainComponent::setQuickTips()
     tip (masterVolume, tr ("Master volume"));
     tip (masterPitch, tr ("Master pitch"));
     tip (gridBox, tr ("Snap"));
+    tip (snapToggleButton, tr ("Snap on / off"));
     tip (patternBox, tr ("Pattern"));
     tip (newPatternButton, tr ("New pattern"));
     tip (patternMenuButton, tr ("Pattern options"));
@@ -3539,6 +3563,7 @@ void MainComponent::timerCallback()
         masterVolume.update();
         masterPitch.update();
         updateRecordQuantise();
+        snapToggleButton.setToggleState (EditorGlobals::get().getGridOption() != grid::noneOption, juce::dontSendNotification);
     }
 
     if (engine.isModified() != lastModified)

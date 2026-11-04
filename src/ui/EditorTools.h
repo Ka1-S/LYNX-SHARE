@@ -106,6 +106,7 @@ constexpr int screenOption = 1;
 
 // Editor combo: id 1 = "Follow global", id i + 2 = options()[i]. Global combo: id i + 1.
 constexpr int followId = 1;
+juce::String mainText(); // "Main: Line": the editors' entry that follows the toolbar snap, by its current name
 void fillEditorBox (juce::ComboBox& box);
 void fillGlobalBox (juce::ComboBox& box);
 
@@ -119,15 +120,42 @@ juce::String describe (const Option& option);
 // A snap selector that explains its current choice in the hint bar: the component's hint text (ui::setHint
 // or the tooltip) followed by what the chosen option does. `editor`: the box has the "Main" (follow the
 // toolbar) entry. The wheel steps through the options.
-class SnapBox : public juce::ComboBox,
+// A drop-down with a small icon before its text (round 170e, Busy Works review #5: the editors' snap, chord and scale
+// boxes were text only). `iconLit` (optional): the icon is drawn in the accent colour while it returns true.
+class IconComboBox : public juce::ComboBox
+{
+public:
+    explicit IconComboBox (Icon icon = Icon::none) : icon (icon) {}
+    void setIcon (Icon newIcon);
+    Icon getIcon() const noexcept { return icon; }
+    std::function<bool()> iconLit;
+
+    void paint (juce::Graphics& g) override;
+    void resized() override;
+    juce::Rectangle<float> iconArea() const;
+
+private:
+    Icon icon;
+};
+
+class SnapBox : public IconComboBox,
                 public ui::HintSource
 {
 public:
     explicit SnapBox (bool editor);
+    ~SnapBox() override;
     ui::Hint hintAt (juce::Point<int>) override;
+    // the "Main" entry names the toolbar snap it follows ("Main: Line"); called when that snap changes
+    void refreshMainText();
 
 private:
+    struct Watch final : juce::ChangeListener
+    {
+        SnapBox* owner = nullptr;
+        void changeListenerCallback (juce::ChangeBroadcaster*) override { owner->refreshMainText(); }
+    };
     bool editor;
+    Watch watch;
 };
 
 // State the editors share with the main window's toolbar. Listeners hear about every change.

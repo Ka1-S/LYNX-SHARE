@@ -462,7 +462,7 @@ TweakReadout::TweakReadout()
 {
     setRepaintsOnMouseActivity (true);
     setMouseCursor (juce::MouseCursor::PointingHandCursor);
-    setTooltip (tr ("Last tweaked parameter: click for its menu (automation clip, link to controller, events, value)"));
+    setTooltip (tr ("Last tweaked parameter: the control you moved last and its value. Click for its menu (automation clip, link to controller, events, value)"));
     setHint (*this, tr ("Last tweaked parameter: [LMB] its menu (create automation clip, link to controller, edit events, init song with this position, value)"),
              true, true);
 }
@@ -493,23 +493,17 @@ void TweakReadout::paint (juce::Graphics& g)
         g.drawRoundedRectangle (r.reduced (0.5f), radius::md, 1.0f);
     }
     r = r.reduced (6.0f, 0.0f);
-    icons::draw (g, Icon::automate, r.removeFromLeft (16.0f).withSizeKeepingCentre (14.0f, 14.0f),
+    // round 170e (Busy Works review #2: "I can't tell what that is"): a knob icon and a "LAST TWEAKED" caption over the
+    // parameter's name, as the toolbar's SNAP / PATTERN captions
+    icons::draw (g, Icon::tweak, r.removeFromLeft (17.0f).withSizeKeepingCentre (16.0f, 16.0f),
                  name.isNotEmpty() ? colour::automation : colour::textDisabled);
-    r.removeFromLeft (5.0f);
-
-    if (name.isEmpty())
-    {
-        g.setFont (font (type::small));
-        g.setColour (colour::textDisabled);
-        g.drawFittedText (tr ("Last tweaked: none"), r.toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
-        return;
-    }
+    r.removeFromLeft (6.0f);
 
     const auto fresh = juce::Time::getMillisecondCounterHiRes() - changedMs < 900.0;
-    if (value.isNotEmpty())
+    if (name.isNotEmpty() && value.isNotEmpty())
     {
         const juce::Font valueFont (font (type::small, true));
-        const auto w = juce::jmin (r.getWidth() * 0.45f, juce::GlyphArrangement::getStringWidth (valueFont, value) + 14.0f);
+        const auto w = juce::jmin (r.getWidth() * 0.4f, juce::GlyphArrangement::getStringWidth (valueFont, value) + 14.0f);
         const auto valueArea = r.removeFromRight (juce::jmax (36.0f, w)).reduced (0.0f, 3.0f);
         g.setColour (fresh ? colour::accentMuted : colour::bg3);
         g.fillRoundedRectangle (valueArea, radius::sm);
@@ -518,9 +512,26 @@ void TweakReadout::paint (juce::Graphics& g)
         g.drawFittedText (value, valueArea.toNearestInt(), juce::Justification::centred, 1, 0.75f);
         r.removeFromRight (6.0f);
     }
+
+    const auto twoLines = r.getHeight() >= 22.0f;
+    if (twoLines)
+    {
+        auto caption = r.removeFromTop (r.getHeight() * 0.42f);
+        g.setFont (font (type::caption - 1.0f, true));
+        g.setColour (colour::textDisabled);
+        g.drawFittedText (tr ("LAST TWEAKED"), caption.withTrimmedTop (2.0f).toNearestInt(), juce::Justification::bottomLeft, 1, 0.8f);
+    }
     g.setFont (font (type::small));
+    if (name.isEmpty())
+    {
+        g.setColour (colour::textDisabled);
+        g.drawFittedText (twoLines ? tr ("none yet: move any knob") : tr ("Last tweaked: none"), r.toNearestInt(),
+                          twoLines ? juce::Justification::topLeft : juce::Justification::centredLeft, 1, 0.8f);
+        return;
+    }
     g.setColour (hover ? colour::textPrimary : colour::textSecondary);
-    g.drawFittedText (name, r.toNearestInt(), juce::Justification::centredLeft, 1, 0.75f);
+    g.drawFittedText (twoLines ? name : tr ("Last tweaked: {0}", { name }), r.toNearestInt(),
+                      twoLines ? juce::Justification::topLeft : juce::Justification::centredLeft, 1, 0.75f);
 }
 
 void TweakReadout::mouseDown (const juce::MouseEvent&)

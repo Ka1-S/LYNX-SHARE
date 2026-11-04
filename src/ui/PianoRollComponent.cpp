@@ -153,7 +153,8 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     addAndMakeVisible (overview);
 
     grid::fillEditorBox (snapBox);
-    snapBox.setTooltip (tr ("Piano Roll grid: follows the global grid in the toolbar, or its own; hold Alt while dragging to ignore it"));
+    snapBox.setTooltip (tr ("Piano Roll snap (magnet): \"Main\" follows the snap in the toolbar, or pick this window's own; hold Alt while dragging to ignore it"));
+    ui::setQuickTip (snapBox, tr ("Piano Roll snap"));
     snapBox.setWantsKeyboardFocus (false);
     snapBox.setMouseClickGrabsKeyboardFocus (false);
     snapBox.onChange = [this] { repaint(); };
@@ -258,13 +259,20 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     scaleSnapButton.setEnabled (false); // until a scale is chosen
     scaleBox.setTooltip (tr ("Highlights the notes of a scale"));
 
+    // round 170e: an icon (FL's slide tool is one) instead of the word "Slide"
     slideButton.setClickingTogglesState (true);
     slideButton.setTooltip (tr ("New notes are \"slide\" notes: the currently sounding note glides to them (808 glide)"));
+    ui::setQuickTip (slideButton, tr ("Slide notes"));
     slideButton.setWantsKeyboardFocus (false);
     slideButton.setMouseClickGrabsKeyboardFocus (false);
-    slideButton.setButtonText (tr ("Slide"));
-    slideButton.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
+    slideButton.setOnColour (theme::colour::bg6);
+    slideButton.setIconColourWhenOn (theme::colour::accent);
+    slideButton.setFlat (true);
     addAndMakeVisible (slideButton);
+    ui::setQuickTip (chordBox, tr ("Chord stamp"));
+    ui::setQuickTip (scaleBox, tr ("Scale"));
+    chordBox.iconLit = [this] { return chordBox.getSelectedId() > 1; };
+    scaleBox.iconLit = [this] { return scaleIndex() > 0; };
 
     colourButton.setTooltip (tr ("Note colour: new notes get this colour. Click: choose it, colour the selection (Alt+C), "
                                  "select by colour (Shift+C)"));
@@ -491,10 +499,10 @@ void PianoRollComponent::resized()
     place (snapBox, 128);
     place (ghostButton, h);
     place (followButton, h);
-    place (slideButton, 54, true);
+    place (slideButton, h, true);
     place (colourButton, h, true);
-    place (chordBox, 86, true);
-    place (scaleBox, 150, true);
+    place (chordBox, 100, true);
+    place (scaleBox, 164, true);
     if (scaleBox.isVisible())
         place (scaleSnapButton, h);
     else
@@ -2497,7 +2505,7 @@ ui::Hint PianoRollComponent::hintAt (juce::Point<int> p)
 
     if (p.y >= rulerTop && p.y < headerHeight && p.x >= keyboardWidth)
     {
-        hint.text = tr ("Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] zoom  [Shift][Wheel] scroll");
+        hint.text = tr ("Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll");
         return hint;
     }
 
@@ -3499,7 +3507,7 @@ void PianoRollComponent::wheelNoteProperty (int note, float deltaY, bool fine, j
     });
 }
 
-void PianoRollComponent::glideBy (double ticks, double pixels)
+void PianoRollComponent::glideBy (double ticks, double pixels, bool immediate)
 {
     if (! gliding)
     {
@@ -3511,6 +3519,17 @@ void PianoRollComponent::glideBy (double ticks, double pixels)
     const auto grid = gridArea();
     glideX.target = juce::jlimit (0.0, juce::jmax (0.0, (double) viewLengthTicks() - grid.getWidth() / pixelsPerTick), glideX.target + ticks);
     glideY.target = juce::jlimit (0.0, juce::jmax (0.0, (double) rows.count * rowHeight - grid.getHeight()), glideY.target + pixels);
+    if (immediate)
+    {
+        scrollTicks = glideX.target;
+        scrollY = (int) std::round (glideY.target);
+        gliding = false;
+        updateScrollBars();
+        glideX.jumpTo (scrollTicks);
+        glideY.jumpTo (scrollY);
+        repaint();
+        return;
+    }
     glideFrame();
 }
 
@@ -3535,8 +3554,32 @@ void PianoRollComponent::glideFrame()
     repaint();
 }
 
-void PianoRollComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
+void PianoRollComponent::mouseMagnify (const juce::MouseEvent& e, float scale)
 {
+    gliding = false;
+    const auto factor = gesture::pinchZoomFactor (scale);
+    if (e.mods.isAltDown()) // taller / shorter keys, keeping the key under the pointer in place
+    {
+        const auto key = yToKey (e.y);
+        const auto offset = e.y - keyToY (key);
+        const auto height = juce::jlimit (gesture::minKeyHeight, gesture::maxKeyHeight, juce::roundToInt (rowHeight * factor));
+        rowHeight = height != rowHeight ? height : juce::jlimit (gesture::minKeyHeight, gesture::maxKeyHeight, rowHeight + (factor > 1.0 ? 1 : factor < 1.0 ? -1 : 0));
+        scrollY = juce::jmax (0, rowFor (key) * rowHeight + offset - (e.y - headerHeight));
+    }
+    else
+    {
+        const auto anchorPixels = (double) juce::jmax (0, e.x - keyboardWidth);
+        const auto zoomed = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, pixelsPerTick * factor);
+        scrollTicks = gesture::zoomAnchored (scrollTicks, pixelsPerTick, zoomed, anchorPixels);
+        pixelsPerTick = zoomed;
+    }
+    updateScrollBars();
+    repaint();
+}
+
+void PianoRollComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& rawWheel)
+{
+    const auto wheel = flmods::normalisedWheel (rawWheel); // Windows touchpads: pieces of a notch (round 170e)
     const auto ctrl = flmods::ctrl (e.mods), alt = e.mods.isAltDown(), shift = e.mods.isShiftDown();
     const auto overGrid = gridArea().contains (e.getPosition()) || velocityArea().contains (e.getPosition());
 
@@ -3601,9 +3644,9 @@ void PianoRollComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::
         const auto vertical = gesture::wheelScrollPixels (wheel.deltaY, wheel.isSmooth, 3.0 * rowHeight);
         const auto sideways = gesture::wheelScrollPixels (wheel.deltaX, wheel.isSmooth, 60.0);
         if (shift)
-            glideBy (gesture::wheelScrollPixels (wheel.deltaY, wheel.isSmooth, 80.0) / pixelsPerTick, 0.0);
+            glideBy (gesture::wheelScrollPixels (wheel.deltaY, wheel.isSmooth, 80.0) / pixelsPerTick, 0.0, wheel.isSmooth);
         else
-            glideBy (sideways / pixelsPerTick, vertical);
+            glideBy (sideways / pixelsPerTick, vertical, wheel.isSmooth); // a trackpad moves the view at once
         return;
     }
 

@@ -5393,9 +5393,11 @@ void MixerLayoutBox::paint (juce::Graphics& g)
     theme::fillRoundRect (g, box, radius::sm, hot ? colour::bg4 : colour::bg2);
     g.setColour (hot ? colour::borderStrong : colour::border);
     g.drawRoundedRectangle (box.reduced (0.5f), radius::sm, 1.0f);
+    // round 170e: the strips icon names what the box is (it showed only "Wide")
+    icons::draw (g, Icon::mixer, box.withWidth (24.0f).withSizeKeepingCentre (14.0f, 14.0f), hot ? colour::textPrimary : colour::textSecondary);
     g.setColour (colour::accent);
     g.setFont (font (type::small, true));
-    g.drawFittedText (tr (juce::String (std::string (mixerlayout::nameOf (MixerStrips::layout)))), getLocalBounds().reduced (8, 0).withTrimmedRight (14),
+    g.drawFittedText (tr (juce::String (std::string (mixerlayout::nameOf (MixerStrips::layout)))), getLocalBounds().reduced (8, 0).withTrimmedLeft (18).withTrimmedRight (14),
                       juce::Justification::centredLeft, 1, 0.8f);
     icons::draw (g, Icon::chevronDown, box.removeFromRight (18.0f).withSizeKeepingCentre (12.0f, 12.0f), hot ? colour::textPrimary : colour::textSecondary);
 }
