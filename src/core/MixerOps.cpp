@@ -334,13 +334,53 @@ int sidechainTo (Song& song, int from, int to)
 
     int linked = 0;
     for (auto& fx : song.mixer[(std::size_t) to].effects)
-        if ((fx.kind == EffectKind::compressor || fx.kind == EffectKind::vocoder) && (fx.sidechain < 0 || fx.sidechain == from))
+        if (listensToSidechain (fx.kind) && (fx.sidechain < 0 || fx.sidechain == from))
         {
             fx.sidechain = from;
             ++linked;
         }
 
     return linked;
+}
+
+bool listensToSidechain (EffectKind kind) noexcept
+{
+    return kind == EffectKind::compressor || kind == EffectKind::fruityLimiter || kind == EffectKind::fruityCompressor
+           || kind == EffectKind::vocoder;
+}
+
+int soleSidechainSender (const Song& song, int to)
+{
+    if (! isInsert (song, to))
+        return -1;
+    int sender = -1;
+    for (int t = 1; t < (int) song.mixer.size(); ++t)
+        for (const auto& send : song.mixer[(std::size_t) t].sends)
+            if (t != to && send.target == to && send.level <= 0.0f)
+            {
+                if (sender >= 0 && sender != t)
+                    return -1;
+                sender = t;
+            }
+    return sender;
+}
+
+bool linkAddedSidechain (Song& song, int to, int slot)
+{
+    if (! isInsert (song, to))
+        return false;
+    auto& effects = song.mixer[(std::size_t) to].effects;
+    if (slot < 0 || slot >= (int) effects.size())
+        return false;
+    auto& fx = effects[(std::size_t) slot];
+    // (dynamics only: a vocoder's side input is its modulator, a choice of its own)
+    if (fx.kind == EffectKind::vocoder || ! listensToSidechain (fx.kind) || fx.sidechain >= 0)
+        return false;
+    const auto from = soleSidechainSender (song, to);
+    if (from < 0)
+        return false;
+    fx.sidechain = from;
+    return true;
 }
 
 namespace

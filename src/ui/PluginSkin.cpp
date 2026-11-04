@@ -516,7 +516,7 @@ float titleText (juce::Graphics& g, juce::Rectangle<float> a, const juce::String
     g.drawText (name, box.translated (0.0f, 1.0f), juce::Justification::centredLeft, true);
     g.setGradientFill (juce::ColourGradient (juce::Colours::white, 0.0f, a.getCentreY() - size * 0.5f, juce::Colour (0xffd6d9e0).interpolatedWith (accent, 0.18f), 0.0f,
                                              a.getCentreY() + size * 0.5f, false));
-    g.drawText (name, box, juce::Justification::centredLeft, true);
+    drawFilledText (g, name, box, juce::Justification::centredLeft); // (not drawText: see drawFilledText)
     if (underline)
     {
         const auto line = juce::Rectangle<float> (a.getX(), a.getBottom() - 3.0f, w, 2.0f);
@@ -529,6 +529,57 @@ float titleText (juce::Graphics& g, juce::Rectangle<float> a, const juce::String
         g.fillRoundedRectangle (line, 1.0f);
     }
     return w;
+}
+
+void drawFilledText (juce::Graphics& g, const juce::String& text, juce::Rectangle<float> area, juce::Justification justification)
+{
+    if (text.isEmpty() || area.isEmpty()) return;
+    juce::GlyphArrangement glyphs;
+    glyphs.addCurtailedLineOfText (g.getCurrentFont(), text, 0.0f, 0.0f, area.getWidth(), true);
+    glyphs.justifyGlyphs (0, glyphs.getNumGlyphs(), area.getX(), area.getY(), area.getWidth(), area.getHeight(), justification);
+    juce::Path outline;
+    for (int i = 0; i < glyphs.getNumGlyphs(); ++i)
+    {
+        auto& glyph = glyphs.getGlyph (i);
+        if (glyph.isWhitespace()) continue;
+        juce::Path one;
+        glyph.createPath (one);
+        if (! one.isEmpty()) outline.addPath (one);
+    }
+    if (! outline.isEmpty()) g.fillPath (outline);
+}
+
+juce::String rendererProbeReport()
+{
+    // what a filled shape changed outside its own box, on this platform's native image type (CoreGraphics on macOS)
+    const auto changedOutside = [] (const std::function<void (juce::Graphics&)>& draw, juce::Rectangle<int> inside) {
+        juce::Image img (juce::Image::ARGB, 240, 80, true);
+        {
+            juce::Graphics g (img);
+            g.fillAll (juce::Colours::black);
+            draw (g);
+        }
+        int changed = 0;
+        for (int y = 0; y < img.getHeight(); ++y)
+            for (int x = 0; x < img.getWidth(); ++x)
+                if (! inside.contains (x, y) && img.getPixelAt (x, y).getBrightness() > 0.05f) ++changed;
+        return changed;
+    };
+    const auto gradient = [] (juce::Graphics& g) {
+        g.setGradientFill (juce::ColourGradient (juce::Colours::white, 0.0f, 20.0f, juce::Colour (0xffd6c0c8), 0.0f, 40.0f, false));
+        g.setFont (theme::font (16.0f, true));
+    };
+    const juce::Rectangle<int> box (20, 20, 120, 24);
+    const auto rawText = changedOutside ([&] (juce::Graphics& g) { gradient (g); g.drawText ("Facet EQ", box.toFloat(), juce::Justification::centredLeft, true); }, box);
+    const auto safeText = changedOutside ([&] (juce::Graphics& g) { gradient (g); drawFilledText (g, "Facet EQ", box.toFloat(), juce::Justification::centredLeft); }, box);
+    const auto emptyPath = changedOutside ([&] (juce::Graphics& g) { gradient (g); g.fillPath (juce::Path()); }, {});
+    juce::String r;
+    r << "renderer probe (pixels changed outside the shape; 0 = right)\n";
+    r << "gradient drawText \"Facet EQ\": " << rawText << "\n";
+    r << "gradient drawFilledText \"Facet EQ\": " << safeText << "\n";
+    r << "gradient fillPath (empty path): " << emptyPath << "\n";
+    r << "result=" << (safeText == 0 ? "OK" : "FAIL") << "\n";
+    return r;
 }
 
 void powerLed (juce::Graphics& g, juce::Point<float> c, float d, bool on)

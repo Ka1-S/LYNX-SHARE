@@ -413,6 +413,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     };
     rackLengthBox.onMenu = [this] { showPatternLengthMenu(); };
     ui::setHint (rackLengthBox, tr ("Pattern length in bars: [LMB] drag or [Wheel] change it  [2xLMB] automatic (from the notes)  [RMB] menu"));
+    ui::setQuickTip (rackLengthBox, tr ("Pattern length (bars)"));
     rackTitleTools.addAndMakeVisible (rackLengthBox);
     rackTitleTools.addAndMakeVisible (rackGraphButton);
     rackTitleTools.layout = [this] {
@@ -583,6 +584,17 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     };
     engine.nameAutomation = [this] (const AutomationTarget& t) { return describeAutomationTarget (engine, t).toStdString(); };
     addAndMakeVisible (gridBox); // global grid (editors)
+    snapToggleButton.setFlat (true);
+    snapToggleButton.setOnColour (juce::Colours::transparentBlack);
+    snapToggleButton.setIconColourWhenOn (theme::colour::accent);
+    snapToggleButton.setWantsKeyboardFocus (false);
+    snapToggleButton.setMouseClickGrabsKeyboardFocus (false);
+    snapToggleButton.setToggleState (EditorGlobals::get().getGridOption() != grid::noneOption, juce::dontSendNotification);
+    snapToggleButton.onClick = [this] {
+        EditorGlobals::get().toggleGrid();
+        snapToggleButton.setToggleState (EditorGlobals::get().getGridOption() != grid::noneOption, juce::dontSendNotification);
+    };
+    addAndMakeVisible (snapToggleButton);
     engine.addChangeListener (this);
     setTypingPiano (typingPiano);
     refreshRecordOptionButtons();
@@ -754,13 +766,17 @@ void MainComponent::paint (juce::Graphics& g)
             g.drawFittedText ((engine.isModified() ? juce::String ("* ") : juce::String()) + name, rest, juce::Justification::centredRight, 1, 0.8f);
     }
 
-    // captions that name the snap and pattern selectors
+    // captions that name the snap and pattern selectors, after their icons (the magnet is a button)
     g.setFont (font (type::caption - 1.0f, true));
     g.setColour (colour::textDisabled);
     if (! snapLabelArea.isEmpty())
-        g.drawText (tr ("SNAP"), snapLabelArea, juce::Justification::centredLeft, true);
+        g.drawText (tr ("SNAP"), snapLabelArea.withTrimmedLeft (rowHeight + 1), juce::Justification::centredLeft, true);
     if (! patternLabelArea.isEmpty())
-        g.drawText (tr ("PATTERN"), patternLabelArea, juce::Justification::centredLeft, true);
+    {
+        const auto iconBox = patternLabelArea.withWidth (rowHeight).toFloat();
+        icons::draw (g, Icon::pattern, iconBox.withSizeKeepingCentre (14.0f, 14.0f), colour::textDisabled);
+        g.drawText (tr ("PATTERN"), patternLabelArea.withTrimmedLeft (rowHeight + 1), juce::Justification::centredLeft, true);
+    }
 }
 
 void MainComponent::resized()
@@ -792,7 +808,11 @@ void MainComponent::resized()
     }
 
     const auto modeWidth = juce::jmax (patternModeButton.getIdealWidth (h - 2), songModeButton.getIdealWidth (h - 2));
-    const int tempoWidth = 90 + grow, timeWidth = 110 + grow, captionWidth = 50, gridWidth = 148;
+    const int tempoWidth = 90 + grow, timeWidth = 110 + grow, gridWidth = 148;
+    // the snap and pattern captions: an icon (the magnet button / the pattern icon) and the longer of the two names
+    const juce::Font captionFont (theme::font (theme::type::caption - 1.0f, true));
+    const int captionWidth = h + 3 + juce::jlimit (30, 80, juce::roundToInt (juce::jmax (juce::GlyphArrangement::getStringWidth (captionFont, tr ("SNAP")),
+                                                                                           juce::GlyphArrangement::getStringWidth (captionFont, tr ("PATTERN"))))) + 6;
 
     std::array<int, toolbarlayout::groupCount> widths {};
     widths[(std::size_t) Group::transport] = modeWidth + 8 + 3 * (bigWidth + 4) + 4 + tempoWidth + 6 + timeWidth;
@@ -883,7 +903,7 @@ void MainComponent::resized()
                     break;
                 case Group::master: hide ({ &masterVolume, &masterPitch }); break;
                 case Group::record: hide ({ &metronomeButton, &typingPianoButton, &recordMenuButton, &countInButton, &waitInputButton, &midiLight }); break;
-                case Group::snap: hide ({ &gridBox, &patternBox, &newPatternButton, &patternMenuButton }); break;
+                case Group::snap: hide ({ &gridBox, &snapToggleButton, &patternBox, &newPatternButton, &patternMenuButton }); break;
                 case Group::windows:
                     for (auto& b : panelButtons)
                         hide ({ &b });
@@ -943,6 +963,7 @@ void MainComponent::resized()
             {
                 auto first = juce::Rectangle<int> (panel.getX(), row1, panel.getWidth(), h);
                 snapLabelArea = first.removeFromLeft (captionWidth);
+                put (snapToggleButton, snapLabelArea.withWidth (h));
                 put (gridBox, first.reduced (0, 1));
                 auto second = juce::Rectangle<int> (panel.getX(), row2, panel.getWidth(), h);
                 patternLabelArea = second.removeFromLeft (captionWidth);
@@ -1004,7 +1025,7 @@ void MainComponent::setToolbarLayout (const toolbarlayout::Layout& layout, bool 
 
     const auto fraction = toolbarlayout::iconFraction (size), maxPx = toolbarlayout::iconMaxPx (size);
     for (auto* b : { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &recordMenuButton, &newPatternButton,
-                     &patternMenuButton, &pluginPickerButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton })
+                     &patternMenuButton, &pluginPickerButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &snapToggleButton })
         b->setIconSizing (fraction, maxPx);
     for (auto& b : panelButtons)
         b.setIconSizing (fraction, maxPx);
@@ -1251,20 +1272,35 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
 {
     const auto chord = chordFromKeyPress (key);
 
-    // 1. the typing piano (its keys win over plain-letter shortcuts while it is on)
-    if (keys::KeyMap::playsNote (chord, typingPiano))
+    // 1. the typing piano: the keys its layout takes (notes, FL's LOCK) win over the shortcuts; FL's FREE keys don't
+    const auto typed = typingKey (chord);
+    if (typed.taken)
     {
-        const auto note = keys::typingPianoNote (chord.key, typingOctave, typingRoot);
-
-        if (! heldKeys.hasTag (key.getKeyCode())) // key repeat: the note is already sounding
-            for (auto c : engine.getSelectedChannels())
-                heldKeys.press (c, note, 0.8f, key.getKeyCode());
+        const auto code = key.getKeyCode();
+        if (! heldKeys.hasTag (code) && typingLaunches.count (code) == 0) // key repeat: the notes are already sounding
+        {
+            // FL sends the typing keyboard's notes as MIDI channel 1 (FUN_011828c0 -> FUN_01181620 channel 0): with
+            // "MIDI channel used for playlist live mode" = 1 and Performance mode on, they launch the Playlist's clips
+            // (what "Layout Performance mode" is for), else they play the selected channels
+            if (engine.typingNotesLaunchClips())
+            {
+                for (auto note : typed.notes)
+                    if (perf::Command c; typingPerformance.note (note, true, c))
+                        engine.performanceCommand (c);
+                typingLaunches[code] = typed.notes;
+            }
+            else
+                for (auto c : engine.getSelectedChannels())
+                    for (auto note : typed.notes) // (a chord layout's key plays several)
+                        heldKeys.press (c, note, 0.8f, code);
+        }
         return true;
     }
+    const auto pianoKeys = typingPiano && ! isPlainKey (chord); // (a FREE plain key is a shortcut as with the piano off)
 
     // 2. a key the user gave an action himself (Options › Shortcuts) wins over the panels' built-in keys
     // (issue #12: Metronome on 'C' did nothing while the Playlist, whose Knife is 'C', had the focus)
-    if (const auto own = keyMap.findUserBound (chord, focusContext(), typingPiano); ! own.empty() && runAction (own))
+    if (const auto own = keyMap.findUserBound (chord, focusContext(), pianoKeys); ! own.empty() && runAction (own))
         return true;
 
     // 3. the focused panel's own keys
@@ -1278,15 +1314,40 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
         return true;
 
     // 4. the key map
-    const auto action = keyMap.find (chord, focusContext(), typingPiano);
+    const auto action = keyMap.find (chord, focusContext(), pianoKeys);
     return ! action.empty() && runAction (action);
+}
+
+bool MainComponent::isPlainKey (const keys::Chord& chord) noexcept
+{
+    return (chord.mods & (keys::ctrl | keys::alt | keys::shift)) == 0;
+}
+
+keys::TypingKey MainComponent::typingKey (const keys::Chord& chord) const
+{
+    return typingPiano && isPlainKey (chord) ? keys::typingPianoKey (chord.key, typingOctave, typingRoot, typingLayout) : keys::TypingKey {};
+}
+
+void MainComponent::releaseTypingLaunches (bool all)
+{
+    for (auto it = typingLaunches.begin(); it != typingLaunches.end();)
+        if (all || ! juce::KeyPress::isKeyCurrentlyDown (it->first))
+        {
+            for (auto note : it->second)
+                if (perf::Command c; typingPerformance.note (note, false, c))
+                    engine.performanceCommand (c);
+            it = typingLaunches.erase (it);
+        }
+        else
+            ++it;
 }
 
 bool MainComponent::keyFromSecondaryWindow (const juce::KeyPress& key)
 {
     // (round 165q / issue #12) a text field keeps its typing keys; the rest runs the global actions
     const auto typingIntoText = dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) != nullptr;
-    const auto action = keyMap.findFromSecondaryWindow (chordFromKeyPress (key), typingIntoText, typingPiano);
+    const auto chord = chordFromKeyPress (key);
+    const auto action = keyMap.findFromSecondaryWindow (chord, typingIntoText, typingPiano && (! isPlainKey (chord) || typingKey (chord).taken));
     return ! action.empty() && runAction (action);
 }
 
@@ -1490,6 +1551,7 @@ bool MainComponent::keyStateChanged (bool)
 
     for (auto code : released)
         heldKeys.releaseTag (code);
+    releaseTypingLaunches (false);
 
     return false;
 }
@@ -1523,6 +1585,7 @@ void MainComponent::setTypingPiano (bool on)
 
     // release anything still sounding from the keyboard
     heldKeys.releaseAll();
+    releaseTypingLaunches (true);
 }
 
 void MainComponent::loadKeyMap()
@@ -1659,6 +1722,8 @@ void MainComponent::loadUiSettings()
             typingOctave = keys::typingpiano::clampOctave (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "typingRoot")
             typingRoot = keys::typingpiano::clampRoot (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
+        else if (key == "typingLayout") // FL's layout name, so the list can grow
+            typingLayout = keys::typingpiano::layoutIndex (line.fromFirstOccurrenceOf ("=", false, false).trim().toStdString());
         else if (key == "keepEditorsOpen")
             ChannelRackComponent::keepEditorsOpen = on;
         else if (key == "selFirstChanPatChanges")
@@ -1807,7 +1872,8 @@ void MainComponent::saveUiSettings()
         return;
 
     uiSettingsFile().replaceWithText ("typingPiano=" + juce::String (typingPiano ? 1 : 0) + "\ntypingOctave=" + juce::String (typingOctave)
-                                      + "\ntypingRoot=" + juce::String (typingRoot) + "\nkeepEditorsOpen="
+                                      + "\ntypingRoot=" + juce::String (typingRoot)
+                                      + "\ntypingLayout=" + juce::String (keys::typingpiano::layoutName (typingLayout)) + "\nkeepEditorsOpen="
                                       + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
                                       + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
                                       + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
@@ -2574,8 +2640,8 @@ void MainComponent::showMetronomeMenu()
 void MainComponent::showTypingPianoMenu()
 {
     // FL 2026's right-click on the typing keyboard button (KbToMIDIPopup, measured round 168t2): Root note C..B,
-    // Octave 2..6 (where the Z row starts), Options › Reset. FL's "Layout" list (FPC, Janko, Performance mode,
-    // Slicex, scales...) is not here yet: LYNX plays the Piano layout, FL's default.
+    // Octave 2..6 (where the Z row starts), Options › Reset, Layout (FL's .scr names and order, core/KeyMap.h).
+    // FL's Reset (KbToMIDIResetClick 0x121ac70) releases the held notes and puts Root note C, Octave 4 and Layout Piano back.
     static const char* const names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
     juce::PopupMenu menu;
     menu.addSectionHeader (tr ("Root note"));
@@ -2586,12 +2652,21 @@ void MainComponent::showTypingPianoMenu()
         menu.addItem (juce::String (o), true, typingOctave == o, [this, o] { typingOctave = o; saveUiSettings(); });
     menu.addSectionHeader (tr ("Options"));
     menu.addItem (tr ("Reset"), [this] {
+        heldKeys.releaseAll();
+        releaseTypingLaunches (true);
         typingOctave = keys::typingpiano::defaultOctave;
         typingRoot = 0;
+        typingLayout = keys::typingpiano::pianoLayout();
         saveUiSettings();
     });
     menu.addSectionHeader (tr ("Layout"));
-    menu.addItem (tr ("Piano"), true, true, [] {});
+    for (int l = 0; l < keys::typingpiano::layoutCount(); ++l) // (FL's file names, untranslated as in FL)
+        menu.addItem (keys::typingpiano::layoutName (l), true, typingLayout == l, [this, l] {
+            heldKeys.releaseAll(); // a held key's notes belong to the old layout
+            releaseTypingLaunches (true);
+            typingLayout = l;
+            saveUiSettings();
+        });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&typingPianoButton));
 }
 
@@ -2877,9 +2952,9 @@ void MainComponent::PatternLengthBox::paint (juce::Graphics& g)
     g.setColour (hovered ? colour::borderStrong : colour::border);
     g.drawRoundedRectangle (area.reduced (0.5f), radius::sm, 1.0f);
     auto r = getLocalBounds().reduced (3, 0);
-    g.setFont (font (type::caption - 1.0f, true));
-    g.setColour (colour::textSecondary);
-    g.drawText (automatic ? "A" : "L", r.removeFromLeft (9), juce::Justification::centred, false);
+    // round 170e: a length icon instead of the letters "A" / "L" (unreadable); dim = automatic (from the notes)
+    icons::draw (g, Icon::span, r.removeFromLeft (13).toFloat().withSizeKeepingCentre (13.0f, 13.0f),
+                 automatic ? colour::textDisabled : colour::textSecondary);
     g.setFont (font (type::small, true));
     g.setColour (automatic ? colour::textSecondary : colour::textPrimary);
     g.drawText (juce::String (bars), r, juce::Justification::centred, false);
@@ -3393,6 +3468,8 @@ void MainComponent::setControlHints()
     ui::setHint (waitInputButton, with (tr ("Wait for input: recording starts with the first note you play"), "record.waitForInput"));
     ui::setHint (typingPianoButton, with (tr ("Typing keyboard to piano: Z..M and Q..P play the selected channels; letter shortcuts pause"),
                                           "view.typingPiano"));
+    ui::setHint (snapToggleButton, tr ("Snap (magnet): [LMB] turns the snap off and back on (as [Backspace]); lit while it snaps. "
+                                       "The Playlist and Piano Roll snap boxes show the same magnet"));
     ui::setHint (gridBox, tr ("Global snap: the grid of the Piano Roll and Playlist (when they follow it) and the quantise of recorded notes  "
                               "[LMB] choose  [Wheel] step  [RMB] length of new notes  [Backspace] snap on/off  [Alt] while dragging: no snap"),
                  true);
@@ -3461,6 +3538,7 @@ void MainComponent::setQuickTips()
     tip (masterVolume, tr ("Master volume"));
     tip (masterPitch, tr ("Master pitch"));
     tip (gridBox, tr ("Snap"));
+    tip (snapToggleButton, tr ("Snap on / off"));
     tip (patternBox, tr ("Pattern"));
     tip (newPatternButton, tr ("New pattern"));
     tip (patternMenuButton, tr ("Pattern options"));
@@ -3488,6 +3566,7 @@ void MainComponent::timerCallback()
         masterVolume.update();
         masterPitch.update();
         updateRecordQuantise();
+        snapToggleButton.setToggleState (EditorGlobals::get().getGridOption() != grid::noneOption, juce::dontSendNotification);
     }
 
     if (engine.isModified() != lastModified)

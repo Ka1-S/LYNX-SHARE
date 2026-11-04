@@ -849,6 +849,18 @@ public:
             }
         }
 
+        if (args.contains ("--gfxprobe"))
+        {
+            // LYNX.exe --gfxprobe report.txt (round 170c, issue #11): renderer checks on this platform's native images —
+            // text drawn with a gradient fill (a word with a space in it) and an empty path filled with a gradient must
+            // stay inside their shapes. JUCE 8.0.4's CoreGraphics renderer (macOS) clipped to an empty glyph or path as
+            // "no clip" and flooded the whole component (Facet EQ's blank pink window).
+            const auto i = args.indexOf ("--gfxprobe");
+            juce::File (args[i + 1].unquoted()).replaceWithText (lynx::skin::rendererProbeReport());
+            quit();
+            return;
+        }
+
         if (args.contains ("--plugui"))
         {
             // LYNX.exe --plugui <folder>: the native effect editors at FL's size (one PNG per editor and page), each
@@ -7741,6 +7753,19 @@ private:
                     layout.setShown (lynx::toolbarlayout::Group::meters, false);
                     ui.setToolbarLayoutForSnapshot (layout);
                     saveArea (ui, ui.getToolbarBoundsForSnapshot(), prefix + "-toolbar-custom-1600.png");
+                }
+                {
+                    // round 170e: the toolbar after a knob was moved: the last tweaked read-out (its caption) and the snap magnet
+                    ui.setSize (1920, 1080); // the read-out needs room beside the hint bar
+                    ui.setToolbarLayoutForSnapshot (lynx::toolbarlayout::Layout::makeDefault());
+                    lynx::AutomationTarget t;
+                    t.kind = lynx::AutomationTargetKind::mixerVolume;
+                    t.index = 0;
+                    offline.noteTweaked (t);
+                    ui.refreshTweakReadoutForSnapshot();
+                    offline.dispatchPendingMessages();
+                    saveArea (ui, ui.getToolbarBoundsForSnapshot(), prefix + "-toolbar-tweak-1920.png");
+                    ui.setSize (1600, 900);
                 }
                 {
                     // the toolbar's edit mode (round 115): outlined panels and the tray of panels under it

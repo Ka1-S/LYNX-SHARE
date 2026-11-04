@@ -274,6 +274,37 @@ inline double wheelScrollPixels (double delta, bool smooth, double pixelsPerNotc
     return -delta * pixelsPerNotch * 7.0;
 }
 
+// --- trackpads (round 170e, Busy Works review #17: no quick zoom with a trackpad on macOS) ----------------------
+// Windows: precision touchpads (two-finger scrolling, and the pinch, which Windows sends as Ctrl+wheel) and
+// high-resolution wheels send WM_MOUSEWHEEL in pieces of a notch, and JUCE reports every piece as a notched event
+// (isSmooth false, one notch = 0.5 x 120 / 256 in its units): each piece then scrolled or zoomed a whole notch.
+// A delta under 3/4 of a notch is such a piece: it becomes a smooth delta of the same size (one notch = 1/7 in the
+// smooth formulas above), so a pinch zooms as far as the fingers move. Notched wheels are unchanged.
+constexpr double windowsWheelNotch = 60.0 / 256.0;
+
+struct WheelDelta
+{
+    double x = 0.0, y = 0.0;
+    bool smooth = false;
+};
+
+inline WheelDelta normaliseWheel (double deltaX, double deltaY, bool smooth, bool windows)
+{
+    const auto piece = [] (double d) { return d != 0.0 && std::abs (d) < 0.75 * windowsWheelNotch; };
+    if (smooth || ! windows || ! (piece (deltaX) || piece (deltaY)))
+        return { deltaX, deltaY, smooth };
+    return { deltaX / windowsWheelNotch / 7.0, deltaY / windowsWheelNotch / 7.0, true };
+}
+
+// The zoom factor of one trackpad pinch event (macOS magnifyWithEvent, Windows GID_ZOOM: JUCE's mouseMagnify `scale`,
+// 1 = no change), limited so that one event never jumps more than x2.
+inline double pinchZoomFactor (double scale)
+{
+    if (! (scale > 0.0) || ! std::isfinite (scale))
+        return 1.0;
+    return std::clamp (scale, 0.5, 2.0);
+}
+
 // --- middle-drag zooms (round 167t, issue #26; FL 2026 evidence in docs/analise/REA_rodada167t.md) ---------------
 // Key height range of the Piano roll. FL's is 18..116 px (16 + 2 px per zoom level 1..50); LYNX also goes
 // shorter, down to 6 px.

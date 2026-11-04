@@ -3301,6 +3301,27 @@ Layout echoformLayout()
         v.push_back (withVoicing (slider (Item::hslider, 642, 322, 70, 16, "L/R offset", nullptr, noCaption)));
         v.push_back (withVoicing (value (714, 320, 52, 20, "L/R offset")));
     }
+    // round 170c (the "shell" audit): the Hybrid engine and the tape voicings run their own loops, which read only
+    // the times, feedback, mix, output, style and phase — every colour, modulation, diffusion, filter and groove control
+    // is dimmed while one of them is on (it used to look live and do nothing)
+    {
+        namespace ef = echosuite::echoform;
+        static constexpr int idleParams[] { ef::width, ef::drive, ef::age, ef::diffusion, ef::diffSize, ef::lowCut, ef::highCut, ef::modRate,
+                                            ef::modDepth, ef::wow, ef::flutter, ef::shift, ef::shiftDetune, ef::pitch, ef::pitchDetune, ef::mode,
+                                            ef::ducking, ef::groove, ef::feel, ef::accent, ef::primes, ef::crossFeedback };
+        for (auto& item : v)
+        {
+            if (item.param == nullptr || ! isValueControl (item.type)) continue;
+            const auto k = paramIndex (EffectKind::echoform, item.param);
+            if (std::find (std::begin (idleParams), std::end (idleParams), k) == std::end (idleParams)) continue;
+            item.idleParam = "Hybrid";
+            item.idleMin = 0.25f;
+            item.idleMax = 1.0f;
+            item.idle2Param = "Tape voicing";
+            item.idle2Min = 1.0f / 6.0f;
+            item.idle2Max = 1.0f;
+        }
+    }
     return l;
 }
 
@@ -4132,6 +4153,18 @@ bool isShown (EffectKind kind, const LayoutItem& item, int page, const EffectPar
         return v >= lo && (v < hi || hi >= 1.0f); // [lo, hi), the top end included at 1
     };
     return inRange (item.whenParam, item.whenMin, item.whenMax) && inRange (item.when2Param, item.when2Min, item.when2Max);
+}
+
+bool isIdle (EffectKind kind, const LayoutItem& item, const EffectParams& params)
+{
+    const auto inRange = [&] (const char* param, float lo, float hi) {
+        if (param == nullptr)
+            return false;
+        const auto i = paramIndex (kind, param);
+        const auto v = i >= 0 && i < (int) params.size() ? params[(std::size_t) i] : 0.0f;
+        return v >= lo && (v < hi || hi >= 1.0f);
+    };
+    return inRange (item.idleParam, item.idleMin, item.idleMax) || inRange (item.idle2Param, item.idle2Min, item.idle2Max);
 }
 
 bool isValueControl (Item type) noexcept
