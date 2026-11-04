@@ -70,6 +70,10 @@ struct LayoutItem
     float whenMin = 0.0f, whenMax = 1.0f;
     const char* when2Param = nullptr;  // a second condition
     float when2Min = 0.0f, when2Max = 1.0f;
+    const char* idleParam = nullptr;   // round 170c: shown dimmed (it does nothing) while this parameter is within
+    float idleMin = 0.0f, idleMax = 1.0f; // [idleMin, idleMax) (1 included), or while the second one is
+    const char* idle2Param = nullptr;
+    float idle2Min = 0.0f, idle2Max = 1.0f;
     int colour = -1;                   // ≥ 0: one of the editor's band colours (EQ bands, multiband bands)
     int columns = 0;                   // radio: options in a grid of this many columns (0 = one column)
     const char* param2 = nullptr;      // display "xy": the parameter on the vertical axis (`param` is the horizontal one)
@@ -132,4 +136,6 @@ bool isValueControl (Item type) noexcept;
 
 // Is the item shown on `page` with these parameter values? (pages and the conditions on other parameters)
 bool isShown (EffectKind kind, const LayoutItem& item, int page, const EffectParams& params, const std::vector<std::uint8_t>* state = nullptr);
+// round 170c: the control has no effect with the current settings (another mode bypasses it): drawn dimmed
+bool isIdle (EffectKind kind, const LayoutItem& item, const EffectParams& params);
 } // namespace lynx::plugui
