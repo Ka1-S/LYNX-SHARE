@@ -4739,7 +4739,7 @@ private:
         };
         // (the recursion through the message loop; written out so each step lets the engine's timer run)
         auto drive = std::make_shared<std::function<void (std::shared_ptr<Pass>)>>();
-        *drive = [this, runPass, drive] (std::shared_ptr<Pass> pass) {
+        *drive = [this, runPass, drive, device] (std::shared_ptr<Pass> pass) { // (the stand-in lives while the passes run)
             if (engine == nullptr)
                 return;
             (*runPass) (pass);
