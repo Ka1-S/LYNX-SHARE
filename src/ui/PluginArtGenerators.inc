@@ -486,6 +486,1404 @@ inline const Theme& threeOscTheme()
     return t;
 }
 
+// --- shared by the generators' themes -------------------------------------------------------------------------------
+
+inline void fillBackdrop (juce::Graphics& g, Rectangle<float> a)
+{
+    const auto& p = pal();
+    g.setGradientFill (ColourGradient (p.bgTop, 0.0f, a.getY(), p.bgBottom, 0.0f, a.getBottom(), false));
+    g.fillRect (a);
+}
+
+// a path through n+1 points of f (u in 0..1) → (x, y)
+template <typename F>
+inline juce::Path curve (int n, F&& f)
+{
+    juce::Path path;
+    for (int i = 0; i <= n; ++i)
+    {
+        const auto q = f ((float) i / (float) n);
+        if (i == 0) path.startNewSubPath (q);
+        else path.lineTo (q);
+    }
+    return path;
+}
+
+// a cap turned on a lathe: concentric marks, a bright bevel (Harmor, Kepler Exo)
+inline void machinedCap (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    const auto& p = pal();
+    g.setGradientFill (ColourGradient (p.capTop.brighter (0.1f + hover * 0.15f), c.x, cap.getY(), p.capBottom, c.x, cap.getBottom(), false));
+    g.fillEllipse (cap);
+    if (fx)
+    {
+        for (int i = 1; i < 5; ++i)
+        {
+            g.setColour (Colours::white.withAlpha (i % 2 == 0 ? 0.05f : 0.025f));
+            g.drawEllipse (cap.reduced (capR * 0.18f * (float) i), 0.8f);
+        }
+        g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.35f), c.x, cap.getY(), Colours::white.withAlpha (0.0f), c.x, c.y, false));
+        g.drawEllipse (cap.reduced (0.6f), 1.1f);
+    }
+}
+
+// === Harmor: spectral resynthesis — graphite, a heat-coloured spectrogram, machined knobs ===========================
+
+inline Colour heat (float v) // 0..1 → ember red, amber, pale yellow
+{
+    const auto& p = pal();
+    return v < 0.5f ? Colour (0xffb3261e).interpolatedWith (p.accent, v * 2.0f) : p.accent.interpolatedWith (Colour (0xfffff1b8), (v - 0.5f) * 2.0f);
+}
+
+inline void canvasHarmor (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    if (! reduced) bloom (g, { a.getRight() - a.getWidth() * 0.2f, a.getY() + a.getHeight() * 0.12f }, a.getWidth() * 0.4f, p.accent, 0.10f);
+    if (display) return;
+    // a spectrogram: time runs right, partials stack up, each column a frame of a resynthesised sound
+    const auto sp = Rectangle<float> (a.getX() + a.getWidth() * 0.38f, a.getY() + 6.0f, a.getWidth() * 0.6f, a.getHeight() * 0.3f);
+    juce::Random rnd (34);
+    const int cols = 64, rows = 28;
+    const auto cw = sp.getWidth() / (float) cols, rh = sp.getHeight() / (float) rows;
+    for (int x = 0; x < cols; ++x)
+    {
+        const auto u = (float) x / (float) cols;
+        const auto env = std::exp (-u * 2.2f) * (0.75f + 0.25f * std::sin (u * 19.0f));
+        const auto fade = juce::jmin (1.0f, u * 6.0f) * (1.0f - u * 0.6f);
+        for (int h = 1; h <= rows; ++h)
+        {
+            const auto v = env * std::pow ((float) h, -0.7f) * (0.7f + 0.3f * rnd.nextFloat());
+            if (v < 0.06f) continue;
+            g.setColour (heat (juce::jlimit (0.0f, 1.0f, v * 1.4f)).withAlpha (0.10f + 0.28f * v * fade));
+            g.fillRect (Rectangle<float> (sp.getX() + (float) x * cw, sp.getBottom() - (float) h * rh, cw - 0.6f, rh * 0.45f));
+        }
+    }
+    // the harmonic ladder on the left: a sawtooth's partials, 1/n
+    for (int h = 1; h <= 24; ++h)
+    {
+        const auto len = a.getWidth() * 0.22f / (float) h;
+        g.setColour (p.accent2.withAlpha (0.10f));
+        g.fillRect (Rectangle<float> (a.getX() + 10.0f, a.getBottom() - 10.0f - (float) h * 5.0f, len, 1.2f));
+    }
+}
+
+inline void harmorEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    for (int i = 0; i < 3; ++i)
+    {
+        g.setColour (heat (1.0f - 0.3f * (float) i));
+        g.fillRoundedRectangle (Rectangle<float> (r * (2.0f - 0.55f * (float) i), r * 0.38f).withCentre ({ c.x - r * 0.275f * (float) i, c.y + r * 0.6f - r * 0.6f * (float) i }), 1.0f);
+    }
+}
+
+inline void harmorMotion (juce::Graphics& g, const Motion& m)
+{
+    // a live spectrum next to the name: partials breathing
+    if (m.stage == m.area) return;
+    const auto s = m.stage.reduced (4.0f);
+    const int n = 22;
+    const auto bw = s.getWidth() / (float) n;
+    for (int i = 0; i < n; ++i)
+    {
+        const auto h = (float) (i + 1);
+        const auto v = juce::jlimit (0.05f, 1.0f, std::pow (h, -0.55f) * (0.65f + 0.35f * std::sin (m.t * (1.1f + 0.13f * h) + h)));
+        const auto bar = Rectangle<float> (s.getX() + (float) i * bw + 1.0f, s.getBottom() - v * s.getHeight(), bw - 2.0f, v * s.getHeight());
+        g.setColour (heat (v).withAlpha (0.55f));
+        g.fillRect (bar);
+    }
+}
+
+inline const Theme& harmorTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Harmor";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff1d1f25), Colour (0xff0a0b0e), Colour (0xffffa62b), Colour (0xff4fd2ff), Colour (0xd01e2027), Colour (0xe40e0f13),
+                  Colour (0xff6d7380), Colour (0xffeef0f4), Colour (0xff060709), Colour (0xff4a4f5a), Colour (0xff17191e), Colour (0xff2a2d35),
+                  Colour (0xfffff4e0), Colour (0xff1c1e24) };
+        x.canvas = canvasHarmor;
+        x.titleEmblem = harmorEmblem;
+        x.drawCap = machinedCap;
+        x.arcGlow = 0.28f;
+        x.stageRepaint = true;
+        x.paintMotion = harmorMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === Harmless: a harmonic comb in clear water — ice blue and lime, glass knobs ======================================
+
+inline void canvasHarmless (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    if (! reduced)
+    {
+        bloom (g, { a.getX() + a.getWidth() * 0.12f, a.getY() + a.getHeight() * 0.1f }, a.getWidth() * 0.35f, p.accent, 0.10f);
+        bloom (g, { a.getRight() - a.getWidth() * 0.1f, a.getBottom() }, a.getWidth() * 0.35f, p.accent2, 0.06f);
+    }
+    if (display) return;
+    // the comb: evenly spaced harmonics under a smooth filter curve (the additive recipe in one picture)
+    const auto base = a.getBottom() - a.getHeight() * 0.06f;
+    const auto top = a.getY() + a.getHeight() * 0.3f;
+    const int n = 48;
+    const auto x0 = a.getX() + a.getWidth() * 0.04f, x1 = a.getRight() - a.getWidth() * 0.04f;
+    auto filter = [&] (float u) { return std::exp (-std::pow ((u - 0.22f) / 0.18f, 2.0f)) * 0.9f + 0.25f * std::exp (-u * 3.0f) + 0.12f * std::exp (-std::pow ((u - 0.62f) / 0.07f, 2.0f)); };
+    for (int i = 0; i < n; ++i)
+    {
+        const auto u = (float) i / (float) (n - 1);
+        const auto x = x0 + (x1 - x0) * u;
+        const auto v = filter (u);
+        g.setGradientFill (ColourGradient (p.accent.withAlpha (0.20f * v + 0.03f), x, base - v * (base - top), p.accent.withAlpha (0.0f), x, base, false));
+        g.fillRect (Rectangle<float> (x - 1.0f, base - v * (base - top), 2.0f, v * (base - top)));
+    }
+    const auto env = curve (160, [&] (float u) { return Point<float> (x0 + (x1 - x0) * u, base - filter (u) * (base - top)); });
+    g.setColour (p.accent2.withAlpha (0.22f));
+    g.strokePath (env, stroke (1.4f));
+    // ripples on the surface
+    for (int i = 0; i < 4; ++i)
+    {
+        g.setColour (p.accent.withAlpha (0.05f));
+        g.drawEllipse (Rectangle<float> (a.getWidth() * (0.2f + 0.12f * (float) i), a.getHeight() * (0.05f + 0.02f * (float) i))
+                           .withCentre ({ a.getX() + a.getWidth() * 0.22f, a.getY() + a.getHeight() * 0.1f }), 1.0f);
+    }
+}
+
+inline void harmlessEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    for (int i = 0; i < 4; ++i)
+    {
+        const auto h = r * 2.0f / (float) (i + 1) * 0.9f;
+        g.setColour (i == 0 ? p.accent2 : p.accent);
+        g.fillRect (Rectangle<float> (c.x - r + (float) i * r * 0.6f, c.y + r * 0.9f - h, r * 0.32f, h));
+    }
+}
+
+inline const Theme& harmlessTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Harmless";
+        x.base = Style::glow;
+        x.pal = { Colour (0xff132230), Colour (0xff070e15), Colour (0xff7fe3ff), Colour (0xffc4f27a), Colour (0xc8152434), Colour (0xe00b141d),
+                  Colour (0xff6fa8c6), Colour (0xffeaf8ff), Colour (0xff050a10), Colour (0xffbfe9fb), Colour (0xff3b6d86), Colour (0xff22384a),
+                  Colour (0xff0d2230), Colour (0xff172a3a) };
+        x.canvas = canvasHarmless;
+        x.titleEmblem = harmlessEmblem;
+        x.cap = Cap::orb;
+        x.thumbPointer = true;
+        return x;
+    }();
+    return t;
+}
+
+// === GMS: a groove machine — warm black, orange step pads, teal display, a running step light =======================
+
+inline void canvasGms (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    styles::brushed (g, a, 0.02f);
+    if (! reduced) bloom (g, { a.getRight() - a.getWidth() * 0.18f, a.getY() + a.getHeight() * 0.05f }, a.getWidth() * 0.35f, p.accent, 0.08f);
+    if (display) return;
+    // a row of sixteen step pads printed along the top, a groove lit in them
+    static const bool groove[16] { true, false, false, true, false, false, true, false, true, false, true, false, false, true, false, true };
+    const auto row = Rectangle<float> (a.getX() + a.getWidth() * 0.42f, a.getY() + 10.0f, a.getWidth() * 0.55f, juce::jmin (26.0f, a.getHeight() * 0.06f));
+    const auto pw = row.getWidth() / 16.0f;
+    for (int i = 0; i < 16; ++i)
+    {
+        const auto pad = Rectangle<float> (row.getX() + (float) i * pw + 2.0f, row.getY(), pw - 4.0f, row.getHeight()).reduced (0.0f, 2.0f);
+        g.setColour ((groove[i] ? p.accent : p.plate).withAlpha (groove[i] ? 0.22f : 0.35f));
+        g.fillRoundedRectangle (pad, 2.0f);
+        if (i % 4 == 0)
+        {
+            g.setColour (p.accent2.withAlpha (0.25f));
+            g.fillRect (pad.withY (pad.getBottom() + 3.0f).withHeight (1.5f));
+        }
+    }
+    // a groove's waveform under it, teal on the dark
+    const auto wave = curve (300, [&] (float u) {
+        const auto beat = std::fmod (u * 8.0f, 1.0f);
+        return Point<float> (a.getX() + a.getWidth() * u, a.getBottom() - a.getHeight() * 0.08f - std::sin (u * 180.0f) * std::exp (-beat * 6.0f) * a.getHeight() * 0.05f);
+    });
+    g.setColour (p.accent2.withAlpha (0.10f));
+    g.strokePath (wave, juce::PathStrokeType (1.0f));
+}
+
+inline void consoleCap (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx) // a mixer-console cap with a coloured index ring
+{
+    const auto& p = pal();
+    g.setGradientFill (ColourGradient (p.capTop.brighter (0.15f + hover * 0.1f), c.x, cap.getY(), p.capBottom, c.x, cap.getBottom(), false));
+    g.fillEllipse (cap);
+    g.setColour (p.accent.withAlpha (0.55f));
+    g.drawEllipse (cap.reduced (capR * 0.22f), juce::jmax (1.0f, capR * 0.08f));
+    if (fx)
+    {
+        g.setColour (Colours::white.withAlpha (0.08f));
+        g.fillEllipse (cap.reduced (capR * 0.35f).withTrimmedBottom (capR * 0.5f));
+    }
+}
+
+inline void gmsEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    for (int i = 0; i < 4; ++i)
+    {
+        g.setColour (i == 1 ? p.accent2 : (i == 2 ? p.plate.brighter (0.4f) : p.accent));
+        g.fillRoundedRectangle (Rectangle<float> (r * 0.85f, r * 0.85f).withCentre ({ c.x + (i % 2 == 0 ? -0.5f : 0.5f) * r, c.y + (i < 2 ? -0.5f : 0.5f) * r }), 1.0f);
+    }
+}
+
+inline void gmsMotion (juce::Graphics& g, const Motion& m)
+{
+    // sixteen steps in the stage with the playing step running through them
+    if (m.stage == m.area) return;
+    const auto s = m.stage.reduced (4.0f, juce::jmax (4.0f, m.stage.getHeight() * 0.3f));
+    const auto pw = s.getWidth() / 16.0f;
+    const auto at = (int) std::fmod (m.t * 4.0f, 16.0f); // 120 bpm sixteenths at half speed
+    for (int i = 0; i < 16; ++i)
+    {
+        const auto pad = Rectangle<float> (s.getX() + (float) i * pw + 1.5f, s.getY(), pw - 3.0f, s.getHeight());
+        g.setColour (i == at ? m.p.accent : (i % 4 == 0 ? m.p.plate.brighter (0.5f) : m.p.plate.brighter (0.2f)));
+        g.fillRoundedRectangle (pad, 2.0f);
+    }
+}
+
+inline const Theme& gmsTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "GMS";
+        x.base = Style::hardware;
+        x.pal = { Colour (0xff221d19), Colour (0xff0d0b0a), Colour (0xffff7a1a), Colour (0xff2fd6c3), Colour (0xd2241f1b), Colour (0xe6120f0d),
+                  Colour (0xff7a6a5c), Colour (0xfff6ece2), Colour (0xff070605), Colour (0xff3c3631), Colour (0xff171412), Colour (0xff2f2925),
+                  Colour (0xfffff0e0), Colour (0xff2a2420) };
+        x.canvas = canvasGms;
+        x.titleEmblem = gmsEmblem;
+        x.drawCap = consoleCap;
+        x.arcGlow = 0.18f;
+        x.stageRepaint = true;
+        x.paintMotion = gmsMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === Morphine: shapes melting into each other — violet and aqua, a waveform morphing ================================
+
+inline float morphShape (float u, float k) // k = 0: a round sine, 1: a sharp spiky pulse train
+{
+    const auto ph = u * juce::MathConstants<float>::twoPi * 3.0f;
+    const auto soft = std::sin (ph);
+    const auto sharp = std::pow (std::abs (std::sin (ph * 0.5f)), 9.0f) * 2.0f - 0.6f;
+    return soft * (1.0f - k) + sharp * k;
+}
+
+inline void canvasMorphine (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    if (! reduced)
+    {
+        bloom (g, { a.getX() + a.getWidth() * 0.25f, a.getY() + a.getHeight() * 0.25f }, a.getWidth() * 0.4f, p.accent, 0.10f);
+        bloom (g, { a.getRight() - a.getWidth() * 0.2f, a.getBottom() - a.getHeight() * 0.2f }, a.getWidth() * 0.35f, p.accent2, 0.07f);
+    }
+    if (display) return;
+    // a fan of in-between shapes: the morph from a sine to a pulse train, across the panel
+    const auto midY = a.getY() + a.getHeight() * 0.18f;
+    const auto amp = a.getHeight() * 0.07f;
+    for (int i = 0; i <= 8; ++i)
+    {
+        const auto k = (float) i / 8.0f;
+        const auto path = curve (220, [&] (float u) { return Point<float> (a.getX() + a.getWidth() * u, midY + (float) i * a.getHeight() * 0.012f - amp * morphShape (u, k)); });
+        g.setColour (p.accent.interpolatedWith (p.accent2, k).withAlpha (0.05f + 0.06f * (i == 0 || i == 8 ? 1.0f : 0.0f)));
+        g.strokePath (path, juce::PathStrokeType (i == 0 || i == 8 ? 1.4f : 1.0f));
+    }
+}
+
+inline void morphineEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    const auto path = curve (60, [&] (float u) { return Point<float> (c.x - r + 2.0f * r * u, c.y - r * 0.7f * morphShape (u * 0.34f, u)); });
+    g.setGradientFill (ColourGradient (p.accent, c.x - r, c.y, p.accent2, c.x + r, c.y, false));
+    g.strokePath (path, stroke (1.6f));
+}
+
+inline void morphineMotion (juce::Graphics& g, const Motion& m)
+{
+    if (m.stage == m.area) return;
+    const auto s = m.stage.reduced (4.0f);
+    const auto k = 0.5f + 0.5f * std::sin (m.t * 0.6f);
+    const auto path = curve (120, [&] (float u) { return Point<float> (s.getX() + s.getWidth() * u, s.getCentreY() - s.getHeight() * 0.36f * morphShape (u * 0.67f, k)); });
+    g.setColour (m.p.accent.interpolatedWith (m.p.accent2, k).withAlpha (0.25f));
+    g.strokePath (path, juce::PathStrokeType (4.0f));
+    g.setColour (m.p.accent.interpolatedWith (m.p.accent2, k));
+    g.strokePath (path, juce::PathStrokeType (1.4f));
+}
+
+inline const Theme& morphineTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Morphine";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff1c1236), Colour (0xff080512), Colour (0xffc86bff), Colour (0xff39e6c8), Colour (0xc41e1438), Colour (0xdc0e0920),
+                  Colour (0xffa184d8), Colour (0xfff0e8ff), Colour (0xff05030c), Colour (0xff5b4296), Colour (0xff160f2c), Colour (0xff2a2048),
+                  Colour (0xfff6f0ff), Colour (0xff1a1232) };
+        x.canvas = canvasMorphine;
+        x.titleEmblem = morphineEmblem;
+        x.twoTone = true;
+        x.cap = Cap::orb;
+        x.pointer = Pointer::glowLine;
+        x.stageRepaint = true;
+        x.paintMotion = morphineMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === Ogun: forged iron — hammered dark metal, a glowing seam, sparks rising =========================================
+
+inline void canvasOgun (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    // hammer marks: soft dents, lit from the top
+    juce::Random rnd (37);
+    const auto dents = (int) juce::jmin (420.0f, a.getWidth() * a.getHeight() / 1400.0f);
+    for (int i = 0; i < dents; ++i)
+    {
+        const Point<float> c { a.getX() + rnd.nextFloat() * a.getWidth(), a.getY() + rnd.nextFloat() * a.getHeight() };
+        const auto r = 6.0f + rnd.nextFloat() * 14.0f;
+        const auto d = Rectangle<float> (r * 2.0f, r * 1.6f).withCentre (c);
+        g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.018f), c.x, d.getY(), Colours::black.withAlpha (0.05f), c.x, d.getBottom(), false));
+        g.fillEllipse (d);
+    }
+    if (display) return;
+    // a hot seam: a crack glowing from inside the metal, across the lower panel
+    const auto seam = curve (90, [&] (float u) {
+        return Point<float> (a.getX() + a.getWidth() * u, a.getBottom() - a.getHeight() * 0.1f + a.getHeight() * 0.03f * std::sin (u * 23.0f) + a.getHeight() * 0.015f * std::sin (u * 71.0f));
+    });
+    if (! reduced)
+    {
+        g.setColour (p.accent.withAlpha (0.10f));
+        g.strokePath (seam, stroke (9.0f));
+        bloom (g, { a.getCentreX(), a.getBottom() }, a.getWidth() * 0.45f, p.accent, 0.10f);
+    }
+    g.setColour (p.accent2.withAlpha (0.35f));
+    g.strokePath (seam, stroke (1.2f));
+}
+
+inline void forgedCap (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx) // an octagonal forged nut, hot at the rim
+{
+    const auto& p = pal();
+    juce::Path oct;
+    for (int i = 0; i < 8; ++i)
+    {
+        const auto ang = juce::MathConstants<float>::twoPi * ((float) i + 0.5f) / 8.0f;
+        const Point<float> q { c.x + std::sin (ang) * capR, c.y - std::cos (ang) * capR };
+        if (i == 0) oct.startNewSubPath (q);
+        else oct.lineTo (q);
+    }
+    oct.closeSubPath();
+    if (fx && ! reduced) bloom (g, c, capR * 1.5f, p.accent, 0.12f + 0.15f * hover);
+    g.setGradientFill (ColourGradient (p.capTop.brighter (0.2f + hover * 0.15f), c.x - capR * 0.5f, cap.getY(), p.capBottom, c.x + capR * 0.5f, cap.getBottom(), false));
+    g.fillPath (oct);
+    g.setColour (p.accent.withAlpha (0.35f + 0.25f * hover));
+    g.strokePath (oct, juce::PathStrokeType (1.0f));
+    if (fx)
+    {
+        g.setColour (Colours::black.withAlpha (0.35f));
+        g.fillEllipse (cap.reduced (capR * 0.55f));
+    }
+}
+
+inline void ogunEmblem (juce::Graphics& g, Point<float> c, float r) // an anvil
+{
+    const auto& p = pal();
+    juce::Path anvil;
+    anvil.startNewSubPath (c.x - r * 1.2f, c.y - r * 0.55f);
+    anvil.lineTo (c.x + r * 0.9f, c.y - r * 0.55f);
+    anvil.quadraticTo (c.x + r * 1.3f, c.y - r * 0.5f, c.x + r * 1.35f, c.y - r * 0.25f);
+    anvil.lineTo (c.x + r * 0.5f, c.y - r * 0.1f);
+    anvil.lineTo (c.x + r * 0.35f, c.y + r * 0.35f);
+    anvil.lineTo (c.x + r * 0.8f, c.y + r * 0.8f);
+    anvil.lineTo (c.x - r * 0.8f, c.y + r * 0.8f);
+    anvil.lineTo (c.x - r * 0.35f, c.y + r * 0.35f);
+    anvil.lineTo (c.x - r * 0.55f, c.y - r * 0.1f);
+    anvil.lineTo (c.x - r * 1.2f, c.y - r * 0.3f);
+    anvil.closeSubPath();
+    g.setColour (p.accent);
+    g.fillPath (anvil);
+}
+
+inline void ogunMotion (juce::Graphics& g, const Motion& m)
+{
+    for (const auto& s : m.motes) // sparks: hot dots that cool as they rise
+    {
+        const auto life = juce::jlimit (0.0f, 1.0f, (s.y - m.stage.getY()) / juce::jmax (1.0f, m.stage.getHeight()));
+        const auto col = m.p.accent.interpolatedWith (m.p.accent2, life);
+        if (! reduced) bloom (g, { s.x, s.y }, s.size * 2.5f, col, 0.35f * life);
+        g.setColour (col.withAlpha (0.4f + 0.6f * life));
+        g.fillEllipse (Rectangle<float> (s.size, s.size).withCentre ({ s.x, s.y }));
+    }
+}
+
+inline const Theme& ogunTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Ogun";
+        x.base = Style::hardware;
+        x.pal = { Colour (0xff2a211c), Colour (0xff0e0a08), Colour (0xffff6a1f), Colour (0xffffc24a), Colour (0xcc2a221d), Colour (0xe2120e0b),
+                  Colour (0xff8a6a55), Colour (0xfff8e6d6), Colour (0xff080605), Colour (0xff4a423d), Colour (0xff1a1614), Colour (0xff332a25),
+                  Colour (0xffffe2c4), Colour (0xff2a221e) };
+        x.canvas = canvasOgun;
+        x.titleEmblem = ogunEmblem;
+        x.drawCap = forgedCap;
+        x.ticks = 9;
+        x.boldTicks = true;
+        x.arcGlow = 0.3f;
+        x.arcGlowWidth = 2.8f;
+        x.motes = 10;
+        x.drift = Drift::rise;
+        x.sizeMin = 1.5f; x.sizeRange = 1.8f;
+        x.vyMin = -30.0f; x.vyRange = 16.0f;
+        x.sway = 6.0f;
+        x.reach = 2.5f;
+        x.paintMotion = ogunMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === PoiZone: venom — a glossy violet drop, drips from the top edge, acid highlights ================================
+
+inline juce::Path dropShape (Point<float> c, float r) // a drop, point up
+{
+    juce::Path d;
+    d.startNewSubPath (c.x, c.y - r * 1.6f);
+    d.cubicTo (c.x + r * 0.35f, c.y - r * 0.9f, c.x + r, c.y - r * 0.35f, c.x + r, c.y + r * 0.15f);
+    d.cubicTo (c.x + r, c.y + r * 0.75f, c.x + r * 0.5f, c.y + r, c.x, c.y + r);
+    d.cubicTo (c.x - r * 0.5f, c.y + r, c.x - r, c.y + r * 0.75f, c.x - r, c.y + r * 0.15f);
+    d.cubicTo (c.x - r, c.y - r * 0.35f, c.x - r * 0.35f, c.y - r * 0.9f, c.x, c.y - r * 1.6f);
+    d.closeSubPath();
+    return d;
+}
+
+inline void canvasPoizone (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    if (! reduced) bloom (g, { a.getRight() - a.getWidth() * 0.12f, a.getY() + a.getHeight() * 0.2f }, a.getWidth() * 0.3f, p.accent, 0.12f);
+    if (display) return;
+    // drips running down from the top edge
+    juce::Random rnd (44);
+    for (int i = 0; i < 18; ++i)
+    {
+        const auto x = a.getX() + rnd.nextFloat() * a.getWidth();
+        const auto len = a.getHeight() * (0.03f + 0.12f * rnd.nextFloat() * rnd.nextFloat());
+        const auto w = 2.0f + rnd.nextFloat() * 4.0f;
+        g.setGradientFill (ColourGradient (p.accent.withAlpha (0.16f), x, a.getY(), p.accent.withAlpha (0.08f), x, a.getY() + len, false));
+        g.fillRoundedRectangle (Rectangle<float> (x - w * 0.5f, a.getY() - 4.0f, w, len + 4.0f), w * 0.5f);
+        g.fillEllipse (Rectangle<float> (w * 1.5f, w * 1.6f).withCentre ({ x, a.getY() + len }));
+    }
+    // one big glossy drop, with rings where it will land
+    const auto c = Point<float> (a.getRight() - a.getWidth() * 0.12f, a.getY() + a.getHeight() * 0.18f);
+    const auto r = juce::jmin (a.getWidth(), a.getHeight()) * 0.07f;
+    const auto drop = dropShape (c, r);
+    g.setGradientFill (ColourGradient (p.accent.brighter (0.2f).withAlpha (0.35f), c.x - r * 0.5f, c.y - r, p.accent.darker (0.6f).withAlpha (0.3f), c.x + r, c.y + r, true));
+    g.fillPath (drop);
+    g.setColour (p.accent2.withAlpha (0.25f));
+    g.strokePath (drop, juce::PathStrokeType (1.0f));
+    g.setColour (Colours::white.withAlpha (0.2f));
+    g.fillEllipse (Rectangle<float> (r * 0.35f, r * 0.6f).withCentre ({ c.x - r * 0.45f, c.y - r * 0.1f }));
+    for (int i = 1; i <= 3; ++i)
+    {
+        g.setColour (p.accent2.withAlpha (0.07f));
+        g.drawEllipse (Rectangle<float> (r * 2.2f * (float) i, r * 0.5f * (float) i).withCentre ({ c.x, c.y + r * 3.2f }), 1.0f);
+    }
+}
+
+inline void poizoneEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    const auto d = dropShape (c.translated (0.0f, r * 0.25f), r * 0.75f);
+    g.setColour (p.accent);
+    g.fillPath (d);
+    g.setColour (p.accent2);
+    g.fillEllipse (Rectangle<float> (r * 0.3f, r * 0.3f).withCentre (c.translated (-r * 0.25f, r * 0.2f)));
+}
+
+inline const Theme& poizoneTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "PoiZone";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff1e0f26), Colour (0xff09050d), Colour (0xffe04bff), Colour (0xff9bff5a), Colour (0xc8211028), Colour (0xe00f0714),
+                  Colour (0xffa45bc0), Colour (0xfffbeaff), Colour (0xff07030a), Colour (0xff5a2f6e), Colour (0xff1a0d22), Colour (0xff2e1a38),
+                  Colour (0xfffff0ff), Colour (0xff22122a) };
+        x.canvas = canvasPoizone;
+        x.titleEmblem = poizoneEmblem;
+        x.cap = Cap::orb;
+        x.pointer = Pointer::glowLine;
+        x.arcGlow = 0.3f;
+        return x;
+    }();
+    return t;
+}
+
+// === Kepler: orbital mechanics — a gold sun, teal orbits, Kepler's equal areas swept ================================
+
+inline void canvasKepler (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    stars (g, a, display ? 30 : 90, 46, 0.3f);
+    if (display) return;
+    const auto sun = Point<float> (a.getRight() - a.getWidth() * 0.16f, a.getY() + a.getHeight() * 0.14f);
+    if (! reduced) bloom (g, sun, a.getWidth() * 0.12f, p.accent2, 0.35f);
+    g.setColour (p.accent2.withAlpha (0.8f));
+    g.fillEllipse (Rectangle<float> (10.0f, 10.0f).withCentre (sun));
+    // orbits: ellipses with the sun at a focus, a planet on each, one with its swept equal-area wedges
+    for (int i = 0; i < 4; ++i)
+    {
+        const auto ra = a.getWidth() * (0.10f + 0.07f * (float) i);
+        const auto e = 0.35f + 0.08f * (float) i;
+        const auto rb = ra * std::sqrt (1.0f - e * e);
+        const auto centre = sun.translated (-ra * e, 0.0f);
+        juce::Path orbit;
+        orbit.addEllipse (Rectangle<float> (ra * 2.0f, rb * 2.0f).withCentre (centre));
+        orbit.applyTransform (juce::AffineTransform::rotation (0.25f, sun.x, sun.y));
+        g.setColour (p.accent.withAlpha (0.16f - 0.025f * (float) i));
+        g.strokePath (orbit, juce::PathStrokeType (1.0f));
+        auto at = [&] (float ang) {
+            return sun + (Point<float> (centre.x + std::cos (ang) * ra, centre.y + std::sin (ang) * rb) - sun).rotatedAboutOrigin (0.25f);
+        };
+        if (i == 2)
+            for (int w = 0; w < 2; ++w) // two wedges of equal area: a short wide one near the sun, a long thin one far away
+            {
+                juce::Path wedge;
+                wedge.startNewSubPath (sun);
+                const auto from = w == 0 ? -0.25f : 2.9f, to = w == 0 ? 0.45f : 3.25f;
+                for (int k = 0; k <= 12; ++k) wedge.lineTo (at (from + (to - from) * (float) k / 12.0f));
+                wedge.closeSubPath();
+                g.setColour (p.accent.withAlpha (0.07f));
+                g.fillPath (wedge);
+            }
+        const auto planet = at (1.3f + 1.4f * (float) i);
+        if (! reduced) bloom (g, planet, 8.0f, p.accent, 0.4f);
+        g.setColour (p.accent.brighter (0.4f));
+        g.fillEllipse (Rectangle<float> (4.0f, 4.0f).withCentre (planet));
+    }
+}
+
+inline void keplerMotion (juce::Graphics& g, const Motion& m)
+{
+    // a small planet on an elliptical orbit around a sun at the stage's left focus; it speeds up near the sun
+    if (m.stage == m.area) return;
+    const auto s = m.stage.reduced (4.0f);
+    const auto ra = s.getWidth() * 0.42f, rb = s.getHeight() * 0.36f;
+    const auto e = std::sqrt (juce::jmax (0.0f, 1.0f - (rb * rb) / (ra * ra)));
+    const auto c = s.getCentre();
+    const auto sun = c.translated (-ra * e, 0.0f);
+    juce::Path orbit;
+    orbit.addEllipse (Rectangle<float> (ra * 2.0f, rb * 2.0f).withCentre (c));
+    g.setColour (m.p.accent.withAlpha (0.22f));
+    g.strokePath (orbit, juce::PathStrokeType (1.0f));
+    if (! reduced) bloom (g, sun, 10.0f, m.p.accent2, 0.5f);
+    g.setColour (m.p.accent2);
+    g.fillEllipse (Rectangle<float> (5.0f, 5.0f).withCentre (sun));
+    // mean anomaly → eccentric anomaly (a few Newton steps): Kepler's equation
+    const auto M = std::fmod (m.t * 0.7f, juce::MathConstants<float>::twoPi);
+    auto E = M;
+    for (int i = 0; i < 4; ++i) E -= (E - e * std::sin (E) - M) / (1.0f - e * std::cos (E));
+    const Point<float> q { c.x - std::cos (E) * ra, c.y + std::sin (E) * rb };
+    if (! reduced) bloom (g, q, 8.0f, m.p.accent, 0.5f);
+    g.setColour (m.p.accent.brighter (0.5f));
+    g.fillEllipse (Rectangle<float> (4.0f, 4.0f).withCentre (q));
+}
+
+inline const Theme& keplerTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Kepler";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff0b1c26), Colour (0xff03080c), Colour (0xff2ee6c5), Colour (0xffffcc66), Colour (0xc40d1e29), Colour (0xdc061118),
+                  Colour (0xff4f9aa3), Colour (0xffe6fbf7), Colour (0xff020609), Colour (0xff2c6a72), Colour (0xff0a1d22), Colour (0xff17323a),
+                  Colour (0xfff2fffd), Colour (0xff102630) };
+        x.canvas = canvasKepler;
+        x.cap = Cap::orb;
+        x.pointer = Pointer::electron;
+        x.stageRepaint = true;
+        x.paintMotion = keplerMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === Kepler Exo: an exoplanet transit — a huge amber star, a dark world crossing it, the light curve dipping ========
+
+inline float transitCurve (float u) // the star's light while a planet crosses (1 = full)
+{
+    const auto d = std::abs (u - 0.5f);
+    return d > 0.16f ? 1.0f : d < 0.11f ? 0.55f : 0.55f + 0.45f * (d - 0.11f) / 0.05f;
+}
+
+inline void canvasKeplerExo (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    stars (g, a, display ? 25 : 70, 167, 0.3f);
+    if (display) return;
+    // the star's limb filling the top right corner, a dark planet in front of it
+    const auto R = juce::jmax (a.getWidth(), a.getHeight()) * 0.32f;
+    const auto star = Point<float> (a.getRight() + R * 0.35f, a.getY() - R * 0.45f);
+    if (! reduced) bloom (g, star, R * 1.5f, p.accent, 0.22f);
+    g.setGradientFill (ColourGradient (p.accent.brighter (0.3f).withAlpha (0.35f), star.x, star.y, p.accent.darker (0.4f).withAlpha (0.25f), star.x - R, star.y + R * 0.4f, true));
+    g.fillEllipse (Rectangle<float> (R * 2.0f, R * 2.0f).withCentre (star));
+    const auto planet = star + Point<float> (-R * 0.78f, R * 0.52f);
+    const auto pr = R * 0.09f;
+    g.setColour (p.bgBottom.withAlpha (0.95f));
+    g.fillEllipse (Rectangle<float> (pr * 2.0f, pr * 2.0f).withCentre (planet));
+    g.setColour (p.accent2.withAlpha (0.4f));
+    g.drawEllipse (Rectangle<float> (pr * 2.0f, pr * 2.0f).withCentre (planet), 1.0f);
+    // the light curve along the bottom: flat, a dip while the world transits, flat again
+    const auto lc = curve (200, [&] (float u) {
+        return Point<float> (a.getX() + a.getWidth() * u, a.getBottom() - a.getHeight() * 0.12f + (1.0f - transitCurve (u)) * a.getHeight() * 0.1f);
+    });
+    g.setColour (p.accent2.withAlpha (0.18f));
+    g.strokePath (lc, stroke (1.3f));
+}
+
+inline void exoEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    if (! reduced) bloom (g, c, r * 2.6f, p.accent, 0.4f);
+    g.setColour (p.accent);
+    g.fillEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c));
+    g.setColour (p.bgBottom);
+    g.fillEllipse (Rectangle<float> (r * 0.8f, r * 0.8f).withCentre (c.translated (r * 0.3f, r * 0.1f)));
+}
+
+inline void exoMotion (juce::Graphics& g, const Motion& m)
+{
+    // the light curve scrolling through the stage, the dip coming round again
+    if (m.stage == m.area) return;
+    const auto s = m.stage.reduced (4.0f);
+    const auto lc = curve (100, [&] (float u) {
+        const auto ph = std::fmod (u + m.t * 0.08f, 1.0f);
+        return Point<float> (s.getX() + s.getWidth() * u, s.getY() + s.getHeight() * 0.3f + (1.0f - transitCurve (ph)) * s.getHeight() * 1.0f);
+    });
+    g.setColour (m.p.accent.withAlpha (0.25f));
+    g.strokePath (lc, juce::PathStrokeType (3.5f));
+    g.setColour (m.p.accent.brighter (0.3f));
+    g.strokePath (lc, juce::PathStrokeType (1.2f));
+}
+
+inline const Theme& keplerExoTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Kepler Exo";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff180f2a), Colour (0xff05030b), Colour (0xffff9b3d), Colour (0xff8a7bff), Colour (0xc41a1230), Colour (0xdc0b0718),
+                  Colour (0xff8a6ab8), Colour (0xfff6ecff), Colour (0xff04020a), Colour (0xff4a3d6e), Colour (0xff120c22), Colour (0xff261d40),
+                  Colour (0xfffff3e6), Colour (0xff1b1430) };
+        x.canvas = canvasKeplerExo;
+        x.titleEmblem = exoEmblem;
+        x.drawCap = machinedCap;
+        x.stageRepaint = true;
+        x.paintMotion = exoMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === Transistor Bass: an acid bass box at night — gunmetal, an acid-yellow squelch, a step line with slides ========
+
+inline float squelch (float u, float cutoff, float q) // a resonant low-pass response, u = log frequency 0..1
+{
+    const auto d = (u - cutoff) / 0.06f;
+    const auto peak = q * std::exp (-d * d);
+    const auto roll = u > cutoff ? std::exp (-(u - cutoff) * 9.0f) : 1.0f;
+    return 0.45f * roll + peak;
+}
+
+inline void canvasTransistorBass (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    styles::brushed (g, a, 0.04f);
+    if (display) return;
+    // a sixteen-step acid line: pitches as dots, slides as arcs, accents brighter
+    static const int notes[16] { 0, 0, 12, 3, 0, 7, 5, 12, 0, 3, 3, 10, 0, 7, 15, 12 };
+    static const bool slide[16] { false, true, false, false, true, false, false, true, false, false, true, false, false, true, false, false };
+    const auto row = Rectangle<float> (a.getX() + a.getWidth() * 0.4f, a.getY() + 8.0f, a.getWidth() * 0.56f, a.getHeight() * 0.16f);
+    const auto sw = row.getWidth() / 16.0f;
+    auto at = [&] (int i) { return Point<float> (row.getX() + sw * ((float) i + 0.5f), row.getBottom() - row.getHeight() * (float) notes[i] / 15.0f); };
+    for (int i = 0; i < 16; ++i)
+    {
+        if (slide[i] && i < 15)
+        {
+            juce::Path s;
+            s.startNewSubPath (at (i));
+            s.quadraticTo ((at (i).x + at (i + 1).x) * 0.5f, juce::jmin (at (i).y, at (i + 1).y) - 8.0f, at (i + 1).x, at (i + 1).y);
+            g.setColour (p.accent2.withAlpha (0.22f));
+            g.strokePath (s, juce::PathStrokeType (1.2f));
+        }
+        const auto accent = notes[i] >= 12;
+        g.setColour (p.accent.withAlpha (accent ? 0.45f : 0.22f));
+        g.fillEllipse (Rectangle<float> (accent ? 6.0f : 4.0f, accent ? 6.0f : 4.0f).withCentre (at (i)));
+    }
+    // the squelch: the filter's response with a screaming resonance, printed across the lower panel
+    const auto base = a.getBottom() - a.getHeight() * 0.06f;
+    const auto resp = curve (200, [&] (float u) { return Point<float> (a.getX() + a.getWidth() * u, base - squelch (u, 0.58f, 0.9f) * a.getHeight() * 0.18f); });
+    if (! reduced)
+    {
+        g.setColour (p.accent.withAlpha (0.06f));
+        g.strokePath (resp, stroke (7.0f));
+    }
+    g.setColour (p.accent.withAlpha (0.18f));
+    g.strokePath (resp, stroke (1.4f));
+}
+
+inline void transistorEmblem (juce::Graphics& g, Point<float> c, float r) // a transistor: a can and three legs
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    g.fillRoundedRectangle (Rectangle<float> (r * 1.5f, r * 1.0f).withCentre (c.translated (0.0f, -r * 0.35f)), r * 0.35f);
+    for (int i = -1; i <= 1; ++i)
+        g.fillRect (Rectangle<float> (r * 0.16f, r * 0.75f).withCentre ({ c.x + (float) i * r * 0.45f, c.y + r * 0.5f }));
+}
+
+inline void transistorMotion (juce::Graphics& g, const Motion& m)
+{
+    // the cutoff sweeping up and down with its resonance peak
+    if (m.stage == m.area) return;
+    const auto s = m.stage.reduced (4.0f);
+    const auto cut = 0.35f + 0.3f * (0.5f + 0.5f * std::sin (m.t * 1.2f));
+    const auto resp = curve (90, [&] (float u) { return Point<float> (s.getX() + s.getWidth() * u, s.getBottom() - squelch (u, cut, 0.9f) * s.getHeight() * 0.7f); });
+    g.setColour (m.p.accent.withAlpha (0.25f));
+    g.strokePath (resp, juce::PathStrokeType (4.0f));
+    g.setColour (m.p.accent);
+    g.strokePath (resp, juce::PathStrokeType (1.3f));
+}
+
+inline const Theme& transistorBassTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Transistor Bass";
+        x.base = Style::hardware;
+        x.pal = { Colour (0xff2c2f34), Colour (0xff131417), Colour (0xfff4e542), Colour (0xffff8a3d), Colour (0xd02e3136), Colour (0xe418191c),
+                  Colour (0xff8b9099), Colour (0xfff2f3f5), Colour (0xff09090a), Colour (0xff2b2b2b), Colour (0xff0c0c0c), Colour (0xff3e4148),
+                  Colour (0xfff2f3f5), Colour (0xff26282c) };
+        x.canvas = canvasTransistorBass;
+        x.titleEmblem = transistorEmblem;
+        x.cap = Cap::bakelite;
+        x.pointerFrom = 0.15f;
+        x.ticks = 11;
+        x.buttTrack = true;
+        x.arcGlow = 0.2f;
+        x.knobScale = 1.04f;
+        x.thumbPointer = true;
+        x.stageRepaint = true;
+        x.paintMotion = transistorMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === Sawer: a luthier's workshop — dark walnut, brass, a saw's teeth along the bottom ===============================
+
+inline void canvasSawer (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    // walnut grain: long wavy fibres
+    juce::Random rnd (65);
+    for (int i = 0; i < (display ? 18 : 60); ++i)
+    {
+        const auto y0 = a.getY() + rnd.nextFloat() * a.getHeight();
+        const auto amp = 2.0f + rnd.nextFloat() * 6.0f, f = 2.0f + rnd.nextFloat() * 4.0f, ph = rnd.nextFloat() * 6.0f;
+        const auto grain = curve (80, [&] (float u) { return Point<float> (a.getX() + a.getWidth() * u, y0 + amp * std::sin (u * f + ph)); });
+        g.setColour ((rnd.nextBool() ? Colours::black : p.accent2).withAlpha (0.035f + 0.03f * rnd.nextFloat()));
+        g.strokePath (grain, juce::PathStrokeType (0.8f + rnd.nextFloat() * 1.6f));
+    }
+    if (display) return;
+    if (! reduced) bloom (g, { a.getX() + a.getWidth() * 0.8f, a.getY() }, a.getWidth() * 0.45f, p.accent, 0.08f);
+    // a blade's teeth along the bottom: a sawtooth in brass
+    juce::Path teeth;
+    const auto y = a.getBottom() - 3.0f, h = juce::jmin (10.0f, a.getHeight() * 0.025f), tw = 12.0f;
+    teeth.startNewSubPath (a.getX(), y);
+    for (auto x = a.getX(); x < a.getRight(); x += tw)
+    {
+        teeth.lineTo (x + tw, y - h);
+        teeth.lineTo (x + tw, y);
+    }
+    g.setColour (p.accent.withAlpha (0.2f));
+    g.strokePath (teeth, juce::PathStrokeType (1.2f));
+    // three saw waves, detuned, drifting apart across the top band
+    for (int k = 0; k < 3; ++k)
+    {
+        const auto f = 6.0f * (1.0f + 0.04f * (float) k);
+        const auto w = curve (300, [&] (float u) {
+            const auto ph = std::fmod (u * f + 0.13f * (float) k, 1.0f);
+            return Point<float> (a.getX() + a.getWidth() * u, a.getY() + a.getHeight() * (0.1f + 0.02f * (float) k) + (ph - 0.5f) * a.getHeight() * 0.06f);
+        });
+        g.setColour (p.accent.withAlpha (0.08f));
+        g.strokePath (w, juce::PathStrokeType (1.0f));
+    }
+}
+
+inline void brassCap (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx) // dark wood knob with a brass ring
+{
+    const auto& p = pal();
+    g.setColour (p.accent.darker (0.3f));
+    g.fillEllipse (cap.expanded (capR * 0.06f));
+    g.setGradientFill (ColourGradient (p.capTop.brighter (0.15f + 0.1f * hover), c.x, cap.getY(), p.capBottom, c.x, cap.getBottom(), false));
+    g.fillEllipse (cap.reduced (capR * 0.12f));
+    if (fx)
+    {
+        g.setGradientFill (ColourGradient (p.accent.brighter (0.4f), c.x - capR, cap.getY(), p.accent.darker (0.5f), c.x + capR, cap.getBottom(), false));
+        g.drawEllipse (cap.reduced (capR * 0.06f), juce::jmax (1.0f, capR * 0.1f));
+    }
+}
+
+inline void sawerEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    juce::Path s;
+    s.startNewSubPath (c.x - r * 1.2f, c.y + r * 0.6f);
+    for (int i = 0; i < 3; ++i)
+    {
+        s.lineTo (c.x - r * 1.2f + r * 0.8f * (float) (i + 1), c.y - r * 0.6f);
+        s.lineTo (c.x - r * 1.2f + r * 0.8f * (float) (i + 1), c.y + r * 0.6f);
+    }
+    g.setColour (pal().accent);
+    g.strokePath (s, stroke (1.5f));
+}
+
+inline const Theme& sawerTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Sawer";
+        x.base = Style::hardware;
+        x.pal = { Colour (0xff2c1d14), Colour (0xff120b07), Colour (0xffe0a84a), Colour (0xfff3e2c0), Colour (0xd02e2017), Colour (0xe414100b),
+                  Colour (0xff9a7650), Colour (0xfff8ecd6), Colour (0xff0a0705), Colour (0xff4a3020), Colour (0xff1e130c), Colour (0xff3a2a1e),
+                  Colour (0xfff8ecd6), Colour (0xff2a1d14) };
+        x.canvas = canvasSawer;
+        x.titleEmblem = sawerEmblem;
+        x.drawCap = brassCap;
+        x.ticks = 11;
+        x.arcGlow = 0.15f;
+        x.thumbPointer = true;
+        return x;
+    }();
+    return t;
+}
+
+// === BeepMap: a picture played as sound — mint and pink pixels melting into spectral lines, a scan line ============
+
+inline void canvasBeepMap (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    if (display) return;
+    // a pixel picture (a seeded landscape of blocks) on the right, its rows becoming partial lines towards the left
+    const auto img = Rectangle<float> (a.getRight() - a.getWidth() * 0.34f, a.getY() + 8.0f, a.getWidth() * 0.32f, a.getHeight() * 0.32f);
+    const int cols = 32, rows = 18;
+    const auto cw = img.getWidth() / (float) cols, rh = img.getHeight() / (float) rows;
+    juce::Random rnd (65);
+    for (int y = 0; y < rows; ++y)
+    {
+        const auto horizon = 0.45f;
+        for (int x = 0; x < cols; ++x)
+        {
+            const auto hill = 0.55f + 0.18f * std::sin ((float) x * 0.35f) + 0.08f * std::sin ((float) x * 1.1f);
+            const auto v = (float) y / (float) rows;
+            const auto lit = v > hill ? 0.8f : (v < horizon * 0.5f && rnd.nextFloat() < 0.08f ? 1.0f : 0.15f * rnd.nextFloat());
+            if (lit < 0.05f) continue;
+            g.setColour ((v > hill ? p.accent : p.accent2).withAlpha (0.18f * lit));
+            g.fillRect (Rectangle<float> (img.getX() + (float) x * cw, img.getY() + (float) y * rh, cw - 1.0f, rh - 1.0f));
+        }
+        // the row as a partial, trailing left
+        g.setGradientFill (ColourGradient (p.accent.withAlpha (0.0f), a.getX() + a.getWidth() * 0.2f, 0.0f, p.accent.withAlpha (0.07f), img.getX(), 0.0f, false));
+        g.fillRect (Rectangle<float> (a.getX() + a.getWidth() * 0.2f, img.getY() + (float) y * rh + rh * 0.4f, img.getX() - a.getX() - a.getWidth() * 0.2f, 1.0f));
+    }
+}
+
+inline void beepMapEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    const auto s = r * 0.62f;
+    for (int i = 0; i < 9; ++i)
+    {
+        if (i == 1 || i == 3 || i == 8) continue;
+        g.setColour (i % 2 == 0 ? p.accent : p.accent2);
+        g.fillRect (Rectangle<float> (s * 0.85f, s * 0.85f).withCentre ({ c.x + (float) (i % 3 - 1) * s, c.y + (float) (i / 3 - 1) * s }));
+    }
+}
+
+inline void beepMapMotion (juce::Graphics& g, const Motion& m)
+{
+    // a tiny picture in the stage, a scan line playing it column by column
+    if (m.stage == m.area) return;
+    const auto s = m.stage.reduced (4.0f);
+    const int cols = 24, rows = 6;
+    const auto cw = s.getWidth() / (float) cols, rh = s.getHeight() / (float) rows;
+    const auto scan = std::fmod (m.t * 0.25f, 1.0f) * (float) cols;
+    for (int x = 0; x < cols; ++x)
+        for (int y = 0; y < rows; ++y)
+        {
+            const auto on = (float) y / (float) rows > 0.45f + 0.3f * std::sin ((float) x * 0.5f);
+            if (! on) continue;
+            const auto near = juce::jmax (0.0f, 1.0f - std::abs ((float) x - scan) / 3.0f);
+            g.setColour (m.p.accent.withAlpha (0.25f + 0.6f * near));
+            g.fillRect (Rectangle<float> (s.getX() + (float) x * cw, s.getY() + (float) y * rh, cw - 1.0f, rh - 1.0f));
+        }
+    g.setColour (m.p.accent2);
+    g.fillRect (Rectangle<float> (s.getX() + scan * cw, s.getY(), 1.5f, s.getHeight()));
+}
+
+inline const Theme& beepMapTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "BeepMap";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff10191a), Colour (0xff050909), Colour (0xff4cf2b0), Colour (0xffff6ad5), Colour (0xc8121c1d), Colour (0xe0080e0f),
+                  Colour (0xff4a8f80), Colour (0xffe8fff6), Colour (0xff030606), Colour (0xff2c4a44), Colour (0xff0e1716), Colour (0xff1c2e2c),
+                  Colour (0xfff2fffa), Colour (0xff142220) };
+        x.canvas = canvasBeepMap;
+        x.titleEmblem = beepMapEmblem;
+        x.cap = Cap::flat;
+        x.arcGlow = 0.25f;
+        x.stageRepaint = true;
+        x.paintMotion = beepMapMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === FL Keys: a grand piano — black lacquer with a long reflection, ivory and gold, keys along the bottom ===========
+
+inline void canvasFlKeys (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    // the lacquer's reflection: a long soft diagonal sheen
+    if (! reduced)
+    {
+        ColourGradient sheen (Colours::white.withAlpha (0.0f), a.getX(), a.getY(), Colours::white.withAlpha (0.0f), a.getRight(), a.getBottom(), false);
+        sheen.addColour (0.42, Colours::white.withAlpha (0.0f));
+        sheen.addColour (0.5, Colours::white.withAlpha (0.045f));
+        sheen.addColour (0.58, Colours::white.withAlpha (0.0f));
+        g.setGradientFill (sheen);
+        g.fillRect (a);
+    }
+    if (display) return;
+    // a keyboard along the bottom, the white keys ivory, the black ones lacquer
+    const auto kb = Rectangle<float> (a.getX(), a.getBottom() - juce::jmin (34.0f, a.getHeight() * 0.07f), a.getWidth(), juce::jmin (34.0f, a.getHeight() * 0.07f));
+    const auto kw = 14.0f;
+    const int n = (int) (kb.getWidth() / kw) + 1;
+    for (int i = 0; i < n; ++i)
+    {
+        const auto k = Rectangle<float> (kb.getX() + (float) i * kw, kb.getY(), kw - 1.0f, kb.getHeight());
+        g.setGradientFill (ColourGradient (p.accent2.withAlpha (0.10f), 0.0f, k.getY(), p.accent2.withAlpha (0.16f), 0.0f, k.getBottom(), false));
+        g.fillRect (k);
+    }
+    for (int i = 0; i < n; ++i)
+    {
+        const auto inOctave = i % 7;
+        if (inOctave == 2 || inOctave == 6) continue;
+        g.setColour (Colours::black.withAlpha (0.55f));
+        g.fillRect (Rectangle<float> (kb.getX() + (float) i * kw + kw * 0.65f, kb.getY(), kw * 0.6f, kb.getHeight() * 0.6f));
+    }
+    g.setColour (p.accent.withAlpha (0.35f)); // the gold rail above the keys
+    g.fillRect (kb.withHeight (1.5f).translated (0.0f, -2.0f));
+    // a curve of the piano's lid on the right
+    juce::Path lid;
+    lid.startNewSubPath (a.getRight() - a.getWidth() * 0.4f, a.getY() + a.getHeight() * 0.04f);
+    lid.cubicTo (a.getRight() - a.getWidth() * 0.12f, a.getY() + a.getHeight() * 0.02f, a.getRight() - a.getWidth() * 0.02f, a.getY() + a.getHeight() * 0.12f,
+                 a.getRight() - a.getWidth() * 0.02f, a.getY() + a.getHeight() * 0.3f);
+    g.setColour (p.accent.withAlpha (0.14f));
+    g.strokePath (lid, stroke (1.5f));
+}
+
+inline void flKeysEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    for (int i = 0; i < 3; ++i)
+    {
+        g.setColour (p.accent2);
+        g.fillRect (Rectangle<float> (r * 0.6f, r * 1.8f).withPosition (c.x - r + (float) i * r * 0.7f, c.y - r * 0.9f));
+    }
+    g.setColour (Colours::black);
+    g.fillRect (Rectangle<float> (r * 0.36f, r * 1.0f).withPosition (c.x - r + r * 0.48f, c.y - r * 0.9f));
+    g.fillRect (Rectangle<float> (r * 0.36f, r * 1.0f).withPosition (c.x - r + r * 1.18f, c.y - r * 0.9f));
+}
+
+inline const Theme& flKeysTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "FL Keys";
+        x.base = Style::glow;
+        x.pal = { Colour (0xff17161a), Colour (0xff060607), Colour (0xffd9a441), Colour (0xfff3e6c8), Colour (0xcc19181c), Colour (0xe40b0b0d),
+                  Colour (0xff6e6658), Colour (0xfff6efe0), Colour (0xff050506), Colour (0xfffaf3e3), Colour (0xffcfc4ab), Colour (0xff2c2a2a),
+                  Colour (0xff8a5a1a), Colour (0xff1f1e22) };
+        x.canvas = canvasFlKeys;
+        x.titleEmblem = flKeysEmblem;
+        x.cap = Cap::porcelain;
+        x.arcGlow = 0.15f;
+        x.thumbPointer = true;
+        return x;
+    }();
+    return t;
+}
+
+// === Fruity Granulizer: a cloud of grains — sand and amber specks drifting into a cloud, teal light =================
+
+inline void canvasGranulizer (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    if (! reduced) bloom (g, { a.getRight() - a.getWidth() * 0.25f, a.getY() + a.getHeight() * 0.2f }, a.getWidth() * 0.35f, p.accent2, 0.08f);
+    if (display) return;
+    // grains: tiny windowed bursts (a dot with a soft envelope), denser towards a cloud on the right
+    juce::Random rnd (67);
+    const auto centre = Point<float> (a.getRight() - a.getWidth() * 0.25f, a.getY() + a.getHeight() * 0.2f);
+    for (int i = 0; i < 520; ++i)
+    {
+        const auto ang = rnd.nextFloat() * 6.283f;
+        const auto rad = std::pow (rnd.nextFloat(), 0.7f) * a.getWidth() * 0.45f;
+        const Point<float> q { centre.x + std::cos (ang) * rad * 1.3f, centre.y + std::sin (ang) * rad * 0.45f };
+        if (! a.contains (q)) continue;
+        const auto d = 1.0f + rnd.nextFloat() * 2.4f;
+        g.setColour ((rnd.nextFloat() < 0.2f ? p.accent2 : p.accent).withAlpha (0.06f + 0.16f * (1.0f - rad / (a.getWidth() * 0.45f))));
+        g.fillEllipse (Rectangle<float> (d, d).withCentre (q));
+    }
+    // a few grains drawn large: a sine burst in a bell window
+    for (int k = 0; k < 4; ++k)
+    {
+        const auto x0 = a.getX() + a.getWidth() * (0.08f + 0.12f * (float) k), y0 = a.getY() + a.getHeight() * (0.1f + 0.05f * (float) (k % 2));
+        const auto w = a.getWidth() * 0.08f;
+        const auto burst = curve (80, [&] (float u) {
+            const auto win = std::exp (-std::pow ((u - 0.5f) / 0.2f, 2.0f));
+            return Point<float> (x0 + w * u, y0 - win * std::sin (u * 40.0f) * a.getHeight() * 0.03f);
+        });
+        g.setColour (p.accent.withAlpha (0.12f));
+        g.strokePath (burst, juce::PathStrokeType (1.0f));
+    }
+}
+
+inline void granulizerEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    juce::Random rnd (7);
+    for (int i = 0; i < 9; ++i)
+    {
+        g.setColour (i % 3 == 0 ? p.accent2 : p.accent);
+        const auto d = r * (0.3f + 0.3f * rnd.nextFloat());
+        g.fillEllipse (Rectangle<float> (d, d).withCentre ({ c.x + (rnd.nextFloat() - 0.5f) * r * 2.0f, c.y + (rnd.nextFloat() - 0.5f) * r * 1.6f }));
+    }
+}
+
+inline void granulizerMotion (juce::Graphics& g, const Motion& m)
+{
+    for (const auto& s : m.motes) // grains flaring and fading
+    {
+        const auto env = std::pow (std::max (0.0f, std::sin (m.t * (0.9f + s.spin) + s.phase)), 3.0f);
+        if (env < 0.02f) continue;
+        if (! reduced) bloom (g, { s.x, s.y }, s.size * 3.0f, m.p.accent, 0.3f * env);
+        g.setColour (m.p.accent.brighter (0.3f).withAlpha (env));
+        g.fillEllipse (Rectangle<float> (s.size, s.size).withCentre ({ s.x, s.y }));
+    }
+}
+
+inline const Theme& granulizerTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Granulizer";
+        x.base = Style::glow;
+        x.pal = { Colour (0xff1e1a14), Colour (0xff0a0806), Colour (0xffffc46b), Colour (0xff4fd8d0), Colour (0xc8201b15), Colour (0xe00e0b08),
+                  Colour (0xff8c7656), Colour (0xfff8eedd), Colour (0xff070504), Colour (0xffe9d2a8), Colour (0xff8a7250), Colour (0xff332b20),
+                  Colour (0xff3a2a10), Colour (0xff261f17) };
+        x.canvas = canvasGranulizer;
+        x.titleEmblem = granulizerEmblem;
+        x.cap = Cap::porcelain;
+        x.motes = 16;
+        x.sizeMin = 1.5f; x.sizeRange = 2.0f;
+        x.reach = 3.0f;
+        x.paintMotion = granulizerMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === Drumaxx: membrane modes — a slate drum head with its nodal circles and diameters, brass tension rods ==========
+
+inline void drumHead (juce::Graphics& g, Point<float> c, float R, float alpha)
+{
+    const auto& p = pal();
+    g.setColour (p.accent.withAlpha (0.10f * alpha));
+    g.drawEllipse (Rectangle<float> (R * 2.0f, R * 2.0f).withCentre (c), 2.0f);
+    // nodal lines of a few membrane modes: circles and diameters
+    for (int i = 1; i <= 3; ++i)
+    {
+        g.setColour (p.accent.withAlpha (0.06f * alpha));
+        g.drawEllipse (Rectangle<float> (R * 2.0f * (float) i / 4.0f, R * 2.0f * (float) i / 4.0f).withCentre (c), 1.0f);
+    }
+    for (int i = 0; i < 3; ++i)
+    {
+        const auto ang = juce::MathConstants<float>::pi * (float) i / 3.0f + 0.3f;
+        g.setColour (p.accent2.withAlpha (0.06f * alpha));
+        g.drawLine ({ c + Point<float> (std::cos (ang), std::sin (ang)) * R, c - Point<float> (std::cos (ang), std::sin (ang)) * R }, 1.0f);
+    }
+    // the rods round the rim
+    for (int i = 0; i < 10; ++i)
+    {
+        const auto ang = juce::MathConstants<float>::twoPi * (float) i / 10.0f;
+        const Point<float> d { std::cos (ang), std::sin (ang) };
+        g.setColour (p.accent2.withAlpha (0.22f * alpha));
+        g.drawLine ({ c + d * R, c + d * (R + 9.0f) }, 2.5f);
+    }
+}
+
+inline void canvasDrumaxx (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    if (! reduced) bloom (g, { a.getRight() - a.getWidth() * 0.15f, a.getY() + a.getHeight() * 0.15f }, a.getWidth() * 0.3f, p.accent, 0.08f);
+    if (display) return;
+    const auto R = juce::jmin (a.getWidth(), a.getHeight()) * 0.3f;
+    drumHead (g, { a.getRight() - R * 0.55f, a.getY() + R * 0.5f }, R, 1.0f);
+    drumHead (g, { a.getX() + R * 0.3f, a.getBottom() - R * 0.25f }, R * 0.7f, 0.6f);
+}
+
+inline void drumaxxEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    g.drawEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c), 1.4f);
+    g.drawEllipse (Rectangle<float> (r * 1.0f, r * 1.0f).withCentre (c), 1.0f);
+    g.setColour (p.accent2);
+    g.drawLine ({ c.translated (-r, 0.0f), c.translated (r, 0.0f) }, 1.0f);
+}
+
+inline void drumRipples (juce::Graphics& g, const Motion& m, Point<float> c, float maxR, float rate) // rings spreading from a hit, then a new hit
+{
+    const auto ph = std::fmod (m.t * rate, 1.0f);
+    for (int i = 0; i < 3; ++i)
+    {
+        const auto u = std::fmod (ph + (float) i * 0.33f, 1.0f);
+        g.setColour (m.p.accent.withAlpha (0.5f * (1.0f - u)));
+        g.drawEllipse (Rectangle<float> (maxR * 2.0f * u, maxR * 0.7f * u).withCentre (c), 1.2f);
+    }
+}
+
+inline void drumaxxMotion (juce::Graphics& g, const Motion& m)
+{
+    if (m.stage == m.area) return;
+    drumRipples (g, m, m.stage.getCentre(), m.stage.getWidth() * 0.45f, 0.6f);
+}
+
+inline const Theme& drumaxxTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Drumaxx";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff17202a), Colour (0xff070a0e), Colour (0xff3ad0ff), Colour (0xffe8b04a), Colour (0xc819232e), Colour (0xe00b1016),
+                  Colour (0xff5f7f99), Colour (0xffe9f5ff), Colour (0xff04070a), Colour (0xff3a4a5a), Colour (0xff121a22), Colour (0xff22303d),
+                  Colour (0xfff0f8ff), Colour (0xff18222c) };
+        x.canvas = canvasDrumaxx;
+        x.titleEmblem = drumaxxEmblem;
+        x.drawCap = machinedCap;
+        x.arcGlow = 0.25f;
+        x.stageRepaint = true;
+        x.paintMotion = drumaxxMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === Drumpad: a practice pad — gum rubber, two sticks crossed, amber hit marks ======================================
+
+inline void canvasDrumpad (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    // rubber grain
+    juce::Random rnd (28);
+    g.setColour (Colours::white.withAlpha (0.018f));
+    for (int i = 0; i < (int) (a.getWidth() * a.getHeight() / 220.0f); ++i)
+        g.fillRect (Rectangle<float> (a.getX() + rnd.nextFloat() * a.getWidth(), a.getY() + rnd.nextFloat() * a.getHeight(), 1.0f, 1.0f));
+    if (display) return;
+    // the pad: a big round, with the scuffs of a thousand hits near its centre
+    const auto R = juce::jmin (a.getWidth(), a.getHeight()) * 0.26f;
+    const auto c = Point<float> (a.getRight() - R * 0.7f, a.getY() + R * 0.6f);
+    g.setColour (Colours::black.withAlpha (0.25f));
+    g.fillEllipse (Rectangle<float> (R * 2.0f, R * 2.0f).withCentre (c));
+    g.setColour (p.accent.withAlpha (0.10f));
+    g.drawEllipse (Rectangle<float> (R * 2.0f, R * 2.0f).withCentre (c), 2.0f);
+    for (int i = 0; i < 40; ++i)
+    {
+        const auto ang = rnd.nextFloat() * 6.283f, rad = std::pow (rnd.nextFloat(), 2.0f) * R * 0.4f;
+        g.setColour (p.accent.withAlpha (0.05f + 0.06f * rnd.nextFloat()));
+        g.fillEllipse (Rectangle<float> (4.0f, 3.0f).withCentre (c + Point<float> (std::cos (ang), std::sin (ang)) * rad));
+    }
+    // two sticks crossed over the pad
+    for (int s = 0; s < 2; ++s)
+    {
+        const auto ang = s == 0 ? 2.5f : 0.64f;
+        const Point<float> d { std::cos (ang), std::sin (ang) };
+        const auto from = c - d * R * 1.4f, to = c + d * R * 0.6f;
+        g.setColour (p.accent2.withAlpha (0.12f));
+        g.drawLine ({ from, to }, 5.0f);
+        g.fillEllipse (Rectangle<float> (8.0f, 8.0f).withCentre (to));
+    }
+}
+
+inline void drumpadEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    g.fillEllipse (Rectangle<float> (r * 1.6f, r * 1.6f).withCentre (c));
+    g.setColour (p.accent2);
+    g.drawLine ({ c.translated (-r * 1.2f, -r * 1.1f), c.translated (r * 0.2f, r * 0.1f) }, 1.4f);
+}
+
+inline void drumpadMotion (juce::Graphics& g, const Motion& m)
+{
+    if (m.stage == m.area) return;
+    drumRipples (g, m, m.stage.getCentre(), m.stage.getWidth() * 0.4f, 1.0f);
+}
+
+inline const Theme& drumpadTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Drumpad";
+        x.base = Style::hardware;
+        x.pal = { Colour (0xff252526), Colour (0xff0e0e0f), Colour (0xffffb347), Colour (0xffd9cdb8), Colour (0xd0262628), Colour (0xe4121213),
+                  Colour (0xff77706a), Colour (0xfff4efe8), Colour (0xff080808), Colour (0xff3a3a3c), Colour (0xff141415), Colour (0xff302f2f),
+                  Colour (0xfffff4e4), Colour (0xff262628) };
+        x.canvas = canvasDrumpad;
+        x.titleEmblem = drumpadEmblem;
+        x.cap = Cap::rubber;
+        x.arcGlow = 0.2f;
+        x.stageRepaint = true;
+        x.paintMotion = drumpadMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === BassDrum: the sub thump — a woofer's cone, the kick's pitch drop, deep plum and hot orange ====================
+
+inline void woofer (juce::Graphics& g, Point<float> c, float R, float alpha, float push)
+{
+    const auto& p = pal();
+    for (int i = 0; i < 6; ++i)
+    {
+        const auto r = R * (1.0f - (float) i * 0.14f) * (1.0f + push * 0.03f * (float) i);
+        g.setColour ((i == 0 ? p.accent2 : p.accent).withAlpha ((i == 0 ? 0.16f : 0.07f) * alpha));
+        g.drawEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c), i == 0 ? 3.0f : 1.0f);
+    }
+    g.setGradientFill (ColourGradient (p.accent.withAlpha (0.18f * alpha), c.x - R * 0.1f, c.y - R * 0.12f, Colours::black.withAlpha (0.2f * alpha), c.x + R * 0.2f, c.y + R * 0.2f, true));
+    g.fillEllipse (Rectangle<float> (R * 0.5f, R * 0.5f).withCentre (c));
+}
+
+inline void canvasBassDrum (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    if (! reduced) bloom (g, { a.getX() + a.getWidth() * 0.15f, a.getBottom() }, a.getWidth() * 0.45f, p.accent, 0.10f);
+    if (display) return;
+    const auto R = juce::jmin (a.getWidth(), a.getHeight()) * 0.28f;
+    woofer (g, { a.getRight() - R * 0.75f, a.getY() + R * 0.7f }, R, 1.0f, 0.0f);
+    // the kick: a sine whose pitch drops fast, decaying — printed along the bottom
+    const auto kick = curve (400, [&] (float u) {
+        const auto ph = 40.0f * u + 6.0f * (1.0f - std::exp (-u * 18.0f));
+        return Point<float> (a.getX() + a.getWidth() * u, a.getBottom() - a.getHeight() * 0.12f - std::sin (ph * 2.0f) * std::exp (-u * 3.5f) * a.getHeight() * 0.08f);
+    });
+    g.setColour (p.accent.withAlpha (0.14f));
+    g.strokePath (kick, juce::PathStrokeType (1.3f));
+}
+
+inline void bassDrumEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    g.setColour (p.accent2);
+    g.drawEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c), 1.4f);
+    g.setColour (p.accent);
+    g.fillEllipse (Rectangle<float> (r * 0.9f, r * 0.9f).withCentre (c));
+}
+
+inline void bassDrumMotion (juce::Graphics& g, const Motion& m)
+{
+    // a small woofer in the stage, thumping at 120 bpm
+    if (m.stage == m.area) return;
+    const auto beat = std::fmod (m.t * 2.0f, 1.0f);
+    const auto push = std::exp (-beat * 7.0f);
+    const auto c = m.stage.getCentre();
+    const auto R = m.stage.getHeight() * 0.42f;
+    if (! reduced) bloom (g, c, R * 1.6f, m.p.accent, 0.3f * push);
+    for (int i = 0; i < 3; ++i)
+    {
+        const auto r = R * (1.0f - 0.3f * (float) i) * (1.0f + 0.08f * push);
+        g.setColour (m.p.accent.withAlpha (0.35f + 0.4f * push));
+        g.drawEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c), 1.2f);
+    }
+}
+
+inline const Theme& bassDrumTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "BassDrum";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff1f1022), Colour (0xff09040b), Colour (0xffff5a2e), Colour (0xffffd34d), Colour (0xc8221125), Colour (0xe00f0711),
+                  Colour (0xff8a5a70), Colour (0xfffbeee8), Colour (0xff060307), Colour (0xff3a2433), Colour (0xff140a12), Colour (0xff2e1a2a),
+                  Colour (0xfffff0e6), Colour (0xff221326) };
+        x.canvas = canvasBassDrum;
+        x.titleEmblem = bassDrumEmblem;
+        x.cap = Cap::rubber;
+        x.pointer = Pointer::glowLine;
+        x.arcGlow = 0.3f;
+        x.stageRepaint = true;
+        x.paintMotion = bassDrumMotion;
+        return x;
+    }();
+    return t;
+}
+
 // === the registry =================================================================================================
 
 const Theme* generatorTheme (Art a)
@@ -496,6 +1894,22 @@ const Theme* generatorTheme (Art a)
         case Art::toxic: return &toxicTheme();
         case Art::sytrus: return &sytrusTheme();
         case Art::threeOsc: return &threeOscTheme();
+        case Art::harmor: return &harmorTheme();
+        case Art::harmless: return &harmlessTheme();
+        case Art::gms: return &gmsTheme();
+        case Art::morphine: return &morphineTheme();
+        case Art::ogun: return &ogunTheme();
+        case Art::poizone: return &poizoneTheme();
+        case Art::kepler: return &keplerTheme();
+        case Art::keplerExo: return &keplerExoTheme();
+        case Art::transistorBass: return &transistorBassTheme();
+        case Art::sawer: return &sawerTheme();
+        case Art::beepMap: return &beepMapTheme();
+        case Art::flKeys: return &flKeysTheme();
+        case Art::granulizer: return &granulizerTheme();
+        case Art::drumaxx: return &drumaxxTheme();
+        case Art::drumpad: return &drumpadTheme();
+        case Art::bassDrum: return &bassDrumTheme();
         default: return nullptr;
     }
 }
@@ -509,6 +1923,22 @@ Art artForInstrument (InstrumentKind kind)
         case InstrumentKind::toxic: return Art::toxic;
         case InstrumentKind::sytrus: return Art::sytrus;
         case InstrumentKind::threeosc: return Art::threeOsc;
+        case InstrumentKind::harmor: return Art::harmor;
+        case InstrumentKind::harmless: return Art::harmless;
+        case InstrumentKind::gms: return Art::gms;
+        case InstrumentKind::morphine: return Art::morphine;
+        case InstrumentKind::ogun: return Art::ogun;
+        case InstrumentKind::poizone: return Art::poizone;
+        case InstrumentKind::kepler: return Art::kepler;
+        case InstrumentKind::keplerExo: return Art::keplerExo;
+        case InstrumentKind::transistorbass: return Art::transistorBass;
+        case InstrumentKind::sawer: return Art::sawer;
+        case InstrumentKind::beepmap: return Art::beepMap;
+        case InstrumentKind::flkeys: return Art::flKeys;
+        case InstrumentKind::granulizer: return Art::granulizer;
+        case InstrumentKind::drumaxx: return Art::drumaxx;
+        case InstrumentKind::drumpad: return Art::drumpad;
+        case InstrumentKind::bassdrum: return Art::bassDrum;
         default: return Art::none;
     }
 }
