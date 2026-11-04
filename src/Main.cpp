@@ -4379,6 +4379,21 @@ private:
         run->steps.push_back ({ "desktop, playing", [this, ui] { ui->showDesktopForSnapshot (false); engine->rewind(); engine->play(); }, {}, 3000 });
         run->steps.push_back ({ "mixer maximised, playing", [ui] { ui->selectTabForSnapshot (3); }, {}, 3000 });
         run->steps.push_back ({ "mixer scroll", {}, [wheelAt, ui, none] (int f) { wheelAt (ui->getMixerForSnapshot(), 0.0f, f < 30 ? -0.25f : 0.25f, none); }, 60 });
+        // a fader dragged while the song plays (round 171c, discussion #10): 4 mouse moves per frame on insert 1's fader,
+        // through the old path (a whole snapshot per move) and through editLevels
+        auto faderMove = [this] (bool levels, int f) {
+            for (int k = 0; k < 4; ++k)
+            {
+                const auto v = 0.5f + 0.3f * std::sin ((float) (f * 4 + k) * 0.05f);
+                const auto edit = [v] (lynx::Song& s) { if (s.mixer.size() > 1) s.mixer[1].volume = v; };
+                if (levels)
+                    engine->editLevels (edit, false); // (no undo step: in a real drag only the press saves one)
+                else
+                    engine->editSong (edit, false);
+            }
+        };
+        run->steps.push_back ({ "mixer fader drag, playing, rebuild per move (before 171c)", {}, [faderMove] (int f) { faderMove (false, f); }, 60 });
+        run->steps.push_back ({ "mixer fader drag, playing, live levels (171c)", {}, [faderMove, this] (int f) { faderMove (true, f); if (f == 59) engine->flushLevels(); }, 60 });
         run->steps.push_back ({ "playlist maximised, playing", [ui] { ui->selectTabForSnapshot (2); }, {}, 3000 });
         run->steps.push_back ({ "playlist scroll down/up", [this] { engine->stop(); },
                                  [wheelAt, ui, none] (int f) { wheelAt (ui->getPlaylistForSnapshot(), 0.0f, f < 40 ? -0.15f : 0.15f, none); }, 80 });

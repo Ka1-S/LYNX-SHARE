@@ -1053,9 +1053,9 @@ void ChannelRackComponent::setValue (Area area, int row, double value)
         return;
 
     if (area == Area::pan)
-        engine.editSong ([row, v = (float) value] (Song& s) { s.channels[(std::size_t) row].pan = v; });
+        engine.editLevels ([row, v = (float) value] (Song& s) { s.channels[(std::size_t) row].pan = v; });
     else if (area == Area::volume)
-        engine.editSong ([row, v = (float) value] (Song& s) { s.channels[(std::size_t) row].volume = v; });
+        engine.editLevels ([row, v = (float) value] (Song& s) { s.channels[(std::size_t) row].volume = v; });
     else if (area == Area::route)
     {
         const auto track = juce::roundToInt (value);

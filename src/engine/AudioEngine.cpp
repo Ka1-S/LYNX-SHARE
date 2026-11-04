@@ -2317,51 +2317,91 @@ void AudioEngine::setSong (Song newSong)
     publishSong();
 }
 
+void AudioEngine::saveUndoStep()
+{
+    // Dozens of edits arrive during a drag; only the first one of the click saves the state.
+    bool samePress = false;
+
+    if (juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown())
+    {
+        const auto press = juce::Desktop::getInstance().getMainMouseSource().getLastMouseDownTime();
+        samePress = press == lastUndoPress;
+        lastUndoPress = press;
+    }
+    else
+    {
+        lastUndoPress = {};
+    }
+
+    if (! samePress)
+    {
+        undoStack.push_back (song);
+        redoStack.clear();
+
+        if (undoStack.size() > maxUndoSteps)
+            undoStack.pop_front();
+        if (sessionHistory)
+        {
+            closeSessionStep();
+            sessionUndo.push_back ({ song, song });
+            sessionRedo.clear();
+            if (sessionUndo.size() > maxUndoSteps)
+                sessionUndo.pop_front();
+        }
+    }
+    if (sessionHistory)
+        sessionAfterOpen = true;
+}
+
 void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoable)
 {
     if (undoable)
     {
-        // Dozens of edits arrive during a drag; only the first one of the click saves the state.
-        bool samePress = false;
-
-        if (juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown())
-        {
-            const auto press = juce::Desktop::getInstance().getMainMouseSource().getLastMouseDownTime();
-            samePress = press == lastUndoPress;
-            lastUndoPress = press;
-        }
-        else
-        {
-            lastUndoPress = {};
-        }
-
-        if (! samePress)
-        {
-            undoStack.push_back (song);
-            redoStack.clear();
-
-            if (undoStack.size() > maxUndoSteps)
-                undoStack.pop_front();
-            if (sessionHistory)
-            {
-                closeSessionStep();
-                sessionUndo.push_back ({ song, song });
-                sessionRedo.clear();
-                if (sessionUndo.size() > maxUndoSteps)
-                    sessionUndo.pop_front();
-            }
-        }
-        if (sessionHistory)
-            sessionAfterOpen = true;
-    }
-
-    if (undoable)
+        saveUndoStep();
         modified = true;
+    }
 
     const auto lengthsBefore = patternLengths (song);
     edit (song);
     followPatternLengths (lengthsBefore, song);
     clipops::updateCrossfades (song); // FL's automatic crossfades follow every edit (round 166e)
+    publishSong();
+}
+
+void AudioEngine::editLevels (const std::function<void (Song&)>& edit, bool undoable)
+{
+    // A fader or knob drag (round 171c, discussion #10): every mouse move used to go through editSong, i.e. a whole
+    // snapshot rebuild per move. While the song played that stalled the message thread and the fader (and the sound)
+    // moved in steps of ~0.2 s. Here the edit changes only levels, so the snapshot in use takes the new values through
+    // its live levels; the full publish follows once the mouse is released (timerCallback).
+    if (publishedLevels == nullptr || ! publishedLevels->matches (song))
+    {
+        editSong (edit, undoable);
+        return;
+    }
+    if (undoable)
+    {
+        saveUndoStep();
+        modified = true;
+    }
+    edit (song);
+    if (! publishedLevels->matches (song)) // (an edit that was not only levels)
+    {
+        publishSong();
+        return;
+    }
+    publishedLevels->store (song);
+    ++songStamp;
+    levelsPending = true;
+    ++levelEdits;
+    sendChangeMessage();
+}
+
+void AudioEngine::flushLevels()
+{
+    if (! levelsPending)
+        return;
+    levelsPending = false;
     publishSong();
 }
 
@@ -2969,6 +3009,7 @@ const AutomationDisplay& AudioEngine::getAutomationDisplay()
 void AudioEngine::publishSong()
 {
     ++songStamp;
+    ++publishCount;
     // Online Sessions (round 168a): every entity has its stable id after any edit, import or load
     uids::normalize (song);
     // pasted / duplicated channels and effect slots get their own instance (round 168s: instances follow their channel)
@@ -3086,6 +3127,8 @@ void AudioEngine::publishSong()
             platform::settingsFile ("edits.log").appendText (juce::String (juce::Time::getMillisecondCounterHiRes() - publishStart, 1) + " ms " + what + "\n");
     };
     mark ("built");
+    levelsPending = false;
+    publishedLevels = projectedSong ? nullptr : state->live; // (stand-ins: their projection, edits rebuild)
     rackExchange.publish (std::move (state));
     mark ("exchanged");
 
@@ -3518,6 +3561,8 @@ void AudioEngine::timerCallback()
     updateRecording();
     updatePerformanceRecording();
     rackExchange.collectGarbage();
+    if (levelsPending && ! juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown())
+        flushLevels(); // a level drag ended: the full snapshot catches up (round 171c)
 
     // Plugins are prepared at a fixed rate; if the device changed rate, recreate them.
     // A plugin whose latency changed (preset change, lookahead) requests a new PDC plan.

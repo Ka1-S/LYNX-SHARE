@@ -302,7 +302,7 @@ void MasterKnob::setValue (double v)
     if (kind == Kind::pitch)
         engine.editSong ([v] (Song& song) { song.masterPitch = (float) v; });
     else
-        engine.editSong ([v] (Song& song) {
+        engine.editLevels ([v] (Song& song) {
             if (! song.mixer.empty())
                 song.mixer.front().volume = (float) v;
         });
