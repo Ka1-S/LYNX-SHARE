@@ -163,6 +163,14 @@ inline void vignette (juce::Graphics& g, Rectangle<float> a, float alpha)
     g.fillRect (a);
 }
 
+// a display-first editor (the Pro editors) shows its illustration behind its display, dimmed under the readouts
+inline void displayDim (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    if (! display) return;
+    g.setColour (Colours::black.withAlpha (0.42f));
+    g.fillRect (a);
+}
+
 inline void cornerScrews (juce::Graphics& g, Rectangle<float> a, float inset, float d)
 {
     if (a.getWidth() < 60.0f || a.getHeight() < 40.0f) return;
@@ -303,7 +311,6 @@ inline void canvasCrest (juce::Graphics& g, Rectangle<float> a, bool display)
 {
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
-    if (display) return;
     // the transfer grid, stronger every fourth line
     for (int i = 0; (float) i * 18.0f < juce::jmax (a.getWidth(), a.getHeight()); ++i)
     {
@@ -333,6 +340,7 @@ inline void canvasCrest (juce::Graphics& g, Rectangle<float> a, bool display)
     }
     softLight (g, { a.getX() + a.getWidth() * 0.25f, a.getY() }, a.getWidth() * 0.5f, p.accent, 0.10f);
     vignette (g, a, 0.4f);
+    displayDim (g, a, display);
 }
 
 inline void crestEmblem (juce::Graphics& g, Point<float> c, float r) // a knee
@@ -352,7 +360,7 @@ inline const Theme& crestTheme()
         Theme x;
         x.name = "Crest Compressor";
         x.base = Style::glow;
-        x.pal = { Colour (0xff1c1e24), Colour (0xff0a0b0e), Colour (0xffffb340), Colour (0xff7fe3ff), Colour (0xd01a1c22), Colour (0xe40c0d10),
+        x.pal = { Colour (0xff1c1e24), Colour (0xff0a0b0e), Colour (0xffffb340), Colour (0xff7fe3ff), Colour (0x9c1a1c22), Colour (0xb80c0d10),
                   Colour (0xff6e6450), Colour (0xfff2e6cf), Colour (0xff07080a), Colour (0xff2c2e33), Colour (0xff111215), Colour (0xff22242a),
                   Colour (0xfffff3d9), Colour (0xff191b20) };
         x.canvas = canvasCrest;
@@ -371,7 +379,6 @@ inline void canvasApex (juce::Graphics& g, Rectangle<float> a, bool display)
 {
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
-    if (display) return;
     const auto ceil = a.getY() + a.getHeight() * 0.3f;
     // a waveform's silhouette pressing up, flat-topped at the ceiling
     juce::Path wave;
@@ -401,6 +408,7 @@ inline void canvasApex (juce::Graphics& g, Rectangle<float> a, bool display)
     g.setGradientFill (line);
     g.fillRect (Rectangle<float> (a.getX(), ceil - 0.75f, a.getWidth(), 1.5f));
     vignette (g, a, 0.4f);
+    displayDim (g, a, display);
 }
 
 inline void apexEmblem (juce::Graphics& g, Point<float> c, float r) // bars under a line
@@ -423,7 +431,7 @@ inline const Theme& apexTheme()
         Theme x;
         x.name = "Apex Limiter";
         x.base = Style::glow;
-        x.pal = { Colour (0xff131c27), Colour (0xff05080c), Colour (0xff4fb3ff), Colour (0xffd9ecff), Colour (0xd0131c27), Colour (0xe4070b10),
+        x.pal = { Colour (0xff131c27), Colour (0xff05080c), Colour (0xff4fb3ff), Colour (0xffd9ecff), Colour (0x9c131c27), Colour (0xb8070b10),
                   Colour (0xff4f6f92), Colour (0xffe6f1ff), Colour (0xff04070b), Colour (0xffc9d2dc), Colour (0xff59626d), Colour (0xff17212c),
                   Colour (0xff0f1720), Colour (0xff17202b) };
         x.canvas = canvasApex;
@@ -441,7 +449,6 @@ inline void canvasPrism (juce::Graphics& g, Rectangle<float> a, bool display)
 {
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
-    if (display) return;
     const auto pc = Point<float> (a.getX() + a.getWidth() * 0.28f, a.getY() + a.getHeight() * 0.42f);
     const auto pr = juce::jmin (a.getWidth(), a.getHeight()) * 0.16f;
     // the white beam coming in
@@ -474,6 +481,7 @@ inline void canvasPrism (juce::Graphics& g, Rectangle<float> a, bool display)
     g.setColour (Colours::white.withAlpha (0.35f));
     g.strokePath (tri, juce::PathStrokeType (1.2f));
     vignette (g, a, 0.35f);
+    displayDim (g, a, display);
 }
 
 inline void prismEmblem (juce::Graphics& g, Point<float> c, float r)
@@ -496,7 +504,7 @@ inline const Theme& prismTheme()
         Theme x;
         x.name = "Prism Multiband";
         x.base = Style::glow;
-        x.pal = { Colour (0xff17141f), Colour (0xff07060b), Colour (0xffb98cff), Colour (0xff6fe3ff), Colour (0xc4191624), Colour (0xdc0a0910),
+        x.pal = { Colour (0xff17141f), Colour (0xff07060b), Colour (0xffb98cff), Colour (0xff6fe3ff), Colour (0x9c191624), Colour (0xb80a0910),
                   Colour (0xff8e86b0), Colour (0xfff0ecff), Colour (0xff050409), Colour (0xff3b3552), Colour (0xff100e18), Colour (0xff221f2e),
                   Colour (0xffffffff), Colour (0xff1a1724) };
         x.canvas = canvasPrism;
@@ -514,7 +522,6 @@ inline void canvasSentry (juce::Graphics& g, Rectangle<float> a, bool display)
 {
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
-    if (display) return;
     // stone courses
     for (float y = a.getY(); y < a.getBottom(); y += 26.0f)
     {
@@ -542,6 +549,7 @@ inline void canvasSentry (juce::Graphics& g, Rectangle<float> a, bool display)
     for (float x = gate.getX(); x < gate.getRight(); x += 22.0f)
         g.fillRect (Rectangle<float> (x, gate.getY() + 10.0f, 1.0f, gate.getHeight() - 10.0f));
     vignette (g, a, 0.45f);
+    displayDim (g, a, display);
 }
 
 inline void sentryEmblem (juce::Graphics& g, Point<float> c, float r) // a keyhole
@@ -572,7 +580,7 @@ inline const Theme& sentryTheme()
         Theme x;
         x.name = "Sentry Gate";
         x.base = Style::hardware;
-        x.pal = { Colour (0xff1a252c), Colour (0xff070b0e), Colour (0xffffc864), Colour (0xff6fc6c0), Colour (0xd0182228), Colour (0xe40a0f12),
+        x.pal = { Colour (0xff1a252c), Colour (0xff070b0e), Colour (0xffffc864), Colour (0xff6fc6c0), Colour (0x9c182228), Colour (0xb80a0f12),
                   Colour (0xff5b6a70), Colour (0xffeee4cc), Colour (0xff050709), Colour (0xff3a3f42), Colour (0xff111315), Colour (0xff1c2428),
                   Colour (0xffffe2a8), Colour (0xff192127) };
         x.canvas = canvasSentry;
@@ -656,7 +664,6 @@ inline void canvasHush (juce::Graphics& g, Rectangle<float> a, bool display)
 {
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
-    if (display) return;
     juce::Random rnd (5);
     for (float x = a.getX() + a.getWidth() * 0.35f; x < a.getRight(); x += 3.0f)
     {
@@ -679,6 +686,7 @@ inline void canvasHush (juce::Graphics& g, Rectangle<float> a, bool display)
     g.setGradientFill (ColourGradient (p.accent.withAlpha (0.25f), c.x, c.y - r, p.accent2.withAlpha (0.05f), c.x, c.y + r * 1.2f, false));
     g.strokePath (s, stroke (r * 0.12f));
     vignette (g, a, 0.4f);
+    displayDim (g, a, display);
 }
 
 inline void hushEmblem (juce::Graphics& g, Point<float> c, float r)
@@ -698,7 +706,7 @@ inline const Theme& hushTheme()
         Theme x;
         x.name = "Hush De-esser";
         x.base = Style::glow;
-        x.pal = { Colour (0xff261b35), Colour (0xff0b0910), Colour (0xffc792ff), Colour (0xffffb3e0), Colour (0xc8221830), Colour (0xe00d0a13),
+        x.pal = { Colour (0xff261b35), Colour (0xff0b0910), Colour (0xffc792ff), Colour (0xffffb3e0), Colour (0x9c221830), Colour (0xb80d0a13),
                   Colour (0xff86709e), Colour (0xfff1e8ff), Colour (0xff07050b), Colour (0xff3a2e4c), Colour (0xff17121f), Colour (0xff221a2e),
                   Colour (0xfff6eaff), Colour (0xff1e1729) };
         x.canvas = canvasHush;
@@ -850,7 +858,7 @@ inline const Theme& atriumTheme()
         Theme x;
         x.name = "Atrium";
         x.base = Style::glow;
-        x.pal = { Colour (0xff2a221b), Colour (0xff0f0c09), Colour (0xfff2c58a), Colour (0xffd9b48a), Colour (0xcc2a221b), Colour (0xe0130f0c),
+        x.pal = { Colour (0xff2a221b), Colour (0xff0f0c09), Colour (0xfff2c58a), Colour (0xffd9b48a), Colour (0x9c2a221b), Colour (0xb8130f0c),
                   Colour (0xff8a7356), Colour (0xfff6e8d2), Colour (0xff0a0806), Colour (0xffcbb89b), Colour (0xff7d6b54), Colour (0xff2a2119),
                   Colour (0xff2a1d10), Colour (0xff221b15) };
         x.canvas = canvasAtrium;
@@ -945,7 +953,7 @@ inline const Theme& foilTheme()
         Theme x;
         x.name = "Foil Plate";
         x.base = Style::hardware;
-        x.pal = { Colour (0xff22262b), Colour (0xff0d0f12), Colour (0xffd98a52), Colour (0xffc9d1d8), Colour (0xd01f2327), Colour (0xe40d0f12),
+        x.pal = { Colour (0xff22262b), Colour (0xff0d0f12), Colour (0xffd98a52), Colour (0xffc9d1d8), Colour (0x9c1f2327), Colour (0xb80d0f12),
                   Colour (0xff7d8791), Colour (0xffeef2f5), Colour (0xff08090b), Colour (0xffd9dee3), Colour (0xff4b5157), Colour (0xff1a1d21),
                   Colour (0xff15181b), Colour (0xff1f2327) };
         x.canvas = canvasFoil;
@@ -1043,7 +1051,7 @@ inline const Theme& haloTheme()
         Theme x;
         x.name = "Halo";
         x.base = Style::neon;
-        x.pal = { Colour (0xff141c30), Colour (0xff05070e), Colour (0xffffe08a), Colour (0xff8fe8ff), Colour (0xb8141c30), Colour (0xd806080f),
+        x.pal = { Colour (0xff141c30), Colour (0xff05070e), Colour (0xffffe08a), Colour (0xff8fe8ff), Colour (0x9c141c30), Colour (0xb806080f),
                   Colour (0xff9fb0d0), Colour (0xfffff6dc), Colour (0xff04060c), Colour (0xfff4f0e6), Colour (0xffb6b0a4), Colour (0xff1d2438),
                   Colour (0xff3a2f14), Colour (0xff161d2e) };
         x.canvas = canvasHalo;
@@ -1122,7 +1130,7 @@ inline const Theme& horizonTheme()
         Theme x;
         x.name = "Horizon";
         x.base = Style::vivid;
-        x.pal = { Colour (0xff2a1b46), Colour (0xff0b0915), Colour (0xffff8a3d), Colour (0xffc58aff), Colour (0xc01d1430), Colour (0xdc0c0915),
+        x.pal = { Colour (0xff2a1b46), Colour (0xff0b0915), Colour (0xffff8a3d), Colour (0xffc58aff), Colour (0x9c1d1430), Colour (0xb80c0915),
                   Colour (0xff8a6a9a), Colour (0xfffff0e0), Colour (0xff07050c), Colour (0xff342a44), Colour (0xff130f1c), Colour (0xff261c36),
                   Colour (0xffffe4cc), Colour (0xff1e1630) };
         x.canvas = canvasHorizon;
@@ -1205,7 +1213,7 @@ inline const Theme& reeverb2Theme()
         Theme x;
         x.name = "Fruity Reeverb 2";
         x.base = Style::hardware;
-        x.pal = { Colour (0xff3a0f17), Colour (0xff12060a), Colour (0xffd8a24a), Colour (0xffffe0b0), Colour (0xd02a0c12), Colour (0xe4120609),
+        x.pal = { Colour (0xff3a0f17), Colour (0xff12060a), Colour (0xffd8a24a), Colour (0xffffe0b0), Colour (0x9c2a0c12), Colour (0xb8120609),
                   Colour (0xff8a5a3a), Colour (0xfff6e3c4), Colour (0xff0a0305), Colour (0xff3a1a1e), Colour (0xff12070a), Colour (0xff2a0d13),
                   Colour (0xfffff0d6), Colour (0xff2a0e14) };
         x.canvas = canvasReeverb2;
@@ -1287,7 +1295,7 @@ inline const Theme& luxeTheme()
         Theme x;
         x.name = "LuxeVerb";
         x.base = Style::glow;
-        x.pal = { Colour (0xff17161a), Colour (0xff070708), Colour (0xffe8c77a), Colour (0xfff6ecd2), Colour (0xd0141317), Colour (0xe8070708),
+        x.pal = { Colour (0xff17161a), Colour (0xff070708), Colour (0xffe8c77a), Colour (0xfff6ecd2), Colour (0x9c141317), Colour (0xb8070708),
                   Colour (0xff8a7646), Colour (0xfff6ecd2), Colour (0xff050505), Colour (0xff2a2a2e), Colour (0xff0a0a0b), Colour (0xff1e1d22),
                   Colour (0xfff6ecd2), Colour (0xff17161a) };
         x.canvas = canvasLuxe;
@@ -1346,7 +1354,7 @@ inline const Theme& reeverb1Theme()
         Theme x;
         x.name = "Fruity Reeverb";
         x.base = Style::glow;
-        x.pal = { Colour (0xff2a3532), Colour (0xff0e1312), Colour (0xff7fe0c4), Colour (0xffd8efe8), Colour (0xcc243030), Colour (0xe00d1212),
+        x.pal = { Colour (0xff2a3532), Colour (0xff0e1312), Colour (0xff7fe0c4), Colour (0xffd8efe8), Colour (0x9c243030), Colour (0xb80d1212),
                   Colour (0xff6a8a82), Colour (0xffe8f6f2), Colour (0xff070a09), Colour (0xffeef3f1), Colour (0xffa9b5b1), Colour (0xff1f2a28),
                   Colour (0xff1c2b27), Colour (0xff1f2a28) };
         x.canvas = canvasReeverb1;
@@ -1449,7 +1457,7 @@ inline const Theme& echoformTheme()
         Theme x;
         x.name = "Echoform";
         x.base = Style::hardware;
-        x.pal = { Colour (0xff2a1f18), Colour (0xff100b08), Colour (0xffc4473a), Colour (0xffe9dfc8), Colour (0xd0281c15), Colour (0xe4100b08),
+        x.pal = { Colour (0xff2a1f18), Colour (0xff100b08), Colour (0xffc4473a), Colour (0xffe9dfc8), Colour (0x9c281c15), Colour (0xb8100b08),
                   Colour (0xff8a6a4e), Colour (0xfff2e8d2), Colour (0xff0a0705), Colour (0xffeee4cc), Colour (0xffb5a688), Colour (0xff22180f),
                   Colour (0xff3a1612), Colour (0xff2a1f18) };
         x.canvas = canvasEchoform;
@@ -1518,7 +1526,7 @@ inline const Theme& spiralTheme()
         Theme x;
         x.name = "Spiral Echo";
         x.base = Style::neon;
-        x.pal = { Colour (0xff0d2026), Colour (0xff04090b), Colour (0xff3fe0c5), Colour (0xffff7a6a), Colour (0xc00d1f25), Colour (0xdc05090b),
+        x.pal = { Colour (0xff0d2026), Colour (0xff04090b), Colour (0xff3fe0c5), Colour (0xffff7a6a), Colour (0x9c0d1f25), Colour (0xb805090b),
                   Colour (0xff4f8a8a), Colour (0xffe6fbf6), Colour (0xff030708), Colour (0xffe9f2ef), Colour (0xff8aa39c), Colour (0xff14282d),
                   Colour (0xff10302c), Colour (0xff0f2227) };
         x.canvas = canvasSpiral;
@@ -1610,7 +1618,7 @@ inline const Theme& orbitTheme()
         Theme x;
         x.name = "Orbit";
         x.base = Style::neon;
-        x.pal = { Colour (0xff16233a), Colour (0xff060a12), Colour (0xffb6ff5c), Colour (0xff7fb4ff), Colour (0xc0142035), Colour (0xdc060a12),
+        x.pal = { Colour (0xff16233a), Colour (0xff060a12), Colour (0xffb6ff5c), Colour (0xff7fb4ff), Colour (0x9c142035), Colour (0xb8060a12),
                   Colour (0xff4f6a8a), Colour (0xffe8f2ff), Colour (0xff04070c), Colour (0xff4a5a74), Colour (0xff111827), Colour (0xff1c2a40),
                   Colour (0xffeaffd6), Colour (0xff17233a) };
         x.canvas = canvasOrbit;
@@ -1702,7 +1710,7 @@ inline const Theme& latticeTheme()
         Theme x;
         x.name = "Lattice Mod";
         x.base = Style::neon;
-        x.pal = { Colour (0xff1a0f1c), Colour (0xff07040a), Colour (0xffff4fa3), Colour (0xffffb84f), Colour (0xc01a0f1c), Colour (0xdc08040a),
+        x.pal = { Colour (0xff1a0f1c), Colour (0xff07040a), Colour (0xffff4fa3), Colour (0xffffb84f), Colour (0x9c1a0f1c), Colour (0xb808040a),
                   Colour (0xff8a4f78), Colour (0xfffde8f4), Colour (0xff050307), Colour (0xff3a2238), Colour (0xff120a14), Colour (0xff261626),
                   Colour (0xffffffff), Colour (0xff1e1220) };
         x.canvas = canvasLattice;
@@ -1790,7 +1798,7 @@ inline const Theme& geminiTheme()
         Theme x;
         x.name = "Gemini Doubler";
         x.base = Style::vivid;
-        x.pal = { Colour (0xff151a2c), Colour (0xff06070e), Colour (0xff4fd8ff), Colour (0xffffc95a), Colour (0xc0141a2c), Colour (0xdc06070e),
+        x.pal = { Colour (0xff151a2c), Colour (0xff06070e), Colour (0xff4fd8ff), Colour (0xffffc95a), Colour (0x9c141a2c), Colour (0xb806070e),
                   Colour (0xff6a7a9a), Colour (0xfff0f4ff), Colour (0xff04050a), Colour (0xff3a4462), Colour (0xff10131f), Colour (0xff1e2438),
                   Colour (0xffffffff), Colour (0xff171c2e) };
         x.canvas = canvasGemini;
@@ -1850,7 +1858,7 @@ inline const Theme& delay2Theme()
         Theme x;
         x.name = "Fruity Delay 2";
         x.base = Style::glow;
-        x.pal = { Colour (0xff162126), Colour (0xff070b0d), Colour (0xff58e0b8), Colour (0xffb8f4ff), Colour (0xc4152026), Colour (0xdc070b0d),
+        x.pal = { Colour (0xff162126), Colour (0xff070b0d), Colour (0xff58e0b8), Colour (0xffb8f4ff), Colour (0x9c152026), Colour (0xb8070b0d),
                   Colour (0xff4f7a78), Colour (0xffe6faf4), Colour (0xff04080a), Colour (0xff2c3a3e), Colour (0xff0e1416), Colour (0xff1c2a2e),
                   Colour (0xffeafff8), Colour (0xff17232a) };
         x.canvas = canvasDelay2;
@@ -2030,7 +2038,6 @@ inline void canvasEmber (juce::Graphics& g, Rectangle<float> a, bool display)
 {
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
-    if (display) return;
     // the heat rising from the bed of coals
     g.setGradientFill (ColourGradient (p.accent.withAlpha (0.28f), 0.0f, a.getBottom(), p.accent.withAlpha (0.0f), 0.0f, a.getBottom() - a.getHeight() * 0.55f, false));
     g.fillRect (a);
@@ -2054,6 +2061,7 @@ inline void canvasEmber (juce::Graphics& g, Rectangle<float> a, bool display)
         g.fillEllipse (Rectangle<float> (1.8f, 1.8f).withCentre (s));
     }
     vignette (g, a, 0.4f);
+    displayDim (g, a, display);
 }
 
 inline void emberEmblem (juce::Graphics& g, Point<float> c, float r) // a flame
@@ -2098,7 +2106,7 @@ inline const Theme& emberTheme()
         Theme x;
         x.name = "Ember Saturator";
         x.base = Style::vivid;
-        x.pal = { Colour (0xff1e1412), Colour (0xff080504), Colour (0xffff6a1a), Colour (0xffffd27a), Colour (0xc81c1210), Colour (0xe0080504),
+        x.pal = { Colour (0xff1e1412), Colour (0xff080504), Colour (0xffff6a1a), Colour (0xffffd27a), Colour (0x9c1c1210), Colour (0xb8080504),
                   Colour (0xff8a4a2a), Colour (0xfffff0dc), Colour (0xff060303), Colour (0xff3a3434), Colour (0xff0a0808), Colour (0xff261a16),
                   Colour (0xffffe0b8), Colour (0xff221714) };
         x.canvas = canvasEmber;
@@ -2127,7 +2135,6 @@ inline void canvasAether (juce::Graphics& g, Rectangle<float> a, bool display)
 {
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
-    if (display) return;
     softLight (g, { a.getCentreX(), a.getY() - a.getHeight() * 0.2f }, a.getWidth() * 0.8f, p.accent, 0.10f);
     // cirrus: long feathery streaks, slanted
     juce::Random rnd (7);
@@ -2159,6 +2166,7 @@ inline void canvasAether (juce::Graphics& g, Rectangle<float> a, bool display)
         g.strokePath (w, juce::PathStrokeType (1.0f));
     }
     vignette (g, a, 0.3f);
+    displayDim (g, a, display);
 }
 
 inline void aetherEmblem (juce::Graphics& g, Point<float> c, float r) // a wind swirl
@@ -2192,7 +2200,7 @@ inline const Theme& aetherTheme()
         Theme x;
         x.name = "Aether";
         x.base = Style::glow;
-        x.pal = { Colour (0xff1e3550), Colour (0xff0b1424), Colour (0xff7fd0ff), Colour (0xffffffff), Colour (0xc01c3048), Colour (0xdc0b1424),
+        x.pal = { Colour (0xff1e3550), Colour (0xff0b1424), Colour (0xff7fd0ff), Colour (0xffffffff), Colour (0x9c1c3048), Colour (0xb80b1424),
                   Colour (0xff7a9ac0), Colour (0xfff0f8ff), Colour (0xff07101c), Colour (0xffcfe6f5), Colour (0xff5a7a96), Colour (0xff1c2e44),
                   Colour (0xff0f2a44), Colour (0xff1a2d44) };
         x.canvas = canvasAether;
@@ -2265,7 +2273,7 @@ inline const Theme& bloodTheme()
         Theme x;
         x.name = "Fruity Blood Overdrive";
         x.base = Style::hardware;
-        x.pal = { Colour (0xff1a0508), Colour (0xff070102), Colour (0xffc4122f), Colour (0xffff8a8a), Colour (0xc8180508), Colour (0xe0070102),
+        x.pal = { Colour (0xff1a0508), Colour (0xff070102), Colour (0xffc4122f), Colour (0xffff8a8a), Colour (0x9c180508), Colour (0xb8070102),
                   Colour (0xff6a1a24), Colour (0xffffe6e6), Colour (0xff050102), Colour (0xff3a0a12), Colour (0xff120306), Colour (0xff22080c),
                   Colour (0xffffffff), Colour (0xff1e0609) };
         x.canvas = canvasBlood;
@@ -2331,7 +2339,7 @@ inline const Theme& fastDistTheme()
         Theme x;
         x.name = "Fruity Fast Dist";
         x.base = Style::vivid;
-        x.pal = { Colour (0xff1c1c1c), Colour (0xff0a0a0a), Colour (0xffff7a00), Colour (0xffffd400), Colour (0xc81a1a1a), Colour (0xe00a0a0a),
+        x.pal = { Colour (0xff1c1c1c), Colour (0xff0a0a0a), Colour (0xffff7a00), Colour (0xffffd400), Colour (0x9c1a1a1a), Colour (0xb80a0a0a),
                   Colour (0xff6a5a4a), Colour (0xfffff2e0), Colour (0xff060606), Colour (0xff2a2a2a), Colour (0xff0e0e0e), Colour (0xff222222),
                   Colour (0xffff9a2a), Colour (0xff1c1c1c) };
         x.canvas = canvasFastDist;
@@ -2413,7 +2421,7 @@ inline const Theme& waveShaperTheme()
         Theme x;
         x.name = "Fruity WaveShaper";
         x.base = Style::neon;
-        x.pal = { Colour (0xff0b1a10), Colour (0xff030805), Colour (0xff5cff8a), Colour (0xffc8ffd6), Colour (0xc80a1a0f), Colour (0xe0030805),
+        x.pal = { Colour (0xff0b1a10), Colour (0xff030805), Colour (0xff5cff8a), Colour (0xffc8ffd6), Colour (0x9c0a1a0f), Colour (0xb8030805),
                   Colour (0xff3a8a52), Colour (0xffd6ffe0), Colour (0xff020503), Colour (0xff2a3a2e), Colour (0xff0a120c), Colour (0xff132a19),
                   Colour (0xffd6ffe0), Colour (0xff0f2014) };
         x.canvas = canvasWaveShaper;
@@ -2481,7 +2489,7 @@ inline const Theme& softClipperTheme()
         Theme x;
         x.name = "Fruity Soft Clipper";
         x.base = Style::glow;
-        x.pal = { Colour (0xff261a16), Colour (0xff0d0807), Colour (0xffffb08a), Colour (0xffffe0c8), Colour (0xc8241815), Colour (0xe00d0807),
+        x.pal = { Colour (0xff261a16), Colour (0xff0d0807), Colour (0xffffb08a), Colour (0xffffe0c8), Colour (0x9c241815), Colour (0xb80d0807),
                   Colour (0xff8a6a5a), Colour (0xfffff0e6), Colour (0xff080504), Colour (0xff4a3630), Colour (0xff1a120f), Colour (0xff2a1d19),
                   Colour (0xfffff0e6), Colour (0xff241815) };
         x.canvas = canvasSoftClipper;
@@ -2553,7 +2561,7 @@ inline const Theme& hardcoreTheme()
         Theme x;
         x.name = "Hardcore";
         x.base = Style::hardware;
-        x.pal = { Colour (0xff1c1a18), Colour (0xff090807), Colour (0xffff6a3a), Colour (0xffe0e0e0), Colour (0xc81a1816), Colour (0xe0090807),
+        x.pal = { Colour (0xff1c1a18), Colour (0xff090807), Colour (0xffff6a3a), Colour (0xffe0e0e0), Colour (0x9c1a1816), Colour (0xb8090807),
                   Colour (0xff6a5a4e), Colour (0xfff2ece6), Colour (0xff060505), Colour (0xff2c2c2c), Colour (0xff0b0b0b), Colour (0xff221f1c),
                   Colour (0xfff4f4f4), Colour (0xff1e1c1a) };
         x.canvas = canvasHardcore;
@@ -2630,7 +2638,7 @@ inline const Theme& distructorTheme()
         Theme x;
         x.name = "Distructor";
         x.base = Style::vivid;
-        x.pal = { Colour (0xff2a2a2a), Colour (0xff0e0e0e), Colour (0xffff2e2e), Colour (0xffc46a3a), Colour (0xc8262626), Colour (0xe00e0e0e),
+        x.pal = { Colour (0xff2a2a2a), Colour (0xff0e0e0e), Colour (0xffff2e2e), Colour (0xffc46a3a), Colour (0x9c262626), Colour (0xb80e0e0e),
                   Colour (0xff6a5a52), Colour (0xfff2eeee), Colour (0xff080808), Colour (0xff4a4a4a), Colour (0xff161616), Colour (0xff222222),
                   Colour (0xffffe6e6), Colour (0xff262626) };
         x.canvas = canvasDistructor;
