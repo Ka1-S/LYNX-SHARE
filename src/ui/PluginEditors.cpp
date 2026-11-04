@@ -117,6 +117,13 @@ public:
         }
 
         accent = skin::accentFor (sgApprox ? EffectKind::maximus : kind);
+        familyAccent = accent;
+        if (skin::artForEffect (kind) != skin::Art::none && ! sgApprox) // round 170j: its own art (Themed)
+        {
+            artLayer = std::make_unique<skin::ArtLayer>();
+            addAndMakeVisible (*artLayer);
+            artLayer->setArt (skin::artForEffect (kind), [this] { return editorStyle() == skin::Style::themed; });
+        }
         if (kind == EffectKind::ember) // round 165: the Classic voicing's VU shows the output level, as the reference's
             vuMode = 2;
         anim.onFrame = [this] { repaint(); };
@@ -539,10 +546,33 @@ public:
     int styleKey() const { return skin::styleKey (kind, layout == &plugui::soundgoodizerLayout()); }
     skin::Style editorStyle() const { return skin::styleFor (kind, layout == &plugui::soundgoodizerLayout()); }
 
+    // round 170j: the art's moving part (Nebula's twinkling stars) lives in the free strip right of the last menu
+    juce::Rectangle<float> artStage() const
+    {
+        const LayoutItem* last = nullptr;
+        for (const auto& item : activeLayout().items)
+            if (item.type == Item::menu && (last == nullptr || item.y >= last->y))
+                last = &item;
+        if (last == nullptr)
+            return {};
+        const auto r = rectOf (*last);
+        return { r.getRight() + 16.0f, r.getY() - 4.0f, juce::jmax (0.0f, (float) getWidth() - r.getRight() - 28.0f), r.getHeight() + 8.0f };
+    }
+
+    void resized() override
+    {
+        if (artLayer == nullptr)
+            return;
+        artLayer->setBounds (getLocalBounds());
+        artLayer->setStage (artStage());
+        artLayer->toFront (false);
+    }
+
     void paint (juce::Graphics& g) override
     {
         using namespace theme;
-        const skin::StyleScope styleScope (editorStyle());
+        const skin::StyleScope styleScope (editorStyle(), skin::artForEffect (kind));
+        accent = editorStyle() == skin::Style::themed ? skin::artAccent (skin::artForEffect (kind)) : familyAccent;
         skin::canvas (g, getLocalBounds().toFloat(), accent);
         const auto* fx = current();
 
@@ -4517,7 +4547,9 @@ private:
     const plugui::Layout* layout = nullptr;
     int page = 0;
     int hoverItem = -1, hoverHeader = 0, dragItem = -1;
-    juce::Colour accent { skin::colour::crimson }; // the plugin family's accent (ui/PluginSkin.h)
+    juce::Colour accent { skin::colour::crimson }; // the plugin family's accent (ui/PluginSkin.h); the art's when Themed
+    juce::Colour familyAccent { skin::colour::crimson };
+    std::unique_ptr<skin::ArtLayer> artLayer; // round 170j: the art's moving part
     skin::Animator anim;                            // hover fades (runs only while something moves)
     int quietFrames = 1000; // frames since the live meters last moved (the displays start at rest)
     float lastMeters = 0.0f;

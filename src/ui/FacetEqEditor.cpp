@@ -1063,7 +1063,7 @@ public:
     void paint (juce::Graphics& g) override
     {
         using namespace theme;
-        const skin::StyleScope styleScope (skin::styleFor (EffectKind::facetEq)); // round 126: one style per plugin
+        const skin::StyleScope styleScope (skin::styleFor (EffectKind::facetEq), skin::Art::facet); // round 126: one style per plugin (170j: Themed)
         g.fillAll (colour::bg0);
         const auto* fx = current();
         if (fx == nullptr)
@@ -1268,6 +1268,10 @@ public:
         const auto area = graphArea();
         const auto plot = plotArea();
         skin::canvas (g, area, colour::accent);
+        // round 170j: Themed draws the analyser in ice and the sum's glow in warm gold; the other styles in the accent
+        const auto themed = skin::style() == skin::Style::themed;
+        const auto specColour = themed ? skin::artAccent2 (skin::Art::facet) : colour::accent;
+        const auto sumGlow = themed ? skin::artAccent (skin::Art::facet) : colour::accent;
 
         // grid: frequencies (numbers or a piano keyboard along the bottom)
         g.setFont (font (type::caption));
@@ -1366,18 +1370,18 @@ public:
             {
                 const auto p = spectrumPath (specPost, true);
                 // round 126: the analyser glows — a deep fill of the accent rising to a lit edge
-                juce::ColourGradient fillGrad (colour::accent.withAlpha (0.34f), 0.0f, plot.getY() + plot.getHeight() * 0.25f, colour::accent.withAlpha (0.02f), 0.0f,
+                juce::ColourGradient fillGrad (specColour.withAlpha (0.34f), 0.0f, plot.getY() + plot.getHeight() * 0.25f, specColour.withAlpha (0.02f), 0.0f,
                                                plot.getBottom(), false);
-                fillGrad.addColour (0.5, colour::accent.darker (0.3f).withAlpha (0.14f));
+                fillGrad.addColour (0.5, specColour.darker (0.3f).withAlpha (0.14f));
                 g.setGradientFill (fillGrad);
                 g.fillPath (p);
                 const auto edge = spectrumPath (specPost, false);
                 if (! skin::reducedEffects())
                 {
-                    g.setColour (colour::accent.withAlpha (0.18f));
+                    g.setColour (specColour.withAlpha (0.18f));
                     g.strokePath (edge, juce::PathStrokeType (4.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
                 }
-                g.setColour (colour::accent.brighter (0.2f).withAlpha (0.85f));
+                g.setColour (specColour.brighter (0.2f).withAlpha (0.85f));
                 g.strokePath (edge, juce::PathStrokeType (1.2f));
             }
             // round 166f: the comparative target's spectrum, a cool line over the source's
@@ -1468,14 +1472,14 @@ public:
             area0.lineTo (plot.getRight(), yForDb (0.0));
             area0.lineTo (plot.getX(), yForDb (0.0));
             area0.closeSubPath();
-            g.setColour (colour::accent.withAlpha (0.16f));
+            g.setColour (sumGlow.withAlpha (0.16f));
             g.fillPath (area0);
             if (! skin::reducedEffects())
             {
-                g.setColour (colour::accent.withAlpha (0.12f));
+                g.setColour (sumGlow.withAlpha (0.12f));
                 g.strokePath (total, juce::PathStrokeType (12.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
             }
-            g.setColour (colour::accent.withAlpha (0.4f));
+            g.setColour (sumGlow.withAlpha (0.4f));
             g.strokePath (total, juce::PathStrokeType (5.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
         g.setColour (curveColour);

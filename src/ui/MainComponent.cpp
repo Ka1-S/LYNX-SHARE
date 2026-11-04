@@ -1641,6 +1641,8 @@ void MainComponent::loadUiSettings()
             skin::overridesFromString (line.fromFirstOccurrenceOf ("=", false, false).trim());
         else if (key == "reducedEffects")
             skin::setReducedEffects (on);
+        else if (key == "artMotion")
+            skin::setArtMotion (on);
         else if (key == "waveStereo")
             ui::WaveformCache::stereo = on;
         else if (key == "noteNames")
@@ -1780,6 +1782,7 @@ void MainComponent::saveUiSettings()
                                       + "\nnoteNames=" + juce::String (notenames::currentStyle.load())
                                       + "\nnoteFlats=" + juce::String (notenames::currentFlats.load() ? 1 : 0)
                                       + "\nreducedEffects=" + juce::String (skin::reducedEffects() ? 1 : 0)
+                                      + "\nartMotion=" + juce::String (skin::artMotion() ? 1 : 0)
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
                                       + "\npluginStyleOverrides=" + skin::overridesToString()
                                       + "\nrememberSeek=" + juce::String (EditorGlobals::get().rememberSeek ? 1 : 0)
@@ -4453,6 +4456,7 @@ void MainComponent::openSettings (int page)
         o.noteNames = notenames::currentStyle.load();
         o.noteFlats = notenames::currentFlats.load();
         o.reducedEffects = skin::reducedEffects();
+        o.artMotion = skin::artMotion();
         o.gpuRendering = gpuRenderingEnabled();
         o.pluginStyle = skin::forcedStyle();
         o.splash = safe->startup.splash;
@@ -4488,8 +4492,9 @@ void MainComponent::openSettings (int page)
             self.setToolbarLayout (layout, true);
         }
         theme::menus::setCompact (o.compactMenus);
-        if (o.reducedEffects != skin::reducedEffects() || o.pluginStyle != skin::forcedStyle())
+        if (o.reducedEffects != skin::reducedEffects() || o.pluginStyle != skin::forcedStyle() || o.artMotion != skin::artMotion())
         {
+            skin::setArtMotion (o.artMotion);
             skin::setReducedEffects (o.reducedEffects);
             skin::setForcedStyle (o.pluginStyle);
             for (int i = 0; i < juce::Desktop::getInstance().getNumComponents(); ++i) // open editors redraw at once

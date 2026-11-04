@@ -7163,3 +7163,5 @@ countries: br
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] pinta com o lápis  [Ctrl+LMB] / [Shift+LMB] escolhe vários  [2xLMB] abre  [RMB] menu"
 "Empty patterns were ignored." = "Os patterns vazios foram ignorados."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Seletor de plugins: todos os geradores e efeitos, as categorias como abas (aperte de novo para fechar)"
+"Themed" = "Temático"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Animar a arte dos plugins (pétalas caindo, brilhos; estilo Temático)"

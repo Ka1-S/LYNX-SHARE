@@ -7007,3 +7007,5 @@ countries: nl be
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] tekenen met het potlood  [Ctrl+LMB] / [Shift+LMB] meerdere kiezen  [2xLMB] openen  [RMB] menu"
 "Empty patterns were ignored." = "Lege patterns zijn overgeslagen."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Pluginkiezer: alle generators en effecten, de categorieën als tabbladen (nogmaals drukken om te sluiten)"
+"Themed" = "Thematisch"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Plugin-illustratie animeren (vallende bloemblaadjes, gloed; stijl Thematisch)"

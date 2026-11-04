@@ -7007,3 +7007,5 @@ countries: ru by kz
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Паттерн: [LMB] рисовать им карандашом  [Ctrl+LMB] / [Shift+LMB] выбрать несколько  [2xLMB] открыть  [RMB] меню"
 "Empty patterns were ignored." = "Пустые паттерны пропущены."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Выбор плагинов: все генераторы и эффекты, категории — вкладками (нажмите ещё раз, чтобы закрыть)"
+"Themed" = "Тематический"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Анимировать оформление плагинов (падающие лепестки, свечение; стиль «Тематический»)"

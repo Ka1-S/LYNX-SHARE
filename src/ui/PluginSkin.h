@@ -111,8 +111,30 @@ void valuePlate (juce::Graphics&, juce::Rectangle<float> area, float corner);
 // --- plugin style (round 126) ---------------------------------------------------------------------
 // The look every built-in editor is drawn in (Settings > General > Plugin style): Glow (the default kit above),
 // Neon, Hardware or Vivid (ui/PluginStyles.inc). Only the drawing changes; layouts and gestures never do.
-enum class Style { glow = 0, neon, hardware, vivid };
-inline constexpr int styleCount = 4;
+//
+// Round 170j adds "Themed": a plugin that has its own ART (ui/PluginArt.inc) is drawn in a theme of its own — an
+// illustration in its background, its own palette, materials and knobs, evoking the mood of the plugin it is
+// inspired by (Sakura's cherry blossoms, Toxic Biohazard's containment lab...). All of it is LYNX's own procedural
+// vector drawing. A plugin without art falls back to its automatic style.
+enum class Style { glow = 0, neon, hardware, vivid, themed };
+inline constexpr int styleCount = 5;
+
+// the per-plugin art of the Themed style (none: the plugin has no theme of its own)
+enum class Art { none = 0, sakura, toxic, sytrus, threeOsc, facet, nebula };
+Art art();                                 // the art the kit draws with right now (Style::themed only)
+Art artForEffect (EffectKind);
+Art artForInstrument (InstrumentKind);
+Style baseStyleOf (Art);                   // the style the art builds on for what it does not draw itself
+juce::Colour artAccent (Art);              // the art's main accent (editors use it for their own drawing)
+juce::Colour artAccent2 (Art);             // its second light
+const char* artName (Art);                 // "Sakura"... (tests, snapshots)
+// animated art (falling petals, glows): Settings > General; also off with Reduced effects or the OS's
+// "show animations" switched off
+bool artMotion();
+void setArtMotion (bool);
+bool osReducedMotion();
+void kickArtLayers(); // the open editors' art layers re-check whether they may move (after a settings change)
+juce::String artSelfTest(); // "OK" or what failed: style resolution with art, every art drawn (LYNX --selftest)
 // the style the kit draws in right now (editors set it for their paint with StyleScope)
 Style style();
 void setStyle (Style);
@@ -128,6 +150,7 @@ int styleKey (EffectKind, bool soundgoodizer = false); // the key of an editor i
 Style defaultStyleFor (int key);                        // the built-in table
 Style styleFor (EffectKind, bool soundgoodizer = false); // forced > override > table
 Style resolve (Style automatic);                        // forced, or `automatic`
+Style resolve (Style automatic, Art);                   // the same for a page with (or without) art: Themed needs art
 int overrideFor (int key);                              // −1: none
 void setOverride (int key, int styleOrMinusOne);
 juce::String overridesToString();
@@ -136,15 +159,61 @@ inline std::function<void()> onStyleSettingsChanged; // the main window saves it
 // adds "Plugin style" (Automatic / Glow / Neon / Hardware / Vivid) for one editor to a menu; `changed` repaints it
 void addStyleMenu (juce::PopupMenu&, int key, std::function<void()> changed);
 inline constexpr const char* styleProperty = "lynxSkinStyle"; // a generator page's knob: its page's automatic style
+// the styleProperty value: the automatic style and the page's art in one int
+inline int packStyle (Style s, Art a) { return (int) s | ((int) a << 8); }
+inline Style unpackStyle (int packed) { return (Style) juce::jlimit (0, styleCount - 1, packed & 0xff); }
+inline Art unpackArt (int packed) { return (Art) ((packed >> 8) & 0xff); }
+void setArt (Art);
 
-// draws with a style until the end of the scope
+// draws with a style (and, for Themed, an art) until the end of the scope; Themed without art draws Glow
 struct StyleScope
 {
-    explicit StyleScope (Style s) : saved (style()) { setStyle (s); }
-    ~StyleScope() { setStyle (saved); }
+    explicit StyleScope (Style s, Art a = Art::none) : saved (style()), savedArt (art())
+    {
+        setArt (a);
+        setStyle (s == Style::themed && a == Art::none ? Style::glow : s);
+    }
+    ~StyleScope()
+    {
+        setStyle (saved);
+        setArt (savedArt);
+    }
     StyleScope (const StyleScope&) = delete;
     StyleScope& operator= (const StyleScope&) = delete;
     Style saved;
+    Art savedArt;
+};
+
+// The animated part of an editor's art (falling petals, a pulsing glow, twinkling stars...), a transparent layer
+// over the editor that takes no mouse clicks. It repaints only the small areas that move, at ≤ 30 Hz, and only
+// while the editor is on screen, the style is Themed and artMotion() is on; otherwise it shows a still frame.
+class ArtLayer final : public juce::Component, private juce::Timer
+{
+public:
+    ArtLayer();
+    ~ArtLayer() override;
+    // `active` tells whether the editor draws in the Themed style right now (Settings can change it at any time)
+    void setArt (Art, std::function<bool()> active);
+    // where the art may move (the editor's free areas; empty: everywhere)
+    void setStage (juce::Rectangle<float>);
+    void paint (juce::Graphics&) override;
+    void visibilityChanged() override { kick(); }
+    void parentHierarchyChanged() override { kick(); }
+    void resized() override;
+    void kick();                 // restart the motion if it may run
+    bool animating() const { return isTimerRunning(); }
+    double phase() const { return t; }
+    void setPhase (double seconds); // a still frame at this time (snapshots)
+
+private:
+    void timerCallback() override;
+    bool showing() const;
+    struct Impl;
+    std::unique_ptr<Impl> impl;
+    Art artId = Art::none;
+    std::function<bool()> isActive;
+    juce::Rectangle<float> stage;
+    double t = 0.0, lastMs = 0.0;
 };
 
 // --- effects level (round 126) --------------------------------------------------------------------
