@@ -4,11 +4,17 @@
 #include "engine/AudioEngine.h"
 #include "platform/Paths.h"
 #include "ui/ChannelSettings.h"
+#include "ui/ControllerEditors.h"
+#include "ui/Controllers164.h"
 #include "ui/FacetEqEditor.h"
+#include "ui/FlExtraEditors.h"
+#include "ui/NewtoneEditor.h"
+#include "ui/PatcherEditor.h"
 #include "ui/PluginEditors.h"
 #include "ui/PluginSkin.h"
 #include "ui/ProEditors.h"
 #include "ui/QuickPick.h"
+#include "ui/VisualEditors.h"
 
 #if JUCE_WINDOWS
  #ifndef WIN32_LEAN_AND_MEAN
@@ -78,6 +84,24 @@ std::unique_ptr<juce::Component> effectEditor (AudioEngine& engine, EffectSlot s
     }
     if (ProEditorWindows::handles (kind))
         return makeProEditor (engine, 1, 0, true); // (display-first editors with their demo signal)
+    // the effects whose window holds their own editor (as the mixer opens them, PluginEditors.cpp open()), not the
+    // generic knob page: else the Patcher, Big Clock, HTML NoteBook, Newtone… were an empty box or a 90 px square
+    if (kind == EffectKind::patcher)
+        return PatcherWindows::makeSlotEditor (engine, 1, 0);
+    if (VisualWindows::handles (kind))
+        return makeVisualEditor (engine, 1, 0, true);
+    if (FlExtraWindows::handles (kind))
+        return makeFlExtraEditor (VisualTarget::mixerSlot (engine, 1, 0), kind, true);
+    if (kind == EffectKind::formulaController)
+        return FormulaControllerWindows::makeEditor (engine, 1, 0);
+    if (NewtoneWindows::handles (kind))
+        return makeNewtoneEditor (engine, 1, 0);
+    if (Controller164Windows::handles (kind))
+    {
+        auto locate = [] (Song& song) -> EffectSlot* { return song.mixer.size() > 1 && ! song.mixer[1].effects.empty() ? &song.mixer[1].effects[0] : nullptr; };
+        return kind == EffectKind::controlSurface ? makeControlSurfaceEditor (engine, locate, std::nullopt)
+                                                  : makeXyControllerEditor (engine, locate, nullptr, std::nullopt);
+    }
     return makeNativeEffectEditor (engine, 1, 0, 1.0f, 0);
 }
 

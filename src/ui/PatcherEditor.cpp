@@ -2429,6 +2429,11 @@ bool takeEffectFromBrowser (const EffectSlot& fx)
     return true;
 }
 
+std::unique_ptr<juce::Component> makeSlotEditor (AudioEngine& engine, int track, int slot)
+{
+    return std::make_unique<PatcherEditor> (engine, Target { false, track, slot }); // (the window's content: picker pictures)
+}
+
 void openSlot (AudioEngine& engine, int track, int slot)
 {
     const auto& song = engine.getSong();

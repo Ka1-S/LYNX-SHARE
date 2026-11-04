@@ -12,6 +12,7 @@ namespace FormulaControllerWindows
 {
 void open (AudioEngine& engine, int track, int slot);
 void closeAll();
+std::unique_ptr<juce::Component> makeEditor (AudioEngine& engine, int track, int slot); // (the window's content)
 } // namespace FormulaControllerWindows
 
 // The editor shown inside the channel settings window of an Envelope Controller channel.

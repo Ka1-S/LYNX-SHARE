@@ -10,6 +10,7 @@ namespace lynx
 namespace PatcherWindows
 {
 void openSlot (AudioEngine& engine, int track, int slot);
+std::unique_ptr<juce::Component> makeSlotEditor (AudioEngine& engine, int track, int slot); // (the window's content)
 void openChannel (AudioEngine& engine, int channel);
 bool isChannelOpen (int channel);
 void closeChannel (int channel);
