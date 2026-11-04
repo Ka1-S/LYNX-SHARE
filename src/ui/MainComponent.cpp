@@ -2397,7 +2397,13 @@ void MainComponent::togglePluginPicker()
         if (! safe->mixer.addEffectToSelected (std::move (slot)))
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Plugin picker"), tr ("The selected insert has no free effect slot."));
         else
+        {
             safe->showPanel (Panel::mixer);
+            // FL opens the new effect's window (round 171c, its "insert effect plugin")
+            const auto track = safe->mixer.getSelectedTrack();
+            if (track >= 0 && track < (int) safe->engine.getSong().mixer.size())
+                safe->mixer.openSlotEditor (track, (int) safe->engine.getSong().mixer[(std::size_t) track].effects.size() - 1);
+        }
     };
     targets.close = [safe] {
         if (safe != nullptr && safe->pluginPickerView != nullptr)

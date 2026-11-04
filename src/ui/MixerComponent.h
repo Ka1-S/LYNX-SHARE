@@ -459,6 +459,7 @@ public:
     void selectFirstTrackWithEffects();
     void selectTrack (int track); // also scrolls the strip into view
     void selectSlot (int slot) { effects.selectSlot (slot); }
+    int getSelectedTrack() const noexcept { return strips.getSelectedTrack(); }
     // Selects the insert and slot and opens the effect's editor (the Browser's "Current project > Effects")
     void openSlotEditor (int track, int slot)
     {
