@@ -311,6 +311,30 @@ std::int64_t snapDown (double tick, std::int64_t step)
     return (std::int64_t) std::floor (tick / (double) step) * step;
 }
 
+std::int64_t snapRound (double tick, std::int64_t step)
+{
+    if (step <= 1)
+        return (std::int64_t) std::floor (tick + 0.5);
+
+    return (std::int64_t) std::floor (tick / (double) step + 0.5) * step;
+}
+
+bool paintWouldStack (const std::vector<Clip>& playlist, const Clip& c)
+{
+    for (const auto& other : playlist)
+    {
+        if (other.track != c.track || other.kind != c.kind || other.start >= c.end() || c.start >= other.end())
+            continue;
+        const auto same = c.kind == ClipKind::pattern    ? other.pattern == c.pattern
+                          : c.kind == ClipKind::audio    ? other.channel == c.channel
+                          : c.kind == ClipKind::automation ? other.automation == c.automation
+                                                           : true;
+        if (same)
+            return true;
+    }
+    return false;
+}
+
 std::int64_t snapNearest (double tick, const std::vector<std::int64_t>& candidates, double maxDistance, std::int64_t fallbackStep)
 {
     auto best = -1.0;

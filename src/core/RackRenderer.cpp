@@ -2497,6 +2497,7 @@ void RackRenderer::process (const RackState* state,
             if (c < polyLayers.size() && c < polyScratch.size()) // (round 168l's mono / porta layers move too)
                 polyLayers[c] = from >= 0 && (std::size_t) from < polyScratch.size() ? polyScratch[(std::size_t) from] : channelpoly::Layer {};
         }
+        scheduledNotes->moveChannels (state->channelFrom); // (round 169d)
     }
     lastState = state; // so prepare() knows which instruments to reconfigure
     lastSerial = state->serial;
@@ -2516,6 +2517,10 @@ void RackRenderer::process (const RackState* state,
             if (echo != nullptr)
                 echo->reset();
     }
+
+    // a start, a stop or a jump: every note was released (or none sounds yet)
+    if (playing != wasPlaying || jumped)
+        scheduledNotes->clear();
 
     if ((wasPlaying && ! playing) || jumped)
     {
@@ -3116,6 +3121,10 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         schedulePatternLoop (pattern, pattern.effectiveLength (song.beatsPerBar), startTick, numSamples,
                              ticksPerSample (bpm, sampleRate), events, song.swing, &song.channels, chaseNotes);
     }
+
+    // each started note ends where it was going to, whatever was edited meanwhile (FL, round 169d)
+    if (playing)
+        scheduledNotes->process (events, numSamples, ticksPerSample (bpm, sampleRate));
 
     // FL's wrapper "Output port" (round 149): the notes a plugin sent out in the previous chunk play the plugins on
     // that port, at this chunk's start

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace lynx
 {
@@ -149,10 +150,12 @@ void schedulePatternLoop (const Pattern& pattern,
             continue; // slide has no "off": the original note continues until its own end
         }
 
+        on.lengthTicks = (float) timing.length;
         emitOccurrences ((double) start, patternLength, startTick, endTick, tps, numSamples, on, out);
         if (chase && (double) start + tps <= position && (double) (start + timing.length) > position)
         {
             on.sampleOffset = 0; // a note crossing the start position ("Play truncated notes on transport")
+            on.lengthTicks = (float) ((double) (start + timing.length) - position);
             out.add (on);
         }
 
@@ -165,6 +168,90 @@ void schedulePatternLoop (const Pattern& pattern,
 
     out.sortByOffset();
 }
+void ScheduledNotes::process (EventBuffer& events, int numSamples, double tps) noexcept
+{
+    if (numSamples <= 0 || tps <= 0.0)
+        return;
+
+    const auto total = events.size();
+    auto kept = 0;
+    for (int i = 0; i < total; ++i)
+    {
+        const auto e = events[i];
+        const auto note = e.channel >= 0 && e.key >= 0 && e.key < audioClipKeyBase;
+
+        if (note && e.type == NoteEvent::Type::on)
+        {
+            if (count < capacity)
+                entries[(std::size_t) count++] = { e.channel, e.key,
+                                                   e.lengthTicks > 0.0f ? clock + e.sampleOffset * tps + (double) e.lengthTicks
+                                                                        : std::numeric_limits<double>::infinity() };
+            else
+                overflow = true;
+        }
+        else if (note && e.type == NoteEvent::Type::off)
+        {
+            // the note this "off" ends: same channel and key, ending here (a note of unknown length: any)
+            const auto at = clock + e.sampleOffset * tps;
+            auto match = -1;
+            for (int k = 0; k < count; ++k)
+            {
+                const auto& entry = entries[(std::size_t) k];
+                if (entry.channel == e.channel && entry.key == e.key
+                    && (std::isinf (entry.end) || std::abs (entry.end - at) <= matchSamples * tps))
+                {
+                    match = k;
+                    break;
+                }
+            }
+            if (match >= 0)
+                entries[(std::size_t) match] = entries[(std::size_t) --count];
+            else if (! overflow)
+                continue; // not the end of a sounding note: a note edited in behind the play head, or changed
+        }
+        events.at (kept++) = e;
+    }
+    events.resize (kept);
+
+    auto added = false;
+    for (int k = 0; k < count;)
+    {
+        const auto due = (entries[(std::size_t) k].end - clock) / tps + dueSamples; // samples into this block
+        if (due >= (double) numSamples)
+        {
+            ++k;
+            continue;
+        }
+        NoteEvent off;
+        off.type = NoteEvent::Type::off;
+        off.channel = entries[(std::size_t) k].channel;
+        off.key = entries[(std::size_t) k].key;
+        off.velocity = 0.0f;
+        off.sampleOffset = std::clamp ((int) std::ceil (due - 1.0e-6), 0, numSamples - 1);
+        events.add (off);
+        added = true;
+        entries[(std::size_t) k] = entries[(std::size_t) --count];
+    }
+    if (added)
+        events.sortByOffset();
+    clock += numSamples * tps;
+}
+
+void ScheduledNotes::moveChannels (const std::vector<int>& from) noexcept
+{
+    auto kept = 0;
+    for (int k = 0; k < count; ++k)
+    {
+        auto entry = entries[(std::size_t) k];
+        const auto moved = std::find (from.begin(), from.end(), entry.channel);
+        if (moved == from.end())
+            continue; // its channel is gone (the instrument went with it)
+        entry.channel = (int) (moved - from.begin());
+        entries[(std::size_t) kept++] = entry;
+    }
+    count = kept;
+}
+
 ScheduleIndex makeScheduleIndex (const Song& song)
 {
     ScheduleIndex index;
@@ -342,10 +429,12 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
                 continue;
             }
 
+            e.lengthTicks = (float) (off - on);
             emitOccurrences ((double) on, loop, startTick, endTick, tps, numSamples, e, out);
             if (chase && (double) on + tps <= loopStart && (double) off > loopStart)
             {
                 e.sampleOffset = 0; // a note crossing the start position ("Play truncated notes on transport")
+                e.lengthTicks = (float) ((double) off - loopStart);
                 out.add (e);
             }
 

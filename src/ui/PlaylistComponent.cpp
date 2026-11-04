@@ -1795,9 +1795,24 @@ int PlaylistComponent::clipAt (int x, int y, bool& onRightEdge, bool& onLeftEdge
     return -1;
 }
 
+std::int64_t PlaylistComponent::snapLine (double tick) const
+{
+    // the grid line nearest to `tick` (FL's ruler click, round 169d); "Nearest" (clip edges) as snap() does
+    const auto& option = grid::resolve (snapBox);
+    if (option.kind == grid::Kind::nearest)
+        return snap (tick, true);
+    const auto step = gridTicks();
+    if (step == (std::int64_t) ppq * juce::jmax (1, engine.getSong().beatsPerBar)) // (whole bars: time signatures)
+    {
+        const auto b = engine.getSong().barAt ((std::int64_t) std::max (0.0, std::floor (tick)));
+        return tick - (double) b.tick >= (double) b.length * 0.5 ? b.tick + b.length : b.tick;
+    }
+    return noteedit::snapRound (tick, step);
+}
+
 void PlaylistComponent::seekTo (int x, bool snapOn)
 {
-    const auto tick = juce::jmax (0.0, snapOn ? (double) snap (xToTick (x), true) : xToTick (x));
+    const auto tick = juce::jmax (0.0, snapOn ? (double) snapLine (xToTick (x)) : xToTick (x));
 
     if (engine.getSong().mode != PlayMode::song)
         engine.editSong ([] (Song& s) { s.mode = PlayMode::song; }, false);
@@ -2921,8 +2936,10 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
                 auto c = paintClip;
                 c.start = nextPaintTick;
                 c.track = yToTrack (e.y);
-                engine.editSong ([c] (Song& s) { s.playlist.push_back (c); });
                 nextPaintTick += length;
+                if (noteedit::paintWouldStack (engine.getSong().playlist, c))
+                    continue; // (FL: no copy over a clip of the same source, round 169d)
+                engine.editSong ([c] (Song& s) { s.playlist.push_back (c); });
             }
             return;
         }
