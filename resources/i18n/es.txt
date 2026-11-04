@@ -7006,3 +7006,4 @@ countries: es mx ar co cl pe ve
 "Undo left alone what someone else changed since: {0}" = "Deshacer no tocó lo que otra persona cambió desde entonces: {0}"
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Patrón: [LMB] pintarlo con el lápiz  [Ctrl+LMB] / [Shift+LMB] elegir varios  [2xLMB] abrir  [RMB] menú"
 "Empty patterns were ignored." = "Se ignoraron los patrones vacíos."
+"Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Selector de plugins: todos los generadores y efectos, las categorías como pestañas (pulsa de nuevo para cerrar)"

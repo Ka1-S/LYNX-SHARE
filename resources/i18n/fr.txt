@@ -7006,3 +7006,4 @@ countries: fr be ch ca lu
 "Undo left alone what someone else changed since: {0}" = "Annuler n'a pas touché à ce que quelqu'un d'autre a modifié depuis : {0}"
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern : [LMB] le peindre au crayon  [Ctrl+LMB] / [Shift+LMB] en choisir plusieurs  [2xLMB] ouvrir  [RMB] menu"
 "Empty patterns were ignored." = "Les patterns vides ont été ignorés."
+"Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Sélecteur de plugins : tous les générateurs et effets, les catégories en onglets (appuyez à nouveau pour fermer)"
