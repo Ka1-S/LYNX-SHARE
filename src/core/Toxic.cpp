@@ -132,6 +132,13 @@ struct Patch
 {
     std::array<float, paramCount> P {};
     std::array<Spectrum, 8> drawn {}; // wave 0 of operators 1…6 and LFOs 1/2
+    std::array<std::uint8_t, 294> link = filledLink(); // the CC link map: parameter → MIDI CC, 0xFF = none (§2.1)
+    static std::array<std::uint8_t, 294> filledLink() noexcept
+    {
+        std::array<std::uint8_t, 294> a {};
+        a.fill (0xff);
+        return a;
+    }
 };
 
 std::optional<Patch> parseState (const std::vector<std::uint8_t>& s)
@@ -152,6 +159,8 @@ std::optional<Patch> parseState (const std::vector<std::uint8_t>& s)
     for (auto& v : p.P)
         if (! std::isfinite (v))
             v = 0.0f;
+    if (s.size() >= paramsAt + 4 * paramCount + 294)
+        std::memcpy (p.link.data(), s.data() + paramsAt + 4 * paramCount, 294);
     return p;
 }
 
@@ -492,6 +501,38 @@ public:
     std::array<int, 8> cctype {}, cctgt {};
     std::array<float, 8> ccamt {};
 
+    // MIDI input and the step sequencer (round 169h, REA_rodada169h-toxic)
+    std::array<float, 128> hostVel {}; // +0x1068: velocity of each key the host holds (FUN_180007a20)
+    std::array<float, 128> cc {};      // +0x1268: the MIDI CC table (CC7 = 1, CC10 = 0.5 from the constructor)
+    float aftertouch = 0.0f;           // +0x166c (FUN_180007b00)
+    float bendSource = 0.0f;           // +0x1468: the wrapper never writes it (FUN_180007a80 has no caller)
+    std::array<std::uint8_t, 294> ccLink {};
+    bool seqOn = false;                // +0x398c (Seq Play)
+    struct Pattern                     // +0x39b8 (FUN_180040240)
+    {
+        std::array<int, 64> step {};
+        bool dual = false, pingPong = false, random = false, swing = false;
+        int steps = 16;
+    } pat;
+    struct Arp // +0x1678 (FUN_18001bb30 and its methods)
+    {
+        struct Step
+        {
+            std::array<int, 8> note {};
+            std::array<float, 8> vel {};
+        };
+        bool stopped = true, toggle = false, due = true, up = true;
+        int numSteps = 0, mode = 0, pos = -2;
+        float gain = 1.0f;
+        double rate = 1.0, swing = 0.0, phase = 0.0;
+        std::array<std::int8_t, 8> lane {};
+        std::array<Step, 64> steps {};
+        Arp() { lane.fill (-1); }
+    } arp;
+    std::uint32_t seqRng = 2222; // DAT_18009ee80 (FUN_180025ed0): process-global in FL, per instance here
+    std::vector<toxic::SeqEvent>* trace = nullptr; // (tests: the notes the engine starts and stops)
+    long long clock = 0;
+
     // run time
     std::array<double, 2> lfoph {}, lforate {};
     std::array<Voice, voiceCount> voices {};
@@ -527,9 +568,13 @@ public:
             return lfoRead (0, (double) (float) lfoph[0]);
         if (t == 3)
             return lfoRead (1, (double) (float) lfoph[1]);
-        if (t >= 7 && t < 135) // MIDI CC table: LYNX sends no CCs; the constructor's CC7 = 1, CC10 = 0.5
-            return t - 7 == 7 ? 1.0f : t - 7 == 10 ? 0.5f : 0.0f;
-        return 0.0f; // 4 and 5 (aftertouch, pitch bend): 0
+        if (t == 4)
+            return aftertouch;
+        if (t == 5)
+            return bendSource;
+        if (t >= 7 && t < 135)
+            return cc[(std::size_t) (t - 7)];
+        return 0.0f;
     }
 
     float modded (int idx, float x) const noexcept // FUN_1800413f0
@@ -641,6 +686,8 @@ public:
         }
         if (idx >= 25 && idx < 157)
             setOp (idx, x);
+        else if (idx >= 157 && idx < 227)
+            seqParam (idx, x);
         else if (idx >= 306 && idx <= 313)
             setWave (idx - 306, i32 ((double) x));
         else if (idx >= 316 && idx <= 323)
@@ -692,6 +739,13 @@ public:
     // FUN_180040ff0 + FUN_180024e80: smoothers snapped, voices reset, output gains snapped, last note forgotten
     void rateSet (double rate)
     {
+        {
+            const auto sustain = cc[64];
+            cc[64] = 0.0f;
+            for (int k = 0; k < 128; ++k)
+                noteOff (k);
+            cc[64] = sustain;
+        }
         fs = rate;
         for (int k = 0; k < kCount; ++k)
             sm[(std::size_t) k] = (float) tg[(std::size_t) k];
@@ -707,6 +761,8 @@ public:
         gL = gR = outGain();
         lastnote = -1;
         fx.setSampleRate (fs);
+        arpReset();
+        arpStop();
     }
 
     // instance as FL creates it: constructor values, the rate, then the saved state (§1.2)
@@ -719,6 +775,15 @@ public:
         rng = 22222;
         counter = 0;
         vtab = {};
+        hostVel = {};
+        cc = {};
+        cc[7] = 1.0f, cc[10] = 0.5f;
+        aftertouch = bendSource = 0.0f;
+        ccLink = p.link;
+        seqOn = false;
+        pat = Pattern {};
+        arp = Arp {};
+        seqRng = 2222;
         for (auto& v : voices)
             v.counter = 0, v.released = false;
         load (defaults());
@@ -746,15 +811,23 @@ public:
         return std::min (std::min (p, np), voiceCount);
     }
 
-    void noteOn (int key, int vel7) // FUN_180007a20 → FUN_1800250b0 / FUN_1800256a0
+    float seqRandom() noexcept // FUN_180025ed0
     {
-        const auto vel = (float) vel7 * 0.00787401572f;
+        seqRng = seqRng * 0xbb38435u + 0x3619636bu;
+        return (float) seqRng * 2.32830644e-10f;
+    }
+
+    void synthNote (int key, float vel) // vtable 0x1c8: FUN_1800250b0 / FUN_1800256a0 (velocity 0 = off)
+    {
+        if (trace != nullptr)
+            trace->push_back ({ clock, key, vel });
         vtab[(std::size_t) key] = i32 ((double) (vel * 127.0f));
         if (vel == 0.0f)
         {
-            noteOff (key);
+            synthOff (key);
             return;
         }
+        seqRandom(); // every note-on draws from the sequencer's generator
         auto start = (float) key;
         if (0.0f <= (float) lastnote)
             start = (float) lastnote;
@@ -828,7 +901,7 @@ public:
         lastnote = key;
     }
 
-    void noteOff (int key)
+    void synthOff (int key)
     {
         vtab[(std::size_t) key] = 0;
         if (poly == 0) // the voice falls back to the nearest held key
@@ -857,6 +930,355 @@ public:
                 v.released = true, v.release();
     }
 
+    // ------------------------------------------------------------------------------ host notes (round 169h)
+
+    void noteOn (int key, int vel7) // FUN_180007a20 (vtable 0x08)
+    {
+        hostVel[(std::size_t) key] = (float) vel7 * 0.00787401572f;
+        if (vel7 != 0)
+            keyDown (key);
+        else
+            keyUp (key);
+    }
+
+    void noteOff (int key) // FUN_180007a60 (vtable 0x10)
+    {
+        hostVel[(std::size_t) key] = 0.0f;
+        keyUp (key);
+    }
+
+    void keyDown (int key) // FUN_180041140 = FUN_180025f80 + the pattern rebuild
+    {
+        const auto vel = hostVel[(std::size_t) key];
+        vtab[(std::size_t) key] = i32 ((double) (vel * 127.0f));
+        if (! seqOn)
+            synthNote (key, vel);
+        rebuild();
+    }
+
+    void keyUp (int key) // FUN_180041170 = FUN_180025fe0 + the pattern rebuild
+    {
+        if (cc[64] == 0.0f) // the sustain pedal holds the voices (the sequencer still sees the key up)
+        {
+            vtab[(std::size_t) key] = 0;
+            if (! seqOn)
+                synthNote (key, 0.0f);
+        }
+        rebuild();
+    }
+
+    // every key released with the sustain pedal forced up (FUN_180025f00, FUN_180025d20 CC123, FUN_180024e80)
+    void releaseAllKeys()
+    {
+        const auto sustain = cc[64];
+        cc[64] = 0.0f;
+        for (int k = 0; k < 128; ++k)
+            noteOff (k);
+        cc[64] = sustain;
+    }
+
+    // ------------------------------------------------------------------------------ MIDI CCs (round 169h)
+
+    // a CC from the host: the wrapper (FUN_1800034b0) does not forward CC 7, 10 and 32
+    void controlChange (int number, int value7) // FUN_180007aa0 → FUN_1800411a0
+    {
+        if (number < 0 || number > 127 || number == 7 || number == 10 || number == 32)
+            return;
+        cc[(std::size_t) number] = (float) std::clamp (value7, 0, 127) * 0.00787401572f;
+        ccChanged (number);
+    }
+
+    void ccChanged (int number) // FUN_1800411a0 (CC 32, the bank select, is not modelled)
+    {
+        ccSideEffects (number);
+        if (number != 7 && number != 10 && number != 32)
+            reapplyCc(); // FUN_1800412b0 / FUN_180041320
+    }
+
+    void ccSideEffects (int number) // FUN_180025d20
+    {
+        if (number == 64)
+        {
+            if (cc[64] == 0.0f) // pedal up: the keys already let go are released now
+                for (int k = 0; k < 128; ++k)
+                    if (hostVel[(std::size_t) k] == 0.0f && vtab[(std::size_t) k] != 0)
+                        keyUp (k);
+        }
+        else if (number == 121) // reset all controllers
+        {
+            cc = {};
+            cc[7] = 1.0f, cc[10] = 0.5f;
+            for (int i = 0; i < 127; ++i)
+                if (i != 32 && i != 64 && i != 121 && i != 123)
+                    ccChanged (i);
+        }
+        else if (number == 123) // all notes off
+            releaseAllKeys();
+        else
+            for (int i = 0; i < 294; ++i) // the CC link map: a linked parameter takes the controller's value
+                if ((int) (std::int8_t) ccLink[(std::size_t) i] == number)
+                {
+                    raw[(std::size_t) i] = cc[(std::size_t) number];
+                    setParam (i, cc[(std::size_t) number]);
+                }
+    }
+
+    void channelPressure (int value7) // FUN_180007b00
+    {
+        aftertouch = (float) std::clamp (value7, 0, 127) * 0.00787401572f;
+        reapplyCc(); // FUN_1800412b0 / FUN_180041320
+    }
+
+    // ------------------------------------------------------------------------------ the step sequencer (round 169h)
+
+    void seqParam (int idx, float x) // FUN_180040240
+    {
+        if (idx >= 163)
+        {
+            pat.step[(std::size_t) (idx - 163)] = std::clamp (acb (x, -26, 24), -26, 24); // FUN_18002ecf0
+            rebuild();
+            return;
+        }
+        const auto on = 0.5f <= x;
+        switch (idx)
+        {
+            case 157: seqPlay (on); return;
+            case 158: pat.swing = on; break;
+            case 159: pat.pingPong = on; break;
+            case 160: pat.random = on; break;
+            case 161: pat.dual = on; break;
+            default: pat.steps = acb (x, 1, 64); break;
+        }
+        rebuild();
+    }
+
+    void seqPlay (bool on) // FUN_180025f00: switching lets every key go (with the old routing)
+    {
+        if (seqOn == on)
+            return;
+        releaseAllKeys();
+        seqOn = on;
+    }
+
+    void arpRelease() // FUN_18001bed0
+    {
+        for (auto& l : arp.lane)
+            if (l >= 0)
+            {
+                synthNote (l, 0.0f);
+                l = -1;
+            }
+    }
+    void arpReset() // FUN_18001bde0
+    {
+        arp.phase = 0.0;
+        arp.toggle = false;
+        arp.due = true;
+        arp.pos = -2;
+        arp.up = true;
+        arp.lane.fill (-1);
+    }
+    void arpStop() // FUN_18001c110
+    {
+        if (! arp.stopped)
+        {
+            arp.stopped = true;
+            arpRelease();
+            arpReset();
+        }
+    }
+    void arpStart() // FUN_18001c140
+    {
+        if (arp.stopped)
+        {
+            arp.stopped = false;
+            arpRelease();
+            arpReset();
+        }
+    }
+
+    // FUN_18002ed20: the pattern built from the held keys (the lowest key sets the octave and the velocity; the chord
+    // they form picks the scale the steps are read in)
+    void rebuild()
+    {
+        int low = 0;
+        while (hostVel[(std::size_t) low] == 0.0f)
+            if (++low > 127)
+            {
+                arpStop();
+                return;
+            }
+        arp.gain = std::min (std::max (hostVel[(std::size_t) low], 0.0f), 1.0f); // FUN_18001be90
+        arpStart();
+        bool pc[24] {};
+        for (int k = 0; k < 128; ++k)
+            if (hostVel[(std::size_t) k] != 0.0f)
+                pc[k % 12] = pc[k % 12 + 12] = true;
+        int type = -1, root = 0;
+        for (int k = 0; k < 12; ++k)
+            if (pc[k])
+                type = 0, root = k;
+        auto scan = [&] (std::initializer_list<int> iv, int t) {
+            for (int k = 0; k < 12; ++k)
+            {
+                bool all = pc[k];
+                for (auto i : iv)
+                    all = all && pc[k + i];
+                if (all)
+                    type = t, root = k;
+            }
+        };
+        scan ({ 3 }, 1);
+        scan ({ 4 }, 2);
+        scan ({ 3, 7 }, 1);
+        scan ({ 4, 7 }, 2);
+        scan ({ 3, 10 }, 3);
+        scan ({ 4, 10 }, 4);
+        scan ({ 3, 7, 10 }, 3);
+        scan ({ 4, 7, 10 }, 4);
+        scan ({ 3, 11 }, 5);
+        scan ({ 4, 11 }, 6);
+        scan ({ 3, 7, 11 }, 5);
+        scan ({ 4, 7, 11 }, 6);
+        scan ({ 3, 6 }, 7);
+        static constexpr std::int8_t scales[8][24] = {
+            { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 },
+            { 0, 1, 2, 3, 3, 5, 6, 7, 8, 8, 10, 10, 0, 1, 2, 3, 3, 5, 6, 7, 8, 8, 10, 10 },
+            { 0, 1, 2, 4, 4, 5, 6, 7, 9, 9, 11, 11, 0, 1, 2, 4, 4, 5, 6, 7, 9, 9, 11, 11 },
+            { 0, 1, 2, 3, 3, 5, 6, 7, 8, 10, 10, 10, -2, 1, 2, 3, 3, 5, 6, 7, 8, 10, 10, 10 },
+            { 0, 1, 2, 4, 4, 5, 6, 7, 8, 10, 10, 10, -2, 1, 2, 4, 4, 5, 6, 7, 8, 10, 10, 10 },
+            { 0, 1, 2, 3, 3, 5, 6, 7, 8, 11, 11, 11, -1, 1, 2, 3, 3, 5, 6, 7, 8, 11, 11, 11 },
+            { 0, 1, 2, 4, 4, 5, 6, 7, 8, 11, 11, 11, -1, 1, 2, 4, 4, 5, 6, 7, 8, 11, 11, 11 },
+            { 0, 1, 2, 3, 3, 5, 6, 6, 8, 8, 10, 10, 0, 1, 2, 3, 3, 5, 6, 6, 8, 8, 10, 10 },
+        };
+        const auto* T = scales[type >= 1 && type <= 7 ? type : 0];
+        for (int i = 0; i < 64; ++i)
+        {
+            auto& st = arp.steps[(std::size_t) i];
+            st.note.fill (-1);
+            st.vel.fill (1.0f);
+            st.note[0] = stepNote (pat.step[(std::size_t) i], T, root, low / 12);
+        }
+        if (pat.dual) // two lanes: step k also plays step k + 32
+        {
+            arp.numSteps = std::min (pat.steps, 32);
+            for (int k = 0; k < 32; ++k)
+            {
+                arp.steps[(std::size_t) k].note[1] = arp.steps[(std::size_t) (k + 32)].note[0];
+                arp.steps[(std::size_t) k].vel[1] = arp.steps[(std::size_t) (k + 32)].vel[0];
+            }
+        }
+        else
+            arp.numSteps = std::min (std::max (pat.steps, 1), 128); // FUN_18001be50
+        arp.mode = pat.random ? 3 : pat.pingPong ? 2 : 0;           // FUN_18001be70
+        arp.swing = pat.swing ? 0.25 : 0.0;                          // FUN_18001beb0
+    }
+
+    // a step value as a note: −26 = rest, −25 = hold, otherwise scale degree (octaves above/below the lowest key)
+    static int stepNote (int v, const std::int8_t* T, int root, int octave) noexcept
+    {
+        if (v == -26)
+            return -1;
+        if (v == -25)
+            return -2;
+        int oct = v / 12, idx = v - 12 * oct;
+        if (v < 0)
+        {
+            oct = (v + 1) / 12 - 1;
+            idx = v - 12 * oct;
+        }
+        auto note = root + (int) T[oct == 0 ? idx : 12 + idx] + (oct + octave) * 12;
+        if (note < 0)
+            note += (~note / 12) * 12 + 12;
+        if (note > 120)
+            note += (9 - ((note / 12) & 0xff)) * 12;
+        return note;
+    }
+
+    // FUN_18001bbb0, at the top of every engine chunk while Seq Play is on: a due step plays its lanes, then the clock
+    // moves on by the chunk; one step is a 16th note (15/tempo s), swing makes them 1.25 and 0.75 long in turn
+    void arpTick (int n)
+    {
+        if (arp.stopped)
+            return;
+        auto& q = arp;
+        if (q.due)
+        {
+            q.due = false;
+            const auto steps = q.numSteps;
+            if (q.mode == 0)
+            {
+                if (q.pos >= steps || q.pos < 0)
+                    q.pos = 0;
+            }
+            else if (q.mode == 1)
+            {
+                if (q.pos < 0)
+                    q.pos = steps - 1;
+            }
+            else if (q.mode == 2)
+            {
+                auto p = q.pos;
+                if (p < -1)
+                    p = 0, q.up = true;
+                else if (p < 0)
+                    p = 1, q.up = true;
+                if (steps - 1 < p)
+                    p = steps - 2, q.up = false;
+                if (p < 0)
+                    p = 0;
+                if (steps - 1 < p)
+                    p = steps - 1;
+                q.pos = p;
+            }
+            else
+            {
+                const auto r = seqRandom();
+                auto p = (int) (r * (float) steps);
+                if (p < 0)
+                    p = 0;
+                if (steps <= p)
+                    p = steps - 1;
+                q.pos = p;
+            }
+            const auto& st = q.steps[(std::size_t) std::clamp (q.pos, 0, 63)];
+            for (int l = 0; l < 8; ++l)
+            {
+                const auto note = std::min (st.note[(std::size_t) l], 127);
+                const auto vel = st.vel[(std::size_t) l] * q.gain;
+                if (note == -2)
+                    continue; // hold: the lane's note goes on
+                auto& lane = q.lane[(std::size_t) l];
+                if (lane >= 0)
+                    synthNote (lane, 0.0f);
+                lane = (std::int8_t) note;
+                if (note >= 0)
+                    synthNote (note, vel);
+            }
+            if (q.mode == 0)
+                ++q.pos;
+            else if (q.mode == 1)
+                --q.pos;
+            else if (q.mode == 2)
+                q.pos += q.up ? 1 : -1;
+        }
+        auto toggle = q.toggle;
+        const auto dur = ! toggle ? q.swing + 1.0 : 1.0 - q.swing;
+        auto ph = (double) n * ((0.066666666666666666 / q.rate * tempo) / fs) + q.phase;
+        q.phase = ph;
+        if (dur <= ph)
+        {
+            do
+            {
+                toggle = ! toggle;
+                ph -= dur;
+            } while (dur <= ph);
+            q.phase = ph;
+            q.due = true;
+            q.toggle = toggle;
+        }
+    }
+
     // a free-running LFO keeps moving while no voice plays (§1.3); when it modulates something the engine must keep
     // running between notes so the next note starts at FL's phase
     bool lfoRunning() const noexcept
@@ -874,6 +1296,8 @@ public:
 
     void process (int n, float* L, float* R) // FUN_1800406d0
     {
+        if (seqOn)
+            arpTick (n);
         const auto c = (double) (float) (4410.0 / fs);
         for (int k = 0; k < kCount; ++k)
         {
@@ -915,6 +1339,7 @@ public:
                 v.render (L, R, n);
         fx.setTempo (tempo);
         fx.process (L, R, n);
+        clock += n;
         const auto g = outGain();
         for (int i = 0; i < n; ++i)
         {
@@ -1453,7 +1878,7 @@ public:
             }
         }
         for (int key = 0; key < 128; ++key)
-            if (held[key].on && eng.vtab[(std::size_t) key] == 0
+            if (held[key].on && eng.vtab[(std::size_t) key] == 0 && eng.hostVel[(std::size_t) key] == 0.0f
                 && std::none_of (eng.voices.begin(), eng.voices.end(), [key] (const Voice& v) { return v.note == key; }))
                 held[key].on = false;
     }
@@ -1572,6 +1997,20 @@ public:
         plugin->noteOff (key);
     }
 
+    // a controller's CCs and channel pressure (round 169h): the engine's CC table feeds the MIDI page's modulation
+    // slots, the CC link map and the sustain pedal, as FL's wrapper delivers them (REA_rodada169h-toxic)
+    void midiMessage (const std::uint8_t* bytes, int size) noexcept override
+    {
+        if (bytes == nullptr || size < 2)
+            return;
+        take();
+        const auto status = bytes[0] & 0xF0;
+        if (status == 0xB0 && size >= 3)
+            plugin->eng.controlChange (bytes[1] & 127, bytes[2] & 127);
+        else if (status == 0xD0)
+            plugin->eng.channelPressure (bytes[1] & 127);
+    }
+
     // FL's PITCH knob and main pitch move the sounding notes too (round 167a)
     void setChannelPitchNow (float knob, float rest) noexcept override
     {
@@ -1639,8 +2078,8 @@ private:
     }
 
     // parameters a playing engine can take at once: everything but the waves (their tables are built off the audio
-    // thread), the effect types (they rebuild the slots' lines), the sequencer and the modulation slots
-    static bool isLive (int index) noexcept { return index >= 0 && index < 306 && index != 294 && (index < 157 || index >= 227); }
+    // thread) and the effect types (they rebuild the slots' lines)
+    static bool isLive (int index) noexcept { return index >= 0 && index < paramCount && index != 294 && (index < 306 || index >= 316); }
 
     void applyLive (int index, float x) noexcept
     {
@@ -1816,10 +2255,50 @@ const std::vector<EngineParam>& toxicParams()
         add (313, "LFO 2 wave", 0.0f, 32.0f, true);
         add (314, "FX 1 type", 0.0f, 5.0f, true);
         add (315, "FX 2 type", 0.0f, 5.0f, true);
+        // the SEQ page (round 169h; FUN_180040240): Play / Swing / Ping-pong / Random / Dual switch at 0.5, the number of
+        // steps acb(x, 1, 64), the 64 steps acb(x, −26, 24) (−26 "---" rest, −25 "SUS" hold)
+        add (157, "Seq play", 0.0f, 1.0f, true);
+        add (158, "Seq swing", 0.0f, 1.0f, true);
+        add (159, "Seq ping-pong", 0.0f, 1.0f, true);
+        add (160, "Seq random", 0.0f, 1.0f, true);
+        add (161, "Seq dual", 0.0f, 1.0f, true);
+        add (162, "Seq steps");
+        t.back().unitLow = 1, t.back().unitHigh = 64;
+        for (int i = 0; i < 64; ++i)
+        {
+            add (163 + i, "Seq step " + std::to_string (i + 1));
+            t.back().unitLow = -26, t.back().unitHigh = 24;
+            t.back().unitText = &toxicStepText;
+        }
+        // the MIDI page's eight modulation slots (§2.4): source 0…134 (FUN_1800413f0), destination 1 + parameter
+        // (0 = none), amount shown as trunc(200x − 100) (FUN_18003b1b0; the engine reads acb(x, −99, 100)/100)
+        for (int k = 0; k < 8; ++k)
+        {
+            const auto n = "Mod " + std::to_string (k + 1);
+            add (316 + k, n + " source", 0.0f, 134.0f, true);
+            add (324 + k, n + " destination", 0.0f, 294.0f, true);
+            add (332 + k, n + " amount");
+            t.back().unitLow = -100, t.back().unitHigh = 100;
+        }
         std::sort (t.begin(), t.end(), [] (const EngineParam& a, const EngineParam& b) { return a.index < b.index; });
         return t;
     }();
     return table;
+}
+
+std::string toxicStepText (int unit)
+{
+    return unit <= -26 ? "---" : unit == -25 ? "SUS" : std::to_string (unit);
+}
+
+std::string toxicModSourceName (int source)
+{
+    static const char* const fixed[] = { "---", "Velocity", "LFO 1", "LFO 2", "Aftertouch", "Pitch wheel" };
+    if (source >= 0 && source < 6)
+        return fixed[source];
+    if (source >= 7 && source < 135)
+        return "CC " + std::to_string (source - 7);
+    return "---";
 }
 
 namespace toxic
@@ -1870,6 +2349,56 @@ std::vector<float> renderReference (const std::vector<std::uint8_t>& state, cons
         n0 += ln;
     }
     return out;
+}
+std::vector<SeqEvent> sequencerEvents (const std::vector<std::uint8_t>& state, const std::vector<RefNote>& notes,
+                                       const std::vector<RefMidi>& midi, double sampleRate, int length, double bpm)
+{
+    std::vector<SeqEvent> events;
+    const auto p = parseState (state);
+    if (! p || needsDll (*p))
+        return events;
+    auto plugin = std::make_unique<Plugin>();
+    plugin->init (sampleRate, *p, builtinSpectra ({}), false);
+    plugin->eng.tempo = bpm;
+    plugin->eng.trace = &events;
+    std::vector<float> l (chunk), r (chunk);
+    for (int n0 = 0; n0 < length; n0 += chunk)
+    {
+        for (const auto& m : midi)
+            if (m.at >= n0 && m.at < n0 + chunk)
+            {
+                if (m.status == 0xB0)
+                    plugin->eng.controlChange (m.data1, m.data2);
+                else if (m.status == 0xD0)
+                    plugin->eng.channelPressure (m.data1);
+            }
+        for (const auto& nt : notes)
+        {
+            if (nt.start >= n0 && nt.start < n0 + chunk)
+                plugin->noteOn (nt.key, nt.initVol, nt.finalVol, nt.finalPan, nt.pitchCents);
+            if (nt.release >= n0 && nt.release < n0 + chunk)
+                plugin->noteOff (std::clamp (nt.key, 0, 127));
+        }
+        std::fill (l.begin(), l.end(), 0.0f);
+        std::fill (r.begin(), r.end(), 0.0f);
+        plugin->render (l.data(), r.data(), std::min (chunk, length - n0));
+    }
+    return events;
+}
+
+float modulatedParam (const std::vector<std::uint8_t>& state, const std::vector<RefMidi>& midi, int index)
+{
+    const auto p = parseState (state);
+    if (! p || index < 0 || index >= paramCount)
+        return 0.0f;
+    auto plugin = std::make_unique<Plugin>();
+    plugin->init (44100.0, *p, builtinSpectra ({}), false);
+    for (const auto& m : midi)
+        if (m.status == 0xB0)
+            plugin->eng.controlChange (m.data1, m.data2);
+        else if (m.status == 0xD0)
+            plugin->eng.channelPressure (m.data1);
+    return plugin->eng.modded (index, plugin->eng.raw[(std::size_t) index]);
 }
 } // namespace toxic
 } // namespace lynx

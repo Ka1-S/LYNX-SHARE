@@ -1,3 +1,4 @@
+#include <optional>
 #include "ui/WindowOwner.h"
 #include "core/NoteNames.h"
 #include "ui/ChannelSettings.h"
@@ -1298,6 +1299,8 @@ public:
                && holds (item.when2Param, item.when2Min, item.when2Max);
     }
 
+    int pageCount() const { return layout != nullptr ? (int) layout->pages.size() : 0; }
+
     void showPage (int p)
     {
         page = p;
@@ -1620,10 +1623,12 @@ public:
                         // a Transistor Bass step's note reads as a note name (60 = C5, FL's naming; round 168q2)
                         static const char* const noteNames[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
                         const auto whole = (int) std::lround (k->getValue());
-                        const auto text = juce::String (item.param).containsIgnoreCase ("oversampling") ? juce::String (1 << juce::jlimit (0, 8, (int) k->getValue())) + "x"
+                        const auto* units = unitParam (*k); // (round 169h: a 0…1 number box in whole units)
+                        const auto text = units != nullptr ? juce::String (units->unitString (units->unitOf ((float) k->getValue())))
+                                        : juce::String (item.param).containsIgnoreCase ("oversampling") ? juce::String (1 << juce::jlimit (0, 8, (int) k->getValue())) + "x"
                                         : juce::String (item.param).endsWith (" note") ? juce::String (noteNames[((whole % 12) + 12) % 12]) + juce::String (whole / 12)
                                                                                        : juce::String (whole);
-                        g.drawText (text, box.withTrimmedRight (8.0f * f), juce::Justification::centred, false);
+                        g.drawFittedText (text, box.withTrimmedRight (8.0f * f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
                         g.setColour (colour::textSecondary);
                         g.drawText (juce::String::fromUTF8 ("\xe2\x96\xb4"), box.withTrimmedLeft (box.getWidth() - 10.0f * f).withHeight (box.getHeight() * 0.5f), juce::Justification::centred, false);
                         g.drawText (juce::String::fromUTF8 ("\xe2\x96\xbe"), box.withTrimmedLeft (box.getWidth() - 10.0f * f).withTrimmedTop (box.getHeight() * 0.5f), juce::Justification::centred, false);
@@ -1901,8 +1906,51 @@ public:
         }
     }
 
+    // a stepper's number moves one unit (the engine's own units for a 0…1 number box, round 169h)
+    const EngineParam* unitParam (const juce::Slider& k) const
+    {
+        const auto* p = modelparams::findByName (instrumentKind, k.getName().toStdString());
+        return p != nullptr && p->hasUnits() ? p : nullptr;
+    }
+    void stepBy (juce::Slider& k, int delta)
+    {
+        if (const auto* p = unitParam (k))
+            k.setValue (p->rawOfUnit (p->unitOf ((float) k.getValue()) + delta), juce::sendNotificationSync);
+        else
+            k.setValue (k.getValue() + delta, juce::sendNotificationSync);
+    }
+
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
+    {
+        if (layout != nullptr && wheel.deltaY != 0.0f)
+            for (const auto& item : layout->items)
+                if (item.type == plugui::Item::stepper && layoutRect (item).contains (e.position) && conditionHolds (item))
+                    if (auto* k = knobFor (item.param))
+                    {
+                        stepBy (*k, wheel.deltaY > 0.0f ? 1 : -1);
+                        repaint();
+                        return;
+                    }
+        juce::Component::mouseWheelMove (e, wheel);
+    }
+
     void mouseDrag (const juce::MouseEvent& e) override
     {
+        if (stepperDrag != nullptr)
+        {
+            if (auto* k = knobFor (stepperDrag->param))
+            {
+                const auto pixels = 6.0f * layoutFactor();
+                const auto units = (int) ((stepperDragY - e.position.y) / pixels);
+                if (units != stepperDragged)
+                {
+                    stepBy (*k, units - stepperDragged);
+                    stepperDragged = units;
+                    repaint();
+                }
+            }
+            return;
+        }
         if (xyItem == nullptr)
             return;
         const auto r = layoutRect (*xyItem);
@@ -1913,7 +1961,11 @@ public:
         repaint();
     }
 
-    void mouseUp (const juce::MouseEvent&) override { xyItem = nullptr; }
+    void mouseUp (const juce::MouseEvent&) override
+    {
+        xyItem = nullptr;
+        stepperDrag = nullptr;
+    }
 
     void mouseDown (const juce::MouseEvent& e) override
     {
@@ -1994,7 +2046,10 @@ public:
             {
                 const auto r = layoutRect (item);
                 const auto up = e.position.y < r.getY() + (item.label != nullptr ? 12.0f * layoutFactor() : 0.0f) + (r.getHeight() - (item.label != nullptr ? 12.0f * layoutFactor() : 0.0f)) * 0.5f;
-                k->setValue (k->getValue() + (up ? 1.0 : -1.0), juce::sendNotificationSync);
+                stepBy (*k, up ? 1 : -1);
+                stepperDrag = &item; // (round 169h) a vertical drag moves the number too
+                stepperDragY = e.position.y;
+                stepperDragged = 0;
             }
             else if (item.type == plugui::Item::toggle)
                 setNormalised (*k, normalised (*k) >= 0.5f ? 0.0f : 1.0f);
@@ -2532,6 +2587,9 @@ private:
     const plugui::Layout* layout = nullptr;
     const modelparams::Table* modelTable = nullptr; // the engine's listed parameters (round 168n)
     InstrumentKind instrumentKind = InstrumentKind::synth;
+    const plugui::LayoutItem* stepperDrag = nullptr; // (round 169h)
+    float stepperDragY = 0.0f;
+    int stepperDragged = 0;
     int page = 0; // the layout's page shown (pageTabs items switch it; round 168n)
     const plugui::LayoutItem* xyItem = nullptr; // the pad being dragged
     juce::TextButton sampleButton; // (a Granulizer node: round 165c)
@@ -4653,7 +4711,7 @@ private:
     {
         const auto& all = list();
         const auto count = (int) all.size();
-        // FL's next index; a preset LYNX can't read (e.g. Ogun's oldest state format) is passed over in the same
+        // FL's next index; a preset LYNX can't read (an unknown or damaged state) is passed over in the same
         // direction, so the arrows keep going
         auto at = presetcycle::step (current, delta, count);
         for (int tries = 0; at >= 0 && tries < count; ++tries)
@@ -5032,6 +5090,14 @@ std::unique_ptr<juce::Component> makeInstrumentPage (AudioEngine& engine, const 
     return nullptr;
 }
 
+// Where "Align all channel editors" put every channel editor (FL stores it per channel, so editors opened later come
+// up there too); empty = centred, as before.
+std::optional<juce::Point<int>>& alignedChannelEditorPosition()
+{
+    static std::optional<juce::Point<int>> at;
+    return at;
+}
+
 class SettingsWindow final : public juce::DocumentWindow
 {
 public:
@@ -5062,6 +5128,9 @@ public:
             setContentOwned (makeChannelFrame (engine, channel).release(), true);
 
         centreWithSize (getWidth(), getHeight());
+        if (! modulation)
+            if (const auto& at = alignedChannelEditorPosition(); at.has_value())
+                setTopLeftPosition (*at); // "Align all channel editors" set every channel's place (round 169k)
         setVisible (true);
         keepAboveMainWindow (*this);
     }
@@ -5105,6 +5174,31 @@ void openWindow (AudioEngine& engine, int channel, bool modulation)
     windows().push_back (std::make_unique<SettingsWindow> (engine, channel, modulation));
 }
 } // namespace
+
+void alignAllChannelEditors (int selectedChannel)
+{
+    // FL's AlignAllChannelEditorsAction (FUN_012317c0, REA_rodada169k §2.4): the focused channel editor (else the
+    // selected channel's, else the first open one) gives the place; every channel editor goes there.
+    auto& open = windows();
+    SettingsWindow* reference = nullptr;
+    for (auto& w : open)
+        if (! w->isModulation() && w->isActiveWindow())
+            reference = w.get();
+    for (auto& w : open)
+        if (reference == nullptr && ! w->isModulation() && w->getChannel() == selectedChannel)
+            reference = w.get();
+    for (auto& w : open)
+        if (reference == nullptr && ! w->isModulation())
+            reference = w.get();
+    if (reference == nullptr)
+        return;
+    const auto at = reference->getPosition();
+    alignedChannelEditorPosition() = at;
+    for (auto& w : open)
+        if (! w->isModulation())
+            w->setTopLeftPosition (at);
+    reference->toFront (true);
+}
 
 void openChannelSettings (AudioEngine& engine, int channel)
 {
@@ -5201,6 +5295,21 @@ std::unique_ptr<juce::Component> makeChannelModulationPanel (AudioEngine& engine
 std::unique_ptr<juce::Component> makeChannelPrecomputePanel (AudioEngine& engine, int channel)
 {
     return std::make_unique<PrecomputePanel> (engine, ChannelRef::rack (channel));
+}
+
+int showChannelLayoutPage (juce::Component& frame, int page)
+{
+    if (auto* panel = dynamic_cast<ModelPanel*> (&frame); panel != nullptr && panel->pageCount() > 0)
+    {
+        const auto count = panel->pageCount();
+        if (page >= 0 && page < count)
+            panel->showPage (page);
+        return count;
+    }
+    for (auto* child : frame.getChildren())
+        if (const auto count = showChannelLayoutPage (*child, page); count > 0)
+            return count;
+    return 0;
 }
 
 std::unique_ptr<juce::Component> makeChannelFrame (AudioEngine& engine, int channel, int tab)

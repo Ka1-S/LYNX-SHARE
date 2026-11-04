@@ -7063,6 +7063,7 @@ countries: ru by kz
 "Animate the plugin art (falling petals, glows; Themed style)" = "Анимировать оформление плагинов (падающие лепестки, свечение; стиль «Тематический»)"
 "click to step, drag or mouse wheel to change" = "щелчок — следующее значение, перетаскивание или колесо мыши — изменить"
 "no effect with the current mode (another engine is in use)" = "не действует в текущем режиме (используется другой движок)"
+"arrows step, click for the list, drag or mouse wheel to change" = "стрелки — шаг, щелчок — список значений, перетаскивание или колесо мыши — изменить"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Основная: {0}"
@@ -7081,3 +7082,25 @@ countries: ru by kz
 "Playlist snap" = "Привязка Playlist"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Линейка: [LMB] позиция  [Alt] без привязки  [Ctrl][LMB], [RMB] или [2xLMB] перетаскивание выделяет ноты в диапазоне времени  [Ctrl][Wheel] / щипок масштаб  [Shift][Wheel] прокрутка"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Линейка: [LMB] позиция песни  [RMB] или [Ctrl][LMB] или [2xLMB] перетаскивание: выделение времени (цикл)  [Shift][LMB] перетаскивание: сдвиг  [Ctrl][RMB] перетаскивание, [Ctrl][Wheel] / щипок: масштаб  [RMB] щелчок: меню  [Alt] без привязки"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "Выкл. (сохранять реальное время)"
+"1/32 note" = "Нота 1/32"
+"1/16 note" = "Нота 1/16"
+"1/8 note" = "Нота 1/8"
+"1/4 note" = "Нота 1/4"
+"Notes played just before the start go onto it" = "Ноты, сыгранные чуть раньше начала, ставятся на начало"
+"Played notes: compensate the output latency" = "Сыгранные ноты: компенсировать задержку выхода"
+"Capture MIDI: the notes just played without recording into the pattern" = "Захват MIDI: только что сыгранные без записи ноты в паттерн"
+"Capture MIDI: {0} notes put in the pattern" = "Захват MIDI: {0} нот добавлено в паттерн"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "Захват MIDI: нечего захватывать (сначала сыграйте ноты без записи)"
+"Seq" = "Секв."
+"Number of steps" = "Число шагов"
+"Dual" = "Двойной"
+"Align all channel editors" = "Выровнять все редакторы каналов"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Смешивать записанные ноты: вкл. (новые ноты добавляются к нотам паттерна)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Смешивать записанные ноты: выкл. (старые ноты записанного канала заменяются)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Смешивать записанные ноты: вкл. — дубль добавляет ноты в паттерн (overdub); выкл. — старые ноты записанного канала заменяются"
+"Tempo tapper: tap the beat to set the tempo" = "Тап-темп: отстучите долю, чтобы задать темп"
+"Blend recorded notes" = "Смешивать записанные ноты"

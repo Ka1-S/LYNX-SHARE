@@ -7,6 +7,7 @@
 #include <map>
 #include <vector>
 
+#include "core/ScoreLog.h"
 #include "core/Song.h"
 
 namespace lynx
@@ -168,6 +169,47 @@ std::int64_t songNotePosition (const Song& song, std::int64_t tick, std::int64_t
 // none) the clip at the take's origin grows to that bar. Returns true when something changed.
 bool growForSongTake (Song& song, int pattern, std::int64_t origin, std::int64_t reach, const std::vector<Note>& notes);
 
+// --- live note timing and the count-in catch (round 170d, the Busy Works video: "the first chord on the downbeat after
+// the pre-count is not recorded", FL drops it too; coord/recording-research-0.1.24.md) -----------------------------------
+// The audio clock as the last audio callback left it: `tick` = the musical position the next block starts at (during a
+// count-in, before the take's start: the start minus the count-in left, as the metronome counts it), `timeMs` = when it
+// was stamped (juce::Time::getMillisecondCounterHiRes, the clock JUCE stamps MIDI input with), `ticksPerMs` at the
+// tempo then, `running` = playing or counting in.
+struct LiveClock
+{
+    double tick = 0.0, timeMs = 0.0, ticksPerMs = 0.0;
+    bool running = false;
+};
+// The musical position of an event that happened at `eventMs` (the MIDI device's own time stamp, not when the UI saw
+// it), moved back by `compensationMs`: what is heard comes out of the output that much after the clock rendered it
+// (output buffer + the driver's output latency; Pro Tools / Cubase / REAPER do the same). A stopped clock: its tick.
+double liveTickAt (const LiveClock& clock, double eventMs, double compensationMs) noexcept;
+
+// Notes played during the count-in of a take that starts at `start` (Logic keeps them at their real time, Cubase's
+// "MIDI Record Catch Range" catches the ones just before the start): a note-on at most `window` ticks before the start
+// goes onto the start (its played length kept when it is released before the start); an earlier one keeps its real
+// song position in Song mode (dropped before the song start), and in Pattern mode its place in the pattern loop, as if
+// the loop had played before (`wrap` = a whole number of pattern loops at least as long as the count-in; a note held
+// over the start then ends at the loop's end). start < 0: no count-in, nothing changes.
+struct CountInCatch
+{
+    std::int64_t start = -1;
+    std::int64_t window = 0;
+    bool songMode = true;
+    std::int64_t wrap = 0;
+    struct Moved
+    {
+        int channel = 0, key = 0;
+        double shift = 0.0; // how far its note-on was moved
+        bool wrapped = false;
+    };
+    std::vector<Moved> moved; // the notes held whose note-on was moved
+};
+// The pattern-loop wrap for a count-in of `countIn` ticks over a pattern loop of `loopLength` ticks.
+std::int64_t countInWrap (std::int64_t countIn, std::int64_t loopLength) noexcept;
+// Applies the catch to an event of the take (its tick in place); false = the event is dropped.
+bool catchEarlyNote (RecordedEvent& e, CountInCatch& c);
+
 class NoteRecorder;
 // One batch of a take's finished notes into the song, as AudioEngine::updateRecording commits it (the caller wraps it in
 // one undoable edit, which also lets the pattern's clips follow its length): quantised and committed into the current
@@ -221,4 +263,33 @@ private:
     std::map<std::pair<int, int>, Held> held; // (channel, key)
     std::vector<Note> finished;
 };
+
+// --- Capture MIDI (round 170d, LYNX's own; Ableton "Capture MIDI", Logic "Capture as Recording", Cubase "Retrospective
+// Record") ----------------------------------------------------------------------------------------------------------------
+// The score log keeps every note played (scorelog::Entry::startTick = the transport position when it was played while
+// playing, -1 when stopped; `recorded` = it went into a take). captureMidi() puts the last phrase played and not
+// recorded into the current pattern: the newest notes back to a silence longer than `gapMs` or a change of transport
+// state, only the ones newer than `afterMs`. Played while playing: where they were played, as a take would have put them
+// (NoteRecorder + commitNoteBatch); played while stopped: from the playhead's bar (Song mode, a clip placed there) or the
+// pattern start (Pattern mode) at the project tempo, the first note on that start, the timing kept. The record options'
+// quantize and overdub / replace apply. Notes still held end at `nowMs`.
+struct CaptureOptions
+{
+    double afterMs = -1.0;
+    double nowMs = 0.0;
+    double gapMs = 4000.0;
+    std::int64_t playhead = 0; // the song position of the playhead (stopped phrases, Song mode)
+    RecordMode mode = RecordMode::overdub;
+    TakeQuantize quantize;
+    bool placeClip = true;
+};
+struct CaptureResult
+{
+    int notes = 0;
+    double newestMs = -1.0; // the newest note captured (the next capture takes only newer ones)
+    bool played = false;    // they were played while the transport ran
+};
+// The phrase captureMidi() would take (oldest first; empty: nothing to capture).
+std::vector<scorelog::Entry> capturePhrase (const Song& song, const std::vector<scorelog::Entry>& log, const CaptureOptions& options);
+CaptureResult captureMidi (Song& song, const std::vector<scorelog::Entry>& log, const CaptureOptions& options);
 } // namespace lynx

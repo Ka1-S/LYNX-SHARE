@@ -184,6 +184,13 @@ public:
         bool punchLoopRegion = false;
         int preRollBars = 0;
         int postRollBars = 0;
+        // round 170d (the Busy Works video: the chord on the downbeat after the count-in was lost; Cubase's "MIDI Record
+        // Catch Range", Logic keeps count-in notes): notes played during the count-in are recorded, and a note-on at most
+        // this many ticks before the take's start goes onto the start (0 = off: they keep their real time)
+        std::int64_t catchWindow = ppq / 4;
+        // round 170d (Pro Tools / Cubase / REAPER): played notes are recorded where they were heard, moved back by the
+        // output buffer + the driver's output latency
+        bool compensateOutput = true;
     };
     // The range this recording keeps (pre-roll or punch), while one is active. UI thread.
     std::optional<PunchRange> getActivePunch() const noexcept { return activePunch; }
@@ -197,6 +204,16 @@ public:
     void resetToInitialValues() noexcept;
     bool isWaitingForInput() const noexcept { return waitingForInput.load(); }
     bool isCountingIn() const noexcept { return transport.countIn.load() > 0.0; }
+    // The audio clock the last callback left (core/Recorder.h LiveClock) and where an event played at `eventMs`
+    // (juce::Time::getMillisecondCounterHiRes) is recorded: sample-accurate against the block, minus the output
+    // latency when compensateOutput is on (round 170d). Any thread.
+    LiveClock liveClock() const noexcept;
+    double recordTickFor (double eventMs) const noexcept;
+    // The count-in catch of the take being counted in / recorded (round 170d; UI thread).
+    const CountInCatch& getCountInCatch() const noexcept { return takeCatch; }
+    // Record › Capture MIDI (round 170d, LYNX's own): the last phrase played without recording into the current pattern
+    // (core/Recorder.h captureMidi), one undo step. UI thread.
+    CaptureResult captureMidi();
 
     // Per-insert record arm: each armed insert records its own audio input (Mixer › insert › input source) into
     // its own take (arming one turns audio recording on; disarming the last one turns it off). Not saved.
@@ -243,6 +260,10 @@ public:
 
     // All notes off on every channel (double-click on Stop). UI thread.
     void panic();
+    // FL's Tools › Macros › Stop sound (Ctrl+H, round 170h2; FL64 MacroStopSoundActionExecute → FUN_011c8d10 →
+    // FUN_011c8a40 (1, 1, 1) → FUN_012b5210): all notes off on every channel and MIDI out, and every effect and
+    // plugin reset — the tails of delays and reverbs stop too. UI thread.
+    void stopSound();
 
     // Note recording (MIDI and PC keyboard) into the current pattern while playing. UI thread.
     void setRecording (bool shouldRecord);
@@ -793,6 +814,12 @@ private:
     std::atomic<int> extraLiveCount { 0 };
     void publishSelection();
     std::atomic<double> blockTimeMs { 0.0 };         // when positionTicks was last updated
+    // the live clock (round 170d): the musical position of the next block (count-in included), its tempo, and whether
+    // it runs; the output latency the played notes are moved back by
+    std::atomic<double> clockTick { 0.0 }, clockTicksPerMs { 0.0 }, outputCompensationMs { 0.0 };
+    std::atomic<bool> clockRunning { false }, compensatePlayed { true };
+    CountInCatch takeCatch; // UI thread
+    double lastCaptureMs = -1.0; // UI thread: the newest note Capture MIDI took
     std::array<std::atomic<float>, scopeSize> scope {}; // ring buffer of the output (written by audio)
     std::atomic<int> scopeWrite { 0 };
     juce::MidiDeviceListConnection midiDevicesChanged;
@@ -811,7 +838,7 @@ private:
         int channel = 0;
     };
     std::vector<NoteLock> noteLocks;
-    void logPlayedNote (int channel, int key, float velocity, bool on);
+    void logPlayedNote (int channel, int key, float velocity, bool on, double tick = -1.0, bool recorded = false);
     mutable juce::SpinLock scoreLogLock;             // MIDI thread and UI thread write, the UI reads
     scorelog::Log scoreLog;
     std::map<std::tuple<int, int, int, int, int, int>, prefs::PickupState> pickups; // (cc, channel, target) -> takeover

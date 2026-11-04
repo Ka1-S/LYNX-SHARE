@@ -83,6 +83,8 @@ std::vector<Action> makeActions()
         { "view.closePluginWindows", TR_NOOP ("Close all plugin windows"), Context::global, { chord (f12, alt) } },
         // FL's CloseAllUnfocusedWindowsAction (Ctrl+F12) and ShowTouchControllerAction (Alt+F7), round 167o
         { "view.closeUnfocusedWindows", TR_NOOP ("Close all windows except the focused one"), Context::global, { chord (f12, ctrl) } },
+        // FL's AlignAllChannelEditorsAction, ShortCut 8315 = Shift+F12 (round 169k)
+        { "view.alignChannelEditors", TR_NOOP ("Align all channel editors"), Context::global, { chord (f12, shift) } },
         { "view.touchKeyboard", TR_NOOP ("Show or hide the Touch keyboard"), Context::global, { chord (f7, alt) } },
         { "panel.maximisePlaylist", TR_NOOP ("Maximize or restore the Playlist"), Context::global, { chord (enter) } },
 
@@ -105,6 +107,7 @@ std::vector<Action> makeActions()
         { "record.countIn", TR_NOOP ("Count-in before recording on/off"), Context::global, { chord ('P', ctrl) } },
         { "record.waitForInput", TR_NOOP ("Recording waits for the first note on/off"), Context::global, { chord ('I', ctrl) } },
         { "record.quickAudio", TR_NOOP ("Record audio now: arm the selected insert and record (press again to stop)"), Context::global, { chord ('R', shift) } },
+        { "record.captureMidi", TR_NOOP ("Capture MIDI: the notes just played without recording into the pattern"), Context::global, { chord ('R', ctrl | shift | alt) } },
 
         // files and history
         { "file.new", TR_NOOP ("New project"), Context::global, { chord ('N', ctrl) } },
@@ -125,7 +128,10 @@ std::vector<Action> makeActions()
         // FL's Edit › "Undo backwards" (EditUndoBackwardsAction, Ctrl+Alt+Z; round 167k): one more step back
         { "edit.undoBackwards", TR_NOOP ("Undo backwards"), Context::global, { chord ('Z', ctrl | alt) } },
         { "edit.redo", TR_NOOP ("Redo"), Context::global, { chord ('Y', ctrl), chord ('Z', ctrl | shift) } },
-        { "edit.history", TR_NOOP ("Undo history"), Context::global, { chord ('H', ctrl) } },
+        // FL's Tools › Macros › Stop sound (MacroStopSoundAction, Ctrl+H; round 170h2): the Undo history moved to
+        // Ctrl+Alt+H, free in FL and in LYNX
+        { "edit.history", TR_NOOP ("Undo history"), Context::global, { chord ('H', ctrl | alt) } },
+        { "tools.stopSound", TR_NOOP ("Stop sound (all notes off)"), Context::global, { chord ('H', ctrl) } },
         { "help.shortcuts", TR_NOOP ("Shortcut sheet (press again to close)"), Context::global, { chord (f1) } },
         { "browser.search", TR_NOOP ("Search the Browser"), Context::global, { chord ('F', ctrl) } },
 

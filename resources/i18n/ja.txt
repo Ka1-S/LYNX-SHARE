@@ -7063,6 +7063,7 @@ countries: jp
 "Animate the plugin art (falling petals, glows; Themed style)" = "プラグインのアートをアニメーション（舞い散る花びら、光；テーマスタイル）"
 "click to step, drag or mouse wheel to change" = "クリックで切り替え、ドラッグまたはマウスホイールで変更"
 "no effect with the current mode (another engine is in use)" = "現在のモードでは効果なし（別のエンジンを使用中）"
+"arrows step, click for the list, drag or mouse wheel to change" = "矢印で1段ずつ、クリックで一覧、ドラッグまたはマウスホイールで変更"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "メイン: {0}"
@@ -7081,3 +7082,25 @@ countries: jp
 "Playlist snap" = "プレイリストのスナップ"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "ルーラー: [LMB] 位置  [Alt] スナップなし  [Ctrl][LMB]、[RMB] または [2xLMB] ドラッグで時間範囲内のノートを選択  [Ctrl][Wheel] / ピンチ ズーム  [Shift][Wheel] スクロール"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "ルーラー: [LMB] ソングの位置  [RMB] または [Ctrl][LMB] または [2xLMB] ドラッグ: 時間選択 (ループ)  [Shift][LMB] ドラッグ: 移動  [Ctrl][RMB] ドラッグ, [Ctrl][Wheel] / ピンチ: ズーム  [RMB] クリック: メニュー  [Alt] スナップなし"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "オフ（実際のタイミングを保持）"
+"1/32 note" = "32分音符"
+"1/16 note" = "16分音符"
+"1/8 note" = "8分音符"
+"1/4 note" = "4分音符"
+"Notes played just before the start go onto it" = "開始直前に弾いたノートを開始位置に置く"
+"Played notes: compensate the output latency" = "演奏したノート：出力レイテンシーを補正"
+"Capture MIDI: the notes just played without recording into the pattern" = "MIDIキャプチャ：録音せずに弾いたばかりのノートをパターンへ"
+"Capture MIDI: {0} notes put in the pattern" = "MIDIキャプチャ：{0} 個のノートをパターンに配置"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "MIDIキャプチャ：キャプチャするものがありません（まず録音せずにノートを弾いてください）"
+"Seq" = "シーケンス"
+"Number of steps" = "ステップ数"
+"Dual" = "デュアル"
+"Align all channel editors" = "すべてのチャンネルエディターを揃える"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "録音ノートをブレンド: オン (新しいノートをパターンのノートに追加)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "録音ノートをブレンド: オフ (録音したチャンネルの古いノートを置き換え)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "録音ノートをブレンド: オンでテイクのノートをパターンに追加 (オーバーダブ)、オフで録音したチャンネルの古いノートを置き換えます"
+"Tempo tapper: tap the beat to set the tempo" = "テンポタッパー: ビートをタップしてテンポを設定"
+"Blend recorded notes" = "録音ノートをブレンド"

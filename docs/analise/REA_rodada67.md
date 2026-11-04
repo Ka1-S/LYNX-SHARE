@@ -344,7 +344,8 @@ modulation ±16, Q `4(1 − f) + 0.5`, envelope decay `((1000f²)f² + 1)·10⁻
 - **Notes** (`FUN_180034e00`, `FUN_180005fa0`): the wrapper turns Init.Vol into a MIDI velocity
   `trunc(127·ln(10·v + 1)/ln 21)`; velocity 0 is a note-off (it only stops a running pattern). Every unmuted pad
   whose Key equals the note plays (Solo: only soloed pads); a hit chokes the other pads of its cut group. Final.Vol
-  scales the pad's target gains (`keyL = keyR`), **Final.Pan is ignored**, Final.Pitch − 100·(key − 60) gives the
+  scales the pad's target gains (`keyL = keyR`), **Final.Pan is ignored** (*round 169l: wrong — an artefact of this harness's
+  ComputeLRVol stand-in `L = R = vol`; FL's law A gives `Vol·cos/sin((1 + pan)π/4)`, REA_rodada169l §1*), Final.Pitch − 100·(key − 60) gives the
   semitone offset. A note equal to a pattern's trigger key starts that pattern (not modelled, §9).
 - **Master** (`FUN_180035840`, `FUN_180033910`): the 16 pads mix into an 8-band EQ (80·2^k Hz, Q 2, band 0 a low
   shelf, band 7 a high shelf, the others peaks; processed band 7 down to band 0, per channel), then the limiter (gain,

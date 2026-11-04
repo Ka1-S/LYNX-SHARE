@@ -7063,6 +7063,7 @@ countries: tr
 "Animate the plugin art (falling petals, glows; Themed style)" = "Eklenti çizimini canlandır (düşen yapraklar, parıltılar; Temalı stil)"
 "click to step, drag or mouse wheel to change" = "adım için tıklayın, değiştirmek için sürükleyin veya fare tekerleğini kullanın"
 "no effect with the current mode (another engine is in use)" = "geçerli modda etkisiz (başka bir motor kullanılıyor)"
+"arrows step, click for the list, drag or mouse wheel to change" = "oklar bir adım ilerletir, liste için tıklayın, değiştirmek için sürükleyin veya fare tekerleğini kullanın"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Ana: {0}"
@@ -7081,3 +7082,25 @@ countries: tr
 "Playlist snap" = "Playlist snap'i"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Cetvel: [LMB] konum  [Alt] snap yok  [Ctrl][LMB], [RMB] veya [2xLMB] sürükle bir zaman aralığındaki notaları seçer  [Ctrl][Wheel] / kıstırma zoom  [Shift][Wheel] kaydır"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Cetvel: [LMB] şarkı konumu  [RMB] veya [Ctrl][LMB] veya [2xLMB] sürükle: zaman seçimi (döngü)  [Shift][LMB] sürükle: taşı  [Ctrl][RMB] sürükle, [Ctrl][Wheel] / kıstırma: zoom  [RMB] tıkla: menü  [Alt] snap yok"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "Kapalı (gerçek zamanlarını koru)"
+"1/32 note" = "1/32 nota"
+"1/16 note" = "1/16 nota"
+"1/8 note" = "1/8 nota"
+"1/4 note" = "1/4 nota"
+"Notes played just before the start go onto it" = "Başlangıçtan hemen önce çalınan notalar başlangıca gider"
+"Played notes: compensate the output latency" = "Çalınan notalar: çıkış gecikmesini telafi et"
+"Capture MIDI: the notes just played without recording into the pattern" = "MIDI yakala: kayıt yapmadan az önce çalınan notalar pattern'e"
+"Capture MIDI: {0} notes put in the pattern" = "MIDI yakala: pattern'e {0} nota kondu"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "MIDI yakala: yakalanacak bir şey yok (önce kayıt yapmadan birkaç nota çalın)"
+"Seq" = "Sek"
+"Number of steps" = "Adım sayısı"
+"Dual" = "Çift"
+"Align all channel editors" = "Tüm kanal düzenleyicilerini hizala"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Kaydedilen notaları harmanla: açık (yeni notalar pattern'deki notalara eklenir)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Kaydedilen notaları harmanla: kapalı (kaydedilen kanalın eski notaları değiştirilir)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Kaydedilen notaları harmanla: açıkken bir kayıt notalarını pattern'e ekler (overdub); kapalıyken kaydedilen kanalın eski notaları değiştirilir"
+"Tempo tapper: tap the beat to set the tempo" = "Tempo tıklayıcı: tempoyu ayarlamak için vuruşa dokunun"
+"Blend recorded notes" = "Kaydedilen notaları harmanla"

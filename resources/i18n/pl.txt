@@ -7063,6 +7063,7 @@ countries: pl
 "Animate the plugin art (falling petals, glows; Themed style)" = "Animuj grafikę wtyczek (spadające płatki, poświata; styl Tematyczny)"
 "click to step, drag or mouse wheel to change" = "kliknij, aby przejść dalej, przeciągnij lub użyj kółka myszy, aby zmienić"
 "no effect with the current mode (another engine is in use)" = "bez efektu w bieżącym trybie (używany jest inny silnik)"
+"arrows step, click for the list, drag or mouse wheel to change" = "strzałki przechodzą o krok, kliknij, aby zobaczyć listę, przeciągnij lub użyj kółka myszy, aby zmienić"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Główna: {0}"
@@ -7081,3 +7082,25 @@ countries: pl
 "Playlist snap" = "Przyciąganie Playlist"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Linijka: [LMB] pozycja  [Alt] bez przyciągania  [Ctrl][LMB], [RMB] lub [2xLMB] przeciągnij zaznacza nuty w zakresie czasu  [Ctrl][Wheel] / szczypnięcie zoom  [Shift][Wheel] przewijanie"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Linijka: [LMB] pozycja utworu  [RMB] lub [Ctrl][LMB] lub [2xLMB] przeciągnij: zaznaczenie czasu (pętla)  [Shift][LMB] przeciągnij: przesuń je  [Ctrl][RMB] przeciągnij, [Ctrl][Wheel] / szczypnięcie: zoom  [RMB] kliknięcie: menu  [Alt] bez przyciągania"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "Wył. (zachowaj rzeczywisty czas)"
+"1/32 note" = "Nuta 1/32"
+"1/16 note" = "Nuta 1/16"
+"1/8 note" = "Nuta 1/8"
+"1/4 note" = "Nuta 1/4"
+"Notes played just before the start go onto it" = "Nuty zagrane tuż przed startem trafiają na start"
+"Played notes: compensate the output latency" = "Zagrane nuty: kompensuj opóźnienie wyjścia"
+"Capture MIDI: the notes just played without recording into the pattern" = "Przechwyć MIDI: nuty zagrane przed chwilą bez nagrywania do patternu"
+"Capture MIDI: {0} notes put in the pattern" = "Przechwyć MIDI: {0} nut wstawionych do patternu"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "Przechwyć MIDI: nie ma czego przechwycić (najpierw zagraj kilka nut bez nagrywania)"
+"Seq" = "Sekw."
+"Number of steps" = "Liczba kroków"
+"Dual" = "Podwójny"
+"Align all channel editors" = "Wyrównaj wszystkie edytory kanałów"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Łącz nagrane nuty: wł. (nowe nuty dochodzą do nut patternu)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Łącz nagrane nuty: wył. (stare nuty nagranego kanału są zastępowane)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Łącz nagrane nuty: wł. — nagranie dodaje nuty do patternu (overdub); wył. — stare nuty nagranego kanału są zastępowane"
+"Tempo tapper: tap the beat to set the tempo" = "Tap tempo: wystukaj rytm, aby ustawić tempo"
+"Blend recorded notes" = "Łącz nagrane nuty"
