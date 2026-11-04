@@ -6561,6 +6561,7 @@ private:
     {
         folder.createDirectory();
         auto ok = true;
+        juce::String titles ("editor\tsize\twidth\tname width at the style's size\tbox\tsize used\tlines\tresult\n");
         for (const auto& p : artPilots())
         {
             artPilotStyle (p, before ? "before" : "after");
@@ -6573,13 +6574,32 @@ private:
                 continue;
             }
             if (p.effectKind == lynx::EffectKind::facetEq) lynx::tickFacetEqEditor (*editor);
+            // round 170k2: titles.tsv, how the header's name fitted (its width at the style's size, the box, the size used)
+            auto fit = [&] (const juce::String& at) {
+                const auto f = lynx::skin::lastTitleFit();
+                if (f.have <= 0.0f) return; // no plugin header drawn (a generator's channel window)
+                titles << juce::String (p.file) << "\t" << at << "\t" << editor->getWidth() << "\t" << juce::String (f.need, 1) << "\t" << juce::String (f.have, 1)
+                       << "\t" << juce::String (f.size, 1) << "\t" << f.lines << "\t" << (f.clipped ? "ELLIPSIS" : "full") << "\n";
+            };
             for (const auto scale : { 1.0f, 2.0f })
             {
                 const auto file = folder.getChildFile (juce::String (p.file) + "-" + (before ? "before" : "after") + "-" + juce::String (juce::roundToInt (scale * 100)) + ".png");
+                lynx::skin::resetTitleFit();
                 savePng (editor->createComponentSnapshot (editor->getLocalBounds(), true, scale), file.getFullPathName());
                 std::printf ("%s %dx%d\n", file.getFullPathName().toRawUTF8(), editor->getWidth(), editor->getHeight());
+                if (scale == 1.0f) fit ("100");
+            }
+            // ... and at the smallest size its window allows (effect panels; the Pro editors scale as a whole)
+            if (const auto smallest = lynx::nativeEditorMinimumSize (*editor); smallest.x > 0)
+            {
+                editor->setSize (smallest.x, smallest.y);
+                const auto file = folder.getChildFile (juce::String (p.file) + "-" + (before ? "before" : "after") + "-min.png");
+                lynx::skin::resetTitleFit();
+                savePng (editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f), file.getFullPathName());
+                fit ("min");
             }
         }
+        folder.getChildFile (juce::String ("titles-") + (before ? "before" : "after") + ".tsv").replaceWithText (titles);
         lynx::skin::setForcedStyle (-1);
         return ok;
     }

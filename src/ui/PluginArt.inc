@@ -1028,6 +1028,31 @@ juce::String artSelfTest()
         }
         expect (! layer.animating(), "a layer off screen never animates");
     }
+    { // round 170k2: a plugin's name always fits its header box: every effect's name, every style, in the narrowest box
+      // titleMinWidth promises (what the effect windows' minimum width is built from) draws whole, no ellipsis
+        juce::Image img (juce::Image::ARGB, 600, 26, true);
+        juce::Graphics g (img);
+        auto clipped = 0, twoLines = 0;
+        for (const auto st : { Style::glow, Style::neon, Style::hardware, Style::vivid })
+        {
+            const StyleScope scope (st);
+            for (int k = 0; k <= (int) lastEffectKind; ++k)
+            {
+                const auto* raw = effectInfo ((EffectKind) k).name;
+                const auto name = raw != nullptr ? juce::String::fromUTF8 (raw) : juce::String();
+                if (name.isEmpty()) continue;
+                titleText (g, { 66.0f, 0.0f, titleMinWidth (name, 26.0f), 26.0f }, name, juce::Colours::red);
+                clipped += lastTitleFit().clipped ? 1 : 0;
+                twoLines += lastTitleFit().lines == 2 ? 1 : 0;
+            }
+        }
+        expect (clipped == 0, "a plugin name clipped in its narrowest header box");
+        expect (twoLines > 0, "the Fruity prefix line");
+        titleText (g, { 66.0f, 0.0f, 400.0f, 26.0f }, "Fruity Blood Overdrive", juce::Colours::red);
+        expect (lastTitleFit().lines == 1 && ! lastTitleFit().clipped && lastTitleFit().size >= 12.0f, "a wide box keeps the one-line name");
+        titleText (g, { 66.0f, 0.0f, 120.0f, 26.0f }, "Fruity Blood Overdrive", juce::Colours::red);
+        expect (lastTitleFit().lines == 2 && ! lastTitleFit().clipped, "a narrow box puts Fruity above the name");
+    }
     setArtMotion (keptMotion);
     return errors.isEmpty() ? juce::String ("OK") : "ERROR " + errors.joinIntoString (", ");
 }

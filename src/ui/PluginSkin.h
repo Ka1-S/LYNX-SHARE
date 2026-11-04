@@ -61,6 +61,18 @@ void headerBar (juce::Graphics&, juce::Rectangle<float> area, juce::Colour accen
 void brandMark (juce::Graphics&, juce::Rectangle<float> area);
 // the plugin's name in the header (bold, with a short accent underline); returns the width used
 float titleText (juce::Graphics&, juce::Rectangle<float> area, const juce::String& name, juce::Colour accent, bool underline = true);
+// round 170k2: the name always fits its box: the style's size, then smaller (down to 10 px), then "Fruity" on a small
+// line above the rest; an ellipsis only when even that cannot fit. titleMinWidth: the narrowest box that still shows
+// the whole name (in the current style, for a header this high). lastTitleFit: what the last titleText did (shots).
+float titleMinWidth (const juce::String& name, float height);
+struct TitleFit
+{
+    float need = 0.0f, have = 0.0f, size = 0.0f; // the name's width at the style's size, the box's width, the size used
+    int lines = 1;
+    bool clipped = false;                         // drawn with an ellipsis
+};
+TitleFit lastTitleFit();
+void resetTitleFit();
 // one line of text in the current gradient (or image) fill, drawn as its glyph outlines; the empty outlines (spaces)
 // are left out (round 170c: JUCE 8.0.4's CoreGraphics renderer took an empty outline as "no clip" and flooded the
 // whole component with the gradient, Facet EQ's blank pink window on macOS, issue #11). A plain colour fill draws
