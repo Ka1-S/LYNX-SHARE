@@ -10,7 +10,7 @@
 // the moving parts live in skin::ArtLayer (below), which repaints only small areas at ≤ 30 Hz while it is shown.
 // Included by PluginSkin.cpp (it shares that file's helpers).
 
-namespace art
+namespace artkit
 {
 using juce::Colour;
 using juce::ColourGradient;
@@ -295,10 +295,11 @@ inline void canvasSakura (juce::Graphics& g, Rectangle<float> a, bool display)
     g.fillRect (a);
     const auto moonC = Point<float> (a.getX() + a.getWidth() * 0.47f, a.getY() + a.getHeight() * 0.115f);
     const auto moonR = juce::jmin (a.getWidth(), a.getHeight()) * 0.07f;
-    if (! reduced) bloom (g, moonC, moonR * 4.0f, Colour (0xffffe3ea), 0.22f);
+    if (! reduced) bloom (g, moonC, moonR * 4.0f, Colour (0xffffe3ea), 0.15f);
     g.setGradientFill (ColourGradient (Colour (0xfffff4f2), moonC.x - moonR * 0.4f, moonC.y - moonR * 0.4f, Colour (0xffe9c9d2), moonC.x + moonR, moonC.y + moonR, true));
-    g.setOpacity (1.0f);
+    g.setOpacity (0.78f);
     g.fillEllipse (Rectangle<float> (moonR * 2.0f, moonR * 2.0f).withCentre (moonC));
+    g.setOpacity (1.0f);
     // far hills in mist along the bottom
     for (int layer = 0; layer < 2; ++layer)
     {
@@ -409,8 +410,14 @@ inline void canvasSytrus (juce::Graphics& g, Rectangle<float> a, bool display)
         juce::Path orbit;
         orbit.addEllipse (Rectangle<float> (R * 2.0f, R * 0.62f).withCentre ({ 0.0f, 0.0f }));
         orbit.applyTransform (juce::AffineTransform::rotation (juce::MathConstants<float>::pi * (float) i / 6.0f).translated (c.x, c.y));
-        g.setColour ((i % 2 == 0 ? p.accent : p.accent2).withAlpha (0.10f));
-        g.strokePath (orbit, juce::PathStrokeType (1.2f));
+        g.setColour ((i % 2 == 0 ? p.accent : p.accent2).withAlpha (0.22f));
+        g.strokePath (orbit, juce::PathStrokeType (1.3f));
+        // an operator riding each orbit
+        const auto ang = 0.9f + 1.7f * (float) i;
+        const Point<float> op = c + Point<float> (std::cos (ang) * R, std::sin (ang) * R * 0.31f).rotatedAboutOrigin (juce::MathConstants<float>::pi * (float) i / 6.0f);
+        if (! reduced) bloom (g, op, 9.0f, i % 2 == 0 ? p.accent : p.accent2, 0.5f);
+        g.setColour (Colours::white.withAlpha (0.8f));
+        g.fillEllipse (Rectangle<float> (3.0f, 3.0f).withCentre (op));
     }
     // FM figures: a few lissajous curves fading across the panel
     for (int i = 0; i < 3; ++i)
@@ -418,7 +425,7 @@ inline void canvasSytrus (juce::Graphics& g, Rectangle<float> a, bool display)
         juce::Path l;
         lissajous (l, { a.getX() + a.getWidth() * (0.2f + 0.3f * (float) i), a.getY() + a.getHeight() * 0.55f }, a.getWidth() * 0.16f, a.getHeight() * 0.3f,
                    (float) (2 + i), (float) (3 + i), 0.6f * (float) i);
-        g.setColour ((i == 1 ? p.accent2 : p.accent).withAlpha (0.045f));
+        g.setColour ((i == 1 ? p.accent2 : p.accent).withAlpha (0.07f));
         g.strokePath (l, juce::PathStrokeType (1.0f));
     }
     stars (g, a, 70, 9, 0.35f);
@@ -450,7 +457,7 @@ inline void canvasThreeOsc (juce::Graphics& g, Rectangle<float> a, bool display)
             if (i == 0) w.startNewSubPath (q);
             else w.lineTo (q);
         }
-        g.setColour (p.title.withAlpha (0.035f));
+        g.setColour (p.accent.withAlpha (0.07f));
         g.strokePath (w, juce::PathStrokeType (1.4f));
     }
     // vent slots along the bottom
@@ -951,7 +958,7 @@ inline bool valuePlate (juce::Graphics& g, Rectangle<float> r, float corner)
     g.drawRoundedRectangle (r.reduced (0.5f), corner, 1.0f);
     return true;
 }
-} // namespace art
+} // namespace artkit
 
 namespace
 {
@@ -1005,8 +1012,8 @@ Style baseStyleOf (Art a)
     }
 }
 
-juce::Colour artAccent (Art a) { return a == Art::none ? colour::crimson : art::palette (a).accent; }
-juce::Colour artAccent2 (Art a) { return a == Art::none ? colour::crimson : art::palette (a).accent2; }
+juce::Colour artAccent (Art a) { return a == Art::none ? colour::crimson : artkit::palette (a).accent; }
+juce::Colour artAccent2 (Art a) { return a == Art::none ? colour::crimson : artkit::palette (a).accent2; }
 
 const char* artName (Art a)
 {
@@ -1142,7 +1149,7 @@ bool ArtLayer::showing() const
 
 void ArtLayer::kick()
 {
-    const auto run = showing() && artMotion() && ! reduced && ! osReducedMotion() && artId != Art::facet && artId != Art::threeOsc;
+    const auto run = showing() && artMotion() && ! reduced && ! osReducedMotion() && artId != Art::facet;
     if (run && ! isTimerRunning())
     {
         lastMs = juce::Time::getMillisecondCounterHiRes();
@@ -1218,7 +1225,7 @@ void ArtLayer::timerCallback()
         }
         dirty.addWithoutMerging (impl->boundsOf (artId, m).getSmallestIntegerContainer());
     }
-    if (artId == Art::toxic || artId == Art::sytrus) // the stage glows (Toxic) or turns (Sytrus): repaint it
+    if (artId == Art::toxic || artId == Art::sytrus || artId == Art::threeOsc) // the stage glows, turns or scrolls: repaint it
         dirty.add (s.getSmallestIntegerContainer());
     dirty.consolidate();
     for (const auto& r : dirty)
@@ -1229,7 +1236,7 @@ void ArtLayer::paint (juce::Graphics& g)
 {
     if (artId == Art::none || (isActive != nullptr && ! isActive())) return;
     const StyleScope scope (Style::themed, artId);
-    const auto& p = art::palette (artId);
+    const auto& p = artkit::palette (artId);
     const auto area = getLocalBounds().toFloat();
     const auto s = stage.isEmpty() ? area : stage;
     const auto tt = (float) t;
@@ -1237,22 +1244,22 @@ void ArtLayer::paint (juce::Graphics& g)
     {
         case Art::sakura:
             for (const auto& m : impl->motes)
-                art::petal (g, { m.x, m.y }, m.size, m.rot, 0.35f + 0.65f * std::abs (std::sin (tt * 1.7f + m.phase)), p.accent2, 0.72f);
+                artkit::petal (g, { m.x, m.y }, m.size, m.rot, 0.35f + 0.65f * std::abs (std::sin (tt * 1.7f + m.phase)), p.accent2, 0.72f);
             break;
         case Art::toxic:
         {
             // the trefoil next to the name, breathing
             const auto pulse = 0.5f + 0.5f * std::sin (tt * 2.4f);
-            const auto c = Point<float> (s.getX() + s.getHeight() * 0.5f, s.getCentreY());
+            const auto c = juce::Point<float> (s.getX() + s.getHeight() * 0.5f, s.getCentreY());
             const auto r = s.getHeight() * 0.36f;
             if (! reduced) bloom (g, c, r * (2.2f + 0.5f * pulse), p.accent, 0.25f + 0.25f * pulse);
-            art::drawTrefoil (g, c, r, p.accent.interpolatedWith (Colours::white, 0.15f * pulse), 0.85f);
+            artkit::drawTrefoil (g, c, r, p.accent.interpolatedWith (juce::Colours::white, 0.15f * pulse), 0.85f);
             for (const auto& m : impl->motes)
             {
                 g.setColour (p.accent.withAlpha (0.55f));
-                g.drawEllipse (Rectangle<float> (m.size, m.size).withCentre ({ m.x, m.y }), 1.0f);
-                g.setColour (Colours::white.withAlpha (0.4f));
-                g.fillEllipse (Rectangle<float> (m.size * 0.3f, m.size * 0.3f).withCentre ({ m.x - m.size * 0.15f, m.y - m.size * 0.15f }));
+                g.drawEllipse (juce::Rectangle<float> (m.size, m.size).withCentre ({ m.x, m.y }), 1.0f);
+                g.setColour (juce::Colours::white.withAlpha (0.4f));
+                g.fillEllipse (juce::Rectangle<float> (m.size * 0.3f, m.size * 0.3f).withCentre ({ m.x - m.size * 0.15f, m.y - m.size * 0.15f }));
             }
             break;
         }
@@ -1260,20 +1267,56 @@ void ArtLayer::paint (juce::Graphics& g)
             for (const auto& m : impl->motes)
             {
                 const auto tw = 0.5f + 0.5f * std::sin (tt * (1.2f + m.spin) + m.phase);
-                if (! reduced) bloom (g, { m.x, m.y }, m.size * 4.0f, p.accent2.interpolatedWith (Colours::white, 0.5f), 0.25f * tw);
-                g.setColour (Colours::white.withAlpha (0.25f + 0.7f * tw));
-                g.fillEllipse (Rectangle<float> (m.size, m.size).withCentre ({ m.x, m.y }));
+                if (! reduced) bloom (g, { m.x, m.y }, m.size * 4.0f, p.accent2.interpolatedWith (juce::Colours::white, 0.5f), 0.25f * tw);
+                g.setColour (juce::Colours::white.withAlpha (0.25f + 0.7f * tw));
+                g.fillEllipse (juce::Rectangle<float> (m.size, m.size).withCentre ({ m.x, m.y }));
             }
             break;
         case Art::sytrus:
         {
             if (s == area) break;
             juce::Path l;
-            art::lissajous (l, s.getCentre(), s.getWidth() * 0.42f, s.getHeight() * 0.38f, 3.0f, 2.0f, tt * 0.5f, 240);
+            artkit::lissajous (l, s.getCentre(), s.getWidth() * 0.42f, s.getHeight() * 0.38f, 3.0f, 2.0f, tt * 0.5f, 240);
             g.setColour (p.accent2.withAlpha (0.18f));
             g.strokePath (l, juce::PathStrokeType (2.6f));
             g.setColour (p.accent.withAlpha (0.55f));
             g.strokePath (l, juce::PathStrokeType (1.0f));
+            break;
+        }
+        case Art::threeOsc:
+        {
+            // a little amber phosphor scope next to the name: the three oscillators' sum scrolling by
+            if (s == area) break;
+            const auto scr = s.reduced (2.0f);
+            g.setColour (juce::Colour (0xff050604));
+            g.fillRoundedRectangle (scr, 6.0f);
+            g.setColour (p.accent.withAlpha (0.10f));
+            for (int i = 1; i < 6; ++i)
+                g.drawVerticalLine ((int) (scr.getX() + scr.getWidth() * (float) i / 6.0f), scr.getY() + 3.0f, scr.getBottom() - 3.0f);
+            g.drawHorizontalLine ((int) scr.getCentreY(), scr.getX() + 3.0f, scr.getRight() - 3.0f);
+            juce::Path tr;
+            const int n = 120;
+            for (int i = 0; i <= n; ++i)
+            {
+                const auto u = (float) i / (float) n;
+                const auto ph = u * 2.0f + tt * 0.35f;
+                const auto sine = std::sin (ph * juce::MathConstants<float>::twoPi);
+                const auto saw = 1.0f - 2.0f * (ph * 2.0f - std::floor (ph * 2.0f));
+                const auto sq = std::fmod (ph * 0.5f, 1.0f) < 0.5f ? 1.0f : -1.0f;
+                const auto v = (sine * 0.5f + saw * 0.25f + sq * 0.2f) * 0.8f;
+                const juce::Point<float> q { scr.getX() + 4.0f + (scr.getWidth() - 8.0f) * u, scr.getCentreY() - v * (scr.getHeight() * 0.42f) };
+                if (i == 0) tr.startNewSubPath (q);
+                else tr.lineTo (q);
+            }
+            g.saveState();
+            g.reduceClipRegion (scr.toNearestInt());
+            g.setColour (p.accent.withAlpha (0.25f));
+            g.strokePath (tr, juce::PathStrokeType (4.0f));
+            g.setColour (p.accent2);
+            g.strokePath (tr, juce::PathStrokeType (1.3f));
+            g.restoreState();
+            g.setColour (juce::Colours::white.withAlpha (0.12f));
+            g.drawRoundedRectangle (scr, 6.0f, 1.0f);
             break;
         }
         default: break;

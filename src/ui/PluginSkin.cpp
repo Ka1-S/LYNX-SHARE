@@ -381,7 +381,7 @@ namespace
 {
 void drawCanvas (juce::Graphics& g, juce::Rectangle<float> a, juce::Colour accent, bool display)
 {
-    if (currentStyle == Style::themed) { art::canvas (g, a, accent, display); return; }
+    if (currentStyle == Style::themed) { artkit::canvas (g, a, accent, display); return; }
     if (currentStyle != Style::glow) { styles::canvas (g, a, accent, display, currentStyle); return; }
     // the deep base
     g.setGradientFill (juce::ColourGradient (display ? juce::Colour (0xff14161c) : juce::Colour (0xff1c1e26), 0.0f, a.getY(),
@@ -429,7 +429,7 @@ void backdrop (juce::Graphics& g, juce::Rectangle<float> a, juce::Colour accent)
 
 void headerBar (juce::Graphics& g, juce::Rectangle<float> a, juce::Colour accent)
 {
-    if (currentStyle == Style::themed && art::headerBar (g, a, accent)) return;
+    if (currentStyle == Style::themed && artkit::headerBar (g, a, accent)) return;
     const BaseScope base;
     if (currentStyle != Style::glow) { styles::headerBar (g, a, accent, currentStyle); return; }
     g.setGradientFill (juce::ColourGradient (juce::Colour (0xff2c2f39), 0.0f, a.getY(), juce::Colour (0xff15171c), 0.0f, a.getBottom(), false));
@@ -543,7 +543,7 @@ void powerLed (juce::Graphics& g, juce::Point<float> c, float d, bool on)
 
 void section (juce::Graphics& g, juce::Rectangle<float> a, float corner, bool raised, juce::Colour tint)
 {
-    if (currentStyle == Style::themed && art::section (g, a, corner, raised, tint)) return;
+    if (currentStyle == Style::themed && artkit::section (g, a, corner, raised, tint)) return;
     const BaseScope base;
     if (currentStyle != Style::glow) { styles::section (g, a, corner, raised, tint, currentStyle); return; }
     // glass with real depth: a soft shadow under it, a translucent body (the aurora shows through), a sheen on the
@@ -579,7 +579,7 @@ void section (juce::Graphics& g, juce::Rectangle<float> a, float corner, bool ra
 
 void sectionTitle (juce::Graphics& g, juce::Rectangle<float> strip, const juce::String& text, juce::Colour accent, float fontSize)
 {
-    if (currentStyle == Style::themed && art::sectionTitle (g, strip, text, accent, fontSize)) return;
+    if (currentStyle == Style::themed && artkit::sectionTitle (g, strip, text, accent, fontSize)) return;
     const BaseScope base;
     if (currentStyle != Style::glow) { styles::sectionTitle (g, strip, text, accent, fontSize, currentStyle); return; }
     g.setFont (juce::Font (theme::font (fontSize, true)).withExtraKerningFactor (0.1f));
@@ -610,7 +610,7 @@ void sectionTitle (juce::Graphics& g, juce::Rectangle<float> strip, const juce::
 
 void well (juce::Graphics& g, juce::Rectangle<float> a, float corner, juce::Colour glow)
 {
-    if (currentStyle == Style::themed && art::well (g, a, corner, glow)) return;
+    if (currentStyle == Style::themed && artkit::well (g, a, corner, glow)) return;
     const BaseScope base;
     if (currentStyle != Style::glow) { styles::well (g, a, corner, glow, currentStyle); return; }
     g.setGradientFill (juce::ColourGradient (juce::Colour (0xff050608), 0.0f, a.getY(), juce::Colour (0xff0f1015), 0.0f, a.getBottom(), false));
@@ -645,7 +645,7 @@ void well (juce::Graphics& g, juce::Rectangle<float> a, float corner, juce::Colo
 
 void floatingPanel (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour edge, float corner)
 {
-    if (currentStyle == Style::themed && art::floatingPanel (g, r, edge, corner)) return;
+    if (currentStyle == Style::themed && artkit::floatingPanel (g, r, edge, corner)) return;
     const BaseScope base;
     if (currentStyle != Style::glow) { styles::floatingPanel (g, r, edge, corner, currentStyle); return; }
     juce::DropShadow (juce::Colours::black.withAlpha (0.7f), 24, { 0, 8 }).drawForRectangle (g, r.toNearestInt());
@@ -694,7 +694,7 @@ void knob (juce::Graphics& g, juce::Rectangle<float> boundsIn, const KnobLook& k
 {
     // Hardware and Vivid draw their knobs a little bigger than the cell's circle (the ring sits close to the caption)
     const auto grow = currentStyle == Style::vivid ? styles::knobScaleVivid : currentStyle == Style::hardware ? styles::knobScaleHardware
-                    : currentStyle == Style::themed ? art::knobScale() : 1.0f;
+                    : currentStyle == Style::themed ? artkit::knobScale() : 1.0f;
     const auto bounds = boundsIn.withSizeKeepingCentre (boundsIn.getWidth() * grow, boundsIn.getHeight() * grow);
     const auto size = juce::jmin (bounds.getWidth(), bounds.getHeight()) - 2.0f;
     if (size <= 4.0f) return;
@@ -742,7 +742,7 @@ void drawKnobDirect (juce::Graphics& g, juce::Rectangle<float> bounds, const Kno
     const auto size = juce::jmin (bounds.getWidth(), bounds.getHeight()) - 2.0f;
     if (size <= 4.0f) return;
     const auto area = bounds.withSizeKeepingCentre (size, size);
-    if (currentStyle == Style::themed) { art::knob (g, area, k); return; }
+    if (currentStyle == Style::themed) { artkit::knob (g, area, k); return; }
     if (currentStyle == Style::neon) { styles::knobNeon (g, area, k); return; }
     if (currentStyle == Style::hardware) { styles::knobHardware (g, area, k); return; }
     if (currentStyle == Style::vivid) { styles::knobVivid (g, area, k); return; }
@@ -893,7 +893,7 @@ void drawKnobDirect (juce::Graphics& g, juce::Rectangle<float> bounds, const Kno
 void slider (juce::Graphics& g, juce::Rectangle<float> t, float value01, bool vertical, bool bipolar, juce::Colour accent, bool hot, bool enabled,
              float thumbLength, float thumbThickness)
 {
-    if (currentStyle == Style::themed && art::slider (g, t, value01, vertical, bipolar, accent, hot, enabled, thumbLength, thumbThickness)) return;
+    if (currentStyle == Style::themed && artkit::slider (g, t, value01, vertical, bipolar, accent, hot, enabled, thumbLength, thumbThickness)) return;
     const BaseScope base;
     if (currentStyle != Style::glow)
     {
@@ -965,7 +965,7 @@ void slider (juce::Graphics& g, juce::Rectangle<float> t, float value01, bool ve
 
 void button (juce::Graphics& g, juce::Rectangle<float> r, bool lit, bool hover, juce::Colour accent, float corner)
 {
-    if (currentStyle == Style::themed && art::button (g, r, lit, hover, accent, corner)) return;
+    if (currentStyle == Style::themed && artkit::button (g, r, lit, hover, accent, corner)) return;
     const BaseScope base;
     if (currentStyle != Style::glow) { styles::button (g, r, lit, hover, accent, corner, currentStyle); return; }
     if (lit)
@@ -1006,7 +1006,7 @@ void button (juce::Graphics& g, juce::Rectangle<float> r, bool lit, bool hover, 
 
 void switchPill (juce::Graphics& g, juce::Rectangle<float> box, bool on, juce::Colour accent, bool enabled)
 {
-    if (currentStyle == Style::themed && art::switchPill (g, box, on, accent, enabled)) return;
+    if (currentStyle == Style::themed && artkit::switchPill (g, box, on, accent, enabled)) return;
     const BaseScope base;
     if (currentStyle != Style::glow) { styles::switchPill (g, box, on, accent, enabled, currentStyle); return; }
     const auto c = enabled ? accent : theme::colour::textSecondary;
@@ -1038,7 +1038,7 @@ void switchPill (juce::Graphics& g, juce::Rectangle<float> box, bool on, juce::C
 
 void selector (juce::Graphics& g, juce::Rectangle<float> r, bool hover, float corner)
 {
-    if (currentStyle == Style::themed && art::selector (g, r, hover, corner)) return;
+    if (currentStyle == Style::themed && artkit::selector (g, r, hover, corner)) return;
     const BaseScope base;
     if (currentStyle != Style::glow) { styles::selector (g, r, hover, corner, currentStyle); return; }
     g.setColour (juce::Colours::black.withAlpha (0.45f));
@@ -1165,7 +1165,7 @@ void glowStroke (juce::Graphics& g, const juce::Path& p, juce::Colour c, float t
 
 void valuePlate (juce::Graphics& g, juce::Rectangle<float> r, float corner)
 {
-    if (currentStyle == Style::themed && art::valuePlate (g, r, corner)) return;
+    if (currentStyle == Style::themed && artkit::valuePlate (g, r, corner)) return;
     const BaseScope base;
     if (currentStyle != Style::glow) { styles::valuePlate (g, r, corner, currentStyle); return; }
     g.setGradientFill (juce::ColourGradient (juce::Colour (0xff040507), 0.0f, r.getY(), juce::Colour (0xff101116), 0.0f, r.getBottom(), false));
