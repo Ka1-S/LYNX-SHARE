@@ -40,12 +40,35 @@ repaints drawing only the layout items they touch (generator page and effect pan
 branch's band above the controls, 20 Hz. Static art is cached (one image per size), so idle editors cost nothing extra.
 GPU: plugin editors draw with GDI (software) since round 157a, so no GPU load.
 
+## The generators' rollout (G1–G4)
+
+Every generator with a plugin page now has a theme of its own (`src/ui/PluginArtGenerators.inc`, ids 1..33):
+- G1: Harmor, Harmless, GMS, Morphine, Ogun, PoiZone, Kepler, Kepler Exo.
+- G2: Transistor Bass, Sawer, BeepMap, FL Keys, Fruity Granulizer, Drumaxx, Drumpad, BassDrum.
+- G3: BooBass, Fruity DrumSynth Live, Fruity DX10, MiniSynth, Plucked!, SimSynth, Autogun, FL Slayer, Fruit Kick, Wasp.
+- G4 (own editors): LYNX Soundfont (its knob/toggle/selector components paint in the page's style), LYNX Synth (its
+  panel gets the plugin kit's knobs on the art's canvas), Wave Traveller (canvas + display wells).
+New framework bits: knob materials as hooks (machined, console, forged nut, brass ring, chrome dome, chicken-head
+base), `Theme::hz` (8–15 fps for slow motion), shared helpers `fillBackdrop`, `curve`. Art directions per theme: the
+tracker's plugin-art-0.1.24.md ("Generators"). Not themed on purpose (not plugin pages): Sampler / audio-clip channel
+settings, DirectWave (no editor of its own), Fruity Dance and Video Player (their picture is the content), utility
+generators (Layer, Dashboard, Voltage, VFX, MIDI Out, controllers, Patcher). Autogun's page is empty without an FL
+state (shots show only the canvas).
+
+Perf (real Windows windows, process CPU % of one core, busy machine, noisy): animated themes add about 2–6 % of a core
+while their editor is open and shown (e.g. Kepler 6.8 vs 2.9 still, GMS 6.0 vs 2.3, Harmor 4.9 vs 3.4, Ogun 8.1 vs
+3.1); still themes cost nothing extra; zero when closed/hidden, motion off, Reduced effects or Windows animations off.
+Raw: tracker/plugin-art/cpu-*.txt (gui-g, gui-g2).
+
+Tests: the self-test (`plugin_art`) checks every id has exactly one theme with a name and a canvas in its id range,
+draws every theme's canvas/section/title/knob/fader/button and moving layer, and that every generator kind with a
+plugin page has art (Sampler / Layer keep the shared style).
+
 ## Where I stopped
 
-- 2026-11-04 ~04:00: pilot done and pushed (feature/art170j + wip/art170j, merged with origin/main); Windows build
-  clean; self-test plugin_art=OK; shots + review page in /mnt/e/lynx-work/tracker/plugin-art/. NOT landed: waiting for
-  the user's approval relayed by the coordinator. Next: keep merging origin/main; after approval run build-local +
-  coord/train.sh art170j; then roll out art to the other plugins.
+- 2026-11-04 ~13:00: split (feature/art170j) queued in the merge train; generators G1–G4 on feature/art170jc
+  (worktree ~/projetos/lynx-wt-art170jc; feature/art170jb is its subset, to delete), Windows build + shots + GUI CPU +
+  self-test OK, build-local running; next: when art170j lands, merge origin/main into art170jc, land it, report.
 - Commands: `OUT=build-win ~/.claude/jobs/f8789b49/tmp/coord/winbuild.sh scripts/build-windows-zig.sh`;
-  `LYNX.exe --artshot <dir> before|after`; `/mnt/e/lynx-work/art170j/artgui.sh before|after|still` under
-  `flock ~/.cache/lynx-wingui.lock`; page: `python3 -I /mnt/e/lynx-work/art170j/mkpage.py`.
+  `LYNX.exe --artshot <dir> before|after [name,name]`; `/mnt/e/lynx-work/art170j/artgui-g2.sh after|still names`
+  under `flock ~/.cache/lynx-wingui.lock`; page: `python3 -I /mnt/e/lynx-work/art170j/mkpage.py`.
