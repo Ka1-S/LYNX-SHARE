@@ -137,3 +137,9 @@ the glide itself is right: −700 → 0 cents relative).
   Traveller's `Default.fst` and Plugin database state (with an embedded sample) are not read by LYNX yet.
 - The decision of §3 (engines whose Default preset differs from FL's Plugin database state).
 - FL Slayer: FL 2026 has no Plugin database entry for it; LYNX keeps its first preset.
+
+## Where I stopped
+
+- Done: §1–§5 code + tests; one fresh FL render of `g169l.flp` compared against LYNX `renderwav` (§5).
+- In progress: full build-local after merging origin/main, the Windows build, the Windows `--export` of
+  `C:\Users\kauan\lynx-test\gen169l\fl\g169l.flp` (fresh profile, test mode) vs FL's `g169l.wav`, then the landing train.
