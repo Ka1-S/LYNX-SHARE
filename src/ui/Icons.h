@@ -36,10 +36,11 @@ enum class Icon
     chord,      // Piano Roll: the chord stamp (three stacked notes; round 170e)
     span,       // Channel Rack: the pattern length (an arrow between two bar lines; round 170e)
     blend,      // recording: blend recorded notes into the pattern (two lines merging into one; round 170e2)
-    filter      // a funnel: filters a list (Channel Rack's channel filter group; round 170e2)
+    filter,     // a funnel: filters a list (Channel Rack's channel filter group; round 170e2)
+    tapTempo    // the tempo tapper: a finger arrow tapping a pad (round 170e2)
 };
 
-constexpr int iconCount = (int) Icon::filter + 1;
+constexpr int iconCount = (int) Icon::tapTempo + 1;
 
 namespace icons
 {

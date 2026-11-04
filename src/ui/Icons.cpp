@@ -666,6 +666,13 @@ Shape make (Icon icon)
             st.addPath (f.createPathWithRoundedCorners (1.25f));
             break;
         }
+        case Icon::tapTempo: // an arrow tapping down on a pad, with the tap's two impact marks
+            fi.addRoundedRectangle (4.0f, 15.5f, 16.0f, 4.5f, 1.5f);
+            line (st, 12.0f, 3.5f, 12.0f, 12.0f);
+            polyline (st, { { 9.0f, 9.0f }, { 12.0f, 12.0f }, { 15.0f, 9.0f } });
+            line (st, 5.0f, 10.5f, 7.0f, 12.5f);
+            line (st, 19.0f, 10.5f, 17.0f, 12.5f);
+            break;
     }
 
     return s;

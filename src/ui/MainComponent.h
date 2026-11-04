@@ -301,7 +301,7 @@ private:
     IconButton waitInputButton { "waitInput", Icon::waitInput };
     // FL's recording panel toggles (round 170e2): Blend recorded notes (overdub, off = replace) and the tempo tapper
     IconButton blendButton { "blend", Icon::blend };
-    IconButton tapTempoButton { "tapTempo", Icon::tap };
+    IconButton tapTempoButton { "tapTempo", Icon::tapTempo };
     void refreshRecordOptionButtons();
     void showRecordMenu();
     // right-click on the metronome: on/off, its volume, count-in (FL keeps the metronome's options there)
