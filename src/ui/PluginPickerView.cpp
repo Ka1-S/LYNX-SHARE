@@ -582,7 +582,7 @@ private:
             pluginthumbs::ensureRendering();
     }
 
-    // fits up to `budget` shown pictures to their tiles (high-quality, ~1–4 ms each), off the paint
+    // fits up to `budget` shown pictures to their tiles, off the paint
     void fitPictures (int budget)
     {
         needsFitting = false;
@@ -600,7 +600,11 @@ private:
                 return;
             }
             const auto w = juce::jmax (1, juce::roundToInt (size.x * scale)), h = juce::jmax (1, juce::roundToInt (size.y * scale));
-            t.scaled = t.picture.rescaled (w, h, juce::Graphics::highResamplingQuality);
+            // halving steps, then the last one, all bilinear (JUCE's high-quality rescale took ~20 ms per picture)
+            auto from = t.picture;
+            while (from.getWidth() >= w * 2 && from.getHeight() >= h * 2)
+                from = from.rescaled (from.getWidth() / 2, from.getHeight() / 2, juce::Graphics::mediumResamplingQuality);
+            t.scaled = from.rescaled (w, h, juce::Graphics::mediumResamplingQuality);
             t.scaledFor = size;
             t.scaledAt = scale;
             repaint (t.bounds.expanded (12));
