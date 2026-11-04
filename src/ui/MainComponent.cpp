@@ -450,7 +450,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         openPianoRoll();
     };
     picker.onOpenPattern = [this] { showPanel (Panel::channelRack); };
-    picker.onPatternMenu = [this] { makePatternMenu().showMenuAsync (juce::PopupMenu::Options().withMousePosition()); };
+    picker.onPatternMenu = [this] { makePatternMenu (picker.pickedPatterns()).showMenuAsync (juce::PopupMenu::Options().withMousePosition()); };
     picker.onNewPattern = [this] { newPatternButton.onClick(); };
     playlist.onRenamePattern = [this] (int p) { showRenamePattern (p); };
     playlist.onOpenInSampler = [this] (int channel) {
@@ -2996,7 +2996,7 @@ juce::PopupMenu MainComponent::playlistTrackExportMenu (bool groups)
     return menu;
 }
 
-juce::PopupMenu MainComponent::makePatternMenu()
+juce::PopupMenu MainComponent::makePatternMenu (std::vector<int> picked)
 {
     const auto& song = engine.getSong();
     const auto index = song.currentPattern;
@@ -3039,10 +3039,12 @@ juce::PopupMenu MainComponent::makePatternMenu()
     menu.addItem (tr ("Move down") + shortcutText ("pattern.moveDown"), index + 1 < (int) song.patterns.size(), false, [this] { movePatternNow (1); });
     menu.addItem (tr ("Split by channel (one new pattern per channel)"), ! pattern.notes.empty(), false, [this] { splitPatternByChannelNow(); });
     // FL's Patterns › PSPatQuickRenderMenu / PSPatRenderMenu / PSPatRenderReplaceMenu (PSPatQuickRenderMenuClick, tags 1 / 0 / 2;
-    // REA round 168e)
-    menu.addItem (tr ("Quick render as audio clip"), [this, index] { renderPatternAsAudioClip (engine, index, 1); });
-    menu.addItem (tr ("Render as audio clip..."), [this, index] { renderPatternAsAudioClip (engine, index, 0); });
-    menu.addItem (tr ("Render and replace..."), [this, index] { renderPatternAsAudioClip (engine, index, 2); });
+    // REA round 168e); opened from the picker, every picked pattern is rendered (round 169k)
+    if (picked.empty())
+        picked = { index };
+    menu.addItem (tr ("Quick render as audio clip"), [this, picked] { renderPatternsAsAudioClips (engine, picked, 1); });
+    menu.addItem (tr ("Render as audio clip..."), [this, picked] { renderPatternsAsAudioClips (engine, picked, 0); });
+    menu.addItem (tr ("Render and replace..."), [this, picked] { renderPatternsAsAudioClips (engine, picked, 2); });
     juce::PopupMenu signatures;
 
     for (int beats : { 2, 3, 4, 5, 6, 7, 8, 9, 12 })

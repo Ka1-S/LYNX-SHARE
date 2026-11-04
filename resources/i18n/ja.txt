@@ -7004,3 +7004,5 @@ countries: jp
 "{0} files arriving" = "{0}個のファイルを受信中"
 "Live session with {0}" = "{0}さんとのライブセッション"
 "Undo left alone what someone else changed since: {0}" = "元に戻すは、その後に他の人が変更したものには触れませんでした: {0}"
+"Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "パターン: [LMB] ペンシルでペイント  [Ctrl+LMB] / [Shift+LMB] 複数選択  [2xLMB] 開く  [RMB] メニュー"
+"Empty patterns were ignored." = "空のパターンは無視されました。"
