@@ -7054,3 +7054,6 @@ countries: cn sg
 "Waiting for the host..." = "正在等待主持人..."
 "{0} new messages" = "{0} 条新消息"
 "rendering stand-ins..." = "正在渲染替身..."
+"Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "样式：[LMB] 用铅笔绘制  [Ctrl+LMB] / [Shift+LMB] 选择多个  [2xLMB] 打开  [RMB] 菜单"
+"Empty patterns were ignored." = "已忽略空样式。"
+"Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "插件选择器：所有发生器和效果器，类别显示为标签（再按一次关闭）"

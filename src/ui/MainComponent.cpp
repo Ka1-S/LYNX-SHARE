@@ -26,6 +26,7 @@
 #include "ui/ShortcutManager.h"
 #include "ui/WaveformView.h"
 #include "ui/QuickAddPalette.h"
+#include "ui/PluginPickerView.h"
 #include "ui/PatcherEditor.h"
 #include "ui/ToolWindow.h"
 #include "ui/LoopStarterWindow.h"
@@ -451,7 +452,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         openPianoRoll();
     };
     picker.onOpenPattern = [this] { showPanel (Panel::channelRack); };
-    picker.onPatternMenu = [this] { makePatternMenu().showMenuAsync (juce::PopupMenu::Options().withMousePosition()); };
+    picker.onPatternMenu = [this] { makePatternMenu (picker.pickedPatterns()).showMenuAsync (juce::PopupMenu::Options().withMousePosition()); };
     picker.onNewPattern = [this] { newPatternButton.onClick(); };
     playlist.onRenamePattern = [this] (int p) { showRenamePattern (p); };
     playlist.onOpenInSampler = [this] (int channel) {
@@ -963,6 +964,8 @@ void MainComponent::resized()
         danceStage->setBounds (getLocalBounds());
         danceStage->toFront (false);
     }
+    if (pluginPickerView != nullptr)
+        pluginPickerView->setBounds (getLocalBounds());
     if (setupOverlay != nullptr)
     {
         setupOverlay->setBounds (getLocalBounds());
@@ -1322,6 +1325,7 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("pattern.moveUp")) movePatternNow (-1);
     else if (is ("pattern.moveDown")) movePatternNow (1);
     else if (id.rfind ("pattern.select", 0) == 0) selectPattern (std::stoi (id.substr (14)) - 1);
+    else if (is ("view.pluginPicker")) togglePluginPicker();
     else if (is ("panel.quickAdd"))
     {
         // FL's F8 opens the plugin picker or closes it (FLEngine 0xebf510, round 167o)
@@ -2250,6 +2254,41 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
 
 // --- quick-add palette and history -------------------------------------------------------------
 
+void MainComponent::togglePluginPicker()
+{
+    // FL's ShowPluginPickerAction (F8): opens the picker over the main window, or closes it (REA_rodada169k §2.5)
+    if (pluginPickerView != nullptr)
+    {
+        auto old = std::move (pluginPickerView);
+        juce::MessageManager::callAsync ([keep = std::shared_ptr<juce::Component> (std::move (old))] {}); // (it may be on the stack)
+        return;
+    }
+    PluginPickerTargets targets;
+    auto safe = juce::Component::SafePointer<MainComponent> (this);
+    targets.addInstrument = [safe] (ChannelDef c) {
+        if (safe == nullptr)
+            return;
+        safe->rack.addChannel (std::move (c), true);
+        safe->showPanel (Panel::channelRack);
+    };
+    targets.addEffect = [safe] (EffectSlot slot) {
+        if (safe == nullptr)
+            return;
+        if (! safe->mixer.addEffectToSelected (std::move (slot)))
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Plugin picker"), tr ("The selected insert has no free effect slot."));
+        else
+            safe->showPanel (Panel::mixer);
+    };
+    targets.close = [safe] {
+        if (safe != nullptr && safe->pluginPickerView != nullptr)
+            safe->togglePluginPicker();
+    };
+    pluginPickerView = makePluginPickerView (engine, std::move (targets));
+    addAndMakeVisible (*pluginPickerView);
+    pluginPickerView->setBounds (getLocalBounds());
+    pluginPickerView->toFront (true);
+}
+
 void MainComponent::showQuickAdd()
 {
     QuickAddTargets targets;
@@ -2958,7 +2997,7 @@ juce::PopupMenu MainComponent::playlistTrackExportMenu (bool groups)
     return menu;
 }
 
-juce::PopupMenu MainComponent::makePatternMenu()
+juce::PopupMenu MainComponent::makePatternMenu (std::vector<int> picked)
 {
     const auto& song = engine.getSong();
     const auto index = song.currentPattern;
@@ -3001,10 +3040,12 @@ juce::PopupMenu MainComponent::makePatternMenu()
     menu.addItem (tr ("Move down") + shortcutText ("pattern.moveDown"), index + 1 < (int) song.patterns.size(), false, [this] { movePatternNow (1); });
     menu.addItem (tr ("Split by channel (one new pattern per channel)"), ! pattern.notes.empty(), false, [this] { splitPatternByChannelNow(); });
     // FL's Patterns › PSPatQuickRenderMenu / PSPatRenderMenu / PSPatRenderReplaceMenu (PSPatQuickRenderMenuClick, tags 1 / 0 / 2;
-    // REA round 168e)
-    menu.addItem (tr ("Quick render as audio clip"), [this, index] { renderPatternAsAudioClip (engine, index, 1); });
-    menu.addItem (tr ("Render as audio clip..."), [this, index] { renderPatternAsAudioClip (engine, index, 0); });
-    menu.addItem (tr ("Render and replace..."), [this, index] { renderPatternAsAudioClip (engine, index, 2); });
+    // REA round 168e); opened from the picker, every picked pattern is rendered (round 169k)
+    if (picked.empty())
+        picked = { index };
+    menu.addItem (tr ("Quick render as audio clip"), [this, picked] { renderPatternsAsAudioClips (engine, picked, 1); });
+    menu.addItem (tr ("Render as audio clip..."), [this, picked] { renderPatternsAsAudioClips (engine, picked, 0); });
+    menu.addItem (tr ("Render and replace..."), [this, picked] { renderPatternsAsAudioClips (engine, picked, 2); });
     juce::PopupMenu signatures;
 
     for (int beats : { 2, 3, 4, 5, 6, 7, 8, 9, 12 })
@@ -5109,6 +5150,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Undo history...") + shortcutText ("edit.history"), [this] { showHistory(); });
         menu.addItem (tr ("Audio editor..."), [this] { openAudioEditor (engine); });
         menu.addSeparator();
+        menu.addItem (tr ("Plugin picker") + shortcutText ("view.pluginPicker"), [this] { togglePluginPicker(); });
         menu.addItem (tr ("Quick-add palette...") + shortcutText ("panel.quickAdd"), [this] { showQuickAdd(); });
         menu.addItem (tr ("Search the Browser") + shortcutText ("browser.search"), [this] {
             showPanel (Panel::browser);

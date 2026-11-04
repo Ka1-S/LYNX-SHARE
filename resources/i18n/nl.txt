@@ -7054,3 +7054,6 @@ countries: nl be
 "Waiting for the host..." = "Wachten op de host..."
 "{0} new messages" = "{0} nieuwe berichten"
 "rendering stand-ins..." = "stand-ins renderen..."
+"Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] tekenen met het potlood  [Ctrl+LMB] / [Shift+LMB] meerdere kiezen  [2xLMB] openen  [RMB] menu"
+"Empty patterns were ignored." = "Lege patterns zijn overgeslagen."
+"Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Pluginkiezer: alle generators en effecten, de categorieën als tabbladen (nogmaals drukken om te sluiten)"

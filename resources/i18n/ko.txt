@@ -7054,3 +7054,6 @@ countries: kr
 "Waiting for the host..." = "호스트를 기다리는 중..."
 "{0} new messages" = "새 메시지 {0}개"
 "rendering stand-ins..." = "대체 음원 렌더링 중..."
+"Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "패턴: [LMB] 연필로 칠하기  [Ctrl+LMB] / [Shift+LMB] 여러 개 선택  [2xLMB] 열기  [RMB] 메뉴"
+"Empty patterns were ignored." = "빈 패턴은 무시되었습니다."
+"Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "플러그인 피커: 모든 제너레이터와 이펙트, 카테고리는 탭으로 (다시 누르면 닫힘)"

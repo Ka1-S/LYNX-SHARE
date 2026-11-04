@@ -7054,3 +7054,6 @@ countries: es mx ar co cl pe ve
 "Waiting for the host..." = "Esperando a quien creó la sesión..."
 "{0} new messages" = "{0} mensajes nuevos"
 "rendering stand-ins..." = "renderizando sustitutos..."
+"Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Patrón: [LMB] pintarlo con el lápiz  [Ctrl+LMB] / [Shift+LMB] elegir varios  [2xLMB] abrir  [RMB] menú"
+"Empty patterns were ignored." = "Se ignoraron los patrones vacíos."
+"Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Selector de plugins: todos los generadores y efectos, las categorías como pestañas (pulsa de nuevo para cerrar)"

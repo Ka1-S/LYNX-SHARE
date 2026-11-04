@@ -7054,3 +7054,6 @@ countries: jp
 "Waiting for the host..." = "ホストを待っています..."
 "{0} new messages" = "新着メッセージ {0} 件"
 "rendering stand-ins..." = "代替音源をレンダー中..."
+"Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "パターン: [LMB] ペンシルでペイント  [Ctrl+LMB] / [Shift+LMB] 複数選択  [2xLMB] 開く  [RMB] メニュー"
+"Empty patterns were ignored." = "空のパターンは無視されました。"
+"Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "プラグインピッカー: すべてのジェネレーターとエフェクト、カテゴリをタブで表示（もう一度押すと閉じる）"
