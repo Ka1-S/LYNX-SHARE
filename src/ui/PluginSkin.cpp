@@ -238,10 +238,15 @@ int styleKey (EffectKind kind, bool soundgoodizer) { return soundgoodizer ? soun
 
 Style defaultStyleFor (int key)
 {
+    if (key >= 0 && key < soundgoodizerKey && artForEffect ((EffectKind) key) != Art::none) return Style::themed; // round 170j: its own art
+    return plainStyleFor (key);
+}
+
+Style plainStyleFor (int key)
+{
     using K = EffectKind;
     constexpr auto G = Style::glow, N = Style::neon, H = Style::hardware, V = Style::vivid;
     if (key == soundgoodizerKey) return V;
-    if (key >= 0 && key < soundgoodizerKey && artForEffect ((K) key) != Art::none) return Style::themed; // round 170j: its own art
     switch ((K) key)
     {
         // the user's picks

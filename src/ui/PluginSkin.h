@@ -155,6 +155,7 @@ int forcedStyle();
 void setForcedStyle (int styleOrMinusOne);
 int styleKey (EffectKind, bool soundgoodizer = false); // the key of an editor in the override table
 Style defaultStyleFor (int key);                        // the built-in table
+Style plainStyleFor (int key);                          // ... as it is without the plugin's own art (Themed)
 Style styleFor (EffectKind, bool soundgoodizer = false); // forced > override > table
 Style resolve (Style automatic);                        // forced, or `automatic`
 Style resolve (Style automatic, Art);                   // the same for a page with (or without) art: Themed needs art

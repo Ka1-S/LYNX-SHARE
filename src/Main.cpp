@@ -925,12 +925,14 @@ public:
 
         if (args.contains ("--artshot"))
         {
-            // LYNX.exe --artshot <folder> [before|after]: round 170j's six pilot editors with their own art (Sakura,
-            // Toxic Biohazard, Sytrus, 3x Osc, Facet EQ, Nebula) drawn off-screen at 100 % and 200 % as
+            // LYNX.exe --artshot <folder> [before|after] [name,name...]: every editor with art of its own (round 170j/170k: the
+            // Themed style; or only the named ones, e.g. "sakura,facet-eq") drawn off-screen at 100 % and 200 % as
             // <folder>/<plugin>-<before|after>-<scale>.png. "before" draws each in the style it had before the Themed style
             const auto i = args.indexOf ("--artshot");
             juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
             const auto mode = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String ("after");
+            if (i + 3 < args.size() && ! args[i + 3].startsWith ("--")) // [name,name...]: only these arts
+                artOnly().addTokens (args[i + 3].unquoted(), ",", "");
             setApplicationReturnValue (runArtShots (juce::File (args[i + 1].unquoted()), mode == "before") ? 0 : 1);
             quit();
             return;
@@ -938,13 +940,15 @@ public:
 
         if (args.contains ("--artgui"))
         {
-            // LYNX.exe --artgui <folder> [before|after|still]: the same six editors in REAL windows on the desktop, one at a
+            // LYNX.exe --artgui <folder> [before|after|still] [name,name...]: the same editors in REAL windows on the desktop, one at a
             // time (always on top, no focus taken), each held while an outside script screenshots it (it writes
             // <folder>/<plugin>.ready with the window's bounds and waits up to 10 s for <folder>/<plugin>.done), then the
             // process CPU it costs over 6 s is written to <folder>/cpu-<mode>.txt. "still": Themed with the motion off
             const auto i = args.indexOf ("--artgui");
             juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
             const auto mode = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String ("after");
+            if (i + 3 < args.size() && ! args[i + 3].startsWith ("--")) // [name,name...]: only these arts
+                artOnly().addTokens (args[i + 3].unquoted(), ",", "");
             runArtGui (juce::File (args[i + 1].unquoted()), mode);
             return;
         }
@@ -6111,20 +6115,41 @@ private:
     // --- round 170j: the pilot editors with their own art -------------------------------------------------
     struct ArtPilot
     {
-        const char* file;
+        std::string file; // the art's name as a file name: "toxic-biohazard"
         bool instrument;
         lynx::InstrumentKind instrumentKind;
         lynx::EffectKind effectKind;
         lynx::skin::Style before; // the automatic style it had before the Themed style
     };
+    static juce::StringArray& artOnly() // --artshot / --artgui: only these (file names), all when empty
+    {
+        static juce::StringArray only;
+        return only;
+    }
+    // every plugin with art of its own (round 170j/170k): generators first, then effects; built from the art
+    // registries, so a new theme is shot without touching this list
     static const std::vector<ArtPilot>& artPilots()
     {
         using I = lynx::InstrumentKind;
         using E = lynx::EffectKind;
-        using S = lynx::skin::Style;
-        static const std::vector<ArtPilot> list { { "sakura", true, I::sakura, E::reverb, S::neon },           { "toxic-biohazard", true, I::toxic, E::reverb, S::neon },
-                                                  { "sytrus", true, I::sytrus, E::reverb, S::neon },           { "3x-osc", true, I::threeosc, E::reverb, S::neon },
-                                                  { "facet-eq", false, I::synth, E::facetEq, S::glow },      { "nebula", false, I::synth, E::nebula, S::neon } };
+        static const std::vector<ArtPilot> list = [] {
+            std::vector<ArtPilot> all;
+            auto slug = [] (lynx::skin::Art a) {
+                return juce::String (lynx::skin::artName (a)).toLowerCase().replaceCharacters (" ", "-").removeCharacters ("!.()'").toStdString();
+            };
+            for (const auto& e : lynx::natives::instrumentEngines())
+                if (const auto a = lynx::skin::artForInstrument (e.kind); a != lynx::skin::Art::none)
+                    all.push_back ({ slug (a), true, e.kind, E::reverb, lynx::skin::Style::neon });
+            for (int k = 0; k <= (int) lynx::lastEffectKind; ++k)
+                if (const auto a = lynx::skin::artForEffect ((E) k); a != lynx::skin::Art::none)
+                    all.push_back ({ slug (a), false, I::synth, (E) k, lynx::skin::plainStyleFor (k) });
+            std::vector<ArtPilot> kept;
+            for (auto& p : all)
+                if (artOnly().isEmpty() || artOnly().contains (juce::String (p.file)))
+                    if (std::none_of (kept.begin(), kept.end(), [&] (const ArtPilot& q) { return q.file == p.file; }))
+                        kept.push_back (p);
+            return kept;
+        }();
         return list;
     }
 
@@ -6176,7 +6201,7 @@ private:
             auto editor = makeArtPilot (offline, p);
             if (editor == nullptr || editor->getWidth() <= 0)
             {
-                std::fprintf (stderr, "%s: no editor\n", p.file);
+                std::fprintf (stderr, "%s: no editor\n", p.file.c_str());
                 ok = false;
                 continue;
             }
@@ -6227,7 +6252,7 @@ private:
             artPilotStyle (p, mode);
             auto editor = makeArtPilot (*engine, p);
             if (editor == nullptr) { ++at; open(); return; }
-            window = std::make_unique<juce::DocumentWindow> (juce::String ("LYNX art - ") + p.file, lynx::theme::colour::bg1, 0);
+            window = std::make_unique<juce::DocumentWindow> (juce::String ("LYNX art - ") + juce::String (p.file), lynx::theme::colour::bg1, 0);
             window->setUsingNativeTitleBar (true);
             window->setContentOwned (editor.release(), true);
             const auto area = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->userArea;
@@ -6279,7 +6304,7 @@ private:
             if (phase == 2 && now - t0 > 6000.0)
             {
                 const auto cpu = (lynx::processCpuSeconds() - c0) / ((now - t0) * 0.001) * 100.0;
-                report << p.file << "\t" << mode << "\t" << juce::String (cpu, 2) << "\t" << (animating() ? "yes" : "no") << "\n";
+                report << juce::String (p.file) << "\t" << mode << "\t" << juce::String (cpu, 2) << "\t" << (animating() ? "yes" : "no") << "\n";
                 ++at;
                 open();
             }
