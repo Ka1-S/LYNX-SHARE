@@ -257,7 +257,15 @@ TEST (mono168l_every_engine_plays_mono_legato_and_porta)
     const auto fl = natives142::flAccess();
     for (const auto& e : natives::instrumentEngines())
     {
-        const auto made = natives::makeChannel (e.kind, fl);
+        auto made = natives::makeChannel (e.kind, fl);
+        // (round 169l: a new Morphine is FL's Plugin database patch, whose pitch the autocorrelation reads 19 semitones
+        // off; the check plays the preset it was written with)
+        if (e.kind == InstrumentKind::morphine)
+            if (const auto c = natives::presetCandidates (e.presetFolder, true, fl); c.size() > 1)
+                for (std::size_t i = 1; i < c.size(); ++i)
+                    if (c[i].find ("BAS Acoustic 1 FG") != std::string::npos)
+                        if (auto p = natives::channelFromPresetFile (e.kind, c[i], fl))
+                            made = p;
         if (! made)
             continue;
         const auto& c = *made;

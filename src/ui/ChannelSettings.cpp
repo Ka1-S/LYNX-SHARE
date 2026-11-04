@@ -4637,7 +4637,7 @@ private:
     {
         const auto& all = list();
         const auto count = (int) all.size();
-        // FL's next index; a preset LYNX can't read (e.g. Ogun's oldest state format) is passed over in the same
+        // FL's next index; a preset LYNX can't read (an unknown or damaged state) is passed over in the same
         // direction, so the arrows keep going
         auto at = presetcycle::step (current, delta, count);
         for (int tries = 0; at >= 0 && tries < count; ++tries)
