@@ -212,7 +212,11 @@ TEST (gen169l_new_generators_are_fl_plugin_database_state)
         const auto fromFile = natives::channelFromPresetFile (kind, first, fl);
         CHECK (made.has_value() && fromFile.has_value());
         if (made && fromFile)
+        {
+            if (made->pluginState != fromFile->pluginState)
+                std::printf ("  %s: state %zu vs %zu bytes\n", e->name, made->pluginState.size(), fromFile->pluginState.size());
             CHECK (made->instrument == kind && made->pluginState == fromFile->pluginState && ! made->pluginState.empty());
+        }
     }
     // Ogun: FL's version-11 state, read (it wasn't before) and kept in today's layout
     const auto og = natives::makeChannel (InstrumentKind::ogun, fl);
