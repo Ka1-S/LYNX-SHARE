@@ -191,7 +191,7 @@ TEST (natives142_engines_from_the_fl_installation)
         CHECK (c->instrument == e.kind && c->name == e.name);
         if (e.kind == InstrumentKind::granulizer || e.kind == InstrumentKind::wavetraveller) // (play the channel's sample: none yet)
             continue;
-        const auto rms = natives142::renderChannel (*c, fl, e.kind == InstrumentKind::drumaxx ? 48 : 60);
+        const auto rms = natives142::renderChannel (*c, fl, e.kind == InstrumentKind::drumaxx ? 36 : 60); // (FL's Default Kit: the kick on 36, round 169e)
         CHECK (rms > 1.0e-3 && std::isfinite (rms));
         if (! (rms > 1.0e-3))
         {

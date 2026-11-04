@@ -7005,3 +7005,5 @@ countries: pl
 "Live session with {0}" = "Sesja na żywo z: {0}"
 "Undo left alone what someone else changed since: {0}" = "Cofanie nie ruszyło tego, co ktoś inny zmienił od tamtej pory: {0}"
 "Mute removed steps" = "Wyciszaj usunięte kroki"
+"Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] maluj nim ołówkiem  [Ctrl+LMB] / [Shift+LMB] wybierz kilka  [2xLMB] otwórz  [RMB] menu"
+"Empty patterns were ignored." = "Puste patterny zostały pominięte."

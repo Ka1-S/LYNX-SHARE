@@ -7,6 +7,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "core/PickerSelection.h"
 #include "engine/AudioEngine.h"
 #include "ui/EditorTools.h"
 #include "ui/Theme.h"
@@ -397,11 +398,16 @@ public:
 
     void paint (juce::Graphics& g) override;
     void mouseDown (const juce::MouseEvent& e) override;
+    void mouseUp (const juce::MouseEvent& e) override;
     void mouseDoubleClick (const juce::MouseEvent& e) override;
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
     void mouseMove (const juce::MouseEvent& e) override;
     void mouseExit (const juce::MouseEvent& e) override;
     ui::Hint hintAt (juce::Point<int> position) override;
+
+    // The patterns picked in the list (FL's picker selection: click, Ctrl+click, Shift+click; round 169k), in the
+    // order they were picked; empty when none is picked.
+    std::vector<int> pickedPatterns() const;
 
     std::function<void()> onOpenPattern;
     std::function<void()> onPatternMenu; // right click on a pattern (it is the current one by then)
@@ -433,6 +439,9 @@ private:
     int view = 0;
     ClipKind seenBrush = ClipKind::pattern; // the list follows the pencil's kind when it changes elsewhere
     int scroll = 0; // in rows
+    pickersel::Selection picked; // pattern indices (pattern view)
+    bool deselectOnUp = false;   // a Ctrl+click on a picked pattern takes it out on release (FL)
+    int pressedRow = -1;
     int hoverTab = -1, hoverRow = -1;
     bool hoverAdd = false;
     static constexpr int rowHeight = 28, headerHeight = 26, footerHeight = 22;

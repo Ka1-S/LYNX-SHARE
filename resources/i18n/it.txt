@@ -7005,3 +7005,5 @@ countries: it ch sm
 "Live session with {0}" = "Sessione live con {0}"
 "Undo left alone what someone else changed since: {0}" = "Annulla non ha toccato ciò che un'altra persona ha modificato nel frattempo: {0}"
 "Mute removed steps" = "Silenzia gli step rimossi"
+"Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] dipingilo con la matita  [Ctrl+LMB] / [Shift+LMB] scegline diversi  [2xLMB] apri  [RMB] menu"
+"Empty patterns were ignored." = "I pattern vuoti sono stati ignorati."
