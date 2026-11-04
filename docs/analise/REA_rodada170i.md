@@ -85,7 +85,8 @@ one more REA pass.
 ## Where I stopped
 
 - Done: §1 and §3 code + tests (`tests/FlQ170iTests.inc`), `LYNX_WARMUP` in renderwav.
-- In progress: build-local, rescore, land batch 1.
+- Verified: build-local 1963871 checks / 0 failures; rescore of the 82 render tests (`E:\lynx-work\flq170i\b2`): 12
+  improved, no regressions. Tracker regenerated. Landing batch 1+2.
 - Next: FPC level (−4.6 dB; REA: layer and pad volume law `(21.527^(v/127) − 1)/10`, constant at FPC_x64.dll
   `0x8E0FA0`, used by `FUN_0086b480`), Slicex level (−2.2 dB), Hardcore (env corr 0.04).
 - Commands: `scripts/flref-lynx.sh /mnt/e/lynx-work/flq170i/rt.list <out> build-local/renderwav 2`, then
