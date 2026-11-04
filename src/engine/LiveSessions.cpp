@@ -32,6 +32,17 @@ constexpr int chatShown = 60;                    // chat lines a late guest gets
 constexpr juce::int64 silenceMs = 35000;         // nothing at all from the relay for this long: the connection is dead
 constexpr double standInRate = 44100.0;          // (P1's stand-ins: 32-bit float WAV at 44.1 kHz)
 
+// a host run's epoch (core/LiveSession.h): 48 random bits (exact in a JSON number)
+std::uint64_t newEpoch()
+{
+    std::uint8_t b[6];
+    livecrypto::randomBytes (b, sizeof b);
+    std::uint64_t e = 0;
+    for (auto x : b)
+        e = e << 8 | x;
+    return e | 1;
+}
+
 juce::String randomHex (int bytes)
 {
     std::vector<std::uint8_t> b ((std::size_t) bytes);
@@ -354,7 +365,7 @@ void LiveSessionManager::start (const Options& o)
         engine.applyRemote (std::move (rounded));
     }
     const auto& song = engine.getSong();
-    authority = std::make_unique<live::Authority> (song, &roundTrip);
+    authority = std::make_unique<live::Authority> (song, &roundTrip, 0, newEpoch());
     replica = std::make_unique<live::Replica> (song, 0, session::hostTag, &roundTrip);
     keepFull = options.guestsKeepFull;
     editEverything = options.guestsEditEverything;
@@ -1183,6 +1194,8 @@ void LiveSessionManager::sendSnapshot (int to, bool resumed)
     set (m, "hostKey", juce::String (livecrypto::toHex (livecrypto::publicKeyOf (hostSeed))));
     set (m, "resume", it->second.token);
     set (m, "resumed", resumed);
+    set (m, "epoch", (juce::int64) authority->epoch());
+    set (m, "lost", resumed && it->second.lostRev);
     set (m, "needs", keysToVar (allNeed));
     juce::Array<juce::var> lines;
     for (std::size_t i = chat.size() > (std::size_t) chatShown ? chat.size() - (std::size_t) chatShown : 0; i < chat.size(); ++i)
@@ -1325,6 +1338,7 @@ void LiveSessionManager::onSnapshot (const juce::var& m)
         sessionpack::resolvePlugins (*song, *manifest, engine.getPluginHost(), true);
     song->session.me = me;
     const bool resumed = (bool) m["resumed"] && replica != nullptr;
+    const auto epoch = (std::uint64_t) (juce::int64) m["epoch"];
     const bool first = state != State::live && ! resumed;
     if (first)
     {
@@ -1345,7 +1359,8 @@ void LiveSessionManager::onSnapshot (const juce::var& m)
     if (resumed)
     {
         // back after a drop, with a fresh snapshot: what we did meanwhile goes on top of it
-        auto working = replica->resume (*song, rev, engine.getSong());
+        auto working = replica->resume (*song, rev, engine.getSong(), (bool) m["lost"] || rev < replica->revision());
+        replica->epoch = epoch;
         engine.applyRemote (std::move (working));
         ++stats.resumedBySnapshot;
         resuming = false;
@@ -1353,6 +1368,7 @@ void LiveSessionManager::onSnapshot (const juce::var& m)
     else
     {
         replica = std::make_unique<live::Replica> (*song, rev, me, &roundTrip);
+        replica->epoch = epoch;
         if (onJoined)
             onJoined (*song);
         else
@@ -1949,6 +1965,7 @@ void LiveSessionManager::sendResume()
     set (m, "tag", (int) me);
     set (m, "token", resumeToken);
     set (m, "rev", (juce::int64) (replica ? replica->revision() : 0));
+    set (m, "epoch", (juce::int64) (replica ? replica->epoch : 0));
     sendJson (hostPeer, m);
     setState (State::waitingHost, tr ("Catching up with the session..."));
 }
@@ -1993,7 +2010,9 @@ void LiveSessionManager::onResume (int from, const juce::var& m)
     authority->setPermissions (tag, back->perms);
     reroute (tag, from);
     const auto rev = (std::uint64_t) (juce::int64) m["rev"];
-    if (auto missed = authority->since (rev))
+    const auto epoch = (std::uint64_t) (juce::int64) m["epoch"];
+    peers[from].lostRev = authority->lostCommitsOf (epoch, rev);
+    if (auto missed = authority->since (rev, epoch))
     {
         for (const auto& c : *missed)
             sendJson (from, commitToVar (c));
@@ -2214,7 +2233,7 @@ bool LiveSessionManager::resumeHost (const juce::File& file, const Options& o)
         onResumed (*song);
     else
         engine.setSong (*song);
-    authority = std::make_unique<live::Authority> (*song, &roundTrip, rev);
+    authority = std::make_unique<live::Authority> (*song, &roundTrip, rev, newEpoch());
     std::map<live::Key, live::Authority::Change> changes;
     if (const auto* rows = j["changes"].getArray())
         for (const auto& row : *rows)

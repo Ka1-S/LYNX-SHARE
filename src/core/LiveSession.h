@@ -125,8 +125,11 @@ using Codec = std::function<Patch (const Patch&)>;
 class Authority
 {
 public:
-    // `startRev`: the revision `initial` is at (a host that restarted from its journal goes on counting from there)
-    Authority (Song initial, Codec codec, std::uint64_t startRev = 0);
+    // `startRev`: the revision `initial` is at (a host that restarted from its journal goes on counting from there).
+    // `epoch`: this run of the host — a host that restarts from a journal older than what its guests saw makes new
+    // revisions with the old numbers, so revisions are only comparable within one epoch.
+    Authority (Song initial, Codec codec, std::uint64_t startRev = 0, std::uint64_t epoch = 0);
+    std::uint64_t epoch() const noexcept { return epochId; }
 
     const Song& confirmed() const noexcept { return state; }
     std::uint64_t revision() const noexcept { return rev; }
@@ -137,6 +140,10 @@ public:
     // The commits after revision `rev` (to replay to someone who reconnects), oldest first; nullopt when they are no
     // longer all kept (replayLimit) or `rev` is not one of ours: that peer needs a fresh snapshot.
     std::optional<std::vector<Commit>> since (std::uint64_t rev) const;
+    // The same for a peer that comes back from epoch `fromEpoch` (another epoch: always a snapshot).
+    std::optional<std::vector<Commit>> since (std::uint64_t rev, std::uint64_t fromEpoch) const;
+    // Whether a peer at (fromEpoch, rev) saw commits this host no longer has (it restarted from an older journal).
+    bool lostCommitsOf (std::uint64_t fromEpoch, std::uint64_t rev) const noexcept { return fromEpoch != epochId && rev > startRevision; }
 
     // Who changed each entity last (the conflict check, §1.3): kept in the host's journal so a restarted host judges
     // the edits that were waiting the same way.
@@ -158,7 +165,7 @@ public:
 
 private:
     Song state;
-    std::uint64_t rev = 0;
+    std::uint64_t rev = 0, startRevision = 0, epochId = 0;
     Codec codec;
     std::map<std::uint32_t, Permissions> perms;
     std::map<Key, Change> lastChange;
@@ -206,6 +213,10 @@ public:
     // peer — it lost commits in a crash —, the changes of this peer's own area it no longer has). Returns the new
     // working song; the next poll proposes what it has on top of the snapshot.
     Song resume (Song snapshot, std::uint64_t rev, const Song& working);
+    // (`hostLost`: the host restarted behind this peer — Authority::lostCommitsOf)
+    Song resume (Song snapshot, std::uint64_t rev, const Song& working, bool hostLost);
+    // the host epoch the confirmed state belongs to (Authority::epoch)
+    std::uint64_t epoch = 0;
 
 private:
     Song state;          // C

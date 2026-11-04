@@ -17,6 +17,7 @@ struct Live169jNet : Live169bNet
 {
     std::vector<bool> online;
     int replays = 0, snapshots = 0;
+    std::uint64_t epochs = 0;
 
     Live169jNet (lynx::Song song, int guestCount, lynx::live::Codec c = {}) : Live169bNet (std::move (song), guestCount, std::move (c))
     {
@@ -34,7 +35,7 @@ struct Live169jNet : Live169bNet
     {
         auto& p = guests[(std::size_t) g];
         online[(std::size_t) g] = true;
-        if (auto missed = authority->since (p.replica->revision()))
+        if (auto missed = authority->since (p.replica->revision(), p.replica->epoch))
         {
             ++replays;
             for (const auto& c : *missed)
@@ -44,7 +45,9 @@ struct Live169jNet : Live169bNet
         else
         {
             ++snapshots;
-            p.working = p.replica->resume (authority->confirmed(), authority->revision(), p.working);
+            const bool lost = authority->lostCommitsOf (p.replica->epoch, p.replica->revision());
+            p.working = p.replica->resume (authority->confirmed(), authority->revision(), p.working, lost || p.replica->revision() > authority->revision());
+            p.replica->epoch = authority->epoch();
         }
     }
 
@@ -54,7 +57,7 @@ struct Live169jNet : Live169bNet
     {
         for (int g = 0; g < (int) guests.size(); ++g)
             drop (g);
-        authority = std::make_unique<lynx::live::Authority> (journal, codec, rev);
+        authority = std::make_unique<lynx::live::Authority> (journal, codec, rev, ++epochs);
         authority->restoreChanges (changes);
         host.replica = std::make_unique<lynx::live::Replica> (journal, rev, 1, codec);
         host.working = journal;
@@ -275,6 +278,18 @@ TEST (live169j_replicas_converge_over_links_that_drop)
         for (auto& g : net.guests)
             ok = ok && live169bSame (g.working, truth) && g.replica->pending() == 0 && g.replica->revision() == net.authority->revision();
         converged += ok ? 1 : 0;
+        if (! ok)
+        {
+            std::string why = "host:" + std::to_string (live169bSame (net.host.working, truth));
+            for (auto& g : net.guests)
+            {
+                why += " g:" + std::to_string (live169bSame (g.working, truth)) + "/" + std::to_string (g.replica->pending()) + "/"
+                       + std::to_string (g.replica->revision()) + "/" + std::to_string (net.authority->revision());
+                for (const auto& k : live::diff (truth, g.working).keys())
+                    why += " " + live::toString (k);
+            }
+            std::printf ("  seed %u: %s\n", seed, why.c_str());
+        }
         replays += net.replays;
         snapshots += net.snapshots;
         for (auto uid : marks)

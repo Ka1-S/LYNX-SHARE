@@ -3940,7 +3940,7 @@ void MainComponent::startLiveFromCommandLine()
         });
     if (cli.contains ("--live-resume"))
     {
-        o.projectFile = {};
+        o.projectFile = juce::File();
         o.autoAccept = true;
         if (! live->resumeHost (LiveSessionManager::defaultJournal(), o))
             platform::testModeLog ("live session: nothing to resume");

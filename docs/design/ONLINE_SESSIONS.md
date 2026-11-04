@@ -673,11 +673,78 @@ Where it differs from the plan above:
   `LYNX --livetest report.txt [--relay URL]`: host + 3 guests in one process over the real relay (wrong code refused,
   media both ways and forwarded, everyone's edits, a refused edit undone, undo per user, a late guest, a guest
   leaving, the host ending).
-- **Not yet (later phases)**: LAN / direct links and ICE; reconnect / resume of a dropped guest (a new join gets a
-  fresh snapshot); host journal and hand-over; live stand-ins over the network (stand-in renders are not sent, a
-  part whose plugin is missing here is silent until P1's package flow); chat, follow-transport, per-participant
-  permission toggles after the start; PAKE / Noise and identity keys (§6.4); hashing big samples off the message
-  thread; FLAC media transfer.
+- **Not yet (later phases)**: see "P2, second slice" below for what round 169j added; still open there.
+
+### P2, second slice (round 169j): reconnect, host journal, chat, transport, permissions, live stand-ins, FLAC
+
+Protocol 2 (`live::protocolVersion`; the same-version rule makes old and new never meet). Code: `core/LiveSession`
+(replay log, `Replica::resend` / `resume`, `Permissions::settings`, chat text, `follow`, `unplayable` / `toRender`),
+`core/LiveCrypto` (the host's Ed25519 identity), `engine/LiveSessions` (the wire, the journal, the workers),
+`engine/MediaPack` (FLAC packs), `ui/LiveChat` (chat window, People and permissions), `ui/LiveSessionUi` (menu,
+presence, the resume question).
+
+- **Reconnect (§1.5 as built).** A computer whose WebSocket closes (or goes silent for 35 s: relay pings every 10 s)
+  goes to *Reconnecting...* and connects again by itself, 1, 2, 4 … 30 s apart, for up to 15 minutes; it keeps
+  working meanwhile (a guest's edits wait: nothing is polled while there is no host). A guest who sees the host's
+  peer leave goes to *Waiting for the host...* instead of ending. Coming back:
+  - the host's own connection: it broadcasts `back`; every waiting guest proves who the host is before talking to it:
+    `seek {nonce}` → `host {nonce, sig}` (Ed25519 over `room|nonce`; the public key came in the snapshot as
+    `hostKey`, the seed stays in the host's journal) — anyone with the invite code has the session key, so the key
+    alone cannot tell the host from a guest pretending;
+  - then `resume {tag, token, rev}` (the token is the guest's own, from its snapshot): the host keeps the last 4096
+    commits (`Authority::since`) and replays the missing ones followed by `resumed {rev}`; the guest's
+    `Replica::resend()` then proposes again whatever it sent that was never confirmed, **with the oldest base it
+    had**, so the host's conflict check judges it as it would have the first time. When the commits are gone (or the
+    host restarted) the answer is a snapshot with `resumed: true`: `Replica::resume()` puts the guest's unconfirmed
+    edits on top of it — and, when the host is *behind* the guest (it lost commits in a crash), also the changes of
+    the guest's own area the host no longer has.
+  - A dropped guest keeps its place: the host lists it greyed (hollow dot), its tag, area, permissions and resume
+    token stay; media it was sending or receiving start again from the first piece at its new peer number.
+- **Host journal.** Every 2 s at most after a change the host writes `<profile>/Live session/journal.json` (the
+  room, the code's secret, the host token and seed, the confirmed song at its revision, who changed each entity
+  last, every guest's tag / name / token / permissions / what they keep). An *End* deletes it; a crash leaves it. At
+  the next start LYNX SHARE asks "LYNX SHARE closed during your live session … Resume it?" (*Resume* / *End it*:
+  the room is closed and the journal deleted); a journal older than 12 h (the relay has forgotten the room) is
+  dropped. Resuming opens the journal's song (its project file stays the current file), reconnects and goes on
+  counting revisions; the waiting guests come back through `seek` / `resume` (snapshot path, their pending edits
+  kept). Command line: `--live-resume`.
+- **Permissions during the session (§2.3).** *File › Online session › People and permissions...* (host): per guest,
+  *Their own channels, patterns, inserts and rows* / *Their own parts + tempo and project settings* (new
+  `Permissions::settings`: the globals and the arrangements' markers) / *Everything* / *Listen only*, and what they
+  keep at the end (per person now, decision 1). `perms {...}` tells the guest, whose hint bar says what changed.
+- **Chat.** *Session chat...* (and the unread count in the menu and the toolbar): `chat {text}` to the host, which
+  stamps name / colour / time and sends `chat` to everyone (one order everywhere); 600 bytes a line, control
+  characters out; the last 300 lines kept, a late guest gets the last 60 in its snapshot. A line arriving while the
+  window is closed shows in the hint bar.
+- **Follow the host's transport** (guests; menu and chat window): the host sends `transport {playing, song, pos,
+  bpm}` when it starts / stops, when its playhead jumps (more than half a beat off where it should be) and every 2 s
+  while playing; a guest that follows plays, stops and jumps with it (`live::follow`: one beat of tolerance, the
+  host's playhead extrapolated at its tempo, Song / Pattern mode too), never while it records.
+- **Live stand-ins (§4.2).** Each computer tells the host which channels / inserts it cannot play
+  (`live::unplayable`: a third-party plugin missing here) — `need {keys}`; the host sends everyone the union
+  (`needs`). The owner of such a part, when all its plugins are here (`live::toRender`), renders it with P1's code
+  (`sessionpack::render`, 32-bit float WAV at 44.1 kHz, pattern stems or a timeline stem) on a background thread,
+  2 s after the last change and never while playing or recording, and puts the stems on the channel / insert as an
+  ordinary edit: they travel like any medium, and the computers that need them play them (P1's projection). A
+  change of the part (P1's source hash per pattern) renders it again. Computers that have the plugin do not fetch
+  those stems (the host notes who has them and fetches one only when a guest asks).
+- **Media.** Files above 1 MiB are hashed on a worker thread (a change that points at one goes out when its hash is
+  ready; a snapshot waits the same way); received files are unpacked and checked on that worker too. A 16 / 24-bit PCM
+  WAV of 256 KiB or more travels as a **FLAC pack** (`'F'` frames): its bytes before and after the samples verbatim
+  plus the samples as FLAC; the receiver writes back exactly the sender's bytes (the SHA-256 is checked as before).
+  The sender builds the pack once, checks that it unpacks to the same bytes, and sends the file as it is when FLAC
+  would not save 10 % (noise, 32-bit float stand-ins, MP3).
+- **Tests**: `tests/Live169jTests.inc` (replay log and its limit; resume by replay keeps the pending edits; a resumed
+  edit is judged on its old base; resume by snapshot and a host that restarted behind its guests; 24 seeded sessions
+  over links that drop with host restarts converge and keep every offline edit; permissions changed mid-session; the
+  host's signature; chat text; following the transport; who renders stand-ins). `--selftest` `live_session=` adds the
+  FLAC packs (16 / 24-bit byte for byte, float and tiny ones raw, a damaged pack refused). `LYNX --livetest report.txt
+  [--relay URL] [--plugin file.vst3]` adds: hashing off the thread, FLAC packs, chat, following, permissions, a
+  guest's drop, the host's drop, live stand-ins (with `--plugin`), the host's crash and restart from its journal.
+- **Still open**: LAN / direct links and ICE (P3); hand-over to another participant; a guest's own LYNX SHARE
+  restarting (it joins again as a new guest; its part stays in the host's project); PAKE / Noise (§6.4); stand-ins
+  of plugins whose state lives outside the song while the owner tweaks them (they follow the song's captured state);
+  a per-session upload cap.
 
 ### 9.1 What is free and what might cost money
 

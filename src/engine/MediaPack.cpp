@@ -151,7 +151,7 @@ bool pack (const juce::File& wav, const juce::File& packFile)
     std::vector<std::vector<int>> samples;
     readSamples (d + l.dataStart, frames, l, samples);
 
-    juce::MemoryOutputStream flacBytes;
+    juce::MemoryBlock flacBytes;
     {
         juce::FlacAudioFormat flac;
         auto stream = std::make_unique<juce::MemoryOutputStream> (flacBytes, false);
@@ -184,7 +184,7 @@ bool pack (const juce::File& wav, const juce::File& packFile)
     out.writeInt64 (frames);
     out.write (d, (size_t) l.dataStart);
     out.write (d + trailerStart, (size_t) (size - trailerStart));
-    out.write (flacBytes.getData(), flacBytes.getDataSize());
+    out.write (flacBytes.getData(), flacBytes.getSize());
     if ((double) out.getDataSize() > 0.9 * (double) size)
         return false; // (not worth it: noise, or already small)
     // the receiver must end with exactly these bytes: check it here first

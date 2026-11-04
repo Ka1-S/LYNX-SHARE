@@ -201,7 +201,7 @@ void offerResume (Context c)
             auto o = optionsFor (c, myName());
             if (r == 1)
             {
-                o.projectFile = {}; // (the journal knows the project)
+                o.projectFile = juce::File(); // (the journal knows the project)
                 if (! c.live.resumeHost (journal, o))
                     warn (tr ("Resume live session"), tr ("The live session could not be resumed."));
                 return;

@@ -1050,7 +1050,8 @@ std::uint32_t ownerOf (const Key& key, const Song& song)
 
 // --- Authority -------------------------------------------------------------------------------------------------------
 
-Authority::Authority (Song initial, Codec c, std::uint64_t startRev) : state (std::move (initial)), rev (startRev), codec (std::move (c))
+Authority::Authority (Song initial, Codec c, std::uint64_t startRev, std::uint64_t e)
+    : state (std::move (initial)), rev (startRev), startRevision (startRev), epochId (e), codec (std::move (c))
 {
     if (! codec)
         codec = [] (const Patch& p) { return p; };
@@ -1080,6 +1081,13 @@ Commit Authority::commitPatch (std::uint32_t origin, std::uint32_t seq, Patch pa
             log.pop_front();
     }
     return c;
+}
+
+std::optional<std::vector<Commit>> Authority::since (std::uint64_t from, std::uint64_t fromEpoch) const
+{
+    if (fromEpoch != epochId)
+        return std::nullopt;
+    return since (from);
 }
 
 std::optional<std::vector<Commit>> Authority::since (std::uint64_t from) const
@@ -1187,8 +1195,12 @@ void Replica::resend()
 
 Song Replica::resume (Song snapshot, std::uint64_t r, const Song& working)
 {
+    return resume (std::move (snapshot), r, working, r < rev);
+}
+
+Song Replica::resume (Song snapshot, std::uint64_t r, const Song& working, bool hostBehind)
+{
     snapshot.session.me = tag;
-    const bool hostBehind = r < rev;
     auto base = appliedRev;
     for (const auto& [s, b] : inflightBase)
         base = std::min (base, b);

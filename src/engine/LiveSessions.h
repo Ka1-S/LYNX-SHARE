@@ -189,6 +189,7 @@ private:
         live::Permissions perms;
         bool keepFull = false;
         std::set<live::Key> need;     // parts it cannot play
+        bool lostRev = false;         // it saw commits this host lost (a restart from an older journal)
     };
     struct Want
     {
