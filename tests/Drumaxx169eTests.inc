@@ -188,9 +188,15 @@ TEST (drumaxx169e_fresh_drumaxx_with_fl_is_fl_default_kit)
     CHECK (peaks.size() == 5u);
     if (peaks.size() == 5u)
         CHECK (peaks[0] < 1.0e-5f && peaks[1] < 1.0e-5f && peaks[2] > 1.0e-3f && peaks[3] > 1.0e-3f && peaks[4] > 1.0e-3f);
-    // the Plugin database entry comes right after a Default preset and before the folder's other presets
-    const auto list = natives::presetCandidates ("Drumaxx", true, fl);
-    CHECK (! list.empty() && list.front().find ("Plugin database") != std::string::npos);
+    // the drums FL ships without a Default.fst start from their Plugin database entry, before the folder's presets;
+    // the other engines keep their folder order (Fruit Kick: its Default.fst, no Plugin database entry)
+    for (const auto* folder : { "Drumaxx", "Drumpad", "BassDrum" })
+    {
+        const auto list = natives::presetCandidates (folder, true, fl);
+        CHECK (! list.empty() && list.front().find ("Plugin database") != std::string::npos);
+    }
     const auto kick = natives::presetCandidates ("Fruit Kick", true, fl);
-    CHECK (kick.size() >= 2 && kick[0].find ("Default.fst") != std::string::npos && kick[1].find ("Plugin database") != std::string::npos);
+    CHECK (! kick.empty() && kick[0].find ("Default.fst") != std::string::npos);
+    for (const auto& path : kick)
+        CHECK (path.find ("Plugin database") == std::string::npos);
 }
