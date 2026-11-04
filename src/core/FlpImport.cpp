@@ -947,6 +947,17 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         return found;
     };
 
+    // old presets keep a plugin's sample relative to FL's Data folder ("\\Patches\\…"). A path that already exists is
+    // kept: on macOS / Linux the resolved path itself starts with '/' (round 170i: Granulizer and 3x Osc lost their
+    // sample there)
+    auto dataRelativeSample = [&options] (const std::string& path) {
+        if (path.empty() || (path[0] != '\\' && path[0] != '/') || options.roots.factoryData.empty()
+            || (options.fileExists && (options.fileExists (path) || options.fileExists (path + ".wav"))))
+            return path;
+        auto inData = resolveFlPath ("%FLStudioFactoryData%\\Data" + path, options.roots);
+        return inData.empty() ? path : inData;
+    };
+
     for (const auto& c : project.channels)
     {
         // automation clips become Song::automations (further below), not channels
@@ -1495,8 +1506,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 if (! c.samplePath.empty() && options.fileExists)
                 {
                     auto path = resolveFlPath (c.samplePath, options.roots);
-                    if (! path.empty() && (path[0] == '\\' || path[0] == '/') && ! options.roots.factoryData.empty())
-                        path = options.roots.factoryData + "\\Data" + path; // (old presets: relative to FL's Data folder)
+                    path = dataRelativeSample (path);
                     if (! path.empty() && ! options.fileExists (path) && options.fileExists (path + ".wav"))
                         path += ".wav";
                     if (! path.empty() && options.fileExists (path))
@@ -1516,8 +1526,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 if (! c.samplePath.empty() && options.fileExists)
                 {
                     auto path = resolveFlPath (c.samplePath, options.roots);
-                    if (! path.empty() && (path[0] == '\\' || path[0] == '/') && ! options.roots.factoryData.empty())
-                        path = options.roots.factoryData + "\\Data" + path;
+                    path = dataRelativeSample (path);
                     if (! path.empty() && ! options.fileExists (path) && options.fileExists (path + ".wav"))
                         path += ".wav";
                     if (! path.empty() && options.fileExists (path))

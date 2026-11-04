@@ -110,3 +110,60 @@ TEST (flq170i_render_tests_wrapped_fruity_effects)
     }
     CHECK (seen == 0 || seen == (int) std::size (cases));
 }
+
+TEST (flq170i_granulizer_and_3xosc_samples_on_posix_roots)
+{
+    // FL's render test "Fruity Granulizer" with the installation on a POSIX path (macOS / Linux, as renderwav and the
+    // app there): the channel keeps its sample (it was prefixed with \Data again because the resolved path starts with
+    // '/', and the Granulizer played nothing)
+    using namespace lynx;
+    if (realFlpDir.empty())
+        return;
+    const std::filesystem::path data (realFlpDir);
+    std::ifstream in (data / "System" / "Render tests" / "Fruity Granulizer.flp", std::ios::binary);
+    std::vector<std::uint8_t> b ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
+    if (b.empty() || data.string().empty() || data.string()[0] != '/')
+        return; // (a Windows test run: the paths start with a drive letter)
+    FlpImportOptions options;
+    options.roots = { data.parent_path().string(), data.string(), "" };
+    options.fileExists = [] (const std::string& p) {
+        auto q = p;
+        std::replace (q.begin(), q.end(), '\\', '/');
+        return std::filesystem::exists (q);
+    };
+    const auto song = importFlp (flp::parseProject (b), options);
+    CHECK (song.channels.size() == 1);
+    if (song.channels.size() == 1)
+    {
+        CHECK (song.channels[0].instrument == InstrumentKind::granulizer);
+        CHECK (! song.channels[0].samplePath.empty());
+        CHECK (song.channels[0].samplePath.find ("808 Kick") != std::string::npos);
+    }
+}
+
+TEST (flq170i_old_data_relative_plugin_sample_still_found)
+{
+    // an old preset's "\Patches\…" sample (relative to FL's Data folder) is still looked up there, on Windows roots
+    using namespace lynx;
+    flp::Project p;
+    flp::Channel c;
+    c.index = 0;
+    c.type = flp::ChannelType::native;
+    c.name = "Gran";
+    c.pluginName = "Fruity Granulizer";
+    c.samplePath = "\\Patches\\Packs\\k.wav";
+    {
+        std::vector<std::uint8_t> st (60, 0);
+        st[0] = 5;
+        c.pluginState = st;
+    }
+    p.channels.push_back (c);
+    FlpImportOptions options;
+    options.roots = { "C:\\FL", "C:\\FL\\Data", "" };
+    std::vector<std::string> asked;
+    options.fileExists = [&asked] (const std::string& path) { asked.push_back (path); return path == "C:\\FL\\Data\\Patches\\Packs\\k.wav"; };
+    const auto song = importFlp (p, options);
+    CHECK (song.channels.size() == 1);
+    if (song.channels.size() == 1)
+        CHECK (song.channels[0].samplePath == "C:\\FL\\Data\\Patches\\Packs\\k.wav");
+}
