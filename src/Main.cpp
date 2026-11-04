@@ -7709,8 +7709,9 @@ private:
         juce::File out;
         juce::StringArray log;
         int step = 0, picked = 0;
-        bool ok = true;
+        bool ok = true, menuShown = false;
         std::unique_ptr<juce::DocumentWindow> owner;
+        juce::PopupMenu pending;
 
         static juce::String highlighted()
         {
@@ -7756,13 +7757,20 @@ private:
             owner->setBounds (200, 200, 300, 200);
             owner->setVisible (true);
             lynx::forceForegroundForTest (*owner);
-            lynx::quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (owner.get()), {});
-            startTimer (150);
+            pending = menu; // shown once the window is up and active (X11 maps and activates it asynchronously)
+            startTimer (300);
         }
 
         void timerCallback() override
         {
             const auto e = juce::KeyPress ('e', {}, 'e');
+            if (step == 0 && owner != nullptr && ! menuShown)
+            {
+                menuShown = true;
+                lynx::forceForegroundForTest (*owner);
+                lynx::quickpick::showMenu (pending, juce::PopupMenu::Options().withTargetComponent (owner.get()), {});
+                return;
+            }
             switch (step++)
             {
                 case 0: expect ("menu open", juce::String ((int) (juce::Component::getCurrentlyModalComponent() != nullptr)), "1"); break;
