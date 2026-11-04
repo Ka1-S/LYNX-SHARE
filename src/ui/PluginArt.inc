@@ -949,7 +949,11 @@ juce::String artSelfTest()
                           EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod, EffectKind::geminiDoubler,
                           EffectKind::fruityDelay2, EffectKind::fruityDelay3, EffectKind::fruityDelayBank, EffectKind::ember, EffectKind::aether,
                           EffectKind::fruityBloodOverdrive, EffectKind::fruityFastDist, EffectKind::fruityWaveShaper, EffectKind::fruitySoftClipper,
-                          EffectKind::hardcore, EffectKind::distructor }) // round 170k: the effects' themes
+                          EffectKind::hardcore, EffectKind::distructor, EffectKind::fruityChorus, EffectKind::hyperChorus, EffectKind::vintageChorus,
+                          EffectKind::fruityFlanger, EffectKind::fruityFlangus, EffectKind::fruityPhaser, EffectKind::vintagePhaser,
+                          EffectKind::flFrequencyShifter, EffectKind::parametricEq, EffectKind::fruityLimiter, EffectKind::fruityCompressor,
+                          EffectKind::fruityMultiband, EffectKind::maximus, EffectKind::transientProcessor, EffectKind::stereoShaper,
+                          EffectKind::stereoEnhancer, EffectKind::spreader }) // round 170k: the effects' themes
         expect (artForEffect (k) != Art::none && styleFor (k) == Style::themed, "effect themes (170k)");
     expect (resolve (Style::themed, Art::sakura) == Style::themed && resolve (Style::neon, Art::none) == Style::neon, "automatic");
     setForcedStyle ((int) Style::themed); // Themed everywhere: only plugins with art

@@ -6149,7 +6149,21 @@ private:
                                                  { "fruity-waveshaper", false, I::synth, E::fruityWaveShaper, S::neon },
                                                  { "fruity-soft-clipper", false, I::synth, E::fruitySoftClipper, S::glow },
                                                  { "hardcore", false, I::synth, E::hardcore, S::neon },        { "distructor", false, I::synth, E::distructor, S::vivid } };
+        static const std::vector<ArtPilot> fx5 { { "fruity-chorus", false, I::synth, E::fruityChorus, S::glow },   { "hyper-chorus", false, I::synth, E::hyperChorus, S::vivid },
+                                                 { "vintage-chorus", false, I::synth, E::vintageChorus, S::hardware }, { "fruity-flanger", false, I::synth, E::fruityFlanger, S::vivid },
+                                                 { "fruity-flangus", false, I::synth, E::fruityFlangus, S::neon },  { "fruity-phaser", false, I::synth, E::fruityPhaser, S::neon },
+                                                 { "vintage-phaser", false, I::synth, E::vintagePhaser, S::hardware },
+                                                 { "frequency-shifter", false, I::synth, E::flFrequencyShifter, S::glow } };
+        static const std::vector<ArtPilot> fx6 { { "fruity-parametric-eq-2", false, I::synth, E::parametricEq, S::neon }, { "fruity-limiter", false, I::synth, E::fruityLimiter, S::hardware },
+                                                 { "fruity-compressor", false, I::synth, E::fruityCompressor, S::hardware },
+                                                 { "fruity-multiband-compressor", false, I::synth, E::fruityMultiband, S::glow },
+                                                 { "maximus", false, I::synth, E::maximus, S::hardware },          { "transient-processor", false, I::synth, E::transientProcessor, S::vivid },
+                                                 { "fruity-stereo-shaper", false, I::synth, E::stereoShaper, S::neon },
+                                                 { "fruity-stereo-enhancer", false, I::synth, E::stereoEnhancer, S::neon },
+                                                 { "spreader", false, I::synth, E::spreader, S::neon } };
         if (artSet() == "fx1") return fx1;
+        if (artSet() == "fx5") return fx5;
+        if (artSet() == "fx6") return fx6;
         if (artSet() == "fx4") return fx4;
         if (artSet() == "fx3") return fx3;
         if (artSet() == "fx2") return fx2;

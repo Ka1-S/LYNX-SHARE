@@ -2652,6 +2652,1068 @@ inline const Theme& distructorTheme()
     return t;
 }
 
+// === Fruity Chorus: a choir of waves — several sines slightly out of phase, woven together ========================
+
+inline void wavesWoven (juce::Graphics& g, Rectangle<float> a, int count, float amp, float freq, float spread, Colour c1, Colour c2, float alpha)
+{
+    for (int k = 0; k < count; ++k)
+    {
+        juce::Path w;
+        const auto ph = (float) k * spread;
+        for (float x = a.getX(); x <= a.getRight(); x += 3.0f)
+        {
+            const Point<float> q { x, a.getCentreY() + amp * std::sin ((x - a.getX()) * freq + ph) * (0.8f + 0.2f * std::sin ((x - a.getX()) * 0.004f + ph)) };
+            if (x == a.getX()) w.startNewSubPath (q);
+            else w.lineTo (q);
+        }
+        g.setColour (c1.interpolatedWith (c2, (float) k / (float) juce::jmax (1, count - 1)).withAlpha (alpha));
+        g.strokePath (w, juce::PathStrokeType (1.3f));
+    }
+}
+
+inline void canvasChorus (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    wavesWoven (g, a.withTrimmedTop (a.getHeight() * 0.2f), 5, a.getHeight() * 0.22f, 0.018f, 0.35f, p.accent, p.accent2, 0.14f);
+    softLight (g, { a.getCentreX(), a.getCentreY() }, a.getWidth() * 0.5f, p.accent, 0.05f);
+    vignette (g, a, 0.4f);
+}
+
+inline void chorusEmblem (juce::Graphics& g, Point<float> c, float r) // three waves
+{
+    const auto& p = pal();
+    for (int k = 0; k < 3; ++k)
+    {
+        juce::Path w;
+        for (int i = 0; i <= 16; ++i)
+        {
+            const auto x = -1.0f + 2.0f * (float) i / 16.0f;
+            const Point<float> q { c.x + x * r * 1.2f, c.y + std::sin (x * 3.14f + (float) k * 0.6f) * r * 0.6f };
+            if (i == 0) w.startNewSubPath (q);
+            else w.lineTo (q);
+        }
+        g.setColour (p.accent.interpolatedWith (p.accent2, (float) k / 2.0f));
+        g.strokePath (w, juce::PathStrokeType (1.0f));
+    }
+}
+
+inline void capPebble (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    const auto& p = pal();
+    g.setGradientFill (ColourGradient (p.capTop.brighter (0.3f + hover * 0.2f), c.x - capR * 0.45f, c.y - capR * 0.55f, p.capBottom, c.x + capR * 0.6f, c.y + capR * 0.9f, true));
+    g.fillEllipse (cap.withSizeKeepingCentre (cap.getWidth(), cap.getHeight() * 0.94f));
+    if (fx)
+    {
+        g.setColour (Colours::white.withAlpha (0.35f));
+        g.fillEllipse (Rectangle<float> (capR * 0.5f, capR * 0.28f).withCentre ({ c.x - capR * 0.32f, c.y - capR * 0.48f }));
+    }
+}
+
+inline const Theme& chorusTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Fruity Chorus";
+        x.base = Style::glow;
+        x.pal = { Colour (0xff111a2c), Colour (0xff05080f), Colour (0xff4fd8e8), Colour (0xffb59cff), Colour (0xc0101a2a), Colour (0xdc05080f),
+                  Colour (0xff5a7aa0), Colour (0xffe8f6ff), Colour (0xff04060b), Colour (0xff3a5a7a), Colour (0xff0e1a2a), Colour (0xff1a2638),
+                  Colour (0xffffffff), Colour (0xff141e30) };
+        x.canvas = canvasChorus;
+        x.titleEmblem = chorusEmblem;
+        x.drawCap = capPebble;
+        x.twoTone = true;
+        return x;
+    }();
+    return t;
+}
+
+// === Hyper Chorus: synthwave — a neon sun over a perspective grid floor ============================================
+
+inline void canvasHyperChorus (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto hz = a.getY() + a.getHeight() * 0.55f;
+    // the sun: horizontal slices, pink to orange
+    const auto c = Point<float> (a.getCentreX(), hz);
+    const auto r = a.getHeight() * 0.32f;
+    g.saveState();
+    g.reduceClipRegion (Rectangle<float> (a.getX(), a.getY(), a.getWidth(), hz - a.getY()).toNearestInt());
+    if (! reduced) softLight (g, c, r * 2.2f, p.accent, 0.15f);
+    g.setGradientFill (ColourGradient (Colour (0xffffd25a).withAlpha (0.5f), c.x, c.y - r, p.accent.withAlpha (0.5f), c.x, c.y, false));
+    g.fillEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c));
+    g.setColour (p.bgTop);
+    for (int i = 0; i < 6; ++i)
+        g.fillRect (Rectangle<float> (c.x - r, c.y - r * 0.5f + (float) i * r * 0.1f, r * 2.0f, 1.0f + (float) i * 0.8f));
+    g.restoreState();
+    // the grid floor
+    g.setColour (p.accent2.withAlpha (0.22f));
+    g.fillRect (Rectangle<float> (a.getX(), hz, a.getWidth(), 1.2f));
+    for (int i = -12; i <= 12; ++i)
+        g.drawLine ({ { c.x + (float) i * 14.0f, hz }, { c.x + (float) i * a.getWidth() * 0.12f, a.getBottom() } }, 0.9f);
+    for (int k = 1; k < 8; ++k)
+    {
+        const auto y = hz + (a.getBottom() - hz) * std::pow ((float) k / 8.0f, 1.8f);
+        g.setColour (p.accent2.withAlpha (0.1f + 0.02f * (float) k));
+        g.fillRect (Rectangle<float> (a.getX(), y, a.getWidth(), 1.0f));
+    }
+    vignette (g, a, 0.35f);
+}
+
+inline void hyperChorusEmblem (juce::Graphics& g, Point<float> c, float r) // a sliced sun
+{
+    const auto& p = pal();
+    g.setGradientFill (ColourGradient (Colour (0xffffd25a), c.x, c.y - r, p.accent, c.x, c.y + r, false));
+    g.fillEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c));
+    g.setColour (p.bgTop);
+    for (int i = 0; i < 3; ++i)
+        g.fillRect (Rectangle<float> (c.x - r, c.y + (float) i * r * 0.35f, r * 2.0f, 1.0f));
+}
+
+inline void capNeonRing (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    const auto& p = pal();
+    g.setColour (Colour (0xff0b0614));
+    g.fillEllipse (cap);
+    if (fx && ! reduced) bloom (g, c, capR * 1.3f, p.accent, 0.2f + hover * 0.2f);
+    g.setColour (p.accent.withAlpha (0.85f));
+    g.drawEllipse (cap.reduced (capR * 0.16f), 1.4f);
+    g.setColour (p.accent2.withAlpha (0.6f));
+    g.drawEllipse (cap.reduced (capR * 0.42f), 1.0f);
+}
+
+inline void hyperChorusMotion (juce::Graphics& g, const Motion& m) // a little grid floor scrolling towards the viewer
+{
+    const auto s = m.stage;
+    if (s.getWidth() < 40.0f || s.getHeight() < 10.0f) return;
+    g.saveState();
+    g.reduceClipRegion (s.toNearestInt());
+    const auto off = std::fmod (m.t * 0.6f, 1.0f);
+    for (int k = 0; k < 6; ++k)
+    {
+        const auto f = std::pow (((float) k + off) / 6.0f, 1.8f);
+        g.setColour (m.p.accent2.withAlpha (0.15f + 0.4f * f));
+        g.fillRect (Rectangle<float> (s.getX(), s.getY() + s.getHeight() * f, s.getWidth(), 1.0f));
+    }
+    for (int i = -6; i <= 6; ++i)
+    {
+        g.setColour (m.p.accent2.withAlpha (0.35f));
+        g.drawLine ({ { s.getCentreX() + (float) i * 6.0f, s.getY() }, { s.getCentreX() + (float) i * s.getWidth() * 0.09f, s.getBottom() } }, 0.8f);
+    }
+    g.restoreState();
+}
+
+inline const Theme& hyperChorusTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Hyper Chorus";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff1e0c33), Colour (0xff07030f), Colour (0xffff3fa4), Colour (0xff3fe8ff), Colour (0xc01a0a2c), Colour (0xdc07030f),
+                  Colour (0xff8a4aa0), Colour (0xffffe6f6), Colour (0xff05020a), Colour (0xff2a1440), Colour (0xff0b0614), Colour (0xff22103a),
+                  Colour (0xffffffff), Colour (0xff1c0b2e) };
+        x.canvas = canvasHyperChorus;
+        x.titleEmblem = hyperChorusEmblem;
+        x.drawCap = capNeonRing;
+        x.twoTone = true;
+        x.pointer = Pointer::glowLine;
+        x.arcGlow = 0.35f;
+        x.stageRepaint = true;
+        x.paintMotion = hyperChorusMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === Vintage Chorus: a 1980s rack chorus — brushed silver, two big push buttons and red lamps printed as decoration =
+
+inline void canvasVintageChorus (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    brushedLines (g, a, 1984, 0.05f);
+    // a black stripe across the top like the unit's legend band
+    g.setColour (Colours::black.withAlpha (0.22f));
+    g.fillRect (Rectangle<float> (a.getX(), a.getY() + a.getHeight() * 0.06f, a.getWidth(), 10.0f));
+    // two big push buttons with red lamps, low right, as decoration
+    for (int i = 0; i < 2; ++i)
+    {
+        const auto b = Rectangle<float> (36.0f, 22.0f).withCentre ({ a.getRight() - 70.0f + (float) i * 44.0f, a.getBottom() - 26.0f });
+        g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.12f), 0.0f, b.getY(), Colours::black.withAlpha (0.12f), 0.0f, b.getBottom(), false));
+        g.fillRoundedRectangle (b, 2.0f);
+        g.setColour (p.accent.withAlpha (0.35f));
+        g.fillEllipse (Rectangle<float> (5.0f, 5.0f).withCentre (b.getCentre().translated (0.0f, -18.0f)));
+    }
+    cornerScrews (g, a, 8.0f, 7.0f);
+    vignette (g, a, 0.3f);
+}
+
+inline void vintageChorusEmblem (juce::Graphics& g, Point<float> c, float r) // two lamps
+{
+    const auto& p = pal();
+    for (const auto dx : { -0.6f, 0.6f })
+    {
+        if (! reduced) bloom (g, c.translated (dx * r, 0.0f), r * 1.4f, p.accent, 0.3f);
+        g.setColour (p.accent);
+        g.fillEllipse (Rectangle<float> (r * 0.8f, r * 0.8f).withCentre (c.translated (dx * r, 0.0f)));
+    }
+}
+
+inline const Theme& vintageChorusTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Vintage Chorus";
+        x.base = Style::hardware;
+        x.pal = { Colour (0xff8a8e94), Colour (0xff4a4e54), Colour (0xffff3a2e), Colour (0xff2a2a2e), Colour (0xd8555a60), Colour (0xe83a3e44),
+                  Colour (0xffb5bac0), Colour (0xff111214), Colour (0xff141517), Colour (0xffe2e5e9), Colour (0xff7d838a), Colour (0xff2e3136),
+                  Colour (0xff111214), Colour (0xff6a6e74) };
+        x.canvas = canvasVintageChorus;
+        x.sectionDeco = ridgeScrews;
+        x.titleEmblem = vintageChorusEmblem;
+        x.drawCap = capChrome;
+        x.buttTrack = true;
+        x.arcGlow = 0.15f;
+        x.thumbPointer = true;
+        return x;
+    }();
+    return t;
+}
+
+// === Fruity Flanger: a jet — a contrail sweeping through a comb of stripes =========================================
+
+inline void canvasFlanger (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    // the comb: vertical stripes whose spacing sweeps across the panel
+    auto x = a.getX();
+    for (int i = 0; x < a.getRight(); ++i)
+    {
+        const auto u = (x - a.getX()) / a.getWidth();
+        const auto gap = 6.0f + 18.0f * (0.5f + 0.5f * std::sin (u * 6.0f));
+        g.setColour (p.accent2.withAlpha (0.05f));
+        g.fillRect (Rectangle<float> (x, a.getY(), 1.5f, a.getHeight()));
+        x += gap;
+    }
+    // the contrail: a long swoosh from low left to high right, widening
+    juce::Path trail;
+    trail.startNewSubPath (a.getX(), a.getBottom() - a.getHeight() * 0.15f);
+    trail.cubicTo (a.getX() + a.getWidth() * 0.4f, a.getBottom() - a.getHeight() * 0.1f, a.getX() + a.getWidth() * 0.6f, a.getY() + a.getHeight() * 0.5f,
+                   a.getRight(), a.getY() + a.getHeight() * 0.12f);
+    if (! reduced)
+    {
+        g.setColour (Colours::white.withAlpha (0.04f));
+        g.strokePath (trail, stroke (22.0f));
+    }
+    g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.02f), a.getX(), a.getBottom(), Colours::white.withAlpha (0.28f), a.getRight(), a.getY(), false));
+    g.strokePath (trail, stroke (2.5f));
+    vignette (g, a, 0.35f);
+}
+
+inline void flangerEmblem (juce::Graphics& g, Point<float> c, float r) // a swoosh
+{
+    juce::Path s;
+    s.startNewSubPath (c.x - r * 1.2f, c.y + r * 0.7f);
+    s.quadraticTo (c.x, c.y + r * 0.6f, c.x + r * 1.2f, c.y - r * 0.8f);
+    g.setColour (pal().accent);
+    g.strokePath (s, stroke (2.0f));
+}
+
+inline const Theme& flangerTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Fruity Flanger";
+        x.base = Style::vivid;
+        x.pal = { Colour (0xff1b2735), Colour (0xff070b11), Colour (0xff6ac8ff), Colour (0xffeaf6ff), Colour (0xc01a2534), Colour (0xdc070b11),
+                  Colour (0xff6a8aa8), Colour (0xffeef6ff), Colour (0xff050810), Colour (0xffc8d0d8), Colour (0xff5a646e), Colour (0xff1e2a38),
+                  Colour (0xff0f1a26), Colour (0xff1a2534) };
+        x.canvas = canvasFlanger;
+        x.titleEmblem = flangerEmblem;
+        x.drawCap = capBrushed;
+        x.arcGlow = 0.25f;
+        return x;
+    }();
+    return t;
+}
+
+// === Fruity Flangus: liquid metal — a mercury surface with ripples ================================================
+
+inline void canvasFlangus (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    // ripples from two drops, interfering
+    for (const auto& c : { Point<float> (a.getX() + a.getWidth() * 0.3f, a.getY() + a.getHeight() * 0.6f), Point<float> (a.getX() + a.getWidth() * 0.75f, a.getY() + a.getHeight() * 0.35f) })
+        for (int i = 1; i < 14; ++i)
+        {
+            const auto r = (float) i * 16.0f;
+            g.setColour ((i % 2 == 0 ? p.accent2 : p.accent).withAlpha (0.07f - 0.004f * (float) i));
+            g.drawEllipse (Rectangle<float> (r * 2.0f, r * 0.8f).withCentre (c), 1.6f);
+        }
+    // a sheen band across
+    g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.0f), 0.0f, a.getY() + a.getHeight() * 0.3f, Colours::white.withAlpha (0.05f), 0.0f, a.getY() + a.getHeight() * 0.45f, false));
+    g.fillRect (a.withTrimmedTop (a.getHeight() * 0.3f).withHeight (a.getHeight() * 0.15f));
+    vignette (g, a, 0.4f);
+}
+
+inline void flangusEmblem (juce::Graphics& g, Point<float> c, float r) // a ripple
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    g.drawEllipse (Rectangle<float> (r * 2.2f, r * 0.9f).withCentre (c), 1.2f);
+    g.setColour (p.accent2);
+    g.drawEllipse (Rectangle<float> (r * 1.1f, r * 0.45f).withCentre (c), 1.0f);
+}
+
+inline void capMercury (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    ColourGradient m (Colours::white.withAlpha (0.95f), c.x - capR * 0.4f, c.y - capR * 0.6f, Colour (0xff3a3e48), c.x + capR * 0.6f, c.y + capR, true);
+    m.addColour (0.5, Colour (0xffa8afba).brighter (hover * 0.15f));
+    g.setGradientFill (m);
+    g.fillEllipse (cap);
+    if (fx)
+    {
+        g.setColour (pal().accent.withAlpha (0.25f));
+        g.drawEllipse (cap.reduced (capR * 0.3f).translated (capR * 0.1f, capR * 0.15f), 0.8f);
+    }
+}
+
+inline const Theme& flangusTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Fruity Flangus";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff23222e), Colour (0xff09090f), Colour (0xffb28aff), Colour (0xffd8dde3), Colour (0xc021202c), Colour (0xdc09090f),
+                  Colour (0xff7a7890), Colour (0xfff2f0ff), Colour (0xff06060a), Colour (0xffd8dde3), Colour (0xff4a4e58), Colour (0xff22212e),
+                  Colour (0xff1a1830), Colour (0xff201f2c) };
+        x.canvas = canvasFlangus;
+        x.titleEmblem = flangusEmblem;
+        x.drawCap = capMercury;
+        x.twoTone = true;
+        return x;
+    }();
+    return t;
+}
+
+// === Fruity Phaser: phase rings — concentric rings sliding out of phase (a moiré) ==================================
+
+inline void canvasPhaser (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto c1 = Point<float> (a.getX() + a.getWidth() * 0.62f, a.getCentreY());
+    const auto c2 = c1.translated (14.0f, 4.0f);
+    for (int i = 1; i < 28; ++i)
+    {
+        const auto r = (float) i * 9.0f;
+        g.setColour (p.accent.withAlpha (0.06f));
+        g.drawEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c1), 1.4f);
+        g.setColour (p.accent2.withAlpha (0.05f));
+        g.drawEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c2), 1.4f);
+    }
+    vignette (g, a, 0.45f);
+}
+
+inline void phaserEmblem (juce::Graphics& g, Point<float> c, float r) // two offset rings
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    g.drawEllipse (Rectangle<float> (r * 1.6f, r * 1.6f).withCentre (c.translated (-r * 0.3f, 0.0f)), 1.3f);
+    g.setColour (p.accent2);
+    g.drawEllipse (Rectangle<float> (r * 1.6f, r * 1.6f).withCentre (c.translated (r * 0.3f, 0.0f)), 1.3f);
+}
+
+inline const Theme& phaserTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Fruity Phaser";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff0f1f22), Colour (0xff04090a), Colour (0xffff9a3c), Colour (0xff3ce0d0), Colour (0xc00e1d20), Colour (0xdc04090a),
+                  Colour (0xff4f7a7a), Colour (0xfffff0e0), Colour (0xff030707), Colour (0xff2a3a3c), Colour (0xff0b1213), Colour (0xff17292c),
+                  Colour (0xffffe6cc), Colour (0xff122326) };
+        x.canvas = canvasPhaser;
+        x.titleEmblem = phaserEmblem;
+        x.cap = Cap::rubber;
+        x.twoTone = true;
+        x.arcGlow = 0.28f;
+        return x;
+    }();
+    return t;
+}
+
+// === Vintage Phaser: a small phaser stomp box in burnt-orange enamel with a jewel lamp ==============================
+
+inline void canvasVintagePhaser (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    if (! reduced) // hammertone enamel
+    {
+        juce::Random rnd (1974);
+        for (int i = 0; i < (int) (a.getWidth() * a.getHeight() / 220.0f); ++i)
+        {
+            const auto r = 2.0f + rnd.nextFloat() * 4.0f;
+            g.setColour ((rnd.nextBool() ? Colours::white : Colours::black).withAlpha (0.035f));
+            g.fillEllipse (Rectangle<float> (r * 2.0f, r * 1.7f).withCentre ({ a.getX() + rnd.nextFloat() * a.getWidth(), a.getY() + rnd.nextFloat() * a.getHeight() }));
+        }
+    }
+    softLight (g, { a.getX() + a.getWidth() * 0.3f, a.getY() }, a.getWidth() * 0.6f, Colours::white, 0.06f);
+    cornerScrews (g, a, 9.0f, 8.0f);
+    vignette (g, a, 0.4f);
+}
+
+inline void vintagePhaserMotion (juce::Graphics& g, const Motion& m) // the jewel lamp blinks slowly (an LFO's pace)
+{
+    const auto s = m.stage;
+    if (s.getWidth() < 16.0f) return;
+    const auto c = Point<float> (s.getRight() - 12.0f, s.getCentreY());
+    const auto pulse = 0.5f + 0.5f * std::sin (m.t * 3.0f);
+    if (! reduced) bloom (g, c, 12.0f, m.p.accent2, 0.15f + 0.45f * pulse);
+    g.setColour (m.p.accent2.interpolatedWith (Colours::white, 0.35f * pulse));
+    g.fillEllipse (Rectangle<float> (7.0f, 7.0f).withCentre (c));
+    g.setColour (Colour (0xffc9ccd1));
+    g.drawEllipse (Rectangle<float> (9.0f, 9.0f).withCentre (c), 1.0f);
+}
+
+inline void vintagePhaserEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    if (! reduced) bloom (g, c, r * 2.4f, p.accent2, 0.4f);
+    g.setColour (p.accent2);
+    g.fillEllipse (Rectangle<float> (r * 1.4f, r * 1.4f).withCentre (c));
+    g.setColour (Colour (0xffc9ccd1));
+    g.drawEllipse (Rectangle<float> (r * 1.8f, r * 1.8f).withCentre (c), 1.0f);
+}
+
+inline const Theme& vintagePhaserTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Vintage Phaser";
+        x.base = Style::hardware;
+        x.pal = { Colour (0xffd4561e), Colour (0xff8a3410), Colour (0xfffff0dc), Colour (0xffff3a2e), Colour (0xd0b2471a), Colour (0xe0802e0e),
+                  Colour (0xffffb08a), Colour (0xfffff6ea), Colour (0xff2a1006), Colour (0xff2c2c2c), Colour (0xff0b0b0b), Colour (0xff5a2208),
+                  Colour (0xfff4f4f4), Colour (0xff9a3c14) };
+        x.canvas = canvasVintagePhaser;
+        x.titleEmblem = vintagePhaserEmblem;
+        x.drawCap = capPedal;
+        x.pointerFrom = 0.3f;
+        x.arcGlow = 0.0f;
+        x.stageRepaint = true;
+        x.paintMotion = vintagePhaserMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === Frequency Shifter: a radio dial — a tuning strip with a needle and station marks, bakelite and cream glow =====
+
+inline void canvasFreqShifter (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    // the dial window along the top: a warm glowing strip with a scale and a red needle
+    const auto dial = Rectangle<float> (a.getX() + a.getWidth() * 0.08f, a.getY() + a.getHeight() * 0.06f, a.getWidth() * 0.84f, 26.0f);
+    if (! reduced) softLight (g, dial.getCentre(), dial.getWidth() * 0.55f, p.accent, 0.08f);
+    g.setGradientFill (ColourGradient (p.accent.withAlpha (0.10f), 0.0f, dial.getY(), p.accent.withAlpha (0.04f), 0.0f, dial.getBottom(), false));
+    g.fillRoundedRectangle (dial, 4.0f);
+    g.setColour (p.accent.withAlpha (0.25f));
+    for (int i = 0; i <= 40; ++i)
+    {
+        const auto x = dial.getX() + 8.0f + (dial.getWidth() - 16.0f) * (float) i / 40.0f;
+        g.fillRect (Rectangle<float> (x, dial.getBottom() - (i % 5 == 0 ? 10.0f : 5.0f), 1.0f, i % 5 == 0 ? 8.0f : 3.0f));
+    }
+    g.setColour (p.accent2.withAlpha (0.6f));
+    g.fillRect (Rectangle<float> (dial.getX() + dial.getWidth() * 0.62f, dial.getY() + 3.0f, 1.6f, dial.getHeight() - 6.0f));
+    // a speaker cloth weave low on the panel
+    if (! reduced)
+    {
+        g.setColour (Colours::black.withAlpha (0.12f));
+        for (float x = a.getX(); x < a.getRight(); x += 4.0f)
+            g.drawLine (x, a.getBottom() - a.getHeight() * 0.25f, x + 8.0f, a.getBottom(), 0.7f);
+    }
+    vignette (g, a, 0.45f);
+}
+
+inline void freqShifterEmblem (juce::Graphics& g, Point<float> c, float r) // a needle on a scale
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    for (int i = 0; i < 5; ++i)
+        g.fillRect (Rectangle<float> (1.0f, i % 2 == 0 ? r * 0.8f : r * 0.4f).withCentre (c.translated (-r + (float) i * r * 0.5f, r * 0.3f)));
+    g.setColour (p.accent2);
+    g.fillRect (Rectangle<float> (1.6f, r * 2.0f).withCentre (c.translated (r * 0.2f, 0.0f)));
+}
+
+inline const Theme& freqShifterTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Frequency Shifter";
+        x.base = Style::hardware;
+        x.pal = { Colour (0xff2a1a12), Colour (0xff0d0806), Colour (0xffffe7b0), Colour (0xffff4a3a), Colour (0xd0261810), Colour (0xe40d0806),
+                  Colour (0xff8a6a4a), Colour (0xfffff2d8), Colour (0xff080504), Colour (0xff4a2e1e), Colour (0xff1a100a), Colour (0xff24170f),
+                  Colour (0xfffff2d8), Colour (0xff261810) };
+        x.canvas = canvasFreqShifter;
+        x.titleEmblem = freqShifterEmblem;
+        x.cap = Cap::bakelite;
+        x.pointerFrom = 0.15f;
+        x.ticks = 11;
+        x.buttTrack = true;
+        x.arcGlow = 0.0f;
+        x.thumbPointer = true;
+        return x;
+    }();
+    return t;
+}
+
+// === Fruity Parametric EQ 2: engineering graph paper under the curve, ink blue ======================================
+
+inline void canvasParamEq (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    // graph paper: a fine grid, every 5th line stronger
+    for (int i = 0; (float) i * 8.0f < juce::jmax (a.getWidth(), a.getHeight()); ++i)
+    {
+        g.setColour (p.accent.withAlpha (i % 5 == 0 ? 0.07f : 0.025f));
+        if ((float) i * 8.0f < a.getWidth()) g.fillRect (Rectangle<float> (a.getX() + (float) i * 8.0f, a.getY(), 1.0f, a.getHeight()));
+        if ((float) i * 8.0f < a.getHeight()) g.fillRect (Rectangle<float> (a.getX(), a.getY() + (float) i * 8.0f, a.getWidth(), 1.0f));
+    }
+    // a drafting curve: a few bells summed, drawn faintly like a pencil line
+    juce::Path curve;
+    for (float x = a.getX(); x <= a.getRight(); x += 3.0f)
+    {
+        const auto u = (x - a.getX()) / a.getWidth();
+        const auto y = 0.35f * std::exp (-std::pow ((u - 0.2f) / 0.08f, 2.0f)) - 0.25f * std::exp (-std::pow ((u - 0.55f) / 0.12f, 2.0f))
+                       + 0.2f * std::exp (-std::pow ((u - 0.85f) / 0.06f, 2.0f));
+        const Point<float> q { x, a.getCentreY() - y * a.getHeight() * 0.6f };
+        if (x == a.getX()) curve.startNewSubPath (q);
+        else curve.lineTo (q);
+    }
+    g.setColour (p.accent2.withAlpha (0.14f));
+    g.strokePath (curve, stroke (1.6f));
+    vignette (g, a, 0.35f);
+}
+
+inline void paramEqEmblem (juce::Graphics& g, Point<float> c, float r) // a bell
+{
+    juce::Path b;
+    for (int i = 0; i <= 20; ++i)
+    {
+        const auto x = -1.0f + 2.0f * (float) i / 20.0f;
+        const Point<float> q { c.x + x * r * 1.2f, c.y + r * 0.6f - std::exp (-x * x * 5.0f) * r * 1.3f };
+        if (i == 0) b.startNewSubPath (q);
+        else b.lineTo (q);
+    }
+    g.setColour (pal().accent);
+    g.strokePath (b, stroke (1.4f));
+}
+
+inline const Theme& paramEqTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Fruity Parametric EQ 2";
+        x.base = Style::glow;
+        x.pal = { Colour (0xff0f1b2e), Colour (0xff050a12), Colour (0xff46c8ff), Colour (0xffe8f4ff), Colour (0xc00e1a2c), Colour (0xdc050a12),
+                  Colour (0xff4a6a90), Colour (0xffe8f4ff), Colour (0xff040810), Colour (0xff2a3a52), Colour (0xff0e1624), Colour (0xff1a2840),
+                  Colour (0xffe8f4ff), Colour (0xff12203a) };
+        x.canvas = canvasParamEq;
+        x.titleEmblem = paramEqEmblem;
+        x.thin = true;
+        x.kerning = 0.08f;
+        x.cap = Cap::flat;
+        x.arcGlow = 0.0f;
+        return x;
+    }();
+    return t;
+}
+
+// === Fruity Limiter: a brick wall — a level line pressing up against a wall of bricks ==============================
+
+inline void canvasLimiter (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    // the wall across the top
+    const auto wall = a.withHeight (a.getHeight() * 0.22f);
+    const auto bw = 34.0f, bh = 13.0f;
+    for (float y = wall.getY(); y < wall.getBottom(); y += bh)
+    {
+        const auto row = (int) ((y - wall.getY()) / bh);
+        for (float x = wall.getX() - (row % 2 == 0 ? 0.0f : bw * 0.5f); x < wall.getRight(); x += bw)
+        {
+            const auto brick = Rectangle<float> (x + 1.0f, y + 1.0f, bw - 2.0f, bh - 2.0f);
+            g.setGradientFill (ColourGradient (p.accent.withAlpha (0.28f), 0.0f, brick.getY(), p.accent.darker (0.6f).withAlpha (0.22f), 0.0f, brick.getBottom(), false));
+            g.fillRect (brick);
+        }
+    }
+    g.setGradientFill (ColourGradient (Colours::transparentBlack, 0.0f, wall.getY(), p.bgBottom.withAlpha (0.4f), 0.0f, wall.getBottom(), false));
+    g.fillRect (wall);
+    // peaks pushing up to the wall and flattening there
+    juce::Path wave;
+    juce::Random rnd (2);
+    wave.startNewSubPath (a.getX(), a.getBottom());
+    for (float x = a.getX(); x <= a.getRight(); x += 4.0f)
+        wave.lineTo (x, juce::jmax (wall.getBottom() + 2.0f, a.getBottom() - a.getHeight() * (0.3f + 0.6f * rnd.nextFloat())));
+    wave.lineTo (a.getRight(), a.getBottom());
+    wave.closeSubPath();
+    g.setColour (p.accent2.withAlpha (0.06f));
+    g.fillPath (wave);
+    vignette (g, a, 0.4f);
+}
+
+inline void limiterEmblem (juce::Graphics& g, Point<float> c, float r) // a brick
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    g.fillRect (Rectangle<float> (r * 2.0f, r * 0.8f).withCentre (c.translated (0.0f, -r * 0.45f)));
+    g.fillRect (Rectangle<float> (r * 0.9f, r * 0.8f).withCentre (c.translated (-r * 0.55f, r * 0.5f)));
+    g.fillRect (Rectangle<float> (r * 0.9f, r * 0.8f).withCentre (c.translated (r * 0.55f, r * 0.5f)));
+}
+
+inline const Theme& limiterTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Fruity Limiter";
+        x.base = Style::hardware;
+        x.pal = { Colour (0xff221c1b), Colour (0xff0b0909), Colour (0xffc0483a), Colour (0xffd8d0c8), Colour (0xc8201a19), Colour (0xe00b0909),
+                  Colour (0xff7a5a52), Colour (0xfff4ece6), Colour (0xff070606), Colour (0xff2c2c2c), Colour (0xff0e0e0e), Colour (0xff241e1d),
+                  Colour (0xfff4ece6), Colour (0xff221c1b) };
+        x.canvas = canvasLimiter;
+        x.titleEmblem = limiterEmblem;
+        x.cap = Cap::rubber;
+        x.arcGlow = 0.22f;
+        return x;
+    }();
+    return t;
+}
+
+// === Fruity Compressor: a spring press — a coil being squeezed, steel and amber ===================================
+
+inline void coil (juce::Graphics& g, Point<float> top, float w, float h, int turns, Colour col, float width)
+{
+    juce::Path s;
+    s.startNewSubPath (top);
+    for (int i = 0; i <= turns * 16; ++i)
+    {
+        const auto u = (float) i / (float) (turns * 16);
+        s.lineTo (top.x + w * 0.5f * std::sin (u * (float) turns * juce::MathConstants<float>::twoPi), top.y + u * h);
+    }
+    g.setColour (col);
+    g.strokePath (s, stroke (width));
+}
+
+inline void canvasCompressor (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    // three springs, more and more compressed, along the right
+    for (int i = 0; i < 3; ++i)
+    {
+        const auto h = a.getHeight() * (0.7f - 0.2f * (float) i);
+        const auto x = a.getRight() - a.getWidth() * (0.32f - 0.11f * (float) i);
+        const auto top = Point<float> (x, a.getBottom() - h - 10.0f);
+        g.setColour (p.accent2.withAlpha (0.12f)); // the press plate
+        g.fillRect (Rectangle<float> (40.0f, 4.0f).withCentre (top.translated (0.0f, -3.0f)));
+        coil (g, top, 30.0f, h, 9, p.accent2.withAlpha (0.14f), 1.5f);
+    }
+    softLight (g, { a.getX() + a.getWidth() * 0.2f, a.getY() }, a.getWidth() * 0.5f, p.accent, 0.08f);
+    vignette (g, a, 0.4f);
+}
+
+inline void compressorEmblem (juce::Graphics& g, Point<float> c, float r) { coil (g, c.translated (0.0f, -r), r * 1.6f, r * 2.0f, 4, pal().accent, 1.2f); }
+
+inline const Theme& compressorTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Fruity Compressor";
+        x.base = Style::hardware;
+        x.pal = { Colour (0xff1e2226), Colour (0xff0a0c0e), Colour (0xffffb84d), Colour (0xffc8d0d8), Colour (0xc81c2024), Colour (0xe00a0c0e),
+                  Colour (0xff6a7480), Colour (0xfff2f0ea), Colour (0xff060708), Colour (0xffc9d2dc), Colour (0xff59626d), Colour (0xff1e2328),
+                  Colour (0xff15181b), Colour (0xff1c2024) };
+        x.canvas = canvasCompressor;
+        x.titleEmblem = compressorEmblem;
+        x.drawCap = capBrushed;
+        x.arcGlow = 0.2f;
+        return x;
+    }();
+    return t;
+}
+
+// === Fruity Multiband Compressor: three strata, like a geological cross-section ===================================
+
+inline void canvasMultiband (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const Colour bands[] { Colour (0xff4fa8ff), Colour (0xff4fe08a), Colour (0xffff6a5a) }; // high on top, low at the bottom
+    juce::Random rnd (3);
+    for (int b = 0; b < 3; ++b)
+    {
+        juce::Path layer;
+        const auto y0 = a.getY() + a.getHeight() * (0.15f + 0.28f * (float) b);
+        layer.startNewSubPath (a.getX(), a.getBottom());
+        for (float x = a.getX(); x <= a.getRight(); x += 12.0f)
+            layer.lineTo (x, y0 + 10.0f * std::sin ((x - a.getX()) * 0.012f + (float) b * 1.7f) + rnd.nextFloat() * 3.0f);
+        layer.lineTo (a.getRight(), a.getBottom());
+        layer.closeSubPath();
+        g.setGradientFill (ColourGradient (bands[b].withAlpha (0.11f), 0.0f, y0, bands[b].withAlpha (0.03f), 0.0f, a.getBottom(), false));
+        g.fillPath (layer);
+    }
+    vignette (g, a, 0.4f);
+}
+
+inline void multibandEmblem (juce::Graphics& g, Point<float> c, float r) // three bars
+{
+    const Colour bands[] { Colour (0xff4fa8ff), Colour (0xff4fe08a), Colour (0xffff6a5a) };
+    for (int b = 0; b < 3; ++b)
+    {
+        g.setColour (bands[b]);
+        g.fillRect (Rectangle<float> (r * 2.0f, r * 0.42f).withCentre (c.translated (0.0f, ((float) b - 1.0f) * r * 0.62f)));
+    }
+}
+
+inline const Theme& multibandTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Fruity Multiband Compressor";
+        x.base = Style::glow;
+        x.pal = { Colour (0xff181c22), Colour (0xff07090c), Colour (0xff4fe08a), Colour (0xff4fa8ff), Colour (0xc0161a20), Colour (0xdc07090c),
+                  Colour (0xff5a6a7a), Colour (0xffeef4f8), Colour (0xff05070a), Colour (0xff2a3038), Colour (0xff0e1116), Colour (0xff1c2128),
+                  Colour (0xffffffff), Colour (0xff181d24) };
+        x.canvas = canvasMultiband;
+        x.titleEmblem = multibandEmblem;
+        x.twoTone = true;
+        x.cap = Cap::flat;
+        return x;
+    }();
+    return t;
+}
+
+// === Maximus: maximum — pressure gauges, chrome and hot yellow ====================================================
+
+inline void gauge (juce::Graphics& g, Point<float> c, float r, float value, Colour col, float alpha)
+{
+    g.setColour (col.withAlpha (0.08f * alpha));
+    g.fillEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c));
+    g.setColour (col.withAlpha (0.3f * alpha));
+    g.drawEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c), 1.2f);
+    for (int i = 0; i <= 10; ++i)
+    {
+        const auto ang = arcStart + arcRange * (float) i / 10.0f;
+        const Point<float> d { std::sin (ang), -std::cos (ang) };
+        g.setColour ((i >= 8 ? Colour (0xffff3a2e) : col).withAlpha (0.35f * alpha));
+        g.drawLine ({ c + d * r * 0.78f, c + d * r * 0.92f }, 1.2f);
+    }
+    const auto ang = arcStart + arcRange * value;
+    g.setColour (col.withAlpha (0.5f * alpha));
+    g.drawLine ({ c, c + Point<float> (std::sin (ang), -std::cos (ang)) * r * 0.75f }, 1.6f);
+}
+
+inline void canvasMaximus (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto r = juce::jmin (a.getHeight() * 0.28f, a.getWidth() * 0.12f);
+    gauge (g, { a.getX() + a.getWidth() * 0.18f, a.getY() + a.getHeight() * 0.4f }, r, 0.92f, p.accent, 1.0f);
+    gauge (g, { a.getX() + a.getWidth() * 0.5f, a.getY() + a.getHeight() * 0.65f }, r * 0.8f, 0.7f, p.accent, 0.8f);
+    gauge (g, { a.getX() + a.getWidth() * 0.82f, a.getY() + a.getHeight() * 0.38f }, r * 0.9f, 0.85f, p.accent, 0.9f);
+    softLight (g, { a.getCentreX(), a.getY() }, a.getWidth() * 0.5f, p.accent, 0.06f);
+    vignette (g, a, 0.4f);
+}
+
+inline void maximusEmblem (juce::Graphics& g, Point<float> c, float r) { gauge (g, c, r * 1.1f, 0.9f, pal().accent, 3.0f); }
+
+inline const Theme& maximusTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Maximus";
+        x.base = Style::hardware;
+        x.pal = { Colour (0xff1a1a1c), Colour (0xff070708), Colour (0xffffd43b), Colour (0xffe0e4e8), Colour (0xc818181a), Colour (0xe0070708),
+                  Colour (0xff7a7458), Colour (0xfffff8dc), Colour (0xff050505), Colour (0xffe0e4e8), Colour (0xff3a3e44), Colour (0xff222224),
+                  Colour (0xff111111), Colour (0xff1c1c1e) };
+        x.canvas = canvasMaximus;
+        x.titleEmblem = maximusEmblem;
+        x.drawCap = capChrome;
+        x.pointer = Pointer::glowLine;
+        x.arcGlow = 0.3f;
+        return x;
+    }();
+    return t;
+}
+
+// === Transient Processor: a strike — the flash of an attack and a long soft tail ==================================
+
+inline void canvasTransient (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto hit = Point<float> (a.getX() + a.getWidth() * 0.18f, a.getCentreY());
+    if (! reduced) softLight (g, hit, a.getHeight() * 0.7f, p.accent, 0.2f);
+    // the envelope: a sharp spike and an exponential tail
+    juce::Path env;
+    env.startNewSubPath (a.getX(), a.getBottom() - 6.0f);
+    env.lineTo (hit.x - 3.0f, a.getBottom() - 6.0f);
+    env.lineTo (hit.x, a.getY() + a.getHeight() * 0.1f);
+    for (float x = hit.x; x <= a.getRight(); x += 4.0f)
+        env.lineTo (x, a.getBottom() - 6.0f - (a.getHeight() * 0.85f) * std::exp (-(x - hit.x) / (a.getWidth() * 0.18f)));
+    g.setColour (p.accent2.withAlpha (0.2f));
+    g.strokePath (env, stroke (1.6f));
+    // flash rays at the hit
+    for (int i = 0; i < 10; ++i)
+    {
+        const auto ang = juce::MathConstants<float>::twoPi * (float) i / 10.0f;
+        g.setColour (p.accent.withAlpha (0.12f));
+        g.drawLine ({ hit + Point<float> (std::cos (ang), std::sin (ang)) * 8.0f, hit + Point<float> (std::cos (ang), std::sin (ang)) * (20.0f + (float) (i % 3) * 10.0f) }, 1.2f);
+    }
+    vignette (g, a, 0.4f);
+}
+
+inline void transientEmblem (juce::Graphics& g, Point<float> c, float r) // a spike and a tail
+{
+    juce::Path e;
+    e.startNewSubPath (c.x - r * 1.2f, c.y + r * 0.8f);
+    e.lineTo (c.x - r * 0.7f, c.y - r);
+    e.quadraticTo (c.x - r * 0.4f, c.y + r * 0.6f, c.x + r * 1.2f, c.y + r * 0.8f);
+    g.setColour (pal().accent);
+    g.strokePath (e, stroke (1.4f));
+}
+
+inline void capDrumHead (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    const auto& p = pal();
+    g.setColour (p.accent2.darker (0.6f));
+    g.fillEllipse (cap);
+    g.setGradientFill (ColourGradient (Colour (0xfff4f2ec).brighter (hover * 0.1f), c.x - capR * 0.3f, c.y - capR * 0.5f, Colour (0xffb8b4a8), c.x + capR * 0.5f, c.y + capR, true));
+    g.fillEllipse (cap.reduced (capR * 0.12f));
+    if (fx)
+    {
+        g.setColour (Colours::black.withAlpha (0.15f));
+        g.drawEllipse (cap.reduced (capR * 0.5f), 0.8f);
+    }
+}
+
+inline const Theme& transientTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Transient Processor";
+        x.base = Style::vivid;
+        x.pal = { Colour (0xff1a1630), Colour (0xff07060f), Colour (0xffffffff), Colour (0xff8a7aff), Colour (0xc018142c), Colour (0xdc07060f),
+                  Colour (0xff6a5a9a), Colour (0xfff4f0ff), Colour (0xff05040a), Colour (0xfff4f2ec), Colour (0xffb8b4a8), Colour (0xff221c3a),
+                  Colour (0xff1a1630), Colour (0xff1c1834) };
+        x.canvas = canvasTransient;
+        x.titleEmblem = transientEmblem;
+        x.drawCap = capDrumHead;
+        x.twoTone = true;
+        x.arcGlow = 0.3f;
+        return x;
+    }();
+    return t;
+}
+
+// === Fruity Stereo Shaper: the stereo field — a goniometer diamond with a Lissajous haze ==========================
+
+inline void canvasStereoShaper (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto c = Point<float> (a.getX() + a.getWidth() * 0.72f, a.getCentreY());
+    const auto r = juce::jmin (a.getWidth(), a.getHeight()) * 0.42f;
+    juce::Path d;
+    d.addQuadrilateral (c.x, c.y - r, c.x + r, c.y, c.x, c.y + r, c.x - r, c.y);
+    g.setColour (p.accent.withAlpha (0.14f));
+    g.strokePath (d, juce::PathStrokeType (1.2f));
+    g.drawLine (c.x, c.y - r, c.x, c.y + r, 0.8f);
+    g.drawLine (c.x - r, c.y, c.x + r, c.y, 0.8f);
+    // the haze: a few Lissajous loops of a slightly decorrelated stereo signal
+    juce::Path l;
+    lissajous (l, c, r * 0.35f, r * 0.75f, 3.0f, 2.0f, 0.7f, 240);
+    l.applyTransform (juce::AffineTransform::rotation (juce::MathConstants<float>::pi * 0.25f, c.x, c.y));
+    g.setColour (p.accent2.withAlpha (0.16f));
+    g.strokePath (l, juce::PathStrokeType (1.0f));
+    vignette (g, a, 0.4f);
+}
+
+inline void stereoShaperEmblem (juce::Graphics& g, Point<float> c, float r) // a diamond
+{
+    juce::Path d;
+    d.addQuadrilateral (c.x, c.y - r, c.x + r, c.y, c.x, c.y + r, c.x - r, c.y);
+    g.setColour (pal().accent);
+    g.strokePath (d, juce::PathStrokeType (1.4f));
+}
+
+inline const Theme& stereoShaperTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Fruity Stereo Shaper";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff0f2216), Colour (0xff040a06), Colour (0xffb6ff5c), Colour (0xff5cffd0), Colour (0xc00e2014), Colour (0xdc040a06),
+                  Colour (0xff4a8a5a), Colour (0xffeeffe0), Colour (0xff030704), Colour (0xff2a3a2e), Colour (0xff0a120c), Colour (0xff152a1b),
+                  Colour (0xffeeffe0), Colour (0xff10241a) };
+        x.canvas = canvasStereoShaper;
+        x.titleEmblem = stereoShaperEmblem;
+        x.twoTone = true;
+        x.cap = Cap::orb;
+        return x;
+    }();
+    return t;
+}
+
+// === Fruity Stereo Enhancer: wide — two speakers pushing a wide arc of sound outwards ==============================
+
+inline void speaker (juce::Graphics& g, Point<float> c, float r, Colour col, float alpha)
+{
+    for (int i = 0; i < 4; ++i)
+    {
+        g.setColour (col.withAlpha (alpha * (0.12f + 0.05f * (float) i)));
+        g.drawEllipse (Rectangle<float> (r * 2.0f * (1.0f - 0.22f * (float) i), r * 2.0f * (1.0f - 0.22f * (float) i)).withCentre (c), 1.2f);
+    }
+    g.setColour (col.withAlpha (alpha * 0.3f));
+    g.fillEllipse (Rectangle<float> (r * 0.3f, r * 0.3f).withCentre (c));
+}
+
+inline void canvasStereoEnhancer (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto r = juce::jmin (a.getHeight() * 0.18f, 40.0f);
+    const auto l = Point<float> (a.getX() + a.getWidth() * 0.12f, a.getCentreY()), rr = Point<float> (a.getRight() - a.getWidth() * 0.12f, a.getCentreY());
+    speaker (g, l, r, p.accent, 1.0f);
+    speaker (g, rr, r, p.accent, 1.0f);
+    // wavefronts spreading outwards from each speaker
+    for (int i = 1; i < 7; ++i)
+    {
+        const auto w = r + (float) i * 22.0f;
+        juce::Path left, right;
+        left.addCentredArc (l.x, l.y, w, w * 1.2f, 0.0f, juce::MathConstants<float>::pi * 1.2f, juce::MathConstants<float>::pi * 1.8f, true);
+        right.addCentredArc (rr.x, rr.y, w, w * 1.2f, 0.0f, juce::MathConstants<float>::pi * 0.2f, juce::MathConstants<float>::pi * 0.8f, true);
+        g.setColour (p.accent2.withAlpha (0.09f - 0.01f * (float) i));
+        g.strokePath (left, juce::PathStrokeType (1.4f));
+        g.strokePath (right, juce::PathStrokeType (1.4f));
+    }
+    vignette (g, a, 0.4f);
+}
+
+inline void stereoEnhancerEmblem (juce::Graphics& g, Point<float> c, float r) { speaker (g, c, r * 1.1f, pal().accent, 4.0f); }
+
+inline const Theme& stereoEnhancerTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Fruity Stereo Enhancer";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff102036), Colour (0xff050a12), Colour (0xff6ac8ff), Colour (0xff9affe0), Colour (0xc00f1e34), Colour (0xdc050a12),
+                  Colour (0xff4a6a90), Colour (0xffeaf6ff), Colour (0xff040810), Colour (0xff2a3a52), Colour (0xff0e1624), Colour (0xff18283e),
+                  Colour (0xffffffff), Colour (0xff122238) };
+        x.canvas = canvasStereoEnhancer;
+        x.titleEmblem = stereoEnhancerEmblem;
+        x.drawCap = capDish;
+        x.twoTone = true;
+        return x;
+    }();
+    return t;
+}
+
+// === Spreader: a peacock fan of rays spreading from the bottom centre ==============================================
+
+inline void canvasSpreader (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto o = Point<float> (a.getCentreX(), a.getBottom() + 10.0f);
+    for (int i = 0; i < 17; ++i)
+    {
+        const auto ang = juce::MathConstants<float>::pi * (0.1f + 0.8f * (float) i / 16.0f);
+        const Point<float> d { -std::cos (ang), -std::sin (ang) };
+        const auto len = a.getHeight() * 0.95f;
+        g.setColour (p.accent.interpolatedWith (p.accent2, (float) i / 16.0f).withAlpha (0.08f));
+        g.drawLine ({ o, o + d * len }, 2.0f);
+        // the "eye" at each ray's end
+        const auto e = o + d * len * 0.9f;
+        g.setColour (p.accent2.withAlpha (0.12f));
+        g.fillEllipse (Rectangle<float> (10.0f, 14.0f).withCentre (e));
+        g.setColour (p.accent.withAlpha (0.2f));
+        g.fillEllipse (Rectangle<float> (4.0f, 6.0f).withCentre (e));
+    }
+    vignette (g, a, 0.4f);
+}
+
+inline void spreaderEmblem (juce::Graphics& g, Point<float> c, float r) // a fan
+{
+    const auto& p = pal();
+    for (int i = 0; i < 5; ++i)
+    {
+        const auto ang = juce::MathConstants<float>::pi * (0.15f + 0.7f * (float) i / 4.0f);
+        g.setColour (p.accent.interpolatedWith (p.accent2, (float) i / 4.0f));
+        g.drawLine ({ c.translated (0.0f, r * 0.8f), c.translated (-std::cos (ang) * r * 1.3f, r * 0.8f - std::sin (ang) * r * 1.3f) }, 1.4f);
+    }
+}
+
+inline const Theme& spreaderTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Spreader";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff0b2420), Colour (0xff030a09), Colour (0xff2ee0a0), Colour (0xff3ab0ff), Colour (0xc00a221e), Colour (0xdc030a09),
+                  Colour (0xff3a8a7a), Colour (0xffe6fff6), Colour (0xff020706), Colour (0xff1e3a34), Colour (0xff081412), Colour (0xff12302a),
+                  Colour (0xffffffff), Colour (0xff0d2622) };
+        x.canvas = canvasSpreader;
+        x.titleEmblem = spreaderEmblem;
+        x.twoTone = true;
+        x.cap = Cap::orb;
+        return x;
+    }();
+    return t;
+}
+
 // === the registry =================================================================================================
 
 const Theme* effectTheme (Art a)
@@ -2691,6 +3753,23 @@ const Theme* effectTheme (Art a)
         case Art::softClipper: return &softClipperTheme();
         case Art::hardcore: return &hardcoreTheme();
         case Art::distructor: return &distructorTheme();
+        case Art::chorus: return &chorusTheme();
+        case Art::hyperChorus: return &hyperChorusTheme();
+        case Art::vintageChorus: return &vintageChorusTheme();
+        case Art::flanger: return &flangerTheme();
+        case Art::flangus: return &flangusTheme();
+        case Art::phaser: return &phaserTheme();
+        case Art::vintagePhaser: return &vintagePhaserTheme();
+        case Art::freqShifter: return &freqShifterTheme();
+        case Art::paramEq: return &paramEqTheme();
+        case Art::limiter: return &limiterTheme();
+        case Art::compressor: return &compressorTheme();
+        case Art::multiband: return &multibandTheme();
+        case Art::maximus: return &maximusTheme();
+        case Art::transient: return &transientTheme();
+        case Art::stereoShaper: return &stereoShaperTheme();
+        case Art::stereoEnhancer: return &stereoEnhancerTheme();
+        case Art::spreader: return &spreaderTheme();
         default: return nullptr;
     }
 }
@@ -2733,6 +3812,23 @@ Art artForEffect (EffectKind kind)
         case EffectKind::fruitySoftClipper: return Art::softClipper;
         case EffectKind::hardcore: return Art::hardcore;
         case EffectKind::distructor: return Art::distructor;
+        case EffectKind::fruityChorus: return Art::chorus;
+        case EffectKind::hyperChorus: return Art::hyperChorus;
+        case EffectKind::vintageChorus: return Art::vintageChorus;
+        case EffectKind::fruityFlanger: return Art::flanger;
+        case EffectKind::fruityFlangus: return Art::flangus;
+        case EffectKind::fruityPhaser: return Art::phaser;
+        case EffectKind::vintagePhaser: return Art::vintagePhaser;
+        case EffectKind::flFrequencyShifter: return Art::freqShifter;
+        case EffectKind::parametricEq: return Art::paramEq;
+        case EffectKind::fruityLimiter: return Art::limiter;
+        case EffectKind::fruityCompressor: return Art::compressor;
+        case EffectKind::fruityMultiband: return Art::multiband;
+        case EffectKind::maximus: return Art::maximus;
+        case EffectKind::transientProcessor: return Art::transient;
+        case EffectKind::stereoShaper: return Art::stereoShaper;
+        case EffectKind::stereoEnhancer: return Art::stereoEnhancer;
+        case EffectKind::spreader: return Art::spreader;
         default: return Art::none;
     }
 }
