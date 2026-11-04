@@ -3720,10 +3720,11 @@ Layout toxicMain()
     }
 
     // MOD: the FM grid (row = the modulating oscillator, column = the modulated one), mix, pan, LFO amounts, pitch
-    v.push_back (section (308, 64, 304, 336, TR_NOOP ("Modulation")));
-    // FL's centre panel has three pages (round 169h): MOD, MIDI (the eight modulation slots) and SEQ (the step sequencer)
+    // FL's centre panel has three pages and no title, only its MOD / MIDI / SEQ tabs (round 169h): MOD, MIDI (the eight
+    // modulation slots) and SEQ (the step sequencer)
+    v.push_back (section (308, 64, 304, 336, nullptr));
     l.pages = { TR_NOOP ("Mod"), TR_NOOP ("MIDI"), TR_NOOP ("Seq") };
-    v.push_back (pageTabs (464, 65, 144, 15, "Mod|MIDI|Seq"));
+    v.push_back (pageTabs (385, 66, 150, 15, "Mod|MIDI|Seq"));
     const auto modFrom = v.size();
     static const char* const digits[] = { "1", "2", "3", "4", "5", "6" };
     v.push_back (label (314, 80, 40, 14, TR_NOOP ("FM"), alignLeft));
