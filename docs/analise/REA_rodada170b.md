@@ -42,7 +42,14 @@ ssDouble = 0x40. FL's mixer track struct: stride 0x1478, "selected" flag at +0x1
 | LYNX before | Built-ins not in a user folder were listed in enum order (the "random" order), in both the mixer menus and the Channel Rack's Add menu. |
 | LYNX now | `plugincatalog::withDefaultCategories`: every built-in sits in FL's category for it (`flCategory`, names matched with or without "Fruity "; FL legacy effects placed by LYNX: Fruity Delay / Reeverb → Delay reverb, 7 Band EQ / Bass Boost / Fast LP / Free Filter → Filter, Center / Mute 2 / Phase Inverter → Gain), FL plugins FL files nowhere → Misc, LYNX's own → **LYNX SHARE** (first); the user's folders win. Sorted A-Z inside; the view radio items always shown. Same tree in the mixer's empty-slot menu, "Replace with" and the Channel Rack Add menu. Installed VST/AU plugins stay in their own Plugin submenu. Tests: `mixfx170b_plugin_menus_group_by_fl_category_lynx_first`. |
 
+## Verification
+- Tests: tests/Mixfx170bTests.inc (6 tests), build-local 1963936 checks, 0 failures.
+- Windows `--snapshot` (fresh LYNX_PROFILE_DIR, LYNX_TEST_MODE=1): `s-mixer170b.png` (inserts 1-3 selected, all routed
+  to insert 4 by one switchSelectedRoute, the lone compressor moved down into slot 2 with slot 1 empty) and
+  `s-menus170b.png` (the mixer slot's effect menu and the Channel Rack's Add menu: LYNX SHARE first, then FL's
+  categories A-Z, Categories / Simple / Tree at the bottom). Kept in C:\Users\kauan\lynx-test\mixfx170b\shots.
+- Not driven with real mouse input on Windows: Ctrl+drag selection, the slot click toggle and the wheel (their logic is
+  covered by the tests; the input paths are JUCE mouse events, Ctrl = Cmd on macOS).
+
 ## Where I stopped
-- Done: code for #10 #12 #13 #16, tests (tests/Mixfx170bTests.inc), the 6 new strings in 15 languages.
-- In progress: build-local, then the Windows build + GUI screenshots, then the merge train (`coord/train.sh mixfx170b`).
-- Rerun: `BUILDSLOT_PRIO=1 ZIG_GLOBAL_CACHE_DIR=~/.cache/zig-mixfx170b-local ZIG_LOCAL_CACHE_DIR=~/.cache/zig-mixfx170b-local coord/buildslot.sh scripts/build-local.sh`
+- Done: code, tests, translations, Windows build, snapshots. Next: merge train `coord/train.sh mixfx170b`, notes.
