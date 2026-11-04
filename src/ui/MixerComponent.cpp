@@ -133,6 +133,7 @@ MixerStrips::MixerStrips (AudioEngine& e)
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
     engine.addChangeListener (this);
+    engine.getLevelsBroadcaster().addChangeListener (this);
     updateSize();
     // 60 Hz: faders that follow their automation move every frame (round 171c); the meters keep their 30 Hz ballistics
     startTimerHz (60);
@@ -140,6 +141,7 @@ MixerStrips::MixerStrips (AudioEngine& e)
 
 MixerStrips::~MixerStrips()
 {
+    engine.getLevelsBroadcaster().removeChangeListener (this);
     engine.removeChangeListener (this);
 }
 

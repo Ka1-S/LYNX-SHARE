@@ -151,6 +151,7 @@ ChannelRackComponent::ChannelRackComponent (AudioEngine& e)
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
     engine.addChangeListener (this);
+    engine.getLevelsBroadcaster().addChangeListener (this);
     previews.setSender ([this] (int channel, int key, float velocity, bool on) { engine.sendLiveNote (channel, key, velocity, on); });
     updateSize();
     startTimerHz (30);
@@ -159,6 +160,7 @@ ChannelRackComponent::ChannelRackComponent (AudioEngine& e)
 ChannelRackComponent::~ChannelRackComponent()
 {
     previews.releaseAll();
+    engine.getLevelsBroadcaster().removeChangeListener (this);
     engine.removeChangeListener (this);
 }
 

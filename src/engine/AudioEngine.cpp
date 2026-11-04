@@ -2394,7 +2394,7 @@ void AudioEngine::editLevels (const std::function<void (Song&)>& edit, bool undo
     ++songStamp;
     levelsPending = true;
     ++levelEdits;
-    sendChangeMessage();
+    levelsChanged.sendChangeMessage();
 }
 
 void AudioEngine::flushLevels()

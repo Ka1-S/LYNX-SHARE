@@ -50,7 +50,42 @@ binaries (clean-room), **[SHOT]** a screenshot looked at.
 
 ## 2. A — the Plugin picker (branch feature/picker171c)
 
-(see the picker section; FL evidence in /mnt/e/lynx-work/picker171c/fl-evidence.md)
+FL evidence (static decompile of TPlugListForm in FLEngine_x64.dll + one FL session, shots s00–s27): the full list is in
+`/mnt/e/lynx-work/picker171c/fl-evidence.md`. What LYNX copies, case by case:
+
+| Case | FL (proof) | LYNX |
+|---|---|---|
+| Single left click on a tile | nothing (FormMouseDown 0xec7ed0 only stores the drag point; s03→s04) | nothing |
+| Double-click / right-click / Enter | loads: generator = new channel, effect = first free slot of the selected insert, window opened (0xec7840; s10, s12, s07→s08) | same (`targets.addInstrument` / `addEffect`, the effect's window opens) |
+| Drag | picker closes, Browser drag of the plugin with the tile picture; an effect brings up the Mixer (0xec85f0 → msg 0x556 → 0x11cae80; s14, s20) | same (`BrowserComponent::startPluginDrag`, `targets.showMixer`) |
+| Drop on the Channel Rack | new last channel, window open (s15→s16) | same (the Browser's Plugin database drop; onto a channel it replaces the instrument, FL audit 165z-a) |
+| Drop on a mixer strip | slot 1 of that insert, insert selected, window open (s20→s21) | same |
+| Drop on the Playlist | nothing (s17→s18) | nothing |
+| Hover | tile slightly bigger with a light frame + glow, dark label "name / category" (paint 0xec9870; s03, s07, s26) | same, in LYNX's red accent |
+| Type to search | case-insensitive substring of the name, others dimmed not removed, pointer jumps to the first name starting with the text else the last containing it, 70 chars, Backspace / Ctrl+Backspace / Ctrl+V (0xec7370; s05, s06) | same (`pickerview::nameMatches`, `searchJump`, `dropLastWord`); the pointer is moved (`Desktop::setMousePosition`) |
+| Keys | Esc closes, Left/PageUp, Right/PageDown = tab, Up/Down = next/previous tile wrapping, skipping dimmed (0xec7060; s07) | same (`stepWrapping`), F8 also closes |
+| Wheel | one tab per notch; Ctrl+wheel = Up/Down (0xec8950; s26) | same; Shift+wheel scrolls a long tab |
+| Right / middle click on empty space, focus lost | closes (0xec7ed0, FormDeactivate 0xec6400; s27) | same |
+| Click a tab | closes and opens the Browser on that Plugin database category (s22→s23) | same; LYNX's Browser has no per-category folders yet, so it opens Generators / Effects when the folder is not there |
+| Pointing at a tab | shows that tab (s24→s25) | same |
+| Tile pictures | screenshots of each plugin's editor at one common scale for both halves (s02) | LYNX's own editors drawn by LYNX (`--pluginthumbs`), one scale for both halves; never FL's images |
+
+LYNX's own parts: the pictures are drawn by a background copy of LYNX (`LYNX --pluginthumbs <cache>/plugin-thumbs/<version>`)
+the first time the picker opens, so the picker opens at once with plain tiles that turn into pictures as they arrive.
+VST / VST3 / CLAP plugins get a tile with their maker and name until their editor has been open once; then
+`PluginWindow` captures it (Windows, PrintWindow PW_RENDERFULLCONTENT) into `<cache>/plugin-thumbs/plugins`.
+
+## 3. Measurements
+
+### 3.1 Picker [MEAS] (Windows 11, 1920×1080, LYNX test mode, fresh profile)
+
+- `--pluginthumbs`: 163 pictures (50 generators, 113 effects) in **12.6 s** in the background process, 16–60 ms each.
+- uiperf on oxygen.flp (playing), first build: F8 shown in **222 ms** (building the view + first paint, the pictures
+  not there yet). The frames while it stayed open were slow (mean 78 ms, pointing 108 ms): the hovered tile's picture was
+  refitted at high quality on every hover change (the cache held one size and the hovered tile is 8 % bigger) and the
+  dimmed window behind was a full-window scaled draw per frame. Fixed: the picture is fitted once per tile size, off the
+  paint (8 per tick), the hovered one is that picture drawn bigger, and the backdrop is composed once.
+  Second build: see 3.3.
 
 ## Where I stopped
 

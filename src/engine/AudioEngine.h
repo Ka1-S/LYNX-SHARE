@@ -483,6 +483,10 @@ public:
     // the publish editLevels deferred, now (tests; the timer does it after a drag)
     void flushLevels();
     std::uint64_t getLevelEditCount() const noexcept { return levelEdits; }
+    // editLevels notifies this one only (the engine's own change message follows with the full publish after the drag):
+    // the ~45 views listening to the engine would otherwise all repaint at every mouse move. The views that show
+    // levels (Mixer strips, Channel Rack) listen to it too.
+    juce::ChangeBroadcaster& getLevelsBroadcaster() noexcept { return levelsChanged; }
     // + 1 at every full publish (not at a level-only edit): listeners can tell a drag's level change from the rest
     std::uint64_t getPublishCount() const noexcept { return publishCount; }
 
@@ -979,6 +983,7 @@ private:
     SnapshotExchange<RackState> rackExchange;
     std::shared_ptr<LiveLevels> publishedLevels; // the last snapshot's live levels (editLevels writes them)
     bool levelsPending = false;                  // editLevels changed the Song since the last publish
+    juce::ChangeBroadcaster levelsChanged;
     std::uint64_t levelEdits = 0;                // (diagnostics / tests)
     std::uint64_t publishCount = 0;
     void saveUndoStep();
