@@ -66,7 +66,10 @@ std::vector<Action> makeActions()
         { "panel.pianoRoll", TR_NOOP ("Show, focus or hide the Piano Roll"), Context::global, { chord (f7) } },
         { "panel.browser", TR_NOOP ("Show, focus or hide the Browser"), Context::global, { chord (f8, alt) } },
         // FL's F8 (ShowPluginPickerAction, round 167o): opens the plugin picker, or closes it when it is open
-        { "panel.quickAdd", TR_NOOP ("Quick-add palette: instruments and effects (press again to close)"), Context::global, { chord (f8) } },
+        { "panel.quickAdd", TR_NOOP ("Quick-add palette: instruments and effects (press again to close)"), Context::global, {} },
+        // FL's F8 (ShowPluginPickerAction, ShortCut 119): the Plugin picker view, again = closed (round 169k; the
+        // quick-add palette that F8 opened since round 167o stays on the toolbar's plug button)
+        { "view.pluginPicker", TR_NOOP ("Plugin picker: every generator and effect, the categories as tabs (press again to close)"), Context::global, { chord (f8) } },
         { "panel.mixer", TR_NOOP ("Show, focus or hide the Mixer"), Context::global, { chord (f9) } },
         // FL 2026's other window keys (its shortcut list, REA round 165a)
         { "view.pluginDatabase", TR_NOOP ("Plugin database (in the Browser)"), Context::global, { chord (f8, shift) } },

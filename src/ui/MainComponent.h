@@ -200,7 +200,8 @@ private:
     juce::PopupMenu getMenuForIndex (int index, const juce::String& name) override;
     void menuItemSelected (int, int) override {}
     void rememberRecent (const juce::File& file);
-    juce::PopupMenu makePatternMenu();
+    // `picked`: the patterns picked in the Playlist picker when the menu opens from there (FL renders all of them)
+    juce::PopupMenu makePatternMenu (std::vector<int> picked = {});
     juce::PopupMenu playlistTrackExportMenu (bool groups); // File › Export / Playlist Tools: the three starts (round 168e)
     // Tools › Last tweaked / Next to last tweaked (REA round 143): the parameter menu of a recently moved control
     juce::PopupMenu makeLastTweakedMenu (int which);
@@ -233,6 +234,8 @@ private:
     void flUndo();
     bool alternateUndo = false; // Settings › General › "Alternate undo mode" (FL's default: off)
     std::unique_ptr<toolbar::EditOverlay> toolbarEditor;
+    std::unique_ptr<juce::Component> pluginPickerView; // FL's Plugin picker (F8), over the main window (round 169k)
+    void togglePluginPicker();
     std::unique_ptr<juce::Component> setupOverlay; // the first-start / Options > Setup wizard, over everything
     toolbar::EditOverlay::Bounds panelBounds {}; // each shown toolbar panel (for the edit mode)
     juce::Rectangle<int> fixedToolbarArea;       // the menu and the hint bar
