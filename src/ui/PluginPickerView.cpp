@@ -429,6 +429,7 @@ private:
             (generators ? tabs.generators : tabs.effects) = pickerview::orderTabs (names, plugincatalog::lynxCategory, installedTab);
         }
         tab = tabs.all();
+        tabLefts.clear();
     }
 
     bool inTab (const Tile& t) const
@@ -822,27 +823,37 @@ private:
     }
     int maxScroll() const noexcept { return juce::jmax (0, contentHeight - tileArea().getHeight()); }
 
+    // the tabs' widths and left edges, measured once (a paint measured every label ~n² times: ~35 ms per frame)
+    void measureTabs() const
+    {
+        if ((int) tabLefts.size() == tabs.count() + 1)
+            return;
+        tabLefts.assign (1, 0);
+        for (int i = 0; i < tabs.count(); ++i)
+        {
+            const auto f = juce::Font (theme::font (i == tabs.all() ? 26.0f : 17.0f, true));
+            tabLefts.push_back (tabLefts.back() + juce::GlyphArrangement::getStringWidthInt (f, tabLabel (i)) + 34);
+        }
+    }
+
     int tabWidth (int i) const
     {
-        const auto f = juce::Font (theme::font (i == tabs.all() ? 26.0f : 17.0f, true));
-        return juce::GlyphArrangement::getStringWidthInt (f, tabLabel (i)) + 34;
+        measureTabs();
+        return tabLefts[(std::size_t) i + 1] - tabLefts[(std::size_t) i];
     }
 
     int stripWidth() const
     {
-        int w = 0;
-        for (int i = 0; i < tabs.count(); ++i)
-            w += tabWidth (i);
-        return w;
+        measureTabs();
+        return tabLefts.back();
     }
 
     juce::Rectangle<int> tabBounds (int i) const
     {
         const auto strip = stripBounds();
         // the strip is centred on "All" when it fits, else scrolled so the shown tab stays in view
-        int x = strip.getX() + juce::jmax (0, (strip.getWidth() - stripWidth()) / 2) - stripOffset;
-        for (int k = 0; k < i; ++k)
-            x += tabWidth (k);
+        measureTabs();
+        const auto x = strip.getX() + juce::jmax (0, (strip.getWidth() - stripWidth()) / 2) - stripOffset + tabLefts[(std::size_t) i];
         return { x, strip.getY() + 10, tabWidth (i), strip.getHeight() - 10 };
     }
 
@@ -958,9 +969,8 @@ private:
         const auto over = stripWidth() - strip.getWidth();
         if (over > 0)
         {
-            int left = 0;
-            for (int k = 0; k < tab; ++k)
-                left += tabWidth (k);
+            measureTabs();
+            const auto left = tabLefts[(std::size_t) tab];
             stripOffset = juce::jlimit (0, over, left + tabWidth (tab) / 2 - strip.getWidth() / 2);
         }
         else
@@ -1037,6 +1047,7 @@ private:
     std::vector<Tile> tiles;
     pickerview::Tabs tabs;
     juce::Image backdrop, backdropShown;
+    mutable std::vector<int> tabLefts; // (measureTabs)
     double paintScale = 1.0;
     juce::ThreadPool workers { 2 };
     int inFlight = 0;
