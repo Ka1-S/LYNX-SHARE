@@ -2434,12 +2434,38 @@ private:
                 song.mixer.back().name = "Insert " + std::to_string (song.mixer.size() - 1);
                 song.mixer.back().effects.push_back (fx);
             }
+            // round 171b's Patcher round trip (coordinator): the Frequency Splitter, Fruity Delay 3 and Peak Controller
+            // nodes came back different (their FL defaults, e.g. the LFO speed 32750 / 65336, lost to 4 decimals)
+            {
+                auto patch = lynx::makeEffectSlot (lynx::EffectKind::patcher);
+                for (const auto kind : { lynx::EffectKind::frequencySplitter, lynx::EffectKind::fruityDelay3, lynx::EffectKind::peakController,
+                                         lynx::EffectKind::reverb, lynx::EffectKind::hardwareInsert })
+                {
+                    lynx::PatchNode node;
+                    node.effect = lynx::natives::newEffect (kind, lynx::flStudioAccess()).value_or (lynx::makeEffectSlot (kind));
+                    if (kind == lynx::EffectKind::peakController)
+                        node.effect.params[7] = 32750.0f / 65336.0f;
+                    node.x = 200.0f, node.y = 60.0f * (float) patch.patcher.nodes.size();
+                    patch.patcher.nodes.push_back (node);
+                }
+                song.mixer.emplace_back();
+                song.mixer.back().name = "Patcher";
+                song.mixer.back().effects.push_back (patch);
+            }
             juce::String why;
             const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why);
+            if (back && back->mixer.size() == song.mixer.size())
+            {
+                const auto& a = song.mixer.back().effects[0].patcher.nodes;
+                const auto& b = back->mixer.back().effects[0].patcher.nodes;
+                for (std::size_t n = 0; n < a.size(); ++n)
+                    if (n >= b.size() || ! (a[n].effect == b[n].effect))
+                        effectParamsResult = juce::String ("ERROR Patcher node ") + lynx::effectInfo (a[n].effect.kind).name;
+            }
             if (! back || back->mixer.size() != song.mixer.size())
                 effectParamsResult = "ERROR load " + why;
             else
-                for (std::size_t t = 1; t < song.mixer.size(); ++t)
+                for (std::size_t t = 1; t + 1 < song.mixer.size() && effectParamsResult == "OK"; ++t)
                     if (back->mixer[t].effects.size() != 1 || back->mixer[t].effects[0].params != song.mixer[t].effects[0].params)
                     {
                         effectParamsResult = juce::String ("ERROR ") + lynx::effectInfo (song.mixer[t].effects[0].kind).name;
