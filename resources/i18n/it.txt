@@ -7059,5 +7059,5 @@ countries: it ch sm
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] dipingilo con la matita  [Ctrl+LMB] / [Shift+LMB] scegline diversi  [2xLMB] apri  [RMB] menu"
 "Empty patterns were ignored." = "I pattern vuoti sono stati ignorati."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Selettore plugin: tutti i generatori e gli effetti, le categorie come schede (premi di nuovo per chiudere)"
-"click to step, drag or mouse wheel to change" = "clic per avanzare, trascina o rotellina per cambiare"
 "no effect with the current mode (another engine is in use)" = "nessun effetto nella modalità attuale (è in uso un altro motore)"
+"arrows step, click for the list, drag or mouse wheel to change" = "le frecce avanzano di un passo, clic per l'elenco, trascina o rotellina per cambiare"
