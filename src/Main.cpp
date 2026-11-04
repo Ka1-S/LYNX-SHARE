@@ -6143,7 +6143,14 @@ private:
                                                  { "orbit", false, I::synth, E::orbit, S::neon },              { "lattice-mod", false, I::synth, E::latticeMod, S::neon },
                                                  { "gemini-doubler", false, I::synth, E::geminiDoubler, S::vivid }, { "fruity-delay-2", false, I::synth, E::fruityDelay2, S::glow },
                                                  { "fruity-delay-3", false, I::synth, E::fruityDelay3, S::vivid }, { "fruity-delay-bank", false, I::synth, E::fruityDelayBank, S::neon } };
+        static const std::vector<ArtPilot> fx4 { { "ember-saturator", false, I::synth, E::ember, S::vivid },   { "aether", false, I::synth, E::aether, S::hardware },
+                                                 { "fruity-blood-overdrive", false, I::synth, E::fruityBloodOverdrive, S::hardware },
+                                                 { "fruity-fast-dist", false, I::synth, E::fruityFastDist, S::vivid },
+                                                 { "fruity-waveshaper", false, I::synth, E::fruityWaveShaper, S::neon },
+                                                 { "fruity-soft-clipper", false, I::synth, E::fruitySoftClipper, S::glow },
+                                                 { "hardcore", false, I::synth, E::hardcore, S::neon },        { "distructor", false, I::synth, E::distructor, S::vivid } };
         if (artSet() == "fx1") return fx1;
+        if (artSet() == "fx4") return fx4;
         if (artSet() == "fx3") return fx3;
         if (artSet() == "fx2") return fx2;
         return list;
