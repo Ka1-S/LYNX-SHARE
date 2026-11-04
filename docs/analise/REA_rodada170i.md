@@ -82,6 +82,20 @@ law. The absolute level is still not explained (pad volume 128 under the same la
 measured), so the law is **not** changed yet: the voice's host level (`TVoiceParams`) and FPC's output stage need
 one more REA pass.
 
+## 5. Hardcore: a box type of 0.5 is an empty box
+
+**FL evidence [FL render + DATA + DECOMP (REA_rodada71 §1.1: box type `(int)(float)(int)v`, cabinet `(int)v`)].** The
+render test's Hardcore state (preset "80s lead") stores the box types 1, 7, 2, 6, **0.5** (distortion, noise gate,
+chorus, delay, and box 5 *on* with type 0.5) and the cabinet 4.0; boxes 2–4 are off. FL truncates: box 5 is empty.
+(REA_rodada71's "box 1 empty, box 5 delay" summary of this state was wrong.) LYNX's render with box 5 switched off nulls
+against FL's render at **−75.2 dB** (ESR; RMS 0.00 dB, envelope corr 1.000).
+
+**LYNX before:** the slot values were rounded (`lround`), so 0.5 became type 1 and box 5 added a second distortion
+(+4.6 dB, a 0.2 s ringing tail after the note; score 2).
+
+**LYNX now:** `hardcore::toSlot` truncates the cabinet and the box types like FL. Test:
+`flq170i_hardcore_box_type_and_cabinet_truncate`.
+
 ## Where I stopped
 
 - Done: §1 and §3 code + tests (`tests/FlQ170iTests.inc`), `LYNX_WARMUP` in renderwav.

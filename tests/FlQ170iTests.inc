@@ -167,3 +167,45 @@ TEST (flq170i_old_data_relative_plugin_sample_still_found)
     if (song.channels.size() == 1)
         CHECK (song.channels[0].samplePath == "C:\\FL\\Data\\Patches\\Packs\\k.wav");
 }
+
+TEST (flq170i_hardcore_box_type_and_cabinet_truncate)
+{
+    // Hardcore reads the box types and the cabinet with (int)v, as FL's plugin: FL's render test "Hardcore" stores box 5
+    // as type 0.5 (on): an empty box in FL (its render nulls at −75 dB with it empty), a distortion in LYNX before
+    using namespace lynx;
+    for (int b = 0; b < hardcore::numBoxes; ++b)
+    {
+        const int p = hardcore::pBoxType + b;
+        CHECK (hardcore::fromSlot (p, hardcore::toSlot (p, 0.5f)) == 0.0f);
+        CHECK (hardcore::fromSlot (p, hardcore::toSlot (p, 0.99f)) == 0.0f);
+        CHECK (hardcore::fromSlot (p, hardcore::toSlot (p, 6.0f)) == 6.0f);
+        CHECK (hardcore::fromSlot (p, hardcore::toSlot (p, 6.7f)) == 6.0f);
+        CHECK (hardcore::fromSlot (p, hardcore::toSlot (p, 11.0f)) == 11.0f);
+    }
+    CHECK (hardcore::fromSlot (hardcore::pCabinet, hardcore::toSlot (hardcore::pCabinet, 4.0f)) == 4.0f);
+    CHECK (hardcore::fromSlot (hardcore::pCabinet, hardcore::toSlot (hardcore::pCabinet, 4.5f)) == 4.0f);
+    CHECK (hardcore::fromSlot (hardcore::pCabinet, hardcore::toSlot (hardcore::pCabinet, 0.5f)) == 0.0f);
+    if (realFlpDir.empty())
+        return;
+    std::ifstream in (std::filesystem::path (realFlpDir) / "System" / "Render tests" / "Hardcore.flp", std::ios::binary);
+    std::vector<std::uint8_t> bytes ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
+    if (bytes.empty())
+        return;
+    FlpImportOptions options;
+    const auto song = importFlp (flp::parseProject (bytes), options);
+    bool found = false;
+    for (const auto& t : song.mixer)
+        for (const auto& fx : t.effects)
+            if (fx.kind == EffectKind::hardcore)
+            {
+                found = true;
+                const auto type = [&fx] (int b) { return hardcore::fromSlot (hardcore::pBoxType + b, fx.params[(std::size_t) (hardcore::pBoxType + b)]); };
+                CHECK (type (0) == 1.0f); // distortion
+                CHECK (type (1) == 7.0f); // noise gate
+                CHECK (type (2) == 2.0f); // chorus
+                CHECK (type (3) == 6.0f); // delay
+                CHECK (type (4) == 0.0f); // empty (stored 0.5)
+                CHECK (hardcore::fromSlot (hardcore::pCabinet, fx.params[(std::size_t) hardcore::pCabinet]) == 4.0f);
+            }
+    CHECK (found);
+}
