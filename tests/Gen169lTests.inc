@@ -81,13 +81,13 @@ TEST (gen169l_drumaxx_through_fl_host_pan_law)
     const auto V = (double) channelGain (0.78125f);
     const auto centre = gen169l::playInstrument (*c, (float) V, (float) V, lead, length);
     const auto half = reference (V * 0.70710678);
-    CHECK (compare (centre, half, 0) < 1e-5 && compare (centre, half, 1) < 1e-5);
+    CHECK (compare (centre, half, 0) < 1e-6 && compare (centre, half, 1) < 1e-6);
     CHECK (compare (centre, reference (V), 0) > 0.2); // (not the old Vol on both sides: +3 dB)
     // the channel's pan counts (it does not in round 67's harness stand-in): p = −0.5 → cos(π/8), sin(π/8)
     const auto t = 0.25 * 3.14159265358979;
     const auto left = gen169l::playInstrument (*c, (float) (std::sqrt (2.0) * V * std::cos (t / 2.0 + 0.0)), (float) (std::sqrt (2.0) * V * std::sin (t / 2.0)), lead, length);
-    CHECK (compare (left, reference (V * std::cos (t / 2.0)), 0) < 1e-5);
-    CHECK (compare (left, reference (V * std::sin (t / 2.0)), 1) < 1e-5);
+    CHECK (compare (left, reference (V * std::cos (t / 2.0)), 0) < 1e-6);
+    CHECK (compare (left, reference (V * std::sin (t / 2.0)), 1) < 1e-6);
 }
 
 // FL renders a Drumaxx channel with no state (the DLL's own defaults) silent (REA_rodada169e §2): LYNX imports it as a
@@ -213,9 +213,9 @@ TEST (gen169l_new_generators_are_fl_plugin_database_state)
         CHECK (made.has_value() && fromFile.has_value());
         if (made && fromFile)
         {
-            if (made->pluginState != fromFile->pluginState)
-                std::printf ("  %s: state %zu vs %zu bytes\n", e->name, made->pluginState.size(), fromFile->pluginState.size());
-            CHECK (made->instrument == kind && made->pluginState == fromFile->pluginState && ! made->pluginState.empty());
+            // (Sakura and Drumpad keep their parameters in modelParams, the others the raw state)
+            CHECK (made->instrument == kind && made->pluginState == fromFile->pluginState && made->modelParams == fromFile->modelParams
+                   && (! made->pluginState.empty() || ! made->modelParams.empty()));
         }
     }
     // Ogun: FL's version-11 state, read (it wasn't before) and kept in today's layout

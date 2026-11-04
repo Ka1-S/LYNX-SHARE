@@ -1389,8 +1389,17 @@ private:
     // FL renders the plugin from the moment it is loaded: its output gain has long reached the master level
     void settle() noexcept
     {
+        // (round 169l: where FL's float glide from 0 comes to rest, a few ulps short of the target, not the target)
         const auto t = (engine->level * 1.0f) * 0.5f;
-        engine->outG[0] = engine->outG[1] = t;
+        float g = 0.0f;
+        for (int i = 0; i < 1 << 20; ++i)
+        {
+            const auto next = (t - g) * 0.005f + g;
+            if (next == g)
+                break;
+            g = next;
+        }
+        engine->outG[0] = engine->outG[1] = g;
     }
 
     void take() noexcept

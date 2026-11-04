@@ -102,7 +102,38 @@ L / R in dB (FL `g169l.wav` vs LYNX `renderwav`, LYNX de-normalised), and the RM
 | Morphine 60 / 48 / 72 | −30.5 −29.9 / −34.0 −31.5 / −27.3 −27.8 | −31.2 −26.6 / −33.8 −31.2 / −27.7 −26.6 | 0.6–1.0 (same level, different waveform: see "left") |
 | Sakura 60 / 48 / 72 | −16.3 −14.1 / −16.2 −14.1 / −20.0 −14.2 | −16.7 −14.3 / −17.0 −14.5 / −19.3 −15.5 | 0.2–0.3 |
 | Transistor Bass 60 / 48 / 72 | −7.5 / −19.0 / −15.2 | −9.5 / −22.0 / −18.2 | 1.3 (LYNX 2–3 dB lower) |
-| Ogun 60 / 48 / 72 | −3.4 −4.6 / −3.7 −3.2 / −5.2 −5.1 | (this render: before §4, the stand-in synth) | |
+| Ogun 60 / 48 / 72 | −3.4 −4.6 / −3.7 −3.2 / −5.2 −5.1 | −4.3 −3.9 / −2.5 −3.7 / −5.1 −5.3 (before §4: the stand-in synth at −18 dB) | 1.4 (same level; Ogun's random phases) |
 
 The 16-bit render's LSB is 3·10⁻⁵: Drumaxx, BassDrum and Drumpad are bit-close. The Drumaxx channel at pan −50 %
 proves Final.Pan's law A (L/R −7.6 dB apart = 20·log10(tan(π/8))).
+
+## 6. LYNX before / now
+
+| | before | now |
+|---|---|---|
+| Drumaxx level | +3.0 dB over FL on every pad; the channel's pan ignored | FL's law A per key: identical to FL's render, centred and panned (§5) |
+| Drumaxx idle blocks | a block with no pad sounding left LYNX's reused buffer as it was (the last block came out again) | cleared (the DLL leaves FL's zeroed buffer untouched) |
+| FL Drumaxx without a state | the stand-in synth (a tone on every key) | a Drumaxx without a kit: silent, as FL |
+| New GMS / Morphine / Transistor Bass / Sakura with FL | the first preset of the folder | FL's Plugin database state (§3) |
+| New Ogun with FL | `300 Ft Glass Bowl` (neither of FL's default states readable) | FL's Plugin database state (version 11, §4) |
+| Ogun states 10–13 in projects / presets | unsupported (stand-in synth) | played (§4) |
+| New BooBass | knobs 32768 | FL's Plugin database 32767 |
+| Without FL | LYNX's bank (round 168n) | unchanged |
+
+Code: `core/Drumaxx.cpp` (`keyLevels`, the idle clear), `core/FlpImport.cpp` (stateless Drumaxx, Ogun layout),
+`core/NativeEngines.cpp` (`presetCandidates`: Plugin database first for the engines of §3, BooBass), `core/Ogun.cpp`
+(`parseState` v10–13, `ogunCurrentLayout`). Tests `tests/Gen169lTests.inc`: `gen169l_drumaxx_through_fl_host_pan_law`
+(the instrument vs the DLL-reference renderer with law A's tables, centre and pan −0.5), `gen169l_stateless_fl_drumaxx_is_silent`,
+`gen169l_ogun_old_state_versions`, `gen169l_new_generators_are_fl_plugin_database_state` and the probe (FL Data dir);
+`mono168l_every_engine_plays_mono_legato_and_porta` keeps Morphine's `BAS Acoustic 1 FG` preset (FL's Plugin database
+Morphine patch reads 19 semitones off in its autocorrelation pitch check: the reason 169e's blanket rule "broke" it —
+the glide itself is right: −700 → 0 cents relative).
+
+## Left / for others
+
+- **Transistor Bass** (round 169g's area, not touched beyond the default state): with FL's Plugin database state
+  ("Factory programs", sequencer on) LYNX renders 2–3 dB below FL on keys 60 / 48 / 72 (§5).
+- Morphine, Sakura, GMS, Ogun: same levels as FL but not sample-compared (their random phases / unison); Wave
+  Traveller's `Default.fst` and Plugin database state (with an embedded sample) are not read by LYNX yet.
+- The decision of §3 (engines whose Default preset differs from FL's Plugin database state).
+- FL Slayer: FL 2026 has no Plugin database entry for it; LYNX keeps its first preset.
