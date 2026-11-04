@@ -25,9 +25,16 @@ See the tracker table: FX and instrument menus (170b #16), add-effect opens its 
 Ctrl+H Stop sound and Ctrl+N Save new version (user decisions), rack items (170a), toolbar/snap/zoom (170e).
 
 ## Where I stopped
-- Done: LYNX trap session + FL session, tracker table, batch 1 code + tests (tests/Wfqa170hTests.inc).
-- In progress: build-local + Windows build of feature/wfqa170h, then GUI verification on Windows, then train.
-- Next: batch 2 (effect window opens when added to a slot) after 170b lands; house (124) and lo-fi (85) sessions:
-  audio loops from the Browser, stems / MP3 export, swing, sidechain compressor set-up, save/reopen.
+- Done: LYNX trap session + FL session, tracker table, batch 1 + batch 2 (effect window opens on add) with tests.
+  build-local 1963861 checks / 0 failures; Windows build OK.
+- GUI-verified on the branch build (shots C:/Users/kauan/lynx-test/wfqa170h/shots/v-*): New dialog Enter creates and
+  LYNX keeps the foreground (v-02); Esc closes Sawer (v-03/04) and Parametric EQ windows, foreground stays on LYNX;
+  Parametric EQ added to Insert 6 opens its window (v-05); Piano roll Ctrl+A, Ctrl+B copies a note one whole bar later
+  at the same offset (v-07); export ends with "Export complete: path" + "Peak: -3.0 dBFS" in the hint bar, no box,
+  foreground on LYNX (v-10). Desktop clean after close (v-12).
+- In progress: merge train (tmp/r170h/train1.log).
+- Next: house (124) and lo-fi (85) sessions: audio loops from the Browser, stems / MP3 export, swing,
+  sidechain compressor set-up, save/reopen.
 - Rerun: `ZIG_GLOBAL_CACHE_DIR=~/.cache/zig-wfqa170h-local ZIG_LOCAL_CACHE_DIR=~/.cache/zig-wfqa170h-local coord/buildslot.sh scripts/build-local.sh`;
-  `OUT=build-win-wfqa170h coord/winbuild.sh scripts/build-windows-zig.sh`; GUI helpers tmp/r170h/g.sh.
+  `OUT=build-win-wfqa170h coord/winbuild.sh scripts/build-windows-zig.sh`; GUI helpers tmp/r170h/g.sh
+  (driver key names are UPPERCASE, e.g. `key CTRL+B`; ABNT2 keyboard: `key BSL` = backslash, `key SHIFT+SLASH` = colon).
