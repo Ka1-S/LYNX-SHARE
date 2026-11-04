@@ -49,6 +49,8 @@ public:
     static bool keepEditorsOpen;
     // FL's "Select first channel with notes when the pattern changes" (Settings › General; REA round 167j §5)
     static bool selectFirstChannelWithNotes;
+    // FL's Channel Rack option "Mute removed steps": turning a step off mutes its note instead of deleting it
+    static bool muteRemovedSteps;
 
     void paint (juce::Graphics& g) override;
     void mouseDown (const juce::MouseEvent& e) override;

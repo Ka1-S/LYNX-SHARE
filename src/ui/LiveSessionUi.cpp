@@ -5,6 +5,7 @@
 #include "engine/AudioEngine.h"
 #include "engine/LiveSessions.h"
 #include "platform/Paths.h"
+#include "ui/LiveChat.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
@@ -63,6 +64,13 @@ void addMenuItems (juce::PopupMenu& menu, Context c)
     menu.addItem (tr ("Start live session..."), ! active, false, [c] { start (c); });
     menu.addItem (tr ("Join live session..."), ! active, false, [c] { join (c); });
     menu.addItem (tr ("Show invite code..."), active && c.live.isHost() && c.live.getInviteCode().isNotEmpty(), false, [c] { showInvite (c); });
+    // round 169j: chat, following the host, permissions during the session
+    const auto unread = c.live.unreadChat();
+    menu.addItem (tr ("Session chat...") + (unread > 0 ? " (" + juce::String (unread) + ")" : juce::String()), active, false, [c] { showChat (c.live); });
+    if (! c.live.isHost())
+        menu.addItem (tr ("Follow the host's transport"), active, c.live.isFollowingTransport(), [c] { c.live.setFollowTransport (! c.live.isFollowingTransport()); });
+    else
+        menu.addItem (tr ("People and permissions..."), active, false, [c] { showPermissions (c.live); });
     menu.addItem (c.live.isHost() || ! active ? tr ("End live session") : tr ("Leave live session"), active, false, [c] { leave (c); });
 }
 
@@ -173,9 +181,42 @@ void leave (Context c)
                                         }));
 }
 
+void offerResume (Context c)
+{
+    const auto journal = LiveSessionManager::defaultJournal();
+    const auto info = LiveSessionManager::readJournal (journal);
+    if (! info)
+    {
+        journal.deleteFile(); // (too old for the relay, or damaged)
+        return;
+    }
+    if (c.live.isActive())
+        return;
+    const auto when = info->saved.toString (true, true, false, true);
+    juce::AlertWindow::showOkCancelBox (
+        juce::MessageBoxIconType::QuestionIcon, tr ("Resume live session"),
+        tr ("LYNX SHARE closed during your live session ({0}, {1} people invited). Resume it? The people in it reconnect by themselves.",
+            { when, juce::String (info->guests) }),
+        tr ("Resume"), tr ("End it"), nullptr, juce::ModalCallbackFunction::create ([c, journal] (int r) {
+            auto o = optionsFor (c, myName());
+            if (r == 1)
+            {
+                o.projectFile = juce::File(); // (the journal knows the project)
+                if (! c.live.resumeHost (journal, o))
+                    warn (tr ("Resume live session"), tr ("The live session could not be resumed."));
+                return;
+            }
+            LiveSessionManager::discardJournal (journal, o.relay);
+        }));
+}
+
 void attach (LiveSessionManager& live)
 {
     live.onHint = [] (const juce::String& text) { ui::postHint ({ text, {} }, 4000); };
+    live.onChat = [] (const LiveSessionManager::ChatLine& line) {
+        if (! line.mine && ! chatVisible())
+            ui::postHint ({ line.name + ": " + line.text.substring (0, 120), {} }, 5000);
+    };
     live.onEnded = [] (const juce::String& text) {
         if (quietEnd)
             ui::postHint ({ text, {} }, 4000);
@@ -197,8 +238,12 @@ int paintPresence (juce::Graphics& g, juce::Rectangle<int> area, const LiveSessi
     auto r = area;
     const auto f = juce::Font (font (type::small, true));
     // the session badge: LIVE (connecting / knocking: its state)
-    const bool on = live.getState() == LiveSessionManager::State::live;
-    const auto badge = on ? tr ("LIVE") : tr ("Connecting...");
+    using S = LiveSessionManager::State;
+    const bool on = live.getState() == S::live;
+    const auto badge = on                                   ? tr ("LIVE")
+                       : live.getState() == S::reconnecting ? tr ("Reconnecting...")
+                       : live.getState() == S::waitingHost  ? tr ("Waiting for the host...")
+                                                            : tr ("Connecting...");
     const auto bw = juce::GlyphArrangement::getStringWidthInt (f, badge) + 12;
     auto b = r.removeFromLeft (bw).reduced (0, 4).toFloat();
     g.setColour (on ? colour::accent : colour::bg5);
@@ -219,7 +264,7 @@ int paintPresence (juce::Graphics& g, juce::Rectangle<int> area, const LiveSessi
             if (r.getWidth() < 20)
                 break;
             auto dot = r.removeFromLeft (20).toFloat().withSizeKeepingCentre (16.0f, 16.0f);
-            g.setColour (juce::Colour (p.colour));
+            g.setColour (juce::Colour (p.colour).withMultipliedAlpha (p.online || p.me ? 1.0f : 0.35f));
             g.fillEllipse (dot);
             if (p.me || p.recording)
             {
@@ -235,20 +280,42 @@ int paintPresence (juce::Graphics& g, juce::Rectangle<int> area, const LiveSessi
         const auto w = 14 + juce::GlyphArrangement::getStringWidthInt (f, name) + (p.recording ? 26 : 0) + 8;
         auto cell = r.removeFromLeft (w);
         const auto dot = cell.removeFromLeft (14).toFloat().withSizeKeepingCentre (9.0f, 9.0f);
-        g.setColour (juce::Colour (p.colour));
-        g.fillEllipse (dot);
+        const bool here = p.online || p.me;
+        g.setColour (juce::Colour (p.colour).withMultipliedAlpha (here ? 1.0f : 0.35f));
+        if (here)
+            g.fillEllipse (dot);
+        else
+            g.drawEllipse (dot, 1.5f); // (their connection dropped: they may come back)
         if (p.host)
         {
             g.setColour (colour::textPrimary.withAlpha (0.8f));
             g.drawEllipse (dot.expanded (1.5f), 1.0f);
         }
-        g.setColour (p.me ? colour::textPrimary : colour::textSecondary);
+        g.setColour (p.me ? colour::textPrimary : here ? colour::textSecondary : colour::textDisabled);
         g.drawText (name, cell.removeFromLeft (cell.getWidth() - (p.recording ? 34 : 8)), juce::Justification::centredLeft, false);
         if (p.recording)
         {
             g.setColour (colour::accent);
             g.drawText (tr ("rec"), cell.removeFromLeft (26), juce::Justification::centredLeft, false);
         }
+    }
+    if (live.unreadChat() > 0 && r.getWidth() > 30)
+    {
+        const auto text = tr ("{0} new messages", { juce::String (live.unreadChat()) });
+        const auto w = juce::GlyphArrangement::getStringWidthInt (f, text) + 12;
+        auto b2 = r.removeFromLeft (w).reduced (0, 4).toFloat();
+        g.setColour (colour::bg5);
+        g.fillRoundedRectangle (b2, 3.0f);
+        g.setColour (colour::textPrimary);
+        g.drawText (text, b2, juce::Justification::centred, false);
+        r.removeFromLeft (6);
+    }
+    if (live.standInsRendering() > 0 && r.getWidth() > 30)
+    {
+        g.setColour (colour::textDisabled);
+        const auto text = tr ("rendering stand-ins...");
+        const auto w = juce::GlyphArrangement::getStringWidthInt (f, text) + 8;
+        g.drawText (text, r.removeFromLeft (w), juce::Justification::centredLeft, true);
     }
     if (live.mediaDownloading() > 0 && r.getWidth() > 30)
     {

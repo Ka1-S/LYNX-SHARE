@@ -369,8 +369,10 @@ if(LYNX_BUILD_APP)
         src/ui/SessionDialogs.cpp
         src/engine/LiveLink.cpp
         src/engine/LiveSessions.cpp
+        src/engine/MediaPack.cpp
         src/engine/LiveTest.cpp
         src/ui/LiveSessionUi.cpp
+        src/ui/LiveChat.cpp
         src/engine/PluginHost.cpp
         src/engine/FlStudio.cpp
         src/engine/PluginSandbox.cpp

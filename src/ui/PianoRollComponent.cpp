@@ -224,7 +224,14 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     ui::setQuickTip (followButton, tr ("Follow the playhead"));
     followButton.onClick = [this] { runAction ("pianoRoll.follow"); };
 
-    for (auto* b : { &ghostButton, &scaleSnapButton, &moreButton, &followButton })
+    playButton.setFlat (true);
+    playButton.setClickingTogglesState (false);
+    playButton.setIconColourWhenOn (theme::colour::accent); // FL: stays a play icon, in the theme colour while playing
+    playButton.setTooltip (tr ("Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)"));
+    playButton.onClick = [this] { if (onPlayPause) onPlayPause(); };
+    playButton.onRightClick = [this] { if (onPlayRightClick) onPlayRightClick(); };
+
+    for (auto* b : { &playButton, &ghostButton, &scaleSnapButton, &moreButton, &followButton })
     {
         b->setWantsKeyboardFocus (false);
         b->setMouseClickGrabsKeyboardFocus (false);
@@ -486,6 +493,7 @@ void PianoRollComponent::resized()
         bar.removeFromLeft (juce::jmin (6, bar.getWidth()));
     };
 
+    place (playButton, h);
     place (channelBox, 150);
     place (tools, tools.getIdealWidth (h));
     place (snapBox, 128);
@@ -4125,6 +4133,9 @@ void PianoRollComponent::timerCallback()
 
     auto& transport = engine.getTransport();
     auto tick = -1.0;
+
+    if (const bool playing = transport.playing.load(); playButton.getToggleState() != playing)
+        playButton.setToggleState (playing, juce::dontSendNotification);
 
     // the playhead shows while the edited pattern plays: Pattern mode, or a clip of it in Song mode (round 162)
     if (transport.playing.load() && isShowing())
