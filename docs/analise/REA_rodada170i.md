@@ -80,7 +80,10 @@ pad's gain the same law on the pad volume (`pad+0x14E`); LYNX uses `(11^(v/127) 
 between the two pads (0.68 dB measured; 0.76 dB predicted by the new law for layers 99 and 117) confirms the layer
 law. The absolute level is still not explained (pad volume 128 under the same law would make FL 6.5 dB louder than
 measured), so the law is **not** changed yet: the voice's host level (`TVoiceParams`) and FPC's output stage need
-one more REA pass.
+one more REA pass. Second pass (this round): `FUN_0086b480` stores the layer gain at voice `+0x19` and the pad gain
+at the pad voice `+0x18`; the note velocity only picks the layer there (`+0x2c` ≤ v < `+0x30`, 127 inclusive). The test
+pads are pad volume 128, layer volume 99 / 117, so the missing factor (FL ≈ 0.095 × (21.527^(v/127) − 1) · P against
+LYNX's 0.56) sits in the voice render, where velocity and the pad gain are applied: still open.
 
 ## 5. Hardcore: a box type of 0.5 is an empty box
 
@@ -95,6 +98,22 @@ against FL's render at **−75.2 dB** (ESR; RMS 0.00 dB, envelope corr 1.000).
 
 **LYNX now:** `hardcore::toSlot` truncates the cabinet and the box types like FL. Test:
 `flq170i_hardcore_box_type_and_cabinet_truncate`.
+
+## 6. Slicex: velocity through FL's Init.Vol law
+
+**FL evidence [DECOMP FLEngine `FUN_00d29aa0` (REA_rodada76 §1) + REA_rodada67 §host + FL render].** FL's host turns a
+note's velocity byte into the voice's Init.Vol `(exp(v·0.01·ln 11) − 1)·0.1` (exactly 1 at velocity 100) and plugin
+generators play Final.Vol = Init.Vol × channel volume. FL's render test "Slicex" has its 10 notes at velocity 100 and
+plays 2.15 dB louder than LYNX (gain fit 1.2786 ≈ 128/100); the same project with the notes rewritten to velocity 128,
+played by LYNX's linear velocity, matches FL's level (RMS −0.01 dB, spectrum 0.03 dB).
+
+**LYNX before:** the sampler that plays an imported Slicex channel scaled the level by velocity/128
+(−2.14 dB at FL's default velocity 100).
+
+**LYNX now:** `SamplerSettings::flVelocityLaw` (set by the importer for Slicex, saved in the project) makes the sampler use FL's law (`flInitVolume`). FPC is left as it was (§4: its level gap is not only the
+velocity), and so is Fruity Slicer: its render test (notes at 100 too) is already 2.4 dB louder in LYNX, the level
+being ruled by its stretch pre-processing (licensed engine, REA_rodada69 §7), so it gives no evidence either way. Test:
+`flq170i_slicex_velocity_reaches_the_level_through_fl_init_vol`.
 
 ## Where I stopped
 

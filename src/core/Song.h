@@ -297,6 +297,10 @@ struct SamplerSettings
 
     SamplePrecompute precompute;
     bool useLoopPoints = true; // FL's "Use loop points": the file's own loop (WAV smpl) plays (.flp 0x8F bit 3)
+    // an FL plugin generator played by the sampler (Slicex): the note velocity reaches the level through
+    // FL's Init.Vol law (11^(v·0.01) − 1)/10, unity at velocity 100, instead of LYNX's linear velocity (REA_rodada76 §1,
+    // REA_rodada170i §6)
+    bool flVelocityLaw = false;
     // FL's "Declicking mode" (.flp 0xD7 byte 0x53, REA_rodada167h §3): 0 out only, 1 transient (no bleeding),
     // 2 transient, 3 generic, 4 smooth, 5 crossfade — how fast a cut voice fades out (10 / 10 / 20 / 20 / 100 / 200 ms)
     int declickMode = 0;

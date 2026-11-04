@@ -209,3 +209,45 @@ TEST (flq170i_hardcore_box_type_and_cabinet_truncate)
             }
     CHECK (found);
 }
+
+TEST (flq170i_slicex_velocity_reaches_the_level_through_fl_init_vol)
+{
+    // FL's host hands a plugin generator the note velocity as Init.Vol = (11^(v·0.01) − 1)/10 (unity at 100,
+    // REA_rodada76 §1); FL's render test "Slicex" (every note at velocity 100) plays 2.14 dB louder than LYNX's linear
+    // velocity did, and nulls in level with the law (REA_rodada170i §6)
+    using namespace lynx;
+    auto smp = std::make_shared<SampleData>();
+    smp->sampleRate = 44100.0;
+    smp->left.assign (44100, 0.25f);
+    const std::shared_ptr<const SampleData> data = smp;
+    auto level = [&data] (bool law, float velocity) {
+        ChannelDef ch;
+        ch.instrument = InstrumentKind::sampler;
+        ch.sampler.flVelocityLaw = law;
+        auto inst = makeInstrument (InstrumentKind::sampler, data);
+        inst->prepare (44100.0);
+        inst->configure (ch, 120.0);
+        std::vector<float> l (4096, 0.0f), r (4096, 0.0f);
+        inst->noteOn (60, velocity);
+        inst->render (l.data(), r.data(), 4096, 1.0f, 1.0f);
+        return (double) std::abs (l[3000]);
+    };
+    const double linear = level (false, 100.0f / 128.0f), law = level (true, 100.0f / 128.0f);
+    CHECK (linear > 0.0);
+    CHECK (std::abs (law / linear - 1.28) < 1e-3);
+    // 64 → (11^0.64 − 1)/10 ≈ 0.364 of unity
+    CHECK (std::abs (level (true, 64.0f / 128.0f) / law - 0.3644) < 2e-3);
+    if (realFlpDir.empty())
+        return;
+    std::ifstream in (std::filesystem::path (realFlpDir) / "System" / "Render tests" / "Slicex.flp", std::ios::binary);
+    std::vector<std::uint8_t> bytes ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
+    if (bytes.empty())
+        return;
+    FlpImportOptions options;
+    const auto song = importFlp (flp::parseProject (bytes), options);
+    bool seen = false;
+    for (const auto& c : song.channels)
+        if (c.instrument == InstrumentKind::sampler)
+            seen = seen || c.sampler.flVelocityLaw;
+    CHECK (seen || song.channels.empty() || song.channels[0].samplePath.empty());
+}

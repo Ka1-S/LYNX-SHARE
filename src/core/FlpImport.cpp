@@ -1314,6 +1314,9 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     def.instrument = InstrumentKind::sampler;
                     def.samplePath = path;
                     def.sampler.pitch = std::clamp (def.sampler.pitch + sliced->pitchCents / 100.0f, -24.0f, 24.0f);
+                    // Slicex: FL's host hands the plugin Init.Vol (REA_rodada170i §6; Fruity Slicer's render test is
+                    // ruled by its licensed stretch and does not show it, so it keeps the linear velocity)
+                    def.sampler.flVelocityLaw = name == "slicex";
 
                     // Slicex's master volume (REA_rodada69 §5): a single full-range zone carries the gain
                     if (sliced->gain != 1.0f && ! path.empty())
