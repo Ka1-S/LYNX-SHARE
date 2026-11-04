@@ -7163,3 +7163,15 @@ countries: br
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] pinta com o lápis  [Ctrl+LMB] / [Shift+LMB] escolhe vários  [2xLMB] abre  [RMB] menu"
 "Empty patterns were ignored." = "Os patterns vazios foram ignorados."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Seletor de plugins: todos os geradores e efeitos, as categorias como abas (aperte de novo para fechar)"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "Desligado (manter o tempo real)"
+"1/32 note" = "Fusa (1/32)"
+"1/16 note" = "Semicolcheia (1/16)"
+"1/8 note" = "Colcheia (1/8)"
+"1/4 note" = "Semínima (1/4)"
+"Notes played just before the start go onto it" = "Notas tocadas logo antes do início vão para ele"
+"Played notes: compensate the output latency" = "Notas tocadas: compensar a latência de saída"
+"Capture MIDI: the notes just played without recording into the pattern" = "Capturar MIDI: as notas recém-tocadas sem gravar vão para o pattern"
+"Capture MIDI: {0} notes put in the pattern" = "Capturar MIDI: {0} notas colocadas no pattern"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "Capturar MIDI: nada para capturar (toque algumas notas antes, sem gravar)"

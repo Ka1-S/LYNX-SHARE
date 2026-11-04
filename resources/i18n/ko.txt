@@ -7007,3 +7007,15 @@ countries: kr
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "패턴: [LMB] 연필로 칠하기  [Ctrl+LMB] / [Shift+LMB] 여러 개 선택  [2xLMB] 열기  [RMB] 메뉴"
 "Empty patterns were ignored." = "빈 패턴은 무시되었습니다."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "플러그인 피커: 모든 제너레이터와 이펙트, 카테고리는 탭으로 (다시 누르면 닫힘)"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "끔 (실제 타이밍 유지)"
+"1/32 note" = "32분음표"
+"1/16 note" = "16분음표"
+"1/8 note" = "8분음표"
+"1/4 note" = "4분음표"
+"Notes played just before the start go onto it" = "시작 직전에 연주한 노트를 시작 위치로"
+"Played notes: compensate the output latency" = "연주한 노트: 출력 레이턴시 보정"
+"Capture MIDI: the notes just played without recording into the pattern" = "MIDI 캡처: 녹음 없이 방금 연주한 노트를 패턴으로"
+"Capture MIDI: {0} notes put in the pattern" = "MIDI 캡처: 노트 {0}개를 패턴에 넣음"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "MIDI 캡처: 캡처할 것이 없음 (먼저 녹음 없이 노트를 연주하세요)"

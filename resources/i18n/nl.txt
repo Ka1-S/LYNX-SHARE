@@ -7007,3 +7007,15 @@ countries: nl be
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] tekenen met het potlood  [Ctrl+LMB] / [Shift+LMB] meerdere kiezen  [2xLMB] openen  [RMB] menu"
 "Empty patterns were ignored." = "Lege patterns zijn overgeslagen."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Pluginkiezer: alle generators en effecten, de categorieën als tabbladen (nogmaals drukken om te sluiten)"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "Uit (echte timing behouden)"
+"1/32 note" = "1/32 noot"
+"1/16 note" = "1/16 noot"
+"1/8 note" = "1/8 noot"
+"1/4 note" = "1/4 noot"
+"Notes played just before the start go onto it" = "Noten die net voor de start gespeeld worden gaan op de start"
+"Played notes: compensate the output latency" = "Gespeelde noten: uitgangslatentie compenseren"
+"Capture MIDI: the notes just played without recording into the pattern" = "MIDI vangen: de net zonder opname gespeelde noten in het pattern"
+"Capture MIDI: {0} notes put in the pattern" = "MIDI vangen: {0} noten in het pattern gezet"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "MIDI vangen: niets te vangen (speel eerst een paar noten, zonder opname)"

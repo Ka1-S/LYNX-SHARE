@@ -7007,3 +7007,15 @@ countries: jp
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "パターン: [LMB] ペンシルでペイント  [Ctrl+LMB] / [Shift+LMB] 複数選択  [2xLMB] 開く  [RMB] メニュー"
 "Empty patterns were ignored." = "空のパターンは無視されました。"
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "プラグインピッカー: すべてのジェネレーターとエフェクト、カテゴリをタブで表示（もう一度押すと閉じる）"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "オフ（実際のタイミングを保持）"
+"1/32 note" = "32分音符"
+"1/16 note" = "16分音符"
+"1/8 note" = "8分音符"
+"1/4 note" = "4分音符"
+"Notes played just before the start go onto it" = "開始直前に弾いたノートを開始位置に置く"
+"Played notes: compensate the output latency" = "演奏したノート：出力レイテンシーを補正"
+"Capture MIDI: the notes just played without recording into the pattern" = "MIDIキャプチャ：録音せずに弾いたばかりのノートをパターンへ"
+"Capture MIDI: {0} notes put in the pattern" = "MIDIキャプチャ：{0} 個のノートをパターンに配置"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "MIDIキャプチャ：キャプチャするものがありません（まず録音せずにノートを弾いてください）"

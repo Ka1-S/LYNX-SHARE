@@ -7007,3 +7007,15 @@ countries: id
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] lukis dengan pensil  [Ctrl+LMB] / [Shift+LMB] pilih beberapa  [2xLMB] buka  [RMB] menu"
 "Empty patterns were ignored." = "Pattern kosong diabaikan."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Pemilih plugin: semua generator dan efek, kategori sebagai tab (tekan lagi untuk menutup)"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "Mati (pertahankan waktu aslinya)"
+"1/32 note" = "Not 1/32"
+"1/16 note" = "Not 1/16"
+"1/8 note" = "Not 1/8"
+"1/4 note" = "Not 1/4"
+"Notes played just before the start go onto it" = "Not yang dimainkan tepat sebelum awal ditaruh di awal"
+"Played notes: compensate the output latency" = "Not yang dimainkan: kompensasi latensi output"
+"Capture MIDI: the notes just played without recording into the pattern" = "Tangkap MIDI: not yang baru dimainkan tanpa merekam ke pattern"
+"Capture MIDI: {0} notes put in the pattern" = "Tangkap MIDI: {0} not ditaruh di pattern"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "Tangkap MIDI: tidak ada yang ditangkap (mainkan beberapa not dulu, tanpa merekam)"

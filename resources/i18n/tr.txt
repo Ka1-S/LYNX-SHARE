@@ -7007,3 +7007,15 @@ countries: tr
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] kalemle boya  [Ctrl+LMB] / [Shift+LMB] birden çok seç  [2xLMB] aç  [RMB] menü"
 "Empty patterns were ignored." = "Boş pattern'ler yok sayıldı."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Eklenti seçici: tüm jeneratörler ve efektler, kategoriler sekme olarak (kapatmak için tekrar basın)"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "Kapalı (gerçek zamanlarını koru)"
+"1/32 note" = "1/32 nota"
+"1/16 note" = "1/16 nota"
+"1/8 note" = "1/8 nota"
+"1/4 note" = "1/4 nota"
+"Notes played just before the start go onto it" = "Başlangıçtan hemen önce çalınan notalar başlangıca gider"
+"Played notes: compensate the output latency" = "Çalınan notalar: çıkış gecikmesini telafi et"
+"Capture MIDI: the notes just played without recording into the pattern" = "MIDI yakala: kayıt yapmadan az önce çalınan notalar pattern'e"
+"Capture MIDI: {0} notes put in the pattern" = "MIDI yakala: pattern'e {0} nota kondu"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "MIDI yakala: yakalanacak bir şey yok (önce kayıt yapmadan birkaç nota çalın)"

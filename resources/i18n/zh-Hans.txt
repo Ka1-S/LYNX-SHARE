@@ -7007,3 +7007,15 @@ countries: cn sg
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "样式：[LMB] 用铅笔绘制  [Ctrl+LMB] / [Shift+LMB] 选择多个  [2xLMB] 打开  [RMB] 菜单"
 "Empty patterns were ignored." = "已忽略空样式。"
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "插件选择器：所有发生器和效果器，类别显示为标签（再按一次关闭）"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "关（保留实际时间）"
+"1/32 note" = "32 分音符"
+"1/16 note" = "16 分音符"
+"1/8 note" = "8 分音符"
+"1/4 note" = "4 分音符"
+"Notes played just before the start go onto it" = "在开始前一刻弹奏的音符放到开始处"
+"Played notes: compensate the output latency" = "弹奏的音符：补偿输出延迟"
+"Capture MIDI: the notes just played without recording into the pattern" = "捕获 MIDI：把刚才未录音时弹奏的音符放入模式"
+"Capture MIDI: {0} notes put in the pattern" = "捕获 MIDI：已将 {0} 个音符放入模式"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "捕获 MIDI：没有可捕获的内容（请先在不录音的情况下弹奏一些音符）"
