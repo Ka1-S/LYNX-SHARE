@@ -7059,8 +7059,11 @@ countries: nl be
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] tekenen met het potlood  [Ctrl+LMB] / [Shift+LMB] meerdere kiezen  [2xLMB] openen  [RMB] menu"
 "Empty patterns were ignored." = "Lege patterns zijn overgeslagen."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Pluginkiezer: alle generators en effecten, de categorieën als tabbladen (nogmaals drukken om te sluiten)"
+"Themed" = "Thematisch"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Plugin-illustratie animeren (vallende bloemblaadjes, gloed; stijl Thematisch)"
 "click to step, drag or mouse wheel to change" = "klik om te verspringen, sleep of scrollwiel om te wijzigen"
 "no effect with the current mode (another engine is in use)" = "geen effect in de huidige modus (een andere engine is actief)"
+"arrows step, click for the list, drag or mouse wheel to change" = "pijlen verspringen, klik voor de lijst, sleep of scrollwiel om te wijzigen"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Hoofd: {0}"
@@ -7101,3 +7104,9 @@ countries: nl be
 "Last tweaked ({0})" = "Laatst aangepast ({0})"
 "Deactivate" = "Deactiveren"
 "Automate Patcher parameter" = "Patcher-parameter automatiseren"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Opgenomen noten mengen: aan (nieuwe noten komen bij die van het pattern)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Opgenomen noten mengen: uit (de oude noten van een opgenomen kanaal worden vervangen)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Opgenomen noten mengen: aan, een opname voegt zijn noten aan het pattern toe (overdub); uit, de oude noten van een opgenomen kanaal worden vervangen"
+"Tempo tapper: tap the beat to set the tempo" = "Tempotapper: tik de beat om het tempo in te stellen"
+"Blend recorded notes" = "Opgenomen noten mengen"
