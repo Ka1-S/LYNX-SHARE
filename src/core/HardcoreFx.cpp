@@ -1321,10 +1321,12 @@ std::optional<State> parse (const std::vector<std::uint8_t>& d)
 
 float toSlot (int param, float raw) noexcept
 {
+    // the cabinet and the box types are read by truncation, as FL's plugin does ((int)v: a stored 0.5 is an empty box,
+    // FL's render test "Hardcore" holds one; REA_rodada170i §5)
     if (param == pCabinet)
-        return std::clamp (raw / (float) numCabinets, 0.0f, 1.0f);
+        return std::clamp ((float) (int) raw / (float) numCabinets, 0.0f, 1.0f);
     if (param >= pBoxType && param < pBoxType + numBoxes)
-        return std::clamp (raw / (float) numPedalTypes, 0.0f, 1.0f);
+        return std::clamp ((float) (int) raw / (float) numPedalTypes, 0.0f, 1.0f);
     return std::clamp (raw, 0.0f, 1.0f);
 }
 

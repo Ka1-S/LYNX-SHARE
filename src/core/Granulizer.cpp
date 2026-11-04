@@ -1118,9 +1118,9 @@ public:
         const auto finalPitch = (float) (100.0 * (k - 60) + (double) knob + (double) nextCents);
         const auto slot = engine.trigger (k, (float) (100.0 * k), finalPitch, (float) (channelVol * (double) initVol),
                                           (float) std::clamp ((double) nextPan + channelPan, -1.0, 1.0));
-        engine.voices[(std::size_t) slot].slide.anchor (live.ref (knob));
-        if (slot >= 0)
+        if (slot >= 0) // (−1: the plugin refuses the note, e.g. without a sample; round 170i: no write before voice 0)
         {
+            engine.voices[(std::size_t) slot].slide.anchor (live.ref (knob));
             volFactor[(std::size_t) slot] = initVol;
             notePan[(std::size_t) slot] = nextPan;
         }
