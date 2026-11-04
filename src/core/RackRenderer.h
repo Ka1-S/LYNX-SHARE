@@ -301,6 +301,10 @@ MixerMatrix mixerMatrix (const MixerTrack& track, float volume, float pan, bool 
 class RackRenderer
 {
 public:
+    // A live choke event on this channel = FL's Stop sound (round 170h2): every effect and plugin is reset (the
+    // all-notes-off is the panic event, channel −1, sent just before it)
+    static constexpr int stopSoundChannel = -2;
+
     ProcessTimes& processTimes() noexcept { return *times; }
 
     // Extra threads for channels and mixer layers (nullptr = everything on the audio thread).
