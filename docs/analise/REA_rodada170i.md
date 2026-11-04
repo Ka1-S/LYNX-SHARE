@@ -83,7 +83,10 @@ measured), so the law is **not** changed yet: the voice's host level (`TVoicePar
 one more REA pass. Second pass (this round): `FUN_0086b480` stores the layer gain at voice `+0x19` and the pad gain
 at the pad voice `+0x18`; the note velocity only picks the layer there (`+0x2c` ≤ v < `+0x30`, 127 inclusive). The test
 pads are pad volume 128, layer volume 99 / 117, so the missing factor (FL ≈ 0.095 × (21.527^(v/127) − 1) · P against
-LYNX's 0.56) sits in the voice render, where velocity and the pad gain are applied: still open.
+LYNX's 0.56) sits in the voice render, where velocity and the pad gain are applied: still open. Arithmetic for the next pass: with
+§6's host law (velocity 100 = unity, +2.14 dB over LYNX's linear velocity) and the layer law above (+5.16 dB at 99,
++5.86 dB at 117), FL would be +7.3 / +8.0 dB over LYNX; it measures +4.57 / +5.25, a constant −2.7 dB left — close to a
+centre pan-law cut (−3.0 dB) on these nearly centred pads (pan 0…12 of 128), but **not confirmed**: no code changed.
 
 ## 5. Hardcore: a box type of 0.5 is an empty box
 
