@@ -93,6 +93,8 @@ jobs:
           mkdir -p editor-pictures
           "${run[@]}" "$bin" --gfxprobe "$PWD/editor-pictures/gfxprobe.txt" || true
           cat editor-pictures/gfxprobe.txt || true
+          perl -e 'alarm shift; exec @ARGV' 600 "${run[@]}" "$bin" --steppertest "$PWD/editor-pictures/steppertest.txt" || true
+          tail -3 editor-pictures/steppertest.txt || true
           perl -e 'alarm shift; exec @ARGV' 1200 "${run[@]}" "$bin" --plugui "$PWD/editor-pictures" || true
           ls editor-pictures | wc -l
 

@@ -191,6 +191,9 @@ private:
     {
         s.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
         s.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 16);
+        // round 170j: the plugin kit's knobs in LYNX Synth's own art ("the LYNX lab"), or the forced plugin style
+        s.getProperties().set (skin::sliderProperty, (juce::int64) skin::artAccent (skin::Art::lynxSynth).getARGB());
+        s.getProperties().set (skin::styleProperty, skin::packStyle (skin::Style::themed, skin::Art::lynxSynth));
         s.setRange (lo, hi, step);
         s.setTextValueSuffix (suffix);
         s.onValueChange = [this] {
@@ -328,6 +331,9 @@ private:
     {
         s.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
         s.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 16);
+        // round 170j: the plugin kit's knobs in LYNX Synth's own art ("the LYNX lab"), or the forced plugin style
+        s.getProperties().set (skin::sliderProperty, (juce::int64) skin::artAccent (skin::Art::lynxSynth).getARGB());
+        s.getProperties().set (skin::styleProperty, skin::packStyle (skin::Style::themed, skin::Art::lynxSynth));
         s.setRange (lo, hi, step);
         s.setTextValueSuffix (suffix);
         s.onValueChange = [this] { changed(); };
@@ -1134,12 +1140,21 @@ public:
         {
             accent = flKeys ? skin::colour::azure : boobass || transistorBass ? skin::colour::ember : harmor || sytrus ? skin::colour::violet
                                                                                                                                            : skin::colour::crimson;
-            // round 126: the page's own style (FL Keys hardware, BooBass vivid, the synths neon)
+            // round 126: the page's own style (FL Keys hardware, BooBass vivid, the synths neon); round 170j: a plugin
+            // with its own art (Sakura, Toxic Biohazard, Sytrus, 3x Osc) is Themed
             pageStyle = flKeys ? skin::Style::hardware : boobass || transistorBass ? skin::Style::vivid : skin::Style::neon;
+            pageArt = skin::artForInstrument (def.instrument);
+            if (pageArt != skin::Art::none)
+            {
+                pageStyle = skin::Style::themed;
+                artLayer = std::make_unique<skin::ArtLayer>();
+                addAndMakeVisible (*artLayer);
+                artLayer->setArt (pageArt, [this] { return themedNow(); });
+            }
             for (auto& k : knobs)
             {
                 k->getProperties().set (skin::sliderProperty, (juce::int64) accent.getARGB());
-                k->getProperties().set (skin::styleProperty, (int) pageStyle);
+                k->getProperties().set (skin::styleProperty, skin::packStyle (pageStyle, pageArt));
                 const auto* item = itemFor (k->getName());
                 if (item == nullptr || (item->type != plugui::Item::knob && item->type != plugui::Item::vslider && item->type != plugui::Item::hslider))
                 {
@@ -1424,10 +1439,45 @@ public:
         g.strokePath (p, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }
 
+    // round 170j: the page draws its own art right now (Settings may force another style)
+    bool themedNow() const { return pageArt != skin::Art::none && skin::resolve (pageStyle, pageArt) == skin::Style::themed; }
+    juce::Colour pageAccent() const { return themedNow() ? skin::artAccent (pageArt) : accent; }
+
+    // where the art's moving part lives: next to the plugin's big name (Toxic's trefoil, Sytrus's figure, 3x Osc's
+    // scope); Sakura's petals fall in the band of the branch, above the first row of sections (a small area to repaint)
+    juce::Rectangle<float> artStage() const
+    {
+        if (layout == nullptr)
+            return {};
+        const auto f = layoutFactor();
+        if (pageArt == skin::Art::sakura)
+        {
+            auto top = (float) getHeight();
+            for (const auto& item : layout->items)
+                if (item.type == plugui::Item::section && layoutRect (item).getY() > (float) getHeight() * 0.18f)
+                    top = juce::jmin (top, layoutRect (item).getY());
+            return { 0.0f, 30.0f, (float) getWidth(), juce::jmax (40.0f, top - 30.0f) };
+        }
+        for (const auto& item : layout->items)
+            if (item.type == plugui::Item::label && item.label != nullptr && (item.style & plugui::dim) != 0 && item.h * f > 30.0f * f
+                && juce::String (item.label).length() > 2)
+            {
+                const auto r = layoutRect (item);
+                const auto w = juce::GlyphArrangement::getStringWidth (theme::font (r.getHeight() * 0.6f, true), item.label);
+                const auto left = (item.style & plugui::alignLeft) != 0;
+                const auto x0 = left ? r.getX() : r.getRight() - juce::jmin (w, r.getWidth());
+                if (pageArt == skin::Art::toxic)
+                    return { x0 - r.getHeight() * 1.5f, r.getY() - r.getHeight() * 0.15f, r.getHeight() * 1.3f, r.getHeight() * 1.3f };
+                return { left ? x0 + w + 12.0f : x0 - r.getHeight() * 2.6f - 12.0f, r.getY() - r.getHeight() * 0.1f, r.getHeight() * 2.6f, r.getHeight() * 1.2f };
+            }
+        return {};
+    }
+
     void paintLayout (juce::Graphics& g)
     {
         using namespace theme;
-        const skin::StyleScope styleScope (skin::resolve (pageStyle));
+        const skin::StyleScope styleScope (skin::resolve (pageStyle, pageArt), pageArt);
+        const auto accent = pageAccent(); // (the art's own light when Themed)
         const auto f = layoutFactor();
         const auto* found = ref.get (engine);
         if (found == nullptr)
@@ -1446,6 +1496,10 @@ public:
             if (! conditionHolds (item))
                 continue;
             const auto r = layoutRect (item);
+            // round 170j: a partial repaint (the art's petals) draws only the items it touches (captions may hang
+            // up to ~26 units past an item's sides)
+            if (! g.clipRegionIntersects (r.expanded (32.0f * f, 8.0f * f).getSmallestIntegerContainer()))
+                continue;
             const auto dimmed = (item.style & plugui::dim) != 0;
             auto* k = knobFor (item.param);
             switch (item.type)
@@ -1518,7 +1572,7 @@ public:
                     }
                     else if (dimmed && r.getHeight() > 30.0f * f) // the plugin's name, big and readable (round 168q2)
                     {
-                        g.setColour (colour::textSecondary);
+                        g.setColour (themedNow() ? accent.interpolatedWith (juce::Colours::white, 0.55f) : colour::textSecondary);
                         g.setFont (font (r.getHeight() * 0.6f, true));
                         g.drawFittedText (item.label, r.toNearestInt(),
                                           (item.style & plugui::alignLeft) != 0 ? juce::Justification::centredLeft : juce::Justification::centredRight, 1, 0.8f);
@@ -2038,8 +2092,11 @@ public:
     void paint (juce::Graphics& g) override
     {
         g.fillAll (theme::colour::bg2);
-        if (layout != nullptr) // a plugin page in FL's arrangement: the plugin skin's canvas
-            skin::canvas (g, getLocalBounds().toFloat(), accent);
+        if (layout != nullptr) // a plugin page in FL's arrangement: the plugin skin's canvas (round 170j: the art's when Themed)
+        {
+            const skin::StyleScope styleScope (themedNow() ? skin::Style::themed : skin::style(), pageArt);
+            skin::canvas (g, getLocalBounds().toFloat(), pageAccent());
+        }
         g.setColour (theme::colour::textPrimary);
         g.setFont (theme::font (layout != nullptr ? theme::type::body : theme::type::title));
         if (! engineFilesMissing)
@@ -2112,6 +2169,12 @@ public:
         if (layout != nullptr)
         {
             resizeLayout();
+            if (artLayer != nullptr)
+            {
+                artLayer->setBounds (getLocalBounds());
+                artLayer->setStage (artStage());
+                artLayer->toFront (false);
+            }
             return;
         }
         constexpr int columns = 7, w = 96, h = 92;
@@ -2535,6 +2598,8 @@ private:
     ChannelRef ref;
     juce::Colour accent { skin::colour::crimson }; // the plugin page's accent (ui/PluginSkin.h)
     skin::Style pageStyle = skin::Style::glow;     // the plugin page's automatic style (round 126)
+    skin::Art pageArt = skin::Art::none;           // its own art (round 170j: Themed)
+    std::unique_ptr<skin::ArtLayer> artLayer;      // the art's moving part (petals, a glowing trefoil...)
     bool sakura = true, boobass = false, drumsynth = false, harmless = false, harmor = false, gms = false, morphine = false, ogun = false, autogun = false, transistorBass = false, miniSynth = false, dx10 = false, kepler = false, keplerExo = false, poizone = false,
          fruitkick = false, bassdrum = false, toxic = false, threeOsc = false, simSynth = false, wasp = false, plucked = false, beepMap = false,
          sawer = false, flKeys = false, granulizer = false, drumaxx = false, slayer = false, fruityDance = false, sytrus = false, wavesFound = false,
@@ -3371,6 +3436,12 @@ public:
 
     int getChannel() const noexcept { return ref.index; }
 
+    void paint (juce::Graphics& g) override // round 170j: the art's canvas behind the controls
+    {
+        const skin::StyleScope styleScope (skin::resolve (skin::Style::themed, skin::Art::lynxSynth), skin::Art::lynxSynth);
+        skin::canvas (g, getLocalBounds().toFloat(), skin::artAccent (skin::Art::lynxSynth));
+    }
+
     void resized() override
     {
         auto area = getLocalBounds().reduced (10);
@@ -3521,6 +3592,9 @@ private:
     {
         s.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
         s.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 16);
+        // round 170j: the plugin kit's knobs in LYNX Synth's own art ("the LYNX lab"), or the forced plugin style
+        s.getProperties().set (skin::sliderProperty, (juce::int64) skin::artAccent (skin::Art::lynxSynth).getARGB());
+        s.getProperties().set (skin::styleProperty, skin::packStyle (skin::Style::themed, skin::Art::lynxSynth));
         s.setRange (lo, hi, step);
         s.setTextValueSuffix (suffix);
         s.onValueChange = [this] { apply(); };
