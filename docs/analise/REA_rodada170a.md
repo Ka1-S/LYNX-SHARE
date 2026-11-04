@@ -87,7 +87,16 @@ in the round 167g Ghidra project, headless decompilation; DFM resources dumped i
   `stepOffAlt = mix (stepOff, accent, stepGroupTint = 0.28)` for every palette (light themes and other accents too);
   the default theme's built-in table and theme::colour::stepOffAlt = 0x5e3036. Test rack170a_step_groups_clearly_apart.
 
+## LYNX verification (Windows, build cfea95e2, fresh profile, LYNX_TEST_MODE, Demo.lynx)
+
+Shots in C:\Users\kauan\lynx-test\r170a: L1 / c_L4 (Song mode, the Beat clip playing: the strip lit, the playing
+column, the snare's hit glowing, its selector flashing white; groups grey / dark red), L8 / c_L8 (the channel menu
+with the underlined letters), L9 (D in the menu deleted Clap), L18 (the menu's Cut cleared Hat), M2 (Ctrl+X cut Clap's
+steps), M3 (Ctrl+V into Reese Bass), M4 (left-drag up 30 px on the rack's pattern box: Beat → Chords, 3 patterns),
+M5 (one wheel notch down: Chords → Bass), c_M6 (every Piano roll key named). Note: synthetic Ctrl chords need the
+scan code (in.ps1 ctrlkey2); without it no Ctrl shortcut reaches LYNX (Ctrl+Z neither) — a test-harness artefact.
+
 ## Where I stopped
 
 - done: §1–§5, note names, FL session (shots in C:\Users\kauan\lynx-test\r170a), tests tests/Rack170aTests.inc.
-- in progress: LYNX Windows screenshots, merge train.
+- done: LYNX Windows screenshots. In progress: merge train.
