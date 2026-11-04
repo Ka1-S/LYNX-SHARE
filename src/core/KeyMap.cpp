@@ -104,6 +104,11 @@ std::vector<Action> makeActions()
         { "transport.metronome", TR_NOOP ("Metronome on/off"), Context::global, { chord ('M', ctrl) } },
         { "record.countIn", TR_NOOP ("Count-in before recording on/off"), Context::global, { chord ('P', ctrl) } },
         { "record.waitForInput", TR_NOOP ("Recording waits for the first note on/off"), Context::global, { chord ('I', ctrl) } },
+        // round 170e3: FL's Options › Blend recorded notes (Ctrl+B), Loop record and Step edit (Ctrl+E) [DFM ShortcutsModule]
+        { "record.blend", TR_NOOP ("Blend recorded notes on/off (off: replace)"), Context::global, { chord ('B', ctrl) } },
+        { "record.loop", TR_NOOP ("Loop record on/off"), Context::global, {} },
+        { "record.stepEdit", TR_NOOP ("Step edit on/off"), Context::global, { chord ('E', ctrl) } },
+        { "record.punch", TR_NOOP ("Punch in/out on the loop region on/off"), Context::global, {} },
         { "record.quickAudio", TR_NOOP ("Record audio now: arm the selected insert and record (press again to stop)"), Context::global, { chord ('R', shift) } },
 
         // files and history

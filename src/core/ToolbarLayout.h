@@ -71,15 +71,30 @@ enum class IconSize
 };
 
 // Height of one toolbar row and the share of a button's height its icon takes, per icon size.
-// Medium is the default: 16 px icons on 28 px rows, drawn with a fine line (ui/Icons.h strokeWidth), so the
-// header stays light with air around each glyph. For comparison, FL Studio 2026 at 100% draws its toolbar
-// glyphs at roughly 16-20 px on buttons about 26-30 px apart (docs/analise/UI_toolbar_study.md).
-inline int rowHeight (IconSize s) { return s == IconSize::small ? 24 : s == IconSize::medium ? 28 : 34; }
-inline float iconFraction (IconSize) { return 0.6f; }
-inline float iconMaxPx (IconSize s) { return s == IconSize::small ? 14.0f : s == IconSize::medium ? 16.0f : 20.0f; }
+// Medium is the default. Round 170e3 (coordinator review: "16 px icons read as tiny at 1920"): 19 px icons on 31 px
+// rows (was 16 on 28), still drawn with one fine line (ui/Icons.h strokeWidth). For comparison, FL Studio 2026 at 100%
+// draws its toolbar glyphs at roughly 16-20 px on buttons about 26-30 px apart (docs/analise/UI_toolbar_study.md).
+inline int rowHeight (IconSize s) { return s == IconSize::small ? 26 : s == IconSize::medium ? 31 : 37; }
+inline float iconFraction (IconSize) { return 0.62f; }
+inline float iconMaxPx (IconSize s) { return s == IconSize::small ? 15.0f : s == IconSize::medium ? 19.0f : 22.0f; }
 // Editor tool strips (inside the panel title row): icon box in px and button width.
-inline float toolIconPx (IconSize s) { return s == IconSize::small ? 14.0f : s == IconSize::medium ? 16.0f : 18.0f; }
+inline float toolIconPx (IconSize s) { return s == IconSize::small ? 15.0f : s == IconSize::medium ? 18.0f : 21.0f; }
 inline int toolButtonWidth (IconSize s, int height) { return height + (s == IconSize::small ? 0 : s == IconSize::medium ? 2 : 4); }
+
+// Round 170e3: on a very wide window (a 4K screen at 100 %) the default size grows one step, so the toolbar and the
+// editors' tool strips use the width instead of leaving a gap; small and large stay as picked.
+constexpr int wideWindowPx = 2400;
+inline IconSize effectiveIconSize (IconSize chosen, int windowWidth) noexcept
+{
+    return chosen == IconSize::medium && windowWidth >= wideWindowPx ? IconSize::large : chosen;
+}
+
+// Round 170e3: the room left after the panels and the hint column is shared out as wider gaps between the panels
+// (up to `maxExtra` px each) before the rest goes in front of the right-hand meters.
+inline int extraGap (int spare, int gaps, int maxExtra = 28) noexcept
+{
+    return gaps <= 0 || spare <= 0 ? 0 : std::min (maxExtra, spare / gaps);
+}
 
 constexpr std::array<int, 9> uiScales { 80, 90, 100, 110, 125, 150, 175, 200, 250 };
 inline int clampScale (int percent) { return std::clamp (percent, 75, 250); }

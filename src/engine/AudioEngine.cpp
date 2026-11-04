@@ -952,6 +952,23 @@ void AudioEngine::logPlayedNote (int channel, int key, float velocity, bool on)
         scoreLog.noteOn (ms, channel, key, velocity);
     else
         scoreLog.noteOff (ms, channel, key);
+    if (stepEditOn.load (std::memory_order_relaxed) && stepEditQueue.size() < 512)
+        stepEditQueue.push_back ({ channel, key, velocity, on });
+}
+
+void AudioEngine::setStepEdit (bool on) noexcept
+{
+    stepEditOn.store (on, std::memory_order_relaxed);
+    const juce::SpinLock::ScopedLockType lock (scoreLogLock);
+    stepEditQueue.clear();
+}
+
+std::vector<stepedit::Played> AudioEngine::takeStepEditNotes()
+{
+    std::vector<stepedit::Played> out;
+    const juce::SpinLock::ScopedLockType lock (scoreLogLock);
+    out.swap (stepEditQueue);
+    return out;
 }
 
 std::vector<scorelog::Entry> AudioEngine::scoreLogSnapshot() const
@@ -2126,7 +2143,8 @@ void AudioEngine::updateRecording()
         // Song mode without a loop region: while recording, the song plays on past its end until recording stops (FL,
         // round 168k [EXEC]: a 1-bar song recorded from bar 1 counted on to bar 8 instead of going back to bar 1), so
         // the notes stay where they were played
-        if (song.mode == PlayMode::song && ! song.hasLoop())
+        // (Loop record off, round 170e3: through the loop region as well)
+        if (recordloop::notesLinear (song.mode, song.hasLoop(), recordOptions.loopRecord))
         {
             noteTakeLinear = true;
             recorder.setLinear (true);

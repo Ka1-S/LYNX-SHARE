@@ -12,6 +12,8 @@
 
 #include "core/AutomationDisplay.h"
 #include "core/HeldNotes.h"
+#include "core/RecordLoop.h"
+#include "core/StepEdit.h"
 #include "core/Preferences.h"
 #include "core/LiveEventQueue.h"
 #include "core/LiveInput.h"
@@ -184,6 +186,11 @@ public:
         bool punchLoopRegion = false;
         int preRollBars = 0;
         int postRollBars = 0;
+        // FL's "Loop record" (toolbar LoopRecordBtn / Options, round 170e3 [DECOMP 0xf1e2a0 toggles a global that
+        // FUN_011d4800 reads: off while recording, the play end becomes "never", so playback runs on]): on, Song mode
+        // recording loops the loop region (one take per pass); off, it plays straight through the region and the notes
+        // and audio stay where they were played. Pattern mode always loops the pattern in LYNX.
+        bool loopRecord = true;
     };
     // The range this recording keeps (pre-roll or punch), while one is active. UI thread.
     std::optional<PunchRange> getActivePunch() const noexcept { return activePunch; }
@@ -235,6 +242,11 @@ public:
     std::vector<scorelog::Entry> scoreLogSnapshot() const;
     bool scoreLogEmpty() const;
     void clearScoreLog();
+    // FL's Step edit (round 170e3, core/StepEdit.h): while on, every note played on a MIDI input or the typing keyboard
+    // is also queued for the UI, which writes it into the pattern when the transport is stopped. Any thread.
+    void setStepEdit (bool on) noexcept;
+    bool isStepEdit() const noexcept { return stepEditOn.load (std::memory_order_relaxed); }
+    std::vector<stepedit::Played> takeStepEditNotes();
 
     // Scale snap for played notes (MIDI input and the PC keyboard): scale index into notetools::scales()
     // (0 = off) and its root (0..11). Any thread.
@@ -814,6 +826,8 @@ private:
     void logPlayedNote (int channel, int key, float velocity, bool on);
     mutable juce::SpinLock scoreLogLock;             // MIDI thread and UI thread write, the UI reads
     scorelog::Log scoreLog;
+    std::atomic<bool> stepEditOn { false };
+    std::vector<stepedit::Played> stepEditQueue;     // under scoreLogLock
     std::map<std::tuple<int, int, int, int, int, int>, prefs::PickupState> pickups; // (cc, channel, target) -> takeover
     // settings / log files written off the message thread (issue #13's freezes); declared before the saver so it
     // outlives it, and its destructor writes what is still queued
@@ -902,7 +916,7 @@ private:
     std::int64_t punchStopAt = -1;                 // post-roll end: playback stops there (-1: none)
     bool linearRecording() const noexcept
     {
-        return song.mode == PlayMode::song && (! song.hasLoop() || recordOptions.punchLoopRegion);
+        return recordloop::linear (song.mode, song.hasLoop(), recordOptions.loopRecord, recordOptions.punchLoopRegion);
     }
     // the audio thread's view of the above while takes record (false when none is open)
     void updateLinearSong() noexcept

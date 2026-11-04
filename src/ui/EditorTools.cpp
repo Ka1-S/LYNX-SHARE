@@ -139,6 +139,17 @@ void ToolStrip::resized()
     }
 }
 
+void ToolStrip::paint (juce::Graphics& g)
+{
+    if (buttons.empty())
+        return;
+    const auto well = getLocalBounds().toFloat().reduced (0.5f);
+    g.setColour (theme::colour::bg2.withAlpha (0.5f));
+    g.fillRoundedRectangle (well, theme::radius::md);
+    g.setColour (theme::colour::border.withAlpha (0.7f));
+    g.drawRoundedRectangle (well, theme::radius::md, 1.0f);
+}
+
 void ToolStrip::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
 {
     if (wheel.deltaY == 0.0f || tools.empty())

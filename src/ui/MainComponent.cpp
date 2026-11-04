@@ -275,14 +275,17 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     // round 170e2: FL's "Blend recorded notes" switch (on = overdub, off = replace) and its tempo tapper button
     blendButton.setOnColour (theme::colour::bg6);
     blendButton.setIconColourWhenOn (theme::colour::accent);
-    blendButton.onClick = [this] {
-        auto o = engine.getRecordOptions();
-        o.mode = o.mode == RecordMode::overdub ? RecordMode::replace : RecordMode::overdub;
-        engine.setRecordOptions (o);
-        refreshRecordOptionButtons();
-        saveUiSettings();
-    };
+    blendButton.onClick = [this] { runAction ("record.blend"); };
     tapTempoButton.onClick = [this] { openTempoTapper (engine); };
+    // round 170e3: loop record, step edit and punch in/out as switches beside them
+    for (auto* b : { &loopRecordButton, &stepEditButton, &punchButton })
+    {
+        b->setOnColour (theme::colour::bg6);
+        b->setIconColourWhenOn (theme::colour::accent);
+    }
+    loopRecordButton.onClick = [this] { runAction ("record.loop"); };
+    stepEditButton.onClick = [this] { runAction ("record.stepEdit"); };
+    punchButton.onClick = [this] { runAction ("record.punch"); };
 
     for (int i = 0; i < workspace::panelCount; ++i)
     {
@@ -510,7 +513,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
     for (auto* c : std::initializer_list<juce::Component*> { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &playButton, &stopButton,
                                                              &recordButton, &recordMenuButton, &patternModeButton, &songModeButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton,
-                                                             &blendButton, &tapTempoButton, &tempoDisplay, &patternBox, &newPatternButton, &patternMenuButton, &pluginPickerButton, &timeDisplay,
+                                                             &blendButton, &tapTempoButton, &loopRecordButton, &stepEditButton, &punchButton, &tempoDisplay, &patternBox, &newPatternButton, &patternMenuButton, &pluginPickerButton, &timeDisplay,
                                                              &songPosition, &masterVolume, &masterPitch, &perfMeter, &output, &hintBar, &tweakReadout, &workspace, &midiLight })
     {
         addAndMakeVisible (c);
@@ -530,25 +533,26 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
     for (auto* b : std::initializer_list<juce::Component*> { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &playButton, &stopButton,
                                                              &recordButton, &recordMenuButton, &patternModeButton, &songModeButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton,
-                                                             &blendButton, &tapTempoButton, &newPatternButton, &patternMenuButton, &pluginPickerButton })
+                                                             &blendButton, &tapTempoButton, &loopRecordButton, &stepEditButton, &punchButton, &newPatternButton, &patternMenuButton, &pluginPickerButton })
         b->setWantsKeyboardFocus (false);
 
     for (auto* b : { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &recordMenuButton, &newPatternButton, &patternMenuButton,
-                     &pluginPickerButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &blendButton, &tapTempoButton })
+                     &pluginPickerButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &blendButton, &tapTempoButton, &loopRecordButton, &stepEditButton, &punchButton })
         b->setFlat (true);
 
     // a light header: every toolbar button is flat; "on" is a faint wash, in the accent for the states that
     // matter while working (playing, recording, metronome, recording options)
     {
         using namespace theme;
-        const auto onWash = colour::accent.withAlpha (0.16f), onIcon = colour::accentHover;
+        const auto onWash = colour::accent.withAlpha (0.24f), onIcon = colour::accentHover; // (round 170e3: a clearer "on")
         for (auto* b : { &playButton, &stopButton, &recordButton, &patternModeButton, &songModeButton })
             b->setFlat (true);
         playButton.setOnColour (onWash);
         playButton.setIconColourWhenOn (onIcon);
         recordButton.setOnColour (colour::record.withAlpha (0.2f));
         recordButton.setIconColourWhenOn (colour::record);
-        for (auto* b : { &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &blendButton, &patternModeButton, &songModeButton })
+        for (auto* b : { &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &blendButton, &loopRecordButton, &stepEditButton, &punchButton,
+                          &patternModeButton, &songModeButton })
         {
             b->setOnColour (onWash);
             b->setIconColourWhenOn (onIcon);
@@ -744,10 +748,26 @@ void MainComponent::paint (juce::Graphics& g)
     g.setColour (colour::border);
     g.fillRect (bar.withHeight (1).withY (bar.getBottom() - 1));
 
-    g.setColour (colour::border.brighter (0.08f));
+    // round 170e3: each panel sits in its own quiet well (transport, master, recording, snap and pattern, windows,
+    // file, meters), so the groups read at a glance; with "Separators" off, only hairlines between them
     if (toolbarLayout.separators) // (the toolbar menu's "Separators")
+    {
+        for (const auto& r : panelBounds)
+            if (! r.isEmpty())
+            {
+                const auto well = r.toFloat().reduced (1.0f, 2.0f);
+                g.setColour (colour::bg2.withAlpha (0.5f));
+                g.fillRoundedRectangle (well, radius::lg);
+                g.setColour (colour::border.withAlpha (0.7f));
+                g.drawRoundedRectangle (well.reduced (0.5f), radius::lg, 1.0f);
+            }
+    }
+    else
+    {
+        g.setColour (colour::border.brighter (0.08f));
         for (auto x : dividers)
             g.fillRect (x, bar.getY() + 12, 1, bar.getHeight() - 24);
+    }
 
     // play, stop and record share one quiet well
     if (! transportArea.isEmpty())
@@ -793,9 +813,11 @@ void MainComponent::paint (juce::Graphics& g)
 void MainComponent::resized()
 {
     using toolbarlayout::Group;
+    if (const auto size = toolbarlayout::effectiveIconSize (toolbarLayout.iconSize, getWidth()); size != appliedIconSize)
+        applyIconSizing (size);
     dividers.clear();
     const auto bar = juce::Rectangle<int> (0, 0, getWidth(), toolbarHeight);
-    auto toolbar = bar.reduced (8, 3);
+    auto toolbar = bar.reduced (8, toolbarLayout.visible ? 5 : 3);
     const auto row1 = toolbar.getY(), row2 = toolbar.getY() + rowHeight + 2, h = rowHeight;
     const auto big = h + 6;                                   // transport buttons: one slim row, centred on both
     const auto bigWidth = h + 4;
@@ -826,9 +848,10 @@ void MainComponent::resized()
                                                                                            juce::GlyphArrangement::getStringWidth (captionFont, tr ("PATTERN"))))) + 6;
 
     std::array<int, toolbarlayout::groupCount> widths {};
-    widths[(std::size_t) Group::transport] = modeWidth + 8 + 3 * (bigWidth + 4) + 4 + tempoWidth + 6 + timeWidth;
+    const int tapWidth = juce::roundToInt (h * 0.8f); // the tempo tapper, right of the tempo (round 170e3)
+    widths[(std::size_t) Group::transport] = modeWidth + 8 + 3 * (bigWidth + 4) + 4 + tempoWidth + 2 + tapWidth + 4 + timeWidth;
     widths[(std::size_t) Group::master] = 92;
-    widths[(std::size_t) Group::record] = 4 * h + 6; // four per row (round 170e2)
+    widths[(std::size_t) Group::record] = 5 * h + 8; // five per row (round 170e3)
     widths[(std::size_t) Group::snap] = captionWidth + gridWidth;
     widths[(std::size_t) Group::windows] = 3 * h + 4;
     widths[(std::size_t) Group::file] = 3 * h + 4;
@@ -846,14 +869,18 @@ void MainComponent::resized()
         used += visible[(std::size_t) i] ? widths[(std::size_t) i] + gap : 0;
 
     const auto hintWidth = juce::jlimit (juce::jmin (minHint, juce::jmax (160, room - used)), maxHint, room - used);
-    // the spare room goes before the first of the meters / output in the toolbar order (they sit on the right)
+    // the spare room: first a little more air between the panels (round 170e3: a wide window reads as groups
+    // instead of one row with a hole), then the rest before the first of the meters / output (they sit on the right)
     auto spare = juce::jmax (0, room - used - hintWidth);
+    const auto shownGroups = (int) std::count (visible.begin(), visible.end(), true);
+    const auto extra = toolbarlayout::extraGap (spare, shownGroups);
+    spare -= extra * shownGroups;
 
     auto take = [&toolbar] (int width) { return toolbar.removeFromLeft (juce::jmin (width, toolbar.getWidth())); };
     auto divide = [&] {
-        take (8);
+        take (8 + extra / 2);
         dividers.push_back (toolbar.getX());
-        take (9);
+        take (9 + extra - extra / 2);
     };
     auto hide = [] (std::initializer_list<juce::Component*> components) {
         for (auto* c : components)
@@ -910,10 +937,10 @@ void MainComponent::resized()
             switch (group)
             {
                 case Group::transport:
-                    hide ({ &patternModeButton, &songModeButton, &playButton, &stopButton, &recordButton, &tempoDisplay, &timeDisplay, &songPosition });
+                    hide ({ &patternModeButton, &songModeButton, &playButton, &stopButton, &recordButton, &tempoDisplay, &tapTempoButton, &timeDisplay, &songPosition });
                     break;
                 case Group::master: hide ({ &masterVolume, &masterPitch }); break;
-                case Group::record: hide ({ &metronomeButton, &typingPianoButton, &recordMenuButton, &countInButton, &waitInputButton, &blendButton, &tapTempoButton, &midiLight }); break;
+                case Group::record: hide ({ &metronomeButton, &typingPianoButton, &recordMenuButton, &countInButton, &waitInputButton, &blendButton, &loopRecordButton, &stepEditButton, &punchButton, &midiLight }); break;
                 case Group::snap: hide ({ &gridBox, &snapToggleButton, &patternBox, &newPatternButton, &patternMenuButton }); break;
                 case Group::windows:
                     for (auto& b : panelButtons)
@@ -959,16 +986,19 @@ void MainComponent::resized()
                 const auto displays = juce::Rectangle<int> (panel.getX(), row1 + 3, panel.getWidth(), 2 * h - 6);
                 const auto displayHeight = displays.getHeight() - 10;
                 put (tempoDisplay, displays.withWidth (tempoWidth).withHeight (displayHeight));
-                put (timeDisplay, displays.withTrimmedLeft (tempoWidth + 6).withWidth (timeWidth).withHeight (displayHeight));
-                put (songPosition, displays.withTop (displays.getY() + displayHeight + 1).withWidth (tempoWidth + 6 + timeWidth));
+                put (tapTempoButton, displays.withTrimmedLeft (tempoWidth + 2).withWidth (tapWidth).withHeight (displayHeight));
+                put (timeDisplay, displays.withTrimmedLeft (tempoWidth + 2 + tapWidth + 4).withWidth (timeWidth).withHeight (displayHeight));
+                put (songPosition, displays.withTop (displays.getY() + displayHeight + 1).withWidth (tempoWidth + 2 + tapWidth + 4 + timeWidth));
                 break;
             }
             case Group::master: // master volume over master pitch
                 put (masterVolume, panel.withY (row1).withHeight (h).reduced (0, 1));
                 put (masterPitch, panel.withY (row2).withHeight (h).reduced (0, 1));
                 break;
-            case Group::record: // metronome, wait for input, count-in, blend over "what to record", typing piano, tempo tapper, MIDI light
-                grid (panel, { &metronomeButton, &waitInputButton, &countInButton, &blendButton, &recordMenuButton, &typingPianoButton, &tapTempoButton, &midiLight }, 4);
+            case Group::record: // the recording switches (round 170e3, as FL's recording panel): metronome, wait for input, count-in,
+                                // blend and the typing piano over loop record, step edit, punch, the recording options menu and the MIDI light
+                grid (panel, { &metronomeButton, &waitInputButton, &countInButton, &blendButton, &typingPianoButton,
+                               &loopRecordButton, &stepEditButton, &punchButton, &recordMenuButton, &midiLight }, 5);
                 break;
             case Group::snap: // global snap over the pattern selector, each with its name
             {
@@ -1026,18 +1056,18 @@ void MainComponent::resized()
 
 // --- toolbar layout ------------------------------------------------------------------------------
 
-void MainComponent::setToolbarLayout (const toolbarlayout::Layout& layout, bool save)
+// The toolbar's rows and icons, and the editors' tool strips, for one icon size (round 170e3: the size in effect can be
+// one step above the chosen one on a very wide window, toolbarlayout::effectiveIconSize).
+void MainComponent::applyIconSizing (toolbarlayout::IconSize size)
 {
-    const auto scaleChanged = layout.uiScale != toolbarLayout.uiScale;
-    toolbarLayout = layout;
-    const auto size = toolbarLayout.iconSize;
+    appliedIconSize = size;
     rowHeight = toolbarlayout::rowHeight (size);
-    toolbarHeight = toolbarLayout.visible ? 2 * rowHeight + 8 : rowHeight + 6;
+    toolbarHeight = toolbarLayout.visible ? 2 * rowHeight + 12 : rowHeight + 6; // (round 170e3: room for the panel wells)
 
     const auto fraction = toolbarlayout::iconFraction (size), maxPx = toolbarlayout::iconMaxPx (size);
     for (auto* b : { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &recordMenuButton, &newPatternButton,
                      &patternMenuButton, &pluginPickerButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &snapToggleButton,
-                     &blendButton, &tapTempoButton })
+                     &blendButton, &tapTempoButton, &loopRecordButton, &stepEditButton, &punchButton })
         b->setIconSizing (fraction, maxPx);
     for (auto& b : panelButtons)
         b.setIconSizing (fraction, maxPx);
@@ -1047,6 +1077,13 @@ void MainComponent::setToolbarLayout (const toolbarlayout::Layout& layout, bool 
     ToolStrip::iconSize = size;
     pianoRoll.resized();
     playlist.resized();
+}
+
+void MainComponent::setToolbarLayout (const toolbarlayout::Layout& layout, bool save)
+{
+    const auto scaleChanged = layout.uiScale != toolbarLayout.uiScale;
+    toolbarLayout = layout;
+    applyIconSizing (toolbarlayout::effectiveIconSize (toolbarLayout.iconSize, getWidth()));
 
     if (save && scaleChanged)
     {
@@ -1453,6 +1490,25 @@ bool MainComponent::runAction (const std::string& id)
         engine.setRecordOptions (o);
         refreshRecordOptionButtons();
     }
+    else if (is ("record.blend") || is ("record.loop") || is ("record.punch"))
+    {
+        auto o = engine.getRecordOptions();
+        if (is ("record.blend"))
+            o.mode = o.mode == RecordMode::overdub ? RecordMode::replace : RecordMode::overdub;
+        else if (is ("record.loop"))
+            o.loopRecord = ! o.loopRecord;
+        else
+            o.punchLoopRegion = ! o.punchLoopRegion;
+        engine.setRecordOptions (o);
+        refreshRecordOptionButtons();
+        saveUiSettings();
+    }
+    else if (is ("record.stepEdit"))
+    {
+        engine.setStepEdit (! engine.isStepEdit());
+        stepSeekTick = stepPrevTick = -1.0; // starts at the position shown now
+        refreshRecordOptionButtons();
+    }
     else if (is ("rack.graphEditor")) rack.toggleGraphLanes();
     else if (is ("rack.pianoRollView"))
     {
@@ -1844,12 +1900,14 @@ void MainComponent::loadUiSettings()
                 (key == "recordToStepSequencer" ? o.toStepSequencer : o.recordingMarkers) = on;
             engine.setRecordOptions (o);
         }
-        else if (key == "recordPunchLoop" || key == "recordPreRoll" || key == "recordPostRoll")
+        else if (key == "recordPunchLoop" || key == "recordPreRoll" || key == "recordPostRoll" || key == "recordLoop")
         {
             auto o = engine.getRecordOptions();
             const auto v = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue();
             if (key == "recordPunchLoop")
                 o.punchLoopRegion = v != 0;
+            else if (key == "recordLoop")
+                o.loopRecord = v != 0;
             else
                 (key == "recordPreRoll" ? o.preRollBars : o.postRollBars) = juce::jlimit (0, 8, v);
             engine.setRecordOptions (o);
@@ -1941,6 +1999,7 @@ void MainComponent::saveUiSettings()
                                       + "\nrecordClips=" + juce::String (engine.getRecordOptions().recordClips ? 1 : 0)
                                       + "\nrecordQuantiseAutomation=" + juce::String (engine.getRecordOptions().quantiseAutomation ? 1 : 0)
                                       + "\nrecordPunchLoop=" + juce::String (engine.getRecordOptions().punchLoopRegion ? 1 : 0)
+                                      + "\nrecordLoop=" + juce::String (engine.getRecordOptions().loopRecord ? 1 : 0)
                                       + "\nrecordPreRoll=" + juce::String (engine.getRecordOptions().preRollBars)
                                       + "\nrecordPostRoll=" + juce::String (engine.getRecordOptions().postRollBars) + "\nmixerUsedOnly=" + juce::String (MixerStrips::showUsedOnly ? 1 : 0) + "\nmixerLayout=" + juce::String ((int) MixerStrips::layout)
                                       + "\nquantizeSongJumps=" + juce::String (engine.quantizeSongJumps.load()) + "\n"
@@ -2504,6 +2563,9 @@ void MainComponent::addRecordOptions (juce::PopupMenu& menu)
     menu.addSubMenu (tr ("Count-in") + shortcutText ("record.countIn"), countIn);
     menu.addItem (tr ("Wait for the first note to start") + shortcutText ("record.waitForInput"), true, o.waitForInput,
                   [set] { set ([] (AudioEngine::RecordOptions& r) { r.waitForInput = ! r.waitForInput; }); });
+    menu.addItem (tr ("Loop record") + shortcutText ("record.loop"), true, o.loopRecord,
+                  [set] { set ([] (AudioEngine::RecordOptions& r) { r.loopRecord = ! r.loopRecord; }); });
+    menu.addItem (tr ("Step edit") + shortcutText ("record.stepEdit"), true, engine.isStepEdit(), [this] { runAction ("record.stepEdit"); });
     // round 163: punch in/out on the loop region, pre-roll and post-roll (bars)
     {
         auto bars = [&set] (juce::PopupMenu& m, int now, std::function<void (AudioEngine::RecordOptions&, int)> apply) {
@@ -2858,6 +2920,18 @@ void MainComponent::refreshRecordOptionButtons()
     waitInputButton.setToggleState (o.waitForInput, juce::dontSendNotification);
     waitInputButton.setTooltip (withKey (o.waitForInput ? tr ("Recording waits for the first note: on") : tr ("Recording waits for the first note: off"),
                                          "record.waitForInput"));
+    blendButton.setTooltip (withKey (blendButton.getTooltip(), "record.blend"));
+    loopRecordButton.setToggleState (o.loopRecord, juce::dontSendNotification);
+    loopRecordButton.setTooltip (withKey (o.loopRecord ? tr ("Loop record: on (Song mode recording loops the loop region, one take per pass)")
+                                                       : tr ("Loop record: off (recording plays straight through the loop region)"),
+                                          "record.loop"));
+    stepEditButton.setToggleState (engine.isStepEdit(), juce::dontSendNotification);
+    stepEditButton.setTooltip (withKey (engine.isStepEdit() ? tr ("Step edit: on (stopped, played notes go into the pattern one snap step after another)")
+                                                            : tr ("Step edit: off"),
+                                        "record.stepEdit"));
+    punchButton.setToggleState (o.punchLoopRegion, juce::dontSendNotification);
+    punchButton.setTooltip (withKey (o.punchLoopRegion ? tr ("Punch in/out: on (audio is kept only inside the loop region)") : tr ("Punch in/out: off"),
+                                     "record.punch"));
 }
 
 void MainComponent::clonePatternNow()
@@ -3479,6 +3553,13 @@ void MainComponent::setControlHints()
     ui::setHint (countInButton, with (tr ("Count-in: one bar of clicks before recording starts (the menu has more lengths)"), "record.countIn"));
     ui::setHint (waitInputButton, with (tr ("Wait for input: recording starts with the first note you play"), "record.waitForInput"));
     ui::setHint (blendButton, tr ("Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced"));
+    ui::setHint (loopRecordButton, with (tr ("Loop record: on, Song mode recording loops the loop region (one take per pass); off, it plays "
+                                             "straight through and keeps everything where it was played"), "record.loop"));
+    ui::setHint (stepEditButton, with (tr ("Step edit: with the transport stopped, notes you play go into the current pattern at the position, "
+                                           "a snap step long; release the keys and the position moves on one step (chords: hold them together)"),
+                                       "record.stepEdit"));
+    ui::setHint (punchButton, with (tr ("Punch in/out: audio recording keeps only the loop region (playback runs through it; pre- and "
+                                        "post-roll in the recording options)"), "record.punch"));
     ui::setHint (tapTempoButton, with (tr ("Tempo tapper: tap the beat to set the tempo"), "view.tempoTapper"));
     ui::setHint (typingPianoButton, with (tr ("Typing keyboard to piano: Z..M and Q..P play the selected channels; letter shortcuts pause"),
                                           "view.typingPiano"));
@@ -3545,7 +3626,10 @@ void MainComponent::setQuickTips()
     tip (metronomeButton, tr ("Metronome"), "transport.metronome");
     tip (countInButton, tr ("Count-in"), "record.countIn");
     tip (waitInputButton, tr ("Wait for input"), "record.waitForInput");
-    tip (blendButton, tr ("Blend recorded notes"));
+    tip (blendButton, tr ("Blend recorded notes"), "record.blend");
+    tip (loopRecordButton, tr ("Loop record"), "record.loop");
+    tip (stepEditButton, tr ("Step edit"), "record.stepEdit");
+    tip (punchButton, tr ("Punch in/out"), "record.punch");
     tip (tapTempoButton, tr ("Tempo tapper"), "view.tempoTapper");
     tip (typingPianoButton, tr ("Typing keyboard to piano"), "view.typingPiano");
     tip (tempoDisplay, tr ("Tempo (BPM)"));
@@ -3571,6 +3655,46 @@ void MainComponent::setQuickTips()
         tip (panelButtons[(std::size_t) i], tr (panelName ((Panel) i)), panelAction ((Panel) i));
 }
 
+// FL's Step edit (round 170e3): the notes played since the last tick go into the current pattern at the position, a
+// snap step of the Piano Roll long; when every key is up the position moves on a step (core/StepEdit.h). While the
+// transport plays they are left to the recording, as in FL.
+void MainComponent::applyStepEdit()
+{
+    auto played = engine.takeStepEditNotes();
+    if (played.empty() || engine.getTransport().playing.load())
+        return;
+
+    const auto now = engine.getTransport().positionTicks.load();
+    // the position moved by anything else (a click on a ruler, Stop): start from there
+    if (now != stepSeekTick && now != stepPrevTick)
+    {
+        const auto& song = engine.getSong();
+        const auto at = transportedit::patternPlayhead (song, song.currentPattern, now);
+        stepWriter.reset (at >= 0.0 ? (std::int64_t) std::llround (at) : 0);
+        stepSeekTick = stepPrevTick = now;
+    }
+
+    const auto step = juce::jmax<std::int64_t> (1, pianoRoll.gridForSnapshot());
+    for (const auto& p : played)
+    {
+        auto moved = false;
+        engine.editSong ([&] (Song& s) {
+            if (! s.patterns.empty())
+                moved = stepWriter.play (p, s.patterns[(std::size_t) juce::jlimit (0, (int) s.patterns.size() - 1, s.currentPattern)], step);
+        }, p.on);
+        if (! moved)
+            continue;
+        const auto& song = engine.getSong();
+        const auto target = transportedit::patternSeekTarget (song, song.currentPattern, (double) stepWriter.getPosition(), now);
+        if (target >= 0.0)
+        {
+            stepPrevTick = engine.getTransport().positionTicks.load();
+            stepSeekTick = target;
+            engine.seek (target);
+        }
+    }
+}
+
 void MainComponent::timerCallback()
 {
     const uitrace::Scope trace ("MainComponent timer", false);
@@ -3584,6 +3708,8 @@ void MainComponent::timerCallback()
         updateRecordQuantise();
         snapToggleButton.setToggleState (EditorGlobals::get().getGridOption() != grid::noneOption, juce::dontSendNotification);
     }
+    if (engine.isStepEdit())
+        applyStepEdit();
 
     if (engine.isModified() != lastModified)
     {

@@ -72,6 +72,7 @@ public:
     void refreshKeys (const std::function<juce::String (EditTool)>& keyOf);
 
     void resized() override;
+    void paint (juce::Graphics& g) override; // round 170e3: the tools sit in one well, apart from the header's other controls
     // the wheel over the strip steps through the tools
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
 
