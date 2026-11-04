@@ -17052,3 +17052,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Drumaxx169eTests.inc"
 #include "Inst169hTests.inc"
 #include "Wfqa170hTests.inc"
+#include "Wfqa170h2Tests.inc"

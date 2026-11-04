@@ -2589,6 +2589,14 @@ void RackRenderer::process (const RackState* state,
 
         while (queue->pop (e))
         {
+            if (e.type == NoteEvent::Type::choke && e.channel == stopSoundChannel) // FL's Stop sound (round 170h2)
+            {
+                for (auto& slots : state->effects)
+                    for (auto& effect : slots)
+                        if (effect != nullptr)
+                            effect->transportReset(); // native effects: reset(); plugins: their wrapper's reset option
+                continue;
+            }
             if (e.type == NoteEvent::Type::choke && e.channel < 0) // panic: every channel stops sounding
             {
                 for (auto& instrument : state->instruments)

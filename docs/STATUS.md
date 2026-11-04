@@ -24,7 +24,7 @@ Core Audio / ALSA + JACK (PipeWire).
   following the global grid, a pattern clip placed in Song mode; switches next to the metronome in the main
   toolbar and the full set in the "what to record" menu and Options → Recording.
 - **Quick-add palette (F8 / plugin-picker icon):** searchable instruments and effects (new channel or selected
-  insert). **Undo history** (Ctrl+H, Edit menu): named steps, click to jump.
+  insert). **Undo history** (Ctrl+Alt+H, Edit menu; Ctrl+H = Stop sound, as in FL): named steps, click to jump.
 - **Piano Roll:** selection (Ctrl+drag, Shift+click, Ctrl+A), group move/resize, Ctrl+C/X/V, Ctrl+B duplicate,
   Ctrl+Q quantize, arrow keys (Shift = octave/bar), snap selector, chords and scale highlighting, per-note
   velocity/pan/fine pitch/mute, slide (808 glide) and porta notes, `.mid` import/export. Note tools

@@ -1354,6 +1354,7 @@ bool MainComponent::runAction (const std::string& id)
             showQuickAdd();
     }
     else if (is ("edit.history")) showHistory();
+    else if (is ("tools.stopSound")) engine.stopSound();
     else if (is ("browser.search"))
     {
         showPanel (Panel::browser);
@@ -3378,7 +3379,8 @@ void MainComponent::setControlHints()
     ui::setHint (playButton, with (tr ("Play: [LMB] play; again: stop and go back to where it started"), "transport.playStop")
                                  + "  " + keyMarkup ("transport.pause") + " " + tr ("pause"));
     ui::setHint (stopButton, tr ("Stop: [LMB] stop and go back to the start (or the remembered position; again: the start)  "
-                                 "[2xLMB] back to the start and all notes off (panic)  [RMB] remember seek time"),
+                                 "[2xLMB] back to the start and all notes off (panic)  [RMB] remember seek time")
+                                 + "  " + keyMarkup ("tools.stopSound") + " " + tr ("Stop sound (all notes off)"), // round 170h2
                  true);
     ui::setHint (recordButton, with (tr ("Record: [LMB] arm, then play to record notes (and audio, when armed)  [RMB] what to record"), "transport.record"),
                  true);
@@ -5044,7 +5046,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addSubMenu (tr ("Last tweaked"), makeLastTweakedMenu (0), engine.getLastTweaked (0).has_value());
         menu.addSubMenu (tr ("Next to last tweaked"), makeLastTweakedMenu (1), engine.getLastTweaked (1).has_value());
         menu.addSectionHeader (tr ("Macros"));
-        menu.addItem (tr ("Stop sound (all notes off)"), [this] { engine.panic(); });
+        menu.addItem (tr ("Stop sound (all notes off)") + shortcutText ("tools.stopSound"), [this] { engine.stopSound(); });
         menu.addItem (tr ("Select unused channels"), [this] {
             showPanel (Panel::channelRack);
             rack.selectUnused();
