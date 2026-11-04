@@ -88,3 +88,70 @@ TEST (gen169l2_without_fl_the_lynx_bank_and_unreadable_entries_fall_through)
     CHECK (! c.empty() && c.front().find ("Plugin database") != std::string::npos);
     CHECK (natives::makeChannel (InstrumentKind::wavetraveller, fl).has_value());
 }
+
+// A new Granulizer / Wave Traveller is FL's database entry, which names no sample: silent, as FL renders it
+TEST (gen169l2_new_granulizer_and_wave_traveller_have_no_sample_like_fl)
+{
+    using namespace lynx;
+    if (realFlpDir.empty())
+        return;
+    const auto fl = natives142::flAccess();
+    for (const auto kind : { InstrumentKind::granulizer, InstrumentKind::wavetraveller })
+    {
+        const auto made = natives::makeChannel (kind, fl);
+        CHECK (made.has_value());
+        if (! made)
+            continue;
+        CHECK (made->instrument == kind && made->samplePath.empty() && ! made->pluginState.empty());
+        const auto first = natives::presetCandidates (natives::presetFolderOf (kind), true, fl);
+        const auto fromDb = first.empty() ? std::nullopt : natives::channelFromPresetFile (kind, first.front(), fl);
+        CHECK (fromDb.has_value() && gen169l2::sameSound (*made, *fromDb));
+    }
+}
+
+// PoiZone's chorus / delay ring on after the last voice (FL's render of its database patch: echoes falling ≈ 6 dB per
+// 0.5 s): the instrument stays busy while they sound, so the renderer (which skips idle channels) neither cuts them
+// nor replays a stale delay line when the channel wakes up later (the burst at other channels' notes, round 169l2)
+TEST (gen169l2_poizone_delay_tail_rings_out_before_idle)
+{
+    using namespace lynx;
+    if (realFlpDir.empty())
+        return;
+    const auto fl = natives142::flAccess();
+    const auto made = natives::makeChannel (InstrumentKind::poizone, fl);
+    CHECK (made.has_value());
+    if (! made)
+        return;
+    const double rate = 44100.0;
+    auto in = makePoiZoneInstrument();
+    in->prepare (rate);
+    in->configure (*made, 120.0);
+    std::vector<float> l (256), r (256);
+    const float g = 0.70710678f;
+    const auto block = [&] { std::fill (l.begin(), l.end(), 0.0f), std::fill (r.begin(), r.end(), 0.0f);
+                             in->render (l.data(), r.data(), 256, g, g);
+                             float p = 0.0f;
+                             for (int i = 0; i < 256; ++i) p = std::max ({ p, std::fabs (l[(std::size_t) i]), std::fabs (r[(std::size_t) i]) });
+                             return p; };
+    block();
+    in->noteOn (60, 100.0f / 128.0f);
+    for (int k = 0; k < (int) (0.5 * rate) / 256; ++k)
+        block();
+    in->noteOff (60);
+    int blocks = 0;
+    float tailPeak = 0.0f; // the loudest block from 1 s after the note off on
+    while (! in->idle() && blocks < (int) (20.0 * rate) / 256)
+    {
+        const auto p = block();
+        if (blocks++ * 256 > (int) rate)
+            tailPeak = std::max (tailPeak, p);
+    }
+    std::printf ("  PoiZone idle %.2f s after the note off, tail peak from 1 s %.1f dB\n", blocks * 256 / rate,
+                 20.0 * std::log10 ((double) tailPeak + 1e-12));
+    CHECK (in->idle());
+    CHECK (blocks * 256 > (int) (1.5 * rate)); // (the echoes: FL's are still at ≈ −40 dB 1.5 s after the note off)
+    CHECK (tailPeak > 1.0e-3f);
+    // woken later (another channel's note in the same cut group, an automation...), it has nothing left to play
+    for (int k = 0; k < 4; ++k)
+        CHECK (block() < 2.0e-6f);
+}

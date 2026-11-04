@@ -1777,6 +1777,7 @@ public:
         HostSlide slide; // a slide note moving Final.Pitch (issue #14)
     };
     Engine eng;
+    long long fxQuiet = 0; // samples since the output last went over −120 dB (or a voice played)
     Slot slots[128];
     // FL's PITCH knob and main pitch, live (round 167a): the held keys move to the channel's pitch now (at once)
     void followPitch (float now) noexcept
@@ -1865,6 +1866,10 @@ public:
     {
         if (eng.anyActive() || ! eng.arpStopped)
             return false;
+        // the chorus / delay keep ringing after the last voice (FL renders their echoes, round 169l2): idle once their
+        // output stayed under −120 dB for the delay lines' length (2 s), so a later block can't replay a stale tail
+        if ((eng.delay.on || eng.chorus.on) && fxQuiet < (long long) (eng.fs * 2.0) + chunkMax)
+            return false;
         return std::none_of (std::begin (slots), std::end (slots), [] (const Slot& s) { return s.on; });
     }
 
@@ -1883,8 +1888,13 @@ public:
             eng.process (l, r, cn);
             if (eng.playing)
                 tpos = tpos + eng.tempo * 0.016666666666666666 * (double) cn * (1.0 / eng.fs);
+            float peak = 0.0f;
             for (int i = 0; i < cn; ++i)
+            {
                 outL[c0 + i] += l[i], outR[c0 + i] += r[i];
+                peak = std::max (peak, std::max (std::fabs (l[i]), std::fabs (r[i])));
+            }
+            fxQuiet = peak > 1.0e-6f || eng.anyActive() ? 0 : fxQuiet + cn;
             if (sliding) // (issue #14) the slide moves the pitch table chunk by chunk
             {
                 sliding = false;

@@ -68,6 +68,8 @@ without a state was the synth channel and is saved as such).
 Sawer, FL Keys, Granulizer and Toxic Biohazard are their Plugin database state, which differs from the
 `Default.*` preset LYNX starts them from (since round 142). Switching them to the Plugin database state is the FL-exact
 choice but changes their fresh sound in LYNX; not done without a yes.
+**Decided (round 169l2): yes — every new generator starts from its Plugin database entry with FL installed
+(REA_rodada169l2 §1).**
 
 ## 4. Ogun states of versions 10–13 [DECOMP]
 
