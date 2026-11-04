@@ -162,6 +162,25 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         };
     }
     PianoRollComponent::shortcutText = [this] (const std::string& id) { return shortcutText (id.c_str()); };
+    // FL's EEPlayBtnClick (FLEngine 0xe4bd40, REA round 169f): Pattern mode first (also while the song plays), then the
+    // play / pause of the transport. EEPlayBtnMouseDown (0xe4bda0), right button: FL's Stop (FUN_011ca520 (0, 0), the very
+    // call of the toolbar's StopBtnClick), which in FL goes back to where playback started, pressed again to the start
+    // (measured in FL 2026, round 169f, Pattern mode after a ruler click)
+    pianoRoll.onPlayPause = [this] {
+        if (engine.getSong().mode != PlayMode::pattern)
+            toggleMode();
+        playPause();
+    };
+    pianoRoll.onPlayRightClick = [this] {
+        const auto playing = engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn();
+        const auto target = transportedit::rollPlayRightClickTarget (playing, engine.getTransport().positionTicks.load(), playStartTicks);
+        engine.stop();
+        if (target > 0)
+            engine.seek (target);
+        else
+            engine.rewind();
+        playStartTicks = target;
+    };
     pianoRoll.onBrowseScores = [this] { // (round 168g: the Piano roll's File › Browse scores)
         showPanel (Panel::browser);
         browser.showScores();

@@ -7005,6 +7005,7 @@ countries: nl be
 "Live session with {0}" = "Livesessie met {0}"
 "Undo left alone what someone else changed since: {0}" = "Ongedaan maken liet ongemoeid wat iemand anders sindsdien wijzigde: {0}"
 "Mute removed steps" = "Verwijderde steps dempen"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Pattern afspelen / pauzeren  [RMB] stoppen en terug naar waar het afspelen begon (nogmaals: naar het begin van het pattern)"
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] tekenen met het potlood  [Ctrl+LMB] / [Shift+LMB] meerdere kiezen  [2xLMB] openen  [RMB] menu"
 "Empty patterns were ignored." = "Lege patterns zijn overgeslagen."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Pluginkiezer: alle generators en effecten, de categorieën als tabbladen (nogmaals drukken om te sluiten)"

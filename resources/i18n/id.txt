@@ -7005,6 +7005,7 @@ countries: id
 "Live session with {0}" = "Sesi live dengan {0}"
 "Undo left alone what someone else changed since: {0}" = "Urungkan tidak menyentuh yang diubah orang lain sejak itu: {0}"
 "Mute removed steps" = "Bisukan step yang dihapus"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Putar / jeda pattern  [RMB] hentikan dan kembali ke tempat pemutaran dimulai (lagi: ke awal pattern)"
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] lukis dengan pensil  [Ctrl+LMB] / [Shift+LMB] pilih beberapa  [2xLMB] buka  [RMB] menu"
 "Empty patterns were ignored." = "Pattern kosong diabaikan."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Pemilih plugin: semua generator dan efek, kategori sebagai tab (tekan lagi untuk menutup)"

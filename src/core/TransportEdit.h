@@ -144,4 +144,11 @@ inline std::int64_t shiftSpaceStopTarget (bool songMode, bool hasTimeSelection, 
 {
     return songMode && hasTimeSelection ? std::max<std::int64_t> (0, selectionStart) : 0;
 }
+
+// Right-click on the Piano roll's play button (FL 2026, tried in FL on macOS for WORKFLOW_FL R29): it stops and goes
+// back to where playback last started (a ruler click, not always bar 1); stopped there already, to the pattern start.
+inline double rollPlayRightClickTarget (bool playing, double position, double lastStart) noexcept
+{
+    return playing || position != lastStart ? std::max (0.0, lastStart) : 0.0;
+}
 } // namespace lynx::transportedit

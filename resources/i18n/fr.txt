@@ -7005,6 +7005,7 @@ countries: fr be ch ca lu
 "Live session with {0}" = "Session en direct avec {0}"
 "Undo left alone what someone else changed since: {0}" = "Annuler n'a pas touché à ce que quelqu'un d'autre a modifié depuis : {0}"
 "Mute removed steps" = "Rendre muets les steps retirés"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Lire / mettre en pause le pattern  [RMB] arrêter et revenir là où la lecture a commencé (encore : au début du pattern)"
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern : [LMB] le peindre au crayon  [Ctrl+LMB] / [Shift+LMB] en choisir plusieurs  [2xLMB] ouvrir  [RMB] menu"
 "Empty patterns were ignored." = "Les patterns vides ont été ignorés."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Sélecteur de plugins : tous les générateurs et effets, les catégories en onglets (appuyez à nouveau pour fermer)"

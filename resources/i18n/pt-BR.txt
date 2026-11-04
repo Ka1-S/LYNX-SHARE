@@ -7090,6 +7090,7 @@ countries: br
 "Mute the selected clips (all when none is selected)" = "Silenciar os clipes selecionados (todos quando nenhum estiver selecionado)"
 "Unmute the selected clips (all when none is selected)" = "Tirar do mudo os clipes selecionados (todos quando nenhum estiver selecionado)"
 "Mute removed steps" = "Silenciar passos removidos"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Tocar / pausar o pattern  [RMB] parar e voltar para onde a reprodução começou (de novo: para o início do pattern)"
 
 # Live sessions (round 169b)
 "Live sessions need a newer libcurl on this computer ({0})" = "As sessões ao vivo precisam de uma libcurl mais nova neste computador ({0})"

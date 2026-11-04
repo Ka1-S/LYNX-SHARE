@@ -7005,6 +7005,7 @@ countries: cn sg
 "Live session with {0}" = "与{0}的实时会话"
 "Undo left alone what someone else changed since: {0}" = "撤销未改动其他人此后修改的内容：{0}"
 "Mute removed steps" = "静音移除的步"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "播放 / 暂停样式  [RMB] 停止并回到开始播放的位置 (再按一次: 回到样式开头)"
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "样式：[LMB] 用铅笔绘制  [Ctrl+LMB] / [Shift+LMB] 选择多个  [2xLMB] 打开  [RMB] 菜单"
 "Empty patterns were ignored." = "已忽略空样式。"
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "插件选择器：所有发生器和效果器，类别显示为标签（再按一次关闭）"
