@@ -100,7 +100,7 @@ TEST (typing169f_fl_layout_piano_free_lock_and_performance)
             CHECK (typingPianoNotes (k, o, 5, piano) == std::vector<int> { typingPianoNote (k, o, 5) });
     for (int k : { '1', '4', '8', '-', 'F', 'K', '\'' })
         CHECK (typingPianoKey (k, 4, 0, piano).taken && typingPianoKey (k, 4, 0, piano).notes.empty());
-    for (int k : { 'A', '`', '\\', ' ', 0x10070 /* F1 */ })
+    for (int k : std::initializer_list<int> { 'A', '`', '\\', ' ', 0x10070 /* F1 */ })
         CHECK (! typingPianoKey (k, 4, 0, piano).taken);
     CHECK (! typingPianoKey ('a', 4, 0, piano).taken && typingPianoKey ('l', 4, 0, piano).taken);
 
