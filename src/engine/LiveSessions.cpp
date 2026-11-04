@@ -1,6 +1,8 @@
 #include "engine/LiveSessions.h"
 
 #include <algorithm>
+#include <atomic>
+#include <condition_variable>
 #include <cstring>
 
 #include "core/MissingFiles.h"
@@ -8,6 +10,7 @@
 #include "core/SessionParts.h"
 #include "core/StandIns.h"
 #include "engine/AudioEngine.h"
+#include "engine/MediaPack.h"
 #include "engine/ProjectFile.h"
 #include "engine/SessionPack.h"
 #include "platform/Paths.h"
@@ -24,6 +27,46 @@ constexpr juce::int64 maxMediaBytes = (juce::int64) 4 << 30;
 constexpr std::size_t maxJsonBytes = 64u << 20;
 constexpr std::size_t uploadBacklog = 1u << 20; // media wait while this much is queued (the song's changes go first)
 const juce::String tokenPrefix = "lynx-media:";
+constexpr juce::int64 inlineHashBytes = 1 << 20; // files above this are hashed off the message thread
+constexpr int chatShown = 60;                    // chat lines a late guest gets
+constexpr juce::int64 silenceMs = 35000;         // nothing at all from the relay for this long: the connection is dead
+constexpr double standInRate = 44100.0;          // (P1's stand-ins: 32-bit float WAV at 44.1 kHz)
+
+// a host run's epoch (core/LiveSession.h): 48 random bits (exact in a JSON number)
+std::uint64_t newEpoch()
+{
+    std::uint8_t b[6];
+    livecrypto::randomBytes (b, sizeof b);
+    std::uint64_t e = 0;
+    for (auto x : b)
+        e = e << 8 | x;
+    return e | 1;
+}
+
+juce::String randomHex (int bytes)
+{
+    std::vector<std::uint8_t> b ((std::size_t) bytes);
+    livecrypto::randomBytes (b.data(), b.size());
+    return juce::String (livecrypto::toHex (b.data(), b.size()));
+}
+
+juce::var keysToVar (const std::set<live::Key>& keys)
+{
+    juce::Array<juce::var> out;
+    for (const auto& k : keys)
+        out.add (juce::String (live::toString (k)));
+    return out;
+}
+
+std::set<live::Key> keysFromVar (const juce::var& v)
+{
+    std::set<live::Key> out;
+    if (const auto* a = v.getArray())
+        for (const auto& item : *a)
+            if (auto k = live::keyFromString (item.toString().toStdString()); k && (k->kind == live::Kind::channel || k->kind == live::Kind::insert) && out.size() < 4096)
+                out.insert (*k);
+    return out;
+}
 
 juce::String str (const std::string& s) { return juce::String::fromUTF8 (s.c_str()); }
 std::string utf8 (const juce::String& s) { return s.toStdString(); }
@@ -84,17 +127,121 @@ juce::File engineFiles()
 }
 } // namespace
 
+// Work off the message thread (round 169j): a job runs on the worker's thread and returns what runs afterwards on the
+// message thread (pump() collects it). Jobs only touch copies; a renderer is left to finish on its own when the
+// session goes (an ExportJob waits for the message thread).
+struct LiveSessionManager::Worker
+{
+    using Done = std::function<void()>;
+    using Job = std::function<Done()>;
+    struct Shared
+    {
+        std::mutex lock;
+        std::condition_variable wake;
+        std::deque<Job> jobs;
+        std::vector<Done> done;
+        bool stop = false;
+    };
+    std::shared_ptr<Shared> shared = std::make_shared<Shared>();
+    std::thread thread;
+    bool inlineJobs = false, detachAtEnd = false;
+
+    Worker (bool runInline, bool detach) : inlineJobs (runInline), detachAtEnd (detach)
+    {
+        if (inlineJobs)
+            return;
+        thread = std::thread ([s = shared] {
+            for (;;)
+            {
+                Job job;
+                {
+                    std::unique_lock<std::mutex> g (s->lock);
+                    s->wake.wait (g, [&] { return s->stop || ! s->jobs.empty(); });
+                    if (s->stop)
+                        return;
+                    job = std::move (s->jobs.front());
+                    s->jobs.pop_front();
+                }
+                auto done = job();
+                const std::lock_guard<std::mutex> g (s->lock);
+                if (done)
+                    s->done.push_back (std::move (done));
+            }
+        });
+    }
+
+    ~Worker()
+    {
+        {
+            const std::lock_guard<std::mutex> g (shared->lock);
+            shared->stop = true;
+            shared->jobs.clear();
+        }
+        shared->wake.notify_all();
+        if (thread.joinable())
+        {
+            if (detachAtEnd)
+                thread.detach();
+            else
+                thread.join();
+        }
+    }
+
+    void post (Job job)
+    {
+        if (inlineJobs)
+        {
+            if (auto done = job())
+                shared->done.push_back (std::move (done));
+            return;
+        }
+        {
+            const std::lock_guard<std::mutex> g (shared->lock);
+            shared->jobs.push_back (std::move (job));
+        }
+        shared->wake.notify_one();
+    }
+
+    std::vector<Done> finished()
+    {
+        std::vector<Done> out;
+        const std::lock_guard<std::mutex> g (shared->lock);
+        out.swap (shared->done);
+        return out;
+    }
+};
+
 LiveSessionManager::LiveSessionManager (AudioEngine& e) : engine (e) {}
 
 LiveSessionManager::~LiveSessionManager()
 {
     *alive = false;
-    if (isActive())
+    if (isActive() && ! abandoned)
         leave();
     stopTimer();
     link.close();
     if (httpThread.joinable())
         httpThread.join();
+    io.reset();
+    renderer.reset();
+}
+
+juce::File LiveSessionManager::defaultJournal()
+{
+    return platform::settingsFile ("Live session").getChildFile ("journal.json");
+}
+
+void LiveSessionManager::runCompletions()
+{
+    for (auto* w : { io.get(), renderer.get() })
+        if (w != nullptr)
+            for (auto& done : w->finished())
+                done();
+}
+
+bool LiveSessionManager::missingHere (const PluginRef& ref)
+{
+    return options.missing ? options.missing (ref) : ! engine.getPluginHost().isInstalled (ref);
 }
 
 // --- the patch on the wire ------------------------------------------------------------------------------------------
@@ -175,7 +322,20 @@ void LiveSessionManager::start (const Options& o)
     host = true;
     me = session::hostTag;
     peers.clear();
+    away.clear();
     stats = {};
+    chat.clear();
+    unread = 0;
+    following = false;
+    abandoned = resuming = false;
+    myPerms = {};
+    allNeed.clear();
+    myNeed.clear();
+    renderedSig.clear();
+    hostSeed = livecrypto::newSeed();
+    journalFile = options.journal != juce::File() ? options.journal : defaultJournal();
+    io = std::make_unique<Worker> (false, false);
+    renderer = std::make_unique<Worker> (options.inlineWork, true);
     std::string why;
     if (! livelink::Connection::available (&why))
         return setState (State::ended, tr ("Live sessions need a newer libcurl on this computer ({0})", { str (why) }));
@@ -205,13 +365,15 @@ void LiveSessionManager::start (const Options& o)
         engine.applyRemote (std::move (rounded));
     }
     const auto& song = engine.getSong();
-    authority = std::make_unique<live::Authority> (song, &roundTrip);
+    authority = std::make_unique<live::Authority> (song, &roundTrip, 0, newEpoch());
     replica = std::make_unique<live::Replica> (song, 0, session::hostTag, &roundTrip);
     keepFull = options.guestsKeepFull;
     editEverything = options.guestsEditEverything;
     mediaFolder = options.folder != juce::File() ? options.folder : sessionpack::sessionMediaFolder (options.projectFile, song, "Live session");
     lastStamp = engine.getSongStamp();
     engine.setSessionHistory (true);
+    ensureHashed (song); // (the big samples start hashing now, before anyone asks for the snapshot)
+    updateNeeds();
 
     invite = {};
     invite.secret = livecrypto::newSecret();
@@ -260,6 +422,7 @@ void LiveSessionManager::onRoomCreated (const juce::String& room, const juce::St
     invite.room = utf8 (room);
     keys = livecrypto::derive (invite);
     inviteCode = str (livecrypto::formatCode (invite));
+    journalDirty = true;
     connect();
 }
 
@@ -270,8 +433,23 @@ void LiveSessionManager::join (const juce::String& code, const Options& o)
     options = o;
     host = false;
     peers.clear();
+    away.clear();
     people.clear();
     stats = {};
+    chat.clear();
+    unread = 0;
+    following = false;
+    abandoned = resuming = false;
+    myPerms = {};
+    allNeed.clear();
+    myNeed.clear();
+    renderedSig.clear();
+    hostKey = {};
+    resumeToken.clear();
+    seekNonce.clear();
+    hostPeer = 0;
+    io = std::make_unique<Worker> (false, false);
+    renderer = std::make_unique<Worker> (options.inlineWork, true);
     std::string why;
     if (! livelink::Connection::available (&why))
         return setState (State::ended, tr ("Live sessions need a newer libcurl on this computer ({0})", { str (why) }));
@@ -293,7 +471,10 @@ void LiveSessionManager::connect()
     wsUrl = wsUrlFor (options.relay, roomId);
     link.close();
     link.open (utf8 (wsUrl), keys.relayToken, userAgent());
-    setState (State::connecting, tr ("Connecting to the session..."));
+    lastEventMs = juce::Time::currentTimeMillis();
+    reconnectAtMs = 0; // (an attempt is under way)
+    if (state != State::reconnecting)
+        setState (State::connecting, tr ("Connecting to the session..."));
     startTimer (40);
 }
 
@@ -306,7 +487,7 @@ void LiveSessionManager::leave()
         auto m = message ("end");
         sendToGuests (m);
     }
-    else if (hostPeer != 0)
+    else if (hostPeer != 0 && state == State::live)
         sendJson (hostPeer, message ("bye"));
     // (what is queued goes out first: a second at most)
     for (int i = 0; i < 40 && link.isOpen() && link.queuedBytes() > 0; ++i)
@@ -338,15 +519,27 @@ void LiveSessionManager::end (const juce::String& text, bool keepPart)
                                                    .withStatusCode (&status));
         }).detach();
     }
-    if (! host && wasLive && keepPart)
+    if (! host && (wasLive || state == State::waitingHost || state == State::reconnecting) && replica && keepPart)
         engine.editSong ([] (Song& s) { s = parts::keepOnlyPart (s); }, false);
     engine.setSessionHistory (false);
+    if (host && ! abandoned && journalFile != juce::File())
+        journalFile.deleteFile(); // (ended on purpose: nothing to resume)
     authority.reset();
     replica.reset();
     uploads.clear();
     wanted.clear();
     forward.clear();
     fragments.clear();
+    away.clear();
+    pendingSnapshots.clear();
+    hashing.clear();
+    packing.clear();
+    if (mediaFolder != juce::File())
+        mediaFolder.getChildFile (".packs").deleteRecursively();
+    packs.clear();
+    rendering = false;
+    resuming = false;
+    haveHostTransport = false;
     for (auto& p : peers)
         p.second.accepted = false;
     people.clear();
@@ -449,24 +642,68 @@ void LiveSessionManager::pump()
             return end (answer.error.isNotEmpty() ? answer.error : tr ("The relay gave an unexpected answer."), false);
         return onRoomCreated (answer.room, answer.hostToken);
     }
+    runCompletions();
+    if (! isActive())
+        return;
     for (auto& e : link.events())
     {
+        lastEventMs = juce::Time::currentTimeMillis();
         handleEvent (e);
         if (! isActive())
             return;
     }
     const auto now = juce::Time::currentTimeMillis();
-    if (state == State::live && now - lastPollMs >= 100)
+    // a dropped connection: connect again (1 s, 2 s, 4 s … 30 s apart); give up after options.reconnectForMs
+    if (state == State::reconnecting || state == State::waitingHost)
+    {
+        if (now - droppedAtMs > options.reconnectForMs)
+            return end (host ? tr ("The live session could not be resumed: the connection did not come back.")
+                             : (keepFull ? tr ("The host did not come back. The project stays as it is.")
+                                         : tr ("The host did not come back. Your part of the project stays here.")),
+                        ! host && ! keepFull);
+        if (state == State::reconnecting && reconnectAtMs != 0 && now >= reconnectAtMs)
+            connect();
+        if (state == State::waitingHost && link.isOpen() && now - lastSeekMs >= 5000)
+            sendSeek (0);
+    }
+    // a connection that went silent (no frame, no pong) is dead even when the system has not noticed yet
+    if (link.isOpen() && (state == State::live || state == State::waitingHost))
+    {
+        if (now - lastPingMs >= 10000)
+        {
+            lastPingMs = now;
+            link.sendText ("{\"type\":\"ping\",\"t\":" + std::to_string (now) + "}");
+        }
+        if (now - lastEventMs > silenceMs)
+            return lostConnection (tr ("The connection to the session went silent."));
+    }
+    const bool editing = state == State::live || (host && state == State::reconnecting);
+    if (editing && now - lastPollMs >= 100)
     {
         lastPollMs = now;
         pollLocal();
         releaseHeld();
-        if (now - lastPresenceMs >= 250)
+        if (state == State::live && now - lastPresenceMs >= 250)
         {
             lastPresenceMs = now;
             sendPresence();
+            if (host)
+                sendTransport();
         }
+        if (! host)
+            followHost();
+        updateNeeds();
+        maybeRenderStandIns();
     }
+    if (host && ! pendingSnapshots.empty() && state == State::live)
+    {
+        auto waiting = pendingSnapshots;
+        pendingSnapshots.clear();
+        for (const auto& [peer, resumed] : waiting)
+            sendSnapshot (peer, resumed);
+    }
+    if (host && journalDirty && now >= journalDueMs)
+        writeJournal (false);
     pumpUploads();
 }
 
@@ -480,6 +717,26 @@ void LiveSessionManager::handleEvent (const livelink::Event& e)
         if (type == "welcome")
         {
             myPeer = (int) ctl["peer"];
+            if (state == State::reconnecting)
+            {
+                ++stats.reconnects;
+                reconnectDelayMs = 1000;
+                if (host)
+                {
+                    // back: every guest that waits checks it is us and resumes
+                    setState (State::live, tr ("Live"));
+                    sendJson (0, message ("back"));
+                    if (onHint)
+                        onHint (tr ("Connected again: the people in the session are coming back."));
+                    sendPeople (true);
+                }
+                else
+                {
+                    setState (State::waitingHost, tr ("Connected again: finding the host..."));
+                    sendSeek (0);
+                }
+                return;
+            }
             if (host)
             {
                 setState (State::live, tr ("Live: waiting for guests"));
@@ -496,18 +753,39 @@ void LiveSessionManager::handleEvent (const livelink::Event& e)
                 setState (State::knocking, tr ("Waiting for the host to let you in..."));
             }
         }
+        else if (type == "join")
+        {
+            if (! host && state == State::waitingHost)
+                sendSeek ((int) ctl["peer"]); // (perhaps the host, back)
+        }
         else if (type == "leave")
         {
             const int peer = (int) ctl["peer"];
-            if (! host && peer == hostPeer && hostPeer != 0)
-                return end (keepFull ? tr ("The host left the live session. The project stays as it is.")
-                                     : tr ("The host left the live session. Your part of the project stays here."),
-                            ! keepFull);
+            if (! host && peer == hostPeer && hostPeer != 0 && state == State::live)
+            {
+                // the host's connection dropped (or its LYNX SHARE closed without ending): wait for it, edits wait too
+                hostPeer = 0;
+                droppedAtMs = juce::Time::currentTimeMillis();
+                uploads.clear();
+                setState (State::waitingHost, tr ("The host's connection dropped. Waiting for them to come back..."));
+                if (onHint)
+                    onHint (tr ("The host's connection dropped. Keep working: your edits go out when they are back."));
+                return;
+            }
             if (host)
                 if (auto it = peers.find (peer); it != peers.end())
                 {
                     const auto name = it->second.name;
                     const bool was = it->second.accepted;
+                    if (was)
+                    {
+                        // a dropped guest may come back (resume): keep their place
+                        auto keep = it->second;
+                        keep.accepted = false;
+                        keep.relayPeer = 0;
+                        away[keep.tag] = keep;
+                        journalDirty = true;
+                    }
                     peers.erase (it);
                     for (auto& u : uploads)
                         if (u.peer == peer)
@@ -519,8 +797,9 @@ void LiveSessionManager::handleEvent (const livelink::Event& e)
                     if (was)
                     {
                         sendPeople (true);
+                        broadcastNeeds();
                         if (onHint)
-                            onHint (tr ("{0} left the live session", { name }));
+                            onHint (tr ("{0}'s connection dropped", { name }));
                     }
                 }
         }
@@ -536,6 +815,10 @@ void LiveSessionManager::handleEvent (const livelink::Event& e)
     }
     if (e.type == T::closed)
     {
+        // a session that was running reconnects by itself (unless the room is gone or the code no longer works)
+        const bool running = state == State::live || state == State::waitingHost || state == State::reconnecting;
+        if (running && e.code != 401 && e.code != 404 && e.code != 4000)
+            return lostConnection (tr ("The connection to the session was lost."));
         juce::String why;
         if (e.code == 401)
             why = tr ("The invite code is wrong.");
@@ -547,10 +830,12 @@ void LiveSessionManager::handleEvent (const livelink::Event& e)
             why = tr ("Too many attempts. Try again in a minute.");
         else if (e.code == 4000)
             why = host ? tr ("The relay closed the session.") : tr ("The host ended the live session.");
+        else if (e.code == 404 && running)
+            why = tr ("The live session is over: the relay no longer has it.");
         else
             why = tr ("The connection to the session was lost.");
         const bool keep = ! host && ! keepFull;
-        if (! host && state == State::live)
+        if (! host && running)
             why += " " + (keepFull ? tr ("The project stays as it is.") : tr ("Your part of the project stays here."));
         end (why, keep);
     }
@@ -591,8 +876,8 @@ void LiveSessionManager::handleFrame (int from, std::vector<std::uint8_t> payloa
         return; // another key (a wrong code), changed on the way or replayed
     ++stats.received;
     const auto type = (*plain)[0];
-    if (type == 'M')
-        return handleMediaChunk (from, plain->data() + 1, plain->size() - 1);
+    if (type == 'M' || type == 'F')
+        return handleMediaChunk (from, plain->data() + 1, plain->size() - 1, type == 'F');
     juce::String text;
     if (type == 'J')
         text = juce::String::fromUTF8 ((const char*) plain->data() + 1, (int) plain->size() - 1);
@@ -627,6 +912,10 @@ void LiveSessionManager::handleMessage (int from, const juce::var& m)
     {
         if (t == "hello")
             return onHello (from, m);
+        if (t == "seek")
+            return onSeek (from, m);
+        if (t == "resume")
+            return onResume (from, m);
         auto it = peers.find (from);
         if (it == peers.end() || ! it->second.accepted)
             return;
@@ -643,21 +932,43 @@ void LiveSessionManager::handleMessage (int from, const juce::var& m)
             serve (from, m["sha"].toString());
         else if (t == "resync")
             sendSnapshot (from);
+        else if (t == "chat")
+            onChatMessage (from, m);
+        else if (t == "need")
+        {
+            peer.need = keysFromVar (m["keys"]);
+            broadcastNeeds();
+        }
         else if (t == "bye")
         {
             const auto name = peer.name;
             peers.erase (it);
+            journalDirty = true;
             sendPeople (true);
+            broadcastNeeds();
             if (onHint)
                 onHint (tr ("{0} left the live session", { name }));
         }
         return;
     }
-    // a guest: only the host speaks to us (the first one who lets us in or turns us away)
-    if (hostPeer == 0 && (t == "snapshot" || t == "deny"))
-        hostPeer = from;
-    if (from != hostPeer)
+    // a guest: only the host speaks to us (the first one who lets us in or turns us away; after a drop, the one who
+    // proves it is the same host)
+    if (t == "host")
+        return onHostAnswer (from, m);
+    if (t == "back")
+    {
+        if (from != hostPeer || state == State::waitingHost)
+            sendSeek (from);
         return;
+    }
+    if (hostPeer == 0 && state == State::knocking && (t == "snapshot" || t == "deny"))
+        hostPeer = from;
+    if (from != hostPeer || hostPeer == 0)
+        return;
+    if (t == "deny" && m["reason"].toString() == "resume")
+        return end (keepFull ? tr ("The host no longer knows this computer in the session. The project stays as it is.")
+                             : tr ("The host no longer knows this computer in the session. Your part of the project stays here."),
+                    ! keepFull);
     if (t == "deny")
     {
         const auto reason = m["reason"].toString();
@@ -670,6 +981,63 @@ void LiveSessionManager::handleMessage (int from, const juce::var& m)
         onSnapshot (m);
     else if (t == "commit")
         onCommit (m);
+    else if (t == "resumed")
+    {
+        // everything we missed has arrived: our own edits that never got through go out again
+        if (replica)
+            replica->resend();
+        resuming = false;
+        ++stats.replayed;
+        setState (State::live, tr ("Live"));
+        lastStamp = 0; // (poll now)
+        pollLocal();
+        sendPresence();
+        myNeed.clear();
+        needStamp = 0;
+        updateNeeds();
+        if (onHint)
+            onHint (tr ("You are back in the live session."));
+    }
+    else if (t == "perms")
+    {
+        myPerms.editEverything = (bool) m["editEverything"];
+        myPerms.listener = (bool) m["listener"];
+        myPerms.settings = (bool) m["settings"];
+        editEverything = myPerms.editEverything;
+        keepFull = (bool) m["keepFull"];
+        if (onHint)
+            onHint (myPerms.listener         ? tr ("The host made you a listener: you hear everything and edit nothing")
+                    : myPerms.editEverything ? tr ("The host lets you edit everything in the project")
+                    : myPerms.settings       ? tr ("The host lets you edit your own parts and the tempo and project settings")
+                                             : tr ("The host lets you edit your own parts"));
+        if (onChange)
+            onChange();
+    }
+    else if (t == "chat")
+    {
+        ChatLine line;
+        line.tag = (std::uint32_t) (int) m["tag"];
+        line.name = m["name"].toString().substring (0, 64);
+        line.text = str (live::cleanChat (utf8 (m["text"].toString())));
+        line.colour = (std::uint32_t) (juce::int64) m["colour"];
+        line.at = (juce::int64) m["at"];
+        line.mine = line.tag == me;
+        if (line.text.isNotEmpty())
+            addChat (line);
+    }
+    else if (t == "transport")
+    {
+        hostTransport.playing = (bool) m["playing"];
+        hostTransport.songMode = (bool) m["song"];
+        hostTransport.ticks = (double) m["pos"];
+        hostTransport.bpm = juce::jlimit (10.0, 999.0, (double) m["bpm"]);
+        hostTransport.atMs = (double) juce::Time::currentTimeMillis();
+        haveHostTransport = true;
+        lastFollowMs = 0; // (follow at once)
+        followHost();
+    }
+    else if (t == "needs")
+        allNeed = keysFromVar (m["keys"]);
     else if (t == "people")
     {
         people.clear();
@@ -686,6 +1054,8 @@ void LiveSessionManager::handleMessage (int from, const juce::var& m)
                 p.recording = (bool) v["recording"];
                 p.position = (double) v["pos"];
                 p.me = p.tag == me;
+                if (p.me)
+                    p.permissions = myPerms, p.keepFull = keepFull;
                 people.push_back (p);
             }
         if (onChange)
@@ -718,7 +1088,7 @@ void LiveSessionManager::onHello (int from, const juce::var& m)
         return;
     if ((int) m["protocol"] != live::protocolVersion)
         return deny (from, "version");
-    int accepted = 0;
+    int accepted = (int) away.size();
     for (const auto& [n, p] : peers)
         accepted += p.accepted || p.asking ? 1 : 0;
     if (accepted >= session::maxParticipants - 1)
@@ -774,7 +1144,13 @@ void LiveSessionManager::accept (int from)
     p->colour = colourOf (p->tag);
     peer.tag = p->tag;
     peer.colour = p->colour;
-    authority->setPermissions (peer.tag, { editEverything, false });
+    peer.token = randomHex (16);
+    peer.perms = {};
+    peer.perms.editEverything = editEverything;
+    peer.keepFull = keepFull;
+    away.erase (peer.tag); // (a dropped guest who joined again from scratch)
+    authority->setPermissions (peer.tag, peer.perms);
+    journalDirty = true;
     broadcastCommit (authority->setParticipants (song.session.participants));
     peer.accepted = true;
     sendSnapshot (from);
@@ -784,12 +1160,17 @@ void LiveSessionManager::accept (int from)
     setState (State::live, tr ("Live"));
 }
 
-void LiveSessionManager::sendSnapshot (int to)
+void LiveSessionManager::sendSnapshot (int to, bool resumed)
 {
     auto it = peers.find (to);
     if (it == peers.end())
         return;
     Song song = authority->confirmed();
+    if (! ensureHashed (song))
+    {
+        pendingSnapshots[to] = resumed; // (a big sample is still being hashed: in a moment)
+        return;
+    }
     tokenize (song);
     sessionpack::Manifest manifest;
     std::vector<const PluginRef*> refs;
@@ -805,11 +1186,32 @@ void LiveSessionManager::sendSnapshot (int to)
     auto m = message ("snapshot");
     set (m, "rev", (juce::int64) authority->revision());
     set (m, "tag", (int) it->second.tag);
-    set (m, "keepFull", keepFull);
-    set (m, "editEverything", editEverything);
+    set (m, "keepFull", it->second.keepFull);
+    set (m, "editEverything", it->second.perms.editEverything);
+    set (m, "perms", permsToVar (it->second.perms, it->second.keepFull));
     set (m, "song", ProjectFile::toJson (song));
     set (m, "manifest", sessionpack::manifestToJson (manifest));
+    set (m, "hostKey", juce::String (livecrypto::toHex (livecrypto::publicKeyOf (hostSeed))));
+    set (m, "resume", it->second.token);
+    set (m, "resumed", resumed);
+    set (m, "epoch", (juce::int64) authority->epoch());
+    set (m, "lost", resumed && it->second.lostRev);
+    set (m, "needs", keysToVar (allNeed));
+    juce::Array<juce::var> lines;
+    for (std::size_t i = chat.size() > (std::size_t) chatShown ? chat.size() - (std::size_t) chatShown : 0; i < chat.size(); ++i)
+    {
+        auto o = object();
+        set (o, "tag", (int) chat[i].tag);
+        set (o, "name", chat[i].name);
+        set (o, "text", chat[i].text);
+        set (o, "colour", (juce::int64) chat[i].colour);
+        set (o, "at", chat[i].at);
+        lines.add (o);
+    }
+    set (m, "chat", lines);
     sendJson (to, m);
+    if (haveHostTransport || engine.getTransport().playing.load())
+        lastTransportMs = 0; // (the newcomer gets the transport at the next presence tick)
 }
 
 void LiveSessionManager::onPropose (int from, const juce::var& m)
@@ -823,6 +1225,7 @@ void LiveSessionManager::onPropose (int from, const juce::var& m)
     const auto c = authority->propose (peer.tag, p);
     stats.rejected += (int) c.rejected.size();
     broadcastCommit (c);
+    journalDirty = true;
 }
 
 void LiveSessionManager::broadcastCommit (const live::Commit& c)
@@ -865,8 +1268,21 @@ void LiveSessionManager::sendPeople (bool force)
             q.playing = p.playing;
             q.recording = p.recording;
             q.position = p.position;
+            q.permissions = p.perms;
+            q.keepFull = p.keepFull;
             list.push_back (q);
         }
+    for (const auto& [tag, p] : away)
+    {
+        Person q;
+        q.tag = p.tag;
+        q.name = p.name;
+        q.colour = p.colour;
+        q.permissions = p.perms;
+        q.keepFull = p.keepFull;
+        list.push_back (q);
+    }
+    std::sort (list.begin() + 1, list.end(), [] (const Person& a, const Person& b) { return a.tag < b.tag; });
     juce::Array<juce::var> out;
     juce::String digest;
     for (const auto& p : list)
@@ -880,7 +1296,8 @@ void LiveSessionManager::sendPeople (bool force)
         set (o, "playing", p.playing);
         set (o, "recording", p.recording);
         set (o, "pos", std::round (p.position));
-        digest << (int) p.tag << p.name << (p.playing ? "p" : "") << (p.recording ? "r" : "") << (p.playing ? juce::String ((int) (p.position / 96.0)) : "") << ";";
+        digest << (int) p.tag << p.name << (p.online ? "o" : "") << (p.playing ? "p" : "") << (p.recording ? "r" : "") << (p.playing ? juce::String ((int) (p.position / 96.0)) : "")
+               << (p.permissions.editEverything ? "E" : "") << (p.permissions.listener ? "L" : "") << (p.permissions.settings ? "S" : "") << (p.keepFull ? "K" : "") << ";";
         out.add (o);
     }
     people = list;
@@ -908,20 +1325,63 @@ void LiveSessionManager::onSnapshot (const juce::var& m)
     me = (std::uint32_t) (int) m["tag"];
     keepFull = (bool) m["keepFull"];
     editEverything = (bool) m["editEverything"];
+    myPerms = {};
+    myPerms.editEverything = editEverything;
+    myPerms.listener = (bool) m["perms"]["listener"];
+    myPerms.settings = (bool) m["perms"]["settings"];
+    livecrypto::fromHex (utf8 (m["hostKey"].toString()), hostKey);
+    resumeToken = m["resume"].toString().substring (0, 64);
+    allNeed = keysFromVar (m["needs"]);
     const auto rev = (std::uint64_t) (juce::int64) m["rev"];
     detokenize (*song, hostPeer);
     if (auto manifest = sessionpack::manifestFromJson (m["manifest"].toString(), error))
         sessionpack::resolvePlugins (*song, *manifest, engine.getPluginHost(), true);
     song->session.me = me;
-    replica = std::make_unique<live::Replica> (*song, rev, me, &roundTrip);
-    const bool first = state != State::live;
-    if (onJoined)
-        onJoined (*song);
+    const bool resumed = (bool) m["resumed"] && replica != nullptr;
+    const auto epoch = (std::uint64_t) (juce::int64) m["epoch"];
+    const bool first = state != State::live && ! resumed;
+    if (first)
+    {
+        chat.clear();
+        if (const auto* lines = m["chat"].getArray())
+            for (const auto& v : *lines)
+            {
+                ChatLine line;
+                line.tag = (std::uint32_t) (int) v["tag"];
+                line.name = v["name"].toString().substring (0, 64);
+                line.text = str (live::cleanChat (utf8 (v["text"].toString())));
+                line.colour = (std::uint32_t) (juce::int64) v["colour"];
+                line.at = (juce::int64) v["at"];
+                if (line.text.isNotEmpty())
+                    chat.push_back (line);
+            }
+    }
+    if (resumed)
+    {
+        // back after a drop, with a fresh snapshot: what we did meanwhile goes on top of it
+        auto working = replica->resume (*song, rev, engine.getSong(), (bool) m["lost"] || rev < replica->revision());
+        replica->epoch = epoch;
+        engine.applyRemote (std::move (working));
+        ++stats.resumedBySnapshot;
+        resuming = false;
+    }
     else
-        engine.setSong (*song);
+    {
+        replica = std::make_unique<live::Replica> (*song, rev, me, &roundTrip);
+        replica->epoch = epoch;
+        if (onJoined)
+            onJoined (*song);
+        else
+            engine.setSong (*song);
+    }
     engine.setSessionHistory (true);
-    lastStamp = engine.getSongStamp();
+    lastStamp = resumed ? 0 : engine.getSongStamp();
     setState (State::live, tr ("Live"));
+    myNeed.clear();
+    needStamp = 0;
+    updateNeeds();
+    if (resumed && onHint)
+        onHint (tr ("You are back in the live session."));
     if (first && onHint)
         onHint (tr ("You joined the live session. Your edits go to everyone."));
 }
@@ -945,8 +1405,11 @@ void LiveSessionManager::applyUpdate (const live::Replica::Update& u)
 {
     if (u.working)
     {
+        // (a local edit made since the last poll is still in the working song: it must still go out)
+        const bool polled = lastStamp == engine.getSongStamp();
         engine.applyRemote (*u.working);
-        lastStamp = engine.getSongStamp();
+        if (polled)
+            lastStamp = engine.getSongStamp();
     }
     if (! u.rejected.empty() && onHint)
     {
@@ -980,7 +1443,13 @@ void LiveSessionManager::pollLocal()
 {
     if (! replica || engine.getSongStamp() == lastStamp)
         return;
+    if (! host && (hostPeer == 0 || state != State::live))
+        return; // (no host to send it to: it waits, nothing is lost)
+    // every sample the change points at must have its hash first (a big one: in a moment, off the message thread)
+    if (! ensureHashed (engine.getSong()))
+        return;
     lastStamp = engine.getSongStamp();
+    lastLocalChangeMs = juce::Time::currentTimeMillis();
     auto p = replica->poll (engine.getSong());
     if (! p)
         return;
@@ -988,6 +1457,7 @@ void LiveSessionManager::pollLocal()
     {
         const auto c = authority->propose (session::hostTag, *p);
         broadcastCommit (c);
+        journalDirty = true;
         return;
     }
     tokenize (p->patch.carrier);
@@ -1075,8 +1545,40 @@ juce::String LiveSessionManager::shaOf (const juce::File& f)
     const auto modified = f.getLastModificationTime().toMilliseconds();
     auto& cached = hashCache[path];
     if (cached.sha.isEmpty() || cached.size != size || cached.modified != modified)
-        cached = { size, modified, sessionpack::hashFile (f) };
+        cached = { size, modified, sessionpack::hashFile (f) }; // (ensureHashed did the big ones off the message thread)
     return cached.sha;
+}
+
+bool LiveSessionManager::ensureHashed (const Song& song)
+{
+    bool ready = true;
+    for (const auto& path : safety::referencedSamples (song))
+    {
+        const juce::File f (str (path));
+        if ((f.isAChildOf (mediaFolder) && isSha (f.getFileNameWithoutExtension())) || ! f.existsAsFile())
+            continue;
+        const auto key = f.getFullPathName();
+        const auto size = f.getSize();
+        const auto modified = f.getLastModificationTime().toMilliseconds();
+        if (auto it = hashCache.find (key); it != hashCache.end() && it->second.sha.isNotEmpty() && it->second.size == size && it->second.modified == modified)
+            continue;
+        if (size <= inlineHashBytes)
+        {
+            hashCache[key] = { size, modified, sessionpack::hashFile (f) };
+            continue;
+        }
+        ready = false;
+        if (io && hashing.insert (key).second)
+            io->post ([this, f, key, size, modified]() -> Worker::Done {
+                const auto sha = sessionpack::hashFile (f);
+                return [this, key, size, modified, sha] {
+                    hashing.erase (key);
+                    hashCache[key] = { size, modified, sha };
+                    ++stats.hashedOffThread;
+                };
+            });
+    }
+    return ready;
 }
 
 void LiveSessionManager::tokenize (Song& song)
@@ -1119,6 +1621,19 @@ void LiveSessionManager::detokenize (Song& song, int fromPeer)
     applyRelocations (song, places);
     // whatever else it points at (a path of the sender's computer, a token that was not one) cannot be read here
     sessionpack::confine (song, mediaFolder, engineFiles());
+    // stand-ins of the parts this computer plays itself are not fetched (the host notes who has them, for whoever asks)
+    std::set<std::string> optional;
+    {
+        const auto cannot = live::unplayable (song, [this] (const PluginRef& r) { return missingHere (r); });
+        for (const auto& c : song.channels)
+            if (cannot.count ({ live::Kind::channel, c.uid, 0 }) == 0)
+                for (const auto& st : c.standIns)
+                    optional.insert (st.path);
+        for (int t = 0; t < (int) song.mixer.size(); ++t)
+            if (cannot.count ({ live::Kind::insert, (std::uint64_t) t, 0 }) == 0)
+                for (const auto& st : song.mixer[(std::size_t) t].standIns)
+                    optional.insert (st.path);
+    }
     std::map<std::string, std::string> local;
     for (const auto& path : safety::referencedSamples (song))
     {
@@ -1126,10 +1641,16 @@ void LiveSessionManager::detokenize (Song& song, int fromPeer)
         const auto sha = f.getFileNameWithoutExtension();
         if (! f.isAChildOf (mediaFolder) || ! isSha (sha))
             continue;
+        const auto name = names[sha].isNotEmpty() ? names[sha] : f.getFileName();
         if (auto it = served.find (sha); it != served.end() && it->second != f && it->second.existsAsFile())
             local[path] = utf8 (it->second.getFullPathName()); // our own file (or one we have already)
+        else if (! f.existsAsFile() && optional.count (path) > 0)
+        {
+            if (host && fromPeer != 0)
+                mediaOrigin[sha] = { fromPeer, name };
+        }
         else if (! f.existsAsFile())
-            request (sha, names[sha].isNotEmpty() ? names[sha] : f.getFileName(), fromPeer);
+            request (sha, name, fromPeer);
     }
     applyRelocations (song, local);
 }
@@ -1140,6 +1661,7 @@ void LiveSessionManager::request (const juce::String& sha, const juce::String& n
         return;
     Want w;
     w.fromPeer = fromPeer;
+    w.fromTag = host ? (peers.count (fromPeer) != 0 ? peers[fromPeer].tag : 0) : session::hostTag;
     w.name = name;
     w.file = mediaFolder.getChildFile (sha + safeExtension (name));
     wanted[sha] = w;
@@ -1161,22 +1683,61 @@ void LiveSessionManager::serve (int to, const juce::String& sha)
         for (const auto& u : uploads)
             if (u.peer == to && u.sha == sha)
                 return;
-        uploads.push_back ({ to, sha, it->second, 0 });
+        // a PCM WAV goes as a lossless FLAC pack (made once, off the message thread)
+        const auto file = it->second;
+        if (file.getFileExtension().toLowerCase() == ".wav" && file.getSize() >= mediapack::minimumSize && unpackable.count (sha) == 0
+            && packs.count (sha) == 0 && io && packing.insert (sha).second)
+        {
+            const auto packFile = mediaFolder.getChildFile (".packs").getChildFile (sha + ".lxf");
+            io->post ([this, file, packFile, sha]() -> Worker::Done {
+                const bool ok = mediapack::pack (file, packFile);
+                return [this, ok, packFile, sha] {
+                    packing.erase (sha);
+                    if (ok)
+                        packs[sha] = packFile;
+                    else
+                        unpackable.insert (sha);
+                };
+            });
+        }
+        uploads.push_back ({ to, sha, file, 0, false });
         return;
     }
-    if (host && wanted.count (sha) != 0)
+    if (! host)
+        return;
+    if (wanted.count (sha) != 0)
         forward[sha].push_back (to); // (a guest's file that is still on its way here)
+    else if (auto o = mediaOrigin.find (sha); o != mediaOrigin.end() && peers.count (o->second.first) != 0)
+    {
+        // a stand-in this computer did not need: fetched from whoever made it, then passed on
+        request (sha, o->second.second, o->second.first);
+        forward[sha].push_back (to);
+    }
 }
 
 void LiveSessionManager::pumpUploads()
 {
     while (! uploads.empty() && link.isOpen() && link.queuedBytes() < uploadBacklog)
     {
+        // (one whose FLAC pack is still being made waits; the others go on)
+        auto ready = std::find_if (uploads.begin(), uploads.end(), [this] (const Upload& x) { return x.next > 0 || packing.count (x.sha) == 0; });
+        if (ready == uploads.end())
+            return;
+        if (ready != uploads.begin())
+            std::iter_swap (ready, uploads.begin());
         auto& u = uploads.front();
+        if (u.next == 0 && ! u.packed)
+            if (auto pk = packs.find (u.sha); pk != packs.end() && pk->second.existsAsFile())
+            {
+                stats.packedSaved += u.file.getSize() - pk->second.getSize();
+                ++stats.packedSent;
+                u.file = pk->second;
+                u.packed = true;
+            }
         const auto size = u.file.getSize();
         const int count = std::max (1, (int) ((size + chunkSize - 1) / chunkSize));
         std::vector<std::uint8_t> plain;
-        plain.push_back ('M');
+        plain.push_back (u.packed ? 'F' : 'M');
         plain.insert (plain.end(), u.sha.toRawUTF8(), u.sha.toRawUTF8() + 64);
         put32 (plain, (std::uint32_t) u.next);
         put32 (plain, (std::uint32_t) count);
@@ -1206,13 +1767,13 @@ void LiveSessionManager::pumpUploads()
     }
 }
 
-void LiveSessionManager::handleMediaChunk (int from, const std::uint8_t* data, std::size_t size)
+void LiveSessionManager::handleMediaChunk (int from, const std::uint8_t* data, std::size_t size, bool packed)
 {
     if (size < 64 + 16)
         return;
     const auto sha = juce::String::fromUTF8 ((const char*) data, 64);
     auto it = wanted.find (sha);
-    if (it == wanted.end() || it->second.fromPeer != from)
+    if (it == wanted.end() || it->second.fromPeer != from || it->second.verifying)
         return; // nothing we asked that peer for
     auto& w = it->second;
     const int index = (int) get32 (data + 64), count = (int) get32 (data + 68);
@@ -1233,6 +1794,13 @@ void LiveSessionManager::handleMediaChunk (int from, const std::uint8_t* data, s
         part.deleteFile();
         w.size = total;
         w.count = count;
+        w.packed = packed;
+    }
+    else if (packed != w.packed)
+    {
+        part.deleteFile();
+        wanted.erase (it);
+        return;
     }
     {
         juce::FileOutputStream out (part);
@@ -1243,10 +1811,49 @@ void LiveSessionManager::handleMediaChunk (int from, const std::uint8_t* data, s
         }
     }
     if (++w.got == w.count)
-        finishMedia (sha);
+        verifyArrived (sha);
 }
 
-void LiveSessionManager::finishMedia (const juce::String& sha)
+void LiveSessionManager::verifyArrived (const juce::String& sha)
+{
+    auto it = wanted.find (sha);
+    if (it == wanted.end())
+        return;
+    auto& w = it->second;
+    w.verifying = true;
+    // unpacking a FLAC pack and hashing the result happen off the message thread; the file is used only if it is
+    // exactly what was announced
+    const auto part = w.file.withFileExtension (w.file.getFileExtension() + ".part"), file = w.file;
+    const bool packed = w.packed;
+    auto check = [part, file, packed, sha]() -> bool {
+        auto source = part;
+        if (packed)
+        {
+            source = file.withFileExtension (file.getFileExtension() + ".unpacked");
+            const bool unpacked = mediapack::unpack (part, source);
+            part.deleteFile();
+            if (! unpacked)
+            {
+                source.deleteFile();
+                return false;
+            }
+        }
+        if (sessionpack::hashFile (source) != sha || ! source.moveFileTo (file))
+        {
+            source.deleteFile();
+            return false;
+        }
+        return true;
+    };
+    if (! io)
+        return finishMedia (sha, check());
+    io->post ([this, check, sha]() -> Worker::Done {
+        const bool ok = check();
+        return [this, sha, ok] { finishMedia (sha, ok); };
+    });
+}
+
+void LiveSessionManager::finishMedia (const juce::String& sha, bool ok)
 {
     auto it = wanted.find (sha);
     if (it == wanted.end())
@@ -1254,7 +1861,7 @@ void LiveSessionManager::finishMedia (const juce::String& sha)
     const auto w = it->second;
     wanted.erase (it);
     auto part = w.file.withFileExtension (w.file.getFileExtension() + ".part");
-    if (sessionpack::hashFile (part) != sha || ! part.moveFileTo (w.file))
+    if (! ok)
     {
         part.deleteFile();
         if (onHint)
@@ -1270,9 +1877,705 @@ void LiveSessionManager::finishMedia (const juce::String& sha)
     forward.erase (sha);
     // the song already points at it: load it now
     engine.getSampleLibrary().forget (w.file.getFullPathName());
+    const bool polled = lastStamp == engine.getSongStamp(); // (an edit not yet sent must still go out)
     engine.applyRemote (engine.getSong());
-    lastStamp = engine.getSongStamp();
+    if (polled)
+        lastStamp = engine.getSongStamp();
     if (onChange)
         onChange();
+}
+// --- reconnect / resume (round 169j, ONLINE_SESSIONS.md §1.5) -------------------------------------------------------
+
+void LiveSessionManager::scheduleReconnect()
+{
+    reconnectAtMs = juce::Time::currentTimeMillis() + reconnectDelayMs;
+    reconnectDelayMs = std::min (30000, reconnectDelayMs * 2);
+}
+
+void LiveSessionManager::lostConnection (const juce::String& why)
+{
+    link.close();
+    (void) link.events(); // (what the closed connection still had to say)
+    fragments.clear();
+    uploads.clear();
+    if (state != State::reconnecting)
+    {
+        droppedAtMs = juce::Time::currentTimeMillis();
+        reconnectDelayMs = 1000;
+        if (host)
+        {
+            // every guest will come back on their own (resume): keep their places
+            for (auto& [n, p] : peers)
+                if (p.accepted)
+                {
+                    auto keep = p;
+                    keep.accepted = false;
+                    keep.relayPeer = 0;
+                    away[keep.tag] = keep;
+                }
+            peers.clear();
+            forward.clear();
+            sendPeople (true);
+        }
+        else
+            hostPeer = 0;
+        setState (State::reconnecting, why + " " + tr ("Connecting again..."));
+        if (onHint)
+            onHint (why + " " + tr ("Connecting again: keep working, nothing is lost."));
+    }
+    scheduleReconnect();
+}
+
+void LiveSessionManager::sendSeek (int to)
+{
+    if (seekNonce.isEmpty())
+        seekNonce = randomHex (16);
+    auto m = message ("seek");
+    set (m, "nonce", seekNonce);
+    sendJson (to, m);
+    lastSeekMs = juce::Time::currentTimeMillis();
+}
+
+void LiveSessionManager::onSeek (int from, const juce::var& m)
+{
+    // someone (a guest that reconnected, or one that saw us come back) asks who the host is: we prove it
+    const auto nonce = m["nonce"].toString();
+    if (nonce.length() < 16 || nonce.length() > 64 || state != State::live)
+        return;
+    const auto sig = livecrypto::signHost (hostSeed, utf8 (roomId), utf8 (nonce));
+    auto answer = message ("host");
+    set (answer, "nonce", nonce);
+    set (answer, "sig", juce::String (livecrypto::toHex (sig)));
+    sendJson (from, answer);
+}
+
+void LiveSessionManager::onHostAnswer (int from, const juce::var& m)
+{
+    if (state != State::waitingHost && ! (state == State::live && from != hostPeer))
+        return;
+    livecrypto::Signature sig {};
+    if (seekNonce.isEmpty() || m["nonce"].toString() != seekNonce || ! livecrypto::fromHex (utf8 (m["sig"].toString()), sig)
+        || ! livecrypto::checkHost (hostKey, utf8 (roomId), utf8 (seekNonce), sig))
+        return; // (not the host of this session)
+    seekNonce.clear();
+    hostPeer = from;
+    reroute (session::hostTag, from);
+    resuming = true;
+    sendResume();
+}
+
+void LiveSessionManager::sendResume()
+{
+    auto m = message ("resume");
+    set (m, "tag", (int) me);
+    set (m, "token", resumeToken);
+    set (m, "rev", (juce::int64) (replica ? replica->revision() : 0));
+    set (m, "epoch", (juce::int64) (replica ? replica->epoch : 0));
+    sendJson (hostPeer, m);
+    setState (State::waitingHost, tr ("Catching up with the session..."));
+}
+
+void LiveSessionManager::reroute (std::uint32_t tag, int peer)
+{
+    // media that were coming from that participant come again from where they are now (from the start)
+    for (auto& [sha, w] : wanted)
+        if (w.fromTag == tag && ! w.verifying)
+        {
+            w.file.withFileExtension (w.file.getFileExtension() + ".part").deleteFile();
+            w.fromPeer = peer;
+            w.got = 0;
+            w.packed = false;
+            auto m = message ("want");
+            set (m, "sha", sha);
+            sendJson (peer, m);
+        }
+}
+
+void LiveSessionManager::onResume (int from, const juce::var& m)
+{
+    const auto tag = (std::uint32_t) (int) m["tag"];
+    const auto token = m["token"].toString();
+    std::optional<Peer> back;
+    if (auto it = away.find (tag); it != away.end())
+        back = it->second;
+    for (auto it = peers.begin(); it != peers.end(); ++it)
+        if (it->second.accepted && it->second.tag == tag)
+        {
+            back = it->second; // (its old connection is not gone yet on the relay)
+            peers.erase (it);
+            break;
+        }
+    if (! back || token.isEmpty() || back->token != token)
+        return deny (from, "resume");
+    away.erase (tag);
+    back->relayPeer = from;
+    back->accepted = true;
+    back->asking = false;
+    peers[from] = *back;
+    authority->setPermissions (tag, back->perms);
+    reroute (tag, from);
+    const auto rev = (std::uint64_t) (juce::int64) m["rev"];
+    const auto epoch = (std::uint64_t) (juce::int64) m["epoch"];
+    peers[from].lostRev = authority->lostCommitsOf (epoch, rev);
+    if (auto missed = authority->since (rev, epoch))
+    {
+        for (const auto& c : *missed)
+            sendJson (from, commitToVar (c));
+        auto done = message ("resumed");
+        set (done, "rev", (juce::int64) authority->revision());
+        sendJson (from, done);
+        ++stats.replayed;
+    }
+    else
+    {
+        sendSnapshot (from, true);
+        ++stats.resumedBySnapshot;
+    }
+    sendPeople (true);
+    broadcastNeeds();
+    journalDirty = true;
+    lastTransportMs = 0;
+    if (onHint)
+        onHint (tr ("{0} is back in the live session", { back->name }));
+}
+
+void LiveSessionManager::dropConnection()
+{
+    if (state == State::live || state == State::waitingHost)
+        lostConnection (tr ("The connection to the session was lost."));
+}
+
+void LiveSessionManager::abandon()
+{
+    if (! isActive())
+        return;
+    abandoned = true;
+    stopTimer();
+    link.close();
+    io.reset(); // (a journal being written is finished first)
+    renderer.reset();
+    authority.reset();
+    replica.reset();
+    peers.clear();
+    away.clear();
+    state = State::ended;
+}
+
+// --- the host's journal ---------------------------------------------------------------------------------------------
+
+juce::var LiveSessionManager::permsToVar (const live::Permissions& p, bool full) const
+{
+    auto o = object();
+    set (o, "editEverything", p.editEverything);
+    set (o, "listener", p.listener);
+    set (o, "settings", p.settings);
+    set (o, "keepFull", full);
+    return o;
+}
+
+void LiveSessionManager::writeJournal (bool now)
+{
+    (void) now;
+    journalDirty = false;
+    journalDueMs = juce::Time::currentTimeMillis() + 2000; // (at most every 2 s)
+    if (! host || ! authority || journalFile == juce::File() || roomId.isEmpty() || hostToken.isEmpty())
+        return;
+    auto j = object();
+    set (j, "version", 1);
+    set (j, "saved", juce::Time::currentTimeMillis());
+    set (j, "relay", options.relay);
+    set (j, "room", roomId);
+    set (j, "secret", str (invite.secret));
+    set (j, "hostToken", hostToken);
+    set (j, "seed", juce::String (livecrypto::toHex (hostSeed)));
+    set (j, "name", hostName());
+    set (j, "editEverything", editEverything);
+    set (j, "keepFull", keepFull);
+    set (j, "projectFile", options.projectFile.getFullPathName());
+    set (j, "mediaFolder", mediaFolder.getFullPathName());
+    set (j, "rev", (juce::int64) authority->revision());
+    juce::Array<juce::var> guests;
+    auto addGuest = [&] (const Peer& p) {
+        auto g = permsToVar (p.perms, p.keepFull);
+        set (g, "tag", (int) p.tag);
+        set (g, "name", p.name);
+        set (g, "token", p.token);
+        set (g, "colour", (juce::int64) p.colour);
+        guests.add (g);
+    };
+    for (const auto& [n, p] : peers)
+        if (p.accepted)
+            addGuest (p);
+    for (const auto& [t, p] : away)
+        addGuest (p);
+    set (j, "guests", guests);
+    juce::Array<juce::var> changes;
+    for (const auto& [k, c] : authority->changes())
+    {
+        juce::Array<juce::var> row;
+        row.add (str (live::toString (k)));
+        row.add ((juce::int64) c.rev);
+        row.add ((int) c.origin);
+        changes.add (row);
+    }
+    set (j, "changes", changes);
+    set (j, "song", ProjectFile::toJson (authority->confirmed()));
+    const auto text = juce::JSON::toString (j, true);
+    const auto file = journalFile;
+    auto write = [file, text]() -> Worker::Done {
+        file.getParentDirectory().createDirectory();
+        juce::TemporaryFile temp (file);
+        if (temp.getFile().replaceWithText (text))
+            temp.overwriteTargetFileWithTemporary();
+        return {};
+    };
+    if (io)
+        io->post (write);
+    else
+        write();
+}
+
+std::optional<LiveSessionManager::JournalInfo> LiveSessionManager::readJournal (const juce::File& file)
+{
+    if (! file.existsAsFile() || file.getSize() > ((juce::int64) 256 << 20))
+        return std::nullopt;
+    const auto j = juce::JSON::parse (file.loadFileAsString());
+    if (! j.isObject() || (int) j["version"] != 1)
+        return std::nullopt;
+    livecrypto::Invite invite { utf8 (j["room"].toString()), utf8 (j["secret"].toString()) };
+    if (! livecrypto::parseCode (livecrypto::formatCode (invite)))
+        return std::nullopt;
+    JournalInfo info;
+    info.name = j["name"].toString();
+    info.code = str (livecrypto::formatCode (invite));
+    info.saved = juce::Time ((juce::int64) j["saved"]);
+    info.revision = (std::uint64_t) (juce::int64) j["rev"];
+    info.projectFile = juce::File (j["projectFile"].toString());
+    if (const auto* g = j["guests"].getArray())
+        info.guests = g->size();
+    // (the relay forgets a room 12 h after its last connection)
+    if (juce::Time::getCurrentTime() - info.saved > juce::RelativeTime::hours (12))
+        return std::nullopt;
+    return info;
+}
+
+void LiveSessionManager::discardJournal (const juce::File& file, const juce::String& relayDefault)
+{
+    const auto j = juce::JSON::parse (file.loadFileAsString());
+    file.deleteFile();
+    const auto room = j["room"].toString(), token = j["hostToken"].toString();
+    auto relay = j["relay"].toString();
+    if (relay.isEmpty())
+        relay = relayDefault;
+    if (room.isEmpty() || token.isEmpty() || relay.isEmpty())
+        return;
+    const auto url = relay.trimCharactersAtEnd ("/") + "/v1/rooms/" + room;
+    std::thread ([url, token] {
+        int status = 0;
+        juce::URL (url).createInputStream (juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
+                                               .withHttpRequestCmd ("DELETE")
+                                               .withExtraHeaders ("Authorization: Bearer " + token)
+                                               .withConnectionTimeoutMs (8000)
+                                               .withStatusCode (&status));
+    }).detach();
+}
+
+bool LiveSessionManager::resumeHost (const juce::File& file, const Options& o)
+{
+    if (isActive())
+        return false;
+    const auto j = juce::JSON::parse (file.loadFileAsString());
+    if (! j.isObject() || (int) j["version"] != 1)
+        return false;
+    livecrypto::Invite inv { utf8 (j["room"].toString()), utf8 (j["secret"].toString()) };
+    const auto parsed = livecrypto::parseCode (livecrypto::formatCode (inv));
+    livecrypto::Seed seed {};
+    juce::String error;
+    auto song = ProjectFile::fromJson (j["song"].toString(), error);
+    if (! parsed || ! livecrypto::fromHex (utf8 (j["seed"].toString()), seed) || ! song || j["hostToken"].toString().isEmpty())
+        return false;
+    std::string why;
+    if (! livelink::Connection::available (&why))
+        return false;
+    options = o;
+    if (options.relay.isEmpty() || j["relay"].toString().isNotEmpty())
+        options.relay = j["relay"].toString().isNotEmpty() ? j["relay"].toString() : options.relay;
+    if (options.name.isEmpty())
+        options.name = j["name"].toString();
+    if (options.projectFile == juce::File())
+        options.projectFile = juce::File (j["projectFile"].toString());
+    options.guestsEditEverything = (bool) j["editEverything"];
+    options.guestsKeepFull = (bool) j["keepFull"];
+    host = true;
+    me = session::hostTag;
+    peers.clear();
+    away.clear();
+    stats = {};
+    chat.clear();
+    unread = 0;
+    following = false;
+    abandoned = resuming = false;
+    allNeed.clear();
+    myNeed.clear();
+    renderedSig.clear();
+    hostSeed = seed;
+    journalFile = file;
+    io = std::make_unique<Worker> (false, false);
+    renderer = std::make_unique<Worker> (options.inlineWork, true);
+    invite = *parsed;
+    keys = livecrypto::derive (invite);
+    roomId = str (invite.room);
+    hostToken = j["hostToken"].toString();
+    inviteCode = str (livecrypto::formatCode (invite));
+    keepFull = options.guestsKeepFull;
+    editEverything = options.guestsEditEverything;
+    mediaFolder = juce::File (j["mediaFolder"].toString());
+    if (mediaFolder == juce::File() || ! juce::File::isAbsolutePath (j["mediaFolder"].toString()))
+        mediaFolder = sessionpack::sessionMediaFolder (options.projectFile, *song, "Live session");
+    const auto rev = (std::uint64_t) (juce::int64) j["rev"];
+    song->session.me = session::hostTag;
+    if (onResumed)
+        onResumed (*song);
+    else
+        engine.setSong (*song);
+    authority = std::make_unique<live::Authority> (*song, &roundTrip, rev, newEpoch());
+    std::map<live::Key, live::Authority::Change> changes;
+    if (const auto* rows = j["changes"].getArray())
+        for (const auto& row : *rows)
+            if (auto k = live::keyFromString (utf8 (row[0].toString())))
+                changes[*k] = { (std::uint64_t) (juce::int64) row[1], (std::uint32_t) (int) row[2] };
+    authority->restoreChanges (std::move (changes));
+    replica = std::make_unique<live::Replica> (*song, rev, session::hostTag, &roundTrip);
+    if (const auto* g = j["guests"].getArray())
+        for (const auto& v : *g)
+        {
+            Peer p;
+            p.tag = (std::uint32_t) (int) v["tag"];
+            p.name = v["name"].toString().substring (0, 40);
+            p.token = v["token"].toString();
+            p.colour = (std::uint32_t) (juce::int64) v["colour"];
+            p.perms.editEverything = (bool) v["editEverything"];
+            p.perms.listener = (bool) v["listener"];
+            p.perms.settings = (bool) v["settings"];
+            p.keepFull = (bool) v["keepFull"];
+            if (p.tag > session::hostTag && p.token.isNotEmpty())
+            {
+                away[p.tag] = p;
+                authority->setPermissions (p.tag, p.perms);
+            }
+        }
+    lastStamp = engine.getSongStamp();
+    engine.setSessionHistory (true);
+    ensureHashed (*song);
+    updateNeeds();
+    sealer.reset();
+    droppedAtMs = juce::Time::currentTimeMillis();
+    reconnectDelayMs = 1000;
+    setState (State::reconnecting, tr ("Resuming the live session..."));
+    connect();
+    return true;
+}
+
+// --- chat, transport, permissions ---------------------------------------------------------------------------------------
+
+void LiveSessionManager::addChat (ChatLine line)
+{
+    chat.push_back (line);
+    while (chat.size() > live::chatKeep)
+        chat.pop_front();
+    if (! line.mine)
+        ++unread;
+    if (onChat)
+        onChat (line);
+    if (onChange)
+        onChange();
+}
+
+void LiveSessionManager::markChatRead()
+{
+    if (unread == 0)
+        return;
+    unread = 0;
+    if (onChange)
+        onChange();
+}
+
+void LiveSessionManager::sendChat (const juce::String& text)
+{
+    const auto clean = str (live::cleanChat (utf8 (text)));
+    if (clean.isEmpty() || state != State::live)
+        return;
+    if (! host)
+    {
+        auto m = message ("chat");
+        set (m, "text", clean);
+        sendJson (hostPeer, m);
+        return; // (it comes back from the host, in everyone's order)
+    }
+    ChatLine line;
+    line.tag = session::hostTag;
+    line.name = hostName();
+    line.text = clean;
+    line.colour = colourOf (session::hostTag);
+    line.at = juce::Time::currentTimeMillis();
+    line.mine = true;
+    addChat (line);
+    auto m = message ("chat");
+    set (m, "tag", (int) line.tag);
+    set (m, "name", line.name);
+    set (m, "text", line.text);
+    set (m, "colour", (juce::int64) line.colour);
+    set (m, "at", line.at);
+    sendToGuests (m);
+}
+
+void LiveSessionManager::onChatMessage (int from, const juce::var& m)
+{
+    auto it = peers.find (from);
+    const auto clean = str (live::cleanChat (utf8 (m["text"].toString())));
+    if (it == peers.end() || clean.isEmpty())
+        return;
+    ChatLine line;
+    line.tag = it->second.tag;
+    line.name = it->second.name;
+    line.text = clean;
+    line.colour = it->second.colour;
+    line.at = juce::Time::currentTimeMillis();
+    addChat (line);
+    auto out = message ("chat");
+    set (out, "tag", (int) line.tag);
+    set (out, "name", line.name);
+    set (out, "text", line.text);
+    set (out, "colour", (juce::int64) line.colour);
+    set (out, "at", line.at);
+    sendToGuests (out);
+}
+
+void LiveSessionManager::sendTransport()
+{
+    const auto& t = engine.getTransport();
+    const bool playing = t.playing.load();
+    const auto ticks = engine.songPlayheadTicks();
+    const auto bpm = t.bpm.load();
+    const auto now = juce::Time::currentTimeMillis();
+    const auto expected = sentPlaying ? sentTicks + (double) (now - lastTransportMs) * bpm * (double) ppq / 60000.0 : sentTicks;
+    const bool due = lastTransportMs == 0 || playing != sentPlaying || (playing && (std::abs (ticks - expected) > ppq / 2 || now - lastTransportMs > 2000))
+                     || (! playing && std::abs (ticks - sentTicks) > 1.0);
+    if (! due)
+        return;
+    sentPlaying = playing;
+    sentTicks = ticks;
+    lastTransportMs = now;
+    auto m = message ("transport");
+    set (m, "playing", playing);
+    set (m, "song", engine.getSong().mode == PlayMode::song);
+    set (m, "pos", ticks);
+    set (m, "bpm", bpm);
+    sendToGuests (m);
+}
+
+void LiveSessionManager::setFollowTransport (bool on)
+{
+    following = on && ! host;
+    lastFollowMs = 0;
+    if (following)
+        followHost();
+    if (onChange)
+        onChange();
+}
+
+void LiveSessionManager::followHost()
+{
+    if (! following || ! haveHostTransport || state != State::live || engine.isRecording())
+        return;
+    const auto now = juce::Time::currentTimeMillis();
+    if (now - lastFollowMs < 700)
+        return; // (the last jump is still settling)
+    const auto a = live::follow (hostTransport, (double) now, engine.getTransport().playing.load(), engine.getSong().mode == PlayMode::song,
+                                 engine.songPlayheadTicks());
+    using T = live::FollowAction::Type;
+    if (a.type == T::none)
+        return;
+    lastFollowMs = now;
+    ++stats.followed;
+    if (a.type == T::stop)
+        return engine.stop();
+    if ((engine.getSong().mode == PlayMode::song) != a.songMode)
+        engine.editSong ([song = a.songMode] (Song& s) { s.mode = song ? PlayMode::song : PlayMode::pattern; }, false);
+    engine.seek (a.ticks);
+    if (a.type == T::play)
+        engine.play();
+}
+
+void LiveSessionManager::setPermissions (std::uint32_t tag, live::Permissions p, bool full)
+{
+    if (! host || ! authority || tag <= session::hostTag)
+        return;
+    Peer* peer = nullptr;
+    int relay = 0;
+    for (auto& [n, q] : peers)
+        if (q.accepted && q.tag == tag)
+            peer = &q, relay = n;
+    if (peer == nullptr)
+        if (auto it = away.find (tag); it != away.end())
+            peer = &it->second;
+    if (peer == nullptr)
+        return;
+    peer->perms = p;
+    peer->keepFull = full;
+    authority->setPermissions (tag, p);
+    if (relay != 0)
+    {
+        auto m = permsToVar (p, full);
+        set (m, "t", "perms");
+        sendJson (relay, m);
+    }
+    journalDirty = true;
+    sendPeople (true);
+    if (onChange)
+        onChange();
+}
+
+// --- live stand-ins (ONLINE_SESSIONS.md §4.2) -------------------------------------------------------------------------
+
+void LiveSessionManager::updateNeeds()
+{
+    const auto now = juce::Time::currentTimeMillis();
+    if (engine.getSongStamp() == needStamp || now - lastNeedMs < 500)
+        return;
+    lastNeedMs = now;
+    needStamp = engine.getSongStamp();
+    auto need = live::unplayable (engine.getSong(), [this] (const PluginRef& r) { return missingHere (r); });
+    if (need == myNeed)
+        return;
+    myNeed = std::move (need);
+    if (host)
+        return broadcastNeeds();
+    if (hostPeer != 0 && state == State::live)
+    {
+        auto m = message ("need");
+        set (m, "keys", keysToVar (myNeed));
+        sendJson (hostPeer, m);
+    }
+}
+
+void LiveSessionManager::broadcastNeeds()
+{
+    if (! host)
+        return;
+    auto all = myNeed;
+    for (const auto& [n, p] : peers)
+        if (p.accepted)
+            all.insert (p.need.begin(), p.need.end());
+    if (all == allNeed)
+        return;
+    allNeed = std::move (all);
+    auto m = message ("needs");
+    set (m, "keys", keysToVar (allNeed));
+    sendToGuests (m);
+}
+
+void LiveSessionManager::maybeRenderStandIns()
+{
+    const auto now = juce::Time::currentTimeMillis();
+    if (rendering || ! renderer || state != State::live || allNeed.empty() || now - lastRenderCheckMs < 500)
+        return;
+    lastRenderCheckMs = now;
+    // (debounced after the last change; never while this computer plays or records)
+    if (engine.getTransport().playing.load() || engine.isRecording() || now - lastLocalChangeMs < options.standInDelayMs)
+        return;
+    const auto& song = engine.getSong();
+    const auto keys = live::toRender (song, allNeed, me, [this] (const PluginRef& r) { return missingHere (r); });
+    std::vector<sessionpack::RenderItem> items;
+    std::vector<std::pair<live::Key, std::string>> sigs;
+    for (const auto& k : keys)
+    {
+        sessionpack::RenderItem item;
+        std::string sig;
+        std::vector<const PluginRef*> refs;
+        if (k.kind == live::Kind::channel)
+        {
+            int index = -1;
+            for (int i = 0; i < (int) song.channels.size(); ++i)
+                if (song.channels[(std::size_t) i].uid == k.a)
+                    index = i;
+            if (index < 0)
+                continue;
+            const auto& c = song.channels[(std::size_t) index];
+            item = { false, index, standins::needsTimeline (song, index), str (c.name), {} };
+            standins::pluginsOf (c, refs);
+            if (item.timeline)
+                sig = sessionpack::sourceHash (song, false, index, -1, standInRate);
+            else
+                for (int p = 0; p < (int) song.patterns.size(); ++p)
+                {
+                    const auto& pat = song.patterns[(std::size_t) p];
+                    if (std::any_of (pat.notes.begin(), pat.notes.end(), [&] (const Note& n) { return n.channel == index; }))
+                        sig += sessionpack::sourceHash (song, false, index, p, standInRate) + ";";
+                }
+            // (what is already on the channel and still matches needs no render: e.g. after a restart)
+            if (sig.empty() && c.standIns.empty())
+                continue; // (no notes anywhere: nothing to play)
+        }
+        else
+        {
+            const auto t = (int) k.a;
+            const auto& track = song.mixer[(std::size_t) t];
+            item = { true, t, true, track.name.empty() ? "Insert " + juce::String (t) : str (track.name), {} };
+            standins::pluginsOf (track, refs);
+            sig = sessionpack::sourceHash (song, true, t, -1, standInRate);
+        }
+        if (renderedSig[k] == sig)
+            continue;
+        juce::StringArray names;
+        for (const auto* r : refs)
+            names.addIfNotAlreadyThere (str (r->name));
+        item.plugins = names.joinIntoString (", ");
+        items.push_back (item);
+        sigs.push_back ({ k, sig });
+    }
+    if (items.empty())
+        return;
+    rendering = true;
+    const auto folder = host ? sessionpack::standInFolder (options.projectFile, song).getChildFile ("Live session")
+                             : mediaFolder.getChildFile ("Stand-ins");
+    const auto by = host ? hostName() : (options.name.isNotEmpty() ? options.name : juce::String ("Guest"));
+    if (onChange)
+        onChange();
+    renderer->post ([this, copy = song, items, folder, by, sigs]() -> Worker::Done {
+        std::vector<sessionpack::Rendered> out;
+        juce::String error;
+        const bool ok = sessionpack::render (copy, items, standInRate, folder, by, out, {}, error);
+        // their hashes now, here: the change that carries them goes out without waiting
+        std::vector<std::pair<juce::File, juce::String>> hashed;
+        for (const auto& r : out)
+            for (const auto& st : r.standIns)
+            {
+                const juce::File f (str (st.path));
+                hashed.push_back ({ f, sessionpack::hashFile (f) });
+            }
+        return [this, ok, out, error, sigs, hashed] {
+            rendering = false;
+            if (! isActive())
+                return;
+            for (const auto& [f, sha] : hashed)
+                if (sha.isNotEmpty())
+                    hashCache[f.getFullPathName()] = { f.getSize(), f.getLastModificationTime().toMilliseconds(), sha };
+            if (! ok)
+            {
+                if (onHint)
+                    onHint (tr ("A stand-in for the others could not be rendered: {0}", { error }));
+                for (const auto& [k, sig] : sigs)
+                    renderedSig[k] = sig; // (not again and again: at the next change)
+                return;
+            }
+            engine.editSong ([&] (Song& s) { sessionpack::apply (s, out); }, false);
+            for (const auto& [k, sig] : sigs)
+                renderedSig[k] = sig;
+            stats.standInsRendered += (int) out.size();
+            if (onChange)
+                onChange();
+        };
+    });
 }
 } // namespace lynx
