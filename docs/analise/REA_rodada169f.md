@@ -91,7 +91,13 @@ LYNX now: click = Pattern mode (also while the song plays), then play / pause; t
 Follow-up (not in these PRs): LYNX's own Stop button, in Pattern mode, goes to the pattern start on the first press
 (transportedit::stopTarget), while FL's goes back to where playback started first (measured above).
 
+## LYNX check (Windows, the three PRs together, fresh profile, test mode)
+
+Typing menu: the 31 layouts in FL's order, Layout Piano checked; L plays a note and PAT stays. Channel Rack options:
+"OPTIONS > Mute removed steps"; with it on a clicked-off step draws off. Piano roll: in Song mode the roll's play
+button switched to Pattern and played; right-click stopped it at 1:1:1 (shots l4..l8).
+
 ## Where I stopped
 
-- Done: REA + one FL session; fixes on feature/pr57, feature/pr58, feature/pr59 (worktrees ~/projetos/lynx-wt/prNN).
-- Next: build-local of each, Windows GUI check of the three together, coord/train.sh pr57 pr58 pr59.
+- Done: REA, one FL session, fixes on feature/pr57/58/59, build-local of each, the Windows check above.
+- Next: coord/train.sh pr57 pr58 pr59, then the Stop follow-up as its own round.
