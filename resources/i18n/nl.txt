@@ -7077,3 +7077,10 @@ countries: nl be
 "Playlist snap" = "Playlist-snap"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Tijdlijn: [LMB] positie  [Alt] geen snap  [Ctrl][LMB], [RMB] of [2xLMB] slepen selecteert de noten in een tijdbereik  [Ctrl][Wheel] / knijpen zoomen  [Shift][Wheel] scrollen"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Tijdlijn: [LMB] songpositie  [RMB] of [Ctrl][LMB] of [2xLMB] slepen: tijdselectie (loop)  [Shift][LMB] slepen: verplaatsen  [Ctrl][RMB] slepen, [Ctrl][Wheel] / knijpen: zoomen  [RMB] klik: menu  [Alt] geen snap"
+
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Opgenomen noten mengen: aan (nieuwe noten komen bij die van het pattern)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Opgenomen noten mengen: uit (de oude noten van een opgenomen kanaal worden vervangen)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Opgenomen noten mengen: aan, een opname voegt zijn noten aan het pattern toe (overdub); uit, de oude noten van een opgenomen kanaal worden vervangen"
+"Tempo tapper: tap the beat to set the tempo" = "Tempotapper: tik de beat om het tempo in te stellen"
+"Blend recorded notes" = "Opgenomen noten mengen"

@@ -7077,3 +7077,10 @@ countries: pl
 "Playlist snap" = "Przyciąganie Playlist"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Linijka: [LMB] pozycja  [Alt] bez przyciągania  [Ctrl][LMB], [RMB] lub [2xLMB] przeciągnij zaznacza nuty w zakresie czasu  [Ctrl][Wheel] / szczypnięcie zoom  [Shift][Wheel] przewijanie"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Linijka: [LMB] pozycja utworu  [RMB] lub [Ctrl][LMB] lub [2xLMB] przeciągnij: zaznaczenie czasu (pętla)  [Shift][LMB] przeciągnij: przesuń je  [Ctrl][RMB] przeciągnij, [Ctrl][Wheel] / szczypnięcie: zoom  [RMB] kliknięcie: menu  [Alt] bez przyciągania"
+
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Łącz nagrane nuty: wł. (nowe nuty dochodzą do nut patternu)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Łącz nagrane nuty: wył. (stare nuty nagranego kanału są zastępowane)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Łącz nagrane nuty: wł. — nagranie dodaje nuty do patternu (overdub); wył. — stare nuty nagranego kanału są zastępowane"
+"Tempo tapper: tap the beat to set the tempo" = "Tap tempo: wystukaj rytm, aby ustawić tempo"
+"Blend recorded notes" = "Łącz nagrane nuty"

@@ -7077,3 +7077,10 @@ countries: tw hk mo
 "Playlist snap" = "播放清單貼齊"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "標尺：[LMB] 位置  [Alt] 不貼齊  [Ctrl][LMB]、[RMB] 或 [2xLMB] 拖曳選取時間範圍內的音符  [Ctrl][Wheel] / 雙指捏合 縮放  [Shift][Wheel] 捲動"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "標尺：[LMB] 歌曲位置  [RMB] 或 [Ctrl][LMB] 或 [2xLMB] 拖曳：時間選取範圍（循環）  [Shift][LMB] 拖曳：移動選取範圍  [Ctrl][RMB] 拖曳, [Ctrl][Wheel] / 雙指捏合：縮放  [RMB] 按一下：選單  [Alt] 不貼齊"
+
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "混合錄製的音符：開（新音符加入圖樣中的音符）"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "混合錄製的音符：關（取代已錄製通道的舊音符）"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "混合錄製的音符：開啟時，一次錄製會把音符加入圖樣（疊錄）；關閉時，取代已錄製通道的舊音符"
+"Tempo tapper: tap the beat to set the tempo" = "節拍速度敲擊器：敲擊節拍來設定速度"
+"Blend recorded notes" = "混合錄製的音符"

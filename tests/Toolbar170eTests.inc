@@ -4,6 +4,7 @@
 #include <limits>
 
 #include "core/EditorGestures.h"
+#include "core/ToolbarLayout.h"
 
 TEST (toolbar170e_windows_touchpad_wheel_pieces_scale_with_the_fingers)
 {
@@ -69,4 +70,17 @@ TEST (toolbar170e_pinch_zoom_factor)
     const auto s1 = zoomAnchored (scroll, ppt, zoomed, anchor);
     const auto s2 = zoomAnchored (s1, zoomed, zoomed * pinchZoomFactor (0.8), anchor);
     CHECK (std::abs (s2 - scroll) < 1e-9);
+}
+
+TEST (toolbar170e2_recording_options_outlast_the_file_buttons)
+{
+    using namespace lynx::toolbarlayout;
+    auto l = Layout::makeDefault();
+    std::array<int, groupCount> widths;
+    widths.fill (100);
+    // room for five of the eight groups: output, meters and then the file buttons drop; the recording options stay
+    const auto v = fit (l, widths, 10, 5 * 110 + 300, 300);
+    CHECK (v[(std::size_t) Group::record] && v[(std::size_t) Group::snap] && v[(std::size_t) Group::windows]);
+    CHECK (! v[(std::size_t) Group::file] && ! v[(std::size_t) Group::meters] && ! v[(std::size_t) Group::output]);
+    CHECK (groupPriority (Group::record) > groupPriority (Group::file));
 }

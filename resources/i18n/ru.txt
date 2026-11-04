@@ -7077,3 +7077,10 @@ countries: ru by kz
 "Playlist snap" = "Привязка Playlist"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Линейка: [LMB] позиция  [Alt] без привязки  [Ctrl][LMB], [RMB] или [2xLMB] перетаскивание выделяет ноты в диапазоне времени  [Ctrl][Wheel] / щипок масштаб  [Shift][Wheel] прокрутка"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Линейка: [LMB] позиция песни  [RMB] или [Ctrl][LMB] или [2xLMB] перетаскивание: выделение времени (цикл)  [Shift][LMB] перетаскивание: сдвиг  [Ctrl][RMB] перетаскивание, [Ctrl][Wheel] / щипок: масштаб  [RMB] щелчок: меню  [Alt] без привязки"
+
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Смешивать записанные ноты: вкл. (новые ноты добавляются к нотам паттерна)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Смешивать записанные ноты: выкл. (старые ноты записанного канала заменяются)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Смешивать записанные ноты: вкл. — дубль добавляет ноты в паттерн (overdub); выкл. — старые ноты записанного канала заменяются"
+"Tempo tapper: tap the beat to set the tempo" = "Тап-темп: отстучите долю, чтобы задать темп"
+"Blend recorded notes" = "Смешивать записанные ноты"

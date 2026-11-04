@@ -7077,3 +7077,10 @@ countries: es mx ar co cl pe ve
 "Playlist snap" = "Ajuste de la Playlist"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Regla: [LMB] posición  [Alt] sin ajuste  [Ctrl][LMB], [RMB] o [2xLMB] arrastrar selecciona las notas de un rango de tiempo  [Ctrl][Wheel] / pellizco zoom  [Shift][Wheel] desplazar"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Regla: [LMB] posición de la canción  [RMB] o [Ctrl][LMB] o [2xLMB] arrastrar: selección de tiempo (bucle)  [Shift][LMB] arrastrar: moverla  [Ctrl][RMB] arrastrar, [Ctrl][Wheel] / pellizco: zoom  [RMB] clic: menú  [Alt] sin ajuste"
+
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Mezclar notas grabadas: sí (las notas nuevas se suman a las del patrón)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Mezclar notas grabadas: no (se reemplazan las notas anteriores de un canal grabado)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Mezclar notas grabadas: activado, una toma suma sus notas al patrón (overdub); desactivado, se reemplazan las notas anteriores de un canal grabado"
+"Tempo tapper: tap the beat to set the tempo" = "Tempo por pulsación: toca el pulso para fijar el tempo"
+"Blend recorded notes" = "Mezclar notas grabadas"

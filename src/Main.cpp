@@ -7465,7 +7465,7 @@ private:
             // follows the window (default rects, not scaled ones); panels drop from the toolbar by priority
             {
                 const auto size = ui.getBounds();
-                for (const auto& [w, h] : std::vector<std::pair<int, int>> { { 1280, 720 }, { 1600, 900 }, { 1920, 1080 }, { 2560, 1440 } })
+                for (const auto& [w, h] : std::vector<std::pair<int, int>> { { 1280, 720 }, { 1366, 768 }, { 1600, 900 }, { 1920, 1080 }, { 2560, 1440 }, { 3840, 2160 } })
                 {
                     ui.setSize (w, h);
                     offline.dispatchPendingMessages();

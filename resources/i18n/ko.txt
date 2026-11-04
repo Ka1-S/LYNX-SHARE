@@ -7077,3 +7077,10 @@ countries: kr
 "Playlist snap" = "플레이리스트 스냅"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "눈금자: [LMB] 위치  [Alt] 스냅 없음  [Ctrl][LMB], [RMB] 또는 [2xLMB] 드래그로 시간 범위의 노트 선택  [Ctrl][Wheel] / 핀치 줌  [Shift][Wheel] 스크롤"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "눈금자: [LMB] 송 위치  [RMB] 또는 [Ctrl][LMB] 또는 [2xLMB] 드래그: 시간 선택(루프)  [Shift][LMB] 드래그: 이동  [Ctrl][RMB] 드래그, [Ctrl][Wheel] / 핀치: 줌  [RMB] 클릭: 메뉴  [Alt] 스냅 없음"
+
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "녹음 노트 섞기: 켬 (새 노트가 패턴의 노트에 더해짐)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "녹음 노트 섞기: 끔 (녹음한 채널의 이전 노트를 대체)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "녹음 노트 섞기: 켜면 테이크의 노트를 패턴에 더하고(오버더브), 끄면 녹음한 채널의 이전 노트를 대체합니다"
+"Tempo tapper: tap the beat to set the tempo" = "탭 템포: 박자를 두드려 템포를 설정"
+"Blend recorded notes" = "녹음 노트 섞기"

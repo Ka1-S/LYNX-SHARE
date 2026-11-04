@@ -7233,3 +7233,10 @@ countries: br
 "Playlist snap" = "Grade da Playlist"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Régua: [LMB] posição  [Alt] sem grade  [Ctrl][LMB], [RMB] ou [2xLMB] arrastar seleciona as notas num trecho  [Ctrl][Wheel] / pinça zoom  [Shift][Wheel] rolar"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Régua: [LMB] posição da música  [RMB] ou [Ctrl][LMB] ou [2xLMB] arrastar: seleção de tempo (loop)  [Shift][LMB] arrastar: move  [Ctrl][RMB] arrastar, [Ctrl][Wheel] / pinça: zoom  [RMB] clique: menu  [Alt] sem grade"
+
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Mesclar notas gravadas: ligado (as notas novas se somam às do pattern)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Mesclar notas gravadas: desligado (as notas antigas de um canal gravado são substituídas)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Mesclar notas gravadas: ligado, uma tomada soma as notas ao pattern (overdub); desligado, as notas antigas de um canal gravado são substituídas"
+"Tempo tapper: tap the beat to set the tempo" = "Tap tempo: toque no ritmo para definir o andamento"
+"Blend recorded notes" = "Mesclar notas gravadas"

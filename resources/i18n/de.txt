@@ -7077,3 +7077,10 @@ countries: de at ch li lu
 "Playlist snap" = "Einrasten in der Playlist"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Lineal: [LMB] Position  [Alt] ohne Einrasten  [Strg][LMB], [RMB] oder [2xLMB] Ziehen wählt die Noten in einem Zeitbereich  [Strg][Wheel] / Pinch-Geste Zoom  [Shift][Wheel] Scrollen"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Lineal: [LMB] Song-Position  [RMB] oder [Strg][LMB] oder [2xLMB] Ziehen: Zeitauswahl (Loop)  [Shift][LMB] Ziehen: verschieben  [Strg][RMB] Ziehen, [Strg][Wheel] / Pinch-Geste: Zoom  [RMB] Klick: Menü  [Alt] ohne Einrasten"
+
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Aufgenommene Noten mischen: an (neue Noten kommen zu denen des Patterns hinzu)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Aufgenommene Noten mischen: aus (die alten Noten eines aufgenommenen Kanals werden ersetzt)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Aufgenommene Noten mischen: an, eine Aufnahme fügt ihre Noten dem Pattern hinzu (Overdub); aus, die alten Noten eines aufgenommenen Kanals werden ersetzt"
+"Tempo tapper: tap the beat to set the tempo" = "Tempo-Tapper: tippe den Beat, um das Tempo zu setzen"
+"Blend recorded notes" = "Aufgenommene Noten mischen"

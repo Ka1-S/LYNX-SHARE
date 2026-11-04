@@ -34,10 +34,12 @@ enum class Icon
     tweak,      // the toolbar's last tweaked parameter: a knob with a turning arrow (round 170e)
     slide,      // Piano Roll: new notes slide (a note with a glide arrow; round 170e)
     chord,      // Piano Roll: the chord stamp (three stacked notes; round 170e)
-    span        // Channel Rack: the pattern length (an arrow between two bar lines; round 170e)
+    span,       // Channel Rack: the pattern length (an arrow between two bar lines; round 170e)
+    blend,      // recording: blend recorded notes into the pattern (two lines merging into one; round 170e2)
+    filter      // a funnel: filters a list (Channel Rack's channel filter group; round 170e2)
 };
 
-constexpr int iconCount = (int) Icon::span + 1;
+constexpr int iconCount = (int) Icon::filter + 1;
 
 namespace icons
 {

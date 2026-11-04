@@ -7077,3 +7077,10 @@ countries: it ch sm
 "Playlist snap" = "Snap della Playlist"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Righello: [LMB] posizione  [Alt] senza snap  [Ctrl][LMB], [RMB] o [2xLMB] trascina seleziona le note in un intervallo di tempo  [Ctrl][Wheel] / pizzico zoom  [Shift][Wheel] scorri"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Righello: [LMB] posizione nel brano  [RMB] o [Ctrl][LMB] o [2xLMB] trascina: selezione temporale (loop)  [Shift][LMB] trascina: spostala  [Ctrl][RMB] trascina, [Ctrl][Wheel] / pizzico: zoom  [RMB] clic: menu  [Alt] senza snap"
+
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Unisci note registrate: sì (le nuove note si aggiungono a quelle del pattern)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Unisci note registrate: no (le vecchie note di un canale registrato vengono sostituite)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Unisci note registrate: attivo, una ripresa aggiunge le sue note al pattern (overdub); disattivo, le vecchie note di un canale registrato vengono sostituite"
+"Tempo tapper: tap the beat to set the tempo" = "Tap tempo: batti il tempo per impostarlo"
+"Blend recorded notes" = "Unisci note registrate"
