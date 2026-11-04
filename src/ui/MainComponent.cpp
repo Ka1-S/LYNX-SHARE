@@ -821,7 +821,7 @@ void MainComponent::resized()
     const auto row1 = toolbar.getY(), row2 = toolbar.getY() + rowHeight + 2, h = rowHeight;
     const auto big = h + 6;                                   // transport buttons: one slim row, centred on both
     const auto bigWidth = h + 4;
-    constexpr int gap = 17;                                   // a divider and the space around it
+    int gap = 17;                                             // a divider and the space around it (13 when compact)
     const auto grow = h - toolbarlayout::rowHeight (toolbarlayout::IconSize::medium); // wider panels for bigger rows
 
     // panel widths
@@ -874,7 +874,8 @@ void MainComponent::resized()
         timeWidth -= 10;
         widths[(std::size_t) Group::transport] -= 16;
         widths[(std::size_t) Group::record] = 4 * h + 6;
-        widths[(std::size_t) Group::snap] -= 36;
+        widths[(std::size_t) Group::snap] -= 16;
+        gap = 13;
         visible = toolbarlayout::fit (toolbarLayout, widths, gap, room, minHint);
     }
     if (! toolbarLayout.visible) // Ctrl+F11: only the menu and the hint bar, on one row
@@ -904,9 +905,9 @@ void MainComponent::resized()
 
     auto take = [&toolbar] (int width) { return toolbar.removeFromLeft (juce::jmin (width, toolbar.getWidth())); };
     auto divide = [&] {
-        take (8 + extra / 2);
+        take (gap / 2 + extra / 2);
         dividers.push_back (toolbar.getX());
-        take (9 + extra - extra / 2);
+        take (gap - gap / 2 + extra - extra / 2);
     };
     auto hide = [] (std::initializer_list<juce::Component*> components) {
         for (auto* c : components)
