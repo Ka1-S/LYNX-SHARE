@@ -756,9 +756,9 @@ void MainComponent::paint (juce::Graphics& g)
             if (! r.isEmpty())
             {
                 const auto well = r.toFloat().reduced (1.0f, 2.0f);
-                g.setColour (colour::bg2.withAlpha (0.5f));
+                g.setColour (colour::bg1.withAlpha (0.55f));
                 g.fillRoundedRectangle (well, radius::lg);
-                g.setColour (colour::border.withAlpha (0.7f));
+                g.setColour (colour::border);
                 g.drawRoundedRectangle (well.reduced (0.5f), radius::lg, 1.0f);
             }
     }
@@ -841,7 +841,8 @@ void MainComponent::resized()
     }
 
     const auto modeWidth = juce::jmax (patternModeButton.getIdealWidth (h - 2), songModeButton.getIdealWidth (h - 2));
-    const int tempoWidth = 90 + grow, timeWidth = 110 + grow, gridWidth = 148;
+    int tempoWidth = 90 + grow, timeWidth = 110 + grow;
+    const int gridWidth = 148;
     // the snap and pattern captions: an icon (the magnet button / the pattern icon) and the longer of the two names
     const juce::Font captionFont (theme::font (theme::type::caption - 1.0f, true));
     const int captionWidth = h + 3 + juce::jlimit (30, 80, juce::roundToInt (juce::jmax (juce::GlyphArrangement::getStringWidth (captionFont, tr ("SNAP")),
@@ -859,8 +860,23 @@ void MainComponent::resized()
     widths[(std::size_t) Group::output] = 116 + grow * 2;
 
     const auto room = toolbar.getWidth();
-    const auto minHint = juce::jmax (menuWidth + 8, 320), maxHint = 620; // room for most hints on two lines
+    // room for most hints on two lines; on a very wide window the hint bar takes more (round 170e3)
+    const auto minHint = juce::jmax (menuWidth + 8, 320), maxHint = room >= 3000 ? 1000 : 620;
     auto visible = toolbarlayout::fit (toolbarLayout, widths, gap, room, minHint);
+    // round 170e3: rather than dropping the recording switches on a narrow window (1280-1440 px), the panels get
+    // tighter: four switches per row (the typing piano and the MIDI light go; Ctrl+T and the View menu keep the piano),
+    // a narrower snap box and displays
+    compactRecord = false;
+    if (toolbarLayout.visible && toolbarLayout.isShown (Group::record) && ! visible[(std::size_t) Group::record])
+    {
+        compactRecord = true;
+        tempoWidth -= 6;
+        timeWidth -= 10;
+        widths[(std::size_t) Group::transport] -= 16;
+        widths[(std::size_t) Group::record] = 4 * h + 6;
+        widths[(std::size_t) Group::snap] -= 36;
+        visible = toolbarlayout::fit (toolbarLayout, widths, gap, room, minHint);
+    }
     if (! toolbarLayout.visible) // Ctrl+F11: only the menu and the hint bar, on one row
         visible.fill (false);
     panelBounds = {};
@@ -875,6 +891,16 @@ void MainComponent::resized()
     const auto shownGroups = (int) std::count (visible.begin(), visible.end(), true);
     const auto extra = toolbarlayout::extraGap (spare, shownGroups);
     spare -= extra * shownGroups;
+    // then a wider output monitor, and what is left either before the meters (right-aligned) or, on a very wide
+    // window, after them, so no hole opens in the middle of the toolbar
+    if (visible[(std::size_t) Group::output] && spare > 0)
+    {
+        const auto more = juce::jmin (240, spare / 3);
+        widths[(std::size_t) Group::output] += more;
+        spare -= more;
+    }
+    if (spare > room / 5)
+        spare = 0;
 
     auto take = [&toolbar] (int width) { return toolbar.removeFromLeft (juce::jmin (width, toolbar.getWidth())); };
     auto divide = [&] {
@@ -997,8 +1023,15 @@ void MainComponent::resized()
                 break;
             case Group::record: // the recording switches (round 170e3, as FL's recording panel): metronome, wait for input, count-in,
                                 // blend and the typing piano over loop record, step edit, punch, the recording options menu and the MIDI light
-                grid (panel, { &metronomeButton, &waitInputButton, &countInButton, &blendButton, &typingPianoButton,
-                               &loopRecordButton, &stepEditButton, &punchButton, &recordMenuButton, &midiLight }, 5);
+                if (compactRecord)
+                {
+                    hide ({ &typingPianoButton, &midiLight });
+                    grid (panel, { &metronomeButton, &waitInputButton, &countInButton, &blendButton,
+                                   &loopRecordButton, &stepEditButton, &punchButton, &recordMenuButton }, 4);
+                }
+                else
+                    grid (panel, { &metronomeButton, &waitInputButton, &countInButton, &blendButton, &typingPianoButton,
+                                   &loopRecordButton, &stepEditButton, &punchButton, &recordMenuButton, &midiLight }, 5);
                 break;
             case Group::snap: // global snap over the pattern selector, each with its name
             {

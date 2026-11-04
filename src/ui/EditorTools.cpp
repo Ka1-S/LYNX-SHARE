@@ -144,9 +144,9 @@ void ToolStrip::paint (juce::Graphics& g)
     if (buttons.empty())
         return;
     const auto well = getLocalBounds().toFloat().reduced (0.5f);
-    g.setColour (theme::colour::bg2.withAlpha (0.5f));
+    g.setColour (theme::colour::bg1.withAlpha (0.55f));
     g.fillRoundedRectangle (well, theme::radius::md);
-    g.setColour (theme::colour::border.withAlpha (0.7f));
+    g.setColour (theme::colour::border);
     g.drawRoundedRectangle (well, theme::radius::md, 1.0f);
 }
 
