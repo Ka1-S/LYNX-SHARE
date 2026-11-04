@@ -125,6 +125,9 @@ public:
     virtual void settleNew() {}
     // Control output ("controller" instruments), 0..1. Audio thread.
     virtual float controlOutput (int /*output*/) const noexcept { return 0.0f; }
+    // the program the instrument plays when a note can select it (Transistor Bass's sequencer: the note's key), −1
+    // otherwise; the editor follows it as FL's does (round 169g2)
+    virtual int selectedProgram() const noexcept { return -1; }
     // Song position (ticks) at the start of the block, for the global LFOs. Audio thread.
     virtual void setSongPosition (double /*ticks*/) noexcept {}
     // No voice sounding: render would only produce silence (the mixer skips the channel until a note arrives).
