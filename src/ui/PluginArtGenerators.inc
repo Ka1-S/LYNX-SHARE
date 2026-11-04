@@ -542,9 +542,9 @@ inline void canvasHarmor (juce::Graphics& g, Rectangle<float> a, bool display)
     if (! reduced) bloom (g, { a.getRight() - a.getWidth() * 0.2f, a.getY() + a.getHeight() * 0.12f }, a.getWidth() * 0.4f, p.accent, 0.10f);
     if (display) return;
     // a spectrogram: time runs right, partials stack up, each column a frame of a resynthesised sound
-    const auto sp = Rectangle<float> (a.getX() + a.getWidth() * 0.38f, a.getY() + 6.0f, a.getWidth() * 0.6f, a.getHeight() * 0.3f);
+    const auto sp = Rectangle<float> (a.getX() + a.getWidth() * 0.02f, a.getY() + 4.0f, a.getWidth() * 0.96f, a.getHeight() * 0.55f);
     juce::Random rnd (34);
-    const int cols = 64, rows = 28;
+    const int cols = 96, rows = 36;
     const auto cw = sp.getWidth() / (float) cols, rh = sp.getHeight() / (float) rows;
     for (int x = 0; x < cols; ++x)
     {
@@ -553,10 +553,10 @@ inline void canvasHarmor (juce::Graphics& g, Rectangle<float> a, bool display)
         const auto fade = juce::jmin (1.0f, u * 6.0f) * (1.0f - u * 0.6f);
         for (int h = 1; h <= rows; ++h)
         {
-            const auto v = env * std::pow ((float) h, -0.7f) * (0.7f + 0.3f * rnd.nextFloat());
-            if (v < 0.06f) continue;
-            g.setColour (heat (juce::jlimit (0.0f, 1.0f, v * 1.4f)).withAlpha (0.10f + 0.28f * v * fade));
-            g.fillRect (Rectangle<float> (sp.getX() + (float) x * cw, sp.getBottom() - (float) h * rh, cw - 0.6f, rh * 0.45f));
+            const auto v = juce::jmin (1.0f, 1.3f * env * std::pow ((float) h, -0.45f) * (0.7f + 0.3f * rnd.nextFloat()));
+            if (v < 0.08f) continue;
+            g.setColour (heat (v).withAlpha ((0.18f + 0.6f * v) * fade));
+            g.fillRect (Rectangle<float> (sp.getX() + (float) x * cw, sp.getBottom() - (float) h * rh, cw - 0.6f, rh * 0.55f));
         }
     }
     // the harmonic ladder on the left: a sawtooth's partials, 1/n
@@ -601,15 +601,16 @@ inline const Theme& harmorTheme()
         Theme x;
         x.name = "Harmor";
         x.base = Style::neon;
-        x.pal = { Colour (0xff1d1f25), Colour (0xff0a0b0e), Colour (0xffffa62b), Colour (0xff4fd2ff), Colour (0xd01e2027), Colour (0xe40e0f13),
-                  Colour (0xff6d7380), Colour (0xffeef0f4), Colour (0xff060709), Colour (0xff4a4f5a), Colour (0xff17191e), Colour (0xff2a2d35),
-                  Colour (0xfffff4e0), Colour (0xff1c1e24) };
+        x.pal = { Colour (0xff1d1f25), Colour (0xff0a0b0e), Colour (0xffffa62b), Colour (0xff4fd2ff), Colour (0x941e2027), Colour (0xb40e0f13),
+                  Colour (0xff6d7380), Colour (0xffeef0f4), Colour (0x9c060709), Colour (0xff4a4f5a), Colour (0xff17191e), Colour (0xff2a2d35),
+                  Colour (0xfffff4e0), Colour (0xff1c1e24) }; // (translucent wells: Harmor's big display areas show the spectrogram)
         x.canvas = canvasHarmor;
         x.titleEmblem = harmorEmblem;
         x.drawCap = machinedCap;
         x.arcGlow = 0.28f;
         x.stageRepaint = true;
         x.paintMotion = harmorMotion;
+        x.hz = 12;
         return x;
     }();
     return t;
@@ -771,6 +772,7 @@ inline const Theme& gmsTheme()
         x.arcGlow = 0.18f;
         x.stageRepaint = true;
         x.paintMotion = gmsMotion;
+        x.hz = 8;
         return x;
     }();
     return t;
@@ -845,6 +847,7 @@ inline const Theme& morphineTheme()
         x.pointer = Pointer::glowLine;
         x.stageRepaint = true;
         x.paintMotion = morphineMotion;
+        x.hz = 15;
         return x;
     }();
     return t;
@@ -961,6 +964,7 @@ inline const Theme& ogunTheme()
         x.sway = 6.0f;
         x.reach = 2.5f;
         x.paintMotion = ogunMotion;
+        x.hz = 15;
         return x;
     }();
     return t;
@@ -1130,6 +1134,7 @@ inline const Theme& keplerTheme()
         x.pointer = Pointer::electron;
         x.stageRepaint = true;
         x.paintMotion = keplerMotion;
+        x.hz = 15;
         return x;
     }();
     return t;
@@ -1153,14 +1158,14 @@ inline void canvasKeplerExo (juce::Graphics& g, Rectangle<float> a, bool display
     const auto R = juce::jmax (a.getWidth(), a.getHeight()) * 0.32f;
     const auto star = Point<float> (a.getRight() + R * 0.35f, a.getY() - R * 0.45f);
     if (! reduced) bloom (g, star, R * 1.5f, p.accent, 0.22f);
-    g.setGradientFill (ColourGradient (p.accent.brighter (0.3f).withAlpha (0.35f), star.x, star.y, p.accent.darker (0.4f).withAlpha (0.25f), star.x - R, star.y + R * 0.4f, true));
+    g.setGradientFill (ColourGradient (Colour (0xfffff2d0).withAlpha (0.7f), star.x, star.y, p.accent.withAlpha (0.55f), star.x - R, star.y + R * 0.4f, true));
     g.fillEllipse (Rectangle<float> (R * 2.0f, R * 2.0f).withCentre (star));
-    const auto planet = star + Point<float> (-R * 0.78f, R * 0.52f);
-    const auto pr = R * 0.09f;
+    const auto planet = star + Point<float> (-R * 0.8f, R * 0.5f);
+    const auto pr = R * 0.045f;
     g.setColour (p.bgBottom.withAlpha (0.95f));
     g.fillEllipse (Rectangle<float> (pr * 2.0f, pr * 2.0f).withCentre (planet));
-    g.setColour (p.accent2.withAlpha (0.4f));
-    g.drawEllipse (Rectangle<float> (pr * 2.0f, pr * 2.0f).withCentre (planet), 1.0f);
+    g.setColour (p.accent2.withAlpha (0.8f)); // its atmosphere lit from behind
+    g.drawEllipse (Rectangle<float> (pr * 2.0f, pr * 2.0f).withCentre (planet), 1.5f);
     // the light curve along the bottom: flat, a dip while the world transits, flat again
     const auto lc = curve (200, [&] (float u) {
         return Point<float> (a.getX() + a.getWidth() * u, a.getBottom() - a.getHeight() * 0.12f + (1.0f - transitCurve (u)) * a.getHeight() * 0.1f);
@@ -1209,6 +1214,7 @@ inline const Theme& keplerExoTheme()
         x.drawCap = machinedCap;
         x.stageRepaint = true;
         x.paintMotion = exoMotion;
+        x.hz = 10;
         return x;
     }();
     return t;
@@ -1305,6 +1311,7 @@ inline const Theme& transistorBassTheme()
         x.thumbPointer = true;
         x.stageRepaint = true;
         x.paintMotion = transistorMotion;
+        x.hz = 15;
         return x;
     }();
     return t;
@@ -1479,6 +1486,7 @@ inline const Theme& beepMapTheme()
         x.arcGlow = 0.25f;
         x.stageRepaint = true;
         x.paintMotion = beepMapMotion;
+        x.hz = 12;
         return x;
     }();
     return t;
@@ -1572,7 +1580,7 @@ inline void canvasGranulizer (juce::Graphics& g, Rectangle<float> a, bool displa
     if (display) return;
     // grains: tiny windowed bursts (a dot with a soft envelope), denser towards a cloud on the right
     juce::Random rnd (67);
-    const auto centre = Point<float> (a.getRight() - a.getWidth() * 0.25f, a.getY() + a.getHeight() * 0.2f);
+    const auto centre = Point<float> (a.getRight() - a.getWidth() * 0.2f, a.getY() + a.getHeight() * 0.08f);
     for (int i = 0; i < 520; ++i)
     {
         const auto ang = rnd.nextFloat() * 6.283f;
@@ -1580,7 +1588,7 @@ inline void canvasGranulizer (juce::Graphics& g, Rectangle<float> a, bool displa
         const Point<float> q { centre.x + std::cos (ang) * rad * 1.3f, centre.y + std::sin (ang) * rad * 0.45f };
         if (! a.contains (q)) continue;
         const auto d = 1.0f + rnd.nextFloat() * 2.4f;
-        g.setColour ((rnd.nextFloat() < 0.2f ? p.accent2 : p.accent).withAlpha (0.06f + 0.16f * (1.0f - rad / (a.getWidth() * 0.45f))));
+        g.setColour ((rnd.nextFloat() < 0.2f ? p.accent2 : p.accent).withAlpha (0.10f + 0.3f * (1.0f - rad / (a.getWidth() * 0.45f))));
         g.fillEllipse (Rectangle<float> (d, d).withCentre (q));
     }
     // a few grains drawn large: a sine burst in a bell window
@@ -1638,6 +1646,7 @@ inline const Theme& granulizerTheme()
         x.sizeMin = 1.5f; x.sizeRange = 2.0f;
         x.reach = 3.0f;
         x.paintMotion = granulizerMotion;
+        x.hz = 12;
         return x;
     }();
     return t;
@@ -1726,6 +1735,7 @@ inline const Theme& drumaxxTheme()
         x.arcGlow = 0.25f;
         x.stageRepaint = true;
         x.paintMotion = drumaxxMotion;
+        x.hz = 15;
         return x;
     }();
     return t;
@@ -1799,6 +1809,7 @@ inline const Theme& drumpadTheme()
         x.arcGlow = 0.2f;
         x.stageRepaint = true;
         x.paintMotion = drumpadMotion;
+        x.hz = 15;
         return x;
     }();
     return t;
@@ -1812,7 +1823,7 @@ inline void woofer (juce::Graphics& g, Point<float> c, float R, float alpha, flo
     for (int i = 0; i < 6; ++i)
     {
         const auto r = R * (1.0f - (float) i * 0.14f) * (1.0f + push * 0.03f * (float) i);
-        g.setColour ((i == 0 ? p.accent2 : p.accent).withAlpha ((i == 0 ? 0.16f : 0.07f) * alpha));
+        g.setColour ((i == 0 ? p.accent2 : p.accent).withAlpha ((i == 0 ? 0.3f : 0.14f) * alpha));
         g.drawEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c), i == 0 ? 3.0f : 1.0f);
     }
     g.setGradientFill (ColourGradient (p.accent.withAlpha (0.18f * alpha), c.x - R * 0.1f, c.y - R * 0.12f, Colours::black.withAlpha (0.2f * alpha), c.x + R * 0.2f, c.y + R * 0.2f, true));
@@ -1879,6 +1890,721 @@ inline const Theme& bassDrumTheme()
         x.arcGlow = 0.3f;
         x.stageRepaint = true;
         x.paintMotion = bassDrumMotion;
+        x.hz = 15;
+        return x;
+    }();
+    return t;
+}
+
+// --- more knob materials (G3) ----------------------------------------------------------------------------------------
+
+// a chicken-head knob's base (guitar amps): a dark round; the pointer from its very centre is the bar (pointerFrom = 0)
+inline void chickenBase (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    const auto& p = pal();
+    g.setGradientFill (ColourGradient (p.capTop.brighter (0.1f + 0.1f * hover), c.x, cap.getY(), p.capBottom, c.x, cap.getBottom(), false));
+    g.fillEllipse (cap);
+    if (fx)
+    {
+        g.setColour (Colours::white.withAlpha (0.08f));
+        g.drawEllipse (cap.reduced (0.6f), 1.0f);
+    }
+}
+
+// a chrome dome: a bright mirror with a dark horizon band
+inline void chromeCap (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    ColourGradient chrome (Colour (0xfff4f6f8), c.x, cap.getY(), Colour (0xff3a3d42), c.x, cap.getBottom(), false);
+    chrome.addColour (0.45, Colour (0xffb8bec6));
+    chrome.addColour (0.52, Colour (0xff4a4e55));
+    chrome.addColour (0.7, Colour (0xff8d939b));
+    g.setGradientFill (chrome);
+    g.fillEllipse (cap);
+    if (fx)
+    {
+        g.setColour (Colours::white.withAlpha (0.25f + 0.2f * hover));
+        g.fillEllipse (Rectangle<float> (capR * 0.7f, capR * 0.35f).withCentre ({ c.x - capR * 0.2f, c.y - capR * 0.5f }));
+        g.setColour (Colours::black.withAlpha (0.35f));
+        g.drawEllipse (cap.reduced (0.5f), 1.0f);
+    }
+}
+
+// === BooBass: a bass guitar — a sunburst body, four strings, a chrome pickup; one string ringing ==================
+
+inline void canvasBooBass (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    // sunburst: amber in the middle, burning to black at the edges
+    g.setGradientFill (ColourGradient (p.bgTop, a.getX() + a.getWidth() * 0.6f, a.getY() + a.getHeight() * 0.35f, p.bgBottom, a.getX(), a.getBottom(), true));
+    g.fillRect (a);
+    if (display) return;
+    // four strings running along the panel, a pickup under them
+    const auto y0 = a.getY() + a.getHeight() * 0.06f;
+    for (int s = 0; s < 4; ++s)
+    {
+        const auto y = y0 + (float) s * 7.0f;
+        g.setColour (Colours::black.withAlpha (0.35f));
+        g.fillRect (Rectangle<float> (a.getX(), y + 1.0f, a.getWidth(), 1.0f + (float) s * 0.4f));
+        g.setColour (p.accent2.withAlpha (0.18f));
+        g.fillRect (Rectangle<float> (a.getX(), y, a.getWidth(), 0.8f + (float) s * 0.4f));
+    }
+    const auto pickup = Rectangle<float> (a.getX() + a.getWidth() * 0.62f, y0 - 6.0f, 46.0f, 33.0f);
+    g.setColour (Colours::black.withAlpha (0.45f));
+    g.fillRoundedRectangle (pickup, 4.0f);
+    for (int i = 0; i < 4; ++i)
+    {
+        g.setColour (p.accent2.withAlpha (0.3f));
+        g.fillEllipse (Rectangle<float> (4.0f, 4.0f).withCentre ({ pickup.getX() + 9.0f + (float) i * 9.5f, y0 + 1.0f + (float) i * 7.0f }));
+    }
+    // the body's binding: a cream line following a curve near the bottom
+    juce::Path bind;
+    bind.startNewSubPath (a.getX(), a.getBottom() - a.getHeight() * 0.05f);
+    bind.cubicTo (a.getX() + a.getWidth() * 0.3f, a.getBottom() - a.getHeight() * 0.12f, a.getX() + a.getWidth() * 0.7f, a.getBottom(), a.getRight(), a.getBottom() - a.getHeight() * 0.08f);
+    g.setColour (p.accent2.withAlpha (0.12f));
+    g.strokePath (bind, stroke (2.0f));
+}
+
+inline void booBassEmblem (juce::Graphics& g, Point<float> c, float r) // a headstock with tuners
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    g.fillRoundedRectangle (Rectangle<float> (r * 0.9f, r * 2.0f).withCentre (c), r * 0.3f);
+    g.setColour (p.accent2);
+    for (int i = 0; i < 2; ++i)
+    {
+        g.fillEllipse (Rectangle<float> (r * 0.45f, r * 0.45f).withCentre ({ c.x - r * 0.7f, c.y - r * 0.5f + (float) i * r * 0.9f }));
+        g.fillEllipse (Rectangle<float> (r * 0.45f, r * 0.45f).withCentre ({ c.x + r * 0.7f, c.y - r * 0.5f + (float) i * r * 0.9f }));
+    }
+}
+
+inline void ringingString (juce::Graphics& g, const Motion& m, float rate) // a string vibrating across the stage, its swing decaying and re-plucked
+{
+    if (m.stage == m.area) return;
+    const auto s = m.stage.reduced (4.0f);
+    const auto since = std::fmod (m.t * rate, 1.0f);
+    const auto amp = std::exp (-since * 4.0f) * s.getHeight() * 0.38f;
+    const auto path = curve (60, [&] (float u) {
+        return Point<float> (s.getX() + s.getWidth() * u, s.getCentreY() + std::sin (u * juce::MathConstants<float>::pi) * amp * std::sin (m.t * 38.0f));
+    });
+    g.setColour (m.p.accent2.withAlpha (0.25f));
+    g.strokePath (path, juce::PathStrokeType (3.0f));
+    g.setColour (m.p.accent2);
+    g.strokePath (path, juce::PathStrokeType (1.1f));
+}
+
+inline void booBassMotion (juce::Graphics& g, const Motion& m) { ringingString (g, m, 0.5f); }
+
+inline const Theme& booBassTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "BooBass";
+        x.base = Style::hardware;
+        x.pal = { Colour (0xff4a2a10), Colour (0xff0b0603), Colour (0xffffb04a), Colour (0xfff5e6c8), Colour (0xc82a1a0e), Colour (0xe0120b06),
+                  Colour (0xff9a6a3a), Colour (0xfffaf0dc), Colour (0xff080503), Colour (0xffd8dde3), Colour (0xff4a4e55), Colour (0xff3a2818),
+                  Colour (0xff1a1a1a), Colour (0xff2a1c10) };
+        x.canvas = canvasBooBass;
+        x.titleEmblem = booBassEmblem;
+        x.drawCap = chromeCap;
+        x.arcGlow = 0.18f;
+        x.stageRepaint = true;
+        x.paintMotion = booBassMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === Fruity DrumSynth Live: a live drum machine — four rows of coloured pads, a rubber feel =========================
+
+inline void canvasDrumSynth (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    if (display) return;
+    static const juce::uint32 rowColours[4] { 0xffff5a3c, 0xffffa23c, 0xffffd23f, 0xff6ad86a };
+    const auto grid = Rectangle<float> (a.getRight() - a.getWidth() * 0.3f, a.getY() + 8.0f, a.getWidth() * 0.27f, a.getHeight() * 0.3f);
+    const auto pw = grid.getWidth() / 8.0f, ph = grid.getHeight() / 4.0f;
+    juce::Random rnd (30);
+    for (int r = 0; r < 4; ++r)
+        for (int c = 0; c < 8; ++c)
+        {
+            const auto lit = rnd.nextFloat() < 0.35f;
+            g.setColour (Colour (rowColours[r]).withAlpha (lit ? 0.28f : 0.07f));
+            g.fillRoundedRectangle (Rectangle<float> (grid.getX() + (float) c * pw, grid.getY() + (float) r * ph, pw - 3.0f, ph - 3.0f), 3.0f);
+        }
+    if (! reduced) bloom (g, grid.getCentre(), grid.getWidth() * 0.7f, p.accent, 0.06f);
+}
+
+inline void drumSynthEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    static const juce::uint32 cols[4] { 0xffff5a3c, 0xffffa23c, 0xffffd23f, 0xff6ad86a };
+    for (int i = 0; i < 4; ++i)
+    {
+        g.setColour (Colour (cols[i]));
+        g.fillRoundedRectangle (Rectangle<float> (r * 0.85f, r * 0.85f).withCentre ({ c.x + (i % 2 == 0 ? -0.5f : 0.5f) * r, c.y + (i < 2 ? -0.5f : 0.5f) * r }), 1.0f);
+    }
+}
+
+inline const Theme& drumSynthTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "DrumSynth Live";
+        x.base = Style::vivid;
+        x.pal = { Colour (0xff222124), Colour (0xff0c0c0d), Colour (0xffff5a3c), Colour (0xffffd23f), Colour (0xd0242326), Colour (0xe4111113),
+                  Colour (0xff6e6a70), Colour (0xfff6f2ee), Colour (0xff070707), Colour (0xff3a383c), Colour (0xff151416), Colour (0xff302e33),
+                  Colour (0xfffff4ea), Colour (0xff262528) };
+        x.canvas = canvasDrumSynth;
+        x.titleEmblem = drumSynthEmblem;
+        x.cap = Cap::rubber;
+        x.arcGlow = 0.22f;
+        return x;
+    }();
+    return t;
+}
+
+// === Fruity DX10: an eighties FM keyboard — dark umber, a stripe of coloured membrane bands, an algorithm diagram ===
+
+inline void canvasDx10 (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    if (display) return;
+    // the membrane stripe band along the top
+    static const juce::uint32 stripes[5] { 0xff57d18b, 0xffe05a6a, 0xffe7c35a, 0xff5aa7e0, 0xffb07ad8 };
+    const auto band = Rectangle<float> (a.getX(), a.getY() + 2.0f, a.getWidth(), 5.0f);
+    for (int i = 0; i < 5; ++i)
+    {
+        g.setColour (Colour (stripes[i]).withAlpha (0.35f));
+        g.fillRect (band.withX (a.getX() + a.getWidth() * (float) i / 5.0f).withWidth (a.getWidth() / 5.0f - 2.0f));
+    }
+    // an algorithm: operators as numbered boxes, modulators stacked over carriers, a feedback loop
+    const auto box = 22.0f;
+    const auto o = Point<float> (a.getRight() - a.getWidth() * 0.2f, a.getY() + a.getHeight() * 0.06f);
+    const Point<float> ops[4] { o, o.translated (0.0f, box * 1.6f), o.translated (box * 1.6f, box * 1.6f), o.translated (0.8f * box, box * 3.2f) };
+    g.setColour (p.accent.withAlpha (0.18f));
+    g.drawLine ({ ops[0].translated (box * 0.5f, box), ops[1].translated (box * 0.5f, 0.0f) }, 1.2f);
+    g.drawLine ({ ops[1].translated (box * 0.5f, box), ops[3].translated (box * 0.5f, 0.0f) }, 1.2f);
+    g.drawLine ({ ops[2].translated (box * 0.5f, box), ops[3].translated (box * 0.5f, 0.0f) }, 1.2f);
+    juce::Path fb; // feedback loop on the top operator
+    fb.addArc (ops[0].x + box * 0.6f, ops[0].y - box * 0.4f, box * 0.8f, box * 0.8f, 0.0f, juce::MathConstants<float>::pi * 1.4f, true);
+    g.strokePath (fb, juce::PathStrokeType (1.2f));
+    for (int i = 0; i < 4; ++i)
+    {
+        g.setColour (Colours::black.withAlpha (0.3f));
+        g.fillRect (Rectangle<float> (box, box).withPosition (ops[i]));
+        g.setColour ((i == 3 ? p.accent2 : p.accent).withAlpha (0.3f));
+        g.drawRect (Rectangle<float> (box, box).withPosition (ops[i]), 1.2f);
+        g.setFont (theme::font (11.0f, true));
+        g.drawText (juce::String (i + 1), Rectangle<float> (box, box).withPosition (ops[i]), juce::Justification::centred, false);
+    }
+}
+
+inline void dx10Emblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    g.drawRect (Rectangle<float> (r * 0.9f, r * 0.9f).withCentre (c.translated (0.0f, -r * 0.55f)), 1.2f);
+    g.setColour (p.accent2);
+    g.fillRect (Rectangle<float> (r * 0.9f, r * 0.9f).withCentre (c.translated (0.0f, r * 0.55f)));
+}
+
+inline const Theme& dx10Theme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "DX10";
+        x.base = Style::glow;
+        x.pal = { Colour (0xff2b2522), Colour (0xff100d0c), Colour (0xff57d18b), Colour (0xffe05a6a), Colour (0xd02c2623), Colour (0xe4141110),
+                  Colour (0xff7a6c62), Colour (0xfff2ece6), Colour (0xff070605), Colour (0xff3a3330), Colour (0xff171412), Colour (0xff342c28),
+                  Colour (0xfff2ece6), Colour (0xff2a2421) };
+        x.canvas = canvasDx10;
+        x.titleEmblem = dx10Emblem;
+        x.cap = Cap::flat;
+        x.thin = true;
+        x.kerning = 0.08f;
+        x.arcGlow = 0.0f;
+        return x;
+    }();
+    return t;
+}
+
+// === MiniSynth: a patch-cord monosynth — navy panel, cream legends, orange cords looping between jacks ==============
+
+inline void canvasMiniSynth (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    if (display) return;
+    // patch cords: sagging curves between jacks along the top
+    juce::Random rnd (41);
+    static const juce::uint32 cords[3] { 0xffff8a2a, 0xfff5e6c8, 0xff3fc7d8 };
+    for (int i = 0; i < 5; ++i)
+    {
+        const auto x0 = a.getX() + a.getWidth() * (0.35f + 0.6f * rnd.nextFloat()), x1 = a.getX() + a.getWidth() * (0.35f + 0.6f * rnd.nextFloat());
+        const auto y = a.getY() + 10.0f;
+        const auto sag = a.getHeight() * (0.06f + 0.1f * rnd.nextFloat());
+        juce::Path cord;
+        cord.startNewSubPath (x0, y);
+        cord.cubicTo (x0, y + sag, x1, y + sag, x1, y);
+        const auto col = Colour (cords[i % 3]);
+        g.setColour (Colours::black.withAlpha (0.25f));
+        g.strokePath (cord, stroke (4.0f), juce::AffineTransform::translation (0.0f, 2.0f));
+        g.setColour (col.withAlpha (0.28f));
+        g.strokePath (cord, stroke (3.0f));
+        for (const auto x : { x0, x1 })
+        {
+            g.setColour (Colours::black.withAlpha (0.5f));
+            g.fillEllipse (Rectangle<float> (8.0f, 8.0f).withCentre ({ x, y }));
+            g.setColour (p.accent2.withAlpha (0.35f));
+            g.drawEllipse (Rectangle<float> (8.0f, 8.0f).withCentre ({ x, y }), 1.0f);
+        }
+    }
+}
+
+inline void miniSynthEmblem (juce::Graphics& g, Point<float> c, float r) // a jack with a cord
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    juce::Path cord;
+    cord.startNewSubPath (c.translated (-r * 1.2f, -r * 0.6f));
+    cord.cubicTo (c.x - r * 1.2f, c.y + r, c.x + r * 0.2f, c.y + r, c.x + r * 0.2f, c.y);
+    g.strokePath (cord, stroke (1.5f));
+    g.setColour (p.accent2);
+    g.drawEllipse (Rectangle<float> (r * 1.0f, r * 1.0f).withCentre (c.translated (r * 0.4f, -r * 0.1f)), 1.2f);
+}
+
+inline const Theme& miniSynthTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "MiniSynth";
+        x.base = Style::hardware;
+        x.pal = { Colour (0xff17203a), Colour (0xff070a14), Colour (0xffff8a2a), Colour (0xfff5e6c8), Colour (0xcc19223c), Colour (0xe20b1020),
+                  Colour (0xff5a6890), Colour (0xfff5e6c8), Colour (0xff04060c), Colour (0xff2b2f3a), Colour (0xff0d0f14), Colour (0xff27304a),
+                  Colour (0xfff5e6c8), Colour (0xff1c2440) };
+        x.canvas = canvasMiniSynth;
+        x.titleEmblem = miniSynthEmblem;
+        x.cap = Cap::bakelite;
+        x.pointerFrom = 0.15f;
+        x.ticks = 11;
+        x.arcGlow = 0.2f;
+        x.thumbPointer = true;
+        return x;
+    }();
+    return t;
+}
+
+// === Plucked!: a harp's strings — deep teal, honey-gold strings fanning, one plucked ===============================
+
+inline void canvasPlucked (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    if (! reduced) bloom (g, { a.getRight(), a.getY() }, a.getWidth() * 0.5f, p.accent, 0.08f);
+    if (display) return;
+    // a harp's strings fanning from the top right, shorter to longer
+    const auto top = Point<float> (a.getRight() - a.getWidth() * 0.05f, a.getY());
+    for (int i = 0; i < 14; ++i)
+    {
+        const auto x = a.getRight() - a.getWidth() * (0.08f + 0.035f * (float) i);
+        const auto len = a.getHeight() * (0.12f + 0.022f * (float) i);
+        g.setColour (p.accent.withAlpha (0.10f + (i == 6 ? 0.12f : 0.0f)));
+        if (i == 6)
+        {
+            const auto plucked = curve (40, [&] (float u) { return Point<float> (x + std::sin (u * juce::MathConstants<float>::pi) * 4.0f, top.y + len * u); });
+            g.strokePath (plucked, juce::PathStrokeType (1.2f));
+        }
+        else
+            g.drawLine ({ x, top.y, x, top.y + len }, 1.0f);
+    }
+    // the neck curve over them
+    juce::Path neck;
+    neck.startNewSubPath (a.getRight() - a.getWidth() * 0.6f, a.getY() + a.getHeight() * 0.1f);
+    neck.quadraticTo (a.getRight() - a.getWidth() * 0.3f, a.getY() - a.getHeight() * 0.02f, a.getRight(), a.getY() + a.getHeight() * 0.02f);
+    g.setColour (p.accent.withAlpha (0.2f));
+    g.strokePath (neck, stroke (3.0f));
+}
+
+inline void pluckedEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    for (int i = 0; i < 3; ++i)
+        g.drawLine ({ c.x - r * 0.8f + (float) i * r * 0.8f, c.y - r, c.x - r * 0.8f + (float) i * r * 0.8f, c.y + r * (0.3f + 0.35f * (float) i) }, 1.2f);
+}
+
+inline void pluckedMotion (juce::Graphics& g, const Motion& m) { ringingString (g, m, 0.7f); }
+
+inline const Theme& pluckedTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Plucked!";
+        x.base = Style::glow;
+        x.pal = { Colour (0xff0f2628), Colour (0xff040c0d), Colour (0xffe8b85a), Colour (0xfffff0c8), Colour (0xc8112a2c), Colour (0xe0071315),
+                  Colour (0xff4f8a86), Colour (0xfff4fbf8), Colour (0xff030909), Colour (0xfff2e2b8), Colour (0xffa0844c), Colour (0xff1c3a3a),
+                  Colour (0xff3a2a10), Colour (0xff153032) };
+        x.canvas = canvasPlucked;
+        x.titleEmblem = pluckedEmblem;
+        x.cap = Cap::porcelain;
+        x.arcGlow = 0.18f;
+        x.stageRepaint = true;
+        x.paintMotion = pluckedMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === SimSynth: an early-90s desktop synth — slate bevels, a sine/saw/square triad, a sky-blue and butter palette ===
+
+inline void canvasSimSynth (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    // a bevelled tile grid, like an old desktop's raised panels
+    const auto tile = 48.0f;
+    for (auto y = a.getY(); y < a.getBottom(); y += tile)
+        for (auto x = a.getX(); x < a.getRight(); x += tile)
+        {
+            g.setColour (Colours::white.withAlpha (0.018f));
+            g.fillRect (Rectangle<float> (x, y, tile - 1.0f, 1.0f));
+            g.fillRect (Rectangle<float> (x, y, 1.0f, tile - 1.0f));
+            g.setColour (Colours::black.withAlpha (0.12f));
+            g.fillRect (Rectangle<float> (x, y + tile - 1.0f, tile, 1.0f));
+            g.fillRect (Rectangle<float> (x + tile - 1.0f, y, 1.0f, tile));
+        }
+    if (display) return;
+    // three oscillators' shapes, stacked, sky blue / butter / white
+    const Colour cols[3] { p.accent, p.accent2, Colour (0xffeef2ff) };
+    for (int k = 0; k < 3; ++k)
+    {
+        const auto y = a.getY() + a.getHeight() * (0.08f + 0.05f * (float) k);
+        const auto w = curve (200, [&] (float u) {
+            const auto ph = std::fmod (u * 5.0f, 1.0f);
+            const auto v = k == 0 ? std::sin (ph * juce::MathConstants<float>::twoPi) : k == 1 ? 1.0f - 2.0f * ph : (ph < 0.5f ? 1.0f : -1.0f);
+            return Point<float> (a.getX() + a.getWidth() * (0.45f + 0.52f * u), y - v * a.getHeight() * 0.018f);
+        });
+        g.setColour (cols[k].withAlpha (0.16f));
+        g.strokePath (w, juce::PathStrokeType (1.2f));
+    }
+}
+
+inline void simSynthEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    g.setColour (p.plate.brighter (0.6f));
+    g.fillRect (Rectangle<float> (r * 1.8f, r * 1.8f).withCentre (c));
+    g.setColour (Colours::white.withAlpha (0.6f));
+    g.fillRect (Rectangle<float> (r * 1.8f, 1.0f).withPosition (c.x - r * 0.9f, c.y - r * 0.9f));
+    g.setColour (p.accent);
+    g.fillRect (Rectangle<float> (r * 0.9f, r * 0.9f).withCentre (c));
+}
+
+inline const Theme& simSynthTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "SimSynth";
+        x.base = Style::glow;
+        x.pal = { Colour (0xff252836), Colour (0xff0e1016), Colour (0xff5ec8ff), Colour (0xffffd166), Colour (0xd0272a38), Colour (0xe4121420),
+                  Colour (0xff6a7090), Colour (0xffeef2ff), Colour (0xff07080c), Colour (0xff4a5068), Colour (0xff1a1d28), Colour (0xff30344a),
+                  Colour (0xffeef2ff), Colour (0xff2a2e3e) };
+        x.canvas = canvasSimSynth;
+        x.titleEmblem = simSynthEmblem;
+        x.cap = Cap::flat;
+        x.arcGlow = 0.15f;
+        return x;
+    }();
+    return t;
+}
+
+// === Autogun: presets fired at random — gunmetal, a cyan reticle, a scatter of hits ================================
+
+inline void canvasAutogun (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    styles::brushed (g, a, 0.025f);
+    if (display) return;
+    const auto c = Point<float> (a.getRight() - a.getWidth() * 0.16f, a.getY() + a.getHeight() * 0.18f);
+    const auto R = juce::jmin (a.getWidth(), a.getHeight()) * 0.16f;
+    g.setColour (p.accent.withAlpha (0.16f));
+    for (int i = 1; i <= 3; ++i)
+        g.drawEllipse (Rectangle<float> (R * 2.0f * (float) i / 3.0f, R * 2.0f * (float) i / 3.0f).withCentre (c), 1.0f);
+    g.drawLine ({ c.x - R * 1.3f, c.y, c.x - R * 0.15f, c.y }, 1.0f);
+    g.drawLine ({ c.x + R * 0.15f, c.y, c.x + R * 1.3f, c.y }, 1.0f);
+    g.drawLine ({ c.x, c.y - R * 1.3f, c.x, c.y - R * 0.15f }, 1.0f);
+    g.drawLine ({ c.x, c.y + R * 0.15f, c.x, c.y + R * 1.3f }, 1.0f);
+    // the hits: random presets, each a tiny waveform glyph
+    juce::Random rnd (57);
+    for (int i = 0; i < 26; ++i)
+    {
+        const auto ang = rnd.nextFloat() * 6.283f, rad = R * 1.8f * std::sqrt (rnd.nextFloat());
+        const auto q = c + Point<float> (std::cos (ang), std::sin (ang)) * rad;
+        const auto f = 1.0f + (float) rnd.nextInt (4);
+        const auto glyph = curve (16, [&] (float u) { return Point<float> (q.x - 6.0f + 12.0f * u, q.y - std::sin (u * f * 6.283f) * 3.0f); });
+        g.setColour ((i % 4 == 0 ? p.accent2 : p.accent).withAlpha (0.18f));
+        g.strokePath (glyph, juce::PathStrokeType (1.0f));
+    }
+}
+
+inline void autogunEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    g.drawEllipse (Rectangle<float> (r * 1.8f, r * 1.8f).withCentre (c), 1.2f);
+    g.drawLine ({ c.x - r * 1.2f, c.y, c.x + r * 1.2f, c.y }, 1.0f);
+    g.drawLine ({ c.x, c.y - r * 1.2f, c.x, c.y + r * 1.2f }, 1.0f);
+    g.setColour (p.accent2);
+    g.fillEllipse (Rectangle<float> (r * 0.45f, r * 0.45f).withCentre (c.translated (r * 0.35f, -r * 0.3f)));
+}
+
+inline const Theme& autogunTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Autogun";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff23272c), Colour (0xff0b0d0f), Colour (0xff39f3ff), Colour (0xffffe14a), Colour (0xcc252a30), Colour (0xe2111316),
+                  Colour (0xff5f7a85), Colour (0xffeefcff), Colour (0xff050607), Colour (0xff3a3f46), Colour (0xff15181b), Colour (0xff2c3238),
+                  Colour (0xfff0feff), Colour (0xff24292e) };
+        x.canvas = canvasAutogun;
+        x.titleEmblem = autogunEmblem;
+        x.drawCap = machinedCap;
+        x.pointer = Pointer::glowLine;
+        x.ticks = 9;
+        x.boldTicks = true;
+        x.arcGlow = 0.3f;
+        return x;
+    }();
+    return t;
+}
+
+// === FL Slayer: a guitar amp stack — black tolex, a woven grille, gold piping, chicken-head knobs, a pilot light ===
+
+inline void canvasSlayer (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    // tolex: a fine pebbled grain
+    juce::Random rnd (68);
+    for (int i = 0; i < (int) (a.getWidth() * a.getHeight() / 160.0f); ++i)
+    {
+        g.setColour ((rnd.nextBool() ? Colours::white : Colours::black).withAlpha (0.025f));
+        g.fillEllipse (Rectangle<float> (1.6f, 1.6f).withCentre ({ a.getX() + rnd.nextFloat() * a.getWidth(), a.getY() + rnd.nextFloat() * a.getHeight() }));
+    }
+    if (display) return;
+    // the grille: a diagonal weave in the top right, framed by gold piping
+    const auto grille = Rectangle<float> (a.getRight() - a.getWidth() * 0.36f, a.getY() + 6.0f, a.getWidth() * 0.34f, a.getHeight() * 0.28f);
+    g.saveState();
+    g.reduceClipRegion (grille.toNearestInt());
+    for (auto x = grille.getX() - grille.getHeight(); x < grille.getRight(); x += 5.0f)
+    {
+        g.setColour (p.accent.withAlpha (0.06f));
+        g.drawLine ({ x, grille.getBottom(), x + grille.getHeight(), grille.getY() }, 1.0f);
+        g.setColour (Colours::black.withAlpha (0.18f));
+        g.drawLine ({ x, grille.getY(), x + grille.getHeight(), grille.getBottom() }, 1.0f);
+    }
+    g.restoreState();
+    g.setColour (p.accent.withAlpha (0.35f));
+    g.drawRoundedRectangle (grille, 6.0f, 1.5f);
+    // the pilot light
+    const auto pilot = Point<float> (grille.getX() - 16.0f, grille.getY() + 14.0f);
+    if (! reduced) bloom (g, pilot, 18.0f, p.accent2, 0.5f);
+    g.setColour (p.accent2);
+    g.fillEllipse (Rectangle<float> (7.0f, 7.0f).withCentre (pilot));
+}
+
+inline void slayerEmblem (juce::Graphics& g, Point<float> c, float r) // a pilot jewel
+{
+    const auto& p = pal();
+    if (! reduced) bloom (g, c, r * 2.2f, p.accent2, 0.5f);
+    g.setColour (p.accent2);
+    g.fillEllipse (Rectangle<float> (r * 1.3f, r * 1.3f).withCentre (c));
+    g.setColour (p.accent);
+    g.drawEllipse (Rectangle<float> (r * 1.8f, r * 1.8f).withCentre (c), 1.2f);
+}
+
+inline const Theme& slayerTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "FL Slayer";
+        x.base = Style::hardware;
+        x.pal = { Colour (0xff1c1b1b), Colour (0xff090909), Colour (0xffffb238), Colour (0xffe8433a), Colour (0xd01d1c1c), Colour (0xe40c0c0c),
+                  Colour (0xff8a7048), Colour (0xfff6ead2), Colour (0xff060606), Colour (0xfff2ead8), Colour (0xffb8ab90), Colour (0xff2e2b28),
+                  Colour (0xff1a1a1a), Colour (0xff222120) };
+        x.canvas = canvasSlayer;
+        x.titleEmblem = slayerEmblem;
+        x.drawCap = chickenBase;
+        x.pointerFrom = 0.0f;
+        x.ticks = 11;
+        x.arcGlow = 0.2f;
+        x.thumbPointer = true;
+        return x;
+    }();
+    return t;
+}
+
+// === Fruit Kick: a juicy kick — an orange slice whose segments are the kick's envelope, lime zest, a beat =========
+
+inline void orangeSlice (juce::Graphics& g, Point<float> c, float R, float alpha)
+{
+    const auto& p = pal();
+    g.setColour (p.accent.withAlpha (0.22f * alpha));
+    g.drawEllipse (Rectangle<float> (R * 2.0f, R * 2.0f).withCentre (c), 3.0f);
+    for (int i = 0; i < 10; ++i)
+    {
+        const auto a0 = juce::MathConstants<float>::twoPi * (float) i / 10.0f + 0.05f, a1 = a0 + juce::MathConstants<float>::twoPi / 10.0f - 0.1f;
+        juce::Path seg;
+        seg.startNewSubPath (c + Point<float> (std::sin (a0), -std::cos (a0)) * R * 0.12f);
+        seg.addCentredArc (c.x, c.y, R * 0.86f, R * 0.86f, 0.0f, a0, a1);
+        seg.closeSubPath();
+        g.setColour (p.accent.withAlpha ((0.06f + 0.05f * (float) (i % 2)) * alpha));
+        g.fillPath (seg);
+    }
+}
+
+inline void canvasFruitKick (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    if (! reduced) bloom (g, { a.getRight() - a.getWidth() * 0.15f, a.getY() + a.getHeight() * 0.2f }, a.getWidth() * 0.35f, p.accent, 0.10f);
+    if (display) return;
+    const auto R = juce::jmin (a.getWidth(), a.getHeight()) * 0.22f;
+    orangeSlice (g, { a.getRight() - R * 0.9f, a.getY() + R * 0.85f }, R, 1.0f);
+    // lime zest specks
+    juce::Random rnd (43);
+    for (int i = 0; i < 40; ++i)
+    {
+        g.setColour (p.accent2.withAlpha (0.10f + 0.1f * rnd.nextFloat()));
+        g.fillEllipse (Rectangle<float> (2.0f, 2.0f).withCentre ({ a.getX() + rnd.nextFloat() * a.getWidth(), a.getY() + rnd.nextFloat() * a.getHeight() * 0.35f }));
+    }
+}
+
+inline void fruitKickEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    g.fillEllipse (Rectangle<float> (r * 1.9f, r * 1.9f).withCentre (c));
+    g.setColour (p.accent2);
+    g.fillEllipse (Rectangle<float> (r * 0.6f, r * 0.35f).withCentre (c.translated (r * 0.3f, -r * 1.0f)));
+}
+
+inline void fruitKickMotion (juce::Graphics& g, const Motion& m)
+{
+    // the slice thumping in the stage at 120 bpm
+    if (m.stage == m.area) return;
+    const auto beat = std::fmod (m.t * 2.0f, 1.0f);
+    const auto push = std::exp (-beat * 8.0f);
+    const auto c = m.stage.getCentre();
+    const auto R = m.stage.getHeight() * (0.36f + 0.06f * push);
+    if (! reduced) bloom (g, c, R * 1.8f, m.p.accent, 0.35f * push);
+    g.setColour (m.p.accent.withAlpha (0.6f + 0.4f * push));
+    g.drawEllipse (Rectangle<float> (R * 2.0f, R * 2.0f).withCentre (c), 1.6f);
+    for (int i = 0; i < 8; ++i)
+    {
+        const auto ang = juce::MathConstants<float>::twoPi * (float) i / 8.0f;
+        g.drawLine ({ c + Point<float> (std::sin (ang), -std::cos (ang)) * R * 0.2f, c + Point<float> (std::sin (ang), -std::cos (ang)) * R * 0.85f }, 1.0f);
+    }
+}
+
+inline const Theme& fruitKickTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Fruit Kick";
+        x.base = Style::vivid;
+        x.pal = { Colour (0xff24121a), Colour (0xff0b0508), Colour (0xffff8c1a), Colour (0xffa6e22e), Colour (0xc826141c), Colour (0xe0100810),
+                  Colour (0xff9a5a4a), Colour (0xfffff0e0), Colour (0xff070305), Colour (0xffffd9b0), Colour (0xffc07a3a), Colour (0xff3a2028),
+                  Colour (0xff4a1a00), Colour (0xff281420) };
+        x.canvas = canvasFruitKick;
+        x.titleEmblem = fruitKickEmblem;
+        x.cap = Cap::porcelain;
+        x.arcGlow = 0.3f;
+        x.stageRepaint = true;
+        x.paintMotion = fruitKickMotion;
+        x.hz = 15;
+        return x;
+    }();
+    return t;
+}
+
+// === Wasp: a hive — black and yellow, a honeycomb lattice, a striped band ==========================================
+
+inline void canvasWasp (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    fillBackdrop (g, a);
+    // the honeycomb, brighter in the top right
+    const auto hs = 16.0f;
+    for (auto row = 0; a.getY() + (float) row * hs * 0.866f < a.getBottom() + hs; ++row)
+        for (auto col = 0; a.getX() + (float) col * hs * 1.5f < a.getRight() + hs; ++col)
+        {
+            const Point<float> c { a.getX() + (float) col * hs * 1.5f, a.getY() + (float) row * hs * 0.866f * 2.0f + (col % 2 == 0 ? 0.0f : hs * 0.866f) };
+            const auto near = juce::jmax (0.0f, 1.0f - c.getDistanceFrom ({ a.getRight(), a.getY() }) / (a.getWidth() * 0.6f));
+            if (near <= 0.0f) continue;
+            juce::Path hex;
+            for (int i = 0; i < 6; ++i)
+            {
+                const auto ang = juce::MathConstants<float>::twoPi * (float) i / 6.0f;
+                const Point<float> q { c.x + std::cos (ang) * hs * 0.95f, c.y + std::sin (ang) * hs * 0.95f };
+                if (i == 0) hex.startNewSubPath (q);
+                else hex.lineTo (q);
+            }
+            hex.closeSubPath();
+            g.setColour (p.accent.withAlpha (0.12f * near));
+            g.strokePath (hex, juce::PathStrokeType (1.0f));
+        }
+    if (display) return;
+    // a striped band along the bottom
+    g.saveState();
+    const auto band = a.withTop (a.getBottom() - 6.0f);
+    g.reduceClipRegion (band.toNearestInt());
+    for (auto x = band.getX() - band.getHeight(); x < band.getRight(); x += 14.0f)
+    {
+        juce::Path s;
+        s.addQuadrilateral (x, band.getBottom(), x + 7.0f, band.getBottom(), x + 7.0f + band.getHeight(), band.getY(), x + band.getHeight(), band.getY());
+        g.setColour (p.accent.withAlpha (0.5f));
+        g.fillPath (s);
+    }
+    g.restoreState();
+}
+
+inline void waspEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    g.fillEllipse (Rectangle<float> (r * 1.2f, r * 2.0f).withCentre (c));
+    g.setColour (Colours::black);
+    for (int i = -1; i <= 1; ++i) g.fillRect (Rectangle<float> (r * 1.3f, r * 0.22f).withCentre (c.translated (0.0f, (float) i * r * 0.5f)));
+}
+
+inline const Theme& waspTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Wasp";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff1c1a12), Colour (0xff090805), Colour (0xffffcc00), Colour (0xfffff3c0), Colour (0xcc1e1c14), Colour (0xe20d0c08),
+                  Colour (0xff8a7a3a), Colour (0xfffff8e0), Colour (0xff060504), Colour (0xff2a2a2a), Colour (0xff0e0e0e), Colour (0xff302c1c),
+                  Colour (0xffffe680), Colour (0xff221f16) };
+        x.canvas = canvasWasp;
+        x.titleEmblem = waspEmblem;
+        x.cap = Cap::rubber;
+        x.pointer = Pointer::glowLine;
+        x.arcGlow = 0.28f;
         return x;
     }();
     return t;
@@ -1910,6 +2636,16 @@ const Theme* generatorTheme (Art a)
         case Art::drumaxx: return &drumaxxTheme();
         case Art::drumpad: return &drumpadTheme();
         case Art::bassDrum: return &bassDrumTheme();
+        case Art::booBass: return &booBassTheme();
+        case Art::drumSynth: return &drumSynthTheme();
+        case Art::dx10: return &dx10Theme();
+        case Art::miniSynth: return &miniSynthTheme();
+        case Art::plucked: return &pluckedTheme();
+        case Art::simSynth: return &simSynthTheme();
+        case Art::autogun: return &autogunTheme();
+        case Art::slayer: return &slayerTheme();
+        case Art::fruitKick: return &fruitKickTheme();
+        case Art::wasp: return &waspTheme();
         default: return nullptr;
     }
 }
@@ -1939,6 +2675,16 @@ Art artForInstrument (InstrumentKind kind)
         case InstrumentKind::drumaxx: return Art::drumaxx;
         case InstrumentKind::drumpad: return Art::drumpad;
         case InstrumentKind::bassdrum: return Art::bassDrum;
+        case InstrumentKind::boobass: return Art::booBass;
+        case InstrumentKind::drumsynth: return Art::drumSynth;
+        case InstrumentKind::dx10: return Art::dx10;
+        case InstrumentKind::minisynth: return Art::miniSynth;
+        case InstrumentKind::plucked: return Art::plucked;
+        case InstrumentKind::simsynth: return Art::simSynth;
+        case InstrumentKind::autogun: return Art::autogun;
+        case InstrumentKind::slayer: return Art::slayer;
+        case InstrumentKind::fruitkick: return Art::fruitKick;
+        case InstrumentKind::wasp: return Art::wasp;
         default: return Art::none;
     }
 }

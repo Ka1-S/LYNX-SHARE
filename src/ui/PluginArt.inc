@@ -99,6 +99,7 @@ struct Theme
     float reach = 1.0f;                      // a mote's repaint radius, in sizes
     bool stageRepaint = false;               // the painter animates the whole stage strip (scopes, pulses)
     void (*paintMotion) (juce::Graphics&, const Motion&) = nullptr;
+    int hz = 20;                             // frames per second of the moving layer (slow motion needs fewer: CPU)
 };
 
 // the registries (PluginArtGenerators.inc / PluginArtEffects.inc)
@@ -867,7 +868,7 @@ void ArtLayer::kick()
     if (run && ! isTimerRunning())
     {
         lastMs = juce::Time::getMillisecondCounterHiRes();
-        startTimerHz (20);
+        startTimerHz (juce::jlimit (5, 30, artkit::themeOf (artId).hz));
     }
     else if (! run && isTimerRunning())
         stopTimer();
