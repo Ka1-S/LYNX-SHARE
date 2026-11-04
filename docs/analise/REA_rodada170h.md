@@ -35,21 +35,9 @@ Ctrl+H Stop sound and Ctrl+N Save new version (user decisions), rack items (170a
 | Double-click an audio clip (lo-fi 85 session, l-05) | DFM `ShortcutEditorForm/BackPanel/AudioClipsPanel` "Double-click on audio clips": Show clip properties / Show channel settings, modifier (none) or Alt | nothing (hint: "[2xLMB] opens"); `openClipSource` had no audio branch | channel settings; Alt: clip properties |
 
 ## Where I stopped
-- Done: LYNX trap session + FL session, tracker table, batch 1 + batch 2 (effect window opens on add) with tests.
-  build-local 1963861 checks / 0 failures; Windows build OK.
-- GUI-verified on the branch build (shots C:/Users/kauan/lynx-test/wfqa170h/shots/v-*): New dialog Enter creates and
-  LYNX keeps the foreground (v-02); Esc closes Sawer (v-03/04) and Parametric EQ windows, foreground stays on LYNX;
-  Parametric EQ added to Insert 6 opens its window (v-05); Piano roll Ctrl+A, Ctrl+B copies a note one whole bar later
-  at the same offset (v-07); export ends with "Export complete: path" + "Peak: -3.0 dBFS" in the hint bar, no box,
-  foreground on LYNX (v-10). Desktop clean after close (v-12).
-- House 124 session (h-*): BPM, swing wheel, chord + stretch + Ctrl+B/transpose, sidechain, stems MP3, save/reopen.
-  Batch 3 (sidechain in either order) built, tests 1963872 checks / 0 failures, GUI-verified s-02 (hint, no box)
-  and s-03 ("Compressor <- Insert 1" right after adding it).
-- In progress: merge train (tmp/r170h/train1.log, train.sh PID 1180345) — the queued feature/wfqa170h includes batch 3.
-  04:55: still waiting; the batch ahead (land.sh gap169k-doc toxseq169h…) hangs in build-local since 03:29
-  (6 zig c++ in futex wait on ~/.cache/zig-main, load 0). If wfqa170h comes back CONFLICT: merge origin/main
-  (MixerComponent.cpp near showAddMenu / showSendMenu is the likely spot), rerun build-local, requeue.
-- Next: lo-fi (85) session (audio loops from the Browser, time-stretch), Save/Open dialogs at the screen's top-left (logged S3).
-- Rerun: `ZIG_GLOBAL_CACHE_DIR=~/.cache/zig-wfqa170h-local ZIG_LOCAL_CACHE_DIR=~/.cache/zig-wfqa170h-local coord/buildslot.sh scripts/build-local.sh`;
-  `OUT=build-win-wfqa170h coord/winbuild.sh scripts/build-windows-zig.sh`; GUI helpers tmp/r170h/g.sh
-  (driver key names are UPPERCASE, e.g. `key CTRL+B`; ABNT2 keyboard: `key BSL` = backslash, `key SHIFT+SLASH` = colon).
+- 170h (feature/wfqa170h, 3 fix batches + docs): in the merge train (train.sh PID 1180345, log tmp/r170h/train1.log).
+- 170h2 (feature/wfqa170h2, da6e6f8a + docs): Ctrl+H Stop sound / Ctrl+Alt+H Undo history, empty default steps,
+  audio-clip double-click. build-local 1963961 checks / 0 failures; Windows build OK; GUI-verified (shots t-01 empty
+  steps, t-02 Ctrl+Alt+H history, t-03 Tools › Stop sound Ctrl+H, t-04 Edit › Undo history Ctrl+Alt+H, t-05 the
+  audio clip's channel settings). Lo-fi 85 session done (shots l-*). Queue it after wfqa170h lands.
+- Next: tracker row 31 (the audio-clip channel's settings have no sample page), Save/Open dialog position (row 26).
