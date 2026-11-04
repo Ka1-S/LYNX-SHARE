@@ -37,8 +37,8 @@ grows, a block row's header gestures, and the conversion's target tracks.
 
 ## 3. Design (LYNX)
 
-**Option.** `Song::patternBlocks` (bool, saved in .lynx) — Playlist menu *Pattern blocks (current project)*, key-map
-action `playlist.patternBlocks`, and Options › Project. Turning it on shows the blocks section; turning it off while
+**Option.** `Song::patternBlocksOn` (bool, saved in .lynx) — the Playlist's right-click menu and its panel options menu
+*Pattern blocks (current project)*, key-map action `playlist.patternBlocks` (no default key; assignable). Turning it on shows the blocks section; turning it off while
 blocks exist asks: *Turn them into clips* / *Delete them* / *Cancel* (LYNX: hidden blocks that still play would be
 confusing). Off by default (as FL 10).
 
@@ -80,7 +80,7 @@ host's blocks travel with the project).
 
 | Item | FL evidence | LYNX before | LYNX now |
 |---|---|---|---|
-| Opt-in block playlist | E1, E4 | none | per-project option, Playlist menu + Options › Project |
+| Opt-in block playlist | E1, E4 | none | per-project option in the Playlist menus (+ key-map action) |
 | Row = pattern, one click paints | E3, E5 | Picker + pencil (pick a pattern first) | block rows, left-click / drag paints |
 | Whole-pattern blocks on the bar grid | E3 | clips can be trimmed/slipped/moved | blocks = pattern length at bar starts, no move/resize |
 | Minimal display | E3 | clip previews | solid colour blocks |

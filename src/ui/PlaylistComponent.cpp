@@ -433,7 +433,9 @@ int PlaylistComponent::blocksSectionHeight() const
     const auto available = getHeight() - headerHeight;
     const auto least = PatternBlocksView::dividerHeight + 3 * PatternBlocksView::rowHeight;
     const auto most = juce::jmax (least, available - 2 * trackHeight); // the clip tracks keep two rows
-    const auto wanted = blocksHeight > 0 ? blocksHeight : available / 3;
+    // by default a third of the grid, or less when every row (and a spare one) fits in less
+    const auto rows = PatternBlocksView::dividerHeight + ((int) engine.getSong().patterns.size() + 1) * PatternBlocksView::rowHeight;
+    const auto wanted = blocksHeight > 0 ? blocksHeight : juce::jmin (available / 3, rows);
     return juce::jlimit (least, most, wanted);
 }
 

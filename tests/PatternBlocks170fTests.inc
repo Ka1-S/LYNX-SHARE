@@ -225,9 +225,15 @@ TEST (pb170f_turn_blocks_into_clips_one_locked_track_per_pattern)
     for (const auto& clip : s.playlist)
     {
         if (clip.track == 2)
-            ++onTrack2, CHECK (clip.pattern == 0 && clip.length == bar);
+        {
+            ++onTrack2;
+            CHECK (clip.pattern == 0 && clip.length == bar);
+        }
         if (clip.track == 3)
-            ++onTrack3, CHECK (clip.pattern == 1 && clip.start == 2 * bar && clip.length == 2 * bar);
+        {
+            ++onTrack3;
+            CHECK (clip.pattern == 1 && clip.start == 2 * bar && clip.length == 2 * bar);
+        }
     }
     CHECK (onTrack2 == 2 && onTrack3 == 1);
     CHECK (s.playlistTracks.size() >= 4 && s.playlistTracks[2].name == "P1" && s.playlistTracks[3].name == "P2");

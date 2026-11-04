@@ -1404,7 +1404,7 @@ struct Arrangement
     std::int64_t loopStart = 0, loopEnd = 0;
     std::vector<Marker> markers;           // sorted by tick (stay here even for the current arrangement)
     std::uint64_t uid = 0;                 // stable id (Online Sessions, round 168a)
-    std::vector<PatternBlock> blocks;      // Pattern Blocks (round 170f); empty for the current one: Song::blocks
+    std::vector<PatternBlock> blocks {};   // Pattern Blocks (round 170f); empty for the current one: Song::blocks
     bool operator== (const Arrangement&) const = default;
 };
 

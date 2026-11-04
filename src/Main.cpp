@@ -8123,6 +8123,8 @@ private:
                 const auto saved = offline.getSong();
                 offline.editSong ([] (lynx::Song& s) {
                     s.patternBlocksOn = true;
+                    while (s.patterns.size() < 5) // a few rows to show (Drums, Bass...: copies of the demo's pattern)
+                        lynx::clonePattern (s, (int) s.patterns.size() - 1);
                     const auto rows = juce::jmin (6, (int) s.patterns.size());
                     for (int r = 0; r < rows; ++r)
                         lynx::patternblocks::paintRange (s, r, (std::int64_t) (r % 3) * 4 * lynx::ppq * 2,
