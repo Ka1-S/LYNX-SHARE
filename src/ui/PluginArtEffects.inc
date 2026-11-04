@@ -1358,6 +1358,672 @@ inline const Theme& reeverb1Theme()
     return t;
 }
 
+// === Echoform (tape-echo role): a reel-to-reel tape path — reels, capstan, a loop of tape, cream and oxblood ========
+
+inline void reel (juce::Graphics& g, Point<float> c, float r, float angle, Colour metal, float alpha)
+{
+    g.setColour (metal.withAlpha (0.14f * alpha));
+    g.fillEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c));
+    g.setColour (Colour (0xff3a2a1e).withAlpha (0.55f * alpha)); // the wound tape
+    g.fillEllipse (Rectangle<float> (r * 1.45f, r * 1.45f).withCentre (c));
+    juce::Path holes; // three cut-outs of the flange
+    for (int i = 0; i < 3; ++i)
+    {
+        const auto a = angle + juce::MathConstants<float>::twoPi * (float) i / 3.0f;
+        holes.addCentredArc (c.x, c.y, r * 0.86f, r * 0.86f, 0.0f, a - 0.45f, a + 0.45f, true);
+        holes.addCentredArc (c.x, c.y, r * 0.42f, r * 0.42f, 0.0f, a + 0.45f, a - 0.45f, false);
+        holes.closeSubPath();
+    }
+    g.setColour (metal.withAlpha (0.22f * alpha));
+    g.fillPath (holes);
+    g.setColour (metal.withAlpha (0.45f * alpha));
+    g.drawEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c), 1.2f);
+    g.fillEllipse (Rectangle<float> (r * 0.22f, r * 0.22f).withCentre (c));
+}
+
+inline void canvasEchoform (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    // tolex: a fine cross-hatch
+    if (! reduced)
+    {
+        g.setColour (Colours::black.withAlpha (0.08f));
+        for (float x = a.getX() - a.getHeight(); x < a.getRight(); x += 5.0f)
+            g.drawLine (x, a.getY(), x + a.getHeight(), a.getBottom(), 0.6f);
+    }
+    // two reels high in the background and the tape running between them past the heads
+    const auto r = juce::jmin (a.getHeight() * 0.3f, a.getWidth() * 0.16f);
+    const auto c1 = Point<float> (a.getX() + a.getWidth() * 0.2f, a.getY() + a.getHeight() * 0.3f);
+    const auto c2 = Point<float> (a.getRight() - a.getWidth() * 0.2f, c1.y);
+    reel (g, c1, r, 0.3f, p.accent2, 1.0f);
+    reel (g, c2, r, 1.1f, p.accent2, 1.0f);
+    juce::Path tape;
+    tape.startNewSubPath (c1.x, c1.y + r * 0.72f);
+    tape.lineTo (a.getCentreX() - r * 0.6f, a.getY() + a.getHeight() * 0.72f);
+    tape.lineTo (a.getCentreX() + r * 0.6f, a.getY() + a.getHeight() * 0.72f);
+    tape.lineTo (c2.x, c2.y + r * 0.72f);
+    g.setColour (Colour (0xff4a3020).withAlpha (0.6f));
+    g.strokePath (tape, juce::PathStrokeType (2.2f));
+    for (int i = 0; i < 3; ++i) // the heads (erase, record, play) under the tape
+    {
+        const auto h = Rectangle<float> (12.0f, 9.0f).withCentre ({ a.getCentreX() + ((float) i - 1.0f) * 22.0f, a.getY() + a.getHeight() * 0.72f + 6.0f });
+        g.setColour (p.accent2.withAlpha (0.18f));
+        g.fillRoundedRectangle (h, 2.0f);
+    }
+    softLight (g, { a.getCentreX(), a.getY() }, a.getWidth() * 0.5f, p.accent2, 0.06f);
+    vignette (g, a, 0.4f);
+}
+
+inline void echoformEmblem (juce::Graphics& g, Point<float> c, float r) { reel (g, c, r * 1.1f, 0.0f, pal().accent2, 4.0f); }
+
+inline void capChickenHead (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    const auto& p = pal();
+    g.setColour (Colour (0xff15100c));
+    g.fillEllipse (cap.expanded (capR * 0.04f));
+    g.setGradientFill (ColourGradient (p.capTop.brighter (0.1f + hover * 0.15f), c.x, cap.getY(), p.capBottom, c.x, cap.getBottom(), false));
+    g.fillEllipse (cap.reduced (capR * 0.1f));
+    if (fx)
+    {
+        g.setColour (Colours::white.withAlpha (0.25f));
+        g.fillEllipse (Rectangle<float> (capR * 0.7f, capR * 0.3f).withCentre ({ c.x - capR * 0.15f, c.y - capR * 0.5f }));
+    }
+}
+
+inline void echoformMotion (juce::Graphics& g, const Motion& m) // two small reels turning in the stage strip
+{
+    const auto s = m.stage;
+    const auto r = juce::jmin (s.getHeight() * 0.42f, 14.0f);
+    if (r < 4.0f) return;
+    const auto y = s.getCentreY();
+    for (int i = 0; i < 2; ++i)
+        reel (g, { s.getRight() - r - 4.0f - (float) i * (r * 2.0f + 8.0f), y }, r, m.t * (i == 0 ? 1.4f : 1.9f), m.p.accent2, 3.5f);
+}
+
+inline const Theme& echoformTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Echoform";
+        x.base = Style::hardware;
+        x.pal = { Colour (0xff2a1f18), Colour (0xff100b08), Colour (0xffc4473a), Colour (0xffe9dfc8), Colour (0xd0281c15), Colour (0xe4100b08),
+                  Colour (0xff8a6a4e), Colour (0xfff2e8d2), Colour (0xff0a0705), Colour (0xffeee4cc), Colour (0xffb5a688), Colour (0xff22180f),
+                  Colour (0xff3a1612), Colour (0xff2a1f18) };
+        x.canvas = canvasEchoform;
+        x.sectionDeco = ridgeScrews;
+        x.titleEmblem = echoformEmblem;
+        x.drawCap = capChickenHead;
+        x.pointerFrom = 0.1f;
+        x.buttTrack = true;
+        x.arcGlow = 0.0f;
+        x.thumbPointer = true;
+        x.stageRepaint = true;
+        x.paintMotion = echoformMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === Spiral Echo (frequency-shifting echo role): a spiral of repeats, each turn shifted in hue ======================
+
+inline void spiral (juce::Graphics& g, Point<float> c, float r, float turns, float phase, float alpha, float width)
+{
+    juce::Path s;
+    const auto n = (int) (turns * 64.0f);
+    for (int i = 0; i <= n; ++i)
+    {
+        const auto u = (float) i / (float) n;
+        const auto ang = phase + u * turns * juce::MathConstants<float>::twoPi;
+        const auto rr = r * (0.06f + 0.94f * u);
+        const Point<float> q { c.x + std::cos (ang) * rr, c.y + std::sin (ang) * rr };
+        if (i == 0) s.startNewSubPath (q);
+        else s.lineTo (q);
+    }
+    ColourGradient hue (Colour (0xff3fe0c5).withAlpha (alpha), c.x - r, c.y, Colour (0xffff7a6a).withAlpha (alpha), c.x + r, c.y, false);
+    hue.addColour (0.5, Colour (0xffffd66a).withAlpha (alpha));
+    g.setGradientFill (hue);
+    g.strokePath (s, stroke (width));
+}
+
+inline void canvasSpiral (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto c = Point<float> (a.getX() + a.getWidth() * 0.72f, a.getY() + a.getHeight() * 0.45f);
+    const auto r = juce::jmin (a.getWidth(), a.getHeight()) * 0.55f;
+    if (! reduced) softLight (g, c, r, p.accent, 0.07f);
+    spiral (g, c, r, 3.2f, 0.0f, 0.16f, 2.0f);
+    // the repeats: dots along the spiral, shrinking inwards
+    for (int i = 0; i < 12; ++i)
+    {
+        const auto u = 1.0f - (float) i / 12.0f;
+        const auto ang = u * 3.2f * juce::MathConstants<float>::twoPi;
+        const auto rr = r * (0.06f + 0.94f * u);
+        g.setColour (p.accent2.withAlpha (0.25f * u));
+        g.fillEllipse (Rectangle<float> (6.0f * u + 2.0f, 6.0f * u + 2.0f).withCentre ({ c.x + std::cos (ang) * rr, c.y + std::sin (ang) * rr }));
+    }
+    vignette (g, a, 0.4f);
+}
+
+inline void spiralEmblem (juce::Graphics& g, Point<float> c, float r) { spiral (g, c, r * 1.1f, 2.2f, 0.0f, 1.0f, 1.3f); }
+
+inline const Theme& spiralTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Spiral Echo";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff0d2026), Colour (0xff04090b), Colour (0xff3fe0c5), Colour (0xffff7a6a), Colour (0xc00d1f25), Colour (0xdc05090b),
+                  Colour (0xff4f8a8a), Colour (0xffe6fbf6), Colour (0xff030708), Colour (0xffe9f2ef), Colour (0xff8aa39c), Colour (0xff14282d),
+                  Colour (0xff10302c), Colour (0xff0f2227) };
+        x.canvas = canvasSpiral;
+        x.titleEmblem = spiralEmblem;
+        x.twoTone = true;
+        x.cap = Cap::porcelain;
+        return x;
+    }();
+    return t;
+}
+
+// === Orbit (modulation-machine role): a planet with satellites on inclined orbits, interference rings ==============
+
+inline void canvasOrbit (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    stars (g, a, 60, 101, 0.5f);
+    const auto c = Point<float> (a.getX() + a.getWidth() * 0.78f, a.getY() + a.getHeight() * 0.32f);
+    const auto r = juce::jmin (a.getWidth(), a.getHeight()) * 0.12f;
+    // interference rings (a comb filter seen as ripples)
+    for (int i = 1; i < 9; ++i)
+    {
+        g.setColour (p.accent.withAlpha (0.05f - 0.004f * (float) i));
+        g.drawEllipse (Rectangle<float> (r * 2.0f + (float) i * 22.0f, r * 2.0f + (float) i * 22.0f).withCentre (c), 1.0f);
+    }
+    // the planet
+    g.setGradientFill (ColourGradient (Colour (0xff6a8ab8), c.x - r * 0.4f, c.y - r * 0.5f, Colour (0xff0e1626), c.x + r * 0.8f, c.y + r, true));
+    g.fillEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c));
+    // inclined orbits with a satellite each
+    for (int i = 0; i < 3; ++i)
+    {
+        juce::Path o;
+        o.addEllipse (Rectangle<float> (r * (3.0f + (float) i * 1.4f), r * (0.9f + (float) i * 0.35f)).withCentre (c));
+        o.applyTransform (juce::AffineTransform::rotation (-0.5f + (float) i * 0.45f, c.x, c.y));
+        g.setColour (p.accent2.withAlpha (0.22f));
+        g.strokePath (o, juce::PathStrokeType (0.9f));
+        const auto pt = o.getPointAlongPath (o.getLength() * (0.15f + 0.3f * (float) i));
+        g.setColour (p.accent);
+        g.fillEllipse (Rectangle<float> (4.0f, 4.0f).withCentre (pt));
+    }
+    vignette (g, a, 0.35f);
+}
+
+inline void orbitEmblem (juce::Graphics& g, Point<float> c, float r) // a satellite
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    g.fillRect (Rectangle<float> (r * 0.7f, r * 0.7f).withCentre (c));
+    g.setColour (p.accent2);
+    g.fillRect (Rectangle<float> (r * 0.8f, r * 0.45f).withCentre (c.translated (-r * 0.85f, 0.0f)));
+    g.fillRect (Rectangle<float> (r * 0.8f, r * 0.45f).withCentre (c.translated (r * 0.85f, 0.0f)));
+}
+
+inline void capDish (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    const auto& p = pal();
+    g.setGradientFill (ColourGradient (p.capTop.brighter (hover * 0.15f), c.x - capR * 0.5f, c.y - capR * 0.5f, p.capBottom, c.x + capR, c.y + capR, true));
+    g.fillEllipse (cap);
+    if (! fx) return;
+    for (int i = 1; i < 4; ++i) // concentric rings of a dish
+    {
+        g.setColour (Colours::white.withAlpha (0.07f));
+        g.drawEllipse (Rectangle<float> (capR * 2.0f * (float) i / 4.0f, capR * 2.0f * (float) i / 4.0f).withCentre (c), 0.7f);
+    }
+}
+
+inline void orbitMotion (juce::Graphics& g, const Motion& m) // a satellite crossing the stage strip on its orbit
+{
+    const auto s = m.stage;
+    if (s.getWidth() < 30.0f) return;
+    const auto c = s.getCentre();
+    juce::Path o;
+    o.addEllipse (s.reduced (6.0f, juce::jmax (2.0f, s.getHeight() * 0.25f)));
+    g.setColour (m.p.accent2.withAlpha (0.2f));
+    g.strokePath (o, juce::PathStrokeType (0.8f));
+    const auto pt = o.getPointAlongPath (o.getLength() * std::fmod (m.t * 0.08f, 1.0f));
+    if (! reduced) bloom (g, pt, 7.0f, m.p.accent, 0.5f);
+    g.setColour (m.p.accent);
+    g.fillEllipse (Rectangle<float> (4.0f, 4.0f).withCentre (pt));
+    juce::ignoreUnused (c);
+}
+
+inline const Theme& orbitTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Orbit";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff16233a), Colour (0xff060a12), Colour (0xffb6ff5c), Colour (0xff7fb4ff), Colour (0xc0142035), Colour (0xdc060a12),
+                  Colour (0xff4f6a8a), Colour (0xffe8f2ff), Colour (0xff04070c), Colour (0xff4a5a74), Colour (0xff111827), Colour (0xff1c2a40),
+                  Colour (0xffeaffd6), Colour (0xff17233a) };
+        x.canvas = canvasOrbit;
+        x.titleEmblem = orbitEmblem;
+        x.drawCap = capDish;
+        x.pointer = Pointer::electron;
+        x.stageRepaint = true;
+        x.paintMotion = orbitMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === Lattice Mod (multitap-modulation role): an isometric lattice of glowing nodes (the taps) ======================
+
+inline void canvasLattice (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto step = 34.0f;
+    const auto h = step * 0.866f;
+    juce::Random rnd (16);
+    for (int row = 0; (float) row * h < a.getHeight() + h; ++row)
+        for (int col = 0; (float) col * step < a.getWidth() + step; ++col)
+        {
+            const Point<float> q { a.getX() + (float) col * step + (row % 2 == 0 ? 0.0f : step * 0.5f), a.getY() + (float) row * h };
+            const Point<float> right { q.x + step, q.y }, down1 { q.x + step * 0.5f, q.y + h }, down2 { q.x - step * 0.5f, q.y + h };
+            g.setColour (p.accent.withAlpha (0.05f));
+            g.drawLine ({ q, right }, 1.0f);
+            g.drawLine ({ q, down1 }, 1.0f);
+            g.drawLine ({ q, down2 }, 1.0f);
+            const auto lit = rnd.nextFloat();
+            if (lit > 0.82f)
+            {
+                if (! reduced) bloom (g, q, 9.0f, lit > 0.93f ? p.accent2 : p.accent, 0.25f);
+                g.setColour ((lit > 0.93f ? p.accent2 : p.accent).withAlpha (0.55f));
+                g.fillEllipse (Rectangle<float> (3.5f, 3.5f).withCentre (q));
+            }
+            else
+            {
+                g.setColour (p.accent.withAlpha (0.12f));
+                g.fillEllipse (Rectangle<float> (2.0f, 2.0f).withCentre (q));
+            }
+        }
+    vignette (g, a, 0.45f);
+}
+
+inline void latticeEmblem (juce::Graphics& g, Point<float> c, float r) // a hexagon
+{
+    juce::Path hex;
+    for (int i = 0; i < 6; ++i)
+    {
+        const auto ang = juce::MathConstants<float>::twoPi * (float) i / 6.0f;
+        const Point<float> q { c.x + std::cos (ang) * r, c.y + std::sin (ang) * r };
+        if (i == 0) hex.startNewSubPath (q);
+        else hex.lineTo (q);
+    }
+    hex.closeSubPath();
+    g.setColour (pal().accent);
+    g.strokePath (hex, juce::PathStrokeType (1.4f));
+}
+
+inline void capHex (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    const auto& p = pal();
+    juce::Path hex;
+    for (int i = 0; i < 6; ++i)
+    {
+        const auto ang = juce::MathConstants<float>::twoPi * (float) i / 6.0f + juce::MathConstants<float>::pi / 6.0f;
+        const Point<float> q { c.x + std::cos (ang) * capR, c.y + std::sin (ang) * capR };
+        if (i == 0) hex.startNewSubPath (q);
+        else hex.lineTo (q);
+    }
+    hex.closeSubPath();
+    g.setGradientFill (ColourGradient (p.capTop.brighter (hover * 0.15f), c.x, cap.getY(), p.capBottom, c.x, cap.getBottom(), false));
+    g.fillPath (hex);
+    if (fx)
+    {
+        g.setColour (p.accent.withAlpha (0.3f));
+        g.strokePath (hex, juce::PathStrokeType (0.8f));
+    }
+}
+
+inline const Theme& latticeTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Lattice Mod";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff1a0f1c), Colour (0xff07040a), Colour (0xffff4fa3), Colour (0xffffb84f), Colour (0xc01a0f1c), Colour (0xdc08040a),
+                  Colour (0xff8a4f78), Colour (0xfffde8f4), Colour (0xff050307), Colour (0xff3a2238), Colour (0xff120a14), Colour (0xff261626),
+                  Colour (0xffffffff), Colour (0xff1e1220) };
+        x.canvas = canvasLattice;
+        x.titleEmblem = latticeEmblem;
+        x.drawCap = capHex;
+        x.twoTone = true;
+        x.pointer = Pointer::glowLine;
+        return x;
+    }();
+    return t;
+}
+
+// === Gemini Doubler: the twins — the Gemini constellation over a sky split in two hues ============================
+
+inline void canvasGemini (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    // the two halves: cyan light from the left, gold from the right, meeting in the middle
+    softLight (g, { a.getX(), a.getCentreY() }, a.getWidth() * 0.6f, p.accent, 0.10f);
+    softLight (g, { a.getRight(), a.getCentreY() }, a.getWidth() * 0.6f, p.accent2, 0.10f);
+    stars (g, a, 70, 2, 0.45f);
+    // the constellation: two stick figures of stars side by side, linked at the head (public sky, drawn freely)
+    const auto u = juce::jmin (a.getWidth(), a.getHeight()) * 0.08f;
+    const auto o = Point<float> (a.getCentreX() - u * 1.5f, a.getY() + a.getHeight() * 0.18f);
+    const Point<float> left[] { { 0.0f, 0.0f }, { 0.2f, 1.6f }, { 0.1f, 3.2f }, { -0.6f, 4.6f }, { 0.6f, 4.8f }, { -0.9f, 1.4f } };
+    const Point<float> right[] { { 3.0f, 0.3f }, { 2.9f, 1.8f }, { 3.1f, 3.4f }, { 2.5f, 4.9f }, { 3.7f, 4.7f }, { 3.9f, 1.6f } };
+    auto figure = [&] (const Point<float>* pts, Colour col)
+    {
+        juce::Path s;
+        s.startNewSubPath (o + pts[0] * u);
+        s.lineTo (o + pts[1] * u);
+        s.lineTo (o + pts[2] * u);
+        s.lineTo (o + pts[3] * u);
+        s.startNewSubPath (o + pts[2] * u);
+        s.lineTo (o + pts[4] * u);
+        s.startNewSubPath (o + pts[1] * u);
+        s.lineTo (o + pts[5] * u);
+        g.setColour (col.withAlpha (0.22f));
+        g.strokePath (s, juce::PathStrokeType (0.9f));
+        for (int i = 0; i < 6; ++i)
+        {
+            const auto q = o + pts[i] * u;
+            if (! reduced) bloom (g, q, i == 0 ? 8.0f : 5.0f, col, 0.35f);
+            g.setColour (Colours::white.withAlpha (0.7f));
+            g.fillEllipse (Rectangle<float> (i == 0 ? 3.0f : 2.0f, i == 0 ? 3.0f : 2.0f).withCentre (q));
+        }
+    };
+    figure (left, p.accent);
+    figure (right, p.accent2);
+    g.setColour (Colours::white.withAlpha (0.15f));
+    g.drawLine ({ o + left[0] * u, o + right[0] * u }, 0.8f);
+    vignette (g, a, 0.35f);
+}
+
+inline void geminiEmblem (juce::Graphics& g, Point<float> c, float r) // II
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    g.fillRect (Rectangle<float> (1.6f, r * 1.6f).withCentre (c.translated (-r * 0.4f, 0.0f)));
+    g.setColour (p.accent2);
+    g.fillRect (Rectangle<float> (1.6f, r * 1.6f).withCentre (c.translated (r * 0.4f, 0.0f)));
+    g.setColour (Colours::white.withAlpha (0.8f));
+    g.fillRect (Rectangle<float> (r * 1.6f, 1.2f).withCentre (c.translated (0.0f, -r * 0.8f)));
+    g.fillRect (Rectangle<float> (r * 1.6f, 1.2f).withCentre (c.translated (0.0f, r * 0.8f)));
+}
+
+inline void capTwin (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    const auto& p = pal();
+    g.setGradientFill (ColourGradient (p.capTop.brighter (0.2f + hover * 0.2f), c.x - capR * 0.45f, c.y - capR * 0.5f, p.capBottom, c.x + capR * 0.7f, c.y + capR * 0.8f, true));
+    g.fillEllipse (cap);
+    if (! fx) return;
+    g.setColour (p.accent.withAlpha (0.45f)); // two rings, one per twin
+    g.drawEllipse (cap.reduced (capR * 0.12f).translated (-capR * 0.05f, 0.0f), 0.8f);
+    g.setColour (p.accent2.withAlpha (0.45f));
+    g.drawEllipse (cap.reduced (capR * 0.24f).translated (capR * 0.05f, 0.0f), 0.8f);
+}
+
+inline const Theme& geminiTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Gemini Doubler";
+        x.base = Style::vivid;
+        x.pal = { Colour (0xff151a2c), Colour (0xff06070e), Colour (0xff4fd8ff), Colour (0xffffc95a), Colour (0xc0141a2c), Colour (0xdc06070e),
+                  Colour (0xff6a7a9a), Colour (0xfff0f4ff), Colour (0xff04050a), Colour (0xff3a4462), Colour (0xff10131f), Colour (0xff1e2438),
+                  Colour (0xffffffff), Colour (0xff171c2e) };
+        x.canvas = canvasGemini;
+        x.titleEmblem = geminiEmblem;
+        x.drawCap = capTwin;
+        x.twoTone = true;
+        x.pointer = Pointer::electron;
+        return x;
+    }();
+    return t;
+}
+
+// === Fruity Delay 2: a bouncing ball, each bounce lower and shorter — the repeats ================================
+
+inline void canvasDelay2 (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto floor = a.getBottom() - a.getHeight() * 0.1f;
+    g.setColour (p.accent.withAlpha (0.12f));
+    g.fillRect (Rectangle<float> (a.getX(), floor, a.getWidth(), 1.0f));
+    auto x = a.getX() + a.getWidth() * 0.04f, h = a.getHeight() * 0.75f, w = a.getWidth() * 0.22f;
+    for (int i = 0; i < 8 && x < a.getRight(); ++i)
+    {
+        juce::Path hop; // one parabola from floor to floor, its peak at h
+        hop.startNewSubPath (x, floor);
+        hop.quadraticTo (x + w * 0.5f, floor - h * 2.0f, x + w, floor);
+        g.setColour (p.accent2.withAlpha (0.14f * std::pow (0.85f, (float) i)));
+        g.strokePath (hop, juce::PathStrokeType (1.2f));
+        const auto r = 8.0f * std::pow (0.82f, (float) i);
+        if (! reduced) bloom (g, { x + w * 0.5f, floor - h }, r * 2.5f, p.accent, 0.2f * std::pow (0.8f, (float) i));
+        g.setColour (p.accent.withAlpha (0.4f * std::pow (0.8f, (float) i)));
+        g.fillEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre ({ x + w * 0.5f, floor - h }));
+        x += w;
+        w *= 0.8f;
+        h *= 0.62f;
+    }
+    vignette (g, a, 0.35f);
+}
+
+inline void delay2Emblem (juce::Graphics& g, Point<float> c, float r) // a ball and its two smaller echoes
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    g.fillEllipse (Rectangle<float> (r * 1.1f, r * 1.1f).withCentre (c.translated (-r * 0.6f, 0.0f)));
+    g.setColour (p.accent.withAlpha (0.6f));
+    g.fillEllipse (Rectangle<float> (r * 0.75f, r * 0.75f).withCentre (c.translated (r * 0.4f, r * 0.15f)));
+    g.setColour (p.accent.withAlpha (0.35f));
+    g.fillEllipse (Rectangle<float> (r * 0.5f, r * 0.5f).withCentre (c.translated (r * 1.1f, r * 0.27f)));
+}
+
+inline const Theme& delay2Theme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Fruity Delay 2";
+        x.base = Style::glow;
+        x.pal = { Colour (0xff162126), Colour (0xff070b0d), Colour (0xff58e0b8), Colour (0xffb8f4ff), Colour (0xc4152026), Colour (0xdc070b0d),
+                  Colour (0xff4f7a78), Colour (0xffe6faf4), Colour (0xff04080a), Colour (0xff2c3a3e), Colour (0xff0e1416), Colour (0xff1c2a2e),
+                  Colour (0xffeafff8), Colour (0xff17232a) };
+        x.canvas = canvasDelay2;
+        x.titleEmblem = delay2Emblem;
+        x.cap = Cap::rubber;
+        return x;
+    }();
+    return t;
+}
+
+// === Fruity Delay 3: an analog delay stomp box — powder-coated enclosure, a jewel lamp, a bucket brigade =========
+
+inline void canvasDelay3 (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    if (! reduced) // powder coat: a fine speckle
+    {
+        juce::Random rnd (3);
+        for (int i = 0; i < (int) (a.getWidth() * a.getHeight() / 90.0f); ++i)
+        {
+            g.setColour ((rnd.nextBool() ? Colours::white : Colours::black).withAlpha (0.05f));
+            g.fillRect (Rectangle<float> (a.getX() + rnd.nextFloat() * a.getWidth(), a.getY() + rnd.nextFloat() * a.getHeight(), 1.0f, 1.0f));
+        }
+    }
+    // the bucket brigade: a chain of buckets passing the signal along, printed along the bottom
+    const auto y = a.getBottom() - a.getHeight() * 0.1f;
+    for (float x = a.getX() + 18.0f; x < a.getRight() - 18.0f; x += 26.0f)
+    {
+        juce::Path b;
+        b.startNewSubPath (x - 7.0f, y - 8.0f);
+        b.lineTo (x - 5.0f, y + 2.0f);
+        b.lineTo (x + 5.0f, y + 2.0f);
+        b.lineTo (x + 7.0f, y - 8.0f);
+        g.setColour (p.accent2.withAlpha (0.16f));
+        g.strokePath (b, juce::PathStrokeType (1.2f));
+        g.drawLine (x + 8.0f, y - 4.0f, x + 17.0f, y - 4.0f, 0.8f);
+    }
+    // the jewel lamp's glow, top right
+    softLight (g, { a.getRight() - a.getWidth() * 0.12f, a.getY() + a.getHeight() * 0.12f }, a.getWidth() * 0.3f, p.accent, 0.12f);
+    vignette (g, a, 0.35f);
+}
+
+inline void delay3Emblem (juce::Graphics& g, Point<float> c, float r) // a jewel lamp
+{
+    const auto& p = pal();
+    if (! reduced) bloom (g, c, r * 2.6f, p.accent, 0.4f);
+    g.setGradientFill (ColourGradient (p.accent.brighter (0.6f), c.x - r * 0.3f, c.y - r * 0.3f, p.accent.darker (0.4f), c.x + r * 0.6f, c.y + r * 0.6f, true));
+    g.fillEllipse (Rectangle<float> (r * 1.5f, r * 1.5f).withCentre (c));
+    g.setColour (Colour (0xffc9ccd1));
+    g.drawEllipse (Rectangle<float> (r * 1.8f, r * 1.8f).withCentre (c), 1.0f);
+}
+
+inline void capPedal (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    const auto& p = pal();
+    g.setColour (Colour (0xff050505));
+    g.fillEllipse (cap.expanded (capR * 0.05f));
+    g.setGradientFill (ColourGradient (Colour (0xff2c2c2c).brighter (hover * 0.2f), c.x, cap.getY(), Colour (0xff0b0b0b), c.x, cap.getBottom(), false));
+    g.fillEllipse (cap);
+    if (fx)
+    {
+        g.setColour (Colours::black.withAlpha (0.7f)); // knurling
+        for (int i = 0; i < 30; ++i)
+        {
+            const auto ang = juce::MathConstants<float>::twoPi * (float) i / 30.0f;
+            const Point<float> d { std::sin (ang), -std::cos (ang) };
+            g.drawLine ({ c + d * capR * 0.84f, c + d * capR * 0.99f }, 0.8f);
+        }
+        g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.14f), c.x, c.y - capR * 0.6f, Colours::transparentWhite, c.x, c.y, false));
+        g.fillEllipse (cap.reduced (capR * 0.2f));
+    }
+    juce::ignoreUnused (p);
+}
+
+inline void delay3Motion (juce::Graphics& g, const Motion& m) // the jewel lamp pulses slowly
+{
+    const auto s = m.stage;
+    if (s.getWidth() < 16.0f) return;
+    const auto c = Point<float> (s.getRight() - 12.0f, s.getCentreY());
+    const auto pulse = 0.5f + 0.5f * std::sin (m.t * 2.2f);
+    if (! reduced) bloom (g, c, 12.0f, m.p.accent, 0.2f + 0.4f * pulse);
+    g.setColour (m.p.accent.interpolatedWith (Colours::white, 0.3f * pulse));
+    g.fillEllipse (Rectangle<float> (7.0f, 7.0f).withCentre (c));
+    g.setColour (Colour (0xffc9ccd1));
+    g.drawEllipse (Rectangle<float> (9.0f, 9.0f).withCentre (c), 1.0f);
+}
+
+inline const Theme& delay3Theme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Fruity Delay 3";
+        x.base = Style::vivid;
+        x.pal = { Colour (0xff1f4e63), Colour (0xff0c2430), Colour (0xffff5a4a), Colour (0xffeaf2f5), Colour (0xc81a4254), Colour (0xe00b2029),
+                  Colour (0xff6a9aac), Colour (0xfff2f8fa), Colour (0xff061117), Colour (0xff2c2c2c), Colour (0xff0b0b0b), Colour (0xff0e2a36),
+                  Colour (0xfff4f4f4), Colour (0xff163a4a) };
+        x.canvas = canvasDelay3;
+        x.sectionDeco = ridgeScrews;
+        x.titleEmblem = delay3Emblem;
+        x.drawCap = capPedal;
+        x.pointerFrom = 0.3f;
+        x.arcGlow = 0.2f;
+        x.stageRepaint = true;
+        x.paintMotion = delay3Motion;
+        return x;
+    }();
+    return t;
+}
+
+// === Fruity Delay Bank: a sorting rack of pigeonholes in warm wood, each a delay line with a brass label ==========
+
+inline void canvasDelayBank (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    if (! reduced) // wood grain: long wavy lines
+    {
+        juce::Random rnd (8);
+        for (float y = a.getY(); y < a.getBottom(); y += 5.0f + rnd.nextFloat() * 4.0f)
+        {
+            juce::Path grain;
+            grain.startNewSubPath (a.getX(), y);
+            for (float x = a.getX(); x <= a.getRight(); x += 20.0f)
+                grain.lineTo (x, y + 1.5f * std::sin (x * 0.02f + y));
+            g.setColour (Colours::black.withAlpha (0.07f + rnd.nextFloat() * 0.05f));
+            g.strokePath (grain, juce::PathStrokeType (0.8f));
+        }
+    }
+    // the pigeonholes: a grid of dark cells with brass labels
+    const auto cw = 70.0f, ch = 48.0f;
+    for (float y = a.getY() + 10.0f; y + ch < a.getBottom(); y += ch + 8.0f)
+        for (float x = a.getX() + 10.0f; x + cw < a.getRight(); x += cw + 8.0f)
+        {
+            const auto cell = Rectangle<float> (x, y, cw, ch);
+            g.setGradientFill (ColourGradient (Colours::black.withAlpha (0.28f), 0.0f, cell.getY(), Colours::black.withAlpha (0.1f), 0.0f, cell.getBottom(), false));
+            g.fillRect (cell);
+            g.setColour (p.accent.withAlpha (0.16f));
+            g.fillRoundedRectangle (Rectangle<float> (22.0f, 6.0f).withCentre ({ cell.getCentreX(), cell.getBottom() - 6.0f }), 1.0f);
+        }
+    vignette (g, a, 0.4f);
+}
+
+inline void delayBankEmblem (juce::Graphics& g, Point<float> c, float r) // four pigeonholes
+{
+    g.setColour (pal().accent);
+    for (int i = 0; i < 4; ++i)
+        g.drawRect (Rectangle<float> (r * 0.9f, r * 0.9f).withCentre (c.translated ((i % 2 == 0 ? -0.5f : 0.5f) * r, (i < 2 ? -0.5f : 0.5f) * r)), 1.0f);
+}
+
+inline const Theme& delayBankTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Fruity Delay Bank";
+        x.base = Style::hardware;
+        x.pal = { Colour (0xff3a2617), Colour (0xff150d07), Colour (0xffe0b25a), Colour (0xfff4dcb0), Colour (0xd0301f13), Colour (0xe4140c06),
+                  Colour (0xff8a6440), Colour (0xfff6e6c8), Colour (0xff0c0704), Colour (0xffe0b25a), Colour (0xff6a4a1e), Colour (0xff24170c),
+                  Colour (0xff1c1206), Colour (0xff2e1e12) };
+        x.canvas = canvasDelayBank;
+        x.titleEmblem = delayBankEmblem;
+        x.drawCap = capBrass;
+        x.arcGlow = 0.12f;
+        x.thumbPointer = true;
+        return x;
+    }();
+    return t;
+}
+
 // === the registry =================================================================================================
 
 const Theme* effectTheme (Art a)
@@ -1381,6 +2047,14 @@ const Theme* effectTheme (Art a)
         case Art::reeverb2: return &reeverb2Theme();
         case Art::luxe: return &luxeTheme();
         case Art::reeverb1: return &reeverb1Theme();
+        case Art::echoform: return &echoformTheme();
+        case Art::spiralEcho: return &spiralTheme();
+        case Art::orbit: return &orbitTheme();
+        case Art::lattice: return &latticeTheme();
+        case Art::gemini: return &geminiTheme();
+        case Art::delay2: return &delay2Theme();
+        case Art::delay3: return &delay3Theme();
+        case Art::delayBank: return &delayBankTheme();
         default: return nullptr;
     }
 }
@@ -1407,6 +2081,14 @@ Art artForEffect (EffectKind kind)
         case EffectKind::reeverb2: return Art::reeverb2;
         case EffectKind::luxeVerb: return Art::luxe;
         case EffectKind::reeverb1: return Art::reeverb1;
+        case EffectKind::echoform: return Art::echoform;
+        case EffectKind::spiralEcho: return Art::spiralEcho;
+        case EffectKind::orbit: return Art::orbit;
+        case EffectKind::latticeMod: return Art::lattice;
+        case EffectKind::geminiDoubler: return Art::gemini;
+        case EffectKind::fruityDelay2: return Art::delay2;
+        case EffectKind::fruityDelay3: return Art::delay3;
+        case EffectKind::fruityDelayBank: return Art::delayBank;
         default: return Art::none;
     }
 }

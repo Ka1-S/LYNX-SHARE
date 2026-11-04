@@ -6139,7 +6139,12 @@ private:
                                                  { "foil-plate", false, I::synth, E::foilPlate, S::hardware },  { "halo", false, I::synth, E::halo, S::neon },
                                                  { "horizon", false, I::synth, E::horizon, S::vivid },          { "fruity-reeverb-2", false, I::synth, E::reeverb2, S::hardware },
                                                  { "luxeverb", false, I::synth, E::luxeVerb, S::glow },         { "fruity-reeverb", false, I::synth, E::reeverb1, S::glow } };
+        static const std::vector<ArtPilot> fx3 { { "echoform", false, I::synth, E::echoform, S::hardware },    { "spiral-echo", false, I::synth, E::spiralEcho, S::neon },
+                                                 { "orbit", false, I::synth, E::orbit, S::neon },              { "lattice-mod", false, I::synth, E::latticeMod, S::neon },
+                                                 { "gemini-doubler", false, I::synth, E::geminiDoubler, S::vivid }, { "fruity-delay-2", false, I::synth, E::fruityDelay2, S::glow },
+                                                 { "fruity-delay-3", false, I::synth, E::fruityDelay3, S::vivid }, { "fruity-delay-bank", false, I::synth, E::fruityDelayBank, S::neon } };
         if (artSet() == "fx1") return fx1;
+        if (artSet() == "fx3") return fx3;
         if (artSet() == "fx2") return fx2;
         return list;
     }
