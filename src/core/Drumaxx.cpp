@@ -1101,6 +1101,9 @@ public:
             }
             if (! any)
             {
+                // (the DLL leaves the host's buffer as it is, zeros in FL: LYNX's own buffers are reused, so clear them)
+                std::fill (l + done, l + done + m, 0.0f);
+                std::fill (r + done, r + done + m, 0.0f);
                 for (auto& b : eqL)
                     b.reset();
                 for (auto& b : eqR)

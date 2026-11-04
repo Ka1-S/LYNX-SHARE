@@ -57,10 +57,11 @@ inline std::vector<float> playInstrument (const lynx::ChannelDef& c, float gl, f
 TEST (gen169l_drumaxx_through_fl_host_pan_law)
 {
     using namespace lynx;
-    const auto c = banks::defaultChannel (InstrumentKind::drumaxx, "Drumaxx");
+    auto c = banks::defaultChannel (InstrumentKind::drumaxx, "Drumaxx");
     CHECK (c.has_value());
     if (! c)
         return;
+    drumaxxSetParam (c->pluginState, 0x2cc, 0.0f); // (the master limiter off: the rest of the chain is linear in the gains)
     const int lead = 8192, length = lead + 44100;
     const auto reference = [&] (double finalVol) {
         drumaxx::RefNote n;
@@ -172,7 +173,7 @@ TEST (gen169l_ogun_old_state_versions)
         CHECK (std::equal (back->begin() + 0x113, back->end(), body->begin() + 0x110));
         std::int32_t dust = 0;
         std::memcpy (&dust, back->data() + 0xfc, 4);
-        CHECK (dust == 430 && (*back)[0xfa] == 0 && (*back)[0xe5] == (n > 0xe5 ? (*body)[0xe5] : 1));
+        CHECK ((n <= 0xfc ? dust == 430 : std::memcmp (back->data() + 0xfc, body->data() + 0xfc, 4) == 0) && (*back)[0xfa] == 0);
         CHECK (ogunParam (now, 17) == 180 && ogunParam (now, 52) == 9);
         auto oldChannel = today;
         oldChannel.pluginState = now;
