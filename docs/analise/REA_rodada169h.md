@@ -98,9 +98,20 @@ Clean-room: the behaviour below was read from FL Studio 2026's own `Ogun_x64.dll
   lines above the knob grid (whose captions start at y 32), one line slightly condensed on designed pages, clear of the
   sample button.
 
+## Windows checks
+
+`LYNX.exe --instrumentshot E:\lynx-work\r169h\shots ogun,autogun,flslayer fl` (fresh LYNX_PROFILE_DIR, LYNX_TEST_MODE=1,
+under the GUI lock), all at 100 / 150 / 200 %, looked at:
+- `ogun-fl-*.png` (800 × 789): the pad shows FL's 4 × 4 grid, the ring's centre on the left edge (Mod X = 0 in "300 Ft
+  Glass Bowl") with only its inner half drawn — as in `fl-ogun-x0.png`.
+- `autogun-fl-*.png` (800 × 789): FL's render-test Autogun channel ("Wide whistle 3"): the Autogun page with Magic
+  dust, Seed 1 3475, Seed 2 Random (0), the ring in the pad's lower-right corner (X high, Y low), clipped like FL.
+- `flslayer-fl-*.png` (800 × 609): the description line now fits in one line at 800 px (condensed a little) instead of
+  ending in "…".
+
 ## Where I stopped
 
-- Done: §1 code + tests (build running), §3 code, §5 code. In progress: §2 FL look (FL session), Windows shots.
-- Next: build-local green → Windows build → `--instrumentshot /mnt/e/lynx-work/r169h ogun,autogun,flslayer fl` → look →
-  commit → coord/train.sh inst169h.
-- Rerun: `~/.claude/jobs/f8789b49/tmp/r169h/bl.sh` (build-local via buildslot), Ghidra scripts in tmp/r169h/gh.
+- Done: §1–§3, §5 with tests (build-local: all Inst169h tests pass; the one other failure, Feat166d's idle-insert
+  timing, is a load-sensitive timing check unrelated to this round), Windows shots above. §4 is the sub-round's
+  (`REA_rodada169h-toxic.md`, branch feature/toxseq169h).
+- Landing: `coord/train.sh inst169h`.
