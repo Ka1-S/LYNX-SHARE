@@ -21,7 +21,7 @@ L > 1 day. Rank = impact × 1/effort, user requests first among equals.
 |---|---|---|---|---|---|---|
 | 1 | **Render several patterns at once** from the Playlist picker (Quick render / Render as audio clip / Render and replace on the picked patterns) | §2.1 [DECOMP 0x11884b0 `PSPatQuickRenderMenuClick`] | current pattern only (`renderPatternAsAudioClip`, REA_rodada168e §3.2) | M | M | **this round** |
 | 2 | **Picker multi-selection** (click / Ctrl+click / Shift+click / right-click keeps the selection) — needed by #1 | §2.2 [DECOMP 0xe4d5d0 `PickerPanelMouseDown`, 0xe4e080 `PickerPanelMouseUp`] | single click only (`PatternPicker`) | M | S | **this round** (with #1) |
-| 3 | **Plugin picker as FL's full view** (the "tab scroll" a user asked for): every plugin of the Plugin database as a tile, grouped by category | View › Plugin picker, `ShowPluginPickerAction` → FUN_00ebf510(0, -1, -10) [DECOMP 0xf1c240]; Channel menu "Open plugin picker" → same call with the channel kind [DECOMP 0x11ffcb0]; [STR] "To make a favorite plugin in the Plugin database, Plugin picker & Plugin list menus…" | a dialog with a category column and a list (`ui/PluginPicker.cpp`, round 151) | H (request) | M–L | layout needs one planned FL session (the picker is drawn at run time, no DFM: `TPlugListForm` is empty [DFM]) → §3 |
+| 3 | **Plugin picker as FL's full view** (§2.5) (the "tab scroll" a user asked for): every plugin of the Plugin database as a tile, grouped by category | View › Plugin picker, `ShowPluginPickerAction` → FUN_00ebf510(0, -1, -10) [DECOMP 0xf1c240]; Channel menu "Open plugin picker" → same call with the channel kind [DECOMP 0x11ffcb0]; [STR] "To make a favorite plugin in the Plugin database, Plugin picker & Plugin list menus…" | a dialog with a category column and a list (`ui/PluginPicker.cpp`, round 151) | H (request) | M–L | layout needs one planned FL session (the picker is drawn at run time, no DFM: `TPlugListForm` is empty [DFM]) → §3 |
 | 4 | **Step edit** (Options, Ctrl+E): with the transport stopped, played notes are typed into the Piano roll at the cursor, which advances by the snap | `OptionsStepEditAction` "Step edit" ShortCut 16453 = Ctrl+E [DFM]; handler passes the checked state to the editor object (vtable +0xb0) [DECOMP 0xf1e740]; toolbar `StepEditBtn` [DFM] | none | M–H | M | next (Piano roll owner after 169f lands) |
 | 5 | **Multilink to controllers** (Ctrl+J): move several parameters, then several controls, they link in order | `OptionsToggleMultiLinkAction` ShortCut 16458 = Ctrl+J, toolbar `MultiLinkBtn` [DFM] | "Link to controller" one at a time | M–H (controller owners) | M | next |
 | 6 | **Tools › Cancel recording**: drops this pass's recorded notes / automation / audio takes, turns record off, keeps the arming | §2.3 [DECOMP 0xf1d7e0] | none | M | S–M | this round if time |
@@ -77,6 +77,25 @@ Playback is not stopped.
 The reference is the focused channel editor's channel (or the selected channel, FUN_011e82c0); its editor position
 (+0x20 of the window record) is copied to every channel whose window record is not flagged 4 (detached); open editors
 are closed and reopened at the new place.
+
+### 2.5 Plugin picker (F8) [FL session + DFM]
+
+One FL session (both locks, FL launched once, closed by its PID; shots `C:\Users\kauan\lynx-test\r169k\p0–p7.png`):
+`ShowPluginPickerAction` "Plugin picker" ShortCut 119 = F8 [DFM]; the picker is drawn at run time (`TPlugListForm`
+has no controls in its DFM).
+
+- F8 lays a dark veil over the whole main window (FL's own UI dimmed under it) [p1].
+- **All** (the start): two halves headed "Generators" (left) and "Effects" (right); every plugin of the Plugin
+  database as a tile (its database screenshot; "Audio Clip" / "Automation Clip" as text), tiles flowing in rows [p1].
+- A tab strip along the bottom: the generator categories (Controller, Drum, MIDI, Misc, Patcher, Sampler, Synth
+  classic, Synth special, Visual), a large **All** in the middle, then the effect categories (Controller, Delay reverb,
+  Distortion, Dynamics, Filter, Flanger, Gain, Misc, Patcher, Visual); "..." at both ends [p1].
+- **Mouse wheel = one tab per notch**: 3 notches down from All → Distortion [p2], 9 → Patcher [p3]. The shown tab is
+  white and bold with a small mark above it; a category shows only its plugins, centred in a row [p2, p3].
+- **Pointing at a tab shows it**: moving the mouse onto "All" switched back from Patcher [p4 → p5].
+- F8 again closes it [p6].
+- Not measured (left as LYNX behaviour): what a click on a tile does (LYNX: adds it, like its quick-add palette),
+  dragging tiles.
 
 ## 3. LYNX work this round
 
