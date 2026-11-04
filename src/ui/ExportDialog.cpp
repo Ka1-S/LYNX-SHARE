@@ -1,6 +1,7 @@
 #include "ui/ExportDialog.h"
 
 #include "core/PlaylistOps.h"
+#include "core/PickerSelection.h"
 #include "core/QuickRender.h"
 #include "core/Mastering.h"
 #include "core/EffectPresets.h"
@@ -1264,6 +1265,100 @@ void renderPatternAsAudioClip (AudioEngine& engine, int pattern, int how)
     mode->button = tr ("Render");
     mode->onRender = go;
     showClipRenderWindow (engine, replace ? tr ("Render and replace") : tr ("Render as audio clip"), std::move (mode));
+}
+
+namespace
+{
+// FL's loop over the picked patterns (PSPatQuickRenderMenuClick FUN_011884b0, REA_rodada169k §2.1)
+struct PatternBatch
+{
+    AudioEngine* engine = nullptr;
+    std::vector<int> patterns;
+    std::vector<Song> renders;
+    std::vector<std::string> names;
+    exportopts::Options options;
+    bool replace = false;
+    int warning = 0;
+    std::vector<std::pair<int, juce::String>> done; // pattern, rendered file
+};
+
+void finishPatternBatch (const std::shared_ptr<PatternBatch>& b)
+{
+    if (! b->done.empty())
+        b->engine->editSong ([b] (Song& s) {
+            for (const auto& [pattern, file] : b->done)
+                quickrender::applyPatternRender (s, pattern, file.toStdString(), b->replace);
+        });
+    if (b->warning == 1)
+        warn (tr ("Warning"), tr ("Pattern is empty, nothing to render."));
+    else if (b->warning == 2)
+        warn (tr ("Warning"), tr ("Empty patterns were ignored."));
+}
+
+void runPatternBatch (std::shared_ptr<PatternBatch> b, std::size_t k)
+{
+    if (k >= b->patterns.size())
+    {
+        finishPatternBatch (b);
+        return;
+    }
+    const auto file = uniqueWav (renderFolder(), b->names[k]);
+    auto job = std::make_unique<ExportJob> (b->renders[k], b->options, file);
+    job->setExtraData (false);
+    (new ExportThread (std::move (job), file, [b, k, file] (bool ok) {
+        if (! ok) // cancelled or failed: FL stops the loop; what was rendered stays
+        {
+            finishPatternBatch (b);
+            return;
+        }
+        b->done.push_back ({ b->patterns[k], file.getFullPathName() });
+        runPatternBatch (b, k + 1);
+    }, tr ("Rendering pattern...")))->launchThread();
+}
+} // namespace
+
+void renderPatternsAsAudioClips (AudioEngine& engine, const std::vector<int>& patterns, int how)
+{
+    if (patterns.size() == 1)
+    {
+        renderPatternAsAudioClip (engine, patterns.front(), how);
+        return;
+    }
+    const auto& song = engine.getSong();
+    const auto plan = pickersel::planRender (patterns, [&song] (int p) { return quickrender::patternRenderable (song, p); });
+    if (plan.render.empty())
+    {
+        if (const auto w = pickersel::skippedWarning (plan); w != 0)
+            warn (tr ("Warning"), w == 1 ? tr ("Pattern is empty, nothing to render.") : tr ("Empty patterns were ignored."));
+        return;
+    }
+    engine.capturePluginStates();
+    auto batch = std::make_shared<PatternBatch>();
+    batch->engine = &engine;
+    batch->patterns = plan.render;
+    batch->replace = how == 2;
+    batch->warning = pickersel::skippedWarning (plan);
+    for (const auto p : plan.render)
+    {
+        batch->renders.push_back (quickrender::makePatternRenderSong (song, p));
+        batch->names.push_back (quickrender::patternName (song, p));
+    }
+    if (how == 1) // Quick: the last choices, no window
+    {
+        batch->options = clipRenderOptions (true);
+        runPatternBatch (batch, 0);
+        return;
+    }
+    // the window once, for the first pattern; the others follow with the same choices (FL's flag 1 after the first)
+    auto mode = std::make_shared<ClipRenderMode>();
+    mode->pattern = true;
+    mode->song = batch->renders.front();
+    mode->button = tr ("Render");
+    mode->onRender = [batch] (const exportopts::Options& o) {
+        batch->options = o;
+        runPatternBatch (batch, 0);
+    };
+    showClipRenderWindow (engine, batch->replace ? tr ("Render and replace") : tr ("Render as audio clip"), std::move (mode));
 }
 
 void exportAllPlaylistTracks (AudioEngine& engine, const juce::String& projectName, quickrender::Start start, bool groups)
