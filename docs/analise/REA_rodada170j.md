@@ -24,9 +24,28 @@ LYNX-own item (look only): no FL behaviour to prove; layouts and gestures (the p
   (real windows, screenshot handshake, process CPU per editor). Self-test: `plugin_art=` line.
 - Art directions: /mnt/e/lynx-work/tracker/plugin-art-0.1.24.md. Review page: /mnt/e/lynx-work/tracker/plugin-art/index.html.
 
+## Perf (real Windows windows, `--artgui`, process CPU % of one core over 6 s, busy machine — noisy)
+
+| editor | before (old style) | Themed, animating | Themed, motion off |
+|---|---|---|---|
+| Sakura (12 petals, 20 Hz, branch band only) | 2.1 | 5.7 (first run 23, warm-up) | 2.1–4.2 |
+| Toxic Biohazard (trefoil pulse + bubbles) | 3.1 | 3.6–8.3 | 0.8–4.4 |
+| Sytrus (Lissajous) | 3.1 | 2.1–4.2 | 0.8 (one 16 outlier) |
+| 3x Osc (scope) | 1.0 | 3.4–5.5 | 2.3–2.9 |
+| Facet EQ (no added motion; its analyser is live) | 14.6 | 13.0–25 | 15.6–33 |
+| Nebula (twinkles) | 4.7 | 3.9–5.2 | 1.6–2.1 |
+
+First version (petals over the whole page, 30 Hz, every item repainted) cost ~27 % for Sakura: fixed by (1) partial
+repaints drawing only the layout items they touch (generator page and effect panel), (2) petals confined to the
+branch's band above the controls, 20 Hz. Static art is cached (one image per size), so idle editors cost nothing extra.
+GPU: plugin editors draw with GDI (software) since round 157a, so no GPU load.
+
 ## Where I stopped
 
-- 2026-11-04 ~01:00: code written (PluginArt.inc, skin, editors, settings, i18n 14 tables, artshot/artgui, selftest);
-  syntax check running; next: Windows build, --artshot before/after, --artgui shots + CPU, review page.
-- Commands: `OUT=build-win ~/.claude/jobs/f8789b49/tmp/coord/winbuild.sh scripts/build-windows-zig.sh`, then
-  `LYNX.exe --artshot <dir> before|after`.
+- 2026-11-04 ~04:00: pilot done and pushed (feature/art170j + wip/art170j, merged with origin/main); Windows build
+  clean; self-test plugin_art=OK; shots + review page in /mnt/e/lynx-work/tracker/plugin-art/. NOT landed: waiting for
+  the user's approval relayed by the coordinator. Next: keep merging origin/main; after approval run build-local +
+  coord/train.sh art170j; then roll out art to the other plugins.
+- Commands: `OUT=build-win ~/.claude/jobs/f8789b49/tmp/coord/winbuild.sh scripts/build-windows-zig.sh`;
+  `LYNX.exe --artshot <dir> before|after`; `/mnt/e/lynx-work/art170j/artgui.sh before|after|still` under
+  `flock ~/.cache/lynx-wingui.lock`; page: `python3 -I /mnt/e/lynx-work/art170j/mkpage.py`.
