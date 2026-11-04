@@ -59,7 +59,9 @@ the menu)**, bit 3 = a parameter / controller port. In FL's own presets: paramet
 outputs `(2, 0x10000000 + k, flags 10)`. A cable (`1300`) between a controller output and a parameter input is the
 event link. **Every activated parameter input is also published as a Patcher parameter** (record `1100`: port id →
 Patcher parameter index, sparse: "8 step pattern" uses 0, 1, 2, 21…28), and the Patcher's own Surface controls are
-published from 2048 on [DATA: all 309 Patcher presets scanned; e.g. "8 step pattern": 11 links Control Surface →
+published from 2048 on. A controller's control is **one port id used twice**: a Control Surface knob k is saved as
+the parameter input `(2, k, id, flags 11)` and the output `(2, 0x10000000 + k, same id, flags 10)` — a cable from that
+id is the output, a cable to it the input [DATA: "8 step pattern", ids 1054…1114] [DATA: all 309 Patcher presets scanned; e.g. "8 step pattern": 11 links Control Surface →
 Fruity Love Philter / Fruity delay bank, 11 published inputs + 11 published Surface outputs].
 
 ### 1.4 Values [HYP, unchanged from REA_rodada141]
@@ -109,6 +111,10 @@ latest value once per block (≤ 2048 samples), as its mixer links do.
 - The mixer slot / Channel Rack menu of a Patcher: *Automate Patcher parameter ▸* with its published parameters.
 
 ### 2.4 FL import (`FlPatcher.cpp`, `FlpImport.cpp`)
+- A port id shared by a controller's input and output (§1.3) is resolved by the cable's end: the source takes the
+  output, the destination the input. Before, the importer took the first record (the input k) as the source, so every
+  Control Surface → parameter link inside an FL Patcher was dropped as "parameter output not mapped" (found by the
+  "8 step pattern" test); a Control Surface's FL output numbers now go through `flOutputToLynx` as mixer links do.
 - `PatcherPort::flags` kept; visible class-2 parameter ports become `paramIns / paramOuts` (through
   `effectParamFromFl` for built-ins). Cables from a node's parameter output now become parameter-output cables (before,
   FL's parameter index was taken as a controller output number and the cable was dropped or wired wrongly).
@@ -121,13 +127,24 @@ latest value once per block (≤ 2048 samples), as its mixer links do.
   a parameter input and a parameter output cable, the node menu and its Parameters submenu, and the `.lynx` round trip
   (`LYNX_PATCHERSHOT_SAVE`) — screenshots in `/mnt/e/lynx-work/patcher171b/`.
 
+Results: all tests pass (2,439,499 checks, 0 failures). FL's demo projects' Patchers now import **126 control cables
+(120 before)**: the 6 recovered are Control Surface links. "8 step pattern": 1 of its 11 Surface links imports (Fruity
+delay bank); the 10 to Fruity Love Philter parameters are reported "not mapped" (LYNX's Love Philter engine has no FL
+parameter map yet). Windows `--patchershot` (fresh profile, test mode): the map with the Surface knob on "2. Damping",
+"1. Room" out to the delay's "3. Tempo sync" (`loaded-insert1-slot0.png`), the node menu (`loaded-menu-node.png`) and
+the Parameters submenus with the ticks (`loaded-menu-node-{inputs,outputs}-parameters.png`); the `.lynx` round trip keeps
+the ports, the event cables and the published parameters (`shot-roundtrip.txt`: wires / published / surface / ports
+same; the effect-state differences listed there are in the splitter, delay and Peak Controller states, not from this
+round).
+
 ## 4. Left open
+- FL parameter maps for Fruity Love Philter (and other FL effects without `effectParamFromFl` entries): their event
+  links are reported, not imported.
 - *Allow threaded processing*: LYNX runs a Patcher's nodes on one thread; the item is not shown.
 - *Align ▸* (needs multi-selection in the Patcher map), *Scaling ▸*, *Compatible voice levels*.
 - *Add one* for audio ports (LYNX nodes have fixed audio ports), the per-port *Insert plugin*.
 - Parameter ports of built-in instruments (they have no parameter list yet) and of nested Patchers.
 
 ## Where I stopped
-- done: core / engine / import / save, editor menus and pins, tests written.
-- in progress: build-local + tests, Windows GUI check.
-- next: notes / reply drafts, train.sh.
+- done: everything above; tests green; Windows GUI check done (/mnt/e/lynx-work/patcher171b); notes + reply draft written.
+- next: merge origin/main, `train.sh patcher171b`, wait for LANDED.

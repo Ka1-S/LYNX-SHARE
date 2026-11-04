@@ -2452,11 +2452,20 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             doc.inputY = doc.outputY = mid;
         }
 
-        auto portOf = [&] (std::uint64_t id) -> const PatcherPort* {
+        // A port by id. FL's controller parameter ports share one id between the input (parameter k) and the output
+        // (0x10000000 + k, the same control: a Control Surface's knob is both, REA_rodada171b §1.3): a cable's source
+        // is the output, its destination the input (`input` picks; −1 = the first one).
+        auto portOf = [&] (std::uint64_t id, int input = -1) -> const PatcherPort* {
+            const PatcherPort* first = nullptr;
             for (const auto& [pid, port] : graph->ports)
                 if (pid == id)
-                    return &port;
-            return nullptr;
+                {
+                    if (input < 0 || port.node < 0 || port.input == (input == 1))
+                        return &port;
+                    if (first == nullptr)
+                        first = &port;
+                }
+            return first;
         };
         // the I/O nodes' MIDI pins as FL saved them (activated even without a cable; FL's node menu › Events, round 162)
         for (const auto& [pid, port] : graph->ports)
@@ -2469,8 +2478,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 }
         for (const auto& c : graph->cables)
         {
-            const auto* src = portOf (c.source);
-            const auto* dst = portOf (c.destination);
+            const auto* src = portOf (c.source, 0);
+            const auto* dst = portOf (c.destination, 1);
             if (src == nullptr || dst == nullptr)
                 continue;
             PatchWire w;

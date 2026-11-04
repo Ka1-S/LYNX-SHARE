@@ -374,6 +374,9 @@ TEST (patcher171b_fl_patcher_preset_with_event_links)
             std::printf ("  %s x%d\n", what.c_str(), count);
     std::printf ("  8 step pattern: %d FL event links -> %d LYNX control cables, %d active parameter inputs, %d published\n", flLinks, links, ports,
                  (int) std::count_if (doc.published.begin(), doc.published.end(), [] (const lynx::PatchParam& p) { return p.node >= 0; }));
+    // the Surface → Fruity delay bank link comes through (the Love Philter's parameters have no LYNX mapping yet); before
+    // round 171b none did: the shared port id made the importer read the Surface's input as the source
+    CHECK (links >= 1 && ports >= 1);
     // every imported cable ends on an active (shown) parameter input, and the graph runs
     for (const auto& w : doc.wires)
         if (w.kind == lynx::PatchWire::Kind::control)
