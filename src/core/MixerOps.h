@@ -54,6 +54,17 @@ int routeTo (Song& song, const std::vector<int>& sources, int to, bool only);
 // or vocoder on `to` without a side input listens to `from`. Returns how many effects now listen.
 int sidechainTo (Song& song, int from, int to);
 
+// The effects a sidechain link feeds (round 170h): LYNX's Compressor, FL's Fruity Limiter / Fruity Compressor
+// (FL users sidechain with these) and the vocoder.
+bool listensToSidechain (EffectKind kind) noexcept;
+// The one insert whose send into `to` is a sidechain link (a level-0 send, as "Sidechain to this track" makes
+// it), or -1 when there is none or more than one.
+int soleSidechainSender (const Song& song, int to);
+// Round 170h: a dynamics effect just added to `to` (slot `slot`, no side input yet) listens to the
+// sole sidechain sender — "Sidechain to this track", then add the compressor, works in that order too.
+// Returns whether it was linked.
+bool linkAddedSidechain (Song& song, int to, int slot);
+
 // Moves effect slot `from` to position `to` of the same insert (the others shift); automations follow. The rows the
 // effects showed in stay in use (the moved effect takes the row of the one it lands on).
 bool moveEffectSlot (Song& song, int track, int from, int to);

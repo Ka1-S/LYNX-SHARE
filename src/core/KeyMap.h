@@ -86,6 +86,29 @@ namespace typingpiano
 }
 int typingPianoNote (int key, int octave = typingpiano::defaultOctave, int root = 0) noexcept;
 
+// FL's "Layout" list in the same menu, from FL 2026's System/Config/Typing to piano/*.scr (written as data, named as
+// FL's files and ordered as FL's menu): FPC, Janko, Performance mode, Piano (the default), Slicex, then the scales and
+// chord maps. FL's "Layout Piano" plays more than typingPianoNote's two rows (L ; , . / [ ] = too) and locks 1 4 8 - F K '.
+namespace typingpiano
+{
+    int layoutCount() noexcept;
+    const char* layoutName (int layout) noexcept; // "" outside 0..layoutCount()-1
+    int layoutIndex (const std::string& name) noexcept; // the Piano layout for an unknown name
+    int pianoLayout() noexcept;
+    int performanceLayout() noexcept; // FL's "Layout Performance mode" (its notes launch the Playlist's clips)
+}
+// What `key` (a plain one: no Ctrl / Alt / Shift) does in `layout` while the typing keyboard is on. `taken`: the piano
+// has the key (a note, or FL's LOCK: no note, no shortcut); not taken = FL's FREE, the key stays a shortcut. `notes`:
+// FL's notes at octave 4, root C, moved by `octave` and `root` in every layout (several for the chord layouts; notes
+// outside 0..127 are dropped, the key stays taken).
+struct TypingKey
+{
+    std::vector<int> notes;
+    bool taken = false;
+};
+TypingKey typingPianoKey (int key, int octave, int root, int layout);
+std::vector<int> typingPianoNotes (int key, int octave, int root, int layout); // typingPianoKey().notes
+
 // The upper-case printable character of a key code (JUCE's getKeyCode()), or 0 for any other key. On Windows JUCE's
 // F-keys, numpad keys and arrows are VK | 0x10000: a plain towupper() of them (16-bit) gave F4 -> 'S', F1 -> 'P',
 // Numpad1 -> 'A', so the editors took them for tool letters (issue #12, found by round 165q).

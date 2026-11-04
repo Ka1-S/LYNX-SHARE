@@ -443,7 +443,7 @@ public:
     void mouseEnter (const juce::MouseEvent&) override { repaint(); }
     void mouseExit (const juce::MouseEvent&) override { repaint(); }
     static juce::PopupMenu menu (MixerStrips& strips); // also in the mixer menu's View section
-    static constexpr int width = 96;
+    static constexpr int width = 112;
 
 private:
     MixerStrips& strips;

@@ -184,9 +184,16 @@ TEST (issue24_fl_ogun_presets_in_fls_order)
         return;
     channel->mixerTrack = 3;
     channel->misc.pitchRange = 7;
-    // (FL's three "Default" presets are Ogun state version 12, which LYNX's Ogun engine doesn't read yet: the arrows
-    // pass over them; "300 Ft Glass Bowl", the new channel's own default, and "Alien Queens Lair" are version 14)
-    CHECK (! lynx::natives::withPreset (*channel, list[1].path, list[1].name, fl).has_value());
+    // (FL's three "Default" presets are Ogun state version 12: since round 169l LYNX reads them too (REA_rodada169l §4),
+    // rewritten as version 14, so the arrows stop on them like FL; "Alien Queens Lair" is version 14)
+    const auto pad = lynx::natives::withPreset (*channel, list[1].path, list[1].name, fl);
+    CHECK (pad.has_value());
+    if (pad)
+    {
+        CHECK (pad->instrument == lynx::InstrumentKind::ogun && pad->name == "Default (pad)");
+        CHECK (pad->mixerTrack == 3 && pad->misc.pitchRange == 7);
+        CHECK (! pad->pluginState.empty() && pad->pluginState[0] == 14);
+    }
     const auto next = lynx::natives::withPreset (*channel, list[4].path, list[4].name, fl);
     CHECK (next.has_value());
     if (next)

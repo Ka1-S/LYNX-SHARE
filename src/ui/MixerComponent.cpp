@@ -1515,8 +1515,8 @@ void MixerStrips::routeSelection (int t, mixerops::RouteKind kind)
                 linked += std::find (sources.begin(), sources.end(), fx.sidechain) != sources.end() ? 1 : 0;
     });
     if ((kind == K::sidechain || kind == K::sidechainOnly) && t > 0 && linked == 0)
-        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Sidechain"),
-                                                tr ("The link was made; add a compressor to this insert to use it."));
+        // (round 170h: in the hint bar, not a box — FL says nothing here; adding the compressor links it)
+        ui::postHint ({ tr ("Sidechain") + ": " + tr ("The link was made; add a compressor to this insert to use it."), {} }, 6000);
 }
 
 void MixerStrips::showSendMenu (int t)
@@ -4887,9 +4887,13 @@ void EffectsPanel::showAddMenu (int row)
                 song.mixer[(std::size_t) t].effects.push_back (std::move (fx));
                 at = (int) song.mixer[(std::size_t) t].effects.size() - 1;
             }
+            mixerops::linkAddedSidechain (song, t, at); // round 170h: the sole sidechain sender feeds a new compressor
         });
-        if (at >= 0)
-            selectedSlot = at;
+        if (at < 0)
+            return at;
+        selectedSlot = at;
+        if ((*slots())[(std::size_t) at].kind != EffectKind::plugin) // (plugins: their own window, below)
+            openEditor (at); // FL opens the effect's window when it is loaded (round 170h, fl-09)
         repaint();
         return at;
     };
@@ -5481,9 +5485,11 @@ void MixerLayoutBox::paint (juce::Graphics& g)
     theme::fillRoundRect (g, box, radius::sm, hot ? colour::bg4 : colour::bg2);
     g.setColour (hot ? colour::borderStrong : colour::border);
     g.drawRoundedRectangle (box.reduced (0.5f), radius::sm, 1.0f);
+    // round 170e: the strips icon names what the box is (it showed only "Wide")
+    icons::draw (g, Icon::mixer, box.withWidth (24.0f).withSizeKeepingCentre (14.0f, 14.0f), hot ? colour::textPrimary : colour::textSecondary);
     g.setColour (colour::accent);
     g.setFont (font (type::small, true));
-    g.drawFittedText (tr (juce::String (std::string (mixerlayout::nameOf (MixerStrips::layout)))), getLocalBounds().reduced (8, 0).withTrimmedRight (14),
+    g.drawFittedText (tr (juce::String (std::string (mixerlayout::nameOf (MixerStrips::layout)))), getLocalBounds().reduced (8, 0).withTrimmedLeft (18).withTrimmedRight (14),
                       juce::Justification::centredLeft, 1, 0.8f);
     icons::draw (g, Icon::chevronDown, box.removeFromRight (18.0f).withSizeKeepingCentre (12.0f, 12.0f), hot ? colour::textPrimary : colour::textSecondary);
 }

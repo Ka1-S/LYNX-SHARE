@@ -1731,9 +1731,17 @@ private:
     }
     double lastSignature = 0.0;
 
+    // round 170c (issue #11: "the visualiser is unstable"): the analyser lives on a fixed grid of log-spaced points
+    // over the graph's whole axis (10 Hz … 30 kHz), not one per pixel column: resizing the window no longer resets it
+    // to the floor or changes its look. Below one FFT bin per point the magnitude is interpolated between bins (no
+    // staircase in the lows), above it the band's strongest bin is kept (a tone reads its true level); then a light
+    // smoothing across neighbours and a short rise (≈ 3 frames) instead of jumping to every frame's value: no flicker.
+    static constexpr int specPoints = 480;
+    static double specHz (int i) { return minHz * std::pow (maxHz / minHz, (double) i / (double) (specPoints - 1)); }
+
     void updateSpectrum()
     {
-        const auto columns = juce::jmax (64, (int) plotArea().getWidth() / 3);
+        constexpr int columns = specPoints;
         if ((int) specPre.size() != columns)
         {
             specPre.assign ((std::size_t) columns, (float) specFloor());
@@ -1744,7 +1752,7 @@ private:
         {
             for (int i = 0; i < columns; ++i)
             {
-                const auto f = hzForX (plotArea().getX() + plotArea().getWidth() * (float) i / (float) (columns - 1));
+                const auto f = specHz (i);
                 // a mix's typical spectrum: pink-ish slope, a kick bump, a presence region, roll-off
                 const auto db = -40.0 - 9.0 * std::log2 (juce::jmax (20.0, f) / 1000.0) * 0.5 + 9.0 * std::exp (-std::pow (std::log2 (f / 60.0), 2.0))
                                 + 4.0 * std::sin (f * 0.0021) - (f > 14000.0 ? (f - 14000.0) * 0.004 : 0.0) + tiltDb (f);
@@ -1769,6 +1777,7 @@ private:
         const auto sr = displayRate();
         const bool side = tap.sideOn.load (std::memory_order_relaxed) && hasTarget(); // round 166f: the comparative target
         if ((int) specSide.size() != columns) specSide.assign ((std::size_t) columns, (float) specFloor());
+        std::vector<float> fresh ((std::size_t) columns);
         for (int which = 0; which < (side ? 3 : 2); ++which)
         {
             auto& ring = which == 0 ? tap.pre : which == 1 ? tap.post : tap.side;
@@ -1787,21 +1796,44 @@ private:
                 ++(ref ? refFrames : curFrames);
             }
             auto& out = which == 0 ? specPre : which == 1 ? specPost : specSide;
-            const auto norm = 4.0f / (float) fftSize; // Hann (coherent gain ½) and one side
+            computeSpectrumDb (fftData.data(), sr, fresh.data());
             for (int i = 0; i < columns; ++i)
             {
-                const auto f0 = hzForX (plotArea().getX() + plotArea().getWidth() * ((float) i - 0.5f) / (float) (columns - 1));
-                const auto f1 = hzForX (plotArea().getX() + plotArea().getWidth() * ((float) i + 0.5f) / (float) (columns - 1));
-                auto k0 = (int) std::floor (f0 * fftSize / sr), k1 = (int) std::ceil (f1 * fftSize / sr);
-                k0 = juce::jlimit (1, fftSize / 2 - 1, k0);
-                k1 = juce::jlimit (k0, fftSize / 2 - 1, k1);
-                float m = 0.0f;
-                for (int k = k0; k <= k1; ++k) m = juce::jmax (m, fftData[(std::size_t) k]);
-                const auto f = hzForX (plotArea().getX() + plotArea().getWidth() * (float) i / (float) (columns - 1));
-                const auto db = (float) (20.0 * std::log10 (m * norm + 1e-9) + tiltDb (f));
+                // neighbours smoothed (¼ ½ ¼ in dB), then a short rise and the analyser speed's fall
+                const auto db = 0.25f * fresh[(std::size_t) juce::jmax (0, i - 1)] + 0.5f * fresh[(std::size_t) i]
+                                + 0.25f * fresh[(std::size_t) juce::jmin (columns - 1, i + 1)];
                 auto& v = out[(std::size_t) i];
-                v = db > v ? db : juce::jmax (db, v - fallPerFrame()); // fast up, falling at the analyser speed
+                v = db > v ? v + (db - v) * 0.6f : juce::jmax (db, v - fallPerFrame());
             }
+        }
+    }
+
+    // one frame's spectrum (dBFS, a full-scale sine = 0 dB, tilted) on the fixed grid, from FFT magnitudes
+    void computeSpectrumDb (const float* magnitudes, double sr, float* out) const
+    {
+        const auto norm = 4.0f / (float) fftSize; // Hann (coherent gain ½) and one side
+        const auto binHz = sr / (double) fftSize;
+        const auto ratio = std::pow (maxHz / minHz, 0.5 / (double) (specPoints - 1)); // half a point's width
+        for (int i = 0; i < specPoints; ++i)
+        {
+            const auto f = specHz (i);
+            float m = 0.0f;
+            if (f >= sr * 0.5) m = 0.0f;
+            else
+            {
+                const auto k0 = f / ratio / binHz, k1 = f * ratio / binHz;
+                if (std::floor (k1) <= std::ceil (k0)) // narrower than a bin: interpolate between the two around f
+                {
+                    const auto k = juce::jlimit (0.0, (double) (fftSize / 2 - 2), f / binHz);
+                    const auto lo = (int) k;
+                    const auto t = (float) (k - lo);
+                    m = magnitudes[lo] + (magnitudes[lo + 1] - magnitudes[lo]) * t;
+                }
+                else
+                    for (int k = juce::jlimit (1, fftSize / 2 - 1, (int) std::ceil (k0)); k <= juce::jlimit (1, fftSize / 2 - 1, (int) std::floor (k1)); ++k)
+                        m = juce::jmax (m, magnitudes[k]);
+            }
+            out[i] = (float) (20.0 * std::log10 (m * norm + 1e-9) + tiltDb (f));
         }
     }
 
