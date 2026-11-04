@@ -41,7 +41,17 @@ juce::String categoryText (const std::string& c)
     return tr (u8 (c));
 }
 
-juce::Colour accentColour() { return skin::colour::azure; } // (sampler-like generators: azure)
+// round 170j: the page has art of its own ("a sound library", ui/PluginArtGenerators.inc): Themed unless a style is forced
+skin::Style pageStyle() { return skin::resolve (skin::Style::themed, skin::Art::soundFont); }
+juce::Colour accentColour() // (sampler-like generators: azure; the art's own light when Themed)
+{
+    return pageStyle() == skin::Style::themed ? skin::artAccent (skin::Art::soundFont) : skin::colour::azure;
+}
+// every part of the page paints in the page's style (the knobs, toggles and selectors are child components)
+struct PageScope
+{
+    skin::StyleScope scope { pageStyle(), skin::Art::soundFont };
+};
 
 // What the editor edits: a Channel Rack channel, or a LYNX Soundfont node inside a Patcher (round 165c: found through
 // `locate`, channel −1 — no automation target, the preview note is rendered off-line instead of played on a channel)
@@ -141,6 +151,7 @@ public:
 
     void paint (juce::Graphics& g) override
     {
+        const PageScope pageScope;
         const auto s = spec();
         auto area = getLocalBounds().toFloat();
         const auto caption = area.removeFromBottom (13.0f);
@@ -218,6 +229,7 @@ public:
     }
     void paint (juce::Graphics& g) override
     {
+        const PageScope pageScope;
         const auto on = paramOf (engine, channel, param) >= 0.5f;
         auto r = getLocalBounds().toFloat();
         skin::switchPill (g, r.removeFromLeft (26.0f).withSizeKeepingCentre (24.0f, 13.0f), on, accentColour(), true);
@@ -250,6 +262,7 @@ public:
     }
     void paint (juce::Graphics& g) override
     {
+        const PageScope pageScope;
         auto r = getLocalBounds().toFloat();
         const auto cap = r.removeFromTop (12.0f);
         g.setColour (skin::captionColour());
@@ -588,6 +601,7 @@ public:
 
     void paint (juce::Graphics& g) override
     {
+        const PageScope pageScope;
         const auto accent = accentColour();
         skin::canvas (g, getLocalBounds().toFloat(), accent);
         // title + description line

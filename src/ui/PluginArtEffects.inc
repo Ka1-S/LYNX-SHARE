@@ -1068,6 +1068,7 @@ inline const Theme& haloTheme()
         x.sway = 3.0f;
         x.reach = 2.0f;
         x.paintMotion = haloMotion;
+        x.hz = 15; // round 170k: slow motion, fewer frames
         return x;
     }();
     return t;
@@ -1470,6 +1471,7 @@ inline const Theme& echoformTheme()
         x.thumbPointer = true;
         x.stageRepaint = true;
         x.paintMotion = echoformMotion;
+        x.hz = 12; // round 170k: slow motion, fewer frames
         return x;
     }();
     return t;
@@ -1627,6 +1629,7 @@ inline const Theme& orbitTheme()
         x.pointer = Pointer::electron;
         x.stageRepaint = true;
         x.paintMotion = orbitMotion;
+        x.hz = 12; // round 170k: slow motion, fewer frames
         return x;
     }();
     return t;
@@ -1966,6 +1969,7 @@ inline const Theme& delay3Theme()
         x.arcGlow = 0.2f;
         x.stageRepaint = true;
         x.paintMotion = delay3Motion;
+        x.hz = 10; // round 170k: slow motion, fewer frames
         return x;
     }();
     return t;
@@ -2825,6 +2829,7 @@ inline const Theme& hyperChorusTheme()
         x.arcGlow = 0.35f;
         x.stageRepaint = true;
         x.paintMotion = hyperChorusMotion;
+        x.hz = 12; // round 170k: slow motion, fewer frames
         return x;
     }();
     return t;
@@ -3120,6 +3125,7 @@ inline const Theme& vintagePhaserTheme()
         x.arcGlow = 0.0f;
         x.stageRepaint = true;
         x.paintMotion = vintagePhaserMotion;
+        x.hz = 12; // round 170k: slow motion, fewer frames
         return x;
     }();
     return t;
@@ -3796,6 +3802,7 @@ inline const Theme& grossBeatTheme()
         x.arcGlow = 0.3f;
         x.stageRepaint = true;
         x.paintMotion = grossBeatMotion;
+        x.hz = 12; // round 170k: slow motion, fewer frames
         return x;
     }();
     return t;

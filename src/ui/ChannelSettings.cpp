@@ -190,6 +190,9 @@ private:
     {
         s.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
         s.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 16);
+        // round 170j: the plugin kit's knobs in LYNX Synth's own art ("the LYNX lab"), or the forced plugin style
+        s.getProperties().set (skin::sliderProperty, (juce::int64) skin::artAccent (skin::Art::lynxSynth).getARGB());
+        s.getProperties().set (skin::styleProperty, skin::packStyle (skin::Style::themed, skin::Art::lynxSynth));
         s.setRange (lo, hi, step);
         s.setTextValueSuffix (suffix);
         s.onValueChange = [this] {
@@ -327,6 +330,9 @@ private:
     {
         s.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
         s.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 16);
+        // round 170j: the plugin kit's knobs in LYNX Synth's own art ("the LYNX lab"), or the forced plugin style
+        s.getProperties().set (skin::sliderProperty, (juce::int64) skin::artAccent (skin::Art::lynxSynth).getARGB());
+        s.getProperties().set (skin::styleProperty, skin::packStyle (skin::Style::themed, skin::Art::lynxSynth));
         s.setRange (lo, hi, step);
         s.setTextValueSuffix (suffix);
         s.onValueChange = [this] { changed(); };
@@ -3348,6 +3354,12 @@ public:
 
     int getChannel() const noexcept { return ref.index; }
 
+    void paint (juce::Graphics& g) override // round 170j: the art's canvas behind the controls
+    {
+        const skin::StyleScope styleScope (skin::resolve (skin::Style::themed, skin::Art::lynxSynth), skin::Art::lynxSynth);
+        skin::canvas (g, getLocalBounds().toFloat(), skin::artAccent (skin::Art::lynxSynth));
+    }
+
     void resized() override
     {
         auto area = getLocalBounds().reduced (10);
@@ -3498,6 +3510,9 @@ private:
     {
         s.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
         s.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 16);
+        // round 170j: the plugin kit's knobs in LYNX Synth's own art ("the LYNX lab"), or the forced plugin style
+        s.getProperties().set (skin::sliderProperty, (juce::int64) skin::artAccent (skin::Art::lynxSynth).getARGB());
+        s.getProperties().set (skin::styleProperty, skin::packStyle (skin::Style::themed, skin::Art::lynxSynth));
         s.setRange (lo, hi, step);
         s.setTextValueSuffix (suffix);
         s.onValueChange = [this] { apply(); };

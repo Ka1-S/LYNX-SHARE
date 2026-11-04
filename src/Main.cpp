@@ -6149,9 +6149,12 @@ private:
             auto slug = [] (lynx::skin::Art a) {
                 return juce::String (lynx::skin::artName (a)).toLowerCase().replaceCharacters (" ", "-").removeCharacters ("!.()'").toStdString();
             };
-            for (const auto& e : lynx::natives::instrumentEngines())
+            for (const auto& e : lynx::natives::instrumentEngines()) // (the engines' order first)
                 if (const auto a = lynx::skin::artForInstrument (e.kind); a != lynx::skin::Art::none)
                     all.push_back ({ slug (a), true, e.kind, E::reverb, lynx::skin::Style::neon });
+            for (int k = 0; k <= (int) I::wavetraveller; ++k) // then every other kind with art (DrumSynth, Autogun, Wasp...)
+                if (const auto a = lynx::skin::artForInstrument ((I) k); a != lynx::skin::Art::none)
+                    all.push_back ({ slug (a), true, (I) k, E::reverb, lynx::skin::Style::neon });
             for (int k = 0; k <= (int) lynx::lastEffectKind; ++k)
                 if (const auto a = lynx::skin::artForEffect ((E) k); a != lynx::skin::Art::none)
                     all.push_back ({ slug (a), false, I::synth, (E) k, lynx::skin::plainStyleFor (k) });
@@ -6181,7 +6184,18 @@ private:
                     song.channels.push_back (*channel);
                     break;
                 }
-            if (song.channels.empty()) return nullptr;
+            if (song.channels.empty()) // a kind without an engine entry: its LYNX default, else an empty channel of that kind
+            {
+                const std::string name = lynx::skin::artName (lynx::skin::artForInstrument (p.instrumentKind));
+                auto channel = lynx::banks::defaultChannel (p.instrumentKind, name);
+                if (! channel)
+                {
+                    channel = lynx::ChannelDef {};
+                    channel->instrument = p.instrumentKind;
+                    channel->name = name;
+                }
+                song.channels.push_back (*channel);
+            }
             song.patterns.emplace_back();
         }
         else
