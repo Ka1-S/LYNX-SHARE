@@ -34,9 +34,11 @@ Ctrl+H Stop sound and Ctrl+N Save new version (user decisions), rack items (170a
   Parametric EQ added to Insert 6 opens its window (v-05); Piano roll Ctrl+A, Ctrl+B copies a note one whole bar later
   at the same offset (v-07); export ends with "Export complete: path" + "Peak: -3.0 dBFS" in the hint bar, no box,
   foreground on LYNX (v-10). Desktop clean after close (v-12).
-- In progress: merge train (tmp/r170h/train1.log).
-- Next: house (124) and lo-fi (85) sessions: audio loops from the Browser, stems / MP3 export, swing,
-  sidechain compressor set-up, save/reopen.
+- House 124 session (h-*): BPM, swing wheel, chord + stretch + Ctrl+B/transpose, sidechain, stems MP3, save/reopen.
+  Batch 3 (sidechain in either order) built, tests 1963872 checks / 0 failures, GUI-verified s-02 (hint, no box)
+  and s-03 ("Compressor <- Insert 1" right after adding it).
+- In progress: merge train (tmp/r170h/train1.log) — the queued feature/wfqa170h includes batch 3.
+- Next: lo-fi (85) session (audio loops from the Browser, time-stretch), Save/Open dialogs at the screen's top-left (logged S3).
 - Rerun: `ZIG_GLOBAL_CACHE_DIR=~/.cache/zig-wfqa170h-local ZIG_LOCAL_CACHE_DIR=~/.cache/zig-wfqa170h-local coord/buildslot.sh scripts/build-local.sh`;
   `OUT=build-win-wfqa170h coord/winbuild.sh scripts/build-windows-zig.sh`; GUI helpers tmp/r170h/g.sh
   (driver key names are UPPERCASE, e.g. `key CTRL+B`; ABNT2 keyboard: `key BSL` = backslash, `key SHIFT+SLASH` = colon).
