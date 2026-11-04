@@ -1637,14 +1637,19 @@ public:
                         if (auto* kx = knobFor (item.param); kx != nullptr)
                             if (auto* ky = knobFor (item.param2); ky != nullptr)
                             {
-                                g.setColour (colour::gridBeat);
-                                g.drawVerticalLine ((int) r.getCentreX(), r.getY(), r.getBottom());
-                                g.drawHorizontalLine ((int) r.getCentreY(), r.getX(), r.getRight());
+                                // FL's Ogun pad (TQuickXYZ, round 169h shots fl-ogun-*.png): a 4 × 4 grid and a small ring
+                                // whose centre is the value, drawn clipped to the pad — at X = 0 only its inner half shows
+                                const juce::Graphics::ScopedSaveState clip (g);
+                                g.reduceClipRegion (r.toNearestInt());
+                                for (int k = 1; k < 4; ++k)
+                                {
+                                    g.setColour (k == 2 ? colour::gridBar : colour::gridBeat);
+                                    g.drawVerticalLine ((int) (r.getX() + r.getWidth() * (float) k / 4.0f), r.getY(), r.getBottom());
+                                    g.drawHorizontalLine ((int) (r.getY() + r.getHeight() * (float) k / 4.0f), r.getX(), r.getRight());
+                                }
                                 const juce::Point<float> pt { r.getX() + r.getWidth() * normalised (*kx), r.getBottom() - r.getHeight() * normalised (*ky) };
-                                g.setColour (accent.withAlpha (0.3f));
-                                g.fillEllipse (juce::Rectangle<float> (16.0f * f, 16.0f * f).withCentre (pt));
                                 g.setColour (accent);
-                                g.drawEllipse (juce::Rectangle<float> (10.0f * f, 10.0f * f).withCentre (pt), 2.0f);
+                                g.drawEllipse (juce::Rectangle<float> (10.0f * f, 10.0f * f).withCentre (pt), juce::jmax (1.5f, 1.5f * f));
                             }
                     if (juce::String (item.display) == "toxicwave" && item.param != nullptr) // round 168n: the wave's cycle
                     {
@@ -2002,7 +2007,7 @@ public:
         g.setColour (theme::colour::textPrimary);
         g.setFont (theme::font (layout != nullptr ? theme::type::body : theme::type::title));
         if (! engineFilesMissing)
-            g.drawText (drumsynth ? tr ("DrumSynth Live — FL's engine, patch on key {0}", { juce::String (editorKey) })
+            g.drawFittedText (drumsynth ? tr ("DrumSynth Live — FL's engine, patch on key {0}", { juce::String (editorKey) })
                                         + (wavesFound ? tr (" (next hit; recorded waves from your FL installation)")
                                                       : tr (" (next hit; recorded waves not found: silent)"))
                         : harmless ? tr ("Harmless — FL's additive engine (chorus/delay/reverb/compressor rack off)")
@@ -2035,7 +2040,7 @@ public:
                         : boobass ? tr ("BooBass — FL's engine, its sound read from your FL installation (knobs: 3-band EQ)")
                         : sakura ? tr ("Sakura — physical strings (FL's engine; new parameters apply to the next note)")
                                  : tr ("Drumpad — physical drum (FL's engine; new parameters apply to the next hit)"),
-                        10, 6, getWidth() - 20, 20, juce::Justification::centredLeft);
+                              descriptionArea(), juce::Justification::centredLeft, layout != nullptr ? 1 : 2, 0.8f);
         if (engineFilesMissing) // round 168q: an engine that runs FL's own DLL / data file, which this computer lacks
         {
             const auto band = juce::Rectangle<float> (8.0f, 5.0f, (float) getWidth() - 16.0f, 22.0f);
@@ -2054,6 +2059,14 @@ public:
         g.setFont (theme::font (theme::type::small));
         for (const auto& k : knobs)
             g.drawText (k->getName(), k->getBounds().withHeight (14).translated (0, -14), juce::Justification::centred);
+    }
+
+    // the engine's one-line description at the top (round 169h: wrapped to a second line above the knob grid, or shrunk a
+    // little on a designed page, instead of cut with "…" in a narrow window); clear of the sample button
+    juce::Rectangle<int> descriptionArea() const
+    {
+        const auto right = sampleButton.isVisible() ? getWidth() - 136 : getWidth() - 10;
+        return { 10, layout != nullptr ? 6 : 2, juce::jmax (40, right - 10), layout != nullptr ? 20 : 30 }; // (the knob grid's captions start at y 32)
     }
 
     void resized() override

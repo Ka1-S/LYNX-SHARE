@@ -6044,6 +6044,12 @@ private:
         juce::StringArray wanted;
         wanted.addTokens (which, ",", "");
         auto ok = true;
+        struct Shot
+        {
+            juce::String name;
+            std::optional<lynx::ChannelDef> channel;
+        };
+        std::vector<Shot> shots;
         for (const auto& e : lynx::natives::instrumentEngines())
         {
             const auto name = key (e.name);
@@ -6058,6 +6064,23 @@ private:
                 ok = false;
                 continue;
             }
+            shots.push_back ({ name, std::move (channel) });
+        }
+        // Autogun (round 169h): not in the Add menus (no preset files); FL's own render-test channel, either source
+        if (wanted.contains ("autogun"))
+        {
+            if (auto channel = lynx::natives::autogunShotChannel (lynx::flStudioAccess()))
+                shots.push_back ({ "autogun", std::move (channel) });
+            else
+            {
+                std::fprintf (stderr, "Autogun: no channel (FL Studio's Render tests\\Autogun.flp)\n");
+                ok = false;
+            }
+        }
+        for (auto& shot : shots)
+        {
+            const auto& name = shot.name;
+            auto& channel = shot.channel;
             lynx::AudioEngine offline (false);
             lynx::Song song;
             song.mixer = lynx::Song::defaultMixer (2);
