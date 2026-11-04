@@ -3423,7 +3423,7 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
     juce::PopupMenu menu;
     ui::addItemHeader (menu, tr ("Playlist track"), ! info.name.empty() ? juce::String::fromUTF8 (info.name.c_str()) : tr ("Track {0}", { juce::String (track + 1) }),
                        info.colour != 0 ? juce::Colour (info.colour) : juce::Colour());
-    menu.addItem (tr ("Rename and color..."), [this, track] { renameTrack (track); });
+    menu.addItem (theme::mnemonic (tr ("Rename and color..."), 'R'), [this, track] { renameTrack (track); });
     menu.addSubMenu (tr ("Change color"), ui::colourMenu (info.colour, [this, track] (std::uint32_t colour) {
                          editTrack (track, [colour] (PlaylistTrack& t) { t.colour = colour; });
                      }, juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1)));
@@ -3439,7 +3439,7 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         });
     });
     // FL's "Auto name" (EEPLTrackAutoNameMenuClick → FUN_012ef490, round 168f): the name and colour of what the track plays most
-    menu.addItem (tr ("Auto name"), [this, tracks = tracksForMenu (track)] {
+    menu.addItem (theme::mnemonic (tr ("Auto name"), 'A'), [this, tracks = tracksForMenu (track)] {
         engine.editSong ([tracks] (Song& s) {
             for (const auto t : tracks)
                 pltracks::autoName (s, t);
@@ -3458,9 +3458,9 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         // FL's "Track mode" (round 146a): unassigned, an audio track (linked to a free mixer track) or an instrument
         // track (a channel and its mixer track)
         juce::PopupMenu modes, instruments;
-        modes.addItem (tr ("Unassigned"), true, info.mode == PlaylistTrackMode::unassigned,
+        modes.addItem (theme::mnemonic (tr ("Unassigned"), 'U'), true, info.mode == PlaylistTrackMode::unassigned,
                        [this, track] { engine.editSong ([track] (Song& s) { trackmodes::unassign (s, track); }); });
-        modes.addItem (tr ("Audio track"), true, info.mode == PlaylistTrackMode::audio, [this, track] {
+        modes.addItem (theme::mnemonic (tr ("Audio track"), 'A'), true, info.mode == PlaylistTrackMode::audio, [this, track] {
             bool ok = false;
             engine.editSong ([track, &ok] (Song& s) { ok = trackmodes::makeAudioTrack (s, track); });
             if (! ok)
@@ -3481,8 +3481,8 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
                                                                                  tr ("There are no available mixer tracks."));
                                  });
         }
-        modes.addSubMenu (tr ("Instrument track"), instruments, instruments.getNumItems() > 0, nullptr, info.mode == PlaylistTrackMode::instrument);
-        menu.addSubMenu (tr ("Track mode"), modes);
+        modes.addSubMenu (theme::mnemonic (tr ("Instrument track"), 'I'), instruments, instruments.getNumItems() > 0, nullptr, info.mode == PlaylistTrackMode::instrument);
+        menu.addSubMenu (theme::mnemonic (tr ("Track mode"), 'T'), modes);
     }
     {
         // FL's "Performance settings" (round 165m [DFM]): how the track's clips in the performance zone launch and play
@@ -3523,7 +3523,7 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         perfMenu.addSectionHeader (tr ("Position sync"));
         for (const auto& [value, text] : syncs)
             perfMenu.addItem (tr (text), true, p.positionSync == value, [set, value = value] { set ([value] (P& x) { x.positionSync = value; }); });
-        menu.addSubMenu (tr ("Performance settings"), perfMenu);
+        menu.addSubMenu (theme::mnemonic (tr ("Performance settings"), 'P'), perfMenu);
     }
     menu.addSeparator();
     {
@@ -3544,10 +3544,10 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         }
         size.addSeparator();
         size.addSubMenu (tr ("Every track"), all);
-        menu.addSubMenu (tr ("Size"), size);
+        menu.addSubMenu (theme::mnemonic (tr ("Size"), 'S'), size);
     }
     // FL's "Lock to this size" (EEPLTrackLockMenuClick 0x1228cb0, round 168f): the row keeps the height it has now
-    menu.addItem (tr ("Lock to this size"), true, info.lockedHeight > 0, [this, track, tracks = tracksForMenu (track)] {
+    menu.addItem (theme::mnemonic (tr ("Lock to this size"), 'L'), true, info.lockedHeight > 0, [this, track, tracks = tracksForMenu (track)] {
         const auto shown = heightOf (track);
         engine.editSong ([tracks, shown] (Song& s) { pltracks::toggleSizeLock (s, tracks, shown); });
         refreshTrackLayout();
@@ -3559,10 +3559,10 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         const auto header = noteedit::groupHeaderOf (song, track);
         const auto member = info.grouped && track > 0;
         const auto folded = header >= 0 && header < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) header].collapsed;
-        menu.addItem (tr ("Group with above track"), track > 0 && ! member, member, [this, track] {
+        menu.addItem (theme::mnemonic (tr ("Group with above track"), 'G'), track > 0 && ! member, member, [this, track] {
             engine.editSong ([track] (Song& s) { noteedit::groupWithAbove (s, track); });
         });
-        menu.addItem (tr ("Ungroup"), member, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::ungroupTrack (s, track); }); });
+        menu.addItem (theme::mnemonic (tr ("Ungroup"), 'n'), member, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::ungroupTrack (s, track); }); });
         menu.addItem (tr ("Auto color group"), header >= 0, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::colourGroup (s, track); }); });
         menu.addItem (tr ("Collapse grouped tracks"), header >= 0, folded, [this, track, folded] {
             engine.editSong ([track, folded] (Song& s) { noteedit::setGroupCollapsed (s, track, ! folded); });
@@ -3614,9 +3614,9 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         {
             // FL's "Consolidate track(s)" (round 146a): the track's clips rendered into one audio clip
             juce::PopupMenu consolidate;
-            consolidate.addItem (tr ("From track start"), hasClips, false, [this, track] { consolidatePlaylistTrack (engine, track, false); });
-            consolidate.addItem (tr ("From song start"), hasClips, false, [this, track] { consolidatePlaylistTrack (engine, track, true); });
-            menu.addSubMenu (tr ("Consolidate track"), consolidate, hasClips);
+            consolidate.addItem (theme::mnemonic (tr ("From track start"), 'F'), hasClips, false, [this, track] { consolidatePlaylistTrack (engine, track, false); });
+            consolidate.addItem (theme::mnemonic (tr ("From song start"), 's'), hasClips, false, [this, track] { consolidatePlaylistTrack (engine, track, true); });
+            menu.addSubMenu (theme::mnemonic (tr ("Consolidate track"), 'o'), consolidate, hasClips);
         }
         menu.addItem (tr ("Merge clips"), hasClips, false, [this, track] {
             setSelection ({});
@@ -3634,18 +3634,18 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         menu.addItem (tr ("Unmute all clips"), hasClips, false, [muteAll] { muteAll (false); });
     }
     menu.addSeparator();
-    menu.addItem (tr ("Insert one"), [this, track] {
+    menu.addItem (theme::mnemonic (tr ("Insert one"), 'I'), [this, track] {
         setSelection ({});
         engine.editSong ([track] (Song& s) { noteedit::insertTrack (s, track); });
     });
-    menu.addItem (tr ("Clone..."), [this, track] { cloneTracksWithDialog (tracksForMenu (track)); });
-    menu.addItem (tr ("Delete"), [this, track] {
+    menu.addItem (theme::mnemonic (tr ("Clone..."), 'o'), [this, track] { cloneTracksWithDialog (tracksForMenu (track)); });
+    menu.addItem (theme::mnemonic (tr ("Delete"), 'e'), [this, track] {
         setSelection ({});
         engine.editSong ([track] (Song& s) { noteedit::removeTrack (s, track); });
     });
     menu.addSeparator();
-    menu.addItem (tr ("Move up"), track > 0, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::swapTracks (s, track, track - 1); }); });
-    menu.addItem (tr ("Move down"), track + 1 < count, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::swapTracks (s, track, track + 1); }); });
+    menu.addItem (theme::mnemonic (tr ("Move up"), 'u'), track > 0, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::swapTracks (s, track, track - 1); }); });
+    menu.addItem (theme::mnemonic (tr ("Move down"), 'd'), track + 1 < count, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::swapTracks (s, track, track + 1); }); });
     return menu;
 }
 
@@ -3980,9 +3980,9 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
     });
 
     if (clip.kind == ClipKind::pattern && onRenamePattern)
-        menu.addItem (tr ("Rename and color..."), [this, p = clip.pattern] { onRenamePattern (p); });
+        menu.addItem (theme::mnemonic (tr ("Rename and color..."), 'R'), [this, p = clip.pattern] { onRenamePattern (p); });
     else if (clip.kind == ClipKind::audio)
-        menu.addItem (tr ("Rename and color..."), [this, ch = clip.channel] {
+        menu.addItem (theme::mnemonic (tr ("Rename and color..."), 'R'), [this, ch = clip.channel] {
             const auto& c = engine.getSong().channels[(std::size_t) ch];
             showNameAndColourDialog (tr ("Rename audio clip"), juce::String::fromUTF8 (c.name.c_str()), c.colour,
                                      [this, ch] (const juce::String& name, std::uint32_t colour) {
@@ -4291,17 +4291,17 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
                     s.playlist[(std::size_t) i].muted = m;
         });
     });
-    menu.addItem (tr ("Cut") + "\tCtrl+X", [this, targets] {
+    menu.addItem (theme::mnemonic (tr ("Cut"), 't') + "\tCtrl+X", [this, targets] {
         setSelection (targets);
         copySelection();
         deleteSelection();
     });
-    menu.addItem (tr ("Copy") + "\tCtrl+C", [this, targets] {
+    menu.addItem (theme::mnemonic (tr ("Copy"), 'C') + "\tCtrl+C", [this, targets] {
         setSelection (targets);
         copySelection();
     });
-    menu.addItem (tr ("Paste here") + "\tCtrl+V", ! clipboard.empty(), false, [this, at = snap (xToTick (mouseX), true)] { pasteClips (at); });
-    menu.addItem ((many ? tr ("Delete selected") : tr ("Delete")) + "\tDel", [this, targets] {
+    menu.addItem (theme::mnemonic (tr ("Paste here"), 'P') + "\tCtrl+V", ! clipboard.empty(), false, [this, at = snap (xToTick (mouseX), true)] { pasteClips (at); });
+    menu.addItem (theme::mnemonic (many ? tr ("Delete selected") : tr ("Delete"), 'D') + "\tDel", [this, targets] {
         setSelection (targets);
         deleteSelection();
     });

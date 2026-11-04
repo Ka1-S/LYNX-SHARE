@@ -46,6 +46,10 @@
 #    the WM frame around one of our windows) dismissed every open popup menu, meant for "the title bar is being
 #    dragged". KWin also sends it when it only restacks or re-sends a frame (with an undocked panel: while a menu of the
 #    main window opens), so the menu closed at once. Only a window that really moved or changed size dismisses now.
+# 12. Every platform, juce_PopupMenu.cpp (round 170a): menu accelerator letters like FL's ('&' letters, e.g. D = Delete).
+#    An item whose text has the mark U+0001 before a character (core/MenuMnemonic.h) is picked by typing that key
+#    while the menu is open: the only enabled item with that key runs (a submenu opens, its first item highlighted);
+#    when several items share the key, each press highlights the next of them (Return runs it), as Windows menus do.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -105,6 +109,12 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("menu kept while the mouse is over LYNX" "LYNX patch (issue #45): the mouse over"
             "    bool doesAnyJuceCompHaveFocus()|NL|    {|NL|"
             "    bool doesAnyJuceCompHaveFocus()|NL|    {|NL|       #if JUCE_LINUX || JUCE_BSD|NL|        // LYNX patch (issue #45): the mouse over one of our windows = still ours (X focus moving between them)|NL|        {|NL|            const auto mousePos = Desktop::getInstance().getMainMouseSource().getScreenPosition();|NL||NL|            for (int i = ComponentPeer::getNumPeers(); --i >= 0;)|NL|            {|NL|                auto& comp = ComponentPeer::getPeer (i)->getComponent();|NL||NL|                if (comp.isShowing() && comp.getLocalBounds().toFloat().contains (comp.getLocalPoint (nullptr, mousePos)))|NL|                    return true;|NL|            }|NL|        }|NL|       #endif|NL||NL|")
+        lynx_juce_fix("menu accelerator letters" "LYNX patch (round 170a): menu accelerator letters"
+            "    bool keyPressed (const KeyPress& key) override|NL|    {|NL|        if (key.isKeyCode (KeyPress::downKey))"
+            "    // LYNX patch (round 170a): menu accelerator letters (core/MenuMnemonic.h marks the letter with U+0001)|NL|    bool lynxMenuMnemonic (const KeyPress& key)|NL|    {|NL|        const auto mods = key.getModifiers();|NL|        const auto typed = CharacterFunctions::toLowerCase (key.getTextCharacter());|NL|        if (typed <= 32 || mods.isCtrlDown() || mods.isCommandDown() || mods.isAltDown())|NL|            return false;|NL||NL|        Array<ItemComponent*> matches;|NL|        for (auto* child : items)|NL|        {|NL|            const auto& text = child->item.text;|NL|            const auto at = text.indexOfChar ((juce_wchar) 1);|NL|            if (at >= 0 && CharacterFunctions::toLowerCase (text[at + 1]) == typed|NL|                && (canBeTriggered (child->item) || hasActiveSubMenu (child->item)))|NL|                matches.add (child);|NL|        }|NL||NL|        if (matches.isEmpty())|NL|            return false;|NL||NL|        disableTimerUntilMouseMoves();|NL||NL|        if (matches.size() > 1)|NL|        {|NL|            setCurrentlyHighlightedChild (matches[(matches.indexOf (currentChild.getComponent()) + 1) % matches.size()]);|NL|            return true;|NL|        }|NL||NL|        auto* only = matches.getFirst();|NL|        setCurrentlyHighlightedChild (only);|NL||NL|        if (hasActiveSubMenu (only->item))|NL|        {|NL|            if (showSubMenuFor (only) && isSubMenuVisible())|NL|                activeSubMenu->selectNextItem (MenuSelectionDirection::current);|NL|        }|NL|        else|NL|        {|NL|            triggerCurrentlyHighlightedItem();|NL|        }|NL||NL|        return true;|NL|    }|NL||NL|    bool keyPressed (const KeyPress& key) override|NL|    {|NL|        if (key.isKeyCode (KeyPress::downKey))")
+        lynx_juce_fix("menu accelerator keys" "LYNX patch (round 170a): accelerator letters"
+            "            dismissMenu (nullptr);|NL|        }|NL|        else|NL|        {|NL|            return false;|NL|        }"
+            "            dismissMenu (nullptr);|NL|        }|NL|        else if (! lynxMenuMnemonic (key)) // LYNX patch (round 170a): accelerator letters|NL|        {|NL|            return false;|NL|        }")
     elseif(file MATCHES "juce_Windowing_linux.cpp$")
         lynx_juce_fix("no X focus for menu windows" "LYNX patch (issue #45): never takes the X focus"
             "    void grabFocus() override|NL|    {|NL|"

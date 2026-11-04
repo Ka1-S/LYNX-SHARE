@@ -119,6 +119,8 @@ public:
     void pasteFromMidiClipboard();
     // File › Browse scores: the main window opens the Browser at FL's score folder
     std::function<void()> onBrowseScores;
+    // "Note names on every key" was switched in the menu (the main window saves its settings)
+    std::function<void()> onNoteNamesChanged;
     // The time selection (Ctrl+drag on the ruler; -1 = none) that Insert / Delete space and Trim use.
     void setTimeSelection (std::int64_t from, std::int64_t to);
     std::int64_t timeSelectionFrom() const noexcept { return timeFrom; }

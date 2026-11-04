@@ -162,6 +162,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         };
     }
     PianoRollComponent::shortcutText = [this] (const std::string& id) { return shortcutText (id.c_str()); };
+    pianoRoll.onNoteNamesChanged = [this] { saveUiSettings(); };
     pianoRoll.onBrowseScores = [this] { // (round 168g: the Piano roll's File › Browse scores)
         showPanel (Panel::browser);
         browser.showScores();
@@ -273,7 +274,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     }
 
     patternBox.setTooltip (tr ("Current pattern (Numpad +/-: next/previous, F4: next empty, F2: rename)"));
-    patternBox.setScrollWheelEnabled (true);
+    patternBox.onStep = [this] (int delta) { selectPattern (stepPattern (engine.getSong(), delta)); };
     gridBox.setScrollWheelEnabled (true);
     patternBox.onChange = [this]
     {
@@ -1434,6 +1435,9 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("rack.selectAll")) rack.selectAll();
     else if (is ("rack.clone")) rack.cloneSelected();
     else if (is ("rack.deleteSelected")) rack.deleteSelected();
+    else if (is ("rack.cut")) rack.cutSelected();
+    else if (is ("rack.copy")) rack.copySelected();
+    else if (is ("rack.paste")) rack.pasteSelected();
     else if (is ("rack.sendToInserts")) rack.sendSelectedToInserts();
     else if (id.rfind ("rack.mute", 0) == 0) rack.toggleMute (std::stoi (id.substr (9)) - 1);
     else if (id.rfind ("rack.solo", 0) == 0) rack.solo (std::stoi (id.substr (9)) - 1);
@@ -1647,6 +1651,8 @@ void MainComponent::loadUiSettings()
             notenames::currentStyle.store (juce::jlimit (0, 2, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue()));
         else if (key == "noteFlats")
             notenames::currentFlats.store (on);
+        else if (key == "noteNamesEveryKey")
+            notenames::everyKey.store (on);
         else if (key == "rememberSeek")
             EditorGlobals::get().rememberSeek = on;
         else if (key == "createVariants")
@@ -1779,6 +1785,7 @@ void MainComponent::saveUiSettings()
                                       + "\nwaveStereo=" + juce::String (ui::WaveformCache::stereo ? 1 : 0)
                                       + "\nnoteNames=" + juce::String (notenames::currentStyle.load())
                                       + "\nnoteFlats=" + juce::String (notenames::currentFlats.load() ? 1 : 0)
+                                      + "\nnoteNamesEveryKey=" + juce::String (notenames::everyKey.load() ? 1 : 0)
                                       + "\nreducedEffects=" + juce::String (skin::reducedEffects() ? 1 : 0)
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
                                       + "\npluginStyleOverrides=" + skin::overridesToString()
@@ -2951,21 +2958,83 @@ void MainComponent::PatternSelector::paint (juce::Graphics& g)
 void MainComponent::PatternSelector::mouseDown (const juce::MouseEvent& e)
 {
     const auto part = partAt (e.x);
+    namePressed = dragging = false;
+    appliedSteps = 0;
 
-    if (part == 1 || e.mods.isPopupMenu())
+    if (e.mods.isPopupMenu())
     {
         if (onMenu)
             onMenu();
     }
+    else if (part == 1)
+        namePressed = true; // the list opens on release unless the mouse dragged (FL's pattern selector)
     else if (onStep)
         onStep (part == 0 ? -1 : 1);
+}
+
+void MainComponent::PatternSelector::mouseDrag (const juce::MouseEvent& e)
+{
+    if (! namePressed)
+        return;
+    dragging = dragging || std::abs (e.getDistanceFromDragStartY()) >= patterndrag::threshold;
+    if (! dragging)
+        return;
+    const auto steps = patterndrag::steps ((float) e.getDistanceFromDragStartY());
+    if (steps != appliedSteps && onStep)
+        onStep (steps - appliedSteps);
+    appliedSteps = steps;
+}
+
+void MainComponent::PatternSelector::mouseUp (const juce::MouseEvent&)
+{
+    if (namePressed && ! dragging && onMenu)
+        onMenu();
+    namePressed = dragging = false;
 }
 
 void MainComponent::PatternSelector::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
 {
     const auto delta = wheel.deltaY != 0.0f ? wheel.deltaY : -wheel.deltaX;
-    if (delta != 0.0f && onStep)
-        onStep (delta > 0.0f ? -1 : 1);
+    if (const auto n = wheelSteps.take (delta); n != 0 && onStep)
+        onStep (n);
+}
+
+void MainComponent::PatternBox::mouseDown (const juce::MouseEvent& e)
+{
+    pressed = dragging = false;
+    appliedSteps = 0;
+    if (! isEnabled() || e.mods.isPopupMenu())
+        return;
+    pressed = true; // the list opens on release unless the mouse dragged (FL's pattern selector)
+}
+
+void MainComponent::PatternBox::mouseDrag (const juce::MouseEvent& e)
+{
+    if (! pressed)
+        return;
+    dragging = dragging || std::abs (e.getDistanceFromDragStartY()) >= patterndrag::threshold;
+    if (! dragging)
+        return;
+    const auto steps = patterndrag::steps ((float) e.getDistanceFromDragStartY());
+    if (steps != appliedSteps && onStep)
+        onStep (steps - appliedSteps);
+    appliedSteps = steps;
+}
+
+void MainComponent::PatternBox::mouseUp (const juce::MouseEvent&)
+{
+    if (pressed && ! dragging)
+        showPopup();
+    pressed = dragging = false;
+}
+
+void MainComponent::PatternBox::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
+{
+    const auto delta = wheel.deltaY != 0.0f ? wheel.deltaY : -wheel.deltaX;
+    if (wheel.isInertial)
+        return;
+    if (const auto n = wheelSteps.take (delta); n != 0 && onStep)
+        onStep (n);
 }
 
 juce::PopupMenu MainComponent::playlistTrackExportMenu (bool groups)
@@ -4452,6 +4521,7 @@ void MainComponent::openSettings (int page)
         o.waveStereo = ui::WaveformCache::stereo;
         o.noteNames = notenames::currentStyle.load();
         o.noteFlats = notenames::currentFlats.load();
+        o.noteNamesEveryKey = notenames::everyKey.load();
         o.reducedEffects = skin::reducedEffects();
         o.gpuRendering = gpuRenderingEnabled();
         o.pluginStyle = skin::forcedStyle();
@@ -4495,10 +4565,12 @@ void MainComponent::openSettings (int page)
             for (int i = 0; i < juce::Desktop::getInstance().getNumComponents(); ++i) // open editors redraw at once
                 if (auto* c = juce::Desktop::getInstance().getComponent (i)) c->repaint();
         }
-        if (o.noteNames != notenames::currentStyle.load() || o.noteFlats != notenames::currentFlats.load())
+        if (o.noteNames != notenames::currentStyle.load() || o.noteFlats != notenames::currentFlats.load()
+            || o.noteNamesEveryKey != notenames::everyKey.load())
         {
             notenames::currentStyle.store (juce::jlimit (0, 2, o.noteNames));
             notenames::currentFlats.store (o.noteFlats);
+            notenames::everyKey.store (o.noteNamesEveryKey);
             for (int i = 0; i < juce::Desktop::getInstance().getNumComponents(); ++i) // the keyboards redraw with the new names
                 if (auto* c = juce::Desktop::getInstance().getComponent (i)) c->repaint();
         }

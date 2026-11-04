@@ -96,6 +96,10 @@ inline juce::FontOptions font (float size, bool bold = false)
 // The width a column of labels needs: `minWidth` when every text fits in it (the English layout), else the widest
 // text (+ the label borders), up to `maxWidth` (round 165o: translated labels are often longer).
 int labelColumnWidth (std::initializer_list<const juce::Label*> labels, int minWidth, int maxWidth);
+
+// A menu item's text with FL's accelerator letter `key` (core/MenuMnemonic.h, round 170a): the letter is underlined in
+// the menu and typing it picks the item, e.g. theme::mnemonic (tr ("Delete..."), 'D').
+juce::String mnemonic (const juce::String& text, char key);
 // Japanese / Korean / Chinese: the installed UI font family LYNX uses for that language (empty: none installed, or a
 // language that needs no font of its own — see needsOwnFont).
 juce::String uiFontForLanguage (const juce::String& languageId);

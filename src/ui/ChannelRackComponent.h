@@ -74,6 +74,10 @@ public:
     bool moveSelected (int delta);
     void cloneSelected();
     void deleteSelected();
+    // FL's Cut / Copy / Paste of the selected channels' steps and notes in the current pattern (Ctrl+X / C / V)
+    void cutSelected();
+    void copySelected();
+    void pasteSelected();
     void sendSelectedToInserts();
     void toggleMute (int channel);
     void solo (int channel);
@@ -175,7 +179,7 @@ private:
     juce::Rectangle<int> rowBounds (int row) const;
     int rowY (int row) const;       // top of a row (rows below the graph lane shift down)
     int filterGroup = -1;
-    static inline std::vector<Note> stepClipboard; // the channel menu's Cut / Copy / Paste (a channel's notes)
+    static inline ChannelStepsClipboard stepClipboard; // Cut / Copy / Paste (Ctrl+X / C / V, the channel menu)
     int visibleIndex (int row) const; // the row's place among the shown rows
     int shownCount() const;
     int rowAtY (int y) const;       // row under y (the lane counts as its channel's row)

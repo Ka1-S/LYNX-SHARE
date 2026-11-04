@@ -22,6 +22,7 @@ struct GeneralOptions
     bool waveSpectral = false, waveStereo = false;
     int noteNames = 0;          // notenames::Style: English, Germanic, Solfège (round 165f)
     bool noteFlats = false;     // black notes as flats
+    bool noteNamesEveryKey = true; // the Piano roll names every key (LYNX, round 170a)
     bool splash = true, startupSound = true, scanAtStart = true;
     bool menuEntry = false;     // Linux AppImage: LYNX in the applications menu + the .lynx file type (round 161)
     bool typingPiano = true, keepEditorsOpen = false, rememberSeek = false;
