@@ -43,7 +43,7 @@ cmp -s "$OUT/JuceConfig.h.new" "$OUT/JuceConfig.h" 2>/dev/null && rm "$OUT/JuceC
 
 COMMON=(-target "$TARGET" -std=c++20 -O2 -DNDEBUG=1 -fno-sanitize=undefined
         -include "$OUT/JuceConfig.h" -include cmake/mingw/mingw_compat.h
-        -I"$OUT/shim" -I"$JUCE_DIR/modules" -I"$JUCE_DIR/modules/juce_audio_processors/format_types/VST3_SDK" -Ithird_party/clap/include -Ithird_party/wavpack/include -Ithird_party/vorbis/include -Ithird_party/lame/include -Ithird_party/asiosdk/common -Ithird_party/sse2neon -Ithird_party/pocketpy -Ithird_party/onnxruntime -Isrc)
+        -I"$OUT/shim" -I"$JUCE_DIR/modules" -I"$JUCE_DIR/modules/juce_audio_processors/format_types/VST3_SDK" -Ithird_party/clap/include -Ithird_party/wavpack/include -Ithird_party/vorbis/include -Ithird_party/lame/include -Ithird_party/asiosdk/common -Ithird_party/sse2neon -Ithird_party/pocketpy -Ithird_party/monocypher -Ithird_party/onnxruntime -Isrc)
 
 # juce_gui_basics is compiled from a patched copy (cmake/LynxPatchJuce.cmake, issue #11: drag & drop fixes), so the
 # JUCE checkout itself is never modified. The copy is only replaced when its patched sources change (module cache).
@@ -178,6 +178,8 @@ APP_SOURCES+=(src/core/PluginCatalog.cpp src/ui/PluginPicker.cpp)
 APP_SOURCES+=(src/core/MissingFiles.cpp src/core/ProjectSafety.cpp src/ui/MissingFilesDialog.cpp src/ui/SettingsDialog.cpp)
 # Online Sessions P1: stable ids, parts, stand-ins, packages and their dialogs (round 168a)
 APP_SOURCES+=(src/core/SessionIds.cpp src/core/SessionParts.cpp src/core/StandIns.cpp src/engine/SessionPack.cpp src/ui/SessionDialogs.cpp)
+# Online Sessions P2: live sessions over the relay (round 169b)
+APP_SOURCES+=(src/core/LiveSession.cpp src/core/LiveCrypto.cpp src/engine/LiveLink.cpp src/engine/LiveSessions.cpp src/engine/LiveTest.cpp src/ui/LiveSessionUi.cpp)
 # LYNX substitutes for missing third-party plugins (round 98)
 APP_SOURCES+=(src/core/PluginSubstitutes.cpp)
 # settings pages (General/Audio/MIDI), plugin manager, shortcut manager (round 82)
@@ -231,7 +233,7 @@ APP_SOURCES+=(src/core/VisualFx.cpp src/ui/VisualEditors.cpp)
 APP_SOURCES+=(src/core/FlExtraFx.cpp src/core/Scratcher.cpp src/core/Dvs.cpp src/core/Transmitter.cpp src/ui/FlExtraEditors.cpp src/core/VideoPlayer.cpp src/ui/VideoPlayerView.cpp)
 APP_SOURCES+=(src/core/VisualFx.cpp src/core/FruityDance.cpp src/ui/VisualEditors.cpp src/ui/VisualGl.cpp src/ui/DanceView.cpp)
 
-for lib in wavpack vorbis lame pocketpy; do declare "TP_KEY_$lib=$(tree_hash third_party/$lib)"; done
+for lib in wavpack vorbis lame pocketpy monocypher; do declare "TP_KEY_$lib=$(tree_hash third_party/$lib)"; done
 
 echo "WavPack (decoder, C)..."
 mkdir -p "$OUT/wavpack"
@@ -268,6 +270,13 @@ if [[ ! -f "$obj" || third_party/pocketpy/pocketpy.c -nt "$obj" || third_party/p
     cached "$obj" "$TP_KEY_pocketpy" -- "$ZIG" cc -target "$TARGET" -O2 -w -std=c11 -DPK_ENABLE_OS=0 -DPK_ENABLE_WATCHDOG=1 -Ithird_party/pocketpy -c third_party/pocketpy/pocketpy.c -o "$obj"
 fi
 
+echo "Monocypher (live session encryption, C)..."
+mkdir -p "$OUT/monocypher"
+obj="$OUT/monocypher/monocypher.o"
+if [[ ! -f "$obj" || third_party/monocypher/monocypher.c -nt "$obj" || third_party/monocypher/monocypher.h -nt "$obj" ]]; then
+    cached "$obj" "$TP_KEY_monocypher" -- "$ZIG" cc -target "$TARGET" -O2 -w -Ithird_party/monocypher -c third_party/monocypher/monocypher.c -o "$obj"
+fi
+
 # the commit the build comes from (crash reports name it)
 COMMIT="$(git rev-parse --short=10 HEAD 2>/dev/null || true)"
 [[ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]] && COMMIT="$COMMIT-dirty"
@@ -293,11 +302,11 @@ IFS=. read -r VMAJ VMIN VPAT <<< "$VERSION"
 ( cd resources && "$ZIG" rc /i "$OUT_ABS" /fo "$OUT_ABS/LYNX.res" LYNX.rc )
 
 echo "Linking..."
-"$ZIG" c++ -target "$TARGET" -O2 -o "$OUT/LYNX.exe" "$OUT"/juce/*.o "$OUT"/app/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT/LYNX.res" \
+"$ZIG" c++ -target "$TARGET" -O2 -o "$OUT/LYNX.exe" "$OUT"/juce/*.o "$OUT"/app/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT/LYNX.res" \
     -Wl,--subsystem,windows \
     -lole32 -loleaut32 -luuid -lwinmm -lws2_32 -lshlwapi -lversion -lwininet -limm32 -lcomdlg32 \
     -lgdi32 -luser32 -lcomctl32 -lshell32 -ladvapi32 -lrpcrt4 -ldbghelp -lsetupapi -luxtheme -ldwmapi \
-    -ld2d1 -ldcomp -ldwrite -ldxgi -ld3d11 -ldxguid -lwsock32 -lopengl32 -lpropsys -lmfplat -lmfuuid -lksuser -lavrt
+    -ld2d1 -ldcomp -ldwrite -ldxgi -ld3d11 -ldxguid -lwsock32 -lopengl32 -lpropsys -lmfplat -lmfuuid -lksuser -lavrt -lwinhttp
 
 ls -la "$OUT/LYNX.exe"
 

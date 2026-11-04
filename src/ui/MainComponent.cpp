@@ -50,6 +50,7 @@
 #include "engine/ProjectPackage.h"
 #include "engine/SessionPack.h"
 #include "ui/SessionDialogs.h"
+#include "engine/LiveSessions.h"
 #include "core/ProjectSafety.h"
 #include "core/MissingFiles.h"
 #include "ui/AutomationUi.h"
@@ -607,6 +608,33 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
                 safe->showWindowsTip();
         });
 
+    // Online Sessions P2 (round 169b): live sessions
+    live = std::make_unique<LiveSessionManager> (engine);
+    liveui::attach (*live);
+    live->onChange = [safe = juce::Component::SafePointer<MainComponent> (this)] {
+        if (safe != nullptr)
+        {
+            safe->repaint (safe->titleArea);
+            safe->menuItemsChanged();
+        }
+    };
+    live->onJoined = [safe = juce::Component::SafePointer<MainComponent> (this)] (Song song) {
+        if (safe == nullptr)
+            return;
+        const auto* host = song.session.find (session::hostTag);
+        const auto hostName = host != nullptr ? juce::String::fromUTF8 (host->name.c_str()) : juce::String();
+        safe->startNewProject (std::move (song), {});
+        safe->projectName = hostName.isNotEmpty() ? tr ("Live session with {0}", { hostName }) : tr ("Live session");
+        safe->updateTitle();
+    };
+    engine.onSessionUndoSkipped = [] (const juce::StringArray& skipped) {
+        ui::postHint ({ tr ("Undo left alone what someone else changed since: {0}", { skipped.joinIntoString (", ") }), {} }, 4000);
+    };
+    juce::Timer::callAfterDelay (1500, [safe = juce::Component::SafePointer<MainComponent> (this)] {
+        if (safe != nullptr)
+            safe->startLiveFromCommandLine();
+    });
+
     // the keys a secondary window (tool, plugin, channel window) leaves unused run the global shortcuts, as in FL
     setSecondaryWindowKeyHandler ([safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::KeyPress& key) {
         return safe != nullptr && safe->keyFromSecondaryWindow (key);
@@ -615,6 +643,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
 MainComponent::~MainComponent()
 {
+    engine.onSessionUndoSkipped = nullptr;
+    live.reset(); // (a session still on ends: the others are told)
     setSecondaryWindowKeyHandler (nullptr);
     cancelProjectLoad(); // an open in progress uses the engine from its thread
     if (sessionLock != nullptr) // a clean exit: no "LYNX did not close properly" next time
@@ -679,10 +709,13 @@ void MainComponent::paint (juce::Graphics& g)
     // the project name, beside the menus (FL's title/hint panel: the title above the hint bar)
     if (! titleArea.isEmpty())
     {
+        // the people of a live session first (round 169b), the project's name after them
+        const auto people = live != nullptr ? liveui::paintPresence (g, titleArea, *live) : 0;
         const auto name = projectName.isNotEmpty() ? projectName : tr ("Untitled");
         g.setFont (font (type::small, true));
         g.setColour (colour::textSecondary);
-        g.drawFittedText ((engine.isModified() ? juce::String ("* ") : juce::String()) + name, titleArea, juce::Justification::centredRight, 1, 0.8f);
+        if (const auto rest = titleArea.withTrimmedLeft (people > 0 ? people + 10 : 0); rest.getWidth() >= 50)
+            g.drawFittedText ((engine.isModified() ? juce::String ("* ") : juce::String()) + name, rest, juce::Justification::centredRight, 1, 0.8f);
     }
 
     // captions that name the snap and pattern selectors
@@ -3855,6 +3888,66 @@ sessionui::Context MainComponent::sessionContext()
             } };
 }
 
+liveui::Context MainComponent::liveContext()
+{
+    return { engine, *live, currentFile, [safe = juce::Component::SafePointer<MainComponent> (this)] (std::function<void()> then) {
+                if (safe != nullptr)
+                    safe->confirmDiscard (std::move (then));
+            } };
+}
+
+void MainComponent::startLiveFromCommandLine()
+{
+    const auto& cli = juce::JUCEApplication::getCommandLineParameterArray();
+    auto value = [&] (const char* flag) {
+        const auto at = cli.indexOf (flag);
+        return at >= 0 && at + 1 < cli.size() ? cli[at + 1].unquoted() : juce::String();
+    };
+    auto o = LiveSessionManager::Options();
+    o.name = value ("--live-name").isNotEmpty() ? value ("--live-name") : liveui::myName();
+    o.projectFile = currentFile;
+    if (const auto relay = value ("--live-relay"); relay.isNotEmpty())
+        o.relay = relay;
+    if (const auto codeFile = value ("--live-host"); codeFile.isNotEmpty())
+    {
+        o.autoAccept = true; // (scripted: nobody to click "Let them in")
+        live->start (o);
+        auto poll = std::make_shared<std::function<void (int)>>();
+        *poll = [safe = juce::Component::SafePointer<MainComponent> (this), codeFile, weak = std::weak_ptr<std::function<void (int)>> (poll)] (int left) {
+            if (safe == nullptr)
+                return;
+            if (safe->live->getState() == LiveSessionManager::State::live)
+                return (void) juce::File (codeFile).replaceWithText (safe->live->getInviteCode());
+            if (safe->live->isActive() && left > 0)
+                juce::Timer::callAfterDelay (200, [poll = weak.lock(), left] {
+                    if (poll != nullptr)
+                        (*poll) (left - 1);
+                });
+            else
+                juce::File (codeFile).replaceWithText ("ERROR " + safe->live->getStatus());
+        };
+        (*poll) (150);
+    }
+    else if (auto code = value ("--live-join"); code.isNotEmpty())
+    {
+        if (code.startsWith ("@"))
+            code = juce::File (code.substring (1)).loadFileAsString().trim();
+        live->join (code, o);
+        // --live-edit: once in, add a channel of one's own (the GUI check sees it arrive on the host)
+        if (cli.contains ("--live-edit"))
+            juce::Timer::callAfterDelay (8000, [safe = juce::Component::SafePointer<MainComponent> (this), name = o.name] {
+                if (safe == nullptr || safe->live->getState() != LiveSessionManager::State::live)
+                    return;
+                safe->engine.editSong ([&] (Song& s) {
+                    ChannelDef c;
+                    c.name = (name + " synth").toStdString();
+                    c.instrument = InstrumentKind::synth;
+                    s.channels.push_back (c);
+                });
+            });
+    }
+}
+
 void MainComponent::exportPackage()
 {
     // FL's zipped loop package: the project and every sample it uses in one .zip
@@ -4914,6 +5007,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             online.addItem (tr ("Send project..."), ! guestCopy, false, [this] { sessionui::sendProject (sessionContext()); });
             online.addItem (tr ("Send my part back..."), guestCopy, false, [this] { sessionui::sendPartBack (sessionContext()); });
             online.addItem (tr ("Merge a part..."), ! guestCopy, false, [this] { sessionui::mergePart (sessionContext()); });
+            online.addSeparator();
+            liveui::addMenuItems (online, liveContext());
             menu.addSubMenu (tr ("Online session"), online);
         }
 

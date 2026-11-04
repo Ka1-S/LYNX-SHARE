@@ -1,6 +1,7 @@
 # LYNX SHARE Online Sessions — design
 
-Status: design (round 167r, 2026-11-01); **phase P1 implemented in round 168a** (see "Decisions" and §9 P1). This is a LYNX-own feature: FL
+Status: design (round 167r, 2026-11-01); **phase P1 implemented in round 168a** (see "Decisions" and §9 P1); **live
+sessions (P2) over the LYNX SHARE relay implemented in round 169b** (§9 "P2 as built"). This is a LYNX-own feature: FL
 Studio 2026 has no live collaboration (see §0). Code references point at the tree as of `origin/main` 4a5f74fc.
 
 ## The idea in one paragraph
@@ -376,6 +377,28 @@ starts / stops / locates this peer's playback when the host's does (±network de
 
 ### 6.1 Transport layers
 
+> **As built (round 169b): the relay first.** Live sessions go through the LYNX SHARE relay
+> (`wss://relay.lynx-share.com`, SHARE_API.md §3) over one WebSocket per computer; LAN-TCP and ICE (below) are not
+> built. Why, in this order:
+>
+> 1. **It works for everyone on day one.** A WebSocket to port 443 passes every home router, carrier-grade NAT,
+>    mobile hotspot and company firewall that lets a browser out; TCP to a host's port needs port forwarding or UPnP,
+>    and ICE hole punching fails for 10–20 % of connections (§9.1) — exactly the cases a first test with a friend
+>    hits, with nothing LYNX can do about it.
+> 2. **Nothing new to ship or trust.** The operating system's own TLS and WebSocket (WinHTTP on Windows; the system
+>    libcurl ≥ 7.86 on Linux / macOS, loaded at run time) — no libjuice, KCP, miniupnpc or listening socket, no
+>    Windows Firewall prompt, no new attack surface on the user's computer (nobody can connect to it).
+> 3. **Privacy**: the participants never learn each other's IP address (only the relay sees them), which a direct
+>    connection always reveals (§6.5).
+> 4. **It costs nothing extra.** The relay runs on the VPS the project already has (the user's decision 5 kept the
+>    free path; the VPS is not a new bill) and a session is small: edits are a few KB, media go once per person.
+>    The relay is blind: it routes by a one-byte peer number and never sees the key (§6.4 as built).
+> 5. **The session protocol does not care.** The messages (§6.2 as built) ride on a `livelink::Connection`; a direct
+>    LAN / ICE link can later carry the same sealed frames, as an optimisation for big media on one network.
+>
+> The cost: every frame makes two hops (≈ 2 × the one-way latency to the relay, ~30–80 ms in Brazil), which only
+> delays when an edit appears on the others' screens — takes are always recorded locally (§5).
+
 ```
   UI / SessionReplica / MediaStore / StandIns
         │  messages (§6.2) on 3 logical streams: state (reliable, ordered) · media (reliable, low priority) · presence (unreliable)
@@ -440,6 +463,25 @@ messages per join):
   `scripts/deploy-site.sh` when the user says so.
 
 ### 6.4 Encryption and the invite code
+
+> **As built (round 169b)** — simpler than the PAKE + Noise plan below, because the relay (not a direct socket) is
+> the only way in and every peer is let in by the host by hand:
+>
+> - **Invite code** `LYNX-RRRRR-RRRRR-SSSS-SSSS-SSSS-SSSS`: the relay's room id (10 characters a-z 2-7) and an
+>   **80-bit secret** (16 characters) the host's LYNX SHARE makes with the system's random generator and never sends
+>   anywhere. Typing is forgiving (case, spaces, dashes, a pasted link; 0/1/8 read as o/i/b).
+> - **Keys**: Argon2id (Monocypher, 8 MiB, 3 passes, a fixed salt) of the secret → a master key; BLAKE2b keyed
+>   with it gives the **relay room token** (domain "relay room token") and the **session key** (domain "session
+>   key:" + room). The host creates the room with that token (`POST /v1/rooms {"token"}`), so the relay checks
+>   tokens without ever getting the secret, and nobody can get from the token to the key (different domains of a
+>   hash, and an 80-bit secret behind Argon2id is out of reach of offline guessing).
+> - **Frames**: `[0x4C][1][nonce 24][MAC 16][XChaCha20-Poly1305(sender id 8, counter 8, payload)]`, additional data
+>   "LYNX SHARE live session v1". The sender id is random per connection; a frame whose counter is not above the
+>   last one from that sender is dropped (replay); a frame changed on the way or sealed with another key is dropped.
+> - **Limits, honestly**: everyone with the code shares one key, so a participant could pose as another one inside
+>   the session (they were let in by the host anyway); there is no forward secrecy (a code that leaks later decrypts
+>   a recording of the traffic — the code dies with the session); no per-install identity keys yet. A PAKE + Noise
+>   handshake (below) fixes these and fits behind the same `Sealer` / `Opener` when direct links come.
 
 - **Invite code** `LYNX-7F3K-Q9WM`: `7F3K` = the room id (server-side lookup), `Q9WM` = a 20-bit secret made by the
   host's LYNX and never sent to the server. The **whole code** is the password of a PAKE (CPace over X25519 with
@@ -585,6 +627,57 @@ Where it differs from the plan above:
   stand-ins play like the part within 1e-4 in Song and Pattern mode, insert stand-ins, streaming SHA-256) and
   `--selftest` `online_session=` (pack with a real `ExportJob` render, hash dedupe, open on another folder, uid
   persistence through save / load, part back, adopt media, merge).
+
+### P2 as built (round 169b): live sessions over the relay
+
+- **Menu**: *File › Online session ›* Start live session... (your name; guests may edit only their own channels,
+  patterns, inserts and rows, or everything; what guests keep at the end) → the invite code (*Show invite code...*,
+  Copy) · Join live session... (name + code; the open project is saved or let go first) · End / Leave live session.
+  A knock asks the host "{name} wants to join your live session" (Let them in / Not now). The toolbar shows a red
+  **LIVE** badge and everyone online (their colour dot, name, "(you)", "rec" while recording, files still arriving).
+- **Transport**: the relay first (§6.1 as built), one WebSocket per computer (`engine/LiveLink`: WinHTTP / libcurl),
+  one room of ≤ 4 peers created by the host with a token derived from the code (SHARE_API.md §3.1). Encryption: §6.4
+  as built.
+- **Wire** (`engine/LiveSessions`): relay payload `[1][sealed]` or `[2][u32 id][u16 i][u16 n][part]` (frames over
+  512 KiB are split; ≤ 64 MiB per message). Sealed plain text: `J` JSON, `Z` gzip JSON (above 4 KiB), `M` a media
+  chunk `[sha256 hex 64][u32 index][u32 count][u64 size][≤ 256 KiB]`. JSON messages: `hello {name, version,
+  protocol}` · `deny {reason: version|full|declined}` · `snapshot {rev, tag, keepFull, editEverything, song,
+  manifest}` · `propose {seq, base, patch}` · `commit {rev, origin, seq, patch, rejected, reason}` · `people {list}`
+  · `presence {playing, recording, pos}` · `want {sha}` · `resync` · `bye` · `end {keepFull}`. A patch is `{set:
+  [keys], del: [keys], song: <the carrier as .lynx JSON>}`.
+- **Replication** (`core/LiveSession`): host-authoritative entity replication exactly as §1.2–§1.4: entities by uid
+  (globals, session, links, order, arrangement, channel, pattern header, notes slice, automation, clip, insert,
+  row); patches carry the changed entities plus id-only stubs; the host's `Authority` checks permissions (§2.2) and
+  conflicts (the earlier edit wins, ripples allowed) and commits in the form every peer receives (the codec = the
+  JSON round trip); every peer's `Replica` rebases its unconfirmed edits on each commit and adopts the host's rounding.
+  Commits wait while the computer records (applied at the stop). A missing revision asks for a fresh snapshot.
+- **Late join**: the snapshot is the confirmed song with its samples as `lynx-media:<sha256>/<name>` tokens and the
+  plugin identities (P1's manifest code: `resolvePlugins` maps them to this computer's plugins).
+- **Media**: a received song first gets every token turned into `<session media folder>/<sha>.<ext>`, then P1's
+  `sessionpack::confine` (anything else outside that folder / FL's factory data becomes a missing file), then a sha
+  this computer already has becomes its own file; the rest is asked for (`want`). Only a file this computer turned
+  into that hash itself is ever sent; pieces arrive in order into a `.part` file that must hash to the sha before it
+  is used; the host forwards a guest's file to the others as soon as it has it. Media wait while > 1 MiB of other
+  frames is queued. Folders: the host's `<project>/Session media/Live session` (Documents/LYNX/Session media/... when
+  not saved), a guest's Documents/LYNX/Projects/Received/Live sessions/<room>.
+- **Undo per user**: in a session `AudioEngine` keeps its own steps (`before`, `after`) and undoes with
+  `live::selectiveRevert`: only what that step changed and nobody changed since; the hint bar names what was left.
+- **Leaving**: a guest's *Leave* tells the host (`bye`) and keeps only their part (`parts::keepOnlyPart`) unless the
+  host allowed a full copy; the host's *End* sends `end`, closes the room (`DELETE`); a host that drops is seen by the
+  relay's `leave` and handled like an end. A guest that drops disappears from everyone's list; their area stays.
+- **Version**: `hello.protocol` must equal `live::protocolVersion`, else `deny version` (decision 2).
+- **Tests**: `tests/Live169bTests.inc` (diff/apply by uid, permissions and ripples, conflicts, 24 seeded delayed
+  networks of 1–3 guests converge, codec rounding adopted, commits held while recording, undo per user, invite code
+  and frames); `--selftest` `live_session=` (every entity of the selftest's rich project through the .lynx JSON:
+  what the format does not keep, stable on a second pass, 3 peers through the real codec converge, keys);
+  `LYNX --livetest report.txt [--relay URL]`: host + 3 guests in one process over the real relay (wrong code refused,
+  media both ways and forwarded, everyone's edits, a refused edit undone, undo per user, a late guest, a guest
+  leaving, the host ending).
+- **Not yet (later phases)**: LAN / direct links and ICE; reconnect / resume of a dropped guest (a new join gets a
+  fresh snapshot); host journal and hand-over; live stand-ins over the network (stand-in renders are not sent, a
+  part whose plugin is missing here is silent until P1's package flow); chat, follow-transport, per-participant
+  permission toggles after the start; PAKE / Noise and identity keys (§6.4); hashing big samples off the message
+  thread; FLAC media transfer.
 
 ### 9.1 What is free and what might cost money
 

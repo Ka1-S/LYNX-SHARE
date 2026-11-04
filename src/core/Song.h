@@ -1039,6 +1039,7 @@ struct MixerTrack
     std::vector<StandIn> standIns;
     // FL's mixer track icon ("Change icon…", .flp 0x5F, REA round 168j): FL's icon index, 0 = none. Kept and saved.
     int icon = 0;
+    bool operator== (const MixerTrack&) const = default; // (Online Sessions P2: entity comparison, round 169b)
 };
 
 constexpr float maxTrackLatencyMs = 5000.0f; // FL's clamp (FUN_012a7230)
@@ -1059,6 +1060,7 @@ struct Note
     float modX = 0.5f, modY = 0.5f; // two free per-note modulation values 0..1 (stored, not yet routed)
     int colour = 0;           // note colour group 0..15 (FL's note colours; .flp note byte 'extra' bits 0-3)
     int group = 0;            // note group (FL's Group, Shift+G: clicking one note selects the group); 0 = none
+    bool operator== (const Note&) const = default; // (Online Sessions P2: entity comparison, round 169b)
 };
 
 constexpr int noteColourCount = 16;
@@ -1105,12 +1107,14 @@ struct PatternEvent
 {
     std::int64_t tick = 0; // from the start of the pattern
     float value = 0.5f;    // 0..1
+    bool operator== (const PatternEvent&) const = default;
 };
 
 struct PatternEvents
 {
     AutomationTarget target;
     std::vector<PatternEvent> events; // sorted by tick, one per tick
+    bool operator== (const PatternEvents&) const = default;
 
     // Value at `tick` (held from the previous event; before the first = the first value).
     float valueAt (double tick) const noexcept;
@@ -1178,6 +1182,7 @@ struct Pattern
 
     bool hasStep (int channel, int step) const noexcept;
     void toggleStep (int channel, int step);
+    bool operator== (const Pattern&) const = default;
 };
 
 enum class ClipKind : std::uint8_t
@@ -1193,6 +1198,7 @@ struct AutomationPoint
     std::int64_t tick = 0; // from the start of the automation
     float value = 0.5f;    // 0..1
     float tension = 0.0f;  // curve to the next point: -1..1 (0 = straight)
+    bool operator== (const AutomationPoint&) const = default;
 };
 
 struct Automation
@@ -1208,6 +1214,7 @@ struct Automation
     {
         int track = -1, slot = 0, output = 0;
         int channel = -1; // instead of an effect: this channel's "controller" instrument
+        bool operator== (const LiveSource&) const = default;
     } source;
     std::vector<float> curve;
     bool isLive() const noexcept { return source.track >= 0 || source.channel >= 0; }
@@ -1217,6 +1224,7 @@ struct Automation
     // Value at `tick` (before the first point = first value; after the last = last).
     float valueAt (double tick) const noexcept;
     std::int64_t length() const noexcept; // tick of the last point (minimum 1)
+    bool operator== (const Automation&) const = default;
 };
 
 // A block in the Playlist: a section of a pattern, or a section of an audioClip channel's audio.
@@ -1252,6 +1260,7 @@ struct Clip
     std::int64_t end() const noexcept { return start + length; }
     std::int64_t effectiveFadeIn() const noexcept { return crossfadeIn > 0 ? crossfadeIn : fadeIn; }
     std::int64_t effectiveFadeOut() const noexcept { return crossfadeOut > 0 ? crossfadeOut : fadeOut; }
+    bool operator== (const Clip&) const = default;
 };
 
 // LYNX extra (issue #25; the user's choice, after round 168k showed FL plays such a clip once and is silent after its
@@ -1308,6 +1317,7 @@ struct MidiLink
     int cc = 0;       // 0..127
     int channel = -1; // MIDI channel 0..15, -1 = any
     AutomationTarget target;
+    bool operator== (const MidiLink&) const = default;
 };
 
 // The links a controller move follows: the project's, then the global ones (settings, every project) whose target
@@ -1362,6 +1372,7 @@ struct PlaylistTrack
     // height in px whatever the vertical zoom and the Size menu; ≤ 0 = not locked (FL keeps −the last locked height).
     int lockedHeight = -1;
     int icon = 0; // FL's playlist track icon (.flp 0xEE u32 at 8, REA round 168j): FL's icon index, 0 = none. Kept and saved.
+    bool operator== (const PlaylistTrack&) const = default;
 };
 
 // Splits a clip at `tick` (absolute): the original keeps the start and the return value is the rest.
@@ -1383,6 +1394,7 @@ struct Arrangement
     std::int64_t loopStart = 0, loopEnd = 0;
     std::vector<Marker> markers;           // sorted by tick (stay here even for the current arrangement)
     std::uint64_t uid = 0;                 // stable id (Online Sessions, round 168a)
+    bool operator== (const Arrangement&) const = default;
 };
 
 // The project's credits (FL's Settings › Info page): shown and edited in Settings › Info, kept in .lynx, imported from .flp.
@@ -1599,6 +1611,7 @@ struct Song
     {
         AutomationTarget target;
         float value = 0.0f; // 0..1
+        bool operator== (const InitialValue&) const = default;
     };
     std::vector<InitialValue> initialValues;
     // Sets (replaces) / removes the target's initial value; the index into initialValues or -1.
