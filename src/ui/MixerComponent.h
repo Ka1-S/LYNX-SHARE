@@ -140,8 +140,9 @@ public:
     bool isInterestedInDragSource (const SourceDetails& details) override;
     void itemDropped (const SourceDetails& details) override;
 
-    // Multi-selection (docs/WORKFLOW_FL.md P2, M1): Ctrl+click on a strip's header toggles it, Shift+click
-    // selects a range; selected faders and pans move together. Always contains the selected track.
+    // Multi-selection (docs/WORKFLOW_FL.md P2, M1; FL's own, round 170b): Ctrl+click or Ctrl+drag across strips selects
+    // a range, Ctrl+Shift adds or removes it, Shift+click selects a range (LYNX); selected faders and pans move together
+    // and the route arrow routes them all. Always contains the selected track.
     const std::vector<int>& getSelection() const noexcept { return selection; }
     void setSelection (std::vector<int> tracks, int primary);
     bool moveSelected (int delta);           // Alt+Left/Right

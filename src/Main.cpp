@@ -79,6 +79,7 @@
 #include "ui/I18n.h"
 #include "ui/MainComponent.h"
 #include "core/MixerOps.h"
+#include "ui/QuickPick.h"
 #include "core/NoteTools.h"
 #include "engine/ProjectPackage.h"
 #include "ui/SetupWizard.h"
@@ -7619,6 +7620,33 @@ private:
                     saveSnapshot (ui, prefix + "-mixer163-" + juce::String (h) + ".png");
                 }
                 ui.setBounds (size);
+                offline.dispatchPendingMessages();
+            }
+            // round 170b (Busy Works Beats' review): inserts 1-3 selected and routed together to insert 4, a single effect
+            // moved down into slot 2 (FL's slot places), and the plugin menus grouped by category, LYNX SHARE first
+            {
+                const auto before = offline.getSong();
+                offline.editSong ([] (lynx::Song& s) {
+                    if (s.mixer.size() < 5)
+                        return;
+                    s.mixer[1].effects.clear();
+                    lynx::EffectSlot fx;
+                    fx.kind = lynx::EffectKind::compressor;
+                    s.mixer[1].effects.push_back (fx);
+                    lynx::mixerops::moveEffectBy (s, 1, 0, 1);
+                    lynx::mixerops::switchSelectedRoute (s, { 1, 2, 3 }, 4, true);
+                });
+                ui.selectMixerTrackForSnapshot (1);
+                ui.getMixerForSnapshot().getStripsForSnapshot().setSelection ({ 1, 2, 3 }, 1);
+                offline.dispatchPendingMessages();
+                saveSnapshot (ui, prefix + "-mixer170b.png");
+                juce::PopupMenu effects, generators;
+                lynx::quickpick::addFolderGroups (effects, offline, std::function<void (lynx::EffectSlot)> ([] (lynx::EffectSlot) {}));
+                lynx::quickpick::addFolderViewItems (effects, offline);
+                lynx::quickpick::addGeneratorMenu (generators, offline, [] (lynx::ChannelDef) {}, {}, nullptr, nullptr);
+                lynx::quickpick::addFolderViewItems (generators, offline);
+                saveMenus (juce::StringArray { "Mixer slot: add an effect", "Channel Rack: add" }, { effects, generators }, prefix + "-menus170b.png");
+                offline.setSong (before);
                 offline.dispatchPendingMessages();
             }
 
