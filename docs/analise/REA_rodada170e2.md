@@ -8,6 +8,7 @@ find things where they expect (recording toggles, pattern/song, tempo tap, maste
 
 ## Where I stopped
 
+- Waiting for toolbar170e to land, then merge origin/main and queue `train.sh toolbar170e2`.
 - Done: recording panel (4 x 2), Blend and Tempo tapper buttons, priorities, filter / arrangement icons, 1366 and 4K
   snapshots, light-theme snapshot run, comparison sheet.
 - Rerun: `tmp/coord/buildslot.sh tmp/coord/bl-wt.sh toolbar170e2`; Windows: `OUT=~/projetos/lynx-wt-toolbar170e2/build-win
@@ -41,4 +42,6 @@ such recording modes; punch / pre-roll is LYNX's own), Shift/Ctrl/Alt touch modi
 
 ## Checks
 
-(see the end of the round report)
+- build-local: 2,438,225 checks, 0 failures (new test toolbar170e2_recording_options_outlast_the_file_buttons).
+- Windows build: ok; `--snapshot` dark and light (fresh profiles, LYNX_TEST_MODE=1) at 1280 / 1366 / 1600 / 1920 / 2560 / 3840.
+- Sheet: /mnt/e/lynx-work/toolbar170e2/compare-170e2.png (FL reference strip, before, after 170e, after 170e2 dark / light, 1366, 4K).
