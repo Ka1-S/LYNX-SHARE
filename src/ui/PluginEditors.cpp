@@ -4062,7 +4062,7 @@ public:
         ui::showValueTip (*this, rectOf (item).toNearestInt(), spec.text (v));
     }
 
-    void mouseUp (const juce::MouseEvent&) override
+    void mouseUp (const juce::MouseEvent& e) override
     {
         eqDragging = false;
         if (wsDragState) // round 165
@@ -4110,6 +4110,20 @@ public:
         if (dragItem >= 0)
         {
             drag.end();
+            // round 170c (issue #14: "Oversampling: off" looked dead): a click on a stepper's value (not only on its
+            // small arrows) steps it up, and past its last value back to the first; a drag or the wheel still sets it
+            if (const auto& item = activeLayout().items[(std::size_t) dragItem];
+                item.type == Item::stepper && item.steps > 0 && item.steps <= 64 && e.mouseWasClicked() && ! e.mods.isPopupMenu())
+                if (const auto param = paramOf (item); param >= 0)
+                {
+                    const auto step = 1.0f / (float) item.steps;
+                    const auto now = valueOf (param);
+                    setValue (param, now >= 1.0f - step * 0.5f ? 0.0f : juce::jlimit (0.0f, 1.0f, now + step));
+                    ui::flashValueTip (*this, rectOf (item).toNearestInt(), valueText (param, valueOf (param)));
+                    dragItem = -1;
+                    repaint();
+                    return;
+                }
             dragItem = -1;
             ui::hideValueTip();
             repaint();
@@ -4267,6 +4281,8 @@ public:
         if (isMixItem (item) && captionArea (item).contains (p))
             return { tr ("MIX label: click to keep the Mix while presets change (mix lock)"), pluginheader::isMixLocked (kind) ? tr ("locked") : tr ("unlocked"), false, false };
         const auto spec = specFor (item);
+        if (item.type == Item::stepper && item.steps > 0 && item.steps <= 64) // round 170c (issue #14)
+            return { juce::String (spec.name) + ": " + tr ("click to step, drag or mouse wheel to change"), spec.text (valueOf (paramOf (item))), false, false };
         return ui::valueHint (spec, valueOf (paramOf (item)));
     }
 

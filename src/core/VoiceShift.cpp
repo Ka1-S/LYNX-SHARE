@@ -37,7 +37,7 @@ float driveCurve (float x, double amount) noexcept
     const auto pre = (float) std::pow (10.0, 1.75 * amount / 20.0);
     const auto down = (float) std::pow (10.0, -1.5 * std::max (0.0, amount - 6.0) / 20.0);
     // crossfade from clean over the first step so that 0 → 0.1 does not jump
-    const auto shaped = 0.5f * mixsuite::ember::shape (mixsuite::ember::Style::tube, 2.0f * pre * x) * down;
+    const auto shaped = 0.5f * mixsuite::ember::shape (mixsuite::ember::Style::tubeBiased, 2.0f * pre * x) * down;
     const auto w = (float) std::min (1.0, amount);
     return x + w * (shaped - x);
 }

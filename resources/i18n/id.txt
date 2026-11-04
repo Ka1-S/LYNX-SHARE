@@ -7007,3 +7007,4 @@ countries: id
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] lukis dengan pensil  [Ctrl+LMB] / [Shift+LMB] pilih beberapa  [2xLMB] buka  [RMB] menu"
 "Empty patterns were ignored." = "Pattern kosong diabaikan."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Pemilih plugin: semua generator dan efek, kategori sebagai tab (tekan lagi untuk menutup)"
+"click to step, drag or mouse wheel to change" = "klik untuk melangkah, seret atau roda mouse untuk mengubah"

@@ -7007,3 +7007,4 @@ countries: tw hk mo
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "樣式：[LMB] 用鉛筆繪製  [Ctrl+LMB] / [Shift+LMB] 選擇多個  [2xLMB] 開啟  [RMB] 選單"
 "Empty patterns were ignored." = "已忽略空樣式。"
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "外掛選擇器：所有產生器與效果器，類別顯示為分頁（再按一次關閉）"
+"click to step, drag or mouse wheel to change" = "按一下切換，拖曳或捲動滑鼠滾輪變更"
