@@ -36,6 +36,7 @@ struct Tile
     juce::Point<int> scaledFor; // (its size: a scroll moves a tile without refitting it)
     double scaledAt = 0.0;    // the display scale it was made for
     double nextLook = 0.0;    // missing: when to look for the file again (ms)
+    bool queued = false;      // a load / fit is on the worker thread
 };
 
 // the size of a PNG from its header (no decoding): {0, 0} when it is not one
@@ -47,6 +48,16 @@ juce::Point<int> pngSize (const juce::File& file)
         return {};
     auto be = [&] (int at) { return (int) ((std::uint32_t) h[at] << 24 | (std::uint32_t) h[at + 1] << 16 | (std::uint32_t) h[at + 2] << 8 | h[at + 3]); };
     return { be (16), be (20) };
+}
+
+// a picture scaled to w × h: halving steps, then the last one, all bilinear, in a software image (it runs on the
+// picker's worker thread; JUCE's high-quality rescale took ~20 ms per picture)
+juce::Image fitImage (const juce::Image& image, int w, int h)
+{
+    auto from = juce::SoftwareImageType().convert (image);
+    while (from.getWidth() >= w * 2 && from.getHeight() >= h * 2)
+        from = from.rescaled (from.getWidth() / 2, from.getHeight() / 2, juce::Graphics::mediumResamplingQuality);
+    return from.rescaled (w, h, juce::Graphics::mediumResamplingQuality);
 }
 
 // FL Studio's Plugin picker (F8; REA_rodada169k §2.5 and REA_rodada171c §2, FL's TPlugListForm): a veil over the main
@@ -67,6 +78,12 @@ public:
         openedAt = t0;
         startTimerHz (60);
         buildMs = juce::Time::getMillisecondCounterHiRes() - t0;
+    }
+
+    ~PluginPickerView() override
+    {
+        stopTimer();
+        workers.removeAllJobs (true, 4000);
     }
 
     double constructionMs() const noexcept { return buildMs; }
@@ -526,44 +543,34 @@ private:
         if (getAlpha() < 1.0f)
             setAlpha ((float) juce::jlimit (0.0, 1.0, (juce::Time::getMillisecondCounterHiRes() - openedAt) / fadeMs));
 
-        // lazily: only the tiles shown, a few per frame (the PNG decode is ~1–3 ms each)
+        // lazily: only the tiles shown. The PNG decode and the fit to the tile's size run on a worker thread (on the
+        // message thread they took the whole frame: Windows paints only when no other message waits)
         const auto now = juce::Time::getMillisecondCounterHiRes();
         if (now < nextLoadAt)
             return;
         nextLoadAt = now + 33.0;
-        if (needsFitting)
-            fitPictures (8);
-        int loads = 0;
-        bool nativeMissing = false, sizeChanged = false;
-        for (auto& t : tiles)
+        bool nativeMissing = false;
+        for (int i = 0; i < (int) tiles.size(); ++i)
         {
-            if (t.bounds.isEmpty() || t.thumb == Tile::Thumb::loaded || ! tileArea().intersects (t.bounds))
+            auto& t = tiles[(std::size_t) i];
+            if (t.bounds.isEmpty() || t.queued || ! tileArea().intersects (t.bounds))
                 continue;
+            if (t.thumb == Tile::Thumb::loaded)
+            {
+                if (! fittedNow (t))
+                    queueFit (i, false);
+                continue;
+            }
             if (t.thumb == Tile::Thumb::missing && now < t.nextLook)
             {
                 nativeMissing = nativeMissing || t.native;
                 continue;
             }
-            if (loads >= 6)
+            if (inFlight >= 8)
                 break;
             const auto file = pluginthumbs::fileFor (t.key, t.native);
             if (file.existsAsFile())
-            {
-                t.picture = juce::ImageFileFormat::loadFrom (file);
-                ++loads;
-            }
-            if (t.picture.isValid())
-            {
-                t.thumb = Tile::Thumb::loaded;
-                const auto w = juce::roundToInt ((float) t.picture.getWidth() / pluginthumbs::pictureScale);
-                const auto h = juce::roundToInt ((float) t.picture.getHeight() / pluginthumbs::pictureScale);
-                if (! t.hasPicture || std::abs (w - t.editorWidth) > 2 || std::abs (h - t.editorHeight) > 2)
-                    sizeChanged = true; // (a picture drawn while the picker was open: its tile takes its size)
-                t.hasPicture = true;
-                t.editorWidth = w;
-                t.editorHeight = h;
-                repaint (t.bounds.expanded (12));
-            }
+                queueFit (i, true);
             else
             {
                 t.thumb = Tile::Thumb::missing;
@@ -572,8 +579,9 @@ private:
                 nativeMissing = nativeMissing || t.native;
             }
         }
-        if (sizeChanged && now - lastRelayout > 400.0)
+        if (relayoutPending && now - lastRelayout > 400.0)
         {
+            relayoutPending = false;
             lastRelayout = now;
             layoutTiles();
             repaint();
@@ -582,33 +590,70 @@ private:
             pluginthumbs::ensureRendering();
     }
 
-    // fits up to `budget` shown pictures to their tiles, off the paint
-    void fitPictures (int budget)
+    bool fittedNow (const Tile& t) const
     {
-        needsFitting = false;
+        return t.scaled.isValid() && t.scaledFor == juce::Point<int> (t.bounds.getWidth(), t.bounds.getHeight()) && t.scaledAt == paintScale;
+    }
+
+    // a job for the worker: load the picture (`load`) and / or fit it to the tile's size now
+    void queueFit (int i, bool load)
+    {
+        auto& t = tiles[(std::size_t) i];
+        if (inFlight >= 8 && ! load)
+            return;
+        const juce::Point<int> size (t.bounds.getWidth(), t.bounds.getHeight());
         const auto scale = paintScale;
-        for (auto& t : tiles)
-        {
-            if (t.thumb != Tile::Thumb::loaded || t.bounds.isEmpty() || ! t.bounds.intersects (tileArea()))
-                continue;
-            const juce::Point<int> size (t.bounds.getWidth(), t.bounds.getHeight());
-            if (t.scaled.isValid() && t.scaledFor == size && t.scaledAt == scale)
-                continue;
-            if (budget-- <= 0)
-            {
-                needsFitting = true;
-                return;
-            }
+        const auto file = load ? pluginthumbs::fileFor (t.key, t.native) : juce::File();
+        const auto picture = t.picture;
+        t.queued = true;
+        ++inFlight;
+        juce::Component::SafePointer<PluginPickerView> safe (this);
+        workers.addJob ([safe, i, file, picture, size, scale] {
+            auto source = file != juce::File() ? juce::ImageFileFormat::loadFrom (file) : picture;
+            if (source.isValid())
+                source = juce::SoftwareImageType().convert (source);
             const auto w = juce::jmax (1, juce::roundToInt (size.x * scale)), h = juce::jmax (1, juce::roundToInt (size.y * scale));
-            // halving steps, then the last one, all bilinear (JUCE's high-quality rescale took ~20 ms per picture)
-            auto from = t.picture;
-            while (from.getWidth() >= w * 2 && from.getHeight() >= h * 2)
-                from = from.rescaled (from.getWidth() / 2, from.getHeight() / 2, juce::Graphics::mediumResamplingQuality);
-            t.scaled = from.rescaled (w, h, juce::Graphics::mediumResamplingQuality);
+            auto fitted = source.isValid() ? fitImage (source, w, h) : juce::Image();
+            juce::MessageManager::callAsync ([safe, i, source, fitted, size, scale] {
+                if (safe != nullptr)
+                    safe->fitDone (i, source, fitted, size, scale);
+            });
+        });
+    }
+
+    void fitDone (int i, const juce::Image& source, const juce::Image& fitted, juce::Point<int> size, double scale)
+    {
+        --inFlight;
+        if (! juce::isPositiveAndBelow (i, (int) tiles.size()))
+            return;
+        auto& t = tiles[(std::size_t) i];
+        t.queued = false;
+        if (! source.isValid())
+        {
+            t.thumb = Tile::Thumb::missing;
+            t.nextLook = t.native ? juce::Time::getMillisecondCounterHiRes() + 400.0 : 1.0e300;
+            return;
+        }
+        if (t.thumb != Tile::Thumb::loaded)
+        {
+            // (drawn as the window's own kind of image: converted once here, not at every paint)
+            t.picture = juce::NativeImageType().convert (source);
+            t.thumb = Tile::Thumb::loaded;
+            const auto w = juce::roundToInt ((float) source.getWidth() / pluginthumbs::pictureScale);
+            const auto h = juce::roundToInt ((float) source.getHeight() / pluginthumbs::pictureScale);
+            if (! t.hasPicture || std::abs (w - t.editorWidth) > 2 || std::abs (h - t.editorHeight) > 2)
+                relayoutPending = true; // (a picture drawn while the picker was open: its tile takes its size)
+            t.hasPicture = true;
+            t.editorWidth = w;
+            t.editorHeight = h;
+        }
+        if (fitted.isValid() && size == juce::Point<int> (t.bounds.getWidth(), t.bounds.getHeight()))
+        {
+            t.scaled = juce::NativeImageType().convert (fitted);
             t.scaledFor = size;
             t.scaledAt = scale;
-            repaint (t.bounds.expanded (12));
         }
+        repaint (t.bounds.expanded (12));
     }
 
     // --- painting --------------------------------------------------------------------------------------------------
@@ -655,9 +700,7 @@ private:
         {
             // the picture fitted to the tile once (the one pointed at is that one drawn 8 % bigger); until it is fitted
             // (the timer fits a few per frame) the kept picture is drawn scaled on the fly
-            const auto fitted = t.scaled.isValid() && t.scaledFor == juce::Point<int> (t.bounds.getWidth(), t.bounds.getHeight()) && t.scaledAt == scale;
-            if (! fitted)
-                needsFitting = true;
+            const auto fitted = fittedNow (t);
             juce::Graphics::ScopedSaveState quality (g);
             if (! fitted)
                 g.setImageResamplingQuality (juce::Graphics::lowResamplingQuality);
@@ -995,7 +1038,9 @@ private:
     pickerview::Tabs tabs;
     juce::Image backdrop, backdropShown;
     double paintScale = 1.0;
-    bool needsFitting = false;
+    juce::ThreadPool workers { 2 };
+    int inFlight = 0;
+    bool relayoutPending = false;
     juce::String searchText;
     bool showPlaceholder = false;
     int tab = 0, hoverTab = -1, hoverTile = -1, pressedTile = -1, stripOffset = 0;
