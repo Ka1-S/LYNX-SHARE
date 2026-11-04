@@ -182,16 +182,16 @@ std::vector<std::string> presetCandidates (const std::string& presetFolder, bool
     const auto folder = std::string ("%FLStudioData%\\Patches\\Plugin presets\\") + (generator ? "Generators\\" : "Effects\\") + presetFolder;
     const auto exists = [&access] (const std::string& p) { return ! p.empty() && access.fileExists && access.fileExists (p); };
 
-    for (const auto* name : { "Default.fst", "Default.tbio", "Default\\Default.tbio" })
-        if (const auto path = resolveFlPath (folder + "\\" + name, access.roots); exists (path))
-            out.push_back (path);
-
-    // then, for the drum generators FL ships without a Default.fst, the plugin's entry in FL's Plugin database
-    // (Generators\Drum\<plugin>.fst): the state FL itself adds when the plugin is picked (Drumaxx' "Default Kit",
-    // REA_rodada169e §1), before any other preset of the folder. (Other engines keep their folder order: e.g.
-    // Morphine's Plugin database state plays differently from the preset LYNX starts it from; not checked yet.)
-    const auto drum = presetFolder == "Drumaxx" || presetFolder == "Drumpad" || presetFolder == "BassDrum";
-    if (generator && drum && access.listPresets)
+    // FL adds a new generator from its Plugin database (the Channel rack's "+" / the plugin picker load the entry's .fst
+    // into the new channel, REA_rodada169l §3): for the engines FL ships without a usable Default preset, that entry
+    // (Generators\<category>\<plugin>.fst) comes first — Drumaxx' "Default Kit" (REA_rodada169e §1), Drumpad, BassDrum,
+    // GMS, Morphine, Transistor Bass ("Factory programs"), Sakura ("Bowed 6"), Ogun (a version-11 state LYNX reads since
+    // round 169l; its Default.fst is not what FL adds). The other engines keep their Default.* first (see §3: FL's
+    // Plugin database state differs from it for some of them; left as it was, for the user to decide).
+    const auto fromDatabase = presetFolder == "Drumaxx" || presetFolder == "Drumpad" || presetFolder == "BassDrum" || presetFolder == "GMS"
+                              || presetFolder == "Morphine" || presetFolder == "Transistor Bass" || presetFolder == "Sakura"
+                              || presetFolder == "Ogun";
+    if (generator && fromDatabase && access.listPresets)
     {
         const auto wanted = lower (presetFolder + ".fst");
         for (const auto& path : access.listPresets (resolveFlPath ("%FLStudioData%\\Patches\\Plugin database\\Generators", access.roots)))
@@ -205,6 +205,10 @@ std::vector<std::string> presetCandidates (const std::string& presetFolder, bool
             }
         }
     }
+
+    for (const auto* name : { "Default.fst", "Default.tbio", "Default\\Default.tbio" })
+        if (const auto path = resolveFlPath (folder + "\\" + name, access.roots); exists (path) && std::find (out.begin(), out.end(), path) == out.end())
+            out.push_back (path);
 
     if (access.listPresets)
         for (const auto& path : access.listPresets (resolveFlPath (folder, access.roots)))
@@ -222,7 +226,7 @@ std::string defaultPresetPath (const std::string& presetFolder, bool generator, 
 
 namespace
 {
-// BooBass has no preset folder: a new one is its three knobs at their defaults (0.5, REA_rodada29 §4) over the
+// BooBass has no preset folder: a new one is its three knobs at FL's Plugin database values (32767) over the
 // multisample of the user's own engine DLL
 std::string booBassDll (const FlAccess& access)
 {
@@ -310,7 +314,9 @@ std::optional<ChannelDef> makeChannel (InstrumentKind kind, const FlAccess& acce
         def.name = engine->name;
         def.instrument = kind;
         def.samplePath = dll;
-        def.modelParams = { 32768.0f, 32768.0f, 32768.0f };
+        // FL's new BooBass is its Plugin database state (Generators\Misc\BooBass.fst: version 1, the three knobs at
+        // 0x7fff; round 169l)
+        def.modelParams = { 32767.0f, 32767.0f, 32767.0f };
         return def;
     }
 

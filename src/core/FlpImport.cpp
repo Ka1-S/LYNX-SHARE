@@ -1628,7 +1628,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 if (name == "ogun" && ogunStateUsable (c.pluginState))
                 {
                     def.instrument = InstrumentKind::ogun;
-                    def.pluginState = c.pluginState;
+                    def.pluginState = ogunCurrentLayout (c.pluginState); // (versions 10…13 in today's layout, round 169l)
                     adoptedFromPlugin = true;
                 }
                 else if (name == "autogun" && autogunStateUsable (c.pluginState))

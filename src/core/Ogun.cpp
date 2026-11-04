@@ -214,10 +214,30 @@ std::optional<StateData> parseState (const std::vector<std::uint8_t>& blob, bool
     StateData S;
     S.autogun = autogun;
     S.version = (int) (vw > 0xffff ? vw >> 16 : vw);
-    if (S.version < 14)
+    if (S.version < 10 || vw == 0x7fffffffu || vw >= 0x130004u)
         return std::nullopt;
     auto body = inflateZlib (blob.data() + 4, blob.size() - 4, false, 16u << 20);
-    if (! body || body->size() < 0x100 + 3 + 12)
+    if (! body)
+        return std::nullopt;
+    if (S.version < 14)
+    {
+        // versions 10…13 (FL's Plugin database Ogun is version 11, round 169l): SaveRestoreState FUN_00864d00 first sets
+        // the parameter bytes at plugin +0x20f…+0x22b (P + 0xe3…0xff: 0, 0, 1, 0, 0, 16 × 0, 0, 0, –, 0, i32 430), then
+        // reads 12 bytes into P + 0 and fewer bytes than today into P + 12 (0xf4 − 1 (v < 11) − 1 (v < 12) − 6
+        // (v < 13)), and clears +0x226 (P + 0xfa) below version 14; the rest of the stream is today's layout
+        const std::size_t n = 12 + 0xf4 - (S.version < 11 ? 1u : 0u) - (S.version < 12 ? 1u : 0u) - (S.version < 13 ? 6u : 0u);
+        if (body->size() < n)
+            return std::nullopt;
+        std::vector<std::uint8_t> image (0x100, 0);
+        image[0xe5] = 1;
+        const std::int32_t dust = 0x1ae;
+        std::memcpy (image.data() + 0xfc, &dust, 4);
+        std::copy (body->begin(), body->begin() + (std::ptrdiff_t) n, image.begin());
+        image[0xfa] = 0;
+        image.insert (image.end(), body->begin() + (std::ptrdiff_t) n, body->end());
+        *body = std::move (image);
+    }
+    if (body->size() < 0x100 + 3 + 12)
         return std::nullopt;
     S.body = std::move (*body);
     std::memcpy (S.P.data(), S.body.data(), 256);
@@ -3670,6 +3690,32 @@ bool ogunStateUsable (const std::vector<std::uint8_t>& state)
     catch (...)
     {
         return false;
+    }
+}
+
+std::vector<std::uint8_t> ogunCurrentLayout (const std::vector<std::uint8_t>& state)
+{
+    std::uint32_t vw = 0;
+    if (state.size() >= 8)
+        std::memcpy (&vw, state.data(), 4);
+    const auto version = (int) (vw > 0xffff ? vw >> 16 : vw);
+    if (state.size() < 8 || version >= 14)
+        return state;
+    try
+    {
+        const auto S = parseState (state);
+        if (! S)
+            return state;
+        // the parsed body is already in version 14's layout (64 parameters, then the rest as stored)
+        std::vector<std::uint8_t> out (4, 0);
+        out[0] = 14;
+        const auto z = zlibStored (S->body);
+        out.insert (out.end(), z.begin(), z.end());
+        return out;
+    }
+    catch (...)
+    {
+        return state;
     }
 }
 
