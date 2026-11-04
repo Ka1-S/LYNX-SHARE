@@ -2010,6 +2010,7 @@ inline const Theme& booBassTheme()
         x.arcGlow = 0.18f;
         x.stageRepaint = true;
         x.paintMotion = booBassMotion;
+        x.hz = 15;
         return x;
     }();
     return t;
@@ -2256,6 +2257,7 @@ inline const Theme& pluckedTheme()
         x.arcGlow = 0.18f;
         x.stageRepaint = true;
         x.paintMotion = pluckedMotion;
+        x.hz = 15;
         return x;
     }();
     return t;

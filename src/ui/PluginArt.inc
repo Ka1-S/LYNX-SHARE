@@ -954,6 +954,15 @@ juce::String artSelfTest()
     expect (artForInstrument (InstrumentKind::sakura) == Art::sakura && artForInstrument (InstrumentKind::threeosc) == Art::threeOsc
                 && artForInstrument (InstrumentKind::kick) == Art::none,
             "instrument art");
+    { // every generator with a plugin page of its own has a theme (round 170j's rollout)
+        using I = InstrumentKind;
+        for (const auto k : { I::sakura, I::drumpad, I::boobass, I::drumsynth, I::harmless, I::sytrus, I::harmor, I::gms, I::morphine, I::ogun,
+                              I::minisynth, I::dx10, I::kepler, I::poizone, I::fruitkick, I::bassdrum, I::toxic, I::threeosc, I::autogun,
+                              I::transistorbass, I::simsynth, I::wasp, I::plucked, I::beepmap, I::sawer, I::flkeys, I::granulizer, I::drumaxx,
+                              I::slayer, I::soundfont, I::keplerExo, I::wavetraveller, I::synth })
+            expect (artForInstrument (k) != Art::none, "a generator without art");
+        expect (artForInstrument (I::sampler) == Art::none && artForInstrument (I::layer) == Art::none, "channel chrome keeps the shared style");
+    }
     expect (artForEffect (EffectKind::facetEq) == Art::facet && artForEffect (EffectKind::epochVerb) == Art::none, "effect art");
     for (const auto a : allArts()) // every id has exactly one theme, with a name and a canvas
     {
