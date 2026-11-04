@@ -1283,6 +1283,8 @@ public:
                && holds (item.when2Param, item.when2Min, item.when2Max);
     }
 
+    int pageCount() const { return layout != nullptr ? (int) layout->pages.size() : 0; }
+
     void showPage (int p)
     {
         page = p;
@@ -5169,6 +5171,21 @@ std::unique_ptr<juce::Component> makeChannelModulationPanel (AudioEngine& engine
 std::unique_ptr<juce::Component> makeChannelPrecomputePanel (AudioEngine& engine, int channel)
 {
     return std::make_unique<PrecomputePanel> (engine, ChannelRef::rack (channel));
+}
+
+int showChannelLayoutPage (juce::Component& frame, int page)
+{
+    if (auto* panel = dynamic_cast<ModelPanel*> (&frame); panel != nullptr && panel->pageCount() > 0)
+    {
+        const auto count = panel->pageCount();
+        if (page >= 0 && page < count)
+            panel->showPage (page);
+        return count;
+    }
+    for (auto* child : frame.getChildren())
+        if (const auto count = showChannelLayoutPage (*child, page); count > 0)
+            return count;
+    return 0;
 }
 
 std::unique_ptr<juce::Component> makeChannelFrame (AudioEngine& engine, int channel, int tab)

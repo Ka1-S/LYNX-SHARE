@@ -87,7 +87,7 @@ TEST (toxic169h_sequencer_steps_and_clock)
     const auto ev = lynx::toxic::sequencerEvents (s, { held (60) }, {}, 44100.0, 30000, 125.0);
     // a 16th note (15/125 s = 5292 samples) quantised to the engine's 64-sample chunks
     CHECK ((onsets (ev, 60) == std::vector<int> { 0, 21184 }));
-    CHECK ((onsets (ev, 67) == std::vector<int> { 5312 }));
+    CHECK ((onsets (ev, 67) == std::vector<int> { 5312, 26496 })); // (the pattern repeats)
     CHECK ((onsets (ev, 72) == std::vector<int> { 10624 }));
     // the rest stops the lane's note and plays nothing
     bool released72 = false;
@@ -102,7 +102,7 @@ TEST (toxic169h_sequencer_swing_and_modes)
     auto s = pattern ({ 0, 1, 2 }, 3);
     set (s, 158, 1.0f); // swing: the steps last 1.25 and 0.75 sixteenths in turn
     auto ev = lynx::toxic::sequencerEvents (s, { held (60) }, {}, 44100.0, 22000, 125.0);
-    CHECK ((onsets (ev, 61) == std::vector<int> { 6656 }));
+    CHECK ((onsets (ev, 61) == std::vector<int> { 6656, 21184 }));
     CHECK ((onsets (ev, 62) == std::vector<int> { 10624 }));
     CHECK ((onsets (ev, 60) == std::vector<int> { 0, 17216 }));
 
