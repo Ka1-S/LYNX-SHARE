@@ -345,7 +345,8 @@ int run (const juce::StringArray& args)
         while (juce::Time::getMillisecondCounter() < until)
         {
             for (auto& p : peers)
-                p->live->pump();
+                if (p->live != nullptr) // (the host's, while it "restarts")
+                    p->live->pump();
             if (done())
                 return true;
             juce::Thread::sleep (5);
@@ -602,20 +603,29 @@ int run (const juce::StringArray& args)
             return false;
         };
         const bool ok = pumpUntil ([&] { return has (rui, "hello from Ana") && has (host, "hello from Ana") && has (ana, "hello from Ana") && has (ana, "hi Ana") && has (rui, "hi Ana"); }, 10000);
-        check (ok && rui.live->unreadChat() >= 2 && rui.live->getChat().back().name == "Host",
+        auto order = [] (Peer& p) {
+            juce::StringArray lines;
+            for (const auto& l : p.live->getChat())
+                lines.add (l.name + ": " + l.text);
+            return lines.joinIntoString (" | ");
+        };
+        check (ok && rui.live->unreadChat() >= 2 && order (rui) == order (host) && order (ana) == order (host),
+               "chat order everywhere: " + order (host));
+        check (ok,
                "chat: Ana's and the host's lines reached everyone in " + juce::String ((int) (juce::Time::getMillisecondCounterHiRes() - t)) + " ms (Rui has "
                    + juce::String (rui.live->unreadChat()) + " unread)");
     }
 
     // follow the host's transport: Rui plays, jumps and stops with the host
     rui.live->setFollowTransport (true);
-    host.engine->seek (7680.0);
-    host.engine->getTransport().positionTicks.store (7680.0); // (no audio device here: the playhead is set by hand)
+    host.engine->seek ((double) ppq);
+    host.engine->getTransport().positionTicks.store ((double) ppq); // (no audio device here: the playhead is set by hand)
     host.engine->play();
+    const auto hostAt = host.engine->songPlayheadTicks();
     pumpUntil ([&] { return rui.engine->getTransport().playing.load(); }, 8000);
     const auto ruiSeek = rui.engine->getTransport().seekRequest.load();
-    check (rui.engine->getTransport().playing.load() && ruiSeek >= 7680.0 && ruiSeek < 7680.0 + 4 * ppq,
-           "Rui follows the host: playing from " + juce::String (ruiSeek, 0) + " ticks (the host's 7680 plus the time on the way)");
+    check (rui.engine->getTransport().playing.load() && hostAt > 0.0 && ruiSeek >= hostAt && ruiSeek < hostAt + 4 * ppq,
+           "Rui follows the host: playing from " + juce::String (ruiSeek, 0) + " ticks (the host's " + juce::String (hostAt, 0) + " plus the time on the way)");
     host.engine->stop();
     check (pumpUntil ([&] { return ! rui.engine->getTransport().playing.load(); }, 8000) && ! ana.engine->getTransport().playing.load(),
            "the host stopped: Rui stopped too, Ana (not following) never played");

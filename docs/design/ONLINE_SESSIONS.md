@@ -691,13 +691,22 @@ presence, the resume question).
     `seek {nonce}` → `host {nonce, sig}` (Ed25519 over `room|nonce`; the public key came in the snapshot as
     `hostKey`, the seed stays in the host's journal) — anyone with the invite code has the session key, so the key
     alone cannot tell the host from a guest pretending;
-  - then `resume {tag, token, rev}` (the token is the guest's own, from its snapshot): the host keeps the last 4096
-    commits (`Authority::since`) and replays the missing ones followed by `resumed {rev}`; the guest's
+  - then `resume {tag, token, rev, epoch}` (the token is the guest's own, from its snapshot): the host keeps the last
+    4096 commits (`Authority::since`) and replays the missing ones followed by `resumed {rev}`; the guest's
     `Replica::resend()` then proposes again whatever it sent that was never confirmed, **with the oldest base it
     had**, so the host's conflict check judges it as it would have the first time. When the commits are gone (or the
     host restarted) the answer is a snapshot with `resumed: true`: `Replica::resume()` puts the guest's unconfirmed
     edits on top of it — and, when the host is *behind* the guest (it lost commits in a crash), also the changes of
     the guest's own area the host no longer has.
+  - **Epochs.** A host that restarts from its journal may be *behind* revisions its guests already saw, and then
+    numbers the next commits with revision numbers those guests already used for other commits. A revision number
+    alone is therefore not a position: every host run draws a random 48-bit `epoch` (in the snapshot and in
+    `resume`), `Authority::since (rev, epoch)` replays only within the guest's own epoch (a guest of an earlier run gets a
+    resume snapshot), and `lostCommitsOf (epoch, rev)` (another epoch, past the revision the journal restarted
+    from) tells the host that a guest saw commits it no longer has (the snapshot then says `lost: true`, and the guest's own-area changes are kept on top).
+    Found by the seeded drop/restart test (16 of 24 sessions diverged before epochs; 24 of 24 converge with them).
+  - A local edit made between two polls is never swallowed by a remote update or an arriving file: the poll stamp
+    moves on only when nothing local was waiting (found by `--livetest` on the real relay).
   - A dropped guest keeps its place: the host lists it greyed (hollow dot), its tag, area, permissions and resume
     token stay; media it was sending or receiving start again from the first piece at its new peer number.
 - **Host journal.** Every 2 s at most after a change the host writes `<profile>/Live session/journal.json` (the

@@ -1405,8 +1405,11 @@ void LiveSessionManager::applyUpdate (const live::Replica::Update& u)
 {
     if (u.working)
     {
+        // (a local edit made since the last poll is still in the working song: it must still go out)
+        const bool polled = lastStamp == engine.getSongStamp();
         engine.applyRemote (*u.working);
-        lastStamp = engine.getSongStamp();
+        if (polled)
+            lastStamp = engine.getSongStamp();
     }
     if (! u.rejected.empty() && onHint)
     {
@@ -1874,8 +1877,10 @@ void LiveSessionManager::finishMedia (const juce::String& sha, bool ok)
     forward.erase (sha);
     // the song already points at it: load it now
     engine.getSampleLibrary().forget (w.file.getFullPathName());
+    const bool polled = lastStamp == engine.getSongStamp(); // (an edit not yet sent must still go out)
     engine.applyRemote (engine.getSong());
-    lastStamp = engine.getSongStamp();
+    if (polled)
+        lastStamp = engine.getSongStamp();
     if (onChange)
         onChange();
 }

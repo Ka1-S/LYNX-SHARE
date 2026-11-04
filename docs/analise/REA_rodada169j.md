@@ -20,11 +20,13 @@ match, so no FL reverse engineering. Design and what was built: [docs/design/ONL
 
 ## Results
 
-(filled in below as the runs finish)
+(filled in as the runs finish)
 
 ## Where I stopped
 
-- Done: core (LiveSession, LiveCrypto), engine (LiveSessions, MediaPack, LiveTest), UI (LiveChat, LiveSessionUi,
-  MainComponent), core tests, docs. WIP pushed as wip/online169j.
-- Next: build-local, Windows build, `--selftest`, `--livetest` (with `--plugin` = tools/testplugin's LYNX Test Synth
-  .vst3), GUI two-instance check, then `coord/train.sh online169j`.
+- Done: core, engine, UI, core tests, docs, translations; build-local bl2 green (live169j: 24/24 sessions converge
+  over dropping links, 183/183 offline edits kept; 1963796 checks, 0 failures).
+- Windows `--livetest` live2 found a real bug (a local edit made between two 100 ms polls was swallowed when a commit
+  or an arriving file updated the working song: Lia's refused edit never went out, 3 FAILs). Fixed in
+  `applyUpdate` / `finishMedia` (the poll stamp moves on only when nothing local waited); live3 passed.
+- Next: Windows rebuild (win5) + livetest ×3, `--selftest`, GUI two-instance check, commit, `coord/train.sh online169j`.
