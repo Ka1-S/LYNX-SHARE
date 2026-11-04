@@ -1938,6 +1938,15 @@ inline void capPedal (juce::Graphics& g, Rectangle<float> cap, Point<float> c, f
     juce::ignoreUnused (p);
 }
 
+// round 170k: the small corners the stage painters animate (Theme::motionArea), so only they are repainted
+inline Rectangle<float> lampArea (Rectangle<float> s) { return Rectangle<float> (30.0f, 30.0f).withCentre ({ s.getRight() - 12.0f, s.getCentreY() }); }
+inline Rectangle<float> recordArea (Rectangle<float> s)
+{
+    const auto r = juce::jmin (s.getHeight() * 0.48f, 18.0f);
+    return Rectangle<float> (r * 2.0f + 8.0f, r * 2.0f + 8.0f).withCentre ({ s.getRight() - r - 4.0f, s.getCentreY() });
+}
+inline Rectangle<float> gridArea (Rectangle<float> s) { return s.withTrimmedLeft (juce::jmax (0.0f, s.getWidth() - 120.0f)); }
+
 inline void delay3Motion (juce::Graphics& g, const Motion& m) // the jewel lamp pulses slowly
 {
     const auto s = m.stage;
@@ -1970,6 +1979,7 @@ inline const Theme& delay3Theme()
         x.stageRepaint = true;
         x.paintMotion = delay3Motion;
         x.hz = 10; // round 170k: slow motion, fewer frames
+        x.motionArea = lampArea;
         return x;
     }();
     return t;
@@ -2792,8 +2802,9 @@ inline void capNeonRing (juce::Graphics& g, Rectangle<float> cap, Point<float> c
 
 inline void hyperChorusMotion (juce::Graphics& g, const Motion& m) // a little grid floor scrolling towards the viewer
 {
-    const auto s = m.stage;
-    if (s.getWidth() < 40.0f || s.getHeight() < 10.0f) return;
+    const auto stage = m.stage;
+    if (stage.getWidth() < 40.0f || stage.getHeight() < 10.0f) return;
+    const auto s = gridArea (stage); // only the strip's right end moves (CPU)
     g.saveState();
     g.reduceClipRegion (s.toNearestInt());
     const auto off = std::fmod (m.t * 0.6f, 1.0f);
@@ -2830,6 +2841,7 @@ inline const Theme& hyperChorusTheme()
         x.stageRepaint = true;
         x.paintMotion = hyperChorusMotion;
         x.hz = 12; // round 170k: slow motion, fewer frames
+        x.motionArea = gridArea;
         return x;
     }();
     return t;
@@ -3126,6 +3138,7 @@ inline const Theme& vintagePhaserTheme()
         x.stageRepaint = true;
         x.paintMotion = vintagePhaserMotion;
         x.hz = 12; // round 170k: slow motion, fewer frames
+        x.motionArea = lampArea;
         return x;
     }();
     return t;
@@ -3803,6 +3816,7 @@ inline const Theme& grossBeatTheme()
         x.stageRepaint = true;
         x.paintMotion = grossBeatMotion;
         x.hz = 12; // round 170k: slow motion, fewer frames
+        x.motionArea = recordArea;
         return x;
     }();
     return t;

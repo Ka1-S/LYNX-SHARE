@@ -100,6 +100,9 @@ struct Theme
     bool stageRepaint = false;               // the painter animates the whole stage strip (scopes, pulses)
     void (*paintMotion) (juce::Graphics&, const Motion&) = nullptr;
     int hz = 20;                             // frames per second of the moving layer (slow motion needs fewer: CPU)
+    // round 170k: the part of the stage the painter animates (a lamp, a record), repainted instead of the whole stage
+    // strip when stageRepaint is set: the editor under the strip then redraws only that corner
+    juce::Rectangle<float> (*motionArea) (juce::Rectangle<float> stage) = nullptr;
 };
 
 // the registries (PluginArtGenerators.inc / PluginArtEffects.inc)
@@ -916,8 +919,8 @@ void ArtLayer::timerCallback()
         impl->step (th, m, dt, (float) t, s);
         dirty.addWithoutMerging (Impl::boundsOf (th, m).getSmallestIntegerContainer());
     }
-    if (th.stageRepaint) // the stage glows, turns or scrolls: repaint it
-        dirty.add (s.getSmallestIntegerContainer());
+    if (th.stageRepaint) // the stage glows, turns or scrolls: repaint it (or only the part that moves)
+        dirty.add ((th.motionArea != nullptr ? th.motionArea (s).getIntersection (s) : s).getSmallestIntegerContainer());
     dirty.consolidate();
     for (const auto& r : dirty)
         repaint (r);
@@ -956,6 +959,14 @@ juce::String artSelfTest()
                           EffectKind::fruityMultiband, EffectKind::maximus, EffectKind::transientProcessor, EffectKind::stereoShaper,
                           EffectKind::stereoEnhancer, EffectKind::spreader, EffectKind::grossBeat, EffectKind::vocodex, EffectKind::vocoder, EffectKind::pitchCorrect, EffectKind::lynxTune, EffectKind::voiceShift, EffectKind::quellDenoiser, EffectKind::flPitchShifter, EffectKind::lovePhilter, EffectKind::effector, EffectKind::squeeze, EffectKind::lofi, EffectKind::eq, EffectKind::compressor, EffectKind::delay, EffectKind::reverb, EffectKind::limiter, EffectKind::distortion, EffectKind::filter, EffectKind::chorus, EffectKind::autoPan, EffectKind::fruityPanOMatic, EffectKind::fruityBalance, EffectKind::utility, EffectKind::fruitySend, EffectKind::frequencySplitter, EffectKind::crossover, EffectKind::multibandDelay, EffectKind::equo, EffectKind::emphasizer, EffectKind::flLowLifter, EffectKind::fruityFastLP, EffectKind::fruityFilter, EffectKind::fruityFreeFilter, EffectKind::fl7BandEq, EffectKind::flBassBoost, EffectKind::convolver, EffectKind::volumeGate, EffectKind::rhythmGain, EffectKind::freqShift, EffectKind::pitchShift, EffectKind::flPhaseInverter, EffectKind::flCenter, EffectKind::flDelay1, EffectKind::fruityMute2 }) // round 170k: the effects' themes
         expect (artForEffect (k) != Art::none && styleFor (k) == Style::themed, "effect themes (170k)");
+    for (int a = 128; a < 256; ++a) // round 170k: a theme that names its moving corner keeps it small and inside the stage
+        if (const auto* th = artkit::effectTheme ((Art) a); th != nullptr && th->motionArea != nullptr)
+        {
+            const juce::Rectangle<float> stage (200.0f, 4.0f, 420.0f, 30.0f);
+            const auto area = th->motionArea (stage).getIntersection (stage);
+            expect (th->stageRepaint && th->paintMotion != nullptr && ! area.isEmpty() && area.getWidth() * area.getHeight() < stage.getWidth() * stage.getHeight() * 0.5f,
+                    "motion area (170k)");
+        }
     expect (resolve (Style::themed, Art::sakura) == Style::themed && resolve (Style::neon, Art::none) == Style::neon, "automatic");
     setForcedStyle ((int) Style::themed); // Themed everywhere: only plugins with art
     expect (styleFor (EffectKind::facetEq) == Style::themed && styleFor (EffectKind::peakController) == Style::glow, "forced Themed");
