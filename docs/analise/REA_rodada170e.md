@@ -10,7 +10,7 @@ symbols for the key functions, clear tooltips / hint text). FL's toolbar order i
 - Done: icons, snap magnet (toolbar toggle + editor boxes), last tweaked caption, Piano roll / Channel Rack / Mixer
   header icons, trackpad pinch + smooth scroll + Windows touchpad pieces, tests (tests/Toolbar170eTests.inc), all 14
   translation tables.
-- Checks: see "Checks" below.
+- Checks: done (see "Checks"); queued on the merge train.
 - Rerun: `tmp/coord/buildslot.sh tmp/coord/bl-wt.sh toolbar170e`; Windows: `OUT=~/projetos/lynx-wt-toolbar170e/build-win
   tmp/coord/winbuild.sh scripts/build-windows-zig.sh`; pictures: `LYNX.exe --snapshot <prefix> Demo.lynx` with a fresh
   LYNX_PROFILE_DIR + LYNX_TEST_MODE=1 into /mnt/e/lynx-work/toolbar170e/{before,after}.
@@ -30,4 +30,11 @@ Not changed: the "Param 110" name in his shot is the FL engine plugin's own unna
 
 ## Checks
 
-(filled in below)
+- build-local with FL Data: 2 438 089 checks, 0 failures (tests/Toolbar170eTests.inc: Windows touchpad pieces, pinch
+  factor, pinch out and back = same view).
+- Windows build + `LYNX.exe --snapshot` (fresh LYNX_PROFILE_DIR, LYNX_TEST_MODE=1, off-screen) of Demo.lynx: before
+  = main's exe (/mnt/e/lynx-work/toolbar170e/before), after = this branch (…/after, incl. the new
+  s-toolbar-tweak-1920.png). Side by side with FL 2026's reference shot: /mnt/e/lynx-work/toolbar170e/compare-170e.png
+  (looked at: toolbar, Playlist, Piano roll, Channel Rack, Mixer headers, last tweaked read-out).
+- Not checked on real hardware: the macOS pinch (no Mac here; JUCE's magnifyWithEvent → mouseMagnify path) and a
+  Windows precision touchpad (none on this PC); the logic is covered by the core tests.
