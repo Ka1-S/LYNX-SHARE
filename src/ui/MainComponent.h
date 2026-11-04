@@ -55,6 +55,7 @@ public:
     void openFile (const juce::File& file);
     void showSetupWizard(); // first run, or Options > Setup wizard (an overlay over this component)
     void closeSetupWizardForSnapshot() { setupOverlay.reset(); }
+    void refreshTweakReadoutForSnapshot() { refreshTweakReadout(); resized(); }
 
     // Asks "save changes?" if there are any; `then` runs unless the user cancels.
     void confirmDiscard (std::function<void()> then);

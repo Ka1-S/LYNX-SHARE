@@ -7475,6 +7475,17 @@ private:
                     saveArea (ui, ui.getToolbarBoundsForSnapshot(), prefix + "-toolbar-custom-1600.png");
                 }
                 {
+                    // round 170e: the toolbar after a knob was moved: the last tweaked read-out (its caption) and the snap magnet
+                    ui.setToolbarLayoutForSnapshot (lynx::toolbarlayout::Layout::makeDefault());
+                    lynx::AutomationTarget t;
+                    t.kind = lynx::AutomationTargetKind::mixerVolume;
+                    t.index = 0;
+                    offline.noteTweaked (t);
+                    ui.refreshTweakReadoutForSnapshot();
+                    offline.dispatchPendingMessages();
+                    saveArea (ui, ui.getToolbarBoundsForSnapshot(), prefix + "-toolbar-tweak-1600.png");
+                }
+                {
                     // the toolbar's edit mode (round 115): outlined panels and the tray of panels under it
                     ui.setToolbarLayoutForSnapshot (lynx::toolbarlayout::Layout::makeDefault());
                     auto layout = lynx::toolbarlayout::Layout::makeDefault();
