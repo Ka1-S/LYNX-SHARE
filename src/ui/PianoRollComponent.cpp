@@ -3644,9 +3644,9 @@ void PianoRollComponent::duplicateSelection()
         return;
 
     std::vector<int> added;
-    const auto grid = gridTicks();
-    editNotes ([&added, &source, grid] (Pattern& p) {
-        added = noteedit::duplicate (p, source, grid);
+    const auto beatsPerBar = engine.getSong().beatsPerBar;
+    editNotes ([&added, &source, beatsPerBar] (Pattern& p) {
+        added = noteedit::duplicateBars (p, source, beatsPerBar); // FL: whole bars later (round 170h)
         notetools::regroup (p, added);
     });
     setSelection (added);
