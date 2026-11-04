@@ -289,6 +289,11 @@ printf '%s\n' "${APP_SOURCES[@]}" | xargs -P "$JOBS" -I{} bash -c '
     [[ "$src" == src/ui/CrashReporter.cpp ]] && extra="-iquote $OUT"
     cached_pp "$obj" -- $ZIG c++ $COMMON_STR $extra -Wall -Wextra -c "$src" -o "$obj"'
 
+# 2026-11-04: an object whose source left APP_SOURCES (another branch's build in this folder) must not be linked
+# by the app/*.o glob below: it broke unrelated landings with undefined symbols.
+declare -A KEEP_OBJ=(); for src in "${APP_SOURCES[@]}"; do KEEP_OBJ["$OUT/app/$(echo "$src" | tr / _).o"]=1; done
+for obj in "$OUT"/app/*.o; do [[ -n "${KEEP_OBJ[$obj]:-}" ]] || { echo "removing stale object $obj"; rm -f "$obj"; }; done
+
 echo "Resources (manifest, icons, version $VERSION)..."
 OUT_ABS="$(cd "$OUT" && pwd)"
 IFS=. read -r VMAJ VMIN VPAT <<< "$VERSION"
