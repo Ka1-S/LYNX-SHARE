@@ -89,6 +89,11 @@ bool available (const EffectEngine& e, const FlAccess& fl);
 std::optional<ChannelDef> makeChannel (InstrumentKind kind, const FlAccess& fl);
 std::optional<EffectSlot> makeSlot (EffectKind kind, const FlAccess& fl, double bpm = 120.0);
 
+// An Autogun channel for the editor pictures (--instrumentshot, round 169h): the Autogun channel of FL's own
+// "System/Render tests/Autogun.flp", imported with its Magic Dust data (Autogun has no preset files: its patches come
+// from its own patch numbers, so it is not offered in the Add menus); nullopt without FL
+std::optional<ChannelDef> autogunShotChannel (const FlAccess& fl);
+
 // Any effect kind: the FL engines through makeSlot, the others makeEffectSlot (nullopt only for an FL engine that
 // can't be made here)
 std::optional<EffectSlot> newEffect (EffectKind kind, const FlAccess& fl, double bpm = 120.0);
