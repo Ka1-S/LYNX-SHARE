@@ -18,12 +18,24 @@ before|after` and `--artset fx1 --artgui <dir> before|after|still`.
 
 | batch | effects | state |
 |---|---|---|
-| 1 | Ridge Strip, Crest Compressor, Apex Limiter, Prism Multiband, Sentry Gate, Glow Leveler, Hush De-esser | built |
+| 1 | Ridge Strip, Crest Compressor, Apex Limiter, Prism Multiband, Sentry Gate, Glow Leveler, Hush De-esser | built, shot |
+| 2 | Epoch Verb, Atrium, Foil Plate, Halo, Horizon, Fruity Reeverb 2, LuxeVerb, Fruity Reeverb | built, shot |
+| 3 | Echoform, Spiral Echo, Orbit, Lattice Mod, Gemini Doubler, Fruity Delay 2 / 3 / Bank | built, shot |
+| 4 | Ember Saturator, Aether, Blood Overdrive, Fast Dist, WaveShaper, Soft Clipper, Hardcore, Distructor | built, shot |
+| 5 | Fruity Chorus, Hyper Chorus, Vintage Chorus, Flanger, Flangus, Phaser, Vintage Phaser, Frequency Shifter | building |
+| 6 | Parametric EQ 2, Fruity Limiter / Compressor / Multiband, Maximus, Transient Processor, Stereo Shaper / Enhancer, Spreader | building |
+| 7 | Gross Beat, Vocodex, Vocoder, Pitcher, LYNX Tune, Voice Shift, Quell, Pitch Shifter, Love Philter, Effector, Squeeze, Lo-fi | drafted |
+| 8 | LYNX basics + FL's small tools (lighter themes from shared motifs) | drafted |
+
+Design notes: the first shots showed the art hidden under opaque panels, so the illustration themes use translucent
+section glass (alpha 0x9c / 0xb8, like the pilot's Nebula); the console / rack / pedal themes stay solid. The
+display-first Pro editors (Crest, Apex, Prism, Sentry, Hush, Ember, Aether) are nearly all display, so their display
+backdrop shows the theme's illustration dimmed (42 % black) under the readouts.
 
 ## Where I stopped
 
 - 2026-11-04: worktree ~/projetos/lynx-wt-art170k on top of feature/art170j's split (be39f467, not yet landed).
-  Batch 1 committed (3f966407); Windows build running (OUT=build-win). Next: shots (artshot fx1 before/after,
+  Batches 1-6 committed; Windows build of 1-6 running; batches 7-8 drafted in the scratchpad (batch7.inc, batch8.inc). Next: shots (artshot fx1 before/after,
   artgui), review page section, build-local + tests, merge origin/main once art170j lands, train.sh art170k.
 - Commands: `OUT=build-win ~/.claude/jobs/f8789b49/tmp/coord/winbuild.sh scripts/build-windows-zig.sh`;
   `build-win/LYNX.exe --artset fx1 --artshot 'E:\lynx-work\art170k\shots' after` (fresh LYNX_PROFILE_DIR + LYNX_TEST_MODE=1).
