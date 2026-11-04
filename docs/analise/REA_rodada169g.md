@@ -26,6 +26,14 @@ unsigned files, so the existing constants stay valid):
 | Kepler / Kepler Exo `engine_x64.dll` | `baf37a1d…` / `10ed2464…` | a different build (2.5 M bytes differ, other layout) | **still FL 2026 only** (fixed RVAs of the LFO / noise / exp tables; needs a content search like TB's — next round) |
 | Toxic Biohazard | optional table check | — | unchanged |
 
+Windows check (C:\Users\kauan\lynx-test\r169g, fresh LYNX_PROFILE_DIR + LYNX_TEST_MODE=1, `--instrumentshot … transistorbass
+fl` = the plugin list's "add Transistor Bass", then `--render` of a held C5):
+
+| Build | FL 2026 installed | FL 2025's engine DLL (`LYNX_FL_INSTALL`=minimal tree with 3392.dll) | no FL (`LYNX_NO_FL=1`) |
+|---|---|---|---|
+| 0.1.23 release | adds, editor drawn (run-v023-fl26/shots), renders peak 0.0598 | **"Transistor Bass: no fl channel"** — the reported bug | (switch not in 0.1.23) |
+| this branch | same, WAV byte-identical to 0.1.23 | adds and renders, **WAV byte-identical** to the FL 2026 one | "no fl channel" (FL's cycles needed; the list says "requires FL Studio") |
+
 Reproduction on 0.1.22/0.1.23 with FL 2026 installed (the build whose hash LYNX knew) — the engine plays: the
 existing test `natives142_engines_from_the_fl_installation` makes the channel from the plugin list and renders it.
 New: `LYNX_NO_FL=1` makes LYNX behave as on a computer without FL (docs/FL_INTEGRATION.md).
