@@ -7709,7 +7709,8 @@ private:
         juce::File out;
         juce::StringArray log;
         int step = 0, picked = 0;
-        bool closed = false, ok = true;
+        bool ok = true;
+        std::unique_ptr<juce::DocumentWindow> owner;
 
         static juce::String highlighted()
         {
@@ -7749,7 +7750,13 @@ private:
             item (sub, 11, "Edison");
             item (sub, 12, "Eventide");
             menu.addSubMenu ("Tree", sub);
-            lynx::quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetScreenArea ({ 200, 200, 1, 1 }), {});
+            // the menu belongs to a window in the foreground, as when the user right-clicks a mixer slot (JUCE closes a
+            // menu of a background process at once)
+            owner = std::make_unique<juce::DocumentWindow> ("LYNX type-ahead test", juce::Colours::black, 0);
+            owner->setBounds (200, 200, 300, 200);
+            owner->setVisible (true);
+            lynx::forceForegroundForTest (*owner);
+            lynx::quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (owner.get()), {});
             startTimer (150);
         }
 
@@ -7776,6 +7783,7 @@ private:
                     expect ("Enter closed the menu", juce::String ((int) (juce::Component::getCurrentlyModalComponent() == nullptr)), "1");
                     expect ("Enter picked", juce::String (picked), "12");
                     stopTimer();
+                    owner.reset();
                     log.add (ok ? "result=OK" : "result=FAIL");
                     out.replaceWithText (log.joinIntoString ("\n") + "\n");
                     juce::JUCEApplication::getInstance()->setApplicationReturnValue (ok ? 0 : 1);
