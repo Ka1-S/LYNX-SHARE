@@ -84,3 +84,18 @@ TEST (picker171c_tiles_share_one_scale_like_fl)
     CHECK (tight.scale == 0.06 && tight.height > 300);
     CHECK (packRows ({}, 600, 300, 10, 0.06, 0.45).boxes.empty());
 }
+
+TEST (picker171c_display_sizes_narrow_the_range)
+{
+    using namespace lynx::pickerview;
+    // still "a big editor is a big tile", but a small effect is not a speck next to a big synth
+    const std::vector<Box> editors { { 0, 0, 400, 300 }, { 0, 0, 1600, 1200 }, { 0, 0, 200, 150 }, { 0, 0, 206, 700 }, { 0, 0, 900, 100 } };
+    const auto d = displaySizes (editors);
+    CHECK (d.size() == 5);
+    CHECK (d.size() == 5 && d[1].w > d[0].w && d[0].w > d[2].w);             // the order kept
+    CHECK (d.size() == 5 && d[1].w < 4 * d[0].w && d[0].w < 2 * d[2].w);     // the range narrowed (sides 4:1 → 2:1)
+    CHECK (d.size() == 5 && std::abs (d[0].w * 3 - d[0].h * 4) <= 4);        // a normal editor keeps its shape
+    CHECK (d.size() == 5 && d[3].h <= d[3].w * 13 / 10 + 1);                 // a very tall one is capped
+    CHECK (d.size() == 5 && d[4].w <= d[4].h * 35 / 10 + 1);                 // a very wide one too
+    CHECK (displaySizes ({}).empty());
+}

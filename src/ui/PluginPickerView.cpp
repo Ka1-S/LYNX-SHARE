@@ -125,7 +125,7 @@ public:
     void paint (juce::Graphics& g) override
     {
         using namespace theme;
-        g.fillAll (colour::bg0);
+        g.fillAll (colour::bg1);
         // the window behind, dimmed: composed once at this size (a full-window scaled draw per frame was most of a frame)
         const auto pixelScale = g.getInternalContext().getPhysicalPixelScaleFactor();
         if (backdrop.isValid() && (backdropShown.getWidth() != juce::roundToInt (getWidth() * pixelScale)
@@ -134,20 +134,21 @@ public:
             backdropShown = juce::Image (juce::Image::RGB, juce::jmax (1, juce::roundToInt (getWidth() * pixelScale)),
                                          juce::jmax (1, juce::roundToInt (getHeight() * pixelScale)), false);
             juce::Graphics b (backdropShown);
-            b.fillAll (colour::bg0);
-            b.setOpacity (0.45f);
+            // a faint ghost of the window (about 7 % of it) on the picker's own clear surface, not a dimmed app
+            b.fillAll (colour::bg1);
+            b.setOpacity (0.35f);
             b.drawImage (backdrop, backdropShown.getBounds().toFloat());
             b.setOpacity (1.0f);
-            b.fillAll (colour::bg0.withAlpha (0.82f));
+            b.fillAll (colour::bg1.withAlpha (0.8f));
         }
         if (backdropShown.isValid())
             g.drawImage (backdropShown, getLocalBounds().toFloat());
         else
-            g.fillAll (colour::bg0.withAlpha (0.82f));
+            g.fillAll (colour::bg1);
 
         const auto bounds = getLocalBounds();
         const auto header = bounds.withHeight (headerHeight);
-        g.setColour (colour::textSecondary);
+        g.setColour (colour::textPrimary.withAlpha (0.85f));
         g.setFont (font (22.0f));
         if (tab == tabs.all())
         {
@@ -503,8 +504,11 @@ private:
     // --- search ----------------------------------------------------------------------------------------------------
     void setSearch (juce::String text)
     {
+        const auto wasSearching = searchText.isNotEmpty();
         searchText = text.substring (0, maxSearch);
         showPlaceholder = false;
+        if (wasSearching != searchText.isNotEmpty())
+            repaint(); // (the matching tiles' name captions come and go)
         const auto query = searchText.toStdString();
         for (auto& t : tiles)
         {
@@ -596,6 +600,17 @@ private:
         return t.scaled.isValid() && t.scaledFor == juce::Point<int> (t.bounds.getWidth(), t.bounds.getHeight()) && t.scaledAt == paintScale;
     }
 
+    // the picture inside its card: a small frame around it, the editor's shape kept (fitted and centred, not stretched)
+    static float cardPadding (juce::Rectangle<float> cell) { return juce::jlimit (3.0f, 6.0f, juce::jmin (cell.getWidth(), cell.getHeight()) * 0.04f); }
+
+    static juce::Rectangle<float> pictureRect (const Tile& t, juce::Rectangle<float> cell)
+    {
+        const auto inner = cell.reduced (cardPadding (cell));
+        const auto ew = (float) juce::jmax (1, t.editorWidth), eh = (float) juce::jmax (1, t.editorHeight);
+        const auto k = juce::jmin (inner.getWidth() / ew, inner.getHeight() / eh);
+        return inner.withSizeKeepingCentre (ew * k, eh * k);
+    }
+
     // a job for the worker: load the picture (`load`) and / or fit it to the tile's size now
     void queueFit (int i, bool load)
     {
@@ -603,17 +618,19 @@ private:
         if (inFlight >= 8 && ! load)
             return;
         const juce::Point<int> size (t.bounds.getWidth(), t.bounds.getHeight());
+        const auto inner = pictureRect (t, t.bounds.toFloat());
+        const juce::Point<float> target (inner.getWidth(), inner.getHeight());
         const auto scale = paintScale;
         const auto file = load ? pluginthumbs::fileFor (t.key, t.native) : juce::File();
         const auto picture = t.picture;
         t.queued = true;
         ++inFlight;
         juce::Component::SafePointer<PluginPickerView> safe (this);
-        workers.addJob ([safe, i, file, picture, size, scale] {
+        workers.addJob ([safe, i, file, picture, size, target, scale] {
             auto source = file != juce::File() ? juce::ImageFileFormat::loadFrom (file) : picture;
             if (source.isValid())
                 source = juce::SoftwareImageType().convert (source);
-            const auto w = juce::jmax (1, juce::roundToInt (size.x * scale)), h = juce::jmax (1, juce::roundToInt (size.y * scale));
+            const auto w = juce::jmax (1, juce::roundToInt (target.x * scale)), h = juce::jmax (1, juce::roundToInt (target.y * scale));
             auto fitted = source.isValid() ? fitImage (source, w, h) : juce::Image();
             juce::MessageManager::callAsync ([safe, i, source, fitted, size, scale] {
                 if (safe != nullptr)
@@ -694,7 +711,7 @@ private:
                 g.fillRoundedRectangle (cell.expanded ((float) (4 - k) * 3.0f), radius::lg + (float) (4 - k) * 2.0f);
             }
         }
-        g.setColour (juce::Colours::black.withAlpha (0.35f));
+        g.setColour (juce::Colours::black.withAlpha (dim ? 0.15f : 0.35f));
         g.fillRect (cell.translated (0.0f, 2.0f));
 
         if (t.thumb == Tile::Thumb::loaded)
@@ -705,14 +722,12 @@ private:
             juce::Graphics::ScopedSaveState quality (g);
             if (! fitted)
                 g.setImageResamplingQuality (juce::Graphics::lowResamplingQuality);
+            // the card: a frame around the picture, which is at full brightness (only the search dims the others)
+            g.setColour (colour::bg3.withMultipliedAlpha (dim ? 0.4f : 1.0f));
+            g.fillRect (cell);
             g.setOpacity (dim ? 0.22f : 1.0f);
-            g.drawImage (fitted ? t.scaled : t.picture, cell);
+            g.drawImage (fitted ? t.scaled : t.picture, pictureRect (t, cell));
             g.setOpacity (1.0f);
-            if (! hover && ! dim)
-            {
-                g.setColour (colour::bg0.withAlpha (0.12f)); // (the one pointed at stands out)
-                g.fillRect (cell);
-            }
         }
         else
         {
@@ -734,8 +749,20 @@ private:
             g.setFont (font (juce::jlimit (9.0f, 16.0f, text.getHeight() * 0.3f), true));
             g.drawFittedText (t.name, text.toNearestInt(), juce::Justification::centred, 3, 0.7f);
         }
-        g.setColour (hover ? colour::textPrimary.withAlpha (0.8f) : colour::border.withMultipliedAlpha (dim ? 0.4f : 1.0f));
+        g.setColour (hover ? colour::textPrimary.withAlpha (0.8f) : colour::border.brighter (0.25f).withMultipliedAlpha (dim ? 0.4f : 1.0f));
         g.drawRect (cell.expanded (1.0f), hover ? 1.5f : 1.0f);
+
+        if (! hover && ! dim && searchText.isNotEmpty() && t.thumb == Tile::Thumb::loaded)
+        {
+            // searching: the matching tiles carry their names (a plain tile already shows it)
+            const auto f = juce::Font (font (juce::jlimit (11.0f, 14.0f, cell.getWidth() * 0.09f), true));
+            const auto strip = cell.withTop (cell.getBottom() - juce::jmin (cell.getHeight() * 0.4f, f.getHeight() + 6.0f));
+            g.setColour (colour::bg0.withAlpha (0.86f));
+            g.fillRect (strip);
+            g.setColour (colour::textPrimary);
+            g.setFont (f);
+            g.drawFittedText (t.name, strip.reduced (4.0f, 1.0f).toNearestInt(), juce::Justification::centred, 1, 0.75f);
+        }
 
         if (hover)
         {
@@ -1004,13 +1031,7 @@ private:
         std::vector<pickerview::Box> sizes;
         for (const auto i : items)
             sizes.push_back ({ 0, 0, tiles[(std::size_t) i].editorWidth, tiles[(std::size_t) i].editorHeight });
-        return sizes;
-    }
-
-    // the scale at which `items` fill `area` (FL: the largest one at which they all fit)
-    double fitScale (const std::vector<int>& items, juce::Rectangle<int> area) const
-    {
-        return items.empty() ? 1.0 : pickerview::packRows (sizesOf (items), area.getWidth(), area.getHeight(), gap, 0.06, 0.45).scale;
+        return pickerview::displaySizes (sizes); // (the editors' sizes, the range narrowed: small effects stay readable)
     }
 
     // `scale` > 0: at that scale (the All tab: both halves at one scale, as FL draws them), else the largest that fits
@@ -1020,7 +1041,7 @@ private:
             return 0;
         const auto sizes = sizesOf (items);
         const auto packed = scale > 0.0 ? pickerview::packAt (sizes, area.getWidth(), gap, scale)
-                                        : pickerview::packRows (sizes, area.getWidth(), area.getHeight(), gap, 0.06, 0.45);
+                                        : pickerview::packRows (sizes, area.getWidth(), area.getHeight(), gap, minScale, maxScale);
         for (std::size_t k = 0; k < items.size(); ++k)
         {
             auto b = packed.boxes[k];
@@ -1045,8 +1066,8 @@ private:
             auto halves = area;
             const auto left = halves.removeFromLeft (halves.getWidth() / 2).withTrimmedRight (20);
             const auto right = halves.withTrimmedLeft (20);
-            const auto scale = juce::jmin (fitScale (gens, left), fitScale (fx, right));
-            contentHeight = juce::jmax (flow (gens, left, false, scale), flow (fx, right, false, scale));
+            // each half at the largest scale that fills it (rows centred), so neither leaves a big empty zone
+            contentHeight = juce::jmax (flow (gens, left, true), flow (fx, right, true));
         }
         else
             contentHeight = flow (tabs.isGenerator (tab) ? gens : fx, area.withTrimmedTop (16), true) + 16; // a category's plugins centred (FL)
@@ -1062,6 +1083,7 @@ private:
     PluginPickerTargets targets;
     std::vector<Tile> tiles;
     pickerview::Tabs tabs;
+    static constexpr double minScale = 0.05, maxScale = 0.6;
     juce::Image backdrop, backdropShown;
     mutable std::vector<int> tabLefts; // (measureTabs)
     double paintScale = 1.0;

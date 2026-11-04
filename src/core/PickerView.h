@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+
 // FL Studio's Plugin picker view (View › Plugin picker, F8), without JUCE (tests/Gap169kPickerTests.inc).
 //
 // FL evidence (docs/analise/REA_rodada169k.md §2.5, one FL session, shots C:\Users\kauan\lynx-test\r169k\p1–p6.png):
@@ -204,6 +206,34 @@ inline Packed packAt (const std::vector<Box>& sizes, int width, int gap, double 
         endRow (sizes.size());
     p.height = std::max (0, y - gap);
     return p;
+}
+
+// The tiles' sizes from the editors' sizes: still "a big editor is a big tile" (FL), but the range is narrowed so a
+// small effect stays recognisable next to a big synth: each size scaled by (its area / the median area)^-0.25, i.e.
+// the side grows as area^0.25 around the median instead of area^0.5; and no tile is more than 1.3 × taller than wide
+// or 3.5 × wider than tall (the picture is fitted into it).
+inline std::vector<Box> displaySizes (const std::vector<Box>& editors)
+{
+    std::vector<double> areas;
+    for (const auto& b : editors)
+        areas.push_back (std::max (1.0, (double) b.w * b.h));
+    if (areas.empty())
+        return {};
+    auto sorted = areas;
+    std::nth_element (sorted.begin(), sorted.begin() + (long) sorted.size() / 2, sorted.end());
+    const auto median = sorted[sorted.size() / 2];
+    std::vector<Box> out;
+    for (std::size_t i = 0; i < editors.size(); ++i)
+    {
+        const auto f = std::pow (areas[i] / median, -0.25);
+        auto w = std::max (1.0, editors[i].w * f), h = std::max (1.0, editors[i].h * f);
+        if (h > w * 1.3)
+            h = w * 1.3;
+        if (w > h * 3.5)
+            h = w / 3.5;
+        out.push_back ({ 0, 0, (int) (w + 0.5), (int) (h + 0.5) });
+    }
+    return out;
 }
 
 inline Packed packRows (const std::vector<Box>& sizes, int width, int height, int gap, double minScale, double maxScale)

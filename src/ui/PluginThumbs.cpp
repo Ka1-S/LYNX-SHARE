@@ -81,6 +81,43 @@ std::unique_ptr<juce::Component> effectEditor (AudioEngine& engine, EffectSlot s
     return makeNativeEffectEditor (engine, 1, 0, 1.0f, 0);
 }
 
+// the editor's drawn part: the frame of the window / channel page around it is often wider than its controls (a
+// generator's page is at least the channel window's width), so the borders of the background's own colour are cut,
+// keeping a small margin; a very tall editor (Control Surface's column) keeps its top part, at most 1.3 × its width
+juce::Image trimToContent (const juce::Image& image)
+{
+    if (! image.isValid())
+        return image;
+    const juce::Image::BitmapData data (image, juce::Image::BitmapData::readOnly);
+    const auto w = image.getWidth(), h = image.getHeight();
+    const auto bg = data.getPixelColour (juce::jmin (3, w - 1), juce::jmin (3, h - 1));
+    auto differs = [&] (int x, int y) {
+        const auto c = data.getPixelColour (x, y);
+        return std::abs ((int) c.getRed() - (int) bg.getRed()) + std::abs ((int) c.getGreen() - (int) bg.getGreen())
+                   + std::abs ((int) c.getBlue() - (int) bg.getBlue()) > 24;
+    };
+    int left = w, right = -1, top = h, bottom = -1;
+    for (int y = 0; y < h; y += 2)
+        for (int x = 0; x < w; x += 2)
+            if (differs (x, y))
+            {
+                left = juce::jmin (left, x);
+                right = juce::jmax (right, x);
+                top = juce::jmin (top, y);
+                bottom = juce::jmax (bottom, y);
+            }
+    if (right < left || bottom < top)
+        return image;
+    auto area = juce::Rectangle<int>::leftTopRightBottom (left, top, right + 2, bottom + 2).expanded (10).getIntersection (image.getBounds());
+    if (area.getWidth() < w / 4 || area.getHeight() < h / 6) // (a stray mark: keep it whole)
+        area = image.getBounds();
+    if (area.getHeight() > area.getWidth() * 13 / 10)
+        area.setHeight (area.getWidth() * 13 / 10);
+    juce::Image out (juce::Image::ARGB, area.getWidth(), area.getHeight(), true);
+    juce::Graphics (out).drawImageAt (image.getClippedImage (area), 0, 0);
+    return out;
+}
+
 std::unique_ptr<juce::ChildProcess>& child()
 {
     static std::unique_ptr<juce::ChildProcess> process;
@@ -91,7 +128,8 @@ bool startedOnce = false;
 
 juce::File nativeFolder()
 {
-    return root().getChildFile (juce::String (JUCE_APPLICATION_VERSION_STRING).retainCharacters ("0123456789.-abcdefghijklmnopqrstuvwxyz"));
+    // (-r2: the pictures trimmed to the editor's drawn part; a new drawing rule = a new folder)
+    return root().getChildFile (juce::String (JUCE_APPLICATION_VERSION_STRING).retainCharacters ("0123456789.-abcdefghijklmnopqrstuvwxyz") + "-r2");
 }
 
 juce::File capturedFolder()
@@ -156,7 +194,7 @@ int renderNative (const juce::File& folder, const juce::StringArray& only, const
         }
         const auto t0 = juce::Time::getMillisecondCounterHiRes();
         const auto area = editor->getLocalBounds().withTrimmedTop (cropTop);
-        const auto picture = shrink (editor->createComponentSnapshot (area, true, 1.0f));
+        const auto picture = shrink (trimToContent (editor->createComponentSnapshot (area, true, 1.0f)));
         if (savePng (picture, file))
             ++drawn;
         if (progress)
@@ -288,7 +326,7 @@ void captureEditor (const std::string& key, juce::Component& editor)
             // (a clipped image shares its pixels: copy it out so the PNG writer and the scaler see only the editor)
             juce::Image own (juce::Image::RGB, pw, ph, false);
             juce::Graphics (own).drawImageAt (picture, 0, 0);
-            savePng (shrink (own, scale), file);
+            savePng (shrink (trimToContent (own), scale), file);
         }
     }
    #else
