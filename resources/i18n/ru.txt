@@ -7069,6 +7069,7 @@ countries: ru by kz
 "Animate the plugin art (falling petals, glows; Themed style)" = "Анимировать оформление плагинов (падающие лепестки, свечение; стиль «Тематический»)"
 "click to step, drag or mouse wheel to change" = "щелчок — следующее значение, перетаскивание или колесо мыши — изменить"
 "no effect with the current mode (another engine is in use)" = "не действует в текущем режиме (используется другой движок)"
+"arrows step, click for the list, drag or mouse wheel to change" = "стрелки — шаг, щелчок — список значений, перетаскивание или колесо мыши — изменить"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Основная: {0}"
@@ -7110,3 +7111,15 @@ countries: ru by kz
 "double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "двойной клик, правый клик или Enter: в выбранную вставку микшера; перетащите на вставку микшера или один из её слотов"
 "point at a category to show it; click it to open it in the Browser" = "наведите на категорию, чтобы показать её; щёлкните, чтобы открыть её в браузере"
 "start to type to search plugins...." = "начните печатать для поиска плагинов...."
+"Disconnect" = "Отключить"
+"Inputs" = "Входы"
+"Outputs" = "Выходы"
+"Last tweaked ({0})" = "Последний изменённый ({0})"
+"Deactivate" = "Деактивировать"
+"Automate Patcher parameter" = "Автоматизировать параметр Patcher"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Смешивать записанные ноты: вкл. (новые ноты добавляются к нотам паттерна)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Смешивать записанные ноты: выкл. (старые ноты записанного канала заменяются)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Смешивать записанные ноты: вкл. — дубль добавляет ноты в паттерн (overdub); выкл. — старые ноты записанного канала заменяются"
+"Tempo tapper: tap the beat to set the tempo" = "Тап-темп: отстучите долю, чтобы задать темп"
+"Blend recorded notes" = "Смешивать записанные ноты"

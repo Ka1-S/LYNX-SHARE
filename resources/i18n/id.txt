@@ -7069,6 +7069,7 @@ countries: id
 "Animate the plugin art (falling petals, glows; Themed style)" = "Animasikan seni plugin (kelopak berjatuhan, cahaya; gaya Bertema)"
 "click to step, drag or mouse wheel to change" = "klik untuk melangkah, seret atau roda mouse untuk mengubah"
 "no effect with the current mode (another engine is in use)" = "tidak berpengaruh pada mode saat ini (mesin lain sedang dipakai)"
+"arrows step, click for the list, drag or mouse wheel to change" = "panah untuk melangkah, klik untuk daftar, seret atau roda mouse untuk mengubah"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Utama: {0}"
@@ -7110,3 +7111,15 @@ countries: id
 "double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "klik ganda, klik kanan atau Enter: ke insert mixer yang dipilih; seret ke insert mixer atau salah satu slotnya"
 "point at a category to show it; click it to open it in the Browser" = "arahkan ke kategori untuk menampilkannya; klik untuk membukanya di Browser"
 "start to type to search plugins...." = "mulai mengetik untuk mencari plugin...."
+"Disconnect" = "Putuskan"
+"Inputs" = "Input"
+"Outputs" = "Output"
+"Last tweaked ({0})" = "Terakhir diubah ({0})"
+"Deactivate" = "Nonaktifkan"
+"Automate Patcher parameter" = "Otomatisasi parameter Patcher"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Campur not rekaman: nyala (not baru ditambahkan ke not pattern)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Campur not rekaman: mati (not lama kanal yang direkam diganti)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Campur not rekaman: nyala, satu take menambahkan notnya ke pattern (overdub); mati, not lama kanal yang direkam diganti"
+"Tempo tapper: tap the beat to set the tempo" = "Tap tempo: ketuk ketukan untuk mengatur tempo"
+"Blend recorded notes" = "Campur not rekaman"

@@ -57,6 +57,7 @@
 #include "core/LuxeVerb.h"
 #include "core/ConvolverFx.h"
 #include "core/ChorusFx.h"
+#include "core/FlangusFastDist.h"
 #include "core/FlPatcher.h"
 #include "core/FlSamplers.h"
 #include "core/FlSynths.h"
@@ -769,21 +770,54 @@ std::optional<SynthSettings> synthFromFlPreset (const std::vector<std::uint8_t>&
     }
 }
 
-namespace
-{
 // Old FL saved its own Fruity effects as VST2 plugins inside Fruity Wrapper: the wrapper keeps their parameters as
-// 0…1 floats (REA_rodada89 §2). Fruity Compressor's 6 controls map linearly onto its native ranges — an untouched
-// instance's floats land exactly on the native defaults [DATA, RawFL demo] — so its native state (layout v1:
-// 6 × i32) is rebuilt; the lookahead flag has no VST2 parameter (off, not confirmed). Fruity Phaser likewise (round
-// 105). Other effects: defaults.
+// 0…1 floats (REA_rodada89 §2). FL Studio 2026 opens them with its native plugin; each float lands linearly on the
+// native control's range (raw = lo + round(v · (hi − lo))), in the native control order. The native state is rebuilt
+// here and read by the exact engines. Evidence [FL render]: FL's own render tests System/Render tests/*.flp hold the
+// thirteen VST2 Fruity effects that FL 11 shipped; rebuilt this way, 12 of them null against FL's renders at the
+// 16-bit floor (REA_rodada170i §1), Fruity Chorus within its random LFO start phase. Fruity Compressor: an untouched
+// instance's floats land exactly on the native defaults [DATA, RawFL demo]; its lookahead flag has no VST2 parameter.
+// The Free Filter and Fruity Filter VST2s have no CENTER parameter: FL's render matches only with CENTER on (the
+// native plugin's default, which the VST2 parameters never touch) [FL render, REA_rodada170i §1].
 std::vector<std::uint8_t> wrappedFruityState (const ForeignPlugin& plugin)
 {
     std::vector<std::uint8_t> native;
     FlVst2State state;
+    if (! parseFlVst2State (plugin.state, state))
+        return native;
+    const auto name = lowercase (plugin.name);
+    auto put = [&native] (std::int32_t v) {
+        for (int b = 0; b < 4; ++b)
+            native.push_back ((std::uint8_t) ((std::uint32_t) v >> (8 * b)));
+    };
+    auto value = [&state] (std::size_t k, std::int32_t lo, std::int32_t hi) {
+        const auto v = k < state.params.size() ? (double) std::clamp (state.params[k], 0.0f, 1.0f) : 0.0;
+        return lo + (std::int32_t) std::lround (v * (double) (hi - lo));
+    };
+    // version, then one i32 per control over [lo, hi]
+    auto controls = [&] (std::int32_t version, std::initializer_list<std::pair<std::int32_t, std::int32_t>> ranges) {
+        if (state.params.size() < ranges.size())
+            return false;
+        if (version >= 0)
+            put (version);
+        std::size_t k = 0;
+        for (const auto& r : ranges)
+            put (value (k++, r.first, r.second));
+        return true;
+    };
+    auto fromMax = [&] (std::int32_t version, const auto& rawMax) {
+        if (state.params.size() < rawMax.size())
+            return false;
+        put (version);
+        for (std::size_t k = 0; k < rawMax.size(); ++k)
+            put (value (k, 0, rawMax[k]));
+        return true;
+    };
+
     // Fruity Phaser (REA_rodada105_phaser): the nine floats over the native ranges, except the stage count, which the
     // old plugin kept over 0…23 stages (FL's render test: an untouched instance saves 8/23 for the native 8 stages =
     // raw 7) [DATA; only the defaults were seen, the other values' mapping is not confirmed]
-    if (plugin.name == "Fruity Phaser" && parseFlVst2State (plugin.state, state) && state.params.size() >= (std::size_t) phaserfx::params)
+    if (name == "fruity phaser" && state.params.size() >= (std::size_t) phaserfx::params)
     {
         phaserfx::State s {};
         for (int k = 0; k < phaserfx::params; ++k)
@@ -794,21 +828,64 @@ std::vector<std::uint8_t> wrappedFruityState (const ForeignPlugin& plugin)
         }
         return phaserfx::serialize (s);
     }
-    if (plugin.name != "Fruity Compressor" || ! parseFlVst2State (plugin.state, state) || state.params.size() < fldyn::compressorControls)
-        return native;
-    auto put = [&native] (std::int32_t v) {
-        for (int b = 0; b < 4; ++b)
-            native.push_back ((std::uint8_t) ((std::uint32_t) v >> (8 * b)));
-    };
-    put (1);
-    for (std::size_t k = 0; k < (std::size_t) fldyn::compressorControls; ++k)
+    bool ok = false;
+    if (name == "fruity compressor")
     {
-        const auto lo = fldyn::compressorMin[k], hi = fldyn::compressorMax[k];
-        put (lo + (std::int32_t) std::lround (std::clamp (state.params[k], 0.0f, 1.0f) * (float) (hi - lo)));
+        if (state.params.size() >= (std::size_t) fldyn::compressorControls)
+        {
+            put (1);
+            for (std::size_t k = 0; k < (std::size_t) fldyn::compressorControls; ++k)
+                put (value (k, fldyn::compressorMin[k], fldyn::compressorMax[k]));
+            ok = true;
+        }
     }
+    else if (name == "fruity balance")
+        ok = controls (-1, { { -128, 128 }, { 0, 320 } }); // (Balance's state has no version)
+    else if (name == "fruity phase inverter")
+        ok = controls (1, { { 0, 1024 } });
+    else if (name == "fruity center")
+        ok = controls (1, { { 0, 1 } });
+    else if (name == "fruity bass boost")
+        ok = controls (1, { { 0, 1024 }, { 0, 1024 } });
+    else if (name == "fruity mute 2")
+        ok = controls (1, { { 0, 1 }, { 0, 2 } });
+    else if (name == "fruity fast lp")
+        ok = controls (1, { { 0, 1024 }, { 0, 1024 } });
+    else if (name == "fruity free filter")
+    {
+        ok = controls (2, { { 100, 700 }, { 0, 1024 }, { 0, 1024 }, { 0, 1024 } });
+        native.push_back (1); // CENTER on
+    }
+    else if (name == "fruity filter")
+    {
+        ok = controls (2, { { 0, 1024 }, { 0, 1024 }, { 0, 1024 }, { 0, 1024 }, { 0, 1024 }, { 0, 1 } });
+        native.push_back (1); // CENTER on
+    }
+    else if (name == "fruity flanger")
+        ok = fromMax (1, flangerfx::rawMax);
+    else if (name == "fruity chorus")
+        ok = fromMax (1, fruitychorusfx::rawMax);
+    else if (name == "fruity reeverb")
+        ok = fromMax (1, reeverb1::maxima);
+    if (! ok)
+        native.clear();
     return native;
 }
-} // namespace
+
+// A Patcher node's parameter port p in FL's numbering → LYNX's parameter of that node (round 171b): a hosted plugin
+// keeps its index, a built-in effect goes through effectParamFromFl; −1 = no LYNX equivalent
+static int flPatcherParam (const PatchNode& node, const std::string& flPlugin, int p)
+{
+    if (p < 0)
+        return -1;
+    if (node.generator)
+        return node.channel.instrument == InstrumentKind::plugin ? p : -1;
+    if (node.effect.kind == EffectKind::plugin)
+        return p;
+    if (const auto map = effectParamFromFl (canonicalFlEffectName (flPlugin), p))
+        return map->param;
+    return -1;
+}
 
 Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 {
@@ -883,6 +960,17 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 options.report->relocatedFiles.push_back ({ saved, found });
         }
         return found;
+    };
+
+    // old presets keep a plugin's sample relative to FL's Data folder ("\\Patches\\…"). A path that already exists is
+    // kept: on macOS / Linux the resolved path itself starts with '/' (round 170i: Granulizer and 3x Osc lost their
+    // sample there)
+    auto dataRelativeSample = [&options] (const std::string& path) {
+        if (path.empty() || (path[0] != '\\' && path[0] != '/') || options.roots.factoryData.empty()
+            || (options.fileExists && (options.fileExists (path) || options.fileExists (path + ".wav"))))
+            return path;
+        auto inData = resolveFlPath ("%FLStudioFactoryData%\\Data" + path, options.roots);
+        return inData.empty() ? path : inData;
     };
 
     for (const auto& c : project.channels)
@@ -1241,6 +1329,9 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     def.instrument = InstrumentKind::sampler;
                     def.samplePath = path;
                     def.sampler.pitch = std::clamp (def.sampler.pitch + sliced->pitchCents / 100.0f, -24.0f, 24.0f);
+                    // Slicex: FL's host hands the plugin Init.Vol (REA_rodada170i §6; Fruity Slicer's render test is
+                    // ruled by its licensed stretch and does not show it, so it keeps the linear velocity)
+                    def.sampler.flVelocityLaw = name == "slicex";
 
                     // Slicex's master volume (REA_rodada69 §5): a single full-range zone carries the gain
                     if (sliced->gain != 1.0f && ! path.empty())
@@ -1433,8 +1524,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 if (! c.samplePath.empty() && options.fileExists)
                 {
                     auto path = resolveFlPath (c.samplePath, options.roots);
-                    if (! path.empty() && (path[0] == '\\' || path[0] == '/') && ! options.roots.factoryData.empty())
-                        path = options.roots.factoryData + "\\Data" + path; // (old presets: relative to FL's Data folder)
+                    path = dataRelativeSample (path);
                     if (! path.empty() && ! options.fileExists (path) && options.fileExists (path + ".wav"))
                         path += ".wav";
                     if (! path.empty() && options.fileExists (path))
@@ -1454,8 +1544,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 if (! c.samplePath.empty() && options.fileExists)
                 {
                     auto path = resolveFlPath (c.samplePath, options.roots);
-                    if (! path.empty() && (path[0] == '\\' || path[0] == '/') && ! options.roots.factoryData.empty())
-                        path = options.roots.factoryData + "\\Data" + path;
+                    path = dataRelativeSample (path);
                     if (! path.empty() && ! options.fileExists (path) && options.fileExists (path + ".wav"))
                         path += ".wav";
                     if (! path.empty() && options.fileExists (path))
@@ -2374,7 +2463,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 else if (fl.plugin == "Fruity Wrapper" && parseFlWrapper (fl.state, foreign))
                 {
                     if (foreign.format == ForeignPlugin::Format::vst2 && effectForFlPlugin (foreign.name))
-                        made = effectFromFl (foreign.name, wrappedFruityState (foreign), song.bpm);
+                        made = effectFromFl (canonicalFlEffectName (foreign.name), wrappedFruityState (foreign), song.bpm);
                     else
                     {
                         made = makeEffectSlot (EffectKind::plugin);
@@ -2437,11 +2526,20 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             doc.inputY = doc.outputY = mid;
         }
 
-        auto portOf = [&] (std::uint64_t id) -> const PatcherPort* {
+        // A port by id. FL's controller parameter ports share one id between the input (parameter k) and the output
+        // (0x10000000 + k, the same control: a Control Surface's knob is both, REA_rodada171b §1.3): a cable's source
+        // is the output, its destination the input (`input` picks; −1 = the first one).
+        auto portOf = [&] (std::uint64_t id, int input = -1) -> const PatcherPort* {
+            const PatcherPort* first = nullptr;
             for (const auto& [pid, port] : graph->ports)
                 if (pid == id)
-                    return &port;
-            return nullptr;
+                {
+                    if (input < 0 || port.node < 0 || port.input == (input == 1))
+                        return &port;
+                    if (first == nullptr)
+                        first = &port;
+                }
+            return first;
         };
         // the I/O nodes' MIDI pins as FL saved them (activated even without a cable; FL's node menu › Events, round 162)
         for (const auto& [pid, port] : graph->ports)
@@ -2454,8 +2552,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 }
         for (const auto& c : graph->cables)
         {
-            const auto* src = portOf (c.source);
-            const auto* dst = portOf (c.destination);
+            const auto* src = portOf (c.source, 0);
+            const auto* dst = portOf (c.destination, 1);
             if (src == nullptr || dst == nullptr)
                 continue;
             PatchWire w;
@@ -2531,11 +2629,29 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 w.kind = PatchWire::Kind::control;
                 if (w.from < 0 || w.to < 0)
                     continue; // (the Patcher's own published parameters)
-                w.fromPort = src->index >= 0x10000000 ? src->index - 0x10000000 : std::max (0, src->index);
                 const auto& source = doc.nodes[(std::size_t) w.from];
-                if (! source.generator && source.effect.kind == EffectKind::peakController) // FL: peak, LFO, peak + LFO
+                if (src->index >= 0 && src->index < 0x10000000) // a node's parameter output (round 171b): parameter p
+                {
+                    const auto p = flPatcherParam (source, graph->nodes[(std::size_t) src->node].plugin, src->index);
+                    if (p < 0)
+                    {
+                        if (options.report != nullptr)
+                            ++options.report->partialEffects["Patcher: parameter output of " + graph->nodes[(std::size_t) src->node].plugin + " (not mapped)"];
+                        continue;
+                    }
+                    w.fromPort = patchParamOutput (p);
+                }
+                else
+                {
+                    w.fromPort = src->index >= 0x10000000 ? src->index - 0x10000000 : 0;
+                    // a Control Surface's outputs: FL's numbers → the panel's order (as for mixer links, round 164)
+                    if (! source.generator && source.effect.kind == EffectKind::controlSurface)
+                        if (const auto k = surface::flOutputToLynx (source.effect.state, w.fromPort))
+                            w.fromPort = *k;
+                }
+                if (! isPatchParamOutput (w.fromPort) && ! source.generator && source.effect.kind == EffectKind::peakController) // FL: peak, LFO, peak + LFO
                     w.fromPort = w.fromPort == 0 ? 1 : w.fromPort == 1 ? 2 : 0;
-                if (w.fromPort >= patcher::nodePorts (source).controlOuts)
+                if (! isPatchParamOutput (w.fromPort) && w.fromPort >= patcher::nodePorts (source).controlOuts)
                 {
                     // the source has no such output in LYNX (an X-Y controller, a Control Surface…): its target keeps the
                     // value FL saved instead of being pinned to 0
@@ -2572,6 +2688,22 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 }
             }
             doc.wires.push_back (std::move (w));
+        }
+
+        // the parameter ports FL shows (round 171b): class-2 node ports with the "visible" flag, parameter p (not a
+        // controller output, 0x10000000 + k) — FL's node menu › Inputs / Outputs › Parameters, ticked
+        for (const auto& [pid, port] : graph->ports)
+        {
+            if (port.node < 0 || port.kind != 2 || (port.flags & 2) == 0 || port.index < 0 || port.index >= 0x10000000
+                || (std::size_t) port.node >= nodeOf.size() || nodeOf[(std::size_t) port.node] < 0)
+                continue;
+            auto& node = doc.nodes[(std::size_t) nodeOf[(std::size_t) port.node]];
+            const auto p = flPatcherParam (node, graph->nodes[(std::size_t) port.node].plugin, port.index);
+            if (p < 0)
+                continue;
+            auto& list = port.input ? node.paramIns : node.paramOuts;
+            if (std::find (list.begin(), list.end(), p) == list.end())
+                list.insert (std::upper_bound (list.begin(), list.end(), p), p);
         }
 
         // the Patcher's published parameters (record 1100): Patcher parameter k → the node's parameter behind that port
@@ -2783,7 +2915,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
                 // old FL saved its own Fruity effects as VST2 inside the wrapper: becomes the internal effect
                 if (wrapped && foreign.format == ForeignPlugin::Format::vst2 && effectForFlPlugin (foreign.name))
-                    made = effectFromFl (foreign.name, wrappedFruityState (foreign), song.bpm);
+                    made = effectFromFl (canonicalFlEffectName (foreign.name), wrappedFruityState (foreign), song.bpm);
                 else if (wrapped)
                 {
                     // the app swaps in the installed plugin; without it, the slot is removed

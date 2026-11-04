@@ -7069,6 +7069,7 @@ countries: fr be ch ca lu
 "Animate the plugin art (falling petals, glows; Themed style)" = "Animer l'illustration des plugins (pétales qui tombent, lueurs ; style Thématique)"
 "click to step, drag or mouse wheel to change" = "cliquer pour avancer, glisser ou molette pour changer"
 "no effect with the current mode (another engine is in use)" = "sans effet dans le mode actuel (un autre moteur est utilisé)"
+"arrows step, click for the list, drag or mouse wheel to change" = "les flèches avancent d'un pas, cliquer pour la liste, glisser ou molette pour changer"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Principal : {0}"
@@ -7110,3 +7111,15 @@ countries: fr be ch ca lu
 "double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "double-clic, clic droit ou Entrée : dans l'insert de mixage sélectionné ; glissez-le sur un insert de mixage ou l'un de ses slots"
 "point at a category to show it; click it to open it in the Browser" = "pointez une catégorie pour l'afficher ; cliquez pour l'ouvrir dans le Navigateur"
 "start to type to search plugins...." = "commencez à taper pour chercher des plugins...."
+"Disconnect" = "Déconnecter"
+"Inputs" = "Entrées"
+"Outputs" = "Sorties"
+"Last tweaked ({0})" = "Dernier réglé ({0})"
+"Deactivate" = "Désactiver"
+"Automate Patcher parameter" = "Automatiser un paramètre du Patcher"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Mélanger les notes enregistrées : oui (les nouvelles notes s'ajoutent à celles du pattern)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Mélanger les notes enregistrées : non (les anciennes notes d'un canal enregistré sont remplacées)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Mélanger les notes enregistrées : activé, une prise ajoute ses notes au pattern (overdub) ; désactivé, les anciennes notes d'un canal enregistré sont remplacées"
+"Tempo tapper: tap the beat to set the tempo" = "Tap tempo : tapez la pulsation pour régler le tempo"
+"Blend recorded notes" = "Mélanger les notes enregistrées"

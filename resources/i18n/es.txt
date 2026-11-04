@@ -7069,6 +7069,7 @@ countries: es mx ar co cl pe ve
 "Animate the plugin art (falling petals, glows; Themed style)" = "Animar el arte de los plugins (pétalos que caen, brillos; estilo Temático)"
 "click to step, drag or mouse wheel to change" = "clic para avanzar, arrastra o usa la rueda del ratón para cambiar"
 "no effect with the current mode (another engine is in use)" = "sin efecto en el modo actual (otro motor está en uso)"
+"arrows step, click for the list, drag or mouse wheel to change" = "las flechas avanzan un paso, clic para la lista, arrastra o usa la rueda del ratón para cambiar"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Principal: {0}"
@@ -7110,3 +7111,15 @@ countries: es mx ar co cl pe ve
 "double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "doble clic, clic derecho o Enter: en el insert del mezclador seleccionado; arrástralo a un insert del mezclador o a uno de sus slots"
 "point at a category to show it; click it to open it in the Browser" = "apunta a una categoría para mostrarla; haz clic para abrirla en el Navegador"
 "start to type to search plugins...." = "empieza a escribir para buscar plugins...."
+"Disconnect" = "Desconectar"
+"Inputs" = "Entradas"
+"Outputs" = "Salidas"
+"Last tweaked ({0})" = "Último ajustado ({0})"
+"Deactivate" = "Desactivar"
+"Automate Patcher parameter" = "Automatizar parámetro del Patcher"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Mezclar notas grabadas: sí (las notas nuevas se suman a las del patrón)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Mezclar notas grabadas: no (se reemplazan las notas anteriores de un canal grabado)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Mezclar notas grabadas: activado, una toma suma sus notas al patrón (overdub); desactivado, se reemplazan las notas anteriores de un canal grabado"
+"Tempo tapper: tap the beat to set the tempo" = "Tempo por pulsación: toca el pulso para fijar el tempo"
+"Blend recorded notes" = "Mezclar notas grabadas"

@@ -7069,6 +7069,7 @@ countries: cn sg
 "Animate the plugin art (falling petals, glows; Themed style)" = "插件美术动画（飘落的花瓣、光晕；主题样式）"
 "click to step, drag or mouse wheel to change" = "单击切换，拖动或滚动鼠标滚轮更改"
 "no effect with the current mode (another engine is in use)" = "在当前模式下无效（正在使用另一个引擎）"
+"arrows step, click for the list, drag or mouse wheel to change" = "箭头逐步切换，单击显示列表，拖动或滚动鼠标滚轮更改"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "主：{0}"
@@ -7110,3 +7111,15 @@ countries: cn sg
 "double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "双击、右键或回车：加入所选混音插入轨；拖到混音插入轨或其插槽"
 "point at a category to show it; click it to open it in the Browser" = "指向分类即显示；点击在浏览器中打开"
 "start to type to search plugins...." = "开始输入以搜索插件...."
+"Disconnect" = "断开连接"
+"Inputs" = "输入"
+"Outputs" = "输出"
+"Last tweaked ({0})" = "最近调整 ({0})"
+"Deactivate" = "停用"
+"Automate Patcher parameter" = "自动化 Patcher 参数"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "混合录制的音符：开（新音符加入模式中的音符）"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "混合录制的音符：关（替换已录制通道的旧音符）"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "混合录制的音符：开启时，一次录制会把音符加入模式（叠录）；关闭时，替换已录制通道的旧音符"
+"Tempo tapper: tap the beat to set the tempo" = "节拍速度敲击器：敲击节拍来设置速度"
+"Blend recorded notes" = "混合录制的音符"

@@ -151,6 +151,7 @@ ChannelRackComponent::ChannelRackComponent (AudioEngine& e)
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
     engine.addChangeListener (this);
+    engine.getLevelsBroadcaster().addChangeListener (this);
     previews.setSender ([this] (int channel, int key, float velocity, bool on) { engine.sendLiveNote (channel, key, velocity, on); });
     updateSize();
     startTimerHz (30);
@@ -159,6 +160,7 @@ ChannelRackComponent::ChannelRackComponent (AudioEngine& e)
 ChannelRackComponent::~ChannelRackComponent()
 {
     previews.releaseAll();
+    engine.getLevelsBroadcaster().removeChangeListener (this);
     engine.removeChangeListener (this);
 }
 
@@ -1053,9 +1055,9 @@ void ChannelRackComponent::setValue (Area area, int row, double value)
         return;
 
     if (area == Area::pan)
-        engine.editSong ([row, v = (float) value] (Song& s) { s.channels[(std::size_t) row].pan = v; });
+        engine.editLevels ([row, v = (float) value] (Song& s) { s.channels[(std::size_t) row].pan = v; });
     else if (area == Area::volume)
-        engine.editSong ([row, v = (float) value] (Song& s) { s.channels[(std::size_t) row].volume = v; });
+        engine.editLevels ([row, v = (float) value] (Song& s) { s.channels[(std::size_t) row].volume = v; });
     else if (area == Area::route)
     {
         const auto track = juce::roundToInt (value);
@@ -2345,6 +2347,8 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
         menu.addItem (tr ("Channel settings..."), [this, channel] { openChannelSettings (engine, channel); });
     // FL's wrench tab of the channel window, for every channel (REA round 143b)
     menu.addItem (tr ("Miscellaneous functions (polyphony, cut groups, arpeggiator)..."), [this, channel] { openChannelMisc (engine, channel); });
+    if (c.instrument == InstrumentKind::patcher) // its published parameters (round 171b)
+        addPatcherParameterItems (menu, engine, c.patcher, { AutomationTargetKind::channelParam, channel, 0, 0 });
 
     if (c.instrument == InstrumentKind::plugin)
     {

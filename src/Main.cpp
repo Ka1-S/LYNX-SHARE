@@ -4,6 +4,7 @@
 
 #include "core/Drumaxx.h"
 #include "core/LoadTrace.h"
+#include "core/Patcher.h"
 #include "core/Patcherize.h"
 #include "core/Performance.h"
 #include "core/VideoPlayer.h"
@@ -872,6 +873,63 @@ public:
             // "no clip" and flooded the whole component (Facet EQ's blank pink window).
             const auto i = args.indexOf ("--gfxprobe");
             juce::File (args[i + 1].unquoted()).replaceWithText (lynx::skin::rendererProbeReport());
+            quit();
+            return;
+        }
+
+        if (args.contains ("--steppertest"))
+        {
+            // LYNX.exe --steppertest <report.txt>: round 170c (#14) — every value stepper of every generated effect editor
+            // driven by synthetic input (arrows, click on the value, drag, wheel, trackpad); ends with result=OK / FAIL
+            const auto i = args.indexOf ("--steppertest");
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            juce::String report;
+            int fails = 0, count = 0, skips = 0;
+            {
+                lynx::AudioEngine offline (false);
+                auto kinds = lynx::plugui::flLayoutKinds();
+                for (const auto own : lynx::plugui::ownLayoutKinds())
+                    kinds.push_back (own);
+                // FL's Default preset when the installation has one (the state-backed controls need FL's state)
+                const auto roots = lynx::findFlStudioRoots();
+                const auto presets = juce::File (juce::String::fromUTF8 (roots.data.c_str())).getChildFile ("Patches/Plugin presets/Effects");
+                for (const auto kind : kinds)
+                {
+                    auto fx = lynx::makeEffectSlot (kind);
+                    for (const auto& plugin : lynx::flPluginsForEffect (kind))
+                    {
+                        juce::MemoryBlock data;
+                        const auto file = presets.getChildFile (juce::String::fromUTF8 (plugin.c_str())).getChildFile ("Default.fst");
+                        if (file.existsAsFile() && file.loadFileAsData (data))
+                        {
+                            const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
+                            if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0); loaded && loaded->kind == kind)
+                                fx = *loaded;
+                        }
+                        break;
+                    }
+                    lynx::Song song;
+                    song.mixer.resize (2);
+                    song.mixer[0].name = "Master";
+                    song.mixer[1].name = "Insert 1";
+                    song.mixer[1].effects.push_back (fx);
+                    offline.setSong (std::move (song));
+                    offline.dispatchPendingMessages();
+                    const auto lines = lynx::stepperSelfTest (offline, 1, 0, (int) lynx::plugui::layoutFor (kind).pages.size());
+                    for (const auto& line : juce::StringArray::fromLines (lines))
+                        if (line.isNotEmpty())
+                        {
+                            ++count;
+                            fails += line.contains (": FAIL") ? 1 : 0;
+                            skips += line.contains (": SKIP") ? 1 : 0;
+                        }
+                    report << lines;
+                    juce::PopupMenu::dismissAllActiveMenus();
+                    offline.dispatchPendingMessages();
+                }
+            }
+            report << "steppers=" << count << " failures=" << fails << " skipped=" << skips << "\nresult=" << (fails == 0 && count > 0 ? "OK" : "FAIL") << "\n";
+            juce::File (args[i + 1].unquoted()).replaceWithText (report);
             quit();
             return;
         }
@@ -4306,6 +4364,10 @@ private:
             return;
         }
 
+        // LYNX_UIPERF_MUTE=1: the Master fader down (the meters of the inserts still move): a run on a desktop someone uses
+        if (juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_MUTE", {}) == "1")
+            engine->editSong ([] (lynx::Song& s) { if (! s.mixer.empty()) s.mixer[0].volume = 0.0f; }, false);
+
         struct Step
         {
             juce::String name;
@@ -4437,6 +4499,21 @@ private:
         run->steps.push_back ({ "desktop, playing", [this, ui] { ui->showDesktopForSnapshot (false); engine->rewind(); engine->play(); }, {}, 3000 });
         run->steps.push_back ({ "mixer maximised, playing", [ui] { ui->selectTabForSnapshot (3); }, {}, 3000 });
         run->steps.push_back ({ "mixer scroll", {}, [wheelAt, ui, none] (int f) { wheelAt (ui->getMixerForSnapshot(), 0.0f, f < 30 ? -0.25f : 0.25f, none); }, 60 });
+        // a fader dragged while the song plays (round 171c, discussion #10): 4 mouse moves per frame on insert 1's fader,
+        // through the old path (a whole snapshot per move) and through editLevels
+        auto faderMove = [this] (bool levels, int f) {
+            for (int k = 0; k < 4; ++k)
+            {
+                const auto v = 0.5f + 0.3f * std::sin ((float) (f * 4 + k) * 0.05f);
+                const auto edit = [v] (lynx::Song& s) { if (s.mixer.size() > 1) s.mixer[1].volume = v; };
+                if (levels)
+                    engine->editLevels (edit, false); // (no undo step: in a real drag only the press saves one)
+                else
+                    engine->editSong (edit, false);
+            }
+        };
+        run->steps.push_back ({ "mixer fader drag, playing, rebuild per move (before 171c)", {}, [faderMove] (int f) { faderMove (false, f); }, 60 });
+        run->steps.push_back ({ "mixer fader drag, playing, live levels (171c)", {}, [faderMove, this] (int f) { faderMove (true, f); if (f == 59) engine->flushLevels(); }, 60 });
         // F8's Plugin picker (round 171c): opening it (the "show" time = building it + its first paint), its pictures
         // loading while it stays open, pointing at the tiles, then closing it
         run->steps.push_back ({ "plugin picker open (F8)", [ui] { ui->togglePluginPickerForSnapshot(); }, {}, 2500 });
@@ -7847,6 +7924,20 @@ private:
                 wire (lynx::patchFromHost, 1, 3, 0);
                 wire (3, 1, 2, 2, 1.0f, lynx::PatchWire::Kind::control);
                 wire (0, 2, lynx::patchToHost, 1, 0.7f);
+                // round 171b (issue #65): a Surface knob on the reverb's parameter input 1, the reverb's parameter 0 out to
+                // the delay's parameter input 2 (FL's Inputs / Outputs › Parameters)
+                {
+                    lynx::SurfaceControl knob;
+                    knob.name = "Knob 1";
+                    knob.value = 0.6f;
+                    slot.patcher.surface = { knob };
+                    slot.patcher.surfaceX = 200.0f, slot.patcher.surfaceY = 380.0f;
+                    lynx::patcher::setParamInput (slot.patcher, 1, 1, true, "Reverb - 2");
+                    lynx::patcher::setParamOutput (slot.patcher, 1, 0, true);
+                    lynx::patcher::setParamInput (slot.patcher, 2, 2, true, "Delay - 3");
+                    wire (lynx::patchSurface, 0, 1, 1, 1.0f, lynx::PatchWire::Kind::control);
+                    wire (1, lynx::patchParamOutput (0), 2, 2, 1.0f, lynx::PatchWire::Kind::control);
+                }
                 slot.patcher.outputTracks = { 3 };
                 slot.patcher.inputX = -20.0f;
                 slot.patcher.outputX = 660.0f;
@@ -7941,6 +8032,37 @@ private:
                             song.patterns[0].notes.push_back ({ (std::int64_t) k * lynx::ppq, lynx::ppq / 2, (int) song.channels.size() - 1, 60 + 4 * k, 0.8f });
                     juce::String error;
                     lynx::ProjectFile::save (song, juce::File (save), error);
+                    // round 171b: the saved Patchers come back the same (parameter ports, event cables, published)
+                    juce::String report;
+                    if (const auto loaded = lynx::ProjectFile::load (juce::File (save), error))
+                    {
+                        const auto same = loaded->mixer.size() > 1 && ! loaded->mixer[1].effects.empty()
+                                          && loaded->mixer[1].effects[0].patcher == song.mixer[1].effects[0].patcher;
+                        const auto& d = loaded->mixer.size() > 1 && ! loaded->mixer[1].effects.empty() ? loaded->mixer[1].effects[0].patcher : lynx::PatcherDoc {};
+                        report << "patcher round trip: " << (same ? "OK" : "DIFFERENT") << "\n";
+                        if (! same && loaded->mixer.size() > 1 && ! loaded->mixer[1].effects.empty())
+                        {
+                            const auto& a = song.mixer[1].effects[0].patcher;
+                            report << "wires " << (a.wires == d.wires ? "same" : "differ") << ", published " << (a.published == d.published ? "same" : "differ")
+                                   << ", surface " << (a.surface == d.surface ? "same" : "differ") << "\n";
+                            for (std::size_t n = 0; n < std::min (a.nodes.size(), d.nodes.size()); ++n)
+                                if (! (a.nodes[n] == d.nodes[n]))
+                                    report << "node " << (int) n << " differs: ports " << (a.nodes[n].paramIns == d.nodes[n].paramIns && a.nodes[n].paramOuts == d.nodes[n].paramOuts ? "same" : "differ")
+                                           << ", effect " << (a.nodes[n].effect == d.nodes[n].effect ? "same" : "differ") << ", xy "
+                                           << (a.nodes[n].x == d.nodes[n].x && a.nodes[n].y == d.nodes[n].y ? "same" : "differ") << "\n";
+                        }
+                        for (int n = 0; n < (int) d.nodes.size(); ++n)
+                            report << "node " << n << " paramIns " << (int) d.nodes[(std::size_t) n].paramIns.size() << " paramOuts "
+                                   << (int) d.nodes[(std::size_t) n].paramOuts.size() << "\n";
+                        for (const auto& w : d.wires)
+                            if (w.kind == lynx::PatchWire::Kind::control)
+                                report << "control " << w.from << ":" << w.fromPort << " -> " << w.to << ":" << w.toPort << "\n";
+                        for (const auto& p : d.published)
+                            report << "published " << p.node << ":" << p.param << " " << juce::String::fromUTF8 (p.name.c_str()) << "\n";
+                    }
+                    else
+                        report << "patcher round trip: load failed: " << error << "\n";
+                    juce::File (prefix + "-roundtrip.txt").replaceWithText (report);
                 }
                 offline.setSong (std::move (song));
             }
@@ -8036,7 +8158,7 @@ private:
             // follows the window (default rects, not scaled ones); panels drop from the toolbar by priority
             {
                 const auto size = ui.getBounds();
-                for (const auto& [w, h] : std::vector<std::pair<int, int>> { { 1280, 720 }, { 1600, 900 }, { 1920, 1080 }, { 2560, 1440 } })
+                for (const auto& [w, h] : std::vector<std::pair<int, int>> { { 1280, 720 }, { 1366, 768 }, { 1600, 900 }, { 1920, 1080 }, { 2560, 1440 }, { 3840, 2160 } })
                 {
                     ui.setSize (w, h);
                     offline.dispatchPendingMessages();

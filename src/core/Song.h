@@ -297,6 +297,10 @@ struct SamplerSettings
 
     SamplePrecompute precompute;
     bool useLoopPoints = true; // FL's "Use loop points": the file's own loop (WAV smpl) plays (.flp 0x8F bit 3)
+    // an FL plugin generator played by the sampler (Slicex): the note velocity reaches the level through
+    // FL's Init.Vol law (11^(v·0.01) − 1)/10, unity at velocity 100, instead of LYNX's linear velocity (REA_rodada76 §1,
+    // REA_rodada170i §6)
+    bool flVelocityLaw = false;
     // FL's "Declicking mode" (.flp 0xD7 byte 0x53, REA_rodada167h §3): 0 out only, 1 transient (no bleeding),
     // 2 transient, 3 generic, 4 smooth, 5 crossfade — how fast a cut voice fades out (10 / 10 / 20 / 20 / 100 / 200 ms)
     int declickMode = 0;
@@ -483,6 +487,13 @@ struct PatchWire
 constexpr int patchMidiPortPin (int port) noexcept { return 1 + port; }
 constexpr int patchPinMidiPort (int pin) noexcept { return pin - 1; }
 constexpr int patchMidiPorts = 256;
+// A node's parameter output (round 171b, FL's node menu › Outputs › Parameters): a control cable from a node with
+// fromPort = patchParamOutput (p) carries that node's parameter p (its current value, 0..1) to the destination.
+// (FL numbers it the other way round: parameter p = p, controller output k = 0x10000000 + k, REA_rodada14 §1.3.1.)
+constexpr int patchParamOutputBase = 0x100000;
+constexpr int patchParamOutput (int param) noexcept { return patchParamOutputBase + param; }
+constexpr bool isPatchParamOutput (int port) noexcept { return port >= patchParamOutputBase; }
+constexpr int patchOutputParam (int port) noexcept { return port - patchParamOutputBase; }
 
 // A parameter the Patcher publishes (FL's record 1100): automating the Patcher's parameter k moves this node parameter
 // (through `curve`, as a control cable). node −1 = an unused index.
@@ -890,6 +901,11 @@ struct PatchNode
         bool operator== (const BusHead& o) const;
     };
     std::vector<BusHead> busHeads;
+    // The parameter (event) ports the user activated (round 171b, FL's node menu › Inputs / Outputs › Parameters, the
+    // node's class-2 ports with the "visible" flag): sorted parameter indices (LYNX's own for built-in effects, the
+    // plugin's for hosted plugins). A port with a cable is always shown. An active input is also one of the Patcher's
+    // published parameters (FL gives every active parameter input a Patcher parameter, record 1100).
+    std::vector<int> paramIns, paramOuts;
 
     bool operator== (const PatchNode& o) const;
 };

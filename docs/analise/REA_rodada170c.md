@@ -80,15 +80,93 @@ Waves and Auto-Tune trials expired → "(ref expired)". Lowest Sound (no audio c
 Pro-L 2 2, Halo 3, Orbit 3, Sentry 3, Nebula 3, ValhallaPlate 3 — added to /mnt/e/lynx-work/tracker/plugin-wishlist.md
 with the trial deadlines (FabFilter ~11-16, Soundtoys ~11-22).
 
+## Second part (feature/plugq170c2)
+
+### #14 again: the WaveShaper's OVERSAMPLE selector (video 17:30–17:50, kf/ws-stack.jpg)
+He clicked the "Off" value again and again on a Mac trackpad and it stayed Off. FL's control: OverSelect 0…4 = Off,
+2x, 4x, 8x, 16x (REA_rodada51 §2.6; LYNX's engine renders each exactly). The shared stepper of the generated editors
+now works like a value selector:
+- the arrows step one value (hit area at least 10 px wide; the up / down halves split at the value box's centre — a
+  caption above the box used to move the split down);
+- a click on the value lists every value (menu, current one ticked); the right-click menu lists them too, above
+  Reset / automation / copy / paste / type-in;
+- a vertical drag moves one value per 10 px; a wheel notch one value; a trackpad's small smooth deltas add up to one
+  value per 0.12 (before, each tiny trackpad event counted as a whole notch);
+- hint: "arrows step, click for the list, drag or mouse wheel to change" (15 languages).
+Oversampling measured (test `waveshaper_round170c_oversampling_lowers_aliasing`, 7 kHz sine into the default curve at
+the top pre-amp, strongest alias at 9.1 / 4.9 kHz): Off −23.4 dB, 2x −113.5, 4x −111.5, 8x −117.3, 16x −115.3 dB.
+
+Audit of every stepper: `LYNX --steppertest report.txt` drives each stepper of every generated effect editor (all
+pages) with synthetic input — up / down arrow clicks, the value's menu (item count, choosing a value), a click on the
+value (opens the menu, changes nothing), a drag up 3 values and back, a wheel notch, a trackpad scroll — one OK / FAIL
+/ SKIP line each; CI runs it on Linux and macOS (artifact editor-pictures-<os>, steppertest.txt). Results: see
+"Stepper audit" below.
+
+### #15 again: Ember's default Tube against FabFilter Saturn 2 (bass / 808 bus)
+His exact setting (video 18:54–19:24, kf/sat-stack.jpg, 19m00.jpg): band 1 style Tube, character Off (the default),
+Drive ~+10.4 dB, Auto gain on, Mix 100 %, 4x oversampling. Saturn 2 (trial) measured black-box with fxmeasure on the
+same signals (48 kHz: 1 kHz −12 dBFS, 50 Hz −8 dBFS + 3 kHz −20 dBFS two-tone, 7 kHz −12 dBFS, an 808 pattern);
+data /mnt/e/lynx-work/plugq170c/sat (compare.txt, ana.py; Saturn renders saturn/, LYNX renders lynx/).
+
+| | THD 1 kHz | H2 / H3 (dB) | IMD 3 kHz ± k·50 Hz | aliases (7 kHz) |
+|---|---|---|---|---|
+| Ember Tube +10.4 dB, before (170c part 1) | 11.6 % | −19.2 / −28.8 | −5.8 dB | — |
+| Ember Tube +10.4 dB, now | 3.2 % | −30.8 / −37.8 | −15.1 dB | below −59 dB |
+| Saturn 2 Clean Tube 50 % | 3.5 % | −33.6 / −31.4 | −16.7 dB | −43.8 dB |
+| Saturn 2 Clean Tube 100 % | 11.9 % | −24.1 / −20.5 | −5.9 dB | −28.9 dB |
+| Saturn 2 Subtle Tube 100 % | 4.6 % | −36.1 / −27.5 | −14.0 dB | −39.8 dB |
+| Saturn 2 Warm Tube 25 % | 4.6 % | −26.7 / −50.6 | −15.7 dB | −58.9 dB |
+| Ember Round valve +10.4 dB (he liked it) | 4.5 % | −27.2 / −39.1 | −13.4 dB | below −59 dB |
+| Ember Tape / Transistor +10.4 dB | 4.9 / 3.0 % | odd only | −6.2 / −5.3 dB | below −59 dB |
+| Saturn 2 Gentle Saturation 50 % (odd) | 4.9 % | odd only | −1.7 dB | −59.1 dB |
+
+The old default Tube at +10 dB was Saturn's Clean Tube at full drive (the same THD and intermodulation): far hotter
+than its knob said. The new default matches Saturn's tube styles at the same distortion (IMD within 1.5 dB, even
+harmonics leading) with less aliasing, and adds no sub-bass pumping on the 808 (energy below 25 Hz −31 dB re the 808's
+fundamental band, input −29 dB; Saturn −35). The symmetric styles (Tape, Transistor) intermodulate as much as
+symmetric saturation does in Saturn (less, at the same THD) — expected for odd-order curves; they stay. Every style
+and character at +10.4 and +15 dB: emscan-10.4.txt / emscan-15.txt (same folder); the amp, fold and rectifier
+characters are deliberate distortions (their auto gain leaves them 7–22 dB quieter on a 1 kHz tone: their cabinet
+filters — not changed).
+
+### Reference captures before the trials expire
+User's priority (2026-11-04): Slate / SSL / Harrison / LiquidSonics iLok trials end 13/11, FabFilter ~16/11, Soundtoys
+~22/11, Waves = a new 7-day demo licence from today. `/mnt/e/lynx-work/refcap0124/` (README there) holds, for every
+reference with a LYNX pair that still runs: the parameter table, the default state, the default render and one-at-a-time
+parameter sweeps of a 7 s stimulus (impulse, log sweep, 1 kHz level staircase, noise bursts, tail) — enough for
+null / response / THD / GR-curve comparisons without the plugins.
+
+**fxmeasure fixes found on the way** (tools/fxmeasure):
+- a Waves shell's first instance in a process comes up as another of its plugins (LYNX's PluginHost has handled it
+  since round 121, fxmeasure did not): today "CLA-2A Stereo" came up as **Dorrough360 5.0**, a surround meter whose
+  output is the input — round 170g's Waves rows ("identical: true", 5-channel buses) measured that meter, not the
+  plugins. Earlier rounds' Waves data show real processing (165x's CLA-2A gain-reduction curves, 152's RComp), so the
+  swap does not happen every time; the log now names the instance, and fxmeasure creates it again until the right
+  one comes (as LYNX does);
+- a 5-channel main bus is asked for stereo;
+- `#` started a comment anywhere, so `set #12 0.5` (by index) never worked: now only at the line start or " # ";
+- `buses` prints the layouts a plugin accepts.
+With the fix and the new licence, CLA-2A runs (gain +8.5 dB at its default) with no demo dropout over 75 s.
+
+### Stepper audit (`--steppertest`)
+45 steppers in the generated effect editors (all pages): Fruity WaveShaper Oversampling, Fruity Limiter attack /
+release / comp. curves, Envelope sidechain, Maximus' six band curves (×2 pages), Vocodex Mod / Car input and Bands,
+Fruity Delay 3 / Delay Bank dividers and repeats, Gross Beat, Patcher MIDI channel, hardware insert round trip...
+- Windows (FL installed, its Default presets loaded): 45 OK, 0 failures (/mnt/e/lynx-work/plugq170c/win/steppertest-win.txt).
+- Linux (no FL): 34 OK, 11 SKIP — Maximus' curves and Vocodex' inputs live in FL's state, and a slot without FL's
+  state cannot be edited (`stateparams::Table::with` leaves it unchanged): on a machine without FL those controls are
+  dead. Open: a built-in default state for Maximus / Vocodex (a new instance without FL), see the audit table.
+- macOS: CI app job (artifact editor-pictures-macOS, steppertest.txt).
+What was wrong before (from the code, not re-run): a click on the value did nothing (0.1.23; part 1 made it step),
+every tiny trackpad event counted as a whole wheel notch, and on captioned steppers the up / down split sat half a
+caption too low, so the lower part of the up arrow stepped down.
+Instrument editors (Sytrus, Toxic, 3x Osc...) have their own steppers (the generator editor), not covered by this
+probe yet.
+
 ## Where I stopped
-- done: #11 diagnosis + skin fix + JUCE patch 12 (CoreGraphics empty path), `--gfxprobe`, CI editor pictures step
-  (Linux + macOS app jobs), Facet analyser grid; #15 Ember Tube curve (measured before / after); #14 stepper click;
-  audit fixes (meter wells, limiter trail, Echoform idle controls, Crest Drive, Hush guard, Atrium early modulation);
-  PARITY.md Sound / Stability columns; tests (tests/PlugQ170cTests.inc), build-local 1 963 870 checks, 0 failures;
-  Linux app build + `--plugui` pictures (Facet EQ draws; /mnt/e/lynx-work/plugq170c/plugui-linux).
-- pending: the macOS CI pictures (runs on wip/plugq170c-probe = without patch 12, wip/plugq170c = with it) were still
-  queued at landing; check the editor-pictures-macOS artifact and `gfxprobe.txt` (raw drawText > 0, drawFilledText 0).
-- next (audit, open rows): Fruity Limiter scrolling envelope, Ember dimming of overridden controls + Voicing switch,
-  Toxic Bend (pitch bend to native generators), 3x Osc default page, Sytrus operator / filter pages, ProEditor partial
-  repaints, one analyser tap per slot; Parametric EQ 2 law on new instances = user decision.
-- rerun: scratchpad linbuild.sh (buildslot), tool/em.cpp measurements (/mnt/e/lynx-work/plugq170c/ember-*.txt).
+- part 1 (feature/plugq170c): in the merge train (queued 02:45, batch of 6).
+- part 2 (feature/plugq170c2): steppers + --steppertest (Linux 34 OK / 11 SKIP, Windows 45 OK), fxmeasure fixes,
+  Saturn 2 comparison, PARITY Facet / Atrium stability 7, build-local 1 963 936 checks 0 failures, Windows build OK
+  (gfxprobe 0 on Windows, Linux, macOS CI). Train next.
+- running outside git: /mnt/e/lynx-work/refcap0124 captures (run_all.sh, waves_run.sh, redo.sh); README there.
+- next: Maximus / Vocodex default state without FL; instrument-editor steppers; re-measure the Waves pairs from refcap.

@@ -7069,6 +7069,7 @@ countries: pl
 "Animate the plugin art (falling petals, glows; Themed style)" = "Animuj grafikę wtyczek (spadające płatki, poświata; styl Tematyczny)"
 "click to step, drag or mouse wheel to change" = "kliknij, aby przejść dalej, przeciągnij lub użyj kółka myszy, aby zmienić"
 "no effect with the current mode (another engine is in use)" = "bez efektu w bieżącym trybie (używany jest inny silnik)"
+"arrows step, click for the list, drag or mouse wheel to change" = "strzałki przechodzą o krok, kliknij, aby zobaczyć listę, przeciągnij lub użyj kółka myszy, aby zmienić"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Główna: {0}"
@@ -7110,3 +7111,15 @@ countries: pl
 "double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "dwuklik, prawy klik lub Enter: do wybranego insertu miksera; przeciągnij na insert miksera lub jeden z jego slotów"
 "point at a category to show it; click it to open it in the Browser" = "wskaż kategorię, aby ją pokazać; kliknij, aby otworzyć ją w Przeglądarce"
 "start to type to search plugins...." = "zacznij pisać, aby szukać wtyczek...."
+"Disconnect" = "Odłącz"
+"Inputs" = "Wejścia"
+"Outputs" = "Wyjścia"
+"Last tweaked ({0})" = "Ostatnio zmieniony ({0})"
+"Deactivate" = "Dezaktywuj"
+"Automate Patcher parameter" = "Automatyzuj parametr Patchera"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Łącz nagrane nuty: wł. (nowe nuty dochodzą do nut patternu)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Łącz nagrane nuty: wył. (stare nuty nagranego kanału są zastępowane)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Łącz nagrane nuty: wł. — nagranie dodaje nuty do patternu (overdub); wył. — stare nuty nagranego kanału są zastępowane"
+"Tempo tapper: tap the beat to set the tempo" = "Tap tempo: wystukaj rytm, aby ustawić tempo"
+"Blend recorded notes" = "Łącz nagrane nuty"
