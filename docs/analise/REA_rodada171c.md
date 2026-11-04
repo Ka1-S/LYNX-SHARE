@@ -85,7 +85,17 @@ VST / VST3 / CLAP plugins get a tile with their maker and name until their edito
   refitted at high quality on every hover change (the cache held one size and the hovered tile is 8 % bigger) and the
   dimmed window behind was a full-window scaled draw per frame. Fixed: the picture is fitted once per tile size, off the
   paint (8 per tick), the hovered one is that picture drawn bigger, and the backdrop is composed once.
-  Second build: see 3.3.
+- That was not enough (frames still ~90–110 ms). A trace of the picker's own paint showed the tiles at 1–5 ms and the
+  rest in the tab strip: every tab's left edge summed the measured width of every tab before it (~30 tabs, thousands of
+  glyph measurements per paint, ~35 ms). Final build: tab widths measured once, the PNG decode and the fit run on two
+  worker threads (Windows paints only when no other message waits, so decoding on the message thread starved the
+  paints), Up/Down and the search walk the tiles in list order.
+- Final [MEAS] (oxygen.flp playing, 316 paints traced): the picker's paint **mean 2.0 ms, p50 1.7, p95 3.5 ms**
+  (max 36 ms = the first paint, composing the backdrop); F8 shows the view in **169–181 ms** (building ~210 tiles,
+  reading 163 PNG headers, first paint); with the pictures already on disk they all arrive within ~1 s of opening.
+- Screens: `/mnt/e/lynx-work/picker171c/final/` (f1 just opened, f2 pictures, f3 hover, f4 search "del", f5 Down key,
+  f6/f7 effect dragged onto Insert 3 (Mixer comes up, effect window opens), f8/f9 3x Osc dragged onto the Channel Rack,
+  f10/f11 pointing at / clicking the "Delay reverb" tab → Browser, `all-163-thumbnails.png`, FL's s02 for reference).
 
 ### 3.2 Fader drag while playing [MEAS] (uiperf, Ryzen 5 3600, Windows 11, Master muted by LYNX_UIPERF_MUTE)
 
