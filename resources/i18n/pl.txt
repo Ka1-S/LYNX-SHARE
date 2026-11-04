@@ -7107,3 +7107,17 @@ countries: pl
 
 # round 170e3: the idle hint on one line
 "Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "Wskaż cokolwiek, by zobaczyć pomoc  [F1] skróty  [F5]-[F9] okna  [Space] odtwórz/zatrzymaj"
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "Wył. (zachowaj rzeczywisty czas)"
+"1/32 note" = "Nuta 1/32"
+"1/16 note" = "Nuta 1/16"
+"1/8 note" = "Nuta 1/8"
+"1/4 note" = "Nuta 1/4"
+"Notes played just before the start go onto it" = "Nuty zagrane tuż przed startem trafiają na start"
+"Played notes: compensate the output latency" = "Zagrane nuty: kompensuj opóźnienie wyjścia"
+"Capture MIDI: the notes just played without recording into the pattern" = "Przechwyć MIDI: nuty zagrane przed chwilą bez nagrywania do patternu"
+"Capture MIDI: {0} notes put in the pattern" = "Przechwyć MIDI: {0} nut wstawionych do patternu"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "Przechwyć MIDI: nie ma czego przechwycić (najpierw zagraj kilka nut bez nagrywania)"
+"Seq" = "Sekw."
+"Number of steps" = "Liczba kroków"
+"Dual" = "Podwójny"

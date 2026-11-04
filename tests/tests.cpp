@@ -17028,6 +17028,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FirstRun167vTests.inc"
 #include "LoopStarter168bTests.inc"
 #include "Rec168kTests.inc"
+#include "Rec170dTests.inc"
 #include "Issue32Tests.inc"
 #include "Mono168lTests.inc"
 #include "MixPre167qTests.inc"
@@ -17055,3 +17056,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Inst169hTests.inc"
 #include "Crash169gTests.inc"
 #include "Wfqa170hTests.inc"
+#include "Toxic169hTests.inc"

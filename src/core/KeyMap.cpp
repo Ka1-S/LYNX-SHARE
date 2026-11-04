@@ -110,6 +110,7 @@ std::vector<Action> makeActions()
         { "record.stepEdit", TR_NOOP ("Step edit on/off"), Context::global, { chord ('E', ctrl) } },
         { "record.punch", TR_NOOP ("Punch in/out on the loop region on/off"), Context::global, {} },
         { "record.quickAudio", TR_NOOP ("Record audio now: arm the selected insert and record (press again to stop)"), Context::global, { chord ('R', shift) } },
+        { "record.captureMidi", TR_NOOP ("Capture MIDI: the notes just played without recording into the pattern"), Context::global, { chord ('R', ctrl | shift | alt) } },
 
         // files and history
         { "file.new", TR_NOOP ("New project"), Context::global, { chord ('N', ctrl) } },

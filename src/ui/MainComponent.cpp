@@ -1553,6 +1553,14 @@ bool MainComponent::runAction (const std::string& id)
         engine.setRecordOptions (o);
         refreshRecordOptionButtons();
     }
+    else if (is ("record.captureMidi")) // round 170d (Ableton's Capture MIDI, Logic's Capture as Recording)
+    {
+        const auto r = engine.captureMidi();
+        if (r.notes > 0)
+            ui::postHint ({ tr ("Capture MIDI: {0} notes put in the pattern", { juce::String (r.notes) }), {}, false, false }, 4000);
+        else
+            ui::postHint ({ tr ("Capture MIDI: nothing to capture (play some notes first, without recording)"), {}, false, false }, 4000);
+    }
     else if (is ("record.waitForInput"))
     {
         auto o = engine.getRecordOptions();
@@ -1970,6 +1978,16 @@ void MainComponent::loadUiSettings()
                 (key == "recordToStepSequencer" ? o.toStepSequencer : o.recordingMarkers) = on;
             engine.setRecordOptions (o);
         }
+        else if (key == "recordCatchWindow" || key == "recordCompensateOutput") // (round 170d)
+        {
+            auto o = engine.getRecordOptions();
+            const auto v = line.fromFirstOccurrenceOf ("=", false, false).trim().getLargeIntValue();
+            if (key == "recordCatchWindow")
+                o.catchWindow = juce::jlimit<std::int64_t> (0, ppq, v);
+            else
+                o.compensateOutput = v != 0;
+            engine.setRecordOptions (o);
+        }
         else if (key == "recordPunchLoop" || key == "recordPreRoll" || key == "recordPostRoll" || key == "recordLoop")
         {
             auto o = engine.getRecordOptions();
@@ -2071,6 +2089,8 @@ void MainComponent::saveUiSettings()
                                       + "\nrecordPunchLoop=" + juce::String (engine.getRecordOptions().punchLoopRegion ? 1 : 0)
                                       + "\nrecordLoop=" + juce::String (engine.getRecordOptions().loopRecord ? 1 : 0)
                                       + "\nrecordPreRoll=" + juce::String (engine.getRecordOptions().preRollBars)
+                                      + "\nrecordCatchWindow=" + juce::String (engine.getRecordOptions().catchWindow)
+                                      + "\nrecordCompensateOutput=" + juce::String (engine.getRecordOptions().compensateOutput ? 1 : 0)
                                       + "\nrecordPostRoll=" + juce::String (engine.getRecordOptions().postRollBars) + "\nmixerUsedOnly=" + juce::String (MixerStrips::showUsedOnly ? 1 : 0) + "\nmixerLayout=" + juce::String ((int) MixerStrips::layout)
                                       + "\nquantizeSongJumps=" + juce::String (engine.quantizeSongJumps.load()) + "\n"
                                       + juce::String (newProjectDefaults().toText()));
@@ -2636,6 +2656,24 @@ void MainComponent::addRecordOptions (juce::PopupMenu& menu)
     menu.addItem (tr ("Loop record") + shortcutText ("record.loop"), true, o.loopRecord,
                   [set] { set ([] (AudioEngine::RecordOptions& r) { r.loopRecord = ! r.loopRecord; }); });
     menu.addItem (tr ("Step edit") + shortcutText ("record.stepEdit"), true, engine.isStepEdit(), [this] { runAction ("record.stepEdit"); });
+    // round 170d: notes played during the count-in are kept; the ones just before the start go onto it
+    {
+        juce::PopupMenu catchMenu;
+        catchMenu.addItem (tr ("Off (keep their real time)"), true, o.catchWindow == 0,
+                           [set] { set ([] (AudioEngine::RecordOptions& r) { r.catchWindow = 0; }); });
+        const std::pair<std::int64_t, const char*> windows[] = { { ppq / 8, TR_NOOP ("1/32 note") },
+                                                                 { ppq / 4, TR_NOOP ("1/16 note") },
+                                                                 { ppq / 2, TR_NOOP ("1/8 note") },
+                                                                 { ppq, TR_NOOP ("1/4 note") } };
+        for (const auto& [ticks, name] : windows)
+            catchMenu.addItem (tr (name), true, o.catchWindow == ticks,
+                               [set, ticks = ticks] { set ([ticks] (AudioEngine::RecordOptions& r) { r.catchWindow = ticks; }); });
+        menu.addSubMenu (tr ("Notes played just before the start go onto it"), catchMenu);
+    }
+    menu.addItem (tr ("Played notes: compensate the output latency"), true, o.compensateOutput,
+                  [set] { set ([] (AudioEngine::RecordOptions& r) { r.compensateOutput = ! r.compensateOutput; }); });
+    menu.addItem (tr ("Capture MIDI: the notes just played without recording into the pattern") + shortcutText ("record.captureMidi"),
+                  [this] { runAction ("record.captureMidi"); });
     // round 163: punch in/out on the loop region, pre-roll and post-roll (bars)
     {
         auto bars = [&set] (juce::PopupMenu& m, int now, std::function<void (AudioEngine::RecordOptions&, int)> apply) {

@@ -7107,3 +7107,17 @@ countries: jp
 
 # round 170e3: the idle hint on one line
 "Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "何かを指すとヘルプ  [F1] ショートカット  [F5]-[F9] ウィンドウ  [Space] 再生/停止"
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "オフ（実際のタイミングを保持）"
+"1/32 note" = "32分音符"
+"1/16 note" = "16分音符"
+"1/8 note" = "8分音符"
+"1/4 note" = "4分音符"
+"Notes played just before the start go onto it" = "開始直前に弾いたノートを開始位置に置く"
+"Played notes: compensate the output latency" = "演奏したノート：出力レイテンシーを補正"
+"Capture MIDI: the notes just played without recording into the pattern" = "MIDIキャプチャ：録音せずに弾いたばかりのノートをパターンへ"
+"Capture MIDI: {0} notes put in the pattern" = "MIDIキャプチャ：{0} 個のノートをパターンに配置"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "MIDIキャプチャ：キャプチャするものがありません（まず録音せずにノートを弾いてください）"
+"Seq" = "シーケンス"
+"Number of steps" = "ステップ数"
+"Dual" = "デュアル"
