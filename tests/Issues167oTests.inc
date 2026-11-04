@@ -16,7 +16,7 @@ TEST (issue23_fl_function_keys_and_the_sheet_list)
     CHECK (map.conflicts().empty());
     CHECK (map.find ({ f12, ctrl }, Context::global, false) == "view.closeUnfocusedWindows");
     CHECK (map.find ({ f7, alt }, Context::global, false) == "view.touchKeyboard");
-    CHECK (map.find ({ f8 }, Context::global, false) == "panel.quickAdd");
+    CHECK (map.find ({ f8 }, Context::global, false) == "view.pluginPicker"); // round 169k: FL's Plugin picker view
     CHECK (map.find ({ f1 }, Context::global, false) == "help.shortcuts");
     // the sheet's column: every F-key binding, F1 first, F12 last, plain before Shift / Ctrl / Alt
     const auto list = map.functionKeyBindings();

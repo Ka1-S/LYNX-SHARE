@@ -26,6 +26,7 @@
 #include "ui/ShortcutManager.h"
 #include "ui/WaveformView.h"
 #include "ui/QuickAddPalette.h"
+#include "ui/PluginPickerView.h"
 #include "ui/PatcherEditor.h"
 #include "ui/ToolWindow.h"
 #include "ui/LoopStarterWindow.h"
@@ -51,6 +52,7 @@
 #include "engine/SessionPack.h"
 #include "ui/SessionDialogs.h"
 #include "engine/LiveSessions.h"
+#include "ui/LiveChat.h"
 #include "core/ProjectSafety.h"
 #include "core/MissingFiles.h"
 #include "ui/AutomationUi.h"
@@ -161,6 +163,25 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         };
     }
     PianoRollComponent::shortcutText = [this] (const std::string& id) { return shortcutText (id.c_str()); };
+    // FL's EEPlayBtnClick (FLEngine 0xe4bd40, REA round 169f): Pattern mode first (also while the song plays), then the
+    // play / pause of the transport. EEPlayBtnMouseDown (0xe4bda0), right button: FL's Stop (FUN_011ca520 (0, 0), the very
+    // call of the toolbar's StopBtnClick), which in FL goes back to where playback started, pressed again to the start
+    // (measured in FL 2026, round 169f, Pattern mode after a ruler click)
+    pianoRoll.onPlayPause = [this] {
+        if (engine.getSong().mode != PlayMode::pattern)
+            toggleMode();
+        playPause();
+    };
+    pianoRoll.onPlayRightClick = [this] {
+        const auto playing = engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn();
+        const auto target = transportedit::rollPlayRightClickTarget (playing, engine.getTransport().positionTicks.load(), playStartTicks);
+        engine.stop();
+        if (target > 0)
+            engine.seek (target);
+        else
+            engine.rewind();
+        playStartTicks = target;
+    };
     pianoRoll.onBrowseScores = [this] { // (round 168g: the Piano roll's File › Browse scores)
         showPanel (Panel::browser);
         browser.showScores();
@@ -616,6 +637,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         {
             safe->repaint (safe->titleArea);
             safe->menuItemsChanged();
+            safe->updateTitle(); // (the session's state is in the window title too: narrow layouts hide the badge)
         }
     };
     live->onJoined = [safe = juce::Component::SafePointer<MainComponent> (this)] (Song song) {
@@ -625,6 +647,19 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         const auto hostName = host != nullptr ? juce::String::fromUTF8 (host->name.c_str()) : juce::String();
         safe->startNewProject (std::move (song), {});
         safe->projectName = hostName.isNotEmpty() ? tr ("Live session with {0}", { hostName }) : tr ("Live session");
+        safe->updateTitle();
+    };
+    // round 169j: the host's LYNX SHARE restarted during a session: its journal's song becomes the open project again
+    live->onResumed = [safe = juce::Component::SafePointer<MainComponent> (this)] (Song song) {
+        if (safe == nullptr)
+            return;
+        const auto journal = LiveSessionManager::readJournal (LiveSessionManager::defaultJournal());
+        safe->startNewProject (std::move (song), {});
+        if (journal && journal->projectFile.existsAsFile())
+        {
+            safe->currentFile = journal->projectFile;
+            safe->projectName = journal->projectFile.getFileNameWithoutExtension();
+        }
         safe->updateTitle();
     };
     engine.onSessionUndoSkipped = [] (const juce::StringArray& skipped) {
@@ -644,6 +679,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 MainComponent::~MainComponent()
 {
     engine.onSessionUndoSkipped = nullptr;
+    liveui::closeChat();
     live.reset(); // (a session still on ends: the others are told)
     setSecondaryWindowKeyHandler (nullptr);
     cancelProjectLoad(); // an open in progress uses the engine from its thread
@@ -947,6 +983,8 @@ void MainComponent::resized()
         danceStage->setBounds (getLocalBounds());
         danceStage->toFront (false);
     }
+    if (pluginPickerView != nullptr)
+        pluginPickerView->setBounds (getLocalBounds());
     if (setupOverlay != nullptr)
     {
         setupOverlay->setBounds (getLocalBounds());
@@ -1346,6 +1384,7 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("pattern.moveUp")) movePatternNow (-1);
     else if (is ("pattern.moveDown")) movePatternNow (1);
     else if (id.rfind ("pattern.select", 0) == 0) selectPattern (std::stoi (id.substr (14)) - 1);
+    else if (is ("view.pluginPicker")) togglePluginPicker();
     else if (is ("panel.quickAdd"))
     {
         // FL's F8 opens the plugin picker or closes it (FLEngine 0xebf510, round 167o)
@@ -1668,6 +1707,8 @@ void MainComponent::loadUiSettings()
             ChannelRackComponent::keepEditorsOpen = on;
         else if (key == "selFirstChanPatChanges")
             ChannelRackComponent::selectFirstChannelWithNotes = on;
+        else if (key == "muteRemovedSteps")
+            ChannelRackComponent::muteRemovedSteps = on;
         else if (key == "alternateUndo")
             alternateUndo = on;
         else if (key == "waveSpectral") // ("waveColours", the old spectral-by-default key, is ignored)
@@ -1812,6 +1853,7 @@ void MainComponent::saveUiSettings()
                                       + "\ntypingLayout=" + juce::String (keys::typingpiano::layoutName (typingLayout)) + "\nkeepEditorsOpen="
                                       + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
                                       + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
+                                      + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
                                       + "\nalternateUndo=" + juce::String (alternateUndo ? 1 : 0)
                                       + "\neditPatternsIn="
                                       + juce::String (PlaylistComponent::editPatternsIn) + "\nsplash=" + juce::String (startup.splash ? 1 : 0)
@@ -2183,6 +2225,11 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             menu.addSubMenu (tr ("Sort channels"), sort);
             menu.addItem (tr ("Select unused channels"), [this] { rack.selectUnused(); });
             action (menu, "rack.groupSelected", tr ("Group selected..."));
+            menu.addSectionHeader (tr ("Options")); // (FL's SSMenu: "Mute removed steps" is in its Options part)
+            menu.addItem (tr ("Mute removed steps"), true, ChannelRackComponent::muteRemovedSteps, [this] {
+                ChannelRackComponent::muteRemovedSteps = ! ChannelRackComponent::muteRemovedSteps;
+                saveUiSettings();
+            });
             break;
         }
         case Panel::playlist:
@@ -2278,6 +2325,41 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
 }
 
 // --- quick-add palette and history -------------------------------------------------------------
+
+void MainComponent::togglePluginPicker()
+{
+    // FL's ShowPluginPickerAction (F8): opens the picker over the main window, or closes it (REA_rodada169k §2.5)
+    if (pluginPickerView != nullptr)
+    {
+        auto old = std::move (pluginPickerView);
+        juce::MessageManager::callAsync ([keep = std::shared_ptr<juce::Component> (std::move (old))] {}); // (it may be on the stack)
+        return;
+    }
+    PluginPickerTargets targets;
+    auto safe = juce::Component::SafePointer<MainComponent> (this);
+    targets.addInstrument = [safe] (ChannelDef c) {
+        if (safe == nullptr)
+            return;
+        safe->rack.addChannel (std::move (c), true);
+        safe->showPanel (Panel::channelRack);
+    };
+    targets.addEffect = [safe] (EffectSlot slot) {
+        if (safe == nullptr)
+            return;
+        if (! safe->mixer.addEffectToSelected (std::move (slot)))
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Plugin picker"), tr ("The selected insert has no free effect slot."));
+        else
+            safe->showPanel (Panel::mixer);
+    };
+    targets.close = [safe] {
+        if (safe != nullptr && safe->pluginPickerView != nullptr)
+            safe->togglePluginPicker();
+    };
+    pluginPickerView = makePluginPickerView (engine, std::move (targets));
+    addAndMakeVisible (*pluginPickerView);
+    pluginPickerView->setBounds (getLocalBounds());
+    pluginPickerView->toFront (true);
+}
 
 void MainComponent::showQuickAdd()
 {
@@ -3636,8 +3718,18 @@ void MainComponent::updateTitle()
         savedSamples = safety::referencedSamples (engine.getSong());
 
     if (auto* window = getTopLevelComponent())
+    {
+        // a live session's state (round 169j): LIVE, or what it is waiting for
+        juce::String liveState;
+        if (live != nullptr && live->isActive())
+        {
+            using S = LiveSessionManager::State;
+            const auto st = live->getState();
+            liveState = " [" + (st == S::live ? tr ("LIVE") : st == S::reconnecting ? tr ("Reconnecting...") : st == S::waitingHost ? tr ("Waiting for the host...") : tr ("Connecting...")) + "]";
+        }
         window->setName ((engine.isModified() ? "* " : "")
-                         + (projectName.isNotEmpty() ? "LYNX SHARE - " + projectName : juce::String ("LYNX SHARE")) + importedSuffix);
+                         + (projectName.isNotEmpty() ? "LYNX SHARE - " + projectName : juce::String ("LYNX SHARE")) + importedSuffix + liveState);
+    }
 }
 
 std::unique_ptr<juce::AlertWindow> MainComponent::makeConfirmDiscardWindow()
@@ -3964,6 +4056,35 @@ void MainComponent::startLiveFromCommandLine()
     o.projectFile = currentFile;
     if (const auto relay = value ("--live-relay"); relay.isNotEmpty())
         o.relay = relay;
+    // round 169j: --live-chat "text" (sent once in), --live-follow (follow the host's transport), --live-resume (the
+    // host resumes its interrupted session without asking)
+    if (const auto text = value ("--live-chat"); text.isNotEmpty())
+        juce::Timer::callAfterDelay (9000, [safe = juce::Component::SafePointer<MainComponent> (this), text] {
+            if (safe != nullptr)
+            {
+                safe->live->sendChat (text);
+                liveui::showChat (*safe->live);
+            }
+        });
+    if (cli.contains ("--live-follow"))
+        juce::Timer::callAfterDelay (8500, [safe = juce::Component::SafePointer<MainComponent> (this)] {
+            if (safe != nullptr)
+                safe->live->setFollowTransport (true);
+        });
+    if (cli.contains ("--live-resume"))
+    {
+        o.projectFile = juce::File();
+        o.autoAccept = true;
+        if (! live->resumeHost (LiveSessionManager::defaultJournal(), o))
+            platform::testModeLog ("live session: nothing to resume");
+        return;
+    }
+    if (! cli.contains ("--live-host") && ! cli.contains ("--live-join"))
+    {
+        if (! platform::testMode())
+            liveui::offerResume (liveContext());
+        return;
+    }
     if (const auto codeFile = value ("--live-host"); codeFile.isNotEmpty())
     {
         o.autoAccept = true; // (scripted: nobody to click "Let them in")
@@ -5110,6 +5231,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Undo history...") + shortcutText ("edit.history"), [this] { showHistory(); });
         menu.addItem (tr ("Audio editor..."), [this] { openAudioEditor (engine); });
         menu.addSeparator();
+        menu.addItem (tr ("Plugin picker") + shortcutText ("view.pluginPicker"), [this] { togglePluginPicker(); });
         menu.addItem (tr ("Quick-add palette...") + shortcutText ("panel.quickAdd"), [this] { showQuickAdd(); });
         menu.addItem (tr ("Search the Browser") + shortcutText ("browser.search"), [this] {
             showPanel (Panel::browser);

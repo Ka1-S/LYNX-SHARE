@@ -491,7 +491,7 @@ TEST (p2_key_map_bindings)
     using namespace lynx::keys;
     KeyMap map;
     CHECK (map.conflicts().empty());
-    CHECK (map.find ({ f8, none }, Context::global, false) == "panel.quickAdd");
+    CHECK (map.find ({ f8, none }, Context::global, false) == "view.pluginPicker"); // F8 = FL's Plugin picker since round 169k
     CHECK (map.find ({ numpad3, none }, Context::playlist, true) == "pattern.select3");
     CHECK (map.find ({ 'C', alt }, Context::playlist, false) == "pattern.clone");
     CHECK (map.find ({ 'C', alt }, Context::pianoRoll, false) == "pianoRoll.colourSelected"); // FL's piano roll: Alt+C = colour (round 153)
