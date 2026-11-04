@@ -7098,3 +7098,9 @@ countries: id
 "Number of steps" = "Jumlah langkah"
 "Dual" = "Ganda"
 "Align all channel editors" = "Ratakan semua editor channel"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Campur not rekaman: nyala (not baru ditambahkan ke not pattern)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Campur not rekaman: mati (not lama kanal yang direkam diganti)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Campur not rekaman: nyala, satu take menambahkan notnya ke pattern (overdub); mati, not lama kanal yang direkam diganti"
+"Tempo tapper: tap the beat to set the tempo" = "Tap tempo: ketuk ketukan untuk mengatur tempo"
+"Blend recorded notes" = "Campur not rekaman"

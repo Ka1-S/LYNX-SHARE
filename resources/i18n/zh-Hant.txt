@@ -7098,3 +7098,9 @@ countries: tw hk mo
 "Number of steps" = "步數"
 "Dual" = "雙軌"
 "Align all channel editors" = "對齊所有通道編輯器"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "混合錄製的音符：開（新音符加入圖樣中的音符）"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "混合錄製的音符：關（取代已錄製通道的舊音符）"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "混合錄製的音符：開啟時，一次錄製會把音符加入圖樣（疊錄）；關閉時，取代已錄製通道的舊音符"
+"Tempo tapper: tap the beat to set the tempo" = "節拍速度敲擊器：敲擊節拍來設定速度"
+"Blend recorded notes" = "混合錄製的音符"

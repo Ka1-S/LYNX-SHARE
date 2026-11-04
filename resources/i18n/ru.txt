@@ -7098,3 +7098,9 @@ countries: ru by kz
 "Number of steps" = "Число шагов"
 "Dual" = "Двойной"
 "Align all channel editors" = "Выровнять все редакторы каналов"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Смешивать записанные ноты: вкл. (новые ноты добавляются к нотам паттерна)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Смешивать записанные ноты: выкл. (старые ноты записанного канала заменяются)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Смешивать записанные ноты: вкл. — дубль добавляет ноты в паттерн (overdub); выкл. — старые ноты записанного канала заменяются"
+"Tempo tapper: tap the beat to set the tempo" = "Тап-темп: отстучите долю, чтобы задать темп"
+"Blend recorded notes" = "Смешивать записанные ноты"

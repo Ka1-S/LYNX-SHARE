@@ -272,6 +272,17 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     }
     countInButton.onClick = [this] { runAction ("record.countIn"); };
     waitInputButton.onClick = [this] { runAction ("record.waitForInput"); };
+    // round 170e2: FL's "Blend recorded notes" switch (on = overdub, off = replace) and its tempo tapper button
+    blendButton.setOnColour (theme::colour::bg6);
+    blendButton.setIconColourWhenOn (theme::colour::accent);
+    blendButton.onClick = [this] {
+        auto o = engine.getRecordOptions();
+        o.mode = o.mode == RecordMode::overdub ? RecordMode::replace : RecordMode::overdub;
+        engine.setRecordOptions (o);
+        refreshRecordOptionButtons();
+        saveUiSettings();
+    };
+    tapTempoButton.onClick = [this] { openTempoTapper (engine); };
 
     for (int i = 0; i < workspace::panelCount; ++i)
     {
@@ -420,7 +431,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         auto r = rackTitleTools.getLocalBounds();
         rackPatternSelector.setBounds (r.removeFromLeft (rackPatternSelectorWidth).reduced (0, 3));
         r.removeFromLeft (6);
-        rackFilterBox.setBounds (r.removeFromLeft (96).reduced (0, 3));
+        rackFilterBox.setBounds (r.removeFromLeft (rackFilterBoxWidth).reduced (0, 3));
         r.removeFromLeft (4);
         swingSlider.setBounds (r.removeFromLeft (26));
         r.removeFromLeft (4);
@@ -499,7 +510,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
     for (auto* c : std::initializer_list<juce::Component*> { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &playButton, &stopButton,
                                                              &recordButton, &recordMenuButton, &patternModeButton, &songModeButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton,
-                                                             &tempoDisplay, &patternBox, &newPatternButton, &patternMenuButton, &pluginPickerButton, &timeDisplay,
+                                                             &blendButton, &tapTempoButton, &tempoDisplay, &patternBox, &newPatternButton, &patternMenuButton, &pluginPickerButton, &timeDisplay,
                                                              &songPosition, &masterVolume, &masterPitch, &perfMeter, &output, &hintBar, &tweakReadout, &workspace, &midiLight })
     {
         addAndMakeVisible (c);
@@ -519,11 +530,11 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
     for (auto* b : std::initializer_list<juce::Component*> { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &playButton, &stopButton,
                                                              &recordButton, &recordMenuButton, &patternModeButton, &songModeButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton,
-                                                             &newPatternButton, &patternMenuButton, &pluginPickerButton })
+                                                             &blendButton, &tapTempoButton, &newPatternButton, &patternMenuButton, &pluginPickerButton })
         b->setWantsKeyboardFocus (false);
 
     for (auto* b : { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &recordMenuButton, &newPatternButton, &patternMenuButton,
-                     &pluginPickerButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton })
+                     &pluginPickerButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &blendButton, &tapTempoButton })
         b->setFlat (true);
 
     // a light header: every toolbar button is flat; "on" is a faint wash, in the accent for the states that
@@ -537,7 +548,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         playButton.setIconColourWhenOn (onIcon);
         recordButton.setOnColour (colour::record.withAlpha (0.2f));
         recordButton.setIconColourWhenOn (colour::record);
-        for (auto* b : { &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &patternModeButton, &songModeButton })
+        for (auto* b : { &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &blendButton, &patternModeButton, &songModeButton })
         {
             b->setOnColour (onWash);
             b->setIconColourWhenOn (onIcon);
@@ -817,7 +828,7 @@ void MainComponent::resized()
     std::array<int, toolbarlayout::groupCount> widths {};
     widths[(std::size_t) Group::transport] = modeWidth + 8 + 3 * (bigWidth + 4) + 4 + tempoWidth + 6 + timeWidth;
     widths[(std::size_t) Group::master] = 92;
-    widths[(std::size_t) Group::record] = 3 * h + 4;
+    widths[(std::size_t) Group::record] = 4 * h + 6; // four per row (round 170e2)
     widths[(std::size_t) Group::snap] = captionWidth + gridWidth;
     widths[(std::size_t) Group::windows] = 3 * h + 4;
     widths[(std::size_t) Group::file] = 3 * h + 4;
@@ -856,12 +867,12 @@ void MainComponent::resized()
         c.setBounds (r);
     };
     // a block of icon buttons, three per row on both rows
-    auto grid = [&] (juce::Rectangle<int> panel, std::initializer_list<juce::Component*> buttons) {
+    auto grid = [&] (juce::Rectangle<int> panel, std::initializer_list<juce::Component*> buttons, int columns = 3) {
         int i = 0;
         for (auto* b : buttons)
         {
-            const auto x = panel.getX() + (i % 3) * (h + 2);
-            put (*b, juce::Rectangle<int> (x, i < 3 ? row1 : row2, h, h));
+            const auto x = panel.getX() + (i % columns) * (h + 2);
+            put (*b, juce::Rectangle<int> (x, i < columns ? row1 : row2, h, h));
             ++i;
         }
     };
@@ -902,7 +913,7 @@ void MainComponent::resized()
                     hide ({ &patternModeButton, &songModeButton, &playButton, &stopButton, &recordButton, &tempoDisplay, &timeDisplay, &songPosition });
                     break;
                 case Group::master: hide ({ &masterVolume, &masterPitch }); break;
-                case Group::record: hide ({ &metronomeButton, &typingPianoButton, &recordMenuButton, &countInButton, &waitInputButton, &midiLight }); break;
+                case Group::record: hide ({ &metronomeButton, &typingPianoButton, &recordMenuButton, &countInButton, &waitInputButton, &blendButton, &tapTempoButton, &midiLight }); break;
                 case Group::snap: hide ({ &gridBox, &snapToggleButton, &patternBox, &newPatternButton, &patternMenuButton }); break;
                 case Group::windows:
                     for (auto& b : panelButtons)
@@ -956,8 +967,8 @@ void MainComponent::resized()
                 put (masterVolume, panel.withY (row1).withHeight (h).reduced (0, 1));
                 put (masterPitch, panel.withY (row2).withHeight (h).reduced (0, 1));
                 break;
-            case Group::record: // metronome, count-in and wait for input over "what to record", typing piano and the MIDI light
-                grid (panel, { &metronomeButton, &countInButton, &waitInputButton, &recordMenuButton, &typingPianoButton, &midiLight });
+            case Group::record: // metronome, wait for input, count-in, blend over "what to record", typing piano, tempo tapper, MIDI light
+                grid (panel, { &metronomeButton, &waitInputButton, &countInButton, &blendButton, &recordMenuButton, &typingPianoButton, &tapTempoButton, &midiLight }, 4);
                 break;
             case Group::snap: // global snap over the pattern selector, each with its name
             {
@@ -1025,7 +1036,8 @@ void MainComponent::setToolbarLayout (const toolbarlayout::Layout& layout, bool 
 
     const auto fraction = toolbarlayout::iconFraction (size), maxPx = toolbarlayout::iconMaxPx (size);
     for (auto* b : { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &recordMenuButton, &newPatternButton,
-                     &patternMenuButton, &pluginPickerButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &snapToggleButton })
+                     &patternMenuButton, &pluginPickerButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &snapToggleButton,
+                     &blendButton, &tapTempoButton })
         b->setIconSizing (fraction, maxPx);
     for (auto& b : panelButtons)
         b.setIconSizing (fraction, maxPx);
@@ -2883,6 +2895,9 @@ void MainComponent::refreshRecordOptionButtons()
     countInButton.setTooltip (withKey (o.countInBars > 0 ? tr ("Count-in before recording: {0} bar(s)", { juce::String (o.countInBars) })
                                                          : tr ("Count-in before recording: off"),
                                        "record.countIn"));
+    blendButton.setToggleState (o.mode == RecordMode::overdub, juce::dontSendNotification);
+    blendButton.setTooltip (o.mode == RecordMode::overdub ? tr ("Blend recorded notes: on (new notes join the pattern's notes)")
+                                                          : tr ("Blend recorded notes: off (a recorded channel's old notes are replaced)"));
     waitInputButton.setToggleState (o.waitForInput, juce::dontSendNotification);
     waitInputButton.setTooltip (withKey (o.waitForInput ? tr ("Recording waits for the first note: on") : tr ("Recording waits for the first note: off"),
                                          "record.waitForInput"));
@@ -3507,6 +3522,8 @@ void MainComponent::setControlHints()
     ui::setHint (metronomeButton, with (tr ("Metronome: clicks on every beat while playing  [RMB] volume and options"), "transport.metronome"), true);
     ui::setHint (countInButton, with (tr ("Count-in: one bar of clicks before recording starts (the menu has more lengths)"), "record.countIn"));
     ui::setHint (waitInputButton, with (tr ("Wait for input: recording starts with the first note you play"), "record.waitForInput"));
+    ui::setHint (blendButton, tr ("Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced"));
+    ui::setHint (tapTempoButton, with (tr ("Tempo tapper: tap the beat to set the tempo"), "view.tempoTapper"));
     ui::setHint (typingPianoButton, with (tr ("Typing keyboard to piano: Z..M and Q..P play the selected channels; letter shortcuts pause"),
                                           "view.typingPiano"));
     ui::setHint (snapToggleButton, tr ("Snap (magnet): [LMB] turns the snap off and back on (as [Backspace]); lit while it snaps. "
@@ -3572,6 +3589,8 @@ void MainComponent::setQuickTips()
     tip (metronomeButton, tr ("Metronome"), "transport.metronome");
     tip (countInButton, tr ("Count-in"), "record.countIn");
     tip (waitInputButton, tr ("Wait for input"), "record.waitForInput");
+    tip (blendButton, tr ("Blend recorded notes"));
+    tip (tapTempoButton, tr ("Tempo tapper"), "view.tempoTapper");
     tip (typingPianoButton, tr ("Typing keyboard to piano"), "view.typingPiano");
     tip (tempoDisplay, tr ("Tempo (BPM)"));
     tip (timeDisplay, tr ("Song time"));
@@ -5853,9 +5872,11 @@ void MainComponent::FilterBox::paint (juce::Graphics& g)
     g.fillRoundedRectangle (area, radius::sm);
     g.setColour (hovered ? colour::borderStrong : colour::border);
     g.drawRoundedRectangle (area.reduced (0.5f), radius::sm, 1.0f);
+    // round 170e2: a funnel names the box (it showed only "All")
+    icons::draw (g, Icon::filter, area.withWidth (22.0f).withSizeKeepingCentre (13.0f, 13.0f), colour::textSecondary);
     g.setColour (colour::textPrimary);
     g.setFont (font (type::small));
-    g.drawText (text, getLocalBounds().withTrimmedLeft (7).withTrimmedRight (16), juce::Justification::centredLeft, true);
+    g.drawText (text, getLocalBounds().withTrimmedLeft (22).withTrimmedRight (16), juce::Justification::centredLeft, true);
     icons::draw (g, Icon::chevronDown, area.removeFromRight (16.0f).reduced (3.0f).translated (-2.0f, 0.0f), colour::textSecondary);
 }
 // FL's Tools › Macros › Prepare for performance mode ([DECOMP] FUN_0122d010, its "Marker settings" dialog: marker count

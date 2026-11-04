@@ -7098,3 +7098,9 @@ countries: it ch sm
 "Number of steps" = "Numero di passi"
 "Dual" = "Doppio"
 "Align all channel editors" = "Allinea tutti gli editor dei canali"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Unisci note registrate: sì (le nuove note si aggiungono a quelle del pattern)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Unisci note registrate: no (le vecchie note di un canale registrato vengono sostituite)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Unisci note registrate: attivo, una ripresa aggiunge le sue note al pattern (overdub); disattivo, le vecchie note di un canale registrato vengono sostituite"
+"Tempo tapper: tap the beat to set the tempo" = "Tap tempo: batti il tempo per impostarlo"
+"Blend recorded notes" = "Unisci note registrate"

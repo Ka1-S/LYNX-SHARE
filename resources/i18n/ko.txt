@@ -7098,3 +7098,9 @@ countries: kr
 "Number of steps" = "스텝 수"
 "Dual" = "듀얼"
 "Align all channel editors" = "모든 채널 편집기 정렬"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "녹음 노트 섞기: 켬 (새 노트가 패턴의 노트에 더해짐)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "녹음 노트 섞기: 끔 (녹음한 채널의 이전 노트를 대체)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "녹음 노트 섞기: 켜면 테이크의 노트를 패턴에 더하고(오버더브), 끄면 녹음한 채널의 이전 노트를 대체합니다"
+"Tempo tapper: tap the beat to set the tempo" = "탭 템포: 박자를 두드려 템포를 설정"
+"Blend recorded notes" = "녹음 노트 섞기"

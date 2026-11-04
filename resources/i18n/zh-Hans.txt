@@ -7098,3 +7098,9 @@ countries: cn sg
 "Number of steps" = "步数"
 "Dual" = "双轨"
 "Align all channel editors" = "对齐所有通道编辑器"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "混合录制的音符：开（新音符加入模式中的音符）"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "混合录制的音符：关（替换已录制通道的旧音符）"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "混合录制的音符：开启时，一次录制会把音符加入模式（叠录）；关闭时，替换已录制通道的旧音符"
+"Tempo tapper: tap the beat to set the tempo" = "节拍速度敲击器：敲击节拍来设置速度"
+"Blend recorded notes" = "混合录制的音符"
