@@ -41,7 +41,7 @@ DigitDisplayColours<C> digitDisplayColours (C bg0, C border, C accent, C accentH
 }
 
 // How much of the accent tints the Channel Rack's every-other beat group of steps (Palette::stepOffAlt).
-constexpr double stepGroupTint = 0.24;
+constexpr double stepGroupTint = 0.28;
 
 // The palette for an accent and a background (alpha is ignored: both are opaque).
 Palette derivePalette (std::uint32_t accent, std::uint32_t background);

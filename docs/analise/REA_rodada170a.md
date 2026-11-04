@@ -9,9 +9,9 @@ in the round 167g Ghidra project, headless decompilation; DFM resources dumped i
 |---|---|---|---|---|
 | 1 | 00:18 "Control X doesn't work on the channel rack" | §1 | Ctrl+X/C/V did nothing in the rack | Ctrl+X/C/V cut / copy / paste the selected channels' steps and notes, as FL |
 | 4 | 03:50 "by default we should have every key labeled" | FL labels the Cs (LYNX extra) | Cs only (white keys too when rows ≥ 16 px) | every key named (≥ 8 px rows), on by default; Settings › General + Piano roll menu switch |
-| 6 | 09:57 "in FL Studio you can left click and drag ... dropdowns take a long time" | §3 | dropdown; rack selector had arrows + wheel | left-drag up/down and the wheel step the patterns on the toolbar box and the rack selector; a click still opens the list |
-| 7 | 12:41 "too close of a color ... dramatically different" | §5 | groups 0x2a2d34 / 0x33363f | see §5 |
-| 8 | 13:18, 20:48 "can't see where the playhead is", "the sound lighting up when it hits" | §2 | playhead only in Pattern mode, a 28 % tint | see §2 |
+| 6 | 09:57 "in FL Studio you can left click and drag ... dropdowns take a long time" | §3 | dropdown; rack selector had arrows + wheel | left-drag up / wheel up = next pattern, down = previous, on the toolbar box and the rack selector; past the last one a new pattern is made (one); a click still opens the list (LYNX) |
+| 7 | 12:41 "too close of a color ... dramatically different" | §5 | groups 0x2a2d34 / 0x33363f | every other group = the off step tinted 28 % with the accent (0x5e3036 on the default theme), every theme |
+| 8 | 13:18, 20:48 "can't see where the playhead is", "the sound lighting up when it hits" | §2 | playhead only in Pattern mode, a 28 % tint | Pattern and Song mode; FL's "Playing step" LED strip under the steps, a column with a bright top bar, the hit step glows, the channel's selector flashes on its hit |
 | 9 | 11:43 "right clicking and hitting shortcut key like D" | §4 | no letters | FL's letters in the Channel Rack, Playlist and Piano roll menus |
 
 ## 1. Ctrl+X / C / V in the Channel Rack
@@ -40,12 +40,23 @@ in the round 167g Ghidra project, headless decompilation; DFM resources dumped i
   (Busy Works' case) the rack never showed a playhead even while the shown pattern played in the Playlist.
 - LYNX now: `transportedit::patternPlayhead` (the Piano roll's rule since round 162): Pattern mode, or a clip of the
   shown pattern playing in Song mode.
+- [SHOT r170a f3/f5/s1, FL 2026 driven once] the strip lights the playing step in Pattern mode and in Song mode (a
+  pattern clip playing); an on-step's own small LED turns red while the playhead is on it; the channel's selector
+  strip (between the name and the steps) flashes white as that channel's note hits.
+- LYNX look: the strip sits at the top of the "add channel" row (9 px, beat groups alternating, the playing cell in
+  the playhead colour); the playing column keeps a 20 % tint plus a 2 px top bar; an on-step (or a loop repeat) at
+  the playhead is filled white 55 % with a playhead outline; the channel's selector pill flashes white.
 
 ## 3. The pattern selector
 
 - [DFM TToolbarForm] `PatSelect: TVectorDigiWheel` (Min 1, Max 999, MoveSpeed 2, Options wwIncMode), hint
   "^?172^^d^^+- ^Pattern selector", OnDblClick → rename (FUN_012d2920), OnGetText → the pattern's name when wide
   enough. A digiwheel: left-drag up/down and the wheel change the value.
+- [SHOT r170a p1–p6] wheel up = next pattern (769 → 770), wheel down = previous (stops at 1); drag up = next,
+  accelerated (50 px jumped many patterns, creating them up to the value), drag down 10 px = −1. A plain click opened
+  no list in FL 2026; LYNX keeps its dropdown on a click (LYNX extra, rules). Past the last pattern FL creates
+  patterns; LYNX creates one new empty pattern when the last one is not empty (patterndrag / stepPatternCreating),
+  10 px per pattern, no acceleration.
 
 ## 4. Menu accelerator letters
 
@@ -63,13 +74,20 @@ in the round 167g Ghidra project, headless decompilation; DFM resources dumped i
   "&Edit", "&Tools", "&View", "&Select".
 - LYNX: core/MenuMnemonic.h marks the letter (U+0001) in the translated caption (a translation without the letter
   gets " (D)"), the LookAndFeel underlines it, JUCE fix 12 (cmake/LynxPatchJuce.cmake) picks the item on the key:
-  one item runs (a submenu opens), several items with the key are highlighted in turn.
+  the first item with the key in menu order runs (a submenu opens).
+- [SHOT r170a m1–m4] FL draws the letter with a dotted underline; 'D' in the channel menu ran "Delete..." at once (its
+  confirm dialog); a letter shared by two items ('t': "Cu&t itself", "Cu&t") ran the FIRST one and closed the menu.
+  LYNX draws a 1 px solid underline (theme look).
 
 ## 5. Step colours
 
-(see the driven session below)
+- [DECOMP 0x1039610 PosLEDPanelPaint] and the step buttons alternate per beat group. [SHOT r170a f2, crops c_f2]
+  FL's groups: dark grey vs a clearly red / maroon tinted group; on-steps white-ish in grey groups, pink in the red ones.
+- LYNX before: 0x2a2d34 / 0x33363f (grey vs slightly lighter grey). Now: themes::derivePalette sets
+  `stepOffAlt = mix (stepOff, accent, stepGroupTint = 0.28)` for every palette (light themes and other accents too);
+  the default theme's built-in table and theme::colour::stepOffAlt = 0x5e3036. Test rack170a_step_groups_clearly_apart.
 
 ## Where I stopped
 
-- done: §1, §2 (Song mode), §3 (drag + wheel), §4, note names; tests tests/Rack170aTests.inc.
-- in progress: FL session (shots), playhead/step look, beat-group colours, Windows screenshots.
+- done: §1–§5, note names, FL session (shots in C:\Users\kauan\lynx-test\r170a), tests tests/Rack170aTests.inc.
+- in progress: LYNX Windows screenshots, merge train.

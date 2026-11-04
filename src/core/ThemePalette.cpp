@@ -24,7 +24,7 @@ constexpr Palette builtIn {
     0xff2a2d34, 0xff3b3f48,                                                             // border, borderStrong
     0xffeceef2, 0xffa1a6b0, 0xff60656f,                                                 // text
     0xffe5383b, 0xfff2545a, 0xffc12a30, 0xff5c1f24, 0xffffffff, 0x2ee5383b,             // accent family
-    0xffc5c9d1, 0xff444955, 0xff2a2d34, 0xff573036, 0xffe8a3a6,                         // knobs, steps (alt: stepOffAlt below)
+    0xffc5c9d1, 0xff444955, 0xff2a2d34, 0xff5e3036, 0xffe8a3a6,                         // knobs, steps (alt: stepOffAlt below)
     0xff3a3e47, 0xff262930, 0xff1d1f24, 0xff17181c, 0xff1c1e23, 0xff16171b,             // grids, keys, rows
     0xffb3545a, 0xffff6b6e, 0xff4a4e57, 0xff3a3e47                                      // notes, LED
 };
