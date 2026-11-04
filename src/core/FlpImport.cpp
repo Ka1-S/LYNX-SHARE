@@ -2559,7 +2559,13 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     w.fromPort = patchParamOutput (p);
                 }
                 else
+                {
                     w.fromPort = src->index >= 0x10000000 ? src->index - 0x10000000 : 0;
+                    // a Control Surface's outputs: FL's numbers → the panel's order (as for mixer links, round 164)
+                    if (! source.generator && source.effect.kind == EffectKind::controlSurface)
+                        if (const auto k = surface::flOutputToLynx (source.effect.state, w.fromPort))
+                            w.fromPort = *k;
+                }
                 if (! isPatchParamOutput (w.fromPort) && ! source.generator && source.effect.kind == EffectKind::peakController) // FL: peak, LFO, peak + LFO
                     w.fromPort = w.fromPort == 0 ? 1 : w.fromPort == 1 ? 2 : 0;
                 if (! isPatchParamOutput (w.fromPort) && w.fromPort >= patcher::nodePorts (source).controlOuts)

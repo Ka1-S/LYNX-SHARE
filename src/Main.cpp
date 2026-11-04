@@ -4,6 +4,7 @@
 
 #include "core/Drumaxx.h"
 #include "core/LoadTrace.h"
+#include "core/Patcher.h"
 #include "core/Patcherize.h"
 #include "core/Performance.h"
 #include "core/VideoPlayer.h"
@@ -7658,6 +7659,37 @@ private:
                             song.patterns[0].notes.push_back ({ (std::int64_t) k * lynx::ppq, lynx::ppq / 2, (int) song.channels.size() - 1, 60 + 4 * k, 0.8f });
                     juce::String error;
                     lynx::ProjectFile::save (song, juce::File (save), error);
+                    // round 171b: the saved Patchers come back the same (parameter ports, event cables, published)
+                    juce::String report;
+                    if (const auto loaded = lynx::ProjectFile::load (juce::File (save), error))
+                    {
+                        const auto same = loaded->mixer.size() > 1 && ! loaded->mixer[1].effects.empty()
+                                          && loaded->mixer[1].effects[0].patcher == song.mixer[1].effects[0].patcher;
+                        const auto& d = loaded->mixer.size() > 1 && ! loaded->mixer[1].effects.empty() ? loaded->mixer[1].effects[0].patcher : lynx::PatcherDoc {};
+                        report << "patcher round trip: " << (same ? "OK" : "DIFFERENT") << "\n";
+                        if (! same && loaded->mixer.size() > 1 && ! loaded->mixer[1].effects.empty())
+                        {
+                            const auto& a = song.mixer[1].effects[0].patcher;
+                            report << "wires " << (a.wires == d.wires ? "same" : "differ") << ", published " << (a.published == d.published ? "same" : "differ")
+                                   << ", surface " << (a.surface == d.surface ? "same" : "differ") << "\n";
+                            for (std::size_t n = 0; n < std::min (a.nodes.size(), d.nodes.size()); ++n)
+                                if (! (a.nodes[n] == d.nodes[n]))
+                                    report << "node " << (int) n << " differs: ports " << (a.nodes[n].paramIns == d.nodes[n].paramIns && a.nodes[n].paramOuts == d.nodes[n].paramOuts ? "same" : "differ")
+                                           << ", effect " << (a.nodes[n].effect == d.nodes[n].effect ? "same" : "differ") << ", xy "
+                                           << (a.nodes[n].x == d.nodes[n].x && a.nodes[n].y == d.nodes[n].y ? "same" : "differ") << "\n";
+                        }
+                        for (int n = 0; n < (int) d.nodes.size(); ++n)
+                            report << "node " << n << " paramIns " << (int) d.nodes[(std::size_t) n].paramIns.size() << " paramOuts "
+                                   << (int) d.nodes[(std::size_t) n].paramOuts.size() << "\n";
+                        for (const auto& w : d.wires)
+                            if (w.kind == lynx::PatchWire::Kind::control)
+                                report << "control " << w.from << ":" << w.fromPort << " -> " << w.to << ":" << w.toPort << "\n";
+                        for (const auto& p : d.published)
+                            report << "published " << p.node << ":" << p.param << " " << juce::String::fromUTF8 (p.name.c_str()) << "\n";
+                    }
+                    else
+                        report << "patcher round trip: load failed: " << error << "\n";
+                    juce::File (prefix + "-roundtrip.txt").replaceWithText (report);
                 }
                 offline.setSong (std::move (song));
             }

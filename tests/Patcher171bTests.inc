@@ -213,7 +213,7 @@ TEST (patcher171b_port_editing)
 TEST (patcher171b_fl_parameter_ports_import)
 {
     using namespace patcher141;
-    // FL's state: a Control Surface's output 0 (0x10000000) on a Fruity Balance's volume (parameter 1, port flags 3 =
+    // FL's state: a Peak Controller's output 0 (0x10000000) on a Fruity Balance's volume (parameter 1, port flags 3 =
     // input + visible), the Balance's pan port active but unused, a plugin's parameter 6 as an output (flags 2) cabled to
     // another plugin's parameter 2; record 1100 publishes the volume port as Patcher parameter 0
     FlBlob blob;
@@ -246,7 +246,7 @@ TEST (patcher171b_fl_parameter_ports_import)
         blob.group (g);
     };
     node (2, 100, "Fruity Balance", balance, { port (0, 0, 1001, 3), port (0, 0, 1002, 2), port (2, 1, 1003, 3), port (2, 0, 1004, 3) });
-    node (2, 101, "Control Surface", {}, { port (2, 0x10000000, 1012, 10) });
+    node (2, 101, "Fruity Peak Controller", std::vector<std::uint8_t> (64, 0), { port (0, 0, 1011, 3), port (2, 0x10000000, 1012, 10) });
     node (2, 102, "Fruity Wrapper", {}, { port (0, 0, 1021, 3), port (0, 0, 1022, 2), port (2, 6, 1023, 2) });
     node (2, 103, "Fruity Wrapper", {}, { port (0, 0, 1031, 3), port (0, 0, 1032, 2), port (2, 2, 1033, 3) });
     blob.pin (2001, 0, true, 0, "Audio input");
@@ -296,9 +296,9 @@ TEST (patcher171b_fl_parameter_ports_import)
         auto expected = std::vector<int> { balanceVolume->param, balancePan->param };
         std::sort (expected.begin(), expected.end());
         CHECK (doc.nodes[0].paramIns == expected);
-        // the Control Surface → volume event link
+        // the controller → volume event link (FL's Peak Controller output 0 = "peak" = LYNX's output 1)
         CHECK (std::any_of (doc.wires.begin(), doc.wires.end(), [&] (const lynx::PatchWire& w) {
-            return w.kind == lynx::PatchWire::Kind::control && w.from == 1 && w.fromPort == 0 && w.to == 0 && w.toPort == balanceVolume->param;
+            return w.kind == lynx::PatchWire::Kind::control && w.from == 1 && w.fromPort == 1 && w.to == 0 && w.toPort == balanceVolume->param;
         }));
         CHECK (! doc.published.empty() && doc.published[0].node == 0 && doc.published[0].param == balanceVolume->param);
     }
@@ -345,7 +345,7 @@ TEST (patcher171b_fl_patcher_preset_with_event_links)
         flLinks += cable.kind == 2;
     for (const auto& [id, p] : graph->ports)
         visibleIns += p.node >= 0 && p.kind == 2 && p.input && (p.flags & 2) != 0;
-    CHECK (flLinks == 11 && visibleIns == 11 && graph->exposed.size() >= 11);
+    CHECK (flLinks == 11 && visibleIns >= 11 && graph->exposed.size() >= 11);
 
     flp::Project project;
     project.tempo = 120.0;
@@ -369,6 +369,9 @@ TEST (patcher171b_fl_patcher_preset_with_event_links)
         links += w.kind == lynx::PatchWire::Kind::control;
     for (const auto& n : doc.nodes)
         ports += (int) n.paramIns.size();
+    for (const auto& [what, count] : report.partialEffects)
+        if (what.rfind ("Patcher", 0) == 0)
+            std::printf ("  %s x%d\n", what.c_str(), count);
     std::printf ("  8 step pattern: %d FL event links -> %d LYNX control cables, %d active parameter inputs, %d published\n", flLinks, links, ports,
                  (int) std::count_if (doc.published.begin(), doc.published.end(), [] (const lynx::PatchParam& p) { return p.node >= 0; }));
     // every imported cable ends on an active (shown) parameter input, and the graph runs

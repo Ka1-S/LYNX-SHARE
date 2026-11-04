@@ -2464,9 +2464,12 @@ void shootMenus (AudioEngine& engine, bool channel, int index, int slot, std::fu
     menus.emplace_back ("to-events", events);
     // round 171b (issue #65): FL's node menu and its Inputs › Parameters of the first node that has parameters
     if (const auto* doc = Target { channel, index, slot }.doc (engine.getSong()))
-        for (int n = 0; n < (int) doc->nodes.size(); ++n)
-            if (auto params = editor.parametersMenu (n, true); params.getNumItems() > 0)
+        for (int pass = 0; pass < 2; ++pass) // (a node with active parameter ports first)
+            for (int n = 0; n < (int) doc->nodes.size(); ++n)
+                if (auto params = editor.parametersMenu (n, true);
+                    params.getNumItems() > 0 && (pass == 1 || ! patcher::shownParamInputs (*doc, n).empty()))
             {
+                pass = 2;
                 menus.emplace_back ("node", editor.nodeMenu (n));
                 menus.emplace_back ("node-inputs-parameters", params);
                 menus.emplace_back ("node-outputs-parameters", editor.parametersMenu (n, false));
