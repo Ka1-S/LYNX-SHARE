@@ -7059,8 +7059,11 @@ countries: id
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] lukis dengan pensil  [Ctrl+LMB] / [Shift+LMB] pilih beberapa  [2xLMB] buka  [RMB] menu"
 "Empty patterns were ignored." = "Pattern kosong diabaikan."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Pemilih plugin: semua generator dan efek, kategori sebagai tab (tekan lagi untuk menutup)"
+"Themed" = "Bertema"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Animasikan seni plugin (kelopak berjatuhan, cahaya; gaya Bertema)"
 "click to step, drag or mouse wheel to change" = "klik untuk melangkah, seret atau roda mouse untuk mengubah"
 "no effect with the current mode (another engine is in use)" = "tidak berpengaruh pada mode saat ini (mesin lain sedang dipakai)"
+"arrows step, click for the list, drag or mouse wheel to change" = "panah untuk melangkah, klik untuk daftar, seret atau roda mouse untuk mengubah"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Utama: {0}"
@@ -7121,3 +7124,10 @@ countries: id
 "Seq" = "Seq"
 "Number of steps" = "Jumlah langkah"
 "Dual" = "Ganda"
+"Align all channel editors" = "Ratakan semua editor channel"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Campur not rekaman: nyala (not baru ditambahkan ke not pattern)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Campur not rekaman: mati (not lama kanal yang direkam diganti)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Campur not rekaman: nyala, satu take menambahkan notnya ke pattern (overdub); mati, not lama kanal yang direkam diganti"
+"Tempo tapper: tap the beat to set the tempo" = "Tap tempo: ketuk ketukan untuk mengatur tempo"
+"Blend recorded notes" = "Campur not rekaman"

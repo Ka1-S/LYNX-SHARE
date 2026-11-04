@@ -1063,6 +1063,15 @@ void AudioEngine::panic()
         w.store (0);
 }
 
+void AudioEngine::stopSound()
+{
+    panic();
+    NoteEvent e;
+    e.type = NoteEvent::Type::choke;
+    e.channel = RackRenderer::stopSoundChannel; // and every effect / plugin reset
+    liveEvents.push (e);
+}
+
 double AudioEngine::songPlayheadTicks() const noexcept
 {
     const auto tick = juce::jmax (0.0, transport.positionTicks.load (std::memory_order_relaxed));

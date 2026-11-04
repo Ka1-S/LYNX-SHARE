@@ -37,9 +37,12 @@ are steady, automation sweeps, sample-rate and buffer changes, no clicks / NaN /
 nothing; 8 = no known problem (not yet proven on macOS for every pair), lower = the problem in the notes below.
 "(ref expired)": the Waves and Auto-Tune trials expired (10-25 / 10-31), so the score rests on the earlier
 measurements (docs/analise, rounds 123–165) and cannot be raised without a new trial. FabFilter runs until ~11-16 and
-Soundtoys until ~11-22: Pro-L 2, Pro-G and Pro-C 3 (no programme comparison yet) should be measured before then.
+Soundtoys until ~11-22: Pro-L 2, Pro-G and Pro-C 3 (no programme comparison yet) should be measured before then. Since
+2026-11-04 every reference that still runs (Waves on a new 7-day licence included) is captured to
+/mnt/e/lynx-work/refcap0124 (parameter tables, default states, one-parameter sweeps of a test stimulus): the "(ref
+expired)" Waves rows can be re-measured from those files; Auto-Tune stays on tune157 / tune165 refs.
 
-Stability notes (round 170c): **Facet EQ** 5: blank on macOS until 170c; analyser reworked 170c (fixed grid, smoothing); one analyser tap per engine (two open EQs take turns); **Apex Limiter** 6: blank on macOS until 170c; ProEditor repaints the whole window at 30 Hz; **Prism Multiband** 6: blank on macOS until 170c; whole-window repaint at 30 Hz; **Hush De-esser** 6: blank on macOS until 170c; empty wave path guarded 170c; **Crest Compressor** 6: blank on macOS until 170c; Drive had no control until 170c; **Quell Denoiser** 6: blank on macOS until 170c; **Echoform** 6: ~22 controls did nothing with Hybrid / a tape voicing on: dimmed since 170c; **Ember Saturator** 6: Tube (the first mode) garbled at +10 dB until 170c; Style / Auto gain silently overridden by a character; Classic voicing has no switch in the editor; **Atrium** 6: Early mod rate / depth do nothing. The lowest Sound scores (Horizon,
+Stability notes (round 170c): **Facet EQ** 7 (was 5): blank on macOS until 170c — the macOS CI picture now draws it (artifact editor-pictures-macOS, gfxprobe 0 changed pixels; the run without JUCE patch 12 showed the raw flood: 16 320); analyser reworked 170c (fixed grid, smoothing); one analyser tap per engine (two open EQs take turns); **Apex Limiter** 6: blank on macOS until 170c; ProEditor repaints the whole window at 30 Hz; **Prism Multiband** 6: blank on macOS until 170c; whole-window repaint at 30 Hz; **Hush De-esser** 6: blank on macOS until 170c; empty wave path guarded 170c; **Crest Compressor** 6: blank on macOS until 170c; Drive had no control until 170c; **Quell Denoiser** 6: blank on macOS until 170c; **Echoform** 6: ~22 controls did nothing with Hybrid / a tape voicing on: dimmed since 170c; **Ember Saturator** 6: Tube (the first mode) garbled at +10 dB until 170c; Style / Auto gain silently overridden by a character; Classic voicing has no switch in the editor; **Atrium** 7 (was 6): Early mod rate / depth did nothing until 170c (now modulate the early taps). The lowest Sound scores (Horizon,
 Apex / Pro-L 2, Halo, Orbit, Sentry, Nebula, ValhallaPlate) have no audio comparison at all: the next parity rounds start
 there.
 
@@ -51,7 +54,7 @@ there.
 | Halo | ValhallaShimmer | 8 | 9 | 3 | 8 | 135 |  |
 | Horizon | ValhallaFutureVerb | 8 | 9 | 2 | 8 | 135 |  |
 | Orbit | ValhallaSpaceModulator | 8 | 9 | 3 | 8 | 135 |  |
-| Facet EQ | Pro-Q 4 | 9 | 8 | 8 | 5 | 152c |  |
+| Facet EQ | Pro-Q 4 | 9 | 8 | 8 | 7 | 152c | 170c: Stability 5 → 7 (draws on macOS CI, steady analyser) |
 | Crest Compressor | Pro-C 3 | 9 | 8 | 5 | 6 | 137 |  |
 | Sentry Gate | Pro-G | 9 | 8 | 3 | 8 | 135 |  |
 | Ember Saturator | Saturn 2 | 9 | 8 | 5 | 6 | 152b |  |
@@ -60,7 +63,7 @@ there.
 | Hush De-esser | DeEsser (Waves) | 10 | 8 | 7 (ref expired) | 6 | 165 | 9 → 10 / 8 → 8 |
 | Echoform | H-Delay (Waves) | 9 | 8 | 7 (ref expired) | 6 | 137 |  |
 | Echoform | ValhallaDelay | 9 | 8 | 4 | 6 | 137 |  |
-| Atrium | ValhallaRoom | 9 | 8 | 4 | 6 | 135 |  |
+| Atrium | ValhallaRoom | 9 | 8 | 4 | 7 | 135 | 170c: Stability 6 → 7 (Early mod rate / depth work) |
 | Auto-pan (stand-in) | PanMan | 9 | 8 | 6 | 8 | 152 |  |
 | Foil Plate | Little Plate | 9 | 8 | 6 | 8 | 152 |  |
 | Ember Saturator | Decapitator | 9 | 9 | 5 | 6 | 165a | 8 → 9 / 7 → 9 |

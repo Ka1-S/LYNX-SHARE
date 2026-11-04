@@ -243,7 +243,9 @@ NewProjectDefaults& newProjectDefaults()
 
 Song makeNewProject (int templateIndex)
 {
-    auto song = templateIndex < 0 ? Song::makeDefault() : makeTemplate (templateIndex);
+    // round 170h2 (user decision): the default new project is FL's way — the channels, their inserts and the Master
+    // limiter, with EMPTY steps (the four-on-the-floor stays in the "Basic beat" template)
+    auto song = makeTemplate (templateIndex < 0 ? 0 : templateIndex);
     applyNewProjectDefaults (song, newProjectDefaults());
     return song;
 }

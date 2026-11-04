@@ -272,6 +272,10 @@ public:
 
     // All notes off on every channel (double-click on Stop). UI thread.
     void panic();
+    // FL's Tools › Macros › Stop sound (Ctrl+H, round 170h2; FL64 MacroStopSoundActionExecute → FUN_011c8d10 →
+    // FUN_011c8a40 (1, 1, 1) → FUN_012b5210): all notes off on every channel and MIDI out, and every effect and
+    // plugin reset — the tails of delays and reverbs stop too. UI thread.
+    void stopSound();
 
     // Note recording (MIDI and PC keyboard) into the current pattern while playing. UI thread.
     void setRecording (bool shouldRecord);

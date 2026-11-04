@@ -1534,6 +1534,7 @@ bool MainComponent::runAction (const std::string& id)
             showQuickAdd();
     }
     else if (is ("edit.history")) showHistory();
+    else if (is ("tools.stopSound")) engine.stopSound();
     else if (is ("browser.search"))
     {
         showPanel (Panel::browser);
@@ -1615,6 +1616,7 @@ bool MainComponent::runAction (const std::string& id)
         }
     }
     else if (is ("view.closeUnfocusedWindows")) closeUnfocusedWindows();
+    else if (is ("view.alignChannelEditors")) alignAllChannelEditors (engine.getSelectedChannel());
     else if (is ("view.touchKeyboard")) toggleTouchKeyboard (engine);
     else if (is ("view.closePluginWindows") || is ("view.closeWindows"))
     {
@@ -1889,6 +1891,8 @@ void MainComponent::loadUiSettings()
             skin::overridesFromString (line.fromFirstOccurrenceOf ("=", false, false).trim());
         else if (key == "reducedEffects")
             skin::setReducedEffects (on);
+        else if (key == "artMotion")
+            skin::setArtMotion (on);
         else if (key == "waveStereo")
             ui::WaveformCache::stereo = on;
         else if (key == "noteNames")
@@ -2042,6 +2046,7 @@ void MainComponent::saveUiSettings()
                                       + "\nnoteNames=" + juce::String (notenames::currentStyle.load())
                                       + "\nnoteFlats=" + juce::String (notenames::currentFlats.load() ? 1 : 0)
                                       + "\nreducedEffects=" + juce::String (skin::reducedEffects() ? 1 : 0)
+                                      + "\nartMotion=" + juce::String (skin::artMotion() ? 1 : 0)
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
                                       + "\npluginStyleOverrides=" + skin::overridesToString()
                                       + "\nrememberSeek=" + juce::String (EditorGlobals::get().rememberSeek ? 1 : 0)
@@ -3650,7 +3655,8 @@ void MainComponent::setControlHints()
     ui::setHint (playButton, with (tr ("Play: [LMB] play; again: stop and go back to where it started"), "transport.playStop")
                                  + "  " + keyMarkup ("transport.pause") + " " + tr ("pause"));
     ui::setHint (stopButton, tr ("Stop: [LMB] stop and go back to the start (or the remembered position; again: the start)  "
-                                 "[2xLMB] back to the start and all notes off (panic)  [RMB] remember seek time"),
+                                 "[2xLMB] back to the start and all notes off (panic)  [RMB] remember seek time")
+                                 + "  " + keyMarkup ("tools.stopSound") + " " + tr ("Stop sound (all notes off)"), // round 170h2
                  true);
     ui::setHint (recordButton, with (tr ("Record: [LMB] arm, then play to record notes (and audio, when armed)  [RMB] what to record"), "transport.record"),
                  true);
@@ -4867,6 +4873,7 @@ void MainComponent::openSettings (int page)
         o.noteNames = notenames::currentStyle.load();
         o.noteFlats = notenames::currentFlats.load();
         o.reducedEffects = skin::reducedEffects();
+        o.artMotion = skin::artMotion();
         o.gpuRendering = gpuRenderingEnabled();
         o.pluginStyle = skin::forcedStyle();
         o.splash = safe->startup.splash;
@@ -4902,8 +4909,9 @@ void MainComponent::openSettings (int page)
             self.setToolbarLayout (layout, true);
         }
         theme::menus::setCompact (o.compactMenus);
-        if (o.reducedEffects != skin::reducedEffects() || o.pluginStyle != skin::forcedStyle())
+        if (o.reducedEffects != skin::reducedEffects() || o.pluginStyle != skin::forcedStyle() || o.artMotion != skin::artMotion())
         {
+            skin::setArtMotion (o.artMotion);
             skin::setReducedEffects (o.reducedEffects);
             skin::setForcedStyle (o.pluginStyle);
             for (int i = 0; i < juce::Desktop::getInstance().getNumComponents(); ++i) // open editors redraw at once
@@ -5376,7 +5384,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addSubMenu (tr ("Last tweaked"), makeLastTweakedMenu (0), engine.getLastTweaked (0).has_value());
         menu.addSubMenu (tr ("Next to last tweaked"), makeLastTweakedMenu (1), engine.getLastTweaked (1).has_value());
         menu.addSectionHeader (tr ("Macros"));
-        menu.addItem (tr ("Stop sound (all notes off)"), [this] { engine.panic(); });
+        menu.addItem (tr ("Stop sound (all notes off)") + shortcutText ("tools.stopSound"), [this] { engine.stopSound(); });
         menu.addItem (tr ("Select unused channels"), [this] {
             showPanel (Panel::channelRack);
             rack.selectUnused();
@@ -5546,6 +5554,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Close all windows (plugins, channel settings, tools)") + shortcutText ("view.closeWindows"), [this] { runAction ("view.closeWindows"); });
         menu.addItem (tr ("Close all plugin windows") + shortcutText ("view.closePluginWindows"), [this] { runAction ("view.closePluginWindows"); });
         menu.addItem (tr ("Close all windows except the focused one") + shortcutText ("view.closeUnfocusedWindows"), [this] { runAction ("view.closeUnfocusedWindows"); });
+        menu.addItem (tr ("Align all channel editors") + shortcutText ("view.alignChannelEditors"), [this] { runAction ("view.alignChannelEditors"); });
         menu.addSeparator();
         menu.addItem (tr ("Plugin database (in the Browser)") + shortcutText ("view.pluginDatabase"), [this] { runAction ("view.pluginDatabase"); });
         menu.addItem (tr ("Audio editor") + shortcutText ("view.audioEditor"), [this] { openAudioEditorForSelection(); });

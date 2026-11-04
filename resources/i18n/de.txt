@@ -7059,8 +7059,11 @@ countries: de at ch li lu
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] mit dem Stift malen  [Ctrl+LMB] / [Shift+LMB] mehrere wählen  [2xLMB] öffnen  [RMB] Menü"
 "Empty patterns were ignored." = "Leere Pattern wurden ignoriert."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Plugin-Picker: alle Generatoren und Effekte, die Kategorien als Reiter (erneut drücken zum Schließen)"
+"Themed" = "Thematisch"
+"Animate the plugin art (falling petals, glows; Themed style)" = "Plugin-Grafik animieren (fallende Blütenblätter, Leuchten; Stil Thematisch)"
 "click to step, drag or mouse wheel to change" = "klicken zum Weiterschalten, ziehen oder Mausrad zum Ändern"
 "no effect with the current mode (another engine is in use)" = "ohne Wirkung im aktuellen Modus (eine andere Engine ist aktiv)"
+"arrows step, click for the list, drag or mouse wheel to change" = "Pfeile schalten weiter, Klick für die Liste, ziehen oder Mausrad zum Ändern"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Haupt: {0}"
@@ -7121,3 +7124,10 @@ countries: de at ch li lu
 "Seq" = "Seq"
 "Number of steps" = "Anzahl der Schritte"
 "Dual" = "Doppelt"
+"Align all channel editors" = "Alle Kanaleditoren ausrichten"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "Aufgenommene Noten mischen: an (neue Noten kommen zu denen des Patterns hinzu)"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Aufgenommene Noten mischen: aus (die alten Noten eines aufgenommenen Kanals werden ersetzt)"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Aufgenommene Noten mischen: an, eine Aufnahme fügt ihre Noten dem Pattern hinzu (Overdub); aus, die alten Noten eines aufgenommenen Kanals werden ersetzt"
+"Tempo tapper: tap the beat to set the tempo" = "Tempo-Tapper: tippe den Beat, um das Tempo zu setzen"
+"Blend recorded notes" = "Aufgenommene Noten mischen"

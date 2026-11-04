@@ -7059,8 +7059,11 @@ countries: cn sg
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "样式：[LMB] 用铅笔绘制  [Ctrl+LMB] / [Shift+LMB] 选择多个  [2xLMB] 打开  [RMB] 菜单"
 "Empty patterns were ignored." = "已忽略空样式。"
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "插件选择器：所有发生器和效果器，类别显示为标签（再按一次关闭）"
+"Themed" = "主题"
+"Animate the plugin art (falling petals, glows; Themed style)" = "插件美术动画（飘落的花瓣、光晕；主题样式）"
 "click to step, drag or mouse wheel to change" = "单击切换，拖动或滚动鼠标滚轮更改"
 "no effect with the current mode (another engine is in use)" = "在当前模式下无效（正在使用另一个引擎）"
+"arrows step, click for the list, drag or mouse wheel to change" = "箭头逐步切换，单击显示列表，拖动或滚动鼠标滚轮更改"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "主：{0}"
@@ -7121,3 +7124,10 @@ countries: cn sg
 "Seq" = "音序"
 "Number of steps" = "步数"
 "Dual" = "双轨"
+"Align all channel editors" = "对齐所有通道编辑器"
+# round 170e2: recording panel toggles
+"Blend recorded notes: on (new notes join the pattern's notes)" = "混合录制的音符：开（新音符加入模式中的音符）"
+"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "混合录制的音符：关（替换已录制通道的旧音符）"
+"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "混合录制的音符：开启时，一次录制会把音符加入模式（叠录）；关闭时，替换已录制通道的旧音符"
+"Tempo tapper: tap the beat to set the tempo" = "节拍速度敲击器：敲击节拍来设置速度"
+"Blend recorded notes" = "混合录制的音符"

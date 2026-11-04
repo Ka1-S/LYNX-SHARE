@@ -9123,7 +9123,7 @@ TEST (ogun_engine)
     broken.resize (broken.size() - 300);
     CHECK (! lynx::ogunStateUsable (broken));
     auto old = blob;
-    old[0] = 13; // the articulator layout is from version 14
+    old[0] = 13; // a version-18 body read as version 13 (a u32 comment count; versions 10…13: Gen169lTests)
     CHECK (! lynx::ogunStateUsable (old));
 
     // reference model (REA round 37 ogmodel.Plugin(state).run: C5 velocity 0.75 released at 6144, G5 velocity 0.625 at 2048
@@ -17039,6 +17039,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Sel168tTests.inc"
 #include "Gap169kTests.inc"
 #include "Gap169kPickerTests.inc"
+#include "Gap169kAlignTests.inc"
 #include "Speech168bTests.inc"
 #include "Design168pTests.inc"
 #include "Typing168tTests.inc"
@@ -17057,3 +17058,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Crash169gTests.inc"
 #include "Wfqa170hTests.inc"
 #include "Toxic169hTests.inc"
+#include "Gen169lTests.inc"
+#include "Wfqa170h2Tests.inc"
