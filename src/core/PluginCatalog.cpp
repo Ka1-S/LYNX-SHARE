@@ -380,7 +380,12 @@ std::vector<MenuFolder> menuTree (const Folders& folders, bool instruments, cons
                 if (const auto it = direct.find (path); it != direct.end()) f.items = it->second;
                 if (! f.items.empty() || ! f.sub.empty()) out.push_back (std::move (f));
             }
-        std::sort (out.begin(), out.end(), [] (const MenuFolder& a, const MenuFolder& b) { return naturalCompare (a.name, b.name) < 0; });
+        std::sort (out.begin(), out.end(), [] (const MenuFolder& a, const MenuFolder& b) {
+            const auto la = a.path == lynxCategory, lb = b.path == lynxCategory; // LYNX's own plugins first (round 170b)
+            if (la != lb)
+                return la;
+            return naturalCompare (a.name, b.name) < 0;
+        });
         return out;
     };
     return build ({});
@@ -428,5 +433,93 @@ int importFlFolders (Folders& folders, bool instruments, const std::vector<std::
         ++placed;
     }
     return placed;
+}
+namespace
+{
+// letters and digits only, lower case ("Fruity X-Y Controller" -> "fruityxycontroller")
+std::string squash (const std::string& name)
+{
+    std::string out;
+    for (const auto c : name)
+        if (std::isalnum ((unsigned char) c))
+            out += (char) std::tolower ((unsigned char) c);
+    return out;
+}
+
+struct CategoryList
+{
+    const char* folder;
+    std::vector<const char*> names;
+};
+
+const std::vector<CategoryList>& flEffectFolders()
+{
+    static const std::vector<CategoryList> list {
+        { "Controller", { "Control Surface", "Fruity Formula Controller", "Fruity Peak Controller", "Fruity X-Y Controller", "Fruity X-Y-Z Controller" } },
+        { "Delay reverb", { "Fruity Convolver", "Fruity Delay 2", "Fruity Delay 3", "Fruity Delay Bank", "Fruity Reeverb 2", "LuxeVerb", "Multiband Delay",
+                            /* legacy */ "Fruity Delay", "Fruity Reeverb" } },
+        { "Distortion", { "Distructor", "Fruity Blood Overdrive", "Fruity Fast Dist", "Fruity Soft Clipper", "Fruity Squeeze", "Fruity WaveShaper", "Hardcore" } },
+        { "Dynamics", { "Emphasis", "Emphasizer", "Fruity Compressor", "Fruity Limiter", "Fruity Multiband Compressor", "Maximus", "Soundgoodizer",
+                        "Transient Processor" } },
+        { "Filter", { "EQUO", "Frequency Splitter", "Fruity Filter", "Fruity Love Philter", "Fruity Parametric EQ 2", "Fruity Parametric EQ",
+                      /* legacy */ "Fruity 7 Band EQ", "Fruity Bass Boost", "Fruity Fast LP", "Fruity Free Filter" } },
+        { "Flanger", { "Fruity Chorus", "Fruity Flanger", "Fruity Flangus", "Fruity Phaser", "Hyper Chorus", "Vintage Chorus", "Vintage Phaser" } },
+        { "Gain", { "Fruity Balance", "Fruity PanOMatic", "Fruity Send", "Fruity Stereo Enhancer", "Fruity Stereo Shaper", "Spreader",
+                    /* legacy */ "Fruity Center", "Fruity Mute 2", "Fruity Phase Inverter" } },
+        { "Misc", { "Edison", "Effector", "FL Studio Mobile Rack FX", "Frequency Shifter", "Fruity LSD", "Fruity Scratcher", "Fruity Vocoder", "Gross Beat",
+                    "Low Lifter", "Newtime", "Newtone", "Pitch Shifter", "Pitcher", "Transmitter", "Transporter", "Vocodex" } },
+        { "Patcher", { "Patcher", "VFX Color Mapper", "VFX Envelope", "VFX Key Mapper", "VFX Keyboard Splitter", "VFX Level Scaler", "VFX Script", "VFX Sequencer" } },
+        { "Visual", { "Fruity Big Clock", "Fruity HTML NoteBook", "Fruity NoteBook 2", "Fruity NoteBook", "Fruity Spectroman", "Fruity dB Meter", "Razer Chroma",
+                      "Tuner", "Wave Candy", "ZGameEditor Visualizer", /* LYNX's name of it */ "Visualizer" } },
+    };
+    return list;
+}
+
+const std::vector<CategoryList>& flGeneratorFolders()
+{
+    static const std::vector<CategoryList> list {
+        { "Controller", { "Fruity Envelope Controller", "Fruity Keyboard Controller" } },
+        { "Drum", { "BassDrum", "Drumaxx", "Drumpad", "FPC", "Fruit Kick", "Fruity DrumSynth Live", "Fruity Slicer", "Fruity Slicer 2", "Slicex" } },
+        { "MIDI", { "Dashboard", "MIDI Out" } },
+        { "Misc", { "Audio Clip", "Automation Clip", "BooBass", "FL Keys", "FL Studio Mobile", "FL Studio Mobile Rack", "Fruity Voltage Controller", "Layer",
+                    "ReWired", "SoundFont Player" } },
+        { "Patcher", { "Patcher", "VFX Color Mapper", "VFX Envelope", "VFX Key Mapper", "VFX Keyboard Splitter", "VFX Level Scaler", "VFX Script", "VFX Sequencer" } },
+        { "Sampler", { "DirectWave", "Fruity Granulizer", "Sampler", "Wave Traveller" } },
+        { "Synth classic", { "3x Osc", "FLEX", "Fruity DX10", "GMS", "Harmless", "Kepler", "Kepler Exo", "MiniSynth", "PoiZone", "Sawer", "SimSynth", "Sytrus",
+                             "Toxic Biohazard", "Transistor Bass" } },
+        // (FL lists Ogun under Drum and Synth special; one folder per plugin here: Synth special)
+        { "Synth special", { "Autogun", "BeepMap", "Harmor", "Morphine", "Ogun", "Plucked!", "Sakura" } },
+        { "Visual", { "Fruity Dance", "Fruity Video Player" } },
+    };
+    return list;
+}
+} // namespace
+
+std::string flCategory (const std::string& name, bool instruments, bool fruityPrefix)
+{
+    const auto want = squash (name);
+    if (want.empty())
+        return {};
+    for (const auto& folder : instruments ? flGeneratorFolders() : flEffectFolders())
+        for (const auto* n : folder.names)
+            if (const auto have = squash (n); have == want || (fruityPrefix && have == "fruity" + want))
+                return folder.folder;
+    return {};
+}
+
+Folders withDefaultCategories (const Folders& user, bool instruments, const std::vector<BuiltinPlugin>& builtins)
+{
+    auto out = user;
+    for (const auto& b : builtins)
+    {
+        if (const auto it = out.of.find (b.key); it != out.of.end() && out.kind (instruments).count (it->second))
+            continue; // the user's folder wins
+        auto folder = flCategory (b.name, instruments, b.fruityPrefix || b.flPlugin);
+        if (folder.empty())
+            folder = b.flPlugin ? "Misc" : lynxCategory;
+        out.kind (instruments).insert (folder);
+        out.of[b.key] = folder;
+    }
+    return out;
 }
 } // namespace lynx::plugincatalog

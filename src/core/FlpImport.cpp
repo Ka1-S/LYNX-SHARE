@@ -2981,6 +2981,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     }
 
                 effectSlotMap.insert ({ { insert.index, slot.index }, { (int) track.effects.size(), slot.plugin } });
+                if (slot.index >= 0 && slot.index < maxEffectSlots)
+                    fx.row = slot.index; // FL's slot place (round 170b): an effect in slot 5 stays in slot 5
                 track.effects.push_back (fx);
             }
         }

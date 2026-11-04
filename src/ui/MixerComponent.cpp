@@ -2,6 +2,8 @@
 #include "platform/Paths.h"
 #include "ui/ColourPicker.h"
 #include "ui/MixerComponent.h"
+#include "ui/SlotWatch.h"
+#include "core/ValueMath.h"
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
 
@@ -1154,16 +1156,20 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
 
     if (part == Part::route)
     {
-        // the selection is the send source: don't change it
+        // the selection is the send source: don't change it. FL (round 170b, REA FUN_012aa110): the arrow acts on every
+        // selected track; Ctrl = route to this track only, Shift = sidechain, Ctrl+Shift = sidechain only.
         const auto from = selected;
+        const auto sources = selection;
+        using K = mixerops::RouteKind;
+        if (flmods::ctrl (e.mods) || e.mods.isShiftDown())
+        {
+            routeSelection (t, flmods::ctrl (e.mods) ? (e.mods.isShiftDown() ? K::sidechainOnly : K::routeOnly) : K::sidechain);
+            return;
+        }
         const auto on = engine.getSong().routes (from, t);
-        engine.editSong ([from, t, on] (Song& s) {
-            s.setRoute (from, t, ! on);
-            if (! on)
-                s.setRouteLevel (from, t, 1.0f); // a new route starts at 0 dB
-        });
+        engine.editSong ([sources, t, on] (Song& s) { mixerops::switchSelectedRoute (s, sources, t, ! on); });
 
-        if (! on) // just enabled (at 0 dB): dragging adjusts the level, like the route knob
+        if (! on && engine.getSong().routes (from, t)) // just enabled (at 0 dB): dragging adjusts the level, like the route knob
         {
             dragPart = Part::send;
             dragTrack = t;
@@ -1172,19 +1178,28 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
-    if ((part == Part::body || part == Part::header || part == Part::meter) && ! flmods::popup (e.mods) && (flmods::ctrl (e.mods) || e.mods.isShiftDown()) && t > 0)
+    if ((part == Part::body || part == Part::header || part == Part::meter) && ! flmods::popup (e.mods) && flmods::ctrl (e.mods) && t > 0)
+    {
+        // FL (round 170b, REA FUN_012c5800 / FUN_012c5f60): Ctrl+click (and drag across the strips) selects the tracks
+        // from here to the mouse, alone; Ctrl+Shift adds them to the selection, or removes them when the click starts
+        // on a selected track
+        selectAnchor = t;
+        selectAdding = ! e.mods.isShiftDown() || ! std::binary_search (selection.begin(), selection.end(), t);
+        selectBase.clear();
+        if (e.mods.isShiftDown())
+            selectBase = selection;
+        dragSelectTo (t);
+        return;
+    }
+
+    if ((part == Part::body || part == Part::header || part == Part::meter) && ! flmods::popup (e.mods) && e.mods.isShiftDown() && t > 0)
     {
         auto s = selection;
-        if (e.mods.isShiftDown())
         {
             s.clear();
             for (int i = juce::jmin (selected, t); i <= juce::jmax (selected, t); ++i)
                 s.push_back (i);
         }
-        else if (auto it = std::find (s.begin(), s.end(), t); it != s.end() && s.size() > 1)
-            s.erase (it);
-        else
-            s.push_back (t);
 
         setSelection (s, std::find (s.begin(), s.end(), t) != s.end() ? t : s.front());
         return;
@@ -1285,8 +1300,40 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
     }
 }
 
+void MixerStrips::dragSelectTo (int t)
+{
+    const auto count = (int) engine.getSong().mixer.size();
+    if (selectAnchor < 1 || count < 2)
+        return;
+    t = juce::jlimit (1, count - 1, t);
+    std::set<int> s (selectBase.begin(), selectBase.end());
+    for (int i = juce::jmin (selectAnchor, t); i <= juce::jmax (selectAnchor, t); ++i)
+    {
+        if (isHidden (i) && i != t && i != selectAnchor)
+            continue;
+        if (selectAdding)
+            s.insert (i);
+        else
+            s.erase (i);
+    }
+    if (s.empty())
+        s.insert (t);
+    // the track under the mouse becomes the current one (FL); when removing, a track that stays selected
+    auto primary = t;
+    if (! s.count (primary))
+        primary = s.count (selected) ? selected : *s.rbegin();
+    setSelection ({ s.begin(), s.end() }, primary);
+}
+
 void MixerStrips::mouseDrag (const juce::MouseEvent& e)
 {
+    if (selectAnchor > 0)
+    {
+        if (const auto t = trackAt (juce::jlimit (0, getWidth() - 1, e.x)); t >= 0)
+            dragSelectTo (t);
+        return;
+    }
+
     if (headerDragTrack > 0)
     {
         if (! headerDragged && std::abs (e.getDistanceFromDragStartX()) < 6)
@@ -1457,6 +1504,21 @@ void MixerStrips::soloExclusive (int t)
     });
 }
 
+void MixerStrips::routeSelection (int t, mixerops::RouteKind kind)
+{
+    using K = mixerops::RouteKind;
+    int linked = 0;
+    engine.editSong ([sources = selection, t, kind, &linked] (Song& s) {
+        mixerops::routeSelectedTo (s, sources, t, kind);
+        if (t >= 0 && t < (int) s.mixer.size())
+            for (const auto& fx : s.mixer[(std::size_t) t].effects)
+                linked += std::find (sources.begin(), sources.end(), fx.sidechain) != sources.end() ? 1 : 0;
+    });
+    if ((kind == K::sidechain || kind == K::sidechainOnly) && t > 0 && linked == 0)
+        // (round 170h: in the hint bar, not a box — FL says nothing here; adding the compressor links it)
+        ui::postHint ({ tr ("Sidechain") + ": " + tr ("The link was made; add a compressor to this insert to use it."), {} }, 6000);
+}
+
 void MixerStrips::showSendMenu (int t)
 {
     const auto& song = engine.getSong();
@@ -1467,22 +1529,15 @@ void MixerStrips::showSendMenu (int t)
 
     const auto fromName = juce::String::fromUTF8 (song.mixer[(std::size_t) from].name.c_str());
     juce::PopupMenu menu;
-    menu.addSectionHeader (fromName + juce::String::fromUTF8 (" \xe2\x86\x92 ") + juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()));
+    const auto sources = (int) std::count_if (selection.begin(), selection.end(), [t] (int x) { return x > 0 && x != t; });
+    menu.addSectionHeader ((sources > 1 ? tr ("{0} selected tracks", { juce::String (sources) }) : fromName)
+                           + juce::String::fromUTF8 (" \xe2\x86\x92 ") + juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()));
     // FL's route arrow menu (round 168s, issue #32 [SHOT] r168s c_f10): route / route only / sidechain / sidechain only
     const auto on = song.routes (from, t);
     const auto can = on || song.canRoute (from, t);
     using K = mixerops::RouteKind;
-    auto route = [this, from, t] (K kind) {
-        int linked = 0;
-        engine.editSong ([from, t, kind, &linked] (Song& s) {
-            mixerops::routeSelectedTo (s, { from }, t, kind);
-            for (const auto& fx : s.mixer[(std::size_t) t].effects)
-                linked += fx.sidechain == from ? 1 : 0;
-        });
-        if ((kind == K::sidechain || kind == K::sidechainOnly) && linked == 0)
-            // (round 170h: in the hint bar, not a box — FL says nothing here; adding the compressor links it)
-            ui::postHint ({ tr ("Sidechain") + ": " + tr ("The link was made; add a compressor to this insert to use it."), {} }, 6000);
-    };
+    // FL (round 170b, REA FUN_012aca70): every item acts on all the selected tracks, not only the current one
+    auto route = [this, t] (K kind) { routeSelection (t, kind); };
     menu.addItem (tr ("Route to this track"), can && ! on, false, [route] { route (K::route); });
     menu.addItem (tr ("Route to this track only"), can, false, [route] { route (K::routeOnly); });
     menu.addSeparator();
@@ -1581,17 +1636,17 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
         case Part::input: h.text = name + " - " + tr ("Input level of this insert's audio input  [LMB] choose the input"); h.hasMenu = true; break;
         case Part::solo: h.text = name + " - " + tr ("Solo"); break;
         case Part::meter: h.text = name + " - " + tr ("Peak meter (left/right) with peak hold  [LMB] selects the track and clears the clip light"); break;
-        case Part::route: h.text = name + " - " + tr ("Send from the selected insert to this one (drag after enabling: level; right-click: sidechain, only here)"); h.hasMenu = true; break;
+        case Part::route: h.text = name + " - " + tr ("Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu"); h.hasMenu = true; break;
         case Part::add: h.text = tr ("Add a mixer insert"); break;
         case Part::header:
-            h.text = name + " - " + tr ("[LMB] selects  [Ctrl]+[LMB] adds  [Shift]+[LMB] range  [LMB] drag sideways reorders  [RMB] insert menu") + feeds() + latency();
+            h.text = name + " - " + tr ("[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu") + feeds() + latency();
             h.hasMenu = true;
             if (engine.insertPlaysStandIn (t))
                 h.text = name + " - " + tr ("Stand-in: a plugin of this insert is not installed on this PC, a render of its sound plays (the plugins' settings are kept)");
             break;
         case Part::body:
         case Part::none:
-            h.text = name + " - " + tr ("Click selects the insert (Ctrl: add, Shift: range), right-click opens its menu; Alt+Left/Right moves the selection") + feeds() + latency();
+            h.text = name + " - " + tr ("Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection") + feeds() + latency();
             h.hasMenu = true;
             break;
     }
@@ -1609,6 +1664,8 @@ void MixerStrips::mouseUp (const juce::MouseEvent&)
 
     headerDragTrack = -1;
     headerDragged = false;
+    selectAnchor = -1;
+    selectBase.clear();
     dragPart = Part::none;
     dragTrack = -1;
     drag.end();
@@ -2569,6 +2626,15 @@ const std::vector<EffectKind>& addableEffects()
     return list;
 }
 
+bool isFlEffect (EffectKind kind)
+{
+    // allEffects lists LYNX's own effects first and FL's from the Formula Controller on (the outboard gear insert is LYNX's)
+    const auto& list = addableEffects();
+    const auto first = std::find (list.begin(), list.end(), EffectKind::formulaController);
+    const auto at = std::find (list.begin(), list.end(), kind);
+    return at != list.end() && at >= first && kind != EffectKind::hardwareInsert;
+}
+
 bool addableEffectAvailable (EffectKind kind)
 {
     const auto* e = natives::effectEngine (kind);
@@ -2665,6 +2731,20 @@ const std::vector<EffectSlot>* EffectsPanel::slots() const
 {
     const auto& mixer = engine.getSong().mixer;
     return track >= 0 && track < (int) mixer.size() ? &mixer[(std::size_t) track].effects : nullptr;
+}
+
+int EffectsPanel::rowOf (int index) const
+{
+    const auto* s = slots();
+    if (s == nullptr || index < 0 || index >= (int) s->size())
+        return -1;
+    return mixerops::effectRows (*s)[(std::size_t) index];
+}
+
+int EffectsPanel::effectIn (int row) const
+{
+    const auto* s = slots();
+    return s == nullptr ? -1 : mixerops::effectAtRow (*s, row);
 }
 
 juce::Rectangle<int> EffectsPanel::mixBounds (int slot) const
@@ -3614,12 +3694,14 @@ void EffectsPanel::paint (juce::Graphics& g)
     g.setFont (font (type::body));
 
     // the 10 slots, as FL draws them: options arrow, name ("Slot N" when empty), mix knob, LED
-    for (int i = 0; i < maxEffectSlots; ++i)
+    // (rows: FL's slot places, an effect may sit below empty slots, round 170b)
+    for (int row = 0; row < maxEffectSlots; ++row)
     {
-        const auto r = slotBounds (i);
-        const auto filled = i < (int) s->size();
+        const auto i = effectIn (row); // the effect shown here, -1 = empty
+        const auto r = slotBounds (row);
+        const auto filled = i >= 0;
         const auto isSelected = i == selectedSlot && filled;
-        const auto slotHovered = i == hoverSlot && dragSlot < 0;
+        const auto slotHovered = row == hoverSlot && dragSlot < 0;
         theme::fillRoundRect (g, r.toFloat(), radius::sm, isSelected ? colour::bg5 : filled ? (slotHovered ? colour::bg4 : colour::bg3) : (slotHovered ? colour::bg3 : colour::bg2.brighter (0.03f)));
         g.setColour (slotHovered ? colour::borderStrong : colour::border);
         g.drawRoundedRectangle (r.toFloat().reduced (0.5f), radius::sm, 1.0f);
@@ -3630,14 +3712,14 @@ void EffectsPanel::paint (juce::Graphics& g)
         }
 
         {
-            const auto a = arrowBounds (i).toFloat().withSizeKeepingCentre (5.0f, 8.0f).translated (1.0f, 0.0f);
+            const auto a = arrowBounds (row).toFloat().withSizeKeepingCentre (5.0f, 8.0f).translated (1.0f, 0.0f);
             juce::Path tri;
             tri.addTriangle (a.getX(), a.getY(), a.getRight(), a.getCentreY(), a.getX(), a.getBottom());
             g.setColour (slotHovered && hoverArrow ? colour::textPrimary : colour::textSecondary.withAlpha (filled ? 1.0f : 0.6f));
             g.fillPath (tri);
         }
 
-        const auto ledArea = ledBounds (i).toFloat().withSizeKeepingCentre (8.0f, 8.0f);
+        const auto ledArea = ledBounds (row).toFloat().withSizeKeepingCentre (8.0f, 8.0f);
         const auto textArea = r.withTrimmedLeft (20).withTrimmedRight (46);
 
         if (filled)
@@ -3672,8 +3754,8 @@ void EffectsPanel::paint (juce::Graphics& g)
             textcache::drawText (g, name, text, juce::Justification::centredLeft);
 
             // slot's dry/wet knob
-            const auto mixActive = (hoverParam == mixParam && hoverSlot == i) || (dragParam == mixParam && selectedSlot == i);
-            drawKnob (g, mixBounds (i).toFloat().withSizeKeepingCentre (18.0f, 18.0f), slot.mix, false,
+            const auto mixActive = (hoverParam == mixParam && hoverSlot == row) || (dragParam == mixParam && selectedSlot == i);
+            drawKnob (g, mixBounds (row).toFloat().withSizeKeepingCentre (18.0f, 18.0f), slot.mix, false,
                       slot.enabled ? (dragParam == mixParam && selectedSlot == i ? colour::accent : colour::info) : colour::textDisabled, mixActive);
         }
         else
@@ -3681,10 +3763,10 @@ void EffectsPanel::paint (juce::Graphics& g)
             // an empty slot keeps its controls in place (dimmed), as FL shows them
             g.setColour (muteLed (false).withAlpha (0.3f));
             g.fillEllipse (ledArea);
-            drawKnob (g, mixBounds (i).toFloat().withSizeKeepingCentre (18.0f, 18.0f), 1.0f, false, colour::textDisabled.withAlpha (0.5f), false);
+            drawKnob (g, mixBounds (row).toFloat().withSizeKeepingCentre (18.0f, 18.0f), 1.0f, false, colour::textDisabled.withAlpha (0.5f), false);
             g.setColour (slotHovered ? colour::textSecondary : colour::textDisabled);
             g.setFont (juce::Font (font (type::body)).italicised());
-            textcache::drawText (g, tr ("Slot {0}", { juce::String (i + 1) }), textArea, juce::Justification::centredLeft);
+            textcache::drawText (g, tr ("Slot {0}", { juce::String (row + 1) }), textArea, juce::Justification::centredLeft);
             g.setFont (font (type::body));
         }
     }
@@ -3692,12 +3774,10 @@ void EffectsPanel::paint (juce::Graphics& g)
     paintEq (g);
     g.reduceClipRegion (0, 0, getWidth(), bottomTop() - 6); // the selected effect's knobs stay above the EQ
 
-    if (dragSlot >= 0 && dropSlot >= 0 && dropSlot != dragSlot) // where the dragged slot lands
-    {
-        const auto r = slotBounds (dropSlot);
-        const auto y = dropSlot > dragSlot ? r.getBottom() + 1 : r.getY() - 2;
+    if (dragSlot >= 0 && dropSlot >= 0 && dropSlot != rowOf (dragSlot)) // where the dragged slot lands (FL: swaps with
+    {                                                                       // the effect there, or takes the empty slot)
         g.setColour (colour::accent);
-        g.fillRect (r.getX(), y, r.getWidth(), 2);
+        g.drawRoundedRectangle (slotBounds (dropSlot).toFloat().reduced (0.5f), radius::sm, 2.0f);
     }
 
     if (selectedSlot < 0 || selectedSlot >= (int) s->size())
@@ -3980,20 +4060,21 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
-    for (int i = 0; i < maxEffectSlots; ++i)
+    for (int row = 0; row < maxEffectSlots; ++row)
     {
-        const auto r = slotBounds (i);
+        const auto r = slotBounds (row);
 
         if (! r.contains (e.getPosition()))
             continue;
 
-        if (i >= (int) s->size())
+        const auto i = effectIn (row);
+        if (i < 0)
         {
-            showAddMenu (i);
+            showAddMenu (row); // (FL: the plugin lands in this slot)
             return;
         }
 
-        if (arrowBounds (i).contains (e.getPosition())) // FL's slot options arrow
+        if (arrowBounds (row).contains (e.getPosition())) // FL's slot options arrow
         {
             selectedSlot = i;
             repaint();
@@ -4004,7 +4085,7 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
         selectedSlot = i;
         repaint();
 
-        if (mixBounds (i).contains (e.getPosition()))
+        if (mixBounds (row).contains (e.getPosition()))
         {
             if (flmods::popup (e.mods))
                 ui::showValueMenu (*this, &engine, specFor (mixParam, i), valueOf (mixParam, i), [this, i] (double v) { setValue (mixParam, i, v); });
@@ -4023,15 +4104,15 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
             return;
         }
 
-        if (flmods::popup (e.mods))
+        if (flmods::popup (e.mods) || (e.mods.isShiftDown() && ! ledBounds (row).contains (e.getPosition()))) // (FL: Shift+click = the menu)
             showSlotMenu (i);
-        else if (ledBounds (i).contains (e.getPosition())) // LED: bypass
+        else if (ledBounds (row).contains (e.getPosition())) // LED: bypass
             engine.editSong ([t = track, i] (Song& song) {
                 auto& slot = song.mixer[(std::size_t) t].effects[(std::size_t) i];
                 slot.enabled = ! slot.enabled;
             });
         else
-            dragSlot = i; // dragging the name reorders the slot
+            dragSlot = i; // dragging the name moves the effect to another slot (a click shows its window)
         return;
     }
 
@@ -4222,7 +4303,7 @@ void EffectsPanel::setValue (int param, int slot, double value)
 int EffectsPanel::mixKnobAt (juce::Point<int> p) const
 {
     for (int i = 0; slots() != nullptr && i < (int) slots()->size(); ++i)
-        if (mixBounds (i).contains (p))
+        if (mixBounds (rowOf (i)).contains (p))
             return i;
 
     return -1;
@@ -4270,14 +4351,26 @@ void EffectsPanel::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseW
         return;
     }
 
-    // the wheel over a slot's name moves it up or down
+    // FL (REA FUN_012ab750): the wheel over a slot moves its effect one slot up or down (into an empty slot too,
+    // wrapping around the 10 slots) and the mouse pointer follows it. A trackpad's small steps add up to one move.
     if (const auto slot = slotAt (e.getPosition()); slot >= 0)
     {
-        const auto to = slot + ((wheel.deltaY != 0.0f ? wheel.deltaY : -wheel.deltaX) > 0.0f ? -1 : 1);
-        bool moved = false;
-        engine.editSongStructural ([t = track, slot, to, &moved] (Song& song) { moved = mixerops::moveEffectSlot (song, t, slot, to); });
-        if (moved)
-            selectedSlot = to;
+        const auto delta = (wheel.isReversed ? -1.0 : 1.0) * (wheel.deltaY != 0.0f ? wheel.deltaY : -wheel.deltaX);
+        if (wheelSlot != slot || juce::Time::getMillisecondCounter() - wheelTime > 400)
+            wheelAccumulator = 0.0;
+        wheelSlot = slot;
+        wheelTime = juce::Time::getMillisecondCounter();
+        const auto steps = controls::slotWheelSteps (wheelAccumulator, delta, wheel.isSmooth, wheel.isInertial);
+        if (steps == 0)
+            return;
+        int now = -1;
+        engine.editSongStructural ([t = track, slot, steps, &now] (Song& song) { now = mixerops::moveEffectBy (song, t, slot, steps > 0 ? -1 : 1); });
+        if (now >= 0)
+        {
+            selectedSlot = wheelSlot = now;
+            const auto target = slotBounds (rowOf (now));
+            juce::Desktop::getInstance().getMainMouseSource().setScreenPosition (localPointToGlobal (juce::Point<int> (e.x, target.getCentreY())).toFloat());
+        }
         repaint();
         return;
     }
@@ -4335,7 +4428,7 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
     if (const auto* s = slots(); s != nullptr && selectedSlot >= 0 && selectedSlot < (int) s->size()
                                  && NativeEffectWindows::canOpen ((*s)[(std::size_t) selectedSlot].kind) && editorButtonBounds().contains (p))
     {
-        h.text = tr ("Open the effect's window (its full controls, as in FL); double-clicking the slot does the same");
+        h.text = tr ("Open the effect's window (its full controls, as in FL); clicking the slot's name does the same");
         return h;
     }
     if (track > 0 && armBounds().contains (p))
@@ -4364,9 +4457,9 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
     for (int i = 0; i < maxEffectSlots; ++i)
         if (slotBounds (i).contains (p))
         {
-            const auto used = slots() != nullptr && i < (int) slots()->size();
+            const auto used = effectIn (i) >= 0;
             h.text = used ? (arrowBounds (i).contains (p) ? tr ("Effect slot options: replace, move, delete...")
-                                                          : tr ("Effect slot: click edits, double-click opens its window, the LED bypasses, drag or wheel reorders, right-click: options"))
+                                                          : tr ("Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options"))
                           : tr ("Empty slot: click to add an effect");
             h.hasMenu = used;
         }
@@ -4380,8 +4473,7 @@ void EffectsPanel::mouseDrag (const juce::MouseEvent& e)
     {
         if (e.getDistanceFromDragStart() > 4)
         {
-            const auto count = slots() != nullptr ? (int) slots()->size() : 0;
-            const auto target = juce::jlimit (0, juce::jmax (0, count - 1), (e.y - slotsTop) / slotHeight);
+            const auto target = juce::jlimit (0, maxEffectSlots - 1, (e.y - slotsTop) / slotHeight); // (empty slots too, as FL)
             if (target != dropSlot)
             {
                 dropSlot = target;
@@ -4451,7 +4543,7 @@ void EffectsPanel::showTip (int param, int slot, bool transient)
     if (s == nullptr || slot < 0 || slot >= (int) s->size())
         return;
 
-    const auto area = param == mixParam ? mixBounds (slot) : knobBounds (param).withHeight (juce::jlimit (30, 44, knobBounds (param).getHeight() - 30));
+    const auto area = param == mixParam ? mixBounds (rowOf (slot)) : knobBounds (param).withHeight (juce::jlimit (30, 44, knobBounds (param).getHeight() - 30));
     const auto text = specFor (param, slot).text (valueOf (param, slot));
     ui::postHint (ui::valueHint (specFor (param, slot), valueOf (param, slot), ui::valueGestures()));
 
@@ -4464,7 +4556,7 @@ void EffectsPanel::showTip (int param, int slot, bool transient)
 void EffectsPanel::mouseMove (const juce::MouseEvent& e)
 {
     const auto p = e.getPosition();
-    auto slot = slotAt (p);
+    auto slot = -1; // (a row)
     auto param = -1;
     auto led = false;
 
@@ -4474,7 +4566,7 @@ void EffectsPanel::mouseMove (const juce::MouseEvent& e)
 
     if (const auto m = mixKnobAt (p); m >= 0)
     {
-        slot = m;
+        slot = rowOf (m);
         param = mixParam;
     }
     else if (slot < 0)
@@ -4521,14 +4613,22 @@ void EffectsPanel::mouseExit (const juce::MouseEvent&)
     }
 }
 
-void EffectsPanel::mouseUp (const juce::MouseEvent&)
+void EffectsPanel::mouseUp (const juce::MouseEvent& e)
 {
-    if (dragSlot >= 0 && dropSlot >= 0 && dropSlot != dragSlot)
+    // a click on the slot's name (not a drag, not the second click of a double-click) shows or hides its window (FL)
+    if (dragSlot >= 0 && dropSlot < 0 && ! e.mouseWasDraggedSinceMouseDown() && e.getNumberOfClicks() == 1)
+    {
+        const auto slot = dragSlot;
+        dragSlot = -1;
+        toggleEditor (slot);
+    }
+
+    if (dragSlot >= 0 && dropSlot >= 0 && dropSlot != rowOf (dragSlot))
     {
         bool moved = false;
-        engine.editSongStructural ([t = track, from = dragSlot, to = dropSlot, &moved] (Song& song) { moved = mixerops::moveEffectSlot (song, t, from, to); });
+        engine.editSongStructural ([t = track, from = dragSlot, to = dropSlot, &moved] (Song& song) { moved = mixerops::moveEffectToRow (song, t, from, to); });
         if (moved)
-            selectedSlot = dropSlot;
+            selectedSlot = effectIn (dropSlot);
     }
 
     if (dragSlot >= 0)
@@ -4554,14 +4654,14 @@ void EffectsPanel::mouseDoubleClick (const juce::MouseEvent& e)
     }
 
     for (int i = 0; slots() != nullptr && i < (int) slots()->size(); ++i)
-        if (mixBounds (i).contains (e.getPosition()))
+        if (mixBounds (rowOf (i)).contains (e.getPosition()))
         {
             engine.editSong ([t = track, i] (Song& song) { song.mixer[(std::size_t) t].effects[(std::size_t) i].mix = 1.0f; });
             return;
         }
-        else if (slotBounds (i).contains (e.getPosition()) && ! arrowBounds (i).contains (e.getPosition()) && ! ledBounds (i).contains (e.getPosition()))
+        else if (slotBounds (rowOf (i)).contains (e.getPosition()) && ! arrowBounds (rowOf (i)).contains (e.getPosition()) && ! ledBounds (rowOf (i)).contains (e.getPosition()))
         {
-            openEditor (i); // double-click on the name: the effect's window (as clicking a slot in FL)
+            openEditor (i); // (the first click opened it, round 170b): it stays open and comes to the front
             return;
         }
 
@@ -4637,22 +4737,28 @@ bool EffectsPanel::dropEffect (EffectSlot fx, juce::Point<int> position)
     if (slots() == nullptr)
         return false;
 
-    auto target = -1;
-    for (int i = 0; i < (int) slots()->size(); ++i)
-        if (slotBounds (i).contains (position))
-            target = i;
+    auto target = -1, emptyRow = -1;
+    for (int row = 0; row < maxEffectSlots; ++row)
+        if (slotBounds (row).contains (position))
+        {
+            target = effectIn (row);
+            emptyRow = target < 0 ? row : -1;
+        }
 
     if (target < 0 && (int) slots()->size() >= maxEffectSlots)
         return false;
 
-    engine.editSong ([t = track, target, fx = std::move (fx)] (Song& song) {
+    int added = -1;
+    engine.editSong ([t = track, target, emptyRow, &added, fx = std::move (fx)] (Song& song) {
         auto& effects = song.mixer[(std::size_t) t].effects;
         if (target >= 0 && target < (int) effects.size())
             effects[(std::size_t) target] = fx;
+        else if (emptyRow >= 0) // dropped on an empty slot: it lands there (FL)
+            added = mixerops::insertEffectAtRow (song, t, fx, emptyRow);
         else
             effects.push_back (fx);
     });
-    selectedSlot = target >= 0 ? target : (int) slots()->size() - 1;
+    selectedSlot = target >= 0 ? target : added >= 0 ? added : (int) slots()->size() - 1;
     repaint();
     return true;
 }
@@ -4666,7 +4772,7 @@ int EffectsPanel::slotAt (juce::Point<int> p) const
 {
     const auto* s = slots();
     for (int i = 0; s != nullptr && i < (int) s->size(); ++i)
-        if (slotBounds (i).contains (p) && ! mixBounds (i).contains (p) && ! ledBounds (i).contains (p) && ! arrowBounds (i).contains (p))
+        if (const auto row = rowOf (i); slotBounds (row).contains (p) && ! mixBounds (row).contains (p) && ! ledBounds (row).contains (p) && ! arrowBounds (row).contains (p))
             return i;
     return -1;
 }
@@ -4712,6 +4818,26 @@ void EffectsPanel::openEditor (int slot)
         NativeEffectWindows::open (engine, track, slot);
 }
 
+void EffectsPanel::toggleEditor (int slot)
+{
+    const auto* s = slots();
+    if (s == nullptr || slot < 0 || slot >= (int) s->size())
+        return;
+    // FL (REA FUN_012bde10, the slot name button's click): the plugin's editor is shown, or hidden when it shows
+    if ((*s)[(std::size_t) slot].kind == EffectKind::plugin)
+    {
+        if (auto* p = dynamic_cast<PluginEffect*> (engine.getEffect (track, slot).get()); p != nullptr && PluginWindows::isOpen (p->getInstance()))
+        {
+            PluginWindows::close (p->getInstance());
+            return;
+        }
+        openPluginWindow (slot);
+        return;
+    }
+    if (! ui::SlotGoneWatcher::closeWindow (engine, track, slot))
+        openEditor (slot);
+}
+
 juce::Rectangle<int> EffectsPanel::editorButtonBounds() const
 {
     // on the title row of the selected effect's knobs
@@ -4745,94 +4871,61 @@ void EffectsPanel::openPluginWindow (int slot)
                                             tr ("This plugin could not be loaded (it is not installed or has not been scanned)."));
 }
 
-void EffectsPanel::showAddMenu (int)
+void EffectsPanel::showAddMenu (int row)
 {
     juce::PopupMenu menu;
 
-    // FL's renamed plugins first (issue #11): "1_EQ" renamed in the Browser's Plugin database is added by typing 1
-    auto addFx = [this] (EffectSlot fx) {
-        const auto t = track;
-        bool added = false;
-        engine.editSong ([t, &fx, &added] (Song& song) {
-            if (t < 0 || t >= (int) song.mixer.size())
+    // the effect lands in the clicked empty slot (FL's slot places, round 170b); returns its index, -1 = not added
+    auto place = [this, row] (EffectSlot fx) {
+        int at = -1;
+        engine.editSong ([t = track, row, &fx, &at] (Song& song) {
+            if (t < 0 || t >= (int) song.mixer.size() || (int) song.mixer[(std::size_t) t].effects.size() >= maxEffectSlots)
                 return;
-            auto& effects = song.mixer[(std::size_t) t].effects;
-            if ((int) effects.size() < maxEffectSlots)
+            at = mixerops::insertEffectAtRow (song, t, fx, row);
+            if (at < 0)
             {
-                effects.push_back (std::move (fx));
-                added = true;
-                mixerops::linkAddedSidechain (song, t, (int) effects.size() - 1);
+                song.mixer[(std::size_t) t].effects.push_back (std::move (fx));
+                at = (int) song.mixer[(std::size_t) t].effects.size() - 1;
             }
+            mixerops::linkAddedSidechain (song, t, at); // round 170h: the sole sidechain sender feeds a new compressor
         });
-        if (! added)
-            return;
-        selectedSlot = (int) slots()->size() - 1;
-        openEditor (selectedSlot); // FL opens the effect's window when it is loaded (round 170h, fl-09)
+        if (at < 0)
+            return at;
+        selectedSlot = at;
+        if ((*slots())[(std::size_t) at].kind != EffectKind::plugin) // (plugins: their own window, below)
+            openEditor (at); // FL opens the effect's window when it is loaded (round 170h, fl-09)
         repaint();
+        return at;
+    };
+
+    // FL's renamed plugins first (issue #11): "1_EQ" renamed in the Browser's Plugin database is added by typing 1
+    auto addFx = [this, place] (EffectSlot fx) {
+        const auto at = place (std::move (fx));
+        if (at >= 0 && (*slots())[(std::size_t) at].kind == EffectKind::plugin)
+            openPluginWindow (at);
     };
     auto picks = quickpick::renamedEffects (engine, addFx);
     quickpick::addPicks (menu, picks);
-    // round 166f (issue #16): then the user's Plugin database folders, one heading each (FL's folder headings)
+    // rounds 166f / 170b (Busy Works: "random order"): every effect under its category heading, A-Z, as FL's slot menu
+    // (LYNX SHARE first, then FL's Plugin database categories, the user's own folders among them)
     quickpick::addFolderGroups (menu, engine, std::function<void (EffectSlot)> (addFx));
-
-    for (auto kind : allEffects)
-        if (! quickpick::inUserFolder (engine, std::string ("lynx:fx:") + effectInfo (kind).name)) // listed under its folder
-        menu.addItem (addableEffectName (kind), addableEffectAvailable (kind), false, [this, kind] {
-            const auto made = newAddableEffect (kind, engine.getSong().bpm);
-            if (! made)
-                return;
-            const auto before = slots()->size();
-            engine.editSong ([t = track, fx = *made] (Song& song) {
-                auto& effects = song.mixer[(std::size_t) t].effects;
-                if ((int) effects.size() < maxEffectSlots)
-                {
-                    effects.push_back (fx);
-                    mixerops::linkAddedSidechain (song, t, (int) effects.size() - 1); // round 170h
-                }
-            });
-            selectedSlot = (int) slots()->size() - 1;
-            if (slots()->size() > before)
-                openEditor (selectedSlot); // (round 170h: FL opens a new effect's window, Fruity Parametric EQ 2 in fl-09)
-            repaint();
-        });
 
     // LYNX equivalents of well-known third-party effects, with the same default preset a substitute gets
     juce::PopupMenu equivalents;
     for (const auto& entry : pluginSubstitutes())
         if (! entry.instrument)
             equivalents.addItem (juce::String::fromUTF8 (entry.product.c_str()) + juce::String::fromUTF8 (" \xe2\x86\x92 ") + juce::String::fromUTF8 (effectInfo (entry.effect).name),
-                                 [this, entry] {
-                                     const auto before = slots()->size();
-                                     engine.editSong ([t = track, entry] (Song& song) {
-                                         auto& effects = song.mixer[(std::size_t) t].effects;
-                                         if ((int) effects.size() < maxEffectSlots)
-                                         {
-                                             effects.push_back (makeSubstituteSlot (entry));
-                                             mixerops::linkAddedSidechain (song, t, (int) effects.size() - 1);
-                                         }
-                                     });
-                                     selectedSlot = (int) slots()->size() - 1;
-                                     if (slots()->size() > before)
-                                         openEditor (selectedSlot);
-                                     repaint();
-                                 });
+                                 [place, entry] { place (makeSubstituteSlot (entry)); });
     if (equivalents.getNumItems() > 0)
         menu.addSubMenu (tr ("LYNX SHARE equivalents"), equivalents);
 
     juce::PopupMenu plugins;
-    addPluginItems (plugins, engine, false, [this] (PluginRef ref) {
-        engine.editSong ([t = track, ref] (Song& song) {
-            auto& effects = song.mixer[(std::size_t) t].effects;
-            if ((int) effects.size() >= maxEffectSlots)
-                return;
-            EffectSlot slot;
-            slot.kind = EffectKind::plugin;
-            slot.plugin = ref;
-            effects.push_back (slot);
-        });
-        selectedSlot = (int) slots()->size() - 1;
-        openPluginWindow (selectedSlot);
-        repaint();
+    addPluginItems (plugins, engine, false, [this, place] (PluginRef ref) {
+        EffectSlot slot;
+        slot.kind = EffectKind::plugin;
+        slot.plugin = ref;
+        if (const auto at = place (std::move (slot)); at >= 0)
+            openPluginWindow (at);
     }, this);
     menu.addSeparator();
     menu.addSubMenu (tr ("Plugin (VST/VST3/CLAP)"), plugins);
@@ -4845,33 +4938,18 @@ void EffectsPanel::showAddMenu (int)
 
 void EffectsPanel::showSlotMenu (int slot)
 {
+    // the same categories as the empty slot's menu (rounds 166f / 170b)
     juce::PopupMenu replace;
-
-    for (auto kind : allEffects)
-        replace.addItem (addableEffectName (kind), addableEffectAvailable (kind), false, [this, slot, kind] {
-            if (const auto made = newAddableEffect (kind, engine.getSong().bpm))
-                engine.editSong ([t = track, slot, fx = *made] (Song& song) { song.mixer[(std::size_t) t].effects[(std::size_t) slot] = fx; });
+    quickpick::addFolderGroups (replace, engine, std::function<void (EffectSlot)> ([this, slot] (EffectSlot fx) {
+        engine.editSong ([t = track, slot, fx] (Song& song) {
+            if (t < (int) song.mixer.size() && slot < (int) song.mixer[(std::size_t) t].effects.size())
+                song.mixer[(std::size_t) t].effects[(std::size_t) slot] = fx;
         });
+        if (slot < (int) slots()->size() && (*slots())[(std::size_t) slot].kind == EffectKind::plugin)
+            openPluginWindow (slot);
+    }));
+    quickpick::addFolderViewItems (replace, engine);
 
-    // round 166f (issue #16): the user's Plugin database folders first, one heading each
-    {
-        juce::PopupMenu folders;
-        if (quickpick::addFolderGroups (folders, engine, std::function<void (EffectSlot)> ([this, slot] (EffectSlot fx) {
-                engine.editSong ([t = track, slot, fx] (Song& song) {
-                    if (t < (int) song.mixer.size() && slot < (int) song.mixer[(std::size_t) t].effects.size())
-                        song.mixer[(std::size_t) t].effects[(std::size_t) slot] = fx;
-                });
-                if (slot < (int) slots()->size() && (*slots())[(std::size_t) slot].kind == EffectKind::plugin)
-                    openPluginWindow (slot);
-            })))
-        {
-            folders.addSubMenu (tr ("All effects"), replace);
-            quickpick::addFolderViewItems (folders, engine);
-            replace = folders;
-        }
-    }
-
-    const auto count = (int) slots()->size();
     juce::PopupMenu menu;
     menu.addSubMenu (tr ("Replace with"), replace);
     menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
@@ -5014,14 +5092,16 @@ void EffectsPanel::showSlotMenu (int slot)
         });
     });
     menu.addSeparator();
-    menu.addItem (tr ("Move up"), slot > 0, false, [this, slot] {
-        engine.editSongStructural ([t = track, slot] (Song& song) { song.swapEffectSlots (t, slot, slot - 1); });
-        selectedSlot = slot - 1;
-    });
-    menu.addItem (tr ("Move down"), slot < count - 1, false, [this, slot] {
-        engine.editSongStructural ([t = track, slot] (Song& song) { song.swapEffectSlots (t, slot, slot + 1); });
-        selectedSlot = slot + 1;
-    });
+    // FL's Move up / Move down (REA FUN_01233de0 / FUN_01235190): one slot, into an empty one too, wrapping around
+    auto move = [this, slot] (int delta) {
+        int now = -1;
+        engine.editSongStructural ([t = track, slot, delta, &now] (Song& song) { now = mixerops::moveEffectBy (song, t, slot, delta); });
+        if (now >= 0)
+            selectedSlot = now;
+        repaint();
+    };
+    menu.addItem (tr ("Move up"), [move] { move (-1); });
+    menu.addItem (tr ("Move down"), [move] { move (1); });
     if ((*slots())[(std::size_t) slot].kind == EffectKind::plugin)
     {
         auto* live = dynamic_cast<PluginEffect*> (engine.getEffect (track, slot).get());
@@ -5077,7 +5157,7 @@ void EffectsPanel::deleteSlot (int slot)
     const auto* s = slots();
     if (s == nullptr || slot < 0 || slot >= (int) s->size())
         return;
-    engine.editSongStructural ([t = track, slot] (Song& song) { song.removeEffectSlot (t, slot); });
+    engine.editSongStructural ([t = track, slot] (Song& song) { mixerops::removeEffectKeepRows (song, t, slot); }); // (FL: the slot stays empty)
     selectedSlot = juce::jmin (slot, (int) slots()->size() - 1);
     repaint();
 }

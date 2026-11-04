@@ -726,6 +726,8 @@ juce::var effectToVar (const EffectSlot& slot)
         e->setProperty ("mix", juce::roundToInt (slot.mix * 10000.0f) / 10000.0);
     if (! slot.smartDisable)
         e->setProperty ("smartDisable", false);
+    if (slot.row >= 0) // the mixer row (FL's slot places, round 170b); absent = right after the previous effect
+        e->setProperty ("row", slot.row);
     if (slot.sidechain >= 0)
         e->setProperty ("sidechain", slot.sidechain);
     if (slot.sidechain2 >= 0)
@@ -807,6 +809,7 @@ std::optional<EffectSlot> effectFromVar (const juce::var& e)
     slot.enabled = (bool) e.getProperty ("on", true);
     slot.mix = juce::jlimit (0.0f, 1.0f, (float) (double) e.getProperty ("mix", 1.0));
     slot.smartDisable = (bool) e.getProperty ("smartDisable", true);
+    slot.row = juce::jlimit (-1, maxEffectSlots - 1, (int) e.getProperty ("row", -1));
 
     if (auto* params = e["params"].getArray())
     {

@@ -2597,15 +2597,9 @@ void ChannelRackComponent::showAddChannelMenu (int insertAt)
                 safe->addChannel (std::move (c), true);
         });
     quickpick::addPicks (menu, picks);
-    // round 166f (issue #16): the user's Plugin database folders, one heading each (FL's folder headings)
-    if (insertAt < 0)
-        quickpick::addFolderGroups (menu, engine, std::function<void (ChannelDef)> ([safe = juce::Component::SafePointer<ChannelRackComponent> (this)] (ChannelDef c) {
-                                        if (safe != nullptr)
-                                            safe->addChannel (std::move (c), true);
-                                    }));
+    // the generators under FL's Plugin database categories and the user's folders (rounds 166f, 170b: addGeneratorMenu)
     addInstrumentItems (menu, insertAt);
-    if (insertAt < 0)
-        quickpick::addFolderViewItems (menu, engine); // FL: Categories / Simple / Tree at the bottom
+    quickpick::addFolderViewItems (menu, engine); // FL: Categories / Simple / Tree at the bottom
     quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (this).withMousePosition(), std::move (picks));
 }
 
