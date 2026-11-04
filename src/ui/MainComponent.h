@@ -425,6 +425,9 @@ private:
                                                                  IconButton { "browserPanel", Icon::browser } };
     IconButton pluginPickerButton { "pluginPicker", Icon::pluginPicker };
     GlobalGridBox gridBox; // global grid of the editors (see ui/EditorTools.h)
+    // FL's Snap panel: the magnet before the snap box (TToolbarForm.SnapLabel, a click toggles the snap like Backspace;
+    // round 170e, Busy Works review #5)
+    IconButton snapToggleButton { "snapToggle", Icon::magnet };
     std::vector<int> dividers; // x positions of the toolbar panel separators
     juce::Rectangle<int> snapLabelArea, patternLabelArea, titleArea, transportArea;
     std::unique_ptr<ui::QuickTipWindow> quickTips; // the tool names under the mouse (ui/HintBar.h)
