@@ -52,6 +52,7 @@
 #include "engine/SessionPack.h"
 #include "ui/SessionDialogs.h"
 #include "engine/LiveSessions.h"
+#include "ui/LiveChat.h"
 #include "core/ProjectSafety.h"
 #include "core/MissingFiles.h"
 #include "ui/AutomationUi.h"
@@ -636,6 +637,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         {
             safe->repaint (safe->titleArea);
             safe->menuItemsChanged();
+            safe->updateTitle(); // (the session's state is in the window title too: narrow layouts hide the badge)
         }
     };
     live->onJoined = [safe = juce::Component::SafePointer<MainComponent> (this)] (Song song) {
@@ -645,6 +647,19 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         const auto hostName = host != nullptr ? juce::String::fromUTF8 (host->name.c_str()) : juce::String();
         safe->startNewProject (std::move (song), {});
         safe->projectName = hostName.isNotEmpty() ? tr ("Live session with {0}", { hostName }) : tr ("Live session");
+        safe->updateTitle();
+    };
+    // round 169j: the host's LYNX SHARE restarted during a session: its journal's song becomes the open project again
+    live->onResumed = [safe = juce::Component::SafePointer<MainComponent> (this)] (Song song) {
+        if (safe == nullptr)
+            return;
+        const auto journal = LiveSessionManager::readJournal (LiveSessionManager::defaultJournal());
+        safe->startNewProject (std::move (song), {});
+        if (journal && journal->projectFile.existsAsFile())
+        {
+            safe->currentFile = journal->projectFile;
+            safe->projectName = journal->projectFile.getFileNameWithoutExtension();
+        }
         safe->updateTitle();
     };
     engine.onSessionUndoSkipped = [] (const juce::StringArray& skipped) {
@@ -664,6 +679,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 MainComponent::~MainComponent()
 {
     engine.onSessionUndoSkipped = nullptr;
+    liveui::closeChat();
     live.reset(); // (a session still on ends: the others are told)
     setSecondaryWindowKeyHandler (nullptr);
     cancelProjectLoad(); // an open in progress uses the engine from its thread
@@ -3648,8 +3664,18 @@ void MainComponent::updateTitle()
         savedSamples = safety::referencedSamples (engine.getSong());
 
     if (auto* window = getTopLevelComponent())
+    {
+        // a live session's state (round 169j): LIVE, or what it is waiting for
+        juce::String liveState;
+        if (live != nullptr && live->isActive())
+        {
+            using S = LiveSessionManager::State;
+            const auto st = live->getState();
+            liveState = " [" + (st == S::live ? tr ("LIVE") : st == S::reconnecting ? tr ("Reconnecting...") : st == S::waitingHost ? tr ("Waiting for the host...") : tr ("Connecting...")) + "]";
+        }
         window->setName ((engine.isModified() ? "* " : "")
-                         + (projectName.isNotEmpty() ? "LYNX SHARE - " + projectName : juce::String ("LYNX SHARE")) + importedSuffix);
+                         + (projectName.isNotEmpty() ? "LYNX SHARE - " + projectName : juce::String ("LYNX SHARE")) + importedSuffix + liveState);
+    }
 }
 
 std::unique_ptr<juce::AlertWindow> MainComponent::makeConfirmDiscardWindow()
@@ -3976,6 +4002,35 @@ void MainComponent::startLiveFromCommandLine()
     o.projectFile = currentFile;
     if (const auto relay = value ("--live-relay"); relay.isNotEmpty())
         o.relay = relay;
+    // round 169j: --live-chat "text" (sent once in), --live-follow (follow the host's transport), --live-resume (the
+    // host resumes its interrupted session without asking)
+    if (const auto text = value ("--live-chat"); text.isNotEmpty())
+        juce::Timer::callAfterDelay (9000, [safe = juce::Component::SafePointer<MainComponent> (this), text] {
+            if (safe != nullptr)
+            {
+                safe->live->sendChat (text);
+                liveui::showChat (*safe->live);
+            }
+        });
+    if (cli.contains ("--live-follow"))
+        juce::Timer::callAfterDelay (8500, [safe = juce::Component::SafePointer<MainComponent> (this)] {
+            if (safe != nullptr)
+                safe->live->setFollowTransport (true);
+        });
+    if (cli.contains ("--live-resume"))
+    {
+        o.projectFile = juce::File();
+        o.autoAccept = true;
+        if (! live->resumeHost (LiveSessionManager::defaultJournal(), o))
+            platform::testModeLog ("live session: nothing to resume");
+        return;
+    }
+    if (! cli.contains ("--live-host") && ! cli.contains ("--live-join"))
+    {
+        if (! platform::testMode())
+            liveui::offerResume (liveContext());
+        return;
+    }
     if (const auto codeFile = value ("--live-host"); codeFile.isNotEmpty())
     {
         o.autoAccept = true; // (scripted: nobody to click "Let them in")

@@ -17018,6 +17018,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Menus168zTests.inc"
 #include "Session168aTests.inc"
 #include "Live169bTests.inc"
+#include "Live169jTests.inc"
 #include "StemSplitTests.inc"
 #include "Zoom167tTests.inc"
 #include "Proll168gTests.inc"
