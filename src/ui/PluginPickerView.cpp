@@ -844,9 +844,9 @@ private:
         std::stable_sort (order.begin(), order.end(), [&] (int a, int b) {
             const auto& p = tiles[(std::size_t) a];
             const auto& q = tiles[(std::size_t) b];
-            if (p.generator != q.generator)
-                return p.generator;
-            return p.bounds.getY() != q.bounds.getY() ? p.bounds.getY() < q.bounds.getY() : p.bounds.getX() < q.bounds.getX();
+            // the list order = the layout order (rows are packed in list order; a row's tiles are centred on its height,
+            // so their tops differ and can't give the order)
+            return p.generator != q.generator && p.generator;
         });
         return order;
     }
