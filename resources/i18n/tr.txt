@@ -7125,9 +7125,3 @@ countries: tr
 "Number of steps" = "Adım sayısı"
 "Dual" = "Çift"
 "Align all channel editors" = "Tüm kanal düzenleyicilerini hizala"
-# round 170e2: recording panel toggles
-"Blend recorded notes: on (new notes join the pattern's notes)" = "Kaydedilen notaları harmanla: açık (yeni notalar pattern'deki notalara eklenir)"
-"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Kaydedilen notaları harmanla: kapalı (kaydedilen kanalın eski notaları değiştirilir)"
-"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Kaydedilen notaları harmanla: açıkken bir kayıt notalarını pattern'e ekler (overdub); kapalıyken kaydedilen kanalın eski notaları değiştirilir"
-"Tempo tapper: tap the beat to set the tempo" = "Tempo tıklayıcı: tempoyu ayarlamak için vuruşa dokunun"
-"Blend recorded notes" = "Kaydedilen notaları harmanla"

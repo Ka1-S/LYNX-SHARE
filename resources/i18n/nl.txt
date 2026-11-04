@@ -7125,9 +7125,3 @@ countries: nl be
 "Number of steps" = "Aantal stappen"
 "Dual" = "Dubbel"
 "Align all channel editors" = "Alle kanaaleditors uitlijnen"
-# round 170e2: recording panel toggles
-"Blend recorded notes: on (new notes join the pattern's notes)" = "Opgenomen noten mengen: aan (nieuwe noten komen bij die van het pattern)"
-"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Opgenomen noten mengen: uit (de oude noten van een opgenomen kanaal worden vervangen)"
-"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Opgenomen noten mengen: aan, een opname voegt zijn noten aan het pattern toe (overdub); uit, de oude noten van een opgenomen kanaal worden vervangen"
-"Tempo tapper: tap the beat to set the tempo" = "Tempotapper: tik de beat om het tempo in te stellen"
-"Blend recorded notes" = "Opgenomen noten mengen"

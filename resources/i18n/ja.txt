@@ -7125,9 +7125,3 @@ countries: jp
 "Number of steps" = "ステップ数"
 "Dual" = "デュアル"
 "Align all channel editors" = "すべてのチャンネルエディターを揃える"
-# round 170e2: recording panel toggles
-"Blend recorded notes: on (new notes join the pattern's notes)" = "録音ノートをブレンド: オン (新しいノートをパターンのノートに追加)"
-"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "録音ノートをブレンド: オフ (録音したチャンネルの古いノートを置き換え)"
-"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "録音ノートをブレンド: オンでテイクのノートをパターンに追加 (オーバーダブ)、オフで録音したチャンネルの古いノートを置き換えます"
-"Tempo tapper: tap the beat to set the tempo" = "テンポタッパー: ビートをタップしてテンポを設定"
-"Blend recorded notes" = "録音ノートをブレンド"

@@ -7125,9 +7125,3 @@ countries: es mx ar co cl pe ve
 "Number of steps" = "Número de pasos"
 "Dual" = "Doble"
 "Align all channel editors" = "Alinear todos los editores de canal"
-# round 170e2: recording panel toggles
-"Blend recorded notes: on (new notes join the pattern's notes)" = "Mezclar notas grabadas: sí (las notas nuevas se suman a las del patrón)"
-"Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Mezclar notas grabadas: no (se reemplazan las notas anteriores de un canal grabado)"
-"Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Mezclar notas grabadas: activado, una toma suma sus notas al patrón (overdub); desactivado, se reemplazan las notas anteriores de un canal grabado"
-"Tempo tapper: tap the beat to set the tempo" = "Tempo por pulsación: toca el pulso para fijar el tempo"
-"Blend recorded notes" = "Mezclar notas grabadas"
