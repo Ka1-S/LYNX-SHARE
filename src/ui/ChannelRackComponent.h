@@ -40,6 +40,9 @@ class ChannelRackComponent final : public juce::Component,
                                    private juce::Timer
 {
 public:
+    // LYNX extra (on by default; Options › General "Playhead column in the Channel Rack"): a soft highlight of the
+    // playing step's column under every row's steps, and the first step of each bar marked on the playing-step strip
+    static inline std::atomic<bool> playheadColumn { true };
     explicit ChannelRackComponent (AudioEngine& engine);
     ~ChannelRackComponent() override;
     void visibilityChanged() override;
@@ -244,9 +247,6 @@ private:
 
     AudioEngine& engine;
     int playheadStep = -1;
-    // LYNX extra (on by default; Options › General "Playhead column in the Channel Rack"): a soft highlight of the
-    // playing step's column under every row's steps, and the first step of each bar marked on the playing-step strip
-    static inline std::atomic<bool> playheadColumn { true };
     static constexpr int positionStripHeight = 9; // FL's "Playing step" LED strip, at the top of the add row
     bool channelHitsNow (int row) const;
     static void paintStepHit (juce::Graphics&, juce::Rectangle<float>);
