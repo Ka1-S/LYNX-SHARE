@@ -7004,6 +7004,7 @@ countries: id
 "{0} files arriving" = "{0} file sedang tiba"
 "Live session with {0}" = "Sesi live dengan {0}"
 "Undo left alone what someone else changed since: {0}" = "Urungkan tidak menyentuh yang diubah orang lain sejak itu: {0}"
+"Mute removed steps" = "Bisukan step yang dihapus"
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] lukis dengan pensil  [Ctrl+LMB] / [Shift+LMB] pilih beberapa  [2xLMB] buka  [RMB] menu"
 "Empty patterns were ignored." = "Pattern kosong diabaikan."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Pemilih plugin: semua generator dan efek, kategori sebagai tab (tekan lagi untuk menutup)"

@@ -7004,6 +7004,7 @@ countries: tr
 "{0} files arriving" = "{0} dosya geliyor"
 "Live session with {0}" = "{0} ile canlı oturum"
 "Undo left alone what someone else changed since: {0}" = "Geri al, o zamandan beri başka birinin değiştirdiğine dokunmadı: {0}"
+"Mute removed steps" = "Kaldırılan step'leri sessize al"
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] kalemle boya  [Ctrl+LMB] / [Shift+LMB] birden çok seç  [2xLMB] aç  [RMB] menü"
 "Empty patterns were ignored." = "Boş pattern'ler yok sayıldı."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Eklenti seçici: tüm jeneratörler ve efektler, kategoriler sekme olarak (kapatmak için tekrar basın)"
