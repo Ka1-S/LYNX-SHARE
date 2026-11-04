@@ -244,4 +244,9 @@ std::string formatPluginNames (const std::map<std::string, std::string>& names);
 // Type-ahead in a menu of `labels` (FL's menus): the one label starting with `typed` (case-insensitive, a renamed
 // plugin's "1_" digit or letter); -1 when none or several do.
 int uniqueTypeAhead (const std::vector<std::string>& labels, char typed);
+// FL's letter keys in an open plugin menu (issue #64): the next item after `current` (-1 = none highlighted) whose
+// label starts with `typed` (case-insensitive, leading spaces skipped), wrapping around past the end; only items
+// that can be highlighted (`selectable`, e.g. not headings or separators) count. -1 when none starts with it.
+// Pressing "e" again moves on to the next one (EQ, then Effector...); nothing is picked until Enter.
+int nextTypeAhead (const std::vector<std::string>& labels, const std::vector<bool>& selectable, int current, char typed);
 } // namespace lynx::prefs

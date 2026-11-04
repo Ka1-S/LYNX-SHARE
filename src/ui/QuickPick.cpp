@@ -298,12 +298,29 @@ std::vector<Pick> renamed (AudioEngine& engine, const std::vector<Entry>& entrie
 }
 
 // Listens to the keys of an open menu (its window is the modal component while it shows).
-struct MenuKeys final : public juce::KeyListener
+struct MenuKeys final : public juce::KeyListener, private juce::Timer
 {
     std::vector<Pick> picks;
     std::function<bool (const juce::KeyPress&)> onKey;
 
-    bool keyPressed (const juce::KeyPress& key, juce::Component*) override
+    ~MenuKeys() override { detachAll(); }
+
+    // Every window of the menu (the root, then each submenu it opens) is the modal component while it has the keys
+    void start()
+    {
+        attachToModal();
+        startTimer (40);
+    }
+    void detachAll()
+    {
+        stopTimer();
+        for (auto& w : windows)
+            if (auto* c = w.getComponent())
+                c->removeKeyListener (this);
+        windows.clear();
+    }
+
+    bool keyPressed (const juce::KeyPress& key, juce::Component* window) override
     {
         if (onKey && onKey (key))
         {
@@ -316,16 +333,63 @@ struct MenuKeys final : public juce::KeyListener
         std::vector<std::string> labels;
         for (const auto& p : picks)
             labels.push_back (p.label.toStdString());
-        const auto index = prefs::uniqueTypeAhead (labels, (char) typed);
-        if (index < 0)
+        if (const auto index = prefs::uniqueTypeAhead (labels, (char) typed); index >= 0)
+        {
+            auto action = picks[(std::size_t) index].action;
+            juce::PopupMenu::dismissAllActiveMenus();
+            juce::MessageManager::callAsync ([action] {
+                if (action)
+                    action();
+            });
+            return true;
+        }
+        return highlightNext (window, (char) typed);
+    }
+
+private:
+    std::vector<juce::Component::SafePointer<juce::Component>> windows;
+
+    void timerCallback() override { attachToModal(); }
+
+    void attachToModal()
+    {
+        auto* modal = juce::Component::getCurrentlyModalComponent();
+        if (modal == nullptr)
+            return;
+        for (auto& w : windows)
+            if (w.getComponent() == modal)
+                return;
+        modal->addKeyListener (this);
+        windows.emplace_back (modal);
+    }
+
+    // FL's letter keys (issue #64): the next item of this menu window starting with the letter gets the highlight
+    // (and scrolls into view); Enter picks it, the arrows / wheel / Esc stay JUCE's. The items are the window's
+    // children in menu order; JUCE's own accessibility actions highlight one ("focus") and tell which one is.
+    static bool highlightNext (juce::Component* window, char typed)
+    {
+        if (window == nullptr)
             return false;
-        auto action = picks[(std::size_t) index].action;
-        juce::PopupMenu::dismissAllActiveMenus();
-        juce::MessageManager::callAsync ([action] {
-            if (action)
-                action();
-        });
-        return true;
+        std::vector<std::string> labels;
+        std::vector<bool> selectable;
+        std::vector<juce::AccessibilityHandler*> handlers;
+        int current = -1;
+        for (auto* child : window->getChildren())
+        {
+            auto* handler = child->getAccessibilityHandler();
+            const auto isItem = handler != nullptr && handler->getRole() == juce::AccessibilityRole::menuItem;
+            const auto& actions = isItem ? handler->getActions() : juce::AccessibilityActions();
+            labels.push_back (isItem ? handler->getTitle().toStdString() : std::string());
+            selectable.push_back (isItem && actions.contains (juce::AccessibilityActionType::focus)
+                                  && (actions.contains (juce::AccessibilityActionType::press) || actions.contains (juce::AccessibilityActionType::showMenu)));
+            if (isItem && handler->hasFocus (false))
+                current = (int) handlers.size();
+            handlers.push_back (handler);
+        }
+        const auto next = prefs::nextTypeAhead (labels, selectable, current, typed);
+        if (next < 0)
+            return false;
+        return handlers[(std::size_t) next]->getActions().invoke (juce::AccessibilityActionType::focus);
     }
 };
 } // namespace
@@ -400,16 +464,9 @@ void showMenu (juce::PopupMenu& menu, const juce::PopupMenu::Options& options, s
     auto keys = std::make_shared<MenuKeys>();
     keys->picks = std::move (picks);
     keys->onKey = std::move (onKey);
-    auto holder = std::make_shared<juce::Component::SafePointer<juce::Component>>();
-    menu.showMenuAsync (options, [keys, holder] (int) {
-        if (auto* w = holder->getComponent())
-            w->removeKeyListener (keys.get());
-    });
-    // the menu's window is the modal component now (JUCE enters its modal state while showing it)
-    if (auto* modal = juce::Component::getCurrentlyModalComponent())
-    {
-        *holder = modal;
-        modal->addKeyListener (keys.get());
-    }
+    menu.showMenuAsync (options, [keys] (int) { keys->detachAll(); });
+    // the menu's window is the modal component now (JUCE enters its modal state while showing it); its submenus are
+    // when they open (the timer finds them)
+    keys->start();
 }
 } // namespace lynx::quickpick
