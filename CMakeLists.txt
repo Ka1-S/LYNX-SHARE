@@ -472,6 +472,7 @@ if(LYNX_BUILD_APP)
         src/ui/TouchKeyboard.cpp
         src/ui/QuickAddPalette.cpp
         src/ui/PluginPickerView.cpp
+        src/ui/PluginThumbs.cpp
         src/ui/PluginPicker.cpp
         src/ui/CrashReporter.cpp
         src/ui/Updater.cpp

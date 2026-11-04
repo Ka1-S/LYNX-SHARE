@@ -1,6 +1,8 @@
 #pragma once
 
+#include <functional>
 #include <memory>
+#include <optional>
 #include <set>
 #include <vector>
 
@@ -152,6 +154,10 @@ public:
     static bool isEffectDrag (const juce::DragAndDropTarget::SourceDetails& details);
     static std::optional<ChannelDef> draggedGenerator (const juce::DragAndDropTarget::SourceDetails& details);
     static std::optional<EffectSlot> draggedEffect (const juce::DragAndDropTarget::SourceDetails& details);
+    // The same drag started elsewhere (the Plugin picker's tiles, round 171c): `source` must sit in a drag container
+    // (the main window); one of the two makers is set. Returns whether the drag started.
+    static bool startPluginDrag (juce::Component& source, std::function<std::optional<ChannelDef>()> generator,
+                                 std::function<std::optional<EffectSlot>()> effect, const juce::String& label, const juce::Image& image);
     static bool isAudioFile (const juce::File& file);
 
     void resized() override;

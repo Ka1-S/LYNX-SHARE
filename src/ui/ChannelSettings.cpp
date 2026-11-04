@@ -5312,6 +5312,11 @@ int showChannelLayoutPage (juce::Component& frame, int page)
     return 0;
 }
 
+int channelFrameHeaderHeight() noexcept
+{
+    return ChannelFrame::headerHeight;
+}
+
 std::unique_ptr<juce::Component> makeChannelFrame (AudioEngine& engine, int channel, int tab)
 {
     const auto kind = engine.getSong().channels[(std::size_t) channel].instrument;

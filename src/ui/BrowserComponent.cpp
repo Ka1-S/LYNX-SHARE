@@ -3802,6 +3802,19 @@ juce::File BrowserComponent::draggedFile (const juce::DragAndDropTarget::SourceD
     return {};
 }
 
+bool BrowserComponent::startPluginDrag (juce::Component& source, std::function<std::optional<ChannelDef>()> generator,
+                                        std::function<std::optional<EffectSlot>()> effect, const juce::String& label, const juce::Image& image)
+{
+    auto* container = juce::DragAndDropContainer::findParentDragContainerFor (&source);
+    if (container == nullptr || (generator == nullptr && effect == nullptr))
+        return false;
+    const auto isGenerator = generator != nullptr;
+    draggedPlugin() = { std::move (generator), std::move (effect) };
+    container->startDragging (juce::String (isGenerator ? generatorDragDescription : effectDragDescription) + "|" + label, &source,
+                              juce::ScaledImage (image), true);
+    return true;
+}
+
 bool BrowserComponent::isGeneratorDrag (const juce::DragAndDropTarget::SourceDetails& details)
 {
     return details.description.toString().startsWith (juce::String (generatorDragDescription) + "|") && draggedPlugin().generator != nullptr;

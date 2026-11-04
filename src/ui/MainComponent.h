@@ -65,6 +65,9 @@ public:
     // each maximized on the workspace; showDesktopForSnapshot shows the default layout (with `extraPanels`, the
     // Piano Roll and Mixer floating too).
     void selectTabForSnapshot (int tab);
+    // --uiperf / tests: F8's Plugin picker (round 171c), and whether it is open
+    void togglePluginPickerForSnapshot() { togglePluginPicker(); }
+    juce::Component* pluginPickerForSnapshot() const noexcept { return pluginPickerView.get(); }
     void showDesktopForSnapshot (bool extraPanels);
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
     void waitForBrowserForSnapshot() { browser.waitForListing (5000); }
