@@ -7008,3 +7008,4 @@ countries: ru by kz
 "Empty patterns were ignored." = "Пустые паттерны пропущены."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Выбор плагинов: все генераторы и эффекты, категории — вкладками (нажмите ещё раз, чтобы закрыть)"
 "click to step, drag or mouse wheel to change" = "щелчок — следующее значение, перетаскивание или колесо мыши — изменить"
+"no effect with the current mode (another engine is in use)" = "не действует в текущем режиме (используется другой движок)"

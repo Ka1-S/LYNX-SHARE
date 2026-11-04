@@ -7008,3 +7008,4 @@ countries: nl be
 "Empty patterns were ignored." = "Lege patterns zijn overgeslagen."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Pluginkiezer: alle generators en effecten, de categorieën als tabbladen (nogmaals drukken om te sluiten)"
 "click to step, drag or mouse wheel to change" = "klik om te verspringen, sleep of scrollwiel om te wijzigen"
+"no effect with the current mode (another engine is in use)" = "geen effect in de huidige modus (een andere engine is actief)"

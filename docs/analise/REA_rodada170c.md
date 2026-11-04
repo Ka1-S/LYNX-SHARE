@@ -50,6 +50,36 @@ The control is real (FL's OverSelect 0…4 = ×1…×16, engine REA_rodada51 §2
 because the stepper only changed when the two tiny arrows were hit. Now a click on the value steps it (wrapping), a drag
 or the wheel still sets it, and its hint says so — for every stepper of the generated editors.
 
+## Audit of shell controls (coord/plugin-audit-0.1.24.md)
+
+Static audit (every param enum use vs EffectInfo vs editor layouts, displays, macOS drawing risks) of the effects and
+the main instruments. Fixed in this round, besides the items above:
+- **Level meter wells** (Soft Clipper, Multiband Compressor ×4, Transient Processor ×2, Balance, Emphasizer, FL
+  Emphasis) drew an empty grid: they now show the slot's live input / output peaks. RackRenderer measures a slot's
+  input and output peak only while an open editor counts itself in `ProcessTimes::levelWanted[slot]` (no cost
+  otherwise); the editor takes them with exchange (0) each frame (held 1 s, falling 24 dB/s).
+- **Limiter / compressor / dynamics curves** of the generated editors (Fruity Limiter...) were a still picture: a
+  fading trail of the signal's input → output peaks now runs over the curve (FL's display is live).
+- **Echoform**: Hybrid and the tape voicings run their own loops (EchoSuite.cpp early returns) that read only the
+  times, feedback, mix, output, style and phase; 22 other controls looked live and did nothing. Layout items now carry
+  `idle` conditions (PluginLayout.h): drawn dimmed, with the hint "no effect with the current mode".
+- **Crest Compressor**: the Character's Drive (read by the DSP) had no control: knob added.
+- **Hush De-esser**: the gradient-filled output wave path is skipped when empty (the macOS flood).
+- **Atrium**: Early mod rate / depth (p15 / p16) were read by nothing; the early taps now move (four phased sines over
+  the taps, 0.05 … 5 Hz, depth = the late lines' law, capped below the shortest tap; depth 0 = the old output).
+Open (listed in the audit with evidence): Fruity Limiter's scrolling envelope,
+Ember's hidden Classic switch and silently overridden controls, Toxic's Bend (no pitch bend reaches native
+generators), 3x Osc's empty page without FL, Sytrus operator / filter pages, ProEditor whole-window repaints,
+**Parametric EQ 2 on new instances (FL's law or LYNX's biquads) — needs the user's decision**.
+
+## PARITY.md: Sound and Stability columns
+
+Added for every inspired-by pair (user's request): Sound from the measured evidence in docs/analise (per-pair survey:
+null / residual, curves, THD, GR), Stability from the editors' real behaviour (macOS pictures, analyser, dead controls).
+Waves and Auto-Tune trials expired → "(ref expired)". Lowest Sound (no audio comparison on record): Horizon 2, Apex /
+Pro-L 2 2, Halo 3, Orbit 3, Sentry 3, Nebula 3, ValhallaPlate 3 — added to /mnt/e/lynx-work/tracker/plugin-wishlist.md
+with the trial deadlines (FabFilter ~11-16, Soundtoys ~11-22).
+
 ## Where I stopped
 - done: diagnosis #11, skin fix, gfxprobe, CI editor pictures step, Facet analyser grid, Ember Tube curve, stepper click.
 - in progress: Linux build of the worktree (build-linux), first CI run (wip/plugq170c-probe) without the JUCE patch.

@@ -257,6 +257,12 @@ struct ProcessTimes
     // [(track * maxEffectSlots + slot) * meterOutputs + output] = Effect::controlOutput (output) after the last block.
     static constexpr int meterOutputs = 8;
     std::array<std::atomic<float>, (std::size_t) maxMixerTracks * maxEffectSlots * meterOutputs> effectMeters {};
+    // Round 170c (issue #14, "everything is a shell"): any slot's input and output peaks for an editor's level meter
+    // (FL's live meters in Soft Clipper, Multiband Compressor, Transient Processor, Balance...). An open editor counts
+    // itself in `levelWanted[key]`; while it is above 0 the audio thread raises slotLevels[key * 2 + 0 / 1] to the
+    // block's peak (linear), and the editor takes them with exchange (0) (the highest peak since its last frame).
+    std::array<std::atomic<std::uint16_t>, (std::size_t) maxMixerTracks * maxEffectSlots> levelWanted {};
+    std::array<std::atomic<float>, (std::size_t) maxMixerTracks * maxEffectSlots * 2> slotLevels {};
 
     // Audio of one effect slot for an editor's spectrum analyser (Facet EQ, round 103): the editor sets `key`
     // (track * maxEffectSlots + slot, −1 = none); the audio thread then writes the slot's input (pre) and output

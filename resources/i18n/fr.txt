@@ -7008,3 +7008,4 @@ countries: fr be ch ca lu
 "Empty patterns were ignored." = "Les patterns vides ont été ignorés."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Sélecteur de plugins : tous les générateurs et effets, les catégories en onglets (appuyez à nouveau pour fermer)"
 "click to step, drag or mouse wheel to change" = "cliquer pour avancer, glisser ou molette pour changer"
+"no effect with the current mode (another engine is in use)" = "sans effet dans le mode actuel (un autre moteur est utilisé)"

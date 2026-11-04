@@ -7008,3 +7008,4 @@ countries: jp
 "Empty patterns were ignored." = "空のパターンは無視されました。"
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "プラグインピッカー: すべてのジェネレーターとエフェクト、カテゴリをタブで表示（もう一度押すと閉じる）"
 "click to step, drag or mouse wheel to change" = "クリックで切り替え、ドラッグまたはマウスホイールで変更"
+"no effect with the current mode (another engine is in use)" = "現在のモードでは効果なし（別のエンジンを使用中）"

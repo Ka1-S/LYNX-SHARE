@@ -7008,3 +7008,4 @@ countries: tr
 "Empty patterns were ignored." = "Boş pattern'ler yok sayıldı."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Eklenti seçici: tüm jeneratörler ve efektler, kategoriler sekme olarak (kapatmak için tekrar basın)"
 "click to step, drag or mouse wheel to change" = "adım için tıklayın, değiştirmek için sürükleyin veya fare tekerleğini kullanın"
+"no effect with the current mode (another engine is in use)" = "geçerli modda etkisiz (başka bir motor kullanılıyor)"

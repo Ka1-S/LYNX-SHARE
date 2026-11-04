@@ -7008,3 +7008,4 @@ countries: kr
 "Empty patterns were ignored." = "빈 패턴은 무시되었습니다."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "플러그인 피커: 모든 제너레이터와 이펙트, 카테고리는 탭으로 (다시 누르면 닫힘)"
 "click to step, drag or mouse wheel to change" = "클릭하면 다음 값, 드래그나 마우스 휠로 변경"
+"no effect with the current mode (another engine is in use)" = "현재 모드에서는 효과 없음 (다른 엔진 사용 중)"

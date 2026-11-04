@@ -46,6 +46,11 @@
 #    the WM frame around one of our windows) dismissed every open popup menu, meant for "the title bar is being
 #    dragged". KWin also sends it when it only restacks or re-sends a frame (with an undocked panel: while a menu of the
 #    main window opens), so the menu closed at once. Only a window that really moved or changed size dismisses now.
+# 12. macOS only, juce_graphics/native/juce_CoreGraphicsContext_mac.mm (issue #11, round 170c): a gradient (or image)
+#    fill of an EMPTY path — the outline of a space when text is drawn with a gradient, an empty spectrum — called
+#    CGContextClip on an empty path, which Quartz ignores ("empty path"), and then drew the gradient over the whole
+#    clip: the whole component. Facet EQ's plugin title ("Facet EQ", a gradient text) flooded the editor pink. An
+#    empty path is now skipped, and clipping to an empty path clips everything away (as the other renderers do).
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -129,6 +134,14 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("frame moved, not restacked" "LYNX patch (issue #45): a frame that moved"
             "    if (configure.window != peerHandle && isParentWindowOf (configure.window, peerHandle))|NL|        dismissBlockingModals (peer);"
             "    // LYNX patch (issue #45): a frame that moved, not a restack|NL|    if (configure.window != peerHandle && isParentWindowOf (configure.window, peerHandle) && lynxWindowMovedOrResized (configure))|NL|        dismissBlockingModals (peer);")
+    elseif(file MATCHES "juce_CoreGraphicsContext_mac.mm$")
+        lynx_juce_fix("no gradient flood from an empty path" "LYNX patch (issue #11): an empty path"
+            "        CGContextReplacePathWithStrokedPath (context.get());|NL||NL|    ScopedCGContextState scopedState (context.get());"
+            "        CGContextReplacePathWithStrokedPath (context.get());|NL||NL|    // LYNX patch (issue #11): an empty path draws nothing (Quartz ignores a clip to it: the fill flooded everything)|NL|    if (CGContextIsPathEmpty (context.get()))|NL|        return;|NL||NL|    ScopedCGContextState scopedState (context.get());")
+
+        lynx_juce_fix("clip to an empty path" "LYNX patch (issue #11): clipping to an empty path"
+            "void CoreGraphicsContext::clipToPath (const Path& path, const AffineTransform& transform)|NL|{|NL|    createPath (path, transform);|NL|"
+            "void CoreGraphicsContext::clipToPath (const Path& path, const AffineTransform& transform)|NL|{|NL|    createPath (path, transform);|NL||NL|    // LYNX patch (issue #11): clipping to an empty path leaves nothing (Quartz would ignore it)|NL|    if (CGContextIsPathEmpty (context.get()))|NL|    {|NL|        CGContextClipToRect (context.get(), CGRectZero);|NL|        lastClipRect.reset();|NL|        return;|NL|    }|NL|")
     else()
         lynx_juce_fix("drop target search after an unused drop" "LYNX patch (issue #11): a drop nobody took"
             "bool ComponentPeer::handleDragDrop (const ComponentPeer::DragInfo& info)|NL|{|NL|    handleDragMove (info);|NL|"
@@ -148,6 +161,7 @@ function(lynx_patch_juce juce_dir)
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_Windowing_linux.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/desktop/juce_Displays.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_XWindowSystem_linux.cpp")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/native/juce_CoreGraphicsContext_mac.mm")
 endfunction()
 
 # run as a script: cmake -DJUCE_DIR=<dir> -P cmake/LynxPatchJuce.cmake
