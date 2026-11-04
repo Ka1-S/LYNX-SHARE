@@ -2751,14 +2751,14 @@ inline void canvasHyperChorus (juce::Graphics& g, Rectangle<float> a, bool displ
         g.fillRect (Rectangle<float> (c.x - r, c.y - r * 0.5f + (float) i * r * 0.1f, r * 2.0f, 1.0f + (float) i * 0.8f));
     g.restoreState();
     // the grid floor
-    g.setColour (p.accent2.withAlpha (0.22f));
+    g.setColour (p.accent2.withAlpha (0.14f));
     g.fillRect (Rectangle<float> (a.getX(), hz, a.getWidth(), 1.2f));
     for (int i = -12; i <= 12; ++i)
         g.drawLine ({ { c.x + (float) i * 14.0f, hz }, { c.x + (float) i * a.getWidth() * 0.12f, a.getBottom() } }, 0.9f);
     for (int k = 1; k < 8; ++k)
     {
         const auto y = hz + (a.getBottom() - hz) * std::pow ((float) k / 8.0f, 1.8f);
-        g.setColour (p.accent2.withAlpha (0.1f + 0.02f * (float) k));
+        g.setColour (p.accent2.withAlpha (0.06f + 0.015f * (float) k));
         g.fillRect (Rectangle<float> (a.getX(), y, a.getWidth(), 1.0f));
     }
     vignette (g, a, 0.35f);
@@ -3714,6 +3714,1135 @@ inline const Theme& spreaderTheme()
     return t;
 }
 
+// === Gross Beat: a turntable — a vinyl record and a tonearm, time-warp swirls, magenta and cyan ==================
+
+inline void vinyl (juce::Graphics& g, Point<float> c, float r, float angle, Colour label, Colour shine, float alpha)
+{
+    g.setColour (Colour (0xff050507).withAlpha (alpha));
+    g.fillEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c));
+    for (float k = r * 0.38f; k < r * 0.98f; k += 2.4f) // grooves
+    {
+        g.setColour (Colours::white.withAlpha (0.03f * alpha));
+        g.drawEllipse (Rectangle<float> (k * 2.0f, k * 2.0f).withCentre (c), 0.6f);
+    }
+    // two sheen wedges that turn with the record
+    for (int i = 0; i < 2; ++i)
+    {
+        juce::Path w;
+        const auto a0 = angle + (float) i * juce::MathConstants<float>::pi;
+        w.addPieSegment (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c), a0, a0 + 0.35f, 0.38f);
+        g.setColour (shine.withAlpha (0.10f * alpha));
+        g.fillPath (w);
+    }
+    g.setColour (label.withAlpha (0.8f * alpha)); // our own label: a plain disc with a ring
+    g.fillEllipse (Rectangle<float> (r * 0.7f, r * 0.7f).withCentre (c));
+    g.setColour (Colours::white.withAlpha (0.4f * alpha));
+    g.drawEllipse (Rectangle<float> (r * 0.5f, r * 0.5f).withCentre (c), 0.8f);
+    g.setColour (Colours::black.withAlpha (alpha));
+    g.fillEllipse (Rectangle<float> (r * 0.06f + 1.0f, r * 0.06f + 1.0f).withCentre (c));
+}
+
+inline void canvasGrossBeat (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto r = juce::jmin (a.getHeight() * 0.42f, a.getWidth() * 0.22f);
+    const auto c = Point<float> (a.getRight() - r * 1.25f, a.getY() + r * 1.1f);
+    if (! reduced) softLight (g, c, r * 1.6f, p.accent, 0.12f);
+    vinyl (g, c, r, 0.4f, p.accent, Colours::white, 0.75f);
+    // the tonearm
+    const auto pivot = Point<float> (c.x + r * 1.05f, c.y - r * 0.85f);
+    g.setColour (p.accent2.withAlpha (0.35f));
+    g.drawLine ({ pivot, c.translated (r * 0.35f, r * 0.45f) }, 3.0f);
+    g.fillEllipse (Rectangle<float> (12.0f, 12.0f).withCentre (pivot));
+    // time-warp swirls on the left: stretched arcs
+    for (int i = 0; i < 6; ++i)
+    {
+        juce::Path s;
+        const auto rr = r * (0.6f + 0.25f * (float) i);
+        s.addCentredArc (a.getX() + a.getWidth() * 0.15f, a.getCentreY(), rr * 1.6f, rr * 0.6f, -0.3f, 0.5f, 2.4f, true);
+        g.setColour (p.accent2.withAlpha (0.07f));
+        g.strokePath (s, juce::PathStrokeType (1.6f));
+    }
+    vignette (g, a, 0.4f);
+}
+
+inline void grossBeatEmblem (juce::Graphics& g, Point<float> c, float r) { vinyl (g, c, r * 1.2f, 0.4f, pal().accent, Colours::white, 1.0f); }
+
+inline void grossBeatMotion (juce::Graphics& g, const Motion& m) // a small record turning in the stage strip
+{
+    const auto s = m.stage;
+    const auto r = juce::jmin (s.getHeight() * 0.48f, 18.0f);
+    if (r < 5.0f || s.getWidth() < r * 2.5f) return;
+    vinyl (g, { s.getRight() - r - 4.0f, s.getCentreY() }, r, m.t * 3.5f, m.p.accent, Colours::white, 1.0f);
+}
+
+inline const Theme& grossBeatTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Gross Beat";
+        x.base = Style::vivid;
+        x.pal = { Colour (0xff1c0f22), Colour (0xff07040a), Colour (0xffff2f92), Colour (0xff2fe0ff), Colour (0x9c1a0e20), Colour (0xb807040a),
+                  Colour (0xff8a3a7a), Colour (0xffffe6f4), Colour (0xff050307), Colour (0xff2a1a2e), Colour (0xff0b070e), Colour (0xff241628),
+                  Colour (0xffffffff), Colour (0xff1e1024) };
+        x.canvas = canvasGrossBeat;
+        x.titleEmblem = grossBeatEmblem;
+        x.cap = Cap::rubber;
+        x.twoTone = true;
+        x.pointer = Pointer::glowLine;
+        x.arcGlow = 0.3f;
+        x.stageRepaint = true;
+        x.paintMotion = grossBeatMotion;
+        return x;
+    }();
+    return t;
+}
+
+// === Vocodex / Fruity Vocoder: voice bands — a bank of band-pass bars like a talking spectrum, robot-panel steel ===
+
+inline void canvasVoiceBands (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto n = 28;
+    const auto bw = a.getWidth() / (float) n;
+    for (int i = 0; i < n; ++i)
+    {
+        const auto u = (float) i / (float) n;
+        // a formant-shaped envelope: two humps
+        const auto h = 0.15f + 0.55f * std::exp (-std::pow ((u - 0.25f) / 0.1f, 2.0f)) + 0.4f * std::exp (-std::pow ((u - 0.6f) / 0.12f, 2.0f));
+        const auto bar = Rectangle<float> (a.getX() + (float) i * bw + 2.0f, a.getBottom() - a.getHeight() * h * 0.8f, bw - 4.0f, a.getHeight() * h * 0.8f);
+        g.setGradientFill (ColourGradient (p.accent.withAlpha (0.16f), 0.0f, bar.getY(), p.accent.withAlpha (0.02f), 0.0f, bar.getBottom(), false));
+        g.fillRect (bar);
+        for (float y = bar.getBottom() - 4.0f; y > bar.getY(); y -= 5.0f) // LED segments
+        {
+            g.setColour (Colours::black.withAlpha (0.35f));
+            g.fillRect (Rectangle<float> (bar.getX(), y, bar.getWidth(), 1.0f));
+        }
+    }
+    vignette (g, a, 0.4f);
+}
+
+inline void voiceBandsEmblem (juce::Graphics& g, Point<float> c, float r) // a grille: rows of dots
+{
+    g.setColour (pal().accent);
+    for (int y = -1; y <= 1; ++y)
+        for (int x = -2; x <= 2; ++x)
+            g.fillEllipse (Rectangle<float> (r * 0.3f, r * 0.3f).withCentre (c.translated ((float) x * r * 0.45f, (float) y * r * 0.5f)));
+}
+
+inline const Theme& vocodexTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Vocodex";
+        x.base = Style::neon;
+        x.pal = { Colour (0xff141a16), Colour (0xff050806), Colour (0xffa8ff3e), Colour (0xffc8d0d8), Colour (0x9c121a14), Colour (0xb8050806),
+                  Colour (0xff5a7a5a), Colour (0xffeeffe0), Colour (0xff030504), Colour (0xffc9d2dc), Colour (0xff59626d), Colour (0xff1a241c),
+                  Colour (0xff111611), Colour (0xff161e18) };
+        x.canvas = canvasVoiceBands;
+        x.titleEmblem = voiceBandsEmblem;
+        x.drawCap = capBrushed;
+        x.pointer = Pointer::glowLine;
+        return x;
+    }();
+    return t;
+}
+
+inline const Theme& vocoderTheme()
+{
+    static const Theme t = []
+    {
+        Theme x = vocodexTheme();
+        x.name = "Fruity Vocoder";
+        x.base = Style::hardware;
+        x.pal.accent = Colour (0xff3ee0ff);
+        x.pal.accent2 = Colour (0xffd0d8e0);
+        x.pal.rim = Colour (0xff4a6a7a);
+        return x;
+    }();
+    return t;
+}
+
+// === Pitcher (pitch correction): a tuning fork with resonance rings, gold on midnight =============================
+
+inline void fork (juce::Graphics& g, Point<float> c, float h, Colour col, float width)
+{
+    juce::Path f;
+    const auto w = h * 0.18f;
+    f.startNewSubPath (c.x - w, c.y - h * 0.5f);
+    f.lineTo (c.x - w, c.y);
+    f.quadraticTo (c.x - w, c.y + w * 1.4f, c.x, c.y + w * 1.4f);
+    f.quadraticTo (c.x + w, c.y + w * 1.4f, c.x + w, c.y);
+    f.lineTo (c.x + w, c.y - h * 0.5f);
+    f.startNewSubPath (c.x, c.y + w * 1.4f);
+    f.lineTo (c.x, c.y + h * 0.5f);
+    g.setColour (col);
+    g.strokePath (f, stroke (width));
+}
+
+inline void canvasPitcher (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto c = Point<float> (a.getRight() - a.getWidth() * 0.18f, a.getCentreY());
+    const auto h = a.getHeight() * 0.7f;
+    for (int i = 1; i < 9; ++i) // resonance rings around the tines
+    {
+        g.setColour (p.accent.withAlpha (0.07f - 0.006f * (float) i));
+        g.drawEllipse (Rectangle<float> ((float) i * 26.0f, (float) i * 34.0f).withCentre (c.translated (0.0f, -h * 0.25f)), 1.2f);
+    }
+    fork (g, c, h, p.accent.withAlpha (0.3f), 4.0f);
+    vignette (g, a, 0.4f);
+}
+
+inline void pitcherEmblem (juce::Graphics& g, Point<float> c, float r) { fork (g, c, r * 2.2f, pal().accent, 1.3f); }
+
+inline const Theme& pitcherTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Pitcher";
+        x.base = Style::vivid;
+        x.pal = { Colour (0xff141a30), Colour (0xff05070f), Colour (0xffffcf5a), Colour (0xff8ab4ff), Colour (0x9c121a2e), Colour (0xb805070f),
+                  Colour (0xff6a6a8a), Colour (0xfffff6dc), Colour (0xff04060c), Colour (0xff2a3048), Colour (0xff0e1220), Colour (0xff1c2238),
+                  Colour (0xffffffff), Colour (0xff161c32) };
+        x.canvas = canvasPitcher;
+        x.titleEmblem = pitcherEmblem;
+        x.drawCap = capBrass;
+        x.arcGlow = 0.25f;
+        return x;
+    }();
+    return t;
+}
+
+// === LYNX Tune (vocal tuning role): a pitch lattice with a curve snapping to its lines, warm rose ================
+
+inline void canvasLynxTune (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto rowH = 16.0f;
+    for (float y = a.getY(); y < a.getBottom(); y += rowH) // the semitone rows, black keys darker
+    {
+        const auto k = ((int) ((y - a.getY()) / rowH)) % 12;
+        const auto black = k == 1 || k == 3 || k == 6 || k == 8 || k == 10;
+        g.setColour ((black ? Colours::black : Colours::white).withAlpha (black ? 0.12f : 0.015f));
+        g.fillRect (Rectangle<float> (a.getX(), y, a.getWidth(), rowH));
+        g.setColour (p.accent.withAlpha (0.04f));
+        g.fillRect (Rectangle<float> (a.getX(), y, a.getWidth(), 1.0f));
+    }
+    // the raw pitch (wobbly, faint) and the corrected one (steps with smooth glides)
+    juce::Path raw, tuned;
+    const float notes[] { 0.55f, 0.45f, 0.62f, 0.38f, 0.5f };
+    for (float x = a.getX(); x <= a.getRight(); x += 3.0f)
+    {
+        const auto u = (x - a.getX()) / a.getWidth();
+        const auto idx = juce::jmin (4, (int) (u * 5.0f));
+        const auto target = notes[idx];
+        const auto wob = 0.025f * std::sin (u * 60.0f) + 0.012f * std::sin (u * 23.0f);
+        const auto frac = u * 5.0f - (float) idx;
+        const auto prev = idx > 0 ? notes[idx - 1] : target;
+        const auto glide = frac < 0.12f ? prev + (target - prev) * (frac / 0.12f) : target;
+        const Point<float> qr { x, a.getY() + a.getHeight() * (target + wob) }, qt { x, a.getY() + a.getHeight() * glide };
+        if (x == a.getX()) { raw.startNewSubPath (qr); tuned.startNewSubPath (qt); }
+        else { raw.lineTo (qr); tuned.lineTo (qt); }
+    }
+    g.setColour (p.accent2.withAlpha (0.12f));
+    g.strokePath (raw, juce::PathStrokeType (1.0f));
+    g.setColour (p.accent.withAlpha (0.22f));
+    g.strokePath (tuned, stroke (2.0f));
+    vignette (g, a, 0.4f);
+}
+
+inline void lynxTuneEmblem (juce::Graphics& g, Point<float> c, float r) // a quantised step
+{
+    juce::Path s;
+    s.startNewSubPath (c.x - r * 1.2f, c.y + r * 0.6f);
+    s.lineTo (c.x - r * 0.3f, c.y + r * 0.6f);
+    s.lineTo (c.x - r * 0.1f, c.y - r * 0.6f);
+    s.lineTo (c.x + r * 1.2f, c.y - r * 0.6f);
+    g.setColour (pal().accent);
+    g.strokePath (s, stroke (1.5f));
+}
+
+inline const Theme& lynxTuneTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "LYNX Tune";
+        x.base = Style::vivid;
+        x.pal = { Colour (0xff221a20), Colour (0xff0a0709), Colour (0xffff5f87), Colour (0xffffc0d0), Colour (0x9c201820), Colour (0xb80a0709),
+                  Colour (0xff8a5a6a), Colour (0xfffff0f4), Colour (0xff070506), Colour (0xff3a2c34), Colour (0xff141014), Colour (0xff2a2026),
+                  Colour (0xffffffff), Colour (0xff221a20) };
+        x.canvas = canvasLynxTune;
+        x.titleEmblem = lynxTuneEmblem;
+        x.drawCap = capPebble;
+        x.twoTone = true;
+        x.arcGlow = 0.3f;
+        return x;
+    }();
+    return t;
+}
+
+// === Voice Shift: a morphing formant shape, violet to coral ========================================================
+
+inline void canvasVoiceShift (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    for (int k = 0; k < 5; ++k) // formant envelopes sliding from low to high
+    {
+        juce::Path f;
+        const auto shift = 0.08f * (float) k;
+        for (float x = a.getX(); x <= a.getRight(); x += 3.0f)
+        {
+            const auto u = (x - a.getX()) / a.getWidth();
+            const auto y = std::exp (-std::pow ((u - 0.2f - shift) / 0.07f, 2.0f)) * 0.7f + std::exp (-std::pow ((u - 0.5f - shift) / 0.1f, 2.0f)) * 0.45f
+                           + std::exp (-std::pow ((u - 0.75f - shift) / 0.08f, 2.0f)) * 0.3f;
+            const Point<float> q { x, a.getBottom() - 10.0f - y * a.getHeight() * 0.7f };
+            if (x == a.getX()) f.startNewSubPath (q);
+            else f.lineTo (q);
+        }
+        g.setColour (p.accent.interpolatedWith (p.accent2, (float) k / 4.0f).withAlpha (0.13f));
+        g.strokePath (f, stroke (1.6f));
+    }
+    vignette (g, a, 0.4f);
+}
+
+inline void voiceShiftEmblem (juce::Graphics& g, Point<float> c, float r) // a formant hump
+{
+    juce::Path f;
+    f.startNewSubPath (c.x - r * 1.2f, c.y + r * 0.7f);
+    f.cubicTo (c.x - r * 0.6f, c.y + r * 0.7f, c.x - r * 0.6f, c.y - r, c.x, c.y - r);
+    f.cubicTo (c.x + r * 0.5f, c.y - r, c.x + r * 0.3f, c.y + r * 0.2f, c.x + r * 1.2f, c.y + r * 0.7f);
+    const auto& p = pal();
+    g.setGradientFill (ColourGradient (p.accent, c.x - r, c.y, p.accent2, c.x + r, c.y, false));
+    g.strokePath (f, stroke (1.5f));
+}
+
+inline const Theme& voiceShiftTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Voice Shift";
+        x.base = Style::vivid;
+        x.pal = { Colour (0xff1e1430), Colour (0xff09060f), Colour (0xffb070ff), Colour (0xffff8a6a), Colour (0x9c1c122c), Colour (0xb809060f),
+                  Colour (0xff7a5a9a), Colour (0xfff6eaff), Colour (0xff06040a), Colour (0xff3a2c4c), Colour (0xff17121f), Colour (0xff261a38),
+                  Colour (0xfff6eaff), Colour (0xff1e1430) };
+        x.canvas = canvasVoiceShift;
+        x.titleEmblem = voiceShiftEmblem;
+        x.drawCap = capVelvet;
+        x.twoTone = true;
+        return x;
+    }();
+    return t;
+}
+
+// === Quell Denoiser: calm water — a still lake with a single ring, grain fading away ===============================
+
+inline void canvasQuell (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    if (! reduced) // the noise: fine grain on the left, fading out to the right
+    {
+        juce::Random rnd (17);
+        for (int i = 0; i < (int) (a.getWidth() * a.getHeight() / 60.0f); ++i)
+        {
+            const auto u = rnd.nextFloat();
+            if (rnd.nextFloat() > (1.0f - u) * (1.0f - u)) continue;
+            g.setColour (Colours::white.withAlpha (0.05f));
+            g.fillRect (Rectangle<float> (a.getX() + u * a.getWidth(), a.getY() + rnd.nextFloat() * a.getHeight(), 1.0f, 1.0f));
+        }
+    }
+    const auto c = Point<float> (a.getX() + a.getWidth() * 0.68f, a.getY() + a.getHeight() * 0.62f);
+    for (int i = 1; i < 6; ++i) // one ring spreading on still water
+    {
+        g.setColour (p.accent.withAlpha (0.12f - 0.018f * (float) i));
+        g.drawEllipse (Rectangle<float> ((float) i * 40.0f, (float) i * 12.0f).withCentre (c), 1.2f);
+    }
+    g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.04f), 0.0f, c.y - 2.0f, Colours::transparentWhite, 0.0f, a.getBottom(), false));
+    g.fillRect (a.withTop (c.y - 2.0f)); // the water's sheen
+    vignette (g, a, 0.4f);
+}
+
+inline void quellEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    g.setColour (p.accent);
+    g.drawEllipse (Rectangle<float> (r * 2.2f, r * 0.8f).withCentre (c), 1.2f);
+    g.fillEllipse (Rectangle<float> (r * 0.4f, r * 0.4f).withCentre (c));
+}
+
+inline const Theme& quellTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Quell Denoiser";
+        x.base = Style::glow;
+        x.pal = { Colour (0xff0e2228), Colour (0xff04090b), Colour (0xff5ad8d0), Colour (0xffcaf4f0), Colour (0x9c0e2026), Colour (0xb804090b),
+                  Colour (0xff4a7a7a), Colour (0xffe6fbf8), Colour (0xff03080a), Colour (0xffbcc8c4), Colour (0xff6a7874), Colour (0xff16292d),
+                  Colour (0xff10302c), Colour (0xff10242a) };
+        x.canvas = canvasQuell;
+        x.titleEmblem = quellEmblem;
+        x.drawCap = capStone;
+        x.arcGlow = 0.15f;
+        return x;
+    }();
+    return t;
+}
+
+// === Pitch Shifter (FL's): stairs — an ascending staircase of semitone steps, cyan on indigo =====================
+
+inline void canvasPitchShifter (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto n = 12;
+    const auto sw = a.getWidth() * 0.6f / (float) n, sh = a.getHeight() * 0.7f / (float) n;
+    juce::Path stairs;
+    stairs.startNewSubPath (a.getX() + a.getWidth() * 0.35f, a.getBottom());
+    for (int i = 0; i < n; ++i)
+    {
+        const auto x = a.getX() + a.getWidth() * 0.35f + (float) i * sw;
+        const auto y = a.getBottom() - (float) (i + 1) * sh;
+        stairs.lineTo (x, y);
+        stairs.lineTo (x + sw, y);
+    }
+    stairs.lineTo (a.getRight(), a.getBottom());
+    stairs.closeSubPath();
+    g.setGradientFill (ColourGradient (p.accent.withAlpha (0.10f), a.getRight(), a.getY(), p.accent.withAlpha (0.02f), a.getX(), a.getBottom(), false));
+    g.fillPath (stairs);
+    g.setColour (p.accent.withAlpha (0.2f));
+    g.strokePath (stairs, juce::PathStrokeType (1.0f));
+    vignette (g, a, 0.4f);
+}
+
+inline void pitchShifterEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    juce::Path s;
+    s.startNewSubPath (c.x - r * 1.2f, c.y + r);
+    for (int i = 0; i < 3; ++i)
+    {
+        s.lineTo (c.x - r * 1.2f + (float) i * r * 0.8f, c.y + r - (float) (i + 1) * r * 0.65f);
+        s.lineTo (c.x - r * 0.4f + (float) i * r * 0.8f, c.y + r - (float) (i + 1) * r * 0.65f);
+    }
+    g.setColour (pal().accent);
+    g.strokePath (s, juce::PathStrokeType (1.4f));
+}
+
+inline const Theme& pitchShifterTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Pitch Shifter";
+        x.base = Style::vivid;
+        x.pal = { Colour (0xff181a3a), Colour (0xff06070f), Colour (0xff3ae0ff), Colour (0xffb08aff), Colour (0x9c161838), Colour (0xb806070f),
+                  Colour (0xff5a6aa0), Colour (0xffeaf6ff), Colour (0xff05060c), Colour (0xff2a2e52), Colour (0xff0e1024), Colour (0xff1e2244),
+                  Colour (0xffffffff), Colour (0xff181a3a) };
+        x.canvas = canvasPitchShifter;
+        x.titleEmblem = pitchShifterEmblem;
+        x.cap = Cap::orb;
+        x.twoTone = true;
+        return x;
+    }();
+    return t;
+}
+
+// === Fruity Love Philter: a love letter — parchment pink, hand-drawn heart curves, wax-seal knobs ================
+
+inline juce::Path heart (Point<float> c, float r)
+{
+    juce::Path h;
+    h.startNewSubPath (c.x, c.y + r);
+    h.cubicTo (c.x - r * 1.4f, c.y, c.x - r * 0.9f, c.y - r * 1.1f, c.x, c.y - r * 0.35f);
+    h.cubicTo (c.x + r * 0.9f, c.y - r * 1.1f, c.x + r * 1.4f, c.y, c.x, c.y + r);
+    h.closeSubPath();
+    return h;
+}
+
+inline void canvasLovePhilter (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    // an envelope curve drawn by hand across the panel, with hearts at its points
+    juce::Path env;
+    juce::Random rnd (14);
+    env.startNewSubPath (a.getX(), a.getBottom() - a.getHeight() * 0.2f);
+    std::vector<Point<float>> pts;
+    for (int i = 1; i <= 6; ++i)
+    {
+        const Point<float> q { a.getX() + a.getWidth() * (float) i / 6.0f, a.getY() + a.getHeight() * (0.2f + 0.6f * rnd.nextFloat()) };
+        const auto prev = env.getCurrentPosition();
+        env.cubicTo (prev.x + (q.x - prev.x) * 0.5f, prev.y, prev.x + (q.x - prev.x) * 0.5f, q.y, q.x, q.y);
+        pts.push_back (q);
+    }
+    g.setColour (p.accent.withAlpha (0.18f));
+    g.strokePath (env, stroke (1.6f));
+    for (const auto& q : pts)
+    {
+        g.setColour (p.accent.withAlpha (0.25f));
+        g.fillPath (heart (q, 6.0f));
+    }
+    // a few big faint hearts floating
+    for (int i = 0; i < 4; ++i)
+    {
+        g.setColour (p.accent2.withAlpha (0.05f));
+        g.fillPath (heart ({ a.getX() + rnd.nextFloat() * a.getWidth(), a.getY() + rnd.nextFloat() * a.getHeight() }, 20.0f + rnd.nextFloat() * 30.0f));
+    }
+    vignette (g, a, 0.4f);
+}
+
+inline void lovePhilterEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    g.setColour (pal().accent);
+    g.fillPath (heart (c, r * 0.9f));
+}
+
+inline void capWaxSeal (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    const auto& p = pal();
+    juce::Path seal; // a slightly irregular disc
+    for (int i = 0; i <= 24; ++i)
+    {
+        const auto ang = juce::MathConstants<float>::twoPi * (float) i / 24.0f;
+        const auto rr = capR * (0.94f + 0.06f * std::sin ((float) i * 2.7f));
+        const Point<float> q { c.x + std::cos (ang) * rr, c.y + std::sin (ang) * rr };
+        if (i == 0) seal.startNewSubPath (q);
+        else seal.lineTo (q);
+    }
+    seal.closeSubPath();
+    g.setGradientFill (ColourGradient (p.accent.brighter (0.2f + hover * 0.2f), c.x - capR * 0.4f, c.y - capR * 0.5f, p.accent.darker (0.7f), c.x + capR * 0.6f, c.y + capR, true));
+    g.fillPath (seal);
+    if (fx)
+    {
+        g.setColour (Colours::black.withAlpha (0.2f));
+        g.drawEllipse (cap.reduced (capR * 0.3f), 1.0f);
+    }
+}
+
+inline const Theme& lovePhilterTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Fruity Love Philter";
+        x.base = Style::vivid;
+        x.pal = { Colour (0xff2e1620), Colour (0xff10070b), Colour (0xffff5a8a), Colour (0xffffc8d8), Colour (0x9c2a141e), Colour (0xb810070b),
+                  Colour (0xff9a5a72), Colour (0xfffff0f4), Colour (0xff0a0507), Colour (0xff4a2232), Colour (0xff1a0a12), Colour (0xff301822),
+                  Colour (0xfffff0f4), Colour (0xff2a1420) };
+        x.canvas = canvasLovePhilter;
+        x.titleEmblem = lovePhilterEmblem;
+        x.drawCap = capWaxSeal;
+        x.twoTone = true;
+        return x;
+    }();
+    return t;
+}
+
+// === Effector: a multi-tool fanned out — blades for its twelve effects, red and steel =============================
+
+inline void canvasEffector (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto o = Point<float> (a.getRight() - a.getWidth() * 0.2f, a.getBottom() - a.getHeight() * 0.15f);
+    for (int i = 0; i < 12; ++i) // twelve blades fanned out of the handle
+    {
+        const auto ang = juce::MathConstants<float>::pi * (0.95f + 0.55f * (float) i / 11.0f);
+        juce::Path blade;
+        const auto len = a.getHeight() * (0.55f + 0.1f * (float) (i % 3));
+        blade.addRoundedRectangle (Rectangle<float> (0.0f, -4.0f, len, 8.0f), 4.0f);
+        blade.applyTransform (juce::AffineTransform::rotation (ang).translated (o));
+        g.setColour (Colour (0xffc8ccd2).withAlpha (0.08f));
+        g.fillPath (blade);
+        g.setColour (Colour (0xffc8ccd2).withAlpha (0.14f));
+        g.strokePath (blade, juce::PathStrokeType (0.8f));
+    }
+    // the handle: a red rounded shape with a white cross
+    const auto handle = Rectangle<float> (a.getWidth() * 0.22f, 26.0f).withCentre (o);
+    g.setColour (p.accent.withAlpha (0.3f));
+    g.fillRoundedRectangle (handle, 13.0f);
+    g.setColour (Colours::white.withAlpha (0.35f));
+    g.fillRect (Rectangle<float> (10.0f, 3.0f).withCentre (handle.getCentre()));
+    g.fillRect (Rectangle<float> (3.0f, 10.0f).withCentre (handle.getCentre()));
+    vignette (g, a, 0.4f);
+}
+
+inline void effectorEmblem (juce::Graphics& g, Point<float> c, float r) // a cross on a red badge
+{
+    g.setColour (pal().accent);
+    g.fillRoundedRectangle (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c), r * 0.4f);
+    g.setColour (Colours::white);
+    g.fillRect (Rectangle<float> (r * 1.2f, r * 0.36f).withCentre (c));
+    g.fillRect (Rectangle<float> (r * 0.36f, r * 1.2f).withCentre (c));
+}
+
+inline const Theme& effectorTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Effector";
+        x.base = Style::vivid;
+        x.pal = { Colour (0xff1e1e22), Colour (0xff0a0a0c), Colour (0xffe8303a), Colour (0xffc8ccd2), Colour (0x9c1c1c20), Colour (0xb80a0a0c),
+                  Colour (0xff6a6e74), Colour (0xfff2f2f4), Colour (0xff060607), Colour (0xffc9d2dc), Colour (0xff59626d), Colour (0xff222226),
+                  Colour (0xff15181b), Colour (0xff1c1c20) };
+        x.canvas = canvasEffector;
+        x.titleEmblem = effectorEmblem;
+        x.drawCap = capBrushed;
+        x.arcGlow = 0.25f;
+        return x;
+    }();
+    return t;
+}
+
+// === Squeeze / Lo-fi: 8-bit — a pixel grid, CRT scanlines, handheld greens ========================================
+
+inline void canvasEightBit (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    // a staircase waveform drawn in big pixels
+    const auto px = 8.0f;
+    for (float x = a.getX(); x < a.getRight(); x += px)
+    {
+        const auto u = (x - a.getX()) / a.getWidth();
+        const auto v = std::round (std::sin (u * 9.0f) * 4.0f) / 4.0f;
+        const auto y = a.getCentreY() - v * a.getHeight() * 0.3f;
+        g.setColour (p.accent.withAlpha (0.18f));
+        g.fillRect (Rectangle<float> (x + 1.0f, std::round (y / px) * px + 1.0f, px - 2.0f, px - 2.0f));
+    }
+    g.setColour (Colours::black.withAlpha (0.12f)); // the pixel grid
+    for (float x = a.getX(); x < a.getRight(); x += px) g.fillRect (Rectangle<float> (x, a.getY(), 1.0f, a.getHeight()));
+    for (float y = a.getY(); y < a.getBottom(); y += px) g.fillRect (Rectangle<float> (a.getX(), y, a.getWidth(), 1.0f));
+    vignette (g, a, 0.45f);
+}
+
+inline void eightBitEmblem (juce::Graphics& g, Point<float> c, float r) // a step drawn in blocks
+{
+    g.setColour (pal().accent);
+    const auto s = r * 0.55f;
+    for (const auto& q : { Point<float> (-1.5f, 1.0f), Point<float> (-0.5f, 1.0f), Point<float> (-0.5f, 0.0f), Point<float> (0.5f, 0.0f), Point<float> (0.5f, -1.0f), Point<float> (1.5f, -1.0f) })
+        g.fillRect (Rectangle<float> (s, s).withCentre (c + q * s));
+}
+
+inline void capPixel (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    const auto& p = pal();
+    const auto sq = cap.reduced (capR * 0.18f);
+    g.setColour (p.capBottom);
+    g.fillRect (sq);
+    g.setColour (p.capTop.brighter (hover * 0.2f));
+    g.fillRect (sq.reduced (2.0f).withTrimmedBottom (sq.getHeight() * 0.3f));
+    if (fx)
+    {
+        g.setColour (Colours::black.withAlpha (0.5f));
+        g.drawRect (sq, 1.0f);
+    }
+    juce::ignoreUnused (c);
+}
+
+inline const Theme& eightBitTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "Squeeze";
+        x.base = Style::vivid;
+        x.pal = { Colour (0xff1a2a12), Colour (0xff070d05), Colour (0xff9bd23a), Colour (0xffd8f0a0), Colour (0x9c182812), Colour (0xb8070d05),
+                  Colour (0xff5a7a3a), Colour (0xffe8ffd0), Colour (0xff050a04), Colour (0xff5a7a3a), Colour (0xff1e2e14), Colour (0xff1c2c14),
+                  Colour (0xffe8ffd0), Colour (0xff1a2a12) };
+        x.canvas = canvasEightBit;
+        x.titleEmblem = eightBitEmblem;
+        x.drawCap = capPixel;
+        x.buttTrack = true;
+        x.arcGlow = 0.0f;
+        return x;
+    }();
+    return t;
+}
+
+inline const Theme& lofiTheme()
+{
+    static const Theme t = []
+    {
+        Theme x = eightBitTheme();
+        x.name = "Lo-fi";
+        x.pal.accent = Colour (0xffffb03a);
+        x.pal.accent2 = Colour (0xfffff0c8);
+        x.pal.bgTop = Colour (0xff2a1e12);
+        x.pal.bgBottom = Colour (0xff0d0905);
+        return x;
+    }();
+    return t;
+}
+
+// === batch 8: LYNX's basic effects and FL's smaller tools — lighter themes, each with its own motif ================
+// The motifs below are shared; each theme picks one with its own palette and placement.
+
+inline void motifRings (juce::Graphics& g, Rectangle<float> a, Point<float> c, int n, float step, float squash, Colour col, float alpha)
+{
+    for (int i = 1; i <= n; ++i)
+    {
+        g.setColour (col.withAlpha (alpha * (1.0f - (float) i / (float) (n + 1))));
+        g.drawEllipse (Rectangle<float> ((float) i * step * 2.0f, (float) i * step * 2.0f * squash).withCentre (c), 1.2f);
+    }
+    juce::ignoreUnused (a);
+}
+
+inline void motifCurve (juce::Graphics& g, Rectangle<float> a, float (*fn) (float), float amp, Colour col, float alpha, float width)
+{
+    juce::Path c;
+    for (float x = a.getX(); x <= a.getRight(); x += 3.0f)
+    {
+        const Point<float> q { x, a.getCentreY() - fn ((x - a.getX()) / a.getWidth()) * amp };
+        if (x == a.getX()) c.startNewSubPath (q);
+        else c.lineTo (q);
+    }
+    if (! reduced)
+    {
+        g.setColour (col.withAlpha (alpha * 0.3f));
+        g.strokePath (c, stroke (width * 4.0f));
+    }
+    g.setColour (col.withAlpha (alpha));
+    g.strokePath (c, stroke (width));
+}
+
+inline void motifBars (juce::Graphics& g, Rectangle<float> a, int n, const float* heights, Colour col, float alpha)
+{
+    const auto bw = a.getWidth() / (float) n;
+    for (int i = 0; i < n; ++i)
+    {
+        const auto h = a.getHeight() * heights[i];
+        const auto bar = Rectangle<float> (a.getX() + (float) i * bw + bw * 0.2f, a.getBottom() - h, bw * 0.6f, h);
+        g.setGradientFill (ColourGradient (col.withAlpha (alpha), 0.0f, bar.getY(), col.withAlpha (alpha * 0.15f), 0.0f, bar.getBottom(), false));
+        g.fillRoundedRectangle (bar, bw * 0.15f);
+    }
+}
+
+inline void emblemDot (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto& p = pal();
+    if (! reduced) bloom (g, c, r * 2.4f, p.accent, 0.35f);
+    g.setColour (p.accent);
+    g.fillEllipse (Rectangle<float> (r * 1.1f, r * 1.1f).withCentre (c));
+    g.setColour (p.accent2);
+    g.drawEllipse (Rectangle<float> (r * 1.9f, r * 1.9f).withCentre (c), 1.0f);
+}
+
+inline float fnBell (float u) { return std::exp (-std::pow ((u - 0.45f) / 0.12f, 2.0f)) - 0.4f * std::exp (-std::pow ((u - 0.8f) / 0.07f, 2.0f)); }
+inline float fnLowpass (float u) { return 0.5f + (u < 0.55f ? 0.0f : -1.6f * (u - 0.55f)) + 0.35f * std::exp (-std::pow ((u - 0.55f) / 0.04f, 2.0f)); }
+inline float fnSine (float u) { return std::sin (u * 18.0f) * (0.6f + 0.4f * std::sin (u * 3.0f)); }
+inline float fnPan (float u) { return 2.0f * std::abs (std::fmod (u * 3.0f, 1.0f) - 0.5f) * 2.0f - 1.0f; }
+inline float fnDecay (float u) { return std::exp (-u * 4.0f) * std::sin (u * 60.0f); }
+inline float fnClip (float u) { return juce::jlimit (-0.6f, 0.6f, 1.5f * std::sin (u * 14.0f)); }
+inline float fnSteps (float u) { return std::fmod (std::floor (u * 16.0f), 2.0f) < 1.0f ? 0.5f : -0.2f; }
+inline float fnTilt (float u) { return 0.6f - 1.2f * u + 0.15f * std::sin (u * 9.0f); }
+inline float fnBass (float u) { return 0.8f * std::exp (-std::pow (u / 0.18f, 2.0f)) - 0.1f; }
+inline float fnPresence (float u) { return 0.7f * std::exp (-std::pow ((u - 0.7f) / 0.15f, 2.0f)); }
+
+// --- LYNX's EQ: a clean bell over a fine grid (studio steel) -----------------------------------------------------------
+inline void canvasBasicEq (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    for (float x = a.getX(); x < a.getRight(); x += 24.0f)
+    {
+        g.setColour (p.accent2.withAlpha (0.03f));
+        g.fillRect (Rectangle<float> (x, a.getY(), 1.0f, a.getHeight()));
+    }
+    motifCurve (g, a, fnBell, a.getHeight() * 0.3f, p.accent, 0.16f, 1.6f);
+    vignette (g, a, 0.4f);
+}
+
+// --- LYNX's Compressor (RComp role): a renaissance gold — an arch of a squeezed waveform ---------------------------------
+inline void canvasBasicComp (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    motifCurve (g, a, fnClip, a.getHeight() * 0.35f, p.accent, 0.12f, 1.4f);
+    softLight (g, { a.getCentreX(), a.getY() }, a.getWidth() * 0.6f, p.accent, 0.08f);
+    vignette (g, a, 0.4f);
+}
+
+// --- LYNX's Delay: echoes — a pulse and its repeats fading to the right --------------------------------------------------
+inline void canvasBasicDelay (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    for (int i = 0; i < 8; ++i)
+    {
+        const auto x = a.getX() + a.getWidth() * (0.08f + 0.12f * (float) i);
+        const auto h = a.getHeight() * 0.6f * std::pow (0.72f, (float) i);
+        g.setColour (p.accent.withAlpha (0.22f * std::pow (0.8f, (float) i)));
+        g.fillRoundedRectangle (Rectangle<float> (4.0f, h).withCentre ({ x, a.getCentreY() }), 2.0f);
+    }
+    vignette (g, a, 0.4f);
+}
+
+// --- LYNX's Reverb: a room's reflections — rays bouncing off walls -------------------------------------------------------
+inline void canvasBasicReverb (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    auto q = Point<float> (a.getX() + a.getWidth() * 0.1f, a.getY() + a.getHeight() * 0.7f);
+    Point<float> d { 0.83f, -0.55f };
+    juce::Path ray;
+    ray.startNewSubPath (q);
+    for (int i = 0; i < 24; ++i)
+    {
+        auto tx = d.x > 0 ? (a.getRight() - q.x) / d.x : (a.getX() - q.x) / d.x;
+        auto ty = d.y > 0 ? (a.getBottom() - q.y) / d.y : (a.getY() - q.y) / d.y;
+        const auto t = juce::jmin (tx, ty);
+        q += d * t;
+        ray.lineTo (q);
+        if (tx < ty) d.x = -d.x; else d.y = -d.y;
+    }
+    g.setColour (p.accent.withAlpha (0.08f));
+    g.strokePath (ray, juce::PathStrokeType (1.0f));
+    vignette (g, a, 0.4f);
+}
+
+// --- LYNX's Limiter / Distortion / Filter / Chorus ------------------------------------------------------------------------
+inline void canvasBasicLimiter (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    g.setColour (p.accent.withAlpha (0.35f));
+    g.fillRect (Rectangle<float> (a.getX(), a.getY() + a.getHeight() * 0.25f, a.getWidth(), 1.2f));
+    motifCurve (g, a.withTrimmedTop (a.getHeight() * 0.25f), fnClip, a.getHeight() * 0.3f, p.accent2, 0.1f, 1.2f);
+    vignette (g, a, 0.4f);
+}
+
+inline void canvasBasicDistortion (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    motifCurve (g, a, fnClip, a.getHeight() * 0.32f, p.accent, 0.18f, 1.6f);
+    g.setGradientFill (ColourGradient (p.accent.withAlpha (0.14f), 0.0f, a.getBottom(), p.accent.withAlpha (0.0f), 0.0f, a.getCentreY(), false));
+    g.fillRect (a);
+    vignette (g, a, 0.4f);
+}
+
+inline void canvasBasicFilter (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    motifCurve (g, a, fnLowpass, a.getHeight() * 0.45f, p.accent, 0.18f, 1.6f);
+    vignette (g, a, 0.4f);
+}
+
+inline void canvasBasicChorus (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    wavesWoven (g, a, 3, a.getHeight() * 0.2f, 0.022f, 0.5f, p.accent, p.accent2, 0.15f);
+    vignette (g, a, 0.4f);
+}
+
+// --- panning / stereo / utilities -----------------------------------------------------------------------------------------
+inline void canvasPan (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    motifCurve (g, a, fnPan, a.getHeight() * 0.28f, p.accent, 0.16f, 1.4f);
+    for (const auto f : { 0.06f, 0.94f }) // left and right speakers
+        speaker (g, { a.getX() + a.getWidth() * f, a.getCentreY() }, 16.0f, p.accent2, 0.8f);
+    vignette (g, a, 0.4f);
+}
+
+inline void canvasBalance (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    // a balance scale: a beam on a post and two pans
+    const auto c = Point<float> (a.getRight() - a.getWidth() * 0.22f, a.getY() + a.getHeight() * 0.35f);
+    const auto w = a.getWidth() * 0.18f;
+    g.setColour (p.accent.withAlpha (0.2f));
+    g.drawLine (c.x, c.y, c.x, a.getBottom() - 8.0f, 2.0f);
+    g.drawLine (c.x - w, c.y + 4.0f, c.x + w, c.y - 4.0f, 2.0f);
+    for (const auto s : { -1.0f, 1.0f })
+    {
+        const auto pc = Point<float> (c.x + s * w, c.y - s * 4.0f + 30.0f);
+        g.drawLine (c.x + s * w, c.y - s * 4.0f, pc.x - 14.0f, pc.y, 0.8f);
+        g.drawLine (c.x + s * w, c.y - s * 4.0f, pc.x + 14.0f, pc.y, 0.8f);
+        g.drawLine (pc.x - 16.0f, pc.y, pc.x + 16.0f, pc.y, 2.0f);
+    }
+    vignette (g, a, 0.4f);
+}
+
+inline void canvasUtility (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    // a calm graphite plate with a fine dot grid
+    for (float y = a.getY() + 6.0f; y < a.getBottom(); y += 12.0f)
+        for (float x = a.getX() + 6.0f; x < a.getRight(); x += 12.0f)
+        {
+            g.setColour (p.accent2.withAlpha (0.05f));
+            g.fillEllipse (Rectangle<float> (1.6f, 1.6f).withCentre ({ x, y }));
+        }
+    vignette (g, a, 0.35f);
+}
+
+// --- FL's filters and EQs ---------------------------------------------------------------------------------------------------
+inline void canvasSweep (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    for (int k = 0; k < 4; ++k) // a filter sweeping: the same curve at four cutoffs
+    {
+        juce::Path c;
+        for (float x = a.getX(); x <= a.getRight(); x += 3.0f)
+        {
+            const auto u = (x - a.getX()) / a.getWidth() - 0.15f * (float) k;
+            const Point<float> q { x, a.getCentreY() - fnLowpass (u + 0.3f) * a.getHeight() * 0.4f };
+            if (x == a.getX()) c.startNewSubPath (q);
+            else c.lineTo (q);
+        }
+        g.setColour (p.accent.interpolatedWith (p.accent2, (float) k / 3.0f).withAlpha (0.12f));
+        g.strokePath (c, stroke (1.4f));
+    }
+    vignette (g, a, 0.4f);
+}
+
+inline void canvasGraphicEq (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    static const float h[] { 0.5f, 0.62f, 0.45f, 0.38f, 0.52f, 0.66f, 0.58f };
+    motifBars (g, a.reduced (a.getWidth() * 0.1f, a.getHeight() * 0.1f), 7, h, p.accent, 0.16f);
+    vignette (g, a, 0.4f);
+}
+
+inline void canvasBassBoost (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    motifCurve (g, a, fnBass, a.getHeight() * 0.45f, p.accent, 0.2f, 2.0f);
+    speaker (g, { a.getRight() - a.getWidth() * 0.18f, a.getCentreY() }, a.getHeight() * 0.3f, p.accent, 1.0f);
+    vignette (g, a, 0.4f);
+}
+
+inline void canvasEmphasis (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    motifCurve (g, a, fnPresence, a.getHeight() * 0.4f, p.accent, 0.18f, 1.6f);
+    vignette (g, a, 0.4f);
+}
+
+inline void canvasTilt (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    motifCurve (g, a, fnTilt, a.getHeight() * 0.3f, p.accent, 0.16f, 1.6f);
+    vignette (g, a, 0.4f);
+}
+
+// --- splitters, multiband delay, convolver --------------------------------------------------------------------------------
+inline void canvasDelta (juce::Graphics& g, Rectangle<float> a, bool display) // a river splitting into a delta
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto o = Point<float> (a.getX(), a.getCentreY());
+    for (int i = 0; i < 5; ++i)
+    {
+        juce::Path r;
+        const auto ty = a.getY() + a.getHeight() * (0.1f + 0.2f * (float) i);
+        r.startNewSubPath (o);
+        r.cubicTo (a.getX() + a.getWidth() * 0.35f, o.y, a.getX() + a.getWidth() * 0.5f, ty, a.getRight(), ty);
+        g.setColour (p.accent.interpolatedWith (p.accent2, (float) i / 4.0f).withAlpha (0.14f));
+        g.strokePath (r, stroke (3.0f - 0.4f * (float) i));
+    }
+    vignette (g, a, 0.4f);
+}
+
+inline void canvasSkyline (juce::Graphics& g, Rectangle<float> a, bool display) // a skyline of band-coloured buildings
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const Colour bands[] { Colour (0xffff6a5a), Colour (0xffffc04a), Colour (0xff4fe08a), Colour (0xff4fa8ff), Colour (0xffb98cff) };
+    juce::Random rnd (21);
+    for (float x = a.getX(); x < a.getRight(); x += 22.0f)
+    {
+        const auto h = a.getHeight() * (0.15f + 0.45f * rnd.nextFloat());
+        const auto b = Rectangle<float> (x + 2.0f, a.getBottom() - h, 18.0f, h);
+        g.setColour (bands[rnd.nextInt (5)].withAlpha (0.10f));
+        g.fillRect (b);
+        g.setColour (Colours::white.withAlpha (0.05f));
+        for (float wy = b.getY() + 4.0f; wy < b.getBottom() - 4.0f; wy += 7.0f) // windows
+            g.fillRect (Rectangle<float> (b.getX() + 4.0f, wy, 3.0f, 3.0f));
+    }
+    vignette (g, a, 0.4f);
+}
+
+inline void canvasCathedral (juce::Graphics& g, Rectangle<float> a, bool display) // an impulse becoming a cathedral
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    // the impulse response: a spike and a decaying comb of reflections
+    for (float x = a.getX() + 20.0f; x < a.getRight(); x += 5.0f)
+    {
+        const auto u = (x - a.getX() - 20.0f) / a.getWidth();
+        const auto h = a.getHeight() * 0.7f * std::exp (-u * 3.5f) * (x == a.getX() + 20.0f ? 1.0f : 0.5f + 0.5f * std::abs (std::sin (x * 1.7f)));
+        g.setColour (p.accent.withAlpha (0.13f));
+        g.fillRect (Rectangle<float> (x, a.getBottom() - h, 1.5f, h));
+    }
+    // a gothic window silhouette on the right
+    const auto c = Point<float> (a.getRight() - a.getWidth() * 0.16f, a.getY() + a.getHeight() * 0.25f);
+    const auto w = a.getWidth() * 0.08f;
+    juce::Path win;
+    win.startNewSubPath (c.x - w, a.getBottom());
+    win.lineTo (c.x - w, c.y + w);
+    win.quadraticTo (c.x - w, c.y - w * 0.4f, c.x, c.y - w * 1.2f);
+    win.quadraticTo (c.x + w, c.y - w * 0.4f, c.x + w, c.y + w);
+    win.lineTo (c.x + w, a.getBottom());
+    g.setColour (p.accent2.withAlpha (0.15f));
+    g.strokePath (win, juce::PathStrokeType (1.6f));
+    vignette (g, a, 0.4f);
+}
+
+inline void canvasGate (juce::Graphics& g, Rectangle<float> a, bool display) // a step sequence of open / closed gates
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    motifCurve (g, a, fnSteps, a.getHeight() * 0.3f, p.accent, 0.15f, 1.4f);
+    vignette (g, a, 0.4f);
+}
+
+inline void canvasShift (juce::Graphics& g, Rectangle<float> a, bool display) // a spectrum line moved sideways, twice
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    for (int k = 0; k < 3; ++k)
+    {
+        juce::Path c;
+        for (float x = a.getX(); x <= a.getRight(); x += 3.0f)
+        {
+            const auto u = (x - a.getX()) / a.getWidth() - 0.08f * (float) k;
+            const Point<float> q { x, a.getCentreY() - fnPresence (u + 0.1f) * a.getHeight() * 0.4f };
+            if (x == a.getX()) c.startNewSubPath (q);
+            else c.lineTo (q);
+        }
+        g.setColour (p.accent.interpolatedWith (p.accent2, (float) k / 2.0f).withAlpha (0.15f));
+        g.strokePath (c, stroke (1.4f));
+    }
+    vignette (g, a, 0.4f);
+}
+
+inline void canvasDecay (juce::Graphics& g, Rectangle<float> a, bool display) // a ringing decay
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    motifCurve (g, a, fnDecay, a.getHeight() * 0.38f, p.accent, 0.15f, 1.2f);
+    vignette (g, a, 0.4f);
+}
+
+inline void canvasSine (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    motifCurve (g, a, fnSine, a.getHeight() * 0.25f, p.accent, 0.14f, 1.3f);
+    vignette (g, a, 0.4f);
+}
+
+// one theme from a motif, a palette and a knob family (batch 8 builds its themes with it)
+inline Theme liteTheme (const char* name, Style base, Colour bgTop, Colour bgBottom, Colour accent, Colour accent2, void (*canvas) (juce::Graphics&, Rectangle<float>, bool),
+                        Cap cap, void (*drawCap) (juce::Graphics&, Rectangle<float>, Point<float>, float, float, bool) = nullptr)
+{
+    Theme x;
+    x.name = name;
+    x.base = base;
+    x.pal = { bgTop, bgBottom, accent, accent2, bgTop.brighter (0.06f).withAlpha ((juce::uint8) 0x9c), bgBottom.withAlpha ((juce::uint8) 0xb8),
+              bgTop.interpolatedWith (accent, 0.35f).brighter (0.2f), accent2.interpolatedWith (Colours::white, 0.7f), bgBottom.darker (0.4f),
+              bgTop.brighter (0.25f), bgBottom.brighter (0.05f), bgTop.brighter (0.08f), Colours::white, bgTop.brighter (0.04f) };
+    x.canvas = canvas;
+    x.titleEmblem = emblemDot;
+    x.cap = cap;
+    x.drawCap = drawCap;
+    return x;
+}
+
+#define LYNX_LITE_THEME(fn, ...) inline const Theme& fn() { static const Theme t = liteTheme (__VA_ARGS__); return t; }
+LYNX_LITE_THEME (basicEqTheme, "EQ", Style::glow, Colour (0xff1a2026), Colour (0xff080a0d), Colour (0xffff4a5a), Colour (0xff9ad0ff), canvasBasicEq, Cap::flat)
+LYNX_LITE_THEME (basicCompTheme, "Compressor", Style::hardware, Colour (0xff2a2418), Colour (0xff0d0b07), Colour (0xffe8b54a), Colour (0xfffff0c8), canvasBasicComp, Cap::flat, capBrass)
+LYNX_LITE_THEME (basicDelayTheme, "Delay", Style::glow, Colour (0xff14202c), Colour (0xff05090d), Colour (0xff4ab8ff), Colour (0xffc8ecff), canvasBasicDelay, Cap::rubber)
+LYNX_LITE_THEME (basicReverbTheme, "Reverb", Style::neon, Colour (0xff1c1630), Colour (0xff07050f), Colour (0xffa67cff), Colour (0xffe0d4ff), canvasBasicReverb, Cap::orb)
+LYNX_LITE_THEME (basicLimiterTheme, "Limiter", Style::glow, Colour (0xff221a1a), Colour (0xff0b0808), Colour (0xffff5a4a), Colour (0xffffd0c8), canvasBasicLimiter, Cap::flat)
+LYNX_LITE_THEME (basicDistortionTheme, "Distortion", Style::vivid, Colour (0xff261410), Colour (0xff0b0504), Colour (0xffff6a2a), Colour (0xffffd08a), canvasBasicDistortion, Cap::rubber)
+LYNX_LITE_THEME (basicFilterTheme, "Filter", Style::neon, Colour (0xff10222a), Colour (0xff04090c), Colour (0xff3ae0d0), Colour (0xffb8fff4), canvasBasicFilter, Cap::orb)
+LYNX_LITE_THEME (basicChorusTheme, "Chorus", Style::glow, Colour (0xff121c2a), Colour (0xff05080d), Colour (0xff5ad8ff), Colour (0xffd0a8ff), canvasBasicChorus, Cap::porcelain)
+LYNX_LITE_THEME (autoPanTheme, "Auto-pan", Style::glow, Colour (0xff142226), Colour (0xff05090b), Colour (0xff4fe0c0), Colour (0xffc8fff0), canvasPan, Cap::flat)
+LYNX_LITE_THEME (panOMaticTheme, "Fruity PanOMatic", Style::vivid, Colour (0xff1e1430), Colour (0xff09060f), Colour (0xffff7ad0), Colour (0xff9ae8ff), canvasPan, Cap::rubber)
+LYNX_LITE_THEME (balanceTheme, "Fruity Balance", Style::glow, Colour (0xff1c1e22), Colour (0xff09090b), Colour (0xffd8c08a), Colour (0xfff0e8d8), canvasBalance, Cap::flat, capBrass)
+LYNX_LITE_THEME (utilityTheme, "Utility", Style::glow, Colour (0xff1e2024), Colour (0xff0a0a0c), Colour (0xffb6ff5c), Colour (0xffe0e4e8), canvasUtility, Cap::flat)
+LYNX_LITE_THEME (sendTheme, "Fruity Send", Style::glow, Colour (0xff1a1e26), Colour (0xff08090c), Colour (0xff7ab8ff), Colour (0xffe0ecff), canvasUtility, Cap::flat)
+LYNX_LITE_THEME (splitterTheme, "Frequency Splitter", Style::glow, Colour (0xff10202a), Colour (0xff04080c), Colour (0xff4fa8ff), Colour (0xff4fe08a), canvasDelta, Cap::flat)
+LYNX_LITE_THEME (crossoverTheme, "Crossover", Style::glow, Colour (0xff141e26), Colour (0xff05080b), Colour (0xff5ab4ff), Colour (0xffffc04a), canvasDelta, Cap::flat)
+LYNX_LITE_THEME (multibandDelayTheme, "Multiband Delay", Style::vivid, Colour (0xff141428), Colour (0xff05050e), Colour (0xffffc04a), Colour (0xff4fa8ff), canvasSkyline, Cap::orb)
+LYNX_LITE_THEME (equoTheme, "EQUO", Style::neon, Colour (0xff142030), Colour (0xff05080f), Colour (0xff46d8ff), Colour (0xffff7ad0), canvasGraphicEq, Cap::flat)
+LYNX_LITE_THEME (emphasizerTheme, "Emphasizer", Style::glow, Colour (0xff221c14), Colour (0xff0b0906), Colour (0xffffc86a), Colour (0xfffff0d0), canvasEmphasis, Cap::porcelain)
+LYNX_LITE_THEME (lowLifterTheme, "Low Lifter", Style::hardware, Colour (0xff1a1c26), Colour (0xff07080c), Colour (0xffff7a3a), Colour (0xffffd8b0), canvasBassBoost, Cap::bakelite)
+LYNX_LITE_THEME (fastLpTheme, "Fruity Fast LP", Style::neon, Colour (0xff10261e), Colour (0xff040b08), Colour (0xff3aff9a), Colour (0xffc8ffe0), canvasSweep, Cap::rubber)
+LYNX_LITE_THEME (fruityFilterTheme, "Fruity Filter", Style::neon, Colour (0xff1a1430), Colour (0xff07050f), Colour (0xffc070ff), Colour (0xff70e0ff), canvasSweep, Cap::orb)
+LYNX_LITE_THEME (freeFilterTheme, "Fruity Free Filter", Style::neon, Colour (0xff0e2230), Colour (0xff04090f), Colour (0xff3ac8ff), Colour (0xffff9a6a), canvasSweep, Cap::orb)
+LYNX_LITE_THEME (sevenBandTheme, "Fruity 7 Band EQ", Style::hardware, Colour (0xff22262c), Colour (0xff0a0b0d), Colour (0xff6ae06a), Colour (0xffe8ffe0), canvasGraphicEq, Cap::bakelite)
+LYNX_LITE_THEME (bassBoostTheme, "Fruity Bass Boost", Style::vivid, Colour (0xff200f1c), Colour (0xff0a0409), Colour (0xffff3a8a), Colour (0xffffc0e0), canvasBassBoost, Cap::rubber)
+LYNX_LITE_THEME (convolverTheme, "Fruity Convolver", Style::glow, Colour (0xff1c1a24), Colour (0xff08070c), Colour (0xffd8c08a), Colour (0xffb8a8ff), canvasCathedral, Cap::flat, capStone)
+LYNX_LITE_THEME (volumeGateTheme, "Volume gate", Style::vivid, Colour (0xff1a1430), Colour (0xff07050f), Colour (0xffff4fa3), Colour (0xff4fe0ff), canvasGate, Cap::rubber)
+LYNX_LITE_THEME (rhythmGainTheme, "Rhythmic envelope", Style::vivid, Colour (0xff201628), Colour (0xff0a060d), Colour (0xffff7a5a), Colour (0xffffd0a0), canvasGate, Cap::rubber)
+LYNX_LITE_THEME (freqShiftTheme, "Frequency shifter", Style::neon, Colour (0xff102224), Colour (0xff04090a), Colour (0xff3ae0c0), Colour (0xffff8a6a), canvasShift, Cap::orb)
+LYNX_LITE_THEME (pitchShiftTheme, "Pitch shift", Style::neon, Colour (0xff181a36), Colour (0xff06070f), Colour (0xff6ab8ff), Colour (0xffd0a8ff), canvasShift, Cap::orb)
+LYNX_LITE_THEME (phaseInverterTheme, "Fruity Phase Inverter", Style::glow, Colour (0xff1e1e24), Colour (0xff09090c), Colour (0xff9ad0ff), Colour (0xffff9a9a), canvasSine, Cap::flat)
+LYNX_LITE_THEME (centerTheme, "Fruity Center", Style::glow, Colour (0xff1e2024), Colour (0xff09090b), Colour (0xffd0d4da), Colour (0xff9ad0ff), canvasUtility, Cap::flat)
+LYNX_LITE_THEME (delay1Theme, "Fruity Delay", Style::glow, Colour (0xff162226), Colour (0xff060a0b), Colour (0xff6ad8c0), Colour (0xffd0fff4), canvasBasicDelay, Cap::rubber)
+LYNX_LITE_THEME (mute2Theme, "Fruity Mute 2", Style::glow, Colour (0xff221a1c), Colour (0xff0b0809), Colour (0xffff5a5a), Colour (0xffe0e0e0), canvasUtility, Cap::flat)
+#undef LYNX_LITE_THEME
+
 // === the registry =================================================================================================
 
 const Theme* effectTheme (Art a)
@@ -3770,6 +4899,51 @@ const Theme* effectTheme (Art a)
         case Art::stereoShaper: return &stereoShaperTheme();
         case Art::stereoEnhancer: return &stereoEnhancerTheme();
         case Art::spreader: return &spreaderTheme();
+        case Art::grossBeat: return &grossBeatTheme();
+        case Art::vocodex: return &vocodexTheme();
+        case Art::vocoder: return &vocoderTheme();
+        case Art::pitcher: return &pitcherTheme();
+        case Art::lynxTune: return &lynxTuneTheme();
+        case Art::voiceShift: return &voiceShiftTheme();
+        case Art::quell: return &quellTheme();
+        case Art::pitchShifter: return &pitchShifterTheme();
+        case Art::lovePhilter: return &lovePhilterTheme();
+        case Art::effector: return &effectorTheme();
+        case Art::squeeze: return &eightBitTheme();
+        case Art::lofi: return &lofiTheme();
+        case Art::basicEq: return &basicEqTheme();
+        case Art::basicComp: return &basicCompTheme();
+        case Art::basicDelay: return &basicDelayTheme();
+        case Art::basicReverb: return &basicReverbTheme();
+        case Art::basicLimiter: return &basicLimiterTheme();
+        case Art::basicDistortion: return &basicDistortionTheme();
+        case Art::basicFilter: return &basicFilterTheme();
+        case Art::basicChorus: return &basicChorusTheme();
+        case Art::autoPan: return &autoPanTheme();
+        case Art::panOMatic: return &panOMaticTheme();
+        case Art::balance: return &balanceTheme();
+        case Art::utility: return &utilityTheme();
+        case Art::send: return &sendTheme();
+        case Art::splitter: return &splitterTheme();
+        case Art::crossover: return &crossoverTheme();
+        case Art::multibandDelay: return &multibandDelayTheme();
+        case Art::equo: return &equoTheme();
+        case Art::emphasizer: return &emphasizerTheme();
+        case Art::lowLifter: return &lowLifterTheme();
+        case Art::fastLp: return &fastLpTheme();
+        case Art::fruityFilter: return &fruityFilterTheme();
+        case Art::freeFilter: return &freeFilterTheme();
+        case Art::sevenBand: return &sevenBandTheme();
+        case Art::bassBoost: return &bassBoostTheme();
+        case Art::convolver: return &convolverTheme();
+        case Art::volumeGate: return &volumeGateTheme();
+        case Art::rhythmGain: return &rhythmGainTheme();
+        case Art::freqShift: return &freqShiftTheme();
+        case Art::pitchShift: return &pitchShiftTheme();
+        case Art::phaseInverter: return &phaseInverterTheme();
+        case Art::center: return &centerTheme();
+        case Art::delay1: return &delay1Theme();
+        case Art::mute2: return &mute2Theme();
         default: return nullptr;
     }
 }
@@ -3829,6 +5003,51 @@ Art artForEffect (EffectKind kind)
         case EffectKind::stereoShaper: return Art::stereoShaper;
         case EffectKind::stereoEnhancer: return Art::stereoEnhancer;
         case EffectKind::spreader: return Art::spreader;
+        case EffectKind::grossBeat: return Art::grossBeat;
+        case EffectKind::vocodex: return Art::vocodex;
+        case EffectKind::vocoder: return Art::vocoder;
+        case EffectKind::pitchCorrect: return Art::pitcher;
+        case EffectKind::lynxTune: return Art::lynxTune;
+        case EffectKind::voiceShift: return Art::voiceShift;
+        case EffectKind::quellDenoiser: return Art::quell;
+        case EffectKind::flPitchShifter: return Art::pitchShifter;
+        case EffectKind::lovePhilter: return Art::lovePhilter;
+        case EffectKind::effector: return Art::effector;
+        case EffectKind::squeeze: return Art::squeeze;
+        case EffectKind::lofi: return Art::lofi;
+        case EffectKind::eq: return Art::basicEq;
+        case EffectKind::compressor: return Art::basicComp;
+        case EffectKind::delay: return Art::basicDelay;
+        case EffectKind::reverb: return Art::basicReverb;
+        case EffectKind::limiter: return Art::basicLimiter;
+        case EffectKind::distortion: return Art::basicDistortion;
+        case EffectKind::filter: return Art::basicFilter;
+        case EffectKind::chorus: return Art::basicChorus;
+        case EffectKind::autoPan: return Art::autoPan;
+        case EffectKind::fruityPanOMatic: return Art::panOMatic;
+        case EffectKind::fruityBalance: return Art::balance;
+        case EffectKind::utility: return Art::utility;
+        case EffectKind::fruitySend: return Art::send;
+        case EffectKind::frequencySplitter: return Art::splitter;
+        case EffectKind::crossover: return Art::crossover;
+        case EffectKind::multibandDelay: return Art::multibandDelay;
+        case EffectKind::equo: return Art::equo;
+        case EffectKind::emphasizer: return Art::emphasizer;
+        case EffectKind::flLowLifter: return Art::lowLifter;
+        case EffectKind::fruityFastLP: return Art::fastLp;
+        case EffectKind::fruityFilter: return Art::fruityFilter;
+        case EffectKind::fruityFreeFilter: return Art::freeFilter;
+        case EffectKind::fl7BandEq: return Art::sevenBand;
+        case EffectKind::flBassBoost: return Art::bassBoost;
+        case EffectKind::convolver: return Art::convolver;
+        case EffectKind::volumeGate: return Art::volumeGate;
+        case EffectKind::rhythmGain: return Art::rhythmGain;
+        case EffectKind::freqShift: return Art::freqShift;
+        case EffectKind::pitchShift: return Art::pitchShift;
+        case EffectKind::flPhaseInverter: return Art::phaseInverter;
+        case EffectKind::flCenter: return Art::center;
+        case EffectKind::flDelay1: return Art::delay1;
+        case EffectKind::fruityMute2: return Art::mute2;
         default: return Art::none;
     }
 }
