@@ -7083,6 +7083,21 @@ countries: de at ch li lu
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Lineal: [LMB] Position  [Alt] ohne Einrasten  [Strg][LMB], [RMB] oder [2xLMB] Ziehen wählt die Noten in einem Zeitbereich  [Strg][Wheel] / Pinch-Geste Zoom  [Shift][Wheel] Scrollen"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Lineal: [LMB] Song-Position  [RMB] oder [Strg][LMB] oder [2xLMB] Ziehen: Zeitauswahl (Loop)  [Shift][LMB] Ziehen: verschieben  [Strg][RMB] Ziehen, [Strg][Wheel] / Pinch-Geste: Zoom  [RMB] Klick: Menü  [Alt] ohne Einrasten"
 
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "Aus (echte Zeit behalten)"
+"1/32 note" = "1/32-Note"
+"1/16 note" = "1/16-Note"
+"1/8 note" = "1/8-Note"
+"1/4 note" = "1/4-Note"
+"Notes played just before the start go onto it" = "Kurz vor dem Start gespielte Noten kommen auf den Start"
+"Played notes: compensate the output latency" = "Gespielte Noten: Ausgangslatenz ausgleichen"
+"Capture MIDI: the notes just played without recording into the pattern" = "MIDI einfangen: die eben ohne Aufnahme gespielten Noten ins Pattern"
+"Capture MIDI: {0} notes put in the pattern" = "MIDI einfangen: {0} Noten ins Pattern gesetzt"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "MIDI einfangen: nichts einzufangen (erst ein paar Noten ohne Aufnahme spielen)"
+"Seq" = "Seq"
+"Number of steps" = "Anzahl der Schritte"
+"Dual" = "Doppelt"
+"Align all channel editors" = "Alle Kanaleditoren ausrichten"
 # round 170e2: recording panel toggles
 "Blend recorded notes: on (new notes join the pattern's notes)" = "Aufgenommene Noten mischen: an (neue Noten kommen zu denen des Patterns hinzu)"
 "Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Aufgenommene Noten mischen: aus (die alten Noten eines aufgenommenen Kanals werden ersetzt)"
@@ -7110,18 +7125,3 @@ countries: de at ch li lu
 
 # round 170e3: the idle hint on one line
 "Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "Zeige auf etwas für Hilfe  [F1] Tastenkürzel  [F5]-[F9] Fenster  [Space] Wiedergabe/Stopp"
-# round 170d: count-in catch, played-note latency, Capture MIDI
-"Off (keep their real time)" = "Aus (echte Zeit behalten)"
-"1/32 note" = "1/32-Note"
-"1/16 note" = "1/16-Note"
-"1/8 note" = "1/8-Note"
-"1/4 note" = "1/4-Note"
-"Notes played just before the start go onto it" = "Kurz vor dem Start gespielte Noten kommen auf den Start"
-"Played notes: compensate the output latency" = "Gespielte Noten: Ausgangslatenz ausgleichen"
-"Capture MIDI: the notes just played without recording into the pattern" = "MIDI einfangen: die eben ohne Aufnahme gespielten Noten ins Pattern"
-"Capture MIDI: {0} notes put in the pattern" = "MIDI einfangen: {0} Noten ins Pattern gesetzt"
-"Capture MIDI: nothing to capture (play some notes first, without recording)" = "MIDI einfangen: nichts einzufangen (erst ein paar Noten ohne Aufnahme spielen)"
-"Seq" = "Seq"
-"Number of steps" = "Anzahl der Schritte"
-"Dual" = "Doppelt"
-"Align all channel editors" = "Alle Kanaleditoren ausrichten"
