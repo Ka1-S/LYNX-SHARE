@@ -125,6 +125,12 @@ public:
     // Performance mode (round 165m, core/Performance.h): launch / release / stop zone clips (message thread). The
     // clips start on the next block, quantized by their track's Performance settings; nothing launches while stopped.
     void performanceCommand (const perf::Command& command) noexcept { performanceLive->commands.push (command); }
+    // FL sends the typing keyboard's notes as MIDI channel 1: they launch performance clips when that is the "MIDI
+    // channel used for playlist live mode" and Performance mode is on (the same test as the MIDI input's)
+    bool typingNotesLaunchClips() const noexcept
+    {
+        return performanceMidiChannel.load (std::memory_order_relaxed) == 1 && performanceMidiOn.load (std::memory_order_relaxed);
+    }
     const perf::Live& performanceState() const noexcept { return *performanceLive; }
     perf::Live& performanceStateForSnapshot() noexcept { return *performanceLive; } // --perfshot: a sample of what plays
     void stop() noexcept; // also cancels a count-in or a wait for the first note
