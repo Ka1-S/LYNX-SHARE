@@ -7104,6 +7104,12 @@ countries: jp
 "Number of steps" = "ステップ数"
 "Dual" = "デュアル"
 "Align all channel editors" = "すべてのチャンネルエディターを揃える"
+"Disconnect" = "切断"
+"Inputs" = "入力"
+"Outputs" = "出力"
+"Last tweaked ({0})" = "最後に調整 ({0})"
+"Deactivate" = "無効化"
+"Automate Patcher parameter" = "Patcher パラメーターをオートメーション"
 # round 170e2: recording panel toggles
 "Blend recorded notes: on (new notes join the pattern's notes)" = "録音ノートをブレンド: オン (新しいノートをパターンのノートに追加)"
 "Blend recorded notes: off (a recorded channel's old notes are replaced)" = "録音ノートをブレンド: オフ (録音したチャンネルの古いノートを置き換え)"

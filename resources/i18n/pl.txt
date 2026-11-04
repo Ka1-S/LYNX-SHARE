@@ -7104,6 +7104,12 @@ countries: pl
 "Number of steps" = "Liczba kroków"
 "Dual" = "Podwójny"
 "Align all channel editors" = "Wyrównaj wszystkie edytory kanałów"
+"Disconnect" = "Odłącz"
+"Inputs" = "Wejścia"
+"Outputs" = "Wyjścia"
+"Last tweaked ({0})" = "Ostatnio zmieniony ({0})"
+"Deactivate" = "Dezaktywuj"
+"Automate Patcher parameter" = "Automatyzuj parametr Patchera"
 # round 170e2: recording panel toggles
 "Blend recorded notes: on (new notes join the pattern's notes)" = "Łącz nagrane nuty: wł. (nowe nuty dochodzą do nut patternu)"
 "Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Łącz nagrane nuty: wył. (stare nuty nagranego kanału są zastępowane)"

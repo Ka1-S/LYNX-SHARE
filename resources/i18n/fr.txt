@@ -7104,6 +7104,12 @@ countries: fr be ch ca lu
 "Number of steps" = "Nombre de pas"
 "Dual" = "Double"
 "Align all channel editors" = "Aligner tous les éditeurs de canal"
+"Disconnect" = "Déconnecter"
+"Inputs" = "Entrées"
+"Outputs" = "Sorties"
+"Last tweaked ({0})" = "Dernier réglé ({0})"
+"Deactivate" = "Désactiver"
+"Automate Patcher parameter" = "Automatiser un paramètre du Patcher"
 # round 170e2: recording panel toggles
 "Blend recorded notes: on (new notes join the pattern's notes)" = "Mélanger les notes enregistrées : oui (les nouvelles notes s'ajoutent à celles du pattern)"
 "Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Mélanger les notes enregistrées : non (les anciennes notes d'un canal enregistré sont remplacées)"

@@ -7104,6 +7104,12 @@ countries: nl be
 "Number of steps" = "Aantal stappen"
 "Dual" = "Dubbel"
 "Align all channel editors" = "Alle kanaaleditors uitlijnen"
+"Disconnect" = "Ontkoppelen"
+"Inputs" = "Ingangen"
+"Outputs" = "Uitgangen"
+"Last tweaked ({0})" = "Laatst aangepast ({0})"
+"Deactivate" = "Deactiveren"
+"Automate Patcher parameter" = "Patcher-parameter automatiseren"
 # round 170e2: recording panel toggles
 "Blend recorded notes: on (new notes join the pattern's notes)" = "Opgenomen noten mengen: aan (nieuwe noten komen bij die van het pattern)"
 "Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Opgenomen noten mengen: uit (de oude noten van een opgenomen kanaal worden vervangen)"

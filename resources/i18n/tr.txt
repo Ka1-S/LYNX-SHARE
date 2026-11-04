@@ -7104,6 +7104,12 @@ countries: tr
 "Number of steps" = "Adım sayısı"
 "Dual" = "Çift"
 "Align all channel editors" = "Tüm kanal düzenleyicilerini hizala"
+"Disconnect" = "Bağlantıyı kes"
+"Inputs" = "Girişler"
+"Outputs" = "Çıkışlar"
+"Last tweaked ({0})" = "Son ayarlanan ({0})"
+"Deactivate" = "Devre dışı bırak"
+"Automate Patcher parameter" = "Patcher parametresini otomatikleştir"
 # round 170e2: recording panel toggles
 "Blend recorded notes: on (new notes join the pattern's notes)" = "Kaydedilen notaları harmanla: açık (yeni notalar pattern'deki notalara eklenir)"
 "Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Kaydedilen notaları harmanla: kapalı (kaydedilen kanalın eski notaları değiştirilir)"

@@ -7104,6 +7104,12 @@ countries: ru by kz
 "Number of steps" = "Число шагов"
 "Dual" = "Двойной"
 "Align all channel editors" = "Выровнять все редакторы каналов"
+"Disconnect" = "Отключить"
+"Inputs" = "Входы"
+"Outputs" = "Выходы"
+"Last tweaked ({0})" = "Последний изменённый ({0})"
+"Deactivate" = "Деактивировать"
+"Automate Patcher parameter" = "Автоматизировать параметр Patcher"
 # round 170e2: recording panel toggles
 "Blend recorded notes: on (new notes join the pattern's notes)" = "Смешивать записанные ноты: вкл. (новые ноты добавляются к нотам паттерна)"
 "Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Смешивать записанные ноты: выкл. (старые ноты записанного канала заменяются)"

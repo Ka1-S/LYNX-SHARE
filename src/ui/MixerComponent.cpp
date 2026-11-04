@@ -5143,6 +5143,8 @@ void EffectsPanel::showSlotMenu (int slot)
         if (auto* p = dynamic_cast<PluginEffect*> (engine.getEffect (track, slot).get()))
             addPluginParameterItems (menu, engine, p->getInstance(), { AutomationTargetKind::effectParam, track, slot, 0 });
     }
+    if ((*slots())[(std::size_t) slot].kind == EffectKind::patcher) // its published parameters (round 171b)
+        addPatcherParameterItems (menu, engine, (*slots())[(std::size_t) slot].patcher, { AutomationTargetKind::effectParam, track, slot, 0 });
 
     // FL's Patcherize / Patcherize all (round 165m): the effect (or the whole chain) into a new Patcher, same sound
     menu.addSeparator();
