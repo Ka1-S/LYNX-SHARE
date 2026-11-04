@@ -7005,3 +7005,5 @@ countries: it ch sm
 "Live session with {0}" = "Sessione live con {0}"
 "Undo left alone what someone else changed since: {0}" = "Annulla non ha toccato ciò che un'altra persona ha modificato nel frattempo: {0}"
 "Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Riproduci / metti in pausa il pattern  [RMB] ferma e torna dove è iniziata la riproduzione (di nuovo: all'inizio del pattern)"
+"Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] dipingilo con la matita  [Ctrl+LMB] / [Shift+LMB] scegline diversi  [2xLMB] apri  [RMB] menu"
+"Empty patterns were ignored." = "I pattern vuoti sono stati ignorati."

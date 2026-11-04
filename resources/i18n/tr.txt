@@ -7005,3 +7005,5 @@ countries: tr
 "Live session with {0}" = "{0} ile canlı oturum"
 "Undo left alone what someone else changed since: {0}" = "Geri al, o zamandan beri başka birinin değiştirdiğine dokunmadı: {0}"
 "Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Pattern'i çal / duraklat  [RMB] durdur ve çalmanın başladığı yere dön (tekrar: pattern'in başına)"
+"Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] kalemle boya  [Ctrl+LMB] / [Shift+LMB] birden çok seç  [2xLMB] aç  [RMB] menü"
+"Empty patterns were ignored." = "Boş pattern'ler yok sayıldı."

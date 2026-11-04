@@ -7005,3 +7005,5 @@ countries: tw hk mo
 "Live session with {0}" = "與{0}的即時工作階段"
 "Undo left alone what someone else changed since: {0}" = "復原未變動其他人此後修改的內容：{0}"
 "Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "播放 / 暫停樣式  [RMB] 停止並回到開始播放的位置 (再按一次: 回到樣式開頭)"
+"Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "樣式：[LMB] 用鉛筆繪製  [Ctrl+LMB] / [Shift+LMB] 選擇多個  [2xLMB] 開啟  [RMB] 選單"
+"Empty patterns were ignored." = "已忽略空樣式。"

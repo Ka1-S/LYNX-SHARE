@@ -7005,3 +7005,5 @@ countries: kr
 "Live session with {0}" = "{0} 님과의 라이브 세션"
 "Undo left alone what someone else changed since: {0}" = "실행 취소는 그 후 다른 사람이 변경한 것은 건드리지 않았습니다: {0}"
 "Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "패턴 재생 / 일시 정지  [RMB] 정지하고 재생을 시작한 위치로 돌아가기 (다시 누르면: 패턴 시작으로)"
+"Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "패턴: [LMB] 연필로 칠하기  [Ctrl+LMB] / [Shift+LMB] 여러 개 선택  [2xLMB] 열기  [RMB] 메뉴"
+"Empty patterns were ignored." = "빈 패턴은 무시되었습니다."

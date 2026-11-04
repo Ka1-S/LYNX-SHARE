@@ -51,7 +51,7 @@ std::vector<std::uint8_t> drumaxxState (const std::string& kitName, const std::v
     {
         auto* p = P.data() + k * padParams;
         p[1] = 0.5f;           // pan centre
-        p[4] = (float) (36 + k); // key
+        p[4] = 0.0f;           // key: an unused pad is on key 0, as in FL's Default Kit (REA_rodada169e §1)
         if (k >= (int) pads.size())
             continue;
         const auto& pad = pads[(std::size_t) k];
@@ -110,15 +110,30 @@ std::vector<float> drumSynthParams (const std::vector<DrumSynthPatch>& patches)
         p[37] = 64.0f;
     }
     auto editorKey = 60;
-    for (const auto& patch : patches)
-    {
-        const auto slot = drumSynthKeyToSlot (patch.key);
+    const auto put = [&m] (const DrumSynthPatch& patch, int key) {
+        const auto slot = drumSynthKeyToSlot (key);
         if (slot < 0)
+            return;
+        for (int i = 0; i < drumSynthPatchParams && i < (int) patch.values.size(); ++i)
+            m[(std::size_t) (drumSynthPatchParams * slot + i)] = (float) patch.values[(std::size_t) i];
+    };
+    // FL's own kits cover every key: its fresh DrumSynth Live (the Plugin database's state) repeats its 24-patch kit
+    // over the 120 keys (key k plays patch k mod 24, REA_rodada169e §3). LYNX's kits are one-octave kits, repeated the
+    // same way every 12 keys, so the step sequencer's C5 (60) plays the kit's C like any other C.
+    for (int key = 0; key < drumSynthPatches; ++key)
+        for (const auto& patch : patches)
+            if (((patch.key % 12) + 12) % 12 == key % 12)
+            {
+                put (patch, key);
+                break;
+            }
+    for (const auto& patch : patches) // (a patch on its own key wins over a repeat)
+    {
+        if (drumSynthKeyToSlot (patch.key) < 0)
             continue;
         if (&patch == &patches.front())
             editorKey = patch.key;
-        for (int i = 0; i < drumSynthPatchParams && i < (int) patch.values.size(); ++i)
-            m[(std::size_t) (drumSynthPatchParams * slot + i)] = (float) patch.values[(std::size_t) i];
+        put (patch, patch.key);
     }
     m[(std::size_t) drumSynthEditorKeyIndex] = (float) editorKey;
     m[(std::size_t) drumSynthEditorKeyIndex + 1] = 4.0f; // state version (informational)

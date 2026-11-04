@@ -186,6 +186,26 @@ std::vector<std::string> presetCandidates (const std::string& presetFolder, bool
         if (const auto path = resolveFlPath (folder + "\\" + name, access.roots); exists (path))
             out.push_back (path);
 
+    // then, for the drum generators FL ships without a Default.fst, the plugin's entry in FL's Plugin database
+    // (Generators\Drum\<plugin>.fst): the state FL itself adds when the plugin is picked (Drumaxx' "Default Kit",
+    // REA_rodada169e §1), before any other preset of the folder. (Other engines keep their folder order: e.g.
+    // Morphine's Plugin database state plays differently from the preset LYNX starts it from; not checked yet.)
+    const auto drum = presetFolder == "Drumaxx" || presetFolder == "Drumpad" || presetFolder == "BassDrum";
+    if (generator && drum && access.listPresets)
+    {
+        const auto wanted = lower (presetFolder + ".fst");
+        for (const auto& path : access.listPresets (resolveFlPath ("%FLStudioData%\\Patches\\Plugin database\\Generators", access.roots)))
+        {
+            const auto cut = path.find_last_of ("\\/");
+            if (lower (cut == std::string::npos ? path : path.substr (cut + 1)) == wanted
+                && std::find (out.begin(), out.end(), path) == out.end())
+            {
+                out.push_back (path);
+                break;
+            }
+        }
+    }
+
     if (access.listPresets)
         for (const auto& path : access.listPresets (resolveFlPath (folder, access.roots)))
             if ((endsWith (path, ".fst") || endsWith (path, ".tbio") || endsWith (path, ".gmsynth") || endsWith (path, ".mrp"))
