@@ -41,6 +41,8 @@ struct EffectEntry
     juce::String label, detail;
     int folder = 0; // 0 LYNX, 1 FL engines, 3 installed
     std::function<std::optional<EffectSlot>()> make;
+    bool available = true; // false: an FL engine without the user's FL installation (listed disabled in the menus)
+    bool flPlugin = false; // one of FL's own effects (its FL category in the menus, round 170b)
 };
 
 // `withUnavailable`: also FL engines this PC cannot make (the menu lists them disabled, "(requires FL Studio)").
@@ -53,7 +55,7 @@ std::vector<GeneratorEntry> generatorEntries (AudioEngine& engine, bool withUnav
 // picker window calls back only while it exists).
 void addGeneratorMenu (juce::PopupMenu& menu, AudioEngine& engine, std::function<void (ChannelDef)> pick,
                        std::function<void()> chooseSample, const ChannelDef* current, juce::Component* owner);
-std::vector<EffectEntry> effectEntries (AudioEngine& engine);
+std::vector<EffectEntry> effectEntries (AudioEngine& engine, bool withUnavailable = false);
 
 // The user's name for `key`, else `original`.
 juce::String shownName (AudioEngine& engine, const std::string& key, const juce::String& original);
@@ -76,12 +78,15 @@ struct Pick
 std::vector<Pick> renamedEffects (AudioEngine& engine, std::function<void (EffectSlot)> add);
 std::vector<Pick> renamedGenerators (AudioEngine& engine, std::function<void (ChannelDef)> add);
 
-// Round 166f (issue #16, FL's Plugin database folders): the plugins the user put in folders (the Browser's Plugin
-// database), one heading per folder ("Stock", "Stock › EQ") with its plugins under it; nothing when no plugin of this
-// kind is in a folder. Returns whether anything was added.
+// Round 166f (issue #16, FL's Plugin database folders) and 170b (Busy Works: "random order"): every built-in plugin
+// and every plugin the user put in a folder (the Browser's Plugin database), under its folder's heading ("Stock",
+// "Stock › EQ"), A-Z, as FL's mixer slot / Add menus: the user's folder, else FL's own category for FL's plugins
+// (Delay reverb, Dynamics, Filter...), else "LYNX SHARE" (first). Installed VST / CLAP plugins in no folder are not
+// listed here (the Plugin › submenu). The view (Categories / Simple / Tree) is the user's. Returns whether anything
+// was added.
 bool addFolderGroups (juce::PopupMenu& menu, AudioEngine& engine, std::function<void (EffectSlot)> add);
 bool addFolderGroups (juce::PopupMenu& menu, AudioEngine& engine, std::function<void (ChannelDef)> add);
-// FL's view switch at the bottom of those menus (radio items Categories / Simple / Tree), when any folder is in use
+// FL's view switch at the bottom of those menus (radio items Categories / Simple / Tree)
 void addFolderViewItems (juce::PopupMenu& menu, AudioEngine& engine);
 // Whether the plugin with this database key ("lynx:fx:Facet EQ") sits in one of the user's folders (it is then listed
 // under its folder's heading only, as in FL where every plugin is in one folder)

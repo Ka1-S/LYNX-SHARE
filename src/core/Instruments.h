@@ -78,6 +78,8 @@ public:
     virtual void render (float* left, float* right, int n, float gainLeft, float gainRight) noexcept = 0;
     // Automated parameter (plugins). 0..1. Audio thread.
     virtual void setParameter (int /*index*/, float /*value*/) noexcept {}
+    // A hosted plugin's parameter value now (0..1; −1 = unknown), for a Patcher parameter output (round 171b). Audio thread.
+    virtual float parameterValue (int /*index*/) const noexcept { return -1.0f; }
     // Latency the instrument introduces (plugins), in samples. For PDC.
     virtual int latencySamples() const noexcept { return 0; }
     // "Slide" note: sounding notes glide to `key` over `samples`, without retriggering. Ignored if unsupported.

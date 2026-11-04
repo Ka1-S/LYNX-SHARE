@@ -23,7 +23,7 @@ enum class Group
 {
     transport, // Pattern/Song, play, stop, record, tempo, time display and song position
     master,    // master volume over master pitch
-    record,    // metronome, count-in, wait for input, what to record, typing piano
+    record,    // metronome, wait for input, count-in, blend; what to record, typing piano, tempo tapper, MIDI light
     snap,      // global snap over the pattern selector
     windows,   // Playlist, Channel Rack, Piano Roll, Mixer, Browser, plugin picker
     file,      // new, open, save, export, undo, redo
@@ -52,9 +52,11 @@ inline const char* groupName (Group g)
 }
 
 // When the window is too narrow, the group with the lowest priority is dropped first. The transport stays.
+// Round 170e2: the recording options outlast the file buttons (FL users look for them on the toolbar; New / Open /
+// Save / Undo are also in the File and Edit menus and their keys).
 inline int groupPriority (Group g)
 {
-    static constexpr std::array<int, groupCount> p { 100, 80, 60, 90, 75, 65, 55, 50 };
+    static constexpr std::array<int, groupCount> p { 100, 80, 70, 90, 75, 60, 55, 50 };
     return p[(std::size_t) g];
 }
 

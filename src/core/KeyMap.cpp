@@ -128,7 +128,10 @@ std::vector<Action> makeActions()
         // FL's Edit › "Undo backwards" (EditUndoBackwardsAction, Ctrl+Alt+Z; round 167k): one more step back
         { "edit.undoBackwards", TR_NOOP ("Undo backwards"), Context::global, { chord ('Z', ctrl | alt) } },
         { "edit.redo", TR_NOOP ("Redo"), Context::global, { chord ('Y', ctrl), chord ('Z', ctrl | shift) } },
-        { "edit.history", TR_NOOP ("Undo history"), Context::global, { chord ('H', ctrl) } },
+        // FL's Tools › Macros › Stop sound (MacroStopSoundAction, Ctrl+H; round 170h2): the Undo history moved to
+        // Ctrl+Alt+H, free in FL and in LYNX
+        { "edit.history", TR_NOOP ("Undo history"), Context::global, { chord ('H', ctrl | alt) } },
+        { "tools.stopSound", TR_NOOP ("Stop sound (all notes off)"), Context::global, { chord ('H', ctrl) } },
         { "help.shortcuts", TR_NOOP ("Shortcut sheet (press again to close)"), Context::global, { chord (f1) } },
         { "browser.search", TR_NOOP ("Search the Browser"), Context::global, { chord ('F', ctrl) } },
 

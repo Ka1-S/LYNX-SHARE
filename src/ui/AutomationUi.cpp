@@ -1114,4 +1114,22 @@ void addPluginParameterItems (juce::PopupMenu& menu, AudioEngine& engine, juce::
     menu.addSubMenu (tr ("Automate plugin parameter"), params);
     addMidiParameterItems (menu, engine, base);
 }
+
+void addPatcherParameterItems (juce::PopupMenu& menu, AudioEngine& engine, const PatcherDoc& doc, const AutomationTarget& base)
+{
+    juce::PopupMenu params;
+    for (int k = 0; k < (int) doc.published.size(); ++k)
+    {
+        const auto& p = doc.published[(std::size_t) k];
+        if (p.node < 0)
+            continue;
+        auto target = base;
+        target.param = k;
+        juce::PopupMenu item;
+        addAutomationItem (item, engine, target);
+        params.addSubMenu (juce::String (k + 1) + ". " + juce::String::fromUTF8 (p.name.c_str()), item);
+    }
+    if (params.getNumItems() > 0)
+        menu.addSubMenu (tr ("Automate Patcher parameter"), params);
+}
 } // namespace lynx

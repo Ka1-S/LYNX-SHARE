@@ -1,4 +1,5 @@
 #include "ui/WaveTravellerEditor.h"
+#include "ui/PluginSkin.h"
 
 #include <algorithm>
 #include <cmath>
@@ -61,7 +62,13 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.fillAll (theme::colour::bg0);
+        { // round 170j: a display well of the page's art (Themed), else the plain dark field
+            const skin::StyleScope styleScope (skin::resolve (skin::Style::themed, skin::Art::waveTraveller), skin::Art::waveTraveller);
+            if (skin::style() == skin::Style::themed)
+                skin::well (g, getLocalBounds().toFloat(), theme::radius::md, juce::Colours::transparentBlack);
+            else
+                g.fillAll (theme::colour::bg0);
+        }
         auto* p = patch ? patch() : nullptr;
         if (p == nullptr)
             return;
@@ -458,7 +465,14 @@ public:
 
     ~WaveTravellerEditor() override { engine.removeChangeListener (this); }
 
-    void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg2); }
+    void paint (juce::Graphics& g) override // round 170j: the art's canvas (Themed), else the plain panel
+    {
+        const skin::StyleScope styleScope (skin::resolve (skin::Style::themed, skin::Art::waveTraveller), skin::Art::waveTraveller);
+        if (skin::style() == skin::Style::themed)
+            skin::canvas (g, getLocalBounds().toFloat(), skin::artAccent (skin::Art::waveTraveller));
+        else
+            g.fillAll (theme::colour::bg2);
+    }
 
     void resized() override
     {

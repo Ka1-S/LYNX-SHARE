@@ -1295,6 +1295,7 @@ bool PatchNode::BusHead::operator== (const BusHead& o) const { return bus == o.b
 bool PatchNode::operator== (const PatchNode& o) const
 {
     return generator == o.generator && label == o.label && x == o.x && y == o.y && busHeads == o.busHeads
+           && paramIns == o.paramIns && paramOuts == o.paramOuts
            && (generator ? channel == o.channel : effect == o.effect);
 }
 
@@ -1303,7 +1304,7 @@ bool EffectSlot::operator== (const EffectSlot& o) const
     if (kind != o.kind || enabled != o.enabled || params != o.params || mix != o.mix || ! (plugin == o.plugin) || sidechain != o.sidechain
         || sidechain2 != o.sidechain2 || sendTracks != o.sendTracks || state != o.state || samplePath != o.samplePath || ! (substituteFor == o.substituteFor)
         || presetName != o.presetName || abOther != o.abOther || abShowingB != o.abShowingB || branches.size() != o.branches.size()
-        || links.size() != o.links.size() || ! (patcher == o.patcher))
+        || links.size() != o.links.size() || ! (patcher == o.patcher) || row != o.row)
         return false;
     for (std::size_t i = 0; i < branches.size(); ++i)
         if (branches[i].gain != o.branches[i].gain || branches[i].chain != o.branches[i].chain)

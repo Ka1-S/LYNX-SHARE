@@ -5553,6 +5553,18 @@ void PlaylistComponent::openClipSource (int hit, bool other)
 
     if (clip.kind == ClipKind::automation)
         openAutomationEditor (engine, clip.automation);
+    else if (clip.kind == ClipKind::audio) // round 170h2: was nothing (the hint said "opens")
+    {
+        // FL's "Double-click on audio clips" (Manage shortcuts, ShortcutEditorForm AudioClipsPanel): the channel
+        // settings, Alt = the clip properties (LYNX's Alt+double-click since round 153)
+        if (other)
+            showClipProperties (engine, hit, { hit }, [safe = juce::Component::SafePointer<PlaylistComponent> (this)] {
+                if (safe != nullptr)
+                    safe->sortClips();
+            });
+        else if (clip.channel >= 0 && clip.channel < (int) engine.getSong().channels.size())
+            openChannelSettings (engine, clip.channel);
+    }
     else if (clip.kind == ClipKind::pattern)
     {
         auto pianoRoll = editPatternsIn == 2

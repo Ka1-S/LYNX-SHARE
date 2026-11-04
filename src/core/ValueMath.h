@@ -36,6 +36,27 @@ inline double wheelNotches (double delta, double notchSize) noexcept
     return delta > 0.0 ? n : -n;
 }
 
+// Wheel steps that move a mixer slot (round 170b, Busy Works on a MacBook trackpad): a mouse wheel's notch is one step;
+// a trackpad's (`smooth`) small deltas add up in `accumulator` until one step's worth (`smoothStep`), and its inertia
+// (the glide after the fingers leave) moves nothing, so one swipe moves the effect a slot or two, not to the end.
+// Returns the signed steps to apply now (positive = up).
+inline int slotWheelSteps (double& accumulator, double delta, bool smooth, bool inertial, double smoothStep = 0.3) noexcept
+{
+    if (inertial || delta == 0.0)
+        return 0;
+    if (! smooth)
+    {
+        accumulator = 0.0;
+        return delta > 0.0 ? 1 : -1;
+    }
+    if ((accumulator > 0.0) != (delta > 0.0))
+        accumulator = 0.0; // (the direction changed)
+    accumulator += delta;
+    const auto steps = (int) (accumulator / smoothStep);
+    accumulator -= steps * smoothStep;
+    return steps;
+}
+
 // Value after `notches` wheel notches (positive = up). `interval` > 0: at least one interval per notch.
 inline double wheelValue (double value, double notches, double minimum, double maximum, bool fine, double interval = 0.0) noexcept
 {

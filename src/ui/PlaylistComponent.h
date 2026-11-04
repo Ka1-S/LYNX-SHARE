@@ -293,7 +293,7 @@ private:
     OverviewBar overview;
     void paintOverview (juce::Graphics& g, juce::Rectangle<float> area, double total);
     std::size_t overviewSignature = 0; // the clips drawn in the overview (repaints it when they change)
-    juce::ComboBox arrangementBox;
+    IconComboBox arrangementBox { Icon::song }; // round 170e2: the arrangement icon names the box
     SnapBox snapBox { true }; // "Main" (the toolbar snap) or this editor's own grid
     ToolStrip tools { true };
     IconButton followButton { "follow", Icon::follow }; // Follow (auto scrolling) on/off, EditorGlobals (round 162)
