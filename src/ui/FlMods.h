@@ -38,7 +38,12 @@ inline bool popup (const juce::ModifierKeys& m) noexcept { return of (m).popup; 
 // gesture::normaliseWheel; round 170e). Other platforms: unchanged.
 inline juce::MouseWheelDetails normalisedWheel (const juce::MouseWheelDetails& wheel) noexcept
 {
-    const auto w = gesture::normaliseWheel (wheel.deltaX, wheel.deltaY, wheel.isSmooth, JUCE_WINDOWS != 0);
+   #if JUCE_WINDOWS
+    constexpr bool windows = true;
+   #else
+    constexpr bool windows = false; // (JUCE_WINDOWS is not defined elsewhere: the Linux build failed)
+   #endif
+    const auto w = gesture::normaliseWheel (wheel.deltaX, wheel.deltaY, wheel.isSmooth, windows);
     auto out = wheel;
     out.deltaX = (float) w.x;
     out.deltaY = (float) w.y;

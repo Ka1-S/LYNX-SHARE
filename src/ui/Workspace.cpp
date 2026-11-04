@@ -517,7 +517,18 @@ public:
     {
         if (wanted.isEmpty())
             return;
-        if (getBounds() != wanted && juce::Desktop::getInstance().getDisplays().getDisplayForRect (wanted) != nullptr)
+        const auto delta = wanted.getPosition() - getBounds().getPosition();
+        if (delta.isOrigin() && getBounds().getWidth() == wanted.getWidth() && getBounds().getHeight() == wanted.getHeight())
+            return;
+        // some managers report the place a frame away from the one asked (WSLg: 32 px up and left of it, so the saved
+        // place crept 32 px at every start): the window is where it was asked, that difference is added to what is saved
+        if (std::abs (delta.x) <= 64 && std::abs (delta.y) <= 64 && getBounds().getWidth() == wanted.getWidth()
+            && getBounds().getHeight() == wanted.getHeight())
+        {
+            reportOffset = delta;
+            return;
+        }
+        if (juce::Desktop::getInstance().getDisplays().getDisplayForRect (wanted) != nullptr)
             setBounds (wanted);
     }
 
@@ -534,14 +545,14 @@ public:
     {
         juce::DocumentWindow::moved();
         if (! settling())
-            owner.detachedWindowMoved (panel, getBounds());
+            owner.detachedWindowMoved (panel, savedBounds());
     }
 
     void resized() override
     {
         juce::DocumentWindow::resized();
         if (! settling())
-            owner.detachedWindowMoved (panel, getBounds());
+            owner.detachedWindowMoved (panel, savedBounds());
     }
 
     // the user moves or resizes it: that is the place now
@@ -565,7 +576,7 @@ private:
         {
             stopTimer();
             wanted = {};
-            owner.detachedWindowMoved (panel, getBounds());
+            owner.detachedWindowMoved (panel, savedBounds());
         }
     }
 
@@ -583,7 +594,10 @@ private:
     Workspace& owner;
     Panel panel;
     SnapConstrainer snapping;
+    juce::Rectangle<int> savedBounds() const { return getBounds() + reportOffset; }
+
     juce::Rectangle<int> wanted; // the saved place, until the window has settled
+    juce::Point<int> reportOffset;
     int settleTicks = 0;
 };
 
