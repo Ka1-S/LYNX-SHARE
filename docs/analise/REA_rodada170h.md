@@ -37,7 +37,10 @@ Ctrl+H Stop sound and Ctrl+N Save new version (user decisions), rack items (170a
 - House 124 session (h-*): BPM, swing wheel, chord + stretch + Ctrl+B/transpose, sidechain, stems MP3, save/reopen.
   Batch 3 (sidechain in either order) built, tests 1963872 checks / 0 failures, GUI-verified s-02 (hint, no box)
   and s-03 ("Compressor <- Insert 1" right after adding it).
-- In progress: merge train (tmp/r170h/train1.log) — the queued feature/wfqa170h includes batch 3.
+- In progress: merge train (tmp/r170h/train1.log, train.sh PID 1180345) — the queued feature/wfqa170h includes batch 3.
+  04:55: still waiting; the batch ahead (land.sh gap169k-doc toxseq169h…) hangs in build-local since 03:29
+  (6 zig c++ in futex wait on ~/.cache/zig-main, load 0). If wfqa170h comes back CONFLICT: merge origin/main
+  (MixerComponent.cpp near showAddMenu / showSendMenu is the likely spot), rerun build-local, requeue.
 - Next: lo-fi (85) session (audio loops from the Browser, time-stretch), Save/Open dialogs at the screen's top-left (logged S3).
 - Rerun: `ZIG_GLOBAL_CACHE_DIR=~/.cache/zig-wfqa170h-local ZIG_LOCAL_CACHE_DIR=~/.cache/zig-wfqa170h-local coord/buildslot.sh scripts/build-local.sh`;
   `OUT=build-win-wfqa170h coord/winbuild.sh scripts/build-windows-zig.sh`; GUI helpers tmp/r170h/g.sh
