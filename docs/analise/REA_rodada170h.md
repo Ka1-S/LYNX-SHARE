@@ -19,9 +19,11 @@ User direction (2026-11-04): match FL where an FL user would get stuck or lost; 
 | Piano roll Ctrl+B | fl-21/22: notes over steps 1-8, Ctrl+B → copy at bar 2; fl-23: notes over steps 1-24 → copy at bar 3 (snap on Step) | b1-11: copy right after the last note (a riff ending at step 10 repeated from step 11) | `noteedit::duplicateBars`: the span rounded up to whole bars (the time signature's bar) |
 | Export: "Export complete" box | fl-26: the render window closes, nothing to click | b1-28: modal box with path and peak | Path, info and peak in the hint bar for 8 s; a box only for a notice that needs reading (and when nothing was exported) |
 | New project dialog | (FL has no New dialog; its dialogs take Enter as OK) | Enter did nothing in it and reached the main window (maximised the Playlist behind it); double-click on a template did nothing | Enter (list or a text field) and a double-click on a template = Create; the template list has the focus when it opens |
+| Add an effect to a mixer slot | fl-09: Fruity Parametric EQ 2 added to an empty slot opens its window | b1-21: slot filled, window closed | The added effect's window opens (all kinds, not only plugins); verified v-05 |
+| House 124 sidechain: "Sidechain to this track", then add a compressor (as LYNX's box said) | FL not driven for this step. FL's Fruity Limiter / Fruity Compressor keep their own side-input number in their state (limiter v6+ at 0xA4, compressor v3+ at 32: REA round 48, core/FruityDynamics.cpp) — FL users sidechain with these | h-13: modal box; h-16: the compressor added afterwards had side input "None" — no ducking; `sidechainTo` only linked LYNX's Compressor and the vocoder, never Fruity Limiter / Compressor | Reminder in the hint bar; `mixerops::linkAddedSidechain`: a Compressor / Fruity Limiter / Fruity Compressor added to an insert with ONE sidechain sender (level-0 send) listens to it; `sidechainTo` also links Fruity Limiter / Compressor (`listensToSidechain`). A vocoder is not auto-linked (its side input is the modulator) |
 
 ## Logged for other rounds / decisions
-See the tracker table: FX and instrument menus (170b #16), add-effect opens its window (170h batch 2, after 170b),
+See the tracker table: FX and instrument menus (170b #16), 
 Ctrl+H Stop sound and Ctrl+N Save new version (user decisions), rack items (170a), toolbar/snap/zoom (170e).
 
 ## Where I stopped

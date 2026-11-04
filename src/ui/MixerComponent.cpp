@@ -1480,8 +1480,8 @@ void MixerStrips::showSendMenu (int t)
                 linked += fx.sidechain == from ? 1 : 0;
         });
         if ((kind == K::sidechain || kind == K::sidechainOnly) && linked == 0)
-            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Sidechain"),
-                                                    tr ("The link was made; add a compressor to this insert to use it."));
+            // (round 170h: in the hint bar, not a box — FL says nothing here; adding the compressor links it)
+            ui::postHint ({ tr ("Sidechain") + ": " + tr ("The link was made; add a compressor to this insert to use it."), {} }, 6000);
     };
     menu.addItem (tr ("Route to this track"), can && ! on, false, [route] { route (K::route); });
     menu.addItem (tr ("Route to this track only"), can, false, [route] { route (K::routeOnly); });
@@ -4761,6 +4761,7 @@ void EffectsPanel::showAddMenu (int)
             {
                 effects.push_back (std::move (fx));
                 added = true;
+                mixerops::linkAddedSidechain (song, t, (int) effects.size() - 1);
             }
         });
         if (! added)
@@ -4784,7 +4785,10 @@ void EffectsPanel::showAddMenu (int)
             engine.editSong ([t = track, fx = *made] (Song& song) {
                 auto& effects = song.mixer[(std::size_t) t].effects;
                 if ((int) effects.size() < maxEffectSlots)
+                {
                     effects.push_back (fx);
+                    mixerops::linkAddedSidechain (song, t, (int) effects.size() - 1); // round 170h
+                }
             });
             selectedSlot = (int) slots()->size() - 1;
             if (slots()->size() > before)
@@ -4802,7 +4806,10 @@ void EffectsPanel::showAddMenu (int)
                                      engine.editSong ([t = track, entry] (Song& song) {
                                          auto& effects = song.mixer[(std::size_t) t].effects;
                                          if ((int) effects.size() < maxEffectSlots)
+                                         {
                                              effects.push_back (makeSubstituteSlot (entry));
+                                             mixerops::linkAddedSidechain (song, t, (int) effects.size() - 1);
+                                         }
                                      });
                                      selectedSlot = (int) slots()->size() - 1;
                                      if (slots()->size() > before)
