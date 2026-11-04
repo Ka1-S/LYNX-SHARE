@@ -7079,3 +7079,15 @@ countries: it ch sm
 "Playlist snap" = "Snap della Playlist"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Righello: [LMB] posizione  [Alt] senza snap  [Ctrl][LMB], [RMB] o [2xLMB] trascina seleziona le note in un intervallo di tempo  [Ctrl][Wheel] / pizzico zoom  [Shift][Wheel] scorri"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Righello: [LMB] posizione nel brano  [RMB] o [Ctrl][LMB] o [2xLMB] trascina: selezione temporale (loop)  [Shift][LMB] trascina: spostala  [Ctrl][RMB] trascina, [Ctrl][Wheel] / pizzico: zoom  [RMB] clic: menu  [Alt] senza snap"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "Spento (mantieni il tempo reale)"
+"1/32 note" = "Nota da 1/32"
+"1/16 note" = "Nota da 1/16"
+"1/8 note" = "Nota da 1/8"
+"1/4 note" = "Nota da 1/4"
+"Notes played just before the start go onto it" = "Le note suonate appena prima dell'inizio vanno sull'inizio"
+"Played notes: compensate the output latency" = "Note suonate: compensa la latenza di uscita"
+"Capture MIDI: the notes just played without recording into the pattern" = "Cattura MIDI: le note appena suonate senza registrare nel pattern"
+"Capture MIDI: {0} notes put in the pattern" = "Cattura MIDI: {0} note messe nel pattern"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "Cattura MIDI: niente da catturare (suona prima qualche nota, senza registrare)"

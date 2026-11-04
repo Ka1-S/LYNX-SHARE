@@ -7079,3 +7079,15 @@ countries: cn sg
 "Playlist snap" = "播放列表吸附"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "标尺：[LMB] 位置  [Alt] 不吸附  [Ctrl][LMB]、[RMB] 或 [2xLMB] 拖动选择时间范围内的音符  [Ctrl][Wheel] / 双指捏合 缩放  [Shift][Wheel] 滚动"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "标尺：[LMB] 歌曲位置  [RMB] 或 [Ctrl][LMB] 或 [2xLMB] 拖动：时间选区（循环）  [Shift][LMB] 拖动：移动选区  [Ctrl][RMB] 拖动, [Ctrl][Wheel] / 双指捏合：缩放  [RMB] 单击：菜单  [Alt] 不吸附"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "关（保留实际时间）"
+"1/32 note" = "32 分音符"
+"1/16 note" = "16 分音符"
+"1/8 note" = "8 分音符"
+"1/4 note" = "4 分音符"
+"Notes played just before the start go onto it" = "在开始前一刻弹奏的音符放到开始处"
+"Played notes: compensate the output latency" = "弹奏的音符：补偿输出延迟"
+"Capture MIDI: the notes just played without recording into the pattern" = "捕获 MIDI：把刚才未录音时弹奏的音符放入模式"
+"Capture MIDI: {0} notes put in the pattern" = "捕获 MIDI：已将 {0} 个音符放入模式"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "捕获 MIDI：没有可捕获的内容（请先在不录音的情况下弹奏一些音符）"

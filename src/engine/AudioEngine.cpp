@@ -719,6 +719,8 @@ void AudioEngine::setRecordOptions (const RecordOptions& options)
     recordOptions.countInBars = juce::jlimit (0, 4, options.countInBars);
     recordOptions.preRollBars = juce::jlimit (0, 8, options.preRollBars);
     recordOptions.postRollBars = juce::jlimit (0, 8, options.postRollBars);
+    recordOptions.catchWindow = juce::jlimit<std::int64_t> (0, ppq, options.catchWindow);
+    compensatePlayed.store (options.compensateOutput);
     updateLinearSong();
     sendChangeMessage();
 }
@@ -762,7 +764,16 @@ void AudioEngine::startPlayback()
 
     if (recordOptions.countInBars > 0)
     {
-        transport.countIn.store ((double) countInLength (song, recordOptions.countInBars, startAt));
+        // the notes played during the count-in belong to this take (round 170d)
+        const auto length = countInLength (song, recordOptions.countInBars, startAt);
+        takeCatch = {};
+        takeCatch.start = startAt;
+        takeCatch.window = recordOptions.catchWindow;
+        takeCatch.songMode = song.mode == PlayMode::song;
+        if (! song.patterns.empty())
+            takeCatch.wrap = countInWrap (length, song.patterns[(std::size_t) juce::jlimit (0, (int) song.patterns.size() - 1, song.currentPattern)]
+                                                      .effectiveLength (song.beatsPerBar));
+        transport.countIn.store ((double) length);
         sendChangeMessage();
         return;
     }
@@ -942,14 +953,14 @@ void AudioEngine::markHeldKey (int key, bool on) noexcept
         heldKeyBits[key >> 6].fetch_and (~bit);
 }
 
-void AudioEngine::logPlayedNote (int channel, int key, float velocity, bool on)
+void AudioEngine::logPlayedNote (int channel, int key, float velocity, bool on, double tick, bool recorded)
 {
     if (channel < 0)
         return;
     const auto ms = juce::Time::getMillisecondCounterHiRes();
     const juce::SpinLock::ScopedLockType lock (scoreLogLock);
     if (on)
-        scoreLog.noteOn (ms, channel, key, velocity);
+        scoreLog.noteOn (ms, channel, key, velocity, tick, recorded);
     else
         scoreLog.noteOff (ms, channel, key);
 }
@@ -1013,11 +1024,14 @@ void AudioEngine::sendLiveNote (int channel, int key, float velocity, bool on, b
     e.key = key;
     e.velocity = velocity;
     liveEvents.push (e);
+    // (round 170d: recorded during the count-in too, at the audio clock's position)
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    const auto taking = record && transport.recording.load() && (transport.playing.load() || isCountingIn());
     if (record)
-        logPlayedNote (channel, key, velocity, on);
+        logPlayedNote (channel, key, velocity, on, transport.playing.load() ? recordTickFor (now) : -1.0, taking);
 
-    if (record && transport.recording.load() && transport.playing.load())
-        uiRecorded.push_back ({ estimatedPositionNow(), channel, key, velocity, on });
+    if (taking)
+        uiRecorded.push_back ({ recordTickFor (now), channel, key, velocity, on });
 }
 
 void AudioEngine::panic()
@@ -1038,6 +1052,49 @@ double AudioEngine::songPlayheadTicks() const noexcept
     if (song.hasLoop() || liveInput.linearSong.load (std::memory_order_relaxed))
         return tick;
     return std::fmod (tick, (double) juce::jmax<std::int64_t> (1, song.songLength()));
+}
+
+LiveClock AudioEngine::liveClock() const noexcept
+{
+    LiveClock c;
+    c.timeMs = blockTimeMs.load (std::memory_order_acquire);
+    c.tick = clockTick.load (std::memory_order_relaxed);
+    c.ticksPerMs = clockTicksPerMs.load (std::memory_order_relaxed);
+    c.running = clockRunning.load (std::memory_order_relaxed);
+    return c;
+}
+
+double AudioEngine::recordTickFor (double eventMs) const noexcept
+{
+    const auto clock = liveClock();
+    // (stopped, or no callback since Play / the count-in started: the transport's own position, as before)
+    if (! clock.running)
+        return transport.positionTicks.load (std::memory_order_relaxed)
+               - (transport.playing.load (std::memory_order_relaxed) ? 0.0 : transport.countIn.load (std::memory_order_relaxed));
+    return liveTickAt (clock, eventMs, compensatePlayed.load (std::memory_order_relaxed) ? outputCompensationMs.load (std::memory_order_relaxed) : 0.0);
+}
+
+CaptureResult AudioEngine::captureMidi()
+{
+    CaptureOptions o;
+    o.afterMs = lastCaptureMs;
+    o.nowMs = juce::Time::getMillisecondCounterHiRes();
+    o.gapMs = 2.0 * juce::jmax (1, song.beatsPerBar) * 60000.0 / juce::jmax (1.0, song.bpm); // two bars of silence end a phrase
+    o.playhead = (std::int64_t) std::llround (songPlayheadTicks());
+    o.mode = recordOptions.mode;
+    o.quantize.grid = recordOptions.quantise;
+    o.quantize.starts = recordOptions.quantiseStarts;
+    o.quantize.end = recordOptions.noteEnd;
+    o.quantize.stepSequencer = recordOptions.toStepSequencer;
+    o.placeClip = recordOptions.placeSongClip;
+    const auto log = scoreLogSnapshot();
+    if (capturePhrase (song, log, o).empty()) // (nothing to capture: no undo step)
+        return {};
+    CaptureResult result;
+    editSong ([&] (Song& s) { result = lynx::captureMidi (s, log, o); });
+    if (result.newestMs > lastCaptureMs)
+        lastCaptureMs = result.newestMs;
+    return result;
 }
 
 double AudioEngine::estimatedPositionNow() const noexcept
@@ -1971,17 +2028,26 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     else
         count = midiHeld.noteOff (m.getNoteNumber(), targets);
 
-    auto push = [this] (const InputHeldNotes::Target& t, bool noteOn, float velocity) {
+    // the time the device stamped the message with (JUCE: getMillisecondCounterHiRes / 1000), not when this thread got
+    // to it; a stamp from elsewhere (0, another clock) falls back to now (round 170d)
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    const auto stamped = m.getTimeStamp() * 1000.0;
+    const auto eventMs = std::abs (stamped - now) < 1000.0 ? stamped : now;
+    const auto taking = transport.recording.load() && (transport.playing.load() || isCountingIn());
+    const auto tick = recordTickFor (eventMs);
+
+    auto push = [this, taking, tick] (const InputHeldNotes::Target& t, bool noteOn, float velocity) {
         NoteEvent e;
         e.type = noteOn ? NoteEvent::Type::on : NoteEvent::Type::off;
         e.channel = t.channel;
         e.key = t.key;
         e.velocity = velocity;
         midiEvents.push (e);
-        logPlayedNote (e.channel, e.key, e.velocity, noteOn);
+        logPlayedNote (e.channel, e.key, e.velocity, noteOn, transport.playing.load() ? tick : -1.0, taking);
 
-        if (transport.recording.load() && transport.playing.load())
-            midiRecordQueue.push ({ estimatedPositionNow(), e.channel, e.key, e.velocity, noteOn });
+        // (round 170d: during the count-in too; the time is the device's, against the audio clock)
+        if (taking)
+            midiRecordQueue.push ({ tick, e.channel, e.key, e.velocity, noteOn });
     };
 
     for (int i = 0; i < staleCount; ++i)
@@ -2108,10 +2174,14 @@ void AudioEngine::updateRecording()
         liveInput.recording.store (false);
         sendChangeMessage();
     }
-    const auto active = transport.recording.load() && playing;
+    // (round 170d: a take starts with its count-in, so the notes played during it are kept)
+    const auto counting = isCountingIn();
+    const auto active = transport.recording.load() && (playing || counting);
 
     if (playing)
         lastPlayingTick = estimatedPositionNow();
+    else if (counting && takeCatch.start >= 0)
+        lastPlayingTick = (double) takeCatch.start;
 
     // the take starts when playing with recording on, or at the first recorded event
     // (which is only queued in that situation, even if this timer hasn't seen it yet)
@@ -2154,15 +2224,16 @@ void AudioEngine::updateRecording()
 
     while (midiRecordQueue.pop (e))
     {
-        if (! recordOptions.recordNotes || outsidePunch (e)) // recording filter: notes off
+        // (count-in notes: onto the start within the catch window, else at their real time; round 170d)
+        if (! recordOptions.recordNotes || ! catchEarlyNote (e, takeCatch) || outsidePunch (e)) // recording filter: notes off
             continue;
         beginTake();
         recorder.add (song, e);
     }
 
-    for (const auto& ui : uiRecorded)
+    for (auto ui : uiRecorded)
     {
-        if (! recordOptions.recordNotes || outsidePunch (ui))
+        if (! recordOptions.recordNotes || ! catchEarlyNote (ui, takeCatch) || outsidePunch (ui))
             continue;
         beginTake();
         recorder.add (song, ui);
@@ -2176,6 +2247,8 @@ void AudioEngine::updateRecording()
 
     if (! active && recorder.isActive())
         recorder.end (song, lastPlayingTick);
+    if (! active && ! counting)
+        takeCatch = {}; // the take is over: its catch with it
 
     auto notes = recorder.takeFinished();
 
@@ -4030,19 +4103,22 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
     numInputChannels = juce::jmin (numInputChannels, (int) inputs.size());
     numOutputChannels = juce::jmin (numOutputChannels, (int) outputs.size());
 
-    // count-in: the metronome counts the pre-roll down, then playback starts
-    if (const auto countIn = transport.countIn.load (std::memory_order_relaxed); countIn > 0.0 && ! transport.playing.load (std::memory_order_relaxed))
-    {
-        const auto left = countIn - numSamples * transport.ticksPerSample();
-        transport.countIn.store (juce::jmax (0.0, left), std::memory_order_relaxed);
+    // count-in: the metronome counts the pre-roll down, then playback starts — to the sample (round 170d: the song
+    // started at the next block boundary and the count-in's clicks ran a block early, so the downbeat flammed ~5 ms
+    // after the last count-in click and the take's notes were late against it): the block is split where the count-in
+    // ends, the part before it counts in (the metronome's clock = the start minus what is left at that sample)
+    const auto countInAtStart = transport.countIn.load (std::memory_order_relaxed);
+    const auto countingIn = countInAtStart > 0.0 && ! transport.playing.load (std::memory_order_relaxed);
+    const auto countInSamples = ! countingIn ? 0
+                                : (int) juce::jmin ((double) numSamples, std::ceil (countInAtStart / juce::jmax (1.0e-9, transport.ticksPerSample()) - 1.0e-6));
 
-        if (left <= 0.0)
-            transport.playing.store (true, std::memory_order_relaxed);
-    }
+    auto countInNow = countInAtStart;
 
     for (int done = 0; done < numSamples;)
     {
         auto n = numSamples - done;
+        if (countInSamples > done)
+            n = juce::jmin (n, countInSamples - done);
         const auto playing = transport.playing.load (std::memory_order_relaxed);
         const auto tps = transport.ticksPerSample();
         // Song mode: the loop region, or else the whole song (back to the start at its end, like FL)
@@ -4234,6 +4310,22 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
             transport.positionTicks.store (position, std::memory_order_relaxed);
         }
 
+        // the count-in's part of the block is over: what is left of it, or playback from here
+        // (a compare-exchange: a Stop pressed meanwhile set it to 0 and must win)
+        if (countInSamples > done)
+        {
+            const auto rawLeft = countInAtStart - (done + n) * transport.ticksPerSample();
+            const auto left = juce::jmax (0.0, rawLeft);
+            const auto ends = done + n >= countInSamples && rawLeft <= 1.0e-6;
+            auto expected = countInNow;
+            if (transport.countIn.compare_exchange_strong (expected, ends ? 0.0 : left, std::memory_order_relaxed))
+            {
+                countInNow = ends ? 0.0 : left;
+                if (ends)
+                    transport.playing.store (true, std::memory_order_relaxed);
+            }
+        }
+
         done += n;
     }
 
@@ -4256,7 +4348,19 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
     if (workers != nullptr)
         workers->park();
 
-    blockTimeMs.store (juce::Time::getMillisecondCounterHiRes(), std::memory_order_relaxed);
+    // the live clock (round 170d): the next block's musical position — during the count-in the metronome's count before
+    // the start (the start minus the count-in left)
+    {
+        const auto tps = transport.ticksPerSample();
+        const auto nowPlaying = transport.playing.load (std::memory_order_relaxed);
+        const auto left = transport.countIn.load (std::memory_order_relaxed);
+        const auto counting = left > 0.0 && ! nowPlaying;
+        const auto position = transport.positionTicks.load (std::memory_order_relaxed);
+        clockTick.store (counting ? position - left : position, std::memory_order_relaxed);
+        clockTicksPerMs.store (tps * transport.sampleRate.load (std::memory_order_relaxed) * 0.001, std::memory_order_relaxed);
+        clockRunning.store (nowPlaying || counting, std::memory_order_relaxed);
+    }
+    blockTimeMs.store (juce::Time::getMillisecondCounterHiRes(), std::memory_order_release);
 }
 
 void AudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
@@ -4265,6 +4369,10 @@ void AudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     rt::resetForNewDevice();
     transport.sampleRate.store (device->getCurrentSampleRate());
     midiSync.deviceStarted (device->getCurrentSampleRate(), device->getCurrentBufferSizeSamples(), device->getOutputLatencyInSamples());
+    // what is heard comes out one output buffer + the driver's output latency after it was rendered (round 170d, as
+    // the MIDI clock output counts it)
+    outputCompensationMs.store (1000.0 * (device->getCurrentBufferSizeSamples() + juce::jmax (0, device->getOutputLatencyInSamples()))
+                                / juce::jmax (1.0, device->getCurrentSampleRate()));
     // FL's fixed size buffers: 2 ms, or the device buffer with "Process maximum size buffers" (REA round 134)
     setFixedPluginBlock (device->getCurrentBufferSizeSamples(), device->getCurrentSampleRate());
 

@@ -7079,3 +7079,15 @@ countries: nl be
 "Playlist snap" = "Playlist-snap"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Tijdlijn: [LMB] positie  [Alt] geen snap  [Ctrl][LMB], [RMB] of [2xLMB] slepen selecteert de noten in een tijdbereik  [Ctrl][Wheel] / knijpen zoomen  [Shift][Wheel] scrollen"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Tijdlijn: [LMB] songpositie  [RMB] of [Ctrl][LMB] of [2xLMB] slepen: tijdselectie (loop)  [Shift][LMB] slepen: verplaatsen  [Ctrl][RMB] slepen, [Ctrl][Wheel] / knijpen: zoomen  [RMB] klik: menu  [Alt] geen snap"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "Uit (echte timing behouden)"
+"1/32 note" = "1/32 noot"
+"1/16 note" = "1/16 noot"
+"1/8 note" = "1/8 noot"
+"1/4 note" = "1/4 noot"
+"Notes played just before the start go onto it" = "Noten die net voor de start gespeeld worden gaan op de start"
+"Played notes: compensate the output latency" = "Gespeelde noten: uitgangslatentie compenseren"
+"Capture MIDI: the notes just played without recording into the pattern" = "MIDI vangen: de net zonder opname gespeelde noten in het pattern"
+"Capture MIDI: {0} notes put in the pattern" = "MIDI vangen: {0} noten in het pattern gezet"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "MIDI vangen: niets te vangen (speel eerst een paar noten, zonder opname)"

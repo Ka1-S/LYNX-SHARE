@@ -7079,3 +7079,15 @@ countries: kr
 "Playlist snap" = "플레이리스트 스냅"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "눈금자: [LMB] 위치  [Alt] 스냅 없음  [Ctrl][LMB], [RMB] 또는 [2xLMB] 드래그로 시간 범위의 노트 선택  [Ctrl][Wheel] / 핀치 줌  [Shift][Wheel] 스크롤"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "눈금자: [LMB] 송 위치  [RMB] 또는 [Ctrl][LMB] 또는 [2xLMB] 드래그: 시간 선택(루프)  [Shift][LMB] 드래그: 이동  [Ctrl][RMB] 드래그, [Ctrl][Wheel] / 핀치: 줌  [RMB] 클릭: 메뉴  [Alt] 스냅 없음"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "끔 (실제 타이밍 유지)"
+"1/32 note" = "32분음표"
+"1/16 note" = "16분음표"
+"1/8 note" = "8분음표"
+"1/4 note" = "4분음표"
+"Notes played just before the start go onto it" = "시작 직전에 연주한 노트를 시작 위치로"
+"Played notes: compensate the output latency" = "연주한 노트: 출력 레이턴시 보정"
+"Capture MIDI: the notes just played without recording into the pattern" = "MIDI 캡처: 녹음 없이 방금 연주한 노트를 패턴으로"
+"Capture MIDI: {0} notes put in the pattern" = "MIDI 캡처: 노트 {0}개를 패턴에 넣음"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "MIDI 캡처: 캡처할 것이 없음 (먼저 녹음 없이 노트를 연주하세요)"

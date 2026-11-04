@@ -7079,3 +7079,15 @@ countries: fr be ch ca lu
 "Playlist snap" = "Magnétisme de la Playlist"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Règle : [LMB] position  [Alt] sans magnétisme  [Ctrl][LMB], [RMB] ou [2xLMB] glisser sélectionne les notes d'une plage de temps  [Ctrl][Wheel] / pincement zoom  [Maj][Wheel] défilement"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Règle : [LMB] position du morceau  [RMB] ou [Ctrl][LMB] ou [2xLMB] glisser : sélection temporelle (boucle)  [Maj][LMB] glisser : la déplacer  [Ctrl][RMB] glisser, [Ctrl][Wheel] / pincement : zoom  [RMB] clic : menu  [Alt] sans magnétisme"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "Désactivé (garder leur temps réel)"
+"1/32 note" = "Triple croche (1/32)"
+"1/16 note" = "Double croche (1/16)"
+"1/8 note" = "Croche (1/8)"
+"1/4 note" = "Noire (1/4)"
+"Notes played just before the start go onto it" = "Les notes jouées juste avant le début vont sur le début"
+"Played notes: compensate the output latency" = "Notes jouées : compenser la latence de sortie"
+"Capture MIDI: the notes just played without recording into the pattern" = "Capturer le MIDI : les notes jouées sans enregistrer vont dans le pattern"
+"Capture MIDI: {0} notes put in the pattern" = "Capturer le MIDI : {0} notes placées dans le pattern"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "Capturer le MIDI : rien à capturer (jouez d'abord quelques notes, sans enregistrer)"

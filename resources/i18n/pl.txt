@@ -7079,3 +7079,15 @@ countries: pl
 "Playlist snap" = "Przyciąganie Playlist"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Linijka: [LMB] pozycja  [Alt] bez przyciągania  [Ctrl][LMB], [RMB] lub [2xLMB] przeciągnij zaznacza nuty w zakresie czasu  [Ctrl][Wheel] / szczypnięcie zoom  [Shift][Wheel] przewijanie"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Linijka: [LMB] pozycja utworu  [RMB] lub [Ctrl][LMB] lub [2xLMB] przeciągnij: zaznaczenie czasu (pętla)  [Shift][LMB] przeciągnij: przesuń je  [Ctrl][RMB] przeciągnij, [Ctrl][Wheel] / szczypnięcie: zoom  [RMB] kliknięcie: menu  [Alt] bez przyciągania"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "Wył. (zachowaj rzeczywisty czas)"
+"1/32 note" = "Nuta 1/32"
+"1/16 note" = "Nuta 1/16"
+"1/8 note" = "Nuta 1/8"
+"1/4 note" = "Nuta 1/4"
+"Notes played just before the start go onto it" = "Nuty zagrane tuż przed startem trafiają na start"
+"Played notes: compensate the output latency" = "Zagrane nuty: kompensuj opóźnienie wyjścia"
+"Capture MIDI: the notes just played without recording into the pattern" = "Przechwyć MIDI: nuty zagrane przed chwilą bez nagrywania do patternu"
+"Capture MIDI: {0} notes put in the pattern" = "Przechwyć MIDI: {0} nut wstawionych do patternu"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "Przechwyć MIDI: nie ma czego przechwycić (najpierw zagraj kilka nut bez nagrywania)"

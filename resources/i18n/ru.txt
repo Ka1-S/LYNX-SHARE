@@ -7079,3 +7079,15 @@ countries: ru by kz
 "Playlist snap" = "Привязка Playlist"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Линейка: [LMB] позиция  [Alt] без привязки  [Ctrl][LMB], [RMB] или [2xLMB] перетаскивание выделяет ноты в диапазоне времени  [Ctrl][Wheel] / щипок масштаб  [Shift][Wheel] прокрутка"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Линейка: [LMB] позиция песни  [RMB] или [Ctrl][LMB] или [2xLMB] перетаскивание: выделение времени (цикл)  [Shift][LMB] перетаскивание: сдвиг  [Ctrl][RMB] перетаскивание, [Ctrl][Wheel] / щипок: масштаб  [RMB] щелчок: меню  [Alt] без привязки"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "Выкл. (сохранять реальное время)"
+"1/32 note" = "Нота 1/32"
+"1/16 note" = "Нота 1/16"
+"1/8 note" = "Нота 1/8"
+"1/4 note" = "Нота 1/4"
+"Notes played just before the start go onto it" = "Ноты, сыгранные чуть раньше начала, ставятся на начало"
+"Played notes: compensate the output latency" = "Сыгранные ноты: компенсировать задержку выхода"
+"Capture MIDI: the notes just played without recording into the pattern" = "Захват MIDI: только что сыгранные без записи ноты в паттерн"
+"Capture MIDI: {0} notes put in the pattern" = "Захват MIDI: {0} нот добавлено в паттерн"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "Захват MIDI: нечего захватывать (сначала сыграйте ноты без записи)"

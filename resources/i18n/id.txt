@@ -7079,3 +7079,15 @@ countries: id
 "Playlist snap" = "Snap Playlist"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Penggaris: [LMB] posisi  [Alt] tanpa snap  [Ctrl][LMB], [RMB] atau [2xLMB] seret memilih not dalam rentang waktu  [Ctrl][Wheel] / cubit zoom  [Shift][Wheel] gulir"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Penggaris: [LMB] posisi song  [RMB] atau [Ctrl][LMB] atau [2xLMB] seret: pilihan waktu (loop)  [Shift][LMB] seret: pindahkan  [Ctrl][RMB] seret, [Ctrl][Wheel] / cubit: zoom  [RMB] klik: menu  [Alt] tanpa snap"
+
+# round 170d: count-in catch, played-note latency, Capture MIDI
+"Off (keep their real time)" = "Mati (pertahankan waktu aslinya)"
+"1/32 note" = "Not 1/32"
+"1/16 note" = "Not 1/16"
+"1/8 note" = "Not 1/8"
+"1/4 note" = "Not 1/4"
+"Notes played just before the start go onto it" = "Not yang dimainkan tepat sebelum awal ditaruh di awal"
+"Played notes: compensate the output latency" = "Not yang dimainkan: kompensasi latensi output"
+"Capture MIDI: the notes just played without recording into the pattern" = "Tangkap MIDI: not yang baru dimainkan tanpa merekam ke pattern"
+"Capture MIDI: {0} notes put in the pattern" = "Tangkap MIDI: {0} not ditaruh di pattern"
+"Capture MIDI: nothing to capture (play some notes first, without recording)" = "Tangkap MIDI: tidak ada yang ditangkap (mainkan beberapa not dulu, tanpa merekam)"
