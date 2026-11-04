@@ -963,7 +963,7 @@ private:
         g.setColour (colour::accent.withAlpha (fx.enabled ? 0.8f : 0.25f)); // the reduction = input − output
         g.fillPath (inP);
         g.setGradientFill (juce::ColourGradient (accent.withAlpha (0.95f), 0.0f, w.getY(), juce::Colour (0xffc8ccd6).withAlpha (0.9f), 0.0f, w.getCentreY(), true));
-        g.fillPath (outP);
+        if (! outP.isEmpty()) g.fillPath (outP); // (round 170c: an empty path with a gradient flooded macOS editors)
         // threshold lines
         const auto dashes = std::array<float, 2> { 6.0f, 4.0f };
         g.setColour (colour::warning.withAlpha (0.9f));
@@ -1107,6 +1107,7 @@ private:
         const auto sy = p.getBottom() - 64.0f;
         out.push_back (knob ({ 110.0f, sy, 76.0f, 64.0f }, knee, tr ("Knee"), 0));
         out.push_back (knob ({ 228.0f, sy, 76.0f, 64.0f }, range, tr ("Range"), 0));
+        out.push_back (knob ({ 344.0f, sy, 76.0f, 64.0f }, drive, tr ("Drive"), 0)); // round 170c: the Character's drive (it had no control)
         out.push_back (knob ({ 460.0f, sy, 76.0f, 64.0f }, lookahead, tr ("Lookahead"), 0));
         out.push_back (knob ({ 578.0f, sy, 76.0f, 64.0f }, hold, tr ("Hold"), 0));
         out.push_back (button ({ 330.0f, sy + 34.0f, 104.0f, 24.0f }, idSideChain, tr ("Side chain"), scOpen, tr ("Open the side chain: detector EQ, level, external input, stereo link")));

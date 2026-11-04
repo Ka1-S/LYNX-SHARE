@@ -30,6 +30,9 @@ namespace
 // samples. The engine also seeds its noise generator from them.
 
 constexpr const char* engineSha256 = "9a5f168219c702514f07f3d568a348fc1438d9ffa287310467dd7887cc74c637";
+// FL Studio 2025.1.6's build (peImageSha256Hex, round 169g): 51 bytes differ from 2026's (link time stamps, the debug
+// directory), not the WAVES resource: tests/Crash169gTests.inc renders both alike
+constexpr const char* engineImageSha256Fl25 = "1b503eb29b3a4c724dcc45e86c3fc0293dfcdba6a98595b613a666263362d818";
 
 // Without the DLL the noise starts from the engine's base constant instead of base + Σ(resource samples): the noise
 // has the same character, only the exact sample sequence differs from FL's
@@ -65,8 +68,10 @@ std::unique_ptr<Waves> loadWaves (const std::string& path)
     if (! in)
         return nullptr;
     const std::vector<std::uint8_t> b ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
-    if (b.size() < 0x1000 || sha256Hex (b.data(), b.size()) != engineSha256)
-        return nullptr; // only the decoded build
+    if (b.size() < 0x1000)
+        return nullptr;
+    if (const auto image = peImageSha256Hex (b); image != engineSha256 && image != engineImageSha256Fl25)
+        return nullptr; // only the decoded builds
     auto u32 = [&] (std::size_t off) { std::uint32_t v = 0; if (off + 4 <= b.size()) std::memcpy (&v, b.data() + off, 4); return v; };
     auto u16 = [&] (std::size_t off) { std::uint16_t v = 0; if (off + 2 <= b.size()) std::memcpy (&v, b.data() + off, 2); return v; };
     const auto pe = (std::size_t) u32 (0x3c);

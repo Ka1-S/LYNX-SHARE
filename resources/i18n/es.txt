@@ -7059,6 +7059,8 @@ countries: es mx ar co cl pe ve
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Patrón: [LMB] pintarlo con el lápiz  [Ctrl+LMB] / [Shift+LMB] elegir varios  [2xLMB] abrir  [RMB] menú"
 "Empty patterns were ignored." = "Se ignoraron los patrones vacíos."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Selector de plugins: todos los generadores y efectos, las categorías como pestañas (pulsa de nuevo para cerrar)"
+"click to step, drag or mouse wheel to change" = "clic para avanzar, arrastra o usa la rueda del ratón para cambiar"
+"no effect with the current mode (another engine is in use)" = "sin efecto en el modo actual (otro motor está en uso)"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Principal: {0}"

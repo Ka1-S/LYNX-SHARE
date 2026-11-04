@@ -7059,6 +7059,8 @@ countries: jp
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "パターン: [LMB] ペンシルでペイント  [Ctrl+LMB] / [Shift+LMB] 複数選択  [2xLMB] 開く  [RMB] メニュー"
 "Empty patterns were ignored." = "空のパターンは無視されました。"
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "プラグインピッカー: すべてのジェネレーターとエフェクト、カテゴリをタブで表示（もう一度押すと閉じる）"
+"click to step, drag or mouse wheel to change" = "クリックで切り替え、ドラッグまたはマウスホイールで変更"
+"no effect with the current mode (another engine is in use)" = "現在のモードでは効果なし（別のエンジンを使用中）"
 
 # round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "メイン: {0}"
