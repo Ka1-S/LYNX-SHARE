@@ -7091,3 +7091,6 @@ countries: kr
 "Capture MIDI: the notes just played without recording into the pattern" = "MIDI 캡처: 녹음 없이 방금 연주한 노트를 패턴으로"
 "Capture MIDI: {0} notes put in the pattern" = "MIDI 캡처: 노트 {0}개를 패턴에 넣음"
 "Capture MIDI: nothing to capture (play some notes first, without recording)" = "MIDI 캡처: 캡처할 것이 없음 (먼저 녹음 없이 노트를 연주하세요)"
+"Seq" = "시퀀스"
+"Number of steps" = "스텝 수"
+"Dual" = "듀얼"

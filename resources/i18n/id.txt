@@ -7091,3 +7091,6 @@ countries: id
 "Capture MIDI: the notes just played without recording into the pattern" = "Tangkap MIDI: not yang baru dimainkan tanpa merekam ke pattern"
 "Capture MIDI: {0} notes put in the pattern" = "Tangkap MIDI: {0} not ditaruh di pattern"
 "Capture MIDI: nothing to capture (play some notes first, without recording)" = "Tangkap MIDI: tidak ada yang ditangkap (mainkan beberapa not dulu, tanpa merekam)"
+"Seq" = "Seq"
+"Number of steps" = "Jumlah langkah"
+"Dual" = "Ganda"

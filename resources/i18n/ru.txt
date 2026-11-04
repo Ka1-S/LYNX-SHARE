@@ -7091,3 +7091,6 @@ countries: ru by kz
 "Capture MIDI: the notes just played without recording into the pattern" = "Захват MIDI: только что сыгранные без записи ноты в паттерн"
 "Capture MIDI: {0} notes put in the pattern" = "Захват MIDI: {0} нот добавлено в паттерн"
 "Capture MIDI: nothing to capture (play some notes first, without recording)" = "Захват MIDI: нечего захватывать (сначала сыграйте ноты без записи)"
+"Seq" = "Секв."
+"Number of steps" = "Число шагов"
+"Dual" = "Двойной"

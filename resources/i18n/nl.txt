@@ -7091,3 +7091,6 @@ countries: nl be
 "Capture MIDI: the notes just played without recording into the pattern" = "MIDI vangen: de net zonder opname gespeelde noten in het pattern"
 "Capture MIDI: {0} notes put in the pattern" = "MIDI vangen: {0} noten in het pattern gezet"
 "Capture MIDI: nothing to capture (play some notes first, without recording)" = "MIDI vangen: niets te vangen (speel eerst een paar noten, zonder opname)"
+"Seq" = "Seq"
+"Number of steps" = "Aantal stappen"
+"Dual" = "Dubbel"

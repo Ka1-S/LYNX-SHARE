@@ -7091,3 +7091,6 @@ countries: jp
 "Capture MIDI: the notes just played without recording into the pattern" = "MIDIキャプチャ：録音せずに弾いたばかりのノートをパターンへ"
 "Capture MIDI: {0} notes put in the pattern" = "MIDIキャプチャ：{0} 個のノートをパターンに配置"
 "Capture MIDI: nothing to capture (play some notes first, without recording)" = "MIDIキャプチャ：キャプチャするものがありません（まず録音せずにノートを弾いてください）"
+"Seq" = "シーケンス"
+"Number of steps" = "ステップ数"
+"Dual" = "デュアル"

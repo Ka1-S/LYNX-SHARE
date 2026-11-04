@@ -6340,6 +6340,14 @@ private:
                 savePng (frame->createComponentSnapshot (frame->getLocalBounds(), true, scale), file.getFullPathName());
                 std::printf ("%s %dx%d\n", file.getFullPathName().toRawUTF8(), frame->getWidth(), frame->getHeight());
             }
+            // round 169h: the layout's other pages (Toxic's MIDI / Seq …), one shot each at 1.5×
+            for (int page = 1; page < lynx::showChannelLayoutPage (*frame, -1); ++page)
+            {
+                lynx::showChannelLayoutPage (*frame, page);
+                const auto file = folder.getChildFile (name + "-" + source + "-page" + juce::String (page) + "-150.png");
+                savePng (frame->createComponentSnapshot (frame->getLocalBounds(), true, 1.5f), file.getFullPathName());
+                std::printf ("%s\n", file.getFullPathName().toRawUTF8());
+            }
         }
         return ok;
     }

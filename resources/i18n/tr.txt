@@ -7091,3 +7091,6 @@ countries: tr
 "Capture MIDI: the notes just played without recording into the pattern" = "MIDI yakala: kayıt yapmadan az önce çalınan notalar pattern'e"
 "Capture MIDI: {0} notes put in the pattern" = "MIDI yakala: pattern'e {0} nota kondu"
 "Capture MIDI: nothing to capture (play some notes first, without recording)" = "MIDI yakala: yakalanacak bir şey yok (önce kayıt yapmadan birkaç nota çalın)"
+"Seq" = "Sek"
+"Number of steps" = "Adım sayısı"
+"Dual" = "Çift"

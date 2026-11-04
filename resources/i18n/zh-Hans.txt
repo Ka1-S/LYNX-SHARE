@@ -7091,3 +7091,6 @@ countries: cn sg
 "Capture MIDI: the notes just played without recording into the pattern" = "捕获 MIDI：把刚才未录音时弹奏的音符放入模式"
 "Capture MIDI: {0} notes put in the pattern" = "捕获 MIDI：已将 {0} 个音符放入模式"
 "Capture MIDI: nothing to capture (play some notes first, without recording)" = "捕获 MIDI：没有可捕获的内容（请先在不录音的情况下弹奏一些音符）"
+"Seq" = "音序"
+"Number of steps" = "步数"
+"Dual" = "双轨"

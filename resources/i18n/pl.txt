@@ -7091,3 +7091,6 @@ countries: pl
 "Capture MIDI: the notes just played without recording into the pattern" = "Przechwyć MIDI: nuty zagrane przed chwilą bez nagrywania do patternu"
 "Capture MIDI: {0} notes put in the pattern" = "Przechwyć MIDI: {0} nut wstawionych do patternu"
 "Capture MIDI: nothing to capture (play some notes first, without recording)" = "Przechwyć MIDI: nie ma czego przechwycić (najpierw zagraj kilka nut bez nagrywania)"
+"Seq" = "Sekw."
+"Number of steps" = "Liczba kroków"
+"Dual" = "Podwójny"
