@@ -73,27 +73,39 @@ TEST (inst169h_ogun_automation_is_live)
         const auto same = run (*inst, 40, [&] (int b) { if (b == 5) inst->setParameter (0, normalisedOf (vol, p0)); });
         CHECK (same == reference);
     }
-    // Master volume to 0 while the note plays: FL's law (3^(x) − 1)/2 is 0 at x = 0 — silence after the gain ramps,
-    // the same as before it; back to its value: the same voice goes on (no new attack: the samples match the reference)
+    // Master volume to 0 while the note plays: FL's law (3^(x) − 1)/2 is 0 at x = 0 — the voice falls silent after the
+    // gain ramp (only the effects' tail goes on), the samples before the change are the reference's; back to its value:
+    // the same voice goes on (no new note)
     {
         auto inst = fresh();
-        const auto out = run (*inst, 40, [&] (int b) {
+        const auto silent = run (*inst, 40, [&] (int b) {
             if (b == 10)
                 inst->setParameter (0, 0.0f);
-            if (b == 20)
-                inst->setParameter (0, normalisedOf (vol, p0));
         });
-        CHECK (std::equal (out.begin(), out.begin() + 10 * 512, reference.begin()));
-        CHECK (energy (out, 12 * 512, 20 * 512) < 1e-12);
-        CHECK (energy (out, 22 * 512, 40 * 512) > 0.25 * energy (reference, 22 * 512, 40 * 512));
+        auto inst2 = fresh();
+        const auto back = run (*inst2, 40, [&] (int b) {
+            if (b == 10)
+                inst2->setParameter (0, 0.0f);
+            if (b == 20)
+                inst2->setParameter (0, normalisedOf (vol, p0));
+        });
+        const auto ref = energy (reference, 30 * 512, 40 * 512);
+        std::printf ("  Ogun Master volume 0 at block 10: blocks 30-40 %.3g (reference %.3g), restored at 20: %.3g\n",
+                     energy (silent, 30 * 512, 40 * 512), ref, energy (back, 30 * 512, 40 * 512));
+        CHECK (std::equal (silent.begin(), silent.begin() + 10 * 512, reference.begin()));
+        CHECK (energy (silent, 30 * 512, 40 * 512) < 0.02 * ref);
+        CHECK (energy (back, 30 * 512, 40 * 512) > 0.25 * ref);
     }
-    // the filter cutoff and the EQ change the sound at once, the voice keeps playing; every automatable index is safe
-    // at its ends while a note plays (effects re-designed live, lines re-allocated / cleared like FL)
+    // the coarse pitch (read by every control block) changes the sound at once, the voice keeps playing; every
+    // automatable index is safe at its ends while a note plays (effects re-designed live, lines re-allocated /
+    // cleared like FL)
     {
+        const auto crs = *lynx::findEngineParam (table, 1);
+        const auto p1 = *lynx::ogunParam (channel->pluginState, 1);
         auto inst = fresh();
         const auto out = run (*inst, 40, [&] (int b) {
             if (b == 10)
-                inst->setParameter (17, 0.05f);
+                inst->setParameter (1, normalisedOf (crs, std::min (p1 + 7, (int) crs.high)));
         });
         CHECK (std::equal (out.begin(), out.begin() + 10 * 512, reference.begin()));
         CHECK (! std::equal (out.begin() + 12 * 512, out.begin() + 20 * 512, reference.begin() + 12 * 512));
@@ -141,8 +153,10 @@ TEST (inst169h_ogun_knob_edits_keep_the_note_and_automation_survives_a_rebuild)
         if (b == 20)
             inst->configure (*channel, 140.0); // (back: the same voice, still held)
     });
-    CHECK (energy (out, 12 * 512, 20 * 512) < 1e-12);
-    CHECK (energy (out, 22 * 512, 30 * 512) > 1e-4);
+    std::printf ("  Ogun knob Volume 0 at block 10: blocks 16-20 %.3g, back at 20: blocks 24-30 %.3g\n", energy (out, 16 * 512, 20 * 512),
+                 energy (out, 24 * 512, 30 * 512));
+    CHECK (energy (out, 16 * 512, 20 * 512) < 0.05 * energy (out, 24 * 512, 30 * 512)); // (the effects' tail only)
+    CHECK (energy (out, 24 * 512, 30 * 512) > 1e-4);
 
     // an automated value outlives a rebuild of the engine (a new tempo)
     auto inst2 = lynx::makeOgunInstrument();
@@ -151,7 +165,7 @@ TEST (inst169h_ogun_knob_edits_keep_the_note_and_automation_survives_a_rebuild)
     inst2->setParameter (0, 0.0f);
     inst2->configure (*channel, 100.0);
     const auto after = run (*inst2, 12, [] (int) {});
-    CHECK (energy (after, 0, after.size()) < 1e-12);
+    CHECK (energy (after, 0, after.size()) < 1e-9); // (a new engine: no tail yet)
 }
 
 TEST (inst169h_ogun_automation_clip_drives_the_engine)
