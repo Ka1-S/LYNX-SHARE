@@ -114,17 +114,33 @@ void schedulePatternLoop (const Pattern& pattern,
                           EventBuffer& out,
                           float swing,
                           const std::vector<ChannelDef>* channels,
-                          bool chase) noexcept
+                          bool chase,
+                          double linearOrigin) noexcept
 {
     if (numSamples <= 0 || patternLength <= 0 || tps <= 0.0)
         return;
 
+    const auto linear = linearOrigin >= 0.0;
     const auto endTick = startTick + numSamples * tps;
-    const auto position = std::fmod (startTick, (double) patternLength);
+    const auto position = linear ? startTick - linearOrigin : std::fmod (startTick, (double) patternLength);
+    // once (linear): the same sample math as a loop's occurrence, for the single one at the origin
+    auto emit = [&] (double t, const NoteEvent& event) {
+        if (! linear)
+            return emitOccurrences (t, patternLength, startTick, endTick, tps, numSamples, event, out);
+        const auto tick = linearOrigin + t;
+        if (tick < startTick - tps || tick >= endTick)
+            return;
+        const auto offset = flSampleOf (tick / tps) - std::nearbyint (startTick / tps);
+        if (offset < 0.0 || offset >= (double) numSamples)
+            return;
+        auto e = event;
+        e.sampleOffset = (int) offset;
+        out.add (e);
+    };
 
     for (const auto& note : pattern.notes)
     {
-        if (note.start >= patternLength || note.muted)
+        if ((! linear && note.start >= patternLength) || note.muted)
             continue; // outside the loop / muted note
 
         NoteEvent on;
@@ -146,12 +162,12 @@ void schedulePatternLoop (const Pattern& pattern,
         {
             on.type = NoteEvent::Type::slide;
             on.slideSamples = (float) ((double) std::max<std::int64_t> (note.length, 1) / tps);
-            emitOccurrences ((double) start, patternLength, startTick, endTick, tps, numSamples, on, out);
+            emit ((double) start, on);
             continue; // slide has no "off": the original note continues until its own end
         }
 
         on.lengthTicks = (float) timing.length;
-        emitOccurrences ((double) start, patternLength, startTick, endTick, tps, numSamples, on, out);
+        emit ((double) start, on);
         if (chase && (double) start + tps <= position && (double) (start + timing.length) > position)
         {
             on.sampleOffset = 0; // a note crossing the start position ("Play truncated notes on transport")
@@ -163,7 +179,7 @@ void schedulePatternLoop (const Pattern& pattern,
         off.type = NoteEvent::Type::off;
         off.velocity = 0.0f;
         const auto length = timing.length;
-        emitOccurrences ((double) (start + length), patternLength, startTick, endTick, tps, numSamples, off, out);
+        emit ((double) (start + length), off);
     }
 
     out.sortByOffset();

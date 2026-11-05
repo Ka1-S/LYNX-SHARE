@@ -57,6 +57,8 @@ public:
     ui::Hint hintAt (juce::Point<int> position) override;
     void mouseDoubleClick (const juce::MouseEvent& e) override;
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
+    // trackpad pinch (macOS; Windows touch screens): time zoom around the pointer, with Alt the vertical zoom (round 170e)
+    void mouseMagnify (const juce::MouseEvent& e, float scale) override;
 
     // Editing shortcuts; the main window forwards keys when the Piano Roll is visible.
     bool handleKey (const juce::KeyPress& key);
@@ -119,6 +121,10 @@ public:
     void pasteFromMidiClipboard();
     // File › Browse scores: the main window opens the Browser at FL's score folder
     std::function<void()> onBrowseScores;
+    // "Note names on every key" was switched in the menu (the main window saves its settings)
+    std::function<void()> onNoteNamesChanged;
+    // The play button: click plays / pauses the pattern, right-click stops back at the last start (the main window's transport)
+    std::function<void()> onPlayPause, onPlayRightClick;
     // The time selection (Ctrl+drag on the ruler; -1 = none) that Insert / Delete space and Trim use.
     void setTimeSelection (std::int64_t from, std::int64_t to);
     std::int64_t timeSelectionFrom() const noexcept { return timeFrom; }
@@ -143,7 +149,7 @@ public:
     ui::Hint hoverForSnapshot();
 
     static constexpr int keyboardWidth = 72;
-    static constexpr int toolbarHeight = 28;
+    static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
     static constexpr int overviewHeight = 16; // the overview strip under the toolbar (round 90)
     static constexpr int timelineHeight = 22;
     static constexpr int rulerTop = toolbarHeight + overviewHeight;
@@ -239,14 +245,15 @@ private:
     ChannelBox channelBox;
     SnapBox snapBox { true };         // "Main" (the toolbar snap) or this editor's own grid
     IconButton ghostButton { "ghosts", Icon::ghost };
-    IconButton scaleSnapButton { "scaleSnap", Icon::magnet }; // snap to the scale (next to the scale box)
+    IconButton scaleSnapButton { "scaleSnap", Icon::scaleSnap }; // snap to the scale (next to the scale box)
     IconButton moreButton { "more", Icon::more }; // note operations, left-edge resize, MIDI import/export
+    IconButton playButton { "play", Icon::play }; // FL's "Play / pause pattern" (EEPlayBtn); right-click: back to the last start
     IconButton followButton { "follow", Icon::follow }; // Follow (auto scrolling) on/off, EditorGlobals (round 162)
     void quantizeOperation (int kind); // 0 = starts, 1 = starts and lengths (quick quantize), 2 = starts 50% toward the grid
     juce::ComboBox laneBox; // what the bottom lane edits: velocity, pan or fine pitch
-    juce::ComboBox chordBox; // chord created on each click (like FL's "stamp")
-    juce::TextButton slideButton { "Slide" }; // new notes slide (like FL's slide tool)
-    juce::ComboBox scaleBox; // scale highlighted on the keyboard rows
+    IconComboBox chordBox { Icon::chord }; // chord created on each click (like FL's "stamp")
+    IconButton slideButton { "slide", Icon::slide }; // new notes slide (like FL's slide tool)
+    IconComboBox scaleBox { Icon::keyboard }; // scale highlighted on the keyboard rows
     // note colour groups (FL's 16 note colours; REA round 153): new notes get `noteColour`; the swatch opens a menu
     // that picks it, colours the selection and selects by colour
     class ColourSwatch final : public juce::Button
@@ -327,7 +334,8 @@ private:
     // smooth wheel scrolling
     gesture::Glide glideX, glideY;
     bool gliding = false;
-    void glideBy (double ticks, double pixels);
+    // `immediate`: a trackpad's smooth scroll moves the view at once (the fingers carry it; round 170e)
+    void glideBy (double ticks, double pixels, bool immediate = false);
     void glideFrame();
     juce::VBlankAttachment vblank { this, [this] { glideFrame(); } };
 

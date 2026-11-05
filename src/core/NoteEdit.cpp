@@ -93,6 +93,11 @@ std::vector<int> duplicate (Pattern& pattern, const std::vector<int>& indices, s
     return paste (pattern, notes, offset);
 }
 
+std::vector<int> duplicateBars (Pattern& pattern, const std::vector<int>& indices, int beatsPerBar)
+{
+    return duplicate (pattern, indices, (std::int64_t) ppq * std::max (1, beatsPerBar));
+}
+
 void quantize (Pattern& pattern, const std::vector<int>& indices, std::int64_t grid)
 {
     grid = std::max<std::int64_t> (1, grid);

@@ -153,7 +153,8 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     addAndMakeVisible (overview);
 
     grid::fillEditorBox (snapBox);
-    snapBox.setTooltip (tr ("Piano Roll grid: follows the global grid in the toolbar, or its own; hold Alt while dragging to ignore it"));
+    snapBox.setTooltip (tr ("Piano Roll snap (magnet): \"Main\" follows the snap in the toolbar, or pick this window's own; hold Alt while dragging to ignore it"));
+    ui::setQuickTip (snapBox, tr ("Piano Roll snap"));
     snapBox.setWantsKeyboardFocus (false);
     snapBox.setMouseClickGrabsKeyboardFocus (false);
     snapBox.onChange = [this] { repaint(); };
@@ -223,7 +224,14 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     ui::setQuickTip (followButton, tr ("Follow the playhead"));
     followButton.onClick = [this] { runAction ("pianoRoll.follow"); };
 
-    for (auto* b : { &ghostButton, &scaleSnapButton, &moreButton, &followButton })
+    playButton.setFlat (true);
+    playButton.setClickingTogglesState (false);
+    playButton.setIconColourWhenOn (theme::colour::accent); // FL: stays a play icon, in the theme colour while playing
+    playButton.setTooltip (tr ("Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)"));
+    playButton.onClick = [this] { if (onPlayPause) onPlayPause(); };
+    playButton.onRightClick = [this] { if (onPlayRightClick) onPlayRightClick(); };
+
+    for (auto* b : { &playButton, &ghostButton, &scaleSnapButton, &moreButton, &followButton })
     {
         b->setWantsKeyboardFocus (false);
         b->setMouseClickGrabsKeyboardFocus (false);
@@ -251,13 +259,20 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     scaleSnapButton.setEnabled (false); // until a scale is chosen
     scaleBox.setTooltip (tr ("Highlights the notes of a scale"));
 
+    // round 170e: an icon (FL's slide tool is one) instead of the word "Slide"
     slideButton.setClickingTogglesState (true);
     slideButton.setTooltip (tr ("New notes are \"slide\" notes: the currently sounding note glides to them (808 glide)"));
+    ui::setQuickTip (slideButton, tr ("Slide notes"));
     slideButton.setWantsKeyboardFocus (false);
     slideButton.setMouseClickGrabsKeyboardFocus (false);
-    slideButton.setButtonText (tr ("Slide"));
-    slideButton.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
+    slideButton.setOnColour (theme::colour::bg6);
+    slideButton.setIconColourWhenOn (theme::colour::accent);
+    slideButton.setFlat (true);
     addAndMakeVisible (slideButton);
+    ui::setQuickTip (chordBox, tr ("Chord stamp"));
+    ui::setQuickTip (scaleBox, tr ("Scale"));
+    chordBox.iconLit = [this] { return chordBox.getSelectedId() > 1; };
+    scaleBox.iconLit = [this] { return scaleIndex() > 0; };
 
     colourButton.setTooltip (tr ("Note colour: new notes get this colour. Click: choose it, colour the selection (Alt+C), "
                                  "select by colour (Shift+C)"));
@@ -478,15 +493,16 @@ void PianoRollComponent::resized()
         bar.removeFromLeft (juce::jmin (6, bar.getWidth()));
     };
 
+    place (playButton, h);
     place (channelBox, 150);
     place (tools, tools.getIdealWidth (h));
     place (snapBox, 128);
     place (ghostButton, h);
     place (followButton, h);
-    place (slideButton, 54, true);
+    place (slideButton, h, true);
     place (colourButton, h, true);
-    place (chordBox, 86, true);
-    place (scaleBox, 150, true);
+    place (chordBox, 100, true);
+    place (scaleBox, 164, true);
     if (scaleBox.isVisible())
         place (scaleSnapButton, h);
     else
@@ -1172,10 +1188,12 @@ void PianoRollComponent::paint (juce::Graphics& g)
 
             const auto isC = key % 12 == 0;
 
-            if (isC || hovered || pressed || (! black && rowHeight >= (list ? 8 : 16)))
+            // every key named (LYNX, on by default: notenames::everyKey) once the rows are tall enough to read
+            const auto everyKey = notenames::everyKey.load (std::memory_order_relaxed) && rowHeight >= 8;
+            if (isC || hovered || pressed || everyKey || (! black && rowHeight >= (list ? 8 : 16)))
             {
                 g.setFont (theme::font (fontHeight, isC));
-                g.setColour (pressed ? onAccent : black ? textPrimary : isC ? bg0 : bg0.withAlpha (0.55f));
+                g.setColour (pressed ? onAccent : black ? textPrimary.withAlpha (hovered ? 1.0f : 0.85f) : isC ? bg0 : bg0.withAlpha (everyKey ? 0.72f : 0.55f));
                 const auto area = black ? juce::Rectangle<int> (2, y, blackWidth - 4, rowHeight)
                                         : juce::Rectangle<int> (blackWidth, y, keyboardWidth - blackWidth - 5, rowHeight);
                 textcache::drawText (g, keyName (key), area, black ? juce::Justification::centredLeft : juce::Justification::centredRight, false);
@@ -2489,7 +2507,7 @@ ui::Hint PianoRollComponent::hintAt (juce::Point<int> p)
 
     if (p.y >= rulerTop && p.y < headerHeight && p.x >= keyboardWidth)
     {
-        hint.text = tr ("Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] zoom  [Shift][Wheel] scroll");
+        hint.text = tr ("Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll");
         return hint;
     }
 
@@ -2820,9 +2838,9 @@ void PianoRollComponent::showMoreMenu()
     const auto grid = gridTicks();
     const auto bar = (std::int64_t) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
     juce::PopupMenu menu;
-    menu.addSubMenu (tr ("File"), fileMenu());
-    menu.addSubMenu (tr ("Edit"), editMenu());
-    menu.addSubMenu (tr ("View"), viewMenu());
+    menu.addSubMenu (theme::mnemonic (tr ("File"), 'F'), fileMenu());
+    menu.addSubMenu (theme::mnemonic (tr ("Edit"), 'E'), editMenu());
+    menu.addSubMenu (theme::mnemonic (tr ("View"), 'V'), viewMenu());
     menu.addSubMenu (tr ("Time markers"), markersMenu());
     menu.addSeparator();
     menu.addSectionHeader (tr ("Note operations (selection, or all notes)"));
@@ -2836,8 +2854,8 @@ void PianoRollComponent::showMoreMenu()
     menu.addItem (tr ("Rotate left within the bar") + "\tCtrl+Shift+Left", [this, grid, bar] { runOperation ([grid, bar] (Pattern& p, const std::vector<int>& t) { noteedit::rotate (p, t, grid, bar, -1); return t; }); });
     menu.addItem (tr ("Rotate right within the bar") + "\tCtrl+Shift+Right", [this, grid, bar] { runOperation ([grid, bar] (Pattern& p, const std::vector<int>& t) { noteedit::rotate (p, t, grid, bar, 1); return t; }); });
     menu.addSeparator();
-    menu.addSubMenu (tr ("Tools"), toolsMenu());
-    menu.addSubMenu (tr ("Select"), selectMenu());
+    menu.addSubMenu (theme::mnemonic (tr ("Tools"), 'T'), toolsMenu());
+    menu.addSubMenu (theme::mnemonic (tr ("Select"), 'S'), selectMenu());
     {
         juce::PopupMenu zoom;
         zoom.addItem (tr ("Zoom in") + "\tPageUp", [this] { runAction ("pianoRoll.zoomIn"); });
@@ -2865,6 +2883,12 @@ void PianoRollComponent::showMoreMenu()
         runOperation ([root, scale] (Pattern& p, const std::vector<int>& t) { notetools::snapNotesToScale (p, t, root, scale); return t; });
     });
     menu.addSeparator();
+    menu.addItem (tr ("Note names on every key"), true, notenames::everyKey.load(), [this] {
+        notenames::everyKey.store (! notenames::everyKey.load());
+        if (onNoteNamesChanged != nullptr)
+            onNoteNamesChanged(); // (saved with the settings)
+        repaint();
+    });
     menu.addItem (tr ("Resize notes from the left edge too") + "\tCtrl+Alt+Home", true, resizeFromLeft, [this] { resizeFromLeft = ! resizeFromLeft; });
     menu.addItem (tr ("Show ghost notes") + "\tAlt+V", true, showGhosts,
                   [this] { ghostButton.setToggleState (! ghostButton.getToggleState(), juce::sendNotificationSync); });
@@ -3168,14 +3192,14 @@ juce::PopupMenu PianoRollComponent::selectMenu()
     auto choose = [this] (std::function<std::vector<int> (const Pattern&, const std::vector<int>&)> pick) {
         setSelection (pick (currentPattern (engine.getSong()), channelNotes()));
     };
-    menu.addItem (tr ("All") + "\tCtrl+A", [this] { selectAll(); });
-    menu.addItem (tr ("Invert selection") + "\tShift+I", [this] { runAction ("pianoRoll.invertSelection"); });
-    menu.addItem (tr ("Deselect") + "\tEsc", ! selection.empty(), false, [this] { setSelection ({}); });
+    menu.addItem (theme::mnemonic (tr ("All"), 'a') + "\tCtrl+A", [this] { selectAll(); });
+    menu.addItem (theme::mnemonic (tr ("Invert selection"), 'I') + "\tShift+I", [this] { runAction ("pianoRoll.invertSelection"); });
+    menu.addItem (theme::mnemonic (tr ("Deselect"), 'D') + "\tEsc", ! selection.empty(), false, [this] { setSelection ({}); });
     menu.addSeparator();
     // FL's Select items with their keys (round 168g): they add to the selection
-    menu.addItem (tr ("Select one at random") + keyText ("pianoRoll.selectRandomOne"), [this] { runAction ("pianoRoll.selectRandomOne"); });
-    menu.addItem (tr ("Select more at random") + keyText ("pianoRoll.selectRandomMore"), [this] { runAction ("pianoRoll.selectRandomMore"); });
-    menu.addItem (tr ("Select odd (swung) notes") + keyText ("pianoRoll.selectOddSteps"), [this] { runAction ("pianoRoll.selectOddSteps"); });
+    menu.addItem (theme::mnemonic (tr ("Select one at random"), 'r') + keyText ("pianoRoll.selectRandomOne"), [this] { runAction ("pianoRoll.selectRandomOne"); });
+    menu.addItem (theme::mnemonic (tr ("Select more at random"), 'r') + keyText ("pianoRoll.selectRandomMore"), [this] { runAction ("pianoRoll.selectRandomMore"); });
+    menu.addItem (theme::mnemonic (tr ("Select odd (swung) notes"), 'o') + keyText ("pianoRoll.selectOddSteps"), [this] { runAction ("pianoRoll.selectOddSteps"); });
     menu.addSeparator();
     menu.addItem (tr ("Odd notes (every other one)"), [choose] { choose ([] (const Pattern& p, const std::vector<int>& t) { return notetools::selectOdd (p, t); }); });
     menu.addItem (tr ("Even notes"), [choose] {
@@ -3185,10 +3209,10 @@ juce::PopupMenu PianoRollComponent::selectMenu()
         const auto seed = (std::uint32_t) juce::Random::getSystemRandom().nextInt();
         choose ([seed] (const Pattern& p, const std::vector<int>& t) { return notetools::selectRandom (p, t, 0.5f, seed); });
     });
-    menu.addItem (tr ("Muted notes"), [choose] { choose ([] (const Pattern& p, const std::vector<int>& t) { return notetools::selectMuted (p, t); }); });
+    menu.addItem (theme::mnemonic (tr ("Muted notes"), 'm'), [choose] { choose ([] (const Pattern& p, const std::vector<int>& t) { return notetools::selectMuted (p, t); }); });
     menu.addItem (tr ("Overlapping notes"), [choose] { choose ([] (const Pattern& p, const std::vector<int>& t) { return notetools::selectOverlapping (p, t); }); });
     menu.addItem (tr ("Stacked notes (hidden duplicates)"), [choose] { choose ([] (const Pattern& p, const std::vector<int>& t) { return notetools::selectStacked (p, t); }); });
-    menu.addItem (tr ("Same colour as the selection") + "\tShift+C", [this] { runAction ("pianoRoll.selectByColour"); });
+    menu.addItem (theme::mnemonic (tr ("Same colour as the selection"), 'c') + "\tShift+C", [this] { runAction ("pianoRoll.selectByColour"); });
     menu.addSeparator();
     menu.addItem (tr ("Group the selected notes") + "\tShift+G", selection.size() > 1, false, [this] { runAction ("pianoRoll.groupNotes"); });
     menu.addItem (tr ("Ungroup the selected notes") + "\tAlt+G", ! selection.empty(), false, [this] { runAction ("pianoRoll.ungroupNotes"); });
@@ -3491,7 +3515,7 @@ void PianoRollComponent::wheelNoteProperty (int note, float deltaY, bool fine, j
     });
 }
 
-void PianoRollComponent::glideBy (double ticks, double pixels)
+void PianoRollComponent::glideBy (double ticks, double pixels, bool immediate)
 {
     if (! gliding)
     {
@@ -3503,6 +3527,17 @@ void PianoRollComponent::glideBy (double ticks, double pixels)
     const auto grid = gridArea();
     glideX.target = juce::jlimit (0.0, juce::jmax (0.0, (double) viewLengthTicks() - grid.getWidth() / pixelsPerTick), glideX.target + ticks);
     glideY.target = juce::jlimit (0.0, juce::jmax (0.0, (double) rows.count * rowHeight - grid.getHeight()), glideY.target + pixels);
+    if (immediate)
+    {
+        scrollTicks = glideX.target;
+        scrollY = (int) std::round (glideY.target);
+        gliding = false;
+        updateScrollBars();
+        glideX.jumpTo (scrollTicks);
+        glideY.jumpTo (scrollY);
+        repaint();
+        return;
+    }
     glideFrame();
 }
 
@@ -3527,8 +3562,32 @@ void PianoRollComponent::glideFrame()
     repaint();
 }
 
-void PianoRollComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
+void PianoRollComponent::mouseMagnify (const juce::MouseEvent& e, float scale)
 {
+    gliding = false;
+    const auto factor = gesture::pinchZoomFactor (scale);
+    if (e.mods.isAltDown()) // taller / shorter keys, keeping the key under the pointer in place
+    {
+        const auto key = yToKey (e.y);
+        const auto offset = e.y - keyToY (key);
+        const auto height = juce::jlimit (gesture::minKeyHeight, gesture::maxKeyHeight, juce::roundToInt (rowHeight * factor));
+        rowHeight = height != rowHeight ? height : juce::jlimit (gesture::minKeyHeight, gesture::maxKeyHeight, rowHeight + (factor > 1.0 ? 1 : factor < 1.0 ? -1 : 0));
+        scrollY = juce::jmax (0, rowFor (key) * rowHeight + offset - (e.y - headerHeight));
+    }
+    else
+    {
+        const auto anchorPixels = (double) juce::jmax (0, e.x - keyboardWidth);
+        const auto zoomed = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, pixelsPerTick * factor);
+        scrollTicks = gesture::zoomAnchored (scrollTicks, pixelsPerTick, zoomed, anchorPixels);
+        pixelsPerTick = zoomed;
+    }
+    updateScrollBars();
+    repaint();
+}
+
+void PianoRollComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& rawWheel)
+{
+    const auto wheel = flmods::normalisedWheel (rawWheel); // Windows touchpads: pieces of a notch (round 170e)
     const auto ctrl = flmods::ctrl (e.mods), alt = e.mods.isAltDown(), shift = e.mods.isShiftDown();
     const auto overGrid = gridArea().contains (e.getPosition()) || velocityArea().contains (e.getPosition());
 
@@ -3593,9 +3652,9 @@ void PianoRollComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::
         const auto vertical = gesture::wheelScrollPixels (wheel.deltaY, wheel.isSmooth, 3.0 * rowHeight);
         const auto sideways = gesture::wheelScrollPixels (wheel.deltaX, wheel.isSmooth, 60.0);
         if (shift)
-            glideBy (gesture::wheelScrollPixels (wheel.deltaY, wheel.isSmooth, 80.0) / pixelsPerTick, 0.0);
+            glideBy (gesture::wheelScrollPixels (wheel.deltaY, wheel.isSmooth, 80.0) / pixelsPerTick, 0.0, wheel.isSmooth);
         else
-            glideBy (sideways / pixelsPerTick, vertical);
+            glideBy (sideways / pixelsPerTick, vertical, wheel.isSmooth); // a trackpad moves the view at once
         return;
     }
 
@@ -3644,9 +3703,9 @@ void PianoRollComponent::duplicateSelection()
         return;
 
     std::vector<int> added;
-    const auto grid = gridTicks();
-    editNotes ([&added, &source, grid] (Pattern& p) {
-        added = noteedit::duplicate (p, source, grid);
+    const auto beatsPerBar = engine.getSong().beatsPerBar;
+    editNotes ([&added, &source, beatsPerBar] (Pattern& p) {
+        added = noteedit::duplicateBars (p, source, beatsPerBar); // FL: whole bars later (round 170h)
         notetools::regroup (p, added);
     });
     setSelection (added);
@@ -4083,11 +4142,16 @@ void PianoRollComponent::timerCallback()
     auto& transport = engine.getTransport();
     auto tick = -1.0;
 
-    // the playhead shows while the edited pattern plays: Pattern mode, or a clip of it in Song mode (round 162)
-    if (transport.playing.load() && isShowing())
+    if (const bool playing = transport.playing.load(); playButton.getToggleState() != playing)
+        playButton.setToggleState (playing, juce::dontSendNotification);
+
+    // the playhead shows while the edited pattern plays: Pattern mode, or a clip of it in Song mode (round 162);
+    // stopped in Step edit too (round 170e5): it is where the next played note goes (FL enters step-edit notes at the
+    // song position, which it draws in the Piano roll), and it moves a snap step on after each one
+    if ((transport.playing.load() || engine.isStepEdit()) && isShowing())
     {
         const auto& song = engine.getSong();
-        tick = transportedit::patternPlayhead (song, song.currentPattern, transport.positionTicks.load());
+        tick = transportedit::patternPlayhead (song, song.currentPattern, transport.positionTicks.load(), engine.patternLinearOrigin());
     }
 
     if (tick != playheadTick)
@@ -4431,15 +4495,15 @@ juce::PopupMenu PianoRollComponent::fileMenu()
     // FL's EEFileMenu (DFM): Open score, Browse scores, Save score as | Import / Export MIDI, Paste from / Copy to MIDI
     // clipboard
     juce::PopupMenu menu;
-    menu.addItem (tr ("Open score...") + keyText ("pianoRoll.openScore"), [this] { runAction ("pianoRoll.openScore"); });
-    menu.addItem (tr ("Browse scores") + keyText ("pianoRoll.browseScores"), onBrowseScores != nullptr, false, [this] { runAction ("pianoRoll.browseScores"); });
-    menu.addItem (tr ("Save score as...") + keyText ("pianoRoll.saveScore"), [this] { runAction ("pianoRoll.saveScore"); });
+    menu.addItem (theme::mnemonic (tr ("Open score..."), 'O') + keyText ("pianoRoll.openScore"), [this] { runAction ("pianoRoll.openScore"); });
+    menu.addItem (theme::mnemonic (tr ("Browse scores"), 'B') + keyText ("pianoRoll.browseScores"), onBrowseScores != nullptr, false, [this] { runAction ("pianoRoll.browseScores"); });
+    menu.addItem (theme::mnemonic (tr ("Save score as..."), 'S') + keyText ("pianoRoll.saveScore"), [this] { runAction ("pianoRoll.saveScore"); });
     menu.addSeparator();
-    menu.addItem (tr ("Import MIDI file...") + keyText ("pianoRoll.importMidi"), [this] { runAction ("pianoRoll.importMidi"); });
-    menu.addItem (tr ("Export as MIDI file...") + keyText ("pianoRoll.exportMidi"), [this] { runAction ("pianoRoll.exportMidi"); });
-    menu.addItem (tr ("Paste from MIDI clipboard...") + keyText ("pianoRoll.pasteMidiClipboard"), midiclipboard::hasMidi(), false,
+    menu.addItem (theme::mnemonic (tr ("Import MIDI file..."), 'I') + keyText ("pianoRoll.importMidi"), [this] { runAction ("pianoRoll.importMidi"); });
+    menu.addItem (theme::mnemonic (tr ("Export as MIDI file..."), 'E') + keyText ("pianoRoll.exportMidi"), [this] { runAction ("pianoRoll.exportMidi"); });
+    menu.addItem (theme::mnemonic (tr ("Paste from MIDI clipboard..."), 'P') + keyText ("pianoRoll.pasteMidiClipboard"), midiclipboard::hasMidi(), false,
                   [this] { runAction ("pianoRoll.pasteMidiClipboard"); });
-    menu.addItem (tr ("Copy to MIDI clipboard") + keyText ("pianoRoll.copyMidiClipboard"), [this] { runAction ("pianoRoll.copyMidiClipboard"); });
+    menu.addItem (theme::mnemonic (tr ("Copy to MIDI clipboard"), 'C') + keyText ("pianoRoll.copyMidiClipboard"), [this] { runAction ("pianoRoll.copyMidiClipboard"); });
     return menu;
 }
 
@@ -4449,12 +4513,12 @@ juce::PopupMenu PianoRollComponent::editMenu()
     const auto hasTime = timeFrom >= 0 && timeTo > timeFrom;
     const auto grid = gridTicks();
     juce::PopupMenu menu;
-    menu.addItem (tr ("Cut") + "\tCtrl+X", ! selection.empty(), false, [this] { copySelection(); deleteSelection(); });
-    menu.addItem (tr ("Copy") + "\tCtrl+C", [this] { copySelection(); });
-    menu.addItem (tr ("Paste") + "\tCtrl+V", ! clipboard.empty(), false, [this] { paste(); });
-    menu.addItem (tr ("Duplicate") + "\tCtrl+B", [this] { duplicateSelection(); });
-    menu.addItem (tr ("Delete") + "\tDel", ! selection.empty(), false, [this] { deleteSelection(); });
-    menu.addItem (tr ("Delete all") + keyText ("pianoRoll.deleteAll"), [this] { runAction ("pianoRoll.deleteAll"); });
+    menu.addItem (theme::mnemonic (tr ("Cut"), 't') + "\tCtrl+X", ! selection.empty(), false, [this] { copySelection(); deleteSelection(); });
+    menu.addItem (theme::mnemonic (tr ("Copy"), 'C') + "\tCtrl+C", [this] { copySelection(); });
+    menu.addItem (theme::mnemonic (tr ("Paste"), 'P') + "\tCtrl+V", ! clipboard.empty(), false, [this] { paste(); });
+    menu.addItem (theme::mnemonic (tr ("Duplicate"), 'u') + "\tCtrl+B", [this] { duplicateSelection(); });
+    menu.addItem (theme::mnemonic (tr ("Delete"), 'D') + "\tDel", ! selection.empty(), false, [this] { deleteSelection(); });
+    menu.addItem (theme::mnemonic (tr ("Delete all"), 'a') + keyText ("pianoRoll.deleteAll"), [this] { runAction ("pianoRoll.deleteAll"); });
     menu.addSeparator();
     menu.addItem (tr ("Shift left") + "\tShift+Left", ! selection.empty(), false, [this, grid] { nudge (-grid, 0); });
     menu.addItem (tr ("Shift right") + "\tShift+Right", ! selection.empty(), false, [this, grid] { nudge (grid, 0); });

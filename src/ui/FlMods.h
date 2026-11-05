@@ -4,6 +4,7 @@
 // isCtrlDown() / isPopupMenu() wherever an FL Ctrl gesture exists (on macOS JUCE turns Control+click into a popup
 // click and never maps Cmd to Ctrl). On Windows and Linux they return exactly isCtrlDown() / isPopupMenu().
 
+#include "core/EditorGestures.h"
 #include "core/ModifierMap.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -32,6 +33,23 @@ inline bool ctrl (const juce::ModifierKeys& m) noexcept { return of (m).ctrl; }
 
 // a right click (never Control+left, which is FL's Ctrl role on a Mac)
 inline bool popup (const juce::ModifierKeys& m) noexcept { return of (m).popup; }
+
+// The wheel event with Windows touchpad pieces of a notch turned into smooth deltas (core/EditorGestures.h,
+// gesture::normaliseWheel; round 170e). Other platforms: unchanged.
+inline juce::MouseWheelDetails normalisedWheel (const juce::MouseWheelDetails& wheel) noexcept
+{
+   #if JUCE_WINDOWS
+    constexpr bool windows = true;
+   #else
+    constexpr bool windows = false; // (JUCE_WINDOWS is only defined on Windows: an expression broke Linux and macOS)
+   #endif
+    const auto w = gesture::normaliseWheel (wheel.deltaX, wheel.deltaY, wheel.isSmooth, windows);
+    auto out = wheel;
+    out.deltaX = (float) w.x;
+    out.deltaY = (float) w.y;
+    out.isSmooth = w.smooth;
+    return out;
+}
 
 // key names of hint / shortcut texts for this platform (⌘ / ⌥ on macOS)
 inline juce::String keyNames (const juce::String& text)

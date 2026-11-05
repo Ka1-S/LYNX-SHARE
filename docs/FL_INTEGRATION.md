@@ -53,3 +53,4 @@ project (the file name, then with its last folders: `Samples\kick.wav`). The rep
 Read-only: no FL file or registry key is written. Encrypted content (FLEX packs, licensed data) is never opened;
 the plugin database holds no licensed content. No Image-Line file is committed (tests use synthetic fixtures).
 Test hook: `LYNX_FL_USER_DATA=<folder>` makes LYNX SHARE read a synthetic user data folder instead of FL's (used to check the database path end to end).
+Test hook: `LYNX_NO_FL=1` makes LYNX SHARE behave as on a computer without FL Studio (no installation, no user data), even where FL is installed; `0` or unset keeps the FL found.

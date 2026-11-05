@@ -55,7 +55,9 @@ inline void quantizeClipStarts (std::vector<Clip>& clips, const std::vector<int>
 // Where the Piano Roll's playhead is inside `pattern` (in ticks of the pattern), or -1 when that pattern is not
 // playing: in Pattern mode the current pattern loops; in Song mode the playhead shows while the song position is
 // inside a clip of that pattern (the clip's offset counts; the clip shown first in the Playlist wins).
-inline double patternPlayhead (const Song& song, int pattern, double transportTick)
+// `linearOrigin` >= 0: a Loop-record-off take in Pattern mode plays the pattern once from there (round 170e5), so the
+// playhead runs on past the pattern's end instead of going back
+inline double patternPlayhead (const Song& song, int pattern, double transportTick, double linearOrigin = -1.0)
 {
     if (pattern < 0 || pattern >= (int) song.patterns.size() || transportTick < 0.0)
         return -1.0;
@@ -64,6 +66,8 @@ inline double patternPlayhead (const Song& song, int pattern, double transportTi
     {
         if (pattern != song.currentPattern)
             return -1.0;
+        if (linearOrigin >= 0.0 && transportTick >= linearOrigin)
+            return transportTick - linearOrigin;
         const auto length = (double) std::max<std::int64_t> (1, song.patterns[(std::size_t) pattern].effectiveLength (song.beatsPerBar));
         return std::fmod (transportTick, length);
     }
@@ -143,5 +147,12 @@ inline std::int64_t stopTarget (bool alreadyStopped, bool rememberSeek, std::int
 inline std::int64_t shiftSpaceStopTarget (bool songMode, bool hasTimeSelection, std::int64_t selectionStart) noexcept
 {
     return songMode && hasTimeSelection ? std::max<std::int64_t> (0, selectionStart) : 0;
+}
+
+// Right-click on the Piano roll's play button (FL 2026, tried in FL on macOS for WORKFLOW_FL R29): it stops and goes
+// back to where playback last started (a ruler click, not always bar 1); stopped there already, to the pattern start.
+inline double rollPlayRightClickTarget (bool playing, double position, double lastStart) noexcept
+{
+    return playing || position != lastStart ? std::max (0.0, lastStart) : 0.0;
 }
 } // namespace lynx::transportedit

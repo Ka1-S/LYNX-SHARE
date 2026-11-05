@@ -80,6 +80,17 @@ double renderChannel (const lynx::ChannelDef& channel, const lynx::natives::FlAc
     }
     return std::sqrt (sum / (2.0 * n));
 }
+// The channel the pitch / voice-layer tests were written with: the engine's `Default.*` preset when FL ships one (a new
+// channel until round 169l2, which made it FL's Plugin database patch: unison saws, delay echoes and arpeggios the
+// autocorrelation pitch estimate can't read), otherwise the new channel
+std::optional<lynx::ChannelDef> writtenWith (lynx::InstrumentKind kind, const lynx::natives::FlAccess& fl)
+{
+    for (const auto& path : lynx::natives::presetCandidates (lynx::natives::presetFolderOf (kind), true, fl))
+        if (path.find ("Plugin presets") != std::string::npos && std::filesystem::path (path).stem().string() == "Default")
+            if (auto c = lynx::natives::channelFromPresetFile (kind, path, fl))
+                return c;
+    return lynx::natives::makeChannel (kind, fl);
+}
 } // namespace natives142
 
 TEST (natives142_lists_and_no_fl_installation)
@@ -191,7 +202,7 @@ TEST (natives142_engines_from_the_fl_installation)
         CHECK (c->instrument == e.kind && c->name == e.name);
         if (e.kind == InstrumentKind::granulizer || e.kind == InstrumentKind::wavetraveller) // (play the channel's sample: none yet)
             continue;
-        const auto rms = natives142::renderChannel (*c, fl, e.kind == InstrumentKind::drumaxx ? 48 : 60);
+        const auto rms = natives142::renderChannel (*c, fl, e.kind == InstrumentKind::drumaxx ? 36 : 60); // (FL's Default Kit: the kick on 36, round 169e)
         CHECK (rms > 1.0e-3 && std::isfinite (rms));
         if (! (rms > 1.0e-3))
         {

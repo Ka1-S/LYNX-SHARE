@@ -78,3 +78,30 @@ jobs:
           "${run[@]}" "$bin" --selftest "$PWD/selftest.txt" "$PWD/selftest-demo.lynx" || true
           cat selftest.txt
           grep -q '^result=OK' selftest.txt
+
+      # Round 170c (issue #11): the plugin editors as this platform draws them (macOS = CoreGraphics), one PNG each,
+      # and the renderer probe (gradient text / empty paths must stay inside their shapes). Kept as an artifact.
+      - name: Editor pictures
+        if: always()
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            bin=build/LYNX_artefacts/Release/LYNX; run=(xvfb-run -a)
+          else
+            bin=build/LYNX_artefacts/Release/LYNX.app/Contents/MacOS/LYNX; run=()
+          fi
+          mkdir -p editor-pictures
+          "${run[@]}" "$bin" --gfxprobe "$PWD/editor-pictures/gfxprobe.txt" || true
+          cat editor-pictures/gfxprobe.txt || true
+          perl -e 'alarm shift; exec @ARGV' 600 "${run[@]}" "$bin" --steppertest "$PWD/editor-pictures/steppertest.txt" || true
+          tail -3 editor-pictures/steppertest.txt || true
+          perl -e 'alarm shift; exec @ARGV' 1200 "${run[@]}" "$bin" --plugui "$PWD/editor-pictures" || true
+          ls editor-pictures | wc -l
+
+      - name: Upload the editor pictures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: editor-pictures-${{ runner.os }}
+          path: editor-pictures
+          retention-days: 14

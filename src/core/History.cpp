@@ -187,6 +187,20 @@ ChangeLabel describeChange (const Song& before, const Song& after)
         return label (TR_NOOP ("Mixer: {0}"), b.name);
     }
 
+    // FL's legacy Pattern Blocks (round 170f)
+    if (before.patternBlocksOn != after.patternBlocksOn)
+        return label (TR_NOOP ("Pattern blocks"));
+    if (before.blocks != after.blocks)
+    {
+        if (after.blocks.empty() && after.playlist.size() > before.playlist.size())
+            return label (TR_NOOP ("Turn pattern blocks into clips"));
+        if (after.blocks.size() > before.blocks.size())
+            return label (TR_NOOP ("Paint pattern blocks"));
+        if (after.blocks.size() < before.blocks.size())
+            return label (TR_NOOP ("Erase pattern blocks"));
+        return label (TR_NOOP ("Edit pattern blocks"));
+    }
+
     // playlist
     if (! sameClips (before.playlist, after.playlist))
     {

@@ -522,7 +522,9 @@ protected:
     void paint (juce::Graphics& g) override
     {
         using namespace theme;
-        const skin::StyleScope styleScope (editorStyle());
+        const skin::StyleScope styleScope (editorStyle(), skin::artForEffect (kind));
+        // round 170k: Themed draws in the effect's own art, and the editor's own drawing follows the art's accent
+        accent = editorStyle() == skin::Style::themed ? skin::artAccent (skin::artForEffect (kind)) : skin::accentFor (kind);
         skin::canvas (g, getLocalBounds().toFloat(), accent);
         const auto* fx = current();
         if (fx == nullptr)

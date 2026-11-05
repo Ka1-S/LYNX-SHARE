@@ -16,7 +16,7 @@ TEST (issue23_fl_function_keys_and_the_sheet_list)
     CHECK (map.conflicts().empty());
     CHECK (map.find ({ f12, ctrl }, Context::global, false) == "view.closeUnfocusedWindows");
     CHECK (map.find ({ f7, alt }, Context::global, false) == "view.touchKeyboard");
-    CHECK (map.find ({ f8 }, Context::global, false) == "panel.quickAdd");
+    CHECK (map.find ({ f8 }, Context::global, false) == "view.pluginPicker"); // round 169k: FL's Plugin picker view
     CHECK (map.find ({ f1 }, Context::global, false) == "help.shortcuts");
     // the sheet's column: every F-key binding, F1 first, F12 last, plain before Shift / Ctrl / Alt
     const auto list = map.functionKeyBindings();
@@ -184,9 +184,16 @@ TEST (issue24_fl_ogun_presets_in_fls_order)
         return;
     channel->mixerTrack = 3;
     channel->misc.pitchRange = 7;
-    // (FL's three "Default" presets are Ogun state version 12, which LYNX's Ogun engine doesn't read yet: the arrows
-    // pass over them; "300 Ft Glass Bowl", the new channel's own default, and "Alien Queens Lair" are version 14)
-    CHECK (! lynx::natives::withPreset (*channel, list[1].path, list[1].name, fl).has_value());
+    // (FL's three "Default" presets are Ogun state version 12: since round 169l LYNX reads them too (REA_rodada169l §4),
+    // rewritten as version 14, so the arrows stop on them like FL; "Alien Queens Lair" is version 14)
+    const auto pad = lynx::natives::withPreset (*channel, list[1].path, list[1].name, fl);
+    CHECK (pad.has_value());
+    if (pad)
+    {
+        CHECK (pad->instrument == lynx::InstrumentKind::ogun && pad->name == "Default (pad)");
+        CHECK (pad->mixerTrack == 3 && pad->misc.pitchRange == 7);
+        CHECK (! pad->pluginState.empty() && pad->pluginState[0] == 14);
+    }
     const auto next = lynx::natives::withPreset (*channel, list[4].path, list[4].name, fl);
     CHECK (next.has_value());
     if (next)

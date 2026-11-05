@@ -14,9 +14,12 @@
 #include <cstring>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <mutex>
 
+#include "core/EngineParams.h"
 #include "core/HarmlessFx.h"
+#include "core/ModelParamsSynths.h"
 #include "core/Inflate.h"
 #include "core/PlateReverb.h"
 
@@ -214,10 +217,30 @@ std::optional<StateData> parseState (const std::vector<std::uint8_t>& blob, bool
     StateData S;
     S.autogun = autogun;
     S.version = (int) (vw > 0xffff ? vw >> 16 : vw);
-    if (S.version < 14)
+    if (S.version < 10 || vw == 0x7fffffffu || vw >= 0x130004u)
         return std::nullopt;
     auto body = inflateZlib (blob.data() + 4, blob.size() - 4, false, 16u << 20);
-    if (! body || body->size() < 0x100 + 3 + 12)
+    if (! body)
+        return std::nullopt;
+    if (S.version < 14)
+    {
+        // versions 10…13 (FL's Plugin database Ogun is version 11, round 169l): SaveRestoreState FUN_00864d00 first sets
+        // the parameter bytes at plugin +0x20f…+0x22b (P + 0xe3…0xff: 0, 0, 1, 0, 0, 16 × 0, 0, 0, –, 0, i32 430), then
+        // reads 12 bytes into P + 0 and fewer bytes than today into P + 12 (0xf4 − 1 (v < 11) − 1 (v < 12) − 6
+        // (v < 13)), and clears +0x226 (P + 0xfa) below version 14; the rest of the stream is today's layout
+        const std::size_t n = 12 + 0xf4 - (S.version < 11 ? 1u : 0u) - (S.version < 12 ? 1u : 0u) - (S.version < 13 ? 6u : 0u);
+        if (body->size() < n)
+            return std::nullopt;
+        std::vector<std::uint8_t> image (0x100, 0);
+        image[0xe5] = 1;
+        const std::int32_t dust = 0x1ae;
+        std::memcpy (image.data() + 0xfc, &dust, 4);
+        std::copy (body->begin(), body->begin() + (std::ptrdiff_t) n, image.begin());
+        image[0xfa] = 0;
+        image.insert (image.end(), body->begin() + (std::ptrdiff_t) n, body->end());
+        *body = std::move (image);
+    }
+    if (body->size() < 0x100 + 3 + 12)
         return std::nullopt;
     S.body = std::move (*body);
     std::memcpy (S.P.data(), S.body.data(), 256);
@@ -1402,6 +1425,293 @@ struct Patch
     std::uint8_t flag (int off) const noexcept { return fl[(std::size_t) (off - 0x200)]; }
 };
 
+// master level and tuning from P[0…2] (FUN_0086a570)
+void designMaster (Patch& p) noexcept
+{
+    const auto& P = p.P;
+    const auto x = f32 (P[0] * 0.0078125);
+    p.master = x == 1.0 ? 1.0 : f32 ((std::exp (x * f32 (std::log (3.0))) - 1.0) * 0.5);
+    if (p.S.autogun)
+        p.master = f32 (p.master * 0.25); // Autogun: the same law × 0.25 (REA_rodada57 §1.3)
+    p.masterCents = P[1] * 100 + P[2];
+}
+
+// the timbre generator's knobs P[5…11]: pre-decay, decay, release, fullness, morph, seeds (FUN_008684e0 cases 5…11)
+void designTimbre (Patch& p) noexcept
+{
+    const auto& P = p.P;
+    p.pre = f32 (P[5] * f32 (0.001));
+    p.dec = P[6] == 10000 ? -1.0 : f32 (P[6] * 0.0001);
+    p.rel = f32 (P[7] * 0.0001);
+    p.full = f32 (P[8] * f32 (0.001));
+    p.morph = f32 (P[9] * f32 (0.001));
+    p.seed1 = P[10] - 1 < 0 ? -1 : mix32 ((long long) P[10] - 0x20cf, 0x1cfc);
+    p.seed2 = P[11] - 1 < 0 ? -1 : mix32 ((long long) P[11] - 0x20cf, 0x1cfc);
+}
+
+// the filter's cutoff / resonance knobs P[17], P[18] (FUN_008684e0 cases 17, 18)
+void designFilterKnobs (Patch& p) noexcept
+{
+    p.fcut = f32 (p.P[17] * 0.00390625);
+    p.fres = f32 (p.P[18] * 0.00390625);
+}
+
+// one band of the plugin EQ from P[40 + k], P[43 + k], P[46 + k] (FUN_0086a670, FUN_00625290)
+void designEqBand (Patch* pp, int k, bool report = true)
+{
+    auto& p = *pp;
+    const auto& P = p.P;
+    const auto& S = p.S;
+    const double fs = p.fs;
+    const int maxBlock = p.maxBlock;
+    const double tempo = p.tempo;
+    (void) P, (void) S, (void) fs, (void) maxBlock, (void) tempo;
+    const auto level = f32 (P[40 + k] * f32 (0.01));
+    auto fq = f32 (f32 (std::exp (f32 (P[43 + k] * 1.52587890625e-05) * std::log (101.0)) - 1.0) * 159.9 + 10.0);
+    const auto width = f32 (P[46 + k] * 1.52587890625e-05);
+    const int dtype = S.eqtype[(std::size_t) k] + 6;
+    const auto nyq = f32 (fs * 0.4999);
+    if (fq > nyq)
+        fq = nyq;
+    const auto w = fq * (2.0 * kPi / fs);
+    const auto sn = std::sin (w), cs = std::cos (w);
+    double A, p3;
+    if (dtype == 7)
+    {
+        A = std::exp (level * 0.025 * std::log (10.0));
+        const auto f1 = f32 (std::exp (width * std::log (1001.0)) - 1.0);
+        p3 = sn / ((f1 * 0.0999 + 0.1) * 2.0);
+    }
+    else
+    {
+        A = std::exp (level * 0.025 * std::log (10.0));
+        p3 = std::sqrt ((A * A + 1.0) / (width * 1.9 + 0.1) - (A - 1.0) * (A - 1.0));
+    }
+    auto& b = p.eq[(std::size_t) k];
+    b.on = level != 0.0 && dtype >= 6 && dtype <= 8;
+    if (report && level != 0.0 && ! b.on)
+        p.fallbacks.push_back ("unknown EQ band type (band off)");
+    if (b.on)
+        b.c = design (dtype, A, p3, sn, cs);
+}
+
+// the chorus taps from P[19…25] (FUN_0086a2d0, FUN_00840690; our ogfx_chorus.py)
+void designChorus (Patch* pp)
+{
+    auto& p = *pp;
+    const auto& P = p.P;
+    const auto& S = p.S;
+    const double fs = p.fs;
+    const int maxBlock = p.maxBlock;
+    const double tempo = p.tempo;
+    (void) P, (void) S, (void) fs, (void) maxBlock, (void) tempo;
+    p.chorusOn = false;
+    p.taps.clear(); // (capacity kept: 18 taps reserved at build)
+    p.chorusD = 0, p.chorusRing = 0, p.chorusDry = 1.0f;
+    if (P[19] >= 1)
+    {
+        p.chorusOn = true;
+        const int order = std::max ((int) P[19], 1);
+        const auto depth = f32 (P[20] * 0.0009765625), speed = f32 (P[21] * 0.0009765625);
+        const auto delay = (double) ((float) P[22] * 0.0078125f);
+        const auto spread = (double) ((float) P[23] * 0.0078125f);
+        const auto cross = (double) ((float) P[24] * 0.0078125f);
+        const auto m = (double) ((float) std::abs ((int) P[25]) * 0.0078125f);
+        const double LN11 = std::log (11.0), LN101 = std::log (101.0), LN1001 = std::log (1001.0), LN5 = std::log (5.0);
+        p.chorusDry = (float) (1.0f - (float) (std::exp (m * LN5) - 1.0) * 0.25f);
+        const int sg = P[25] == 0 ? 0 : (P[25] > 0 ? 1 : -1);
+        const auto wet = (float) ((float) sg * (1.0f - (float) (std::exp ((double) (float) (1.0f - (float) m) * LN5) - 1.0) * 0.25f));
+        auto warp = [&] (double v, double scale) { return (float) ((float) (std::exp ((double) (float) v * LN11) - 1.0) * (float) ((float) scale / 10.0f)); };
+        const auto A = warp (depth, 1092.5);
+        const auto r = f32 (std::exp ((double) (float) (1.0f - (float) speed) * LN101) - 1.0);
+        const auto K = (2147483648.0 / (r * 75000.0 + 50000.0)) * 500.0;
+        const auto Bd = warp (delay, 4410.0);
+        const auto sp = (float) ((float) (std::exp (spread * LN1001) - 1.0) / 1000.0f);
+        const auto fsr = (float) (44100.0 / (double) (int) fs);
+        auto xmix = [&] (double a, double b) { return a * (double) sp + b * (double) (1.0f - sp); };
+        const int cnt = 2 * order;
+        float maxd = 0.0f, gsum = 0.0f;
+        for (int i = 0; i < cnt; ++i)
+        {
+            float t;
+            int ch;
+            std::uint32_t ph0;
+            if (i < order)
+                t = (float) i, ch = 0, ph0 = 0;
+            else
+                t = (float) (cnt - i - 1), ch = 1, ph0 = 0x80000000u;
+            const float w = 1.0f - t / (float) order;
+            float jt;
+            std::memcpy (&jt, &chorusJitterBits[i % 20], 4);
+            const auto jj = f32 (xmix ((double) (jt * jt), 1.0));
+            float gL = 1.0f, gR = (float) cross * w;
+            if (ch)
+                std::swap (gL, gR);
+            gsum = (float) ((double) gsum + std::fabs ((double) gL) + std::fabs ((double) gR));
+            auto base = A * w + 10.0f;
+            const auto k0 = K / (double) (A + 10.0f);
+            const auto k1 = K * jj / (double) base;
+            const auto kk = xmix (k1, k0);
+            const auto dmod = (float) xmix ((double) ((Bd * w) * (float) jj), (double) Bd);
+            const auto off = (long long) rnd ((double) ((w * sp) * 2147483648.0f / 256.0f));
+            ph0 = (std::uint32_t) (ph0 + (std::uint32_t) ((std::uint64_t) off << 8));
+            const auto inc = (std::uint32_t) (std::int64_t) rnd (kk * (double) fsr);
+            base = base / fsr;
+            auto qd = dmod / fsr;
+            if (! (qd > 8.0f))
+                qd = 8.0f;
+            const float centre = base + qd;
+            const float v = centre + base;
+            if (! (maxd > v))
+                maxd = v;
+            const auto sq = std::sqrt ((double) (base * 4.0f));
+            ChorusTap tp;
+            tp.ch = ch, tp.gL = gL, tp.gR = gR, tp.centre = (double) centre, tp.inc = inc, tp.ph0 = ph0;
+            tp.s8 = f32 (sq / 2147483648.0), tp.s9 = f32 (sq), tp.s10 = f32 (sq / 2.0);
+            p.taps.push_back (tp);
+        }
+        auto g = (float) (1.0f - (float) (std::exp ((double) (float) (1.0f - 1.0f / gsum) * LN1001) - 1.0) / 1000.0f);
+        g = g * wet;
+        for (auto& tp : p.taps)
+            tp.gL = tp.gL * g, tp.gR = tp.gR * g;
+        p.chorusD = (int) rnd ((double) maxd) + 8;
+        p.chorusRing = maxBlock * p.osf + p.chorusD;
+    }
+}
+
+// the delay from P[26…30] and the tempo (FUN_00869dd0; our ogfx_delay.py)
+void designDelay (Patch* pp)
+{
+    auto& p = *pp;
+    const auto& P = p.P;
+    const auto& S = p.S;
+    const double fs = p.fs;
+    const int maxBlock = p.maxBlock;
+    const double tempo = p.tempo;
+    (void) P, (void) S, (void) fs, (void) maxBlock, (void) tempo;
+    p.delayOn = false;
+    if (S.b358[1])
+    {
+        p.delayOn = true;
+        const int ifs = (int) fs;
+        const auto a = f32 (std::abs ((int) P[28]) * 0.001953125);
+        const auto factor = f32 (f32 (std::exp (a * std::log (1001.0)) - 1.0) * 50.0);
+        const int off = (int) rnd ((double) ((float) factor * (float) ifs / 100000.0f));
+        double d;
+        if (S.b358[0] != 0)
+            d = ((double) P[27] * ifs) * 0.3125 / f32 (tempo);
+        else
+            d = ((double) P[27] * ifs) / 384.0;
+        p.delayLen = std::max (1, (int) rnd (d));
+        p.delaySize = maxBlock * p.osf + off + p.delayLen;
+        p.delayOffL = P[28] > 0 ? 0 : off;
+        p.delayOffR = P[28] > 0 ? off : 0;
+        p.delayFb = f32 (P[26] * 0.0078125);
+        const auto v = f32 (P[29] * 0.0078125);
+        const auto av = f32 (std::fabs (v));
+        double g;
+        if (av == 1.0)
+            g = 1.0;
+        else
+            g = f32 ((std::exp ((double) ((float) av * 2.39789534f)) - 1.0) * f32 (0.1));
+        p.delayWet = f32 (g * (v == 0.0 ? 0.0 : (v < 0.0 ? -1.0 : 1.0)));
+        p.delayMode = P[30];
+    }
+}
+
+// the reverb from P[31…39] and the tempo (FUN_0086a0a0, FUN_0083f840; DSP in core/PlateReverb.h)
+void designReverb (Patch* pp)
+{
+    auto& p = *pp;
+    const auto& P = p.P;
+    const auto& S = p.S;
+    const double fs = p.fs;
+    const int maxBlock = p.maxBlock;
+    const double tempo = p.tempo;
+    (void) P, (void) S, (void) fs, (void) maxBlock, (void) tempo;
+    p.reverbOn = false;
+    if (P[53] & 0xff)
+    {
+        p.reverbOn = true;
+        const int ifs = (int) fs;
+        double pd;
+        if (p.flag (0x201))
+            pd = ((double) P[33] * ifs) * 0.3125 / f32 (tempo);
+        else
+            pd = ((double) P[33] * ifs) / 384.0;
+        p.reverbPre = std::max (1, (int) rnd (pd));
+        const auto decay = f32 (((double) P[36] * ifs) / 10.0);
+        const auto lowcut = P[31] == 0x13 ? 0.0 : (double) P[31];
+        const auto highcut = P[32] == 0xdd ? 0.0 : (double) P[32];
+        const auto damp = P[37] == 0xdd ? 0.0 : (double) P[37];
+        const int room = P[34], diff = P[35], colour = P[38];
+        p.reverbWet = (float) P[39] * 0.00390625f;
+        auto& R = p.reverbProto;
+        const auto inv = f32 (1.0 / ifs);
+        auto onepole = [&] (double f) {
+            if (f == 0.0)
+                return 1.0f;
+            const auto h = f32 (ifs * 0.5);
+            if (! (h > f))
+                f = h;
+            const auto w = f * 628.3185307179587 * inv;
+            const auto b = f32 (2.0 - std::cos (w));
+            const auto bb = f32 (b * b);
+            return (float) (1.0 - (b - std::sqrt (bb - 1.0)));
+        };
+        if (lowcut == 0.0)
+            R.cLc = 0.0f;
+        else
+        {
+            auto f = lowcut;
+            const auto h = f32 (ifs * 0.5);
+            if (! (h > f))
+                f = h;
+            const auto t = f32 (std::tan (f * kPi * inv));
+            R.cLc = (float) ((t - 1.0) / (t + 1.0));
+        }
+        R.cHc = onepole (highcut);
+        auto muldiv = [] (long long a, long long b, long long c) {
+            const auto pr = a * b;
+            const auto qq = std::llabs (pr) / std::llabs (c);
+            return (pr >= 0) == (c > 0) ? qq : -qq;
+        };
+        const auto Rr = muldiv (ifs, room + 15, 0x73);
+        for (int i = 0; i < 12; ++i)
+            R.L[(std::size_t) i] = (int) std::max (1LL, muldiv (PlateReverb::lines[i], Rr, 20000));
+        for (int i = 0; i < 7; ++i)
+            R.tl[(std::size_t) i] = (int) muldiv (PlateReverb::tapsL[i], Rr, 20000), R.tr[(std::size_t) i] = (int) muldiv (PlateReverb::tapsR[i], Rr, 20000);
+        const auto fd = f32 (diff * 0.01), hh = f32 (inv * 0.5);
+        const double LN_1E3 = std::log (0.001);
+        if (fd == 0.0)
+            R.cIn = R.c1 = R.c2 = 0.0f;
+        else
+        {
+            auto gg = [&] (int a, int b, double kf) {
+                const auto xx = (double) ((float) (a + b) * (float) hh);
+                return (float) std::exp (LN_1E3 * xx / (fd * kf));
+            };
+            R.cIn = gg (R.L[0], R.L[1], 0.07);
+            R.c1 = gg (R.L[4], R.L[8], 0.35);
+            R.c2 = gg (R.L[6], R.L[10], 0.51);
+        }
+        const auto Ssum = (double) (float) (R.L[5] + R.L[7] + R.L[9] + R.L[11]);
+        R.g = (float) std::exp (0.25 * (LN_1E3 * Ssum / decay));
+        R.cDamp = onepole (damp);
+        const auto kc = colour >= 0 && colour <= 4 ? PlateReverb::colourFactor[colour] : 1.0;
+        const auto d2 = f32 (std::exp (0.25 * (LN_1E3 * Ssum / f32 (decay * (double) (float) kc))));
+        auto rr = f32 (d2 / (double) R.g);
+        R.c48 = (float) ((rr - 1.0) * 0.5);
+        if (rr > 1.0)
+            rr = 1.0;
+        const auto t = (float) std::tan (500.0 * kPi * inv);
+        R.c44 = (float) ((float) (t - (float) rr) / (float) (t + (float) rr));
+    }
+}
+
+// the effects tail (FUN_0086a2d0: 100 ms at 44.1 kHz plus the chorus ring)
+int tailOf (const Patch& p) noexcept { return (int) ((long long) p.fs * 100 / 44100) + (p.chorusOn ? p.chorusRing : 0); }
+
 std::shared_ptr<Patch> buildPatch (const StateData& S, double fsHost, int quality, double tempo, int maxBlock)
 {
     auto pp = std::make_shared<Patch>();
@@ -1443,20 +1753,9 @@ std::shared_ptr<Patch> buildPatch (const StateData& S, double fsHost, int qualit
     p.rateLimit = f32 (0.001 * 44100.0 / fs);
     const auto r20 = 44100.0 / fs;
     p.declickLen = f32 (96.0 / (r20 * r20));
-    const auto x = f32 (P[0] * 0.0078125);
-    p.master = x == 1.0 ? 1.0 : f32 ((std::exp (x * f32 (std::log (3.0))) - 1.0) * 0.5);
-    if (S.autogun)
-        p.master = f32 (p.master * 0.25); // Autogun: the same law × 0.25 (REA_rodada57 §1.3)
-    p.masterCents = P[1] * 100 + P[2];
-    p.pre = f32 (P[5] * f32 (0.001));
-    p.dec = P[6] == 10000 ? -1.0 : f32 (P[6] * 0.0001);
-    p.rel = f32 (P[7] * 0.0001);
-    p.full = f32 (P[8] * f32 (0.001));
-    p.morph = f32 (P[9] * f32 (0.001));
-    p.seed1 = P[10] - 1 < 0 ? -1 : mix32 ((long long) P[10] - 0x20cf, 0x1cfc);
-    p.seed2 = P[11] - 1 < 0 ? -1 : mix32 ((long long) P[11] - 0x20cf, 0x1cfc);
-    p.fcut = f32 (P[17] * 0.00390625);
-    p.fres = f32 (P[18] * 0.00390625);
+    designMaster (p);
+    designTimbre (p);
+    designFilterKnobs (p);
     p.ftype = P[49], p.forder = P[50], p.fflat = P[51];
     if (p.forder > 0 && (p.ftype < 0 || p.ftype > 3))
     {
@@ -1588,215 +1887,13 @@ std::shared_ptr<Patch> buildPatch (const StateData& S, double fsHost, int qualit
     }
     p.fft.init (p.N);
     p.speedK = f32 (f32 (33488.07421875) * (double) (1 << p.qt));
-    // EQ (FUN_0086a670, FUN_00625290)
     for (int k = 0; k < 3; ++k)
-    {
-        const auto level = f32 (P[40 + k] * f32 (0.01));
-        auto fq = f32 (f32 (std::exp (f32 (P[43 + k] * 1.52587890625e-05) * std::log (101.0)) - 1.0) * 159.9 + 10.0);
-        const auto width = f32 (P[46 + k] * 1.52587890625e-05);
-        const int dtype = S.eqtype[(std::size_t) k] + 6;
-        const auto nyq = f32 (fs * 0.4999);
-        if (fq > nyq)
-            fq = nyq;
-        const auto w = fq * (2.0 * kPi / fs);
-        const auto sn = std::sin (w), cs = std::cos (w);
-        double A, p3;
-        if (dtype == 7)
-        {
-            A = std::exp (level * 0.025 * std::log (10.0));
-            const auto f1 = f32 (std::exp (width * std::log (1001.0)) - 1.0);
-            p3 = sn / ((f1 * 0.0999 + 0.1) * 2.0);
-        }
-        else
-        {
-            A = std::exp (level * 0.025 * std::log (10.0));
-            p3 = std::sqrt ((A * A + 1.0) / (width * 1.9 + 0.1) - (A - 1.0) * (A - 1.0));
-        }
-        auto& b = p.eq[(std::size_t) k];
-        b.on = level != 0.0 && dtype >= 6 && dtype <= 8;
-        if (level != 0.0 && ! b.on)
-            p.fallbacks.push_back ("unknown EQ band type (band off)");
-        if (b.on)
-            b.c = design (dtype, A, p3, sn, cs);
-    }
-    p.tailLen = (int) ((long long) fs * 100 / 44100);
-    // chorus (FUN_0086a2d0, FUN_00840690; our ogfx_chorus.py)
-    if (P[19] >= 1)
-    {
-        p.chorusOn = true;
-        const int order = std::max ((int) P[19], 1);
-        const auto depth = f32 (P[20] * 0.0009765625), speed = f32 (P[21] * 0.0009765625);
-        const auto delay = (double) ((float) P[22] * 0.0078125f);
-        const auto spread = (double) ((float) P[23] * 0.0078125f);
-        const auto cross = (double) ((float) P[24] * 0.0078125f);
-        const auto m = (double) ((float) std::abs ((int) P[25]) * 0.0078125f);
-        const double LN11 = std::log (11.0), LN101 = std::log (101.0), LN1001 = std::log (1001.0), LN5 = std::log (5.0);
-        p.chorusDry = (float) (1.0f - (float) (std::exp (m * LN5) - 1.0) * 0.25f);
-        const int sg = P[25] == 0 ? 0 : (P[25] > 0 ? 1 : -1);
-        const auto wet = (float) ((float) sg * (1.0f - (float) (std::exp ((double) (float) (1.0f - (float) m) * LN5) - 1.0) * 0.25f));
-        auto warp = [&] (double v, double scale) { return (float) ((float) (std::exp ((double) (float) v * LN11) - 1.0) * (float) ((float) scale / 10.0f)); };
-        const auto A = warp (depth, 1092.5);
-        const auto r = f32 (std::exp ((double) (float) (1.0f - (float) speed) * LN101) - 1.0);
-        const auto K = (2147483648.0 / (r * 75000.0 + 50000.0)) * 500.0;
-        const auto Bd = warp (delay, 4410.0);
-        const auto sp = (float) ((float) (std::exp (spread * LN1001) - 1.0) / 1000.0f);
-        const auto fsr = (float) (44100.0 / (double) (int) fs);
-        auto xmix = [&] (double a, double b) { return a * (double) sp + b * (double) (1.0f - sp); };
-        const int cnt = 2 * order;
-        float maxd = 0.0f, gsum = 0.0f;
-        for (int i = 0; i < cnt; ++i)
-        {
-            float t;
-            int ch;
-            std::uint32_t ph0;
-            if (i < order)
-                t = (float) i, ch = 0, ph0 = 0;
-            else
-                t = (float) (cnt - i - 1), ch = 1, ph0 = 0x80000000u;
-            const float w = 1.0f - t / (float) order;
-            float jt;
-            std::memcpy (&jt, &chorusJitterBits[i % 20], 4);
-            const auto jj = f32 (xmix ((double) (jt * jt), 1.0));
-            float gL = 1.0f, gR = (float) cross * w;
-            if (ch)
-                std::swap (gL, gR);
-            gsum = (float) ((double) gsum + std::fabs ((double) gL) + std::fabs ((double) gR));
-            auto base = A * w + 10.0f;
-            const auto k0 = K / (double) (A + 10.0f);
-            const auto k1 = K * jj / (double) base;
-            const auto kk = xmix (k1, k0);
-            const auto dmod = (float) xmix ((double) ((Bd * w) * (float) jj), (double) Bd);
-            const auto off = (long long) rnd ((double) ((w * sp) * 2147483648.0f / 256.0f));
-            ph0 = (std::uint32_t) (ph0 + (std::uint32_t) ((std::uint64_t) off << 8));
-            const auto inc = (std::uint32_t) (std::int64_t) rnd (kk * (double) fsr);
-            base = base / fsr;
-            auto qd = dmod / fsr;
-            if (! (qd > 8.0f))
-                qd = 8.0f;
-            const float centre = base + qd;
-            const float v = centre + base;
-            if (! (maxd > v))
-                maxd = v;
-            const auto sq = std::sqrt ((double) (base * 4.0f));
-            ChorusTap tp;
-            tp.ch = ch, tp.gL = gL, tp.gR = gR, tp.centre = (double) centre, tp.inc = inc, tp.ph0 = ph0;
-            tp.s8 = f32 (sq / 2147483648.0), tp.s9 = f32 (sq), tp.s10 = f32 (sq / 2.0);
-            p.taps.push_back (tp);
-        }
-        auto g = (float) (1.0f - (float) (std::exp ((double) (float) (1.0f - 1.0f / gsum) * LN1001) - 1.0) / 1000.0f);
-        g = g * wet;
-        for (auto& tp : p.taps)
-            tp.gL = tp.gL * g, tp.gR = tp.gR * g;
-        p.chorusD = (int) rnd ((double) maxd) + 8;
-        p.chorusRing = maxBlock * p.osf + p.chorusD;
-        p.tailLen += p.chorusRing;
-    }
-    // delay (FUN_00869dd0; our ogfx_delay.py)
-    if (S.b358[1])
-    {
-        p.delayOn = true;
-        const int ifs = (int) fs;
-        const auto a = f32 (std::abs ((int) P[28]) * 0.001953125);
-        const auto factor = f32 (f32 (std::exp (a * std::log (1001.0)) - 1.0) * 50.0);
-        const int off = (int) rnd ((double) ((float) factor * (float) ifs / 100000.0f));
-        double d;
-        if (S.b358[0] != 0)
-            d = ((double) P[27] * ifs) * 0.3125 / f32 (tempo);
-        else
-            d = ((double) P[27] * ifs) / 384.0;
-        p.delayLen = std::max (1, (int) rnd (d));
-        p.delaySize = maxBlock * p.osf + off + p.delayLen;
-        p.delayOffL = P[28] > 0 ? 0 : off;
-        p.delayOffR = P[28] > 0 ? off : 0;
-        p.delayFb = f32 (P[26] * 0.0078125);
-        const auto v = f32 (P[29] * 0.0078125);
-        const auto av = f32 (std::fabs (v));
-        double g;
-        if (av == 1.0)
-            g = 1.0;
-        else
-            g = f32 ((std::exp ((double) ((float) av * 2.39789534f)) - 1.0) * f32 (0.1));
-        p.delayWet = f32 (g * (v == 0.0 ? 0.0 : (v < 0.0 ? -1.0 : 1.0)));
-        p.delayMode = P[30];
-    }
-    // reverb (FUN_0086a0a0, FUN_0083f840; DSP in core/PlateReverb.h)
-    if (P[53] & 0xff)
-    {
-        p.reverbOn = true;
-        const int ifs = (int) fs;
-        double pd;
-        if (p.flag (0x201))
-            pd = ((double) P[33] * ifs) * 0.3125 / f32 (tempo);
-        else
-            pd = ((double) P[33] * ifs) / 384.0;
-        p.reverbPre = std::max (1, (int) rnd (pd));
-        const auto decay = f32 (((double) P[36] * ifs) / 10.0);
-        const auto lowcut = P[31] == 0x13 ? 0.0 : (double) P[31];
-        const auto highcut = P[32] == 0xdd ? 0.0 : (double) P[32];
-        const auto damp = P[37] == 0xdd ? 0.0 : (double) P[37];
-        const int room = P[34], diff = P[35], colour = P[38];
-        p.reverbWet = (float) P[39] * 0.00390625f;
-        auto& R = p.reverbProto;
-        const auto inv = f32 (1.0 / ifs);
-        auto onepole = [&] (double f) {
-            if (f == 0.0)
-                return 1.0f;
-            const auto h = f32 (ifs * 0.5);
-            if (! (h > f))
-                f = h;
-            const auto w = f * 628.3185307179587 * inv;
-            const auto b = f32 (2.0 - std::cos (w));
-            const auto bb = f32 (b * b);
-            return (float) (1.0 - (b - std::sqrt (bb - 1.0)));
-        };
-        if (lowcut == 0.0)
-            R.cLc = 0.0f;
-        else
-        {
-            auto f = lowcut;
-            const auto h = f32 (ifs * 0.5);
-            if (! (h > f))
-                f = h;
-            const auto t = f32 (std::tan (f * kPi * inv));
-            R.cLc = (float) ((t - 1.0) / (t + 1.0));
-        }
-        R.cHc = onepole (highcut);
-        auto muldiv = [] (long long a, long long b, long long c) {
-            const auto pr = a * b;
-            const auto qq = std::llabs (pr) / std::llabs (c);
-            return (pr >= 0) == (c > 0) ? qq : -qq;
-        };
-        const auto Rr = muldiv (ifs, room + 15, 0x73);
-        for (int i = 0; i < 12; ++i)
-            R.L[(std::size_t) i] = (int) std::max (1LL, muldiv (PlateReverb::lines[i], Rr, 20000));
-        for (int i = 0; i < 7; ++i)
-            R.tl[(std::size_t) i] = (int) muldiv (PlateReverb::tapsL[i], Rr, 20000), R.tr[(std::size_t) i] = (int) muldiv (PlateReverb::tapsR[i], Rr, 20000);
-        const auto fd = f32 (diff * 0.01), hh = f32 (inv * 0.5);
-        const double LN_1E3 = std::log (0.001);
-        if (fd == 0.0)
-            R.cIn = R.c1 = R.c2 = 0.0f;
-        else
-        {
-            auto gg = [&] (int a, int b, double kf) {
-                const auto xx = (double) ((float) (a + b) * (float) hh);
-                return (float) std::exp (LN_1E3 * xx / (fd * kf));
-            };
-            R.cIn = gg (R.L[0], R.L[1], 0.07);
-            R.c1 = gg (R.L[4], R.L[8], 0.35);
-            R.c2 = gg (R.L[6], R.L[10], 0.51);
-        }
-        const auto Ssum = (double) (float) (R.L[5] + R.L[7] + R.L[9] + R.L[11]);
-        R.g = (float) std::exp (0.25 * (LN_1E3 * Ssum / decay));
-        R.cDamp = onepole (damp);
-        const auto kc = colour >= 0 && colour <= 4 ? PlateReverb::colourFactor[colour] : 1.0;
-        const auto d2 = f32 (std::exp (0.25 * (LN_1E3 * Ssum / f32 (decay * (double) (float) kc))));
-        auto rr = f32 (d2 / (double) R.g);
-        R.c48 = (float) ((rr - 1.0) * 0.5);
-        if (rr > 1.0)
-            rr = 1.0;
-        const auto t = (float) std::tan (500.0 * kPi * inv);
-        R.c44 = (float) ((float) (t - (float) rr) / (float) (t + (float) rr));
-    }
+        designEqBand (pp.get(), k);
+    p.taps.reserve (18);
+    designChorus (pp.get());
+    p.tailLen = tailOf (p);
+    designDelay (pp.get());
+    designReverb (pp.get());
     return pp;
 }
 
@@ -1892,7 +1989,7 @@ public:
     static constexpr int maxHostBlock = 512;
     static constexpr int maxVoices = 64;
 
-    explicit Engine (std::shared_ptr<const Patch> patch)
+    explicit Engine (std::shared_ptr<Patch> patch)
         : pt (std::move (patch))
     {
         const auto& p = *pt;
@@ -1918,6 +2015,7 @@ public:
             ringL.assign ((std::size_t) sz, 0.0f), ringR.assign ((std::size_t) sz, 0.0f);
             ringMask = sz - 1;
         }
+        chorusSpread = p.P[23];
         if (p.delayOn)
         {
             dline.assign (2 * (std::size_t) p.delaySize, 0.0f);
@@ -1930,7 +2028,7 @@ public:
             reverb.allocate (p.reverbPre);
         }
         decSt.fill (0.0);
-        if (p.sg != nullptr && p.sgMix > 0)
+        if (p.sg != nullptr) // (made with the loaded band mix even at 0: automation of P63 can switch the stage on, below)
         {
             sg = std::make_unique<hlfx::MaximusProcessor>();
             sg->prepare (p.sg, p.fsHost, p.sgMix);
@@ -1944,6 +2042,37 @@ public:
     }
 
     const Patch& patch() const noexcept { return *pt; }
+
+    // An automated parameter (FL's ProcessParam FUN_008684e0 with the "set" flag, REA_rodada169h §1): P[index] takes
+    // the integer `value` and only what FL recomputes for it changes; the sounding voices go on. Indices 0…48 (FL's
+    // automatable P range; 49…88 in FL are the articulators' knobs, not listed in LYNX) and, for Autogun, 63 (Magic dust:
+    // the stage's on/off test only, the band mix stays the loaded one, REA_rodada57 §1.4). Audio thread.
+    void setParam (int index, int value) noexcept
+    {
+        auto& p = *pt;
+        if (! ((index >= 0 && index <= 48) || (index == 63 && p.S.autogun)) || p.P[(std::size_t) index] == value)
+            return;
+        p.P[(std::size_t) index] = value;
+        // P[3], P[4] (Mod X / Y): the voices glide to them at their next control block (FUN_0086a610); P[12…16]
+        // (unison): read at note start, P[15] (pitch) also by every control block (FUN_0086c530)
+        if (index <= 2)
+            designMaster (p); // (FUN_0086a570: read by every control block)
+        else if (index >= 5 && index <= 11)
+            designTimbre (p); // pre-decay … seeds: the next notes' timbre (the playing ones keep theirs, as in FL)
+        else if (index == 17 || index == 18)
+            designFilterKnobs (p);
+        else if (index >= 19 && index <= 25)
+            liveChorus();
+        else if (index >= 26 && index <= 30)
+            liveDelay();
+        else if (index >= 31 && index <= 39)
+            liveReverb();
+        else if (index >= 40 && index <= 48)
+            designEqBand (pt.get(), (index - 40) % 3, false); // (the filter state is kept)
+        else if (index == 63)
+            p.sgMix = value; // (the stage runs while it is > 0; its band mix is not re-sent, as in FL)
+        refreshQuiet();
+    }
 
     // host values
     int counter = 0;
@@ -2098,7 +2227,7 @@ public:
         }
         if (p.osf > 1)
             decimate (m);
-        if (sg != nullptr)
+        if (sg != nullptr && p.sgMix > 0) // (Gen_Render: the stage is skipped while P63 = 0)
             sg->process (bufL.data(), bufR.data(), n);
         float peak = 0.0f;
         for (int i = 0; i < n; ++i)
@@ -2128,7 +2257,7 @@ public:
             dr = (int) ((dr + (long long) m) % p.delaySize);
             dw = (int) ((dw + (long long) m) % p.delaySize);
         }
-        if (sg != nullptr)
+        if (sg != nullptr && p.sgMix > 0)
         {
             // the Soundgoodizer stage keeps running on silence (its envelopes relax as in FL's Gen_Render)
             std::fill (tmpL.begin(), tmpL.begin() + n, 0.0f);
@@ -2138,7 +2267,7 @@ public:
     }
 
 private:
-    std::shared_ptr<const Patch> pt;
+    std::shared_ptr<Patch> pt; // this engine's own copy: automation changes it in place (setParam)
     std::vector<std::unique_ptr<Voice>> pool;
     std::vector<Voice*> order; // listed voices in note-on order
     std::vector<std::pair<Voice*, int>> j0Map;
@@ -2162,6 +2291,106 @@ private:
     std::array<double, 24> decSt {};
     std::unique_ptr<hlfx::MaximusProcessor> sg; // Autogun's Magic Dust stage
     long long quietFor = 0, quietNeeded = 0;
+
+    void refreshQuiet() noexcept
+    {
+        const auto& p = *pt;
+        quietNeeded = (long long) (2.0 * p.fsHost) + (p.chorusOn ? p.chorusRing : 0) + (p.delayOn ? 4LL * p.delaySize : 0)
+                      + (p.reverbOn ? (long long) p.reverbPre + reverb.L[5] + reverb.L[9] : 0);
+    }
+
+    // FUN_0086a2d0 → FUN_00840690: the taps are designed again; a tap keeps its LFO phase unless the ring's length or
+    // the spread changed (then every phase restarts and the ring is cleared, FUN_00840d30); order 0 frees the chorus
+    // and a chorus switched on starts fresh
+    void liveChorus() noexcept
+    {
+        auto& p = *pt;
+        const bool was = p.chorusOn;
+        const auto oldD = p.chorusD;
+        const auto oldSpread = chorusSpread;
+        designChorus (pt.get());
+        p.tailLen = tailOf (p);
+        chorusSpread = p.P[23];
+        if (! p.chorusOn)
+        {
+            chorusPh.clear();
+            return;
+        }
+        const bool reset = ! was || p.chorusD != oldD || chorusSpread != oldSpread;
+        const auto keep = reset ? 0 : std::min (chorusPh.size(), p.taps.size());
+        chorusPh.resize (p.taps.size(), 0u); // (≤ 18: reserved)
+        for (std::size_t i = keep; i < p.taps.size(); ++i)
+            chorusPh[i] = reset ? p.taps[i].ph0 : 0u;
+        if (reset)
+        {
+            int sz = 1;
+            while (sz < nb + p.chorusD + 16)
+                sz <<= 1;
+            if ((int) ringL.size() < sz)
+                ringL.resize ((std::size_t) sz), ringR.resize ((std::size_t) sz); // (only when the ring grows)
+            std::fill (ringL.begin(), ringL.end(), 0.0f);
+            std::fill (ringR.begin(), ringR.end(), 0.0f);
+            ringMask = sz - 1;
+            ringPos = 0;
+        }
+    }
+
+    // FUN_00869dd0 → FUN_0083cd50: offsets, feedback, volume and mode change at once; the line is cleared (and its
+    // read / write points start again) only when its length changes
+    void liveDelay() noexcept
+    {
+        auto& p = *pt;
+        const auto oldSize = p.delaySize;
+        designDelay (pt.get());
+        if (! p.delayOn || p.delaySize == oldSize)
+            return;
+        if (dline.size() < 2 * (std::size_t) p.delaySize)
+            dline.resize (2 * (std::size_t) p.delaySize); // (only when it grows)
+        std::fill (dline.begin(), dline.end(), 0.0f);
+        dr = 0, dw = p.delayLen % p.delaySize;
+    }
+
+    // FUN_0086a0a0: a new predelay length re-allocates and clears the whole reverb (FUN_0083f650 → FUN_0083f5d0); a new
+    // room size clears its 12 lines (positions wrapped into the new lengths); the rest only changes the coefficients
+    // (FUN_0083f840)
+    void liveReverb() noexcept
+    {
+        auto& p = *pt;
+        if (! p.reverbOn)
+            return; // (switched by P53, not automatable)
+        designReverb (pt.get());
+        const auto& R = p.reverbProto;
+        if (p.reverbPre != (int) reverb.pre.size())
+        {
+            reverb = R;
+            reverb.allocate (p.reverbPre);
+            return;
+        }
+        const bool room = R.L != reverb.L;
+        auto keepBuf = std::move (reverb.buf);
+        auto keepPre = std::move (reverb.pre);
+        const auto keepP = reverb.P;
+        const auto pp = reverb.pp;
+        const float st[9] { reverb.s10, reverb.s14, reverb.s18, reverb.s3c, reverb.s40, reverb.s4c, reverb.s50, reverb.s54, reverb.s58 };
+        reverb = R; // coefficients, lengths, taps
+        reverb.buf = std::move (keepBuf);
+        reverb.pre = std::move (keepPre);
+        reverb.pp = pp;
+        reverb.s10 = st[0], reverb.s14 = st[1], reverb.s18 = st[2], reverb.s3c = st[3], reverb.s40 = st[4], reverb.s4c = st[5],
+        reverb.s50 = st[6], reverb.s54 = st[7], reverb.s58 = st[8];
+        for (std::size_t i = 0; i < 12; ++i)
+        {
+            reverb.P[i] = keepP[i] % reverb.L[i];
+            if (room)
+            {
+                if ((int) reverb.buf[i].size() < reverb.L[i])
+                    reverb.buf[i].resize ((std::size_t) reverb.L[i]); // (only when a line grows)
+                std::fill (reverb.buf[i].begin(), reverb.buf[i].end(), 0.0f);
+            }
+        }
+    }
+
+    int chorusSpread = 0;
 
     void grow (int count)
     {
@@ -3510,6 +3739,10 @@ public:
             loadedSgPath = channel.samplePath;
             sgPreset = sgPresetFrom (readInstallFile (loadedSgPath));
         }
+        // only automatable knobs changed (the editor): the playing engine takes them like FL's ProcessParam, the notes go on
+        if (channel.pluginState != loadedState && ! sgChanged && loadedRate == rate.load() && loadedMode == render && b == loadedBpm
+            && liveChange (channel.pluginState))
+            return;
         if (channel.pluginState != loadedState)
         {
             loadedState = channel.pluginState;
@@ -3530,6 +3763,21 @@ public:
     {
         nextPan = pan;
         nextCents = cents;
+    }
+
+    // automation clips / links (round 169h): FL's host sends min + round(value·(max − min)) of the knob to ProcessParam
+    // (flag 0x20, FUN_008684e0), which applies it to the running plugin; the value is kept for a rebuilt engine
+    void setParameter (int index, float value) noexcept override
+    {
+        take();
+        const auto* p = findEngineParam (autogun ? autogunEngineParams() : ogunEngineParams(), index);
+        if (p == nullptr || ! std::isfinite (value) || ! liveIndex (index, autogun))
+            return;
+        const auto v = (double) std::clamp (value, 0.0f, 1.0f);
+        const auto raw = (int) p->low + (int) rnd (v * (double) (p->high - p->low));
+        automated[(std::size_t) index] = raw;
+        if (engine != nullptr)
+            engine->setParam (index, raw);
     }
 
     void noteOn (int key, float velocity) noexcept override
@@ -3637,7 +3885,50 @@ private:
             delete retired.exchange (engine.release());
             engine.reset (e);
             engine->setLevels (channelVol, channelPan);
+            for (int i = 0; i < 64; ++i) // automated values outlive a rebuild (tempo, sample rate, another state)
+                if (automated[(std::size_t) i] != notAutomated)
+                    engine->setParam (i, automated[(std::size_t) i]);
         }
+        liveParams.drain ([this] (int index, float value) {
+            automated[(std::size_t) index] = notAutomated; // (the state holds the knob's value now)
+            if (engine != nullptr)
+                engine->setParam (index, (int) value);
+        });
+    }
+
+    // FL's automatable P range (ProcessParam 0…48) and Autogun's Magic dust (63)
+    static bool liveIndex (int index, bool isAutogun) noexcept { return (index >= 0 && index <= 48) || (isAutogun && index == 63); }
+
+    // UI thread, under buildMutex: true when `next` differs from the loaded state only in P[0…48] (a knob of the editor);
+    // the changes then go to the audio thread. Magic dust is not live from the knob: FL's knob also re-sends the band
+    // mix to the Soundgoodizer stage (FUN_0088d930), which needs a new stage.
+    bool liveChange (const std::vector<std::uint8_t>& next)
+    {
+        if (! parsed)
+            return false;
+        std::optional<StateData> n;
+        try
+        {
+            n = parseState (next, autogun);
+        }
+        catch (...)
+        {
+            return false;
+        }
+        if (! n || n->version != parsed->version || n->body.size() != parsed->body.size()
+            || std::memcmp (n->body.data() + 4 * 49, parsed->body.data() + 4 * 49, n->body.size() - 4 * 49) != 0)
+            return false;
+        std::vector<int> changed;
+        for (int i = 0; i <= 48; ++i)
+            if (n->P[(std::size_t) i] != parsed->P[(std::size_t) i])
+                changed.push_back (i);
+        if (changed.size() > liveParams.space())
+            return false;
+        for (const auto i : changed)
+            liveParams.push (i, (float) n->P[(std::size_t) i]);
+        loadedState = next;
+        parsed = std::move (n);
+        return true;
     }
 
     std::unique_ptr<Engine> engine;
@@ -3657,6 +3948,13 @@ private:
     bool loadedMode = false;
     double channelVol = 1.0, channelPan = 0.0;
     float nextPan = 0.0f, nextCents = 0.0f;
+    static constexpr int notAutomated = std::numeric_limits<int>::min();
+    std::array<int, 64> automated = [] {
+        std::array<int, 64> a {};
+        a.fill (notAutomated);
+        return a;
+    }(); // (audio thread)
+    LiveParamQueue liveParams; // knob changes, UI → audio thread
 };
 
 } // namespace
@@ -3670,6 +3968,32 @@ bool ogunStateUsable (const std::vector<std::uint8_t>& state)
     catch (...)
     {
         return false;
+    }
+}
+
+std::vector<std::uint8_t> ogunCurrentLayout (const std::vector<std::uint8_t>& state)
+{
+    std::uint32_t vw = 0;
+    if (state.size() >= 8)
+        std::memcpy (&vw, state.data(), 4);
+    const auto version = (int) (vw > 0xffff ? vw >> 16 : vw);
+    if (state.size() < 8 || version >= 14)
+        return state;
+    try
+    {
+        const auto S = parseState (state);
+        if (! S)
+            return state;
+        // the parsed body is already in version 14's layout (64 parameters, then the rest as stored)
+        std::vector<std::uint8_t> out (4, 0);
+        out[0] = 14;
+        const auto z = zlibStored (S->body);
+        out.insert (out.end(), z.begin(), z.end());
+        return out;
+    }
+    catch (...)
+    {
+        return state;
     }
 }
 

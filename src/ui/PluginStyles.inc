@@ -177,12 +177,12 @@ inline void headerBar (juce::Graphics& g, Rectangle<float> a, Colour accent, Sty
     }
 }
 
-inline float titleText (juce::Graphics& g, Rectangle<float> a, const juce::String& name, Colour accent, bool underline, Style s)
+// round 170k2: `size` comes from skin::titleText, which fits the name in the box first (see titleLook)
+inline float titleText (juce::Graphics& g, Rectangle<float> a, const juce::String& name, Colour accent, bool underline, Style s, float size)
 {
     if (s == Style::neon)
     {
         const auto n = neonOf (accent);
-        const auto size = juce::jlimit (14.0f, 21.0f, a.getHeight() * 0.74f);
         g.setFont (juce::Font (theme::font (size, true)).withExtraKerningFactor (0.06f));
         const auto w = juce::jmin (a.getWidth(), juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), name) + 4.0f);
         const auto box = a.withWidth (w);
@@ -201,7 +201,6 @@ inline float titleText (juce::Graphics& g, Rectangle<float> a, const juce::Strin
     }
     if (s == Style::hardware) // an engraved silver badge
     {
-        const auto size = juce::jlimit (12.0f, 16.0f, a.getHeight() * 0.56f);
         g.setFont (juce::Font (theme::font (size, true)).withExtraKerningFactor (0.08f));
         const auto text = name.toUpperCase();
         const auto tw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), text);
@@ -219,7 +218,6 @@ inline float titleText (juce::Graphics& g, Rectangle<float> a, const juce::Strin
         return w;
     }
     // vivid: heavy, big, white
-    const auto size = juce::jlimit (14.0f, 20.0f, a.getHeight() * 0.72f);
     g.setFont (juce::Font (theme::font (size, true)).withExtraKerningFactor (0.03f));
     const auto text = name.toUpperCase();
     const auto w = juce::jmin (a.getWidth(), juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), text) + 2.0f);

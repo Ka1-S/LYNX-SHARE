@@ -12,6 +12,8 @@
 
 #include "core/AutomationDisplay.h"
 #include "core/HeldNotes.h"
+#include "core/RecordLoop.h"
+#include "core/StepEdit.h"
 #include "core/Preferences.h"
 #include "core/LiveEventQueue.h"
 #include "core/LiveInput.h"
@@ -125,6 +127,12 @@ public:
     // Performance mode (round 165m, core/Performance.h): launch / release / stop zone clips (message thread). The
     // clips start on the next block, quantized by their track's Performance settings; nothing launches while stopped.
     void performanceCommand (const perf::Command& command) noexcept { performanceLive->commands.push (command); }
+    // FL sends the typing keyboard's notes as MIDI channel 1: they launch performance clips when that is the "MIDI
+    // channel used for playlist live mode" and Performance mode is on (the same test as the MIDI input's)
+    bool typingNotesLaunchClips() const noexcept
+    {
+        return performanceMidiChannel.load (std::memory_order_relaxed) == 1 && performanceMidiOn.load (std::memory_order_relaxed);
+    }
     const perf::Live& performanceState() const noexcept { return *performanceLive; }
     perf::Live& performanceStateForSnapshot() noexcept { return *performanceLive; } // --perfshot: a sample of what plays
     void stop() noexcept; // also cancels a count-in or a wait for the first note
@@ -178,6 +186,18 @@ public:
         bool punchLoopRegion = false;
         int preRollBars = 0;
         int postRollBars = 0;
+        // FL's "Loop record" (toolbar LoopRecordBtn / Options, round 170e3 [DECOMP 0xf1e2a0 toggles a global that
+        // FUN_011d4800 reads: off while recording, the play end becomes "never", so playback runs on]): on, Song mode
+        // recording loops the loop region (one take per pass); off, it plays straight through the region and the notes
+        // and audio stay where they were played. Pattern mode always loops the pattern in LYNX.
+        bool loopRecord = true;
+        // round 170d (the Busy Works video: the chord on the downbeat after the count-in was lost; Cubase's "MIDI Record
+        // Catch Range", Logic keeps count-in notes): notes played during the count-in are recorded, and a note-on at most
+        // this many ticks before the take's start goes onto the start (0 = off: they keep their real time)
+        std::int64_t catchWindow = ppq / 4;
+        // round 170d (Pro Tools / Cubase / REAPER): played notes are recorded where they were heard, moved back by the
+        // output buffer + the driver's output latency
+        bool compensateOutput = true;
     };
     // The range this recording keeps (pre-roll or punch), while one is active. UI thread.
     std::optional<PunchRange> getActivePunch() const noexcept { return activePunch; }
@@ -191,6 +211,16 @@ public:
     void resetToInitialValues() noexcept;
     bool isWaitingForInput() const noexcept { return waitingForInput.load(); }
     bool isCountingIn() const noexcept { return transport.countIn.load() > 0.0; }
+    // The audio clock the last callback left (core/Recorder.h LiveClock) and where an event played at `eventMs`
+    // (juce::Time::getMillisecondCounterHiRes) is recorded: sample-accurate against the block, minus the output
+    // latency when compensateOutput is on (round 170d). Any thread.
+    LiveClock liveClock() const noexcept;
+    double recordTickFor (double eventMs) const noexcept;
+    // The count-in catch of the take being counted in / recorded (round 170d; UI thread).
+    const CountInCatch& getCountInCatch() const noexcept { return takeCatch; }
+    // Record › Capture MIDI (round 170d, LYNX's own): the last phrase played without recording into the current pattern
+    // (core/Recorder.h captureMidi), one undo step. UI thread.
+    CaptureResult captureMidi();
 
     // Per-insert record arm: each armed insert records its own audio input (Mixer › insert › input source) into
     // its own take (arming one turns audio recording on; disarming the last one turns it off). Not saved.
@@ -229,6 +259,11 @@ public:
     std::vector<scorelog::Entry> scoreLogSnapshot() const;
     bool scoreLogEmpty() const;
     void clearScoreLog();
+    // FL's Step edit (round 170e3, core/StepEdit.h): while on, every note played on a MIDI input or the typing keyboard
+    // is also queued for the UI, which writes it into the pattern when the transport is stopped. Any thread.
+    void setStepEdit (bool on) noexcept;
+    bool isStepEdit() const noexcept { return stepEditOn.load (std::memory_order_relaxed); }
+    std::vector<stepedit::Played> takeStepEditNotes();
 
     // Scale snap for played notes (MIDI input and the PC keyboard): scale index into notetools::scales()
     // (0 = off) and its root (0..11). Any thread.
@@ -237,10 +272,16 @@ public:
 
     // All notes off on every channel (double-click on Stop). UI thread.
     void panic();
+    // FL's Tools › Macros › Stop sound (Ctrl+H, round 170h2; FL64 MacroStopSoundActionExecute → FUN_011c8d10 →
+    // FUN_011c8a40 (1, 1, 1) → FUN_012b5210): all notes off on every channel and MIDI out, and every effect and
+    // plugin reset — the tails of delays and reverbs stop too. UI thread.
+    void stopSound();
 
     // Note recording (MIDI and PC keyboard) into the current pattern while playing. UI thread.
     void setRecording (bool shouldRecord);
     bool isRecording() const noexcept { return transport.recording.load(); }
+    // Pattern mode, a take with Loop record off (round 170e5): the transport tick the pattern plays once from, < 0: none
+    double patternLinearOrigin() const noexcept { return liveInput.patternOrigin.load (std::memory_order_relaxed); }
 
     // Audio recording from the interface input: with this on, recording (Rec + Play) writes the
     // input to a WAV and, on stop, the take becomes a Playlist clip (latency-compensated).
@@ -453,6 +494,19 @@ public:
     // settings are copied into the Song first, so the undo step has them; the moved plugins keep their instances (the
     // rack matches them by instance tag, round 168s).
     void editSongStructural (const std::function<void (Song&)>& edit);
+    // An edit that changes only levels (mixer volume / pan / separation, channel volume / pan), e.g. a fader drag: one
+    // undo step per press like editSong, but the playing snapshot takes the values at once without a rebuild (round
+    // 171c); the full publish follows when the mouse is released. Anything else falls back to editSong.
+    void editLevels (const std::function<void (Song&)>& edit, bool undoable = true);
+    // the publish editLevels deferred, now (tests; the timer does it after a drag)
+    void flushLevels();
+    std::uint64_t getLevelEditCount() const noexcept { return levelEdits; }
+    // editLevels notifies this one only (the engine's own change message follows with the full publish after the drag):
+    // the ~45 views listening to the engine would otherwise all repaint at every mouse move. The views that show
+    // levels (Mixer strips, Channel Rack) listen to it too.
+    juce::ChangeBroadcaster& getLevelsBroadcaster() noexcept { return levelsChanged; }
+    // + 1 at every full publish (not at a level-only edit): listeners can tell a drag's level change from the rest
+    std::uint64_t getPublishCount() const noexcept { return publishCount; }
 
     // Changes since the last save/open (for the "*" in the title and the "save changes?" prompt).
     bool isModified() const noexcept { return modified; }
@@ -787,6 +841,12 @@ private:
     std::atomic<int> extraLiveCount { 0 };
     void publishSelection();
     std::atomic<double> blockTimeMs { 0.0 };         // when positionTicks was last updated
+    // the live clock (round 170d): the musical position of the next block (count-in included), its tempo, and whether
+    // it runs; the output latency the played notes are moved back by
+    std::atomic<double> clockTick { 0.0 }, clockTicksPerMs { 0.0 }, outputCompensationMs { 0.0 };
+    std::atomic<bool> clockRunning { false }, compensatePlayed { true };
+    CountInCatch takeCatch; // UI thread
+    double lastCaptureMs = -1.0; // UI thread: the newest note Capture MIDI took
     std::array<std::atomic<float>, scopeSize> scope {}; // ring buffer of the output (written by audio)
     std::atomic<int> scopeWrite { 0 };
     juce::MidiDeviceListConnection midiDevicesChanged;
@@ -805,9 +865,11 @@ private:
         int channel = 0;
     };
     std::vector<NoteLock> noteLocks;
-    void logPlayedNote (int channel, int key, float velocity, bool on);
+    void logPlayedNote (int channel, int key, float velocity, bool on, double tick = -1.0, bool recorded = false);
     mutable juce::SpinLock scoreLogLock;             // MIDI thread and UI thread write, the UI reads
     scorelog::Log scoreLog;
+    std::atomic<bool> stepEditOn { false };
+    std::vector<stepedit::Played> stepEditQueue;     // under scoreLogLock
     std::map<std::tuple<int, int, int, int, int, int>, prefs::PickupState> pickups; // (cc, channel, target) -> takeover
     // settings / log files written off the message thread (issue #13's freezes); declared before the saver so it
     // outlives it, and its destructor writes what is still queued
@@ -896,7 +958,7 @@ private:
     std::int64_t punchStopAt = -1;                 // post-roll end: playback stops there (-1: none)
     bool linearRecording() const noexcept
     {
-        return song.mode == PlayMode::song && (! song.hasLoop() || recordOptions.punchLoopRegion);
+        return recordloop::linear (song.mode, song.hasLoop(), recordOptions.loopRecord, recordOptions.punchLoopRegion);
     }
     // the audio thread's view of the above while takes record (false when none is open)
     void updateLinearSong() noexcept
@@ -939,6 +1001,12 @@ private:
     void sessionStep (bool redo);
     juce::Time lastUndoPress; // mouse click that already produced an undo step
     SnapshotExchange<RackState> rackExchange;
+    std::shared_ptr<LiveLevels> publishedLevels; // the last snapshot's live levels (editLevels writes them)
+    bool levelsPending = false;                  // editLevels changed the Song since the last publish
+    juce::ChangeBroadcaster levelsChanged;
+    std::uint64_t levelEdits = 0;                // (diagnostics / tests)
+    std::uint64_t publishCount = 0;
+    void saveUndoStep();
     RackState lastPublishedShape; // channels + instruments of the last snapshot, to reuse voices
     std::vector<int> standInChannels, standInInserts; // (playsStandIn)
     // Issue #36 (u-he Presswerk crashed in its VST3 teardown, freed from the engine's timer callback): the racks the

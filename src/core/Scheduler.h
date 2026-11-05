@@ -140,7 +140,10 @@ void schedulePatternLoop (const Pattern& pattern,
                           EventBuffer& out,
                           float swing = 0.0f,
                           const std::vector<ChannelDef>* channels = nullptr,
-                          bool chase = false) noexcept;
+                          bool chase = false,
+                          double linearOrigin = -1.0) noexcept;
+// `linearOrigin` >= 0 (round 170e5, Loop record off in Pattern mode): the pattern plays once from that transport tick,
+// every note (also those past `patternLength`) and no repeat; before it nothing plays.
 // `chase` (both schedulers): playback starts at startTick and FL's Settings › Audio › "Play truncated notes on
 // transport" is on (FLEngine FUN_011e7470, REA_rodada167j §2): the notes that started before startTick and still
 // sound there start on the block's first sample, with what is left of their length.

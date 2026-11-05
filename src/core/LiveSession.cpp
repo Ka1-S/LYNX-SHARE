@@ -1,12 +1,15 @@
 #include "core/LiveSession.h"
 
 #include <algorithm>
+#include <cmath>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 
 #include "core/ClipOps.h"
+#include "core/PatternBlocks.h"
 #include "core/SessionIds.h"
+#include "core/StandIns.h"
 
 namespace lynx::live
 {
@@ -127,6 +130,8 @@ U canon (const Song& in)
     const auto current = std::clamp (s.currentArrangement, 0, (int) s.arrangements.size() - 1);
     s.arrangements[(std::size_t) current].clips = std::move (s.playlist);
     s.playlist.clear();
+    s.arrangements[(std::size_t) current].blocks = std::move (s.blocks); // Pattern Blocks (round 170f) likewise
+    s.blocks.clear();
 
     // the local view and derived data
     s.currentPattern = 0;
@@ -207,6 +212,8 @@ Song decode (U&& u)
     s.currentArrangement = 0;
     s.playlist = std::move (s.arrangements[0].clips);
     s.arrangements[0].clips.clear();
+    s.blocks = std::move (s.arrangements[0].blocks);
+    s.arrangements[0].blocks.clear();
     auto mapper = [] (const std::unordered_map<int, int>& at) {
         return [&at] (int& i) {
             if (isCode (i))
@@ -219,6 +226,7 @@ Song decode (U&& u)
     refs::forEachChannelRef (s, mapper (channelAt));
     refs::forEachPatternRef (s, mapper (patternAt));
     refs::forEachAutomationRef (s, mapper (automationAt));
+    s.forEachBlockList ([&s] (std::vector<PatternBlock>& list) { patternblocks::normalize (list, (int) s.patterns.size()); });
     s.currentPattern = 0;
     for (auto& p : s.patterns)
         p.sortNotes();
@@ -235,7 +243,7 @@ bool sameGlobals (const Song& a, const Song& b)
            && a.cleanMixer == b.cleanMixer && a.autoCrossfades == b.autoCrossfades && a.playTruncatedNotes == b.playTruncatedNotes
            && a.fastDeclick == b.fastDeclick && a.panTriangular == b.panTriangular && a.autoPdc == b.autoPdc
            && a.compensateAutomations == b.compensateAutomations && a.timeSignatureMode == b.timeSignatureMode && a.scaleHighlight == b.scaleHighlight
-           && a.dataFolder == b.dataFolder;
+           && a.dataFolder == b.dataFolder && a.patternBlocksOn == b.patternBlocksOn;
 }
 
 void copyGlobals (const Song& from, Song& to)
@@ -261,6 +269,7 @@ void copyGlobals (const Song& from, Song& to)
     to.timeSignatureMode = from.timeSignatureMode;
     to.scaleHighlight = from.scaleHighlight;
     to.dataFolder = from.dataFolder;
+    to.patternBlocksOn = from.patternBlocksOn; // (round 170f; the blocks travel in their arrangement's header)
 }
 
 template <typename T>
@@ -1002,6 +1011,8 @@ bool mayEdit (std::uint32_t tag, const Permissions& perms, const Key& key, const
         return false;
     if (perms.editEverything)
         return key.kind != Kind::session;
+    if (perms.settings && (key.kind == Kind::globals || key.kind == Kind::arrangement))
+        return true;
     const auto* me = song.session.find (tag);
     switch (key.kind)
     {
@@ -1046,7 +1057,8 @@ std::uint32_t ownerOf (const Key& key, const Song& song)
 
 // --- Authority -------------------------------------------------------------------------------------------------------
 
-Authority::Authority (Song initial, Codec c) : state (std::move (initial)), codec (std::move (c))
+Authority::Authority (Song initial, Codec c, std::uint64_t startRev, std::uint64_t e)
+    : state (std::move (initial)), rev (startRev), startRevision (startRev), epochId (e), codec (std::move (c))
 {
     if (! codec)
         codec = [] (const Patch& p) { return p; };
@@ -1071,8 +1083,33 @@ Commit Authority::commitPatch (std::uint32_t origin, std::uint32_t seq, Patch pa
         c.rev = ++rev;
         for (const auto& k : c.patch.keys())
             lastChange[k] = { rev, origin };
+        log.push_back (c);
+        if (log.size() > replayLimit)
+            log.pop_front();
     }
     return c;
+}
+
+std::optional<std::vector<Commit>> Authority::since (std::uint64_t from, std::uint64_t fromEpoch) const
+{
+    if (fromEpoch != epochId)
+        return std::nullopt;
+    return since (from);
+}
+
+std::optional<std::vector<Commit>> Authority::since (std::uint64_t from) const
+{
+    if (from > rev)
+        return std::nullopt; // (a revision we never made: this host restarted behind the peer)
+    std::vector<Commit> out;
+    if (from == rev)
+        return out;
+    if (log.empty() || log.front().rev > from + 1)
+        return std::nullopt;
+    for (const auto& c : log)
+        if (c.rev > from)
+            out.push_back (c);
+    return out;
 }
 
 Commit Authority::propose (std::uint32_t origin, const Proposal& proposal)
@@ -1140,11 +1177,61 @@ std::optional<Proposal> Replica::poll (const Song& working)
         return std::nullopt;
     Proposal p;
     p.seq = ++seq;
-    p.baseRev = appliedRev;
+    p.baseRev = resendBase ? std::min (*resendBase, appliedRev) : appliedRev;
+    resendBase.reset();
     p.patch = std::move (d);
     inflight[p.seq] = p.patch;
+    inflightBase[p.seq] = p.baseRev;
     lastSent = working;
     return p;
+}
+
+void Replica::resend()
+{
+    if (inflight.empty())
+        return;
+    auto base = appliedRev;
+    for (const auto& [s, b] : inflightBase)
+        base = std::min (base, b);
+    inflight.clear();
+    inflightBase.clear();
+    // (what the working song has on top of the confirmed state it was last rebased on goes out again)
+    lastSent = applied;
+    resendBase = base;
+}
+
+Song Replica::resume (Song snapshot, std::uint64_t r, const Song& working)
+{
+    return resume (std::move (snapshot), r, working, r < rev);
+}
+
+Song Replica::resume (Song snapshot, std::uint64_t r, const Song& working, bool hostBehind)
+{
+    snapshot.session.me = tag;
+    auto base = appliedRev;
+    for (const auto& [s, b] : inflightBase)
+        base = std::min (base, b);
+    std::set<Key> mine;
+    for (const auto& k : diff (applied, working).keys())
+        mine.insert (k);
+    if (hostBehind)
+        for (const auto& k : diff (snapshot, applied).keys())
+            if (ownerOf (k, applied) == tag && tag != session::hostTag)
+                mine.insert (k);
+    std::erase_if (mine, [&] (const Key& k) { return k.kind == Kind::session || (k.kind == Kind::order && tag != session::hostTag); });
+    const auto own = diff (snapshot, working, &mine);
+    Song x = snapshot;
+    copyLocalView (working, x);
+    apply (x, own);
+    state = applied = snapshot;
+    lastSent = snapshot;
+    copyLocalView (working, lastSent);
+    rev = appliedRev = r;
+    inflight.clear();
+    inflightBase.clear();
+    acks.clear();
+    resendBase = hostBehind ? r : std::min (base, r);
+    return x;
 }
 
 Replica::Update Replica::onCommit (const Commit& commit, const Song& working, bool hold)
@@ -1210,7 +1297,7 @@ Replica::Update Replica::rebase (const Song& working)
     auto newWorking = move (working, adoptW);
     lastSent = move (lastSent, adoptSent);
     for (const auto& [s, c] : acks)
-        inflight.erase (s);
+        inflight.erase (s), inflightBase.erase (s);
     acks.clear();
     applied = state;
     appliedRev = rev;
@@ -1236,5 +1323,109 @@ Song selectiveRevert (const Song& current, const Song& before, const Song& after
     Song x = current;
     apply (x, back, [&] (const Key& k) { return allowed.count (k) > 0; });
     return x;
+}
+// --- chat ------------------------------------------------------------------------------------------------------------
+
+std::string cleanChat (const std::string& text)
+{
+    std::string out;
+    out.reserve (std::min (text.size(), chatMaxBytes));
+    for (std::size_t i = 0; i < text.size(); ++i)
+    {
+        const auto c = (unsigned char) text[i];
+        if (c == '\r')
+            continue;
+        if (c < 0x20 && c != '\n')
+            out.push_back (' ');
+        else if (c == 0x7F)
+            continue;
+        else
+            out.push_back ((char) c);
+    }
+    // trim spaces and line breaks at both ends
+    const auto first = out.find_first_not_of (" \n\t");
+    if (first == std::string::npos)
+        return {};
+    out = out.substr (first, out.find_last_not_of (" \n\t") - first + 1);
+    if (out.size() > chatMaxBytes)
+    {
+        auto cut = chatMaxBytes;
+        while (cut > 0 && ((unsigned char) out[cut] & 0xC0) == 0x80)
+            --cut; // (not inside a UTF-8 sequence)
+        out.resize (cut);
+    }
+    return out;
+}
+
+// --- follow the host's transport -------------------------------------------------------------------------------------
+
+double hostTicksAt (const HostTransport& host, double nowMs) noexcept
+{
+    if (! host.playing)
+        return host.ticks;
+    const auto elapsed = std::max (0.0, nowMs - host.atMs);
+    return host.ticks + elapsed * host.bpm * (double) ppq / 60000.0;
+}
+
+FollowAction follow (const HostTransport& host, double nowMs, bool playing, bool songMode, double ticks, double toleranceTicks)
+{
+    FollowAction a;
+    a.songMode = host.songMode;
+    a.ticks = hostTicksAt (host, nowMs);
+    if (! host.playing)
+    {
+        a.type = playing ? FollowAction::Type::stop : FollowAction::Type::none;
+        return a;
+    }
+    if (! playing || songMode != host.songMode)
+        a.type = FollowAction::Type::play;
+    else if (std::abs (ticks - a.ticks) > toleranceTicks)
+        a.type = FollowAction::Type::seek;
+    return a;
+}
+
+// --- live stand-ins --------------------------------------------------------------------------------------------------
+
+std::set<Key> unplayable (const Song& song, const std::function<bool (const PluginRef&)>& missing)
+{
+    std::set<Key> out;
+    auto anyMissing = [&] (const std::vector<const PluginRef*>& refs) {
+        return std::any_of (refs.begin(), refs.end(), [&] (const PluginRef* r) { return missing (*r); });
+    };
+    for (const auto& c : song.channels)
+    {
+        std::vector<const PluginRef*> refs;
+        standins::pluginsOf (c, refs);
+        if (c.uid != 0 && anyMissing (refs))
+            out.insert ({ Kind::channel, c.uid, 0 });
+    }
+    for (int t = 1; t < (int) song.mixer.size(); ++t)
+    {
+        std::vector<const PluginRef*> refs;
+        standins::pluginsOf (song.mixer[(std::size_t) t], refs);
+        if (anyMissing (refs))
+            out.insert ({ Kind::insert, (std::uint64_t) t, 0 });
+    }
+    return out;
+}
+
+std::vector<Key> toRender (const Song& song, const std::set<Key>& needed, std::uint32_t me, const std::function<bool (const PluginRef&)>& missing)
+{
+    std::vector<Key> out;
+    const auto here = unplayable (song, missing);
+    for (const auto& k : needed)
+    {
+        if (here.count (k) > 0 || ownerOf (k, song) != me)
+            continue; // (not all of its plugins are here, or it is someone else's to render)
+        if (k.kind == Kind::channel)
+        {
+            const bool exists = std::any_of (song.channels.begin(), song.channels.end(), [&] (const ChannelDef& c) { return c.uid == k.a; });
+            if (exists)
+                out.push_back (k);
+        }
+        else if (k.kind == Kind::insert && k.a > 0 && k.a < song.mixer.size() && standins::insertUsesPlugin (song.mixer[(std::size_t) k.a]))
+            out.push_back (k);
+    }
+    return out;
 }
 } // namespace lynx::live

@@ -24,7 +24,7 @@ constexpr Palette builtIn {
     0xff2a2d34, 0xff3b3f48,                                                             // border, borderStrong
     0xffeceef2, 0xffa1a6b0, 0xff60656f,                                                 // text
     0xffe5383b, 0xfff2545a, 0xffc12a30, 0xff5c1f24, 0xffffffff, 0x2ee5383b,             // accent family
-    0xffc5c9d1, 0xff444955, 0xff2a2d34, 0xff33363f, 0xffe8a3a6,                         // knobs, steps
+    0xffc5c9d1, 0xff444955, 0xff2a2d34, 0xff5e3036, 0xffe8a3a6,                         // knobs, steps (alt: stepOffAlt below)
     0xff3a3e47, 0xff262930, 0xff1d1f24, 0xff17181c, 0xff1c1e23, 0xff16171b,             // grids, keys, rows
     0xffb3545a, 0xffff6b6e, 0xff4a4e57, 0xff3a3e47                                      // notes, LED
 };
@@ -81,7 +81,7 @@ Palette derivePalette (std::uint32_t accentIn, std::uint32_t backgroundIn)
 
     // surfaces, hairlines, grids: the built-in steps from the background
     for (auto* token : { &p.bg0, &p.bg1, &p.bg2, &p.bg3, &p.bg4, &p.bg5, &p.bg6, &p.border, &p.borderStrong, &p.knobTrack, &p.stepOff,
-                         &p.stepOffAlt, &p.gridBar, &p.gridBeat, &p.gridStep, &p.keyBlack, &p.rowWhite, &p.rowBlack, &p.noteMuted, &p.ledOff })
+                         &p.gridBar, &p.gridBeat, &p.gridStep, &p.keyBlack, &p.rowWhite, &p.rowBlack, &p.noteMuted, &p.ledOff })
         *token = surface (*token, background, light);
 
     if (light)
@@ -112,6 +112,9 @@ Palette derivePalette (std::uint32_t accentIn, std::uint32_t backgroundIn)
         p.noteHard = mix (accent, 0xffffffff, 0.26);
         p.noteSoft = mix (accent, 0xff808080, 0.42);
     }
+    // the Channel Rack's every-other beat group: the off step tinted with the accent, clearly apart at a glance like
+    // FL's grey / red groups (Busy Works Beats' video, round 170a: "too close of a color")
+    p.stepOffAlt = mix (p.stepOff, p.accent, stepGroupTint);
     return p;
 }
 

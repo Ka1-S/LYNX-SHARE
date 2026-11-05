@@ -237,6 +237,7 @@ struct Engine::Impl
     float shiftState = 0.0f;
     float apG[lineCount] {}, inG[4] {}, eApG = 0;
     double modDepth = 0, modInc[lineCount] {};
+    double eModDepth = 0, eModInc = 0, eModPhase = 0; // round 170c: the early taps' modulation (samples, rad / sample)
     double feedbackGain = -1;
 
     Impl (double maxLine, double maxPre) : maxLineSec (maxLine), maxPreSec (maxPre)
@@ -364,6 +365,17 @@ struct Engine::Impl
             for (auto& w : bW[c])
                 w = (float) (w / std::sqrt (std::max (b, 1e-9)));
         }
+
+        // round 170c: the early taps' modulation (four sines, a tap on each in turn; never past the shortest tap)
+        eModDepth = std::max (0.0, s.earlyModDepthMs) * ms;
+        if (eModDepth > 0.0)
+        {
+            int shortest = raw[0].mask;
+            for (int c = 0; c < 2; ++c)
+                for (int k = 0; k < earlyTaps; ++k) shortest = std::min (shortest, eD[c][k]);
+            eModDepth = std::min (eModDepth, std::max (0.0, 0.45 * (double) shortest - 1.0));
+        }
+        eModInc = 2.0 * pi * std::max (0.0, s.earlyModRateHz) / sr;
 
         // modulation
         modDepth = std::max (0.0, s.modDepthMs) * ms;
@@ -497,7 +509,16 @@ struct Engine::Impl
                 raw[c].write (p);
                 // early reflections
                 float er = 0.0f;
-                if (early != 0.0f || send != 0.0f)
+                if ((early != 0.0f || send != 0.0f) && eModDepth > 0.0) // round 170c: modulated taps
+                {
+                    double eLfo[4];
+                    for (int j = 0; j < 4; ++j)
+                        eLfo[j] = 0.5 * eModDepth * (1.0 + std::sin (eModPhase + 1.5707963267948966 * j + 0.9 * c));
+                    const auto longest = (double) (raw[c].mask - 3);
+                    for (int k = 0; k < earlyTaps; ++k)
+                        er += eW[c][k] * raw[c].readFrac (std::min (longest, (double) eD[c][k] + eLfo[k & 3]));
+                }
+                else if (early != 0.0f || send != 0.0f)
                     for (int k = 0; k < earlyTaps; ++k)
                         er += eW[c][k] * raw[c].read (eD[c][k]);
                 if (eApG != 0.0f)
@@ -521,6 +542,9 @@ struct Engine::Impl
             }
 
             // late tank
+            eModPhase += eModInc;
+            if (eModPhase > 2.0 * pi)
+                eModPhase -= 2.0 * pi;
             float sOut[lineCount];
             for (int i = 0; i < lineCount; ++i)
             {
@@ -928,6 +952,10 @@ protected:
         s.earlyDecay = 2.0 + 3.0 * p[14];
         s.earlyDiffusion = 0.3 + 0.7 * p[14];
         s.earlySend = p[17];
+        // round 170c: Early mod rate / depth were read by nothing (the "shell" audit); the early taps now move like the
+        // late lines (same laws: 0.05 … 5 Hz, depth falling with the rate)
+        s.earlyModRateHz = 0.05 + 4.95 * p[15];
+        s.earlyModDepthMs = 0.8 * t.modScale * p[16] / std::sqrt (std::max (0.3, s.earlyModRateHz));
         s.inDiffusion = t.inDiff * p[18];
         s.loopDiffusion = 0.3 + 0.6 * p[18];
         const auto space = (double) p[20];

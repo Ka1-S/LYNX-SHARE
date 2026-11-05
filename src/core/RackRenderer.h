@@ -31,6 +31,22 @@
 
 namespace lynx
 {
+// The levels a drag moves (round 171c, discussion #10): mixer volume / pan / separation and channel volume / pan.
+// A snapshot carries its own copy as atomics; while a fader or knob is dragged the UI writes the new value here
+// (AudioEngine::editLevels) instead of rebuilding the whole snapshot for every mouse move, and the renderer reads them
+// at each block. The next full build starts again from the Song, which holds the same values.
+struct LiveLevels
+{
+    explicit LiveLevels (const Song& song);
+    // false = the song's mixer or channel count differs from this snapshot's (a structural edit: rebuild instead)
+    bool matches (const Song& song) const noexcept;
+    // the song's values into the atomics (UI thread; the layout must match)
+    void store (const Song& song) noexcept;
+
+    std::vector<std::atomic<float>> mixerVolume, mixerPan, mixerStereo;
+    std::vector<std::atomic<float>> channelVolume, channelPan;
+};
+
 // Immutable snapshot published by the UI. Instruments are shared between
 // consecutive snapshots so voices are not cut off when the song is edited.
 struct RackState
@@ -78,6 +94,8 @@ struct RackState
     };
     std::vector<PluginParamBinding> pluginParams;
     bool hasAutomation = false;
+    // the dragged levels (round 171c); never nullptr in a built snapshot
+    std::shared_ptr<LiveLevels> live;
     ScheduleIndex schedule; // index to schedule the Playlist without scanning every note
     std::vector<int> performanceZone; // Performance mode: the zone's clips (perf::zoneClips), empty when off
     int tempoAutomation = -1; // tempo automation, if any
@@ -257,6 +275,12 @@ struct ProcessTimes
     // [(track * maxEffectSlots + slot) * meterOutputs + output] = Effect::controlOutput (output) after the last block.
     static constexpr int meterOutputs = 8;
     std::array<std::atomic<float>, (std::size_t) maxMixerTracks * maxEffectSlots * meterOutputs> effectMeters {};
+    // Round 170c (issue #14, "everything is a shell"): any slot's input and output peaks for an editor's level meter
+    // (FL's live meters in Soft Clipper, Multiband Compressor, Transient Processor, Balance...). An open editor counts
+    // itself in `levelWanted[key]`; while it is above 0 the audio thread raises slotLevels[key * 2 + 0 / 1] to the
+    // block's peak (linear), and the editor takes them with exchange (0) (the highest peak since its last frame).
+    std::array<std::atomic<std::uint16_t>, (std::size_t) maxMixerTracks * maxEffectSlots> levelWanted {};
+    std::array<std::atomic<float>, (std::size_t) maxMixerTracks * maxEffectSlots * 2> slotLevels {};
 
     // Audio of one effect slot for an editor's spectrum analyser (Facet EQ, round 103): the editor sets `key`
     // (track * maxEffectSlots + slot, −1 = none); the audio thread then writes the slot's input (pre) and output
@@ -291,10 +315,16 @@ struct MixerMatrix
 };
 // `volume` = the fader position (0..1, MixerTrack::volume), `pan` −1..1 (both possibly automated)
 MixerMatrix mixerMatrix (const MixerTrack& track, float volume, float pan, bool triangular) noexcept;
+// the same with the separation given (a live value, round 171c) instead of track.stereo
+MixerMatrix mixerMatrix (const MixerTrack& track, float volume, float pan, bool triangular, float stereo) noexcept;
 
 class RackRenderer
 {
 public:
+    // A live choke event on this channel = FL's Stop sound (round 170h2): every effect and plugin is reset (the
+    // all-notes-off is the panic event, channel −1, sent just before it)
+    static constexpr int stopSoundChannel = -2;
+
     ProcessTimes& processTimes() noexcept { return *times; }
 
     // Extra threads for channels and mixer layers (nullptr = everything on the audio thread).

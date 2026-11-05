@@ -61,6 +61,11 @@ void span (const std::vector<Note>& notes, std::int64_t& start, std::int64_t& en
 // span length rounded up to a multiple of `grid`. Returns the new indices.
 std::vector<int> duplicate (Pattern& pattern, const std::vector<int>& indices, std::int64_t grid);
 
+// The Piano roll's Ctrl+B / Duplicate (round 170h, FL 2026 driven with the snap on Step): the copy goes whole bars
+// later, the selection's span rounded up to bars (notes over steps 1-8 -> bar 2, over 1-24 -> bar 3), so a riff
+// repeats in time even when its last note ends before the bar line.
+std::vector<int> duplicateBars (Pattern& pattern, const std::vector<int>& indices, int beatsPerBar);
+
 // Rounds the notes' start to the nearest multiple of `grid` (length kept).
 void quantize (Pattern& pattern, const std::vector<int>& indices, std::int64_t grid);
 

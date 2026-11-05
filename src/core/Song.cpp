@@ -3,6 +3,7 @@
 #include "core/FlSynths.h"
 #include "core/VoltageController.h"
 #include "core/MidiOut.h"
+#include "core/PatternBlocks.h"
 
 #include <algorithm>
 #include <iterator>
@@ -36,18 +37,32 @@ bool Pattern::hasStep (int channel, int step) const noexcept
 {
     const auto tick = (std::int64_t) step * ticksPerStep;
     return std::any_of (notes.begin(), notes.end(),
-                        [&] (const Note& n) { return n.channel == channel && n.start == tick; });
+                        [&] (const Note& n) { return n.channel == channel && n.start == tick && ! n.muted; });
 }
 
-void Pattern::toggleStep (int channel, int step)
+void Pattern::toggleStep (int channel, int step, bool muteRemoved)
 {
+    // FL's SetStep (FLEngine FUN_012d4140, REA round 169f): with "Mute removed steps" on, turning a step off mutes its
+    // notes and turning it on unmutes them; with the option off, turning it off deletes them (muted ones too) and
+    // turning it on adds a new note (a muted one there stays as it is).
     const auto tick = (std::int64_t) step * ticksPerStep;
-    const auto it = std::find_if (notes.begin(), notes.end(),
-                                  [&] (const Note& n) { return n.channel == channel && n.start == tick; });
+    const auto onStep = [&] (const Note& n) { return n.channel == channel && n.start == tick; };
 
-    if (it != notes.end())
+    if (hasStep (channel, step))
     {
-        notes.erase (it);
+        if (muteRemoved)
+            for (auto& n : notes)
+                n.muted = n.muted || onStep (n);
+        else
+            notes.erase (std::remove_if (notes.begin(), notes.end(), onStep), notes.end());
+        return;
+    }
+
+    if (muteRemoved && std::any_of (notes.begin(), notes.end(), onStep))
+    {
+        for (auto& n : notes)
+            if (onStep (n))
+                n.muted = false;
         return;
     }
 
@@ -65,13 +80,17 @@ std::int64_t Song::songLength() const noexcept
 
     for (const auto& c : playlist)
         end = std::max (end, c.end());
+    // Pattern Blocks (round 170f) play with the clips
+    const auto blocksEnd = patternblocks::end (*this);
+    end = std::max (end, blocksEnd);
+    const bool arranged = ! playlist.empty() || blocksEnd > 0;
 
     // an empty Playlist (e.g. recording the first take in Song mode) loops the current pattern's length, not one bar
-    if (playlist.empty() && currentPattern >= 0 && currentPattern < (int) patterns.size())
+    if (! arranged && currentPattern >= 0 && currentPattern < (int) patterns.size())
         end = patterns[(std::size_t) currentPattern].effectiveLength (beatsPerBar);
 
     // FL: Song mode loops at the exact end of the last clip (a clip ending at 3:05 loops at 3:05), not at the bar end
-    if (! playlist.empty() && end > 0)
+    if (arranged && end > 0)
         return end;
     return std::max<std::int64_t> (bar, (end + bar - 1) / bar * bar);
 }
@@ -130,6 +149,8 @@ void Song::removePattern (int index)
             if (c.kind == ClipKind::pattern && c.pattern > index)
                 --c.pattern;
     });
+
+    patternblocks::removePattern (*this, index); // (round 170f)
 
     // Loop Starter channels follow their pattern (round 168b)
     for (auto& c : channels)
@@ -805,12 +826,15 @@ void Song::selectArrangement (int index)
 
     auto& from = arrangements[(std::size_t) currentArrangement];
     from.clips = std::move (playlist);
+    from.blocks = std::move (blocks);
     from.loopStart = loopStart;
     from.loopEnd = loopEnd;
 
     auto& to = arrangements[(std::size_t) index];
     playlist = std::move (to.clips);
     to.clips.clear();
+    blocks = std::move (to.blocks);
+    to.blocks.clear();
     loopStart = to.loopStart;
     loopEnd = to.loopEnd;
     currentArrangement = index;
@@ -824,6 +848,7 @@ int Song::addArrangement (const std::string& name, bool copyCurrent)
     if (copyCurrent)
     {
         a.clips = playlist;
+        a.blocks = blocks;
         a.loopStart = loopStart;
         a.loopEnd = loopEnd;
         a.markers = markers();
@@ -1270,6 +1295,7 @@ bool PatchNode::BusHead::operator== (const BusHead& o) const { return bus == o.b
 bool PatchNode::operator== (const PatchNode& o) const
 {
     return generator == o.generator && label == o.label && x == o.x && y == o.y && busHeads == o.busHeads
+           && paramIns == o.paramIns && paramOuts == o.paramOuts
            && (generator ? channel == o.channel : effect == o.effect);
 }
 
@@ -1278,7 +1304,7 @@ bool EffectSlot::operator== (const EffectSlot& o) const
     if (kind != o.kind || enabled != o.enabled || params != o.params || mix != o.mix || ! (plugin == o.plugin) || sidechain != o.sidechain
         || sidechain2 != o.sidechain2 || sendTracks != o.sendTracks || state != o.state || samplePath != o.samplePath || ! (substituteFor == o.substituteFor)
         || presetName != o.presetName || abOther != o.abOther || abShowingB != o.abShowingB || branches.size() != o.branches.size()
-        || links.size() != o.links.size() || ! (patcher == o.patcher))
+        || links.size() != o.links.size() || ! (patcher == o.patcher) || row != o.row)
         return false;
     for (std::size_t i = 0; i < branches.size(); ++i)
         if (branches[i].gain != o.branches[i].gain || branches[i].chain != o.branches[i].chain)
@@ -1315,6 +1341,7 @@ float faderPosition (float gain) noexcept
 Song makeExportSong (const Song& song, bool wholeSong, std::int64_t tailTicks, std::int64_t& musicLength)
 {
     Song out = song;
+    patternblocks::expandSong (out); // Pattern Blocks (round 170f) become clips
 
     if (out.patterns.empty())
         out.patterns.emplace_back().name = "Pattern 1";

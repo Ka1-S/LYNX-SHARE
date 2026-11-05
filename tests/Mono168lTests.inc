@@ -257,7 +257,15 @@ TEST (mono168l_every_engine_plays_mono_legato_and_porta)
     const auto fl = natives142::flAccess();
     for (const auto& e : natives::instrumentEngines())
     {
-        const auto made = natives::makeChannel (e.kind, fl);
+        auto made = natives142::writtenWith (e.kind, fl); // (round 169l2: the Default preset it was written with)
+        // (round 169l: a new Morphine is FL's Plugin database patch, whose pitch the autocorrelation reads 19 semitones
+        // off; the check plays the preset it was written with)
+        if (e.kind == InstrumentKind::morphine)
+            if (const auto c = natives::presetCandidates (e.presetFolder, true, fl); c.size() > 1)
+                for (std::size_t i = 1; i < c.size(); ++i)
+                    if (c[i].find ("BAS Acoustic 1 FG") != std::string::npos)
+                        if (auto p = natives::channelFromPresetFile (e.kind, c[i], fl))
+                            made = p;
         if (! made)
             continue;
         const auto& c = *made;
@@ -280,9 +288,21 @@ TEST (mono168l_every_engine_plays_mono_legato_and_porta)
             in.noteOn (60, 0.8f);
             const auto taken = HostSlide::pendingGlide().taken;
             HostSlide::pendingGlide() = {};
-            if (taken != in.followsChannelPorta())
+            // an engine that refuses the note (e.g. a Granulizer whose sample is not on this machine) starts no voice
+            // and so takes no glide (round 170i: it no longer writes the glide into voice −1)
+            bool refused = false;
+            if (! taken && in.followsChannelPorta())
+            {
+                std::vector<float> l (2048, 0.0f), r (2048, 0.0f);
+                in.render (l.data(), r.data(), 2048, 1.0f, 1.0f);
+                refused = std::all_of (l.begin(), l.end(), [] (float x) { return x == 0.0f; })
+                          && std::all_of (r.begin(), r.end(), [] (float x) { return x == 0.0f; });
+            }
+            if (refused)
+                std::printf ("  porta: %s refuses the note here (no voice, no glide)\n", e.name);
+            else if (taken != in.followsChannelPorta())
                 std::printf ("  porta: %s %s the glide at note on\n", e.name, taken ? "takes" : "does not take");
-            CHECK (taken == in.followsChannelPorta());
+            CHECK (refused || taken == in.followsChannelPorta());
         }
         if (unreadable.count (std::string (e.name)) != 0 || ownTimeline.count (std::string (e.name)) != 0)
             continue;

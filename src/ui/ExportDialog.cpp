@@ -1,6 +1,9 @@
 #include "ui/ExportDialog.h"
 
+#include "core/PatternBlocks.h"
+#include "core/MessageThreadOwned.h"
 #include "core/PlaylistOps.h"
+#include "core/PickerSelection.h"
 #include "core/QuickRender.h"
 #include "core/Mastering.h"
 #include "core/EffectPresets.h"
@@ -13,6 +16,7 @@
 
 #include "engine/Exporter.h"
 #include "engine/Text.h"
+#include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/SettingsPages.h"
 #include "ui/Theme.h"
@@ -21,6 +25,16 @@ namespace lynx
 {
 namespace
 {
+// the job of one stem / playlist track: made and deleted on the message thread, a Cancel never waits for it (round 169g)
+struct JobOnMessageThread : MessageThreadOwned<ExportJob>
+{
+    explicit JobOnMessageThread (juce::Thread& t)
+        : MessageThreadOwned<ExportJob> ([] (std::function<void()> f) { juce::MessageManager::callAsync (std::move (f)); },
+                                         [&t] { return t.threadShouldExit(); })
+    {
+    }
+};
+
 class ExportThread final : public juce::ThreadWithProgressWindow
 {
 public:
@@ -53,6 +67,13 @@ public:
         }
         else if (ok && reveal)
             file.revealToUser(); // "Show the file(s) when complete"
+        else if (ok && job->getNotice().isEmpty())
+            // FL closes its render window and says nothing (round 170h, FL 2026 driven): no box to click away, the
+            // result goes to the hint bar for a few seconds; a box stays for a notice that needs reading
+            ui::postHint ({ tr ("Export complete") + ": " + file.getFullPathName()
+                                + (job->getInfo().isEmpty() ? juce::String() : "  " + job->getInfo()),
+                            tr ("Peak: {0} dBFS", { juce::String (juce::Decibels::gainToDecibels (job->getPeak()), 1) }) },
+                          8000);
         else if (ok)
             juce::AlertWindow::showMessageBoxAsync (job->getNotice().isEmpty() ? juce::MessageBoxIconType::InfoIcon : juce::MessageBoxIconType::WarningIcon,
                                                     tr ("Export complete"),
@@ -129,14 +150,14 @@ public:
             auto& item = items[i];
             setStatusMessage (item.name);
 
-            std::unique_ptr<ExportJob> job;
-            juce::WaitableEvent ready;
-            juce::MessageManager::callAsync ([&] {
-                job = std::make_unique<ExportJob> (item.song, options, item.file);
-                job->setExtraData (true);
-                ready.signal();
+            JobOnMessageThread slot (*this);
+            auto* job = slot.create ([&item, this] {
+                auto j = std::make_unique<ExportJob> (item.song, options, item.file);
+                j->setExtraData (true);
+                return j;
             });
-            ready.wait();
+            if (job == nullptr)
+                break; // (cancelled)
 
             juce::String error;
             const auto base = (double) i / (double) items.size();
@@ -151,12 +172,7 @@ public:
                 files.push_back (item.file);
             }
 
-            juce::WaitableEvent gone;
-            juce::MessageManager::callAsync ([&] {
-                job.reset();
-                gone.signal();
-            });
-            gone.wait();
+            slot.release();
         }
     }
 
@@ -166,6 +182,9 @@ public:
             afterRender (files);
         if (! cancelled && options.showWhenDone && written > 0)
             baseFile.getParentDirectory().startAsProcess();
+        else if (! cancelled && written > 0)
+            ui::postHint ({ tr ("Stems exported") + ": " + tr ("{0} file(s) in {1}", { juce::String (written), baseFile.getParentDirectory().getFullPathName() }), {} },
+                          8000);
         else if (! cancelled)
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Stems exported"),
                                                     tr ("{0} file(s) in {1}", { juce::String (written), baseFile.getParentDirectory().getFullPathName() }));
@@ -314,7 +333,7 @@ public:
         const auto& song = engine.getSong();
         // the range follows what is playing unless a selection was the last choice and still exists
         if (clip == nullptr && (options.range != Range::selection || ! hasSelection (song)))
-            options.range = song.mode == PlayMode::song && ! song.playlist.empty() ? Range::song : Range::pattern;
+            options.range = song.mode == PlayMode::song && (! song.playlist.empty() || patternblocks::active (song)) ? Range::song : Range::pattern;
 
         for (auto* t : { &whatTitle, &formatTitle, &optionsTitle })
             addAndMakeVisible (t);
@@ -1149,14 +1168,14 @@ public:
         {
             auto& item = items[i];
             setStatusMessage (item.name);
-            std::unique_ptr<ExportJob> job;
-            juce::WaitableEvent ready;
-            juce::MessageManager::callAsync ([&] {
-                job = std::make_unique<ExportJob> (item.song, options, item.file);
-                job->setExtraData (false);
-                ready.signal();
+            JobOnMessageThread slot (*this);
+            auto* job = slot.create ([&item, this] {
+                auto j = std::make_unique<ExportJob> (item.song, options, item.file);
+                j->setExtraData (false);
+                return j;
             });
-            ready.wait();
+            if (job == nullptr)
+                break; // (cancelled)
 
             juce::String error;
             const auto base = (double) i / (double) items.size();
@@ -1168,12 +1187,7 @@ public:
             else if (! threadShouldExit())
                 failed = true;
 
-            juce::WaitableEvent gone;
-            juce::MessageManager::callAsync ([&] {
-                job.reset();
-                gone.signal();
-            });
-            gone.wait();
+            slot.release();
         }
     }
 
@@ -1264,6 +1278,100 @@ void renderPatternAsAudioClip (AudioEngine& engine, int pattern, int how)
     mode->button = tr ("Render");
     mode->onRender = go;
     showClipRenderWindow (engine, replace ? tr ("Render and replace") : tr ("Render as audio clip"), std::move (mode));
+}
+
+namespace
+{
+// FL's loop over the picked patterns (PSPatQuickRenderMenuClick FUN_011884b0, REA_rodada169k §2.1)
+struct PatternBatch
+{
+    AudioEngine* engine = nullptr;
+    std::vector<int> patterns;
+    std::vector<Song> renders;
+    std::vector<std::string> names;
+    exportopts::Options options;
+    bool replace = false;
+    int warning = 0;
+    std::vector<std::pair<int, juce::String>> done; // pattern, rendered file
+};
+
+void finishPatternBatch (const std::shared_ptr<PatternBatch>& b)
+{
+    if (! b->done.empty())
+        b->engine->editSong ([b] (Song& s) {
+            for (const auto& [pattern, file] : b->done)
+                quickrender::applyPatternRender (s, pattern, file.toStdString(), b->replace);
+        });
+    if (b->warning == 1)
+        warn (tr ("Warning"), tr ("Pattern is empty, nothing to render."));
+    else if (b->warning == 2)
+        warn (tr ("Warning"), tr ("Empty patterns were ignored."));
+}
+
+void runPatternBatch (std::shared_ptr<PatternBatch> b, std::size_t k)
+{
+    if (k >= b->patterns.size())
+    {
+        finishPatternBatch (b);
+        return;
+    }
+    const auto file = uniqueWav (renderFolder(), b->names[k]);
+    auto job = std::make_unique<ExportJob> (b->renders[k], b->options, file);
+    job->setExtraData (false);
+    (new ExportThread (std::move (job), file, [b, k, file] (bool ok) {
+        if (! ok) // cancelled or failed: FL stops the loop; what was rendered stays
+        {
+            finishPatternBatch (b);
+            return;
+        }
+        b->done.push_back ({ b->patterns[k], file.getFullPathName() });
+        runPatternBatch (b, k + 1);
+    }, tr ("Rendering pattern...")))->launchThread();
+}
+} // namespace
+
+void renderPatternsAsAudioClips (AudioEngine& engine, const std::vector<int>& patterns, int how)
+{
+    if (patterns.size() == 1)
+    {
+        renderPatternAsAudioClip (engine, patterns.front(), how);
+        return;
+    }
+    const auto& song = engine.getSong();
+    const auto plan = pickersel::planRender (patterns, [&song] (int p) { return quickrender::patternRenderable (song, p); });
+    if (plan.render.empty())
+    {
+        if (const auto w = pickersel::skippedWarning (plan); w != 0)
+            warn (tr ("Warning"), w == 1 ? tr ("Pattern is empty, nothing to render.") : tr ("Empty patterns were ignored."));
+        return;
+    }
+    engine.capturePluginStates();
+    auto batch = std::make_shared<PatternBatch>();
+    batch->engine = &engine;
+    batch->patterns = plan.render;
+    batch->replace = how == 2;
+    batch->warning = pickersel::skippedWarning (plan);
+    for (const auto p : plan.render)
+    {
+        batch->renders.push_back (quickrender::makePatternRenderSong (song, p));
+        batch->names.push_back (quickrender::patternName (song, p));
+    }
+    if (how == 1) // Quick: the last choices, no window
+    {
+        batch->options = clipRenderOptions (true);
+        runPatternBatch (batch, 0);
+        return;
+    }
+    // the window once, for the first pattern; the others follow with the same choices (FL's flag 1 after the first)
+    auto mode = std::make_shared<ClipRenderMode>();
+    mode->pattern = true;
+    mode->song = batch->renders.front();
+    mode->button = tr ("Render");
+    mode->onRender = [batch] (const exportopts::Options& o) {
+        batch->options = o;
+        runPatternBatch (batch, 0);
+    };
+    showClipRenderWindow (engine, batch->replace ? tr ("Render and replace") : tr ("Render as audio clip"), std::move (mode));
 }
 
 void exportAllPlaylistTracks (AudioEngine& engine, const juce::String& projectName, quickrender::Start start, bool groups)

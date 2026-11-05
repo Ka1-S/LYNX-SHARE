@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include <functional>
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -38,6 +40,9 @@ class ChannelRackComponent final : public juce::Component,
                                    private juce::Timer
 {
 public:
+    // LYNX extra (on by default; Options › General "Playhead column in the Channel Rack"): a soft highlight of the
+    // playing step's column under every row's steps, and the first step of each bar marked on the playing-step strip
+    static inline std::atomic<bool> playheadColumn { true };
     explicit ChannelRackComponent (AudioEngine& engine);
     ~ChannelRackComponent() override;
     void visibilityChanged() override;
@@ -49,6 +54,8 @@ public:
     static bool keepEditorsOpen;
     // FL's "Select first channel with notes when the pattern changes" (Settings › General; REA round 167j §5)
     static bool selectFirstChannelWithNotes;
+    // FL's Channel Rack option "Mute removed steps": turning a step off mutes its note instead of deleting it
+    static bool muteRemovedSteps;
 
     void paint (juce::Graphics& g) override;
     void mouseDown (const juce::MouseEvent& e) override;
@@ -74,6 +81,10 @@ public:
     bool moveSelected (int delta);
     void cloneSelected();
     void deleteSelected();
+    // FL's Cut / Copy / Paste of the selected channels' steps and notes in the current pattern (Ctrl+X / C / V)
+    void cutSelected();
+    void copySelected();
+    void pasteSelected();
     void sendSelectedToInserts();
     void toggleMute (int channel);
     void solo (int channel);
@@ -175,7 +186,7 @@ private:
     juce::Rectangle<int> rowBounds (int row) const;
     int rowY (int row) const;       // top of a row (rows below the graph lane shift down)
     int filterGroup = -1;
-    static inline std::vector<Note> stepClipboard; // the channel menu's Cut / Copy / Paste (a channel's notes)
+    static inline ChannelStepsClipboard stepClipboard; // Cut / Copy / Paste (Ctrl+X / C / V, the channel menu)
     int visibleIndex (int row) const; // the row's place among the shown rows
     int shownCount() const;
     int rowAtY (int y) const;       // row under y (the lane counts as its channel's row)
@@ -236,6 +247,9 @@ private:
 
     AudioEngine& engine;
     int playheadStep = -1;
+    static constexpr int positionStripHeight = 9; // FL's "Playing step" LED strip, at the top of the add row
+    bool channelHitsNow (int row) const;
+    static void paintStepHit (juce::Graphics&, juce::Rectangle<float>);
 
     enum class PaintMode { none, add, remove } paintMode = PaintMode::none;
     int lastPaintedRow = -1, lastPaintedStep = -1;

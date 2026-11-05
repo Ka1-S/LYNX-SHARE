@@ -7,6 +7,8 @@
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
 #include "ui/PlaylistComponent.h"
+#include "ui/PatternBlocksView.h"
+#include "core/PatternBlocks.h"
 #include "ui/StemExtract.h"
 
 #include "core/KeyMap.h"
@@ -247,8 +249,13 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     overview.onShowAll = [this] { zoomAll(); };
     addAndMakeVisible (overview);
 
+    // FL's legacy Pattern Blocks (round 170f): shown under the clip tracks while the project's option is on
+    blocksView = std::make_unique<PatternBlocksView> (engine, *this);
+    addChildComponent (*blocksView);
+
     grid::fillEditorBox (snapBox);
-    snapBox.setTooltip (tr ("Playlist grid: follows the global grid in the toolbar, or its own; hold Alt while dragging to ignore it"));
+    snapBox.setTooltip (tr ("Playlist snap (magnet): \"Main\" follows the snap in the toolbar, or pick this window's own; hold Alt while dragging to ignore it"));
+    ui::setQuickTip (snapBox, tr ("Playlist snap"));
     snapBox.setWantsKeyboardFocus (false);
     snapBox.setMouseClickGrabsKeyboardFocus (false);
     snapBox.onChange = [this] { repaint(); };
@@ -417,7 +424,82 @@ juce::Colour PlaylistComponent::patternColour (const Song& song, int pattern)
 juce::Rectangle<int> PlaylistComponent::gridArea() const
 {
     return getLocalBounds().withTrimmedLeft (headerWidth).withTrimmedTop (headerHeight)
-        .withTrimmedRight (scrollBarSize);
+        .withTrimmedRight (scrollBarSize).withTrimmedBottom (blocksSectionHeight());
+}
+
+int PlaylistComponent::blocksSectionHeight() const
+{
+    if (! engine.getSong().patternBlocksOn)
+        return 0;
+    const auto available = getHeight() - headerHeight;
+    const auto least = PatternBlocksView::dividerHeight + 3 * PatternBlocksView::rowHeight;
+    const auto most = juce::jmax (least, available - 2 * trackHeight); // the clip tracks keep two rows
+    // by default a third of the grid, or less when every row (and a spare one) fits in less
+    const auto rows = PatternBlocksView::dividerHeight + ((int) engine.getSong().patterns.size() + 1) * PatternBlocksView::rowHeight;
+    const auto wanted = blocksHeight > 0 ? blocksHeight : juce::jmin (available / 3, rows);
+    return juce::jlimit (least, most, wanted);
+}
+
+void PlaylistComponent::setBlocksHeight (int height)
+{
+    blocksHeight = juce::jmax (1, height);
+    resized();
+    repaint();
+}
+
+void PlaylistComponent::scrollTicksBy (double ticks)
+{
+    scrollTicks = juce::jmax (0.0, scrollTicks + ticks);
+    updateScrollBars();
+    repaint();
+}
+
+void PlaylistComponent::togglePatternBlocks()
+{
+    const auto& song = engine.getSong();
+    if (! song.patternBlocksOn)
+    {
+        engine.editSong ([] (Song& s) { s.patternBlocksOn = true; });
+        return;
+    }
+    auto any = false;
+    for (const auto& a : song.arrangements)
+        any = any || ! a.blocks.empty();
+    if (song.blocks.empty() && ! any)
+    {
+        engine.editSong ([] (Song& s) { s.patternBlocksOn = false; });
+        return;
+    }
+    // blocks that stay hidden would still be in the project but silent: FL's own way out was to turn them into clips
+    auto options = juce::MessageBoxOptions()
+                       .withIconType (juce::MessageBoxIconType::QuestionIcon)
+                       .withTitle (tr ("Pattern blocks"))
+                       .withMessage (tr ("This project has pattern blocks. Turn them into clips (one track per pattern) so they keep playing, or delete them?"))
+                       .withButton (tr ("Turn them into clips"))
+                       .withButton (tr ("Delete them"))
+                       .withButton (tr ("Cancel"))
+                       .withAssociatedComponent (this);
+    juce::AlertWindow::showAsync (options, [safe = juce::Component::SafePointer<PlaylistComponent> (this)] (int result) {
+        if (safe == nullptr || result == 0)
+            return;
+        safe->engine.editSong ([result] (Song& s) {
+            if (result == 1)
+                patternblocks::toClipsInEveryArrangement (s);
+            s.forEachBlockList ([] (std::vector<PatternBlock>& list) { list.clear(); });
+            s.patternBlocksOn = false;
+        });
+    });
+}
+
+void PlaylistComponent::turnBlocksIntoClips()
+{
+    if (engine.getSong().blocks.empty())
+    {
+        ui::postHint ({ tr ("No pattern blocks to turn into clips"), {} }, 3000);
+        return;
+    }
+    setSelection ({});
+    engine.editSong ([] (Song& s) { patternblocks::toClips (s); });
 }
 
 double PlaylistComponent::tickToX (double tick) const { return headerWidth + (tick - scrollTicks) * pixelsPerTick; }
@@ -628,7 +710,11 @@ void PlaylistComponent::resized()
     followButton.setBounds (snapBox.getRight() + 6, 3, h, h);
     stretchButton.setBounds (followButton.getRight() + 2, 3, h, h);
     overview.setBounds (headerWidth, toolbarHeight, getWidth() - headerWidth - scrollBarSize, overviewHeight);
-    vBar.setBounds (getWidth() - scrollBarSize, headerHeight, scrollBarSize, getHeight() - headerHeight);
+    const auto blocks = blocksSectionHeight();
+    blocksShown = blocks > 0;
+    vBar.setBounds (getWidth() - scrollBarSize, headerHeight, scrollBarSize, getHeight() - headerHeight - blocks);
+    blocksView->setBounds (0, getHeight() - blocks, getWidth(), blocks);
+    blocksView->setVisible (blocksShown);
     updateScrollBars();
 
     if (fitSongPending)
@@ -3440,7 +3526,7 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
     juce::PopupMenu menu;
     ui::addItemHeader (menu, tr ("Playlist track"), ! info.name.empty() ? juce::String::fromUTF8 (info.name.c_str()) : tr ("Track {0}", { juce::String (track + 1) }),
                        info.colour != 0 ? juce::Colour (info.colour) : juce::Colour());
-    menu.addItem (tr ("Rename and color..."), [this, track] { renameTrack (track); });
+    menu.addItem (theme::mnemonic (tr ("Rename and color..."), 'R'), [this, track] { renameTrack (track); });
     menu.addSubMenu (tr ("Change color"), ui::colourMenu (info.colour, [this, track] (std::uint32_t colour) {
                          editTrack (track, [colour] (PlaylistTrack& t) { t.colour = colour; });
                      }, juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1)));
@@ -3456,7 +3542,7 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         });
     });
     // FL's "Auto name" (EEPLTrackAutoNameMenuClick → FUN_012ef490, round 168f): the name and colour of what the track plays most
-    menu.addItem (tr ("Auto name"), [this, tracks = tracksForMenu (track)] {
+    menu.addItem (theme::mnemonic (tr ("Auto name"), 'A'), [this, tracks = tracksForMenu (track)] {
         engine.editSong ([tracks] (Song& s) {
             for (const auto t : tracks)
                 pltracks::autoName (s, t);
@@ -3475,9 +3561,9 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         // FL's "Track mode" (round 146a): unassigned, an audio track (linked to a free mixer track) or an instrument
         // track (a channel and its mixer track)
         juce::PopupMenu modes, instruments;
-        modes.addItem (tr ("Unassigned"), true, info.mode == PlaylistTrackMode::unassigned,
+        modes.addItem (theme::mnemonic (tr ("Unassigned"), 'U'), true, info.mode == PlaylistTrackMode::unassigned,
                        [this, track] { engine.editSong ([track] (Song& s) { trackmodes::unassign (s, track); }); });
-        modes.addItem (tr ("Audio track"), true, info.mode == PlaylistTrackMode::audio, [this, track] {
+        modes.addItem (theme::mnemonic (tr ("Audio track"), 'A'), true, info.mode == PlaylistTrackMode::audio, [this, track] {
             bool ok = false;
             engine.editSong ([track, &ok] (Song& s) { ok = trackmodes::makeAudioTrack (s, track); });
             if (! ok)
@@ -3498,8 +3584,8 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
                                                                                  tr ("There are no available mixer tracks."));
                                  });
         }
-        modes.addSubMenu (tr ("Instrument track"), instruments, instruments.getNumItems() > 0, nullptr, info.mode == PlaylistTrackMode::instrument);
-        menu.addSubMenu (tr ("Track mode"), modes);
+        modes.addSubMenu (theme::mnemonic (tr ("Instrument track"), 'I'), instruments, instruments.getNumItems() > 0, nullptr, info.mode == PlaylistTrackMode::instrument);
+        menu.addSubMenu (theme::mnemonic (tr ("Track mode"), 'T'), modes);
     }
     {
         // FL's "Performance settings" (round 165m [DFM]): how the track's clips in the performance zone launch and play
@@ -3540,7 +3626,7 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         perfMenu.addSectionHeader (tr ("Position sync"));
         for (const auto& [value, text] : syncs)
             perfMenu.addItem (tr (text), true, p.positionSync == value, [set, value = value] { set ([value] (P& x) { x.positionSync = value; }); });
-        menu.addSubMenu (tr ("Performance settings"), perfMenu);
+        menu.addSubMenu (theme::mnemonic (tr ("Performance settings"), 'P'), perfMenu);
     }
     menu.addSeparator();
     {
@@ -3561,10 +3647,10 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         }
         size.addSeparator();
         size.addSubMenu (tr ("Every track"), all);
-        menu.addSubMenu (tr ("Size"), size);
+        menu.addSubMenu (theme::mnemonic (tr ("Size"), 'S'), size);
     }
     // FL's "Lock to this size" (EEPLTrackLockMenuClick 0x1228cb0, round 168f): the row keeps the height it has now
-    menu.addItem (tr ("Lock to this size"), true, info.lockedHeight > 0, [this, track, tracks = tracksForMenu (track)] {
+    menu.addItem (theme::mnemonic (tr ("Lock to this size"), 'L'), true, info.lockedHeight > 0, [this, track, tracks = tracksForMenu (track)] {
         const auto shown = heightOf (track);
         engine.editSong ([tracks, shown] (Song& s) { pltracks::toggleSizeLock (s, tracks, shown); });
         refreshTrackLayout();
@@ -3576,10 +3662,10 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         const auto header = noteedit::groupHeaderOf (song, track);
         const auto member = info.grouped && track > 0;
         const auto folded = header >= 0 && header < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) header].collapsed;
-        menu.addItem (tr ("Group with above track"), track > 0 && ! member, member, [this, track] {
+        menu.addItem (theme::mnemonic (tr ("Group with above track"), 'G'), track > 0 && ! member, member, [this, track] {
             engine.editSong ([track] (Song& s) { noteedit::groupWithAbove (s, track); });
         });
-        menu.addItem (tr ("Ungroup"), member, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::ungroupTrack (s, track); }); });
+        menu.addItem (theme::mnemonic (tr ("Ungroup"), 'n'), member, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::ungroupTrack (s, track); }); });
         menu.addItem (tr ("Auto color group"), header >= 0, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::colourGroup (s, track); }); });
         menu.addItem (tr ("Collapse grouped tracks"), header >= 0, folded, [this, track, folded] {
             engine.editSong ([track, folded] (Song& s) { noteedit::setGroupCollapsed (s, track, ! folded); });
@@ -3631,9 +3717,9 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         {
             // FL's "Consolidate track(s)" (round 146a): the track's clips rendered into one audio clip
             juce::PopupMenu consolidate;
-            consolidate.addItem (tr ("From track start"), hasClips, false, [this, track] { consolidatePlaylistTrack (engine, track, false); });
-            consolidate.addItem (tr ("From song start"), hasClips, false, [this, track] { consolidatePlaylistTrack (engine, track, true); });
-            menu.addSubMenu (tr ("Consolidate track"), consolidate, hasClips);
+            consolidate.addItem (theme::mnemonic (tr ("From track start"), 'F'), hasClips, false, [this, track] { consolidatePlaylistTrack (engine, track, false); });
+            consolidate.addItem (theme::mnemonic (tr ("From song start"), 's'), hasClips, false, [this, track] { consolidatePlaylistTrack (engine, track, true); });
+            menu.addSubMenu (theme::mnemonic (tr ("Consolidate track"), 'o'), consolidate, hasClips);
         }
         menu.addItem (tr ("Merge clips"), hasClips, false, [this, track] {
             setSelection ({});
@@ -3651,18 +3737,18 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         menu.addItem (tr ("Unmute all clips"), hasClips, false, [muteAll] { muteAll (false); });
     }
     menu.addSeparator();
-    menu.addItem (tr ("Insert one"), [this, track] {
+    menu.addItem (theme::mnemonic (tr ("Insert one"), 'I'), [this, track] {
         setSelection ({});
         engine.editSong ([track] (Song& s) { noteedit::insertTrack (s, track); });
     });
-    menu.addItem (tr ("Clone..."), [this, track] { cloneTracksWithDialog (tracksForMenu (track)); });
-    menu.addItem (tr ("Delete"), [this, track] {
+    menu.addItem (theme::mnemonic (tr ("Clone..."), 'o'), [this, track] { cloneTracksWithDialog (tracksForMenu (track)); });
+    menu.addItem (theme::mnemonic (tr ("Delete"), 'e'), [this, track] {
         setSelection ({});
         engine.editSong ([track] (Song& s) { noteedit::removeTrack (s, track); });
     });
     menu.addSeparator();
-    menu.addItem (tr ("Move up"), track > 0, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::swapTracks (s, track, track - 1); }); });
-    menu.addItem (tr ("Move down"), track + 1 < count, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::swapTracks (s, track, track + 1); }); });
+    menu.addItem (theme::mnemonic (tr ("Move up"), 'u'), track > 0, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::swapTracks (s, track, track - 1); }); });
+    menu.addItem (theme::mnemonic (tr ("Move down"), 'd'), track + 1 < count, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::swapTracks (s, track, track + 1); }); });
     return menu;
 }
 
@@ -3899,6 +3985,9 @@ void PlaylistComponent::showRulerMenu (int x)
         menu.addItem (tr ("Reverse selected audio clips") + "\t9", anyAudio, false, [this] { runAction ("playlist.reverseClips"); });
     }
     menu.addItem (tr ("Automatic crossfades (current project)"), true, engine.getSong().autoCrossfades, [this] { runAction ("playlist.autoCrossfades"); });
+    // FL's legacy Pattern Blocks (round 170f)
+    menu.addItem (tr ("Pattern blocks (current project)"), true, engine.getSong().patternBlocksOn, [this] { runAction ("playlist.patternBlocks"); });
+    menu.addItem (tr ("Turn pattern blocks into clips"), ! engine.getSong().blocks.empty(), false, [this] { runAction ("playlist.blocksToClips"); });
     {
         juce::PopupMenu zoom;
         zoom.addItem (tr ("Zoom in") + "\tPageUp", [this] { runAction ("playlist.zoomIn"); });
@@ -3997,9 +4086,9 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
     });
 
     if (clip.kind == ClipKind::pattern && onRenamePattern)
-        menu.addItem (tr ("Rename and color..."), [this, p = clip.pattern] { onRenamePattern (p); });
+        menu.addItem (theme::mnemonic (tr ("Rename and color..."), 'R'), [this, p = clip.pattern] { onRenamePattern (p); });
     else if (clip.kind == ClipKind::audio)
-        menu.addItem (tr ("Rename and color..."), [this, ch = clip.channel] {
+        menu.addItem (theme::mnemonic (tr ("Rename and color..."), 'R'), [this, ch = clip.channel] {
             const auto& c = engine.getSong().channels[(std::size_t) ch];
             showNameAndColourDialog (tr ("Rename audio clip"), juce::String::fromUTF8 (c.name.c_str()), c.colour,
                                      [this, ch] (const juce::String& name, std::uint32_t colour) {
@@ -4308,17 +4397,17 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
                     s.playlist[(std::size_t) i].muted = m;
         });
     });
-    menu.addItem (tr ("Cut") + "\tCtrl+X", [this, targets] {
+    menu.addItem (theme::mnemonic (tr ("Cut"), 't') + "\tCtrl+X", [this, targets] {
         setSelection (targets);
         copySelection();
         deleteSelection();
     });
-    menu.addItem (tr ("Copy") + "\tCtrl+C", [this, targets] {
+    menu.addItem (theme::mnemonic (tr ("Copy"), 'C') + "\tCtrl+C", [this, targets] {
         setSelection (targets);
         copySelection();
     });
-    menu.addItem (tr ("Paste here") + "\tCtrl+V", ! clipboard.empty(), false, [this, at = snap (xToTick (mouseX), true)] { pasteClips (at); });
-    menu.addItem ((many ? tr ("Delete selected") : tr ("Delete")) + "\tDel", [this, targets] {
+    menu.addItem (theme::mnemonic (tr ("Paste here"), 'P') + "\tCtrl+V", ! clipboard.empty(), false, [this, at = snap (xToTick (mouseX), true)] { pasteClips (at); });
+    menu.addItem (theme::mnemonic (many ? tr ("Delete selected") : tr ("Delete"), 'D') + "\tDel", [this, targets] {
         setSelection (targets);
         deleteSelection();
     });
@@ -4531,6 +4620,8 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.rippleDelete")) rippleDeleteSelection();
     else if (is ("playlist.ripple")) setRipple (! ripple);
     else if (is ("playlist.autoCrossfades")) engine.editSong ([] (Song& s) { s.autoCrossfades = ! s.autoCrossfades; });
+    else if (is ("playlist.patternBlocks")) togglePatternBlocks();
+    else if (is ("playlist.blocksToClips")) turnBlocksIntoClips();
     else if (is ("playlist.follow")) EditorGlobals::get().setFollowing (false, ! EditorGlobals::get().isFollowing (false));
     else if (is ("playlist.selectTimeAround")) selectTimeAroundSelection();
     else if (is ("playlist.timePrevious")) moveTimeSelection (-1);
@@ -5377,7 +5468,7 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
             hint.hasMenu = true;
             return hint;
         }
-        hint.text = tr ("Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag: zoom  [RMB] click: menu  [Alt] no snap");
+        hint.text = tr ("Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap");
         hint.hasMenu = true;
         return hint;
     }
@@ -5479,6 +5570,18 @@ void PlaylistComponent::openClipSource (int hit, bool other)
 
     if (clip.kind == ClipKind::automation)
         openAutomationEditor (engine, clip.automation);
+    else if (clip.kind == ClipKind::audio) // round 170h2: was nothing (the hint said "opens")
+    {
+        // FL's "Double-click on audio clips" (Manage shortcuts, ShortcutEditorForm AudioClipsPanel): the channel
+        // settings, Alt = the clip properties (LYNX's Alt+double-click since round 153)
+        if (other)
+            showClipProperties (engine, hit, { hit }, [safe = juce::Component::SafePointer<PlaylistComponent> (this)] {
+                if (safe != nullptr)
+                    safe->sortClips();
+            });
+        else if (clip.channel >= 0 && clip.channel < (int) engine.getSong().channels.size())
+            openChannelSettings (engine, clip.channel);
+    }
     else if (clip.kind == ClipKind::pattern)
     {
         auto pianoRoll = editPatternsIn == 2
@@ -5585,7 +5688,7 @@ void PlaylistComponent::addAudioClipAtPlayhead (const juce::File& file)
     addAudioClip (engine, file, start, track, true);
 }
 
-void PlaylistComponent::glideBy (double ticks, double pixels)
+void PlaylistComponent::glideBy (double ticks, double pixels, bool immediate)
 {
     if (! gliding)
     {
@@ -5597,6 +5700,17 @@ void PlaylistComponent::glideBy (double ticks, double pixels)
     const auto grid = gridArea();
     glideX.target = juce::jlimit (0.0, juce::jmax (0.0, hBar.getMaximumRangeLimit() - grid.getWidth() / pixelsPerTick), glideX.target + ticks);
     glideY.target = juce::jlimit (0.0, juce::jmax (0.0, (double) tracksHeight() - grid.getHeight()), glideY.target + pixels);
+    if (immediate)
+    {
+        scrollTicks = glideX.target;
+        scrollY = (int) std::round (glideY.target);
+        gliding = false;
+        updateScrollBars();
+        glideX.jumpTo (scrollTicks); // the scroll bar may have clamped it
+        glideY.jumpTo (scrollY);
+        repaint();
+        return;
+    }
     glideFrame();
 }
 
@@ -5621,8 +5735,27 @@ void PlaylistComponent::glideFrame()
     repaint();
 }
 
-void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
+void PlaylistComponent::mouseMagnify (const juce::MouseEvent& e, float scale)
 {
+    gliding = false;
+    const auto factor = gesture::pinchZoomFactor (scale);
+    if (e.mods.isAltDown()) // the track heights, around the pointer
+    {
+        setTrackZoom (trackZoom * factor, e.y);
+        return;
+    }
+    const auto anchorPixels = (double) juce::jmax (0, e.x - headerWidth);
+    const auto zoomed = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), pixelsPerTick * factor);
+    scrollTicks = gesture::zoomAnchored (scrollTicks, pixelsPerTick, zoomed, anchorPixels);
+    pixelsPerTick = zoomed;
+    zoomBeforeAll = 0.0;
+    updateScrollBars();
+    repaint();
+}
+
+void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& rawWheel)
+{
+    const auto wheel = flmods::normalisedWheel (rawWheel); // Windows touchpads: pieces of a notch (round 170e)
     const auto ctrl = flmods::ctrl (e.mods), alt = e.mods.isAltDown(), shift = e.mods.isShiftDown();
 
     // Shift+wheel over a track header: moves the track up / down
@@ -5682,12 +5815,12 @@ void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::M
         return;
     }
 
-    // plain wheel: up/down (Shift: left/right); a horizontal wheel or trackpad swipe scrolls sideways
+    // plain wheel: up/down (Shift: left/right); a horizontal wheel or trackpad swipe scrolls sideways (a trackpad at once)
     if (shift)
-        glideBy (gesture::wheelScrollPixels (wheel.deltaY, wheel.isSmooth, 120.0) / pixelsPerTick, 0.0);
+        glideBy (gesture::wheelScrollPixels (wheel.deltaY, wheel.isSmooth, 120.0) / pixelsPerTick, 0.0, wheel.isSmooth);
     else
         glideBy (gesture::wheelScrollPixels (wheel.deltaX, wheel.isSmooth, 80.0) / pixelsPerTick,
-                 gesture::wheelScrollPixels (wheel.deltaY, wheel.isSmooth, 2.0 * defaultRowHeight()));
+                 gesture::wheelScrollPixels (wheel.deltaY, wheel.isSmooth, 2.0 * defaultRowHeight()), wheel.isSmooth);
 }
 
 void PlaylistComponent::scrollBarMoved (juce::ScrollBar* bar, double start)
@@ -5727,6 +5860,9 @@ void PlaylistComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
     followButton.setToggleState (EditorGlobals::get().isFollowing (false), juce::dontSendNotification);
     refreshArrangementBox();
     refreshTrackLayout();
+    if (engine.getSong().patternBlocksOn != blocksShown) // Pattern Blocks turned on / off (menu, undo, another project)
+        resized();
+    blocksView->refresh();
     updateScrollBars();
     repaint();
 }
@@ -6052,6 +6188,12 @@ void PatternPicker::paint (juce::Graphics& g)
                 }
             }
 
+            if (row.kind == ClipKind::pattern && picked.contains (row.index) && picked.items.size() > 1) // picked with others
+            {
+                g.setColour (colour::accent.withAlpha (0.8f));
+                g.drawRoundedRectangle (box.reduced (0.5f), radius::sm, 1.2f);
+            }
+
             if (current) // the current source: the accent strip
             {
                 g.setColour (colour::accent);
@@ -6104,10 +6246,49 @@ void PatternPicker::mouseDown (const juce::MouseEvent& e)
     if (row.kind == ClipKind::pattern && row.index != engine.getSong().currentPattern)
         engine.editSong ([p = row.index] (Song& s) { s.currentPattern = p; }, false);
 
+    // FL's picker selection (PickerPanelMouseDown FUN_00e4d5d0, REA_rodada169k §2.2)
+    pressedRow = -1;
+    if (row.kind == ClipKind::pattern)
+    {
+        pickersel::clamp (picked, (int) engine.getSong().patterns.size());
+        if (flmods::popup (e.mods))
+            pickersel::rightDown (picked, row.index, flmods::ctrl (e.mods));
+        else
+        {
+            deselectOnUp = pickersel::leftDownDeselects (picked, row.index, flmods::ctrl (e.mods));
+            pressedRow = i;
+        }
+    }
+
     if (flmods::popup (e.mods) && row.kind == ClipKind::pattern && onPatternMenu)
         onPatternMenu();
 
     repaint();
+}
+
+void PatternPicker::mouseUp (const juce::MouseEvent& e)
+{
+    // FL's PickerPanelMouseUp FUN_00e4e080: plain = only this one, Ctrl = toggle, Shift = the range from the first picked
+    const auto i = rowAt (e.y);
+    if (pressedRow < 0 || i != pressedRow)
+    {
+        pressedRow = -1;
+        return;
+    }
+    pressedRow = -1;
+    const auto list = rows();
+    if (i >= (int) list.size() || list[(std::size_t) i].kind != ClipKind::pattern)
+        return;
+    pickersel::leftUp (picked, list[(std::size_t) i].index, flmods::ctrl (e.mods), e.mods.isShiftDown(), deselectOnUp);
+    deselectOnUp = false;
+    repaint();
+}
+
+std::vector<int> PatternPicker::pickedPatterns() const
+{
+    auto s = picked;
+    pickersel::clamp (s, (int) engine.getSong().patterns.size());
+    return s.items;
 }
 
 void PatternPicker::mouseDoubleClick (const juce::MouseEvent& e)
@@ -6167,7 +6348,7 @@ ui::Hint PatternPicker::hintAt (juce::Point<int> p)
     {
         hint.value = list[(std::size_t) i].name;
         hint.text = list[(std::size_t) i].kind == ClipKind::pattern
-                        ? tr ("Pattern: [LMB] paint it with the pencil  [2xLMB] open  [RMB] menu")
+                        ? tr ("Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu")
                         : tr ("Clip source: [LMB] paint it with the pencil");
         hint.hasMenu = list[(std::size_t) i].kind == ClipKind::pattern;
     }

@@ -117,6 +117,13 @@ public:
         }
 
         accent = skin::accentFor (sgApprox ? EffectKind::maximus : kind);
+        familyAccent = accent;
+        if (skin::artForEffect (kind) != skin::Art::none && ! sgApprox) // round 170j: its own art (Themed)
+        {
+            artLayer = std::make_unique<skin::ArtLayer>();
+            addAndMakeVisible (*artLayer);
+            artLayer->setArt (skin::artForEffect (kind), [this] { return editorStyle() == skin::Style::themed; });
+        }
         if (kind == EffectKind::ember) // round 165: the Classic voicing's VU shows the output level, as the reference's
             vuMode = 2;
         anim.onFrame = [this] { repaint(); };
@@ -138,22 +145,44 @@ public:
                 liveDisplays = true;
                 break;
             }
+        for (const auto& item : l.items) // round 170c: a level meter well shows the slot's live input / output peaks
+            if (item.type == Item::display && item.display != nullptr && levelDisplay (item.display))
+                levelMeter = true;
+        levelTrail.fill ({ -60.0f, -60.0f });
+        if (levelMeter && ! node.locate)
+            if (auto* times = engine.getProcessTimes(); times != nullptr && levelKey() < times->levelWanted.size())
+                times->levelWanted[levelKey()].fetch_add (1, std::memory_order_relaxed);
         if (! node.locate)
             startTimerHz (30); // live displays, and the controls following their automation (cheap while nothing moves)
         else if (liveDisplays)
             startTimerHz (30);
-        setSize ((int) std::ceil ((float) l.width * initialScale), (int) std::ceil ((float) l.height * initialScale + headerHeight + footerHeight()));
+        // round 170k2: never narrower than its header needs to show the whole name (the body keeps its scale)
+        setSize (juce::jmax ((int) std::ceil ((float) l.width * initialScale), minimumWidth()),
+                 (int) std::ceil ((float) l.height * initialScale + headerHeight + footerHeight()));
     }
 
     ~NativeEffectEditor() override
     {
         stopTimer();
+        if (levelMeter && ! node.locate)
+            if (auto* times = engine.getProcessTimes(); times != nullptr && levelKey() < times->levelWanted.size())
+                times->levelWanted[levelKey()].fetch_sub (1, std::memory_order_relaxed);
         engine.removeChangeListener (this);
         ui::hideValueTip();
     }
 
     // the design size (for the window's aspect ratio)
     juce::Point<int> designSize() const { return { activeLayout().width, activeLayout().height }; }
+    juce::String headerName() const { return layout == &plugui::soundgoodizerLayout() ? juce::String ("Soundgoodizer") : utf8 (effectInfo (kind).name); }
+
+    // round 170k2: the narrowest window whose header still shows the plugin's whole name (the bar at its narrowest)
+    int minimumWidth() const
+    {
+        const auto name = headerName();
+        const auto left = menuButton().getRight() + 40.0f; // the arrow, LYNX's mark and the LED
+        const auto right = usesBar() ? pluginheader::PresetBar::narrowWidth() : 22.0f + 26.0f + 90.0f + 4.0f + 6.0f; // prev, next, preset box
+        return juce::roundToInt (std::ceil (left + skin::titleMinWidth (name, headerHeight) + right));
+    }
 
     // The slot as shown: while the song plays, its automated parameters at their automation's value (issue #11 comment 4:
     // Parametric EQ 2's handles, Fruity Filter's knobs... move with the automation, as in FL). Edits always go through
@@ -539,10 +568,33 @@ public:
     int styleKey() const { return skin::styleKey (kind, layout == &plugui::soundgoodizerLayout()); }
     skin::Style editorStyle() const { return skin::styleFor (kind, layout == &plugui::soundgoodizerLayout()); }
 
+    // round 170j: the art's moving part (Nebula's twinkling stars) lives in the free strip right of the last menu
+    juce::Rectangle<float> artStage() const
+    {
+        const LayoutItem* last = nullptr;
+        for (const auto& item : activeLayout().items)
+            if (item.type == Item::menu && (last == nullptr || item.y >= last->y))
+                last = &item;
+        if (last == nullptr)
+            return {};
+        const auto r = rectOf (*last);
+        return { r.getRight() + 16.0f, r.getY() - 4.0f, juce::jmax (0.0f, (float) getWidth() - r.getRight() - 28.0f), r.getHeight() + 8.0f };
+    }
+
+    void resized() override
+    {
+        if (artLayer == nullptr)
+            return;
+        artLayer->setBounds (getLocalBounds());
+        artLayer->setStage (artStage());
+        artLayer->toFront (false);
+    }
+
     void paint (juce::Graphics& g) override
     {
         using namespace theme;
-        const skin::StyleScope styleScope (editorStyle());
+        const skin::StyleScope styleScope (editorStyle(), skin::artForEffect (kind));
+        accent = editorStyle() == skin::Style::themed ? skin::artAccent (skin::artForEffect (kind)) : familyAccent;
         skin::canvas (g, getLocalBounds().toFloat(), accent);
         const auto* fx = current();
 
@@ -558,8 +610,15 @@ public:
 
         const auto& items = activeLayout().items;
         for (int i = 0; i < (int) items.size(); ++i)
-            if (visible (items[(std::size_t) i]))
+            if (visible (items[(std::size_t) i])
+                && (artLayer == nullptr || g.clipRegionIntersects (rectOf (items[(std::size_t) i]).expanded (40.0f, 24.0f).getSmallestIntegerContainer())))
+            {
+                // round 170j: a partial repaint of the art draws only what it touches; round 170c: a control another mode bypasses is drawn dimmed
+                const auto idle = plugui::isIdle (kind, items[(std::size_t) i], fx->params);
+                if (idle) g.beginTransparencyLayer (0.35f);
                 paintItem (g, items[(std::size_t) i], i, *fx);
+                if (idle) g.endTransparencyLayer();
+            }
         if (hasHelpLine())
             paintHelpLine (g);
     }
@@ -570,7 +629,10 @@ public:
     juce::Rectangle<float> prevButton() const { return nextButton().translated (-22.0f, 0.0f); }
     juce::Rectangle<float> presetBox() const
     {
-        const auto w = juce::jlimit (90.0f, 220.0f, (float) getWidth() * 0.32f);
+        // round 170k2: the box gives way to the title (never below 90 px)
+        const auto name = headerName();
+        const auto room = prevButton().getX() - 4.0f - 6.0f - (menuButton().getRight() + 40.0f) - skin::titleMinWidth (name, headerHeight);
+        const auto w = juce::jlimit (90.0f, juce::jmax (90.0f, room), juce::jlimit (90.0f, 220.0f, (float) getWidth() * 0.32f));
         return { prevButton().getX() - w - 4.0f, 3.0f, w, 20.0f };
     }
 
@@ -587,15 +649,17 @@ public:
         skin::brandMark (g, juce::Rectangle<float> (menuButton().getRight() + 2.0f, 0.0f, 18.0f, area.getHeight()));
         const auto ledC = juce::Point<float> (menuButton().getRight() + 30.0f, area.getCentreY());
         skin::powerLed (g, ledC, 7.0f, fx.enabled);
+        const auto name = headerName();
         auto text = area.withLeft (ledC.x + 10.0f).withRight (presetBox().getX() - 6.0f);
         if (usesBar())
-            text = bar.place (area).withLeft (ledC.x + 10.0f);
-        const auto name = layout == &plugui::soundgoodizerLayout() ? juce::String ("Soundgoodizer") : utf8 (effectInfo (kind).name);
+            text = bar.place (area, true, ledC.x + 10.0f - area.getX() + skin::titleMinWidth (name, area.getHeight())).withLeft (ledC.x + 10.0f);
         const auto nameWidth = skin::titleText (g, text.withHeight (area.getHeight()), name, accent);
         text.removeFromLeft (nameWidth);
         g.setFont (font (type::small));
         g.setColour (colour::textSecondary);
-        g.drawText ("(" + trackName() + ")", text.withTrimmedLeft (8.0f), juce::Justification::centredLeft, true);
+        // where it is: only when it fits whole (round 170k2: no "(I…" stub beside the name)
+        if (const auto where = "(" + trackName() + ")"; juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), where) <= text.getWidth() - 9.0f)
+            g.drawText (where, text.withTrimmedLeft (8.0f), juce::Justification::centredLeft, false);
 
         if (usesBar())
         {
@@ -2029,6 +2093,19 @@ public:
             strokeCurve ([t, ratio] (float x) { return x <= t ? x : t + (x - t) / ratio; }, inner, true);
             g.setColour (colour::gridBar);
             g.drawHorizontalLine ((int) (inner.getBottom() - inner.getHeight() * t), inner.getX(), inner.getRight());
+            // round 170c (the "shell" audit: FL's display is live, this one was a still picture): the signal's
+            // input → output peaks of the last ~1.5 s as a fading trail of dots on the curve's axes (−60 … 0 dB)
+            if (! node.locate)
+                for (int k = 0; k < (int) levelTrail.size(); ++k)
+                {
+                    const auto& [inDb, outDb] = levelTrail[(std::size_t) ((levelTrailAt + k) % (int) levelTrail.size())];
+                    if (inDb <= -59.5f) continue;
+                    const auto x = juce::jlimit (0.0f, 1.0f, (inDb + 60.0f) / 60.0f), y = juce::jlimit (0.0f, 1.0f, (outDb + 60.0f) / 60.0f);
+                    const auto age = (float) (k + 1) / (float) levelTrail.size(); // 1 = newest
+                    const auto d = (k == (int) levelTrail.size() - 1 ? 7.0f : 3.0f) * s;
+                    g.setColour ((k == (int) levelTrail.size() - 1 ? colour::textPrimary : curveColour).withAlpha (0.15f + 0.85f * age * age));
+                    g.fillEllipse (juce::Rectangle<float> (d, d).withCentre ({ inner.getX() + inner.getWidth() * x, inner.getBottom() - inner.getHeight() * y }));
+                }
         }
         else if (id == "shaper") // the feedback saturation: drive from the level, knee and symmetry
         {
@@ -2065,11 +2142,21 @@ public:
             const auto decay = 0.15f + param01 (item.param != nullptr ? item.param : "Decay") * 3.0f;
             strokeCurve ([decay] (float x) { return std::exp (-x * 4.0f / decay) * 0.9f; }, inner, true);
         }
-        else if (id == "meter") // level meter well (FL's live meters; LYNX shows the levels in the mixer)
+        else if (id == "meter") // level meter well: the slot's live input and output peaks (round 170c; before: an empty grid)
         {
             g.setColour (colour::gridBeat);
             for (int i = 1; i < 12; ++i)
                 g.drawHorizontalLine ((int) (r.getY() + r.getHeight() * (float) i / 12.0f), r.getX() + 2.0f, r.getRight() - 2.0f);
+            const auto to01 = [] (float db) { return juce::jlimit (0.0f, 1.0f, (db + 60.0f) / 66.0f); };
+            const auto vertical = r.getHeight() >= r.getWidth();
+            auto area = r.reduced (3.0f);
+            const auto gap = 2.0f;
+            for (int k = 0; k < 2; ++k)
+            {
+                const auto bar = vertical ? juce::Rectangle<float> (area.getX() + (area.getWidth() + gap) * 0.5f * (float) k, area.getY(), (area.getWidth() - gap) * 0.5f, area.getHeight())
+                                          : juce::Rectangle<float> (area.getX(), area.getY() + (area.getHeight() + gap) * 0.5f * (float) k, area.getWidth(), (area.getHeight() - gap) * 0.5f);
+                skin::meter (g, bar, to01 (levelDb[(std::size_t) k]), to01 (levelHoldDb[(std::size_t) k]), vertical);
+            }
         }
         else if (id == "clip") // hard / soft clipping at the threshold
         {
@@ -3923,6 +4010,11 @@ public:
             return;
         }
 
+        if (e.mods.isPopupMenu() && listedStepper (item)) // round 170c (#14): its values, then the parameter items
+        {
+            showStepperMenu (item, true);
+            return;
+        }
         if (e.mods.isPopupMenu())
         {
             ui::showValueMenu (*this, &engine, spec, valueOf (param), [this, param] (double v) { setValue (param, (float) v); });
@@ -3955,14 +4047,15 @@ public:
                 setValue (param, valueOf (param) >= 0.5f ? 0.0f : 1.0f);
                 return;
             case Item::stepper:
-                if (e.position.x > r.getRight() - juce::jmin (12.0f * scale(), r.getWidth() * 0.4f))
+                // round 170c (#14): the arrows' halves split at the value box's centre (the caption above it moved the
+                // split down before), and a small stepper's arrows get a 10 px hit area
+                if (const auto arrow = stepperArrowAt (item, e.position); arrow != 0)
                 {
-                    const auto up = e.position.y < r.getY() + (item.label != nullptr ? 12.0f * scale() : 0.0f) + (r.getBottom() - r.getY()) * 0.5f;
-                    const auto step = item.steps > 0 ? 1.0f / (float) item.steps : 0.01f;
-                    setValue (param, valueOf (param) + (up ? step : -step));
-                    ui::flashValueTip (*this, r.toNearestInt(), valueText (param, valueOf (param)));
+                    stepStepper (item, arrow);
                     return;
                 }
+                stepperDragIndex = listedStepper (item) ? stepperIndex (item, valueOf (param)) : -1;
+                stepperMoved = false;
                 break;
             case Item::hslider:
             case Item::vslider:
@@ -4050,6 +4143,14 @@ public:
         const auto& item = activeLayout().items[(std::size_t) dragItem];
         const auto param = paramOf (item);
         const auto spec = specFor (item);
+        if (listedStepper (item) && stepperDragIndex >= 0) // round 170c (#14): one value per stepperDragPixels
+        {
+            stepperMoved = stepperMoved || std::abs (e.getDistanceFromDragStartY()) >= 3;
+            const auto v = stepperValue (item, stepperDragIndex + (int) std::trunc (-(float) e.getDistanceFromDragStartY() / stepperDragPixels));
+            setValue (param, v);
+            ui::showValueTip (*this, rectOf (item).toNearestInt(), spec.text (v));
+            return;
+        }
         auto v = drag.update (e, spec);
         if (item.type == Item::hslider) // horizontal sliders follow the mouse sideways too
         {
@@ -4062,7 +4163,7 @@ public:
         ui::showValueTip (*this, rectOf (item).toNearestInt(), spec.text (v));
     }
 
-    void mouseUp (const juce::MouseEvent&) override
+    void mouseUp (const juce::MouseEvent& e) override
     {
         eqDragging = false;
         if (wsDragState) // round 165
@@ -4110,6 +4211,19 @@ public:
         if (dragItem >= 0)
         {
             drag.end();
+            // round 170c (issue #14: "Oversampling: Off" could not be changed): a click on a stepper's value (no drag)
+            // lists its values, as FL's value selectors do; the arrows step, a drag or the wheel moves it
+            stepperDragIndex = -1;
+            if (const auto& item = activeLayout().items[(std::size_t) dragItem];
+                listedStepper (item) && ! stepperMoved && ! e.mods.isPopupMenu())
+            {
+                dragItem = -1;
+                ui::hideValueTip();
+                ++stepperMenusShown;
+                showStepperMenu (item, false);
+                repaint();
+                return;
+            }
             dragItem = -1;
             ui::hideValueTip();
             repaint();
@@ -4151,6 +4265,218 @@ public:
         const auto spec = specFor (item);
         setValue (paramOf (item), (float) spec.defaultValue);
     }
+
+    // --- steppers (round 170c, issue #14: "Oversampling: Off" could not be changed on a Mac) --------------------
+    // A stepper with a short list of values (its `steps` = the last value's index, 1…64) works like FL's value selectors:
+    // the arrows step one value, a click on the value lists them all (a menu; the right-click menu lists them too, above
+    // the usual parameter items), a vertical drag moves one value per stepperDragPixels, the wheel one value per notch and a
+    // trackpad one value per stepperTrackpadDelta of accumulated scroll (a Mac trackpad sends many tiny smooth deltas).
+    static constexpr float stepperDragPixels = 10.0f, stepperTrackpadDelta = 0.12f;
+    static bool listedStepper (const LayoutItem& item) noexcept { return item.type == Item::stepper && item.steps > 0 && item.steps <= 64; }
+
+    juce::Rectangle<float> stepperBox (const LayoutItem& item) const
+    {
+        auto box = rectOf (item);
+        if (item.label != nullptr && ! hasStyle (item, plugui::noCaption))
+            box.removeFromTop (12.0f * scale());
+        return box;
+    }
+
+    juce::Rectangle<float> stepperArrows (const LayoutItem& item) const
+    {
+        auto box = stepperBox (item);
+        return box.removeFromRight (juce::jmin (12.0f * scale(), box.getWidth() * 0.4f));
+    }
+
+    // the arrows' hit area: at least 10 px wide (the drawn arrows of a small stepper are narrower), never the whole box
+    int stepperArrowAt (const LayoutItem& item, juce::Point<float> p) const
+    {
+        const auto box = stepperBox (item);
+        const auto drawn = stepperArrows (item);
+        const auto hit = box.withLeft (juce::jmax (box.getX() + box.getWidth() * 0.5f, juce::jmin (drawn.getX(), box.getRight() - 10.0f * scale())));
+        if (! hit.contains (p))
+            return 0;
+        return p.y < box.getCentreY() ? 1 : -1;
+    }
+
+    float stepperValue (const LayoutItem& item, int index) const { return juce::jlimit (0.0f, 1.0f, (float) index / (float) item.steps); }
+    int stepperIndex (const LayoutItem& item, float value) const { return juce::jlimit (0, item.steps, juce::roundToInt (value * (float) item.steps)); }
+
+    void stepStepper (const LayoutItem& item, int delta)
+    {
+        const auto param = paramOf (item);
+        if (param < 0 || delta == 0)
+            return;
+        const auto step = item.steps > 0 ? 1.0f / (float) item.steps : 0.01f;
+        const auto v = listedStepper (item) ? stepperValue (item, stepperIndex (item, valueOf (param)) + delta)
+                                            : juce::jlimit (0.0f, 1.0f, valueOf (param) + (float) delta * step);
+        setValue (param, v);
+        ui::reportTweak (specFor (item));
+        ui::flashValueTip (*this, rectOf (item).toNearestInt(), valueText (param, valueOf (param)));
+    }
+
+    // every value of a listed stepper, the current one ticked (FL's value selectors list theirs)
+    juce::PopupMenu stepperMenu (const LayoutItem& item)
+    {
+        juce::PopupMenu menu;
+        const auto param = paramOf (item);
+        if (param < 0 || ! listedStepper (item))
+            return menu;
+        const auto now = stepperIndex (item, valueOf (param));
+        for (int k = 0; k <= item.steps; ++k)
+            menu.addItem (valueText (param, stepperValue (item, k)), true, k == now,
+                          [safe = juce::Component::SafePointer<NativeEffectEditor> (this), param, v = stepperValue (item, k)] {
+                              if (safe != nullptr)
+                                  safe->setValue (param, v);
+                          });
+        return menu;
+    }
+
+    void showStepperMenu (const LayoutItem& item, bool withParameterItems)
+    {
+        auto menu = stepperMenu (item);
+        if (menu.getNumItems() == 0)
+            return;
+        const auto param = paramOf (item);
+        const auto spec = specFor (item);
+        if (withParameterItems)
+        {
+            menu.addSeparator();
+            ui::addValueItems (menu, *this, &engine, spec, valueOf (param), [safe = juce::Component::SafePointer<NativeEffectEditor> (this), param] (double v) {
+                if (safe != nullptr)
+                    safe->setValue (param, (float) v);
+            });
+        }
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (stepperBox (item).toNearestInt())));
+    }
+
+public:
+    // Round 170c (#14): every stepper of the current page driven by synthetic input — a click on each arrow, a click on
+    // the value (its menu), a drag up and down, wheel notches, trackpad scrolls. One line per stepper: OK / FAIL and why.
+    juce::String stepperSelfTest()
+    {
+        juce::String report;
+        const auto source = juce::Desktop::getInstance().getMainMouseSource();
+        const auto& items = activeLayout().items;
+        for (std::size_t i = 0; i < items.size(); ++i)
+        {
+            const auto& item = items[i];
+            if (item.type != Item::stepper || ! visible (item))
+                continue;
+            const auto param = paramOf (item);
+            juce::String line = juce::String (effectInfo (kind).name) + " / " + (item.param != nullptr ? item.param : "?") + " (steps " + juce::String (item.steps) + "): ";
+            if (param < 0)
+            {
+                report << line << "FAIL no parameter\n";
+                continue;
+            }
+            // a control kept in FL's state (Maximus, Vocodex...) is editable only once the slot has FL's state
+            if (isStateParam (param) && current() != nullptr && ! stateTable().get (current()->state, plugui::stateIndex (kind, param)))
+            {
+                report << line << "SKIP state-backed, the slot has no FL state\n";
+                continue;
+            }
+            juce::StringArray fails;
+            const auto now = juce::Time::getCurrentTime();
+            auto event = [&] (juce::Point<float> p, juce::ModifierKeys mods, std::optional<juce::Point<float>> down = {}) {
+                return juce::MouseEvent (source, p, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, this, this, now, down.value_or (p), now, 1, false);
+            };
+            const auto left = juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier);
+            // (a state parameter's edit reaches the slot through the engine's message queue)
+            auto settle = [this] { engine.dispatchPendingMessages(); };
+            auto set = [&] (float v) { setValue (param, v); settle(); };
+            auto click = [&] (juce::Point<float> p) {
+                mouseDown (event (p, left));
+                mouseUp (event (p, juce::ModifierKeys()));
+                juce::PopupMenu::dismissAllActiveMenus();
+                settle();
+            };
+            const auto box = stepperBox (item);
+            const auto arrows = stepperArrows (item);
+            const auto upAt = juce::Point<float> (arrows.getCentreX(), box.getY() + box.getHeight() * 0.25f);
+            const auto downAt = juce::Point<float> (arrows.getCentreX(), box.getY() + box.getHeight() * 0.75f);
+            const auto body = juce::Point<float> (box.getX() + juce::jmax (2.0f, (arrows.getX() - box.getX()) * 0.5f), box.getCentreY());
+            const auto start = valueOf (param);
+            const auto low = 0.0f;
+
+            // arrows: from the lowest value, up then down
+            set (low);
+            click (upAt);
+            const auto afterUp = valueOf (param);
+            if (! (afterUp > low))
+                fails.add ("up arrow");
+            click (downAt);
+            if (std::abs (valueOf (param) - low) > 1.0e-4f)
+                fails.add ("down arrow (" + valueText (param, low) + " -> " + valueText (param, afterUp) + " -> " + valueText (param, valueOf (param))
+                           + ", raw " + juce::String (afterUp, 4) + " / " + juce::String (valueOf (param), 4) + ")");
+
+            if (listedStepper (item))
+            {
+                // the value's menu: every value, choosing the last one sets it
+                auto menu = stepperMenu (item);
+                if (menu.getNumItems() != item.steps + 1)
+                    fails.add ("menu has " + juce::String (menu.getNumItems()) + " items");
+                std::function<void()> last;
+                for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                    last = it.getItem().action;
+                if (last)
+                    last();
+                settle();
+                if (std::abs (valueOf (param) - 1.0f) > 1.0e-4f)
+                    fails.add ("menu choice");
+                // a click on the value opens it (and changes nothing by itself)
+                set (low);
+                stepperMenusShown = 0;
+                click (body);
+                if (stepperMenusShown != 1)
+                    fails.add ("click on the value shows no menu");
+                if (std::abs (valueOf (param) - low) > 1.0e-4f)
+                    fails.add ("click on the value changed it");
+
+                // drag up three values, then back down
+                set (low);
+                mouseDown (event (body, left));
+                mouseDrag (event (body.translated (0.0f, -3.4f * stepperDragPixels), left, body));
+                settle();
+                const auto dragged = stepperIndex (item, valueOf (param));
+                mouseDrag (event (body, left, body));
+                mouseUp (event (body, juce::ModifierKeys(), body));
+                juce::PopupMenu::dismissAllActiveMenus();
+                settle();
+                if (dragged != juce::jmin (3, item.steps))
+                    fails.add ("drag up gave value " + juce::String (dragged));
+                if (stepperIndex (item, valueOf (param)) != 0)
+                    fails.add ("drag back");
+
+                // a wheel notch up, then a trackpad scroll (many small smooth deltas) up
+                set (low);
+                juce::MouseWheelDetails notch { 0.0f, 0.15f, false, false, false };
+                mouseWheelMove (event (body, juce::ModifierKeys()), notch);
+                settle();
+                if (stepperIndex (item, valueOf (param)) != 1)
+                    fails.add ("wheel notch gave value " + juce::String (stepperIndex (item, valueOf (param))));
+                set (low);
+                stepperWheel = 0.0f;
+                juce::MouseWheelDetails pad { 0.0f, 0.02f, false, true, false };
+                for (int k = 0; k < 7; ++k)
+                {
+                    mouseWheelMove (event (body, juce::ModifierKeys()), pad);
+                    settle();
+                }
+                if (stepperIndex (item, valueOf (param)) != 1)
+                    fails.add ("trackpad scroll gave value " + juce::String (stepperIndex (item, valueOf (param))));
+            }
+            set (start);
+            report << line << (fails.isEmpty() ? juce::String ("OK") : "FAIL " + fails.joinIntoString (", ")) << "\n";
+        }
+        return report;
+    }
+
+private:
+    int stepperMenusShown = 0;     // (the self-test counts the menus a click opens)
+    float stepperWheel = 0.0f;     // a trackpad's accumulated scroll over a listed stepper
+    int stepperDragIndex = -1;     // the value a drag started from (-1 = no stepper drag)
+    bool stepperMoved = false;     // that drag moved (then its mouse-up opens no menu)
 
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
     {
@@ -4197,6 +4523,25 @@ public:
             const auto n = (int) plugui::optionLabels (item).size();
             const auto o = plugui::optionAt (item, valueOf (param)) + (wheel.deltaY > 0 ? (item.type == Item::radio ? -1 : 1) : (item.type == Item::radio ? 1 : -1));
             setValue (param, plugui::optionValue (item, juce::jlimit (0, n - 1, o)));
+            return;
+        }
+        if (listedStepper (item)) // round 170c (#14): one value per notch; a trackpad's small deltas add up to one
+        {
+            const auto delta = std::abs (wheel.deltaY) >= std::abs (wheel.deltaX) ? wheel.deltaY : -wheel.deltaX;
+            if (delta == 0.0f || ui::wheelScrolling())
+                return;
+            const auto sign = wheel.isReversed ? -1.0f : 1.0f;
+            if (! wheel.isSmooth)
+            {
+                stepStepper (item, delta * sign > 0.0f ? 1 : -1);
+                return;
+            }
+            stepperWheel += delta * sign;
+            if (std::abs (stepperWheel) >= stepperTrackpadDelta)
+            {
+                stepStepper (item, stepperWheel > 0.0f ? 1 : -1);
+                stepperWheel = 0.0f;
+            }
             return;
         }
         if (item.type == Item::stepper && item.steps > 1000 && wheel.deltaY != 0.0f) // a fine count (the hardware insert's delay in samples): one per notch, Shift ×10
@@ -4267,6 +4612,10 @@ public:
         if (isMixItem (item) && captionArea (item).contains (p))
             return { tr ("MIX label: click to keep the Mix while presets change (mix lock)"), pluginheader::isMixLocked (kind) ? tr ("locked") : tr ("unlocked"), false, false };
         const auto spec = specFor (item);
+        if (const auto* fx = current(); fx != nullptr && plugui::isIdle (kind, item, fx->params)) // round 170c
+            return { juce::String (spec.name) + ": " + tr ("no effect with the current mode (another engine is in use)"), spec.text (valueOf (paramOf (item))), false, false };
+        if (item.type == Item::stepper && item.steps > 0 && item.steps <= 64) // round 170c (issue #14)
+            return { juce::String (spec.name) + ": " + tr ("arrows step, click for the list, drag or mouse wheel to change"), spec.text (valueOf (paramOf (item))), false, false };
         return ui::valueHint (spec, valueOf (paramOf (item)));
     }
 
@@ -4436,6 +4785,29 @@ private:
         if (! isShowing()) return; // a hidden editor costs nothing
         if (! node.locate && shownSlot.changed (engine.getAutomationDisplay(), track, slot)) // the controls follow their automation
             repaint();
+        if (levelMeter && ! node.locate) // round 170c: the level meter wells (input / output peaks, held 1 s, falling 24 dB/s)
+            if (auto* times = engine.getProcessTimes(); times != nullptr && levelKey() < times->levelWanted.size())
+            {
+                bool moved = false;
+                for (int k = 0; k < 2; ++k)
+                {
+                    const auto peak = times->slotLevels[levelKey() * 2 + (std::size_t) k].exchange (0.0f, std::memory_order_relaxed);
+                    const auto db = juce::jlimit (-60.0f, 6.0f, juce::Decibels::gainToDecibels (peak, -100.0f));
+                    auto& shown = levelDb[(std::size_t) k];
+                    auto& hold = levelHoldDb[(std::size_t) k];
+                    const auto before = shown;
+                    shown = db >= shown ? db : juce::jmax (db, shown - 0.8f);
+                    if (db >= hold) { hold = db; levelHoldFrames[(std::size_t) k] = 30; }
+                    else if (--levelHoldFrames[(std::size_t) k] < 0) hold = juce::jmax (shown, hold - 0.8f);
+                    moved = moved || std::abs (shown - before) > 0.01f || levelHoldFrames[(std::size_t) k] >= 0;
+                }
+                levelTrail[(std::size_t) levelTrailAt] = { levelDb[0], levelDb[1] }; // the dynamics curves' live trail
+                levelTrailAt = (levelTrailAt + 1) % (int) levelTrail.size();
+                if (moved)
+                    for (const auto& item : activeLayout().items)
+                        if (item.type == Item::display && item.display != nullptr && levelDisplay (item.display) && visible (item))
+                            repaint (rectOf (item).getSmallestIntegerContainer().expanded (2));
+            }
         if (kind == EffectKind::parametricEq && ! node.locate) // round 166f: the spectrum / heatmap of the EQ's output
             for (const auto& item : activeLayout().items)
                 if (item.type == Item::display && item.display != nullptr && std::strcmp (item.display, "eq") == 0)
@@ -4517,11 +4889,24 @@ private:
     const plugui::Layout* layout = nullptr;
     int page = 0;
     int hoverItem = -1, hoverHeader = 0, dragItem = -1;
-    juce::Colour accent { skin::colour::crimson }; // the plugin family's accent (ui/PluginSkin.h)
+    juce::Colour accent { skin::colour::crimson }; // the plugin family's accent (ui/PluginSkin.h); the art's when Themed
+    juce::Colour familyAccent { skin::colour::crimson };
+    std::unique_ptr<skin::ArtLayer> artLayer; // round 170j: the art's moving part
     skin::Animator anim;                            // hover fades (runs only while something moves)
     int quietFrames = 1000; // frames since the live meters last moved (the displays start at rest)
     float lastMeters = 0.0f;
     bool liveDisplays = false;            // the layout has live meters / graphs (redrawn by the timer)
+    // round 170c: the "meter" wells' live levels (dBFS: input, output), their holds and the slot's key
+    bool levelMeter = false;
+    std::array<float, 2> levelDb { -60.0f, -60.0f }, levelHoldDb { -60.0f, -60.0f };
+    std::array<int, 2> levelHoldFrames { 0, 0 };
+    std::array<std::pair<float, float>, 45> levelTrail {};
+    int levelTrailAt = 0;
+    static bool levelDisplay (const char* id)
+    {
+        return std::strcmp (id, "meter") == 0 || std::strcmp (id, "limiter") == 0 || std::strcmp (id, "compressor") == 0 || std::strcmp (id, "dynamics") == 0;
+    }
+    std::size_t levelKey() const { return (std::size_t) juce::jmax (0, track) * (std::size_t) maxEffectSlots + (std::size_t) juce::jmax (0, slot); }
     mutable ShownEffectSlot shownSlot;    // the slot with its automation's values (current())
     ui::ValueDrag drag;
     juce::String presetName;
@@ -4599,7 +4984,7 @@ public:
         // keep FL's proportions while resizing (the presets bar has a fixed height)
         if (auto* c = getConstrainer())
         {
-            c->setMinimumSize (design.x / 2, design.y / 2);
+            c->setMinimumSize (juce::jmax (design.x / 2, editor->minimumWidth()), design.y / 2); // round 170k2: the name fits
             c->setMaximumSize (design.x * 3, design.y * 3 + 200);
         }
         centreWithSize (getWidth(), getHeight());
@@ -4636,6 +5021,15 @@ void setNativeEditorDemo (bool on)
     demoDisplays = on;
 }
 
+juce::Point<int> nativeEditorMinimumSize (juce::Component& editor)
+{
+    // as NativeEffectWindow's constrainer (the editor there is made at 1.25, its design size is the layout's)
+    auto* native = dynamic_cast<NativeEffectEditor*> (&editor);
+    if (native == nullptr) return {};
+    const auto design = native->designSize();
+    return { juce::jmax (design.x / 2, native->minimumWidth()), design.y / 2 };
+}
+
 bool tickNativeEffectEditor (juce::Component& editor)
 {
     auto* native = dynamic_cast<NativeEffectEditor*> (&editor);
@@ -4647,6 +5041,17 @@ bool tickNativeEffectEditor (juce::Component& editor)
 std::unique_ptr<juce::Component> makeNativeEffectEditor (AudioEngine& engine, int track, int slot, float scale, int page)
 {
     return std::make_unique<NativeEffectEditor> (engine, track, slot, scale, page);
+}
+
+juce::String stepperSelfTest (AudioEngine& engine, int track, int slot, int pages)
+{
+    juce::String report;
+    for (int page = 0; page < juce::jmax (1, pages); ++page)
+    {
+        NativeEffectEditor editor (engine, track, slot, 1.0f, page);
+        report << editor.stepperSelfTest();
+    }
+    return report;
 }
 
 std::unique_ptr<juce::Component> makeNodeEffectEditor (AudioEngine& engine, std::function<EffectSlot* (Song&)> locate,

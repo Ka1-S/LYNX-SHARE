@@ -317,6 +317,62 @@ void commitNoteBatch (Song& song, const NoteRecorder& recorder, std::vector<Note
     growForSongTake (song, pattern, recorder.songOrigin(), recorder.originReach(), notes);
 }
 
+// --- live note timing and the count-in catch (round 170d) -------------------------------------------------------------
+
+double liveTickAt (const LiveClock& clock, double eventMs, double compensationMs) noexcept
+{
+    if (! clock.running || clock.ticksPerMs <= 0.0)
+        return clock.tick;
+    // (a time stamp from another clock or a stale queue: at most a quarter second either way)
+    const auto elapsed = std::clamp (eventMs - clock.timeMs, -250.0, 250.0);
+    return clock.tick + (elapsed - std::max (0.0, compensationMs)) * clock.ticksPerMs;
+}
+
+std::int64_t countInWrap (std::int64_t countIn, std::int64_t loopLength) noexcept
+{
+    const auto loop = std::max<std::int64_t> (1, loopLength);
+    return std::max<std::int64_t> (1, (std::max<std::int64_t> (0, countIn) + loop - 1) / loop) * loop;
+}
+
+bool catchEarlyNote (RecordedEvent& e, CountInCatch& c)
+{
+    if (c.start < 0)
+        return true;
+    auto found = std::find_if (c.moved.begin(), c.moved.end(), [&e] (const CountInCatch::Moved& m) { return m.channel == e.channel && m.key == e.key; });
+    const auto start = (double) c.start;
+
+    if (e.on)
+    {
+        if (found != c.moved.end()) // a repeated note-on: the previous one's move is over
+            c.moved.erase (found);
+        if (e.tick >= start)
+            return true;
+        if (e.tick >= start - (double) std::max<std::int64_t> (0, c.window))
+        {
+            c.moved.push_back ({ e.channel, e.key, start - e.tick, false });
+            e.tick = start;
+            return true;
+        }
+        if (c.songMode)
+            return e.tick >= 0.0; // its real song position (nothing before the song start)
+        const auto wrap = (double) std::max<std::int64_t> (1, c.wrap);
+        c.moved.push_back ({ e.channel, e.key, wrap, true });
+        e.tick += wrap;
+        return true;
+    }
+
+    // a release: follows its note-on's move
+    if (found == c.moved.end())
+        return true;
+    if (e.tick < start)
+        e.tick += found->shift; // released before the start: the played length
+    else if (found->wrapped)
+        e.tick = start + (double) std::max<std::int64_t> (1, c.wrap); // held over the start: to the loop's end
+    // (a caught note released after the start keeps its release)
+    c.moved.erase (found);
+    return true;
+}
+
 std::int64_t countInLength (const Song& song, int bars, std::int64_t tick)
 {
     return std::max (0, bars) * std::max<std::int64_t> (1, song.barAt (std::max<std::int64_t> (0, tick)).length);
@@ -556,6 +612,7 @@ void NoteRecorder::begin (std::int64_t loopLength)
 {
     active = true;
     linear = false;
+    patternOrigin = -1.0;
     loop = std::max<std::int64_t> (1, loopLength);
     origin = -1;
     reach = -1;
@@ -622,7 +679,8 @@ void NoteRecorder::finish (const Song& song, int channel, int key, const Held& h
     }
     else
     {
-        n.start = patternPositionForTick (song, h.tick, loop);
+        n.start = patternOrigin >= 0.0 ? (std::int64_t) std::floor (std::max (0.0, h.tick - patternOrigin))
+                                       : patternPositionForTick (song, h.tick, loop);
     }
     // Song mode loops (the loop region, or the whole song): a note held across the loop's end ends after the wrap
     auto played = endTick - h.tick;
@@ -640,5 +698,116 @@ std::vector<Note> NoteRecorder::takeFinished()
     std::vector<Note> out;
     out.swap (finished);
     return out;
+}
+
+// --- Capture MIDI (round 170d) -----------------------------------------------------------------------------------------
+
+namespace
+{
+double captureEnd (const scorelog::Entry& e, const CaptureOptions& o) noexcept
+{
+    return e.endMs >= 0.0 ? e.endMs : std::max (e.startMs, o.nowMs);
+}
+} // namespace
+
+std::vector<scorelog::Entry> capturePhrase (const Song& song, const std::vector<scorelog::Entry>& log, const CaptureOptions& options)
+{
+    std::vector<scorelog::Entry> phrase;
+    auto usable = [&] (const scorelog::Entry& e) {
+        return ! e.recorded && e.startMs > options.afterMs && e.channel >= 0 && e.channel < (int) song.channels.size();
+    };
+    // back from the newest note, while the transport state stays and no silence is longer than gapMs
+    auto newest = (int) log.size() - 1;
+    while (newest >= 0 && ! usable (log[(std::size_t) newest]))
+        --newest;
+    if (newest < 0)
+        return phrase;
+    const auto played = log[(std::size_t) newest].startTick >= 0.0;
+    auto phraseStart = log[(std::size_t) newest].startMs;
+    for (auto i = newest; i >= 0; --i)
+    {
+        const auto& e = log[(std::size_t) i];
+        if (e.recorded || e.startMs <= options.afterMs)
+            break;
+        if ((e.startTick >= 0.0) != played || captureEnd (e, options) < phraseStart - std::max (0.0, options.gapMs))
+            break;
+        if (e.channel < 0 || e.channel >= (int) song.channels.size()) // (a channel deleted since)
+            continue;
+        phrase.push_back (e);
+        phraseStart = std::min (phraseStart, e.startMs);
+    }
+    std::reverse (phrase.begin(), phrase.end());
+    return phrase;
+}
+
+CaptureResult captureMidi (Song& song, const std::vector<scorelog::Entry>& log, const CaptureOptions& options)
+{
+    CaptureResult result;
+    if (song.patterns.empty() || song.currentPattern < 0 || song.currentPattern >= (int) song.patterns.size())
+        return result;
+    auto endOf = [&options] (const scorelog::Entry& e) { return captureEnd (e, options); };
+    const auto phrase = capturePhrase (song, log, options);
+    if (phrase.empty())
+        return result;
+    for (const auto& e : phrase)
+        result.newestMs = std::max (result.newestMs, e.startMs);
+    const auto played = phrase.back().startTick >= 0.0;
+    result.played = played;
+
+    const auto ticksPerMs = std::max (1.0, song.bpm) * ppq / 60000.0;
+    const auto pattern = song.currentPattern;
+    std::vector<int> cleared;
+
+    if (! played && song.mode != PlayMode::song)
+    {
+        // stopped, Pattern mode: from the pattern start, the timing kept (the pattern grows to the phrase)
+        std::vector<Note> notes;
+        for (const auto& e : phrase)
+        {
+            Note n;
+            n.start = (std::int64_t) std::llround ((e.startMs - phrase.front().startMs) * ticksPerMs);
+            n.length = std::max<std::int64_t> (ticksPerStep / 8, (std::int64_t) std::llround ((endOf (e) - e.startMs) * ticksPerMs));
+            n.channel = e.channel;
+            n.key = std::clamp (e.key, 0, 127);
+            n.velocity = std::clamp (e.velocity, 0.0f, 1.0f);
+            notes.push_back (n);
+        }
+        result.notes = (int) notes.size();
+        NoteRecorder none;
+        commitNoteBatch (song, none, std::move (notes), options.mode, options.quantize, cleared, false, true);
+        return result;
+    }
+
+    // as a take: the note-ons and releases through a NoteRecorder (Song mode: placed where they were played, a clip at
+    // the origin; Pattern mode: in the loop)
+    const auto base = played ? 0.0 : (double) song.barAt (std::max<std::int64_t> (0, options.playhead)).tick;
+    std::vector<RecordedEvent> events;
+    for (const auto& e : phrase)
+    {
+        const auto on = played ? e.startTick : base + (e.startMs - phrase.front().startMs) * ticksPerMs;
+        const auto off = on + (endOf (e) - e.startMs) * ticksPerMs;
+        events.push_back ({ on, e.channel, e.key, e.velocity, true });
+        events.push_back ({ off, e.channel, e.key, 0.0f, false });
+    }
+    // in the order they happened (a release before a note-on at the same tick)
+    std::stable_sort (events.begin(), events.end(), [] (const RecordedEvent& a, const RecordedEvent& b) {
+        return a.tick < b.tick || (a.tick == b.tick && ! a.on && b.on);
+    });
+    NoteRecorder recorder;
+    recorder.begin (song.patterns[(std::size_t) pattern].effectiveLength (song.beatsPerBar));
+    // (Song mode: the positions are already the song's — played ones as the transport wrapped them, stopped ones laid
+    // out from the playhead's bar — none wraps again at the song's end)
+    recorder.setLinear (song.mode == PlayMode::song);
+    double last = 0.0;
+    for (const auto& ev : events)
+    {
+        recorder.add (song, ev);
+        last = std::max (last, ev.tick);
+    }
+    recorder.end (song, last);
+    auto notes = recorder.takeFinished();
+    result.notes = (int) notes.size();
+    commitNoteBatch (song, recorder, std::move (notes), options.mode, options.quantize, cleared, options.placeClip, true);
+    return result;
 }
 } // namespace lynx

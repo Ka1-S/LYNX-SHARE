@@ -40,7 +40,11 @@ public:
     PresetBar (AudioEngine& engine, int track, int slot);
 
     // Where the bar sits: right-aligned in `area` (a header strip); returns the space left of it.
-    juce::Rectangle<float> place (juce::Rectangle<float> area, bool withPresets = true);
+    // keepLeft (round 170k2): the width the caller needs at the left of `area` (its title): the copy button goes and the
+    // preset box shrinks (down to 70 px) before the bar eats into it
+    juce::Rectangle<float> place (juce::Rectangle<float> area, bool withPresets = true, float keepLeft = 0.0f);
+    // round 170k2: the width the bar takes in a narrow window (no copy button, the preset box at its smallest)
+    static float narrowWidth (bool withPresets = true);
     void paint (juce::Graphics& g, juce::Colour accent) const;
     Part partAt (juce::Point<float> p) const;
     bool contains (juce::Point<float> p) const { return partAt (p) != Part::none; }

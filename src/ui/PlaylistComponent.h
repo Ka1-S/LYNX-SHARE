@@ -2,11 +2,13 @@
 
 #include <functional>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "core/PickerSelection.h"
 #include "engine/AudioEngine.h"
 #include "ui/EditorTools.h"
 #include "ui/Theme.h"
@@ -14,6 +16,8 @@
 
 namespace lynx
 {
+class PatternBlocksView;
+
 // FL-style Playlist (arrangement): tracks vertically, time horizontally.
 //  - a tool strip (Pencil, Brush, Eraser, Mute, Knife, Lasso, Zoom, Listen, Slip); with the Pencil:
 //    left click on empty space "paints" the current source (and starts dragging it), dragging a clip moves
@@ -83,6 +87,8 @@ public:
     ui::Hint hintAt (juce::Point<int> position) override;
     void mouseDoubleClick (const juce::MouseEvent& e) override;
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
+    // trackpad pinch (macOS; Windows touch screens): time zoom around the pointer, with Alt the vertical zoom (round 170e)
+    void mouseMagnify (const juce::MouseEvent& e, float scale) override;
 
     // Editing shortcuts; the main window forwards keys when the Playlist is visible.
     bool handleKey (const juce::KeyPress& key);
@@ -127,7 +133,7 @@ public:
     ui::Hint hoverForSnapshot();
 
     static constexpr int headerWidth = 96;
-    static constexpr int toolbarHeight = 28;
+    static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
     static constexpr int overviewHeight = 16; // the overview strip under the toolbar (round 90)
     static constexpr int timelineHeight = 24;
     static constexpr int rulerTop = toolbarHeight + overviewHeight;
@@ -138,6 +144,15 @@ public:
     static constexpr int scrollBarSize = 12;
 
     static juce::Colour patternColour (const Song& song, int pattern);
+
+    // FL's legacy Pattern Blocks (round 170f, issue #60): the section under the clip tracks while the project's option is
+    // on (ui/PatternBlocksView.h). `height` = the section's height in px (the divider drag); clamped to the window.
+    void setBlocksHeight (int height);
+    int blocksSectionHeight() const;
+    void togglePatternBlocks();       // the option, asking what to do with existing blocks when it goes off
+    void turnBlocksIntoClips();       // FL's "Turn pattern instances into clips"
+    void scrollTicksBy (double ticks); // (the blocks section's drag past its edges)
+    PatternBlocksView* getBlocksViewForSnapshot() { return blocksView.get(); }
     static juce::Colour audioClipColour (const ChannelDef& channel);
 
     // A project was just opened: scroll to the start and, when the song is longer than the view, zoom out
@@ -279,7 +294,7 @@ private:
     OverviewBar overview;
     void paintOverview (juce::Graphics& g, juce::Rectangle<float> area, double total);
     std::size_t overviewSignature = 0; // the clips drawn in the overview (repaints it when they change)
-    juce::ComboBox arrangementBox;
+    IconComboBox arrangementBox { Icon::song }; // round 170e2: the arrangement icon names the box
     SnapBox snapBox { true }; // "Main" (the toolbar snap) or this editor's own grid
     ToolStrip tools { true };
     IconButton followButton { "follow", Icon::follow }; // Follow (auto scrolling) on/off, EditorGlobals (round 162)
@@ -373,7 +388,8 @@ private:
     // smooth wheel scrolling
     gesture::Glide glideX, glideY;
     bool gliding = false;
-    void glideBy (double ticks, double pixels);
+    // `immediate`: a trackpad's smooth scroll moves the view at once (the fingers carry it; round 170e)
+    void glideBy (double ticks, double pixels, bool immediate = false);
     void glideFrame();
     juce::VBlankAttachment vblank { this, [this] { glideFrame(); } };
 
@@ -382,6 +398,12 @@ private:
     void zoomToSelection();
     void zoomAll();
     void centreOnPlayhead();
+
+    // Pattern Blocks (round 170f)
+    friend class PatternBlocksView;
+    std::unique_ptr<PatternBlocksView> blocksView;
+    int blocksHeight = 0; // 0 = the default (a third of the grid)
+    bool blocksShown = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PlaylistComponent)
 };
@@ -398,11 +420,16 @@ public:
 
     void paint (juce::Graphics& g) override;
     void mouseDown (const juce::MouseEvent& e) override;
+    void mouseUp (const juce::MouseEvent& e) override;
     void mouseDoubleClick (const juce::MouseEvent& e) override;
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
     void mouseMove (const juce::MouseEvent& e) override;
     void mouseExit (const juce::MouseEvent& e) override;
     ui::Hint hintAt (juce::Point<int> position) override;
+
+    // The patterns picked in the list (FL's picker selection: click, Ctrl+click, Shift+click; round 169k), in the
+    // order they were picked; empty when none is picked.
+    std::vector<int> pickedPatterns() const;
 
     std::function<void()> onOpenPattern;
     std::function<void()> onPatternMenu; // right click on a pattern (it is the current one by then)
@@ -434,6 +461,9 @@ private:
     int view = 0;
     ClipKind seenBrush = ClipKind::pattern; // the list follows the pencil's kind when it changes elsewhere
     int scroll = 0; // in rows
+    pickersel::Selection picked; // pattern indices (pattern view)
+    bool deselectOnUp = false;   // a Ctrl+click on a picked pattern takes it out on release (FL)
+    int pressedRow = -1;
     int hoverTab = -1, hoverRow = -1;
     bool hoverAdd = false;
     static constexpr int rowHeight = 28, headerHeight = 26, footerHeight = 22;

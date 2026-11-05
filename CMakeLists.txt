@@ -243,6 +243,7 @@ target_sources(lynx_core PRIVATE
     src/core/TempoDetect.cpp
     src/core/ScoreLog.cpp
     src/core/ChannelLoops.cpp
+    src/core/PatternBlocks.cpp
     src/core/ChannelBurn.cpp
     src/core/AutoSampler.cpp)
 
@@ -369,8 +370,10 @@ if(LYNX_BUILD_APP)
         src/ui/SessionDialogs.cpp
         src/engine/LiveLink.cpp
         src/engine/LiveSessions.cpp
+        src/engine/MediaPack.cpp
         src/engine/LiveTest.cpp
         src/ui/LiveSessionUi.cpp
+        src/ui/LiveChat.cpp
         src/engine/PluginHost.cpp
         src/engine/FlStudio.cpp
         src/engine/PluginSandbox.cpp
@@ -389,6 +392,7 @@ if(LYNX_BUILD_APP)
         src/ui/ChannelRackComponent.cpp
         src/ui/PianoRollComponent.cpp
         src/ui/PlaylistComponent.cpp
+        src/ui/PatternBlocksView.cpp
         src/ui/MixerComponent.cpp
         src/ui/QuickPick.cpp
         src/ui/PluginWindow.cpp
@@ -469,6 +473,7 @@ if(LYNX_BUILD_APP)
         src/ui/PluginMonitorWindow.cpp
         src/ui/TouchKeyboard.cpp
         src/ui/QuickAddPalette.cpp
+        src/ui/PluginPickerView.cpp
         src/ui/PluginPicker.cpp
         src/ui/CrashReporter.cpp
         src/ui/Updater.cpp

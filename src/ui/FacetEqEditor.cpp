@@ -1063,7 +1063,7 @@ public:
     void paint (juce::Graphics& g) override
     {
         using namespace theme;
-        const skin::StyleScope styleScope (skin::styleFor (EffectKind::facetEq)); // round 126: one style per plugin
+        const skin::StyleScope styleScope (skin::styleFor (EffectKind::facetEq), skin::Art::facet); // round 126: one style per plugin (170j: Themed)
         g.fillAll (colour::bg0);
         const auto* fx = current();
         if (fx == nullptr)
@@ -1268,6 +1268,10 @@ public:
         const auto area = graphArea();
         const auto plot = plotArea();
         skin::canvas (g, area, colour::accent);
+        // round 170j: Themed draws the analyser in ice and the sum's glow in warm gold; the other styles in the accent
+        const auto themed = skin::style() == skin::Style::themed;
+        const auto specColour = themed ? skin::artAccent2 (skin::Art::facet) : colour::accent;
+        const auto sumGlow = themed ? skin::artAccent (skin::Art::facet) : colour::accent;
 
         // grid: frequencies (numbers or a piano keyboard along the bottom)
         g.setFont (font (type::caption));
@@ -1366,18 +1370,18 @@ public:
             {
                 const auto p = spectrumPath (specPost, true);
                 // round 126: the analyser glows — a deep fill of the accent rising to a lit edge
-                juce::ColourGradient fillGrad (colour::accent.withAlpha (0.34f), 0.0f, plot.getY() + plot.getHeight() * 0.25f, colour::accent.withAlpha (0.02f), 0.0f,
+                juce::ColourGradient fillGrad (specColour.withAlpha (0.34f), 0.0f, plot.getY() + plot.getHeight() * 0.25f, specColour.withAlpha (0.02f), 0.0f,
                                                plot.getBottom(), false);
-                fillGrad.addColour (0.5, colour::accent.darker (0.3f).withAlpha (0.14f));
+                fillGrad.addColour (0.5, specColour.darker (0.3f).withAlpha (0.14f));
                 g.setGradientFill (fillGrad);
                 g.fillPath (p);
                 const auto edge = spectrumPath (specPost, false);
                 if (! skin::reducedEffects())
                 {
-                    g.setColour (colour::accent.withAlpha (0.18f));
+                    g.setColour (specColour.withAlpha (0.18f));
                     g.strokePath (edge, juce::PathStrokeType (4.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
                 }
-                g.setColour (colour::accent.brighter (0.2f).withAlpha (0.85f));
+                g.setColour (specColour.brighter (0.2f).withAlpha (0.85f));
                 g.strokePath (edge, juce::PathStrokeType (1.2f));
             }
             // round 166f: the comparative target's spectrum, a cool line over the source's
@@ -1468,14 +1472,14 @@ public:
             area0.lineTo (plot.getRight(), yForDb (0.0));
             area0.lineTo (plot.getX(), yForDb (0.0));
             area0.closeSubPath();
-            g.setColour (colour::accent.withAlpha (0.16f));
+            g.setColour (sumGlow.withAlpha (0.16f));
             g.fillPath (area0);
             if (! skin::reducedEffects())
             {
-                g.setColour (colour::accent.withAlpha (0.12f));
+                g.setColour (sumGlow.withAlpha (0.12f));
                 g.strokePath (total, juce::PathStrokeType (12.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
             }
-            g.setColour (colour::accent.withAlpha (0.4f));
+            g.setColour (sumGlow.withAlpha (0.4f));
             g.strokePath (total, juce::PathStrokeType (5.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
         g.setColour (curveColour);
@@ -1731,9 +1735,17 @@ private:
     }
     double lastSignature = 0.0;
 
+    // round 170c (issue #11: "the visualiser is unstable"): the analyser lives on a fixed grid of log-spaced points
+    // over the graph's whole axis (10 Hz … 30 kHz), not one per pixel column: resizing the window no longer resets it
+    // to the floor or changes its look. Below one FFT bin per point the magnitude is interpolated between bins (no
+    // staircase in the lows), above it the band's strongest bin is kept (a tone reads its true level); then a light
+    // smoothing across neighbours and a short rise (≈ 3 frames) instead of jumping to every frame's value: no flicker.
+    static constexpr int specPoints = 480;
+    static double specHz (int i) { return minHz * std::pow (maxHz / minHz, (double) i / (double) (specPoints - 1)); }
+
     void updateSpectrum()
     {
-        const auto columns = juce::jmax (64, (int) plotArea().getWidth() / 3);
+        constexpr int columns = specPoints;
         if ((int) specPre.size() != columns)
         {
             specPre.assign ((std::size_t) columns, (float) specFloor());
@@ -1744,7 +1756,7 @@ private:
         {
             for (int i = 0; i < columns; ++i)
             {
-                const auto f = hzForX (plotArea().getX() + plotArea().getWidth() * (float) i / (float) (columns - 1));
+                const auto f = specHz (i);
                 // a mix's typical spectrum: pink-ish slope, a kick bump, a presence region, roll-off
                 const auto db = -40.0 - 9.0 * std::log2 (juce::jmax (20.0, f) / 1000.0) * 0.5 + 9.0 * std::exp (-std::pow (std::log2 (f / 60.0), 2.0))
                                 + 4.0 * std::sin (f * 0.0021) - (f > 14000.0 ? (f - 14000.0) * 0.004 : 0.0) + tiltDb (f);
@@ -1769,6 +1781,7 @@ private:
         const auto sr = displayRate();
         const bool side = tap.sideOn.load (std::memory_order_relaxed) && hasTarget(); // round 166f: the comparative target
         if ((int) specSide.size() != columns) specSide.assign ((std::size_t) columns, (float) specFloor());
+        std::vector<float> fresh ((std::size_t) columns);
         for (int which = 0; which < (side ? 3 : 2); ++which)
         {
             auto& ring = which == 0 ? tap.pre : which == 1 ? tap.post : tap.side;
@@ -1787,21 +1800,44 @@ private:
                 ++(ref ? refFrames : curFrames);
             }
             auto& out = which == 0 ? specPre : which == 1 ? specPost : specSide;
-            const auto norm = 4.0f / (float) fftSize; // Hann (coherent gain ½) and one side
+            computeSpectrumDb (fftData.data(), sr, fresh.data());
             for (int i = 0; i < columns; ++i)
             {
-                const auto f0 = hzForX (plotArea().getX() + plotArea().getWidth() * ((float) i - 0.5f) / (float) (columns - 1));
-                const auto f1 = hzForX (plotArea().getX() + plotArea().getWidth() * ((float) i + 0.5f) / (float) (columns - 1));
-                auto k0 = (int) std::floor (f0 * fftSize / sr), k1 = (int) std::ceil (f1 * fftSize / sr);
-                k0 = juce::jlimit (1, fftSize / 2 - 1, k0);
-                k1 = juce::jlimit (k0, fftSize / 2 - 1, k1);
-                float m = 0.0f;
-                for (int k = k0; k <= k1; ++k) m = juce::jmax (m, fftData[(std::size_t) k]);
-                const auto f = hzForX (plotArea().getX() + plotArea().getWidth() * (float) i / (float) (columns - 1));
-                const auto db = (float) (20.0 * std::log10 (m * norm + 1e-9) + tiltDb (f));
+                // neighbours smoothed (¼ ½ ¼ in dB), then a short rise and the analyser speed's fall
+                const auto db = 0.25f * fresh[(std::size_t) juce::jmax (0, i - 1)] + 0.5f * fresh[(std::size_t) i]
+                                + 0.25f * fresh[(std::size_t) juce::jmin (columns - 1, i + 1)];
                 auto& v = out[(std::size_t) i];
-                v = db > v ? db : juce::jmax (db, v - fallPerFrame()); // fast up, falling at the analyser speed
+                v = db > v ? v + (db - v) * 0.6f : juce::jmax (db, v - fallPerFrame());
             }
+        }
+    }
+
+    // one frame's spectrum (dBFS, a full-scale sine = 0 dB, tilted) on the fixed grid, from FFT magnitudes
+    void computeSpectrumDb (const float* magnitudes, double sr, float* out) const
+    {
+        const auto norm = 4.0f / (float) fftSize; // Hann (coherent gain ½) and one side
+        const auto binHz = sr / (double) fftSize;
+        const auto ratio = std::pow (maxHz / minHz, 0.5 / (double) (specPoints - 1)); // half a point's width
+        for (int i = 0; i < specPoints; ++i)
+        {
+            const auto f = specHz (i);
+            float m = 0.0f;
+            if (f >= sr * 0.5) m = 0.0f;
+            else
+            {
+                const auto k0 = f / ratio / binHz, k1 = f * ratio / binHz;
+                if (std::floor (k1) <= std::ceil (k0)) // narrower than a bin: interpolate between the two around f
+                {
+                    const auto k = juce::jlimit (0.0, (double) (fftSize / 2 - 2), f / binHz);
+                    const auto lo = (int) k;
+                    const auto t = (float) (k - lo);
+                    m = magnitudes[lo] + (magnitudes[lo + 1] - magnitudes[lo]) * t;
+                }
+                else
+                    for (int k = juce::jlimit (1, fftSize / 2 - 1, (int) std::ceil (k0)); k <= juce::jlimit (1, fftSize / 2 - 1, (int) std::floor (k1)); ++k)
+                        m = juce::jmax (m, magnitudes[k]);
+            }
+            out[i] = (float) (20.0 * std::log10 (m * norm + 1e-9) + tiltDb (f));
         }
     }
 

@@ -72,7 +72,7 @@ CORE="$CORE src/core/SoundFont.cpp src/core/SoundFontLoad.cpp src/core/SoundFont
 # Ogg Vorbis decoding as FL does (REA round 77)
 CORE="$CORE src/core/OggVorbis.cpp"
 # export options, MP3 encoding, plugin performance monitor, clip properties / arrangements (round 84)
-CORE="$CORE src/core/ExportOptions.cpp src/core/Mp3Encoder.cpp src/core/Mp3Decoder.cpp src/core/PluginMonitor.cpp src/core/PlaylistOps.cpp src/core/QuickRender.cpp src/core/ProjectContents.cpp src/core/TempoDetect.cpp src/core/ScoreLog.cpp src/core/ChannelLoops.cpp src/core/ChannelBurn.cpp src/core/AutoSampler.cpp"
+CORE="$CORE src/core/ExportOptions.cpp src/core/Mp3Encoder.cpp src/core/Mp3Decoder.cpp src/core/PluginMonitor.cpp src/core/PlaylistOps.cpp src/core/QuickRender.cpp src/core/ProjectContents.cpp src/core/TempoDetect.cpp src/core/ScoreLog.cpp src/core/ChannelLoops.cpp src/core/PatternBlocks.cpp src/core/ChannelBurn.cpp src/core/AutoSampler.cpp"
 # LYNX's Facet EQ and Apex Limiter (round 99)
 CORE="$CORE src/core/FacetEq.cpp src/core/ApexLimiter.cpp src/core/Mastering.cpp"
 # LYNX's dynamics suite and FabFilter state translation (round 108)
@@ -220,7 +220,9 @@ $CXX $FLAGS $CORE $WAVPACK tools/wavetravellerrender.cpp -o build-local/wavetrav
 
 # (the tools queued above: build them in parallel, at most half the cores at once, an LTO link takes ~4 GB)
 if [[ -n "$TOOLS_QUEUE" && -f "$TOOLS_QUEUE" ]]; then
-    tools_jobs=$(( $(nproc 2>/dev/null || echo 4) / 2 )); (( tools_jobs < 2 )) && tools_jobs=2; (( tools_jobs > 6 )) && tools_jobs=6
+    # 2026-11-04: in parallel the tools deadlocked inside zig's shared object cache (every zig process waiting on a
+    # manifest lock another one held, 0 % CPU for hours). One at a time by default; LYNX_TOOLS_JOBS=n to try more.
+    tools_jobs=${LYNX_TOOLS_JOBS:-1}
     xargs -P "$tools_jobs" -d '\n' -I{} bash -c '{}' < "$TOOLS_QUEUE"
     rm -f "$TOOLS_QUEUE"
 fi

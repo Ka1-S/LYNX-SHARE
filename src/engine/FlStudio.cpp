@@ -58,6 +58,10 @@ juce::File existingFolder (const juce::String& path)
 FlStudioInstall findFlStudio()
 {
     FlStudioInstall fl;
+    // test hook (round 169g): LYNX_NO_FL=1 = a computer without FL Studio, even where it is installed (0 / empty = FL
+    // as found; round 169g2)
+    if (const auto noFl = juce::SystemStats::getEnvironmentVariable ("LYNX_NO_FL", {}).trim(); noFl.isNotEmpty() && noFl != "0")
+        return fl;
 
     // installation: where FL says it is, else the newest "FL Studio*" under Program Files\Image-Line
     // LYNX_FL_INSTALL=<folder> points at an installation anywhere (another Wine prefix, a copy, tests)
