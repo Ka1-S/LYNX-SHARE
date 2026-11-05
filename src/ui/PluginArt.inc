@@ -92,6 +92,7 @@ struct Theme
     bool thumbPointer = false;      // fader thumbs carry the pointer colour (else the accent)
     // round tp172c: the label of an OFF toggle (transparent = the global disabled text; a light panel needs its own)
     Colour offLabelCol { 0 };
+    bool noValueArc = false;        // round tp172c: knobs show their value by the pointer on a printed scale only (consoles)
 
     // round tp172d: the flat "hardware graphic" look of the third-party originals (Valhalla, Soundtoys...) — solid
     // colour fields, bold outlines, big plain type; every field defaults to the look above
@@ -645,25 +646,28 @@ inline void knob (juce::Graphics& g, Rectangle<float> area, const KnobLook& k)
     const auto r = scale ? ringR - 4.0f : ringR;
 
     // the track and the lit value arc
-    g.setColour (p.track.withAlpha (k.enabled ? 1.0f : 0.6f));
-    g.strokePath (arc (c, r, arcStart, arcStart + arcRange), juce::PathStrokeType (t, juce::PathStrokeType::curved, th0.buttTrack ? juce::PathStrokeType::butt : juce::PathStrokeType::rounded));
-    if (std::abs (to - from) > 0.002f)
+    if (! th0.noValueArc)
     {
-        const auto v = arc (c, r, from, to);
-        if (fx && k.enabled && th0.arcGlow > 0.0f)
+        g.setColour (p.track.withAlpha (k.enabled ? 1.0f : 0.6f));
+        g.strokePath (arc (c, r, arcStart, arcStart + arcRange), juce::PathStrokeType (t, juce::PathStrokeType::curved, th0.buttTrack ? juce::PathStrokeType::butt : juce::PathStrokeType::rounded));
+        if (std::abs (to - from) > 0.002f)
         {
-            g.setColour (lit.withAlpha (th0.arcGlow));
-            g.strokePath (v, stroke (t * th0.arcGlowWidth));
+            const auto v = arc (c, r, from, to);
+            if (fx && k.enabled && th0.arcGlow > 0.0f)
+            {
+                g.setColour (lit.withAlpha (th0.arcGlow));
+                g.strokePath (v, stroke (t * th0.arcGlowWidth));
+            }
+            if (th0.twoTone)
+                g.setGradientFill (ColourGradient (lit2, c.x - r, c.y + r, lit, c.x + r, c.y - r, false));
+            else
+                g.setColour (lit);
+            g.strokePath (v, stroke (t));
         }
-        if (th0.twoTone)
-            g.setGradientFill (ColourGradient (lit2, c.x - r, c.y + r, lit, c.x + r, c.y - r, false));
-        else
-            g.setColour (lit);
-        g.strokePath (v, stroke (t));
     }
 
-    // the cap
-    const auto capR = juce::jmax (3.0f, r - t * (thin ? 2.4f : 1.6f));
+    // the cap (round tp172c: without the arc it fills the scale, a console knob)
+    const auto capR = juce::jmax (3.0f, th0.noValueArc ? r + t * 0.2f : r - t * (thin ? 2.4f : 1.6f));
     const auto cap = Rectangle<float> (capR * 2.0f, capR * 2.0f).withCentre (c);
     if (fx)
     {

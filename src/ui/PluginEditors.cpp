@@ -289,6 +289,20 @@ public:
         return { item.x * s, headerHeight + item.y * s, item.w * s, item.h * s };
     }
 
+    // round tp172c: the art drawn now — Ridge Strip's 4K voicing has its own (dark) console look
+    skin::Art artNow() const
+    {
+        const auto art = skin::artForEffect (kind);
+        if (art != skin::Art::ridge) return art;
+        const auto* fx = current();
+        if (fx == nullptr) return art;
+        const auto on = [&] (const char* name) {
+            const auto i = plugui::paramIndex (kind, name);
+            return i >= 0 && i < (int) fx->params.size() && fx->params[(std::size_t) i] >= 0.5f;
+        };
+        return on ("4K voicing") && ! on ("Modern voicing") && ! on ("Vocal strip") ? skin::Art::ridge4k : art;
+    }
+
     bool visible (const LayoutItem& item) const
     {
         const auto* fx = current();
@@ -600,8 +614,8 @@ public:
     void paint (juce::Graphics& g) override
     {
         using namespace theme;
-        const skin::StyleScope styleScope (editorStyle(), skin::artForEffect (kind));
-        accent = editorStyle() == skin::Style::themed ? skin::artAccent (skin::artForEffect (kind)) : familyAccent;
+        const skin::StyleScope styleScope (editorStyle(), artNow());
+        accent = editorStyle() == skin::Style::themed ? skin::artAccent (artNow()) : familyAccent;
         skin::canvas (g, getLocalBounds().toFloat(), accent);
         const auto* fx = current();
 
@@ -996,7 +1010,9 @@ public:
                 skin::switchPill (g, box, on, accent, fx.enabled);
                 auto text = r.withTrimmedLeft (21.0f * s);
                 const auto offLabel = skin::offLabelColour(); // round tp172c: a theme's own (readable on its panels)
-                g.setColour (on ? colour::textPrimary : (! offLabel.isTransparent() ? (hot ? offLabel.brighter (0.3f) : offLabel)
+                g.setColour (on ? (offLabel.isTransparent() || offLabel.getPerceivedBrightness() > 0.5f ? colour::textPrimary
+                                                                                                          : offLabel.darker (0.6f)) // a light panel: lit = darker
+                                 : (! offLabel.isTransparent() ? (hot ? offLabel.brighter (0.3f) : offLabel)
                                                                     : (hot ? colour::textSecondary : colour::textDisabled)));
                 if (item.label != nullptr)
                     ui::drawFittingText (g, caps (tr (item.label)), text, juce::Justification::centredLeft, font (juce::jmax (8.0f, 9.5f * s), true), 7.0f);

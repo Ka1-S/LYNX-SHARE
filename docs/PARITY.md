@@ -1947,7 +1947,7 @@ tables), Ridge's appended **Modern voicing**, **Peak detect** and **Gate hold**.
 | Bell width | follows the gain (Q 0.15 at ±3 dB … 0.7 at ±20 on the mids) | measured per gain and Q | ✅ | |
 | HPF / LPF | 3rd-order high-pass 20 … 500 Hz, 2nd-order low-pass 3 … 27.5 kHz, corners off the read-out by up to 25 % | the measured corners | ✅ | |
 | Compressor | feed-forward, RMS (soft knee, threshold −13.5 dB under the dial) or Peak (hard, −17.9 dB); fast attack 3 ms, normal ~45 ms; release τ = 0.68 × the dial | the same laws | ✅ | dynfit residual 0.03 … 0.4 dB on stairs and bursts |
-| Auto make-up and its offset | 0.6 dB per dB of threshold under +10, × the ratio's slope | the same | ✅ | ratio 3 at −12 dB reads 0.5 dB high (S5) |
+| Auto make-up and its offset | 5/6 dB per dB of threshold under +3, × the ratio's slope | the same | ✅ | slice 2 refit on three measured points (ratio 2 / 10 at −15, ratio 3 at −12) |
 | Gate / expander | gate with hysteresis and hold, expander 0.86 dB/dB, range 10 / 40 dB = 7.9 / 47.8 dB, release a dB slew | the same; Hold dial | ✅ | |
 | Mix | 0 … 100 % | Comp. mix | ✅ | linear blend (not measured) |
 | Width, pan, fader, cut, listen, routing panel | centre module | input / output / phase; fader folded into Output | ⚠️ | width / pan / S/C routing not translated |

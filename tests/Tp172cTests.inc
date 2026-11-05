@@ -83,6 +83,9 @@ TEST (ridge_modern_voicing_laws_tp172c)
     CHECK (std::abs (s2::makeupDb (s) - 8.9) < 0.2);
     s.compRatio = 10.0;
     CHECK (std::abs (s2::makeupDb (s) - 13.2) < 0.3);
+    s.compRatio = 3.0; s.compThreshold = -12.0; // slice 2: the S5 render's +8.75 dB
+    CHECK (std::abs (s2::makeupDb (s) - 8.75) < 0.2);
+    s.compRatio = 10.0; s.compThreshold = -15.0;
     s2::Strip strip;
     strip.prepare (48000.0);
     s.gateRange = 20.0; s.gateThreshold = -20.0; s.lfGain = 6.0; s.hfGain = -6.0; s.compPeak = true;
