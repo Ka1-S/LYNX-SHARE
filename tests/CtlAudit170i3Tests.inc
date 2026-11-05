@@ -63,9 +63,8 @@ const std::vector<Case>& cases()
             { "Mod ", "the modulation matrix needs its sources (wheel, aftertouch…)" },
             { "flanger", "an inactive effect type" }, { "chorus", "an inactive effect type" }, { "reverb", "an inactive effect type" },
             { "delay", "an inactive effect type" }, { "lo-fi", "an inactive effect type" }, { "phaser", "an inactive effect type" },
-            { "free", "a free LFO only differs between notes" },
-            { "Filter decay", "the filter envelope in the random settings" }, { "Filter sustain", "the filter envelope in the random settings" },
-            { "decay", "an operator off in the random settings" }, { "sustain", "an operator off in the random settings" },
+            { "LFO 1 free", "a free LFO differs only after a pause with no voice" },
+            { "LFO 2 free", "a free LFO differs only after a pause with no voice" },
             { "Bend range", "needs pitch bend" } },
           { "wave", "type", "delay sync" } },
         { "PoiZone",
@@ -73,7 +72,7 @@ const std::vector<Case>& cases()
           { { "Mod wheel", "needs the mod wheel" }, { "Gate step", "the gate plays only with the gate on" },
             { "Gate speed", "the gate plays only with the gate on" }, { "Bend range", "needs pitch bend" } },
           {} },
-        { "Sakura", {}, { { "Mod 7", "a modulation slot without source in the random settings" } }, {} },
+        { "Sakura", {}, {}, {} },
         { "Kepler", {}, { { "Arp range", "the arpeggiator is off" } }, {} },
         { "Kepler Exo",
           {},
@@ -84,8 +83,7 @@ const std::vector<Case>& cases()
         { "SimSynth", {}, {}, {} },
         { "MiniSynth",
           {},
-          { { "Mod wheel", "needs the mod wheel" }, { "Filter decay", "the filter envelope in the random settings" },
-            { "Filter sustain", "the filter envelope in the random settings" } },
+          { { "Mod wheel", "needs the mod wheel" } },
           {} },
         { "Fruity DX10", {}, {}, {} },
         { "Plucked!", {}, {}, {} },
@@ -105,8 +103,7 @@ const std::vector<Case>& cases()
           { { "retrig", "needs a pad hit again while it sounds" }, { "Pad 11", "not in the Default Kit's pattern" },
             { "Pad 12", "not in the Default Kit's pattern" }, { "Pad 13", "not in the Default Kit's pattern" },
             { "Pad 14", "not in the Default Kit's pattern" }, { "Pad 15", "not in the Default Kit's pattern" },
-            { "Pad 16", "not in the Default Kit's pattern" }, { "SOF", "the pad's SOF level in the random settings" },
-            { "Vel mod", "a velocity modulation without target in the random settings" }, { "Limiter release", "the kit stays under the limiter" } },
+            { "Pad 16", "not in the Default Kit's pattern" }, { "Limiter release", "the kit stays under the limiter" } },
           {} },
         { "Drumpad", {}, {}, {} },
         { "Fruit Kick", {}, {}, {} },
@@ -134,7 +131,9 @@ bool listed (const std::string& name, const std::vector<const char*>& names)
 struct Setup
 {
     lynx::ChannelDef channel;
+    std::vector<lynx::ctlaudit::Control> all;      // every editor control (the random settings change them all)
     std::vector<lynx::ctlaudit::Control> controls; // the sample (the allowed ones out)
+    std::vector<int> at;                           // the sample's places in `all`
     lynx::ctlaudit::Pattern pattern;
 };
 
@@ -168,18 +167,18 @@ std::optional<Setup> setup (const Case& k, std::size_t most)
     Setup s;
     s.channel = *c;
     s.pattern = ctlaudit::patternFor (engine->kind);
-    const auto all = ctlaudit::editorControls (s.channel);
+    s.all = ctlaudit::editorControls (s.channel);
     for (const auto& [index, raw] : k.sets)
-        for (const auto& ctl : all)
+        for (const auto& ctl : s.all)
             if (ctl.index == index)
                 CHECK (ctl.set (s.channel, raw));
-    std::vector<ctlaudit::Control> open;
-    for (const auto& ctl : all)
-        if (! listed (ctl.name, k.allowed))
-            open.push_back (ctl);
+    std::vector<int> open;
+    for (std::size_t i = 0; i < s.all.size(); ++i)
+        if (! listed (s.all[i].name, k.allowed))
+            open.push_back ((int) i);
     const auto step = std::max<std::size_t> (1, (open.size() + most - 1) / most);
     for (std::size_t i = 0; i < open.size(); i += step)
-        s.controls.push_back (open[i]);
+        s.controls.push_back (s.all[(std::size_t) open[i]]), s.at.push_back (open[i]);
     return s;
 }
 } // namespace ctl170i3
@@ -198,15 +197,14 @@ TEST (ctl170i3_every_control_changes_the_render)
             continue;
         const auto rep = ctlaudit::audit (s->channel, s->controls, s->pattern, smp, false, false);
         CHECK (rep.basePeak > 1e-3);
-        std::vector<int> silent;
+        std::vector<int> silent; // (places in s->all)
         for (std::size_t i = 0; i < s->controls.size(); ++i)
             for (const auto& r : rep.results)
                 if (r.index == s->controls[i].index && r.name == s->controls[i].name && ! ctlaudit::moved (r.state, rep.noise))
-                    silent.push_back ((int) i);
-        const auto left = silent.empty() ? silent : ctlaudit::stillDead (s->channel, s->controls, silent, s->pattern, smp);
+                    silent.push_back (s->at[i]);
+        const auto left = silent.empty() ? silent : ctlaudit::stillDead (s->channel, s->all, silent, s->pattern, smp);
         for (const auto i : left)
-            std::printf ("  %s: %d %s never changes the render\n", k.engine, s->controls[(std::size_t) i].index,
-                         s->controls[(std::size_t) i].name.c_str());
+            std::printf ("  %s: %d %s never changes the render\n", k.engine, s->all[(std::size_t) i].index, s->all[(std::size_t) i].name.c_str());
         CHECK (left.empty());
     }
 }
