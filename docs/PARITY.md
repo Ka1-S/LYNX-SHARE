@@ -51,6 +51,7 @@ there.
 | Ridge Strip | SSL E-Channel (Waves) | 9 | 8 | 7 (ref expired) | 8 | 165 | 8 → 9 / 7 → 8 |
 | LYNX Tune | Auto-Tune Pro | 8 | 7 | 6 (ref expired) | 8 | 135 | 165j: sound only (highs kept, measured; scores unchanged) |
 | Ridge Strip (Vocal strip) | SSL Native Vocalstrip 2 | 9 | 7 | 8 (ref expired) | 8 | 145 |  |
+| Ridge Strip (Modern) | SSL Native Channel Strip 2 | 9 | 8 | 7 | 8 | tp172c | sound 3 → 7 (fxparity 2.6 → 7.1, 30 renders); look: the console's colour-coded caps on grey metal, three columns |
 | Halo | ValhallaShimmer | 8 | 9 | 3 | 8 | 135 |  |
 | Horizon | ValhallaFutureVerb | 8 | 9 | 2 | 8 | 135 |  |
 | Orbit | ValhallaSpaceModulator | 8 | 9 | 3 | 8 | 135 |  |
@@ -1847,3 +1848,32 @@ TD-PSOLA from core/VocalPitch.h), for this role: 696 slots in 399 of her project
 **Scores**: configuration 0/10 → **9/10**, design 0/10 → **8/10** (round 135).
 
 Sources (web): [Decapitator guide (B&H copy)](https://static.bhphoto.com/lit_files/89645.pdf), [SOS Soundtoys 5 review](https://www.soundonsound.com/reviews/soundtoys-5); the rest from the official trials (round 135).
+
+---
+
+## Round tp172c: SSL Native Channel Strip 2 (Ridge Strip's Modern voicing)
+Sources: the official SSL trial (Native Channel Strip 2 v2.10, black-box only): its parameter table and read-outs, 30
+programme renders (defaults + 5 settings × drums / music / vocal / sweep / stair), 224 + 224 impulse renders on a dense
+grid (every EQ band's frequency × gain, the mid bands' Q × gain, both EQ types, the filters), sine ramps, stairs and
+tone bursts through 48 dynamics settings (ratios, thresholds, attack, peak / RMS, release, auto make-up, gate /
+expander ranges and releases). Fits: tp172c `ana/` (bandfit, shelf4, filtfit, dynfit, the ramp fits). No plug-in code,
+data or image was read or copied. LYNX: `vmatch::strip2` (core/VoiceMatch.h, core/ConsoleStrip2.inc and its generated
+tables), Ridge's appended **Modern voicing**, **Peak detect** and **Gate hold**.
+
+| Original feature | Original [EXEC trial] | Ridge Strip (Modern voicing) | Status | Note |
+|---|---|---|---|---|
+| E / G EQ types | switch between HMF and LMF | the EQ curve tabs read "E type / G type" | ✅ | E shelves: first order (0.01 dB); G shelves: second order with the dip / bump either side (≤ 0.4 dB); bells fitted per grid point (≤ 0.2 dB below 10 kHz) |
+| Band gains | LF ±16.5, mids / HF ±20 dB, a non-linear law ("+12" on a mid = +7.3 dB E, +9.25 dB G) | the dial reads the reference's value, the measured gain is applied | ✅ | interpolated on the measured grid |
+| Bell width | follows the gain (Q 0.15 at ±3 dB … 0.7 at ±20 on the mids) | measured per gain and Q | ✅ | |
+| HPF / LPF | 3rd-order high-pass 20 … 500 Hz, 2nd-order low-pass 3 … 27.5 kHz, corners off the read-out by up to 25 % | the measured corners | ✅ | |
+| Compressor | feed-forward, RMS (soft knee, threshold −13.5 dB under the dial) or Peak (hard, −17.9 dB); fast attack 3 ms, normal ~45 ms; release τ = 0.68 × the dial | the same laws | ✅ | dynfit residual 0.03 … 0.4 dB on stairs and bursts |
+| Auto make-up and its offset | 0.6 dB per dB of threshold under +10, × the ratio's slope | the same | ✅ | ratio 3 at −12 dB reads 0.5 dB high (S5) |
+| Gate / expander | gate with hysteresis and hold, expander 0.86 dB/dB, range 10 / 40 dB = 7.9 / 47.8 dB, release a dB slew | the same; Hold dial | ✅ | |
+| Mix | 0 … 100 % | Comp. mix | ✅ | linear blend (not measured) |
+| Width, pan, fader, cut, listen, routing panel | centre module | input / output / phase; fader folded into Output | ⚠️ | width / pan / S/C routing not translated |
+
+**Sound** (fxparity, LYNX as it loads the trial's saved states): before 2.6 (the state was not translated), with the 4K
+voicing 3.6, with the Modern voicing **7.1** (defaults 7…9, EQ settings 6…8, compressor 6…8, gate + peak 5…8). The
+remaining error: the dense drum transients through the fast peak compressor + gate (S4 drums 5) and the make-up with
+the dynamics before the EQ (S5, +0.5 dB).
+

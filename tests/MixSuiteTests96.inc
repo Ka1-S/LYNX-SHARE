@@ -448,12 +448,12 @@ TEST (mixsuite_panels_place_every_parameter)
         // two items never show together when any of their show-conditions on the same parameter are disjoint
         // (round 148: also the second condition, e.g. Ridge's 4K voicing items inside the Vocal strip wrapper)
         auto exclusive = [] (const plugui::LayoutItem& a, const plugui::LayoutItem& b) {
-            const char* ap[2] { a.whenParam, a.when2Param };
-            const char* bp[2] { b.whenParam, b.when2Param };
-            const float alo[2] { a.whenMin, a.when2Min }, ahi[2] { a.whenMax, a.when2Max };
-            const float blo[2] { b.whenMin, b.when2Min }, bhi[2] { b.whenMax, b.when2Max };
-            for (int i = 0; i < 2; ++i)
-                for (int j = 0; j < 2; ++j)
+            const char* ap[3] { a.whenParam, a.when2Param, a.when3Param };
+            const char* bp[3] { b.whenParam, b.when2Param, b.when3Param };
+            const float alo[3] { a.whenMin, a.when2Min, a.when3Min }, ahi[3] { a.whenMax, a.when2Max, a.when3Max };
+            const float blo[3] { b.whenMin, b.when2Min, b.when3Min }, bhi[3] { b.whenMax, b.when2Max, b.when3Max };
+            for (int i = 0; i < 3; ++i)
+                for (int j = 0; j < 3; ++j)
                     if (ap[i] != nullptr && bp[j] != nullptr && std::strcmp (ap[i], bp[j]) == 0 && (ahi[i] <= blo[j] || bhi[j] <= alo[i]))
                         return true;
             return false;

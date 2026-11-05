@@ -126,6 +126,11 @@ enum Param
     // dynamics' side chain (de-essing / frequency-conscious compression); the audio keeps neither (the filters stay at the
     // input when split). Ridge's own engine and the E voicing
     eqToSidechain,
+    // round tp172c (appended, off = the old sound): the "Modern" voicing — the modern console channel strip measured on
+    // the SSL Native Channel Strip 2 trial (core/VoiceMatch.h, strip2): its E / G EQ types (the EQ curve: Brown = E,
+    // Black = G), filters, feed-forward compressor (its peak / RMS detector) and gate (with its hold); the shared
+    // controls read the reference's own ranges
+    modern, compPeak, gateHold,
     count
 };
 // round 147b: the auto make-up (dB) for Ridge's own compressor: the console's for the same threshold (dBFS + 18 = the
@@ -169,6 +174,21 @@ float k4ColourValue (int colour) noexcept;
 double k4MicDb (float v) noexcept;          // 0 .. 50 dB
 double k4OffsetDb (float v) noexcept;       // -12 .. +12 dB
 std::string vocalParamText (int param, float v);
+// round tp172c: the Modern voicing and its own scales (dial position 0..1; the translator inverts them)
+bool modernVoicing (const EffectParams& p) noexcept;
+std::string modernParamText (int param, float v);
+double mHpfHz (float v) noexcept;    // 0 = out, else 20.9 .. 500 Hz (log)
+double mLpfKHz (float v) noexcept;   // 0 = out, else 27.5 .. 3 kHz (log)
+double mLfHz (float v) noexcept;     // 40 .. 600 Hz
+double mLmfKHz (float v) noexcept;   // 0.2 .. 2 kHz
+double mHmfKHz (float v) noexcept;   // 0.6 .. 7 kHz
+double mHfKHz (float v) noexcept;    // 1.5 .. 22 kHz
+double mLfGainDb (float v) noexcept; // ±16.5 dB
+double mGainDb (float v) noexcept;   // ±20 dB (LMF, HMF, HF)
+double mQ (float v) noexcept;        // 0.5 .. 2.5
+double mRatio (float v) noexcept;    // 1 (0) .. 63 : 1, infinity at the top (1e9); the reference's dial
+float mRatioValue (double ratio) noexcept;
+double mHoldSeconds (float v) noexcept; // 0 .. 4 s
 } // namespace ridge
 
 // ---- Glow Leveler (optical leveler) ----

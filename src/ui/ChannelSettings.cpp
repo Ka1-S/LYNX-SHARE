@@ -1320,7 +1320,7 @@ public:
             return v >= lo && (v < hi || (hi >= 1.0f && v <= hi));
         };
         return (item.page < 0 || item.page == page) && holds (item.whenParam, item.whenMin, item.whenMax)
-               && holds (item.when2Param, item.when2Min, item.when2Max);
+               && holds (item.when2Param, item.when2Min, item.when2Max) && holds (item.when3Param, item.when3Min, item.when3Max);
     }
 
     int pageCount() const { return layout != nullptr ? (int) layout->pages.size() : 0; }

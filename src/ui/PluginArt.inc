@@ -78,6 +78,8 @@ struct Theme
     // knobs
     Cap cap = Cap::flat;
     void (*drawCap) (juce::Graphics&, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx) = nullptr; // replaces `cap`
+    // round tp172c: a colour per parameter for the caps (a console's colour-coded knobs); drawCap reads it as knobTint
+    Colour (*capTint) (const char* param) = nullptr;
     Pointer pointer = Pointer::line;
     float pointerFrom = 0.35f;      // where a line pointer starts (fraction of the cap's radius)
     int ticks = 0;                  // a printed scale around the knob (0 = none; every 5th is long)
@@ -88,6 +90,8 @@ struct Theme
     float knobScale = 1.0f;         // knobs drawn a little larger than their slot (cap skirts)
     void (*tipDeco) (juce::Graphics&, Point<float> tip, float t, float angle) = nullptr; // rides the arc's tip (knobs >= 34 px)
     bool thumbPointer = false;      // fader thumbs carry the pointer colour (else the accent)
+    // round tp172c: the label of an OFF toggle (transparent = the global disabled text; a light panel needs its own)
+    Colour offLabelCol { 0 };
 
     // the moving layer (ArtLayer): motes and/or a painter for the stage strip; all null/0 = a still theme
     int motes = 0;
@@ -131,6 +135,11 @@ inline const Theme& themeOf (Art a)
 }
 
 inline const Theme& th() { return themeOf (currentArt); }
+
+// round tp172c: the cap colour of the knob being drawn (KnobLook::capTint; transparent = the theme's own)
+inline Colour knobTint;
+inline Colour capTintFor (const char* param) { return th().capTint != nullptr ? th().capTint (param) : Colour(); }
+inline Colour offLabelColour() { return th().offLabelCol; } // round tp172c
 inline const Palette& palette (Art a) { return themeOf (a).pal; }
 inline const Palette& pal() { return th().pal; }
 
@@ -498,6 +507,7 @@ inline void drawCapFamily (juce::Graphics& g, Cap family, Rectangle<float> cap, 
 
 inline void knob (juce::Graphics& g, Rectangle<float> area, const KnobLook& k)
 {
+    knobTint = k.capTint; // round tp172c: for the theme's drawCap (set first: every branch below may draw a cap)
     const auto& th0 = th();
     const auto& p = th0.pal;
     const auto size = area.getWidth();

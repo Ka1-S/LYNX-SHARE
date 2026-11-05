@@ -234,38 +234,30 @@ inline void capVelvet (juce::Graphics& g, Rectangle<float> cap, Point<float> c, 
     }
 }
 
-// === Ridge Strip (channel-strip role): a console at night =========================================================
+// === Ridge Strip (channel-strip role, round tp172c): a large-format console's channel — warm grey metal panels, ===
+// colour-coded knobs (red HF, green HMF, blue LMF, black LF, silver filters, grey dynamics), printed scales, orange
+// lit switches. The mood of the reference channel strips (a console module), drawn here from scratch.
 
 inline void canvasRidge (juce::Graphics& g, Rectangle<float> a, bool display)
 {
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
     if (display) return;
-    brushedLines (g, a, 17, 0.025f);
-    // the channel rails: thin dark grooves with a lit edge, one strip every 64 px
-    for (float x = a.getX() + 32.0f; x < a.getRight(); x += 64.0f)
+    // the module's sheet metal: fine horizontal brushing, a cooler band down the middle (the meter bridge's slot)
+    brushedLines (g, a, 17, 0.035f);
+    const auto mid = Rectangle<float> (a.getX() + a.getWidth() * 0.355f, a.getY(), a.getWidth() * 0.29f, a.getHeight());
+    g.setGradientFill (ColourGradient (Colour (0xff2c2e31).withAlpha (0.55f), mid.getX(), 0.0f, Colour (0xff3a3d41).withAlpha (0.55f), mid.getCentreX(), 0.0f, true));
+    g.fillRect (mid);
+    for (const auto x : { mid.getX(), mid.getRight() })
     {
-        g.setColour (Colours::black.withAlpha (0.35f));
-        g.fillRect (Rectangle<float> (x, a.getY(), 1.5f, a.getHeight()));
-        g.setColour (Colours::white.withAlpha (0.05f));
-        g.fillRect (Rectangle<float> (x + 1.5f, a.getY(), 1.0f, a.getHeight()));
+        g.setColour (Colours::black.withAlpha (0.45f));
+        g.fillRect (Rectangle<float> (x - 1.0f, a.getY(), 1.5f, a.getHeight()));
+        g.setColour (Colours::white.withAlpha (0.10f));
+        g.fillRect (Rectangle<float> (x + 0.5f, a.getY(), 1.0f, a.getHeight()));
     }
-    // fader caps out of focus along the bottom, each in its slot
-    juce::Random rnd (65);
-    for (float x = a.getX() + 4.0f; x < a.getRight() - 24.0f; x += 64.0f)
-    {
-        const auto slot = Rectangle<float> (x + 26.0f, a.getBottom() - a.getHeight() * 0.22f, 4.0f, a.getHeight() * 0.2f);
-        g.setColour (Colours::black.withAlpha (0.4f));
-        g.fillRoundedRectangle (slot, 2.0f);
-        const auto cap = Rectangle<float> (x + 14.0f, slot.getY() + rnd.nextFloat() * slot.getHeight() * 0.7f, 28.0f, 12.0f);
-        g.setGradientFill (ColourGradient (Colour (0xffd9d9d4).withAlpha (0.16f), 0.0f, cap.getY(), Colour (0xff6d6d6a).withAlpha (0.12f), 0.0f, cap.getBottom(), false));
-        g.fillRoundedRectangle (cap, 2.0f);
-        g.setColour (Colours::white.withAlpha (0.12f));
-        g.fillRect (cap.withSizeKeepingCentre (cap.getWidth() - 6.0f, 1.2f));
-    }
-    // a warm meter-bridge light from above
-    softLight (g, { a.getCentreX(), a.getY() - a.getHeight() * 0.1f }, a.getWidth() * 0.7f, Colour (0xffffd8a0), 0.06f);
-    vignette (g, a, 0.35f);
+    // a soft studio light from above
+    softLight (g, { a.getCentreX(), a.getY() - a.getHeight() * 0.15f }, a.getWidth() * 0.8f, Colour (0xfffff2dc), 0.07f);
+    vignette (g, a, 0.25f);
 }
 
 inline void ridgeEmblem (juce::Graphics& g, Point<float> c, float r) // a fader cap in its slot
@@ -282,6 +274,46 @@ inline void ridgeEmblem (juce::Graphics& g, Point<float> c, float r) // a fader 
 
 inline void ridgeScrews (juce::Graphics& g, Rectangle<float> a, float) { cornerScrews (g, a, 5.0f, 4.0f); }
 
+
+// the console's colour code, by parameter (a Ridge parameter name -> the cap colour)
+inline Colour ridgeCapTint (const char* param)
+{
+    const juce::String n (param);
+    if (n.startsWith ("HF ")) return Colour (0xffc8202a);                         // red
+    if (n.startsWith ("HMF ")) return Colour (0xff2f9a45);                        // green
+    if (n.startsWith ("LMF ")) return Colour (0xff2c6fc9);                        // blue
+    if (n.startsWith ("LF ")) return Colour (0xff26272a);                         // black
+    if (n == "HPF" || n == "LPF") return Colour (0xffd9dadb);                     // silver
+    if (n.startsWith ("Gate ")) return Colour (0xff2e3033);                       // dark grey
+    if (n.startsWith ("Comp") || n == "Ratio" || n == "Make-up offset") return Colour (0xffb9bbbd); // light grey
+    if (n == "Input" || n == "Mic gain") return Colour (0xff26272a);
+    return {};
+}
+
+// a console knob: a moulded coloured body on a dark skirt, a light rim on top and a white pointer (drawn by the kit)
+inline void capRidge (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    const auto body = knobTint.isTransparent() ? Colour (0xff3a3c40) : knobTint;
+    // the skirt
+    g.setGradientFill (ColourGradient (Colour (0xff4a4c50), c.x, cap.getY(), Colour (0xff141517), c.x, cap.getBottom(), false));
+    g.fillEllipse (cap.expanded (capR * 0.04f));
+    // the body
+    const auto top = cap.reduced (capR * 0.16f);
+    g.setGradientFill (ColourGradient (body.brighter (0.35f + hover * 0.15f), c.x - capR * 0.35f, c.y - capR * 0.55f,
+                                       body.darker (0.45f), c.x + capR * 0.45f, c.y + capR * 0.7f, true));
+    g.fillEllipse (top);
+    if (fx)
+    {
+        // the moulded top's highlight and its rim
+        g.setColour (Colours::white.withAlpha (body.getPerceivedBrightness() > 0.6f ? 0.35f : 0.22f));
+        g.drawEllipse (top.reduced (0.6f), 1.0f);
+        g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.28f), c.x, top.getY(), Colours::transparentWhite, c.x, c.y, false));
+        g.fillEllipse (top.reduced (capR * 0.12f).withHeight (top.getHeight() * 0.45f).translated (0.0f, capR * 0.04f));
+    }
+    g.setColour (Colours::black.withAlpha (0.5f));
+    g.drawEllipse (cap.expanded (capR * 0.04f), 1.0f);
+}
+
 inline const Theme& ridgeTheme()
 {
     static const Theme t = []
@@ -289,17 +321,24 @@ inline const Theme& ridgeTheme()
         Theme x;
         x.name = "Ridge Strip";
         x.base = Style::hardware;
-        x.pal = { Colour (0xff2c3139), Colour (0xff14171c), Colour (0xffe8463c), Colour (0xffffd9a0), Colour (0xd8262a31), Colour (0xe8181b20),
-                  Colour (0xff6b7480), Colour (0xffeceae2), Colour (0xff0b0d10), Colour (0xff4a4e55), Colour (0xff1b1d21), Colour (0xff0e1013),
-                  Colour (0xfff4f1e8), Colour (0xff22262c) };
+        //          canvas                                       accent (orange lamps)      second light
+        x.pal = { Colour (0xff5f6164), Colour (0xff47494c), Colour (0xfff08a24), Colour (0xffffc46a),
+                  // panels (sheet metal, nearly opaque)          rim                         titles
+                  Colour (0xf04e5054), Colour (0xf03d3f43), Colour (0xff232427), Colour (0xfff3f1ec),
+                  // wells (the meter bridge)  caps (fader)                                   track                      pointer
+                  Colour (0xff121315), Colour (0xffd8d8d4), Colour (0xff8a8a86), Colour (0xff2e3033), Colour (0xfffafafa),
+                  Colour (0xff3a3c40) };
         x.canvas = canvasRidge;
         x.sectionDeco = ridgeScrews;
         x.titleEmblem = ridgeEmblem;
-        x.drawCap = capConsole;
-        x.pointerFrom = 0.55f;
+        x.drawCap = capRidge;
+        x.capTint = ridgeCapTint;
+        x.pointerFrom = 0.25f;
+        x.ticks = 11;
         x.buttTrack = true;
         x.arcGlow = 0.0f;
         x.thumbPointer = true;
+        x.offLabelCol = Colour (0xffb4b8bf); // round tp172c: off switches stay readable on the grey metal
         return x;
     }();
     return t;
