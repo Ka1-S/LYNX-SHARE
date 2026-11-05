@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <atomic>
 #include <cmath>
 #include <complex>
@@ -4729,6 +4730,49 @@ const std::vector<Setting>& settingTable()
     return t;
 }
 
+// round 172a: the modulation matrix of the same page (REA_rodada11 §1.5): main ints 3… (FM) and 84… (RM), 9 × 9 each,
+// M[row][column] = 3 + 81·layer + 9·row + column, ±256; rows = destinations (operators 1–6, filters 1–3), columns =
+// sources (operators 1–6), then PAN, FX and OUT (FM layer only: the RM page shows the operator columns)
+const std::vector<Setting>& matrixTable()
+{
+    static const std::vector<std::string> names = [] {
+        std::vector<std::string> n;
+        const auto unit = [] (int row) { return row < 6 ? "op " + std::to_string (row + 1) : "filter " + std::to_string (row - 5); };
+        for (int layer = 0; layer < 2; ++layer)
+            for (int row = 0; row < 9; ++row)
+                for (int column = 0; column < (layer == 0 ? 9 : 6); ++column)
+                {
+                    static const char* const outs[3] = { " pan", " FX", " out" };
+                    auto u = unit (row);
+                    u[0] = (char) std::toupper ((unsigned char) u[0]);
+                    n.push_back (column < 6 ? std::string (layer == 0 ? "FM" : "RM") + " op " + std::to_string (column + 1) + " to " + unit (row)
+                                            : u + outs[column - 6]);
+                }
+        return n;
+    }();
+    static const std::vector<Setting> t = [] {
+        std::vector<Setting> m;
+        std::size_t k = 0;
+        for (int layer = 0; layer < 2; ++layer)
+            for (int row = 0; row < 9; ++row)
+                for (int column = 0; column < (layer == 0 ? 9 : 6); ++column)
+                    m.push_back ({ names[k++].c_str(), 3 + 81 * layer + 9 * row + column, -256, 256 });
+        return m;
+    }();
+    return t;
+}
+
+// the main controls, then the matrix cells
+const std::vector<Setting>& allSettings()
+{
+    static const std::vector<Setting> t = [] {
+        auto all = settingTable();
+        all.insert (all.end(), matrixTable().begin(), matrixTable().end());
+        return all;
+    }();
+    return t;
+}
+
 // the decompressed body of a state the engine can read, or nothing
 std::optional<std::vector<std::uint8_t>> settingsBody (const std::vector<std::uint8_t>& state)
 {
@@ -4749,12 +4793,12 @@ std::size_t settingOffset (int index) noexcept
 
 const std::vector<Setting>& settings()
 {
-    return settingTable();
+    return allSettings();
 }
 
 std::optional<int> settingValue (const std::vector<std::uint8_t>& state, int setting)
 {
-    const auto& t = settingTable();
+    const auto& t = allSettings();
     if (setting < 0 || setting >= (int) t.size())
         return std::nullopt;
     const auto body = settingsBody (state);
@@ -4770,7 +4814,7 @@ std::optional<int> settingValue (const std::vector<std::uint8_t>& state, int set
 
 bool setSetting (std::vector<std::uint8_t>& state, int setting, int value)
 {
-    const auto& t = settingTable();
+    const auto& t = allSettings();
     if (setting < 0 || setting >= (int) t.size())
         return false;
     auto body = settingsBody (state);

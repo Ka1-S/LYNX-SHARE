@@ -12501,7 +12501,12 @@ TEST (sytrus_main_settings)
         return -1;
     };
     const int master = find ("Master level"), unison = find ("Unison"), porta = find ("Porta"), live = find ("Live oversampling");
-    CHECK (master >= 0 && unison >= 0 && porta >= 0 && live >= 0 && S.size() == 25u);
+    // 25 main controls, then the matrix (round 172a): FM 9 × 9 (sources, PAN, FX, OUT) and RM 9 × 6
+    CHECK (master >= 0 && unison >= 0 && porta >= 0 && live >= 0 && S.size() == 25u + 81u + 54u);
+    const int out1 = find ("Op 1 out"), fm21 = find ("FM op 2 to op 1"), rm3f2 = find ("RM op 3 to filter 2");
+    CHECK (out1 >= 0 && fm21 >= 0 && rm3f2 >= 0 && find ("RM op 1 pan") < 0);
+    CHECK (out1 >= 0 && S[(std::size_t) out1].index == 3 + 8 && S[(std::size_t) rm3f2].index == 3 + 81 + 9 * 7 + 2);
+    CHECK (lynx::sytrus::settingValue (blob, out1) == 256 && lynx::sytrus::settingValue (blob, fm21) == 0);
     CHECK (lynx::sytrus::settingValue (blob, master) == 128 && lynx::sytrus::settingValue (blob, unison) == 3);
     CHECK (lynx::sytrus::settingValue (blob, porta) == 0 && lynx::sytrus::settingValue (blob, find ("Mod X")) == 256);
     CHECK (! lynx::sytrus::settingValue (blob, -1) && ! lynx::sytrus::settingValue (blob, (int) S.size()));
@@ -12529,6 +12534,9 @@ TEST (sytrus_main_settings)
     CHECK (lynx::sytrus::setSetting (edited, porta, 1) && lynx::sytrus::settingValue (edited, porta) == 1);
     CHECK (lynx::sytrus::setSetting (edited, live, 2) && lynx::sytrus::settingValue (edited, live) == 2);
     CHECK (lynx::sytrus::parsePatch (edited) != nullptr);
+    // a matrix cell: op 2 modulates op 1 (FM), clamped to ±256; the patch stays playable
+    CHECK (lynx::sytrus::setSetting (edited, fm21, 999) && lynx::sytrus::settingValue (edited, fm21) == 256);
+    CHECK (lynx::sytrus::settingValue (edited, out1) == 256 && lynx::sytrus::parsePatch (edited) != nullptr);
 }
 
 TEST (harmor_effects_rack)
@@ -15341,6 +15349,7 @@ TEST (slayer_and_fruity_dance_import)
 #include "UiPolish2Tests.inc"
 #include "UiToolbarTests.inc"
 #include "LuxeVerbTests.inc"
+#include "Parity172bTests.inc"
 #include "ConvolverTests.inc"
 
 // --- Newtone / Newtime (REA_rodada73) -----------------------------------------------------------------------------
@@ -17249,3 +17258,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issue32dTests.inc"
 #include "FlpExport171eTests.inc"
 #include "Tp172cTests.inc"
+#include "Layout172aTests.inc"

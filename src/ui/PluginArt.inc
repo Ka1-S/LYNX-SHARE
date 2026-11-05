@@ -92,6 +92,7 @@ struct Theme
     bool thumbPointer = false;      // fader thumbs carry the pointer colour (else the accent)
     // round tp172c: the label of an OFF toggle (transparent = the global disabled text; a light panel needs its own)
     Colour offLabelCol { 0 };
+    bool noValueArc = false;        // round tp172c: knobs show their value by the pointer on a printed scale only (consoles)
 
     // round tp172d: the flat "hardware graphic" look of the third-party originals (Valhalla, Soundtoys...) — solid
     // colour fields, bold outlines, big plain type; every field defaults to the look above
@@ -105,6 +106,10 @@ struct Theme
     float captionScale = 1.0f;      // caption and value type size (big, plain labels)
     Colour barCol { 0 };            // barSlider's fill (transparent = the accent)
     Colour headerCol { 0 };         // a solid header bar (transparent = the canvas' gradient); for light themes
+    float cornerScale = 1.0f;       // flat sections' corner radius × this (the originals' rounded "pods": 3 … 5)
+    Colour sectionFills[4] {};      // flat sections: the n-th top-level section's own fill (transparent = panelTop)
+    bool hwKeys = false;            // option tabs and switches as square hardware keys (grey caps, lit in the accent)
+    float cheek = 0.0f;             // the hardware canvases' wooden cheeks, px (0 = their own default)
 
     // the moving layer (ArtLayer): motes and/or a painter for the stage strip; all null/0 = a still theme
     int motes = 0;
@@ -366,13 +371,42 @@ inline bool headerBar (juce::Graphics& g, Rectangle<float> a, Colour)
     return true;
 }
 
+inline int sectionOrdinal = -1; // round tp172d: the section being drawn, in layout order (sectionFills)
+
+// round tp172d: a square hardware key — a bevelled grey cap, lit in the accent (the originals' style and switch keys)
+inline void hwKey (juce::Graphics& g, Rectangle<float> r, bool lit, bool hover)
+{
+    const auto& p = pal();
+    const auto corner = juce::jmin (3.0f, r.getHeight() * 0.12f);
+    g.setColour (Colours::black.withAlpha (0.55f));
+    g.fillRoundedRectangle (r.translated (0.0f, 1.5f).expanded (1.0f), corner + 1.0f);
+    const auto top = lit ? p.accent.brighter (0.25f) : Colour (0xff9b9c9e).brighter (hover ? 0.12f : 0.0f);
+    const auto bottom = lit ? p.accent.darker (0.35f) : Colour (0xff4f5053);
+    g.setGradientFill (ColourGradient (top, 0.0f, r.getY(), bottom, 0.0f, r.getBottom(), false));
+    g.fillRoundedRectangle (r, corner);
+    const auto face = r.reduced (juce::jmax (2.0f, r.getHeight() * 0.12f));
+    g.setGradientFill (ColourGradient (bottom.interpolatedWith (top, 0.75f), 0.0f, face.getY(), bottom.interpolatedWith (top, 0.35f), 0.0f, face.getBottom(), false));
+    g.fillRoundedRectangle (face, corner * 0.6f);
+    g.setColour (Colours::white.withAlpha (lit ? 0.45f : 0.3f));
+    g.drawLine (r.getX() + corner, r.getY() + 0.8f, r.getRight() - corner, r.getY() + 0.8f, 1.0f);
+    g.setColour (Colour (0xff141414));
+    g.drawRoundedRectangle (r, corner, 1.0f);
+    if (lit && ! reduced) bloom (g, r.getCentre(), r.getWidth() * 0.9f, p.accent, 0.16f);
+}
+
 inline bool section (juce::Graphics& g, Rectangle<float> a, float corner, bool raised, Colour)
 {
     const auto& t = th();
     const auto& p = t.pal;
     if (t.flatSections) // round tp172d: a solid field with a bold outline
     {
-        g.setColour (raised ? p.panelTop.brighter (0.06f) : p.panelTop);
+        corner *= t.cornerScale;
+        const auto own = sectionOrdinal >= 0 && sectionOrdinal < 4 && t.sectionFills[sectionOrdinal].getAlpha() > 0;
+        const auto fill = own ? t.sectionFills[sectionOrdinal] : (raised ? p.panelTop.brighter (0.06f) : p.panelTop);
+        if (own) // a printed colour field: a soft top-down sheen
+            g.setGradientFill (ColourGradient (fill.brighter (0.08f), 0.0f, a.getY(), fill.darker (0.12f), 0.0f, a.getBottom(), false));
+        else
+            g.setColour (fill);
         g.fillRoundedRectangle (a, corner);
         if (t.sectionDeco != nullptr) t.sectionDeco (g, a, corner);
         if (t.rimWidth > 0.0f)
@@ -612,25 +646,28 @@ inline void knob (juce::Graphics& g, Rectangle<float> area, const KnobLook& k)
     const auto r = scale ? ringR - 4.0f : ringR;
 
     // the track and the lit value arc
-    g.setColour (p.track.withAlpha (k.enabled ? 1.0f : 0.6f));
-    g.strokePath (arc (c, r, arcStart, arcStart + arcRange), juce::PathStrokeType (t, juce::PathStrokeType::curved, th0.buttTrack ? juce::PathStrokeType::butt : juce::PathStrokeType::rounded));
-    if (std::abs (to - from) > 0.002f)
+    if (! th0.noValueArc)
     {
-        const auto v = arc (c, r, from, to);
-        if (fx && k.enabled && th0.arcGlow > 0.0f)
+        g.setColour (p.track.withAlpha (k.enabled ? 1.0f : 0.6f));
+        g.strokePath (arc (c, r, arcStart, arcStart + arcRange), juce::PathStrokeType (t, juce::PathStrokeType::curved, th0.buttTrack ? juce::PathStrokeType::butt : juce::PathStrokeType::rounded));
+        if (std::abs (to - from) > 0.002f)
         {
-            g.setColour (lit.withAlpha (th0.arcGlow));
-            g.strokePath (v, stroke (t * th0.arcGlowWidth));
+            const auto v = arc (c, r, from, to);
+            if (fx && k.enabled && th0.arcGlow > 0.0f)
+            {
+                g.setColour (lit.withAlpha (th0.arcGlow));
+                g.strokePath (v, stroke (t * th0.arcGlowWidth));
+            }
+            if (th0.twoTone)
+                g.setGradientFill (ColourGradient (lit2, c.x - r, c.y + r, lit, c.x + r, c.y - r, false));
+            else
+                g.setColour (lit);
+            g.strokePath (v, stroke (t));
         }
-        if (th0.twoTone)
-            g.setGradientFill (ColourGradient (lit2, c.x - r, c.y + r, lit, c.x + r, c.y - r, false));
-        else
-            g.setColour (lit);
-        g.strokePath (v, stroke (t));
     }
 
-    // the cap
-    const auto capR = juce::jmax (3.0f, r - t * (thin ? 2.4f : 1.6f));
+    // the cap (round tp172c: without the arc it fills the scale, a console knob)
+    const auto capR = juce::jmax (3.0f, th0.noValueArc ? r + t * 0.2f : r - t * (thin ? 2.4f : 1.6f));
     const auto cap = Rectangle<float> (capR * 2.0f, capR * 2.0f).withCentre (c);
     if (fx)
     {
@@ -846,6 +883,9 @@ juce::Colour valueColour (bool hot)
     return hot ? theme::colour::textPrimary : juce::Colour (0xffd3d6dd);
 }
 float captionScale() { return currentStyle == Style::themed ? artkit::th().captionScale : 1.0f; }
+bool hwKeys() { return currentStyle == Style::themed && artkit::th().hwKeys; }
+void hwKey (juce::Graphics& g, juce::Rectangle<float> r, bool lit, bool hover) { artkit::hwKey (g, r, lit, hover); }
+void setSectionOrdinal (int ordinal) { artkit::sectionOrdinal = ordinal; }
 
 Style baseStyleOf (Art a) { return a == Art::none ? Style::glow : artkit::themeOf (a).base; }
 juce::Colour artAccent (Art a) { return a == Art::none ? colour::crimson : artkit::palette (a).accent; }

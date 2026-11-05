@@ -6471,7 +6471,9 @@ private:
         offline.setSong (std::move (song));
         offline.dispatchPendingMessages();
         const bool facet = kind == lynx::EffectKind::facetEq;
-        const bool pro = lynx::ProEditorWindows::handles (kind);
+        // (Ember in its Classic voicing: the Classic panel, as the mixer opens it)
+        const bool pro = lynx::ProEditorWindows::handles (kind)
+                         && ! (kind == lynx::EffectKind::ember && fx.params[(std::size_t) lynx::mixsuite::ember::voicing] > 0.5f);
         auto editor = facet ? lynx::makeFacetEqEditor (offline, 1, 0, false)
                             : pro ? lynx::makeProEditor (offline, 1, 0, true) : lynx::makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
         if (editor == nullptr)

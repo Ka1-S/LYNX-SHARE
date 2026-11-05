@@ -1262,7 +1262,9 @@ protected:
         s.buildSec = 0.02 + 0.3 * size * (1.0 - p[3] * 0.5);
         s.shape = 0;
         s.lineScale = m.scale * (0.3 + 1.2 * size);
-        s.rt60 = (1.5 + 12.5 * size) * m.rtScale * std::min (3.0, 1.0 + 2.8 * p[2] * p[2]); // feedback lengthens the tail (§5)
+        // round tp172d: the reference's tail barely follows Size at feedback 0 (music / impulse, Size 30 % and 50 %: RT
+        // ≈ 7.6 and 8 s; ours was 4.7 and 6.7 s)
+        s.rt60 = (4.5 + 7.0 * size) * m.rtScale * std::min (3.0, 1.0 + 2.8 * p[2] * p[2]); // feedback lengthens the tail (§5)
         s.earlyLevel = 0.45; // it speaks at once
         s.earlySec = 0.03;
         s.earlyDiffusion = p[3];
@@ -1277,7 +1279,10 @@ protected:
         s.loopBandwidth = dark ? 5000.0 : 0.0;
         s.modRateHz = 0.05 + 4.95 * p[7];
         s.modDepthMs = 1.2 * p[8] / std::sqrt (std::max (0.3, s.modRateHz));
-        s.gain = dark ? 0.75 : 0.95;
+        // round tp172d: without feedback the reference is quieter on music and drums (Mix 100 %: −4…−8 dB against
+        // ours; at Feedback 50 % within 1 dB) but not on its impulse (the shimmer is not linear: the two disagree),
+        // so the trim is −3 dB, fading out by half feedback
+        s.gain = (dark ? 0.75 : 0.95) * std::pow (10.0, -3.0 * (1.0 - std::min (1.0, 2.0 * (double) p[2])) / 20.0);
         if (m.stereo == 2)
             s.crossFeed = 0.0, s.splitSides = true; // the two sides stay apart
     }

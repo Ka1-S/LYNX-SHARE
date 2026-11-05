@@ -149,6 +149,7 @@ struct Settings
     // processes (1 − m) itself ± m side). Off = the mid signal (her states)
     bool proLink = false, linkSide = false;
     double link = 1.0, linkOnly = 0.0;
+    bool gate = true; // round tp172b: false = the reference's Allround mode (no single-vocal gate, the same level law)
 };
 
 class DeEsser

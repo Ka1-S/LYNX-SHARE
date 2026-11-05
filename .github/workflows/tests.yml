@@ -15,6 +15,14 @@ env:
   JUCE_SHA256: 0effe9823a6fd8a4f98e5c08be7d308350e417b2d15dcf34011e778fefbbf005
 
 jobs:
+  server:
+    name: Server limits
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: sudo apt-get update -q && sudo apt-get install -y -q python3-aiohttp
+      - run: /usr/bin/python3 -m unittest discover -s server/tests -p 'test_*.py' -v
+
   core:
     name: Core (${{ matrix.os }}, ${{ matrix.compiler }})
     runs-on: ${{ matrix.os }}
