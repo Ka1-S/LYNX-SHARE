@@ -6,6 +6,7 @@
 #include "core/Effects.h"
 #include "core/FlEffects.h"
 #include "core/GrossBeat.h"
+#include "core/HardcoreFx.h"
 #include "core/Harmless.h"
 #include "core/HarmlessFx.h"
 #include "core/LynxBanks.h"
@@ -395,7 +396,15 @@ std::optional<EffectSlot> makeSlot (EffectKind kind, const FlAccess& access, dou
                 if (slot && slot->kind == kind)
                 {
                     if (kind == EffectKind::grossBeat)
+                    {
                         grossbeat::setPpq (slot->state, 96);
+                        // round 173d: FL's Default preset keeps every slot empty (FL fills a new instance from its default
+                        // bank, not in the preset): with it every slot picked in the editor, and the attack / release /
+                        // tension / mix knobs, did nothing. A new instance starts on LYNX's factory slots, as without FL
+                        const auto names = grossbeat::slotNames (slot->state, false);
+                        if (std::all_of (names.begin(), names.end(), [] (const std::string& n) { return n.empty(); }))
+                            slot->state = grossbeat::factoryContainer();
+                    }
                     return slot;
                 }
             }
@@ -415,6 +424,22 @@ std::optional<EffectSlot> newEffect (EffectKind kind, const FlAccess& access, do
     if (effectEngine (kind) != nullptr)
         return makeSlot (kind, access, bpm);
     auto slot = makeEffectSlot (kind);
+    // round 173d: a new Hardcore carries the cabinet impulses of the user's FL installation, as one imported from an
+    // .flp does (hardcore::fromFl); before, its Cabinet menu did nothing on a new instance. Without FL it has none.
+    if (kind == EffectKind::hardcore && access.readFile)
+    {
+        std::vector<std::pair<int, std::vector<std::uint8_t>>> files;
+        for (int c = 1; c <= hardcore::numCabinets; ++c)
+        {
+            const auto p = resolveFlPath ("%FLStudioFactoryData%\\" + hardcore::cabinetPath (c), access.roots);
+            if (p.empty() || (access.fileExists && ! access.fileExists (p)))
+                continue;
+            if (auto b = access.readFile (p); ! b.empty())
+                files.emplace_back (c, std::move (b));
+        }
+        if (! files.empty())
+            slot.state = hardcore::packCabinets (files);
+    }
     // round tp172d: an Ember added by hand opens on its Classic panel (the hardware saturator, its role); its multiband
     // page is one click away ("Advanced"). makeEffectSlot's default (the multiband engine) stays, for loaded projects
     if (kind == EffectKind::ember)
