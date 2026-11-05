@@ -17057,6 +17057,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Typeahead170bTests.inc"
 #include "PlugQ170cTests.inc"
 #include "Toolbar170eTests.inc"
+#include "Rack170aTests.inc"
 #include "Inst169hTests.inc"
 #include "Crash169gTests.inc"
 #include "Wfqa170hTests.inc"

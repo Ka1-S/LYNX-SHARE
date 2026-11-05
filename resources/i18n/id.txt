@@ -7137,3 +7137,11 @@ countries: id
 
 # round 170e3: the idle hint on one line
 "Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "Arahkan ke apa saja untuk bantuan  [F1] pintasan  [F5]-[F9] jendela  [Space] putar/berhenti"
+# --- round 170a (Channel Rack cut/copy/paste, note names on every key)
+"Cut the selected channels' steps" = "Potong langkah kanal yang dipilih"
+"Copy the selected channels' steps" = "Salin langkah kanal yang dipilih"
+"Paste steps into the selected channels" = "Tempel langkah ke kanal yang dipilih"
+"Note names on every key" = "Nama not di setiap tuts"
+"Note names on every Piano roll key" = "Nama not di setiap tuts Piano Roll"
+"[LMB] drag up / down: step through the patterns" = "[LMB] seret ke atas / bawah: telusuri pattern"
+"Playhead column in the Channel Rack" = "Kolom playhead di Channel Rack"

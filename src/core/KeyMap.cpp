@@ -150,6 +150,10 @@ std::vector<Action> makeActions()
         { "rack.selectAll", TR_NOOP ("Select all channels"), Context::channelRack, { chord ('A', ctrl) } },
         { "rack.clone", TR_NOOP ("Clone the selected channels"), Context::channelRack, { chord ('C', alt) } },
         { "rack.deleteSelected", TR_NOOP ("Delete the selected channels"), Context::channelRack, { chord (del, alt) } },
+        // FL's Edit › Cut / Copy / Paste with the rack focused (REA round 170a §1): the selected channels' steps and notes
+        { "rack.cut", TR_NOOP ("Cut the selected channels' steps"), Context::channelRack, { chord ('X', ctrl) } },
+        { "rack.copy", TR_NOOP ("Copy the selected channels' steps"), Context::channelRack, { chord ('C', ctrl) } },
+        { "rack.paste", TR_NOOP ("Paste steps into the selected channels"), Context::channelRack, { chord ('V', ctrl) } },
         { "rack.sendToInserts", TR_NOOP ("Send the selected channels to free mixer inserts"), Context::channelRack, { chord ('L', ctrl) } },
         { "rack.graphEditor", TR_NOOP ("Step graph lanes on/off"), Context::channelRack, { chord ('K', ctrl) } },
         { "rack.pianoRollView", TR_NOOP ("Piano-roll view of all channels on/off"), Context::channelRack, {} },
