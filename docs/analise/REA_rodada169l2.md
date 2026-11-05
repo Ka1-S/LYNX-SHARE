@@ -89,5 +89,9 @@ Code: `core/NativeEngines.cpp` (`presetCandidates`), `core/PoiZone.cpp` (`Plugin
 
 ## Where I stopped
 
-- Done: §1 code, §2 FL render + comparison, §3 fix, tests written.
-- In progress: build-local + FL-data tests, then the landing train.
+- Done: §1 code, §2 FL render + comparison, §3 fix, tests. The pitch audits (`left167_sounding_notes…`,
+  `mono168l_every_engine…`, `issue14` pitch audit) play the engine's `Default.*` preset they were written with
+  (`natives142::writtenWith`): the database patches (Sytrus "Supersaw", Harmor, Toxic, PoiZone's echoes) defeat the
+  autocorrelation estimate, as Morphine's did in round 169l; the host pitch path they test is the same for every patch.
+  Whole suite with FL's Data dir: 2 439 575 checks, 0 failures.
+- In progress: merge of origin/main (tb169g2, rack170a, patblocks170f…), its build + tests, then the landing train.
