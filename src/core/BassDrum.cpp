@@ -661,10 +661,13 @@ private:
         if (! v.active)
             return;
         const double ratio = std::min (std::max ((double) v.ratio, 0.25), 4.0) * (44100.0 / (double) v.fs);
+        // 512 output samples fill the DLL's 2048-sample buffer at its largest ratio (4, at 44.1 kHz and up). Below 44.1 kHz
+        // the ratio goes past 4 and a pass would overrun it, so LYNX takes fewer (found by tools/genfuzz, round 170i2)
+        const int most = std::clamp ((int) (2048.0 / ratio), 1, 512);
         int done = 0, rem = n;
         while (rem > 0)
         {
-            const int m = std::min (rem, 512);
+            const int m = std::min (rem, most);
             rem -= m;
             int st = 0;
             const int need = v.res.prepare (ratio, m, st);

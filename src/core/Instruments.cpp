@@ -1698,8 +1698,10 @@ public:
             if (index < 0 || index >= slices.count)
                 return;
 
-            first = std::floor (total * slices.starts[(std::size_t) index]);
-            last = index + 1 < slices.count ? std::max (first, std::floor (total * slices.starts[(std::size_t) index + 1]) - 1.0) : total;
+            // the starts are fractions of the sample (floats): the nearest frame, as a float a hair under p/total made
+            // every Slicex slice start one frame early (round 170i2, REA_rodada170i §9)
+            first = std::round (total * slices.starts[(std::size_t) index]);
+            last = index + 1 < slices.count ? std::max (first, std::round (total * slices.starts[(std::size_t) index + 1]) - 1.0) : total;
             sliced = true;
         }
         const auto base = baseRate (*data) / clipStretch;

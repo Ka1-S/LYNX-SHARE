@@ -530,15 +530,18 @@ void splitDrumChannel (Song& song, int channel, const std::vector<DrumPad>& pads
         def.plugin = {};
         const auto single = pad.layers.size() == 1;
         def.samplePath = single ? pad.layers.front().path : std::string();
-        def.zones = single ? std::vector<SampleZone> {} : pad.layers;
+        // the pad and layer gains ride on the zones (FPC's law goes above unity: the channel volume curve would clip
+        // them), the channel keeps its own volume (round 170i2)
+        def.zones = pad.layers;
         for (auto& z : def.zones)
+        {
             z.rootKey = 60, z.lowKey = 0, z.highKey = 127; // the pad plays at the sample's pitch
-        // volume: channel gain × pad gain (× the single layer's), mapped back to the channel curve
-        const auto gain = channelGain (original.volume) * pad.gain * (single ? pad.layers.front().gain : 1.0f);
-        def.volume = std::clamp ((float) (std::log (10.0 * gain + 1.0) / std::log (11.0)), 0.0f, 1.0f);
+            z.gain *= pad.gain;
+        }
         def.pan = std::clamp (original.pan + pad.pan, -1.0f, 1.0f);
         def.sampler = {};
-        def.sampler.pitch = std::clamp (original.sampler.pitch + pad.tune + (single ? pad.layers.front().tune : 0.0f), -24.0f, 24.0f);
+        def.sampler.pitch = std::clamp (original.sampler.pitch + pad.tune, -24.0f, 24.0f);
+        def.sampler.flVelocityLaw = true; // FL's host hands FPC the velocity as Init.Vol (REA_rodada170i §7)
         // kit-specific cut groups (don't mix with other channels' groups)
         def.cutGroup = pad.cutGroup > 0 ? 1000 * (channel + 1) + pad.cutGroup : 0;
         def.cutBy = pad.cutBy > 0 ? 1000 * (channel + 1) + pad.cutBy : 0;
