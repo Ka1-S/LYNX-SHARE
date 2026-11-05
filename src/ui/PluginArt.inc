@@ -1048,10 +1048,18 @@ juce::String artSelfTest()
         }
         expect (clipped == 0, "a plugin name clipped in its narrowest header box");
         expect (twoLines > 0, "the Fruity prefix line");
-        titleText (g, { 66.0f, 0.0f, 400.0f, 26.0f }, "Fruity Blood Overdrive", juce::Colours::red);
-        expect (lastTitleFit().lines == 1 && ! lastTitleFit().clipped && lastTitleFit().size >= 12.0f, "a wide box keeps the one-line name");
-        titleText (g, { 66.0f, 0.0f, 120.0f, 26.0f }, "Fruity Blood Overdrive", juce::Colours::red);
-        expect (lastTitleFit().lines == 2 && ! lastTitleFit().clipped, "a narrow box puts Fruity above the name");
+        for (const auto st : { Style::glow, Style::hardware })
+        {
+            const StyleScope scope (st);
+            titleText (g, { 66.0f, 0.0f, 400.0f, 26.0f }, "Fruity Blood Overdrive", juce::Colours::red);
+            expect (lastTitleFit().lines == 1 && ! lastTitleFit().clipped && lastTitleFit().size >= 12.0f, "a wide box keeps the one-line name");
+            // the narrowest box the name may get (titleMinWidth): too narrow for one line at the smallest size in any style
+            titleText (g, { 66.0f, 0.0f, titleMinWidth ("Fruity Blood Overdrive", 26.0f), 26.0f }, "Fruity Blood Overdrive", juce::Colours::red);
+            const auto f = lastTitleFit();
+            if (f.lines != 2 || f.clipped)
+                errors.add ("a narrow box puts Fruity above the name (" + juce::String (styleName (st)) + ": lines " + juce::String (f.lines) + ", size "
+                            + juce::String (f.size, 1) + ", need " + juce::String (f.need, 1) + ")");
+        }
     }
     setArtMotion (keptMotion);
     return errors.isEmpty() ? juce::String ("OK") : "ERROR " + errors.joinIntoString (", ");
