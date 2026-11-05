@@ -51,6 +51,7 @@
 #include "ui/DanceView.h"
 #include "ui/PluginPresetMenu.h"
 #include "ui/PluginWindow.h"
+#include "ui/PluginThumbs.h"
 #include "ui/ClipProperties.h"
 #include "ui/NewProjectDialog.h"
 #include "ui/PluginMonitorWindow.h"
@@ -1016,6 +1017,28 @@ public:
             ok = ok && shoot (lynx::makeChannelPrecomputePanel (shotEngine, 0), "-precompute.png");
             ok = ok && shoot (lynx::makeSettingsPanel (shotEngine, lynx::SettingsPage::project), "-project.png");
             setApplicationReturnValue (ok ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--pluginthumbs"))
+        {
+            // LYNX.exe --pluginthumbs <folder> [key,key...]: the Plugin picker's pictures of LYNX's own plugins (round 171c,
+            // ui/PluginThumbs.h), each editor drawn off-screen and kept as <folder>/<name>.png; the picker starts this in
+            // the background when pictures are missing. One line per plugin on stdout.
+            const auto i = args.indexOf ("--pluginthumbs");
+            lynx::crashguard::quietCrashReports();
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            juce::StringArray only;
+            if (i + 2 < args.size() && ! args[i + 2].startsWith ("--"))
+                only.addTokens (args[i + 2].unquoted(), ",", "");
+            const auto t0 = juce::Time::getMillisecondCounterHiRes();
+            const auto drawn = lynx::pluginthumbs::renderNative (juce::File (args[i + 1].unquoted()), only, [] (const juce::String& line) {
+                std::printf ("%s\n", line.toRawUTF8());
+                std::fflush (stdout);
+            });
+            std::printf ("drawn %d in %.0f ms\n", drawn, juce::Time::getMillisecondCounterHiRes() - t0);
+            setApplicationReturnValue (0);
             quit();
             return;
         }
@@ -4605,6 +4628,20 @@ private:
         };
         run->steps.push_back ({ "mixer fader drag, playing, rebuild per move (before 171c)", {}, [faderMove] (int f) { faderMove (false, f); }, 60 });
         run->steps.push_back ({ "mixer fader drag, playing, live levels (171c)", {}, [faderMove, this] (int f) { faderMove (true, f); if (f == 59) engine->flushLevels(); }, 60 });
+        // F8's Plugin picker (round 171c): opening it (the "show" time = building it + its first paint), its pictures
+        // loading while it stays open, pointing at the tiles, then closing it
+        run->steps.push_back ({ "plugin picker open (F8)", [ui] { ui->togglePluginPickerForSnapshot(); }, {}, 2500 });
+        run->steps.push_back ({ "plugin picker, pointing at tiles", {}, [this, ui] (int f) {
+                                   if (auto* picker = ui->pluginPickerForSnapshot(); picker != nullptr && mainWindow->getPeer() != nullptr)
+                                   {
+                                       const auto p = picker->localPointToGlobal (juce::Point<int> (60 + (f * 37) % juce::jmax (1, picker->getWidth() - 120),
+                                                                                                      90 + (f * 53) % juce::jmax (1, picker->getHeight() - 200)));
+                                       const auto local = mainWindow->getPeer()->globalToLocal (p.toFloat());
+                                       mainWindow->getPeer()->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, local, {}, 0.0f, 0.0f,
+                                                                               juce::Time::currentTimeMillis());
+                                   }
+                               }, 60 });
+        run->steps.push_back ({ "plugin picker close", [ui] { ui->togglePluginPickerForSnapshot(); }, {}, 300 });
         run->steps.push_back ({ "playlist maximised, playing", [ui] { ui->selectTabForSnapshot (2); }, {}, 3000 });
         run->steps.push_back ({ "playlist scroll down/up", [this] { engine->stop(); },
                                  [wheelAt, ui, none] (int f) { wheelAt (ui->getPlaylistForSnapshot(), 0.0f, f < 40 ? -0.15f : 0.15f, none); }, 80 });

@@ -7120,6 +7120,13 @@ countries: id
 "Number of steps" = "Jumlah langkah"
 "Dual" = "Ganda"
 "Align all channel editors" = "Ratakan semua editor channel"
+
+# Round 171c: the Plugin picker
+"Plugin picker: every plugin as a picture; drag one onto the Channel Rack or the Mixer (right-click: quick-add palette)" = "Pemilih plugin: setiap plugin sebagai gambar; seret satu ke Channel Rack atau Mixer (klik kanan: palet tambah cepat)"
+"double-click, right-click or Enter: a new channel; drag it onto the Channel Rack (onto a channel: replaces its instrument)" = "klik ganda, klik kanan atau Enter: channel baru; seret ke Channel Rack (ke sebuah channel: mengganti instrumennya)"
+"double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "klik ganda, klik kanan atau Enter: ke insert mixer yang dipilih; seret ke insert mixer atau salah satu slotnya"
+"point at a category to show it; click it to open it in the Browser" = "arahkan ke kategori untuk menampilkannya; klik untuk membukanya di Browser"
+"start to type to search plugins...." = "mulai mengetik untuk mencari plugin...."
 "Disconnect" = "Putuskan"
 "Inputs" = "Input"
 "Outputs" = "Output"

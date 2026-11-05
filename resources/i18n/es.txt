@@ -7120,6 +7120,13 @@ countries: es mx ar co cl pe ve
 "Number of steps" = "Número de pasos"
 "Dual" = "Doble"
 "Align all channel editors" = "Alinear todos los editores de canal"
+
+# Round 171c: the Plugin picker
+"Plugin picker: every plugin as a picture; drag one onto the Channel Rack or the Mixer (right-click: quick-add palette)" = "Selector de plugins: cada plugin como imagen; arrastra uno al Channel Rack o al Mezclador (clic derecho: paleta de añadido rápido)"
+"double-click, right-click or Enter: a new channel; drag it onto the Channel Rack (onto a channel: replaces its instrument)" = "doble clic, clic derecho o Enter: un canal nuevo; arrástralo al Channel Rack (sobre un canal: reemplaza su instrumento)"
+"double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "doble clic, clic derecho o Enter: en el insert del mezclador seleccionado; arrástralo a un insert del mezclador o a uno de sus slots"
+"point at a category to show it; click it to open it in the Browser" = "apunta a una categoría para mostrarla; haz clic para abrirla en el Navegador"
+"start to type to search plugins...." = "empieza a escribir para buscar plugins...."
 "Disconnect" = "Desconectar"
 "Inputs" = "Entradas"
 "Outputs" = "Salidas"

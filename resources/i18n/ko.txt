@@ -7120,6 +7120,13 @@ countries: kr
 "Number of steps" = "스텝 수"
 "Dual" = "듀얼"
 "Align all channel editors" = "모든 채널 편집기 정렬"
+
+# Round 171c: the Plugin picker
+"Plugin picker: every plugin as a picture; drag one onto the Channel Rack or the Mixer (right-click: quick-add palette)" = "플러그인 선택기: 모든 플러그인을 그림으로 표시; Channel Rack 또는 믹서로 드래그 (오른쪽 클릭: 빠른 추가 팔레트)"
+"double-click, right-click or Enter: a new channel; drag it onto the Channel Rack (onto a channel: replaces its instrument)" = "더블 클릭, 오른쪽 클릭 또는 Enter: 새 채널; Channel Rack으로 드래그 (채널 위: 그 악기를 교체)"
+"double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "더블 클릭, 오른쪽 클릭 또는 Enter: 선택한 믹서 인서트에; 믹서 인서트나 그 슬롯으로 드래그"
+"point at a category to show it; click it to open it in the Browser" = "카테고리를 가리키면 표시, 클릭하면 브라우저에서 열기"
+"start to type to search plugins...." = "입력하여 플러그인 검색...."
 "Disconnect" = "연결 해제"
 "Inputs" = "입력"
 "Outputs" = "출력"

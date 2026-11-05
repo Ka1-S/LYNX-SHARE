@@ -1549,6 +1549,11 @@ private:
 
 namespace FormulaControllerWindows
 {
+std::unique_ptr<juce::Component> makeEditor (AudioEngine& engine, int track, int slot)
+{
+    return std::make_unique<FormulaEditor> (engine, track, slot); // (the window's content: picker pictures)
+}
+
 void open (AudioEngine& engine, int track, int slot)
 {
     auto& open = formulaWindows();
