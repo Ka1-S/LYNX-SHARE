@@ -49,6 +49,9 @@ bool autogunStateUsable (const std::vector<std::uint8_t>& state);
 // An Ogun state of version 10…13 (FL's Plugin database Ogun is version 11) rewritten in version 14's layout, as Ogun's
 // own loader reads it (round 169l); newer or unreadable states unchanged. Keeps ogunParam / ogunSetParam valid.
 std::vector<std::uint8_t> ogunCurrentLayout (const std::vector<std::uint8_t>& state);
+// index 53 is the reverb's on switch (P[53]'s low byte); 64 / 65 are the delay's tempo-sync and on switches, the two
+// bytes after P (round 170i3: the editor had no switch for them, so a new channel's delay and reverb knobs did nothing)
+constexpr int ogunReverbOnIndex = 53, ogunDelayTempoIndex = 64, ogunDelayOnIndex = 65;
 std::optional<int> ogunParam (const std::vector<std::uint8_t>& state, int index);
 // Writes P[index] (the state is re-wrapped as zlib with stored blocks); false if the state can't be read
 bool ogunSetParam (std::vector<std::uint8_t>& state, int index, int value);

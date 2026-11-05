@@ -663,12 +663,32 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                                    ? previous->echoes[(std::size_t) channelOrigin[c]]
                                    : std::make_shared<channelmisc::NoteEcho>();
 
-    // (FL's Kepler keeps sounding when its cut group cuts it: FL's renders with and without "cut itself" are the same
-    // and both null against the engine fed every note to its end, REA_rodada165g-flbeta165k §3)
+    // FL's cut groups cut its Sampler / audio clip channels (REA_rodada167h) but not its plugin generators: Kepler
+    // keeps sounding when its group cuts it (REA_rodada165g-flbeta165k §3), and so do the 26 FL generators of
+    // REA_rodada170i3 §2 (FL's renders with and without "cut itself" are the same; Ogun's tail in 169l's project)
+    const auto flCutsIt = [] (InstrumentKind k) {
+        switch (k)
+        {
+            case InstrumentKind::sakura: case InstrumentKind::drumpad: case InstrumentKind::boobass:
+            case InstrumentKind::drumsynth: case InstrumentKind::harmless: case InstrumentKind::sytrus:
+            case InstrumentKind::harmor: case InstrumentKind::gms: case InstrumentKind::morphine:
+            case InstrumentKind::ogun: case InstrumentKind::minisynth: case InstrumentKind::dx10:
+            case InstrumentKind::kepler: case InstrumentKind::keplerExo: case InstrumentKind::poizone:
+            case InstrumentKind::fruitkick: case InstrumentKind::bassdrum: case InstrumentKind::toxic:
+            case InstrumentKind::threeosc: case InstrumentKind::autogun: case InstrumentKind::transistorbass:
+            case InstrumentKind::simsynth: case InstrumentKind::plucked: case InstrumentKind::beepmap:
+            case InstrumentKind::sawer: case InstrumentKind::flkeys: case InstrumentKind::granulizer:
+            case InstrumentKind::drumaxx: case InstrumentKind::slayer: case InstrumentKind::directwave:
+            case InstrumentKind::wavetraveller:
+                return false;
+            default:
+                return true;
+        }
+    };
     for (std::size_t c = 0; c < channels.size(); ++c)
         if (channels[c].cutGroup > 0)
             for (std::size_t d = 0; d < channels.size(); ++d)
-                if (channels[d].cutBy == channels[c].cutGroup && channels[d].instrument != InstrumentKind::kepler)
+                if (channels[d].cutBy == channels[c].cutGroup && flCutsIt (channels[d].instrument))
                 {
                     state->cutTargets[c].push_back ((int) d);
                     state->hasCutGroups = true;

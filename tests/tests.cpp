@@ -17042,6 +17042,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Gap169kAlignTests.inc"
 #include "FlQ170iTests.inc"
 #include "FlQ170i2Tests.inc"
+#include "FlQ170i3Tests.inc"
 #include "Speech168bTests.inc"
 #include "Design168pTests.inc"
 #include "Typing168tTests.inc"
