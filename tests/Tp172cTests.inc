@@ -1,6 +1,6 @@
 // Round tp172c: Ridge Strip's reference strips — SSL Native Channel Strip 2, 4K G and 4K B states load into the 4K
 // voicing (Channel Strip 2: E / G EQ = Brown / Black, its own "out" positions, no VCA colour; 4K G: Black, LMF ÷3 /
-// HMF ×3; 4K B: Brown, its compressor not modelled); the editor's three columns fit the window.
+// HMF ×3; 4K B: Brown, its stepped compressor read as the 4K's, slice 4); the editor's three columns fit the window.
 namespace tp172c
 {
 inline lynx::EffectSlot sslSlot (const std::string& plugin, const std::string& params)
@@ -50,8 +50,40 @@ TEST (ridge_channel_strip_2_state_translated_tp172c)
     CHECK (r::k4Voicing (p) && r::k4ColourIndex (p[r::k4Colour]) == 1);
     CHECK (std::abs (r::lmfHz (p[r::lmfFreq]) - 500.0) < 0.1 && std::abs (r::hmfHz (p[r::hmfFreq]) - 6000.0) < 1.0);
     p = tp172c::sslSlot ("SSL 4K B", "<PARAM id=\"LowEqGain\" value=\"6.0\"/><PARAM id=\"CompRatio\" value=\"3.0\"/>").params;
-    CHECK (r::k4Voicing (p) && r::k4ColourIndex (p[r::k4Colour]) == 0 && p[r::compRatio] == 0.0f);
+    CHECK (r::k4Voicing (p) && r::k4ColourIndex (p[r::k4Colour]) == 0);
     CHECK (std::abs (r::bandGainDb (p[r::lfGain], false) - 6.0) < 1e-4);
+}
+
+// slice 4: the 4K B's stepped compressor (K4B_dyn / K4B_mk on its trial) and the 4K compressor's blend between its
+// measured ratio nodes (a 10:1 dial acted like ~100:1: the 4K E's S4 setting was 6 dB too deep)
+TEST (ridge_4k_b_steps_and_ratio_blend_tp172c4)
+{
+    using namespace lynx;
+    namespace r = mixsuite::ridge;
+    auto p = tp172c::sslSlot ("SSL 4K B", "<PARAM id=\"CompRatio\" value=\"2.0\"/><PARAM id=\"CompThreshold\" value=\"-15.0\"/>"
+                                         "<PARAM id=\"CompAutoMakeUp\" value=\"1.0\"/><PARAM id=\"CompRelease\" value=\"3.0\"/>").params;
+    CHECK (r::k4Voicing (p) && r::ratio (p[r::compRatio]) > 1e6);                    // "4:1" = near-limiting here
+    CHECK (std::abs (r::eCompThresholdDb (p[r::compThreshold]) + 7.0) < 1e-3);       // its knee 8 dB higher
+    CHECK (p[r::autoMakeup] < 0.5f && std::abs (r::trimDb (p[r::output]) - 12.6) < 0.01); // its make-up, in the output
+    CHECK (std::abs (r::releaseSeconds (p[r::compRelease]) - 0.8) < 1e-3);           // step 3 = .8 s
+    p = tp172c::sslSlot ("SSL 4K B", "<PARAM id=\"CompRatio\" value=\"0.0\"/><PARAM id=\"SaturationIn\" value=\"1.0\"/>"
+                                     "<PARAM id=\"SaturationAmount\" value=\"50.0\"/>").params;
+    CHECK (p[r::compRatio] == 0.0f && p[r::k4Pre] > 0.5f && std::abs (r::k4MicDb (p[r::k4Mic]) - 27.5) < 0.01);
+
+    vmatch::echannel::Settings e;
+    e.model = 1;
+    e.autoMakeup = false;
+    e.compRatio = 10.0;
+    double last = 0.0;
+    for (const double t : { -20.0, -15.0, -12.0, -10.0, -8.0, -5.0, 0.0, 5.0 }) // deeper for every lower threshold
+    {
+        e.compThreshold = t;
+        const auto g = vmatch::echannel::compStaticGainDb (e, -9.0);
+        CHECK (t == -20.0 || g > last);
+        last = g;
+    }
+    e.compThreshold = -10.0;
+    CHECK (vmatch::echannel::compStaticGainDb (e, -9.0) > -19.5); // the trial: about -17 dB (S4); it gave -23
 }
 
 TEST (ridge_three_column_layout_fits_tp172c)
