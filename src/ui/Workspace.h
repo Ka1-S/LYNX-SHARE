@@ -64,6 +64,9 @@ public:
 
     // True while one of the detached windows is the active window.
     bool isDetachedWindowActive() const;
+    // Issue #62: after the main window came up (it was built hidden, behind the splash), the restored detached windows go
+    // back to their saved place (window managers place new windows themselves) and above the main window.
+    void restoreDetachedWindows();
 
     std::function<void (Panel)> onFocusChanged;
     std::function<bool (const juce::KeyPress&)> onKeyInDetachedWindow;
