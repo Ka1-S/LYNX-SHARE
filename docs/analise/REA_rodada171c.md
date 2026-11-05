@@ -148,6 +148,11 @@ FL [SHOT f0–f5]: FL's Master fader follows the mouse during playback with the 
   window. FL difference, on purpose: FL's tiles follow each editor's size (s02.png); LYNX uses one cell size.
   The generator Patcher's picture is now its node graph (it was the Sampler page). LYNX has no built-in light theme;
   the "light" screens use a custom theme (background #E8EAEE) through Theme settings' own file.
+- 2026-11-05 06:40: an editor with nothing in it yet (Newtone / Newtime without a sample, the empty Control Surface,
+  the Patcher graphs) shows the name tile instead of a dark box (edges < 2.2 %, or < 3 % with < 0.5 % bright pixels;
+  Harmor, the sparsest real editor, is 2.4 % / 0.86 %). final2 shots (1920 / 1280 × All / Synth classic × dark /
+  light) and the all-163 sheet are in `/mnt/e/lynx-work/picker171c/final2/`. **Waiting for the coordinator's / user's
+  review; not queued.**
 - Not done / LYNX differences left: LYNX's Browser has no per-category Plugin database folders, so a tab click opens
   Generators / Effects (FL opens the category folder); "Open plugin picker" targeted from Insert / Replace menus and
   mixer slots (FL's 0x70000000 / channel targets) not wired; hover Preview sound (FL: only when a .nfo has Preview=,
