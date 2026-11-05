@@ -2,6 +2,8 @@
 
 #include <utility>
 
+#include "core/HarmorControls.h"
+
 // (the i18n test scans the sources for TR_NOOP: captions below are translated by the editor)
 #ifndef TR_NOOP
 #define TR_NOOP(text) text
@@ -66,6 +68,19 @@ struct Page
         i.type = Item::vslider;
         i.x = x, i.y = y, i.w = w;
         i.h = caption != nullptr ? h + 14.0f : h;
+        i.param = param;
+        i.label = caption;
+        i.style = caption == nullptr ? (std::uint16_t) (style | noCaption) : style;
+        v.push_back (i);
+    }
+
+    // a horizontal slider in (x, y, w, h), its caption under it
+    void hslider (float x, float y, float w, float h, const char* param, const char* caption, std::uint16_t style = 0)
+    {
+        LayoutItem i;
+        i.type = Item::hslider;
+        i.x = x, i.y = y, i.w = w;
+        i.h = caption != nullptr ? h + 13.0f : h;
         i.param = param;
         i.label = caption;
         i.style = caption == nullptr ? (std::uint16_t) (style | noCaption) : style;
@@ -412,11 +427,11 @@ Layout simSynthLayout()
     return std::move (p.l);
 }
 // --- Ogun / Autogun (Ogun_x64.dll TSynthEditorForm, 560 × 640): master, modulation X/Y, timbre, unison, filter, the
-// output EQ, the articulator editor (the saved curves, not edited in LYNX) and the effects row ------------------------
+// output EQ and the effects row (the articulator editor's curves are not edited in LYNX) ------------------------------
 
 Layout ogunLayout (bool autogun)
 {
-    Page p (autogun ? "Autogun" : "Ogun", 560, 548);
+    Page p (autogun ? "Autogun" : "Ogun", 560, 436);
     p.section (4, 0, 92, 96, TR_NOOP ("Master"));
     p.fader (11, 18, 20, 58, "Master volume", TR_NOOP ("Vol"));
     p.fader (40, 18, 20, 58, "Coarse pitch", TR_NOOP ("Crs"), bipolar);
@@ -452,49 +467,47 @@ Layout ogunLayout (bool autogun)
     p.section (398, 100, 158, 116, TR_NOOP ("Filter"));
     p.knob (414, 130, 46, "Filter frequency", TR_NOOP ("Freq"), big);
     p.knob (488, 136, 36, "Filter resonance", TR_NOOP ("Res"));
-    // EQ: three bands (level faders, frequency and width knobs)
-    p.section (446, 220, 110, 210, TR_NOOP ("EQ"));
+    // EQ: three bands (level fader, frequency and width knobs), a strip across the page where FL has the articulator
+    // editor and the EQ column (round 172a: the articulators' curves are not editable in LYNX, so no panel for them)
+    p.section (4, 220, 552, 98, TR_NOOP ("EQ"));
     static const char* const lv[3] = { "EQ band 1 level", "EQ band 2 level", "EQ band 3 level" };
     static const char* const fq[3] = { "EQ band 1 freq", "EQ band 2 freq", "EQ band 3 freq" };
     static const char* const bw[3] = { "EQ band 1 width", "EQ band 2 width", "EQ band 3 width" };
+    static const char* const band[3] = { "1", "2", "3" };
     for (int k = 0; k < 3; ++k)
     {
-        const auto x = 458.0f + 32.0f * (float) k;
-        p.fader (x + 2, 240, 20, 80, lv[k], nullptr, bipolar);
-        p.knob (x, 330, 26, fq[k], TR_NOOP ("Freq"));
-        p.knob (x, 376, 26, bw[k], TR_NOOP ("Width"));
+        const auto x = 40.0f + 180.0f * (float) k;
+        p.fader (x, 240, 20, 56, lv[k], band[k], bipolar);
+        p.knob (x + 40, 250, 32, fq[k], TR_NOOP ("Freq"));
+        p.knob (x + 88, 250, 32, bw[k], TR_NOOP ("Width"));
     }
-    // the articulators (13 point-curve envelopes / LFOs / maps): FL's curve editor, kept as saved
-    p.section (4, 220, 438, 210, TR_NOOP ("Articulators"));
-    p.label (16, 300, 414, 16, TR_NOOP ("Envelopes, LFOs and maps keep the saved patch"), dim);
-    p.label (16, 324, 414, 16, TR_NOOP ("Plays FL Studio's own presets and data files: no LYNX presets for this engine"), dim);
     // EFFECTS: chorus, delay, reverb
-    p.section (4, 434, 168, 114, TR_NOOP ("Chorus"));
-    p.stepper (8, 466, 26, 22, "Chorus order", TR_NOOP ("Ord"), 9);
-    p.fader (38, 452, 18, 74, "Chorus depth", TR_NOOP ("Dep"));
-    p.fader (60, 452, 18, 74, "Chorus speed", TR_NOOP ("Spd"));
-    p.fader (82, 452, 18, 74, "Chorus delay", TR_NOOP ("Del"));
-    p.fader (104, 452, 18, 74, "Chorus spread", TR_NOOP ("Spr"));
-    p.fader (126, 452, 18, 74, "Chorus cross", TR_NOOP ("Crs"), bipolar);
-    p.fader (148, 452, 18, 74, "Chorus mix", TR_NOOP ("Mix"), bipolar);
-    p.section (176, 434, 160, 114, TR_NOOP ("Delay"));
-    p.stepper (184, 466, 40, 22, "Delay feedback mode", TR_NOOP ("Mode"), 3);
+    p.section (4, 322, 168, 114, TR_NOOP ("Chorus"));
+    p.stepper (8, 354, 26, 22, "Chorus order", TR_NOOP ("Ord"), 9);
+    p.fader (38, 340, 18, 74, "Chorus depth", TR_NOOP ("Dep"));
+    p.fader (60, 340, 18, 74, "Chorus speed", TR_NOOP ("Spd"));
+    p.fader (82, 340, 18, 74, "Chorus delay", TR_NOOP ("Del"));
+    p.fader (104, 340, 18, 74, "Chorus spread", TR_NOOP ("Spr"));
+    p.fader (126, 340, 18, 74, "Chorus cross", TR_NOOP ("Crs"), bipolar);
+    p.fader (148, 340, 18, 74, "Chorus mix", TR_NOOP ("Mix"), bipolar);
+    p.section (176, 322, 160, 114, TR_NOOP ("Delay"));
+    p.stepper (184, 354, 40, 22, "Delay feedback mode", TR_NOOP ("Mode"), 3);
     // (round 170i3: the delay and reverb run only with these switches on; FL's Plugin database Ogun: delay off, reverb on)
-    p.toggle (184, 496, 48, 16, "Delay on", TR_NOOP ("On"), boxed);
-    p.toggle (184, 518, 48, 16, "Delay tempo sync", TR_NOOP ("Tempo"), boxed);
-    p.fader (240, 452, 18, 74, "Delay feedback", TR_NOOP ("Fb"));
-    p.fader (262, 452, 18, 74, "Delay time", TR_NOOP ("Time"));
-    p.fader (284, 452, 18, 74, "Delay stereo offset", TR_NOOP ("Ofs"), bipolar);
-    p.fader (306, 452, 18, 74, "Delay volume", TR_NOOP ("Vol"), bipolar);
-    p.section (340, 434, 216, 114, TR_NOOP ("Reverb"));
-    p.stepper (346, 466, 26, 22, "Reverb color", TR_NOOP ("Col"), 4);
-    p.toggle (344, 496, 30, 16, "Reverb on", TR_NOOP ("On"), boxed);
+    p.toggle (184, 384, 48, 16, "Delay on", TR_NOOP ("On"), boxed);
+    p.toggle (184, 406, 48, 16, "Delay tempo sync", TR_NOOP ("Tempo"), boxed);
+    p.fader (240, 340, 18, 74, "Delay feedback", TR_NOOP ("Fb"));
+    p.fader (262, 340, 18, 74, "Delay time", TR_NOOP ("Time"));
+    p.fader (284, 340, 18, 74, "Delay stereo offset", TR_NOOP ("Ofs"), bipolar);
+    p.fader (306, 340, 18, 74, "Delay volume", TR_NOOP ("Vol"), bipolar);
+    p.section (340, 322, 216, 114, TR_NOOP ("Reverb"));
+    p.stepper (346, 354, 26, 22, "Reverb color", TR_NOOP ("Col"), 4);
+    p.toggle (344, 384, 30, 16, "Reverb on", TR_NOOP ("On"), boxed);
     static const std::pair<const char*, const char*> rev[8] = {
         { "Reverb low cut", TR_NOOP ("LC") }, { "Reverb high cut", TR_NOOP ("HC") }, { "Reverb predelay", TR_NOOP ("Pre") },
         { "Reverb room size", TR_NOOP ("Size") }, { "Reverb diffusion", TR_NOOP ("Diff") }, { "Reverb decay", TR_NOOP ("Dec") },
         { "Reverb high damping", TR_NOOP ("HD") }, { "Reverb wet", TR_NOOP ("Wet") } };
     for (int i = 0; i < 8; ++i)
-        p.fader (378.0f + 22.0f * (float) i, 452, 18, 74, rev[i].first, rev[i].second, i == 7 ? bipolar : 0);
+        p.fader (378.0f + 22.0f * (float) i, 340, 18, 74, rev[i].first, rev[i].second, i == 7 ? bipolar : 0);
     return std::move (p.l);
 }
 
@@ -631,7 +644,6 @@ Layout miniSynthLayout()
     p.knob (590, 280, 40, "Phaser frequency", TR_NOOP ("Freq"));
     on (5, from);
     p.name (8, 360, 200, 36, "MiniSynth");
-    p.label (220, 370, 489, 16, TR_NOOP ("Plays FL Studio's own presets and data files: no LYNX presets for this engine"), dim);
     return std::move (p.l);
 }
 
@@ -642,7 +654,6 @@ Layout miniSynthLayout()
 Layout gmsLayout()
 {
     Page p ("GMS", 1000, 440);
-    p.label (4, 420, 992, 16, TR_NOOP ("Plays FL Studio's own presets and data files: no LYNX presets for this engine"), dim);
     static const char* const fx[10] = { TR_NOOP ("Distortion"), TR_NOOP ("Crusher"), TR_NOOP ("Flanger"), TR_NOOP ("Phaser"), TR_NOOP ("Low pass"),
                                         TR_NOOP ("High pass"), TR_NOOP ("Delay"), TR_NOOP ("Reverb"), TR_NOOP ("Panner"), TR_NOOP ("Trancer") };
     p.l.pages.assign (fx, fx + 10);
@@ -793,12 +804,12 @@ Layout gmsLayout()
 }
 
 // --- Morphine (its skin, 886 × 552): the top bar (polyphony / transpose / fine, glide, velocity curve, the master
-// envelope, drive and level), the noise generator and the effects row (chorus, delay, reverb, the 8-band EQ); the
-// generators, morph line and modulation pages keep the saved patch ------------------------------------------------
+// envelope, drive and level), the noise generator, the 8-band EQ and the effects row (chorus, delay, reverb); the
+// generators, morph line and modulation pages are not edited in LYNX ------------------------------------------------
 
 Layout morphineLayout()
 {
-    Page p ("Morphine", 886, 420);
+    Page p ("Morphine", 886, 368);
     p.section (4, 4, 270, 96, nullptr, boxed);
     p.name (12, 8, 254, 40, "Morphine");
     p.knob (20, 56, 28, "Transpose", TR_NOOP ("Transp"), bipolar);
@@ -816,39 +827,176 @@ Layout morphineLayout()
     p.knob (750, 30, 34, "Overdrive", TR_NOOP ("Drive"));
     p.knob (820, 30, 34, "Master level", TR_NOOP ("Level"));
 
-    p.section (4, 104, 600, 180, TR_NOOP ("Generators"));
-    p.label (20, 180, 568, 16, TR_NOOP ("Generators, morph line and modulation keep the saved patch"), dim);
-    p.label (20, 204, 568, 16, TR_NOOP ("Plays FL Studio's own presets and data files: no LYNX presets for this engine"), dim);
-    p.section (608, 104, 274, 180, TR_NOOP ("Noise"));
-    p.knob (624, 130, 40, "Noise mix", TR_NOOP ("Mix"));
-    p.knob (690, 130, 40, "Noise pan", TR_NOOP ("Pan"), bipolar);
-    p.knob (756, 130, 40, "Noise velocity", TR_NOOP ("Vel"));
-    p.toggle (624, 214, 90, 18, "Noise mute", TR_NOOP ("Mute"), boxed);
-
-    p.section (4, 288, 170, 128, TR_NOOP ("Chorus"));
-    p.toggle (130, 290, 40, 14, "Chorus on", TR_NOOP ("On"), boxed);
-    p.knob (14, 322, 34, "Chorus depth", TR_NOOP ("Depth"));
-    p.knob (70, 322, 34, "Chorus rate", TR_NOOP ("Rate"));
-    p.knob (126, 322, 34, "Chorus mix", TR_NOOP ("Mix"));
-    p.section (178, 288, 284, 128, TR_NOOP ("Delay"));
-    p.toggle (418, 290, 40, 14, "Delay on", TR_NOOP ("On"), boxed);
-    p.knob (188, 322, 34, "Delay time", TR_NOOP ("Time"));
-    p.knob (244, 322, 34, "Delay stereo", TR_NOOP ("Stereo"), bipolar);
-    p.knob (300, 322, 34, "Delay feedback", TR_NOOP ("Fdbk"));
-    p.knob (356, 322, 34, "Delay modulation", TR_NOOP ("Mod depth"));
-    p.knob (412, 322, 34, "Delay mix", TR_NOOP ("Mix"));
-    p.section (466, 288, 168, 128, TR_NOOP ("Reverb"));
-    p.toggle (590, 290, 40, 14, "Reverb on", TR_NOOP ("On"), boxed);
-    p.knob (476, 322, 34, "Reverb decay", TR_NOOP ("Decay"));
-    p.knob (532, 322, 34, "Reverb damping", TR_NOOP ("Hi-cut"));
-    p.knob (588, 322, 34, "Reverb mix", TR_NOOP ("Mix"));
-    p.section (638, 288, 244, 128, TR_NOOP ("Equalizer"));
-    p.toggle (838, 290, 40, 14, "EQ on", TR_NOOP ("On"), boxed);
+    // round 172a: the noise generator and the 8-band EQ under the top bar, the effects row under them (the generators'
+    // pages are not editable in LYNX, so no panel for them)
+    p.section (4, 104, 300, 128, TR_NOOP ("Noise"));
+    p.knob (20, 132, 40, "Noise mix", TR_NOOP ("Mix"));
+    p.knob (86, 132, 40, "Noise pan", TR_NOOP ("Pan"), bipolar);
+    p.knob (152, 132, 40, "Noise velocity", TR_NOOP ("Vel"));
+    p.toggle (214, 146, 74, 18, "Noise mute", TR_NOOP ("Mute"), boxed);
+    p.section (308, 104, 574, 128, TR_NOOP ("Equalizer"));
+    p.toggle (838, 106, 40, 14, "EQ on", TR_NOOP ("On"), boxed);
     static const std::pair<const char*, const char*> eq[8] = { { "EQ 62 Hz", "62" }, { "EQ 125 Hz", "125" }, { "EQ 250 Hz", "250" },
                                                                { "EQ 500 Hz", "500" }, { "EQ 1 kHz", "1K" }, { "EQ 2 kHz", "2K" },
                                                                { "EQ 4 kHz", "4K" }, { "EQ 8 kHz", "8K" } };
     for (int i = 0; i < 8; ++i)
-        p.fader (646.0f + 29.0f * (float) i, 310, 18, 84, eq[i].first, eq[i].second, bipolar);
+        p.fader (346.0f + 68.0f * (float) i, 126, 18, 84, eq[i].first, eq[i].second, bipolar);
+
+    p.section (4, 236, 200, 128, TR_NOOP ("Chorus"));
+    p.toggle (160, 238, 40, 14, "Chorus on", TR_NOOP ("On"), boxed);
+    p.knob (20, 270, 34, "Chorus depth", TR_NOOP ("Depth"));
+    p.knob (86, 270, 34, "Chorus rate", TR_NOOP ("Rate"));
+    p.knob (152, 270, 34, "Chorus mix", TR_NOOP ("Mix"));
+    p.section (208, 236, 404, 128, TR_NOOP ("Delay"));
+    p.toggle (568, 238, 40, 14, "Delay on", TR_NOOP ("On"), boxed);
+    p.knob (228, 270, 34, "Delay time", TR_NOOP ("Time"));
+    p.knob (304, 270, 34, "Delay stereo", TR_NOOP ("Stereo"), bipolar);
+    p.knob (380, 270, 34, "Delay feedback", TR_NOOP ("Fdbk"));
+    p.knob (456, 270, 34, "Delay modulation", TR_NOOP ("Mod depth"));
+    p.knob (532, 270, 34, "Delay mix", TR_NOOP ("Mix"));
+    p.section (616, 236, 266, 128, TR_NOOP ("Reverb"));
+    p.toggle (838, 238, 40, 14, "Reverb on", TR_NOOP ("On"), boxed);
+    p.knob (640, 270, 34, "Reverb decay", TR_NOOP ("Decay"));
+    p.knob (722, 270, 34, "Reverb damping", TR_NOOP ("Hi-cut"));
+    p.knob (804, 270, 34, "Reverb mix", TR_NOOP ("Mix"));
+    return std::move (p.l);
+}
+
+// --- Harmor (round 172a): FL's part panel in its order — TIMBRE and the level faders at the top left, BLUR / TREM,
+// PRISM / HARMONIZER / VIBRATO under them, UNISON beside them, the filtering section (filter 1, filter 2 and their
+// mix) on the right with PLUCK and PHASER under it, and the GLOBAL strip at the bottom with the A / B part tabs, the
+// part crossfade, legato / porta, the volumes before and after the effects, pitch, LFO and the X / Y / Z controls.
+// The part panel shows part A or part B (the tabs are the layout's two pages); every control is a raw FL integer of
+// the saved state (core/HarmorControls.h). FL's timbre / filter shape menus, EQ, envelopes and image pages are not
+// editable in LYNX, so they are left out instead of shown empty.
+
+Layout harmorLayout()
+{
+    Page p ("Harmor", 1000, 430);
+    p.l.pages = { "A", "B" };
+    const auto n = [] (int part, int index) { return harmorui::name (part, index); };
+    for (int part = 0; part < 2; ++part)
+    {
+        const auto first = p.v.size();
+        const auto N = [&] (int index) { return n (part, index); };
+
+        // TIMBRE: phase start / randomness, the timbre mix, the three subs, protection and clip
+        p.section (4, 0, 316, 96, TR_NOOP ("Timbre"));
+        p.label (12, 20, 80, 12, TR_NOOP ("Phase"), dim);
+        p.knob (16, 34, 30, N (0), TR_NOOP ("Start"));
+        p.knob (56, 34, 30, N (1), TR_NOOP ("Rand"), bipolar);
+        p.knob (104, 26, 44, N (4), TR_NOOP ("Mix"), big);
+        p.fader (170, 22, 16, 52, N (5), nullptr);
+        p.fader (190, 22, 16, 52, N (6), nullptr);
+        p.fader (210, 22, 16, 52, N (7), nullptr);
+        p.label (164, 76, 68, 12, TR_NOOP ("Sub"), dim);
+        p.fader (248, 22, 16, 52, N (8), TR_NOOP ("Prot"));
+        p.fader (284, 22, 16, 52, N (9), TR_NOOP ("Clip"));
+        // the part's levels: FX send, volume, volume envelope amount, auto gain
+        p.section (324, 0, 178, 96, TR_NOOP ("Level"));
+        p.fader (338, 22, 16, 52, N (10), TR_NOOP ("FX"), bipolar);
+        p.fader (370, 22, 16, 52, N (11), TR_NOOP ("Vol"));
+        p.fader (402, 22, 16, 52, N (12), TR_NOOP ("Env"));
+        p.knob (446, 32, 34, N (13), TR_NOOP ("Auto"));
+
+        // BLUR (mix, time attack / decay, harmonic) and TREM (depth, stereo gap)
+        p.section (4, 100, 214, 92, TR_NOOP ("Blur"));
+        p.knob (16, 126, 30, N (20), TR_NOOP ("Mix"));
+        p.knob (62, 126, 30, N (21), TR_NOOP ("Att"));
+        p.knob (108, 126, 30, N (22), TR_NOOP ("Dec"));
+        p.knob (166, 122, 36, N (23), TR_NOOP ("Harm"));
+        p.section (222, 100, 116, 92, TR_NOOP ("Trem"));
+        p.knob (238, 126, 30, N (17), TR_NOOP ("Depth"));
+        p.knob (290, 126, 30, N (19), TR_NOOP ("Gap"));
+
+        // PRISM, HARMONIZER (amount, width, strength), VIBRATO (depth, speed)
+        p.section (4, 196, 76, 92, TR_NOOP ("Prism"));
+        p.knob (22, 220, 38, N (26), TR_NOOP ("Amt"), bipolar);
+        p.section (84, 196, 150, 92, TR_NOOP ("Harmonizer"));
+        p.knob (94, 220, 38, N (27), TR_NOOP ("Amt"));
+        p.knob (144, 224, 30, N (28), TR_NOOP ("Width"));
+        p.knob (190, 224, 30, N (29), TR_NOOP ("Str"));
+        p.section (238, 196, 100, 92, TR_NOOP ("Vibrato"));
+        p.knob (250, 224, 30, N (45), TR_NOOP ("Depth"));
+        p.knob (296, 224, 30, N (46), TR_NOOP ("Speed"));
+
+        // UNISON: order, type, alternate phase; pitch, panning and phase faders
+        p.section (342, 100, 160, 188, TR_NOOP ("Unison"));
+        p.stepper (354, 138, 40, 22, N (34), TR_NOOP ("Order"), 8);
+        p.menu (354, 190, 68, 20, N (35), TR_NOOP ("Type"), "Classic|Blurred|Uniform|Random|Hz");
+        p.toggle (354, 222, 68, 14, N (36), TR_NOOP ("Alt"));
+        p.fader (432, 122, 16, 130, N (38), TR_NOOP ("Pitch"));
+        p.fader (456, 122, 16, 130, N (37), TR_NOOP ("Pan"));
+        p.fader (480, 122, 16, 130, N (39), TR_NOOP ("Phase"), bipolar);
+
+        // the filtering section: per filter the adaptive envelope and scale, envelope amount, key tracking, width and
+        // frequency, then its resonance (amount, width, offset, scale, adaptive width); self-oscillation on filter 1,
+        // the filter 1 / 2 mix on filter 2
+        for (int f = 0; f < 2; ++f)
+        {
+            const auto y = f == 0 ? 0.0f : 100.0f;
+            const auto o = 12 * f;
+            p.section (506, y, 490, f == 0 ? 96.0f : 92.0f, f == 0 ? TR_NOOP ("Filter 1") : TR_NOOP ("Filter 2"));
+            p.toggle (516, y + 26, 62, 14, N (51 + o), TR_NOOP ("Adapt"));
+            p.tabs (516, y + 48, 62, 16, N (53 + o), "Oct|Hz");
+            p.knob (590, y + 22, 40, N (56 + o), TR_NOOP ("Env"), big | bipolar);
+            p.knob (642, y + 28, 30, N (55 + o), TR_NOOP ("Key"), bipolar);
+            p.knob (684, y + 28, 30, N (54 + o), TR_NOOP ("Width"));
+            p.knob (726, y + 20, 46, N (52 + o), TR_NOOP ("Freq"), big);
+            p.knob (786, y + 24, 38, N (57 + o), TR_NOOP ("Res"));
+            p.knob (834, y + 28, 30, N (59 + o), TR_NOOP ("Width"));
+            p.knob (874, y + 28, 30, N (60 + o), TR_NOOP ("Ofs"), bipolar);
+            p.tabs (912, y + 26, 40, 16, N (58 + o), "Oct|Hz");
+            p.toggle (912, y + 48, 40, 14, N (61 + o), TR_NOOP ("Adapt"));
+            p.knob (958, y + 28, 30, N (f == 0 ? 62 : 74), f == 0 ? TR_NOOP ("Osc") : TR_NOOP ("Mix"), f == 0 ? 0 : bipolar);
+        }
+
+        // PLUCK (time) and PHASER (scale, mix, width, offset, speed, key tracking)
+        p.section (506, 196, 100, 92, TR_NOOP ("Pluck"));
+        p.knob (534, 218, 44, N (75), TR_NOOP ("Time"), big);
+        p.section (610, 196, 386, 92, TR_NOOP ("Phaser"));
+        p.tabs (622, 232, 80, 18, N (77), "Oct|Hz|Harm");
+        p.knob (716, 216, 44, N (76), TR_NOOP ("Mix"), big);
+        p.knob (786, 222, 30, N (78), TR_NOOP ("Width"));
+        p.knob (840, 222, 30, N (79), TR_NOOP ("Ofs"));
+        p.knob (894, 222, 30, N (80), TR_NOOP ("Speed"), bipolar);
+        p.knob (948, 222, 30, N (81), TR_NOOP ("Key"), bipolar);
+
+        for (auto i = first; i < p.v.size(); ++i)
+            p.v[i].page = part;
+    }
+
+    // GLOBAL: the part tabs and crossfade, legato / velocity / porta, the volumes before and after the effects, pitch,
+    // LFO, the X / Y / Z pad; FX: the rack's delay and reverb (FL's FX page, the units with an on switch)
+    p.section (4, 292, 636, 134, TR_NOOP ("Global"));
+    p.label (16, 314, 80, 12, TR_NOOP ("Part"), dim);
+    {
+        LayoutItem t;
+        t.type = Item::tabs;
+        t.x = 16, t.y = 330, t.w = 80, t.h = 26;
+        t.options = "A|B";
+        t.style = pageTabs;
+        p.v.push_back (t);
+    }
+    p.hslider (12, 370, 88, 22, n (-1, 10), "A / B");
+    p.toggle (130, 324, 86, 16, n (-1, 4), TR_NOOP ("Legato"));
+    p.toggle (130, 348, 86, 16, n (-1, 6), TR_NOOP ("Vel"));
+    p.toggle (130, 372, 86, 16, n (-1, 5), TR_NOOP ("Porta"));
+    p.fader (246, 316, 18, 82, n (-1, 11), TR_NOOP ("Pre"));
+    p.fader (280, 316, 18, 82, n (-1, 12), TR_NOOP ("Post"));
+    p.fader (314, 316, 18, 82, n (-1, 14), TR_NOOP ("Pitch"), bipolar);
+    p.knob (354, 330, 34, n (-1, 15), TR_NOOP ("LFO"));
+    p.display (420, 314, 104, 104, "xy", n (-1, 0), n (-1, 1));
+    p.knob (544, 318, 28, n (-1, 0), "X");
+    p.knob (544, 372, 28, n (-1, 1), "Y");
+    p.knob (590, 318, 28, n (-1, 2), "Z");
+    p.section (644, 292, 352, 134, TR_NOOP ("FX"));
+    p.toggle (658, 316, 80, 16, n (-1, 39), TR_NOOP ("Delay"));
+    p.knob (660, 340, 30, n (-1, 41), TR_NOOP ("Fdbk"));
+    p.knob (706, 340, 30, n (-1, 44), TR_NOOP ("Vol"));
+    p.toggle (762, 316, 80, 16, n (-1, 22), TR_NOOP ("Reverb"));
+    p.knob (764, 340, 30, n (-1, 31), TR_NOOP ("Wet"));
+    p.name (816, 372, 172, 44, "Harmor");
     return std::move (p.l);
 }
 } // namespace
@@ -856,7 +1004,8 @@ Layout morphineLayout()
 const Layout* synthGroupLayout (InstrumentKind kind)
 {
     static const Layout harmless = harmlessLayout(), dx10 = dx10Layout(), sim = simSynthLayout(), ogun = ogunLayout (false),
-                        autogun = ogunLayout (true), mini = miniSynthLayout(), gms = gmsLayout(), morphine = morphineLayout();
+                        autogun = ogunLayout (true), mini = miniSynthLayout(), gms = gmsLayout(), morphine = morphineLayout(),
+                        harmor = harmorLayout();
     switch (kind)
     {
         case InstrumentKind::harmless: return &harmless;
@@ -867,6 +1016,7 @@ const Layout* synthGroupLayout (InstrumentKind kind)
         case InstrumentKind::minisynth: return &mini;
         case InstrumentKind::gms: return &gms;
         case InstrumentKind::morphine: return &morphine;
+        case InstrumentKind::harmor: return &harmor; // (listed with the first designed pages in instrumentLayoutKinds)
         default: return nullptr;
     }
 }
