@@ -251,7 +251,7 @@ int main (int argc, char** argv)
                     options.fileExists = [] (const std::string& p) { return fs::is_regular_file (local (p)); };
                     options.readFile = [] (const std::string& p) { return readFile (local (p)); };
                 }
-                const auto song = lynx::importFlp (lynx::flp::parseProject (readFile (f.path())), options);
+                const auto song = lynx::importFlp (flp::parseProject (readFile (f.path())), options);
                 for (const auto& c : song.channels)
                     if (only.empty() || only == c.name)
                         fuzzChannel (c, f.path().filename().string() + ": " + c.name);

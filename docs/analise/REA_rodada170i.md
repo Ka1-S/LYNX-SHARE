@@ -184,12 +184,15 @@ Test: `flq170i2_slice_starts_on_their_exact_frame`.
 
 ## Where I stopped
 
-- Done: §1, §3 (batch 1–2: build-local 1963871 checks / 0 failures, queued on the merge train), §5 and §6 (batch 3:
-  1963902 checks / 0 failures). Rescore of the 82 render tests (`E:\lynx-work\flq170i\b3`): 14 improved, no
-  regressions; mean sound score 6.64 → 7.78 (81 scorable), 38 at the 16-bit floor (was 28). Tracker regenerated.
-- Open: FPC (§4), Slicex's remaining −24 dB (slice edges), EQUO (send not routed, lag 341), Fruity Scratcher (r167c
-  area), FL Keys (FL's own render is silent: needs one FL re-render), random-phase engines (not defects), FLEX and Fruity
-  Slicer's stretch (permanent decisions). fxfuzz not re-run this round.
+- 170i (landed 108eb8f8): §1, §3, §5, §6; mean sound score 6.64 → 7.78.
+- 170i2: re-measured on main (Drumaxx 2 → 8 from 169l's pan law); FPC (§7, −7.7 → −75 dB), EQUO (§8, −5.6 → −17.4 dB
+  plain, −55 dB with FL's pre-roll), Slicex (§9, −24 → −35 dB); FL Keys and Scratcher explained (§10). Mean 7.85 → 7.99,
+  39 render tests at the 16-bit floor. 29 FL demos / templates that use FPC, EQUO or Slicex: no regression; "Create a
+  chord progression" (FPC) spec 4.7 → 0.4 dB, "nucleon - Transient Processor" rms −0.8 → 0.0 dB.
+- Fuzz (ASAN + UBSan): fxfuzz 165 effect slots, 0 non-finite, no sanitizer report. GENFUZZ_RESULT
+- Open: FL's render pre-roll (LFO effects drift without it, glides need it: model it per plugin), Slicex's slice-edge
+  fade (−35 dB), FLEX and Fruity Slicer's stretch (permanent decisions), FL Keys (FL's command-line render is silent).
 - Commands: `scripts/flref-lynx.sh /mnt/e/lynx-work/flq170i/rt.list <out> build-local/renderwav 2`, then
   `python3 scripts/flref_compare.py batch /mnt/e/lynx-work/flq170i/flref <out> <out>/report.md`;
-  tracker: `python3 /mnt/e/lynx-work/flq170i/py/mkdoc.py <out>/compare.jsonl`.
+  tracker: `python3 /mnt/e/lynx-work/flq170i/py/mkdoc.py <out>/compare.jsonl`; fuzz: `scripts/fxfuzz-asan.sh` /
+  `scripts/genfuzz-asan.sh --fl "<FL>/Data" --dir <folder>`.

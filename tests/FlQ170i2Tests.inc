@@ -139,3 +139,42 @@ TEST (flq170i2_equo_render_is_not_hq_and_glides_from_construction)
         late += std::abs ((double) render[(std::size_t) i] - still[(std::size_t) i]);
     CHECK (early > 10.0 * late);
 }
+
+TEST (flq170i2_drumaxx_pitched_up_at_low_rates_stays_in_its_buffer)
+{
+    // tools/genfuzz: at 22.05 kHz a pad with Pitch at max and the channel pitched up steps over 4 internal samples per
+    // host sample, and a 256-sample pass overran the DLL-sized 1024-sample buffer into the next pad (crash in reset)
+    using namespace lynx;
+    auto c = banks::defaultChannel (InstrumentKind::drumaxx, "Drumaxx");
+    CHECK (c.has_value());
+    if (! c)
+        return;
+    for (int k = 0; k < 16; ++k)
+        drumaxxSetParam (c->pluginState, 44 * k + 34, 1.0f);
+    auto in = makeDrumaxxInstrument();
+    in->prepare (22050.0);
+    in->configure (*c, 120.0);
+    in->setChannelPitchNow (1200.0f, 0.0f);
+    std::vector<float> l (4096), r (4096);
+    double peak = 0.0;
+    bool finiteOut = true;
+    for (int round = 0; round < 3; ++round)
+    {
+        for (int key = 36; key <= 51; ++key)
+            in->noteOn (key, 1.0f);
+        for (int b = 0; b < 12; ++b)
+        {
+            std::fill (l.begin(), l.end(), 0.0f), std::fill (r.begin(), r.end(), 0.0f);
+            in->render (l.data(), r.data(), 4096, 1.0f, 1.0f);
+            for (int i = 0; i < 4096; ++i)
+            {
+                finiteOut = finiteOut && std::isfinite (l[(std::size_t) i]) && std::isfinite (r[(std::size_t) i]);
+                peak = std::max ({ peak, (double) std::abs (l[(std::size_t) i]), (double) std::abs (r[(std::size_t) i]) });
+            }
+        }
+        for (int key = 36; key <= 51; ++key)
+            in->noteOff (key);
+    }
+    CHECK (finiteOut);
+    CHECK (peak > 1e-3 && peak < 16.0);
+}

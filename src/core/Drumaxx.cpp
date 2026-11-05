@@ -994,9 +994,13 @@ public:
         if (d.gR < 0.0f)
             d.gR = d.tR;
         int done = 0;
+        // The DLL's 1024-sample buffer holds 256 host samples up to a step of 4 (44.1 kHz and up, every pitch). Below
+        // ~38 kHz with the pad pitched up a block would overrun it, so LYNX renders fewer host samples per pass
+        // (found by tools/genfuzz, round 170i2): at FL's rates nothing changes.
+        const auto most = std::clamp ((int) (1000.0 / std::max (step, 1.0e-6)), 1, 256);
         while (0 < n)
         {
-            auto m = std::min (n, 256);
+            auto m = std::min (n, most);
             n -= m;
             auto pos = d.pos;
             for (; pos < 0.0 && 0 < m; --m)
