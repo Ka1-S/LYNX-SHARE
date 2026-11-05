@@ -84,12 +84,12 @@ struct ChannelRef
         return { [c] (Song& s) -> ChannelDef* { return c >= 0 && c < (int) s.channels.size() ? &s.channels[(std::size_t) c] : nullptr; }, c };
     }
     const ChannelDef* get (const AudioEngine& engine) const { return locate ? locate (const_cast<Song&> (engine.getSong())) : nullptr; }
-    void edit (AudioEngine& engine, std::function<void (ChannelDef&)> change) const
+    void edit (AudioEngine& engine, std::function<void (ChannelDef&)> change, bool undoable = true) const
     {
         engine.editSong ([l = locate, change = std::move (change)] (Song& s) {
             if (auto* d = l ? l (s) : nullptr)
                 change (*d);
-        });
+        }, undoable);
     }
 };
 
@@ -480,7 +480,8 @@ private:
 // Physical-model channels (Sakura, Drumpad; REA_rodada28): knobs for the main raw FL parameters (0..1)
 class ModelPanel final : public juce::Component,
                          public juce::DragAndDropTarget,
-                         public juce::FileDragAndDropTarget
+                         public juce::FileDragAndDropTarget,
+                         private juce::Timer
 {
 public:
     ModelPanel (AudioEngine& e, ChannelRef c)
@@ -1173,6 +1174,29 @@ public:
             const auto f = juce::jmin (layoutScale, 1200.0f / (float) layout->width, 720.0f / (float) layout->height);
             setSize ((int) std::ceil (f * (float) layout->width) + 16, (int) std::ceil (f * (float) layout->height) + layoutTop + 8);
         }
+        if (transistorBass && ref.index >= 0)
+            startTimerHz (10); // the page follows the program a note selects (round 169g2)
+    }
+
+    // Transistor Bass with its sequencer on: a note selects program = key (REA_rodada57 §2.10) and FL's editor shows
+    // that program, so its knobs edit what plays. The channel's state takes the playing program (not an undo step)
+    // and every knob reads it again (round 169g2)
+    void timerCallback() override
+    {
+        const auto* c = channelNow();
+        const auto instrument = engine.getChannelInstrument (ref.index);
+        if (c == nullptr || instrument == nullptr)
+            return;
+        const auto selected = instrument->selectedProgram();
+        const auto prog = transistorBassProgram (c->pluginState);
+        if (selected < 0 || ! prog || prog->program == selected)
+            return;
+        auto next = c->pluginState;
+        if (! transistorBassSelectProgram (next, selected))
+            return;
+        ref.edit (engine, [next = std::move (next)] (ChannelDef& d) { d.pluginState = next; }, false);
+        syncKnobs (true);
+        repaint();
     }
 
     // a knob of a listed engine parameter (round 168n): raw range of the state, automation target channelParam
@@ -1271,13 +1295,13 @@ public:
 
     // the listed parameters' knobs read the channel's state again (an edit that moved other values: Transistor Bass's
     // note / octave, CLEAR, octave buttons; round 168q2)
-    void syncKnobs()
+    void syncKnobs (bool all = false)
     {
         const auto* c = channelNow();
         if (c == nullptr || modelTable == nullptr)
             return;
         for (auto& k : knobs)
-            if (const auto* p = modelparams::findByName (instrumentKind, k->getName().toStdString()); p != nullptr && p->index >= tbseq::length)
+            if (const auto* p = modelparams::findByName (instrumentKind, k->getName().toStdString()); p != nullptr && (all || p->index >= tbseq::length))
                 if (const auto v = modelparams::rawValue (*c, p->index))
                     k->setValue (*v, juce::dontSendNotification);
     }

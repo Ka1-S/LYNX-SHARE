@@ -130,7 +130,7 @@ public:
     ui::Hint hoverForSnapshot();
 
     static constexpr int headerWidth = 96;
-    static constexpr int toolbarHeight = 28;
+    static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
     static constexpr int overviewHeight = 16; // the overview strip under the toolbar (round 90)
     static constexpr int timelineHeight = 24;
     static constexpr int rulerTop = toolbarHeight + overviewHeight;

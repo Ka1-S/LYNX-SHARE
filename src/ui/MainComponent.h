@@ -231,7 +231,11 @@ private:
     // toolbar, or Options > Toolbar; core/ToolbarLayout.h). Row height follows the icon size.
     toolbarlayout::Layout toolbarLayout = toolbarlayout::Layout::makeDefault();
     int rowHeight = toolbarlayout::rowHeight (toolbarlayout::IconSize::medium);
-    int toolbarHeight = 2 * rowHeight + 8;
+    int toolbarHeight = 2 * rowHeight + 12;
+    toolbarlayout::IconSize appliedIconSize = toolbarlayout::IconSize::medium;
+    bool compactRecord = false;
+    juce::Rectangle<int> modeArea; // the Pattern / Song switch (painted as one control) // a narrow window: four recording switches per row (round 170e3)
+    void applyIconSizing (toolbarlayout::IconSize size);
     void setToolbarLayout (const toolbarlayout::Layout& layout, bool save = true);
     juce::PopupMenu makeToolbarMenu();
     void showToolbarMenu();
@@ -311,6 +315,13 @@ private:
     // FL's recording panel toggles (round 170e2): Blend recorded notes (overdub, off = replace) and the tempo tapper
     IconButton blendButton { "blend", Icon::blend };
     IconButton tapTempoButton { "tapTempo", Icon::tapTempo };
+    // round 170e3: FL's Loop record and Step edit switches, and LYNX's punch in/out on the loop region, as toggles
+    IconButton loopRecordButton { "loopRecord", Icon::loopRecord };
+    IconButton stepEditButton { "stepEdit", Icon::stepEdit };
+    IconButton punchButton { "punch", Icon::punch };
+    stepedit::Writer stepWriter;               // Step edit: where the next played note goes (core/StepEdit.h)
+    double stepSeekTick = -1.0, stepPrevTick = -1.0; // the position step edit last moved to / moved from
+    void applyStepEdit();
     void refreshRecordOptionButtons();
     void showRecordMenu();
     // right-click on the metronome: on/off, its volume, count-in (FL keeps the metronome's options there)

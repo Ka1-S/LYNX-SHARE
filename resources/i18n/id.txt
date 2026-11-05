@@ -7116,3 +7116,24 @@ countries: id
 "Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Campur not rekaman: nyala, satu take menambahkan notnya ke pattern (overdub); mati, not lama kanal yang direkam diganti"
 "Tempo tapper: tap the beat to set the tempo" = "Tap tempo: ketuk ketukan untuk mengatur tempo"
 "Blend recorded notes" = "Campur not rekaman"
+
+# round 170e3: recording switches (loop record, step edit, punch)
+"Blend recorded notes on/off (off: replace)" = "Campur not rekaman aktif/nonaktif (nonaktif: ganti)"
+"Loop record on/off" = "Rekam berulang aktif/nonaktif"
+"Step edit on/off" = "Input per langkah aktif/nonaktif"
+"Punch in/out on the loop region on/off" = "Punch in/out pada wilayah loop aktif/nonaktif"
+"Loop record" = "Rekam berulang"
+"Step edit" = "Input per langkah"
+"Loop record: on (Song mode recording loops the loop region, one take per pass)" = "Rekam berulang: aktif (di mode Song rekaman mengulang wilayah loop, satu take per putaran)"
+"Loop record: off (recording plays straight through the loop region)" = "Rekam berulang: nonaktif (rekaman berjalan lurus melewati wilayah loop)"
+"Step edit: on (stopped, played notes go into the pattern one snap step after another)" = "Input per langkah: aktif (saat berhenti, not yang dimainkan masuk ke pattern, satu langkah snap demi langkah)"
+"Step edit: off" = "Input per langkah: nonaktif"
+"Punch in/out: on (audio is kept only inside the loop region)" = "Punch in/out: aktif (audio hanya disimpan di dalam wilayah loop)"
+"Punch in/out: off" = "Punch in/out: nonaktif"
+"Loop record: on, Song mode recording loops the loop region (one take per pass); off, it plays straight through and keeps everything where it was played" = "Rekam berulang: aktif, di mode Song rekaman mengulang wilayah loop (satu take per putaran); nonaktif, berjalan lurus dan menyimpan semuanya di tempat dimainkan"
+"Step edit: with the transport stopped, notes you play go into the current pattern at the position, a snap step long; release the keys and the position moves on one step (chords: hold them together)" = "Input per langkah: saat transport berhenti, not yang Anda mainkan masuk ke pattern saat ini di posisi, sepanjang satu langkah snap; lepaskan tuts dan posisi maju satu langkah (akor: tahan bersamaan)"
+"Punch in/out: audio recording keeps only the loop region (playback runs through it; pre- and post-roll in the recording options)" = "Punch in/out: rekaman audio hanya menyimpan wilayah loop (pemutaran melewatinya; pre-roll dan post-roll di opsi rekaman)"
+"Punch in/out" = "Punch in/out"
+
+# round 170e3: the idle hint on one line
+"Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "Arahkan ke apa saja untuk bantuan  [F1] pintasan  [F5]-[F9] jendela  [Space] putar/berhenti"

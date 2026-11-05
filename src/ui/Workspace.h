@@ -94,7 +94,7 @@ public:
     // Screen bounds a detached window snaps to: the main window and the other detached panels.
     std::vector<juce::Rectangle<int>> otherWindowScreenBounds (Panel panel) const;
 
-    static constexpr int titleHeight = 28;
+    static constexpr int titleHeight = 32; // round 170e3: room for 20 px tool icons in the editors (was 28)
 
 private:
     void applyLayout();

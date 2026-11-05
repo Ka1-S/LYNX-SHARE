@@ -1235,6 +1235,15 @@ public:
             return;
         }
 
+        if (args.contains ("--typeaheadtest"))
+        {
+            // LYNX.exe --typeaheadtest out.txt: issue #64 — a real popup menu (headings, a submenu) driven by key presses
+            // through its window's peer, as the OS delivers them; writes what got the highlight and what was picked
+            const auto i = args.indexOf ("--typeaheadtest");
+            runTypeAheadTest (juce::File (args[i + 1].unquoted()));
+            return;
+        }
+
         if (args.contains ("--snapshot"))
         {
             const auto i = args.indexOf ("--snapshot");
@@ -8093,6 +8102,113 @@ private:
                     });
                 }
         }
+    }
+
+    // Issue #64: FL's letter keys in a plugin menu (quickpick::showMenu), checked on the real menu windows
+    struct TypeAheadTest final : private juce::Timer
+    {
+        juce::File out;
+        juce::StringArray log;
+        int step = 0, picked = 0;
+        bool ok = true, menuShown = false;
+        std::unique_ptr<juce::DocumentWindow> owner;
+        juce::PopupMenu pending;
+
+        static juce::String highlighted()
+        {
+            if (auto* window = juce::Component::getCurrentlyModalComponent())
+                for (auto* child : window->getChildren())
+                    if (auto* h = child->getAccessibilityHandler(); h != nullptr && h->hasFocus (false))
+                        return h->getTitle();
+            return "(none)";
+        }
+        static void press (const juce::KeyPress& key)
+        {
+            if (auto* window = juce::Component::getCurrentlyModalComponent())
+                if (auto* peer = window->getPeer())
+                    peer->handleKeyPress (key);
+        }
+        void expect (const juce::String& what, const juce::String& got, const juce::String& wanted)
+        {
+            const auto good = got == wanted;
+            ok = ok && good;
+            log.add ((good ? "ok   " : "FAIL ") + what + ": " + got + (good ? juce::String() : " (wanted " + wanted + ")"));
+        }
+
+        void start()
+        {
+            juce::PopupMenu menu, sub;
+            auto item = [this] (juce::PopupMenu& m, int id, const char* text, bool enabled = true) {
+                m.addItem (text, enabled, false, [this, id] { picked = id; });
+            };
+            menu.addSectionHeader ("LYNX SHARE");
+            item (menu, 1, "Echoform");
+            item (menu, 2, "EQ");
+            item (menu, 3, "Halo");
+            menu.addSectionHeader ("Misc");
+            item (menu, 4, "Effector");
+            item (menu, 5, "Exciter (unavailable)", false);
+            item (sub, 10, "Delay");
+            item (sub, 11, "Edison");
+            item (sub, 12, "Eventide");
+            menu.addSubMenu ("Tree", sub);
+            // the menu belongs to a window in the foreground, as when the user right-clicks a mixer slot (JUCE closes a
+            // menu of a background process at once)
+            owner = std::make_unique<juce::DocumentWindow> ("LYNX type-ahead test", juce::Colours::black, 0);
+            owner->setBounds (200, 200, 300, 200);
+            owner->setVisible (true);
+            lynx::forceForegroundForTest (*owner);
+            pending = menu; // shown once the window is up and active (X11 maps and activates it asynchronously)
+            startTimer (300);
+        }
+
+        void timerCallback() override
+        {
+            const auto e = juce::KeyPress ('e', {}, 'e');
+            if (step == 0 && owner != nullptr && ! menuShown)
+            {
+                menuShown = true;
+                lynx::forceForegroundForTest (*owner);
+                lynx::quickpick::showMenu (pending, juce::PopupMenu::Options().withTargetComponent (owner.get()), {});
+                return;
+            }
+            switch (step++)
+            {
+                case 0: expect ("menu open", juce::String ((int) (juce::Component::getCurrentlyModalComponent() != nullptr)), "1"); break;
+                case 1: press (e); expect ("e", highlighted(), "Echoform"); break;
+                case 2: press (e); expect ("e again", highlighted(), "EQ"); break;
+                case 3: press (juce::KeyPress ('E', juce::ModifierKeys::shiftModifier, 'E')); expect ("E (shift)", highlighted(), "Effector"); break;
+                case 4: press (e); expect ("e wraps (skips the disabled one)", highlighted(), "Echoform"); break;
+                case 5: press (juce::KeyPress ('m', {}, 'm')); expect ("m (only a heading starts with it: no move)", highlighted(), "Echoform"); break;
+                case 6: press (juce::KeyPress (juce::KeyPress::downKey)); expect ("down arrow", highlighted(), "EQ"); break;
+                case 7: press (e); expect ("e after the arrow", highlighted(), "Effector"); break;
+                case 8: press (juce::KeyPress ('t', {}, 't')); expect ("t", highlighted(), "Tree"); break;
+                case 9: press (juce::KeyPress (juce::KeyPress::rightKey)); break; // opens the submenu (it takes the keys)
+                case 10: press (e); expect ("e in the submenu", highlighted(), "Edison"); break;
+                case 11: press (e); expect ("e again in the submenu", highlighted(), "Eventide"); break;
+                case 12: expect ("nothing picked by the letters", juce::String (picked), "0"); press (juce::KeyPress (juce::KeyPress::returnKey)); break;
+                case 13: break;
+                default:
+                    expect ("Enter closed the menu", juce::String ((int) (juce::Component::getCurrentlyModalComponent() == nullptr)), "1");
+                    expect ("Enter picked", juce::String (picked), "12");
+                    stopTimer();
+                    owner.reset();
+                    log.add (ok ? "result=OK" : "result=FAIL");
+                    out.replaceWithText (log.joinIntoString ("\n") + "\n");
+                    juce::JUCEApplication::getInstance()->setApplicationReturnValue (ok ? 0 : 1);
+                    juce::JUCEApplication::quit();
+                    return;
+            }
+        }
+    };
+    std::unique_ptr<TypeAheadTest> typeAheadTest;
+
+    void runTypeAheadTest (const juce::File& out)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        typeAheadTest = std::make_unique<TypeAheadTest>();
+        typeAheadTest->out = out;
+        typeAheadTest->start();
     }
 
     void runSnapshot (const juce::String& prefix, const juce::String& projectPath)

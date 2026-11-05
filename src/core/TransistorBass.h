@@ -40,7 +40,7 @@ bool transistorBassDllUsable (const std::string& path);
 
 std::unique_ptr<Instrument> makeTransistorBassInstrument();
 
-// The designed page (round 168q): parameter `index` (0…41) of the current program's working patch — its byte offset
+// The designed page (round 168q): parameter `index` (0…41) of the edit program's working patch — its byte offset
 // in a usable state (−1 otherwise) — and the program's sequence for the sequence display.
 int transistorBassParamOffset (const std::vector<std::uint8_t>& state, int index);
 struct TransistorBassProgram
@@ -55,6 +55,10 @@ struct TransistorBassProgram
     std::array<Step, 32> steps {};
 };
 std::optional<TransistorBassProgram> transistorBassProgram (const std::vector<std::uint8_t>& state);
+// FL's editor shows and edits its "edit program"; with the sequencer on and the state's follow flag set, a note makes
+// both the playing and the edit program the note's key (engine_x64 FUN_18000d5a0, REA_rodada169g2): the state's
+// program and edit program become `program` (0…127), in place; false when the state is not usable (round 169g2)
+bool transistorBassSelectProgram (std::vector<std::uint8_t>& state, int program);
 // The page's sequence rows (round 168q2, FL's 16-step editor): parameters after the patch's 0…41 — the saved
 // program's sequence length (1…16), the sequencer switch, then per step i (0…15) firstStep + 5i + {0 note 0…131,
 // 1 octave 0…10 (the note's octave: note / 12), 2 gate, 3 slide, 4 accent}.

@@ -7116,3 +7116,24 @@ countries: kr
 "Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "녹음 노트 섞기: 켜면 테이크의 노트를 패턴에 더하고(오버더브), 끄면 녹음한 채널의 이전 노트를 대체합니다"
 "Tempo tapper: tap the beat to set the tempo" = "탭 템포: 박자를 두드려 템포를 설정"
 "Blend recorded notes" = "녹음 노트 섞기"
+
+# round 170e3: recording switches (loop record, step edit, punch)
+"Blend recorded notes on/off (off: replace)" = "녹음 노트 섞기 켜기/끄기 (끄기: 교체)"
+"Loop record on/off" = "루프 녹음 켜기/끄기"
+"Step edit on/off" = "스텝 입력 켜기/끄기"
+"Punch in/out on the loop region on/off" = "루프 구간 펀치 인/아웃 켜기/끄기"
+"Loop record" = "루프 녹음"
+"Step edit" = "스텝 입력"
+"Loop record: on (Song mode recording loops the loop region, one take per pass)" = "루프 녹음: 켜짐 (송 모드에서 녹음이 루프 구간을 반복, 한 바퀴에 한 테이크)"
+"Loop record: off (recording plays straight through the loop region)" = "루프 녹음: 꺼짐 (녹음이 루프 구간을 그대로 지나갑니다)"
+"Step edit: on (stopped, played notes go into the pattern one snap step after another)" = "스텝 입력: 켜짐 (정지 상태에서 연주한 노트가 스냅 한 스텝씩 패턴에 들어갑니다)"
+"Step edit: off" = "스텝 입력: 꺼짐"
+"Punch in/out: on (audio is kept only inside the loop region)" = "펀치 인/아웃: 켜짐 (오디오는 루프 구간 안에서만 유지)"
+"Punch in/out: off" = "펀치 인/아웃: 꺼짐"
+"Loop record: on, Song mode recording loops the loop region (one take per pass); off, it plays straight through and keeps everything where it was played" = "루프 녹음: 켜면 송 모드 녹음이 루프 구간을 반복하고 (한 바퀴에 한 테이크), 끄면 그대로 지나가며 연주한 위치에 모두 남깁니다"
+"Step edit: with the transport stopped, notes you play go into the current pattern at the position, a snap step long; release the keys and the position moves on one step (chords: hold them together)" = "스텝 입력: 트랜스포트가 멈춘 상태에서 연주한 노트가 현재 패턴의 위치에 스냅 한 스텝 길이로 들어갑니다. 키를 떼면 위치가 한 스텝 이동합니다 (코드: 함께 누르기)"
+"Punch in/out: audio recording keeps only the loop region (playback runs through it; pre- and post-roll in the recording options)" = "펀치 인/아웃: 오디오 녹음은 루프 구간만 남깁니다 (재생은 그 구간을 지나감, 프리롤/포스트롤은 녹음 옵션에서)"
+"Punch in/out" = "펀치 인/아웃"
+
+# round 170e3: the idle hint on one line
+"Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "아무 곳이나 가리키면 도움말  [F1] 단축키  [F5]-[F9] 창  [Space] 재생/정지"
