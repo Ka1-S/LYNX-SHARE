@@ -323,13 +323,13 @@ struct UiPerfDrag final : public std::enable_shared_from_this<UiPerfDrag>,
         ++framesOverFader;
     }
 
+    // the moves end; as in the reporter's clip, the song is stopped while the button is still down
     juce::String stop()
     {
         stopTimer();
         active = false;
         valueAtRelease = engine->getSong().mixer[(std::size_t) track].volume;
-        juce::ModifierKeys::currentModifiers = {};
-        inject (x, lastY, false);
+        engine->stop();
         juce::String text;
         text << "    drag of insert " << track << "'s fader" << (visible ? "" : " (NOT VISIBLE)") << ": " << moves << " moves handled, " << dropped
              << " folded into the next (the message thread still busy with the previous one)\n"
@@ -337,6 +337,15 @@ struct UiPerfDrag final : public std::enable_shared_from_this<UiPerfDrag>,
              << "    input -> paint (move to the first frame over the fader): " << describe (latencies) << ", " << framesOverFader
              << " frames over the fader\n";
         return text;
+    }
+
+    juce::String release()
+    {
+        const auto now = engine->getSong().mixer[(std::size_t) track].volume;
+        juce::ModifierKeys::currentModifiers = {};
+        inject (x, lastY, false);
+        return "    song stopped, button still down: fader " + juce::String (now, 4) + " (" + juce::String (valueAtRelease, 4) + " at the last move) "
+               + (std::abs (now - valueAtRelease) < 1.0e-4f ? "kept" : "CHANGED") + "\n";
     }
 
     juce::String released() const
@@ -4791,6 +4800,7 @@ private:
                                    const auto rail = strips.faderRailForSnapshot (dragTrack);
                                    drag->start (*mainWindow, strips, rail, engine.get(), dragTrack);
                                }, {}, 3000, [drag] { return drag->stop(); } });
+        run->steps.push_back ({ "song stopped during the drag", {}, {}, 500, [drag] { return drag->release(); } });
         run->steps.push_back ({ "after the drag (released)", {}, {}, 600, [drag] { return drag->released(); } });
         run->steps.push_back ({ "desktop, playing", [this, ui] { ui->showDesktopForSnapshot (false); engine->rewind(); engine->play(); }, {}, 3000 });
         run->steps.push_back ({ "mixer maximised, playing", [ui] { ui->selectTabForSnapshot (3); }, {}, 3000 });
