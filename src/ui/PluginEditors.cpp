@@ -713,7 +713,8 @@ public:
             g.drawRoundedRectangle (r.withSizeKeepingCentre (w, r.getHeight()), 3.0f, 1.0f);
         }
         g.setColour (locked ? theme::colour::textPrimary : hasStyle (item, plugui::dim) ? colour::textDisabled : skin::captionColour());
-        ui::drawFittingText (g, caps (tr (item.label)), r, j, font (juce::jmax (8.0f, 9.5f * scale()), true), 7.0f); // (round 165: fit, no "...")
+        ui::drawFittingText (g, caps (tr (item.label)), r.expanded (0.0f, (skin::captionScale() - 1.0f) * 6.0f * scale()), j,
+                            font (juce::jmax (8.0f, 9.5f * scale() * skin::captionScale()), true), 7.0f); // (round 165: fit, no "..."; tp172d: themed size)
     }
 
     void paintItem (juce::Graphics& g, const LayoutItem& item, int index, const EffectSlot& fx)
@@ -753,8 +754,8 @@ public:
             case Item::value:
                 if (hasStyle (item, plugui::boxed)) // a read-out plate (FL's value boxes)
                     skin::valuePlate (g, r, radius::sm * s);
-                g.setColour (hot ? accent : (fx.enabled ? colour::textPrimary : colour::textDisabled));
-                g.setFont (font (juce::jmax (8.0f, 11.0f * s)));
+                g.setColour (hot ? accent : (fx.enabled ? (skin::captionScale() > 1.0f ? skin::valueColour (false) : colour::textPrimary) : colour::textDisabled));
+                g.setFont (font (juce::jmax (8.0f, 11.0f * s * juce::jmin (1.25f, skin::captionScale())), skin::captionScale() > 1.0f));
                 g.drawFittedText (valueText (param, value), r.toNearestInt(),
                                   hasStyle (item, plugui::alignLeft) ? juce::Justification::centredLeft : juce::Justification::centred, 1, 0.7f);
                 break;
@@ -783,8 +784,8 @@ public:
                 {
                     caption (g, item, r.withHeight (13.0f * s).expanded (10.0f * s, 0.0f));
                     g.setColour (hot ? look.accent.brighter (0.3f) : skin::valueColour (false));
-                    g.setFont (font (juce::jmax (8.0f, 10.5f * s)));
-                    g.drawFittedText (valueText (param, value), below.withHeight (13.0f * s).expanded (10.0f * s, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
+                    g.setFont (font (juce::jmax (8.0f, 10.5f * s * skin::captionScale()), skin::captionScale() > 1.0f));
+                    g.drawFittedText (valueText (param, value), below.withHeight (13.0f * s * skin::captionScale()).expanded (10.0f * s, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
                 }
                 else if (! hasStyle (item, plugui::noCaption))
                 {
@@ -792,8 +793,8 @@ public:
                     if (hasStyle (item, plugui::showValue))
                     {
                         g.setColour (hot ? look.accent.brighter (0.3f) : skin::valueColour (false));
-                        g.setFont (font (juce::jmax (8.0f, 10.5f * s)));
-                        g.drawFittedText (valueText (param, value), below.withTrimmedTop (12.0f * s).withHeight (13.0f * s).toNearestInt(),
+                        g.setFont (font (juce::jmax (8.0f, 10.5f * s * skin::captionScale()), skin::captionScale() > 1.0f));
+                        g.drawFittedText (valueText (param, value), below.withTrimmedTop (12.0f * s).withHeight (13.0f * s * skin::captionScale()).toNearestInt(),
                                           juce::Justification::centred, 1, 0.7f);
                     }
                 }
