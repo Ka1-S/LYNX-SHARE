@@ -320,6 +320,9 @@ bool runPluginSandboxWorker (const juce::String& commandLine)
     if (! commandLine.contains (pluginSandboxId))
         return false;
     trace ("child: " + commandLine);
+   #if JUCE_MAC
+    juce::Process::setDockIconVisible (false); // (one LYNX icon in the Dock, not one more per sandboxed plugin)
+   #endif
     worker() = std::make_unique<SandboxWorker>();
     if (! worker()->initialiseFromCommandLine (commandLine, pluginSandboxId, 10000))
     {
