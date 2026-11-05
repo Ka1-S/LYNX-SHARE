@@ -2,6 +2,7 @@
 #include "ui/WindowOwner.h"
 #include "core/NoteNames.h"
 #include "ui/ChannelSettings.h"
+#include "ui/FileChoosers.h"
 #include "ui/LayerEditor.h"
 #include "ui/DanceView.h"
 #include "ui/Controllers164.h"
@@ -1118,8 +1119,8 @@ public:
                 juce::StringArray patterns;
                 for (const auto e : sampleFileExtensions)
                     patterns.add ("*." + juce::String (std::string (e)));
-                chooser = std::make_unique<juce::FileChooser> (tr ("Sample"), juce::File(), patterns.joinIntoString (";"));
-                chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                chooser = lynx::ui::makeFileChooser (tr ("Sample"), juce::File(), patterns.joinIntoString (";"));
+                lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                                       [safe = juce::Component::SafePointer<ModelPanel> (this)] (const juce::FileChooser& fc) {
                                           if (safe == nullptr || fc.getResult() == juce::File())
                                               return;
@@ -2335,8 +2336,8 @@ private:
                 juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, juce::String ("BeepMap"), tr ("Copy a .bmp file's path first, or use Open."));
             return;
         }
-        chooser = std::make_unique<juce::FileChooser> (tr ("Open a bitmap"), juce::File(), "*.bmp");
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+        chooser = lynx::ui::makeFileChooser (tr ("Open a bitmap"), juce::File(), "*.bmp");
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [safe = juce::Component::SafePointer<ModelPanel> (this)] (const juce::FileChooser& fc) {
                                   juce::MemoryBlock data;
                                   if (safe == nullptr || ! fc.getResult().loadFileAsData (data))

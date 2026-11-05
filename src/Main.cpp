@@ -70,6 +70,7 @@
 #include "core/SoundFont.h"
 #include "core/Sfz.h"
 #include "ui/Dialogs.h"
+#include "ui/FileChoosers.h"
 #include "ui/TrackIcons.h"
 #include "core/RackOps.h"
 #include "core/Layer.h"
@@ -1277,6 +1278,16 @@ public:
             // through its window's peer, as the OS delivers them; writes what got the highlight and what was picked
             const auto i = args.indexOf ("--typeaheadtest");
             runTypeAheadTest (juce::File (args[i + 1].unquoted()));
+            return;
+        }
+
+        if (args.contains ("--choosertest"))
+        {
+            // LYNX --choosertest out.txt file: issue #72 — opens LYNX's file chooser as the UI does (makeFileChooser +
+            // launchChooser) and reports which dialog came up and what reached the callback. A built-in dialog is shot
+            // (out.txt.png), `file` typed into it and confirmed; a native one (zenity / kdialog) is left to answer.
+            const auto i = args.indexOf ("--choosertest");
+            runChooserTest (juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()));
             return;
         }
 
@@ -8460,6 +8471,99 @@ private:
         }
     };
     std::unique_ptr<TypeAheadTest> typeAheadTest;
+
+    struct ChooserTest final : private juce::Timer
+    {
+        juce::File out, file;
+        juce::StringArray log;
+        std::unique_ptr<juce::FileChooser> chooser;
+        double started = 0;
+        bool shot = false, done = false;
+
+        void start()
+        {
+            log.add ("LYNX_FILE_DIALOG=" + juce::SystemStats::getEnvironmentVariable ("LYNX_FILE_DIALOG", {}));
+            log.add ("native=" + juce::String ((int) lynx::ui::filechooser::nativeDialogs()));
+            chooser = lynx::ui::makeFileChooser ("Open audio file", file.getParentDirectory(), "*.wav;*.flac");
+            started = juce::Time::getMillisecondCounterHiRes();
+            lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                                     [this] (const juce::FileChooser& fc) { finish (fc.getResult()); });
+            startTimer (200);
+        }
+
+        static juce::FileChooserDialogBox* builtInDialog()
+        {
+            for (int i = 0; i < juce::Desktop::getInstance().getNumComponents(); ++i)
+                if (auto* box = dynamic_cast<juce::FileChooserDialogBox*> (juce::Desktop::getInstance().getComponent (i)); box != nullptr && box->isShowing())
+                    return box;
+            return nullptr;
+        }
+
+        static juce::FileBrowserComponent* findBrowser (juce::Component& c)
+        {
+            if (auto* b = dynamic_cast<juce::FileBrowserComponent*> (&c))
+                return b;
+            for (auto* child : c.getChildren())
+                if (auto* b = findBrowser (*child))
+                    return b;
+            return nullptr;
+        }
+
+        void timerCallback() override
+        {
+            if (done)
+                return;
+            if (auto* box = builtInDialog(); box != nullptr && ! shot)
+            {
+                shot = true;
+                log.add ("built-in dialog shown after " + juce::String (juce::roundToInt (juce::Time::getMillisecondCounterHiRes() - started)) + " ms");
+                const auto image = box->createComponentSnapshot (box->getLocalBounds());
+                juce::FileOutputStream png (out.getSiblingFile (out.getFileName() + ".png"));
+                if (png.openedOk())
+                {
+                    png.setPosition (0), png.truncate();
+                    juce::PNGImageFormat().writeImageToStream (image, png);
+                }
+                if (auto* browser = findBrowser (*box))
+                {
+                    browser->setRoot (file.getParentDirectory());
+                    browser->setFileName (file.getFileName());
+                    log.add ("typed " + file.getFileName());
+                    box->exitModalState (1);
+                }
+                else
+                    log.add ("no file browser in the dialog");
+            }
+            if (juce::Time::getMillisecondCounterHiRes() - started > 30000.0)
+                finish ({}, "timeout");
+        }
+
+        void finish (const juce::File& result, const juce::String& why = {})
+        {
+            if (done)
+                return;
+            done = true;
+            stopTimer();
+            log.add ("callback after " + juce::String (juce::roundToInt (juce::Time::getMillisecondCounterHiRes() - started)) + " ms: "
+                     + (why.isNotEmpty() ? why : result.getFullPathName().isEmpty() ? juce::String ("(no file)") : result.getFullPathName()));
+            log.add ("native now=" + juce::String ((int) lynx::ui::filechooser::nativeDialogs()));
+            const auto ok = result == file && result.existsAsFile();
+            log.add (ok ? "result=OK" : "result=FAIL");
+            out.replaceWithText (log.joinIntoString ("\n") + "\n");
+            juce::JUCEApplication::getInstance()->setApplicationReturnValue (ok ? 0 : 1);
+            juce::MessageManager::callAsync ([] { juce::JUCEApplication::quit(); });
+        }
+    };
+    std::unique_ptr<ChooserTest> chooserTest;
+
+    void runChooserTest (const juce::File& out, const juce::File& file)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        chooserTest = std::make_unique<ChooserTest>();
+        chooserTest->out = out;
+        chooserTest->file = file;
+        chooserTest->start();
+    }
 
     void runTypeAheadTest (const juce::File& out)
     {

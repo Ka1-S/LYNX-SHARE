@@ -4,6 +4,7 @@
 
 #include "engine/AudioEngine.h"
 #include "engine/FlStudio.h"
+#include "ui/FileChoosers.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "platform/Paths.h"
@@ -301,8 +302,8 @@ private:
 
     void chooseFolder()
     {
-        chooser = std::make_unique<juce::FileChooser> (tr ("Plugin folder"), juce::File(), "");
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories, [this] (const juce::FileChooser& c) {
+        chooser = lynx::ui::makeFileChooser (tr ("Plugin folder"), juce::File(), "");
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories, [this] (const juce::FileChooser& c) {
             if (const auto folder = c.getResult(); folder.isDirectory())
             {
                 folderList.addIfNotAlreadyThere (folder.getFullPathName(), true);

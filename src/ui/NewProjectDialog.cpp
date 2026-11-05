@@ -4,6 +4,7 @@
 #include "core/Preferences.h"
 #include "core/Templates.h"
 #include "engine/ProjectFile.h"
+#include "ui/FileChoosers.h"
 #include "ui/I18n.h"
 #include "ui/SettingsPages.h"
 #include "ui/Theme.h"
@@ -394,8 +395,8 @@ private:
 
     void pickFolder()
     {
-        chooser = std::make_unique<juce::FileChooser> (tr ("Folder for the project"), folder);
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories, [this] (const juce::FileChooser& fc) {
+        chooser = lynx::ui::makeFileChooser (tr ("Folder for the project"), folder);
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories, [this] (const juce::FileChooser& fc) {
             if (fc.getResult() == juce::File())
                 return;
             folder = fc.getResult();

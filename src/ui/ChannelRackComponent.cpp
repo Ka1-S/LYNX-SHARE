@@ -4,6 +4,7 @@
 #include "core/FruityDance.h"
 #include "core/VideoPlayer.h"
 #include "ui/ColourPicker.h"
+#include "ui/FileChoosers.h"
 #include "ui/TrackIcons.h"
 #include "core/TrackIcons.h"
 #include "ui/PatcherEditor.h"
@@ -2662,8 +2663,8 @@ void ChannelRackComponent::showAddChannelMenu (int insertAt)
 
 void ChannelRackComponent::chooseSample (int channel, int insertAt)
 {
-    fileChooser = std::make_unique<juce::FileChooser> (tr ("Choose sample"), juce::File(), engine.getSampleLibrary().wildcard());
-    fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+    fileChooser = lynx::ui::makeFileChooser (tr ("Choose sample"), juce::File(), engine.getSampleLibrary().wildcard());
+    lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [this, channel, insertAt] (const juce::FileChooser& chooser) {
                                   if (! chooser.getResult().existsAsFile())
                                       return;

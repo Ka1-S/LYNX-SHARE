@@ -8,6 +8,7 @@
 
 #include <juce_audio_formats/juce_audio_formats.h>
 
+#include "ui/FileChoosers.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
@@ -1586,9 +1587,9 @@ private:
 
     void loadImpulse (CurveEditor& c)
     {
-        chooser = std::make_unique<juce::FileChooser> (tr ("Load an impulse response"), juce::File(), "*.wav;*.aif;*.aiff;*.flac");
+        chooser = lynx::ui::makeFileChooser (tr ("Load an impulse response"), juce::File(), "*.wav;*.aif;*.aiff;*.flac");
         juce::Component::SafePointer<ToolPanel> self (this);
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [self, &c] (const juce::FileChooser& fc) {
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [self, &c] (const juce::FileChooser& fc) {
             if (self == nullptr || fc.getResults().isEmpty())
                 return;
             juce::AudioFormatManager formats;
