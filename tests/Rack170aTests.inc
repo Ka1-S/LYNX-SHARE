@@ -175,3 +175,22 @@ TEST (rack170a_step_groups_clearly_apart)
             CHECK (fromLit >= 150);
         }
 }
+
+TEST (rack170a2_lit_steps_in_the_channel_colour)
+{
+    using namespace lynx::themes;
+    // LYNX: a lit step takes its channel's colour, lifted until it stands clear of both empty-step greys
+    for (const auto bg : { 0xff1c1e23u, 0xfff2f3f5u })
+    {
+        const auto p = derivePalette (0xffe5383bu, bg);
+        CHECK (litStepColour (0, p) == p.stepOn); // no channel colour: the theme's lit step
+        for (const auto colour : { 0xffe5383bu, 0xff2fbf71u, 0xff3d8bfdu, 0xff202020u, 0xffeeeeeeu, 0xff5c1f24u, 0xfff0a020u })
+        {
+            const auto lit = litStepColour (colour, p);
+            CHECK (contrastRatio (lit, p.stepOff) >= minLitStepContrast);
+            CHECK (contrastRatio (lit, p.stepOffAlt) >= minLitStepContrast);
+        }
+    }
+    // a colour that already reads stays exactly the channel's
+    CHECK (litStepColour (0xff2fbf71u, defaultPalette()) == 0xff2fbf71u);
+}

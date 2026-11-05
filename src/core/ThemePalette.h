@@ -46,6 +46,12 @@ DigitDisplayColours<C> digitDisplayColours (C bg0, C border, C accent, C accentH
 constexpr double stepGroupLift = 0.08;
 constexpr double stepGroupTint = 0.12;
 
+// A lit Channel Rack step in its channel's colour (LYNX, round 170a2; FL keeps its steps white / pink): the colour
+// lifted (towards white on a dark theme, black on a light one) until it stands clear of both empty-step greys
+// (WCAG contrast >= minLitStepContrast against stepOff and stepOffAlt). 0 (no colour) = the palette's stepOn.
+constexpr double minLitStepContrast = 2.6;
+std::uint32_t litStepColour (std::uint32_t channelColour, const Palette& palette);
+
 // The palette for an accent and a background (alpha is ignored: both are opaque).
 Palette derivePalette (std::uint32_t accent, std::uint32_t background);
 // LYNX's built-in palette (= derivePalette (defaultAccent, defaultBackground)).

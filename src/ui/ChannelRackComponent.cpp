@@ -730,6 +730,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
     const auto clip = g.getClipBounds();
     const auto primary = engine.getSelectedChannel();
     const auto& selection = engine.getSelectedChannels();
+    const auto palette = theme::currentPalette();
     const auto column = playheadColumn.load (std::memory_order_relaxed) && playheadStep >= 0 && playheadStep < steps;
     g.setFont (theme::font (theme::type::body));
 
@@ -742,6 +743,9 @@ void ChannelRackComponent::paint (juce::Graphics& g)
 
         const auto& channel = song.channels[(std::size_t) row];
         const auto selected = std::binary_search (selection.begin(), selection.end(), row);
+        const auto litOn = stepsChannelColour.load (std::memory_order_relaxed) && channel.colour != 0
+                               ? juce::Colour (themes::litStepColour (channel.colour, palette))
+                               : theme::colour::stepOn;
 
         if (selected) // selected rows are subtly lifted
         {
@@ -765,6 +769,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
         }
 
         const auto loopSteps = loopStepsOf (row); // the row loops: the repeats after its loop point are ghost steps
+        const auto stepOn = litOn; // (the channel's lit-step colour, or the theme's)
 
         if (showsNotePreview (pattern, row, pianoRollView)) // piano-roll notes: a miniature instead of the step buttons
         {

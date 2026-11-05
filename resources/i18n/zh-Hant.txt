@@ -7166,3 +7166,4 @@ countries: tw hk mo
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "循環錄音：開（錄音循環：Song 模式下為循環區域，每遍一個錄音；Pattern 模式下為樣式）"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "循環錄音：關（錄音一直向前：穿過循環區域，或越過樣式末尾，樣式隨之變長）"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "循環錄音：開，錄音循環（Song 模式：循環區域，每遍一個錄音；Pattern 模式：樣式）；關，一直向前，穿過循環區域或越過樣式末尾，並把一切保留在演奏的位置（樣式變長）"
+"Steps use channel colour" = "步進使用通道顏色"

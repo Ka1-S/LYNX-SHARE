@@ -118,6 +118,22 @@ Palette derivePalette (std::uint32_t accentIn, std::uint32_t backgroundIn)
     return p;
 }
 
+std::uint32_t litStepColour (std::uint32_t channelColour, const Palette& palette)
+{
+    if ((channelColour & 0x00ffffffu) == 0)
+        return palette.stepOn;
+    const auto colour = channelColour | 0xff000000u;
+    const auto lightTheme = relativeLuminance (palette.stepOff) > 0.4;
+    const auto towards = lightTheme ? 0xff000000u : 0xffffffffu;
+    for (int i = 0; i <= 20; ++i)
+    {
+        const auto lit = mix (colour, towards, i * 0.05);
+        if (contrastRatio (lit, palette.stepOff) >= minLitStepContrast && contrastRatio (lit, palette.stepOffAlt) >= minLitStepContrast)
+            return lit;
+    }
+    return palette.stepOn;
+}
+
 const Palette& defaultPalette()
 {
     return builtIn;
