@@ -4,6 +4,11 @@
 
 namespace lynx
 {
+// The CLAP plugin id (e.g. "com.vendor.plugin") of a scanned CLAP plugin: its module is opened and the descriptor whose
+// id hashes to the description's uniqueId is read (Export to FL Studio, round 171e: FL's wrapper keys CLAP by its id).
+// Empty when the file no longer has it.
+std::string clapPluginId (const juce::PluginDescription& description);
+
 // CLAP plugin hosting (JUCE 8 only ships VST3/AU/LV2). Implemented as one more
 // juce::AudioPluginFormat: scanning, the plugin list, the plugin window, saved state,
 // latency (PDC) and parameter automation all work through the same path as VST3.

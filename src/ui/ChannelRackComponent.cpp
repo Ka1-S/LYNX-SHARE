@@ -730,6 +730,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
     const auto clip = g.getClipBounds();
     const auto primary = engine.getSelectedChannel();
     const auto& selection = engine.getSelectedChannels();
+    const auto palette = theme::currentPalette();
     const auto column = playheadColumn.load (std::memory_order_relaxed) && playheadStep >= 0 && playheadStep < steps;
     g.setFont (theme::font (theme::type::body));
 
@@ -742,6 +743,9 @@ void ChannelRackComponent::paint (juce::Graphics& g)
 
         const auto& channel = song.channels[(std::size_t) row];
         const auto selected = std::binary_search (selection.begin(), selection.end(), row);
+        const auto litOn = stepsChannelColour.load (std::memory_order_relaxed) && channel.colour != 0
+                               ? juce::Colour (themes::litStepColour (channel.colour, palette))
+                               : theme::colour::stepOn;
 
         if (selected) // selected rows are subtly lifted
         {
@@ -765,6 +769,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
         }
 
         const auto loopSteps = loopStepsOf (row); // the row loops: the repeats after its loop point are ghost steps
+        const auto stepOn = litOn; // (the channel's lit-step colour, or the theme's)
 
         if (showsNotePreview (pattern, row, pianoRollView)) // piano-roll notes: a miniature instead of the step buttons
         {
@@ -2359,12 +2364,12 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
     menu.addItem (theme::mnemonic (tr ("Load sample..."), 'L'), c.instrument != InstrumentKind::audioClip, false, [this, channel] { chooseSample (channel); });
     {
         // "Cut itself": a new note cuts the channel's own sounding note (its cut group and "cut by" are its own)
-        const auto self = 1000 + channel;
-        const auto cutsItself = c.cutGroup != 0 && c.cutGroup == c.cutBy;
-        menu.addItem (theme::mnemonic (tr ("Cut itself"), 't'), true, cutsItself, [this, channel, self, cutsItself] {
-            engine.editSong ([channel, self, cutsItself] (Song& s) {
-                auto& ch = s.channels[(std::size_t) channel];
-                ch.cutGroup = ch.cutBy = cutsItself ? 0 : self;
+        // (issue #68: the same state as the sample panel's checkbox and the Misc page's "Cut self")
+        const auto cutsItself = channelCutsItself (c);
+        menu.addItem (theme::mnemonic (tr ("Cut itself"), 't'), true, cutsItself, [this, channel, cutsItself] {
+            engine.editSong ([channel, cutsItself] (Song& s) {
+                if (channel < (int) s.channels.size())
+                    setChannelCutsItself (s.channels[(std::size_t) channel], channel, ! cutsItself);
             });
         });
     }

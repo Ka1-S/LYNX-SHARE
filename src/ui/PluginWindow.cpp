@@ -2,6 +2,7 @@
 #include "ui/PluginWindow.h"
 #include "ui/PluginPicker.h"
 #include "ui/PluginPresetMenu.h"
+#include "ui/PluginThumbs.h"
 
 #include <algorithm>
 #include <map>
@@ -451,6 +452,8 @@ public:
         crashguard::note (("editor open: " + plugin.getName()).toStdString());
 
         const auto resizable = editor->isResizable();
+        shownEditor = editor;
+        thumbKey = plugin.getPluginDescription().createIdentifierString().toStdString();
         if (context.engine != nullptr && context.find) // FL's wrapper header and settings page (round 146a)
             setContentOwned (new WrappedEditor (editor, *context.engine, std::move (context.find), plugin, context.channel), true);
         else
@@ -531,6 +534,9 @@ private:
     }
     void timerCallback() override
     {
+        // the Plugin picker's picture of this plugin (round 171c): its editor once it has been drawn for a while
+        if (++ticks == 15 && shownEditor != nullptr && shownEditor->isShowing() && ! isMinimised())
+            pluginthumbs::captureEditor (thumbKey, *shownEditor);
         const auto mouse = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition().roundToInt();
         const auto active = isActiveWindow() || (isShowing() && getScreenBounds().contains (mouse));
         if (const auto moved = changes.tick (active); moved >= 0 && PluginWindows::onGesture)
@@ -556,6 +562,9 @@ private:
     std::shared_ptr<void> owner;
     juce::AudioPluginInstance& plugin;
     lasttweak::ChangeFilter changes;
+    juce::Component::SafePointer<juce::Component> shownEditor;
+    std::string thumbKey;
+    int ticks = 0;
 };
 
 } // namespace

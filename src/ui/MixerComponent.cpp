@@ -5546,6 +5546,8 @@ MixerComponent::MixerComponent (AudioEngine& e)
         if (! addEffectToSelected (std::move (fx)))
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Plugin database"),
                                                     tr ("The selected insert has no free effect slot."));
+        else // FL opens the dropped effect's window (round 171c: the Plugin picker's drag is FL's Browser drag)
+            openSlotEditor (track, (int) engine.getSong().mixer[(std::size_t) track].effects.size() - 1);
     };
     strips.onInstrumentDropped = [this] (int track, ChannelDef c) {
         selectTrack (track);

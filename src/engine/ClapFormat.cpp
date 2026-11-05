@@ -1172,4 +1172,18 @@ void addPluginFormats (juce::AudioPluginFormatManager& manager)
     manager.addFormat (new ClapPluginFormat());
     manager.addFormat (new Vst2PluginFormat());
 }
+
+std::string clapPluginId (const juce::PluginDescription& description)
+{
+    if (description.pluginFormatName != ClapPluginFormat::formatName)
+        return {};
+    auto module = ClapModule::open (description.fileOrIdentifier);
+    if (module == nullptr || module->factory == nullptr)
+        return {};
+    const auto count = module->factory->get_plugin_count (module->factory);
+    for (std::uint32_t i = 0; i < count; ++i)
+        if (const auto* d = module->factory->get_plugin_descriptor (module->factory, i); d != nullptr && d->id != nullptr && idHash (d->id) == description.uniqueId)
+            return d->id;
+    return {};
+}
 } // namespace lynx

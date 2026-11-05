@@ -36,6 +36,8 @@ std::unique_ptr<juce::Component> makeChannelPrecomputePanel (AudioEngine& engine
 // The whole channel window (REA round 143b): FL's header strip (tabs; On, Pan, Vol, Track) over the instrument page,
 // the "Envelope / instrument" tab (synth, sampler) and the "Misc" tab. `tab` < 0 = the Misc tab.
 std::unique_ptr<juce::Component> makeChannelFrame (AudioEngine& engine, int channel, int tab = 0);
+// the height of that window's channel header (tabs, pan / volume / pitch...) above the instrument's pages
+int channelFrameHeaderHeight() noexcept;
 // The designed plugin page inside a channel window shows page `page` (screenshots, round 169h); returns the page count
 // of its layout (0 = no pages)
 int showChannelLayoutPage (juce::Component& frame, int page);

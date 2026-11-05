@@ -60,11 +60,16 @@ public:
 
     // Asks "save changes?" if there are any; `then` runs unless the user cancels.
     void confirmDiscard (std::function<void()> then);
+    // The main window came up (issue #62): the detached panels restored with the layout go to their saved place, above it.
+    void restoreDetachedWindows() { workspace.restoreDetachedWindows(); }
 
     // For --snapshot mode: 0 = Channel Rack, 1 = Piano Roll (on the channel with the most notes), 2 = Playlist, 3 = Mixer,
     // each maximized on the workspace; showDesktopForSnapshot shows the default layout (with `extraPanels`, the
     // Piano Roll and Mixer floating too).
     void selectTabForSnapshot (int tab);
+    // --uiperf / tests: F8's Plugin picker (round 171c), and whether it is open
+    void togglePluginPickerForSnapshot() { togglePluginPicker(); }
+    juce::Component* pluginPickerForSnapshot() const noexcept { return pluginPickerView.get(); }
     void showDesktopForSnapshot (bool extraPanels);
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
     void waitForBrowserForSnapshot() { browser.waitForListing (5000); }
