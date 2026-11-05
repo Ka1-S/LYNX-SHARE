@@ -41,7 +41,7 @@ inline juce::MouseWheelDetails normalisedWheel (const juce::MouseWheelDetails& w
    #if JUCE_WINDOWS
     constexpr bool windows = true;
    #else
-    constexpr bool windows = false; // (JUCE_WINDOWS is not defined elsewhere: the Linux build failed)
+    constexpr bool windows = false; // (JUCE_WINDOWS is only defined on Windows: an expression broke Linux and macOS)
    #endif
     const auto w = gesture::normaliseWheel (wheel.deltaX, wheel.deltaY, wheel.isSmooth, windows);
     auto out = wheel;

@@ -68,6 +68,8 @@ without a state was the synth channel and is saved as such).
 Sawer, FL Keys, Granulizer and Toxic Biohazard are their Plugin database state, which differs from the
 `Default.*` preset LYNX starts them from (since round 142). Switching them to the Plugin database state is the FL-exact
 choice but changes their fresh sound in LYNX; not done without a yes.
+**Decided (round 169l2): yes — every new generator starts from its Plugin database entry with FL installed
+(REA_rodada169l2 §1).**
 
 ## 4. Ogun states of versions 10–13 [DECOMP]
 
@@ -150,4 +152,7 @@ the glide itself is right: −700 → 0 cents relative).
 - Done: §1–§5 code + tests; one fresh FL render of `g169l.flp` compared against LYNX `renderwav` (§5).
 - Done: the Windows `--export` vs FL's `g169l.wav` (§5).
 - Done: build-local after merging origin/main (1 963 900 checks, 0 failures); with FL's Data dir `gen169l`, `mono168l_every`,
-  `natives142`, `drumaxx169e` pass. Next: the landing train.
+  `natives142`, `drumaxx169e` pass.
+- First train: `issue24_fl_ogun_presets_in_fls_order` still expected FL's v12 Ogun "Default" presets to be skipped by the
+  preset arrows; updated (they load now, keeping the channel's mixer track / pitch range). After merging origin/main
+  (rec170d, inst169h2) the whole suite with FL's Data dir: 2 438 600 checks, 0 failures. Requeued.

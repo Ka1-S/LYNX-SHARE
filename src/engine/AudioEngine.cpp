@@ -963,6 +963,23 @@ void AudioEngine::logPlayedNote (int channel, int key, float velocity, bool on, 
         scoreLog.noteOn (ms, channel, key, velocity, tick, recorded);
     else
         scoreLog.noteOff (ms, channel, key);
+    if (stepEditOn.load (std::memory_order_relaxed) && stepEditQueue.size() < 512)
+        stepEditQueue.push_back ({ channel, key, velocity, on });
+}
+
+void AudioEngine::setStepEdit (bool on) noexcept
+{
+    stepEditOn.store (on, std::memory_order_relaxed);
+    const juce::SpinLock::ScopedLockType lock (scoreLogLock);
+    stepEditQueue.clear();
+}
+
+std::vector<stepedit::Played> AudioEngine::takeStepEditNotes()
+{
+    std::vector<stepedit::Played> out;
+    const juce::SpinLock::ScopedLockType lock (scoreLogLock);
+    out.swap (stepEditQueue);
+    return out;
 }
 
 std::vector<scorelog::Entry> AudioEngine::scoreLogSnapshot() const
@@ -1044,6 +1061,15 @@ void AudioEngine::panic()
         c.store (0);
     for (auto& w : heldKeyBits)
         w.store (0);
+}
+
+void AudioEngine::stopSound()
+{
+    panic();
+    NoteEvent e;
+    e.type = NoteEvent::Type::choke;
+    e.channel = RackRenderer::stopSoundChannel; // and every effect / plugin reset
+    liveEvents.push (e);
 }
 
 double AudioEngine::songPlayheadTicks() const noexcept
@@ -2185,18 +2211,27 @@ void AudioEngine::updateRecording()
 
     // the take starts when playing with recording on, or at the first recorded event
     // (which is only queued in that situation, even if this timer hasn't seen it yet)
-    auto beginTake = [this] {
+    auto beginTake = [this] (double at) {
         if (recorder.isActive())
             return;
 
         const auto& pattern = song.patterns[(std::size_t) song.currentPattern];
         recorder.begin (pattern.effectiveLength (song.beatsPerBar));
+        // Pattern mode with Loop record off (round 170e5, FL's "never" play end [DECOMP 0x11d4800]): the pattern plays
+        // once from the start of this pass and on past its end; the notes stay where they were played, so it grows
+        if (recordloop::patternLinear (song.mode, recordOptions.loopRecord))
+        {
+            const auto origin = recordloop::patternOrigin (at, pattern.effectiveLength (song.beatsPerBar));
+            recorder.setPatternOrigin (origin);
+            liveInput.patternOrigin.store (origin);
+        }
         takeHasUndoStep = false;
         takeClearedChannels.clear();
         // Song mode without a loop region: while recording, the song plays on past its end until recording stops (FL,
         // round 168k [EXEC]: a 1-bar song recorded from bar 1 counted on to bar 8 instead of going back to bar 1), so
         // the notes stay where they were played
-        if (song.mode == PlayMode::song && ! song.hasLoop())
+        // (Loop record off, round 170e3: through the loop region as well)
+        if (recordloop::notesLinear (song.mode, song.hasLoop(), recordOptions.loopRecord))
         {
             noteTakeLinear = true;
             recorder.setLinear (true);
@@ -2205,7 +2240,7 @@ void AudioEngine::updateRecording()
     };
 
     if (active)
-        beginTake();
+        beginTake (lastPlayingTick);
 
     RecordedEvent e;
 
@@ -2227,7 +2262,7 @@ void AudioEngine::updateRecording()
         // (count-in notes: onto the start within the catch window, else at their real time; round 170d)
         if (! recordOptions.recordNotes || ! catchEarlyNote (e, takeCatch) || outsidePunch (e)) // recording filter: notes off
             continue;
-        beginTake();
+        beginTake (std::min (lastPlayingTick, e.tick));
         recorder.add (song, e);
     }
 
@@ -2235,7 +2270,7 @@ void AudioEngine::updateRecording()
     {
         if (! recordOptions.recordNotes || ! catchEarlyNote (ui, takeCatch) || outsidePunch (ui))
             continue;
-        beginTake();
+        beginTake (std::min (lastPlayingTick, ui.tick));
         recorder.add (song, ui);
     }
 
@@ -2254,6 +2289,8 @@ void AudioEngine::updateRecording()
 
     if (! recorder.isActive() && std::exchange (noteTakeLinear, false))
         updateLinearSong();
+    if (! recorder.isActive() && liveInput.patternOrigin.load (std::memory_order_relaxed) >= 0.0)
+        liveInput.patternOrigin.store (-1.0); // the take is over: the pattern loops again
 
     if (notes.empty())
         return;
@@ -2317,51 +2354,91 @@ void AudioEngine::setSong (Song newSong)
     publishSong();
 }
 
+void AudioEngine::saveUndoStep()
+{
+    // Dozens of edits arrive during a drag; only the first one of the click saves the state.
+    bool samePress = false;
+
+    if (juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown())
+    {
+        const auto press = juce::Desktop::getInstance().getMainMouseSource().getLastMouseDownTime();
+        samePress = press == lastUndoPress;
+        lastUndoPress = press;
+    }
+    else
+    {
+        lastUndoPress = {};
+    }
+
+    if (! samePress)
+    {
+        undoStack.push_back (song);
+        redoStack.clear();
+
+        if (undoStack.size() > maxUndoSteps)
+            undoStack.pop_front();
+        if (sessionHistory)
+        {
+            closeSessionStep();
+            sessionUndo.push_back ({ song, song });
+            sessionRedo.clear();
+            if (sessionUndo.size() > maxUndoSteps)
+                sessionUndo.pop_front();
+        }
+    }
+    if (sessionHistory)
+        sessionAfterOpen = true;
+}
+
 void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoable)
 {
     if (undoable)
     {
-        // Dozens of edits arrive during a drag; only the first one of the click saves the state.
-        bool samePress = false;
-
-        if (juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown())
-        {
-            const auto press = juce::Desktop::getInstance().getMainMouseSource().getLastMouseDownTime();
-            samePress = press == lastUndoPress;
-            lastUndoPress = press;
-        }
-        else
-        {
-            lastUndoPress = {};
-        }
-
-        if (! samePress)
-        {
-            undoStack.push_back (song);
-            redoStack.clear();
-
-            if (undoStack.size() > maxUndoSteps)
-                undoStack.pop_front();
-            if (sessionHistory)
-            {
-                closeSessionStep();
-                sessionUndo.push_back ({ song, song });
-                sessionRedo.clear();
-                if (sessionUndo.size() > maxUndoSteps)
-                    sessionUndo.pop_front();
-            }
-        }
-        if (sessionHistory)
-            sessionAfterOpen = true;
-    }
-
-    if (undoable)
+        saveUndoStep();
         modified = true;
+    }
 
     const auto lengthsBefore = patternLengths (song);
     edit (song);
     followPatternLengths (lengthsBefore, song);
     clipops::updateCrossfades (song); // FL's automatic crossfades follow every edit (round 166e)
+    publishSong();
+}
+
+void AudioEngine::editLevels (const std::function<void (Song&)>& edit, bool undoable)
+{
+    // A fader or knob drag (round 171c, discussion #10): every mouse move used to go through editSong, i.e. a whole
+    // snapshot rebuild per move. While the song played that stalled the message thread and the fader (and the sound)
+    // moved in steps of ~0.2 s. Here the edit changes only levels, so the snapshot in use takes the new values through
+    // its live levels; the full publish follows once the mouse is released (timerCallback).
+    if (publishedLevels == nullptr || ! publishedLevels->matches (song))
+    {
+        editSong (edit, undoable);
+        return;
+    }
+    if (undoable)
+    {
+        saveUndoStep();
+        modified = true;
+    }
+    edit (song);
+    if (! publishedLevels->matches (song)) // (an edit that was not only levels)
+    {
+        publishSong();
+        return;
+    }
+    publishedLevels->store (song);
+    ++songStamp;
+    levelsPending = true;
+    ++levelEdits;
+    levelsChanged.sendChangeMessage();
+}
+
+void AudioEngine::flushLevels()
+{
+    if (! levelsPending)
+        return;
+    levelsPending = false;
     publishSong();
 }
 
@@ -2969,6 +3046,7 @@ const AutomationDisplay& AudioEngine::getAutomationDisplay()
 void AudioEngine::publishSong()
 {
     ++songStamp;
+    ++publishCount;
     // Online Sessions (round 168a): every entity has its stable id after any edit, import or load
     uids::normalize (song);
     // pasted / duplicated channels and effect slots get their own instance (round 168s: instances follow their channel)
@@ -3086,6 +3164,8 @@ void AudioEngine::publishSong()
             platform::settingsFile ("edits.log").appendText (juce::String (juce::Time::getMillisecondCounterHiRes() - publishStart, 1) + " ms " + what + "\n");
     };
     mark ("built");
+    levelsPending = false;
+    publishedLevels = projectedSong ? nullptr : state->live; // (stand-ins: their projection, edits rebuild)
     rackExchange.publish (std::move (state));
     mark ("exchanged");
 
@@ -3518,6 +3598,8 @@ void AudioEngine::timerCallback()
     updateRecording();
     updatePerformanceRecording();
     rackExchange.collectGarbage();
+    if (levelsPending && ! juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown())
+        flushLevels(); // a level drag ended: the full snapshot catches up (round 171c)
 
     // Plugins are prepared at a fixed rate; if the device changed rate, recreate them.
     // A plugin whose latency changed (preset change, lookahead) requests a new PDC plan.

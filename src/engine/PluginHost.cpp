@@ -437,6 +437,25 @@ void PluginInstrument::allNotesOff() noexcept
     midi.addEvent (juce::MidiMessage::allSoundOff (1), 0);
 }
 
+// A Patcher parameter output (round 171b): the parameter's value as the plugin reports it, guarded like the audio calls
+static float hostedParameterValue (juce::AudioPluginInstance& plugin, const std::atomic<bool>& crashed, int index) noexcept
+{
+    if (crashed.load (std::memory_order_relaxed) || index < 0)
+        return -1.0f;
+    float value = -1.0f;
+    crashguard::run ([&] {
+        const auto& params = plugin.getParameters();
+        if (index < params.size())
+            value = params[index]->getValue();
+    });
+    return value;
+}
+
+float PluginInstrument::parameterValue (int index) const noexcept
+{
+    return hostedParameterValue (*plugin, crashed, index);
+}
+
 void PluginInstrument::setParameter (int index, float value) noexcept
 {
     if (crashed.load (std::memory_order_relaxed) || midiControls.set (index, value))
@@ -605,6 +624,11 @@ void PluginEffect::setParameterFromUi (int index, float value)
     if (midiControls.set (index, value))
         return;
     guardedUiParameter (*plugin, crashed, name, index, value);
+}
+
+float PluginEffect::parameterValue (int index) const noexcept
+{
+    return hostedParameterValue (*plugin, crashed, index);
 }
 
 void PluginEffect::setParameter (int index, float value) noexcept

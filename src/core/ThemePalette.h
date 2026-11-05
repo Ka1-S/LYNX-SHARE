@@ -40,6 +40,9 @@ DigitDisplayColours<C> digitDisplayColours (C bg0, C border, C accent, C accentH
     return { bg0, hot ? accent : border, hot ? accentHover : dimmed ? textDisabled : textPrimary };
 }
 
+// How much of the accent tints the Channel Rack's every-other beat group of steps (Palette::stepOffAlt).
+constexpr double stepGroupTint = 0.28;
+
 // The palette for an accent and a background (alpha is ignored: both are opaque).
 Palette derivePalette (std::uint32_t accent, std::uint32_t background);
 // LYNX's built-in palette (= derivePalette (defaultAccent, defaultBackground)).

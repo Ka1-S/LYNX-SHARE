@@ -49,16 +49,12 @@ pattern signature markers do not yet change the Piano roll's bar grid or playbac
 
 ## Where I stopped
 
-- State (2026-11-02, paused by the coordinator for round 168w): all code, tests, docs and 15 languages are done on
-  feature/proll168g; NOT landed yet. `tests/Proll168gTests.inc`: 69 checks, 0 failures (mini binary with FL's Data).
-- Last land.sh (build-local with FL Data): 2105295 checks, 2 failures, both expected from this round and fixed in
-  8e3f3d7f: the demo scan counted the pattern markers as Playlist markers (tests.cpp, now counts both), and Rea167j
-  expected Ctrl+Shift+M in the Piano roll = file.exportMidi (FL's own EEExportMIDIAction 0x604D in the Piano roll's
-  EEMenu takes it: now pianoRoll.exportMidi there, file.exportMidi elsewhere). Windows build in that landing: not looked at
-  (the merge was rolled back).
-- Next step after RESUME: `flock ~/projetos/lynx/.git/lynx-merge.lock ~/.claude/jobs/f8789b49/tmp/r168g/mergeland168g.sh`
-  (merges origin/main with union of the i18n tables, regenerates src/ui/i18n, runs coord/land.sh proll168g); then the
-  GUI check with the landed LYNX.exe (fresh LYNX_PROFILE_DIR, LYNX_TEST_MODE=1; scripts in
-  C:\Users\kauan\lynx-test\proll168g: click / drag / chord / shot .ps1); then the final report.
+- State (2026-11-03): all code, tests, docs and 15 languages done on feature/proll168g; merged with origin/main,
+  build-local 2399408 checks, 0 failures; queued in the merge train (coord/train.sh proll168g).
+- Windows GUI check (2026-11-03, the branch's LYNX.exe, fresh LYNX_PROFILE_DIR, LYNX_TEST_MODE=1, real mouse/keys):
+  three notes E5/G5/A#5 drawn with the pencil; Ctrl+box select shows the chord name "Edim" in the toolbar; Alt+B toggles
+  the grid highlights; Alt+T asks for a name ("New marker") and draws the marker flag + name in the ruler at the song
+  position; right press on the marker opens Rename marker / Delete marker / Time markers; the More menu has File / Edit /
+  View / Time markers. Alt+N (background waveform) needs an audio channel: covered by the unit tests only.
 - Left (not FL-parity blockers): note REPEAT length, F4 (note colour presets / typing-to-piano layouts), pattern time
   signature markers do not yet change the Piano roll's bar grid.

@@ -106,6 +106,11 @@ std::vector<Action> makeActions()
         { "transport.metronome", TR_NOOP ("Metronome on/off"), Context::global, { chord ('M', ctrl) } },
         { "record.countIn", TR_NOOP ("Count-in before recording on/off"), Context::global, { chord ('P', ctrl) } },
         { "record.waitForInput", TR_NOOP ("Recording waits for the first note on/off"), Context::global, { chord ('I', ctrl) } },
+        // round 170e3: FL's Options › Blend recorded notes (Ctrl+B), Loop record and Step edit (Ctrl+E) [DFM ShortcutsModule]
+        { "record.blend", TR_NOOP ("Blend recorded notes on/off (off: replace)"), Context::global, { chord ('B', ctrl) } },
+        { "record.loop", TR_NOOP ("Loop record on/off"), Context::global, {} },
+        { "record.stepEdit", TR_NOOP ("Step edit on/off"), Context::global, { chord ('E', ctrl) } },
+        { "record.punch", TR_NOOP ("Punch in/out on the loop region on/off"), Context::global, {} },
         { "record.quickAudio", TR_NOOP ("Record audio now: arm the selected insert and record (press again to stop)"), Context::global, { chord ('R', shift) } },
         { "record.captureMidi", TR_NOOP ("Capture MIDI: the notes just played without recording into the pattern"), Context::global, { chord ('R', ctrl | shift | alt) } },
 
@@ -128,7 +133,10 @@ std::vector<Action> makeActions()
         // FL's Edit › "Undo backwards" (EditUndoBackwardsAction, Ctrl+Alt+Z; round 167k): one more step back
         { "edit.undoBackwards", TR_NOOP ("Undo backwards"), Context::global, { chord ('Z', ctrl | alt) } },
         { "edit.redo", TR_NOOP ("Redo"), Context::global, { chord ('Y', ctrl), chord ('Z', ctrl | shift) } },
-        { "edit.history", TR_NOOP ("Undo history"), Context::global, { chord ('H', ctrl) } },
+        // FL's Tools › Macros › Stop sound (MacroStopSoundAction, Ctrl+H; round 170h2): the Undo history moved to
+        // Ctrl+Alt+H, free in FL and in LYNX
+        { "edit.history", TR_NOOP ("Undo history"), Context::global, { chord ('H', ctrl | alt) } },
+        { "tools.stopSound", TR_NOOP ("Stop sound (all notes off)"), Context::global, { chord ('H', ctrl) } },
         { "help.shortcuts", TR_NOOP ("Shortcut sheet (press again to close)"), Context::global, { chord (f1) } },
         { "browser.search", TR_NOOP ("Search the Browser"), Context::global, { chord ('F', ctrl) } },
 
@@ -142,6 +150,10 @@ std::vector<Action> makeActions()
         { "rack.selectAll", TR_NOOP ("Select all channels"), Context::channelRack, { chord ('A', ctrl) } },
         { "rack.clone", TR_NOOP ("Clone the selected channels"), Context::channelRack, { chord ('C', alt) } },
         { "rack.deleteSelected", TR_NOOP ("Delete the selected channels"), Context::channelRack, { chord (del, alt) } },
+        // FL's Edit › Cut / Copy / Paste with the rack focused (REA round 170a §1): the selected channels' steps and notes
+        { "rack.cut", TR_NOOP ("Cut the selected channels' steps"), Context::channelRack, { chord ('X', ctrl) } },
+        { "rack.copy", TR_NOOP ("Copy the selected channels' steps"), Context::channelRack, { chord ('C', ctrl) } },
+        { "rack.paste", TR_NOOP ("Paste steps into the selected channels"), Context::channelRack, { chord ('V', ctrl) } },
         { "rack.sendToInserts", TR_NOOP ("Send the selected channels to free mixer inserts"), Context::channelRack, { chord ('L', ctrl) } },
         { "rack.graphEditor", TR_NOOP ("Step graph lanes on/off"), Context::channelRack, { chord ('K', ctrl) } },
         { "rack.pianoRollView", TR_NOOP ("Piano-roll view of all channels on/off"), Context::channelRack, {} },
@@ -241,6 +253,9 @@ std::vector<Action> makeActions()
         { "playlist.ripple", TR_NOOP ("Ripple editing on/off"), Context::playlist, { chord ('S', shift) } },
         // FL's Playlist › Edit › "Automatic crossfades (current project)" (round 166e)
         { "playlist.autoCrossfades", TR_NOOP ("Automatic crossfades (current project) on/off"), Context::playlist, {} },
+        // FL's legacy Pattern Blocks (round 170f, issue #60)
+        { "playlist.patternBlocks", TR_NOOP ("Pattern blocks (current project) on/off"), Context::playlist, {} },
+        { "playlist.blocksToClips", TR_NOOP ("Turn pattern blocks into clips"), Context::playlist, {} },
         // FL's Select › time (round 167k: EESelAroundSelAction, EESelPrevAction / EESelNextAction, Playlist focused)
         { "playlist.selectTimeAround", TR_NOOP ("Select time around selection"), Context::playlist, { chord (enter, ctrl) } },
         { "playlist.timePrevious", TR_NOOP ("Select previous time"), Context::playlist, { chord (left, ctrl) } },

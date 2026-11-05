@@ -78,6 +78,8 @@ public:
     virtual void render (float* left, float* right, int n, float gainLeft, float gainRight) noexcept = 0;
     // Automated parameter (plugins). 0..1. Audio thread.
     virtual void setParameter (int /*index*/, float /*value*/) noexcept {}
+    // A hosted plugin's parameter value now (0..1; −1 = unknown), for a Patcher parameter output (round 171b). Audio thread.
+    virtual float parameterValue (int /*index*/) const noexcept { return -1.0f; }
     // Latency the instrument introduces (plugins), in samples. For PDC.
     virtual int latencySamples() const noexcept { return 0; }
     // "Slide" note: sounding notes glide to `key` over `samples`, without retriggering. Ignored if unsupported.
@@ -125,6 +127,9 @@ public:
     virtual void settleNew() {}
     // Control output ("controller" instruments), 0..1. Audio thread.
     virtual float controlOutput (int /*output*/) const noexcept { return 0.0f; }
+    // the program the instrument plays when a note can select it (Transistor Bass's sequencer: the note's key), −1
+    // otherwise; the editor follows it as FL's does (round 169g2)
+    virtual int selectedProgram() const noexcept { return -1; }
     // Song position (ticks) at the start of the block, for the global LFOs. Audio thread.
     virtual void setSongPosition (double /*ticks*/) noexcept {}
     // No voice sounding: render would only produce silence (the mixer skips the channel until a note arrives).

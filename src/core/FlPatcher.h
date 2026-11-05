@@ -32,6 +32,9 @@ struct PatcherPort
     int index = 0;      // audio: bus; control input: parameter; control output: 0x10000000 + output; pin: bus
     int kind = 0;       // 0 audio, 1 MIDI, 2 control
     std::string name;   // pins: "Audio input", "Notes", "Insert 3"…
+    // node ports (record 5009 @16): bit 0 input, bit 1 visible (FL's node menu › Inputs / Outputs: activated),
+    // bit 3 a parameter / controller port (REA_rodada14 §1.3.1, REA_rodada171b)
+    std::uint32_t flags = 0;
 };
 struct PatcherCable
 {

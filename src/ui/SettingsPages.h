@@ -22,6 +22,8 @@ struct GeneralOptions
     bool waveSpectral = false, waveStereo = false;
     int noteNames = 0;          // notenames::Style: English, Germanic, Solfège (round 165f)
     bool noteFlats = false;     // black notes as flats
+    bool noteNamesEveryKey = true; // the Piano roll names every key (LYNX, round 170a)
+    bool rackPlayheadColumn = true; // the Channel Rack's playhead column + bar marks (LYNX, round 170a)
     bool splash = true, startupSound = true, scanAtStart = true;
     bool menuEntry = false;     // Linux AppImage: LYNX in the applications menu + the .lynx file type (round 161)
     bool typingPiano = true, keepEditorsOpen = false, rememberSeek = false;
@@ -41,6 +43,7 @@ struct GeneralOptions
     int crashReports = 0;          // crashreport::Consent: 0 ask, 1 always send, 2 never (round 159)
     bool checkUpdates = true;      // "Check for updates automatically" (ui/Updater.h, round 166b)
     bool reducedEffects = false;
+    bool artMotion = true;         // round 170j: the Themed plugins' art moves (falling petals, glows...)
     bool gpuRendering = true;      // Windows: Direct2D (JUCE 8's default) or GDI for every LYNX window (round 157a)
     int pluginStyle = -1;          // −1 automatic (each plugin its own style), else a skin::Style forced everywhere   // plugin editors without glows, blooms or the open animation (ui/PluginSkin.h)
 

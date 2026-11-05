@@ -639,4 +639,24 @@ int uniqueTypeAhead (const std::vector<std::string>& labels, char typed)
         }
     return found;
 }
+
+int nextTypeAhead (const std::vector<std::string>& labels, const std::vector<bool>& selectable, int current, char typed)
+{
+    const auto lowerChar = [] (char c) { return (char) std::tolower ((unsigned char) c); };
+    if (typed == 0 || std::isspace ((unsigned char) typed) || labels.empty())
+        return -1;
+    const auto n = (int) labels.size();
+    const auto start = current >= 0 && current < n ? current + 1 : 0;
+    for (int k = 0; k < n; ++k)
+    {
+        const auto i = (start + k) % n;
+        if (i < (int) selectable.size() && ! selectable[(std::size_t) i])
+            continue;
+        const auto& label = labels[(std::size_t) i];
+        const auto first = label.find_first_not_of (' ');
+        if (first != std::string::npos && lowerChar (label[first]) == lowerChar (typed))
+            return i;
+    }
+    return -1;
+}
 } // namespace lynx::prefs

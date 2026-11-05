@@ -233,7 +233,12 @@ private:
     // toolbar, or Options > Toolbar; core/ToolbarLayout.h). Row height follows the icon size.
     toolbarlayout::Layout toolbarLayout = toolbarlayout::Layout::makeDefault();
     int rowHeight = toolbarlayout::rowHeight (toolbarlayout::IconSize::medium);
-    int toolbarHeight = 2 * rowHeight + 8;
+    int toolbarHeight = 2 * rowHeight + 12;
+    toolbarlayout::IconSize appliedIconSize = toolbarlayout::IconSize::medium;
+    bool compactRecord = false;
+    bool narrowSnap = false; // round 170e5, 1280 px: the "+" new-pattern button takes the pattern icon's place
+    juce::Rectangle<int> modeArea; // the Pattern / Song switch (painted as one control) // a narrow window: four recording switches per row (round 170e3)
+    void applyIconSizing (toolbarlayout::IconSize size);
     void setToolbarLayout (const toolbarlayout::Layout& layout, bool save = true);
     juce::PopupMenu makeToolbarMenu();
     void showToolbarMenu();
@@ -310,6 +315,16 @@ private:
     IconButton typingPianoButton { "typingPiano", Icon::keyboard };
     IconButton countInButton { "countIn", Icon::countIn };
     IconButton waitInputButton { "waitInput", Icon::waitInput };
+    // FL's recording panel toggles (round 170e2): Blend recorded notes (overdub, off = replace) and the tempo tapper
+    IconButton blendButton { "blend", Icon::blend };
+    IconButton tapTempoButton { "tapTempo", Icon::tapTempo };
+    // round 170e3: FL's Loop record and Step edit switches, and LYNX's punch in/out on the loop region, as toggles
+    IconButton loopRecordButton { "loopRecord", Icon::loopRecord };
+    IconButton stepEditButton { "stepEdit", Icon::stepEdit };
+    IconButton punchButton { "punch", Icon::punch };
+    stepedit::Writer stepWriter;               // Step edit: where the next played note goes (core/StepEdit.h)
+    double stepSeekTick = -1.0, stepPrevTick = -1.0; // the position step edit last moved to / moved from
+    void applyStepEdit();
     void refreshRecordOptionButtons();
     void showRecordMenu();
     // right-click on the metronome: on/off, its volume, count-in (FL keeps the metronome's options there)
@@ -355,7 +370,21 @@ private:
     };
     TempoDisplay tempoDisplay { engine };
 
-    juce::ComboBox patternBox;
+    // The toolbar's pattern selector (FL's PatSelect, a TVectorDigiWheel; REA round 170a §3): a click opens the list as
+    // before, a left-drag up / down and the wheel step through the patterns (no list to open and read).
+    struct PatternBox final : public juce::ComboBox
+    {
+        std::function<void (int delta)> onStep;
+        float downY = 0.0f;
+        int appliedSteps = 0;
+        bool dragging = false, pressed = false;
+        patterndrag::Wheel wheelSteps;
+        void mouseDown (const juce::MouseEvent& e) override;
+        void mouseDrag (const juce::MouseEvent& e) override;
+        void mouseUp (const juce::MouseEvent& e) override;
+        void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
+    };
+    PatternBox patternBox;
     IconButton newPatternButton { "newPattern", Icon::plus };
     IconButton patternMenuButton { "patternMenu", Icon::more };
     juce::Slider swingSlider { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox }; // in the Channel Rack's title bar
@@ -378,6 +407,9 @@ private:
         juce::String text;
         juce::Colour colour;
         int hoveredPart = -1; // 0 = previous, 1 = name, 2 = next
+        int appliedSteps = 0;  // a left-drag on the name steps through the patterns (FL's pattern selector)
+        bool namePressed = false, dragging = false;
+        patterndrag::Wheel wheelSteps;
         std::function<void (int delta)> onStep;
         std::function<void()> onMenu;
         static constexpr int arrowWidth = 16;
@@ -386,11 +418,14 @@ private:
         void mouseMove (const juce::MouseEvent& e) override { setHovered (partAt (e.x)); }
         void mouseExit (const juce::MouseEvent&) override { setHovered (-1); }
         void mouseDown (const juce::MouseEvent& e) override;
+        void mouseDrag (const juce::MouseEvent& e) override;
+        void mouseUp (const juce::MouseEvent& e) override;
         void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel) override;
         void setHovered (int part) { if (part != hoveredPart) { hoveredPart = part; repaint(); } }
     };
     PatternSelector rackPatternSelector;
     void showRackPatternList();
+    void stepPatternFromSelector (int delta); // drag / wheel on the toolbar box or the rack selector
     void refreshRackPatternSelector();
     // The current pattern's length in bars next to the swing knob (issue #12; drawn like the rack's insert number
     // box): drag up / down or the wheel changes it, double-click = automatic (from the notes), right-click = menu.
@@ -428,7 +463,8 @@ private:
     IconButton rackFollowButton { "rackFollow", Icon::follow }; // Follow the playing step (issue #12)
     static constexpr int rackPatternSelectorWidth = 132;
     static constexpr int rackLengthBoxWidth = 40;
-    static constexpr int rackTitleToolsWidth = rackPatternSelectorWidth + 6 + 96 + 4 + 26 + 4 + rackLengthBoxWidth + 4 + 24 + 4 + 24 + 4 + 24 + 4 + 24 + 4 + 24;
+    static constexpr int rackFilterBoxWidth = 108;
+    static constexpr int rackTitleToolsWidth = rackPatternSelectorWidth + 6 + rackFilterBoxWidth + 4 + 26 + 4 + rackLengthBoxWidth + 4 + 24 + 4 + 24 + 4 + 24 + 4 + 24 + 4 + 24;
     // one icon per workspace panel (F5..F9): click toggles, right-click shows it maximized
     std::array<IconButton, workspace::panelCount> panelButtons { IconButton { "playlistPanel", Icon::playlist },
                                                                  IconButton { "rackPanel", Icon::channelRack },

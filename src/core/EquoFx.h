@@ -69,14 +69,15 @@ public:
     void set (const State& s) noexcept; // a newly loaded state (as after FL's state load)
     void setKnobs (const State& s) noexcept; // knob / option changes on the running engine
     void setBands (const State& s) noexcept; // band table / band mode changes on the running engine (values glide)
-    void reset() noexcept;              // as freshly loaded: filters cleared, gains ramp in from zero
+    void reset() noexcept;              // as freshly loaded: filters cleared, gains ramp in from zero (smoother kept)
     void flush() noexcept;              // FL's Flush message: filters cleared, gains jump to their targets
     void process (float* left, float* right, int n) noexcept; // stereo, in place, any n (FL blocks of 512)
 
     // motion smoothing: FL calls the plugin once per song tick (samples per tick; 0 = no ticks); tick() = one call
     void setSamplesPerTick (double samplesPerTick) noexcept;
     void tick() noexcept;
-    // the smoother's states as FL's constructor leaves them (1, 0, 1) instead of at the loaded values (EXEC checks)
+    // the smoother's states as FL's constructor leaves them (1, 0, 1). A new engine starts there and set() / reset() do
+    // not touch them (FL's render of the render test, REA_rodada170i §8); this puts them back (EXEC checks)
     void startFromConstruction() noexcept;
 
     // band b's current volume / pan / send values (after mix, shift, morph and the master bank)

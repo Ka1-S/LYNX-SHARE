@@ -1601,6 +1601,7 @@ public:
         reverse.store (s.reverse);
         cutSelf.store (s.cut);
         useLoops.store (s.useLoopPoints);
+        flVelocityLaw.store (s.flVelocityLaw);
         declickMode.store (std::clamp (s.declickMode, 0, 5));
         // with "keep pitch" the sample arrives already stretched (RackState): play at normal speed; the keys then
         // transpose it through each voice's pitch shifter (round 162), so its length stays
@@ -1715,8 +1716,10 @@ public:
             if (index < 0 || index >= slices.count)
                 return;
 
-            first = std::floor (total * slices.starts[(std::size_t) index]);
-            last = index + 1 < slices.count ? std::max (first, std::floor (total * slices.starts[(std::size_t) index + 1]) - 1.0) : total;
+            // the starts are fractions of the sample (floats): the nearest frame, as a float a hair under p/total made
+            // every Slicex slice start one frame early (round 170i2, REA_rodada170i §9)
+            first = std::round (total * slices.starts[(std::size_t) index]);
+            last = index + 1 < slices.count ? std::max (first, std::round (total * slices.starts[(std::size_t) index + 1]) - 1.0) : total;
             sliced = true;
         }
         const auto base = baseRate (*data) / clipStretch;
@@ -1771,7 +1774,9 @@ public:
         target->key = key;
         // FL plays a Playlist audio clip at unity gain at the channel's default volume (78%): the channel volume
         // curve is relative to that point for clips (REA_rodada89 §4.2 [EXEC]: +5.2 dB at every volume and pan)
-        target->velocity = clipMode ? velocity * audioClipUnity() : velocity;
+        target->velocity = clipMode                                         ? velocity * audioClipUnity()
+                           : flVelocityLaw.load (std::memory_order_relaxed) ? flInitVolume (velocity)
+                                                                            : velocity;
         target->data = data;
         target->zoneGain = (zone != nullptr ? zone->zone.gain : 1.0f) * noteGain;
 
@@ -2092,7 +2097,7 @@ public:
                     voicePan (v.basePan, v.panL, v.panR);
                 }
                 else if (prop == (int) vfx::Prop::velocity)
-                    v.velocity = std::clamp (value, 0.0f, 1.0f);
+                    v.velocity = flVelocityLaw.load (std::memory_order_relaxed) ? flInitVolume (value) : std::clamp (value, 0.0f, 1.0f);
             }
     }
 
@@ -2930,6 +2935,7 @@ private:
     bool nextPorta = false;
     std::atomic<bool> reverse { false }, cutSelf { false };
     std::atomic<bool> useLoops { true }, fastDeclick { false }, panTriangular { false };
+    std::atomic<bool> flVelocityLaw { false }; // SamplerSettings::flVelocityLaw
     std::atomic<int> declickMode { 0 };
 };
 } // namespace

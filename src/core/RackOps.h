@@ -27,6 +27,47 @@ bool isPatternEmpty (const Pattern& pattern) noexcept;
 // Index of the next/previous pattern (clamped to the list).
 int stepPattern (const Song& song, int delta) noexcept;
 
+// FL's pattern selector (the toolbar's PatSelect, a TVectorDigiWheel with Min 1 / Max 999; REA round 170a §3): a
+// left-drag up or down steps through the patterns, the wheel steps one pattern per notch, a click without a drag opens
+// the list. Shared by the toolbar's pattern box and the Channel Rack's pattern selector.
+namespace patterndrag
+{
+inline constexpr int threshold = 3;              // px a press moves before it is a drag (and opens no list)
+inline constexpr float pixelsPerPattern = 10.0f; // drag distance per pattern
+// Patterns stepped by a drag `dragY` px from where it started (screen y grows downwards): up = the next patterns.
+inline int steps (float dragY) noexcept { return (int) (-dragY / pixelsPerPattern); }
+// The wheel: one pattern per notch (a trackpad's small deltas add up to a notch); up = the next pattern, as FL's
+// selector ([SHOT] round 170a: a notch up on "Pattern 769" gave "Pattern 770").
+struct Wheel
+{
+    float pending = 0.0f;
+    static constexpr float notch = 0.1f;
+    int take (float delta) noexcept
+    {
+        if (delta >= notch || delta <= -notch) // a mouse wheel's notch (JUCE: 0.23 on Windows): one pattern
+        {
+            pending = 0.0f;
+            return delta > 0.0f ? 1 : -1;
+        }
+        if ((delta > 0.0f) != (pending > 0.0f) && pending != 0.0f)
+            pending = 0.0f; // a turn the other way starts over
+        pending += delta;
+        if (pending >= notch || pending <= -notch)
+        {
+            const auto n = pending > 0.0f ? 1 : -1;
+            pending = 0.0f;
+            return n;
+        }
+        return 0;
+    }
+};
+} // namespace patterndrag
+
+// The pattern selector's step (drag / wheel): FL's selector goes on past the last pattern and creates the one it lands
+// on ([SHOT] round 170a: a drag up from "Pattern 1" made "Pattern 769"). LYNX creates at most one: stepping forward
+// from the last pattern appends a new empty one unless the last one is already empty. Returns the index to select.
+int stepPatternCreating (Song& song, int delta);
+
 // The first empty pattern after `from` (wrapping around, never `from` itself); -1 if there is none.
 int findNextEmptyPattern (const Song& song, int from) noexcept;
 
@@ -183,6 +224,32 @@ bool channelCutsItself (const ChannelDef& c) noexcept;
 void setChannelCutsItself (ChannelDef& c, int channel, bool on) noexcept;
 // The cut-group number as the Misc tab shows it: "--" for none, "self" for the channel's own group, else the number.
 std::string cutGroupText (int group, int channel);
+
+// FL's Channel Rack Cut / Copy / Paste (Ctrl+X / Ctrl+C / Ctrl+V with the rack focused, and the channel menu's Cut /
+// Copy / Paste; REA round 170a §1: EditCutAction / CutMenuClick → the selected channels' steps and notes in the current
+// pattern). The clipboard runs from the first selected channel to the last channel: slot k is channel first + k, a
+// channel that was not selected is a gap that a paste leaves alone. A paste starts at the first selected channel, each
+// copied slot replaces that channel's notes (an empty slot clears them) and its loop point (none: removed). A cut
+// removes the notes (the loop points stay).
+struct ChannelStepsClipboard
+{
+    struct Slot
+    {
+        bool copied = false;     // false: that channel was not selected (left alone by a paste)
+        std::vector<Note> notes; // channel field = 0
+        bool loops = false;      // it had an entry in Pattern::channelLoops
+        int loopSetting = 0;
+    };
+    std::vector<Slot> slots;
+    bool empty() const noexcept { return slots.empty(); }
+};
+// `selected`: channel indices (any order). Empty clipboard when nothing is selected.
+ChannelStepsClipboard copyChannelSteps (const Pattern& pattern, const std::vector<int>& selected, int channelCount);
+// Removes the notes of the `selected` channels. Returns true when something was removed.
+bool clearChannelSteps (Pattern& pattern, const std::vector<int>& selected);
+// Pastes from the first selected channel; returns false (nothing changed) when the clipboard is empty or no channel
+// is selected.
+bool pasteChannelSteps (Pattern& pattern, const ChannelStepsClipboard& clipboard, const std::vector<int>& selected, int channelCount);
 
 // FL's hint bar over a step shows its song position as bar:step:tick ("1:02:00"): bar from 1, step (a 16th) from 1
 // with two digits, the tick inside the step (in FL's 96-per-quarter units: 24 per step) with two digits.

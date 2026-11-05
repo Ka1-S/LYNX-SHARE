@@ -2066,12 +2066,17 @@ struct State
 {
     bool usable = false;
     int version = 0, program = 0, sequencerMode = 0, engine = 0, oversampling = 4;
+    // the program the editor shows and edits, and whether a note (sequencer on) makes it the note's program
+    // (engine_x64 FUN_18000cb70 saves +0x3bf2c, +0x3bf30, +0x3bf28; FUN_18000d5a0 note-on; round 169g2)
+    int editProgram = 0;
+    bool follow = false;
     float seqTranspose = 0.0f;
     std::array<Program, 128> programs {};
     std::vector<std::array<float, 100>> patches; // the working copies (the second of each stored pair)
     std::array<std::size_t, 128> workingAt {};    // the byte offset of each working copy's first value (round 168q)
     std::vector<Sequence> sequences;
     std::size_t engineAt = 0, sequencerModeAt = 0; // (round 168q2)
+    std::size_t programAt = 0;                     // the program, then the edit program (round 169g2)
 };
 
 struct Reader
@@ -2130,9 +2135,10 @@ State parseState (const std::vector<std::uint8_t>& s)
     st.version = e.get<std::int16_t>();
     if (st.version < 1 || st.version > 5)
         return st;
+    st.programAt = e.at;
     st.program = e.get<std::int32_t>();
-    e.get<std::int32_t>();
-    e.get<std::uint8_t>();
+    st.editProgram = e.get<std::int32_t>();
+    st.follow = e.get<std::uint8_t>() != 0;
     for (auto& p : st.programs)
     {
         e.get<std::int16_t>();
@@ -2204,7 +2210,7 @@ State parseState (const std::vector<std::uint8_t>& s)
     st.engine = 0;
     if (st.version >= 5)
         st.engine = e.get<std::int32_t>();
-    st.usable = e.ok && e.at == engineEnd && st.program >= 0 && st.program < 128;
+    st.usable = e.ok && e.at == engineEnd && st.program >= 0 && st.program < 128 && st.editProgram >= 0 && st.editProgram < 128;
     for (const auto& p : st.programs)
         if (p.patch < 0 || p.patch >= 128 || p.sequence < 0 || p.sequence >= 128)
             st.usable = false;
@@ -2223,6 +2229,7 @@ public:
             engine = std::make_unique<Engine2> (dll, st.engine == 1);
         reverb.reset();
         program = st.program;
+        editProgram = st.editProgram;
         seqMode = st.sequencerMode;
         seqTranspose = st.seqTranspose;
         applyPatch();
@@ -2265,6 +2272,8 @@ public:
         if (seqMode != 0)
             arpNoteOn (0, 1.0f);
         applyPatch();
+        if (st.follow) // (FUN_18000d5a0: the editor follows the note)
+            editProgram = program;
         playing = true;
     }
 
@@ -2290,6 +2299,8 @@ public:
         gainL = std::sqrt (1.0f - p);
     }
     void setPitchExpression (float semis) noexcept { engine->pitchExpr = semis * 0.009999999776482582f; }
+    // MIDI CC 7 (FUN_18000d780: value/127, applied before the reverb; round 169g2)
+    void setMidiVolume (int cc7) noexcept { midiVolume = (float) ((double) std::clamp (cc7, 0, 127) / 127.0); }
     void setCutExpression (float x) noexcept { engine->cutExpr = x; }
     void setResExpression (float y) noexcept { engine->resExpr = y; }
 
@@ -2375,13 +2386,19 @@ public:
 
     bool silent() const noexcept { return engine->silent(); }
 
+    // the program the editor edits: the saved one, or the last note's key while the sequencer is on and follows
+    int editedProgram() const noexcept { return editProgram; }
+
     // a parameter of the current program's patch moved while playing (the designed page, automation; round 168q)
     void hostParam (int i, float v) noexcept
     {
         if (i < 0 || i >= 0x2A || ! std::isfinite (v))
             return;
-        st.patches[(std::size_t) st.programs[(std::size_t) program].patch][(std::size_t) i] = v;
-        setParam (i, (double) v);
+        // (FL's editor sets the edit program's patch; the engine takes it when that patch is the one playing)
+        const auto patch = st.programs[(std::size_t) editProgram].patch;
+        st.patches[(std::size_t) patch][(std::size_t) i] = v;
+        if (patch == st.programs[(std::size_t) program].patch)
+            setParam (i, (double) v);
     }
 
     // the saved program's sequence edited while playing (the page's step rows, automation; round 168q2): `raw` in the
@@ -2390,7 +2407,8 @@ public:
     {
         if (! std::isfinite (raw))
             return;
-        auto& q = st.sequences[(std::size_t) st.programs[(std::size_t) st.program].sequence];
+        // (the edit program's sequence, round 169g2)
+        auto& q = st.sequences[(std::size_t) st.programs[(std::size_t) editProgram].sequence];
         const auto v = (int) std::lround (raw);
         if (index == tbseq::length)
             q.length = std::clamp (v, 1, 16);
@@ -2621,7 +2639,7 @@ private:
     float xfA = 1.0f, xfB = 0.0f, xfStep = 0.0f;
     int xfLength = 13230, xfCount = 0, xfIndex = 0, xfTarget = 0;
     double rate = 44100.0, invRate = 1.0 / 44100.0, hostTempo = 125.0, rateScale = 1.0;
-    int program = 0, seqMode = 0, lastKey = -1, targetCount = 0;
+    int program = 0, editProgram = 0, seqMode = 0, lastKey = -1, targetCount = 0;
     float seqTranspose = 0.0f, gainL = 1.0f, gainR = 1.0f, midiVolume = 1.0f, velocityMix = 0.0f;
     bool playing = false;
     std::vector<Held> held;
@@ -2655,7 +2673,7 @@ void poke (std::vector<std::uint8_t>& b, std::size_t at, T v) noexcept
         std::memcpy (b.data() + at, &v, sizeof (T));
 }
 
-const Sequence& savedSequence (const State& st) { return st.sequences[(std::size_t) st.programs[(std::size_t) st.program].sequence]; }
+const Sequence& savedSequence (const State& st) { return st.sequences[(std::size_t) st.programs[(std::size_t) st.editProgram].sequence]; }
 
 // a sequence parameter's raw value in a parsed state (nullopt: not a sequence parameter)
 std::optional<float> seqValue (const State& st, int index)
@@ -2730,7 +2748,7 @@ std::optional<float> anyValue (const State& st, const std::vector<std::uint8_t>&
     {
         if (! st.usable)
             return std::nullopt;
-        const auto at = st.workingAt[(std::size_t) st.programs[(std::size_t) st.program].patch] + 4 * (std::size_t) index;
+        const auto at = st.workingAt[(std::size_t) st.programs[(std::size_t) st.editProgram].patch] + 4 * (std::size_t) index;
         return peek<float> (b, at);
     }
     return seqValue (st, index);
@@ -2742,7 +2760,7 @@ bool anyWriteInPlace (std::vector<std::uint8_t>& b, const State& st, int index, 
     {
         if (! st.usable)
             return false;
-        poke<float> (b, st.workingAt[(std::size_t) st.programs[(std::size_t) st.program].patch] + 4 * (std::size_t) index, raw);
+        poke<float> (b, st.workingAt[(std::size_t) st.programs[(std::size_t) st.editProgram].patch] + 4 * (std::size_t) index, raw);
         return true;
     }
     return seqWriteInPlace (b, st, index, raw);
@@ -2813,6 +2831,7 @@ public:
         slide = {};
         slideKey = k;
         plugin->noteOn (0, k, v7);
+        selected.store (plugin->editedProgram());
         sent[(std::size_t) k] = false;
         nextPan = 0.0f, nextCents = 0.0f;
         quiet = 0;
@@ -2868,6 +2887,16 @@ public:
                 sent[(std::size_t) k] = true;
             }
         plugin->setTempo (tempo.load());
+        // FL's channel volume reaches the plugin only as MIDI CC 7 (Final.Vol is not read, §2.10): raw volume
+        // (0…12800)·128/12800 truncated, at most 127, as Kepler's host (REA_rodada165g-flbeta165k §3); LYNX's gains are
+        // channelGain(v) = (11^v − 1)/10, so v comes back as log(10·g + 1)/log 11 (round 169g2: was the channel gain on
+        // the output, 3 dB below FL at the default volume)
+        {
+            const auto v = vol > 0.0 ? std::log (10.0 * vol + 1.0) / std::log (11.0) : 0.0;
+            const auto cc7 = (int) std::min<long long> (127, std::max<long long> (0, std::llround (v * 12800.0) / 100));
+            if (cc7 != sentVolume)
+                plugin->setMidiVolume (sentVolume = cc7);
+        }
         float peak = 0.0f;
         for (int done = 0; done < n;)
         {
@@ -2880,11 +2909,10 @@ public:
                 slide.advance ((float) m);
             }
             plugin->render (scratchL.data(), scratchR.data(), m);
-            const auto g = (float) vol;
             for (int i = 0; i < m; ++i)
             {
-                left[done + i] += scratchL[(std::size_t) i] * g;
-                right[done + i] += scratchR[(std::size_t) i] * g;
+                left[done + i] += scratchL[(std::size_t) i];
+                right[done + i] += scratchR[(std::size_t) i];
                 peak = std::max ({ peak, std::fabs (scratchL[(std::size_t) i]), std::fabs (scratchR[(std::size_t) i]) });
             }
             done += m;
@@ -2914,6 +2942,8 @@ private:
             sounding.fill (false);
             quiet = 0;
             liveParams.clear(); // (built from the newest state)
+            sentVolume = -1;
+            selected.store (plugin != nullptr ? plugin->editedProgram() : -1);
         }
         if (plugin != nullptr)
             liveParams.drain ([this] (int i, float v) {
@@ -2930,14 +2960,27 @@ private:
     {
         if (before.size() != after.size() || ! parsed.usable)
             return false;
-        const auto a = parseState (before), b = parseState (after);
-        if (! a.usable || ! b.usable || a.program != b.program)
+        auto base = before;
+        auto a = parseState (base);
+        const auto b = parseState (after);
+        if (! a.usable || ! b.usable)
             return false;
-        auto expected = before;
+        // the editor followed the program a note selected (round 169g2): the engine already plays it
+        if (a.program != b.program || a.editProgram != b.editProgram)
+        {
+            if (b.editProgram != selected.load() || a.programAt != b.programAt)
+                return false;
+            poke<std::int32_t> (base, a.programAt, b.program);
+            poke<std::int32_t> (base, a.programAt + 4, b.editProgram);
+            a = parseState (base);
+            if (! a.usable)
+                return false;
+        }
+        auto expected = base;
         std::vector<std::pair<int, float>> changed;
         for (const auto& p : transistorBassParams())
         {
-            const auto va = anyValue (a, before, p.index), vb = anyValue (b, after, p.index);
+            const auto va = anyValue (a, base, p.index), vb = anyValue (b, after, p.index);
             if (! va || ! vb)
                 return false;
             if (std::memcmp (&*va, &*vb, sizeof (float)) == 0)
@@ -2954,6 +2997,8 @@ private:
     }
 
 public:
+    int selectedProgram() const noexcept override { return selected.load(); }
+
     void setParameter (int index, float value) noexcept override
     {
         take();
@@ -2973,6 +3018,8 @@ private:
     std::shared_ptr<const DllData> data;
     std::atomic<double> rate { 44100.0 }, tempo { 140.0 };
     std::atomic<float> channelCents { 0.0f };
+    std::atomic<int> selected { -1 }; // the plugin's program (selectedProgram)
+    int sentVolume = -1;              // the MIDI volume sent to the plugin
     std::vector<std::uint8_t> state;
     std::string dllPath;
     int quiet = 0;
@@ -2998,7 +3045,17 @@ int transistorBassParamOffset (const std::vector<std::uint8_t>& state, int index
     const auto st = parseState (state);
     if (! st.usable)
         return -1;
-    return (int) st.workingAt[(std::size_t) st.programs[(std::size_t) st.program].patch] + 4 * index;
+    return (int) st.workingAt[(std::size_t) st.programs[(std::size_t) st.editProgram].patch] + 4 * index;
+}
+
+bool transistorBassSelectProgram (std::vector<std::uint8_t>& state, int program)
+{
+    const auto st = parseState (state);
+    if (! st.usable || program < 0 || program >= 128 || st.programAt + 4 > state.size())
+        return false;
+    poke<std::int32_t> (state, st.programAt, program);     // (what FL saves after the note: the program…)
+    poke<std::int32_t> (state, st.programAt + 4, program); // (…and the edit program that followed it)
+    return true;
 }
 
 std::optional<TransistorBassProgram> transistorBassProgram (const std::vector<std::uint8_t>& state)
@@ -3007,8 +3064,8 @@ std::optional<TransistorBassProgram> transistorBassProgram (const std::vector<st
     if (! st.usable)
         return std::nullopt;
     TransistorBassProgram out;
-    const auto& pr = st.programs[(std::size_t) st.program];
-    out.program = st.program;
+    const auto& pr = st.programs[(std::size_t) st.editProgram];
+    out.program = st.editProgram;
     out.transpose = pr.transpose;
     out.sequencer = st.sequencerMode != 0;
     const auto& q = st.sequences[(std::size_t) pr.sequence];

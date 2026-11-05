@@ -2282,9 +2282,11 @@ public:
     {
         if (synth == nullptr)
             return;
+        // every key, not only the held ones: a note at velocity 0 on a sounding key clears the key's held entry (FUN_1800e93d0)
+        // and leaves the sounding voice alive, so it was never released and rang until the project closed (genfuzz,
+        // round 170i2). The DLL's note off releases the key's voices whatever the held table says.
         for (int k = 0; k < 128; ++k)
-            if (synth->held[k] != 0)
-                synth->noteOff (k);
+            synth->noteOff (k);
     }
 
     // the effects run after the voices whether or not a voice sounds (no bypass, §2.11): idle once no voice is alive

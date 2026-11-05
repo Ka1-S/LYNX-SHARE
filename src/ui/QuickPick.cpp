@@ -8,6 +8,7 @@
 #include "core/MidiControls.h"
 #include "core/SoundFont.h"
 #include "core/NativeEngines.h"
+#include "core/PluginCatalog.h"
 #include "core/Preferences.h"
 #include "core/ProjectContents.h"
 #include "core/VideoPlayer.h"
@@ -113,17 +114,19 @@ std::vector<GeneratorEntry> generatorEntries (AudioEngine& engine, bool withUnav
     return out;
 }
 
-std::vector<EffectEntry> effectEntries (AudioEngine& engine)
+std::vector<EffectEntry> effectEntries (AudioEngine& engine, bool withUnavailable)
 {
     std::vector<EffectEntry> out;
     const auto bpm = engine.getSong().bpm;
     for (const auto kind : addableEffects())
-        if (addableEffectAvailable (kind))
+        if (const auto available = addableEffectAvailable (kind); available || withUnavailable)
         {
             const auto flEngine = natives::effectEngine (kind) != nullptr;
             out.push_back ({ std::string ("lynx:fx:") + effectInfo (kind).name, addableEffectName (kind),
                              flEngine ? tr ("built-in FL engine") : tr ("built-in"), flEngine ? 1 : 0,
                              [kind, bpm] { return std::optional<EffectSlot> (newAddableEffect (kind, bpm)); } });
+            out.back().available = available;
+            out.back().flPlugin = isFlEffect (kind);
         }
 
     auto types = engine.getPluginHost().getKnownPlugins().getTypes();
@@ -143,12 +146,78 @@ std::vector<EffectEntry> effectEntries (AudioEngine& engine)
     return out;
 }
 
+namespace
+{
+// The built-in plugins of `entries` with what their default category needs (round 170b)
+plugincatalog::BuiltinPlugin builtinOf (const GeneratorEntry& e)
+{
+    const auto name = e.key.rfind ("lynx:gen:", 0) == 0 ? e.key.substr (9) : e.key;
+    return { e.key, name, true, e.folder == 1 };
+}
+plugincatalog::BuiltinPlugin builtinOf (const EffectEntry& e)
+{
+    const auto name = e.key.rfind ("lynx:fx:", 0) == 0 ? e.key.substr (8) : e.key;
+    return { e.key, name, e.flPlugin, e.flPlugin };
+}
+
+// FL's plugin menu (REA_rodada166f §1, round 170b): a heading per folder with its subfolders as submenus and its plugins
+// A-Z (Categories), every folder a submenu (Tree) or one A-Z list (Simple); `item` adds entry i to a menu.
+template <typename Entry>
+bool categorizedItems (juce::PopupMenu& menu, AudioEngine& engine, const std::vector<Entry>& entries, bool instruments,
+                       const std::function<void (juce::PopupMenu&, int)>& item)
+{
+    std::vector<std::string> keys;
+    std::vector<plugincatalog::BuiltinPlugin> builtins;
+    for (const auto& e : entries)
+    {
+        keys.push_back (e.key);
+        if (e.folder != 3) // (installed plugins only under a folder the user made)
+            builtins.push_back (builtinOf (e));
+    }
+    auto& host = engine.getPluginHost();
+    const auto folders = plugincatalog::withDefaultCategories (host.databaseFolders(), instruments, builtins);
+    const auto tree = plugincatalog::menuTree (folders, instruments, keys);
+    if (tree.empty()) return false;
+    const auto view = (plugincatalog::MenuView) host.databaseFolders().view;
+    auto label = [&] (int i) { return shownName (engine, entries[(std::size_t) i].key, entries[(std::size_t) i].label); };
+    auto addItems = [&] (juce::PopupMenu& m, std::vector<int> items) {
+        std::stable_sort (items.begin(), items.end(), [&] (int a, int b) { return label (a).compareNatural (label (b)) < 0; });
+        for (const auto i : items)
+            item (m, i);
+    };
+    std::function<juce::PopupMenu (const plugincatalog::MenuFolder&)> submenu = [&] (const plugincatalog::MenuFolder& f) {
+        juce::PopupMenu m;
+        for (const auto& sub : f.sub) m.addSubMenu (juce::String::fromUTF8 (sub.name.c_str()), submenu (sub));
+        addItems (m, f.items);
+        return m;
+    };
+    if (view == plugincatalog::MenuView::simple)
+        addItems (menu, plugincatalog::allItems (tree));
+    else
+        for (const auto& f : tree)
+        {
+            if (view == plugincatalog::MenuView::tree)
+            {
+                menu.addSubMenu (juce::String::fromUTF8 (f.name.c_str()), submenu (f));
+                continue;
+            }
+            menu.addSectionHeader (juce::String::fromUTF8 (f.name.c_str()));
+            for (const auto& sub : f.sub) menu.addSubMenu (juce::String::fromUTF8 (sub.name.c_str()), submenu (sub));
+            addItems (menu, f.items);
+        }
+    menu.addSeparator();
+    return true;
+}
+} // namespace
+
 void addGeneratorMenu (juce::PopupMenu& menu, AudioEngine& engine, std::function<void (ChannelDef)> pick,
                        std::function<void()> chooseSample, const ChannelDef* current, juce::Component* owner)
 {
     const auto entries = generatorEntries (engine, true);
-    auto item = [&] (juce::PopupMenu& m, const GeneratorEntry& e) {
-        // the channel's own generator is ticked (only kinds with one entry: the VFX and FL engines share kinds / names)
+    // FL's Add menu (round 170b): the generators under their categories, A-Z (FL's Plugin database folders, LYNX's own
+    // first); the channel's own generator is ticked (only kinds with one entry: the VFX and FL engines share kinds / names)
+    categorizedItems<GeneratorEntry> (menu, engine, entries, true, [&] (juce::PopupMenu& m, int i) {
+        const auto& e = entries[(std::size_t) i];
         const auto own = current != nullptr && current->instrument == e.kind && e.folder == 0 && e.kind != InstrumentKind::controller;
         m.addItem (shownName (engine, e.key, e.label), e.available, own, [make = e.make, pick] {
             if (auto c = make())
@@ -157,28 +226,7 @@ void addGeneratorMenu (juce::PopupMenu& menu, AudioEngine& engine, std::function
                 juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("FL engines"),
                                                         tr ("This engine needs the data files of an FL Studio installation, which were not found or could not be read."));
         });
-    };
-    auto section = [&] (int s) {
-        for (const auto& e : entries)
-            if (e.folder == 0 && e.section == s)
-                item (menu, e);
-    };
-    auto folder = [&] (int f, const juce::String& name) {
-        juce::PopupMenu sub;
-        for (const auto& e : entries)
-            if (e.folder == f)
-                item (sub, e);
-        if (sub.getNumItems() > 0)
-            menu.addSubMenu (name, sub);
-    };
-
-    section (0);
-    menu.addSeparator();
-    section (1);
-    folder (1, tr ("FL engines"));
-    folder (2, tr ("VFX (note effects)"));
-    section (2);
-    menu.addSeparator();
+    });
     if (chooseSample)
         menu.addItem (tr ("Sampler (choose file)..."), chooseSample);
     juce::PopupMenu plugins;
@@ -250,12 +298,29 @@ std::vector<Pick> renamed (AudioEngine& engine, const std::vector<Entry>& entrie
 }
 
 // Listens to the keys of an open menu (its window is the modal component while it shows).
-struct MenuKeys final : public juce::KeyListener
+struct MenuKeys final : public juce::KeyListener, private juce::Timer
 {
     std::vector<Pick> picks;
     std::function<bool (const juce::KeyPress&)> onKey;
 
-    bool keyPressed (const juce::KeyPress& key, juce::Component*) override
+    ~MenuKeys() override { detachAll(); }
+
+    // Every window of the menu (the root, then each submenu it opens) is the modal component while it has the keys
+    void start()
+    {
+        attachToModal();
+        startTimer (40);
+    }
+    void detachAll()
+    {
+        stopTimer();
+        for (auto& w : windows)
+            if (auto* c = w.getComponent())
+                c->removeKeyListener (this);
+        windows.clear();
+    }
+
+    bool keyPressed (const juce::KeyPress& key, juce::Component* window) override
     {
         if (onKey && onKey (key))
         {
@@ -268,16 +333,63 @@ struct MenuKeys final : public juce::KeyListener
         std::vector<std::string> labels;
         for (const auto& p : picks)
             labels.push_back (p.label.toStdString());
-        const auto index = prefs::uniqueTypeAhead (labels, (char) typed);
-        if (index < 0)
+        if (const auto index = prefs::uniqueTypeAhead (labels, (char) typed); index >= 0)
+        {
+            auto action = picks[(std::size_t) index].action;
+            juce::PopupMenu::dismissAllActiveMenus();
+            juce::MessageManager::callAsync ([action] {
+                if (action)
+                    action();
+            });
+            return true;
+        }
+        return highlightNext (window, (char) typed);
+    }
+
+private:
+    std::vector<juce::Component::SafePointer<juce::Component>> windows;
+
+    void timerCallback() override { attachToModal(); }
+
+    void attachToModal()
+    {
+        auto* modal = juce::Component::getCurrentlyModalComponent();
+        if (modal == nullptr)
+            return;
+        for (auto& w : windows)
+            if (w.getComponent() == modal)
+                return;
+        modal->addKeyListener (this);
+        windows.emplace_back (modal);
+    }
+
+    // FL's letter keys (issue #64): the next item of this menu window starting with the letter gets the highlight
+    // (and scrolls into view); Enter picks it, the arrows / wheel / Esc stay JUCE's. The items are the window's
+    // children in menu order; JUCE's own accessibility actions highlight one ("focus") and tell which one is.
+    static bool highlightNext (juce::Component* window, char typed)
+    {
+        if (window == nullptr)
             return false;
-        auto action = picks[(std::size_t) index].action;
-        juce::PopupMenu::dismissAllActiveMenus();
-        juce::MessageManager::callAsync ([action] {
-            if (action)
-                action();
-        });
-        return true;
+        std::vector<std::string> labels;
+        std::vector<bool> selectable;
+        std::vector<juce::AccessibilityHandler*> handlers;
+        int current = -1;
+        for (auto* child : window->getChildren())
+        {
+            auto* handler = child->getAccessibilityHandler();
+            const auto isItem = handler != nullptr && handler->getRole() == juce::AccessibilityRole::menuItem;
+            const auto& actions = isItem ? handler->getActions() : juce::AccessibilityActions();
+            labels.push_back (isItem ? handler->getTitle().toStdString() : std::string());
+            selectable.push_back (isItem && actions.contains (juce::AccessibilityActionType::focus)
+                                  && (actions.contains (juce::AccessibilityActionType::press) || actions.contains (juce::AccessibilityActionType::showMenu)));
+            if (isItem && handler->hasFocus (false))
+                current = (int) handlers.size();
+            handlers.push_back (handler);
+        }
+        const auto next = prefs::nextTypeAhead (labels, selectable, current, typed);
+        if (next < 0)
+            return false;
+        return handlers[(std::size_t) next]->getActions().invoke (juce::AccessibilityActionType::focus);
     }
 };
 } // namespace
@@ -292,57 +404,9 @@ std::vector<Pick> renamedGenerators (AudioEngine& engine, std::function<void (Ch
     return renamed<GeneratorEntry, ChannelDef> (engine, generatorEntries (engine), std::move (add));
 }
 
-namespace
-{
-template <typename Entry, typename Thing>
-bool folderGroups (juce::PopupMenu& menu, AudioEngine& engine, const std::vector<Entry>& entries, bool instruments, std::function<void (Thing)> add)
-{
-    std::vector<std::string> keys;
-    for (const auto& e : entries) keys.push_back (e.key);
-    auto& host = engine.getPluginHost();
-    const auto tree = plugincatalog::menuTree (host.databaseFolders(), instruments, keys);
-    if (tree.empty()) return false;
-    const auto view = (plugincatalog::MenuView) host.databaseFolders().view;
-    auto label = [&] (int i) { return shownName (engine, entries[(std::size_t) i].key, entries[(std::size_t) i].label); };
-    // the plugins of a folder, A-Z by their shown name (FL's database order)
-    auto addItems = [&] (juce::PopupMenu& m, std::vector<int> items) {
-        std::sort (items.begin(), items.end(), [&] (int a, int b) { return label (a).compareNatural (label (b)) < 0; });
-        for (const auto i : items)
-            m.addItem (label (i), [make = entries[(std::size_t) i].make, add] {
-                if (auto thing = make())
-                    add (std::move (*thing));
-            });
-    };
-    std::function<juce::PopupMenu (const plugincatalog::MenuFolder&)> submenu = [&] (const plugincatalog::MenuFolder& f) {
-        juce::PopupMenu m;
-        for (const auto& sub : f.sub) m.addSubMenu (juce::String::fromUTF8 (sub.name.c_str()), submenu (sub));
-        addItems (m, f.items);
-        return m;
-    };
-    if (view == plugincatalog::MenuView::simple)
-        addItems (menu, plugincatalog::allItems (tree));
-    else
-        for (const auto& f : tree)
-        {
-            if (view == plugincatalog::MenuView::tree)
-            {
-                menu.addSubMenu (juce::String::fromUTF8 (f.name.c_str()), submenu (f));
-                continue;
-            }
-            // Categories (FL's default): the folder's heading, its subfolders as submenus, then its plugins
-            menu.addSectionHeader (juce::String::fromUTF8 (f.name.c_str()));
-            for (const auto& sub : f.sub) menu.addSubMenu (juce::String::fromUTF8 (sub.name.c_str()), submenu (sub));
-            addItems (menu, f.items);
-        }
-    menu.addSeparator();
-    return true;
-}
-} // namespace
-
 void addFolderViewItems (juce::PopupMenu& menu, AudioEngine& engine)
 {
     const auto& folders = engine.getPluginHost().databaseFolders();
-    if (folders.of.empty()) return;
     // FL's view switch under the list (radio items): Categories / Simple / Tree
     menu.addSeparator();
     static const char* const names[] { TR_NOOP ("Categories"), TR_NOOP ("Simple"), TR_NOOP ("Tree") };
@@ -362,12 +426,26 @@ bool inUserFolder (AudioEngine& engine, const std::string& key)
 
 bool addFolderGroups (juce::PopupMenu& menu, AudioEngine& engine, std::function<void (EffectSlot)> add)
 {
-    return folderGroups<EffectEntry, EffectSlot> (menu, engine, effectEntries (engine), false, std::move (add));
+    const auto entries = effectEntries (engine, true);
+    return categorizedItems<EffectEntry> (menu, engine, entries, false, [&] (juce::PopupMenu& m, int i) {
+        const auto& e = entries[(std::size_t) i];
+        m.addItem (shownName (engine, e.key, e.label), e.available, false, [make = e.make, add] {
+            if (auto thing = make())
+                add (std::move (*thing));
+        });
+    });
 }
 
 bool addFolderGroups (juce::PopupMenu& menu, AudioEngine& engine, std::function<void (ChannelDef)> add)
 {
-    return folderGroups<GeneratorEntry, ChannelDef> (menu, engine, generatorEntries (engine), true, std::move (add));
+    const auto entries = generatorEntries (engine);
+    return categorizedItems<GeneratorEntry> (menu, engine, entries, true, [&] (juce::PopupMenu& m, int i) {
+        const auto& e = entries[(std::size_t) i];
+        m.addItem (shownName (engine, e.key, e.label), e.available, false, [make = e.make, add] {
+            if (auto thing = make())
+                add (std::move (*thing));
+        });
+    });
 }
 
 void addPicks (juce::PopupMenu& menu, const std::vector<Pick>& picks)
@@ -386,16 +464,9 @@ void showMenu (juce::PopupMenu& menu, const juce::PopupMenu::Options& options, s
     auto keys = std::make_shared<MenuKeys>();
     keys->picks = std::move (picks);
     keys->onKey = std::move (onKey);
-    auto holder = std::make_shared<juce::Component::SafePointer<juce::Component>>();
-    menu.showMenuAsync (options, [keys, holder] (int) {
-        if (auto* w = holder->getComponent())
-            w->removeKeyListener (keys.get());
-    });
-    // the menu's window is the modal component now (JUCE enters its modal state while showing it)
-    if (auto* modal = juce::Component::getCurrentlyModalComponent())
-    {
-        *holder = modal;
-        modal->addKeyListener (keys.get());
-    }
+    menu.showMenuAsync (options, [keys] (int) { keys->detachAll(); });
+    // the menu's window is the modal component now (JUCE enters its modal state while showing it); its submenus are
+    // when they open (the timer finds them)
+    keys->start();
 }
 } // namespace lynx::quickpick

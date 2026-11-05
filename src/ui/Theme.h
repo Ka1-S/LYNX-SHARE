@@ -57,7 +57,7 @@ inline juce::Colour meterClip { 0xffff3b3f };
 inline juce::Colour knobArc { 0xffc5c9d1 };     // rotary value arcs at rest (accent while touched)
 inline juce::Colour knobTrack { 0xff444955 };   // the unlit part of a knob's ring (reads on every panel surface)
 inline juce::Colour stepOff { 0xff2a2d34 };
-inline juce::Colour stepOffAlt { 0xff33363f };   // every other group of 4 steps
+inline juce::Colour stepOffAlt { 0xff5e3036 };   // every other group of 4 steps (accent-tinted, round 170a)
 inline juce::Colour stepOn { 0xffe5383b }; // = accent
 inline juce::Colour stepNote { 0xffe8a3a6 };     // a step that only has a Piano Roll note
 inline juce::Colour gridBar { 0xff3a3e47 };      // bar lines
@@ -96,6 +96,10 @@ inline juce::FontOptions font (float size, bool bold = false)
 // The width a column of labels needs: `minWidth` when every text fits in it (the English layout), else the widest
 // text (+ the label borders), up to `maxWidth` (round 165o: translated labels are often longer).
 int labelColumnWidth (std::initializer_list<const juce::Label*> labels, int minWidth, int maxWidth);
+
+// A menu item's text with FL's accelerator letter `key` (core/MenuMnemonic.h, round 170a): the letter is underlined in
+// the menu and typing it picks the item, e.g. theme::mnemonic (tr ("Delete..."), 'D').
+juce::String mnemonic (const juce::String& text, char key);
 // Japanese / Korean / Chinese: the installed UI font family LYNX uses for that language (empty: none installed, or a
 // language that needs no font of its own — see needsOwnFont).
 juce::String uiFontForLanguage (const juce::String& languageId);

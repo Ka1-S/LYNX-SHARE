@@ -23,6 +23,9 @@ void closeAll();
 
 // The editor alone at `scale` (1 = FL's size; for --snapshot / --plugui).
 std::unique_ptr<juce::Component> makeNativeEffectEditor (AudioEngine& engine, int track, int slot, float scale = 1.0f, int page = 0);
+// Round 170c (#14): drives every stepper of the slot's editor (all pages) with synthetic clicks, drags, wheel notches and
+// trackpad scrolls; one "OK" / "FAIL <why>" line per stepper.
+juce::String stepperSelfTest (AudioEngine& engine, int track, int slot, int pages);
 // The same editor on an effect node inside a Patcher (round 165c: the Hardware Insert): `locate` finds the node's slot in
 // the song, `running` its running instance (live meters); `name` is shown where a mixer editor names its insert.
 std::unique_ptr<juce::Component> makeNodeEffectEditor (AudioEngine& engine, std::function<EffectSlot* (Song&)> locate,
@@ -32,4 +35,6 @@ void setNativeEditorDemo (bool on);
 // Round 166f (--eq166fshot): one display tick of a native editor without its timer (Parametric EQ 2's spectrum and
 // heatmap read the slot's analyser tap, which this claims); false when `editor` is not a native effect editor.
 bool tickNativeEffectEditor (juce::Component& editor);
+// round 170k2: the smallest size its window allows (the header still shows the whole name); {} for another component
+juce::Point<int> nativeEditorMinimumSize (juce::Component& editor);
 } // namespace lynx

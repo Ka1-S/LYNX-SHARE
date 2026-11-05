@@ -188,15 +188,19 @@ TEST (drumaxx169e_fresh_drumaxx_with_fl_is_fl_default_kit)
     CHECK (peaks.size() == 5u);
     if (peaks.size() == 5u)
         CHECK (peaks[0] < 1.0e-5f && peaks[1] < 1.0e-5f && peaks[2] > 1.0e-3f && peaks[3] > 1.0e-3f && peaks[4] > 1.0e-3f);
-    // the drums FL ships without a Default.fst start from their Plugin database entry, before the folder's presets;
-    // the other engines keep their folder order (Fruit Kick: its Default.fst, no Plugin database entry)
-    for (const auto* folder : { "Drumaxx", "Drumpad", "BassDrum" })
+    // the drums FL ships without a Default.fst start from their Plugin database entry, before the folder's presets
+    // (since round 169l2 every generator does: Fruit Kick's entry, then its Default.fst, which is the same state)
+    for (const auto* folder : { "Drumaxx", "Drumpad", "BassDrum", "Fruit Kick" })
     {
         const auto list = natives::presetCandidates (folder, true, fl);
         CHECK (! list.empty() && list.front().find ("Plugin database") != std::string::npos);
     }
     const auto kick = natives::presetCandidates ("Fruit Kick", true, fl);
-    CHECK (! kick.empty() && kick[0].find ("Default.fst") != std::string::npos);
-    for (const auto& path : kick)
-        CHECK (path.find ("Plugin database") == std::string::npos);
+    CHECK (kick.size() > 1 && kick[1].find ("Default.fst") != std::string::npos);
+    if (kick.size() > 1)
+    {
+        const auto a = natives::channelFromPresetFile (InstrumentKind::fruitkick, kick[0], fl);
+        const auto b = natives::channelFromPresetFile (InstrumentKind::fruitkick, kick[1], fl);
+        CHECK (a && b && a->modelParams == b->modelParams && a->pluginState == b->pluginState);
+    }
 }

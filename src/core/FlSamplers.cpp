@@ -96,6 +96,15 @@ double l11 (double x) // (11^x − 1)/10: FL's volume curves
 {
     return (std::pow (11.0, std::clamp (x, 0.0, 2.0)) - 1.0) / 10.0;
 }
+
+// FPC's pad and layer volume law (FPC_x64.dll voice start FUN_0086b480, constant 20.526958f at 0x8E0FA0):
+// (exp(v/127 · ln(20.526958 + 1)) − 1)/10, v = the 0…128 (pad) / 0…127 (layer) volume (REA_rodada170i §4)
+float fpcVolume (int v)
+{
+    const float x = (float) v / 127.0f;
+    const double e = std::exp ((double) x * std::log ((double) 20.526958f + 1.0));
+    return (float) ((double) (float) (e - 1.0) / 10.0);
+}
 } // namespace
 
 std::optional<std::vector<DrumPad>> fpcPads (const std::vector<std::uint8_t>& d)
@@ -121,7 +130,9 @@ std::optional<std::vector<DrumPad>> fpcPads (const std::vector<std::uint8_t>& d)
         forEachChunk (top.data, top.size, [&] (const Chunk& c) {
             if (c.id == 0x64) // 16 × i32 parameters
             {
-                pad.gain = (float) l11 (std::clamp (i32 (c, 0), 0, 128) / 127.0);
+                // FPC's own law, and the constant 1/(2·√2) its output carries (measured against FL's renders of
+                // pad / layer volume and pan variants of FL's render test, REA_rodada170i §7)
+                pad.gain = fpcVolume (std::clamp (i32 (c, 0), 0, 128)) * 0.35355339059327373f;
                 pad.pan = std::clamp (i32 (c, 1), -128, 128) / 128.0f;
                 muted = (i32 (c, 2) & 1) != 0;
                 pad.key = std::clamp (i32 (c, 3), 0, 127);
@@ -145,7 +156,7 @@ std::optional<std::vector<DrumPad>> fpcPads (const std::vector<std::uint8_t>& d)
                     }
                     else if (l.id == 0x12D)
                     {
-                        layer.gain = (float) l11 (std::clamp (i32 (l, 0), 0, 127) / 127.0);
+                        layer.gain = fpcVolume (std::clamp (i32 (l, 0), 0, 127));
                         layer.lowVelocity = std::clamp (i32 (l, 2), 0, 127);
                         const auto high = std::clamp (i32 (l, 3), 0, 127); // exclusive, except 127
                         layer.highVelocity = high >= 127 ? 127 : std::max (layer.lowVelocity, high - 1);
