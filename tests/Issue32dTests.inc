@@ -27,7 +27,12 @@ struct NoteSpy final : lynx::Instrument
         log.push_back ({ false, key, rendered + position });
         sounding[(std::size_t) key] = std::max (0, sounding[(std::size_t) key] - 1);
     }
-    void allNotesOff() noexcept override { sounding.fill (0); }
+    int allOffs = 0;
+    void allNotesOff() noexcept override
+    {
+        sounding.fill (0);
+        ++allOffs;
+    }
     void render (float*, float*, int n, float, float) noexcept override { position += n; }
     bool idle() const noexcept override { return false; }
     void beginChunk (int n) noexcept override // (a chunk's notes split its render calls: position = within it)
