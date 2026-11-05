@@ -1,10 +1,13 @@
 #include "core/NativeEngines.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "core/Effects.h"
 #include "core/FlEffects.h"
 #include "core/GrossBeat.h"
+#include "core/Harmless.h"
+#include "core/HarmlessFx.h"
 #include "core/LynxBanks.h"
 #include "core/MidiOut.h"
 #include "core/PhysicalModels.h"
@@ -425,4 +428,25 @@ std::string instrumentMenuName (const InstrumentEngine& e)
 {
     return std::string (e.name) + (e.beta ? " (beta)" : "");
 }
+void followControl (ChannelDef& c, int index, const FlAccess& fl)
+{
+    if (c.instrument != InstrumentKind::harmless || index != harmlessComboIndex + 3 || c.modelParams.size() < (std::size_t) harmlessCompIndex)
+        return;
+    // the type's Maximus state follows the settings (byte count, then the bytes), as FlpImport stores it
+    c.modelParams.resize ((std::size_t) harmlessCompIndex);
+    const auto type = (int) std::lround (c.modelParams[(std::size_t) harmlessComboIndex + 3]);
+    if (type <= 0 || ! fl.readFile)
+        return;
+    const auto path = resolveFlPath ("%FLStudioFactoryData%\\Plugins\\Fruity\\Generators\\Harmless\\Data\\Compression\\" + std::to_string (type) + ".fst",
+                                     fl.roots);
+    if (path.empty() || (fl.fileExists && ! fl.fileExists (path)))
+        return;
+    const auto state = hlfx::maximusStateFromFst (fl.readFile (path));
+    if (! state || hlfx::makeMaximusPreset (*state) == nullptr)
+        return;
+    c.modelParams.push_back ((float) state->size());
+    for (const auto byte : *state)
+        c.modelParams.push_back ((float) byte);
+}
+
 } // namespace lynx::natives

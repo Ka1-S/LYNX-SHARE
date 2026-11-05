@@ -3798,6 +3798,33 @@ EffectSlot makeEffectSlot (EffectKind kind)
     return slot;
 }
 
+std::size_t savedEffectParamCount (const EffectSlot& slot) noexcept
+{
+    if (slot.kind == EffectKind::plugin)
+        return 0;
+    auto count = std::min (effectInfo (slot.kind).params.size(), slot.params.size());
+    for (auto i = slot.params.size(); i > count; --i)
+        if (slot.params[i - 1] != 0.0f)
+            return i;
+    return count;
+}
+
+double savedEffectParamValue (float v) noexcept
+{
+    const auto rounded = std::round ((double) v * 10000.0) / 10000.0;
+    if ((float) rounded == v)
+        return rounded;
+    for (int digits = 6; digits <= 9; ++digits)
+    {
+        char text[40];
+        std::snprintf (text, sizeof (text), "%.*g", digits, (double) v);
+        const auto d = std::strtod (text, nullptr);
+        if ((float) d == v)
+            return d;
+    }
+    return (double) v;
+}
+
 void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexcept
 {
     // round 147: Prism Multiband saved before its measured Dynamic phase engine keeps the round-108 construction

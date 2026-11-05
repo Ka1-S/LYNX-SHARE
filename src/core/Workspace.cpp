@@ -253,6 +253,10 @@ std::string Layout::serialise() const
         std::snprintf (line, sizeof (line), "panel %s %d %d %d %.5f %.5f %.5f %.5f %d %d %d %d\n", ids[i], p.visible ? 1 : 0,
                        p.maximised ? 1 : 0, p.detached ? 1 : 0, p.bounds.x / fw, p.bounds.y / fh, p.bounds.w / fw, p.bounds.h / fh,
                        p.windowBounds.x, p.windowBounds.y, p.windowBounds.w, p.windowBounds.h);
+        // (issue #62: a plugin's GTK may switch the C locale to one with a decimal comma: the file stays the same)
+        for (auto* c = line; *c != 0; ++c)
+            if (*c == ',')
+                *c = '.';
         out << line;
     }
 
@@ -278,6 +282,7 @@ std::optional<Layout> Layout::parse (const std::string& text, int width, int hei
 
     while (std::getline (in, line))
     {
+        std::replace (line.begin(), line.end(), ',', '.'); // (a file written with a decimal comma, issue #62)
         std::istringstream words (line);
         std::string kind;
 

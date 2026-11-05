@@ -734,11 +734,12 @@ juce::var effectToVar (const EffectSlot& slot)
     e->setProperty ("kind", effectId (slot.kind));
     e->setProperty ("on", slot.enabled);
     juce::Array<juce::var> params;
-    const auto used = slot.kind == EffectKind::plugin ? 0 : effectInfo (slot.kind).params.size();
-    // (the hardware insert's are exact: its round trip is a sample count over 65536 steps, round 164d)
-    const auto exact = slot.kind == EffectKind::hardwareInsert;
+    // the named parameters and the hidden ones after them that hold a value (issue #67: the Parametric EQ's FL law,
+    // processing and band mask live past its 36 named ones); each value reads back as the same float (FL's raw values,
+    // the hardware insert's round trip over 65536 steps)
+    const auto used = savedEffectParamCount (slot);
     for (std::size_t i = 0; i < used && i < slot.params.size(); ++i)
-        params.add (exact ? (double) slot.params[i] : juce::roundToInt (slot.params[i] * 10000.0f) / 10000.0);
+        params.add (savedEffectParamValue (slot.params[i]));
     e->setProperty ("params", params);
     if (slot.kind == EffectKind::fruitySend) // the span "Send to" is normalised over (round 166d: 500 inserts)
         e->setProperty ("sendSpan", maxMixerTracks - 1);
@@ -767,7 +768,7 @@ juce::var effectToVar (const EffectSlot& slot)
     {
         juce::Array<juce::var> other;
         for (const auto v : slot.abOther)
-            other.add (juce::roundToInt (v * 10000.0f) / 10000.0);
+            other.add (savedEffectParamValue (v));
         e->setProperty ("abOther", other);
         if (slot.abShowingB)
             e->setProperty ("abB", true);

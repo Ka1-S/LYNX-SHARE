@@ -106,6 +106,11 @@ void rotate (Pattern& pattern, const std::vector<int>& indices, std::int64_t gri
 // The multiple of `step` at or before `tick` (step <= 1: whole ticks).
 std::int64_t snapDown (double tick, std::int64_t step);
 
+// The multiple of `step` nearest to `tick`, a tie going to the later one (step <= 1: whole ticks). FL puts the song
+// position on the grid line nearest to a click in the Playlist's ruler (round 169d, [SHOT] r169d f32–f34: Bar snap,
+// clicks at bar 5.33 / 5.5 / 5.83 → 5:01, 6:01, 6:01), not on the line before it.
+std::int64_t snapRound (double tick, std::int64_t step);
+
 // The candidate closest to `tick` when it lies within `maxDistance` ticks; otherwise snapDown (tick, fallbackStep).
 std::int64_t snapNearest (double tick, const std::vector<std::int64_t>& candidates, double maxDistance, std::int64_t fallbackStep);
 
@@ -126,6 +131,12 @@ void trimStart (Clip& clip, std::int64_t newStart, std::int64_t minLength);
 // Slip: moves the content under the clip by `delta` ticks (positive = later); the clip stays put.
 // The offset never goes below 0.
 void slip (Clip& clip, std::int64_t delta);
+
+// The Playlist's paint brush (round 169d, issue #32): a copy it would paint over a clip of the same source (pattern,
+// audio channel, automation) on the same track. FL's brush does not stack one there ([SHOT] r169d f37–f39: a stroke
+// from bar 1 across clips of the same pattern at bars 2–6 adds only bar 1's; deleting bar 3's leaves nothing under it).
+// Stacked copies played the pattern twice ("later on playback they sound doubled (louder)").
+bool paintWouldStack (const std::vector<Clip>& playlist, const Clip& c);
 
 // Inserts `length` ticks of silence at `at`: clips starting at or after it (and markers) move right.
 void insertTime (std::vector<Clip>& clips, std::vector<Marker>& markers, std::int64_t at, std::int64_t length);
