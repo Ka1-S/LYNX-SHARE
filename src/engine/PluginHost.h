@@ -79,6 +79,7 @@ public:
     void transportReset() noexcept override { panic(); }
     void render (float* left, float* right, int n, float gainLeft, float gainRight) noexcept override;
     void setParameter (int index, float value) noexcept override;
+    float parameterValue (int index) const noexcept override;
     int latencySamples() const noexcept override
     {
         return crashed.load (std::memory_order_relaxed) ? 0 : plugin->getLatencySamples() + (fixed != nullptr ? fixed->latency() : 0);
@@ -163,6 +164,7 @@ public:
     }
     void process (float* left, float* right, int n, const EffectParams& params, double bpm) noexcept override;
     void setParameter (int index, float value) noexcept override;
+    float parameterValue (int index) const noexcept override;
     int latencySamples() const noexcept override
     {
         return crashed.load (std::memory_order_relaxed) ? 0 : plugin->getLatencySamples() + (fixed != nullptr ? fixed->latency() : 0);

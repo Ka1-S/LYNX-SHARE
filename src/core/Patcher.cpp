@@ -247,8 +247,10 @@ struct Graph::AudioWire
 struct Graph::ControlWire
 {
     int from = 0, output = 0, to = 0, param = 0;
+    int fromParam = -1; // a parameter output (round 171b): the source node's parameter, else its control output `output`
     std::vector<float> curve;
     int docIndex = 0;
+    float sent = std::numeric_limits<float>::quiet_NaN(); // the value last given to a plugin / instrument target
 };
 
 struct Graph::VfxQueue
@@ -422,11 +424,19 @@ Graph::Graph (const PatcherDoc& doc, double sampleRate, const Factories& factori
         }
         else if ((validNode (src.from) || (src.from == patchSurface && std::max (0, src.fromPort) < doc.surfaceOutputs())) && validNode (src.to)
                  && src.enabled && src.toPort >= 0
-                 && (src.from == patchSurface || std::max (0, src.fromPort) < nodePorts (doc.nodes[(std::size_t) src.from]).controlOuts)) // (a source with that output)
+                 && (src.from == patchSurface || isPatchParamOutput (src.fromPort) // (a node's parameter output, round 171b)
+                     || std::max (0, src.fromPort) < nodePorts (doc.nodes[(std::size_t) src.from]).controlOuts)) // (a source with that output)
         {
             ControlWire c;
             c.from = src.from;
             c.output = std::max (0, src.fromPort);
+            if (src.from != patchSurface && isPatchParamOutput (src.fromPort))
+            {
+                c.output = -1;
+                c.fromParam = patchOutputParam (src.fromPort);
+                if (! nodes[(std::size_t) c.from]->plugin && ! nodes[(std::size_t) c.from]->generator && c.fromParam >= maxEffectParams)
+                    continue;
+            }
             c.to = src.to;
             c.param = src.toPort;
             c.curve = src.curve;
@@ -1130,11 +1140,23 @@ void Graph::processPiece (const float* inL, const float* inR, const float* scL, 
             values.nodes[(std::size_t) published[k].node].params[(std::size_t) published[k].param] = publishedValues[k];
 
     // control cables: the source's latest output moves the target's parameter (one block of lag, as the mixer's links)
-    for (const auto& c : controls)
+    for (auto& c : controls)
     {
         auto raw = 0.0f;
         if (c.from == patchSurface) // the Surface tab's control (round 151)
             raw = c.output < (int) values.surface.size() ? values.surface[(std::size_t) c.output] : 0.0f;
+        else if (c.fromParam >= 0) // a node's parameter output (round 171b): its current value
+        {
+            const auto& source = *nodes[(std::size_t) c.from];
+            if (source.generator)
+                raw = source.instrument != nullptr ? source.instrument->parameterValue (c.fromParam) : -1.0f;
+            else if (source.plugin)
+                raw = source.effect != nullptr ? source.effect->parameterValue (c.fromParam) : -1.0f;
+            else
+                raw = values.nodes[(std::size_t) c.from].params[(std::size_t) c.fromParam];
+            if (! (raw >= 0.0f)) // (a parameter whose value can't be read: nothing to send)
+                continue;
+        }
         else
         {
             const auto& source = *nodes[(std::size_t) c.from];
@@ -1144,6 +1166,14 @@ void Graph::processPiece (const float* inL, const float* inR, const float* scL, 
         }
         const auto v = mapControl (c.curve, raw);
         auto& target = *nodes[(std::size_t) c.to];
+        // a plugin / instrument target gets the value when it changes (round 171b): a hosted plugin is not called
+        // with the same value every block, and a change made in its own window stays until the source moves
+        if (target.generator || target.plugin)
+        {
+            if (v == c.sent)
+                continue;
+            c.sent = v;
+        }
         if (target.generator)
         {
             if (target.instrument != nullptr)
@@ -1772,6 +1802,120 @@ void removeNode (PatcherDoc& doc, int node)
         if (w.to > node)
             --w.to;
     }
+    // its published parameters are freed (their indices stay); the later nodes' move down (round 171b)
+    for (auto& p : doc.published)
+    {
+        if (p.node == node)
+            p = PatchParam {};
+        else if (p.node > node)
+            --p.node;
+    }
+}
+
+namespace
+{
+void insertSorted (std::vector<int>& v, int x)
+{
+    if (std::find (v.begin(), v.end(), x) == v.end())
+        v.insert (std::upper_bound (v.begin(), v.end(), x), x);
+}
+} // namespace
+
+std::vector<int> shownParamInputs (const PatcherDoc& doc, int node)
+{
+    if (node < 0 || node >= (int) doc.nodes.size())
+        return {};
+    auto shown = doc.nodes[(std::size_t) node].paramIns;
+    for (const auto& w : doc.wires)
+        if (w.kind == PatchWire::Kind::control && w.to == node && w.toPort >= 0)
+            insertSorted (shown, w.toPort);
+    return shown;
+}
+
+std::vector<int> shownParamOutputs (const PatcherDoc& doc, int node)
+{
+    if (node < 0 || node >= (int) doc.nodes.size())
+        return {};
+    auto shown = doc.nodes[(std::size_t) node].paramOuts;
+    for (const auto& w : doc.wires)
+        if (w.kind == PatchWire::Kind::control && w.from == node && isPatchParamOutput (w.fromPort))
+            insertSorted (shown, patchOutputParam (w.fromPort));
+    return shown;
+}
+
+int publishedIndex (const PatcherDoc& doc, int node, int param)
+{
+    for (std::size_t k = 0; k < doc.published.size(); ++k)
+        if (doc.published[k].node == node && doc.published[k].param == param)
+            return (int) k;
+    return -1;
+}
+
+void setParamInput (PatcherDoc& doc, int node, int param, bool on, const std::string& name)
+{
+    if (node < 0 || node >= (int) doc.nodes.size() || param < 0)
+        return;
+    auto& ins = doc.nodes[(std::size_t) node].paramIns;
+    if (on)
+    {
+        insertSorted (ins, param);
+        if (publishedIndex (doc, node, param) < 0)
+        {
+            PatchParam p;
+            p.node = node;
+            p.param = param;
+            p.name = name.empty() ? nodeName (doc.nodes[(std::size_t) node]) + " " + std::to_string (param + 1) : name;
+            doc.published.push_back (std::move (p));
+        }
+        return;
+    }
+    std::erase (ins, param);
+    std::erase_if (doc.wires, [node, param] (const PatchWire& w) { return w.kind == PatchWire::Kind::control && w.to == node && w.toPort == param; });
+    if (const auto k = publishedIndex (doc, node, param); k >= 0)
+        doc.published[(std::size_t) k] = PatchParam {};
+    while (! doc.published.empty() && doc.published.back().node < 0) // (trailing free indices are dropped)
+        doc.published.pop_back();
+}
+
+void setParamOutput (PatcherDoc& doc, int node, int param, bool on)
+{
+    if (node < 0 || node >= (int) doc.nodes.size() || param < 0)
+        return;
+    auto& outs = doc.nodes[(std::size_t) node].paramOuts;
+    if (on)
+    {
+        insertSorted (outs, param);
+        return;
+    }
+    std::erase (outs, param);
+    std::erase_if (doc.wires, [node, param] (const PatchWire& w) {
+        return w.kind == PatchWire::Kind::control && w.from == node && w.fromPort == patchParamOutput (param);
+    });
+}
+
+void deactivateUnusedParams (PatcherDoc& doc, int node, bool inputs)
+{
+    if (node < 0 || node >= (int) doc.nodes.size())
+        return;
+    const auto shown = inputs ? shownParamInputs (doc, node) : shownParamOutputs (doc, node);
+    for (const auto p : shown)
+    {
+        const auto used = std::any_of (doc.wires.begin(), doc.wires.end(), [&] (const PatchWire& w) {
+            return w.kind == PatchWire::Kind::control && (inputs ? (w.to == node && w.toPort == p) : (w.from == node && w.fromPort == patchParamOutput (p)));
+        });
+        if (! used)
+            inputs ? setParamInput (doc, node, p, false) : setParamOutput (doc, node, p, false);
+    }
+}
+
+bool nodeHasCables (const PatcherDoc& doc, int node)
+{
+    return std::any_of (doc.wires.begin(), doc.wires.end(), [node] (const PatchWire& w) { return w.from == node || w.to == node; });
+}
+
+void disconnectNode (PatcherDoc& doc, int node)
+{
+    std::erase_if (doc.wires, [node] (const PatchWire& w) { return w.from == node || w.to == node; });
 }
 
 int addSurfaceControl (PatcherDoc& doc, SurfaceControl control)

@@ -120,6 +120,9 @@ bool isFlSynthPresetPlugin (const std::string& pluginName);
 
 // Internal effect similar to a native FL effect (by the plugin's internal name).
 std::optional<EffectKind> effectForFlPlugin (const std::string& name);
+// FL's own Fruity effect saved as a VST2 inside Fruity Wrapper (FL 11): the native state FL 2026 opens it with, rebuilt
+// from the VST2 parameter floats (empty when the effect or its state is not known; REA_rodada170i §1)
+std::vector<std::uint8_t> wrappedFruityState (const ForeignPlugin& plugin);
 
 // Our target for an FL controlID (channel/mixer). `channelMap` = FL channel -> ours.
 AutomationTarget automationTargetFor (flp::ControlId id, const std::map<int, int>& channelMap, int mixerTracks);

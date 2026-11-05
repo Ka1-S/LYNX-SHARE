@@ -4,6 +4,7 @@
 #include "core/MetronomeVoice.h"
 
 #include "core/ChannelLoops.h"
+#include "core/PatternBlocks.h"
 
 #include "core/ControlSurface.h"
 #include "core/VoltageController.h"
@@ -108,6 +109,35 @@ public:
     void process (float*, float*, int, const EffectParams&, double) noexcept override {}
 };
 } // namespace
+
+LiveLevels::LiveLevels (const Song& song)
+    : mixerVolume (song.mixer.size()), mixerPan (song.mixer.size()), mixerStereo (song.mixer.size()),
+      channelVolume (song.channels.size()), channelPan (song.channels.size())
+{
+    store (song);
+}
+
+bool LiveLevels::matches (const Song& song) const noexcept
+{
+    return mixerVolume.size() == song.mixer.size() && channelVolume.size() == song.channels.size();
+}
+
+void LiveLevels::store (const Song& song) noexcept
+{
+    if (! matches (song))
+        return;
+    for (std::size_t t = 0; t < song.mixer.size(); ++t)
+    {
+        mixerVolume[t].store (song.mixer[t].volume, std::memory_order_relaxed);
+        mixerPan[t].store (song.mixer[t].pan, std::memory_order_relaxed);
+        mixerStereo[t].store (song.mixer[t].stereo, std::memory_order_relaxed);
+    }
+    for (std::size_t c = 0; c < song.channels.size(); ++c)
+    {
+        channelVolume[c].store (song.channels[c].volume, std::memory_order_relaxed);
+        channelPan[c].store (song.channels[c].pan, std::memory_order_relaxed);
+    }
+}
 
 std::unique_ptr<const RackState> RackState::build (Song song,
                                                    const RackState* previous,
@@ -403,6 +433,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
     const auto& samples = factories.samples;
 
     auto state = std::make_unique<RackState>();
+    state->live = std::make_shared<LiveLevels> (song);
     state->instruments.reserve (song.channels.size());
     std::vector<Instrument*> keyShiftLater; // new instruments only: none is visible to the audio thread yet
 
@@ -593,6 +624,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
 
     // FL's Channel Rack looping (round 165f-rack): the looping channels' repeats are written out as notes here, so
     // playback, the Playlist's pattern clips and export all play them without any cost on the audio thread
+    // FL's legacy Pattern Blocks (round 170f): plain pattern clips from here on (playback, export, song length)
+    patternblocks::expandSong (song);
     channelloops::expandSong (song);
     state->song = std::move (song);
     const auto tailStarted = std::chrono::steady_clock::now();
@@ -1276,13 +1309,30 @@ void RackState::slotsOfTarget (const Song& song, const AutomationTarget& target,
         }
 }
 
+namespace
+{
+// a level as the UI last set it (RackState::live, round 171c); the snapshot's own value without one
+float liveLevel (const RackState& state, std::vector<std::atomic<float>> LiveLevels::*values, int index, float fallback) noexcept
+{
+    if (state.live == nullptr || index < 0)
+        return fallback;
+    const auto& v = (*state.live).*values;
+    return (std::size_t) index < v.size() ? v[(std::size_t) index].load (std::memory_order_relaxed) : fallback;
+}
+} // namespace
+
 MixerMatrix mixerMatrix (const MixerTrack& track, float volume, float pan, bool triangular) noexcept
+{
+    return mixerMatrix (track, volume, pan, triangular, track.stereo);
+}
+
+MixerMatrix mixerMatrix (const MixerTrack& track, float volume, float pan, bool triangular, float stereo) noexcept
 {
     // FL keeps the fader as an int (12800 = 0 dB), the pan ±6400 and the separation ±64; LYNX keeps them /16000,
     // /6400 and /64. Float arithmetic as FL's, the circular kernel in x87 extended precision (flvp::panLaw).
     const auto x = std::clamp (volume, 0.0f, 1.0f) * 1.25f;
     const auto p = std::clamp (pan, -1.0f, 1.0f);
-    const auto sep = std::clamp (track.stereo, -1.0f, 1.0f);
+    const auto sep = std::clamp (stereo, -1.0f, 1.0f);
     MixerMatrix m;
     if (x == 1.0f && p == 0.0f && sep == 0.0f) // FL's fast path: exactly unity
     {
@@ -1885,8 +1935,10 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
 {
     const auto& c = state.song.channels[(std::size_t) i];
     const auto automation = state.hasAutomation;
-    const auto volume = channelGain (automation ? automated (state.channelVolumeAuto[(std::size_t) i], c.volume) : c.volume);
-    const auto pan = automation ? automated (state.channelPanAuto[(std::size_t) i], (c.pan + 1.0f) * 0.5f) * 2.0f - 1.0f : c.pan;
+    const auto knobVolume = liveLevel (state, &LiveLevels::channelVolume, i, c.volume);
+    const auto knobPan = liveLevel (state, &LiveLevels::channelPan, i, c.pan);
+    const auto volume = channelGain (automation ? automated (state.channelVolumeAuto[(std::size_t) i], knobVolume) : knobVolume);
+    const auto pan = automation ? automated (state.channelPanAuto[(std::size_t) i], (knobPan + 1.0f) * 0.5f) * 2.0f - 1.0f : knobPan;
     float gl = 0.0f, gr = 0.0f;
     panGains (pan, volume, gl, gr);
 
@@ -3378,9 +3430,12 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     if (! song.mixer.empty())
     {
         const auto& master = song.mixer[0];
-        const auto volume = state.hasAutomation ? automated (state.mixerVolumeAuto[0], master.volume) : master.volume;
-        const auto pan = state.hasAutomation ? automated (state.mixerPanAuto[0], (master.pan + 1.0f) * 0.5f) * 2.0f - 1.0f : master.pan;
-        target = master.muted ? MixerMatrix { 0.0f, 0.0f, 0.0f, 0.0f } : mixerMatrix (master, volume, pan, song.panTriangular);
+        const auto fader = liveLevel (state, &LiveLevels::mixerVolume, 0, master.volume);
+        const auto knob = liveLevel (state, &LiveLevels::mixerPan, 0, master.pan);
+        const auto volume = state.hasAutomation ? automated (state.mixerVolumeAuto[0], fader) : fader;
+        const auto pan = state.hasAutomation ? automated (state.mixerPanAuto[0], (knob + 1.0f) * 0.5f) * 2.0f - 1.0f : knob;
+        target = master.muted ? MixerMatrix { 0.0f, 0.0f, 0.0f, 0.0f }
+                              : mixerMatrix (master, volume, pan, song.panTriangular, liveLevel (state, &LiveLevels::mixerStereo, 0, master.stereo));
     }
 
     lastTrackGain[0] = applyMatrix (trackBuffer (0, 0), trackBuffer (0, 1), left, right, numSamples, lastTrackGain[0], target);
@@ -3699,10 +3754,11 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
 
     if (! silent || (taps & (1u << (unsigned) RecordSource::postLevel)) != 0)
     {
-        const auto volume = state.hasAutomation ? automated (state.mixerVolumeAuto[(std::size_t) t], track.volume) : track.volume;
-        const auto pan = state.hasAutomation ? automated (state.mixerPanAuto[(std::size_t) t], (track.pan + 1.0f) * 0.5f) * 2.0f - 1.0f
-                                             : track.pan;
-        level = mixerMatrix (track, volume, pan, state.song.panTriangular);
+        const auto fader = liveLevel (state, &LiveLevels::mixerVolume, t, track.volume);
+        const auto knob = liveLevel (state, &LiveLevels::mixerPan, t, track.pan);
+        const auto volume = state.hasAutomation ? automated (state.mixerVolumeAuto[(std::size_t) t], fader) : fader;
+        const auto pan = state.hasAutomation ? automated (state.mixerPanAuto[(std::size_t) t], (knob + 1.0f) * 0.5f) * 2.0f - 1.0f : knob;
+        level = mixerMatrix (track, volume, pan, state.song.panTriangular, liveLevel (state, &LiveLevels::mixerStereo, t, track.stereo));
         if (! silent)
             target = level;
     }

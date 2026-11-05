@@ -18,6 +18,9 @@ enum class Style
 
 inline std::atomic<int> currentStyle { 0 };
 inline std::atomic<bool> currentFlats { false };
+// LYNX (Busy Works Beats' video, round 170a): the Piano roll names every key, not only the Cs (FL labels the Cs). On by
+// default; Settings › General and the Piano roll's menu switch it.
+inline std::atomic<bool> everyKey { true };
 
 inline Style style() noexcept { return (Style) currentStyle.load (std::memory_order_relaxed); }
 inline bool flats() noexcept { return currentFlats.load (std::memory_order_relaxed); }
