@@ -55,7 +55,7 @@ there.
 | Horizon | ValhallaFutureVerb | 8 | 9 | 2 | 8 | 135 |  |
 | Orbit | ValhallaSpaceModulator | 8 | 9 | 3 | 8 | 135 |  |
 | Facet EQ | Pro-Q 4 | 9 | 8 | 8 | 7 | 152c | 170c: Stability 5 → 7 (draws on macOS CI, steady analyser) |
-| Crest Compressor | Pro-C 3 | 9 | 8 | 5 | 6 | tp172b | tp172b: sound 4.7 → 5.4 measured (auto gain follows attack); look toward the reference |
+| Crest Compressor | Pro-C 3 | 9 | 8 | 6 | 6 | tp172b | tp172b: sound 4.7 → 5.7 measured (auto gain and release follow the attack, detector floor); look toward the reference |
 | Sentry Gate | Pro-G | 9 | 8 | 7 | 8 | tp172b | tp172b: sound 3 → 7 (first programme comparison: 7.2; upward law, hysteresis) |
 | Ember Saturator | Saturn 2 | 9 | 8 | 5 | 6 | 152b |  |
 | Aether | Fresh Air | 9 | 8 | 8 | 8 | 128 |  |
@@ -87,15 +87,15 @@ there.
 
 Our own host rendered bursts / drums / music / stair / sweep / vocal through each trial at its default and 3–5 saved
 settings; LYNX rendered the same with the translated states (`tools/fxrender`, `scripts/fxparity.py`). Mean score
-before → after (0–10): Facet / Pro-Q 4 9.3 → 9.3; Crest / Pro-C 3 4.7 → 5.4 (auto gain follows the attack);
+before → after (0–10): Facet / Pro-Q 4 9.3 → 9.3; Crest / Pro-C 3 4.7 → 5.7 (auto gain follows the attack; the release shortens with a slow attack; a 1 ms detector floor in Clean / Allround / Opto);
 Apex / Pro-L 2 5.7 → 6.9 (two-stage release, per-style laws); Prism / Pro-MB 5.9 → 7.6; Sentry / Pro-G 6.2 → 7.2;
-Hush / Pro-DS 6.0 → 6.0; Saturn 2 5.1 (Ember: round 172d). LuxeVerb gained a **Space** engine page for the Pro-R 2
+Hush / Pro-DS 6.0 → 6.4 (Allround follows the measured level law, 0.2 dB per dB); Saturn 2 5.1 (Ember: round 172d). LuxeVerb gained a **Space** engine page for the Pro-R 2
 role (16-line FDN with per-band decay; Modern / Vintage / Plate; distance, thickness, character, width, decay EQ),
 fitted from measured RT60 per octave, EDC, early energy and modulation; `fxparity verb` 7.4 → 8.9 on the programme
 states, 8.9 over 28 probe settings. Saved Pro-R 2 states translate to it (`translate = pro-r2`). The FL engine stays the
 default and FL-exact. Looks: Facet, Crest, Apex, Prism, Sentry and Hush moved toward their references' palettes and
 flat caps; Fruity Delay 3 stays FL-exact (Timeless 3 compared for design only). Open: Pro-G's burst attenuation (S3),
-Pro-DS Allround level, Crest −1 dB on dynamic material, Apex's default attack, Sentry's Upward knobs, the Space
+Crest S1 / S3 music −1 … −1.6 dB and S4 (Bus, auto gain) +1 … +2 dB, Apex's default attack, Sentry's Upward knobs, the Space
 engine's early onset at 100 % mix. Data and pictures: /mnt/e/lynx-work/tp172b (report.md).
 
 ## Round 165j: LYNX Tune sound quality, before → after (measured)
