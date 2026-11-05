@@ -17053,6 +17053,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Mute53fTests.inc"
 #include "Issue32cTests.inc"
 #include "Drumaxx169eTests.inc"
+#include "PatternBlocks170fTests.inc"
 #include "Mixfx170bTests.inc"
 #include "Typeahead170bTests.inc"
 #include "PlugQ170cTests.inc"

@@ -5,9 +5,11 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <optional>
 #include <set>
 #include <sstream>
 
+#include "core/PatternBlocks.h"
 #include "core/Preferences.h"
 
 namespace lynx::exportopts
@@ -201,8 +203,12 @@ Options withSingleFormat (Options o, Format f)
     return o;
 }
 
-std::vector<Note> midiExportNotes (const Song& song)
+std::vector<Note> midiExportNotes (const Song& original)
 {
+    std::optional<Song> expanded; // Pattern Blocks (round 170f) export as their clips
+    if (patternblocks::active (original))
+        patternblocks::expandSong (expanded.emplace (original));
+    const Song& song = expanded ? *expanded : original;
     std::vector<Note> out;
     const auto trackMuted = [&song] (int track) {
         return track >= 0 && track < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) track].muted;
@@ -319,8 +325,13 @@ bool hasSelection (const Song& song) noexcept
     return song.loopEnd > song.loopStart && song.loopStart >= 0;
 }
 
-Song makeRenderSong (const Song& song, const Options& o, std::int64_t tailTicks, std::int64_t& musicTicks, std::int64_t& loopTicks)
+Song makeRenderSong (const Song& original, const Options& o, std::int64_t tailTicks, std::int64_t& musicTicks, std::int64_t& loopTicks)
 {
+    // FL's legacy Pattern Blocks (round 170f) are rendered as the clips they play as
+    std::optional<Song> expanded;
+    if (patternblocks::active (original))
+        patternblocks::expandSong (expanded.emplace (original));
+    const Song& song = expanded ? *expanded : original;
     Song base = song;
     std::int64_t length = 0;
 
@@ -438,8 +449,12 @@ std::vector<int> stemTracks (const Song& song, const std::vector<int>& only)
     return out;
 }
 
-std::vector<int> stemChannels (const Song& song, Range range)
+std::vector<int> stemChannels (const Song& original, Range range)
 {
+    std::optional<Song> expanded; // Pattern Blocks (round 170f) count as their clips
+    if (patternblocks::active (original))
+        patternblocks::expandSong (expanded.emplace (original));
+    const Song& song = expanded ? *expanded : original;
     std::set<int> used;
     auto addPattern = [&] (int p) {
         if (p < 0 || p >= (int) song.patterns.size())

@@ -1,4 +1,5 @@
 #include "core/RackOps.h"
+#include "core/PatternBlocks.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -119,6 +120,7 @@ void shiftPatternClips (Song& song, int index, int delta)
             if (c.kind == ClipKind::pattern && c.pattern >= index)
                 c.pattern += delta;
     });
+    patternblocks::shiftPatterns (song, index, delta); // (round 170f)
 }
 } // namespace
 
@@ -222,6 +224,7 @@ bool movePattern (Song& song, int index, int delta)
             if (c.kind == ClipKind::pattern)
                 c.pattern = c.pattern == index ? other : c.pattern == other ? index : c.pattern;
     });
+    patternblocks::swapPatterns (song, index, other); // (round 170f)
 
     if (song.currentPattern == index)
         song.currentPattern = other;

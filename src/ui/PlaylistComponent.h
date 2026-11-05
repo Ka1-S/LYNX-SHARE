@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -15,6 +16,8 @@
 
 namespace lynx
 {
+class PatternBlocksView;
+
 // FL-style Playlist (arrangement): tracks vertically, time horizontally.
 //  - a tool strip (Pencil, Brush, Eraser, Mute, Knife, Lasso, Zoom, Listen, Slip); with the Pencil:
 //    left click on empty space "paints" the current source (and starts dragging it), dragging a clip moves
@@ -141,6 +144,15 @@ public:
     static constexpr int scrollBarSize = 12;
 
     static juce::Colour patternColour (const Song& song, int pattern);
+
+    // FL's legacy Pattern Blocks (round 170f, issue #60): the section under the clip tracks while the project's option is
+    // on (ui/PatternBlocksView.h). `height` = the section's height in px (the divider drag); clamped to the window.
+    void setBlocksHeight (int height);
+    int blocksSectionHeight() const;
+    void togglePatternBlocks();       // the option, asking what to do with existing blocks when it goes off
+    void turnBlocksIntoClips();       // FL's "Turn pattern instances into clips"
+    void scrollTicksBy (double ticks); // (the blocks section's drag past its edges)
+    PatternBlocksView* getBlocksViewForSnapshot() { return blocksView.get(); }
     static juce::Colour audioClipColour (const ChannelDef& channel);
 
     // A project was just opened: scroll to the start and, when the song is longer than the view, zoom out
@@ -385,6 +397,12 @@ private:
     void zoomToSelection();
     void zoomAll();
     void centreOnPlayhead();
+
+    // Pattern Blocks (round 170f)
+    friend class PatternBlocksView;
+    std::unique_ptr<PatternBlocksView> blocksView;
+    int blocksHeight = 0; // 0 = the default (a third of the grid)
+    bool blocksShown = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PlaylistComponent)
 };
