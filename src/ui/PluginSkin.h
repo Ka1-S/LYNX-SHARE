@@ -251,8 +251,10 @@ void setReducedEffects (bool);
 void playOpenAnimation (juce::Component& content, Style = Style::glow);
 
 // --- typography ----------------------------------------------------------------------------------
-inline juce::Colour captionColour() { return juce::Colour (0xff8c919c); }
-inline juce::Colour valueColour (bool hot) { return hot ? theme::colour::textPrimary : juce::Colour (0xffd3d6dd); }
+// round tp172d: a themed editor may set its own caption / value colours and type size (artkit::Theme)
+juce::Colour captionColour();
+juce::Colour valueColour (bool hot);
+float captionScale();
 
 // --- animation -----------------------------------------------------------------------------------
 // Smooth hover / press levels per control id, advanced by a 60 Hz timer that runs ONLY while something is

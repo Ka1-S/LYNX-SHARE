@@ -424,7 +424,7 @@ TEST (echosuite101_lattice_taps_feedback_and_layout)
     base[lt::feedback] = 0.0f;
     base[lt::delay] = 0.1f; // 100 ms
     base[lt::spread] = 0.5f;
-    // taps at delay × (1 − spread · k / N), gain −1/√N (inverted wet)
+    // taps at delay × (1 − spread · k / N), gain 1/√N (in phase: round 172d, the measured UberMod wet is not inverted)
     for (const auto& [v, n] : { std::pair<float, int> { 2.5f / 24.0f, 2 }, { 6.5f / 24.0f, 4 } })
     {
         auto p = base;
@@ -435,7 +435,7 @@ TEST (echosuite101_lattice_taps_feedback_and_layout)
             const auto at = (std::size_t) std::lround (lt::tapMs (p, k, n, false) * 48.0);
             CHECK (std::abs (lt::tapMs (p, k, n, false) - 100.0 * (1.0 - 0.5 * k / n)) < 1e-3);
             const auto found = argmaxAbs (y.l, at - 20, at + 20);
-            CHECK (found >= at - 2 && found <= at + 2 && y.l[found] < 0.0f);
+            CHECK (found >= at - 2 && found <= at + 2 && y.l[found] > 0.0f);
             CHECK (std::abs (std::abs (y.l[found]) / 0.25 - 1.0 / std::sqrt ((double) n)) < 0.12);
         }
     }

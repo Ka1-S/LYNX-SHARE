@@ -29,6 +29,7 @@
 #include "engine/PipeWireDevice.h"
 #include "platform/LinuxRealtime.h"
 #include "engine/Exporter.h"
+#include "engine/FlStudioExport.h"
 #include "engine/MidiFileIo.h"
 #include "engine/PluginHost.h"
 #include "engine/PluginSandbox.h"
@@ -50,6 +51,7 @@
 #include "ui/DanceView.h"
 #include "ui/PluginPresetMenu.h"
 #include "ui/PluginWindow.h"
+#include "ui/PluginThumbs.h"
 #include "ui/ClipProperties.h"
 #include "ui/NewProjectDialog.h"
 #include "ui/PluginMonitorWindow.h"
@@ -1019,6 +1021,28 @@ public:
             return;
         }
 
+        if (args.contains ("--pluginthumbs"))
+        {
+            // LYNX.exe --pluginthumbs <folder> [key,key...]: the Plugin picker's pictures of LYNX's own plugins (round 171c,
+            // ui/PluginThumbs.h), each editor drawn off-screen and kept as <folder>/<name>.png; the picker starts this in
+            // the background when pictures are missing. One line per plugin on stdout.
+            const auto i = args.indexOf ("--pluginthumbs");
+            lynx::crashguard::quietCrashReports();
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            juce::StringArray only;
+            if (i + 2 < args.size() && ! args[i + 2].startsWith ("--"))
+                only.addTokens (args[i + 2].unquoted(), ",", "");
+            const auto t0 = juce::Time::getMillisecondCounterHiRes();
+            const auto drawn = lynx::pluginthumbs::renderNative (juce::File (args[i + 1].unquoted()), only, [] (const juce::String& line) {
+                std::printf ("%s\n", line.toRawUTF8());
+                std::fflush (stdout);
+            });
+            std::printf ("drawn %d in %.0f ms\n", drawn, juce::Time::getMillisecondCounterHiRes() - t0);
+            setApplicationReturnValue (0);
+            quit();
+            return;
+        }
+
         if (args.contains ("--artshot"))
         {
             // LYNX.exe --artshot <folder> [before|after] [name,name...]: every editor with art of its own (round 170j/170k: the
@@ -1316,6 +1340,13 @@ public:
             juce::File (args[i + 2].unquoted() + ".txt").replaceWithText (report);
             setApplicationReturnValue (written > 0 ? 0 : 1);
             quit();
+            return;
+        }
+
+        if (args.contains ("--export-flp"))
+        {
+            const auto i = args.indexOf ("--export-flp");
+            runFlExport (args[i + 1].unquoted(), args[i + 2].unquoted(), args.contains ("--substitute"));
             return;
         }
 
@@ -4597,6 +4628,20 @@ private:
         };
         run->steps.push_back ({ "mixer fader drag, playing, rebuild per move (before 171c)", {}, [faderMove] (int f) { faderMove (false, f); }, 60 });
         run->steps.push_back ({ "mixer fader drag, playing, live levels (171c)", {}, [faderMove, this] (int f) { faderMove (true, f); if (f == 59) engine->flushLevels(); }, 60 });
+        // F8's Plugin picker (round 171c): opening it (the "show" time = building it + its first paint), its pictures
+        // loading while it stays open, pointing at the tiles, then closing it
+        run->steps.push_back ({ "plugin picker open (F8)", [ui] { ui->togglePluginPickerForSnapshot(); }, {}, 2500 });
+        run->steps.push_back ({ "plugin picker, pointing at tiles", {}, [this, ui] (int f) {
+                                   if (auto* picker = ui->pluginPickerForSnapshot(); picker != nullptr && mainWindow->getPeer() != nullptr)
+                                   {
+                                       const auto p = picker->localPointToGlobal (juce::Point<int> (60 + (f * 37) % juce::jmax (1, picker->getWidth() - 120),
+                                                                                                      90 + (f * 53) % juce::jmax (1, picker->getHeight() - 200)));
+                                       const auto local = mainWindow->getPeer()->globalToLocal (p.toFloat());
+                                       mainWindow->getPeer()->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, local, {}, 0.0f, 0.0f,
+                                                                               juce::Time::currentTimeMillis());
+                                   }
+                               }, 60 });
+        run->steps.push_back ({ "plugin picker close", [ui] { ui->togglePluginPickerForSnapshot(); }, {}, 300 });
         run->steps.push_back ({ "playlist maximised, playing", [ui] { ui->selectTabForSnapshot (2); }, {}, 3000 });
         run->steps.push_back ({ "playlist scroll down/up", [this] { engine->stop(); },
                                  [wheelAt, ui, none] (int f) { wheelAt (ui->getPlaylistForSnapshot(), 0.0f, f < 40 ? -0.15f : 0.15f, none); }, 80 });
@@ -6090,6 +6135,58 @@ private:
                << "result=" << (ok ? "OK" : "ERROR " + error) << "\n";
         juce::File (outputPath + ".txt").replaceWithText (report);
 
+        setApplicationReturnValue (ok ? 0 : 1);
+        quit();
+    }
+
+    // LYNX.exe --export-flp project.(lynx|flp) output.(flp|zip) [--substitute] (round 171e): File › Export › FL Studio
+    // project without the window (option A unless --substitute; the renders next to a .flp in "<name> audio"); the
+    // report goes to output.txt
+    void runFlExport (const juce::String& inputPath, const juce::String& outputPath, bool substitute)
+    {
+        juce::String error;
+        bool ok = false;
+        lynx::flstudio::Written written;
+        {
+            lynx::AudioEngine loader (false);
+            const juce::File input (inputPath);
+            if (input.hasFileExtension ("flp"))
+                ok = loader.importFlpFile (input, error);
+            else if (auto song = lynx::ProjectFile::load (input, error))
+            {
+                loader.setSong (std::move (*song));
+                ok = true;
+            }
+            if (ok)
+            {
+                const juce::File output (outputPath);
+                const auto zip = output.hasFileExtension ("zip");
+                const auto mode = substitute ? lynx::flpexport::LynxOnly::substitute : lynx::flpexport::LynxOnly::renderAudio;
+                loader.capturePluginStates();
+                auto options = lynx::flstudio::optionsFor (&loader.getPluginHost(), mode, loader.getSong());
+                // --flp-ppq N: the file's PPQ (tests; default: 96 when the notes and clips fit it)
+                if (const auto args = juce::JUCEApplication::getCommandLineParameterArray(); args.contains ("--flp-ppq"))
+                    options.ppq = juce::jlimit (0, 960, args[args.indexOf ("--flp-ppq") + 1].getIntValue());
+                const auto renderDir = zip ? juce::File::getSpecialLocation (juce::File::tempDirectory).getNonexistentChildFile ("LYNX FL export", {}, false)
+                                           : output.getSiblingFile (output.getFileNameWithoutExtension() + " audio");
+                ok = lynx::flstudio::exportProject (loader.getSong(), options, output, zip, renderDir, 44100.0,
+                                                    [] (const lynx::Song& s, const lynx::ExportSettings& settings, const juce::File& wav,
+                                                        const std::function<bool (double)>& progress, juce::String& err) {
+                                                        lynx::ExportJob job (s, settings, wav);
+                                                        return job.run (progress, err);
+                                                    },
+                                                    {}, written, error);
+                if (zip)
+                    renderDir.deleteRecursively();
+            }
+        }
+        juce::String report;
+        report << (ok ? "ok" : "error=" + error) << "\n"
+               << "exact=" << (int) written.report.exact.size() << " rendered=" << (int) written.report.rendered.size()
+               << " substituted=" << (int) written.report.substituted.size() << " dropped=" << (int) written.report.dropped.size()
+               << " samples=" << written.samples << "\n\n"
+               << lynx::flstudio::reportText (written) << "\n";
+        juce::File (outputPath + ".txt").replaceWithText (report);
         setApplicationReturnValue (ok ? 0 : 1);
         quit();
     }
