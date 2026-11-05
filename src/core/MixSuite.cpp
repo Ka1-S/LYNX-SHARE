@@ -3167,7 +3167,9 @@ const EffectInfo& aetherInfo()
     static const EffectInfo info { "Aether",
                                    { { "Air", 0.0f }, { "Air freq.", 0.62f }, { "Harmonics", 0.0f }, { "Exciter freq.", 0.56f },
                                      { "Character", 0.5f }, { "Mix", 1.0f }, { "Output", 0.5f },
-                                     { "Dynamic", 0.0f }, { "Mid air", 0.0f }, { "High air", 0.0f } } };
+                                     // issue #77 (round tp172c): the measured dynamic air model is the default (a new
+                                     // Aether's Mid / High air were the round-114 shelf + exciter, nearly inaudible)
+                                     { "Dynamic", 1.0f }, { "Mid air", 0.0f }, { "High air", 0.0f } } };
     return info;
 }
 

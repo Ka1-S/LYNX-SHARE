@@ -59,7 +59,7 @@ there.
 | Crest Compressor | Pro-C 3 | 9 | 8 | 5 | 6 | 137 |  |
 | Sentry Gate | Pro-G | 9 | 8 | 3 | 8 | 135 |  |
 | Ember Saturator | Saturn 2 | 9 | 8 | 5 | 6 | 152b |  |
-| Aether | Fresh Air | 9 | 8 | 8 | 8 | 128 |  |
+| Aether | Fresh Air | 9 | 8 | 8 | 9 | tp172c | issue #77: the measured dynamic air model is the default (a new Aether ran the round-114 shelf + exciter: Mid air nearly inaudible, High air ~1.5 dB short of loudness); fxparity on Mid / High air 0–100 % sweeps 5.0 → 8.3; look: frosted plate, white disc knobs |
 | Glow Leveler | CLA-2A (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165x | 9 → 9 → 10 / 8 → 8 (165w: the measured release; 165x: the measured attack, Auto Makeup's reference, the VU display saved and translated) |
 | Hush De-esser | DeEsser (Waves) | 10 | 8 | 7 (ref expired) | 6 | 165 | 9 → 10 / 8 → 8 |
 | Echoform | H-Delay (Waves) | 9 | 8 | 7 (ref expired) | 6 | 137 |  |
