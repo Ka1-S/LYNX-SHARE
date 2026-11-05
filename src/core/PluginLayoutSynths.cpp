@@ -479,7 +479,7 @@ Layout ogunLayout (bool autogun)
     p.fader (148, 452, 18, 74, "Chorus mix", TR_NOOP ("Mix"), bipolar);
     p.section (176, 434, 160, 114, TR_NOOP ("Delay"));
     p.stepper (184, 466, 40, 22, "Delay feedback mode", TR_NOOP ("Mode"), 3);
-    // (round 170i3: the delay and reverb run only with these switches on; FL's Plugin database Ogun has both off)
+    // (round 170i3: the delay and reverb run only with these switches on; FL's Plugin database Ogun: delay off, reverb on)
     p.toggle (184, 496, 48, 16, "Delay on", TR_NOOP ("On"), boxed);
     p.toggle (184, 518, 48, 16, "Delay tempo sync", TR_NOOP ("Tempo"), boxed);
     p.fader (240, 452, 18, 74, "Delay feedback", TR_NOOP ("Fb"));

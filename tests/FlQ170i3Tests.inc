@@ -86,7 +86,7 @@ TEST (flq170i3_cut_groups_skip_fl_plugin_generators)
 TEST (flq170i3_ogun_delay_and_reverb_switches_change_the_sound)
 {
     // Ogun's delay only runs with S.b358[1] set and its reverb with P[53]'s low byte (designDelay / designReverb): the
-    // editor had no switch for them, so on FL's Plugin database Ogun the delay and reverb knobs did nothing
+    // editor had no switch for them, so on FL's Plugin database Ogun (delay off) the delay knobs did nothing
     using namespace lynx;
     if (realFlpDir.empty())
         return;
@@ -95,7 +95,10 @@ TEST (flq170i3_ogun_delay_and_reverb_switches_change_the_sound)
     if (db.empty())
         return;
     auto base = ogunCurrentLayout (db);
-    CHECK (ogunSetParam (base, ogunDelayOnIndex, 0) && ogunSetParam (base, ogunReverbOnIndex, 0));
+    const auto dbDelay = ogunParam (base, ogunDelayOnIndex).value_or (-1), dbSync = ogunParam (base, ogunDelayTempoIndex).value_or (-1),
+               dbReverb = ogunParam (base, ogunReverbOnIndex).value_or (-1);
+    CHECK (ogunSetParam (base, ogunDelayOnIndex, 0) && ogunSetParam (base, ogunReverbOnIndex, 0)
+           && ogunSetParam (base, ogunDelayTempoIndex, 0));
     CHECK (ogunParam (base, ogunDelayOnIndex) == 0 && ogunParam (base, ogunReverbOnIndex) == 0);
     ogun::RefNote n;
     n.key = 60;
@@ -117,14 +120,18 @@ TEST (flq170i3_ogun_delay_and_reverb_switches_change_the_sound)
     auto synced = delayed;
     CHECK (ogunSetParam (synced, ogunDelayTempoIndex, 1) && ogunParam (synced, ogunDelayTempoIndex) == 1);
     const auto withSync = tail (synced);
+    // (at 140 BPM a synced 192 is 0.43 s, unsynced 0.5 s: same energy, other echo times)
+    const auto a = ogun::renderReference (delayed, { n }, 44100.0, length), b = ogun::renderReference (synced, { n }, 44100.0, length);
+    double moved = 0.0;
+    for (std::size_t i = 0; i < a.size() && i < b.size(); ++i)
+        moved += ((double) a[i] - b[i]) * ((double) a[i] - b[i]);
     auto reverb = base;
-    const auto p53 = ogunParam (db, 53).value_or (0);
     CHECK (ogunSetParam (reverb, ogunReverbOnIndex, 1) && ogunParam (reverb, ogunReverbOnIndex) == 1);
     CHECK (ogunSetParam (reverb, 39, 120));
     const auto withReverb = tail (reverb);
-    std::printf ("  Ogun tail energy: dry %.3g, delay %.3g, delay synced %.3g, reverb %.3g (P53 was %d)\n", dry, withDelay,
-                 withSync, withReverb, p53);
+    std::printf ("  Ogun tail energy: dry %.3g, delay %.3g, delay synced %.3g, reverb %.3g (the database patch: delay %d, sync %d, reverb %d)\n",
+                 dry, withDelay, withSync, withReverb, dbDelay, dbSync, dbReverb);
     CHECK (withDelay > 1.5 * dry + 1e-6);
-    CHECK (std::abs (withSync - withDelay) > 1e-3 * withDelay);
+    CHECK (moved > 0.1 * withSync);
     CHECK (withReverb > 1.5 * dry + 1e-6);
 }

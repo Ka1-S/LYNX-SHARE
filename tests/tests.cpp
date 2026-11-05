@@ -9118,7 +9118,7 @@ TEST (ogun_engine)
         std::ofstream (dump, std::ios::binary).write ((const char*) blob.data(), (std::streamsize) blob.size());
     CHECK (lynx::ogunStateUsable (blob));
     CHECK (lynx::ogunFallbacks (blob).empty());
-    CHECK (lynx::ogunParam (blob, 17) == 180 && lynx::ogunParam (blob, 52) == 9 && ! lynx::ogunParam (blob, 64));
+    CHECK (lynx::ogunParam (blob, 17) == 180 && lynx::ogunParam (blob, 52) == 9 && ! lynx::ogunParam (blob, lynx::ogunDelayOnIndex + 1));
     auto broken = blob;
     broken.resize (broken.size() - 300);
     CHECK (! lynx::ogunStateUsable (broken));

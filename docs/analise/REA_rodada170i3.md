@@ -58,8 +58,8 @@ read overwrites: the version is never compared. LYNX (`wavetrav::parseState`) no
 
 From the dead-control audit (round 170i3c): Ogun's delay runs only with the byte after P (`S.b358[1]`, its tempo
 sync `b358[0]`) set, and its reverb only with P[53]'s low byte (`designDelay` / `designReverb`). LYNX's Ogun / Autogun
-editor had no switch for any of them, so on a new channel (FL's Plugin database Ogun: both off) the delay knobs P26–P30
-and reverb knobs P31–P39 changed nothing. `ogunParam` / `ogunSetParam` now read / write them (index 53 = reverb on,
+editor had no switch for any of them. FL's Plugin database Ogun has the delay off (tempo sync on) and the reverb on,
+so on a new channel the delay knobs P26–P30 changed nothing and the reverb could not be switched off. `ogunParam` / `ogunSetParam` now read / write them (index 53 = reverb on,
 64 = delay tempo sync, 65 = delay on: LYNX's indices, not FL host parameters), and the editor shows the three
 switches. Test `flq170i3_ogun_delay_and_reverb_switches_change_the_sound`.
 
@@ -87,7 +87,7 @@ shows a dialog (*roblem* / *rror* / *issing*) or no render arrives for 120 s.
 |---|---|---|
 | FL generator in a cut group (incl. "cut itself") | choked at the next note | keeps sounding, like FL |
 | Ogun's tail in 169l's project | −82 dB at 1.4 s (choked by Drumaxx) | FL's within 1 dB to −80 dB |
-| Ogun / Autogun editor: delay on, delay tempo sync, reverb on | missing (delay and reverb knobs dead) | switches |
+| Ogun / Autogun editor: delay on, delay tempo sync, reverb on | missing (delay knobs dead on a new channel) | switches |
 | Wave Traveller's FL Default.fst | refused (empty channel) | loads |
 
 ## Where I stopped
