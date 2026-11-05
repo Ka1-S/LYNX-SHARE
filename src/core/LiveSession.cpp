@@ -11,6 +11,10 @@
 #include "core/SessionIds.h"
 #include "core/StandIns.h"
 
+#ifndef TR_NOOP
+ #define TR_NOOP(text) text // marks a literal for translation (tools/i18n_keys.py scans core too)
+#endif
+
 namespace lynx::live
 {
 namespace
@@ -544,34 +548,45 @@ std::optional<Key> keyFromString (const std::string& s)
     return std::nullopt;
 }
 
-std::string describe (const Key& k, const Song& song)
+std::string describe (const Key& k, const Song& song, const Translate& translate)
 {
+    auto t = [&] (const char* english) { return translate ? translate (english) : std::string (english); };
+    auto fill = [] (std::string text, std::initializer_list<std::string> args) {
+        int n = 0;
+        for (const auto& arg : args)
+        {
+            const auto mark = "{" + std::to_string (n++) + "}";
+            if (const auto at = text.find (mark); at != std::string::npos)
+                text.replace (at, mark.size(), arg);
+        }
+        return text;
+    };
     auto patternName = [&] (std::uint64_t uid) -> std::string {
         for (std::size_t i = 0; i < song.patterns.size(); ++i)
             if (song.patterns[i].uid == uid)
-                return song.patterns[i].name.empty() ? "Pattern " + std::to_string (i + 1) : song.patterns[i].name;
-        return "a pattern";
+                return song.patterns[i].name.empty() ? fill (t (TR_NOOP ("Pattern {0}")), { std::to_string (i + 1) }) : song.patterns[i].name;
+        return t (TR_NOOP ("a pattern"));
     };
     auto channelName = [&] (std::uint64_t uid) -> std::string {
         for (std::size_t i = 0; i < song.channels.size(); ++i)
             if (song.channels[i].uid == uid)
-                return song.channels[i].name.empty() ? "Channel " + std::to_string (i + 1) : song.channels[i].name;
-        return "a channel";
+                return song.channels[i].name.empty() ? fill (t (TR_NOOP ("Channel {0}")), { std::to_string (i + 1) }) : song.channels[i].name;
+        return t (TR_NOOP ("a channel"));
     };
     switch (k.kind)
     {
-        case Kind::globals: return "Tempo & project settings";
-        case Kind::session: return "Participants";
-        case Kind::links: return "MIDI links";
-        case Kind::order: return "Order";
-        case Kind::arrangement: return "Arrangement";
+        case Kind::globals: return t (TR_NOOP ("Tempo & project settings"));
+        case Kind::session: return t (TR_NOOP ("Participants"));
+        case Kind::links: return t (TR_NOOP ("MIDI links"));
+        case Kind::order: return t (TR_NOOP ("Item order"));
+        case Kind::arrangement: return t (TR_NOOP ("Arrangement"));
         case Kind::channel: return channelName (k.a);
         case Kind::pattern: return patternName (k.a);
-        case Kind::notes: return channelName (k.b) + " in " + patternName (k.a);
-        case Kind::automation: return "Automation";
-        case Kind::clip: return "Clip";
-        case Kind::insert: return k.a == 0 ? std::string ("Master") : "Insert " + std::to_string (k.a);
-        case Kind::row: return "Track " + std::to_string (k.a + 1);
+        case Kind::notes: return fill (t (TR_NOOP ("{0} in {1}")), { channelName (k.b), patternName (k.a) });
+        case Kind::automation: return t (TR_NOOP ("Automation"));
+        case Kind::clip: return t (TR_NOOP ("Playlist clip"));
+        case Kind::insert: return k.a == 0 ? t (TR_NOOP ("Master")) : fill (t (TR_NOOP ("Insert {0}")), { std::to_string (k.a) });
+        case Kind::row: return fill (t (TR_NOOP ("Track {0}")), { std::to_string (k.a + 1) });
     }
     return {};
 }
