@@ -943,7 +943,8 @@ public:
                 skin::switchPill (g, box, on, accent, fx.enabled);
                 auto text = r.withTrimmedLeft (21.0f * s);
                 const auto offLabel = skin::offLabelColour(); // round tp172c: a theme's own (readable on its panels)
-                g.setColour (on ? (offLabel.isTransparent() ? colour::textPrimary : offLabel.darker (0.6f)) // a light panel: lit = darker
+                g.setColour (on ? (offLabel.isTransparent() || offLabel.getPerceivedBrightness() > 0.5f ? colour::textPrimary
+                                                                                                          : offLabel.darker (0.6f)) // a light panel: lit = darker
                                  : (! offLabel.isTransparent() ? (hot ? offLabel.brighter (0.3f) : offLabel)
                                                                     : (hot ? colour::textSecondary : colour::textDisabled)));
                 if (item.label != nullptr)

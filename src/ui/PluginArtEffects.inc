@@ -257,22 +257,22 @@ inline void canvasRidge (juce::Graphics& g, Rectangle<float> a, bool display)
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
     if (display) return;
-    // round tp172c (slice 2): a light console faceplate — brushed aluminium, the brushing running down the module,
+    // round tp172c (slice 2): the console faceplate — mid-grey brushed metal, the brushing running down the module,
     // a dark recessed channel down the middle where the meter bridge sits
     if (! reduced)
     {
         juce::Random rnd (172);
-        for (int i = 0; i < 260; ++i)
+        for (int i = 0; i < 420; ++i)
         {
             const auto x = a.getX() + rnd.nextFloat() * a.getWidth();
             const auto y = a.getY() + rnd.nextFloat() * a.getHeight();
-            const auto len = a.getHeight() * (0.15f + 0.5f * rnd.nextFloat());
-            g.setColour ((rnd.nextBool() ? Colours::white : Colours::black).withAlpha (0.025f + 0.035f * rnd.nextFloat()));
+            const auto len = a.getHeight() * (0.3f + 0.7f * rnd.nextFloat());
+            g.setColour ((rnd.nextBool() ? Colours::white : Colours::black).withAlpha (0.010f + 0.016f * rnd.nextFloat()));
             g.fillRect (Rectangle<float> (x, y - len * 0.5f, 0.8f + rnd.nextFloat(), len));
         }
     }
     const auto mid = Rectangle<float> (a.getX() + a.getWidth() * 0.355f, a.getY(), a.getWidth() * 0.29f, a.getHeight());
-    g.setGradientFill (ColourGradient (Colour (0xff232427), mid.getX(), 0.0f, Colour (0xff34363a), mid.getCentreX(), 0.0f, true));
+    g.setGradientFill (ColourGradient (Colour (0xff2a2b2e), mid.getX(), 0.0f, Colour (0xff3b3d40), mid.getCentreX(), 0.0f, true));
     g.fillRect (mid);
     for (const auto x : { mid.getX(), mid.getRight() })
     {
@@ -361,13 +361,13 @@ inline const Theme& ridgeTheme()
         Theme x;
         x.name = "Ridge Strip";
         x.base = Style::hardware;
-        // round tp172c (slice 2): the reference's light grey faceplate, dark legends, dark recessed meters
-        //          canvas (brushed aluminium)                   accent (orange lamps)      second light
-        x.pal = { Colour (0xffb6b8ba), Colour (0xff9c9ea1), Colour (0xfff08a24), Colour (0xffffc46a),
-                  // panels (the faceplate's modules)             rim                         titles (dark legends)
-                  Colour (0xf4bfc1c3), Colour (0xf4a9abae), Colour (0xff55585c), Colour (0xff151618),
+        // round tp172c (slice 2): the reference's mid-grey faceplate, light legends, dark recessed meters
+        //          canvas (brushed metal)                   accent (orange lamps)      second light
+        x.pal = { Colour (0xff6e7073), Colour (0xff5a5c5f), Colour (0xfff08a24), Colour (0xffffc46a),
+                  // panels: barely there — one continuous faceplate split by thin dividers   rim (dividers)   titles (light legends)
+                  Colour (0x0affffff), Colour (0x0affffff), Colour (0x9a2a2c2f), Colour (0xfff2f2ee),
                   // wells (the meter bridge)  caps (fader)                                   track                      pointer
-                  Colour (0xff141517), Colour (0xffe6e6e2), Colour (0xff8e8e8a), Colour (0xff6d7074), Colour (0xfffafafa),
+                  Colour (0xff141517), Colour (0xffe6e6e2), Colour (0xff8e8e8a), Colour (0xff2e3033), Colour (0xfffafafa),
                   Colour (0xff3f4145) };
         x.canvas = canvasRidge;
         x.headerDeco = ridgeHeader;
@@ -380,9 +380,12 @@ inline const Theme& ridgeTheme()
         x.buttTrack = true;
         x.arcGlow = 0.0f;
         x.thumbPointer = true;
-        x.offLabelCol = Colour (0xff2b2d31); // round tp172c: dark legends on the light faceplate
-        x.captionCol = Colour (0xff1c1d20);
-        x.valueCol = Colour (0xff303236);
+        x.offLabelCol = Colour (0xffc4c7cc); // round tp172c: light legends on the grey faceplate
+        x.captionCol = Colour (0xffeeeff1);
+        x.valueCol = Colour (0xffc9ccd1);
+        x.flatSections = true;               // no cards: the modules are marked by thin dividers on the one faceplate
+        x.rimWidth = 1.0f;
+        x.headerCol = Colour (0xff26272a);
         x.noValueArc = true;                 // the value reads off the pointer and the printed scale, as on a console
         return x;
     }();
@@ -433,6 +436,7 @@ inline const Theme& ridge4kTheme()
                   Colour (0xff4a4c50) };
         x.canvas = canvasRidge4k;
         x.headerDeco = nullptr;
+        x.flatSections = false;              // its own sheet-metal modules
         x.capTint = ridge4kCapTint;
         x.offLabelCol = Colour (0xffb4b8bf);
         x.captionCol = Colour (0xffd9dadc);
