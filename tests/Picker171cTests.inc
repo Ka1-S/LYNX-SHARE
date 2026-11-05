@@ -59,43 +59,40 @@ TEST (picker171c_up_down_wrap_and_skip_dimmed)
     CHECK (stepWrapping ({}, 2, 1) == 2);
 }
 
-TEST (picker171c_tiles_share_one_scale_like_fl)
+TEST (picker171c_one_cell_box_for_every_tile)
 {
     using namespace lynx::pickerview;
-    // a big editor is a big tile: every picture at the same scale, the largest that fits
-    const std::vector<Box> sizes { { 0, 0, 1000, 700 }, { 0, 0, 500, 350 }, { 0, 0, 400, 200 }, { 0, 0, 300, 600 } };
-    const auto p = packRows (sizes, 600, 400, 10, 0.05, 0.45);
-    CHECK (p.boxes.size() == 4 && p.height <= 400 && p.scale > 0.05);
-    CHECK (p.boxes.size() == 4 && std::abs (p.boxes[0].w - 2 * p.boxes[1].w) <= 1); // the same scale for all
-    for (const auto& b : p.boxes)
-        CHECK (b.x >= 0 && b.x + b.w <= 600);
-    // the largest scale: a bigger area never makes the tiles smaller, and maxScale caps them
-    const auto roomy = packRows (sizes, 2000, 2000, 10, 0.05, 0.45);
-    CHECK (roomy.scale == 0.45 && roomy.rowSlack.size() == 1);
-    // rows: tiles centred in their row's height, and a row's slack for centring
-    const auto rows = packAt ({ { 0, 0, 100, 100 }, { 0, 0, 100, 50 }, { 0, 0, 100, 100 } }, 220, 10, 1.0);
-    CHECK (rows.rowOf.size() == 3 && rows.rowOf[0] == 0 && rows.rowOf[1] == 0 && rows.rowOf[2] == 1);
-    CHECK (rows.boxes.size() == 3 && rows.boxes[1].y == 25 && rows.boxes[2].y == 110 && rows.boxes[2].x == 0);
-    CHECK (rows.rowSlack.size() == 2 && rows.rowSlack[0] == 10 && rows.rowSlack[1] == 120);
-    CHECK (rows.height == 210);
-    // too many: the smallest scale (the view scrolls)
-    std::vector<Box> many (400, Box { 0, 0, 500, 300 });
-    const auto tight = packRows (many, 600, 300, 10, 0.06, 0.45);
-    CHECK (tight.scale == 0.06 && tight.height > 300);
-    CHECK (packRows ({}, 600, 300, 10, 0.06, 0.45).boxes.empty());
+    // both halves fit, at the largest cell; the half with more plugins gets more columns
+    const auto g = split (50, 110, 1800, 800, 10, 40, 1.6, 72, 300);
+    CHECK (g.fits && g.cellW >= 72 && g.cellW <= 300 && std::abs (g.cellW - (int) (g.cellH * 1.6 + 0.5)) <= 1);
+    CHECK (g.rightCols > g.leftCols);
+    CHECK (gridHeight (50, g.leftCols, g.cellH, 10) <= 800 && gridHeight (110, g.rightCols, g.cellH, 10) <= 800);
+    CHECK (gridWidth (g.leftCols, g.cellW, 10) + gridWidth (g.rightCols, g.cellW, 10) + 40 <= 1800);
+    // one more pixel of cell would not fit (the largest)
+    const auto bigger = split (50, 110, 1800, 800, 10, 40, 1.6, g.cellW + 1, g.cellW + 1);
+    CHECK (! bigger.fits || bigger.cellW == g.cellW);
+    // the grid fills most of the room: no big empty zone
+    const auto usedW = gridWidth (g.leftCols, g.cellW, 10) + gridWidth (g.rightCols, g.cellW, 10) + 40;
+    CHECK (usedW * 10 >= 1800 * 8);
+    // a few plugins: capped at maxW; too many: the smallest cells, scrolled
+    const auto few = split (3, 0, 1800, 800, 10, 0, 1.6, 72, 300);
+    CHECK (few.fits && few.cellW == 300 && few.leftCols == 3 && few.rightCols == 0);
+    const auto many = split (2000, 0, 600, 300, 10, 0, 1.6, 72, 300);
+    CHECK (! many.fits && many.cellW == 72);
+    // cells: rows left to right, the last row centred
+    const auto cells = gridCells (5, 3, 100, 60, 10);
+    CHECK (cells.size() == 5 && cells[2].x == 220 && cells[3].y == 70 && cells[3].x == 55 && cells[4].x == 165);
+    CHECK (gridCells (3, 0, 100, 60, 10).empty());
 }
 
-TEST (picker171c_display_sizes_narrow_the_range)
+TEST (picker171c_picture_fitted_inside_its_cell)
 {
     using namespace lynx::pickerview;
-    // still "a big editor is a big tile", but a small effect is not a speck next to a big synth
-    const std::vector<Box> editors { { 0, 0, 400, 300 }, { 0, 0, 1600, 1200 }, { 0, 0, 200, 150 }, { 0, 0, 206, 700 }, { 0, 0, 900, 100 } };
-    const auto d = displaySizes (editors);
-    CHECK (d.size() == 5);
-    CHECK (d.size() == 5 && d[1].w > d[0].w && d[0].w > d[2].w);             // the order kept
-    CHECK (d.size() == 5 && d[1].w < 4 * d[0].w && d[0].w < 2 * d[2].w);     // the range narrowed (sides 4:1 → 2:1)
-    CHECK (d.size() == 5 && std::abs (d[0].w * 3 - d[0].h * 4) <= 4);        // a normal editor keeps its shape
-    CHECK (d.size() == 5 && d[3].h <= d[3].w * 13 / 10 + 1);                 // a very tall one is capped
-    CHECK (d.size() == 5 && d[4].w <= d[4].h * 35 / 10 + 1);                 // a very wide one too
-    CHECK (displaySizes ({}).empty());
+    // a tall, narrow editor is letterboxed (never stretched, never bigger than the cell)
+    const auto tall = fitInside ({ 0, 0, 160, 100 }, 206, 700);
+    CHECK (tall.h == 100 && tall.w < 40 && tall.x > 60 && tall.y == 0);
+    const auto wide = fitInside ({ 10, 20, 160, 100 }, 900, 100);
+    CHECK (wide.w == 160 && wide.h < 20 && wide.x == 10 && wide.y > 60);
+    const auto same = fitInside ({ 0, 0, 160, 100 }, 320, 200);
+    CHECK (same.w == 160 && same.h == 100);
 }

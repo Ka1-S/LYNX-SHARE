@@ -152,8 +152,10 @@ public:
         g.setFont (font (22.0f));
         if (tab == tabs.all())
         {
-            g.drawText (tr ("Generators"), header.withWidth (bounds.getWidth() / 2), juce::Justification::centred);
-            g.drawText (tr ("Effects"), header.withTrimmedLeft (bounds.getWidth() / 2), juce::Justification::centred);
+            // (over each grid: the halves' widths follow their columns)
+            const auto titleW = bounds.getWidth() / 2 - 200;
+            g.drawText (tr ("Generators"), header.withWidth (titleW).withCentre ({ leftTitleX, header.getCentreY() }), juce::Justification::centred);
+            g.drawText (tr ("Effects"), header.withWidth (titleW).withCentre ({ rightTitleX, header.getCentreY() }), juce::Justification::centred);
         }
         paintSearch (g, header);
 
@@ -1024,32 +1026,12 @@ private:
         repaint();
     }
 
-    // the tiles of one half at one scale: every picture at the same scale (FL: a big editor is a big tile), rows
-    // packed left to right; `centre`: each row centred (a category alone)
-    std::vector<pickerview::Box> sizesOf (const std::vector<int>& items) const
+    // one grid of tiles: `items` in `cols` columns of one cell size, from `topLeft`
+    void place (const std::vector<int>& items, juce::Point<int> topLeft, int cols, const pickerview::Grid& grid)
     {
-        std::vector<pickerview::Box> sizes;
-        for (const auto i : items)
-            sizes.push_back ({ 0, 0, tiles[(std::size_t) i].editorWidth, tiles[(std::size_t) i].editorHeight });
-        return pickerview::displaySizes (sizes); // (the editors' sizes, the range narrowed: small effects stay readable)
-    }
-
-    // `scale` > 0: at that scale (the All tab: both halves at one scale, as FL draws them), else the largest that fits
-    int flow (const std::vector<int>& items, juce::Rectangle<int> area, bool centre, double scale = 0.0)
-    {
-        if (items.empty())
-            return 0;
-        const auto sizes = sizesOf (items);
-        const auto packed = scale > 0.0 ? pickerview::packAt (sizes, area.getWidth(), gap, scale)
-                                        : pickerview::packRows (sizes, area.getWidth(), area.getHeight(), gap, minScale, maxScale);
-        for (std::size_t k = 0; k < items.size(); ++k)
-        {
-            auto b = packed.boxes[k];
-            if (centre)
-                b.x += packed.rowSlack[(std::size_t) packed.rowOf[k]] / 2;
-            tiles[(std::size_t) items[k]].bounds = { area.getX() + b.x, area.getY() + b.y, b.w, b.h };
-        }
-        return packed.height;
+        const auto cells = pickerview::gridCells ((int) items.size(), cols, grid.cellW, grid.cellH, gap);
+        for (std::size_t k = 0; k < items.size() && k < cells.size(); ++k)
+            tiles[(std::size_t) items[k]].bounds = { topLeft.x + cells[k].x, topLeft.y + cells[k].y, cells[k].w, cells[k].h };
     }
 
     void layoutTiles()
@@ -1061,16 +1043,33 @@ private:
         for (int i = 0; i < (int) tiles.size(); ++i)
             if (inTab (tiles[(std::size_t) i]))
                 (tiles[(std::size_t) i].generator ? gens : fx).push_back (i);
+        // every tile the same 16:10 cell, its picture fitted inside; the largest cells at which all fit, and on the
+        // All tab each half gets the columns it needs, so both fill their height and the window's width
         if (tab == tabs.all())
         {
-            auto halves = area;
-            const auto left = halves.removeFromLeft (halves.getWidth() / 2).withTrimmedRight (20);
-            const auto right = halves.withTrimmedLeft (20);
-            // each half at the largest scale that fills it (rows centred), so neither leaves a big empty zone
-            contentHeight = juce::jmax (flow (gens, left, true), flow (fx, right, true));
+            const auto grid = pickerview::split ((int) gens.size(), (int) fx.size(), area.getWidth(), area.getHeight(), gap, separation,
+                                                 cellAspect, minCell, maxCell);
+            const auto lw = pickerview::gridWidth (grid.leftCols, grid.cellW, gap), rw = pickerview::gridWidth (grid.rightCols, grid.cellW, gap);
+            const auto spare = juce::jmax (0, area.getWidth() - lw - rw - separation);
+            const auto lx = area.getX() + spare / 3, rx = lx + lw + separation + spare / 3;
+            place (gens, { lx, area.getY() }, grid.leftCols, grid);
+            place (fx, { rx, area.getY() }, grid.rightCols, grid);
+            leftTitleX = lx + lw / 2;
+            rightTitleX = rx + rw / 2;
+            contentHeight = juce::jmax (pickerview::gridHeight ((int) gens.size(), grid.leftCols, grid.cellH, gap),
+                                        pickerview::gridHeight ((int) fx.size(), grid.rightCols, grid.cellH, gap));
         }
         else
-            contentHeight = flow (tabs.isGenerator (tab) ? gens : fx, area.withTrimmedTop (16), true) + 16; // a category's plugins centred (FL)
+        {
+            const auto& items = tabs.isGenerator (tab) ? gens : fx;
+            const auto inner = area.withTrimmedTop (16);
+            const auto grid = pickerview::split ((int) items.size(), 0, inner.getWidth(), inner.getHeight(), gap, 0, cellAspect, minCell, maxCell);
+            const auto w = pickerview::gridWidth (grid.leftCols, grid.cellW, gap);
+            const auto h = pickerview::gridHeight ((int) items.size(), grid.leftCols, grid.cellH, gap);
+            // a category's plugins centred (FL)
+            place (items, { inner.getX() + (inner.getWidth() - w) / 2, inner.getY() + juce::jmax (0, (inner.getHeight() - h) / 2) }, grid.leftCols, grid);
+            contentHeight = h + 16;
+        }
         scroll = juce::jlimit (0, maxScroll(), scroll);
         for (auto& t : tiles)
             if (! t.bounds.isEmpty())
@@ -1083,7 +1082,9 @@ private:
     PluginPickerTargets targets;
     std::vector<Tile> tiles;
     pickerview::Tabs tabs;
-    static constexpr double minScale = 0.05, maxScale = 0.6;
+    static constexpr double cellAspect = 1.6; // (16:10)
+    static constexpr int minCell = 56, maxCell = 300, separation = 32;
+    int leftTitleX = 0, rightTitleX = 0;
     juce::Image backdrop, backdropShown;
     mutable std::vector<int> tabLefts; // (measureTabs)
     double paintScale = 1.0;

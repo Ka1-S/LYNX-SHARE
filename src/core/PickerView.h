@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cmath>
 
 // FL Studio's Plugin picker view (View › Plugin picker, F8), without JUCE (tests/Gap169kPickerTests.inc).
 //
@@ -159,106 +158,94 @@ inline int stepWrapping (const std::vector<char>& usable, int at, int delta)
     return k;
 }
 
-// The tiles of one half laid out like FL's: every editor at the same scale `k` (a big editor is a big tile), in rows
-// left to right, each tile centred in its row's height; the largest k in [minScale, maxScale] that fits `height`
-// (else minScale and the content is taller). `sizes` hold the editors' sizes (w, h).
+// The tiles: one cell box for every plugin (a fixed 16:10 shape; its picture is fitted inside, letterboxed), in a
+// grid per half. `split` finds the largest cell width (in [minW, maxW]) at which both halves fit `height`, giving
+// each half as many columns as it needs (the generators fewer than the effects), so neither leaves a big empty zone.
 struct Box
 {
     int x = 0, y = 0, w = 0, h = 0;
 };
 
-struct Packed
+struct Grid
 {
-    std::vector<Box> boxes;    // one per size
-    std::vector<int> rowOf;    // the row of each
-    std::vector<int> rowSlack; // per row: width left over (to centre it)
-    int height = 0;
-    double scale = 0.0;
+    int cellW = 0, cellH = 0;
+    int leftCols = 0, rightCols = 0;
+    bool fits = true; // false: the smallest cells, the view scrolls
 };
 
-inline Packed packAt (const std::vector<Box>& sizes, int width, int gap, double k)
+inline int gridRows (int n, int cols) { return n <= 0 || cols <= 0 ? 0 : (n + cols - 1) / cols; }
+
+inline int gridHeight (int n, int cols, int cellH, int gap)
 {
-    Packed p;
-    p.scale = k;
-    int x = 0, y = 0, rowHeight = 0, rowStart = 0;
-    auto endRow = [&] (std::size_t end) {
-        for (auto i = (std::size_t) rowStart; i < end; ++i)
-            p.boxes[i].y = y + (rowHeight - p.boxes[i].h) / 2;
-        p.rowSlack.push_back (std::max (0, width - (x - gap)));
-        y += rowHeight + gap;
-    };
-    for (std::size_t i = 0; i < sizes.size(); ++i)
-    {
-        const auto w = std::max (16, (int) (sizes[i].w * k + 0.5)), h = std::max (12, (int) (sizes[i].h * k + 0.5));
-        if (x > 0 && x + w > width)
-        {
-            endRow (i);
-            x = 0;
-            rowHeight = 0;
-            rowStart = (int) i;
-        }
-        p.boxes.push_back ({ x, 0, w, h });
-        p.rowOf.push_back ((int) p.rowSlack.size());
-        x += w + gap;
-        rowHeight = std::max (rowHeight, h);
-    }
-    if (! sizes.empty())
-        endRow (sizes.size());
-    p.height = std::max (0, y - gap);
-    return p;
+    const auto rows = gridRows (n, cols);
+    return rows == 0 ? 0 : rows * cellH + (rows - 1) * gap;
 }
 
-// The tiles' sizes from the editors' sizes: still "a big editor is a big tile" (FL), but the range is narrowed so a
-// small effect stays recognisable next to a big synth: each size scaled by (its area / the median area)^-0.25, i.e.
-// the side grows as area^0.25 around the median instead of area^0.5; and no tile is more than 1.3 × taller than wide
-// or 3.5 × wider than tall (the picture is fitted into it).
-inline std::vector<Box> displaySizes (const std::vector<Box>& editors)
+inline int gridWidth (int cols, int cellW, int gap) { return cols <= 0 ? 0 : cols * cellW + (cols - 1) * gap; }
+
+// `right` = 0: one grid (a category tab); else two, `separation` apart
+inline Grid split (int left, int right, int width, int height, int gap, int separation, double aspect, int minW, int maxW)
 {
-    std::vector<double> areas;
-    for (const auto& b : editors)
-        areas.push_back (std::max (1.0, (double) b.w * b.h));
-    if (areas.empty())
-        return {};
-    auto sorted = areas;
-    std::nth_element (sorted.begin(), sorted.begin() + (long) sorted.size() / 2, sorted.end());
-    const auto median = sorted[sorted.size() / 2];
+    Grid best;
+    auto tryWidth = [&] (int w, bool needFit) -> bool {
+        const auto h = std::max (1, (int) (w / aspect + 0.5));
+        const auto room = right > 0 ? width - separation : width;
+        const auto total = (room + gap) / (w + gap) - (right > 0 ? 1 : 0); // (two grids: one gap fewer)
+        if (total < (left > 0 ? 1 : 0) + (right > 0 ? 1 : 0))
+            return false;
+        int bestL = -1, bestHeight = 1 << 30;
+        if (right <= 0)
+        {
+            bestL = std::min (total, std::max (1, left));
+            bestHeight = gridHeight (left, bestL, h, gap);
+        }
+        else
+            for (int l = left > 0 ? 1 : 0; l <= total - 1; ++l)
+            {
+                const auto hh = std::max (gridHeight (left, l, h, gap), gridHeight (right, total - l, h, gap));
+                if (hh < bestHeight)
+                {
+                    bestHeight = hh;
+                    bestL = l;
+                }
+            }
+        if (bestL < 0 || (needFit && bestHeight > height))
+            return false;
+        best = { w, h, bestL, right > 0 ? total - bestL : 0, bestHeight <= height };
+        return true;
+    };
+    for (int w = maxW; w >= minW; --w)
+        if (tryWidth (w, true))
+            return best;
+    if (! tryWidth (minW, false))
+        best = { minW, std::max (1, (int) (minW / aspect + 0.5)), std::max (0, std::min (left, 1)), right > 0 ? 1 : 0, false };
+    return best;
+}
+
+// the cells of `n` tiles in `cols` columns, rows left to right, the last row centred
+inline std::vector<Box> gridCells (int n, int cols, int cellW, int cellH, int gap)
+{
     std::vector<Box> out;
-    for (std::size_t i = 0; i < editors.size(); ++i)
+    if (cols <= 0)
+        return out;
+    const auto full = gridWidth (cols, cellW, gap);
+    for (int i = 0; i < n; ++i)
     {
-        const auto f = std::pow (areas[i] / median, -0.25);
-        auto w = std::max (1.0, editors[i].w * f), h = std::max (1.0, editors[i].h * f);
-        if (h > w * 1.3)
-            h = w * 1.3;
-        if (w > h * 3.5)
-            h = w / 3.5;
-        out.push_back ({ 0, 0, (int) (w + 0.5), (int) (h + 0.5) });
+        const auto row = i / cols, col = i % cols;
+        const auto inRow = std::min (cols, n - row * cols);
+        const auto offset = (full - gridWidth (inRow, cellW, gap)) / 2;
+        out.push_back ({ offset + col * (cellW + gap), row * (cellH + gap), cellW, cellH });
     }
     return out;
 }
 
-inline Packed packRows (const std::vector<Box>& sizes, int width, int height, int gap, double minScale, double maxScale)
+// a picture of `w` × `h` fitted inside a cell, centred, its shape kept (never stretched or bigger than the cell)
+inline Box fitInside (Box cell, int w, int h)
 {
-    if (sizes.empty() || width <= 0)
-        return {};
-    auto best = packAt (sizes, width, gap, maxScale);
-    if (best.height <= height)
-        return best;
-    double lo = minScale, hi = maxScale;
-    best = packAt (sizes, width, gap, lo);
-    if (best.height > height)
-        return best; // (too many: the smallest, scrolled)
-    for (int i = 0; i < 24; ++i)
-    {
-        const auto mid = (lo + hi) / 2.0;
-        auto p = packAt (sizes, width, gap, mid);
-        if (p.height <= height)
-        {
-            best = std::move (p);
-            lo = mid;
-        }
-        else
-            hi = mid;
-    }
-    return best;
+    if (w <= 0 || h <= 0 || cell.w <= 0 || cell.h <= 0)
+        return cell;
+    const auto k = std::min ((double) cell.w / w, (double) cell.h / h);
+    const auto fw = std::max (1, (int) (w * k + 0.5)), fh = std::max (1, (int) (h * k + 0.5));
+    return { cell.x + (cell.w - fw) / 2, cell.y + (cell.h - fh) / 2, fw, fh };
 }
 } // namespace lynx::pickerview

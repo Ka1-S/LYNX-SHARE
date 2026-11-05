@@ -238,6 +238,12 @@ int renderNative (const juce::File& folder, const juce::StringArray& only, const
         auto channel = g.make();
         if (! channel.has_value())
             continue;
+        if (channel->instrument == InstrumentKind::patcher) // (its window is its node graph, as the Channel Rack opens it)
+        {
+            auto frame = generatorEditor (engine, std::move (*channel));
+            shoot (g.key, PatcherWindows::makeChannelEditor (engine, 0), 0);
+            continue;
+        }
         shoot (g.key, generatorEditor (engine, std::move (*channel)), channelFrameHeaderHeight());
     }
     for (const auto& f : quickpick::effectEntries (engine))

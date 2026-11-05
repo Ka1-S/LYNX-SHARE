@@ -133,6 +133,14 @@ FL [SHOT f0–f5]: FL's Master fader follows the mouse during playback with the 
 - feature/picker171c: merged with origin/main (now includes 170b's categories and 170k's art), Windows-checked,
   screenshots in /mnt/e/lynx-work/picker171c/final/. **Waiting for the user's OK on the screenshots before landing**
   (brief). To land: re-merge origin/main, build-local + tests, `coord/train.sh picker171c`.
+- 2026-11-04 (late): visual polish after the coordinator's review of f2/f4 — each half of All fills its own area
+  (rows centred, scale up to 0.6), tile sizes = editor sizes with the range narrowed ((area/median)^-0.25, h ≤ 1.3 w,
+  w ≤ 3.5 h; `pickerview::displaySizes`), cards (bg3 frame, 3–6 px padding, the picture aspect-fitted, not stretched),
+  pictures at full brightness (only the search dims), a lighter surface (bg1, the window behind at ~7 %), names on the
+  matching tiles while searching. Thumbnails: background borders trimmed (`trimToContent`, folder "-r2"), and the
+  effects whose window holds their own editor (Patcher, Wave Candy / Visualizer, Big Clock / Tuner / HTML NoteBook /
+  Scratcher, Formula Controller, Newtone / Newtime, X-Y / X-Y-Z / Control Surface) drawn from that editor instead of
+  the generic knob page (they were 87 px squares or empty boxes). New screens go to `/mnt/e/lynx-work/picker171c/final2/`.
 - Not done / LYNX differences left: LYNX's Browser has no per-category Plugin database folders, so a tab click opens
   Generators / Effects (FL opens the category folder); "Open plugin picker" targeted from Insert / Replace menus and
   mixer slots (FL's 0x70000000 / channel targets) not wired; hover Preview sound (FL: only when a .nfo has Preview=,
