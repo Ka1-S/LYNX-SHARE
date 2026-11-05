@@ -7173,6 +7173,9 @@ countries: cn sg
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "循环录音：开（录音循环：Song 模式下为循环区域，每遍一个录音；Pattern 模式下为样式）"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "循环录音：关（录音一直向前：穿过循环区域，或越过样式末尾，样式随之变长）"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "循环录音：开，录音循环（Song 模式：循环区域，每遍一个录音；Pattern 模式：样式）；关，一直向前，穿过循环区域或越过样式末尾，并把一切保留在演奏的位置（样式变长）"
+"Echo time" = "回声时间"
+"Prime numbers" = "质数"
+"The Classic panel: one-screen hardware saturator (Drive, Punish, five styles)" = "Classic 面板：单屏硬件饱和器（Drive、Punish、五种风格）"
 
 # round 171e: Export to FL Studio
 "{0} saved." = "已保存 {0}。"

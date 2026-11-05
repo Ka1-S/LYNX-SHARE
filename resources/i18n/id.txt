@@ -7173,6 +7173,9 @@ countries: id
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "Rekam loop: aktif (rekaman berulang: wilayah loop di mode Song, satu take per putaran; pattern di mode Pattern)"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "Rekam loop: nonaktif (rekaman terus lurus: melewati wilayah loop, atau melewati akhir pattern, yang memanjang)"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "Rekam loop: aktif, rekaman berulang (mode Song: wilayah loop, satu take per putaran; mode Pattern: pattern); nonaktif, terus lurus, melewati wilayah loop atau akhir pattern, dan menyimpan semuanya di tempat dimainkan (pattern memanjang)"
+"Echo time" = "Waktu gema"
+"Prime numbers" = "Bilangan prima"
+"The Classic panel: one-screen hardware saturator (Drive, Punish, five styles)" = "Panel Classic: saturator perangkat keras satu layar (Drive, Punish, lima gaya)"
 
 # round 171e: Export to FL Studio
 "{0} saved." = "{0} disimpan."

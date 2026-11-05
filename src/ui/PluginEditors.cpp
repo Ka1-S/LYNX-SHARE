@@ -104,7 +104,7 @@ public:
             layout = &plugui::layoutFor (kind);
             if (kind == EffectKind::ember) // round 165: this window only opens for the Classic voicing — its one-screen
             {                              // panel, not the 1110-unit multiband page around it
-                static const auto classic = [] { auto l = plugui::layoutFor (EffectKind::ember); l.height = 440; return l; }();
+                static const auto classic = [] { auto l = plugui::layoutFor (EffectKind::ember); l.height = 380; return l; }(); // (tp172d: 760 × 380)
                 layout = &classic;
             }
             if (kind == EffectKind::maximus) // Soundgoodizer runs on the Maximus engine: its own page
@@ -424,6 +424,9 @@ public:
         if (usesBar())
             bar.willEdit();
         editSlot ([param, v = juce::jlimit (0.0f, 1.0f, value)] (EffectSlot& target) { target.params[(std::size_t) param] = v; });
+        // round tp172d: "Advanced" (the Voicing off) swaps this Classic panel for Ember's multiband page
+        if (kind == EffectKind::ember && param == (int) mixsuite::ember::voicing && value < 0.5f && track >= 0 && node.locate == nullptr)
+            NativeEffectWindows::switchEmberEditor (engine, track, slot, false);
     }
 
     juce::String valueText (int param, float value) const
@@ -735,7 +738,16 @@ public:
         {
             case Item::section:
             {
+                {
+                    int ordinal = 0; // round tp172d: the section's place among the top-level ones (a theme's own fills)
+                    const auto& items = activeLayout().items;
+                    for (int k = 0; k < index && k < (int) items.size(); ++k)
+                        if (items[(std::size_t) k].type == Item::section && ! hasStyle (items[(std::size_t) k], plugui::raised) && visible (items[(std::size_t) k]))
+                            ++ordinal;
+                    skin::setSectionOrdinal (hasStyle (item, plugui::raised) ? -1 : ordinal);
+                }
                 skin::section (g, r, radius::lg * s, hasStyle (item, plugui::raised), fx.enabled ? accent : juce::Colours::transparentBlack);
+                skin::setSectionOrdinal (-1);
                 if (item.label != nullptr && *item.label != 0 && ! hasStyle (item, plugui::boxed))
                     skin::sectionTitle (g, r.withHeight (16.0f * s).translated (0.0f, 1.0f * s), caps (tr (item.label)), accent, juce::jmax (8.0f, 10.0f * s));
                 break;
@@ -745,7 +757,7 @@ public:
                 if (hasStyle (item, plugui::dim) && ! hasStyle (item, plugui::boxed) && item.h > 30.0f && item.label != nullptr)
                 {
                     // the plugin's name, big and readable (FL's logos are not reproduced; round 168q2)
-                    g.setColour (colour::textSecondary);
+                    g.setColour (skin::captionScale() > 1.0f ? skin::captionColour() : colour::textSecondary); // (tp172d: a themed panel's type)
                     ui::drawFittingText (g, item.label, r, hasStyle (item, plugui::alignLeft) ? juce::Justification::centredLeft : juce::Justification::centredRight,
                                          font (r.getHeight() * 0.62f, true), r.getHeight() * 0.25f, 0.0f, 0.8f); // (smaller, never "Wav...")
                     break;
@@ -854,6 +866,19 @@ public:
                     break;
                 }
                 const auto rowH = r.getHeight() / (float) juce::jmax (1, (int) labels.size());
+                if (skin::hwKeys()) // round tp172d: a column of square keys, each with its caption (the originals' mode keys)
+                {
+                    for (int o = 0; o < (int) labels.size(); ++o)
+                    {
+                        const auto row = juce::Rectangle<float> (r.getX(), r.getY() + rowH * (float) o, r.getWidth(), rowH);
+                        const auto k = juce::jmin (rowH * 0.7f, 24.0f * s);
+                        skin::hwKey (g, juce::Rectangle<float> (k, k).withCentre ({ row.getX() + k * 0.5f + 2.0f * s, row.getCentreY() }), o == chosen && fx.enabled, hot);
+                        g.setColour (skin::captionColour());
+                        ui::drawFittingText (g, caps (texts[(std::size_t) o]), row.withTrimmedLeft (k + 10.0f * s), juce::Justification::centredLeft,
+                                             font (juce::jmax (8.0f, 11.0f * s * skin::captionScale()), true), 7.0f);
+                    }
+                    break;
+                }
                 for (int o = 0; o < (int) labels.size(); ++o)
                 {
                     const auto row = juce::Rectangle<float> (r.getX(), r.getY() + rowH * (float) o, r.getWidth(), rowH);
@@ -888,6 +913,30 @@ public:
                 const auto count = (float) juce::jmax (1, (int) labels.size());
                 const auto w = vertical ? r.getWidth() : r.getWidth() / count;
                 const auto h = vertical ? r.getHeight() / count : r.getHeight();
+                if (skin::hwKeys() && ! vertical && ! hasStyle (item, plugui::pageTabs)) // round tp172d: a row of square keys joined by a line
+                {
+                    bool letters = true; // A / E / N / T / P: square keys; words: wide keys
+                    for (const auto& t : texts) letters = letters && t.length() <= 2;
+                    const auto key = juce::jmin (w * 0.62f, h);
+                    if (letters)
+                    {
+                        g.setColour (skin::captionColour().withAlpha (0.8f));
+                        g.fillRect (juce::Rectangle<float> (r.getX() + w * 0.5f, r.getCentreY() - 1.0f * s, w * (count - 1.0f), 2.0f * s));
+                    }
+                    for (int o = 0; o < (int) labels.size(); ++o)
+                    {
+                        const auto centre = juce::Point<float> (r.getX() + w * ((float) o + 0.5f), r.getCentreY());
+                        const auto cell = letters ? juce::Rectangle<float> (key, key).withCentre (centre)
+                                                  : juce::Rectangle<float> (w - 4.0f * s, h).withCentre (centre);
+                        skin::hwKey (g, cell, o == chosen && fx.enabled, hot);
+                        g.setColour (juce::Colours::black.withAlpha (0.5f));
+                        g.setFont (font (letters ? juce::jmax (8.0f, key * 0.46f) : juce::jmax (7.0f, juce::jmin (h * 0.5f, 10.0f * s)), true));
+                        g.drawText (caps (texts[(std::size_t) o]), cell.translated (0.0f, 1.0f).toNearestInt(), juce::Justification::centred, false);
+                        g.setColour (juce::Colours::white);
+                        g.drawText (caps (texts[(std::size_t) o]), cell.toNearestInt(), juce::Justification::centred, false);
+                    }
+                    break;
+                }
                 skin::valuePlate (g, r, radius::md);
                 for (int o = 0; o < (int) labels.size(); ++o)
                 {
@@ -927,6 +976,20 @@ public:
                     g.setColour (on ? colour::onAccent : colour::textSecondary);
                     if (item.label != nullptr)
                         ui::drawFittingText (g, caps (tr (item.label)), r, juce::Justification::centred, font (juce::jmax (8.0f, r.getHeight() * 0.8f), true), 6.5f);
+                    break;
+                }
+                if (skin::hwKeys()) // round tp172d: a square key (lit when on), its caption beside it
+                {
+                    const auto k = juce::jmin (r.getHeight(), 26.0f * s);
+                    const auto key = juce::Rectangle<float> (k * 1.3f, k).withCentre ({ r.getX() + k * 0.65f, r.getCentreY() });
+                    skin::hwKey (g, key, on && fx.enabled, hot);
+                    g.setColour (on ? juce::Colours::white : juce::Colours::white.withAlpha (0.7f));
+                    g.setFont (font (juce::jmax (7.0f, k * 0.4f), true));
+                    g.drawText (on ? "ON" : "OFF", key.toNearestInt(), juce::Justification::centred, false);
+                    g.setColour (skin::captionColour().getAlpha() > 0 ? skin::captionColour() : colour::textPrimary);
+                    if (item.label != nullptr)
+                        ui::drawFittingText (g, caps (tr (item.label)), r.withTrimmedLeft (k * 1.3f + 6.0f * s), juce::Justification::centredLeft,
+                                             font (juce::jmax (8.0f, 10.5f * s * skin::captionScale()), true), 7.0f);
                     break;
                 }
                 const auto box = juce::Rectangle<float> (16.0f * s, 9.0f * s).withCentre ({ r.getX() + 9.0f * s, r.getCentreY() });
@@ -5156,6 +5219,23 @@ void open (AudioEngine& engine, int track, int slot)
     const auto title = utf8 (isSoundgoodizerApprox (fxSlot) ? "Soundgoodizer" : effectInfo (kind).name) + " - " + (name.isNotEmpty() ? name : tr ("Insert {0}", { juce::String (track) })) + " ("
                        + tr ("slot {0}", { juce::String (slot + 1) }) + ")";
     open[key] = std::make_unique<NativeEffectWindow> (engine, track, slot, title);
+}
+
+void switchEmberEditor (AudioEngine& engine, int track, int slot, bool classic)
+{
+    juce::MessageManager::callAsync ([&engine, track, slot, classic]
+    {
+        if (classic)
+        {
+            ProEditorWindows::close (track, slot);
+            open (engine, track, slot);
+        }
+        else
+        {
+            windows().erase ({ track, slot });
+            ProEditorWindows::open (engine, track, slot);
+        }
+    });
 }
 
 void closeAll()

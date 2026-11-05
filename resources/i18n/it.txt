@@ -7173,6 +7173,9 @@ countries: it ch sm
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "Registrazione in loop: attiva (la registrazione si ripete: la regione di loop in modalità Song, una ripresa per passaggio; il pattern in modalità Pattern)"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "Registrazione in loop: disattiva (la registrazione prosegue dritta: attraverso la regione di loop, o oltre la fine del pattern, che si allunga)"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "Registrazione in loop: attiva, la registrazione si ripete (modalità Song: la regione di loop, una ripresa per passaggio; modalità Pattern: il pattern); disattiva, prosegue dritta, attraverso la regione di loop o oltre la fine del pattern, e tiene tutto dove è stato suonato (il pattern si allunga)"
+"Echo time" = "Tempo eco"
+"Prime numbers" = "Numeri primi"
+"The Classic panel: one-screen hardware saturator (Drive, Punish, five styles)" = "Il pannello Classic: saturatore hardware in una schermata (Drive, Punish, cinque stili)"
 
 # round 171e: Export to FL Studio
 "{0} saved." = "{0} salvato."

@@ -136,11 +136,32 @@ Both numbers are given below.
 - Echoform, Ember, Voice Shift and Auto-pan carry a Soundtoys-style hardware theme: black face, walnut cheeks, rubber knobs and wide-tracked caps.
 - Everything is drawn by LYNX code, with LYNX names.
 
+**Look, second slice (the Soundtoys roles' panels):**
+- **Ember ← Decapitator.** An Ember added from the mixer opens on the Classic panel, laid out like the original:
+  - Punish top left, the VU in the middle with the name beside it, Output and Auto under the name;
+  - the big Drive left, then Low cut (Thump under it), Tone, High cut (Steep under it) and Mix in one row;
+  - the five style keys (A E N T P) joined by a line along the bottom.
+  
+  "Advanced" swaps the window for the multiband page, whose "Classic" key swaps back. Loaded projects keep their voicing: only the mixer's Add sets Classic, and Ember's default parameters are unchanged.
+- **Echoform ← EchoBoy.** Three rounded pods:
+  - the echo pod: Mix, Echo time and Feedback; Low cut, Prime numbers and High cut under them;
+  - the tempo pod: the tap pad, Groove / Feel and the echo mode;
+  - the saturation pod: Saturation, Age and Output, with the Style and Tape menus.
+  
+  The Tweak strip and the rest of the controls sit below.
+- **Voice Shift ← Little AlterBoy:**
+  - the three printed fields (mustard pitch / formant, teal mode, red drive / mix);
+  - square mode keys;
+  - the name strip along the bottom.
+- **Auto-pan ← PanMan:** rounded pods and square keys.
+- **The hardware themes:**
+  - square bevelled keys for tabs, switches and option lists;
+  - wider walnut cheeks;
+  - a fill colour per section.
+
 **Design gaps still open:**
-- Echoform keeps its own multi-role layout; EchoBoy's three-zone face is not reproduced.
-- Ember's editor is the multiband view, and Classic is reached through its style tabs.
-- Voice Shift uses one panel colour where the original has mustard / teal / red zones.
 - Atrium's Predelay and Decay bars draw linear while the original's are skewed.
+- Ember's Drive has no printed 0 … 10 scale, and the VU reads "VU". The original's meter face and logo are not reproduced, as the rules require.
 
 ## Round 165j: LYNX Tune sound quality, before → after (measured)
 

@@ -10,6 +10,7 @@
 #include "core/HarmlessFx.h"
 #include "core/LynxBanks.h"
 #include "core/MidiOut.h"
+#include "core/MixSuite.h"
 #include "core/PhysicalModels.h"
 #include "flp/Flp.h"
 
@@ -413,7 +414,12 @@ std::optional<EffectSlot> newEffect (EffectKind kind, const FlAccess& access, do
 {
     if (effectEngine (kind) != nullptr)
         return makeSlot (kind, access, bpm);
-    return makeEffectSlot (kind);
+    auto slot = makeEffectSlot (kind);
+    // round tp172d: an Ember added by hand opens on its Classic panel (the hardware saturator, its role); its multiband
+    // page is one click away ("Advanced"). makeEffectSlot's default (the multiband engine) stays, for loaded projects
+    if (kind == EffectKind::ember)
+        slot.params[(std::size_t) mixsuite::ember::voicing] = 1.0f;
+    return slot;
 }
 
 std::string effectMenuName (EffectKind kind)
