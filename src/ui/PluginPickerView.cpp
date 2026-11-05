@@ -643,25 +643,28 @@ private:
         });
     }
 
-    // under 6 % of the picture differs from its background: an editor with nothing in it yet (Newtone before a
-    // sample, an empty Control Surface) would be a blank box in the grid
+    // an editor with nothing in it yet (Newtone before a sample, an empty Control Surface or Patcher) would be a blank
+    // box in the grid: few edges (a neighbour 3 px away differing by > 40) and almost no bright pixels (text, knobs).
+    // Measured on the 163 pictures: the empty ones 1.5–2.15 % edges or < 3 % with < 0.5 % bright; the sparsest real
+    // editor (Harmor) 2.4 % edges, 0.86 % bright
     static bool almostEmpty (const juce::Image& image)
     {
         const juce::Image::BitmapData data (image, juce::Image::BitmapData::readOnly);
         const auto w = image.getWidth(), h = image.getHeight();
         if (w < 8 || h < 8)
             return true;
-        const auto bg = data.getPixelColour (3, 3);
-        int busy = 0, all = 0;
+        int edges = 0, bright = 0, all = 0;
         for (int y = 0; y < h; y += 3)
-            for (int x = 0; x < w; x += 3)
+            for (int x = 0; x + 3 < w; x += 3)
             {
-                const auto c = data.getPixelColour (x, y);
-                busy += std::abs ((int) c.getRed() - (int) bg.getRed()) + std::abs ((int) c.getGreen() - (int) bg.getGreen())
-                            + std::abs ((int) c.getBlue() - (int) bg.getBlue()) > 40 ? 1 : 0;
+                const auto a = data.getPixelColour (x, y), b = data.getPixelColour (x + 3, y);
+                edges += std::abs ((int) a.getRed() - (int) b.getRed()) + std::abs ((int) a.getGreen() - (int) b.getGreen())
+                             + std::abs ((int) a.getBlue() - (int) b.getBlue()) > 40 ? 1 : 0;
+                bright += 0.3f * a.getRed() + 0.59f * a.getGreen() + 0.11f * a.getBlue() > 90.0f ? 1 : 0;
                 ++all;
             }
-        return busy * 100 < all * 6;
+        const auto edgeShare = 100.0 * edges / juce::jmax (1, all), brightShare = 100.0 * bright / juce::jmax (1, all);
+        return edgeShare < 2.2 || (edgeShare < 3.0 && brightShare < 0.5);
     }
 
     void fitDone (int i, const juce::Image& source, const juce::Image& fitted, juce::Point<int> size, double scale, bool sparse)
