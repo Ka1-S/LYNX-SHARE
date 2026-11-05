@@ -138,8 +138,9 @@ TEST (issue14_pitch_audit_of_the_instruments)
         synth.instrument = InstrumentKind::synth;
         list.emplace_back ("LYNX Synth", synth);
     }
+    // (round 169l2: the Default preset the audit was written with, not the Plugin database patch of a new channel)
     for (const auto& e : natives::instrumentEngines())
-        if (const auto c = natives::makeChannel (e.kind, fl))
+        if (const auto c = natives142::writtenWith (e.kind, fl))
             list.emplace_back (e.name, *c);
     Note held;
     held.key = 60;
