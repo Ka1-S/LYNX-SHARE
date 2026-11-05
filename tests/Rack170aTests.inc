@@ -154,8 +154,8 @@ TEST (rack170a_step_groups_clearly_apart)
     CHECK (d.stepOffAlt != d.stepOff);
     const auto r = [] (std::uint32_t c) { return (int) ((c >> 16) & 255); };
     const auto gch = [] (std::uint32_t c) { return (int) ((c >> 8) & 255); };
-    CHECK (r (d.stepOffAlt) - r (d.stepOff) >= 30);              // clearly redder
-    CHECK (r (d.stepOffAlt) - gch (d.stepOffAlt) >= 25);         // a tint, not a lighter grey
+    CHECK (r (d.stepOffAlt) - r (d.stepOff) >= 25);              // clearly apart (lighter, warmer)
+    CHECK (r (d.stepOffAlt) > gch (d.stepOffAlt));               // a reddish grey, as FL's
     // every theme (light ones too, and other accents) keeps the groups apart
     for (const auto bg : { 0xff1c1e23u, 0xfff2f3f5u, 0xff3a3d44u })
         for (const auto accent : { 0xffe5383bu, 0xff3a8ee5u })
@@ -165,5 +165,13 @@ TEST (rack170a_step_groups_clearly_apart)
             for (const int shift : { 16, 8, 0 })
                 diff += std::abs ((int) ((p.stepOffAlt >> shift) & 255) - (int) ((p.stepOff >> shift) & 255));
             CHECK (diff >= 45);
+            // round 170a2: an empty step can't pass for a lit one — a dull grey (low saturation), far from the lit step
+            const auto ch = [&p] (int shift) { return (int) ((p.stepOffAlt >> shift) & 255); };
+            const auto spread = std::max ({ ch (16), ch (8), ch (0) }) - std::min ({ ch (16), ch (8), ch (0) });
+            CHECK (spread <= 30);
+            int fromLit = 0;
+            for (const int shift : { 16, 8, 0 })
+                fromLit += std::abs ((int) ((p.stepOffAlt >> shift) & 255) - (int) ((p.accent >> shift) & 255));
+            CHECK (fromLit >= 150);
         }
 }

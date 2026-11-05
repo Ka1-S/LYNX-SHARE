@@ -40,8 +40,11 @@ DigitDisplayColours<C> digitDisplayColours (C bg0, C border, C accent, C accentH
     return { bg0, hot ? accent : border, hot ? accentHover : dimmed ? textDisabled : textPrimary };
 }
 
-// How much of the accent tints the Channel Rack's every-other beat group of steps (Palette::stepOffAlt).
-constexpr double stepGroupTint = 0.28;
+// The Channel Rack's every-other beat group of steps (Palette::stepOffAlt): the off step lifted towards the text colour
+// (a clearly different grey) with a little of the accent (a dull reddish grey, as FL's alternate groups), never
+// saturated enough to pass for a lit step (round 170a2: at 28 % accent the empty steps read as active ones).
+constexpr double stepGroupLift = 0.08;
+constexpr double stepGroupTint = 0.12;
 
 // The palette for an accent and a background (alpha is ignored: both are opaque).
 Palette derivePalette (std::uint32_t accent, std::uint32_t background);

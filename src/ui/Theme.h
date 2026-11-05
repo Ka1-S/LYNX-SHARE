@@ -57,7 +57,7 @@ inline juce::Colour meterClip { 0xffff3b3f };
 inline juce::Colour knobArc { 0xffc5c9d1 };     // rotary value arcs at rest (accent while touched)
 inline juce::Colour knobTrack { 0xff444955 };   // the unlit part of a knob's ring (reads on every panel surface)
 inline juce::Colour stepOff { 0xff2a2d34 };
-inline juce::Colour stepOffAlt { 0xff5e3036 };   // every other group of 4 steps (accent-tinted, round 170a)
+inline juce::Colour stepOffAlt { 0xff4f3c42 };   // every other group of 4 steps (a dull reddish grey, round 170a2)
 inline juce::Colour stepOn { 0xffe5383b }; // = accent
 inline juce::Colour stepNote { 0xffe8a3a6 };     // a step that only has a Piano Roll note
 inline juce::Colour gridBar { 0xff3a3e47 };      // bar lines
