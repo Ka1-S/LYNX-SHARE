@@ -200,3 +200,29 @@ TEST (parity172b_crest_release_follows_attack)
     CHECK (std::abs (fast + 17.1) < 1.0);
     CHECK (std::abs (slow + 12.6) < 1.5);
 }
+
+TEST (parity172b_hush_pro_ds_allround_level_law)
+{
+    // a Pro-DS state in Allround (threshold −40, range 8, wide band, the translated values): the reference turns a
+    // 7 kHz sine down by 0.2 dB per dB over the threshold — −4.5 dB at −18 dBFS, the full 8 dB only at 0 dBFS
+    const float v[] { 0.574031174f, 0.333333343f, 0.333333343f, 1, 0, 0, 1, 0.56f, 0.5f, 0, 1, 0.845098317f, 0.666666687f,
+                      1, 0, 0, 0.5f, 1, 0, 0, 0.5f, 0.5f, 1, 0, 0 };
+    const auto grDb = [&v] (double dbfs) {
+        auto slot = lynx::makeEffectSlot (lynx::EffectKind::hushDeEsser);
+        for (std::size_t i = 0; i < std::size (v); ++i) slot.params[i] = v[i];
+        auto fx = lynx::makeEffect (slot);
+        fx->prepare (p172b::sr);
+        const double a = std::pow (10.0, dbfs / 20.0);
+        std::vector<float> l (48000), r;
+        for (int i = 0; i < 48000; ++i) l[(std::size_t) i] = (float) (a * std::sin (2.0 * M_PI * 7000.0 * i / p172b::sr));
+        r = l;
+        p172b::run (*fx, l, r, slot.params);
+        double e = 0.0;
+        for (int i = 24000; i < 48000; ++i) e += (double) l[(std::size_t) i] * l[(std::size_t) i];
+        return 20.0 * std::log10 (std::sqrt (e / 24000.0) / (a * std::sqrt (0.5)));
+    };
+    const double mid = grDb (-18.0), top = grDb (0.0);
+    std::printf ("  hush allround: %.1f dB at -18 dBFS (ref -4.5), %.1f dB at 0 dBFS (ref -8.0)\n", mid, top);
+    CHECK (std::abs (mid + 4.5) < 0.8);
+    CHECK (std::abs (top + 8.0) < 0.5);
+}
