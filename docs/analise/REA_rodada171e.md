@@ -89,6 +89,10 @@ launch each for screenshots. FL opened every file (.flp and .zip) with no error 
 | p1: FL render of the export vs LYNX | −5.5 dB (FL louder) | 0.998 | 5.2 dB | same shape; a level gap, see 5.3 |
 | thief: FL original vs FL render of the export (sessions 1–2) | — | −0.23 | — | **wrong**: plays ~2.5× too fast and stops at 95 s, fixed (5.3) |
 | p2: FL render of the export (sessions 1–2) | grows −10 → −0.6 dBFS | — | — | **wrong**: the bass piles up to clipping, fixed (5.3) |
+| after the fixes, LYNX original vs LYNX's import of the export: p1 | −0.53 dB | 1.000 | 0.94 dB | esr −19.9 dB |
+| … p2 (option A: 2 inserts rendered) | +0.81 dB | 0.992 | 2.35 dB | esr −14.5 dB (was +4.8 dB / 0.934 before fix 7) |
+| … p2 (option B: substituted / left out) | +0.63 dB | 0.974 | 1.6 dB | the LYNX compressor and reverb are missing by design |
+| … thief | −0.53 dB | 0.952 | 0.27 dB | 0 step notes on generators, 0 / 12800 automation levels |
 
 ### 5.3 What the FL renders taught (fixed this round)
 
@@ -106,7 +110,11 @@ launch each for screenshots. FL opened every file (.flp and .zip) with no error 
 5. **A plugin not on this PC** (stand-in) keeps its Fruity Wrapper record, so FL loads it where it is installed.
 6. **Channel envelopes**: FL applies a channel's 0xDA records after the plugin state; the export writes the volume
    envelope enabled only when LYNX shapes the note (checked: p1/p2's generators go with it off).
-7. A link LYNX's importer can't map (thief's "SNARE PITCH", channel param 0x000D0004) stays an automation clip
+7. **An insert render is that insert's output alone** [CODE][TEST]: `lynx::makeBounceSong` keeps the inserts feeding the
+   soloed insert audible on their own Master route, so p2's reverb render also held the dry loop, which the loop
+   insert's render played again (+4.8 dB in LYNX's import). `flpexport::makeInsertRenderSong` cuts the feeders' Master
+   route for the export's renders (the Export dialog's stems keep the old behaviour).
+8. A link LYNX's importer can't map (thief's "SNARE PITCH", channel param 0x000D0004) stays an automation clip
    linked to nothing; FL keeps it, it moves nothing (as in LYNX).
 
 The p1 level gap (FL 5.5 dB louder, shape identical) is LYNX-vs-FL engine parity of the instruments themselves (the
@@ -121,4 +129,12 @@ VST/CLAP test synth and the 3x Osc default patch), not the file: LYNX's import o
 
 ## Where I stopped
 
-(filled in at the end of the round)
+- Done: the feature (menu, dialog, CLI, report, 14 languages), the converter with both options, the .zip, tests
+  (`tests/FlpExport171eTests.inc`, 10 tests), two FL sessions (renders + GUI screenshots) and the fixes they showed.
+- **Not yet seen by FL**: the fixes after session 2 (automation clip range 0 / 12800, step notes only on sample
+  channels, insert renders without their feeders, the importer's range). Both FL sessions of the round are used; the
+  exports to check are in `E:\lynx-work\flpexport171e\out3\` (p1, p1z.zip, p2, p2sub, thiefback). Next session:
+  render them with `scripts/flref-fl.sh` and compare with `flref_compare.py pair` (thiefback against FL's thief.wav:
+  expect ~240 s and env_corr ≳ 0.9; p2 must not grow; p1's 5.5 dB level gap is engine parity, a separate item).
+- Incident, session 1: the click that closed FL's Cloud path warning also started playback and added one stray clip in
+  FL's GUI; nothing was saved, FL was closed by its PID. Session 2 used a window message (no click); no dialog came.

@@ -66,6 +66,10 @@ RenderPlan planRenders (const Song& song, const Options& options);
 // The song copy that renders a frozen channel: only `channel` plays (the patterns and Playlist as they are, in Song mode),
 // straight to a clean Master (no effects, unity, centre) — its own volume, pan and their automation are in the render.
 Song makeFreezeSong (const Song& song, int channel);
+// The song copy that renders insert `track` for the export: lynx::makeBounceSong, but the inserts feeding it reach the
+// Master only through it (their own Master route is cut), so the render is that insert's output alone and the exported
+// file doesn't play its sources twice (they keep their own inserts).
+Song makeInsertRenderSong (const Song& song, int track);
 // After the render (`wav`, `length` ticks from the song's start): the channel becomes an audio clip channel at unity
 // that plays the render from tick 0 on a new Playlist track; its notes leave the patterns and the automation of its
 // volume / pan / parameters stops (it is in the audio).

@@ -462,6 +462,13 @@ TEST (flpexport171e_insert_render_switches_off_the_lynx_slots)
     CHECK (flpexport::planRenders (song, options).inserts.empty() || std::find (flpexport::planRenders (song, options).inserts.begin(),
                                                                                     flpexport::planRenders (song, options).inserts.end(), 3)
                                                                          == flpexport::planRenders (song, options).inserts.end());
+    // the render of an insert is its output alone: the inserts feeding it reach the Master only through it (p2 in
+    // LYNX played its loop twice, once in the loop insert's render and once inside the reverb insert's render)
+    const auto renderSong = flpexport::makeInsertRenderSong (fx171e::richSong(), 3);
+    CHECK (renderSong.mixer[3].solo && renderSong.mixer[3].toMaster && renderSong.mixer[3].sends.empty());
+    for (std::size_t t = 1; t < renderSong.mixer.size(); ++t)
+        if (t != 3)
+            CHECK (! renderSong.mixer[t].toMaster);
 }
 
 TEST (flpexport171e_sample_paths_rewritten_for_the_package)

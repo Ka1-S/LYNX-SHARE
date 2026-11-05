@@ -369,6 +369,17 @@ RenderPlan planRenders (const Song& song, const Options& options)
     return plan;
 }
 
+Song makeInsertRenderSong (const Song& song, int track)
+{
+    auto out = makeBounceSong (song, track);
+    if (track <= 0 || track >= (int) out.mixer.size())
+        return out;
+    for (int t = 1; t < (int) out.mixer.size(); ++t)
+        if (t != track)
+            out.mixer[(std::size_t) t].toMaster = false;
+    return out;
+}
+
 Song makeFreezeSong (const Song& song, int channel)
 {
     Song out = song;

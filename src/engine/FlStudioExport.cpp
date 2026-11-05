@@ -117,7 +117,7 @@ bool exportProject (const Song& song, const flpexport::Options& options, const j
             job.wav = wavFor ((job.channel ? "Channel " : "Insert ") + std::to_string (job.channel ? job.index + 1 : job.index)
                               + (job.name.isEmpty() ? std::string() : " " + job.name.toStdString()));
             // (every render from the song as it is: the renders don't hear each other's changes)
-            const auto renderSong = job.channel ? flpexport::makeFreezeSong (song, job.index) : makeBounceSong (song, job.index);
+            const auto renderSong = job.channel ? flpexport::makeFreezeSong (song, job.index) : flpexport::makeInsertRenderSong (song, job.index);
             const auto base = (double) i / (double) (jobs.size() + 1);
             const auto ok = render (renderSong, settings, job.wav, [&] (double p) {
                 return ! progress || progress (base + p / (double) (jobs.size() + 1), label);
