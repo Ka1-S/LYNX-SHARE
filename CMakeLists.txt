@@ -305,6 +305,8 @@ target_link_libraries(lynx_core PUBLIC vorbis_decoder)
 
 add_executable(lynx_tests tests/tests.cpp)
 target_link_libraries(lynx_tests PRIVATE lynx_core)
+add_executable(lynx_kumi_playlist_tests tests/KumiPlaylistEditsTests.cpp)
+target_link_libraries(lynx_kumi_playlist_tests PRIVATE lynx_core)
 
 add_executable(flpdump tools/flpdump.cpp)
 target_link_libraries(flpdump PRIVATE lynx_core)
@@ -314,6 +316,7 @@ target_link_libraries(renderwav PRIVATE lynx_core)
 
 enable_testing()
 add_test(NAME lynx_tests COMMAND lynx_tests)
+add_test(NAME lynx_kumi_playlist_tests COMMAND lynx_kumi_playlist_tests)
 
 # ---------------------------------------------------------------------------
 # App (JUCE)
@@ -359,6 +362,9 @@ if(LYNX_BUILD_APP)
         src/platform/Package.cpp
         src/platform/NativeEmbed.cpp
         src/engine/AudioEngine.cpp
+        src/engine/KumiControl.cpp
+        src/engine/KumiPluginControl.cpp
+        src/engine/KumiPlaylistControl.cpp
         src/engine/ChannelRackProcessor.cpp
         src/engine/Metronome.cpp
         src/engine/SampleLibrary.cpp

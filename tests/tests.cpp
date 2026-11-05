@@ -4777,13 +4777,29 @@ TEST (plugin_factories_create_reuse_and_fallback)
     CHECK (instrumentsMade == 1 && effectsMade == 1);
     CHECK (a->instruments.size() == 2 && a->instruments[1] != nullptr); // missing: muted, but it exists
 
-    // changing the saved state doesn't recreate; swapping the plugin does
+    // An intentional stored-state edit (and its undo) must actually reach the
+    // hosted instance. A metadata-only capture sync updates both Song and prior
+    // shape before building, and continues to reuse the running plugin.
     s.channels[0].plugin.state = "abc";
     auto b = lynx::RackState::build (s, a.get(), 48000.0, f);
-    CHECK (instrumentsMade == 1 && b->instruments[0] == a->instruments[0] && b->effects[1][0] == a->effects[1][0]);
+    CHECK (instrumentsMade == 2 && b->instruments[0] != a->instruments[0] && b->effects[1][0] == a->effects[1][0]);
+    s.mixer[1].effects[0].plugin.state = "new effect state";
+    auto changed = lynx::RackState::build (s, b.get(), 48000.0, f);
+    CHECK (instrumentsMade == 2 && effectsMade == 2 && changed->effects[1][0] != b->effects[1][0]);
+    s.channels[0].plugin.state.clear();
+    s.mixer[1].effects[0].plugin.state.clear();
+    auto undone = lynx::RackState::build (s, changed.get(), 48000.0, f);
+    CHECK (instrumentsMade == 3 && effectsMade == 3);
+    CHECK (undone->instruments[0] != changed->instruments[0] && undone->effects[1][0] != changed->effects[1][0]);
+    auto capturedShape = *undone;
+    capturedShape.song.channels[0].plugin.state = s.channels[0].plugin.state = "captured instrument";
+    capturedShape.song.mixer[1].effects[0].plugin.state = s.mixer[1].effects[0].plugin.state = "captured effect";
+    auto captured = lynx::RackState::build (s, &capturedShape, 48000.0, f);
+    CHECK (instrumentsMade == 3 && effectsMade == 3);
+    CHECK (captured->instruments[0] == undone->instruments[0] && captured->effects[1][0] == undone->effects[1][0]);
     s.mixer[1].effects[0].plugin.id = "VST3-Outro-1";
-    auto c2 = lynx::RackState::build (s, b.get(), 48000.0, f);
-    CHECK (effectsMade == 2);
+    auto c2 = lynx::RackState::build (s, captured.get(), 48000.0, f);
+    CHECK (effectsMade == 4);
 
     // rendering with a missing plugin and a plugin slot breaks nothing
     lynx::RackRenderer r;

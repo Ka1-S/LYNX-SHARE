@@ -1917,6 +1917,36 @@ void PluginHost::preload (const PluginRef& ref, int wanted)
     preloaded[preloadKey (ref, preloadRate)].push_back (std::move (p));
 }
 
+bool PluginHost::preloadChecked (const PluginRef& ref, double sampleRate, juce::String& error)
+{
+    if (ref.id.empty() || ! std::isfinite (sampleRate) || sampleRate <= 0)
+    {
+        error = "Invalid plugin identity or sample rate";
+        return false;
+    }
+    Preloaded ready;
+    ready.instance = createInstance (ref, sampleRate, &error);
+    if (ready.instance == nullptr)
+        return false;
+    const std::scoped_lock lock (preloadLock);
+    preloaded[preloadKey (ref, sampleRate)].push_back (std::move (ready));
+    return true;
+}
+
+void PluginHost::discardPreloaded (const PluginRef& ref, double sampleRate)
+{
+    std::vector<Preloaded> discarded;
+    {
+        const std::scoped_lock lock (preloadLock);
+        if (auto found = preloaded.find (preloadKey (ref, sampleRate)); found != preloaded.end())
+        {
+            discarded = std::move (found->second);
+            preloaded.erase (found);
+        }
+    }
+    // Plugin teardown stays outside the cache mutex, just as clearPreloaded().
+}
+
 void PluginHost::clearPreloaded()
 {
     {
