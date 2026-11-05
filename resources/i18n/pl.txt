@@ -7059,6 +7059,22 @@ countries: pl
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] maluj nim ołówkiem  [Ctrl+LMB] / [Shift+LMB] wybierz kilka  [2xLMB] otwórz  [RMB] menu"
 "Empty patterns were ignored." = "Puste patterny zostały pominięte."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Wybór wtyczek: wszystkie generatory i efekty, kategorie jako karty (naciśnij ponownie, aby zamknąć)"
+
+# --- Pattern blocks (round 170f, issue #60)
+"Pattern blocks" = "Bloki patternów"
+"Turn pattern blocks into clips" = "Zamień bloki patternów na klipy"
+"Paint pattern blocks" = "Maluj bloki patternów"
+"Erase pattern blocks" = "Wymaż bloki patternów"
+"Edit pattern blocks" = "Edytuj bloki patternów"
+"Pattern blocks (current project) on/off" = "Bloki patternów (bieżący projekt) wł./wył."
+"Pattern blocks (current project)" = "Bloki patternów (bieżący projekt)"
+"Pattern blocks: drag to resize, double-click to show every row" = "Bloki patternów: przeciągnij, aby zmienić rozmiar, dwuklik pokazuje wszystkie wiersze"
+"Pattern block row: click selects the pattern, double-click opens it, right-click renames and colours it" = "Wiersz bloków patternu: kliknięcie wybiera pattern, dwuklik go otwiera, prawy klik zmienia nazwę i kolor"
+"Pattern blocks: click or drag paints whole blocks of this row's pattern, right-click erases" = "Bloki patternów: kliknięcie lub przeciągnięcie maluje całe bloki patternu tego wiersza, prawy klik wymazuje"
+"This project has pattern blocks. Turn them into clips (one track per pattern) so they keep playing, or delete them?" = "Ten projekt ma bloki patternów. Zamienić je na klipy (jedna ścieżka na pattern), aby dalej grały, czy usunąć?"
+"Turn them into clips" = "Zamień na klipy"
+"Delete them" = "Usuń je"
+"No pattern blocks to turn into clips" = "Brak bloków patternów do zamiany na klipy"
 "{0} selected tracks" = "Wybrane ścieżki: {0}"
 "Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu" = "Kieruje wybrane inserty do tego (przeciągnij po włączeniu: poziom). Ctrl+klik: tylko ta ścieżka, Shift: sidechain, Ctrl+Shift: tylko sidechain, prawy klik: menu"
 "[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] zaznacza  [Ctrl]+[LMB] lub przeciągnij przez: zakres  [Ctrl]+[Shift]+[LMB] dodaje lub usuwa  [LMB] przeciągnij w bok zmienia kolejność  [RMB] menu insertu"
@@ -7137,6 +7153,14 @@ countries: pl
 
 # round 170e3: the idle hint on one line
 "Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "Wskaż cokolwiek, by zobaczyć pomoc  [F1] skróty  [F5]-[F9] okna  [Space] odtwórz/zatrzymaj"
+# --- round 170a (Channel Rack cut/copy/paste, note names on every key)
+"Cut the selected channels' steps" = "Wytnij kroki zaznaczonych kanałów"
+"Copy the selected channels' steps" = "Kopiuj kroki zaznaczonych kanałów"
+"Paste steps into the selected channels" = "Wklej kroki do zaznaczonych kanałów"
+"Note names on every key" = "Nazwy nut na każdym klawiszu"
+"Note names on every Piano roll key" = "Nazwy nut na każdym klawiszu Piano Roll"
+"[LMB] drag up / down: step through the patterns" = "[LMB] przeciągnij w górę / w dół: przełączaj patterny"
+"Playhead column in the Channel Rack" = "Kolumna głowicy odtwarzania w Channel Rack"
 
 # round 170e5: Loop record in Pattern mode
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "Nagrywanie w pętli: wł. (nagrywanie się zapętla: obszar pętli w trybie Song, jedno ujęcie na przebieg; pattern w trybie Pattern)"

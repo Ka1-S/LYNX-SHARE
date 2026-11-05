@@ -1,9 +1,11 @@
 #include "ui/PluginSkin.h"
 
+#include "core/Effects.h"
 #include "ui/I18n.h"
 #include "ui/WindowOwner.h"
 
 #include <cstdint>
+#include <cstring>
 #include <unordered_map>
 
 #if JUCE_WINDOWS
@@ -496,12 +498,119 @@ void brandMark (juce::Graphics& g, juce::Rectangle<float> a)
     g.drawImage (img, r, juce::RectanglePlacement::centred);
 }
 
+namespace
+{
+TitleFit lastFit;
+
+// round 170k2: how each style sets a plugin's name (its size for a box this high, kerning, capitals, padding)
+struct TitleLook
+{
+    float nominal, kerning, pad;
+    bool upper;
+};
+TitleLook titleLook (Style s, float h)
+{
+    switch (s)
+    {
+        case Style::neon: return { juce::jlimit (14.0f, 21.0f, h * 0.74f), 0.06f, 4.0f, false };
+        case Style::hardware: return { juce::jlimit (12.0f, 16.0f, h * 0.56f), 0.08f, 16.0f, true };
+        case Style::vivid: return { juce::jlimit (14.0f, 20.0f, h * 0.72f), 0.03f, 3.5f, true };
+        default: return { juce::jlimit (13.0f, 18.0f, h * 0.62f), 0.02f, 2.0f, false };
+    }
+}
+float titleWidth (const TitleLook& look, const juce::String& name, float size)
+{
+    const auto f = juce::Font (theme::font (size, true)).withExtraKerningFactor (look.kerning);
+    return juce::GlyphArrangement::getStringWidth (f, look.upper ? name.toUpperCase() : name) + look.pad;
+}
+// the largest size from the style's own down to minSize at which the name fits `w`; 0 when even minSize does not
+float fittingSize (const TitleLook& look, const juce::String& name, float w, float minSize)
+{
+    for (auto size = look.nominal; size >= minSize - 0.01f; size -= 0.5f)
+        if (titleWidth (look, name, size) <= w - 1.0f) // (a pixel of slack: drawText rounds its own way)
+            return size;
+    return 0.0f;
+}
+constexpr float titleMinSize = 10.0f; // smaller than this a header name stops reading as a title
+
+float drawTitleLine (juce::Graphics& g, juce::Rectangle<float> a, const juce::String& name, juce::Colour accent, bool underline, float size);
+} // namespace
+
+TitleFit lastTitleFit() { return lastFit; }
+void resetTitleFit() { lastFit = {}; }
+
+// the prefix that may go to a small line above the name when the full name does not fit on one ("Fruity Blood
+// Overdrive": "Fruity" over "Blood Overdrive")
+static int titlePrefixLength (const juce::String& name)
+{
+    for (const auto* p : { "Fruity " })
+        if (name.startsWithIgnoreCase (p) && name.length() > (int) std::strlen (p) + 2)
+            return (int) std::strlen (p);
+    return 0;
+}
+
+float titleMinWidth (const juce::String& name, float height)
+{
+    // the widest any style needs (a window's minimum size does not change with the style)
+    auto most = 0.0f;
+    for (const auto st : { Style::glow, Style::neon, Style::hardware, Style::vivid })
+    {
+        if (const auto n = titlePrefixLength (name); n > 0 && height >= 20.0f)
+        {
+            const auto low = titleLook (st, height * 0.7f);
+            most = juce::jmax (most, titleWidth (low, name.substring (n), titleMinSize));
+        }
+        else
+            most = juce::jmax (most, titleWidth (titleLook (st, height), name, titleMinSize));
+    }
+    return std::ceil (most) + 2.0f;
+}
+
 float titleText (juce::Graphics& g, juce::Rectangle<float> a, const juce::String& name, juce::Colour accent, bool underline)
 {
     const BaseScope base;
-    if (currentStyle != Style::glow) return styles::titleText (g, a, name, accent, underline, currentStyle);
+    const auto look = titleLook (currentStyle, a.getHeight());
+    lastFit = { titleWidth (look, name, look.nominal), a.getWidth(), look.nominal, 1, false };
+    // 1. one line, the style's size or a little smaller
+    if (const auto size = fittingSize (look, name, a.getWidth(), juce::jmax (titleMinSize, look.nominal * 0.75f)); size > 0.0f)
+    {
+        lastFit.size = size;
+        return drawTitleLine (g, a, name, accent, underline, size);
+    }
+    // 2. a known prefix ("Fruity") on a small line above, the rest of the name below it
+    if (const auto n = titlePrefixLength (name); n > 0 && a.getHeight() >= 20.0f)
+    {
+        const auto rest = name.substring (n);
+        const auto top = a.withHeight (a.getHeight() * 0.36f).translated (0.0f, 1.0f);
+        const auto low = a.withTrimmedTop (a.getHeight() * 0.36f);
+        const auto lowLook = titleLook (currentStyle, low.getHeight());
+        if (const auto size = fittingSize (lowLook, rest, low.getWidth(), titleMinSize); size > 0.0f)
+        {
+            const auto prefix = name.substring (0, n).trim();
+            const auto prefixSize = juce::jmax (8.0f, top.getHeight() * 0.95f);
+            g.setFont (juce::Font (theme::font (prefixSize, true)).withExtraKerningFactor (0.12f));
+            const auto prefixWidth = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), prefix.toUpperCase()) + 4.0f;
+            g.setColour (juce::Colours::white.withAlpha (0.62f));
+            g.drawText (prefix.toUpperCase(), top.withTrimmedLeft (lowLook.pad > 8.0f ? 4.0f : 1.0f), juce::Justification::centredLeft, false);
+            lastFit.size = size;
+            lastFit.lines = 2;
+            const auto w = drawTitleLine (g, low, rest, accent, false, size);
+            return juce::jmax (w, prefixWidth);
+        }
+    }
+    // 3. one line at the smallest title size (ellipsis only when even that does not fit)
+    const auto size = juce::jmax (titleMinSize, fittingSize (look, name, a.getWidth(), titleMinSize));
+    lastFit.size = size;
+    lastFit.clipped = titleWidth (look, name, size) > a.getWidth() + 0.5f;
+    return drawTitleLine (g, a, name, accent, underline, size);
+}
+
+namespace
+{
+float drawTitleLine (juce::Graphics& g, juce::Rectangle<float> a, const juce::String& name, juce::Colour accent, bool underline, float size)
+{
+    if (currentStyle != Style::glow) return styles::titleText (g, a, name, accent, underline, currentStyle, size);
     // the name plate: big and bold, lit from behind in the accent
-    const auto size = juce::jlimit (13.0f, 18.0f, a.getHeight() * 0.62f);
     g.setFont (juce::Font (theme::font (size, true)).withExtraKerningFactor (0.02f));
     const auto w = juce::jmin (a.getWidth(), juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), name) + 2.0f);
     const auto box = a.withWidth (w);
@@ -530,6 +639,7 @@ float titleText (juce::Graphics& g, juce::Rectangle<float> a, const juce::String
     }
     return w;
 }
+} // namespace
 
 void drawFilledText (juce::Graphics& g, const juce::String& text, juce::Rectangle<float> area, juce::Justification justification)
 {

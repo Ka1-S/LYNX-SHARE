@@ -368,7 +368,21 @@ private:
     };
     TempoDisplay tempoDisplay { engine };
 
-    juce::ComboBox patternBox;
+    // The toolbar's pattern selector (FL's PatSelect, a TVectorDigiWheel; REA round 170a §3): a click opens the list as
+    // before, a left-drag up / down and the wheel step through the patterns (no list to open and read).
+    struct PatternBox final : public juce::ComboBox
+    {
+        std::function<void (int delta)> onStep;
+        float downY = 0.0f;
+        int appliedSteps = 0;
+        bool dragging = false, pressed = false;
+        patterndrag::Wheel wheelSteps;
+        void mouseDown (const juce::MouseEvent& e) override;
+        void mouseDrag (const juce::MouseEvent& e) override;
+        void mouseUp (const juce::MouseEvent& e) override;
+        void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
+    };
+    PatternBox patternBox;
     IconButton newPatternButton { "newPattern", Icon::plus };
     IconButton patternMenuButton { "patternMenu", Icon::more };
     juce::Slider swingSlider { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox }; // in the Channel Rack's title bar
@@ -391,6 +405,9 @@ private:
         juce::String text;
         juce::Colour colour;
         int hoveredPart = -1; // 0 = previous, 1 = name, 2 = next
+        int appliedSteps = 0;  // a left-drag on the name steps through the patterns (FL's pattern selector)
+        bool namePressed = false, dragging = false;
+        patterndrag::Wheel wheelSteps;
         std::function<void (int delta)> onStep;
         std::function<void()> onMenu;
         static constexpr int arrowWidth = 16;
@@ -399,11 +416,14 @@ private:
         void mouseMove (const juce::MouseEvent& e) override { setHovered (partAt (e.x)); }
         void mouseExit (const juce::MouseEvent&) override { setHovered (-1); }
         void mouseDown (const juce::MouseEvent& e) override;
+        void mouseDrag (const juce::MouseEvent& e) override;
+        void mouseUp (const juce::MouseEvent& e) override;
         void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel) override;
         void setHovered (int part) { if (part != hoveredPart) { hoveredPart = part; repaint(); } }
     };
     PatternSelector rackPatternSelector;
     void showRackPatternList();
+    void stepPatternFromSelector (int delta); // drag / wheel on the toolbar box or the rack selector
     void refreshRackPatternSelector();
     // The current pattern's length in bars next to the swing knob (issue #12; drawn like the rack's insert number
     // box): drag up / down or the wheel changes it, double-click = automatic (from the notes), right-click = menu.

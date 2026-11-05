@@ -1,5 +1,7 @@
 #include "ui/Theme.h"
 
+#include "core/MenuMnemonic.h"
+
 #include <algorithm>
 #include <limits>
 #include <unordered_map>
@@ -399,6 +401,11 @@ void setPalette (const themes::Palette& p)
     theme::window = bg1; theme::panel = bg2; theme::toolbar = bg3; theme::channelButton = bg4; theme::channelButtonSelected = bg6;
     theme::knobBackground = bg0; theme::stepOn = accent; theme::stepOnOffGrid = stepNote; theme::accentOrange = accent;
     theme::playhead = accent; theme::text = textPrimary;
+}
+
+juce::String mnemonic (const juce::String& text, char key)
+{
+    return juce::String::fromUTF8 (menumnemonic::apply (text.toStdString(), key).c_str());
 }
 
 int labelColumnWidth (std::initializer_list<const juce::Label*> labels, int minWidth, int maxWidth)
@@ -839,7 +846,8 @@ void LookAndFeel::getIdealPopupMenuItemSize (const juce::String& text, bool isSe
     }
     idealHeight = standardMenuItemHeight > 0 ? standardMenuItemHeight : menus::itemHeight();
     const auto iconWidth = juce::roundToInt ((float) idealHeight * 0.8f);
-    idealWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (font, text)) + iconWidth + (menus::compact() ? 36 : idealHeight + 30);
+    const auto shown = text.removeCharacters (juce::String::charToString ((juce::juce_wchar) menumnemonic::mark)); // (an accelerator mark)
+    idealWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (font, shown)) + iconWidth + (menus::compact() ? 36 : idealHeight + 30);
 }
 
 void LookAndFeel::drawPopupMenuItem (juce::Graphics& g, const juce::Rectangle<int>& area, bool isSeparator, bool isActive, bool isHighlighted,
@@ -895,8 +903,21 @@ void LookAndFeel::drawPopupMenuItem (juce::Graphics& g, const juce::Rectangle<in
         g.setFont (font);
     }
 
+    // FL's accelerator letter (core/MenuMnemonic.h, round 170a): the mark is hidden, its letter underlined
+    const auto markAt = text.indexOfChar ((juce::juce_wchar) menumnemonic::mark);
+    const auto shown = markAt >= 0 ? text.removeCharacters (juce::String::charToString ((juce::juce_wchar) menumnemonic::mark)) : text;
     g.setColour (textColour);
-    g.drawFittedText (text, content, juce::Justification::centredLeft, 1, 0.9f);
+    g.drawFittedText (shown, content, juce::Justification::centredLeft, 1, 0.9f);
+
+    if (markAt >= 0 && markAt < shown.length() && isActive)
+    {
+        const auto full = juce::GlyphArrangement::getStringWidth (font, shown);
+        const auto squeeze = full > (float) content.getWidth() && full > 0.0f ? juce::jmax (0.9f, (float) content.getWidth() / full) : 1.0f;
+        const auto x = (float) content.getX() + juce::GlyphArrangement::getStringWidth (font, shown.substring (0, markAt)) * squeeze;
+        const auto w = juce::GlyphArrangement::getStringWidth (font, shown.substring (markAt, markAt + 1)) * squeeze;
+        const auto baseline = (float) content.getCentreY() - font.getHeight() * 0.5f + font.getAscent();
+        g.fillRect (juce::Rectangle<float> (x, baseline + 1.5f, juce::jmax (1.0f, w), 1.0f));
+    }
 }
 
 void LookAndFeel::drawPopupMenuSectionHeader (juce::Graphics& g, const juce::Rectangle<int>& area, const juce::String& sectionName)

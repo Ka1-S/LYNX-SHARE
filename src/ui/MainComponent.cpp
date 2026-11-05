@@ -163,6 +163,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         };
     }
     PianoRollComponent::shortcutText = [this] (const std::string& id) { return shortcutText (id.c_str()); };
+    pianoRoll.onNoteNamesChanged = [this] { saveUiSettings(); };
     // FL's EEPlayBtnClick (FLEngine 0xe4bd40, REA round 169f): Pattern mode first (also while the song plays), then the
     // play / pause of the transport. EEPlayBtnMouseDown (0xe4bda0), right button: FL's Stop (FUN_011ca520 (0, 0), the very
     // call of the toolbar's StopBtnClick), which in FL goes back to where playback started, pressed again to the start
@@ -307,7 +308,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     }
 
     patternBox.setTooltip (tr ("Current pattern (Numpad +/-: next/previous, F4: next empty, F2: rename)"));
-    patternBox.setScrollWheelEnabled (true);
+    patternBox.onStep = [this] (int delta) { stepPatternFromSelector (delta); };
     gridBox.setScrollWheelEnabled (true);
     patternBox.onChange = [this]
     {
@@ -411,9 +412,9 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     ui::setHint (rackLoopStarterButton, tr ("Loop Starter: pick a genre and get a drum loop (kit channels with steps) to re-roll and send to the Playlist"));
     rackTitleTools.addAndMakeVisible (rackLoopStarterButton);
     // the pattern selector (issue #9): change the pattern the rack edits right from its title bar
-    rackPatternSelector.onStep = [this] (int delta) { selectPattern (stepPattern (engine.getSong(), delta)); };
+    rackPatternSelector.onStep = [this] (int delta) { stepPatternFromSelector (delta); };
     rackPatternSelector.onMenu = [this] { showRackPatternList(); };
-    ui::setHint (rackPatternSelector, tr ("Pattern the Channel Rack edits: [LMB] on the name: the list of patterns, on the arrows: previous / next  [Wheel] step"));
+    ui::setHint (rackPatternSelector, tr ("Pattern the Channel Rack edits: [LMB] on the name: the list of patterns, on the arrows: previous / next  [Wheel] step") + "  " + tr ("[LMB] drag up / down: step through the patterns"));
     rackTitleTools.addAndMakeVisible (rackPatternSelector);
     rackTitleTools.addAndMakeVisible (rackFilterBox);
     rackTitleTools.addAndMakeVisible (swingSlider);
@@ -1721,6 +1722,9 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("rack.selectAll")) rack.selectAll();
     else if (is ("rack.clone")) rack.cloneSelected();
     else if (is ("rack.deleteSelected")) rack.deleteSelected();
+    else if (is ("rack.cut")) rack.cutSelected();
+    else if (is ("rack.copy")) rack.copySelected();
+    else if (is ("rack.paste")) rack.pasteSelected();
     else if (is ("rack.sendToInserts")) rack.sendSelectedToInserts();
     else if (id.rfind ("rack.mute", 0) == 0) rack.toggleMute (std::stoi (id.substr (9)) - 1);
     else if (id.rfind ("rack.solo", 0) == 0) rack.solo (std::stoi (id.substr (9)) - 1);
@@ -1942,6 +1946,10 @@ void MainComponent::loadUiSettings()
             notenames::currentStyle.store (juce::jlimit (0, 2, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue()));
         else if (key == "noteFlats")
             notenames::currentFlats.store (on);
+        else if (key == "noteNamesEveryKey")
+            notenames::everyKey.store (on);
+        else if (key == "rackPlayheadColumn")
+            ChannelRackComponent::playheadColumn.store (on);
         else if (key == "rememberSeek")
             EditorGlobals::get().rememberSeek = on;
         else if (key == "createVariants")
@@ -2088,6 +2096,8 @@ void MainComponent::saveUiSettings()
                                       + "\nwaveStereo=" + juce::String (ui::WaveformCache::stereo ? 1 : 0)
                                       + "\nnoteNames=" + juce::String (notenames::currentStyle.load())
                                       + "\nnoteFlats=" + juce::String (notenames::currentFlats.load() ? 1 : 0)
+                                      + "\nnoteNamesEveryKey=" + juce::String (notenames::everyKey.load() ? 1 : 0)
+                                      + "\nrackPlayheadColumn=" + juce::String (ChannelRackComponent::playheadColumn.load() ? 1 : 0)
                                       + "\nreducedEffects=" + juce::String (skin::reducedEffects() ? 1 : 0)
                                       + "\nartMotion=" + juce::String (skin::artMotion() ? 1 : 0)
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
@@ -2396,6 +2406,17 @@ void MainComponent::selectPattern (int index)
         engine.editSong ([index] (Song& s) { s.currentPattern = index; }, false);
 }
 
+void MainComponent::stepPatternFromSelector (int delta)
+{
+    // FL's selector goes on past the last pattern (rack ops stepPatternCreating: one new empty pattern at most)
+    const auto& song = engine.getSong();
+    const auto last = (int) song.patterns.size() - 1;
+    if (delta > 0 && last >= 0 && song.currentPattern + delta > last && ! isPatternEmpty (song.patterns[(std::size_t) last]))
+        engine.editSong ([delta] (Song& s) { s.currentPattern = stepPatternCreating (s, delta); });
+    else
+        selectPattern (stepPattern (song, delta));
+}
+
 void MainComponent::nextEmptyPattern()
 {
     engine.editSong ([] (Song& s) { gotoNextEmptyPattern (s); });
@@ -2471,6 +2492,9 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "playlist.ripple", tr ("Ripple editing (resizing and deleting move the later clips)"), true, playlist.isRippleOn());
             action (menu, "playlist.rippleDelete", tr ("Delete the selected clips and close the gaps"));
             action (menu, "playlist.autoCrossfades", tr ("Automatic crossfades (current project)"), true, engine.getSong().autoCrossfades);
+            // FL's legacy Pattern Blocks (round 170f, issue #60): FL 10's "Enable legacy pattern blocks", per project here
+            action (menu, "playlist.patternBlocks", tr ("Pattern blocks (current project)"), true, engine.getSong().patternBlocksOn);
+            action (menu, "playlist.blocksToClips", tr ("Turn pattern blocks into clips"), ! engine.getSong().blocks.empty());
             action (menu, "playlist.follow", tr ("Follow the playhead (auto scrolling)"), true, EditorGlobals::get().isFollowing (false));
             action (menu, "playlist.pitchClipsDown", tr ("Pitch selected audio clips one semitone down"));
             action (menu, "playlist.pitchClipsUp", tr ("Pitch selected audio clips one semitone up"));
@@ -3314,21 +3338,83 @@ void MainComponent::PatternSelector::paint (juce::Graphics& g)
 void MainComponent::PatternSelector::mouseDown (const juce::MouseEvent& e)
 {
     const auto part = partAt (e.x);
+    namePressed = dragging = false;
+    appliedSteps = 0;
 
-    if (part == 1 || e.mods.isPopupMenu())
+    if (e.mods.isPopupMenu())
     {
         if (onMenu)
             onMenu();
     }
+    else if (part == 1)
+        namePressed = true; // the list opens on release unless the mouse dragged (FL's pattern selector)
     else if (onStep)
         onStep (part == 0 ? -1 : 1);
+}
+
+void MainComponent::PatternSelector::mouseDrag (const juce::MouseEvent& e)
+{
+    if (! namePressed)
+        return;
+    dragging = dragging || std::abs (e.getDistanceFromDragStartY()) >= patterndrag::threshold;
+    if (! dragging)
+        return;
+    const auto steps = patterndrag::steps ((float) e.getDistanceFromDragStartY());
+    if (steps != appliedSteps && onStep)
+        onStep (steps - appliedSteps);
+    appliedSteps = steps;
+}
+
+void MainComponent::PatternSelector::mouseUp (const juce::MouseEvent&)
+{
+    if (namePressed && ! dragging && onMenu)
+        onMenu();
+    namePressed = dragging = false;
 }
 
 void MainComponent::PatternSelector::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
 {
     const auto delta = wheel.deltaY != 0.0f ? wheel.deltaY : -wheel.deltaX;
-    if (delta != 0.0f && onStep)
-        onStep (delta > 0.0f ? -1 : 1);
+    if (const auto n = wheelSteps.take (delta); n != 0 && onStep)
+        onStep (n);
+}
+
+void MainComponent::PatternBox::mouseDown (const juce::MouseEvent& e)
+{
+    pressed = dragging = false;
+    appliedSteps = 0;
+    if (! isEnabled() || e.mods.isPopupMenu())
+        return;
+    pressed = true; // the list opens on release unless the mouse dragged (FL's pattern selector)
+}
+
+void MainComponent::PatternBox::mouseDrag (const juce::MouseEvent& e)
+{
+    if (! pressed)
+        return;
+    dragging = dragging || std::abs (e.getDistanceFromDragStartY()) >= patterndrag::threshold;
+    if (! dragging)
+        return;
+    const auto steps = patterndrag::steps ((float) e.getDistanceFromDragStartY());
+    if (steps != appliedSteps && onStep)
+        onStep (steps - appliedSteps);
+    appliedSteps = steps;
+}
+
+void MainComponent::PatternBox::mouseUp (const juce::MouseEvent&)
+{
+    if (pressed && ! dragging)
+        showPopup();
+    pressed = dragging = false;
+}
+
+void MainComponent::PatternBox::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
+{
+    const auto delta = wheel.deltaY != 0.0f ? wheel.deltaY : -wheel.deltaX;
+    if (wheel.isInertial)
+        return;
+    if (const auto n = wheelSteps.take (delta); n != 0 && onStep)
+        onStep (n);
 }
 
 juce::PopupMenu MainComponent::playlistTrackExportMenu (bool groups)
@@ -3727,7 +3813,7 @@ void MainComponent::setControlHints()
                               "[LMB] choose  [Wheel] step  [RMB] length of new notes  [Backspace] snap on/off  [Alt] while dragging: no snap"),
                  true);
     ui::setHint (patternBox, tr ("Current pattern: what the Channel Rack and Piano Roll edit and Pattern mode plays  [LMB] choose  [Wheel] step  "
-                                 "[F4] next empty  [F2] rename"));
+                                 "[F4] next empty  [F2] rename") + "  " + tr ("[LMB] drag up / down: step through the patterns"));
     ui::setHint (newPatternButton, tr ("New pattern: an empty pattern after the last one"));
     ui::setHint (patternMenuButton, tr ("Pattern menu: rename, color, length, clone, insert, split by channel, delete"), true);
 
@@ -4921,6 +5007,8 @@ void MainComponent::openSettings (int page)
         o.waveStereo = ui::WaveformCache::stereo;
         o.noteNames = notenames::currentStyle.load();
         o.noteFlats = notenames::currentFlats.load();
+        o.noteNamesEveryKey = notenames::everyKey.load();
+        o.rackPlayheadColumn = ChannelRackComponent::playheadColumn.load();
         o.reducedEffects = skin::reducedEffects();
         o.artMotion = skin::artMotion();
         o.gpuRendering = gpuRenderingEnabled();
@@ -4966,12 +5054,19 @@ void MainComponent::openSettings (int page)
             for (int i = 0; i < juce::Desktop::getInstance().getNumComponents(); ++i) // open editors redraw at once
                 if (auto* c = juce::Desktop::getInstance().getComponent (i)) c->repaint();
         }
-        if (o.noteNames != notenames::currentStyle.load() || o.noteFlats != notenames::currentFlats.load())
+        if (o.noteNames != notenames::currentStyle.load() || o.noteFlats != notenames::currentFlats.load()
+            || o.noteNamesEveryKey != notenames::everyKey.load())
         {
             notenames::currentStyle.store (juce::jlimit (0, 2, o.noteNames));
             notenames::currentFlats.store (o.noteFlats);
+            notenames::everyKey.store (o.noteNamesEveryKey);
             for (int i = 0; i < juce::Desktop::getInstance().getNumComponents(); ++i) // the keyboards redraw with the new names
                 if (auto* c = juce::Desktop::getInstance().getComponent (i)) c->repaint();
+        }
+        if (o.rackPlayheadColumn != ChannelRackComponent::playheadColumn.load())
+        {
+            ChannelRackComponent::playheadColumn.store (o.rackPlayheadColumn);
+            self.rack.repaint();
         }
         if (o.gpuRendering != gpuRenderingEnabled())
             setGpuRenderingEnabled (o.gpuRendering);

@@ -161,6 +161,10 @@ void forEachPatternRef (Song& song, const IndexFn& fn)
             if (c.kind == ClipKind::pattern)
                 fn (c.pattern);
     });
+    song.forEachBlockList ([&] (std::vector<PatternBlock>& list) { // Pattern Blocks' rows (round 170f)
+        for (auto& b : list)
+            fn (b.pattern);
+    });
     for (auto& c : song.channels) // a Loop Starter channel's pattern (round 168b)
         if (c.loopStarterPattern >= 0)
             fn (c.loopStarterPattern);

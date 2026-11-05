@@ -7059,6 +7059,22 @@ countries: tr
 "Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] kalemle boya  [Ctrl+LMB] / [Shift+LMB] birden çok seç  [2xLMB] aç  [RMB] menü"
 "Empty patterns were ignored." = "Boş pattern'ler yok sayıldı."
 "Plugin picker: every generator and effect, the categories as tabs (press again to close)" = "Eklenti seçici: tüm jeneratörler ve efektler, kategoriler sekme olarak (kapatmak için tekrar basın)"
+
+# --- Pattern blocks (round 170f, issue #60)
+"Pattern blocks" = "Pattern blokları"
+"Turn pattern blocks into clips" = "Pattern bloklarını klibe dönüştür"
+"Paint pattern blocks" = "Pattern blokları çiz"
+"Erase pattern blocks" = "Pattern bloklarını sil"
+"Edit pattern blocks" = "Pattern bloklarını düzenle"
+"Pattern blocks (current project) on/off" = "Pattern blokları (geçerli proje) aç/kapat"
+"Pattern blocks (current project)" = "Pattern blokları (geçerli proje)"
+"Pattern blocks: drag to resize, double-click to show every row" = "Pattern blokları: boyutlandırmak için sürükleyin, tüm satırları göstermek için çift tıklayın"
+"Pattern block row: click selects the pattern, double-click opens it, right-click renames and colours it" = "Pattern blok satırı: tıklama pattern'i seçer, çift tıklama açar, sağ tıklama adını ve rengini değiştirir"
+"Pattern blocks: click or drag paints whole blocks of this row's pattern, right-click erases" = "Pattern blokları: tıklama veya sürükleme bu satırın pattern'inin bütün bloklarını çizer, sağ tıklama siler"
+"This project has pattern blocks. Turn them into clips (one track per pattern) so they keep playing, or delete them?" = "Bu projede pattern blokları var. Çalmaya devam etmeleri için kliplere (pattern başına bir parça) dönüştürülsün mü, yoksa silinsin mi?"
+"Turn them into clips" = "Kliplere dönüştür"
+"Delete them" = "Sil"
+"No pattern blocks to turn into clips" = "Klibe dönüştürülecek pattern bloğu yok"
 "{0} selected tracks" = "{0} seçili kanal"
 "Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu" = "Seçili insert'leri buraya yönlendirir (açtıktan sonra sürükle: seviye). Ctrl+tık: yalnız bu kanal, Shift: sidechain, Ctrl+Shift: yalnız sidechain, sağ tık: menü"
 "[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] seçer  [Ctrl]+[LMB] veya üzerinden sürükle: aralık  [Ctrl]+[Shift]+[LMB] ekler veya çıkarır  [LMB] yana sürüklemek sıralar  [RMB] insert menüsü"
@@ -7137,6 +7153,14 @@ countries: tr
 
 # round 170e3: the idle hint on one line
 "Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "Yardım için herhangi bir şeyin üzerine gelin  [F1] kısayollar  [F5]-[F9] pencereler  [Space] çal/durdur"
+# --- round 170a (Channel Rack cut/copy/paste, note names on every key)
+"Cut the selected channels' steps" = "Seçili kanalların adımlarını kes"
+"Copy the selected channels' steps" = "Seçili kanalların adımlarını kopyala"
+"Paste steps into the selected channels" = "Adımları seçili kanallara yapıştır"
+"Note names on every key" = "Her tuşta nota adları"
+"Note names on every Piano roll key" = "Piano Roll'un her tuşunda nota adları"
+"[LMB] drag up / down: step through the patterns" = "[LMB] yukarı / aşağı sürükle: pattern'ler arasında gez"
+"Playhead column in the Channel Rack" = "Channel Rack içinde çalma sütunu"
 
 # round 170e5: Loop record in Pattern mode
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "Döngü kaydı: açık (kayıt döner: Song modunda döngü bölgesi, her turda bir çekim; Pattern modunda pattern)"

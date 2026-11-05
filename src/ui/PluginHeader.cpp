@@ -171,7 +171,7 @@ bool PresetBar::hasLynxPresets() const
     return ! presets::factory (kind).empty() || isLynxEngine (kind);
 }
 
-juce::Rectangle<float> PresetBar::place (juce::Rectangle<float> area, bool withPresets)
+juce::Rectangle<float> PresetBar::place (juce::Rectangle<float> area, bool withPresets, float keepLeft)
 {
     presetsShown = withPresets;
     const auto h = juce::jmin (20.0f, area.getHeight() - 4.0f);
@@ -186,12 +186,15 @@ juce::Rectangle<float> PresetBar::place (juce::Rectangle<float> area, bool withP
         rNext = take (18.0f);
         rPrev = take (18.0f);
         x -= 2.0f;
-        rPreset = take (juce::jlimit (70.0f, 180.0f, area.getWidth() * 0.26f));
+        // round 170k2: the preset box gives way to the title first (never below 70 px)
+        const auto spare = area.getWidth() - keepLeft - narrowWidth (true);
+        rPreset = take (juce::jlimit (70.0f, juce::jmax (70.0f, 70.0f + spare), juce::jlimit (70.0f, 180.0f, area.getWidth() * 0.26f)));
         x -= 8.0f;
     }
     else
         rNext = rPrev = rPreset = {};
-    if (area.getWidth() >= 420.0f) // narrow windows (Quell) keep the title readable: A / B without the copy button
+    // narrow windows (Quell) keep the title readable: A / B without the copy button (round 170k2: also when the title needs its room)
+    if (area.getWidth() >= 420.0f && x - 37.0f - (18.0f + 18.0f + 8.0f + 20.0f + 20.0f + 6.0f) - area.getX() >= keepLeft)
     {
         rCopy = take (34.0f);
         x -= 3.0f;
@@ -205,6 +208,12 @@ juce::Rectangle<float> PresetBar::place (juce::Rectangle<float> area, bool withP
     rUndo = take (20.0f);
     x -= 6.0f;
     return area.withRight (juce::jmax (area.getX(), x));
+}
+
+float PresetBar::narrowWidth (bool withPresets)
+{
+    // as place() lays it out below 420 px: (next, prev, gap, preset box, gap) + B, A, gap + redo, undo, gap + margin
+    return (withPresets ? 18.0f + 18.0f + 2.0f + 70.0f + 8.0f : 0.0f) + 18.0f + 18.0f + 8.0f + 20.0f + 20.0f + 6.0f + 4.0f;
 }
 
 void PresetBar::paint (juce::Graphics& g, juce::Colour accent) const
