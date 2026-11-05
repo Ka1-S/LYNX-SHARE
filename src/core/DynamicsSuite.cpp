@@ -523,6 +523,7 @@ private:
     struct Detector
     {
         double env = -120.0, sustain = 0.0, gain = 0.0;
+        double peak = -120.0; // round 173d: the input's peak (instant attack, the detector's release): the lift's ceiling
         int holdLeft = 0, gainHold = 0, peakPos = 0;
     };
 
@@ -530,7 +531,7 @@ private:
     struct Ctx
     {
         Style st;
-        double thr, rat, kn, rng, aA, relMs, rate, slowCoef, gainBlend;
+        double thr, rat, kn, rng, aA, relMs, rate, slowCoef, gainBlend, aP = 0.0;
         int holdSamples, window;
         bool autoRel;
     };
@@ -594,6 +595,7 @@ private:
         const auto releaseByAttack = (1.0 + std::pow (10.0 / 50.0, 1.5)) / (1.0 + std::pow (att / 50.0, 1.5));
         c.aA = coef (std::max (sd.attackFloorMs, att * sd.attackScale), rate);
         c.relMs = std::max (0.5, releaseTau (sd, releaseMs (p[release])) * releaseByAttack);
+        c.aP = coef (c.relMs, rate);
         c.autoRel = on (p[autoRelease]) && sd.curve != Curve::twoWay;
         c.rate = rate;
         c.slowCoef = coef (1000.0, rate);
@@ -652,6 +654,18 @@ private:
                 d.gain = aR * d.gain + (1.0 - aR) * target;
             }
             g += x.gainBlend * (d.gain - g);
+        }
+        d.peak = in > d.peak ? in : x.aP * d.peak + (1.0 - x.aP) * in;
+        if (g > 0.0) // round 173d (issue #77): the upward lift of Upward / Two-way, kept safe
+        {
+            // the detector lags a hit by its attack, so a gap lifted by up to Range (60 dB) met the next drum hit at
+            // full lift (+45 dBFS peaks on −18 dBFS drums). Three bounds: (1) the lift fades out below a −80 dBFS
+            // floor (gone by −100 dBFS), so silence and noise are never raised; (2) it never exceeds maxLiftDb;
+            // (3) it never takes the input's peak (instant attack) above the threshold, so a hit arriving into a
+            // lifted gap is pulled down on its first sample
+            constexpr double floorDb = -80.0, fadeDb = 20.0, maxLiftDb = 30.0;
+            g *= std::clamp ((d.env - (floorDb - fadeDb)) / fadeDb, 0.0, 1.0);
+            g = std::min ({ g, maxLiftDb, std::max (0.0, x.thr - d.peak) });
         }
         d.sustain = x.slowCoef * d.sustain + (1.0 - x.slowCoef) * std::max (0.0, -g);
         return g;

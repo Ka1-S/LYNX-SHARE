@@ -16350,6 +16350,7 @@ TEST (plugin_layout_options_match_the_engine_values)
 }
 #include "FabMeasureTests99.inc"
 #include "DynamicsTests108.inc"
+#include "Crest173dTests.inc"
 #include "LynxTuneTests95.inc"
 #include "LynxVerbTests100.inc"
 #include "FacetTests103.inc"
