@@ -863,6 +863,7 @@ juce::Colour capTintFor (const char* param)
 
 juce::Colour offLabelColour()
 {
+    if (currentStyle == Style::themed && artkit::onDarkFill) return juce::Colour (0xffd0d3d6); // round tp172d
     return currentStyle == Style::themed ? artkit::offLabelColour() : juce::Colour();
 }
 
