@@ -171,3 +171,32 @@ TEST (parity172b_pro_r2_and_pro_l2_translators)
     CHECK (std::abs (luxeverb::sp::predelayMs (at (luxeverb::sp::predelay)) - 18.5) < 1.0);
     CHECK (fabfilter::translatorNamed ("pro-r2") != nullptr && fabfilter::translatorNamed ("pro-l2") != nullptr);
 }
+
+TEST (parity172b_crest_release_follows_attack)
+{
+    // the reference (Clean, threshold −30, ratio 4, 1 kHz at −6 dBFS): −17.1 dB at attack 10 / release 200 but only
+    // −12.6 dB at attack = release = 100 ms — the release shortens with a slow attack, so a steady sine sags
+    using namespace lynx::dyn::crest;
+    const auto grDb = [] (double attMs, double relMs) {
+        auto slot = lynx::makeEffectSlot (lynx::EffectKind::crestCompressor);
+        slot.params[style] = styleValue (Style::clean);
+        slot.params[threshold] = 0.5f; // −30 dB
+        slot.params[ratio] = ratioValue (4.0);
+        slot.params[attack] = attackValue (attMs);
+        slot.params[release] = releaseValue (relMs);
+        slot.params[autoGain] = 0.0f;
+        auto fx = lynx::makeEffect (slot);
+        fx->prepare (p172b::sr);
+        std::vector<float> l (48000), r;
+        for (int i = 0; i < 48000; ++i) l[(std::size_t) i] = (float) (0.5012 * std::sin (2.0 * M_PI * 1000.0 * i / p172b::sr));
+        r = l;
+        p172b::run (*fx, l, r, slot.params);
+        double e = 0.0;
+        for (int i = 24000; i < 48000; ++i) e += (double) l[(std::size_t) i] * l[(std::size_t) i];
+        return 20.0 * std::log10 (std::sqrt (e / 24000.0) / (0.5012 * std::sqrt (0.5)));
+    };
+    const double fast = grDb (10.0, 200.0), slow = grDb (100.0, 100.0);
+    std::printf ("  crest steady gain: attack 10 / release 200 %.1f dB (ref -17.1), attack = release = 100 %.1f dB (ref -12.6)\n", fast, slow);
+    CHECK (std::abs (fast + 17.1) < 1.0);
+    CHECK (std::abs (slow + 12.6) < 1.5);
+}

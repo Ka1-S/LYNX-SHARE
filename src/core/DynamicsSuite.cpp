@@ -554,8 +554,15 @@ private:
         c.rat = ratioOf (p[ratio]);
         c.kn = kneeDb (p[knee]);
         c.rng = std::max (0.01, rangeDb (p[range]));
-        c.aA = coef (std::max (0.002, attackMs (p[attack]) * sd.attackScale), rate);
-        c.relMs = std::max (0.5, releaseTau (sd, releaseMs (p[release])));
+        // round tp172b [EXEC] (Pro-C 3 trial, equal-RMS sine / noise stairs and −40 → −6 → −40 dBFS steps): Clean's, Allround's and
+        // Opto's detector never follows faster than τ = 1 ms (noise at the fastest attack read only ~1.5 dB over a sine of the same RMS,
+        // not ~4.5), and the release shortens as the attack lengthens — 50 % release 63 / 84 / 66 ms at attack 0.1 / 10 /
+        // 30 ms (release 100 / 200 / 200), ~17 ms at attack = release = 100 ms, where a steady sine sags 4.5 dB
+        const auto att = attackMs (p[attack]);
+        const auto releaseByAttack = (1.0 + std::pow (10.0 / 50.0, 1.5)) / (1.0 + std::pow (att / 50.0, 1.5));
+        const bool floored = c.st == Style::clean || c.st == Style::allround || c.st == Style::opto; // measured; Punch has none
+        c.aA = coef (std::max (floored ? 1.0 : 0.002, att * sd.attackScale), rate);
+        c.relMs = std::max (0.5, releaseTau (sd, releaseMs (p[release])) * releaseByAttack);
         c.autoRel = on (p[autoRelease]) && sd.curve != Curve::twoWay;
         c.rate = rate;
         c.slowCoef = coef (1000.0, rate);
