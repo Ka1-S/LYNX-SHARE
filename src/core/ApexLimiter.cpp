@@ -40,17 +40,21 @@ struct Interp
 };
 const Interp& interp() { static const Interp i; return i; }
 
-// per style: share of the slow release stage, slow-stage time factor, smoothing shape of the attack (0 = linear ramp)
-struct StyleLaw { double slowShare, slowFactor, fastFactor; };
+// per style, the two release stages (round tp172b [EXEC], fitted to the reference's gain recovery after 1.6 / 9.6 /
+// 50 / 200 ms bursts 9.6 dB over the ceiling, 12 settings, rms error 0.2 … 0.8 dB): the slow stage charges toward
+// the gain reduction the programme needs over attackFactor × Attack and recovers over releaseFactor × Release + 12 ms;
+// the fast stage follows every drop at once and recovers in fastMs, so a short transient is limited without pumping
+// what follows it (the old law recovered half of every reduction on a stage as slow as Release)
+struct StyleLaw { double attackFactor, releaseFactor, fastMs; };
 constexpr StyleLaw laws[styleCount] = {
-    { 0.50, 6.0, 1.0 },  // Clean: half of the recovery on a slow stage — least distortion
-    { 0.60, 7.0, 1.2 },  // Glue (round 128): a little more slow stage than Clean — smooth, steady
-    { 0.25, 4.0, 0.7 },  // Punch: mostly fast, transients come back quickly
-    { 0.35, 5.0, 0.6 },  // Dynamic (round 128): quick fast stage, some slow stage — keeps the movement
-    { 0.15, 3.5, 0.6 },  // Dense (round 128): between Punch and Loud
-    { 0.10, 3.0, 0.5 },  // Loud: fast recovery, the most density
-    { 0.40, 5.0, 0.8 },  // Bus (round 128): moderate, for groups and buses
-    { 0.70, 8.0, 1.5 },  // Safe: long, smooth recovery
+    { 0.55, 0.40, 0.3 },  // Clean (the reference's Transparent)
+    { 0.30, 0.70, 0.3 },  // Glue (Allround): the longest hold of the moderate styles
+    { 0.20, 0.40, 1.0 },  // Punch (Punchy): quick charge, transients come back over a millisecond
+    { 0.15, 0.15, 0.3 },  // Dynamic: the shortest stages — keeps the movement
+    { 0.30, 0.50, 0.3 },  // Dense (Modern)
+    { 0.40, 1.00, 0.3 },  // Loud (Aggressive): slow recovery — the most density
+    { 0.10, 0.30, 1.0 },  // Bus: charges fastest, moderate recovery
+    { 0.40, 0.70, 10.0 }, // Safe: a slow fast stage — the least distortion
 };
 
 // error-feedback noise shaping filters (on the quantisation error of the last samples)
@@ -102,7 +106,7 @@ struct Core
         std::fill (outL.begin(), outL.end(), 0.0f); std::fill (outR.begin(), outR.end(), 0.0f);
         histL.fill (0.0); histR.fill (0.0); scHistL.fill (0.0); scHistR.fill (0.0);
         pos = 0;
-        fastL = fastR = slowL = slowR = 1.0;
+        fastL = fastR = slowL = slowR = 0.0; // dB
         dcXL = dcXR = dcYL = dcYR = 0.0;
         err = {};
         rng = 0x9e3779b97f4a7c15ull;
@@ -126,12 +130,12 @@ struct Core
         }
         const auto law = laws[(int) style (p[4])];
         const double rel = releaseMs (p[3]) * 0.001 * sampleRate;
-        const double kFast = 1.0 - std::exp (-1.0 / std::max (1.0, rel * law.fastFactor));
-        const double kSlow = 1.0 - std::exp (-1.0 / std::max (1.0, rel * law.slowFactor));
+        const double kFast = 1.0 - std::exp (-1.0 / std::max (1.0, law.fastMs * 0.001 * sampleRate));
+        const double kSlow = 1.0 - std::exp (-1.0 / std::max (1.0, rel * law.releaseFactor + 0.012 * sampleRate));
         const bool truePeak = p[5] >= 0.5f;
         const double link = std::clamp ((double) p[6], 0.0, 1.0);
         const double attackSamples = attackMs (p[pAttack]) * 0.001 * sampleRate;
-        const double kAttack = attackSamples >= 1.0 ? 1.0 - std::exp (-1.0 / attackSamples) : 0.0;
+        const double kAttack = attackSamples * law.attackFactor >= 1.0 ? 1.0 - std::exp (-1.0 / (attackSamples * law.attackFactor)) : 1.0;
         const double linkRelease = std::clamp ((double) p[pLinkRelease], 0.0, 1.0);
         const bool unity = p[pUnity] >= 0.5f, audition = p[pAudition] >= 0.5f, dcFilter = p[pDcFilter] >= 0.5f;
         if (! dcFilter) dcXL = dcXR = dcYL = dcYR = 0.0;
@@ -190,12 +194,14 @@ struct Core
             const double aL = std::min (1.0, boxSumL / look), aR = std::min (1.0, boxSumR / look);
 
             // release: the gain follows a drop at once and recovers on a fast and a slow stage (mixed by style)
-            fastL = aL < fastL ? aL : fastL + (aL - fastL) * kFast;
-            slowL = aL < slowL ? (kAttack > 0.0 ? slowL + (aL - slowL) * kAttack : aL) : slowL + (aL - slowL) * kSlow;
-            fastR = aR < fastR ? aR : fastR + (aR - fastR) * kFast;
-            slowR = aR < slowR ? (kAttack > 0.0 ? slowR + (aR - slowR) * kAttack : aR) : slowR + (aR - slowR) * kSlow;
-            double gL = std::min (aL, (1.0 - law.slowShare) * fastL + law.slowShare * slowL);
-            double gR = std::min (aR, (1.0 - law.slowShare) * fastR + law.slowShare * slowR);
+            // release: both stages in dB; the gain is the deeper of the requirement and the two stages
+            const double dL = 20.0 * std::log10 (std::max (aL, 1e-9)), dR = 20.0 * std::log10 (std::max (aR, 1e-9));
+            fastL = dL < fastL ? dL : fastL + (dL - fastL) * kFast;
+            fastR = dR < fastR ? dR : fastR + (dR - fastR) * kFast;
+            slowL += (dL - slowL) * (dL < slowL ? kAttack : kSlow);
+            slowR += (dR - slowR) * (dR < slowR ? kAttack : kSlow);
+            double gL = std::min (aL, std::pow (10.0, std::min (fastL, slowL) / 20.0));
+            double gR = std::min (aR, std::pow (10.0, std::min (fastR, slowR) / 20.0));
             if (linkRelease > link) // the release stage linked further than the transients (round 128)
             {
                 const double shared = std::min (gL, gR), f = (linkRelease - link) / (1.0 - link);
@@ -250,7 +256,7 @@ struct Core
     double boxSumL = 1.0, boxSumR = 1.0;
     int boxPos = 0, pos = 0;
     SlidingMin minAll, minL, minR;
-    double fastL = 1.0, fastR = 1.0, slowL = 1.0, slowR = 1.0;
+    double fastL = 0.0, fastR = 0.0, slowL = 0.0, slowR = 0.0; // release stages, dB
 };
 
 class ApexLimiterEffect final : public Effect

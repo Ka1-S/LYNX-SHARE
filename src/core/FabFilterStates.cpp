@@ -6,6 +6,7 @@
 #include <cstring>
 #include <string>
 
+#include "core/ApexLimiter.h"
 #include "core/DynamicsSuite.h"
 #include "core/FacetEq.h"
 #include "core/MixSuite.h"
@@ -275,7 +276,18 @@ int fromProMB (const State& s, EffectSlot& slot)
                                             std::pow (2.0, (double) s.at ((std::size_t) (22 * b + 3))), state == 1 };
     }
     if (count == 0)
-        return 0;
+    {
+        // round tp172b [EXEC]: a state with no band (the reference's default: every band "Unused") passes the audio
+        // through untouched; Prism's defaults compress (−4 … −6 dB on a mix): one band, switched off
+        set (Global::bandLayout, 0.0f);
+        set (Global::bandCountParam, bandCountValue (1));
+        for (int b = 0; b < bands; ++b)
+            set (param (b, fEnabled), 0.0f);
+        set (Global::mix, clamp01 (s.at (133)));
+        set (Global::input, linValue (levelDb (s.at (134)), -36.0, 36.0));
+        set (Global::output, linValue (levelDb (s.at (136)), -36.0, 36.0));
+        return n;
+    }
     std::stable_sort (used.begin(), used.begin() + count, [] (const Ref& a, const Ref& b) { return a.lo < b.lo; });
     set (Global::bandLayout, 1.0f);
     set (Global::bandCountParam, bandCountValue (count));
@@ -657,8 +669,52 @@ int fromProDS (const State& s, EffectSlot& slot)
     return 20;
 }
 
+// ---------------------------------------------------------------- Pro-L 2 -> Apex Limiter
+// layout (FabF v2, count 32, 34 values; round tp172b [EXEC]: each parameter set through the official trial's parameter
+// API, the component state saved after a processed block): 0 gain dB, 1 style (0 Transparent, 1 Punchy, 2 Dynamic,
+// 3 Allround, 4 Aggressive, 5 Modern, 6 Bus, 7 Safe), 2 look-ahead ms, 3 attack (norm: 10 000 v⁴ ms, Apex's law),
+// 4 release (norm: ≈ 6860 v³ ms), 5 / 6 channel link transients / release (norm: 0.5 = 100 %), 9 oversampling (0 off,
+// 1 2x … 5 32x), 10 true peak, 11 dithering (0 off, 1 … 5 = 16, 18, 20, 22, 24 bits), 12 noise shaping (0 none,
+// 1 basic, 2 optimized, 3 weighted), 13 DC offset filter, 14 side-chain triggering, 15 unity gain, 16 audition
+// limiting, 17 bypass, 18 output level dBTP (the ceiling), 24 meter scale.
+int fromProL2 (const State& s, EffectSlot& slot)
+{
+    if (slot.kind != EffectKind::apexLimiter || ! s.named || s.count != 32 || ! finiteAll (s, 19))
+        return 0;
+    auto& p = slot.params;
+    int n = 0;
+    const auto set = [&] (int k, float v) {
+        p[(std::size_t) k] = clamp01 (v);
+        ++n;
+    };
+    // their styles → Apex's (Clean, Glue, Punch, Dynamic, Dense, Loud, Bus, Safe at k / 7)
+    static constexpr int styles[8] { 0, 2, 3, 1, 5, 4, 6, 7 };
+    set (apex::pGain, linValue (s.at (0), 0.0, 30.0));
+    set (apex::pStyle, (float) styles[std::clamp (roundIndex (s.at (1)), 0, 7)] / 7.0f);
+    set (apex::pLookahead, linValue (s.at (2), 0.0, apex::maxLookaheadMs));
+    set (apex::pAttack, clamp01 (s.at (3)));
+    const auto releaseMs = 6860.0 * std::pow (std::clamp ((double) s.at (4), 0.0, 1.0), 3.0);
+    set (apex::pRelease, apex::releaseValue (std::max (1.0, releaseMs)));
+    set (apex::pLink, clamp01 (2.0 * s.at (5)));
+    set (apex::pLinkRelease, clamp01 (2.0 * s.at (6)));
+    set (apex::pOversampling, (float) std::clamp (roundIndex (s.at (9)), 0, 3) / 3.0f); // 16x / 32x → Apex's 8x
+    set (apex::pTruePeak, s.at (10) >= 0.5f ? 1.0f : 0.0f);
+    set (apex::pDither, (float) std::clamp (roundIndex (s.at (11)), 0, 5) / 5.0f);
+    set (apex::pShaping, (float) std::clamp (roundIndex (s.at (12)), 0, 3) / 3.0f);
+    set (apex::pDcFilter, s.at (13) >= 0.5f ? 1.0f : 0.0f);
+    set (apex::pSidechain, s.at (14) >= 0.5f ? 1.0f : 0.0f);
+    set (apex::pUnity, s.at (15) >= 0.5f ? 1.0f : 0.0f);
+    set (apex::pAudition, s.at (16) >= 0.5f ? 1.0f : 0.0f);
+    set (apex::pCeiling, linValue (s.at (18), -30.0, 0.0));
+    if (s.at (17) >= 0.5f)
+        slot.enabled = false;
+    return n;
+}
+
 Translator translatorNamed (std::string_view name)
 {
+    if (name == "pro-l2")
+        return fromProL2;
     if (name == "pro-ds")
         return fromProDS;
     if (name == "pro-q4")

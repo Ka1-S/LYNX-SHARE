@@ -395,6 +395,9 @@ product = FabFilter Pro-L
 vendor = FabFilter
 lynx = Apex Limiter
 names = FabFilter Pro-L; FabFilter Pro-L 2; Pro-L; Pro-L 2
+# round tp172b: a Pro-L 2 state (component "FabF", 32 values, measured black-box) is translated: gain, style, look-ahead,
+# attack, release, channel links, oversampling, true peak, dither, noise shaping, DC filter, side chain, output level
+translate = pro-l2
 
 # ---------------------------------------------------------------- compressors -> Compressor
 [waves-rcomp]
