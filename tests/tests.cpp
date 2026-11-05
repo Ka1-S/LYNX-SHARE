@@ -16215,7 +16215,7 @@ TEST (plugin_layouts_name_real_parameters)
             CHECK (item.param2 == nullptr || plugui::paramIndex (kind, item.param2) >= 0);
             if (item.param2 != nullptr && plugui::paramIndex (kind, item.param2) >= 0)
                 placed[(std::size_t) plugui::paramIndex (kind, item.param2)] = true;
-            for (const auto* when : { item.whenParam, item.when2Param })
+            for (const auto* when : { item.whenParam, item.when2Param, item.when3Param })
                 CHECK (when == nullptr || plugui::paramIndex (kind, when) >= 0);
         }
         for (const auto* name : l.menuSwitches)
@@ -17076,3 +17076,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "CtlAudit170i3Tests.inc"
 #include "Issue32dTests.inc"
 #include "FlpExport171eTests.inc"
+#include "Tp172cTests.inc"

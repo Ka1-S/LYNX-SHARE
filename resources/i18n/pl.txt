@@ -7197,3 +7197,5 @@ countries: pl
 "Worth knowing" = "Warto wiedzieć"
 "Samples not on this PC" = "Sample, których nie ma na tym PC"
 "Steps use channel colour" = "Kroki w kolorze kanału"
+"E type|G type" = "Typ E|Typ G"
+"Modern console" = "Nowoczesna konsola"

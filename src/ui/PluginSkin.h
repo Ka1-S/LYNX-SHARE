@@ -106,8 +106,15 @@ struct KnobLook
     float hover = 0.0f;   // 0..1 (animated by the owner, or 0 / 1)
     bool active = false;  // being dragged
     bool enabled = true;  // the plugin is on
+    // round tp172c: the cap's own colour (a console's colour-coded knobs: red HF, green HMF...); transparent = the
+    // theme's. Only the themed style reads it, through the theme's capTint hook (see capTintFor)
+    juce::Colour capTint {};
 };
 void knob (juce::Graphics&, juce::Rectangle<float> bounds, const KnobLook&);
+// round tp172c: the cap colour the current plugin theme gives the knob of this parameter (transparent = none)
+juce::Colour capTintFor (const char* param);
+// round tp172c: the current plugin theme's colour for an OFF toggle's label (transparent = the global one)
+juce::Colour offLabelColour();
 
 // a slider track (vertical or horizontal) with its lit part and a thumb
 void slider (juce::Graphics&, juce::Rectangle<float> trackArea, float value01, bool vertical, bool bipolar, juce::Colour accent, bool hot,

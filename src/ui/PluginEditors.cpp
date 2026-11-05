@@ -770,6 +770,7 @@ public:
                 look.hover = glow;
                 look.active = index == dragItem;
                 look.enabled = fx.enabled;
+                look.capTint = skin::capTintFor (item.param);
                 skin::knob (g, circle, look);
                 auto below = r.withTop (circle.getBottom() + 1.0f * s);
                 if (hasStyle (item, plugui::valueAbove))
@@ -927,7 +928,9 @@ public:
                 const auto box = juce::Rectangle<float> (16.0f * s, 9.0f * s).withCentre ({ r.getX() + 9.0f * s, r.getCentreY() });
                 skin::switchPill (g, box, on, accent, fx.enabled);
                 auto text = r.withTrimmedLeft (21.0f * s);
-                g.setColour (on ? colour::textPrimary : (hot ? colour::textSecondary : colour::textDisabled));
+                const auto offLabel = skin::offLabelColour(); // round tp172c: a theme's own (readable on its panels)
+                g.setColour (on ? colour::textPrimary : (! offLabel.isTransparent() ? (hot ? offLabel.brighter (0.3f) : offLabel)
+                                                                    : (hot ? colour::textSecondary : colour::textDisabled)));
                 if (item.label != nullptr)
                     ui::drawFittingText (g, caps (tr (item.label)), text, juce::Justification::centredLeft, font (juce::jmax (8.0f, 9.5f * s), true), 7.0f);
                 break;
@@ -2480,8 +2483,9 @@ public:
             for (int k = 0; k < 5; ++k)
             {
                 const auto cell = juce::Rectangle<float> (area.getX(), area.getY() + h * (float) k, area.getWidth(), h);
-                const auto led = cell.withWidth (cell.getHeight() * 0.62f).withSizeKeepingCentre (cell.getHeight() * 0.5f, cell.getHeight() * 0.5f)
-                                     .withX (cell.getX() + 2.0f * s);
+                // round tp172c: the LED keeps to the ladder's width (a tall ladder kept growing it over its numbers)
+                const auto d = juce::jmin (cell.getHeight() * 0.5f, cell.getWidth() * 0.34f);
+                const auto led = juce::Rectangle<float> (d, d).withCentre ({ cell.getX() + 2.0f * s + d * 0.5f, cell.getCentreY() });
                 const bool lit = fx.enabled && db >= (float) steps[k] - 0.05f;
                 g.setColour (lit ? accent : colour::gridBeat);
                 g.fillEllipse (led);

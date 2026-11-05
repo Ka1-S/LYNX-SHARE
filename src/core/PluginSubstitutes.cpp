@@ -486,7 +486,9 @@ translate = waves-ssl-channel
 product = SSL Native Channel Strip / 4K E
 vendor = Solid State Logic
 lynx = Ridge Strip
-names = SSL Native Channel Strip 2; SSL Native Channel Strip; SSL 4K E; SSL 4K B; Vocalstrip 2; SSL Native Vocalstrip 2
+names = SSL Native Channel Strip 2; SSL Native Channel Strip; SSL 4K E; SSL 4K B; SSL 4K G; Vocalstrip 2; SSL Native Vocalstrip 2
+# round tp172c: a Channel Strip 2 state (the same XML form) to Ridge's Modern voicing, measured black-box on its trial
+# (E / G EQ, filters, compressor, gate); 4K G (Black) and 4K B (Brown; its own compressor is not modelled) to the 4K voicing
 # round 145: a Vocalstrip 2 state (XML, the original's own units) is translated to Ridge's Vocal strip voicing, measured
 # black-box on the official trial (de-esser, de-ploser, EQ, compander, order; REA_rodada145 §2); round 148: a 4K E state
 # (the same XML form) to Ridge's 4K voicing, measured on the 4K E trial (REA_rodada148 §2); the other strips' states are
@@ -500,7 +502,7 @@ translate = ssl-vocalstrip-2
 product = channel strips (SSL 4K G, Harrison 32C / MPC, Slate VCC / Virtual Mix Rack)
 vendor = Complete Access (role)
 lynx = Ridge Strip
-names = SSL 4K G; Harrison 32C; Harrison_32ClassicChannelStrip; Harrison 32Classic; Harrison_MPCChannelStrip; VM VCC Channel; Virtual Mix Rack; VBC Rack; SSL Guitarstrip; SSL Native Drumstrip v6
+names = Harrison 32C; Harrison_32ClassicChannelStrip; Harrison 32Classic; Harrison_MPCChannelStrip; VM VCC Channel; Virtual Mix Rack; VBC Rack; SSL Guitarstrip; SSL Native Drumstrip v6
 
 [complete-access-bus-comps]
 product = bus / smart compressors (SSL Bus Compressor 2, G3, VBC, sonible smart:comp, pure:comp)
@@ -1490,7 +1492,12 @@ int translateSslVocalstrip2 (const std::vector<std::uint8_t>& state, EffectSlot&
     const std::string text (state.begin() + (std::ptrdiff_t) root, state.end());
     const auto plugin = attributeIn (text, 0, "PluginName");
     const bool k4e = plugin.find ("4K E") != std::string::npos;
-    if (plugin.find ("Vocalstrip 2") == std::string::npos && ! k4e)
+    // round tp172c: SSL Native Channel Strip 2 (the same XML form) -> the Modern voicing
+    const bool cs2 = plugin.find ("Channel Strip 2") != std::string::npos;
+    // round tp172c: SSL 4K G (its EQ = the 4K voicing's Black; LMF ÷3 / HMF ×3 move the band) and SSL 4K B (its EQ,
+    // filters and gate; the B's compressor — ratios up to "ds", stepped releases — is not modelled: left at 1:1)
+    const bool k4g = plugin.find ("4K G") != std::string::npos, k4b = plugin.find ("4K B") != std::string::npos;
+    if (plugin.find ("Vocalstrip 2") == std::string::npos && ! k4e && ! cs2 && ! k4g && ! k4b)
         return 0;
     const bool useB = attributeIn (text, 0, "StateASelected") == "0";
     const auto block = text.find (useB ? "<B" : "<A");
@@ -1513,7 +1520,61 @@ int translateSslVocalstrip2 (const std::vector<std::uint8_t>& state, EffectSlot&
     };
     auto sw = [&at] (const char* id, bool fallback) { return at (id, fallback ? 1.0 : 0.0) >= 0.5 ? 1.0f : 0.0f; };
     auto& p = slot.params;
-    if (k4e)
+    if (cs2)
+    {
+        // round tp172c: SSL Native Channel Strip 2 -> Ridge's Modern voicing (core/VoiceMatch.h strip2, measured on its
+        // trial), every control in the original's units through the voicing's own laws (HighPassFreq 20 = out,
+        // LowPassFreq 35 = out, EqE 1 = E / 0 = G, CompRatio 1e9+ = infinity). Not read: pan, width, the external key,
+        // the side-chain routing and listen, filters to input, the legacy switches
+        p[r::modern] = 1.0f;
+        p[r::console4k] = 0.0f;
+        p[r::voicing] = 0.0f;
+        p[r::vocal] = 0.0f;
+        p[r::input] = linNorm (at ("InputTrim", 0.0), -20.0, 20.0);
+        const auto fader = at ("FaderLevel", 0.0);
+        p[r::output] = linNorm (at ("OutputTrim", 0.0) + std::max (fader, -20.0), -20.0, 20.0);
+        p[r::phase] = sw ("PhaseInvert", false);
+        const auto hp = at ("HighPassFreq", 20.0), lp = at ("LowPassFreq", 35.0);
+        p[r::hpf] = hp < 20.5 ? 0.0f : std::max (1e-4f, logNorm (hp, 20.9, 500.0));
+        p[r::lpf] = lp > 27.6 ? 0.0f : std::max (1e-4f, logNorm (lp, 27.5, 3.0));
+        if (at ("FiltersIn", 1.0) < 0.5)
+            p[r::hpf] = p[r::lpf] = 0.0f;
+        p[r::curve] = at ("EqE", 0.0) >= 0.5 ? 0.0f : 1.0f;
+        p[r::lfGain] = linNorm (at ("LowEqGain", 0.0), -16.5, 16.5);
+        p[r::lfFreq] = logNorm (at ("LowEqFreq", 182.0), 40.0, 600.0);
+        p[r::lfBell] = sw ("LowEqBell", false);
+        p[r::lmfGain] = linNorm (at ("LowMidEqGain", 0.0), -20.0, 20.0);
+        p[r::lmfFreq] = logNorm (at ("LowMidEqFreq", 0.8), 0.2, 2.0);
+        p[r::lmfQ] = linNorm (at ("LowMidEqQ", 1.5), 0.5, 2.5);
+        p[r::hmfGain] = linNorm (at ("HighMidEqGain", 0.0), -20.0, 20.0);
+        p[r::hmfFreq] = logNorm (at ("HighMidEqFreq", 2.45), 0.6, 7.0);
+        p[r::hmfQ] = linNorm (at ("HighMidEqQ", 1.5), 0.5, 2.5);
+        p[r::hfGain] = linNorm (at ("HighEqGain", 0.0), -20.0, 20.0);
+        p[r::hfFreq] = logNorm (at ("HighEqFreq", 7.5), 1.5, 22.0);
+        p[r::hfBell] = sw ("HighEqBell", false);
+        p[r::eqOn] = sw ("EqIn", true);
+        p[r::compRatio] = r::mRatioValue (at ("CompRatio", 1.0));
+        p[r::compThreshold] = linNorm (at ("CompThreshold", 10.0), -20.0, 10.0);
+        p[r::compRelease] = logNorm (at ("CompRelease", 0.1), 0.1, 4.0);
+        p[r::compFastAttack] = sw ("CompFastAttack", false);
+        p[r::compPeak] = sw ("CompPeak", false);
+        p[r::compMix] = (float) std::clamp (at ("CompMix", 100.0) / 100.0, 0.0, 1.0);
+        p[r::autoMakeup] = sw ("CompAutoMakeUp", true);
+        p[r::k4MakeupOffset] = linNorm (at ("CompAutoMakeUpCompensation", 0.0), -12.0, 12.0);
+        p[r::gateRange] = linNorm (at ("GateRange", 0.0), 0.0, 40.0);
+        p[r::gateThreshold] = linNorm (at ("GateThreshold", 10.0), -30.0, 10.0);
+        p[r::gateRelease] = logNorm (at ("GateRelease", 0.1), 0.1, 4.0);
+        p[r::gateHold] = linNorm (at ("GateHold", 0.25), 0.0, 4.0);
+        p[r::gateFastAttack] = sw ("GateFastAttack", false);
+        p[r::expander] = sw ("GateExpander", false);
+        p[r::dynOn] = sw ("DynamicsIn", true);
+        p[r::order] = sw ("DynamicsPreEq", false);
+        p[r::analog] = 0.0f;
+        if (at ("Bypass", 0.0) >= 0.5)
+            slot.enabled = false;
+        return (int) v.size();
+    }
+    if (k4e || k4g || k4b)
     {
         // round 148: SSL 4K E -> Ridge's 4K voicing, the controls in the original's units through Ridge's own laws
         // (EQ and filter frequencies: LF in Hz, the others in kHz; HighPassFreq 10 = out, LowPassFreq 35 = out; CompRatio
@@ -1534,27 +1595,27 @@ int translateSslVocalstrip2 (const std::vector<std::uint8_t>& state, EffectSlot&
         p[r::lfFreq] = logNorm (at ("LowEqFreq", 200.0), 30.0, 450.0);
         p[r::lfBell] = sw ("LowEqBell", false);
         p[r::lmfGain] = gain (at ("LowMidEqGain", 0.0));
-        p[r::lmfFreq] = logNorm (at ("LowMidEqFreq", 1.0) * 1000.0, 200.0, 2500.0);
+        p[r::lmfFreq] = logNorm (at ("LowMidEqFreq", 1.0) * 1000.0 / (at ("LowMidEqDiv3", 0.0) >= 0.5 ? 3.0 : 1.0), 200.0, 2500.0);
         p[r::lmfQ] = r::k4QValue (at ("LowMidEqQ", 1.5));
         p[r::hmfGain] = gain (at ("HighMidEqGain", 0.0));
-        p[r::hmfFreq] = logNorm (at ("HighMidEqFreq", 3.0) * 1000.0, 600.0, 7000.0);
+        p[r::hmfFreq] = logNorm (at ("HighMidEqFreq", 3.0) * 1000.0 * (at ("HighMidEqMult3", 0.0) >= 0.5 ? 3.0 : 1.0), 600.0, 7000.0);
         p[r::hmfQ] = r::k4QValue (at ("HighMidEqQ", 1.5));
         p[r::hfGain] = gain (at ("HighEqGain", 0.0));
         p[r::hfFreq] = logNorm (at ("HighEqFreq", 8.0) * 1000.0, 1500.0, 16000.0);
         p[r::hfBell] = sw ("HighEqBell", false);
         p[r::eqOn] = sw ("EqIn", true);
-        p[r::k4Colour] = r::k4ColourValue ((int) std::lround (at ("EqColour", 0.0)));
-        const auto ratio = at ("CompRatio", 1.0);
+        p[r::k4Colour] = r::k4ColourValue (k4g ? 1 : k4b ? 0 : (int) std::lround (at ("EqColour", 0.0)));
+        const auto ratio = k4b ? 1.0 : at ("CompRatio", 1.0);
         p[r::compRatio] = ratio <= 1.0005 ? 0.0f : (ratio >= 30.0 ? 1.0f : (float) std::sqrt (std::clamp ((ratio - 1.0) / 19.0, 0.0, 0.996)));
         p[r::compThreshold] = linNorm (at ("CompThreshold", 10.0), -20.0, 10.0);
-        p[r::compRelease] = logNorm (at ("CompRelease", 0.4), 0.1, 4.0);
+        p[r::compRelease] = logNorm (k4b ? 0.4 : at ("CompRelease", 0.4), 0.1, 4.0);
         p[r::compFastAttack] = sw ("CompFastAttack", false);
         p[r::compMix] = (float) std::clamp (at ("CompMix", 100.0) / 100.0, 0.0, 1.0);
         p[r::autoMakeup] = sw ("CompAutoMakeUp", true);
         p[r::k4MakeupOffset] = linNorm (at ("CompAutoMakeUpCompensation", 0.0), -12.0, 12.0);
         p[r::gateRange] = linNorm (at ("GateRange", 0.0), 0.0, 40.0);
         p[r::gateThreshold] = linNorm (at ("GateThreshold", -30.0), -30.0, 10.0);
-        p[r::gateRelease] = logNorm (at ("GateRelease", 0.4), 0.1, 4.0);
+        p[r::gateRelease] = logNorm (k4b ? 0.4 : at ("GateRelease", 0.4), 0.1, 4.0); // (the B's is a step index)
         p[r::gateFastAttack] = sw ("GateFastAttack", false);
         p[r::expander] = sw ("GateExpander", false);
         p[r::dynOn] = sw ("DynamicsIn", true);

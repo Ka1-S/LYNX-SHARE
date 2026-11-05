@@ -7197,3 +7197,5 @@ countries: tr
 "Worth knowing" = "Bilmekte fayda var"
 "Samples not on this PC" = "Bu PC'de olmayan sample'lar"
 "Steps use channel colour" = "Adımlar kanal rengini kullanır"
+"E type|G type" = "E tipi|G tipi"
+"Modern console" = "Modern konsol"

@@ -7197,3 +7197,5 @@ countries: jp
 "Worth knowing" = "補足"
 "Samples not on this PC" = "この PC にないサンプル"
 "Steps use channel colour" = "ステップにチャンネルの色を使う"
+"E type|G type" = "Eタイプ|Gタイプ"
+"Modern console" = "モダンコンソール"
