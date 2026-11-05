@@ -4137,11 +4137,13 @@ void PianoRollComponent::timerCallback()
     if (const bool playing = transport.playing.load(); playButton.getToggleState() != playing)
         playButton.setToggleState (playing, juce::dontSendNotification);
 
-    // the playhead shows while the edited pattern plays: Pattern mode, or a clip of it in Song mode (round 162)
-    if (transport.playing.load() && isShowing())
+    // the playhead shows while the edited pattern plays: Pattern mode, or a clip of it in Song mode (round 162);
+    // stopped in Step edit too (round 170e5): it is where the next played note goes (FL enters step-edit notes at the
+    // song position, which it draws in the Piano roll), and it moves a snap step on after each one
+    if ((transport.playing.load() || engine.isStepEdit()) && isShowing())
     {
         const auto& song = engine.getSong();
-        tick = transportedit::patternPlayhead (song, song.currentPattern, transport.positionTicks.load());
+        tick = transportedit::patternPlayhead (song, song.currentPattern, transport.positionTicks.load(), engine.patternLinearOrigin());
     }
 
     if (tick != playheadTick)

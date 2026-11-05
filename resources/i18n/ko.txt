@@ -7137,3 +7137,8 @@ countries: kr
 
 # round 170e3: the idle hint on one line
 "Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "아무 곳이나 가리키면 도움말  [F1] 단축키  [F5]-[F9] 창  [Space] 재생/정지"
+
+# round 170e5: Loop record in Pattern mode
+"Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "루프 녹음: 켜짐 (녹음이 반복: Song 모드에서는 루프 구간, 한 바퀴마다 테이크 하나; Pattern 모드에서는 패턴)"
+"Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "루프 녹음: 꺼짐 (녹음이 그대로 진행: 루프 구간을 지나거나, 패턴 끝을 넘어 패턴이 길어짐)"
+"Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "루프 녹음: 켜짐, 녹음이 반복 (Song 모드: 루프 구간, 한 바퀴마다 테이크 하나; Pattern 모드: 패턴); 꺼짐, 그대로 진행하여 루프 구간을 지나거나 패턴 끝을 넘고, 연주한 자리에 모두 남김 (패턴이 길어짐)"

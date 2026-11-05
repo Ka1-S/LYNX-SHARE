@@ -228,6 +228,10 @@ public:
 
     // Song mode: the song plays on past its end while the take records (no wrap of the positions; round 168k).
     void setLinear (bool on) noexcept { linear = on; }
+    // Pattern mode, Loop record off (round 170e5): the notes go at their distance from this transport tick (the
+    // pattern played once from there), not folded into the loop; < 0: folded (the default)
+    void setPatternOrigin (double tick) noexcept { patternOrigin = tick; }
+    double getPatternOrigin() const noexcept { return patternOrigin; }
     // Song mode: the take's origin (see takeOriginFor), -1 until its first note; `originFromClip` = it is a clip's.
     std::int64_t songOrigin() const noexcept { return origin; }
     bool originFromClip() const noexcept { return fromClip; }
@@ -256,6 +260,7 @@ private:
 
     bool active = false;
     bool linear = false;
+    double patternOrigin = -1.0;
     std::int64_t loop = 0;
     std::int64_t origin = -1;
     std::int64_t reach = -1;

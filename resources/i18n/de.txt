@@ -7137,3 +7137,8 @@ countries: de at ch li lu
 
 # round 170e3: the idle hint on one line
 "Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "Zeige auf etwas für Hilfe  [F1] Tastenkürzel  [F5]-[F9] Fenster  [Space] Wiedergabe/Stopp"
+
+# round 170e5: Loop record in Pattern mode
+"Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "Loop-Aufnahme: an (die Aufnahme wiederholt: im Song-Modus den Loop-Bereich, ein Take pro Durchlauf; im Pattern-Modus das Pattern)"
+"Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "Loop-Aufnahme: aus (die Aufnahme läuft geradeaus weiter: durch den Loop-Bereich oder über das Pattern-Ende hinaus, das dann wächst)"
+"Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "Loop-Aufnahme: an, die Aufnahme wiederholt (Song-Modus: den Loop-Bereich, ein Take pro Durchlauf; Pattern-Modus: das Pattern); aus, sie läuft geradeaus weiter, durch den Loop-Bereich oder über das Pattern-Ende hinaus, und behält alles dort, wo es gespielt wurde (das Pattern wächst)"

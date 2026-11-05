@@ -280,6 +280,8 @@ public:
     // Note recording (MIDI and PC keyboard) into the current pattern while playing. UI thread.
     void setRecording (bool shouldRecord);
     bool isRecording() const noexcept { return transport.recording.load(); }
+    // Pattern mode, a take with Loop record off (round 170e5): the transport tick the pattern plays once from, < 0: none
+    double patternLinearOrigin() const noexcept { return liveInput.patternOrigin.load (std::memory_order_relaxed); }
 
     // Audio recording from the interface input: with this on, recording (Rec + Play) writes the
     // input to a WAV and, on stop, the take becomes a Playlist clip (latency-compensated).

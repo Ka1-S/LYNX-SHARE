@@ -810,12 +810,14 @@ void MainComponent::paint (juce::Graphics& g)
     g.setFont (font (type::caption - 1.0f, true));
     g.setColour (colour::textDisabled);
     if (! snapLabelArea.isEmpty())
-        g.drawText (tr ("SNAP"), snapLabelArea.withTrimmedLeft (rowHeight + 1), juce::Justification::centredLeft, true);
+        if (snapLabelArea.getWidth() > rowHeight + 20) // (the narrowest toolbar keeps only the magnet)
+            g.drawText (tr ("SNAP"), snapLabelArea.withTrimmedLeft (rowHeight + 1), juce::Justification::centredLeft, true);
     if (! patternLabelArea.isEmpty())
     {
         const auto iconBox = patternLabelArea.withWidth (rowHeight).toFloat();
         icons::draw (g, Icon::pattern, iconBox.withSizeKeepingCentre (14.0f, 14.0f), colour::textDisabled);
-        g.drawText (tr ("PATTERN"), patternLabelArea.withTrimmedLeft (rowHeight + 1), juce::Justification::centredLeft, true);
+        if (patternLabelArea.getWidth() > rowHeight + 20)
+            g.drawText (tr ("PATTERN"), patternLabelArea.withTrimmedLeft (rowHeight + 1), juce::Justification::centredLeft, true);
     }
 }
 
@@ -854,7 +856,7 @@ void MainComponent::resized()
     const int gridWidth = 148;
     // the snap and pattern captions: an icon (the magnet button / the pattern icon) and the longer of the two names
     const juce::Font captionFont (theme::font (theme::type::caption - 1.0f, true));
-    const int captionWidth = h + 3 + juce::jlimit (30, 80, juce::roundToInt (juce::jmax (juce::GlyphArrangement::getStringWidth (captionFont, tr ("SNAP")),
+    int captionWidth = h + 3 + juce::jlimit (30, 80, juce::roundToInt (juce::jmax (juce::GlyphArrangement::getStringWidth (captionFont, tr ("SNAP")),
                                                                                            juce::GlyphArrangement::getStringWidth (captionFont, tr ("PATTERN"))))) + 6;
 
     std::array<int, toolbarlayout::groupCount> widths {};
@@ -870,7 +872,8 @@ void MainComponent::resized()
 
     const auto room = toolbar.getWidth();
     // room for most hints on two lines; on a very wide window the hint bar takes more (round 170e3)
-    const auto minHint = juce::jmax (menuWidth + 8, 320), maxHint = room >= 3000 ? 1000 : 620;
+    auto minHint = juce::jmax (menuWidth + 8, 320);
+    const auto maxHint = room >= 3000 ? 1000 : 620;
     auto visible = toolbarlayout::fit (toolbarLayout, widths, gap, room, minHint);
     // round 170e3: rather than dropping the recording switches on a narrow window (1280-1440 px), the panels get
     // tighter: four switches per row (the typing piano and the MIDI light go; Ctrl+T and the View menu keep the piano),
@@ -890,6 +893,20 @@ void MainComponent::resized()
         widths[(std::size_t) Group::snap] -= 16;
         gap = 13;
         visible = toolbarlayout::fit (toolbarLayout, widths, gap, room, minHint);
+        // round 170e5: still too narrow (1280 px): the snap and pattern captions keep only their icons, the hint
+        // column only the menu's width, tighter displays and gaps; the recording switches stay
+        if (! visible[(std::size_t) Group::record])
+        {
+            const auto icons = h + 4;
+            widths[(std::size_t) Group::snap] -= captionWidth - icons;
+            captionWidth = icons;
+            tempoWidth -= 6;
+            timeWidth -= 8;
+            widths[(std::size_t) Group::transport] -= 14;
+            minHint = menuWidth + 8;
+            gap = 11;
+            visible = toolbarlayout::fit (toolbarLayout, widths, gap, room, minHint);
+        }
     }
     if (! toolbarLayout.visible) // Ctrl+F11: only the menu and the hint bar, on one row
         visible.fill (false);
@@ -3035,8 +3052,8 @@ void MainComponent::refreshRecordOptionButtons()
                                          "record.waitForInput"));
     blendButton.setTooltip (withKey (blendButton.getTooltip(), "record.blend"));
     loopRecordButton.setToggleState (o.loopRecord, juce::dontSendNotification);
-    loopRecordButton.setTooltip (withKey (o.loopRecord ? tr ("Loop record: on (Song mode recording loops the loop region, one take per pass)")
-                                                       : tr ("Loop record: off (recording plays straight through the loop region)"),
+    loopRecordButton.setTooltip (withKey (o.loopRecord ? tr ("Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)")
+                                                       : tr ("Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)"),
                                           "record.loop"));
     stepEditButton.setToggleState (engine.isStepEdit(), juce::dontSendNotification);
     stepEditButton.setTooltip (withKey (engine.isStepEdit() ? tr ("Step edit: on (stopped, played notes go into the pattern one snap step after another)")
@@ -3667,8 +3684,9 @@ void MainComponent::setControlHints()
     ui::setHint (countInButton, with (tr ("Count-in: one bar of clicks before recording starts (the menu has more lengths)"), "record.countIn"));
     ui::setHint (waitInputButton, with (tr ("Wait for input: recording starts with the first note you play"), "record.waitForInput"));
     ui::setHint (blendButton, tr ("Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced"));
-    ui::setHint (loopRecordButton, with (tr ("Loop record: on, Song mode recording loops the loop region (one take per pass); off, it plays "
-                                             "straight through and keeps everything where it was played"), "record.loop"));
+    ui::setHint (loopRecordButton, with (tr ("Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it "
+                                             "plays straight on, through the loop region or past the pattern's end, and keeps everything where it "
+                                             "was played (the pattern grows)"), "record.loop"));
     ui::setHint (stepEditButton, with (tr ("Step edit: with the transport stopped, notes you play go into the current pattern at the position, "
                                            "a snap step long; release the keys and the position moves on one step (chords: hold them together)"),
                                        "record.stepEdit"));
@@ -3788,7 +3806,12 @@ void MainComponent::applyStepEdit()
         stepSeekTick = stepPrevTick = now;
     }
 
-    const auto step = juce::jmax<std::int64_t> (1, pianoRoll.gridForSnapshot());
+    // the toolbar (main) snap is FL's step-edit step (round 170e5)
+    const auto& mainSnap = grid::options()[(std::size_t) juce::jlimit (0, (int) grid::options().size() - 1, EditorGlobals::get().getGridOption())];
+    const auto mainTicks = mainSnap.kind == grid::Kind::ticks ? (std::int64_t) mainSnap.ticks
+                           : mainSnap.kind == grid::Kind::bar ? (std::int64_t) ppq * juce::jmax (1, engine.getSong().beatsPerBar)
+                                                              : 0;
+    const auto step = stepedit::stepLength (mainTicks, pianoRoll.gridForSnapshot());
     for (const auto& p : played)
     {
         auto moved = false;
