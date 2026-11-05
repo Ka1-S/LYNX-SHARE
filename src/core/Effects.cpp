@@ -3863,6 +3863,10 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 165x: a Hush De-esser saved before the extended law keeps ±12 dB levels, the 2 … 16 kHz high-pass, its own link
     if (slot.kind == EffectKind::hushDeEsser && savedCount <= (std::size_t) mixsuite::hush::rangeLaw)
         slot.params[(std::size_t) mixsuite::hush::rangeLaw] = 0.0f;
+    // issue #77 (round tp172c): the dynamic air model became Aether's default; an Aether saved before it existed
+    // (round 124) keeps the shelf + exciter it was set up with
+    if (slot.kind == EffectKind::aether && savedCount <= (std::size_t) mixsuite::aether::dynamic)
+        slot.params[(std::size_t) mixsuite::aether::dynamic] = 0.0f;
     // round 152: a Compressor saved before the measured vintage curve keeps the round-150 curve
     if (slot.kind == EffectKind::compressor && savedCount <= 18 && slot.params.size() > 18)
         slot.params[18] = 0.0f;
