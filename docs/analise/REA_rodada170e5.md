@@ -32,7 +32,7 @@ Step edit:
 | # | item | before | now |
 |---|---|---|---|
 | 1 | Loop record off in Pattern mode | the pattern always looped and a take folded into it | the pattern plays once from the start of the pass the take began in, then the position runs on (silence after the old end, no repeat). Notes stay where they were played, so the pattern grows. The Piano roll playhead runs on past the end. When the take ends (Stop / record off), the pattern loops again. Loop record on (the default) is unchanged. |
-| 2 | record switches at 1280 px | dropped at 1280 (kept from 1366 by the 170e3 compact level) | a second compact level: the snap and pattern captions keep only their icons, the hint column shrinks to the menu's width, the tempo and time displays get 6 + 8 px narrower, and the gap is 11. The record group stays. |
+| 2 | record switches at 1280 px | dropped at 1280 (kept from 1366 by the 170e3 compact level) | two more compact levels. First: the snap/pattern captions become icons only, the hint column shrinks to the menu's width, the tempo/time displays get 6 + 8 px narrower, and the gap is 11. Then: a 24 px narrower snap box, gap 8, and the "+" new-pattern button takes the pattern icon's place, so the pattern box keeps room for a name. Last resort: the window buttons go before the recording switches (F5-F9 and View open the same windows). At 1280 the record group and the window buttons both show (s-toolbar-1280.png). |
 | 3 | step-edit cursor | the Piano roll drew the playhead only while playing, so a stopped step edit showed no insert point | in Step edit the Piano roll shows the position marker while stopped (line + ruler triangle), moves it a step after each note or chord, and Follow keeps it in view |
 | 4 | step-edit step | the Piano roll's own snap | the main (toolbar) snap, like FL. A snap with no size of its own (Line, Events) uses the Piano roll's grid, and one step when that is free too |
 | 5 | tooltips / hint | Loop record described Song mode only | they describe Pattern mode too (3 strings, 15 languages) |
@@ -64,4 +64,9 @@ Not done / limits:
 
 ## Where I stopped
 
-See the round report.
+- Done: all three items, tests toolbar170e5_* (local build-local 0 failures), Windows build + snapshots
+  /mnt/e/lynx-work/toolbar170e5/after3 (s-toolbar-1280.png: record group visible; 1366 unchanged).
+- Rerun: `tmp/coord/buildslot.sh tmp/coord/bl-wt.sh toolbar170e5`; Windows `OUT=~/projetos/lynx-wt-toolbar170e5/build-win
+  tmp/coord/winbuild.sh scripts/build-windows-zig.sh`; snapshots `LYNX.exe --snapshot` with LYNX_SNAPSHOT_SIZE=1280x720,
+  fresh LYNX_PROFILE_DIR, LYNX_TEST_MODE=1.
+- Open: Pattern-mode audio takes with Loop record off still loop the pattern; fixed-length patterns do not grow.

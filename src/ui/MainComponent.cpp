@@ -879,6 +879,7 @@ void MainComponent::resized()
     // tighter: four switches per row (the typing piano and the MIDI light go; Ctrl+T and the View menu keep the piano),
     // a narrower snap box and displays
     compactRecord = false;
+    narrowSnap = false;
     if (toolbarLayout.visible && toolbarLayout.isShown (Group::record) && ! visible[(std::size_t) Group::record])
     {
         compactRecord = true;
@@ -906,6 +907,23 @@ void MainComponent::resized()
             minHint = menuWidth + 8;
             gap = 11;
             visible = toolbarlayout::fit (toolbarLayout, widths, gap, room, minHint);
+        }
+        // and still (1280 px, measured: the switches missed it by a few px): a narrower snap box, tight gaps; then
+        // the window buttons go before the recording switches (F5-F9 and the View menu open the same windows)
+        if (! visible[(std::size_t) Group::record])
+        {
+            widths[(std::size_t) Group::snap] -= 24;
+            narrowSnap = true;
+            gap = 8;
+            visible = toolbarlayout::fit (toolbarLayout, widths, gap, room, minHint);
+        }
+        if (! visible[(std::size_t) Group::record])
+        {
+            auto narrow = toolbarLayout;
+            for (auto& e : narrow.entries)
+                if (e.group == Group::windows)
+                    e.shown = false;
+            visible = toolbarlayout::fit (narrow, widths, gap, room, minHint);
         }
     }
     if (! toolbarLayout.visible) // Ctrl+F11: only the menu and the hint bar, on one row
@@ -1096,8 +1114,16 @@ void MainComponent::resized()
                 auto second = juce::Rectangle<int> (panel.getX(), row2, panel.getWidth(), h);
                 patternLabelArea = second.removeFromLeft (captionWidth);
                 put (patternMenuButton, second.removeFromRight (h));
-                put (newPatternButton, second.removeFromRight (h));
-                second.removeFromRight (2);
+                if (narrowSnap) // (the pattern box keeps room for a name)
+                {
+                    put (newPatternButton, patternLabelArea.withWidth (h));
+                    patternLabelArea = {};
+                }
+                else
+                {
+                    put (newPatternButton, second.removeFromRight (h));
+                    second.removeFromRight (2);
+                }
                 put (patternBox, second.reduced (0, 1));
                 break;
             }
