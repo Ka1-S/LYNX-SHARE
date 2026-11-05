@@ -343,7 +343,7 @@ LYNX.AppImage --menu-entry on|off             Linux AppImage: add to / remove fr
 
 ## Native Kumi control (experimental)
 
-On macOS and Linux, LYNX can expose its open project through the opt-in `lynx-kumi/1` control endpoint. It stays off during a normal start. Use a matching Kumi build with `--daw lynx`.
+On macOS and Linux, LYNX can expose its open project through the opt-in `lynx-kumi/1` control endpoint. It stays off during a normal start. Use a [matching Kumi build](https://github.com/user1303836/kumi/pull/1060) with `--daw lynx`.
 
 ```sh
 mkdir -p "$PWD/kumi-control"
