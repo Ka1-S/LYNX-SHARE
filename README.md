@@ -341,6 +341,30 @@ LYNX --uiperf project.flp rep.txt             time the UI drawing: Mixer, Playli
 LYNX.AppImage --menu-entry on|off             Linux AppImage: add to / remove from the applications menu
 ```
 
+## Native Kumi control (experimental)
+
+On macOS and Linux, LYNX can expose its open project through the opt-in `lynx-kumi/1` control endpoint. It stays off during a normal start. Use a matching Kumi build with `--daw lynx`.
+
+```sh
+mkdir -p "$PWD/kumi-control"
+chmod 700 "$PWD/kumi-control"
+export LYNX_KUMI_DISCOVERY="$PWD/kumi-control/connection.json"
+/path/to/LYNX.app/Contents/MacOS/LYNX /absolute/path/song.lynx
+# In another terminal, using the same absolute discovery path:
+KUMI_LYNX_CONFIG="$PWD/kumi-control/connection.json" kumi --daw lynx
+```
+
+The endpoint binds only to `127.0.0.1` on an ephemeral port. Its atomically created discovery file has owner-only permissions and a private authentication token. Keep it out of chat, version control and shared folders. Each connection carries one newline-delimited JSON request and response, bounded to 1 MiB. Message-loop deadlines are five seconds for ordinary calls and sixty seconds for plugin loading, parameter changes and undo/redo. A timeout is an uncertain outcome: inspect the project before another edit.
+
+- Inspect the live project, transport, channels, mixer and complete MIDI-note properties; change tempo, playback, channel/mixer controls and pattern notes.
+- Inspect top-level hosted instruments and hosted/native mixer effects, with paginated normalized parameter values and display text. Parameter batches preserve full hosted state and use native undo. Native synth instruments and nested Patcher devices are not exposed.
+- Search, load and remove built-in effects or effects already in LYNX's scanned catalog. Arbitrary plugin paths and new folder scans are not accepted.
+- Inspect and edit the current Playlist arrangement using stable clip IDs. A bounded add/update/duplicate/remove batch validates fully before committing as one undo step. Existing pattern/audio-channel/automation sources retain their routing; content-locked tracks are refused.
+
+Every mutation requires the observed `expectedProjectId`, `expectedRevision`, and `expectedEpoch`. Public `controlEpoch` identifies this app run independently of the private token, preventing stale calls after a restart. Success responses include `projectId`, `revision` and `controlEpoch`; `session.inspect` advertises capability groups. Kumi attaches guards automatically. Plugin parameter batches also require per-parameter `expectedValue`, since a plugin editor can change values without publishing a Song revision. Note replacement requires every property returned by `pattern.notes`.
+
+Edits are refused while recording. Plugin/effect, Playlist, note replacement and history operations require stopped playback. Native undo/redo uses LYNX's shared history, including the producer's edits. Saving projects, arbitrary audio import, arrangement switching and live audio capture are not exposed.
+
 ## Shortcuts
 
 | Key | Action |
