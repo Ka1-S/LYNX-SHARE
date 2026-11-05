@@ -7206,3 +7206,7 @@ countries: nl be
 "Decay EQ" = "Uitsterf-EQ"
 "Low decay" = "Laag uitsterven"
 "High decay" = "Hoog uitsterven"
+
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "Geen|Smooth|Op-El|Mastering"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Nog drie compressorkarakters, in plaats van de stijl: zacht, opto-elektronisch of mastering"

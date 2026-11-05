@@ -179,11 +179,14 @@ int fromProC3 (const State& s, EffectSlot& slot)
         p[(std::size_t) k] = clamp01 (v);
         ++n;
     };
-    // their style list (index → ours); the indices we never saw named map to Allround
-    static constexpr Style styles[14] { Style::clean, Style::allround, Style::allround, Style::punch, Style::upward, Style::twoWay,
-                                        Style::allround, Style::variMu, Style::classic, Style::opto, Style::vocal, Style::allround,
+    // their style list (index → ours): Clean, Versatile (our Allround), Smooth, Punch, Upward, TTM (our Two-way), Op-El,
+    // Vari-Mu, Classic, Opto, Vocal, Mastering, Bus, Pumping; Smooth / Op-El / Mastering are voicings (round tp172b2)
+    static constexpr Style styles[14] { Style::clean, Style::allround, Style::smooth, Style::punch, Style::upward, Style::twoWay,
+                                        Style::opEl, Style::variMu, Style::classic, Style::opto, Style::vocal, Style::mastering,
                                         Style::bus, Style::pumping };
-    set (style, styleValue (styles[std::clamp (roundIndex (s.at (0)), 0, 13)]));
+    const auto st = styles[std::clamp (roundIndex (s.at (0)), 0, 13)];
+    set (style, styleValue (st));
+    set (voicing, voicingValue (st));
     set (threshold, linValue (s.at (1), -60.0, 0.0));
     set (ratio, ratioValue (ratioFromNorm (s.at (4))));
     set (knee, linValue (s.at (5), 0.0, 72.0));

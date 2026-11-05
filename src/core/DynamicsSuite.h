@@ -56,6 +56,9 @@ enum Param
     // period long, on the song position; MIDI = while a note is held on the chosen Channel Rack channel.
     // [EXEC] measured on the trial (REA_rodada137 §6)
     trigger, triggerSync, triggerRate, triggerLength, triggerChannel,
+    // round tp172b2 (Pro-C 3 parity, appended; none by default): Pro-C 3's styles that Style has no slot for — Smooth,
+    // Op-El and Mastering — chosen over the style when set (the style list itself keeps its 11 entries for old projects)
+    voicing,
     count
 };
 enum class Trigger { off, hostSync, midi };
@@ -82,12 +85,15 @@ double meterRangeDb (float v) noexcept;  // the display's range: 9, 18, 36, 72 o
 double autoThresholdDb (double knobDb, double programRmsDb) noexcept;
 inline int scParam (int band, int field) noexcept { return sc1Shape + band * 5 + field; } // field: 0 shape .. 4 slope
 
-enum class Style { clean, allround, punch, upward, twoWay, variMu, classic, opto, vocal, bus, pumping };
-constexpr int styles = 11;
+enum class Style { clean, allround, punch, upward, twoWay, variMu, classic, opto, vocal, bus, pumping,
+                   smooth, opEl, mastering }; // the last three only through the voicing parameter
+constexpr int styles = 11, allStyles = 14, voicings = 4;
 enum class Character { off, warm, crisp, bright };
 
-Style styleOf (float v) noexcept;
-float styleValue (Style s) noexcept;
+Style styleOf (float v) noexcept;              // the style parameter alone (its 11 entries)
+Style styleOf (const EffectParams& p) noexcept; // the style the engine runs: the voicing when set, else the style
+float styleValue (Style s) noexcept;            // the style parameter's value (one of its 11 entries)
+float voicingValue (Style s) noexcept;          // the voicing parameter's value (0 = none for the 11 styles)
 double thresholdDb (float v) noexcept;   // −60 .. 0 dBFS
 double ratioOf (float v) noexcept;       // 1 .. 100 : 1
 float ratioValue (double r) noexcept;
@@ -255,8 +261,10 @@ double mixOf (float v) noexcept;         // −1 (left / mid) … +1 (right / si
 double panOf (float v) noexcept;         // −1 … +1 balance
 enum class Style { classic, clean, vocal, guitar, upward };
 constexpr int styles = 5;
-Style styleOf (float v) noexcept;
-float styleValue (Style s) noexcept;
+Style styleOf (float v) noexcept;              // the style parameter alone (its 11 entries)
+Style styleOf (const EffectParams& p) noexcept; // the style the engine runs: the voicing when set, else the style
+float styleValue (Style s) noexcept;            // the style parameter's value (one of its 11 entries)
+float voicingValue (Style s) noexcept;          // the voicing parameter's value (0 = none for the 11 styles)
 double thresholdDb (float v) noexcept;   // −60 .. 0
 double ratioOf (float v) noexcept;       // 1 .. 100 (same law as Crest)
 double rangeDb (float v) noexcept;       // 0 .. 100 dB

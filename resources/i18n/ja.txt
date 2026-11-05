@@ -7206,3 +7206,7 @@ countries: jp
 "Decay EQ" = "ディケイEQ"
 "Low decay" = "低域ディケイ"
 "High decay" = "高域ディケイ"
+
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "なし|Smooth|Op-El|Mastering"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "スタイルの代わりに使える3つのコンプレッサーキャラクター：スムーズ、オプトエレクトロニック、マスタリング"

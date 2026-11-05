@@ -173,7 +173,13 @@ std::string ratioText (double r) { return r >= 99.5 ? "100 : 1" : fmt (r < 10.0 
 namespace crest
 {
 Style styleOf (float v) noexcept { return (Style) pick (v, styles); }
-float styleValue (Style s) noexcept { return (float) (int) s / (float) (styles - 1); }
+Style styleOf (const EffectParams& p) noexcept
+{
+    const auto v = pick (p[voicing], voicings);
+    return v > 0 ? (Style) (styles + v - 1) : styleOf (p[style]);
+}
+float styleValue (Style s) noexcept { return (int) s < styles ? (float) (int) s / (float) (styles - 1) : styleValue (Style::allround); }
+float voicingValue (Style s) noexcept { return (int) s < styles ? 0.0f : (float) ((int) s - styles + 1) / (float) (voicings - 1); }
 double thresholdDb (float v) noexcept { return lin (v, -60.0, 0.0); }
 double ratioOf (float v) noexcept { return ratioLaw (v); }
 float ratioValue (double r) noexcept { return ratioLawValue (r); }
@@ -259,19 +265,33 @@ struct StyleDef
     double kneeAdd, kneeScale; // knee = add + scale × knob
     Curve curve;
     double windowMs;     // > 0: the level is the peak over this window (a ripple-free detector for fast releases)
+    // round tp172b2 [EXEC] (Pro-C 3 trial, 1 kHz stairs over a ratio × knee grid per style): the downward curve's
+    // threshold offset (dB, + = the curve starts later), its slope relative to the ratio's 1 − 1/R, and a knee that
+    // grows with that slope (dB per unit of slope) on top of add + scale × knob
+    double offsetDb = 0.0, slopeScale = 1.0, kneeSlope = 0.0;
+    // the detector never follows faster than this (ms; round tp172b measured ~1 ms on Clean / Allround / Opto)
+    double attackFloorMs = 0.002;
+    // 0: the level is smoothed (attack / release on the detector level, then the curve); 1: the curve's gain is
+    // smoothed instead (the time constants act on the gain change, whatever the ratio); in between, a blend
+    double gainBlend = 0.0;
+    // two-way: the fixed gain (dB per unit of slope) and the upward part's slope under threshold − 6 dB
+    double baseDb = 0.0, upSlope = 0.0;
 };
-constexpr StyleDef styleDefs[styles] {
-    { 0.265, 1.27, 0.77, 6.0, 0.50, Curve::downward, 0.0 }, // clean
-    { 0.56, 0.94, 0.15, 6.0, 1.00, Curve::downward, 0.0 },  // allround
-    { 0.31, 1.10, 0.65, 4.0, 0.80, Curve::downward, 0.0 },  // punch
-    { 0.31, 2.50, 1.00, 0.0, 1.00, Curve::upward, 0.0 },    // upward
-    { 0.235, 0.01, 0.00, 0.0, 1.00, Curve::twoWay, 1.3 },   // two-way (recovers within about a millisecond)
+constexpr StyleDef styleDefs[allStyles] {
+    { 0.263, 0.519, 1.082, 7.60, 0.487, Curve::downward, 0.0, 1.09, 1.000, 8.56, 0.464, 0.54 }, // clean
+    { 0.382, 0.223, 0.862, 16.28, 0.488, Curve::downward, 0.0, 0.00, 1.000, 4.61, 1.000, 0.86 }, // allround
+    { 0.310, 0.580, 0.722, 6.21, 0.800, Curve::downward, 0.0, 0.00, 1.000, 0.00, 0.002, 0.71 }, // punch
+    { 0.31, 2.50, 1.00, 0.0, 0.00, Curve::upward, 0.0, -10.5, 1.0, 0.0, 0.002 }, // upward
+    { 0.235, 0.01, 0.00, 0.0, 1.00, Curve::twoWay, 1.3, 0.0, 0.808, 0.0, 0.002, 0.0, -5.75, 0.473 }, // two-way (recovers within about a millisecond)
     { 0.335, 0.65, 0.98, 0.0, 1.00, Curve::variMu, 0.0 },   // vari-mu
     { 0.30, 1.57, 0.53, 4.0, 0.17, Curve::downward, 0.0 },  // classic
-    { 0.32, 1.52, 0.88, 4.0, 0.65, Curve::downward, 0.0 },  // opto
-    { 1.08, 1.70, 0.04, 0.0, 1.00, Curve::vocal, 0.0 },     // vocal
-    { 0.24, 3.57, 0.19, 0.0, 1.00, Curve::downward, 0.0 },  // bus
-    { 0.08, 2.36, 1.00, 0.0, 1.00, Curve::downward, 0.0 },  // pumping
+    { 0.169, 0.789, 0.880, 7.27, 0.722, Curve::downward, 0.0, 0.77, 1.000, 2.88, 0.750, 0.39 }, // opto
+    { 1.08, 1.70, 0.04, 8.0, 0.50, Curve::vocal, 0.0, -2.1, 1.1667, 0.0, 0.002 }, // vocal
+    { 0.027, 1.093, 0.510, 7.39, 0.608, Curve::downward, 0.0, 0.00, 1.000, 9.41, 0.045, 0.93 }, // bus
+    { 0.002, 1.582, 0.800, 0.00, 0.952, Curve::downward, 0.0, 0.00, 1.000, 0.00, 0.002, 0.46, 0.0, 0.0 }, // pumping
+    { 0.56, 0.94, 0.15, 6.0, 1.00, Curve::downward, 0.0, 0.0, 1.0, 0.0, 1.0 },  // smooth (voicing)
+    { 0.570, 0.223, 0.990, 13.98, 0.488, Curve::downward, 0.0, 0.00, 1.000, 4.61, 1.000, 1.00, 0.0, 0.0 }, // op-el (voicing)
+    { 0.56, 0.94, 0.15, 6.0, 1.00, Curve::downward, 0.0, 0.0, 1.0, 0.0, 1.0 },  // mastering (voicing)
 };
 
 double releaseTau (const StyleDef& d, double knobMs) noexcept
@@ -325,22 +345,27 @@ double curveGain (Style st, double x, double thr, double r, double knee, double 
     {
         case Curve::upward:
         {
-            // upward: quiet parts are lifted toward a point 10.5 dB under the threshold; above it the gain holds
-            const auto g = s * (thr - 10.5 - std::min (x, thr));
+            // upward: quiet parts are lifted toward a point `offsetDb` from the threshold (−10.5 dB: under it); above
+            // the threshold the gain holds; the corner is softened over the style's knee
+            const auto kn = d.kneeAdd + d.kneeScale * knee + d.kneeSlope * s;
+            const auto softMin = x - kneeCurve (x - thr, 1.0, kn);
+            const auto g = s * d.slopeScale * (thr + d.offsetDb - softMin);
             return std::clamp (g, -range, range);
         }
         case Curve::twoWay:
         {
             // two-way: a fixed offset, upward compression below (threshold − 6 dB), downward above (threshold + 4 dB)
-            const auto g = -5.75 * s + 0.473 * s * std::max (0.0, thr - 6.0 - x) - 0.808 * kneeCurve (x - thr - 4.0, s, knee);
+            const auto kn = d.kneeAdd + d.kneeScale * knee + d.kneeSlope * s;
+            const auto g = d.baseDb * s + d.upSlope * s * std::max (0.0, thr - 6.0 - x)
+                         - d.slopeScale * kneeCurve (x - thr - 4.0 - d.offsetDb, s, kn);
             return std::clamp (g, -range, range);
         }
         case Curve::vocal:
         {
             // a long smooth curve that already reduces far below the threshold (softplus in dB), steeper on top
-            const auto k = 8.0 + knee * 0.5;
-            const auto sv = std::min (1.0, 1.1667 * s);
-            const auto z = (x - (thr - 2.1)) / k;
+            const auto k = std::max (0.5, d.kneeAdd + d.kneeScale * knee + d.kneeSlope * s);
+            const auto sv = std::min (1.0, d.slopeScale * s);
+            const auto z = (x - (thr + d.offsetDb)) / k;
             const auto soft = z > 30.0 ? z : std::log1p (std::exp (z));
             return -std::min (range, sv * k * soft);
         }
@@ -353,7 +378,7 @@ double curveGain (Style st, double x, double thr, double r, double knee, double 
         }
         case Curve::downward:
         default:
-            return -std::min (range, kneeCurve (x - thr, s, d.kneeAdd + d.kneeScale * knee));
+            return -std::min (range, kneeCurve (x - thr - d.offsetDb, s * d.slopeScale, d.kneeAdd + d.kneeScale * knee + d.kneeSlope * s));
     }
 }
 
@@ -370,7 +395,7 @@ void scEqParams (const EffectParams& p, EffectParams& out) noexcept
 
 double staticGainDb (const EffectParams& p, double inputDb)
 {
-    return curveGain (styleOf (p[style]), inputDb, thresholdDb (p[threshold]), ratioOf (p[ratio]), kneeDb (p[knee]),
+    return curveGain (styleOf (p), inputDb, thresholdDb (p[threshold]), ratioOf (p[ratio]), kneeDb (p[knee]),
                       std::max (0.01, rangeDb (p[range])));
 }
 
@@ -490,15 +515,15 @@ private:
     // the detector of one channel
     struct Detector
     {
-        double env = -120.0, sustain = 0.0;
-        int holdLeft = 0, peakPos = 0;
+        double env = -120.0, sustain = 0.0, gain = 0.0;
+        int holdLeft = 0, gainHold = 0, peakPos = 0;
     };
 
     // per-chunk settings at the rate the detector runs at
     struct Ctx
     {
         Style st;
-        double thr, rat, kn, rng, aA, relMs, rate, slowCoef;
+        double thr, rat, kn, rng, aA, relMs, rate, slowCoef, gainBlend;
         int holdSamples, window;
         bool autoRel;
     };
@@ -548,7 +573,7 @@ private:
     Ctx context (const EffectParams& p, double rate) const noexcept
     {
         Ctx c;
-        c.st = styleOf (p[style]);
+        c.st = styleOf (p);
         const auto& sd = styleDefs[(int) c.st];
         c.thr = on (p[autoThreshold]) ? autoThresholdDb (thresholdDb (p[threshold]), programDb) : thresholdDb (p[threshold]);
         c.rat = ratioOf (p[ratio]);
@@ -560,12 +585,12 @@ private:
         // 30 ms (release 100 / 200 / 200), ~17 ms at attack = release = 100 ms, where a steady sine sags 4.5 dB
         const auto att = attackMs (p[attack]);
         const auto releaseByAttack = (1.0 + std::pow (10.0 / 50.0, 1.5)) / (1.0 + std::pow (att / 50.0, 1.5));
-        const bool floored = c.st == Style::clean || c.st == Style::allround || c.st == Style::opto; // measured; Punch has none
-        c.aA = coef (std::max (floored ? 1.0 : 0.002, att * sd.attackScale), rate);
+        c.aA = coef (std::max (sd.attackFloorMs, att * sd.attackScale), rate);
         c.relMs = std::max (0.5, releaseTau (sd, releaseMs (p[release])) * releaseByAttack);
         c.autoRel = on (p[autoRelease]) && sd.curve != Curve::twoWay;
         c.rate = rate;
         c.slowCoef = coef (1000.0, rate);
+        c.gainBlend = sd.gainBlend;
         c.holdSamples = (int) (holdMs (p[hold]) * 0.001 * rate);
         c.window = sd.windowMs > 0.0 ? std::clamp ((int) (sd.windowMs * 0.001 * rate), 1, peakWindow) : 0;
         return c;
@@ -603,7 +628,24 @@ private:
             const auto aR = coef (ms, x.rate);
             d.env = aR * d.env + (1.0 - aR) * in;
         }
-        const auto g = curveGain (x.st, d.env, x.thr, x.rat, x.kn, x.rng);
+        auto g = curveGain (x.st, d.env, x.thr, x.rat, x.kn, x.rng);
+        if (x.gainBlend > 0.0) // the gain-domain detector: the instantaneous curve gain, smoothed
+        {
+            const auto target = curveGain (x.st, in, x.thr, x.rat, x.kn, x.rng);
+            if (target < d.gain)
+            {
+                d.gain = x.aA * d.gain + (1.0 - x.aA) * target;
+                d.gainHold = x.holdSamples;
+            }
+            else if (d.gainHold > 0)
+                --d.gainHold;
+            else
+            {
+                const auto aR = coef (x.relMs, x.rate);
+                d.gain = aR * d.gain + (1.0 - aR) * target;
+            }
+            g += x.gainBlend * (d.gain - g);
+        }
         d.sustain = x.slowCoef * d.sustain + (1.0 - x.slowCoef) * std::max (0.0, -g);
         return g;
     }
@@ -660,7 +702,7 @@ private:
         const auto inGain = (float) dbToGain (trimDb (p[input]));
         const auto outGain = (float) dbToGain (trimDb (p[output]));
         const auto mx = std::clamp (p[mix], 0.0f, 1.0f);
-        const auto st = styleOf (p[style]);
+        const auto st = styleOf (p);
         float makeup = 1.0f;
         if (on (p[autoGain]) && styleDefs[(int) st].curve != Curve::upward)
         {
@@ -671,7 +713,9 @@ private:
             // +0.9 at 50 ms, +0.0 at 250 ms with the defaults; release and look-ahead don't change it). It was half of
             // the style's own curve whatever the attack (+6.8 dB at the defaults, 2 dB louder)
             const double slowAttack = 1.0 / (1.0 + std::pow (attackMs (p[attack]) / 12.0, 1.1));
-            makeup = (float) dbToGain (std::min (rng, -0.36 * slowAttack * curveGain (Style::clean, 0.0, thresholdDb (p[threshold]), ratioOf (p[ratio]), kneeDb (p[knee]), rng)));
+            // (the plain curve it was measured against: knee 6 dB + half the knob, no style offsets)
+            const auto plain = std::min (rng, kneeCurve (-thresholdDb (p[threshold]), 1.0 - 1.0 / ratioOf (p[ratio]), 6.0 + 0.5 * kneeDb (p[knee])));
+            makeup = (float) dbToGain (std::min (rng, 0.36 * slowAttack * plain));
         }
         const auto mode = linkModeOf (p[linkMode]);
         const bool ms = mode != LinkMode::stereo;
@@ -2535,7 +2579,8 @@ const EffectInfo& crestInfo()
                                      { "Wet pan", 0.5f }, { "Dry pan", 0.5f }, // round 135
                                      // round 137: the side-chain trigger (off), 1/4 note, rate 100 %, length 10 %, no channel
                                      { "Trigger", 0.0f }, { "Trigger sync", 0.5f }, { "Trigger rate", 0.5f }, { "Trigger length", 0.1f },
-                                     { "Trigger channel", 0.0f } } };
+                                     { "Trigger channel", 0.0f },
+                                     { "Voicing", 0.0f } } }; // round tp172b2
     return info;
 }
 
@@ -2734,6 +2779,11 @@ std::string paramText (EffectKind kind, int param, float v)
             case triggerLength: return fmt ("%.0f%%", 100.0 * triggerLengthOf (v));
             case triggerChannel:
                 return triggerChannelOf (v) < 0 ? std::string ("Off") : fmt ("Channel %.0f", (double) (triggerChannelOf (v) + 1));
+            case voicing:
+            {
+                static const char* names[voicings] { "None", "Smooth", "Op-El", "Mastering" };
+                return names[pick (v, voicings)];
+            }
             default: return on (v) ? "on" : "off";
         }
     }

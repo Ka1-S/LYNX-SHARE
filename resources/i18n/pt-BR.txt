@@ -7362,3 +7362,7 @@ countries: br
 "Decay EQ" = "EQ do decaimento"
 "Low decay" = "Decaimento grave"
 "High decay" = "Decaimento agudo"
+
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "Nenhum|Suave|Op-El|Masterização"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Mais três caracteres de compressor, usados no lugar do estilo: suave, optoeletrônico ou masterização"

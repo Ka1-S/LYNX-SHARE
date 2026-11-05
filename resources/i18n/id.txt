@@ -7206,3 +7206,7 @@ countries: id
 "Decay EQ" = "EQ peluruhan"
 "Low decay" = "Peluruhan rendah"
 "High decay" = "Peluruhan tinggi"
+
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "Tidak ada|Smooth|Op-El|Mastering"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Tiga karakter kompresor lagi, dipakai menggantikan gaya: halus, opto-elektronik, atau mastering"

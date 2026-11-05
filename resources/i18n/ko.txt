@@ -7206,3 +7206,7 @@ countries: kr
 "Decay EQ" = "디케이 EQ"
 "Low decay" = "저역 디케이"
 "High decay" = "고역 디케이"
+
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "없음|Smooth|Op-El|Mastering"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "스타일 대신 쓰는 컴프레서 캐릭터 세 가지: 스무스, 광전자식, 마스터링"

@@ -7206,3 +7206,7 @@ countries: de at ch li lu
 "Decay EQ" = "Abkling-EQ"
 "Low decay" = "Tiefen-Abklingen"
 "High decay" = "Höhen-Abklingen"
+
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "Keine|Smooth|Op-El|Mastering"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Drei weitere Kompressor-Charaktere, statt des Stils: weich, optoelektronisch oder Mastering"
