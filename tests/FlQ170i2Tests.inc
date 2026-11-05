@@ -65,7 +65,17 @@ TEST (flq170i2_fpc_volume_law_and_velocity)
                 CHECK (std::abs (layer.gain / law (99) - 1.0) < 1e-5);
         }
     CHECK (kick);
+    if (realFlpDir[0] != '/')
+        return; // (a Windows test run: the paths start with a drive letter)
+    // FL's own samples (the pads whose samples are missing are dropped), as in a real import
+    const std::filesystem::path data (realFlpDir);
     FlpImportOptions options;
+    options.roots = { data.parent_path().string(), data.string(), "" };
+    options.fileExists = [] (const std::string& p) {
+        auto q = p;
+        std::replace (q.begin(), q.end(), '\\', '/');
+        return ! existingPathIgnoringCase (q).empty();
+    };
     const auto song = importFlp (project, options);
     bool seen = false;
     for (const auto& c : song.channels)
