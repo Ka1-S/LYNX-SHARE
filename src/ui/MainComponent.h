@@ -60,6 +60,8 @@ public:
 
     // Asks "save changes?" if there are any; `then` runs unless the user cancels.
     void confirmDiscard (std::function<void()> then);
+    // The main window came up (issue #62): the detached panels restored with the layout go to their saved place, above it.
+    void restoreDetachedWindows() { workspace.restoreDetachedWindows(); }
 
     // For --snapshot mode: 0 = Channel Rack, 1 = Piano Roll (on the channel with the most notes), 2 = Playlist, 3 = Mixer,
     // each maximized on the workspace; showDesktopForSnapshot shows the default layout (with `extraPanels`, the

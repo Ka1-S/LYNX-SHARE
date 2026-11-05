@@ -2236,7 +2236,8 @@ static bool hasLiveMeters (EffectKind kind) noexcept
            || kind == EffectKind::echoform // round 135w: Echoform's output meter
            || kind == EffectKind::autoPan || kind == EffectKind::voiceShift // round 135: the pan position, the shifter's notes
            || kind == EffectKind::hardwareInsert // round 164d: send / return levels, the ping
-           || kind == EffectKind::xyController || kind == EffectKind::xyzController; // round 164: the pad's target and outputs
+           || kind == EffectKind::xyController || kind == EffectKind::xyzController // round 164: the pad's target and outputs
+           || kind == EffectKind::peakController; // issue #66: its display's Peak + LFO, Peak and LFO lines
 }
 
 void RackRenderer::setSidechain (const RackState& state, const EffectSlot& slot, Effect& effect, int track) noexcept
@@ -2320,6 +2321,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             && slots[i].kind != EffectKind::formulaController
             && slots[i].kind != EffectKind::xyController && slots[i].kind != EffectKind::xyzController
             && slots[i].kind != EffectKind::controlSurface
+            && slots[i].kind != EffectKind::peakController // (issue #66: its LFO runs and its peak falls in silence, as FL's)
             // round 164c: a visual plugin keeps recording silence (its display falls, the video export stays in time)
             && slots[i].kind != EffectKind::waveCandy && slots[i].kind != EffectKind::visualizer
             && slots[i].kind != EffectKind::tuner // (round 165g: the tuner's display follows the signal into silence)

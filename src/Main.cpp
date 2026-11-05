@@ -2531,12 +2531,74 @@ private:
         // through it, the invite code's keys)
         const auto liveResult = lynx::livetest::selfTest (&rich);
 
+        // issue #67: every built-in effect's parameters, named and hidden (the Parametric EQ's FL law, processing, band
+        // mask...), at odd values, through a project save and reload: the same floats back
+        juce::String effectParamsResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            song.mixer.resize (1);
+            for (int k = 0; k <= (int) lynx::lastEffectKind; ++k)
+            {
+                const auto kind = (lynx::EffectKind) k;
+                if (kind == lynx::EffectKind::plugin || kind == lynx::EffectKind::parallel)
+                    continue;
+                auto fx = lynx::makeEffectSlot (kind);
+                for (std::size_t i = 0; i < fx.params.size(); ++i)
+                {
+                    auto v = (float) ((double) ((i * 7919 + (std::size_t) k * 104729) % 65521) / 65521.0);
+                    fx.params[i] = v == fx.params[i] ? 1.0f - v : v;
+                }
+                if (kind == lynx::EffectKind::fruitySend) // ("Send to" is written over the insert span)
+                    fx.params[3] = 0.0f;
+                song.mixer.emplace_back();
+                song.mixer.back().name = "Insert " + std::to_string (song.mixer.size() - 1);
+                song.mixer.back().effects.push_back (fx);
+            }
+            // round 171b's Patcher round trip (coordinator): the Frequency Splitter, Fruity Delay 3 and Peak Controller
+            // nodes came back different (their FL defaults, e.g. the LFO speed 32750 / 65336, lost to 4 decimals)
+            {
+                auto patch = lynx::makeEffectSlot (lynx::EffectKind::patcher);
+                for (const auto kind : { lynx::EffectKind::frequencySplitter, lynx::EffectKind::fruityDelay3, lynx::EffectKind::peakController,
+                                         lynx::EffectKind::reverb, lynx::EffectKind::hardwareInsert })
+                {
+                    lynx::PatchNode node;
+                    node.effect = lynx::natives::newEffect (kind, lynx::flStudioAccess()).value_or (lynx::makeEffectSlot (kind));
+                    if (kind == lynx::EffectKind::peakController)
+                        node.effect.params[7] = 32750.0f / 65336.0f;
+                    node.x = 200.0f, node.y = 60.0f * (float) patch.patcher.nodes.size();
+                    patch.patcher.nodes.push_back (node);
+                }
+                song.mixer.emplace_back();
+                song.mixer.back().name = "Patcher";
+                song.mixer.back().effects.push_back (patch);
+            }
+            juce::String why;
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why);
+            if (back && back->mixer.size() == song.mixer.size())
+            {
+                const auto& a = song.mixer.back().effects[0].patcher.nodes;
+                const auto& b = back->mixer.back().effects[0].patcher.nodes;
+                for (std::size_t n = 0; n < a.size(); ++n)
+                    if (n >= b.size() || ! (a[n].effect == b[n].effect))
+                        effectParamsResult = juce::String ("ERROR Patcher node ") + lynx::effectInfo (a[n].effect.kind).name;
+            }
+            if (! back || back->mixer.size() != song.mixer.size())
+                effectParamsResult = "ERROR load " + why;
+            else
+                for (std::size_t t = 1; t + 1 < song.mixer.size() && effectParamsResult == "OK"; ++t)
+                    if (back->mixer[t].effects.size() != 1 || back->mixer[t].effects[0].params != song.mixer[t].effects[0].params)
+                    {
+                        effectParamsResult = juce::String ("ERROR ") + lynx::effectInfo (song.mixer[t].effects[0].kind).name;
+                        break;
+                    }
+        }
+
         // round 170j: the Themed plugin style (its resolution with and without art; every art draws)
         const auto artResult = lynx::skin::artSelfTest();
 
         const auto ok = audioOk && projectOk && richOk && hwOutOk && flp168jOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
-                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK";
+                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK";
 
         juce::String report;
         report << "connections=" << offline.getNumGraphConnections() << "\n"
@@ -2559,6 +2621,7 @@ private:
                << "live_session=" << liveResult << "\n"
                << "wavpack=" << wavpack << "\n"
                << "effects=" << (effectsOk ? "OK" : "NONFINITE") << "\n"
+               << "effect_params_saved=" << effectParamsResult << "\n"
                << "driver_panel=" << driverPanel << "\n"
                << "plugin_art=" << artResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
@@ -9698,6 +9761,12 @@ private:
                 setFullScreen (true); // (a title-bar window: maximized, the taskbar stays)
             toFront (true);
             content->grabKeyboardFocus();
+            // issue #62: the detached panels restored with the layout (built before this window was shown): their saved
+            // place and above it, once the window manager has placed this one
+            juce::Timer::callAfterDelay (250, [safe = juce::Component::SafePointer<MainWindow> (this)] {
+                if (safe != nullptr)
+                    safe->content->restoreDetachedWindows();
+            });
         }
 
         // The window's place and maximized state for the next start (main-window.txt in the settings folder).
