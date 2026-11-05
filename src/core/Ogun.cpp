@@ -3999,11 +3999,15 @@ std::vector<std::uint8_t> ogunCurrentLayout (const std::vector<std::uint8_t>& st
 
 std::optional<int> ogunParam (const std::vector<std::uint8_t>& state, int index)
 {
-    if (index < 0 || index >= 64 || state.size() < 8)
+    if (index < 0 || index >= ogunDelayOnIndex + 1 || state.size() < 8)
         return std::nullopt;
     const auto body = inflateZlib (state.data() + 4, state.size() - 4, false, 16u << 20);
-    if (! body || body->size() < 256)
+    if (! body || body->size() < 256 + 3)
         return std::nullopt;
+    if (index >= 64) // the delay's switches: the bytes after P (S.b358, designDelay)
+        return (int) (*body)[256 + (std::size_t) (index - ogunDelayTempoIndex)];
+    if (index == ogunReverbOnIndex) // only P[53]'s low byte switches the reverb (designReverb)
+        return (int) ((*body)[4 * 53] != 0);
     std::int32_t v;
     std::memcpy (&v, body->data() + 4 * index, 4);
     return v;
@@ -4011,13 +4015,20 @@ std::optional<int> ogunParam (const std::vector<std::uint8_t>& state, int index)
 
 bool ogunSetParam (std::vector<std::uint8_t>& state, int index, int value)
 {
-    if (index < 0 || index >= 64 || state.size() < 8)
+    if (index < 0 || index >= ogunDelayOnIndex + 1 || state.size() < 8)
         return false;
     auto body = inflateZlib (state.data() + 4, state.size() - 4, false, 16u << 20);
-    if (! body || body->size() < 256)
+    if (! body || body->size() < 256 + 3)
         return false;
-    const std::int32_t v = value;
-    std::memcpy (body->data() + 4 * index, &v, 4);
+    if (index >= 64)
+        (*body)[256 + (std::size_t) (index - ogunDelayTempoIndex)] = (std::uint8_t) (value != 0);
+    else if (index == ogunReverbOnIndex)
+        (*body)[4 * 53] = (std::uint8_t) (value != 0);
+    else
+    {
+        const std::int32_t v = value;
+        std::memcpy (body->data() + 4 * index, &v, 4);
+    }
     const auto z = zlibStored (*body);
     state.resize (4);
     state.insert (state.end(), z.begin(), z.end());

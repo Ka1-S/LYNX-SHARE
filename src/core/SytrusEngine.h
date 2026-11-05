@@ -36,6 +36,8 @@ bool stateUsable (const std::vector<std::uint8_t>& state);
 // The "Main settings" page of Sytrus (REA_rodada74 §3): master level / LFO / pitch, the global volume and filter
 // envelope scales, unison, Mod X/Y, PORTA and the quality settings (oversampling order and envelope accuracy, live and
 // export). `index` is the main-block int (offset / 4; −1 = the PORTA flag byte), low…high the plugin control's range.
+// After those 25, the modulation matrix of the page (round 172a): "FM op j to op i" / "… to filter k", "Op i pan" / "FX" /
+// "out" (FM layer, 81 cells) and "RM op j to …" (54 cells), each ±256.
 struct Setting
 {
     const char* name;

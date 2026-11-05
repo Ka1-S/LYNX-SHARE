@@ -320,7 +320,9 @@ bool parseState (const std::vector<std::uint8_t>& bytes, State& state)
             return header;
         if (tag == 1000)
         {
-            if (end - p < 12 || i32At (p) != 1000005)
+            // the version word is read and dropped (FUN_0074aee0 overwrites it with the next field): FL loads the
+            // 1000001 of its own older presets (Plugin presets\Wave Traveller\Default.fst) like the 1000005 it writes
+            if (end - p < 12)
                 return false;
             state.selectedKey = i32At (p + 4);
             const auto len = i32At (p + 8);

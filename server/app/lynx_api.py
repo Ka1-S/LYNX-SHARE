@@ -17,7 +17,7 @@ import urllib.parse
 
 from aiohttp import web
 
-from lynx_common import (VERSION, RateLimiter, bearer, client_key, env_int, env_str, errors_middleware, fail,
+from lynx_common import (MAX_CLIENTS, VERSION, RateLimiter, bearer, client_key, env_int, env_str, errors_middleware, fail,
                          json_response, random_id, random_token, setup_logging, token_hash, token_matches)
 
 log = setup_logging("lynx-api")
@@ -45,7 +45,8 @@ STARTED = time.time()
 create_limiter = RateLimiter(CREATES_PER_HOUR, 3600)
 patch_limiter = RateLimiter(600, 60)      # upload requests (not bytes) per client
 read_limiter = RateLimiter(300, 60)       # metadata / page / download requests per client
-daily_bytes: dict[str, tuple[str, int]] = {}  # client key -> (UTC day, declared bytes created that day)
+daily_bytes: dict[str, int] = {}  # client key -> declared bytes created on daily_day (UTC)
+daily_day = time.strftime("%Y-%m-%d", time.gmtime())
 locks: dict[str, asyncio.Lock] = {}
 
 
@@ -163,6 +164,7 @@ async def health(request: web.Request) -> web.Response:
 
 
 async def create_share(request: web.Request) -> web.Response:
+    global daily_day
     key = client_key(request)
     if not create_limiter.allow(key):
         return fail(429, "too many shares, try again later", {"Retry-After": "600"})
@@ -188,9 +190,12 @@ async def create_share(request: web.Request) -> web.Response:
         return fail(400, "sha256 must be 64 hex digits")
 
     today = time.strftime("%Y-%m-%d", time.gmtime())
-    day, used = daily_bytes.get(key, (today, 0))
-    if day != today:
-        used = 0
+    if daily_day != today:
+        daily_bytes.clear()
+        daily_day = today
+    if key not in daily_bytes and len(daily_bytes) >= MAX_CLIENTS:
+        return fail(503, "too many upload clients, try again later", {"Retry-After": "3600"})
+    used = daily_bytes.get(key, 0)
     if used + size > CLIENT_DAILY_BYTES:
         return fail(429, "daily upload volume reached, try again tomorrow", {"Retry-After": "3600"})
     metas = all_metas()
@@ -209,7 +214,7 @@ async def create_share(request: web.Request) -> web.Response:
     open(blob_path(sid), "wb").close()
     os.chmod(blob_path(sid), 0o600)
     write_meta(meta)
-    daily_bytes[key] = (today, used + size)
+    daily_bytes[key] = used + size
     log.info("share created id=%s… size=%d days=%d", sid[:6], size, days)
     view = public_view(meta)
     view.update({"token": token, "uploadUrl": f"{PUBLIC_URL}/v1/shares/{sid}", "offset": 0, "chunkSize": 8 * CHUNK})

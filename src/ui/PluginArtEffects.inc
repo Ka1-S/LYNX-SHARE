@@ -41,9 +41,9 @@ inline const Theme& facetTheme()
         Theme x;
         x.name = "Facet EQ";
         x.base = Style::glow;
-        x.pal = { Colour (0xff161e2b), Colour (0xff090d14), Colour (0xffffc95a), Colour (0xff66d6ff), Colour (0xd8172030), Colour (0xe80e131c),
-                  Colour (0xff7189ab), Colour (0xffe7eef8), Colour (0xff070a10), Colour (0xff2a3446), Colour (0xff141a25), Colour (0xff2a3446),
-                  Colour (0xfff4f7fb), Colour (0xff151c28) };
+        x.pal = { Colour (0xff1f1d1c), Colour (0xff0d0c0c), Colour (0xffffc84a), Colour (0xff7fd0ff), Colour (0xd820201f), Colour (0xe80f0f0e),
+                  Colour (0xff6a6560), Colour (0xfff2eee6), Colour (0xff090808), Colour (0xff35322f), Colour (0xff1a1817), Colour (0xff2c2a28),
+                  Colour (0xfff7f3ea), Colour (0xff1c1a19) };
         x.canvas = canvasFacet;
         x.thin = true;
         x.kerning = 0.06f;
@@ -248,38 +248,49 @@ inline Theme soundtoysTheme (const char* name, Colour accent, Colour title, Colo
     return x;
 }
 
-// === Ridge Strip (channel-strip role): a console at night =========================================================
+// === Ridge Strip (channel-strip role, round tp172c): a large-format console's channel — warm grey metal panels, ===
+// colour-coded knobs (red HF, green HMF, blue LMF, black LF, silver filters, grey dynamics), printed scales, orange
+// lit switches. The mood of the reference channel strips (a console module), drawn here from scratch.
 
 inline void canvasRidge (juce::Graphics& g, Rectangle<float> a, bool display)
 {
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
     if (display) return;
-    brushedLines (g, a, 17, 0.025f);
-    // the channel rails: thin dark grooves with a lit edge, one strip every 64 px
-    for (float x = a.getX() + 32.0f; x < a.getRight(); x += 64.0f)
+    // round tp172c (slice 2): the console faceplate — mid-grey brushed metal, the brushing running down the module,
+    // a dark recessed channel down the middle where the meter bridge sits
+    if (! reduced)
     {
-        g.setColour (Colours::black.withAlpha (0.35f));
-        g.fillRect (Rectangle<float> (x, a.getY(), 1.5f, a.getHeight()));
-        g.setColour (Colours::white.withAlpha (0.05f));
-        g.fillRect (Rectangle<float> (x + 1.5f, a.getY(), 1.0f, a.getHeight()));
+        juce::Random rnd (172);
+        for (int i = 0; i < 420; ++i)
+        {
+            const auto x = a.getX() + rnd.nextFloat() * a.getWidth();
+            const auto y = a.getY() + rnd.nextFloat() * a.getHeight();
+            const auto len = a.getHeight() * (0.3f + 0.7f * rnd.nextFloat());
+            g.setColour ((rnd.nextBool() ? Colours::white : Colours::black).withAlpha (0.010f + 0.016f * rnd.nextFloat()));
+            g.fillRect (Rectangle<float> (x, y - len * 0.5f, 0.8f + rnd.nextFloat(), len));
+        }
     }
-    // fader caps out of focus along the bottom, each in its slot
-    juce::Random rnd (65);
-    for (float x = a.getX() + 4.0f; x < a.getRight() - 24.0f; x += 64.0f)
+    const auto mid = Rectangle<float> (a.getX() + a.getWidth() * 0.355f, a.getY(), a.getWidth() * 0.29f, a.getHeight());
+    g.setGradientFill (ColourGradient (Colour (0xff2a2b2e), mid.getX(), 0.0f, Colour (0xff3b3d40), mid.getCentreX(), 0.0f, true));
+    g.fillRect (mid);
+    for (const auto x : { mid.getX(), mid.getRight() })
     {
-        const auto slot = Rectangle<float> (x + 26.0f, a.getBottom() - a.getHeight() * 0.22f, 4.0f, a.getHeight() * 0.2f);
-        g.setColour (Colours::black.withAlpha (0.4f));
-        g.fillRoundedRectangle (slot, 2.0f);
-        const auto cap = Rectangle<float> (x + 14.0f, slot.getY() + rnd.nextFloat() * slot.getHeight() * 0.7f, 28.0f, 12.0f);
-        g.setGradientFill (ColourGradient (Colour (0xffd9d9d4).withAlpha (0.16f), 0.0f, cap.getY(), Colour (0xff6d6d6a).withAlpha (0.12f), 0.0f, cap.getBottom(), false));
-        g.fillRoundedRectangle (cap, 2.0f);
-        g.setColour (Colours::white.withAlpha (0.12f));
-        g.fillRect (cap.withSizeKeepingCentre (cap.getWidth() - 6.0f, 1.2f));
+        g.setColour (Colours::black.withAlpha (0.55f));
+        g.fillRect (Rectangle<float> (x - 1.0f, a.getY(), 2.0f, a.getHeight()));
+        g.setColour (Colours::white.withAlpha (0.35f));
+        g.fillRect (Rectangle<float> (x + (x == mid.getX() ? -2.0f : 1.0f), a.getY(), 1.0f, a.getHeight()));
     }
-    // a warm meter-bridge light from above
-    softLight (g, { a.getCentreX(), a.getY() - a.getHeight() * 0.1f }, a.getWidth() * 0.7f, Colour (0xffffd8a0), 0.06f);
-    vignette (g, a, 0.35f);
+    // a soft studio light from above
+    softLight (g, { a.getCentreX(), a.getY() - a.getHeight() * 0.15f }, a.getWidth() * 0.8f, Colour (0xffffffff), 0.10f);
+    vignette (g, a, 0.12f);
+}
+
+// the header: the console's dark legend strip (the faceplate around stays light)
+inline void ridgeHeader (juce::Graphics& g, Rectangle<float> bar)
+{
+    g.setGradientFill (ColourGradient (Colour (0xff36383c), 0.0f, bar.getY(), Colour (0xff1d1e21), 0.0f, bar.getBottom(), false));
+    g.fillRect (bar);
 }
 
 inline void ridgeEmblem (juce::Graphics& g, Point<float> c, float r) // a fader cap in its slot
@@ -296,6 +307,53 @@ inline void ridgeEmblem (juce::Graphics& g, Point<float> c, float r) // a fader 
 
 inline void ridgeScrews (juce::Graphics& g, Rectangle<float> a, float) { cornerScrews (g, a, 5.0f, 4.0f); }
 
+
+// the console's colour code, by parameter (a Ridge parameter name -> the cap colour)
+inline Colour ridgeCapTint (const char* param)
+{
+    const juce::String n (param);
+    // slice 2: the Vocal strip voicing's colour code (the reference vocal strip's): green compander timing and ratio,
+    // grey levels, blue notch, red high band, black filter and level trims
+    if (n == "Compander attack" || n == "Compander release" || n == "Compander ratio") return Colour (0xff2f8a4a);
+    if (n.startsWith ("Notch ")) return Colour (0xff2c6fc9);
+    if (n.startsWith ("High ")) return Colour (0xffc8202a);
+    if (n == "Vocal HPF freq." || n == "Make-up" || n.startsWith ("Vocal ")) return Colour (0xff26272a);
+    if (n.startsWith ("Compander") || n.startsWith ("Expander") || n.startsWith ("De-")) return Colour (0xffcfd1d3);
+    if (n.startsWith ("HF ")) return Colour (0xffc8202a);                         // red
+    if (n.startsWith ("HMF ")) return Colour (0xff2f9a45);                        // green
+    if (n.startsWith ("LMF ")) return Colour (0xff2c6fc9);                        // blue
+    if (n.startsWith ("LF ")) return Colour (0xff26272a);                         // black
+    if (n == "HPF" || n == "LPF") return Colour (0xffd9dadb);                     // silver
+    if (n.startsWith ("Gate ")) return Colour (0xff2e3033);                       // dark grey
+    if (n.startsWith ("Comp") || n == "Ratio" || n == "Make-up offset") return Colour (0xffb9bbbd); // light grey
+    if (n == "Input" || n == "Mic gain") return Colour (0xff26272a);
+    return {};
+}
+
+// a console knob: a moulded coloured body on a dark skirt, a light rim on top and a white pointer (drawn by the kit)
+inline void capRidge (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    const auto body = knobTint.isTransparent() ? Colour (0xff3a3c40) : knobTint;
+    // the skirt
+    g.setGradientFill (ColourGradient (Colour (0xff4a4c50), c.x, cap.getY(), Colour (0xff141517), c.x, cap.getBottom(), false));
+    g.fillEllipse (cap.expanded (capR * 0.04f));
+    // the body
+    const auto top = cap.reduced (capR * 0.16f);
+    g.setGradientFill (ColourGradient (body.brighter (0.35f + hover * 0.15f), c.x - capR * 0.35f, c.y - capR * 0.55f,
+                                       body.darker (0.45f), c.x + capR * 0.45f, c.y + capR * 0.7f, true));
+    g.fillEllipse (top);
+    if (fx)
+    {
+        // the moulded top's highlight and its rim
+        g.setColour (Colours::white.withAlpha (body.getPerceivedBrightness() > 0.6f ? 0.35f : 0.22f));
+        g.drawEllipse (top.reduced (0.6f), 1.0f);
+        g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.28f), c.x, top.getY(), Colours::transparentWhite, c.x, c.y, false));
+        g.fillEllipse (top.reduced (capR * 0.12f).withHeight (top.getHeight() * 0.45f).translated (0.0f, capR * 0.04f));
+    }
+    g.setColour (Colours::black.withAlpha (0.5f));
+    g.drawEllipse (cap.expanded (capR * 0.04f), 1.0f);
+}
+
 inline const Theme& ridgeTheme()
 {
     static const Theme t = []
@@ -303,17 +361,86 @@ inline const Theme& ridgeTheme()
         Theme x;
         x.name = "Ridge Strip";
         x.base = Style::hardware;
-        x.pal = { Colour (0xff2c3139), Colour (0xff14171c), Colour (0xffe8463c), Colour (0xffffd9a0), Colour (0xd8262a31), Colour (0xe8181b20),
-                  Colour (0xff6b7480), Colour (0xffeceae2), Colour (0xff0b0d10), Colour (0xff4a4e55), Colour (0xff1b1d21), Colour (0xff0e1013),
-                  Colour (0xfff4f1e8), Colour (0xff22262c) };
+        // round tp172c (slice 2): the reference's mid-grey faceplate, light legends, dark recessed meters
+        //          canvas (brushed metal)                   accent (orange lamps)      second light
+        x.pal = { Colour (0xff6e7073), Colour (0xff5a5c5f), Colour (0xfff08a24), Colour (0xffffc46a),
+                  // panels: barely there — one continuous faceplate split by thin dividers   rim (dividers)   titles (light legends)
+                  Colour (0x0affffff), Colour (0x0affffff), Colour (0x9a2a2c2f), Colour (0xfff2f2ee),
+                  // wells (the meter bridge)  caps (fader)                                   track                      pointer
+                  Colour (0xff141517), Colour (0xffe6e6e2), Colour (0xff8e8e8a), Colour (0xff2e3033), Colour (0xfffafafa),
+                  Colour (0xff3f4145) };
         x.canvas = canvasRidge;
+        x.headerDeco = ridgeHeader;
         x.sectionDeco = ridgeScrews;
         x.titleEmblem = ridgeEmblem;
-        x.drawCap = capConsole;
-        x.pointerFrom = 0.55f;
+        x.drawCap = capRidge;
+        x.capTint = ridgeCapTint;
+        x.pointerFrom = 0.25f;
+        x.ticks = 11;
         x.buttTrack = true;
         x.arcGlow = 0.0f;
         x.thumbPointer = true;
+        x.offLabelCol = Colour (0xffc4c7cc); // round tp172c: light legends on the grey faceplate
+        x.captionCol = Colour (0xffeeeff1);
+        x.valueCol = Colour (0xffc9ccd1);
+        x.flatSections = true;               // no cards: the modules are marked by thin dividers on the one faceplate
+        x.rimWidth = 1.0f;
+        x.headerCol = Colour (0xff26272a);
+        x.noValueArc = true;                 // the value reads off the pointer and the printed scale, as on a console
+        return x;
+    }();
+    return t;
+}
+
+// round tp172c (slice 2): the 4K voicing's own look — the E-series console the role is measured on is a dark
+// charcoal module (the light faceplate above is the newer console's): dark metal, light legends, the same colour
+// code with the LF knob brown and the gate's green
+inline void canvasRidge4k (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    brushedLines (g, a, 17, 0.035f);
+    const auto mid = Rectangle<float> (a.getX() + a.getWidth() * 0.355f, a.getY(), a.getWidth() * 0.29f, a.getHeight());
+    g.setGradientFill (ColourGradient (Colour (0xff1c1d20).withAlpha (0.7f), mid.getX(), 0.0f, Colour (0xff2a2c30).withAlpha (0.7f), mid.getCentreX(), 0.0f, true));
+    g.fillRect (mid);
+    for (const auto x : { mid.getX(), mid.getRight() })
+    {
+        g.setColour (Colours::black.withAlpha (0.5f));
+        g.fillRect (Rectangle<float> (x - 1.0f, a.getY(), 1.5f, a.getHeight()));
+        g.setColour (Colours::white.withAlpha (0.08f));
+        g.fillRect (Rectangle<float> (x + 0.5f, a.getY(), 1.0f, a.getHeight()));
+    }
+    softLight (g, { a.getCentreX(), a.getY() - a.getHeight() * 0.15f }, a.getWidth() * 0.8f, Colour (0xfffff2dc), 0.06f);
+    vignette (g, a, 0.25f);
+}
+
+inline Colour ridge4kCapTint (const char* param)
+{
+    const juce::String n (param);
+    if (n.startsWith ("LF ")) return Colour (0xff6e4a3c);                         // brown
+    if (n.startsWith ("Gate ")) return Colour (0xff2c5a36);                       // green
+    if (n == "Mic gain") return Colour (0xffa8282c);                              // red
+    return ridgeCapTint (param);
+}
+
+inline const Theme& ridge4kTheme()
+{
+    static const Theme t = []
+    {
+        Theme x = ridgeTheme();
+        x.name = "Ridge Strip 4K";
+        x.pal = { Colour (0xff3b3d40), Colour (0xff2c2e31), Colour (0xfff08a24), Colour (0xffffc46a),
+                  Colour (0xf0434548), Colour (0xf036383b), Colour (0xff1d1e21), Colour (0xffeeeeea),
+                  Colour (0xff111214), Colour (0xffd8d8d4), Colour (0xff8a8a86), Colour (0xff55585c), Colour (0xfffafafa),
+                  Colour (0xff4a4c50) };
+        x.canvas = canvasRidge4k;
+        x.headerDeco = nullptr;
+        x.flatSections = false;              // its own sheet-metal modules
+        x.capTint = ridge4kCapTint;
+        x.offLabelCol = Colour (0xffb4b8bf);
+        x.captionCol = Colour (0xffd9dadc);
+        x.valueCol = Colour (0xffb9bcc1);
         return x;
     }();
     return t;
@@ -381,7 +508,8 @@ inline const Theme& crestTheme()
         x.titleEmblem = crestEmblem;
         x.cap = Cap::flat;
         x.pointer = Pointer::glowLine;
-        x.arcGlow = 0.25f;
+        x.arcGlow = 0.06f;
+        x.thin = true; // round tp172b: the reference's look
         return x;
     }();
     return t;
@@ -445,13 +573,13 @@ inline const Theme& apexTheme()
         Theme x;
         x.name = "Apex Limiter";
         x.base = Style::glow;
-        x.pal = { Colour (0xff131c27), Colour (0xff05080c), Colour (0xff4fb3ff), Colour (0xffd9ecff), Colour (0x9c131c27), Colour (0xb8070b10),
-                  Colour (0xff4f6f92), Colour (0xffe6f1ff), Colour (0xff04070b), Colour (0xffc9d2dc), Colour (0xff59626d), Colour (0xff17212c),
-                  Colour (0xff0f1720), Colour (0xff17202b) };
+        x.pal = { Colour (0xff1d1b1e), Colour (0xff0d0c0e), Colour (0xffe0404a), Colour (0xffd8d8de), Colour (0x9c1e1c20), Colour (0xb80c0b0d),
+                  Colour (0xff5a4f55), Colour (0xfff0e8ea), Colour (0xff09080a), Colour (0xff3a373b), Colour (0xff1d1b1e), Colour (0xff2a2629),
+                  Colour (0xfff2f0f2), Colour (0xff1f1d21) };
         x.canvas = canvasApex;
         x.titleEmblem = apexEmblem;
-        x.drawCap = capBrushed;
-        x.arcGlow = 0.22f;
+        x.arcGlow = 0.08f;
+        x.thin = true; // round tp172b: the reference's look
         return x;
     }();
     return t;
@@ -518,13 +646,15 @@ inline const Theme& prismTheme()
         Theme x;
         x.name = "Prism Multiband";
         x.base = Style::glow;
-        x.pal = { Colour (0xff17141f), Colour (0xff07060b), Colour (0xffb98cff), Colour (0xff6fe3ff), Colour (0x9c191624), Colour (0xb80a0910),
-                  Colour (0xff8e86b0), Colour (0xfff0ecff), Colour (0xff050409), Colour (0xff3b3552), Colour (0xff100e18), Colour (0xff221f2e),
-                  Colour (0xffffffff), Colour (0xff1a1724) };
+        x.pal = { Colour (0xff222124), Colour (0xff0f0f11), Colour (0xffffc23a), Colour (0xff8fd0ff), Colour (0x9c242326), Colour (0xb80e0e10),
+                  Colour (0xff5d5a60), Colour (0xfff2efe8), Colour (0xff0a0a0b), Colour (0xff38363a), Colour (0xff1c1b1e), Colour (0xff2b2a2e),
+                  Colour (0xfffff3d6), Colour (0xff1f1e22) };
         x.canvas = canvasPrism;
         x.titleEmblem = prismEmblem;
-        x.twoTone = true;
-        x.cap = Cap::orb;
+        x.twoTone = false;
+        x.cap = Cap::flat;
+        x.thin = true; // round tp172b: the reference's look
+        x.arcGlow = 0.08f; // round tp172b: the reference's look
         return x;
     }();
     return t;
@@ -593,16 +723,15 @@ inline const Theme& sentryTheme()
     {
         Theme x;
         x.name = "Sentry Gate";
-        x.base = Style::hardware;
-        x.pal = { Colour (0xff1a252c), Colour (0xff070b0e), Colour (0xffffc864), Colour (0xff6fc6c0), Colour (0x9c182228), Colour (0xb80a0f12),
-                  Colour (0xff5b6a70), Colour (0xffeee4cc), Colour (0xff050709), Colour (0xff3a3f42), Colour (0xff111315), Colour (0xff1c2428),
-                  Colour (0xffffe2a8), Colour (0xff192127) };
+        x.base = Style::glow;
+        x.pal = { Colour (0xff3d4560), Colour (0xff262b3d), Colour (0xff8fb4ff), Colour (0xffe8ecf6), Colour (0x9c434b66), Colour (0xb82a3043),
+                  Colour (0xff6c7593), Colour (0xffeef1fa), Colour (0xff1c2030), Colour (0xffd7dced), Colour (0xff8a93ad), Colour (0xff2b3146),
+                  Colour (0xff1d2232), Colour (0xff30364b) };
         x.canvas = canvasSentry;
-        x.sectionDeco = sentryRivets;
         x.titleEmblem = sentryEmblem;
-        x.drawCap = capIron;
-        x.pointer = Pointer::glowLine;
-        x.arcGlow = 0.2f;
+        x.pointer = Pointer::line;
+        x.arcGlow = 0.05f;
+        x.cap = Cap::porcelain; // round tp172b: the reference's look
         return x;
     }();
     return t;
@@ -720,13 +849,14 @@ inline const Theme& hushTheme()
         Theme x;
         x.name = "Hush De-esser";
         x.base = Style::glow;
-        x.pal = { Colour (0xff261b35), Colour (0xff0b0910), Colour (0xffc792ff), Colour (0xffffb3e0), Colour (0x9c221830), Colour (0xb80d0a13),
-                  Colour (0xff86709e), Colour (0xfff1e8ff), Colour (0xff07050b), Colour (0xff3a2e4c), Colour (0xff17121f), Colour (0xff221a2e),
-                  Colour (0xfff6eaff), Colour (0xff1e1729) };
+        x.pal = { Colour (0xff3a3a33), Colour (0xff23231f), Colour (0xffe8b923), Colour (0xff9fd36a), Colour (0x9c3d3d36), Colour (0xb8262622),
+                  Colour (0xff6b6a5c), Colour (0xffeeeadb), Colour (0xff1b1b18), Colour (0xfff5cf45), Colour (0xffb88a10), Colour (0xff2e2e29),
+                  Colour (0xfffff6d8), Colour (0xff34342e) };
         x.canvas = canvasHush;
         x.titleEmblem = hushEmblem;
-        x.drawCap = capVelvet;
-        x.twoTone = true;
+        x.twoTone = false;
+        x.cap = Cap::orb; // round tp172b: the reference's look
+        x.arcGlow = 0.06f; // round tp172b: the reference's look
         return x;
     }();
     return t;
@@ -4305,6 +4435,7 @@ const Theme* effectTheme (Art a)
         case Art::facet: return &facetTheme();
         case Art::nebula: return &nebulaTheme();
         case Art::ridge: return &ridgeTheme();
+        case Art::ridge4k: return &ridge4kTheme();
         case Art::crest: return &crestTheme();
         case Art::apex: return &apexTheme();
         case Art::prism: return &prismTheme();

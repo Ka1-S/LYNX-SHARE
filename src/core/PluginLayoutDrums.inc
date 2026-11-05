@@ -137,11 +137,11 @@ Layout drumaxx()
 {
     // the 16 pads in two banks of eight (1-8 / 9-16, the page tabs), each with its volume, pan, mute and solo and a
     // play pad that also selects it; the selected pad's voice (Drumpad's controls) below; the master EQ and limiter
-    // at the bottom. Drumaxx's pattern sequencer is not played by LYNX (REA_rodada67 §9).
+    // at the bottom. Drumaxx's pattern sequencer is not played by LYNX (REA_rodada67 §9), so no panel for it (round 172a).
     Layout l;
     l.fl = "Drumaxx";
     l.width = 762;
-    l.height = 614;
+    l.height = 544;
     l.pages = { TR_NOOP ("Pads 1-8"), TR_NOOP ("Pads 9-16") };
     auto& v = l.items;
     v.push_back (label (30, 8, 220, 30, "Drumaxx", dim | alignLeft));
@@ -176,22 +176,20 @@ Layout drumaxx()
         v.push_back (onPage (toggle (x + 102, y + 52, 26, 18, names[pad][3], "S", boxed), page));
     }
     drumpadVoice (v, -16, 255);
-    v.push_back (section (14, 478, 744, 66, TR_NOOP ("Sequencer")));
-    v.push_back (label (24, 498, 724, 40, TR_NOOP ("Drumaxx's pattern sequencer is not played by LYNX: play the pads from the Piano roll or the Channel rack"), dim));
-    v.push_back (section (14, 548, 468, 64, TR_NOOP ("Equalizer")));
-    v.push_back (section (488, 548, 270, 64, TR_NOOP ("Master")));
-    v.push_back (knob (52, 576, 32, "EQ band 1", "63", 599, bipolar));
-    v.push_back (knob (107, 576, 32, "EQ band 2", "125", 599, bipolar));
-    v.push_back (knob (164, 576, 32, "EQ band 3", "250", 599, bipolar));
-    v.push_back (knob (219, 576, 32, "EQ band 4", "500", 599, bipolar));
-    v.push_back (knob (274, 576, 32, "EQ band 5", "1k", 599, bipolar));
-    v.push_back (knob (331, 576, 32, "EQ band 6", "2k", 599, bipolar));
-    v.push_back (knob (394, 576, 32, "EQ band 7", "4k", 599, bipolar));
-    v.push_back (knob (451, 576, 32, "EQ band 8", "8k", 599, bipolar));
-    v.push_back (knob (652, 576, 32, "Limiter gain", TR_NOOP ("Gain"), 599));
-    v.push_back (knob (709, 576, 32, "Limiter release", TR_NOOP ("Release"), 599));
-    v.push_back (toggle (495, 565, 34, 22, "EQ on", TR_NOOP ("EQ")));
-    v.push_back (toggle (572, 565, 34, 22, "Limiter on", TR_NOOP ("Limiter")));
+    v.push_back (section (14, 478, 468, 64, TR_NOOP ("Equalizer")));
+    v.push_back (section (488, 478, 270, 64, TR_NOOP ("Master")));
+    v.push_back (knob (52, 506, 32, "EQ band 1", "63", 529, bipolar));
+    v.push_back (knob (107, 506, 32, "EQ band 2", "125", 529, bipolar));
+    v.push_back (knob (164, 506, 32, "EQ band 3", "250", 529, bipolar));
+    v.push_back (knob (219, 506, 32, "EQ band 4", "500", 529, bipolar));
+    v.push_back (knob (274, 506, 32, "EQ band 5", "1k", 529, bipolar));
+    v.push_back (knob (331, 506, 32, "EQ band 6", "2k", 529, bipolar));
+    v.push_back (knob (394, 506, 32, "EQ band 7", "4k", 529, bipolar));
+    v.push_back (knob (451, 506, 32, "EQ band 8", "8k", 529, bipolar));
+    v.push_back (knob (652, 506, 32, "Limiter gain", TR_NOOP ("Gain"), 529));
+    v.push_back (knob (709, 506, 32, "Limiter release", TR_NOOP ("Release"), 529));
+    v.push_back (toggle (495, 495, 34, 22, "EQ on", TR_NOOP ("EQ")));
+    v.push_back (toggle (572, 495, 34, 22, "Limiter on", TR_NOOP ("Limiter")));
     return l;
 }
 
@@ -451,44 +449,44 @@ Layout slayer()
     Layout l;
     l.fl = "FL Slayer";
     l.width = 396;
-    l.height = 404;
+    l.height = 360;
     auto& v = l.items;
     v.push_back (label (8, 4, 150, 34, "FL Slayer", dim | alignLeft));
     v.push_back (section (160, 4, 232, 46, TR_NOOP ("Aid")));
     v.push_back (menuOf (168, 24, 120, 20, "Mode", nullptr, slayerModes));
     v.push_back (knob (318, 30, 22, "Timing", nullptr, 0, noCaption));
     v.push_back (toggle (344, 22, 44, 22, "Latch", TR_NOOP ("Latch"), boxed));
-    v.push_back (section (4, 56, 388, 124, TR_NOOP ("Strings")));
+    v.push_back (section (4, 56, 388, 80, TR_NOOP ("Strings")));
     v.push_back (label (12, 78, 60, 12, TR_NOOP ("Type"), dim));
     v.push_back (stepper (16, 96, 48, 30, "Strings", nullptr, 7));
     v.push_back (label (80, 78, 60, 12, TR_NOOP ("Coils"), dim));
     v.push_back (stepper (86, 96, 48, 30, "Coils", nullptr, 3));
     v.push_back (label (150, 78, 236, 12, TR_NOOP ("Pickup position"), dim));
     v.push_back (slider (Item::hslider, 150, 96, 236, 30, "Pickup", nullptr, noCaption));
-    v.push_back (section (4, 184, 388, 100, TR_NOOP ("Playing")));
-    v.push_back (toggle (12, 214, 48, 22, "Glissando", TR_NOOP ("Gliss"), boxed));
-    v.push_back (knob (36, 262, 26, "Pitchbend 2", TR_NOOP ("Bend 2"), 280, bipolar));
-    v.push_back (knob (90, 228, 30, "Tone", TR_NOOP ("Tone"), 252, bipolar));
-    v.push_back (knob (136, 228, 30, "Slap", TR_NOOP ("Slap"), 252));
-    v.push_back (knob (182, 228, 30, "Fret", TR_NOOP ("Fret"), 252));
-    v.push_back (knob (228, 228, 30, "Harmonic", TR_NOOP ("Harm"), 252));
-    v.push_back (knob (274, 228, 30, "Damp", TR_NOOP ("Damp"), 252));
-    v.push_back (knob (320, 228, 30, "Vel volume", TR_NOOP ("Vel vol"), 252));
-    v.push_back (knob (364, 228, 30, "Vel damp", TR_NOOP ("Vel damp"), 252));
-    v.push_back (section (4, 288, 120, 112, TR_NOOP ("Amp")));
-    v.push_back (radio (10, 308, 56, 88, "Amp type", "Clean|Overdrive|Distortion|Fuzz"));
-    v.push_back (radio (70, 308, 50, 88, "Cabinet", "Cab 1|Cab 2|Cab 3|Cab 4"));
-    v.push_back (section (128, 288, 264, 56, nullptr, boxed));
-    v.push_back (knob (148, 310, 24, "Drive", TR_NOOP ("Drive"), 332));
-    v.push_back (knob (190, 310, 24, "Presence", TR_NOOP ("Pres"), 332));
-    v.push_back (knob (232, 310, 24, "Feedback", TR_NOOP ("Fdbk"), 332));
-    v.push_back (knob (284, 310, 24, "EQ low", TR_NOOP ("Low"), 332, bipolar));
-    v.push_back (knob (326, 310, 24, "EQ mid", TR_NOOP ("Mid"), 332, bipolar));
-    v.push_back (knob (368, 310, 24, "EQ high", TR_NOOP ("High"), 332, bipolar));
-    v.push_back (section (128, 348, 264, 52, TR_NOOP ("FX")));
-    v.push_back (menuOf (134, 370, 140, 20, "Effect", nullptr, slayerEffects));
-    v.push_back (knob (306, 378, 22, "FX par 1", TR_NOOP ("Par 1"), 396));
-    v.push_back (knob (356, 378, 22, "FX par 2", TR_NOOP ("Par 2"), 396));
+    v.push_back (section (4, 140, 388, 100, TR_NOOP ("Playing")));
+    v.push_back (toggle (12, 170, 48, 22, "Glissando", TR_NOOP ("Gliss"), boxed));
+    v.push_back (knob (36, 218, 26, "Pitchbend 2", TR_NOOP ("Bend 2"), 236, bipolar));
+    v.push_back (knob (90, 184, 30, "Tone", TR_NOOP ("Tone"), 208, bipolar));
+    v.push_back (knob (136, 184, 30, "Slap", TR_NOOP ("Slap"), 208));
+    v.push_back (knob (182, 184, 30, "Fret", TR_NOOP ("Fret"), 208));
+    v.push_back (knob (228, 184, 30, "Harmonic", TR_NOOP ("Harm"), 208));
+    v.push_back (knob (274, 184, 30, "Damp", TR_NOOP ("Damp"), 208));
+    v.push_back (knob (320, 184, 30, "Vel volume", TR_NOOP ("Vel vol"), 208));
+    v.push_back (knob (364, 184, 30, "Vel damp", TR_NOOP ("Vel damp"), 208));
+    v.push_back (section (4, 244, 120, 112, TR_NOOP ("Amp")));
+    v.push_back (radio (10, 264, 56, 88, "Amp type", "Clean|Overdrive|Distortion|Fuzz"));
+    v.push_back (radio (70, 264, 50, 88, "Cabinet", "Cab 1|Cab 2|Cab 3|Cab 4"));
+    v.push_back (section (128, 244, 264, 56, nullptr, boxed));
+    v.push_back (knob (148, 266, 24, "Drive", TR_NOOP ("Drive"), 288));
+    v.push_back (knob (190, 266, 24, "Presence", TR_NOOP ("Pres"), 288));
+    v.push_back (knob (232, 266, 24, "Feedback", TR_NOOP ("Fdbk"), 288));
+    v.push_back (knob (284, 266, 24, "EQ low", TR_NOOP ("Low"), 288, bipolar));
+    v.push_back (knob (326, 266, 24, "EQ mid", TR_NOOP ("Mid"), 288, bipolar));
+    v.push_back (knob (368, 266, 24, "EQ high", TR_NOOP ("High"), 288, bipolar));
+    v.push_back (section (128, 304, 264, 52, TR_NOOP ("FX")));
+    v.push_back (menuOf (134, 326, 140, 20, "Effect", nullptr, slayerEffects));
+    v.push_back (knob (306, 334, 22, "FX par 1", TR_NOOP ("Par 1"), 352));
+    v.push_back (knob (356, 334, 22, "FX par 2", TR_NOOP ("Par 2"), 352));
     return l;
 }
 

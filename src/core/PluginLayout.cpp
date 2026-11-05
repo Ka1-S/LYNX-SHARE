@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -167,11 +168,17 @@ LayoutItem when (LayoutItem i, const char* param, float lo, float hi)
         i.whenMin = lo;
         i.whenMax = hi;
     }
-    else
+    else if (i.when2Param == nullptr)
     {
         i.when2Param = param;
         i.when2Min = lo;
         i.when2Max = hi;
+    }
+    else
+    {
+        i.when3Param = param;
+        i.when3Min = lo;
+        i.when3Max = hi;
     }
     return i;
 }
@@ -623,6 +630,36 @@ Layout luxeVerb()
     tile (150, 399, "Envelope decay", TR_NOOP ("Decay"), 425);
     tile (207, 399, "Envelope smoothing", TR_NOOP ("Smooth"), 425);
     v.push_back (display (298, 262, 636, 184, "envelope", "Decay"));
+
+    // round tp172b: the Space engine (core/SpaceVerb.h, the Pro-R role) on a second page; the page tabs also switch
+    // the engine, so the page shown is the engine heard
+    for (auto& i : v)
+        i.page = 0;
+    l.pages = { "LuxeVerb", TR_NOOP ("Space") };
+    auto engineTabs = pageTabs (380, 0, 188, 13, TR_NOOP ("LuxeVerb|Space"));
+    engineTabs.param = "Space engine";
+    v.push_back (engineTabs);
+    const auto sp = [&v] (LayoutItem i) { v.push_back (onPage (std::move (i), 1)); };
+    const auto dial = [&] (float cx, float cy, const char* param, const char* caption, std::uint16_t style = 0) {
+        sp (knob (cx, cy, 40, param, caption, cy + 30, style | valueAbove));
+    };
+    sp (section (8, 18, 932, 230, TR_NOOP ("Reverb")));
+    sp (tabs (413, 40, 120, 16, "Space style", TR_NOOP ("Modern|Vintage|Plate")));
+    dial (70, 120, "Space pre-delay", TR_NOOP ("P. delay"));
+    dial (160, 120, "Space character", TR_NOOP ("Character"));
+    dial (250, 120, "Thickness", TR_NOOP ("Thickness"), bipolar);
+    dial (340, 120, "Distance", TR_NOOP ("Distance"));
+    v.push_back (onPage (value (433, 66, 80, 13, "Space", 0), 1));
+    sp (knob (473, 140, 84, "Space", TR_NOOP ("Space"), 196, big));
+    dial (473, 212, "Decay rate", TR_NOOP ("Decay rate"));
+    dial (606, 120, "Space brightness", TR_NOOP ("Brightness"), bipolar);
+    dial (696, 120, "Space width", TR_NOOP ("Width"));
+    dial (786, 120, "Space mix", TR_NOOP ("Mix"));
+    sp (section (8, 256, 932, 196, TR_NOOP ("Decay EQ")));
+    dial (120, 350, "Low decay", TR_NOOP ("Low decay"), bipolar);
+    dial (220, 350, "Low decay freq.", TR_NOOP ("Low freq"));
+    dial (727, 350, "High decay", TR_NOOP ("High decay"), bipolar);
+    dial (827, 350, "High decay freq.", TR_NOOP ("High freq"));
     return l;
 }
 
@@ -1504,14 +1541,14 @@ Layout booBass()
 
 Layout sytrusMain()
 {
-    // Sytrus' MAIN page: master faders, volume and filter envelopes, unison, the modulation X/Y pad, quality and porta.
-    // The operator, filter and effect pages and the FM / RM matrix keep the saved patch (not editable in LYNX).
+    // Sytrus' MAIN page: master faders, volume and filter envelopes, unison, the modulation X/Y pad, quality and porta,
+    // and the FM / RM matrix (round 172a). The operator, filter and effect pages are not editable in LYNX (left out).
     Layout l;
     l.fl = "Sytrus";
     l.width = 850;
     l.height = 346;
     auto& v = l.items;
-    v.push_back (label (8, 4, 80, 22, TR_NOOP ("Main"), boxed));
+    v.push_back (section (6, 14, 538, 122, TR_NOOP ("Main")));
     const auto fader = [&v] (float cx, const char* param, const char* caption, bool bipolarFader) {
         v.push_back (slider (Item::vslider, cx - 9, 54, 18, 70, param, nullptr, noCaption | (bipolarFader ? bipolar : 0)));
         v.push_back (label (cx - 16, 38, 32, 13, caption));
@@ -1541,71 +1578,60 @@ Layout sytrusMain()
     fader (504, "Uni phase", TR_NOOP ("Ph"), false);
     fader (527, "Uni env var", TR_NOOP ("En"), false);
     v.push_back (label (470, 122, 66, 10, TR_NOOP ("Unison"), dim));
-    v.push_back (section (12, 138, 168, 160, TR_NOOP ("Modulation")));
-    v.push_back (display (18, 160, 128, 130, "xy", "Mod X", "Mod Y"));
-    v.push_back (knob (164, 185, 24, "Mod X", "X", 205));
-    v.push_back (knob (164, 232, 24, "Mod Y", "Y", 252));
-    v.push_back (section (362, 138, 178, 86, TR_NOOP ("Quality")));
-    v.push_back (label (462, 156, 34, 12, TR_NOOP ("Draft")));
-    v.push_back (label (500, 156, 34, 12, TR_NOOP ("Render")));
-    v.push_back (label (368, 174, 92, 16, TR_NOOP ("HQ envelopes"), alignLeft));
-    v.push_back (toggle (470, 175, 16, 14, "Live env accuracy", nullptr));
-    v.push_back (toggle (508, 175, 16, 14, "Export env accuracy", nullptr));
-    v.push_back (label (368, 198, 92, 16, TR_NOOP ("Oversampling"), alignLeft));
-    v.push_back (stepper (462, 196, 32, 22, "Live oversampling", nullptr, 4));
-    v.push_back (stepper (500, 196, 32, 22, "Export oversampling", nullptr, 4));
-    v.push_back (toggle (450, 270, 70, 16, "Porta", TR_NOOP ("Porta")));
-    v.push_back (section (553, 34, 294, 260, nullptr, boxed));
-    v.push_back (label (560, 150, 280, 16, TR_NOOP ("Operators, filters, effects and the matrix"), dim));
-    v.push_back (label (560, 168, 280, 16, TR_NOOP ("keep the saved patch"), dim));
-    v.push_back (label (560, 300, 286, 40, "Sytrus", dim));
-    return l;
-}
-
-Layout harmorMain()
-{
-    // Harmor's part page and global section, with the controls LYNX edits at FL's places (timbre mix, blur, tremolo,
-    // harmonizer, unison order and detune, vibrato, filter cutoff and resonance, pluck, phaser, part volume, A/B
-    // crossfade and the global volume); the rest of the panel keeps the saved patch
-    Layout l;
-    l.fl = "Harmor";
-    l.width = 1000;
-    l.height = 600;
-    auto& v = l.items;
-    v.push_back (section (12, 0, 976, 330, nullptr, boxed));
-    const auto title = [&v] (float x, float y, const char* text) { v.push_back (label (x, y, 110, 18, text, alignLeft)); };
-    title (100, 70, TR_NOOP ("Timbre"));
-    title (18, 104, TR_NOOP ("Blur"));
-    title (228, 104, TR_NOOP ("Trem"));
-    title (60, 180, TR_NOOP ("Prism"));
-    title (210, 180, TR_NOOP ("Harmonizer"));
-    title (380, 160, TR_NOOP ("Unison"));
-    title (40, 278, TR_NOOP ("Pitch"));
-    title (270, 270, TR_NOOP ("Vibrato"));
-    title (400, 270, TR_NOOP ("Legato"));
-    title (555, 238, TR_NOOP ("Pluck"));
-    title (655, 238, TR_NOOP ("Phaser"));
-    title (900, 238, TR_NOOP ("EQ"));
-    title (555, 20, TR_NOOP ("Filter 1"));
-    v.push_back (knob (177, 40, 30, "Timbre mix", TR_NOOP ("Mix"), 63));
-    v.push_back (knob (61, 135, 30, "Harm. blur", TR_NOOP ("Mix"), 160));
-    v.push_back (knob (277, 135, 30, "Tremolo", TR_NOOP ("Depth"), 160));
-    v.push_back (knob (181, 219, 34, "Harmonizer", TR_NOOP ("Amt"), 247));
-    v.push_back (stepper (414, 196, 30, 22, "Unison", TR_NOOP ("Order"), 8));
-    v.push_back (slider (Item::vslider, 476, 182, 18, 80, "Uni detune", TR_NOOP ("Pitch")));
-    v.push_back (knob (335, 291, 28, "Vibrato", TR_NOOP ("Depth"), 312));
-    v.push_back (slider (Item::vslider, 455, 40, 18, 100, "A volume", TR_NOOP ("Vol"), bipolar));
-    v.push_back (knob (725, 71, 44, "Cutoff", TR_NOOP ("Freq"), 106));
-    v.push_back (knob (828, 71, 34, "Resonance", TR_NOOP ("Res"), 106));
-    v.push_back (knob (587, 283, 40, "Pluck", TR_NOOP ("Time"), 313));
-    v.push_back (knob (686, 283, 34, "Phaser mix", TR_NOOP ("Mix"), 313));
-    v.push_back (section (12, 334, 380, 266, nullptr, boxed));
-    title (22, 342, TR_NOOP ("Global"));
-    v.push_back (slider (Item::vslider, 172, 410, 20, 110, "Master vol", TR_NOOP ("Vol")));
-    v.push_back (slider (Item::hslider, 280, 368, 90, 26, "A/B mix", TR_NOOP ("Part A / B")));
-    v.push_back (section (396, 334, 592, 266, nullptr, boxed));
-    v.push_back (label (420, 450, 540, 16, TR_NOOP ("The other Harmor controls keep the saved patch"), dim));
-    v.push_back (label (820, 556, 160, 40, "Harmor", dim));
+    v.push_back (section (12, 138, 220, 160, TR_NOOP ("Modulation")));
+    v.push_back (display (18, 160, 150, 130, "xy", "Mod X", "Mod Y"));
+    v.push_back (knob (200, 185, 26, "Mod X", "X", 206));
+    v.push_back (knob (200, 240, 26, "Mod Y", "Y", 261));
+    v.push_back (section (236, 138, 304, 160, TR_NOOP ("Quality")));
+    v.push_back (label (412, 158, 44, 12, TR_NOOP ("Draft")));
+    v.push_back (label (462, 158, 54, 12, TR_NOOP ("Render")));
+    v.push_back (label (246, 176, 150, 16, TR_NOOP ("HQ envelopes"), alignLeft));
+    v.push_back (toggle (426, 177, 16, 14, "Live env accuracy", nullptr));
+    v.push_back (toggle (481, 177, 16, 14, "Export env accuracy", nullptr));
+    v.push_back (label (246, 204, 150, 16, TR_NOOP ("Oversampling"), alignLeft));
+    v.push_back (stepper (418, 202, 32, 22, "Live oversampling", nullptr, 4));
+    v.push_back (stepper (473, 202, 32, 22, "Export oversampling", nullptr, 4));
+    v.push_back (toggle (246, 246, 110, 16, "Porta", TR_NOOP ("Porta")));
+    // round 172a: the FM / RM modulation matrix at FL's place (REA_rodada11 §1.5): rows = destinations (operators 1–6,
+    // filters 1–3), columns = sources (operators 1–6), then PAN, FX and OUT; the FM / RM tabs switch the operator
+    // columns' layer (PAN, FX and OUT are the FM layer's, shown on both)
+    l.pages = { "FM", "RM" };
+    v.push_back (section (553, 34, 294, 266, TR_NOOP ("Matrix")));
+    static const char* const rows[9] = { "1", "2", "3", "4", "5", "6", "F1", "F2", "F3" };
+    static const char* const columns[9] = { "1", "2", "3", "4", "5", "6", TR_NOOP ("Pan"), TR_NOOP ("FX"), TR_NOOP ("Out") };
+    static const std::vector<std::string> cells = [] {
+        std::vector<std::string> n; // the names of core/SytrusEngine.cpp's matrix settings
+        for (int layer = 0; layer < 2; ++layer)
+            for (int row = 0; row < 9; ++row)
+                for (int column = 0; column < 9; ++column)
+                {
+                    const auto unit = row < 6 ? "op " + std::to_string (row + 1) : "filter " + std::to_string (row - 5);
+                    auto upper = unit;
+                    upper[0] = (char) std::toupper ((unsigned char) upper[0]);
+                    static const char* const outs[3] = { " pan", " FX", " out" };
+                    n.push_back (column < 6 ? std::string (layer == 0 ? "FM" : "RM") + " op " + std::to_string (column + 1) + " to " + unit
+                                            : upper + outs[column - 6]);
+                }
+        return n;
+    }();
+    for (int c = 0; c < 9; ++c)
+        v.push_back (label (576 + 29.0f * (float) c, 52, 28, 12, columns[c]));
+    for (int r = 0; r < 9; ++r)
+    {
+        const auto cy = 78.0f + 25.0f * (float) r;
+        v.push_back (label (557, cy - 6, 20, 12, rows[r]));
+        for (int layer = 0; layer < 2; ++layer)
+            for (int c = 0; c < 9; ++c)
+            {
+                if (layer == 1 && c >= 6)
+                    continue;
+                auto k = knob (590 + 29.0f * (float) c, cy, 22, cells[(std::size_t) (81 * layer + 9 * r + c)].c_str(), nullptr, 0, noCaption | bipolar);
+                k.page = c >= 6 ? -1 : layer;
+                v.push_back (k);
+            }
+    }
+    v.push_back (pageTabs (553, 306, 90, 22, "FM|RM"));
+    v.push_back (label (650, 300, 196, 42, "Sytrus", dim));
     return l;
 }
 
@@ -1799,8 +1825,12 @@ Layout ridgeStrip()
     // left, frequency in the middle, Q / bell on the right), the EQ curve under them. Right: DYNAMICS (the
     // compressor, then the expander / gate, their gain-reduction meters), the routing (EQ and dynamics in, order,
     // filters to the side chain), and the GAIN block (input, phase, output) at the bottom.
+    // round tp172c: three columns like the reference console channel strip — the filters and EQ bands on the left
+    // (HF at the top down to LF), the input / output block in the middle (the EQ curve over the I/O meters, input trim
+    // and phase, the output fader between the meters), the dynamics on the right (compressor, expander / gate, their
+    // LED ladders and the routing)
     Layout l;
-    l.width = 560;
+    l.width = 780;
     l.height = 716;
     auto& v = l.items;
     // --- left column: filters and EQ
@@ -1828,59 +1858,69 @@ Layout ridgeStrip()
             v.push_back (toggle (194, y + 34.0f, 72, 20, extra[b], TR_NOOP ("Bell")));
     }
     v.push_back (section (4, 520, 276, 192, TR_NOOP ("Equalizer")));
-    v.push_back (display (10, 540, 264, 118, "ridgeeq"));
     // round 165: the Brown / Black curves are Ridge's own engine's (the E console voicing has the console's one curve)
-    v.push_back (when (when (tabs (10, 664, 150, 20, "EQ curve", TR_NOOP ("Brown|Black")), "4K voicing", 0.0f, 0.5f), "Voicing", 0.0f, 0.5f));
+    // (round tp172c: two conditions at most — the 4K and Modern voicings; in the E voicing the curve has no effect)
+    v.push_back (when (when (tabs (10, 548, 150, 20, "EQ curve", TR_NOOP ("Brown|Black")), "4K voicing", 0.0f, 0.5f), "Modern voicing", 0.0f, 0.5f));
+    // round tp172c: the Modern voicing (the console measured on the SSL Native Channel Strip 2 trial) — the curve picks its
+    // E / G EQ type; its compressor's peak detector, the gate's hold and the make-up offset join the dynamics
+    v.push_back (when (tabs (10, 548, 150, 20, "EQ curve", TR_NOOP ("E type|G type")), "Modern voicing", 0.5f, 1.0f));
+    v.push_back (toggle (170, 620, 104, 20, "Modern voicing", TR_NOOP ("Modern console")));
+    v.push_back (when (dial (652, 52, 24, "Make-up offset", TR_NOOP ("Offset"), bipolar), "Modern voicing", 0.5f, 1.0f));
+    v.push_back (when (toggle (516, 100, 64, 20, "Peak detect", TR_NOOP ("Peak")), "Modern voicing", 0.5f, 1.0f));
+    v.push_back (when (dial (722, 372, 20, "Gate hold", TR_NOOP ("Hold")), "Modern voicing", 0.5f, 1.0f));
     // round 148: the 4K voicing (the console measured on the SSL 4K E trial) — its three EQ colours, the mic pre and
     // its gain, the make-up offset; the rest of the panel drives it with the console's own scales
-    v.push_back (when (tabs (10, 664, 150, 20, "EQ colour", TR_NOOP ("Brown|Black|Orange")), "4K voicing", 0.5f, 1.0f));
-    v.push_back (toggle (170, 688, 104, 20, "4K voicing", TR_NOOP ("4K console")));
-    v.push_back (when (dial (432, 52, 24, "Make-up offset", TR_NOOP ("Offset"), bipolar), "4K voicing", 0.5f, 1.0f));
-    v.push_back (when (toggle (384, 540, 70, 20, "Mic pre", TR_NOOP ("Mic pre")), "4K voicing", 0.5f, 1.0f));
-    v.push_back (when (dial (504, 548, 24, "Mic gain", TR_NOOP ("Mic")), "4K voicing", 0.5f, 1.0f));
-    v.push_back (toggle (170, 664, 104, 20, "EQ on", TR_NOOP ("EQ in")));
+    v.push_back (when (when (tabs (10, 548, 150, 20, "EQ colour", TR_NOOP ("Brown|Black|Orange")), "4K voicing", 0.5f, 1.0f), "Modern voicing", 0.0f, 0.5f));
+    v.push_back (toggle (170, 584, 104, 20, "4K voicing", TR_NOOP ("4K console")));
+    v.push_back (when (when (dial (652, 52, 24, "Make-up offset", TR_NOOP ("Offset"), bipolar), "4K voicing", 0.5f, 1.0f), "Modern voicing", 0.0f, 0.5f));
+    v.push_back (toggle (170, 548, 104, 20, "EQ on", TR_NOOP ("EQ in")));
     // round 123: the voicing — Ridge's own engine, or the measured E-type console (substitutes start there)
-    v.push_back (tabs (10, 688, 150, 20, "Voicing", TR_NOOP ("Classic|E console")));
+    v.push_back (tabs (10, 584, 150, 20, "Voicing", TR_NOOP ("Classic|E console")));
 
-    // --- right column: dynamics, routing, gain
-    v.push_back (section (284, 4, 272, 236, TR_NOOP ("Compressor")));
-    v.push_back (display (290, 24, 120, 70, "ridgecomp"));
-    v.push_back (dial (480, 62, 46, "Comp. threshold", TR_NOOP ("Threshold"), big));
-    v.push_back (dial (330, 150, 32, "Ratio", TR_NOOP ("Ratio")));
-    v.push_back (dial (410, 150, 32, "Comp. release", TR_NOOP ("Release")));
-    v.push_back (dial (490, 150, 28, "Comp. mix", TR_NOOP ("Mix")));
-    v.push_back (toggle (296, 206, 110, 20, "Fast attack", TR_NOOP ("Fast attack")));
-    v.push_back (toggle (414, 206, 136, 20, "Auto make-up", TR_NOOP ("Auto make-up"))); // round 147b: the console's
-    v.push_back (section (284, 244, 272, 196, TR_NOOP ("Expander / gate")));
-    v.push_back (dial (480, 296, 46, "Gate threshold", TR_NOOP ("Threshold"), big));
-    v.push_back (dial (330, 290, 32, "Gate range", TR_NOOP ("Range")));
-    v.push_back (dial (330, 370, 32, "Gate release", TR_NOOP ("Release")));
-    v.push_back (toggle (396, 380, 70, 20, "Gate fast", TR_NOOP ("Fast")));
-    v.push_back (tabs (396, 408, 154, 20, "Expander", TR_NOOP ("Gate|Expand")));
+    // --- right column: dynamics, routing
+    v.push_back (section (504, 4, 272, 236, TR_NOOP ("Compressor")));
+    v.push_back (display (510, 24, 120, 70, "ridgecomp"));
+    v.push_back (dial (700, 62, 46, "Comp. threshold", TR_NOOP ("Threshold"), big));
+    v.push_back (dial (550, 150, 32, "Ratio", TR_NOOP ("Ratio")));
+    v.push_back (dial (630, 150, 32, "Comp. release", TR_NOOP ("Release")));
+    v.push_back (dial (710, 150, 28, "Comp. mix", TR_NOOP ("Mix")));
+    v.push_back (toggle (516, 206, 110, 20, "Fast attack", TR_NOOP ("Fast attack")));
+    v.push_back (toggle (634, 206, 136, 20, "Auto make-up", TR_NOOP ("Auto make-up"))); // round 147b: the console's
+    v.push_back (section (504, 244, 272, 196, TR_NOOP ("Expander / gate")));
+    v.push_back (dial (700, 296, 46, "Gate threshold", TR_NOOP ("Threshold"), big));
+    v.push_back (dial (550, 290, 32, "Gate range", TR_NOOP ("Range")));
+    v.push_back (dial (550, 370, 32, "Gate release", TR_NOOP ("Release")));
+    v.push_back (toggle (616, 380, 70, 20, "Gate fast", TR_NOOP ("Fast")));
+    v.push_back (tabs (616, 408, 154, 20, "Expander", TR_NOOP ("Gate|Expand")));
     // round 165: the reference's two LED ladders (compressor, expander / gate: 3 … 20 dB of reduction) on the left, the
     // routing on the right — the dynamics in, where they sit (before / after the EQ), the EQ into their side chain
-    v.push_back (section (284, 444, 272, 132, TR_NOOP ("Dynamics")));
+    v.push_back (section (504, 444, 272, 268, TR_NOOP ("Dynamics")));
     {
-        auto comp = display (292, 462, 30, 108, "grleds");
+        auto comp = display (512, 462, 30, 236, "grleds");
         comp.steps = 0;
         comp.label = TR_NOOP ("Comp");
         v.push_back (comp);
-        auto gate = display (326, 462, 30, 108, "grleds");
+        auto gate = display (546, 462, 30, 236, "grleds");
         gate.steps = 1;
         gate.label = TR_NOOP ("Exp");
         v.push_back (gate);
     }
-    v.push_back (toggle (366, 464, 84, 20, "Dynamics on", TR_NOOP ("Dyn in")));
-    v.push_back (toggle (456, 464, 92, 20, "Analog", TR_NOOP ("Analog"))); // round 147b: the console emulation's colour
-    v.push_back (tabs (366, 494, 182, 20, "Order", TR_NOOP ("EQ>Dyn|Dyn>EQ")));
-    v.push_back (when (toggle (366, 524, 182, 20, "EQ to SC", TR_NOOP ("EQ to side chain")), "4K voicing", 0.0f, 0.5f));
-    // the GAIN block (round 129, the reference's): input trim and phase, the output fader beside the input / output
-    // level meter with its peak read-outs
-    v.push_back (section (284, 580, 272, 132, TR_NOOP ("Gain")));
-    v.push_back (dial (322, 628, 36, "Input", TR_NOOP ("Input"), bipolar));
-    v.push_back (toggle (294, 682, 56, 20, "Phase", TR_NOOP ("Phase")));
-    v.push_back (slider (Item::vslider, 370, 600, 34, 106, "Output", TR_NOOP ("Output")));
-    v.push_back (display (420, 598, 130, 110, "iometer"));
+    v.push_back (toggle (586, 464, 84, 20, "Dynamics on", TR_NOOP ("Dyn in")));
+    v.push_back (toggle (676, 464, 92, 20, "Analog", TR_NOOP ("Analog"))); // round 147b: the console emulation's colour
+    v.push_back (tabs (586, 494, 182, 20, "Order", TR_NOOP ("EQ>Dyn|Dyn>EQ")));
+    v.push_back (when (when (toggle (586, 524, 182, 20, "EQ to SC", TR_NOOP ("EQ to side chain")), "4K voicing", 0.0f, 0.5f), "Modern voicing", 0.0f, 0.5f));
+    // --- centre: the EQ curve over the input / output block (round tp172c: the reference's middle module)
+    v.push_back (section (284, 4, 216, 168, TR_NOOP ("Curve")));
+    v.push_back (display (290, 26, 204, 140, "ridgeeq"));
+    // the GAIN block (round 129, the reference's): input trim and phase (and the 4K's mic pre), the output fader between
+    // the input / output level meters with their peak read-outs
+    v.push_back (section (284, 176, 216, 536, TR_NOOP ("Gain")));
+    v.push_back (dial (330, 224, 36, "Input", TR_NOOP ("Input"), bipolar));
+    v.push_back (toggle (400, 200, 90, 20, "Phase", TR_NOOP ("Phase")));
+    v.push_back (when (toggle (400, 226, 90, 20, "Mic pre", TR_NOOP ("Mic pre")), "4K voicing", 0.5f, 1.0f));
+    v.push_back (when (dial (444, 258, 24, "Mic gain", TR_NOOP ("Mic")), "4K voicing", 0.5f, 1.0f));
+    v.push_back (display (294, 300, 150, 404, "iometer"));
+    v.push_back (slider (Item::vslider, 452, 310, 40, 390, "Output", TR_NOOP ("Output")));
     return l;
 }
 
@@ -2662,6 +2702,9 @@ Layout withRhythmVoicing (Layout l)
     {
         if (it.whenParam != nullptr) // keep the item's own condition as the second one
         {
+            it.when3Param = it.when2Param; // round tp172c: and a second one as the third
+            it.when3Min = it.when2Min;
+            it.when3Max = it.when2Max;
             it.when2Param = it.whenParam;
             it.when2Min = it.whenMin;
             it.when2Max = it.whenMax;
@@ -2748,6 +2791,9 @@ Layout withVocalVoicing (Layout l)
     {
         if (it.whenParam != nullptr)
         {
+            it.when3Param = it.when2Param; // round tp172c: Ridge's Modern / 4K items carry two conditions already
+            it.when3Min = it.when2Min;
+            it.when3Max = it.when2Max;
             it.when2Param = it.whenParam;
             it.when2Min = it.whenMin;
             it.when2Max = it.whenMax;
@@ -2756,7 +2802,17 @@ Layout withVocalVoicing (Layout l)
         it = when (it, "Vocal strip", 0.0f, 0.5f);
     }
     l.height = std::max (l.height, 744);
-    auto add = [&l] (LayoutItem it) { l.items.push_back (when (it, "Vocal strip", 0.5f, 1.0f)); };
+    // round tp172c: the panel was drawn for a 560-wide editor; a wider one (Ridge's three columns) spreads it out
+    // (positions, and the widths of everything but the knobs)
+    const auto sx = (float) l.width / 560.0f;
+    auto add = [&l, sx] (LayoutItem it)
+    {
+        if (it.type == Item::knob)
+            it.x = (it.x + it.w * 0.5f) * sx - it.w * 0.5f;
+        else
+            it.x *= sx, it.w *= sx;
+        l.items.push_back (when (it, "Vocal strip", 0.5f, 1.0f));
+    };
     add (section (4, 4, 552, 128, TR_NOOP ("Level")));
     add (dial (50, 64, 40, "Vocal input", TR_NOOP ("Input"), bipolar));
     add (display (100, 26, 250, 96, "iometer"));
@@ -4072,7 +4128,7 @@ Layout poizoneMain()
 
 const Layout* instrumentLayout (InstrumentKind kind)
 {
-    static const Layout osc = threeOsc(), keys = flKeys(), boo = booBass(), sytrus = sytrusMain(), harmor = harmorMain(), toxic = toxicMain(), poizone = poizoneMain();
+    static const Layout osc = threeOsc(), keys = flKeys(), boo = booBass(), sytrus = sytrusMain(), toxic = toxicMain(), poizone = poizoneMain();
     switch (kind)
     {
         case InstrumentKind::toxic: return &toxic;
@@ -4081,7 +4137,6 @@ const Layout* instrumentLayout (InstrumentKind kind)
         case InstrumentKind::flkeys: return &keys;
         case InstrumentKind::boobass: return &boo;
         case InstrumentKind::sytrus: return &sytrus;
-        case InstrumentKind::harmor: return &harmor;
         default: break;
     }
     // round 168q (core/EngineLayouts.cpp)
@@ -4262,7 +4317,8 @@ bool isShown (EffectKind kind, const LayoutItem& item, int page, const EffectPar
                        : i >= 0 && i < (int) params.size() ? params[(std::size_t) i] : 0.0f;
         return v >= lo && (v < hi || hi >= 1.0f); // [lo, hi), the top end included at 1
     };
-    return inRange (item.whenParam, item.whenMin, item.whenMax) && inRange (item.when2Param, item.when2Min, item.when2Max);
+    return inRange (item.whenParam, item.whenMin, item.whenMax) && inRange (item.when2Param, item.when2Min, item.when2Max)
+           && inRange (item.when3Param, item.when3Min, item.when3Max);
 }
 
 bool isIdle (EffectKind kind, const LayoutItem& item, const EffectParams& params)

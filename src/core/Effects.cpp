@@ -2718,6 +2718,8 @@ const EffectInfo& effectInfo (EffectKind kind)
         luxeverb::toParams (luxeverb::Settings {}, p);
         for (std::size_t i = 0; i < (std::size_t) luxeVerbParamCount; ++i)
             info.params.push_back ({ luxeverb::names[i], p[i] });
+        for (std::size_t i = 0; i < (std::size_t) luxeVerbSpaceCount; ++i) // round tp172b: the Space engine (off)
+            info.params.push_back ({ luxeverb::sp::names[i], luxeverb::sp::defaults[i] });
         return info;
     }();
     // FL's 4 automatable controls as (raw − min) / range (core/ConvolverFx.h); the impulse response is in the slot's state
@@ -3202,6 +3204,8 @@ const EffectInfo& effectInfo (EffectKind kind)
 
 std::string formatEffectParam (EffectKind kind, int param, float v, double bpm, const EffectParams& context)
 {
+    if (kind == EffectKind::ridgeStrip && mixsuite::ridge::modernVoicing (context)) // round tp172c: the Modern voicing's
+        return mixsuite::ridge::modernParamText (param, v);
     if (kind == EffectKind::ridgeStrip && mixsuite::ridge::k4Voicing (context)) // round 148: the 4K console's scales
         return mixsuite::ridge::k4ParamText (param, v);
     if (kind == EffectKind::ridgeStrip && mixsuite::ridge::eVoicing (context)) // round 123: the console's own scales

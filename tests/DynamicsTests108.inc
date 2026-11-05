@@ -566,14 +566,15 @@ TEST (dyn108_sentry_gate_curves_and_timing)
     g = stairGains (x, run (EffectKind::sentryGate, p, x), per, exp.size());
     CHECK (std::abs (g[1] + 9.7) < 1.2);
 
-    // upward style: +2 dB at 0 dBFS with the defaults (upward threshold −6 dB, 1.5 : 1), nothing below
+    // upward style: +3 dB at 0 dBFS with the defaults (upward threshold −6 dB, 1.5 : 1), nothing below — round
+    // tp172b measured the reference lifting (ratio − 1) dB per dB above the upward threshold (was 1 − 1 / ratio: +2)
     p = defaults (EffectKind::sentryGate);
     p[s::style] = s::styleValue (s::Style::upward);
     const std::vector<double> up { -40, -12, 0 };
     x = stair (up, 0.5, 1000.0, per);
     g = stairGains (x, run (EffectKind::sentryGate, p, x), per, up.size());
     std::printf ("  upward: %.2f / %.2f / %.2f dB\n", g[0], g[1], g[2]);
-    CHECK (std::abs (g[0]) < 0.1 && std::abs (g[1]) < 0.1 && std::abs (g[2] - 2.0) < 0.3);
+    CHECK (std::abs (g[0]) < 0.1 && std::abs (g[1]) < 0.1 && std::abs (g[2] - 3.0) < 0.3);
 
     // closing after a −10 → −60 dBFS step (attack 0.1 ms, release 150 ms): Classic −6 dB after 39 ms, −20 after 147
     std::vector<float> burst ((std::size_t) (3 * sr));

@@ -149,6 +149,7 @@ struct Settings
     // processes (1 − m) itself ± m side). Off = the mid signal (her states)
     bool proLink = false, linkSide = false;
     double link = 1.0, linkOnly = 0.0;
+    bool gate = true; // round tp172b: false = the reference's Allround mode (no single-vocal gate, the same level law)
 };
 
 class DeEsser
@@ -260,3 +261,65 @@ private:
 double measuredStaticDelta (double ratio, double over) noexcept;
 } // namespace progcomp
 } // namespace lynx::vmatch
+
+// ---- round tp172c: a modern console channel strip (Ridge Strip, "Modern" voicing) ----
+// Fitted black-box on the SSL Native Channel Strip 2 trial (its renders only: impulses on a dense grid of every EQ band,
+// both EQ types, the filters; sine ramps, stairs and tone bursts through the dynamics). The E type's shelves are first
+// order, the G type's are second-order shelves with the dip / bump either side; every bell is a peaking section whose
+// width follows the gain; the filters are a 3rd-order high-pass and a 2nd-order low-pass. The compressor is feed-forward
+// (peak or RMS detector, threshold offset and slope per ratio, soft knee in RMS mode), the auto make-up a share of the
+// reduction at 0 dBFS; the gate / expander shares the threshold scale, the gate has its hold and hysteresis.
+namespace lynx::vmatch::strip2
+{
+// Controls in the reference's own units (its dials' read-outs)
+struct Settings
+{
+    double inputDb = 0.0, outputDb = 0.0;
+    bool phase = false;
+    double hpHz = 0.0;  // 0 = out, else 20 .. 500 Hz
+    double lpKHz = 0.0; // 0 = out, else 3 .. 27.5 kHz
+    bool typeG = false; // the EQ type: E (false) or G
+    double lfGain = 0.0, lfHz = 182.0;  // ±16.5 dB, 40 .. 600 Hz
+    bool lfBell = false;
+    double lmfGain = 0.0, lmfKHz = 0.8, lmfQ = 1.5; // ±20 dB, 0.2 .. 2 kHz, Q 0.5 .. 2.5
+    double hmfGain = 0.0, hmfKHz = 2.45, hmfQ = 1.5; // ±20 dB, 0.6 .. 7 kHz
+    double hfGain = 0.0, hfKHz = 7.5;  // ±20 dB, 1.5 .. 22 kHz
+    bool hfBell = false;
+    bool eqOn = true;
+    double compRatio = 1.0, compThreshold = 10.0, compRelease = 0.1; // x:1 (>= 1e6 = infinity), -20 .. +10 dB, 0.1 .. 4 s
+    bool compFast = false, compPeak = false, autoMakeup = true;
+    double makeupOffsetDb = 0.0, compMix = 1.0; // -12 .. +12 dB, 0 .. 1
+    bool expander = false, gateFast = false;
+    double gateThreshold = 10.0, gateRange = 0.0, gateRelease = 0.1, gateHold = 0.25; // -30 .. +10 dB, 0 .. 40 dB, s, s
+    bool dynOn = true;
+    bool dynamicsPreEq = false; // the dynamics before the filters and EQ (default: after them)
+};
+
+// Magnitude of the filters + EQ (dB) at `hz`
+double responseDb (const Settings& s, double sampleRate, double hz);
+// The compressor's automatic make-up (dB, offset included; 0 with the compressor at 1:1 or auto make-up off)
+double makeupDb (const Settings& s) noexcept;
+// The compressor's static output level (dB) for a steady sine at `inputDb` (dBFS peak), make-up included
+double compStaticDb (const Settings& s, double inputDb) noexcept;
+
+class Strip
+{
+public:
+    void prepare (double sampleRate) noexcept;
+    void reset() noexcept;
+    void process (float* l, float* r, int n, const Settings& s) noexcept;
+    float compReductionDb() const noexcept { return lastComp; }
+    float gateReductionDb() const noexcept { return lastGate; }
+
+private:
+    void design (const Settings& s) noexcept;
+    double sr = 48000.0;
+    Settings designed {};
+    bool designedOnce = false;
+    Biquad hp1, hp2, lp, bands[4];
+    bool hpOn = false, lpOn = false, bandOn[4] {};
+    double env = 0.0, gr = 0.0, genv = 0.0, ggr = 0.0, holdLeft = 0.0;
+    bool gateOpen = false;
+    float lastComp = 0.0f, lastGate = 0.0f;
+};
+} // namespace lynx::vmatch::strip2

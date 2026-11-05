@@ -6,6 +6,7 @@
 #include "ui/VisualEditors.h"
 #include "ui/FlExtraEditors.h"
 #include "ui/PluginEditors.h"
+#include "core/LuxeVerb.h"
 #include "core/PresetCycle.h"
 #include "core/ShownEffectSlot.h"
 
@@ -130,6 +131,9 @@ public:
         page = initialPage;
         if (kind == EffectKind::equo && initialPage == 0)
             page = 3; // bank 1, volume (FL opens EQUO on its first bank)
+        if (kind == EffectKind::luxeVerb && initialPage == 0) // round tp172b: open on the engine in use
+            if (const auto* fx = current())
+                page = fx->params[(std::size_t) luxeVerbSpaceFirst] >= 0.5f ? 1 : 0;
         if (kind == EffectKind::maximus && stateBacked() && initialPage == 0)
             if (const auto* fx = current())
                 page = maximusfx::selectedBand (fx->state); // FL reopens Maximus on the band selected when it was saved
@@ -283,6 +287,20 @@ public:
     {
         const auto s = scale();
         return { item.x * s, headerHeight + item.y * s, item.w * s, item.h * s };
+    }
+
+    // round tp172c: the art drawn now — Ridge Strip's 4K voicing has its own (dark) console look
+    skin::Art artNow() const
+    {
+        const auto art = skin::artForEffect (kind);
+        if (art != skin::Art::ridge) return art;
+        const auto* fx = current();
+        if (fx == nullptr) return art;
+        const auto on = [&] (const char* name) {
+            const auto i = plugui::paramIndex (kind, name);
+            return i >= 0 && i < (int) fx->params.size() && fx->params[(std::size_t) i] >= 0.5f;
+        };
+        return on ("4K voicing") && ! on ("Modern voicing") && ! on ("Vocal strip") ? skin::Art::ridge4k : art;
     }
 
     bool visible (const LayoutItem& item) const
@@ -596,8 +614,8 @@ public:
     void paint (juce::Graphics& g) override
     {
         using namespace theme;
-        const skin::StyleScope styleScope (editorStyle(), skin::artForEffect (kind));
-        accent = editorStyle() == skin::Style::themed ? skin::artAccent (skin::artForEffect (kind)) : familyAccent;
+        const skin::StyleScope styleScope (editorStyle(), artNow());
+        accent = editorStyle() == skin::Style::themed ? skin::artAccent (artNow()) : familyAccent;
         skin::canvas (g, getLocalBounds().toFloat(), accent);
         const auto* fx = current();
 
@@ -782,6 +800,7 @@ public:
                 look.hover = glow;
                 look.active = index == dragItem;
                 look.enabled = fx.enabled;
+                look.capTint = skin::capTintFor (item.param);
                 skin::knob (g, circle, look);
                 auto below = r.withTop (circle.getBottom() + 1.0f * s);
                 if (hasStyle (item, plugui::valueAbove))
@@ -990,7 +1009,11 @@ public:
                 const auto box = juce::Rectangle<float> (16.0f * s, 9.0f * s).withCentre ({ r.getX() + 9.0f * s, r.getCentreY() });
                 skin::switchPill (g, box, on, accent, fx.enabled);
                 auto text = r.withTrimmedLeft (21.0f * s);
-                g.setColour (on ? colour::textPrimary : (hot ? colour::textSecondary : colour::textDisabled));
+                const auto offLabel = skin::offLabelColour(); // round tp172c: a theme's own (readable on its panels)
+                g.setColour (on ? (offLabel.isTransparent() || offLabel.getPerceivedBrightness() > 0.5f ? colour::textPrimary
+                                                                                                          : offLabel.darker (0.6f)) // a light panel: lit = darker
+                                 : (! offLabel.isTransparent() ? (hot ? offLabel.brighter (0.3f) : offLabel)
+                                                                    : (hot ? colour::textSecondary : colour::textDisabled)));
                 if (item.label != nullptr)
                     ui::drawFittingText (g, caps (tr (item.label)), text, juce::Justification::centredLeft, font (juce::jmax (8.0f, 9.5f * s), true), 7.0f);
                 break;
@@ -2543,8 +2566,9 @@ public:
             for (int k = 0; k < 5; ++k)
             {
                 const auto cell = juce::Rectangle<float> (area.getX(), area.getY() + h * (float) k, area.getWidth(), h);
-                const auto led = cell.withWidth (cell.getHeight() * 0.62f).withSizeKeepingCentre (cell.getHeight() * 0.5f, cell.getHeight() * 0.5f)
-                                     .withX (cell.getX() + 2.0f * s);
+                // round tp172c: the LED keeps to the ladder's width (a tall ladder kept growing it over its numbers)
+                const auto d = juce::jmin (cell.getHeight() * 0.5f, cell.getWidth() * 0.34f);
+                const auto led = juce::Rectangle<float> (d, d).withCentre ({ cell.getX() + 2.0f * s + d * 0.5f, cell.getCentreY() });
                 const bool lit = fx.enabled && db >= (float) steps[k] - 0.05f;
                 g.setColour (lit ? accent : colour::gridBeat);
                 g.fillEllipse (led);
@@ -3823,6 +3847,8 @@ public:
                 page += (o - (page / item.steps) % n) * item.steps;
             else
                 page = o;
+            if (const auto p = paramOf (item); p >= 0) // round tp172b: page tabs that also choose a value (LuxeVerb's engine)
+                setValue (p, n > 1 ? (float) o / (float) (n - 1) : 0.0f);
             hoverItem = -1;
             repaint();
             return;
