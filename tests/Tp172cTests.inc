@@ -96,3 +96,36 @@ TEST (ridge_modern_voicing_laws_tp172c)
     for (float v : l) finite = finite && std::isfinite (v);
     CHECK (finite && strip.compReductionDb() > 1.0f);
 }
+
+// issue #77: a new Aether runs the measured dynamic air model (its Mid air was the round-114 exciter, nearly
+// inaudible); its steady-tone lifts sit on the Fresh Air trial's (black-box sweep renders, -12 dBFS: Mid air 50 %
+// +2.2 dB at 5 kHz, 100 % +4.8 dB at 8 kHz; High air 100 % +1.0 dB at 1 kHz) and quiet highs come up strongly
+TEST (aether_issue77_default_model_and_levels_tp172c)
+{
+    using namespace mixsuite96;
+    namespace air = lynx::mixsuite::aether;
+    auto p = defaults (EffectKind::aether);
+    CHECK (p[air::dynamic] == 1.0f);
+    const double sr = 48000.0;
+    auto gainDb = [&] (const lynx::EffectParams& q, double hz, double amp) {
+        const auto y = run (EffectKind::aether, q, sine (hz, amp, 48000, sr), sr);
+        return 20.0 * std::log10 (amplitude (y, hz, 24000, 16384, sr) / amp);
+    };
+    CHECK (std::abs (gainDb (p, 5000.0, 0.25)) < 0.3); // both amounts at 0: transparent
+    p[air::midAir] = 0.5f;
+    const auto mid50 = gainDb (p, 5000.0, 0.25);
+    CHECK (mid50 > 1.5 && std::abs (mid50 - 2.2) < 1.0); // Mid air is clearly audible
+    p[air::midAir] = 1.0f;
+    CHECK (std::abs (gainDb (p, 8000.0, 0.25) - 4.8) < 1.0);
+    p[air::midAir] = 0.0f;
+    p[air::highAir] = 1.0f;
+    CHECK (std::abs (gainDb (p, 1000.0, 0.25) - 1.0) < 0.6);
+    CHECK (gainDb (p, 12000.0, 0.01) > 15.0); // a quiet 12 kHz tone: the dynamic lift (vocal air +20 dB on the trial)
+    // a project saved before the dynamic model existed keeps the shelf + exciter it was set up with
+    lynx::EffectSlot old = lynx::makeEffectSlot (EffectKind::aether);
+    lynx::upgradeLoadedEffectParams (old, (std::size_t) air::dynamic);
+    CHECK (old.params[air::dynamic] == 0.0f);
+    lynx::EffectSlot now = lynx::makeEffectSlot (EffectKind::aether);
+    lynx::upgradeLoadedEffectParams (now, (std::size_t) air::count);
+    CHECK (now.params[air::dynamic] == 1.0f);
+}
