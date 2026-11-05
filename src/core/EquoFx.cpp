@@ -216,7 +216,14 @@ struct Engine::Impl
     float norm = 0, volume = 1, volumeNow = 0;
     std::array<BandFilter, numBands> band {};
     std::array<std::array<float, numTargets>, numBands> value {}, now {}; // targets and the values in use
-    std::array<std::array<double, numTargets>, numBands> glide {};       // the motion smoother's states
+    // the motion smoother's states: FL's plugin creates them at volume 1, pan 0, send 1 and a state load does not touch
+    // them, so the first ticks after a load glide from there (§2.5; FL's render of the render test, REA_rodada170i §8)
+    std::array<std::array<double, numTargets>, numBands> glide = [] {
+        std::array<std::array<double, numTargets>, numBands> g {};
+        for (auto& b : g)
+            b = { 1.0, 0.0, 1.0 };
+        return g;
+    }();
     double samplesPerTick = 0, tickLeft = 0, smoothCoef = 0;
     bool smoothOn = false;
     std::vector<std::array<double, 24>> up, down;
@@ -555,7 +562,7 @@ void Engine::set (const State& s) noexcept
     d->st = s;
     d->configure();
     d->fresh();
-    d->settle (true);
+    d->settle (false); // (a load leaves the smoother's states: §2.5)
 }
 
 void Engine::setKnobs (const State& s) noexcept
@@ -591,7 +598,7 @@ void Engine::setBands (const State& s) noexcept
 void Engine::reset() noexcept
 {
     d->fresh();
-    d->settle (true);
+    d->settle (false); // (like FL's Flush: the values in use go to their targets, the smoother's states stay)
     d->tickLeft = 0;
 }
 
@@ -757,6 +764,10 @@ namespace
 class EquoEffect final : public Effect
 {
 public:
+    // FL's "HQ non-realtime" process mode (§2.2) is the export's "HQ for all plugins", not every render: FL's
+    // command-line render of the render test "EQUO" matches the plain design, not the doubled one (REA_rodada170i §8)
+    static bool hqRender() noexcept { return offlineRendering() && hqForAllPlugins(); }
+
     explicit EquoEffect (const std::vector<std::uint8_t>& flState)
     {
         if (auto s = parse (flState))
@@ -767,7 +778,7 @@ public:
     void prepare (double sampleRate) noexcept override
     {
         rate = sampleRate;
-        rendering = offlineRendering();
+        rendering = hqRender();
         engine.prepare (sampleRate, rendering);
         engine.set (state);
     }
@@ -791,9 +802,9 @@ public:
             state.target = next.target;
             engine.setBands (state);
         }
-        if (offlineRendering() != rendering)
+        if (hqRender() != rendering)
         {
-            rendering = offlineRendering();
+            rendering = hqRender();
             engine.prepare (rate, rendering);
             engine.set (state);
         }
