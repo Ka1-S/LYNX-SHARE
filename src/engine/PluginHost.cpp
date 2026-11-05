@@ -218,6 +218,22 @@ std::optional<std::string> guardedState (juce::AudioPluginInstance& plugin, std:
     return state.toBase64Encoding().toStdString();
 }
 
+bool guardedRestore (juce::AudioPluginInstance& plugin, std::atomic<bool>& crashed, const std::string& name,
+                     const std::string& encoded)
+{
+    if (crashed.load()) return false;
+    juce::MemoryBlock state;
+    if (encoded.empty() || ! state.fromBase64Encoding (juce::String::fromUTF8 (encoded.c_str()))) return false;
+    const juce::ScopedLock lock (plugin.getCallbackLock());
+    if (const auto code = crashguard::run ([&] { plugin.setStateInformation (state.getData(), (int) state.getSize()); }); code != 0)
+    {
+        crashed.store (true);
+        recordCrash (name, code);
+        return false;
+    }
+    return true;
+}
+
 void guardedUiParameter (juce::AudioPluginInstance& plugin, std::atomic<bool>& crashed, const std::string& name, int index, float value)
 {
     if (crashed.load())
@@ -329,6 +345,11 @@ void PluginInstrument::failed (std::uint32_t code) noexcept
 std::optional<std::string> PluginInstrument::captureState()
 {
     return guardedState (*plugin, crashed, name);
+}
+
+bool PluginInstrument::restoreState (const std::string& state)
+{
+    return guardedRestore (*plugin, crashed, name, state);
 }
 
 void PluginInstrument::setParameterFromUi (int index, float value)
@@ -613,6 +634,11 @@ void PluginEffect::failed (std::uint32_t code) noexcept
 std::optional<std::string> PluginEffect::captureState()
 {
     return guardedState (*plugin, crashed, name);
+}
+
+bool PluginEffect::restoreState (const std::string& state)
+{
+    return guardedRestore (*plugin, crashed, name, state);
 }
 
 void PluginEffect::flushMidiControls() noexcept
@@ -1916,6 +1942,39 @@ void PluginHost::preload (const PluginRef& ref, int wanted)
     p.instance = createInstance (ref, preloadRate, &p.error);
     const std::scoped_lock lock (preloadLock);
     preloaded[preloadKey (ref, preloadRate)].push_back (std::move (p));
+}
+
+bool PluginHost::preloadChecked (const PluginRef& ref, double sampleRate, juce::String& error,
+                                const std::function<bool (juce::AudioPluginInstance&, juce::String&)>& validate)
+{
+    if (ref.id.empty() || ! std::isfinite (sampleRate) || sampleRate <= 0)
+    {
+        error = "Invalid plugin identity or sample rate";
+        return false;
+    }
+    Preloaded ready;
+    ready.instance = createInstance (ref, sampleRate, &error);
+    if (ready.instance == nullptr)
+        return false;
+    if (validate && ! validate (*ready.instance, error))
+        return false;
+    const std::scoped_lock lock (preloadLock);
+    preloaded[preloadKey (ref, sampleRate)].push_back (std::move (ready));
+    return true;
+}
+
+void PluginHost::discardPreloaded (const PluginRef& ref, double sampleRate)
+{
+    std::vector<Preloaded> discarded;
+    {
+        const std::scoped_lock lock (preloadLock);
+        if (auto found = preloaded.find (preloadKey (ref, sampleRate)); found != preloaded.end())
+        {
+            discarded = std::move (found->second);
+            preloaded.erase (found);
+        }
+    }
+    // Plugin teardown stays outside the cache mutex, just as clearPreloaded().
 }
 
 void PluginHost::clearPreloaded()

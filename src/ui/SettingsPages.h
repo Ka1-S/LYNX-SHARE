@@ -43,6 +43,7 @@ struct GeneralOptions
     bool pluginSubstitutes = true; // missing plugins play a LYNX equivalent (core/PluginSubstitutes.h)
     int crashReports = 0;          // crashreport::Consent: 0 ask, 1 always send, 2 never (round 159)
     bool checkUpdates = true;      // "Check for updates automatically" (ui/Updater.h, round 166b)
+    bool remoteControl = false;   // opt-in local control API
     bool reducedEffects = false;
     bool artMotion = true;         // round 170j: the Themed plugins' art moves (falling petals, glows...)
     bool gpuRendering = true;      // Windows: Direct2D (JUCE 8's default) or GDI for every LYNX window (round 157a)
