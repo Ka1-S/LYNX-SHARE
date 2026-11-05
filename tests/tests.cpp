@@ -127,6 +127,7 @@
 #include "core/RackRenderer.h"
 #include "core/MetronomeVoice.h"
 #include "engine/Transport.h"
+#include "engine/RemoteHistory.h"
 #include "core/Patcherize.h"
 #include "core/Performance.h"
 #include "core/Scheduler.h"
@@ -4888,6 +4889,93 @@ TEST (remote_reset_replaces_only_requested_instances_and_default_reuse_stays_unc
     const auto later = lynx::RackState::build (reset, replaced.get(), 48000.0, normal);
     CHECK (instrumentsMade == 3 && effectsMade == 3);
     CHECK (later->instruments[0] == replaced->instruments[0] && later->effects[1][0] == replaced->effects[1][0]);
+}
+
+TEST (remote_history_normalized_restores_preserve_lineage_without_crossing_producer_edits)
+{
+    struct Entry { std::string song; bool remote = false; std::string deviceHash; };
+    std::vector<Entry> undo { { "A", true, "B" }, { "B", true, "C" } }, redo;
+    std::string live = "C";
+    const auto restore = [&] (auto& from, auto& to, const std::string& normalized) {
+        CHECK (! from.empty() && from.back().deviceHash == live);
+        const auto savedTarget = from.back().song;
+        // A real engine inverse stores captured live bytes, even when its raw model blob was older.
+        to.push_back ({ live, true, {} });
+        from.pop_back();
+        live = normalized;
+        lynx::remote_history::acceptRestoredState (to.back(), from.empty() ? nullptr : &from.back(), savedTarget, live);
+    };
+
+    restore (undo, redo, "B-normalized");
+    CHECK (undo.back().deviceHash == live && redo.back().deviceHash == live);
+    CHECK (redo.back().song == "C");
+    restore (undo, redo, "A-normalized");
+    CHECK (undo.empty() && redo.back().song == "B-normalized");
+    restore (redo, undo, "B-normalized-again");
+    CHECK (redo.back().deviceHash == live); // the next redo adopts normalization through the same proven lineage
+    restore (redo, undo, "C-normalized");
+    CHECK (redo.empty() && undo.size() == 2);
+
+    // A producer changed B to D before the following remote edit. Undoing that edit may normalize D, but cannot
+    // promote the older B fence: doing so would silently authorize undo across the producer's opaque edit.
+    undo = { { "A", true, "B" }, { "D", true, "E" } };
+    redo.clear();
+    live = "E";
+    restore (undo, redo, "D-normalized");
+    CHECK (redo.back().deviceHash == live && undo.back().deviceHash == "B");
+    CHECK (undo.back().deviceHash != live); // the next remote-owned undo remains refused
+
+    // An ordinary producer entry never acquires a remote fence even if its bytes happen to match the target.
+    Entry ordinary { "A", false, "B" }, inverse { "C", true, {} };
+    lynx::remote_history::acceptRestoredState (inverse, &ordinary, std::string ("B"), std::string ("B-normalized"));
+    CHECK (ordinary.deviceHash == "B" && inverse.deviceHash == "B-normalized");
+}
+
+TEST (remote_capture_mirror_preserves_projected_shape_and_updates_only_matching_hosted_bytes)
+{
+    lynx::Song captured;
+    lynx::ChannelDef hosted;
+    hosted.instrument = lynx::InstrumentKind::plugin;
+    hosted.plugin.id = "Synth";
+    hosted.plugin.state = "saved";
+    captured.channels = { hosted, hosted };
+    captured.channels[1].instance.renew();
+    lynx::ChannelDef patcher;
+    patcher.instrument = lynx::InstrumentKind::patcher;
+    lynx::PatchNode nested;
+    nested.generator = true;
+    nested.channel = hosted;
+    patcher.patcher.nodes.push_back (nested);
+    captured.channels.push_back (patcher);
+    captured.mixer = lynx::Song::defaultMixer (2);
+    lynx::EffectSlot effect;
+    effect.kind = lynx::EffectKind::plugin;
+    effect.plugin.id = "Effect";
+    effect.plugin.state = "saved";
+    captured.mixer[1].effects.push_back (effect);
+    auto published = captured;
+    published.channels[0].muted = true; // an insert stand-in changes routing/muting in the published projection
+    published.channels[1].instrument = lynx::InstrumentKind::sampler;
+    published.channels[1].samplePath = "stem.wav";
+    published.channels.push_back (lynx::ChannelDef()); // generated stem helper channels must survive
+    published.mixer[1].effects[0].enabled = false;
+
+    captured.channels[0].plugin.state = "captured synth";
+    captured.channels[1].plugin.state = "unavailable synth";
+    captured.channels[2].patcher.nodes[0].channel.plugin.state = "captured nested synth";
+    captured.mixer[1].effects[0].plugin.state = "captured effect";
+    lynx::remote_history::mirrorCapturedHostedStates (captured, published);
+    CHECK (published.channels.size() == 4 && published.channels[0].muted);
+    CHECK (published.channels[0].plugin.state == "captured synth");
+    CHECK (published.channels[1].instrument == lynx::InstrumentKind::sampler && published.channels[1].samplePath == "stem.wav");
+    CHECK (published.channels[1].plugin.state == "saved"); // a projected replacement is not the captured hosted device
+    CHECK (published.channels[2].patcher.nodes[0].channel.plugin.state == "captured nested synth");
+    CHECK (! published.mixer[1].effects[0].enabled && published.mixer[1].effects[0].plugin.state == "captured effect");
+
+    published.channels[0].instance.renew();
+    captured.channels[0].plugin.state = "different device";
+    lynx::remote_history::mirrorCapturedHostedStates (captured, published);
+    CHECK (published.channels[0].plugin.state == "captured synth");
 }
 
 TEST (export_song_adds_silent_tail_and_never_restarts)

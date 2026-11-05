@@ -1,6 +1,7 @@
 #include "engine/AudioEngine.h"
 #include "engine/ProjectFile.h"
 #include "engine/RemoteError.h"
+#include "engine/RemoteHistory.h"
 #include "core/Sha256.h"
 
 #include "core/LiveSession.h"
@@ -69,6 +70,15 @@ std::unordered_set<std::uint64_t> remoteFreshTargets (const Song& before, const 
         for (const auto& effect : track.effects)
             if (! existing.contains (effect.instance.id)) fresh.insert (effect.instance.id);
     return fresh;
+}
+
+void adoptCapturedRemoteDevices (Song& model, RackState& published, Song&& captured)
+{
+    // Capturing changes only saved hosted-state bytes. Keep the model and reuse baseline equal to the verified
+    // running devices without publishing, changing history or capturing a vendor a second time.
+    remote_history::mirrorCapturedHostedStates (captured, published.song);
+    model.channels = std::move (captured.channels);
+    model.mixer = std::move (captured.mixer);
 }
 }
 
@@ -2502,9 +2512,19 @@ void AudioEngine::sessionStep (bool redo)
         // Prepare the pending after-state, selective result and all conflict labels before touching either stack.
         auto step = from.back();
         if (! redo && sessionAfterOpen) step.second = song;
+        if (remote)
+        {
+            // The full device projection passed the fence. Use its captured bytes at this endpoint, while keeping
+            // the historical metadata used to detect selective conflicts in the remaining entities.
+            auto& outgoing = redo ? step.first : step.second;
+            outgoing.channels = before->channels;
+            outgoing.mixer = before->mixer;
+        }
+        const auto& current = before ? *before : song;
         std::vector<live::Key> skipped;
-        auto next = redo ? live::selectiveRevert (song, step.second, step.first, &skipped)
-                         : live::selectiveRevert (song, step.first, step.second, &skipped);
+        auto next = redo ? live::selectiveRevert (current, step.second, step.first, &skipped)
+                         : live::selectiveRevert (current, step.first, step.second, &skipped);
+        const auto savedTargetHash = remote ? remoteDeviceStateHashOf (next) : juce::String();
         juce::StringArray names;
         for (const auto& key : skipped)
             names.addIfNotAlreadyThere (juce::String::fromUTF8 (live::describe (key, song).c_str()));
@@ -2527,7 +2547,13 @@ void AudioEngine::sessionStep (bool redo)
         levelsPending = false;
         publishSong();
         const auto fence = finishRemoteHistory (before);
-        if (remote && ! remoteHistoryFailed) to.back().deviceHash = fence;
+        if (remote && ! remoteHistoryFailed)
+        {
+            auto& incoming = redo ? to.back().second : to.back().first;
+            incoming.channels = song.channels;
+            incoming.mixer = song.mixer;
+            remote_history::acceptRestoredState (to.back(), from.empty() ? nullptr : &from.back(), savedTargetHash, fence);
+        }
         if (! names.isEmpty() && onSessionUndoSkipped) onSessionUndoSkipped (names);
     }
     catch (...)
@@ -2572,6 +2598,11 @@ void AudioEngine::historyStep (bool redo)
             capturePluginStatesInto (*before, false);
             if (! checkRemoteHistory (from.back().deviceHash, *before)) return;
         }
+        const auto savedTargetHash = remote ? remoteDeviceStateHashOf (from.back().song) : juce::String();
+        // The model's saved blob can differ from the running vendor's normalized blob. Redo must restore the
+        // actual state we are leaving, captured before any history movement, rather than the stale model bytes.
+        std::optional<HistoryEntry> inverse;
+        if (remote) inverse.emplace (HistoryEntry { *before, true });
         const auto fresh = remote ? remoteFreshTargets (*before, from.back().song) : std::unordered_set<std::uint64_t>();
         const juce::ScopedValueSetter<std::unordered_set<std::uint64_t>> freshPolicy (remoteFreshInstances, fresh);
         if (remoteHistoryCancelled && remoteHistoryCancelled())
@@ -2582,7 +2613,8 @@ void AudioEngine::historyStep (bool redo)
         }
         // Moving song into a temporary may already change the live model even if push_back throws.
         movementMayHaveBegun = true;
-        to.push_back ({ std::move (song), remote });
+        if (remote) to.push_back (std::move (*inverse));
+        else to.push_back ({ std::move (song), false });
         song = std::move (from.back().song);
         from.pop_back();
         modified = true;
@@ -2590,7 +2622,9 @@ void AudioEngine::historyStep (bool redo)
         lastUndoPress = {};
         publishSong();
         const auto fence = finishRemoteHistory (before);
-        if (remote && ! remoteHistoryFailed) to.back().deviceHash = fence;
+        if (remote && ! remoteHistoryFailed)
+            remote_history::acceptRestoredState (to.back(), from.empty() ? nullptr : &from.back(),
+                                                 savedTargetHash, fence);
     }
     catch (...)
     {
@@ -4465,7 +4499,9 @@ juce::String AudioEngine::finishRemoteHistory (const std::optional<Song>& before
         syncRemotePluginStates (*before);
         auto current = song;
         capturePluginStatesInto (current, false);
-        return remoteDeviceStateHashOf (current);
+        const auto fence = remoteDeviceStateHashOf (current);
+        adoptCapturedRemoteDevices (song, lastPublishedShape, std::move (current));
+        return fence;
     }
     catch (...)
     {
@@ -4492,8 +4528,7 @@ bool AudioEngine::editSongRemoteTransaction (const std::function<void (Song&)>& 
     try
     {
         song = std::move (before); // capture live state in the owned undo step, without adding a separate step
-        lastPublishedShape.song.channels = song.channels;
-        lastPublishedShape.song.mixer = song.mixer;
+        remote_history::mirrorCapturedHostedStates (song, lastPublishedShape.song);
         lastUndoPress = {};
         levelsPending = false;
         const juce::ScopedValueSetter<bool> remoteStep (nextRemoteHistoryStep, true);
@@ -4503,6 +4538,7 @@ bool AudioEngine::editSongRemoteTransaction (const std::function<void (Song&)>& 
         auto committed = song;
         capturePluginStatesInto (committed, false);
         const auto fence = remoteDeviceStateHashOf (committed);
+        adoptCapturedRemoteDevices (song, lastPublishedShape, std::move (committed));
         if (! undoStack.empty()) undoStack.back().deviceHash = fence;
         if (sessionHistory && ! sessionUndo.empty()) sessionUndo.back().deviceHash = fence;
         remoteHistoryError.clear();
