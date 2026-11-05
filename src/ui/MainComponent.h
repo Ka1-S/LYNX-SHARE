@@ -234,6 +234,7 @@ private:
     int toolbarHeight = 2 * rowHeight + 12;
     toolbarlayout::IconSize appliedIconSize = toolbarlayout::IconSize::medium;
     bool compactRecord = false;
+    bool narrowSnap = false; // round 170e5, 1280 px: the "+" new-pattern button takes the pattern icon's place
     juce::Rectangle<int> modeArea; // the Pattern / Song switch (painted as one control) // a narrow window: four recording switches per row (round 170e3)
     void applyIconSizing (toolbarlayout::IconSize size);
     void setToolbarLayout (const toolbarlayout::Layout& layout, bool save = true);

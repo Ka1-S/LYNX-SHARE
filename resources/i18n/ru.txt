@@ -7161,3 +7161,8 @@ countries: ru by kz
 "Note names on every Piano roll key" = "Названия нот на всех клавишах Piano Roll"
 "[LMB] drag up / down: step through the patterns" = "[LMB] тянуть вверх / вниз: листать паттерны"
 "Playhead column in the Channel Rack" = "Столбец позиции воспроизведения в Channel Rack"
+
+# round 170e5: Loop record in Pattern mode
+"Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "Запись по кругу: вкл. (запись повторяется: область цикла в режиме Song, один дубль за проход; паттерн в режиме Pattern)"
+"Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "Запись по кругу: выкл. (запись идёт дальше: через область цикла или за конец паттерна, который удлиняется)"
+"Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "Запись по кругу: вкл., запись повторяется (режим Song: область цикла, один дубль за проход; режим Pattern: паттерн); выкл., идёт дальше, через область цикла или за конец паттерна, и оставляет всё там, где было сыграно (паттерн удлиняется)"

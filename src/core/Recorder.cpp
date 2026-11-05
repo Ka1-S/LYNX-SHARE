@@ -612,6 +612,7 @@ void NoteRecorder::begin (std::int64_t loopLength)
 {
     active = true;
     linear = false;
+    patternOrigin = -1.0;
     loop = std::max<std::int64_t> (1, loopLength);
     origin = -1;
     reach = -1;
@@ -678,7 +679,8 @@ void NoteRecorder::finish (const Song& song, int channel, int key, const Held& h
     }
     else
     {
-        n.start = patternPositionForTick (song, h.tick, loop);
+        n.start = patternOrigin >= 0.0 ? (std::int64_t) std::floor (std::max (0.0, h.tick - patternOrigin))
+                                       : patternPositionForTick (song, h.tick, loop);
     }
     // Song mode loops (the loop region, or the whole song): a note held across the loop's end ends after the wrap
     auto played = endTick - h.tick;

@@ -7161,3 +7161,8 @@ countries: de at ch li lu
 "Note names on every Piano roll key" = "Notennamen auf jeder Taste der Piano Roll"
 "[LMB] drag up / down: step through the patterns" = "[LMB] nach oben / unten ziehen: durch die Patterns blättern"
 "Playhead column in the Channel Rack" = "Abspielspalte im Channel Rack"
+
+# round 170e5: Loop record in Pattern mode
+"Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "Loop-Aufnahme: an (die Aufnahme wiederholt: im Song-Modus den Loop-Bereich, ein Take pro Durchlauf; im Pattern-Modus das Pattern)"
+"Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "Loop-Aufnahme: aus (die Aufnahme läuft geradeaus weiter: durch den Loop-Bereich oder über das Pattern-Ende hinaus, das dann wächst)"
+"Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "Loop-Aufnahme: an, die Aufnahme wiederholt (Song-Modus: den Loop-Bereich, ein Take pro Durchlauf; Pattern-Modus: das Pattern); aus, sie läuft geradeaus weiter, durch den Loop-Bereich oder über das Pattern-Ende hinaus, und behält alles dort, wo es gespielt wurde (das Pattern wächst)"

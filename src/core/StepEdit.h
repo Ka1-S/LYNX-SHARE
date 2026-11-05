@@ -68,4 +68,15 @@ private:
     std::int64_t position = 0;
     int held = 0;
 };
+
+// Round 170e5: how far a step moves. FL's toolbar snap is the step-edit step too ([STR] hint
+// "Main snap / quantization / step edit step"), so: the main snap's size when it has one (a fraction of a step, a beat,
+// a bar); a snap without a size of its own (none, the zoom's lines, events) moves by the Piano roll's grid, and by
+// one step when that is free too (single ticks would stack every note on one spot).
+inline std::int64_t stepLength (std::int64_t mainSnapTicks, std::int64_t editorGridTicks) noexcept
+{
+    if (mainSnapTicks > 0)
+        return mainSnapTicks;
+    return editorGridTicks > 1 ? editorGridTicks : (std::int64_t) ticksPerStep;
+}
 } // namespace lynx::stepedit

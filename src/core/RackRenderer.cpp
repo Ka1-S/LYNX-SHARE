@@ -3188,7 +3188,8 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         const auto patternIndex = std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1);
         const auto& pattern = song.patterns[(std::size_t) patternIndex];
         schedulePatternLoop (pattern, pattern.effectiveLength (song.beatsPerBar), startTick, numSamples,
-                             ticksPerSample (bpm, sampleRate), events, song.swing, &song.channels, chaseNotes);
+                             ticksPerSample (bpm, sampleRate), events, song.swing, &song.channels, chaseNotes,
+                             liveInput != nullptr ? liveInput->patternOrigin.load (std::memory_order_relaxed) : -1.0);
     }
 
     // FL's wrapper "Output port" (round 149): the notes a plugin sent out in the previous chunk play the plugins on
