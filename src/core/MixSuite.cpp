@@ -1778,7 +1778,7 @@ private:
     Delay2<256> dry;
     Biquad shelf, pre, post;
     dyn::Engine dynEngine;
-    bool dynamicMode = false;
+    bool dynamicMode = true; // issue #77: the default model (its latency is known before the first block)
     std::array<float, maxBlock> hl {}, hr {};
     Meters meters;
 };
