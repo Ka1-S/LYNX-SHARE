@@ -18,7 +18,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace lynx::space
+namespace lynx::spaceverb
 {
 enum class Style { modern, vintage, plate };
 
@@ -326,4 +326,4 @@ private:
     double preS = 0.0, modDepth = 0.0, modInc = 0.0, phase = 0.0, erGain = 1.0, erSpread = 1.0, lateGain = 1.0;
     double side = 1.0, dryGain = 0.89, wetGain = 0.45, norm = 0.3;
 };
-} // namespace lynx::space
+} // namespace lynx::spaceverb

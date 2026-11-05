@@ -6,7 +6,6 @@
 #include "core/DynamicsSuite.h"
 #include "core/FabFilterStates.h"
 #include "core/LuxeVerb.h"
-#include "core/SpaceVerb.h"
 
 namespace p172b
 {

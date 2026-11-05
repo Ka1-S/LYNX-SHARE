@@ -1524,11 +1524,11 @@ std::string text (int index, float v)
     }
 }
 
-static space::Settings settingsOf (const EffectParams& p) noexcept
+static spaceverb::Settings settingsOf (const EffectParams& p) noexcept
 {
     const auto at = [&] (int i) { return p[(std::size_t) (luxeVerbSpaceFirst + i)]; };
-    space::Settings s;
-    s.style = at (style) < 0.25f ? space::Style::modern : at (style) < 0.75f ? space::Style::vintage : space::Style::plate;
+    spaceverb::Settings s;
+    s.style = at (style) < 0.25f ? spaceverb::Style::modern : at (style) < 0.75f ? spaceverb::Style::vintage : spaceverb::Style::plate;
     s.decaySec = decaySeconds (at (space));
     s.rate = rateOf (at (rate));
     s.distance = at (distance);
@@ -1608,7 +1608,7 @@ public:
 
 private:
     luxeverb::Engine engine;
-    space::Engine spaceEngine;
+    spaceverb::Engine spaceEngine;
     bool spaceOn = false;
     int rate = 44100;
     bool created = false, ready = false;
