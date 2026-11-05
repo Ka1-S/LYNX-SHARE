@@ -874,9 +874,20 @@ namespace vocalds
 {
 namespace
 {
+// round 148's timing, kept by the reference's Allround mode
 constexpr double detAttackMs = 0.01, detReleaseMs = 1.71, gainAttackMs = 2.95, gainReleaseMs = 1.765;
-constexpr double extraAheadMs = 0.08, ratioMs = 0.2683, openRatioDb = -7.054, closeRatioDb = -2.263;
+constexpr double extraAheadMs = 0.08;
+// Single Vocal keeps round 148's fit (round tp172b3: a gate fitted on the whole Pro-DS bank closed on steady white
+// noise as the reference does, but cost 1 point on the vocal itself)
+constexpr double sDetReleaseMs = 1.71, sGainAttackMs = 2.95, sGainReleaseMs = 1.765;
+constexpr double ratioMs = 0.2683, openRatioDb = -7.054, closeRatioDb = -2.263;
 constexpr double openDb = 3.9, closeDb = -4.1;
+constexpr double lawOffsetDb = 4.1, spanDb = 0.0, spanScale = 1.0;
+// round tp172b3 [EXEC] (the Pro-DS trial bank, 264 Allround renders: white-noise stairs, vocal, drums, bursts and sweeps
+// over threshold −60 … −10, range 3 … 30 dB, high-pass 3 … 12 kHz, low-pass 8 … 18 kHz, wide and split band; fitted on
+// the 5 ms gain trajectories, full band and above 4 kHz): Allround reads the band level as a density, + allroundBw ×
+// 10 log10 (7 kHz / the band's width), with its law's offset allroundOffsetDb (round 148's span, 0.1 − threshold)
+constexpr double allroundOffsetDb = 6.34, allroundBw = 0.72;
 double pole (double ms, double sr) noexcept { return ms <= 0.0 ? 0.0 : std::exp (-1.0 / (ms * 0.001 * sr)); }
 } // namespace
 
@@ -925,9 +936,12 @@ void DeEsser::design (const Settings& s) noexcept
 void DeEsser::process (float* l, float* r, int n, const Settings& s) noexcept
 {
     design (s);
-    const double ca = pole (detAttackMs, sr), cr = pole (detReleaseMs, sr), ga = pole (gainAttackMs, sr), gr = pole (gainReleaseMs, sr);
+    const double ca = pole (detAttackMs, sr), cr = pole (s.gate ? sDetReleaseMs : detReleaseMs, sr);
+    const double ga = pole (s.gate ? sGainAttackMs : gainAttackMs, sr), gr = pole (s.gate ? sGainReleaseMs : gainReleaseMs, sr);
     const double cq = pole (ratioMs, sr);
     const double thr = std::clamp (s.thresholdDb, -60.0, 0.0), range = std::clamp (s.rangeDb, 0.0, 24.0);
+    const double span = s.gate ? std::max (1.0, spanDb + spanScale * (0.1 - thr)) : 0.1 - thr;
+    const double laAdj = s.gate ? lawOffsetDb : allroundOffsetDb + allroundBw * 10.0 * std::log10 (7000.0 / std::max (100.0, designedLp - designedHp));
     const int ahead = std::clamp ((int) std::lround ((s.lookahead ? std::clamp (s.lookaheadMs, 0.0, 15.0) + extraAheadMs : 0.0) * 0.001 * sr), 0, latency);
     constexpr std::int64_t m = ring - 1;
     float maxGr = 0.0f, maxDet = -300.0f;
@@ -985,7 +999,7 @@ void DeEsser::process (float* l, float* r, int n, const Settings& s) noexcept
                 open = true;
             else if (open && (la < thr + closeDb || rr < closeRatioDb))
                 open = false;
-            const double t = open ? std::clamp (range * (la - thr + 4.1) / (0.1 - thr), 0.0, range) : 0.0;
+            const double t = open ? std::clamp (range * (la + laAdj - thr) / span, 0.0, range) : 0.0;
             sm = t > sm ? ga * sm + (1.0 - ga) * t : gr * sm + (1.0 - gr) * t;
             gainDb = -sm;
             maxDet = std::max (maxDet, (float) la);
@@ -998,7 +1012,7 @@ void DeEsser::process (float* l, float* r, int n, const Settings& s) noexcept
                     bopen = true;
                 else if (bopen && (lb < thr + closeDb || rb < closeRatioDb))
                     bopen = false;
-                const double tb = bopen ? std::clamp (range * (lb - thr + 4.1) / (0.1 - thr), 0.0, range) : 0.0;
+                const double tb = bopen ? std::clamp (range * (lb + laAdj - thr) / span, 0.0, range) : 0.0;
                 bsm = tb > bsm ? ga * bsm + (1.0 - ga) * tb : gr * bsm + (1.0 - gr) * tb;
                 maxDet = std::max (maxDet, (float) lb);
             }
