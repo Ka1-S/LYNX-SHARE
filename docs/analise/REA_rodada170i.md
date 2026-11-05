@@ -182,6 +182,26 @@ Test: `flq170i2_slice_starts_on_their_exact_frame`.
   Outside the first 0.35 s LYNX's spectrum is within 0.03 dB and its level within 0.1 dB; the waveform is −11 dB off at a
   108-sample lag (FL's event grid, which moves with that pre-roll). Not reproducible, not a defect.
 
+## 11. genfuzz: the generators' fuzzer and what it found
+
+`tools/genfuzz` (`scripts/genfuzz-asan.sh`, g++ ASAN + UBSan) builds every native generator from FL's defaults and every
+channel of FL's render tests, then drives each through 400-event storms at 22.05–192 kHz (any key and velocity, chords,
+note offs with release velocity, bends, channel pitch, CCs, cut, all notes off, slides; blocks 1–4096) and checks for
+non-finite output and for sound 20 s after everything was released (`--ops a…l` narrows the event kinds).
+
+- **Drumaxx** (crash): a pad's resampling pass of 256 host samples fills the DLL-sized 1024-sample buffer only up to a
+  step of 4 (44.1 kHz and up at any pitch). At 22.05 kHz with Pitch at max and the channel pitched up the step is ~6.9:
+  the pass overran into the next pad's delay lines. LYNX now takes fewer host samples per pass when the step needs it
+  (unchanged at FL's rates).
+- **BassDrum** (crash): the same with its 2048-sample buffer and 512-sample passes (ratio > 4 below 44.1 kHz).
+- **Morphine** (stuck note): a velocity-0 note on a sounding key clears the key's held entry (FUN_1800e93d0 returns
+  before allocating a voice) and leaves the voice alive; LYNX's All Notes Off only sent note offs to held keys. It now
+  sends the DLL's note off to every key (its note off releases the key's voices whatever the held table says).
+- **FL Slayer** (not a defect): the default guitar's tail falls ~3 dB/s and is still above −60 dBFS after 20 s. The
+  engine is the bit-exact port of the DLL (REA_rodada68), so it is FL's own tail; genfuzz now calls a note stuck only
+  when it has not fallen by half since 10 s.
+- The ASAN scripts compile `Slayer.cpp` with `-fno-inline`, as CMakeLists.txt does (GCC 15 miscompiles it, REA_rodada117).
+
 ## Where I stopped
 
 - 170i (landed 108eb8f8): §1, §3, §5, §6; mean sound score 6.64 → 7.78.
@@ -189,7 +209,8 @@ Test: `flq170i2_slice_starts_on_their_exact_frame`.
   plain, −55 dB with FL's pre-roll), Slicex (§9, −24 → −35 dB); FL Keys and Scratcher explained (§10). Mean 7.85 → 7.99,
   39 render tests at the 16-bit floor. 29 FL demos / templates that use FPC, EQUO or Slicex: no regression; "Create a
   chord progression" (FPC) spec 4.7 → 0.4 dB, "nucleon - Transient Processor" rms −0.8 → 0.0 dB.
-- Fuzz (ASAN + UBSan): fxfuzz 165 effect slots, 0 non-finite, no sanitizer report. GENFUZZ_RESULT
+- Fuzz (ASAN + UBSan): fxfuzz 165 effect slots, 0 non-finite, no sanitizer report. genfuzz (§11) found 2 crashes
+  and 1 stuck note, fixed; genfuzz after the fixes, 125 channels (every native generator + the render tests' channels), 2 rounds: 0 problems, no sanitizer report
 - Open: FL's render pre-roll (LFO effects drift without it, glides need it: model it per plugin), Slicex's slice-edge
   fade (−35 dB), FLEX and Fruity Slicer's stretch (permanent decisions), FL Keys (FL's command-line render is silent).
 - Commands: `scripts/flref-lynx.sh /mnt/e/lynx-work/flq170i/rt.list <out> build-local/renderwav 2`, then

@@ -12,7 +12,8 @@ objs=()
 for f in $CORE tools/genfuzz.cpp; do objs+=("$O/$(echo "$f" | tr / _).o"); done
 for f in $CORE tools/genfuzz.cpp; do
     o="$O/$(echo "$f" | tr / _).o"
-    [[ -f $o && $o -nt $f && $o -nt $NEWEST_H ]] || echo "g++ $FL -c $f -o $o"
+    extra=""; [[ $f == src/core/Slayer.cpp ]] && extra="-fno-inline" # (GCC 15 miscompiles Slayer's x87 engine when inlining: CMakeLists.txt)
+    [[ -f $o && $o -nt $f && $o -nt $NEWEST_H ]] || echo "g++ $FL $extra -c $f -o $o"
 done | xargs -P "${JOBS:-8}" -I{} sh -c '{}'
 [[ -d build-local/wavpack ]] || { echo "run scripts/build-local.sh first (C decoders)"; exit 1; }
 g++ -fsanitize=address,undefined "${objs[@]}" build-local/wavpack/*.o build-local/vorbis/*.o build-local/lame/*.o build-local/pocketpy/*.o build-local/monocypher/*.o -o "$O/genfuzz"

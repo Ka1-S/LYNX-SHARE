@@ -178,3 +178,80 @@ TEST (flq170i2_drumaxx_pitched_up_at_low_rates_stays_in_its_buffer)
     CHECK (finiteOut);
     CHECK (peak > 1e-3 && peak < 16.0);
 }
+
+TEST (flq170i2_bassdrum_pitched_up_at_low_rates_stays_in_its_buffer)
+{
+    // tools/genfuzz: below 44.1 kHz BassDrum's resampling ratio passes 4 and a 512-sample pass overran the DLL-sized
+    // 2048-sample buffer into the next voice (crash in generate)
+    using namespace lynx;
+    if (realFlpDir.empty())
+        return;
+    const auto c = natives::makeChannel (InstrumentKind::bassdrum, natives142::flAccess()); // (FL's Plugin database state)
+    CHECK (c.has_value());
+    if (! c)
+        return;
+    auto in = makeBassDrumInstrument();
+    in->prepare (22050.0);
+    in->configure (*c, 120.0);
+    in->setChannelPitchNow (4800.0f, 0.0f);
+    std::vector<float> l (4096), r (4096);
+    double peak = 0.0;
+    bool finiteOut = true;
+    for (int round = 0; round < 3; ++round)
+    {
+        for (int key = 100; key <= 127; key += 3)
+            in->noteOn (key, 1.0f);
+        for (int b = 0; b < 8; ++b)
+        {
+            std::fill (l.begin(), l.end(), 0.0f), std::fill (r.begin(), r.end(), 0.0f);
+            in->render (l.data(), r.data(), 4096, 1.0f, 1.0f);
+            for (int i = 0; i < 4096; ++i)
+            {
+                finiteOut = finiteOut && std::isfinite (l[(std::size_t) i]) && std::isfinite (r[(std::size_t) i]);
+                peak = std::max ({ peak, (double) std::abs (l[(std::size_t) i]), (double) std::abs (r[(std::size_t) i]) });
+            }
+        }
+        in->allNotesOff();
+    }
+    CHECK (finiteOut);
+    CHECK (peak > 1e-3 && peak < 16.0);
+}
+
+TEST (flq170i2_morphine_all_notes_off_ends_a_note_retriggered_at_velocity_zero)
+{
+    // tools/genfuzz: a note at velocity 0 on a key that sounds clears the key's held entry and leaves its voice alive;
+    // All Notes Off (Stop) only released the held keys, so that voice rang forever
+    using namespace lynx;
+    if (realFlpDir.empty())
+        return;
+    const auto c = natives::makeChannel (InstrumentKind::morphine, natives142::flAccess());
+    CHECK (c.has_value());
+    if (! c)
+        return;
+    auto in = makeInstrument (InstrumentKind::morphine, nullptr);
+    CHECK (in != nullptr);
+    if (in == nullptr)
+        return;
+    in->prepare (44100.0);
+    in->configure (*c, 120.0);
+    std::vector<float> l (4096), r (4096);
+    const auto block = [&] {
+        std::fill (l.begin(), l.end(), 0.0f), std::fill (r.begin(), r.end(), 0.0f);
+        in->render (l.data(), r.data(), 4096, 1.0f, 1.0f);
+        double p = 0.0;
+        for (int i = 0; i < 4096; ++i)
+            p = std::max ({ p, (double) std::abs (l[(std::size_t) i]), (double) std::abs (r[(std::size_t) i]) });
+        return p;
+    };
+    in->noteOn (60, 0.8f);
+    double held = 0.0;
+    for (int b = 0; b < 11; ++b)
+        held = std::max (held, block());
+    CHECK (held > 1e-2);
+    in->noteOn (60, 0.0f);
+    in->allNotesOff();
+    double last = 1.0;
+    for (int b = 0; b < 11 * 8; ++b) // 8 s
+        last = block();
+    CHECK (last < 1e-4);
+}

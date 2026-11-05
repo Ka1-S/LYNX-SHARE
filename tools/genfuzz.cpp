@@ -12,6 +12,7 @@
 // built with -fsanitize=address,undefined (scripts/genfuzz-asan.sh), any memory error.
 //
 // Usage: genfuzz [--seed n] [--rounds n] [--fl <FL Studio's Data folder>] [--dir <folder with .flp>]... [--only <name>]
+//        [--ops <list>]   only these event kinds (letters a–l = the cases of the storm, to narrow a finding down)
 //               [--verbose]
 // Exit code: 0 = clean, 1 = non-finite output or a stuck note found (crashes abort on their own).
 
@@ -40,6 +41,7 @@ int problems = 0, channelsTested = 0;
 std::mt19937 rng { 170 };
 int rounds = 3;
 bool verbose = false;
+std::string ops; // (empty: every event kind)
 
 float uni() { return std::uniform_real_distribution<float> (0.0f, 1.0f) (rng); }
 int pick (int lo, int hi) { return std::uniform_int_distribution<int> (lo, hi) (rng); }
@@ -125,7 +127,10 @@ void fuzzChannel (const lynx::ChannelDef& channel, const std::string& label)
         const int steps = 400;
         for (int step = 0; step < steps && ! bad; ++step)
         {
-            switch (pick (0, 11))
+            int kind = pick (0, 11);
+            while (! ops.empty() && ops.find ((char) ('a' + kind)) == std::string::npos)
+                kind = pick (0, 11);
+            switch (kind)
             {
                 case 0: case 1: case 2: // a note: any key, extreme or random velocity, with an expression
                 {
@@ -175,7 +180,7 @@ void fuzzChannel (const lynx::ChannelDef& channel, const std::string& label)
         for (auto k : held)
             in.noteOff (k);
         in.allNotesOff();
-        double last = 0.0;
+        double last = 0.0, mid = 0.0; // (the peak of the last block, the loudest block from 10 s to 11 s)
         for (int done = 0; done < (int) (20.0 * rate); done += 4096)
         {
             std::fill (l.begin(), l.end(), 0.0f), std::fill (r.begin(), r.end(), 0.0f);
@@ -187,14 +192,18 @@ void fuzzChannel (const lynx::ChannelDef& channel, const std::string& label)
                 break;
             }
             last = peak (l, r, 4096);
+            if (done >= (int) (10.0 * rate) && done < (int) (11.0 * rate))
+                mid = std::max (mid, last);
         }
-        if (! bad && last > 1e-3) // −60 dBFS after 20 s of release
+        // −60 dBFS after 20 s of release, and not still dying away (FL Slayer's default guitar rings for > 20 s in the
+        // DLL too: its tail falls ~3 dB a second, a stuck note does not fall)
+        if (! bad && last > 1e-3 && last > 0.5 * mid)
         {
             std::printf ("STUCK       %s  rate %.0f  round %d: peak %.4f after 20 s of release\n", label.c_str(), rate, round, last);
             ++problems;
         }
         else if (verbose)
-            std::printf ("  ok %s  rate %.0f  round %d (release peak %.2g)\n", label.c_str(), rate, round, last);
+            std::printf ("  ok %s  rate %.0f  round %d (release peak %.2g, %.2g at 10 s)\n", label.c_str(), rate, round, last, mid);
     }
 }
 } // namespace
@@ -215,13 +224,15 @@ int main (int argc, char** argv)
             flData = next();
         else if (a == "--dir")
             dirs.push_back (next());
+        else if (a == "--ops")
+            ops = next();
         else if (a == "--only")
             only = next();
         else if (a == "--verbose")
             verbose = true;
         else
         {
-            std::printf ("usage: genfuzz [--seed n] [--rounds n] [--fl <FL Data folder>] [--dir <folder>]... [--only <name>] [--verbose]\n");
+            std::printf ("usage: genfuzz [--seed n] [--rounds n] [--fl <FL Data folder>] [--dir <folder>]... [--only <name>] [--ops <a-l>] [--verbose]\n");
             return 2;
         }
     }
