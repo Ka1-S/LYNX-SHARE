@@ -29,6 +29,9 @@ struct State
     std::atomic<double> worstScopeMs { 0.0 };
     std::atomic<int> paints { 0 };
     std::atomic<double> worstStallMs { 0.0 };
+    std::atomic<int> frames { 0 };              // frames the main window painted (ui/FrameProbe.h, round 173f)
+    std::atomic<double> worstFrameGapMs { 0.0 }; // the longest time between two of them
+    double lastFrameMs = 0.0;                    // (message thread)
     juce::CriticalSection lock;
     juce::String worstScopeName, pending; // pending: log lines written by the watchdog thread
     std::function<juce::String()> summary;
@@ -38,6 +41,16 @@ inline State& state()
 {
     static State s;
     return s;
+}
+
+// The main window painted a frame (message thread; ui/FrameProbe.h). Gaps over 1 s are idle time, not a hitch.
+inline void frame (double nowMs)
+{
+    auto& s = state();
+    s.frames.fetch_add (1, std::memory_order_relaxed);
+    if (const auto gap = nowMs - s.lastFrameMs; s.lastFrameMs > 0.0 && gap < 1000.0 && gap > s.worstFrameGapMs.load (std::memory_order_relaxed))
+        s.worstFrameGapMs.store (gap, std::memory_order_relaxed);
+    s.lastFrameMs = nowMs;
 }
 
 // Scopes slower than this are logged (LYNX_TRACE_UI_MIN=<ms>, default 8)
@@ -221,7 +234,8 @@ private:
                     name = s.worstScopeName;
                     s.worstScopeName = {};
                 }
-                append ("second: worst stall " + juce::String (secondWorst, 1) + " ms, paints " + juce::String (s.paints.exchange (0))
+                append ("second: worst stall " + juce::String (secondWorst, 1) + " ms, frames " + juce::String (s.frames.exchange (0))
+                        + " (longest gap " + juce::String (s.worstFrameGapMs.exchange (0.0), 1) + " ms), paints " + juce::String (s.paints.exchange (0))
                         + ", slowest scope " + juce::String (s.worstScopeMs.exchange (0.0), 1) + " ms " + name + "  " + audio);
                 lastSummary = now;
                 juce::String text;

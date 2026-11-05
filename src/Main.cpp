@@ -83,6 +83,8 @@
 #include "ui/QuickAddPalette.h"
 #include "ui/I18n.h"
 #include "ui/MainComponent.h"
+#include "ui/FrameProbe.h"
+#include "ui/UiTrace.h"
 #include "core/MixerOps.h"
 #include "ui/QuickPick.h"
 #include "core/NoteTools.h"
@@ -277,6 +279,134 @@ juce::String collectUncleanSessions()
     return lastStep;
 }
 } // namespace
+
+// --uiperf (round 173f, discussion #10): a mixer fader dragged up and down with the mouse while the pattern plays. A
+// high-resolution timer delivers 125 moves a second to the message thread through the window's own mouse path
+// (ComponentPeer::handleMouseEvent), at most one waiting at a time as Windows does with WM_MOUSEMOVE; every frame the
+// window paints tells whether it covered the fader. Measured: how long a move waited for the message thread, the time
+// from a move to the first frame that shows the fader after it (input → paint), and whether the value stays put when
+// the mouse is released.
+struct UiPerfDrag final : public std::enable_shared_from_this<UiPerfDrag>,
+                          private juce::HighResolutionTimer
+{
+    ~UiPerfDrag() override { stopTimer(); }
+
+    void start (juce::Component& windowIn, juce::Component& strips, juce::Rectangle<int> rail, lynx::AudioEngine* engineIn, int trackIn)
+    {
+        window = &windowIn;
+        engine = engineIn;
+        track = trackIn;
+        railInWindow = window->getLocalArea (&strips, rail);
+        watch = railInWindow.expanded (6, 40); // the cap, its tip above and the dB read-out below
+        visible = strips.isShowing() && window->getLocalArea (&strips, strips.getLocalBounds()).contains (railInWindow.getCentre());
+        const auto volume = engine->getSong().mixer[(std::size_t) track].volume;
+        x = (float) railInWindow.getCentreX();
+        startY = (float) railInWindow.getBottom() - volume * (float) railInWindow.getHeight(); // on the cap: no jump
+        amplitude = 0.4f * (float) railInWindow.getHeight();
+        centreY = juce::jlimit ((float) railInWindow.getY() + amplitude, (float) railInWindow.getBottom() - amplitude, startY);
+        t0 = juce::Time::getMillisecondCounterHiRes();
+        inject (x, startY, false);
+        juce::ModifierKeys::currentModifiers = juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier);
+        inject (x, startY, true);
+        active = true;
+        startTimer (8);
+    }
+
+    // message thread
+    void framePainted (double now, juce::Rectangle<int> area)
+    {
+        if (pending.empty() || ! area.intersects (watch))
+            return;
+        for (const auto t : pending)
+            latencies.push_back (now - t);
+        pending.clear();
+        ++framesOverFader;
+    }
+
+    juce::String stop()
+    {
+        stopTimer();
+        active = false;
+        valueAtRelease = engine->getSong().mixer[(std::size_t) track].volume;
+        juce::ModifierKeys::currentModifiers = {};
+        inject (x, lastY, false);
+        juce::String text;
+        text << "    drag of insert " << track << "'s fader" << (visible ? "" : " (NOT VISIBLE)") << ": " << moves << " moves handled, " << dropped
+             << " folded into the next (the message thread still busy with the previous one)\n"
+             << "    move waited for the message thread: " << describe (queueDelays) << "\n"
+             << "    input -> paint (move to the first frame over the fader): " << describe (latencies) << ", " << framesOverFader
+             << " frames over the fader\n";
+        return text;
+    }
+
+    juce::String released() const
+    {
+        const auto now = engine->getSong().mixer[(std::size_t) track].volume;
+        return "    after the release: fader " + juce::String (now, 4) + " (" + juce::String (valueAtRelease, 4) + " when released) "
+               + (std::abs (now - valueAtRelease) < 1.0e-4f ? "kept" : "CHANGED") + "\n";
+    }
+
+private:
+    juce::Component* window = nullptr;
+    lynx::AudioEngine* engine = nullptr;
+    int track = 1;
+    juce::Rectangle<int> railInWindow, watch;
+    bool visible = false;
+    float x = 0.0f, startY = 0.0f, centreY = 0.0f, amplitude = 0.0f, lastY = 0.0f;
+    double t0 = 0.0;
+    std::atomic<bool> active { false }, posted { false };
+    std::atomic<int> dropped { 0 };
+    int moves = 0, framesOverFader = 0;
+    float valueAtRelease = 0.0f;
+    std::vector<double> pending, latencies, queueDelays;
+
+    static juce::String describe (std::vector<double> v)
+    {
+        if (v.empty())
+            return "none";
+        std::sort (v.begin(), v.end());
+        const auto at = [&v] (double q) { return v[std::min (v.size() - 1, (std::size_t) (q * (double) v.size()))]; };
+        return "p50 " + juce::String (at (0.5), 1) + " / p95 " + juce::String (at (0.95), 1) + " / p99 " + juce::String (at (0.99), 1) + " / max "
+               + juce::String (v.back(), 1) + " ms";
+    }
+
+    void inject (float px, float py, bool down)
+    {
+        lastY = py;
+        if (auto* peer = window != nullptr ? window->getPeer() : nullptr)
+        {
+            const auto local = peer->globalToLocal (window->localPointToGlobal (juce::Point<float> (px, py)));
+            peer->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, local,
+                                    down ? juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier) : juce::ModifierKeys(),
+                                    juce::MouseInputSource::defaultPressure, juce::MouseInputSource::defaultOrientation,
+                                    juce::Time::currentTimeMillis());
+        }
+    }
+
+    void hiResTimerCallback() override
+    {
+        if (! active.load())
+            return;
+        if (posted.exchange (true))
+        {
+            ++dropped;
+            return;
+        }
+        const auto postedAt = juce::Time::getMillisecondCounterHiRes();
+        juce::MessageManager::callAsync ([self = shared_from_this(), postedAt] {
+            self->posted = false;
+            if (! self->active.load())
+                return;
+            const auto now = juce::Time::getMillisecondCounterHiRes();
+            self->queueDelays.push_back (now - postedAt);
+            // up and down ~1.3 times a second, like the reporter's hand
+            const auto y = self->centreY + self->amplitude * (float) std::sin (2.0 * juce::MathConstants<double>::pi * 1.3 * (now - self->t0) / 1000.0);
+            self->inject (self->x, y, true);
+            self->pending.push_back (postedAt);
+            ++self->moves;
+        });
+    }
+};
 
 class LynxApplication final : public juce::JUCEApplication
 {
@@ -4499,6 +4629,7 @@ private:
             std::function<void()> setup;
             std::function<void (int)> action; // per frame; none: the step watches the window for `frames` ms
             int frames;
+            std::function<juce::String()> finish = {}; // round 173f: after the step, its own lines for the report
         };
 
         struct UiPerf final : juce::Timer
@@ -4510,8 +4641,12 @@ private:
             std::size_t step = 0;
             int frame = -1;
             std::vector<double> times, rendered; // whole frames (event + paint + blit, when this timer paints) / the window's paints
+            std::vector<double> frames;          // round 173f: the time of every frame the window painted (ui/FrameProbe.h)
             double setupMs = 0.0, wallStart = 0.0;
             double cpuStart = 0.0; // process CPU seconds (std::clock is wall time on Windows)
+            double messageCpuStart = 0.0; // the message thread's CPU seconds
+            double audioLoadSum = 0.0;    // the device's CPU use (AudioDeviceManager::getCpuUsage), summed per tick
+            int audioLoadTicks = 0;
 
             UiPerf (LynxApplication& a, juce::File r) : app (a), report (std::move (r)) {}
 
@@ -4543,11 +4678,17 @@ private:
                     setupMs = juce::Time::getMillisecondCounterHiRes() - t0;
                     times.clear();
                     rendered.clear();
+                    frames.clear();
                     wallStart = juce::Time::getMillisecondCounterHiRes();
                     cpuStart = lynx::processCpuSeconds();
+                    messageCpuStart = lynx::threadCpuSeconds();
+                    audioLoadSum = 0.0;
+                    audioLoadTicks = 0;
                     frame = 0;
                     return;
                 }
+                audioLoadSum += app.engine->getDeviceManager().getCpuUsage();
+                ++audioLoadTicks;
                 if (s.action)
                     s.action (frame);
                 if (const auto ms = paintNow(); ms > 0.25) // (nothing to paint: not a frame)
@@ -4558,10 +4699,16 @@ private:
 
                 const auto wall = juce::Time::getMillisecondCounterHiRes() - wallStart;
                 const auto cpu = 1000.0 * (lynx::processCpuSeconds() - cpuStart);
+                const auto messageCpu = 1000.0 * (lynx::threadCpuSeconds() - messageCpuStart);
                 text << s.name << ": show " << juce::String (setupMs, 1) << " ms\n"
                      << "    painted frames: " << stats (rendered) << "\n"
                      << "    timed here (event + paint + blit): " << stats (times)
-                     << "\n    CPU " << juce::String (wall > 0.0 ? 100.0 * cpu / wall : 0.0, 0) << "% (process, " << juce::String (wall / 1000.0, 1) << " s)\n";
+                     << "\n    window frames (probe): " << lynx::ui::FrameStats::of (frames, wall).describe()
+                     << "\n    CPU " << juce::String (wall > 0.0 ? 100.0 * cpu / wall : 0.0, 0) << "% (process, " << juce::String (wall / 1000.0, 1) << " s), message thread "
+                     << juce::String (wall > 0.0 ? 100.0 * messageCpu / wall : 0.0, 1) << "%, audio device "
+                     << juce::String (audioLoadTicks > 0 ? 100.0 * audioLoadSum / audioLoadTicks : 0.0, 1) << "%\n";
+                if (s.finish)
+                    text << s.finish();
                 juce::File (report).replaceWithText (text);
                 ++step;
                 frame = -1;
@@ -4591,6 +4738,7 @@ private:
                     juce::ignoreUnused (juce::Desktop::getInstance().getMainMouseSource().getScreenPosition());
                 text << "mouse position query: " << juce::String ((juce::Time::getMillisecondCounterHiRes() - q0) / 100.0, 3) << " ms\n";
                 app.mainWindow->onFrame = nullptr;
+                app.mainWindow->watchFrames ({});
                 app.engine->stop();
                 text << "result=OK\n";
                 report.replaceWithText (text);
@@ -4613,6 +4761,13 @@ private:
 
         auto run = std::make_unique<UiPerf> (*this, report);
         mainWindow->onFrame = [r = run.get()] (double ms) { if (r->frame >= 0) r->rendered.push_back (ms); };
+        // round 173f: every frame the window paints; a fader drag's moves count as shown when a frame covers the fader
+        auto drag = std::make_shared<UiPerfDrag>();
+        mainWindow->watchFrames ([r = run.get(), drag] (double now, juce::Rectangle<int> area) {
+            if (r->frame >= 0)
+                r->frames.push_back (now);
+            drag->framePainted (now, area);
+        });
         run->text << "project: " << project.getFullPathName() << "\n"
                    << "LYNX " << getApplicationVersion() << ", " << juce::SystemStats::getOperatingSystemName() << ", "
                    << juce::SystemStats::getCpuModel() << ", window " << mainWindow->getWidth() << "x" << mainWindow->getHeight()
@@ -4621,6 +4776,22 @@ private:
                    << ", audio device " << (engine->getDeviceManager().getCurrentAudioDevice() != nullptr ? engine->getDeviceManager().getCurrentAudioDevice()->getName() : juce::String ("none")) << "\n"
                    << "load " << juce::String (loadMs / 1000.0, 2) << " s\n";
         const auto none = juce::ModifierKeys();
+        // discussion #10 (round 173f): the reporter's screen — the Channel Rack and the Mixer open, the pattern playing —
+        // watched as it is, then insert 3's fader dragged up and down with the mouse (125 moves a second through the
+        // window's own mouse path, the frames painted as the window paints them)
+        const auto dragTrack = engine->getSong().mixer.size() > 3 ? 3 : 1;
+        run->steps.push_back ({ "rack + mixer, pattern playing", [this, ui] {
+                                   ui->showPanelsForSnapshot ({ lynx::workspace::Panel::channelRack, lynx::workspace::Panel::mixer });
+                                   engine->getTransport().songMode = false;
+                                   engine->rewind();
+                                   engine->play();
+                               }, {}, 4000 });
+        run->steps.push_back ({ "fader drag by mouse, rack + mixer, pattern playing", [this, ui, drag, dragTrack] {
+                                   auto& strips = ui->getMixerForSnapshot().getStripsForSnapshot();
+                                   const auto rail = strips.faderRailForSnapshot (dragTrack);
+                                   drag->start (*mainWindow, strips, rail, engine.get(), dragTrack);
+                               }, {}, 3000, [drag] { return drag->stop(); } });
+        run->steps.push_back ({ "after the drag (released)", {}, {}, 600, [drag] { return drag->released(); } });
         run->steps.push_back ({ "desktop, playing", [this, ui] { ui->showDesktopForSnapshot (false); engine->rewind(); engine->play(); }, {}, 3000 });
         run->steps.push_back ({ "mixer maximised, playing", [ui] { ui->selectTabForSnapshot (3); }, {}, 3000 });
         run->steps.push_back ({ "mixer scroll", {}, [wheelAt, ui, none] (int f) { wheelAt (ui->getMixerForSnapshot(), 0.0f, f < 30 ? -0.25f : 0.25f, none); }, 60 });
@@ -10032,6 +10203,8 @@ private:
         // Shows the window (built hidden while the splash screen is up).
         void reveal()
         {
+            if (lynx::uitrace::enabled()) // LYNX_TRACE_UI: the frames per second and the longest gap in ui.log (round 173f)
+                watchFrames ({});
             setVisible (true);
             lynx::applyWindowChrome (*this);
             lynx::fitWindowOnScreen (*this); // a size saved at another UI zoom still fits (round 163)
@@ -10058,6 +10231,30 @@ private:
 
         void closeButtonPressed() override { JUCEApplication::getInstance()->systemRequestedQuit(); }
 
+        // Every frame the window paints, with its dirty area (ui/FrameProbe.h; --uiperf, LYNX_TRACE_UI). The trace keeps
+        // counting when --uiperf watches too.
+        void watchFrames (std::function<void (double, juce::Rectangle<int>)> callback)
+        {
+            if (probe == nullptr)
+            {
+                probe = std::make_unique<lynx::ui::FrameProbe>();
+                Component::addAndMakeVisible (*probe); // (ResizableWindow hides the plain overload)
+                probe->setBounds (getLocalBounds());
+            }
+            probe->onFrame = [callback = std::move (callback)] (double now, juce::Rectangle<int> area) {
+                if (lynx::uitrace::enabled())
+                    lynx::uitrace::frame (now);
+                if (callback)
+                    callback (now, area);
+            };
+        }
+        void resized() override
+        {
+            DocumentWindow::resized();
+            if (probe != nullptr)
+                probe->setBounds (getLocalBounds());
+        }
+
         // --uiperf: the time of each frame the window paints (its own paint, then every child's, up to the last)
         std::function<void (double)> onFrame;
         void paint (juce::Graphics& g) override
@@ -10076,6 +10273,7 @@ private:
 
     private:
         lynx::MainComponent* content = nullptr; // owned by the window
+        std::unique_ptr<lynx::ui::FrameProbe> probe; // (on top of the content; see watchFrames)
         double frameStart = 0.0;
         bool maximiseOnReveal = false;
 
