@@ -278,17 +278,17 @@ struct StyleDef
     double baseDb = 0.0, upSlope = 0.0;
 };
 constexpr StyleDef styleDefs[allStyles] {
-    { 0.263, 0.519, 1.082, 7.60, 0.487, Curve::downward, 0.0, 1.09, 1.000, 8.56, 0.464, 0.54 }, // clean
-    { 0.382, 0.223, 0.862, 16.28, 0.488, Curve::downward, 0.0, 0.00, 1.000, 4.61, 1.000, 0.86 }, // allround
+    { 0.334, 0.850, 1.080, 5.30, 0.607, Curve::downward, 0.0, 1.09, 1.000, 5.68, 0.464, 1.00, 0.00, 0.000 }, // clean
+    { 0.796, 0.288, 0.814, 18.87, 0.360, Curve::downward, 0.0, 0.00, 1.000, 2.88, 1.616, 1.00, 0.00, 0.000 }, // allround
     { 0.310, 0.580, 0.722, 6.21, 0.800, Curve::downward, 0.0, 0.00, 1.000, 0.00, 0.002, 0.71 }, // punch
-    { 0.000, 41.775, 1.200, 0.00, 0.000, Curve::upward, 0.0, -4.87, 0.670, 51.42, 0.002, 0.77, 0.00, 0.000 }, // upward
-    { 0.002, 0.002, 0.000, 11.04, 1.000, Curve::twoWay, 1.3, -0.71, 0.800, 3.46, 0.019, 0.70, -0.43, 0.487 }, // two-way (recovers within about a millisecond)
-    { 45.680, 0.076, 0.470, 0.00, 0.000, Curve::downward, 0.0, 3.42, 1.000, 39.36, 1.000, 1.00, 0.0, 0.0 }, // vari-mu
-    { 1.150, 0.564, 0.402, 20.80, 0.000, Curve::downward, 0.0, -0.58, 1.000, 0.00, 0.002, 1.00, 0.00, 0.000 }, // classic
+    { 0.000, 1.547, 0.696, 2.88, 0.000, Curve::upward, 0.0, -5.41, 0.812, 44.32, 0.807, 0.87, -0.80, 0.000 }, // upward
+    { 0.235, 0.010, 0.000, 0.00, 1.000, Curve::twoWay, 1.3, 0.00, 0.808, 0.00, 0.002, 0.00, -5.75, 0.473 }, // two-way (round 108's fit: the bank refit lost the −18 dB threshold stairs; recovers within about a millisecond)
+    { 0.335, 0.650, 0.980, 0.00, 1.000, Curve::variMu, 0.0, 0.00, 1.000, 0.00, 0.002, 0.00, 0.00, 0.000 }, // vari-mu (round 108's fit)
+    { 0.300, 1.570, 0.530, 4.00, 0.170, Curve::downward, 0.0, 0.00, 1.000, 0.00, 0.002, 0.00, 0.00, 0.000 }, // classic (round 108's fit)
     { 0.169, 0.789, 0.880, 7.27, 0.722, Curve::downward, 0.0, 0.77, 1.000, 2.88, 0.750, 0.39 }, // opto
     { 1.611, 0.712, 0.000, 8.40, 0.000, Curve::vocal, 0.0, -0.17, 3.000, 0.00, 0.002, 0.96, 0.00, 0.000 }, // vocal
-    { 0.027, 1.093, 0.510, 7.39, 0.608, Curve::downward, 0.0, 0.00, 1.000, 9.41, 0.045, 0.93 }, // bus
-    { 0.002, 1.582, 0.800, 0.00, 0.952, Curve::downward, 0.0, 0.00, 1.000, 0.00, 0.002, 0.46, 0.0, 0.0 }, // pumping
+    { 0.240, 3.570, 0.190, 0.00, 1.000, Curve::downward, 0.0, 0.00, 1.000, 0.00, 0.002, 0.00, 0.00, 0.000 }, // bus (round 108's fit)
+    { 0.080, 2.360, 1.000, 0.00, 1.000, Curve::downward, 0.0, 0.00, 1.000, 0.00, 0.002, 0.00, 0.00, 0.000 }, // pumping (round 108's fit)
     { 0.878, 0.102, 0.750, 17.92, 0.176, Curve::downward, 0.0, 1.86, 1.000, 28.04, 3.320, 1.00, 0.00, 0.000 }, // smooth (voicing)
     { 0.570, 0.223, 0.990, 13.98, 0.488, Curve::downward, 0.0, 0.00, 1.000, 4.61, 1.000, 1.00, 0.0, 0.0 }, // op-el (voicing)
     { 0.023, 3.667, 0.190, 1.69, 0.808, Curve::downward, 0.0, -0.77, 1.000, 0.00, 3.165, 0.83, 0.00, 0.000 }, // mastering (voicing)
@@ -352,7 +352,9 @@ double curveGain (Style st, double x, double thr, double r, double knee, double 
             // the threshold the gain holds; the corner is softened over the style's knee
             const auto kn = d.kneeAdd + d.kneeScale * knee + d.kneeSlope * s;
             const auto softMin = x - kneeCurve (x - thr, 1.0, kn);
-            const auto g = s * d.slopeScale * (thr + d.offsetDb - softMin);
+            // round tp172b2 [EXEC] (Pro-C 3 trial, 1 kHz stairs at thresholds −36 … −18): the level held above the
+            // threshold sinks as the threshold rises (−1.4 dB at −30, −7.9 dB at −18, ratio 4): baseDb per dB over −30
+            const auto g = s * d.slopeScale * (thr + d.offsetDb + d.baseDb * (thr + 30.0) - softMin);
             // round tp172b3 [EXEC] (the Pro-C 3 trial, Upward, drums and bursts after digital silence): the lift stops
             // at 30 dB whatever the range (a 30 ms attack lets the first hit through 29.5 dB up, as the original)
             return std::clamp (g, -range, std::min (range, upwardCapDb));
