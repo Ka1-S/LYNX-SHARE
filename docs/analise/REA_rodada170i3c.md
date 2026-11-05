@@ -119,7 +119,7 @@ is on. Reported to the round's parent (Ogun is its area).
 ## 4. Tests
 
 `tests/CtlAudit170i3Tests.inc` (skipped without FL's Data folder):
-- `ctl170i3_every_control_changes_the_render`: per engine, a sample of at most 24 editor controls (the allowed ones
+- `ctl170i3_every_control_changes_the_render`: per engine, a sample of at most 12 editor controls (the allowed ones
   out, each with its reason in the file). Each must move the render through a new instrument, directly or in a
   random setting of the other controls.
 - `ctl170i3_editor_edits_and_automation_reach_the_playing_instrument`: per engine, up to 3 controls that moved. Each

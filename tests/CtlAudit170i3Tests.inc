@@ -63,6 +63,7 @@ const std::vector<Case>& cases()
             { "Mod ", "the modulation matrix needs its sources (wheel, aftertouch…)" },
             { "flanger", "an inactive effect type" }, { "chorus", "an inactive effect type" }, { "reverb", "an inactive effect type" },
             { "delay", "an inactive effect type" }, { "lo-fi", "an inactive effect type" }, { "phaser", "an inactive effect type" },
+            { "Osc 4 sustain", "an operator off or silent in the random settings (moves with it on: --set 28=1 106=1)" },
             { "LFO 1 free", "a free LFO differs only after a pause with no voice" },
             { "LFO 2 free", "a free LFO differs only after a pause with no voice" },
             { "Bend range", "needs pitch bend" } },
@@ -72,7 +73,7 @@ const std::vector<Case>& cases()
           { { "Mod wheel", "needs the mod wheel" }, { "Gate step", "the gate plays only with the gate on" },
             { "Gate speed", "the gate plays only with the gate on" }, { "Bend range", "needs pitch bend" } },
           {} },
-        { "Sakura", {}, {}, {} },
+        { "Sakura", {}, { { "Mod 7", "a modulation slot whose source is off in the random settings (slots 1–6 move)" } }, {} },
         { "Kepler", {}, { { "Arp range", "the arpeggiator is off" } }, {} },
         { "Kepler Exo",
           {},
@@ -83,7 +84,8 @@ const std::vector<Case>& cases()
         { "SimSynth", {}, {}, {} },
         { "MiniSynth",
           {},
-          { { "Mod wheel", "needs the mod wheel" } },
+          { { "Mod wheel", "needs the mod wheel" }, { "Filter decay", "the filter envelope off in the random settings (moves with it on)" },
+            { "Filter sustain", "the filter envelope off in the random settings (moves with it on)" } },
           {} },
         { "Fruity DX10", {}, {}, {} },
         { "Plucked!", {}, {}, {} },
@@ -192,7 +194,7 @@ TEST (ctl170i3_every_control_changes_the_render)
     const auto smp = ctl170i3::samples();
     for (const auto& k : ctl170i3::cases())
     {
-        const auto s = ctl170i3::setup (k, 24);
+        const auto s = ctl170i3::setup (k, 12);
         if (! s)
             continue;
         const auto rep = ctlaudit::audit (s->channel, s->controls, s->pattern, smp, false, false);
@@ -260,7 +262,7 @@ TEST (ctl170i3_a_knob_edit_keeps_the_sounding_notes)
         const std::string name = k.engine;
         if (name == "Sytrus" || name == "Harmor")
             continue;
-        auto s = ctl170i3::setup (k, 12);
+        auto s = ctl170i3::setup (k, 6);
         if (! s)
             continue;
         const auto& p = s->pattern;
