@@ -7199,3 +7199,12 @@ countries: nl be
 "Steps use channel colour" = "Stappen in de kanaalkleur"
 "E type|G type" = "E-type|G-type"
 "Modern console" = "Moderne console"
+
+# round tp172b: LuxeVerb's Space engine
+"LuxeVerb|Space" = "LuxeVerb|Ruimte"
+"Modern|Vintage|Plate" = "Modern|Vintage|Plaat"
+"Distance" = "Afstand"
+"Decay rate" = "Uitsterfsnelheid"
+"Decay EQ" = "Uitsterf-EQ"
+"Low decay" = "Laag uitsterven"
+"High decay" = "Hoog uitsterven"

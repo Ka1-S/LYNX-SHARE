@@ -7199,3 +7199,12 @@ countries: de at ch li lu
 "Steps use channel colour" = "Steps in Kanalfarbe"
 "E type|G type" = "E-Typ|G-Typ"
 "Modern console" = "Moderne Konsole"
+
+# round tp172b: LuxeVerb's Space engine
+"LuxeVerb|Space" = "LuxeVerb|Raum"
+"Modern|Vintage|Plate" = "Modern|Vintage|Platte"
+"Distance" = "Abstand"
+"Decay rate" = "Abklingrate"
+"Decay EQ" = "Abkling-EQ"
+"Low decay" = "Tiefen-Abklingen"
+"High decay" = "Höhen-Abklingen"

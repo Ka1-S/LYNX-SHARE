@@ -7199,3 +7199,12 @@ countries: jp
 "Steps use channel colour" = "ステップにチャンネルの色を使う"
 "E type|G type" = "Eタイプ|Gタイプ"
 "Modern console" = "モダンコンソール"
+
+# round tp172b: LuxeVerb's Space engine
+"LuxeVerb|Space" = "LuxeVerb|スペース"
+"Modern|Vintage|Plate" = "モダン|ヴィンテージ|プレート"
+"Distance" = "距離"
+"Decay rate" = "ディケイ・レート"
+"Decay EQ" = "ディケイEQ"
+"Low decay" = "低域ディケイ"
+"High decay" = "高域ディケイ"

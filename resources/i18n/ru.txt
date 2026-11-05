@@ -7199,3 +7199,12 @@ countries: ru by kz
 "Steps use channel colour" = "Шаги в цвете канала"
 "E type|G type" = "Тип E|Тип G"
 "Modern console" = "Современная консоль"
+
+# round tp172b: LuxeVerb's Space engine
+"LuxeVerb|Space" = "LuxeVerb|Пространство"
+"Modern|Vintage|Plate" = "Модерн|Винтаж|Пластина"
+"Distance" = "Дистанция"
+"Decay rate" = "Скорость затухания"
+"Decay EQ" = "EQ затухания"
+"Low decay" = "Затухание НЧ"
+"High decay" = "Затухание ВЧ"

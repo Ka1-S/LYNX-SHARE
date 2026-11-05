@@ -7199,3 +7199,12 @@ countries: kr
 "Steps use channel colour" = "스텝에 채널 색상 사용"
 "E type|G type" = "E 타입|G 타입"
 "Modern console" = "모던 콘솔"
+
+# round tp172b: LuxeVerb's Space engine
+"LuxeVerb|Space" = "LuxeVerb|스페이스"
+"Modern|Vintage|Plate" = "모던|빈티지|플레이트"
+"Distance" = "거리"
+"Decay rate" = "디케이 비율"
+"Decay EQ" = "디케이 EQ"
+"Low decay" = "저역 디케이"
+"High decay" = "고역 디케이"

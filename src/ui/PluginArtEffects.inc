@@ -41,9 +41,9 @@ inline const Theme& facetTheme()
         Theme x;
         x.name = "Facet EQ";
         x.base = Style::glow;
-        x.pal = { Colour (0xff161e2b), Colour (0xff090d14), Colour (0xffffc95a), Colour (0xff66d6ff), Colour (0xd8172030), Colour (0xe80e131c),
-                  Colour (0xff7189ab), Colour (0xffe7eef8), Colour (0xff070a10), Colour (0xff2a3446), Colour (0xff141a25), Colour (0xff2a3446),
-                  Colour (0xfff4f7fb), Colour (0xff151c28) };
+        x.pal = { Colour (0xff1f1d1c), Colour (0xff0d0c0c), Colour (0xffffc84a), Colour (0xff7fd0ff), Colour (0xd820201f), Colour (0xe80f0f0e),
+                  Colour (0xff6a6560), Colour (0xfff2eee6), Colour (0xff090808), Colour (0xff35322f), Colour (0xff1a1817), Colour (0xff2c2a28),
+                  Colour (0xfff7f3ea), Colour (0xff1c1a19) };
         x.canvas = canvasFacet;
         x.thin = true;
         x.kerning = 0.06f;
@@ -420,7 +420,8 @@ inline const Theme& crestTheme()
         x.titleEmblem = crestEmblem;
         x.cap = Cap::flat;
         x.pointer = Pointer::glowLine;
-        x.arcGlow = 0.25f;
+        x.arcGlow = 0.06f;
+        x.thin = true; // round tp172b: the reference's look
         return x;
     }();
     return t;
@@ -484,13 +485,13 @@ inline const Theme& apexTheme()
         Theme x;
         x.name = "Apex Limiter";
         x.base = Style::glow;
-        x.pal = { Colour (0xff131c27), Colour (0xff05080c), Colour (0xff4fb3ff), Colour (0xffd9ecff), Colour (0x9c131c27), Colour (0xb8070b10),
-                  Colour (0xff4f6f92), Colour (0xffe6f1ff), Colour (0xff04070b), Colour (0xffc9d2dc), Colour (0xff59626d), Colour (0xff17212c),
-                  Colour (0xff0f1720), Colour (0xff17202b) };
+        x.pal = { Colour (0xff1d1b1e), Colour (0xff0d0c0e), Colour (0xffe0404a), Colour (0xffd8d8de), Colour (0x9c1e1c20), Colour (0xb80c0b0d),
+                  Colour (0xff5a4f55), Colour (0xfff0e8ea), Colour (0xff09080a), Colour (0xff3a373b), Colour (0xff1d1b1e), Colour (0xff2a2629),
+                  Colour (0xfff2f0f2), Colour (0xff1f1d21) };
         x.canvas = canvasApex;
         x.titleEmblem = apexEmblem;
-        x.drawCap = capBrushed;
-        x.arcGlow = 0.22f;
+        x.arcGlow = 0.08f;
+        x.thin = true; // round tp172b: the reference's look
         return x;
     }();
     return t;
@@ -557,13 +558,15 @@ inline const Theme& prismTheme()
         Theme x;
         x.name = "Prism Multiband";
         x.base = Style::glow;
-        x.pal = { Colour (0xff17141f), Colour (0xff07060b), Colour (0xffb98cff), Colour (0xff6fe3ff), Colour (0x9c191624), Colour (0xb80a0910),
-                  Colour (0xff8e86b0), Colour (0xfff0ecff), Colour (0xff050409), Colour (0xff3b3552), Colour (0xff100e18), Colour (0xff221f2e),
-                  Colour (0xffffffff), Colour (0xff1a1724) };
+        x.pal = { Colour (0xff222124), Colour (0xff0f0f11), Colour (0xffffc23a), Colour (0xff8fd0ff), Colour (0x9c242326), Colour (0xb80e0e10),
+                  Colour (0xff5d5a60), Colour (0xfff2efe8), Colour (0xff0a0a0b), Colour (0xff38363a), Colour (0xff1c1b1e), Colour (0xff2b2a2e),
+                  Colour (0xfffff3d6), Colour (0xff1f1e22) };
         x.canvas = canvasPrism;
         x.titleEmblem = prismEmblem;
-        x.twoTone = true;
-        x.cap = Cap::orb;
+        x.twoTone = false;
+        x.cap = Cap::flat;
+        x.thin = true; // round tp172b: the reference's look
+        x.arcGlow = 0.08f; // round tp172b: the reference's look
         return x;
     }();
     return t;
@@ -632,16 +635,15 @@ inline const Theme& sentryTheme()
     {
         Theme x;
         x.name = "Sentry Gate";
-        x.base = Style::hardware;
-        x.pal = { Colour (0xff1a252c), Colour (0xff070b0e), Colour (0xffffc864), Colour (0xff6fc6c0), Colour (0x9c182228), Colour (0xb80a0f12),
-                  Colour (0xff5b6a70), Colour (0xffeee4cc), Colour (0xff050709), Colour (0xff3a3f42), Colour (0xff111315), Colour (0xff1c2428),
-                  Colour (0xffffe2a8), Colour (0xff192127) };
+        x.base = Style::glow;
+        x.pal = { Colour (0xff3d4560), Colour (0xff262b3d), Colour (0xff8fb4ff), Colour (0xffe8ecf6), Colour (0x9c434b66), Colour (0xb82a3043),
+                  Colour (0xff6c7593), Colour (0xffeef1fa), Colour (0xff1c2030), Colour (0xffd7dced), Colour (0xff8a93ad), Colour (0xff2b3146),
+                  Colour (0xff1d2232), Colour (0xff30364b) };
         x.canvas = canvasSentry;
-        x.sectionDeco = sentryRivets;
         x.titleEmblem = sentryEmblem;
-        x.drawCap = capIron;
-        x.pointer = Pointer::glowLine;
-        x.arcGlow = 0.2f;
+        x.pointer = Pointer::line;
+        x.arcGlow = 0.05f;
+        x.cap = Cap::porcelain; // round tp172b: the reference's look
         return x;
     }();
     return t;
@@ -759,13 +761,14 @@ inline const Theme& hushTheme()
         Theme x;
         x.name = "Hush De-esser";
         x.base = Style::glow;
-        x.pal = { Colour (0xff261b35), Colour (0xff0b0910), Colour (0xffc792ff), Colour (0xffffb3e0), Colour (0x9c221830), Colour (0xb80d0a13),
-                  Colour (0xff86709e), Colour (0xfff1e8ff), Colour (0xff07050b), Colour (0xff3a2e4c), Colour (0xff17121f), Colour (0xff221a2e),
-                  Colour (0xfff6eaff), Colour (0xff1e1729) };
+        x.pal = { Colour (0xff3a3a33), Colour (0xff23231f), Colour (0xffe8b923), Colour (0xff9fd36a), Colour (0x9c3d3d36), Colour (0xb8262622),
+                  Colour (0xff6b6a5c), Colour (0xffeeeadb), Colour (0xff1b1b18), Colour (0xfff5cf45), Colour (0xffb88a10), Colour (0xff2e2e29),
+                  Colour (0xfffff6d8), Colour (0xff34342e) };
         x.canvas = canvasHush;
         x.titleEmblem = hushEmblem;
-        x.drawCap = capVelvet;
-        x.twoTone = true;
+        x.twoTone = false;
+        x.cap = Cap::orb; // round tp172b: the reference's look
+        x.arcGlow = 0.06f; // round tp172b: the reference's look
         return x;
     }();
     return t;

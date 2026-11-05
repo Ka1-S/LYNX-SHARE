@@ -554,8 +554,15 @@ private:
         c.rat = ratioOf (p[ratio]);
         c.kn = kneeDb (p[knee]);
         c.rng = std::max (0.01, rangeDb (p[range]));
-        c.aA = coef (std::max (0.002, attackMs (p[attack]) * sd.attackScale), rate);
-        c.relMs = std::max (0.5, releaseTau (sd, releaseMs (p[release])));
+        // round tp172b [EXEC] (Pro-C 3 trial, equal-RMS sine / noise stairs and −40 → −6 → −40 dBFS steps): Clean's, Allround's and
+        // Opto's detector never follows faster than τ = 1 ms (noise at the fastest attack read only ~1.5 dB over a sine of the same RMS,
+        // not ~4.5), and the release shortens as the attack lengthens — 50 % release 63 / 84 / 66 ms at attack 0.1 / 10 /
+        // 30 ms (release 100 / 200 / 200), ~17 ms at attack = release = 100 ms, where a steady sine sags 4.5 dB
+        const auto att = attackMs (p[attack]);
+        const auto releaseByAttack = (1.0 + std::pow (10.0 / 50.0, 1.5)) / (1.0 + std::pow (att / 50.0, 1.5));
+        const bool floored = c.st == Style::clean || c.st == Style::allround || c.st == Style::opto; // measured; Punch has none
+        c.aA = coef (std::max (floored ? 1.0 : 0.002, att * sd.attackScale), rate);
+        c.relMs = std::max (0.5, releaseTau (sd, releaseMs (p[release])) * releaseByAttack);
         c.autoRel = on (p[autoRelease]) && sd.curve != Curve::twoWay;
         c.rate = rate;
         c.slowCoef = coef (1000.0, rate);
@@ -658,7 +665,13 @@ private:
         if (on (p[autoGain]) && styleDefs[(int) st].curve != Curve::upward)
         {
             const auto rng = std::max (0.01, rangeDb (p[range]));
-            makeup = (float) dbToGain (std::min (rng, -0.5 * curveGain (st, 0.0, thresholdDb (p[threshold]), ratioOf (p[ratio]), kneeDb (p[knee]), rng)));
+            // round tp172b [EXEC] (1 kHz stairs through the reference, 32 settings): its auto gain makes up ~0.36 of the
+            // plain downward curve's reduction at 0 dBFS (threshold, ratio, knee, range), the same for every downward
+            // style, scaled down by a slow attack: 1 / (1 + (attack / 12 ms)^1.1) (+5.1 dB at 0.005 ms, +2.8 at 10 ms,
+            // +0.9 at 50 ms, +0.0 at 250 ms with the defaults; release and look-ahead don't change it). It was half of
+            // the style's own curve whatever the attack (+6.8 dB at the defaults, 2 dB louder)
+            const double slowAttack = 1.0 / (1.0 + std::pow (attackMs (p[attack]) / 12.0, 1.1));
+            makeup = (float) dbToGain (std::min (rng, -0.36 * slowAttack * curveGain (Style::clean, 0.0, thresholdDb (p[threshold]), ratioOf (p[ratio]), kneeDb (p[knee]), rng)));
         }
         const auto mode = linkModeOf (p[linkMode]);
         const bool ms = mode != LinkMode::stereo;
@@ -2182,23 +2195,40 @@ constexpr StyleDef styleDefs[styles] {
     { 4.3, 0.15, 0.49, 120.0, 0.25, 0.50 }, // clean
     { 0.2, 17.0, 0.49, 100.0, 0.20, 0.50 }, // vocal
     { 0.0, 0.7, 0.49, 20.0, 0.05, 0.60 },   // guitar (its release waits ~110 ms, then falls fast)
-    { 0.0, 0.0, 0.49, 45.0, 0.10, 0.50 },   // upward
+    // upward (round tp172b, measured on the reference: the lifted gain falls back slowly — a linear-domain time constant
+    // of ~0.3 s at release 10 ms, ~0.7 s at 150 ms, ~3 s at 1 s)
+    { 0.0, 0.0, 0.49, 273.0, 2.73, 0.50 },
 };
 constexpr double guitarWaitMs = 110.0;
 
-// target gain (dB) for a detector level x
-double gateCurve (const EffectParams& p, double x) noexcept
+// round tp172b [EXEC] (a 1 kHz ramp −60 → 0 → −60 dBFS at 10 dB/s through the reference, threshold −30, ratio 100): an
+// open gate closes this far below the point where it opened (Classic −37.3, Clean −41.0, Vocal −37.8, Guitar −31.9
+// dBFS, less the release's lag on the ramp). The gap shrinks with the ratio: at ratio 2 the reference opens and closes
+// at the same expansion point (−43.9 / −45.9 dB at −6 dB of gain, the rest is the release), hence × (1 − 1 / (ratio − 1)).
+constexpr double closeGapDb[styles] { 6.9, 9.9, 6.7, 0.6, 0.0 };
+
+double closeGap (const EffectParams& p) noexcept
+{
+    const auto st = styleOf (p[style]);
+    const auto r = ratioOf (p[ratio]);
+    return r <= 2.0 ? 0.0 : closeGapDb[(int) st] * (1.0 - 1.0 / (r - 1.0));
+}
+
+// target gain (dB) for a detector level x; `gap`: how far the curve sits below its opening point (an open gate)
+double gateCurve (const EffectParams& p, double x, double gap = 0.0) noexcept
 {
     const auto st = styleOf (p[style]);
     if (st == Style::upward)
     {
         const auto ut = upThresholdDb (p[upThreshold]);
-        return kneeCurve (x - ut, 1.0 - 1.0 / upRatioOf (p[upRatio]), kneeDb (p[knee]));
+        // round tp172b [EXEC]: the reference lifts by (ratio − 1) dB per dB above the upward threshold (threshold −12,
+        // ratio 1.25 / 1.5 / 2 / 3: +1.5 / +3 / +6 / +12 dB at −6 dBFS), not 1 − 1 / ratio
+        return kneeCurve (x - ut, upRatioOf (p[upRatio]) - 1.0, kneeDb (p[knee]));
     }
     const auto r = ratioOf (p[ratio]);
     if (r <= 1.0001)
         return 0.0;
-    const auto start = thresholdDb (p[threshold]) - styleDefs[(int) st].offsetDb / std::max (1.0, r - 1.0);
+    const auto start = thresholdDb (p[threshold]) - styleDefs[(int) st].offsetDb / std::max (1.0, r - 1.0) - gap;
     return -std::min (rangeDb (p[range]), kneeCurve (start - x, r - 1.0, kneeDb (p[knee])));
 }
 } // namespace
@@ -2243,6 +2273,7 @@ public:
         osGain.reset();
         level = 0.0;
         gain = 0.0;
+        isOpen = false;
         holdLeft = 0;
     }
 
@@ -2316,6 +2347,9 @@ private:
         const auto holdSamples = (int) (holdMs (p[hold]) * sd.holdScale * 0.001 * sr)
                                  + (st == Style::guitar ? (int) (guitarWaitMs * 0.001 * sr) : 0);
         const auto levelRel = coef (5.0, sr);
+        const auto gap = st == Style::upward ? 0.0 : closeGap (p);
+        if (gap <= 0.0)
+            isOpen = false;
         const auto dryGain = std::clamp (p[dry], 0.0f, 1.0f);
         const auto outGain = (float) dbToGain (lin (p[output], -24.0, 24.0));
         const auto la = laOn > 0 ? lookaheadMs (p[lookahead]) : 0.0;
@@ -2360,7 +2394,17 @@ private:
             // peak detector: instant attack, 5 ms release
             const auto m = (double) std::max (std::abs (sa), std::abs (sb));
             level = m > level ? m : levelRel * level + (1.0 - levelRel) * m;
-            auto target = dbToGain (gateCurve (p, gainToDb (level)));
+            // round tp172b: hysteresis — the gate opens on the opening curve and, once open, follows the curve shifted
+            // down by the style's gap until the level falls under it
+            const auto levelDb = gainToDb (level);
+            if (gap > 0.0)
+            {
+                if (gateCurve (p, levelDb) >= -1.0)
+                    isOpen = true;
+                else if (gateCurve (p, levelDb, gap) < -1.0)
+                    isOpen = false;
+            }
+            auto target = dbToGain (gateCurve (p, levelDb, isOpen ? gap : 0.0));
             if (duck) // ducking: an open gate is the deepest cut
                 target = duckFloor / std::max (1e-9, target);
             // the gain moves in the linear domain: opening with the attack, closing (after hold) with the release
@@ -2463,6 +2507,7 @@ private:
     MonoDelay gainDelay;
     Biquad hp, lp;
     double level = 0.0, gain = 0.0;
+    bool isOpen = false; // round tp172b: past the opening point (the hysteresis)
     int holdLeft = 0;
     const float* scL = nullptr;
     const float* scR = nullptr;

@@ -15169,6 +15169,7 @@ TEST (slayer_and_fruity_dance_import)
 #include "UiPolish2Tests.inc"
 #include "UiToolbarTests.inc"
 #include "LuxeVerbTests.inc"
+#include "Parity172bTests.inc"
 #include "ConvolverTests.inc"
 
 // --- Newtone / Newtime (REA_rodada73) -----------------------------------------------------------------------------

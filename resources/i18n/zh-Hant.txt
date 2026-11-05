@@ -7199,3 +7199,12 @@ countries: tw hk mo
 "Steps use channel colour" = "步進使用通道顏色"
 "E type|G type" = "E 型|G 型"
 "Modern console" = "現代調音台"
+
+# round tp172b: LuxeVerb's Space engine
+"LuxeVerb|Space" = "LuxeVerb|空間"
+"Modern|Vintage|Plate" = "現代|復古|板式"
+"Distance" = "距離"
+"Decay rate" = "衰減速率"
+"Decay EQ" = "衰減等化"
+"Low decay" = "低頻衰減"
+"High decay" = "高頻衰減"

@@ -7199,3 +7199,12 @@ countries: cn sg
 "Steps use channel colour" = "步进使用通道颜色"
 "E type|G type" = "E 型|G 型"
 "Modern console" = "现代调音台"
+
+# round tp172b: LuxeVerb's Space engine
+"LuxeVerb|Space" = "LuxeVerb|空间"
+"Modern|Vintage|Plate" = "现代|复古|板式"
+"Distance" = "距离"
+"Decay rate" = "衰减速率"
+"Decay EQ" = "衰减均衡"
+"Low decay" = "低频衰减"
+"High decay" = "高频衰减"

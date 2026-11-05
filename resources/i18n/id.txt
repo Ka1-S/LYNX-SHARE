@@ -7199,3 +7199,12 @@ countries: id
 "Steps use channel colour" = "Langkah memakai warna channel"
 "E type|G type" = "Tipe E|Tipe G"
 "Modern console" = "Konsol modern"
+
+# round tp172b: LuxeVerb's Space engine
+"LuxeVerb|Space" = "LuxeVerb|Ruang"
+"Modern|Vintage|Plate" = "Modern|Vintage|Plat"
+"Distance" = "Jarak"
+"Decay rate" = "Laju peluruhan"
+"Decay EQ" = "EQ peluruhan"
+"Low decay" = "Peluruhan rendah"
+"High decay" = "Peluruhan tinggi"

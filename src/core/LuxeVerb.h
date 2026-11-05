@@ -21,6 +21,11 @@ namespace lynx
 {
 constexpr int luxeVerbControlCount = 49;
 constexpr int luxeVerbParamCount = luxeVerbControlCount + 4; // + sync of predelay, feedback delay, feed-forward 1 / 2
+// Round tp172b: the "Space" engine's controls follow FL's (core/SpaceVerb.h, the Pro-R role). They are off by default,
+// so the FL-exact sound and FL's state mapping (the first luxeVerbParamCount values) are unchanged.
+constexpr int luxeVerbSpaceFirst = luxeVerbParamCount;
+constexpr int luxeVerbSpaceCount = 15;
+constexpr int luxeVerbAllParamCount = luxeVerbSpaceFirst + luxeVerbSpaceCount;
 
 std::unique_ptr<Effect> makeLuxeVerb();
 
@@ -32,6 +37,22 @@ std::string luxeVerbParamText (int param, float value01);
 
 namespace luxeverb
 {
+// the Space engine's parameters (positions from luxeVerbSpaceFirst) and their laws
+namespace sp
+{
+enum : int { engine, style, space, rate, distance, brightness, character, thickness, width, predelay, mix, lowMult, lowFreq, highMult, highFreq };
+extern const std::array<const char*, luxeVerbSpaceCount> names;
+extern const std::array<float, luxeVerbSpaceCount> defaults;
+double decaySeconds (float v) noexcept;   // "Space": 0.3 … 10 s (mid-band RT60 at 100 % rate)
+float decayValue (double seconds) noexcept;
+double rateOf (float v) noexcept;         // 25 … 400 % (×0.25 … ×4)
+double predelayMs (float v) noexcept;     // 0 … 500 ms (cubic)
+double multOf (float v) noexcept;         // decay-EQ multiplier ×0.25 … ×4
+double lowHz (float v) noexcept;          // 20 … 2000 Hz
+double highHz (float v) noexcept;         // 500 … 20000 Hz
+std::string text (int index, float v);
+} // namespace sp
+
 struct Range
 {
     int lo, hi;

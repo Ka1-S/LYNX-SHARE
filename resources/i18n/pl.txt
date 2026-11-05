@@ -7199,3 +7199,12 @@ countries: pl
 "Steps use channel colour" = "Kroki w kolorze kanału"
 "E type|G type" = "Typ E|Typ G"
 "Modern console" = "Nowoczesna konsola"
+
+# round tp172b: LuxeVerb's Space engine
+"LuxeVerb|Space" = "LuxeVerb|Przestrzeń"
+"Modern|Vintage|Plate" = "Modern|Vintage|Płyta"
+"Distance" = "Odległość"
+"Decay rate" = "Tempo wybrzmiewania"
+"Decay EQ" = "EQ wybrzmiewania"
+"Low decay" = "Wybrzmiewanie niskie"
+"High decay" = "Wybrzmiewanie wysokie"

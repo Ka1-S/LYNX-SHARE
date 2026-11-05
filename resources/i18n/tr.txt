@@ -7199,3 +7199,12 @@ countries: tr
 "Steps use channel colour" = "Adımlar kanal rengini kullanır"
 "E type|G type" = "E tipi|G tipi"
 "Modern console" = "Modern konsol"
+
+# round tp172b: LuxeVerb's Space engine
+"LuxeVerb|Space" = "LuxeVerb|Alan"
+"Modern|Vintage|Plate" = "Modern|Vintage|Plaka"
+"Distance" = "Mesafe"
+"Decay rate" = "Sönüm oranı"
+"Decay EQ" = "Sönüm EQ"
+"Low decay" = "Alçak sönüm"
+"High decay" = "Yüksek sönüm"

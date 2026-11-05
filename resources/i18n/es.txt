@@ -7199,3 +7199,12 @@ countries: es mx ar co cl pe ve
 "Steps use channel colour" = "Pasos con el color del canal"
 "E type|G type" = "Tipo E|Tipo G"
 "Modern console" = "Consola moderna"
+
+# round tp172b: LuxeVerb's Space engine
+"LuxeVerb|Space" = "LuxeVerb|Espacio"
+"Modern|Vintage|Plate" = "Moderno|Vintage|Placa"
+"Distance" = "Distancia"
+"Decay rate" = "Tasa de caída"
+"Decay EQ" = "EQ de caída"
+"Low decay" = "Caída grave"
+"High decay" = "Caída aguda"

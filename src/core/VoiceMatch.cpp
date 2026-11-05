@@ -979,7 +979,9 @@ void DeEsser::process (float* l, float* r, int n, const Settings& s) noexcept
         if (now >= 0)
         {
             const double la = level[(std::size_t) ((now + ahead) & m)], rr = ratio[(std::size_t) (now & m)];
-            if (! open && la >= thr + openDb && rr >= openRatioDb)
+            if (! s.gate)
+                open = true;
+            else if (! open && la >= thr + openDb && rr >= openRatioDb)
                 open = true;
             else if (open && (la < thr + closeDb || rr < closeRatioDb))
                 open = false;
@@ -990,7 +992,9 @@ void DeEsser::process (float* l, float* r, int n, const Settings& s) noexcept
             if (two)
             {
                 const double lb = blevel[(std::size_t) ((now + ahead) & m)], rb = bratio[(std::size_t) (now & m)];
-                if (! bopen && lb >= thr + openDb && rb >= openRatioDb)
+                if (! s.gate)
+                    bopen = true;
+                else if (! bopen && lb >= thr + openDb && rb >= openRatioDb)
                     bopen = true;
                 else if (bopen && (lb < thr + closeDb || rb < closeRatioDb))
                     bopen = false;

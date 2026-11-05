@@ -7199,3 +7199,12 @@ countries: it ch sm
 "Steps use channel colour" = "Step con il colore del canale"
 "E type|G type" = "Tipo E|Tipo G"
 "Modern console" = "Console moderna"
+
+# round tp172b: LuxeVerb's Space engine
+"LuxeVerb|Space" = "LuxeVerb|Spazio"
+"Modern|Vintage|Plate" = "Moderno|Vintage|Piastra"
+"Distance" = "Distanza"
+"Decay rate" = "Velocità di decadimento"
+"Decay EQ" = "EQ del decadimento"
+"Low decay" = "Decadimento basso"
+"High decay" = "Decadimento alto"
