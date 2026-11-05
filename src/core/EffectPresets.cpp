@@ -383,12 +383,23 @@ std::string toText (EffectKind kind, const std::string& name, const EffectParams
     const auto sendSpan = kind == EffectKind::fruitySend && params.size() > 3 ? flbasic::saveSendSpan ({ params[3] }) : 0;
     if (sendSpan > 0)
         out << sendSpanKey << " = " << sendSpan << "\n";
-    for (std::size_t i = 0; i < info.size() && i < params.size(); ++i)
+    // issue #67: values that read back as the same float, and the hidden parameters after the named ones that hold a
+    // value (the Parametric EQ's FL law, processing, band mask…) as "#index" lines (older versions skip them)
+    EffectSlot slot;
+    slot.kind = kind;
+    slot.params = params;
+    const auto used = std::max (info.size(), savedEffectParamCount (slot));
+    for (std::size_t i = 0; i < used && i < params.size(); ++i)
     {
         char value[32];
         const auto v = sendSpan > 0 && i == 3 ? flbasic::sendTrackValueInSpan (params[i], sendSpan) : params[i];
         std::snprintf (value, sizeof (value), "%.6g", (double) v);
-        out << info[i].name << " = " << value << "\n";
+        if ((float) std::strtod (value, nullptr) != v)
+            std::snprintf (value, sizeof (value), "%.9g", (double) v);
+        if (i < info.size())
+            out << info[i].name << " = " << value << "\n";
+        else
+            out << "#" << i << " = " << value << "\n";
     }
     if (state != nullptr && savesState (kind))
         out << stateKey << " = " << toHex (*state) << "\n";
@@ -424,6 +435,15 @@ std::optional<Loaded> fromText (EffectKind kind, const std::string& text)
             {
                 loaded.state = std::move (*bytes);
                 loaded.hasState = true;
+            }
+        }
+        else if (key.size() > 1 && key[0] == '#' && std::isdigit ((unsigned char) key[1]))
+        {
+            const auto p = std::atoi (key.c_str() + 1); // a hidden parameter (issue #67)
+            if (p >= (int) effectInfo (kind).params.size() && p < maxEffectParams)
+            {
+                loaded.params[(std::size_t) p] = (float) std::clamp (std::atof (value.c_str()), 0.0, 1.0);
+                saved = std::max (saved, (std::size_t) p + 1);
             }
         }
         else if (const auto p = paramByName (kind, key); p >= 0)

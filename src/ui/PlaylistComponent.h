@@ -221,6 +221,7 @@ private:
     double previewPositionBefore = 0.0;
     std::int64_t gridTicks() const; // the grid step in use (resolving Screen / Nearest note)
     std::int64_t snap (double tick, bool enabled) const;
+    std::int64_t snapLine (double tick) const; // the nearest grid line (the ruler, round 169d)
     std::vector<std::int64_t> snapCandidates() const;
     int clipAt (int x, int y, bool& onRightEdge) const;
     int clipAt (int x, int y, bool& onRightEdge, bool& onLeftEdge) const;

@@ -815,12 +815,16 @@ void setChannelPortamento (ChannelDef& c, bool on, float beats) noexcept
 
 bool channelCutsItself (const ChannelDef& c) noexcept
 {
-    return c.cutGroup != 0 && c.cutGroup == c.cutBy;
+    // issue #68: one state for every "Cut itself" control (rack menu, sample panel, Misc page). FL has one: its "Cut self"
+    // sets Cut and By to the same group (FLEngine_x64 CutItselfBtnClick 0xF67C60 → 0xFEAAF0: [0x27C] = a group,
+    // [0x280] = [0x27C]); LYNX's sampler flag (projects saved by the sample panel before 0.1.24) counts too
+    return (c.cutGroup != 0 && c.cutGroup == c.cutBy) || c.sampler.cut;
 }
 
 void setChannelCutsItself (ChannelDef& c, int channel, bool on) noexcept
 {
     c.cutGroup = c.cutBy = on ? 1000 + channel : 0;
+    c.sampler.cut = on; // (the sampler's own quick cut of its voices goes with it, as an imported FL "cut itself")
 }
 
 std::string cutGroupText (int group, int channel)

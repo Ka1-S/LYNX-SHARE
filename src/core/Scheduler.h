@@ -56,6 +56,8 @@ struct NoteEvent
     // A VFX channel (round 164b): −1 = an ordinary note; −2 = one its processor takes (it goes nowhere else); N ≥ 0 =
     // what the processor sent on MIDI port N (only the routes on that port take it)
     std::int16_t port = -1;
+    // a scheduled note's "on" (round 169d): the ticks from it to the note's "off" (0 = not known), for ScheduledNotes
+    float lengthTicks = 0.0f;
 };
 
 // Fixed-capacity buffer. Events beyond capacity are dropped
@@ -70,6 +72,7 @@ public:
     void sortByOffset() noexcept;
 
     int size() const noexcept { return count; }
+    void resize (int n) noexcept { count = n < 0 ? 0 : n < count ? n : count; } // (shrinks only)
     int droppedCount() const noexcept { return dropped; }
     const NoteEvent& operator[] (int i) const noexcept { return events[(std::size_t) i]; }
     NoteEvent& at (int i) noexcept { return events[(std::size_t) i]; }
@@ -80,6 +83,46 @@ private:
     std::array<NoteEvent, capacity> events {};
     int count = 0;
     int dropped = 0;
+};
+
+// The song's notes that started and the end each one started with (round 169d, issue #32 follow-up 2). FL keeps a
+// note's "off" once the note starts: a note deleted, moved or made longer while it sounds, or left behind when the
+// pattern changes, still ends where it was going to (FL 2026 [SHOT] r169d f13–f16: C5 deleted while playing, still
+// sounding at +150 ms and +550 ms, gone after its end; f17–f20: a new pattern added while it sounds, the same).
+// LYNX's schedulers emit each "off" from the notes as they are now, so such a note got none and hung until Stop.
+// Audio thread: process() takes a block's scheduled events (sorted). An "off" the scheduler emits ends the sounding
+// note of its channel and key that ends there; a note whose "off" has not come two samples after its end (the
+// schedulers' rounding) gets one there; any other "off" (a note edited in behind the play head, or made shorter or
+// longer while it sounds) is dropped, so it cannot end another voice of that key. Audio clips (keys ≥ 128) pass.
+class ScheduledNotes
+{
+public:
+    static constexpr int capacity = 4096;
+    // the schedulers round a note's "on" and "off" to samples: an "off" within this of a note's end is that note's,
+    // and a note whose "off" has not come this long after its end gets its own
+    static constexpr double matchSamples = 3.0, dueSamples = 2.0;
+
+    void clear() noexcept
+    {
+        count = 0;
+        overflow = false;
+        clock = 0.0;
+    }
+    void process (EventBuffer& events, int numSamples, double tps) noexcept;
+    // channels inserted, removed or moved: from[c] = the old index of channel c (−1 = a new channel)
+    void moveChannels (const std::vector<int>& from) noexcept;
+    int sounding() const noexcept { return count; }
+
+private:
+    struct Entry
+    {
+        int channel = 0, key = 0;
+        double end = 0.0; // on `clock`; +inf = its "off" comes from the scheduler only
+    };
+    std::array<Entry, capacity> entries {};
+    int count = 0;
+    bool overflow = false; // a note could not be kept: every "off" passes until the next clear()
+    double clock = 0.0;    // ticks played since clear()
 };
 
 inline double ticksPerSample (double bpm, double sampleRate) noexcept
