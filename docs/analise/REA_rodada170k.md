@@ -68,3 +68,22 @@ cost nothing extra (the canvas is cached).
   train.sh art170k right after art170j lands (my branch contains its commits: never land before it).
 - Commands: `OUT=build-win ~/.claude/jobs/f8789b49/tmp/coord/winbuild.sh scripts/build-windows-zig.sh`;
   `build-win/LYNX.exe --artshot 'E:\lynx-work\art170k\shots' after halo,orbit` (fresh LYNX_PROFILE_DIR + LYNX_TEST_MODE=1).
+
+## 170k2 — whole plugin names in the header
+
+Coordinator: the themed header cut long names ("FRUITY B…" for Blood Overdrive at 100 % with room around it). Audit
+of every editor with art (`--artshot` now writes `titles-<mode>.tsv`: the name's width at the style's size, the box,
+the size used, lines, full / ELLIPSIS; and a `-min.png` shot at the smallest window size). Before: 12 effect panels
+cut or hid their name at 100 % (Blood Overdrive, Fast Dist, Flangus, Fast LP, Free Filter, Bass Boost, 7 Band EQ,
+Squeeze, WaveShaper, PanOMatic, Quell, Mute 2; Balance, Center, Send, Phase Inverter, Soft Clipper showed no name at
+all). Fix (all styles, not only Themed):
+- `skin::titleText` fits the name: the style's size, then down to 75 % of it (≥ 10 px); then a known prefix
+  ("Fruity") on a small line above the rest; an ellipsis only when even that cannot fit.
+- The preset bar gives way first (the copy button goes, the preset box shrinks to 70 px); "(Insert n)" shows only
+  when whole.
+- An effect panel is never narrower than its header needs (`minimumWidth()`: the window's minimum width and the
+  panel's own default width, so the Patcher too). The tiny utilities' windows (Center, Phase Inverter, Mute 2…)
+  open wider; their bodies keep their scale.
+After: 95 effects at 100 % and 87 panels at their smallest size, all `full` (80 one line, 15 two lines at 100 %).
+Self-test: every effect name in every style draws whole in the narrowest box `titleMinWidth` promises.
+Shots: E:\lynx-work\art170k\titles (titles-before-after.png, before/, after/, titles-audit.tsv).
