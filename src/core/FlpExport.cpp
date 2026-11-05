@@ -627,8 +627,12 @@ struct Converter
         song.forEachClipList ([&] (const std::vector<Clip>& clips) {
             for (const auto& c : clips)
             {
+                if (c.muted)
+                    continue; // (left out)
                 use (c.start);
-                use (c.length);
+                // (an audio clip's length goes unstretched, as playlistItem writes it)
+                use (c.kind == ClipKind::audio && c.stretch > 0.0 && c.stretch != 1.0 ? (std::int64_t) std::llround ((double) c.length / c.stretch)
+                                                                                        : c.length);
             }
         });
         filePpq = fine ? 96 : ppq;
@@ -992,8 +996,7 @@ struct Converter
         {
             case AutomationTargetKind::tempo:
                 id.raw = flp::ControlId::tempo;
-                if (valueMap != nullptr) // FL automates the tempo from 60 to 180 BPM
-                    *valueMap = [] (float v) { return (float) std::clamp ((tempoFromValue (v) - 60.0) / 120.0, 0.0, 1.0); };
+                // (LYNX's tempo target is FL's whole range, 10…522 BPM: the clip's range below is the whole range too)
                 return id;
             case AutomationTargetKind::channelVolume:
             case AutomationTargetKind::channelPan:
@@ -1058,6 +1061,14 @@ struct Converter
     }
 
     // ---- patterns ----
+    bool playsSample (int channel) const
+    {
+        for (const auto& c : out.channels)
+            if (c.index == channel)
+                return c.type == flp::ChannelType::sampler || c.type == flp::ChannelType::audioClip;
+        return false;
+    }
+
     void patterns()
     {
         for (int i = 0; i < (int) song.patterns.size(); ++i)
@@ -1081,8 +1092,10 @@ struct Converter
                     continue;
                 flp::Note f;
                 f.position = ticks (n.start);
-                // a step (one step long, on the step grid): FL's step note, which the Channel Rack shows as a step
-                const auto step = n.length == ticksPerStep && n.start % ticksPerStep == 0;
+                // a step (one step long, on the step grid): FL's step note, which the Channel Rack shows as a step.
+                // Only on a channel that plays a sample: FL holds a step note on a generator (3x Osc, a plugin)
+                // until something cuts it, so the voices pile up (FL render, round 171e)
+                const auto step = n.length == ticksPerStep && n.start % ticksPerStep == 0 && playsSample (n.channel);
                 f.length = step ? 0 : std::max<std::uint32_t> (1, ticks (n.length));
                 f.channel = (std::uint16_t) n.channel;
                 f.key = (std::uint16_t) std::clamp (n.key, 0, 131);
@@ -1135,7 +1148,6 @@ struct Converter
     // ---- automation clips: FL channels after the song's ----
     void automations()
     {
-        int dropped = 0;
         for (int a = 0; a < (int) song.automations.size(); ++a)
         {
             const auto& src = song.automations[(std::size_t) a];
@@ -1146,17 +1158,22 @@ struct Converter
             }
             std::function<float (float)> map;
             const auto id = controlFor (src.target, &map);
-            if (! id)
+            if (! id && src.target.kind != AutomationTargetKind::none)
             {
-                ++dropped;
-                if (src.target.kind != AutomationTargetKind::none)
-                    report.dropped.push_back ("Automation '" + src.name + "': its target has no FL equivalent");
+                report.dropped.push_back ("Automation '" + src.name + "': its target has no FL equivalent");
                 continue;
             }
+            // (no target at all: FL's own unlinked automation clip, kept as one)
             flp::Channel c;
             c.index = (int) out.channels.size();
             c.type = flp::ChannelType::automationClip;
             c.name = src.name;
+            // an automation clip's channel levels are its range: pan = minimum, volume = maximum (of 12800, in the
+            // target's whole range) [DATA: FL's tempo clips keep 1250…4250 = 60…180 BPM; FL 2026 played a clip written
+            // with a channel's default levels over 6400…10000: round 171e, FL render]. Always the whole range here.
+            c.hasLevels = true;
+            c.pan = 0;
+            c.volume = 12800;
             for (std::size_t i = 0; i < src.points.size(); ++i)
             {
                 const auto& pt = src.points[i];
@@ -1170,7 +1187,8 @@ struct Converter
             if (c.automation.empty())
                 c.automation.push_back ({ 0.0, (double) (map ? map (song.targetValue (src.target)) : song.targetValue (src.target)), 0.0f });
             automationChannel[a] = c.index;
-            out.automationLinks.push_back ({ c.index, *id });
+            if (id)
+                out.automationLinks.push_back ({ c.index, *id });
             out.channels.push_back (std::move (c));
         }
         if (! automationChannel.empty())
@@ -1311,7 +1329,6 @@ struct Converter
     // ---- the mixer ----
     void mixer()
     {
-        int exactSlots = 0, substituted = 0;
         for (int t = 0; t < (int) song.mixer.size(); ++t)
         {
             const auto& track = song.mixer[(std::size_t) t];
@@ -1401,7 +1418,6 @@ struct Converter
                     slot.plugin = sub->first;
                     slot.state = sub->second;
                     report.substituted.push_back (label + effectInfo (fx.kind).name + " → " + sub->first + " (FL's defaults)");
-                    ++substituted;
                 }
                 if (slot.plugin.empty())
                 {
@@ -1412,7 +1428,6 @@ struct Converter
                 if (! what.empty())
                 {
                     report.exact.push_back (label + what);
-                    ++exactSlots;
                 }
                 slotMap[{ t, s }] = row;
                 slotPlugin[{ t, s }] = slot.plugin;

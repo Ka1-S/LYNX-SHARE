@@ -3499,15 +3499,24 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 break;
             }
 
+        // the clip's range (round 171e): its channel levels, pan = minimum and volume = maximum of 12800 in the target's
+        // whole range (FL's tempo clips: 1250…4250 = 60…180 of FL's 10…522 BPM); a file without them: the whole range,
+        // and the tempo FL's usual 60…180
+        const auto ranged = c.hasLevels;
+        const auto lo = ranged ? std::clamp (c.pan / 12800.0, 0.0, 1.0) : 0.0;
+        const auto hi = ranged ? std::clamp (c.volume / 12800.0, 0.0, 1.0) : 1.0;
         for (std::size_t i = 0; i < c.automation.size(); ++i)
         {
             const auto& p = c.automation[i];
             const auto tick = (std::int64_t) std::llround (p.position * ppq);
-            auto value = (float) std::clamp (p.value, 0.0, 1.0);
+            auto value = (float) (lo + (hi - lo) * std::clamp (p.value, 0.0, 1.0));
 
-            // FL automates tempo from 60 to 180 BPM; our target covers the full tempo range
+            // our tempo target is FL's whole tempo range
             if (a.target.kind == AutomationTargetKind::tempo)
-                value = valueFromTempo (60.0 + 120.0 * value);
+            {
+                if (! ranged)
+                    value = valueFromTempo (60.0 + 120.0 * std::clamp (p.value, 0.0, 1.0));
+            }
             else if (valueMap)
                 value = std::clamp (valueMap (value), 0.0f, 1.0f);
 

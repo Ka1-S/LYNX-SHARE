@@ -389,9 +389,6 @@ TEST (flpexport171e_reexport_keeps_fl_states)
     CHECK (first.channels.size() == second.channels.size());
     for (std::size_t i = 0; i < std::min (first.channels.size(), second.channels.size()); ++i)
     {
-        if (first.channels[i].pluginName != second.channels[i].pluginName || first.channels[i].pluginState != second.channels[i].pluginState)
-            std::printf ("  channel %d: '%s' %d B vs '%s' %d B\n", (int) i, first.channels[i].pluginName.c_str(), (int) first.channels[i].pluginState.size(),
-                         second.channels[i].pluginName.c_str(), (int) second.channels[i].pluginState.size());
         CHECK (first.channels[i].pluginName == second.channels[i].pluginName);
         CHECK (first.channels[i].pluginState == second.channels[i].pluginState);
     }
@@ -510,4 +507,99 @@ TEST (flpexport171e_fl_round_171e_fixes)
     CHECK (project.header.ppq == 96);
     options.ppq = 960;
     CHECK (flp::parseProject (flpexport::exportFlp (song, options, report)).header.ppq == 960);
+    // 4. an automation clip linked to nothing (FL has them) stays an automation clip, with its Playlist clip
+    options.ppq = 0;
+    Automation unlinked;
+    unlinked.name = "Unlinked";
+    unlinked.points = { { 0, 0.3f, 0.0f }, { ppq * 4, 0.7f, 0.0f } };
+    song.automations.push_back (unlinked);
+    Clip uc;
+    uc.kind = ClipKind::automation;
+    uc.automation = (int) song.automations.size() - 1;
+    uc.track = 5;
+    uc.length = ppq * 4;
+    song.playlist.push_back (uc);
+    const auto before = project.arrangements[0].items.size();
+    project = flp::parseProject (flpexport::exportFlp (song, options, report));
+    CHECK (project.arrangements[0].items.size() == before + 1);
+    CHECK (std::any_of (project.channels.begin(), project.channels.end(),
+                        [] (const flp::Channel& c) { return c.type == flp::ChannelType::automationClip && c.name == "Unlinked"; }));
+    // 5. a one-step note on the step grid is FL's step note (length 0) only on a channel that plays a sample:
+    // FL holds a step note on a generator until something cuts it (the 3x Osc bass piled up to clipping)
+    int samplerChannel = -1;
+    for (int i = 0; i < (int) song.channels.size() && samplerChannel < 0; ++i)
+        if (song.channels[(std::size_t) i].instrument == InstrumentKind::sampler)
+            samplerChannel = i;
+    CHECK (samplerChannel >= 0 && song.channels[6].instrument == InstrumentKind::threeosc);
+    Pattern steps;
+    steps.name = "Steps";
+    for (const auto ch : { samplerChannel, 6 })
+    {
+        Note n;
+        n.start = ppq;
+        n.length = ticksPerStep;
+        n.channel = ch;
+        n.key = 48;
+        steps.notes.push_back (n);
+    }
+    song.patterns.push_back (steps);
+    project = flp::parseProject (flpexport::exportFlp (song, options, report));
+    const auto& written = project.patterns.back().notes;
+    CHECK (written.size() == 2);
+    for (const auto& n : written)
+        CHECK (n.channel == samplerChannel ? n.length == 0 : n.length == (std::uint32_t) project.header.ppq / 4);
+}
+
+TEST (flpexport171e_automation_clip_range)
+{
+    // an FL automation clip's levels are its range (pan = low, volume = high, of 12800, in the target's whole range):
+    // FL's own tempo clips keep 1250..4250 (60..180 BPM). LYNX writes the whole range; the importer reads either.
+    using namespace lynx;
+    auto song = fx171e::richSong();
+    for (auto& a : song.automations)
+        if (a.target.kind == AutomationTargetKind::tempo)
+            a.points = { { 0, valueFromTempo (40.0), 0.0f }, { ppq * 8, valueFromTempo (250.0), 0.0f } };
+    flpexport::Options options;
+    flpexport::Report report;
+    auto project = flp::parseProject (flpexport::exportFlp (song, options, report));
+    int clips = 0;
+    for (const auto& c : project.channels)
+        if (c.type == flp::ChannelType::automationClip)
+        {
+            ++clips;
+            CHECK (c.hasLevels && c.pan == 0 && c.volume == 12800);
+        }
+    CHECK (clips == 2);
+    auto back = importFlp (project, fx171e::importOptions());
+    bool sawTempo = false;
+    for (const auto& a : back.automations)
+        if (a.target.kind == AutomationTargetKind::tempo && a.points.size() == 2)
+        {
+            sawTempo = true;
+            CHECK (fx171e::near (tempoFromValue (a.points[0].value), 40.0, 0.05));
+            CHECK (fx171e::near (tempoFromValue (a.points[1].value), 250.0, 0.05));
+        }
+    CHECK (sawTempo);
+
+    // FL's own range: 0.5 of a 1250..4250 tempo clip is 120 BPM
+    for (auto& c : project.channels)
+        if (c.type == flp::ChannelType::automationClip && c.name == "Tempo")
+        {
+            c.pan = 1250;
+            c.volume = 4250;
+            for (auto& p : c.automation)
+                p.value = 0.5;
+        }
+    back = importFlp (project, fx171e::importOptions());
+    for (const auto& a : back.automations)
+        if (a.target.kind == AutomationTargetKind::tempo && ! a.points.empty())
+            CHECK (fx171e::near (tempoFromValue (a.points[0].value), 10.0 + 512.0 * (2750.0 / 12800.0), 0.05));
+    // a clip with no levels plays FL's default 60..180 for the tempo
+    for (auto& c : project.channels)
+        if (c.type == flp::ChannelType::automationClip && c.name == "Tempo")
+            c.hasLevels = false;
+    back = importFlp (project, fx171e::importOptions());
+    for (const auto& a : back.automations)
+        if (a.target.kind == AutomationTargetKind::tempo && ! a.points.empty())
+            CHECK (fx171e::near (tempoFromValue (a.points[0].value), 120.0, 0.05));
 }
