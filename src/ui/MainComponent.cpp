@@ -62,6 +62,7 @@
 #include "ui/AudioEditor.h"
 #include "ui/TempoTapper.h"
 #include "ui/ExportDialog.h"
+#include "ui/FlStudioExportDialog.h"
 #include "ui/ParametricEqEditor.h"
 #include "ui/PluginWindow.h"
 #include "ui/I18n.h"
@@ -5601,6 +5602,14 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             exports.addSubMenu (tr ("All playlist track groups"), playlistTrackExportMenu (true));
             exports.addSeparator();
             exports.addItem (tr ("Project with samples (.zip)..."), [this] { exportPackage(); });
+            // Export to FL Studio (round 171e, idea by Tookolld): a .flp or FL's zipped loop package
+            exports.addItem (tr ("FL Studio project..."), [this] {
+                engine.capturePluginStates();
+                showFlStudioExportDialog (engine,
+                                          currentFile != juce::File() ? currentFile.getParentDirectory()
+                                                                      : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                                          projectStem (projectName));
+            });
             // FL's "Project bones..." (FileExportProjectBonesAction; REA round 168e)
             exports.addItem (tr ("Project bones..."), [this] { exportProjectBones (engine, currentFile.getParentDirectory(), projectName); });
             exports.addItem (tr ("Project data files (collect the samples into a folder)..."), [this] { collectSamples(); });

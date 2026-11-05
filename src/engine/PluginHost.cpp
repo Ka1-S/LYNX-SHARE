@@ -10,6 +10,7 @@
 #include "core/PluginScanPolicy.h"
 
 #include "core/FlWrapper.h"
+#include "core/FlpExport.h"
 #include "core/LoadTrace.h"
 
 #include "engine/ClapFormat.h"
@@ -2224,4 +2225,154 @@ std::string capturePluginState (juce::AudioPluginInstance& plugin)
     plugin.getStateInformation (state);
     return state.toBase64Encoding().toStdString();
 }
+
+// ---- Export to FL Studio (round 171e) ----
+namespace
+{
+std::vector<std::uint8_t> blockBytes (const juce::MemoryBlock& m)
+{
+    const auto* b = static_cast<const std::uint8_t*> (m.getData());
+    return std::vector<std::uint8_t> (b, b + m.getSize());
+}
+
+std::vector<std::uint8_t> juceStateBytes (const std::string& base64)
+{
+    juce::MemoryBlock m;
+    if (base64.empty() || ! m.fromBase64Encoding (juce::String::fromUTF8 (base64.c_str())))
+        return {};
+    return blockBytes (m);
+}
+
+#if JUCE_WINDOWS
+// IPluginFactory's leading calls by their vtable place (FUnknown's three, getFactoryInfo, countClasses, getClassInfo)
+struct FactoryClasses
+{
+    virtual long __stdcall queryInterface (const char*, void**) = 0;
+    virtual unsigned long __stdcall addRef() = 0;
+    virtual unsigned long __stdcall release() = 0;
+    virtual long __stdcall getFactoryInfo (void*) = 0;
+    virtual int __stdcall countClasses() = 0;
+    virtual long __stdcall getClassInfo (int index, void* info) = 0;
+};
+struct ClassInfo // PClassInfo
+{
+    char cid[16];
+    int cardinality;
+    char category[32];
+    char name[64];
+};
+#endif
+
+// The VST3 class TUID of a scanned VST3 (JUCE keeps only its hash): FL's plugin database for the same file, else the
+// module's own class list (the class whose TUID hashes to the description's deprecatedUid)
+std::optional<std::array<std::uint8_t, 16>> vst3ClassIdOf (const juce::PluginDescription& d, const FlPluginDb& db)
+{
+    auto matches = [&d] (const std::array<std::uint8_t, 16>& id) { return vst3Hash (id) == d.deprecatedUid || vst3NormalisedHash (id) == d.uniqueId; };
+    ForeignPlugin probe;
+    probe.format = ForeignPlugin::Format::vst3;
+    probe.name = d.name.toStdString();
+    probe.path = d.fileOrIdentifier.toStdString();
+    if (const auto* entry = db.match (probe, d.isInstrument); entry != nullptr && entry->hasClassId && matches (entry->classId))
+        return entry->classId;
+   #if JUCE_WINDOWS
+    juce::File file (d.fileOrIdentifier);
+    if (file.isDirectory())
+        file = file.getChildFile ("Contents").getChildFile ("x86_64-win").getChildFile (file.getFileName());
+    const auto module = LoadLibraryW (file.getFullPathName().toWideCharPointer());
+    if (module == nullptr)
+        return std::nullopt;
+    std::optional<std::array<std::uint8_t, 16>> found;
+    auto* init = (bool (*)()) (void*) GetProcAddress (module, "InitDll");
+    const auto started = init == nullptr || init();
+    if (started)
+        if (auto* get = (FactoryClasses* (*)()) (void*) GetProcAddress (module, "GetPluginFactory"))
+            if (auto* factory = get())
+            {
+                for (int i = 0, n = factory->countClasses(); i < n && ! found; ++i)
+                {
+                    ClassInfo info {};
+                    if (factory->getClassInfo (i, &info) != 0)
+                        continue;
+                    std::array<std::uint8_t, 16> id {};
+                    std::memcpy (id.data(), info.cid, 16);
+                    if (std::strncmp (info.category, "Audio Module Class", 32) == 0 && matches (id))
+                        found = id;
+                }
+                factory->release();
+            }
+    if (started && init != nullptr)
+        if (auto* exit = (bool (*)()) (void*) GetProcAddress (module, "ExitDll"))
+            exit();
+    FreeLibrary (module); // (the module stays loaded while JUCE's own instance holds it)
+    return found;
+   #else
+    return std::nullopt;
+   #endif
+}
+} // namespace
+
+std::optional<ForeignPlugin> PluginHost::flWrapperRecord (const PluginRef& ref, bool instrument)
+{
+    const auto d = find (juce::String::fromUTF8 (ref.id.c_str()));
+    if (d == nullptr)
+        return std::nullopt;
+    ForeignPlugin p;
+    p.name = d->name.toStdString();
+    p.path = d->fileOrIdentifier.toStdString();
+    p.midiInPort = ref.midiInPort;
+    p.midiOutPort = ref.midiOutPort;
+    p.bendRange = ref.bendRange;
+    const auto state = juceStateBytes (ref.state);
+    if (d->pluginFormatName == "VST3")
+    {
+        p.format = ForeignPlugin::Format::vst3;
+        const auto id = vst3ClassIdOf (*d, flPluginDatabase());
+        if (! id)
+            return std::nullopt;
+        p.classId = *id;
+        p.hasClassId = true;
+        // FL names a VST3 after its file (REA_rodada5 §2.2)
+        p.name = juce::File (d->fileOrIdentifier).getFileNameWithoutExtension().toStdString();
+        std::vector<std::uint8_t> component, controller;
+        if (const auto xml = juce::AudioProcessor::getXmlFromBinary (state.data(), (int) state.size()); xml != nullptr && xml->hasTagName ("VST3PluginState"))
+        {
+            juce::MemoryBlock m;
+            if (const auto* c = xml->getChildByName ("IComponent"); c != nullptr && m.fromBase64Encoding (c->getAllSubText().trim()))
+                component = blockBytes (m);
+            m.reset();
+            if (const auto* c = xml->getChildByName ("IEditController"); c != nullptr && m.fromBase64Encoding (c->getAllSubText().trim()))
+                controller = blockBytes (m);
+        }
+        p.state = flpexport::flVst3State (component, controller);
+    }
+    else if (d->pluginFormatName == Vst2PluginFormat::formatName)
+    {
+        p.format = ForeignPlugin::Format::vst2;
+        p.vst2Id = (std::uint32_t) d->uniqueId;
+        FlVst2State check;
+        if (parseFlVst2State (state, check))
+            p.state = state; // LYNX's VST2 host keeps FL's own layout (REA_rodada89 §2)
+        else if (! state.empty())
+        {
+            FlVst2State chunk;
+            chunk.flags = 8;
+            chunk.chunk = state;
+            p.state = writeFlVst2State (chunk);
+        }
+    }
+    else if (d->pluginFormatName == ClapPluginFormat::formatName)
+    {
+        p.format = ForeignPlugin::Format::clap;
+        p.clapId = clapPluginId (*d);
+        if (p.clapId.empty())
+            return std::nullopt;
+        p.state = { 0, 0, 0, 0 };
+        p.state.insert (p.state.end(), state.begin(), state.end());
+    }
+    else
+        return std::nullopt;
+    juce::ignoreUnused (instrument);
+    return p;
+}
+
 } // namespace lynx

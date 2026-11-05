@@ -29,6 +29,7 @@
 #include "engine/PipeWireDevice.h"
 #include "platform/LinuxRealtime.h"
 #include "engine/Exporter.h"
+#include "engine/FlStudioExport.h"
 #include "engine/MidiFileIo.h"
 #include "engine/PluginHost.h"
 #include "engine/PluginSandbox.h"
@@ -1305,6 +1306,13 @@ public:
             juce::File (args[i + 2].unquoted() + ".txt").replaceWithText (report);
             setApplicationReturnValue (written > 0 ? 0 : 1);
             quit();
+            return;
+        }
+
+        if (args.contains ("--export-flp"))
+        {
+            const auto i = args.indexOf ("--export-flp");
+            runFlExport (args[i + 1].unquoted(), args[i + 2].unquoted(), args.contains ("--substitute"));
             return;
         }
 
@@ -6016,6 +6024,54 @@ private:
                << "result=" << (ok ? "OK" : "ERROR " + error) << "\n";
         juce::File (outputPath + ".txt").replaceWithText (report);
 
+        setApplicationReturnValue (ok ? 0 : 1);
+        quit();
+    }
+
+    // LYNX.exe --export-flp project.(lynx|flp) output.(flp|zip) [--substitute] (round 171e): File › Export › FL Studio
+    // project without the window (option A unless --substitute; the renders next to a .flp in "<name> audio"); the
+    // report goes to output.txt
+    void runFlExport (const juce::String& inputPath, const juce::String& outputPath, bool substitute)
+    {
+        juce::String error;
+        bool ok = false;
+        lynx::flstudio::Written written;
+        {
+            lynx::AudioEngine loader (false);
+            const juce::File input (inputPath);
+            if (input.hasFileExtension ("flp"))
+                ok = loader.importFlpFile (input, error);
+            else if (auto song = lynx::ProjectFile::load (input, error))
+            {
+                loader.setSong (std::move (*song));
+                ok = true;
+            }
+            if (ok)
+            {
+                const juce::File output (outputPath);
+                const auto zip = output.hasFileExtension ("zip");
+                const auto mode = substitute ? lynx::flpexport::LynxOnly::substitute : lynx::flpexport::LynxOnly::renderAudio;
+                const auto options = lynx::flstudio::optionsFor (&loader.getPluginHost(), mode, loader.getSong());
+                const auto renderDir = zip ? juce::File::getSpecialLocation (juce::File::tempDirectory).getNonexistentChildFile ("LYNX FL export", {}, false)
+                                           : output.getSiblingFile (output.getFileNameWithoutExtension() + " audio");
+                ok = lynx::flstudio::exportProject (loader.getSong(), options, output, zip, renderDir, 44100.0,
+                                                    [] (const lynx::Song& s, const lynx::ExportSettings& settings, const juce::File& wav,
+                                                        const std::function<bool (double)>& progress, juce::String& err) {
+                                                        lynx::ExportJob job (s, settings, wav);
+                                                        return job.run (progress, err);
+                                                    },
+                                                    {}, written, error);
+                if (zip)
+                    renderDir.deleteRecursively();
+            }
+        }
+        juce::String report;
+        report << (ok ? "ok" : "error=" + error) << "\n"
+               << "exact=" << (int) written.report.exact.size() << " rendered=" << (int) written.report.rendered.size()
+               << " substituted=" << (int) written.report.substituted.size() << " dropped=" << (int) written.report.dropped.size()
+               << " samples=" << written.samples << "\n\n"
+               << lynx::flstudio::reportText (written) << "\n";
+        juce::File (outputPath + ".txt").replaceWithText (report);
         setApplicationReturnValue (ok ? 0 : 1);
         quit();
     }
