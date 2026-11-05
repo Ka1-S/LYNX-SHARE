@@ -3456,15 +3456,23 @@ void BrowserComponent::showPluginDatabaseForSnapshot()
     rebuildTree();
 }
 
-void BrowserComponent::showPluginDatabase()
+void BrowserComponent::showPluginDatabase (const juce::String& folder, int generators)
 {
     const auto db = tr ("Plugin database");
     openPluginFolders.insert (db);
     openPluginFolders.insert (db + "/" + tr ("Generators"));
     openPluginFolders.insert (db + "/" + tr ("Effects"));
+    // the Plugin picker's tab clicked (round 171c, FL opens its Browser on that category): that folder of the user's,
+    // else the Generators / Effects heading
+    const auto kind = generators > 0 ? tr ("Generators") : tr ("Effects");
+    if (generators >= 0 && folder.isNotEmpty())
+        openPluginFolders.insert (kind + "/" + folder);
     setTab (allTab);
     rebuildTree();
-    if (const auto row = tree->rowLabelled (db); row >= 0)
+    auto row = generators >= 0 && folder.isNotEmpty() ? tree->rowLabelled (folder) : -1;
+    if (row < 0)
+        row = tree->rowLabelled (generators >= 0 ? kind : db);
+    if (row >= 0)
     {
         tree->select (row, false);
         tree->grabKeyboardFocus();
@@ -3800,6 +3808,19 @@ juce::File BrowserComponent::draggedFile (const juce::DragAndDropTarget::SourceD
         return juce::File (text.fromFirstOccurrenceOf ("|", false, false));
 
     return {};
+}
+
+bool BrowserComponent::startPluginDrag (juce::Component& source, std::function<std::optional<ChannelDef>()> generator,
+                                        std::function<std::optional<EffectSlot>()> effect, const juce::String& label, const juce::Image& image)
+{
+    auto* container = juce::DragAndDropContainer::findParentDragContainerFor (&source);
+    if (container == nullptr || (generator == nullptr && effect == nullptr))
+        return false;
+    const auto isGenerator = generator != nullptr;
+    draggedPlugin() = { std::move (generator), std::move (effect) };
+    container->startDragging (juce::String (isGenerator ? generatorDragDescription : effectDragDescription) + "|" + label, &source,
+                              juce::ScaledImage (image), true);
+    return true;
 }
 
 bool BrowserComponent::isGeneratorDrag (const juce::DragAndDropTarget::SourceDetails& details)

@@ -83,6 +83,49 @@ there.
 | Voice Shift | Little AlterBoy | 10 | 8 | 4 | 8 | 137 |  |
 | Prism Multiband | Pro-MB | 10 | 10 | 8 | 6 | 152 |  |
 
+## Round 172d: Soundtoys / Valhalla / Waves roles — measured sound, before → after
+
+**Method**
+- Black-box only. The originals are rendered by fxmeasure, with one process per setting for the demo-limited Valhalla and Waves plugins. LYNX is rendered by `tools/fxrender` through its own state translator; the Soundtoys mappings are done by hand.
+- **fxparity** (`scripts/fxparity.py`, round 172b's harness) is residual-first. A 100 %-wet reverb cannot null, so it tops out near 4.
+- **verb** (`scripts/fxparity.py verb`, round 172b's shared reverb score, one metric for every reverb) scores a reverb's impulse response 0–10 as the mean of seven parts:
+  - RT60 per octave
+  - EDC shape
+  - early energy and pre-delay
+  - the tail's tonal balance
+  - L/R correlation
+  - tail movement
+  - wet level
+
+Both numbers are given below.
+
+| LYNX engine | Original | fxparity | verb | What changed |
+|---|---|---|---|---|
+| Nebula | Valhalla Supermassive | 1.5 → 3.2 | 5.7 → 6.8 | a wet gain per mode (22-mode probe); level flat over Feedback (measured knots); a low shelf with Density; first-order cuts |
+| Atrium | ValhallaRoom | 1.8 → 3.2 | 7.5 → 7.4 | linear early/late crossfade (late +6 dB at 50 %); +2 dB; the original's low end (+10 dB shelf at 90 Hz, −5 dB at 140 Hz) and air (+4 dB at 9 kHz) |
+| Horizon | ValhallaFutureVerb | 1.6 → 3.0 | 6.5 → 8.1 | level ∝ 1/√RT (the original's wet energy stays at 22–24 dB over Decay); HF damping ×0.7 above 4 kHz; first-order EQ cuts; Room / Hall / Space gains |
+| Foil Plate | ValhallaPlate | 2.7 → 3.1 | 8.2 → 8.4 | band edge ~11 kHz, 16 poles (the original is brick-walled: 12.7 kHz −35 dB); +2.3 dB |
+| Foil Plate (plate voicing) | Little Plate | 1.4 → 2.2 | 6.0 → 7.5 | level re-measured at Mix 100 % (it was 6–16 dB low, most at short decays: knots per decade of Decay); darker above 2.5 kHz (−5 dB shelf, 7 kHz low-pass); early part −9 dB; RT per band already within 5 % |
+| Lattice Mod | ValhallaUberMod | 3.1 → 3.9 | — | the wet is in phase with the dry (the dry + wet comb notch measured on music; round 101's inverted wet does not hold here) |
+| Ember Saturator (Classic) | Decapitator | 4.6 → 4.8 | — | with Punish on, E / N / T / P saturate at the measured level (the curve, knees and bias, scaled ×0.40 / 0.90 / 0.65 / 0.86; the small-signal law is unchanged) |
+| Orbit / Spiral Echo / Epoch Verb / Halo | Space Modulator / Freq Echo / VintageVerb / Shimmer | 3.8 / 3.4 / 2.9 / 2.2 (unchanged) | Epoch 7.0, Halo 6.2 | open: Epoch has a 39 Hz tank mode at Size 100 %; Halo is 6–9 dB loud on sustained music at Mix 100 % (the original seems to limit its loop) |
+| Echoform | EchoBoy / ValhallaDelay / H-Delay | 5.2 / 3.8 / 5.9 | — | measure only (EchoBoy's mapping fixed: feedback units) |
+| Auto-pan / Voice Shift | PanMan / Little AlterBoy | 3.2 / 2.0 | — | measure only |
+| Glow Leveler / Compressor / Gemini / Quell | CLA-2A / RComp / Doubler2 / NS1 (Waves) | 4.3 / 6.4 / 4.4 / 4.0 | — | measure only (refcap licence of 11-04) |
+
+**Decapitator captures:** the original's Auto moves its Output knob asynchronously after a Drive change made by host automation. The earlier captures had the trim in some settings only, which made styles E / N / T look 8–11 dB too loud and gave a mean of 3.2. All its captures now set Auto off and pin Output at 0 dB first.
+
+**Look:**
+- The Valhalla roles have flat themes in the original's manner: solid panels, flat disc knobs, bar sliders, large legends, and per-plugin palettes.
+- Echoform, Ember, Voice Shift and Auto-pan carry a Soundtoys-style hardware theme: black face, walnut cheeks, rubber knobs and wide-tracked caps.
+- Everything is drawn by LYNX code, with LYNX names.
+
+**Design gaps still open:**
+- Echoform keeps its own multi-role layout; EchoBoy's three-zone face is not reproduced.
+- Ember's editor is the multiband view, and Classic is reached through its style tabs.
+- Voice Shift uses one panel colour where the original has mustard / teal / red zones.
+- Atrium's Predelay and Decay bars draw linear while the original's are skewed.
+
 ## Round 165j: LYNX Tune sound quality, before → after (measured)
 
 Round 165j (`docs/analise/REA_rodada165j.md`): LYNX Tune against the official Auto-Tune Pro 11.6 and Waves Tune

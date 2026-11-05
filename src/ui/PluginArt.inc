@@ -93,6 +93,19 @@ struct Theme
     // round tp172c: the label of an OFF toggle (transparent = the global disabled text; a light panel needs its own)
     Colour offLabelCol { 0 };
 
+    // round tp172d: the flat "hardware graphic" look of the third-party originals (Valhalla, Soundtoys...) — solid
+    // colour fields, bold outlines, big plain type; every field defaults to the look above
+    bool flatSections = false;      // sections: a solid panelTop fill and a rimWidth outline in `rim`; titles plain and centred
+    float rimWidth = 2.0f;
+    bool discKnob = false;          // knobs: a flat disc (capTop) with a thick pointer to its edge; a thin value ring outside
+    bool discRing = true;           // ... with that ring (accent) — false = the disc alone
+    bool barSlider = false;         // faders: a wide flat bar (track) filled from the bottom in the accent, no thumb
+    Colour captionCol { 0 };        // knob / fader captions (transparent = the shared grey)
+    Colour valueCol { 0 };          // their value read-outs (transparent = the shared light grey)
+    float captionScale = 1.0f;      // caption and value type size (big, plain labels)
+    Colour barCol { 0 };            // barSlider's fill (transparent = the accent)
+    Colour headerCol { 0 };         // a solid header bar (transparent = the canvas' gradient); for light themes
+
     // the moving layer (ArtLayer): motes and/or a painter for the stage strip; all null/0 = a still theme
     int motes = 0;
     Drift drift = Drift::still;
@@ -332,6 +345,14 @@ inline void canvas (juce::Graphics& g, Rectangle<float> a, Colour, bool display)
 inline bool headerBar (juce::Graphics& g, Rectangle<float> a, Colour)
 {
     const auto& p = pal();
+    if (th().flatSections) // round tp172d: a flat bar
+    {
+        g.setColour (th().headerCol.getAlpha() > 0 ? th().headerCol : p.bgTop.brighter (0.12f));
+        g.fillRect (a);
+        g.setColour (p.accent.withAlpha (0.8f));
+        g.fillRect (a.withTop (a.getBottom() - 2.0f));
+        return true;
+    }
     g.setGradientFill (ColourGradient (p.bgTop.brighter (0.25f), 0.0f, a.getY(), p.bgBottom.brighter (0.1f), 0.0f, a.getBottom(), false));
     g.fillRect (a);
     if (const auto fn = th().headerDeco) fn (g, a);
@@ -349,6 +370,18 @@ inline bool section (juce::Graphics& g, Rectangle<float> a, float corner, bool r
 {
     const auto& t = th();
     const auto& p = t.pal;
+    if (t.flatSections) // round tp172d: a solid field with a bold outline
+    {
+        g.setColour (raised ? p.panelTop.brighter (0.06f) : p.panelTop);
+        g.fillRoundedRectangle (a, corner);
+        if (t.sectionDeco != nullptr) t.sectionDeco (g, a, corner);
+        if (t.rimWidth > 0.0f)
+        {
+            g.setColour (p.rim);
+            g.drawRoundedRectangle (a.reduced (t.rimWidth * 0.5f), corner, t.rimWidth);
+        }
+        return true;
+    }
     if (! reduced)
     {
         g.setColour (Colours::black.withAlpha (0.28f));
@@ -372,6 +405,13 @@ inline bool sectionTitle (juce::Graphics& g, Rectangle<float> strip, const juce:
 {
     const auto& t = th();
     const auto& p = t.pal;
+    if (t.flatSections) // round tp172d: a plain, big, centred title
+    {
+        g.setFont (juce::Font (theme::font (fontSize * t.captionScale * 1.15f, true)).withExtraKerningFactor (t.kerning));
+        g.setColour (p.title);
+        g.drawText (text, strip.translated (0.0f, 2.0f), juce::Justification::centred, false);
+        return true;
+    }
     g.setFont (juce::Font (theme::font (fontSize, true)).withExtraKerningFactor (t.kerning));
     const auto w = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), text);
     const auto box = Rectangle<float> (w + 26.0f, strip.getHeight()).withCentre (strip.getCentre());
@@ -522,6 +562,36 @@ inline void knob (juce::Graphics& g, Rectangle<float> area, const KnobLook& k)
     const auto lit2 = k.enabled ? p.accent2 : theme::colour::textDisabled;
     const Point<float> dir { std::sin (to), -std::cos (to) };
 
+    if (th0.discKnob) // round tp172d: a flat disc with a thick pointer (the originals' graphic knobs)
+    {
+        const auto ringT = juce::jlimit (1.2f, 3.0f, size * 0.04f);
+        const auto discR = size * 0.5f - (th0.discRing ? ringT * 2.6f : 1.0f);
+        if (th0.discRing)
+        {
+            const auto rr = size * 0.5f - ringT * 0.8f;
+            g.setColour (p.track.withAlpha (k.enabled ? 0.9f : 0.5f));
+            g.strokePath (arc (c, rr, arcStart, arcStart + arcRange), juce::PathStrokeType (ringT));
+            if (std::abs (to - from) > 0.002f)
+            {
+                g.setColour (lit);
+                g.strokePath (arc (c, rr, from, to), juce::PathStrokeType (ringT));
+            }
+        }
+        const auto disc = Rectangle<float> (discR * 2.0f, discR * 2.0f).withCentre (c);
+        const auto capCol = k.enabled ? p.capTop.brighter (hover * 0.12f) : p.capTop.withMultipliedSaturation (0.3f);
+        g.setColour (capCol);
+        g.fillEllipse (disc);
+        if (p.capBottom != p.capTop)
+        {
+            g.setColour (p.capBottom);
+            g.drawEllipse (disc.reduced (0.5f), juce::jmax (1.0f, size * 0.02f));
+        }
+        const auto pw = juce::jlimit (1.6f, 6.0f, size * 0.075f);
+        g.setColour (k.enabled ? p.pointer : p.pointer.withAlpha (0.5f));
+        g.drawLine ({ c + dir * discR * th0.pointerFrom, c + dir * (discR - pw * 0.2f) }, pw);
+        return;
+    }
+
     const auto thin = th0.thin;
     const auto t = juce::jlimit (thin ? 1.6f : 2.0f, thin ? 3.5f : 7.0f, size * (thin ? 0.05f : 0.085f));
     const auto ringR = size * 0.5f - t * 0.7f;
@@ -606,6 +676,37 @@ inline bool slider (juce::Graphics& g, Rectangle<float> tr, float v, bool vertic
     const auto& th0 = th();
     const auto& p = th0.pal;
     v = juce::jlimit (0.0f, 1.0f, v);
+    if (th0.barSlider) // round tp172d: a wide flat bar filled in the accent (Valhalla's faders)
+    {
+        const auto wide = vertical ? tr.withSizeKeepingCentre (juce::jmax (tr.getWidth(), thumbLength * 0.9f), tr.getHeight())
+                                   : tr.withSizeKeepingCentre (tr.getWidth(), juce::jmax (tr.getHeight(), thumbLength * 0.6f));
+        g.setColour (p.track);
+        g.fillRect (wide);
+        const auto barBase = th0.barCol.getAlpha() > 0 ? th0.barCol : p.accent;
+        const auto lit = enabled ? barBase.brighter (hot ? 0.15f : 0.0f) : theme::colour::textDisabled;
+        auto fill = wide;
+        if (vertical)
+        {
+            const auto pos = wide.getBottom() - v * wide.getHeight();
+            const auto zero = bipolar ? wide.getCentreY() : wide.getBottom();
+            fill = Rectangle<float> (wide.getX(), juce::jmin (zero, pos), wide.getWidth(), std::abs (zero - pos));
+            g.setColour (lit.withAlpha (0.8f));
+            g.fillRect (fill);
+            g.setColour (lit);
+            g.fillRect (Rectangle<float> (wide.getX(), pos - 2.0f, wide.getWidth(), 4.0f)); // the level edge
+        }
+        else
+        {
+            const auto pos = wide.getX() + v * wide.getWidth();
+            const auto zero = bipolar ? wide.getCentreX() : wide.getX();
+            fill = Rectangle<float> (juce::jmin (zero, pos), wide.getY(), std::abs (zero - pos), wide.getHeight());
+            g.setColour (lit.withAlpha (0.8f));
+            g.fillRect (fill);
+            g.setColour (lit);
+            g.fillRect (Rectangle<float> (pos - 2.0f, wide.getY(), 4.0f, wide.getHeight()));
+        }
+        return true;
+    }
     const auto track = vertical ? tr.withSizeKeepingCentre (juce::jmin (4.0f, tr.getWidth()), tr.getHeight()) : tr.withSizeKeepingCentre (tr.getWidth(), juce::jmin (4.0f, tr.getHeight()));
     g.setColour (p.track);
     g.fillRoundedRectangle (track, 2.0f);
@@ -732,6 +833,19 @@ const std::vector<Art>& allArts()
     return all;
 }
 } // namespace
+
+juce::Colour captionColour()
+{
+    if (currentStyle == Style::themed && artkit::th().captionCol.getAlpha() > 0) return artkit::th().captionCol;
+    return juce::Colour (0xff8c919c);
+}
+juce::Colour valueColour (bool hot)
+{
+    if (currentStyle == Style::themed && artkit::th().valueCol.getAlpha() > 0)
+        return hot ? artkit::th().valueCol.brighter (0.3f) : artkit::th().valueCol;
+    return hot ? theme::colour::textPrimary : juce::Colour (0xffd3d6dd);
+}
+float captionScale() { return currentStyle == Style::themed ? artkit::th().captionScale : 1.0f; }
 
 Style baseStyleOf (Art a) { return a == Art::none ? Style::glow : artkit::themeOf (a).base; }
 juce::Colour artAccent (Art a) { return a == Art::none ? colour::crimson : artkit::palette (a).accent; }

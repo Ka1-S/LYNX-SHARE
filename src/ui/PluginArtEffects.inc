@@ -5,6 +5,14 @@
 
 namespace artkit
 {
+// round tp172d: the flat canvas of the originals' graphic looks (Valhalla...) — one solid field, a faint fall-off
+inline void canvasFlat (juce::Graphics& g, Rectangle<float> a, bool)
+{
+    const auto& p = pal();
+    g.setGradientFill (ColourGradient (p.bgTop, 0.0f, a.getY(), p.bgBottom, 0.0f, a.getBottom(), false));
+    g.fillRect (a);
+}
+
 // === Facet EQ: studio glass — clean and precise, thin lines, no motion =============================================
 
 inline void canvasFacet (juce::Graphics& g, Rectangle<float> a, bool)
@@ -46,65 +54,7 @@ inline const Theme& facetTheme()
     return t;
 }
 
-// === Nebula: deep space — a magenta/cyan nebula, planet knobs, twinkling stars ======================================
-
-inline void canvasNebula (juce::Graphics& g, Rectangle<float> a, bool display)
-{
-    const auto& p = pal();
-    g.setGradientFill (ColourGradient (p.bgTop, 0.0f, a.getY(), p.bgBottom, 0.0f, a.getBottom(), false));
-    g.fillRect (a);
-    if (! reduced)
-    {
-        // gas clouds: stacked soft blooms of magenta, violet and teal along a diagonal band
-        juce::Random rnd (2026);
-        for (int i = 0; i < 26; ++i)
-        {
-            const auto t = rnd.nextFloat();
-            const Point<float> c { a.getX() + a.getWidth() * (0.05f + 0.9f * t), a.getY() + a.getHeight() * (0.75f - 0.5f * t + (rnd.nextFloat() - 0.5f) * 0.35f) };
-            const auto col = t < 0.4f ? p.accent : t < 0.7f ? Colour (0xff8a5cff) : p.accent2;
-            bloom (g, c, a.getHeight() * (0.12f + 0.25f * rnd.nextFloat()), col, 0.05f + 0.07f * rnd.nextFloat());
-        }
-        // a bright core
-        bloom (g, { a.getX() + a.getWidth() * 0.55f, a.getY() + a.getHeight() * 0.45f }, a.getHeight() * 0.22f, Colour (0xffffe6fb), 0.10f);
-    }
-    // a spiral galaxy far away, top right
-    if (! display)
-    {
-        const auto gc = Point<float> (a.getRight() - a.getWidth() * 0.12f, a.getY() + a.getHeight() * 0.2f);
-        const auto gr = juce::jmin (a.getWidth(), a.getHeight()) * 0.09f;
-        for (int arm = 0; arm < 2; ++arm)
-        {
-            juce::Path s;
-            for (int i = 0; i <= 60; ++i)
-            {
-                const auto t = (float) i / 60.0f;
-                const auto ang = (float) arm * juce::MathConstants<float>::pi + t * 4.2f;
-                const Point<float> q { gc.x + std::cos (ang) * gr * t, gc.y + std::sin (ang) * gr * t * 0.45f };
-                if (i == 0) s.startNewSubPath (q);
-                else s.lineTo (q);
-            }
-            g.setColour (Colour (0xffe8dcff).withAlpha (0.18f));
-            g.strokePath (s, stroke (2.2f));
-            g.setColour (Colour (0xffe8dcff).withAlpha (0.35f));
-            g.strokePath (s, stroke (0.8f));
-        }
-        if (! reduced) bloom (g, gc, gr * 0.7f, Colour (0xfffff0ff), 0.35f);
-    }
-    stars (g, a, display ? 60 : 160, 5, 0.9f);
-}
-
-inline void nebulaHeader (juce::Graphics& g, Rectangle<float> a) { stars (g, a, (int) (a.getWidth() / 9.0f), 3, 0.6f); }
-
-inline void nebulaMotion (juce::Graphics& g, const Motion& m)
-{
-    for (const auto& s : m.motes) // twinkling stars
-    {
-        const auto tw = 0.5f + 0.5f * std::sin (m.t * (1.2f + s.spin) + s.phase);
-        if (! reduced) bloom (g, { s.x, s.y }, s.size * 4.0f, m.p.accent2.interpolatedWith (Colours::white, 0.5f), 0.25f * tw);
-        g.setColour (Colours::white.withAlpha (0.25f + 0.7f * tw));
-        g.fillEllipse (Rectangle<float> (s.size, s.size).withCentre ({ s.x, s.y }));
-    }
-}
+// === Nebula (Valhalla Supermassive role): the original's flat graphic panel — indigo night, violet fields, big black knobs ===
 
 inline const Theme& nebulaTheme()
 {
@@ -112,18 +62,20 @@ inline const Theme& nebulaTheme()
     {
         Theme x;
         x.name = "Nebula";
-        x.base = Style::neon;
-        x.pal = { Colour (0xff0c0b22), Colour (0xff020208), Colour (0xffff5cd3), Colour (0xff3fe2ff), Colour (0xb4141133), Colour (0xd8070617),
-                  Colour (0xffa184ff), Colour (0xfff1eaff), Colour (0xff03030b), Colour (0xff3a2a6e), Colour (0xff0b0920), Colour (0xff221c44),
-                  Colour (0xffffffff), Colour (0xff120f2a) };
-        x.canvas = canvasNebula;
-        x.headerDeco = nebulaHeader;
-        x.twoTone = true;
-        x.cap = Cap::planet;
-        x.pointer = Pointer::electron;
-        x.motes = 22;
-        x.reach = 4.0f;
-        x.paintMotion = nebulaMotion;
+        x.base = Style::glow;
+        x.pal = { Colour (0xff131133), Colour (0xff0c0b24), Colour (0xffbdb8ff), Colour (0xff7d78ff), Colour (0xff4a44c6), Colour (0xff4a44c6),
+                  Colour (0xff6c66f0), Colour (0xffffffff), Colour (0xff1b1842), Colour (0xff060608), Colour (0xff060608), Colour (0xff2b2775),
+                  Colour (0xffffffff), Colour (0xff3a35a0) };
+        x.canvas = canvasFlat;
+        x.flatSections = true;
+        x.discKnob = true;
+        x.pointerFrom = 0.0f;
+        x.arcGlow = 0.0f;
+        x.kerning = 0.02f;
+        x.captionScale = 1.3f;
+        x.captionCol = Colours::white;
+        x.valueCol = Colour (0xffc9c5ff);
+        x.rimWidth = 0.0f;
         return x;
     }();
     return t;
@@ -232,6 +184,68 @@ inline void capVelvet (juce::Graphics& g, Rectangle<float> cap, Point<float> c, 
         g.setColour (p.accent.withAlpha (0.18f));
         g.drawEllipse (cap.reduced (0.6f), 1.2f);
     }
+}
+
+
+// round tp172d: the Soundtoys-role hardware look — a black anodised face between two walnut cheeks, corner screws
+inline void woodCheek (juce::Graphics& g, Rectangle<float> a, juce::int64 seed)
+{
+    vfill (g, a, Colour (0xff6a3a1c), Colour (0xff3e200d));
+    if (reduced) return;
+    juce::Random rnd (seed);
+    for (int i = 0; i < 14; ++i) // the grain: long wavy darker lines
+    {
+        juce::Path gr;
+        const auto x0 = a.getX() + rnd.nextFloat() * a.getWidth();
+        const auto amp = 0.6f + rnd.nextFloat() * 1.4f, ph = rnd.nextFloat() * 6.0f;
+        for (float y = a.getY(); y <= a.getBottom(); y += 6.0f)
+        {
+            const Point<float> q { x0 + amp * std::sin (ph + y * 0.035f), y };
+            if (y == a.getY()) gr.startNewSubPath (q);
+            else gr.lineTo (q);
+        }
+        g.setColour (Colour (0xff1e0e04).withAlpha (0.25f + 0.3f * rnd.nextFloat()));
+        g.strokePath (gr, juce::PathStrokeType (0.6f + rnd.nextFloat() * 1.2f));
+    }
+    g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.10f), a.getX(), 0.0f, Colours::transparentBlack, a.getRight(), 0.0f, false));
+    g.fillRect (a);
+}
+
+inline void canvasSoundtoys (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto cheek = juce::jlimit (8.0f, 16.0f, a.getWidth() * 0.016f);
+    woodCheek (g, a.withWidth (cheek), 7);
+    woodCheek (g, a.withTrimmedLeft (a.getWidth() - cheek), 11);
+    const auto face = a.reduced (cheek, 0.0f);
+    brushedLines (g, face, 72, 0.025f);
+    g.setColour (Colours::black.withAlpha (0.6f)); // the face's edge against the wood
+    g.drawRect (face, 1.5f);
+    cornerScrews (g, face.reduced (2.0f), 5.0f, 4.0f);
+}
+
+inline Theme soundtoysTheme (const char* name, Colour accent, Colour title, Colour panel, Colour rim, float rimWidth)
+{
+    Theme x;
+    x.name = name;
+    x.base = Style::hardware;
+    x.pal = { Colour (0xff1b1b1c), Colour (0xff0c0c0d), accent, accent.brighter (0.4f), panel, panel, rim, title, Colour (0xff070707),
+              Colour (0xff2a2a2c), Colour (0xff060606), Colour (0x00000000), Colours::white, Colour (0xff232325) };
+    x.canvas = canvasSoundtoys;
+    x.flatSections = true;
+    x.rimWidth = rimWidth;
+    x.cap = Cap::rubber;
+    x.ticks = 11;           // the printed dot scale around each knob
+    x.pointerFrom = 0.15f;
+    x.arcGlow = 0.0f;
+    x.thin = true;
+    x.kerning = 0.28f;      // wide-tracked caps
+    x.captionCol = title;
+    x.valueCol = title.withMultipliedBrightness (0.85f);
+    x.captionScale = 1.1f;
+    return x;
 }
 
 // === Ridge Strip (channel-strip role, round tp172c): a large-format console's channel — warm grey metal panels, ===
@@ -757,45 +771,7 @@ inline const Theme& hushTheme()
     return t;
 }
 
-// === Epoch Verb (vintage-digital reverb role): a 1980s rack — black brushed unit, a red display glow, memory chips ==
-
-inline void canvasEpoch (juce::Graphics& g, Rectangle<float> a, bool display)
-{
-    const auto& p = pal();
-    vfill (g, a, p.bgTop, p.bgBottom);
-    if (display) return;
-    brushedLines (g, a, 80, 0.03f);
-    // a grid of memory chips printed faintly on the board behind the panel (rows of small dark packages with legs)
-    juce::Random rnd (1980);
-    for (float y = a.getY() + 18.0f; y < a.getBottom() - 20.0f; y += 46.0f)
-        for (float x = a.getX() + 14.0f + (rnd.nextFloat() * 20.0f); x < a.getRight() - 40.0f; x += 58.0f + rnd.nextFloat() * 20.0f)
-        {
-            const auto chip = Rectangle<float> (x, y, 34.0f, 14.0f);
-            g.setColour (Colours::black.withAlpha (0.28f));
-            g.fillRoundedRectangle (chip, 1.5f);
-            g.setColour (Colours::white.withAlpha (0.035f));
-            for (float lx = chip.getX() + 3.0f; lx < chip.getRight() - 2.0f; lx += 4.0f)
-            {
-                g.fillRect (Rectangle<float> (lx, chip.getY() - 3.0f, 1.5f, 3.0f));
-                g.fillRect (Rectangle<float> (lx, chip.getBottom(), 1.5f, 3.0f));
-            }
-            g.fillEllipse (Rectangle<float> (2.5f, 2.5f).withCentre (chip.getTopLeft().translated (4.0f, 4.0f)));
-        }
-    // the readout's red glow spilling from the top and warm sodium light low
-    softLight (g, { a.getX() + a.getWidth() * 0.7f, a.getY() }, a.getWidth() * 0.45f, p.accent, 0.12f);
-    softLight (g, { a.getX() + a.getWidth() * 0.15f, a.getBottom() }, a.getWidth() * 0.4f, p.accent2, 0.06f);
-    vignette (g, a, 0.4f);
-}
-
-inline void epochEmblem (juce::Graphics& g, Point<float> c, float r) // a lit display segment
-{
-    const auto& p = pal();
-    if (! reduced) bloom (g, c, r * 2.6f, p.accent, 0.35f);
-    g.setColour (p.accent);
-    g.fillRoundedRectangle (Rectangle<float> (r * 1.8f, r * 1.1f).withCentre (c), 1.0f);
-    g.setColour (Colours::black.withAlpha (0.5f));
-    g.fillRect (Rectangle<float> (r * 1.8f, 0.8f).withCentre (c));
-}
+// === Epoch Verb (ValhallaVintageVerb role): the original's 1970s-80s flat graphic — oxblood ground, orange outlines, orange disc knobs ===
 
 inline const Theme& epochTheme()
 {
@@ -803,80 +779,26 @@ inline const Theme& epochTheme()
     {
         Theme x;
         x.name = "Epoch Verb";
-        x.base = Style::hardware;
-        x.pal = { Colour (0xff1c1c1e), Colour (0xff0a0a0b), Colour (0xffff5a36), Colour (0xffffb35a), Colour (0xd81a1a1c), Colour (0xe80c0c0d),
-                  Colour (0xff57534f), Colour (0xfff2ede6), Colour (0xff070606), Colour (0xff2a2a2b), Colour (0xff0e0e0f), Colour (0xff1e1e20),
-                  Colour (0xfff7f2ea), Colour (0xff1b1b1d) };
-        x.canvas = canvasEpoch;
-        x.sectionDeco = ridgeScrews;
-        x.titleEmblem = epochEmblem;
-        x.cap = Cap::bakelite;
-        x.pointerFrom = 0.2f;
-        x.buttTrack = true;
-        x.arcGlow = 0.18f;
-        x.thumbPointer = true;
+        x.base = Style::glow;
+        x.pal = { Colour (0xff3c0c08), Colour (0xff2c0705), Colour (0xffffb02e), Colour (0xffff6a1f), Colour (0xff3c0c08), Colour (0xff3c0c08),
+                  Colour (0xffff9a1f), Colour (0xffffffff), Colour (0xff210503), Colour (0xffff6a1f), Colour (0xffff6a1f), Colour (0xff5a1a10),
+                  Colour (0xff120302), Colour (0xff5a1a10) };
+        x.canvas = canvasFlat;
+        x.flatSections = true;
+        x.discKnob = true;
+        x.pointerFrom = 0.0f;
+        x.arcGlow = 0.0f;
+        x.kerning = 0.02f;
+        x.captionScale = 1.3f;
+        x.captionCol = Colour (0xffffa94a);
+        x.valueCol = Colours::white;
+        x.rimWidth = 2.5f;
         return x;
     }();
     return t;
 }
 
-// === Atrium (room role): a stone atrium in afternoon light — arches, pillars, light shafts, dust ===================
-
-inline void canvasAtrium (juce::Graphics& g, Rectangle<float> a, bool display)
-{
-    const auto& p = pal();
-    vfill (g, a, p.bgTop, p.bgBottom);
-    if (display) return;
-    // a colonnade of arches receding to a vanishing point (thin sandstone lines)
-    const auto vp = Point<float> (a.getX() + a.getWidth() * 0.62f, a.getY() + a.getHeight() * 0.45f);
-    for (int i = 0; i < 6; ++i)
-    {
-        const auto s = std::pow (0.72f, (float) i); // each arch smaller (further)
-        const auto w = a.getWidth() * 0.9f * s, h = a.getHeight() * 1.1f * s;
-        const auto box = Rectangle<float> (w, h).withCentre (vp.translated (0.0f, h * 0.1f));
-        juce::Path arch;
-        arch.startNewSubPath (box.getX(), box.getBottom());
-        arch.lineTo (box.getX(), box.getY() + w * 0.5f);
-        arch.addCentredArc (box.getCentreX(), box.getY() + w * 0.5f, w * 0.5f, w * 0.5f, 0.0f, -juce::MathConstants<float>::halfPi,
-                            juce::MathConstants<float>::halfPi, false);
-        arch.lineTo (box.getRight(), box.getBottom());
-        g.setColour (p.accent2.withAlpha (0.10f * (1.0f - 0.12f * (float) i)));
-        g.strokePath (arch, juce::PathStrokeType (juce::jmax (0.8f, 3.0f * s)));
-    }
-    // light shafts slanting down from the upper left
-    if (! reduced)
-        for (int i = 0; i < 3; ++i)
-        {
-            juce::Path shaft;
-            const auto x0 = a.getX() + a.getWidth() * (0.08f + 0.14f * (float) i);
-            shaft.startNewSubPath (x0, a.getY());
-            shaft.lineTo (x0 + a.getWidth() * 0.06f, a.getY());
-            shaft.lineTo (x0 + a.getWidth() * 0.36f, a.getBottom());
-            shaft.lineTo (x0 + a.getWidth() * 0.24f, a.getBottom());
-            shaft.closeSubPath();
-            g.setGradientFill (ColourGradient (p.accent.withAlpha (0.09f), x0, a.getY(), p.accent.withAlpha (0.0f), x0 + a.getWidth() * 0.3f, a.getBottom(), false));
-            g.fillPath (shaft);
-        }
-    // dust motes in the light (static)
-    juce::Random rnd (9);
-    for (int i = 0; i < 40; ++i)
-    {
-        g.setColour (p.accent.withAlpha (0.08f + rnd.nextFloat() * 0.12f));
-        g.fillEllipse (Rectangle<float> (1.6f, 1.6f).withCentre ({ a.getX() + rnd.nextFloat() * a.getWidth() * 0.6f, a.getY() + rnd.nextFloat() * a.getHeight() }));
-    }
-    vignette (g, a, 0.45f);
-}
-
-inline void atriumEmblem (juce::Graphics& g, Point<float> c, float r) // an arch
-{
-    juce::Path arch;
-    arch.startNewSubPath (c.x - r, c.y + r);
-    arch.lineTo (c.x - r, c.y);
-    arch.addCentredArc (c.x, c.y, r, r, 0.0f, -juce::MathConstants<float>::halfPi, juce::MathConstants<float>::halfPi, false);
-    arch.lineTo (c.x + r, c.y + r);
-    g.setColour (pal().accent);
-    g.strokePath (arch, stroke (1.6f));
-}
+// === Atrium (ValhallaRoom role): the original's "Electric Blue" mode — graphite fields, cyan bars and cyan disc knobs ===
 
 inline void capStone (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
 {
@@ -897,81 +819,27 @@ inline const Theme& atriumTheme()
         Theme x;
         x.name = "Atrium";
         x.base = Style::glow;
-        x.pal = { Colour (0xff2a221b), Colour (0xff0f0c09), Colour (0xfff2c58a), Colour (0xffd9b48a), Colour (0x9c2a221b), Colour (0xb8130f0c),
-                  Colour (0xff8a7356), Colour (0xfff6e8d2), Colour (0xff0a0806), Colour (0xffcbb89b), Colour (0xff7d6b54), Colour (0xff2a2119),
-                  Colour (0xff2a1d10), Colour (0xff221b15) };
-        x.canvas = canvasAtrium;
-        x.titleEmblem = atriumEmblem;
-        x.drawCap = capStone;
-        x.arcGlow = 0.18f;
+        x.pal = { Colour (0xff4b4c4f), Colour (0xff444548), Colour (0xff72f0f8), Colour (0xff3fc8d4), Colour (0xff38393c), Colour (0xff38393c),
+                  Colour (0xff38393c), Colour (0xffffffff), Colour (0xff2a2b2d), Colour (0xff72f0f8), Colour (0xff72f0f8), Colour (0xff2b2c2f),
+                  Colour (0xff1c1d1f), Colour (0xff2f3033) };
+        x.canvas = canvasFlat;
+        x.flatSections = true;
+        x.discKnob = true;
+        x.pointerFrom = 0.0f;
+        x.arcGlow = 0.0f;
+        x.kerning = 0.02f;
+        x.captionScale = 1.3f;
+        x.captionCol = Colours::white;
+        x.valueCol = Colours::white;
+        x.rimWidth = 0.0f;
+        x.barSlider = true;
+        x.discRing = false;
         return x;
     }();
     return t;
 }
 
-// === Foil Plate (plate role): a suspended steel plate on springs, brushed foil sheen, copper transducers ==========
-
-inline void canvasFoil (juce::Graphics& g, Rectangle<float> a, bool display)
-{
-    const auto& p = pal();
-    vfill (g, a, p.bgTop, p.bgBottom);
-    if (display) return;
-    // the plate: a big tilted sheet in the background, hung from the frame by springs
-    const auto plate = Rectangle<float> (a.getWidth() * 0.86f, a.getHeight() * 0.62f).withCentre (a.getCentre().translated (0.0f, a.getHeight() * 0.06f));
-    g.setGradientFill (ColourGradient (p.accent2.withAlpha (0.10f), plate.getX(), plate.getY(), p.accent2.withAlpha (0.03f), plate.getRight(), plate.getBottom(), false));
-    g.fillRect (plate);
-    if (! reduced) // the diagonal sheen of the foil
-    {
-        juce::Path sheen;
-        sheen.startNewSubPath (plate.getX() + plate.getWidth() * 0.35f, plate.getY());
-        sheen.lineTo (plate.getX() + plate.getWidth() * 0.5f, plate.getY());
-        sheen.lineTo (plate.getX() + plate.getWidth() * 0.3f, plate.getBottom());
-        sheen.lineTo (plate.getX() + plate.getWidth() * 0.15f, plate.getBottom());
-        sheen.closeSubPath();
-        g.setColour (Colours::white.withAlpha (0.05f));
-        g.fillPath (sheen);
-    }
-    brushedLines (g, plate, 33, 0.03f);
-    g.setColour (p.accent2.withAlpha (0.22f));
-    g.drawRect (plate, 1.0f);
-    // springs from the frame's corners to the plate's
-    auto spring = [&] (Point<float> from, Point<float> to)
-    {
-        juce::Path s;
-        const auto n = 9;
-        const auto d = to - from;
-        const Point<float> perp { -d.y, d.x };
-        const auto len = juce::jmax (1.0f, d.getDistanceFromOrigin());
-        s.startNewSubPath (from);
-        for (int i = 1; i < n; ++i)
-            s.lineTo (from + d * ((float) i / (float) n) + perp * ((i % 2 == 0 ? 1.0f : -1.0f) * 4.0f / len));
-        s.lineTo (to);
-        g.setColour (p.accent2.withAlpha (0.28f));
-        g.strokePath (s, juce::PathStrokeType (1.0f));
-    };
-    spring (a.getTopLeft().translated (6.0f, 6.0f), plate.getTopLeft());
-    spring (a.getTopRight().translated (-6.0f, 6.0f), plate.getTopRight());
-    spring (a.getBottomLeft().translated (6.0f, -6.0f), plate.getBottomLeft());
-    spring (a.getBottomRight().translated (-6.0f, -6.0f), plate.getBottomRight());
-    // copper transducers on the plate
-    for (const auto f : { 0.3f, 0.72f })
-    {
-        const auto c = Point<float> (plate.getX() + plate.getWidth() * f, plate.getY() + plate.getHeight() * (f < 0.5f ? 0.35f : 0.62f));
-        g.setGradientFill (ColourGradient (p.accent.withAlpha (0.35f), c.x - 6.0f, c.y - 6.0f, p.accent.darker (0.6f).withAlpha (0.3f), c.x + 6.0f, c.y + 6.0f, true));
-        g.fillEllipse (Rectangle<float> (16.0f, 16.0f).withCentre (c));
-    }
-    vignette (g, a, 0.4f);
-}
-
-inline void foilEmblem (juce::Graphics& g, Point<float> c, float r) // a plate on two springs
-{
-    const auto& p = pal();
-    g.setColour (p.accent2);
-    g.drawRect (Rectangle<float> (r * 2.2f, r * 1.0f).withCentre (c.translated (0.0f, r * 0.3f)), 1.0f);
-    g.setColour (p.accent);
-    for (const auto dx : { -0.8f, 0.8f })
-        g.drawLine (c.x + dx * r, c.y - r, c.x + dx * r, c.y - r * 0.2f, 1.0f);
-}
+// === Foil Plate (ValhallaPlate role): the original's graphic look — black ground, steel-blue fields, black disc knobs ===
 
 inline void capChrome (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool)
 {
@@ -991,97 +859,26 @@ inline const Theme& foilTheme()
     {
         Theme x;
         x.name = "Foil Plate";
-        x.base = Style::hardware;
-        x.pal = { Colour (0xff22262b), Colour (0xff0d0f12), Colour (0xffd98a52), Colour (0xffc9d1d8), Colour (0x9c1f2327), Colour (0xb80d0f12),
-                  Colour (0xff7d8791), Colour (0xffeef2f5), Colour (0xff08090b), Colour (0xffd9dee3), Colour (0xff4b5157), Colour (0xff1a1d21),
-                  Colour (0xff15181b), Colour (0xff1f2327) };
-        x.canvas = canvasFoil;
-        x.titleEmblem = foilEmblem;
-        x.drawCap = capChrome;
-        x.arcGlow = 0.18f;
+        x.base = Style::glow;
+        x.pal = { Colour (0xff050506), Colour (0xff000000), Colour (0xffa9cdfa), Colour (0xff5d95d8), Colour (0xff21599a), Colour (0xff21599a),
+                  Colour (0xff21599a), Colour (0xffffffff), Colour (0xff0d2747), Colour (0xff040405), Colour (0xff040405), Colour (0xff163d6a),
+                  Colour (0xffffffff), Colour (0xff1a4a82) };
+        x.canvas = canvasFlat;
+        x.flatSections = true;
+        x.discKnob = true;
+        x.pointerFrom = 0.0f;
+        x.arcGlow = 0.0f;
+        x.kerning = 0.02f;
+        x.captionScale = 1.3f;
+        x.captionCol = Colours::white;
+        x.valueCol = Colour (0xffbdd8fb);
+        x.rimWidth = 0.0f;
         return x;
     }();
     return t;
 }
 
-// === Halo (shimmer role): a luminous ring of light, sparkles rising an octave at a time ===========================
-
-inline void canvasHalo (juce::Graphics& g, Rectangle<float> a, bool display)
-{
-    const auto& p = pal();
-    vfill (g, a, p.bgTop, p.bgBottom);
-    if (display) return;
-    const auto c = Point<float> (a.getCentreX(), a.getY() + a.getHeight() * 0.32f);
-    const auto r = juce::jmin (a.getWidth(), a.getHeight()) * 0.3f;
-    if (! reduced)
-    {
-        softLight (g, c, r * 2.2f, p.accent, 0.10f);
-        // the corona: a few soft rings
-        for (int i = 0; i < 4; ++i)
-        {
-            g.setColour (p.accent.withAlpha (0.05f));
-            g.drawEllipse (Rectangle<float> ((r + (float) i * 5.0f) * 2.0f, (r + (float) i * 5.0f) * 0.7f).withCentre (c), 6.0f);
-        }
-    }
-    g.setGradientFill (ColourGradient (p.accent.withAlpha (0.55f), c.x - r, c.y, p.accent2.withAlpha (0.4f), c.x + r, c.y, false));
-    g.drawEllipse (Rectangle<float> (r * 2.0f, r * 0.7f).withCentre (c), 2.0f);
-    // sparkles rising in octaves: tiers of smaller and smaller four-point stars
-    juce::Random rnd (12);
-    for (int tier = 0; tier < 3; ++tier)
-        for (int i = 0; i < 9; ++i)
-        {
-            const Point<float> s { a.getX() + rnd.nextFloat() * a.getWidth(), a.getBottom() - a.getHeight() * (0.15f + 0.28f * (float) tier + rnd.nextFloat() * 0.2f) };
-            const auto sz = 5.0f / (float) (tier + 1);
-            juce::Path star;
-            star.startNewSubPath (s.x, s.y - sz);
-            star.quadraticTo (s.x, s.y, s.x + sz, s.y);
-            star.quadraticTo (s.x, s.y, s.x, s.y + sz);
-            star.quadraticTo (s.x, s.y, s.x - sz, s.y);
-            star.quadraticTo (s.x, s.y, s.x, s.y - sz);
-            g.setColour (p.accent.interpolatedWith (Colours::white, 0.5f).withAlpha (0.18f + 0.1f * (float) tier));
-            g.fillPath (star);
-        }
-    vignette (g, a, 0.35f);
-}
-
-inline void haloEmblem (juce::Graphics& g, Point<float> c, float r)
-{
-    const auto& p = pal();
-    if (! reduced) bloom (g, c, r * 2.4f, p.accent, 0.3f);
-    g.setColour (p.accent);
-    g.drawEllipse (Rectangle<float> (r * 2.2f, r * 0.9f).withCentre (c), 1.4f);
-}
-
-inline void haloTip (juce::Graphics& g, Point<float> tip, float t, float) // a sparkle rides the arc's tip
-{
-    const auto& p = pal();
-    const auto sz = t * 1.6f;
-    juce::Path star;
-    star.startNewSubPath (tip.x, tip.y - sz);
-    star.quadraticTo (tip.x, tip.y, tip.x + sz, tip.y);
-    star.quadraticTo (tip.x, tip.y, tip.x, tip.y + sz);
-    star.quadraticTo (tip.x, tip.y, tip.x - sz, tip.y);
-    star.quadraticTo (tip.x, tip.y, tip.x, tip.y - sz);
-    g.setColour (p.accent.interpolatedWith (Colours::white, 0.6f));
-    g.fillPath (star);
-}
-
-inline void haloMotion (juce::Graphics& g, const Motion& m)
-{
-    for (const auto& s : m.motes) // sparkles rising and fading
-    {
-        const auto fade = juce::jlimit (0.0f, 1.0f, (s.y - m.stage.getY()) / juce::jmax (1.0f, m.stage.getHeight()));
-        const auto sz = s.size * (0.8f + 0.4f * std::sin (m.t * 3.0f + s.phase));
-        juce::Path star;
-        star.startNewSubPath (s.x, s.y - sz);
-        star.quadraticTo (s.x, s.y, s.x + sz, s.y);
-        star.quadraticTo (s.x, s.y, s.x, s.y + sz);
-        star.quadraticTo (s.x, s.y, s.x - sz, s.y);
-        star.quadraticTo (s.x, s.y, s.x, s.y - sz);
-        g.setColour (m.p.accent.interpolatedWith (Colours::white, 0.5f).withAlpha (0.2f + 0.6f * fade));
-        g.fillPath (star);
-    }
-}
+// === Halo (ValhallaShimmer role): the original's light minimal look — pale grey ground, graphite disc knobs, dark type ===
 
 inline const Theme& haloTheme()
 {
@@ -1089,79 +886,28 @@ inline const Theme& haloTheme()
     {
         Theme x;
         x.name = "Halo";
-        x.base = Style::neon;
-        x.pal = { Colour (0xff141c30), Colour (0xff05070e), Colour (0xffffe08a), Colour (0xff8fe8ff), Colour (0x9c141c30), Colour (0xb806080f),
-                  Colour (0xff9fb0d0), Colour (0xfffff6dc), Colour (0xff04060c), Colour (0xfff4f0e6), Colour (0xffb6b0a4), Colour (0xff1d2438),
-                  Colour (0xff3a2f14), Colour (0xff161d2e) };
-        x.canvas = canvasHalo;
-        x.titleEmblem = haloEmblem;
-        x.twoTone = true;
-        x.cap = Cap::porcelain;
-        x.tipDeco = haloTip;
-        x.motes = 10;
-        x.drift = Drift::rise;
-        x.sizeMin = 1.5f;
-        x.sizeRange = 2.0f;
-        x.vyMin = -10.0f;
-        x.vyRange = -8.0f;
-        x.sway = 3.0f;
-        x.reach = 2.0f;
-        x.paintMotion = haloMotion;
-        x.hz = 15; // round 170k: slow motion, fewer frames
+        x.base = Style::glow;
+        x.pal = { Colour (0xffeeeef0), Colour (0xffb4b4b9), Colour (0xff4a4a50), Colour (0xff8a8a90), Colour (0x00ffffff), Colour (0x00ffffff),
+                  Colour (0x00ffffff), Colour (0xff2e2e33), Colour (0xffd4d4d8), Colour (0xff26262a), Colour (0xff26262a), Colour (0xffc4c4c8),
+                  Colour (0xffeeeeee), Colour (0xff55555b) };
+        x.canvas = canvasFlat;
+        x.flatSections = true;
+        x.discKnob = true;
+        x.pointerFrom = 0.0f;
+        x.arcGlow = 0.0f;
+        x.kerning = 0.02f;
+        x.captionScale = 1.3f;
+        x.captionCol = Colour (0xff2e2e33);
+        x.valueCol = Colour (0xff2e2e33);
+        x.rimWidth = 0.0f;
+        x.headerCol = Colour (0xff3a3a3f);
+        x.pal.accent2 = Colour (0xff3a3a40);
         return x;
     }();
     return t;
 }
 
-// === Horizon (echo + reverb role): dawn on a flat horizon, the sun repeated as fading echoes =======================
-
-inline void canvasHorizon (juce::Graphics& g, Rectangle<float> a, bool display)
-{
-    const auto& p = pal();
-    ColourGradient sky (Colour (0xff0b0915), 0.0f, a.getY(), Colour (0xff2a1b46), 0.0f, a.getY() + a.getHeight() * 0.62f, false);
-    sky.addColour (0.85, Colour (0xff6a2c4a));
-    sky.addColour (1.0, Colour (0xffb04a3a));
-    g.setGradientFill (sky);
-    g.fillRect (a.withHeight (a.getHeight() * 0.62f));
-    vfill (g, a.withTrimmedTop (a.getHeight() * 0.62f), Colour (0xff1a0f18), p.bgBottom);
-    if (display) return;
-    const auto hy = a.getY() + a.getHeight() * 0.62f;
-    // the sun and its echoes to the right, each fainter and smaller
-    for (int i = 4; i >= 0; --i)
-    {
-        const auto r = a.getHeight() * 0.13f * std::pow (0.82f, (float) i);
-        const auto c = Point<float> (a.getX() + a.getWidth() * (0.22f + 0.16f * (float) i), hy);
-        g.saveState();
-        g.reduceClipRegion (Rectangle<float> (a.getX(), a.getY(), a.getWidth(), hy - a.getY()).toNearestInt());
-        if (i == 0 && ! reduced) softLight (g, c, r * 3.0f, p.accent, 0.25f);
-        g.setGradientFill (ColourGradient (Colour (0xffffd28a).withAlpha (0.9f * std::pow (0.5f, (float) i)), c.x, c.y - r, p.accent.withAlpha (0.7f * std::pow (0.5f, (float) i)), c.x, c.y, false));
-        g.fillEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c));
-        g.restoreState();
-    }
-    // the horizon line and the sun's path on the water
-    g.setColour (p.accent.withAlpha (0.5f));
-    g.fillRect (Rectangle<float> (a.getX(), hy, a.getWidth(), 1.0f));
-    juce::Random rnd (4);
-    for (int i = 0; i < 14; ++i)
-    {
-        const auto y = hy + 4.0f + (float) i * 4.0f;
-        const auto w = a.getWidth() * (0.12f - 0.006f * (float) i) * (0.6f + rnd.nextFloat() * 0.6f);
-        g.setColour (p.accent.withAlpha (0.18f - 0.011f * (float) i));
-        g.fillRect (Rectangle<float> (a.getX() + a.getWidth() * 0.22f - w * 0.5f, y, w, 1.2f));
-    }
-    vignette (g, a, 0.35f);
-}
-
-inline void horizonEmblem (juce::Graphics& g, Point<float> c, float r) // a half sun on a line
-{
-    const auto& p = pal();
-    juce::Path sun;
-    sun.addCentredArc (c.x, c.y + r * 0.4f, r, r, 0.0f, -juce::MathConstants<float>::halfPi, juce::MathConstants<float>::halfPi, true);
-    sun.closeSubPath();
-    g.setColour (p.accent);
-    g.fillPath (sun);
-    g.fillRect (Rectangle<float> (r * 2.8f, 1.0f).withCentre (c.translated (0.0f, r * 0.5f)));
-}
+// === Horizon (ValhallaFutureVerb role): the original's look — black ground, mint outlines, outlined black knobs ===
 
 inline const Theme& horizonTheme()
 {
@@ -1169,14 +915,20 @@ inline const Theme& horizonTheme()
     {
         Theme x;
         x.name = "Horizon";
-        x.base = Style::vivid;
-        x.pal = { Colour (0xff2a1b46), Colour (0xff0b0915), Colour (0xffff8a3d), Colour (0xffc58aff), Colour (0x9c1d1430), Colour (0xb80c0915),
-                  Colour (0xff8a6a9a), Colour (0xfffff0e0), Colour (0xff07050c), Colour (0xff342a44), Colour (0xff130f1c), Colour (0xff261c36),
-                  Colour (0xffffe4cc), Colour (0xff1e1630) };
-        x.canvas = canvasHorizon;
-        x.titleEmblem = horizonEmblem;
-        x.twoTone = true;
-        x.cap = Cap::orb;
+        x.base = Style::glow;
+        x.pal = { Colour (0xff060709), Colour (0xff030405), Colour (0xff55f2cc), Colour (0xff38c9e8), Colour (0xff060709), Colour (0xff060709),
+                  Colour (0xff55f2cc), Colour (0xffe9fff9), Colour (0xff0b1513), Colour (0xff060709), Colour (0xff55f2cc), Colour (0xff163a33),
+                  Colour (0xff55f2cc), Colour (0xff10241f) };
+        x.canvas = canvasFlat;
+        x.flatSections = true;
+        x.discKnob = true;
+        x.pointerFrom = 0.0f;
+        x.arcGlow = 0.0f;
+        x.kerning = 0.02f;
+        x.captionScale = 1.3f;
+        x.captionCol = Colours::white;
+        x.valueCol = Colour (0xffc4fbec);
+        x.rimWidth = 2.5f;
         return x;
     }();
     return t;
@@ -1406,117 +1158,20 @@ inline const Theme& reeverb1Theme()
     return t;
 }
 
-// === Echoform (tape-echo role): a reel-to-reel tape path — reels, capstan, a loop of tape, cream and oxblood ========
-
-inline void reel (juce::Graphics& g, Point<float> c, float r, float angle, Colour metal, float alpha)
-{
-    g.setColour (metal.withAlpha (0.14f * alpha));
-    g.fillEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c));
-    g.setColour (Colour (0xff3a2a1e).withAlpha (0.55f * alpha)); // the wound tape
-    g.fillEllipse (Rectangle<float> (r * 1.45f, r * 1.45f).withCentre (c));
-    juce::Path holes; // three cut-outs of the flange
-    for (int i = 0; i < 3; ++i)
-    {
-        const auto a = angle + juce::MathConstants<float>::twoPi * (float) i / 3.0f;
-        holes.addCentredArc (c.x, c.y, r * 0.86f, r * 0.86f, 0.0f, a - 0.45f, a + 0.45f, true);
-        holes.addCentredArc (c.x, c.y, r * 0.42f, r * 0.42f, 0.0f, a + 0.45f, a - 0.45f, false);
-        holes.closeSubPath();
-    }
-    g.setColour (metal.withAlpha (0.22f * alpha));
-    g.fillPath (holes);
-    g.setColour (metal.withAlpha (0.45f * alpha));
-    g.drawEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c), 1.2f);
-    g.fillEllipse (Rectangle<float> (r * 0.22f, r * 0.22f).withCentre (c));
-}
-
-inline void canvasEchoform (juce::Graphics& g, Rectangle<float> a, bool display)
-{
-    const auto& p = pal();
-    vfill (g, a, p.bgTop, p.bgBottom);
-    if (display) return;
-    // tolex: a fine cross-hatch
-    if (! reduced)
-    {
-        g.setColour (Colours::black.withAlpha (0.08f));
-        for (float x = a.getX() - a.getHeight(); x < a.getRight(); x += 5.0f)
-            g.drawLine (x, a.getY(), x + a.getHeight(), a.getBottom(), 0.6f);
-    }
-    // two reels high in the background and the tape running between them past the heads
-    const auto r = juce::jmin (a.getHeight() * 0.3f, a.getWidth() * 0.16f);
-    const auto c1 = Point<float> (a.getX() + a.getWidth() * 0.2f, a.getY() + a.getHeight() * 0.3f);
-    const auto c2 = Point<float> (a.getRight() - a.getWidth() * 0.2f, c1.y);
-    reel (g, c1, r, 0.3f, p.accent2, 1.0f);
-    reel (g, c2, r, 1.1f, p.accent2, 1.0f);
-    juce::Path tape;
-    tape.startNewSubPath (c1.x, c1.y + r * 0.72f);
-    tape.lineTo (a.getCentreX() - r * 0.6f, a.getY() + a.getHeight() * 0.72f);
-    tape.lineTo (a.getCentreX() + r * 0.6f, a.getY() + a.getHeight() * 0.72f);
-    tape.lineTo (c2.x, c2.y + r * 0.72f);
-    g.setColour (Colour (0xff4a3020).withAlpha (0.6f));
-    g.strokePath (tape, juce::PathStrokeType (2.2f));
-    for (int i = 0; i < 3; ++i) // the heads (erase, record, play) under the tape
-    {
-        const auto h = Rectangle<float> (12.0f, 9.0f).withCentre ({ a.getCentreX() + ((float) i - 1.0f) * 22.0f, a.getY() + a.getHeight() * 0.72f + 6.0f });
-        g.setColour (p.accent2.withAlpha (0.18f));
-        g.fillRoundedRectangle (h, 2.0f);
-    }
-    softLight (g, { a.getCentreX(), a.getY() }, a.getWidth() * 0.5f, p.accent2, 0.06f);
-    vignette (g, a, 0.4f);
-}
-
-inline void echoformEmblem (juce::Graphics& g, Point<float> c, float r) { reel (g, c, r * 1.1f, 0.0f, pal().accent2, 4.0f); }
-
-inline void capChickenHead (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
-{
-    const auto& p = pal();
-    g.setColour (Colour (0xff15100c));
-    g.fillEllipse (cap.expanded (capR * 0.04f));
-    g.setGradientFill (ColourGradient (p.capTop.brighter (0.1f + hover * 0.15f), c.x, cap.getY(), p.capBottom, c.x, cap.getBottom(), false));
-    g.fillEllipse (cap.reduced (capR * 0.1f));
-    if (fx)
-    {
-        g.setColour (Colours::white.withAlpha (0.25f));
-        g.fillEllipse (Rectangle<float> (capR * 0.7f, capR * 0.3f).withCentre ({ c.x - capR * 0.15f, c.y - capR * 0.5f }));
-    }
-}
-
-inline void echoformMotion (juce::Graphics& g, const Motion& m) // two small reels turning in the stage strip
-{
-    const auto s = m.stage;
-    const auto r = juce::jmin (s.getHeight() * 0.42f, 14.0f);
-    if (r < 4.0f) return;
-    const auto y = s.getCentreY();
-    for (int i = 0; i < 2; ++i)
-        reel (g, { s.getRight() - r - 4.0f - (float) i * (r * 2.0f + 8.0f), y }, r, m.t * (i == 0 ? 1.4f : 1.9f), m.p.accent2, 3.5f);
-}
+// === Echoform (EchoBoy role, round tp172d): the original's hardware look — see soundtoysTheme =====================
 
 inline const Theme& echoformTheme()
 {
+    // round tp172d: EchoBoy's hardware look (its role) — black face, walnut cheeks, bold white rounded outlines, red LEDs
     static const Theme t = []
     {
-        Theme x;
-        x.name = "Echoform";
-        x.base = Style::hardware;
-        x.pal = { Colour (0xff2a1f18), Colour (0xff100b08), Colour (0xffc4473a), Colour (0xffe9dfc8), Colour (0x9c281c15), Colour (0xb8100b08),
-                  Colour (0xff8a6a4e), Colour (0xfff2e8d2), Colour (0xff0a0705), Colour (0xffeee4cc), Colour (0xffb5a688), Colour (0xff22180f),
-                  Colour (0xff3a1612), Colour (0xff2a1f18) };
-        x.canvas = canvasEchoform;
-        x.sectionDeco = ridgeScrews;
-        x.titleEmblem = echoformEmblem;
-        x.drawCap = capChickenHead;
-        x.pointerFrom = 0.1f;
-        x.buttTrack = true;
-        x.arcGlow = 0.0f;
-        x.thumbPointer = true;
-        x.stageRepaint = true;
-        x.paintMotion = echoformMotion;
-        x.hz = 12; // round 170k: slow motion, fewer frames
+        auto x = soundtoysTheme ("Echoform", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
         return x;
     }();
     return t;
 }
 
-// === Spiral Echo (frequency-shifting echo role): a spiral of repeats, each turn shifted in hue ======================
+// === Spiral Echo (ValhallaFreqEcho role): the original's look — a periwinkle field, black disc knobs, white type ===
 
 inline void spiral (juce::Graphics& g, Point<float> c, float r, float turns, float phase, float alpha, float width)
 {
@@ -1537,91 +1192,35 @@ inline void spiral (juce::Graphics& g, Point<float> c, float r, float turns, flo
     g.strokePath (s, stroke (width));
 }
 
-inline void canvasSpiral (juce::Graphics& g, Rectangle<float> a, bool display)
-{
-    const auto& p = pal();
-    vfill (g, a, p.bgTop, p.bgBottom);
-    if (display) return;
-    const auto c = Point<float> (a.getX() + a.getWidth() * 0.72f, a.getY() + a.getHeight() * 0.45f);
-    const auto r = juce::jmin (a.getWidth(), a.getHeight()) * 0.55f;
-    if (! reduced) softLight (g, c, r, p.accent, 0.07f);
-    spiral (g, c, r, 3.2f, 0.0f, 0.16f, 2.0f);
-    // the repeats: dots along the spiral, shrinking inwards
-    for (int i = 0; i < 12; ++i)
-    {
-        const auto u = 1.0f - (float) i / 12.0f;
-        const auto ang = u * 3.2f * juce::MathConstants<float>::twoPi;
-        const auto rr = r * (0.06f + 0.94f * u);
-        g.setColour (p.accent2.withAlpha (0.25f * u));
-        g.fillEllipse (Rectangle<float> (6.0f * u + 2.0f, 6.0f * u + 2.0f).withCentre ({ c.x + std::cos (ang) * rr, c.y + std::sin (ang) * rr }));
-    }
-    vignette (g, a, 0.4f);
-}
-
-inline void spiralEmblem (juce::Graphics& g, Point<float> c, float r) { spiral (g, c, r * 1.1f, 2.2f, 0.0f, 1.0f, 1.3f); }
-
 inline const Theme& spiralTheme()
 {
     static const Theme t = []
     {
         Theme x;
         x.name = "Spiral Echo";
-        x.base = Style::neon;
-        x.pal = { Colour (0xff0d2026), Colour (0xff04090b), Colour (0xff3fe0c5), Colour (0xffff7a6a), Colour (0x9c0d1f25), Colour (0xb805090b),
-                  Colour (0xff4f8a8a), Colour (0xffe6fbf6), Colour (0xff030708), Colour (0xffe9f2ef), Colour (0xff8aa39c), Colour (0xff14282d),
-                  Colour (0xff10302c), Colour (0xff0f2227) };
-        x.canvas = canvasSpiral;
-        x.titleEmblem = spiralEmblem;
-        x.twoTone = true;
-        x.cap = Cap::porcelain;
+        x.base = Style::glow;
+        x.pal = { Colour (0xff4b63b9), Colour (0xff4359ab), Colour (0xffffffff), Colour (0xffd8e0ff), Colour (0x00000000), Colour (0x00000000),
+                  Colour (0x00000000), Colour (0xffffffff), Colour (0xff34478a), Colour (0xff050508), Colour (0xff050508), Colour (0xff3a4f99),
+                  Colour (0xffffffff), Colour (0xff3a4f99) };
+        x.canvas = canvasFlat;
+        x.flatSections = true;
+        x.discKnob = true;
+        x.pointerFrom = 0.0f;
+        x.arcGlow = 0.0f;
+        x.kerning = 0.02f;
+        x.captionScale = 1.3f;
+        x.captionCol = Colours::white;
+        x.valueCol = Colours::white;
+        x.rimWidth = 0.0f;
+        x.discRing = false;
+        x.headerCol = Colour (0xff34478a);
+        x.pal.accent = Colour (0xff15161c);
         return x;
     }();
     return t;
 }
 
-// === Orbit (modulation-machine role): a planet with satellites on inclined orbits, interference rings ==============
-
-inline void canvasOrbit (juce::Graphics& g, Rectangle<float> a, bool display)
-{
-    const auto& p = pal();
-    vfill (g, a, p.bgTop, p.bgBottom);
-    if (display) return;
-    stars (g, a, 60, 101, 0.5f);
-    const auto c = Point<float> (a.getX() + a.getWidth() * 0.78f, a.getY() + a.getHeight() * 0.32f);
-    const auto r = juce::jmin (a.getWidth(), a.getHeight()) * 0.12f;
-    // interference rings (a comb filter seen as ripples)
-    for (int i = 1; i < 9; ++i)
-    {
-        g.setColour (p.accent.withAlpha (0.05f - 0.004f * (float) i));
-        g.drawEllipse (Rectangle<float> (r * 2.0f + (float) i * 22.0f, r * 2.0f + (float) i * 22.0f).withCentre (c), 1.0f);
-    }
-    // the planet
-    g.setGradientFill (ColourGradient (Colour (0xff6a8ab8), c.x - r * 0.4f, c.y - r * 0.5f, Colour (0xff0e1626), c.x + r * 0.8f, c.y + r, true));
-    g.fillEllipse (Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c));
-    // inclined orbits with a satellite each
-    for (int i = 0; i < 3; ++i)
-    {
-        juce::Path o;
-        o.addEllipse (Rectangle<float> (r * (3.0f + (float) i * 1.4f), r * (0.9f + (float) i * 0.35f)).withCentre (c));
-        o.applyTransform (juce::AffineTransform::rotation (-0.5f + (float) i * 0.45f, c.x, c.y));
-        g.setColour (p.accent2.withAlpha (0.22f));
-        g.strokePath (o, juce::PathStrokeType (0.9f));
-        const auto pt = o.getPointAlongPath (o.getLength() * (0.15f + 0.3f * (float) i));
-        g.setColour (p.accent);
-        g.fillEllipse (Rectangle<float> (4.0f, 4.0f).withCentre (pt));
-    }
-    vignette (g, a, 0.35f);
-}
-
-inline void orbitEmblem (juce::Graphics& g, Point<float> c, float r) // a satellite
-{
-    const auto& p = pal();
-    g.setColour (p.accent);
-    g.fillRect (Rectangle<float> (r * 0.7f, r * 0.7f).withCentre (c));
-    g.setColour (p.accent2);
-    g.fillRect (Rectangle<float> (r * 0.8f, r * 0.45f).withCentre (c.translated (-r * 0.85f, 0.0f)));
-    g.fillRect (Rectangle<float> (r * 0.8f, r * 0.45f).withCentre (c.translated (r * 0.85f, 0.0f)));
-}
+// === Orbit (ValhallaSpaceModulator role): the original's look — a dark maroon field, bright coloured disc knobs, big white type ===
 
 inline void capDish (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
 {
@@ -1636,114 +1235,34 @@ inline void capDish (juce::Graphics& g, Rectangle<float> cap, Point<float> c, fl
     }
 }
 
-inline void orbitMotion (juce::Graphics& g, const Motion& m) // a satellite crossing the stage strip on its orbit
-{
-    const auto s = m.stage;
-    if (s.getWidth() < 30.0f) return;
-    const auto c = s.getCentre();
-    juce::Path o;
-    o.addEllipse (s.reduced (6.0f, juce::jmax (2.0f, s.getHeight() * 0.25f)));
-    g.setColour (m.p.accent2.withAlpha (0.2f));
-    g.strokePath (o, juce::PathStrokeType (0.8f));
-    const auto pt = o.getPointAlongPath (o.getLength() * std::fmod (m.t * 0.08f, 1.0f));
-    if (! reduced) bloom (g, pt, 7.0f, m.p.accent, 0.5f);
-    g.setColour (m.p.accent);
-    g.fillEllipse (Rectangle<float> (4.0f, 4.0f).withCentre (pt));
-    juce::ignoreUnused (c);
-}
-
 inline const Theme& orbitTheme()
 {
     static const Theme t = []
     {
         Theme x;
         x.name = "Orbit";
-        x.base = Style::neon;
-        x.pal = { Colour (0xff16233a), Colour (0xff060a12), Colour (0xffb6ff5c), Colour (0xff7fb4ff), Colour (0x9c142035), Colour (0xb8060a12),
-                  Colour (0xff4f6a8a), Colour (0xffe8f2ff), Colour (0xff04070c), Colour (0xff4a5a74), Colour (0xff111827), Colour (0xff1c2a40),
-                  Colour (0xffeaffd6), Colour (0xff17233a) };
-        x.canvas = canvasOrbit;
-        x.titleEmblem = orbitEmblem;
-        x.drawCap = capDish;
-        x.pointer = Pointer::electron;
-        x.stageRepaint = true;
-        x.paintMotion = orbitMotion;
-        x.hz = 12; // round 170k: slow motion, fewer frames
+        x.base = Style::glow;
+        x.pal = { Colour (0xff2c0a0b), Colour (0xff1d0405), Colour (0xffff2f97), Colour (0xff2f86ff), Colour (0x00000000), Colour (0x00000000),
+                  Colour (0x00000000), Colour (0xffffffff), Colour (0xff3d1213), Colour (0xffff2f97), Colour (0xffff2f97), Colour (0xff4a1a1c),
+                  Colour (0xff141414), Colour (0xff4a1a1c) };
+        x.canvas = canvasFlat;
+        x.flatSections = true;
+        x.discKnob = true;
+        x.pointerFrom = 0.0f;
+        x.arcGlow = 0.0f;
+        x.kerning = 0.02f;
+        x.captionScale = 1.3f;
+        x.captionCol = Colours::white;
+        x.valueCol = Colours::white;
+        x.rimWidth = 0.0f;
+        x.captionScale = 1.5f;
+        x.discRing = false;
         return x;
     }();
     return t;
 }
 
-// === Lattice Mod (multitap-modulation role): an isometric lattice of glowing nodes (the taps) ======================
-
-inline void canvasLattice (juce::Graphics& g, Rectangle<float> a, bool display)
-{
-    const auto& p = pal();
-    vfill (g, a, p.bgTop, p.bgBottom);
-    if (display) return;
-    const auto step = 34.0f;
-    const auto h = step * 0.866f;
-    juce::Random rnd (16);
-    for (int row = 0; (float) row * h < a.getHeight() + h; ++row)
-        for (int col = 0; (float) col * step < a.getWidth() + step; ++col)
-        {
-            const Point<float> q { a.getX() + (float) col * step + (row % 2 == 0 ? 0.0f : step * 0.5f), a.getY() + (float) row * h };
-            const Point<float> right { q.x + step, q.y }, down1 { q.x + step * 0.5f, q.y + h }, down2 { q.x - step * 0.5f, q.y + h };
-            g.setColour (p.accent.withAlpha (0.05f));
-            g.drawLine ({ q, right }, 1.0f);
-            g.drawLine ({ q, down1 }, 1.0f);
-            g.drawLine ({ q, down2 }, 1.0f);
-            const auto lit = rnd.nextFloat();
-            if (lit > 0.82f)
-            {
-                if (! reduced) bloom (g, q, 9.0f, lit > 0.93f ? p.accent2 : p.accent, 0.25f);
-                g.setColour ((lit > 0.93f ? p.accent2 : p.accent).withAlpha (0.55f));
-                g.fillEllipse (Rectangle<float> (3.5f, 3.5f).withCentre (q));
-            }
-            else
-            {
-                g.setColour (p.accent.withAlpha (0.12f));
-                g.fillEllipse (Rectangle<float> (2.0f, 2.0f).withCentre (q));
-            }
-        }
-    vignette (g, a, 0.45f);
-}
-
-inline void latticeEmblem (juce::Graphics& g, Point<float> c, float r) // a hexagon
-{
-    juce::Path hex;
-    for (int i = 0; i < 6; ++i)
-    {
-        const auto ang = juce::MathConstants<float>::twoPi * (float) i / 6.0f;
-        const Point<float> q { c.x + std::cos (ang) * r, c.y + std::sin (ang) * r };
-        if (i == 0) hex.startNewSubPath (q);
-        else hex.lineTo (q);
-    }
-    hex.closeSubPath();
-    g.setColour (pal().accent);
-    g.strokePath (hex, juce::PathStrokeType (1.4f));
-}
-
-inline void capHex (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
-{
-    const auto& p = pal();
-    juce::Path hex;
-    for (int i = 0; i < 6; ++i)
-    {
-        const auto ang = juce::MathConstants<float>::twoPi * (float) i / 6.0f + juce::MathConstants<float>::pi / 6.0f;
-        const Point<float> q { c.x + std::cos (ang) * capR, c.y + std::sin (ang) * capR };
-        if (i == 0) hex.startNewSubPath (q);
-        else hex.lineTo (q);
-    }
-    hex.closeSubPath();
-    g.setGradientFill (ColourGradient (p.capTop.brighter (hover * 0.15f), c.x, cap.getY(), p.capBottom, c.x, cap.getBottom(), false));
-    g.fillPath (hex);
-    if (fx)
-    {
-        g.setColour (p.accent.withAlpha (0.3f));
-        g.strokePath (hex, juce::PathStrokeType (0.8f));
-    }
-}
+// === Lattice Mod (ValhallaUberMod role): the original's look — a sky-blue field, white level bars, a graphite tab panel ===
 
 inline const Theme& latticeTheme()
 {
@@ -1751,15 +1270,26 @@ inline const Theme& latticeTheme()
     {
         Theme x;
         x.name = "Lattice Mod";
-        x.base = Style::neon;
-        x.pal = { Colour (0xff1a0f1c), Colour (0xff07040a), Colour (0xffff4fa3), Colour (0xffffb84f), Colour (0x9c1a0f1c), Colour (0xb808040a),
-                  Colour (0xff8a4f78), Colour (0xfffde8f4), Colour (0xff050307), Colour (0xff3a2238), Colour (0xff120a14), Colour (0xff261626),
-                  Colour (0xffffffff), Colour (0xff1e1220) };
-        x.canvas = canvasLattice;
-        x.titleEmblem = latticeEmblem;
-        x.drawCap = capHex;
-        x.twoTone = true;
-        x.pointer = Pointer::glowLine;
+        x.base = Style::glow;
+        x.pal = { Colour (0xff5b8fc6), Colour (0xff5084bc), Colour (0xffffffff), Colour (0xffdbe9f8), Colour (0xff3a3a3c), Colour (0xff3a3a3c),
+                  Colour (0xff3a3a3c), Colour (0xffffffff), Colour (0xff2c2c2e), Colour (0xff4f86c0), Colour (0xff4f86c0), Colour (0xff303032),
+                  Colour (0xffffffff), Colour (0xff3a3a3c) };
+        x.canvas = canvasFlat;
+        x.flatSections = true;
+        x.discKnob = true;
+        x.pointerFrom = 0.0f;
+        x.arcGlow = 0.0f;
+        x.kerning = 0.02f;
+        x.captionScale = 1.3f;
+        x.captionCol = Colours::white;
+        x.valueCol = Colours::white;
+        x.rimWidth = 0.0f;
+        x.barSlider = true;
+        x.discRing = false;
+        x.barCol = Colours::white;
+        x.headerCol = Colour (0xff2f5f92);
+        x.pal.accent = Colour (0xff1c1c1e);
+        x.pal.accent2 = Colour (0xff3a3a3c);
         return x;
     }();
     return t;
@@ -2085,98 +1615,14 @@ inline const Theme& delayBankTheme()
     return t;
 }
 
-// === Ember Saturator (saturation role): a forge — coals glowing at the bottom, heat haze, blackened iron ============
-
-inline void canvasEmber (juce::Graphics& g, Rectangle<float> a, bool display)
-{
-    const auto& p = pal();
-    vfill (g, a, p.bgTop, p.bgBottom);
-    // the heat rising from the bed of coals
-    g.setGradientFill (ColourGradient (p.accent.withAlpha (0.28f), 0.0f, a.getBottom(), p.accent.withAlpha (0.0f), 0.0f, a.getBottom() - a.getHeight() * 0.55f, false));
-    g.fillRect (a);
-    // the coals: lumpy dark shapes with glowing cracks along the bottom edge
-    juce::Random rnd (451);
-    for (float x = a.getX() - 10.0f; x < a.getRight(); x += 16.0f + rnd.nextFloat() * 14.0f)
-    {
-        const auto w = 20.0f + rnd.nextFloat() * 18.0f, h = 10.0f + rnd.nextFloat() * 10.0f;
-        const auto coal = Rectangle<float> (x, a.getBottom() - h * 0.8f, w, h);
-        g.setColour (Colour (0xff120806));
-        g.fillEllipse (coal);
-        const auto hot = rnd.nextFloat();
-        g.setGradientFill (ColourGradient (p.accent2.withAlpha (0.5f + 0.4f * hot), coal.getCentreX(), coal.getY() + 2.0f, p.accent.withAlpha (0.0f), coal.getCentreX(), coal.getBottom(), false));
-        g.fillEllipse (coal.reduced (w * 0.2f, h * 0.25f).translated (0.0f, -h * 0.1f));
-    }
-    // a few sparks frozen mid-air
-    for (int i = 0; i < 24; ++i)
-    {
-        const Point<float> s { a.getX() + rnd.nextFloat() * a.getWidth(), a.getBottom() - a.getHeight() * (0.1f + 0.6f * rnd.nextFloat() * rnd.nextFloat()) };
-        g.setColour (p.accent2.withAlpha (0.3f + 0.4f * rnd.nextFloat()));
-        g.fillEllipse (Rectangle<float> (1.8f, 1.8f).withCentre (s));
-    }
-    vignette (g, a, 0.4f);
-    displayDim (g, a, display);
-}
-
-inline void emberEmblem (juce::Graphics& g, Point<float> c, float r) // a flame
-{
-    const auto& p = pal();
-    juce::Path f;
-    f.startNewSubPath (c.x, c.y - r * 1.2f);
-    f.cubicTo (c.x + r * 0.9f, c.y - r * 0.2f, c.x + r * 0.8f, c.y + r, c.x, c.y + r);
-    f.cubicTo (c.x - r * 0.8f, c.y + r, c.x - r * 0.9f, c.y - r * 0.1f, c.x - r * 0.2f, c.y - r * 0.4f);
-    f.quadraticTo (c.x - r * 0.1f, c.y - r * 0.1f, c.x, c.y - r * 1.2f);
-    g.setGradientFill (ColourGradient (p.accent2, c.x, c.y + r * 0.6f, p.accent, c.x, c.y - r, false));
-    g.fillPath (f);
-}
-
-inline void capBlackSteel (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
-{
-    const auto& p = pal();
-    g.setGradientFill (ColourGradient (p.capTop.brighter (hover * 0.2f), c.x - capR * 0.5f, c.y - capR * 0.7f, p.capBottom, c.x + capR * 0.5f, c.y + capR, true));
-    g.fillEllipse (cap);
-    if (fx) // the fire's reflection along the bottom of the cap
-    {
-        g.setGradientFill (ColourGradient (p.accent.withAlpha (0.35f), c.x, cap.getBottom(), p.accent.withAlpha (0.0f), c.x, c.y, false));
-        g.fillEllipse (cap.reduced (capR * 0.06f));
-    }
-}
-
-inline void emberMotion (juce::Graphics& g, const Motion& m) // embers rising off the coals
-{
-    for (const auto& s : m.motes)
-    {
-        const auto life = juce::jlimit (0.0f, 1.0f, (s.y - m.stage.getY()) / juce::jmax (1.0f, m.stage.getHeight()));
-        if (! reduced) bloom (g, { s.x, s.y }, s.size * 3.0f, m.p.accent, 0.3f * life);
-        g.setColour (m.p.accent2.interpolatedWith (m.p.accent, 1.0f - life).withAlpha (0.25f + 0.65f * life));
-        g.fillEllipse (Rectangle<float> (s.size, s.size).withCentre ({ s.x, s.y }));
-    }
-}
+// === Ember Saturator (Decapitator role, round tp172d): the original's hardware look — see soundtoysTheme ==========
 
 inline const Theme& emberTheme()
 {
+    // round tp172d: Decapitator's hardware look (its role) — black face, walnut cheeks, cream type, an orange style lamp
     static const Theme t = []
     {
-        Theme x;
-        x.name = "Ember Saturator";
-        x.base = Style::vivid;
-        x.pal = { Colour (0xff1e1412), Colour (0xff080504), Colour (0xffff6a1a), Colour (0xffffd27a), Colour (0x9c1c1210), Colour (0xb8080504),
-                  Colour (0xff8a4a2a), Colour (0xfffff0dc), Colour (0xff060303), Colour (0xff3a3434), Colour (0xff0a0808), Colour (0xff261a16),
-                  Colour (0xffffe0b8), Colour (0xff221714) };
-        x.canvas = canvasEmber;
-        x.titleEmblem = emberEmblem;
-        x.drawCap = capBlackSteel;
-        x.twoTone = true;
-        x.pointer = Pointer::glowLine;
-        x.arcGlow = 0.3f;
-        x.motes = 10;
-        x.drift = Drift::rise;
-        x.sizeMin = 1.4f;
-        x.sizeRange = 1.6f;
-        x.vyMin = -14.0f;
-        x.vyRange = -12.0f;
-        x.sway = 5.0f;
-        x.reach = 3.0f;
-        x.paintMotion = emberMotion;
+        auto x = soundtoysTheme ("Ember Saturator", Colour (0xffff7a45), Colour (0xffe9e2d0), Colour (0xff121213), Colour (0xff3c3c3e), 1.0f);
         return x;
     }();
     return t;
@@ -4054,57 +3500,17 @@ inline const Theme& lynxTuneTheme()
     return t;
 }
 
-// === Voice Shift: a morphing formant shape, violet to coral ========================================================
-
-inline void canvasVoiceShift (juce::Graphics& g, Rectangle<float> a, bool display)
-{
-    const auto& p = pal();
-    vfill (g, a, p.bgTop, p.bgBottom);
-    if (display) return;
-    for (int k = 0; k < 5; ++k) // formant envelopes sliding from low to high
-    {
-        juce::Path f;
-        const auto shift = 0.08f * (float) k;
-        for (float x = a.getX(); x <= a.getRight(); x += 3.0f)
-        {
-            const auto u = (x - a.getX()) / a.getWidth();
-            const auto y = std::exp (-std::pow ((u - 0.2f - shift) / 0.07f, 2.0f)) * 0.7f + std::exp (-std::pow ((u - 0.5f - shift) / 0.1f, 2.0f)) * 0.45f
-                           + std::exp (-std::pow ((u - 0.75f - shift) / 0.08f, 2.0f)) * 0.3f;
-            const Point<float> q { x, a.getBottom() - 10.0f - y * a.getHeight() * 0.7f };
-            if (x == a.getX()) f.startNewSubPath (q);
-            else f.lineTo (q);
-        }
-        g.setColour (p.accent.interpolatedWith (p.accent2, (float) k / 4.0f).withAlpha (0.13f));
-        g.strokePath (f, stroke (1.6f));
-    }
-    vignette (g, a, 0.4f);
-}
-
-inline void voiceShiftEmblem (juce::Graphics& g, Point<float> c, float r) // a formant hump
-{
-    juce::Path f;
-    f.startNewSubPath (c.x - r * 1.2f, c.y + r * 0.7f);
-    f.cubicTo (c.x - r * 0.6f, c.y + r * 0.7f, c.x - r * 0.6f, c.y - r, c.x, c.y - r);
-    f.cubicTo (c.x + r * 0.5f, c.y - r, c.x + r * 0.3f, c.y + r * 0.2f, c.x + r * 1.2f, c.y + r * 0.7f);
-    const auto& p = pal();
-    g.setGradientFill (ColourGradient (p.accent, c.x - r, c.y, p.accent2, c.x + r, c.y, false));
-    g.strokePath (f, stroke (1.5f));
-}
+// === Voice Shift (Little AlterBoy role, round tp172d): the original's look — mustard panels, red LEDs ============
 
 inline const Theme& voiceShiftTheme()
 {
+    // round tp172d: Little AlterBoy's look (its role) — black face, walnut cheeks, mustard panels, red LED read-outs
     static const Theme t = []
     {
-        Theme x;
-        x.name = "Voice Shift";
-        x.base = Style::vivid;
-        x.pal = { Colour (0xff1e1430), Colour (0xff09060f), Colour (0xffb070ff), Colour (0xffff8a6a), Colour (0x9c1c122c), Colour (0xb809060f),
-                  Colour (0xff7a5a9a), Colour (0xfff6eaff), Colour (0xff06040a), Colour (0xff3a2c4c), Colour (0xff17121f), Colour (0xff261a38),
-                  Colour (0xfff6eaff), Colour (0xff1e1430) };
-        x.canvas = canvasVoiceShift;
-        x.titleEmblem = voiceShiftEmblem;
-        x.drawCap = capVelvet;
-        x.twoTone = true;
+        auto x = soundtoysTheme ("Voice Shift", Colour (0xffe8322a), Colour (0xfff7e9b0), Colour (0xffc39a1a), Colour (0xffc39a1a), 0.0f);
+        x.valueCol = Colour (0xffff4a3a);
+        x.captionCol = Colours::white; // the original's white legends on the mustard panels
+        x.pal.well = Colour (0xff1a0806);
         return x;
     }();
     return t;
@@ -4876,7 +4282,12 @@ LYNX_LITE_THEME (basicLimiterTheme, "Limiter", Style::glow, Colour (0xff221a1a),
 LYNX_LITE_THEME (basicDistortionTheme, "Distortion", Style::vivid, Colour (0xff261410), Colour (0xff0b0504), Colour (0xffff6a2a), Colour (0xffffd08a), canvasBasicDistortion, Cap::rubber)
 LYNX_LITE_THEME (basicFilterTheme, "Filter", Style::neon, Colour (0xff10222a), Colour (0xff04090c), Colour (0xff3ae0d0), Colour (0xffb8fff4), canvasBasicFilter, Cap::orb)
 LYNX_LITE_THEME (basicChorusTheme, "Chorus", Style::glow, Colour (0xff121c2a), Colour (0xff05080d), Colour (0xff5ad8ff), Colour (0xffd0a8ff), canvasBasicChorus, Cap::porcelain)
-LYNX_LITE_THEME (autoPanTheme, "Auto-pan", Style::glow, Colour (0xff142226), Colour (0xff05090b), Colour (0xff4fe0c0), Colour (0xffc8fff0), canvasPan, Cap::flat)
+// round tp172d: PanMan's hardware look (Auto-pan's role) — black face, walnut cheeks, white outlines, a red LED meter
+inline const Theme& autoPanTheme()
+{
+    static const Theme t = soundtoysTheme ("Auto-pan", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
+    return t;
+}
 LYNX_LITE_THEME (panOMaticTheme, "Fruity PanOMatic", Style::vivid, Colour (0xff1e1430), Colour (0xff09060f), Colour (0xffff7ad0), Colour (0xff9ae8ff), canvasPan, Cap::rubber)
 LYNX_LITE_THEME (balanceTheme, "Fruity Balance", Style::glow, Colour (0xff1c1e22), Colour (0xff09090b), Colour (0xffd8c08a), Colour (0xfff0e8d8), canvasBalance, Cap::flat, capBrass)
 LYNX_LITE_THEME (utilityTheme, "Utility", Style::glow, Colour (0xff1e2024), Colour (0xff0a0a0c), Colour (0xffb6ff5c), Colour (0xffe0e4e8), canvasUtility, Cap::flat)

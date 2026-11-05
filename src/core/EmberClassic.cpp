@@ -96,8 +96,24 @@ const StyleModel& styleModel (int style) noexcept { return styleTable[std::clamp
 
 const StyleModel& punishModel (int style) noexcept
 {
-    static const StyleModel a = punishModelA();
-    return std::clamp (style, 0, styleCount - 1) == 0 ? a : styleModel (style);
+    // round 172d [black-box, the trial with Auto off and Output at 0 dB, music and stairs at drives 2 … 8]: E / N / T / P
+    // with Punish on saturate much lower than their own curve under the +14 dB law (loud music 1 … 8 dB quieter, T alike
+    // at drives 2 / 4 / 8): their curve scales down (knees and bias alike, so the small-signal law above is unchanged)
+    static const std::array<StyleModel, styleCount> models = []
+    {
+        std::array<StyleModel, styleCount> x;
+        constexpr double knee[styleCount] = { 1.0, 0.40, 0.90, 0.65, 0.86 };
+        for (int i = 0; i < styleCount; ++i)
+        {
+            x[(size_t) i] = i == 0 ? punishModelA() : styleModel (i);
+            x[(size_t) i].cPos *= knee[i];
+            x[(size_t) i].cNeg *= knee[i];
+            x[(size_t) i].bias *= knee[i]; // the whole curve scales (its envelope too, so biasDyn stays): the slope
+                                           // at the bias, the small-signal gain, is the same
+        }
+        return x;
+    }();
+    return models[(size_t) std::clamp (style, 0, styleCount - 1)];
 }
 
 // [EXEC] the trial's own value → text laws (VST3 parameter read-back, REA_rodada136 §1)

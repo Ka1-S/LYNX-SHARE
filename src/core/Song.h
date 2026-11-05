@@ -620,6 +620,20 @@ struct LayerSettings
 // its mixer insert (the channel's own volume and pan are left out, they still apply live); an insert's is its output
 // after its effect chain, before the fader. Saved with the project, so a project sent to a friend and the host's final
 // project keep them as the fallback; they only play where the plugin is missing (standins::project).
+// The FL plugin an imported channel generator or mixer effect came from (round 171e, Export to FL Studio): its internal
+// name (.flp 0xC9) and saved state (0xD5; empty = the same as the channel's pluginState), and a fingerprint of what the
+// import made of it (flpexport::fingerprint). While the LYNX side is unchanged (the same fingerprint), Export to FL
+// Studio writes the original plugin back byte for byte. Saved with the project.
+struct FlOrigin
+{
+    std::string plugin;
+    std::vector<std::uint8_t> state;
+    std::uint64_t fingerprint = 0;
+
+    bool empty() const noexcept { return plugin.empty(); }
+    bool operator== (const FlOrigin&) const = default;
+};
+
 struct StandIn
 {
     std::uint64_t pattern = 0; // pattern uid; 0 = the whole song (a timeline stem, Song mode)
@@ -689,6 +703,7 @@ struct ChannelDef
     int loopStarterPattern = -1;
     std::string loopStarterSlot, loopStarterCategory;
     bool loopStarterLocked = false;
+    FlOrigin flOrigin;    // imported from FL: the original generator (round 171e)
     InstanceTag instance; // runtime identity of the channel (never saved)
 
     bool hasKeyRegion() const noexcept { return keyLow > 0 || keyHigh < 127; }
@@ -876,6 +891,7 @@ struct EffectSlot
     // slot 5 with slots 1-4 empty. -1 = right after the previous effect (every effect of an old project). The chain
     // order is the vector's order; the rows only grow along it (core/MixerOps.h effectRows).
     int row = -1;
+    FlOrigin flOrigin;    // imported from FL: the original effect plugin (round 171e)
     InstanceTag instance; // runtime identity of the slot (never saved, not compared)
 
     bool operator== (const EffectSlot& o) const; // every field (Song.cpp)

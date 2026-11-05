@@ -281,7 +281,7 @@ double syncedDelayMs (const EffectParams& p, double bpm) noexcept;
 int tapCount (float v) noexcept;     // 1, 1, 2, 3, 3, 3, 4, 8, 8, 16 (index floor(24 v))
 double delayMs (float v) noexcept;   // 0 .. 1000 ms
 double tapMs (const EffectParams& p, int tap, int taps, bool right) noexcept; // tap position (without modulation)
-double tapLevel (const EffectParams& p, int tap, int taps) noexcept;        // signed (the wet is inverted)
+double tapLevel (const EffectParams& p, int tap, int taps) noexcept;        // signed (in phase since round 172d)
 } // namespace lattice
 
 // Wet / dry laws: equal power (Echoform, Orbit, Lattice) or linear (Spiral Echo).
