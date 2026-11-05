@@ -7195,6 +7195,8 @@ countries: tr
 "Worth knowing" = "Bilmekte fayda var"
 "Samples not on this PC" = "Bu PC'de olmayan sample'lar"
 "Steps use channel colour" = "Adımlar kanal rengini kullanır"
+# round tp172d: the Echoform / Auto-pan page switch
+"Main|Tweak" = "Ana|İnce ayar"
 "E type|G type" = "E tipi|G tipi"
 "Modern console" = "Modern konsol"
 

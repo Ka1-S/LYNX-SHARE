@@ -7195,6 +7195,8 @@ countries: de at ch li lu
 "Worth knowing" = "Gut zu wissen"
 "Samples not on this PC" = "Samples, die nicht auf diesem PC sind"
 "Steps use channel colour" = "Steps in Kanalfarbe"
+# round tp172d: the Echoform / Auto-pan page switch
+"Main|Tweak" = "Haupt|Feintuning"
 "E type|G type" = "E-Typ|G-Typ"
 "Modern console" = "Moderne Konsole"
 

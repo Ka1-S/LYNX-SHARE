@@ -7195,6 +7195,8 @@ countries: kr
 "Worth knowing" = "알아둘 점"
 "Samples not on this PC" = "이 PC에 없는 샘플"
 "Steps use channel colour" = "스텝에 채널 색상 사용"
+# round tp172d: the Echoform / Auto-pan page switch
+"Main|Tweak" = "메인|조정"
 "E type|G type" = "E 타입|G 타입"
 "Modern console" = "모던 콘솔"
 
