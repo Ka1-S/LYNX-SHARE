@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <map>
+#include <tuple>
 
 #include "core/ApexLimiter.h"
 #include "core/DynamicsSuite.h"
@@ -2812,24 +2813,114 @@ private:
         if (c.id == idPower) toggleEnabled();
     }
 
+    // --- the frosted panel (round tp172c: the reference's light lower half, drawn here from scratch) -------------
+    static inline const juce::Colour kSlate { 0xff33414d }, kSlateDim { 0xff6a7884 };
+
+    void frostFill (juce::Graphics& g, juce::Rectangle<float> r) const
+    {
+        const auto a = panel();
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffe3edf2), 0.0f, a.getY(), juce::Colour (0xffc6d6df), 0.0f, a.getBottom(), false));
+        g.fillRect (r);
+    }
+
+    static void frostDisc (juce::Graphics& g, juce::Rectangle<float> r, bool hover)
+    {
+        const auto R = r.getWidth() * 0.5f;
+        for (int i = 4; i >= 1; --i) // a soft shadow under the disc
+        {
+            g.setColour (juce::Colour (0xff4f6878).withAlpha (0.05f));
+            g.fillEllipse (r.translated (0.0f, R * 0.05f * (float) i).expanded (R * 0.025f * (float) i));
+        }
+        g.setGradientFill (juce::ColourGradient (juce::Colour (hover ? 0xffffffff : 0xfffbfdfe), r.getX() + R * 0.6f, r.getY() + R * 0.3f,
+                                                 juce::Colour (0xffd7e3ea), r.getRight() - R * 0.3f, r.getBottom(), true));
+        g.fillEllipse (r);
+        g.setColour (juce::Colour (0xffb7c7d1));
+        g.drawEllipse (r.reduced (0.5f), 1.0f);
+        g.setColour (juce::Colours::white);
+        g.drawEllipse (r.reduced (R * 0.07f), 1.0f);
+    }
+
+    void slateText (juce::Graphics& g, juce::Rectangle<float> r, const juce::String& t, float size, bool bold, juce::Colour col = kSlate) const
+    {
+        g.setColour (col);
+        g.setFont (juce::Font (theme::font (size, bold)).withExtraKerningFactor (bold ? 0.08f : 0.0f));
+        g.drawText (bold ? caps (t) : t, r, juce::Justification::centred, false);
+    }
+
+    // a disc knob: the value inside, a short pointer at the rim (angles as LYNX's knobs: −135°…+135°)
+    void discKnob (juce::Graphics& g, juce::Rectangle<float> slot, juce::Rectangle<float> disc, int param, const juce::String& cap, bool big)
+    {
+        frostFill (g, slot);
+        const auto hover = slot.contains (mouse);
+        frostDisc (g, disc, hover || dragCtl == param);
+        const auto R = disc.getWidth() * 0.5f;
+        const auto c = disc.getCentre();
+        const auto ang = juce::MathConstants<float>::pi * (-0.75f + 1.5f * v (param));
+        const juce::Point<float> d { std::sin (ang), -std::cos (ang) };
+        g.setColour (dragCtl == param ? accent.darker (0.3f) : kSlate);
+        g.drawLine ({ c + d * R * 0.70f, c + d * R * 0.90f }, big ? 2.6f : 2.0f);
+        if (big)
+        {
+            slateText (g, juce::Rectangle<float> (disc.getWidth(), 34.0f).withCentre (c.translated (0.0f, -8.0f)), text (param), 24.0f, false);
+            slateText (g, juce::Rectangle<float> (disc.getWidth(), 14.0f).withCentre (c.translated (0.0f, 18.0f)), cap, 11.0f, true, kSlateDim);
+        }
+        else
+        {
+            slateText (g, disc, text (param), 10.5f, false);
+            slateText (g, juce::Rectangle<float> (disc.getWidth() + 40.0f, 14.0f).withCentre ({ c.x, disc.getY() - 12.0f }), cap, 10.5f, true);
+        }
+    }
+
+    void paintOverlay (juce::Graphics& g, const EffectSlot&) override
+    {
+        const auto a = panel();
+        const auto cy = a.getY() + 12.0f;
+        // the two big discs (the slots drawn by layoutControls; their captions and values move inside the disc)
+        for (const auto& [x, p, cap, top] : { std::tuple<float, int, juce::String, const char*> { 125.0f, pMid(), tr ("Mid air"), "100" },
+                                              std::tuple<float, int, juce::String, const char*> { 445.0f, pHigh(), tr ("High air"), "15 dB" } })
+        {
+            const auto slot = juce::Rectangle<float> (x - 14.0f, cy + 10.0f, 178.0f, 184.0f);
+            const auto disc = juce::Rectangle<float> (146.0f, 146.0f).withCentre ({ x + 75.0f, cy + 12.0f + 73.0f });
+            discKnob (g, slot, disc, p, cap, true);
+            // the scale's ends beside the disc's foot
+            g.setColour (kSlateDim);
+            g.setFont (theme::font (10.5f, true));
+            g.drawText ("0", juce::Rectangle<float> (disc.getX() - 34.0f, disc.getBottom() - 16.0f, 30.0f, 14.0f), juce::Justification::centredRight, false);
+            g.drawText (top, juce::Rectangle<float> (disc.getRight() + 4.0f, disc.getBottom() - 16.0f, 52.0f, 14.0f), juce::Justification::centredLeft, false);
+        }
+        // the trim: a small disc
+        const auto trimSlot = juce::Rectangle<float> (612.0f, a.getBottom() - 112.0f, 100.0f, 108.0f);
+        discKnob (g, trimSlot, juce::Rectangle<float> (46.0f, 46.0f).withCentre ({ 662.0f, a.getBottom() - 62.0f }), P ("Output"), tr ("Trim"), false);
+        // the link: a frosted pill with two chain links, rimmed in the accent while linked
+        const auto link = juce::Rectangle<float> (330.0f, cy + 70.0f, 60.0f, 28.0f);
+        frostFill (g, link.expanded (2.0f));
+        const auto hover = link.contains (mouse);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (hover ? 0xffffffff : 0xfff6fafc), 0.0f, link.getY(), juce::Colour (0xffd5e1e8), 0.0f, link.getBottom(), false));
+        g.fillRoundedRectangle (link, link.getHeight() * 0.5f);
+        g.setColour (linked ? accent.darker (0.2f) : juce::Colour (0xffa9bbc6));
+        g.drawRoundedRectangle (link.reduced (0.5f), link.getHeight() * 0.5f, linked ? 1.8f : 1.0f);
+        g.setColour (linked ? accent.darker (0.35f) : kSlate);
+        const auto lc = link.getCentre();
+        for (const auto dx : { -5.0f, 5.0f })
+            g.drawRoundedRectangle (juce::Rectangle<float> (13.0f, 8.0f).withCentre (lc.translated (dx, 0.0f)), 4.0f, 1.6f);
+    }
+
     void paintCustom (juce::Graphics& g, const Ctl& c) override
     {
         if (c.id != idPower) return;
         const auto* fx = current();
         const auto on = fx != nullptr && fx->enabled;
+        // round tp172c: a small frosted disc on the pale panel, the power glyph lit in the accent
         const auto r = c.r.reduced (2.0f);
-        g.setColour (c.r.contains (mouse) ? colour::bg5 : colour::bg4);
-        g.fillEllipse (r);
-        g.setColour (on ? colour::accent : colour::borderStrong);
-        g.drawEllipse (r, 1.5f);
+        frostDisc (g, r, c.r.contains (mouse));
         juce::Path glyph;
-        const auto cx = r.getCentreX(), cy = r.getCentreY(), rr = r.getWidth() * 0.24f;
+        const auto cx = r.getCentreX(), cy = r.getCentreY(), rr = r.getWidth() * 0.22f;
         glyph.addCentredArc (cx, cy, rr, rr, 0.0f, 0.75f, juce::MathConstants<float>::twoPi - 0.75f, true);
         glyph.startNewSubPath (cx, cy - rr * 1.3f);
         glyph.lineTo (cx, cy - rr * 0.2f);
-        g.setColour (on ? colour::accent : colour::textDisabled);
+        g.setColour (on ? accent.darker (0.35f) : kSlateDim);
         g.strokePath (glyph, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        caption (g, c.r.translated (0.0f, -18.0f).withHeight (14.0f).expanded (20.0f, 0.0f), tr ("Power"));
+        slateText (g, c.r.translated (0.0f, -18.0f).withHeight (14.0f).expanded (20.0f, 0.0f), tr ("Power"), 10.5f, true);
     }
 
     // the arc meter's scale: compressed at the bottom, open near 0 dB, like a programme meter
@@ -2918,19 +3009,13 @@ private:
                     juce::Rectangle<float> (160.0f, 22.0f).withCentre ({ centre.x, d.getBottom() - 46.0f }), juce::Justification::centred, false);
         caption (g, juce::Rectangle<float> (160.0f, 14.0f).withCentre ({ centre.x, d.getBottom() - 26.0f }), tr ("Output peak"));
 
-        // the knob panel
+        // the knob panel (round tp172c): a pale frosted plate under the dark display, as on the reference
         const auto a = panel();
-        g.setColour (colour::bg2);
-        g.fillRect (a);
-        g.setColour (colour::border);
+        frostFill (g, a);
+        g.setColour (juce::Colours::black.withAlpha (0.55f));
         g.drawHorizontalLine ((int) a.getY(), 0.0f, a.getRight());
-        g.setColour (colour::textDisabled);
-        g.setFont (font (type::caption));
-        const auto ly = a.getY() + 150.0f;
-        g.drawText ("0", juce::Rectangle<float> (104.0f, ly, 30.0f, 14.0f), juce::Justification::centredRight, false);
-        g.drawText ("100", juce::Rectangle<float> (268.0f, ly, 30.0f, 14.0f), juce::Justification::centredLeft, false);
-        g.drawText ("0", juce::Rectangle<float> (424.0f, ly, 30.0f, 14.0f), juce::Justification::centredRight, false);
-        g.drawText ("15 dB", juce::Rectangle<float> (588.0f, ly, 40.0f, 14.0f), juce::Justification::centredLeft, false);
+        g.setColour (juce::Colours::white.withAlpha (0.8f));
+        g.drawHorizontalLine ((int) a.getY() + 1, 0.0f, a.getRight());
     }
 };
 

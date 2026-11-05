@@ -230,9 +230,10 @@ double makeupDb (const Settings& s) noexcept
 {
     if (! s.autoMakeup || s.compRatio <= 1.0005)
         return 0.0;
-    // [EXEC] 0.6 dB per dB of threshold under the dial's top (+10), times the ratio's slope (ratios 2 and 10 at -15 dB:
-    // +8.9 / +13.2 dB; none at the default +10), then the offset
-    return 0.6 * peakSlope (s.compRatio) * std::max (0.0, 10.0 - s.compThreshold) + s.makeupOffsetDb;
+    // [EXEC] 5/6 dB per dB of threshold under +3 dB, times the ratio's slope, then the offset. Fitted on three measured
+    // points: ratios 2 and 10 at -15 dB (+8.9 / +13.2 dB) and ratio 3 at -12 dB (+8.75 dB, the S5 render; round tp172c
+    // slice 2 — the earlier 0.6 x (10 - thr) law read 0.5 dB loud there)
+    return (5.0 / 6.0) * peakSlope (s.compRatio) * std::max (0.0, 3.0 - s.compThreshold) + s.makeupOffsetDb;
 }
 
 double compStaticDb (const Settings& s, double inputDb) noexcept
