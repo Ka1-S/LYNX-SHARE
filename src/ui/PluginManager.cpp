@@ -4,6 +4,7 @@
 #include "engine/AudioEngine.h"
 #include "engine/PluginHost.h"
 #include "platform/Paths.h"
+#include "ui/FileChoosers.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
@@ -415,9 +416,9 @@ private:
 
     void chooseFile()
     {
-        chooser = std::make_unique<juce::FileChooser> (tr ("Add a plugin file"), juce::File::getSpecialLocation (juce::File::userHomeDirectory),
+        chooser = lynx::ui::makeFileChooser (tr ("Add a plugin file"), juce::File::getSpecialLocation (juce::File::userHomeDirectory),
                                                        "*.vst3;*.clap");
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
                                   | juce::FileBrowserComponent::canSelectDirectories,
                               [safe = juce::Component::SafePointer<PluginManagerPanel> (this)] (const juce::FileChooser& c) {
                                   if (safe == nullptr || c.getResult() == juce::File() || ! safe->persistent)

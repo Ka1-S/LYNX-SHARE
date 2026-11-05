@@ -1,6 +1,7 @@
 #include "ui/FlMods.h"
 #include "platform/Paths.h"
 #include "ui/ColourPicker.h"
+#include "ui/FileChoosers.h"
 #include "ui/MixerComponent.h"
 #include "ui/SlotWatch.h"
 #include "core/ValueMath.h"
@@ -2181,10 +2182,10 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         file.addItem (tr ("Open mixer track state..."), [this, targets] {
             auto& chooser = mixerStateChooser();
             const auto start = mixerpresets::folders().isEmpty() ? mixerStatesFolder() : mixerpresets::folders()[0];
-            chooser = std::make_unique<juce::FileChooser> (tr ("Open mixer track state"), start,
+            chooser = lynx::ui::makeFileChooser (tr ("Open mixer track state"), start,
                                                            juce::String ("*.fst;*") + ProjectFile::mixerTrackStateExtension);
             juce::Component::SafePointer<MixerStrips> safe (this);
-            chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe, targets] (const juce::FileChooser& fc) {
+            lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe, targets] (const juce::FileChooser& fc) {
                 if (safe != nullptr && fc.getResult().existsAsFile() && ! mixerpresets::loadOnTracks (safe->engine, targets, fc.getResult()))
                     juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Open mixer track state"),
                                                             tr ("This file is not a mixer track state LYNX SHARE can read."));
@@ -2193,11 +2194,11 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         file.addItem (tr ("Save mixer track state as...") + "\tCtrl+Shift+S", [this, t, trackName] {
             auto& chooser = mixerStateChooser();
             const auto name = juce::File::createLegalFileName (trackName.isNotEmpty() ? trackName : tr ("Mixer track {0}", { juce::String (t) }));
-            chooser = std::make_unique<juce::FileChooser> (tr ("Save mixer track state"), mixerStatesFolder().getChildFile (name + ProjectFile::mixerTrackStateExtension),
+            chooser = lynx::ui::makeFileChooser (tr ("Save mixer track state"), mixerStatesFolder().getChildFile (name + ProjectFile::mixerTrackStateExtension),
                                                            juce::String ("*") + ProjectFile::mixerTrackStateExtension);
             juce::Component::SafePointer<MixerStrips> safe (this);
             mixerStatesFolder().createDirectory();
-            chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting, [safe, t] (const juce::FileChooser& fc) {
+            lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting, [safe, t] (const juce::FileChooser& fc) {
                 if (safe != nullptr && fc.getResult() != juce::File())
                     saveMixerTrackState (safe->engine, t, fc.getResult().withFileExtension (ProjectFile::mixerTrackStateExtension));
             });
@@ -5054,9 +5055,9 @@ void EffectsPanel::showSlotMenu (int slot)
         juce::PopupMenu source;
         source.addItem (fx.samplePath.empty() ? tr ("No sample") : current.getFileName(), false, false, [] {});
         source.addItem (tr ("Choose a sample..."), [this, slot, current] {
-            sampleChooser = std::make_unique<juce::FileChooser> (tr ("Source sample"), current.existsAsFile() ? current : juce::File(),
+            sampleChooser = lynx::ui::makeFileChooser (tr ("Source sample"), current.existsAsFile() ? current : juce::File(),
                                                                  "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
-            sampleChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+            lynx::ui::launchChooser (sampleChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                                         [this, slot] (const juce::FileChooser& fc) {
                                             const auto file = fc.getResult();
                                             if (file == juce::File())
@@ -5446,8 +5447,8 @@ void chooseRecordTo (AudioEngine& engine, int track)
         initial = folder.getChildFile (name + ".wav");
     }
     static std::unique_ptr<juce::FileChooser> chooser;
-    chooser = std::make_unique<juce::FileChooser> (tr ("Record {0} to", { insert }), initial, "*.wav");
-    chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+    chooser = lynx::ui::makeFileChooser (tr ("Record {0} to", { insert }), initial, "*.wav");
+    lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                           [&engine, track] (const juce::FileChooser& fc) {
                               auto file = fc.getResult();
                               if (file == juce::File() || track >= (int) engine.getSong().mixer.size())

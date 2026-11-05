@@ -8,6 +8,7 @@
 #include "core/SoundFontIndex.h"
 #include "engine/PluginHost.h"
 #include "core/SearchQuery.h"
+#include "ui/FileChoosers.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/PluginSkin.h"
@@ -741,8 +742,8 @@ private:
     void chooseFont()
     {
         const auto start = currentPath().empty() ? juce::File::getSpecialLocation (juce::File::userDocumentsDirectory) : juce::File (u8 (currentPath()));
-        chooser = std::make_unique<juce::FileChooser> (tr ("Load SoundFont"), start, "*.sf2;*.sf3;*.sfz");
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+        chooser = lynx::ui::makeFileChooser (tr ("Load SoundFont"), start, "*.sf2;*.sf3;*.sfz");
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [safe = juce::Component::SafePointer<SoundFontEditor> (this)] (const juce::FileChooser& fc) {
                                   if (safe == nullptr || fc.getResult() == juce::File())
                                       return;
@@ -797,8 +798,8 @@ private:
             menu.addItem (u8 (f), false, false, nullptr);
         menu.addSeparator();
         menu.addItem (tr ("Add folder..."), [this] {
-            chooser = std::make_unique<juce::FileChooser> (tr ("Add a SoundFont folder"), juce::File::getSpecialLocation (juce::File::userDocumentsDirectory));
-            chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+            chooser = lynx::ui::makeFileChooser (tr ("Add a SoundFont folder"), juce::File::getSpecialLocation (juce::File::userDocumentsDirectory));
+            lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
                                   [] (const juce::FileChooser& fc) {
                                       if (fc.getResult() == juce::File())
                                           return;

@@ -12,6 +12,7 @@
 #include "engine/ProjectFile.h"
 #include "core/HardwareInsert.h"
 #include "platform/Paths.h"
+#include "ui/FileChoosers.h"
 #include "ui/WindowOwner.h"
 
 #include "engine/Exporter.h"
@@ -944,10 +945,10 @@ private:
                       : suggestedFolder.isDirectory() ? suggestedFolder
                                                       : juce::File::getSpecialLocation (juce::File::userMusicDirectory);
 
-        chooser = std::make_unique<juce::FileChooser> (tr ("Export audio"), folder.getChildFile (suggestedName + extension), "*" + extension);
+        chooser = lynx::ui::makeFileChooser (tr ("Export audio"), folder.getChildFile (suggestedName + extension), "*" + extension);
         auto& engineRef = engine;
 
-        chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                               [this, o, extension, &engineRef, tracks = onlyTracks, realtime = realtime, after = afterRender] (const juce::FileChooser& fc) {
                                   auto file = fc.getResult();
 
@@ -1228,9 +1229,9 @@ void consolidatePlaylistTrack (AudioEngine& engine, int track, bool fromSongStar
         consolidate (engine, plan, renderFolder());
         return;
     }
-    auto chooser = std::make_shared<juce::FileChooser> (tr ("Select a folder to consolidate to"), renderFolder());
+    auto chooser = lynx::ui::makeSharedFileChooser (tr ("Select a folder to consolidate to"), renderFolder());
     auto* engineRef = &engine;
-    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories, [engineRef, plan, chooser] (const juce::FileChooser& fc) {
+    lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories, [engineRef, plan, chooser] (const juce::FileChooser& fc) {
         if (fc.getResult().isDirectory())
             consolidate (*engineRef, plan, fc.getResult());
     });
@@ -1377,9 +1378,9 @@ void renderPatternsAsAudioClips (AudioEngine& engine, const std::vector<int>& pa
 void exportAllPlaylistTracks (AudioEngine& engine, const juce::String& projectName, quickrender::Start start, bool groups)
 {
     // FL (FUN_012fd7a0): first the folder ("Select rendering folder"), then the render window once for every track
-    auto chooser = std::make_shared<juce::FileChooser> (tr ("Select the folder where output should be rendered..."), renderFolder());
+    auto chooser = lynx::ui::makeSharedFileChooser (tr ("Select the folder where output should be rendered..."), renderFolder());
     auto* engineRef = &engine;
-    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+    lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
                           [engineRef, projectName, start, groups, chooser] (const juce::FileChooser& fc) {
         const auto folder = fc.getResult();
         if (! folder.isDirectory())
@@ -1476,10 +1477,10 @@ int writeProjectBones (const Song& song, const juce::File& dir, juce::StringArra
 void exportProjectBones (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& projectName)
 {
     // FL (FUN_011edb50): "Export project bones", a folder in which the bones go to a sub-folder named after the project
-    auto chooser = std::make_shared<juce::FileChooser> (tr ("Save project bones (channel / effect presets & scores) subdirectory in..."),
+    auto chooser = lynx::ui::makeSharedFileChooser (tr ("Save project bones (channel / effect presets & scores) subdirectory in..."),
                                                         suggestedFolder.isDirectory() ? suggestedFolder : renderFolder());
     auto* engineRef = &engine;
-    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+    lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
                           [engineRef, projectName, chooser] (const juce::FileChooser& fc) {
         const auto folder = fc.getResult();
         if (! folder.isDirectory())

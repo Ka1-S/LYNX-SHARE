@@ -16,6 +16,7 @@
 #include "engine/PluginHost.h"
 #include "engine/Text.h"
 #include "ui/AutomationUi.h"
+#include "ui/FileChoosers.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
@@ -753,16 +754,16 @@ private:
         if (menu.getNumItems() > 0)
             menu.addSeparator();
         menu.addItem (tr ("Load preset..."), [this] {
-            chooser = std::make_unique<juce::FileChooser> (tr ("Load preset..."), flPresetFolder().isDirectory() ? flPresetFolder() : userPresetFolder(), "*.fst");
-            chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [this] (const juce::FileChooser& fc) {
+            chooser = lynx::ui::makeFileChooser (tr ("Load preset..."), flPresetFolder().isDirectory() ? flPresetFolder() : userPresetFolder(), "*.fst");
+            lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [this] (const juce::FileChooser& fc) {
                 if (fc.getResult().existsAsFile())
                     loadPreset (fc.getResult());
             });
         });
         menu.addItem (tr ("Save preset as..."), [this] {
             userPresetFolder().createDirectory();
-            chooser = std::make_unique<juce::FileChooser> (tr ("Save preset as..."), userPresetFolder().getChildFile ("MIDI Out.fst"), "*.fst");
-            chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting, [this] (const juce::FileChooser& fc) {
+            chooser = lynx::ui::makeFileChooser (tr ("Save preset as..."), userPresetFolder().getChildFile ("MIDI Out.fst"), "*.fst");
+            lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting, [this] (const juce::FileChooser& fc) {
                 auto file = fc.getResult();
                 if (file == juce::File())
                     return;

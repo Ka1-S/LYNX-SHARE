@@ -14,6 +14,7 @@
 #include "engine/Exporter.h"
 #include "platform/Paths.h"
 #include "ui/ColourPicker.h"
+#include "ui/FileChoosers.h"
 #include "ui/I18n.h"
 #include "ui/PluginSkin.h"
 #include "ui/SlotWatch.h"
@@ -2436,14 +2437,14 @@ private:
 
     void chooseFfmpeg()
     {
-        chooser = std::make_unique<juce::FileChooser> (tr ("Locate ffmpeg"), juce::File(),
+        chooser = lynx::ui::makeFileChooser (tr ("Locate ffmpeg"), juce::File(),
 #if JUCE_WINDOWS
                                                        "ffmpeg.exe");
 #else
                                                        "*");
 #endif
         juce::Component::SafePointer<VideoExportPanel> safe (this);
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
             if (safe == nullptr || ! fc.getResult().existsAsFile())
                 return;
             setFfmpegLocation (fc.getResult());
@@ -2458,9 +2459,9 @@ private:
         const auto title = song.info.title.empty() ? juce::String ("LYNX SHARE video") : juce::String::fromUTF8 (song.info.title.c_str());
         const auto start = juce::File::getSpecialLocation (juce::File::userMoviesDirectory).getChildFile (juce::File::createLegalFileName (title)
                                                                                                          + (ffmpeg.existsAsFile() ? ".mp4" : ""));
-        chooser = std::make_unique<juce::FileChooser> (tr ("Export video"), start, ffmpeg.existsAsFile() ? "*.mp4" : "*");
+        chooser = lynx::ui::makeFileChooser (tr ("Export video"), start, ffmpeg.existsAsFile() ? "*.mp4" : "*");
         juce::Component::SafePointer<VideoExportPanel> safe (this);
-        chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting, [safe] (const juce::FileChooser& fc) {
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting, [safe] (const juce::FileChooser& fc) {
             if (safe == nullptr || fc.getResult() == juce::File())
                 return;
             safe->start (fc.getResult());
@@ -3030,9 +3031,9 @@ private:
             });
         menu.addSeparator();
         menu.addItem (tr ("Import an FL ZGameEditor Visualizer preset (.fst)..."), [this] {
-            chooser = std::make_unique<juce::FileChooser> (tr ("ZGameEditor Visualizer preset"), juce::File(), "*.fst");
+            chooser = lynx::ui::makeFileChooser (tr ("ZGameEditor Visualizer preset"), juce::File(), "*.fst");
             juce::Component::SafePointer<VisualizerEditor> safe (this);
-            chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
+            lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
                 if (safe == nullptr || ! fc.getResult().existsAsFile())
                     return;
                 juce::MemoryBlock data;
@@ -3068,9 +3069,9 @@ private:
 
     void pickImage()
     {
-        chooser = std::make_unique<juce::FileChooser> (tr ("Choose a picture"), juce::File(), "*.png;*.jpg;*.jpeg;*.gif");
+        chooser = lynx::ui::makeFileChooser (tr ("Choose a picture"), juce::File(), "*.png;*.jpg;*.jpeg;*.gif");
         juce::Component::SafePointer<VisualizerEditor> safe (this);
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
             if (safe == nullptr || ! fc.getResult().existsAsFile())
                 return;
             safe->changeLayer ([path = fc.getResult().getFullPathName().toStdString()] (scene::Layer& l) { l.path = path; });
