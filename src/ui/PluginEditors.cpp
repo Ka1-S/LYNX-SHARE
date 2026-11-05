@@ -156,7 +156,9 @@ public:
             startTimerHz (30); // live displays, and the controls following their automation (cheap while nothing moves)
         else if (liveDisplays)
             startTimerHz (30);
-        setSize ((int) std::ceil ((float) l.width * initialScale), (int) std::ceil ((float) l.height * initialScale + headerHeight + footerHeight()));
+        // round 170k2: never narrower than its header needs to show the whole name (the body keeps its scale)
+        setSize (juce::jmax ((int) std::ceil ((float) l.width * initialScale), minimumWidth()),
+                 (int) std::ceil ((float) l.height * initialScale + headerHeight + footerHeight()));
     }
 
     ~NativeEffectEditor() override
