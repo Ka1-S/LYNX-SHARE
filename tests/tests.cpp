@@ -9118,7 +9118,7 @@ TEST (ogun_engine)
         std::ofstream (dump, std::ios::binary).write ((const char*) blob.data(), (std::streamsize) blob.size());
     CHECK (lynx::ogunStateUsable (blob));
     CHECK (lynx::ogunFallbacks (blob).empty());
-    CHECK (lynx::ogunParam (blob, 17) == 180 && lynx::ogunParam (blob, 52) == 9 && ! lynx::ogunParam (blob, 64));
+    CHECK (lynx::ogunParam (blob, 17) == 180 && lynx::ogunParam (blob, 52) == 9 && ! lynx::ogunParam (blob, lynx::ogunDelayOnIndex + 1));
     auto broken = blob;
     broken.resize (broken.size() - 300);
     CHECK (! lynx::ogunStateUsable (broken));
@@ -17042,6 +17042,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Gap169kAlignTests.inc"
 #include "FlQ170iTests.inc"
 #include "FlQ170i2Tests.inc"
+#include "FlQ170i3Tests.inc"
 #include "Speech168bTests.inc"
 #include "Design168pTests.inc"
 #include "Typing168tTests.inc"
