@@ -1974,9 +1974,11 @@ Layout glowLeveler()
     // AUTO MAKEUP under it, and the bottom strip of the reference — HF emphasis (its HI FREQ), MIX, TRIM
     Layout l;
     l.width = 540;
-    l.height = 300;
+    l.height = 312;
     auto& v = l.items;
-    v.push_back (section (4, 4, 532, 292, TR_NOOP ("Optical leveler")));
+    v.push_back (section (4, 4, 532, 304, TR_NOOP ("Optical leveler")));
+    // round tp172d: the reference's dark lower strip under the trims (the theme fills this second section near-black)
+    v.push_back (section (4, 232, 532, 76, ""));
     v.push_back (dial (86, 124, 92, "Gain", TR_NOOP ("Gain"), big));
     v.push_back (dial (454, 124, 92, "Peak reduction", TR_NOOP ("Peak reduction"), big));
     auto vu = display (170, 40, 200, 136, "vumeter");
@@ -1990,18 +1992,18 @@ Layout glowLeveler()
     v.push_back (tabs (12, 206, 160, 22, "Voicing", TR_NOOP ("Modern|Opto classic")));
     // round 152: the reference's ANALOG buttons (hum and noise, measured) bottom left, and the opto law of the classic
     // voicing (Old = a project saved before round 152: the round-123 Limit, no auto make-up there)
-    v.push_back (label (12, 236, 120, 12, TR_NOOP ("Analog")));
-    v.push_back (tabs (12, 250, 120, 20, "Analog", TR_NOOP ("Off|50 Hz|60 Hz"), { 0.0f, 0.5f, 1.0f }));
+    v.push_back (label (12, 244, 120, 12, TR_NOOP ("Analog")));
+    v.push_back (tabs (12, 258, 120, 20, "Analog", TR_NOOP ("Off|50 Hz|60 Hz"), { 0.0f, 0.5f, 1.0f }));
     v.push_back (when (tabs (12, 26, 130, 18, "Opto law", TR_NOOP ("Old|Measured")), "Voicing", 0.5f, 1.0f));
     // round 165w: the classic voicing's release (Measured = the trial's gain recovery; Old = round 123's slower tail, kept
     // by a project saved before), right, under the VU selector
     v.push_back (when (label (392, 46, 136, 10, TR_NOOP ("Attack / release")), "Voicing", 0.5f, 1.0f)); // round 165x: both measured
     v.push_back (when (tabs (392, 57, 136, 16, "Opto release", TR_NOOP ("Old|Measured")), "Voicing", 0.5f, 1.0f));
-    v.push_back (dial (170, 254, 28, "Emphasis", TR_NOOP ("HF emphasis")));
-    v.push_back (dial (270, 254, 28, "Mix", TR_NOOP ("Mix")));
-    v.push_back (dial (370, 254, 28, "Trim", TR_NOOP ("Trim"), bipolar));
+    v.push_back (dial (170, 262, 28, "Emphasis", TR_NOOP ("HF emphasis")));
+    v.push_back (dial (270, 262, 28, "Mix", TR_NOOP ("Mix")));
+    v.push_back (dial (370, 262, 28, "Trim", TR_NOOP ("Trim"), bipolar));
     // round 165x: where Auto makeup was switched on (the reference's make-up follows the dial from there)
-    v.push_back (when (dial (470, 254, 28, "Makeup ref", TR_NOOP ("Makeup ref")), "Voicing", 0.5f, 1.0f));
+    v.push_back (when (dial (470, 262, 28, "Makeup ref", TR_NOOP ("Makeup ref")), "Voicing", 0.5f, 1.0f));
     return l;
 }
 
@@ -2584,6 +2586,9 @@ Layout quellDenoiser()
     v.push_back (meter (30, 34, 70, 300, 0, TR_NOOP ("Reduction")));
     v.push_back (slider (Item::vslider, 170, 30, 70, 316, "Amount", TR_NOOP ("Amount")));
     v.push_back (display (128, 30, 42, 316, "faderscale")); // round 137: the fader's 0 … 100 scale
+    auto scaleRight = display (240, 30, 42, 316, "faderscale"); // round tp172d: printed on both sides, as on the reference
+    scaleRight.steps = 1;
+    v.push_back (scaleRight);
     v.push_back (value (170, 372, 70, 20, "Amount", 0));
     v.push_back (toggle (22, 372, 96, 22, "Listen", TR_NOOP ("Listen")));
     v.push_back (toggle (22, 342, 96, 22, "Matched", TR_NOOP ("Matched"))); // round 124: the engine fitted to NS1

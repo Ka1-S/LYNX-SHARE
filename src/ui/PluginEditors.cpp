@@ -637,7 +637,9 @@ public:
                 // round 170j: a partial repaint of the art draws only what it touches; round 170c: a control another mode bypasses is drawn dimmed
                 const auto idle = plugui::isIdle (kind, items[(std::size_t) i], fx->params);
                 if (idle) g.beginTransparencyLayer (0.35f);
+                skin::setOnDarkFill (onDarkFill (i)); // round tp172d
                 paintItem (g, items[(std::size_t) i], i, *fx);
+                skin::setOnDarkFill (false);
                 if (idle) g.endTransparencyLayer();
             }
         if (hasHelpLine())
@@ -736,6 +738,27 @@ public:
         g.setColour (locked ? theme::colour::textPrimary : hasStyle (item, plugui::dim) ? colour::textDisabled : skin::captionColour());
         ui::drawFittingText (g, caps (tr (item.label)), r.expanded (0.0f, (skin::captionScale() - 1.0f) * 6.0f * scale()), j,
                             font (juce::jmax (8.0f, 9.5f * scale() * skin::captionScale()), true), 7.0f); // (round 165: fit, no "..."; tp172d: themed size)
+    }
+
+    // round tp172d: does item `index` sit on a top-level section the theme fills dark (the last one under its centre)?
+    bool onDarkFill (int index) const
+    {
+        const auto& items = activeLayout().items;
+        const auto& it = items[(std::size_t) index];
+        if (it.type == Item::section)
+            return false;
+        const juce::Point<float> c { it.x + it.w * 0.5f, it.y + it.h * 0.5f };
+        int ordinal = 0, under = -1;
+        for (int k = 0; k < (int) items.size(); ++k)
+        {
+            const auto& s = items[(std::size_t) k];
+            if (s.type != Item::section || hasStyle (s, plugui::raised) || ! visible (s))
+                continue;
+            if (juce::Rectangle<float> (s.x, s.y, s.w, s.h).contains (c))
+                under = ordinal;
+            ++ordinal;
+        }
+        return skin::sectionFillIsDark (under);
     }
 
     void paintItem (juce::Graphics& g, const LayoutItem& item, int index, const EffectSlot& fx)
@@ -2593,6 +2616,39 @@ public:
             const auto bar = r.reduced (1.5f * s);
             if (bar.getHeight() > 2.0f * bar.getWidth()) // a tall meter (Quell): the reduction grows downwards, 0 dB at the top
             {
+                if (editorStyle() == skin::Style::themed && kind == EffectKind::quellDenoiser)
+                {
+                    // round tp172d: the reference's meter — a dark recessed well, a thin soft light bar, the scale
+                    // printed on both sides, the held reduction in a small orange read-out
+                    const auto box = bar.withTrimmedBottom (22.0f * s);
+                    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff2c3035), box.getX(), box.getY(), juce::Colour (0xff15171a), box.getX(), box.getBottom(), false));
+                    g.fillRoundedRectangle (box, 6.0f * s);
+                    g.setColour (juce::Colours::black.withAlpha (0.6f));
+                    g.drawRoundedRectangle (box, 6.0f * s, 1.2f);
+                    const auto well = box.reduced (box.getWidth() * 0.36f, 12.0f * s);
+                    g.setColour (juce::Colour (0xff050607));
+                    g.fillRoundedRectangle (well.expanded (3.0f * s), 3.0f * s);
+                    g.setFont (font (juce::jmax (6.5f, 8.0f * s)));
+                    for (int db = 0; db <= 30; db += 6)
+                    {
+                        const auto y = well.getY() + well.getHeight() * (float) db / 30.0f;
+                        g.setColour (juce::Colour (0xffb9bec4));
+                        g.drawHorizontalLine ((int) y, box.getX() + 4.0f * s, well.getX() - 6.0f * s);
+                        g.drawHorizontalLine ((int) y, well.getRight() + 6.0f * s, box.getRight() - 4.0f * s);
+                        g.drawText (juce::String (-db), juce::Rectangle<float> (box.getX() + 2.0f * s, y - 10.0f * s, well.getX() - box.getX() - 8.0f * s, 9.0f * s), juce::Justification::centredRight, false);
+                        g.drawText (juce::String (-db), juce::Rectangle<float> (well.getRight() + 6.0f * s, y - 10.0f * s, box.getRight() - well.getRight() - 8.0f * s, 9.0f * s), juce::Justification::centredLeft, false);
+                    }
+                    const auto fill = well.reduced (well.getWidth() * 0.25f, 0.0f).withHeight (well.getHeight() * amount);
+                    g.setGradientFill (juce::ColourGradient (juce::Colour (0xffe8ecef).withAlpha (fx.enabled ? 0.75f : 0.3f), fill.getX(), 0.0f, juce::Colour (0xff8a9096).withAlpha (fx.enabled ? 0.6f : 0.25f), fill.getRight(), 0.0f, false));
+                    g.fillRect (fill);
+                    grHold = juce::jmax (grHold, amount);
+                    const auto readout = juce::Rectangle<float> (bar.getCentreX() - 22.0f * s, bar.getBottom() - 18.0f * s, 44.0f * s, 16.0f * s);
+                    g.setColour (juce::Colour (0xff070809));
+                    g.fillRoundedRectangle (readout, 3.0f * s);
+                    g.setColour (skin::valueColour (false));
+                    g.drawText (grHold > 0.0005f ? juce::String (-grHold * 30.0f, 1) : juce::String ("0.0"), readout, juce::Justification::centred, false);
+                    return;
+                }
                 const auto well = bar.reduced (0.0f, 4.0f * s).withTrimmedBottom (14.0f * s);
                 g.setColour (colour::gridBeat);
                 g.setFont (font (8.5f * s));
@@ -2634,10 +2690,13 @@ public:
             for (int k = 0; k <= 100; k += 10)
             {
                 const auto y = bottom - (bottom - top) * (float) k / 100.0f;
+                const auto right = item.steps == 1; // round tp172d: the scale on the fader's right side, mirrored
                 g.setColour (colour::gridBeat);
-                g.drawHorizontalLine ((int) y, area.getRight() - 6.0f * s, area.getRight());
-                g.setColour (colour::textSecondary);
-                g.drawText (juce::String (k), juce::Rectangle<float> (area.getX(), y - 5.0f * s, area.getWidth() - 8.0f * s, 10.0f * s), juce::Justification::centredRight, false);
+                if (right) g.drawHorizontalLine ((int) y, area.getX(), area.getX() + 6.0f * s);
+                else g.drawHorizontalLine ((int) y, area.getRight() - 6.0f * s, area.getRight());
+                g.setColour (skin::captionColour().getAlpha() > 0 && editorStyle() == skin::Style::themed ? skin::captionColour().withAlpha (0.75f) : colour::textSecondary);
+                g.drawText (juce::String (k), juce::Rectangle<float> (right ? area.getX() + 8.0f * s : area.getX(), y - 5.0f * s, area.getWidth() - 8.0f * s, 10.0f * s),
+                            right ? juce::Justification::centredLeft : juce::Justification::centredRight, false);
             }
             return;
         }

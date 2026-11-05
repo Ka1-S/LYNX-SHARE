@@ -169,6 +169,18 @@ Both numbers are given below.
   - The Rhythm voicing's Tweak and Trigger rows are on a Tweak page, so the panel is 290 px tall instead of 444.
   - The plain panner (Voicing off) shows on both pages.
 
+**Look, fourth slice (the Waves roles with a trial):**
+- **Glow Leveler ← CLA-2A:**
+  - a light brushed-silver faceplate with corner screws and black bakelite knobs read off their pointers;
+  - red lit keys and dark legends;
+  - a near-black lower strip under the trims (Analog, HF emphasis, Mix, Trim, Makeup ref), with light legends.
+- **Quell Denoiser ← NS1:**
+  - a graphite plate;
+  - a dark recessed meter well with a thin soft light bar and its scale on both sides, and a small orange read-out;
+  - a large grooved metal fader cap on a recessed slot, with the 0 … 100 scale on both sides.
+- Gemini Doubler already matched Doubler's look.
+- **Pending a licence:** LYNX Tune ← Auto-Tune Pro. The trial has expired. Once a licence is in, sound captures (correction speed, humanize, formant, the artefact character) and the look will be done together.
+
 **Design gaps still open:**
 - Atrium's Predelay and Decay bars draw linear while the original's are skewed.
 - Ember's Drive has no printed 0 … 10 scale, and the VU reads "VU". The original's meter face and logo are not reproduced, as the rules require.
