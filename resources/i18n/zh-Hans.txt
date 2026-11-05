@@ -7195,6 +7195,8 @@ countries: cn sg
 "Worth knowing" = "须知"
 "Samples not on this PC" = "不在此电脑上的采样"
 "Steps use channel colour" = "步进使用通道颜色"
+# round tp172d: the Echoform / Auto-pan page switch
+"Main|Tweak" = "主要|微调"
 "E type|G type" = "E 型|G 型"
 "Modern console" = "现代调音台"
 

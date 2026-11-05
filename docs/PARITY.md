@@ -124,7 +124,8 @@ Both numbers are given below.
 | Foil Plate (plate voicing) | Little Plate | 1.4 → 2.2 | 6.0 → 7.5 | level re-measured at Mix 100 % (it was 6–16 dB low, most at short decays: knots per decade of Decay); darker above 2.5 kHz (−5 dB shelf, 7 kHz low-pass); early part −9 dB; RT per band already within 5 % |
 | Lattice Mod | ValhallaUberMod | 3.1 → 3.9 | — | the wet is in phase with the dry (the dry + wet comb notch measured on music; round 101's inverted wet does not hold here) |
 | Ember Saturator (Classic) | Decapitator | 4.6 → 4.8 | — | with Punish on, E / N / T / P saturate at the measured level (the curve, knees and bias, scaled ×0.40 / 0.90 / 0.65 / 0.86; the small-signal law is unchanged) |
-| Orbit / Spiral Echo / Epoch Verb / Halo | Space Modulator / Freq Echo / VintageVerb / Shimmer | 3.8 / 3.4 / 2.9 / 2.2 (unchanged) | Epoch 7.0, Halo 6.2 | open: Epoch has a 39 Hz tank mode at Size 100 %; Halo is 6–9 dB loud on sustained music at Mix 100 % (the original seems to limit its loop) |
+| Halo | ValhallaShimmer | 2.2 → 2.3 | 6.2 → 6.1 | without feedback the wet is trimmed −3 dB, fading out by Feedback 50 %; the tail follows Size less (4.5 + 7 × Size s). On music / drums (original − LYNX) the error is now D −0.1 / −0.3, S1 +0.6 / +1.1, S2 −5 / −7, S3 −3 / −1 dB (it was up to −9). The original's impulse and music levels disagree (its shimmer is not linear), so a full −5 dB trim (music within 1–5 dB) cost verb's impulse-level part (verb 5.8): −3 dB is the compromise. Its music renders' demo dropouts were checked and are negligible (≤ 2 windows of 35). Open: at Feedback 50 % our shimmer tail falls 60 dB in ~2 s where the original's lasts ~14 s (the shifted crossfade loses energy each pass; an energy-keeping crossfade rang out, so it was not kept). |
+| Orbit / Spiral Echo / Epoch Verb | Space Modulator / Freq Echo / VintageVerb | 3.8 / 3.4 / 2.9 (unchanged) | Epoch 7.0 | Epoch's "39 Hz mode" is not a mode. 85 % of the music stimulus's energy is three bass notes (32, 44 and 48 Hz). The original's response has a notch there (−10…−13 dB below its low-end mean); ours has a peak (+6…+9). The impulse's band levels and RTs per octave match within 2 dB. Left alone: matching the original's mode positions would tune to the stimulus, not to the reverb. |
 | Echoform | EchoBoy / ValhallaDelay / H-Delay | 5.2 / 3.8 / 5.9 | — | measure only (EchoBoy's mapping fixed: feedback units) |
 | Auto-pan / Voice Shift | PanMan / Little AlterBoy | 3.2 / 2.0 | — | measure only |
 | Glow Leveler / Compressor / Gemini / Quell | CLA-2A / RComp / Doubler2 / NS1 (Waves) | 4.3 / 6.4 / 4.4 / 4.0 | — | measure only (refcap licence of 11-04) |
@@ -158,6 +159,15 @@ Both numbers are given below.
   - square bevelled keys for tabs, switches and option lists;
   - wider walnut cheeks;
   - a fill colour per section.
+
+**Look, third slice:**
+- **Echoform ← EchoBoy.**
+  - The default page is the three pods only, with bigger knobs (Echo time 84 px), generous spacing and the walnut cheeks.
+  - The Tweak strip, the switch rows and the Style edit moved behind a "Main | Tweak" key pair, bottom left: EchoBoy's TWEAK key.
+- **Auto-pan ← PanMan.**
+  - Bigger pan knobs (52 px), the name in the free corner, and the walnut cheeks.
+  - The Rhythm voicing's Tweak and Trigger rows are on a Tweak page, so the panel is 290 px tall instead of 444.
+  - The plain panner (Voicing off) shows on both pages.
 
 **Design gaps still open:**
 - Atrium's Predelay and Decay bars draw linear while the original's are skewed.

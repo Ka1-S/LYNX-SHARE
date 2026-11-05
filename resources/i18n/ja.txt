@@ -7195,6 +7195,8 @@ countries: jp
 "Worth knowing" = "補足"
 "Samples not on this PC" = "この PC にないサンプル"
 "Steps use channel colour" = "ステップにチャンネルの色を使う"
+# round tp172d: the Echoform / Auto-pan page switch
+"Main|Tweak" = "メイン|微調整"
 "E type|G type" = "Eタイプ|Gタイプ"
 "Modern console" = "モダンコンソール"
 
