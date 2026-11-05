@@ -83,11 +83,28 @@ Per item: the reporter's words | FL evidence | LYNX before | LYNX now.
   Linux, Windows and macOS.
 - **Test:** issues171a_detached_windows_survive_a_restart (+ GUI checks below).
 
+## GUI evidence (Windows, fresh profile, LYNX_TEST_MODE=1)
+
+Screenshots in `E:\lynx-work\issues171\check\`:
+- #67: `b-*` = preset "40Hz + 18kHz cut" loaded, saved (42 params incl. [36]=0.5, [39]=1); `c-eq-reopen.png` =
+  the same steep 40 Hz / 18 kHz curve after reopening the saved file.
+- #68: `d-menu-after-cut.png` = "Cut itself" ticked in the rack menu after clicking it; `d-settings.png` = the
+  sample panel "Cut itself" checkbox ticked for the same channel.
+- #66: `b-peak1.png` / `b-peak2.png` = Peak Controller LFO display scrolling while playing.
+- #62: Linux WSLg `i62-before-wslg.png` (re-placed by the WM) vs `i62-after-wslg*.png` (kept at 300,200 over two
+  restarts, above the main window).
+
+Round 171b Patcher round-trip losses (splitter, Fruity Delay 3, Peak Controller) were the 4-decimal rounding in
+`effectToVar`; `savedEffectParamValue` writes the shortest exact float, and the selftest `effect_params_saved`
+compares the Patcher nodes with full `EffectSlot ==`.
+
+## Open (not fixed in 171a)
+
+- #63: sampler release / Mod X / Mod Y per-note lanes not routed; note pan / fine pitch do not reach VST3
+  (JUCE host has no note expression); the Arpeggiator drops note pan.
+- FLP-imported mono channels (`maxVoices==1` -> `sampler.cut`) now show "Cut itself" ticked (one state, as FL).
+
 ## Where I stopped
 
-- Done: code for all five issues, tests in tests/Issues171aTests.inc, selftest `effect_params_saved`.
-- In progress: build-local (LYNX_TEST=issues171a) and the Linux GUI build (build-linux in the worktree).
-- Next: run all tests, Linux selftest + Xvfb/WSLg checks (#62, #66), Windows GUI checks (#67, #68, #66, #62), merge
-  origin/main, train.sh issues171a, notes/replies.
-- Commands: `ZIG_GLOBAL_CACHE_DIR=~/.cache/zig-issues171a buildslot.sh scripts/build-local.sh "<FL>/Data"`;
-  Linux: scratchpad linbuild.sh (cmake + ninja -j3 in build-linux).
+- Done: code, tests, Linux + Windows GUI checks, merge of origin/main.
+- Next: build-local + Linux selftest after the merge, then `train.sh issues171a`.
