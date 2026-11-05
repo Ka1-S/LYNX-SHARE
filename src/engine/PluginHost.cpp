@@ -2366,8 +2366,11 @@ std::optional<ForeignPlugin> PluginHost::flWrapperRecord (const PluginRef& ref, 
         p.clapId = clapPluginId (*d);
         if (p.clapId.empty())
             return std::nullopt;
-        p.state = { 0, 0, 0, 0 };
-        p.state.insert (p.state.end(), state.begin(), state.end());
+        if (! state.empty())
+        {
+            p.state = { 0, 0, 0, 0 };
+            p.state.insert (p.state.end(), state.begin(), state.end());
+        }
     }
     else
         return std::nullopt;

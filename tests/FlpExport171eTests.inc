@@ -82,7 +82,7 @@ lynx::Song richSong()
     p.colour = 0xFF884422u;
     Note n;
     n.start = ppq * 2;
-    n.length = ppq / 2 + 37 * 10;
+    n.length = ppq / 2 + 373;
     n.channel = 6;
     n.key = 67;
     n.velocity = 0.5f;
@@ -111,7 +111,7 @@ lynx::Song richSong()
     s.mixer[2].masterLevel = 0.8f;
 
     // an FL effect imported earlier (its origin kept): written back byte for byte
-    const std::vector<std::uint8_t> limiterState = { 7, 0, 0, 0, 0xe8, 3, 0, 0, 0xd0, 7, 0, 0 };
+    const auto limiterState = flpexport::fruityLimiterDefaultState();
     EffectSlot fl;
     fl.kind = EffectKind::fruityLimiter;
     fl.flOrigin = { "Fruity Limiter", limiterState, 0 };
@@ -288,7 +288,7 @@ TEST (flpexport171e_song_round_trips_through_the_importer)
     const auto bytes = flpexport::exportFlp (song, options, report);
     const auto project = flp::parseProject (bytes);
     CHECK (project.warnings.empty());
-    CHECK (project.header.ppq == 960); // a note 370 ticks longer than half a beat needs LYNX's PPQ
+    CHECK (project.header.ppq == 960); // a note 373 ticks longer than half a beat needs LYNX's PPQ
     const auto back = importFlp (project, fx171e::importOptions());
 
     CHECK (back.bpm == 128.0 && back.beatsPerBar == 3 && fx171e::near (back.swing, 0.25, 0.01));
@@ -389,6 +389,9 @@ TEST (flpexport171e_reexport_keeps_fl_states)
     CHECK (first.channels.size() == second.channels.size());
     for (std::size_t i = 0; i < std::min (first.channels.size(), second.channels.size()); ++i)
     {
+        if (first.channels[i].pluginName != second.channels[i].pluginName || first.channels[i].pluginState != second.channels[i].pluginState)
+            std::printf ("  channel %d: '%s' %d B vs '%s' %d B\n", (int) i, first.channels[i].pluginName.c_str(), (int) first.channels[i].pluginState.size(),
+                         second.channels[i].pluginName.c_str(), (int) second.channels[i].pluginState.size());
         CHECK (first.channels[i].pluginName == second.channels[i].pluginName);
         CHECK (first.channels[i].pluginState == second.channels[i].pluginState);
     }
@@ -458,7 +461,7 @@ TEST (flpexport171e_insert_render_switches_off_the_lynx_slots)
     flpexport::Report after;
     const auto project = flp::parseProject (flpexport::exportFlp (song, options, after));
     CHECK (std::none_of (after.dropped.begin(), after.dropped.end(), [] (const std::string& d) { return d.find ("Insert 3") != std::string::npos; }));
-    CHECK (project.channels.size() == song.channels.size());
+    CHECK (project.channels.size() >= song.channels.size()); // (+ FL's automation clip channels)
     CHECK (flpexport::planRenders (song, options).inserts.empty() || std::find (flpexport::planRenders (song, options).inserts.begin(),
                                                                                     flpexport::planRenders (song, options).inserts.end(), 3)
                                                                          == flpexport::planRenders (song, options).inserts.end());
@@ -473,4 +476,38 @@ TEST (flpexport171e_sample_paths_rewritten_for_the_package)
     flpexport::Report report;
     const auto project = flp::parseProject (flpexport::exportFlp (song, options, report));
     CHECK (project.channels.size() > 5 && project.channels[5].samplePath == "Samples/loop.wav");
+}
+
+TEST (flpexport171e_fl_round_171e_fixes)
+{
+    // FL 2026 renders of the first exports (REA_rodada171e §5): a 3x Osc with no state, a plugin not on this PC, the PPQ
+    using namespace lynx;
+    auto song = fx171e::richSong();
+    flpexport::Options options;
+    flpexport::Report report;
+    // 1. LYNX's 3x Osc with no state goes as FL's own version-14 state (an empty one made FL's notes never end)
+    CHECK (song.channels[6].pluginState.empty());
+    auto project = flp::parseProject (flpexport::exportFlp (song, options, report));
+    CHECK (project.channels[6].pluginName == "3x Osc" && project.channels[6].pluginState == flpexport::defaultThreeOscState());
+    CHECK (threeOscStateUsable (flpexport::defaultThreeOscState()) && flpexport::defaultThreeOscState().size() == 460);
+    // the other engines LYNX plays need their own state (else they are rendered)
+    ChannelDef sim;
+    sim.instrument = InstrumentKind::simsynth;
+    CHECK (flpexport::needsFreeze (sim));
+    // 2. a stand-in whose FL plugin is not on this PC keeps its wrapper
+    auto standIn = song.channels[7];
+    standIn.instrument = InstrumentKind::synth;
+    song.channels[7] = standIn;
+    CHECK (! flpexport::needsFreeze (standIn));
+    project = flp::parseProject (flpexport::exportFlp (song, options, report));
+    CHECK (project.channels[7].pluginName == "Fruity Wrapper");
+    // 3. the PPQ: notes and clips decide, the rest is rounded; a forced PPQ is kept
+    CHECK (project.header.ppq == 960); // (the 373-tick note)
+    auto& notes = song.patterns[0].notes;
+    notes.erase (std::remove_if (notes.begin(), notes.end(), [] (const Note& n) { return n.length % 10 != 0 || n.start % 10 != 0; }), notes.end());
+    song.patterns[0].lengthTicks = ppq * 4 + 3; // (not on 96's grid: rounded)
+    project = flp::parseProject (flpexport::exportFlp (song, options, report));
+    CHECK (project.header.ppq == 96);
+    options.ppq = 960;
+    CHECK (flp::parseProject (flpexport::exportFlp (song, options, report)).header.ppq == 960);
 }

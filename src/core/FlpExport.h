@@ -41,6 +41,7 @@ struct Options
     // sample's milliseconds
     std::function<double (const std::string&)> sampleSeconds;
     flp::WriteOptions write;
+    int ppq = 0; // the file's PPQ (0 = 96 when the notes and clips fit it, else 960)
 };
 
 // What the export did, one line per thing, for the report window.
@@ -100,6 +101,11 @@ std::vector<std::uint8_t> flVst3State (const std::vector<std::uint8_t>& componen
 flp::Project toProject (const Song& song, const Options& options, Report& report);
 // toProject + flp::writeProject
 std::vector<std::uint8_t> exportFlp (const Song& song, const Options& options, Report& report);
+
+// FL 2026's default Fruity Limiter state (option B's substitute for LYNX's Limiter)
+std::vector<std::uint8_t> fruityLimiterDefaultState();
+// LYNX's 3x Osc with no state, as FL's own version-14 state
+std::vector<std::uint8_t> defaultThreeOscState();
 
 // FL value helpers (exposed for tests)
 int envelopeTimeValue (double seconds) noexcept; // inverse of flp::Channel::envelopeTime (v ≥ 101)

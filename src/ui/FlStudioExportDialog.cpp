@@ -32,7 +32,7 @@ public:
         : file (target)
     {
         title.setText (tr ("{0} saved.", { target.getFileName() }), juce::dontSendNotification);
-        title.setFont (theme::font (theme::type::body).boldened());
+        title.setFont (theme::font (theme::type::body, true));
         title.setColour (juce::Label::textColourId, theme::colour::textPrimary);
         addAndMakeVisible (title);
         body.setMultiLine (true);
@@ -156,7 +156,7 @@ public:
         renders = flpexport::planRenders (engine.getSong(), flstudio::optionsFor (&engine.getPluginHost(), flpexport::LynxOnly::renderAudio, engine.getSong()));
         auto heading = [this] (juce::Label& l, const juce::String& text) {
             l.setText (text, juce::dontSendNotification);
-            l.setFont (theme::font (theme::type::body).boldened());
+            l.setFont (theme::font (theme::type::body, true));
             l.setColour (juce::Label::textColourId, theme::colour::textPrimary);
             addAndMakeVisible (l);
         };

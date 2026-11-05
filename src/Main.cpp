@@ -6051,7 +6051,11 @@ private:
                 const juce::File output (outputPath);
                 const auto zip = output.hasFileExtension ("zip");
                 const auto mode = substitute ? lynx::flpexport::LynxOnly::substitute : lynx::flpexport::LynxOnly::renderAudio;
-                const auto options = lynx::flstudio::optionsFor (&loader.getPluginHost(), mode, loader.getSong());
+                loader.capturePluginStates();
+                auto options = lynx::flstudio::optionsFor (&loader.getPluginHost(), mode, loader.getSong());
+                // --flp-ppq N: the file's PPQ (tests; default: 96 when the notes and clips fit it)
+                if (const auto args = juce::JUCEApplication::getCommandLineParameterArray(); args.contains ("--flp-ppq"))
+                    options.ppq = juce::jlimit (0, 960, args[args.indexOf ("--flp-ppq") + 1].getIntValue());
                 const auto renderDir = zip ? juce::File::getSpecialLocation (juce::File::tempDirectory).getNonexistentChildFile ("LYNX FL export", {}, false)
                                            : output.getSiblingFile (output.getFileNameWithoutExtension() + " audio");
                 ok = lynx::flstudio::exportProject (loader.getSong(), options, output, zip, renderDir, 44100.0,

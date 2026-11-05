@@ -10,6 +10,7 @@
 #include "core/Effects.h"
 #include "core/FlEffects.h"
 #include "core/PatternBlocks.h"
+#include "core/ThreeOsc.h"
 
 namespace lynx::flpexport
 {
@@ -217,6 +218,19 @@ int slideTimeValue (float beats) noexcept
     return std::clamp (iround (1024.0 * std::log (n * 26.0 / 48.0 + 1.0) / std::log (27.0)), 0, 1660);
 }
 
+std::vector<std::uint8_t> defaultThreeOscState()
+{
+    // a version-13 state of zeros is LYNX's Params {}; normalised: version 14 + the default voice snapshot
+    std::vector<std::uint8_t> zero (4 + 21 * 4 + 8, 0);
+    zero[0] = 13;
+    return threeOscNormalisedState (zero, {});
+}
+
+std::vector<std::uint8_t> fruityLimiterDefaultState()
+{
+    return std::vector<std::uint8_t> (std::begin (fruityLimiterDefault), std::end (fruityLimiterDefault));
+}
+
 std::uint64_t fingerprint (const ChannelDef& c)
 {
     Hash h;
@@ -263,8 +277,9 @@ std::string flGeneratorName (const ChannelDef& c)
     if (c.instrument == InstrumentKind::layer)
         return "Layer";
     // (an empty state: the engines LYNX plays from their defaults, which are FL's — a new FL instance)
-    const auto own = c.instrument == InstrumentKind::threeosc || c.instrument == InstrumentKind::simsynth || c.instrument == InstrumentKind::dx10
-                     || c.instrument == InstrumentKind::plucked || c.instrument == InstrumentKind::wavetraveller;
+    // (3x Osc with no state: LYNX's default is written as FL's own version-14 state [FL 2026: a 3x Osc with an empty
+    // state keeps uninitialised voice settings, its notes never end; round 171e, FL render])
+    const auto own = c.instrument == InstrumentKind::threeosc;
     if (const auto* g = generatorFor (c.instrument); g != nullptr && (! c.pluginState.empty() || own))
         return g->name;
     return {};
@@ -294,7 +309,7 @@ std::string instrumentName (InstrumentKind k)
 
 bool needsFreeze (const ChannelDef& c)
 {
-    if (c.instrument == InstrumentKind::plugin)
+    if (c.instrument == InstrumentKind::plugin || c.plugin.foreign.format != ForeignPlugin::Format::none)
         return false; // the wrapper (or, unknown, planRenders decides)
     if (! flGeneratorName (c).empty())
         return false;
@@ -490,6 +505,8 @@ std::vector<std::uint8_t> flVst3State (const std::vector<std::uint8_t>& componen
     // u32 1 + records {u32 id, u64 size}: 1 (64 B, first u32 = 1), 3 component, 2 controller [DATA: FL 2026's VST3
     // states]; record 4 (FL's parameter slots) is left out: FL then gives slot k to the plugin's k-th parameter, which is
     // LYNX's parameter index (REA_rodada22 §2.3)
+    if (component.empty() && controller.empty())
+        return {}; // (no state: the wrapper then has none and FL starts the plugin from its defaults)
     Records r;
     r.put32 (1);
     std::vector<std::uint8_t> head (64, 0);
@@ -564,7 +581,8 @@ std::vector<std::uint8_t> writeWrapper (const ForeignPlugin& p, bool instrument,
         r.record (0x3A, p.clapId);
     r.record (0x36, p.name);
     r.record (0x37, p.path);
-    r.record (0x35, p.state);
+    if (! p.state.empty())
+        r.record (0x35, p.state);
     return r.b;
 }
 
@@ -585,40 +603,34 @@ struct Converter
     std::map<std::pair<int, int>, int> slotMap;
     std::map<std::pair<int, int>, std::string> slotPlugin; // → FL plugin name ("Fruity Wrapper" for hosted plugins)
 
-    std::uint32_t ticks (std::int64_t t) const { return (std::uint32_t) std::max<std::int64_t> (0, t * filePpq / ppq); }
+    std::uint32_t ticks (std::int64_t t) const { return (std::uint32_t) std::max<std::int64_t> (0, (t * filePpq + ppq / 2) / ppq); } // (rounded)
     std::string path (const std::string& p) const { return options.samplePath && ! p.empty() ? options.samplePath (p) : p; }
 
     void choosePpq()
     {
-        // FL's own 96 when every time fits it, else LYNX's 960 (FL's PPQ list goes up to 960)
+        // FL's own 96 when every note and clip fits it, else LYNX's 960; other times (pattern lengths, event ticks, markers,
+        // offsets) are rounded to the file's PPQ [FL 2026 played a 960-PPQ export of an FL demo wrongly, round 171e]
+        if (options.ppq > 0)
+        {
+            filePpq = options.ppq;
+            out.header.ppq = (std::uint16_t) filePpq;
+            return;
+        }
         bool fine = true;
         auto use = [&fine] (std::int64_t t) { fine = fine && t % (ppq / 96) == 0; };
         for (const auto& p : song.patterns)
-        {
-            use (p.lengthTicks);
             for (const auto& n : p.notes)
             {
                 use (n.start);
                 use (n.length);
             }
-            for (const auto& m : p.markers)
-                use (m.tick);
-            for (const auto& lane : p.events)
-                for (const auto& e : lane.events)
-                    use (e.tick);
-        }
         song.forEachClipList ([&] (const std::vector<Clip>& clips) {
             for (const auto& c : clips)
             {
                 use (c.start);
                 use (c.length);
-                if (c.kind == ClipKind::pattern)
-                    use (c.offset);
             }
         });
-        for (const auto& a : song.arrangements)
-            for (const auto& m : a.markers)
-                use (m.tick);
         filePpq = fine ? 96 : ppq;
         out.header.ppq = (std::uint16_t) filePpq;
     }
@@ -865,8 +877,9 @@ struct Converter
             sampler (c, def);
             report.exact.push_back (channelLabel (def, index) + (def.instrument == InstrumentKind::audioClip ? ": audio clip" : ": Sampler"));
         }
-        else if (def.instrument == InstrumentKind::plugin)
+        else if (def.instrument == InstrumentKind::plugin || def.plugin.foreign.format != ForeignPlugin::Format::none)
         {
+            // (also a stand-in whose FL plugin is not on this PC: its wrapper goes back as FL wrote it)
             c.type = flp::ChannelType::instrument;
             if (const auto record = hosted (def.plugin, true))
             {
@@ -882,6 +895,8 @@ struct Converter
             c.type = flp::ChannelType::instrument;
             c.pluginName = name;
             c.pluginState = originMatches (def) && ! def.flOrigin.state.empty() ? def.flOrigin.state : def.pluginState;
+            if (c.pluginState.empty() && def.instrument == InstrumentKind::threeosc)
+                c.pluginState = defaultThreeOscState();
             const auto* g = generatorFor (def.instrument);
             if ((g != nullptr && g->channelSample) || samplerLike (def.instrument))
                 c.samplePath = path (def.samplePath);
