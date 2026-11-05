@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstring>
+#include <initializer_list>
 #include <limits>
 #include <map>
 
@@ -488,7 +489,7 @@ vendor = Solid State Logic
 lynx = Ridge Strip
 names = SSL Native Channel Strip 2; SSL Native Channel Strip; SSL 4K E; SSL 4K B; SSL 4K G; Vocalstrip 2; SSL Native Vocalstrip 2
 # round tp172c: a Channel Strip 2 state (the same XML form) to Ridge's Modern voicing, measured black-box on its trial
-# (E / G EQ, filters, compressor, gate); 4K G (Black) and 4K B (Brown; its own compressor is not modelled) to the 4K voicing
+# (E / G EQ, filters, compressor, gate); 4K G (Black) and 4K B (Brown; its stepped compressor, slice 4) to the 4K voicing
 # round 145: a Vocalstrip 2 state (XML, the original's own units) is translated to Ridge's Vocal strip voicing, measured
 # black-box on the official trial (de-esser, de-ploser, EQ, compander, order; REA_rodada145 §2); round 148: a 4K E state
 # (the same XML form) to Ridge's 4K voicing, measured on the 4K E trial (REA_rodada148 §2); the other strips' states are
@@ -1495,7 +1496,7 @@ int translateSslVocalstrip2 (const std::vector<std::uint8_t>& state, EffectSlot&
     // round tp172c: SSL Native Channel Strip 2 (the same XML form) -> the Modern voicing
     const bool cs2 = plugin.find ("Channel Strip 2") != std::string::npos;
     // round tp172c: SSL 4K G (its EQ = the 4K voicing's Black; LMF ÷3 / HMF ×3 move the band) and SSL 4K B (its EQ,
-    // filters and gate; the B's compressor — ratios up to "ds", stepped releases — is not modelled: left at 1:1)
+    // filters and gate; round tp172c4: its stepped compressor through the 4K voicing's)
     const bool k4g = plugin.find ("4K G") != std::string::npos, k4b = plugin.find ("4K B") != std::string::npos;
     if (plugin.find ("Vocalstrip 2") == std::string::npos && ! k4e && ! cs2 && ! k4g && ! k4b)
         return 0;
@@ -1559,7 +1560,7 @@ int translateSslVocalstrip2 (const std::vector<std::uint8_t>& state, EffectSlot&
         p[r::compFastAttack] = sw ("CompFastAttack", false);
         p[r::compPeak] = sw ("CompPeak", false);
         p[r::compMix] = (float) std::clamp (at ("CompMix", 100.0) / 100.0, 0.0, 1.0);
-        p[r::autoMakeup] = sw ("CompAutoMakeUp", true);
+        p[r::autoMakeup] = k4b ? 0.0f : sw ("CompAutoMakeUp", true);
         p[r::k4MakeupOffset] = linNorm (at ("CompAutoMakeUpCompensation", 0.0), -12.0, 12.0);
         p[r::gateRange] = linNorm (at ("GateRange", 0.0), 0.0, 40.0);
         p[r::gateThreshold] = linNorm (at ("GateThreshold", 10.0), -30.0, 10.0);
@@ -1591,37 +1592,70 @@ int translateSslVocalstrip2 (const std::vector<std::uint8_t>& state, EffectSlot&
         p[r::hpf] = hp < 16.5 ? 0.0f : std::max (1e-4f, logNorm (hp, 16.0, 350.0));
         p[r::lpf] = lp > 15.95 ? 0.0f : std::max (1e-4f, logNorm (lp * 1000.0, 22000.0, 3000.0));
         auto gain = [] (double db) { return linNorm (db, -15.0, 15.0); };
-        p[r::lfGain] = gain (at ("LowEqGain", 0.0));
+        // round tp172c4: the 4K G's dials span ±18 (LF) / ±20 (HF) / ±22 dB (mids) for the same curves this console draws
+        // at ±15 (its Black renders matched the 4K E's Black node for node, K4G_ir): its gains scale onto the ±15 dials
+        const double gLf = k4g ? 15.0 / 18.0 : 1.0, gHf = k4g ? 15.0 / 20.0 : 1.0, gMid = k4g ? 15.0 / 22.0 : 1.0;
+        p[r::lfGain] = gain (gLf * at ("LowEqGain", 0.0));
         p[r::lfFreq] = logNorm (at ("LowEqFreq", 200.0), 30.0, 450.0);
         p[r::lfBell] = sw ("LowEqBell", false);
-        p[r::lmfGain] = gain (at ("LowMidEqGain", 0.0));
+        p[r::lmfGain] = gain (gMid * at ("LowMidEqGain", 0.0));
         p[r::lmfFreq] = logNorm (at ("LowMidEqFreq", 1.0) * 1000.0 / (at ("LowMidEqDiv3", 0.0) >= 0.5 ? 3.0 : 1.0), 200.0, 2500.0);
         p[r::lmfQ] = r::k4QValue (at ("LowMidEqQ", 1.5));
-        p[r::hmfGain] = gain (at ("HighMidEqGain", 0.0));
+        p[r::hmfGain] = gain (gMid * at ("HighMidEqGain", 0.0));
         p[r::hmfFreq] = logNorm (at ("HighMidEqFreq", 3.0) * 1000.0 * (at ("HighMidEqMult3", 0.0) >= 0.5 ? 3.0 : 1.0), 600.0, 7000.0);
         p[r::hmfQ] = r::k4QValue (at ("HighMidEqQ", 1.5));
-        p[r::hfGain] = gain (at ("HighEqGain", 0.0));
+        p[r::hfGain] = gain (gHf * at ("HighEqGain", 0.0));
         p[r::hfFreq] = logNorm (at ("HighEqFreq", 8.0) * 1000.0, 1500.0, 16000.0);
         p[r::hfBell] = sw ("HighEqBell", false);
         p[r::eqOn] = sw ("EqIn", true);
         p[r::k4Colour] = r::k4ColourValue (k4g ? 1 : k4b ? 0 : (int) std::lround (at ("EqColour", 0.0)));
-        const auto ratio = k4b ? 1.0 : at ("CompRatio", 1.0);
+        // round tp172c4: the B's ratio, compressor release and gate release are switch steps (its ratio: out, 2, 4, 10 : 1,
+        // "ds"; its releases: "ds", .2, .4, .8, 1.6 s, auto — the two non-numbered ones read as the times whose static
+        // curve they match), measured on its trial (K4B_dyn / K4B_mk / K4B_mic): every step compresses near-limiting,
+        // its knee 8 (2 and 4 : 1), 10 (10 : 1) or 18 dB ("ds") above where this console's knee sits for the same dial ->
+        // the 4K voicing at infinity with the threshold moved up; the B's auto make-up depends on the threshold only
+        // (12.6 / 9.1 / 3.5 / 1.5 dB at -15 / -5 / 0 / +5; none in "ds"), so it goes into the output instead
+        auto step = [&at] (const char* id, double fallback, std::initializer_list<double> values) {
+            const auto i = (std::size_t) std::clamp ((int) std::lround (at (id, fallback)), 0, (int) values.size() - 1);
+            return *(values.begin() + i);
+        };
+        const auto bStep = k4b ? (int) std::clamp (std::lround (at ("CompRatio", 0.0)), 0L, 4L) : 0;
+        const auto ratio = k4b ? (bStep == 0 ? 1.0 : 1e9) : at ("CompRatio", 1.0);
         p[r::compRatio] = ratio <= 1.0005 ? 0.0f : (ratio >= 30.0 ? 1.0f : (float) std::sqrt (std::clamp ((ratio - 1.0) / 19.0, 0.0, 0.996)));
-        p[r::compThreshold] = linNorm (at ("CompThreshold", 10.0), -20.0, 10.0);
-        p[r::compRelease] = logNorm (k4b ? 0.4 : at ("CompRelease", 0.4), 0.1, 4.0);
+        double bOffset = k4b ? step ("CompRatio", 0.0, { 0.0, 8.0, 8.0, 10.0, 18.0 }) : 0.0;
+        // (the 4K G's slow-attack compression runs 1 .. 3 dB deeper than this console's for the same dial, K4G_dyn: its
+        // threshold reads 1 dB lower at 0 and 3 dB lower at -15 and below; with fast attack they agree)
+        if (k4g && sw ("CompFastAttack", false) < 0.5f)
+            bOffset = -1.0 - 2.0 * std::clamp (-at ("CompThreshold", 10.0) / 15.0, 0.0, 1.0);
+        p[r::compThreshold] = linNorm (at ("CompThreshold", 10.0) + bOffset, -20.0, 10.0);
+        if (k4b)
+        {
+            double outDb = at ("OutputTrim", 0.0) + std::max (at ("FaderLevel", 0.0), -20.0);
+            const auto t = at ("CompThreshold", 10.0);
+            if (bStep >= 1 && bStep <= 3 && sw ("CompAutoMakeUp", true) >= 0.5f && sw ("DynamicsIn", true) >= 0.5f)
+                outDb += t <= -15.0 ? 12.6 + 0.35 * (-15.0 - t)
+                       : t <= -5.0 ? 12.6 + (t + 15.0) * (9.1 - 12.6) / 10.0
+                       : t <= 0.0 ? 9.1 + (t + 5.0) * (3.5 - 9.1) / 5.0
+                       : t <= 5.0 ? 3.5 + t * (1.5 - 3.5) / 5.0 : std::max (0.0, 1.5 - (t - 5.0) * 0.2);
+            if (sw ("SaturationIn", false) >= 0.5f)
+                outDb += 0.27; // its mic pre has no level loss (this console's Pre In alone is -0.27 dB)
+            p[r::output] = linNorm (outDb, -20.0, 20.0);
+        }
+        p[r::compRelease] = logNorm (k4b ? step ("CompRelease", 5.0, { 1.4, 0.2, 0.4, 0.8, 1.6, 1.0 }) : at ("CompRelease", 0.4), 0.1, 4.0);
         p[r::compFastAttack] = sw ("CompFastAttack", false);
         p[r::compMix] = (float) std::clamp (at ("CompMix", 100.0) / 100.0, 0.0, 1.0);
-        p[r::autoMakeup] = sw ("CompAutoMakeUp", true);
+        p[r::autoMakeup] = k4b ? 0.0f : sw ("CompAutoMakeUp", true);
         p[r::k4MakeupOffset] = linNorm (at ("CompAutoMakeUpCompensation", 0.0), -12.0, 12.0);
         p[r::gateRange] = linNorm (at ("GateRange", 0.0), 0.0, 40.0);
         p[r::gateThreshold] = linNorm (at ("GateThreshold", -30.0), -30.0, 10.0);
-        p[r::gateRelease] = logNorm (k4b ? 0.4 : at ("GateRelease", 0.4), 0.1, 4.0); // (the B's is a step index)
+        p[r::gateRelease] = logNorm (k4b ? step ("GateRelease", 2.0, { 0.1, 0.2, 0.4, 0.8, 1.6 }) : at ("GateRelease", 0.4), 0.1, 4.0);
         p[r::gateFastAttack] = sw ("GateFastAttack", false);
         p[r::expander] = sw ("GateExpander", false);
         p[r::dynOn] = sw ("DynamicsIn", true);
         p[r::order] = sw ("DynamicsPreEq", false);
         p[r::k4Pre] = sw ("SaturationIn", false);
-        p[r::k4Mic] = linNorm (at ("SaturationAmount", 0.0), 0.0, 50.0);
+        // (the B's mic pre is far gentler: its Mic dial reads as this console's 5 + 0.45 x Mic, K4B_mic)
+        p[r::k4Mic] = linNorm (k4b ? 5.0 + 0.45 * at ("SaturationAmount", 0.0) : at ("SaturationAmount", 0.0), 0.0, 50.0);
         p[r::analog] = sw ("AnalogueVca", true);
         if (at ("Bypass", 0.0) >= 0.5)
             slot.enabled = false;
