@@ -107,3 +107,18 @@ scan code (in.ps1 ctrlkey2); without it no Ctrl shortcut reaches LYNX (Ctrl+Z ne
 
 - done: §1–§5, note names, FL session (shots in C:\Users\kauan\lynx-test\r170a), tests tests/Rack170aTests.inc.
 - done: LYNX Windows screenshots. In progress: merge train.
+
+## Round 170a2 — beat-group tint and lit-step colours (coordinator + user, 2026-11-05)
+
+- Problem (LYNX shot N7): at 28 % accent the empty steps of groups 2 / 4 were a mid red, the hue of a lit step — they
+  read as active steps. Now `stepOffAlt = mix (mix (stepOff, textPrimary, stepGroupLift = 0.08), accent,
+  stepGroupTint = 0.12)`: a dull reddish grey (0x4f3c42 on the default theme; a pinkish grey on a light theme), as
+  FL's alternate groups (r170a f2: a dull reddish grey, much darker than a lit step). Tests: low saturation (channel
+  spread <= 30), far from the lit step, still >= 45 apart from the plain group.
+- Lit steps in the channel's colour (user request). [SHOT r170a2 FL 2026, one session, channels given random colours,
+  /mnt/e/lynx-work/r170a/tint/fl_*.png] FL's lit steps stay white / pink whatever the channel colour; the Channel rack
+  options menu's "Colorful channel controls" (TFruityLoopsMainForm ColorfulChannelControlsMenu, off by default,
+  restored off after the test) only colours each channel's mixer-insert box, not the steps. FL has no option for
+  coloured steps, so LYNX adds its own: Settings › General "Steps use channel colour", on by default (settings key
+  rackStepsChannelColour). `themes::litStepColour` lifts the colour (to white on a dark theme, black on a light one)
+  until its WCAG contrast is >= 2.6 against both empty-step greys; a channel without a colour keeps the theme's lit step.

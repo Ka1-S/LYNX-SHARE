@@ -183,7 +183,7 @@ TEST (rack170a2_lit_steps_in_the_channel_colour)
     for (const auto bg : { 0xff1c1e23u, 0xfff2f3f5u })
     {
         const auto p = derivePalette (0xffe5383bu, bg);
-        CHECK (litStepColour (0, p) == p.stepOn); // no channel colour: the theme's lit step
+        CHECK (litStepColour (0, p) == p.accent); // no channel colour: the theme's lit step (the accent)
         for (const auto colour : { 0xffe5383bu, 0xff2fbf71u, 0xff3d8bfdu, 0xff202020u, 0xffeeeeeeu, 0xff5c1f24u, 0xfff0a020u })
         {
             const auto lit = litStepColour (colour, p);

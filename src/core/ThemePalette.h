@@ -48,7 +48,7 @@ constexpr double stepGroupTint = 0.12;
 
 // A lit Channel Rack step in its channel's colour (LYNX, round 170a2; FL keeps its steps white / pink): the colour
 // lifted (towards white on a dark theme, black on a light one) until it stands clear of both empty-step greys
-// (WCAG contrast >= minLitStepContrast against stepOff and stepOffAlt). 0 (no colour) = the palette's stepOn.
+// (WCAG contrast >= minLitStepContrast against stepOff and stepOffAlt). 0 (no colour) = the palette's lit step, the accent.
 constexpr double minLitStepContrast = 2.6;
 std::uint32_t litStepColour (std::uint32_t channelColour, const Palette& palette);
 
