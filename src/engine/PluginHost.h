@@ -349,7 +349,8 @@ public:
     void preload (const PluginRef& ref, int wanted = 1);
     // Prepare one exact instance before an atomic control edit. A failure is reported
     // to the caller and is not cached; the next rack build consumes the ready instance.
-    bool preloadChecked (const PluginRef& ref, double sampleRate, juce::String& error);
+    bool preloadChecked (const PluginRef& ref, double sampleRate, juce::String& error,
+                         const std::function<bool (juce::AudioPluginInstance&, juce::String&)>& validate = {});
     void discardPreloaded (const PluginRef& ref, double sampleRate);
     void clearPreloaded();
     int preloadedCount() const;

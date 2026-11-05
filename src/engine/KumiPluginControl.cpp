@@ -125,6 +125,18 @@ struct Hosted
         if (instrument != nullptr) instrument->setParameterFromUi (parameter, value);
         else effect->setParameterFromUi (parameter, value);
     }
+    void flushStagedParameters (double bpm) const
+    {
+        // A VST3 controller receives UI edits immediately, but its component may
+        // consume them only in process(). Capturing before that block can save
+        // the old component state. Process one bounded, silent staging buffer;
+        // this instance is never attached to the device or the live song.
+        std::array<float, PluginHost::maxBlockSize> left {}, right {};
+        if (instrumentOwner != nullptr)
+            instrumentOwner->render (left.data(), right.data(), PluginHost::maxBlockSize, 0.0f, 0.0f);
+        else
+            effectOwner->process (left.data(), right.data(), PluginHost::maxBlockSize, {}, bpm);
+    }
     std::optional<std::string> capture() const { return instrument != nullptr ? instrument->captureState() : effect->captureState(); }
 };
 Hosted running (AudioEngine& engine, const Target& t)
@@ -351,11 +363,43 @@ juce::var setParameters (AudioEngine& engine, const juce::var& args, const std::
             staged.set (change.index, change.value);
             if (staged.crashed()) invalid ("The plugin rejected staged parameter changes; no project changes made");
         }
+        staged.flushStagedParameters (song.bpm);
+        if (staged.crashed()) invalid ("The plugin could not process staged parameter changes; no project changes made");
+        checkCancelled (cancelled);
+        std::vector<float> desired;
+        desired.reserve (changes.size());
+        for (const auto& change : changes)
+        {
+            const auto* parameter = staged.instance().getParameters()[change.index];
+            const auto value = parameter->getValue();
+            if (! std::isfinite (value)) invalid ("The staged plugin returned an invalid parameter value");
+            const auto steps = parameter->getNumSteps();
+            const auto tolerance = steps > 1 && steps < 1000000 ? 0.5f / (float) (steps - 1) + 0.000001f : 0.000001f;
+            if (std::abs (value - change.value) > tolerance)
+                invalid ("The plugin did not apply the staged parameter value; no project changes made");
+            desired.push_back (value);
+        }
         const auto after = staged.capture();
         if (! after) invalid ("Cannot capture staged plugin state; no project changes made");
         ref.state = *after;
         juce::String error;
-        if (! engine.getPluginHost().preloadChecked (ref, engine.getTransport().sampleRate.load(), error))
+        const auto verified = [&] (juce::AudioPluginInstance& prepared, juce::String& why) {
+            const auto& parameters = prepared.getParameters();
+            if (parameters.size() != count)
+            {
+                why = "Restored plugin exposes different parameters";
+                return false;
+            }
+            for (std::size_t i = 0; i < changes.size(); ++i)
+                if (! std::isfinite (parameters[changes[i].index]->getValue())
+                    || std::abs (parameters[changes[i].index]->getValue() - desired[i]) > 0.000001f)
+                {
+                    why = "Plugin state did not retain staged parameter changes";
+                    return false;
+                }
+            return true;
+        };
+        if (! engine.getPluginHost().preloadChecked (ref, engine.getTransport().sampleRate.load(), error, verified))
             invalid ("Cannot prepare changed plugin state: " + error.substring (0, 512));
         const auto rate = engine.getTransport().sampleRate.load();
         const juce::ScopeGuard discardPrepared { [&] { engine.getPluginHost().discardPreloaded (ref, rate); } };

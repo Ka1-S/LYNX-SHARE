@@ -1917,7 +1917,8 @@ void PluginHost::preload (const PluginRef& ref, int wanted)
     preloaded[preloadKey (ref, preloadRate)].push_back (std::move (p));
 }
 
-bool PluginHost::preloadChecked (const PluginRef& ref, double sampleRate, juce::String& error)
+bool PluginHost::preloadChecked (const PluginRef& ref, double sampleRate, juce::String& error,
+                                const std::function<bool (juce::AudioPluginInstance&, juce::String&)>& validate)
 {
     if (ref.id.empty() || ! std::isfinite (sampleRate) || sampleRate <= 0)
     {
@@ -1927,6 +1928,8 @@ bool PluginHost::preloadChecked (const PluginRef& ref, double sampleRate, juce::
     Preloaded ready;
     ready.instance = createInstance (ref, sampleRate, &error);
     if (ready.instance == nullptr)
+        return false;
+    if (validate && ! validate (*ready.instance, error))
         return false;
     const std::scoped_lock lock (preloadLock);
     preloaded[preloadKey (ref, sampleRate)].push_back (std::move (ready));
