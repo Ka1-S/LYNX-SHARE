@@ -1022,7 +1022,7 @@ public:
                     skin::hwKey (g, key, on && fx.enabled, hot);
                     g.setColour (on ? juce::Colours::white : juce::Colours::white.withAlpha (0.7f));
                     g.setFont (font (juce::jmax (7.0f, k * 0.4f), true));
-                    g.drawText (on ? "ON" : "OFF", key.toNearestInt(), juce::Justification::centred, false);
+                    g.drawFittedText (on ? tr ("ON") : tr ("OFF"), key.toNearestInt(), juce::Justification::centred, 1, 0.6f);
                     g.setColour (skin::captionColour().getAlpha() > 0 ? skin::captionColour() : colour::textPrimary);
                     if (item.label != nullptr)
                         ui::drawFittingText (g, caps (tr (item.label)), r.withTrimmedLeft (k * 1.3f + 6.0f * s), juce::Justification::centredLeft,
