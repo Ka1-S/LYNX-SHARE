@@ -2236,7 +2236,8 @@ static bool hasLiveMeters (EffectKind kind) noexcept
            || kind == EffectKind::echoform // round 135w: Echoform's output meter
            || kind == EffectKind::autoPan || kind == EffectKind::voiceShift // round 135: the pan position, the shifter's notes
            || kind == EffectKind::hardwareInsert // round 164d: send / return levels, the ping
-           || kind == EffectKind::xyController || kind == EffectKind::xyzController; // round 164: the pad's target and outputs
+           || kind == EffectKind::xyController || kind == EffectKind::xyzController // round 164: the pad's target and outputs
+           || kind == EffectKind::peakController; // issue #66: its display's Peak + LFO, Peak and LFO lines
 }
 
 void RackRenderer::setSidechain (const RackState& state, const EffectSlot& slot, Effect& effect, int track) noexcept
@@ -2320,6 +2321,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             && slots[i].kind != EffectKind::formulaController
             && slots[i].kind != EffectKind::xyController && slots[i].kind != EffectKind::xyzController
             && slots[i].kind != EffectKind::controlSurface
+            && slots[i].kind != EffectKind::peakController // (issue #66: its LFO runs and its peak falls in silence, as FL's)
             // round 164c: a visual plugin keeps recording silence (its display falls, the video export stays in time)
             && slots[i].kind != EffectKind::waveCandy && slots[i].kind != EffectKind::visualizer
             && slots[i].kind != EffectKind::tuner // (round 165g: the tuner's display follows the signal into silence)
@@ -2563,6 +2565,7 @@ void RackRenderer::process (const RackState* state,
             if (c < polyLayers.size() && c < polyScratch.size()) // (round 168l's mono / porta layers move too)
                 polyLayers[c] = from >= 0 && (std::size_t) from < polyScratch.size() ? polyScratch[(std::size_t) from] : channelpoly::Layer {};
         }
+        scheduledNotes->moveChannels (state->channelFrom); // (round 169d)
     }
     lastState = state; // so prepare() knows which instruments to reconfigure
     lastSerial = state->serial;
@@ -2582,6 +2585,10 @@ void RackRenderer::process (const RackState* state,
             if (echo != nullptr)
                 echo->reset();
     }
+
+    // a start, a stop or a jump: every note was released (or none sounds yet)
+    if (playing != wasPlaying || jumped)
+        scheduledNotes->clear();
 
     if ((wasPlaying && ! playing) || jumped)
     {
@@ -3191,6 +3198,10 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
                              ticksPerSample (bpm, sampleRate), events, song.swing, &song.channels, chaseNotes,
                              liveInput != nullptr ? liveInput->patternOrigin.load (std::memory_order_relaxed) : -1.0);
     }
+
+    // each started note ends where it was going to, whatever was edited meanwhile (FL, round 169d)
+    if (playing)
+        scheduledNotes->process (events, numSamples, ticksPerSample (bpm, sampleRate));
 
     // FL's wrapper "Output port" (round 149): the notes a plugin sent out in the previous chunk play the plugins on
     // that port, at this chunk's start
