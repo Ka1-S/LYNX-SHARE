@@ -43,8 +43,8 @@ DigitDisplayColours<C> digitDisplayColours (C bg0, C border, C accent, C accentH
 // The Channel Rack's every-other beat group of steps (Palette::stepOffAlt): the off step lifted towards the text colour
 // (a clearly different grey) with a little of the accent (a dull reddish grey, as FL's alternate groups), never
 // saturated enough to pass for a lit step (round 170a2: at 28 % accent the empty steps read as active ones).
-constexpr double stepGroupLift = 0.08;
-constexpr double stepGroupTint = 0.12;
+constexpr double stepGroupLift = 0.10;
+constexpr double stepGroupTint = 0.09;
 
 // A lit Channel Rack step in its channel's colour (LYNX, round 170a2; FL keeps its steps white / pink): the colour
 // lifted (towards white on a dark theme, black on a light one) until it stands clear of both empty-step greys

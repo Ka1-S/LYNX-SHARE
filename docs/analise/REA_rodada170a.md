@@ -111,8 +111,8 @@ scan code (in.ps1 ctrlkey2); without it no Ctrl shortcut reaches LYNX (Ctrl+Z ne
 ## Round 170a2 — beat-group tint and lit-step colours (coordinator + user, 2026-11-05)
 
 - Problem (LYNX shot N7): at 28 % accent the empty steps of groups 2 / 4 were a mid red, the hue of a lit step — they
-  read as active steps. Now `stepOffAlt = mix (mix (stepOff, textPrimary, stepGroupLift = 0.08), accent,
-  stepGroupTint = 0.12)`: a dull reddish grey (0x4f3c42 on the default theme; a pinkish grey on a light theme), as
+  read as active steps. Now `stepOffAlt = mix (mix (stepOff, textPrimary, stepGroupLift = 0.10), accent,
+  stepGroupTint = 0.09)`: a dull reddish grey (0x4c3f46 on the default theme; a pinkish grey on a light theme), as
   FL's alternate groups (r170a f2: a dull reddish grey, much darker than a lit step). Tests: low saturation (channel
   spread <= 30), far from the lit step, still >= 45 apart from the plain group.
 - Lit steps in the channel's colour (user request). [SHOT r170a2 FL 2026, one session, channels given random colours,
