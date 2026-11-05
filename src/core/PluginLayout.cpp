@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -1504,14 +1505,14 @@ Layout booBass()
 
 Layout sytrusMain()
 {
-    // Sytrus' MAIN page: master faders, volume and filter envelopes, unison, the modulation X/Y pad, quality and porta.
-    // The operator, filter and effect pages and the FM / RM matrix keep the saved patch (not editable in LYNX).
+    // Sytrus' MAIN page: master faders, volume and filter envelopes, unison, the modulation X/Y pad, quality and porta,
+    // and the FM / RM matrix (round 172a). The operator, filter and effect pages are not editable in LYNX (left out).
     Layout l;
     l.fl = "Sytrus";
     l.width = 850;
     l.height = 346;
     auto& v = l.items;
-    v.push_back (label (8, 4, 80, 22, TR_NOOP ("Main"), boxed));
+    v.push_back (section (6, 14, 538, 122, TR_NOOP ("Main")));
     const auto fader = [&v] (float cx, const char* param, const char* caption, bool bipolarFader) {
         v.push_back (slider (Item::vslider, cx - 9, 54, 18, 70, param, nullptr, noCaption | (bipolarFader ? bipolar : 0)));
         v.push_back (label (cx - 16, 38, 32, 13, caption));
@@ -1541,71 +1542,60 @@ Layout sytrusMain()
     fader (504, "Uni phase", TR_NOOP ("Ph"), false);
     fader (527, "Uni env var", TR_NOOP ("En"), false);
     v.push_back (label (470, 122, 66, 10, TR_NOOP ("Unison"), dim));
-    v.push_back (section (12, 138, 168, 160, TR_NOOP ("Modulation")));
-    v.push_back (display (18, 160, 128, 130, "xy", "Mod X", "Mod Y"));
-    v.push_back (knob (164, 185, 24, "Mod X", "X", 205));
-    v.push_back (knob (164, 232, 24, "Mod Y", "Y", 252));
-    v.push_back (section (362, 138, 178, 86, TR_NOOP ("Quality")));
-    v.push_back (label (462, 156, 34, 12, TR_NOOP ("Draft")));
-    v.push_back (label (500, 156, 34, 12, TR_NOOP ("Render")));
-    v.push_back (label (368, 174, 92, 16, TR_NOOP ("HQ envelopes"), alignLeft));
-    v.push_back (toggle (470, 175, 16, 14, "Live env accuracy", nullptr));
-    v.push_back (toggle (508, 175, 16, 14, "Export env accuracy", nullptr));
-    v.push_back (label (368, 198, 92, 16, TR_NOOP ("Oversampling"), alignLeft));
-    v.push_back (stepper (462, 196, 32, 22, "Live oversampling", nullptr, 4));
-    v.push_back (stepper (500, 196, 32, 22, "Export oversampling", nullptr, 4));
-    v.push_back (toggle (450, 270, 70, 16, "Porta", TR_NOOP ("Porta")));
-    v.push_back (section (553, 34, 294, 260, nullptr, boxed));
-    v.push_back (label (560, 150, 280, 16, TR_NOOP ("Operators, filters, effects and the matrix"), dim));
-    v.push_back (label (560, 168, 280, 16, TR_NOOP ("keep the saved patch"), dim));
-    v.push_back (label (560, 300, 286, 40, "Sytrus", dim));
-    return l;
-}
-
-Layout harmorMain()
-{
-    // Harmor's part page and global section, with the controls LYNX edits at FL's places (timbre mix, blur, tremolo,
-    // harmonizer, unison order and detune, vibrato, filter cutoff and resonance, pluck, phaser, part volume, A/B
-    // crossfade and the global volume); the rest of the panel keeps the saved patch
-    Layout l;
-    l.fl = "Harmor";
-    l.width = 1000;
-    l.height = 600;
-    auto& v = l.items;
-    v.push_back (section (12, 0, 976, 330, nullptr, boxed));
-    const auto title = [&v] (float x, float y, const char* text) { v.push_back (label (x, y, 110, 18, text, alignLeft)); };
-    title (100, 70, TR_NOOP ("Timbre"));
-    title (18, 104, TR_NOOP ("Blur"));
-    title (228, 104, TR_NOOP ("Trem"));
-    title (60, 180, TR_NOOP ("Prism"));
-    title (210, 180, TR_NOOP ("Harmonizer"));
-    title (380, 160, TR_NOOP ("Unison"));
-    title (40, 278, TR_NOOP ("Pitch"));
-    title (270, 270, TR_NOOP ("Vibrato"));
-    title (400, 270, TR_NOOP ("Legato"));
-    title (555, 238, TR_NOOP ("Pluck"));
-    title (655, 238, TR_NOOP ("Phaser"));
-    title (900, 238, TR_NOOP ("EQ"));
-    title (555, 20, TR_NOOP ("Filter 1"));
-    v.push_back (knob (177, 40, 30, "Timbre mix", TR_NOOP ("Mix"), 63));
-    v.push_back (knob (61, 135, 30, "Harm. blur", TR_NOOP ("Mix"), 160));
-    v.push_back (knob (277, 135, 30, "Tremolo", TR_NOOP ("Depth"), 160));
-    v.push_back (knob (181, 219, 34, "Harmonizer", TR_NOOP ("Amt"), 247));
-    v.push_back (stepper (414, 196, 30, 22, "Unison", TR_NOOP ("Order"), 8));
-    v.push_back (slider (Item::vslider, 476, 182, 18, 80, "Uni detune", TR_NOOP ("Pitch")));
-    v.push_back (knob (335, 291, 28, "Vibrato", TR_NOOP ("Depth"), 312));
-    v.push_back (slider (Item::vslider, 455, 40, 18, 100, "A volume", TR_NOOP ("Vol"), bipolar));
-    v.push_back (knob (725, 71, 44, "Cutoff", TR_NOOP ("Freq"), 106));
-    v.push_back (knob (828, 71, 34, "Resonance", TR_NOOP ("Res"), 106));
-    v.push_back (knob (587, 283, 40, "Pluck", TR_NOOP ("Time"), 313));
-    v.push_back (knob (686, 283, 34, "Phaser mix", TR_NOOP ("Mix"), 313));
-    v.push_back (section (12, 334, 380, 266, nullptr, boxed));
-    title (22, 342, TR_NOOP ("Global"));
-    v.push_back (slider (Item::vslider, 172, 410, 20, 110, "Master vol", TR_NOOP ("Vol")));
-    v.push_back (slider (Item::hslider, 280, 368, 90, 26, "A/B mix", TR_NOOP ("Part A / B")));
-    v.push_back (section (396, 334, 592, 266, nullptr, boxed));
-    v.push_back (label (420, 450, 540, 16, TR_NOOP ("The other Harmor controls keep the saved patch"), dim));
-    v.push_back (label (820, 556, 160, 40, "Harmor", dim));
+    v.push_back (section (12, 138, 220, 160, TR_NOOP ("Modulation")));
+    v.push_back (display (18, 160, 150, 130, "xy", "Mod X", "Mod Y"));
+    v.push_back (knob (200, 185, 26, "Mod X", "X", 206));
+    v.push_back (knob (200, 240, 26, "Mod Y", "Y", 261));
+    v.push_back (section (236, 138, 304, 160, TR_NOOP ("Quality")));
+    v.push_back (label (412, 158, 44, 12, TR_NOOP ("Draft")));
+    v.push_back (label (462, 158, 54, 12, TR_NOOP ("Render")));
+    v.push_back (label (246, 176, 150, 16, TR_NOOP ("HQ envelopes"), alignLeft));
+    v.push_back (toggle (426, 177, 16, 14, "Live env accuracy", nullptr));
+    v.push_back (toggle (481, 177, 16, 14, "Export env accuracy", nullptr));
+    v.push_back (label (246, 204, 150, 16, TR_NOOP ("Oversampling"), alignLeft));
+    v.push_back (stepper (418, 202, 32, 22, "Live oversampling", nullptr, 4));
+    v.push_back (stepper (473, 202, 32, 22, "Export oversampling", nullptr, 4));
+    v.push_back (toggle (246, 246, 110, 16, "Porta", TR_NOOP ("Porta")));
+    // round 172a: the FM / RM modulation matrix at FL's place (REA_rodada11 §1.5): rows = destinations (operators 1–6,
+    // filters 1–3), columns = sources (operators 1–6), then PAN, FX and OUT; the FM / RM tabs switch the operator
+    // columns' layer (PAN, FX and OUT are the FM layer's, shown on both)
+    l.pages = { "FM", "RM" };
+    v.push_back (section (553, 34, 294, 266, TR_NOOP ("Matrix")));
+    static const char* const rows[9] = { "1", "2", "3", "4", "5", "6", "F1", "F2", "F3" };
+    static const char* const columns[9] = { "1", "2", "3", "4", "5", "6", TR_NOOP ("Pan"), TR_NOOP ("FX"), TR_NOOP ("Out") };
+    static const std::vector<std::string> cells = [] {
+        std::vector<std::string> n; // the names of core/SytrusEngine.cpp's matrix settings
+        for (int layer = 0; layer < 2; ++layer)
+            for (int row = 0; row < 9; ++row)
+                for (int column = 0; column < 9; ++column)
+                {
+                    const auto unit = row < 6 ? "op " + std::to_string (row + 1) : "filter " + std::to_string (row - 5);
+                    auto upper = unit;
+                    upper[0] = (char) std::toupper ((unsigned char) upper[0]);
+                    static const char* const outs[3] = { " pan", " FX", " out" };
+                    n.push_back (column < 6 ? std::string (layer == 0 ? "FM" : "RM") + " op " + std::to_string (column + 1) + " to " + unit
+                                            : upper + outs[column - 6]);
+                }
+        return n;
+    }();
+    for (int c = 0; c < 9; ++c)
+        v.push_back (label (576 + 29.0f * (float) c, 52, 28, 12, columns[c]));
+    for (int r = 0; r < 9; ++r)
+    {
+        const auto cy = 78.0f + 25.0f * (float) r;
+        v.push_back (label (557, cy - 6, 20, 12, rows[r]));
+        for (int layer = 0; layer < 2; ++layer)
+            for (int c = 0; c < 9; ++c)
+            {
+                if (layer == 1 && c >= 6)
+                    continue;
+                auto k = knob (590 + 29.0f * (float) c, cy, 22, cells[(std::size_t) (81 * layer + 9 * r + c)].c_str(), nullptr, 0, noCaption | bipolar);
+                k.page = c >= 6 ? -1 : layer;
+                v.push_back (k);
+            }
+    }
+    v.push_back (pageTabs (553, 306, 90, 22, "FM|RM"));
+    v.push_back (label (650, 300, 196, 42, "Sytrus", dim));
     return l;
 }
 
@@ -4034,7 +4024,7 @@ Layout poizoneMain()
 
 const Layout* instrumentLayout (InstrumentKind kind)
 {
-    static const Layout osc = threeOsc(), keys = flKeys(), boo = booBass(), sytrus = sytrusMain(), harmor = harmorMain(), toxic = toxicMain(), poizone = poizoneMain();
+    static const Layout osc = threeOsc(), keys = flKeys(), boo = booBass(), sytrus = sytrusMain(), toxic = toxicMain(), poizone = poizoneMain();
     switch (kind)
     {
         case InstrumentKind::toxic: return &toxic;
@@ -4043,7 +4033,6 @@ const Layout* instrumentLayout (InstrumentKind kind)
         case InstrumentKind::flkeys: return &keys;
         case InstrumentKind::boobass: return &boo;
         case InstrumentKind::sytrus: return &sytrus;
-        case InstrumentKind::harmor: return &harmor;
         default: break;
     }
     // round 168q (core/EngineLayouts.cpp)

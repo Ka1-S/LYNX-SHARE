@@ -22,6 +22,7 @@
 #include "core/ChannelMiscFx.h"
 #include "core/FlpImport.h"
 #include "core/Harmor.h"
+#include "core/HarmorControls.h"
 #include "core/Gms.h"
 #include "core/MiniSynth.h"
 #include "core/SimSynth.h"
@@ -479,6 +480,7 @@ private:
 
 // Physical-model channels (Sakura, Drumpad; REA_rodada28): knobs for the main raw FL parameters (0..1)
 class ModelPanel final : public juce::Component,
+                         public juce::TooltipClient,
                          public juce::DragAndDropTarget,
                          public juce::FileDragAndDropTarget,
                          private juce::Timer
@@ -578,15 +580,8 @@ public:
             { 54, "Cutoff", 0, 8192 }, { 59, "Resonance", 0, 1000 }, { 52, "Filter env", -1000, 1000 },
             { 31, "Pluck", 0, 1000 }, { 23, "Mask mix", 0, 1000 }, { 65, "Unison", 1, 9 }, { 67, "Uni detune", 0, 256 },
             { 25, "Tremolo", 0, 1000 }, { 71, "Phaser mix", 0, 1000 }, { 79, "Harmonizer", 0, 1000 } };
-        // Harmor: raw FL integers inside the saved state (part A, and the global master / A–B mix; REA_rodada34)
-        struct HarmorKnob { int part, index; const char* name; double low, high; };
-        static const HarmorKnob harmorKnobs[] = {
-            { -1, 12, "Master vol", 0, 2000 }, { -1, 10, "A/B mix", 0, 1000 }, { 0, 11, "A volume", -1000, 1000 },
-            { 0, 4, "Timbre mix", 0, 1000 }, { 0, 52, "Cutoff", 0, 8192 }, { 0, 57, "Resonance", 0, 1000 },
-            { 0, 75, "Pluck", 0, 1000 }, { 0, 34, "Unison", 1, 9 }, { 0, 38, "Uni detune", 0, 256 },
-            { 0, 27, "Harmonizer", 0, 1000 }, { 0, 76, "Phaser mix", 0, 1000 }, { 0, 23, "Harm. blur", 0, 10000 },
-            { 0, 45, "Vibrato", 0, 1000 }, { 0, 17, "Tremolo", 0, 1000 } };
-        auto addHarmor = [&] (const HarmorKnob& k) {
+        // Harmor: raw FL integers inside the saved state, both parts and the global strip (core/HarmorControls.h, round 172a)
+        auto addHarmor = [&] (const harmorui::Control& k) {
             const auto at = harmorParamOffset (def.pluginState, k.part, k.index);
             if (at < 0)
                 return;
@@ -595,12 +590,13 @@ public:
             auto knob = std::make_unique<juce::Slider> (juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::TextBoxBelow);
             knob->setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 16);
             knob->setRange (k.low, k.high, 1.0);
-            knob->setValue (value, juce::dontSendNotification);
-            knob->setName (k.name);
-            knob->onValueChange = [this, k, s = knob.get()] {
-                ref.edit (engine, [k, v = (std::int32_t) s->getValue()] (ChannelDef& channelDef) {
+            knob->setValue (k.invert ? k.low + k.high - value : value, juce::dontSendNotification);
+            knob->setName (juce::String::fromUTF8 (k.name.c_str()));
+            knob->onValueChange = [this, part = k.part, index = k.index, flip = k.invert ? k.low + k.high : 0, s = knob.get()] {
+                const auto shown = (std::int32_t) s->getValue();
+                ref.edit (engine, [part, index, v = flip != 0 ? flip - shown : shown] (ChannelDef& channelDef) {
                     auto& st = channelDef.pluginState;
-                    if (const auto o = harmorParamOffset (st, k.part, k.index); o >= 0)
+                    if (const auto o = harmorParamOffset (st, part, index); o >= 0)
                         std::memcpy (st.data() + o, &v, 4);
                 });
             };
@@ -1088,7 +1084,7 @@ public:
                     addOgun (k);
         }
         else if (harmor)
-            for (const auto& k : harmorKnobs)
+            for (const auto& k : harmorui::controls())
                 addHarmor (k);
         else if (harmless)
             for (const auto& k : harmlessKnobs)
@@ -1914,7 +1910,7 @@ public:
         for (auto& k : knobs)
         {
             const auto* item = itemFor (k->getName());
-            if (item == nullptr || ! k->isVisible())
+            if (item == nullptr) // (hidden knobs too: another page's knobs keep their place for when the page shows)
                 continue;
             auto r = layoutRect (*item);
             if ((item->type == plugui::Item::vslider || item->type == plugui::Item::hslider) && (item->style & plugui::noCaption) == 0 && item->label != nullptr)
@@ -2100,40 +2096,7 @@ public:
         g.setColour (theme::colour::textPrimary);
         g.setFont (theme::font (layout != nullptr ? theme::type::body : theme::type::title));
         if (! engineFilesMissing)
-            g.drawFittedText (drumsynth ? tr ("DrumSynth Live — FL's engine, patch on key {0}", { juce::String (editorKey) })
-                                        + (wavesFound ? tr (" (next hit; recorded waves from your FL installation)")
-                                                      : tr (" (next hit; recorded waves not found: silent)"))
-                        : harmless ? tr ("Harmless — FL's additive engine (chorus/delay/reverb/compressor rack off)")
-                        : harmor ? tr ("Harmor — FL's additive engine (effects rack off; image synthesis not decoded)")
-                        : gms ? tr ("GMS — FL's engine (waves read from your FL installation)")
-                        : morphine ? tr ("Morphine — FL's additive engine (new settings restart the voices)")
-                        : transistorBass ? tr ("Transistor Bass — FL's engine with its sequencer and effects (oscillator cycles read from your FL installation)")
-                        : autogun ? tr ("Autogun — FL's engine with its effects and Magic Dust (SG.dat read from your FL installation)")
-                        : ogun ? tr ("Ogun — FL's engine with its effects (Seed 2 Random is a fixed draw per channel)")
-                        : poizone ? tr ("PoiZone — FL's engine with its gate, chorus, delay and arpeggiator (new settings restart the voices)")
-                        : miniSynth ? tr ("MiniSynth — FL's engine with its effects (wave tables read from your FL installation)")
-                        : dx10 ? tr ("Fruity DX10 — FL's FM engine")
-                        : kepler ? tr ("Kepler — FL's engine (LFO shape and noise read from your FL installation)")
-                        : keplerExo ? tr ("Kepler Exo — FL's engine with its effects (tables read from your FL installation)")
-                        : fruitkick ? tr ("Fruit Kick — FL's engine (channel envelopes stepped per tick)")
-                        : bassdrum ? tr ("BassDrum — FL's engine (table and noise samples read from your FL installation)")
-                        : toxic ? tr ("Toxic Biohazard — FL's engine with its effects (waves read from your FL installation)")
-                        : threeOsc ? tr ("3x Osc — FL's engine (custom wave from the channel's sample)")
-                        : simSynth ? tr ("SimSynth — FL's engine (new settings restart the voices)")
-                        : wasp ? tr ("Wasp — FL Studio 2026 has no 64-bit Wasp: the channel keeps its settings and stays silent, as in FL")
-                        : flKeys ? tr ("FL Keys — FL's engine (wavetable read from your FL installation)")
-                        : plucked ? tr ("Plucked! — FL's plucked-string engine")
-                        : beepMap ? tr ("BeepMap — FL's engine (plays the bitmap saved with the channel)")
-                        : sawer ? tr ("Sawer — FL's engine with its effects (oscillator cycle read from your FL installation)")
-                        : granulizer ? tr ("Fruity Granulizer — FL's engine on the channel's sample")
-                        : drumaxx ? tr ("Drumaxx — FL's physical drum engine (pads on their keys; patterns not played)")
-                        : slayer ? tr ("FL Slayer — FL's engine with its effects, amp and cabinet (picks read from your FL installation; new settings restart the voices)")
-                        : sytrus ? tr ("Sytrus — FL's engine, main settings (operators, filters and effects keep the saved patch)")
-                        : fruityDance ? tr ("Fruity Dance — a visual plugin: it makes no sound, the channel keeps its settings")
-                        : boobass ? tr ("BooBass — FL's engine, its sound read from your FL installation (knobs: 3-band EQ)")
-                        : sakura ? tr ("Sakura — physical strings (FL's engine; new parameters apply to the next note)")
-                                 : tr ("Drumpad — physical drum (FL's engine; new parameters apply to the next hit)"),
-                              descriptionArea(), juce::Justification::centredLeft, layout != nullptr ? 1 : 2, 0.8f);
+            g.drawFittedText (shownDescription(), descriptionArea(), juce::Justification::centredLeft, layout != nullptr ? 1 : 2, 0.8f);
         if (engineFilesMissing) // round 168q: an engine that runs FL's own DLL / data file, which this computer lacks
         {
             const auto band = juce::Rectangle<float> (8.0f, 5.0f, (float) getWidth() - 16.0f, 22.0f);
@@ -2152,6 +2115,65 @@ public:
         g.setFont (theme::font (theme::type::small));
         for (const auto& k : knobs)
             g.drawText (k->getName(), k->getBounds().withHeight (14).translated (0, -14), juce::Justification::centred);
+    }
+
+    // the engine's description (what it is and where its data comes from)
+    juce::String description() const
+    {
+        return drumsynth ? tr ("DrumSynth Live — FL's engine, patch on key {0}", { juce::String (editorKey) })
+                               + (wavesFound ? tr (" (next hit; recorded waves from your FL installation)")
+                                             : tr (" (next hit; recorded waves not found: silent)"))
+               : harmless ? tr ("Harmless — FL's additive engine with its effects rack")
+               : harmor ? tr ("Harmor — FL's additive engine with its effects rack")
+               : gms ? tr ("GMS — FL's engine (waves read from your FL installation)")
+               : morphine ? tr ("Morphine — FL's additive engine (new settings restart the voices)")
+               : transistorBass ? tr ("Transistor Bass — FL's engine with its sequencer and effects (oscillator cycles read from your FL installation)")
+               : autogun ? tr ("Autogun — FL's engine with its effects and Magic Dust (SG.dat read from your FL installation)")
+               : ogun ? tr ("Ogun — FL's engine with its effects (Seed 2 Random is a fixed draw per channel)")
+               : poizone ? tr ("PoiZone — FL's engine with its gate, chorus, delay and arpeggiator (new settings restart the voices)")
+               : miniSynth ? tr ("MiniSynth — FL's engine with its effects (wave tables read from your FL installation)")
+               : dx10 ? tr ("Fruity DX10 — FL's FM engine")
+               : kepler ? tr ("Kepler — FL's engine (LFO shape and noise read from your FL installation)")
+               : keplerExo ? tr ("Kepler Exo — FL's engine with its effects (tables read from your FL installation)")
+               : fruitkick ? tr ("Fruit Kick — FL's engine (channel envelopes stepped per tick)")
+               : bassdrum ? tr ("BassDrum — FL's engine (table and noise samples read from your FL installation)")
+               : toxic ? tr ("Toxic Biohazard — FL's engine with its effects (waves read from your FL installation)")
+               : threeOsc ? tr ("3x Osc — FL's engine (custom wave from the channel's sample)")
+               : simSynth ? tr ("SimSynth — FL's engine (new settings restart the voices)")
+               : wasp ? tr ("Wasp — FL Studio 2026 has no 64-bit Wasp: the channel keeps its settings and stays silent, as in FL")
+               : flKeys ? tr ("FL Keys — FL's engine (wavetable read from your FL installation)")
+               : plucked ? tr ("Plucked! — FL's plucked-string engine")
+               : beepMap ? tr ("BeepMap — FL's engine (plays the bitmap saved with the channel)")
+               : sawer ? tr ("Sawer — FL's engine with its effects (oscillator cycle read from your FL installation)")
+               : granulizer ? tr ("Fruity Granulizer — FL's engine on the channel's sample")
+               : drumaxx ? tr ("Drumaxx — FL's physical drum engine (pads on their keys; patterns not played)")
+               : slayer ? tr ("FL Slayer — FL's engine with its effects, amp and cabinet (picks read from your FL installation; new settings restart the voices)")
+               : sytrus ? tr ("Sytrus — FL's engine, main settings (operators, filters and effects keep the saved patch)")
+               : fruityDance ? tr ("Fruity Dance — a visual plugin: it makes no sound, the channel keeps its settings")
+               : boobass ? tr ("BooBass — FL's engine, its sound read from your FL installation (knobs: 3-band EQ)")
+               : sakura ? tr ("Sakura — physical strings (FL's engine; new parameters apply to the next note)")
+                        : tr ("Drumpad — physical drum (FL's engine; new parameters apply to the next hit)");
+    }
+
+    // round 172a: a designed page shows only the plugin and what it is; the notes in brackets (data files, what restarts
+    // the voices...) are the header's tooltip instead of text on the page
+    juce::String shownDescription() const
+    {
+        const auto full = description();
+        if (layout == nullptr)
+            return full;
+        auto at = full.indexOfChar ('(');
+        if (const auto wide = full.indexOfChar ((juce::juce_wchar) 0xff08); wide > 0 && (at < 0 || wide < at)) // a full-width bracket
+            at = wide;
+        return at > 0 ? full.substring (0, at).trimEnd() : full;
+    }
+
+    juce::String getTooltip() override
+    {
+        const auto full = description();
+        if (! engineFilesMissing && descriptionArea().contains (getMouseXYRelative()) && shownDescription() != full)
+            return full;
+        return {};
     }
 
     // the engine's one-line description at the top (round 169h: wrapped to a second line above the knob grid, or shrunk a
