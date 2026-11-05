@@ -7166,3 +7166,11 @@ countries: nl be
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "Loop-opname: aan (de opname herhaalt: het loopgebied in Song-modus, één take per ronde; het pattern in Pattern-modus)"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "Loop-opname: uit (de opname loopt rechtdoor: door het loopgebied, of voorbij het einde van het pattern, dat langer wordt)"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "Loop-opname: aan, de opname herhaalt (Song-modus: het loopgebied, één take per ronde; Pattern-modus: het pattern); uit, ze loopt rechtdoor, door het loopgebied of voorbij het einde van het pattern, en houdt alles waar het gespeeld werd (het pattern wordt langer)"
+# round tp172b: LuxeVerb's Space engine
+"LuxeVerb|Space" = "LuxeVerb|Ruimte"
+"Modern|Vintage|Plate" = "Modern|Vintage|Plaat"
+"Distance" = "Afstand"
+"Decay rate" = "Uitsterfsnelheid"
+"Decay EQ" = "Uitsterf-EQ"
+"Low decay" = "Laag uitsterven"
+"High decay" = "Hoog uitsterven"

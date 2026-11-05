@@ -6,6 +6,7 @@
 #include "ui/VisualEditors.h"
 #include "ui/FlExtraEditors.h"
 #include "ui/PluginEditors.h"
+#include "core/LuxeVerb.h"
 #include "core/PresetCycle.h"
 #include "core/ShownEffectSlot.h"
 
@@ -130,6 +131,9 @@ public:
         page = initialPage;
         if (kind == EffectKind::equo && initialPage == 0)
             page = 3; // bank 1, volume (FL opens EQUO on its first bank)
+        if (kind == EffectKind::luxeVerb && initialPage == 0) // round tp172b: open on the engine in use
+            if (const auto* fx = current())
+                page = fx->params[(std::size_t) luxeVerbSpaceFirst] >= 0.5f ? 1 : 0;
         if (kind == EffectKind::maximus && stateBacked() && initialPage == 0)
             if (const auto* fx = current())
                 page = maximusfx::selectedBand (fx->state); // FL reopens Maximus on the band selected when it was saved
@@ -3759,6 +3763,8 @@ public:
                 page += (o - (page / item.steps) % n) * item.steps;
             else
                 page = o;
+            if (const auto p = paramOf (item); p >= 0) // round tp172b: page tabs that also choose a value (LuxeVerb's engine)
+                setValue (p, n > 1 ? (float) o / (float) (n - 1) : 0.0f);
             hoverItem = -1;
             repaint();
             return;

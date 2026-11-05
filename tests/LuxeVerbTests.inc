@@ -97,5 +97,5 @@ TEST (luxeverb_engine)
     CHECK (lynx::luxeverb::fromParams (p) == s);
     CHECK (lynx::luxeVerbParamText (0, 0.0f) == "-60.0 dB" && lynx::luxeVerbParamText (13, 0.5f) == "freeze");
     CHECK (lynx::luxeVerbParamText (49, 1.0f) == "on" && lynx::luxeVerbParamText (16, 1.0f) == "+12.0 st");
-    CHECK (lynx::effectInfo (lynx::EffectKind::luxeVerb).params.size() == (std::size_t) lynx::luxeVerbParamCount);
+    CHECK (lynx::effectInfo (lynx::EffectKind::luxeVerb).params.size() == (std::size_t) lynx::luxeVerbAllParamCount); // + the Space engine (round tp172b)
 }

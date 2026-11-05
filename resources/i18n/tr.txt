@@ -7166,3 +7166,11 @@ countries: tr
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "Döngü kaydı: açık (kayıt döner: Song modunda döngü bölgesi, her turda bir çekim; Pattern modunda pattern)"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "Döngü kaydı: kapalı (kayıt düz devam eder: döngü bölgesinin içinden ya da uzayan pattern'in sonunun ötesine)"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "Döngü kaydı: açık, kayıt döner (Song modu: döngü bölgesi, her turda bir çekim; Pattern modu: pattern); kapalı, düz devam eder, döngü bölgesinin içinden ya da pattern'in sonunun ötesine, ve her şeyi çalındığı yerde tutar (pattern uzar)"
+# round tp172b: LuxeVerb's Space engine
+"LuxeVerb|Space" = "LuxeVerb|Alan"
+"Modern|Vintage|Plate" = "Modern|Vintage|Plaka"
+"Distance" = "Mesafe"
+"Decay rate" = "Sönüm oranı"
+"Decay EQ" = "Sönüm EQ"
+"Low decay" = "Alçak sönüm"
+"High decay" = "Yüksek sönüm"

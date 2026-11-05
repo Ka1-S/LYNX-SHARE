@@ -7322,3 +7322,11 @@ countries: br
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "Gravação em loop: ligada (a gravação repete: a região de loop no modo Song, uma tomada por volta; o pattern no modo Pattern)"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "Gravação em loop: desligada (a gravação segue direto: pela região de loop, ou além do fim do pattern, que cresce)"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "Gravação em loop: ligada, a gravação repete (modo Song: a região de loop, uma tomada por volta; modo Pattern: o pattern); desligada, segue direto, pela região de loop ou além do fim do pattern, e mantém tudo onde foi tocado (o pattern cresce)"
+# round tp172b: LuxeVerb's Space engine
+"LuxeVerb|Space" = "LuxeVerb|Espaço"
+"Modern|Vintage|Plate" = "Moderno|Vintage|Placa"
+"Distance" = "Distância"
+"Decay rate" = "Taxa de decaimento"
+"Decay EQ" = "EQ do decaimento"
+"Low decay" = "Decaimento grave"
+"High decay" = "Decaimento agudo"

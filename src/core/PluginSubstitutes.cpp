@@ -185,6 +185,8 @@ vendor = FabFilter
 lynx = LuxeVerb
 names = FabFilter Pro-R; FabFilter Pro-R 2; Pro-R; Pro-R 2
 mix = 1
+# round tp172b: a Pro-R 2 state opens LuxeVerb's Space engine at its settings (core/SpaceVerb.h)
+translate = pro-r2
 
 [soundtoys-littleplate]
 product = Little Plate

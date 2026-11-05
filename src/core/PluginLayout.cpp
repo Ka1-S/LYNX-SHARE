@@ -623,6 +623,36 @@ Layout luxeVerb()
     tile (150, 399, "Envelope decay", TR_NOOP ("Decay"), 425);
     tile (207, 399, "Envelope smoothing", TR_NOOP ("Smooth"), 425);
     v.push_back (display (298, 262, 636, 184, "envelope", "Decay"));
+
+    // round tp172b: the Space engine (core/SpaceVerb.h, the Pro-R role) on a second page; the page tabs also switch
+    // the engine, so the page shown is the engine heard
+    for (auto& i : v)
+        i.page = 0;
+    l.pages = { "LuxeVerb", TR_NOOP ("Space") };
+    auto engineTabs = pageTabs (380, 0, 188, 13, TR_NOOP ("LuxeVerb|Space"));
+    engineTabs.param = "Space engine";
+    v.push_back (engineTabs);
+    const auto sp = [&v] (LayoutItem i) { v.push_back (onPage (std::move (i), 1)); };
+    const auto dial = [&] (float cx, float cy, const char* param, const char* caption, std::uint16_t style = 0) {
+        sp (knob (cx, cy, 40, param, caption, cy + 30, style | valueAbove));
+    };
+    sp (section (8, 18, 932, 230, TR_NOOP ("Reverb")));
+    sp (tabs (413, 40, 120, 16, "Space style", TR_NOOP ("Modern|Vintage|Plate")));
+    dial (70, 120, "Space pre-delay", TR_NOOP ("P. delay"));
+    dial (160, 120, "Space character", TR_NOOP ("Character"));
+    dial (250, 120, "Thickness", TR_NOOP ("Thickness"), bipolar);
+    dial (340, 120, "Distance", TR_NOOP ("Distance"));
+    v.push_back (onPage (value (433, 66, 80, 13, "Space", 0), 1));
+    sp (knob (473, 140, 84, "Space", TR_NOOP ("Space"), 196, big));
+    dial (473, 212, "Decay rate", TR_NOOP ("Decay rate"));
+    dial (606, 120, "Space brightness", TR_NOOP ("Brightness"), bipolar);
+    dial (696, 120, "Space width", TR_NOOP ("Width"));
+    dial (786, 120, "Space mix", TR_NOOP ("Mix"));
+    sp (section (8, 256, 932, 196, TR_NOOP ("Decay EQ")));
+    dial (120, 350, "Low decay", TR_NOOP ("Low decay"), bipolar);
+    dial (220, 350, "Low decay freq.", TR_NOOP ("Low freq"));
+    dial (727, 350, "High decay", TR_NOOP ("High decay"), bipolar);
+    dial (827, 350, "High decay freq.", TR_NOOP ("High freq"));
     return l;
 }
 

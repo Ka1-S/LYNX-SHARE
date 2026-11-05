@@ -7,6 +7,7 @@
 #include <string>
 
 #include "core/ApexLimiter.h"
+#include "core/LuxeVerb.h"
 #include "core/DynamicsSuite.h"
 #include "core/FacetEq.h"
 #include "core/MixSuite.h"
@@ -711,10 +712,65 @@ int fromProL2 (const State& s, EffectSlot& slot)
     return n;
 }
 
+// ---------------------------------------------------------------- Pro-R 2 -> LuxeVerb (Space engine)
+// layout (FFBS v1, 136 values, observed black-box by saving the state after each control change): 0 space (the
+// knob's normalized value; 0.1286 / 0.25 / 0.5 / 0.7 / 0.8444 read 0.5 / 1 / 2.5 / 4 / 6 s), 1 decay rate
+// (log4: −0.5 = 50 %, 0.5 = 200 %), 2 distance, 3 brightness (0.5 = 0 %), 4 style (0 Modern, 1 Vintage, 2 Plate),
+// 5 character, 6 thickness (−1 … 1), 7 stereo width, 9 mix %, 16 pre-delay (normalized, 0.3333 = 20 ms: cubic over
+// 500 ms), 19 + 7b decay-rate EQ band b (used, enabled, log2 Hz, gain (log2 of the decay multiplier), Q, shape
+// (1 low shelf, 2 high shelf, others: bells), …)
+int fromProR2 (const State& s, EffectSlot& slot)
+{
+    if (slot.kind != EffectKind::luxeVerb || s.named || s.count != 136 || ! finiteAll (s, 60))
+        return 0;
+    using namespace luxeverb::sp;
+    auto& p = slot.params;
+    const auto set = [&] (int i, double v) { p[(std::size_t) (luxeVerbSpaceFirst + i)] = (float) std::clamp (v, 0.0, 1.0); };
+    set (engine, 1.0);
+    set (space, s.at (0));
+    set (rate, (s.at (1) + 1.0) / 2.0);
+    set (distance, s.at (2));
+    set (brightness, s.at (3));
+    set (style, s.at (4) / 2.0);
+    set (character, s.at (5));
+    set (thickness, (s.at (6) + 1.0) / 2.0);
+    set (width, s.at (7));
+    set (mix, s.at (9) / 100.0);
+    set (predelay, s.at (16));
+    int n = 11;
+    for (int b = 0; b < 6; ++b)
+    {
+        const std::size_t o = 19 + 7 * (std::size_t) b;
+        if (s.at (o) < 0.5f || s.at (o + 1) < 0.5f)
+            continue;
+        const double hz = std::pow (2.0, (double) s.at (o + 2)), mult = std::pow (2.0, (double) s.at (o + 3));
+        const int shape = (int) std::lround (s.at (o + 5));
+        const bool low = shape == 1 || (shape != 2 && hz < 1000.0);
+        const double weight = shape == 1 || shape == 2 ? 1.0 : 0.5; // a bell only bends part of the band
+        const double m = std::pow (mult, weight);
+        // multiplier v = log4 (m) / 2 + 0.5; frequency on the knob's log scale
+        if (low)
+        {
+            set (lowMult, std::log (m) / std::log (4.0) / 2.0 + 0.5);
+            set (lowFreq, std::log (std::clamp (hz, 20.0, 2000.0) / 20.0) / std::log (100.0));
+        }
+        else
+        {
+            set (highMult, std::log (m) / std::log (4.0) / 2.0 + 0.5);
+            set (highFreq, std::log (std::clamp (hz, 500.0, 20000.0) / 500.0) / std::log (40.0));
+        }
+        n += 2;
+    }
+    slot.mix = 1.0f;
+    return n;
+}
+
 Translator translatorNamed (std::string_view name)
 {
     if (name == "pro-l2")
         return fromProL2;
+    if (name == "pro-r2")
+        return fromProR2;
     if (name == "pro-ds")
         return fromProDS;
     if (name == "pro-q4")

@@ -2718,6 +2718,8 @@ const EffectInfo& effectInfo (EffectKind kind)
         luxeverb::toParams (luxeverb::Settings {}, p);
         for (std::size_t i = 0; i < (std::size_t) luxeVerbParamCount; ++i)
             info.params.push_back ({ luxeverb::names[i], p[i] });
+        for (std::size_t i = 0; i < (std::size_t) luxeVerbSpaceCount; ++i) // round tp172b: the Space engine (off)
+            info.params.push_back ({ luxeverb::sp::names[i], luxeverb::sp::defaults[i] });
         return info;
     }();
     // FL's 4 automatable controls as (raw − min) / range (core/ConvolverFx.h); the impulse response is in the slot's state
