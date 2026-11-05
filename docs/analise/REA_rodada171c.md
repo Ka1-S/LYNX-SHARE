@@ -141,6 +141,13 @@ FL [SHOT f0–f5]: FL's Master fader follows the mouse during playback with the 
   effects whose window holds their own editor (Patcher, Wave Candy / Visualizer, Big Clock / Tuner / HTML NoteBook /
   Scratcher, Formula Controller, Newtone / Newtime, X-Y / X-Y-Z / Control Surface) drawn from that editor instead of
   the generic knob page (they were 87 px squares or empty boxes). New screens go to `/mnt/e/lynx-work/picker171c/final2/`.
+- 2026-11-05: after the user's review (one giant tall tile, tiny dark pictures, empty space) the coordinator set hard
+  requirements that replace "tile size follows the editor": **every tile is the same 16:10 cell**, the picture
+  aspect-fitted and centred inside (letterboxed), never stretched or oversized; the All tab gives each half the columns
+  it needs (`pickerview::split`: the largest cell, 56–300 px wide, at which both halves fit), so the grid fills the
+  window. FL difference, on purpose: FL's tiles follow each editor's size (s02.png); LYNX uses one cell size.
+  The generator Patcher's picture is now its node graph (it was the Sampler page). LYNX has no built-in light theme;
+  the "light" screens use a custom theme (background #E8EAEE) through Theme settings' own file.
 - Not done / LYNX differences left: LYNX's Browser has no per-category Plugin database folders, so a tab click opens
   Generators / Effects (FL opens the category folder); "Open plugin picker" targeted from Insert / Replace menus and
   mixer slots (FL's 0x70000000 / channel targets) not wired; hover Preview sound (FL: only when a .nfo has Preview=,
