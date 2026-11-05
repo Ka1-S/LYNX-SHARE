@@ -1,5 +1,6 @@
 #include "engine/ProjectFile.h"
 
+#include "core/PatternBlocks.h"
 #include "core/SessionIds.h"
 
 #include "core/MixerOps.h"
@@ -386,6 +387,17 @@ juce::var patcherToVar (const PatcherDoc& doc)
             }
             v->setProperty ("busHeads", heads);
         }
+        // the activated parameter ports (round 171b)
+        auto list = [] (const std::vector<int>& from) {
+            juce::Array<juce::var> a;
+            for (const auto p : from)
+                a.add (p);
+            return a;
+        };
+        if (! n.paramIns.empty())
+            v->setProperty ("paramIns", list (n.paramIns));
+        if (! n.paramOuts.empty())
+            v->setProperty ("paramOuts", list (n.paramOuts));
         nodes.add (juce::var (v.release()));
     }
     o->setProperty ("nodes", nodes);
@@ -484,6 +496,15 @@ PatcherDoc patcherFromVar (const juce::var& v, const Song& song)
                         head.head = effectFromVar (h["head"]);
                     node.busHeads.push_back (std::move (head));
                 }
+            auto readParams = [] (const juce::var& a, std::vector<int>& out) {
+                if (auto* list = a.getArray())
+                    for (const auto& p : *list)
+                        if (const auto x = (int) p; x >= 0 && x < patchParamOutputBase
+                                                     && std::find (out.begin(), out.end(), x) == out.end())
+                            out.insert (std::upper_bound (out.begin(), out.end(), x), x);
+            };
+            readParams (n["paramIns"], node.paramIns);
+            readParams (n["paramOuts"], node.paramOuts);
             doc.nodes.push_back (std::move (node));
         }
     const auto count = (int) doc.nodes.size();
@@ -976,6 +997,26 @@ std::vector<StandIn> standInsFromVar (const juce::var& v)
             if (! s.path.empty())
                 out.push_back (std::move (s));
         }
+    return out;
+}
+
+// FL's legacy Pattern Blocks (round 170f): [[pattern, start], ...]
+juce::var blocksToVar (const std::vector<PatternBlock>& list)
+{
+    juce::Array<juce::var> out;
+    for (const auto& b : list)
+        out.add (juce::Array<juce::var> { b.pattern, (juce::int64) b.start });
+    return out;
+}
+
+std::vector<PatternBlock> blocksFromVar (const juce::var& v, const Song& song)
+{
+    std::vector<PatternBlock> out;
+    if (auto* list = v.getArray())
+        for (const auto& b : *list)
+            if (b.isArray() && b.size() == 2)
+                out.push_back ({ (int) b[0], (std::int64_t) (juce::int64) b[1] });
+    patternblocks::normalize (out, (int) song.patterns.size());
     return out;
 }
 
@@ -2066,6 +2107,10 @@ juce::String toJson (const Song& song)
     }
 
     root->setProperty ("playlist", clipsToVar (song.playlist));
+    if (song.patternBlocksOn)
+        root->setProperty ("patternBlocks", true);
+    if (! song.blocks.empty())
+        root->setProperty ("blocks", blocksToVar (song.blocks));
 
     {
         juce::Array<juce::var> tracks;
@@ -2142,7 +2187,8 @@ juce::String toJson (const Song& song)
             root->setProperty ("playlistTrackIcons", icons);
     }
 
-    const auto anyMarkers = std::any_of (song.arrangements.begin(), song.arrangements.end(), [] (const Arrangement& a) { return ! a.markers.empty(); });
+    const auto anyMarkers = std::any_of (song.arrangements.begin(), song.arrangements.end(),
+                                         [] (const Arrangement& a) { return ! a.markers.empty() || ! a.blocks.empty(); });
 
     if (song.arrangements.size() > 1 || anyMarkers)
     {
@@ -2157,6 +2203,8 @@ juce::String toJson (const Song& song)
             if ((int) i != song.currentArrangement) // the current one is in "playlist"
             {
                 o->setProperty ("clips", clipsToVar (a.clips));
+                if (! a.blocks.empty())
+                    o->setProperty ("blocks", blocksToVar (a.blocks));
 
                 if (a.loopEnd > a.loopStart)
                     o->setProperty ("loop", juce::Array<juce::var> { (juce::int64) a.loopStart, (juce::int64) a.loopEnd });
@@ -2417,6 +2465,8 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
         }
 
     song.playlist = clipsFromVar (root["playlist"], song);
+    song.patternBlocksOn = (bool) root.getProperty ("patternBlocks", false);
+    song.blocks = blocksFromVar (root["blocks"], song);
 
     if (auto* links = root["midiLinks"].getArray())
         for (const auto& l : *links)
@@ -2543,6 +2593,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
             Arrangement arrangement;
             arrangement.name = a["name"].toString().toStdString();
             arrangement.clips = clipsFromVar (a["clips"], song);
+            arrangement.blocks = blocksFromVar (a["blocks"], song);
 
             if (const auto& loop = a["loop"]; loop.isArray() && loop.size() == 2)
             {
@@ -2563,6 +2614,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
 
         song.currentArrangement = juce::jlimit (0, (int) song.arrangements.size() - 1, (int) root.getProperty ("currentArrangement", 0));
         song.arrangements[(std::size_t) song.currentArrangement].clips.clear();
+        song.arrangements[(std::size_t) song.currentArrangement].blocks.clear();
     }
 
     song.mode = root["mode"].toString() == "song" ? PlayMode::song : PlayMode::pattern;

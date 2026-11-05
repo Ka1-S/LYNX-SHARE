@@ -321,8 +321,8 @@ std::vector<std::uint8_t> tbassState (std::int16_t stepVersion)
     auto str = [&put] () { put ((std::int32_t) 0); };
     put ((std::int16_t) 5);
     put ((std::int32_t) 3); // the current program
-    put ((std::int32_t) 0);
-    put ((std::uint8_t) 0);
+    put ((std::int32_t) 3); // the edit program (FL saves both; the page edits this one, round 169g2)
+    put ((std::uint8_t) 0); // (follow)
     for (int k = 0; k < 128; ++k)
     {
         put ((std::int16_t) 0);

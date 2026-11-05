@@ -156,7 +156,9 @@ public:
             startTimerHz (30); // live displays, and the controls following their automation (cheap while nothing moves)
         else if (liveDisplays)
             startTimerHz (30);
-        setSize ((int) std::ceil ((float) l.width * initialScale), (int) std::ceil ((float) l.height * initialScale + headerHeight + footerHeight()));
+        // round 170k2: never narrower than its header needs to show the whole name (the body keeps its scale)
+        setSize (juce::jmax ((int) std::ceil ((float) l.width * initialScale), minimumWidth()),
+                 (int) std::ceil ((float) l.height * initialScale + headerHeight + footerHeight()));
     }
 
     ~NativeEffectEditor() override
@@ -171,6 +173,16 @@ public:
 
     // the design size (for the window's aspect ratio)
     juce::Point<int> designSize() const { return { activeLayout().width, activeLayout().height }; }
+    juce::String headerName() const { return layout == &plugui::soundgoodizerLayout() ? juce::String ("Soundgoodizer") : utf8 (effectInfo (kind).name); }
+
+    // round 170k2: the narrowest window whose header still shows the plugin's whole name (the bar at its narrowest)
+    int minimumWidth() const
+    {
+        const auto name = headerName();
+        const auto left = menuButton().getRight() + 40.0f; // the arrow, LYNX's mark and the LED
+        const auto right = usesBar() ? pluginheader::PresetBar::narrowWidth() : 22.0f + 26.0f + 90.0f + 4.0f + 6.0f; // prev, next, preset box
+        return juce::roundToInt (std::ceil (left + skin::titleMinWidth (name, headerHeight) + right));
+    }
 
     // The slot as shown: while the song plays, its automated parameters at their automation's value (issue #11 comment 4:
     // Parametric EQ 2's handles, Fruity Filter's knobs... move with the automation, as in FL). Edits always go through
@@ -617,7 +629,10 @@ public:
     juce::Rectangle<float> prevButton() const { return nextButton().translated (-22.0f, 0.0f); }
     juce::Rectangle<float> presetBox() const
     {
-        const auto w = juce::jlimit (90.0f, 220.0f, (float) getWidth() * 0.32f);
+        // round 170k2: the box gives way to the title (never below 90 px)
+        const auto name = headerName();
+        const auto room = prevButton().getX() - 4.0f - 6.0f - (menuButton().getRight() + 40.0f) - skin::titleMinWidth (name, headerHeight);
+        const auto w = juce::jlimit (90.0f, juce::jmax (90.0f, room), juce::jlimit (90.0f, 220.0f, (float) getWidth() * 0.32f));
         return { prevButton().getX() - w - 4.0f, 3.0f, w, 20.0f };
     }
 
@@ -634,15 +649,17 @@ public:
         skin::brandMark (g, juce::Rectangle<float> (menuButton().getRight() + 2.0f, 0.0f, 18.0f, area.getHeight()));
         const auto ledC = juce::Point<float> (menuButton().getRight() + 30.0f, area.getCentreY());
         skin::powerLed (g, ledC, 7.0f, fx.enabled);
+        const auto name = headerName();
         auto text = area.withLeft (ledC.x + 10.0f).withRight (presetBox().getX() - 6.0f);
         if (usesBar())
-            text = bar.place (area).withLeft (ledC.x + 10.0f);
-        const auto name = layout == &plugui::soundgoodizerLayout() ? juce::String ("Soundgoodizer") : utf8 (effectInfo (kind).name);
+            text = bar.place (area, true, ledC.x + 10.0f - area.getX() + skin::titleMinWidth (name, area.getHeight())).withLeft (ledC.x + 10.0f);
         const auto nameWidth = skin::titleText (g, text.withHeight (area.getHeight()), name, accent);
         text.removeFromLeft (nameWidth);
         g.setFont (font (type::small));
         g.setColour (colour::textSecondary);
-        g.drawText ("(" + trackName() + ")", text.withTrimmedLeft (8.0f), juce::Justification::centredLeft, true);
+        // where it is: only when it fits whole (round 170k2: no "(I…" stub beside the name)
+        if (const auto where = "(" + trackName() + ")"; juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), where) <= text.getWidth() - 9.0f)
+            g.drawText (where, text.withTrimmedLeft (8.0f), juce::Justification::centredLeft, false);
 
         if (usesBar())
         {
@@ -4967,7 +4984,7 @@ public:
         // keep FL's proportions while resizing (the presets bar has a fixed height)
         if (auto* c = getConstrainer())
         {
-            c->setMinimumSize (design.x / 2, design.y / 2);
+            c->setMinimumSize (juce::jmax (design.x / 2, editor->minimumWidth()), design.y / 2); // round 170k2: the name fits
             c->setMaximumSize (design.x * 3, design.y * 3 + 200);
         }
         centreWithSize (getWidth(), getHeight());
@@ -5002,6 +5019,15 @@ void NativeEffectWindow::closeButtonPressed()
 void setNativeEditorDemo (bool on)
 {
     demoDisplays = on;
+}
+
+juce::Point<int> nativeEditorMinimumSize (juce::Component& editor)
+{
+    // as NativeEffectWindow's constrainer (the editor there is made at 1.25, its design size is the layout's)
+    auto* native = dynamic_cast<NativeEffectEditor*> (&editor);
+    if (native == nullptr) return {};
+    const auto design = native->designSize();
+    return { juce::jmax (design.x / 2, native->minimumWidth()), design.y / 2 };
 }
 
 bool tickNativeEffectEditor (juce::Component& editor)

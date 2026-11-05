@@ -125,6 +125,9 @@ struct LiveInput
     // punching on the loop region (round 163): the region is not looped either, playback runs through the punch-out
     // into the post-roll
     std::atomic<bool> noLoopRegion { false };
+    // Pattern mode, a note take with Loop record off (round 170e5): the transport tick the pattern plays once from
+    // (no repeats; FL's "never" play end), < 0: off, the pattern loops
+    std::atomic<double> patternOrigin { -1.0 };
 
     // audio -> UI: peak of each insert's input source, monitored or not
     MeterBank meters;

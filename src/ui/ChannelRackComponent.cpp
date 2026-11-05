@@ -39,6 +39,7 @@
 #include "ui/AudioEditor.h"
 #include "ui/AutoSamplerDialog.h"
 #include "core/RackOps.h"
+#include "core/TransportEdit.h"
 #include "core/ChannelBurn.h"
 #include "core/ChannelLoops.h"
 #include "core/SoundFont.h"
@@ -151,6 +152,7 @@ ChannelRackComponent::ChannelRackComponent (AudioEngine& e)
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
     engine.addChangeListener (this);
+    engine.getLevelsBroadcaster().addChangeListener (this);
     previews.setSender ([this] (int channel, int key, float velocity, bool on) { engine.sendLiveNote (channel, key, velocity, on); });
     updateSize();
     startTimerHz (30);
@@ -159,6 +161,7 @@ ChannelRackComponent::ChannelRackComponent (AudioEngine& e)
 ChannelRackComponent::~ChannelRackComponent()
 {
     previews.releaseAll();
+    engine.getLevelsBroadcaster().removeChangeListener (this);
     engine.removeChangeListener (this);
 }
 
@@ -693,6 +696,24 @@ bool ChannelRackComponent::cellHasNote (int channel, int step) const
     return false;
 }
 
+bool ChannelRackComponent::channelHitsNow (int row) const
+{
+    if (playheadStep < 0 || playheadStep >= numSteps())
+        return false;
+    const auto& song = engine.getSong();
+    const auto& p = song.patterns[(std::size_t) song.currentPattern];
+    const auto loopSteps = loopStepsOf (row);
+    const auto step = loopSteps > 0 && playheadStep >= loopSteps ? playheadStep % loopSteps : playheadStep;
+    return p.hasStep (row, step) || cellHasNote (row, step);
+}
+
+void ChannelRackComponent::paintStepHit (juce::Graphics& g, juce::Rectangle<float> r)
+{
+    theme::fillRoundRect (g, r, theme::radius::sm, juce::Colours::white.withAlpha (0.55f));
+    g.setColour (theme::colour::playhead);
+    g.drawRoundedRectangle (r.reduced (0.75f), theme::radius::sm, 1.5f);
+}
+
 void ChannelRackComponent::paint (juce::Graphics& g)
 {
     const uitrace::Scope trace ("ChannelRackComponent paint", true, g.getClipBounds());
@@ -709,6 +730,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
     const auto clip = g.getClipBounds();
     const auto primary = engine.getSelectedChannel();
     const auto& selection = engine.getSelectedChannels();
+    const auto column = playheadColumn.load (std::memory_order_relaxed) && playheadStep >= 0 && playheadStep < steps;
     g.setFont (theme::font (theme::type::body));
 
     for (int row = 0; row < (int) song.channels.size(); ++row)
@@ -725,6 +747,12 @@ void ChannelRackComponent::paint (juce::Graphics& g)
         {
             g.setColour (bg3);
             g.fillRect (0, y + 1, getWidth(), rowHeight - 2);
+        }
+
+        if (column) // LYNX: the playing column, soft, under the step buttons (their colours and groups stay readable)
+        {
+            g.setColour (playhead.withAlpha (0.2f));
+            g.fillRect (gridLeft() + playheadStep * stepWidth - 1, y, stepWidth, rowHeight);
         }
 
         if (channel.instrument == InstrumentKind::audioClip)
@@ -767,6 +795,8 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 const auto repeated = pattern.hasStep (row, source) || cellHasNote (row, source);
                 auto fill = repeated ? stepOn : theme::stepOff (step);
                 theme::fillRoundRect (g, r.toFloat(), theme::radius::sm, fill.withMultipliedAlpha (hoverStepHere ? 0.75f : repeated ? 0.45f : 0.3f));
+                if (repeated && step == playheadStep) // the repeat plays: lit as a hit (below)
+                    paintStepHit (g, r.toFloat());
                 if (any)
                 {
                     g.setColour (textDisabled);
@@ -790,6 +820,10 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             else
                 theme::fillRoundRect (g, r.toFloat(), theme::radius::sm, hoverStepHere ? fill.brighter (any ? 0.15f : 0.35f) : fill);
 
+            // FL lights the step as the playhead hits it (its LED turns red, round 170a [SHOT]): a step that plays now glows
+            if (any && step == playheadStep && step < realSteps)
+                paintStepHit (g, r.toFloat());
+
             if (hoverStepHere)
             {
                 g.setColour (textSecondary.withAlpha (0.7f));
@@ -808,12 +842,25 @@ void ChannelRackComponent::paint (juce::Graphics& g)
     const auto addY = rowY ((int) song.channels.size());
     g.setColour (textDisabled);
     g.setFont (theme::font (theme::type::small));
-    textcache::drawText (g, tr ("or drop an audio file here"), gridLeft() + 4, addY, 400, rowHeight, juce::Justification::centredLeft);
+    textcache::drawText (g, tr ("or drop an audio file here"), gridLeft() + 4, addY + positionStripHeight, 400, rowHeight - positionStripHeight,
+                         juce::Justification::centredLeft);
 
-    if (playheadStep >= 0 && playheadStep < steps)
+    const auto stepsPerBar = std::max (1, song.beatsPerBar) * (int) (ppq / ticksPerStep);
+    // FL's "Playing step" strip (PosLEDPanel, REA round 170a §2): a slim LED row under the steps, beat groups
+    // alternating, the playing step lit — in Pattern mode and whenever the shown pattern plays in Song mode
+    for (int step = 0; step < realSteps; ++step)
     {
-        theme::fillRoundRect (g, juce::Rectangle<float> ((float) (gridLeft() + playheadStep * stepWidth), 2.0f, (float) stepWidth - 2.0f,
-                                                        (float) addY - 2.0f), theme::radius::sm, playhead.withAlpha (0.28f));
+        const auto cell = juce::Rectangle<float> ((float) (gridLeft() + step * stepWidth) + 1.0f, (float) addY + 2.0f, (float) stepWidth - 4.0f,
+                                                  (float) positionStripHeight - 3.0f);
+        if (cell.getRight() < (float) clip.getX() || cell.getX() > (float) clip.getRight())
+            continue;
+        theme::fillRoundRect (g, cell, 1.5f, step == playheadStep ? playhead : theme::stepOff (step).brighter (0.12f));
+        // LYNX: each bar's first step marked (finding the bars on 32 / 64-step patterns)
+        if (playheadColumn.load (std::memory_order_relaxed) && step % stepsPerBar == 0 && step != playheadStep)
+        {
+            g.setColour (accent.withAlpha (0.7f));
+            g.fillRect (cell.withHeight (2.0f));
+        }
     }
 
     // the controls column stays put while the steps scroll sideways (FL's rack keeps the channel buttons in
@@ -928,6 +975,9 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             // selector: a slim pill, lit when the row is selected
             const auto pill = juce::Rectangle<float> ((float) selectLeft() + 3.0f, (float) y + 7.0f, (float) selectWidth - 6.0f, (float) rowHeight - 14.0f);
             theme::fillRoundRect (g, pill, 3.0f, selected ? (hovered (Area::select) ? accentHover : accent) : hovered (Area::select) ? textDisabled : ledOff);
+            // FL flashes the channel's selector as its note plays (round 170a [SHOT]): the "sound lighting up when it hits"
+            if (! channel.muted && channelHitsNow (row))
+                theme::fillRoundRect (g, pill.expanded (1.0f, 0.0f), 3.0f, juce::Colours::white.withAlpha (selected ? 0.75f : 0.9f));
         }
 
         paintLane (g);
@@ -1053,9 +1103,9 @@ void ChannelRackComponent::setValue (Area area, int row, double value)
         return;
 
     if (area == Area::pan)
-        engine.editSong ([row, v = (float) value] (Song& s) { s.channels[(std::size_t) row].pan = v; });
+        engine.editLevels ([row, v = (float) value] (Song& s) { s.channels[(std::size_t) row].pan = v; });
     else if (area == Area::volume)
-        engine.editSong ([row, v = (float) value] (Song& s) { s.channels[(std::size_t) row].volume = v; });
+        engine.editLevels ([row, v = (float) value] (Song& s) { s.channels[(std::size_t) row].volume = v; });
     else if (area == Area::route)
     {
         const auto track = juce::roundToInt (value);
@@ -1523,6 +1573,31 @@ void ChannelRackComponent::rotateSelected (int steps)
         const auto length = patternSteps (s, p);
         for (auto r : rows)
             rotateSteps (p, r, steps, length);
+    });
+}
+
+void ChannelRackComponent::copySelected()
+{
+    const auto& song = engine.getSong();
+    stepClipboard = copyChannelSteps (song.patterns[(std::size_t) song.currentPattern], engine.getSelectedChannels(), (int) song.channels.size());
+}
+
+void ChannelRackComponent::cutSelected()
+{
+    copySelected();
+    const auto rows = engine.getSelectedChannels();
+    const auto& song = engine.getSong();
+    auto copy = song.patterns[(std::size_t) song.currentPattern];
+    if (clearChannelSteps (copy, rows)) // (nothing to cut: no undo step)
+        engine.editSong ([rows] (Song& s) { clearChannelSteps (s.patterns[(std::size_t) s.currentPattern], rows); });
+}
+
+void ChannelRackComponent::pasteSelected()
+{
+    if (stepClipboard.empty() || engine.getSelectedChannels().empty())
+        return;
+    engine.editSong ([rows = engine.getSelectedChannels(), clip = stepClipboard] (Song& s) {
+        pasteChannelSteps (s.patterns[(std::size_t) s.currentPattern], clip, rows, (int) s.channels.size());
     });
 }
 
@@ -2256,7 +2331,7 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
     });
     menu.addItem (tr ("Graph editor") + "\tCtrl+K", true, graphLanes, [this] { toggleGraphLanes(); });
     menu.addSeparator();
-    menu.addItem (tr ("Rename and color...") + "\tF2", [this, channel] { rename (channel); });
+    menu.addItem (theme::mnemonic (tr ("Rename and color..."), 'R') + "\tF2", [this, channel] { rename (channel); });
     menu.addSubMenu (tr ("Change color"), ui::colourMenu (c.colour, [this, channel] (std::uint32_t colour) {
                          if (channel < (int) engine.getSong().channels.size())
                              engine.editSong ([channel, colour] (Song& s) { s.channels[(std::size_t) channel].colour = colour; });
@@ -2281,12 +2356,12 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
             engine.editSong ([channel] (Song& s) { s.channels[(std::size_t) channel].soloLock = ! s.channels[(std::size_t) channel].soloLock; });
     });
     menu.addSeparator();
-    menu.addItem (tr ("Load sample..."), c.instrument != InstrumentKind::audioClip, false, [this, channel] { chooseSample (channel); });
+    menu.addItem (theme::mnemonic (tr ("Load sample..."), 'L'), c.instrument != InstrumentKind::audioClip, false, [this, channel] { chooseSample (channel); });
     {
         // "Cut itself": a new note cuts the channel's own sounding note (its cut group and "cut by" are its own)
         const auto self = 1000 + channel;
         const auto cutsItself = c.cutGroup != 0 && c.cutGroup == c.cutBy;
-        menu.addItem (tr ("Cut itself"), true, cutsItself, [this, channel, self, cutsItself] {
+        menu.addItem (theme::mnemonic (tr ("Cut itself"), 't'), true, cutsItself, [this, channel, self, cutsItself] {
             engine.editSong ([channel, self, cutsItself] (Song& s) {
                 auto& ch = s.channels[(std::size_t) channel];
                 ch.cutGroup = ch.cutBy = cutsItself ? 0 : self;
@@ -2297,7 +2372,7 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
     {
         juce::PopupMenu insert;
         addInstrumentItems (insert, channel);
-        menu.addSubMenu (tr ("Insert"), insert);
+        menu.addSubMenu (theme::mnemonic (tr ("Insert"), 'I'), insert);
     }
     menu.addSubMenu (tr ("Replace"), instruments);
     // FL's Patcherize (round 165m): the channel's instrument into a new Patcher, same sound
@@ -2308,12 +2383,12 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
     });
     // FL's Loop Starter channel menu (round 168b): Replace sample, Generate steps, Locked, One-shot category
     loopstarterui::addChannelMenu (menu, engine, channel);
-    menu.addItem (selected > 1 ? tr ("Clone {0} channels", { juce::String (selected) }) : tr ("Clone") + "\tAlt+C", [this] { cloneSelected(); });
+    menu.addItem (selected > 1 ? theme::mnemonic (tr ("Clone {0} channels", { juce::String (selected) }), 'C') : theme::mnemonic (tr ("Clone"), 'C') + "\tAlt+C", [this] { cloneSelected(); });
 
     if (selected > 1)
-        menu.addItem (tr ("Delete {0} channels", { juce::String (selected) }) + "\tAlt+Del", selected < count, false, [this] { deleteSelected(); });
+        menu.addItem (theme::mnemonic (tr ("Delete {0} channels", { juce::String (selected) }), 'D') + "\tAlt+Del", selected < count, false, [this] { deleteSelected(); });
     else
-        menu.addItem (tr ("Delete...") + "\tAlt+Del", count > 1, false, [this, channel] {
+        menu.addItem (theme::mnemonic (tr ("Delete..."), 'D') + "\tAlt+Del", count > 1, false, [this, channel] {
             closeEditor (channel);
             engine.editSong ([channel] (Song& s) { s.removeChannel (channel); });
             openEditorRow = -1;
@@ -2345,6 +2420,8 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
         menu.addItem (tr ("Channel settings..."), [this, channel] { openChannelSettings (engine, channel); });
     // FL's wrench tab of the channel window, for every channel (REA round 143b)
     menu.addItem (tr ("Miscellaneous functions (polyphony, cut groups, arpeggiator)..."), [this, channel] { openChannelMisc (engine, channel); });
+    if (c.instrument == InstrumentKind::patcher) // its published parameters (round 171b)
+        addPatcherParameterItems (menu, engine, c.patcher, { AutomationTargetKind::channelParam, channel, 0, 0 });
 
     if (c.instrument == InstrumentKind::plugin)
     {
@@ -2399,43 +2476,23 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
 
     // --- second column: the channel's steps in the current pattern ---
     menu.addColumnBreak();
+    // FL's Cut / Copy / Paste (REA round 170a §1): the selected channels' steps and notes, as Ctrl+X / C / V
     {
-        auto notesOf = [this, channel] {
-            std::vector<Note> out;
-            const auto& song = engine.getSong();
-            for (const auto& n : song.patterns[(std::size_t) song.currentPattern].notes)
-                if (n.channel == channel)
-                    out.push_back (n);
-            return out;
-        };
-        auto clear = [channel] (Song& s) {
-            auto& notes = s.patterns[(std::size_t) s.currentPattern].notes;
-            notes.erase (std::remove_if (notes.begin(), notes.end(), [channel] (const Note& n) { return n.channel == channel; }), notes.end());
-        };
-        const auto hasNotes = ! notesOf().empty();
-        menu.addItem (tr ("Cut"), hasNotes, false, [this, notesOf, clear] {
-            stepClipboard = notesOf();
-            engine.editSong (clear);
+        const auto& song = engine.getSong();
+        const auto& selection = engine.getSelectedChannels();
+        const auto& notes = song.patterns[(std::size_t) song.currentPattern].notes;
+        const auto hasNotes = std::any_of (notes.begin(), notes.end(), [&selection] (const Note& n) {
+            return std::binary_search (selection.begin(), selection.end(), n.channel);
         });
-        menu.addItem (tr ("Copy"), hasNotes, false, [notesOf] { stepClipboard = notesOf(); });
-        menu.addItem (tr ("Paste"), ! stepClipboard.empty(), false, [this, channel, clear] {
-            engine.editSong ([channel, clear, notes = stepClipboard] (Song& s) {
-                clear (s);
-                auto& target = s.patterns[(std::size_t) s.currentPattern].notes;
-                for (auto n : notes)
-                {
-                    n.channel = channel;
-                    target.push_back (n);
-                }
-                std::stable_sort (target.begin(), target.end(), [] (const Note& a, const Note& b) { return a.start < b.start; });
-            });
-        });
+        menu.addItem (theme::mnemonic (tr ("Cut"), 't') + "\tCtrl+X", hasNotes, false, [this] { cutSelected(); });
+        menu.addItem (theme::mnemonic (tr ("Copy"), 'o') + "\tCtrl+C", hasNotes, false, [this] { copySelected(); });
+        menu.addItem (theme::mnemonic (tr ("Paste"), 'p') + "\tCtrl+V", ! stepClipboard.empty(), false, [this] { pasteSelected(); });
     }
     menu.addSeparator();
-    menu.addItem (tr ("Fill each 2 steps"), [this] { fillSelected (2); });
-    menu.addItem (tr ("Fill each 4 steps"), [this] { fillSelected (4); });
-    menu.addItem (tr ("Fill each 8 steps"), [this] { fillSelected (8); });
-    menu.addItem (tr ("Advanced fill..."), [this, channel] { showEuclideanFill (channel); });
+    menu.addItem (theme::mnemonic (tr ("Fill each 2 steps"), '2'), [this] { fillSelected (2); });
+    menu.addItem (theme::mnemonic (tr ("Fill each 4 steps"), '4'), [this] { fillSelected (4); });
+    menu.addItem (theme::mnemonic (tr ("Fill each 8 steps"), '8'), [this] { fillSelected (8); });
+    menu.addItem (theme::mnemonic (tr ("Advanced fill..."), 'f'), [this, channel] { showEuclideanFill (channel); });
     menu.addSeparator();
     menu.addItem (tr ("Rotate left") + "\tShift+Ctrl+Left", [this] { rotateSelected (-1); });
     menu.addItem (tr ("Rotate right") + "\tShift+Ctrl+Right", [this] { rotateSelected (1); });
@@ -2443,7 +2500,7 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
     {
         // FL's "Receive notes from" (round 165f-rack): a MIDI input device (any or one MIDI channel) plays only this channel
         juce::PopupMenu receive;
-        receive.addItem (tr ("Unlock"), ! c.receiveFrom.empty(), false, [this, channel] {
+        receive.addItem (theme::mnemonic (tr ("Unlock"), 'u'), ! c.receiveFrom.empty(), false, [this, channel] {
             engine.editSong ([channel] (Song& s) {
                 s.channels[(std::size_t) channel].receiveFrom.clear();
                 s.channels[(std::size_t) channel].receiveMidiChannel = 0;
@@ -2476,13 +2533,13 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
             receive.addItem (juce::String::fromUTF8 (c.receiveFrom.c_str()) + " (" + tr ("not connected") + ")", false, true, [] {});
         if (devices.isEmpty() && c.receiveFrom.empty())
             receive.addItem (tr ("No MIDI input device"), false, false, [] {});
-        menu.addSubMenu (c.receiveFrom.empty() ? tr ("Receive notes from") : tr ("Receive notes from") + " (" + tr ("locked") + ")", receive);
+        menu.addSubMenu (theme::mnemonic (c.receiveFrom.empty() ? tr ("Receive notes from") : tr ("Receive notes from") + " (" + tr ("locked") + ")", 'n'), receive);
     }
     {
         // FL's "Burn MIDI to" (round 165f-rack): what the channel plays (loops, swing, time, arpeggiator, echo) as notes
         juce::PopupMenu burn;
-        burn.addItem (tr ("Current pattern"), [this, channel] { burnMidi (channel, false); });
-        burn.addItem (tr ("New pattern"), [this, channel] { burnMidi (channel, true); });
+        burn.addItem (theme::mnemonic (tr ("Current pattern"), 'c'), [this, channel] { burnMidi (channel, false); });
+        burn.addItem (theme::mnemonic (tr ("New pattern"), 'n'), [this, channel] { burnMidi (channel, true); });
         menu.addSubMenu (tr ("Burn MIDI to"), burn);
         // its loop point in this pattern (FL's advanced looping control menu)
         const auto& song = engine.getSong();
@@ -2531,7 +2588,7 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
         menu.addSubMenu (tr ("Sort channels"), sort);
     }
     menu.addItem (tr ("Select unused channels"), [this] { selectUnused(); });
-    menu.addItem (tr ("Group selected...") + "\tAlt+G", [this] { groupSelected(); });
+    menu.addItem (theme::mnemonic (tr ("Group selected..."), 'G') + "\tAlt+G", [this] { groupSelected(); });
     return menu;
 }
 
@@ -2821,23 +2878,26 @@ void ChannelRackComponent::timerCallback()
     auto& transport = engine.getTransport();
     auto step = -1;
 
-    if (transport.playing.load() && engine.getSong().mode == PlayMode::pattern)
+    // the playhead shows whenever the shown pattern plays: Pattern mode, or a clip of it in Song mode (Busy Works
+    // Beats' video, round 170a: in Song mode the rack showed none), as the Piano Roll's (transportedit::patternPlayhead)
+    if (transport.playing.load() && isShowing())
     {
         const auto& song = engine.getSong();
-        const auto& p = song.patterns[(std::size_t) song.currentPattern];
-        const auto length = (double) p.effectiveLength (song.beatsPerBar);
-        step = (int) (std::fmod (transport.positionTicks.load(), length) / ticksPerStep);
+        const auto tick = transportedit::patternPlayhead (song, song.currentPattern, transport.positionTicks.load());
+        if (tick >= 0.0)
+            step = (int) (tick / ticksPerStep);
     }
 
     if (step != playheadStep)
     {
         auto dirty = [this] (int s) {
             if (s >= 0)
-                repaint (gridLeft() + s * stepWidth, 0, stepWidth, getHeight());
+                repaint (gridLeft() + s * stepWidth - 1, 0, stepWidth + 1, getHeight());
         };
         dirty (playheadStep);
         playheadStep = step;
         dirty (playheadStep);
+        repaint (stickyX + selectLeft(), 0, selectWidth, getHeight()); // the selectors flash with the hits
         followPlayhead();
     }
 }

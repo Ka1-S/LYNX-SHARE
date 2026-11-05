@@ -96,7 +96,9 @@ bool inUserFolder (AudioEngine& engine, const std::string& key);
 void addPicks (juce::PopupMenu& menu, const std::vector<Pick>& picks);
 
 // Shows `menu`; while it is open, typing a character that starts exactly one of `picks` runs that one (FL's menus),
-// and `onKey` sees the other keys first (e.g. Delete in a slot menu; true = used, the menu closes).
+// and `onKey` sees the other keys first (e.g. Delete in a slot menu; true = used, the menu closes). Any other letter
+// moves the highlight to the next item starting with it in the menu (or open submenu) being typed in, as FL's plugin
+// menus do (issue #64): "e" EQ, "e" again Effector...; Enter picks it.
 void showMenu (juce::PopupMenu& menu, const juce::PopupMenu::Options& options, std::vector<Pick> picks,
                std::function<bool (const juce::KeyPress&)> onKey = {});
 } // namespace lynx::quickpick

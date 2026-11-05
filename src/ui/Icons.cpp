@@ -673,6 +673,33 @@ Shape make (Icon icon)
             line (st, 4.5f, 10.5f, 7.0f, 13.0f);
             line (st, 19.5f, 10.5f, 17.0f, 13.0f);
             break;
+        case Icon::loopRecord: // a loop arrow around a record dot
+        {
+            constexpr float r = 8.0f;
+            juce::Path a;
+            a.addCentredArc (12.0f, 12.0f, r, r, 0.0f, pi * 0.25f, pi * 1.85f, true);
+            st.addPath (a);
+            const auto to = pi * 1.85f;
+            const juce::Point<float> end (12.0f + r * std::sin (to), 12.0f - r * std::cos (to));
+            const juce::Point<float> along (std::cos (to), std::sin (to)), out (std::sin (to), -std::cos (to));
+            juce::Path h;
+            h.addTriangle (end + along * 3.8f, end + out * 3.3f - along * 0.6f, end - out * 3.3f - along * 0.6f);
+            fi.addPath (h);
+            fi.addEllipse (8.5f, 8.5f, 7.0f, 7.0f);
+            break;
+        }
+        case Icon::stepEdit: // three steps typed one after another (the last one hollow: the next), an arrow on to it
+            fi.addRoundedRectangle (2.5f, 14.0f, 5.0f, 5.0f, 1.0f);
+            fi.addRoundedRectangle (9.5f, 14.0f, 5.0f, 5.0f, 1.0f);
+            st.addRoundedRectangle (16.5f, 14.0f, 5.0f, 5.0f, 1.0f);
+            line (st, 5.0f, 9.0f, 17.5f, 9.0f);
+            polyline (st, { { 15.0f, 6.0f }, { 18.5f, 9.0f }, { 15.0f, 12.0f } });
+            break;
+        case Icon::punch: // a record dot between two brackets (in and out)
+            polyline (st, { { 7.0f, 4.5f }, { 4.0f, 4.5f }, { 4.0f, 19.5f }, { 7.0f, 19.5f } });
+            polyline (st, { { 17.0f, 4.5f }, { 20.0f, 4.5f }, { 20.0f, 19.5f }, { 17.0f, 19.5f } });
+            fi.addEllipse (8.0f, 8.0f, 8.0f, 8.0f);
+            break;
     }
 
     return s;

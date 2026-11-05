@@ -183,15 +183,13 @@ std::vector<std::string> presetCandidates (const std::string& presetFolder, bool
     const auto exists = [&access] (const std::string& p) { return ! p.empty() && access.fileExists && access.fileExists (p); };
 
     // FL adds a new generator from its Plugin database (the Channel rack's "+" / the plugin picker load the entry's .fst
-    // into the new channel, REA_rodada169l §3): for the engines FL ships without a usable Default preset, that entry
-    // (Generators\<category>\<plugin>.fst) comes first — Drumaxx' "Default Kit" (REA_rodada169e §1), Drumpad, BassDrum,
-    // GMS, Morphine, Transistor Bass ("Factory programs"), Sakura ("Bowed 6"), Ogun (a version-11 state LYNX reads since
-    // round 169l; its Default.fst is not what FL adds). The other engines keep their Default.* first (see §3: FL's
-    // Plugin database state differs from it for some of them; left as it was, for the user to decide).
-    const auto fromDatabase = presetFolder == "Drumaxx" || presetFolder == "Drumpad" || presetFolder == "BassDrum" || presetFolder == "GMS"
-                              || presetFolder == "Morphine" || presetFolder == "Transistor Bass" || presetFolder == "Sakura"
-                              || presetFolder == "Ogun";
-    if (generator && fromDatabase && access.listPresets)
+    // into the new channel, REA_rodada169l §3): for every generator that entry (Generators\<category>\<plugin>.fst)
+    // comes first — Drumaxx' "Default Kit" (REA_rodada169e §1), Transistor Bass' "Factory programs", Sakura's "Bowed 6",
+    // Ogun's version-11 state, and the engines whose Default preset differs from it (3x Osc, Sytrus, Harmor, Harmless,
+    // PoiZone, MiniSynth, Sawer, FL Keys, Granulizer, Toxic, BeepMap: user decision, round 169l2). Where FL's Default.fst
+    // equals it (Kepler, SimSynth, DX10, Plucked!, Fruit Kick) nothing changes; an entry LYNX can't read falls through to
+    // the Default preset, then the folder.
+    if (generator && access.listPresets)
     {
         const auto wanted = lower (presetFolder + ".fst");
         for (const auto& path : access.listPresets (resolveFlPath ("%FLStudioData%\\Patches\\Plugin database\\Generators", access.roots)))

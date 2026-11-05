@@ -100,6 +100,9 @@ struct Theme
     bool stageRepaint = false;               // the painter animates the whole stage strip (scopes, pulses)
     void (*paintMotion) (juce::Graphics&, const Motion&) = nullptr;
     int hz = 20;                             // frames per second of the moving layer (slow motion needs fewer: CPU)
+    // round 170k: the part of the stage the painter animates (a lamp, a record), repainted instead of the whole stage
+    // strip when stageRepaint is set: the editor under the strip then redraws only that corner
+    juce::Rectangle<float> (*motionArea) (juce::Rectangle<float> stage) = nullptr;
 };
 
 // the registries (PluginArtGenerators.inc / PluginArtEffects.inc)
@@ -916,8 +919,8 @@ void ArtLayer::timerCallback()
         impl->step (th, m, dt, (float) t, s);
         dirty.addWithoutMerging (Impl::boundsOf (th, m).getSmallestIntegerContainer());
     }
-    if (th.stageRepaint) // the stage glows, turns or scrolls: repaint it
-        dirty.add (s.getSmallestIntegerContainer());
+    if (th.stageRepaint) // the stage glows, turns or scrolls: repaint it (or only the part that moves)
+        dirty.add ((th.motionArea != nullptr ? th.motionArea (s).getIntersection (s) : s).getSmallestIntegerContainer());
     dirty.consolidate();
     for (const auto& r : dirty)
         repaint (r);
@@ -943,10 +946,30 @@ juce::String artSelfTest()
     expect (unpackStyle (packStyle (Style::themed, Art::toxic)) == Style::themed && unpackArt (packStyle (Style::themed, Art::toxic)) == Art::toxic, "pack");
     setForcedStyle (-1);
     expect (styleFor (EffectKind::facetEq) == Style::themed && styleFor (EffectKind::nebula) == Style::themed, "pilots are Themed");
-    expect (styleFor (EffectKind::epochVerb) == Style::hardware && styleFor (EffectKind::crestCompressor) == Style::glow, "others keep their style");
+    expect (styleFor (EffectKind::peakController) == Style::glow, "others keep their style");
+    for (const auto k : { EffectKind::ridgeStrip, EffectKind::crestCompressor, EffectKind::apexLimiter, EffectKind::prismMultiband, EffectKind::sentryGate,
+                          EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::epochVerb, EffectKind::atrium, EffectKind::foilPlate,
+                          EffectKind::halo, EffectKind::horizon, EffectKind::reeverb2, EffectKind::luxeVerb, EffectKind::reeverb1,
+                          EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod, EffectKind::geminiDoubler,
+                          EffectKind::fruityDelay2, EffectKind::fruityDelay3, EffectKind::fruityDelayBank, EffectKind::ember, EffectKind::aether,
+                          EffectKind::fruityBloodOverdrive, EffectKind::fruityFastDist, EffectKind::fruityWaveShaper, EffectKind::fruitySoftClipper,
+                          EffectKind::hardcore, EffectKind::distructor, EffectKind::fruityChorus, EffectKind::hyperChorus, EffectKind::vintageChorus,
+                          EffectKind::fruityFlanger, EffectKind::fruityFlangus, EffectKind::fruityPhaser, EffectKind::vintagePhaser,
+                          EffectKind::flFrequencyShifter, EffectKind::parametricEq, EffectKind::fruityLimiter, EffectKind::fruityCompressor,
+                          EffectKind::fruityMultiband, EffectKind::maximus, EffectKind::transientProcessor, EffectKind::stereoShaper,
+                          EffectKind::stereoEnhancer, EffectKind::spreader, EffectKind::grossBeat, EffectKind::vocodex, EffectKind::vocoder, EffectKind::pitchCorrect, EffectKind::lynxTune, EffectKind::voiceShift, EffectKind::quellDenoiser, EffectKind::flPitchShifter, EffectKind::lovePhilter, EffectKind::effector, EffectKind::squeeze, EffectKind::lofi, EffectKind::eq, EffectKind::compressor, EffectKind::delay, EffectKind::reverb, EffectKind::limiter, EffectKind::distortion, EffectKind::filter, EffectKind::chorus, EffectKind::autoPan, EffectKind::fruityPanOMatic, EffectKind::fruityBalance, EffectKind::utility, EffectKind::fruitySend, EffectKind::frequencySplitter, EffectKind::crossover, EffectKind::multibandDelay, EffectKind::equo, EffectKind::emphasizer, EffectKind::flLowLifter, EffectKind::fruityFastLP, EffectKind::fruityFilter, EffectKind::fruityFreeFilter, EffectKind::fl7BandEq, EffectKind::flBassBoost, EffectKind::convolver, EffectKind::volumeGate, EffectKind::rhythmGain, EffectKind::freqShift, EffectKind::pitchShift, EffectKind::flPhaseInverter, EffectKind::flCenter, EffectKind::flDelay1, EffectKind::fruityMute2 }) // round 170k: the effects' themes
+        expect (artForEffect (k) != Art::none && styleFor (k) == Style::themed, "effect themes (170k)");
+    for (int a = 128; a < 256; ++a) // round 170k: a theme that names its moving corner keeps it small and inside the stage
+        if (const auto* th = artkit::effectTheme ((Art) a); th != nullptr && th->motionArea != nullptr)
+        {
+            const juce::Rectangle<float> stage (200.0f, 4.0f, 420.0f, 30.0f);
+            const auto area = th->motionArea (stage).getIntersection (stage);
+            expect (th->stageRepaint && th->paintMotion != nullptr && ! area.isEmpty() && area.getWidth() * area.getHeight() < stage.getWidth() * stage.getHeight() * 0.5f,
+                    "motion area (170k)");
+        }
     expect (resolve (Style::themed, Art::sakura) == Style::themed && resolve (Style::neon, Art::none) == Style::neon, "automatic");
     setForcedStyle ((int) Style::themed); // Themed everywhere: only plugins with art
-    expect (styleFor (EffectKind::facetEq) == Style::themed && styleFor (EffectKind::epochVerb) == Style::hardware, "forced Themed");
+    expect (styleFor (EffectKind::facetEq) == Style::themed && styleFor (EffectKind::peakController) == Style::glow, "forced Themed");
     expect (resolve (Style::neon, Art::none) == Style::neon && resolve (Style::themed, Art::none) == Style::glow, "forced Themed without art");
     setForcedStyle ((int) Style::vivid);
     expect (styleFor (EffectKind::facetEq) == Style::vivid && resolve (Style::themed, Art::toxic) == Style::vivid, "forced Vivid");
@@ -963,7 +986,7 @@ juce::String artSelfTest()
             expect (artForInstrument (k) != Art::none, "a generator without art");
         expect (artForInstrument (I::sampler) == Art::none && artForInstrument (I::layer) == Art::none, "channel chrome keeps the shared style");
     }
-    expect (artForEffect (EffectKind::facetEq) == Art::facet && artForEffect (EffectKind::epochVerb) == Art::none, "effect art");
+    expect (artForEffect (EffectKind::facetEq) == Art::facet && artForEffect (EffectKind::peakController) == Art::none, "effect art");
     for (const auto a : allArts()) // every id has exactly one theme, with a name and a canvas
     {
         const auto* gt = artkit::generatorTheme (a);
@@ -1004,6 +1027,39 @@ juce::String artSelfTest()
             layer.paint (g);
         }
         expect (! layer.animating(), "a layer off screen never animates");
+    }
+    { // round 170k2: a plugin's name always fits its header box: every effect's name, every style, in the narrowest box
+      // titleMinWidth promises (what the effect windows' minimum width is built from) draws whole, no ellipsis
+        juce::Image img (juce::Image::ARGB, 600, 26, true);
+        juce::Graphics g (img);
+        auto clipped = 0, twoLines = 0;
+        for (const auto st : { Style::glow, Style::neon, Style::hardware, Style::vivid })
+        {
+            const StyleScope scope (st);
+            for (int k = 0; k <= (int) lastEffectKind; ++k)
+            {
+                const auto* raw = effectInfo ((EffectKind) k).name;
+                const auto name = raw != nullptr ? juce::String::fromUTF8 (raw) : juce::String();
+                if (name.isEmpty()) continue;
+                titleText (g, { 66.0f, 0.0f, titleMinWidth (name, 26.0f), 26.0f }, name, juce::Colours::red);
+                clipped += lastTitleFit().clipped ? 1 : 0;
+                twoLines += lastTitleFit().lines == 2 ? 1 : 0;
+            }
+        }
+        expect (clipped == 0, "a plugin name clipped in its narrowest header box");
+        expect (twoLines > 0, "the Fruity prefix line");
+        for (const auto st : { Style::glow, Style::hardware })
+        {
+            const StyleScope scope (st);
+            titleText (g, { 66.0f, 0.0f, 400.0f, 26.0f }, "Fruity Blood Overdrive", juce::Colours::red);
+            expect (lastTitleFit().lines == 1 && ! lastTitleFit().clipped && lastTitleFit().size >= 12.0f, "a wide box keeps the one-line name");
+            // the narrowest box the name may get (titleMinWidth): too narrow for one line at the smallest size in any style
+            titleText (g, { 66.0f, 0.0f, titleMinWidth ("Fruity Blood Overdrive", 26.0f), 26.0f }, "Fruity Blood Overdrive", juce::Colours::red);
+            const auto f = lastTitleFit();
+            if (f.lines != 2 || f.clipped)
+                errors.add ("a narrow box puts Fruity above the name (" + juce::String (styleName (st)) + ": lines " + juce::String (f.lines) + ", size "
+                            + juce::String (f.size, 1) + ", need " + juce::String (f.need, 1) + ")");
+        }
     }
     setArtMotion (keptMotion);
     return errors.isEmpty() ? juce::String ("OK") : "ERROR " + errors.joinIntoString (", ");

@@ -281,4 +281,21 @@ int addSurfaceControl (PatcherDoc& doc, SurfaceControl control);
 void removeSurfaceControl (PatcherDoc& doc, int index);
 // Name shown for a node: its label, else the plugin / effect / instrument name
 std::string nodeName (const PatchNode& node);
+
+// --- Parameter (event) ports (round 171b, issue #65; FL's node menu › Inputs / Outputs › Parameters, REA_rodada171b) ---
+// The parameter inputs / outputs a node shows: the activated ones and those with a control cable, sorted.
+std::vector<int> shownParamInputs (const PatcherDoc& doc, int node);
+std::vector<int> shownParamOutputs (const PatcherDoc& doc, int node);
+// Activates / deactivates parameter input `param` of `node`. Activating also publishes it as a Patcher parameter (FL
+// gives every active parameter input one, record 1100) named `name`; deactivating removes its cables and frees its
+// Patcher parameter (the index stays, so automation of the others keeps its target).
+void setParamInput (PatcherDoc& doc, int node, int param, bool on, const std::string& name = {});
+void setParamOutput (PatcherDoc& doc, int node, int param, bool on);
+// "Deactivate unused": keeps only the parameter ports of that side with a cable
+void deactivateUnusedParams (PatcherDoc& doc, int node, bool inputs);
+// The Patcher parameter that publishes `node`'s parameter `param` (−1: none)
+int publishedIndex (const PatcherDoc& doc, int node, int param);
+// FL's node menu › Disconnect: every cable of the node goes (its ports stay active)
+void disconnectNode (PatcherDoc& doc, int node);
+bool nodeHasCables (const PatcherDoc& doc, int node);
 } // namespace lynx::patcher

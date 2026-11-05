@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <optional>
@@ -224,6 +226,9 @@ private:
     float shownVolume (int track) const; // the fader's value, or its automation's while the song plays (issue #12)
     void repaintAutomatedStrips();
     std::uint32_t shownAutomation = 0;
+    unsigned timerTicks = 0;
+    std::uint64_t seenPublish = 0;                     // AudioEngine::getPublishCount at the last full refresh
+    std::vector<std::array<float, 3>> shownLevels;   // volume, pan, separation per strip then (round 171c)
     std::vector<int> automatedStrips;
     juce::Rectangle<int> panArea (int track) const;
     juce::Rectangle<int> muteArea (int track) const;

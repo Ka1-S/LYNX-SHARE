@@ -1,4 +1,5 @@
 #include "core/RackOps.h"
+#include "core/PatternBlocks.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -119,6 +120,7 @@ void shiftPatternClips (Song& song, int index, int delta)
             if (c.kind == ClipKind::pattern && c.pattern >= index)
                 c.pattern += delta;
     });
+    patternblocks::shiftPatterns (song, index, delta); // (round 170f)
 }
 } // namespace
 
@@ -222,6 +224,7 @@ bool movePattern (Song& song, int index, int delta)
             if (c.kind == ClipKind::pattern)
                 c.pattern = c.pattern == index ? other : c.pattern == other ? index : c.pattern;
     });
+    patternblocks::swapPatterns (song, index, other); // (round 170f)
 
     if (song.currentPattern == index)
         song.currentPattern = other;
@@ -858,4 +861,96 @@ bool replaceGenerator (Song& song, int index, ChannelDef generator)
     c = std::move (generator);
     return true;
 }
+// --- Channel Rack Cut / Copy / Paste (REA round 170a §1) -------------------------------------------------------
+
+ChannelStepsClipboard copyChannelSteps (const Pattern& pattern, const std::vector<int>& selected, int channelCount)
+{
+    ChannelStepsClipboard clip;
+    int first = channelCount;
+    for (auto c : selected)
+        if (c >= 0 && c < channelCount)
+            first = std::min (first, c);
+    if (first >= channelCount)
+        return clip;
+
+    clip.slots.resize ((std::size_t) (channelCount - first));
+    for (auto c : selected)
+        if (c >= first && c < channelCount)
+            clip.slots[(std::size_t) (c - first)].copied = true;
+
+    for (const auto& n : pattern.notes)
+        if (n.channel >= first && n.channel < channelCount && clip.slots[(std::size_t) (n.channel - first)].copied)
+        {
+            auto copy = n;
+            copy.channel = 0;
+            clip.slots[(std::size_t) (n.channel - first)].notes.push_back (copy);
+        }
+
+    for (const auto& l : pattern.channelLoops)
+        if (l.channel >= first && l.channel < channelCount && clip.slots[(std::size_t) (l.channel - first)].copied)
+        {
+            auto& slot = clip.slots[(std::size_t) (l.channel - first)];
+            slot.loops = true;
+            slot.loopSetting = l.setting;
+        }
+    return clip;
+}
+
+bool clearChannelSteps (Pattern& pattern, const std::vector<int>& selected)
+{
+    const auto before = pattern.notes.size();
+    pattern.notes.erase (std::remove_if (pattern.notes.begin(), pattern.notes.end(),
+                                         [&selected] (const Note& n) { return std::find (selected.begin(), selected.end(), n.channel) != selected.end(); }),
+                         pattern.notes.end());
+    return pattern.notes.size() != before;
+}
+
+bool pasteChannelSteps (Pattern& pattern, const ChannelStepsClipboard& clipboard, const std::vector<int>& selected, int channelCount)
+{
+    int first = channelCount;
+    for (auto c : selected)
+        if (c >= 0 && c < channelCount)
+            first = std::min (first, c);
+    if (clipboard.empty() || first >= channelCount)
+        return false;
+
+    std::vector<int> targets;
+    for (int k = 0; k < (int) clipboard.slots.size() && first + k < channelCount; ++k)
+        if (clipboard.slots[(std::size_t) k].copied)
+            targets.push_back (first + k);
+    clearChannelSteps (pattern, targets);
+
+    for (auto channel : targets)
+    {
+        const auto& slot = clipboard.slots[(std::size_t) (channel - first)];
+        for (auto n : slot.notes)
+        {
+            n.channel = channel;
+            pattern.notes.push_back (n);
+        }
+        auto& loops = pattern.channelLoops;
+        loops.erase (std::remove_if (loops.begin(), loops.end(), [channel] (const ChannelLoop& l) { return l.channel == channel; }), loops.end());
+        if (slot.loops)
+            loops.push_back ({ channel, slot.loopSetting });
+    }
+    pattern.sortNotes();
+    return true;
+}
+
+int stepPatternCreating (Song& song, int delta)
+{
+    if (song.patterns.empty())
+        return 0;
+    const auto last = (int) song.patterns.size() - 1;
+    const auto target = song.currentPattern + delta;
+    if (delta > 0 && target > last && ! isPatternEmpty (song.patterns[(std::size_t) last]))
+    {
+        Pattern p;
+        p.name = newPatternName (song);
+        song.patterns.push_back (std::move (p));
+        return last + 1;
+    }
+    return std::clamp (target, 0, last);
+}
+
 } // namespace lynx
