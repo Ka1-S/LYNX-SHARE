@@ -3112,6 +3112,7 @@ void AudioEngine::publishSong()
 
     const loadtrace::Scope buildTiming ("rack_build");
     RackState::Factories factories;
+    factories.restorePluginState = externalPluginStateRestore;
     factories.samples = [this] (const std::string& path) {
         const loadtrace::Scope timing ("rack_samples");
         return samples.load (juce::String::fromUTF8 (path.c_str()));

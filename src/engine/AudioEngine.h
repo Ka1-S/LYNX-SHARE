@@ -103,6 +103,8 @@ public:
     std::shared_ptr<Effect> getEffect (int track, int slot) const;
 
     // Copies the plugins' current state into the Song (before saving).
+    // Enabled only after the opt-in authenticated external control endpoint starts.
+    void enableExternalPluginStateRestore() noexcept { externalPluginStateRestore = true; }
     void capturePluginStates(); // (before every save: also adds the working time so far, see stampWorkTime)
     // FL's Project info working time (REA round 167g): wall-clock time since the project was opened, added to the
     // saved total at each save. workSecondsNow() = the saved total + this session so far.
@@ -1007,6 +1009,7 @@ private:
     std::uint64_t levelEdits = 0;                // (diagnostics / tests)
     std::uint64_t publishCount = 0;
     void saveUndoStep();
+    bool externalPluginStateRestore = false;
     RackState lastPublishedShape; // channels + instruments of the last snapshot, to reuse voices
     std::vector<int> standInChannels, standInInserts; // (playsStandIn)
     // Issue #36 (u-he Presswerk crashed in its VST3 teardown, freed from the engine's timer callback): the racks the

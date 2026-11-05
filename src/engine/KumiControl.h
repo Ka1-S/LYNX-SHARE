@@ -13,7 +13,8 @@ class AudioEngine;
 class KumiControl final
 {
 public:
-    static std::unique_ptr<KumiControl> create (AudioEngine&, std::function<juce::String()> projectName);
+    static std::unique_ptr<KumiControl> create (AudioEngine&, std::function<juce::String()> projectName,
+                                                 std::function<juce::String()> projectPath = {});
     ~KumiControl();
 
 private:

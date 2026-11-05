@@ -486,7 +486,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                             && previous->song.bpm == song.bpm))))
             && (kind != InstrumentKind::plugin
                 || (previous->song.channels[p].plugin.id == channel.plugin.id
-                    && previous->song.channels[p].plugin.state == channel.plugin.state && previous->sampleRate == sampleRate
+                    && (! factories.restorePluginState || previous->song.channels[p].plugin.state == channel.plugin.state) && previous->sampleRate == sampleRate
                     && samePluginProcessing (previous->song.channels[p].plugin, channel.plugin))))
         {
             state->instruments.push_back (previous->instruments[p]);
@@ -591,7 +591,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                            == facet::resolution (slots[i].params[(std::size_t) facet::resolutionParam]))
                 && (kind != EffectKind::plugin
                     || (previous->song.mixer[pt].effects[pi].plugin.id == slots[i].plugin.id
-                        && previous->song.mixer[pt].effects[pi].plugin.state == slots[i].plugin.state && previous->sampleRate == sampleRate
+                        && (! factories.restorePluginState || previous->song.mixer[pt].effects[pi].plugin.state == slots[i].plugin.state) && previous->sampleRate == sampleRate
                         && samePluginProcessing (previous->song.mixer[pt].effects[pi].plugin, slots[i].plugin)))
                 && (previous->song.mixer[pt].effects[pi].state == slots[i].state
                     || (previous->sampleRate == sampleRate && previous->effects[pt][pi] != nullptr && previous->effects[pt][pi]->acceptState (slots[i].state))))

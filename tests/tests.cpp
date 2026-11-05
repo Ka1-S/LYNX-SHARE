@@ -4777,6 +4777,16 @@ TEST (plugin_factories_create_reuse_and_fallback)
     CHECK (instrumentsMade == 1 && effectsMade == 1);
     CHECK (a->instruments.size() == 2 && a->instruments[1] != nullptr); // missing: muted, but it exists
 
+    // Default startup keeps the established reuse contract: saving/capturing
+    // different serialized bytes by itself must not recreate hosted instances.
+    auto storedOnly = s;
+    storedOnly.channels[0].plugin.state = "captured instrument without opt-in";
+    storedOnly.mixer[1].effects[0].plugin.state = "captured effect without opt-in";
+    auto ordinary = lynx::RackState::build (storedOnly, a.get(), 48000.0, f);
+    CHECK (instrumentsMade == 1 && effectsMade == 1);
+    CHECK (ordinary->instruments[0] == a->instruments[0] && ordinary->effects[1][0] == a->effects[1][0]);
+    f.restorePluginState = true;
+
     // An intentional stored-state edit (and its undo) must actually reach the
     // hosted instance. A metadata-only capture sync updates both Song and prior
     // shape before building, and continues to reuse the running plugin.

@@ -54,6 +54,8 @@ public:
 
     // Opens .lynx or .flp (also used by the command line).
     void openFile (const juce::File& file);
+    // The document currently saved/opened, empty for an unsaved or imported song.
+    juce::File getCurrentProjectFile() const { return currentFile; }
     void showSetupWizard(); // first run, or Options > Setup wizard (an overlay over this component)
     void closeSetupWizardForSnapshot() { setupOverlay.reset(); }
     void refreshTweakReadoutForSnapshot() { refreshTweakReadout(); resized(); }

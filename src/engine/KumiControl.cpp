@@ -2,6 +2,10 @@
 #include "engine/AudioEngine.h"
 #include "engine/KumiPluginControl.h"
 #include "engine/KumiPlaylistControl.h"
+#include "engine/KumiInstrumentControl.h"
+#include "engine/KumiJsonLimits.h"
+#include "engine/KumiAuthentication.h"
+#include "core/SessionIds.h"
 
 #include <algorithm>
 #include <atomic>
@@ -23,6 +27,8 @@ namespace lynx
 namespace
 {
 constexpr std::size_t maxMessage = 1024 * 1024;
+constexpr std::size_t maxHandshake = 1024;
+constexpr const char* protocol = "lynx-kumi/2";
 constexpr juce::int64 maxTick = 1000000000;
 using Field = std::pair<const char*, juce::var>;
 
@@ -100,15 +106,6 @@ juce::String randomToken()
 #endif
 }
 
-bool sameToken (const juce::String& supplied, const juce::String& expected)
-{
-    if (supplied.length() != expected.length())
-        return false;
-    unsigned difference = 0;
-    for (int i = 0; i < expected.length(); ++i)
-        difference |= (unsigned) (supplied[i] ^ expected[i]);
-    return difference == 0;
-}
 
 void writeDiscovery (const juce::File& file, const juce::String& json)
 {
@@ -191,10 +188,10 @@ struct KumiControl::Impl final : juce::Thread
 {
     struct State
     {
-        State (AudioEngine& e, std::function<juce::String()> name)
-            : engine (e), projectName (std::move (name)), controlEpoch (randomToken()) {}
+        State (AudioEngine& e, std::function<juce::String()> name, std::function<juce::String()> path)
+            : engine (e), projectName (std::move (name)), projectPath (std::move (path)), controlEpoch (randomToken()) {}
         AudioEngine& engine;
-        std::function<juce::String()> projectName;
+        std::function<juce::String()> projectName, projectPath;
         // Public boot identity, generated independently of the private authentication token.
         const juce::String controlEpoch;
         std::atomic<bool> active { true };
@@ -211,7 +208,7 @@ struct KumiControl::Impl final : juce::Thread
                     : c.instrument == InstrumentKind::sampler ? juce::String ("sampler")
                     : c.instrument == InstrumentKind::audioClip ? juce::String ("audioClip")
                     : juce::String ("native:") + juce::String ((int) c.instrument);
-                channels.add (object ({ { "index", (int) i }, { "name", text (c.name) }, { "instrument", instrument },
+                channels.add (object ({ { "index", (int) i }, { "channelId", text (uids::toHex (c.uid)) }, { "name", text (c.name) }, { "instrument", instrument },
                                        { "volume", c.volume }, { "pan", c.pan }, { "muted", c.muted }, { "mixer", c.mixerTrack } }));
             }
             for (std::size_t i = 0; i < s.mixer.size(); ++i)
@@ -221,7 +218,7 @@ struct KumiControl::Impl final : juce::Thread
                                     { "pan", m.pan }, { "muted", m.muted }, { "solo", m.solo } }));
             }
             for (std::size_t i = 0; i < s.patterns.size(); ++i)
-                patterns.add (object ({ { "index", (int) i }, { "name", text (s.patterns[i].name) },
+                patterns.add (object ({ { "index", (int) i }, { "patternId", text (uids::toHex (s.patterns[i].uid)) }, { "name", text (s.patterns[i].name) },
                                        { "noteCount", (int) s.patterns[i].notes.size() } }));
             for (std::size_t i = 0; i < s.playlist.size(); ++i)
             {
@@ -231,13 +228,14 @@ struct KumiControl::Impl final : juce::Thread
                                        { "start", (juce::int64) c.start }, { "length", (juce::int64) c.length },
                                        { "offset", (juce::int64) c.offset }, { "muted", c.muted } }));
             }
-            return object ({ { "project", object ({ { "name", projectName() }, { "id", text (s.projectId) }, { "modified", engine.isModified() } }) },
-                            { "controlEpoch", controlEpoch },
-                            { "bpm", s.bpm }, { "beatsPerBar", s.beatsPerBar }, { "playing", t.playing.load() },
+            return object ({ { "project", object ({ { "name", projectName() }, { "id", text (s.projectId) },
+                                                              { "path", projectPath ? projectPath() : juce::String() }, { "modified", engine.isModified() } }) },
+                            { "controlEpoch", controlEpoch }, { "appVersion", JUCE_APPLICATION_VERSION_STRING },
+                            { "bpm", s.bpm }, { "beatsPerBar", s.beatsPerBar }, { "playing", t.playing.load() }, { "recording", engine.isRecording() },
                             { "songMode", s.mode == PlayMode::song }, { "positionTicks", t.positionTicks.load() },
                             { "ppq", ppq }, { "channels", channels }, { "mixer", mixer }, { "patterns", patterns },
                             { "currentPattern", s.currentPattern }, { "playlist", playlist },
-                            { "capabilities", object ({ { "pluginParameters", true }, { "effects", true }, { "playlist", true } }) },
+                            { "capabilities", object ({ { "pluginParameters", true }, { "effects", true }, { "playlist", true }, { "instruments", true } }) },
                             { "canUndo", engine.canUndo() }, { "canRedo", engine.canRedo() },
                             { "revision", (juce::int64) engine.getSongStamp() } });
         }
@@ -251,20 +249,37 @@ struct KumiControl::Impl final : juce::Thread
             if (op == "pattern.notes")
             {
                 const auto index = indexFor (args, s.patterns.size());
+                const auto& source = s.patterns[(std::size_t) index].notes;
+                const auto total = (juce::int64) source.size();
+                const auto offset = args.hasProperty ("offset") ? integer (args, "offset", 0, 1000000000) : 0;
+                const auto paged = args.hasProperty ("offset") || args.hasProperty ("limit");
+                const auto limit = args.hasProperty ("limit") ? integer (args, "limit", 1, 256) : (paged ? 256 : total);
                 juce::Array<juce::var> notes;
-                for (const auto& note : s.patterns[(std::size_t) index].notes)
-                    notes.add (noteValue (note));
-                return object ({ { "index", index }, { "notes", notes },
-                                 { "revision", (juce::int64) engine.getSongStamp() } });
+                for (auto i = offset; i < total && i - offset < limit; ++i)
+                    notes.add (noteValue (source[(std::size_t) i]));
+                auto result = object ({ { "index", index }, { "notes", notes }, { "offset", offset }, { "totalNotes", total },
+                                        { "revision", (juce::int64) engine.getSongStamp() } });
+                if (offset < total && total - offset > limit) result.getDynamicObject()->setProperty ("nextOffset", offset + limit);
+                return result;
             }
             if (op == "plugin.inspect" || op == "effect.catalog")
                 return dispatchKumiPlugin (engine, op, args, cancelled);
+            if (op == "instrument.catalog")
+                return dispatchKumiInstrument (engine, op, args, cancelled);
             if (op == "playlist.inspect")
                 return dispatchKumiPlaylist (engine, op, args);
 
+            // An authenticated emergency stop must work even when the project or
+            // revision has changed since Kumi's last observation.
+            if (op == "transport.stop")
+            {
+                engine.stop();
+                return object ({ { "playing", false } });
+            }
+
             if (op != "transport.play" && op != "transport.stop" && op != "tempo.set" && op != "mixer.set"
                 && op != "channel.set" && op != "pattern.replace_notes" && op != "history.undo" && op != "history.redo"
-                && ! isKumiPluginOperation (op) && ! isKumiPlaylistOperation (op))
+                && ! isKumiPluginOperation (op) && ! isKumiPlaylistOperation (op) && ! isKumiInstrumentOperation (op))
                 invalid ("Unsupported operation: " + op);
 
             // Every mutation is bound to the project and revision Kumi actually observed. This also protects shared
@@ -282,6 +297,8 @@ struct KumiControl::Impl final : juce::Thread
                 invalid ("Stop recording before changing the project through Kumi");
             if (isKumiPluginOperation (op))
                 return dispatchKumiPlugin (engine, op, args, cancelled);
+            if (isKumiInstrumentOperation (op))
+                return dispatchKumiInstrument (engine, op, args, cancelled);
             if (isKumiPlaylistOperation (op))
                 return dispatchKumiPlaylist (engine, op, args);
 
@@ -289,11 +306,6 @@ struct KumiControl::Impl final : juce::Thread
             {
                 engine.startPlayback();
                 return object ({ { "playing", engine.getTransport().playing.load() } });
-            }
-            if (op == "transport.stop")
-            {
-                engine.stop();
-                return object ({ { "playing", false } });
             }
             if (op == "tempo.set")
             {
@@ -388,8 +400,8 @@ struct KumiControl::Impl final : juce::Thread
         std::atomic<bool> cancelled { false };
     };
 
-    Impl (AudioEngine& engine, std::function<juce::String()> name, juce::File file)
-        : juce::Thread ("Kumi control"), state (std::make_shared<State> (engine, std::move (name))),
+    Impl (AudioEngine& engine, std::function<juce::String()> name, std::function<juce::String()> path, juce::File file)
+        : juce::Thread ("Kumi control"), state (std::make_shared<State> (engine, std::move (name), std::move (path))),
           discovery (std::move (file)), token (randomToken())
     {
         if (! listener.createListener (0, "127.0.0.1"))
@@ -405,8 +417,8 @@ struct KumiControl::Impl final : juce::Thread
         pid = (juce::int64) ::getpid();
 #endif
         writeDiscovery (discovery, juce::JSON::toString (object ({
-            { "protocol", "lynx-kumi/1" }, { "host", "127.0.0.1" }, { "port", listener.getBoundPort() },
-            { "token", token }, { "pid", pid } }), true));
+            { "protocol", protocol }, { "host", "127.0.0.1" }, { "port", listener.getBoundPort() },
+            { "token", token }, { "pid", pid }, { "appVersion", JUCE_APPLICATION_VERSION_STRING } }), true));
         startThread();
     }
 
@@ -424,11 +436,14 @@ struct KumiControl::Impl final : juce::Thread
 
     juce::var request (const juce::String& json)
     {
+        const auto utf8 = json.toRawUTF8();
+        if (! kumi_json::withinNestingLimit (std::string_view (utf8, json.getNumBytesAsUTF8())))
+            return failure ("JSON nesting exceeds the control request limit");
         juce::var input;
         if (juce::JSON::parse (json, input).failed() || input.getDynamicObject() == nullptr)
             return failure ("Invalid JSON request");
-        if (! input["token"].isString() || ! sameToken (input["token"].toString(), token))
-            return failure ("Authentication failed");
+        if (input.getDynamicObject()->getProperties().size() != 2 || input.hasProperty ("token"))
+            return failure ("Authenticated requests require only op and args");
         if (! input["op"].isString() || input["op"].toString().length() > 100
             || input["args"].getDynamicObject() == nullptr)
             return failure ("Request needs an operation string and an args object");
@@ -460,7 +475,8 @@ struct KumiControl::Impl final : juce::Thread
         }))
             return failure ("The LYNX message loop is unavailable");
         const auto longOperation = work->op == "plugin.parameters_set" || work->op == "effect.load"
-                                || work->op == "history.undo" || work->op == "history.redo";
+                                || work->op == "history.undo" || work->op == "history.redo"
+                                || work->op == "channel.create" || work->op == "instrument.replace";
         const auto deadline = juce::Time::getMillisecondCounterHiRes() + (longOperation ? 60000.0 : 5000.0);
         while (state->active && ! threadShouldExit() && juce::Time::getMillisecondCounterHiRes() < deadline)
             if (work->finished.wait (50))
@@ -469,68 +485,106 @@ struct KumiControl::Impl final : juce::Thread
         return failure ("LYNX did not answer in time; the change may have run. Inspect the session before retrying");
     }
 
+    bool readLine (juce::StreamingSocket& socket, std::string& pending, std::string& line,
+                   std::size_t limit, double deadline)
+    {
+        while (state->active && ! threadShouldExit() && juce::Time::getMillisecondCounterHiRes() < deadline)
+        {
+            if (const auto newline = pending.find ('\n'); newline != std::string::npos)
+            {
+                if (newline > limit) return false;
+                line = pending.substr (0, newline);
+                pending.erase (0, newline + 1);
+                return true;
+            }
+            if (pending.size() > limit) return false;
+            if (socket.waitUntilReady (true, 50) <= 0) continue;
+            char chunk[4096];
+            const auto amount = (int) std::min<std::size_t> (sizeof (chunk), limit + 1 - pending.size());
+            const auto count = socket.read (chunk, amount, false);
+            if (count <= 0) return false;
+            pending.append (chunk, (std::size_t) count);
+        }
+        return false;
+    }
+
+    bool writeFrame (juce::StreamingSocket& socket, const juce::var& value, std::size_t limit, double deadline)
+    {
+        auto output = juce::JSON::toString (value, true).toStdString();
+        if (output.size() > limit) return false;
+        output += '\n';
+        std::size_t sent = 0;
+        while (sent < output.size() && state->active && ! threadShouldExit()
+               && juce::Time::getMillisecondCounterHiRes() < deadline)
+        {
+            if (socket.waitUntilReady (false, 50) <= 0) continue;
+            const auto amount = (int) std::min<std::size_t> (16384, output.size() - sent);
+#if JUCE_LINUX
+            const auto count = ::send (socket.getRawSocketHandle(), output.data() + sent, (std::size_t) amount, MSG_NOSIGNAL);
+#else
+            const auto count = socket.write (output.data() + sent, amount);
+#endif
+            if (count <= 0) return false;
+            sent += (std::size_t) count;
+        }
+        return sent == output.size();
+    }
+
+    bool authenticate (juce::StreamingSocket& socket, std::string& pending)
+    {
+        const auto deadline = juce::Time::getMillisecondCounterHiRes() + 2000.0;
+        std::string line;
+        if (! readLine (socket, pending, line, maxHandshake, deadline)
+            || ! kumi_json::withinNestingLimit (line, 8)) return false;
+        juce::var hello;
+        if (juce::JSON::parse (juce::String::fromUTF8 (line.data(), (int) line.size()), hello).failed()
+            || hello.getDynamicObject() == nullptr || hello.getDynamicObject()->getProperties().size() != 3
+            || hello["type"].toString() != "hello" || hello["protocol"].toString() != protocol
+            || ! hello["nonce"].isString() || ! kumi_auth::isLowerHex (hello["nonce"].toString().toStdString(), 32))
+            return false;
+        const auto clientNonce = hello["nonce"].toString().toStdString();
+        const auto serverNonce = randomToken().substring (0, 32).toStdString();
+        const auto key = token.toStdString();
+        const auto challenge = object ({ { "type", "challenge" }, { "protocol", protocol },
+                                        { "nonce", text (serverNonce) }, { "proof", text (kumi_auth::proof (key, "server", clientNonce, serverNonce)) } });
+        if (! writeFrame (socket, challenge, maxHandshake, deadline)
+            || ! readLine (socket, pending, line, maxHandshake, deadline)
+            || ! kumi_json::withinNestingLimit (line, 8)) return false;
+        juce::var auth;
+        if (juce::JSON::parse (juce::String::fromUTF8 (line.data(), (int) line.size()), auth).failed()
+            || auth.getDynamicObject() == nullptr || auth.getDynamicObject()->getProperties().size() != 2
+            || auth["type"].toString() != "auth" || ! auth["proof"].isString()) return false;
+        const auto supplied = auth["proof"].toString().toStdString();
+        if (! kumi_auth::isLowerHex (supplied, 64)
+            || ! kumi_auth::constantTimeEqual (supplied, kumi_auth::proof (key, "client", clientNonce, serverNonce))) return false;
+        return writeFrame (socket, object ({ { "type", "ready" }, { "protocol", protocol } }), maxHandshake, deadline);
+    }
+
     void connection (juce::StreamingSocket& socket)
     {
 #if JUCE_MAC || JUCE_LINUX || JUCE_BSD
         const auto fd = socket.getRawSocketHandle();
         const auto flags = ::fcntl (fd, F_GETFL, 0);
-        if (flags < 0 || ::fcntl (fd, F_SETFL, flags | O_NONBLOCK) != 0)
-            return;
+        if (flags < 0 || ::fcntl (fd, F_SETFL, flags | O_NONBLOCK) != 0) return;
 #if JUCE_MAC || JUCE_BSD
         const int noSigPipe = 1;
-        if (::setsockopt (fd, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, sizeof (noSigPipe)) != 0)
+        if (::setsockopt (fd, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, sizeof (noSigPipe)) != 0) return;
+#endif
+#endif
+        std::string pending;
+        if (! authenticate (socket, pending))
+        {
+            writeFrame (socket, failure ("Authentication failed; lynx-kumi/2 mutual authentication is required"),
+                        maxHandshake, juce::Time::getMillisecondCounterHiRes() + 500.0);
             return;
-#endif
-#endif
-        std::string bytes;
-        juce::var response;
-        bool complete = false;
-        const auto deadline = juce::Time::getMillisecondCounterHiRes() + 2000.0;
-        while (state->active && ! threadShouldExit() && juce::Time::getMillisecondCounterHiRes() < deadline)
-        {
-            if (socket.waitUntilReady (true, 100) <= 0)
-                continue;
-            char chunk[4096];
-            const auto read = socket.read (chunk, sizeof (chunk), false);
-            if (read <= 0)
-                break;
-            bytes.append (chunk, (std::size_t) read);
-            if (bytes.size() > maxMessage)
-            {
-                response = failure ("Request exceeds 1 MiB");
-                complete = true;
-                break;
-            }
-            if (const auto newline = bytes.find ('\n'); newline != std::string::npos)
-            {
-                response = request (juce::String::fromUTF8 (bytes.data(), (int) newline));
-                complete = true;
-                break;
-            }
         }
-        if (! complete)
-            response = failure ("Request did not finish within two seconds");
-        auto output = juce::JSON::toString (response, true).toStdString();
-        if (output.size() > maxMessage)
-            output = juce::JSON::toString (failure ("Response exceeds 1 MiB; request a smaller collection"), true).toStdString();
-        output += '\n';
-        std::size_t sent = 0;
-        const auto writeDeadline = juce::Time::getMillisecondCounterHiRes() + 2000.0;
-        while (sent < output.size() && state->active && ! threadShouldExit()
-               && juce::Time::getMillisecondCounterHiRes() < writeDeadline)
-        {
-            if (socket.waitUntilReady (false, 100) <= 0)
-                continue;
-            const auto amount = (int) std::min<std::size_t> (16384, output.size() - sent);
-#if JUCE_LINUX
-            const auto count = ::send (fd, output.data() + sent, (std::size_t) amount, MSG_NOSIGNAL);
-#else
-            const auto count = socket.write (output.data() + sent, amount);
-#endif
-            if (count <= 0)
-                break;
-            sent += (std::size_t) count;
-        }
+        std::string line;
+        auto response = readLine (socket, pending, line, maxMessage, juce::Time::getMillisecondCounterHiRes() + 2000.0)
+            ? request (juce::String::fromUTF8 (line.data(), (int) line.size()))
+            : failure ("Authenticated request exceeded its byte or time limit");
+        if (juce::JSON::toString (response, true).getNumBytesAsUTF8() > maxMessage)
+            response = failure ("Response exceeds 1 MiB; request a smaller collection");
+        writeFrame (socket, response, maxMessage, juce::Time::getMillisecondCounterHiRes() + 2000.0);
     }
 
     void run() override
@@ -555,7 +609,8 @@ struct KumiControl::Impl final : juce::Thread
 KumiControl::KumiControl (std::unique_ptr<Impl> value) : impl (std::move (value)) {}
 KumiControl::~KumiControl() = default;
 
-std::unique_ptr<KumiControl> KumiControl::create (AudioEngine& engine, std::function<juce::String()> name)
+std::unique_ptr<KumiControl> KumiControl::create (AudioEngine& engine, std::function<juce::String()> name,
+                                                  std::function<juce::String()> projectPath)
 {
     const auto path = juce::SystemStats::getEnvironmentVariable ("LYNX_KUMI_DISCOVERY", {});
     if (path.isEmpty())
@@ -564,7 +619,9 @@ std::unique_ptr<KumiControl> KumiControl::create (AudioEngine& engine, std::func
     {
         if (! juce::File::isAbsolutePath (path))
             invalid ("LYNX_KUMI_DISCOVERY must be an absolute path");
-        return std::unique_ptr<KumiControl> (new KumiControl (std::make_unique<Impl> (engine, std::move (name), juce::File (path))));
+        auto control = std::unique_ptr<KumiControl> (new KumiControl (std::make_unique<Impl> (engine, std::move (name), std::move (projectPath), juce::File (path))));
+        engine.enableExternalPluginStateRestore();
+        return control;
     }
     catch (const std::exception& e)
     {

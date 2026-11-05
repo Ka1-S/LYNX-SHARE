@@ -1468,6 +1468,9 @@ public:
             const auto title = mainWindow != nullptr ? mainWindow->getName() : juce::String ("Untitled");
             const auto separator = title.indexOf (" - ");
             return separator >= 0 ? title.substring (separator + 3) : title;
+        }, [this] {
+            const auto file = mainWindow != nullptr ? mainWindow->getContent().getCurrentProjectFile() : juce::File();
+            return file == juce::File() ? juce::String() : file.getFullPathName();
         });
     }
 

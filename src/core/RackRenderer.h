@@ -241,6 +241,9 @@ struct RackState
         StretchedSampleProvider stretchedSamples;
         PluginInstrumentFactory pluginInstruments;
         PluginEffectFactory pluginEffects;
+        // External control may intentionally replace saved hosted state. Ordinary
+        // rack edits retain their existing instance reuse semantics by default.
+        bool restorePluginState = false;
     };
 
     // Builds the next state reusing the instruments from `previous` when the
