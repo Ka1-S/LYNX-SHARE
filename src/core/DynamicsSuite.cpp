@@ -336,6 +336,9 @@ double variMuShare (double s, double o) noexcept
     return std::min (1.0, f / 0.96);
 }
 
+// the most an upward curve lifts (dB), whatever the range (round tp172b3, measured)
+constexpr double upwardCapDb = 30.0;
+
 // target gain change (dB; negative = reduction) for a detector level `x` (dB)
 double curveGain (Style st, double x, double thr, double r, double knee, double range) noexcept
 {
@@ -350,15 +353,19 @@ double curveGain (Style st, double x, double thr, double r, double knee, double 
             const auto kn = d.kneeAdd + d.kneeScale * knee + d.kneeSlope * s;
             const auto softMin = x - kneeCurve (x - thr, 1.0, kn);
             const auto g = s * d.slopeScale * (thr + d.offsetDb - softMin);
-            return std::clamp (g, -range, range);
+            // round tp172b3 [EXEC] (the Pro-C 3 trial, Upward, drums and bursts after digital silence): the lift stops
+            // at 30 dB whatever the range (a 30 ms attack lets the first hit through 29.5 dB up, as the original)
+            return std::clamp (g, -range, std::min (range, upwardCapDb));
         }
         case Curve::twoWay:
         {
             // two-way: a fixed offset, upward compression below (threshold − 6 dB), downward above (threshold + 4 dB)
             const auto kn = d.kneeAdd + d.kneeScale * knee + d.kneeSlope * s;
-            const auto g = d.baseDb * s + d.upSlope * s * std::max (0.0, thr - 6.0 - x)
-                         - d.slopeScale * kneeCurve (x - thr - 4.0 - d.offsetDb, s, kn);
-            return std::clamp (g, -range, range);
+            // round tp172b3: the upward part only over the 30 dB under its corner and not on silence (under −90 dBFS:
+            // the original's first hit after digital silence comes out turned down, never lifted)
+            const auto up = x < -90.0 ? 0.0 : d.upSlope * s * std::clamp (thr - 6.0 - x, 0.0, upwardCapDb);
+            const auto g = d.baseDb * s + up - d.slopeScale * kneeCurve (x - thr - 4.0 - d.offsetDb, s, kn);
+            return std::clamp (g, -range, std::min (range, upwardCapDb));
         }
         case Curve::vocal:
         {
