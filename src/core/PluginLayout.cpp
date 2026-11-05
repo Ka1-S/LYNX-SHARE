@@ -2047,25 +2047,31 @@ Layout withEmberClassic (Layout l)
         if (it.whenParam == nullptr || it.when2Param == nullptr)
             it = when (it, "Voicing", 0.0f, 0.5f);
     auto add = [&l] (LayoutItem it) { l.items.push_back (when (it, "Voicing", 0.5f, 1.0f)); };
-    add (section (4, 4, 512, 432, TR_NOOP ("Classic")));
-    add (toggle (24, 44, 104, 28, "Classic punish", TR_NOOP ("Punish")));
-    auto vu = display (152, 28, 216, 136, "vumeter");
+    // round tp172d: the reference's hardware panel, wider than tall (its proportions): Punish top left, the VU in the
+    // middle with the name right of it, Output + Auto under the name, the big Drive left, Low cut (Thump under it),
+    // Tone, High cut (Steep under it) and Mix in one row, the five style buttons along the bottom; "Advanced" opens
+    // Ember's own multiband page (the Voicing switch, lit while it is off)
+    l.width = 760; // (Ember's own page stays 520 wide at the left)
+    add (section (34, 8, 692, 364, nullptr, boxed)); // (inside the wooden cheeks)
+    add (toggle (56, 46, 132, 30, "Classic punish", TR_NOOP ("Punish")));
+    auto vu = display (262, 16, 236, 140, "vumeter");
     vu.steps = 0;
     add (vu);
-    add (dial (434, 84, 56, "Classic output", TR_NOOP ("Output")));
-    add (toggle (400, 156, 68, 20, "Classic auto", TR_NOOP ("Auto")));
-    add (dial (86, 222, 104, "Classic drive", TR_NOOP ("Drive"), big));
-    add (dial (204, 268, 50, "Classic low cut", TR_NOOP ("Low cut")));
-    add (dial (300, 268, 50, "Classic tone", TR_NOOP ("Tone"), bipolar));
-    add (dial (396, 268, 50, "Classic high cut", TR_NOOP ("High cut")));
-    add (dial (474, 222, 50, "Classic mix", TR_NOOP ("Mix")));
-    add (toggle (168, 336, 72, 20, "Classic thump", TR_NOOP ("Thump")));
-    add (toggle (360, 336, 72, 20, "Classic steep", TR_NOOP ("Steep")));
-    add (label (24, 368, 280, 14, TR_NOOP ("Style")));
-    add (tabs (24, 384, 300, 32, "Classic style", TR_NOOP ("A|E|N|T|P")));
+    add (label (516, 38, 200, 40, "EMBER", dim | alignLeft));
+    add (dial (582, 140, 58, "Classic output", TR_NOOP ("Output")));
+    add (toggle (630, 128, 90, 22, "Classic auto", TR_NOOP ("Auto")));
+    add (dial (118, 214, 118, "Classic drive", TR_NOOP ("Drive"), big));
+    add (dial (300, 244, 62, "Classic low cut", TR_NOOP ("Low cut")));
+    add (dial (424, 244, 62, "Classic tone", TR_NOOP ("Tone"), bipolar));
+    add (dial (548, 244, 62, "Classic high cut", TR_NOOP ("High cut")));
+    add (dial (672, 244, 62, "Classic mix", TR_NOOP ("Mix")));
+    add (toggle (264, 302, 80, 22, "Classic thump", TR_NOOP ("Thump")));
+    add (toggle (512, 302, 80, 22, "Classic steep", TR_NOOP ("Steep")));
+    add (tabs (196, 330, 330, 34, "Classic style", TR_NOOP ("A|E|N|T|P")));
+    add (label (536, 330, 80, 34, TR_NOOP ("Style"), alignLeft));
     // projects saved before round 165 keep round 136's Punish until switched to the measured law
-    add (when (tabs (344, 360, 152, 20, "Classic law", TR_NOOP ("Old|Measured")), "Classic law", 0.0f, 0.5f));
-    add (toggle (344, 392, 152, 24, "Voicing", TR_NOOP ("Classic")));
+    add (when (tabs (40, 336, 150, 22, "Classic law", TR_NOOP ("Old|Measured")), "Classic law", 0.0f, 0.5f));
+    add (toggle (604, 336, 116, 24, "Voicing", TR_NOOP ("Advanced"), inverted));
     return l;
 }
 
@@ -2783,9 +2789,9 @@ Layout voiceShiftLayout()
     // MODE buttons in the middle, DRIVE and MIX on the right
     Layout l;
     l.width = 640;
-    l.height = 230;
+    l.height = 272; // round tp172d: + the name strip along the bottom (the original's)
     auto& v = l.items;
-    v.push_back (section (4, 4, 300, 222, TR_NOOP ("Pitch / formant")));
+    v.push_back (section (4, 4, 300, 222, nullptr, boxed)); // (tp172d: its two captions name it, as on the original)
     v.push_back (knob (80, 100, 78, "Pitch", TR_NOOP ("Pitch"), 0, (std::uint16_t) (big | bipolar | noCaption)));
     v.push_back (label (40, 28, 80, 16, TR_NOOP ("Pitch")));
     v.push_back (value (44, 176, 72, 24, "Pitch", boxed));
@@ -2800,6 +2806,7 @@ Layout voiceShiftLayout()
     v.push_back (section (446, 4, 190, 222, nullptr, boxed));
     v.push_back (dial (494, 100, 60, "Drive", TR_NOOP ("Drive"), big));
     v.push_back (dial (588, 100, 60, "Mix", TR_NOOP ("Mix"), big));
+    v.push_back (label (16, 232, 320, 34, "VOICE SHIFT", dim | alignLeft));
     return l;
 }
 
@@ -3138,93 +3145,85 @@ Layout echoformLayout()
     l.height = 446; // round 135w: + a second row of switches (was 300); round 137: + the Rhythm row (was 330);
                     // round 144: + the rhythm editor (was 352)
     auto& v = l.items;
-    const auto top = 4.0f, h = 232.0f, k1 = 66.0f, k2 = 160.0f, d = 34.0f;
-    // mix + style
-    v.push_back (section (4, top, 80, h, TR_NOOP ("Mix")));
-    v.push_back (dial (44, k1, d, "Mix", TR_NOOP ("Mix")));
-    v.push_back (stepped (dial (44, k2, d, "Style", TR_NOOP ("Style")), 4));
-    // delay: the left time (ms or note) and the second knob of the style: spread, ratio, spacing or the right time
-    v.push_back (section (88, top, 188, h, TR_NOOP ("Delay")));
+    // round tp172d: EchoBoy's arrangement (its role) — three rounded pods: the echo (Mix, the echo time, Feedback;
+    // Low cut, Prime numbers, High cut under them), the tempo (tap, Groove, Feel, the echo mode) and the saturation
+    // (Saturation, Age, Output; the style menus); the Tweak strip under them, then the switch rows and Style edit
+    l.height = 556;
+    // the echo pod
+    v.push_back (section (4, 4, 446, 252, nullptr, boxed));
+    v.push_back (dial (70, 70, 56, "Mix", TR_NOOP ("Mix")));
     // round 129: "Delay L" when the style has a right time (dual, ping-pong), as on the reference
-    v.push_back (when (when (dial (138, 76, 54, "Time L", TR_NOOP ("Delay"), big), "Sync L", 0.0f, 0.5f), "Style", 0.0f, 0.6f));
-    v.push_back (when (when (stepped (dial (138, 76, 54, "Note L", TR_NOOP ("Delay"), big), 9), "Sync L", 0.5f, 1.0f), "Style", 0.0f, 0.6f));
-    v.push_back (when (when (dial (138, 76, 54, "Time L", TR_NOOP ("Delay L"), big), "Sync L", 0.0f, 0.5f), "Style", 0.6f, 1.0f));
-    v.push_back (when (when (stepped (dial (138, 76, 54, "Note L", TR_NOOP ("Delay L"), big), 9), "Sync L", 0.5f, 1.0f), "Style", 0.6f, 1.0f));
-    v.push_back (when (dial (228, 76, 54, "Spread", TR_NOOP ("Spread"), (std::uint16_t) (big | bipolar)), "Style", 0.0f, 0.2f));
-    v.push_back (when (dial (228, 76, 54, "Ratio", TR_NOOP ("Ratio"), big), "Style", 0.2f, 0.4f));
-    v.push_back (when (dial (228, 76, 54, "Spacing", TR_NOOP ("Spacing"), (std::uint16_t) (big | bipolar)), "Style", 0.4f, 0.6f));
-    v.push_back (when (when (dial (228, 76, 54, "Time R", TR_NOOP ("Delay R"), big), "Style", 0.6f, 1.0f), "Sync R", 0.0f, 0.5f));
-    v.push_back (when (when (stepped (dial (228, 76, 54, "Note R", TR_NOOP ("Delay R"), big), 9), "Style", 0.6f, 1.0f), "Sync R", 0.5f, 1.0f));
+    v.push_back (when (when (dial (200, 70, 62, "Time L", TR_NOOP ("Echo time"), big), "Sync L", 0.0f, 0.5f), "Style", 0.0f, 0.6f));
+    v.push_back (when (when (stepped (dial (200, 70, 62, "Note L", TR_NOOP ("Echo time"), big), 9), "Sync L", 0.5f, 1.0f), "Style", 0.0f, 0.6f));
+    v.push_back (when (when (dial (200, 70, 62, "Time L", TR_NOOP ("Delay L"), big), "Sync L", 0.0f, 0.5f), "Style", 0.6f, 1.0f));
+    v.push_back (when (when (stepped (dial (200, 70, 62, "Note L", TR_NOOP ("Delay L"), big), 9), "Sync L", 0.5f, 1.0f), "Style", 0.6f, 1.0f));
+    v.push_back (when (dial (284, 70, 44, "Spread", TR_NOOP ("Spread"), bipolar), "Style", 0.0f, 0.2f));
+    v.push_back (when (dial (284, 70, 44, "Ratio", TR_NOOP ("Ratio")), "Style", 0.2f, 0.4f));
+    v.push_back (when (dial (284, 70, 44, "Spacing", TR_NOOP ("Spacing"), bipolar), "Style", 0.4f, 0.6f));
+    v.push_back (when (when (dial (284, 70, 44, "Time R", TR_NOOP ("Delay R")), "Style", 0.6f, 1.0f), "Sync R", 0.0f, 0.5f));
+    v.push_back (when (when (stepped (dial (284, 70, 44, "Note R", TR_NOOP ("Delay R")), 9), "Style", 0.6f, 1.0f), "Sync R", 0.5f, 1.0f));
+    v.push_back (dial (384, 70, 56, "Feedback", TR_NOOP ("Feedback")));
     const std::vector<float> syncValues { 0.25f, 0.5f, 0.75f, 1.0f };
-    v.push_back (menuOf (100, 150, 76, 20, "Sync L", TR_NOOP ("Sync"), TR_NOOP ("ms|Note|Dotted|Triplet"), syncValues));
-    v.push_back (when (menuOf (190, 150, 76, 20, "Sync R", TR_NOOP ("Sync"), TR_NOOP ("ms|Note|Dotted|Triplet"), syncValues), "Style", 0.6f, 1.0f));
+    v.push_back (menuOf (158, 120, 84, 20, "Sync L", TR_NOOP ("Sync"), TR_NOOP ("ms|Note|Dotted|Triplet"), syncValues));
+    v.push_back (when (menuOf (246, 120, 76, 20, "Sync R", TR_NOOP ("Sync"), TR_NOOP ("ms|Note|Dotted|Triplet"), syncValues), "Style", 0.6f, 1.0f));
+    // quad: Repeat / Swell where the right sync menu sits in the two-time styles
+    v.push_back (when (tabs (246, 120, 76, 20, "Swell", TR_NOOP ("Repeat|Swell")), "Style", 0.4f, 0.6f));
     // the echo train (round 137: in Rhythm mode, three passes of the pattern; round 144: edited in the rhythm editor below)
-    v.push_back (display (96, 180, 172, 50, "echotrain"));
-    // feedback + width
-    v.push_back (section (280, top, 80, h, TR_NOOP ("Feedback")));
-    v.push_back (dial (320, k1, d, "Feedback", TR_NOOP ("Feedback")));
-    v.push_back (dial (320, k2, d, "Width", TR_NOOP ("Width"), bipolar));
-    // colour
-    v.push_back (section (364, top, 80, h, TR_NOOP ("Colour")));
-    v.push_back (dial (404, k1, d, "Drive", TR_NOOP ("Drive")));
-    v.push_back (dial (404, k2, d, "Age", TR_NOOP ("Age")));
-    // diffusion
-    v.push_back (section (448, top, 80, h, TR_NOOP ("Diffusion")));
-    v.push_back (dial (488, k1, d, "Diffusion", TR_NOOP ("Amount")));
-    v.push_back (dial (488, k2, d, "Diffusion size", TR_NOOP ("Size")));
+    v.push_back (display (150, 146, 180, 34, "echotrain"));
+    v.push_back (dial (70, 210, 44, "Low cut", TR_NOOP ("Low cut")));
+    v.push_back (toggle (172, 212, 136, 24, "Prime numbers", TR_NOOP ("Prime numbers")));
+    v.push_back (dial (384, 210, 44, "High cut", TR_NOOP ("High cut")));
+    // the tempo pod: a tap-tempo pad (sets the left time), Groove / Feel, the echo mode (single, dual, ping-pong...)
+    v.push_back (section (454, 4, 232, 252, nullptr, boxed));
+    v.push_back (display (500, 24, 140, 30, "taptempo", "Time L", "Sync L"));
+    v.push_back (dial (508, 122, 44, "Groove", TR_NOOP ("Groove"), bipolar));
+    v.push_back (dial (632, 122, 44, "Feel", TR_NOOP ("Feel"), bipolar));
+    v.push_back (stepped (dial (570, 202, 46, "Style", TR_NOOP ("Mode")), 4));
+    // the saturation pod: Saturation (the drive), Age, Output; the echo style (the engine's mode) and the measured tape loops
+    v.push_back (section (690, 4, 256, 252, nullptr, boxed));
+    v.push_back (dial (818, 64, 52, "Drive", TR_NOOP ("Saturation")));
+    v.push_back (dial (740, 130, 40, "Age", TR_NOOP ("Age")));
+    v.push_back (dial (896, 130, 40, "Output", TR_NOOP ("Output"), bipolar)); // round 119
+    v.push_back (label (700, 186, 50, 22, TR_NOOP ("Style"), alignLeft));
+    v.push_back (menuOf (752, 186, 186, 22, "Mode", TR_NOOP ("Style"),
+                         TR_NOOP ("Tape|Lo-Fi|Hi-Fi tape|Bucket brigade|Analog|Digital|Clean|Phaser|Shifter|Pitch|Reverse|Detune"), stepCentres (12)));
+    // round 136: the measured tape-echo loops (EchoBoy's role)
+    v.push_back (label (700, 218, 50, 22, TR_NOOP ("Tape"), alignLeft));
+    v.push_back (menuOf (752, 218, 186, 22, "Tape voicing", TR_NOOP ("Tape voicing"), TR_NOOP ("Off|Ping-pong tape|Studio tape|Studio tape hot"),
+                         { 0.0f, 1.0f / 3.0f, 2.0f / 3.0f, 1.0f }));
+    // TWEAK (EchoBoy's Tweak panel): width, diffusion, the mode's modulation, ducking, accent, the dual-mode cross
+    // feedback, the echoes' balance; the echoes' output level with a clip lamp (H-Delay's meter)
+    v.push_back (section (4, 262, 942, 92, TR_NOOP ("Tweak")));
+    const auto ty = 320.0f, td = 30.0f;
+    v.push_back (dial (54, ty, td, "Width", TR_NOOP ("Width"), bipolar));
+    v.push_back (dial (134, ty, td, "Diffusion", TR_NOOP ("Diffusion")));
+    v.push_back (dial (214, ty, td, "Diffusion size", TR_NOOP ("Size")));
     // modulation: wow / flutter (tape), rate / depth, shift / detune (shifter), pitch / detune (pitch, reverse, detune)
     const auto tape = 1.0f / 12.0f, shifter = 8.0f / 12.0f, pitch = 9.0f / 12.0f, detune = 11.0f / 12.0f;
-    // round 129: the section is named after what it holds in the mode (the reference renames it FREQ / PITCH)
-    v.push_back (when (section (532, top, 80, h, TR_NOOP ("Mod")), "Mode", 0.0f, shifter));
-    v.push_back (when (section (532, top, 80, h, TR_NOOP ("Freq")), "Mode", shifter, pitch));
-    v.push_back (when (section (532, top, 80, h, TR_NOOP ("Pitch")), "Mode", pitch, 1.0f));
-    v.push_back (when (dial (572, k1, d, "Wow", TR_NOOP ("Wow")), "Mode", 0.0f, tape));
-    v.push_back (when (dial (572, k2, d, "Flutter", TR_NOOP ("Flutter")), "Mode", 0.0f, tape));
-    v.push_back (when (dial (572, k1, d, "Mod rate", TR_NOOP ("Rate")), "Mode", tape, shifter));
-    v.push_back (when (dial (572, k2, d, "Mod depth", TR_NOOP ("Depth")), "Mode", tape, shifter));
-    v.push_back (when (dial (572, k1, d, "Shift", TR_NOOP ("Shift"), bipolar), "Mode", shifter, pitch));
-    v.push_back (when (dial (572, k2, d, "Shift detune", TR_NOOP ("Detune"), bipolar), "Mode", shifter, pitch));
-    v.push_back (when (dial (572, k1, d, "Pitch", TR_NOOP ("Pitch"), bipolar), "Mode", pitch, detune));
-    v.push_back (when (dial (572, k2, d, "Pitch detune", TR_NOOP ("Detune"), bipolar), "Mode", pitch, 1.0f));
-    // EQ (high cut above the low cut, as on the hardware-style panels)
-    v.push_back (section (616, top, 80, h, TR_NOOP ("EQ")));
-    v.push_back (dial (656, k1, d, "High cut", TR_NOOP ("High")));
-    v.push_back (dial (656, k2, d, "Low cut", TR_NOOP ("Low")));
-    // ducking
-    v.push_back (section (700, top, 76, h, TR_NOOP ("Output")));
-    v.push_back (dial (738, k1, d, "Ducking", TR_NOOP ("Ducking")));
-    v.push_back (dial (738, k2, d, "Output", TR_NOOP ("Level"), bipolar)); // round 119
+    v.push_back (when (dial (294, ty, td, "Wow", TR_NOOP ("Wow")), "Mode", 0.0f, tape));
+    v.push_back (when (dial (374, ty, td, "Flutter", TR_NOOP ("Flutter")), "Mode", 0.0f, tape));
+    v.push_back (when (dial (294, ty, td, "Mod rate", TR_NOOP ("Rate")), "Mode", tape, shifter));
+    v.push_back (when (dial (374, ty, td, "Mod depth", TR_NOOP ("Depth")), "Mode", tape, shifter));
+    v.push_back (when (dial (294, ty, td, "Shift", TR_NOOP ("Shift"), bipolar), "Mode", shifter, pitch));
+    v.push_back (when (dial (374, ty, td, "Shift detune", TR_NOOP ("Detune"), bipolar), "Mode", shifter, pitch));
+    v.push_back (when (dial (294, ty, td, "Pitch", TR_NOOP ("Pitch"), bipolar), "Mode", pitch, detune));
+    v.push_back (when (dial (374, ty, td, "Pitch detune", TR_NOOP ("Detune"), bipolar), "Mode", pitch, 1.0f));
+    v.push_back (dial (454, ty, td, "Ducking", TR_NOOP ("Ducking")));
+    v.push_back (dial (534, ty, td, "Accent", TR_NOOP ("Accent"), bipolar));
+    v.push_back (dial (614, ty, td, "Cross feedback", TR_NOOP ("X-feed")));
+    v.push_back (dial (694, ty, td, "Balance", TR_NOOP ("Balance"), bipolar));
+    v.push_back (display (904, 266, 38, 84, "outmeter"));
+    // the rows below keep their round 119 … 150 places, under the Tweak strip
+    const auto lowerFrom = v.size();
     // round 119: ping-pong in pairs (shown with the ping-pong style)
     v.push_back (when (toggle (280, 252, 90, 24, "Pairs", TR_NOOP ("Pairs")), "Style", 0.8f, 1.0f));
-    // round 129: the echoes' polarity per side (H-Delay's phase L / R) and a tap-tempo pad (sets the left time)
+    // round 129: the echoes' polarity per side (H-Delay's phase L / R)
     v.push_back (toggle (376, 254, 70, 20, "Phase L", TR_NOOP ("Phase L")));
     v.push_back (toggle (452, 254, 70, 20, "Phase R", TR_NOOP ("Phase R")));
-    v.push_back (display (532, 252, 80, 24, "taptempo", "Time L", "Sync L"));
     // round 124: the hybrid engine (H-Delay's measured loop)
     v.push_back (label (620, 254, 48, 20, TR_NOOP ("Hybrid")));
     v.push_back (menuOf (670, 252, 104, 24, "Hybrid", TR_NOOP ("Hybrid"), TR_NOOP ("Off|Clean|Analog"), { 0.0f, 0.5f, 1.0f }));
-    // round 136: the measured tape-echo loops (EchoBoy's role)
-    v.push_back (label (782, 254, 40, 20, TR_NOOP ("Tape")));
-    v.push_back (menuOf (824, 252, 122, 24, "Tape voicing", TR_NOOP ("Tape voicing"), TR_NOOP ("Off|Ping-pong tape|Studio tape|Studio tape hot"),
-                         { 0.0f, 1.0f / 3.0f, 2.0f / 3.0f, 1.0f }));
-    // the mode selector along the bottom
-    v.push_back (label (8, 254, 52, 20, TR_NOOP ("Mode")));
-    v.push_back (menuOf (64, 252, 200, 24, "Mode", TR_NOOP ("Mode"),
-                         TR_NOOP ("Tape|Lo-Fi|Hi-Fi tape|Bucket brigade|Analog|Digital|Clean|Phaser|Shifter|Pitch|Reverse|Detune"), stepCentres (12)));
-    // ---- round 135w (docs/PARITY.md: H-Delay, ValhallaDelay, EchoBoy / PrimalTap)
-    // TWEAK: EchoBoy's groove / feel / accent, its dual-mode cross feedback, the echoes' balance
-    v.push_back (section (780, top, 124, h, TR_NOOP ("Tweak")));
-    v.push_back (dial (812, 52, 26, "Groove", TR_NOOP ("Groove"), bipolar));
-    v.push_back (dial (812, 124, 26, "Feel", TR_NOOP ("Feel"), bipolar));
-    v.push_back (dial (812, 196, 26, "Accent", TR_NOOP ("Accent"), bipolar));
-    v.push_back (dial (872, 52, 26, "Cross feedback", TR_NOOP ("X-feed")));
-    v.push_back (dial (872, 124, 26, "Balance", TR_NOOP ("Balance"), bipolar));
-    v.push_back (toggle (848, 186, 52, 20, "Prime numbers", TR_NOOP ("Primes")));
-    // the echoes' output level with a clip lamp (H-Delay's meter)
-    v.push_back (section (908, top, 38, h, TR_NOOP ("Out")));
-    v.push_back (display (910, 24, 34, 208, "outmeter"));
     // quad: Repeat / Swell where the right sync menu sits in the two-time styles, the four taps on the second row
-    v.push_back (when (tabs (190, 150, 76, 20, "Swell", TR_NOOP ("Repeat|Swell")), "Style", 0.4f, 0.6f));
     v.push_back (when (label (8, 290, 40, 20, TR_NOOP ("Taps")), "Style", 0.4f, 0.6f));
     v.push_back (when (toggle (48, 290, 34, 20, "Tap A", TR_NOOP ("A")), "Style", 0.4f, 0.6f));
     v.push_back (when (toggle (86, 290, 34, 20, "Tap B", TR_NOOP ("B")), "Style", 0.4f, 0.6f));
@@ -3302,6 +3301,8 @@ Layout echoformLayout()
         v.push_back (withVoicing (slider (Item::hslider, 642, 322, 70, 16, "L/R offset", nullptr, noCaption)));
         v.push_back (withVoicing (value (714, 320, 52, 20, "L/R offset")));
     }
+    for (auto i = lowerFrom; i < v.size(); ++i) // (tp172d: under the pods and the Tweak strip)
+        v[i].y += 110.0f;
     // round 170c (the "shell" audit): the Hybrid engine and the tape voicings run their own loops, which read only
     // the times, feedback, mix, output, style and phase — every colour, modulation, diffusion, filter and groove control
     // is dimmed while one of them is on (it used to look live and do nothing)

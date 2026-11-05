@@ -19,6 +19,9 @@ bool canOpen (EffectKind kind);
 bool canOpen (const EffectSlot& slot);
 void open (AudioEngine& engine, int track, int slot);
 void closeAll();
+// round tp172d: Ember's two editors — its Classic panel (this window) and its multiband page (ProEditorWindows) — swap
+// in place when the Voicing switches: the slot's other window closes and this one opens (asynchronously)
+void switchEmberEditor (AudioEngine& engine, int track, int slot, bool classic);
 } // namespace NativeEffectWindows
 
 // The editor alone at `scale` (1 = FL's size; for --snapshot / --plugui).

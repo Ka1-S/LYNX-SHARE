@@ -7166,3 +7166,6 @@ countries: kr
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "루프 녹음: 켜짐 (녹음이 반복: Song 모드에서는 루프 구간, 한 바퀴마다 테이크 하나; Pattern 모드에서는 패턴)"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "루프 녹음: 꺼짐 (녹음이 그대로 진행: 루프 구간을 지나거나, 패턴 끝을 넘어 패턴이 길어짐)"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "루프 녹음: 켜짐, 녹음이 반복 (Song 모드: 루프 구간, 한 바퀴마다 테이크 하나; Pattern 모드: 패턴); 꺼짐, 그대로 진행하여 루프 구간을 지나거나 패턴 끝을 넘고, 연주한 자리에 모두 남김 (패턴이 길어짐)"
+"Echo time" = "에코 타임"
+"Prime numbers" = "소수"
+"The Classic panel: one-screen hardware saturator (Drive, Punish, five styles)" = "Classic 패널: 한 화면 하드웨어 새츄레이터 (Drive, Punish, 다섯 가지 스타일)"

@@ -216,7 +216,7 @@ inline void canvasSoundtoys (juce::Graphics& g, Rectangle<float> a, bool display
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
     if (display) return;
-    const auto cheek = juce::jlimit (8.0f, 16.0f, a.getWidth() * 0.016f);
+    const auto cheek = th().cheek > 0.0f ? th().cheek : juce::jlimit (8.0f, 16.0f, a.getWidth() * 0.016f);
     woodCheek (g, a.withWidth (cheek), 7);
     woodCheek (g, a.withTrimmedLeft (a.getWidth() - cheek), 11);
     const auto face = a.reduced (cheek, 0.0f);
@@ -1127,6 +1127,9 @@ inline const Theme& echoformTheme()
     static const Theme t = []
     {
         auto x = soundtoysTheme ("Echoform", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
+        x.cornerScale = 4.0f; // the original's three rounded pods
+        x.hwKeys = true;
+        x.cheek = 16.0f; // (the pods fill the face)
         return x;
     }();
     return t;
@@ -1584,6 +1587,9 @@ inline const Theme& emberTheme()
     static const Theme t = []
     {
         auto x = soundtoysTheme ("Ember Saturator", Colour (0xffff7a45), Colour (0xffe9e2d0), Colour (0xff121213), Colour (0xff3c3c3e), 1.0f);
+        x.hwKeys = true;  // Punish / Thump / Steep and the five style keys
+        x.cheek = 30.0f;
+        x.captionScale = 1.25f;
         return x;
     }();
     return t;
@@ -3472,6 +3478,13 @@ inline const Theme& voiceShiftTheme()
         x.valueCol = Colour (0xffff4a3a);
         x.captionCol = Colours::white; // the original's white legends on the mustard panels
         x.pal.well = Colour (0xff1a0806);
+        // the original's three printed fields: mustard (pitch / formant), teal (mode), red (drive / mix)
+        x.sectionFills[0] = Colour (0xffc39a1a);
+        x.sectionFills[1] = Colour (0xff1d5a6c);
+        x.sectionFills[2] = Colour (0xffb51d1d);
+        x.hwKeys = true;
+        x.cheek = 30.0f;
+        x.cornerScale = 0.5f;
         return x;
     }();
     return t;
@@ -4246,7 +4259,15 @@ LYNX_LITE_THEME (basicChorusTheme, "Chorus", Style::glow, Colour (0xff121c2a), C
 // round tp172d: PanMan's hardware look (Auto-pan's role) — black face, walnut cheeks, white outlines, a red LED meter
 inline const Theme& autoPanTheme()
 {
-    static const Theme t = soundtoysTheme ("Auto-pan", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
+    // round tp172d: PanMan's look (its role) — black face, walnut cheeks, rounded pods with white outlines, square keys
+    static const Theme t = []
+    {
+        auto x = soundtoysTheme ("Auto-pan", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
+        x.cornerScale = 4.0f;
+        x.hwKeys = true;
+        x.cheek = 30.0f;
+        return x;
+    }();
     return t;
 }
 LYNX_LITE_THEME (panOMaticTheme, "Fruity PanOMatic", Style::vivid, Colour (0xff1e1430), Colour (0xff09060f), Colour (0xffff7ad0), Colour (0xff9ae8ff), canvasPan, Cap::rubber)

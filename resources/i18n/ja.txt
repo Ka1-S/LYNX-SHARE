@@ -7166,3 +7166,6 @@ countries: jp
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "ループ録音: オン（録音が繰り返す: Song モードではループ範囲、1 周ごとに 1 テイク；Pattern モードではパターン）"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "ループ録音: オフ（録音はそのまま進む: ループ範囲を通り抜け、またはパターンの終わりを越えて、パターンが伸びる）"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "ループ録音: オン、録音が繰り返す（Song モード: ループ範囲、1 周ごとに 1 テイク；Pattern モード: パターン）；オフ、そのまま進み、ループ範囲を通り抜けるかパターンの終わりを越え、演奏した位置にすべて残す（パターンが伸びる）"
+"Echo time" = "エコータイム"
+"Prime numbers" = "素数"
+"The Classic panel: one-screen hardware saturator (Drive, Punish, five styles)" = "Classic パネル：1画面のハードウェア・サチュレーター（Drive、Punish、5つのスタイル）"

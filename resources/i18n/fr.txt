@@ -7166,3 +7166,6 @@ countries: fr be ch ca lu
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "Enregistrement en boucle : activé (l'enregistrement boucle : la zone de boucle en mode Song, une prise par passage ; le pattern en mode Pattern)"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "Enregistrement en boucle : désactivé (l'enregistrement continue tout droit : à travers la zone de boucle, ou au-delà de la fin du pattern, qui s'allonge)"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "Enregistrement en boucle : activé, l'enregistrement boucle (mode Song : la zone de boucle, une prise par passage ; mode Pattern : le pattern) ; désactivé, il continue tout droit, à travers la zone de boucle ou au-delà de la fin du pattern, et garde tout là où c'était joué (le pattern s'allonge)"
+"Echo time" = "Temps d'écho"
+"Prime numbers" = "Nombres premiers"
+"The Classic panel: one-screen hardware saturator (Drive, Punish, five styles)" = "Le panneau Classic : saturateur matériel sur un écran (Drive, Punish, cinq styles)"
