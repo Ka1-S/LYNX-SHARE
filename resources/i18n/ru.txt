@@ -7196,3 +7196,4 @@ countries: ru by kz
 "Left out" = "Не перенесено"
 "Worth knowing" = "Полезно знать"
 "Samples not on this PC" = "Сэмплы, которых нет на этом ПК"
+"Steps use channel colour" = "Шаги в цвете канала"

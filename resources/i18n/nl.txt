@@ -7196,3 +7196,4 @@ countries: nl be
 "Left out" = "Weggelaten"
 "Worth knowing" = "Goed om te weten"
 "Samples not on this PC" = "Samples die niet op deze pc staan"
+"Steps use channel colour" = "Stappen in de kanaalkleur"

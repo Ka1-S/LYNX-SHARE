@@ -7196,3 +7196,4 @@ countries: pl
 "Left out" = "Pominięto"
 "Worth knowing" = "Warto wiedzieć"
 "Samples not on this PC" = "Sample, których nie ma na tym PC"
+"Steps use channel colour" = "Kroki w kolorze kanału"

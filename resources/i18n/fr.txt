@@ -7196,3 +7196,4 @@ countries: fr be ch ca lu
 "Left out" = "Omis"
 "Worth knowing" = "Bon à savoir"
 "Samples not on this PC" = "Samples absents de ce PC"
+"Steps use channel colour" = "Pas à la couleur du canal"

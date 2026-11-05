@@ -7196,3 +7196,4 @@ countries: it ch sm
 "Left out" = "Escluso"
 "Worth knowing" = "Da sapere"
 "Samples not on this PC" = "Campioni non presenti su questo PC"
+"Steps use channel colour" = "Step con il colore del canale"

@@ -7196,3 +7196,4 @@ countries: kr
 "Left out" = "제외됨"
 "Worth knowing" = "알아둘 점"
 "Samples not on this PC" = "이 PC에 없는 샘플"
+"Steps use channel colour" = "스텝에 채널 색상 사용"

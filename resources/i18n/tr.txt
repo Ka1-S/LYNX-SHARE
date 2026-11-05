@@ -7196,3 +7196,4 @@ countries: tr
 "Left out" = "Dışarıda kaldı"
 "Worth knowing" = "Bilmekte fayda var"
 "Samples not on this PC" = "Bu PC'de olmayan sample'lar"
+"Steps use channel colour" = "Adımlar kanal rengini kullanır"

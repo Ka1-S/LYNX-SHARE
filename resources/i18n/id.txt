@@ -7196,3 +7196,4 @@ countries: id
 "Left out" = "Ditinggalkan"
 "Worth knowing" = "Perlu diketahui"
 "Samples not on this PC" = "Sampel yang tidak ada di PC ini"
+"Steps use channel colour" = "Langkah memakai warna channel"

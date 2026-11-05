@@ -7196,3 +7196,4 @@ countries: tw hk mo
 "Left out" = "已略去"
 "Worth knowing" = "須知"
 "Samples not on this PC" = "不在此電腦上的取樣"
+"Steps use channel colour" = "步進使用通道顏色"
