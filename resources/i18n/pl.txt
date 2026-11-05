@@ -7200,3 +7200,5 @@ countries: pl
 "Worth knowing" = "Warto wiedzieć"
 "Samples not on this PC" = "Sample, których nie ma na tym PC"
 "Steps use channel colour" = "Kroki w kolorze kanału"
+# round tp172d: the Echoform / Auto-pan page switch
+"Main|Tweak" = "Główne|Tweak"

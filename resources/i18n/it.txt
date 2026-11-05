@@ -7200,3 +7200,5 @@ countries: it ch sm
 "Worth knowing" = "Da sapere"
 "Samples not on this PC" = "Campioni non presenti su questo PC"
 "Steps use channel colour" = "Step con il colore del canale"
+# round tp172d: the Echoform / Auto-pan page switch
+"Main|Tweak" = "Principale|Ritocco"

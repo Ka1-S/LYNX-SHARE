@@ -7200,3 +7200,5 @@ countries: ru by kz
 "Worth knowing" = "Полезно знать"
 "Samples not on this PC" = "Сэмплы, которых нет на этом ПК"
 "Steps use channel colour" = "Шаги в цвете канала"
+# round tp172d: the Echoform / Auto-pan page switch
+"Main|Tweak" = "Основное|Подстройка"

@@ -7200,3 +7200,5 @@ countries: id
 "Worth knowing" = "Perlu diketahui"
 "Samples not on this PC" = "Sampel yang tidak ada di PC ini"
 "Steps use channel colour" = "Langkah memakai warna channel"
+# round tp172d: the Echoform / Auto-pan page switch
+"Main|Tweak" = "Utama|Tweak"

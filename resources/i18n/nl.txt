@@ -7200,3 +7200,5 @@ countries: nl be
 "Worth knowing" = "Goed om te weten"
 "Samples not on this PC" = "Samples die niet op deze pc staan"
 "Steps use channel colour" = "Stappen in de kanaalkleur"
+# round tp172d: the Echoform / Auto-pan page switch
+"Main|Tweak" = "Hoofd|Tweak"

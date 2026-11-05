@@ -1129,7 +1129,7 @@ inline const Theme& echoformTheme()
         auto x = soundtoysTheme ("Echoform", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
         x.cornerScale = 4.0f; // the original's three rounded pods
         x.hwKeys = true;
-        x.cheek = 16.0f; // (the pods fill the face)
+        x.cheek = 30.0f; // (the layout leaves room for them)
         return x;
     }();
     return t;

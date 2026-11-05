@@ -908,7 +908,7 @@ public:
                 const auto count = (float) juce::jmax (1, (int) labels.size());
                 const auto w = vertical ? r.getWidth() : r.getWidth() / count;
                 const auto h = vertical ? r.getHeight() / count : r.getHeight();
-                if (skin::hwKeys() && ! vertical && ! hasStyle (item, plugui::pageTabs)) // round tp172d: a row of square keys joined by a line
+                if (skin::hwKeys() && ! vertical) // round tp172d: a row of square keys joined by a line (or wide keys for words)
                 {
                     bool letters = true; // A / E / N / T / P: square keys; words: wide keys
                     for (const auto& t : texts) letters = letters && t.length() <= 2;
