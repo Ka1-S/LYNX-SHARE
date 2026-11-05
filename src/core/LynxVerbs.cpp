@@ -222,6 +222,7 @@ struct Engine::Impl
     double curLen[lineCount] {}; // glided line lengths (samples)
     double lfo[lineCount] {};
     Shifter shifters[4]; // inside lines 0, 2, 4, 6 (shimmer)
+    float shiftHp[4][2] {}; // round tp172d: the shifted branch's two one-pole high-pass states (energy-keeping shimmer)
     Biquad outLow, outHigh, shelfLow, shelfHigh, toneHigh, toneMid, band[maxBandSections];
     bool outLowOn = false, outHighOn = false, shelfLowOn = false, shelfHighOn = false, toneHighOn = false, toneMidOn = false, bandOn = false;
     int bandSections = 0;
@@ -310,6 +311,8 @@ struct Engine::Impl
         }
         for (auto& sh : shifters)
             sh.clear();
+        for (auto& h : shiftHp)
+            h[0] = h[1] = 0.0f;
         outLow.reset();
         outHigh.reset();
         shelfLow.reset();
@@ -494,6 +497,22 @@ struct Engine::Impl
         // the shifted part is decorrelated, so the loop keeps the decay the absorption filters set: always stable
         const auto shimmer = (float) (std::clamp (s.shiftFeedback, 0.0, 1.0) * std::clamp (s.shiftMix, 0.0, 1.0));
         const auto width = (float) std::clamp (s.width, -2.0, 2.0), gain = (float) s.gain;
+        // round tp172d: the injected shimmer (Halo). The plain crossfade moved a share of every pass up an octave,
+        // where the absorption takes it: a shimmer tail died in ~2 s where the reference's keeps the RT of its size
+        // (the reference's RT barely depends on the shift). Here the line keeps all of itself and the shifted voice is
+        // added on top (high-passed at 120 Hz: the grains' slow amplitude modulation would pile up below it), small
+        // enough that the loop stays below unity at the longest RT; it fades in over the first 2 semitones, where
+        // the voices are still correlated (unshifted, the feedback is the RT law's alone)
+        float shimmerKeep[2] = { 1.0f, 1.0f }, shimmerB[2] = { 0.0f, 0.0f };
+        const auto hpC = (float) (1.0 - std::exp (-2.0 * pi * 120.0 / sr));
+        if (s.shimmerEnergy > 0.0)
+            for (int v = 0; v < 2; ++v)
+            {
+                const auto a = (double) (v == 1 ? shimmer * voice2 : shimmer);
+                const auto f = std::min (1.0, std::abs (v == 1 ? s.shiftSemis2 : s.shiftSemis) / 2.0);
+                shimmerB[v] = (float) (s.shimmerEnergy * a * f);
+                shimmerKeep[v] = 1.0f - shimmerB[v] * (float) (1.0 - f); // (unshifted: plain feedback, the RT law's own)
+            }
         double target[lineCount];
         for (int i = 0; i < lineCount; ++i)
             target[i] = targetLen (s, i);
@@ -610,8 +629,24 @@ struct Engine::Impl
                     // the second voice (dual modes) takes line 2 and line 6
                     const auto r = i == 2 && voice2 > 0.0f ? ratio2 : ratio;
                     const auto amount = i == 2 && voice2 > 0.0f ? shimmer * voice2 : shimmer;
-                    u = (1.0f - amount) * u + amount * shifters[i / 2].process (u, r);
-                    w = (1.0f - amount) * w + amount * shifters[2 + i / 2].process (w, i == 2 && voice2 > 0.0f ? ratio2 : ratio);
+                    if (s.shimmerEnergy > 0.0)
+                    {
+                        const auto b = shimmerB[i == 2 && voice2 > 0.0f ? 1 : 0], keep = shimmerKeep[i == 2 && voice2 > 0.0f ? 1 : 0];
+                        auto hp = [&] (int k, float x)
+                        {
+                            shiftHp[k][0] += hpC * (x - shiftHp[k][0]);
+                            x -= shiftHp[k][0];
+                            shiftHp[k][1] += hpC * (x - shiftHp[k][1]);
+                            return x - shiftHp[k][1];
+                        };
+                        u = keep * u + b * hp (i / 2, shifters[i / 2].process (u, r));
+                        w = keep * w + b * hp (2 + i / 2, shifters[2 + i / 2].process (w, i == 2 && voice2 > 0.0f ? ratio2 : ratio));
+                    }
+                    else
+                    {
+                        u = (1.0f - amount) * u + amount * shifters[i / 2].process (u, r);
+                        w = (1.0f - amount) * w + amount * shifters[2 + i / 2].process (w, i == 2 && voice2 > 0.0f ? ratio2 : ratio);
+                    }
                 }
                 const auto alt = (i & 1) == 0 ? 0.5f : -0.5f; // reverbs: decorrelated sides from the first pass on
                 lines[i].write (u + (parallel ? injL[i] : alt) * in[0]);
@@ -1259,13 +1294,18 @@ protected:
         s.shiftSemis2 = s.shiftSemis - 24.0;
         s.inDiffusion = p[3];
         s.loopDiffusion = 0.2 + 0.7 * p[3];
-        s.buildSec = 0.02 + 0.3 * size * (1.0 - p[3] * 0.5);
+        s.buildSec = 0.15 + 0.5 * size * (1.0 - p[3] * 0.5); // round tp172d: the reference blooms over ~0.5 s
         s.shape = 0;
         s.lineScale = m.scale * (0.3 + 1.2 * size);
-        // round tp172d: the reference's tail barely follows Size at feedback 0 (music / impulse, Size 30 % and 50 %: RT
-        // ≈ 7.6 and 8 s; ours was 4.7 and 6.7 s)
-        s.rt60 = (4.5 + 7.0 * size) * m.rtScale * std::min (3.0, 1.0 + 2.8 * p[2] * p[2]); // feedback lengthens the tail (§5)
-        s.earlyLevel = 0.45; // it speaks at once
+        // round tp172d: the reference's RT per Size and Feedback, measured (refs/halo: 20 s impulses; Size 30 / 50 / 80 %
+        // ≈ 5.6 / 8.4 / 12 s at feedback 0; feedback lengthens it ×1.2 / 1.65 / 2.2 at 50 / 75 / 100 % with the octave
+        // shift, ×1.4 / 2.1 / 4.3 unshifted, where the loop's own voice comes back in phase)
+        {
+            const auto fb = (double) p[2], f = std::min (1.0, std::abs (s.shiftSemis) / 2.0);
+            const auto mShift = 1.0 + 1.2 * std::pow (fb, 2.5), mPlain = 1.0 + 3.3 * fb * fb * fb;
+            s.rt60 = (1.5 + 12.5 * size) * m.rtScale * (mPlain + (mShift - mPlain) * f);
+        }
+        s.earlyLevel = 0.3; // round tp172d: its first 0.3 s are 5–9 dB under ours at 0.45
         s.earlySec = 0.03;
         s.earlyDiffusion = p[3];
         s.outLowCut = 250.0 * p[5]; // gentle: the reference's low cut barely shows at 63 Hz (§5, not confirmed)
@@ -1279,10 +1319,15 @@ protected:
         s.loopBandwidth = dark ? 5000.0 : 0.0;
         s.modRateHz = 0.05 + 4.95 * p[7];
         s.modDepthMs = 1.2 * p[8] / std::sqrt (std::max (0.3, s.modRateHz));
-        // round tp172d: without feedback the reference is quieter on music and drums (Mix 100 %: −4…−8 dB against
-        // ours; at Feedback 50 % within 1 dB) but not on its impulse (the shimmer is not linear: the two disagree),
-        // so the trim is −3 dB, fading out by half feedback
-        s.gain = (dark ? 0.75 : 0.95) * std::pow (10.0, -3.0 * (1.0 - std::min (1.0, 2.0 * (double) p[2])) / 20.0);
+        // round tp172d: the wet level measured on music and drums (refs/halo): −2 dB up to Feedback 75 %, rising to 0 dB
+        // at 100 % (the reference swells). Its impulse has a fuller low end than ours (+9 / +5 dB at 63 / 125 Hz) but its
+        // music and drums don't (a shelf for the impulse made drums 5 dB loud there): left flat
+        {
+            const auto fb = (double) p[2];
+            const auto trimDb = fb <= 0.75 ? -2.0 : -2.0 + 8.0 * (fb - 0.75);
+            s.gain = (dark ? 0.75 : 0.95) * std::pow (10.0, trimDb / 20.0);
+        }
+        s.shimmerEnergy = 0.2; // the shifted voice's share added per pass (× the shimmer amount)
         if (m.stereo == 2)
             s.crossFeed = 0.0, s.splitSides = true; // the two sides stay apart
     }
