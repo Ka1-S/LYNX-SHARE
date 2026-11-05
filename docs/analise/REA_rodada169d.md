@@ -23,12 +23,37 @@ CC 123 / 120 for a VST3 without MIDI mapping: on Stop the plugin was never told 
 | "maybe note reset, polyphony, or PDC not killing the last note on stop" | — | PDC delays audio only (the channel's and the inserts' delay lines), never note events: a note off is never late. Polyphony: the channel's Max polyphony / Mono act on the note path, after the schedulers: unchanged | no change needed |
 | Piano roll previews (coordinator: "make sure preview note-offs always arrive") | — | `HeldNotes` (core/HeldNotes.h) pairs every preview note on with one note off however the gesture ends (mouse up, drag to another key, the window hidden, the editor destroyed, channel switched); a Stop / jump releases a hosted synth's held keys (169c), a native engine's notes (allNotesOff) | unchanged; noted: `AudioEngine::sendLiveNote` ignores a full live queue (256 events), which can only happen if the audio thread stops reading it |
 
+## Playlist cursor (comment of 2026-11-03 23:32, added to this round)
+
+> "You can notice in the video how the cursor in the sequencer is clicking on one place but the playback triangle is
+> reacting on an earlier spot. And when i use the brush or pen tool this can cause problems sometimes by adding some
+> patterns in places i didnt want and later on playback they sound doubled (Louder). I didnt mean the ctrl+v"
+
+The video is the round 169c one (`/mnt/e/lynx-work/issue32b/video.webm`, 0.1.22): 30–40 s, ruler clicks while
+playing with "Line (follows zoom)" zoomed out to ~9 px per bar (frame at 31 s: the hand at x ≈ 988, the triangle
+at 961 = bar 33, i.e. bars before the pointer).
+
+| Item | FL evidence | LYNX before | LYNX now |
+|---|---|---|---|
+| Ruler click → song position | [SHOT] f32–f34 (FL 2026, main snap Bar, 60 px per bar): clicks at bar 5.83 and 5.5 → **6:01:00**, at 5.33 → **5:01:00**: the nearest grid line | `seekTo` used `snap()` = the line at or before the click (`snapDown`); "Line (follows zoom)" at that zoom is 2 bars (`screenStep`, lines ≥ 16 px), so the triangle landed up to two bars before the pointer | `PlaylistComponent::snapLine`: the nearest line (`noteedit::snapRound`; whole bars by `barAt`, so time signatures hold; "Nearest" keeps the clip edges). Alt = no snap as before. Test `issue32d_a_ruler_click_goes_to_the_nearest_grid_line` |
+| Brush over existing clips | [SHOT] f35 → f37 → f38 → f39: Pattern 1 painted at bars 2–6 on Track 1; a stroke from bar 1 across them adds only bar 1's clip; right-click on bar 3's clip deletes it and nothing is under it — FL does not stack a copy | `Drag::paint` pushed a copy every clip length along the stroke whatever was there: a stroke over clips of the same pattern stacked copies on them → the pattern played twice ("doubled (louder)") | a copy that would overlap a clip of the same source (pattern / audio channel / automation) on that track is not painted; the stroke goes on after it (`noteedit::paintWouldStack`). Other patterns may still overlap (FL allows it). Test `issue32d_the_brush_does_not_stack_a_copy_on_the_same_clip` |
+| Pen | not checked in FL this round | a click places the clip at the grid line at or before the pointer (the cell under it); a click on a clip grabs it (never a copy on it) | unchanged; the stacked copies came from the brush |
+
 ## Windows check
 
-(filled after the branch build)
+Branch build `build-win\LYNX.exe` (= `LYNXfix.exe`), `trance-ts.lynx`, fresh profile from `proftpl`:
+
+| Check | main c50aeb49 | branch |
+|---|---|---|
+| test synth: long note (3000 ticks) deleted while it sounds (`main.log.1` / `fix.log.1`) | lasts 202 846 samples (4.6 s): until Stop | lasts **69 233 samples** = its 3000 ticks at 130 BPM, 48 kHz; 25/25 notes on/off, 0 left sounding |
+| native Synth: C5 deleted while it sounds ([SHOT] `ln.png` / `xn.png`) | its key stays lit two passes later, until Stop | lit right after the delete (as in FL), off at the next passes |
+| Playlist ruler, House project, "Line (follows zoom)" at 8.25 px per bar (2-bar lines), click at x = 794 ([SHOT] `rm.png` / `rx.png`) | 19:1:1, the triangle ~16 px (two bars) left of the click | **21:1:1**, the triangle at the click |
+| brush: stroke A bars 3–9 on Track 6, stroke B from bar 1 to 11 across it (saved file, `brushcount.py`) | 18 clips: a second Pattern 1 clip on each of bars 3–9 | 11 clips (bars 1–11), none stacked |
 
 ## Where I stopped
 
 - Done: video analysis; FL evidence (one FL session, closed with "No" to save); main reproduction with the LYNX Test
   Synth (`tools/testplugin`) and the native Synth (`trance-ts.lynx`: Invader 2 → test synth, long notes added).
-- Next: build-local + Windows build, the same deletions with the branch build, `coord/train.sh issue32d`.
+- Done too: the branch build's deletions (above); FL session 2 (ruler and brush, closed with "No").
+- Done too: Playlist ruler / brush check (main vs branch, above); build-local.
+- Next: merge origin/main, `coord/train.sh issue32d`.
