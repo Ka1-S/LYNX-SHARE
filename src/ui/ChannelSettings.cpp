@@ -84,12 +84,12 @@ struct ChannelRef
         return { [c] (Song& s) -> ChannelDef* { return c >= 0 && c < (int) s.channels.size() ? &s.channels[(std::size_t) c] : nullptr; }, c };
     }
     const ChannelDef* get (const AudioEngine& engine) const { return locate ? locate (const_cast<Song&> (engine.getSong())) : nullptr; }
-    void edit (AudioEngine& engine, std::function<void (ChannelDef&)> change) const
+    void edit (AudioEngine& engine, std::function<void (ChannelDef&)> change, bool undoable = true) const
     {
         engine.editSong ([l = locate, change = std::move (change)] (Song& s) {
             if (auto* d = l ? l (s) : nullptr)
                 change (*d);
-        });
+        }, undoable);
     }
 };
 
@@ -480,7 +480,8 @@ private:
 // Physical-model channels (Sakura, Drumpad; REA_rodada28): knobs for the main raw FL parameters (0..1)
 class ModelPanel final : public juce::Component,
                          public juce::DragAndDropTarget,
-                         public juce::FileDragAndDropTarget
+                         public juce::FileDragAndDropTarget,
+                         private juce::Timer
 {
 public:
     ModelPanel (AudioEngine& e, ChannelRef c)
@@ -1173,6 +1174,29 @@ public:
             const auto f = juce::jmin (layoutScale, 1200.0f / (float) layout->width, 720.0f / (float) layout->height);
             setSize ((int) std::ceil (f * (float) layout->width) + 16, (int) std::ceil (f * (float) layout->height) + layoutTop + 8);
         }
+        if (transistorBass && ref.index >= 0)
+            startTimerHz (10); // the page follows the program a note selects (round 169g2)
+    }
+
+    // Transistor Bass with its sequencer on: a note selects program = key (REA_rodada57 §2.10) and FL's editor shows
+    // that program, so its knobs edit what plays. The channel's state takes the playing program (not an undo step)
+    // and every knob reads it again (round 169g2)
+    void timerCallback() override
+    {
+        const auto* c = channelNow();
+        const auto instrument = engine.getChannelInstrument (ref.index);
+        if (c == nullptr || instrument == nullptr)
+            return;
+        const auto selected = instrument->selectedProgram();
+        const auto prog = transistorBassProgram (c->pluginState);
+        if (selected < 0 || ! prog || prog->program == selected)
+            return;
+        auto next = c->pluginState;
+        if (! transistorBassSelectProgram (next, selected))
+            return;
+        ref.edit (engine, [next = std::move (next)] (ChannelDef& d) { d.pluginState = next; }, false);
+        syncKnobs (true);
+        repaint();
     }
 
     // a knob of a listed engine parameter (round 168n): raw range of the state, automation target channelParam
@@ -1187,7 +1211,10 @@ public:
         knob->setName (juce::String::fromUTF8 (p.name.c_str()));
         const auto index = p.index;
         knob->onValueChange = [this, index, s = knob.get()] {
-            ref.edit (engine, [index, v = (float) s->getValue()] (ChannelDef& c) { modelparams::setRawValue (c, index, v); });
+            ref.edit (engine, [index, v = (float) s->getValue()] (ChannelDef& c) {
+                modelparams::setRawValue (c, index, v);
+                natives::followControl (c, index, flStudioAccess()); // (Harmless' compression type loads its preset)
+            });
             if (instrumentKind == InstrumentKind::transistorbass && index >= tbseq::length) // (a step's note moves its octave)
                 syncKnobs();
             if (layout != nullptr)
@@ -1271,13 +1298,13 @@ public:
 
     // the listed parameters' knobs read the channel's state again (an edit that moved other values: Transistor Bass's
     // note / octave, CLEAR, octave buttons; round 168q2)
-    void syncKnobs()
+    void syncKnobs (bool all = false)
     {
         const auto* c = channelNow();
         if (c == nullptr || modelTable == nullptr)
             return;
         for (auto& k : knobs)
-            if (const auto* p = modelparams::findByName (instrumentKind, k->getName().toStdString()); p != nullptr && p->index >= tbseq::length)
+            if (const auto* p = modelparams::findByName (instrumentKind, k->getName().toStdString()); p != nullptr && (all || p->index >= tbseq::length))
                 if (const auto v = modelparams::rawValue (*c, p->index))
                     k->setValue (*v, juce::dontSendNotification);
     }
@@ -3094,7 +3121,7 @@ private:
             filterType.setSelectedId (c->sampler.filterType + 1, juce::dontSendNotification);
             release.setValue (c->sampler.release, juce::dontSendNotification);
             reverse.setToggleState (c->sampler.reverse, juce::dontSendNotification);
-            cut.setToggleState (c->sampler.cut, juce::dontSendNotification);
+            cut.setToggleState (channelCutsItself (*c), juce::dontSendNotification); // (issue #68: the rack menu's state too)
             porta.setToggleState (c->sampler.porta, juce::dontSendNotification);
             updating = false;
             showAutomation (true);
@@ -3189,6 +3216,7 @@ private:
         s.release = (float) release.getValue();
         s.reverse = reverse.getToggleState();
         s.cut = cut.getToggleState();
+        const auto cutChanged = s.cut != channelCutsItself (*current()); // (issue #68: the rack menu's cut-itself too)
         s.porta = porta.getToggleState();
         s.cutoff = (float) cutoff.getValue();
         s.resonance = (float) resonance.getValue();
@@ -3207,11 +3235,15 @@ private:
             if (adsr || moved (s.cutoff, old.cutoff) || moved (s.resonance, old.resonance) || s.filterType != old.filterType)
                 s.flChannel.clear();
         }
-        if (s == current()->sampler)
+        if (s == current()->sampler && ! cutChanged)
             return;
 
         const auto before = current()->sampler;
-        ref.edit (engine, [s] (ChannelDef& channelDef) { channelDef.sampler = s; });
+        ref.edit (engine, [s, cutChanged, index = ref.index] (ChannelDef& channelDef) {
+            channelDef.sampler = s;
+            if (cutChanged)
+                setChannelCutsItself (channelDef, index, s.cut);
+        });
         for (const auto& [slider, param] : tweakTargets)
             if (std::abs (samplerparam::get (before, param) - samplerparam::get (s, param)) > 1.0e-6f)
                 engine.noteTweaked ({ AutomationTargetKind::channelParam, ref.index, 0, param });

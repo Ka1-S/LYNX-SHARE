@@ -64,6 +64,9 @@ public:
 
     // True while one of the detached windows is the active window.
     bool isDetachedWindowActive() const;
+    // Issue #62: after the main window came up (it was built hidden, behind the splash), the restored detached windows go
+    // back to their saved place (window managers place new windows themselves) and above the main window.
+    void restoreDetachedWindows();
 
     std::function<void (Panel)> onFocusChanged;
     std::function<bool (const juce::KeyPress&)> onKeyInDetachedWindow;
@@ -94,7 +97,7 @@ public:
     // Screen bounds a detached window snaps to: the main window and the other detached panels.
     std::vector<juce::Rectangle<int>> otherWindowScreenBounds (Panel panel) const;
 
-    static constexpr int titleHeight = 28;
+    static constexpr int titleHeight = 32; // round 170e3: room for 20 px tool icons in the editors (was 28)
 
 private:
     void applyLayout();

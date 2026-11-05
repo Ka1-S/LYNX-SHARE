@@ -257,7 +257,7 @@ TEST (mono168l_every_engine_plays_mono_legato_and_porta)
     const auto fl = natives142::flAccess();
     for (const auto& e : natives::instrumentEngines())
     {
-        auto made = natives::makeChannel (e.kind, fl);
+        auto made = natives142::writtenWith (e.kind, fl); // (round 169l2: the Default preset it was written with)
         // (round 169l: a new Morphine is FL's Plugin database patch, whose pitch the autocorrelation reads 19 semitones
         // off; the check plays the preset it was written with)
         if (e.kind == InstrumentKind::morphine)

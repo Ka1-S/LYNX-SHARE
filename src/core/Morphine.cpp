@@ -1,4 +1,5 @@
 #include "core/Morphine.h"
+#include "core/EngineParams.h"
 #include "core/HostSlide.h"
 
 #include <algorithm>
@@ -2201,6 +2202,13 @@ public:
         tempo.store (bpm > 0.0 ? bpm : 120.0);
         if (channel.pluginState == state && channel.samplePath == noisePath)
             return;
+        // only global knobs changed (the editor, round 170i3): the playing synth takes them as automation does, the
+        // notes go on (a new synth used to cut them at every knob move)
+        if (channel.samplePath == noisePath && liveChange (state, channel.pluginState))
+        {
+            state = channel.pluginState;
+            return;
+        }
         state = channel.pluginState;
         noisePath = channel.samplePath;
         try
@@ -2282,9 +2290,11 @@ public:
     {
         if (synth == nullptr)
             return;
+        // every key, not only the held ones: a note at velocity 0 on a sounding key clears the key's held entry (FUN_1800e93d0)
+        // and leaves the sounding voice alive, so it was never released and rang until the project closed (genfuzz,
+        // round 170i2). The DLL's note off releases the key's voices whatever the held table says.
         for (int k = 0; k < 128; ++k)
-            if (synth->held[k] != 0)
-                synth->noteOff (k);
+            synth->noteOff (k);
     }
 
     // the effects run after the voices whether or not a voice sounds (no bypass, §2.11): idle once no voice is alive
@@ -2327,18 +2337,60 @@ private:
 
     void take() noexcept
     {
-        if (retired.load() != nullptr)
-            return;
-        if (auto* s = incoming.exchange (nullptr))
-        {
-            // a new state (load or an edit in the settings panel) plays on a synth built for it off the audio thread;
-            // one built for another rate waits for prepare()
-            retired.store (setup);
-            setup = s;
-            synth = setup->rate == rate ? setup->synth.get() : nullptr;
-            quiet = 0;
-        }
+        if (retired.load() == nullptr)
+            if (auto* s = incoming.exchange (nullptr))
+            {
+                // a new state (load or an edit in the settings panel) plays on a synth built for it off the audio thread;
+                // one built for another rate waits for prepare()
+                retired.store (setup);
+                setup = s;
+                synth = setup->rate == rate ? setup->synth.get() : nullptr;
+                quiet = 0;
+            }
+        liveParams.drain ([this] (int index, float x) { applyLive (index, x); });
     }
+
+    // the globals a playing synth takes at once (setParameter's set: A0…A39 but the two that pick wave sets)
+    static bool isLive (int index) noexcept { return index >= 0 && index < 40 && index != 2 && index != 3; }
+
+    void applyLive (int index, float x) noexcept
+    {
+        if (setup == nullptr || setup->patch == nullptr)
+            return;
+        setup->patch->A[index] = (double) x;
+        if (synth != nullptr)
+            synth->liveGlobal (index);
+    }
+
+    // UI thread: queues the globals that differ when nothing else in the state did
+    bool liveChange (const std::vector<std::uint8_t>& before, const std::vector<std::uint8_t>& after)
+    {
+        if (before.size() != after.size() || before.empty())
+            return false;
+        const auto at = morphineParamOffset (before, 0);
+        if (at < 0 || morphineParamOffset (after, 0) != at || (std::size_t) at + 4 * 40 > before.size())
+            return false;
+        if (std::memcmp (before.data(), after.data(), (std::size_t) at) != 0
+            || std::memcmp (before.data() + at + 4 * 40, after.data() + at + 4 * 40, before.size() - (std::size_t) at - 4 * 40) != 0)
+            return false;
+        std::vector<std::pair<int, float>> changed;
+        for (int i = 0; i < 40; ++i)
+            if (std::memcmp (before.data() + at + 4 * i, after.data() + at + 4 * i, 4) != 0)
+            {
+                if (! isLive (i))
+                    return false;
+                float x = 0.0f;
+                std::memcpy (&x, after.data() + at + 4 * i, 4);
+                changed.push_back ({ i, std::isfinite (x) ? x : 0.0f });
+            }
+        if (changed.size() > liveParams.space())
+            return false;
+        for (const auto& [i, x] : changed)
+            liveParams.push (i, x);
+        return true;
+    }
+
+    LiveParamQueue liveParams;
 
     Setup* setup = nullptr;
     Synth* synth = nullptr;

@@ -72,6 +72,7 @@ public:
     void refreshKeys (const std::function<juce::String (EditTool)>& keyOf);
 
     void resized() override;
+    void paint (juce::Graphics& g) override; // round 170e3: the tools sit in one well, apart from the header's other controls
     // the wheel over the strip steps through the tools
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
 
@@ -79,6 +80,7 @@ private:
     EditTool tool = EditTool::pencil;
     std::vector<std::unique_ptr<IconButton>> buttons;
     std::vector<EditTool> tools;
+    std::vector<juce::Rectangle<int>> wells; // one per tool group (round 170e3)
 };
 
 // --- grid --------------------------------------------------------------------------------

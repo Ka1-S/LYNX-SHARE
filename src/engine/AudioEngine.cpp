@@ -963,6 +963,23 @@ void AudioEngine::logPlayedNote (int channel, int key, float velocity, bool on, 
         scoreLog.noteOn (ms, channel, key, velocity, tick, recorded);
     else
         scoreLog.noteOff (ms, channel, key);
+    if (stepEditOn.load (std::memory_order_relaxed) && stepEditQueue.size() < 512)
+        stepEditQueue.push_back ({ channel, key, velocity, on });
+}
+
+void AudioEngine::setStepEdit (bool on) noexcept
+{
+    stepEditOn.store (on, std::memory_order_relaxed);
+    const juce::SpinLock::ScopedLockType lock (scoreLogLock);
+    stepEditQueue.clear();
+}
+
+std::vector<stepedit::Played> AudioEngine::takeStepEditNotes()
+{
+    std::vector<stepedit::Played> out;
+    const juce::SpinLock::ScopedLockType lock (scoreLogLock);
+    out.swap (stepEditQueue);
+    return out;
 }
 
 std::vector<scorelog::Entry> AudioEngine::scoreLogSnapshot() const
@@ -2194,18 +2211,27 @@ void AudioEngine::updateRecording()
 
     // the take starts when playing with recording on, or at the first recorded event
     // (which is only queued in that situation, even if this timer hasn't seen it yet)
-    auto beginTake = [this] {
+    auto beginTake = [this] (double at) {
         if (recorder.isActive())
             return;
 
         const auto& pattern = song.patterns[(std::size_t) song.currentPattern];
         recorder.begin (pattern.effectiveLength (song.beatsPerBar));
+        // Pattern mode with Loop record off (round 170e5, FL's "never" play end [DECOMP 0x11d4800]): the pattern plays
+        // once from the start of this pass and on past its end; the notes stay where they were played, so it grows
+        if (recordloop::patternLinear (song.mode, recordOptions.loopRecord))
+        {
+            const auto origin = recordloop::patternOrigin (at, pattern.effectiveLength (song.beatsPerBar));
+            recorder.setPatternOrigin (origin);
+            liveInput.patternOrigin.store (origin);
+        }
         takeHasUndoStep = false;
         takeClearedChannels.clear();
         // Song mode without a loop region: while recording, the song plays on past its end until recording stops (FL,
         // round 168k [EXEC]: a 1-bar song recorded from bar 1 counted on to bar 8 instead of going back to bar 1), so
         // the notes stay where they were played
-        if (song.mode == PlayMode::song && ! song.hasLoop())
+        // (Loop record off, round 170e3: through the loop region as well)
+        if (recordloop::notesLinear (song.mode, song.hasLoop(), recordOptions.loopRecord))
         {
             noteTakeLinear = true;
             recorder.setLinear (true);
@@ -2214,7 +2240,7 @@ void AudioEngine::updateRecording()
     };
 
     if (active)
-        beginTake();
+        beginTake (lastPlayingTick);
 
     RecordedEvent e;
 
@@ -2236,7 +2262,7 @@ void AudioEngine::updateRecording()
         // (count-in notes: onto the start within the catch window, else at their real time; round 170d)
         if (! recordOptions.recordNotes || ! catchEarlyNote (e, takeCatch) || outsidePunch (e)) // recording filter: notes off
             continue;
-        beginTake();
+        beginTake (std::min (lastPlayingTick, e.tick));
         recorder.add (song, e);
     }
 
@@ -2244,7 +2270,7 @@ void AudioEngine::updateRecording()
     {
         if (! recordOptions.recordNotes || ! catchEarlyNote (ui, takeCatch) || outsidePunch (ui))
             continue;
-        beginTake();
+        beginTake (std::min (lastPlayingTick, ui.tick));
         recorder.add (song, ui);
     }
 
@@ -2263,6 +2289,8 @@ void AudioEngine::updateRecording()
 
     if (! recorder.isActive() && std::exchange (noteTakeLinear, false))
         updateLinearSong();
+    if (! recorder.isActive() && liveInput.patternOrigin.load (std::memory_order_relaxed) >= 0.0)
+        liveInput.patternOrigin.store (-1.0); // the take is over: the pattern loops again
 
     if (notes.empty())
         return;

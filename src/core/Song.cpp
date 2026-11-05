@@ -3,6 +3,7 @@
 #include "core/FlSynths.h"
 #include "core/VoltageController.h"
 #include "core/MidiOut.h"
+#include "core/PatternBlocks.h"
 
 #include <algorithm>
 #include <iterator>
@@ -79,13 +80,17 @@ std::int64_t Song::songLength() const noexcept
 
     for (const auto& c : playlist)
         end = std::max (end, c.end());
+    // Pattern Blocks (round 170f) play with the clips
+    const auto blocksEnd = patternblocks::end (*this);
+    end = std::max (end, blocksEnd);
+    const bool arranged = ! playlist.empty() || blocksEnd > 0;
 
     // an empty Playlist (e.g. recording the first take in Song mode) loops the current pattern's length, not one bar
-    if (playlist.empty() && currentPattern >= 0 && currentPattern < (int) patterns.size())
+    if (! arranged && currentPattern >= 0 && currentPattern < (int) patterns.size())
         end = patterns[(std::size_t) currentPattern].effectiveLength (beatsPerBar);
 
     // FL: Song mode loops at the exact end of the last clip (a clip ending at 3:05 loops at 3:05), not at the bar end
-    if (! playlist.empty() && end > 0)
+    if (arranged && end > 0)
         return end;
     return std::max<std::int64_t> (bar, (end + bar - 1) / bar * bar);
 }
@@ -144,6 +149,8 @@ void Song::removePattern (int index)
             if (c.kind == ClipKind::pattern && c.pattern > index)
                 --c.pattern;
     });
+
+    patternblocks::removePattern (*this, index); // (round 170f)
 
     // Loop Starter channels follow their pattern (round 168b)
     for (auto& c : channels)
@@ -819,12 +826,15 @@ void Song::selectArrangement (int index)
 
     auto& from = arrangements[(std::size_t) currentArrangement];
     from.clips = std::move (playlist);
+    from.blocks = std::move (blocks);
     from.loopStart = loopStart;
     from.loopEnd = loopEnd;
 
     auto& to = arrangements[(std::size_t) index];
     playlist = std::move (to.clips);
     to.clips.clear();
+    blocks = std::move (to.blocks);
+    to.blocks.clear();
     loopStart = to.loopStart;
     loopEnd = to.loopEnd;
     currentArrangement = index;
@@ -838,6 +848,7 @@ int Song::addArrangement (const std::string& name, bool copyCurrent)
     if (copyCurrent)
     {
         a.clips = playlist;
+        a.blocks = blocks;
         a.loopStart = loopStart;
         a.loopEnd = loopEnd;
         a.markers = markers();
@@ -1330,6 +1341,7 @@ float faderPosition (float gain) noexcept
 Song makeExportSong (const Song& song, bool wholeSong, std::int64_t tailTicks, std::int64_t& musicLength)
 {
     Song out = song;
+    patternblocks::expandSong (out); // Pattern Blocks (round 170f) become clips
 
     if (out.patterns.empty())
         out.patterns.emplace_back().name = "Pattern 1";

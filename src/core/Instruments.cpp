@@ -132,7 +132,11 @@ struct DrumVoice
     float lastNoise = 0.0f;
     float lastHighPass = 0.0f;
     int age = 0;            // samples since the hit
+    float panL = 1.0f, panR = 1.0f; // the note's own pan (issue #63)
+    double pitchRatio = 1.0;        // the note's fine pitch
 };
+
+void voicePan (float pan, float& left, float& right) noexcept;
 
 class DrumInstrument final : public Instrument
 {
@@ -173,6 +177,19 @@ public:
         target->level = 1.0f;
         target->velocity = velocity;
         target->pitchEnv = 1.0;
+        // issue #63: the note's pan and fine pitch (the Channel Rack's graph editor / the piano roll); centred notes
+        // stay bit for bit as before
+        if (nextPan != 0.0f)
+            voicePan (nextPan, target->panL, target->panR);
+        if (nextCents != 0.0f)
+            target->pitchRatio = std::pow (2.0, (double) nextCents / 1200.0);
+        nextPan = nextCents = 0.0f;
+    }
+
+    void setNextNoteExpression (float pan, float cents, bool) noexcept override
+    {
+        nextPan = std::isfinite (pan) ? std::clamp (pan, -1.0f, 1.0f) : 0.0f;
+        nextCents = std::isfinite (cents) ? std::clamp (cents, -4800.0f, 4800.0f) : 0.0f;
     }
 
     void noteOff (int) noexcept override {} // drums play until the end of the decay
@@ -193,8 +210,8 @@ public:
             for (int i = 0; i < n; ++i)
             {
                 const auto s = nextSample (v) * v.velocity;
-                left[i] += s * gl;
-                right[i] += s * gr;
+                left[i] += s * gl * v.panL;
+                right[i] += s * gr * v.panR;
             }
 
             if (v.level < 0.0005f)
@@ -216,7 +233,7 @@ private:
         {
             case InstrumentKind::kick:
             {
-                const auto hz = 45.0 + 110.0 * v.pitchEnv; // sweep 155 → 45 Hz
+                const auto hz = (45.0 + 110.0 * v.pitchEnv) * v.pitchRatio; // sweep 155 → 45 Hz
                 v.phase += twoPi * hz / sampleRate;
                 out = (float) std::sin (v.phase) * v.level;
                 break;
@@ -224,7 +241,7 @@ private:
 
             case InstrumentKind::snare:
             {
-                const auto hz = 180.0 + 60.0 * v.pitchEnv;
+                const auto hz = (180.0 + 60.0 * v.pitchEnv) * v.pitchRatio;
                 v.phase += twoPi * hz / sampleRate;
                 const auto tone = (float) std::sin (v.phase) * (float) v.pitchEnv;
                 const auto noise = highPass (v, noiseGen.next());
@@ -324,10 +341,11 @@ private:
     double pitchDecay = 0.999;
     std::array<DrumVoice, 4> voices {};
     Noise noiseGen;
+    float nextPan = 0.0f, nextCents = 0.0f;
 };
 
 // Per-voice pan gains (constant power, 1 at center).
-inline void voicePan (float pan, float& left, float& right) noexcept
+void voicePan (float pan, float& left, float& right) noexcept
 {
     const auto angle = (std::clamp (pan, -1.0f, 1.0f) + 1.0f) * 0.25f * 3.14159265f;
     left = std::cos (angle) * 1.41421356f;
@@ -1698,8 +1716,10 @@ public:
             if (index < 0 || index >= slices.count)
                 return;
 
-            first = std::floor (total * slices.starts[(std::size_t) index]);
-            last = index + 1 < slices.count ? std::max (first, std::floor (total * slices.starts[(std::size_t) index + 1]) - 1.0) : total;
+            // the starts are fractions of the sample (floats): the nearest frame, as a float a hair under p/total made
+            // every Slicex slice start one frame early (round 170i2, REA_rodada170i §9)
+            first = std::round (total * slices.starts[(std::size_t) index]);
+            last = index + 1 < slices.count ? std::max (first, std::round (total * slices.starts[(std::size_t) index + 1]) - 1.0) : total;
             sliced = true;
         }
         const auto base = baseRate (*data) / clipStretch;

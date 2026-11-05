@@ -4,6 +4,7 @@
 #include "core/MetronomeVoice.h"
 
 #include "core/ChannelLoops.h"
+#include "core/PatternBlocks.h"
 
 #include "core/ControlSurface.h"
 #include "core/VoltageController.h"
@@ -623,6 +624,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
 
     // FL's Channel Rack looping (round 165f-rack): the looping channels' repeats are written out as notes here, so
     // playback, the Playlist's pattern clips and export all play them without any cost on the audio thread
+    // FL's legacy Pattern Blocks (round 170f): plain pattern clips from here on (playback, export, song length)
+    patternblocks::expandSong (song);
     channelloops::expandSong (song);
     state->song = std::move (song);
     const auto tailStarted = std::chrono::steady_clock::now();
@@ -2233,7 +2236,8 @@ static bool hasLiveMeters (EffectKind kind) noexcept
            || kind == EffectKind::echoform // round 135w: Echoform's output meter
            || kind == EffectKind::autoPan || kind == EffectKind::voiceShift // round 135: the pan position, the shifter's notes
            || kind == EffectKind::hardwareInsert // round 164d: send / return levels, the ping
-           || kind == EffectKind::xyController || kind == EffectKind::xyzController; // round 164: the pad's target and outputs
+           || kind == EffectKind::xyController || kind == EffectKind::xyzController // round 164: the pad's target and outputs
+           || kind == EffectKind::peakController; // issue #66: its display's Peak + LFO, Peak and LFO lines
 }
 
 void RackRenderer::setSidechain (const RackState& state, const EffectSlot& slot, Effect& effect, int track) noexcept
@@ -2317,6 +2321,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             && slots[i].kind != EffectKind::formulaController
             && slots[i].kind != EffectKind::xyController && slots[i].kind != EffectKind::xyzController
             && slots[i].kind != EffectKind::controlSurface
+            && slots[i].kind != EffectKind::peakController // (issue #66: its LFO runs and its peak falls in silence, as FL's)
             // round 164c: a visual plugin keeps recording silence (its display falls, the video export stays in time)
             && slots[i].kind != EffectKind::waveCandy && slots[i].kind != EffectKind::visualizer
             && slots[i].kind != EffectKind::tuner // (round 165g: the tuner's display follows the signal into silence)
@@ -3185,7 +3190,8 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         const auto patternIndex = std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1);
         const auto& pattern = song.patterns[(std::size_t) patternIndex];
         schedulePatternLoop (pattern, pattern.effectiveLength (song.beatsPerBar), startTick, numSamples,
-                             ticksPerSample (bpm, sampleRate), events, song.swing, &song.channels, chaseNotes);
+                             ticksPerSample (bpm, sampleRate), events, song.swing, &song.channels, chaseNotes,
+                             liveInput != nullptr ? liveInput->patternOrigin.load (std::memory_order_relaxed) : -1.0);
     }
 
     // FL's wrapper "Output port" (round 149): the notes a plugin sent out in the previous chunk play the plugins on

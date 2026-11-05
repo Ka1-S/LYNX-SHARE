@@ -71,7 +71,7 @@ the pitch-slide anchor into voice −1 before checking it (out-of-bounds write, 
 `core/FlpImport.cpp`); the Granulizer checks the voice before touching it. Tests:
 `flq170i_granulizer_and_3xosc_samples_on_posix_roots`, `flq170i_old_data_relative_plugin_sample_still_found`.
 
-## 4. FPC's level (open)
+## 4. FPC's level (solved in §7)
 
 The render test plays −4.57 dB too quietly in LYNX, a pure gain (gain-fitted ESR −39 dB) except on the hi-hat pad
 (−5.25 dB). **[DECOMP FPC_x64.dll `FUN_0086b480` (voice start), constant at `0x8E0FA0` = 20.526958 (f32, read-only:
@@ -118,14 +118,102 @@ velocity), and so is Fruity Slicer: its render test (notes at 100 too) is alread
 being ruled by its stretch pre-processing (licensed engine, REA_rodada69 §7), so it gives no evidence either way. Test:
 `flq170i_slicex_velocity_reaches_the_level_through_fl_init_vol`.
 
+# Round 170i2 (the open items of 170i)
+
+**FL sessions [FL render].** Three FL launches, one at a time under `~/.cache/lynx-wingui.lock` and
+`~/.cache/lynx-fl.lock`, each rendering one folder of probe projects (`FL64.exe /R /Ewav /F<folder> /O<out>`; FL exits by
+itself after the folder; no plugin scan; the probes are FL's render tests with one state field or note byte changed in
+place, `E:\lynx-work\flq170i2\probe*`). The unchanged `FPC.flp` rendered again is bit-identical to the 2026-10-16
+cache, so the cache and the new renders agree.
+
+## 7. FPC: FL's volume law, velocity and a constant
+
+| FL render (kick pad, its sample fitted, residual ≤ −65 dB) | FL gain | LYNX before | FL / LYNX |
+|---|---|---|---|
+| the render test (pad 128, layer 99, velocity 100, centre) | 0.40777 | 0.24099 | 1.692 |
+| every pad hard left | L 0.57667, R 0 | L 0.34081 | 1.692 |
+| pad volume 64 | 0.07159 | 0.05542 | 1.2916 |
+| layer volume 127 | 0.84191 | 0.4395 | 1.9156 |
+| velocity 64 (layer 1 of the kick) | 0.14841 = 0.364 × velocity 100 | — | — |
+
+- Pan: the same ratio centred and hard left, so FPC's pan law is LYNX's channel pan law.
+- Pad and layer volume follow `(21.527^(v/127) − 1)/10` (§4's decompile): predicted ratios 1.2916 and 1.9156 against
+  LYNX's `(11^x − 1)/10`, measured 1.2916 and 1.9156.
+- Velocity: 64 gives 0.364 of 100 = `(11^0.64 − 1)/10`, FL's Init.Vol law (§6), so velocity 100 is unity.
+- What is left is a constant: FL = pad law × layer law × velocity law × LYNX's channel chain × **0.35355 = 1/(2·√2)**
+  (−9.03 dB), the same on all four renders to 0.000 dB. Where FPC applies it (its output stage) is not traced.
+
+**LYNX now:** `fpcPads` uses FPC's law (`fpcVolume`) and carries the constant in the pad gain; the split channels keep
+the FPC channel's volume and put the pad × layer gain on their zones (FPC's law goes above unity, which the channel
+volume curve clipped), with FL's velocity law (`SamplerSettings::flVelocityLaw`). The render test: **−7.7 → −75.0 dB**
+(score 2 → 10). Test: `flq170i2_fpc_volume_law_and_velocity`.
+
+## 8. EQUO: no HQ in a plain render, and the smoother glides from FL's construction values
+
+- **[FL render]** FL's command-line render of the render test matches EQUO's plain band design: with LYNX's
+  offline flag driving the "HQ non-realtime" design (REA_rodada61 §2.2, "not confirmed") the render was 2.25 dB louder
+  (ESR −5.6 dB); with the plain design the level is right. The HQ design now follows the export's **HQ for all plugins**
+  (`offlineRendering() && hqForAllPlugins()`), like the other HQ switches (REA_rodada134 B6).
+- **[FL render]** FL's output starts 1 dB low and reaches the loaded curve after ~0.45 s; the same project with motion
+  smoothness 0 starts on the curve at once. That is REA_rodada61 §2.5: the smoother states start at (1, 0, 1) when the
+  plugin is created and a state load leaves them. LYNX started them at the loaded values (marked there as an
+  inference); now a new engine starts at (1, 0, 1) and `set()` / `reset()` keep them.
+- Result: smoothness 0 nulls at **−87 dB**; the render test −5.6 → −17.4 dB as `renderwav` renders it (no warm-up)
+  and **−55 dB** with a warm-up of 2688 samples (FL's own render pre-roll, which moves by a few hundred samples from
+  run to run, REA_rodada154 / REA_rodada165g). In the app the engines run while stopped, so an export has no glide.
+  Test: `flq170i2_equo_render_is_not_hq_and_glides_from_construction`.
+- The earlier note "send not routed" was wrong for this test: its state has no send (REA_rodada61 §1).
+
+## 9. Slicex: each slice one frame early
+
+**[FL render + debug]** After the first slice every slice played the frame just before its start: the slice starts are
+stored as fractions (`float(p / total)`), and `floor(total · f)` lands on `p − 1` when the float is a hair under.
+The sampler now takes the nearest frame. The render test: −24.1 → **−35.1 dB**; the first slice nulls at −82 dB, what is
+left is at the slice changes (FL switches instantly, LYNX's cut fades the old slice over a few samples: not traced).
+Test: `flq170i2_slice_starts_on_their_exact_frame`.
+
+## 10. FL Keys and Fruity Scratcher: no fix possible from LYNX's side
+
+- **FL Keys [FL render]:** FL's render of the render test is silent again (2026-11-04), and with every note moved 8 beats
+  later too: not a loading race. FL 2026's command-line render plays nothing for this project, so it gives no
+  reference; the engine's evidence stays REA_rodada69 §8.5 (DLL harness, bit-identical on the 11 demo states).
+- **Fruity Scratcher [FL render + REA_rodada165g §6]:** the score comes from FL's own nondeterminism: FL runs the plugin
+  for a pre-roll of 75 + 544k samples that changes from run to run (two FL renders of this test differ by −18…−20 dB).
+  Outside the first 0.35 s LYNX's spectrum is within 0.03 dB and its level within 0.1 dB; the waveform is −11 dB off at a
+  108-sample lag (FL's event grid, which moves with that pre-roll). Not reproducible, not a defect.
+
+## 11. genfuzz: the generators' fuzzer and what it found
+
+`tools/genfuzz` (`scripts/genfuzz-asan.sh`, g++ ASAN + UBSan) builds every native generator from FL's defaults and every
+channel of FL's render tests, then drives each through 400-event storms at 22.05–192 kHz (any key and velocity, chords,
+note offs with release velocity, bends, channel pitch, CCs, cut, all notes off, slides; blocks 1–4096) and checks for
+non-finite output and for sound 20 s after everything was released (`--ops a…l` narrows the event kinds).
+
+- **Drumaxx** (crash): a pad's resampling pass of 256 host samples fills the DLL-sized 1024-sample buffer only up to a
+  step of 4 (44.1 kHz and up at any pitch). At 22.05 kHz with Pitch at max and the channel pitched up the step is ~6.9:
+  the pass overran into the next pad's delay lines. LYNX now takes fewer host samples per pass when the step needs it
+  (unchanged at FL's rates).
+- **BassDrum** (crash): the same with its 2048-sample buffer and 512-sample passes (ratio > 4 below 44.1 kHz).
+- **Morphine** (stuck note): a velocity-0 note on a sounding key clears the key's held entry (FUN_1800e93d0 returns
+  before allocating a voice) and leaves the voice alive; LYNX's All Notes Off only sent note offs to held keys. It now
+  sends the DLL's note off to every key (its note off releases the key's voices whatever the held table says).
+- **FL Slayer** (not a defect): the default guitar's tail falls ~3 dB/s and is still above −60 dBFS after 20 s. The
+  engine is the bit-exact port of the DLL (REA_rodada68), so it is FL's own tail; genfuzz now calls a note stuck only
+  when it has not fallen by half since 10 s.
+- The ASAN scripts compile `Slayer.cpp` with `-fno-inline`, as CMakeLists.txt does (GCC 15 miscompiles it, REA_rodada117).
+
 ## Where I stopped
 
-- Done: §1, §3 (batch 1–2: build-local 1963871 checks / 0 failures, queued on the merge train), §5 and §6 (batch 3:
-  1963902 checks / 0 failures). Rescore of the 82 render tests (`E:\lynx-work\flq170i\b3`): 14 improved, no
-  regressions; mean sound score 6.64 → 7.78 (81 scorable), 38 at the 16-bit floor (was 28). Tracker regenerated.
-- Open: FPC (§4), Slicex's remaining −24 dB (slice edges), EQUO (send not routed, lag 341), Fruity Scratcher (r167c
-  area), FL Keys (FL's own render is silent: needs one FL re-render), random-phase engines (not defects), FLEX and Fruity
-  Slicer's stretch (permanent decisions). fxfuzz not re-run this round.
+- 170i (landed 108eb8f8): §1, §3, §5, §6; mean sound score 6.64 → 7.78.
+- 170i2: re-measured on main (Drumaxx 2 → 8 from 169l's pan law); FPC (§7, −7.7 → −75 dB), EQUO (§8, −5.6 → −17.4 dB
+  plain, −55 dB with FL's pre-roll), Slicex (§9, −24 → −35 dB); FL Keys and Scratcher explained (§10). Mean 7.85 → 7.99,
+  39 render tests at the 16-bit floor. 29 FL demos / templates that use FPC, EQUO or Slicex: no regression; "Create a
+  chord progression" (FPC) spec 4.7 → 0.4 dB, "nucleon - Transient Processor" rms −0.8 → 0.0 dB.
+- Fuzz (ASAN + UBSan): fxfuzz 165 effect slots, 0 non-finite, no sanitizer report. genfuzz (§11) found 2 crashes
+  and 1 stuck note, fixed; genfuzz after the fixes, 125 channels (every native generator + the render tests' channels), 2 rounds: 0 problems, no sanitizer report
+- Open: FL's render pre-roll (LFO effects drift without it, glides need it: model it per plugin), Slicex's slice-edge
+  fade (−35 dB), FLEX and Fruity Slicer's stretch (permanent decisions), FL Keys (FL's command-line render is silent).
 - Commands: `scripts/flref-lynx.sh /mnt/e/lynx-work/flq170i/rt.list <out> build-local/renderwav 2`, then
   `python3 scripts/flref_compare.py batch /mnt/e/lynx-work/flq170i/flref <out> <out>/report.md`;
-  tracker: `python3 /mnt/e/lynx-work/flq170i/py/mkdoc.py <out>/compare.jsonl`.
+  tracker: `python3 /mnt/e/lynx-work/flq170i/py/mkdoc.py <out>/compare.jsonl`; fuzz: `scripts/fxfuzz-asan.sh` /
+  `scripts/genfuzz-asan.sh --fl "<FL>/Data" --dir <folder>`.
