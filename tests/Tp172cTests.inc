@@ -320,4 +320,14 @@ TEST (ridge_drive_section_tp172c6)
     s = gs (p32 ("Compressor", 0) + p32 ("Drive", 1) + p32 ("Drive Type", 1) + p32 ("Bass Drive", 11) + p32 ("Low-Pass Filter", 20));
     CHECK (s.params[r::compRatio] == 0.0f && r::driveModelIndex (s.params[r::driveModel]) == r::driveBassAmp && s.params[r::driveAmount] == 1.0f);
     CHECK (s.params[r::lpf] == 0.0f);
+
+    // Drumstrip: its gate (open threshold, range capped at Ridge's 60 dB, release) and trims
+    s = tp172c::harrisonSlot ("SSL Native Drumstrip v6",
+                              "<SSL_PLUGIN_STATE PluginName=\"SSL Native Drumstrip v6\" Version=\"6.0\" StateASelected=\"1\"><A><PROCESSOR_STATE>"
+                                  + p32 ("bypass", 0) + p32 ("gateOn", 1) + p32 ("gateOpen", -24) + p32 ("gateClose", -30) + p32 ("gateRange", 80)
+                                  + p32 ("gateRelease", 0.5) + p32 ("gateAttack", 0.05) + p32 ("input", 3) + p32 ("output", -2) + p32 ("TransOn", 0)
+                                  + p32 ("hfOn", 0) + p32 ("lfOn", 0) + p32 ("lmcOn", 0) + "</PROCESSOR_STATE></A><B><PROCESSOR_STATE/></B></SSL_PLUGIN_STATE>");
+    CHECK (s.kind == EffectKind::ridgeStrip && s.params[r::dynOn] == 1.0f && s.params[r::compRatio] == 0.0f);
+    CHECK (std::abs (r::gateRangeDb (s.params[r::gateRange]) - 60.0) < 1e-3 && std::abs (r::gateThresholdDb (s.params[r::gateThreshold]) + 24.0) < 1e-3);
+    CHECK (std::abs (r::trimDb (s.params[r::input]) - 3.0) < 0.01 && std::abs (r::trimDb (s.params[r::output]) + 2.0) < 0.01);
 }

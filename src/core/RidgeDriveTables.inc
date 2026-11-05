@@ -52,9 +52,9 @@ constexpr DriveNode kDrive7[] { // Guitar amp
     { -27.0f, 2.1f, 0.673f, 4.86f, 6.0f, 0.0f, 16.34f, -7.17f },
 };
 constexpr DriveNode kDrive8[] { // Bass amp
-    { -7.0f, 2.1f, 0.713f, 6.23f, 3.0f, 0.0f, 6.84f, 14.94f },
-    { -23.0f, 2.1f, 0.714f, 12.62f, 3.0f, 0.0f, 6.84f, 14.94f },
-    { -39.0f, 2.1f, 0.735f, 18.71f, 3.0f, 0.0f, 6.84f, 14.94f },
+    { -7.0f, 2.1f, 0.713f, 6.23f, 3.0f, 0.0f, 7.50f, 16.98f },
+    { -23.0f, 2.1f, 0.714f, 12.62f, 3.0f, 0.0f, 9.08f, 12.42f },
+    { -39.0f, 2.1f, 0.735f, 18.71f, 3.0f, 0.0f, 10.04f, 10.29f },
 };
 // lo, hi, positions, nodes, bell Hz / Q, high shelf Hz, low-pass Hz / Q / sections (0 = none), high-pass Hz / Q,
 // second bell Hz / Q / dB, first-order all-pass Hz (0 = none; the phase the originals' low end showed) (the tone is normalised to 0 dB at 1 kHz, where the curve's gain was measured)

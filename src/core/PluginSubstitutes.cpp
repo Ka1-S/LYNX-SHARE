@@ -500,10 +500,19 @@ translate = ssl-vocalstrip-2
 # trials on this PC) by role only — their states are not read (not in her corpus, not measured): LYNX's effect for
 # the same job at its defaults, so a project that used them still plays a sensible chain
 [complete-access-strips]
-product = channel strips (Slate Virtual Mix Rack, SSL Drumstrip)
+product = channel strips (Slate Virtual Mix Rack)
 vendor = Complete Access (role)
 lynx = Ridge Strip
-names = Virtual Mix Rack; VBC Rack; SSL Native Drumstrip v6
+names = Virtual Mix Rack; VBC Rack
+
+# round tp172c6: SSL Native Drumstrip -> Ridge's gate and trims (its transient shaper, enhancers and listen-mic
+# compressor not reproduced yet)
+[ssl-drumstrip]
+product = Drumstrip (drum channel strip)
+vendor = Solid State Logic (Complete Access)
+lynx = Ridge Strip
+names = SSL Native Drumstrip v6; SSL Native Drumstrip; Drumstrip
+translate = ssl-drumstrip
 
 # round tp172c6: SSL Guitarstrip -> Ridge's own engine (EQ, filters, compressor) with the DRIVE section on the Guitar amp /
 # Bass amp models, measured black-box on its trial
@@ -1957,6 +1966,49 @@ int translateSslGuitarstrip (const std::vector<std::uint8_t>& state, EffectSlot&
     return (int) v.size();
 }
 
+// round tp172c6: SSL Native Drumstrip (the SSL_PLUGIN_STATE XML, A / B) -> Ridge's own engine with its gate (open
+// threshold, range up to Ridge's 60 dB, release) and its input / output trims. Not reproduced yet: the transient shaper,
+// the HF / LF enhancers and the listen-mic compressor (Ridge stays flat for them)
+int translateSslDrumstrip (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace r = mixsuite::ridge;
+    const auto root = findBytes (state, "<SSL_PLUGIN_STATE");
+    if (root == std::string::npos || slot.kind != EffectKind::ridgeStrip)
+        return 0;
+    const std::string text (state.begin() + (std::ptrdiff_t) root, state.end());
+    if (attributeIn (text, 0, "PluginName").find ("Drumstrip") == std::string::npos)
+        return 0;
+    const bool useB = attributeIn (text, 0, "StateASelected") == "0";
+    const auto block = text.find (useB ? "<B" : "<A");
+    if (block == std::string::npos)
+        return 0;
+    const auto v = xmlParams (text, block, text.find (useB ? "</B>" : "</A>", block));
+    if (v.size() < 10)
+        return 0;
+    auto at = [&v] (const char* id, double fallback) { const auto it = v.find (id); return it != v.end() ? it->second : fallback; };
+    auto& p = slot.params;
+    p[r::modern] = p[r::console4k] = p[r::voicing] = p[r::vocal] = 0.0f;
+    p[r::curve] = 0.0f;
+    p[r::analog] = p[r::autoMakeup] = 0.0f;
+    p[r::eqOn] = 0.0f;
+    p[r::hpf] = p[r::lpf] = 0.0f;
+    p[r::compRatio] = 0.0f;
+    const bool gateIn = at ("gateOn", 0.0) >= 0.5;
+    p[r::dynOn] = gateIn ? 1.0f : 0.0f;
+    p[r::expander] = 0.0f;
+    p[r::gateRange] = gateIn ? linNorm (std::clamp (at ("gateRange", 80.0), 0.0, 60.0), 0.0, 60.0) : 0.0f;
+    // the open threshold (Ridge closes 4 dB under it; the trial's sweep at the threshold stays open, as here)
+    p[r::gateThreshold] = linNorm (at ("gateOpen", -30.0), -80.0, 0.0);
+    p[r::gateRelease] = logNorm (std::clamp (at ("gateRelease", 0.2), 0.1, 4.0), 0.1, 4.0);
+    p[r::gateFastAttack] = at ("gateAttack", 0.05) < 0.5 ? 1.0f : 0.0f;
+    p[r::input] = linNorm (std::clamp (at ("input", 0.0), -20.0, 20.0), -20.0, 20.0);
+    p[r::output] = linNorm (std::clamp (at ("output", 0.0), -20.0, 20.0), -20.0, 20.0);
+    p[r::driveOn] = 0.0f;
+    if (at ("bypass", 0.0) >= 0.5)
+        slot.enabled = false;
+    return (int) v.size();
+}
+
 // SSL Native Vocalstrip 2 (round 145): its state is XML with named parameters in the original's own units
 // (<SSL_PLUGIN_STATE … StateASelected="1"><A><PROCESSOR_STATE><PARAM id="compThreshold" value="-33.2"/> …); the A or B
 // setting that plays maps one to one onto Ridge Strip's Vocal strip voicing, which reproduces the official trial
@@ -2651,6 +2703,8 @@ RawTranslator rawTranslatorNamed (std::string_view name)
         return translateVccChannel;
     if (name == "ssl-guitarstrip")
         return translateSslGuitarstrip;
+    if (name == "ssl-drumstrip")
+        return translateSslDrumstrip;
     if (name == "auto-tune-pro")
         return translateAutoTunePro;
     if (name == "waves-tune")
