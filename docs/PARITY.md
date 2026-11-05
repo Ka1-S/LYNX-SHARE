@@ -55,8 +55,8 @@ there.
 | Horizon | ValhallaFutureVerb | 8 | 9 | 2 | 8 | 135 |  |
 | Orbit | ValhallaSpaceModulator | 8 | 9 | 3 | 8 | 135 |  |
 | Facet EQ | Pro-Q 4 | 9 | 8 | 8 | 7 | 152c | 170c: Stability 5 → 7 (draws on macOS CI, steady analyser) |
-| Crest Compressor | Pro-C 3 | 9 | 8 | 5 | 6 | 137 |  |
-| Sentry Gate | Pro-G | 9 | 8 | 3 | 8 | 135 |  |
+| Crest Compressor | Pro-C 3 | 9 | 8 | 5 | 6 | tp172b | tp172b: sound 4.7 → 5.4 measured (auto gain follows attack); look toward the reference |
+| Sentry Gate | Pro-G | 9 | 8 | 7 | 8 | tp172b | tp172b: sound 3 → 7 (first programme comparison: 7.2; upward law, hysteresis) |
 | Ember Saturator | Saturn 2 | 9 | 8 | 5 | 6 | 152b |  |
 | Aether | Fresh Air | 9 | 8 | 8 | 8 | 128 |  |
 | Glow Leveler | CLA-2A (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165x | 9 → 9 → 10 / 8 → 8 (165w: the measured release; 165x: the measured attack, Auto Makeup's reference, the VU display saved and translated) |
@@ -67,20 +67,36 @@ there.
 | Auto-pan (stand-in) | PanMan | 9 | 8 | 6 | 8 | 152 |  |
 | Foil Plate | Little Plate | 9 | 8 | 6 | 8 | 152 |  |
 | Ember Saturator | Decapitator | 9 | 9 | 5 | 6 | 165a | 8 → 9 / 7 → 9 |
-| Apex Limiter | Pro-L 2 | 9 | 9 | 2 | 6 | 135 |  |
+| Apex Limiter | Pro-L 2 | 9 | 9 | 7 | 6 | tp172b | tp172b: sound 2 → 7 (first programme comparison: 5.7 → 6.9; two-stage release) |
 | Epoch Verb | ValhallaVintageVerb | 9 | 9 | 5 | 8 | 135 |  |
 | Nebula | Valhalla Supermassive | 9 | 9 | 3 | 8 | 135 |  |
 | Spiral Echo | ValhallaFreqEcho | 9 | 9 | 7 | 8 | 129 |  |
 | Lattice Mod | ValhallaUberMod | 9 | 9 | 4 | 8 | 144 |  |
 | Quell Denoiser | NS1 (Waves) | 9 | 9 | 4 (ref expired) | 6 | 137 |  |
-| Hush De-esser | Pro-DS | 10 | 9 | 5 | 6 | 165x | 8 → 9 → 10 / 8 → 8 → 9 (165w: pans, state levels; 165x: ranges, the 0 … 200 % link knob) |
+| Hush De-esser | Pro-DS | 10 | 9 | 6 | 6 | tp172b | 8 → 9 → 10 / 8 → 8 → 9 (165w: pans, state levels; 165x: ranges, the 0 … 200 % link knob) |
 | Foil Plate | ValhallaPlate | 9 | 10 | 3 | 8 | 135 |  |
 | Gemini Doubler | Doubler2 / Doubler4 (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165w | 9 → 10 / 8 → 8 (defaults; 165w: shelf range −88 … +12 and law) |
 | Compressor (stand-in) | Renaissance Compressor (Waves) | 10 | 8 | 6 (ref expired) | 8 | 152 |  |
 | LYNX Tune | Waves Tune Real-Time | 10 | 8 | 6 (ref expired) | 8 | 152b | 165j: sound only (measured; scores unchanged) |
 | Echoform | EchoBoy / PrimalTap | 10 | 8 | 6 | 6 | 150 |  |
 | Voice Shift | Little AlterBoy | 10 | 8 | 4 | 8 | 137 |  |
-| Prism Multiband | Pro-MB | 10 | 10 | 8 | 6 | 152 |  |
+| Prism Multiband | Pro-MB | 10 | 10 | 8 | 6 | tp172b | tp172b: programme 5.9 → 7.6 (default state level fixed) |
+| LuxeVerb (Space engine) | Pro-R 2 | 7 | 7 | 8 | 8 | tp172b | new: Space engine page, verb score 7.4 → 8.9 (RT60 / EDC / early / stereo / modulation, measured) |
+
+## Round tp172b: FabFilter roles measured against the trials (black-box, programme material)
+
+Our own host rendered bursts / drums / music / stair / sweep / vocal through each trial at its default and 3–5 saved
+settings; LYNX rendered the same with the translated states (`tools/fxrender`, `scripts/fxparity.py`). Mean score
+before → after (0–10): Facet / Pro-Q 4 9.3 → 9.3; Crest / Pro-C 3 4.7 → 5.4 (auto gain follows the attack);
+Apex / Pro-L 2 5.7 → 6.9 (two-stage release, per-style laws); Prism / Pro-MB 5.9 → 7.6; Sentry / Pro-G 6.2 → 7.2;
+Hush / Pro-DS 6.0 → 6.0; Saturn 2 5.1 (Ember: round 172d). LuxeVerb gained a **Space** engine page for the Pro-R 2
+role (16-line FDN with per-band decay; Modern / Vintage / Plate; distance, thickness, character, width, decay EQ),
+fitted from measured RT60 per octave, EDC, early energy and modulation; `fxparity verb` 7.4 → 8.9 on the programme
+states, 8.9 over 28 probe settings. Saved Pro-R 2 states translate to it (`translate = pro-r2`). The FL engine stays the
+default and FL-exact. Looks: Facet, Crest, Apex, Prism, Sentry and Hush moved toward their references' palettes and
+flat caps; Fruity Delay 3 stays FL-exact (Timeless 3 compared for design only). Open: Pro-G's burst attenuation (S3),
+Pro-DS Allround level, Crest −1 dB on dynamic material, Apex's default attack, Sentry's Upward knobs, the Space
+engine's early onset at 100 % mix. Data and pictures: /mnt/e/lynx-work/tp172b (report.md).
 
 ## Round 165j: LYNX Tune sound quality, before → after (measured)
 
