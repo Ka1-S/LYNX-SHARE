@@ -1,4 +1,4 @@
-#include "KumiPluginControl.h"
+#include "RemotePluginControl.h"
 #include "AudioEngine.h"
 #include "core/Effects.h"
 #include "core/MixerOps.h"
@@ -406,7 +406,7 @@ juce::var setParameters (AudioEngine& engine, const juce::var& args, const std::
         checkCommit (engine, args, cancelled);
         const auto stillBefore = live->capture();
         if (! stillBefore || *stillBefore != *before) invalid ("The plugin changed while preparing the edit; inspect it again");
-        engine.editSongStructural ([t, ref] (Song& edited) { pluginRef (edited, t).state = ref.state; });
+        engine.editSongRemoteTransaction ([t, ref] (Song& edited) { pluginRef (edited, t).state = ref.state; }, cancelled);
     }
     else
     {
@@ -420,11 +420,11 @@ juce::var setParameters (AudioEngine& engine, const juce::var& args, const std::
             }
             else replacement.params[(std::size_t) change.index] = change.value;
         checkCommit (engine, args, cancelled);
-        engine.editSong ([t, replacement = std::move (replacement)] (Song& edited) {
+        engine.editSongRemoteTransaction ([t, replacement = std::move (replacement)] (Song& edited) {
             auto& effect = edited.mixer[(std::size_t) t.mixer].effects[(std::size_t) t.effect];
             effect.params = replacement.params;
             effect.state = replacement.state;
-        });
+        }, cancelled);
     }
     return object ({ { "target", t.value() }, { "changed", (int) changes.size() } });
 }
@@ -469,7 +469,7 @@ juce::var load (AudioEngine& engine, const juce::var& args, const std::function<
         if (fx.kind == EffectKind::plugin) engine.getPluginHost().discardPreloaded (preparedRef, rate);
     } };
     checkCommit (engine, args, cancelled);
-    engine.editSongStructural ([mixer, at, fx = std::move (fx)] (Song& song) mutable {
+    engine.editSongRemoteTransaction ([mixer, at, fx = std::move (fx)] (Song& song) mutable {
         auto& effects = song.mixer[(std::size_t) mixer].effects;
         const auto rows = mixerops::effectRows (effects);
         int row = 0;
@@ -478,7 +478,7 @@ juce::var load (AudioEngine& engine, const juce::var& args, const std::function<
         if (inserted < 0) invalid ("No free effect slot");
         if (inserted != at) mixerops::moveEffectSlot (song, mixer, inserted, at);
         mixerops::linkAddedSidechain (song, mixer, at);
-    });
+    }, cancelled);
     return object ({ { "target", Target { false, -1, mixer, at }.value() }, { "loaded", true } });
 }
 juce::var remove (AudioEngine& engine, const juce::var& args, const std::function<bool()>& cancelled)
@@ -487,17 +487,17 @@ juce::var remove (AudioEngine& engine, const juce::var& args, const std::functio
     const auto mixer = index (args, "mixerIndex", (int) engine.getSong().mixer.size());
     const auto effect = index (args, "effectIndex", (int) engine.getSong().mixer[(std::size_t) mixer].effects.size());
     checkCommit (engine, args, cancelled);
-    engine.editSongStructural ([mixer, effect] (Song& song) { mixerops::removeEffectKeepRows (song, mixer, effect); });
+    engine.editSongRemoteTransaction ([mixer, effect] (Song& song) { mixerops::removeEffectKeepRows (song, mixer, effect); }, cancelled);
     return object ({ { "removed", true }, { "mixerIndex", mixer }, { "effectIndex", effect } });
 }
 }
 
-bool isKumiPluginOperation (const juce::String& operation)
+bool isRemotePluginOperation (const juce::String& operation)
 {
     return operation == "plugin.inspect" || operation == "plugin.parameters_set" || operation == "effect.catalog"
         || operation == "effect.load" || operation == "effect.remove";
 }
-juce::var dispatchKumiPlugin (AudioEngine& engine, const juce::String& operation, const juce::var& args,
+juce::var dispatchRemotePlugin (AudioEngine& engine, const juce::String& operation, const juce::var& args,
                               const std::function<bool()>& cancelled)
 {
     jassert (juce::MessageManager::getInstance()->isThisTheMessageThread());

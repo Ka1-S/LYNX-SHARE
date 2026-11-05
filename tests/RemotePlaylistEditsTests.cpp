@@ -1,10 +1,10 @@
-#include "engine/KumiPlaylistEdits.h"
+#include "engine/RemotePlaylistEdits.h"
 #include <cstdio>
 #include <limits>
 #include <stdexcept>
 
 using namespace lynx;
-using namespace lynx::kumi_playlist;
+using namespace lynx::remote_playlist;
 
 void check (bool value, const char* message)
 {
@@ -55,7 +55,7 @@ int main()
         Edit move;
         move.clipId = song.playlist[0].uid;
         move.patch.start = 3840;
-        auto moved = kumi_playlist::apply (song, { move });
+        auto moved = remote_playlist::apply (song, { move });
         auto expected = song.playlist[0];
         expected.start = 3840;
         check (moved.song.playlist[0] == expected, "move lost existing audio clip metadata");
@@ -65,7 +65,7 @@ int main()
         duplicate.action = Edit::Action::duplicate;
         duplicate.clipId = song.playlist[0].uid;
         duplicate.patch.track = 2;
-        auto copied = kumi_playlist::apply (song, { duplicate });
+        auto copied = remote_playlist::apply (song, { duplicate });
         expected = song.playlist[0];
         expected.track = 2;
         expected.uid = copied.song.playlist[1].uid;
@@ -82,44 +82,44 @@ int main()
         Edit remove;
         remove.action = Edit::Action::remove;
         remove.clipId = song.playlist[0].uid;
-        auto replaced = kumi_playlist::apply (song, { add, remove });
+        auto replaced = remote_playlist::apply (song, { add, remove });
         check (replaced.song.playlist.size() == 1 && replaced.song.playlist[0].kind == ClipKind::pattern,
                "add/remove transaction targeted unstable indices");
         check (replaced.created.size() == 1 && replaced.removed == 1, "transaction result counts are incorrect");
 
         auto invalid = move;
         invalid.patch.start = maxTick;
-        refuses ([&] { kumi_playlist::apply (song, { move, invalid }); });
+        refuses ([&] { remote_playlist::apply (song, { move, invalid }); });
         check ((song.playlist == original.playlist && song.nextUid == original.nextUid), "late invalid edit changed source model");
         invalid = add;
         invalid.source = 5;
-        refuses ([&] { kumi_playlist::apply (song, { invalid }); });
+        refuses ([&] { remote_playlist::apply (song, { invalid }); });
         invalid = move;
         invalid.clipId = 0;
-        refuses ([&] { kumi_playlist::apply (song, { invalid }); });
+        refuses ([&] { remote_playlist::apply (song, { invalid }); });
         invalid = move;
         invalid.patch.stretch = std::numeric_limits<double>::infinity();
-        refuses ([&] { kumi_playlist::apply (song, { invalid }); });
+        refuses ([&] { remote_playlist::apply (song, { invalid }); });
         invalid = move;
         invalid.patch.length = 1;
-        refuses ([&] { kumi_playlist::apply (song, { invalid }); }); // existing fades no longer fit
+        refuses ([&] { remote_playlist::apply (song, { invalid }); }); // existing fades no longer fit
         invalid = add;
         invalid.patch.gain = 2.0f;
-        refuses ([&] { kumi_playlist::apply (song, { invalid }); }); // audio fields cannot silently affect pattern clips
+        refuses ([&] { remote_playlist::apply (song, { invalid }); }); // audio fields cannot silently affect pattern clips
         auto locked = song;
         locked.playlistTracks[1].lockedToContent = true;
-        refuses ([&] { kumi_playlist::apply (locked, { move }); });
+        refuses ([&] { remote_playlist::apply (locked, { move }); });
         locked = song;
         locked.playlistTracks[2].lockedToContent = true;
-        refuses ([&] { kumi_playlist::apply (locked, { duplicate }); });
-        refuses ([&] { kumi_playlist::apply (song, {}); });
-        refuses ([&] { kumi_playlist::apply (song, std::vector<Edit> (129, move)); });
-        std::puts ("Kumi Playlist transaction checks passed");
+        refuses ([&] { remote_playlist::apply (locked, { duplicate }); });
+        refuses ([&] { remote_playlist::apply (song, {}); });
+        refuses ([&] { remote_playlist::apply (song, std::vector<Edit> (129, move)); });
+        std::puts ("Remote Playlist transaction checks passed");
         return 0;
     }
     catch (const std::exception& error)
     {
-        std::fprintf (stderr, "Kumi Playlist transaction check failed: %s\n", error.what());
+        std::fprintf (stderr, "Remote Playlist transaction check failed: %s\n", error.what());
         return 1;
     }
 }

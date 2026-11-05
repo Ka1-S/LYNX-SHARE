@@ -1,6 +1,6 @@
-#include "engine/KumiPlaylistControl.h"
+#include "engine/RemotePlaylistControl.h"
 #include "engine/AudioEngine.h"
-#include "engine/KumiPlaylistEdits.h"
+#include "engine/RemotePlaylistEdits.h"
 #include <cmath>
 #include <initializer_list>
 #include <stdexcept>
@@ -86,11 +86,11 @@ juce::var clipValue (const Clip& clip, int index)
                     { "crossfadeIn", (juce::int64) clip.crossfadeIn }, { "crossfadeOut", (juce::int64) clip.crossfadeOut } });
 }
 
-kumi_playlist::Patch parsePatch (const juce::var& value)
+remote_playlist::Patch parsePatch (const juce::var& value)
 {
-    kumi_playlist::Patch patch;
-    constexpr auto max = kumi_playlist::maxTick;
-    if (value.hasProperty ("track")) patch.track = (int) integer (value, "track", 0, kumi_playlist::maxTrack);
+    remote_playlist::Patch patch;
+    constexpr auto max = remote_playlist::maxTick;
+    if (value.hasProperty ("track")) patch.track = (int) integer (value, "track", 0, remote_playlist::maxTrack);
     if (value.hasProperty ("start")) patch.start = integer (value, "start", 0, max);
     if (value.hasProperty ("length")) patch.length = integer (value, "length", 1, max);
     if (value.hasProperty ("offset")) patch.offset = integer (value, "offset", 0, max);
@@ -106,25 +106,25 @@ kumi_playlist::Patch parsePatch (const juce::var& value)
     return patch;
 }
 
-std::vector<kumi_playlist::Edit> parseEdits (const juce::var& args)
+std::vector<remote_playlist::Edit> parseEdits (const juce::var& args)
 {
     fields (args, { "edits", "expectedProjectId", "expectedRevision", "expectedEpoch" });
     const auto* input = args["edits"].getArray();
     if (input == nullptr || input->isEmpty() || input->size() > 128) fail ("edits must contain between 1 and 128 Playlist edits");
-    std::vector<kumi_playlist::Edit> edits;
+    std::vector<remote_playlist::Edit> edits;
     for (const auto& value : *input)
     {
         fields (value, { "action", "clipId", "kind", "pattern", "channel", "automation", "track", "start", "length", "offset",
                         "fadeIn", "fadeOut", "offsetFraction", "gain", "pan", "pitch", "stretch", "muted", "reversed" });
-        kumi_playlist::Edit edit;
+        remote_playlist::Edit edit;
         const auto action = string (value, "action");
-        if (action == "add") edit.action = kumi_playlist::Edit::Action::add;
-        else if (action == "update") edit.action = kumi_playlist::Edit::Action::update;
-        else if (action == "duplicate") edit.action = kumi_playlist::Edit::Action::duplicate;
-        else if (action == "remove") edit.action = kumi_playlist::Edit::Action::remove;
+        if (action == "add") edit.action = remote_playlist::Edit::Action::add;
+        else if (action == "update") edit.action = remote_playlist::Edit::Action::update;
+        else if (action == "duplicate") edit.action = remote_playlist::Edit::Action::duplicate;
+        else if (action == "remove") edit.action = remote_playlist::Edit::Action::remove;
         else fail ("Playlist action must be add, update, duplicate or remove");
         edit.patch = parsePatch (value);
-        if (edit.action == kumi_playlist::Edit::Action::add)
+        if (edit.action == remote_playlist::Edit::Action::add)
         {
             if (value.hasProperty ("clipId")) fail ("Add allocates its own clipId");
             const auto kind = string (value, "kind");
@@ -156,9 +156,9 @@ juce::var inspect (const Song& song, const juce::var& args)
     juce::Array<juce::var> clips, tracks, arrangements, patterns, audio, automations;
     for (std::size_t i = offset; i < std::min (song.playlist.size(), offset + limit); ++i)
         clips.add (clipValue (song.playlist[i], (int) i));
-    auto trackCount = std::min ((std::size_t) kumi_playlist::maxTrack + 1, song.playlistTracks.size());
+    auto trackCount = std::min ((std::size_t) remote_playlist::maxTrack + 1, song.playlistTracks.size());
     for (const auto& clip : song.playlist)
-        if (clip.track >= 0 && clip.track <= kumi_playlist::maxTrack) trackCount = std::max (trackCount, (std::size_t) clip.track + 1);
+        if (clip.track >= 0 && clip.track <= remote_playlist::maxTrack) trackCount = std::max (trackCount, (std::size_t) clip.track + 1);
     for (std::size_t i = 0; i < trackCount; ++i)
     {
         const auto track = i < song.playlistTracks.size() ? song.playlistTracks[i] : PlaylistTrack {};
@@ -196,21 +196,21 @@ juce::var inspect (const Song& song, const juce::var& args)
 }
 } // namespace
 
-bool isKumiPlaylistOperation (const juce::String& op) { return op == "playlist.inspect" || op == "playlist.edit"; }
+bool isRemotePlaylistOperation (const juce::String& op) { return op == "playlist.inspect" || op == "playlist.edit"; }
 
-juce::var dispatchKumiPlaylist (AudioEngine& engine, const juce::String& op, const juce::var& args)
+juce::var dispatchRemotePlaylist (AudioEngine& engine, const juce::String& op, const juce::var& args, const std::function<bool()>& cancelled)
 {
     if (op == "playlist.inspect") return inspect (engine.getSong(), args);
     if (op != "playlist.edit") fail ("Unsupported Playlist operation");
     if (engine.getTransport().playing.load() || engine.isRecording()) fail ("Stop playback and recording before editing the Playlist");
-    auto transaction = kumi_playlist::apply (engine.getSong(), parseEdits (args));
+    auto transaction = remote_playlist::apply (engine.getSong(), parseEdits (args));
     const auto changed = transaction.song.playlist != engine.getSong().playlist;
     if (changed)
     {
-        engine.editSong ([&] (Song& song) {
+        engine.editSongRemoteTransaction ([&] (Song& song) {
             song.playlist = std::move (transaction.song.playlist);
             song.nextUid = transaction.song.nextUid;
-        });
+        }, cancelled);
     }
     juce::Array<juce::var> created;
     for (const auto id : transaction.created) created.add (text (uids::toHex (id)));

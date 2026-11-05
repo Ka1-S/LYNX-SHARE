@@ -1,11 +1,23 @@
-#include "engine/KumiControl.h"
+#if defined(_WIN32)
+ #ifndef WIN32_LEAN_AND_MEAN
+  #define WIN32_LEAN_AND_MEAN
+ #endif
+ #include <winsock2.h>
+#endif
+
+#include "engine/RemoteControl.h"
 #include "engine/AudioEngine.h"
-#include "engine/KumiPluginControl.h"
-#include "engine/KumiPlaylistControl.h"
-#include "engine/KumiInstrumentControl.h"
-#include "engine/KumiJsonLimits.h"
-#include "engine/KumiAuthentication.h"
+#include "engine/RemotePluginControl.h"
+#include "engine/RemotePlaylistControl.h"
+#include "engine/RemoteInstrumentControl.h"
+#include "engine/RemoteJsonLimits.h"
+#include "engine/RemoteAuthentication.h"
 #include "core/SessionIds.h"
+#include "engine/RemoteError.h"
+#include "engine/RemoteFileSecurity.h"
+#include "engine/RemoteProjectControl.h"
+#include "platform/Paths.h"
+#include <deque>
 
 #include <algorithm>
 #include <atomic>
@@ -28,7 +40,7 @@ namespace
 {
 constexpr std::size_t maxMessage = 1024 * 1024;
 constexpr std::size_t maxHandshake = 1024;
-constexpr const char* protocol = "lynx-kumi/2";
+constexpr const char* protocol = "lynx-control/1";
 constexpr juce::int64 maxTick = 1000000000;
 using Field = std::pair<const char*, juce::var>;
 
@@ -42,7 +54,10 @@ juce::var object (std::initializer_list<Field> fields)
 
 juce::String text (const std::string& value) { return juce::String::fromUTF8 (value.c_str()); }
 juce::var success (juce::var result) { return object ({ { "ok", true }, { "result", std::move (result) } }); }
-juce::var failure (const juce::String& error) { return object ({ { "ok", false }, { "error", error } }); }
+juce::var failure (const juce::String& error, const juce::String& code = "invalid", bool uncertain = false)
+{
+    return object ({ { "ok", false }, { "error", error }, { "code", code }, { "uncertain", uncertain } });
+}
 
 [[noreturn]] void invalid (const juce::String& why) { throw std::runtime_error (why.toStdString()); }
 
@@ -79,69 +94,8 @@ int indexFor (const juce::var& args, std::size_t size)
     return (int) integer (args, "index", 0, (juce::int64) size - 1);
 }
 
-juce::String randomToken()
-{
-#if JUCE_MAC || JUCE_LINUX || JUCE_BSD
-    unsigned char bytes[32];
-    const auto fd = ::open ("/dev/urandom", O_RDONLY | O_CLOEXEC);
-    if (fd < 0)
-        invalid ("Cannot open the operating system random source");
-    std::size_t done = 0;
-    while (done < sizeof (bytes))
-    {
-        const auto count = ::read (fd, bytes + done, sizeof (bytes) - done);
-        if (count < 0 && errno == EINTR)
-            continue;
-        if (count <= 0)
-        {
-            ::close (fd);
-            invalid ("Cannot read the operating system random source");
-        }
-        done += (std::size_t) count;
-    }
-    ::close (fd);
-    return juce::String::toHexString (bytes, sizeof (bytes), 0);
-#else
-    invalid ("Kumi control is currently available on macOS and Linux");
-#endif
-}
-
-
-void writeDiscovery (const juce::File& file, const juce::String& json)
-{
-#if JUCE_MAC || JUCE_LINUX || JUCE_BSD
-    auto pattern = (file.getFullPathName() + ".XXXXXX").toStdString();
-    const auto fd = ::mkstemp (pattern.data());
-    if (fd < 0)
-        invalid ("Cannot create Kumi discovery file in its parent folder");
-    bool ok = ::fchmod (fd, S_IRUSR | S_IWUSR) == 0;
-    const auto bytes = json.toStdString();
-    std::size_t done = 0;
-    while (ok && done < bytes.size())
-    {
-        const auto count = ::write (fd, bytes.data() + done, bytes.size() - done);
-        if (count < 0 && errno == EINTR)
-            continue;
-        if (count <= 0)
-            ok = false;
-        else
-            done += (std::size_t) count;
-    }
-    if (ok)
-        ok = ::fsync (fd) == 0;
-    ::close (fd);
-    if (ok)
-        ok = ::rename (pattern.c_str(), file.getFullPathName().toRawUTF8()) == 0;
-    if (! ok)
-    {
-        ::unlink (pattern.c_str());
-        invalid ("Cannot publish owner-only Kumi discovery file");
-    }
-#else
-    juce::ignoreUnused (file, json);
-    invalid ("Owner-only Kumi discovery is unavailable on this platform");
-#endif
-}
+using remote_files::randomToken;
+using remote_files::writeDiscovery;
 
 juce::var noteValue (const Note& n)
 {
@@ -184,22 +138,60 @@ Note parseNote (const juce::var& value, std::size_t channels)
 }
 } // namespace
 
-struct KumiControl::Impl final : juce::Thread
+struct RemoteControl::Impl final : juce::Thread
 {
     struct State
     {
         State (AudioEngine& e, std::function<juce::String()> name, std::function<juce::String()> path)
-            : engine (e), projectName (std::move (name)), projectPath (std::move (path)), controlEpoch (randomToken()) {}
+            : engine (e), projectName (std::move (name)), projectPath (std::move (path)), controlEpoch (randomToken()), projectControl (e) {}
         AudioEngine& engine;
         std::function<juce::String()> projectName, projectPath;
         // Public boot identity, generated independently of the private authentication token.
         const juce::String controlEpoch;
         std::atomic<bool> active { true };
+        RemoteProjectControl projectControl;
+        struct Change { std::uint64_t revision; juce::String kind; };
+        std::deque<Change> changes;
+        std::uint64_t observedRevision = 0;
+        std::string observedProject;
+
+        void observe (const juce::String& kind = "project")
+        {
+            const auto revision = engine.getSongStamp();
+            const auto project = engine.getSong().projectId;
+            if (observedProject != project) { changes.clear(); observedRevision = revision; observedProject = project; }
+            else if (revision != observedRevision)
+            {
+                changes.push_back ({ revision, kind });
+                while (changes.size() > 128) changes.pop_front();
+                observedRevision = revision;
+            }
+        }
+
+        juce::var status()
+        {
+            observe();
+            const auto& s = engine.getSong();
+            const auto& t = engine.getTransport();
+            return object ({ { "project", object ({ { "id", text (s.projectId) }, { "name", projectName() },
+                    { "path", projectPath ? projectPath() : juce::String() }, { "modified", engine.isModified() } }) },
+                { "appVersion", JUCE_APPLICATION_VERSION_STRING }, { "bpm", s.bpm }, { "beatsPerBar", s.beatsPerBar },
+                { "playing", t.playing.load() }, { "recording", engine.isRecording() },
+                { "songMode", s.mode == PlayMode::song }, { "positionTicks", t.positionTicks.load() }, { "ppq", ppq },
+                { "currentPattern", s.currentPattern }, { "channelCount", (int) s.channels.size() },
+                { "patternCount", (int) s.patterns.size() }, { "canUndo", engine.canUndo() }, { "canRedo", engine.canRedo() },
+                { "historyError", engine.getRemoteHistoryError() },
+                { "capabilities", object ({ { "pluginParameters", true }, { "effects", true }, { "playlist", true },
+                    { "instruments", true }, { "projectDocument", true }, { "projectTransactions", true },
+                    { "deviceStateHash", true }, { "changePolling", true } }) } });
+        }
 
         juce::var inspect()
         {
             const auto& s = engine.getSong();
             const auto& t = engine.getTransport();
+            if (s.channels.size() + s.mixer.size() + s.patterns.size() + s.playlist.size() > 4096)
+                throw RemoteError ("limit", "Session overview exceeds 4096 objects; use bounded project.read pages");
             juce::Array<juce::var> channels, mixer, patterns, playlist;
             for (std::size_t i = 0; i < s.channels.size(); ++i)
             {
@@ -235,7 +227,7 @@ struct KumiControl::Impl final : juce::Thread
                             { "songMode", s.mode == PlayMode::song }, { "positionTicks", t.positionTicks.load() },
                             { "ppq", ppq }, { "channels", channels }, { "mixer", mixer }, { "patterns", patterns },
                             { "currentPattern", s.currentPattern }, { "playlist", playlist },
-                            { "capabilities", object ({ { "pluginParameters", true }, { "effects", true }, { "playlist", true }, { "instruments", true } }) },
+                            { "capabilities", status()["capabilities"] },
                             { "canUndo", engine.canUndo() }, { "canRedo", engine.canRedo() },
                             { "revision", (juce::int64) engine.getSongStamp() } });
         }
@@ -244,6 +236,27 @@ struct KumiControl::Impl final : juce::Thread
         {
             jassert (juce::MessageManager::getInstance()->isThisTheMessageThread());
             const auto& s = engine.getSong();
+            observe();
+            if (op == "status") return status();
+            if (op == "device.state") return object ({ { "deviceStateHash", engine.remoteDeviceStateHash() } });
+            if (op == "changes")
+            {
+                const auto from = (std::uint64_t) integer (args, "fromRevision", 0, 9007199254740991LL);
+                const auto limit = args.hasProperty ("limit") ? (int) integer (args, "limit", 1, 128) : 128;
+                juce::Array<juce::var> entries;
+                for (const auto& change : changes)
+                    if (change.revision > from && entries.size() < limit)
+                        entries.add (object ({ { "revision", (juce::int64) change.revision }, { "kind", change.kind } }));
+                return object ({ { "changes", entries }, { "fromRevision", (juce::int64) from },
+                    { "gap", from != engine.getSongStamp() && (changes.empty() || from < changes.front().revision - 1) },
+                    { "hasMore", ! changes.empty() && ! entries.isEmpty() && (juce::int64) entries.getLast()["revision"] < (juce::int64) changes.back().revision } });
+            }
+            if (op == "api.describe")
+                return object ({ { "protocol", protocol }, { "apiVersion", 1 }, { "projectFormat", "lynx-json/1" },
+                    { "maxRequestBytes", (int) maxMessage }, { "maxResponseBytes", (int) maxMessage },
+                    { "authentication", "hmac-sha256-mutual" }, { "capabilities", status()["capabilities"] },
+                    { "operations", juce::var (juce::StringArray { "api.describe", "status", "changes", "session.inspect", "device.state", "project.read", "project.edit", "pattern.notes", "plugin.inspect", "effect.catalog", "instrument.catalog", "playlist.inspect", "tempo.set", "mixer.set", "channel.set", "channel.create", "instrument.replace", "pattern.replace_notes", "plugin.parameters_set", "effect.load", "effect.remove", "playlist.edit", "transport.play", "transport.stop", "history.undo", "history.redo" }) } });
+            if (op == "project.read") return projectControl.dispatch (op, args, cancelled);
             if (op == "session.inspect")
                 return inspect();
             if (op == "pattern.notes")
@@ -252,8 +265,7 @@ struct KumiControl::Impl final : juce::Thread
                 const auto& source = s.patterns[(std::size_t) index].notes;
                 const auto total = (juce::int64) source.size();
                 const auto offset = args.hasProperty ("offset") ? integer (args, "offset", 0, 1000000000) : 0;
-                const auto paged = args.hasProperty ("offset") || args.hasProperty ("limit");
-                const auto limit = args.hasProperty ("limit") ? integer (args, "limit", 1, 256) : (paged ? 256 : total);
+                const auto limit = args.hasProperty ("limit") ? integer (args, "limit", 1, 256) : 256;
                 juce::Array<juce::var> notes;
                 for (auto i = offset; i < total && i - offset < limit; ++i)
                     notes.add (noteValue (source[(std::size_t) i]));
@@ -263,14 +275,14 @@ struct KumiControl::Impl final : juce::Thread
                 return result;
             }
             if (op == "plugin.inspect" || op == "effect.catalog")
-                return dispatchKumiPlugin (engine, op, args, cancelled);
+                return dispatchRemotePlugin (engine, op, args, cancelled);
             if (op == "instrument.catalog")
-                return dispatchKumiInstrument (engine, op, args, cancelled);
+                return dispatchRemoteInstrument (engine, op, args, cancelled);
             if (op == "playlist.inspect")
-                return dispatchKumiPlaylist (engine, op, args);
+                return dispatchRemotePlaylist (engine, op, args, cancelled);
 
             // An authenticated emergency stop must work even when the project or
-            // revision has changed since Kumi's last observation.
+            // revision has changed since Remote's last observation.
             if (op == "transport.stop")
             {
                 engine.stop();
@@ -279,28 +291,35 @@ struct KumiControl::Impl final : juce::Thread
 
             if (op != "transport.play" && op != "transport.stop" && op != "tempo.set" && op != "mixer.set"
                 && op != "channel.set" && op != "pattern.replace_notes" && op != "history.undo" && op != "history.redo"
-                && ! isKumiPluginOperation (op) && ! isKumiPlaylistOperation (op) && ! isKumiInstrumentOperation (op))
+                && ! isRemotePluginOperation (op) && ! isRemotePlaylistOperation (op) && ! isRemoteInstrumentOperation (op)
+                && ! isRemoteProjectOperation (op))
                 invalid ("Unsupported operation: " + op);
 
-            // Every mutation is bound to the project and revision Kumi actually observed. This also protects shared
+            // Every mutation is bound to the project and revision Remote actually observed. This also protects shared
             // history: an intervening producer edit must never become a delayed agent undo's target.
             if (! args["expectedProjectId"].isString() || s.projectId.empty()
                 || args["expectedProjectId"].toString() != text (s.projectId))
-                invalid ("Project changed or expectedProjectId is missing; inspect the session again");
+                throw RemoteError ("changed", "Project changed or expectedProjectId is missing; inspect the session again");
             if (! args["expectedEpoch"].isString() || args["expectedEpoch"].toString() != controlEpoch)
-                invalid ("LYNX control restarted or expectedEpoch is missing; inspect the session again");
+                throw RemoteError ("changed", "LYNX control restarted or expectedEpoch is missing; inspect the session again");
             const auto& revision = args["expectedRevision"];
             if (! (revision.isInt() || revision.isInt64()) || (juce::int64) revision < 0
                 || (std::uint64_t) (juce::int64) revision != engine.getSongStamp())
-                invalid ("Project changed since it was read or expectedRevision is missing; inspect the session again");
-            if (engine.isRecording() && op != "transport.stop")
-                invalid ("Stop recording before changing the project through Kumi");
-            if (isKumiPluginOperation (op))
-                return dispatchKumiPlugin (engine, op, args, cancelled);
-            if (isKumiInstrumentOperation (op))
-                return dispatchKumiInstrument (engine, op, args, cancelled);
-            if (isKumiPlaylistOperation (op))
-                return dispatchKumiPlaylist (engine, op, args);
+                throw RemoteError ("changed", "Project changed since it was read or expectedRevision is missing; inspect the session again");
+            if (engine.isRecording())
+                throw RemoteError ("busy", "Stop recording before changing the project through remote control");
+            if (juce::ModifierKeys::getCurrentModifiersRealtime().isAnyMouseButtonDown())
+                throw RemoteError ("busy", "Finish the current mouse gesture before remote editing or history changes");
+            if (args.hasProperty ("expectedDeviceStateHash") && (op == "history.undo" || op == "history.redo"))
+                if (! args["expectedDeviceStateHash"].isString() || args["expectedDeviceStateHash"].toString() != engine.remoteDeviceStateHash())
+                    throw RemoteError ("changed", "A device changed since the observed history fence; undo was refused");
+            if (isRemoteProjectOperation (op)) return projectControl.dispatch (op, args, cancelled);
+            if (isRemotePluginOperation (op))
+                return dispatchRemotePlugin (engine, op, args, cancelled);
+            if (isRemoteInstrumentOperation (op))
+                return dispatchRemoteInstrument (engine, op, args, cancelled);
+            if (isRemotePlaylistOperation (op))
+                return dispatchRemotePlaylist (engine, op, args, cancelled);
 
             if (op == "transport.play")
             {
@@ -311,7 +330,7 @@ struct KumiControl::Impl final : juce::Thread
             {
                 const auto bpm = number (args, "bpm", minTempo, maxTempo);
                 if (bpm != s.bpm)
-                    engine.editSong ([bpm] (Song& song) { song.bpm = bpm; });
+                    engine.editSongRemoteTransaction ([bpm] (Song& song) { song.bpm = bpm; }, cancelled);
                 return object ({ { "bpm", engine.getSong().bpm } });
             }
             if (op == "mixer.set" || op == "channel.set")
@@ -347,13 +366,7 @@ struct KumiControl::Impl final : juce::Thread
                         if (muted) channel.muted = m;
                     }
                 };
-                if (muted || solo)
-                    engine.editSong (change);
-                else
-                {
-                    engine.editLevels (change);
-                    engine.flushLevels();
-                }
+                engine.editSongRemoteTransaction (change, cancelled);
                 return object ({ { "index", index }, { "changed", true } });
             }
             if (op == "pattern.replace_notes")
@@ -369,11 +382,11 @@ struct KumiControl::Impl final : juce::Thread
                 for (const auto& value : *input)
                     notes.push_back (parseNote (value, s.channels.size()));
                 const auto count = (int) notes.size();
-                engine.editSong ([index, notes = std::move (notes)] (Song& song) {
+                engine.editSongRemoteTransaction ([index, notes = std::move (notes)] (Song& song) {
                     auto& pattern = song.patterns[(std::size_t) index];
                     pattern.notes = notes;
                     pattern.sortNotes();
-                });
+                }, cancelled);
                 return object ({ { "index", index }, { "noteCount", count } });
             }
             if (op == "history.undo" || op == "history.redo")
@@ -384,7 +397,7 @@ struct KumiControl::Impl final : juce::Thread
                 const auto available = undo ? engine.canUndo() : engine.canRedo();
                 if (available)
                 {
-                    if (undo) engine.undo(); else engine.redo();
+                    if (undo) engine.undoRemoteControl (cancelled); else engine.redoRemoteControl (cancelled);
                 }
                 return object ({ { "changed", available }, { "canUndo", engine.canUndo() }, { "canRedo", engine.canRedo() } });
             }
@@ -401,20 +414,26 @@ struct KumiControl::Impl final : juce::Thread
     };
 
     Impl (AudioEngine& engine, std::function<juce::String()> name, std::function<juce::String()> path, juce::File file)
-        : juce::Thread ("Kumi control"), state (std::make_shared<State> (engine, std::move (name), std::move (path))),
+        : juce::Thread ("LYNX Remote Control"), state (std::make_shared<State> (engine, std::move (name), std::move (path))),
           discovery (std::move (file)), token (randomToken())
     {
         if (! listener.createListener (0, "127.0.0.1"))
-            invalid ("Cannot create the Kumi loopback listener");
+            invalid ("Cannot create the remote-control loopback listener");
 #if JUCE_MAC || JUCE_LINUX || JUCE_BSD
         const auto listenerFd = listener.getRawSocketHandle();
         const auto listenerFlags = ::fcntl (listenerFd, F_GETFL, 0);
         if (listenerFlags < 0 || ::fcntl (listenerFd, F_SETFL, listenerFlags | O_NONBLOCK) != 0)
-            invalid ("Cannot make the Kumi listener nonblocking");
+            invalid ("Cannot make the remote listener nonblocking");
+#elif JUCE_WINDOWS
+        u_long mode = 1;
+        if (::ioctlsocket ((SOCKET) listener.getRawSocketHandle(), FIONBIO, &mode) != 0)
+            invalid ("Cannot make the remote listener nonblocking");
 #endif
         juce::int64 pid = 0;
 #if JUCE_MAC || JUCE_LINUX || JUCE_BSD
         pid = (juce::int64) ::getpid();
+#elif JUCE_WINDOWS
+        pid = (juce::int64) GetCurrentProcessId();
 #endif
         writeDiscovery (discovery, juce::JSON::toString (object ({
             { "protocol", protocol }, { "host", "127.0.0.1" }, { "port", listener.getBoundPort() },
@@ -429,15 +448,22 @@ struct KumiControl::Impl final : juce::Thread
         stopThread (3500);
         listener.close();
         // A second custom LYNX may have replaced this file; never remove its record.
-        const auto record = juce::JSON::parse (discovery.loadFileAsString());
-        if (record["token"].toString() == token)
-            discovery.deleteFile();
+        try
+        {
+            remote_files::checkPrivateFile (discovery);
+            if (discovery.getSize() <= 16384)
+            {
+                const auto record = juce::JSON::parse (discovery.loadFileAsString());
+                if (record["token"].toString() == token) discovery.deleteFile();
+            }
+        }
+        catch (...) {}
     }
 
     juce::var request (const juce::String& json)
     {
         const auto utf8 = json.toRawUTF8();
-        if (! kumi_json::withinNestingLimit (std::string_view (utf8, json.getNumBytesAsUTF8())))
+        if (! remote_json::withinNestingLimit (std::string_view (utf8, json.getNumBytesAsUTF8())))
             return failure ("JSON nesting exceeds the control request limit");
         juce::var input;
         if (juce::JSON::parse (json, input).failed() || input.getDynamicObject() == nullptr)
@@ -463,12 +489,16 @@ struct KumiControl::Impl final : juce::Thread
                 });
                 if (auto* properties = result.getDynamicObject())
                 {
-                    properties->setProperty ("revision", (juce::int64) shared->engine.getSongStamp());
-                    properties->setProperty ("projectId", text (shared->engine.getSong().projectId));
+                    shared->observe (work->op);
+                    if (work->op != "project.read" || ! properties->hasProperty ("revision"))
+                        properties->setProperty ("revision", (juce::int64) shared->engine.getSongStamp());
+                    if (work->op != "project.read" || ! properties->hasProperty ("projectId"))
+                        properties->setProperty ("projectId", text (shared->engine.getSong().projectId));
                     properties->setProperty ("controlEpoch", shared->controlEpoch);
                 }
                 work->response = success (std::move (result));
             }
+            catch (const RemoteError& e) { work->response = failure (e.what(), e.code, e.uncertain); }
             catch (const std::exception& e) { work->response = failure (e.what()); }
             catch (...) { work->response = failure ("Control operation failed"); }
             work->finished.signal();
@@ -476,13 +506,19 @@ struct KumiControl::Impl final : juce::Thread
             return failure ("The LYNX message loop is unavailable");
         const auto longOperation = work->op == "plugin.parameters_set" || work->op == "effect.load"
                                 || work->op == "history.undo" || work->op == "history.redo"
-                                || work->op == "channel.create" || work->op == "instrument.replace";
+                                || work->op == "channel.create" || work->op == "instrument.replace"
+                                || work->op == "project.read" || work->op == "project.edit" || work->op == "device.state";
         const auto deadline = juce::Time::getMillisecondCounterHiRes() + (longOperation ? 60000.0 : 5000.0);
         while (state->active && ! threadShouldExit() && juce::Time::getMillisecondCounterHiRes() < deadline)
             if (work->finished.wait (50))
                 return work->response;
         work->cancelled = true;
-        return failure ("LYNX did not answer in time; the change may have run. Inspect the session before retrying");
+        const auto readOnly = work->op == "status" || work->op == "changes" || work->op == "api.describe" || work->op == "device.state"
+            || work->op == "session.inspect" || work->op == "project.read" || work->op == "pattern.notes"
+            || work->op == "plugin.inspect" || work->op == "effect.catalog" || work->op == "instrument.catalog" || work->op == "playlist.inspect";
+        return failure (readOnly ? "LYNX read timed out; retry after checking the application"
+                                : "LYNX did not answer in time; the change may have run. Inspect the session before retrying",
+                        readOnly ? "failed" : "uncertain", ! readOnly);
     }
 
     bool readLine (juce::StreamingSocket& socket, std::string& pending, std::string& line,
@@ -535,28 +571,28 @@ struct KumiControl::Impl final : juce::Thread
         const auto deadline = juce::Time::getMillisecondCounterHiRes() + 2000.0;
         std::string line;
         if (! readLine (socket, pending, line, maxHandshake, deadline)
-            || ! kumi_json::withinNestingLimit (line, 8)) return false;
+            || ! remote_json::withinNestingLimit (line, 8)) return false;
         juce::var hello;
         if (juce::JSON::parse (juce::String::fromUTF8 (line.data(), (int) line.size()), hello).failed()
             || hello.getDynamicObject() == nullptr || hello.getDynamicObject()->getProperties().size() != 3
             || hello["type"].toString() != "hello" || hello["protocol"].toString() != protocol
-            || ! hello["nonce"].isString() || ! kumi_auth::isLowerHex (hello["nonce"].toString().toStdString(), 32))
+            || ! hello["nonce"].isString() || ! remote_auth::isLowerHex (hello["nonce"].toString().toStdString(), 32))
             return false;
         const auto clientNonce = hello["nonce"].toString().toStdString();
         const auto serverNonce = randomToken().substring (0, 32).toStdString();
         const auto key = token.toStdString();
         const auto challenge = object ({ { "type", "challenge" }, { "protocol", protocol },
-                                        { "nonce", text (serverNonce) }, { "proof", text (kumi_auth::proof (key, "server", clientNonce, serverNonce)) } });
+                                        { "nonce", text (serverNonce) }, { "proof", text (remote_auth::proof (key, "server", clientNonce, serverNonce)) } });
         if (! writeFrame (socket, challenge, maxHandshake, deadline)
             || ! readLine (socket, pending, line, maxHandshake, deadline)
-            || ! kumi_json::withinNestingLimit (line, 8)) return false;
+            || ! remote_json::withinNestingLimit (line, 8)) return false;
         juce::var auth;
         if (juce::JSON::parse (juce::String::fromUTF8 (line.data(), (int) line.size()), auth).failed()
             || auth.getDynamicObject() == nullptr || auth.getDynamicObject()->getProperties().size() != 2
             || auth["type"].toString() != "auth" || ! auth["proof"].isString()) return false;
         const auto supplied = auth["proof"].toString().toStdString();
-        if (! kumi_auth::isLowerHex (supplied, 64)
-            || ! kumi_auth::constantTimeEqual (supplied, kumi_auth::proof (key, "client", clientNonce, serverNonce))) return false;
+        if (! remote_auth::isLowerHex (supplied, 64)
+            || ! remote_auth::constantTimeEqual (supplied, remote_auth::proof (key, "client", clientNonce, serverNonce))) return false;
         return writeFrame (socket, object ({ { "type", "ready" }, { "protocol", protocol } }), maxHandshake, deadline);
     }
 
@@ -570,11 +606,14 @@ struct KumiControl::Impl final : juce::Thread
         const int noSigPipe = 1;
         if (::setsockopt (fd, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, sizeof (noSigPipe)) != 0) return;
 #endif
+#elif JUCE_WINDOWS
+        u_long mode = 1;
+        if (::ioctlsocket ((SOCKET) socket.getRawSocketHandle(), FIONBIO, &mode) != 0) return;
 #endif
         std::string pending;
         if (! authenticate (socket, pending))
         {
-            writeFrame (socket, failure ("Authentication failed; lynx-kumi/2 mutual authentication is required"),
+            writeFrame (socket, failure ("Authentication failed; lynx-control/1 mutual authentication is required"),
                         maxHandshake, juce::Time::getMillisecondCounterHiRes() + 500.0);
             return;
         }
@@ -606,26 +645,27 @@ struct KumiControl::Impl final : juce::Thread
     juce::String token;
 };
 
-KumiControl::KumiControl (std::unique_ptr<Impl> value) : impl (std::move (value)) {}
-KumiControl::~KumiControl() = default;
+RemoteControl::RemoteControl (std::unique_ptr<Impl> value) : impl (std::move (value)) {}
+RemoteControl::~RemoteControl() = default;
 
-std::unique_ptr<KumiControl> KumiControl::create (AudioEngine& engine, std::function<juce::String()> name,
-                                                  std::function<juce::String()> projectPath)
+bool RemoteControl::active() const noexcept { return impl != nullptr && impl->state->active.load(); }
+juce::File RemoteControl::discoveryFile() const { return impl != nullptr ? impl->discovery : juce::File(); }
+
+std::unique_ptr<RemoteControl> RemoteControl::create (AudioEngine& engine, bool enabled, std::function<juce::String()> name,
+                                                    std::function<juce::String()> projectPath)
 {
-    const auto path = juce::SystemStats::getEnvironmentVariable ("LYNX_KUMI_DISCOVERY", {});
-    if (path.isEmpty())
-        return {};
+    if (! enabled) return {};
+    const auto override = juce::SystemStats::getEnvironmentVariable ("LYNX_CONTROL_DISCOVERY", {});
     try
     {
-        if (! juce::File::isAbsolutePath (path))
-            invalid ("LYNX_KUMI_DISCOVERY must be an absolute path");
-        auto control = std::unique_ptr<KumiControl> (new KumiControl (std::make_unique<Impl> (engine, std::move (name), std::move (projectPath), juce::File (path))));
-        engine.enableExternalPluginStateRestore();
-        return control;
+        if (override.isNotEmpty() && ! juce::File::isAbsolutePath (override))
+            invalid ("LYNX_CONTROL_DISCOVERY must be an absolute path");
+        const auto file = override.isEmpty() ? platform::settingsFile ("control/connection.json") : juce::File (override);
+        return std::unique_ptr<RemoteControl> (new RemoteControl (std::make_unique<Impl> (engine, std::move (name), std::move (projectPath), file)));
     }
     catch (const std::exception& e)
     {
-        juce::Logger::writeToLog ("Kumi control did not start: " + juce::String (e.what()));
+        juce::Logger::writeToLog ("LYNX Remote Control did not start: " + juce::String (e.what()));
         return {};
     }
 }

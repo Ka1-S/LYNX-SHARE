@@ -522,6 +522,7 @@ private:
     BrowserComponent browser;
     Workspace workspace; // after the panels' contents: it is destroyed first
     updater::UpdateBar updateBar; // "LYNX SHARE x.y.z is available" under the toolbar (round 166b)
+    juce::Label remoteControlBar;
     std::unique_ptr<juce::Component> danceStage; // the dance channels' dancers over the workspace (ui/DanceView.h, round 165e)
 
     std::unique_ptr<juce::FileChooser> fileChooser;

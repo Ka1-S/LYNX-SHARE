@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-namespace lynx::kumi_playlist
+namespace lynx::remote_playlist
 {
 constexpr std::int64_t maxTick = 1000000000;
 constexpr int maxTrack = 499;
@@ -59,7 +59,7 @@ inline void writableTrack (const Song& song, int track)
     if (track < 0 || track > maxTrack)
         fail ("Playlist track must be between 0 and 499");
     if (track < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) track].lockedToContent)
-        fail ("Kumi does not edit Playlist tracks locked to content; unlock the track first");
+        fail ("Remote does not edit Playlist tracks locked to content; unlock the track first");
 }
 
 inline void validateClip (const Song& song, const Clip& clip)
@@ -174,4 +174,4 @@ inline Transaction apply (const Song& original, const std::vector<Edit>& edits)
     }
     return result;
 }
-} // namespace lynx::kumi_playlist
+} // namespace lynx::remote_playlist

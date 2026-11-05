@@ -4785,31 +4785,29 @@ TEST (plugin_factories_create_reuse_and_fallback)
     auto ordinary = lynx::RackState::build (storedOnly, a.get(), 48000.0, f);
     CHECK (instrumentsMade == 1 && effectsMade == 1);
     CHECK (ordinary->instruments[0] == a->instruments[0] && ordinary->effects[1][0] == a->effects[1][0]);
-    f.restorePluginState = true;
 
-    // An intentional stored-state edit (and its undo) must actually reach the
-    // hosted instance. A metadata-only capture sync updates both Song and prior
-    // shape before building, and continues to reuse the running plugin.
+    // Serialized state changes and undo preserve running instances. Remote control
+    // applies deliberate state edits in place through the engine, outside this factory.
     s.channels[0].plugin.state = "abc";
     auto b = lynx::RackState::build (s, a.get(), 48000.0, f);
-    CHECK (instrumentsMade == 2 && b->instruments[0] != a->instruments[0] && b->effects[1][0] == a->effects[1][0]);
+    CHECK (instrumentsMade == 1 && b->instruments[0] == a->instruments[0] && b->effects[1][0] == a->effects[1][0]);
     s.mixer[1].effects[0].plugin.state = "new effect state";
     auto changed = lynx::RackState::build (s, b.get(), 48000.0, f);
-    CHECK (instrumentsMade == 2 && effectsMade == 2 && changed->effects[1][0] != b->effects[1][0]);
+    CHECK (instrumentsMade == 1 && effectsMade == 1 && changed->effects[1][0] == b->effects[1][0]);
     s.channels[0].plugin.state.clear();
     s.mixer[1].effects[0].plugin.state.clear();
     auto undone = lynx::RackState::build (s, changed.get(), 48000.0, f);
-    CHECK (instrumentsMade == 3 && effectsMade == 3);
-    CHECK (undone->instruments[0] != changed->instruments[0] && undone->effects[1][0] != changed->effects[1][0]);
+    CHECK (instrumentsMade == 1 && effectsMade == 1);
+    CHECK (undone->instruments[0] == changed->instruments[0] && undone->effects[1][0] == changed->effects[1][0]);
     auto capturedShape = *undone;
     capturedShape.song.channels[0].plugin.state = s.channels[0].plugin.state = "captured instrument";
     capturedShape.song.mixer[1].effects[0].plugin.state = s.mixer[1].effects[0].plugin.state = "captured effect";
     auto captured = lynx::RackState::build (s, &capturedShape, 48000.0, f);
-    CHECK (instrumentsMade == 3 && effectsMade == 3);
+    CHECK (instrumentsMade == 1 && effectsMade == 1);
     CHECK (captured->instruments[0] == undone->instruments[0] && captured->effects[1][0] == undone->effects[1][0]);
     s.mixer[1].effects[0].plugin.id = "VST3-Outro-1";
     auto c2 = lynx::RackState::build (s, captured.get(), 48000.0, f);
-    CHECK (effectsMade == 4);
+    CHECK (effectsMade == 2);
 
     // rendering with a missing plugin and a plugin slot breaks nothing
     lynx::RackRenderer r;
@@ -4830,6 +4828,66 @@ TEST (plugin_factories_create_reuse_and_fallback)
         peak = std::max (peak, std::abs (v));
     }
     CHECK (peak > 0.0f);
+}
+
+TEST (remote_reset_replaces_only_requested_instances_and_default_reuse_stays_unchanged)
+{
+    lynx::Song source;
+    source.mixer = lynx::Song::defaultMixer (2);
+    for (const auto* id : { "Synth A", "Synth B" })
+    {
+        lynx::ChannelDef channel;
+        channel.instrument = lynx::InstrumentKind::plugin;
+        channel.plugin.id = id;
+        channel.plugin.state = std::string ("saved ") + id;
+        source.channels.push_back (std::move (channel));
+    }
+    for (const auto* id : { "Effect A", "Effect B" })
+    {
+        lynx::EffectSlot effect;
+        effect.kind = lynx::EffectKind::plugin;
+        effect.plugin.id = id;
+        effect.plugin.state = std::string ("saved ") + id;
+        source.mixer[1].effects.push_back (std::move (effect));
+    }
+    int instrumentsMade = 0, effectsMade = 0;
+    std::string lastInstrumentState, lastEffectState;
+    lynx::RackState::Factories normal;
+    normal.pluginInstruments = [&] (const lynx::PluginRef& ref, double) -> std::shared_ptr<lynx::Instrument> {
+        ++instrumentsMade;
+        lastInstrumentState = ref.state;
+        return lynx::makeInstrument (lynx::InstrumentKind::synth);
+    };
+    normal.pluginEffects = [&] (const lynx::PluginRef& ref, double) -> std::shared_ptr<lynx::Effect> {
+        ++effectsMade;
+        lastEffectState = ref.state;
+        return lynx::makeEffect (lynx::EffectKind::eq);
+    };
+    const auto before = lynx::RackState::build (source, nullptr, 48000.0, normal);
+    CHECK (instrumentsMade == 2 && effectsMade == 2);
+    auto reset = source;
+    reset.channels[0].instance.renew();
+    reset.channels[0].plugin.state.clear();
+    reset.mixer[1].effects[0].instance.renew();
+    reset.mixer[1].effects[0].plugin.state.clear();
+
+    // Ordinary project/UI edits retain the established positional fallback, even for fresh model tags.
+    const auto ordinary = lynx::RackState::build (reset, before.get(), 48000.0, normal);
+    CHECK (instrumentsMade == 2 && effectsMade == 2);
+    CHECK (ordinary->instruments[0] == before->instruments[0] && ordinary->effects[1][0] == before->effects[1][0]);
+
+    auto requested = normal;
+    requested.freshInstances = { reset.channels[0].instance.id, reset.mixer[1].effects[0].instance.id };
+    const auto replaced = lynx::RackState::build (reset, before.get(), 48000.0, requested);
+    CHECK (instrumentsMade == 3 && effectsMade == 3);
+    CHECK (lastInstrumentState.empty() && lastEffectState.empty()); // factories received actual default-state requests
+    CHECK (replaced->instruments[0] != before->instruments[0] && replaced->effects[1][0] != before->effects[1][0]);
+    CHECK (replaced->instruments[1] == before->instruments[1] && replaced->effects[1][1] == before->effects[1][1]);
+
+    // The policy belongs to that build only: later ordinary edits reuse the newly created instances.
+    const auto later = lynx::RackState::build (reset, replaced.get(), 48000.0, normal);
+    CHECK (instrumentsMade == 3 && effectsMade == 3);
+    CHECK (later->instruments[0] == replaced->instruments[0] && later->effects[1][0] == replaced->effects[1][0]);
 }
 
 TEST (export_song_adds_silent_tail_and_never_restarts)

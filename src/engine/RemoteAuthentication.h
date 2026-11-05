@@ -4,7 +4,7 @@
 #include <array>
 #include <string_view>
 
-namespace lynx::kumi_auth
+namespace lynx::remote_auth
 {
 inline std::array<std::uint8_t, 32> digestBytes (const std::string& hex)
 {
@@ -54,6 +54,6 @@ inline bool constantTimeEqual (std::string_view supplied, std::string_view expec
 }
 inline std::string proof (std::string_view token, std::string_view role, std::string_view clientNonce, std::string_view serverNonce)
 {
-    return hmacSha256 (token, "lynx-kumi/2\n" + std::string (role) + "\n" + std::string (clientNonce) + "\n" + std::string (serverNonce));
+    return hmacSha256 (token, "lynx-control/1\n" + std::string (role) + "\n" + std::string (clientNonce) + "\n" + std::string (serverNonce));
 }
 }

@@ -4,7 +4,7 @@
 #include <optional>
 #include <stdexcept>
 
-namespace lynx::kumi_instruments
+namespace lynx::remote_instruments
 {
 // Stage complete model edits before touching the engine or its undo stack.
 struct Result { Song song; int channelIndex; };

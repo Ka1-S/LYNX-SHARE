@@ -90,6 +90,8 @@ public:
     bool hasCrashed() const noexcept { return crashed.load (std::memory_order_relaxed); }
     // The plugin's state for saving (base64, as capturePluginState), or nullopt after a crash (keep the saved one).
     std::optional<std::string> captureState();
+    // Remote control only, with playback stopped and the engine callback lock held.
+    bool restoreState (const std::string& state);
     // Sets a parameter from the UI / controllers (setValueNotifyingHost), guarded like the audio calls.
     void setParameterFromUi (int index, float value);
     void setRenderMode (bool offline);
@@ -175,6 +177,8 @@ public:
     bool hasCrashed() const noexcept { return crashed.load (std::memory_order_relaxed); }
     // The plugin's state for saving (base64, as capturePluginState), or nullopt after a crash (keep the saved one).
     std::optional<std::string> captureState();
+    // Remote control only, with playback stopped and the engine callback lock held.
+    bool restoreState (const std::string& state);
     // Sets a parameter from the UI / controllers (setValueNotifyingHost), guarded like the audio calls.
     void setParameterFromUi (int index, float value);
     void setRenderMode (bool offline);

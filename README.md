@@ -341,31 +341,13 @@ LYNX --uiperf project.flp rep.txt             time the UI drawing: Mixer, Playli
 LYNX.AppImage --menu-entry on|off             Linux AppImage: add to / remove from the applications menu
 ```
 
-## Native Kumi control (experimental)
+## LYNX Remote Control (experimental)
 
-On macOS and Linux, LYNX can expose its open project through the opt-in `lynx-kumi/2` control endpoint. It stays off during a normal start. Use a [matching Kumi build and `lynx-kumi` companion](https://github.com/user1303836/kumi/pull/1060) with `--daw lynx`. The companion connects this native endpoint to Kumi's shared `kumi-daw/1` bridge and MCP host. This endpoint is not in a released LYNX build yet.
+Enable **Settings > General > Remote control** to let authenticated local clients read and edit the open project. It is off by default. An active indicator appears under the toolbar; switching the setting off closes the listener and removes its discovery file. Automatic update checks keep their normal behavior.
 
-```sh
-mkdir -p "$PWD/kumi-control"
-chmod 700 "$PWD/kumi-control"
-export LYNX_KUMI_DISCOVERY="$PWD/kumi-control/connection.json"
-export KUMI_LYNX_APP="/path/to/LYNX.app"
-"$KUMI_LYNX_APP/Contents/MacOS/LYNX" /absolute/path/song.lynx
-# In another terminal, using the same absolute discovery path:
-KUMI_LYNX_CONFIG="$PWD/kumi-control/connection.json" kumi --daw lynx
-```
+The vendor-neutral `lynx-control/1` API provides bounded project and device reads, complete paged native-project snapshots, atomic document edits, transport, revision/change tracking and guarded native undo. It uses an owner-private discovery file and mutual authentication on loopback. Windows, macOS and Linux use the same protocol. This API is not in a released build yet.
 
-The endpoint binds only to `127.0.0.1` on an ephemeral port. Its atomically created discovery file has owner-only permissions and a private authentication key. Keep it out of chat, version control and shared folders. Version 2 uses fresh client/server challenges and role-separated HMAC-SHA256 proofs; the client verifies the server before authenticating. The key is never sent over the socket. Version 1 bearer-token requests are refused. Authentication frames are limited to 1 KiB and eight nesting levels; authenticated requests/responses are limited to 1 MiB, with request nesting limited to 64. Each authenticated connection carries one tokenless operation and response. Transport I/O has two-second bounds; message-loop deadlines are five seconds for ordinary calls and sixty seconds for instrument/plugin loading, parameter changes and undo/redo. A timeout is an uncertain outcome: inspect the project before another edit.
-
-- Inspect the live project, transport, channels, mixer and complete MIDI-note properties; change tempo, playback, channel/mixer controls and pattern notes. `pattern.notes` supports `offset`/`limit` pages of at most 256 notes and returns `totalNotes` and `nextOffset`.
-- Search native generators and already-scanned hosted instruments with `instrument.catalog`, including availability and exact IDs. `channel.create` appends or inserts a routed channel; `instrument.replace` preserves its notes, routing, identity and channel preferences. Both reuse the same generator factories as the menus, preflight hosted plugins and commit as one structural undo step. Arbitrary paths and sample import are not accepted.
-- Inspect top-level hosted instruments and hosted/native mixer effects, with paginated normalized parameter values and display text. Parameter batches preserve full hosted state and use native undo. Native synth parameter editing and nested Patcher devices are not exposed.
-- Search, load and remove built-in effects or effects already in LYNX's scanned catalog. Arbitrary plugin paths and new folder scans are not accepted.
-- Inspect and edit the current Playlist arrangement using stable clip IDs. A bounded add/update/duplicate/remove batch validates fully before committing as one undo step. Existing pattern/audio-channel/automation sources retain their routing; content-locked tracks are refused.
-
-Mutations require the observed `expectedProjectId`, `expectedRevision`, and `expectedEpoch`, except authenticated `transport.stop`, which always stops the current transport even if an edit or restart made those observations stale. Public `controlEpoch` identifies this app run independently of the private token, preventing stale edits after a restart. Success responses include `projectId`, `revision` and `controlEpoch`; `session.inspect` advertises capability groups, including `instruments`. Kumi attaches guards automatically. Plugin parameter batches also require per-parameter `expectedValue`, since a plugin editor can change values without publishing a Song revision. Note replacement requires every property returned by `pattern.notes`.
-
-Edits are refused while recording. Instrument/channel creation, plugin/effect, Playlist, note replacement and history operations require stopped playback. Native undo/redo uses LYNX's shared history, including the producer's edits. Saving projects, arbitrary audio import, arrangement switching and live audio capture are not exposed.
+See the [protocol and operation reference](docs/REMOTE_CONTROL.md) and [standalone Python client](examples/remote_control.py). Clients do not need Kumi. For unattended launches, `LYNX_CONTROL_ENABLED=1` enables the API for that run; `LYNX_CONTROL_DISCOVERY` optionally selects an absolute private discovery path. The path alone does not enable remote control. Keep discovery credentials out of chat, version control and shared folders.
 
 ## Shortcuts
 

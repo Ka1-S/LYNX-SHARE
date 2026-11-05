@@ -1,6 +1,6 @@
-#include "engine/KumiInstrumentEdits.h"
-#include "engine/KumiJsonLimits.h"
-#include "engine/KumiAuthentication.h"
+#include "engine/RemoteInstrumentEdits.h"
+#include "engine/RemoteJsonLimits.h"
+#include "engine/RemoteAuthentication.h"
 #include <cstdio>
 #include <stdexcept>
 
@@ -80,7 +80,7 @@ void instrumentEdits()
     ChannelDef generator;
     generator.instrument = InstrumentKind::snare;
     generator.name = "New Snare";
-    auto inserted = kumi_instruments::create (original, generator, 1, 3);
+    auto inserted = remote_instruments::create (original, generator, 1, 3);
     const auto& song = inserted.song;
     check (inserted.channelIndex == 1 && song.channels.size() == 4, "middle insertion failed");
     check (song.channels[1].mixerTrack == 3 && song.channels[1].instrument == InstrumentKind::snare, "selected generator or route lost");
@@ -97,12 +97,12 @@ void instrumentEdits()
     check (song.playlist[0].channel == 3 && song.arrangements[1].clips[0].channel == 3, "audio sources were not remapped in every arrangement");
     check (original.channels.size() == 3 && original.patterns[0].notes[0].channel == 1, "staged insertion changed original");
 
-    auto appended = kumi_instruments::create (original, generator);
+    auto appended = remote_instruments::create (original, generator);
     check (appended.channelIndex == 3 && appended.song.channels.size() == 4, "default insertion did not append");
     check (appended.song.channels.back().mixerTrack != 2, "default insertion reused the occupied insert");
     check (appended.song.patterns == original.patterns && appended.song.automations == original.automations, "append remapped existing musical references");
 
-    auto replaced = kumi_instruments::replace (original, 1, generator);
+    auto replaced = remote_instruments::replace (original, 1, generator);
     auto expected = original.channels[1];
     expected.instrument = generator.instrument;
     expected.name = generator.name;
@@ -112,17 +112,17 @@ void instrumentEdits()
     check (replaced.song.patterns == original.patterns && replaced.song.automations == original.automations
            && replaced.song.playlist == original.playlist, "replacement changed musical references");
 
-    refuses ([&] { kumi_instruments::create (original, generator, -1); });
-    refuses ([&] { kumi_instruments::create (original, generator, 4); });
-    refuses ([&] { kumi_instruments::create (original, generator, 1, 4); });
-    refuses ([&] { kumi_instruments::replace (original, 3, generator); });
-    refuses ([&] { kumi_instruments::replace (original, -1, generator); });
+    refuses ([&] { remote_instruments::create (original, generator, -1); });
+    refuses ([&] { remote_instruments::create (original, generator, 4); });
+    refuses ([&] { remote_instruments::create (original, generator, 1, 4); });
+    refuses ([&] { remote_instruments::replace (original, 3, generator); });
+    refuses ([&] { remote_instruments::replace (original, -1, generator); });
     check (original.channels[1].plugin.state == "existing state" && original.patterns[0].notes[0].channel == 1,
            "rejected transaction changed original model");
 }
 void authentication()
 {
-    using namespace kumi_auth;
+    using namespace remote_auth;
     // RFC 4231 cases 1, 2, 3 and 6 include binary keys/data and a key
     // longer than SHA-256's block, independently checking the HMAC construction.
     check (hmacSha256 (std::string (20, '\x0b'), "Hi There") ==
@@ -139,8 +139,8 @@ void authentication()
     const auto serverProof = proof (key, "server", client, server);
     const auto clientProof = proof (key, "client", client, server);
     // Independent Python hashlib/hmac vectors pin the ASCII token key and transcript.
-    check (serverProof == "6c812276d14bef8bc5fb68938878c31b5f3fcb99e052a7ad17e9649dea6bdd15", "server proof transcript changed");
-    check (clientProof == "3760ec19e0b65f53d2bfdcf48c2905d340c702f4f00415bf9cd1966fabec0108", "client proof transcript changed");
+    check (serverProof == "8dc31853f158358575e3b58b554d2bd73d555325a891b29c7bc5de90c3b4077a", "server proof transcript changed");
+    check (clientProof == "2626f47afd5c951ff3c7147d1aed38a9443f7aedf728b2471db8acde57a2b12c", "client proof transcript changed");
     check (! constantTimeEqual (serverProof, clientProof), "server proof could be reflected as client authentication");
     check (! constantTimeEqual (clientProof, proof (key, "client", client, std::string (32, '0'))), "proof could be replayed for a fresh server nonce");
     check (! constantTimeEqual (clientProof, proof (std::string (64, 'b'), "client", client, server)), "wrong key proof authenticated");
@@ -154,7 +154,7 @@ void authentication()
 
 void jsonNesting()
 {
-    using kumi_json::withinNestingLimit;
+    using remote_json::withinNestingLimit;
     check (withinNestingLimit (std::string (64, '[') + "0" + std::string (64, ']')), "nesting boundary was rejected");
     check (! withinNestingLimit (std::string (65, '[') + "0" + std::string (65, ']')), "over-nested unauthenticated array was accepted");
     std::string objects;
@@ -172,7 +172,7 @@ int main()
         instrumentEdits();
         jsonNesting();
         authentication();
-        std::puts ("Kumi instrument edits, JSON nesting and authentication tests passed");
+        std::puts ("Remote instrument edits, JSON nesting and authentication tests passed");
         return 0;
     }
     catch (const std::exception& error)

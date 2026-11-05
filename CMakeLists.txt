@@ -307,10 +307,10 @@ target_link_libraries(lynx_core PUBLIC vorbis_decoder)
 
 add_executable(lynx_tests tests/tests.cpp)
 target_link_libraries(lynx_tests PRIVATE lynx_core)
-add_executable(lynx_kumi_playlist_tests tests/KumiPlaylistEditsTests.cpp)
-target_link_libraries(lynx_kumi_playlist_tests PRIVATE lynx_core)
-add_executable(lynx_kumi_instrument_tests tests/KumiInstrumentEditsTests.cpp)
-target_link_libraries(lynx_kumi_instrument_tests PRIVATE lynx_core)
+add_executable(lynx_remote_playlist_tests tests/RemotePlaylistEditsTests.cpp)
+target_link_libraries(lynx_remote_playlist_tests PRIVATE lynx_core)
+add_executable(lynx_remote_instrument_tests tests/RemoteInstrumentEditsTests.cpp)
+target_link_libraries(lynx_remote_instrument_tests PRIVATE lynx_core)
 
 add_executable(flpdump tools/flpdump.cpp)
 target_link_libraries(flpdump PRIVATE lynx_core)
@@ -320,8 +320,8 @@ target_link_libraries(renderwav PRIVATE lynx_core)
 
 enable_testing()
 add_test(NAME lynx_tests COMMAND lynx_tests)
-add_test(NAME lynx_kumi_playlist_tests COMMAND lynx_kumi_playlist_tests)
-add_test(NAME lynx_kumi_instrument_tests COMMAND lynx_kumi_instrument_tests)
+add_test(NAME lynx_remote_playlist_tests COMMAND lynx_remote_playlist_tests)
+add_test(NAME lynx_remote_instrument_tests COMMAND lynx_remote_instrument_tests)
 
 # ---------------------------------------------------------------------------
 # App (JUCE)
@@ -367,11 +367,14 @@ if(LYNX_BUILD_APP)
         src/platform/Package.cpp
         src/platform/NativeEmbed.cpp
         src/engine/AudioEngine.cpp
-        src/engine/KumiControl.cpp
-        src/engine/KumiPluginControl.cpp
-        src/engine/KumiInstrumentControl.cpp
+        src/engine/RemoteControl.cpp
+        src/engine/RemoteProjectControl.cpp
+        src/engine/RemoteProjectDocument.cpp
+        src/ui/RemoteControlSettings.cpp
+        src/engine/RemotePluginControl.cpp
+        src/engine/RemoteInstrumentControl.cpp
         src/engine/GeneratorCatalog.cpp
-        src/engine/KumiPlaylistControl.cpp
+        src/engine/RemotePlaylistControl.cpp
         src/engine/ChannelRackProcessor.cpp
         src/engine/Metronome.cpp
         src/engine/SampleLibrary.cpp
@@ -516,7 +519,7 @@ if(LYNX_BUILD_APP)
     if(WIN32)
         target_include_directories(LYNX PRIVATE third_party/asiosdk/common)
         target_compile_definitions(LYNX PRIVATE JUCE_ASIO=1) # ASIO SDK headers in third_party/asiosdk (GPLv3 option)
-        target_link_libraries(LYNX PRIVATE winhttp) # live sessions' WebSocket (engine/LiveLink.cpp)
+        target_link_libraries(LYNX PRIVATE winhttp bcrypt advapi32) # live sessions' WebSocket (engine/LiveLink.cpp)
     elseif(APPLE)
         target_compile_definitions(LYNX PRIVATE JUCE_PLUGINHOST_AU=1)
         target_link_libraries(LYNX PRIVATE ${CMAKE_DL_LIBS}) # (libcurl loaded at run time: engine/LiveLink.cpp)
@@ -538,6 +541,15 @@ if(LYNX_BUILD_APP)
         PUBLIC
             juce::juce_recommended_config_flags
             juce::juce_recommended_lto_flags)
+
+    add_executable(lynx_remote_project_tests
+        tests/RemoteProjectControlTests.cpp
+        src/engine/RemoteProjectDocument.cpp
+        src/engine/ProjectFile.cpp)
+    target_include_directories(lynx_remote_project_tests PRIVATE src)
+    target_compile_definitions(lynx_remote_project_tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+    target_link_libraries(lynx_remote_project_tests PRIVATE lynx_core juce::juce_core)
+    add_test(NAME lynx_remote_project_tests COMMAND lynx_remote_project_tests)
 endif()
 
 if(LYNX_BUILD_APP AND UNIX AND NOT APPLE)

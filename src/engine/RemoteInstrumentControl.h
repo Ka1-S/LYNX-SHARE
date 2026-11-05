@@ -6,8 +6,8 @@
 namespace lynx
 {
 class AudioEngine;
-bool isKumiInstrumentOperation (const juce::String&);
+bool isRemoteInstrumentOperation (const juce::String&);
 // Message thread only; the outer control dispatcher authenticates and guards writes.
-juce::var dispatchKumiInstrument (AudioEngine&, const juce::String&, const juce::var&,
+juce::var dispatchRemoteInstrument (AudioEngine&, const juce::String&, const juce::var&,
                                  const std::function<bool()>& cancelled = {});
 }

@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <string_view>
 
-namespace lynx::kumi_json
+namespace lynx::remote_json
 {
 // Run before JUCE's recursive JSON parser, including before authentication. The
 // byte limit alone does not bound parser stack usage. Syntax remains JUCE's job.

@@ -218,6 +218,22 @@ std::optional<std::string> guardedState (juce::AudioPluginInstance& plugin, std:
     return state.toBase64Encoding().toStdString();
 }
 
+bool guardedRestore (juce::AudioPluginInstance& plugin, std::atomic<bool>& crashed, const std::string& name,
+                     const std::string& encoded)
+{
+    if (crashed.load()) return false;
+    juce::MemoryBlock state;
+    if (encoded.empty() || ! state.fromBase64Encoding (juce::String::fromUTF8 (encoded.c_str()))) return false;
+    const juce::ScopedLock lock (plugin.getCallbackLock());
+    if (const auto code = crashguard::run ([&] { plugin.setStateInformation (state.getData(), (int) state.getSize()); }); code != 0)
+    {
+        crashed.store (true);
+        recordCrash (name, code);
+        return false;
+    }
+    return true;
+}
+
 void guardedUiParameter (juce::AudioPluginInstance& plugin, std::atomic<bool>& crashed, const std::string& name, int index, float value)
 {
     if (crashed.load())
@@ -329,6 +345,11 @@ void PluginInstrument::failed (std::uint32_t code) noexcept
 std::optional<std::string> PluginInstrument::captureState()
 {
     return guardedState (*plugin, crashed, name);
+}
+
+bool PluginInstrument::restoreState (const std::string& state)
+{
+    return guardedRestore (*plugin, crashed, name, state);
 }
 
 void PluginInstrument::setParameterFromUi (int index, float value)
@@ -613,6 +634,11 @@ void PluginEffect::failed (std::uint32_t code) noexcept
 std::optional<std::string> PluginEffect::captureState()
 {
     return guardedState (*plugin, crashed, name);
+}
+
+bool PluginEffect::restoreState (const std::string& state)
+{
+    return guardedRestore (*plugin, crashed, name, state);
 }
 
 void PluginEffect::flushMidiControls() noexcept

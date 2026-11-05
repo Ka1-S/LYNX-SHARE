@@ -1,7 +1,7 @@
-#include "engine/KumiInstrumentControl.h"
+#include "engine/RemoteInstrumentControl.h"
 #include "engine/AudioEngine.h"
 #include "engine/GeneratorCatalog.h"
-#include "engine/KumiInstrumentEdits.h"
+#include "engine/RemoteInstrumentEdits.h"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -119,21 +119,21 @@ juce::var edit (AudioEngine& engine, const juce::String& operation, const juce::
     // The structural path captures live hosted state once, only after every
     // preparation/cancellation guard has passed. Build from that fresh model;
     // never replace it with a copy made before plugin-state capture.
-    engine.editSongStructural ([replace, at, mixer, generator = std::move (*generator)] (Song& current) mutable {
-        auto staged = replace ? kumi_instruments::replace (current, at, std::move (generator))
-                              : kumi_instruments::create (current, std::move (generator), at, mixer);
+    engine.editSongRemoteTransaction ([replace, at, mixer, generator = std::move (*generator)] (Song& current) mutable {
+        auto staged = replace ? remote_instruments::replace (current, at, std::move (generator))
+                              : remote_instruments::create (current, std::move (generator), at, mixer);
         current = std::move (staged.song);
-    });
+    }, cancelled);
     const auto& channel = engine.getSong().channels[(std::size_t) at];
     return object ({ { "channelIndex", at }, { "instrumentId", id }, { "mixerIndex", channel.mixerTrack },
                     { "name", text (channel.name) }, { "channelCount", (int) engine.getSong().channels.size() } });
 }
 }
-bool isKumiInstrumentOperation (const juce::String& operation)
+bool isRemoteInstrumentOperation (const juce::String& operation)
 {
     return operation == "instrument.catalog" || operation == "channel.create" || operation == "instrument.replace";
 }
-juce::var dispatchKumiInstrument (AudioEngine& engine, const juce::String& operation, const juce::var& args,
+juce::var dispatchRemoteInstrument (AudioEngine& engine, const juce::String& operation, const juce::var& args,
                                  const std::function<bool()>& cancelled)
 {
     jassert (juce::MessageManager::getInstance()->isThisTheMessageThread());

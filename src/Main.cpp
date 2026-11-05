@@ -23,7 +23,8 @@
 #include "core/SynthPresets.h"
 #include "core/FlWrapper.h"
 #include "engine/AudioEngine.h"
-#include "engine/KumiControl.h"
+#include "engine/RemoteControl.h"
+#include "ui/RemoteControlSettings.h"
 #include "engine/Metronome.h"
 #include "engine/AudioLogger.h"
 #include "engine/DllAsioDevice.h"
@@ -1506,13 +1507,18 @@ public:
         lynx::applyRenderingChoice (*mainWindow); // (GPU rendering off: GDI; round 157a)
         lynx::startRenderingWatch();
         startupTrace.mark ("main window built");
-        kumiControl = lynx::KumiControl::create (*engine, [this] {
-            const auto title = mainWindow != nullptr ? mainWindow->getName() : juce::String ("Untitled");
-            const auto separator = title.indexOf (" - ");
-            return separator >= 0 ? title.substring (separator + 3) : title;
-        }, [this] {
-            const auto file = mainWindow != nullptr ? mainWindow->getContent().getCurrentProjectFile() : juce::File();
-            return file == juce::File() ? juce::String() : file.getFullPathName();
+        lynx::remoteui::install ([this] (bool enabled) {
+            remoteControl = nullptr;
+            if (enabled)
+                remoteControl = lynx::RemoteControl::create (*engine, true, [this] {
+                    const auto title = mainWindow != nullptr ? mainWindow->getName() : juce::String ("Untitled");
+                    const auto separator = title.indexOf (" - ");
+                    return separator >= 0 ? title.substring (separator + 3) : title;
+                }, [this] {
+                    const auto file = mainWindow != nullptr ? mainWindow->getContent().getCurrentProjectFile() : juce::File();
+                    return file == juce::File() ? juce::String() : file.getFullPathName();
+                });
+            lynx::remoteui::setRuntimeStatus (remoteControl != nullptr && remoteControl->active());
         });
     }
 
@@ -1712,8 +1718,6 @@ public:
     // seconds after the window is up so it never competes with the start-up; and the result of an update just installed
     void startUpdateCheck()
     {
-        if (juce::SystemStats::getEnvironmentVariable ("LYNX_KUMI_DISCOVERY", {}).isNotEmpty())
-            return; // the opt-in custom build keeps its adapter; manual update is still available
         if (openTimeReport != juce::File())
             return;
         lynx::updater::afterStart();
@@ -1737,7 +1741,8 @@ public:
         lynx::shutdownStemExtraction(); // (a separation in flight stops before its window and the engine go)
         if (mainWindow != nullptr && mainWindow->isVisible())
             mainWindow->saveState();
-        kumiControl = nullptr; // cancels queued control work before its engine and UI go
+        lynx::remoteui::shutdown();
+        remoteControl = nullptr; // cancels queued control work before its engine and UI go
         mainWindow = nullptr; // the UI goes before the engine
         lynx::updater::shutdown(); // (a check or download in flight stops)
         crashEngine = nullptr;
@@ -9990,7 +9995,7 @@ private:
 
     lynx::theme::LookAndFeel lookAndFeel;
     std::unique_ptr<lynx::AudioEngine> engine;
-    std::unique_ptr<lynx::KumiControl> kumiControl;
+    std::unique_ptr<lynx::RemoteControl> remoteControl;
     std::unique_ptr<juce::XmlElement> savedDeviceState; // --rtstress: the user's device before this run's --type/--buffer
 
     // Hidden test mode --asiodll "<driver.dll>[|{CLSID}]" (REA round 97): an ASIO driver loaded straight from its file,
