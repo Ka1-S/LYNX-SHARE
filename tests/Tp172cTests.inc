@@ -161,3 +161,68 @@ TEST (aether_issue77_default_model_and_levels_tp172c)
     lynx::upgradeLoadedEffectParams (now, (std::size_t) air::count);
     CHECK (now.params[air::dynamic] == 1.0f);
 }
+
+// slice 5: Harrison 32Classic and MPC channel strip states -> Ridge's own engine (laws fitted on their trials)
+namespace tp172c
+{
+inline lynx::EffectSlot harrisonSlot (const std::string& plugin, const std::string& xml)
+{
+    using namespace lynx;
+    ForeignPlugin fp;
+    fp.format = ForeignPlugin::Format::vst3;
+    fp.name = plugin;
+    fp.state = substtest::flVst3State (substtest::juceXmlComponent (xml));
+    const auto id = pluginIdentity (fp);
+    const auto* entry = findPluginSubstitute (id, false);
+    if (entry == nullptr)
+        return {};
+    int n = 0;
+    return makeSubstituteSlot (*entry, &id, &n);
+}
+inline std::string p32 (const char* id, double v) { return std::string ("<PARAM id=\"") + id + "\" value=\"" + std::to_string (v) + "\"/>"; }
+} // namespace tp172c
+
+TEST (ridge_harrison_strips_translated_tp172c5)
+{
+    using namespace lynx;
+    using tp172c::p32;
+    namespace r = mixsuite::ridge;
+    const std::string base = p32 ("bypass", 0) + p32 ("compressor_in", 1) + p32 ("compressor_mode", 1) + p32 ("compressor_attack", 20)
+                             + p32 ("compressor_release", 50) + p32 ("gate_in", 1) + p32 ("gate_depth", 0) + p32 ("gate_threshold", 0)
+                             + p32 ("equalizer_in", 1) + p32 ("equalizer_eq_in", 1) + p32 ("equalizer_filters_in", 1)
+                             + p32 ("equalizer_highpass_filter_freq", 25) + p32 ("equalizer_lowpass_filter_freq", 20000)
+                             + p32 ("input_trim", 0) + p32 ("output_trim", 0) + p32 ("FaderLevel", 0);
+    auto c32 = [&] (const std::string& params) {
+        return tp172c::harrisonSlot ("Harrison 32Classic Channel Strip",
+                                     "<SSL_PLUGIN_STATE PluginName=\"Harrison 32Classic Channel Strip\" Version=\"2.0.20\" StateASelected=\"1\"><A><PROCESSOR_STATE>"
+                                         + base + params + "</PROCESSOR_STATE></A><B><PROCESSOR_STATE/></B></SSL_PLUGIN_STATE>");
+    };
+    auto s = c32 (p32 ("equalizer_band_freq_2", 1421.74) + p32 ("equalizer_band_gain_2", -4.0) + p32 ("compressor_ratio", 4.0)
+                  + p32 ("compressor_threshold", -20.0) + p32 ("CompAutoMakeUp", 1.0));
+    auto& p = s.params;
+    CHECK (s.kind == EffectKind::ridgeStrip && ! r::k4Voicing (p) && ! r::modernVoicing (p) && p[r::curve] < 0.5f);
+    CHECK (std::abs (r::hmfHz (p[r::hmfFreq]) - 1421.74) < 0.5 && std::abs (r::bandGainDb (p[r::hmfGain], false) + 4.0) < 1e-3);
+    CHECK (std::abs (r::ratio (p[r::compRatio]) - 4.0) < 0.01 && std::abs (r::compThresholdDb (p[r::compThreshold]) + 19.0) < 1e-3);
+    CHECK (std::abs (r::trimDb (p[r::output]) - 7.5) < 0.01);      // its auto make-up: half of 20 dB x (1 - 1/4)
+    CHECK (std::abs (r::hpfHz (p[r::hpf]) - 23.25) < 0.1 && p[r::lpf] > 0.0f); // 12 dB/oct 25 Hz -> Ridge's 18 dB/oct lower
+    s = c32 (p32 ("compressor_mode", 0) + p32 ("compressor_ratio", 10.0) + p32 ("gate_depth", 20) + p32 ("gate_threshold", -30)
+             + p32 ("gate_mode", 1) + p32 ("equalizer_band_freq_4", 111.35) + p32 ("equalizer_band_gain_4", 13.74));
+    CHECK (s.params[r::compRatio] == 0.0f);                                         // the Leveler: no static reduction
+    {   // a -45 dBFS threshold: Ridge's -40 floor + 4 dB more input, taken back at the output
+        const auto d = c32 (p32 ("compressor_ratio", 30.0) + p32 ("compressor_threshold", -45.0) + p32 ("CompAutoMakeUp", 0.0));
+        CHECK (std::abs (r::compThresholdDb (d.params[r::compThreshold]) + 40.0) < 1e-3 && std::abs (r::trimDb (d.params[r::input]) - 4.0) < 0.01);
+        CHECK (std::abs (r::trimDb (d.params[r::output]) + 4.0) < 0.01);
+    }
+    CHECK (std::abs (r::gateRangeDb (s.params[r::gateRange]) - 20.0) < 1e-3 && s.params[r::expander] > 0.5f);
+    CHECK (std::abs (r::lfHz (s.params[r::lfFreq]) - 174.2) < 0.5 && std::abs (r::bandGainDb (s.params[r::lfGain], false) - 11.67) < 0.01);
+
+    const std::string mpc = "<HarrisonMPCChannelStrip plugin_size=\"1.0\" version=\"327936\">" + p32 ("bypass", 0) + p32 ("mpc_compressorin", 1)
+                            + p32 ("mpccomp_ratio", 1.5) + p32 ("mpccomp_threshold", -10) + p32 ("mpccomp_release", 100) + p32 ("mpccomp_attack", 5)
+                            + p32 ("mpc_equalizerin", 1) + p32 ("mpceq_bandGain3", 6) + p32 ("mpceq_bandFreq3", 185) + p32 ("mpceq_bandQ3", 3)
+                            + p32 ("mpceq_bandShape3", 7) + p32 ("mpceq_bandGain6", -5) + p32 ("mpceq_bandFreq6", 1838) + p32 ("mpceq_bandQ6", 3)
+                            + p32 ("mpceq_bandShape6", 7) + p32 ("mpc_trim", 0) + "</HarrisonMPCChannelStrip>";
+    s = tp172c::harrisonSlot ("Harrison_MPCChannelStrip", mpc);
+    CHECK (s.kind == EffectKind::ridgeStrip && std::abs (r::ratio (s.params[r::compRatio]) - 1.5) < 0.01);
+    CHECK (std::abs (r::lmfHz (s.params[r::lmfFreq]) - 200.0) < 0.5 && std::abs (r::bandGainDb (s.params[r::lmfGain], false) - 6.0) < 1e-3);
+    CHECK (std::abs (r::hmfHz (s.params[r::hmfFreq]) - 1838.0) < 1.0 && std::abs (r::bandGainDb (s.params[r::hmfGain], false) + 5.0) < 1e-3);
+}
