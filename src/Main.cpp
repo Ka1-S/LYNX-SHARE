@@ -944,6 +944,17 @@ public:
             return;
         }
 
+        if (args.contains ("--parityshot"))
+        {
+            // LYNX.exe --parityshot <out.png> <effect name> [<params file>]: one built-in effect's editor with the given
+            // parameters ("index value" lines, tools/fxrender --dump), its displays fed by the demo song — the LYNX side
+            // of the third-party parity pictures (round tp172b)
+            const auto i = args.indexOf ("--parityshot");
+            runParityShot (args[i + 1].unquoted(), args[i + 2].unquoted(), i + 3 < args.size() ? args[i + 3].unquoted() : juce::String());
+            quit();
+            return;
+        }
+
         if (args.contains ("--design168rshot"))
         {
             // LYNX.exe --design168rshot <folder>: round 168r's editors (FL effects that had a generated page and LYNX's own
@@ -6374,6 +6385,70 @@ private:
                 editorCpu->cases.push_back (c);
         editorCpu->done = [this] { juce::MessageManager::callAsync ([this] { editorCpu.reset(); quit(); }); };
         editorCpu->start();
+    }
+
+    void runParityShot (const juce::String& path, const juce::String& effectName, const juce::String& paramsFile)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        int kindIndex = -1;
+        for (int k = 0; k <= (int) lynx::lastEffectKind; ++k)
+            if (juce::String::fromUTF8 (lynx::effectInfo ((lynx::EffectKind) k).name).equalsIgnoreCase (effectName))
+                kindIndex = k;
+        if (kindIndex < 0)
+            return;
+        const auto kind = (lynx::EffectKind) kindIndex;
+        auto fx = lynx::makeEffectSlot (kind);
+        if (paramsFile.isNotEmpty())
+            for (const auto& line : juce::StringArray::fromLines (juce::File (paramsFile).loadFileAsString()))
+            {
+                const auto t = juce::StringArray::fromTokens (line, " \t", "");
+                const auto index = t.size() >= 2 ? t[0].getIntValue() : -1;
+                if (index >= 0 && index < lynx::maxEffectParams)
+                    fx.params[(std::size_t) index] = t[1].getFloatValue();
+            }
+        lynx::AudioEngine offline (false);
+        auto song = lynx::Song::makeDefault();
+        song.mixer.resize (2);
+        song.mixer[0].name = "Master";
+        song.mixer[1].name = "Insert 1";
+        song.mixer[1].effects.assign (1, fx);
+        for (auto& c : song.channels)
+            c.mixerTrack = 1;
+        offline.setSong (std::move (song));
+        offline.dispatchPendingMessages();
+        const bool facet = kind == lynx::EffectKind::facetEq;
+        const bool pro = lynx::ProEditorWindows::handles (kind);
+        auto editor = facet ? lynx::makeFacetEqEditor (offline, 1, 0, false)
+                            : pro ? lynx::makeProEditor (offline, 1, 0, true) : lynx::makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
+        if (editor == nullptr)
+            return;
+        if (! pro) // the demo song through the effect, the editor ticked 30 times a second of audio as its timer would
+        {
+            lynx::AudioEngine::RenderOptions o;
+            o.seconds = 3.0;
+            o.sampleRate = 48000.0;
+            o.pluginWarmUp = false;
+            int sinceTick = 0;
+            o.capture = [&] (const float*, const float*, int n) {
+                sinceTick += n;
+                if (sinceTick < 1600) return;
+                sinceTick = 0;
+                if (facet) lynx::tickFacetEqEditor (*editor);
+                else lynx::tickNativeEffectEditor (*editor);
+            };
+            offline.renderOffline (o);
+        }
+        juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);
+        {
+            juce::Graphics g (image);
+            g.fillAll (lynx::theme::panel);
+            editor->paintEntireComponent (g, false);
+        }
+        const juce::File file (path);
+        file.deleteFile();
+        juce::PNGImageFormat png;
+        if (auto stream = file.createOutputStream())
+            png.writeImageToStream (image, *stream);
     }
 
     void runEq166fShots (const juce::String& folder)

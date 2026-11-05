@@ -937,8 +937,10 @@ protected:
         s.outHighCut = 100.0 + 14900.0 * p[3];
         s.bandLimit = t.cut;
         const auto earlyLate = (double) p[4]; // 0 = early only, 1 = late only
-        s.earlyLevel = t.early * std::min (1.0, 2.0 * (1.0 - earlyLate)) * 1.4;
-        s.lateLevel = t.lateGain * std::min (1.0, 2.0 * earlyLate);
+        // round 172d: a linear crossfade like the reference's (its impulse energy per window at 0 / ¼ / ½ / ¾ / 1: the late
+        // tank grows in proportion and sits ≈ 6 dB above the old law at 50 %, the early part −3.7 dB at 0 %)
+        s.earlyLevel = t.early * 0.92 * (1.0 - earlyLate);
+        s.lateLevel = t.lateGain * 3.8 * earlyLate;
         s.shape = t.shape;
         s.lineScale = t.scale * (0.35 + 0.9 * p[5]);
         s.crossFeed = 0.35 + 0.65 * p[6];
@@ -960,7 +962,16 @@ protected:
         s.loopDiffusion = 0.3 + 0.6 * p[18];
         const auto space = (double) p[20];
         s.buildSec = 0.02 + 0.06 * space;
-        s.gain = 0.47 * (1.0 + 0.6 * space);
+        s.gain = 0.47 * (1.0 + 0.6 * space) * 1.25; // round 172d: +2 dB with the crossfade below (music / drums RMS within 1 dB at the defaults)
+        // round 172d: the reference's late field holds far more below 100 Hz (impulse and music, octave bands: 31 / 63 Hz
+        // +8 … +15 dB at the defaults) than this tank's few low modes give
+        s.lowShelfHz = 90.0;
+        s.lowShelfDb = 10.0;
+        s.toneMidHz = 140.0; // (the tank's own hump around 125 … 160 Hz taken back)
+        s.toneMidDb = -5.0;
+        s.toneMidQ = 1.4;
+        s.highShelfHz = 9000.0; // and keeps more air above 9 kHz (third octaves 10 … 16 kHz −4 … −7 dB without it)
+        s.highShelfDb = 4.0;
         s.outLowCut = 1000.0 * p[21];
         s.outLowOrder = 1;
         if (s.outLowCut < 5.0)
@@ -982,18 +993,18 @@ struct FoilType
 // plate types: line scale, own onset (ms), bass RT ×, high-frequency absorption (1/s at 8 kHz), band limit (Hz, 0 = full band),
 // early level, gain
 const FoilType foilTypes[foil::typeCount] = {
-    { "Silver", 1.00, 20.5, 1.0, 0.34, 9000.0, 0.35, 1.00 },
-    { "Pewter", 0.85, 1.0, 1.0, 0.30, 9000.0, 0.45, 1.13 },
-    { "Nickel", 1.10, 56.0, 1.0, 0.25, 10000.0, 0.35, 0.83 },
-    { "Bronze", 0.90, 17.0, 1.0, 0.30, 9000.0, 0.55, 1.05 },
-    { "Bismuth", 1.20, 6.5, 1.0, 0.20, 8500.0, 0.30, 1.00 },
-    { "Tin", 1.00, 18.5, 1.0, 0.32, 9000.0, 0.35, 1.13 },
-    { "Zinc", 1.30, 6.5, 1.1, 0.18, 9500.0, 0.30, 1.16 },
-    { "Platinum", 1.20, 81.0, 1.3, 0.35, 8500.0, 0.25, 0.62 },
+    { "Silver", 1.00, 20.5, 1.0, 0.34, 11000.0, 0.35, 1.00 },
+    { "Pewter", 0.85, 1.0, 1.0, 0.30, 11000.0, 0.45, 1.13 },
+    { "Nickel", 1.10, 56.0, 1.0, 0.25, 11500.0, 0.35, 0.83 },
+    { "Bronze", 0.90, 17.0, 1.0, 0.30, 11000.0, 0.55, 1.05 },
+    { "Bismuth", 1.20, 6.5, 1.0, 0.20, 11000.0, 0.30, 1.00 },
+    { "Tin", 1.00, 18.5, 1.0, 0.32, 11000.0, 0.35, 1.13 },
+    { "Zinc", 1.30, 6.5, 1.1, 0.18, 11300.0, 0.30, 1.16 },
+    { "Platinum", 1.20, 81.0, 1.3, 0.35, 10800.0, 0.25, 0.62 },
     { "Tungsten", 1.00, 21.0, 1.0, 0.30, 0.0, 0.35, 0.68 },
     { "Iron", 1.10, 56.0, 1.1, 0.30, 0.0, 0.30, 0.60 },
     { "Gold", 1.00, 20.5, 1.0, 0.30, 0.0, 0.35, 0.68 },
-    { "Lead", 1.00, 1.5, 1.0, 0.45, 8500.0, 0.40, 1.00 },
+    { "Lead", 1.00, 1.5, 1.0, 0.45, 11000.0, 0.40, 1.00 },
 };
 double foilDecaySec (float v) { return knotLaw (v, foilDecayKnots, foilDecayCount); }
 
@@ -1049,7 +1060,10 @@ protected:
         s.highXover = 5000.0;
         s.lowMult = t.lowRt;
         s.lowXover = 250.0;
+        // round 172d: the reference plate's band edge is higher and far steeper (third octaves: 10 kHz kept, 12.7 kHz
+        // −35 dB, 16 kHz −70 dB under 10 kHz, against the old 9 kHz, 4-pole edge): 16 poles
         s.bandLimit = t.bw;
+        s.bandLimitSections = 8;
         s.inDiffusion = 1.0;
         s.loopDiffusion = 0.85;
         // 0 % = mono, 100 % = decorrelated, 200 % = slightly anti-correlated (−0.21, measured)
@@ -1064,7 +1078,7 @@ protected:
         s.earlyLevel = t.early;
         s.earlySec = 0.015;
         s.earlyDiffusion = 0.8;
-        s.gain = t.gain;
+        s.gain = t.gain * 1.3; // round 172d: +2.3 dB (the reference plate at its defaults: music / drums RMS −3.6 / −4.2 dB)
         // round 135: a low cut on the plate's output, 20 Hz … 1 kHz (0 = off; 12 dB/oct)
         s.outLowCut = foil::lowCutHz (p[13]);
         s.outLowOrder = 2;
@@ -1079,7 +1093,19 @@ protected:
             s.highMult = row.high;
             s.highXover = 3000.0;
             s.bandLimit = 0.0;
-            s.gain *= 0.82; // −1.7 dB: the trial's tail energy (impulse, Mix 100 %, 0.5 … 20 s within ±0.5 dB)
+            // round 172d: re-measured at Mix 100 % (the trial, the impulse's whole response at Decay 1 / 3 / 10 s, with the
+            // darker tail and quieter early part below): the plate is 6 … 16 dB louder than round 150's level, more so at
+            // short decays (dB per decade of the Decay label)
+            static constexpr double levelKnots[] = { 0.0, 15.7, 0.477, 9.0, 1.0, 5.8, 1.5, 4.3 };
+            const auto label = infinite ? 30.0 : std::max (1.0, rt);
+            s.gain *= 0.82 / 1.3 * std::pow (10.0, knotLaw (std::log10 (label), levelKnots, 4) / 20.0); // (round 150: −1.7 dB)
+            // round 172d: it is darker above 2 kHz than this tank (third octaves 2.5 … 8 kHz −5 … −8 dB, both the impulse
+            // and music, the decay per band already matched) and its first 80 ms hold 7 … 10 dB less of the energy
+            s.toneHighHz = 2500.0;
+            s.toneHighDb = -5.0;
+            s.outHighCut = std::min (s.outHighCut > 0.0 ? s.outHighCut : 1.0e9, 7000.0); // (and from 8 kHz up −8 … −14 dB)
+            s.outHighOrder = 2;
+            s.earlyLevel *= 0.35;
         }
     }
 };
@@ -1092,21 +1118,22 @@ constexpr int nebulaDelayCount = (int) (sizeof (nebulaDelayKnots) / sizeof (doub
 struct NebulaMode
 {
     const char* name;
-    double dm0, dm100, mult0, mult100, corr;
+    double dm0, dm100, mult0, mult100, corr, gain;
 };
-// decay multiplier at density 0 / 100, line length × delay at density 0 / 100, stereo correlation (measured, §4)
+// decay multiplier at density 0 / 100, line length × delay at density 0 / 100, stereo correlation (measured, §4),
+// wet gain (round 172d: the reference's wet level per mode at Mix 100 %, impulse / bursts / music, defaults otherwise)
 LYNX_FIT_TABLE NebulaMode nebulaModes[nebula::modeCount] = {
-    { "Ripple", 1.03, 1.26, 1, 1, 0.93 },        { "Swell", 3.43, 3.82, 1, 2, -0.31 },
-    { "Fold", 1.33, 1.39, 1, 2, -0.25 },       { "Drift", 2.56, 2.67, 1, 1, 0.25 },
-    { "Abyss", 3.64, 3.97, 1, 2, -0.21 },      { "Vortex", 7.04, 6.77, 2, 2, 0.29 },
-    { "Glint", 1.03, 1.17, 1, 1, 0.77 },        { "Pulse", 1.03, 1.22, 1, 1, 0.87 },
-    { "Expanse", 4.29, 12.8, 8, 1, 0.39 },       { "Haze", 2.14, 12.3, 4, 1, 0.63 },
-    { "Veil", 2.02, 5.04, 2, 1, 0.72 },  { "Mist", 1.00, 1.01, 1, 1, 0.47 },
-    { "Monolith", 2.16, 16.3, 4, 1, 1.0 },       { "Eternity", 20.0, 20.7, 8, 1, -0.30 },
-    { "Tide", 1.00, 1.12, 1, 1, 0.54 },      { "Shoal", 1.03, 1.30, 1, 1, 0.37 },
-    { "Spark", 1.00, 1.05, 1, 1, 0.95 },       { "Plateau", 2.10, 9.65, 4, 1, 0.0 },
-    { "Dusk", 4.15, 12.65, 8, 1, 0.31 },       { "Mirage", 1.00, 1.35, 1, 2, -0.43 },
-    { "Cluster", 1.02, 1.01, 1, 1, -0.10 },    { "Beacon", 1.16, 1.04, 1, 1, 0.84 },
+    { "Ripple", 1.03, 1.26, 1, 1, 0.93, 2.41 },        { "Swell", 3.43, 3.82, 1, 2, -0.31, 1.60 },
+    { "Fold", 1.33, 1.39, 1, 2, -0.25, 1.79 },       { "Drift", 2.56, 2.67, 1, 1, 0.25, 1.12 },
+    { "Abyss", 3.64, 3.97, 1, 2, -0.21, 1.26 },      { "Vortex", 7.04, 6.77, 2, 2, 0.29, 1.05 },
+    { "Glint", 1.03, 1.17, 1, 1, 0.77, 1.67 },        { "Pulse", 1.03, 1.22, 1, 1, 0.87, 1.93 },
+    { "Expanse", 4.29, 12.8, 8, 1, 0.39, 3.57 },       { "Haze", 2.14, 12.3, 4, 1, 0.63, 3.87 },
+    { "Veil", 2.02, 5.04, 2, 1, 0.72, 1.43 },  { "Mist", 1.00, 1.01, 1, 1, 0.47, 1.49 },
+    { "Monolith", 2.16, 16.3, 4, 1, 1.0, 3.84 },       { "Eternity", 20.0, 20.7, 8, 1, -0.30, 2.06 },
+    { "Tide", 1.00, 1.12, 1, 1, 0.54, 1.50 },      { "Shoal", 1.03, 1.30, 1, 1, 0.37, 1.51 },
+    { "Spark", 1.00, 1.05, 1, 1, 0.95, 2.43 },       { "Plateau", 2.10, 9.65, 4, 1, 0.0, 3.62 },
+    { "Dusk", 4.15, 12.65, 8, 1, 0.31, 2.86 },       { "Mirage", 1.00, 1.35, 1, 2, -0.43, 1.50 },
+    { "Cluster", 1.02, 1.01, 1, 1, -0.10, 2.56 },    { "Beacon", 1.16, 1.04, 1, 1, 0.84, 2.27 },
 };
 double nebulaDelayMs (float v) { return knotLaw (v, nebulaDelayKnots, nebulaDelayCount); }
 const char* const syncNames[4] = { "ms", "Note", "Dotted", "Triplet" };
@@ -1161,11 +1188,22 @@ protected:
         const auto corr = (1.0 + (m.corr - 1.0) * dens) * (1.0 - std::min (1.0, 2.0 * warp));
         const auto w = std::sqrt ((1.0 - corr) / (1.0 + corr + 1e-3));
         s.width = (-1.0 + 2.0 * p[7]) * std::min (2.0, w);
+        // round 172d: both cuts are first order in the reference (Mix 100 %, cuts at 5 … 70 % / 10 … 75 %: −3 dB at the
+        // linear law's frequency, 6 dB per octave beyond)
         s.outLowCut = 10.0 + 1990.0 * p[8];
+        s.outLowOrder = 1;
         s.outHighCut = 200.0 + 19800.0 * p[9];
+        s.outHighOrder = 1;
         s.modRateHz = skewLaw (p[10], 0.01, 10.0, 2.328);
         s.modDepthMs = 2.0 * p[11] / std::sqrt (std::max (0.1, s.modRateHz));
-        s.gain = 0.9;
+        // round 172d: the reference keeps its level nearly flat over Feedback and Density (Mix 100 %, its first mode):
+        // the measured wet level against this loop's, in dB per Feedback knot; Density keeps its lows there (this tank's
+        // diffusion takes 5 … 10 dB below 250 Hz from the summed sides), so a low shelf comes in with it
+        static constexpr double fbKnots[] = { 0.0, 7.0, 0.2, 6.3, 0.5, 0.0, 0.8, -2.7, 0.95, -3.6, 1.0, -4.0 };
+        const auto fbDb = knotLaw (fb, fbKnots, 6);
+        s.gain = m.gain * std::pow (10.0, fbDb / 20.0);
+        s.lowShelfHz = 220.0;
+        s.lowShelfDb = 8.0 * std::min (1.0, dens / 0.15);
     }
 };
 
@@ -1270,10 +1308,12 @@ struct HorizonReverb
     int shape;
     double scale, rtScale, preMs, buildMs, early, gain;
 };
+// gain: round 172d re-fitted Room / Hall / Space against the reference's modes (Mix 100 %, impulse and music) with
+// the 1 / √RT level law below; the others keep their earlier values
 LYNX_FIT_TABLE HorizonReverb horizonReverbs[horizon::reverbModeCount] = {
-    { "Room", 1, 1.0, 0.80, 50.0, 60.0, 0.3, 1.5 },  { "Chamber", 1, 1.2, 1.00, 45.0, 45.0, 0.3, 3.0 },
-    { "Plate", 2, 1.0, 1.00, 25.0, 8.0, 0.0, 3.6 },  { "Hall", 0, 1.0, 0.92, 35.0, 60.0, 0.2, 1.25 },
-    { "Cathedral", 0, 1.3, 1.05, 60.0, 80.0, 0.1, 1.6 }, { "Space", 0, 1.5, 1.10, 70.0, 90.0, 0.0, 0.5 },
+    { "Room", 1, 1.0, 0.80, 50.0, 60.0, 0.3, 2.4 },  { "Chamber", 1, 1.2, 1.00, 45.0, 45.0, 0.3, 3.0 },
+    { "Plate", 2, 1.0, 1.00, 25.0, 8.0, 0.0, 3.6 },  { "Hall", 0, 1.0, 0.92, 35.0, 60.0, 0.2, 4.4 },
+    { "Cathedral", 0, 1.3, 1.05, 60.0, 80.0, 0.1, 1.6 }, { "Space", 0, 1.5, 1.10, 70.0, 90.0, 0.0, 2.8 },
     { "Freeze", 0, 1.4, 3.30, 70.0, 900.0, 0.0, 0.4 },   { "Gated", 1, 0.8, 0.60, 30.0, 0.0, 0.1, 0.9 },
 };
 const char* const horizonColours[4] = { "Bright", "Neutral", "Dark", "Vintage" };
@@ -1332,13 +1372,20 @@ protected:
         s.modDepthMs = 1.0 * p[18] / std::sqrt (std::max (0.1, s.modRateHz));
         s.outLowCut = skewLaw (p[19], 20.0, 1000.0, 1.807);
         s.outHighCut = skewLaw (p[20], 1000.0, 20000.0, 1.078);
+        s.outLowOrder = 1; // round 172d: gentle EQ cuts (the reference's lows at 31 … 50 Hz and highs at 10 … 16 kHz)
+        s.outHighOrder = 1;
         const auto colour = choice (p[23], 4);
         if (horizonColourCut[colour] > 0.0)
             s.outHighCut = std::min (s.outHighCut, horizonColourCut[colour]);
         if (colour == 3)
             s.outLowCut = std::max (s.outLowCut, 250.0);
         s.width = -1.0 + 2.0 * p[1];
-        s.gain = m.gain * p[16];
+        // round 172d: the reference holds its wet energy nearly constant over Decay (impulse, Mix 100 %, Decay 10 … 60 %:
+        // 22 … 24 dB while this tank's grows with the RT), so the level follows 1 / √RT; its highs die sooner (8 kHz
+        // RT ≈ 0.75 × this tank's at 2 … 8 s)
+        s.gain = m.gain * p[16] * 0.65 / std::sqrt (std::max (0.2, s.rt60));
+        s.highMult = 0.7;
+        s.highXover = 4000.0;
     }
 
     // the echo before the reverb (routing "echo → reverb"), or after it
