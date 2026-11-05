@@ -1211,7 +1211,10 @@ public:
         knob->setName (juce::String::fromUTF8 (p.name.c_str()));
         const auto index = p.index;
         knob->onValueChange = [this, index, s = knob.get()] {
-            ref.edit (engine, [index, v = (float) s->getValue()] (ChannelDef& c) { modelparams::setRawValue (c, index, v); });
+            ref.edit (engine, [index, v = (float) s->getValue()] (ChannelDef& c) {
+                modelparams::setRawValue (c, index, v);
+                natives::followControl (c, index, flStudioAccess()); // (Harmless' compression type loads its preset)
+            });
             if (instrumentKind == InstrumentKind::transistorbass && index >= tbseq::length) // (a step's note moves its octave)
                 syncKnobs();
             if (layout != nullptr)

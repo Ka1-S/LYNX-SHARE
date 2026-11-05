@@ -27,12 +27,16 @@
 #include "core/SytrusEngine.h"
 #include "core/ThreeOsc.h"
 #include "core/ModelParams.h"
+#include "core/NativeEngines.h"
 #include "core/RackRenderer.h"
 #include "core/Song.h"
 
 namespace lynx::ctlaudit
 {
 // one editor control of a channel: how to read it and write it as the editor does (raw value, the control's range)
+// FL's installation for the controls that load files (natives::followControl), set by the caller; nullptr = none
+inline const natives::FlAccess* flAccess = nullptr;
+
 struct Control
 {
     int index = 0;            // the engine's parameter number (automation target param), −1 = not automatable
@@ -56,7 +60,12 @@ inline std::vector<Control> modelControls (const ChannelDef& c)
         k.index = p.index, k.name = p.name, k.low = p.low, k.high = p.high;
         const auto index = p.index;
         k.get = [index] (const ChannelDef& d) { return modelparams::rawValue (d, index); };
-        k.set = [index] (ChannelDef& d, float raw) { return modelparams::setRawValue (d, index, raw); };
+        k.set = [index] (ChannelDef& d, float raw) {
+            const auto ok = modelparams::setRawValue (d, index, raw);
+            if (ok && flAccess != nullptr)
+                natives::followControl (d, index, *flAccess); // (as the editor's knob does)
+            return ok;
+        };
         out.push_back (std::move (k));
     }
     return out;

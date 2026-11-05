@@ -91,6 +91,7 @@ int main (int argc, char** argv)
         }
     }
     const auto fl = flAccess (flData);
+    lynx::ctlaudit::flAccess = &fl;
     const lynx::ctlaudit::Samples samples = [] (const std::string& p) { return lynx::tools::readWav (local (p)); };
     for (const auto& e : lynx::natives::instrumentEngines())
     {
