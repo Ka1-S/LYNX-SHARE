@@ -876,6 +876,16 @@ std::vector<std::uint8_t> writeProject (const Project& p, const WriteOptions& op
         insert.flags = t == 0 ? 0x0C : 0x4C;
         if (t > 0)
             insert.routes = { 0 }; // an insert the project leaves out: FL's default, routed to the Master
+        // the last record is FL's "Current" track: FL plays the selected insert through it, so FL writes it with no
+        // route to the Master (flags 0x0C, routes 00); routed to the Master, everything played twice (+6.02 dB in
+        // FL's render of every LYNX export, round 171e2 [FL])
+        const auto current = t > 0 && t == tracks - 1;
+        if (current)
+        {
+            insert.flags = 0x0C;
+            insert.routes.clear();
+            insert.monitor = 1;
+        }
         if (const auto it = inserts.find (t); it != inserts.end())
             insert = *it->second;
         if (insert.icon > 0)
@@ -938,7 +948,7 @@ std::vector<std::uint8_t> writeProject (const Project& p, const WriteOptions& op
         std::vector<std::uint32_t> order;
         values[0x40000000u] = 12800; // the main volume
         order.push_back (0x40000000u);
-        for (int t = 0; t < tracks; ++t)
+        for (int t = 0; t < tracks - 1; ++t) // (not the "Current" track: FL writes none for it)
             defaultTrackControls (values, order, t);
         for (const auto& c : p.controls)
         {

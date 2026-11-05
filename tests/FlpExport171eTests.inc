@@ -638,3 +638,34 @@ TEST (flpexport171e2_sidechain_inputs_are_level_0_routes)
     const auto back = importFlp (project, fx171e::importOptions());
     CHECK (std::none_of (back.mixer[1].sends.begin(), back.mixer[1].sends.end(), [] (const MixerSend& s) { return s.target == 4; }));
 }
+
+TEST (flpexport171e2_current_track_is_not_routed_to_the_master)
+{
+    // FL's last mixer record is its "Current" track, which plays the selected insert: routed to the Master it doubled
+    // the whole song (every LYNX export rendered +6.02 dB in FL; with the record as FL writes it, a kick-only export
+    // renders bit-exact with LYNX, esr -84 dB [FL, round 171e2]). FL writes it with flags 0x0C, no route, no controls.
+    using namespace lynx;
+    const auto song = fx171e::richSong();
+    flpexport::Options options;
+    flpexport::Report report;
+    const auto project = flp::parseProject (flpexport::exportFlp (song, options, report));
+    CHECK (! project.mixer.empty());
+    int last = -1;
+    for (const auto& m : project.mixer)
+        last = std::max (last, m.index);
+    CHECK (last >= (int) song.mixer.size());
+    for (const auto& m : project.mixer)
+        if (m.index == last)
+        {
+            CHECK (m.flags == 0x0Cu);
+            CHECK (std::none_of (m.routes.begin(), m.routes.end(), [] (int r) { return r == 0; }));
+        }
+        else if (m.index > 0)
+            CHECK (std::find (m.routes.begin(), m.routes.end(), 0) != m.routes.end() || ! m.hasRoutes);
+    for (const auto& c : project.controls)
+        if (c.id.raw >= 0x70000000u && c.id.raw < 0x80000000u + 0x70000000u)
+            CHECK (((c.id.raw - 0x70000000u) >> 22) != (std::uint32_t) last);
+    // the importer still sees the song's own inserts only
+    const auto back = importFlp (project, fx171e::importOptions());
+    CHECK (back.mixer.size() < (std::size_t) last + 1);
+}
