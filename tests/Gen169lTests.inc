@@ -221,7 +221,5 @@ TEST (gen169l_new_generators_are_fl_plugin_database_state)
     // Ogun: FL's version-11 state, read (it wasn't before) and kept in today's layout
     const auto og = natives::makeChannel (InstrumentKind::ogun, fl);
     CHECK (og.has_value() && og->pluginState.size() > 8 && og->pluginState[0] == 14);
-    // the engines whose Default preset FL's Plugin database equals keep it (e.g. Kepler)
-    const auto kc = natives::presetCandidates ("Kepler", true, fl);
-    CHECK (! kc.empty() && kc.front().find ("Plugin presets") != std::string::npos);
+    // (since round 169l2 every generator starts from its Plugin database entry: Gen169l2Tests.inc)
 }

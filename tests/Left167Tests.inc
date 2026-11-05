@@ -177,7 +177,7 @@ TEST (left167_sounding_notes_follow_a_live_pitch_knob_and_main_pitch)
     const auto fl = natives142::flAccess();
     for (const auto& e : natives::instrumentEngines())
     {
-        const auto c = natives::makeChannel (e.kind, fl);
+        const auto c = natives142::writtenWith (e.kind, fl); // (round 169l2: the preset it was measured with)
         if (! c)
             continue;
         const auto knobOut = left167::renderLiveTweak (*c, 2.0f, 0.0f, 0.75, 2.0);
