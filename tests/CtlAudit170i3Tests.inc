@@ -56,7 +56,7 @@ const std::vector<Case>& cases()
         { "Ogun",
           {},
           { { "Delay", "the editor has no Delay on switch yet (round 170i3 report)" } },
-          { "Richness", "Quality" } },
+          { "Richness", "Quality", "Reverb on", "Delay on", "Delay tempo" } }, // (FL's ProcessParam covers 0…48)
         { "Toxic Biohazard",
           {},
           { { "Seq ", "the sequencer's steps play only with the sequencer on" },

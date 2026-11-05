@@ -114,7 +114,8 @@ two engines.
 `Ogun.cpp designDelay` turns the delay on only with `S.b358[1]` (the tempo flag is `b358[0]`); the reverb is on only
 with `P[53] & 0xff`. The parameter table (`ModelParamsSynths.cpp ogunCommon`) lists none of the three, so on a new
 channel (delay off) the five delay knobs 26–30 never change the sound. They work on an imported project whose delay
-is on. Reported to the round's parent (Ogun is its area).
+is on. Reported to the round's parent (Ogun is its area), which adds the three switches (53, 64, 65) on
+feature/flq170i3; the test's Ogun exception for the delay knobs can go once both have landed.
 
 ## 4. Tests
 
