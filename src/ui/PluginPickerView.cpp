@@ -31,6 +31,7 @@ struct Tile
 
     // the picture: none yet / loaded / not there (a native one may still come from the background drawing)
     enum class Thumb { unknown, loaded, missing } thumb = Thumb::unknown;
+    bool sparse = false;      // the picture is an almost empty editor (no sample / script yet): the name tile instead
     juce::Image picture;      // as kept on disk
     juce::Image scaled;       // fitted to the tile's current size (painting is a plain blit)
     juce::Point<int> scaledFor; // (its size: a scroll moves a tile without refitting it)
@@ -634,14 +635,36 @@ private:
                 source = juce::SoftwareImageType().convert (source);
             const auto w = juce::jmax (1, juce::roundToInt (target.x * scale)), h = juce::jmax (1, juce::roundToInt (target.y * scale));
             auto fitted = source.isValid() ? fitImage (source, w, h) : juce::Image();
-            juce::MessageManager::callAsync ([safe, i, source, fitted, size, scale] {
+            const auto sparse = source.isValid() && file != juce::File() && almostEmpty (source);
+            juce::MessageManager::callAsync ([safe, i, source, fitted, size, scale, sparse] {
                 if (safe != nullptr)
-                    safe->fitDone (i, source, fitted, size, scale);
+                    safe->fitDone (i, source, fitted, size, scale, sparse);
             });
         });
     }
 
-    void fitDone (int i, const juce::Image& source, const juce::Image& fitted, juce::Point<int> size, double scale)
+    // under 6 % of the picture differs from its background: an editor with nothing in it yet (Newtone before a
+    // sample, an empty Control Surface) would be a blank box in the grid
+    static bool almostEmpty (const juce::Image& image)
+    {
+        const juce::Image::BitmapData data (image, juce::Image::BitmapData::readOnly);
+        const auto w = image.getWidth(), h = image.getHeight();
+        if (w < 8 || h < 8)
+            return true;
+        const auto bg = data.getPixelColour (3, 3);
+        int busy = 0, all = 0;
+        for (int y = 0; y < h; y += 3)
+            for (int x = 0; x < w; x += 3)
+            {
+                const auto c = data.getPixelColour (x, y);
+                busy += std::abs ((int) c.getRed() - (int) bg.getRed()) + std::abs ((int) c.getGreen() - (int) bg.getGreen())
+                            + std::abs ((int) c.getBlue() - (int) bg.getBlue()) > 40 ? 1 : 0;
+                ++all;
+            }
+        return busy * 100 < all * 6;
+    }
+
+    void fitDone (int i, const juce::Image& source, const juce::Image& fitted, juce::Point<int> size, double scale, bool sparse)
     {
         --inFlight;
         if (! juce::isPositiveAndBelow (i, (int) tiles.size()))
@@ -659,6 +682,7 @@ private:
             // (drawn as the window's own kind of image: converted once here, not at every paint)
             t.picture = juce::NativeImageType().convert (source);
             t.thumb = Tile::Thumb::loaded;
+            t.sparse = sparse;
             const auto w = juce::roundToInt ((float) source.getWidth() / pluginthumbs::pictureScale);
             const auto h = juce::roundToInt ((float) source.getHeight() / pluginthumbs::pictureScale);
             if (! t.hasPicture || std::abs (w - t.editorWidth) > 2 || std::abs (h - t.editorHeight) > 2)
@@ -716,7 +740,7 @@ private:
         g.setColour (juce::Colours::black.withAlpha (dim ? 0.15f : 0.35f));
         g.fillRect (cell.translated (0.0f, 2.0f));
 
-        if (t.thumb == Tile::Thumb::loaded)
+        if (t.thumb == Tile::Thumb::loaded && ! t.sparse)
         {
             // the picture fitted to the tile once (the one pointed at is that one drawn 8 % bigger); until it is fitted
             // (the timer fits a few per frame) the kept picture is drawn scaled on the fly
@@ -754,7 +778,7 @@ private:
         g.setColour (hover ? colour::textPrimary.withAlpha (0.8f) : colour::border.brighter (0.25f).withMultipliedAlpha (dim ? 0.4f : 1.0f));
         g.drawRect (cell.expanded (1.0f), hover ? 1.5f : 1.0f);
 
-        if (! hover && ! dim && searchText.isNotEmpty() && t.thumb == Tile::Thumb::loaded)
+        if (! hover && ! dim && searchText.isNotEmpty() && t.thumb == Tile::Thumb::loaded && ! t.sparse)
         {
             // searching: the matching tiles carry their names (a plain tile already shows it)
             const auto f = juce::Font (font (juce::jlimit (11.0f, 14.0f, cell.getWidth() * 0.09f), true));
