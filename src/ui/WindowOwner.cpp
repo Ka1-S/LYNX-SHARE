@@ -86,6 +86,21 @@ double processCpuSeconds()
    #endif
 }
 
+double threadCpuSeconds()
+{
+   #if JUCE_WINDOWS
+    FILETIME created {}, exited {}, kernel {}, user {};
+    if (GetThreadTimes (GetCurrentThread(), &created, &exited, &kernel, &user))
+        return (double) ((((std::uint64_t) kernel.dwHighDateTime << 32) | kernel.dwLowDateTime) + (((std::uint64_t) user.dwHighDateTime << 32) | user.dwLowDateTime)) * 1e-7;
+    return 0.0;
+   #elif defined (CLOCK_THREAD_CPUTIME_ID)
+    timespec t {};
+    return clock_gettime (CLOCK_THREAD_CPUTIME_ID, &t) == 0 ? (double) t.tv_sec + (double) t.tv_nsec * 1e-9 : 0.0;
+   #else
+    return 0.0;
+   #endif
+}
+
 juce::TextEditor* firstTextField (juce::Component& dialog)
 {
     juce::TextEditor* best = nullptr;

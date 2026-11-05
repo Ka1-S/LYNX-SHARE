@@ -174,6 +174,8 @@ public:
 
     void mouseMove (const juce::MouseEvent& e) override;
     void mouseExit (const juce::MouseEvent& e) override;
+    // --uiperf (round 173f): where a fader drag starts (the fader's rail, strip coordinates)
+    juce::Rectangle<int> faderRailForSnapshot (int track) const { return faderRail (track); }
 
 private:
     enum class Part { none, pan, stereo, fader, meter, mute, solo, route, send, header, body, add, arm, input };

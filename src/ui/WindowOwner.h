@@ -81,4 +81,6 @@ juce::Image logoImage();
 
 // The CPU time this process has used so far, in seconds (user + kernel; --editorcpu).
 double processCpuSeconds();
+// The CPU time the calling thread has used so far, in seconds (user + kernel; --uiperf: the message thread's share).
+double threadCpuSeconds();
 } // namespace lynx

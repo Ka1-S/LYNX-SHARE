@@ -2406,6 +2406,14 @@ void MainComponent::showDesktopForSnapshot (bool extraPanels)
     refreshPanelButtons();
 }
 
+void MainComponent::showPanelsForSnapshot (std::initializer_list<Panel> panels)
+{
+    workspace.resetLayout();
+    for (const auto panel : panels)
+        workspace.show (panel);
+    refreshPanelButtons();
+}
+
 // --- patterns ------------------------------------------------------------------------------------
 
 void MainComponent::selectPattern (int index)
