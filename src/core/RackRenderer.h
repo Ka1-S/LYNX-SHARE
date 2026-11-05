@@ -421,6 +421,8 @@ public:
 
     // Events of the last block (for tests and diagnostics).
     const EventBuffer& lastEvents() const noexcept { return events; }
+    // Song notes started and not ended yet (round 169d; tests and diagnostics)
+    int scheduledNotesSounding() const noexcept { return scheduledNotes->sounding(); }
 
     // FL's "Compensate automations" (REA round 168j): a mixer effect whose input the delay compensation delays gets its
     // automation clips' value at its own, delayed, position (`current` = the value at the song position)
@@ -485,6 +487,8 @@ private:
     int publishedTop = 0;                                   // channels past it have nothing published
     void publishSoundingKeys (int channels) noexcept;
     std::array<VoiceOrder, maxChannels> voiceOrders {};      // sounding notes in order, for the channels' Max polyphony
+    // the song's started notes and their ends (round 169d): an edit while playing can't leave one without its "off"
+    std::unique_ptr<ScheduledNotes> scheduledNotes = std::make_unique<ScheduledNotes>();
     // FL's channel Mono / Porta in front of every instrument (round 168l, core/ChannelPoly.h): one per channel (prepare)
     std::vector<channelpoly::Layer> polyLayers;
     std::vector<channelpoly::Layer> polyScratch; // (round 168s: channels moved, see process)

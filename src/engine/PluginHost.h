@@ -314,6 +314,12 @@ public:
     int adoptFlPlugins (Song& song, juce::StringArray* missing = nullptr, juce::StringArray* matched = nullptr,
                         juce::StringArray* withoutState = nullptr, juce::StringArray* substituted = nullptr);
 
+    // Export to FL Studio (round 171e): a plugin of this PC as FL's Fruity Wrapper keeps it — the format, its identifier
+    // (VST2 id, VST3 class TUID from FL's plugin database or the module's factory, CLAP id), name, path and the state
+    // in FL's layout (VST3: component + controller records; VST2: FL's layout, which LYNX's VST2 host already keeps;
+    // CLAP: u32 0 + the plugin's bytes). nullopt = not in the plugin list, or its identifier can't be read.
+    std::optional<ForeignPlugin> flWrapperRecord (const PluginRef& ref, bool instrument);
+
     // A .lynx song just loaded: substitute slots whose original plugin is now installed go back to it (always: the
     // original is preferred); plugin effect slots whose plugin isn't installed get their LYNX substitute (when
     // pluginSubstitutesEnabled()). Returns how many slots changed; `restored` / `substituted` count each kind.

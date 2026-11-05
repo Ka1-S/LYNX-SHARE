@@ -36,6 +36,8 @@ add_library(lynx_core STATIC
     src/core/LoadTrace.cpp
     src/core/ModuleWarmup.cpp
     src/core/FlpImport.cpp
+    src/core/FlpExport.cpp
+    src/flp/FlpWrite.cpp
     src/core/Effects.cpp
     src/core/NoteEdit.cpp
     src/core/Recorder.cpp
@@ -389,6 +391,7 @@ if(LYNX_BUILD_APP)
         src/engine/FlStudio.cpp
         src/engine/PluginSandbox.cpp
         src/engine/Exporter.cpp
+        src/engine/FlStudioExport.cpp
         src/engine/StreamPrefetcher.cpp
         src/engine/DllAsioDevice.cpp
         src/engine/PipeWireDevice.cpp
@@ -419,6 +422,7 @@ if(LYNX_BUILD_APP)
         src/ui/PatcherEditor.cpp
         src/ui/DynamicsDisplays.cpp
         src/ui/ExportDialog.cpp
+        src/ui/FlStudioExportDialog.cpp
         src/ui/AutoSamplerDialog.cpp
         src/ui/AutomationUi.cpp
         src/ui/ControllerEditors.cpp
@@ -485,6 +489,7 @@ if(LYNX_BUILD_APP)
         src/ui/TouchKeyboard.cpp
         src/ui/QuickAddPalette.cpp
         src/ui/PluginPickerView.cpp
+        src/ui/PluginThumbs.cpp
         src/ui/PluginPicker.cpp
         src/ui/CrashReporter.cpp
         src/ui/Updater.cpp

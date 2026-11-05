@@ -30,6 +30,7 @@
 #include "engine/PipeWireDevice.h"
 #include "platform/LinuxRealtime.h"
 #include "engine/Exporter.h"
+#include "engine/FlStudioExport.h"
 #include "engine/MidiFileIo.h"
 #include "engine/PluginHost.h"
 #include "engine/PluginSandbox.h"
@@ -51,6 +52,7 @@
 #include "ui/DanceView.h"
 #include "ui/PluginPresetMenu.h"
 #include "ui/PluginWindow.h"
+#include "ui/PluginThumbs.h"
 #include "ui/ClipProperties.h"
 #include "ui/NewProjectDialog.h"
 #include "ui/PluginMonitorWindow.h"
@@ -944,6 +946,17 @@ public:
             return;
         }
 
+        if (args.contains ("--parityshot"))
+        {
+            // LYNX.exe --parityshot <out.png> <effect name> [<params file>]: one built-in effect's editor with the given
+            // parameters ("index value" lines, tools/fxrender --dump), its displays fed by the demo song — the LYNX side
+            // of the third-party parity pictures (round tp172b)
+            const auto i = args.indexOf ("--parityshot");
+            runParityShot (args[i + 1].unquoted(), args[i + 2].unquoted(), i + 3 < args.size() ? args[i + 3].unquoted() : juce::String());
+            quit();
+            return;
+        }
+
         if (args.contains ("--design168rshot"))
         {
             // LYNX.exe --design168rshot <folder>: round 168r's editors (FL effects that had a generated page and LYNX's own
@@ -1005,6 +1018,28 @@ public:
             ok = ok && shoot (lynx::makeChannelPrecomputePanel (shotEngine, 0), "-precompute.png");
             ok = ok && shoot (lynx::makeSettingsPanel (shotEngine, lynx::SettingsPage::project), "-project.png");
             setApplicationReturnValue (ok ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--pluginthumbs"))
+        {
+            // LYNX.exe --pluginthumbs <folder> [key,key...]: the Plugin picker's pictures of LYNX's own plugins (round 171c,
+            // ui/PluginThumbs.h), each editor drawn off-screen and kept as <folder>/<name>.png; the picker starts this in
+            // the background when pictures are missing. One line per plugin on stdout.
+            const auto i = args.indexOf ("--pluginthumbs");
+            lynx::crashguard::quietCrashReports();
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            juce::StringArray only;
+            if (i + 2 < args.size() && ! args[i + 2].startsWith ("--"))
+                only.addTokens (args[i + 2].unquoted(), ",", "");
+            const auto t0 = juce::Time::getMillisecondCounterHiRes();
+            const auto drawn = lynx::pluginthumbs::renderNative (juce::File (args[i + 1].unquoted()), only, [] (const juce::String& line) {
+                std::printf ("%s\n", line.toRawUTF8());
+                std::fflush (stdout);
+            });
+            std::printf ("drawn %d in %.0f ms\n", drawn, juce::Time::getMillisecondCounterHiRes() - t0);
+            setApplicationReturnValue (0);
             quit();
             return;
         }
@@ -1306,6 +1341,13 @@ public:
             juce::File (args[i + 2].unquoted() + ".txt").replaceWithText (report);
             setApplicationReturnValue (written > 0 ? 0 : 1);
             quit();
+            return;
+        }
+
+        if (args.contains ("--export-flp"))
+        {
+            const auto i = args.indexOf ("--export-flp");
+            runFlExport (args[i + 1].unquoted(), args[i + 2].unquoted(), args.contains ("--substitute"));
             return;
         }
 
@@ -4598,6 +4640,20 @@ private:
         };
         run->steps.push_back ({ "mixer fader drag, playing, rebuild per move (before 171c)", {}, [faderMove] (int f) { faderMove (false, f); }, 60 });
         run->steps.push_back ({ "mixer fader drag, playing, live levels (171c)", {}, [faderMove, this] (int f) { faderMove (true, f); if (f == 59) engine->flushLevels(); }, 60 });
+        // F8's Plugin picker (round 171c): opening it (the "show" time = building it + its first paint), its pictures
+        // loading while it stays open, pointing at the tiles, then closing it
+        run->steps.push_back ({ "plugin picker open (F8)", [ui] { ui->togglePluginPickerForSnapshot(); }, {}, 2500 });
+        run->steps.push_back ({ "plugin picker, pointing at tiles", {}, [this, ui] (int f) {
+                                   if (auto* picker = ui->pluginPickerForSnapshot(); picker != nullptr && mainWindow->getPeer() != nullptr)
+                                   {
+                                       const auto p = picker->localPointToGlobal (juce::Point<int> (60 + (f * 37) % juce::jmax (1, picker->getWidth() - 120),
+                                                                                                      90 + (f * 53) % juce::jmax (1, picker->getHeight() - 200)));
+                                       const auto local = mainWindow->getPeer()->globalToLocal (p.toFloat());
+                                       mainWindow->getPeer()->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, local, {}, 0.0f, 0.0f,
+                                                                               juce::Time::currentTimeMillis());
+                                   }
+                               }, 60 });
+        run->steps.push_back ({ "plugin picker close", [ui] { ui->togglePluginPickerForSnapshot(); }, {}, 300 });
         run->steps.push_back ({ "playlist maximised, playing", [ui] { ui->selectTabForSnapshot (2); }, {}, 3000 });
         run->steps.push_back ({ "playlist scroll down/up", [this] { engine->stop(); },
                                  [wheelAt, ui, none] (int f) { wheelAt (ui->getPlaylistForSnapshot(), 0.0f, f < 40 ? -0.15f : 0.15f, none); }, 80 });
@@ -6095,6 +6151,58 @@ private:
         quit();
     }
 
+    // LYNX.exe --export-flp project.(lynx|flp) output.(flp|zip) [--substitute] (round 171e): File › Export › FL Studio
+    // project without the window (option A unless --substitute; the renders next to a .flp in "<name> audio"); the
+    // report goes to output.txt
+    void runFlExport (const juce::String& inputPath, const juce::String& outputPath, bool substitute)
+    {
+        juce::String error;
+        bool ok = false;
+        lynx::flstudio::Written written;
+        {
+            lynx::AudioEngine loader (false);
+            const juce::File input (inputPath);
+            if (input.hasFileExtension ("flp"))
+                ok = loader.importFlpFile (input, error);
+            else if (auto song = lynx::ProjectFile::load (input, error))
+            {
+                loader.setSong (std::move (*song));
+                ok = true;
+            }
+            if (ok)
+            {
+                const juce::File output (outputPath);
+                const auto zip = output.hasFileExtension ("zip");
+                const auto mode = substitute ? lynx::flpexport::LynxOnly::substitute : lynx::flpexport::LynxOnly::renderAudio;
+                loader.capturePluginStates();
+                auto options = lynx::flstudio::optionsFor (&loader.getPluginHost(), mode, loader.getSong());
+                // --flp-ppq N: the file's PPQ (tests; default: 96 when the notes and clips fit it)
+                if (const auto args = juce::JUCEApplication::getCommandLineParameterArray(); args.contains ("--flp-ppq"))
+                    options.ppq = juce::jlimit (0, 960, args[args.indexOf ("--flp-ppq") + 1].getIntValue());
+                const auto renderDir = zip ? juce::File::getSpecialLocation (juce::File::tempDirectory).getNonexistentChildFile ("LYNX FL export", {}, false)
+                                           : output.getSiblingFile (output.getFileNameWithoutExtension() + " audio");
+                ok = lynx::flstudio::exportProject (loader.getSong(), options, output, zip, renderDir, 44100.0,
+                                                    [] (const lynx::Song& s, const lynx::ExportSettings& settings, const juce::File& wav,
+                                                        const std::function<bool (double)>& progress, juce::String& err) {
+                                                        lynx::ExportJob job (s, settings, wav);
+                                                        return job.run (progress, err);
+                                                    },
+                                                    {}, written, error);
+                if (zip)
+                    renderDir.deleteRecursively();
+            }
+        }
+        juce::String report;
+        report << (ok ? "ok" : "error=" + error) << "\n"
+               << "exact=" << (int) written.report.exact.size() << " rendered=" << (int) written.report.rendered.size()
+               << " substituted=" << (int) written.report.substituted.size() << " dropped=" << (int) written.report.dropped.size()
+               << " samples=" << written.samples << "\n\n"
+               << lynx::flstudio::reportText (written) << "\n";
+        juce::File (outputPath + ".txt").replaceWithText (report);
+        setApplicationReturnValue (ok ? 0 : 1);
+        quit();
+    }
+
     // LYNX.exe --export project.(flp|lynx) output.(wav|flac|ogg|mp3) [--pattern] [--insert N] [--rate N]
     // Same path as "Export" in the UI: the whole song (or the current pattern) with its tail.
     void runExport (const juce::String& inputPath, const juce::String& outputPath, bool patternOnly, int insert)
@@ -6326,6 +6434,70 @@ private:
                 editorCpu->cases.push_back (c);
         editorCpu->done = [this] { juce::MessageManager::callAsync ([this] { editorCpu.reset(); quit(); }); };
         editorCpu->start();
+    }
+
+    void runParityShot (const juce::String& path, const juce::String& effectName, const juce::String& paramsFile)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        int kindIndex = -1;
+        for (int k = 0; k <= (int) lynx::lastEffectKind; ++k)
+            if (juce::String::fromUTF8 (lynx::effectInfo ((lynx::EffectKind) k).name).equalsIgnoreCase (effectName))
+                kindIndex = k;
+        if (kindIndex < 0)
+            return;
+        const auto kind = (lynx::EffectKind) kindIndex;
+        auto fx = lynx::makeEffectSlot (kind);
+        if (paramsFile.isNotEmpty())
+            for (const auto& line : juce::StringArray::fromLines (juce::File (paramsFile).loadFileAsString()))
+            {
+                const auto t = juce::StringArray::fromTokens (line, " \t", "");
+                const auto index = t.size() >= 2 ? t[0].getIntValue() : -1;
+                if (index >= 0 && index < lynx::maxEffectParams)
+                    fx.params[(std::size_t) index] = t[1].getFloatValue();
+            }
+        lynx::AudioEngine offline (false);
+        auto song = lynx::Song::makeDefault();
+        song.mixer.resize (2);
+        song.mixer[0].name = "Master";
+        song.mixer[1].name = "Insert 1";
+        song.mixer[1].effects.assign (1, fx);
+        for (auto& c : song.channels)
+            c.mixerTrack = 1;
+        offline.setSong (std::move (song));
+        offline.dispatchPendingMessages();
+        const bool facet = kind == lynx::EffectKind::facetEq;
+        const bool pro = lynx::ProEditorWindows::handles (kind);
+        auto editor = facet ? lynx::makeFacetEqEditor (offline, 1, 0, false)
+                            : pro ? lynx::makeProEditor (offline, 1, 0, true) : lynx::makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
+        if (editor == nullptr)
+            return;
+        if (! pro) // the demo song through the effect, the editor ticked 30 times a second of audio as its timer would
+        {
+            lynx::AudioEngine::RenderOptions o;
+            o.seconds = 3.0;
+            o.sampleRate = 48000.0;
+            o.pluginWarmUp = false;
+            int sinceTick = 0;
+            o.capture = [&] (const float*, const float*, int n) {
+                sinceTick += n;
+                if (sinceTick < 1600) return;
+                sinceTick = 0;
+                if (facet) lynx::tickFacetEqEditor (*editor);
+                else lynx::tickNativeEffectEditor (*editor);
+            };
+            offline.renderOffline (o);
+        }
+        juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);
+        {
+            juce::Graphics g (image);
+            g.fillAll (lynx::theme::panel);
+            editor->paintEntireComponent (g, false);
+        }
+        const juce::File file (path);
+        file.deleteFile();
+        juce::PNGImageFormat png;
+        if (auto stream = file.createOutputStream())
+            png.writeImageToStream (image, *stream);
     }
 
     void runEq166fShots (const juce::String& folder)

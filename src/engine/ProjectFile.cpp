@@ -356,6 +356,33 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song);
 juce::var effectToVar (const EffectSlot& slot);
 std::optional<EffectSlot> effectFromVar (const juce::var& e);
 
+// The FL plugin an imported generator / effect came from (round 171e, Export to FL Studio): {plugin, state, print}
+juce::var flOriginToVar (const FlOrigin& origin)
+{
+    auto o = std::make_unique<juce::DynamicObject>();
+    o->setProperty ("plugin", juce::String::fromUTF8 (origin.plugin.c_str()));
+    if (! origin.state.empty())
+        o->setProperty ("state", juce::Base64::toBase64 (origin.state.data(), origin.state.size()));
+    o->setProperty ("print", juce::String::toHexString ((juce::int64) origin.fingerprint));
+    return juce::var (o.release());
+}
+
+FlOrigin flOriginFromVar (const juce::var& v)
+{
+    FlOrigin origin;
+    if (! v.isObject())
+        return origin;
+    origin.plugin = v["plugin"].toString().toStdString();
+    if (const auto encoded = v["state"].toString(); encoded.isNotEmpty())
+    {
+        juce::MemoryOutputStream raw;
+        if (juce::Base64::convertFromBase64 (raw, encoded))
+            origin.state.assign ((const std::uint8_t*) raw.getData(), (const std::uint8_t*) raw.getData() + raw.getDataSize());
+    }
+    origin.fingerprint = (std::uint64_t) v["print"].toString().getHexValue64();
+    return origin;
+}
+
 // FL's Patcher graph (REA_rodada141): nodes (an effect or a channel each, nested Patchers too), cables, the host
 // nodes' places and the extra outputs' inserts
 juce::var patcherToVar (const PatcherDoc& doc)
@@ -762,6 +789,8 @@ juce::var effectToVar (const EffectSlot& slot)
         e->setProperty ("state", juce::Base64::toBase64 (slot.state.data(), slot.state.size()));
     if (! slot.samplePath.empty()) // Newtone / Newtime source sample
         e->setProperty ("sample", str (slot.samplePath));
+    if (! slot.flOrigin.empty()) // the FL effect it was imported from (round 171e)
+        e->setProperty ("flOrigin", flOriginToVar (slot.flOrigin));
     if (! slot.presetName.empty()) // the editor's preset name and A/B compare (round 129)
         e->setProperty ("preset", str (slot.presetName));
     if (! slot.abOther.empty())
@@ -866,6 +895,8 @@ std::optional<EffectSlot> effectFromVar (const juce::var& e)
         if (juce::Base64::convertFromBase64 (raw, e["state"].toString()))
             slot.state.assign ((const std::uint8_t*) raw.getData(), (const std::uint8_t*) raw.getData() + raw.getDataSize());
     }
+    if (e.hasProperty ("flOrigin"))
+        slot.flOrigin = flOriginFromVar (e["flOrigin"]);
 
     if (auto* branches = e["branches"].getArray())
         for (const auto& b : *branches)
@@ -1231,6 +1262,8 @@ juce::var channelToVar (const ChannelDef& c)
         o->setProperty ("receiveFrom", juce::Array<juce::var> { str (c.receiveFrom), c.receiveMidiChannel });
     if (c.icon != 0) // FL's channel icon index (round 168j)
         o->setProperty ("icon", c.icon);
+    if (! c.flOrigin.empty()) // the FL generator it was imported from (round 171e)
+        o->setProperty ("flOrigin", flOriginToVar (c.flOrigin));
     if (c.loopStarterPattern >= 0) // FL's Loop Starter (round 168b): [pattern, slot, category, locked]
         o->setProperty ("loopStarter", juce::Array<juce::var> { c.loopStarterPattern, str (c.loopStarterSlot), str (c.loopStarterCategory), c.loopStarterLocked });
     if (c.instrument == InstrumentKind::layer)
@@ -1498,6 +1531,8 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         }
     }
     def.icon = juce::jlimit (0, 0xFFFF, (int) c.getProperty ("icon", 0));
+    if (c.hasProperty ("flOrigin"))
+        def.flOrigin = flOriginFromVar (c["flOrigin"]);
     if (const auto& from = c["receiveFrom"]; from.isArray() && from.size() >= 2)
     {
         def.receiveFrom = from[0].toString().toStdString();

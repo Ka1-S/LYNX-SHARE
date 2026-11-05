@@ -106,8 +106,15 @@ struct KnobLook
     float hover = 0.0f;   // 0..1 (animated by the owner, or 0 / 1)
     bool active = false;  // being dragged
     bool enabled = true;  // the plugin is on
+    // round tp172c: the cap's own colour (a console's colour-coded knobs: red HF, green HMF...); transparent = the
+    // theme's. Only the themed style reads it, through the theme's capTint hook (see capTintFor)
+    juce::Colour capTint {};
 };
 void knob (juce::Graphics&, juce::Rectangle<float> bounds, const KnobLook&);
+// round tp172c: the cap colour the current plugin theme gives the knob of this parameter (transparent = none)
+juce::Colour capTintFor (const char* param);
+// round tp172c: the current plugin theme's colour for an OFF toggle's label (transparent = the global one)
+juce::Colour offLabelColour();
 
 // a slider track (vertical or horizontal) with its lit part and a thumb
 void slider (juce::Graphics&, juce::Rectangle<float> trackArea, float value01, bool vertical, bool bipolar, juce::Colour accent, bool hot,
@@ -251,8 +258,10 @@ void setReducedEffects (bool);
 void playOpenAnimation (juce::Component& content, Style = Style::glow);
 
 // --- typography ----------------------------------------------------------------------------------
-inline juce::Colour captionColour() { return juce::Colour (0xff8c919c); }
-inline juce::Colour valueColour (bool hot) { return hot ? theme::colour::textPrimary : juce::Colour (0xffd3d6dd); }
+// round tp172d: a themed editor may set its own caption / value colours and type size (artkit::Theme)
+juce::Colour captionColour();
+juce::Colour valueColour (bool hot);
+float captionScale();
 
 // --- animation -----------------------------------------------------------------------------------
 // Smooth hover / press levels per control id, advanced by a 60 Hz timer that runs ONLY while something is

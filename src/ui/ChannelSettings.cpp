@@ -1323,7 +1323,7 @@ public:
             return v >= lo && (v < hi || (hi >= 1.0f && v <= hi));
         };
         return (item.page < 0 || item.page == page) && holds (item.whenParam, item.whenMin, item.whenMax)
-               && holds (item.when2Param, item.when2Min, item.when2Max);
+               && holds (item.when2Param, item.when2Min, item.when2Max) && holds (item.when3Param, item.when3Min, item.when3Max);
     }
 
     int pageCount() const { return layout != nullptr ? (int) layout->pages.size() : 0; }
@@ -5342,6 +5342,11 @@ int showChannelLayoutPage (juce::Component& frame, int page)
         if (const auto count = showChannelLayoutPage (*child, page); count > 0)
             return count;
     return 0;
+}
+
+int channelFrameHeaderHeight() noexcept
+{
+    return ChannelFrame::headerHeight;
 }
 
 std::unique_ptr<juce::Component> makeChannelFrame (AudioEngine& engine, int channel, int tab)

@@ -1,6 +1,8 @@
 #pragma once
 
+#include <functional>
 #include <memory>
+#include <optional>
 #include <set>
 #include <vector>
 
@@ -129,7 +131,9 @@ public:
     void showProjectForSnapshot();
     void showPluginDatabaseForSnapshot();
     void showScores();         // the Piano roll's File › Browse scores: FL's Data/Patches/Scores ("FL MIDI")
-    void showPluginDatabase(); // FL's Shift+F8: the All tab with the Plugin database opened and scrolled into view
+    // FL's Shift+F8: the All tab with the Plugin database opened and scrolled into view; with a folder (the Plugin
+    // picker's tab, round 171c; `generators` 1 / 0, -1 = none) that folder of the Generators / Effects opened
+    void showPluginDatabase (const juce::String& folder = {}, int generators = -1);
     // --snapshot (round 164): only `folder`, opened, listed under `filter` (folders with nothing to list left out)
     void showFilterForSnapshot (const juce::File& folder, browserview::ContentFilter filter);
     void resetViewForSnapshot(); // its Generators / Effects FL engines open (round 142)
@@ -152,6 +156,10 @@ public:
     static bool isEffectDrag (const juce::DragAndDropTarget::SourceDetails& details);
     static std::optional<ChannelDef> draggedGenerator (const juce::DragAndDropTarget::SourceDetails& details);
     static std::optional<EffectSlot> draggedEffect (const juce::DragAndDropTarget::SourceDetails& details);
+    // The same drag started elsewhere (the Plugin picker's tiles, round 171c): `source` must sit in a drag container
+    // (the main window); one of the two makers is set. Returns whether the drag started.
+    static bool startPluginDrag (juce::Component& source, std::function<std::optional<ChannelDef>()> generator,
+                                 std::function<std::optional<EffectSlot>()> effect, const juce::String& label, const juce::Image& image);
     static bool isAudioFile (const juce::File& file);
 
     void resized() override;

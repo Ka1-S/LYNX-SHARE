@@ -70,6 +70,8 @@ struct LayoutItem
     float whenMin = 0.0f, whenMax = 1.0f;
     const char* when2Param = nullptr;  // a second condition
     float when2Min = 0.0f, when2Max = 1.0f;
+    const char* when3Param = nullptr;  // round tp172c: a third (a voicing wrapper around an item that already has two)
+    float when3Min = 0.0f, when3Max = 1.0f;
     const char* idleParam = nullptr;   // round 170c: shown dimmed (it does nothing) while this parameter is within
     float idleMin = 0.0f, idleMax = 1.0f; // [idleMin, idleMax) (1 included), or while the second one is
     const char* idle2Param = nullptr;
