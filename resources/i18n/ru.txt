@@ -7198,3 +7198,11 @@ countries: ru by kz
 "Samples not on this PC" = "Сэмплы, которых нет на этом ПК"
 "E type|G type" = "Тип E|Тип G"
 "Modern console" = "Современная консоль"
+# round tp172c6: Ridge Strip's DRIVE section
+"Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "Сатурация|Консоль E|Консоль G|Консоль A|Консоль N|Консоль Y|Лампа|Гитарный усил.|Басовый усил."
+"Switches the drive section on: saturation at the end of the strip, before the output" = "Включает секцию драйва: сатурация в конце линейки, перед выходом"
+"The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "Вид сатурации: мягкий клиппер, пять консольных каналов, ламповый каскад или гитарный / басовый усилитель"
+"How hard the model is driven; the consoles and the clipper keep the level, the amps get louder" = "Насколько сильно раскачивается модель; консоли и клиппер сохраняют уровень, усилители становятся громче"
+"Level into the drive: more distortion without changing the drive" = "Уровень на входе драйва: больше искажений без изменения драйва"
+"Level after the drive" = "Уровень после драйва"
+"Blends the clean signal back in" = "Подмешивает обратно чистый сигнал"

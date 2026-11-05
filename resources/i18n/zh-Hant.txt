@@ -7198,3 +7198,11 @@ countries: tw hk mo
 "Samples not on this PC" = "不在此電腦上的取樣"
 "E type|G type" = "E 型|G 型"
 "Modern console" = "現代調音台"
+# round tp172c6: Ridge Strip's DRIVE section
+"Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "飽和|控制台 E|控制台 G|控制台 A|控制台 N|控制台 Y|真空管|吉他音箱|貝斯音箱"
+"Switches the drive section on: saturation at the end of the strip, before the output" = "開啟驅動部分：在通道條末端、輸出之前的飽和"
+"The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "飽和類型：軟削波器、五種控制台通道、真空管級或吉他 / 貝斯音箱"
+"How hard the model is driven; the consoles and the clipper keep the level, the amps get louder" = "模型被驅動的程度；控制台和削波器保持電平，音箱會變得更響"
+"Level into the drive: more distortion without changing the drive" = "進入驅動的電平：在不改變驅動的情況下得到更多失真"
+"Level after the drive" = "驅動之後的電平"
+"Blends the clean signal back in" = "把乾淨訊號混回來"

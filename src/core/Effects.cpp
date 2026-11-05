@@ -3202,6 +3202,17 @@ const EffectInfo& effectInfo (EffectKind kind)
 
 std::string formatEffectParam (EffectKind kind, int param, float v, double bpm, const EffectParams& context)
 {
+    if (kind == EffectKind::ridgeStrip && param == mixsuite::ridge::driveAmount) // round tp172c6: the model's own dial
+    {
+        const auto model = mixsuite::ridge::driveModelIndex (context[(std::size_t) mixsuite::ridge::driveModel]);
+        const auto u = mixsuite::ridge::driveAmountUnits (model, v);
+        char text[32];
+        if (model >= mixsuite::ridge::driveGuitarAmp)
+            std::snprintf (text, sizeof text, "%.2f", u);
+        else
+            std::snprintf (text, sizeof text, model == mixsuite::ridge::driveSaturate ? "%+.1f dB" : "%.1f dB", u);
+        return text;
+    }
     if (kind == EffectKind::ridgeStrip && mixsuite::ridge::modernVoicing (context)) // round tp172c: the Modern voicing's
         return mixsuite::ridge::modernParamText (param, v);
     if (kind == EffectKind::ridgeStrip && mixsuite::ridge::k4Voicing (context)) // round 148: the 4K console's scales

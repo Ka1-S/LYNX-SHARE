@@ -7198,3 +7198,11 @@ countries: jp
 "Samples not on this PC" = "この PC にないサンプル"
 "E type|G type" = "Eタイプ|Gタイプ"
 "Modern console" = "モダンコンソール"
+# round tp172c6: Ridge Strip's DRIVE section
+"Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "サチュレート|コンソール E|コンソール G|コンソール A|コンソール N|コンソール Y|真空管|ギターアンプ|ベースアンプ"
+"Switches the drive section on: saturation at the end of the strip, before the output" = "ドライブ部をオンにします: ストリップの最後、出力の前でのサチュレーション"
+"The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "サチュレーションの種類: ソフトクリッパー、5種類のコンソールチャンネル、真空管段、ギター / ベースアンプ"
+"How hard the model is driven; the consoles and the clipper keep the level, the amps get louder" = "モデルをどれだけ強くドライブするか。コンソールとクリッパーはレベルを保ち、アンプは音量が上がります"
+"Level into the drive: more distortion without changing the drive" = "ドライブへの入力レベル: ドライブを変えずに歪みを増やします"
+"Level after the drive" = "ドライブ後のレベル"
+"Blends the clean signal back in" = "クリーンな信号を混ぜ戻します"

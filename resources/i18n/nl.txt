@@ -7198,3 +7198,11 @@ countries: nl be
 "Samples not on this PC" = "Samples die niet op deze pc staan"
 "E type|G type" = "E-type|G-type"
 "Modern console" = "Moderne console"
+# round tp172c6: Ridge Strip's DRIVE section
+"Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "Satureren|Console E|Console G|Console A|Console N|Console Y|Buis|Gitaarversterker|Basversterker"
+"Switches the drive section on: saturation at the end of the strip, before the output" = "Zet de drive-sectie aan: saturatie aan het eind van de strip, vóór de uitgang"
+"The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "Het soort saturatie: een zachte clipper, vijf consolekanalen, een buistrap of een gitaar- / basversterker"
+"How hard the model is driven; the consoles and the clipper keep the level, the amps get louder" = "Hoe hard het model wordt aangestuurd; de consoles en de clipper houden het niveau, de versterkers worden luider"
+"Level into the drive: more distortion without changing the drive" = "Niveau de drive in: meer vervorming zonder de drive te veranderen"
+"Level after the drive" = "Niveau na de drive"
+"Blends the clean signal back in" = "Mengt het schone signaal terug"

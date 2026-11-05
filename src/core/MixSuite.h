@@ -131,8 +131,24 @@ enum Param
     // Black = G), filters, feed-forward compressor (its peak / RMS detector) and gate (with its hold); the shared
     // controls read the reference's own ranges
     modern, compPeak, gateHold,
+    // round tp172c6 (appended, off = the old sound): the DRIVE section — a measured saturation stage at the strip's end
+    // (before the output trim in Ridge's own engine, after the voicings' own output): a static curve per model and
+    // drive position (fitted on the trials' stairs, 4x oversampled), its tone, an input gain into it, a trim and a mix
+    driveOn, driveModel, driveAmount, driveInput, driveTrim, driveMix,
     count
 };
+// round tp172c6: the drive models (DRIVE section), in the Model selector's order
+enum DriveModel { driveSaturate, driveConsoleE, driveConsoleG, driveConsoleA, driveConsoleN, driveConsoleY, driveTube,
+                  driveGuitarAmp, driveBassAmp, driveModels };
+int driveModelIndex (float v) noexcept;
+float driveModelValue (int model) noexcept;
+const char* driveModelName (int model) noexcept;  // English (the selector's options are translated in the layout)
+double driveAmountUnits (int model, float v) noexcept; // the model's own dial: dB (Saturate -24 .. +24, consoles / tube 0 .. 18) or 0 .. 11 (amps)
+float driveAmountValue (int model, double units) noexcept;
+double driveInputDb (float v) noexcept;  // -24 .. +24 dB
+double driveTrimDb (float v) noexcept;   // -24 .. +24 dB
+// the drive stage's static curve (no tone, no oversampling) at the current settings: output for one input sample
+double driveCurve (const EffectParams& p, double x) noexcept;
 // round 147b: the auto make-up (dB) for Ridge's own compressor: the console's for the same threshold (dBFS + 18 = the
 // console's dBu scale) and ratio; 0 with the compressor off
 double autoMakeupDb (const EffectParams& p) noexcept;
