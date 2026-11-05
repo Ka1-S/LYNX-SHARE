@@ -2390,7 +2390,9 @@ double tapLevel (const EffectParams& p, int tap, int taps) noexcept
         const auto pos = 1.0 - 2.0 * (double) tap / (double) (taps - 1); // +1 at the longest tap, −1 at the shortest
         gain *= std::pow (10.0, 6.0 * bipolar (p[slope]) * pos / 20.0);
     }
-    return -gain; // the measured wet is polarity-inverted (REA_rodada101 §6)
+    // round 172d: in phase with the dry (Valhalla UberMod, the main reference: music / sweep / vocal at Mix 50 … 100 %,
+    // the dry + wet comb sits where an in-phase wet puts it; the older inverted wet, REA_rodada101 §6, scored 3.1 → 3.9)
+    return gain;
 }
 
 namespace

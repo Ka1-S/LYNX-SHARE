@@ -492,12 +492,16 @@ Layout ogunLayout (bool autogun)
     p.fader (148, 340, 18, 74, "Chorus mix", TR_NOOP ("Mix"), bipolar);
     p.section (176, 322, 160, 114, TR_NOOP ("Delay"));
     p.stepper (184, 354, 40, 22, "Delay feedback mode", TR_NOOP ("Mode"), 3);
+    // (round 170i3: the delay and reverb run only with these switches on; FL's Plugin database Ogun: delay off, reverb on)
+    p.toggle (184, 384, 48, 16, "Delay on", TR_NOOP ("On"), boxed);
+    p.toggle (184, 406, 48, 16, "Delay tempo sync", TR_NOOP ("Tempo"), boxed);
     p.fader (240, 340, 18, 74, "Delay feedback", TR_NOOP ("Fb"));
     p.fader (262, 340, 18, 74, "Delay time", TR_NOOP ("Time"));
     p.fader (284, 340, 18, 74, "Delay stereo offset", TR_NOOP ("Ofs"), bipolar);
     p.fader (306, 340, 18, 74, "Delay volume", TR_NOOP ("Vol"), bipolar);
     p.section (340, 322, 216, 114, TR_NOOP ("Reverb"));
     p.stepper (346, 354, 26, 22, "Reverb color", TR_NOOP ("Col"), 4);
+    p.toggle (344, 384, 30, 16, "Reverb on", TR_NOOP ("On"), boxed);
     static const std::pair<const char*, const char*> rev[8] = {
         { "Reverb low cut", TR_NOOP ("LC") }, { "Reverb high cut", TR_NOOP ("HC") }, { "Reverb predelay", TR_NOOP ("Pre") },
         { "Reverb room size", TR_NOOP ("Size") }, { "Reverb diffusion", TR_NOOP ("Diff") }, { "Reverb decay", TR_NOOP ("Dec") },

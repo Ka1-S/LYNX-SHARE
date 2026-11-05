@@ -2,6 +2,7 @@
 #include "core/VoxStrip.h"
 
 #include <algorithm>
+#include <complex>
 #include <cmath>
 #include <cstring>
 #include <iterator>
@@ -1337,4 +1338,10 @@ void Compressor::process (float* l, float* r, int n, const Settings& s) noexcept
     change = (float) -extreme;
 }
 } // namespace progcomp
+} // namespace lynx::vmatch
+
+// round tp172c: the modern console channel strip (Ridge Strip, "Modern" voicing)
+namespace lynx::vmatch
+{
+#include "core/ConsoleStrip2.inc"
 } // namespace lynx::vmatch

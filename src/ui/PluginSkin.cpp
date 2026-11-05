@@ -856,6 +856,16 @@ void drawKnobDirect (juce::Graphics& g, juce::Rectangle<float> bounds, const Kno
 // Knobs are drawn once per look into a small cached image (value to 1/1000, hover in 8 steps, the screen's pixel
 // scale) and blitted afterwards: a display editor repainting at 30 Hz re-uses its unchanged knobs for free. The
 // bloom a big knob casts on the panel (brighter as it is turned up) is one gradient, drawn live.
+juce::Colour capTintFor (const char* param)
+{
+    return currentStyle == Style::themed && param != nullptr ? artkit::capTintFor (param) : juce::Colour();
+}
+
+juce::Colour offLabelColour()
+{
+    return currentStyle == Style::themed ? artkit::offLabelColour() : juce::Colour();
+}
+
 void knob (juce::Graphics& g, juce::Rectangle<float> boundsIn, const KnobLook& k)
 {
     // Hardware and Vivid draw their knobs a little bigger than the cell's circle (the ring sits close to the caption)
@@ -883,6 +893,7 @@ void knob (juce::Graphics& g, juce::Rectangle<float> boundsIn, const KnobLook& k
     key = key * 11u + (std::uint64_t) currentArt;
     key = key * 401u + (std::uint64_t) std::lround (scale * 100.0f);
     key ^= (std::uint64_t) k.accent.getARGB() * 0x9e3779b97f4a7c15ull;
+    key ^= (std::uint64_t) k.capTint.getARGB() * 0xc2b2ae3d27d4eb4full;
 
     static std::unordered_map<std::uint64_t, juce::Image> cache;
     auto it = cache.find (key);

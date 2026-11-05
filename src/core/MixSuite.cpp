@@ -311,6 +311,43 @@ int k4ColourIndex (float v) noexcept { return std::clamp ((int) std::lround (v *
 float k4ColourValue (int colour) noexcept { return (float) std::clamp (colour, 0, 2) * 0.5f; }
 double k4MicDb (float v) noexcept { return lin (v, 0.0, 50.0); }
 double k4OffsetDb (float v) noexcept { return lin (v, -12.0, 12.0); }
+// round tp172c: the Modern voicing's scales (the reference's ranges; its ratio dial through its own read-outs)
+bool modernVoicing (const EffectParams& p) noexcept { return on (p[modern]); }
+double mHpfHz (float v) noexcept { return v <= 0.0f ? 0.0 : logMap (v, 20.9, 500.0); }
+double mLpfKHz (float v) noexcept { return v <= 0.0f ? 0.0 : logMap (v, 27.5, 3.0); }
+double mLfHz (float v) noexcept { return logMap (v, 40.0, 600.0); }
+double mLmfKHz (float v) noexcept { return logMap (v, 0.2, 2.0); }
+double mHmfKHz (float v) noexcept { return logMap (v, 0.6, 7.0); }
+double mHfKHz (float v) noexcept { return logMap (v, 1.5, 22.0); }
+double mLfGainDb (float v) noexcept { return lin (v, -16.5, 16.5); }
+double mGainDb (float v) noexcept { return lin (v, -20.0, 20.0); }
+double mQ (float v) noexcept { return lin (v, 0.5, 2.5); }
+double mHoldSeconds (float v) noexcept { return lin (v, 0.0, 4.0); }
+namespace
+{
+// the reference's ratio dial (its read-outs at eighths of the travel); 63 .. infinity on the last eighth
+constexpr double kModernRatio[8] { 1.0, 1.1, 1.8, 4.3, 10.0, 21.0, 38.0, 63.0 };
+}
+double mRatio (float v) noexcept
+{
+    const double x = std::clamp ((double) v, 0.0, 1.0) * 8.0;
+    if (v >= 0.999f)
+        return 1e9;
+    if (x >= 7.0) // 63 : 1 to "infinity" (2000 : 1 just under the top)
+        return 63.0 * std::pow (2000.0 / 63.0, (x - 7.0) / (7.992 - 7.0));
+    const int i = (int) x;
+    return kModernRatio[i] * std::pow (kModernRatio[i + 1] / kModernRatio[i], x - i);
+}
+float mRatioValue (double ratio) noexcept
+{
+    if (ratio <= 1.0) return 0.0f;
+    if (ratio >= 99.5) return 1.0f; // [EXEC] the reference stores its "INF" as 100
+    if (ratio >= 63.0)
+        return (float) std::min (0.998, (7.0 + std::log (ratio / 63.0) / std::log (2000.0 / 63.0) * 0.992) / 8.0);
+    int i = 0;
+    while (i < 6 && ratio > kModernRatio[i + 1]) ++i;
+    return (float) ((i + std::log (ratio / kModernRatio[i]) / std::log (kModernRatio[i + 1] / kModernRatio[i])) / 8.0);
+}
 double autoMakeupDb (const EffectParams& p) noexcept
 {
     if (p[compRatio] <= 0.0005f || ! on (p[dynOn]))
@@ -458,8 +495,52 @@ vmatch::echannel::Settings consoleSettingsOf (const EffectParams& p) noexcept
 }
 
 
+// round tp172c: the Modern voicing's settings (the shared controls in the reference's own units)
+vmatch::strip2::Settings modernSettingsOf (const EffectParams& p) noexcept
+{
+    vmatch::strip2::Settings m;
+    m.inputDb = trimDb (p[input]);
+    m.outputDb = trimDb (p[output]);
+    m.phase = on (p[phase]);
+    m.hpHz = mHpfHz (p[hpf]);
+    m.lpKHz = mLpfKHz (p[lpf]);
+    m.typeG = on (p[curve]);
+    m.lfGain = mLfGainDb (p[lfGain]);
+    m.lfHz = mLfHz (p[lfFreq]);
+    m.lfBell = on (p[lfBell]);
+    m.lmfGain = mGainDb (p[lmfGain]);
+    m.lmfKHz = mLmfKHz (p[lmfFreq]);
+    m.lmfQ = mQ (p[lmfQ]);
+    m.hmfGain = mGainDb (p[hmfGain]);
+    m.hmfKHz = mHmfKHz (p[hmfFreq]);
+    m.hmfQ = mQ (p[hmfQ]);
+    m.hfGain = mGainDb (p[hfGain]);
+    m.hfKHz = mHfKHz (p[hfFreq]);
+    m.hfBell = on (p[hfBell]);
+    m.eqOn = on (p[eqOn]);
+    m.compRatio = mRatio (p[compRatio]);
+    m.compThreshold = eCompThresholdDb (p[compThreshold]);
+    m.compRelease = releaseSeconds (p[ridge::compRelease]);
+    m.compFast = on (p[compFastAttack]);
+    m.compPeak = on (p[compPeak]);
+    m.compMix = std::clamp ((double) p[compMix], 0.0, 1.0);
+    m.autoMakeup = on (p[autoMakeup]);
+    m.makeupOffsetDb = k4OffsetDb (p[k4MakeupOffset]);
+    m.expander = on (p[expander]);
+    m.gateFast = on (p[gateFastAttack]);
+    m.gateThreshold = eGateThresholdDb (p[gateThreshold]);
+    m.gateRange = eGateRangeDb (p[gateRange]);
+    m.gateRelease = releaseSeconds (p[ridge::gateRelease]);
+    m.gateHold = mHoldSeconds (p[gateHold]);
+    m.dynOn = on (p[dynOn]);
+    m.dynamicsPreEq = on (p[order]);
+    return m;
+}
+
 double responseDb (const EffectParams& p, double sampleRate, double hz)
 {
+    if (modernVoicing (p)) // round tp172c
+        return vmatch::strip2::responseDb (modernSettingsOf (p), sampleRate, hz);
     if (k4Voicing (p) || eVoicing (p)) // round 148: the console's own curve
         return vmatch::echannel::responseDb (consoleSettingsOf (p), sampleRate, hz);
     EqDesign d;
@@ -477,6 +558,8 @@ double responseDb (const EffectParams& p, double sampleRate, double hz)
 
 double compressorCurveDb (const EffectParams& p, double inputDb)
 {
+    if (modernVoicing (p)) // round tp172c: the Modern voicing's measured law
+        return vmatch::strip2::compStaticDb (modernSettingsOf (p), inputDb);
     return gainComputer (inputDb, compThresholdDb (p[compThreshold]), ratio (p[compRatio]));
 }
 
@@ -489,6 +572,7 @@ public:
     {
         sr = rate;
         console.prepare (rate);
+        modernEngine.prepare (rate);
         vocalEngine.prepare (rate);
         reset();
     }
@@ -499,6 +583,7 @@ public:
     void reset() noexcept override
     {
         console.reset();
+        modernEngine.reset();
         vocalEngine.reset();
         for (auto* d : { &audio, &side })
         {
@@ -525,6 +610,13 @@ public:
             return;
         }
         vocalLatency = 0;
+        if (modernVoicing (p)) // round tp172c
+        {
+            const auto inPeak = Meters::peak (l, r, n);
+            modernEngine.process (l, r, n, modernSettingsOf (p));
+            meters.set (modernEngine.compReductionDb(), modernEngine.gateReductionDb(), inPeak, Meters::peak (l, r, n));
+            return;
+        }
         if (k4Voicing (p)) // round 148
         {
             const auto inPeak = Meters::peak (l, r, n);
@@ -662,6 +754,7 @@ private:
 
 
     vmatch::echannel::Channel console;
+    vmatch::strip2::Strip modernEngine; // round tp172c
     voxstrip::Engine vocalEngine;
     int vocalLatency = 0;
 
@@ -3027,7 +3120,9 @@ const EffectInfo& ridgeInfo()
                                      { "4K voicing", 0.0f }, { "EQ colour", 0.0f }, { "Mic pre", 0.0f }, { "Mic gain", 0.0f },
                                      { "Make-up offset", 0.5f },
                                      // round 165
-                                     { "EQ to SC", 0.0f } } };
+                                     { "EQ to SC", 0.0f },
+                                     // round tp172c: the Modern voicing (core/VoiceMatch.h, strip2)
+                                     { "Modern voicing", 0.0f }, { "Peak detect", 0.0f }, { "Gate hold", 0.0625f } } };
     return info;
 }
 
@@ -3249,6 +3344,29 @@ std::string k4ParamText (int param, float v)
     }
 }
 
+// round tp172c
+std::string modernParamText (int param, float v)
+{
+    switch (param)
+    {
+        case hpf: return v <= 0.0f ? "off" : hzText (mHpfHz (v));
+        case lpf: return v <= 0.0f ? "off" : hzText (mLpfKHz (v) * 1000.0);
+        case curve: return on (v) ? "G type" : "E type";
+        case lfGain: return fmt ("%+.1f dB", mLfGainDb (v));
+        case lmfGain: case hmfGain: case hfGain: return fmt ("%+.1f dB", mGainDb (v));
+        case lfFreq: return hzText (mLfHz (v));
+        case lmfFreq: return hzText (mLmfKHz (v) * 1000.0);
+        case hmfFreq: return hzText (mHmfKHz (v) * 1000.0);
+        case hfFreq: return hzText (mHfKHz (v) * 1000.0);
+        case lmfQ: case hmfQ: return fmt ("Q %.2f", mQ (v));
+        case compRatio: { const auto r = mRatio (v); return r > 1e6 ? "inf : 1" : fmt (r < 10.0 ? "%.1f : 1" : "%.0f : 1", r); }
+        case gateHold: return fmt ("%.2f s", mHoldSeconds (v));
+        case compPeak: return on (v) ? "peak" : "RMS";
+        case modern: return on (v) ? "modern console" : "off";
+        default: return k4ParamText (param, v);
+    }
+}
+
 std::string vocalParamText (int param, float v)
 {
     namespace vs = voxstrip;
@@ -3304,6 +3422,7 @@ std::string paramText (EffectKind kind, int param, float v)
             case order: return on (v) ? "dyn > EQ" : "EQ > dyn";
             case voicing: return on (v) ? "E console" : "classic";
             case console4k: return on (v) ? "4K console" : "off";
+            case modern: case compPeak: case gateHold: return modernParamText (param, v); // round tp172c
             case k4Colour: case k4Mic: case k4MakeupOffset: return k4ParamText (param, v);
             case filterSplit: return on (v) ? "split" : "with EQ";
             case vocal: case vInput: case vOutput: case vOrder: case vDsFreq: case vDsThreshold: case vDsSplit:

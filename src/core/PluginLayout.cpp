@@ -168,11 +168,17 @@ LayoutItem when (LayoutItem i, const char* param, float lo, float hi)
         i.whenMin = lo;
         i.whenMax = hi;
     }
-    else
+    else if (i.when2Param == nullptr)
     {
         i.when2Param = param;
         i.when2Min = lo;
         i.when2Max = hi;
+    }
+    else
+    {
+        i.when3Param = param;
+        i.when3Min = lo;
+        i.when3Max = hi;
     }
     return i;
 }
@@ -1789,8 +1795,12 @@ Layout ridgeStrip()
     // left, frequency in the middle, Q / bell on the right), the EQ curve under them. Right: DYNAMICS (the
     // compressor, then the expander / gate, their gain-reduction meters), the routing (EQ and dynamics in, order,
     // filters to the side chain), and the GAIN block (input, phase, output) at the bottom.
+    // round tp172c: three columns like the reference console channel strip — the filters and EQ bands on the left
+    // (HF at the top down to LF), the input / output block in the middle (the EQ curve over the I/O meters, input trim
+    // and phase, the output fader between the meters), the dynamics on the right (compressor, expander / gate, their
+    // LED ladders and the routing)
     Layout l;
-    l.width = 560;
+    l.width = 780;
     l.height = 716;
     auto& v = l.items;
     // --- left column: filters and EQ
@@ -1818,59 +1828,69 @@ Layout ridgeStrip()
             v.push_back (toggle (194, y + 34.0f, 72, 20, extra[b], TR_NOOP ("Bell")));
     }
     v.push_back (section (4, 520, 276, 192, TR_NOOP ("Equalizer")));
-    v.push_back (display (10, 540, 264, 118, "ridgeeq"));
     // round 165: the Brown / Black curves are Ridge's own engine's (the E console voicing has the console's one curve)
-    v.push_back (when (when (tabs (10, 664, 150, 20, "EQ curve", TR_NOOP ("Brown|Black")), "4K voicing", 0.0f, 0.5f), "Voicing", 0.0f, 0.5f));
+    // (round tp172c: two conditions at most — the 4K and Modern voicings; in the E voicing the curve has no effect)
+    v.push_back (when (when (tabs (10, 548, 150, 20, "EQ curve", TR_NOOP ("Brown|Black")), "4K voicing", 0.0f, 0.5f), "Modern voicing", 0.0f, 0.5f));
+    // round tp172c: the Modern voicing (the console measured on the SSL Native Channel Strip 2 trial) — the curve picks its
+    // E / G EQ type; its compressor's peak detector, the gate's hold and the make-up offset join the dynamics
+    v.push_back (when (tabs (10, 548, 150, 20, "EQ curve", TR_NOOP ("E type|G type")), "Modern voicing", 0.5f, 1.0f));
+    v.push_back (toggle (170, 620, 104, 20, "Modern voicing", TR_NOOP ("Modern console")));
+    v.push_back (when (dial (652, 52, 24, "Make-up offset", TR_NOOP ("Offset"), bipolar), "Modern voicing", 0.5f, 1.0f));
+    v.push_back (when (toggle (516, 100, 64, 20, "Peak detect", TR_NOOP ("Peak")), "Modern voicing", 0.5f, 1.0f));
+    v.push_back (when (dial (722, 372, 20, "Gate hold", TR_NOOP ("Hold")), "Modern voicing", 0.5f, 1.0f));
     // round 148: the 4K voicing (the console measured on the SSL 4K E trial) — its three EQ colours, the mic pre and
     // its gain, the make-up offset; the rest of the panel drives it with the console's own scales
-    v.push_back (when (tabs (10, 664, 150, 20, "EQ colour", TR_NOOP ("Brown|Black|Orange")), "4K voicing", 0.5f, 1.0f));
-    v.push_back (toggle (170, 688, 104, 20, "4K voicing", TR_NOOP ("4K console")));
-    v.push_back (when (dial (432, 52, 24, "Make-up offset", TR_NOOP ("Offset"), bipolar), "4K voicing", 0.5f, 1.0f));
-    v.push_back (when (toggle (384, 540, 70, 20, "Mic pre", TR_NOOP ("Mic pre")), "4K voicing", 0.5f, 1.0f));
-    v.push_back (when (dial (504, 548, 24, "Mic gain", TR_NOOP ("Mic")), "4K voicing", 0.5f, 1.0f));
-    v.push_back (toggle (170, 664, 104, 20, "EQ on", TR_NOOP ("EQ in")));
+    v.push_back (when (when (tabs (10, 548, 150, 20, "EQ colour", TR_NOOP ("Brown|Black|Orange")), "4K voicing", 0.5f, 1.0f), "Modern voicing", 0.0f, 0.5f));
+    v.push_back (toggle (170, 584, 104, 20, "4K voicing", TR_NOOP ("4K console")));
+    v.push_back (when (when (dial (652, 52, 24, "Make-up offset", TR_NOOP ("Offset"), bipolar), "4K voicing", 0.5f, 1.0f), "Modern voicing", 0.0f, 0.5f));
+    v.push_back (toggle (170, 548, 104, 20, "EQ on", TR_NOOP ("EQ in")));
     // round 123: the voicing — Ridge's own engine, or the measured E-type console (substitutes start there)
-    v.push_back (tabs (10, 688, 150, 20, "Voicing", TR_NOOP ("Classic|E console")));
+    v.push_back (tabs (10, 584, 150, 20, "Voicing", TR_NOOP ("Classic|E console")));
 
-    // --- right column: dynamics, routing, gain
-    v.push_back (section (284, 4, 272, 236, TR_NOOP ("Compressor")));
-    v.push_back (display (290, 24, 120, 70, "ridgecomp"));
-    v.push_back (dial (480, 62, 46, "Comp. threshold", TR_NOOP ("Threshold"), big));
-    v.push_back (dial (330, 150, 32, "Ratio", TR_NOOP ("Ratio")));
-    v.push_back (dial (410, 150, 32, "Comp. release", TR_NOOP ("Release")));
-    v.push_back (dial (490, 150, 28, "Comp. mix", TR_NOOP ("Mix")));
-    v.push_back (toggle (296, 206, 110, 20, "Fast attack", TR_NOOP ("Fast attack")));
-    v.push_back (toggle (414, 206, 136, 20, "Auto make-up", TR_NOOP ("Auto make-up"))); // round 147b: the console's
-    v.push_back (section (284, 244, 272, 196, TR_NOOP ("Expander / gate")));
-    v.push_back (dial (480, 296, 46, "Gate threshold", TR_NOOP ("Threshold"), big));
-    v.push_back (dial (330, 290, 32, "Gate range", TR_NOOP ("Range")));
-    v.push_back (dial (330, 370, 32, "Gate release", TR_NOOP ("Release")));
-    v.push_back (toggle (396, 380, 70, 20, "Gate fast", TR_NOOP ("Fast")));
-    v.push_back (tabs (396, 408, 154, 20, "Expander", TR_NOOP ("Gate|Expand")));
+    // --- right column: dynamics, routing
+    v.push_back (section (504, 4, 272, 236, TR_NOOP ("Compressor")));
+    v.push_back (display (510, 24, 120, 70, "ridgecomp"));
+    v.push_back (dial (700, 62, 46, "Comp. threshold", TR_NOOP ("Threshold"), big));
+    v.push_back (dial (550, 150, 32, "Ratio", TR_NOOP ("Ratio")));
+    v.push_back (dial (630, 150, 32, "Comp. release", TR_NOOP ("Release")));
+    v.push_back (dial (710, 150, 28, "Comp. mix", TR_NOOP ("Mix")));
+    v.push_back (toggle (516, 206, 110, 20, "Fast attack", TR_NOOP ("Fast attack")));
+    v.push_back (toggle (634, 206, 136, 20, "Auto make-up", TR_NOOP ("Auto make-up"))); // round 147b: the console's
+    v.push_back (section (504, 244, 272, 196, TR_NOOP ("Expander / gate")));
+    v.push_back (dial (700, 296, 46, "Gate threshold", TR_NOOP ("Threshold"), big));
+    v.push_back (dial (550, 290, 32, "Gate range", TR_NOOP ("Range")));
+    v.push_back (dial (550, 370, 32, "Gate release", TR_NOOP ("Release")));
+    v.push_back (toggle (616, 380, 70, 20, "Gate fast", TR_NOOP ("Fast")));
+    v.push_back (tabs (616, 408, 154, 20, "Expander", TR_NOOP ("Gate|Expand")));
     // round 165: the reference's two LED ladders (compressor, expander / gate: 3 … 20 dB of reduction) on the left, the
     // routing on the right — the dynamics in, where they sit (before / after the EQ), the EQ into their side chain
-    v.push_back (section (284, 444, 272, 132, TR_NOOP ("Dynamics")));
+    v.push_back (section (504, 444, 272, 268, TR_NOOP ("Dynamics")));
     {
-        auto comp = display (292, 462, 30, 108, "grleds");
+        auto comp = display (512, 462, 30, 236, "grleds");
         comp.steps = 0;
         comp.label = TR_NOOP ("Comp");
         v.push_back (comp);
-        auto gate = display (326, 462, 30, 108, "grleds");
+        auto gate = display (546, 462, 30, 236, "grleds");
         gate.steps = 1;
         gate.label = TR_NOOP ("Exp");
         v.push_back (gate);
     }
-    v.push_back (toggle (366, 464, 84, 20, "Dynamics on", TR_NOOP ("Dyn in")));
-    v.push_back (toggle (456, 464, 92, 20, "Analog", TR_NOOP ("Analog"))); // round 147b: the console emulation's colour
-    v.push_back (tabs (366, 494, 182, 20, "Order", TR_NOOP ("EQ>Dyn|Dyn>EQ")));
-    v.push_back (when (toggle (366, 524, 182, 20, "EQ to SC", TR_NOOP ("EQ to side chain")), "4K voicing", 0.0f, 0.5f));
-    // the GAIN block (round 129, the reference's): input trim and phase, the output fader beside the input / output
-    // level meter with its peak read-outs
-    v.push_back (section (284, 580, 272, 132, TR_NOOP ("Gain")));
-    v.push_back (dial (322, 628, 36, "Input", TR_NOOP ("Input"), bipolar));
-    v.push_back (toggle (294, 682, 56, 20, "Phase", TR_NOOP ("Phase")));
-    v.push_back (slider (Item::vslider, 370, 600, 34, 106, "Output", TR_NOOP ("Output")));
-    v.push_back (display (420, 598, 130, 110, "iometer"));
+    v.push_back (toggle (586, 464, 84, 20, "Dynamics on", TR_NOOP ("Dyn in")));
+    v.push_back (toggle (676, 464, 92, 20, "Analog", TR_NOOP ("Analog"))); // round 147b: the console emulation's colour
+    v.push_back (tabs (586, 494, 182, 20, "Order", TR_NOOP ("EQ>Dyn|Dyn>EQ")));
+    v.push_back (when (when (toggle (586, 524, 182, 20, "EQ to SC", TR_NOOP ("EQ to side chain")), "4K voicing", 0.0f, 0.5f), "Modern voicing", 0.0f, 0.5f));
+    // --- centre: the EQ curve over the input / output block (round tp172c: the reference's middle module)
+    v.push_back (section (284, 4, 216, 168, TR_NOOP ("Curve")));
+    v.push_back (display (290, 26, 204, 140, "ridgeeq"));
+    // the GAIN block (round 129, the reference's): input trim and phase (and the 4K's mic pre), the output fader between
+    // the input / output level meters with their peak read-outs
+    v.push_back (section (284, 176, 216, 536, TR_NOOP ("Gain")));
+    v.push_back (dial (330, 224, 36, "Input", TR_NOOP ("Input"), bipolar));
+    v.push_back (toggle (400, 200, 90, 20, "Phase", TR_NOOP ("Phase")));
+    v.push_back (when (toggle (400, 226, 90, 20, "Mic pre", TR_NOOP ("Mic pre")), "4K voicing", 0.5f, 1.0f));
+    v.push_back (when (dial (444, 258, 24, "Mic gain", TR_NOOP ("Mic")), "4K voicing", 0.5f, 1.0f));
+    v.push_back (display (294, 300, 150, 404, "iometer"));
+    v.push_back (slider (Item::vslider, 452, 310, 40, 390, "Output", TR_NOOP ("Output")));
     return l;
 }
 
@@ -2646,6 +2666,9 @@ Layout withRhythmVoicing (Layout l)
     {
         if (it.whenParam != nullptr) // keep the item's own condition as the second one
         {
+            it.when3Param = it.when2Param; // round tp172c: and a second one as the third
+            it.when3Min = it.when2Min;
+            it.when3Max = it.when2Max;
             it.when2Param = it.whenParam;
             it.when2Min = it.whenMin;
             it.when2Max = it.whenMax;
@@ -2712,6 +2735,9 @@ Layout withVocalVoicing (Layout l)
     {
         if (it.whenParam != nullptr)
         {
+            it.when3Param = it.when2Param; // round tp172c: Ridge's Modern / 4K items carry two conditions already
+            it.when3Min = it.when2Min;
+            it.when3Max = it.when2Max;
             it.when2Param = it.whenParam;
             it.when2Min = it.whenMin;
             it.when2Max = it.whenMax;
@@ -2720,7 +2746,17 @@ Layout withVocalVoicing (Layout l)
         it = when (it, "Vocal strip", 0.0f, 0.5f);
     }
     l.height = std::max (l.height, 744);
-    auto add = [&l] (LayoutItem it) { l.items.push_back (when (it, "Vocal strip", 0.5f, 1.0f)); };
+    // round tp172c: the panel was drawn for a 560-wide editor; a wider one (Ridge's three columns) spreads it out
+    // (positions, and the widths of everything but the knobs)
+    const auto sx = (float) l.width / 560.0f;
+    auto add = [&l, sx] (LayoutItem it)
+    {
+        if (it.type == Item::knob)
+            it.x = (it.x + it.w * 0.5f) * sx - it.w * 0.5f;
+        else
+            it.x *= sx, it.w *= sx;
+        l.items.push_back (when (it, "Vocal strip", 0.5f, 1.0f));
+    };
     add (section (4, 4, 552, 128, TR_NOOP ("Level")));
     add (dial (50, 64, 40, "Vocal input", TR_NOOP ("Input"), bipolar));
     add (display (100, 26, 250, 96, "iometer"));
@@ -4213,7 +4249,8 @@ bool isShown (EffectKind kind, const LayoutItem& item, int page, const EffectPar
                        : i >= 0 && i < (int) params.size() ? params[(std::size_t) i] : 0.0f;
         return v >= lo && (v < hi || hi >= 1.0f); // [lo, hi), the top end included at 1
     };
-    return inRange (item.whenParam, item.whenMin, item.whenMax) && inRange (item.when2Param, item.when2Min, item.when2Max);
+    return inRange (item.whenParam, item.whenMin, item.whenMax) && inRange (item.when2Param, item.when2Min, item.when2Max)
+           && inRange (item.when3Param, item.when3Min, item.when3Max);
 }
 
 bool isIdle (EffectKind kind, const LayoutItem& item, const EffectParams& params)

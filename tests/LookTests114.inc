@@ -71,5 +71,5 @@ TEST (look114_ridge_strip_reads_top_to_bottom_like_a_channel_strip)
     CHECK (at ("HF gain")->y < at ("HMF gain")->y && at ("HMF gain")->y < at ("LMF gain")->y && at ("LMF gain")->y < at ("LF gain")->y);
     CHECK (at ("Comp. threshold")->y < at ("Gate threshold")->y && at ("Gate threshold")->y < at ("Output")->y);
     CHECK (at ("LF gain")->x < l.width * 0.5f && at ("Comp. threshold")->x > l.width * 0.5f);
-    CHECK (l.height > l.width); // a strip: taller than wide
+    CHECK (l.height >= 700); // round tp172c: three columns like the reference strip (wider than tall), full strip height
 }

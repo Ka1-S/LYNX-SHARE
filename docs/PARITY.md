@@ -51,6 +51,7 @@ there.
 | Ridge Strip | SSL E-Channel (Waves) | 9 | 8 | 7 (ref expired) | 8 | 165 | 8 → 9 / 7 → 8 |
 | LYNX Tune | Auto-Tune Pro | 8 | 7 | 6 (ref expired) | 8 | 135 | 165j: sound only (highs kept, measured; scores unchanged) |
 | Ridge Strip (Vocal strip) | SSL Native Vocalstrip 2 | 9 | 7 | 8 (ref expired) | 8 | 145 |  |
+| Ridge Strip (Modern) | SSL Native Channel Strip 2 | 9 | 8 | 7 | 8 | tp172c | sound 3 → 7 (fxparity 2.6 → 7.1, 30 renders); look: the console's colour-coded caps on grey metal, three columns |
 | Halo | ValhallaShimmer | 8 | 9 | 3 | 8 | 135 |  |
 | Horizon | ValhallaFutureVerb | 8 | 9 | 2 | 8 | 135 |  |
 | Orbit | ValhallaSpaceModulator | 8 | 9 | 3 | 8 | 135 |  |
@@ -81,6 +82,49 @@ there.
 | Echoform | EchoBoy / PrimalTap | 10 | 8 | 6 | 6 | 150 |  |
 | Voice Shift | Little AlterBoy | 10 | 8 | 4 | 8 | 137 |  |
 | Prism Multiband | Pro-MB | 10 | 10 | 8 | 6 | 152 |  |
+
+## Round 172d: Soundtoys / Valhalla / Waves roles — measured sound, before → after
+
+**Method**
+- Black-box only. The originals are rendered by fxmeasure, with one process per setting for the demo-limited Valhalla and Waves plugins. LYNX is rendered by `tools/fxrender` through its own state translator; the Soundtoys mappings are done by hand.
+- **fxparity** (`scripts/fxparity.py`, round 172b's harness) is residual-first. A 100 %-wet reverb cannot null, so it tops out near 4.
+- **verb** (`scripts/fxparity.py verb`, round 172b's shared reverb score, one metric for every reverb) scores a reverb's impulse response 0–10 as the mean of seven parts:
+  - RT60 per octave
+  - EDC shape
+  - early energy and pre-delay
+  - the tail's tonal balance
+  - L/R correlation
+  - tail movement
+  - wet level
+
+Both numbers are given below.
+
+| LYNX engine | Original | fxparity | verb | What changed |
+|---|---|---|---|---|
+| Nebula | Valhalla Supermassive | 1.5 → 3.2 | 5.7 → 6.8 | a wet gain per mode (22-mode probe); level flat over Feedback (measured knots); a low shelf with Density; first-order cuts |
+| Atrium | ValhallaRoom | 1.8 → 3.2 | 7.5 → 7.4 | linear early/late crossfade (late +6 dB at 50 %); +2 dB; the original's low end (+10 dB shelf at 90 Hz, −5 dB at 140 Hz) and air (+4 dB at 9 kHz) |
+| Horizon | ValhallaFutureVerb | 1.6 → 3.0 | 6.5 → 8.1 | level ∝ 1/√RT (the original's wet energy stays at 22–24 dB over Decay); HF damping ×0.7 above 4 kHz; first-order EQ cuts; Room / Hall / Space gains |
+| Foil Plate | ValhallaPlate | 2.7 → 3.1 | 8.2 → 8.4 | band edge ~11 kHz, 16 poles (the original is brick-walled: 12.7 kHz −35 dB); +2.3 dB |
+| Foil Plate (plate voicing) | Little Plate | 1.4 → 2.2 | 6.0 → 7.5 | level re-measured at Mix 100 % (it was 6–16 dB low, most at short decays: knots per decade of Decay); darker above 2.5 kHz (−5 dB shelf, 7 kHz low-pass); early part −9 dB; RT per band already within 5 % |
+| Lattice Mod | ValhallaUberMod | 3.1 → 3.9 | — | the wet is in phase with the dry (the dry + wet comb notch measured on music; round 101's inverted wet does not hold here) |
+| Ember Saturator (Classic) | Decapitator | 4.6 → 4.8 | — | with Punish on, E / N / T / P saturate at the measured level (the curve, knees and bias, scaled ×0.40 / 0.90 / 0.65 / 0.86; the small-signal law is unchanged) |
+| Orbit / Spiral Echo / Epoch Verb / Halo | Space Modulator / Freq Echo / VintageVerb / Shimmer | 3.8 / 3.4 / 2.9 / 2.2 (unchanged) | Epoch 7.0, Halo 6.2 | open: Epoch has a 39 Hz tank mode at Size 100 %; Halo is 6–9 dB loud on sustained music at Mix 100 % (the original seems to limit its loop) |
+| Echoform | EchoBoy / ValhallaDelay / H-Delay | 5.2 / 3.8 / 5.9 | — | measure only (EchoBoy's mapping fixed: feedback units) |
+| Auto-pan / Voice Shift | PanMan / Little AlterBoy | 3.2 / 2.0 | — | measure only |
+| Glow Leveler / Compressor / Gemini / Quell | CLA-2A / RComp / Doubler2 / NS1 (Waves) | 4.3 / 6.4 / 4.4 / 4.0 | — | measure only (refcap licence of 11-04) |
+
+**Decapitator captures:** the original's Auto moves its Output knob asynchronously after a Drive change made by host automation. The earlier captures had the trim in some settings only, which made styles E / N / T look 8–11 dB too loud and gave a mean of 3.2. All its captures now set Auto off and pin Output at 0 dB first.
+
+**Look:**
+- The Valhalla roles have flat themes in the original's manner: solid panels, flat disc knobs, bar sliders, large legends, and per-plugin palettes.
+- Echoform, Ember, Voice Shift and Auto-pan carry a Soundtoys-style hardware theme: black face, walnut cheeks, rubber knobs and wide-tracked caps.
+- Everything is drawn by LYNX code, with LYNX names.
+
+**Design gaps still open:**
+- Echoform keeps its own multi-role layout; EchoBoy's three-zone face is not reproduced.
+- Ember's editor is the multiband view, and Classic is reached through its style tabs.
+- Voice Shift uses one panel colour where the original has mustard / teal / red zones.
+- Atrium's Predelay and Decay bars draw linear while the original's are skewed.
 
 ## Round 165j: LYNX Tune sound quality, before → after (measured)
 
@@ -1847,3 +1891,32 @@ TD-PSOLA from core/VocalPitch.h), for this role: 696 slots in 399 of her project
 **Scores**: configuration 0/10 → **9/10**, design 0/10 → **8/10** (round 135).
 
 Sources (web): [Decapitator guide (B&H copy)](https://static.bhphoto.com/lit_files/89645.pdf), [SOS Soundtoys 5 review](https://www.soundonsound.com/reviews/soundtoys-5); the rest from the official trials (round 135).
+
+---
+
+## Round tp172c: SSL Native Channel Strip 2 (Ridge Strip's Modern voicing)
+Sources: the official SSL trial (Native Channel Strip 2 v2.10, black-box only): its parameter table and read-outs, 30
+programme renders (defaults + 5 settings × drums / music / vocal / sweep / stair), 224 + 224 impulse renders on a dense
+grid (every EQ band's frequency × gain, the mid bands' Q × gain, both EQ types, the filters), sine ramps, stairs and
+tone bursts through 48 dynamics settings (ratios, thresholds, attack, peak / RMS, release, auto make-up, gate /
+expander ranges and releases). Fits: tp172c `ana/` (bandfit, shelf4, filtfit, dynfit, the ramp fits). No plug-in code,
+data or image was read or copied. LYNX: `vmatch::strip2` (core/VoiceMatch.h, core/ConsoleStrip2.inc and its generated
+tables), Ridge's appended **Modern voicing**, **Peak detect** and **Gate hold**.
+
+| Original feature | Original [EXEC trial] | Ridge Strip (Modern voicing) | Status | Note |
+|---|---|---|---|---|
+| E / G EQ types | switch between HMF and LMF | the EQ curve tabs read "E type / G type" | ✅ | E shelves: first order (0.01 dB); G shelves: second order with the dip / bump either side (≤ 0.4 dB); bells fitted per grid point (≤ 0.2 dB below 10 kHz) |
+| Band gains | LF ±16.5, mids / HF ±20 dB, a non-linear law ("+12" on a mid = +7.3 dB E, +9.25 dB G) | the dial reads the reference's value, the measured gain is applied | ✅ | interpolated on the measured grid |
+| Bell width | follows the gain (Q 0.15 at ±3 dB … 0.7 at ±20 on the mids) | measured per gain and Q | ✅ | |
+| HPF / LPF | 3rd-order high-pass 20 … 500 Hz, 2nd-order low-pass 3 … 27.5 kHz, corners off the read-out by up to 25 % | the measured corners | ✅ | |
+| Compressor | feed-forward, RMS (soft knee, threshold −13.5 dB under the dial) or Peak (hard, −17.9 dB); fast attack 3 ms, normal ~45 ms; release τ = 0.68 × the dial | the same laws | ✅ | dynfit residual 0.03 … 0.4 dB on stairs and bursts |
+| Auto make-up and its offset | 0.6 dB per dB of threshold under +10, × the ratio's slope | the same | ✅ | ratio 3 at −12 dB reads 0.5 dB high (S5) |
+| Gate / expander | gate with hysteresis and hold, expander 0.86 dB/dB, range 10 / 40 dB = 7.9 / 47.8 dB, release a dB slew | the same; Hold dial | ✅ | |
+| Mix | 0 … 100 % | Comp. mix | ✅ | linear blend (not measured) |
+| Width, pan, fader, cut, listen, routing panel | centre module | input / output / phase; fader folded into Output | ⚠️ | width / pan / S/C routing not translated |
+
+**Sound** (fxparity, LYNX as it loads the trial's saved states): before 2.6 (the state was not translated), with the 4K
+voicing 3.6, with the Modern voicing **7.1** (defaults 7…9, EQ settings 6…8, compressor 6…8, gate + peak 5…8). The
+remaining error: the dense drum transients through the fast peak compressor + gate (S4 drums 5) and the make-up with
+the dynamics before the EQ (S5, +0.5 dB).
+

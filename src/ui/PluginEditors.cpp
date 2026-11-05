@@ -713,7 +713,8 @@ public:
             g.drawRoundedRectangle (r.withSizeKeepingCentre (w, r.getHeight()), 3.0f, 1.0f);
         }
         g.setColour (locked ? theme::colour::textPrimary : hasStyle (item, plugui::dim) ? colour::textDisabled : skin::captionColour());
-        ui::drawFittingText (g, caps (tr (item.label)), r, j, font (juce::jmax (8.0f, 9.5f * scale()), true), 7.0f); // (round 165: fit, no "...")
+        ui::drawFittingText (g, caps (tr (item.label)), r.expanded (0.0f, (skin::captionScale() - 1.0f) * 6.0f * scale()), j,
+                            font (juce::jmax (8.0f, 9.5f * scale() * skin::captionScale()), true), 7.0f); // (round 165: fit, no "..."; tp172d: themed size)
     }
 
     void paintItem (juce::Graphics& g, const LayoutItem& item, int index, const EffectSlot& fx)
@@ -753,8 +754,8 @@ public:
             case Item::value:
                 if (hasStyle (item, plugui::boxed)) // a read-out plate (FL's value boxes)
                     skin::valuePlate (g, r, radius::sm * s);
-                g.setColour (hot ? accent : (fx.enabled ? colour::textPrimary : colour::textDisabled));
-                g.setFont (font (juce::jmax (8.0f, 11.0f * s)));
+                g.setColour (hot ? accent : (fx.enabled ? (skin::captionScale() > 1.0f ? skin::valueColour (false) : colour::textPrimary) : colour::textDisabled));
+                g.setFont (font (juce::jmax (8.0f, 11.0f * s * juce::jmin (1.25f, skin::captionScale())), skin::captionScale() > 1.0f));
                 g.drawFittedText (valueText (param, value), r.toNearestInt(),
                                   hasStyle (item, plugui::alignLeft) ? juce::Justification::centredLeft : juce::Justification::centred, 1, 0.7f);
                 break;
@@ -769,6 +770,7 @@ public:
                 look.hover = glow;
                 look.active = index == dragItem;
                 look.enabled = fx.enabled;
+                look.capTint = skin::capTintFor (item.param);
                 skin::knob (g, circle, look);
                 auto below = r.withTop (circle.getBottom() + 1.0f * s);
                 if (hasStyle (item, plugui::valueAbove))
@@ -783,8 +785,8 @@ public:
                 {
                     caption (g, item, r.withHeight (13.0f * s).expanded (10.0f * s, 0.0f));
                     g.setColour (hot ? look.accent.brighter (0.3f) : skin::valueColour (false));
-                    g.setFont (font (juce::jmax (8.0f, 10.5f * s)));
-                    g.drawFittedText (valueText (param, value), below.withHeight (13.0f * s).expanded (10.0f * s, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
+                    g.setFont (font (juce::jmax (8.0f, 10.5f * s * skin::captionScale()), skin::captionScale() > 1.0f));
+                    g.drawFittedText (valueText (param, value), below.withHeight (13.0f * s * skin::captionScale()).expanded (10.0f * s, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
                 }
                 else if (! hasStyle (item, plugui::noCaption))
                 {
@@ -792,8 +794,8 @@ public:
                     if (hasStyle (item, plugui::showValue))
                     {
                         g.setColour (hot ? look.accent.brighter (0.3f) : skin::valueColour (false));
-                        g.setFont (font (juce::jmax (8.0f, 10.5f * s)));
-                        g.drawFittedText (valueText (param, value), below.withTrimmedTop (12.0f * s).withHeight (13.0f * s).toNearestInt(),
+                        g.setFont (font (juce::jmax (8.0f, 10.5f * s * skin::captionScale()), skin::captionScale() > 1.0f));
+                        g.drawFittedText (valueText (param, value), below.withTrimmedTop (12.0f * s).withHeight (13.0f * s * skin::captionScale()).toNearestInt(),
                                           juce::Justification::centred, 1, 0.7f);
                     }
                 }
@@ -926,7 +928,9 @@ public:
                 const auto box = juce::Rectangle<float> (16.0f * s, 9.0f * s).withCentre ({ r.getX() + 9.0f * s, r.getCentreY() });
                 skin::switchPill (g, box, on, accent, fx.enabled);
                 auto text = r.withTrimmedLeft (21.0f * s);
-                g.setColour (on ? colour::textPrimary : (hot ? colour::textSecondary : colour::textDisabled));
+                const auto offLabel = skin::offLabelColour(); // round tp172c: a theme's own (readable on its panels)
+                g.setColour (on ? colour::textPrimary : (! offLabel.isTransparent() ? (hot ? offLabel.brighter (0.3f) : offLabel)
+                                                                    : (hot ? colour::textSecondary : colour::textDisabled)));
                 if (item.label != nullptr)
                     ui::drawFittingText (g, caps (tr (item.label)), text, juce::Justification::centredLeft, font (juce::jmax (8.0f, 9.5f * s), true), 7.0f);
                 break;
@@ -2479,8 +2483,9 @@ public:
             for (int k = 0; k < 5; ++k)
             {
                 const auto cell = juce::Rectangle<float> (area.getX(), area.getY() + h * (float) k, area.getWidth(), h);
-                const auto led = cell.withWidth (cell.getHeight() * 0.62f).withSizeKeepingCentre (cell.getHeight() * 0.5f, cell.getHeight() * 0.5f)
-                                     .withX (cell.getX() + 2.0f * s);
+                // round tp172c: the LED keeps to the ladder's width (a tall ladder kept growing it over its numbers)
+                const auto d = juce::jmin (cell.getHeight() * 0.5f, cell.getWidth() * 0.34f);
+                const auto led = juce::Rectangle<float> (d, d).withCentre ({ cell.getX() + 2.0f * s + d * 0.5f, cell.getCentreY() });
                 const bool lit = fx.enabled && db >= (float) steps[k] - 0.05f;
                 g.setColour (lit ? accent : colour::gridBeat);
                 g.fillEllipse (led);

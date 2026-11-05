@@ -129,9 +129,31 @@ FL [SHOT f0–f5]: FL's Master fader follows the mouse during playback with the 
 
 ## Where I stopped
 
-- 2026-11-04 19:10. feature/fader171c: done (tests 16 checks / 0 failures, full suite passed before), measured (3.3),
-  going through the merge train.
-- feature/picker171c: picker works on Windows (shots p01–p19, q01–q06 in /mnt/e/lynx-work/picker171c/gui/): F8,
-  background pictures, hover, typed search, Enter / double-click, drag to the Channel Rack and to a mixer insert, tab
-  click → Browser, right-click on empty space closes, Ctrl+wheel. Perf fixes (fit off the paint, bilinear halving,
-  list-order walk) in the next Windows build; then the final screenshots, and the picker waits for the user's OK.
+- 2026-11-04 21:00. feature/fader171c LANDED (merge 27d3e6cc, train head bc3b4e24).
+- feature/picker171c: merged with origin/main (now includes 170b's categories and 170k's art), Windows-checked,
+  screenshots in /mnt/e/lynx-work/picker171c/final/. **Waiting for the user's OK on the screenshots before landing**
+  (brief). To land: re-merge origin/main, build-local + tests, `coord/train.sh picker171c`.
+- 2026-11-04 (late): visual polish after the coordinator's review of f2/f4 — each half of All fills its own area
+  (rows centred, scale up to 0.6), tile sizes = editor sizes with the range narrowed ((area/median)^-0.25, h ≤ 1.3 w,
+  w ≤ 3.5 h; `pickerview::displaySizes`), cards (bg3 frame, 3–6 px padding, the picture aspect-fitted, not stretched),
+  pictures at full brightness (only the search dims), a lighter surface (bg1, the window behind at ~7 %), names on the
+  matching tiles while searching. Thumbnails: background borders trimmed (`trimToContent`, folder "-r2"), and the
+  effects whose window holds their own editor (Patcher, Wave Candy / Visualizer, Big Clock / Tuner / HTML NoteBook /
+  Scratcher, Formula Controller, Newtone / Newtime, X-Y / X-Y-Z / Control Surface) drawn from that editor instead of
+  the generic knob page (they were 87 px squares or empty boxes). New screens go to `/mnt/e/lynx-work/picker171c/final2/`.
+- 2026-11-05: after the user's review (one giant tall tile, tiny dark pictures, empty space) the coordinator set hard
+  requirements that replace "tile size follows the editor": **every tile is the same 16:10 cell**, the picture
+  aspect-fitted and centred inside (letterboxed), never stretched or oversized; the All tab gives each half the columns
+  it needs (`pickerview::split`: the largest cell, 56–300 px wide, at which both halves fit), so the grid fills the
+  window. FL difference, on purpose: FL's tiles follow each editor's size (s02.png); LYNX uses one cell size.
+  The generator Patcher's picture is now its node graph (it was the Sampler page). LYNX has no built-in light theme;
+  the "light" screens use a custom theme (background #E8EAEE) through Theme settings' own file.
+- 2026-11-05 06:40: an editor with nothing in it yet (Newtone / Newtime without a sample, the empty Control Surface,
+  the Patcher graphs) shows the name tile instead of a dark box (edges < 2.2 %, or < 3 % with < 0.5 % bright pixels;
+  Harmor, the sparsest real editor, is 2.4 % / 0.86 %). final2 shots (1920 / 1280 × All / Synth classic × dark /
+  light) and the all-163 sheet are in `/mnt/e/lynx-work/picker171c/final2/`. **Waiting for the coordinator's / user's
+  review; not queued.**
+- Not done / LYNX differences left: LYNX's Browser has no per-category Plugin database folders, so a tab click opens
+  Generators / Effects (FL opens the category folder); "Open plugin picker" targeted from Insert / Replace menus and
+  mixer slots (FL's 0x70000000 / channel targets) not wired; hover Preview sound (FL: only when a .nfo has Preview=,
+  stock FL has none).

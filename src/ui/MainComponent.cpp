@@ -62,6 +62,7 @@
 #include "ui/AudioEditor.h"
 #include "ui/TempoTapper.h"
 #include "ui/ExportDialog.h"
+#include "ui/FlStudioExportDialog.h"
 #include "ui/ParametricEqEditor.h"
 #include "ui/PluginWindow.h"
 #include "ui/I18n.h"
@@ -206,8 +207,11 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     redoButton.setTooltip (withKey (tr ("Redo"), "edit.redo"));
     redoButton.onClick = [this] { undoRedo (true); };
     redoButton.onRightClick = [this] { showHistory(); };
-    pluginPickerButton.setTooltip (withKey (tr ("Plugin picker: add an instrument or plugin as a new channel"), "panel.quickAdd"));
-    pluginPickerButton.onClick = [this] { showQuickAdd(); };
+    // FL's toolbar picker button (round 171c): a click opens the Plugin picker (F8); a right-click LYNX's quick-add palette
+    pluginPickerButton.setTooltip (withKey (tr ("Plugin picker: every plugin as a picture; drag one onto the Channel Rack or the Mixer (right-click: quick-add palette)"),
+                                            "view.pluginPicker"));
+    pluginPickerButton.onClick = [this] { togglePluginPicker(); };
+    pluginPickerButton.onRightClick = [this] { showQuickAdd(); };
 
     // transport: Play toggles play / stop-and-back; Stop returns to the start; double-click Stop = all notes off
     playButton.setTooltip (tr ("Play; pressed again, stops and goes back to where it started") + " (Space; Ctrl+Space pauses)");
@@ -1950,6 +1954,8 @@ void MainComponent::loadUiSettings()
             notenames::everyKey.store (on);
         else if (key == "rackPlayheadColumn")
             ChannelRackComponent::playheadColumn.store (on);
+        else if (key == "rackStepsChannelColour")
+            ChannelRackComponent::stepsChannelColour.store (on);
         else if (key == "rememberSeek")
             EditorGlobals::get().rememberSeek = on;
         else if (key == "createVariants")
@@ -2098,6 +2104,7 @@ void MainComponent::saveUiSettings()
                                       + "\nnoteFlats=" + juce::String (notenames::currentFlats.load() ? 1 : 0)
                                       + "\nnoteNamesEveryKey=" + juce::String (notenames::everyKey.load() ? 1 : 0)
                                       + "\nrackPlayheadColumn=" + juce::String (ChannelRackComponent::playheadColumn.load() ? 1 : 0)
+                                      + "\nrackStepsChannelColour=" + juce::String (ChannelRackComponent::stepsChannelColour.load() ? 1 : 0)
                                       + "\nreducedEffects=" + juce::String (skin::reducedEffects() ? 1 : 0)
                                       + "\nartMotion=" + juce::String (skin::artMotion() ? 1 : 0)
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
@@ -2603,11 +2610,27 @@ void MainComponent::togglePluginPicker()
         if (! safe->mixer.addEffectToSelected (std::move (slot)))
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Plugin picker"), tr ("The selected insert has no free effect slot."));
         else
+        {
             safe->showPanel (Panel::mixer);
+            // FL opens the new effect's window (round 171c, its "insert effect plugin")
+            const auto track = safe->mixer.getSelectedTrack();
+            if (track >= 0 && track < (int) safe->engine.getSong().mixer.size())
+                safe->mixer.openSlotEditor (track, (int) safe->engine.getSong().mixer[(std::size_t) track].effects.size() - 1);
+        }
     };
     targets.close = [safe] {
         if (safe != nullptr && safe->pluginPickerView != nullptr)
             safe->togglePluginPicker();
+    };
+    targets.showMixer = [safe] { // (an effect dragged out of the picker: FL brings up the Mixer)
+        if (safe != nullptr)
+            safe->showPanel (Panel::mixer);
+    };
+    targets.openBrowser = [safe] (const std::string& category, bool generators) {
+        if (safe == nullptr)
+            return;
+        safe->showPanel (Panel::browser);
+        safe->browser.showPluginDatabase (category.empty() ? juce::String() : tr (category.c_str()), category.empty() ? -1 : (generators ? 1 : 0));
     };
     pluginPickerView = makePluginPickerView (engine, std::move (targets));
     addAndMakeVisible (*pluginPickerView);
@@ -5009,6 +5032,7 @@ void MainComponent::openSettings (int page)
         o.noteFlats = notenames::currentFlats.load();
         o.noteNamesEveryKey = notenames::everyKey.load();
         o.rackPlayheadColumn = ChannelRackComponent::playheadColumn.load();
+        o.rackStepsChannelColour = ChannelRackComponent::stepsChannelColour.load();
         o.reducedEffects = skin::reducedEffects();
         o.artMotion = skin::artMotion();
         o.gpuRendering = gpuRenderingEnabled();
@@ -5063,9 +5087,11 @@ void MainComponent::openSettings (int page)
             for (int i = 0; i < juce::Desktop::getInstance().getNumComponents(); ++i) // the keyboards redraw with the new names
                 if (auto* c = juce::Desktop::getInstance().getComponent (i)) c->repaint();
         }
-        if (o.rackPlayheadColumn != ChannelRackComponent::playheadColumn.load())
+        if (o.rackPlayheadColumn != ChannelRackComponent::playheadColumn.load()
+            || o.rackStepsChannelColour != ChannelRackComponent::stepsChannelColour.load())
         {
             ChannelRackComponent::playheadColumn.store (o.rackPlayheadColumn);
+            ChannelRackComponent::stepsChannelColour.store (o.rackStepsChannelColour);
             self.rack.repaint();
         }
         if (o.gpuRendering != gpuRenderingEnabled())
@@ -5601,6 +5627,14 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             exports.addSubMenu (tr ("All playlist track groups"), playlistTrackExportMenu (true));
             exports.addSeparator();
             exports.addItem (tr ("Project with samples (.zip)..."), [this] { exportPackage(); });
+            // Export to FL Studio (round 171e, idea by Tookolld): a .flp or FL's zipped loop package
+            exports.addItem (tr ("FL Studio project..."), [this] {
+                engine.capturePluginStates();
+                showFlStudioExportDialog (engine,
+                                          currentFile != juce::File() ? currentFile.getParentDirectory()
+                                                                      : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                                          projectStem (projectName));
+            });
             // FL's "Project bones..." (FileExportProjectBonesAction; REA round 168e)
             exports.addItem (tr ("Project bones..."), [this] { exportProjectBones (engine, currentFile.getParentDirectory(), projectName); });
             exports.addItem (tr ("Project data files (collect the samples into a folder)..."), [this] { collectSamples(); });

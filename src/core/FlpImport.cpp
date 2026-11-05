@@ -1,4 +1,5 @@
 #include "core/FlpImport.h"
+#include "core/FlpExport.h"
 
 #include "core/Dvs.h"
 #include "core/FlExtraFx.h"
@@ -2195,6 +2196,15 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             }
         }
 
+        // Export to FL Studio (round 171e): the original generator, written back while LYNX leaves it as imported (an FPC
+        // becomes several channels and a wrapped plugin travels as its plugin reference: neither keeps one)
+        if (c.type == flp::ChannelType::instrument && ! c.pluginName.empty() && c.pluginName != "Fruity Wrapper" && c.pluginName != "FPC")
+        {
+            def.flOrigin.plugin = c.pluginName;
+            if (def.pluginState != c.pluginState)
+                def.flOrigin.state = c.pluginState;
+        }
+
         song.channels.push_back (std::move (def));
     }
 
@@ -2808,6 +2818,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     if (patcherSidechain > 0 && patcherSidechain < tracks && patcherSidechain != insert.index)
                         slot.sidechain = patcherSidechain;
                     effectSlotMap.insert ({ { insert.index, original.index }, { (int) track.effects.size(), original.plugin } });
+                    slot.flOrigin = { original.plugin, original.state, 0 }; // (round 171e: Export to FL Studio)
                     track.effects.push_back (std::move (slot));
                     if (options.report != nullptr)
                         ++options.report->converted["Patcher (graph)"];
@@ -3118,6 +3129,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 effectSlotMap.insert ({ { insert.index, slot.index }, { (int) track.effects.size(), slot.plugin } });
                 if (slot.index >= 0 && slot.index < maxEffectSlots)
                     fx.row = slot.index; // FL's slot place (round 170b): an effect in slot 5 stays in slot 5
+                // Export to FL Studio (round 171e): the FL effect itself, written back while LYNX leaves it as imported (one
+                // FL slot = one LYNX slot here; a hosted plugin travels as its plugin reference)
+                if (fx.kind != EffectKind::plugin && expanded.size() == 1)
+                    fx.flOrigin = { slot.plugin, slot.state, 0 };
                 track.effects.push_back (fx);
             }
         }
@@ -3487,15 +3502,24 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 break;
             }
 
+        // the clip's range (round 171e): its channel levels, pan = minimum and volume = maximum of 12800 in the target's
+        // whole range (FL's tempo clips: 1250…4250 = 60…180 of FL's 10…522 BPM); a file without them: the whole range,
+        // and the tempo FL's usual 60…180
+        const auto ranged = c.hasLevels;
+        const auto lo = ranged ? std::clamp (c.pan / 12800.0, 0.0, 1.0) : 0.0;
+        const auto hi = ranged ? std::clamp (c.volume / 12800.0, 0.0, 1.0) : 1.0;
         for (std::size_t i = 0; i < c.automation.size(); ++i)
         {
             const auto& p = c.automation[i];
             const auto tick = (std::int64_t) std::llround (p.position * ppq);
-            auto value = (float) std::clamp (p.value, 0.0, 1.0);
+            auto value = (float) (lo + (hi - lo) * std::clamp (p.value, 0.0, 1.0));
 
-            // FL automates tempo from 60 to 180 BPM; our target covers the full tempo range
+            // our tempo target is FL's whole tempo range
             if (a.target.kind == AutomationTargetKind::tempo)
-                value = valueFromTempo (60.0 + 120.0 * value);
+            {
+                if (! ranged)
+                    value = valueFromTempo (60.0 + 120.0 * std::clamp (p.value, 0.0, 1.0));
+            }
             else if (valueMap)
                 value = std::clamp (valueMap (value), 0.0f, 1.0f);
 
@@ -3855,6 +3879,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         splitDrumChannel (song, it->first, it->second);
 
     numberChorusInstances (song); // the random LFO phases FL gives each Hyper Chorus instance (REA_rodada59 §2.6)
+    flpexport::stampOrigins (song); // what the import made of each FL plugin (Export to FL Studio, round 171e)
     clipops::updateCrossfades (song); // the project's "Automatic crossfades" on its overlapping audio clips (round 167a)
     return song;
 }

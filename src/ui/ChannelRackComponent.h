@@ -43,6 +43,9 @@ public:
     // LYNX extra (on by default; Options › General "Playhead column in the Channel Rack"): a soft highlight of the
     // playing step's column under every row's steps, and the first step of each bar marked on the playing-step strip
     static inline std::atomic<bool> playheadColumn { true };
+    // LYNX extra (on by default; Options › General "Steps use channel colour"): a lit step in its channel's colour
+    // (themes::litStepColour); FL's steps stay white / pink ("Colorful channel controls" only colours the insert box)
+    static inline std::atomic<bool> stepsChannelColour { true };
     explicit ChannelRackComponent (AudioEngine& engine);
     ~ChannelRackComponent() override;
     void visibilityChanged() override;

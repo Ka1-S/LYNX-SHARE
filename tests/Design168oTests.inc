@@ -120,7 +120,7 @@ TEST (design168o_layouts_name_real_parameters)
             names.insert (p.name);
         for (const auto& item : layout->items)
         {
-            for (const char* p : { item.param, item.param2, item.whenParam, item.when2Param })
+            for (const char* p : { item.param, item.param2, item.whenParam, item.when2Param, item.when3Param })
                 if (p != nullptr)
                 {
                     CHECK (names.count (p) == 1); // every control edits a parameter of its engine

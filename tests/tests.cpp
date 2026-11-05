@@ -9118,7 +9118,7 @@ TEST (ogun_engine)
         std::ofstream (dump, std::ios::binary).write ((const char*) blob.data(), (std::streamsize) blob.size());
     CHECK (lynx::ogunStateUsable (blob));
     CHECK (lynx::ogunFallbacks (blob).empty());
-    CHECK (lynx::ogunParam (blob, 17) == 180 && lynx::ogunParam (blob, 52) == 9 && ! lynx::ogunParam (blob, 64));
+    CHECK (lynx::ogunParam (blob, 17) == 180 && lynx::ogunParam (blob, 52) == 9 && ! lynx::ogunParam (blob, lynx::ogunDelayOnIndex + 1));
     auto broken = blob;
     broken.resize (broken.size() - 300);
     CHECK (! lynx::ogunStateUsable (broken));
@@ -16223,7 +16223,7 @@ TEST (plugin_layouts_name_real_parameters)
             CHECK (item.param2 == nullptr || plugui::paramIndex (kind, item.param2) >= 0);
             if (item.param2 != nullptr && plugui::paramIndex (kind, item.param2) >= 0)
                 placed[(std::size_t) plugui::paramIndex (kind, item.param2)] = true;
-            for (const auto* when : { item.whenParam, item.when2Param })
+            for (const auto* when : { item.whenParam, item.when2Param, item.when3Param })
                 CHECK (when == nullptr || plugui::paramIndex (kind, when) >= 0);
         }
         for (const auto* name : l.menuSwitches)
@@ -17050,6 +17050,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Gap169kAlignTests.inc"
 #include "FlQ170iTests.inc"
 #include "FlQ170i2Tests.inc"
+#include "FlQ170i3Tests.inc"
 #include "Speech168bTests.inc"
 #include "Design168pTests.inc"
 #include "Typing168tTests.inc"
@@ -17073,6 +17074,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Wfqa170hTests.inc"
 #include "Toxic169hTests.inc"
 #include "Gen169lTests.inc"
+#include "Picker171cTests.inc"
 #include "Gen169l2Tests.inc"
 #include "Patcher171bTests.inc"
 #include "Wfqa170h2Tests.inc"
@@ -17081,4 +17083,6 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issues171aTests.inc"
 #include "CtlAudit170i3Tests.inc"
 #include "Issue32dTests.inc"
+#include "FlpExport171eTests.inc"
+#include "Tp172cTests.inc"
 #include "Layout172aTests.inc"
