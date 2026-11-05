@@ -782,7 +782,7 @@ void MixerStrips::paint (juce::Graphics& g)
             juce::Graphics::ScopedSaveState state (g);
             g.addTransform (juce::AffineTransform::rotation (-juce::MathConstants<float>::halfPi, (float) column.getCentreX(), (float) column.getCentreY()));
             const auto rotated = juce::Rectangle<int> (column.getHeight(), column.getWidth()).withCentre (column.getCentre());
-            g.drawFittedText (name, rotated, juce::Justification::centredLeft, 1, 0.8f);
+            textcache::drawFittedText (g, name, rotated, juce::Justification::centredLeft, 1, 0.8f); // (laid out once: round 173f)
         }
 
         // FL's narrow strips show the level beside the name too: two thin bars (Wide layouts)
