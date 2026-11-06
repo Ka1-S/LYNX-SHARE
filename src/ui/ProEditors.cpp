@@ -3153,6 +3153,14 @@ private:
     }
 
     int dragParam = -1;
+    bool powerPending = false;
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        if (powerPending && ! e.mouseWasDraggedSinceMouseDown())
+            toggleEnabled();
+        powerPending = false;
+        ProEditor::mouseUp (e);
+    }
     bool dragging (int p) const { return dragParam == p && isMouseButtonDown(); }
     void customDown (const Ctl& c, const juce::MouseEvent& e) override
     {
@@ -3175,13 +3183,12 @@ private:
             edit (p, v (p) >= 0.5f ? 0.0f : 1.0f);
             return;
         }
-        if (p == k::mainOut && e.position.getDistanceFrom (knobCentre (p)) < knobRadius (p) * 0.55f)
-        {
-            toggleEnabled(); // the power symbol on the OUT knob: the plugin on / bypassed
-            return;
-        }
+        // the power symbol on the OUT knob (measured on the original, tp172c8): a click on it (no drag) switches the
+        // plugin on / bypassed; a drag, from the symbol or the ring, moves the main output gain
+        powerPending = p == k::mainOut && e.position.getDistanceFrom (knobCentre (p)) < knobRadius (p) * 0.55f;
         if (ui::isResetClick (e))
         {
+            powerPending = false;
             edit (p, (float) specFor (p).defaultValue);
             return;
         }
