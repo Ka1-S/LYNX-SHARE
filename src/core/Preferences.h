@@ -23,6 +23,16 @@ int clampAutosaveMinutes (int minutes); // the nearest choice
 constexpr int defaultAutosaveMinutes = 2;
 constexpr int defaultAutosaveKeep = 10;
 int clampAutosaveKeep (int keep); // 1..100
+// Round 177d (an FL wishlist item: a backup written while playing made the sound stutter; the user's decision): with
+// "waitForQuiet" on (the default) a due backup also waits while the song plays and until `quietMs` after the last
+// MIDI input, not only while recording (FL postpones it for recording only).
+constexpr double backupQuietMs = 5000.0;
+inline bool backupMayRun (bool recording, bool playing, double msSinceMidi, bool waitForQuiet) noexcept
+{
+    if (recording)
+        return false;
+    return ! waitForQuiet || (! playing && msSinceMidi >= backupQuietMs);
+}
 
 // Backup file name (without extension) of project `stem` saved at a date/time: "Night Drive (2026-10-16 19.50.03)".
 // Sorting these names sorts them by time.

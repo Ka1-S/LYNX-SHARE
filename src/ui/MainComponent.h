@@ -304,6 +304,13 @@ private:
     int autosaveTicks = 0;
     std::shared_ptr<std::atomic<bool>> autosaveRunning = std::make_shared<std::atomic<bool>> (false); // the backup file is being written
     int autosaveMinutes = 2, autosaveKeep = 10; // Settings › General › Backup
+    bool backupWaitsForQuiet = true;              // (round 177d) also while playing / right after MIDI input
+    bool hoverValues = false;                     // (round 177d) the hovered control's value next to the mouse
+    bool hoverTipShown = false;                   // ...and it is showing now
+    juce::String hoverTipText;
+    juce::Point<int> hoverTipAt;
+    std::uint32_t backupMidiSeen = 0;
+    double backupMidiMs = -1.0e9;
     bool lastModified = false;
     void openPianoRoll();
     void toggleMode();
@@ -514,6 +521,7 @@ private:
     ui::HintBar hintBar;
     ui::TweakReadout tweakReadout; // FL's Tools › Last tweaked, at the hint bar's right end (round 162d)
     void refreshTweakReadout();
+    void updateHoverValue (juce::Component* hovered, const ui::Hint& hint, bool live);
     int tweakTicks = 0;
     void placeHintBar (juce::Rectangle<int> row); // the hint bar and, at its right end, the last-tweaked read-out
     bool hintsFrozen = false; // --snapshot: keep the hint that was set

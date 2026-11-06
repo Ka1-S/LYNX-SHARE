@@ -271,4 +271,39 @@ int resolveProjectSamples (Song& song, const std::string& projectFolder, const s
     }
     return moves.empty() ? 0 : applyRelocations (song, moves);
 }
+int compareVersions (const std::string& a, const std::string& b)
+{
+    const auto numbers = [] (const std::string& v) {
+        std::vector<long> parts;
+        long n = 0;
+        bool inNumber = false;
+        for (const auto c : v)
+        {
+            if (std::isdigit ((unsigned char) c))
+            {
+                n = std::min (n * 10 + (c - '0'), 1000000000L);
+                inNumber = true;
+            }
+            else if (c == '.' && inNumber)
+            {
+                parts.push_back (n);
+                n = 0;
+                inNumber = false;
+            }
+            else
+                break; // the suffix ("-alpha", " beta") is not compared
+        }
+        if (inNumber)
+            parts.push_back (n);
+        return parts;
+    };
+    const auto x = numbers (a), y = numbers (b);
+    for (std::size_t i = 0; i < std::max (x.size(), y.size()); ++i)
+    {
+        const auto p = i < x.size() ? x[i] : 0L, q = i < y.size() ? y[i] : 0L;
+        if (p != q)
+            return p < q ? -1 : 1;
+    }
+    return 0;
+}
 } // namespace lynx::safety

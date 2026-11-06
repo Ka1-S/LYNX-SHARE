@@ -16,10 +16,12 @@ constexpr const char* extension = ".lynx";
 constexpr int currentVersion = 1;
 
 juce::String toJson (const Song& song);
-std::optional<Song> fromJson (const juce::String& json, juce::String& error);
+// `savedBy` (optional) receives the version of LYNX SHARE that wrote the project ("" for projects from before round
+// 177d, which did not write it): a newer one may hold things this build drops (safety::savedByNewerVersion).
+std::optional<Song> fromJson (const juce::String& json, juce::String& error, juce::String* savedBy = nullptr);
 
 bool save (const Song& song, const juce::File& file, juce::String& error);
-std::optional<Song> load (const juce::File& file, juce::String& error);
+std::optional<Song> load (const juce::File& file, juce::String& error, juce::String* savedBy = nullptr);
 
 // One mixer track as stored in a project (sends, input and effects included).
 juce::var mixerTrackToVar (const MixerTrack& track);

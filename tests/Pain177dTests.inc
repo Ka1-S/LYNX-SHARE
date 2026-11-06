@@ -1,0 +1,59 @@
+// Round 177d, FL pain points (research-web-2.md §3; docs/analise/REA_rodada177d.md §2).
+// Slice 177d-2: 22 solo action, 20 ultra-fine, 15 backups, 37 savedBy.
+
+TEST (pain177d_ultra_fine_drag_and_wheel)
+{
+    using namespace lynx::controls;
+    CHECK (fineScale (false, false) == 1.0);
+    CHECK (fineScale (false, true) == 1.0); // Shift alone changes nothing (FL)
+    CHECK (fineScale (true, false) == fineFactor);
+    CHECK (fineScale (true, true) == ultraFineFactor);
+    // 100 px over a 0..1 range swept by 200 px: 0.5 plain, 0.05 fine, 0.005 ultra-fine
+    CHECK (std::abs (dragValueScaled (0.0, 100.0, 0.0, 1.0, 200.0, 1.0) - 0.5) < 1e-12);
+    CHECK (std::abs (dragValueScaled (0.0, 100.0, 0.0, 1.0, 200.0, fineScale (true, false)) - 0.05) < 1e-12);
+    CHECK (std::abs (dragValueScaled (0.0, 100.0, 0.0, 1.0, 200.0, fineScale (true, true)) - 0.005) < 1e-12);
+    // the old entry points are unchanged
+    CHECK (dragValue (0.0, 100.0, 0.0, 1.0, 200.0, true) == dragValueScaled (0.0, 100.0, 0.0, 1.0, 200.0, fineFactor));
+    CHECK (wheelValue (0.5, 1.0, 0.0, 1.0, false) == wheelValueScaled (0.5, 1.0, 0.0, 1.0, 1.0));
+    CHECK (std::abs (wheelValueScaled (0.5, 1.0, 0.0, 1.0, ultraFineFactor) - (0.5 + wheelStep * 0.01)) < 1e-12);
+}
+
+TEST (pain177d_solo_selected_channel_action_is_bound_nowhere_by_default)
+{
+    const auto& actions = lynx::keys::actions();
+    const auto it = std::find_if (actions.begin(), actions.end(), [] (const auto& a) { return std::string (a.id) == "channel.soloSelected"; });
+    CHECK (it != actions.end());
+    if (it != actions.end())
+        CHECK (it->defaults.empty());
+}
+
+TEST (pain177d_backups_wait_for_a_quiet_moment)
+{
+    using lynx::prefs::backupMayRun;
+    // recording: never (FL)
+    CHECK (! backupMayRun (true, false, 1e9, false));
+    CHECK (! backupMayRun (true, false, 1e9, true));
+    // the option off: only recording holds it (FL)
+    CHECK (backupMayRun (false, true, 0.0, false));
+    // on (the default): not while playing, not right after MIDI input
+    CHECK (! backupMayRun (false, true, 1e9, true));
+    CHECK (! backupMayRun (false, false, 1000.0, true));
+    CHECK (backupMayRun (false, false, lynx::prefs::backupQuietMs, true));
+}
+
+TEST (pain177d_saved_by_newer_version)
+{
+    using lynx::safety::compareVersions;
+    using lynx::safety::savedByNewerVersion;
+    CHECK (compareVersions ("0.1.10", "0.1.9") > 0);
+    CHECK (compareVersions ("0.1.9", "0.1.10") < 0);
+    CHECK (compareVersions ("0.1.25-alpha", "0.1.25") == 0);
+    CHECK (compareVersions ("0.2", "0.1.99") > 0);
+    CHECK (compareVersions ("1.0", "1.0.0") == 0);
+    CHECK (compareVersions ("", "0.0.0") == 0);
+    // only a newer build warns; projects from before "savedBy" never do
+    CHECK (savedByNewerVersion ("0.1.26-alpha", "0.1.25-alpha"));
+    CHECK (! savedByNewerVersion ("0.1.25-alpha", "0.1.25-alpha"));
+    CHECK (! savedByNewerVersion ("0.1.20", "0.1.25-alpha"));
+    CHECK (! savedByNewerVersion ("", "0.1.25-alpha"));
+}

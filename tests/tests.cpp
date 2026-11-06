@@ -17050,6 +17050,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Rec168kTests.inc"
 #include "Rec170dTests.inc"
 #include "Rec177dTests.inc"
+#include "Pain177dTests.inc"
 #include "Issue32Tests.inc"
 #include "Mono168lTests.inc"
 #include "MixPre167qTests.inc"

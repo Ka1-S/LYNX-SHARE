@@ -102,7 +102,7 @@ N/A = does not apply. Other rounds own: 1, 4 → 177a; 2, 9, 28, 29 → 177b; 33
 | 28 | one-step "create automation" | 177b | — | — | — |
 | 29 | link many targets to one controller | 177b | — | — | — |
 | 30 | one-click multitrack MIDI export | 177d | ALREADY | File › Export › MIDI file (Ctrl+Shift+M), one track per channel (`MidiFileIo::saveSong`) | — |
-| 31 | pattern cleanup | 177d | PARTLY | make unique, purge unused audio clips, split by channel; no merge, purge or sort for patterns | merge identical, delete unused, sort (batch 5); the auto-unique modifier → **user decision** |
+| 31 | pattern cleanup | 177d | PARTLY | make unique, purge unused audio clips, split by channel; no merge, purge or sort for patterns | 31a: merge identical, delete unused, sort (batch 5). 31b, the modifier that makes a clip unique when you edit it: **declined by the user** (2026-11-06), not built |
 | 32 | nested groups | 177d | HAS | Playlist and rack groups are one level | **user decision** (L, model change) |
 | 33 | tempo map | 175a | — | — | — |
 | 34 | consistent BPM detection | 175a / 177d | ALREADY (177d part) | one detector (`core/TempoDetect.cpp`) used by Playlist and Channel settings | — |
@@ -117,10 +117,74 @@ N/A = does not apply. Other rounds own: 1, 4 → 177a; 2, 9, 28, 29 → 177b; 33
 2. **Knobs / values:** 20 (ultra-fine), 10 (hover readout, an option).
 3. **Plugin wrapper:** 11 (keep on top), 12 (per-channel velocity), 13 (test note on load, an option), 7 (Plugin Manager column).
 4. **Transport / pitch:** 22 (solo active channel), 21 (semitone key shift, an option).
-5. **Patterns / export:** 31 (merge, delete unused, sort), 35 (stems that skip buses and sends).
+5. **Patterns / export:** 31a (merge, delete unused, sort), 35 (stems that skip buses and sends).
 6. **Piano roll:** 25 (song-bar ruler, an option), 26 (copy ghost notes).
 7. **Mixer strip:** 6a (EQ bypass), 5 (tests), 3 (`.fst` volume check).
 8. **Event editor:** 27 (with 177b).
 9. **Unload plugin:** 8.
 
-Waiting for a user decision: 24, 32, 6b, the default for 15, and the auto-unique part of 31.
+User decisions (2026-11-06, through the coordinator):
+- **24, clip volume envelopes:** yes, as its own slice. It must cost nothing on clips that have no envelope. The UI gate needs FL | LYNX | Ableton shots. For .flp export, pick whichever loses nothing.
+- **6b, gain-reduction meter:** yes, for LYNX's own dynamics only. It shows only on strips that have one, small, and costs nothing when hidden.
+- **15, backups:** yes. They also wait while playing and right after MIDI input, behind a Settings option that is on by default.
+- **32, nested groups:** declined for now.
+- **31b, auto-unique clips on edit:** declined. Nothing of it is built. 31a, pattern cleanup, is a separate item and goes ahead.
+
+## 3. Slice 177d-2: quick fixes (22, 20, 15) and pattern hygiene (31a)
+
+### 22. Solo the selected channel from any window
+- **FL:** channel solo is only Ctrl+click on the channel's mute LED in the Channel rack, or the rack's numbered keys while the rack has focus. FL has no global action for it.
+- **LYNX before:** the same as FL (`rack.solo1..10`, Context::channelRack).
+- **Change:** a new global action `channel.soloSelected` ("Solo the selected channel (from any window)"). It has no key by default (FL keeps its keys); you bind one in the shortcut editor. It runs the rack's solo, `noteedit::soloChannel`, so pressing it again lets every channel play, as in FL.
+
+### 20. Ultra-fine knob drag
+- **FL:** Ctrl+drag and Ctrl+wheel are fine. Shift has no knob meaning in FL's control contract (docs/WORKFLOW_FL.md P1 7/15). To be checked in FL at the next GUI turn.
+- **Change:** Ctrl+Shift = ultra-fine (1/100) for drags and the wheel on every `ValueControl` (`controls::fineScale`). Ctrl alone is unchanged (FL), and so is Shift alone. Switching modifiers mid-drag continues from the current value.
+
+### 15. Backups that never stutter the sound
+- **FL:** postpones the timed backup while recording (LYNX did the same).
+- **User decision:** a Settings › General option, "Wait with backups while the song plays or a MIDI keyboard is being played", **on** by default. A due backup then waits while the transport plays and for 5 s after the last MIDI input (`prefs::backupMayRun`). It never waits while recording. Off = FL's behaviour.
+
+### 31a. Pattern hygiene (not the declined 31b auto-unique modifier)
+- **FL (FLEngine_x64.dll strings, 2026.1):** the Playlist picker has "Select unused" › Patterns / Audio clips / Automations (`EEPickerSelectUnusedMenu`, `EEPickerSelectUnusedPatternsMenu`, `…AudioClipsMenu`, `…AutomationsMenu`). It also has "Sort patterns by name / by color" (`EEPickerSortPatternsByNameMenu` / `…ByColorMenu`), sort for audio clips (by name / color / track) and sort for automations (by name / color). FL has no merge of identical patterns.
+- **LYNX before:** none of these picker items. Only "Purge unused audio clips" and "Select unused channels" existed.
+- **Core (this slice):** `unusedPatterns`, `deletePatterns`, `reorderPatterns`, `sortPatterns` (by name: case-insensitive, stable; by colour: hue then lightness, with uncoloured patterns last in their order), `identicalPatterns` and `mergeIdenticalPatterns`. Merge is LYNX's own (the wishlist item). Same content means notes, events, length, loops and markers; empty patterns are never merged.
+- **Where FL puts them:** in FLEngine the DFM names sit in one block with `EEPickerAutoScrollMenu`, `EEPickerShowRightMenu`, `EEPickerWidth*Menu` and `EEPickerAutoGroupMenu`, the Playlist's "Picker panel" options (REA_rodada167j-gaps: "Picker panel (Enable, side, width, sort, select unused)" in the Playlist menu). To be confirmed with an FL shot at the GUI turn.
+- **UI:** Playlist menu › "Picker panel" › "Select unused" › "Patterns (n)" (picks them in the picker, as FL's selection), and "Sort patterns" › By name / By color. Below a separator are LYNX's own "Delete unused patterns (n)" and "Merge identical patterns (n)". A right-click in the picker's empty part opens the same menu. Each change is one undo step. Audio clip and automation selection and sorting (FL's other items) are not built: the LYNX picker selects patterns only.
+
+### 20 (continued). Sliders too
+`juce::Slider` controls (plugin editors) go through the slider contract (`ValueControl.cpp`, `setFine`). They take the same scale: Ctrl = 10×, Ctrl+Shift = 100× finer, for drags and for the wheel.
+
+### 10. The value at the cursor on hover (an option)
+- **FL:** hovering a control shows its name and value in the hint bar only. A pill at the cursor shows only while dragging.
+- **LYNX before:** the same, using the hint bar (`ui::hintFor` gives `Hint::value`) and the drag pill (`showValueTip`).
+- **Change:** Settings › General › Editing, "Show a control's value next to the mouse when hovering over it (LYNX)", **off** by default (FL). When on, the hint timer that already runs shows the hint's value in the drag pill just above the cursor (`MainComponent::updateHoverValue`). It covers every control that reports a value to the hint bar. Nothing new runs while the option is off, and the pill is moved only when the value or the mouse position changes. A drag keeps its own read-out.
+
+### 37. Opening a project saved by a newer LYNX SHARE
+- **FL:** an FL project from a newer FL opens with "This project was made with a newer version" only when the format needs it. Otherwise an older FL drops what it does not know without saying so.
+- **LYNX before:** the `.lynx` format is at version 1. A file from a later build opened silently, and saving it dropped any field this build does not know.
+- **Change:** every save writes `"savedBy": "<version>"`. Opening a project whose `savedBy` is newer than the running build (`safety::compareVersions`, which compares the dotted numbers and ignores "-alpha") shows one notice: "This project was saved by LYNX SHARE {0}, and this is {1}. What the newer version added may be lost if you save it here: use File › Save as... to keep the original." Projects from before this round have no `savedBy` and never warn.
+
+### 26. Copying ghost notes
+- **FL:** ghost notes (other channels, and this channel in the clips that overlap) can only be looked at. Editing them means switching channel.
+- **LYNX before:** other channels' ghosts become editable with Ctrl+Alt+V (as in FL). Clip ghosts are drawn only.
+- **Change:** Piano roll › Edit › "Copy ghost notes" (LYNX's own, next to Copy). It puts every ghost note on show (the ghost channels that are ticked, plus the clip ghosts) on the note clipboard. Ctrl+V then pastes them into the channel being edited, at the same place. The item is greyed out when no ghost shows.
+
+### 25. Song bar numbers in the Piano roll ruler (an option)
+- **FL:** the Piano roll ruler numbers the pattern's own bars (1, 2, 3...) wherever the pattern plays.
+- **Change:** Piano roll › View › "Ruler: song bars (LYNX)" (action `pianoRoll.songBarsRuler`, no default key), **off** by default (FL). When on, the ruler numbers the bars as the Playlist does where the pattern's first unmuted clip plays (`polish::patternSongOrigin`, the same clip the clip ghosts use). A pattern that is not on the Playlist keeps its own numbers. Only the labels change: the grid and the positions stay the same.
+
+### 35. "Instruments only" channel stems
+- **FL:** "Split mixer tracks" renders each insert, so a send reverb or a bus lands in its own file and not in the instrument's. FL has no per-channel render.
+- **LYNX before:** "One per channel (stems)" mutes the other channels but keeps the mixer, so each stem carries its sends and the buses it goes through.
+- **Change:** a fourth Export › Files choice, "One per channel, instruments only (no sends or buses)" (`Stems::channelsDry`). For each stem, the channel's insert loses its sends and goes straight to the Master (`makeChannelStemSong (song, c, true)`). Its own effects stay. The Master's effects follow the existing "Master effects" box. The dialog layout is unchanged (it is one more item in the same list).
+
+## 4. Slice 177d-3: mixer strip (6a EQ bypass, 6b gain-reduction meter)
+
+### 6a. Per-track EQ bypass
+- **FL:** the insert's 3-band EQ has no bypass of its own: you reset each band (to be confirmed in FL at the next GUI turn, together with the UI shots).
+- **Change:** right-click the EQ title bar in the effects panel and choose "Bypass the EQ (its settings are kept)". `TrackEq::bypassed` is saved as `eqBypassed`. A bypassed EQ costs nothing in the engine (`TrackEq::active()` is false). The title then reads "bypassed" in the disabled-text colour, and the hint adds "[RMB] bypass". FLP export writes the bands flat while bypassed, which is what FL would hear.
+
+### 6b. Gain-reduction meter (user decision: LYNX's own dynamics only)
+- **FL:** no gain reduction on the mixer strip. Each dynamics plugin shows it in its own window.
+- **Change:** a 3 px bar to the right of the strip's level meters, hanging from the top (0 to 30 dB, `mixerops::gainReductionRangeDb`). It is drawn only on strips that have an enabled LYNX compressor, Apex limiter, Crest compressor, Sentry gate, Quell denoiser, Ridge strip, Glow leveler or Hush de-esser (`mixerops::reportsGainReduction`). It reads the effect meters the engine already publishes (output 0), so the audio thread does no new work. The UI checks only strips that show a meter.
