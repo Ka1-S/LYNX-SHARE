@@ -2115,6 +2115,36 @@ private:
                        && ! plain.contains ("patternBlocks");
         }
 
+        // comping (round 177c): a comp's equal-power crossfades (Clip::fadeCurve) and the crossfade length are saved; a
+        // project without them has neither in its file
+        bool compOk = false;
+        {
+            auto song = lynx::Song::makeDefault();
+            const auto plain = lynx::ProjectFile::toJson (song);
+            lynx::ChannelDef take;
+            take.instrument = lynx::InstrumentKind::audioClip;
+            take.samplePath = "take.wav";
+            song.channels.push_back (take);
+            lynx::Clip a;
+            a.kind = lynx::ClipKind::audio;
+            a.channel = (int) song.channels.size() - 1;
+            a.length = lynx::ppq;
+            a.fadeOut = 20;
+            a.fadeCurve = 2;
+            auto b = a;
+            b.start = lynx::ppq - 20;
+            b.fadeOut = 0;
+            b.fadeIn = 20;
+            b.fadeCurve = 1;
+            song.playlist = { a, b };
+            song.compCrossfadeMs = 12.5f;
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), error);
+            const auto plainBack = lynx::ProjectFile::fromJson (plain, error);
+            compOk = back && back->playlist.size() == 2 && back->playlist[0].fadeCurve == 2 && back->playlist[1].fadeCurve == 1
+                     && back->playlist[1].fadeIn == 20 && back->compCrossfadeMs == 12.5f && plainBack
+                     && plainBack->compCrossfadeMs == lynx::Song::defaultCompCrossfadeMs && ! plain.contains ("compCrossfadeMs");
+        }
+
         // Misc › Mono / Porta / Slide on every generator (round 168l): kept in the file; a project saved before (an
         // imported engine's flags in its synth settings) gets them back, a Max polyphony of 1 is not Mono
         bool polyOk = false;
@@ -2803,7 +2833,7 @@ private:
         // round 170j: the Themed plugin style (its resolution with and without art; every art draws)
         const auto artResult = lynx::skin::artSelfTest();
 
-        const auto ok = audioOk && projectOk && richOk && hwOutOk && flp168jOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
+        const auto ok = audioOk && projectOk && richOk && hwOutOk && flp168jOk && blocksOk && compOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK";
 
@@ -2815,6 +2845,7 @@ private:
                << "hardware_outputs=" << (hwOutOk ? "OK" : "ERROR") << "\n"
                << "flp168j_fields=" << (flp168jOk ? "OK" : "ERROR") << "\n"
                << "pattern_blocks=" << (blocksOk ? "OK" : "ERROR") << "\n"
+               << "comp_crossfades=" << (compOk ? "OK" : "ERROR") << "\n"
                << "channel_polyphony=" << (polyOk ? "OK" : "ERROR") << "\n"
                << "track_latency=" << (latencyOk ? "OK" : "ERROR") << "\n"
                << "plugin_substitutes=" << (substituteOk ? "OK" : "ERROR") << "\n"

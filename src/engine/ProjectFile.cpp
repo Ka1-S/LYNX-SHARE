@@ -1071,7 +1071,7 @@ juce::var clipsToVar (const std::vector<Clip>& list)
         const auto pan = juce::roundToInt (c.pan * 1000.0f) / 1000.0;
         const auto pitch = juce::roundToInt (c.pitch * 1000.0f) / 1000.0;
         const auto stretch = std::round (c.stretch * 1.0e6) / 1.0e6;
-        const int used = c.uid != 0 ? 10 : stretch != 1.0 ? 9 : c.reversed ? 8 : pitch != 0.0 ? 7 : pan != 0.0 ? 6 : fraction != 0.0 ? 5 : c.muted ? 4
+        const int used = c.fadeCurve != 0 ? 11 : c.uid != 0 ? 10 : stretch != 1.0 ? 9 : c.reversed ? 8 : pitch != 0.0 ? 7 : pan != 0.0 ? 6 : fraction != 0.0 ? 5 : c.muted ? 4
                        : (c.fadeIn > 0 || c.fadeOut > 0 || c.gain != 1.0f) ? 3 : 0;
         if (used > 0)
         {
@@ -1098,6 +1098,8 @@ juce::var clipsToVar (const std::vector<Clip>& list)
                 clip.add (stretch);
             if (used >= 10)
                 clip.add (uidVar (c.uid)); // Online Sessions (round 168a)
+            if (used >= 11)
+                clip.add ((int) c.fadeCurve); // comp crossfades (round 177c)
         }
 
         clips.add (clip);
@@ -1136,6 +1138,7 @@ std::vector<Clip> clipsFromVar (const juce::var& v, const Song& song)
                 clip.reversed = c.size() >= 15 && (bool) c[14];
                 clip.stretch = c.size() >= 16 ? juce::jlimit (0.01, 100.0, (double) c[15]) : 1.0;
                 clip.uid = c.size() >= 17 ? uidFrom (c[16]) : 0;
+                clip.fadeCurve = c.size() >= 18 ? (std::uint8_t) juce::jlimit (0, 3, (int) c[17]) : 0;
             }
 
             if (c.size() >= 7 && (int) c[5] == 2)
@@ -1951,6 +1954,8 @@ juce::String toJson (const Song& song)
         root->setProperty ("performanceMode", true);
     if (song.autoCrossfades)
         root->setProperty ("autoCrossfades", true);
+    if (song.compCrossfadeMs != Song::defaultCompCrossfadeMs)
+        root->setProperty ("compCrossfadeMs", (double) song.compCrossfadeMs);
     if (song.playTruncatedNotes)
         root->setProperty ("playTruncatedNotes", true);
     if (song.fastDeclick)
@@ -2355,6 +2360,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
     song.cleanMixer = (bool) root.getProperty ("cleanMixer", false);
     song.performanceMode = (bool) root.getProperty ("performanceMode", false);
     song.autoCrossfades = (bool) root.getProperty ("autoCrossfades", false);
+    song.compCrossfadeMs = juce::jlimit (0.0f, 100.0f, (float) (double) root.getProperty ("compCrossfadeMs", (double) Song::defaultCompCrossfadeMs));
     song.playTruncatedNotes = (bool) root.getProperty ("playTruncatedNotes", false);
     song.fastDeclick = (bool) root.getProperty ("fastDeclick", false);
     song.panTriangular = root.getProperty ("panLaw", "circular").toString() == "triangular";

@@ -270,6 +270,8 @@ inline void updateCrossfades (std::vector<Clip>& clips, bool on)
         auto& b = clips[(std::size_t) order[k]];
         if (a.track != b.track || b.start <= a.start || b.start >= a.end() || b.end() <= a.end())
             continue;
+        if ((a.fadeCurve & 2) != 0 && (b.fadeCurve & 1) != 0) // a comp crossfade (round 177c) keeps its own curve
+            continue;
         const auto overlap = a.end() - b.start;
         a.crossfadeOut = std::max (a.crossfadeOut, overlap);
         b.crossfadeIn = std::max (b.crossfadeIn, overlap);
@@ -286,6 +288,14 @@ inline float crossfadeCurve (float x) noexcept
 {
     x = std::clamp (x, 0.0f, 1.0f);
     return 0.5f - 0.5f * std::cos (3.14159265358979f * x);
+}
+
+// A comp crossfade (round 177c): sin(x·π/2) — the fade-in and the fade-out (the same curve, mirrored) keep constant
+// power (sin² + cos² = 1), the right sum for two different takes (uncorrelated) where an S curve would dip ~3 dB.
+inline float equalPowerCurve (float x) noexcept
+{
+    x = std::clamp (x, 0.0f, 1.0f);
+    return std::sin (1.57079632679490f * x);
 }
 
 // FL's audio clip gain handle (round 166e §2): −96.1 dB (shown "-INF") … +36 dB, 0.05 dB per pixel of drag.

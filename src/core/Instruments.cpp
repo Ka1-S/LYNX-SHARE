@@ -54,14 +54,17 @@ namespace lynx
 {
 namespace
 {
-// An audio clip voice's fade gain at its position: linear fades, or FL's S curve for an automatic crossfade
+// An audio clip voice's fade gain at its position: linear fades, FL's S curve for an automatic crossfade, or the
+// equal-power curve of a comp crossfade (round 177c)
 float clipFadeGainOf (float elapsed, float remaining, float in, float out, std::uint8_t shape) noexcept
 {
     auto gain = 1.0f;
     if (in > 0.0f && elapsed < in)
-        gain *= (shape & 1) != 0 ? clipops::crossfadeCurve (elapsed / in) : elapsed / in;
+        gain *= (shape & 8) != 0 ? clipops::equalPowerCurve (elapsed / in)
+              : (shape & 1) != 0 ? clipops::crossfadeCurve (elapsed / in) : elapsed / in;
     if (out > 0.0f && remaining < out)
-        gain *= (shape & 2) != 0 ? clipops::crossfadeCurve (std::max (0.0f, remaining) / out) : std::max (0.0f, remaining) / out;
+        gain *= (shape & 16) != 0 ? clipops::equalPowerCurve (std::max (0.0f, remaining) / out)
+              : (shape & 2) != 0 ? clipops::crossfadeCurve (std::max (0.0f, remaining) / out) : std::max (0.0f, remaining) / out;
     return gain;
 }
 
@@ -1795,7 +1798,7 @@ public:
         target->clipRemaining = clipFades[1];
         target->fadeIn = clipFades[2];
         target->fadeOut = clipFades[3];
-        target->fadeShape = (std::uint8_t) (clipShape & 3);
+        target->fadeShape = (std::uint8_t) (clipShape & (3 | 8 | 16));
         // FL's read speed: the rate ratio at the original pitch, else exp(cents·ln2/1200)·ratio
         target->rate = flrs::speedFor ((float) (semitones * 100.0), base);
         target->reversed = backwards;

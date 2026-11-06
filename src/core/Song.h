@@ -1296,6 +1296,10 @@ struct Clip
     // Song::autoCrossfades is on (never saved). A crossfade replaces that side's fade, with an S-shaped curve.
     std::int64_t crossfadeIn = 0, crossfadeOut = 0;
     std::uint64_t uid = 0; // stable id (Online Sessions, round 168a): whose clip it is
+    // audio clips, LYNX comping (round 177c, core/Comping.h): bit 0 = the fade-in is an equal-power crossfade (sin), bit 1 =
+    // the fade-out (cos). Set where a comp switches takes: the two clips overlap by the fade and their gains sum to
+    // constant power. Saved with the project.
+    std::uint8_t fadeCurve = 0;
 
     std::int64_t end() const noexcept { return start + length; }
     std::int64_t effectiveFadeIn() const noexcept { return crossfadeIn > 0 ? crossfadeIn : fadeIn; }
@@ -1632,6 +1636,13 @@ struct Song
     // without it loads with it off (FL: "old projects now load with automatic crossfades turned off"); new projects
     // take Settings' "Enable automatic crossfades in new projects".
     bool autoCrossfades = false;
+    // LYNX comping (round 177c, core/Comping.h): the length of the equal-power crossfade where a comp switches takes (ms,
+    // 0 = a hard cut). Saved with the project when it is not the default.
+    static constexpr float defaultCompCrossfadeMs = 5.0f;
+    float compCrossfadeMs = defaultCompCrossfadeMs;
+    // Comping: the take lane being auditioned (a Playlist track, -1 = none) and its comp track. While set, the lane
+    // plays (its muted take clips too) instead of the comp track. Not saved; comp::setAudition sets both.
+    int auditionLane = -1, auditionComp = -1;
     // FL's Project › "Play truncated notes in clips" (REA round 167g, .flp 0x1E): a note that starts before a pattern
     // clip's start (the clip trimmed or sliced into it) plays from the clip's start with what is left of its length
     // (FL FUN_010608a0); off = such notes are dropped (LYNX's behaviour before; projects saved before keep it off).
