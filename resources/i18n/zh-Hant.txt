@@ -52,6 +52,7 @@ countries: tw hk mo
 "Could not open" = "無法開啟"
 "(imported from MIDI)" = "（從MIDI匯入）"
 "(imported from FL Studio)" = "（從FL Studio匯入）"
+"(imported from .als)" = "(從 .als 匯入)"
 "Could not save" = "無法儲存"
 "File" = "檔案"
 "Edit" = "編輯"
@@ -7315,6 +7316,11 @@ countries: tw hk mo
 "{0} crashed. Save your project now (as a new file is safest)." = "{0} 崩潰了。請立即儲存專案（另存為新檔案最安全）。"
 "Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "已關閉其視窗，以便 LYNX SHARE 繼續執行。在重新開啟專案之前，該外掛可能無法正常運作。"
 "Wheels" = "滾輪"
+"Animation rate" = "動畫速率"
+"Display (default)" = "顯示器（預設）"
+"60 Hz" = "60 Hz"
+"30 Hz" = "30 Hz"
+"How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); 60 Hz or 30 Hz use less CPU on slower computers." = "播放頭、電平表和示波器的更新頻率。「顯示器」跟隨螢幕更新率（最流暢）；60 Hz 或 30 Hz 在較慢的電腦上佔用較少 CPU。"
 
 # round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"
@@ -7354,3 +7360,18 @@ countries: tw hk mo
 "HighCut" = "高切"
 "Rushin" = "搶拍"
 "Draggin" = "拖拍"
+
+# round 176a: the 32-bit plugin bridge
+"Native" = "原生"
+"32 bit" = "32 位元"
+"64 bit" = "64 位元"
+"Bit size" = "位元數"
+"Which build of the plugin loads when both a 32-bit and a 64-bit one are installed" = "同時安裝了 32 位元和 64 位元版本時載入哪個版本的外掛"
+"32bit - bridged" = "32 位元 - 橋接"
+"64bit - bridged" = "64 位元 - 橋接"
+"64bit - native" = "64 位元 - 原生"
+"A plugin" = "外掛"
+"{0} crashed in the 32-bit bridge." = "{0} 在 32 位元橋接中崩潰。"
+"{0} crashed in its separate process." = "{0} 在其獨立處理程序中崩潰。"
+"{0} stopped responding (separate process)." = "{0} 停止回應（獨立處理程序）。"
+"Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "只有它的處理程序受到影響：LYNX SHARE 和你的專案繼續執行，外掛已靜音。請儲存專案；下次開啟時外掛會重新載入。"

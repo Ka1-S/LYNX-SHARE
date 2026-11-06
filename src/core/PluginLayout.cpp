@@ -539,6 +539,8 @@ Layout reeverb2()
     return l;
 }
 
+LayoutItem menuOf (float x, float y, float w, float h, const char* param, const char* caption, const char* options); // (below)
+
 Layout luxeVerb()
 {
     // INPUT | REVERB | PITCH | OUTPUT on top, ENVELOPE and the analyser below; every knob has its value on a plate above
@@ -641,26 +643,33 @@ Layout luxeVerb()
     engineTabs.param = "Space engine";
     v.push_back (engineTabs);
     const auto sp = [&v] (LayoutItem i) { v.push_back (onPage (std::move (i), 1)); };
-    const auto dial = [&] (float cx, float cy, const char* param, const char* caption, std::uint32_t style = 0) {
-        sp (knob (cx, cy, 40, param, caption, cy + 30, style | valueAbove));
+    // round tp172b4: the Pro-R role's arrangement — one strip of knobs across the top (pre-delay, character,
+    // thickness, distance, the big SPACE with its decay rate beside it, brightness, width, mix; the style above
+    // character and thickness), the decay-rate EQ curve filling the rest with its four knobs in its lower corners.
+    // Values under the captions (and the decay time inside SPACE)
+    const auto dial = [&] (float cx, float cy, float d, const char* param, const char* caption, std::uint32_t style = 0, float w = 76.0f) {
+        auto i = knob (cx, cy, d, param, caption, cy + d * 0.5f + 20.0f, style | rangeEnds);
+        i.w = std::max (d, std::min (w, i.h)); // room for the caption and the value (the circle keeps its size: the height
+                                                // bounds it; never wider than tall, so no caption hides under a knob)
+        i.x = cx - i.w * 0.5f;
+        sp (std::move (i));
     };
-    sp (section (8, 18, 932, 230, TR_NOOP ("Reverb")));
-    sp (tabs (413, 40, 120, 16, "Space style", TR_NOOP ("Modern|Vintage|Plate")));
-    dial (70, 120, "Space pre-delay", TR_NOOP ("P. delay"));
-    dial (160, 120, "Space character", TR_NOOP ("Character"));
-    dial (250, 120, "Thickness", TR_NOOP ("Thickness"), bipolar);
-    dial (340, 120, "Distance", TR_NOOP ("Distance"));
-    v.push_back (onPage (value (433, 66, 80, 13, "Space", 0), 1));
-    sp (knob (473, 140, 84, "Space", TR_NOOP ("Space"), 196, big));
-    dial (473, 212, "Decay rate", TR_NOOP ("Decay rate"));
-    dial (606, 120, "Space brightness", TR_NOOP ("Brightness"), bipolar);
-    dial (696, 120, "Space width", TR_NOOP ("Width"));
-    dial (786, 120, "Space mix", TR_NOOP ("Mix"));
-    sp (section (8, 256, 932, 196, TR_NOOP ("Decay EQ")));
-    dial (120, 350, "Low decay", TR_NOOP ("Low decay"), bipolar);
-    dial (220, 350, "Low decay freq.", TR_NOOP ("Low freq"));
-    dial (727, 350, "High decay", TR_NOOP ("High decay"), bipolar);
-    dial (827, 350, "High decay freq.", TR_NOOP ("High freq"));
+    sp (menuOf (118, 22, 104, 18, "Space style", nullptr, TR_NOOP ("Modern|Vintage|Plate"))); // the reference's mode drop-down
+    dial (62, 84, 40, "Space pre-delay", TR_NOOP ("P. delay"));
+    dial (144, 84, 40, "Space character", TR_NOOP ("Character"));
+    dial (226, 84, 40, "Thickness", TR_NOOP ("Thickness"), bipolar);
+    dial (322, 80, 58, "Distance", TR_NOOP ("Distance"));
+    sp (knob (470, 92, 116, "Space", TR_NOOP ("Space"), 170, big));
+    v.push_back (onPage (value (420, 80, 100, 24, "Space", big), 1));
+    dial (566, 46, 32, "Decay rate", TR_NOOP ("Decay rate"), 0, 64.0f);
+    dial (636, 80, 58, "Space brightness", TR_NOOP ("Brightness"), bipolar);
+    dial (742, 84, 44, "Space width", TR_NOOP ("Width"));
+    dial (866, 84, 44, "Space mix", TR_NOOP ("Mix"));
+    sp (display (8, 186, 932, 266, "decayeq", "Decay rate"));
+    dial (64, 384, 32, "Low decay", TR_NOOP ("Low decay"), bipolar);
+    dial (140, 384, 32, "Low decay freq.", TR_NOOP ("Low freq"));
+    dial (808, 384, 32, "High decay", TR_NOOP ("High decay"), bipolar);
+    dial (884, 384, 32, "High decay freq.", TR_NOOP ("High freq"));
     return l;
 }
 

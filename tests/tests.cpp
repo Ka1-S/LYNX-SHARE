@@ -17095,6 +17095,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Tb169g2Tests.inc"
 #include "Issues171aTests.inc"
 #include "CtlAudit170i3Tests.inc"
+#include "CtlWake173dTests.inc"
 #include "Issue32dTests.inc"
 #include "Issue81Tests.inc"
 #include "FlpExport171eTests.inc"
@@ -17103,3 +17104,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issues173aTests.inc"
 #include "FxAudit173dTests.inc"
 #include "Fluid174eTests.inc"
+#include "AlsImport175aTests.inc"
+#include "Bridge176aTests.inc"
