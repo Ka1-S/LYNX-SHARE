@@ -228,7 +228,7 @@ TEST (ridge_harrison_strips_translated_tp172c5)
 }
 
 // slice 6: Ridge's DRIVE section (off by default: the old sound, no latency), its curve, and the states that use it
-// (Harrison 32C saturator, Slate VCC Channel, SSL Guitarstrip)
+// (Harrison 32C saturator, SSL Guitarstrip; the VCC Channel moved to Kiln Channel in slice 7)
 TEST (ridge_drive_section_tp172c6)
 {
     using namespace lynx;
@@ -276,30 +276,6 @@ TEST (ridge_drive_section_tp172c6)
     CHECK (s.params[r::driveOn] == 1.0f && r::driveModelIndex (s.params[r::driveModel]) == r::driveSaturate);
     CHECK (std::abs (r::driveAmountUnits (r::driveSaturate, s.params[r::driveAmount]) - 12.0) < 1e-3);
 
-    // VCC Channel: the playing slot's console and drive, its input / output on Ridge's trims, EQ and dynamics out
-    auto vcc = [] (const std::string& slot1Console) {
-        ForeignPlugin fp;
-        fp.format = ForeignPlugin::Format::vst3;
-        fp.name = "VM VCC Channel";
-        const std::string xml = "<VccC-state><package version=\"1.0\"><section id=\"Common\"><entry id=\"Current slot\" type=\"uint32\" value=\"1\"/></section>"
-                                "<section id=\"Slot0\"><entry id=\"Console\" type=\"float64\" value=\"0.0\"/><entry id=\"Drive\" type=\"float64\" value=\"0.1\"/></section>"
-                                "<section id=\"Slot1\"><entry id=\"Console\" type=\"float64\" value=\"" + slot1Console + "\"/>"
-                                "<entry id=\"Drive\" type=\"float64\" value=\"0.75\"/><entry id=\"Input\" type=\"float64\" value=\"0.75\"/>"
-                                "<entry id=\"Output\" type=\"float64\" value=\"0.25\"/></section></package></VccC-state>";
-        fp.state = substtest::flVst3State (std::vector<std::uint8_t> (xml.begin(), xml.end()));
-        const auto id = pluginIdentity (fp);
-        const auto* entry = findPluginSubstitute (id, false);
-        if (entry == nullptr)
-            return EffectSlot {};
-        int n = 0;
-        return makeSubstituteSlot (*entry, &id, &n);
-    };
-    s = vcc ("0.45");                                                   // the third step: US A
-    CHECK (s.kind == EffectKind::ridgeStrip && s.params[r::driveOn] == 1.0f && r::driveModelIndex (s.params[r::driveModel]) == r::driveConsoleA);
-    CHECK (std::abs (s.params[r::driveAmount] - 0.75f) < 1e-6 && s.params[r::eqOn] == 0.0f && s.params[r::dynOn] == 0.0f);
-    CHECK (std::abs (r::trimDb (s.params[r::input]) - 9.0) < 0.01 && std::abs (r::trimDb (s.params[r::output]) + 9.0) < 0.01);
-    CHECK (r::driveModelIndex (vcc ("0.95").params[r::driveModel]) == r::driveTube);
-
     // Guitarstrip: EQ, the compressor's mode -> ratio, the amp and its pre-amp
     auto gs = [] (const std::string& params) {
         return tp172c::harrisonSlot ("SSL Guitarstrip",
@@ -330,4 +306,124 @@ TEST (ridge_drive_section_tp172c6)
     CHECK (s.kind == EffectKind::ridgeStrip && s.params[r::dynOn] == 1.0f && s.params[r::compRatio] == 0.0f);
     CHECK (std::abs (r::gateRangeDb (s.params[r::gateRange]) - 60.0) < 1e-3 && std::abs (r::gateThresholdDb (s.params[r::gateThreshold]) + 24.0) < 1e-3);
     CHECK (std::abs (r::trimDb (s.params[r::input]) - 3.0) < 0.01 && std::abs (r::trimDb (s.params[r::output]) + 2.0) < 0.01);
+}
+
+// slice 7: Kiln Channel, LYNX's console channel — the six console models on the measured drive stages, its noise floor,
+// group bypass shared by the group's members, the meters, and the VCC Channel state translated onto it
+TEST (kiln_channel_tp172c7)
+{
+    using namespace lynx;
+    namespace k = mixsuite::kiln;
+    namespace r = mixsuite::ridge;
+    const auto& info = effectInfo (EffectKind::kilnChannel);
+    CHECK ((int) info.params.size() == k::count && std::string (info.name) == "Kiln Channel");
+    auto p = makeEffectSlot (EffectKind::kilnChannel).params;
+    CHECK (p[k::noiseReduction] == 1.0f && p[k::group] == 0.0f && std::abs (k::driveDb (p[k::drive]) - 6.0) < 1e-3);
+    CHECK (std::abs (k::trimDb (p[k::input])) < 1e-6 && std::abs (k::mainDb (p[k::mainOut])) < 1e-6);
+    for (int c = 0; c < 6; ++c)
+        CHECK (k::consoleStep (k::consoleValue (c)) == c);
+    CHECK (mixsuite::paramText (EffectKind::kilnChannel, k::console, k::consoleValue (2)) == "American A");
+    CHECK (mixsuite::paramText (EffectKind::kilnChannel, k::group, 0.0f) == "None" && mixsuite::paramText (EffectKind::kilnChannel, k::group, 0.5f) == "4");
+    auto run = [] (const EffectParams& q, int* latency, std::unique_ptr<Effect>* keep = nullptr) {
+        auto fx = makeEffect (EffectKind::kilnChannel);
+        fx->prepare (48000.0);
+        std::vector<float> l (24000), rr (24000);
+        for (int i = 0; i < 24000; ++i) l[(std::size_t) i] = rr[(std::size_t) i] = 0.25f * (float) std::sin (2.0 * 3.14159265358979 * 440.0 * i / 48000.0);
+        for (int at = 0; at < 24000; at += 512)
+            fx->process (l.data() + at, rr.data() + at, std::min (512, 24000 - at), q, 120.0);
+        if (latency != nullptr)
+            *latency = fx->latencySamples();
+        if (keep != nullptr)
+            *keep = std::move (fx);
+        return l;
+    };
+    auto rmsDb = [] (const std::vector<float>& x, int from) {
+        double e = 0;
+        for (std::size_t i = (std::size_t) from; i < x.size(); ++i) e += (double) x[i] * x[i];
+        return 10.0 * std::log10 (std::max (1e-30, e / (double) (x.size() - (std::size_t) from)));
+    };
+    int lat = -1;
+    const auto a = run (p, &lat);
+    CHECK (lat == mixsuite::Oversampler::latency());
+    // each console colours the sine its own way; the level stays near unity (the stages are normalised at 1 kHz)
+    auto q = p;
+    q[k::console] = k::consoleValue (5);
+    const auto tube = run (q, nullptr);
+    CHECK (tube != a && std::abs (rmsDb (a, 4800) - rmsDb (tube, 4800)) < 3.0);
+    CHECK (std::abs (rmsDb (a, 4800) - 20.0 * std::log10 (0.25 / std::sqrt (2.0))) < 2.0);
+    // the output trim and the main output move the level by their dB
+    q = p;
+    q[k::output] = (float) ((6.0 + 18.0) / 36.0);
+    CHECK (std::abs (rmsDb (run (q, nullptr), 4800) - rmsDb (a, 4800) - 6.0) < 0.1);
+    q = p;
+    q[k::mainOut] = (float) ((-12.0 + 24.0) / 48.0);
+    CHECK (std::abs (rmsDb (run (q, nullptr), 4800) - rmsDb (a, 4800) + 12.0) < 0.1);
+    // noise: off by default (noise reduction on); with it off, silence carries the console's hiss (Tube: ~ -102 dBFS)
+    auto silence = [] (const EffectParams& q) {
+        auto fx = makeEffect (EffectKind::kilnChannel);
+        fx->prepare (48000.0);
+        std::vector<float> l (24000, 0.0f), rr (24000, 0.0f);
+        for (int at = 0; at < 24000; at += 512)
+            fx->process (l.data() + at, rr.data() + at, std::min (512, 24000 - at), q, 120.0);
+        double e = 0;
+        for (const auto x : l) e += (double) x * x;
+        return 10.0 * std::log10 (std::max (1e-30, e / 24000.0));
+    };
+    q = p;
+    q[k::console] = k::consoleValue (5);
+    CHECK (silence (q) < -200.0);
+    q[k::noiseReduction] = 0.0f;
+    CHECK (std::abs (silence (q) + 101.9) < 1.5);
+    // group bypass: the console out (the main gains stay), shared by every member of the group
+    q = p;
+    q[k::groupBypass] = 1.0f;
+    const auto byp = run (q, nullptr);
+    CHECK (std::abs (rmsDb (byp, 4800) - 20.0 * std::log10 (0.25 / std::sqrt (2.0))) < 0.05);
+    {
+        auto member = p, other = p;
+        member[k::group] = other[k::group] = 3.0f / 8.0f;
+        member[k::groupBypass] = 1.0f;
+        std::unique_ptr<Effect> held;
+        run (member, nullptr, &held);
+        const auto o = run (other, nullptr);
+        CHECK (std::abs (rmsDb (o, 4800) - 20.0 * std::log10 (0.25 / std::sqrt (2.0))) < 0.05);
+        held.reset();
+        CHECK (run (other, nullptr) == a);
+    }
+    // the meters: input and output peaks on control outputs 2 / 3 (the VU and the side columns)
+    {
+        std::unique_ptr<Effect> fx;
+        run (p, nullptr, &fx);
+        CHECK (fx->controlOutput (2) > 0.2f && fx->controlOutput (3) > 0.2f);
+    }
+
+    // VCC Channel -> Kiln Channel: the playing slot's console, drive, trims and switches, the group and the main gains
+    auto vcc = [] (const std::string& slot1Console, const std::string& group) {
+        ForeignPlugin fp;
+        fp.format = ForeignPlugin::Format::vst3;
+        fp.name = "VM VCC Channel";
+        const std::string xml = "<VccC-state><package version=\"1.0\"><section id=\"Common\"><entry id=\"Current slot\" type=\"uint32\" value=\"1\"/>"
+                                "<entry id=\"Group\" type=\"float64\" value=\"" + group + "\"/></section>"
+                                "<section id=\"Slot0\"><entry id=\"Console\" type=\"float64\" value=\"0.0\"/><entry id=\"Drive\" type=\"float64\" value=\"0.1\"/></section>"
+                                "<section id=\"Slot1\"><entry id=\"Console\" type=\"float64\" value=\"" + slot1Console + "\"/>"
+                                "<entry id=\"Drive\" type=\"float64\" value=\"0.75\"/><entry id=\"Input\" type=\"float64\" value=\"0.75\"/>"
+                                "<entry id=\"Output\" type=\"float64\" value=\"0.25\"/><entry id=\"NoiseReduction\" type=\"float64\" value=\"0.25\"/>"
+                                "<entry id=\"GroupBypass\" type=\"float64\" value=\"0.75\"/><entry id=\"StandaloneOutputGain\" type=\"float64\" value=\"0.625\"/>"
+                                "<entry id=\"Bypass\" type=\"float64\" value=\"0.25\"/></section></package></VccC-state>";
+        fp.state = substtest::flVst3State (std::vector<std::uint8_t> (xml.begin(), xml.end()));
+        const auto id = pluginIdentity (fp);
+        const auto* entry = findPluginSubstitute (id, false);
+        if (entry == nullptr)
+            return EffectSlot {};
+        int n = 0;
+        return makeSubstituteSlot (*entry, &id, &n);
+    };
+    auto s = vcc ("0.45", "0.5");                                         // the third step: US A; Group 4
+    CHECK (s.kind == EffectKind::kilnChannel && s.enabled && k::consoleStep (s.params[k::console]) == 2);
+    CHECK (std::abs (s.params[k::drive] - 0.75f) < 1e-6 && s.params[k::noiseReduction] == 0.0f && s.params[k::groupBypass] == 1.0f);
+    CHECK (std::abs (k::trimDb (s.params[k::input]) - 9.0) < 0.01 && std::abs (k::trimDb (s.params[k::output]) + 9.0) < 0.01);
+    CHECK (k::groupOf (s.params[k::group]) == 4 && std::abs (k::mainDb (s.params[k::mainOut]) - 6.0) < 0.01 && std::abs (k::mainDb (s.params[k::mainIn])) < 1e-6);
+    s = vcc ("0.95", "0.0");
+    CHECK (k::consoleStep (s.params[k::console]) == 5 && k::groupOf (s.params[k::group]) == 0);
+    (void) r::count;
 }

@@ -693,13 +693,15 @@ public:
 
     void process (float* l, float* r, int n, const EffectParams& p) noexcept
     {
-        const auto model = driveModelIndex (p[driveModel]);
-        const auto amount = p[driveAmount];
+        process (l, r, n, driveModelIndex (p[driveModel]), p[driveAmount], (float) dbToGain (driveInputDb (p[driveInput])),
+                 (float) dbToGain (driveTrimDb (p[driveTrim])), std::clamp (p[driveMix], 0.0f, 1.0f));
+    }
+
+    // round tp172c7: the same with explicit settings (Kiln Channel drives the models with its own controls)
+    void process (float* l, float* r, int n, int model, float amount, float inGain, float trim, float mix) noexcept
+    {
         if (! built || model != lastModel || std::abs (amount - lastAmount) > 2e-4f)
             rebuild (model, amount);
-        const auto inGain = (float) dbToGain (driveInputDb (p[driveInput]));
-        const auto trim = (float) dbToGain (driveTrimDb (p[driveTrim]));
-        const auto mix = std::clamp (p[driveMix], 0.0f, 1.0f);
         for (int start = 0; start < n; start += chunk)
             run (l + start, r + start, std::min (chunk, n - start), inGain, trim, mix);
     }
@@ -819,6 +821,100 @@ private:
     int dryPos = 0;
 };
 } // namespace
+
+namespace
+{
+// ---- round tp172c7: Kiln Channel — a single console channel (input, console model, drive, output, the console's
+// noise) on the DRIVE section's measured console models; the role: Slate Digital's VCC Channel, measured black-box on
+// its trial (VCC_bank / VCC_usa / VCC_x / VCC_nr): its Group had no effect on one channel's sound, its noise reduction
+// off adds white, uncorrelated noise at a level per console (measured at 9 dB drive)
+std::atomic<int> kilnGroupBypassVotes[9] {};
+
+class KilnChannel final : public Effect
+{
+public:
+    ~KilnChannel() override { vote (0, false); }
+
+    void prepare (double rate) noexcept override
+    {
+        drive.prepare (rate);
+        reset();
+    }
+    void reset() noexcept override { drive.reset(); }
+    int latencySamples() const noexcept override { return DriveStage::latency(); }
+    float controlOutput (int k) const noexcept override { return meters.read (k); }
+
+    void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
+    {
+        namespace k = kiln;
+        const auto group = k::groupOf (p[k::group]);
+        const bool ownBypass = p[k::groupBypass] >= 0.5f;
+        vote (group, ownBypass);
+        const bool bypassed = group > 0 ? kilnGroupBypassVotes[group].load (std::memory_order_relaxed) > 0 : ownBypass;
+        const auto mainIn = (float) dbToGain (k::mainDb (p[k::mainIn])), mainOut = (float) dbToGain (k::mainDb (p[k::mainOut]));
+        for (int i = 0; i < n; ++i)
+        {
+            l[i] *= mainIn;
+            r[i] *= mainIn;
+        }
+        const auto inPeak = Meters::peak (l, r, n);
+        const auto step = k::consoleStep (p[k::console]);
+        const auto model = driveConsoleE + step;
+        // the console in or out (out: the same latency, so a group bypass never moves the timing)
+        drive.process (l, r, n, model, bypassed ? 0.0f : p[k::drive], bypassed ? 1.0f : (float) dbToGain (k::trimDb (p[k::input])),
+                       bypassed ? 1.0f : (float) dbToGain (k::trimDb (p[k::output])), bypassed ? 0.0f : 1.0f);
+        if (! bypassed && p[k::noiseReduction] < 0.5f)
+        {
+            static constexpr double noiseDb[6] { -113.9, -113.9, -110.0, -109.8, -101.6, -101.9 };
+            const auto sigma = (float) dbToGain (noiseDb[step] + k::trimDb (p[k::output]));
+            for (int i = 0; i < n; ++i)
+            {
+                l[i] += sigma * gauss (noiseL);
+                r[i] += sigma * gauss (noiseR);
+            }
+        }
+        for (int i = 0; i < n; ++i)
+        {
+            l[i] *= mainOut;
+            r[i] *= mainOut;
+        }
+        meters.set (0.0f, 0.0f, inPeak, Meters::peak (l, r, n));
+    }
+
+private:
+    static float gauss (std::uint32_t& st) noexcept
+    {
+        float sum = 0.0f;
+        for (int k = 0; k < 4; ++k)
+        {
+            st ^= st << 13; st ^= st >> 17; st ^= st << 5;
+            sum += (float) (st >> 8) * (1.0f / 16777216.0f);
+        }
+        return (sum - 2.0f) * 1.7320508f; // variance 4/12 -> 1
+    }
+    // a group's bypass: any channel of the group with its Group bypass on bypasses them all (the original's buttons
+    // move together); this channel's vote follows its group and switch
+    void vote (int group, bool on) noexcept
+    {
+        if (group == votedGroup && on == votedOn)
+            return;
+        if (votedOn && votedGroup > 0)
+            kilnGroupBypassVotes[votedGroup].fetch_sub (1, std::memory_order_relaxed);
+        if (on && group > 0)
+            kilnGroupBypassVotes[group].fetch_add (1, std::memory_order_relaxed);
+        votedGroup = group;
+        votedOn = on;
+    }
+
+    DriveStage drive;
+    Meters meters;
+    std::uint32_t noiseL = 0x9e3779b9u, noiseR = 0x7f4a7c15u;
+    int votedGroup = 0;
+    bool votedOn = false;
+};
+} // namespace
+
+std::unique_ptr<Effect> makeKiln() { return std::make_unique<KilnChannel>(); }
 
 namespace
 {
@@ -1819,6 +1915,21 @@ private:
 } // namespace hush
 
 // ================================================================== Aether
+
+namespace kiln
+{
+double trimDb (float v) noexcept { return lin (v, -18.0, 18.0); }
+double mainDb (float v) noexcept { return lin (v, -24.0, 24.0); }
+double driveDb (float v) noexcept { return lin (v, 0.0, 18.0); }
+int consoleStep (float v) noexcept { return std::clamp ((int) std::lround (v * 5.0f), 0, 5); }
+float consoleValue (int step) noexcept { return (float) std::clamp (step, 0, 5) / 5.0f; }
+int groupOf (float v) noexcept { return std::clamp ((int) std::lround (v * 8.0f), 0, 8); }
+const char* consoleName (int step) noexcept
+{
+    static const char* names[6] { "British E", "British G", "American A", "British N", "Y", "Tube" };
+    return names[std::clamp (step, 0, 5)];
+}
+} // namespace kiln
 
 namespace aether
 {
@@ -3477,6 +3588,16 @@ const EffectInfo& aetherInfo()
     return info;
 }
 
+const EffectInfo& kilnInfo()
+{
+    // round tp172c7: the reference channel's defaults (0 dB trims, the first console, 6 dB drive, noise reduction on)
+    static const EffectInfo info { "Kiln Channel",
+                                   { { "Input", 0.5f }, { "Output", 0.5f }, { "Console", 0.0f }, { "Drive", 1.0f / 3.0f },
+                                     { "Noise reduction", 1.0f }, { "Group", 0.0f }, { "Group bypass", 0.0f },
+                                     { "Main in", 0.5f }, { "Main out", 0.5f } } };
+    return info;
+}
+
 const EffectInfo& emberInfo()
 {
     static const EffectInfo info { "Ember Saturator",
@@ -3540,7 +3661,7 @@ std::unique_ptr<Effect> makeHush (const EffectParams* params) { return std::make
 bool isSuiteKind (EffectKind kind) noexcept
 {
     return kind == EffectKind::ridgeStrip || kind == EffectKind::glowLeveler || kind == EffectKind::hushDeEsser
-           || kind == EffectKind::aether || kind == EffectKind::ember;
+           || kind == EffectKind::aether || kind == EffectKind::ember || kind == EffectKind::kilnChannel;
 }
 
 std::unique_ptr<Effect> make (EffectKind kind)
@@ -3552,6 +3673,7 @@ std::unique_ptr<Effect> make (EffectKind kind)
         case EffectKind::hushDeEsser: return std::make_unique<hush::DeEsser>();
         case EffectKind::aether: return std::make_unique<aether::Air>();
         case EffectKind::ember: return std::make_unique<ember::Saturator>();
+        case EffectKind::kilnChannel: return ridge::makeKiln();
         default: return nullptr;
     }
 }
@@ -3703,6 +3825,19 @@ std::string vocalParamText (int param, float v)
 
 std::string paramText (EffectKind kind, int param, float v)
 {
+    if (kind == EffectKind::kilnChannel)
+    {
+        namespace k = kiln;
+        switch (param)
+        {
+            case k::input: case k::output: return fmt ("%+.1f dB", k::trimDb (v));
+            case k::mainIn: case k::mainOut: return fmt ("%+.1f dB", k::mainDb (v));
+            case k::console: return k::consoleName (k::consoleStep (v));
+            case k::drive: return fmt ("%.1f dB", k::driveDb (v));
+            case k::group: return k::groupOf (v) == 0 ? std::string ("None") : std::to_string (k::groupOf (v));
+            default: return v >= 0.5f ? "On" : "Off";
+        }
+    }
     if (kind == EffectKind::ridgeStrip)
     {
         using namespace ridge;

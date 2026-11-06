@@ -345,6 +345,16 @@ const std::map<std::pair<K, std::string>, const char*>& own()
         { { K::aether, "dynamic" }, TR_NOOP ("The air follows the signal: less on loud, harsh moments") },
         { { K::aether, "mid air" }, TR_NOOP ("Air on the upper mids") },
         { { K::aether, "high air" }, TR_NOOP ("Air on the very top") },
+        // Kiln Channel (round tp172c7)
+        { { K::kilnChannel, "input" }, TR_NOOP ("Level into the console model: more input drives it harder") },
+        { { K::kilnChannel, "output" }, TR_NOOP ("Level after the console model") },
+        { { K::kilnChannel, "console" }, TR_NOOP ("The console model: two British E and G channels, an American A, a British N, the Y and a tube desk") },
+        { { K::kilnChannel, "drive" }, TR_NOOP ("How hard the console's circuits are pushed: more drive, more colour and harmonics") },
+        { { K::kilnChannel, "noise reduction" }, TR_NOOP ("On: the console's hiss is left out. Off: its measured noise floor is added") },
+        { { K::kilnChannel, "group" }, TR_NOOP ("The group this channel belongs to: Group bypass on any member bypasses the whole group") },
+        { { K::kilnChannel, "group bypass" }, TR_NOOP ("Bypasses the console on every channel of the group") },
+        { { K::kilnChannel, "main in" }, TR_NOOP ("Level into the plugin, before the console") },
+        { { K::kilnChannel, "main out" }, TR_NOOP ("Level out of the plugin, after everything") },
         // Ember Saturator
         { { K::ember, "drive" }, TR_NOOP ("How hard the signal hits the saturation") },
         { { K::ember, "style" }, TR_NOOP ("The saturation's character: tube, tape, transistor or fuzz") },
@@ -613,6 +623,16 @@ Summary fromName (K kind, const std::string& name)
         else if (contains (name, "safe")) s.text = TR_NOOP ("a safety limiter: only catches the overs");
         return s;
     }
+    if (kind == K::kilnChannel)
+    {
+        if (contains (name, "british e")) s.text = TR_NOOP ("the classic British large-format desk: tight, forward mids");
+        else if (contains (name, "british g")) s.text = TR_NOOP ("the later British desk: cleaner, a little brighter");
+        else if (contains (name, "american a")) s.text = TR_NOOP ("the American desk: thick lows, a warm push");
+        else if (contains (name, "british n")) s.text = TR_NOOP ("the British boutique desk: silky top, rich harmonics");
+        else if (contains (name, "y")) s.text = TR_NOOP ("a modern desk with heavy colour and noise");
+        else if (contains (name, "tube")) s.text = TR_NOOP ("a tube desk: round, dark, the most noise");
+        return s;
+    }
     if (kind == K::ember)
     {
         if (contains (name, "tube")) s.text = TR_NOOP ("tube saturation: soft, mostly even harmonics");
@@ -667,6 +687,7 @@ int modeParam (EffectKind kind)
         case K::atrium: case K::foilPlate: name = "Type"; break;
         case K::halo: case K::horizon: name = "Reverb mode"; break;
         case K::ember: case K::crestCompressor: case K::sentryGate: case K::apexLimiter: name = "Style"; break;
+        case K::kilnChannel: name = "Console"; break;
         default: return -1;
     }
     const auto& info = effectInfo (kind);

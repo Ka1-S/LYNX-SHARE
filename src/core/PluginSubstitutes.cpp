@@ -528,12 +528,12 @@ lynx = Ridge Strip
 names = SSL Guitarstrip; Guitarstrip
 translate = ssl-guitarstrip
 
-# round tp172c6: Slate VCC Channel -> Ridge's DRIVE section on the console's measured model (the drive and the trims
-# read from its state)
+# round tp172c6: Slate VCC Channel -> the console's measured model (the drive and the trims read from its state);
+# tp172c7: onto Kiln Channel, LYNX's console channel (console, drive, trims, noise, group, group bypass, main gains)
 [vcc-channel]
 product = VCC Channel (console emulation)
 vendor = Slate Digital (Complete Access)
-lynx = Ridge Strip
+lynx = Kiln Channel
 names = VM VCC Channel; VCC Channel
 translate = vcc-channel
 
@@ -1833,15 +1833,17 @@ int translateHarrisonStrip (const std::vector<std::uint8_t>& state, EffectSlot& 
     return (int) v.size();
 }
 
-// round tp172c6: Slate VCC Channel (its state: a <package> archive, Slot0 / Slot1 sections of normalised entries; the
-// "Current slot" plays) -> Ridge with its EQ and dynamics out and the DRIVE section on the console's model (Brit 4k E /
-// Brit 4k G / US A / Brit N / Y / RC-Tube -> Console E / G / A / N / Y, Tube), the drive 0 .. 18 dB as measured; its Input
-// and Output (-18 .. +18 dB) on Ridge's trims (the input drives the model, the output after it)
+// round tp172c6: Slate VCC Channel (its state: a <package> archive, a Common section and Slot0 / Slot1 sections of
+// normalised entries; the "Current slot" plays). Round tp172c7: onto Kiln Channel, LYNX's console channel (it was
+// Ridge's DRIVE section): the console selector (Brit 4k E / Brit 4k G / US A / Brit N / Y / RC-Tube -> Kiln's six
+// steps, the same order), the drive 0 .. 18 dB, Input and Output (-18 .. +18 dB), Noise Reduction and Group Bypass (its
+// switches store 0.25 = off, 0.75 = on), the Group in Common (None, 1 .. 8 over nine equal bins) and the main gains
+// (StandaloneInputGain / StandaloneOutputGain, -24 .. +24 dB)
 int translateVccChannel (const std::vector<std::uint8_t>& state, EffectSlot& slot)
 {
-    namespace r = mixsuite::ridge;
+    namespace k = mixsuite::kiln;
     const auto root = findBytes (state, "<package");
-    if (root == std::string::npos || slot.kind != EffectKind::ridgeStrip || findBytes (state, "VccC-state") == std::string::npos)
+    if (root == std::string::npos || slot.kind != EffectKind::kilnChannel || findBytes (state, "VccC-state") == std::string::npos)
         return 0;
     const std::string text (state.begin() + (std::ptrdiff_t) root, state.end());
     auto entries = [&text] (const std::string& section) {
@@ -1866,21 +1868,17 @@ int translateVccChannel (const std::vector<std::uint8_t>& state, EffectSlot& slo
         return 0;
     auto at = [&v] (const char* id, double fallback) { const auto it = v.find (id); return it != v.end() ? it->second : fallback; };
     auto& p = slot.params;
-    p[r::modern] = p[r::console4k] = p[r::voicing] = p[r::vocal] = 0.0f;
-    p[r::eqOn] = p[r::dynOn] = 0.0f;
-    p[r::hpf] = p[r::lpf] = 0.0f;
-    p[r::compRatio] = p[r::gateRange] = 0.0f;
-    p[r::autoMakeup] = p[r::analog] = 0.0f;
-    // the console selector: six steps (Brit 4k E, Brit 4k G, US A, Brit N, Y, RC-Tube)
-    static const int models[6] { r::driveConsoleE, r::driveConsoleG, r::driveConsoleA, r::driveConsoleN, r::driveConsoleY, r::driveTube };
     const auto console = std::clamp ((int) std::floor (at ("Console", 0.0) * 6.0), 0, 5);
-    p[r::driveOn] = 1.0f;
-    p[r::driveModel] = r::driveModelValue (models[console]);
-    p[r::driveAmount] = (float) std::clamp (at ("Drive", 1.0 / 3.0), 0.0, 1.0);
-    p[r::driveInput] = p[r::driveTrim] = 0.5f;
-    p[r::driveMix] = 1.0f;
-    p[r::input] = linNorm (std::clamp (-18.0 + 36.0 * at ("Input", 0.5), -20.0, 20.0), -20.0, 20.0);
-    p[r::output] = linNorm (std::clamp (-18.0 + 36.0 * at ("Output", 0.5), -20.0, 20.0), -20.0, 20.0);
+    p[k::console] = k::consoleValue (console);
+    p[k::drive] = (float) std::clamp (at ("Drive", 1.0 / 3.0), 0.0, 1.0);
+    p[k::input] = (float) std::clamp (at ("Input", 0.5), 0.0, 1.0);   // both -18 .. +18 dB, linear
+    p[k::output] = (float) std::clamp (at ("Output", 0.5), 0.0, 1.0);
+    p[k::noiseReduction] = at ("NoiseReduction", 0.75) >= 0.5 ? 1.0f : 0.0f;
+    p[k::groupBypass] = at ("GroupBypass", 0.25) >= 0.5 ? 1.0f : 0.0f;
+    const auto group = common.count ("Group") ? std::clamp ((int) std::floor (common.at ("Group") * 9.0), 0, 8) : 0;
+    p[k::group] = (float) group / 8.0f;
+    p[k::mainIn] = (float) std::clamp (at ("StandaloneInputGain", 0.5), 0.0, 1.0);   // both -24 .. +24 dB, linear
+    p[k::mainOut] = (float) std::clamp (at ("StandaloneOutputGain", 0.5), 0.0, 1.0);
     if (at ("Bypass", 0.0) >= 0.5)
         slot.enabled = false;
     return (int) v.size();
