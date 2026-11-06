@@ -670,3 +670,35 @@ TEST (als175a_beats_warp_mode)
         CHECK (std::abs (10.0 * std::log10 (eout / (ein * 1.25))) < 1.5);
     }
 }
+
+TEST (als175a_warped_clip_stretches_offline)
+{
+    // the same set with the file length recorded (Live always writes it): 96000 frames at 48 kHz = 2 s = 8 content beats.
+    // The channel stretches the whole file to 8 beats with the clip's warp mode (Complex); the clip plays it unstretched
+    using namespace lynx;
+    auto xml = als175a::richSet();
+    const std::string from = "</FileRef></SampleRef></AudioClip>";
+    const auto at = xml.find (from);
+    CHECK (at != std::string::npos);
+    if (at == std::string::npos)
+        return;
+    xml.replace (at, from.size(), "</FileRef><DefaultDuration Value=\"96000\" /><DefaultSampleRate Value=\"48000\" /></SampleRef></AudioClip>");
+    FlpImportReport report;
+    const auto bytes = als175a::bytesOf (xml);
+    const auto packed = gzip::compressStored (bytes.data(), bytes.size());
+    const auto song = importAls (packed, als175a::options (&report), nullptr);
+    CHECK (song.has_value());
+    if (! song)
+        return;
+    const Clip* take = nullptr;
+    for (const auto& c : song->playlist)
+        if (c.kind == ClipKind::audio)
+            take = &c;
+    CHECK (take != nullptr);
+    if (take == nullptr)
+        return;
+    CHECK (take->stretch == 1.0 && std::abs (take->pitch - 2.0f) < 1e-6 && take->offset == 0);
+    const auto& ch = song->channels[(std::size_t) take->channel];
+    CHECK (ch.sampler.keepPitch && ch.sampler.stretchMethod == StretchMethod::complex);
+    CHECK (std::abs (ch.sampler.stretchBeats - 8.0f) < 1e-5);
+}

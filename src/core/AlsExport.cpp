@@ -488,7 +488,10 @@ struct Exporter
         // content beats ↔ sample seconds: one rate, the clip's stretch [import: stretch = beats per second · 60 / bpm]
         const auto seconds = options.sampleSeconds ? options.sampleSeconds (ch.samplePath) : 0.0;
         const auto spanSeconds = seconds > 0.0 ? seconds : 1.0;
-        const auto beatsPerSecond = clip.stretch * song.bpm / 60.0;
+        // a channel stretched to a length in beats (an imported warped clip, FL's stretch): its beats per file second
+        const auto beatsPerSecond = (ch.sampler.keepPitch && ch.sampler.stretchBeats > 0.0f && seconds > 0.0 ? (double) ch.sampler.stretchBeats / seconds
+                                                                                                             : song.bpm / 60.0)
+                                    * clip.stretch;
         if (auto* markers = c.child ("WarpMarkers"))
         {
             markers->kids.clear();
