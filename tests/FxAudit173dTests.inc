@@ -108,7 +108,6 @@ const std::vector<Allowed>& knownGaps()
         { "Fruity Love Philter", "Master LFO", "inert", philter }, { "Fruity Love Philter", "Mod X", "inert", philter },
         { "Fruity Love Philter", "Mod Y", "inert", philter }, { "Fruity Love Philter", "Pattern", "inert", philter },
         { "Fruity Convolver", "EQ", "inert", "gap173d-3: the amount of a drawn EQ curve; FL's default curve is flat at 0 dB (×1, REA_rodada60 §6) and LYNX's editor can't draw one" },
-        { "Vocodex", "Subtractive gate", "inert", "gap173d-4: how the gate map applies its threshold (both paths reproduced, REA_rodada35 §4.2); a new instance's gate map is flat at 0 and LYNX's editor can't draw Vocodex maps" },
     };
     return a;
 }

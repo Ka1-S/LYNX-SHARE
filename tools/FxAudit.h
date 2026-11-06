@@ -37,12 +37,14 @@
 #include <string>
 #include <vector>
 
+#include "core/ConvolverFx.h"
 #include "core/EquoFx.h"
 #include "core/LovePhilter.h"
 #include "core/Effects.h"
 #include "core/FacetEq.h"
 #include "core/PluginLayout.h"
 #include "core/StateParams.h"
+#include "core/Vocodex.h"
 
 namespace lynx::fxaudit
 {
@@ -671,7 +673,7 @@ struct Hint
     bool sidechain = false;                  // also with the side-chain input
     int move = -1;                           // ≥ 0: this parameter jumps to moveTo in the middle of the pad
     float moveTo = 0.0f;
-    std::function<void (EffectSlot&)> edit;  // a change no parameter makes (a send track kept in the state)
+    std::function<void (EffectSlot&)> edit = nullptr; // a change no parameter makes (a send track kept in the state)
 };
 
 struct Options
@@ -964,6 +966,19 @@ inline std::vector<Hint> hintsFor (EffectKind kind)
             out.push_back (all);
             break;
         }
+        case EffectKind::convolver:
+        {
+            // round 173d3 (gap173d-3): FL's default EQ curve is flat (its gain acts at any EQ amount), so the EQ amount
+            // is heard only once a curve is drawn: a low shelf down, a high boost
+            Hint h { "an EQ curve drawn (lows down, highs up)", {} };
+            h.edit = [] (EffectSlot& e) {
+                std::vector<convolver::EnvPoint> pts (4);
+                pts[0].y = 0.15, pts[1].dt = 0.3, pts[1].y = 0.5, pts[2].dt = 0.4, pts[2].y = 0.5, pts[3].dt = 0.3, pts[3].y = 0.95;
+                convolver::writeEqCurve (e.state, pts);
+            };
+            out.push_back (h);
+            break;
+        }
         case EffectKind::frequencySplitter:
         {
             // (the low band down: the bands no longer sum back to the input, so the crossover is heard)
@@ -993,6 +1008,15 @@ inline std::vector<Hint> hintsFor (EffectKind kind)
         case EffectKind::pitchCorrect:
             out.push_back (named ("Harmonize from the held notes, mixed", { { "Harmonize", 1.0f }, { "MIDI", 1.0f }, { "Mix", 1.0f } }));
             break;
+        case EffectKind::vocodex:
+        {
+            // round 173d3 (gap173d-4): a new instance's gate map ("Modulator noise level") is flat at 0, so the
+            // Subtractive gate switch has no threshold to act on until the map is drawn
+            Hint h { "the gate map drawn (a rising line)", {} };
+            h.edit = [] (EffectSlot& e) { e.state = vocodex::withMap (e.state, 3, { { 0.0, 0.0 }, { 1.0, 0.8 } }); };
+            out.push_back (h);
+            break;
+        }
         default:
             break;
     }
