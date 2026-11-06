@@ -7377,3 +7377,5 @@ countries: br
 "{0} in {1}" = "{0} em {1}"
 "Playlist clip" = "Clip da Playlist"
 "ON" = "LIG."
+"{0} crashed. Save your project now (as a new file is safest)." = "{0} travou. Salve seu projeto agora (como um arquivo novo é o mais seguro)."
+"Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "A janela dele foi fechada para que o LYNX SHARE continuasse funcionando. O plugin pode não funcionar direito até o projeto ser aberto de novo."

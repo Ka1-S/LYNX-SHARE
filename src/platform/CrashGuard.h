@@ -24,6 +24,37 @@ std::uint32_t run (Fn&& fn) noexcept
     return call ([] (void* c) { (*static_cast<std::remove_reference_t<Fn>*> (c)) (); }, &fn);
 }
 
+// Plugin editor windows (issue #32, round 174a; Windows x64 only, elsewhere these do nothing). A hosted plugin's own
+// window procedure runs outside every LYNX call (DispatchMessageW calls it from the message loop), so a fault in it
+// ended LYNX (the reporter's synth editor: access violation under DispatchMessageW). The JUCE patch
+// (cmake/LynxPatchJuce.cmake fix 15) sends each message through dispatchGuarded, which dispatches it inside an SEH
+// guard. A fault is caught only when
+//   - it is not a debugger event, a heap corruption, a stack overflow or a fail-fast (those still end the process:
+//     going on with a damaged heap or stack is not safe), and
+//   - the first frame outside Windows' own modules is not LYNX.exe (a bug in LYNX stays a crash with its report), and
+//   - `claim` (set by the app) says the message's window or that module belongs to an open plugin editor: it returns
+//     that editor's top-level window, else nullptr.
+// Then the editor's window is hidden at once, the messages for it are dropped (a WM_PAINT is validated) until
+// forgetWindow, and `onFault` runs after the guard (still on the message thread) to close the editor and tell the
+// user. Not done on macOS / Linux: there a fault is a signal, and jumping out of the Cocoa / X11 event dispatch from a
+// signal handler leaves the run loop, autorelease pools and the X lock in an undefined state (see
+// docs/analise/REA_rodada174a.md); "Run in a separate process" is the protection there.
+struct WindowFault
+{
+    void* rootWindow = nullptr; // the editor's top-level window (HWND)
+    std::uint32_t code = 0;     // NTSTATUS
+    std::string where;          // "module+0xoffset" of the faulting instruction
+    std::string module;         // the module blamed (first one outside Windows), UTF-8 full path
+    std::string trace;          // every frame, as moduleBacktrace
+};
+using WindowClaim = void* (*) (void* window, const wchar_t* faultModulePath);
+void setWindowGuard (WindowClaim claim, void (*onFault) (const WindowFault&)) noexcept;
+void dispatchGuarded (const void* msg) noexcept; // msg: const MSG*
+void forgetWindow (void* rootWindow) noexcept;   // the editor is gone: a new window may reuse the handle
+// Whether a fault with this exception code may be caught at all (see above); true for access violations, illegal
+// instructions, divisions by zero, C++ exceptions leaving the plugin...
+bool windowFaultCatchable (std::uint32_t code) noexcept;
+
 // Child processes that load plugins (scan, sandbox): a plugin crashing there must not pop Windows' "stopped working"
 // dialog on the user's screen (the parent notices the exit code). Also covers fail-fast exits (0xC0000409).
 void quietCrashReports() noexcept;

@@ -7294,3 +7294,5 @@ countries: cn sg
 "{0} in {1}" = "{1} 中的 {0}"
 "Playlist clip" = "Playlist 片段"
 "ON" = "开"
+"{0} crashed. Save your project now (as a new file is safest)." = "{0} 崩溃了。请立即保存项目（另存为新文件最安全）。"
+"Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "已关闭其窗口，以便 LYNX SHARE 继续运行。在重新打开项目之前，该插件可能无法正常工作。"

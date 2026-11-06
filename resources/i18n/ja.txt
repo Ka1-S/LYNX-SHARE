@@ -7294,3 +7294,5 @@ countries: jp
 "{0} in {1}" = "{1}の{0}"
 "Playlist clip" = "Playlistクリップ"
 "ON" = "オン"
+"{0} crashed. Save your project now (as a new file is safest)." = "{0} がクラッシュしました。今すぐプロジェクトを保存してください（新しいファイルとして保存するのが最も安全です）。"
+"Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "LYNX SHARE を動作させ続けるため、そのウィンドウを閉じました。プロジェクトを開き直すまで、プラグインが正しく動作しない可能性があります。"

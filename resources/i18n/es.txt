@@ -7294,3 +7294,5 @@ countries: es mx ar co cl pe ve
 "{0} in {1}" = "{0} en {1}"
 "Playlist clip" = "Clip de la Playlist"
 "ON" = "ACT."
+"{0} crashed. Save your project now (as a new file is safest)." = "{0} falló. Guarda tu proyecto ahora (lo más seguro es como un archivo nuevo)."
+"Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "Su ventana se cerró para que LYNX SHARE siguiera funcionando. Es posible que el plugin no funcione bien hasta que vuelvas a abrir el proyecto."

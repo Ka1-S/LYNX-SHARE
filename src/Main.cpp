@@ -211,6 +211,11 @@ UncleanCause uncleanCause()
         if (step.startsWith ("closing the editor of ") || step.startsWith ("loaded plugin") || step.startsWith ("opening project"))
             break; // older steps than these did not end the session
     }
+    // issue #32 (round 174a): a plugin whose editor already faulted in this session (caught, LYNX went on) is the
+    // likely cause when the session then ended without a word: offer it a separate process too
+    for (int i = uncleanSteps.size(); --i >= 0 && cause.editorPlugin.isEmpty();)
+        if (const auto editor = lynx::crashreport::parseEditorCrashStep (uncleanSteps[i].toStdString()); ! editor.plugin.empty())
+            cause.editorPlugin = juce::String::fromUTF8 (editor.plugin.c_str());
     if (crashFile.existsAsFile())
     {
         // the first frames after the crash handler's own (the "--- frames" part lists the faulting thread)
@@ -959,6 +964,16 @@ public:
             const auto i = args.indexOf ("--editortest");
             const auto only = i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].unquoted() : juce::String();
             runEditorTest (args[i + 1].unquoted(), args[i + 2].unquoted(), only);
+            return;
+        }
+
+        if (args.contains ("--editorcrashtest"))
+        {
+            // LYNX.exe --editorcrashtest "LYNX Test Crash.clap" report.txt (issue #32, round 174a; Windows): the test
+            // plugin's editor faults in its own window procedure (LYNX_TEST_CRASH=editor). LYNX must catch it, close
+            // that editor, record the trace and keep running its message loop.
+            const auto i = args.indexOf ("--editorcrashtest");
+            runEditorCrashTest (args[i + 1].unquoted(), args[i + 2].unquoted());
             return;
         }
 
@@ -3427,6 +3442,90 @@ private:
         });
         test->step ("plugin=" + chosen->name + " instrument=" + juce::String ((int) test->instrument));
         test->startTimerHz (20);
+    }
+
+    void runEditorCrashTest (const juce::String& pluginPath, const juce::String& reportPath)
+    {
+        struct CrashTest final : juce::Timer
+        {
+            juce::String reportPath, report;
+            std::unique_ptr<lynx::PluginHost> host;
+            juce::AudioPluginInstance* plugin = nullptr;
+            std::function<void (bool)> done;
+            int ticks = 0, crashesBefore = 0;
+
+            void step (const juce::String& line)
+            {
+                report << line << "\n";
+                juce::File (reportPath).replaceWithText (report); // at each step: a crash leaves the last one
+            }
+
+            void timerCallback() override
+            {
+                ++ticks;
+                const auto crashes = lynx::PluginWindows::editorCrashCount() - crashesBefore;
+                const auto open = lynx::PluginWindows::isOpen (*plugin);
+                if ((crashes > 0 && ! open) || ticks >= 50) // 100 ms ticks: up to 5 s
+                {
+                    stopTimer();
+                    step ("editor_crashes=" + juce::String (crashes) + " window_open=" + juce::String ((int) open) + " ticks=" + juce::String (ticks));
+                    bool traced = false;
+                    if (crashes > 0)
+                    {
+                        const auto last = lynx::PluginWindows::editorCrashes().back();
+                        traced = last.traceFile.existsAsFile() && last.traceFile.loadFileAsString().contains ("LYNX Test Crash");
+                        step ("plugin=" + last.plugin + " detail=" + last.detail + " trace=" + last.traceFile.getFileName() + " traced="
+                              + juce::String ((int) traced));
+                        last.traceFile.deleteFile();
+                    }
+                    // still alive: one more message through the loop after the fault
+                    juce::MessageManager::callAsync ([this, ok = crashes == 1 && ! open && traced] {
+                        step ("message_loop_after_fault=1");
+                        step (juce::String ("result=") + (ok ? "OK" : "FAILED"));
+                        done (ok);
+                    });
+                }
+            }
+        };
+
+        auto* test = new CrashTest();
+        test->reportPath = reportPath;
+        test->done = [this, test] (bool ok)
+        {
+            setApplicationReturnValue (ok ? 0 : 1);
+            juce::MessageManager::callAsync ([this, test] { lynx::PluginWindows::closeAll(); delete test; quit(); });
+        };
+       #if ! JUCE_WINDOWS
+        test->step ("result=SKIPPED (Windows only: on macOS / Linux a plugin fault is a signal, see docs/analise/REA_rodada174a.md)");
+        test->done (true);
+        return;
+       #else
+        _putenv_s ("LYNX_TEST_CRASH", "editor");
+        test->host = std::make_unique<lynx::PluginHost> (false);
+        test->step ("plugins_in_file=" + juce::String (test->host->addPluginFile (juce::File (pluginPath))));
+        std::shared_ptr<juce::AudioPluginInstance> instance;
+        for (const auto& type : test->host->getKnownPlugins().getTypes())
+        {
+            if (juce::File (type.fileOrIdentifier).getFileName() != juce::File (pluginPath).getFileName())
+                continue;
+            juce::String error;
+            instance = std::shared_ptr<juce::AudioPluginInstance> (lynx::createRightInstance (test->host->getFormats(), type, 48000.0, 512, error).release());
+            test->step ("plugin=" + type.name + (instance == nullptr ? " error=" + error : juce::String()));
+            break;
+        }
+        if (instance == nullptr || ! instance->hasEditor())
+        {
+            test->step ("result=FAILED (no plugin with an editor)");
+            test->done (false);
+            return;
+        }
+        lynx::preparePlugin (*instance, 48000.0, 512);
+        test->plugin = instance.get();
+        test->crashesBefore = lynx::PluginWindows::editorCrashCount();
+        lynx::PluginWindows::open (instance, *instance, instance->getName()); // (the window keeps the plugin alive)
+        test->step ("window_open=" + juce::String ((int) lynx::PluginWindows::isOpen (*instance)));
+        test->startTimer (100);
+       #endif
     }
 
     void runEditorTest (const juce::String& pluginPath, const juce::String& reportPath, const juce::String& only)

@@ -7294,3 +7294,5 @@ countries: kr
 "{0} in {1}" = "{1}의 {0}"
 "Playlist clip" = "Playlist 클립"
 "ON" = "켬"
+"{0} crashed. Save your project now (as a new file is safest)." = "{0}이(가) 충돌했습니다. 지금 프로젝트를 저장하세요(새 파일로 저장하는 것이 가장 안전합니다)."
+"Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "LYNX SHARE가 계속 실행될 수 있도록 해당 창을 닫았습니다. 프로젝트를 다시 열 때까지 플러그인이 제대로 작동하지 않을 수 있습니다."

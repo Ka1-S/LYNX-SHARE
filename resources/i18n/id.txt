@@ -7294,3 +7294,5 @@ countries: id
 "{0} in {1}" = "{0} di {1}"
 "Playlist clip" = "Clip Playlist"
 "ON" = "NYALA"
+"{0} crashed. Save your project now (as a new file is safest)." = "{0} crash. Simpan proyek sekarang (paling aman sebagai file baru)."
+"Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "Jendelanya ditutup agar LYNX SHARE tetap berjalan. Plugin mungkin tidak bekerja dengan benar sampai proyek dibuka lagi."

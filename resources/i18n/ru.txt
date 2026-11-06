@@ -7294,3 +7294,5 @@ countries: ru by kz
 "{0} in {1}" = "{0} в {1}"
 "Playlist clip" = "Клип Playlist"
 "ON" = "ON"
+"{0} crashed. Save your project now (as a new file is safest)." = "{0}: сбой. Сохраните проект сейчас (надёжнее всего — как новый файл)."
+"Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "Его окно закрыто, чтобы LYNX SHARE продолжал работать. Плагин может работать неправильно, пока проект не будет открыт заново."

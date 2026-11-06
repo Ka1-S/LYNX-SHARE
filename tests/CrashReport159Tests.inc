@@ -264,3 +264,32 @@ TEST (report174a_fatal_hang_is_crash)
     CHECK (! hangIsFatalReport (""));
     CHECK (lynx::crashreport::githubKindOption ("crash") == "LYNX SHARE closed (crash)");
 }
+
+// Issue #32 (round 174a): a fault in a plugin's own editor window that LYNX caught (the editor closed, LYNX went on)
+TEST (report174a_editor_crash_step)
+{
+    using namespace lynx::crashreport;
+    const auto step = std::string ("04:42:18 ") + editorCrashStepPrefix
+                    + "Synth (x64) (access violation at Synth.dll+0x4be460), trace in autosave\\editor-crash 2026-11-06 04-42-18.txt";
+    const auto parsed = parseEditorCrashStep (step);
+    CHECK (parsed.plugin == "Synth (x64)");                       // a name with parentheses of its own
+    CHECK (parsed.traceFile == "editor-crash 2026-11-06 04-42-18.txt");
+    const auto noTime = parseEditorCrashStep (std::string (editorCrashStepPrefix) + "Meter (C++ exception at Meter.vst3+0x10)");
+    CHECK (noTime.plugin == "Meter" && noTime.traceFile.empty());
+    CHECK (parseEditorCrashStep ("04:42:18 editor shown: Synth").plugin.empty());
+    CHECK (parseEditorCrashStep ("").plugin.empty());
+
+    // what may be caught: errors and C++ exceptions; never debugger events, heap corruption, stack overflow, fail-fast
+    CHECK (editorFaultCatchable (0xC0000005u));  // access violation (the reporter's synth editor)
+    CHECK (editorFaultCatchable (0xC000001Du));  // illegal instruction
+    CHECK (editorFaultCatchable (0xC0000094u));  // integer division by zero
+    CHECK (editorFaultCatchable (0xE06D7363u));  // MSVC C++ exception leaving the plugin
+    CHECK (editorFaultCatchable (0x20474343u));  // GCC / Clang C++ exception
+    CHECK (! editorFaultCatchable (0xC0000374u)); // heap corruption
+    CHECK (! editorFaultCatchable (0xC00000FDu)); // stack overflow
+    CHECK (! editorFaultCatchable (0xC0000409u)); // fail-fast
+    CHECK (! editorFaultCatchable (0x80000003u)); // breakpoint
+    CHECK (! editorFaultCatchable (0x80000004u)); // single step
+    CHECK (! editorFaultCatchable (0x406D1388u)); // thread name
+    CHECK (! editorFaultCatchable (0x40010006u)); // OutputDebugString
+}

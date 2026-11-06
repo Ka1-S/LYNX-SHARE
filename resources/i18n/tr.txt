@@ -7294,3 +7294,5 @@ countries: tr
 "{0} in {1}" = "{1} içinde {0}"
 "Playlist clip" = "Playlist klibi"
 "ON" = "AÇIK"
+"{0} crashed. Save your project now (as a new file is safest)." = "{0} çöktü. Projenizi şimdi kaydedin (en güvenlisi yeni bir dosya olarak)."
+"Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "LYNX SHARE çalışmaya devam edebilsin diye penceresi kapatıldı. Proje yeniden açılana kadar plugin düzgün çalışmayabilir."
