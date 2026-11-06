@@ -7339,3 +7339,18 @@ countries: ru by kz
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Связывает регулировки: поворот Входа двигает Выход в обратную сторону, уровень сохраняется при смене драйва"
 "Input and Output move together on every channel of the group that has Group I/O on" = "Вход и Выход двигаются вместе на всех каналах группы с включённым «Вход/выход группы»"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: консольный канал LYNX. Тяните ручку, Alt+клик сбрасывает, правый клик — автоматизация"
+
+# round 176a: the 32-bit plugin bridge
+"Native" = "Нативный"
+"32 bit" = "32 бит"
+"64 bit" = "64 бит"
+"Bit size" = "Разрядность"
+"Which build of the plugin loads when both a 32-bit and a 64-bit one are installed" = "Какая сборка плагина загружается, если установлены и 32-битная, и 64-битная"
+"32bit - bridged" = "32 бит - мост"
+"64bit - bridged" = "64 бит - мост"
+"64bit - native" = "64 бит - нативный"
+"A plugin" = "Плагин"
+"{0} crashed in the 32-bit bridge." = "Сбой {0} в 32-битном мосте."
+"{0} crashed in its separate process." = "Сбой {0} в отдельном процессе."
+"{0} stopped responding (separate process)." = "{0} не отвечает (отдельный процесс)."
+"Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Затронут только его процесс: LYNX SHARE и проект продолжили работу, а плагин заглушён. Сохраните проект; плагин снова загрузится при следующем открытии."

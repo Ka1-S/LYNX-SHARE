@@ -26,6 +26,7 @@ struct Entry
     std::string category; // what the plugin declares (may be empty)
     bool instrument = false;
     std::string renamed = {}; // its name in the Plugin database when the user renamed it ("1_EQ"; empty = not renamed)
+    std::string bits = {};    // the Bits column (Windows): "64", "32" (runs in the 32-bit bridge) or "32+64"
 
     const std::string& shownName() const noexcept { return renamed.empty() ? name : renamed; }
 };
@@ -132,4 +133,11 @@ struct BuiltinPlugin
     bool flPlugin = false;     // one of FL's plugins: "Misc" when FL has no folder for it
 };
 Folders withDefaultCategories (const Folders& user, bool instruments, const std::vector<BuiltinPlugin>& builtins);
+
+// FL's "Combine 32 and 64 bit versions of a plugin" (on by default; REA round 176a §3): a plugin installed both as a
+// 32-bit and a 64-bit build is ONE entry, Bits "32+64", that loads the 64-bit build (the wrapper's "Bit size" picks).
+// `items`: per installed plugin, its identity (format, ID and name: the same for both builds) and whether it is 32-bit.
+// Returns each one's Bits label: "64", "32", "32+64" (the 64-bit one of a pair) or "" (the 32-bit one of a pair: not
+// listed, the combined entry stands for it).
+std::vector<std::string> combinedBits (const std::vector<std::pair<std::string, bool>>& items);
 } // namespace lynx::plugincatalog

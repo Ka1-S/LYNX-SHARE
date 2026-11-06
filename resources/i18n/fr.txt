@@ -7339,3 +7339,18 @@ countries: fr be ch ca lu
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Lie les réglages : tourner l'Entrée déplace la Sortie en sens inverse, le niveau reste stable quand le drive change"
 "Input and Output move together on every channel of the group that has Group I/O on" = "Entrée et Sortie bougent ensemble sur toutes les voies du groupe ayant E/S du groupe activé"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel : la voie de console de LYNX. Faites glisser un bouton, Alt+clic le réinitialise, clic droit pour l'automation"
+
+# round 176a: the 32-bit plugin bridge
+"Native" = "Natif"
+"32 bit" = "32 bits"
+"64 bit" = "64 bits"
+"Bit size" = "Taille en bits"
+"Which build of the plugin loads when both a 32-bit and a 64-bit one are installed" = "La version du plugin chargée quand une version 32 bits et une version 64 bits sont installées"
+"32bit - bridged" = "32 bits - pont"
+"64bit - bridged" = "64 bits - pont"
+"64bit - native" = "64 bits - natif"
+"A plugin" = "Un plugin"
+"{0} crashed in the 32-bit bridge." = "{0} a planté dans le pont 32 bits."
+"{0} crashed in its separate process." = "{0} a planté dans son processus séparé."
+"{0} stopped responding (separate process)." = "{0} ne répond plus (processus séparé)."
+"Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Seul son processus a été touché : LYNX SHARE et votre projet ont continué de tourner, et le plugin a été coupé. Enregistrez votre projet ; le plugin se recharge à la prochaine ouverture."
