@@ -277,7 +277,7 @@ load).
   - a swipe on a lane (the lane's own rows, no extra tool) and the used-range highlight on the lanes;
   - an audition button on each lane header;
   - the comp-crossfade length in Project settings;
-  - "Flatten comp" and "Insert take lane" in the track menu;
+  - "Flatten comp" in the track menu;
   - the equal-power curve drawn on comp crossfades.
 - Several comps per group (Logic's comp list) and Ctrl+Up/Down to cycle takes for a selection (Live) are possible
   later additions on the same model.
