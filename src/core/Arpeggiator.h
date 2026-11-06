@@ -27,7 +27,20 @@ public:
     std::array<NoteEvent, maxEvents> input {}, output {};
 
 private:
-    void hold (int key, float velocity) noexcept;
+    // what an arpeggiated note takes from the held note it plays (issue #63: the note's pan, fine pitch, Mod X / Y,
+    // colour and level, as FL's arpeggiator keeps them; the velocity was already kept)
+    struct Expression
+    {
+        float pan = 0.0f, cents = 0.0f, modX = 0.5f, modY = 0.5f, gain = 1.0f;
+        std::int8_t colour = 0;
+    };
+    static Expression expressionOf (const NoteEvent& e) noexcept { return { e.pan, e.cents, e.modX, e.modY, e.gain, e.colour }; }
+    static void apply (const Expression& x, NoteEvent& e) noexcept
+    {
+        e.pan = x.pan, e.cents = x.cents, e.modX = x.modX, e.modY = x.modY, e.gain = x.gain, e.colour = x.colour;
+    }
+
+    void hold (const NoteEvent& on) noexcept;
     void release (int key) noexcept;
     int sequenceLength (const ArpSettings& settings) const noexcept;
     int keyAt (const ArpSettings& settings, int index) const noexcept; // a position of the sequence → its key
@@ -35,6 +48,7 @@ private:
 
     std::array<int, maxHeld> heldKeys {};
     std::array<float, maxHeld> heldVelocity {};
+    std::array<Expression, maxHeld> heldExpression {};
     int heldCount = 0;
     int step = 0;          // position in the sequence
     int repeatCount = 0;

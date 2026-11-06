@@ -4564,7 +4564,7 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
                                                  else if (result == 2 || result == 3)
                                                  {
                                                      const auto bpm = juce::jlimit (minTempo, maxTempo, result == 3 ? std::round (found.bpm) : found.bpm);
-                                                     engine.editSong ([bpm] (Song& s) { s.bpm = bpm; });
+                                                     engine.editSong ([bpm] (Song& s) { clipops::followTempo (s, bpm); });
                                                  }
                                              }),
                                              true);

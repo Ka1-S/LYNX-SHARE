@@ -1,5 +1,6 @@
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
+#include "core/ClipOps.h"
 #include "core/NoteNames.h"
 #include "ui/FileChoosers.h"
 #include "ui/ProjectLoading.h"
@@ -3646,7 +3647,7 @@ void MainComponent::TempoDisplay::setBpm (double bpm)
     bpm = controls::clampTempo (bpm);
 
     if (std::abs (bpm - engine.getSong().bpm) > 1e-9)
-        engine.editSong ([bpm] (Song& s) { s.bpm = bpm; });
+        engine.editSong ([bpm] (Song& s) { clipops::followTempo (s, bpm); });
 
     repaint();
 }
