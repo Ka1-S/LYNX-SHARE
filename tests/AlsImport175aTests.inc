@@ -474,6 +474,15 @@ TEST (als175a_export_round_trip)
         CHECK (out.xml.find ("<GroupTrack ") != std::string::npos);
         if (! why.empty())
             std::printf ("  loader rule: %s\n", why.c_str());
+        // every routing names a Live input / output, never a track path of the set a template came from: the Live 11 group
+        // template's "p46251/p41230/p36996" input crashed Live 12.4 ("invalid map<K, T> key")
+        for (auto at = out.xml.find ("<Target Value=\""); at != std::string::npos; at = out.xml.find ("<Target Value=\"", at + 1))
+        {
+            const auto value = out.xml.substr (at + 15, 8);
+            CHECK (value.rfind ("AudioIn/", 0) == 0 || value.rfind ("AudioOut", 0) == 0 || value.rfind ("MidiIn/", 0) == 0 || value.rfind ("MidiOut/", 0) == 0);
+            if (value[0] == 'p')
+                std::printf ("  routing to a foreign track path: %s\n", out.xml.substr (at, 50).c_str());
+        }
         // a clip's scale name is a setting (an index in Live 12, "Major"... in Live 11), never empty: Live 12.4 refuses
         // the set ("Unexpected value for int node")
         for (auto at = out.xml.find ("<ScaleInformation>"); at != std::string::npos; at = out.xml.find ("<ScaleInformation>", at + 1))

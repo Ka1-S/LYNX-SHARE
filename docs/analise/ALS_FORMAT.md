@@ -223,6 +223,8 @@ File › Export › "Ableton Live set (.als)..." and `LYNX.exe --export-als <in>
 9b. **List ids.** Items of one list have unique `Id`s ("Non-unique list ids"). The skeletons keep Live's own ids inside an object and reset only the object's own id.
 10. **Note attributes.** Live 11 writes every `MidiNoteEvent` attribute: Time Duration Velocity VelocityDeviation OffVelocity Probability IsEnabled NoteId. Live 12 leaves out the default ones but keeps the same order [DATA].
 11. **Before-the-song event.** An envelope opens with the "before the song" event at −63072000. A point at time 0 *is* that event; it is not written twice [DATA].
+12. **Routings point at this set.** Every routing `Target` is `AudioIn/…`, `AudioOut/…`, `MidiIn/…` or `MidiOut/…`. A track path (`p46251/p41230/p36996`) left over from the set a skeleton came from makes Live 12.4 crash on load with "A serious program error" (`std::out_of_range`, "invalid map<K, T> key" in Log.txt). The Live 11 GroupTrack skeleton carried one in its `AudioInputRouting`; the exporter now writes `AudioIn/External/S0` ("Ext. In", "1/2"), as Live saves groups. Found by bisecting the Live 11 export: ungrouped it loads, one plain group crashes, a real Live 11.3 group transplanted in loads, and the fixed group loads [LIVE, Live 12.4.16].
+13. **Sample formats.** Live reads WAV, AIFF, FLAC, Ogg and MP3. It does not read WavPack (`.wv`) or Ogg-in-WAV (format tags 0x674F–0x6751, logged as "Unknown unsupported format 26447"). The exporter decodes such samples and writes them as 32-bit float `.wav` in `Samples/Imported/`, also with "Refer to them where they are" [LIVE].
 
 **Mapping from LYNX:**
 - **Tracks:**
