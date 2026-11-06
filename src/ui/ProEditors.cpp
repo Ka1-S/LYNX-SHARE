@@ -1103,7 +1103,8 @@ private:
     juce::Rectangle<float> main() const { return bodyArea().withTrimmedBottom (scOpen ? scH : 0.0f); }
     juce::Rectangle<float> plot() const { return main().withTrimmedRight (100.0f).withTrimmedTop (10.0f).withTrimmedBottom (8.0f); }
     juce::Rectangle<float> scPanel() const { return { 0.0f, main().getBottom(), (float) getWidth(), scH }; }
-    juce::Rectangle<float> kneeArea() const { auto p = plot(); return { p.getX(), p.getY(), juce::jmin (330.0f, p.getWidth() * 0.42f), p.getHeight() * 0.62f }; }
+    // round tp172b4: down to just above the knob row's Auto toggles (it covered them)
+    juce::Rectangle<float> kneeArea() const { auto p = plot(); return { p.getX(), p.getY(), juce::jmin (330.0f, p.getWidth() * 0.42f), juce::jmax (80.0f, p.getHeight() - 222.0f) }; }
     double thresholdDb() const { return dyn::crest::thresholdDb (v (dyn::crest::threshold)); }
 
     Column demoColumn (int i) const override
@@ -1124,7 +1125,7 @@ private:
         out.push_back (custom ({ p.getX() + 24.0f, sc().y ((float) thresholdDb(), p) - 5.0f, p.getWidth() - 24.0f, 10.0f }, idThreshold, threshold,
                                tr ("Threshold: drag up or down")));
         out.push_back (button ({ kneeOpen ? kneeArea().getRight() : p.getX(), p.getY() + 80.0f, 20.0f, 64.0f }, idKnee,
-                               juce::String::fromUTF8 (kneeOpen ? "\xc2\xab" : "\xc2\xbb"), kneeOpen, tr ("Knee: show the transfer curve")));
+                               juce::String::fromUTF8 (kneeOpen ? "\xc2\xab" : "\xc2\xbb"), false, tr ("Knee: show the transfer curve"))); // (a grey tab, as the reference's)
         // the knob row over the bottom of the display
         const auto by = p.getBottom() - 190.0f;
         out.push_back (knob ({ 96.0f, by, 104.0f, 118.0f }, threshold, tr ("Threshold"), 2));
@@ -1349,9 +1350,31 @@ private:
         // the transfer curve, slid out from the left
         if (kneeOpen)
         {
+            // round tp172b4: as the reference draws it — a plain light line on the field (no box, no fill), the unity
+            // diagonal faint, a divider at the panel's edge, the live input as a dot
             const auto k = kneeArea();
-            drawPanel (g, k.expanded (2.0f));
-            dynui::paint (g, "crestcurve", k, 1.0f, fx, [this] (int i) { return liveMeter (i); }, none);
+            constexpr float lo = -60.0f;
+            const auto xOf = [&k] (float db) { return k.getX() + k.getWidth() * (db - lo) / -lo; };
+            const auto yOf = [&k] (float db) { return k.getBottom() - k.getHeight() * (juce::jlimit (lo, 0.0f, db) - lo) / -lo; };
+            g.setColour (colour::textDisabled.withAlpha (0.35f));
+            g.drawLine (k.getX(), k.getBottom(), k.getRight(), k.getY(), 1.0f);
+            g.drawVerticalLine ((int) k.getRight(), k.getY(), k.getBottom());
+            juce::Path curve;
+            for (int i = 0; i <= 120; ++i)
+            {
+                const auto in = lo + -lo * (float) i / 120.0f;
+                const juce::Point<float> pt { xOf (in), yOf (in + (float) dyn::crest::staticGainDb (fx.params, in)) };
+                if (i == 0) curve.startNewSubPath (pt); else curve.lineTo (pt);
+            }
+            g.setColour (fx.enabled ? colour::textSecondary : colour::textDisabled);
+            g.strokePath (curve, juce::PathStrokeType (1.6f));
+            const auto lm = liveMeter (2);
+            const auto live = lm > 1e-6f ? 20.0f * std::log10 (lm) : -120.0f;
+            if (fx.enabled && live > lo)
+            {
+                g.setColour (colour::textPrimary);
+                g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre ({ xOf (live), yOf (live + (float) dyn::crest::staticGainDb (fx.params, live)) }));
+            }
         }
         // meters: input, output and gain reduction
         const auto mr = juce::Rectangle<float> (p.getRight() + 46.0f, p.getY(), 50.0f, p.getHeight());
