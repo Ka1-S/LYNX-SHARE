@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+
 #include <atomic>
 
 // Built-in instruments: synthesized drums and synth, and a sampler. They let the
@@ -57,7 +59,13 @@ public:
     // A MIDI controller's pitch wheel on this channel (round 162, issue #9), already scaled by the channel's pitch
     // range (FL's Misc › Pitch range, ±2 semitones by default): every sounding and new note is bent by `semitones`
     // until the wheel moves again. Audio thread. Hosted plugins get the raw MIDI pitch bend instead (midiMessage).
-    virtual void pitchBend (float /*semitones*/) noexcept {}
+    // Round 173d: FL's native generators have no wheel input of their own; the wheel moves the channel's pitch (the
+    // voice's Final.Pitch, REA_rodada164e / 167a) and each generator follows it as it follows the PITCH knob (its own
+    // "Bend range" control does not scale it: FL renders bit-identical with it at max). So by default the rack keeps
+    // the wheel here (wheelCents) and adds it to the channel's pitch; engines with a wheel of their own override this.
+    virtual void pitchBend (float semitones) noexcept { wheel = std::isfinite (semitones) ? semitones * 100.0f : 0.0f; }
+    // the wheel the rack adds to this channel's pitch (cents; 0 for an engine that bends by itself)
+    float wheelCents() const noexcept { return wheel; }
     // The channel's pitch as it stands now, in cents: its PITCH knob + fine tune + the main pitch (issue #14). Audio
     // thread, before every render. Native engines take these at note on (configure / setNextNoteExpression) and ignore
     // it; a hosted plugin turns it into MIDI pitch bend (FL's wrapper: pitch bend range).
@@ -178,6 +186,9 @@ public:
         float pan = 0.0f, cents = 0.0f, modX = 0.5f, modY = 0.5f, release = 0.5f;
     };
     virtual int takePortEvents (PortEvent* /*out*/, int /*max*/) noexcept { return 0; }
+
+private:
+    float wheel = 0.0f; // (pitchBend's default)
 };
 
 // Audio of an already-decoded sample (loaded off the audio thread). Short samples

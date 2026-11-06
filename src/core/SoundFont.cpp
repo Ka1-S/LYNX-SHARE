@@ -1083,6 +1083,8 @@ public:
             }
     }
 
+    void pitchBend (float) noexcept override {} // (it bends by the raw MIDI pitch bend, midiMessage)
+
     void midiMessage (const std::uint8_t* m, int size) noexcept override
     {
         if (size < 2)

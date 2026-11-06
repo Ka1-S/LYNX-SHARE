@@ -1161,6 +1161,12 @@ public:
                 k->setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
                 if (item->type == plugui::Item::vslider)
                     k->setSliderStyle (juce::Slider::LinearVertical);
+                if ((item->style & plugui::springBack) != 0) // (a pitch bend wheel: back to the centre when let go)
+                    k->onDragEnd = [s = k.get(), before = k->onDragEnd] {
+                        s->setValue (0.5 * (s->getMinimum() + s->getMaximum()), juce::sendNotificationSync);
+                        if (before)
+                            before();
+                    };
                 if (item->type == plugui::Item::hslider)
                     k->setSliderStyle (juce::Slider::LinearHorizontal);
                 k->setPopupDisplayEnabled (true, true, this);

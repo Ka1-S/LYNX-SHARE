@@ -563,6 +563,263 @@ double compressorCurveDb (const EffectParams& p, double inputDb)
     return gainComputer (inputDb, compThresholdDb (p[compThreshold]), ratio (p[compRatio]));
 }
 
+// ---- round tp172c6: the DRIVE section ----
+// Each model is a static curve per drive position, fitted black-box on the trials' stairs (a 1 kHz sine, -51 .. -9 dBFS
+// RMS: fundamental, H2, H3, H5; tp172c data), and its linear tone (the impulse renders): x -> o * T f(x / T) with
+// f(u) = u / (1 + |u|^p)^(1/p) (the negative half clips a dB later), the negative half scaled by k (a level-independent
+// H2), + c2 y^2 (a level-dependent H2); then a low bell and a high shelf (and the amps' cabinet low-pass). The positions
+// between the measured ones interpolate the fitted values. Saturate's curve moves with its dial (-24 .. +24 dB into
+// the clipper, the level compensated: +0.9 dB below it, as measured).
+namespace
+{
+struct DriveNode
+{
+    float tDb, p, k, oDb, aDb, c2, bellDb, shelfDb;
+};
+struct DriveModelDef
+{
+    double lo, hi;          // the dial's range in the model's units
+    int nodes;              // measured positions, equally spaced over the dial
+    const DriveNode* node;
+    double bellHz, bellQ, shelfHz, lpHz, lpQ;
+    int lpSections;
+    double hpHz, hpQ, bell2Hz, bell2Q, bell2Db;
+    double apHz;            // first-order all-pass (0 = none)
+};
+#include "core/RidgeDriveTables.inc"
+
+DriveNode driveNodeAt (int model, float v) noexcept
+{
+    const auto& m = kDriveModels[std::clamp (model, 0, (int) driveModels - 1)];
+    if (model == driveSaturate)
+    {
+        auto n = m.node[0];
+        n.tDb = (float) (n.tDb - lin (v, m.lo, m.hi));
+        return n;
+    }
+    const auto x = (double) std::clamp (v, 0.0f, 1.0f) * (m.nodes - 1);
+    const auto i = std::min ((int) x, m.nodes - 2);
+    const auto t = (float) (x - i);
+    const auto& a = m.node[i];
+    const auto& b = m.node[i + 1];
+    auto mix = [t] (float u, float w) { return u + (w - u) * t; };
+    return { mix (a.tDb, b.tDb), mix (a.p, b.p), mix (a.k, b.k), mix (a.oDb, b.oDb), mix (a.aDb, b.aDb), mix (a.c2, b.c2),
+             mix (a.bellDb, b.bellDb), mix (a.shelfDb, b.shelfDb) };
+}
+
+struct DriveShape
+{
+    double t = 1, p = 2, k = 1, o = 1, r = 1, c2 = 0, ip = 0.5;
+    void set (const DriveNode& n) noexcept
+    {
+        t = std::pow (10.0, n.tDb / 20.0);
+        p = std::max (0.3, (double) n.p);
+        ip = 1.0 / p;
+        k = n.k;
+        o = std::pow (10.0, n.oDb / 20.0);
+        r = std::pow (10.0, n.aDb / 20.0);
+        c2 = n.c2;
+    }
+    double operator() (double x) const noexcept
+    {
+        const auto tt = x >= 0.0 ? t : t * r;
+        const auto u = x / tt;
+        auto y = o * tt * u / std::pow (1.0 + std::pow (std::abs (u), p), ip);
+        if (y < 0.0)
+            y *= k;
+        return y + c2 * y * y;
+    }
+};
+} // namespace
+
+int driveModelIndex (float v) noexcept { return std::clamp ((int) std::lround (v * (float) (driveModels - 1)), 0, (int) driveModels - 1); }
+float driveModelValue (int model) noexcept { return (float) std::clamp (model, 0, (int) driveModels - 1) / (float) (driveModels - 1); }
+const char* driveModelName (int model) noexcept
+{
+    static const char* names[driveModels] { "Saturate", "Console E", "Console G", "Console A", "Console N", "Console Y", "Tube",
+                                            "Guitar amp", "Bass amp" };
+    return names[std::clamp (model, 0, (int) driveModels - 1)];
+}
+double driveAmountUnits (int model, float v) noexcept
+{
+    const auto& m = kDriveModels[std::clamp (model, 0, (int) driveModels - 1)];
+    return lin (v, m.lo, m.hi);
+}
+float driveAmountValue (int model, double units) noexcept
+{
+    const auto& m = kDriveModels[std::clamp (model, 0, (int) driveModels - 1)];
+    return (float) std::clamp ((units - m.lo) / (m.hi - m.lo), 0.0, 1.0);
+}
+double driveInputDb (float v) noexcept { return lin (v, -24.0, 24.0); }
+double driveTrimDb (float v) noexcept { return lin (v, -24.0, 24.0); }
+double driveCurve (const EffectParams& p, double x) noexcept
+{
+    DriveShape s;
+    const auto model = driveModelIndex (p[driveModel]);
+    s.set (driveNodeAt (model, p[driveAmount]));
+    return s (x * dbToGain (driveInputDb (p[driveInput]))) * dbToGain (driveTrimDb (p[driveTrim]));
+}
+
+namespace
+{
+// the stage: input gain -> curve (4x oversampled, a lookup table rebuilt when the settings move) -> 2 Hz DC blocker ->
+// tone -> trim, mixed with the dry signal (delayed by the oversampler's latency)
+class DriveStage
+{
+public:
+    static int latency() noexcept { return Oversampler::latency(); }
+
+    void prepare (double rate) noexcept
+    {
+        sr = rate;
+        dcCoef = std::exp (-2.0 * 3.141592653589793 * 2.0 / sr);
+        for (auto& o : os)
+            o.setFactor (4);
+        reset();
+    }
+
+    void reset() noexcept
+    {
+        for (auto& o : os)
+            o.reset();
+        for (auto* b : { &bell, &bell2, &shelf, &lp, &lp2, &hp, &ap })
+            b->reset();
+        dc[0] = dc[1] = dcIn[0] = dcIn[1] = 0.0;
+        for (auto& ring : dry)
+            ring.fill (0.0f);
+        dryPos = 0;
+        built = false;
+    }
+
+    void process (float* l, float* r, int n, const EffectParams& p) noexcept
+    {
+        const auto model = driveModelIndex (p[driveModel]);
+        const auto amount = p[driveAmount];
+        if (! built || model != lastModel || std::abs (amount - lastAmount) > 2e-4f)
+            rebuild (model, amount);
+        const auto inGain = (float) dbToGain (driveInputDb (p[driveInput]));
+        const auto trim = (float) dbToGain (driveTrimDb (p[driveTrim]));
+        const auto mix = std::clamp (p[driveMix], 0.0f, 1.0f);
+        for (int start = 0; start < n; start += chunk)
+            run (l + start, r + start, std::min (chunk, n - start), inGain, trim, mix);
+    }
+
+private:
+    void rebuild (int model, float amount) noexcept
+    {
+        lastModel = model;
+        lastAmount = amount;
+        built = true;
+        const auto node = driveNodeAt (model, amount);
+        DriveShape s;
+        s.set (node);
+        for (int i = 0; i < tableSize; ++i)
+            table[(std::size_t) i] = (float) s (-tableRange + 2.0 * tableRange * i / (tableSize - 1));
+        shape = s;
+        const auto& m = kDriveModels[(std::size_t) model];
+        bell.peaking (sr, std::min (m.bellHz, sr * 0.45), m.bellQ, node.bellDb);
+        shelf.shelf (sr, std::min (m.shelfHz, sr * 0.45), node.shelfDb, true);
+        bell2On = std::abs (m.bell2Db) > 1e-6;
+        bell2.peaking (sr, std::min (m.bell2Hz, sr * 0.45), m.bell2Q, m.bell2Db);
+        lpSections = m.lpHz > 0.0 ? m.lpSections : 0;
+        lp.filter (sr, 0, std::min (m.lpHz > 0.0 ? m.lpHz : 20000.0, sr * 0.45), m.lpQ);
+        lp2 = lp;
+        hpOn = m.hpHz > 0.0;
+        hp.filter (sr, 1, std::max (m.hpHz, 1.0), m.hpQ);
+        // first-order all-pass (s - a) / (s + a) by the bilinear transform: unit gain, so the tone's 1 kHz norm ignores it
+        apOn = m.apHz > 0.0;
+        if (apOn)
+        {
+            const auto k = std::tan (3.141592653589793 * std::min (m.apHz, sr * 0.45) / sr);
+            ap.b0 = (1.0 - k) / (1.0 + k);
+            ap.b1 = -1.0;
+            ap.b2 = 0.0;
+            ap.a1 = (k - 1.0) / (k + 1.0);
+            ap.a2 = 0.0;
+        }
+        // the curve's gain was measured at 1 kHz: the tone is 0 dB there
+        const auto w = 2.0 * 3.141592653589793 * 1000.0 / sr;
+        double g = biquadMag (bell, w) * biquadMag (shelf, w);
+        if (bell2On) g *= biquadMag (bell2, w);
+        for (int k = 0; k < lpSections; ++k) g *= biquadMag (lp, w);
+        if (hpOn) g *= biquadMag (hp, w);
+        toneNorm = (float) (1.0 / std::max (1e-6, g));
+    }
+
+    void run (float* l, float* r, int n, float inGain, float trim, float mix) noexcept
+    {
+        const auto lat = latency();
+        float* ch[2] = { l, r };
+        float dryChunk[2][chunk];
+        for (int c = 0; c < 2; ++c)
+            for (int i = 0; i < n; ++i)
+            {
+                // the dry signal, delayed by the oversampler's latency (aligned with the driven path)
+                auto& ring = dry[(std::size_t) c];
+                ring[(std::size_t) ((dryPos + i) & (ringSize - 1))] = ch[c][i];
+                dryChunk[c][i] = ring[(std::size_t) ((dryPos + i - lat) & (ringSize - 1))];
+                ch[c][i] *= inGain;
+            }
+        dryPos = (dryPos + n) & (ringSize - 1);
+        for (int c = 0; c < 2; ++c)
+            os[(std::size_t) c].process (ch[c], n, [this] (float x) noexcept { return lookup (x); });
+        for (int c = 0; c < 2; ++c)
+            for (int i = 0; i < n; ++i)
+            {
+                // 2 Hz DC blocker (the asymmetric halves and c2 leave an offset): y[n] = x[n] - x[n-1] + R y[n-1]
+                const double x = ch[c][i];
+                const auto y = x - dcIn[c] + dcCoef * dc[c];
+                dcIn[c] = x;
+                dc[c] = y;
+                ch[c][i] = (float) y;
+            }
+        bell.processBlock (l, r, n);
+        shelf.processBlock (l, r, n);
+        if (bell2On)
+            bell2.processBlock (l, r, n);
+        if (lpSections > 0)
+            lp.processBlock (l, r, n);
+        if (lpSections > 1)
+            lp2.processBlock (l, r, n);
+        if (hpOn)
+            hp.processBlock (l, r, n);
+        if (apOn)
+            ap.processBlock (l, r, n);
+        const auto wet = trim * toneNorm * mix;
+        for (int c = 0; c < 2; ++c)
+            for (int i = 0; i < n; ++i)
+                ch[c][i] = ch[c][i] * wet + (1.0f - mix) * dryChunk[c][i];
+    }
+
+    float lookup (float x) const noexcept
+    {
+        const auto pos = ((double) x + tableRange) * ((tableSize - 1) / (2.0 * tableRange));
+        if (pos <= 0.0 || pos >= tableSize - 1)
+            return (float) shape (x); // beyond +-4 (+12 dBFS): the curve itself
+        const auto i = (int) pos;
+        const auto t = (float) (pos - i);
+        return table[(std::size_t) i] + (table[(std::size_t) i + 1] - table[(std::size_t) i]) * t;
+    }
+
+    static constexpr int chunk = 256, ringSize = 1024;
+    static constexpr int tableSize = 4097;
+    static constexpr double tableRange = 4.0;
+    double sr = 44100.0;
+    std::array<Oversampler, 2> os;
+    std::array<float, tableSize> table {};
+    DriveShape shape;
+    Biquad bell, bell2, shelf, lp, lp2, hp, ap;
+    bool bell2On = false, hpOn = false, apOn = false, built = false;
+    int lpSections = 0;
+    float toneNorm = 1.0f;
+    int lastModel = -1;
+    float lastAmount = -1.0f;
+    double dc[2] {}, dcIn[2] {}, dcCoef = 0.9997;
+    std::array<std::array<float, ringSize>, 2> dry {};
+    int dryPos = 0;
+};
+} // namespace
+
 namespace
 {
 class Strip final : public Effect
@@ -574,17 +831,20 @@ public:
         console.prepare (rate);
         modernEngine.prepare (rate);
         vocalEngine.prepare (rate);
+        drive.prepare (rate);
         reset();
     }
 
-    // round 145: only the Vocal strip voicing's look-ahead adds latency (known from the last block's settings)
-    int latencySamples() const noexcept override { return vocalLatency; }
+    // round 145: only the Vocal strip voicing's look-ahead adds latency (known from the last block's settings);
+    // round tp172c6: + the DRIVE section's oversampler while it is in
+    int latencySamples() const noexcept override { return vocalLatency + driveLatency; }
 
     void reset() noexcept override
     {
         console.reset();
         modernEngine.reset();
         vocalEngine.reset();
+        drive.reset();
         for (auto* d : { &audio, &side })
         {
             d->hp1.reset(); d->hp2.reset(); d->lp.reset(); d->lf.reset(); d->lmf.reset(); d->hmf.reset(); d->hf.reset();
@@ -605,6 +865,7 @@ public:
             vocalEngine.set (vocalSettings (p));
             vocalLatency = vocalEngine.latencySamples();
             vocalEngine.process (l, r, n);
+            driveAfterVoicing (l, r, n, p);
             meters.set (vocalEngine.compReductionDb(), std::max (vocalEngine.deEssReductionDb(), vocalEngine.dePlosReductionDb()),
                         inPeak, Meters::peak (l, r, n));
             return;
@@ -614,6 +875,7 @@ public:
         {
             const auto inPeak = Meters::peak (l, r, n);
             modernEngine.process (l, r, n, modernSettingsOf (p));
+            driveAfterVoicing (l, r, n, p);
             meters.set (modernEngine.compReductionDb(), modernEngine.gateReductionDb(), inPeak, Meters::peak (l, r, n));
             return;
         }
@@ -621,6 +883,7 @@ public:
         {
             const auto inPeak = Meters::peak (l, r, n);
             console.process (l, r, n, consoleSettingsOf (p));
+            driveAfterVoicing (l, r, n, p);
             meters.set (console.compReductionDb(), console.gateReductionDb(), inPeak, Meters::peak (l, r, n));
             return;
         }
@@ -628,6 +891,7 @@ public:
         {
             const auto inPeak = Meters::peak (l, r, n);
             console.process (l, r, n, consoleSettingsOf (p));
+            driveAfterVoicing (l, r, n, p);
             if (on (p[analog]))
                 addAnalogNoise (l, r, n);
             meters.set (console.compReductionDb(), console.gateReductionDb(), inPeak, Meters::peak (l, r, n));
@@ -641,6 +905,13 @@ public:
         const auto outGain = (float) (dbToGain (trimDb (p[output]) + (on (p[autoMakeup]) ? autoMakeupDb (p) : 0.0)) * (on (p[phase]) ? -1.0 : 1.0));
         const bool eq = on (p[eqOn]), dyn = on (p[dynOn]), eqFirst = ! on (p[order]), fts = on (p[filtersToSidechain]);
         const bool eqSc = on (p[eqToSidechain]); // round 165: the filters and the EQ in the side chain only
+        // round tp172c6: with the DRIVE section in, the output gain waits until after it
+        const bool driveIn = on (p[driveOn]);
+        driveLatency = driveIn ? DriveStage::latency() : 0;
+        if (driveIn && ! driveWasIn)
+            drive.reset();
+        driveWasIn = driveIn;
+        const auto driveOutGain = driveIn ? 1.0f : outGain;
 
         // compressor
         const auto thr = compThresholdDb (p[compThreshold]), rat = ratio (p[compRatio]);
@@ -719,8 +990,18 @@ public:
 
             if (eq && ! eqFirst && ! eqSc)
                 bands (audio, a, b);
-            l[i] = a * outGain;
-            r[i] = b * outGain;
+            l[i] = a * driveOutGain;
+            r[i] = b * driveOutGain;
+        }
+        // round tp172c6: the DRIVE section sits before the output trim (the strip's own make-up and phase)
+        if (driveIn)
+        {
+            drive.process (l, r, n, p);
+            for (int i = 0; i < n; ++i)
+            {
+                l[i] *= outGain;
+                r[i] *= outGain;
+            }
         }
         if (on (p[analog]))
             addAnalogNoise (l, r, n);
@@ -753,10 +1034,25 @@ private:
     std::uint32_t noiseL = 0x9e3779b9u, noiseR = 0x85ebca6bu;
 
 
+    // round tp172c6: the DRIVE section after a voicing (their output trims are inside them)
+    void driveAfterVoicing (float* l, float* r, int n, const EffectParams& p) noexcept
+    {
+        const bool driveIn = on (p[driveOn]);
+        driveLatency = driveIn ? DriveStage::latency() : 0;
+        if (driveIn && ! driveWasIn)
+            drive.reset();
+        driveWasIn = driveIn;
+        if (driveIn)
+            drive.process (l, r, n, p);
+    }
+
     vmatch::echannel::Channel console;
     vmatch::strip2::Strip modernEngine; // round tp172c
     voxstrip::Engine vocalEngine;
     int vocalLatency = 0;
+    DriveStage drive; // round tp172c6
+    int driveLatency = 0;
+    bool driveWasIn = false;
 
     static void filters (EqDesign& d, float& a, float& b) noexcept
     {
@@ -3127,7 +3423,10 @@ const EffectInfo& ridgeInfo()
                                      // round 165
                                      { "EQ to SC", 0.0f },
                                      // round tp172c: the Modern voicing (core/VoiceMatch.h, strip2)
-                                     { "Modern voicing", 0.0f }, { "Peak detect", 0.0f }, { "Gate hold", 0.0625f } } };
+                                     { "Modern voicing", 0.0f }, { "Peak detect", 0.0f }, { "Gate hold", 0.0625f },
+                                     // round tp172c6: the DRIVE section (off = the old sound)
+                                     { "Drive in", 0.0f }, { "Drive model", 0.0f }, { "Drive amount", 0.5f }, { "Drive input", 0.5f },
+                                     { "Drive trim", 0.5f }, { "Drive mix", 1.0f } } };
     return info;
 }
 
@@ -3439,6 +3738,16 @@ std::string paramText (EffectKind kind, int param, float v)
                 return vocalParamText (param, v);
             case phase: return on (v) ? "inverted" : "normal";
             case compMix: return fmt ("%.0f%%", v * 100.0);
+            // round tp172c6: the DRIVE section (the amount reads in the selected model's units; see driveParamText)
+            case driveModel: return driveModelName (driveModelIndex (v));
+            case driveAmount: return fmt ("%.1f", v * 10.0);
+            // (whole dB from ±10 on: the read-out fits under the small dial)
+            case driveInput: case driveTrim:
+            {
+                const auto db = param == driveInput ? driveInputDb (v) : driveTrimDb (v);
+                return std::abs (db) >= 9.95 ? fmt ("%+.0f dB", db) : fmt ("%+.1f dB", db);
+            }
+            case driveMix: return fmt ("%.0f%%", v * 100.0);
             default: return onOff (v);
         }
     }

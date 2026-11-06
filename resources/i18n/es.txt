@@ -7199,6 +7199,14 @@ countries: es mx ar co cl pe ve
 "Main|Tweak" = "Principal|Ajuste fino"
 "E type|G type" = "Tipo E|Tipo G"
 "Modern console" = "Consola moderna"
+# round tp172c6: Ridge Strip's DRIVE section
+"Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "Saturar|Consola E|Consola G|Consola A|Consola N|Consola Y|Válvula|Ampli guitarra|Ampli bajo"
+"Switches the drive section on: saturation at the end of the strip, before the output" = "Activa la sección de drive: saturación al final del canal, antes de la salida"
+"The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "El tipo de saturación: un clipper suave, cinco canales de consola, una etapa de válvula o un amplificador de guitarra / bajo"
+"How hard the model is driven; the consoles and the clipper keep the level, the amps get louder" = "Cuánto se exige al modelo; las consolas y el clipper mantienen el nivel, los amplificadores suben de volumen"
+"Level into the drive: more distortion without changing the drive" = "Nivel hacia el drive: más distorsión sin cambiar el drive"
+"Level after the drive" = "Nivel después del drive"
+"Blends the clean signal back in" = "Vuelve a mezclar la señal limpia"
 
 # round tp172b: LuxeVerb's Space engine
 "LuxeVerb|Space" = "LuxeVerb|Espacio"
@@ -7296,3 +7304,4 @@ countries: es mx ar co cl pe ve
 "ON" = "ACT."
 "{0} crashed. Save your project now (as a new file is safest)." = "{0} falló. Guarda tu proyecto ahora (lo más seguro es como un archivo nuevo)."
 "Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "Su ventana se cerró para que LYNX SHARE siguiera funcionando. Es posible que el plugin no funcione bien hasta que vuelvas a abrir el proyecto."
+"Wheels" = "Ruedas"

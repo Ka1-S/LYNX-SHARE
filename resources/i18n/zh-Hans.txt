@@ -7199,6 +7199,14 @@ countries: cn sg
 "Main|Tweak" = "主要|微调"
 "E type|G type" = "E 型|G 型"
 "Modern console" = "现代调音台"
+# round tp172c6: Ridge Strip's DRIVE section
+"Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "饱和|控制台 E|控制台 G|控制台 A|控制台 N|控制台 Y|电子管|吉他音箱|贝斯音箱"
+"Switches the drive section on: saturation at the end of the strip, before the output" = "打开驱动部分：在通道条末尾、输出之前的饱和"
+"The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "饱和类型：软削波器、五种控制台通道、电子管级或吉他 / 贝斯音箱"
+"How hard the model is driven; the consoles and the clipper keep the level, the amps get louder" = "模型被驱动的程度；控制台和削波器保持电平，音箱会变得更响"
+"Level into the drive: more distortion without changing the drive" = "进入驱动的电平：在不改变驱动的情况下获得更多失真"
+"Level after the drive" = "驱动之后的电平"
+"Blends the clean signal back in" = "把干净信号混回来"
 
 # round tp172b: LuxeVerb's Space engine
 "LuxeVerb|Space" = "LuxeVerb|空间"
@@ -7296,3 +7304,4 @@ countries: cn sg
 "ON" = "开"
 "{0} crashed. Save your project now (as a new file is safest)." = "{0} 崩溃了。请立即保存项目（另存为新文件最安全）。"
 "Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "已关闭其窗口，以便 LYNX SHARE 继续运行。在重新打开项目之前，该插件可能无法正常工作。"
+"Wheels" = "滚轮"

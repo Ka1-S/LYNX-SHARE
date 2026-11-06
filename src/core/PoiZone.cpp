@@ -1956,6 +1956,15 @@ public:
         tempo.store (bpm > 0.0 ? bpm : 120.0);
         const int mp = channel.maxPolyphony == 1 ? 1 : 0 /* FL tells the generator its Max polyphony, not the Mono box (round 168l) */;
         const std::lock_guard<std::mutex> lock (buildMutex);
+        // PoiZone's own MODULATION and PITCH BEND wheels (parameters 157 / 158, round 173d): not in FL's state, kept
+        // in the channel's modelParams; the playing engine takes a move at once, a rebuilt one at take()
+        const auto [mw, pb] = poizone::wheelsOf (channel);
+        if (mw != modWheel.load() || pb != bendWheel.load())
+        {
+            modWheel.store (mw), bendWheel.store (pb);
+            liveParams.push (poizone::modWheelParam, mw);
+            liveParams.push (poizone::bendWheelParam, pb);
+        }
         if (channel.pluginState == loadedState && loadedRate == rate.load() && mp == loadedPoly)
             return;
         // only parameters changed (a knob of the editor): the playing engine takes them, the notes go on (round 168n)
@@ -2091,6 +2100,8 @@ private:
             for (int k = 0; k < 128; ++k)
                 plugin->setLevels (k, channelVol, channelPan);
             liveParams.clear(); // (the new engine was built from the newest state)
+            plugin->eng.setParam (poizone::modWheelParam, modWheel.load()); // (its wheels are not in the state)
+            plugin->eng.setParam (poizone::bendWheelParam, bendWheel.load());
         }
         if (plugin != nullptr)
             liveParams.drain ([this] (int index, float v) { plugin->eng.setParam (index, v); });
@@ -2129,6 +2140,7 @@ private:
     std::vector<std::uint8_t> loadedState;
     double loadedRate = 0.0;
     int loadedPoly = 0;
+    std::atomic<float> modWheel { 0.0f }, bendWheel { 0.5f }; // (the wheels' raw values: 0…1, the bend centred at ½)
     double channelVol = 1.0, channelPan = 0.0, lastTicks = -1.0, songBeats = 0.0;
     bool playing = false;
     float notePan[128] {};
@@ -2157,6 +2169,27 @@ std::optional<float> poizoneParam (const std::vector<std::uint8_t>& state, int i
 }
 
 std::unique_ptr<Instrument> makePoiZoneInstrument() { return std::make_unique<PoiZoneInstrument>(); }
+
+namespace poizone
+{
+std::pair<float, float> wheelsOf (const ChannelDef& channel) noexcept
+{
+    const auto& m = channel.modelParams;
+    auto at = [&m] (std::size_t i, float none) { return i < m.size() && std::isfinite (m[i]) ? std::clamp (m[i], 0.0f, 1.0f) : none; };
+    return { at (0, 0.0f), at (1, 0.5f) };
+}
+
+bool setWheel (ChannelDef& channel, int index, float raw)
+{
+    if (index != modWheelParam && index != bendWheelParam)
+        return false;
+    auto& m = channel.modelParams;
+    const auto [mw, pb] = wheelsOf (channel);
+    m = { mw, pb };
+    m[index == modWheelParam ? 0 : 1] = std::isfinite (raw) ? std::clamp (raw, 0.0f, 1.0f) : (index == modWheelParam ? 0.0f : 0.5f);
+    return true;
+}
+} // namespace poizone
 
 const std::vector<EngineParam>& poizoneParams()
 {
@@ -2233,6 +2266,10 @@ const std::vector<EngineParam>& poizoneParams()
         add (78, "Bend range", 0.0f, 23.0f, true);
         add (79, "Gate speed", 0.0f, 6.0f, true);
         add (80, "LFO sync", 0.0f, 10.0f, true);
+        // the editor's wheels (TSynthEditorForm's ModWheel / PitchBendWheel, round 173d): what MW amount / destination
+        // and PB range act through (FL's generators take no MIDI wheel, REA_rodada164e)
+        add (poizone::modWheelParam, "Mod wheel");
+        add (poizone::bendWheelParam, "Pitch bend");
         return t;
     }();
     return table;

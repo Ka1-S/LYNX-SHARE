@@ -7199,6 +7199,14 @@ countries: id
 "Main|Tweak" = "Utama|Tweak"
 "E type|G type" = "Tipe E|Tipe G"
 "Modern console" = "Konsol modern"
+# round tp172c6: Ridge Strip's DRIVE section
+"Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "Saturasi|Konsol E|Konsol G|Konsol A|Konsol N|Konsol Y|Tabung|Amp gitar|Amp bas"
+"Switches the drive section on: saturation at the end of the strip, before the output" = "Menyalakan bagian drive: saturasi di akhir strip, sebelum output"
+"The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "Jenis saturasi: clipper lembut, lima kanal konsol, tahap tabung, atau amp gitar / bas"
+"How hard the model is driven; the consoles and the clipper keep the level, the amps get louder" = "Seberapa keras model didorong; konsol dan clipper menjaga level, amp menjadi lebih keras"
+"Level into the drive: more distortion without changing the drive" = "Level ke drive: distorsi lebih banyak tanpa mengubah drive"
+"Level after the drive" = "Level setelah drive"
+"Blends the clean signal back in" = "Mencampur kembali sinyal bersih"
 
 # round tp172b: LuxeVerb's Space engine
 "LuxeVerb|Space" = "LuxeVerb|Ruang"
@@ -7296,3 +7304,4 @@ countries: id
 "ON" = "NYALA"
 "{0} crashed. Save your project now (as a new file is safest)." = "{0} crash. Simpan proyek sekarang (paling aman sebagai file baru)."
 "Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "Jendelanya ditutup agar LYNX SHARE tetap berjalan. Plugin mungkin tidak bekerja dengan benar sampai proyek dibuka lagi."
+"Wheels" = "Roda"

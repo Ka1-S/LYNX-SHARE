@@ -7199,6 +7199,14 @@ countries: tr
 "Main|Tweak" = "Ana|İnce ayar"
 "E type|G type" = "E tipi|G tipi"
 "Modern console" = "Modern konsol"
+# round tp172c6: Ridge Strip's DRIVE section
+"Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "Doyur|Konsol E|Konsol G|Konsol A|Konsol N|Konsol Y|Lamba|Gitar amfisi|Bas amfisi"
+"Switches the drive section on: saturation at the end of the strip, before the output" = "Drive bölümünü açar: kanal şeridinin sonunda, çıkıştan önce doyum"
+"The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "Doyum türü: yumuşak bir clipper, beş konsol kanalı, bir lamba katı veya bir gitar / bas amfisi"
+"How hard the model is driven; the consoles and the clipper keep the level, the amps get louder" = "Modelin ne kadar sert sürüldüğü; konsollar ve clipper seviyeyi korur, amfiler yükselir"
+"Level into the drive: more distortion without changing the drive" = "Drive'a giren seviye: drive'ı değiştirmeden daha fazla distorsiyon"
+"Level after the drive" = "Drive'dan sonraki seviye"
+"Blends the clean signal back in" = "Temiz sinyali geri karıştırır"
 
 # round tp172b: LuxeVerb's Space engine
 "LuxeVerb|Space" = "LuxeVerb|Alan"
@@ -7296,3 +7304,4 @@ countries: tr
 "ON" = "AÇIK"
 "{0} crashed. Save your project now (as a new file is safest)." = "{0} çöktü. Projenizi şimdi kaydedin (en güvenlisi yeni bir dosya olarak)."
 "Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "LYNX SHARE çalışmaya devam edebilsin diye penceresi kapatıldı. Proje yeniden açılana kadar plugin düzgün çalışmayabilir."
+"Wheels" = "Tekerlekler"

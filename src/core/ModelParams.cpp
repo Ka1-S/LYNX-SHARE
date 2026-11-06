@@ -55,7 +55,25 @@ const std::map<InstrumentKind, Table>& tables()
 } // namespace
 
 Table toxicModelTable() { return { &toxicParams(), &stateFloat<toxicParamOffset>, &setStateFloat<toxicParamOffset> }; }
-Table poizoneModelTable() { return { &poizoneParams(), &stateFloat<poizoneParamOffset>, &setStateFloat<poizoneParamOffset> }; }
+namespace
+{
+// (PoiZone's wheels, 157 / 158, live in modelParams: FL's state has no room for them)
+std::optional<float> poizoneValue (const ChannelDef& c, const EngineParam& p)
+{
+    if (p.index == poizone::modWheelParam || p.index == poizone::bendWheelParam)
+    {
+        const auto [mw, pb] = poizone::wheelsOf (c);
+        return p.index == poizone::modWheelParam ? mw : pb;
+    }
+    return stateFloat<poizoneParamOffset> (c, p);
+}
+bool setPoizoneValue (ChannelDef& c, const EngineParam& p, float raw)
+{
+    return poizone::setWheel (c, p.index, raw) || setStateFloat<poizoneParamOffset> (c, p, raw);
+}
+} // namespace
+
+Table poizoneModelTable() { return { &poizoneParams(), &poizoneValue, &setPoizoneValue }; }
 
 const Table* tableOf (InstrumentKind kind)
 {

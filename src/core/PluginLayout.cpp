@@ -17,6 +17,7 @@
 #include "core/EngineLayouts.h"
 #include "core/Effects.h"
 #include "core/MaximusFx.h"
+#include "core/MixSuite.h"
 #include "core/MultibandDelayFx.h"
 #include "core/StateParams.h"
 #include "core/Toxic.h"
@@ -1857,7 +1858,7 @@ Layout ridgeStrip()
         else
             v.push_back (toggle (194, y + 34.0f, 72, 20, extra[b], TR_NOOP ("Bell")));
     }
-    v.push_back (section (4, 520, 276, 192, TR_NOOP ("Equalizer")));
+    v.push_back (section (4, 520, 276, 124, TR_NOOP ("Equalizer")));
     // round 165: the Brown / Black curves are Ridge's own engine's (the E console voicing has the console's one curve)
     // (round tp172c: two conditions at most — the 4K and Modern voicings; in the E voicing the curve has no effect)
     v.push_back (when (when (tabs (10, 548, 150, 20, "EQ curve", TR_NOOP ("Brown|Black")), "4K voicing", 0.0f, 0.5f), "Modern voicing", 0.0f, 0.5f));
@@ -1876,6 +1877,24 @@ Layout ridgeStrip()
     v.push_back (toggle (170, 548, 104, 20, "EQ on", TR_NOOP ("EQ in")));
     // round 123: the voicing — Ridge's own engine, or the measured E-type console (substitutes start there)
     v.push_back (tabs (10, 584, 150, 20, "Voicing", TR_NOOP ("Classic|E console")));
+    // round tp172c6: the DRIVE section under the EQ — in, the model (measured saturators, consoles, tube, amps), its
+    // drive, the level into it, the trim after it and the mix
+    v.push_back (section (4, 648, 276, 64, TR_NOOP ("Drive")));
+    v.push_back (toggle (10, 666, 50, 18, "Drive in", TR_NOOP ("In")));
+    {
+        LayoutItem m;
+        m.type = Item::menu;
+        m.x = 10, m.y = 688, m.w = 96, m.h = 18;
+        m.param = "Drive model";
+        m.options = TR_NOOP ("Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp");
+        for (int k = 0; k < mixsuite::ridge::driveModels; ++k)
+            m.values.push_back (mixsuite::ridge::driveModelValue (k));
+        v.push_back (m);
+    }
+    v.push_back (dial (130, 676, 22, "Drive amount", TR_NOOP ("Drive")));
+    v.push_back (dial (174, 676, 20, "Drive input", TR_NOOP ("Input"), bipolar));
+    v.push_back (dial (216, 676, 20, "Drive trim", TR_NOOP ("Trim"), bipolar));
+    v.push_back (dial (256, 676, 20, "Drive mix", TR_NOOP ("Mix")));
 
     // --- right column: dynamics, routing
     v.push_back (section (504, 4, 272, 236, TR_NOOP ("Compressor")));
@@ -4020,7 +4039,7 @@ Layout poizoneMain()
     Layout l;
     l.fl = "PoiZone";
     l.width = 856;
-    l.height = 378;
+    l.height = 486;
     auto& v = l.items;
     // a 40-pixel FL wheel at (left, top of the row) → LYNX knob with its caption
     auto wheel = [&v] (float left, float rowTop, const char* param, const char* caption, std::uint16_t style = 0) {
@@ -4127,6 +4146,13 @@ Layout poizoneMain()
     for (int i = 0; i < 16; ++i)
         v.push_back (toggle (712 + 17 * (float) (i % 8), r4 + 26 + 24 * (float) (i / 8), 16, 22,
                              stored ("Gate step " + std::to_string (i + 1)), nullptr, boxed));
+
+    // row 5: FL's two wheels under the panel (TSynthEditorForm's PitchBendWheel at x 47 and ModWheel at x 97, 19 × 94;
+    // the pitch bend springs back to the centre when released, FL's PitchBendReset)
+    const float r5 = 382;
+    v.push_back (section (6, r5, 134, 102, TR_NOOP ("Wheels")));
+    v.push_back (slider (Item::vslider, 40, r5 + 22, 25, 62, "Pitch bend", TR_NOOP ("Bend"), bipolar | springBack));
+    v.push_back (slider (Item::vslider, 90, r5 + 22, 25, 62, "Mod wheel", TR_NOOP ("Mod")));
     return l;
 }
 } // namespace
