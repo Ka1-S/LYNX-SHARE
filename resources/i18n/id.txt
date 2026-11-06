@@ -7307,3 +7307,16 @@ countries: id
 "None|Smooth|Op-El|Mastering" = "Tidak ada|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Tiga karakter kompresor lagi, dipakai menggantikan gaya: halus, opto-elektronik, atau mastering"
 "Wheels" = "Roda"
+
+# --- Live set export (round 175a)
+"Everything went over to the Live set." = "Semuanya masuk ke set Live."
+"Export Live set" = "Ekspor set Live"
+"Could not copy {0}; the set refers to it where it is" = "Tidak dapat menyalin {0}; set merujuk ke lokasi aslinya"
+"The Live set could not be written" = "Set Live tidak dapat ditulis"
+"Save for" = "Simpan untuk"
+"Live 11 (also opens in Live 12)" = "Live 11 (juga terbuka di Live 12)"
+"Copy them into the project folder" = "Salin ke folder proyek"
+"Refer to them where they are" = "Rujuk ke lokasi aslinya"
+"Choose the folder for the Live set" = "Pilih folder untuk set Live"
+"Ableton Live set (.als)..." = "Set Ableton Live (.als)..."
+"The set is saved as \"<name> Project/<name>.als\". Tracks, clips, notes, mixer levels, sends, VST plugins with their state, markers and tempo go over; a report lists the rest." = "Set disimpan sebagai \"<nama> Project/<nama>.als\". Track, klip, not, level mixer, send, plugin VST beserta statusnya, marker, dan tempo ikut dipindahkan; laporan mencantumkan sisanya."

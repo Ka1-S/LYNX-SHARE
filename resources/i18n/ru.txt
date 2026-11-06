@@ -7307,3 +7307,16 @@ countries: ru by kz
 "None|Smooth|Op-El|Mastering" = "Нет|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Ещё три характера компрессора вместо стиля: мягкий, оптоэлектронный или мастеринг"
 "Wheels" = "Колёса"
+
+# --- Live set export (round 175a)
+"Everything went over to the Live set." = "Всё перенесено в сет Live."
+"Export Live set" = "Экспорт сета Live"
+"Could not copy {0}; the set refers to it where it is" = "Не удалось скопировать {0}; сет ссылается на исходное место"
+"The Live set could not be written" = "Не удалось записать сет Live"
+"Save for" = "Сохранить для"
+"Live 11 (also opens in Live 12)" = "Live 11 (открывается и в Live 12)"
+"Copy them into the project folder" = "Копировать в папку проекта"
+"Refer to them where they are" = "Ссылаться на исходное место"
+"Choose the folder for the Live set" = "Выберите папку для сета Live"
+"Ableton Live set (.als)..." = "Сет Ableton Live (.als)..."
+"The set is saved as \"<name> Project/<name>.als\". Tracks, clips, notes, mixer levels, sends, VST plugins with their state, markers and tempo go over; a report lists the rest." = "Сет сохраняется как «<имя> Project/<имя>.als». Переносятся дорожки, клипы, ноты, уровни микшера, посылы, VST-плагины с их состоянием, маркеры и темп; остальное перечислено в отчёте."

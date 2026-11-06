@@ -7307,3 +7307,16 @@ countries: kr
 "None|Smooth|Op-El|Mastering" = "없음|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "스타일 대신 쓰는 컴프레서 캐릭터 세 가지: 스무스, 광전자식, 마스터링"
 "Wheels" = "휠"
+
+# --- Live set export (round 175a)
+"Everything went over to the Live set." = "모든 것이 Live 세트로 옮겨졌습니다."
+"Export Live set" = "Live 세트 내보내기"
+"Could not copy {0}; the set refers to it where it is" = "{0}을(를) 복사할 수 없습니다. 세트는 원래 위치를 참조합니다"
+"The Live set could not be written" = "Live 세트를 쓸 수 없습니다"
+"Save for" = "저장 대상"
+"Live 11 (also opens in Live 12)" = "Live 11 (Live 12에서도 열림)"
+"Copy them into the project folder" = "프로젝트 폴더에 복사"
+"Refer to them where they are" = "원래 위치를 참조"
+"Choose the folder for the Live set" = "Live 세트 폴더 선택"
+"Ableton Live set (.als)..." = "Ableton Live 세트 (.als)..."
+"The set is saved as \"<name> Project/<name>.als\". Tracks, clips, notes, mixer levels, sends, VST plugins with their state, markers and tempo go over; a report lists the rest." = "세트는 \"<이름> Project/<이름>.als\"로 저장됩니다. 트랙, 클립, 노트, 믹서 레벨, 센드, 상태를 포함한 VST 플러그인, 마커, 템포가 옮겨지며 나머지는 보고서에 표시됩니다."

@@ -7307,3 +7307,16 @@ countries: cn sg
 "None|Smooth|Op-El|Mastering" = "无|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "另外三种压缩器特性，代替风格使用：平滑、光电或母带"
 "Wheels" = "滚轮"
+
+# --- Live set export (round 175a)
+"Everything went over to the Live set." = "所有内容都已转入 Live 套装。"
+"Export Live set" = "导出 Live 套装"
+"Could not copy {0}; the set refers to it where it is" = "无法复制 {0}；套装引用其原位置"
+"The Live set could not be written" = "无法写入 Live 套装"
+"Save for" = "保存为"
+"Live 11 (also opens in Live 12)" = "Live 11（也可在 Live 12 中打开）"
+"Copy them into the project folder" = "复制到项目文件夹"
+"Refer to them where they are" = "引用其原位置"
+"Choose the folder for the Live set" = "选择 Live 套装的文件夹"
+"Ableton Live set (.als)..." = "Ableton Live 套装 (.als)..."
+"The set is saved as \"<name> Project/<name>.als\". Tracks, clips, notes, mixer levels, sends, VST plugins with their state, markers and tempo go over; a report lists the rest." = "套装保存为“<名称> Project/<名称>.als”。轨道、片段、音符、混音器电平、发送、带状态的 VST 插件、标记和速度都会转入；其余内容列在报告中。"

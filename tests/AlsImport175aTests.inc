@@ -343,3 +343,259 @@ TEST (als175a_reads_live11_sets)
     const auto song = importAls (als175a::bytesOf (als175a::richSet ("11.0_11300", true)), als175a::options (nullptr));
     CHECK (song && std::abs (song->bpm - 128.0) < 1e-9 && song->beatsPerBar == 3 && song->mixer.size() == 5);
 }
+
+// Opt-in (LYNX_ALS_DIR=folder): every .als / .xml set below the folder is imported and summarised. Real sets (the ones
+// Live ships, sets from public repositories) stay on the developer's disk; none is committed.
+TEST (als175a_real_sets)
+{
+    using namespace lynx;
+    const char* dir = std::getenv ("LYNX_ALS_DIR");
+    if (dir == nullptr)
+        return;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator (dir))
+    {
+        const auto ext = entry.path().extension().string();
+        if (ext != ".als" && ext != ".xml")
+            continue;
+        std::ifstream in (entry.path(), std::ios::binary);
+        const std::vector<std::uint8_t> bytes ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
+        FlpImportReport report;
+        AlsImportOptions o;
+        o.common.projectFolder = entry.path().parent_path().string();
+        o.common.fileExists = [] (const std::string& p) { return std::filesystem::exists (p); };
+        o.common.report = &report;
+        std::string error;
+        const auto t0 = std::chrono::steady_clock::now();
+        const auto song = importAls (bytes, o, &error);
+        const auto ms = std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t0).count();
+        CHECK (song.has_value());
+        if (! song)
+        {
+            std::printf ("  %s: ERROR %s\n", entry.path().filename().string().c_str(), error.c_str());
+            continue;
+        }
+        int plugins = 0, notes = 0;
+        for (const auto& c : song->channels)
+            plugins += c.plugin.foreign.format != ForeignPlugin::Format::none;
+        for (const auto& m : song->mixer)
+            for (const auto& fx : m.effects)
+                plugins += fx.plugin.foreign.format != ForeignPlugin::Format::none;
+        for (const auto& p : song->patterns)
+            notes += (int) p.notes.size();
+        std::printf ("  %s: %.0f ms, bpm %.2f %d/x, %zu inserts, %zu channels, %zu patterns (%d notes), %zu clips, %zu automations, "
+                     "%zu markers, %d plugins, %d samples missing, %zu dropped devices, %zu unsupported\n",
+                     entry.path().filename().string().c_str(), ms, song->bpm, song->beatsPerBar, song->mixer.size(), song->channels.size(),
+                     song->patterns.size(), notes, song->playlist.size(), song->automations.size(), song->markers().size(), plugins,
+                     report.missingSamples, report.droppedEffects.size(), report.unsupported.size());
+    }
+}
+
+// --- .als export (round 175a, N2): LYNX → .als → LYNX keeps what the format holds, for Live 12 and Live 11 sets
+
+#include "core/AlsExport.h"
+#include "flp/FlpWrite.h"
+
+namespace als175a
+{
+// every pointee id unique and below NextPointeeId; SendsPre and each track's clip slots sized right [ALS_FORMAT §9]
+inline bool loaderRulesHold (const std::string& xmlText, int returns, std::string& why)
+{
+    lynx::xml::Document d;
+    if (! d.parse (xmlText))
+    {
+        why = "unparsable";
+        return false;
+    }
+    std::set<std::string> ids;
+    long maxId = 0;
+    bool unique = true;
+    std::function<void (const lynx::xml::Element&)> walk = [&] (const lynx::xml::Element& e) {
+        const auto n = std::string (e.name());
+        if (e.hasAttr ("Id"))
+            maxId = std::max (maxId, std::strtol (e.attr ("Id").c_str(), nullptr, 10));
+        const auto target = n == "Pointee" || (n.size() > 6 && n.compare (n.size() - 6, 6, "Target") == 0) || n.rfind ("ControllerTargets.", 0) == 0;
+        if (target && e.hasAttr ("Id") && ! ids.insert (e.attr ("Id")).second)
+            unique = false;
+        // list items: ids unique among their siblings ("Non-unique list ids")
+        std::set<std::string> siblings;
+        for (const auto& c : e.children())
+            if (c.hasAttr ("Id") && ! siblings.insert (std::string (c.name()) + "#" + c.attr ("Id")).second)
+                unique = false;
+        for (const auto& c : e.children())
+            walk (c);
+    };
+    const auto set = d.root().child ("LiveSet");
+    walk (set);
+    if (! unique)
+        why = "duplicate pointee id";
+    else if (set.number ("NextPointeeId") <= (double) maxId)
+        why = "NextPointeeId too low";
+    else if ((int) set.child ("SendsPre").children().size() != returns)
+        why = "SendsPre";
+    else
+    {
+        const auto scenes = set.child ("Scenes").children ("Scene").size();
+        for (const auto& t : set.child ("Tracks").children())
+            for (const auto* seq : { "DeviceChain/MainSequencer/ClipSlotList", "DeviceChain/FreezeSequencer/ClipSlotList" })
+                if (t.path (seq) && t.path (seq).children ("ClipSlot").size() != (t.name() == "GroupTrack" ? 0 : scenes))
+                    why = std::string ("clip slots of ") + std::string (t.name());
+        for (const auto& g : set.child ("Tracks").children ("GroupTrack"))
+            if (g.child ("Slots").children ("GroupTrackSlot").size() != scenes)
+                why = "group track slots";
+        if ((int) set.child ("Tracks").children ("ReturnTrack").size() != returns)
+            why = "returns";
+    }
+    return why.empty();
+}
+} // namespace als175a
+
+TEST (als175a_export_round_trip)
+{
+    using namespace lynx;
+    const auto original = importAls (als175a::bytesOf (als175a::richSet()), als175a::options (nullptr));
+    CHECK (original.has_value());
+    if (! original)
+        return;
+    for (const auto version : { AlsVersion::live12, AlsVersion::live11 })
+    {
+        AlsExportOptions o;
+        o.version = version;
+        o.sampleSeconds = [] (const std::string&) { return 2.0; };
+        const auto out = exportAls (*original, o);
+        CHECK (! out.bytes.empty() && gzip::isGzip (out.bytes.data(), out.bytes.size()));
+        const auto live11 = version == AlsVersion::live11;
+        CHECK (out.xml.find (live11 ? "<MasterTrack" : "<MainTrack") != std::string::npos);
+        CHECK (out.xml.find (live11 ? "<MainTrack" : "<MasterTrack") == std::string::npos);
+        CHECK (out.xml.find (live11 ? "MinorVersion=\"11." : "MinorVersion=\"12.") != std::string::npos);
+        std::string why;
+        // returns: Reverb. Band (the set's group track: an insert with no channel that Vocal routes into, not to the
+        // Master) goes back as a group track holding Vocal
+        CHECK (als175a::loaderRulesHold (out.xml, 1, why));
+        CHECK (out.xml.find ("<GroupTrack ") != std::string::npos);
+        if (! why.empty())
+            std::printf ("  loader rule: %s\n", why.c_str());
+        // a clip's scale name is a setting (an index in Live 12, "Major"... in Live 11), never empty: Live 12.4 refuses
+        // the set ("Unexpected value for int node")
+        for (auto at = out.xml.find ("<ScaleInformation>"); at != std::string::npos; at = out.xml.find ("<ScaleInformation>", at + 1))
+        {
+            const auto name = out.xml.find ("<Name Value=\"", at);
+            CHECK (name != std::string::npos && out.xml.compare (name, 15, "<Name Value=\"\"") != 0);
+        }
+
+        FlpImportReport report;
+        auto opts = als175a::options (&report);
+        opts.common.fileExists = [] (const std::string&) { return true; };
+        const auto back = importAls (out.bytes, opts);
+        CHECK (back.has_value());
+        if (! back)
+            continue;
+        const auto& s = *back;
+        CHECK (std::abs (s.bpm - 128.0) < 1e-9 && s.beatsPerBar == 3);
+        // Keys: the VST3 instrument with the same class and component state; its 8 riff notes from beat 4
+        const ChannelDef* keys = nullptr;
+        for (const auto& c : s.channels)
+            if (c.name == "Keys")
+                keys = &c;
+        CHECK (keys != nullptr && keys->instrument == InstrumentKind::plugin);
+        if (keys != nullptr)
+        {
+            const ChannelDef* before = nullptr;
+            for (const auto& c : original->channels)
+                if (c.name == "Keys")
+                    before = &c;
+            CHECK (before != nullptr && keys->plugin.foreign.classId == before->plugin.foreign.classId);
+            std::vector<std::uint8_t> a, b, ca, cb;
+            CHECK (before != nullptr && splitFlVst3State (keys->plugin.foreign.state, a, ca) && splitFlVst3State (before->plugin.foreign.state, b, cb) && a == b);
+            CHECK (std::abs (s.mixer[(std::size_t) keys->mixerTrack].volume - faderPosition (0.5f)) < 1e-3);
+        }
+        int riffNotes = 0;
+        for (const auto& c : s.playlist)
+            if (c.kind == ClipKind::pattern && c.start == 4 * ppq)
+                riffNotes += (int) s.patterns[(std::size_t) c.pattern].notes.size();
+        CHECK (riffNotes == 8);
+        // the vocal: same sample, stretch, transpose and gain; its VST2 insert keeps the chunk
+        const Clip* take = nullptr;
+        for (const auto& c : s.playlist)
+            if (c.kind == ClipKind::audio)
+                take = &c;
+        CHECK (take != nullptr);
+        if (take != nullptr)
+        {
+            CHECK (std::abs (take->stretch - 1.875) < 1e-6 && std::abs (take->pitch - 2.0f) < 1e-6 && std::abs (take->gain - 0.5f) < 1e-6);
+            CHECK (take->start == 0 && take->length == 8 * ppq);
+            const auto& ch = s.channels[(std::size_t) take->channel];
+            CHECK (ch.samplePath == "E:/sets/Song Project/Samples/Imported/vocal.wav");
+            bool chunk = false;
+            for (const auto& fx : s.mixer[(std::size_t) ch.mixerTrack].effects)
+            {
+                FlVst2State st;
+                chunk = chunk || (fx.plugin.foreign.vst2Id == 1802725230u && parseFlVst2State (fx.plugin.foreign.state, st) && st.chunk.size() == 6);
+            }
+            CHECK (chunk);
+            CHECK (! s.mixer[(std::size_t) ch.mixerTrack].toMaster); // (it fed the Band insert only)
+        }
+        CHECK (als175a::markerNamed (s, "Verse") != nullptr && als175a::markerNamed (s, "Verse")->tick == 6 * ppq);
+        CHECK (s.loopStart == 4 * ppq && s.loopEnd == 12 * ppq);
+        bool automated = false;
+        for (const auto& a : s.automations)
+            automated = automated || (a.target.kind == AutomationTargetKind::mixerVolume && a.points.size() == 2);
+        CHECK (automated);
+    }
+}
+
+TEST (als175a_flp_to_als)
+{
+    using namespace lynx;
+    // an .flp (written by LYNX's .flp writer) → LYNX → .als → LYNX: the notes and the tempo arrive
+    flp::Project p;
+    p.tempo = 97.5;
+    flp::Channel c;
+    c.index = 0;
+    c.type = flp::ChannelType::sampler;
+    c.name = "Kick";
+    c.samplePath = "C:/k.wav";
+    p.channels.push_back (c);
+    flp::Pattern pat;
+    pat.index = 1;
+    pat.name = "Beat";
+    for (int k = 0; k < 4; ++k)
+    {
+        flp::Note n;
+        n.position = 96 * k;
+        n.length = 48;
+        n.key = 60 + k;
+        n.velocity = 100;
+        pat.notes.push_back (n);
+    }
+    p.patterns.push_back (pat);
+    flp::Arrangement a;
+    a.name = "Main";
+    flp::PlaylistItem item;
+    item.position = 384;
+    item.length = 384;
+    item.index = 1;
+    item.track = 0;
+    a.items.push_back (item);
+    p.arrangements.push_back (a);
+    FlpImportOptions fo;
+    fo.fileExists = [] (const std::string&) { return true; };
+    const auto viaFlp = importFlp (flp::parseProject (flp::writeProject (p)), fo);
+    const auto out = exportAls (viaFlp);
+    std::string why;
+    CHECK (als175a::loaderRulesHold (out.xml, 0, why));
+    const auto back = importAls (out.bytes);
+    CHECK (back.has_value());
+    if (! back)
+        return;
+    CHECK (std::abs (back->bpm - 97.5) < 1e-9);
+    std::vector<std::pair<std::int64_t, int>> before, after;
+    for (const auto* song : { &viaFlp, &*back })
+        for (const auto& clip : song->playlist)
+            if (clip.kind == ClipKind::pattern)
+                for (const auto& n : song->patterns[(std::size_t) clip.pattern].notes)
+                    if (n.start >= clip.offset && n.start < clip.offset + clip.length)
+                        (song == &viaFlp ? before : after).push_back ({ clip.start + n.start - clip.offset, n.key });
+    std::sort (before.begin(), before.end());
+    std::sort (after.begin(), after.end());
+    CHECK (before.size() == 4 && before == after);
+}

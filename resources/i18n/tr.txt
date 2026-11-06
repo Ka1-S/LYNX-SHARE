@@ -7307,3 +7307,16 @@ countries: tr
 "None|Smooth|Op-El|Mastering" = "Yok|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Stil yerine kullanılan üç kompresör karakteri daha: yumuşak, opto-elektronik veya mastering"
 "Wheels" = "Tekerlekler"
+
+# --- Live set export (round 175a)
+"Everything went over to the Live set." = "Her şey Live setine aktarıldı."
+"Export Live set" = "Live seti dışa aktar"
+"Could not copy {0}; the set refers to it where it is" = "{0} kopyalanamadı; set onu bulunduğu yerden kullanıyor"
+"The Live set could not be written" = "Live seti yazılamadı"
+"Save for" = "Şunun için kaydet"
+"Live 11 (also opens in Live 12)" = "Live 11 (Live 12'de de açılır)"
+"Copy them into the project folder" = "Proje klasörüne kopyala"
+"Refer to them where they are" = "Bulundukları yerden kullan"
+"Choose the folder for the Live set" = "Live seti için klasör seçin"
+"Ableton Live set (.als)..." = "Ableton Live seti (.als)..."
+"The set is saved as \"<name> Project/<name>.als\". Tracks, clips, notes, mixer levels, sends, VST plugins with their state, markers and tempo go over; a report lists the rest." = "Set \"<ad> Project/<ad>.als\" olarak kaydedilir. Kanallar, klipler, notalar, mikser seviyeleri, gönderimler, durumlarıyla VST eklentileri, işaretçiler ve tempo aktarılır; bir rapor geri kalanını listeler."

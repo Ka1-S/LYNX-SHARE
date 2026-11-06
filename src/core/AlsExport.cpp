@@ -1,0 +1,1009 @@
+#include "core/AlsExport.h"
+
+#include <algorithm>
+#include <charconv>
+#include <cmath>
+#include <map>
+#include <mutex>
+#include <set>
+
+#include "core/AlsImport.h"
+#include "core/AlsSkeleton.h"
+#include "core/Effects.h"
+#include "core/FlWrapper.h"
+#include "core/Gzip.h"
+#include "core/Inflate.h"
+#include "core/XmlLite.h"
+
+// Evidence tags as in docs/analise/ALS_FORMAT.md. [LIVE] = checked by opening the result in Live 12.4.
+
+namespace lynx
+{
+namespace
+{
+// ---------------------------------------------------------------------------------------------------------------
+// A small mutable XML tree for writing
+
+struct Node
+{
+    std::string name;
+    std::vector<std::pair<std::string, std::string>> attrs;
+    std::string text;
+    std::vector<Node> kids;
+
+    Node* child (std::string_view n)
+    {
+        for (auto& k : kids)
+            if (k.name == n)
+                return &k;
+        return nullptr;
+    }
+    Node* at (std::string_view path)
+    {
+        Node* e = this;
+        while (e != nullptr && ! path.empty())
+        {
+            const auto slash = path.find ('/');
+            e = e->child (path.substr (0, slash));
+            path = slash == std::string_view::npos ? std::string_view {} : path.substr (slash + 1);
+        }
+        return e;
+    }
+    void set (std::string_view key, std::string value)
+    {
+        for (auto& a : attrs)
+            if (a.first == key)
+            {
+                a.second = std::move (value);
+                return;
+            }
+        attrs.emplace_back (std::string (key), std::move (value));
+    }
+    std::string get (std::string_view key) const
+    {
+        for (const auto& a : attrs)
+            if (a.first == key)
+                return a.second;
+        return {};
+    }
+    bool has (std::string_view key) const
+    {
+        return std::any_of (attrs.begin(), attrs.end(), [key] (const auto& a) { return a.first == key; });
+    }
+    // The "Value" of the member at `path` (false when the skeleton has no such member)
+    bool value (std::string_view path, std::string v)
+    {
+        if (auto* e = at (path))
+        {
+            e->set ("Value", std::move (v));
+            return true;
+        }
+        return false;
+    }
+    Node& add (Node n)
+    {
+        kids.push_back (std::move (n));
+        return kids.back();
+    }
+};
+
+Node fromElement (const xml::Element& e)
+{
+    Node n;
+    n.name = std::string (e.name());
+    n.attrs = e.attributes();
+    n.text = e.text();
+    for (const auto& c : e.children())
+        n.kids.push_back (fromElement (c));
+    return n;
+}
+
+void write (const Node& n, std::string& out, int depth)
+{
+    out.append ((std::size_t) depth, '\t');
+    out += '<';
+    out += n.name;
+    for (const auto& [k, v] : n.attrs)
+    {
+        out += ' ';
+        out += k;
+        out += "=\"";
+        out += xml::escape (v);
+        out += '"';
+    }
+    if (n.kids.empty() && n.text.empty())
+    {
+        out += " />\n";
+        return;
+    }
+    out += '>';
+    if (! n.text.empty())
+        out += xml::escape (n.text);
+    if (! n.kids.empty())
+    {
+        out += '\n';
+        for (const auto& k : n.kids)
+            write (k, out, depth + 1);
+        out.append ((std::size_t) depth, '\t');
+    }
+    out += "</";
+    out += n.name;
+    out += ">\n";
+}
+
+std::string num (double v)
+{
+    if (std::abs (v) < 1e-12)
+        return "0";
+    char buf[64];
+    const auto r = std::to_chars (buf, buf + sizeof buf, v);
+    return std::string (buf, r.ptr);
+}
+std::string num (std::int64_t v) { return std::to_string (v); }
+std::string num (int v) { return std::to_string (v); }
+std::string boolean (bool b) { return b ? "true" : "false"; }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Skeletons (core/AlsSkeleton.h): one map of element kind → element per version, decoded once
+
+struct Skeletons
+{
+    std::map<std::string, Node> kinds;
+    const Node& operator[] (const std::string& k) const
+    {
+        static const Node none;
+        const auto it = kinds.find (k);
+        return it != kinds.end() ? it->second : none;
+    }
+};
+
+const Skeletons& skeletons (AlsVersion v)
+{
+    static Skeletons cache[2];
+    static std::once_flag once[2];
+    const auto i = v == AlsVersion::live11 ? 1 : 0;
+    std::call_once (once[i], [i] {
+        const auto* data = i == 1 ? alsskeleton::live11 : alsskeleton::live12;
+        const auto size = i == 1 ? sizeof (alsskeleton::live11) : sizeof (alsskeleton::live12);
+        const auto raw = i == 1 ? alsskeleton::live11Size : alsskeleton::live12Size;
+        const auto text = inflateZlib (data, size, false, raw + 16);
+        if (! text)
+            return;
+        xml::Document doc;
+        if (! doc.parse (std::string (text->begin(), text->end())))
+            return;
+        for (const auto& kind : doc.root().children ("Kind"))
+            if (const auto inner = kind.children(); ! inner.empty())
+                cache[i].kinds[kind.attr ("name")] = fromElement (inner.front());
+    });
+    return cache[i];
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+
+constexpr double minGain = 0.0003162277571; // −70 dB: Live's fader floor [DATA]
+constexpr double maxGain = 1.99526238;      // +6 dB [DATA]
+constexpr double beforeSong = -63072000.0;  // [DATA]
+
+double beats (std::int64_t ticks) { return (double) ticks / (double) ppq; }
+
+int warpModeOf (const SamplerSettings& s)
+{
+    if (! s.keepPitch)
+        return 3; // Re-Pitch
+    switch (s.stretchMethod)
+    {
+        case StretchMethod::transients: return 0; // Beats
+        case StretchMethod::mono: return 1;       // Tones
+        default: return 4;                        // Complex
+    }
+}
+
+// What one Live track stands for
+struct LiveTrack
+{
+    enum class Kind { midi, audio, group, ret } kind = Kind::midi;
+    std::string name;
+    std::uint32_t colour = 0;
+    int insert = 0;   // the LYNX mixer insert whose fader / effects / sends the track carries (0: none of its own)
+    int channel = -1; // midi: the channel
+    int row = -1;     // audio: the Playlist track
+    int group = -1;   // index of its group track in the list (-1: none)
+    int bus = -1;     // the insert its own insert routes into (a group), -1: none
+    bool ownsInsert = true; // carries its insert's sends and effects (false: a member of a shared insert's group)
+    double gain = 1.0;
+    float pan = 0.0f;
+    bool muted = false, solo = false;
+};
+
+struct Exporter
+{
+    const Song& song;
+    const AlsExportOptions& options;
+    const Skeletons& sk;
+    AlsExportResult& result;
+    bool live11 = false;
+    std::set<std::string> noted;
+
+    void note (const std::string& what)
+    {
+        if (noted.insert (what).second)
+            result.notes.push_back (what);
+    }
+
+    std::string mainName() const { return live11 ? "MasterTrack" : "MainTrack"; }
+    std::string mainOut() const { return live11 ? "AudioOut/Master" : "AudioOut/Main"; }
+
+    // ---- plugin devices
+    bool pluginDevice (const PluginRef& ref, bool instrument, bool on, Node& out)
+    {
+        ForeignPlugin f = ref.foreign;
+        if (f.format == ForeignPlugin::Format::none && options.pluginRecord)
+            if (auto record = options.pluginRecord (ref, instrument))
+            {
+                f = std::move (*record);
+                if (! ref.name.empty())
+                    f.name = ref.name;
+            }
+        if (f.format == ForeignPlugin::Format::vst3)
+        {
+            out = sk["PluginDeviceVst3"];
+            std::vector<std::uint8_t> component, controller;
+            if (! f.state.empty() && ! splitFlVst3State (f.state, component, controller))
+                note ("Plugin state not carried over: " + f.name);
+            const auto fields = alsVst3Fields (f.classId);
+            for (auto* info : { out.at ("PluginDesc/Vst3PluginInfo"), out.at ("PluginDesc/Vst3PluginInfo/Preset/Vst3Preset") })
+            {
+                if (info == nullptr)
+                    continue;
+                for (int k = 0; k < 4; ++k)
+                    info->value ("Uid/Fields." + std::to_string (k), num (fields[(std::size_t) k]));
+                info->value ("DeviceType", instrument ? "1" : "2");
+                info->value ("Name", f.name);
+            }
+            if (auto* preset = out.at ("PluginDesc/Vst3PluginInfo/Preset/Vst3Preset"))
+            {
+                if (auto* p = preset->child ("ProcessorState"))
+                    p->text = alsHexEncode (component);
+                if (auto* c = preset->child ("ControllerState"))
+                    c->text = alsHexEncode (controller);
+            }
+        }
+        else if (f.format == ForeignPlugin::Format::vst2)
+        {
+            out = sk["PluginDeviceVst2"];
+            auto* info = out.at ("PluginDesc/VstPluginInfo");
+            if (info == nullptr)
+                return false;
+            info->value ("Path", f.path);
+            info->value ("PlugName", f.name);
+            info->value ("UniqueId", num ((std::int64_t) f.vst2Id));
+            info->value ("Category", instrument ? "2" : "1");
+            if (auto* preset = info->at ("Preset/VstPreset"))
+            {
+                preset->value ("UniqueId", num ((std::int64_t) f.vst2Id));
+                FlVst2State st;
+                if (! f.state.empty() && parseFlVst2State (f.state, st))
+                {
+                    if (! st.chunk.empty())
+                    {
+                        preset->value ("Type", num ((std::int64_t) 0x46426368)); // 'FBCh' [LIVE]
+                        if (auto* b = preset->child ("Buffer"))
+                            b->text = alsHexEncode (st.chunk);
+                    }
+                    else
+                        note ("Plugin settings without a chunk not carried over: " + f.name);
+                    preset->value ("ProgramNumber", num (st.currentProgram));
+                }
+            }
+        }
+        else
+            return false;
+        out.value ("On/Manual", boolean (on));
+        return true;
+    }
+
+    // ---- tracks
+    Node trackNode (const LiveTrack& t, int trackId, int returns, const std::vector<int>& groupIds)
+    {
+        const char* kind = t.kind == LiveTrack::Kind::midi ? "MidiTrack" : t.kind == LiveTrack::Kind::audio ? "AudioTrack"
+                         : t.kind == LiveTrack::Kind::group                                   ? "GroupTrack"
+                                                                                              : "ReturnTrack";
+        Node n = sk[kind];
+        n.set ("Id", num (trackId));
+        n.value ("Name/EffectiveName", t.name);
+        n.value ("Name/UserName", t.name);
+        n.value ("Color", num (std::max (0, alsColourIndex (t.colour))));
+        n.value ("TrackGroupId", num (t.group >= 0 ? groupIds[(std::size_t) t.group] : -1));
+        if (auto* out = n.at ("DeviceChain/AudioOutputRouting"))
+        {
+            // an insert that feeds only other inserts (FL's "Master" send off): no output, its sends carry it
+            const auto noOutput = t.group < 0 && t.insert > 0 && t.kind != LiveTrack::Kind::ret && ! song.mixer[(std::size_t) t.insert].toMaster;
+            out->value ("Target", t.group >= 0 ? "AudioOut/GroupTrack" : noOutput ? "AudioOut/None" : mainOut());
+            out->value ("UpperDisplayString", t.group >= 0 ? "Group" : noOutput ? "No Output" : "Master");
+            out->value ("LowerDisplayString", "");
+        }
+        if (auto* mixer = n.at ("DeviceChain/Mixer"))
+        {
+            mixer->value ("Volume/Manual", num (std::clamp (t.gain, minGain, maxGain)));
+            mixer->value ("Pan/Manual", num ((double) std::clamp (t.pan, -1.0f, 1.0f)));
+            mixer->value ("Speaker/Manual", boolean (! t.muted));
+            mixer->value ("SoloSink", boolean (t.solo));
+            if (auto* sends = mixer->child ("Sends"))
+            {
+                sends->kids.clear();
+                for (int r = 0; r < returns; ++r)
+                {
+                    Node h = sk["TrackSendHolder"];
+                    h.set ("Id", num (r));
+                    h.value ("Send/Manual", num (minGain));
+                    sends->add (std::move (h));
+                }
+            }
+        }
+        // a group track: one GroupTrackSlot per scene in its own Slots list, and NO freeze clip slots (Live 11.0–12.2
+        // save it empty; "List of group track freeze sequencer slots not empty" otherwise) [LIVE, DATA]
+        if (auto* groupSlots = n.child ("Slots"); groupSlots != nullptr && ! groupSlots->kids.empty())
+        {
+            Node slot = groupSlots->kids.front();
+            slot.set ("Id", "0");
+            groupSlots->kids.clear();
+            groupSlots->add (std::move (slot));
+        }
+        // one clip slot per scene (one scene), in the main and the freeze sequencer [LIVE: §9 rule 6]
+        for (const auto* seq : { "DeviceChain/MainSequencer/ClipSlotList", "DeviceChain/FreezeSequencer/ClipSlotList" })
+            if (auto* slots = n.at (seq))
+            {
+                slots->kids.clear();
+                if (t.kind == LiveTrack::Kind::group)
+                    continue;
+                Node slot = sk["ClipSlot"];
+                slot.set ("Id", "0");
+                slots->add (std::move (slot));
+            }
+        return n;
+    }
+
+    void setSend (Node& track, int returnIndex, double level)
+    {
+        if (auto* sends = track.at ("DeviceChain/Mixer/Sends"); sends != nullptr && returnIndex < (int) sends->kids.size())
+            sends->kids[(std::size_t) returnIndex].value ("Send/Manual", num (std::clamp (level, minGain, maxGain)));
+    }
+
+    void addDevice (Node& track, Node device)
+    {
+        if (auto* devices = track.at ("DeviceChain/DeviceChain/Devices"))
+        {
+            device.set ("Id", num ((int) devices->kids.size()));
+            devices->add (std::move (device));
+        }
+    }
+
+    void insertEffects (Node& track, int insert)
+    {
+        if (insert < 0 || insert >= (int) song.mixer.size())
+            return;
+        for (const auto& fx : song.mixer[(std::size_t) insert].effects)
+        {
+            if (fx.kind == EffectKind::plugin)
+            {
+                Node d;
+                if (pluginDevice (fx.plugin, false, fx.enabled, d))
+                {
+                    addDevice (track, std::move (d));
+                    continue;
+                }
+            }
+            note ((fx.kind == EffectKind::plugin ? "Plugin not exported (not VST2 or VST3, or not found): " : "Effect not exported (LYNX built-in): ")
+                  + (fx.plugin.name.empty() ? std::string (effectInfo (fx.kind).name) : fx.plugin.name) + " on " + song.mixer[(std::size_t) insert].name);
+        }
+    }
+
+    // ---- clips
+    Node midiClip (const Pattern& p, int channel, std::int64_t start, std::int64_t length, std::int64_t offset, bool muted, int id)
+    {
+        Node c = sk["MidiClip"];
+        c.set ("Id", num (id));
+        c.set ("Time", num (beats (start)));
+        const auto len = beats (length);
+        c.value ("CurrentStart", num (beats (start)));
+        c.value ("CurrentEnd", num (beats (start + length)));
+        c.value ("Name", p.name);
+        c.value ("Color", num (std::max (0, alsColourIndex (p.colour))));
+        c.value ("Disabled", boolean (muted));
+        if (auto* loop = c.child ("Loop"))
+        {
+            loop->value ("LoopStart", "0");
+            loop->value ("LoopEnd", num (len));
+            loop->value ("StartRelative", "0");
+            loop->value ("LoopOn", "false");
+            loop->value ("OutMarker", num (len));
+            loop->value ("HiddenLoopStart", "0");
+            loop->value ("HiddenLoopEnd", num (len));
+        }
+        std::map<int, std::vector<const Note*>> byKey;
+        for (const auto& n : p.notes)
+            if (n.channel == channel && n.start >= offset && n.start < offset + length)
+                byKey[n.key].push_back (&n);
+        auto* keyTracks = c.at ("Notes/KeyTracks");
+        int noteId = 1, kt = 0;
+        if (keyTracks != nullptr)
+        {
+            keyTracks->kids.clear();
+            for (const auto& [key, notes] : byKey)
+            {
+                Node track = sk["KeyTrack"];
+                track.set ("Id", num (kt++));
+                track.value ("MidiKey", num (key));
+                auto* list = track.child ("Notes");
+                if (list == nullptr)
+                    continue;
+                list->kids.clear();
+                for (const auto* n : notes)
+                {
+                    Node e;
+                    e.name = "MidiNoteEvent";
+                    e.set ("Time", num (beats (n->start - offset)));
+                    e.set ("Duration", num (beats (std::min (n->length, offset + length - n->start))));
+                    e.set ("Velocity", num (std::clamp ((double) n->velocity * 127.0, 1.0, 127.0)));
+                    // Live 11 writes every attribute; Live 12 leaves out the default ones (same order) [DATA]
+                    if (live11)
+                        e.set ("VelocityDeviation", "0");
+                    e.set ("OffVelocity", num (std::clamp ((double) n->release * 127.0, 0.0, 127.0)));
+                    if (live11)
+                        e.set ("Probability", "1");
+                    if (live11 || n->muted)
+                        e.set ("IsEnabled", n->muted ? "false" : "true");
+                    e.set ("NoteId", num (noteId++));
+                    list->add (std::move (e));
+                }
+                keyTracks->add (std::move (track));
+            }
+        }
+        c.value ("Notes/NoteIdGenerator/NextId", num (noteId));
+        return c;
+    }
+
+    Node audioClip (const Clip& clip, int id)
+    {
+        Node c = sk["AudioClip"];
+        const auto& ch = song.channels[(std::size_t) clip.channel];
+        c.set ("Id", num (id));
+        c.set ("Time", num (beats (clip.start)));
+        c.value ("CurrentStart", num (beats (clip.start)));
+        c.value ("CurrentEnd", num (beats (clip.end())));
+        c.value ("Name", ch.name);
+        c.value ("Disabled", boolean (clip.muted));
+        const auto mode = warpModeOf (ch.sampler);
+        c.value ("IsWarped", "true");
+        c.value ("WarpMode", num (mode));
+        const auto pitch = mode == 3 ? 0.0 : (double) clip.pitch;
+        const auto coarse = std::round (pitch);
+        c.value ("PitchCoarse", num (coarse));
+        c.value ("PitchFine", num ((pitch - coarse) * 100.0));
+        c.value ("SampleVolume", num ((double) clip.gain));
+        // content beats ↔ sample seconds: one rate, the clip's stretch [import: stretch = beats per second · 60 / bpm]
+        const auto seconds = options.sampleSeconds ? options.sampleSeconds (ch.samplePath) : 0.0;
+        const auto spanSeconds = seconds > 0.0 ? seconds : 1.0;
+        const auto beatsPerSecond = clip.stretch * song.bpm / 60.0;
+        if (auto* markers = c.child ("WarpMarkers"))
+        {
+            markers->kids.clear();
+            for (int k = 0; k < 2; ++k)
+            {
+                Node m;
+                m.name = "WarpMarker";
+                m.set ("Id", num (k));
+                m.set ("SecTime", num (k == 0 ? 0.0 : spanSeconds));
+                m.set ("BeatTime", num (k == 0 ? 0.0 : spanSeconds * beatsPerSecond));
+                markers->add (std::move (m));
+            }
+        }
+        const auto from = beats (clip.offset) + (double) clip.offsetFraction / ppq;
+        const auto to = from + beats (clip.length);
+        if (auto* loop = c.child ("Loop"))
+        {
+            loop->value ("LoopStart", num (from));
+            loop->value ("LoopEnd", num (to));
+            loop->value ("StartRelative", "0");
+            loop->value ("LoopOn", "false");
+            loop->value ("OutMarker", num (to));
+            loop->value ("HiddenLoopStart", num (from));
+            loop->value ("HiddenLoopEnd", num (to));
+        }
+        c.value ("Fades/FadeInLength", num (beats (clip.fadeIn)));
+        c.value ("Fades/FadeOutLength", num (beats (clip.fadeOut)));
+        if (auto* ref = c.at ("SampleRef/FileRef"))
+        {
+            bool relative = false;
+            const auto path = options.samplePath ? options.samplePath (ch.samplePath, relative) : ch.samplePath;
+            ref->value ("RelativePathType", relative ? "1" : "0");
+            ref->value ("RelativePath", relative ? path : std::string());
+            ref->value ("Path", relative ? std::string() : path);
+            ref->value ("Type", "1");
+            ref->value ("LivePackName", "");
+            ref->value ("LivePackId", "");
+            ref->value ("OriginalFileSize", "0");
+            ref->value ("OriginalCrc", "0");
+        }
+        if (auto* sref = c.child ("SampleRef"))
+        {
+            sref->value ("LastModDate", "0");
+            sref->value ("DefaultDuration", "0");
+            sref->value ("DefaultSampleRate", "0");
+        }
+        if (clip.reversed)
+            note ("Reversed audio clips are exported forwards");
+        return c;
+    }
+
+    // ---- automation
+    void addEnvelope (Node& owner, const std::string& pointee, const std::vector<std::pair<double, double>>& events, int& envelopeId)
+    {
+        auto* list = owner.at ("AutomationEnvelopes/Envelopes");
+        if (list == nullptr || events.empty() || pointee.empty())
+            return;
+        Node env = sk["AutomationEnvelope"];
+        env.set ("Id", num (envelopeId++));
+        env.value ("EnvelopeTarget/PointeeId", pointee);
+        if (auto* ev = env.at ("Automation/Events"))
+        {
+            ev->kids.clear();
+            int id = 0;
+            auto add = [&] (double t, double v) {
+                Node e;
+                e.name = "FloatEvent";
+                e.set ("Id", num (id++));
+                e.set ("Time", num (t));
+                e.set ("Value", num (v));
+                ev->add (std::move (e));
+            };
+            // Live's own envelopes open with the "before the song" event; a point at the very start is that event [DATA]
+            add (beforeSong, events.front().second);
+            for (std::size_t i = events.front().first <= 0.0 ? 1 : 0; i < events.size(); ++i)
+                add (events[i].first, events[i].second);
+        }
+        list->add (std::move (env));
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    void run()
+    {
+        live11 = sk.kinds.count ("Root") > 0 && sk["Root"].get ("MinorVersion").rfind ("11.", 0) == 0;
+        Node root = sk["Root"];
+        root.set ("Creator", options.creator);
+        Node set = sk["LiveSet"];
+
+        // which channels play notes (in any pattern placed on the Playlist, or the current pattern for a pattern-mode song)
+        std::vector<const Clip*> patternClips, audioClips, automationClips;
+        for (const auto& c : song.playlist)
+        {
+            if (c.kind == ClipKind::pattern && c.pattern >= 0 && c.pattern < (int) song.patterns.size())
+                patternClips.push_back (&c);
+            else if (c.kind == ClipKind::audio && c.channel >= 0 && c.channel < (int) song.channels.size())
+                audioClips.push_back (&c);
+            else if (c.kind == ClipKind::automation && c.automation >= 0 && c.automation < (int) song.automations.size())
+                automationClips.push_back (&c);
+            else if (c.kind != ClipKind::pattern && c.kind != ClipKind::audio && c.kind != ClipKind::automation)
+                note ("Playlist clips of this kind are not exported (video, pattern blocks...)");
+        }
+        Clip patternModeClip;
+        if (patternClips.empty() && audioClips.empty() && ! song.patterns.empty())
+        {
+            const auto cur = std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1);
+            patternModeClip.pattern = cur;
+            patternModeClip.length = std::max<std::int64_t> (song.patterns[(std::size_t) cur].lengthTicks, (std::int64_t) song.beatsPerBar * ppq);
+            patternClips.push_back (&patternModeClip);
+            note ("The song had no Playlist clips: the current pattern is exported at the start");
+        }
+        std::vector<bool> plays (song.channels.size(), false);
+        for (const auto* c : patternClips)
+            for (const auto& n : song.patterns[(std::size_t) c->pattern].notes)
+                if (n.channel >= 0 && n.channel < (int) plays.size())
+                    plays[(std::size_t) n.channel] = true;
+
+        // the Live tracks
+        std::vector<LiveTrack> tracks;
+        std::map<int, int> perInsert; // insert → how many tracks use it
+        for (std::size_t i = 0; i < song.channels.size(); ++i)
+        {
+            const auto& ch = song.channels[i];
+            if (ch.instrument == InstrumentKind::audioClip)
+                continue;
+            const auto plugin = ch.instrument == InstrumentKind::plugin;
+            if (! plays[i] && ! plugin)
+                continue;
+            LiveTrack t;
+            t.kind = LiveTrack::Kind::midi;
+            t.name = ch.name;
+            t.colour = ch.colour;
+            t.channel = (int) i;
+            t.insert = std::clamp (ch.mixerTrack, 0, (int) song.mixer.size() - 1);
+            t.gain = channelGain (ch.volume);
+            t.pan = ch.pan;
+            tracks.push_back (t);
+            if (! plugin && ch.instrument != InstrumentKind::plugin)
+                note ("Instrument not exported (LYNX built-in, notes kept): " + ch.name);
+        }
+        std::map<int, std::vector<const Clip*>> rows;
+        for (const auto* c : audioClips)
+            rows[c->track].push_back (c);
+        for (const auto& [row, clips] : rows)
+        {
+            LiveTrack t;
+            t.kind = LiveTrack::Kind::audio;
+            t.row = row;
+            t.name = row < (int) song.playlistTracks.size() && ! song.playlistTracks[(std::size_t) row].name.empty()
+                         ? song.playlistTracks[(std::size_t) row].name
+                         : song.channels[(std::size_t) clips.front()->channel].name;
+            t.colour = row < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) row].colour : 0;
+            const auto& ch = song.channels[(std::size_t) clips.front()->channel];
+            t.insert = std::clamp (ch.mixerTrack, 0, (int) song.mixer.size() - 1);
+            // a Playlist audio clip plays at unity at FL's default channel volume [Instruments.cpp audioClipUnity]
+            t.gain = channelGain (ch.volume) / channelGain (10000.0f / 12800.0f);
+            t.pan = ch.pan;
+            tracks.push_back (t);
+            for (const auto* c : clips)
+                if (song.channels[(std::size_t) c->channel].mixerTrack != ch.mixerTrack)
+                    note ("Audio clips of one Playlist track on different mixer inserts: the first insert is used (" + t.name + ")");
+        }
+        for (const auto& t : tracks)
+            if (t.insert > 0)
+                ++perInsert[t.insert];
+
+        // buses: an insert with no track of its own that other inserts route into (their only output, no Master)
+        // becomes a group track, as Live's own groups import (AlsImport: the members' inserts feed the group's insert)
+        auto busOf = [&] (int m) -> int {
+            if (m <= 0 || m >= (int) song.mixer.size())
+                return -1;
+            const auto& mx = song.mixer[(std::size_t) m];
+            if (mx.toMaster || mx.sends.size() != 1)
+                return -1;
+            const auto target = mx.sends.front().target;
+            return target > 0 && target < (int) song.mixer.size() && target != m && perInsert.count (target) == 0 ? target : -1;
+        };
+
+        // returns: the other inserts with no track of their own that inserts send to
+        std::set<int> sendTargets;
+        for (std::size_t m = 1; m < song.mixer.size(); ++m)
+            for (const auto& s : song.mixer[m].sends)
+                if (s.target != busOf ((int) m))
+                    sendTargets.insert (s.target);
+        std::set<int> buses;
+        for (std::size_t m = 1; m < song.mixer.size(); ++m)
+            if (const auto b = busOf ((int) m); b > 0)
+                buses.insert (b);
+        std::vector<int> returnInsert;
+        std::map<int, int> returnOf; // insert → return index
+        for (const auto target : sendTargets)
+            if (target > 0 && target < (int) song.mixer.size() && perInsert.count (target) == 0 && ! buses.count (target))
+            {
+                returnOf[target] = (int) returnInsert.size();
+                returnInsert.push_back (target);
+            }
+
+        // groups: an insert shared by several tracks (the tracks keep the channel's own level), and buses; a group
+        // routed into a bus nests in that bus's group. Items in order of first appearance, then listed depth-first:
+        // Live lists a group's tracks right after it.
+        std::vector<LiveTrack> items;
+        std::vector<int> parentOf;   // per item: the insert of its group (-1: top level)
+        std::map<int, int> groupItem; // group insert → item
+        std::function<void (int, int)> ensureGroup = [&] (int insert, int depth) {
+            if (groupItem.count (insert) || depth > 16)
+                return;
+            const auto parent = busOf (insert);
+            if (parent > 0)
+                ensureGroup (parent, depth + 1);
+            const auto& m = song.mixer[(std::size_t) insert];
+            LiveTrack g;
+            g.kind = LiveTrack::Kind::group;
+            g.name = m.name;
+            g.colour = m.colour;
+            g.insert = insert;
+            g.bus = parent;
+            g.gain = faderGain (m.volume);
+            g.pan = m.pan;
+            g.muted = m.muted;
+            g.solo = m.solo;
+            groupItem[insert] = (int) items.size();
+            items.push_back (g);
+            parentOf.push_back (parent > 0 && groupItem.count (parent) ? parent : -1);
+        };
+        for (const auto& t0 : tracks)
+        {
+            auto t = t0;
+            const auto shared = t.insert > 0 && perInsert[t.insert] > 1;
+            int parent = -1;
+            if (shared)
+            {
+                ensureGroup (t.insert, 0);
+                parent = t.insert;
+                t.ownsInsert = false;
+            }
+            else if (t.insert > 0)
+            {
+                // the insert folds into the track: its fader multiplies, its pan adds, its state is the track's
+                const auto& m = song.mixer[(std::size_t) t.insert];
+                t.gain *= faderGain (m.volume);
+                t.pan = std::clamp (t.pan + m.pan, -1.0f, 1.0f);
+                t.muted = m.muted;
+                t.solo = m.solo;
+                t.bus = busOf (t.insert);
+                if (t.bus > 0)
+                {
+                    ensureGroup (t.bus, 0);
+                    parent = t.bus;
+                }
+            }
+            items.push_back (t);
+            parentOf.push_back (parent);
+        }
+        std::vector<LiveTrack> ordered;
+        {
+            std::vector<int> newIndex (items.size(), -1);
+            std::function<void (std::size_t, int)> emit = [&] (std::size_t i, int groupIndex) {
+                newIndex[i] = (int) ordered.size();
+                ordered.push_back (items[i]);
+                ordered.back().group = groupIndex;
+                if (items[i].kind == LiveTrack::Kind::group)
+                {
+                    const auto self = newIndex[i];
+                    for (std::size_t j = 0; j < items.size(); ++j)
+                        if (parentOf[j] == items[i].insert && newIndex[j] < 0 && j != i)
+                            emit (j, self);
+                }
+            };
+            for (std::size_t i = 0; i < items.size(); ++i)
+                if (parentOf[i] < 0 && newIndex[i] < 0)
+                    emit (i, -1);
+        }
+        for (const auto r : returnInsert)
+        {
+            const auto& m = song.mixer[(std::size_t) r];
+            LiveTrack t;
+            t.kind = LiveTrack::Kind::ret;
+            t.name = m.name;
+            t.colour = m.colour;
+            t.insert = r;
+            t.gain = faderGain (m.volume);
+            t.pan = m.pan;
+            t.muted = m.muted;
+            t.solo = m.solo;
+            ordered.push_back (t);
+        }
+        for (std::size_t m = 1; m < song.mixer.size(); ++m)
+            if (perInsert.count ((int) m) == 0 && ! returnOf.count ((int) m) && ! buses.count ((int) m) && ! song.mixer[m].effects.empty())
+                note ("Mixer insert with effects but no channel not exported: " + song.mixer[m].name);
+
+        // nodes
+        const auto returns = (int) returnInsert.size();
+        std::vector<int> trackIds (ordered.size());
+        for (std::size_t i = 0; i < ordered.size(); ++i)
+            trackIds[i] = 8 + (int) i;
+        std::vector<Node> nodes;
+        int clipId = 0;
+        for (std::size_t i = 0; i < ordered.size(); ++i)
+        {
+            const auto& t = ordered[i];
+            Node n = trackNode (t, trackIds[i], returns, trackIds);
+            // sends of the insert this track carries (a member of a group: the group carries them)
+            if (t.insert > 0 && t.ownsInsert)
+                for (const auto& s : song.mixer[(std::size_t) t.insert].sends)
+                {
+                    if (s.target == t.bus)
+                        continue; // the route into its group
+                    if (const auto it = returnOf.find (s.target); it != returnOf.end())
+                        setSend (n, it->second, s.level);
+                    else
+                        note ("Mixer routing between inserts not exported (only sends to return-style inserts): " + song.mixer[(std::size_t) t.insert].name);
+                }
+
+            if (t.kind == LiveTrack::Kind::midi)
+            {
+                const auto& ch = song.channels[(std::size_t) t.channel];
+                if (ch.instrument == InstrumentKind::plugin)
+                {
+                    Node d;
+                    if (pluginDevice (ch.plugin, true, true, d))
+                        addDevice (n, std::move (d));
+                    else
+                        note ("Plugin not exported (not VST2 or VST3, or not found): " + ch.name);
+                }
+                if (auto* events = n.at ("DeviceChain/MainSequencer/ClipTimeable/ArrangerAutomation/Events"))
+                    for (const auto* c : patternClips)
+                    {
+                        const auto& p = song.patterns[(std::size_t) c->pattern];
+                        const auto has = std::any_of (p.notes.begin(), p.notes.end(), [&] (const Note& x) {
+                            return x.channel == t.channel && x.start >= c->offset && x.start < c->offset + c->length;
+                        });
+                        if (has)
+                            events->add (midiClip (p, t.channel, c->start, c->length, c->offset, c->muted, clipId++));
+                    }
+            }
+            else if (t.kind == LiveTrack::Kind::audio)
+            {
+                if (auto* events = n.at ("DeviceChain/MainSequencer/Sample/ArrangerAutomation/Events"))
+                    for (const auto* c : audioClips)
+                        if (c->track == t.row)
+                            events->add (audioClip (*c, clipId++));
+            }
+            if (t.ownsInsert)
+                insertEffects (n, t.insert);
+            nodes.push_back (std::move (n));
+        }
+
+        // main track: tempo, time signature, master fader and effects
+        auto* main = set.child (mainName());
+        if (main != nullptr)
+        {
+            main->value ("DeviceChain/Mixer/Tempo/Manual", num (song.bpm));
+            main->value ("DeviceChain/Mixer/TimeSignature/Manual", num (alsTimeSignatureCode (song.beatsPerBar, 4)));
+            if (! song.mixer.empty())
+            {
+                main->value ("DeviceChain/Mixer/Volume/Manual", num (std::clamp ((double) faderGain (song.mixer[0].volume), minGain, maxGain)));
+                main->value ("DeviceChain/Mixer/Pan/Manual", num ((double) song.mixer[0].pan));
+                if (auto* devices = main->at ("DeviceChain/DeviceChain/Devices"))
+                    devices->kids.clear();
+                insertEffects (*main, 0);
+            }
+            if (auto* envs = main->at ("AutomationEnvelopes/Envelopes"))
+                envs->kids.clear();
+        }
+        if (auto* list = set.child ("Tracks"))
+        {
+            list->kids.clear();
+            for (auto& n : nodes)
+                list->add (std::move (n));
+        }
+        if (auto* pre = set.child ("SendsPre"))
+        {
+            pre->kids.clear();
+            for (int r = 0; r < returns; ++r)
+            {
+                Node b;
+                b.name = "SendPreBool";
+                b.set ("Id", num (r));
+                b.set ("Value", "false");
+                pre->add (std::move (b));
+            }
+        }
+        if (auto* scenes = set.child ("Scenes"))
+        {
+            scenes->kids.clear();
+            Node s = sk["Scene"];
+            s.set ("Id", "0");
+            scenes->add (std::move (s));
+        }
+        if (auto* locs = set.at ("Locators/Locators"))
+        {
+            locs->kids.clear();
+            int id = 0;
+            for (const auto& m : song.markers())
+            {
+                if (m.action != Marker::none || m.numerator > 0)
+                    continue;
+                Node l = sk["Locator"];
+                l.set ("Id", num (id++));
+                l.value ("Time", num (beats (m.tick)));
+                l.value ("Name", m.name);
+                locs->add (std::move (l));
+            }
+        }
+        if (auto* tr = set.child ("Transport"))
+        {
+            const auto loop = song.loopEnd > song.loopStart;
+            tr->value ("LoopOn", boolean (loop));
+            if (loop)
+            {
+                tr->value ("LoopStart", num (beats (song.loopStart)));
+                tr->value ("LoopLength", num (beats (song.loopEnd - song.loopStart)));
+            }
+        }
+
+        // ids: every pointee unique, then the envelopes, then NextPointeeId above them all [§9 rules 2–4]
+        int next = 1000;
+        std::function<void (Node&)> renumber = [&] (Node& e) {
+            const auto target = e.name == "Pointee" || (e.name.size() > 6 && e.name.compare (e.name.size() - 6, 6, "Target") == 0)
+                                || e.name.rfind ("ControllerTargets.", 0) == 0;
+            if (target && e.has ("Id"))
+                e.set ("Id", num (next++));
+            for (auto& k : e.kids)
+                renumber (k);
+        };
+        renumber (set);
+
+        // automation: mixer volume / pan of a track's insert, the Master, tempo
+        int envelopeId = 0;
+        std::map<std::string, std::pair<Node*, std::vector<std::pair<double, double>>>> envelopes; // pointee → owner, events
+        auto* trackList = set.child ("Tracks");
+        auto ownerOf = [&] (int insert) -> Node* {
+            if (insert == 0)
+                return main;
+            for (std::size_t i = 0; i < ordered.size(); ++i)
+                if (ordered[i].insert == insert && ordered[i].ownsInsert)
+                    return &trackList->kids[i];
+            return nullptr;
+        };
+        for (const auto* c : automationClips)
+        {
+            const auto& a = song.automations[(std::size_t) c->automation];
+            Node* owner = nullptr;
+            std::string path;
+            std::function<double (float)> map;
+            switch (a.target.kind)
+            {
+                case AutomationTargetKind::tempo:
+                    owner = main;
+                    path = "DeviceChain/Mixer/Tempo/AutomationTarget";
+                    map = [] (float v) { return tempoFromValue (v); };
+                    break;
+                case AutomationTargetKind::mixerVolume:
+                    owner = ownerOf (a.target.index);
+                    path = "DeviceChain/Mixer/Volume/AutomationTarget";
+                    map = [] (float v) { return std::clamp ((double) faderGain (v), minGain, maxGain); };
+                    break;
+                case AutomationTargetKind::mixerPan:
+                    owner = ownerOf (a.target.index);
+                    path = "DeviceChain/Mixer/Pan/AutomationTarget";
+                    map = [] (float v) { return (double) v * 2.0 - 1.0; };
+                    break;
+                default: break;
+            }
+            if (owner == nullptr)
+            {
+                note ("Automation not exported: " + a.name);
+                continue;
+            }
+            const auto* t = owner->at (path);
+            if (t == nullptr)
+                continue;
+            auto& slot = envelopes[t->get ("Id")];
+            slot.first = owner;
+            for (const auto& p : a.points)
+                slot.second.push_back ({ beats (c->start + p.tick), map (p.value) });
+        }
+        for (auto& [pointee, entry] : envelopes)
+        {
+            std::stable_sort (entry.second.begin(), entry.second.end(), [] (const auto& x, const auto& y) { return x.first < y.first; });
+            addEnvelope (*entry.first, pointee, entry.second, envelopeId);
+        }
+
+        int maxId = next;
+        std::function<void (const Node&)> scan = [&] (const Node& e) {
+            if (e.has ("Id"))
+            {
+                const auto v = e.get ("Id");
+                int x = 0;
+                if (std::from_chars (v.data(), v.data() + v.size(), x).ec == std::errc())
+                    maxId = std::max (maxId, x);
+            }
+            for (const auto& k : e.kids)
+                scan (k);
+        };
+        scan (set);
+        set.value ("NextPointeeId", num (maxId + 10));
+
+        root.kids.clear();
+        root.add (std::move (set));
+        result.xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+        write (root, result.xml, 0);
+        const auto* data = reinterpret_cast<const std::uint8_t*> (result.xml.data());
+        result.bytes = gzip::compressStored (data, result.xml.size());
+    }
+};
+} // namespace
+
+AlsExportResult exportAls (const Song& song, const AlsExportOptions& options)
+{
+    AlsExportResult result;
+    const auto& sk = skeletons (options.version);
+    if (sk.kinds.empty())
+    {
+        result.notes.push_back ("internal error: the set skeletons could not be read");
+        return result;
+    }
+    Exporter e { song, options, sk, result, false, {} };
+    e.run();
+    return result;
+}
+} // namespace lynx

@@ -7307,3 +7307,16 @@ countries: de at ch li lu
 "None|Smooth|Op-El|Mastering" = "Keine|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Drei weitere Kompressor-Charaktere, statt des Stils: weich, optoelektronisch oder Mastering"
 "Wheels" = "Räder"
+
+# --- Live set export (round 175a)
+"Everything went over to the Live set." = "Alles wurde in das Live-Set übernommen."
+"Export Live set" = "Live-Set exportieren"
+"Could not copy {0}; the set refers to it where it is" = "{0} konnte nicht kopiert werden; das Set verweist auf den ursprünglichen Ort"
+"The Live set could not be written" = "Das Live-Set konnte nicht geschrieben werden"
+"Save for" = "Speichern für"
+"Live 11 (also opens in Live 12)" = "Live 11 (öffnet auch in Live 12)"
+"Copy them into the project folder" = "In den Projektordner kopieren"
+"Refer to them where they are" = "Am ursprünglichen Ort verweisen"
+"Choose the folder for the Live set" = "Ordner für das Live-Set wählen"
+"Ableton Live set (.als)..." = "Ableton-Live-Set (.als)..."
+"The set is saved as \"<name> Project/<name>.als\". Tracks, clips, notes, mixer levels, sends, VST plugins with their state, markers and tempo go over; a report lists the rest." = "Das Set wird als \"<Name> Project/<Name>.als\" gespeichert. Spuren, Clips, Noten, Mixerpegel, Sends, VST-Plugins mit ihrem Zustand, Marker und Tempo werden übernommen; ein Bericht listet den Rest."
