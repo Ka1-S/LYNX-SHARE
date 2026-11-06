@@ -7294,3 +7294,4 @@ countries: jp
 "{0} in {1}" = "{1}の{0}"
 "Playlist clip" = "Playlistクリップ"
 "ON" = "オン"
+"Wheels" = "ホイール"

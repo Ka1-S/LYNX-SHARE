@@ -7294,3 +7294,4 @@ countries: kr
 "{0} in {1}" = "{1}의 {0}"
 "Playlist clip" = "Playlist 클립"
 "ON" = "켬"
+"Wheels" = "휠"

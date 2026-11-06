@@ -7294,3 +7294,4 @@ countries: fr be ch ca lu
 "{0} in {1}" = "{0} dans {1}"
 "Playlist clip" = "Clip de la Playlist"
 "ON" = "ON"
+"Wheels" = "Molettes"

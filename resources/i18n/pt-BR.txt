@@ -7377,3 +7377,4 @@ countries: br
 "{0} in {1}" = "{0} em {1}"
 "Playlist clip" = "Clip da Playlist"
 "ON" = "LIG."
+"Wheels" = "Rodas"

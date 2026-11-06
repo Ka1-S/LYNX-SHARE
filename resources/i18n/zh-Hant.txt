@@ -7294,3 +7294,4 @@ countries: tw hk mo
 "{0} in {1}" = "{1} 中的 {0}"
 "Playlist clip" = "Playlist 片段"
 "ON" = "開"
+"Wheels" = "滾輪"

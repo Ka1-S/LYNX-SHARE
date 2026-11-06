@@ -7294,3 +7294,4 @@ countries: nl be
 "{0} in {1}" = "{0} in {1}"
 "Playlist clip" = "Playlist-clip"
 "ON" = "AAN"
+"Wheels" = "Wielen"
