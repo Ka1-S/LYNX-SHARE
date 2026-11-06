@@ -2728,7 +2728,7 @@ Layout withRhythmVoicing (Layout l)
     add (label (20, 190, 30, 16, TR_NOOP ("L"), alignLeft));
     add (label (154, 190, 30, 16, TR_NOOP ("C")));
     add (label (288, 190, 30, 16, TR_NOOP ("R")));
-    add (tabs (20, 216, 298, 20, "Pattern", TR_NOOP ("Left / right|8 steps")));
+    add (tabs (20, 216, 298, 20, "Pattern", TR_NOOP ("Left / right|Ramp|8 steps")));
     add (section (340, 4, 250, 242, TR_NOOP ("Rate")));
     add (tabs (350, 28, 230, 22, "Sync", TR_NOOP ("Hz|Beats")));
     add (when (dial (465, 104, 52, "Rhythm rate", TR_NOOP ("Rate"), big), "Sync", 0.0f, 0.5f));

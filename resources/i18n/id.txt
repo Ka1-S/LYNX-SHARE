@@ -3940,7 +3940,7 @@ countries: id
 "Off|Ping-pong tape|Studio tape|Studio tape hot" = "Mati|Ping-pong tape|Studio tape|Studio tape hot"
 "Measured rhythm voicing" = "Voicing ritme terukur"
 "Hz|Beats" = "Hz|Beat"
-"Left / right|8 steps" = "Kiri / kanan|8 step"
+"Left / right|Ramp|8 steps" = "Kiri / kanan|Ramp|8 step"
 "Digital|Analog|Hot" = "Digital|Analog|Hot"
 "Separator" = "Pemisah"
 "Create group" = "Buat grup"

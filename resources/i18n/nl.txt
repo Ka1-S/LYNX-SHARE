@@ -3940,7 +3940,7 @@ countries: nl be
 "Off|Ping-pong tape|Studio tape|Studio tape hot" = "Uit|Ping-pong tape|Studio tape|Studio tape hot"
 "Measured rhythm voicing" = "Gemeten ritme-voicing"
 "Hz|Beats" = "Hz|Tellen"
-"Left / right|8 steps" = "Links / rechts|8 steps"
+"Left / right|Ramp|8 steps" = "Links / rechts|Helling|8 steps"
 "Digital|Analog|Hot" = "Digitaal|Analoog|Hot"
 "Separator" = "Scheidingslijn"
 "Create group" = "Groep maken"

@@ -3940,7 +3940,7 @@ countries: ru by kz
 "Off|Ping-pong tape|Studio tape|Studio tape hot" = "Выкл.|Ping-pong tape|Studio tape|Studio tape hot"
 "Measured rhythm voicing" = "Измеренная ритмическая окраска"
 "Hz|Beats" = "Hz|Доли"
-"Left / right|8 steps" = "Лево / право|8 шагов"
+"Left / right|Ramp|8 steps" = "Лево / право|Рампа|8 шагов"
 "Digital|Analog|Hot" = "Цифра|Аналог|Горячий"
 "Separator" = "Разделитель"
 "Create group" = "Создать группу"

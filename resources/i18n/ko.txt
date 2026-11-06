@@ -3940,7 +3940,7 @@ countries: kr
 "Off|Ping-pong tape|Studio tape|Studio tape hot" = "끔|Ping-pong tape|Studio tape|Studio tape hot"
 "Measured rhythm voicing" = "측정된 리듬 보이싱"
 "Hz|Beats" = "Hz|박"
-"Left / right|8 steps" = "좌 / 우|8스텝"
+"Left / right|Ramp|8 steps" = "좌 / 우|램프|8스텝"
 "Digital|Analog|Hot" = "디지털|아날로그|핫"
 "Separator" = "구분선"
 "Create group" = "그룹 만들기"

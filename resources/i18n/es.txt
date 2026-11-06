@@ -3940,7 +3940,7 @@ countries: es mx ar co cl pe ve
 "Off|Ping-pong tape|Studio tape|Studio tape hot" = "Desact.|Cinta ping-pong|Cinta de estudio|Cinta de estudio caliente"
 "Measured rhythm voicing" = "Voicing rítmico medido"
 "Hz|Beats" = "Hz|Tiempos"
-"Left / right|8 steps" = "Izquierda / derecha|8 pasos"
+"Left / right|Ramp|8 steps" = "Izquierda / derecha|Rampa|8 pasos"
 "Digital|Analog|Hot" = "Digital|Analógico|Caliente"
 "Separator" = "Separador"
 "Create group" = "Crear grupo"

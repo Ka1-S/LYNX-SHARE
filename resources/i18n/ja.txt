@@ -3940,7 +3940,7 @@ countries: jp
 "Off|Ping-pong tape|Studio tape|Studio tape hot" = "オフ|Ping-pong tape|Studio tape|Studio tape hot"
 "Measured rhythm voicing" = "計測リズムボイシング"
 "Hz|Beats" = "Hz|拍"
-"Left / right|8 steps" = "左 / 右|8ステップ"
+"Left / right|Ramp|8 steps" = "左 / 右|ランプ|8ステップ"
 "Digital|Analog|Hot" = "デジタル|アナログ|ホット"
 "Separator" = "区切り"
 "Create group" = "グループを作成"

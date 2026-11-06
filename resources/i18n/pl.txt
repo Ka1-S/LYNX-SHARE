@@ -3940,7 +3940,7 @@ countries: pl
 "Off|Ping-pong tape|Studio tape|Studio tape hot" = "Wył.|Ping-pong tape|Studio tape|Studio tape hot"
 "Measured rhythm voicing" = "Zmierzone brzmienie rytmu"
 "Hz|Beats" = "Hz|Miary"
-"Left / right|8 steps" = "Lewo / prawo|8 kroków"
+"Left / right|Ramp|8 steps" = "Lewo / prawo|Rampa|8 kroków"
 "Digital|Analog|Hot" = "Cyfrowy|Analogowy|Hot"
 "Separator" = "Separator"
 "Create group" = "Utwórz grupę"
