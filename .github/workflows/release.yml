@@ -116,6 +116,7 @@ jobs:
             build-win/LYNX.exe
             build-win/lynx-asio.dll
             build-win/lynx-asio32.dll
+            build-win/LYNX-bridge32.exe
             build-win/onnxruntime.dll
           if-no-files-found: error
 
@@ -168,6 +169,7 @@ jobs:
             signed/LYNX.exe
             signed/lynx-asio.dll
             signed/lynx-asio32.dll
+            signed/LYNX-bridge32.exe
             signed/onnxruntime.dll
           if-no-files-found: error
 
@@ -197,7 +199,13 @@ jobs:
           if ($v.ProductName -ne 'LYNX SHARE' -or $v.ProductVersion -ne $env:VERSION) { throw "version resource mismatch" }
           $sig = Get-AuthenticodeSignature $exe.FullName
           "Authenticode: $($sig.Status) $($sig.SignerCertificate.Subject)"
-          if ('${{ needs.sign.result }}' -eq 'success' -and $sig.Status -ne 'Valid') { throw "signed build is not validly signed" }
+          if ('${{ needs.sign.result }}' -eq 'success') {
+            # the test-signing policy signs with SignPath's self-signed test certificate: Windows does not trust it
+            # (status UnknownError/NotTrusted), so only check that a signature from that certificate is present
+            if ('${{ vars.SIGNPATH_POLICY_SLUG }}' -eq 'test-signing') {
+              if ($sig.Status -eq 'NotSigned' -or $sig.SignerCertificate.Subject -notmatch 'Test certificate') { throw "test-signed build carries no test signature" }
+            } elseif ($sig.Status -ne 'Valid') { throw "signed build is not validly signed" }
+          }
 
       - name: Self-test
         shell: pwsh
@@ -226,6 +234,7 @@ jobs:
           # LYNX ASIO driver and its registration helpers (REA round 97)
           if (Test-Path bin\lynx-asio.dll) { Copy-Item bin\lynx-asio.dll, "asio\Register LYNX ASIO.bat", "asio\Unregister LYNX ASIO.bat" "pkg\$name\" }
           if (Test-Path bin\lynx-asio32.dll) { Copy-Item bin\lynx-asio32.dll "pkg\$name\" }  # 32-bit hosts (round 106)
+          Copy-Item bin\LYNX-bridge32.exe "pkg\$name\"  # 32-bit plugins run in it (round 176a)
           New-Item -ItemType Directory -Force dist | Out-Null
           Compress-Archive -Path "pkg\$name" -DestinationPath "dist\$name.zip"
           Copy-Item bin\LYNX.exe dist\

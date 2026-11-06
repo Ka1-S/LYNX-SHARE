@@ -83,11 +83,12 @@ void scaleLabels (juce::Graphics& g, const LevelScale& s, juce::Rectangle<float>
 class ApexEditor final : public ProEditor
 {
 public:
-    ApexEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::apexLimiter, d, 950, 600) { fillDemo(); }
+    ApexEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::apexLimiter, d, 950, 600) { knobRanges = true; fillDemo(); }
 
 private:
     enum { idPanel = 1, idGain, idCeiling, idTp, idAdvanced, idLoudness, idLoudReset };
-    bool panelOpen = true, advancedOpen = false;
+    // round tp172b4: the reference opens with its knob panel folded into the tab at the lower left (its idle view)
+    bool panelOpen = false, advancedOpen = false;
     static constexpr const char* styles = "Clean|Glue|Punch|Dynamic|Dense|Loud|Bus|Safe";
 
     // the display / meter scale chosen with the meter-scale menu (round 128): −16 / −32 / −48 dB, K-12 / K-14 / K-20
@@ -202,12 +203,14 @@ private:
         const auto d = plot();
         out.push_back (custom ({ d.getX() + 60.0f, scaleNow().y ((float) ceilingDb(), d) - 5.0f, d.getWidth() - 60.0f, 10.0f }, idCeiling, 1,
                                tr ("Output ceiling: drag up or down (the bottom bar's Out does the same)")));
-        out.push_back (button ({ d.getRight() - 46.0f, d.getBottom() - 26.0f, 40.0f, 20.0f }, idTp, "TP", v (5) >= 0.5f,
+        // round tp172b4: the reference's strip at the display's lower right — TP, the loudness meters, the meter scale —
+        // with the display speed left of it
+        out.push_back (button ({ d.getRight() - 154.0f, d.getBottom() - 26.0f, 30.0f, 20.0f }, idTp, "TP", v (5) >= 0.5f,
                                tr ("True peak: the ceiling also holds between the samples (4x interpolation)")));
-        out.push_back (button ({ d.getRight() - 232.0f, d.getY() + 18.0f, 84.0f, 20.0f }, idLoudness, tr ("Loudness"), loudnessShown(),
+        out.push_back (button ({ d.getRight() - 123.0f, d.getBottom() - 26.0f, 46.0f, 20.0f }, idLoudness, "LUFS", loudnessShown(),
                                tr ("Loudness meter: momentary, short term and integrated LUFS, loudness range, peak")));
         {
-            auto dm = menu ({ d.getRight() - 210.0f, d.getBottom() - 26.0f, 86.0f, 20.0f }, apex::pDisplayMode, {}, "Fast|Slow|Slow down|Infinite|Off");
+            auto dm = menu ({ d.getRight() - 240.0f, d.getBottom() - 26.0f, 82.0f, 20.0f }, apex::pDisplayMode, {}, "Fast|Slow|Slow down|Infinite|Off");
             dm.hint = tr ("Display speed: Fast, Slow, Slow down (the past compressed), Infinite (the whole take), Off (meters only)");
             out.push_back (dm);
         }
@@ -245,21 +248,22 @@ private:
                 out.push_back (sc);
             }
         }
-        else
-            out.push_back (button ({ 0.0f, plot().getBottom() - 120.0f, 22.0f, 110.0f }, idPanel, juce::String::fromUTF8 ("\xc2\xbb"), false, tr ("Show the knobs: style, look-ahead, attack, release, channel linking")));
+        else // (its caption, CONTROLS, is written up the tab by paintBody)
+            out.push_back (button ({ 0.0f, plot().getBottom() - 120.0f, 20.0f, 106.0f }, idPanel, {}, false, tr ("Show the knobs: style, look-ahead, attack, release, channel linking")));
         // the meter scale next to the TP button (bottom right of the display)
         {
             const auto d = plot();
-            auto ms = menu ({ d.getRight() - 120.0f, d.getBottom() - 26.0f, 70.0f, 20.0f }, apex::pMeterScale, {}, "-16 dB|-32 dB|-48 dB|K-12|K-14|K-20");
+            auto ms = menu ({ d.getRight() - 76.0f, d.getBottom() - 26.0f, 70.0f, 20.0f }, apex::pMeterScale, {}, "-16 dB|-32 dB|-48 dB|K-12|K-14|K-20");
             ms.hint = tr ("Meter scale of the display and the meters");
             out.push_back (ms);
         }
         const auto b = barArea();
         const auto cy = b.getCentreY();
+        // round tp172b4: the reference's order — true peak limiting, oversampling, dither (then our noise shaping)
         out.push_back (barMenu ({ 10.0f, cy - 11.0f, 160.0f, 22.0f }, apex::pTruePeak, tr ("True peak limiting"), "Off|On"));
-        out.push_back (barMenu ({ 176.0f, cy - 11.0f, 130.0f, 22.0f }, apex::pDither, tr ("Dither"), "Off|16 bits|18 bits|20 bits|22 bits|24 bits"));
-        out.push_back (barMenu ({ 312.0f, cy - 11.0f, 160.0f, 22.0f }, apex::pShaping, tr ("Noise shaping"), "None|Basic|Optimized|Weighted"));
-        out.push_back (barMenu ({ 478.0f, cy - 11.0f, 150.0f, 22.0f }, apex::pOversampling, tr ("Oversampling"), "Off|2x|4x|8x"));
+        out.push_back (barMenu ({ 176.0f, cy - 11.0f, 140.0f, 22.0f }, apex::pOversampling, tr ("Oversampling"), "Off|2x|4x|8x"));
+        out.push_back (barMenu ({ 322.0f, cy - 11.0f, 130.0f, 22.0f }, apex::pDither, tr ("Dither"), "Off|16 bits|18 bits|20 bits|22 bits|24 bits"));
+        out.push_back (barMenu ({ 458.0f, cy - 11.0f, 160.0f, 22.0f }, apex::pShaping, tr ("Noise shaping"), "None|Basic|Optimized|Weighted"));
         out.push_back (barValue ({ b.getRight() - 150.0f, cy - 11.0f, 140.0f, 22.0f }, 1, tr ("Out")));
         out.push_back (barValue ({ b.getRight() - 300.0f, cy - 11.0f, 140.0f, 22.0f }, 0, tr ("Gain")));
     }
@@ -415,29 +419,34 @@ private:
 
         // the ceiling line (red) with its value at the right
         const auto cy = scaleNow().y ((float) ceilingDb(), p);
-        g.setColour (colour::accent);
+        g.setColour (accent.withMultipliedBrightness (0.8f)); // round tp172b4: the reference's dimmer red
         g.drawHorizontalLine ((int) cy, p.getX(), p.getRight());
         g.setFont (font (type::caption, true));
         g.drawText (tr ("Out") + " " + text (1), juce::Rectangle<float> (p.getRight() - 130.0f, cy + 2.0f, 124.0f, 14.0f), juce::Justification::centredRight, false);
 
-        // the GAIN slider on the left edge
+        // the GAIN slider on the left edge (round tp172b4: the reference's look — a column of dim red light from the top
+        // of the display down to the slider's foot, framed on the left and below, a slate value box)
         const auto tr_ = gainTrack();
-        g.setColour (colour::bg2.withAlpha (0.75f));
-        g.fillRoundedRectangle (tr_.expanded (6.0f, 8.0f).withTrimmedBottom (-18.0f), 6.0f);
-        g.setColour (colour::accent.withAlpha (0.18f));
-        g.fillRect (tr_.withTop (gainBox().getCentreY()).reduced (14.0f, 0.0f));
-        g.setColour (colour::knobTrack);
-        g.fillRect (tr_.withSizeKeepingCentre (3.0f, tr_.getHeight()));
+        {
+            const auto col = juce::Rectangle<float> (tr_.getX() - 2.0f, p.getY() - 14.0f, tr_.getWidth() + 14.0f, tr_.getBottom() + 14.0f - (p.getY() - 14.0f));
+            g.setGradientFill (juce::ColourGradient (accent.withAlpha (0.20f), col.getCentreX(), col.getY(), accent.withAlpha (0.0f), col.getRight() + 6.0f, col.getY(), false));
+            g.fillRect (col);
+            g.setGradientFill (juce::ColourGradient (juce::Colours::transparentBlack, 0.0f, col.getY(), colour::bg0.withAlpha (0.35f), 0.0f, col.getBottom(), false));
+            g.fillRect (col);
+            g.setColour (juce::Colours::white.withAlpha (0.16f));
+            g.drawVerticalLine ((int) col.getX(), col.getY(), col.getBottom());
+            g.drawHorizontalLine ((int) col.getBottom(), col.getX(), col.getRight());
+        }
         const auto box = gainBox();
         const auto hot = box.expanded (6.0f).contains (mouse) || (dragCtl == -2 && pressed.id == idGain);
-        g.setColour (hot ? colour::bg6 : colour::bg5);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (hot ? 0xff6a7392 : 0xff5d6681), 0.0f, box.getY(), juce::Colour (hot ? 0xff4f5672 : 0xff474e66), 0.0f, box.getBottom(), false));
         g.fillRoundedRectangle (box, 4.0f);
-        g.setColour (hot ? colour::accent : colour::borderStrong);
+        g.setColour (hot ? accent : juce::Colour (0xff2a2d3a));
         g.drawRoundedRectangle (box, 4.0f, 1.0f);
         g.setColour (colour::textPrimary);
         g.setFont (font (type::small, true));
         g.drawText ((gainDb() >= 0.05 ? "+" : "") + juce::String (gainDb(), 1), box, juce::Justification::centred, false);
-        caption (g, juce::Rectangle<float> (tr_.getX() - 10.0f, tr_.getBottom() + 4.0f, 54.0f, 14.0f), tr ("Gain"));
+        caption (g, juce::Rectangle<float> (tr_.getX() - 10.0f, tr_.getBottom() + 18.0f, 54.0f, 14.0f), tr ("Gain"));
 
         // the meters: output and gain reduction
         const auto m = juce::Rectangle<float> (d.getRight() + 46.0f, p.getY(), 52.0f, p.getHeight());
@@ -477,14 +486,34 @@ private:
         {
             // on a dark plate at the top left of the display, right of the GAIN slider
             const auto lr = juce::Rectangle<float> (p.getX() + 64.0f, p.getY() + 2.0f, 132.0f, 15.0f);
-            g.setColour (colour::bg0.withAlpha (0.7f));
-            g.fillRoundedRectangle (lr, 3.0f);
-            g.setColour (colour::textSecondary);
+            g.setColour (colour::textDisabled); // round tp172b4: plain dim text (the reference has no plate there)
             g.setFont (font (type::caption));
             g.drawText (tr ("latency {0} samples", { juce::String (apex::latencyFor (48000.0, apex::oversamplingFactor (v (apex::pOversampling)))) }),
                         lr.reduced (5.0f, 0.0f), juce::Justification::centredLeft, true);
         }
         if (loudnessShown()) paintLoudness (g);
+    }
+
+    void paintOverlay (juce::Graphics& g, const EffectSlot&) override
+    {
+        if (! panelOpen) // the folded knob panel's tab: CONTROLS written up it, a » at its top
+        {
+            Ctl tab;
+            for (const auto& c : controls())
+                if (c.type == K::button && c.id == idPanel) tab = c;
+            if (! tab.r.isEmpty())
+            {
+                g.setColour (colour::textSecondary);
+                g.setFont (font (type::small, true));
+                g.drawText (juce::String::fromUTF8 ("\xc2\xbb"), tab.r.withHeight (18.0f), juce::Justification::centred, false);
+                g.saveState();
+                g.addTransform (juce::AffineTransform::rotation (juce::MathConstants<float>::halfPi, tab.r.getCentreX(), tab.r.getCentreY() + 8.0f));
+                g.setFont (font (type::caption, true));
+                g.drawText (caps (tr ("Controls")), juce::Rectangle<float> (tab.r.getHeight() - 22.0f, 14.0f).withCentre ({ tab.r.getCentreX(), tab.r.getCentreY() + 8.0f }),
+                            juce::Justification::centred, false);
+                g.restoreState();
+            }
+        }
     }
 
     // the loudness panel (round 135): short-term and momentary bars with the target line, integrated / range / peak
@@ -570,6 +599,7 @@ class HushEditor final : public ProEditor
 public:
     HushEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::hushDeEsser, d, 720, 500)
     {
+        knobRanges = true; // round tp172b4: each knob's scale under it, the value on hover
         fillDemo();
         if (! displayShown()) setSize (720, 500 - (int) waveH);
     }
@@ -676,7 +706,8 @@ private:
         out.push_back (aud);
         // middle: display, mode, processing, side chain
         const auto mx = 304.0f;
-        out.push_back (button ({ mx + 40.0f, y0 - 2.0f, 110.0f, 20.0f }, idDisplay, tr ("Display"), displayShown(), tr ("Show or hide the scrolling display")));
+        // round tp172b4: a dark tab, as the reference's (the display above shows whether it is on)
+        out.push_back (button ({ mx + 40.0f, y0 - 2.0f, 110.0f, 20.0f }, idDisplay, tr ("Display"), false, tr ("Show or hide the scrolling display")));
         auto md = tabs ({ mx, y0 + 40.0f, 190.0f, 28.0f }, P ("Allround"), "Single vocal|Allround", { 0.0f, 1.0f });
         md.hint = tr ("Single vocal: one voice; Allround: a mix or other material (the sibilance must also stand out from the whole signal)");
         out.push_back (md);
@@ -696,12 +727,16 @@ private:
         }
         else
         {
-            out.push_back (knob ({ 512.0f, y0 + 2.0f, 84.0f, 90.0f }, P ("Stereo link"), tr ("Stereo link")));
+            auto link = knob ({ 512.0f, y0 + 2.0f, 84.0f, 90.0f }, P ("Stereo link"), tr ("Stereo link"));
+            link.cap = juce::Colour (0xff53524f); // round tp172b4: the reference's small knobs are grey
+            out.push_back (link);
             auto mid = toggle ({ 522.0f, y0 + 96.0f, 64.0f, 18.0f }, P ("Link mid"), "MID");
             mid.hint = tr ("Mid: detect on the middle of the stereo image only");
             out.push_back (mid);
         }
-        out.push_back (knob ({ 512.0f, y0 + 120.0f, 84.0f, 90.0f }, P ("Lookahead time"), tr ("Lookahead")));
+        auto lat = knob ({ 512.0f, y0 + 120.0f, 84.0f, 90.0f }, P ("Lookahead time"), tr ("Lookahead"));
+        lat.cap = juce::Colour (0xff53524f);
+        out.push_back (lat);
         auto la = toggle ({ 522.0f, y0 + 214.0f, 64.0f, 18.0f }, P ("Lookahead"), tr ("On"));
         la.hint = tr ("Look-ahead on / off");
         out.push_back (la);
@@ -906,14 +941,26 @@ private:
             look.hover = hover ? 1.0f : 0.0f;
             look.active = active;
             look.enabled = current() == nullptr || current()->enabled;
+            look.capTint = juce::Colour (0xff53524f); // round tp172b4: grey, as the other small knob
             skin::knob (g, knobR, look);
+            // round tp172b4: its scale (0 … 200 %) under it, the value while hovered or dragged, then the caption
+            const auto row = knobR.withY (knobR.getBottom() + 1.0f).withHeight (12.0f);
+            if (hover || active)
+            {
+                g.setColour (skin::valueColour (true));
+                g.setFont (font (type::caption, true));
+                g.drawText (linkText(), row.expanded (40.0f, 0.0f), juce::Justification::centred, false);
+            }
+            else
+            {
+                g.setColour (colour::textDisabled);
+                g.setFont (font (type::caption));
+                g.drawText ("0 %", row.withWidth (row.getWidth() * 0.5f + 10.0f).translated (-10.0f, 0.0f), juce::Justification::centredLeft, false);
+                g.drawText ("200 %", row.withTrimmedLeft (row.getWidth() * 0.5f - 10.0f).translated (10.0f, 0.0f), juce::Justification::centredRight, false);
+            }
             g.setColour (skin::captionColour().interpolatedWith (colour::textPrimary, hover ? 0.5f : 0.0f));
             g.setFont (font (type::caption, true));
-            g.drawText (caps (tr ("Stereo link")), juce::Rectangle<float> (c.r.getX() - 14.0f, knobR.getBottom() + 3.0f, c.r.getWidth() + 28.0f, 14.0f),
-                        juce::Justification::centred, false);
-            g.setColour (skin::valueColour (active || hover));
-            g.setFont (font (type::small, false));
-            g.drawText (linkText(), juce::Rectangle<float> (c.r.getX() - 24.0f, knobR.getBottom() + 17.0f, c.r.getWidth() + 48.0f, 14.0f),
+            g.drawText (caps (tr ("Stereo link")), juce::Rectangle<float> (c.r.getX() - 14.0f, knobR.getBottom() + 14.0f, c.r.getWidth() + 28.0f, 14.0f),
                         juce::Justification::centred, false);
         }
         else if (c.id == idExternal)
@@ -949,8 +996,11 @@ private:
 
     void paintWave (juce::Graphics& g, const EffectSlot& fx, juce::Rectangle<float> w)
     {
-        g.setColour (colour::bg1);
-        g.fillRect (w);
+        // round tp172b4: the waveform lies on the field (the reference's display has no well), faint level lines across
+        g.setColour (juce::Colours::white.withAlpha (0.045f));
+        for (const auto db : { -2.0f, -6.0f, -12.0f, -24.0f })
+            for (const auto upper : { true, false })
+                g.drawHorizontalLine ((int) waveY (db, upper), w.getX(), w.getRight());
         g.setColour (colour::gridBeat);
         g.drawHorizontalLine ((int) w.getCentreY(), w.getX(), w.getRight());
         const auto n = (int) w.getWidth();
@@ -982,9 +1032,7 @@ private:
     void paintControlsArea (juce::Graphics& g, juce::Rectangle<float> w)
     {
         // the control area
-        const auto area = juce::Rectangle<float> (0.0f, w.getBottom() + 4.0f, w.getWidth(), barArea().getY() - w.getBottom() - 8.0f);
-        g.setColour (colour::bg2);
-        g.fillRoundedRectangle (area.reduced (4.0f, 0.0f), 8.0f);
+        // round tp172b4: the knobs sit on the field itself (no card), as in the reference
         caption (g, { 304.0f, w.getBottom() + 34.0f, 190.0f, 14.0f }, tr ("Mode"));
         caption (g, { 304.0f, w.getBottom() + 90.0f, 190.0f, 14.0f }, tr ("Processing"));
 
@@ -1045,7 +1093,7 @@ private:
 class CrestEditor final : public ProEditor
 {
 public:
-    CrestEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::crestCompressor, d, 860, 560) { fillDemo(); }
+    CrestEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::crestCompressor, d, 860, 560) { knobRanges = true; fillDemo(); }
 
 private:
     enum { idThreshold = 1, idKnee, idSideChain, idInMeter, idScNode0 = 10 };
@@ -1055,7 +1103,7 @@ private:
         const auto range = (float) dyn::crest::meterRangeDb (v (dyn::crest::meterScale));
         return { -range * 30.0f / 72.0f, -range };
     }
-    bool kneeOpen = false, scOpen = false;
+    bool kneeOpen = true, scOpen = false; // round tp172b4: the transfer curve shows by default, as in the reference
     static constexpr float scH = 170.0f;
     int scDrag = -1;
 
@@ -1067,7 +1115,8 @@ private:
     juce::Rectangle<float> main() const { return bodyArea().withTrimmedBottom (scOpen ? scH : 0.0f); }
     juce::Rectangle<float> plot() const { return main().withTrimmedRight (100.0f).withTrimmedTop (10.0f).withTrimmedBottom (8.0f); }
     juce::Rectangle<float> scPanel() const { return { 0.0f, main().getBottom(), (float) getWidth(), scH }; }
-    juce::Rectangle<float> kneeArea() const { auto p = plot(); return { p.getX(), p.getY(), juce::jmin (330.0f, p.getWidth() * 0.42f), p.getHeight() * 0.62f }; }
+    // round tp172b4: down to just above the knob row's Auto toggles (it covered them)
+    juce::Rectangle<float> kneeArea() const { auto p = plot(); return { p.getX(), p.getY(), juce::jmin (330.0f, p.getWidth() * 0.42f), juce::jmax (80.0f, p.getHeight() - 222.0f) }; }
     double thresholdDb() const { return dyn::crest::thresholdDb (v (dyn::crest::threshold)); }
 
     Column demoColumn (int i) const override
@@ -1088,16 +1137,24 @@ private:
         out.push_back (custom ({ p.getX() + 24.0f, sc().y ((float) thresholdDb(), p) - 5.0f, p.getWidth() - 24.0f, 10.0f }, idThreshold, threshold,
                                tr ("Threshold: drag up or down")));
         out.push_back (button ({ kneeOpen ? kneeArea().getRight() : p.getX(), p.getY() + 80.0f, 20.0f, 64.0f }, idKnee,
-                               juce::String::fromUTF8 (kneeOpen ? "\xc2\xab" : "\xc2\xbb"), kneeOpen, tr ("Knee: show the transfer curve")));
+                               juce::String::fromUTF8 (kneeOpen ? "\xc2\xab" : "\xc2\xbb"), false, tr ("Knee: show the transfer curve"))); // (a grey tab, as the reference's)
         // the knob row over the bottom of the display
         const auto by = p.getBottom() - 190.0f;
         out.push_back (knob ({ 96.0f, by, 104.0f, 118.0f }, threshold, tr ("Threshold"), 2));
         out.push_back (toggle ({ 108.0f, by - 26.0f, 80.0f, 20.0f }, autoThreshold, tr ("Auto")));
         out.push_back (knob ({ 214.0f, by, 104.0f, 118.0f }, ratio, tr ("Ratio"), 2));
-        out.push_back (menu ({ 330.0f, by + 54.0f, 104.0f, 28.0f }, style, {}, "Clean|Allround|Punch|Upward|Two-way|Vari-mu|Classic|Opto|Vocal|Bus|Pumping"));
-        out.push_back (menu ({ 342.0f, by + 90.0f, 80.0f, 20.0f }, character, tr ("Character"), "Off|Warm|Crisp|Bright"));
-        // round tp172b2: Pro-C 3's Smooth / Op-El / Mastering characters, a voicing over the style (above its button)
-        out.push_back (menu ({ 342.0f, by + 24.0f, 80.0f, 20.0f }, voicing, {}, "None|Smooth|Op-El|Mastering"));
+        // round tp172b4: the style button at the knobs' height, then the character and the voicing under it (labelled),
+        // where the reference keeps its character control
+        // round tp172b4 (second pass): the style a single pill button at the knobs' height, as the reference's; the
+        // character and the voicing (LYNX's) small text buttons under it ("Character: Warm")
+        {
+            auto st = menu ({ 334.0f, by + 30.0f, 96.0f, 24.0f }, style, {}, "Clean|Allround|Punch|Upward|Two-way|Vari-mu|Classic|Opto|Vocal|Bus|Pumping");
+            st.look = 1;
+            out.push_back (st);
+        }
+        out.push_back (barMenu ({ 318.0f, by + 62.0f, 128.0f, 18.0f }, character, tr ("Character"), "Off|Warm|Crisp|Bright"));
+        // round tp172b2: Pro-C 3's Smooth / Op-El / Mastering characters, a voicing over the style
+        out.push_back (barMenu ({ 318.0f, by + 82.0f, 128.0f, 18.0f }, voicing, tr ("Voicing"), "None|Smooth|Op-El|Mastering"));
         out.push_back (knob ({ 446.0f, by, 104.0f, 118.0f }, attack, tr ("Attack"), 2));
         out.push_back (knob ({ 564.0f, by, 104.0f, 118.0f }, release, tr ("Release"), 2));
         out.push_back (toggle ({ 576.0f, by - 26.0f, 80.0f, 20.0f }, autoRelease, tr ("Auto")));
@@ -1108,13 +1165,18 @@ private:
         out.push_back (menu ({ p.getRight() - 16.0f, p.getBottom() - 20.0f, 60.0f, 20.0f }, meterScale, {}, "9 dB|18 dB|36 dB|72 dB|90 dB"));
         out.push_back (button ({ p.getRight() + 42.0f, main().getY(), 18.0f, 12.0f }, idInMeter, "IN", v (inputMeter) >= 0.5f,
                                tr ("Input meter: show or hide")));
-        const auto sy = p.getBottom() - 64.0f;
-        out.push_back (knob ({ 110.0f, sy, 76.0f, 64.0f }, knee, tr ("Knee"), 0));
-        out.push_back (knob ({ 228.0f, sy, 76.0f, 64.0f }, range, tr ("Range"), 0));
-        out.push_back (knob ({ 344.0f, sy, 76.0f, 64.0f }, drive, tr ("Drive"), 0)); // round 170c: the Character's drive (it had no control)
-        out.push_back (knob ({ 460.0f, sy, 76.0f, 64.0f }, lookahead, tr ("Lookahead"), 0));
-        out.push_back (knob ({ 578.0f, sy, 76.0f, 64.0f }, hold, tr ("Hold"), 0));
-        out.push_back (button ({ 330.0f, sy + 34.0f, 104.0f, 24.0f }, idSideChain, tr ("Side chain"), scOpen, tr ("Open the side chain: detector EQ, level, external input, stereo link")));
+        // round tp172b4 (second pass): KNEE, RANGE, LOOKAHEAD and HOLD as the reference's short curved bars under the big
+        // knobs (DRIVE, LYNX's, the same in the middle), the side-chain button under them
+        const auto sy = p.getBottom() - 70.0f;
+        for (const auto& [x, prm, cap] : { std::tuple<float, int, juce::String> { 108.0f, (int) knee, tr ("Knee") }, { 226.0f, (int) range, tr ("Range") },
+                                           { 342.0f, (int) drive, tr ("Drive") }, { 458.0f, (int) lookahead, tr ("Lookahead") },
+                                           { 576.0f, (int) hold, tr ("Hold") } })
+        {
+            auto bar = knob ({ x, sy, 80.0f, 46.0f }, prm, cap, 0);
+            bar.look = 1;
+            out.push_back (bar);
+        }
+        out.push_back (button ({ 334.0f, sy + 48.0f, 96.0f, 20.0f }, idSideChain, tr ("Side chain"), scOpen, tr ("Open the side chain: detector EQ, level, external input, stereo link")));
         if (scOpen)
         {
             const auto s = scPanel();
@@ -1311,9 +1373,31 @@ private:
         // the transfer curve, slid out from the left
         if (kneeOpen)
         {
+            // round tp172b4: as the reference draws it — a plain light line on the field (no box, no fill), the unity
+            // diagonal faint, a divider at the panel's edge, the live input as a dot
             const auto k = kneeArea();
-            drawPanel (g, k.expanded (2.0f));
-            dynui::paint (g, "crestcurve", k, 1.0f, fx, [this] (int i) { return liveMeter (i); }, none);
+            constexpr float lo = -60.0f;
+            const auto xOf = [&k] (float db) { return k.getX() + k.getWidth() * (db - lo) / -lo; };
+            const auto yOf = [&k] (float db) { return k.getBottom() - k.getHeight() * (juce::jlimit (lo, 0.0f, db) - lo) / -lo; };
+            g.setColour (colour::textDisabled.withAlpha (0.35f));
+            g.drawLine (k.getX(), k.getBottom(), k.getRight(), k.getY(), 1.0f);
+            g.drawVerticalLine ((int) k.getRight(), k.getY(), k.getBottom());
+            juce::Path curve;
+            for (int i = 0; i <= 120; ++i)
+            {
+                const auto in = lo + -lo * (float) i / 120.0f;
+                const juce::Point<float> pt { xOf (in), yOf (in + (float) dyn::crest::staticGainDb (fx.params, in)) };
+                if (i == 0) curve.startNewSubPath (pt); else curve.lineTo (pt);
+            }
+            g.setColour (fx.enabled ? colour::textSecondary : colour::textDisabled);
+            g.strokePath (curve, juce::PathStrokeType (1.6f));
+            const auto lm = liveMeter (2);
+            const auto live = lm > 1e-6f ? 20.0f * std::log10 (lm) : -120.0f;
+            if (fx.enabled && live > lo)
+            {
+                g.setColour (colour::textPrimary);
+                g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre ({ xOf (live), yOf (live + (float) dyn::crest::staticGainDb (fx.params, live)) }));
+            }
         }
         // meters: input, output and gain reduction
         const auto mr = juce::Rectangle<float> (p.getRight() + 46.0f, p.getY(), 50.0f, p.getHeight());
@@ -1349,7 +1433,7 @@ private:
 class SentryEditor final : public ProEditor
 {
 public:
-    SentryEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::sentryGate, d, 730, 380) { fillDemo(); }
+    SentryEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::sentryGate, d, 730, 380) { knobRanges = true; fillDemo(); }
 
 private:
     enum { idThreshold = 1, idExpert, idFilters };
@@ -1393,9 +1477,14 @@ private:
             out.push_back (toggle ({ 530.0f, m.getY() + 39.0f, 100.0f, 14.0f }, ducking, tr ("Ducking")));
         out.push_back (knob ({ 530.0f, m.getY() + 54.0f, 100.0f, 108.0f }, attack, tr ("Attack")));
         out.push_back (knob ({ 530.0f, m.getY() + 178.0f, 100.0f, 108.0f }, release, tr ("Release")));
-        out.push_back (knob ({ 644.0f, m.getY() + 8.0f, 76.0f, 88.0f }, hold, tr ("Hold"), 0));
-        out.push_back (knob ({ 644.0f, m.getY() + 102.0f, 76.0f, 88.0f }, knee, tr ("Knee"), 0));
-        out.push_back (knob ({ 644.0f, m.getY() + 196.0f, 76.0f, 88.0f }, lookahead, tr ("Lookahead"), 0));
+        // round tp172b4: the reference's small knobs have darker slate caps
+        for (const auto& [y, prm, cap] : { std::tuple<float, int, juce::String> { 8.0f, (int) hold, tr ("Hold") }, { 102.0f, (int) knee, tr ("Knee") },
+                                           { 196.0f, (int) lookahead, tr ("Lookahead") } })
+        {
+            auto k = knob ({ 644.0f, m.getY() + y, 76.0f, 88.0f }, prm, cap, 0);
+            k.cap = juce::Colour (0xff4f5370);
+            out.push_back (k);
+        }
         out.push_back (toggle ({ 646.0f, m.getY() + 290.0f, 72.0f, 20.0f }, lookaheadOn, tr ("On")));
         out.push_back (button ({ d.getCentreX() - 60.0f, m.getBottom() - 30.0f, 120.0f, 24.0f }, idExpert, tr ("Expert"), expertOpen,
                                tr ("Expert: side chain (internal / external, gain and mix per channel), side-chain filters, upward expansion, ducking, wet / dry level and pan")));
@@ -1507,7 +1596,7 @@ private:
         using namespace dyn::sentry;
         const auto d = disp();
         skin::canvas (g, bodyArea(), accent);
-        skin::well (g, d.expanded (4.0f), 6.0f);
+        // round tp172b4: the transfer graph lies on the field (the reference draws no well), only its grid
         // the input level scrolling behind (newest at the right), on the vertical dB scale
         const auto n = (int) d.getWidth();
         juce::Path in;
@@ -1560,11 +1649,12 @@ private:
         g.setColour (colour::warning.withAlpha (0.85f));
         g.drawDashedLine (juce::Line<float> (d.getX(), ty, d.getRight(), ty), dashes.data(), 2, 1.0f);
         g.drawDashedLine (juce::Line<float> (tx, d.getY(), tx, d.getBottom()), dashes.data(), 2, 1.0f);
-        // meter: input level and gain reduction
+        // meter: input level and gain reduction (round tp172b4: slim dark slots, a pale level, as the reference's)
         const auto mr = juce::Rectangle<float> (d.getRight() + 32.0f, d.getY(), 10.0f, d.getHeight());
-        g.setColour (colour::bg0);
+        g.setColour (juce::Colours::black.withAlpha (0.3f));
         g.fillRect (mr);
-        g.setColour (colour::meterLow.withAlpha (0.85f));
+        g.fillRect (mr.translated (12.0f, 0.0f));
+        g.setColour (juce::Colour (0xffc9cede).withAlpha (0.8f));
         g.fillRect (mr.withTop (yDb (now)));
         g.setColour (colour::accent);
         g.fillRect (mr.translated (12.0f, 0.0f).withBottom (d.getY() + d.getHeight() * juce::jlimit (0.0f, 1.0f, columnBack (0).gr / 66.0f)));
@@ -1594,6 +1684,7 @@ class PrismEditor final : public ProEditor
 public:
     PrismEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::prismMultiband, d, 920, 600)
     {
+        knobRanges = true; // round tp172b4: each knob's scale under it, the value on hover
         specArea = plot();
         specMinHz = 20.0;
         specMaxHz = 20000.0;
@@ -1602,7 +1693,8 @@ public:
 
 private:
     enum { idPrev = 1, idNext, idClose, idRange, idAnalyzer, idClassic, idExpert, idClassicDet, idSplit, idFree, idSolo0 = 20, idMute0 = 30 };
-    int selected = 0, hoverBand = -1, dragBand = -1, dragEdge = -1;
+    // round tp172b4: no band panel until a band is clicked (the reference opens on the bare display)
+    int selected = -1, hoverBand = -1, dragBand = -1, dragEdge = -1;
     bool expert = false; // round 147: the band panel's expert part (side-chain filtering, stereo link), view only
     double rangeView = 12.0;
     int analyzer = 3; // 0 off, 1 pre, 2 post, 3 pre + post (view only)
@@ -2179,6 +2271,14 @@ private:
         if (selected >= nb()) selected = nb() - 1; // a band removed (or a smaller preset): keep the panel on a band
         const auto p = plot();
         displayBackground (g, bodyArea());
+        // round tp172b4: the reference's full log grid (every 1 … 9 of each decade, faint)
+        for (double dec = 10.0; dec <= 10000.0; dec *= 10.0)
+            for (int k = 2; k <= 9; ++k)
+                if (const auto hz = dec * k; hz > 20.0 && hz < 20000.0 && k != 2 && k != 5)
+                {
+                    g.setColour (juce::Colours::white.withAlpha (0.045f));
+                    g.drawVerticalLine ((int) xForHz (hz, p), p.getY(), p.getBottom());
+                }
         frequencyLabels (g, p, p.getBottom() + 12.0f);
         // the analyser
         if (analyzer == 1 || analyzer == 3)
@@ -2193,7 +2293,7 @@ private:
             const auto y = gainY (db);
             g.setColour (f == 0.0 ? colour::gridBar : colour::gridBeat);
             g.drawHorizontalLine ((int) y, p.getX(), p.getRight());
-            g.setColour (colour::warning.withAlpha (0.8f));
+            g.setColour (accent.withAlpha (0.85f));
             g.drawText ((db > 0 ? "+" : "") + juce::String ((int) db), juce::Rectangle<float> (p.getRight() + 8.0f, y - 7.0f, 30.0f, 14.0f), juce::Justification::centredLeft, false);
         }
         for (const auto db : { -20.0f, -40.0f, -60.0f, -80.0f })
@@ -2208,7 +2308,7 @@ private:
             const auto c = peqview::bandColour (b);
             const auto region = juce::Rectangle<float> (bandLoX (b), p.getY(), juce::jmax (0.0f, bandHiX (b) - bandLoX (b)), p.getHeight());
             const auto on = bandOn (b);
-            g.setColour (c.withAlpha (on ? (b == selected ? 0.16f : 0.08f) : 0.02f));
+            g.setColour (c.withAlpha (on ? (b == selected ? 0.2f : 0.12f) : 0.03f));
             g.fillRect (region);
             gains[b] = on ? liveDb (b) + levelDb (v (bp (b, fLevel))) : 0.0;
             if (on)
@@ -2248,7 +2348,7 @@ private:
             if (i == 0) resp.startNewSubPath (x, gainY (db));
             else resp.lineTo (x, gainY (db));
         }
-        skin::glowStroke (g, resp, fx.enabled ? colour::warning : colour::textDisabled, 2.0f, fx.enabled ? 1.0f : 0.0f);
+        skin::glowStroke (g, resp, fx.enabled ? accent : colour::textDisabled, 2.0f, fx.enabled ? 0.6f : 0.0f); // (tp172b4: the reference's orange)
         // the nodes
         for (int b = 0; b < nb(); ++b)
         {

@@ -4167,6 +4167,10 @@ std::optional<float> keplerValue (const ChannelDef& c, const EngineParam& p)
     if (keplerExoState (c.pluginState) != exoTable)
         return std::nullopt;
     const auto at = keplerPanelOffset (c.pluginState, p.index);
+    if (at < 0 && ! exoTable && (p.index == 34 || p.index == 35) && keplerPanelOffset (c.pluginState, 0) >= 0)
+        return defaultParam (panelToInternal (p.index)); // (a 34-float state: the LFO retrig panels not saved yet)
+    if (at < 0 && exoTable && p.index >= 0 && p.index < 0x9b && keplerPanelOffset (c.pluginState, 0) >= 0)
+        return exoDefaultParam (p.index); // (a state saved before the last parameters existed: see keplerSetValue)
     if (at < 0)
         return std::nullopt;
     const auto v = f32At (c.pluginState, (std::size_t) at);
@@ -4178,6 +4182,51 @@ bool keplerSetValue (ChannelDef& c, const EngineParam& p, float raw)
 {
     if (keplerExoState (c.pluginState) != exoTable)
         return false;
+    // round 173d2: every installation preset is a version-2 state of 34 floats, without the LFO retrig panels
+    // (34 "Retrig Phase Active", 35 "Phase", REA_rodada46 §1.1), so their edits were lost; FL's later states carry
+    // 36 (REA_rodada46 §1.2, "Stroll Up": 4 / 36). The count is explicit in the state: grow it to 36
+    if (! exoTable && (p.index == 34 || p.index == 35) && keplerPanelOffset (c.pluginState, p.index) < 0
+        && exoWrapperSize (c.pluginState) == 0 && keplerPanelOffset (c.pluginState, 0) >= 0 && u32 (c.pluginState, 0x1D) == 34)
+    {
+        auto& s = c.pluginState;
+        const auto at = (std::ptrdiff_t) (0x21 + 4 * 34);
+        std::uint8_t extra[8] {};
+        const float retrig = defaultParam (0x34), phase = defaultParam (0x35);
+        std::memcpy (extra, &retrig, 4);
+        std::memcpy (extra + 4, &phase, 4);
+        s.insert (s.begin() + at, extra, extra + 8);
+        const std::uint32_t n = 36, size = u32 (s, 4) + 8;
+        std::memcpy (s.data() + 0x1D, &n, 4);
+        std::memcpy (s.data() + 4, &size, 4);
+    }
+    // round 173d2: FL's "Kepler Exo" Default preset is a version-2 "Kepler-2" state of 151 floats (0…0x96), without
+    // VCA smooth, Saturation HQ, Master detune and HPF on (0x97…0x9a; FL's engine fills them from its defaults), so
+    // their edits were lost. Grow the explicit count to 0x9b with the defaults, and the stream and wrapper sizes with it
+    if (exoTable && p.index >= 0 && p.index < 0x9b && keplerPanelOffset (c.pluginState, p.index) < 0 && keplerPanelOffset (c.pluginState, 0) >= 0)
+    {
+        auto& s = c.pluginState;
+        const auto w = exoWrapperSize (s);
+        const auto n = (int) u32 (s, w + 0x1D);
+        if (n > 0 && n < 0x9b)
+        {
+            std::vector<std::uint8_t> extra ((std::size_t) (0x9b - n) * 4);
+            for (int i = n; i < 0x9b; ++i)
+            {
+                const auto v = exoDefaultParam (i);
+                std::memcpy (extra.data() + 4 * (i - n), &v, 4);
+            }
+            const auto add = (std::uint32_t) extra.size();
+            s.insert (s.begin() + (std::ptrdiff_t) (w + 0x21 + 4 * (std::size_t) n), extra.begin(), extra.end());
+            const std::uint32_t count = 0x9b, size = u32 (s, w + 4) + add;
+            std::memcpy (s.data() + w + 0x1D, &count, 4);
+            std::memcpy (s.data() + w + 4, &size, 4);
+            if (w > 0)
+            {
+                const auto outer = u32 (s, 8) + add;
+                std::memcpy (s.data() + 8, &outer, 4);
+            }
+        }
+    }
     const auto at = keplerPanelOffset (c.pluginState, p.index);
     if (at < 0 || ! std::isfinite (raw))
         return false;
