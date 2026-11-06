@@ -7357,3 +7357,4 @@ countries: de at ch li lu
 "Spectral distribution" = "Spektrale Verteilung"
 "Envelope saturation" = "Hüllkurvensättigung"
 "Map: [RMB] add a point (hold and drag to place it)  [LMB] drag a point" = "Map: [RMB] fügt einen Punkt hinzu (halten und ziehen zum Platzieren)  [LMB] zieht einen Punkt"
+"Impulse|Equalizer" = "Impuls|Equalizer"

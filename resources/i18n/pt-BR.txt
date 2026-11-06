@@ -7440,3 +7440,4 @@ countries: br
 "Spectral distribution" = "Distribuição espectral"
 "Envelope saturation" = "Saturação do envelope"
 "Map: [RMB] add a point (hold and drag to place it)  [LMB] drag a point" = "Mapa: [RMB] adiciona um ponto (segure e arraste para posicioná-lo)  [LMB] arrasta um ponto"
+"Impulse|Equalizer" = "Impulso|Equalizador"

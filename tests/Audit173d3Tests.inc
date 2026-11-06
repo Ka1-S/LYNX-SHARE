@@ -37,9 +37,9 @@ TEST (audit173d3_equo_send_goes_to_the_insert)
             CHECK (energy > 1.0);
             run (routed, false, &sendAgain); // computed but not routed: nothing reaches a buffer
             CHECK (std::all_of (sendAgain.begin(), sendAgain.end(), [] (float v) { return v == 0.0f; }));
-            // a band's send level (bank 1, the band at 1 kHz) changes what is sent
+            // a band's send level (the master bank, which plays without a morph; the band at 1 kHz) changes what is sent
             auto edited = *lynx::equofx::parse (routed);
-            edited.cell (0, 17, 2) = edited.cell (0, 17, 2) > 1.0f ? 0.1f : 1.9f;
+            edited.cell (8, 17, 2) = edited.cell (8, 17, 2) > 1.0f ? 0.1f : 1.9f;
             edited.target[17][2].mode = 0;
             lynx::equofx::Engine e;
             e.prepare (44100.0, false);

@@ -565,7 +565,7 @@ Layout lovePhilterLayout()
     // --- unit page
     v.push_back (section (0, 0, 443, 400, nullptr, boxed));
     for (int u = 0; u < units; ++u) // EnableBank1…8 (right-click: solo, in the options)
-        v.push_back (toggle (4.0f + 29.8f * (float) u, 5, 20, 20, philterName (u, "on"), nullptr, boxed));
+        v.push_back (toggle (7.0f + 29.8f * (float) u, 8, 14, 14, philterName (u, "on"), nullptr)); // (FL: LEDs)
     v.push_back (pageDigit (3, 26, 240, 31, "1|2|3|4|5|6|7|8", 1));
     v.push_back (label (4, 59, 47, 16, "IN", boxed));
     v.push_back (label (55, 59, 235, 16, "FILTER", boxed));
@@ -579,14 +579,17 @@ Layout lovePhilterLayout()
     for (int u = 0; u < units; ++u)
     {
         const auto shelf = [&] (LayoutItem i, bool gain) { // L / B / H for the plain filters, GAIN (or DRIVE) for shelves, peaking, Mango
-            return gain ? when (std::move (i), philterName (u, "type"), 8.0f / 11.0f, 1.0f)
-                        : when (std::move (i), philterName (u, "type"), 0.0f, 7.5f / 11.0f);
+            // (FL shot: L / B / H mix the state variable filter's outputs, so only the Chocolate type shows them)
+            return gain ? when (std::move (i), philterName (u, "type"), 7.5f / 11.0f, 1.0f)
+                        : when (std::move (i), philterName (u, "type"), 0.0f, 0.5f / 11.0f);
         };
         unitItem (knob (27, 161, 36, philterName (u, "input"), "VOL", 184), u);
         unitItem (stepper (72, 95, 27, 21, philterName (u, "type"), nullptr, 11), u);
-        unitItem (radio (105, 81, 106, 48, philterName (u, "mode"), "OFF|SINGLE|DUAL|TRIPLE|ALT DUAL|ALT TRIPLE",
-                         { 0.0f, 0.2f, 0.4f, 0.6f, 0.8f, 1.0f }),
-                  u);
+        // (FL shot: two columns, OFF / SINGLE / DUAL then TRIPLE / ALT DUAL / ALT TRIPLE; the grid fills rows first)
+        auto mode = radio (105, 81, 106, 48, philterName (u, "mode"), "OFF|TRIPLE|SINGLE|ALT DUAL|DUAL|ALT TRIPLE",
+                           { 0.0f, 0.6f, 0.2f, 0.8f, 0.4f, 1.0f });
+        mode.columns = 2;
+        unitItem (mode, u);
         unitItem (toggle (246, 61, 40, 12, philterName (u, "ALT"), "ALT"), u);
         unitItem (knob (98, 161, 36, philterName (u, "envelope amount"), "ENV", 184), u);
         unitItem (knob (141, 159, 42, philterName (u, "cutoff"), "CUT", 184), u);
@@ -595,7 +598,7 @@ Layout lovePhilterLayout()
         unitItem (shelf (slider (Item::vslider, 245, 81, 16, 96, philterName (u, "band"), "B"), false), u);
         unitItem (shelf (slider (Item::vslider, 265, 81, 16, 96, philterName (u, "high"), "H"), false), u);
         unitItem (shelf (knob (253, 161, 36, philterName (u, "low"), "GAIN", 184), true), u);
-        unitItem (toggle (300, 98, 23, 36, philterName (u, "shaper on"), "ON", boxed), u);
+        unitItem (toggle (300, 98, 23, 36, philterName (u, "shaper on"), "ON"), u);
         unitItem (knob (344, 101, 36, philterName (u, "shaper pre amp"), "AMP", 123), u);
         unitItem (knob (344, 161, 36, philterName (u, "shaper mix"), "MIX", 184), u);
         unitItem (toggle (300, 154, 22, 24, philterName (u, "shaper unipolar"), nullptr, boxed), u);
@@ -658,7 +661,7 @@ Layout lovePhilterLayout()
     v.push_back (slider (Item::vslider, m + 208, 52, 15, 88, "Follower level", nullptr, noCaption));
     v.push_back (label (m + 159, 141, 15, 9, "VOL"));
     v.push_back (label (m + 175, 141, 31, 9, "LFO"));
-    v.push_back (label (m + 199, 141, 32, 9, "IEF"));
+    v.push_back (label (m + 201, 141, 26, 9, "IEF"));
     v.push_back (label (m + 162, 153, 61, 18, "IEF", boxed));
     v.push_back (section (m + 162, 171, 61, 126, nullptr, boxed | raised));
     v.push_back (toggle (m + 170, 174, 47, 17, "Use unit 1", "USE1"));

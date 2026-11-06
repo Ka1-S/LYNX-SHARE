@@ -7357,3 +7357,4 @@ countries: ru by kz
 "Spectral distribution" = "Спектральное распределение"
 "Envelope saturation" = "Сатурация огибающей"
 "Map: [RMB] add a point (hold and drag to place it)  [LMB] drag a point" = "Карта: [RMB] добавляет точку (удерживайте и тяните, чтобы поставить)  [LMB] перетаскивает точку"
+"Impulse|Equalizer" = "Импульс|Эквалайзер"

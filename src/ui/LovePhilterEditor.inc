@@ -40,6 +40,10 @@
     bool lpOther() const { return kind == EffectKind::convolver || kind == EffectKind::vocodex; } // a map of another plugin
     int vxMap() const { return juce::jlimit (0, 12, page); }
 
+    // the slot read: the one being painted (the snapshot editors have no running slot), else the editor's
+    const EffectSlot* lpPaintSlot = nullptr;
+    const EffectSlot* lpFx() const { return lpPaintSlot != nullptr ? lpPaintSlot : current(); }
+
     int lpUnit() const { return page % 8; }
     static constexpr int lpShaper = 7; // the WS target: the unit's shaper curve
     int lpTarget() const { return (page / 8) % 9; }
@@ -47,7 +51,7 @@
     bool lpMap() const { return lpOther() || lpTarget() == lpShaper || lpPart() >= 2; }
     int lpPattern() const // the "Pattern" knob (FL 1…10) picks the pattern envelope shown
     {
-        const auto* fx = current();
+        const auto* fx = lpFx();
         return fx != nullptr && fx->params.size() > 5 ? juce::jlimit (0, 9, juce::roundToInt (fx->params[5] * 9.0f)) : 0;
     }
 
@@ -61,7 +65,7 @@
 
     std::optional<philter::DocEnv> lpEnv() const
     {
-        const auto* fx = current();
+        const auto* fx = lpFx();
         if (fx == nullptr || lpOther())
             return std::nullopt;
         auto d = philter::readDoc (fx->state);
@@ -90,7 +94,7 @@
     {
         if (lpDragging)
             return lpDragPoints;
-        if (const auto* fx = current(); fx != nullptr && kind == EffectKind::convolver)
+        if (const auto* fx = lpFx(); fx != nullptr && kind == EffectKind::convolver)
         {
             std::vector<LpPoint> out;
             if (const auto c = convolver::readEqCurve (fx->state))
@@ -106,7 +110,7 @@
             }
             return out;
         }
-        if (const auto* fx = current(); fx != nullptr && kind == EffectKind::vocodex)
+        if (const auto* fx = lpFx(); fx != nullptr && kind == EffectKind::vocodex)
         {
             std::vector<LpPoint> out;
             if (const auto maps = vocodex::readMaps (fx->state))
@@ -586,6 +590,8 @@
         using namespace theme;
         const auto s = scale();
         const auto c = fx.enabled ? colour::accent : colour::textDisabled;
+        lpPaintSlot = &fx;
+        const juce::ScopeGuard clearSlot { [this] { lpPaintSlot = nullptr; } };
         const auto span = lpSpan();
         g.setColour (colour::gridBeat);
         if (kind == EffectKind::convolver) // FL's equalizer page: the frequency axis (Hz along the bottom), 0 dB in the middle
@@ -624,9 +630,12 @@
                 else
                     p.lineTo (at);
             }
+            // (FL shot: PAN, CUT and RES move around their knob, so their curves fill from the middle line)
+            const auto centred = kind == EffectKind::lovePhilter && lpTarget() != lpShaper && (lpTarget() == 0 || lpTarget() == 2 || lpTarget() == 3);
+            const auto base = centred ? inner.getCentreY() : inner.getBottom();
             auto fill = p;
-            fill.lineTo (inner.getRight(), inner.getBottom());
-            fill.lineTo (inner.getX(), inner.getBottom());
+            fill.lineTo (inner.getRight(), base);
+            fill.lineTo (inner.getX(), base);
             fill.closeSubPath();
             g.setColour (c.withAlpha (0.14f));
             g.fillPath (fill);
