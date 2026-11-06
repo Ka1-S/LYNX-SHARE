@@ -7302,6 +7302,12 @@ countries: tw hk mo
 "{0} in {1}" = "{1} 中的 {0}"
 "Playlist clip" = "Playlist 片段"
 "ON" = "開"
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "無|Smooth|Op-El|Mastering"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "另外三種壓縮器特性，代替風格使用：平滑、光電或母帶"
+"{0} crashed. Save your project now (as a new file is safest)." = "{0} 崩潰了。請立即儲存專案（另存為新檔案最安全）。"
+"Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "已關閉其視窗，以便 LYNX SHARE 繼續執行。在重新開啟專案之前，該外掛可能無法正常運作。"
+"Wheels" = "滾輪"
 
 # round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"
@@ -7332,10 +7338,6 @@ countries: tw hk mo
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "連動增益：轉動輸入時輸出反向移動，改變驅動時電平保持不變"
 "Input and Output move together on every channel of the group that has Group I/O on" = "在開啟編組輸入/輸出的同編組所有通道上，輸入與輸出一起移動"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel：LYNX 的混音台通道。拖動旋鈕，Alt+點擊復位，右鍵自動化"
-# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
-"None|Smooth|Op-El|Mastering" = "無|Smooth|Op-El|Mastering"
-"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "另外三種壓縮器特性，代替風格使用：平滑、光電或母帶"
-"Wheels" = "滾輪"
 # round tp172c8: Fret Channel, Shell Channel
 "Level into the strip" = "進入通道條的電平"
 "Level out of the strip, after the output mix" = "離開通道條的電平(在輸出混合之後)"

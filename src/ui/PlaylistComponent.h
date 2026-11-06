@@ -11,6 +11,7 @@
 #include "core/PickerSelection.h"
 #include "engine/AudioEngine.h"
 #include "ui/EditorTools.h"
+#include "ui/FrameTicker.h"
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
 
@@ -48,7 +49,6 @@ class PlaylistComponent final : public juce::Component,
                                 public juce::DragAndDropTarget,
                                 public ui::HintSource,
                                 private juce::ChangeListener,
-                                private juce::Timer,
                                 private juce::ScrollBar::Listener
 {
 public:
@@ -181,7 +181,17 @@ private:
     bool showClipProgress = true, showTrackProgress = true; // FL's View › Performance clip / track progress
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
-    void timerCallback() override;
+    // the playhead and Performance mode's live clips, at the display's refresh (round 174e; was a 30 Hz timer)
+    bool liveFrame (double nowMs);
+    double perfRepaintMs = 0.0;
+    // The view kept as an image, the playhead drawn over it (round 174e): a playhead frame only blits its column of the
+    // image and draws the line, instead of painting the lanes, clips and waveforms under it again 144 times a second.
+    // Any other repaint (an edit, a scroll, a child) refreshes its area of the image. LYNX_PLAYLIST_CACHE=0: off.
+    class PlayheadCache;
+    bool playheadOverlay = false;      // the cache is on: the playhead's own repaints keep its image
+    bool playheadRepaintOnly = false;  // set around the playhead's own repaints: the image stays valid
+    bool cachePainting = false;        // paint() is filling the image: no playhead in it
+    void paintPlayhead (juce::Graphics& g);
     void scrollBarMoved (juce::ScrollBar*, double) override;
 
     juce::Rectangle<int> gridArea() const;
@@ -392,6 +402,7 @@ private:
     void glideBy (double ticks, double pixels, bool immediate = false);
     void glideFrame();
     juce::VBlankAttachment vblank { this, [this] { glideFrame(); } };
+    ui::FrameTicker frames { *this, [this] (double ms) { return liveFrame (ms); } };
 
     void zoomAroundCentre (double factor);
     void zoomToBars (int bars);

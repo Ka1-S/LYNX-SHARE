@@ -2896,16 +2896,21 @@ void ChannelRackComponent::timerCallback()
                         repaint (controlBounds (Area::pan, r).getUnion (controlBounds (Area::volume, r)).expanded (2));
         automatedRows = std::move (rows);
     }
+}
 
+bool ChannelRackComponent::playheadFrame (double)
+{
     auto& transport = engine.getTransport();
     auto step = -1;
+    const auto playing = transport.playing.load();
 
     // the playhead shows whenever the shown pattern plays: Pattern mode, or a clip of it in Song mode (Busy Works
     // Beats' video, round 170a: in Song mode the rack showed none), as the Piano Roll's (transportedit::patternPlayhead)
-    if (transport.playing.load() && isShowing())
+    if (playing && isShowing())
     {
         const auto& song = engine.getSong();
-        const auto tick = transportedit::patternPlayhead (song, song.currentPattern, transport.positionTicks.load());
+        // (between two audio blocks it moves on at the song's tempo, round 174e: the step lights when it is heard)
+        const auto tick = transportedit::patternPlayhead (song, song.currentPattern, transport.positionTicks.load() + engine.playheadAdvanceTicks());
         if (tick >= 0.0)
             step = (int) (tick / ticksPerStep);
     }
@@ -2921,7 +2926,9 @@ void ChannelRackComponent::timerCallback()
         dirty (playheadStep);
         repaint (stickyX + selectLeft(), 0, selectWidth, getHeight()); // the selectors flash with the hits
         followPlayhead();
+        return true;
     }
+    return playing;
 }
 
 void ChannelRackComponent::followPlayhead()

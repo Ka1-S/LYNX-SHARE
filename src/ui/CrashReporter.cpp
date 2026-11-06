@@ -54,7 +54,8 @@ juce::String Session::kind() const
     if (crashFile.existsAsFile())
         return "crash";
     if (hangFile != juce::File())
-        return "hang";
+        // (issue #32, round 174a: the UI thread was inside Windows' fatal-error report — the process was dying)
+        return crashreport::hangIsFatalReport (hangFile.loadFileAsString().toStdString()) ? "crash" : "hang";
     return "unclean";
 }
 
@@ -85,6 +86,11 @@ Session parseSession (const juce::String& text)
                 const auto file = autosave.getChildFile (body.fromFirstOccurrenceOf (marker, false, false).trim());
                 (juce::String (marker).startsWith ("backtrace") ? s.crashFile : s.hangFile) = file;
             }
+        if (const auto editor = crashreport::parseEditorCrashStep (utf8 (body)); ! editor.plugin.empty())
+        {
+            s.editorCrashPlugin = fromUtf8 (editor.plugin);
+            s.editorCrashFile = editor.traceFile.empty() ? juce::File() : autosave.getChildFile (fromUtf8 (editor.traceFile));
+        }
         if (body.startsWith ("UI responding again"))
             s.hangFile = juce::File(); // the freeze ended by itself: not what closed LYNX
     }
@@ -238,6 +244,12 @@ cr::ReportInput makeInput (const Session& session, const juce::String& kind, juc
     {
         in.crashFile = utf8 (session.crashFile.getFileName());
         in.crashText = utf8 (session.crashFile.loadFileAsString());
+    }
+    else if (session.editorCrashFile.existsAsFile())
+    {
+        // (issue #32: no crash file, but a plugin editor's fault was caught earlier in the session: its trace)
+        in.crashFile = utf8 (session.editorCrashFile.getFileName());
+        in.crashText = utf8 (session.editorCrashFile.loadFileAsString());
     }
     if (session.hangFile.existsAsFile())
     {

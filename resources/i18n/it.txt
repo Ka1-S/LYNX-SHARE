@@ -7302,6 +7302,12 @@ countries: it ch sm
 "{0} in {1}" = "{0} in {1}"
 "Playlist clip" = "Clip della Playlist"
 "ON" = "ON"
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "Nessuno|Smooth|Op-El|Mastering"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Altri tre caratteri del compressore, al posto dello stile: morbido, optoelettronico o mastering"
+"{0} crashed. Save your project now (as a new file is safest)." = "{0} è andato in crash. Salva ora il progetto (la cosa più sicura è salvarlo come nuovo file)."
+"Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "La sua finestra è stata chiusa perché LYNX SHARE potesse continuare a funzionare. Il plugin potrebbe non funzionare correttamente finché il progetto non viene riaperto."
+"Wheels" = "Rotelle"
 
 # round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"
@@ -7332,10 +7338,6 @@ countries: it ch sm
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Collega i trim: girando l'Ingresso l'Uscita si muove al contrario, il livello resta mentre cambia il drive"
 "Input and Output move together on every channel of the group that has Group I/O on" = "Ingresso e Uscita si muovono insieme su tutti i canali del gruppo con I/O del gruppo attivo"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: il canale console di LYNX. Trascina una manopola, Alt+clic la azzera, clic destro per l'automazione"
-# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
-"None|Smooth|Op-El|Mastering" = "Nessuno|Smooth|Op-El|Mastering"
-"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Altri tre caratteri del compressore, al posto dello stile: morbido, optoelettronico o mastering"
-"Wheels" = "Rotelle"
 # round tp172c8: Fret Channel, Shell Channel
 "Level into the strip" = "Livello in ingresso al canale"
 "Level out of the strip, after the output mix" = "Livello in uscita dal canale, dopo il mix di uscita"

@@ -7302,6 +7302,12 @@ countries: nl be
 "{0} in {1}" = "{0} in {1}"
 "Playlist clip" = "Playlist-clip"
 "ON" = "AAN"
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "Geen|Smooth|Op-El|Mastering"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Nog drie compressorkarakters, in plaats van de stijl: zacht, opto-elektronisch of mastering"
+"{0} crashed. Save your project now (as a new file is safest)." = "{0} is gecrasht. Sla je project nu op (als nieuw bestand is het veiligst)."
+"Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "Het venster is gesloten zodat LYNX SHARE kon blijven werken. De plugin werkt misschien pas weer goed als het project opnieuw wordt geopend."
+"Wheels" = "Wielen"
 
 # round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"
@@ -7332,10 +7338,6 @@ countries: nl be
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Koppelt de trims: Ingang draaien beweegt Uitgang andersom, het niveau blijft terwijl de drive verandert"
 "Input and Output move together on every channel of the group that has Group I/O on" = "Ingang en Uitgang bewegen samen op elk kanaal van de groep met Groeps-I/O aan"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: het consolekanaal van LYNX. Sleep een knop, Alt+klik zet terug, rechtsklik voor automatisering"
-# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
-"None|Smooth|Op-El|Mastering" = "Geen|Smooth|Op-El|Mastering"
-"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Nog drie compressorkarakters, in plaats van de stijl: zacht, opto-elektronisch of mastering"
-"Wheels" = "Wielen"
 # round tp172c8: Fret Channel, Shell Channel
 "Level into the strip" = "Niveau de strip in"
 "Level out of the strip, after the output mix" = "Niveau de strip uit, na de output-mix"

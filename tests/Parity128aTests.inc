@@ -67,7 +67,9 @@ TEST (parity128a_apex_new_controls)
         process (*fx, l, r, q);
     };
     std::vector<float> la, ra, lb, rb;
-    p[pStyle] = 1.0f; // Safe: the most slow stage
+    // round tp172b3: Loud (the reference's Aggressive). The Pro-L 2 refit gives Safe an almost instant slow stage
+    // (attack × 0.0115, measured), so its attack control barely shows here; Loud's slow stage follows the attack most
+    p[pStyle] = 0.6667f;
     run (p, la, ra);
     auto q = p;
     q[pAttack] = 0.6f; // ≈ 1.3 s
@@ -75,6 +77,7 @@ TEST (parity128a_apex_new_controls)
     const auto after0 = rms (la, (std::size_t) (0.3 * sr), (std::size_t) (0.5 * sr)), after1 = rms (lb, (std::size_t) (0.3 * sr), (std::size_t) (0.5 * sr));
     std::printf ("  apex attack: quiet part after the burst %.4f -> %.4f\n", after0, after1);
     CHECK (after1 > after0 * 1.02);
+    p[pStyle] = 1.0f; // the rest in Safe, as before
 
     // dither: every output sample on the 16-bit grid
     q = p;

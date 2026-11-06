@@ -7302,6 +7302,12 @@ countries: id
 "{0} in {1}" = "{0} di {1}"
 "Playlist clip" = "Clip Playlist"
 "ON" = "NYALA"
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "Tidak ada|Smooth|Op-El|Mastering"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Tiga karakter kompresor lagi, dipakai menggantikan gaya: halus, opto-elektronik, atau mastering"
+"{0} crashed. Save your project now (as a new file is safest)." = "{0} crash. Simpan proyek sekarang (paling aman sebagai file baru)."
+"Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "Jendelanya ditutup agar LYNX SHARE tetap berjalan. Plugin mungkin tidak bekerja dengan benar sampai proyek dibuka lagi."
+"Wheels" = "Roda"
 
 # round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"
@@ -7332,10 +7338,6 @@ countries: id
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Menautkan trim: memutar Input menggerakkan Output berlawanan, level tetap saat drive berubah"
 "Input and Output move together on every channel of the group that has Group I/O on" = "Input dan Output bergerak bersama di setiap kanal grup yang I/O grup-nya aktif"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: kanal konsol LYNX. Seret kenop, Alt+klik mereset, klik kanan untuk otomasi"
-# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
-"None|Smooth|Op-El|Mastering" = "Tidak ada|Smooth|Op-El|Mastering"
-"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Tiga karakter kompresor lagi, dipakai menggantikan gaya: halus, opto-elektronik, atau mastering"
-"Wheels" = "Roda"
 # round tp172c8: Fret Channel, Shell Channel
 "Level into the strip" = "Level yang masuk ke strip"
 "Level out of the strip, after the output mix" = "Level yang keluar dari strip, setelah output mix"

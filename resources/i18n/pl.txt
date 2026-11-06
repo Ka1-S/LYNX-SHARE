@@ -7302,6 +7302,12 @@ countries: pl
 "{0} in {1}" = "{0} w {1}"
 "Playlist clip" = "Clip Playlisty"
 "ON" = "WŁ."
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "Brak|Smooth|Op-El|Mastering"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Trzy kolejne charaktery kompresora, zamiast stylu: łagodny, optoelektroniczny lub mastering"
+"{0} crashed. Save your project now (as a new file is safest)." = "{0} uległ awarii. Zapisz teraz projekt (najbezpieczniej jako nowy plik)."
+"Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "Jego okno zostało zamknięte, aby LYNX SHARE mógł dalej działać. Plugin może nie działać poprawnie do ponownego otwarcia projektu."
+"Wheels" = "Kółka"
 
 # round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"
@@ -7332,10 +7338,6 @@ countries: pl
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Łączy trimy: obrót Wejścia przesuwa Wyjście odwrotnie, poziom zostaje, gdy zmienia się drive"
 "Input and Output move together on every channel of the group that has Group I/O on" = "Wejście i Wyjście ruszają się razem na każdym kanale grupy z włączonym We/Wy grupy"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: kanał konsoli LYNX. Przeciągnij pokrętło, Alt+klik resetuje, prawy klik – automatyka"
-# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
-"None|Smooth|Op-El|Mastering" = "Brak|Smooth|Op-El|Mastering"
-"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Trzy kolejne charaktery kompresora, zamiast stylu: łagodny, optoelektroniczny lub mastering"
-"Wheels" = "Kółka"
 # round tp172c8: Fret Channel, Shell Channel
 "Level into the strip" = "Poziom na wejściu toru"
 "Level out of the strip, after the output mix" = "Poziom na wyjściu toru, po miksie wyjściowym"

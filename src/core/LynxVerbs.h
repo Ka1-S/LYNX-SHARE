@@ -88,6 +88,7 @@ struct Settings
     double shiftMix = 1.0;         // 0..1: shifted part of what feeds back (0 = plain feedback)
     double shiftSemis2 = -12.0;    // second voice (dual modes)
     double shift2Mix = 0.0;        // 0..1: level of the second voice in the shifted feedback
+    double shimmerEnergy = 0.0;    // round tp172d: > 0 = the line keeps itself and the shifted voice is added, × this (Halo)
     // output
     double width = 1.0;            // −2..2: side gain of the wet output (M/S); 0 = mono, negative swaps L/R
     double outLowCut = 0.0, outHighCut = 0.0;  // Hz (0 = off)
