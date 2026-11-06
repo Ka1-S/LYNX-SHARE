@@ -551,13 +551,13 @@ Layout lovePhilterLayout()
     // or GAIN), WS (ON, AMP, MIX, unipolar / bipolar), OUT (PAN, VOL, NEXT) — over the articulator editor (target,
     // part, pattern number, the curve and its LFO / envelope panel); the main panel on the right: the X / Y pad with
     // SMOOTH and the X / Y wheels, the master level, master LFO and follower (IEF) level sliders, the follower's USE1 /
-    // ATT / REL, CENTER, HQ ENVELOPES and OVERSAMPLING. The page = unit (×1) + editor target (×8) + articulator part (×64).
+    // ATT / REL, CENTER, HQ ENVELOPES and OVERSAMPLING. The page = unit (×1) + editor target (×8, nine) + articulator part (×72).
     Layout l;
     l.fl = "Fruity Love Philter";
     l.width = 670;
     l.height = 400;
     auto& v = l.items;
-    constexpr int units = 8, targets = 8;
+    constexpr int units = 8, targets = 9, shaperTarget = 7;
     const auto unitItem = [&] (LayoutItem i, int u) {
         i.page = u, i.pageModulo = units, i.pageStride = 1;
         v.push_back (std::move (i));
@@ -607,15 +607,29 @@ Layout lovePhilterLayout()
     }
     // --- the articulator editor: target, part, pattern, the curve and the part's panel
     v.push_back (section (3, 197, 436, 200, nullptr, boxed | raised));
-    v.push_back (pageDigit (4, 199, 434, 15, "PAN|VOL|CUT|RES|L|B|H|WS", units));
-    v.push_back (stepper (4, 216, 41, 17, "Pattern", nullptr, 9));
-    v.push_back (pageDigit (46, 217, 392, 15, "ENV|LFO|MOD X|MOD Y|IEF", units * targets));
+    // FL shot: nine targets (WS = the unit's shaper curve, a map with no part row or panel; WMIX = the shaper mix's
+    // articulator) and the part row PAT / LFO / MOD X / MOD Y / IEF with the pattern number left of it
+    v.push_back (pageDigit (4, 199, 434, 15, "PAN|VOL|CUT|RES|LOW|BAND|HIGH|WS|WMIX", units));
+    for (int t = 0; t < targets; ++t)
+        if (t != shaperTarget)
+        {
+            auto pattern = stepper (4, 216, 41, 17, "Pattern", nullptr, 9);
+            auto parts = pageDigit (46, 217, 392, 15, "PAT|LFO|MOD X|MOD Y|IEF", units * targets);
+            for (auto* i : { &pattern, &parts })
+            {
+                i->page = t, i->pageStride = units, i->pageModulo = targets;
+                v.push_back (*i);
+            }
+        }
     v.push_back (display (4, 235, 434, 129, "lpcurve"));
     static const char* const artNames[8] = { "pan", "volume", "cutoff", "resonance", "low", "band", "high", "shaper mix" };
     for (int u = 0; u < units; ++u)
         for (int t = 0; t < targets; ++t)
         {
-            const auto at = [&] (const char* field) { return philterName (u, (std::string (artNames[t]) + " " + field).c_str()); };
+            if (t == shaperTarget)
+                continue;
+            const auto art = t < shaperTarget ? t : 7;
+            const auto at = [&] (const char* field) { return philterName (u, (std::string (artNames[art]) + " " + field).c_str()); };
             const int envPage = u + units * t, lfoPage = envPage + units * targets;
             v.push_back (onPage (toggle (5, 366, 16, 16, at ("envelope on"), nullptr, boxed), envPage));
             v.push_back (onPage (toggle (114, 365, 42, 17, at ("envelope tempo"), "TEMPO"), envPage));

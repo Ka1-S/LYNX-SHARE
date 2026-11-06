@@ -2135,8 +2135,17 @@ public:
                     equofx::setSendInsert (e.state, t);
             });
         };
-        menu.addItem (tr ("None"), true, chosen <= 0, [choose] { choose (0); });
         const auto& mixer = engine.getSong().mixer;
+        if (fx->kind == EffectKind::equo) // FL's EQUO send box: (none) and the tracks this insert routes to (round 173d3)
+        {
+            menu.addItem ("(" + tr ("none") + ")", true, chosen <= 0, [choose] { choose (0); });
+            for (int t = 1; t < (int) mixer.size(); ++t)
+                if (t != track && (engine.getSong().routes (track, t) || t == chosen))
+                    menu.addItem (insertName (t), true, t == chosen, [choose, t] { choose (t); });
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (r.toNearestInt())));
+            return;
+        }
+        menu.addItem (tr ("None"), true, chosen <= 0, [choose] { choose (0); });
         for (int t = 1; t < (int) mixer.size(); ++t)
             if (t != track)
                 menu.addItem (juce::String (t) + "  " + insertName (t), engine.getSong().canRoute (track, t) || t == chosen, t == chosen, [choose, t] { choose (t); });
@@ -2161,9 +2170,20 @@ public:
             paintTransmitterEnvelope (g, inner, fx);
             return;
         }
-        if (id == "equosend")
+        if (id == "equosend") // FL's send track box: "---" (none) or the insert's number, with its up / down marks
         {
-            paintTransmitterSend (g, r, fx, 0);
+            const auto t = fx.sendTracks[0];
+            g.setColour (theme::colour::bg0.withAlpha (0.35f));
+            g.fillRect (r);
+            g.setColour (t > 0 ? theme::colour::textPrimary : theme::colour::textSecondary);
+            g.setFont (theme::font (juce::jmax (8.0f, 10.0f * scale())));
+            g.drawText (t > 0 ? juce::String (t) : juce::String ("---"), r.withTrimmedRight (9.0f * scale()).toNearestInt(), juce::Justification::centredRight, false);
+            const auto ar = r.removeFromRight (9.0f * scale()).reduced (1.5f * scale(), r.getHeight() * 0.22f);
+            juce::Path up, down;
+            up.addTriangle (ar.getX(), ar.getCentreY() - 1.0f, ar.getRight(), ar.getCentreY() - 1.0f, ar.getCentreX(), ar.getY());
+            down.addTriangle (ar.getX(), ar.getCentreY() + 1.0f, ar.getRight(), ar.getCentreY() + 1.0f, ar.getCentreX(), ar.getBottom());
+            g.fillPath (up);
+            g.fillPath (down);
             return;
         }
         if (id == "tsssend0" || id == "tsssend1")
@@ -4800,6 +4820,8 @@ private:
             return { mxHint (item, p), {}, false, true };
         if (isPhilterCurve (item)) // round 173d3
             return { lpHint (item, p), {}, false, true };
+        if (item.type == Item::display && juce::String (item.display) == "equosend") // round 173d3: FL's hint
+            return { tr ("Send track number"), current() != nullptr && current()->sendTracks[0] > 0 ? insertName (current()->sendTracks[0]) : juce::String ("---"), false, false };
         if (isGbAny (item)) // round 168m
             return { gbHint (item, p), {}, false, true };
         if (item.type == Item::display)

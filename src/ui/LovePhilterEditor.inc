@@ -2,8 +2,9 @@
 // NativeEffectEditor's class body.
 //
 // FL's form shows one articulator part at a time under the unit page: the editor target (PAN … WS, the eight
-// articulators of the selected unit) × the part (the pattern envelope of the pattern shown, the LFO's amplitude
-// envelope, the Mod X / Mod Y / envelope-follower maps). The page encodes the choice: unit (×1), target (×8), part (×64).
+// articulators of the selected unit, plus WS: the unit's shaper curve) × the part (the pattern envelope of the pattern
+// shown, the LFO's amplitude envelope, the Mod X / Mod Y / envelope-follower maps). The page encodes the choice: unit
+// (×1), target (×8, nine: PAN VOL CUT RES LOW BAND HIGH WS WMIX), part (×72).
 // The graph is FL's shared envelope editor (the gestures of Maximus' and Gross Beat's, REA_rodada168m §2 / 168x §1):
 //   right-click on empty space   add a point there (dragged while the button is held; it takes the last tension)
 //   right-click a point           the point's menu          Alt+right-click a point   delete it
@@ -28,9 +29,10 @@
     static bool isPhilterCurve (const LayoutItem& item) { return item.type == Item::display && item.display != nullptr && juce::String (item.display) == "lpcurve"; }
 
     int lpUnit() const { return page % 8; }
-    int lpTarget() const { return (page / 8) % 8; }
-    int lpPart() const { return (page / 64) % 5; } // 0 pattern envelope, 1 LFO, 2 Mod X, 3 Mod Y, 4 follower
-    bool lpMap() const { return lpPart() >= 2; }
+    static constexpr int lpShaper = 7; // the WS target: the unit's shaper curve
+    int lpTarget() const { return (page / 8) % 9; }
+    int lpPart() const { return (page / 72) % 5; } // 0 pattern envelope, 1 LFO, 2 Mod X, 3 Mod Y, 4 follower
+    bool lpMap() const { return lpTarget() == lpShaper || lpPart() >= 2; }
     int lpPattern() const // the "Pattern" knob (FL 1…10) picks the pattern envelope shown
     {
         const auto* fx = current();
@@ -39,7 +41,9 @@
 
     static philter::DocEnv& lpEnvIn (philter::Doc& d, int unit, int target, int part, int pattern)
     {
-        auto& a = d.u[(std::size_t) unit].art[(std::size_t) target];
+        if (target == lpShaper)
+            return d.u[(std::size_t) unit].ws;
+        auto& a = d.u[(std::size_t) unit].art[(std::size_t) (target < lpShaper ? target : 7)];
         return part == 0 ? a.pat[(std::size_t) pattern] : part == 1 ? a.lfo : a.maps[(std::size_t) part - 2];
     }
 
@@ -376,6 +380,26 @@
                 lpWrite (now, -1, point);
             }
         });
+        if (point > 0) // the shape of the segment that ends here (FL's Mode list)
+        {
+            menu.addSectionHeader (tr ("Mode"));
+            for (const auto& m : flshape::waveShaperModes())
+                menu.addItem (tr (m.name), true, p.mode == m.mode, [this, point, mode = m.mode] {
+                    auto now = lpPoints();
+                    if (point < (int) now.size())
+                    {
+                        now[(std::size_t) point].mode = mode;
+                        lpWrite (now);
+                    }
+                });
+        }
+        if (! lpMap()) // FL's ADSR section: the loop start and the sustain / loop end marks
+            if (const auto e = lpEnv())
+            {
+                menu.addSectionHeader (tr ("ADSR section"));
+                menu.addItem (tr ("Loop start"), true, e->loop == point, [this, point] { lpSetMark (true, point); });
+                menu.addItem (tr ("Sustain / loop end"), true, e->sus == point, [this, point] { lpSetMark (false, point); });
+            }
         menu.addSeparator();
         menu.addItem (tr ("Copy value"), [y = p.y] { lpCopiedValue = y; });
         menu.addItem (tr ("Paste value"), lpCopiedValue >= 0.0f, false, [this, point] {
@@ -386,13 +410,55 @@
                 lpWrite (now);
             }
         });
+        menu.addItem (tr ("Type in value..."), [this, point] { lpTypeValue (point); });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+
+    // a mark set on the point again clears it (FL's ticked menu entries)
+    void lpSetMark (bool loop, int point)
+    {
+        const auto* fx = current();
+        if (fx == nullptr)
+            return;
+        auto d = philter::readDoc (fx->state);
+        if (! d)
+            return;
+        auto& e = lpEnvIn (*d, lpUnit(), lpTarget(), lpPart(), lpPattern());
+        auto& mark = loop ? e.loop : e.sus;
+        mark = mark == point ? -1 : point;
+        if (usesBar())
+            bar.willEdit();
+        editSlot ([bytes = philter::writeDoc (*d)] (EffectSlot& target) { target.state = bytes; });
+        repaint();
+    }
+
+    void lpTypeValue (int point)
+    {
+        const auto pts = lpPoints();
+        if (point < 0 || point >= (int) pts.size())
+            return;
+        auto* window = new juce::AlertWindow (tr ("Point value"), tr ("Percent (0 to 100)"), juce::MessageBoxIconType::NoIcon);
+        window->addTextEditor ("value", juce::String (pts[(std::size_t) point].y * 100.0f, 1));
+        window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        juce::Component::SafePointer<NativeEffectEditor> self (this);
+        window->enterModalState (true, juce::ModalCallbackFunction::create ([self, window, point] (int result) {
+                                     if (result != 1 || self == nullptr)
+                                         return;
+                                     auto now = self->lpPoints();
+                                     if (point < (int) now.size())
+                                     {
+                                         now[(std::size_t) point].y = juce::jlimit (0.0f, 1.0f, window->getTextEditorContents ("value").getFloatValue() / 100.0f);
+                                         self->lpWrite (now);
+                                     }
+                                 }),
+                                 true);
     }
 
     juce::String lpHint (const LayoutItem& item, juce::Point<float> p) const
     {
         if (lpPointAt (item, p) >= 0)
-            return tr ("Point: [LMB] drag moves  [RMB] value, delete  [Alt][RMB] delete");
+            return tr ("Point: [LMB] drag moves  [RMB] shape, value, delete  [Alt][RMB] delete");
         if (lpHandleAt (item, p) >= 0)
             return tr ("Tension: [LMB] drag up / down bends the segment ([Ctrl] fine)  [RMB] straight");
         return tr ("Articulator: [RMB] add a point (hold and drag to place it)  [LMB] drag a point");

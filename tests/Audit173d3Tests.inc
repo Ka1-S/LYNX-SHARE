@@ -61,7 +61,7 @@ TEST (audit173d3_love_philter_doc_round_trip_and_edits)
     using namespace lynx;
     // a version-12 state of our own making: FL's default as LYNX writes it is not in the repository, so build one by
     // editing the round-66 test state (tests.cpp, love_philter_*) through the document itself
-    const auto stateA = hex (
+    const auto stateA = vfx164::hex (
         "03000c00789cedda316ed44018c5f1cfd90b5050234a0e81702a1a6e4045c11d68e7005c00c40928e96810254590380225e552538471ec"
         "d97c314c841e0259cfff91463bf66e7e3b9ac42fdf582e1151961e776abf1f314ce3b3a5d7f6e4fb8bf1b2b6693c5cf56118e6b79ed5fe"
         "b2f6b7b53fadfd41ed8f1379378d9fd77e88a50d57c3c3f597dcd28ee3fcfaadbe9e8fcb24e272d56238fd4019a73e2c5f3074c1ebf732"
