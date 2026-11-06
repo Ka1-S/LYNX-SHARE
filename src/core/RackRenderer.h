@@ -74,6 +74,16 @@ struct RackState
         std::vector<int> clipPeers;
     };
     std::vector<LanePlay> laneAutomations;
+    // round 177b: modulator routings — each drives its own slot (bound last: it wins) from the target's value, or the
+    // value of the automation that drives it, plus depth × the modulator
+    struct ModPlay
+    {
+        int slot = -1, source = -1; // its slot; the slot that drove the target before (-1: none)
+        float base = 0.5f;          // the target's own value
+        int modulator = 0;
+        float depth = 0.0f;
+    };
+    std::vector<ModPlay> modRoutes;
     std::vector<int> channelVolumeAuto, channelPanAuto;
     std::vector<int> mixerVolumeAuto, mixerPanAuto;
     std::vector<std::vector<std::array<int, maxEffectParams>>> effectParamAuto; // [track][slot][param] (built-in)
@@ -446,6 +456,8 @@ private:
     void runEffects (const RackState& state, int track, int n) noexcept;
     void setSidechain (const RackState& state, const EffectSlot& slot, Effect& effect, int track) noexcept;
     void updateAutomation (const RackState& state, double startTick) noexcept;
+    void updateModulators (const RackState& state, double tick, int numSamples) noexcept; // round 177b
+    double modSeconds = 0.0; // the free-running modulators' clock
     // ticks from `tick` to the next pattern event (or pattern clip edge) that changes a lane's value; +inf if none
     static double ticksToNextEvent (const RackState& state, double tick) noexcept;
     // bindings from this automation slot on (andLive: and those of live controllers, the links)

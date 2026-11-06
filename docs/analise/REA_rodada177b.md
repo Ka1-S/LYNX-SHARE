@@ -238,7 +238,7 @@ Open: FL's knobs 0x600–0x604 are automatable channel parameters (not automatab
 were not traced (LYNX clamps to 0…1); "Global / retriggered LFO" handler not traced (LYNX: phase from the song start);
 the LFO under a non-linear target map (an imported effect parameter) is applied in LYNX's value space.
 
-## Slice 4 — modulators (proposal only, not built)
+## Slice 4 — modulators (proposal, then built as P1 on the user's go for 0.1.25)
 
 ### What LYNX and FL have [CODE] [STR]
 - FL-exact controllers: Envelope Controller (channel), Keyboard Controller, Peak Controller and Formula Controller
@@ -275,3 +275,16 @@ the LFO under a non-linear target map (an imported effect parameter) is applied 
 6. **Phases**: P1 LFO + random with rings on LYNX knobs; P2 envelope follower from any insert (no extra track); P3 note
    envelopes and steps; P4 per-voice for LYNX synths. Needs a user decision on the order, and whether FL's automation
    clip LFO mode (the FL-exact gap) comes first.
+
+### Built (P1; the depth ring on the knobs waits for the UI gate)
+| Piece | Where |
+|---|---|
+| `Modulator` (shape: sine, triangle, saw up / down, square, random, smooth random; synced in beats or free in Hz; phase; unipolar; seed; routes `{target, depth −1..1}`), `Song::modulators`; `canModulate` = LYNX's own controls (not the tempo, not plugin parameters) | `core/Song` |
+| Engine: each route gets its own slot bound after everything (it wins) and plays `clamp (base + depth·m(t))`, base = the automation that drove the target, else the control's value; synced modulators follow the song position (live clock when stopped), the random shapes are a hash of the cycle (the same at the same position); no modulator = nothing bound, nothing computed; no allocation or lock | `core/RackRenderer` `modRoutes`, `updateModulators` |
+| Project files (`modulators`), .flp export: dropped with a report line (FL has none) | `engine/ProjectFile`, `core/FlpExport` |
+| UI: every LYNX control's menu gets "Modulate" after FL's items (each modulator, ticked with its depth when routed; New modulator (LFO); Modulators...); Tools › "Modulators..." window: name, shape, Sync + cycle length or Hz, phase, 0..1, a scope of one cycle, the routes with a depth knob and remove | `ui/AutomationUi`, `ui/MainComponent` |
+| Tests: `mod177b_shapes`, `mod177b_modulates_a_target_around_its_value` (rendered levels: up / down around the value, around an automation, depth 0 and no modulator = nothing bound); selftest `lanes_saved` round-trips modulators | `tests/Mod177bTests.inc`, `Main.cpp` |
+
+Open (phases, as proposed): the depth ring and drag-to-route on knobs (P1b, after the UI gate), plugin parameters
+(their value lives in the plugin: needs a base read from the plugin), envelope follower (P2), note envelopes / steps
+(P3), per-voice (P4).

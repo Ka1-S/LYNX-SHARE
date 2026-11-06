@@ -2826,11 +2826,27 @@ private:
             const auto lane = lynx::autolanes::addLane (song, 3, { lynx::AutomationTargetKind::mixerVolume, 1, 0, 0 }, "Vol", 0.4f);
             song.playlistTracks[3].lanes[0].height = 72;
             song.playlistTracks[3].lanesFolded = true;
+            // (the same round's clip LFO and modulators ride along)
+            auto& lfo = song.automations[(std::size_t) lane].lfo;
+            lfo.on = true;
+            lfo.level = -40;
+            lfo.speed = 30000;
+            lfo.flags = 1 | 4;
+            lfo.phase = 123456789u;
+            lfo.amp = { { 0, 0.5f, 0.0f }, { 960, 1.0f, 0.0f } };
+            lynx::Modulator mod;
+            mod.name = "LFO 1";
+            mod.shape = lynx::ModShape::square;
+            mod.sync = false;
+            mod.hz = 2.5;
+            mod.routes = { { { lynx::AutomationTargetKind::mixerPan, 1, 0, 0 }, -0.5f } };
+            song.modulators.push_back (mod);
             juce::String why;
             const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why);
             if (! back || back->playlistTracks.size() < 4 || ! (back->playlistTracks[3].lanes == song.playlistTracks[3].lanes)
                 || ! back->playlistTracks[3].lanesFolded || back->automations.size() != song.automations.size()
-                || ! (back->automations[(std::size_t) lane].points == song.automations[(std::size_t) lane].points))
+                || ! (back->automations[(std::size_t) lane].points == song.automations[(std::size_t) lane].points)
+                || ! (back->automations[(std::size_t) lane].lfo == lfo) || ! (back->modulators == song.modulators))
                 lanesResult = "ERROR " + why;
         }
 
@@ -9436,6 +9452,42 @@ private:
                 auto editor = lynx::makeAutomationEditor (offline, 0);
                 editor->setSize (760, 300);
                 saveWindow (std::move (editor), "-automation.png");
+
+                // round 177b: the same clip in FL's LFO mode (its amplitude points, the played curve, the LFO strip)
+                const auto before = offline.getSong().automations[0].lfo;
+                offline.editSong ([] (lynx::Song& song) {
+                    auto& lfo = song.automations[0].lfo;
+                    lfo.on = true;
+                    lfo.level = 96;
+                    lfo.speed = lynx::AutomationLfo::speedForBeats (2.0);
+                    lfo.tension = 40;
+                    lfo.amp = { { 0, 0.3f, 0.0f }, { lynx::ppq * 8, 1.0f, 0.0f } };
+                }, false);
+                auto lfoEditor = lynx::makeAutomationEditor (offline, 0);
+                lfoEditor->setSize (760, 330);
+                saveWindow (std::move (lfoEditor), "-automation-lfo.png");
+                offline.editSong ([before] (lynx::Song& song) { song.automations[0].lfo = before; }, false);
+            }
+
+            // round 177b: LYNX's modulators window, with one routed modulator
+            {
+                offline.editSong ([] (lynx::Song& song) {
+                    lynx::Modulator m;
+                    m.name = "LFO 1";
+                    m.shape = lynx::ModShape::triangle;
+                    m.routes = { { { lynx::AutomationTargetKind::mixerVolume, 1, 0, 0 }, 0.25f }, { { lynx::AutomationTargetKind::mixerPan, 1, 0, 0 }, -0.5f } };
+                    song.modulators.push_back (m);
+                    lynx::Modulator r;
+                    r.name = "LFO 2";
+                    r.shape = lynx::ModShape::smoothRandom;
+                    r.sync = false;
+                    r.hz = 0.5;
+                    song.modulators.push_back (r);
+                }, false);
+                auto mods = lynx::makeModulatorsPanel (offline);
+                mods->setSize (720, 360);
+                saveWindow (std::move (mods), "-modulators.png");
+                offline.editSong ([] (lynx::Song& song) { song.modulators.clear(); }, false);
             }
 
             saveWindow (lynx::makeChannelSettingsPanel (offline, 0), "-sampler.png");

@@ -33,6 +33,13 @@ void typeAutomationPointValue (AudioEngine& engine, int automation, int point);
 void openAutomationEditor (AudioEngine& engine, int automation);
 void closeAutomationEditors();
 
+// Round 177b: LYNX's modulators window (one list: shape, rate, phase, routes with their depth), and the parameter
+// menu's "Modulate" submenu (LYNX's own controls only; after FL's items).
+void openModulators (AudioEngine& engine);
+void closeModulators();
+std::unique_ptr<juce::Component> makeModulatorsPanel (AudioEngine& engine); // (--snapshot mode)
+void addModulationItems (juce::PopupMenu& menu, AudioEngine& engine, const AutomationTarget& target);
+
 // Just the editor (for --snapshot mode).
 std::unique_ptr<juce::Component> makeAutomationEditor (AudioEngine& engine, int automation);
 

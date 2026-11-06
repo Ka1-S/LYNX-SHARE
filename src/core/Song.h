@@ -1318,6 +1318,37 @@ struct Automation
     bool operator== (const Automation&) const = default;
 };
 
+// Round 177b: LYNX's modulators (not FL: FL's controllers stay as they are). A modulator moves its targets around their
+// own value (relative, as Bitwig's and Live's "Mod"): the played value = clamp (the knob's value, or its automation, +
+// depth × the modulator's output). Off the audio thread nothing is made until the first modulator exists.
+struct Song;
+enum class ModShape : std::uint8_t { sine, triangle, sawUp, sawDown, square, random, smoothRandom };
+
+struct ModRoute
+{
+    AutomationTarget target;
+    float depth = 0.25f; // -1..1 of the target's whole range
+    bool operator== (const ModRoute&) const = default;
+};
+
+struct Modulator
+{
+    std::string name;            // "LFO 1"
+    ModShape shape = ModShape::sine;
+    bool sync = true;            // tempo-synced: `beats` per cycle; free: `hz`
+    double beats = 4.0;          // cycle length in quarter notes (synced)
+    double hz = 1.0;             // cycles per second (free)
+    float phase = 0.0f;          // start phase, 0..1 of a cycle
+    bool unipolar = false;       // 0..1 instead of -1..1
+    std::uint32_t seed = 1;      // the random shapes' sequence
+    std::vector<ModRoute> routes;
+    bool operator== (const Modulator&) const = default;
+
+    // The output at `cycles` (cycles since the song start, or since the modulator started when free).
+    float output (double cycles) const noexcept;
+    static bool canModulate (const Song& song, const AutomationTarget& target) noexcept; // LYNX's own controls
+};
+
 // A block in the Playlist: a section of a pattern, or a section of an audioClip channel's audio.
 struct Clip
 {
@@ -1632,6 +1663,9 @@ struct Song
         for (auto& p : patterns)
             for (auto& lane : p.events)
                 fn (lane.target);
+        for (auto& m : modulators)
+            for (auto& r : m.routes)
+                fn (r.target);
     }
     void removeDeadMidiLinks();
 
@@ -1730,6 +1764,7 @@ struct Song
     // whether an effect slot processes: switched on, and not a substitute while the substitutes are bypassed
     bool slotActive (const EffectSlot& slot) const noexcept { return slot.enabled && ! (substitutesBypassed && slot.isSubstitute()); }
     std::vector<Automation> automations;
+    std::vector<Modulator> modulators; // round 177b: LYNX's modulators (empty: no cost)
     std::vector<PlaylistTrack> playlistTracks; // index = track; tracks past the end use the default
     std::vector<MidiLink> midiLinks;
     // FL's "initialized controls" (.flp 0xD8; the parameter menu's "Init song with this position", REA round 146):

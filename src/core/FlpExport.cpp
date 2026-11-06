@@ -1531,6 +1531,11 @@ flp::Project toProject (const Song& input, const Options& options, Report& repor
     // automation lanes (round 177b): FL has none; each becomes an automation clip on a free track
     if (const auto n = autolanes::lanesToClips (song); n > 0)
         report.notes.push_back ("Automation lanes: " + std::to_string (n) + " lane(s) written as automation clips (FL has no lanes)");
+    // modulators (round 177b): FL has none; the modulated controls keep their own values
+    for (const auto& m : song.modulators)
+        if (! m.routes.empty())
+            report.dropped.push_back ("Modulator '" + m.name + "' (" + std::to_string (m.routes.size())
+                                      + " target(s)): FL has no modulators; the targets keep their own values");
     Converter c (song, options, report);
     c.run();
     return std::move (c.out);

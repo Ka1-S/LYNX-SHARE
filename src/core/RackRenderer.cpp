@@ -1324,6 +1324,51 @@ void RackState::buildAutomationTables()
             eventLanes.push_back ({ p, l, slot });
             bind (slot++, lane.target);
         }
+
+    // round 177b: modulators, after everything else (a modulated target follows its automation or its own value)
+    modRoutes.clear();
+    const auto boundSlot = [this] (const AutomationTarget& t) {
+        const auto channelOk = t.index >= 0 && t.index < (int) song.channels.size();
+        const auto trackOk = t.index >= 0 && t.index < (int) song.mixer.size();
+        switch (t.kind)
+        {
+            case AutomationTargetKind::channelVolume: return channelOk ? channelVolumeAuto[(std::size_t) t.index] : -1;
+            case AutomationTargetKind::channelPan: return channelOk ? channelPanAuto[(std::size_t) t.index] : -1;
+            case AutomationTargetKind::mixerVolume: return trackOk ? mixerVolumeAuto[(std::size_t) t.index] : -1;
+            case AutomationTargetKind::mixerPan: return trackOk ? mixerPanAuto[(std::size_t) t.index] : -1;
+            case AutomationTargetKind::effectParam:
+                return trackOk && t.slot >= 0 && t.slot < (int) effectParamAuto[(std::size_t) t.index].size() && t.param >= 0 && t.param < maxEffectParams
+                           ? effectParamAuto[(std::size_t) t.index][(std::size_t) t.slot][(std::size_t) t.param]
+                           : -1;
+            case AutomationTargetKind::effectMix:
+                return trackOk && t.slot >= 0 && t.slot < (int) effectMixAuto[(std::size_t) t.index].size() ? effectMixAuto[(std::size_t) t.index][(std::size_t) t.slot] : -1;
+            case AutomationTargetKind::mixerSend:
+                for (const auto& r : routeAutos)
+                    if (r.from == t.index && r.to == t.slot)
+                        return r.slot;
+                return -1;
+            case AutomationTargetKind::channelParam:
+            {
+                auto found = -1;
+                for (const auto& p : pluginParams)
+                    if (p.channel == t.index && p.param == t.param)
+                        found = p.automation;
+                return found;
+            }
+            case AutomationTargetKind::tempo:
+            case AutomationTargetKind::none: break;
+        }
+        return -1;
+    };
+    for (int m = 0; m < (int) song.modulators.size(); ++m)
+        for (const auto& route : song.modulators[(std::size_t) m].routes)
+        {
+            if (slot >= maxAutomations || route.depth == 0.0f || ! Modulator::canModulate (song, route.target))
+                continue;
+            const auto source = boundSlot (route.target);
+            modRoutes.push_back ({ slot, source, std::clamp (song.targetValue (route.target), 0.0f, 1.0f), m, route.depth });
+            bind (slot++, route.target);
+        }
 }
 
 void RackState::slotsOfTarget (const Song& song, const AutomationTarget& target, std::vector<int>& out)
@@ -1844,6 +1889,24 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
                                    : 0.0;
     clearOverriddenValues();
     applyPluginParams (state, 0);
+}
+
+void RackRenderer::updateModulators (const RackState& state, double tick, int numSamples) noexcept
+{
+    const auto& song = state.song;
+    const auto beats = std::max (0.0, tick) / (double) ppq;
+    for (const auto& r : state.modRoutes)
+    {
+        if (r.modulator < 0 || r.modulator >= (int) song.modulators.size())
+            continue;
+        const auto& m = song.modulators[(std::size_t) r.modulator];
+        const auto cycles = m.sync ? beats / std::max (1.0e-3, m.beats) : modSeconds * std::max (0.0, m.hz);
+        const auto source = r.source >= 0 ? automationValues[(std::size_t) r.source] : std::numeric_limits<float>::quiet_NaN();
+        const auto base = std::isnan (source) ? r.base : source;
+        automationValues[(std::size_t) r.slot] = std::clamp (base + r.depth * m.output (cycles), 0.0f, 1.0f);
+    }
+    if (sampleRate > 0.0)
+        modSeconds += numSamples / sampleRate;
 }
 
 float RackRenderer::compensatedAutomation (const RackState& state, int automation, int track, int slot, float current) const noexcept
@@ -3191,6 +3254,8 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     const auto& song = state.song;
     const auto tracks = std::max<int> (1, (int) song.mixer.size());
 
+    if (! state.modRoutes.empty()) // round 177b (before the automation applies the plugin-side parameters)
+        updateModulators (state, playing ? startTick : liveTick, numSamples);
     if (state.hasAutomation) // (a hair later: a chunk that starts on a pattern event's sample takes its value)
         updateAutomation (state, startTick + 1.0e-6);
 

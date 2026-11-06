@@ -4,6 +4,7 @@
 #include "core/VoltageController.h"
 #include "core/MidiOut.h"
 #include "core/PatternBlocks.h"
+#include "core/MidiControls.h"
 
 #include <algorithm>
 #include <iterator>
@@ -1336,6 +1337,66 @@ float AutomationLfo::apply (float value, double clipTick, double songTick) const
     const auto l = output (clipTick, songTick);
     const auto out = add ? value + l * amount : value * (1.0f + 2.0f * l * amount);
     return std::clamp (out, 0.0f, 1.0f);
+}
+
+// --- modulators (round 177b) ------------------------------------------------------------------------------------
+namespace
+{
+float modNoise (std::uint32_t seed, std::int64_t step) noexcept
+{
+    // a hash of (seed, step) to -1..1: the same output at the same song position, whatever was played before
+    auto x = (std::uint64_t) (std::uint32_t) step * 0x9E3779B97F4A7C15ull ^ ((std::uint64_t) seed << 32 | (std::uint32_t) (step >> 32));
+    x ^= x >> 30;
+    x *= 0xBF58476D1CE4E5B9ull;
+    x ^= x >> 27;
+    x *= 0x94D049BB133111EBull;
+    x ^= x >> 31;
+    return (float) ((double) (x >> 11) / 9007199254740992.0 * 2.0 - 1.0);
+}
+} // namespace
+
+float Modulator::output (double cycles) const noexcept
+{
+    const auto c = cycles + (double) phase;
+    const auto whole = std::floor (c);
+    const auto f = (float) (c - whole); // 0..1 within the cycle
+    float y = 0.0f;
+    switch (shape)
+    {
+        case ModShape::sine: y = std::sin (f * 6.28318530718f); break;
+        case ModShape::triangle: y = f < 0.25f ? f * 4.0f : (f < 0.75f ? 2.0f - f * 4.0f : f * 4.0f - 4.0f); break;
+        case ModShape::sawUp: y = f * 2.0f - 1.0f; break;
+        case ModShape::sawDown: y = 1.0f - f * 2.0f; break;
+        case ModShape::square: y = f < 0.5f ? 1.0f : -1.0f; break;
+        case ModShape::random: y = modNoise (seed, (std::int64_t) whole); break;
+        case ModShape::smoothRandom:
+        {
+            const auto a = modNoise (seed, (std::int64_t) whole), b = modNoise (seed, (std::int64_t) whole + 1);
+            const auto s = f * f * (3.0f - 2.0f * f);
+            y = a + (b - a) * s;
+            break;
+        }
+    }
+    return unipolar ? (y + 1.0f) * 0.5f : y;
+}
+
+bool Modulator::canModulate (const Song& song, const AutomationTarget& t) noexcept
+{
+    // LYNX's own controls: not the tempo, not a plugin's parameters (their value lives in the plugin)
+    if (t.kind == AutomationTargetKind::none || t.kind == AutomationTargetKind::tempo || song.targetValue (t) < 0.0f)
+        return false;
+    if (t.kind == AutomationTargetKind::effectParam && t.index >= 0 && t.index < (int) song.mixer.size() && t.slot >= 0
+        && t.slot < (int) song.mixer[(std::size_t) t.index].effects.size())
+    {
+        const auto kind = song.mixer[(std::size_t) t.index].effects[(std::size_t) t.slot].kind;
+        return kind != EffectKind::plugin && kind != EffectKind::patcher;
+    }
+    if (t.kind == AutomationTargetKind::channelParam && t.index >= 0 && t.index < (int) song.channels.size())
+    {
+        const auto kind = song.channels[(std::size_t) t.index].instrument;
+        return kind != InstrumentKind::plugin && kind != InstrumentKind::patcher && ! midictl::isMidiParam (t.param);
+    }
+    return true;
 }
 
 std::int64_t Automation::length() const noexcept
