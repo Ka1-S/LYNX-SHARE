@@ -383,6 +383,47 @@ bool linkAddedSidechain (Song& song, int to, int slot)
     return true;
 }
 
+bool acceptsSidechain (EffectKind kind) noexcept
+{
+    switch (kind)
+    {
+        case EffectKind::compressor: case EffectKind::fruityLimiter: case EffectKind::fruityCompressor:
+        case EffectKind::vocoder: case EffectKind::vocodex: case EffectKind::facetEq: case EffectKind::apexLimiter:
+        case EffectKind::hushDeEsser: case EffectKind::crestCompressor: case EffectKind::prismMultiband:
+        case EffectKind::sentryGate: case EffectKind::luxeVerb: case EffectKind::patcher: case EffectKind::transmitter:
+        case EffectKind::flTransporter:
+            return true;
+        default:
+            return false;
+    }
+}
+
+SidechainPick sidechainFrom (Song& song, int to, int slot, int from, bool second)
+{
+    if ((to != 0 && ! isInsert (song, to)) || song.mixer.empty() || slot < 0 || slot >= (int) song.mixer[(std::size_t) to].effects.size())
+        return SidechainPick::invalid;
+    if (from < 0)
+    {
+        auto& fx = song.mixer[(std::size_t) to].effects[(std::size_t) slot];
+        (second ? fx.sidechain2 : fx.sidechain) = -1;
+        return SidechainPick::cleared;
+    }
+    if (! isInsert (song, from) || from == to)
+        return SidechainPick::invalid;
+    // (the Master is processed after every insert: it needs no route)
+    if (to != 0 && ! song.routes (from, to))
+    {
+        if (! song.canRoute (from, to))
+            return SidechainPick::cycle;
+        song.setRoute (from, to, true, 0.0f);
+    }
+    auto& fx = song.mixer[(std::size_t) to].effects[(std::size_t) slot];
+    (second ? fx.sidechain2 : fx.sidechain) = from;
+    if (fx.kind == EffectKind::vocoder)
+        fx.params[16] = 1.0f; // separate inputs (otherwise L = modulator, R = carrier)
+    return SidechainPick::linked;
+}
+
 namespace
 {
 // FL's "only": the source stops sending anywhere (its sends and its route to the Master)

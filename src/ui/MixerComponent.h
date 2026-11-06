@@ -428,6 +428,11 @@ private:
     void openEditor (int slot);
     void toggleEditor (int slot); // FL: a click on the slot's name shows or hides its window (round 170b)
     juce::Rectangle<int> editorButtonBounds() const;
+    // Round 177b: the selected effect's "Sidechain from" picker (effects with a side input; empty bounds = none)
+    juce::Rectangle<int> sidechainButtonBounds() const;
+    int titleRowY() const;
+    void paintSidechainButton (juce::Graphics& g, const EffectSlot& slot);
+    bool hoverSidechain = false;
     void openPluginWindow (int slot);
     juce::Rectangle<int> fxSwitchBounds() const; // all effects on/off; right-click opens/closes their windows
     void toggleAllWindows();

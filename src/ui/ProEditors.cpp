@@ -6,6 +6,7 @@
 #include <map>
 #include <tuple>
 
+#include "core/MixerOps.h"
 #include "core/ApexLimiter.h"
 #include "core/DynamicsSuite.h"
 #include "core/FacetEq.h"
@@ -783,8 +784,10 @@ private:
         const auto assign = [this] (int source) {
             const auto p = P ("External SC");
             engine.editSong ([tk = track, sl = slot, source, p] (Song& s) {
+                // round 177b: the pick makes the route (a level-0 send) as the mixer's picker does; a loop changes nothing
+                if (mixerops::sidechainFrom (s, tk, sl, source) == mixerops::SidechainPick::cycle)
+                    return;
                 auto& target = s.mixer[(std::size_t) tk].effects[(std::size_t) sl];
-                target.sidechain = source;
                 target.params[(std::size_t) p] = source >= 0 ? 1.0f : 0.0f;
             });
         };

@@ -18,6 +18,7 @@
 #include "core/LiveInput.h"
 #include "core/HardwareOutput.h"
 #include "core/MixerOps.h"
+#include "ui/PluginHeader.h"
 #include "core/ProjectSafety.h"
 #include "core/Templates.h"
 #include "core/RackOps.h"
@@ -4055,6 +4056,7 @@ void EffectsPanel::paint (juce::Graphics& g)
         g.setColour (colour::textSecondary);
         g.setFont (font (type::caption));
         textcache::drawText (g, quickpick::slotName (engine, slot), button.translated (0, 34), juce::Justification::centred);
+        paintSidechainButton (g, slot);
         return;
     }
 
@@ -4117,7 +4119,8 @@ void EffectsPanel::paint (juce::Graphics& g)
     const auto tune = slot.kind == EffectKind::lynxTune;
     const auto editorButton = ! gate && ! vocoder && NativeEffectWindows::canOpen (slot.kind);
     const auto titleY = (gate ? gateStepsBounds().getY() : vocoder ? bandLevelsBounds().getY() : tune ? tuneKeysBounds().getY() : knobBounds (0).getY()) - 28;
-    const auto titleRight = getWidth() - 10 - (editorButton ? editorButtonBounds().getWidth() + 6 : 0);
+    const auto scButton = sidechainButtonBounds();
+    const auto titleRight = scButton.isEmpty() ? getWidth() - 10 - (editorButton ? editorButtonBounds().getWidth() + 6 : 0) : scButton.getX() - 6;
     textcache::drawText (g, juce::String::fromUTF8 (info.name), 10, titleY, titleRight - 10, 20, juce::Justification::centredLeft, true);
     if (slot.isSubstitute()) // which missing plugin this stands in for (the project keeps it)
     {
@@ -4140,6 +4143,7 @@ void EffectsPanel::paint (juce::Graphics& g)
         g.setFont (font (type::small));
         textcache::drawFittedText (g, tr ("Editor"), b.withTrimmedLeft (24.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
     }
+    paintSidechainButton (g, slot);
 
     if (tune) // the scale's notes on one octave; a note switched off is never a target
     {
@@ -4246,6 +4250,12 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
 
     if (s == nullptr)
         return;
+
+    if (const auto sc = sidechainButtonBounds(); ! sc.isEmpty() && sc.contains (e.getPosition()))
+    {
+        pluginheader::showSidechainPicker (engine, track, selectedSlot, this, sc);
+        return;
+    }
 
     if (eqFoldBounds().contains (e.getPosition()) && e.mods.isLeftButtonDown())
     {
@@ -4676,6 +4686,12 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
         return ui::valueHint (specFor (param, selectedSlot), valueOf (param, selectedSlot), gesture);
 
     ui::Hint h;
+    if (const auto sc = sidechainButtonBounds(); ! sc.isEmpty() && sc.contains (p))
+    {
+        h.text = tr ("Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose");
+        h.hasMenu = true;
+        return h;
+    }
     if (const auto* s = slots(); s != nullptr && selectedSlot >= 0 && selectedSlot < (int) s->size()
                                  && NativeEffectWindows::canOpen ((*s)[(std::size_t) selectedSlot].kind) && editorButtonBounds().contains (p))
     {
@@ -4837,6 +4853,12 @@ void EffectsPanel::mouseMove (const juce::MouseEvent& e)
         }
     if (slot >= 0)
         led = ledBounds (slot).contains (p);
+
+    if (const auto sc = sidechainButtonBounds(); sc.contains (p) != hoverSidechain) // round 177b
+    {
+        hoverSidechain = ! hoverSidechain;
+        repaint (sc);
+    }
 
     if (slot != hoverSlot || param != hoverParam || led != hoverLed || input != hoverInput || eq != hoverEq || output != hoverOutput || arrow != hoverArrow)
     {
@@ -5095,6 +5117,62 @@ juce::Rectangle<int> EffectsPanel::editorButtonBounds() const
     return { getWidth() - 96, (tuneSelected() ? tuneKeysBounds().getY() : knobBounds (0).getY()) - 29, 86, 20 };
 }
 
+void EffectsPanel::paintSidechainButton (juce::Graphics& g, const EffectSlot& slot)
+{
+    using namespace theme;
+    const auto b = sidechainButtonBounds().toFloat();
+    if (b.isEmpty())
+        return;
+    const auto source = pluginheader::sidechainSourceText (engine.getSong(), slot);
+    const auto hover = b.contains (getMouseXYRelative().toFloat());
+    theme::fillRoundRect (g, b, radius::md, hover ? colour::bg5 : colour::bg4);
+    if (source.isNotEmpty()) // linked: the accent edge, as a lit route
+    {
+        g.setColour (colour::accent.withAlpha (0.8f));
+        g.drawRoundedRectangle (b.reduced (0.5f), radius::md, 1.0f);
+    }
+    icons::draw (g, Icon::link, b.withWidth (22.0f).withSizeKeepingCentre (13.0f, 13.0f).translated (4.0f, 0.0f),
+                 source.isNotEmpty() ? colour::accent : colour::textSecondary);
+    const auto modulator = slot.kind == EffectKind::vocoder || slot.kind == EffectKind::vocodex;
+    const auto text = (modulator ? tr ("Modulator") : tr ("SC")) + ": " + (source.isNotEmpty() ? source : tr ("None"));
+    g.setColour (source.isNotEmpty() ? colour::textPrimary : colour::textSecondary);
+    g.setFont (font (type::small));
+    textcache::drawFittedText (g, text, b.withTrimmedLeft (24.0f).withTrimmedRight (14.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
+    juce::Path tri; // ▾: it opens a list
+    const auto a = juce::Point<float> (b.getRight() - 9.0f, b.getCentreY());
+    tri.addTriangle (a.x - 3.5f, a.y - 2.0f, a.x + 3.5f, a.y - 2.0f, a.x, a.y + 2.5f);
+    g.setColour (colour::textSecondary);
+    g.fillPath (tri);
+}
+
+int EffectsPanel::titleRowY() const
+{
+    return (gateSelected() ? gateStepsBounds().getY() : vocoderSelected() ? bandLevelsBounds().getY()
+            : tuneSelected() ? tuneKeysBounds().getY() : knobBounds (0).getY()) - 28;
+}
+
+juce::Rectangle<int> EffectsPanel::sidechainButtonBounds() const
+{
+    const auto* s = slots();
+    if (s == nullptr || selectedSlot < 0 || selectedSlot >= (int) s->size() || track < 0)
+        return {};
+    const auto& slot = (*s)[(std::size_t) selectedSlot];
+    if (slot.kind == EffectKind::facetEq || slot.kind == EffectKind::parametricEq || slot.kind == EffectKind::parallel
+        || isSoundgoodizerApprox (slot)) // (Facet EQ: its own picker on its curve page)
+        return {};
+    if (! pluginheader::takesSidechain (engine, track, selectedSlot))
+        return {};
+    if (slot.kind == EffectKind::plugin) // under the plugin's name
+    {
+        const auto button = pluginButtonBounds();
+        return { button.getX(), button.getBottom() + 38, button.getWidth(), 22 };
+    }
+    const auto editorButton = slot.kind != EffectKind::volumeGate && ! vocoderSelected() && NativeEffectWindows::canOpen (slot.kind);
+    const auto right = editorButton ? editorButtonBounds().getX() - 6 : getWidth() - 10;
+    const auto width = juce::jmin (130, juce::jmax (0, right - 90));
+    return width < 60 ? juce::Rectangle<int>() : juce::Rectangle<int> (right - width, titleRowY(), width, 20);
+}
+
 void EffectsPanel::openPluginWindow (int slot)
 {
     auto effect = engine.getEffect (track, slot);
@@ -5114,7 +5192,7 @@ void EffectsPanel::openPluginWindow (int slot)
                                   if (t >= (int) song.mixer.size() || slot >= (int) song.mixer[(std::size_t) t].effects.size())
                                       return nullptr;
                                   return &song.mixer[(std::size_t) t].effects[(std::size_t) slot].plugin;
-                              } });
+                              }, false, track, slot });
         return;
     }
 
@@ -5242,35 +5320,21 @@ void EffectsPanel::showSlotMenu (int slot)
             menu.addSubMenu (tr ("FL presets"), presets);
     }
 
-    // side inputs: another track's output feeds the compressor's detector, or the vocoder's modulator/carrier
+    // side inputs: another track's output feeds the compressor's detector, or the vocoder's modulator/carrier. Round
+    // 177b: every effect with a side input (plugins with a sidechain bus too) gets the picker, which makes the route
     const auto kind = (*slots())[(std::size_t) slot].kind;
     auto sideMenu = [&] (const juce::String& title, bool second) {
         juce::PopupMenu side;
-        const auto& fx = (*slots())[(std::size_t) slot];
-        const auto current = second ? fx.sidechain2 : fx.sidechain;
-        auto assign = [this, slot, second] (int source) {
-            engine.editSong ([tk = track, slot, second, source] (Song& s) {
-                auto& target = s.mixer[(std::size_t) tk].effects[(std::size_t) slot];
-                (second ? target.sidechain2 : target.sidechain) = source;
-                if (target.kind == EffectKind::vocoder && source >= 0)
-                    target.params[16] = 1.0f; // separate inputs (otherwise L = modulator, R = carrier)
-            });
-        };
-        side.addItem (tr ("None"), true, current < 0, [assign] { assign (-1); });
-        const auto& song = engine.getSong();
-        for (int t = 1; t < (int) song.mixer.size(); ++t)
-            if (t != track)
-                side.addItem (juce::String (t) + " " + juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()), true, current == t,
-                              [assign, t] { assign (t); });
+        pluginheader::addSidechainPicker (side, engine, track, slot, second);
         menu.addSubMenu (title, side);
     };
-    if (kind == EffectKind::compressor || kind == EffectKind::fruityLimiter || kind == EffectKind::fruityCompressor || kind == EffectKind::facetEq)
-        sideMenu (tr ("Sidechain from"), false);
     if (kind == EffectKind::vocoder || kind == EffectKind::vocodex)
     {
         sideMenu (tr ("Modulator from"), false);
         sideMenu (tr ("Carrier from"), true);
     }
+    else if (pluginheader::takesSidechain (engine, track, slot))
+        sideMenu (tr ("Sidechain from"), false);
     if (kind == EffectKind::newtone || kind == EffectKind::newtime)
     {
         // the sample the plugin plays in slave mode (REA_rodada73): FL's edits are kept in the state but not reproduced
