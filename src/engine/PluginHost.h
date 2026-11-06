@@ -291,6 +291,13 @@ public:
 
     std::unique_ptr<juce::PluginDescription> find (const juce::String& id) const;
 
+    // FL's "Combine 32 and 64 bit versions of a plugin" (round 176a): what the 32-bit and the 64-bit build of one plugin
+    // share (format, ID, name), and the other build of `description` when both are installed (null: there is none).
+    static std::string bitnessKey (const juce::PluginDescription& description);
+    std::unique_ptr<juce::PluginDescription> otherBuild (const juce::PluginDescription& description) const;
+    // The build `ref` loads: its "Bit size" (Native = the 64-bit build when there is one, else the one there is).
+    std::unique_ptr<juce::PluginDescription> buildFor (const PluginRef& ref) const;
+
     // Online Sessions (round 168a). The plugin of `ref` is installed here (scanned, its file still there); when it is
     // not, a part that has a stand-in render plays that instead (core/StandIns.h).
     bool isInstalled (const PluginRef& ref);

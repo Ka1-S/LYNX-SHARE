@@ -34,6 +34,8 @@ if [[ -f "$(dirname "$EXE")/lynx-asio.dll" ]]; then
     cp "$(dirname "$EXE")/lynx-asio.dll" "asio/Register LYNX ASIO.bat" "asio/Unregister LYNX ASIO.bat" "$STAGE/"
     [[ -f "$(dirname "$EXE")/lynx-asio32.dll" ]] && cp "$(dirname "$EXE")/lynx-asio32.dll" "$STAGE/"
 fi
+# the 32-bit plugin bridge (round 176a)
+[[ -f "$(dirname "$EXE")/LYNX-bridge32.exe" ]] && cp "$(dirname "$EXE")/LYNX-bridge32.exe" "$STAGE/"
 [[ -f PRIVACY.md ]] && cp PRIVACY.md "$STAGE/"
 
 if [[ -n "$DEMO" ]]; then
