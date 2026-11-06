@@ -3,6 +3,7 @@
 // Clip properties and arrangement management (FL's "Clip properties" and "Merge arrangement" windows, interpreted;
 // REA_rodada84). Plain edits on a Song, each run inside AudioEngine::editSong (one undo step). No JUCE.
 
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -148,3 +149,29 @@ std::vector<int> audioTrackConflicts (const Song& song, const std::vector<int>& 
 
 // "Consolidate track(s)" moved to core/QuickRender.h (round 168e: FL's new track above, the old one grouped and muted).
 } // namespace lynx::trackmodes
+
+// FL's "Create automation clip" placement (REA round 177b: FUN_01191a50 places it, FUN_00e50b50 picks the track).
+namespace lynx::autoclipplace
+{
+// FL's Options › General "Create automation clips at the playback position" (CreateAutoClipsAtCursorBox, checked in
+// FL's form [DFM]); an app setting, not saved in projects.
+inline std::atomic<bool>& atPlaybackFlag() noexcept
+{
+    static std::atomic<bool> on { true };
+    return on;
+}
+inline bool atPlayback() noexcept { return atPlaybackFlag().load (std::memory_order_relaxed); }
+inline void setAtPlayback (bool on) noexcept { atPlaybackFlag().store (on, std::memory_order_relaxed); }
+
+struct Place
+{
+    int track = 0;
+    std::int64_t start = 0, length = 0;
+};
+// Where a new automation clip goes. The Playlist time selection (Song::loopStart / loopEnd) gives its place and length.
+// Otherwise it starts at `playTick` when `atPlayback` (FL's Options › General "Create automation clips at the
+// playback position", on by default), else at the song start; it reaches the end of the song (at least one bar). The
+// track: the first one, from the top, with no clips at all (checked live in FL 2026: a free gap on a used track is not
+// taken; instrument tracks take no automation clips: FL's "Instrument tracks are not for audio or automation clips.").
+Place forNewClip (const Song& song, bool atPlayback, std::int64_t playTick);
+} // namespace lynx::autoclipplace

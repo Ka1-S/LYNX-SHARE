@@ -7365,3 +7365,5 @@ countries: fr be ch ca lu
 "That track is fed by this one: the link would make a loop." = "Cette piste est alimentée par celle-ci : le lien créerait une boucle."
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "Entrée sidechain : l'insert que cet effet écoute. En choisir un le route ici au niveau 0 ; il garde ses propres sorties  [LMB] choisir"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "Entrée sidechain : l'insert qu'écoute l'entrée latérale de ce plugin. En choisir un le route ici au niveau 0 ; il garde ses propres sorties"
+"Create automation clips at the playback position" = "Créer les clips d'automation à la position de lecture"
+"On: a new automation clip starts at the song position (without a time selection). Off: at the start of the song" = "Activé : un nouveau clip d'automation commence à la position du morceau (sans sélection de temps). Désactivé : au début du morceau"

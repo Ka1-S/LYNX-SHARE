@@ -7365,3 +7365,5 @@ countries: kr
 "That track is fed by this one: the link would make a loop." = "그 트랙은 이 트랙에서 신호를 받습니다: 연결하면 루프가 생깁니다."
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "사이드체인 입력: 이 이펙트가 듣는 인서트. 하나를 고르면 레벨 0으로 여기로 라우팅되고, 원래 출력은 그대로 유지됩니다  [LMB] 선택"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "사이드체인 입력: 이 플러그인의 사이드 입력이 듣는 인서트. 하나를 고르면 레벨 0으로 여기로 라우팅되고, 원래 출력은 그대로 유지됩니다"
+"Create automation clips at the playback position" = "재생 위치에 오토메이션 클립 만들기"
+"On: a new automation clip starts at the song position (without a time selection). Off: at the start of the song" = "켜짐: 새 오토메이션 클립이 곡의 재생 위치에서 시작합니다(시간 선택이 없을 때). 꺼짐: 곡의 시작에서"

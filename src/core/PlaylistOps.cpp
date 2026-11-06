@@ -632,3 +632,37 @@ int followAudioTracks (Song& song, const std::vector<int>& touched, bool makeUni
 }
 
 } // namespace lynx::trackmodes
+
+namespace lynx::autoclipplace
+{
+Place forNewClip (const Song& song, bool atPlayback, std::int64_t playTick)
+{
+    const auto bar = (std::int64_t) ppq * std::max (1, song.beatsPerBar);
+    const auto songEnd = song.playlist.empty() ? (std::int64_t) 0 : song.songLength();
+    Place place;
+    if (song.hasLoop())
+    {
+        place.start = song.loopStart;
+        place.length = song.loopEnd - song.loopStart;
+    }
+    else
+    {
+        // FL (checked live, round 177b): the clip starts at the song position even past the last clip, and is one bar
+        // long when nothing lies after it.
+        place.start = atPlayback ? std::max ((std::int64_t) 0, playTick) : 0;
+        place.length = std::max (bar, songEnd - place.start);
+    }
+    // FL (checked live, round 177b): the first track with no clips at all; a free gap on a used track is not taken
+    auto busy = [&] (int track) {
+        if (track < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) track].mode == PlaylistTrackMode::instrument)
+            return true;
+        for (const auto& c : song.playlist)
+            if (c.track == track)
+                return true;
+        return false;
+    };
+    while (busy (place.track))
+        ++place.track;
+    return place;
+}
+} // namespace lynx::autoclipplace

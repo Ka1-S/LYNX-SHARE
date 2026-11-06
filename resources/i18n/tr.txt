@@ -7365,3 +7365,5 @@ countries: tr
 "That track is fed by this one: the link would make a loop." = "O kanal bu kanaldan besleniyor: bağlantı bir döngü oluşturur."
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "Sidechain girişi: bu efektin dinlediği insert. Birini seçmek onu buraya 0 seviyesinde yönlendirir; kendi çıkışları korunur  [LMB] seç"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "Sidechain girişi: bu eklentinin yan girişinin dinlediği insert. Birini seçmek onu buraya 0 seviyesinde yönlendirir; kendi çıkışları korunur"
+"Create automation clips at the playback position" = "Otomasyon kliplerini çalma konumunda oluştur"
+"On: a new automation clip starts at the song position (without a time selection). Off: at the start of the song" = "Açık: yeni bir otomasyon klibi şarkı konumunda başlar (zaman seçimi yoksa). Kapalı: şarkının başında"

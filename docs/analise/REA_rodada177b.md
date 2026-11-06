@@ -77,3 +77,56 @@ lanes (design sent to the coordinator first) → slice 4 modulators (proposal on
 
 Cost when unused: none. The plugin path copies the side input only when the slot has one (pointer set per block by
 the renderer, cleared after use); no allocation on the audio thread (the fixed-block scratch is sized at creation).
+
+---
+
+## Slice 2 — "Automate this" in one step
+
+### What LYNX had [CODE]
+- Every LYNX control's right-click menu has FL's parameter menu: Automation › Edit events…, Init song with this
+  position, Delete initial value, **Create automation clip**, Edit automation clip…; Remote control › Link to MIDI
+  controller, Override global link…, Link to internal controller (round 149, `addAutomationItem`).
+- Third-party plugin parameters: Tools › Last tweaked / the toolbar read-out (round 162d) and Add › "Automation for
+  last tweaked parameter" (round 143), as in FL.
+- `addAutomationClip` put the clip on the track **after the last used track**, from the song start (or the time
+  selection), over the whole song.
+
+### FL Studio [DFM] [DECOMP]
+- Options › General › Miscellaneous: **"Create automation clips at the playback position"**
+  (`CreateAutoClipsAtCursorBox`, `"Checked": true` in FL's form, hint "When enabled, automation clips are created at
+  the playback position") [DFM, REA_rodada169k #8; STR 0x0022xxxx forms.options.generalpage.miscpanel].
+- `FUN_01191a50 (param, place, …, undo)` = Create automation clip [DECOMP, string "create automation clip" @
+  0x01192628]. It makes the automation clip channel ("AutoTrack.fst" template, name "Automation"), sets its range,
+  then with `place`:
+  - the Playlist **time selection** (playlist +0xd74 / +0xd78) gives start and end;
+  - else, when the options form's check box (+0x10e0 → +0x49e, read straight from the control) is on: the **song
+    position** when it lies inside the arrangement, otherwise the Playlist's left edge; when it is off: the song start;
+  - end = max(start + a minimum, the arrangement end (+0xb1c));
+  - the track: `FUN_00e50b50` walks the 500 tracks from a start track and takes the **first one whose span is free**
+    (`FUN_01062140` checks the range) [DECOMP].
+- Instrument tracks refuse automation clips: "Instrument tracks are not for audio or automation clips." [STR].
+- **Checked live in FL 2026 (UI gate, round 177b)**, four "Create automation clip" from mixer faders in a new project:
+  playhead 1:01 → Track 1, one bar; 5:02 → Track 2, one bar; 9:02 (past the last clip) → Track 3 at 9:02, one bar;
+  3:02 → Track 4, up to the song end (10:02). So: the clip starts at the song position even past the last clip, an
+  empty Playlist gives one bar, and the track is the **first one with no clips at all** — Track 1 was skipped although
+  it was free over the new clip's span. The decompiled "span" check is read that way (the start track / range it is
+  given cover the whole track); LYNX follows what FL does. [EXEC]
+
+
+### Is this the best way? — verdict
+- FL's way is already one step from any LYNX control (right-click › Create automation clip). The missing piece was
+  FL's placement: at the playhead, on the first free track. Built **FL-exact**, with FL's option (on by default).
+- Live / Bitwig draw automation straight onto the track's lane: that is slice 3 (optional lanes), not a change to
+  FL's clips.
+- Third-party plugin knobs: FL relies on Last tweaked (kept). Proposal (needs a JUCE patch, not built): VST3 plugins
+  that open a host context menu for a parameter (`IComponentHandler3::createContextMenu`; JUCE hosts it but adds no
+  host items) get LYNX's items at the top — Create automation clip, Link to controller. Bitwig / Cubase / Studio One
+  do this; it is the real one-step for plugin knobs. → asked the coordinator.
+
+### Built (slice 2)
+| Piece | Where |
+|---|---|
+| `autoclipplace::forNewClip(song, atPlayback, playTick)` — FL's placement (selection › playhead › song start; to the song end, ≥ 1 bar; first free track, instrument tracks skipped) and the app setting `atPlayback()` | `core/PlaylistOps` |
+| `addAutomationClip` uses it (Song mode playhead) | `ui/AutomationUi` |
+| Options › General › Editing: "Create automation clips at the playback position" (on), saved with the app settings | `ui/SettingsPages`, `ui/MainComponent` |
+| Test `auto177b_new_automation_clip_place` | `tests/Auto177bTests.inc` |

@@ -1,6 +1,7 @@
 #include "ui/FlMods.h"
 #include "ui/WindowOwner.h"
 #include "ui/AutomationUi.h"
+#include "core/PlaylistOps.h"
 #include "core/LastTweaked.h"
 
 #include <map>
@@ -818,27 +819,24 @@ void createAutomationClip (AudioEngine& engine, const AutomationTarget& target)
 
 void addAutomationClip (AudioEngine& engine, const AutomationTarget& target, const std::string& name, float value)
 {
+    // FL's placement (round 177b, REA FUN_01191a50): the time selection, else the playback position (Options › General
+    // "Create automation clips at the playback position", Song mode) or the song start; the first free track
+    const auto playTick = engine.getSong().mode == PlayMode::song ? (std::int64_t) engine.getTransport().positionTicks.load() : 0;
     engine.editSong ([&] (Song& s) {
-        // the Playlist time selection gives the clip its place and length; otherwise the whole song
-        const auto bar = (std::int64_t) ppq * std::max (1, s.beatsPerBar);
-        const auto length = s.hasLoop() ? s.loopEnd - s.loopStart : s.playlist.empty() ? bar * 4 : s.songLength();
+        const auto place = autoclipplace::forNewClip (s, autoclipplace::atPlayback(), playTick);
 
         Automation a;
         a.name = name;
         a.target = target;
-        a.points = { { 0, value, 0.0f }, { length, value, 0.0f } };
+        a.points = { { 0, value, 0.0f }, { place.length, value, 0.0f } };
         s.automations.push_back (std::move (a));
-
-        int track = 0;
-        for (const auto& c : s.playlist)
-            track = std::max (track, c.track + 1);
 
         Clip clip;
         clip.kind = ClipKind::automation;
         clip.automation = (int) s.automations.size() - 1;
-        clip.track = track;
-        clip.start = s.hasLoop() ? s.loopStart : 0;
-        clip.length = length;
+        clip.track = place.track;
+        clip.start = place.start;
+        clip.length = place.length;
         s.playlist.push_back (clip);
     });
 
