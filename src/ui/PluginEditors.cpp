@@ -338,7 +338,7 @@ public:
             r.removeFromBottom (13.0f * s);
         }
         else if (! hasStyle (item, plugui::noCaption))
-            r.removeFromBottom ((hasStyle (item, plugui::showValue) ? 26.0f : 14.0f) * s);
+            r.removeFromBottom ((hasStyle (item, plugui::showValue) || hasStyle (item, plugui::rangeEnds) ? 26.0f : 14.0f) * s);
         const auto d = juce::jmin (r.getWidth(), r.getHeight());
         return r.withSizeKeepingCentre (d, d).withY (r.getY());
     }
@@ -843,6 +843,42 @@ public:
                     g.setColour (hot ? look.accent.brighter (0.3f) : skin::valueColour (false));
                     g.setFont (font (juce::jmax (8.0f, 10.5f * s * skin::captionScale()), skin::captionScale() > 1.0f));
                     g.drawFittedText (valueText (param, value), below.withHeight (13.0f * s * skin::captionScale()).expanded (10.0f * s, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
+                }
+                else if (hasStyle (item, plugui::rangeEnds)) // round tp172b4: the scale's ends, the value on hover, the caption
+                {
+                    const auto row = below.withHeight (12.0f * s);
+                    if (hot || index == dragItem)
+                    {
+                        g.setColour (hot ? look.accent.brighter (0.3f) : skin::valueColour (true));
+                        g.setFont (font (juce::jmax (8.0f, 10.0f * s), true));
+                        g.drawFittedText (valueText (param, value), row.expanded (12.0f * s, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
+                    }
+                    else
+                    {
+                        const auto shortText = [] (juce::String t) {
+            // round tp172b4: scale ends as the references print them — "1:1", "-60 dB", "5 s" (no zero decimals, no
+            // spaces round a ratio's colon)
+            t = t.replace (" : ", ":");
+            juce::String out;
+            for (int i = 0; i < t.length(); ++i)
+            {
+                if (t[i] == '.' && i > 0 && juce::CharacterFunctions::isDigit (t[i - 1]))
+                {
+                    int j = i + 1;
+                    while (j < t.length() && t[j] == '0') ++j;
+                    if (j > i + 1 && (j >= t.length() || ! juce::CharacterFunctions::isDigit (t[j]))) { i = j - 1; continue; }
+                }
+                out << juce::String::charToString (t[i]);
+            }
+            return out;
+        };
+                        const auto ends = circle.withY (row.getY()).withHeight (row.getHeight()).expanded (12.0f * s, 0.0f);
+                        g.setColour (colour::textDisabled);
+                        g.setFont (font (juce::jmax (7.5f, 9.0f * s)));
+                        g.drawText (shortText (valueText (param, 0.0f)), ends, juce::Justification::centredLeft, false);
+                        g.drawText (shortText (valueText (param, 1.0f)), ends, juce::Justification::centredRight, false);
+                    }
+                    caption (g, item, below.withTrimmedTop (12.0f * s).withHeight (13.0f * s));
                 }
                 else if (! hasStyle (item, plugui::noCaption))
                 {

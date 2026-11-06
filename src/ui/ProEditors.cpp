@@ -83,7 +83,7 @@ void scaleLabels (juce::Graphics& g, const LevelScale& s, juce::Rectangle<float>
 class ApexEditor final : public ProEditor
 {
 public:
-    ApexEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::apexLimiter, d, 950, 600) { fillDemo(); }
+    ApexEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::apexLimiter, d, 950, 600) { knobRanges = true; fillDemo(); }
 
 private:
     enum { idPanel = 1, idGain, idCeiling, idTp, idAdvanced, idLoudness, idLoudReset };
@@ -599,6 +599,7 @@ class HushEditor final : public ProEditor
 public:
     HushEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::hushDeEsser, d, 720, 500)
     {
+        knobRanges = true; // round tp172b4: each knob's scale under it, the value on hover
         fillDemo();
         if (! displayShown()) setSize (720, 500 - (int) waveH);
     }
@@ -942,13 +943,24 @@ private:
             look.enabled = current() == nullptr || current()->enabled;
             look.capTint = juce::Colour (0xff53524f); // round tp172b4: grey, as the other small knob
             skin::knob (g, knobR, look);
+            // round tp172b4: its scale (0 … 200 %) under it, the value while hovered or dragged, then the caption
+            const auto row = knobR.withY (knobR.getBottom() + 1.0f).withHeight (12.0f);
+            if (hover || active)
+            {
+                g.setColour (skin::valueColour (true));
+                g.setFont (font (type::caption, true));
+                g.drawText (linkText(), row.expanded (40.0f, 0.0f), juce::Justification::centred, false);
+            }
+            else
+            {
+                g.setColour (colour::textDisabled);
+                g.setFont (font (type::caption));
+                g.drawText ("0 %", row.withWidth (row.getWidth() * 0.5f + 10.0f).translated (-10.0f, 0.0f), juce::Justification::centredLeft, false);
+                g.drawText ("200 %", row.withTrimmedLeft (row.getWidth() * 0.5f - 10.0f).translated (10.0f, 0.0f), juce::Justification::centredRight, false);
+            }
             g.setColour (skin::captionColour().interpolatedWith (colour::textPrimary, hover ? 0.5f : 0.0f));
             g.setFont (font (type::caption, true));
-            g.drawText (caps (tr ("Stereo link")), juce::Rectangle<float> (c.r.getX() - 14.0f, knobR.getBottom() + 3.0f, c.r.getWidth() + 28.0f, 14.0f),
-                        juce::Justification::centred, false);
-            g.setColour (skin::valueColour (active || hover));
-            g.setFont (font (type::small, false));
-            g.drawText (linkText(), juce::Rectangle<float> (c.r.getX() - 24.0f, knobR.getBottom() + 17.0f, c.r.getWidth() + 48.0f, 14.0f),
+            g.drawText (caps (tr ("Stereo link")), juce::Rectangle<float> (c.r.getX() - 14.0f, knobR.getBottom() + 14.0f, c.r.getWidth() + 28.0f, 14.0f),
                         juce::Justification::centred, false);
         }
         else if (c.id == idExternal)
@@ -1081,7 +1093,7 @@ private:
 class CrestEditor final : public ProEditor
 {
 public:
-    CrestEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::crestCompressor, d, 860, 560) { fillDemo(); }
+    CrestEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::crestCompressor, d, 860, 560) { knobRanges = true; fillDemo(); }
 
 private:
     enum { idThreshold = 1, idKnee, idSideChain, idInMeter, idScNode0 = 10 };
@@ -1133,10 +1145,16 @@ private:
         out.push_back (knob ({ 214.0f, by, 104.0f, 118.0f }, ratio, tr ("Ratio"), 2));
         // round tp172b4: the style button at the knobs' height, then the character and the voicing under it (labelled),
         // where the reference keeps its character control
-        out.push_back (menu ({ 330.0f, by + 10.0f, 104.0f, 26.0f }, style, {}, "Clean|Allround|Punch|Upward|Two-way|Vari-mu|Classic|Opto|Vocal|Bus|Pumping"));
-        out.push_back (menu ({ 342.0f, by + 44.0f, 80.0f, 18.0f }, character, tr ("Character"), "Off|Warm|Crisp|Bright"));
+        // round tp172b4 (second pass): the style a single pill button at the knobs' height, as the reference's; the
+        // character and the voicing (LYNX's) small text buttons under it ("Character: Warm")
+        {
+            auto st = menu ({ 334.0f, by + 30.0f, 96.0f, 24.0f }, style, {}, "Clean|Allround|Punch|Upward|Two-way|Vari-mu|Classic|Opto|Vocal|Bus|Pumping");
+            st.look = 1;
+            out.push_back (st);
+        }
+        out.push_back (barMenu ({ 318.0f, by + 62.0f, 128.0f, 18.0f }, character, tr ("Character"), "Off|Warm|Crisp|Bright"));
         // round tp172b2: Pro-C 3's Smooth / Op-El / Mastering characters, a voicing over the style
-        out.push_back (menu ({ 342.0f, by + 80.0f, 80.0f, 18.0f }, voicing, tr ("Voicing"), "None|Smooth|Op-El|Mastering"));
+        out.push_back (barMenu ({ 318.0f, by + 82.0f, 128.0f, 18.0f }, voicing, tr ("Voicing"), "None|Smooth|Op-El|Mastering"));
         out.push_back (knob ({ 446.0f, by, 104.0f, 118.0f }, attack, tr ("Attack"), 2));
         out.push_back (knob ({ 564.0f, by, 104.0f, 118.0f }, release, tr ("Release"), 2));
         out.push_back (toggle ({ 576.0f, by - 26.0f, 80.0f, 20.0f }, autoRelease, tr ("Auto")));
@@ -1147,13 +1165,18 @@ private:
         out.push_back (menu ({ p.getRight() - 16.0f, p.getBottom() - 20.0f, 60.0f, 20.0f }, meterScale, {}, "9 dB|18 dB|36 dB|72 dB|90 dB"));
         out.push_back (button ({ p.getRight() + 42.0f, main().getY(), 18.0f, 12.0f }, idInMeter, "IN", v (inputMeter) >= 0.5f,
                                tr ("Input meter: show or hide")));
-        const auto sy = p.getBottom() - 64.0f;
-        out.push_back (knob ({ 110.0f, sy, 76.0f, 64.0f }, knee, tr ("Knee"), 0));
-        out.push_back (knob ({ 228.0f, sy, 76.0f, 64.0f }, range, tr ("Range"), 0));
-        out.push_back (knob ({ 344.0f, sy, 76.0f, 64.0f }, drive, tr ("Drive"), 0)); // round 170c: the Character's drive (it had no control)
-        out.push_back (knob ({ 460.0f, sy, 76.0f, 64.0f }, lookahead, tr ("Lookahead"), 0));
-        out.push_back (knob ({ 578.0f, sy, 76.0f, 64.0f }, hold, tr ("Hold"), 0));
-        out.push_back (button ({ 330.0f, sy + 34.0f, 104.0f, 24.0f }, idSideChain, tr ("Side chain"), scOpen, tr ("Open the side chain: detector EQ, level, external input, stereo link")));
+        // round tp172b4 (second pass): KNEE, RANGE, LOOKAHEAD and HOLD as the reference's short curved bars under the big
+        // knobs (DRIVE, LYNX's, the same in the middle), the side-chain button under them
+        const auto sy = p.getBottom() - 70.0f;
+        for (const auto& [x, prm, cap] : { std::tuple<float, int, juce::String> { 108.0f, (int) knee, tr ("Knee") }, { 226.0f, (int) range, tr ("Range") },
+                                           { 342.0f, (int) drive, tr ("Drive") }, { 458.0f, (int) lookahead, tr ("Lookahead") },
+                                           { 576.0f, (int) hold, tr ("Hold") } })
+        {
+            auto bar = knob ({ x, sy, 80.0f, 46.0f }, prm, cap, 0);
+            bar.look = 1;
+            out.push_back (bar);
+        }
+        out.push_back (button ({ 334.0f, sy + 48.0f, 96.0f, 20.0f }, idSideChain, tr ("Side chain"), scOpen, tr ("Open the side chain: detector EQ, level, external input, stereo link")));
         if (scOpen)
         {
             const auto s = scPanel();
@@ -1410,7 +1433,7 @@ private:
 class SentryEditor final : public ProEditor
 {
 public:
-    SentryEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::sentryGate, d, 730, 380) { fillDemo(); }
+    SentryEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::sentryGate, d, 730, 380) { knobRanges = true; fillDemo(); }
 
 private:
     enum { idThreshold = 1, idExpert, idFilters };
@@ -1661,6 +1684,7 @@ class PrismEditor final : public ProEditor
 public:
     PrismEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::prismMultiband, d, 920, 600)
     {
+        knobRanges = true; // round tp172b4: each knob's scale under it, the value on hover
         specArea = plot();
         specMinHz = 20.0;
         specMaxHz = 20000.0;

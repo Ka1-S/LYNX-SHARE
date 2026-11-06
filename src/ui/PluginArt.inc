@@ -97,6 +97,9 @@ struct Theme
     // dimples round its edge, a light thumb riding the edge at the value (with a short mark), on a dark ticked ring; no
     // lit arc. A knob's capTint (KnobLook) recolours the cap (the small grey knobs beside the big coloured ones)
     bool gripKnob = false;
+    // round tp172b4: the compressor reference's big caps — the cap fills the knob, a fine rim round it, the lit arc
+    // runs just inside the rim with a small square mark at its tip
+    bool arcInCap = false;
 
     // round tp172d: the flat "hardware graphic" look of the third-party originals (Valhalla, Soundtoys...) — solid
     // colour fields, bold outlines, big plain type; every field defaults to the look above
@@ -701,6 +704,33 @@ inline void knob (juce::Graphics& g, Rectangle<float> area, const KnobLook& k)
             g.setColour (lit.withAlpha (0.55f));
             g.drawEllipse (cap.expanded (1.0f), 1.2f);
         }
+        return;
+    }
+
+    if (th0.arcInCap)
+    {
+        const auto capR = size * 0.5f - 1.0f;
+        const auto cap = Rectangle<float> (capR * 2.0f, capR * 2.0f).withCentre (c);
+        if (fx)
+        {
+            g.setColour (Colours::black.withAlpha (0.4f));
+            g.fillEllipse (cap.translated (0.0f, capR * 0.06f).expanded (1.0f));
+        }
+        g.setGradientFill (ColourGradient (p.capTop.brighter (hover * 0.08f), c.x, cap.getY(), p.capBottom, c.x, cap.getBottom(), false));
+        g.fillEllipse (cap);
+        g.setColour (p.rim.withAlpha (k.enabled ? 0.9f : 0.5f));
+        g.drawEllipse (cap.reduced (0.5f), juce::jmax (1.0f, size * 0.012f));
+        const auto t = juce::jlimit (1.6f, 3.2f, size * 0.035f);
+        const auto r = capR - t * 1.6f;
+        if (std::abs (to - from) > 0.002f)
+        {
+            g.setColour (lit);
+            g.strokePath (arc (c, r, from, to), juce::PathStrokeType (t, juce::PathStrokeType::curved, juce::PathStrokeType::butt));
+        }
+        // the mark at the value, just inside the arc
+        const auto tip = c + dir * (r - t * 1.9f);
+        g.setColour (k.enabled ? lit : theme::colour::textDisabled);
+        g.fillRect (Rectangle<float> (t * 1.1f, t * 1.1f).withCentre (tip));
         return;
     }
 

@@ -538,6 +538,8 @@ Layout reeverb2()
     return l;
 }
 
+LayoutItem menuOf (float x, float y, float w, float h, const char* param, const char* caption, const char* options); // (below)
+
 Layout luxeVerb()
 {
     // INPUT | REVERB | PITCH | OUTPUT on top, ENVELOPE and the analyser below; every knob has its value on a plate above
@@ -645,13 +647,13 @@ Layout luxeVerb()
     // character and thickness), the decay-rate EQ curve filling the rest with its four knobs in its lower corners.
     // Values under the captions (and the decay time inside SPACE)
     const auto dial = [&] (float cx, float cy, float d, const char* param, const char* caption, std::uint16_t style = 0, float w = 76.0f) {
-        auto i = knob (cx, cy, d, param, caption, cy + d * 0.5f + 20.0f, style | showValue);
+        auto i = knob (cx, cy, d, param, caption, cy + d * 0.5f + 20.0f, style | rangeEnds);
         i.w = std::max (d, std::min (w, i.h)); // room for the caption and the value (the circle keeps its size: the height
                                                 // bounds it; never wider than tall, so no caption hides under a knob)
         i.x = cx - i.w * 0.5f;
         sp (std::move (i));
     };
-    sp (tabs (96, 24, 150, 16, "Space style", TR_NOOP ("Modern|Vintage|Plate")));
+    sp (menuOf (118, 22, 104, 18, "Space style", nullptr, TR_NOOP ("Modern|Vintage|Plate"))); // the reference's mode drop-down
     dial (62, 84, 40, "Space pre-delay", TR_NOOP ("P. delay"));
     dial (144, 84, 40, "Space character", TR_NOOP ("Character"));
     dial (226, 84, 40, "Thickness", TR_NOOP ("Thickness"), bipolar);

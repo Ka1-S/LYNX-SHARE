@@ -486,7 +486,7 @@ inline void canvasCrest (juce::Graphics& g, Rectangle<float> a, bool display)
             else { const auto d = x - th + knee; y = x + (1.0f / ratio - 1.0f) * d * d / (4.0f * knee); }
             curve.lineTo (o.x + x * s, o.y - y * s);
         }
-        g.setColour ((k == 0 ? p.accent2 : p.accent).withAlpha (0.08f));
+        g.setColour ((k == 0 ? p.accent2 : p.accent).withAlpha (0.03f)); // (tp172b4: fainter, the field reads plain)
         g.strokePath (curve, juce::PathStrokeType (1.4f));
     }
     softLight (g, { a.getX() + a.getWidth() * 0.25f, a.getY() }, a.getWidth() * 0.5f, p.accent, 0.04f);
@@ -522,6 +522,7 @@ inline const Theme& crestTheme()
         x.pointer = Pointer::glowLine;
         x.arcGlow = 0.06f;
         x.thin = true; // round tp172b: the reference's look
+        x.arcInCap = true; // round tp172b4: caps as big as the reference's, the arc inside the rim
         return x;
     }();
     return t;
