@@ -2,6 +2,7 @@
 
 #include "core/PickerView.h"
 #include "core/PluginCatalog.h"
+#include "ui/AutomationUi.h"
 #include "ui/BrowserComponent.h"
 #include "ui/I18n.h"
 #include "ui/PluginThumbs.h"
@@ -30,7 +31,9 @@ constexpr int edgeX = 32, edgeTop = 56, edgeBottom = 96, halvesGap = 80; // the 
 constexpr int tileGap = 8;                                              // between tiles in a row
 constexpr int shadow = 3;                                               // the drop shadow around a picture
 constexpr float textTileSize = 17.0f, tabSize = 19.0f, allSize = 26.0f, titleSize = 26.0f;
-constexpr float labelNameSize = 21.0f, labelCategorySize = 17.0f;
+// (FL draws the label in Cuprum 21 / 17, a tall face: these sizes give LYNX's face the same cap heights on screen,
+// measured on fl-1920-dynamics-hover: name ~15 px, category ~11 px)
+constexpr float labelNameSize = 25.0f, labelCategorySize = 20.0f, labelPadX = 10.0f, labelPadY = 4.0f;
 
 struct Tile
 {
@@ -479,6 +482,36 @@ private:
             t.makeGenerator = g.make;
             add (std::move (t));
         }
+        // FL's Plugin database also lists Generators/Misc/Audio Clip and Automation Clip (.fst with no bitmap: text
+        // tiles). Audio Clip adds an audio clip channel (no sample yet); Automation Clip an automation linked to nothing,
+        // its clip on a free Playlist track and its editor open (LYNX keeps automations out of the Channel Rack). A drag
+        // of it does the same where it is dropped on the Channel Rack or a mixer strip.
+        {
+            Tile audio;
+            audio.name = "Audio Clip"; // (plugin names are not translated)
+            audio.key = "lynx:clip:audio";
+            audio.category = "Misc";
+            audio.generator = true;
+            audio.native = false; // (no picture to draw: a text tile, as in FL)
+            audio.makeGenerator = [name = audio.name.toStdString()]() -> std::optional<ChannelDef> {
+                ChannelDef c;
+                c.name = name;
+                c.instrument = InstrumentKind::audioClip;
+                return c;
+            };
+            add (std::move (audio));
+            Tile automation;
+            automation.name = "Automation Clip";
+            automation.key = "lynx:clip:automation";
+            automation.category = "Misc";
+            automation.generator = true;
+            automation.native = false;
+            automation.makeGenerator = [&engine = engine]() -> std::optional<ChannelDef> {
+                juce::MessageManager::callAsync ([&engine] { createUnlinkedAutomationClip (engine); });
+                return std::nullopt; // (no channel: the clip is made instead)
+            };
+            add (std::move (automation));
+        }
         for (const auto& f : fxEntries)
         {
             if (! f.available || ! f.make)
@@ -909,13 +942,13 @@ private:
             const auto lb = labelBox (i);
             g.setColour (juce::Colour (0xf0080808));
             g.fillRoundedRectangle (lb, 8.0f);
-            auto lines = lb.reduced (7.0f, 4.0f);
+            auto lines = lb.reduced (labelPadX, labelPadY);
             g.setColour (colour::textPrimary);
-            g.setFont (font (labelNameSize));
-            g.drawText (t.name, lines.removeFromTop (labelNameSize + 4.0f), juce::Justification::centredLeft);
-            g.setColour (colour::textPrimary.withAlpha (0.69f));
+            g.setFont (font (labelNameSize, true));
+            g.drawText (t.name, lines.removeFromTop (labelNameSize), juce::Justification::centredLeft, false);
+            g.setColour (colour::accent); // (FL: white at 0xB0; LYNX: its red)
             g.setFont (font (labelCategorySize));
-            g.drawText (tr (t.category.c_str()), lines, juce::Justification::centredLeft);
+            g.drawText (tr (t.category.c_str()), lines, juce::Justification::centredLeft, false);
         }
     }
 
@@ -924,10 +957,10 @@ private:
     juce::Rectangle<float> labelBox (int i) const
     {
         const auto& t = tiles[(std::size_t) i];
-        const auto nameW = juce::GlyphArrangement::getStringWidth (juce::Font (theme::font (labelNameSize)), t.name);
+        const auto nameW = juce::GlyphArrangement::getStringWidth (juce::Font (theme::font (labelNameSize, true)), t.name);
         const auto catW = juce::GlyphArrangement::getStringWidth (juce::Font (theme::font (labelCategorySize)), tr (t.category.c_str()));
-        const auto halfW = (juce::jmax (nameW, catW) + 2.0f) * 0.5f + 7.0f;
-        const auto h = labelNameSize + labelCategorySize + 16.0f;
+        const auto halfW = (juce::jmax (nameW, catW) + 2.0f) * 0.5f + labelPadX;
+        const auto h = labelNameSize + labelCategorySize + 2.0f * labelPadY;
         const auto hb = highlight (t.bounds, t.rowHeight, false);
         const auto c = juce::jlimit ((float) t.bounds.getX(), (float) t.bounds.getRight(), (float) mouseX);
         const auto mid = getWidth() * 0.5f;

@@ -16,6 +16,7 @@
 #include "ui/QuickPick.h"
 #include "ui/VideoPlayerView.h"
 #include "ui/VisualEditors.h"
+#include "core/FlExtraFx.h"
 #include "core/Vfx.h"
 
 #if JUCE_WINDOWS
@@ -144,8 +145,28 @@ juce::Image demoVideoFrame()
     return frame;
 }
 
+// A page for the HTML NoteBook's picture (written next to the pictures, deleted after the render)
+juce::File demoPage (const juce::File& folder)
+{
+    auto file = folder.getChildFile ("demo-notebook.html");
+    file.replaceWithText ("<html><head><title>Session notes</title></head><body>"
+                          "<h1>Session notes</h1>"
+                          "<p><b>Song:</b> Night Drive &mdash; 124 BPM, A minor</p>"
+                          "<h2>To do</h2><ul>"
+                          "<li>Record the second verse vocal</li>"
+                          "<li>Tighten the bass under the kick (sidechain)</li>"
+                          "<li>Automate the filter in the break</li>"
+                          "<li>Bounce stems for the mix</li></ul>"
+                          "<h2>Lyrics</h2>"
+                          "<p><i>City lights are fading, the road keeps calling me home...</i></p>"
+                          "</body></html>");
+    return file;
+}
+
 void addDemoContent (EffectSlot& slot, const juce::File& folder)
 {
+    if (slot.kind == EffectKind::htmlNotebook && flextra::htmlnotebook::address (slot.state).empty())
+        slot.state = flextra::htmlnotebook::stateFor (demoPage (folder).getFullPathName().toStdString());
     if (slot.kind == EffectKind::newtone || slot.kind == EffectKind::newtime)
         if (const auto voice = demoVoice (folder); voice.existsAsFile())
             slot.samplePath = voice.getFullPathName().toStdString();
@@ -222,7 +243,7 @@ std::unique_ptr<juce::Component> effectEditor (AudioEngine& engine, EffectSlot s
     if (VisualWindows::handles (kind))
         return makeVisualEditor (engine, 1, 0, true);
     if (FlExtraWindows::handles (kind))
-        return makeFlExtraEditor (VisualTarget::mixerSlot (engine, 1, 0), kind, true);
+        return makeFlExtraSlotEditor (engine, 1, 0, true); // (its own slot target: the NoteBook reads its page from it)
     if (kind == EffectKind::formulaController)
         return FormulaControllerWindows::makeEditor (engine, 1, 0);
     if (NewtoneWindows::handles (kind))
@@ -283,9 +304,9 @@ bool startedOnce = false;
 
 juce::File nativeFolder()
 {
-    // (-r2: the pictures trimmed to the editor's drawn part; -r3: FL's budget and the editors' demo content (round
+    // (-r2: the pictures trimmed to the editor's drawn part; -r3/-r4: FL's budget and the editors' demo content (round
     // 175b); a new drawing rule = a new folder)
-    return root().getChildFile (juce::String (JUCE_APPLICATION_VERSION_STRING).retainCharacters ("0123456789.-abcdefghijklmnopqrstuvwxyz") + "-r3");
+    return root().getChildFile (juce::String (JUCE_APPLICATION_VERSION_STRING).retainCharacters ("0123456789.-abcdefghijklmnopqrstuvwxyz") + "-r4");
 }
 
 juce::File capturedFolder()
@@ -395,6 +416,7 @@ int renderNative (const juce::File& folder, const juce::StringArray& only, const
     }
     engine.setSong (Song {});
     folder.getChildFile ("demo-voice.wav").deleteFile();
+    folder.getChildFile ("demo-notebook.html").deleteFile();
     return drawn;
 }
 

@@ -1334,6 +1334,15 @@ std::unique_ptr<juce::Component> makeFlExtraEditor (const VisualTarget& target, 
     }
 }
 
+std::unique_ptr<juce::Component> makeFlExtraSlotEditor (AudioEngine& engine, int track, int slot, bool demo)
+{
+    const auto& mixer = engine.getSong().mixer;
+    if (track < 0 || track >= (int) mixer.size() || slot < 0 || slot >= (int) mixer[(std::size_t) track].effects.size())
+        return nullptr;
+    const auto kind = mixer[(std::size_t) track].effects[(std::size_t) slot].kind;
+    return isExtraKind (kind) ? makeFlExtraEditor (slotTarget (engine, track, slot), kind, demo) : nullptr;
+}
+
 namespace FlExtraWindows
 {
 bool handles (EffectKind kind)

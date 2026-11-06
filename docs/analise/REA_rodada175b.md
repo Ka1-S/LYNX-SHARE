@@ -44,6 +44,8 @@ Sources:
 - An entry whose name is already listed only adds its category to that tile ("Ogun" in Drum and Synth special is one
   tile).
 - Only the Plugin database is listed. "Installed" is not in the picker; its "..." ends open it in the Browser (171c).
+- [FL install, fl-1920-all] `Generators/Misc/Audio Clip.fst` and `Automation Clip.fst` have no .nfo or bitmap, so
+  they are text tiles, sorted with the rest ("3x Osc", "Audio Clip", …, "Automation Clip").
 
 ### Packing [STATIC FUN_00ec0d40, FUN_00ec0510, FUN_00ec0180]
 
@@ -97,7 +99,8 @@ Checks against FL. `tests/Picker175bTests.inc` runs the same numbers through `pi
     peak, fading over about 20 px down and a third of the width across), and smaller ones at the middle of each side.
 - The hovered tile is drawn a little bigger (eased; about 6 %).
 - A tab pointed at gets the same box, ± 18 px vertically and not widened ([FL fl-1920-synthclassic]).
-- The label is a dark box (0x080808, alpha 240) whose top is 3 px above the highlight's bottom. It holds:
+- The label is a dark box (0x080808, alpha 240) whose top is 3 px above the highlight's bottom, about 53 px high at
+  1920 ([FL fl-1920-dynamics-hover]: name glyphs 19 px top to descender, category 16 px). It holds:
   - the name at 21 px;
   - the category at 17 px (15 px when it holds a "/"), white at alpha 0xB0;
   - the .nfo Tip at 11 px, if there is one.
@@ -116,6 +119,13 @@ Checks against FL. `tests/Picker175bTests.inc` runs the same numbers through `pi
     tint and glows. LYNX's own colour is kept where FL uses its accent: the press is LYNX red (FL: orange) and so is the
     first letter of a text tile.
   - Pictures are drawn × 1.1, as FL draws them (once, when they are scaled).
+  - The label's sizes give LYNX's face FL's on-screen glyph heights (name 25 px bold, category 20 px, box 53 px); the
+    category is LYNX red.
+  - Audio Clip and Automation Clip are text tiles in Generators › Misc. Audio Clip adds an audio clip channel;
+    Automation Clip an automation linked to nothing, its clip on a free Playlist track and its editor open (LYNX has no
+    automation channels in the Channel Rack). Dragged, they do the same on the Channel Rack or a mixer strip.
+  - Drops checked in LYNX: Channel Rack (new channel), a mixer slot (the effect in that slot), the Playlist (nothing,
+    as in FL: REA_rodada171c s17→s18).
   - A dragged tile: the picker window steps aside and the drag runs in the main window's drag container, so a tile can
     be dropped on the Channel Rack, the Playlist or a mixer slot.
   - Third-party plugins in no Plugin database folder are not listed, as in FL.
@@ -124,4 +134,5 @@ Checks against FL. `tests/Picker175bTests.inc` runs the same numbers through `pi
   - Pictures use FL's budget (half the editor, ≤ 258 × 128); they go to a new cache folder, `<version>-r3`.
   - Editors that are empty when new are drawn in use, with LYNX-made content: Newtone and Newtime analyse a synthetic
     sung phrase, Control Surface has two knobs, Video Player shows a drawn still, and VFX Script has a script with
-    controls.
+    controls; the HTML NoteBook shows a sample page (its picture was drawn from the wrong slot target and showed "No
+    page").
