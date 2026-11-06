@@ -711,3 +711,91 @@ TEST (als175a_warped_clip_stretches_offline)
     CHECK (ch.sampler.keepPitch && ch.sampler.stretchMethod == StretchMethod::complex);
     CHECK (std::abs (ch.sampler.stretchBeats - 8.0f) < 1e-5);
 }
+
+TEST (als175a_beats_transpose_resamples_each_piece)
+{
+    // Beats with a transpose (Live: each piece read 2^(st/12) faster from its own start, at its own place on the grid).
+    // Four 0.5 s pieces of a 330 Hz decaying tone, +12 st at 1×: every piece starts where it did, plays at 660 Hz (one
+    // source frame every half output frame) and, done after half its length, fills the rest back and forth
+    constexpr double rate = 44100.0;
+    constexpr long piece = 22050, lead = 4410;
+    lynx::SampleData in;
+    in.sampleRate = rate;
+    in.left.assign ((std::size_t) (lead + 4 * piece), 0.0f);
+    for (long k = 0; k < 4; ++k)
+        for (long i = 0; i < piece; ++i)
+            in.left[(std::size_t) (lead + k * piece + i)] = (float) (0.8 * std::exp (-3.0 * (double) i / piece)
+                                                                    * std::sin (2.0 * 3.141592653589793 * 330.0 * (double) i / rate));
+    in.right = in.left;
+    const auto attacks = lynx::stretchdetail::beatsCuts (in.left.data(), (long) in.frames(), rate);
+    CHECK (attacks.size() == 4);
+
+    const auto up = lynx::timeStretch (in, 1.0, lynx::StretchMethod::beats, 12.0);
+    CHECK (up->frames() == in.frames()); // the length follows the stretch only
+    const auto fade = (long) std::lround (rate * 0.016);
+    int exact = 0, mirrored = 0;
+    for (std::size_t k = 1; k + 1 < attacks.size(); ++k)
+    {
+        const auto a = attacks[k], length = attacks[k + 1] - a;
+        double fwd = 0.0, back = 0.0;
+        for (long i = fade; i < length / 2 - 2; ++i) // output frame i = source frame a + 2i (an even read: no interpolation)
+            fwd = std::max (fwd, (double) std::abs (up->left[(std::size_t) (a + i)] - in.left[(std::size_t) (a + 2 * i)]));
+        const auto played = (length - 1) / 2 + 1;
+        for (long j = 0; j < played / 2 - fade; ++j) // then backwards from the piece's end
+            back = std::max (back, (double) std::abs (up->left[(std::size_t) (a + played + j)] - up->left[(std::size_t) (a + played - 1 - j)]));
+        exact += fwd < 1e-5;
+        mirrored += back < 1e-5;
+    }
+    CHECK (exact == 2);
+    CHECK (mirrored == 2);
+
+    // other methods ignore the transpose (they transpose in real time); 0 st is the plain Beats stretch
+    const auto tones = lynx::timeStretch (in, 1.25, lynx::StretchMethod::tones, 12.0);
+    const auto tonesPlain = lynx::timeStretch (in, 1.25, lynx::StretchMethod::tones);
+    CHECK (tones->left == tonesPlain->left);
+    const auto zero = lynx::timeStretch (in, 1.25, lynx::StretchMethod::beats, 0.0);
+    const auto plain = lynx::timeStretch (in, 1.25, lynx::StretchMethod::beats);
+    CHECK (zero->left == plain->left);
+}
+
+TEST (als175a_beats_clip_transpose_is_rendered_offline)
+{
+    // the rich set's clip, in Beats (WarpMode 0) with its +2 st and the file length recorded: the channel bakes the +2 st
+    // into its stretched sample (stretchPitch) and the clip plays untransposed; exported again, the transpose is back
+    using namespace lynx;
+    auto xml = als175a::richSet();
+    const std::string from = "</FileRef></SampleRef></AudioClip>";
+    const auto at = xml.find (from);
+    const std::string mode = "<WarpMode Value=\"4\" />";
+    const auto atMode = xml.find (mode);
+    CHECK (at != std::string::npos && atMode != std::string::npos);
+    if (at == std::string::npos || atMode == std::string::npos)
+        return;
+    xml.replace (at, from.size(), "</FileRef><DefaultDuration Value=\"96000\" /><DefaultSampleRate Value=\"48000\" /></SampleRef></AudioClip>");
+    xml.replace (xml.find (mode), mode.size(), "<WarpMode Value=\"0\" />");
+    FlpImportReport report;
+    const auto bytes = als175a::bytesOf (xml);
+    const auto packed = gzip::compressStored (bytes.data(), bytes.size());
+    const auto song = importAls (packed, als175a::options (&report), nullptr);
+    CHECK (song.has_value());
+    if (! song)
+        return;
+    const Clip* take = nullptr;
+    for (const auto& c : song->playlist)
+        if (c.kind == ClipKind::audio)
+            take = &c;
+    CHECK (take != nullptr);
+    if (take == nullptr)
+        return;
+    const auto& ch = song->channels[(std::size_t) take->channel];
+    CHECK (ch.sampler.stretchMethod == StretchMethod::beats && ch.sampler.keepPitch);
+    CHECK (std::abs (ch.sampler.stretchPitch - 2.0f) < 1e-6);
+    CHECK (take->pitch == 0.0f && take->stretch == 1.0);
+    CHECK (std::abs (ch.sampler.stretchBeats - 8.0f) < 1e-5);
+
+    // exported: PitchCoarse 2 again
+    AlsExportOptions options;
+    options.sampleSeconds = [] (const std::string&) { return 2.0; };
+    const auto als = exportAls (*song, options);
+    CHECK (als.xml.find ("<PitchCoarse Value=\"2\" />") != std::string::npos);
+}

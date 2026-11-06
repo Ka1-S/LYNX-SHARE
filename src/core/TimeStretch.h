@@ -16,7 +16,10 @@
 namespace lynx
 {
 // `ratio` = output duration / input duration (2 = twice as long, same pitch).
-std::shared_ptr<SampleData> timeStretch (const SampleData& input, double ratio, StretchMethod method = StretchMethod::general);
+// `semitones` (Beats only, else ignored): each piece is also resampled by that much, offline (Live's clip transpose in
+// Beats mode); the pieces keep their places on the grid.
+std::shared_ptr<SampleData> timeStretch (const SampleData& input, double ratio, StretchMethod method = StretchMethod::general,
+                                         double semitones = 0.0);
 
 // FL's stretch mode (channel record 0xD7 +0x6C, REA_rodada3 §5.2) → LYNX's method. 0 (Resample) has no
 // pitch-preserving stretch; callers keep resampling for it.

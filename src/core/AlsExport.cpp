@@ -489,7 +489,9 @@ struct Exporter
         const auto mode = warpModeOf (ch.sampler);
         c.value ("IsWarped", "true");
         c.value ("WarpMode", num (mode));
-        const auto pitch = mode == 3 ? 0.0 : (double) clip.pitch;
+        // a Beats channel's offline transposition (stretchPitch) is the clip's transpose in Live
+        const auto baked = mode == 0 && ch.sampler.keepPitch && ch.sampler.stretchBeats > 0.0f ? (double) ch.sampler.stretchPitch : 0.0;
+        const auto pitch = mode == 3 ? 0.0 : std::clamp ((double) clip.pitch + baked, -48.0, 48.0);
         const auto coarse = std::round (pitch);
         c.value ("PitchCoarse", num (coarse));
         c.value ("PitchFine", num ((pitch - coarse) * 100.0));
