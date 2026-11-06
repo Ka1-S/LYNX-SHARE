@@ -81,6 +81,10 @@ scroll differs from the shifted one by ~1e-12 px; one coverage step of an anti-a
 "1-step rounding". Scaled zoom frames differ from exact (expected; ~90–117 k px, the lanes only). Picture memory
 10.4 MB (two full-size RGB images), 0 when the Playlist is hidden.
 
+The build being queued (cap of 2 scaled steps, main `ab256f09` merged: `99f95ff4`, install n6) gave the same result: `--cachetest`
+failures 0, zoom settled and zoom out settled 0 px, scrolls 4 / 5 / 12 px at max 1; `--selftest` OK; build-local 1938931 checks,
+0 failures. These are off-screen tests: they do not measure fps.
+
 ### 3.4 Results [MEAS] (`session3.sh`, 60 s phases, Thief playing, dupmon fps, two runs each)
 
 | build | load | pl-watch | pl-wheel | pl-zoom | fd-watch | fd-drag |
