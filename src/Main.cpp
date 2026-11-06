@@ -33,6 +33,7 @@
 #include "engine/MidiFileIo.h"
 #include "engine/PluginHost.h"
 #include "engine/PluginSandbox.h"
+#include "engine/Bridge32Test.h"
 #include "engine/ProjectFile.h"
 #include "core/Sha256.h"
 #include "engine/SessionPack.h"
@@ -498,6 +499,17 @@ public:
         {
             const auto i = args.indexOf ("--sandboxtest");
             runSandboxTest (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+
+        if (args.contains ("--bridge32test"))
+        {
+            // LYNX.exe --bridge32test "LYNX Test Synth 32.dll" report.txt [--compare "LYNX Test Synth.dll"] (round 176a):
+            // the 32-bit plugin bridge (engine/Bridge32Test.cpp)
+            const auto i = args.indexOf ("--bridge32test");
+            const auto compare = args.contains ("--compare") ? args[args.indexOf ("--compare") + 1].unquoted() : juce::String();
+            setApplicationReturnValue (lynx::runBridge32Test (args[i + 1].unquoted(), args[i + 2].unquoted(), compare));
+            quit();
             return;
         }
 
@@ -6494,7 +6506,7 @@ private:
         juce::String error, report;
         bool ok = false;
 
-        if (input.hasFileExtension ("flp"))
+        if (input.hasFileExtension ("flp;als"))
             ok = offline.importFlpFile (input, error);
         else if (auto song = lynx::ProjectFile::load (input, error))
         {
@@ -6855,11 +6867,14 @@ private:
         offline.setSong (std::move (song));
         offline.dispatchPendingMessages();
         const bool facet = kind == lynx::EffectKind::facetEq;
+        // round tp172b4: the originals are pictured idle (nothing playing), so the display-first editors are too: no demo
+        // history unless LYNX_PARITYSHOT_DEMO=1 asks for the running display
+        const bool demoDisplay = juce::SystemStats::getEnvironmentVariable ("LYNX_PARITYSHOT_DEMO", {}) == "1";
         // (Ember in its Classic voicing: the Classic panel, as the mixer opens it)
         const bool pro = lynx::ProEditorWindows::handles (kind)
                          && ! (kind == lynx::EffectKind::ember && fx.params[(std::size_t) lynx::mixsuite::ember::voicing] > 0.5f);
         auto editor = facet ? lynx::makeFacetEqEditor (offline, 1, 0, false)
-                            : pro ? lynx::makeProEditor (offline, 1, 0, true) : lynx::makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
+                            : pro ? lynx::makeProEditor (offline, 1, 0, demoDisplay) : lynx::makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
         if (editor == nullptr)
             return;
         if (! pro) // the demo song through the effect, the editor ticked 30 times a second of audio as its timer would
