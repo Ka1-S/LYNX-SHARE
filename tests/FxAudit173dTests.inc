@@ -130,6 +130,14 @@ bool isAllowed (const std::string& effect, const std::string& control, const std
 }
 
 // the kinds [from, to]: each control moves the output (or is listed), no broken output
+// controls whose material only FL's installation has: without FL's Data they have nothing to switch (CI)
+bool needsFlFiles (const std::string& effect, const std::string& control)
+{
+    // Hardcore's cabinet impulses are read from FL's Plugins\Fruity\Effects\Hardcore\Imp (natives::newEffect, never
+    // bundled): without them every Cabinet choice is the bypass
+    return realFlpDir.empty() && effect == "Hardcore" && control == "Cabinet";
+}
+
 void auditRange (int from, int to)
 {
     using namespace lynx;
@@ -159,7 +167,7 @@ void auditRange (int from, int to)
         // a control silent on the short programme (a slow release, a long pattern) gets the survey's programme
         auto second = opt;
         for (const auto& c : rep.controls)
-            if (c.status == fxaudit::Status::dead && ! isAllowed (rep.name, c.control.name, "inert"))
+            if (c.status == fxaudit::Status::dead && ! isAllowed (rep.name, c.control.name, "inert") && ! needsFlFiles (rep.name, c.control.name))
                 second.only.push_back (c.control.name);
         if (second.only.empty())
             ; // all moved
