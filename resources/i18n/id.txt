@@ -7353,7 +7353,7 @@ countries: id
 "One per channel, instruments only (no sends or buses)" = "Satu per channel, hanya instrumen (tanpa send atau bus)"
 "Patterns ({0})" = "Pattern ({0})"
 "Select unused" = "Pilih yang tidak dipakai"
-"Sort patterns" = "Urutkan pattern"
+"Sort" = "Urutkan"
 "Delete unused patterns ({0})" = "Hapus pattern yang tidak dipakai ({0})"
 "Merge identical patterns ({0})" = "Gabungkan pattern yang identik ({0})"
 "Picker panel" = "Panel pemilih"

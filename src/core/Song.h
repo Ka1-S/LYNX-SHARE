@@ -1602,6 +1602,14 @@ struct Song
             if ((int) i != currentArrangement)
                 fn (arrangements[i].blocks);
     }
+    template <typename Fn>
+    void forEachBlockList (Fn&& fn) const
+    {
+        fn (blocks);
+        for (std::size_t i = 0; i < arrangements.size(); ++i)
+            if ((int) i != currentArrangement)
+                fn (arrangements[i].blocks);
+    }
 
     bool hasLoop() const noexcept { return loopEnd > loopStart; }
 

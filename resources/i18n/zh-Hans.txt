@@ -7353,7 +7353,7 @@ countries: cn sg
 "One per channel, instruments only (no sends or buses)" = "每个通道一个，仅乐器（不含发送和总线）"
 "Patterns ({0})" = "样式 ({0})"
 "Select unused" = "选择未使用的"
-"Sort patterns" = "排序样式"
+"Sort" = "排序"
 "Delete unused patterns ({0})" = "删除未使用的样式 ({0})"
 "Merge identical patterns ({0})" = "合并相同的样式 ({0})"
 "Picker panel" = "选择面板"

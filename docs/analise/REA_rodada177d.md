@@ -138,8 +138,9 @@ User decisions (2026-11-06, through the coordinator):
 - **Change:** a new global action `channel.soloSelected` ("Solo the selected channel (from any window)"). It has no key by default (FL keeps its keys); you bind one in the shortcut editor. It runs the rack's solo, `noteedit::soloChannel`, so pressing it again lets every channel play, as in FL.
 
 ### 20. Ultra-fine knob drag
-- **FL:** Ctrl+drag and Ctrl+wheel are fine. Shift has no knob meaning in FL's control contract (docs/WORKFLOW_FL.md P1 7/15). To be checked in FL at the next GUI turn.
+- **FL:** Ctrl+drag and Ctrl+wheel are fine. Checked in FL 2026 (shots in /mnt/e/lynx-work/rec177d/fl/k00–k15): Ctrl+drag of 40 px moved a knob 78 % → 82 %, and Ctrl+Shift+drag of 40 px moved it 82 % → 86 %, so FL treats Ctrl+Shift the same as Ctrl.
 - **Change:** Ctrl+Shift = ultra-fine (1/100) for drags and the wheel on every `ValueControl` (`controls::fineScale`). Ctrl alone is unchanged (FL), and so is Shift alone. Switching modifiers mid-drag continues from the current value.
+- **Is this the best way?** Yes, as a LYNX extra (coordinator decision, 2026-11-06). Every FL gesture stays the same: Ctrl alone is FL's fine step, and Ctrl+Shift in FL only repeats it, so LYNX gives that combination a use without taking one away. An option to turn it off was considered and not added, because nobody who uses FL's gestures can notice it. Logged in docs/PARITY.md › "Host workflow: LYNX extras over FL".
 
 ### 15. Backups that never stutter the sound
 - **FL:** postpones the timed backup while recording (LYNX did the same).
@@ -149,8 +150,8 @@ User decisions (2026-11-06, through the coordinator):
 - **FL (FLEngine_x64.dll strings, 2026.1):** the Playlist picker has "Select unused" › Patterns / Audio clips / Automations (`EEPickerSelectUnusedMenu`, `EEPickerSelectUnusedPatternsMenu`, `…AudioClipsMenu`, `…AutomationsMenu`). It also has "Sort patterns by name / by color" (`EEPickerSortPatternsByNameMenu` / `…ByColorMenu`), sort for audio clips (by name / color / track) and sort for automations (by name / color). FL has no merge of identical patterns.
 - **LYNX before:** none of these picker items. Only "Purge unused audio clips" and "Select unused channels" existed.
 - **Core (this slice):** `unusedPatterns`, `deletePatterns`, `reorderPatterns`, `sortPatterns` (by name: case-insensitive, stable; by colour: hue then lightness, with uncoloured patterns last in their order), `identicalPatterns` and `mergeIdenticalPatterns`. Merge is LYNX's own (the wishlist item). Same content means notes, events, length, loops and markers; empty patterns are never merged.
-- **Where FL puts them:** in FLEngine the DFM names sit in one block with `EEPickerAutoScrollMenu`, `EEPickerShowRightMenu`, `EEPickerWidth*Menu` and `EEPickerAutoGroupMenu`, the Playlist's "Picker panel" options (REA_rodada167j-gaps: "Picker panel (Enable, side, width, sort, select unused)" in the Playlist menu). To be confirmed with an FL shot at the GUI turn.
-- **UI:** Playlist menu › "Picker panel" › "Select unused" › "Patterns (n)" (picks them in the picker, as FL's selection), and "Sort patterns" › By name / By color. Below a separator are LYNX's own "Delete unused patterns (n)" and "Merge identical patterns (n)". A right-click in the picker's empty part opens the same menu. Each change is one undo step. Audio clip and automation selection and sorting (FL's other items) are not built: the LYNX picker selects patterns only.
+- **Where FL puts them (confirmed, shots in /mnt/e/lynx-work/rec177d/fl/k00–k15):** the Playlist menu has a "Picker panel" submenu. It holds Enable (Alt+P), Show on right side and Width ›, then the Selection items, then Misc. options, and last a **Tools** section with "Select unused ›" (Patterns / Audio / Automations) and "Sort ›" (Patterns › / Audio › / Automations ›, each with By name / By color, and By track for audio). A right-click on the empty part of the picker opens no menu in FL.
+- **UI (aligned with the FL shots):** Playlist menu › "Picker panel" opens with a "Tools" header, then "Select unused" › "Patterns (n)" (picks them in the picker, as FL's selection), and "Sort" › "Patterns" › By name / By color, as in FL. Below a separator are LYNX's own "Delete unused patterns (n)" and "Merge identical patterns (n)". The empty part of the picker has no right-click menu, as in FL. LYNX does not have FL's other Picker panel items yet (Enable, side, width and the Selection / Misc. options). Each change is one undo step. Audio clip and automation selection and sorting (FL's other items) are not built: the LYNX picker selects patterns only.
 
 ### 20 (continued). Sliders too
 `juce::Slider` controls (plugin editors) go through the slider contract (`ValueControl.cpp`, `setFine`). They take the same scale: Ctrl = 10×, Ctrl+Shift = 100× finer, for drags and for the wheel.
@@ -182,9 +183,18 @@ User decisions (2026-11-06, through the coordinator):
 ## 4. Slice 177d-3: mixer strip (6a EQ bypass, 6b gain-reduction meter)
 
 ### 6a. Per-track EQ bypass
-- **FL:** the insert's 3-band EQ has no bypass of its own: you reset each band (to be confirmed in FL at the next GUI turn, together with the UI shots).
+- **FL (checked, shots in /mnt/e/lynx-work/rec177d/fl/k00–k15):** the insert's 3-band Equalizer has no bypass of its own, and right-clicking its title opens no menu. You reset each band.
 - **Change:** right-click the EQ title bar in the effects panel and choose "Bypass the EQ (its settings are kept)". `TrackEq::bypassed` is saved as `eqBypassed`. A bypassed EQ costs nothing in the engine (`TrackEq::active()` is false). The title then reads "bypassed" in the disabled-text colour, and the hint adds "[RMB] bypass". FLP export writes the bands flat while bypassed, which is what FL would hear.
+- **Is this the best way?** Yes, as a LYNX extra (coordinator decision, 2026-11-06; pain point 6 from the approved list). It lives on a right-click that does nothing in FL, so no FL gesture changes. A visible button would be quicker to reach, but it would add a control FL does not have to every strip. Logged in docs/PARITY.md › "Host workflow: LYNX extras over FL".
 
 ### 6b. Gain-reduction meter (user decision: LYNX's own dynamics only)
 - **FL:** no gain reduction on the mixer strip. Each dynamics plugin shows it in its own window.
 - **Change:** a 3 px bar to the right of the strip's level meters, hanging from the top (0 to 30 dB, `mixerops::gainReductionRangeDb`). It is drawn only on strips that have an enabled LYNX compressor, Apex limiter, Crest compressor, Sentry gate, Quell denoiser, Ridge strip, Glow leveler or Hush de-esser (`mixerops::reportsGainReduction`). It reads the effect meters the engine already publishes (output 0), so the audio thread does no new work. The UI checks only strips that show a meter.
+
+## 5. Found along the way, and later proposals
+
+### Bug: audio-take track name and take name disagree
+Seen at the 177d-1 GUI check (shots l25/l26). An audio take recorded through Insert 6 is named "Insert 6_Take1", but the Playlist track it lands on is renamed "Insert 7". This is LYNX-side (FL names the track after the take's insert). It is not caused by 177d-1, which only draws the take while it records. To be fixed in a later 177d slice.
+
+### Proposal: undo steps for tweaks made in a plugin's own GUI (pain point 16)
+Plugin parameter moves made in the plugin's own window make no undo step today, and the History labels name the channel or insert, not the parameter. This needs the plugin state captured before and after a gesture (`PluginWindows::onGesture` already reports begin and end) and stored in History. That is a larger change, logged as a later proposal (coordinator, 2026-11-06).

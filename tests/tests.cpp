@@ -17053,6 +17053,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Pain177dTests.inc"
 #include "Mixer177dTests.inc"
 #include "Edit177dTests.inc"
+#include "Patterns177dTests.inc"
 #include "Issue32Tests.inc"
 #include "Mono168lTests.inc"
 #include "MixPre167qTests.inc"

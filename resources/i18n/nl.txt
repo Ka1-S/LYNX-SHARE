@@ -7353,7 +7353,7 @@ countries: nl be
 "One per channel, instruments only (no sends or buses)" = "Eén per kanaal, alleen instrumenten (geen sends of bussen)"
 "Patterns ({0})" = "Patterns ({0})"
 "Select unused" = "Ongebruikte selecteren"
-"Sort patterns" = "Patterns sorteren"
+"Sort" = "Sorteren"
 "Delete unused patterns ({0})" = "Ongebruikte patterns verwijderen ({0})"
 "Merge identical patterns ({0})" = "Identieke patterns samenvoegen ({0})"
 "Picker panel" = "Kiezerpaneel"

@@ -7353,7 +7353,7 @@ countries: jp
 "One per channel, instruments only (no sends or buses)" = "チャンネルごと、楽器のみ (センドとバスなし)"
 "Patterns ({0})" = "パターン ({0})"
 "Select unused" = "未使用を選択"
-"Sort patterns" = "パターンを並べ替え"
+"Sort" = "並べ替え"
 "Delete unused patterns ({0})" = "未使用のパターンを削除 ({0})"
 "Merge identical patterns ({0})" = "同一のパターンを統合 ({0})"
 "Picker panel" = "ピッカーパネル"

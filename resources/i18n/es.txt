@@ -7353,7 +7353,7 @@ countries: es mx ar co cl pe ve
 "One per channel, instruments only (no sends or buses)" = "Uno por canal, solo instrumentos (sin envíos ni buses)"
 "Patterns ({0})" = "Patrones ({0})"
 "Select unused" = "Seleccionar sin usar"
-"Sort patterns" = "Ordenar patrones"
+"Sort" = "Ordenar"
 "Delete unused patterns ({0})" = "Eliminar patrones sin usar ({0})"
 "Merge identical patterns ({0})" = "Fusionar patrones idénticos ({0})"
 "Picker panel" = "Panel selector"

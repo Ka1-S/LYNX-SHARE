@@ -7353,7 +7353,7 @@ countries: tw hk mo
 "One per channel, instruments only (no sends or buses)" = "每個通道一個，僅樂器（不含傳送和匯流排）"
 "Patterns ({0})" = "樣式 ({0})"
 "Select unused" = "選取未使用的"
-"Sort patterns" = "排序樣式"
+"Sort" = "排序"
 "Delete unused patterns ({0})" = "刪除未使用的樣式 ({0})"
 "Merge identical patterns ({0})" = "合併相同的樣式 ({0})"
 "Picker panel" = "選擇面板"

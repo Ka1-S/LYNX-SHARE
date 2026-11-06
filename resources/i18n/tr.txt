@@ -7353,7 +7353,7 @@ countries: tr
 "One per channel, instruments only (no sends or buses)" = "Kanal başına bir, yalnız enstrümanlar (send ve bus olmadan)"
 "Patterns ({0})" = "Pattern'ler ({0})"
 "Select unused" = "Kullanılmayanları seç"
-"Sort patterns" = "Pattern'leri sırala"
+"Sort" = "Sırala"
 "Delete unused patterns ({0})" = "Kullanılmayan pattern'leri sil ({0})"
 "Merge identical patterns ({0})" = "Aynı pattern'leri birleştir ({0})"
 "Picker panel" = "Seçici paneli"

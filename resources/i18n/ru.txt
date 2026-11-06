@@ -7353,7 +7353,7 @@ countries: ru by kz
 "One per channel, instruments only (no sends or buses)" = "Стемы: каналы, только инструменты (без посылов и шин)"
 "Patterns ({0})" = "Паттерны ({0})"
 "Select unused" = "Выбрать неиспользуемые"
-"Sort patterns" = "Сортировать паттерны"
+"Sort" = "Сортировать"
 "Delete unused patterns ({0})" = "Удалить неиспользуемые паттерны ({0})"
 "Merge identical patterns ({0})" = "Объединить одинаковые паттерны ({0})"
 "Picker panel" = "Панель выбора"

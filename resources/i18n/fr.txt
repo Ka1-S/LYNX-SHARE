@@ -7353,7 +7353,7 @@ countries: fr be ch ca lu
 "One per channel, instruments only (no sends or buses)" = "Un par canal, instruments seuls (sans envois ni bus)"
 "Patterns ({0})" = "Patterns ({0})"
 "Select unused" = "Sélectionner les inutilisés"
-"Sort patterns" = "Trier les patterns"
+"Sort" = "Trier"
 "Delete unused patterns ({0})" = "Supprimer les patterns inutilisés ({0})"
 "Merge identical patterns ({0})" = "Fusionner les patterns identiques ({0})"
 "Picker panel" = "Panneau de sélection"

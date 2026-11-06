@@ -7353,7 +7353,7 @@ countries: kr
 "One per channel, instruments only (no sends or buses)" = "채널마다 하나, 악기만 (센드·버스 제외)"
 "Patterns ({0})" = "패턴 ({0})"
 "Select unused" = "사용하지 않는 항목 선택"
-"Sort patterns" = "패턴 정렬"
+"Sort" = "정렬"
 "Delete unused patterns ({0})" = "사용하지 않는 패턴 삭제 ({0})"
 "Merge identical patterns ({0})" = "동일한 패턴 병합 ({0})"
 "Picker panel" = "피커 패널"
