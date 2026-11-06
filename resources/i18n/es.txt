@@ -7294,3 +7294,4 @@ countries: es mx ar co cl pe ve
 "{0} in {1}" = "{0} en {1}"
 "Playlist clip" = "Clip de la Playlist"
 "ON" = "ACT."
+"Wheels" = "Ruedas"

@@ -7294,3 +7294,4 @@ countries: ru by kz
 "{0} in {1}" = "{0} в {1}"
 "Playlist clip" = "Клип Playlist"
 "ON" = "ON"
+"Wheels" = "Колёса"

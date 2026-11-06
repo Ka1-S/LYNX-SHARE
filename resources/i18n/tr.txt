@@ -7294,3 +7294,4 @@ countries: tr
 "{0} in {1}" = "{1} içinde {0}"
 "Playlist clip" = "Playlist klibi"
 "ON" = "AÇIK"
+"Wheels" = "Tekerlekler"

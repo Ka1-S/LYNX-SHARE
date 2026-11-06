@@ -7294,3 +7294,4 @@ countries: pl
 "{0} in {1}" = "{0} w {1}"
 "Playlist clip" = "Clip Playlisty"
 "ON" = "WŁ."
+"Wheels" = "Kółka"

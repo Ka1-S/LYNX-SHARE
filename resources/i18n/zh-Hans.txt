@@ -7294,3 +7294,4 @@ countries: cn sg
 "{0} in {1}" = "{1} 中的 {0}"
 "Playlist clip" = "Playlist 片段"
 "ON" = "开"
+"Wheels" = "滚轮"

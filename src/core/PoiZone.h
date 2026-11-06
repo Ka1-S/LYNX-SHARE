@@ -48,6 +48,13 @@ std::unique_ptr<Instrument> makePoiZoneInstrument();
 
 namespace poizone
 {
+// PoiZone's own wheels on its editor (TSynthEditorForm: ModWheel, PitchBendWheel; REA_rodada44 §1.3: parameter 157 = the
+// mod wheel x, 158 = the pitch bend 2x − 1). FL's state does not hold them (its 172 floats carry other data past 155);
+// LYNX keeps them in ChannelDef::modelParams { mod wheel, pitch bend } (empty: 0 and the centre ½).
+constexpr int modWheelParam = 157, bendWheelParam = 158;
+std::pair<float, float> wheelsOf (const ChannelDef& channel) noexcept;
+bool setWheel (ChannelDef& channel, int index, float raw);
+
 // One note for the reference renderer (drives the engine like pzmodel.Plugin.run).
 struct RefNote
 {
