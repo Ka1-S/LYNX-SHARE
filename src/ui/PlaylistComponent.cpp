@@ -5886,9 +5886,9 @@ bool PlaylistComponent::liveFrame (double nowMs)
     if (song.mode == PlayMode::song && (playing || transport.positionTicks.load() > 0.0))
         tick = engine.songPlayheadTicks() + engine.playheadAdvanceTicks();
 
-    // only when it moved on screen: the line is anti-aliased, so a twentieth of a pixel already shows (zoomed out, a
-    // playhead crossing a few pixels a second still glides instead of stepping)
-    const auto moved = (tick < 0.0) != (playheadTick < 0.0) || std::abs ((tick - playheadTick) * pixelsPerTick) >= 0.05;
+    // whenever it moved: the line is anti-aliased, so even a fraction of a pixel shows (zoomed out, a playhead crossing
+    // a few pixels a second glides at the display's rate instead of stepping, as FL's does)
+    const auto moved = (tick < 0.0) != (playheadTick < 0.0) || std::abs ((tick - playheadTick) * pixelsPerTick) >= 0.002;
     if (moved && isShowing())
     {
         // only the cursor column (old and new) is repainted: large projects stay cheap
