@@ -3741,8 +3741,12 @@ std::string paramText (EffectKind kind, int param, float v)
             // round tp172c6: the DRIVE section (the amount reads in the selected model's units; see driveParamText)
             case driveModel: return driveModelName (driveModelIndex (v));
             case driveAmount: return fmt ("%.1f", v * 10.0);
-            case driveInput: return fmt ("%+.1f dB", driveInputDb (v));
-            case driveTrim: return fmt ("%+.1f dB", driveTrimDb (v));
+            // (whole dB from ±10 on: the read-out fits under the small dial)
+            case driveInput: case driveTrim:
+            {
+                const auto db = param == driveInput ? driveInputDb (v) : driveTrimDb (v);
+                return std::abs (db) >= 9.95 ? fmt ("%+.0f dB", db) : fmt ("%+.1f dB", db);
+            }
             case driveMix: return fmt ("%.0f%%", v * 100.0);
             default: return onOff (v);
         }
