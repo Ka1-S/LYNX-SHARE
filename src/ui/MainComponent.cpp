@@ -73,8 +73,23 @@
 #include "core/HintMarkup.h"
 #include "core/SongStats.h"
 
+#if JUCE_PLUGINHOST_VST3
+namespace juce
+{
+// cmake/LynxPatchJuce.cmake fix 17 (round 177b): LYNX's items at the top of a VST3 plugin's parameter context menu
+extern void (*lynxVst3ParamMenuHook) (AudioPluginInstance&, int, PopupMenu&);
+} // namespace juce
+#endif
+
 namespace lynx
 {
+// round 177b: the engine LYNX's VST3 parameter-menu hook uses (set while the main window lives)
+static AudioEngine*& vst3MenuEngine()
+{
+    static AudioEngine* engine = nullptr;
+    return engine;
+}
+
 namespace
 {
 using workspace::Panel;
@@ -604,6 +619,19 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         }
     };
     engine.nameAutomation = [this] (const AutomationTarget& t) { return describeAutomationTarget (engine, t).toStdString(); };
+   #if JUCE_PLUGINHOST_VST3
+    // round 177b: a right-click on a VST3 plugin's knob (when the plugin asks the host for the parameter's menu) offers
+    // LYNX's parameter items first: Create automation clip, Edit events, Link to MIDI / internal controller...
+    vst3MenuEngine() = &engine;
+    juce::lynxVst3ParamMenuHook = [] (juce::AudioPluginInstance& plugin, int param, juce::PopupMenu& menu) {
+        if (auto* e = vst3MenuEngine())
+            if (const auto t = e->targetOfPlugin (plugin, param))
+            {
+                menu.addSectionHeader ("LYNX SHARE - " + describeAutomationTarget (*e, *t));
+                addAutomationItem (menu, *e, *t, true);
+            }
+    };
+   #endif
     addAndMakeVisible (gridBox); // global grid (editors)
     snapToggleButton.setFlat (true);
     snapToggleButton.setOnColour (juce::Colours::transparentBlack);
@@ -730,6 +758,10 @@ MainComponent::~MainComponent()
     themeui::previewStartupSound = nullptr;
     onEditEventsInPianoRoll = nullptr;
     PluginWindows::onGesture = nullptr;
+   #if JUCE_PLUGINHOST_VST3
+    juce::lynxVst3ParamMenuHook = nullptr;
+    vst3MenuEngine() = nullptr;
+   #endif
     removeDialogTextFocus();
     engine.nameAutomation = nullptr;
     PluginWindows::closeAll(); // plugin UIs before the engine

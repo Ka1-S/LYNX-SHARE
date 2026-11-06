@@ -68,6 +68,11 @@
 #    dispatchGuarded) runs a message for a third-party plugin's own window inside an SEH guard: a fault in the plugin's
 #    window procedure (the reporter's synth editor, 0xC0000005 under DispatchMessageW) closes that editor instead of
 #    ending LYNX. Without a hook (tests, other programs) it is JUCE's DispatchMessage as before.
+# 17. Every platform, juce_audio_processors/format_types/juce_VST3PluginFormat.cpp (round 177b): a VST3 plugin that asks
+#    the host for a parameter's context menu (IComponentHandler3::createContextMenu with a ParamID, e.g. a right-click
+#    on a knob) gets the host's items at the top of it through `lynxVst3ParamMenuHook` (LYNX: Create automation clip,
+#    Link to controller…, as on its own knobs). JUCE built the menu from the plugin's items only. Without a hook, or
+#    for a menu without a parameter, it is JUCE's menu as before.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -172,6 +177,19 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("dispatch through the hook" "LYNX patch (issue #32): through the hook"
             "                TranslateMessage (&m);|NL|                DispatchMessage (&m);"
             "                TranslateMessage (&m);|NL||NL|                // LYNX patch (issue #32): through the hook when LYNX set one|NL|                if (lynxDispatchMessageHook != nullptr)|NL|                    lynxDispatchMessageHook (&m);|NL|                else|NL|                    DispatchMessage (&m);")
+    elseif(file MATCHES "juce_VST3PluginFormat.cpp$")
+        lynx_juce_fix("VST3 host menu hook" "LYNX patch (round 177b): the host's items in a parameter's menu"
+            "class VST3PluginInstance;|NL||NL|struct VST3HostContext final : public Vst::IComponentHandler,"
+            "class VST3PluginInstance;|NL||NL|// LYNX patch (round 177b): the host's items in a parameter's menu (set by LYNX; null = none)|NL|void (*lynxVst3ParamMenuHook) (AudioPluginInstance&, int, PopupMenu&) = nullptr;|NL||NL|struct VST3HostContext final : public Vst::IComponentHandler,")
+        lynx_juce_fix("VST3 menu remembers its parameter" "LYNX patch (round 177b): the parameter the menu is for"
+            "        tresult PLUGIN_API popup (UCoord x, UCoord y) override;|NL|"
+            "        tresult PLUGIN_API popup (UCoord x, UCoord y) override;|NL||NL|        // LYNX patch (round 177b): the parameter the menu is for (createContextMenu's ParamID)|NL|        bool lynxHasParam = false;|NL|        Vst::ParamID lynxParamId = 0;|NL|")
+        lynx_juce_fix("VST3 menu for a parameter" "LYNX patch (round 177b): a menu for a parameter"
+            "    Vst::IContextMenu* PLUGIN_API createContextMenu (IPlugView*, const Vst::ParamID*) override|NL|    {|NL|        if (plugin == nullptr)|NL|            return nullptr;|NL||NL|        auto* result = new ContextMenu (*plugin);|NL|"
+            "    Vst::IContextMenu* PLUGIN_API createContextMenu (IPlugView*, const Vst::ParamID* lynxParam) override|NL|    {|NL|        if (plugin == nullptr)|NL|            return nullptr;|NL||NL|        auto* result = new ContextMenu (*plugin);|NL|        // LYNX patch (round 177b): a menu for a parameter remembers it (the host's items, popup)|NL|        if (lynxParam != nullptr)|NL|        {|NL|            result->lynxHasParam = true;|NL|            result->lynxParamId = *lynxParam;|NL|        }|NL|")
+        lynx_juce_fix("VST3 host items in the menu" "LYNX patch (round 177b): the host's items first"
+            "    OwnedArray<PopupMenu> menuStack;|NL|    PopupMenu* topLevelMenu = menuStack.add (new PopupMenu());|NL|"
+            "    OwnedArray<PopupMenu> menuStack;|NL|    PopupMenu* topLevelMenu = menuStack.add (new PopupMenu());|NL||NL|    // LYNX patch (round 177b): the host's items first (items with their own action: their result is 0)|NL|    if (lynxVst3ParamMenuHook != nullptr && lynxHasParam)|NL|        if (auto* param = owner.getParameterForID (lynxParamId))|NL|        {|NL|            lynxVst3ParamMenuHook (owner, static_cast<AudioProcessorParameter*> (param)->getParameterIndex(), *topLevelMenu);|NL|            if (topLevelMenu->getNumItems() > 0)|NL|                topLevelMenu->addSeparator();|NL|        }|NL|")
     elseif(file MATCHES "juce_VST3Common.h$")
         lynx_juce_fix("VST3 note ids" "LYNX patch (issue #70): each note its own noteId"
             "        toEventList (result, midiBuffer, &mapping, callback);|NL|    }"
@@ -197,6 +215,7 @@ function(lynx_patch_juce juce_dir)
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_XWindowSystem_linux.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/native/juce_CoreGraphicsContext_mac.mm")
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3Common.h")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3PluginFormat.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_events/native/juce_Messaging_windows.cpp")
 endfunction()
 
