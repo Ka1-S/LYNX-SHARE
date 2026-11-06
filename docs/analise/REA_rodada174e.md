@@ -116,3 +116,88 @@ GUI cost at a higher frame rate on the Playlist.
 - **Oscilloscope**: ~11 % of a core at 72 Hz from Direct2D path stroking; a cached stroke style or a JUCE patch that
   realises the geometry once would cut it without changing its look.
 - Over-deadline counts need a quiet machine to compare builds; the 8-minute sessions here ran with load 12–27.
+
+## 6. Slice 2 (174e2): animation rate, scroll by shifting, cheaper mixer and scope
+
+Working data: `/mnt/e/lynx-work/fluid174e2/` (`sess-*.log`, `glitches-*.log`, `load-*.log` = load average every
+10 s, `ui-*.log` = `LYNX_TRACE_UI` traces, `fluid/` = dupmon frame times). Builds:
+`C:\Users\kauan\lynx-test\fluid174e\{base, s2a (new7), s2b, exp8, s2c}`. Method as above, with `session2.sh`
+(profiles on E:, `dupmon2.exe`) adding 2× `pl-zoom` (Ctrl+wheel) to phase A. No quiet window was available (other
+rounds building): load was 7–16 during these runs, so CPU shares are ±5 points between identical runs; the A/B
+below alternates builds three times.
+
+### 6.1 What changed [CODE]
+
+1. **Settings › General › Animation rate**: Display (default) / 60 Hz / 30 Hz caps every `ui::FrameTicker`
+   (playhead, meters, scope, step column) while keeping them on the display's vertical blanks. The frames are chosen
+   by `framepace::Pacer` (`src/core/FramePacing.h`): one per cap, time based (the next frame is due one interval of
+   the cap after the last; half a display frame early counts; no catch-up burst after a stall), shared by every
+   ticker with that cap, so they present on the same frames. A first version numbered the display frames
+   (absolute vblank time / estimated period, then a shared counter); both paced 60 Hz unevenly (gaps of 1–11
+   display frames, p95 38 ms) because the period estimate moved the number and other vblank sources (a second
+   monitor, a second window) advanced the counter. Test `fluid174e2_frame_pacing`. FL has no equivalent setting;
+   it is a LYNX addition asked for by the coordinator.
+2. **JUCE patch 15** (`cmake/LynxPatchJuce.cmake`, `juce_Direct2DImage_windows.cpp`): JUCE 8.0.4 copies the whole
+   image back from the GPU each time a `Graphics` drawing into a Direct2D image ends (a full-screen Playlist picture
+   = 8 MB and a GPU stall per frame). `juce::lynxSkipImageReadback`, set by `ui::ScopedNoImageReadback`, skips it for
+   LYNX's cached pictures, which are only drawn to the window. `juce_graphics` now builds from the patched copy.
+3. **Playlist: scroll by shifting the picture.** A scroll by whole pixels shifts the cached picture (two images,
+   swapped) and paints only the rows / columns it uncovered; the glide steps whole pixels. Two bugs kept it from
+   working: JUCE sends a whole-component `repaint()` to `CachedComponentImage::invalidateAll()`, not to
+   `invalidate()`, so the scroll flag was ignored and the picture dropped every frame; and the "large repaint →
+   paint straight to the window" path then kept the picture empty for the whole scroll. Both fixed (a scroll always
+   goes through the picture). Traced: a wheel frame paints 1.8–7 ms instead of 21–28 ms.
+4. **Mixer**: the cached picture of the visible strips now leaves out everything that moves with the level: the
+   meter fills and the two thin bars beside a vertical name (Wide layouts) are drawn over it, and their repaints keep
+   it valid (the thin bars had invalidated it every frame). An automated fader repaints its rail only when the cap
+   moved by 1/8 px and its dB readout only when the text changed. The meter gradient is anchored at x = 0: JUCE's
+   Direct2D gradient-brush cache (128 entries, keyed by the gradient's points) then shares one brush across all the
+   meters instead of one per meter.
+5. **Toolbar oscilloscope**: stroked into a software image and copied (`BitmapData`, row `memcpy`) into one
+   persistent native image, drawn with one `drawImage`: Direct2D no longer builds a path geometry and stroke style
+   per frame, and no software image is converted per draw. Same look (`LYNX_SCOPE_IMAGE=0` = the old path).
+
+### 6.2 Results [MEAS]
+
+8-minute sessions (240 s phases), fps from dupmon (two runs each):
+
+| build | pl-watch | pl-wheel | pl-zoom | fd-watch | fd-drag | main A / B | watch CPU A / B | over A / B | late A / B | load |
+|---|---|---|---|---|---|---|---|---|---|---|
+| base (0.1.24), base2 | 30.2 / 30.2 | 40.7 / 40.7 | 49.6 / 49.6 | 30.9 / 30.8 | 89 / 90 | 19.2 % / 17.9 % | 13.1 % / 15.0 % | 0 / 0 | 0 / 0 | 7.5–11 |
+| s2a (slice 2 before the fixes) | 143.7 / 143.7 | 38.6 / 42.7 | 105 / 107 | 141.3 / 141.2 | 134 / 136 | 21.6 % / 29.7 % | 6.7 % / 31.9 % | 0 / 1 | 0 / 22 ¹ | 5–8 |
+| s2b (+ scroll / mixer fixes) | 127.2 / 128.4 | 70.3 / 72.3 | 41.4 / 41.4 | 140.3 / 142.1 | 133 / 137 | 22.6 % / 27.4 % | 11.9 % / 31.7 % | 59 ² / 1 | 1 / 0 | 9–16 |
+| S2C_ROW |
+| FL Studio 2026 (fl2, 60 s phases) | 135 / 126 | 125 / 118 | 128 / 128 | 90 | 70 / 77 | 72 % / 56 % | — | — | — | — |
+
+¹ one burst of late *device* calls in 6 s during plain playback (09:01:45–51, load 7.4), LYNX's own processing
+over deadline 1. ² bars 68–78 in plain playback while the load average was ~15 (above 12: machine noise, as in
+slice 1); base2 at load 8 had 0.
+
+A/B, 30 s phases, three alternating rounds (main thread while watching; fps):
+
+| run | Mixer watch CPU | fd-watch | Playlist watch CPU | pl-wheel | pl-zoom | load |
+|---|---|---|---|---|---|---|
+| exp8 (per-meter rects) ×3 | 25.5 / 20.1 / 19.4 % | 141 / 122 / 141 | 26.2 / 15.1 / 12.3 % | 92–111 | 59–144 | 8.8 / 14.7 / 11.5 |
+| exp8, one union rect per frame ×3 | 17.4 / 28.9 / 25.6 % | 141 / 142 / 141 | 11.4 / 11.7 / 24.3 % | 84–112 | 82–91 | 7.0 / 8.3 / 11.3 |
+| base ×3 | 17.7 / 12.2 / 12.9 % | 30.9 | 12.0 / 11.4 / 9.2 % | 34–38 | 49–50 | 6.8 / 8.6 / 9.4 |
+
+pl-zoom varies most between runs (41–144 fps on the same code): the runs start from the zoom the previous run
+left, and at the zoom limit nothing changes on screen (counted as fast frames); read it as a range.
+
+Per-meter rectangles and one union rectangle per frame are within the noise of each other (over all six runs of
+each, x/y/z series: union 21.6 % mean, best 15.1 %; per-meter 22.4 %, best 15.0 %); the union rectangle is kept
+(one repaint call per frame, `MixerStrips::advanceMeters`). Earlier single runs with experiment switches (since removed): flat meter colour instead of the gradient
+26.7 %, no meter overlay at all 22.5 %: the remaining Mixer cost is not in LYNX's paint code (the traced paints are
+0.1–0.4 ms a frame) but in the per-frame window present, which only fewer frames reduce.
+
+Animation rate, 30 s phases on s2b (before the pacer): 60 Hz = 60 fps, Mixer watch 15.3 %; 30 Hz = 29 fps,
+Mixer watch 5.7 % (gaps uneven: fixed by the pacer, AR_ROW).
+
+### 6.3 Open
+
+- **Mixer main thread at 140 fps is ~20 % (base 14 % at 31 fps)**: per frame it is a third of base's cost; the
+  rest is the window's present at 140 Hz. Not reached: ≤ 14.5 % at 140 fps. The 60 Hz setting brings it to ~15 %.
+  Next step if wanted: present the Mixer from its own child window / swap chain, or measure on a quiet machine first
+  (the coordinator schedules a clean 174c re-run before the 0.1.25 tag).
+- **Zoom (Ctrl+wheel) 80–90 fps, FL 128**: every zoom step repaints the whole Playlist (~22 ms traced: clip
+  frames, names, waveforms). Needs a per-clip picture cache (waveform and frame images reused across zoom levels).

@@ -22,6 +22,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <functional>
+#include <map>
 
 namespace lynx::ui
 {
@@ -106,9 +107,8 @@ private:
     {
         const auto nowMs = juce::Time::getMillisecondCounterHiRes();
         lastVBlankMs = nowMs;
-        // at most maxHz, on the same frames for every ticker (one window present per frame instead of one per ticker):
-        // the display's frame period (measured from the vertical blanks' own clock, shared by all the tickers) gives
-        // a frame number; a ticker capped to a half of the refresh runs on the even frames, a third on every third...
+        // at most maxHz (or the Animation rate), on the same frames for every ticker (one window present per frame
+        // instead of one per ticker): the display's frame period is measured from the vertical blanks' own clock
         const auto frameMs = seconds * 1000.0;
         auto& period = framePeriodMs();
         if (const auto delta = frameMs - lastFrameMs; lastFrameMs > 0.0 && delta > 2.0 && delta < 50.0)
@@ -118,11 +118,10 @@ private:
         lastFrameMs = frameMs;
         if (period > 0.0)
         {
-            // this ticker's frames per display frame: below one, it runs on the display frames where the running count
-            // n * perFrame reaches a new whole number (the same frames for every ticker with the same cap: 72 Hz on a
-            // 144 Hz display = every other frame, 60 Hz = 60 of the 144, evenly spread)
+            // below the refresh, the frames where this cap's next one is due (core/FramePacing.h): 72 Hz on a 144 Hz
+            // display = every other frame, 60 Hz = every 2nd / 3rd, the same frames for every ticker with that cap
             const auto cap = rateLimit() > 0 ? juce::jmin (maxHz, (double) rateLimit()) : maxHz;
-            if (! framepace::runs ((double) std::llround (frameMs / period), period * cap / 1000.0))
+            if (! pacerFor (cap).runs (frameMs, period, cap))
                 return;
         }
 
@@ -130,6 +129,13 @@ private:
             quiet = 0;
         else
             ++quiet; // (detached by the timer: not from inside the attachment's own callback)
+    }
+
+    // One pacer per cap, shared by the tickers with that cap (they run on the same frames). Message thread.
+    static framepace::Pacer& pacerFor (double capHz)
+    {
+        static std::map<int, framepace::Pacer> pacers;
+        return pacers[juce::roundToInt (capHz * 10.0)];
     }
 
     static double& framePeriodMs()

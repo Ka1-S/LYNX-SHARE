@@ -2696,8 +2696,8 @@ void MixerStrips::paintMeterLevel (juce::Graphics& g, int t, int ch, juce::Recta
     if (h > 0)
     {
         const auto lit = bar.withTop (bar.getBottom() - h);
-        juce::ColourGradient gradient (colour::meterClip, (float) bar.getX(), (float) bar.getY(), colour::meterLow, (float) bar.getX(),
-                                       (float) bar.getBottom(), false);
+        // (vertical: every meter of the same height shares one gradient, so JUCE's Direct2D brush cache hits)
+        juce::ColourGradient gradient (colour::meterClip, 0.0f, (float) bar.getY(), colour::meterLow, 0.0f, (float) bar.getBottom(), false);
         gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (0.0f)), colour::meterClip); // above 0 dB: clip zone
         gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-6.0f)), colour::meterMid);
         gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-18.0f)), colour::meterLow);
@@ -2781,6 +2781,9 @@ bool MixerStrips::liveFrame (double nowMs)
         }
     }
 
+    // every meter row that changed by a pixel goes into one rectangle, repainted once per frame (round 174e2: the A/B
+    // against one repaint per meter favoured the single rectangle, within the noise of the machine)
+    juce::Rectangle<int> dirty;
     for (std::size_t i = 0; i < levels.size(); ++i)
     {
         auto& m = levels[i];
@@ -2800,17 +2803,23 @@ bool MixerStrips::liveFrame (double nowMs)
         const auto rows = meters::dirtyRows (before, m, area.getHeight(), [] (float v) { return meterPosition (v); });
         if (! rows.empty())
         {
-            meterRepaintOnly = meterCacheOn; // (the cached picture under the bar stays valid)
-            repaint (area.getX() + ch * (sp.meterWidth + 2) - 1, area.getY() + rows.top - 1, sp.meterWidth + 2, rows.bottom - rows.top + 2);
+            const juce::Rectangle<int> bar (area.getX() + ch * (sp.meterWidth + 2) - 1, area.getY() + rows.top - 1, sp.meterWidth + 2,
+                                            rows.bottom - rows.top + 2);
+            dirty = dirty.isEmpty() ? bar : dirty.getUnion (bar);
             // the thin bars beside the name: only the bar that moved, and (cached) over the picture as well (round 174e2)
             if (const auto bars = nameBars (t); ! bars.isEmpty()
                 && (int) (meterPosition (m.level) * 64.0f) != (int) (meterPosition (before.level) * 64.0f))
             {
                 const auto bw = (bars.getWidth() - 3) / 2;
-                repaint (bars.getX() + 1 + ch * (bw + 1) - 1, bars.getY(), bw + 2, bars.getHeight());
+                dirty = dirty.getUnion ({ bars.getX() + 1 + ch * (bw + 1) - 1, bars.getY(), bw + 2, bars.getHeight() });
             }
-            meterRepaintOnly = false;
         }
+    }
+    if (! dirty.isEmpty())
+    {
+        meterRepaintOnly = meterCacheOn; // (the cached picture under the meters stays valid: they are drawn over it)
+        repaint (dirty);
+        meterRepaintOnly = false;
     }
     return moving;
 }
