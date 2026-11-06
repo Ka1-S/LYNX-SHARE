@@ -501,9 +501,11 @@ inline const Theme& crestTheme()
         Theme x;
         x.name = "Crest Compressor";
         x.base = Style::glow;
-        x.pal = { Colour (0xff1c1e24), Colour (0xff0a0b0e), Colour (0xffffb340), Colour (0xff7fe3ff), Colour (0x9c1a1c22), Colour (0xb80c0d10),
-                  Colour (0xff6e6450), Colour (0xfff2e6cf), Colour (0xff07080a), Colour (0xff2c2e33), Colour (0xff111215), Colour (0xff22242a),
-                  Colour (0xfffff3d9), Colour (0xff191b20) };
+        // round tp172b4: the reference's warm graphite field, dark caps and a thin yellow arc (sampled: arc #f8c838,
+        // caps #29252a, field #262429)
+        x.pal = { Colour (0xff2b292e), Colour (0xff1c1a1e), Colour (0xfff8c838), Colour (0xff7fe3ff), Colour (0x9c2a282d), Colour (0xb81c1a1e),
+                  Colour (0xff4e4a50), Colour (0xffd6d0d6), Colour (0xff1f1d21), Colour (0xff353136), Colour (0xff1f1c20), Colour (0xff151316),
+                  Colour (0xfff8c838), Colour (0xff2e2b30) };
         x.canvas = canvasCrest;
         x.titleEmblem = crestEmblem;
         x.cap = Cap::flat;
