@@ -2,6 +2,7 @@
 #include "engine/FileSort.h"
 #include "platform/Paths.h"
 
+#include "core/PlaylistOps.h"
 #include "core/Drumaxx.h"
 #include "core/PatternBlocks.h"
 #include "core/LoadTrace.h"
@@ -2818,10 +2819,25 @@ private:
         // round 177b: a plugin's sidechain bus gets the slot's sidechain (one-click sidechain)
         const auto sidechainResult = lynx::pluginSidechainSelfTest();
 
+        // round 177b: automation lanes come back from a project (track, automation, height, folded)
+        juce::String lanesResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            const auto lane = lynx::autolanes::addLane (song, 3, { lynx::AutomationTargetKind::mixerVolume, 1, 0, 0 }, "Vol", 0.4f);
+            song.playlistTracks[3].lanes[0].height = 72;
+            song.playlistTracks[3].lanesFolded = true;
+            juce::String why;
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why);
+            if (! back || back->playlistTracks.size() < 4 || ! (back->playlistTracks[3].lanes == song.playlistTracks[3].lanes)
+                || ! back->playlistTracks[3].lanesFolded || back->automations.size() != song.automations.size()
+                || ! (back->automations[(std::size_t) lane].points == song.automations[(std::size_t) lane].points))
+                lanesResult = "ERROR " + why;
+        }
+
         const auto ok = audioOk && projectOk && richOk && hwOutOk && flp168jOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
-                        && sidechainResult == "OK";
+                        && sidechainResult == "OK" && lanesResult == "OK";
 
         juce::String report;
         report << "connections=" << offline.getNumGraphConnections() << "\n"
@@ -2848,6 +2864,7 @@ private:
                << "driver_panel=" << driverPanel << "\n"
                << "plugin_art=" << artResult << "\n"
                << "plugin_sidechain=" << sidechainResult << "\n"
+               << "lanes_saved=" << lanesResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n"
                << "result=" << (ok ? "OK" : "FAILED") << "\n";

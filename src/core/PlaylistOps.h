@@ -175,3 +175,22 @@ struct Place
 // taken; instrument tracks take no automation clips: FL's "Instrument tracks are not for audio or automation clips.").
 Place forNewClip (const Song& song, bool atPlayback, std::int64_t playTick);
 } // namespace lynx::autoclipplace
+
+// Round 177b: optional automation lanes under Playlist tracks (Song.h AutomationLane). Plain edits for editSong.
+namespace lynx::autolanes
+{
+// The track whose lanes hold automation `a`, or -1 (an automation clip's automation, a live link...).
+int ownerTrack (const Song& song, int automation);
+// A new lane on `track` for `target`, a flat line at `value` over the song; returns the automation index (-1: bad track).
+int addLane (Song& song, int track, const AutomationTarget& target, const std::string& name, float value);
+// Removes lane `lane` of `track` and its automation.
+bool removeLane (Song& song, int track, int lane);
+// "Move clip into lane": the automation clip's curve (over its span, offset applied) replaces what the lane of the same
+// target on `track` has there (a lane is made when there is none); the clip is removed. Returns the lane's automation.
+int clipToLane (Song& song, int clip, int track);
+// "Lane to automation clip": the lane's automation becomes a clip on the first free track over [0, its end]; the lane
+// entry goes. Returns the new clip's index, or -1.
+int laneToClip (Song& song, int track, int lane);
+// Every lane to a clip (the .flp export: FL has no lanes). Returns how many.
+int lanesToClips (Song& song);
+} // namespace lynx::autolanes

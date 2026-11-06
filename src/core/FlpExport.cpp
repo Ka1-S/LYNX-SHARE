@@ -1,3 +1,4 @@
+#include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
 
 #include <algorithm>
@@ -1497,6 +1498,9 @@ flp::Project toProject (const Song& input, const Options& options, Report& repor
         if (n > 0)
             report.notes.push_back ("Pattern Blocks: " + std::to_string (n) + " block(s) written as pattern clips (FL 2026 has no blocks)");
     }
+    // automation lanes (round 177b): FL has none; each becomes an automation clip on a free track
+    if (const auto n = autolanes::lanesToClips (song); n > 0)
+        report.notes.push_back ("Automation lanes: " + std::to_string (n) + " lane(s) written as automation clips (FL has no lanes)");
     Converter c (song, options, report);
     c.run();
     return std::move (c.out);

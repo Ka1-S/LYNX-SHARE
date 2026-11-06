@@ -734,6 +734,15 @@ void Song::removeAutomation (int index)
 
     automations.erase (automations.begin() + index);
 
+    for (auto& track : playlistTracks) // round 177b: lanes follow the renumbering; the removed one's lane goes
+    {
+        track.lanes.erase (std::remove_if (track.lanes.begin(), track.lanes.end(), [index] (const AutomationLane& l) { return l.automation == index; }),
+                           track.lanes.end());
+        for (auto& l : track.lanes)
+            if (l.automation > index)
+                --l.automation;
+    }
+
     forEachClipList ([index] (std::vector<Clip>& clips) {
         clips.erase (std::remove_if (clips.begin(), clips.end(),
                                      [index] (const Clip& c) { return c.kind == ClipKind::automation && c.automation == index; }),

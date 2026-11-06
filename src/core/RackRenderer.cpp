@@ -1155,6 +1155,22 @@ void RackState::buildAutomationTables()
         std::sort (clips.begin(), clips.end(),
                    [this] (int a, int b) { return song.playlist[(std::size_t) a].start < song.playlist[(std::size_t) b].start; });
 
+    // round 177b: the lanes of unmuted tracks; a lane automation's own clips (if any) don't play as clips
+    laneAutomations.clear();
+    for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+        for (const auto& lane : song.playlistTracks[(std::size_t) t].lanes)
+            if (lane.automation >= 0 && lane.automation < count && ! song.isTrackMuted (t)
+                && ! automations[(std::size_t) lane.automation].points.empty())
+            {
+                automationClips[(std::size_t) lane.automation].clear();
+                laneAutomations.push_back ({ lane.automation, {} });
+            }
+    for (auto& lane : laneAutomations)
+        for (int a = 0; a < count; ++a)
+            if (a != lane.automation && ! automationClips[(std::size_t) a].empty()
+                && automations[(std::size_t) a].target == automations[(std::size_t) lane.automation].target)
+                lane.clipPeers.push_back (a);
+
     liveAutomations.clear();
     for (int a = 0; a < count; ++a)
         if (automations[(std::size_t) a].isLive())
@@ -1274,6 +1290,9 @@ void RackState::buildAutomationTables()
 
         bind (a, automations[(std::size_t) a].target);
     }
+    // a lane binds its target last: it carries the clips of the same target where they play (render)
+    for (const auto& lane : laneAutomations)
+        bind (lane.automation, automations[(std::size_t) lane.automation].target);
 
     // pattern events (event editor): slots after the automations; they win over automation clips of the same
     // target. The tempo is not driven by pattern events.
@@ -1792,6 +1811,20 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
     for (std::size_t a = 0; a < state.automationClips.size(); ++a)
         if (! state.automationClips[a].empty())
             automationValues[a] = automationValueAt (song, song.automations[a], state.automationClips[a], tick);
+
+    // automation lanes (round 177b): the lane's curve in song time, except where a clip of the same target plays
+    for (const auto& lane : state.laneAutomations)
+    {
+        auto value = std::numeric_limits<float>::quiet_NaN();
+        for (const auto peer : lane.clipPeers)
+            for (const auto i : state.automationClips[(std::size_t) peer])
+                if (const auto& c = song.playlist[(std::size_t) i]; tick >= (double) c.start && tick < (double) c.end())
+                {
+                    value = automationValues[(std::size_t) peer];
+                    break;
+                }
+        automationValues[(std::size_t) lane.automation] = std::isnan (value) ? song.automations[(std::size_t) lane.automation].valueAt (tick) : value;
+    }
 
     // Performance mode: the launched automation clips (the last block's passes) drive their automation
     if (perfRunning)

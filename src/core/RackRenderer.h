@@ -66,6 +66,14 @@ struct RackState
     static constexpr int maxAutomations = 1024;
     std::vector<std::vector<int>> automationClips; // per automation: clips in the Playlist
     std::vector<char> zoneAutomations;             // per automation: it has clips in the performance zone
+    // round 177b: automation lanes (PlaylistTrack::lanes): the lane automations that play, and per lane the automations
+    // of the same target that have clips (where one of their clips plays, it wins over the lane)
+    struct LanePlay
+    {
+        int automation = -1;
+        std::vector<int> clipPeers;
+    };
+    std::vector<LanePlay> laneAutomations;
     std::vector<int> channelVolumeAuto, channelPanAuto;
     std::vector<int> mixerVolumeAuto, mixerPanAuto;
     std::vector<std::vector<std::array<int, maxEffectParams>>> effectParamAuto; // [track][slot][param] (built-in)

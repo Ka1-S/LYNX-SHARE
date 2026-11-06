@@ -1390,6 +1390,16 @@ struct TrackPerformance
     bool operator== (const TrackPerformance&) const = default;
 };
 
+// Round 177b: an optional automation lane under a Playlist track (Live / Bitwig style, next to FL's clips): the
+// automation's points are in song time and play over the whole song; where an automation clip of the same target
+// plays, the clip wins (Bitwig's rule). Display only: `height` (px, 0 = default).
+struct AutomationLane
+{
+    int automation = -1; // index into Song::automations
+    int height = 0;
+    bool operator== (const AutomationLane&) const = default;
+};
+
 // Header of a Playlist track.
 struct PlaylistTrack
 {
@@ -1415,6 +1425,8 @@ struct PlaylistTrack
     // height in px whatever the vertical zoom and the Size menu; ≤ 0 = not locked (FL keeps −the last locked height).
     int lockedHeight = -1;
     int icon = 0; // FL's playlist track icon (.flp 0xEE u32 at 8, REA round 168j): FL's icon index, 0 = none. Kept and saved.
+    std::vector<AutomationLane> lanes; // round 177b: optional automation lanes (shared by every arrangement)
+    bool lanesFolded = false;          // the lanes are hidden under the track
     bool operator== (const PlaylistTrack&) const = default;
 };
 
