@@ -122,6 +122,7 @@ public:
     bool isLit() const noexcept { return litFrames > 0; }
     void paint (juce::Graphics& g) override;
     void mouseUp (const juce::MouseEvent& e) override;
+    void stepTool (int direction); override;
     ui::Hint hintAt (juce::Point<int> position) override;
 
     std::function<void()> onReconnect;
