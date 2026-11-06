@@ -57,6 +57,17 @@ inline bool hasNoteInCell (const Pattern& pattern, int channel, int key, std::in
 // other pattern clips, mapped into `pattern`'s own time. FL draws these hollow. Muted clips are skipped; a clip longer
 // than its pattern loops it with stretchedClipsLoop() (LYNX extra), else plays it once (FL, round 168k). Empty when
 // the pattern is not in the Playlist.
+// Round 177d (pain point 25): the song tick of the pattern's tick 0 as it plays in the Playlist (its first unmuted
+// clip, as for the clip ghosts), or -1 when no clip of it is on the Playlist.
+inline std::int64_t patternSongOrigin (const Song& song, int pattern)
+{
+    const Clip* home = nullptr;
+    for (const auto& c : song.playlist)
+        if (c.kind == ClipKind::pattern && c.pattern == pattern && ! c.muted && (home == nullptr || c.start < home->start))
+            home = &c;
+    return home == nullptr ? -1 : home->start - home->offset;
+}
+
 inline std::vector<Note> clipGhostNotes (const Song& song, int pattern, int channel, std::size_t limit = 2000)
 {
     std::vector<Note> out;

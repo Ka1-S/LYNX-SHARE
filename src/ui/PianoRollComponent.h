@@ -106,6 +106,7 @@ public:
     // default): a selection of 2 to 10 different keys shows its chord name over the grid's top-left corner. The main
     // window saves both with the UI options.
     static inline bool gridHighlights = true, showChordName = false;
+    static inline bool songBarsRuler = false; // round 177d: the ruler numbers song bars (off = FL: pattern bars)
     // View › Background waveform (Alt+N): an audio file dropped on the Piano roll is drawn behind the notes from the
     // pattern's start at the song tempo (FL's FUN_00e70bf0 / FUN_00e45a00); one for every editor, not saved.
     static bool isBackgroundWaveShown() noexcept;
@@ -234,6 +235,8 @@ private:
 
     void deleteSelection();
     void copySelection();
+    std::vector<Note> visibleGhostNotes() const; // round 177d: the ghost notes on show, as notes (song pattern ticks)
+    void copyGhostNotes();
     void paste();
     void duplicateSelection();
     void nudge (std::int64_t ticks, int keys);
