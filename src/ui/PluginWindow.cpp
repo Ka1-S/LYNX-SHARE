@@ -140,7 +140,9 @@ public:
         g.fillAll (colour::bg1);
         g.setColour (colour::textSecondary);
         g.setFont (font (type::caption));
-        g.drawText (tr ("version {0}", { plugin.getPluginDescription().version }), getWidth() - 200, 8, 184, tabHeight, juce::Justification::centredRight);
+        // the plugin's own version; nothing when it reports none (VST2's effGetVendorVersion 0 arrives as "0")
+        if (const auto version = plugin.getPluginDescription().version.trim(); version.containsAnyOf ("123456789"))
+            g.drawText (tr ("version {0}", { version }), getWidth() - 200, 8, 184, tabHeight, juce::Justification::centredRight);
         for (const auto& [area, title] : groups)
         {
             g.setColour (colour::bg2);
