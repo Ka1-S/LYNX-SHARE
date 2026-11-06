@@ -1,4 +1,5 @@
 #include "platform/CrashGuard.h"
+#include "core/CrashReport.h"
 
 #include <algorithm>
 #include <atomic>
@@ -294,6 +295,7 @@ const char* describe (std::uint32_t code) noexcept
         case 0xC00000FDu: return "stack overflow";
         case 0xC000008Eu: case 0xC0000090u: case 0xC0000091u: case 0xC0000093u: return "floating-point exception";
         case 0xC0000409u: return "buffer overrun";
+        case 0xC0000374u: return "heap corruption";
         case 0xE06D7363u: case 0x20474343u: return "C++ exception";
         default: return "exception";
     }
@@ -337,6 +339,15 @@ std::string symbolOf (DWORD64 address)
     DWORD64 displacement = 0;
     if (! SymFromAddr (GetCurrentProcess(), address, &displacement, info))
         return {};
+    // LYNX.exe's own frames without its PDB: the nearest export is one of the few the exe has (pocketpy's py_*), not
+    // the function (issue #32 reports named main and the CRT start-up "py_tpbase + 0x18a9"); the offset says more alone
+    if (info->ModBase == (DWORD64) (std::uintptr_t) GetModuleHandleW (nullptr))
+    {
+        IMAGEHLP_MODULEW64 module {};
+        module.SizeOfStruct = sizeof (module);
+        if (! SymGetModuleInfoW64 (GetCurrentProcess(), address, &module) || module.SymType == SymExport || module.SymType == SymNone)
+            return {};
+    }
     char text[320];
     std::snprintf (text, sizeof (text), "%s + 0x%llx", info->Name, (unsigned long long) displacement);
     return text;
@@ -721,6 +732,188 @@ std::string symbolizeOwnFrames (const std::string& text)
 #endif
     return out;
 }
+
+// --- plugin editor windows (issue #32, round 174a) ----------------------------------------------------------------
+
+bool windowFaultCatchable (std::uint32_t code) noexcept
+{
+    return crashreport::editorFaultCatchable (code);
+}
+
+#if defined(LYNX_UNWIND)
+namespace
+{
+WindowClaim windowClaim = nullptr;
+void (*windowFaultHandler) (const WindowFault&) = nullptr;
+
+// the fault being handled (written by the filter on the faulting thread, read right after the guard; the message
+// thread only)
+struct CaughtFault
+{
+    HWND root = nullptr;
+    std::uint32_t code = 0;
+    std::uintptr_t address = 0;
+    std::uintptr_t frames[64] = {};
+    int frameCount = 0;
+    wchar_t module[MAX_PATH] = {};
+};
+CaughtFault caught;
+bool filtering = false;
+
+constexpr int maxDeadWindows = 16;
+HWND deadWindows[maxDeadWindows] = {};
+
+bool isDead (HWND root) noexcept
+{
+    if (root == nullptr)
+        return false;
+    for (auto* w : deadWindows)
+        if (w == root)
+            return true;
+    return false;
+}
+
+// the window, its top-level window or any window up its owner chain is a faulted editor (LYNX makes plugin windows
+// owned by the main window, so GA_ROOTOWNER would always be the main window)
+bool underDeadWindow (HWND window) noexcept
+{
+    auto h = window != nullptr ? GetAncestor (window, GA_ROOT) : nullptr;
+    for (int i = 0; i < 8 && h != nullptr; ++i)
+    {
+        if (isDead (h))
+            return true;
+        const auto owner = GetWindow (h, GW_OWNER);
+        h = owner != nullptr ? GetAncestor (owner, GA_ROOT) : nullptr;
+    }
+    return false;
+}
+
+// a module of Windows itself (System32, SysWOW64, WinSxS...): not who to blame
+bool systemModule (const wchar_t* path) noexcept
+{
+    wchar_t windows[MAX_PATH] = {};
+    const auto n = GetWindowsDirectoryW (windows, MAX_PATH);
+    return n > 0 && n < MAX_PATH && CompareStringOrdinal (path, (int) n, windows, (int) n, TRUE) == CSTR_EQUAL;
+}
+
+int windowFilter (const MSG* m, EXCEPTION_POINTERS* ep) noexcept
+{
+    if (ep == nullptr || ep->ExceptionRecord == nullptr || ep->ContextRecord == nullptr || windowClaim == nullptr || filtering)
+        return EXCEPTION_CONTINUE_SEARCH;
+    const auto code = (std::uint32_t) ep->ExceptionRecord->ExceptionCode;
+    if (! windowFaultCatchable (code))
+        return EXCEPTION_CONTINUE_SEARCH;
+    filtering = true;
+    int result = EXCEPTION_CONTINUE_SEARCH;
+    caught = {};
+    caught.code = code;
+    caught.address = (std::uintptr_t) ep->ExceptionRecord->ExceptionAddress;
+    caught.frameCount = unwind (*ep->ContextRecord, caught.frames, 64);
+    // the first frame outside Windows' modules is who faulted (a C++ throw starts in KERNELBASE's RaiseException)
+    const auto self = GetModuleHandleW (nullptr);
+    for (int i = 0; i < caught.frameCount; ++i)
+    {
+        HMODULE module = nullptr;
+        if (! GetModuleHandleExW (GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                                  reinterpret_cast<LPCWSTR> (caught.frames[i]), &module) || module == nullptr)
+            continue; // generated code (a plugin's JIT): look further
+        wchar_t path[MAX_PATH] = {};
+        if (GetModuleFileNameW (module, path, MAX_PATH) == 0 || systemModule (path))
+            continue;
+        if (module != self) // LYNX's own fault stays a crash (its crash file and report)
+        {
+            lstrcpynW (caught.module, path, MAX_PATH);
+            if (auto* root = static_cast<HWND> (windowClaim (m->hwnd, path)))
+            {
+                caught.root = root;
+                result = EXCEPTION_EXECUTE_HANDLER;
+            }
+        }
+        break;
+    }
+    filtering = false;
+    return result;
+}
+
+// no C++ objects in this frame (SEH and C++ unwinding must not share one function)
+bool dispatchInGuard (const MSG* m) noexcept
+{
+    __try
+    {
+        DispatchMessageW (m);
+        return false;
+    }
+    __except (windowFilter (m, GetExceptionInformation()))
+    {
+        return true;
+    }
+}
+} // namespace
+
+void setWindowGuard (WindowClaim claim, void (*onFault) (const WindowFault&)) noexcept
+{
+    windowClaim = claim;
+    windowFaultHandler = onFault;
+}
+
+void forgetWindow (void* rootWindow) noexcept
+{
+    for (auto& w : deadWindows)
+        if (w == static_cast<HWND> (rootWindow))
+            w = nullptr;
+}
+
+void dispatchGuarded (const void* msg) noexcept
+{
+    const auto* m = static_cast<const MSG*> (msg);
+    if (m == nullptr)
+        return;
+    // a faulted editor until it is closed: its messages are dropped (a dirty one would be painted again at once)
+    if (m->hwnd != nullptr && underDeadWindow (m->hwnd))
+    {
+        if (m->message == WM_PAINT)
+            ValidateRect (m->hwnd, nullptr);
+        return;
+    }
+    if (! dispatchInGuard (m))
+        return;
+
+    const auto root = caught.root;
+    ShowWindow (root, SW_HIDE); // at once: no more paints of a half-dead editor
+    for (auto& w : deadWindows)
+        if (w == nullptr || w == root)
+        {
+            w = root;
+            break;
+        }
+    try
+    {
+        WindowFault fault;
+        fault.rootWindow = root;
+        fault.code = caught.code;
+        fault.where = describeAddress (reinterpret_cast<const void*> (caught.address));
+        fault.module = narrow (caught.module);
+        char head[160];
+        std::snprintf (head, sizeof (head), "exception 0x%08lx (%s) at ", (unsigned long) caught.code, describe (caught.code));
+        fault.trace = head + fault.where + "\n" + formatFrames (std::vector<std::uintptr_t> (caught.frames, caught.frames + caught.frameCount));
+        if (windowFaultHandler != nullptr)
+            windowFaultHandler (fault);
+    }
+    catch (...) {}
+}
+#else
+void setWindowGuard (WindowClaim, void (*) (const WindowFault&)) noexcept {}
+void forgetWindow (void*) noexcept {}
+void dispatchGuarded (const void* msg) noexcept
+{
+ #if defined(_WIN32)
+    if (msg != nullptr)
+        DispatchMessageW (static_cast<const MSG*> (msg));
+ #else
+    (void) msg;
+ #endif
+}
+#endif
 
 std::string lastHangFile()
 {

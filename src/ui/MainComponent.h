@@ -142,6 +142,8 @@ private:
     void showShortcutManager();
     int scansSeen = 0; // background plugin scans already announced in the hint bar
     int pluginCrashesSeen = 0; // hosted plugins that crashed (engine/PluginHost.h) and were already announced
+    int editorCrashesSeen = 0; // faults in plugin editor windows (ui/PluginWindow.h, issue #32) already announced
+    void announceEditorCrash (const juce::String& plugin);
     void showHelp();
     void closeUnfocusedWindows();
     void closeHelp();
@@ -257,7 +259,7 @@ private:
     void flUndo();
     bool alternateUndo = false; // Settings › General › "Alternate undo mode" (FL's default: off)
     std::unique_ptr<toolbar::EditOverlay> toolbarEditor;
-    std::unique_ptr<juce::Component> pluginPickerView; // FL's Plugin picker (F8), over the main window (round 169k)
+    std::unique_ptr<juce::Component> pluginPickerView; // FL's Plugin picker (F8), its own window over the screen (rounds 169k, 175b)
     void togglePluginPicker();
     std::unique_ptr<juce::Component> setupOverlay; // the first-start / Options > Setup wizard, over everything
     toolbar::EditOverlay::Bounds panelBounds {}; // each shown toolbar panel (for the edit mode)

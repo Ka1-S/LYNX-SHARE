@@ -28,4 +28,6 @@ juce::String report (const juce::String& path);
 // `channel`: the Channel Rack channel (−1 in a Patcher: `locate` finds the node)
 std::unique_ptr<juce::Component> makeVideoPlayerEditor (AudioEngine& engine, std::function<ChannelDef* (Song&)> locate, int channel);
 std::unique_ptr<juce::Component> makeVideoPlayerEditor (AudioEngine& engine, int channel);
+// The Video Player editor inside `root` (it may be `root`) shows `still` on its screen (the picker's thumbnail)
+void showVideoStill (juce::Component& root, const juce::Image& still);
 } // namespace lynx

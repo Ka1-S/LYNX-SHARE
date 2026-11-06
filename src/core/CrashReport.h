@@ -104,6 +104,25 @@ std::string jsonEscape (std::string_view utf8);     // the quoted JSON string
 std::string repairUtf8 (std::string_view text);     // invalid bytes -> U+FFFD
 std::string truncateUtf8 (std::string_view text, std::size_t maxBytes); // never cuts a character
 bool validId (std::string_view id);                 // lower-case UUID v4 (what the server accepts)
+// Issue #32 (round 174a): a "freeze" whose sampled UI stack is inside Windows' own fatal-error report (heap corruption
+// found by free(), or another exception Windows is reporting: RtlReportException / WER under KiUserExceptionDispatcher)
+// is the process dying, not a frozen UI. Its hang file is the only stack such a crash leaves (a fail-fast skips the
+// crash handler), so the report says "crash".
+bool hangIsFatalReport (std::string_view hangText);
+// Issue #32 (round 174a): a fault inside a plugin's own editor window that LYNX caught (the editor was closed, LYNX went
+// on) is a session step "plugin editor crashed: <name> (<what> at <module+offset>), trace in autosave\<file>". A later
+// report of the session carries that trace when it has no crash file of its own, and the start-up dialog offers that
+// plugin a separate process.
+constexpr const char* editorCrashStepPrefix = "plugin editor crashed: ";
+struct EditorCrashStep
+{
+    std::string plugin, traceFile; // both empty when the step is another one
+};
+EditorCrashStep parseEditorCrashStep (std::string_view step); // with or without the "HH:MM:SS " time
+// Whether a fault with this exception code (NTSTATUS) inside a plugin's editor window may be caught and the editor
+// closed (platform/CrashGuard.h dispatchGuarded): errors and C++ exceptions yes; debugger events, heap corruption,
+// stack overflow and fail-fast never (going on with a damaged heap or stack only moves the crash)
+bool editorFaultCatchable (std::uint32_t code) noexcept;
 std::string formatUuid (const std::uint8_t (&bytes)[16]); // the v4 UUID text of 16 random bytes (version bits set)
 
 // ---- GitHub ------------------------------------------------------------------------------------------------------

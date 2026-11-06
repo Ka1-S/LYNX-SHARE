@@ -137,7 +137,7 @@ below alternates builds three times.
    display frames, p95 38 ms) because the period estimate moved the number and other vblank sources (a second
    monitor, a second window) advanced the counter. Test `fluid174e2_frame_pacing`. FL has no equivalent setting;
    it is a LYNX addition asked for by the coordinator.
-2. **JUCE patch 15** (`cmake/LynxPatchJuce.cmake`, `juce_Direct2DImage_windows.cpp`): JUCE 8.0.4 copies the whole
+2. **JUCE patch 16** (`cmake/LynxPatchJuce.cmake`, `juce_Direct2DImage_windows.cpp`): JUCE 8.0.4 copies the whole
    image back from the GPU each time a `Graphics` drawing into a Direct2D image ends (a full-screen Playlist picture
    = 8 MB and a GPU stall per frame). `juce::lynxSkipImageReadback`, set by `ui::ScopedNoImageReadback`, skips it for
    LYNX's cached pictures, which are only drawn to the window. `juce_graphics` now builds from the patched copy.
