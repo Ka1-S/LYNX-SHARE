@@ -3,6 +3,7 @@
 #include "core/MessageThreadOwned.h"
 #include "engine/Exporter.h"
 #include "engine/FlStudioExport.h"
+#include "ui/FileChoosers.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
@@ -233,8 +234,8 @@ private:
         const auto zip = zipButton.getToggleState();
         const auto ext = zip ? juce::String (".zip") : juce::String (".flp");
         const auto start = (lastFolder.isDirectory() ? lastFolder : suggestedFolder).getChildFile (juce::File::createLegalFileName (projectName) + ext);
-        chooser = std::make_unique<juce::FileChooser> (tr ("Export to FL Studio"), start, "*" + ext);
-        chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+        chooser = lynx::ui::makeFileChooser (tr ("Export to FL Studio"), start, "*" + ext);
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                               [safe = juce::Component::SafePointer<FlExportPanel> (this), zip, ext] (const juce::FileChooser& c) {
                                   auto file = c.getResult();
                                   if (safe == nullptr || file == juce::File())

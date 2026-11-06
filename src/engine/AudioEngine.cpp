@@ -2473,7 +2473,7 @@ void AudioEngine::sessionStep (bool redo)
     auto next = redo ? live::selectiveRevert (song, step.second, step.first, &skipped) : live::selectiveRevert (song, step.first, step.second, &skipped);
     juce::StringArray names;
     for (const auto& k : skipped)
-        names.addIfNotAlreadyThere (juce::String::fromUTF8 (live::describe (k, song).c_str()));
+        names.addIfNotAlreadyThere (juce::String::fromUTF8 (live::describe (k, song, [] (const char* s) { return tr (s).toStdString(); }).c_str()));
     to.push_back (std::move (step));
     song = std::move (next);
     modified = true;

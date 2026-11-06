@@ -1,6 +1,7 @@
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
 #include "core/NoteNames.h"
+#include "ui/FileChoosers.h"
 #include "ui/ProjectLoading.h"
 #include "ui/UiTrace.h"
 #include "core/LoadTrace.h"
@@ -1954,6 +1955,8 @@ void MainComponent::loadUiSettings()
             notenames::everyKey.store (on);
         else if (key == "rackPlayheadColumn")
             ChannelRackComponent::playheadColumn.store (on);
+        else if (key == "rackStepsChannelColour")
+            ChannelRackComponent::stepsChannelColour.store (on);
         else if (key == "rememberSeek")
             EditorGlobals::get().rememberSeek = on;
         else if (key == "createVariants")
@@ -2102,6 +2105,7 @@ void MainComponent::saveUiSettings()
                                       + "\nnoteFlats=" + juce::String (notenames::currentFlats.load() ? 1 : 0)
                                       + "\nnoteNamesEveryKey=" + juce::String (notenames::everyKey.load() ? 1 : 0)
                                       + "\nrackPlayheadColumn=" + juce::String (ChannelRackComponent::playheadColumn.load() ? 1 : 0)
+                                      + "\nrackStepsChannelColour=" + juce::String (ChannelRackComponent::stepsChannelColour.load() ? 1 : 0)
                                       + "\nreducedEffects=" + juce::String (skin::reducedEffects() ? 1 : 0)
                                       + "\nartMotion=" + juce::String (skin::artMotion() ? 1 : 0)
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
@@ -2399,6 +2403,14 @@ void MainComponent::showDesktopForSnapshot (bool extraPanels)
         workspace.show (Panel::channelRack);
     }
 
+    refreshPanelButtons();
+}
+
+void MainComponent::showPanelsForSnapshot (std::initializer_list<Panel> panels)
+{
+    workspace.resetLayout();
+    for (const auto panel : panels)
+        workspace.show (panel);
     refreshPanelButtons();
 }
 
@@ -4571,8 +4583,8 @@ void MainComponent::exportPackage()
     const auto start = (currentFile != juce::File() ? currentFile.getParentDirectory()
                                                      : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory))
                            .getChildFile (stem + ".zip");
-    fileChooser = std::make_unique<juce::FileChooser> (tr ("Export project with samples"), start, "*.zip");
-    fileChooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+    fileChooser = lynx::ui::makeFileChooser (tr ("Export project with samples"), start, "*.zip");
+    lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                               [safe = juce::Component::SafePointer<MainComponent> (this), stem] (const juce::FileChooser& chooser) {
                                   auto zip = chooser.getResult();
                                   if (safe == nullptr || zip == juce::File())
@@ -4596,10 +4608,10 @@ void MainComponent::exportPackage()
 void MainComponent::collectSamples()
 {
     // FL's "Export project data files": copy the samples the project uses into one folder (and use the copies)
-    fileChooser = std::make_unique<juce::FileChooser> (tr ("Copy the project's samples to..."),
+    fileChooser = lynx::ui::makeFileChooser (tr ("Copy the project's samples to..."),
                                                        currentFile != juce::File() ? currentFile.getParentDirectory()
                                                                                    : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory));
-    fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+    lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
                               [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::FileChooser& chooser) {
                                   const auto folder = chooser.getResult();
                                   if (safe == nullptr || folder == juce::File())
@@ -4628,10 +4640,10 @@ void MainComponent::saveToNewProjectFolder()
     const auto start = currentFile != juce::File() ? currentFile.getParentDirectory()
                                                    : lynx::platform::documentsFolder().getChildFile ("LYNX/Projects");
     start.createDirectory();
-    fileChooser = std::make_unique<juce::FileChooser> (tr ("Save to new project folder"),
+    fileChooser = lynx::ui::makeFileChooser (tr ("Save to new project folder"),
                                                        start.getChildFile (projectName.isNotEmpty() ? juce::File::createLegalFileName (projectName) : juce::String ("untitled")),
                                                        juce::String ("*") + ProjectFile::extension);
-    fileChooser->launchAsync (juce::FileBrowserComponent::saveMode, [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::FileChooser& chooser) {
+    lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::saveMode, [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::FileChooser& chooser) {
         const auto chosen = chooser.getResult();
         if (safe == nullptr || chosen == juce::File())
             return;
@@ -4853,10 +4865,10 @@ void MainComponent::chooseFileToOpen()
 
 void MainComponent::chooseFileToOpenNow()
 {
-    fileChooser = std::make_unique<juce::FileChooser> (tr ("Open project"), currentFile.getParentDirectory(),
+    fileChooser = lynx::ui::makeFileChooser (tr ("Open project"), currentFile.getParentDirectory(),
                                                        juce::String ("*") + ProjectFile::extension + ";*.dawproj;*.flp;*.zip;*.lynxpack;*.mid;*.midi");
 
-    fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+    lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [this] (const juce::FileChooser& chooser) {
                                   if (chooser.getResult().existsAsFile())
                                       openFile (chooser.getResult());
@@ -5029,6 +5041,7 @@ void MainComponent::openSettings (int page)
         o.noteFlats = notenames::currentFlats.load();
         o.noteNamesEveryKey = notenames::everyKey.load();
         o.rackPlayheadColumn = ChannelRackComponent::playheadColumn.load();
+        o.rackStepsChannelColour = ChannelRackComponent::stepsChannelColour.load();
         o.reducedEffects = skin::reducedEffects();
         o.artMotion = skin::artMotion();
         o.gpuRendering = gpuRenderingEnabled();
@@ -5083,9 +5096,11 @@ void MainComponent::openSettings (int page)
             for (int i = 0; i < juce::Desktop::getInstance().getNumComponents(); ++i) // the keyboards redraw with the new names
                 if (auto* c = juce::Desktop::getInstance().getComponent (i)) c->repaint();
         }
-        if (o.rackPlayheadColumn != ChannelRackComponent::playheadColumn.load())
+        if (o.rackPlayheadColumn != ChannelRackComponent::playheadColumn.load()
+            || o.rackStepsChannelColour != ChannelRackComponent::stepsChannelColour.load())
         {
             ChannelRackComponent::playheadColumn.store (o.rackPlayheadColumn);
+            ChannelRackComponent::stepsChannelColour.store (o.rackStepsChannelColour);
             self.rack.repaint();
         }
         if (o.gpuRendering != gpuRenderingEnabled())
@@ -5277,9 +5292,9 @@ void MainComponent::exportAudio (int format)
 void MainComponent::importMidiFile()
 {
     const auto folder = currentFile.existsAsFile() ? currentFile.getParentDirectory() : juce::File::getSpecialLocation (juce::File::userMusicDirectory);
-    fileChooser = std::make_unique<juce::FileChooser> (tr ("Import MIDI file"), folder, "*.mid;*.midi");
+    fileChooser = lynx::ui::makeFileChooser (tr ("Import MIDI file"), folder, "*.mid;*.midi");
     juce::Component::SafePointer<MainComponent> safe (this);
-    fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
+    lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
         const auto file = fc.getResult();
         if (safe == nullptr || file == juce::File())
             return;
@@ -5338,9 +5353,9 @@ void MainComponent::exportMidiFile()
     // FL's File › Export › "MIDI file...": the arrangement's notes (or the current pattern's) as a Standard MIDI File
     const auto folder = currentFile.existsAsFile() ? currentFile.getParentDirectory() : juce::File::getSpecialLocation (juce::File::userMusicDirectory);
     const auto name = projectName.isNotEmpty() ? projectName : juce::String ("LYNX SHARE");
-    fileChooser = std::make_unique<juce::FileChooser> (tr ("Export MIDI file"), folder.getChildFile (name + ".mid"), "*.mid");
+    fileChooser = lynx::ui::makeFileChooser (tr ("Export MIDI file"), folder.getChildFile (name + ".mid"), "*.mid");
     juce::Component::SafePointer<MainComponent> safe (this);
-    fileChooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+    lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                               [safe] (const juce::FileChooser& fc) {
                                   auto file = fc.getResult();
                                   if (safe == nullptr || file == juce::File())
@@ -5387,9 +5402,9 @@ void MainComponent::save (bool askForFile)
 
     const auto startFolder = currentFile.isAChildOf (autosaveFolder()) ? juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
                                                                        : currentFile.getParentDirectory();
-    fileChooser = std::make_unique<juce::FileChooser> (tr ("Save project"), startFolder, juce::String ("*") + ProjectFile::extension);
+    fileChooser = lynx::ui::makeFileChooser (tr ("Save project"), startFolder, juce::String ("*") + ProjectFile::extension);
 
-    fileChooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+    lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                               [write] (const juce::FileChooser& chooser) {
                                   const auto file = chooser.getResult();
                                   if (file == juce::File())

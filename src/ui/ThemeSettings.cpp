@@ -6,6 +6,7 @@
 
 #include "platform/Paths.h"
 #include "ui/ColourPicker.h"
+#include "ui/FileChoosers.h"
 #include "ui/I18n.h"
 #include "ui/SettingsPages.h"
 #include "ui/Theme.h"
@@ -638,9 +639,9 @@ private:
 
     void importTheme()
     {
-        chooser = std::make_unique<juce::FileChooser> (tr ("Import theme"), userThemesFolder(), juce::String ("*") + fileExtension);
+        chooser = lynx::ui::makeFileChooser (tr ("Import theme"), userThemesFolder(), juce::String ("*") + fileExtension);
         juce::Component::SafePointer<ThemePage> safe (this);
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
             if (safe == nullptr || ! fc.getResult().existsAsFile())
                 return;
             if (auto t = loadFile (fc.getResult()))
@@ -675,10 +676,10 @@ private:
             keepAboveMainWindow (*window);
             return;
         }
-        chooser = std::make_unique<juce::FileChooser> (tr ("Export theme"),
+        chooser = lynx::ui::makeFileChooser (tr ("Export theme"),
                                                        userThemesFolder().getChildFile (juce::File::createLegalFileName (juce::String::fromUTF8 (spec.name.c_str())) + fileExtension),
                                                        juce::String ("*") + fileExtension);
-        chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting, [safe] (const juce::FileChooser& fc) {
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting, [safe] (const juce::FileChooser& fc) {
             if (safe == nullptr || fc.getResult() == juce::File())
                 return;
             saveFile (safe->spec, fc.getResult().withFileExtension (fileExtension));
@@ -697,10 +698,10 @@ private:
 
     void chooseSound()
     {
-        chooser = std::make_unique<juce::FileChooser> (tr ("Startup sound"), juce::File::getSpecialLocation (juce::File::userMusicDirectory),
+        chooser = lynx::ui::makeFileChooser (tr ("Startup sound"), juce::File::getSpecialLocation (juce::File::userMusicDirectory),
                                                        "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
         juce::Component::SafePointer<ThemePage> safe (this);
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
             if (safe == nullptr || ! fc.getResult().existsAsFile())
                 return;
             // a short sound: it plays in full at every start
@@ -749,8 +750,8 @@ private:
 void chooseWorkspaceImage (std::function<void (const juce::File&)> done)
 {
     static std::unique_ptr<juce::FileChooser> chooser;
-    chooser = std::make_unique<juce::FileChooser> (tr ("Workspace image"), backgroundsFolder(), "*.png;*.jpg;*.jpeg;*.gif");
-    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [done] (const juce::FileChooser& fc) {
+    chooser = lynx::ui::makeFileChooser (tr ("Workspace image"), backgroundsFolder(), "*.png;*.jpg;*.jpeg;*.gif");
+    lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [done] (const juce::FileChooser& fc) {
         if (! fc.getResult().existsAsFile())
             return;
         if (! juce::ImageFileFormat::loadFrom (fc.getResult()).isValid())

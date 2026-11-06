@@ -40,7 +40,9 @@ int fromProG (const State& state, EffectSlot& slot);    // -> Sentry Gate
 int fromSaturn2 (const State& state, EffectSlot& slot); // -> Ember Saturator (multiband)
 int fromProQ4 (const State& state, EffectSlot& slot);   // -> Facet EQ
 int fromProDS (const State& state, EffectSlot& slot);   // -> Hush De-esser (round 148)
-Translator translatorNamed (std::string_view name);     // "pro-c3", "pro-mb", "pro-g", "saturn2", "pro-q4", "pro-ds"; null if unknown
+int fromProL2 (const State& state, EffectSlot& slot);   // -> Apex Limiter (round tp172b)
+int fromProR2 (const State& state, EffectSlot& slot);   // -> LuxeVerb's Space engine (round tp172b)
+Translator translatorNamed (std::string_view name);     // "pro-c3", "pro-mb", "pro-g", "saturn2", "pro-q4", "pro-ds", "pro-l2"; null if unknown
 
 // Their gain encoding (output / wet / band levels): −1 … 1 ↔ −∞ … +36 dB (0.2 per 7.2 dB above −0.6)
 double levelDb (float v) noexcept;

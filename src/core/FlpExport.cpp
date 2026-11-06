@@ -1071,6 +1071,18 @@ struct Converter
         }
     }
 
+    // the inserts whose effects take insert `source` as a side-chain input (LYNX keeps the source, FL a level-0 route)
+    std::vector<int> sidechainTargets (int source) const
+    {
+        std::vector<int> out;
+        for (int u = 1; u < (int) song.mixer.size(); ++u)
+            if (u != source)
+                for (const auto& fx : song.mixer[(std::size_t) u].effects)
+                    if ((fx.sidechain == source || fx.sidechain2 == source) && std::find (out.begin(), out.end(), u) == out.end())
+                        out.push_back (u);
+        return out;
+    }
+
     // ---- patterns ----
     bool playsSample (int channel) const
     {
@@ -1367,6 +1379,11 @@ struct Converter
                 for (const auto& s : track.sends)
                     if (s.target > 0 && s.target < (int) song.mixer.size() && s.target != t)
                         m.routes.push_back (s.target);
+                // a side-chain input is FL's route at level 0 (sidechain only): without it FL's compressors and
+                // limiters have nothing to follow (thief's kick ducking was lost: +3.7 dB in FL, round 171e2)
+                for (const auto target : sidechainTargets (t))
+                    if (std::find (m.routes.begin(), m.routes.end(), target) == m.routes.end())
+                        m.routes.push_back (target);
             }
 
             // the levels (FL ranges: volume 0..16000 with 12800 = 0 dB, pan ±6400, separation ±64, route levels on the fader curve)
@@ -1388,6 +1405,9 @@ struct Converter
                 for (const auto& s : track.sends)
                     if (s.target > 0 && s.target < (int) song.mixer.size())
                         control (0, flp::ControlId::mixerSendBase + s.target, std::clamp (iround (faderPosition (s.level) * 16000.0), 0, 16000));
+                for (const auto target : sidechainTargets (t))
+                    if (std::none_of (track.sends.begin(), track.sends.end(), [&] (const MixerSend& s) { return s.target == target; }))
+                        control (0, flp::ControlId::mixerSendBase + target, 0);
             }
 
             // the effect slots

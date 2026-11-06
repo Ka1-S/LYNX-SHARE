@@ -24,7 +24,7 @@ constexpr Palette builtIn {
     0xff2a2d34, 0xff3b3f48,                                                             // border, borderStrong
     0xffeceef2, 0xffa1a6b0, 0xff60656f,                                                 // text
     0xffe5383b, 0xfff2545a, 0xffc12a30, 0xff5c1f24, 0xffffffff, 0x2ee5383b,             // accent family
-    0xffc5c9d1, 0xff444955, 0xff2a2d34, 0xff5e3036, 0xffe8a3a6,                         // knobs, steps (alt: stepOffAlt below)
+    0xffc5c9d1, 0xff444955, 0xff2a2d34, 0xff4c3f46, 0xffe8a3a6,                         // knobs, steps (alt: stepOffAlt below)
     0xff3a3e47, 0xff262930, 0xff1d1f24, 0xff17181c, 0xff1c1e23, 0xff16171b,             // grids, keys, rows
     0xffb3545a, 0xffff6b6e, 0xff4a4e57, 0xff3a3e47                                      // notes, LED
 };
@@ -112,10 +112,26 @@ Palette derivePalette (std::uint32_t accentIn, std::uint32_t backgroundIn)
         p.noteHard = mix (accent, 0xffffffff, 0.26);
         p.noteSoft = mix (accent, 0xff808080, 0.42);
     }
-    // the Channel Rack's every-other beat group: the off step tinted with the accent, clearly apart at a glance like
-    // FL's grey / red groups (Busy Works Beats' video, round 170a: "too close of a color")
-    p.stepOffAlt = mix (p.stepOff, p.accent, stepGroupTint);
+    // the Channel Rack's every-other beat group: clearly apart at a glance (Busy Works Beats' video, round 170a: "too
+    // close of a color") yet a dull reddish grey like FL's, far from a lit step (round 170a2)
+    p.stepOffAlt = mix (mix (p.stepOff, p.textPrimary, stepGroupLift), p.accent, stepGroupTint);
     return p;
+}
+
+std::uint32_t litStepColour (std::uint32_t channelColour, const Palette& palette)
+{
+    if ((channelColour & 0x00ffffffu) == 0)
+        return palette.accent;
+    const auto colour = channelColour | 0xff000000u;
+    const auto lightTheme = relativeLuminance (palette.stepOff) > 0.4;
+    const auto towards = lightTheme ? 0xff000000u : 0xffffffffu;
+    for (int i = 0; i <= 20; ++i)
+    {
+        const auto lit = mix (colour, towards, i * 0.05);
+        if (contrastRatio (lit, palette.stepOff) >= minLitStepContrast && contrastRatio (lit, palette.stepOffAlt) >= minLitStepContrast)
+            return lit;
+    }
+    return palette.accent;
 }
 
 const Palette& defaultPalette()

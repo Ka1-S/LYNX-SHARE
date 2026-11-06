@@ -7,15 +7,18 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import ipaddress
 import json
 import logging
 import os
 import secrets
 import time
+from collections import OrderedDict
 
 from aiohttp import web
 
 VERSION = "1"  # bumped when the HTTP API changes in a way clients must know about
+MAX_CLIENTS = 50000
 
 
 def env_int(name: str, default: int) -> int:
@@ -69,9 +72,13 @@ def client_key(request: web.Request) -> str:
     (no trusted_proxies configured), so the last element is the client."""
     xff = request.headers.get("X-Forwarded-For", "")
     ip = xff.split(",")[-1].strip() if xff else (request.remote or "")
-    if ":" in ip:  # IPv6: one key per /64, the smallest block a home line usually gets
-        parts = ip.split(":")
-        ip = ":".join(parts[:4])
+    try:
+        address = ipaddress.ip_address(ip)
+        if isinstance(address, ipaddress.IPv6Address):
+            address = address.ipv4_mapped or ipaddress.ip_network((address, 64), strict=False).network_address
+        ip = str(address)
+    except ValueError:
+        ip = request.remote or ""
     salt = env_str("LYNX_SALT", "dev-salt")
     return hmac.new(salt.encode(), ip.encode(), hashlib.sha256).hexdigest()[:24]
 
@@ -81,19 +88,23 @@ class RateLimiter:
 
     def __init__(self, rate: float, per: float):
         self.rate, self.per = float(rate), float(per)
-        self.buckets: dict[str, tuple[float, float]] = {}
+        self.buckets: OrderedDict[str, tuple[float, float]] = OrderedDict()
 
     def allow(self, key: str, cost: float = 1.0) -> bool:
         now = time.monotonic()
+        while self.buckets:
+            _, (_, last) = next(iter(self.buckets.items()))
+            if now - last < self.per:
+                break
+            self.buckets.popitem(last=False)
+        if key not in self.buckets and len(self.buckets) >= MAX_CLIENTS:
+            return False  # preserve active clients' limits when the table is full
         tokens, last = self.buckets.get(key, (self.rate, now))
         tokens = min(self.rate, tokens + (now - last) * self.rate / self.per)
-        if tokens < cost:
-            self.buckets[key] = (tokens, now)
-            return False
-        self.buckets[key] = (tokens - cost, now)
-        if len(self.buckets) > 50000:  # forget full buckets so memory stays bounded
-            self.buckets = {k: v for k, v in self.buckets.items() if v[0] < self.rate}
-        return True
+        allowed = tokens >= cost
+        self.buckets[key] = (tokens - cost if allowed else tokens, now)
+        self.buckets.move_to_end(key)
+        return allowed
 
 
 def json_response(status: int, body: dict, headers: dict | None = None) -> web.Response:

@@ -6,6 +6,7 @@
 #include "ui/VisualEditors.h"
 #include "ui/FlExtraEditors.h"
 #include "ui/PluginEditors.h"
+#include "core/LuxeVerb.h"
 #include "core/PresetCycle.h"
 #include "core/ShownEffectSlot.h"
 
@@ -103,7 +104,7 @@ public:
             layout = &plugui::layoutFor (kind);
             if (kind == EffectKind::ember) // round 165: this window only opens for the Classic voicing — its one-screen
             {                              // panel, not the 1110-unit multiband page around it
-                static const auto classic = [] { auto l = plugui::layoutFor (EffectKind::ember); l.height = 440; return l; }();
+                static const auto classic = [] { auto l = plugui::layoutFor (EffectKind::ember); l.height = 380; return l; }(); // (tp172d: 760 × 380)
                 layout = &classic;
             }
             if (kind == EffectKind::maximus) // Soundgoodizer runs on the Maximus engine: its own page
@@ -130,6 +131,9 @@ public:
         page = initialPage;
         if (kind == EffectKind::equo && initialPage == 0)
             page = 3; // bank 1, volume (FL opens EQUO on its first bank)
+        if (kind == EffectKind::luxeVerb && initialPage == 0) // round tp172b: open on the engine in use
+            if (const auto* fx = current())
+                page = fx->params[(std::size_t) luxeVerbSpaceFirst] >= 0.5f ? 1 : 0;
         if (kind == EffectKind::maximus && stateBacked() && initialPage == 0)
             if (const auto* fx = current())
                 page = maximusfx::selectedBand (fx->state); // FL reopens Maximus on the band selected when it was saved
@@ -434,6 +438,9 @@ public:
         if (usesBar())
             bar.willEdit();
         editSlot ([param, v = juce::jlimit (0.0f, 1.0f, value)] (EffectSlot& target) { target.params[(std::size_t) param] = v; });
+        // round tp172d: "Advanced" (the Voicing off) swaps this Classic panel for Ember's multiband page
+        if (kind == EffectKind::ember && param == (int) mixsuite::ember::voicing && value < 0.5f && track >= 0 && node.locate == nullptr)
+            NativeEffectWindows::switchEmberEditor (engine, track, slot, false);
     }
 
     juce::String valueText (int param, float value) const
@@ -630,7 +637,9 @@ public:
                 // round 170j: a partial repaint of the art draws only what it touches; round 170c: a control another mode bypasses is drawn dimmed
                 const auto idle = plugui::isIdle (kind, items[(std::size_t) i], fx->params);
                 if (idle) g.beginTransparencyLayer (0.35f);
+                skin::setOnDarkFill (onDarkFill (i)); // round tp172d
                 paintItem (g, items[(std::size_t) i], i, *fx);
+                skin::setOnDarkFill (false);
                 if (idle) g.endTransparencyLayer();
             }
         if (hasHelpLine())
@@ -731,6 +740,27 @@ public:
                             font (juce::jmax (8.0f, 9.5f * scale() * skin::captionScale()), true), 7.0f); // (round 165: fit, no "..."; tp172d: themed size)
     }
 
+    // round tp172d: does item `index` sit on a top-level section the theme fills dark (the last one under its centre)?
+    bool onDarkFill (int index) const
+    {
+        const auto& items = activeLayout().items;
+        const auto& it = items[(std::size_t) index];
+        if (it.type == Item::section)
+            return false;
+        const juce::Point<float> c { it.x + it.w * 0.5f, it.y + it.h * 0.5f };
+        int ordinal = 0, under = -1;
+        for (int k = 0; k < (int) items.size(); ++k)
+        {
+            const auto& s = items[(std::size_t) k];
+            if (s.type != Item::section || hasStyle (s, plugui::raised) || ! visible (s))
+                continue;
+            if (juce::Rectangle<float> (s.x, s.y, s.w, s.h).contains (c))
+                under = ordinal;
+            ++ordinal;
+        }
+        return skin::sectionFillIsDark (under);
+    }
+
     void paintItem (juce::Graphics& g, const LayoutItem& item, int index, const EffectSlot& fx)
     {
         using namespace theme;
@@ -745,7 +775,16 @@ public:
         {
             case Item::section:
             {
+                {
+                    int ordinal = 0; // round tp172d: the section's place among the top-level ones (a theme's own fills)
+                    const auto& items = activeLayout().items;
+                    for (int k = 0; k < index && k < (int) items.size(); ++k)
+                        if (items[(std::size_t) k].type == Item::section && ! hasStyle (items[(std::size_t) k], plugui::raised) && visible (items[(std::size_t) k]))
+                            ++ordinal;
+                    skin::setSectionOrdinal (hasStyle (item, plugui::raised) ? -1 : ordinal);
+                }
                 skin::section (g, r, radius::lg * s, hasStyle (item, plugui::raised), fx.enabled ? accent : juce::Colours::transparentBlack);
+                skin::setSectionOrdinal (-1);
                 if (item.label != nullptr && *item.label != 0 && ! hasStyle (item, plugui::boxed))
                     skin::sectionTitle (g, r.withHeight (16.0f * s).translated (0.0f, 1.0f * s), caps (tr (item.label)), accent, juce::jmax (8.0f, 10.0f * s));
                 break;
@@ -755,7 +794,7 @@ public:
                 if (hasStyle (item, plugui::dim) && ! hasStyle (item, plugui::boxed) && item.h > 30.0f && item.label != nullptr)
                 {
                     // the plugin's name, big and readable (FL's logos are not reproduced; round 168q2)
-                    g.setColour (colour::textSecondary);
+                    g.setColour (skin::captionScale() > 1.0f ? skin::captionColour() : colour::textSecondary); // (tp172d: a themed panel's type)
                     ui::drawFittingText (g, item.label, r, hasStyle (item, plugui::alignLeft) ? juce::Justification::centredLeft : juce::Justification::centredRight,
                                          font (r.getHeight() * 0.62f, true), r.getHeight() * 0.25f, 0.0f, 0.8f); // (smaller, never "Wav...")
                     break;
@@ -864,6 +903,19 @@ public:
                     break;
                 }
                 const auto rowH = r.getHeight() / (float) juce::jmax (1, (int) labels.size());
+                if (skin::hwKeys()) // round tp172d: a column of square keys, each with its caption (the originals' mode keys)
+                {
+                    for (int o = 0; o < (int) labels.size(); ++o)
+                    {
+                        const auto row = juce::Rectangle<float> (r.getX(), r.getY() + rowH * (float) o, r.getWidth(), rowH);
+                        const auto k = juce::jmin (rowH * 0.7f, 24.0f * s);
+                        skin::hwKey (g, juce::Rectangle<float> (k, k).withCentre ({ row.getX() + k * 0.5f + 2.0f * s, row.getCentreY() }), o == chosen && fx.enabled, hot);
+                        g.setColour (skin::captionColour());
+                        ui::drawFittingText (g, caps (texts[(std::size_t) o]), row.withTrimmedLeft (k + 10.0f * s), juce::Justification::centredLeft,
+                                             font (juce::jmax (8.0f, 11.0f * s * skin::captionScale()), true), 7.0f);
+                    }
+                    break;
+                }
                 for (int o = 0; o < (int) labels.size(); ++o)
                 {
                     const auto row = juce::Rectangle<float> (r.getX(), r.getY() + rowH * (float) o, r.getWidth(), rowH);
@@ -898,6 +950,30 @@ public:
                 const auto count = (float) juce::jmax (1, (int) labels.size());
                 const auto w = vertical ? r.getWidth() : r.getWidth() / count;
                 const auto h = vertical ? r.getHeight() / count : r.getHeight();
+                if (skin::hwKeys() && ! vertical) // round tp172d: a row of square keys joined by a line (or wide keys for words)
+                {
+                    bool letters = true; // A / E / N / T / P: square keys; words: wide keys
+                    for (const auto& t : texts) letters = letters && t.length() <= 2;
+                    const auto key = juce::jmin (w * 0.62f, h);
+                    if (letters)
+                    {
+                        g.setColour (skin::captionColour().withAlpha (0.8f));
+                        g.fillRect (juce::Rectangle<float> (r.getX() + w * 0.5f, r.getCentreY() - 1.0f * s, w * (count - 1.0f), 2.0f * s));
+                    }
+                    for (int o = 0; o < (int) labels.size(); ++o)
+                    {
+                        const auto centre = juce::Point<float> (r.getX() + w * ((float) o + 0.5f), r.getCentreY());
+                        const auto cell = letters ? juce::Rectangle<float> (key, key).withCentre (centre)
+                                                  : juce::Rectangle<float> (w - 4.0f * s, h).withCentre (centre);
+                        skin::hwKey (g, cell, o == chosen && fx.enabled, hot);
+                        g.setColour (juce::Colours::black.withAlpha (0.5f));
+                        g.setFont (font (letters ? juce::jmax (8.0f, key * 0.46f) : juce::jmax (7.0f, juce::jmin (h * 0.5f, 10.0f * s)), true));
+                        g.drawText (caps (texts[(std::size_t) o]), cell.translated (0.0f, 1.0f).toNearestInt(), juce::Justification::centred, false);
+                        g.setColour (juce::Colours::white);
+                        g.drawText (caps (texts[(std::size_t) o]), cell.toNearestInt(), juce::Justification::centred, false);
+                    }
+                    break;
+                }
                 skin::valuePlate (g, r, radius::md);
                 for (int o = 0; o < (int) labels.size(); ++o)
                 {
@@ -937,6 +1013,20 @@ public:
                     g.setColour (on ? colour::onAccent : colour::textSecondary);
                     if (item.label != nullptr)
                         ui::drawFittingText (g, caps (tr (item.label)), r, juce::Justification::centred, font (juce::jmax (8.0f, r.getHeight() * 0.8f), true), 6.5f);
+                    break;
+                }
+                if (skin::hwKeys()) // round tp172d: a square key (lit when on), its caption beside it
+                {
+                    const auto k = juce::jmin (r.getHeight(), 26.0f * s);
+                    const auto key = juce::Rectangle<float> (k * 1.3f, k).withCentre ({ r.getX() + k * 0.65f, r.getCentreY() });
+                    skin::hwKey (g, key, on && fx.enabled, hot);
+                    g.setColour (on ? juce::Colours::white : juce::Colours::white.withAlpha (0.7f));
+                    g.setFont (font (juce::jmax (7.0f, k * 0.4f), true));
+                    g.drawFittedText (on ? tr ("ON") : tr ("OFF"), key.toNearestInt(), juce::Justification::centred, 1, 0.6f);
+                    g.setColour (skin::captionColour().getAlpha() > 0 ? skin::captionColour() : colour::textPrimary);
+                    if (item.label != nullptr)
+                        ui::drawFittingText (g, caps (tr (item.label)), r.withTrimmedLeft (k * 1.3f + 6.0f * s), juce::Justification::centredLeft,
+                                             font (juce::jmax (8.0f, 10.5f * s * skin::captionScale()), true), 7.0f);
                     break;
                 }
                 const auto box = juce::Rectangle<float> (16.0f * s, 9.0f * s).withCentre ({ r.getX() + 9.0f * s, r.getCentreY() });
@@ -2526,6 +2616,39 @@ public:
             const auto bar = r.reduced (1.5f * s);
             if (bar.getHeight() > 2.0f * bar.getWidth()) // a tall meter (Quell): the reduction grows downwards, 0 dB at the top
             {
+                if (editorStyle() == skin::Style::themed && kind == EffectKind::quellDenoiser)
+                {
+                    // round tp172d: the reference's meter — a dark recessed well, a thin soft light bar, the scale
+                    // printed on both sides, the held reduction in a small orange read-out
+                    const auto box = bar.withTrimmedBottom (22.0f * s);
+                    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff2c3035), box.getX(), box.getY(), juce::Colour (0xff15171a), box.getX(), box.getBottom(), false));
+                    g.fillRoundedRectangle (box, 6.0f * s);
+                    g.setColour (juce::Colours::black.withAlpha (0.6f));
+                    g.drawRoundedRectangle (box, 6.0f * s, 1.2f);
+                    const auto well = box.reduced (box.getWidth() * 0.36f, 12.0f * s);
+                    g.setColour (juce::Colour (0xff050607));
+                    g.fillRoundedRectangle (well.expanded (3.0f * s), 3.0f * s);
+                    g.setFont (font (juce::jmax (6.5f, 8.0f * s)));
+                    for (int db = 0; db <= 30; db += 6)
+                    {
+                        const auto y = well.getY() + well.getHeight() * (float) db / 30.0f;
+                        g.setColour (juce::Colour (0xffb9bec4));
+                        g.drawHorizontalLine ((int) y, box.getX() + 4.0f * s, well.getX() - 6.0f * s);
+                        g.drawHorizontalLine ((int) y, well.getRight() + 6.0f * s, box.getRight() - 4.0f * s);
+                        g.drawText (juce::String (-db), juce::Rectangle<float> (box.getX() + 2.0f * s, y - 10.0f * s, well.getX() - box.getX() - 8.0f * s, 9.0f * s), juce::Justification::centredRight, false);
+                        g.drawText (juce::String (-db), juce::Rectangle<float> (well.getRight() + 6.0f * s, y - 10.0f * s, box.getRight() - well.getRight() - 8.0f * s, 9.0f * s), juce::Justification::centredLeft, false);
+                    }
+                    const auto fill = well.reduced (well.getWidth() * 0.25f, 0.0f).withHeight (well.getHeight() * amount);
+                    g.setGradientFill (juce::ColourGradient (juce::Colour (0xffe8ecef).withAlpha (fx.enabled ? 0.75f : 0.3f), fill.getX(), 0.0f, juce::Colour (0xff8a9096).withAlpha (fx.enabled ? 0.6f : 0.25f), fill.getRight(), 0.0f, false));
+                    g.fillRect (fill);
+                    grHold = juce::jmax (grHold, amount);
+                    const auto readout = juce::Rectangle<float> (bar.getCentreX() - 22.0f * s, bar.getBottom() - 18.0f * s, 44.0f * s, 16.0f * s);
+                    g.setColour (juce::Colour (0xff070809));
+                    g.fillRoundedRectangle (readout, 3.0f * s);
+                    g.setColour (skin::valueColour (false));
+                    g.drawText (grHold > 0.0005f ? juce::String (-grHold * 30.0f, 1) : juce::String ("0.0"), readout, juce::Justification::centred, false);
+                    return;
+                }
                 const auto well = bar.reduced (0.0f, 4.0f * s).withTrimmedBottom (14.0f * s);
                 g.setColour (colour::gridBeat);
                 g.setFont (font (8.5f * s));
@@ -2567,10 +2690,13 @@ public:
             for (int k = 0; k <= 100; k += 10)
             {
                 const auto y = bottom - (bottom - top) * (float) k / 100.0f;
+                const auto right = item.steps == 1; // round tp172d: the scale on the fader's right side, mirrored
                 g.setColour (colour::gridBeat);
-                g.drawHorizontalLine ((int) y, area.getRight() - 6.0f * s, area.getRight());
-                g.setColour (colour::textSecondary);
-                g.drawText (juce::String (k), juce::Rectangle<float> (area.getX(), y - 5.0f * s, area.getWidth() - 8.0f * s, 10.0f * s), juce::Justification::centredRight, false);
+                if (right) g.drawHorizontalLine ((int) y, area.getX(), area.getX() + 6.0f * s);
+                else g.drawHorizontalLine ((int) y, area.getRight() - 6.0f * s, area.getRight());
+                g.setColour (skin::captionColour().getAlpha() > 0 && editorStyle() == skin::Style::themed ? skin::captionColour().withAlpha (0.75f) : colour::textSecondary);
+                g.drawText (juce::String (k), juce::Rectangle<float> (right ? area.getX() + 8.0f * s : area.getX(), y - 5.0f * s, area.getWidth() - 8.0f * s, 10.0f * s),
+                            right ? juce::Justification::centredLeft : juce::Justification::centredRight, false);
             }
             return;
         }
@@ -3780,6 +3906,8 @@ public:
                 page += (o - (page / item.steps) % n) * item.steps;
             else
                 page = o;
+            if (const auto p = paramOf (item); p >= 0) // round tp172b: page tabs that also choose a value (LuxeVerb's engine)
+                setValue (p, n > 1 ? (float) o / (float) (n - 1) : 0.0f);
             hoverItem = -1;
             repaint();
             return;
@@ -5166,6 +5294,23 @@ void open (AudioEngine& engine, int track, int slot)
     const auto title = utf8 (isSoundgoodizerApprox (fxSlot) ? "Soundgoodizer" : effectInfo (kind).name) + " - " + (name.isNotEmpty() ? name : tr ("Insert {0}", { juce::String (track) })) + " ("
                        + tr ("slot {0}", { juce::String (slot + 1) }) + ")";
     open[key] = std::make_unique<NativeEffectWindow> (engine, track, slot, title);
+}
+
+void switchEmberEditor (AudioEngine& engine, int track, int slot, bool classic)
+{
+    juce::MessageManager::callAsync ([&engine, track, slot, classic]
+    {
+        if (classic)
+        {
+            ProEditorWindows::close (track, slot);
+            open (engine, track, slot);
+        }
+        else
+        {
+            windows().erase ({ track, slot });
+            ProEditorWindows::open (engine, track, slot);
+        }
+    });
 }
 
 void closeAll()

@@ -1414,7 +1414,7 @@ void LiveSessionManager::applyUpdate (const live::Replica::Update& u)
     if (! u.rejected.empty() && onHint)
     {
         const auto& song = engine.getSong();
-        const auto what = str (live::describe (u.rejected.front(), song));
+        const auto what = str (live::describe (u.rejected.front(), song, [] (const char* s) { return tr (s).toStdString(); }));
         const auto owner = live::ownerOf (u.rejected.front(), song);
         if (u.reason == "conflict")
             onHint (tr ("{0} was changed by someone else at the same time: their change was kept", { what }));
