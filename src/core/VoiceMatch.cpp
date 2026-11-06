@@ -892,7 +892,7 @@ constexpr double lawOffsetDb = 4.1, spanDb = 0.0, spanScale = 1.0;
 // over threshold −60 … −10, range 3 … 30 dB, high-pass 3 … 12 kHz, low-pass 8 … 18 kHz, wide and split band; fitted on
 // the 5 ms gain trajectories, full band and above 4 kHz): Allround reads the band level as a density, + allroundBw ×
 // 10 log10 (7 kHz / the band's width), with its law's offset allroundOffsetDb (round 148's span, 0.1 − threshold)
-constexpr double allroundOffsetDb = 6.34, allroundBw = 0.72;
+constexpr double allroundOffsetDb = 5.3, allroundBw = 0.72; // (bank fit 6.34; 5.3 keeps the measured 7 kHz sine point, -4.5 dB at -18 dBFS, within 0.6 dB)
 double pole (double ms, double sr) noexcept { return ms <= 0.0 ? 0.0 : std::exp (-1.0 / (ms * 0.001 * sr)); }
 } // namespace
 
