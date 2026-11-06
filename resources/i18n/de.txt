@@ -7199,6 +7199,14 @@ countries: de at ch li lu
 "Main|Tweak" = "Haupt|Feintuning"
 "E type|G type" = "E-Typ|G-Typ"
 "Modern console" = "Moderne Konsole"
+# round tp172c6: Ridge Strip's DRIVE section
+"Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "Sättigen|Konsole E|Konsole G|Konsole A|Konsole N|Konsole Y|Röhre|Gitarrenamp|Bassamp"
+"Switches the drive section on: saturation at the end of the strip, before the output" = "Schaltet die Drive-Sektion ein: Sättigung am Ende des Kanalzugs, vor dem Ausgang"
+"The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "Die Art der Sättigung: ein weicher Clipper, fünf Konsolenkanäle, eine Röhrenstufe oder ein Gitarren- / Bassverstärker"
+"How hard the model is driven; the consoles and the clipper keep the level, the amps get louder" = "Wie stark das Modell angefahren wird; Konsolen und Clipper halten den Pegel, die Verstärker werden lauter"
+"Level into the drive: more distortion without changing the drive" = "Pegel in den Drive: mehr Verzerrung, ohne den Drive zu ändern"
+"Level after the drive" = "Pegel nach dem Drive"
+"Blends the clean signal back in" = "Mischt das saubere Signal wieder hinzu"
 
 # round tp172b: LuxeVerb's Space engine
 "LuxeVerb|Space" = "LuxeVerb|Raum"
@@ -7294,4 +7302,7 @@ countries: de at ch li lu
 "{0} in {1}" = "{0} in {1}"
 "Playlist clip" = "Playlist-Clip"
 "ON" = "AN"
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "Keine|Smooth|Op-El|Mastering"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Drei weitere Kompressor-Charaktere, statt des Stils: weich, optoelektronisch oder Mastering"
 "Wheels" = "Räder"

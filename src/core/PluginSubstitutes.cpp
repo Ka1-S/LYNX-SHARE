@@ -505,10 +505,48 @@ translate = ssl-vocalstrip-2
 # trials on this PC) by role only — their states are not read (not in her corpus, not measured): LYNX's effect for
 # the same job at its defaults, so a project that used them still plays a sensible chain
 [complete-access-strips]
-product = channel strips (SSL 4K G, Harrison 32C / MPC, Slate VCC / Virtual Mix Rack)
+product = channel strips (Slate Virtual Mix Rack)
 vendor = Complete Access (role)
 lynx = Ridge Strip
-names = Harrison 32C; Harrison_32ClassicChannelStrip; Harrison 32Classic; Harrison_MPCChannelStrip; VM VCC Channel; Virtual Mix Rack; VBC Rack; SSL Guitarstrip; SSL Native Drumstrip v6
+names = Virtual Mix Rack; VBC Rack
+
+# round tp172c6: SSL Native Drumstrip -> Ridge's gate and trims (its transient shaper, enhancers and listen-mic
+# compressor not reproduced yet)
+[ssl-drumstrip]
+product = Drumstrip (drum channel strip)
+vendor = Solid State Logic (Complete Access)
+lynx = Ridge Strip
+names = SSL Native Drumstrip v6; SSL Native Drumstrip; Drumstrip
+translate = ssl-drumstrip
+
+# round tp172c6: SSL Guitarstrip -> Ridge's own engine (EQ, filters, compressor) with the DRIVE section on the Guitar amp /
+# Bass amp models, measured black-box on its trial
+[ssl-guitarstrip]
+product = Guitarstrip (guitar / bass channel strip)
+vendor = Solid State Logic (Complete Access)
+lynx = Ridge Strip
+names = SSL Guitarstrip; Guitarstrip
+translate = ssl-guitarstrip
+
+# round tp172c6: Slate VCC Channel -> Ridge's DRIVE section on the console's measured model (the drive and the trims
+# read from its state)
+[vcc-channel]
+product = VCC Channel (console emulation)
+vendor = Slate Digital (Complete Access)
+lynx = Ridge Strip
+names = VM VCC Channel; VCC Channel
+translate = vcc-channel
+
+# round tp172c5: Harrison 32Classic and MPC channel strips -> Ridge's own engine (brown curve), their states read and
+# translated in the originals' units by laws fitted black-box on the official trials (EQ bands and filters, compressor
+# with the 32C's auto make-up, gate / expander, trims); tp172c6: the 32C's saturator on Ridge's DRIVE section (Saturate);
+# the MPC's de-esser / denoiser are not reproduced yet
+[harrison-strips]
+product = Harrison 32Classic / MPC channel strips
+vendor = Harrison
+lynx = Ridge Strip
+names = Harrison 32C; Harrison_32ClassicChannelStrip; Harrison 32Classic; Harrison 32Classic Channel Strip; Harrison_MPCChannelStrip; Harrison MPC Channel Strip
+translate = harrison-strip
 
 [complete-access-bus-comps]
 product = bus / smart compressors (SSL Bus Compressor 2, G3, VBC, sonible smart:comp, pure:comp)
@@ -1484,6 +1522,498 @@ int translateWavesCla76 (const std::vector<std::uint8_t>& state, EffectSlot& slo
     return 11;
 }
 
+// round tp172c5: Harrison 32Classic Channel Strip and Harrison MPC Channel Strip -> Ridge Strip's own engine (brown EQ
+// curve), their states read black-box from the official trials. The 32C's state is the SSL_PLUGIN_STATE XML (its own
+// ids, the original's units); the MPC's a flat <HarrisonMPCChannelStrip> element of PARAMs. The laws below are fits
+// of Ridge's own bands / filters / dynamics to the trial's captures (tp172c data: H32_eq, H32_dyn, H32_mk, MPC_eq,
+// MPC_dyn): bells keep the dial's frequency and gain with a gain-dependent Q, shelves move to the corner and plateau
+// that match the original's gentler curve, the high-pass (12 dB/oct there, 18 here) sits lower.
+namespace harrison
+{
+// piecewise-linear table lookup on x (x ascending), clamped at the ends
+double interp (double x, std::initializer_list<double> xs, std::initializer_list<double> ys)
+{
+    const double* a = xs.begin();
+    const double* b = ys.begin();
+    const auto n = xs.size();
+    if (x <= a[0]) return b[0];
+    for (std::size_t i = 1; i < n; ++i)
+        if (x <= a[i])
+            return b[i - 1] + (b[i] - b[i - 1]) * (x - a[i - 1]) / (a[i] - a[i - 1]);
+    return b[n - 1];
+}
+double lg (double hz) { return std::log (std::max (hz, 1.0)); }
+
+// bells: the dial's gain; Q 0.5 (Ridge's widest) for small gains up to 0.75 at full gain
+double bellQ (double gainDb) { return interp (std::abs (gainDb), { 0.0, 7.0, 13.74 }, { 0.5, 0.55, 0.75 }); }
+
+// the 32C's low shelf (dial 19 .. 800 Hz): Ridge's corner and plateau at full gain, scaled for smaller gains
+void lowShelf (double hz, double gainDb, double& ridgeHz, double& ridgeDb)
+{
+    const auto x = lg (hz);
+    const std::initializer_list<double> f { lg (18.95), lg (58.81), lg (111.35), lg (369.3), lg (798.7) };
+    const auto fullHz = std::exp (interp (x, f, { lg (51.0), lg (111.4), lg (174.2), lg (887.5), lg (1593.0) }));
+    const auto fullDb = interp (x, f, { 6.65, 10.8, 11.67, 12.73, 12.87 });
+    const auto a = std::abs (gainDb);
+    ridgeDb = std::copysign (fullDb * interp (a, { 0.0, 2.49, 6.94, 13.74 }, { 0.0, 0.307, 0.709, 1.0 }), gainDb);
+    ridgeHz = fullHz * interp (a, { 2.49, 6.94, 13.74 }, { 0.93, 0.96, 1.0 });
+}
+
+// the 32C's high shelf (dial 690 Hz .. 14.5 kHz): boost and cut differ
+void highShelf (double hz, double gainDb, double& ridgeHz, double& ridgeDb)
+{
+    const auto x = lg (hz);
+    const std::initializer_list<double> f { lg (689.0), lg (1389.5), lg (3619.0), lg (9021.6), lg (14497.5) };
+    const bool boost = gainDb >= 0.0;
+    const auto fullHz = std::exp (boost ? interp (x, f, { lg (362.6), lg (1286.4), lg (2104.8), lg (4212.6), lg (5744.7) })
+                                        : interp (x, f, { lg (382.4), lg (1406.5), lg (2363.2), lg (4995.4), lg (6982.4) }));
+    const auto fullDb = boost ? interp (x, f, { 12.52, 11.79, 11.16, 9.19, 7.38 }) : interp (x, f, { 13.05, 12.71, 12.40, 11.27, 10.02 });
+    const auto a = std::abs (gainDb);
+    ridgeDb = std::copysign (fullDb * (boost ? interp (a, { 0.0, 2.49, 6.94, 13.74 }, { 0.0, 0.274, 0.694, 1.0 })
+                                             : interp (a, { 0.0, 2.49, 6.94, 13.74 }, { 0.0, 0.341, 0.722, 1.0 })), gainDb);
+    ridgeHz = fullHz * (boost ? interp (a, { 2.49, 6.94, 13.74 }, { 0.948, 1.008, 1.0 }) : interp (a, { 2.49, 6.94, 13.74 }, { 1.16, 1.042, 1.0 }));
+}
+
+// the 32C's filters: high-pass 12 dB/oct (Ridge's 18 dB/oct one a little lower), low-pass 12 dB/oct (as measured)
+double hpfHz (double hz) { return hz * std::exp (interp (lg (hz), { lg (30.0), lg (250.0) }, { std::log (0.93), std::log (0.70) })); }
+double lpfHz (double hz)
+{
+    return std::exp (interp (lg (hz), { lg (187.6), lg (1607.0), lg (7321.0), lg (20000.0) }, { lg (188.0), lg (1659.0), lg (10063.0), lg (19268.0) }));
+}
+// the 32C's auto make-up: half the gain reduction a steady signal at 0 dBFS would get (measured: thr -10 .. -36, 2 .. 20 : 1)
+double autoMakeupDb (double thresholdDb, double ratio) { return std::max (0.0, -thresholdDb) * (1.0 - 1.0 / std::max (1.0, ratio)) * 0.5; }
+} // namespace harrison
+
+// every <PARAM id="…" value="…"/> from `from` to `to` (std::string::npos = the end) in the original's units
+std::map<std::string, double> xmlParams (const std::string& text, std::size_t from, std::size_t to)
+{
+    std::map<std::string, double> v;
+    for (auto q = text.find ("<PARAM ", from); q != std::string::npos && q < to; q = text.find ("<PARAM ", q + 7))
+    {
+        const auto id = attributeIn (text, q, "id");
+        float value = 0;
+        if (! id.empty() && parseFloat (attributeIn (text, q, "value"), value) && std::isfinite (value))
+            v[id] = value;
+    }
+    return v;
+}
+
+int translateHarrisonStrip (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace r = mixsuite::ridge;
+    if (slot.kind != EffectKind::ridgeStrip)
+        return 0;
+    const auto c32 = findBytes (state, "<SSL_PLUGIN_STATE"), mpc = findBytes (state, "<HarrisonMPCChannelStrip");
+    if (c32 == std::string::npos && mpc == std::string::npos)
+        return 0;
+    const std::string text (state.begin() + (std::ptrdiff_t) std::min (c32, mpc), state.end());
+    std::map<std::string, double> v;
+    if (c32 < mpc)
+    {
+        if (attributeIn (text, 0, "PluginName").find ("Harrison 32") == std::string::npos)
+            return 0;
+        const bool useB = attributeIn (text, 0, "StateASelected") == "0";
+        const auto block = text.find (useB ? "<B" : "<A");
+        if (block == std::string::npos)
+            return 0;
+        v = xmlParams (text, block, text.find (useB ? "</B>" : "</A>", block));
+    }
+    else
+        v = xmlParams (text, 0, std::string::npos);
+    if (v.size() < 10)
+        return 0;
+    auto at = [&v] (const char* id, double fallback) {
+        const auto it = v.find (id);
+        return it != v.end() ? it->second : fallback;
+    };
+    auto sw = [&at] (const char* id, bool fallback) { return at (id, fallback ? 1.0 : 0.0) >= 0.5; };
+    auto& p = slot.params;
+    // Ridge's own engine, brown curve, its own auto make-up off (the originals' make-up goes into the output trim)
+    p[r::modern] = p[r::console4k] = p[r::voicing] = p[r::vocal] = 0.0f;
+    p[r::curve] = 0.0f;
+    p[r::analog] = 0.0f;
+    p[r::autoMakeup] = 0.0f;
+    p[r::eqToSidechain] = p[r::filtersToSidechain] = 0.0f;
+    auto gainV = [] (double db) { return linNorm (db, -15.0, 15.0); };
+    auto setBell = [&] (int gain, int freq, int q, double hz, double db, double lo, double hi) {
+        p[(std::size_t) gain] = gainV (db);
+        p[(std::size_t) freq] = logNorm (hz, lo, hi);
+        if (q >= 0)
+            p[(std::size_t) q] = logNorm (harrison::bellQ (db), 0.5, 2.5);
+    };
+    auto ratioV = [] (double ratio) {
+        return ratio <= 1.0005 ? 0.0f : (float) std::sqrt (std::clamp ((ratio - 1.0) / 19.0, 0.0, 0.996));
+    };
+    double outDb = 0.0;
+    if (c32 < mpc)
+    {
+        // ---- 32Classic: 4-band EQ (Hi / Hi-Mid / Low-Mid / Low; shelf or bell at the ends), filters, compressor
+        // (Leveler / Compressor / Limiter), gate / expander, saturator (Ridge's DRIVE section since tp172c6), trims
+        const bool filtersIn = sw ("equalizer_in", true) && sw ("equalizer_filters_in", true);
+        const auto hp = at ("equalizer_highpass_filter_freq", 25.0), lp = at ("equalizer_lowpass_filter_freq", 20000.0);
+        p[r::hpf] = filtersIn ? std::max (1e-4f, logNorm (harrison::hpfHz (hp), 16.0, 350.0)) : 0.0f;
+        p[r::lpf] = filtersIn ? std::max (1e-4f, logNorm (harrison::lpfHz (lp), 22000.0, 3000.0)) : 0.0f;
+        p[r::eqOn] = sw ("equalizer_in", true) && sw ("equalizer_eq_in", true) ? 1.0f : 0.0f;
+        // the dials: Hi (shelf / bell), Hi-Mid 270 .. 8000 Hz, Low-Mid 104 .. 4366 Hz, Low (shelf / bell). A mid outside
+        // its Ridge band's range (Hi-Mid 600 .. 7000, Low-Mid 200 .. 2500), or an end bell outside LF / HF's (30 .. 450,
+        // 1500 .. 16000), moves to a neighbour band left flat
+        struct Dial { double hz, db; bool bell; };
+        Dial hi { at ("equalizer_band_freq_1", 3619.0), at ("equalizer_band_gain_1", 0.0), sw ("equalizer_hi_bell", false) };
+        Dial hm { at ("equalizer_band_freq_2", 1422.0), at ("equalizer_band_gain_2", 0.0), true };
+        Dial lm { at ("equalizer_band_freq_3", 609.0), at ("equalizer_band_gain_3", 0.0), true };
+        Dial lo { at ("equalizer_band_freq_4", 111.35), at ("equalizer_band_gain_4", 0.0), sw ("equalizer_lo_bell", false) };
+        auto flat = [] (const Dial& d) { return std::abs (d.db) < 0.05; };
+        if (! flat (hm) && hm.hz < 600.0 && flat (lm)) std::swap (hm, lm);
+        else if (! flat (hm) && hm.hz > 7000.0 && flat (hi)) { hi = hm; hm.db = 0.0; }
+        if (! flat (lm) && lm.hz > 2500.0 && flat (hm)) std::swap (hm, lm);
+        else if (! flat (lm) && lm.hz < 200.0 && flat (lo)) { lo = lm; lm.db = 0.0; }
+        if (hi.bell && ! flat (hi) && hi.hz < 1500.0 && flat (hm)) { hm = hi; hi.db = 0.0; }
+        if (lo.bell && ! flat (lo) && lo.hz > 450.0 && flat (lm)) { lm = lo; lo.db = 0.0; }
+        double hz = 0, db = 0;
+        p[r::hfBell] = hi.bell ? 1.0f : 0.0f;
+        if (hi.bell) { hz = hi.hz; db = hi.db; } else harrison::highShelf (hi.hz, hi.db, hz, db);
+        setBell (r::hfGain, r::hfFreq, -1, hz, db, 1500.0, 16000.0);
+        setBell (r::hmfGain, r::hmfFreq, r::hmfQ, hm.hz, hm.db, 600.0, 7000.0);
+        setBell (r::lmfGain, r::lmfFreq, r::lmfQ, lm.hz, lm.db, 200.0, 2500.0);
+        p[r::lfBell] = lo.bell ? 1.0f : 0.0f;
+        if (lo.bell) { hz = lo.hz; db = lo.db; } else harrison::lowShelf (lo.hz, lo.db, hz, db);
+        setBell (r::lfGain, r::lfFreq, -1, hz, db, 30.0, 450.0);
+        // compressor: threshold in dBFS, ratio 1 .. 100 : 1. On the stair (sines) its static line meets the input at
+        // the dial - 2 dB RMS (the Limiter's ~1.8 dB lower); Ridge's detector reads the sine's peak (+3 dB), so its
+        // threshold sits at the dial + 1. Under Ridge's -40 dBFS floor the rest moves into the input trim (taken back
+        // at the output, the gate's threshold follows). The Leveler showed no static reduction (read as off)
+        const auto mode = (int) std::lround (at ("compressor_mode", 1.0));
+        const bool compIn = sw ("compressor_in", true) && mode != 0;
+        const auto ratio = compIn ? at ("compressor_ratio", 10.0) : 1.0, thr = at ("compressor_threshold", 0.0);
+        const auto ridgeThr = thr + 1.0 - (mode == 2 ? 1.8 : 0.0);
+        const auto inDb = at ("input_trim", 0.0);
+        const auto lift = compIn ? std::clamp (-40.0 - ridgeThr, 0.0, std::max (0.0, 20.0 - inDb)) : 0.0;
+        p[r::compRatio] = ratioV (ratio);
+        p[r::compThreshold] = linNorm (ridgeThr + lift, -40.0, 0.0);
+        p[r::compRelease] = logNorm (at ("compressor_release", 50.0) / 1000.0, 0.1, 4.0);
+        p[r::compFastAttack] = at ("compressor_attack", 20.0) < 3.0 ? 1.0f : 0.0f;
+        p[r::compMix] = (float) std::clamp (at ("CompMix", 100.0) / 100.0, 0.0, 1.0);
+        if (compIn)
+            outDb += at ("compressor_makeup_gain", 0.0) + (sw ("CompAutoMakeUp", true) ? harrison::autoMakeupDb (thr, ratio) : 0.0);
+        // gate (gate_mode 1 = the 1:2 expander), depth = the range
+        const bool gateIn = sw ("gate_in", true);
+        p[r::gateRange] = gateIn ? linNorm (at ("gate_depth", 0.0), 0.0, 60.0) : 0.0f;
+        p[r::gateThreshold] = linNorm (at ("gate_threshold", 0.0) + lift, -80.0, 0.0);
+        p[r::gateRelease] = logNorm (at ("gate_release", 100.0) / 1000.0, 0.1, 4.0);
+        p[r::gateFastAttack] = at ("gate_attack", 1.0) < 0.5 ? 1.0f : 0.0f;
+        p[r::expander] = at ("gate_mode", 0.0) >= 0.5 ? 1.0f : 0.0f;
+        p[r::dynOn] = sw ("DynamicsIn", true) ? 1.0f : 0.0f;
+        p[r::order] = 0.0f;
+        p[r::phase] = sw ("polarity", false) ? 1.0f : 0.0f;
+        p[r::input] = linNorm (inDb + lift, -20.0, 20.0);
+        outDb += at ("output_trim", 0.0) + std::max (at ("FaderLevel", 0.0), -20.0) - lift;
+        // round tp172c6: its saturator -> Ridge's DRIVE section, Saturate model (the dial -24 .. +24 dB, as measured);
+        // before the output trim / fader, as Ridge's drive sits
+        p[r::driveOn] = sw ("saturator_in", false) ? 1.0f : 0.0f;
+        p[r::driveModel] = r::driveModelValue (r::driveSaturate);
+        p[r::driveAmount] = r::driveAmountValue (r::driveSaturate, at ("saturator_drive", 0.0));
+        p[r::driveInput] = p[r::driveTrim] = 0.5f;
+        p[r::driveMix] = 1.0f;
+        if (sw ("bypass", false))
+            slot.enabled = false;
+    }
+    else
+    {
+        // ---- MPC: 8 bands (shape 1/2 low-pass 12/24, 3/4 high-pass 12/24, 5 low shelf, 6 high shelf, 7 bell, 8 notch,
+        // 9 band-pass) onto Ridge's 4: the active bells / shelves with gain, the largest four (shelves on LF / HF, the
+        // bells on the free slots by frequency); the high- / low-pass shapes -> Ridge's filters. Its bell's Q reads as the cookbook's
+        // Q x 6.35 / |gain| (measured at 9.6 .. 19.2 dB); shelves: corner x 1.4 (low) / x 0.71 (high), slope 1.
+        // Compressor -> Ridge's (threshold dBFS, ratio, release, make-up); its de-esser and denoiser are not reproduced
+        struct Band { double hz, db, q; int shape; };
+        std::vector<Band> bands;
+        double hpHz = 0.0, lpHz = 0.0;
+        const bool eqIn = sw ("mpc_equalizerin", true);
+        for (int b = 1; b <= 8 && eqIn; ++b)
+        {
+            const auto key = [b] (const char* n) { return std::string (n) + std::to_string (b); };
+            if (at (key ("mpceq_bandIn").c_str(), 1.0) < 0.5)
+                continue;
+            const auto hz = at (key ("mpceq_bandFreq").c_str(), 1000.0), db = at (key ("mpceq_bandGain").c_str(), 0.0);
+            const auto shape = (int) std::lround (at (key ("mpceq_bandShape").c_str(), 7.0));
+            // the 12 dB/oct shapes take the 32C's filter laws (same family), the 24 dB/oct ones the dial
+            if (shape == 3 || shape == 4) hpHz = std::max (hpHz, shape == 3 ? harrison::hpfHz (hz) : hz);
+            else if (shape == 1 || shape == 2)
+            {
+                const auto lz = shape == 1 ? harrison::lpfHz (hz) : hz;
+                lpHz = lpHz > 0.0 ? std::min (lpHz, lz) : lz;
+            }
+            else if ((shape >= 5 && shape <= 7) && std::abs (db) > 0.05)
+                bands.push_back ({ hz, db, at (key ("mpceq_bandQ").c_str(), 3.0), shape });
+        }
+        std::sort (bands.begin(), bands.end(), [] (const Band& a, const Band& b) { return std::abs (a.db) > std::abs (b.db); });
+        if (bands.size() > 4)
+            bands.resize (4);
+        std::sort (bands.begin(), bands.end(), [] (const Band& a, const Band& b) { return a.hz < b.hz; });
+        auto rbjQ = [] (const Band& b) { return b.q * std::min (1.0, 6.35 / std::max (1e-3, std::abs (b.db))); };
+        p[r::hpf] = hpHz > 0.0 ? std::max (1e-4f, logNorm (hpHz, 16.0, 350.0)) : 0.0f;
+        p[r::lpf] = lpHz > 0.0 ? std::max (1e-4f, logNorm (lpHz, 22000.0, 3000.0)) : 0.0f;
+        for (int g : { r::lfGain, r::lmfGain, r::hmfGain, r::hfGain })
+            p[(std::size_t) g] = 0.5f;
+        // slots: a low shelf takes LF, a high shelf HF (Ridge's only shelves); the bells (and a second shelf of a
+        // kind, played as a bell) take the free slots, the mids first (they have a Q), in frequency order
+        int slotOf[4] = { -1, -1, -1, -1 };
+        bool taken[4] = { false, false, false, false };
+        for (std::size_t i = 0; i < bands.size(); ++i)
+        {
+            const int want = bands[i].shape == 5 ? 0 : bands[i].shape == 6 ? 3 : -1;
+            if (want >= 0 && ! taken[want]) { taken[want] = true; slotOf[i] = want; }
+        }
+        std::vector<int> freeSlots;
+        for (int sl : { 1, 2, 0, 3 })
+            if (! taken[sl]) freeSlots.push_back (sl);
+        std::size_t rest = 0;
+        for (std::size_t i = 0; i < bands.size(); ++i)
+            rest += slotOf[i] < 0 ? 1 : 0;
+        freeSlots.resize (std::min (freeSlots.size(), rest));
+        std::sort (freeSlots.begin(), freeSlots.end());
+        for (std::size_t i = 0, k = 0; i < bands.size(); ++i)   // bands are in frequency order
+            if (slotOf[i] < 0 && k < freeSlots.size()) slotOf[i] = freeSlots[k++];
+        for (std::size_t i = 0; i < bands.size(); ++i)
+        {
+            const auto& b = bands[i];
+            const bool shelf = (b.shape == 5 && slotOf[i] == 0) || (b.shape == 6 && slotOf[i] == 3);
+            const auto shelfHz = b.shape == 5 ? b.hz * 1.4 : b.hz * 0.71;
+            switch (slotOf[i])
+            {
+                case 0:
+                    p[r::lfBell] = shelf ? 0.0f : 1.0f;
+                    setBell (r::lfGain, r::lfFreq, -1, shelf ? shelfHz : b.hz, b.db, 30.0, 450.0);
+                    break;
+                case 1:
+                    setBell (r::lmfGain, r::lmfFreq, -1, b.hz, b.db, 200.0, 2500.0);
+                    p[r::lmfQ] = logNorm (rbjQ (b), 0.5, 2.5);
+                    break;
+                case 2:
+                    setBell (r::hmfGain, r::hmfFreq, -1, b.hz, b.db, 600.0, 7000.0);
+                    p[r::hmfQ] = logNorm (rbjQ (b), 0.5, 2.5);
+                    break;
+                case 3:
+                    p[r::hfBell] = shelf ? 0.0f : 1.0f;
+                    setBell (r::hfGain, r::hfFreq, -1, shelf ? shelfHz : b.hz, b.db, 1500.0, 16000.0);
+                    break;
+                default:
+                    break;
+            }
+        }
+        p[r::eqOn] = eqIn ? 1.0f : 0.0f;
+        // its compressor on the stair: the static line meets the input 1.5 .. 3.6 dB under the dial (more at high
+        // ratios); a wide knee (dial 1 .. 30 dB, 3 by default) reads as a gentler ratio from a higher threshold
+        // (15.5 dB: ~55 % of the slope, ~4 dB up). Ridge's detector reads the sine's peak (+3 dB); under its
+        // -40 dBFS floor the rest moves into the input trim, taken back at the output
+        const bool compIn = sw ("mpc_compressorin", true);
+        const auto dialRatio = compIn ? std::max (1.0, at ("mpccomp_ratio", 1.5)) : 1.0;
+        const auto knee = std::max (0.0, at ("mpccomp_knee", 3.0) - 3.0);
+        const auto slope = (1.0 - 1.0 / dialRatio) * (1.0 - 0.45 * std::min (1.0, knee / 12.5));
+        const auto ratio = 1.0 / std::max (1e-3, 1.0 - slope);
+        const auto ridgeThr = at ("mpccomp_threshold", -10.0) + 3.0 - 1.5 - 2.2 * (1.0 - 1.0 / dialRatio) + 0.3 * knee;
+        const auto trimDbIn = at ("mpc_trim", 0.0);
+        const auto lift = compIn ? std::clamp (-40.0 - ridgeThr, 0.0, std::max (0.0, 20.0 - trimDbIn)) : 0.0;
+        p[r::compRatio] = ratioV (ratio);
+        p[r::compThreshold] = linNorm (ridgeThr + lift, -40.0, 0.0);
+        p[r::compRelease] = logNorm (at ("mpccomp_release", 100.0) / 1000.0, 0.1, 4.0);
+        p[r::compFastAttack] = at ("mpccomp_attack", 5.0) < 3.0 ? 1.0f : 0.0f;
+        p[r::compMix] = 1.0f;
+        if (compIn)
+            outDb += at ("mpccomp_makeup", 0.0);
+        p[r::gateRange] = 0.0f;
+        p[r::dynOn] = 1.0f;
+        p[r::order] = 0.0f;
+        p[r::phase] = sw ("mpc_polarity", false) ? 1.0f : 0.0f;
+        p[r::input] = linNorm (trimDbIn + lift, -20.0, 20.0);
+        outDb -= lift;
+        if (sw ("bypass", false))
+            slot.enabled = false;
+    }
+    p[r::output] = linNorm (outDb, -20.0, 20.0);
+    return (int) v.size();
+}
+
+// round tp172c6: Slate VCC Channel (its state: a <package> archive, Slot0 / Slot1 sections of normalised entries; the
+// "Current slot" plays) -> Ridge with its EQ and dynamics out and the DRIVE section on the console's model (Brit 4k E /
+// Brit 4k G / US A / Brit N / Y / RC-Tube -> Console E / G / A / N / Y, Tube), the drive 0 .. 18 dB as measured; its Input
+// and Output (-18 .. +18 dB) on Ridge's trims (the input drives the model, the output after it)
+int translateVccChannel (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace r = mixsuite::ridge;
+    const auto root = findBytes (state, "<package");
+    if (root == std::string::npos || slot.kind != EffectKind::ridgeStrip || findBytes (state, "VccC-state") == std::string::npos)
+        return 0;
+    const std::string text (state.begin() + (std::ptrdiff_t) root, state.end());
+    auto entries = [&text] (const std::string& section) {
+        std::map<std::string, double> v;
+        const auto at = text.find ("<section id=\"" + section + "\"");
+        if (at == std::string::npos)
+            return v;
+        const auto end = text.find ("</section>", at);
+        for (auto q = text.find ("<entry ", at); q != std::string::npos && q < end; q = text.find ("<entry ", q + 7))
+        {
+            float value = 0;
+            const auto id = attributeIn (text, q, "id");
+            if (! id.empty() && parseFloat (attributeIn (text, q, "value"), value) && std::isfinite (value))
+                v[id] = value;
+        }
+        return v;
+    };
+    const auto common = entries ("Common");
+    const auto slotIndex = common.count ("Current slot") ? (int) std::lround (common.at ("Current slot")) : 0;
+    auto v = entries ("Slot" + std::to_string (std::clamp (slotIndex, 0, 1)));
+    if (v.count ("Console") == 0 || v.count ("Drive") == 0)
+        return 0;
+    auto at = [&v] (const char* id, double fallback) { const auto it = v.find (id); return it != v.end() ? it->second : fallback; };
+    auto& p = slot.params;
+    p[r::modern] = p[r::console4k] = p[r::voicing] = p[r::vocal] = 0.0f;
+    p[r::eqOn] = p[r::dynOn] = 0.0f;
+    p[r::hpf] = p[r::lpf] = 0.0f;
+    p[r::compRatio] = p[r::gateRange] = 0.0f;
+    p[r::autoMakeup] = p[r::analog] = 0.0f;
+    // the console selector: six steps (Brit 4k E, Brit 4k G, US A, Brit N, Y, RC-Tube)
+    static const int models[6] { r::driveConsoleE, r::driveConsoleG, r::driveConsoleA, r::driveConsoleN, r::driveConsoleY, r::driveTube };
+    const auto console = std::clamp ((int) std::floor (at ("Console", 0.0) * 6.0), 0, 5);
+    p[r::driveOn] = 1.0f;
+    p[r::driveModel] = r::driveModelValue (models[console]);
+    p[r::driveAmount] = (float) std::clamp (at ("Drive", 1.0 / 3.0), 0.0, 1.0);
+    p[r::driveInput] = p[r::driveTrim] = 0.5f;
+    p[r::driveMix] = 1.0f;
+    p[r::input] = linNorm (std::clamp (-18.0 + 36.0 * at ("Input", 0.5), -20.0, 20.0), -20.0, 20.0);
+    p[r::output] = linNorm (std::clamp (-18.0 + 36.0 * at ("Output", 0.5), -20.0, 20.0), -20.0, 20.0);
+    if (at ("Bypass", 0.0) >= 0.5)
+        slot.enabled = false;
+    return (int) v.size();
+}
+
+// round tp172c6: SSL Guitarstrip (its state: the SSL_PLUGIN_STATE XML, the A or B setting in its own units) -> Ridge's
+// own engine (brown curve) with the DRIVE section on the Guitar amp / Bass amp models, measured black-box on its trial
+// (GS_bank): EQ low / high first-order shelves ±12 dB (read as Ridge's shelves at their best-fitting corner and gain),
+// mid bell ±12 dB at Q 0.5 (0.5 .. 7 kHz), 24 dB/oct high-pass (20 = out) and a steep low-pass (20 kHz = out) on Ridge's
+// slopes at the corners that fit best; the compressor's threshold in dB (RMS), its mode Fastest .. Slowest = 2 : 1 ..
+// 4 : 1 with ~1 / 10 / 30 ms attack and ~50 / 130 / 300 ms release; the amp's drive 0 .. 11 and the guitar pre-amp
+// (-6 .. +30 dB, on the drive input). Not read: Boost, Punch, Edge, the bass Punch / Shape, the EQ pre / post order
+int translateSslGuitarstrip (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace r = mixsuite::ridge;
+    const auto root = findBytes (state, "<SSL_PLUGIN_STATE");
+    if (root == std::string::npos || slot.kind != EffectKind::ridgeStrip)
+        return 0;
+    const std::string text (state.begin() + (std::ptrdiff_t) root, state.end());
+    if (attributeIn (text, 0, "PluginName").find ("Guitarstrip") == std::string::npos)
+        return 0;
+    const bool useB = attributeIn (text, 0, "StateASelected") == "0";
+    const auto block = text.find (useB ? "<B" : "<A");
+    if (block == std::string::npos)
+        return 0;
+    const auto v = xmlParams (text, block, text.find (useB ? "</B>" : "</A>", block));
+    if (v.size() < 10)
+        return 0;
+    auto at = [&v] (const char* id, double fallback) { const auto it = v.find (id); return it != v.end() ? it->second : fallback; };
+    auto sw = [&at] (const char* id, bool fallback) { return at (id, fallback ? 1.0 : 0.0) >= 0.5; };
+    auto& p = slot.params;
+    p[r::modern] = p[r::console4k] = p[r::voicing] = p[r::vocal] = 0.0f;
+    p[r::curve] = 0.0f;
+    p[r::analog] = 0.0f;
+    p[r::eqToSidechain] = p[r::filtersToSidechain] = 0.0f;
+    p[r::gateRange] = 0.0f;
+    // EQ: the shelves (first order in the original) as Ridge's S 1 shelves: low cut 327 Hz x0.93, boost 450 Hz (its
+    // range's top) x1.0; high 4262 Hz x0.87
+    const bool eqIn = sw ("EQ", true);
+    p[r::eqOn] = eqIn ? 1.0f : 0.0f;
+    const auto loDb = std::clamp (at ("Low Gain", 0.0), -12.0, 12.0), hiDb = std::clamp (at ("High Gain", 0.0), -12.0, 12.0);
+    p[r::lfBell] = p[r::hfBell] = 0.0f;
+    p[r::lfGain] = linNorm (loDb * (loDb < 0.0 ? 0.928 : 1.0), -15.0, 15.0);
+    p[r::lfFreq] = logNorm (loDb < 0.0 ? 327.5 : 450.0, 30.0, 450.0);
+    p[r::hfGain] = linNorm (hiDb * 0.867, -15.0, 15.0);
+    p[r::hfFreq] = logNorm (4262.0, 1500.0, 16000.0);
+    const auto midHz = std::clamp (at ("Mid Frequency", 1.0), 0.5, 7.0) * 1000.0, midDb = std::clamp (at ("Mid Gain", 0.0), -12.0, 12.0);
+    const bool lowMid = midHz < 600.0;
+    p[r::lmfGain] = linNorm (lowMid ? midDb : 0.0, -15.0, 15.0);
+    p[r::lmfFreq] = logNorm (lowMid ? midHz : 1000.0, 200.0, 2500.0);
+    p[r::lmfQ] = 0.0f;
+    p[r::hmfGain] = linNorm (lowMid ? 0.0 : midDb, -15.0, 15.0);
+    p[r::hmfFreq] = logNorm (lowMid ? 3000.0 : midHz, 600.0, 7000.0);
+    p[r::hmfQ] = 0.0f;
+    // filters: the 24 dB/oct high-pass fits Ridge's 18 dB/oct at ~1.25x its corner; the steep low-pass Ridge's 12 dB/oct at
+    // 0.52x (3.6 kHz) .. 0.74x (11.3 kHz)
+    const auto hp = at ("High-Pass Filter", 20.0), lp = at ("Low-Pass Filter", 20.0);
+    const auto hpK = hp < 30.0 ? 1.03 : 1.25;
+    p[r::hpf] = eqIn && hp > 20.5 ? std::max (1e-4f, logNorm (hp * hpK, 16.0, 350.0)) : 0.0f;
+    const auto lpK = std::clamp (0.523 + (0.74 - 0.523) * std::log (std::max (lp, 3.0) / 3.6) / std::log (11.3 / 3.6), 0.5, 0.8);
+    p[r::lpf] = eqIn && lp < 19.5 ? std::max (1e-4f, logNorm (std::max (3000.0, lp * 1000.0 * lpK), 22000.0, 3000.0)) : 0.0f;
+    // compressor: threshold -36 .. 0 dB at the sine's RMS (Ridge reads the peak: +3), mode 0 .. 4 = Fastest .. Slowest
+    const bool compIn = sw ("Compressor", false);
+    const auto mode = std::clamp (at ("Compressor Mode", 2.0), 0.0, 4.0);
+    const auto thr = std::clamp (at ("Compressor Threshold", 0.0), -36.0, 0.0);
+    p[r::dynOn] = compIn ? 1.0f : 0.0f;
+    p[r::compRatio] = compIn ? (float) std::sqrt (std::clamp ((1.0 + 0.5 * mode) / 19.0, 0.0, 0.996)) : 0.0f;
+    p[r::compThreshold] = linNorm (thr + 3.0, -40.0, 0.0);
+    p[r::compFastAttack] = mode < 1.0 ? 1.0f : 0.0f;
+    p[r::compRelease] = logNorm (std::exp (std::log (0.1) + (std::log (0.3) - std::log (0.1)) * mode / 4.0), 0.1, 4.0);
+    p[r::compMix] = (float) std::clamp (at ("Compressor Mix", 100.0) / 100.0, 0.0, 1.0);
+    p[r::autoMakeup] = compIn && sw ("Compressor Auto Gain", false) ? 1.0f : 0.0f;
+    p[r::order] = 0.0f;
+    // the amp: Drive Type 0 = guitar, 1 = bass; drive 0 .. 11; the guitar pre-amp onto the drive input
+    const bool bass = at ("Drive Type", 0.0) >= 0.5;
+    const auto model = bass ? r::driveBassAmp : r::driveGuitarAmp;
+    p[r::driveOn] = sw ("Drive", false) ? 1.0f : 0.0f;
+    p[r::driveModel] = r::driveModelValue (model);
+    p[r::driveAmount] = r::driveAmountValue (model, at (bass ? "Bass Drive" : "Guitar Drive", 0.0));
+    p[r::driveInput] = linNorm (bass ? 0.0 : std::clamp (at ("Guitar Pre-Amp", 0.0), -24.0, 24.0), -24.0, 24.0);
+    p[r::driveTrim] = 0.5f;
+    p[r::driveMix] = (float) std::clamp (at ("Drive Mix", 100.0) / 100.0, 0.0, 1.0);
+    p[r::input] = linNorm (std::clamp (at ("Input Gain", 0.0), -20.0, 20.0), -20.0, 20.0);
+    p[r::output] = linNorm (std::clamp (at ("Output Gain", 0.0), -20.0, 20.0), -20.0, 20.0);
+    p[r::phase] = sw ("Phase Invert", false) ? 1.0f : 0.0f;
+    if (sw ("Bypass", false))
+        slot.enabled = false;
+    return (int) v.size();
+}
+
+// round tp172c6: SSL Native Drumstrip (the SSL_PLUGIN_STATE XML, A / B) -> Ridge's own engine with its gate (open
+// threshold, range up to Ridge's 60 dB, release) and its input / output trims. Not reproduced yet: the transient shaper,
+// the HF / LF enhancers and the listen-mic compressor (Ridge stays flat for them)
+int translateSslDrumstrip (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace r = mixsuite::ridge;
+    const auto root = findBytes (state, "<SSL_PLUGIN_STATE");
+    if (root == std::string::npos || slot.kind != EffectKind::ridgeStrip)
+        return 0;
+    const std::string text (state.begin() + (std::ptrdiff_t) root, state.end());
+    if (attributeIn (text, 0, "PluginName").find ("Drumstrip") == std::string::npos)
+        return 0;
+    const bool useB = attributeIn (text, 0, "StateASelected") == "0";
+    const auto block = text.find (useB ? "<B" : "<A");
+    if (block == std::string::npos)
+        return 0;
+    const auto v = xmlParams (text, block, text.find (useB ? "</B>" : "</A>", block));
+    if (v.size() < 10)
+        return 0;
+    auto at = [&v] (const char* id, double fallback) { const auto it = v.find (id); return it != v.end() ? it->second : fallback; };
+    auto& p = slot.params;
+    p[r::modern] = p[r::console4k] = p[r::voicing] = p[r::vocal] = 0.0f;
+    p[r::curve] = 0.0f;
+    p[r::analog] = p[r::autoMakeup] = 0.0f;
+    p[r::eqOn] = 0.0f;
+    p[r::hpf] = p[r::lpf] = 0.0f;
+    p[r::compRatio] = 0.0f;
+    const bool gateIn = at ("gateOn", 0.0) >= 0.5;
+    p[r::dynOn] = gateIn ? 1.0f : 0.0f;
+    p[r::expander] = 0.0f;
+    p[r::gateRange] = gateIn ? linNorm (std::clamp (at ("gateRange", 80.0), 0.0, 60.0), 0.0, 60.0) : 0.0f;
+    // the open threshold (Ridge closes 4 dB under it; the trial's sweep at the threshold stays open, as here)
+    p[r::gateThreshold] = linNorm (at ("gateOpen", -30.0), -80.0, 0.0);
+    p[r::gateRelease] = logNorm (std::clamp (at ("gateRelease", 0.2), 0.1, 4.0), 0.1, 4.0);
+    p[r::gateFastAttack] = at ("gateAttack", 0.05) < 0.5 ? 1.0f : 0.0f;
+    p[r::input] = linNorm (std::clamp (at ("input", 0.0), -20.0, 20.0), -20.0, 20.0);
+    p[r::output] = linNorm (std::clamp (at ("output", 0.0), -20.0, 20.0), -20.0, 20.0);
+    p[r::driveOn] = 0.0f;
+    if (at ("bypass", 0.0) >= 0.5)
+        slot.enabled = false;
+    return (int) v.size();
+}
+
 // SSL Native Vocalstrip 2 (round 145): its state is XML with named parameters in the original's own units
 // (<SSL_PLUGIN_STATE … StateASelected="1"><A><PROCESSOR_STATE><PARAM id="compThreshold" value="-33.2"/> …); the A or B
 // setting that plays maps one to one onto Ridge Strip's Vocal strip voicing, which reproduces the official trial
@@ -2172,6 +2702,14 @@ RawTranslator rawTranslatorNamed (std::string_view name)
         return translateWavesSslChannel;
     if (name == "ssl-vocalstrip-2")
         return translateSslVocalstrip2;
+    if (name == "harrison-strip")
+        return translateHarrisonStrip;
+    if (name == "vcc-channel")
+        return translateVccChannel;
+    if (name == "ssl-guitarstrip")
+        return translateSslGuitarstrip;
+    if (name == "ssl-drumstrip")
+        return translateSslDrumstrip;
     if (name == "auto-tune-pro")
         return translateAutoTunePro;
     if (name == "waves-tune")

@@ -112,6 +112,48 @@ TEST (parity172b_crest_auto_gain_follows_attack)
     CHECK (slow < 0.5);
 }
 
+TEST (parity172b_crest_no_lift_after_silence)
+{
+    // round tp172b2 (control audit 173d): after digital silence (or a −100 dBFS floor) a loud burst never comes out
+    // above its own peak for any style or voicing (auto gain off, range 60 dB, the lowest threshold, the highest
+    // ratio, the fastest and the slowest attack); the original's Upward lift stops at 30 dB, Crest's at the same
+    using namespace lynx::dyn::crest;
+    double worst = -100.0;
+    for (int st = 0; st < allStyles; ++st)
+        for (const float att : { 0.0f, 1.0f })
+            for (const double floorAmp : { 0.0, 1e-5 })
+            {
+                auto slot = lynx::makeEffectSlot (lynx::EffectKind::crestCompressor);
+                slot.params[style] = styleValue ((Style) st);
+                slot.params[voicing] = voicingValue ((Style) st);
+                slot.params[threshold] = 0.0f;
+                slot.params[ratio] = 1.0f;
+                slot.params[range] = 1.0f;
+                slot.params[attack] = att;
+                slot.params[autoGain] = 0.0f;
+                auto fx = lynx::makeEffect (slot);
+                fx->prepare (p172b::sr);
+                std::vector<float> l (120000), r;
+                std::uint32_t rng = 12345u;
+                double inPeak = 0.0;
+                for (int i = 0; i < 120000; ++i)
+                {
+                    rng = rng * 1664525u + 1013904223u;
+                    const double u = ((double) (rng >> 8) / 16777216.0 - 0.5) * 2.0;
+                    const double v = i >= 96000 ? 0.5 * u : floorAmp * u;
+                    l[(std::size_t) i] = (float) v;
+                    if (i >= 96000) inPeak = std::max (inPeak, std::abs (v));
+                }
+                r = l;
+                p172b::run (*fx, l, r, slot.params);
+                double outPeak = 0.0;
+                for (int i = 96000; i < 120000; ++i) outPeak = std::max (outPeak, (double) std::abs (l[(std::size_t) i]));
+                worst = std::max (worst, 20.0 * std::log10 (outPeak / inPeak));
+            }
+    std::printf ("  crest silence -> burst: the highest peak over the input %+.2f dB\n", worst);
+    CHECK (worst < 1.0);
+}
+
 TEST (parity172b_luxeverb_space_engine)
 {
     using namespace lynx;

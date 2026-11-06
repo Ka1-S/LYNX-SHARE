@@ -277,6 +277,13 @@ const std::map<std::pair<K, std::string>, const char*>& own()
         { { K::ridgeStrip, "comp mix" }, TR_NOOP ("Parallel compression: blends the uncompressed signal back in") },
         { { K::ridgeStrip, "eq to sc" }, TR_NOOP ("The filters and the EQ shape only what the dynamics hear (de-essing, frequency-conscious compression); the audio keeps neither") },
         { { K::ridgeStrip, "filter split" }, TR_NOOP ("The filters go before the dynamics, even when the EQ is after them") },
+        // round tp172c6: the DRIVE section
+        { { K::ridgeStrip, "drive in" }, TR_NOOP ("Switches the drive section on: saturation at the end of the strip, before the output") },
+        { { K::ridgeStrip, "drive model" }, TR_NOOP ("The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp") },
+        { { K::ridgeStrip, "drive amount" }, TR_NOOP ("How hard the model is driven; the consoles and the clipper keep the level, the amps get louder") },
+        { { K::ridgeStrip, "drive input" }, TR_NOOP ("Level into the drive: more distortion without changing the drive") },
+        { { K::ridgeStrip, "drive trim" }, TR_NOOP ("Level after the drive") },
+        { { K::ridgeStrip, "drive mix" }, TR_NOOP ("Blends the clean signal back in") },
         // round 145: the Vocal strip voicing
         { { K::ridgeStrip, "vocal strip" }, TR_NOOP ("The vocal channel strip: de-esser, de-ploser, three-band EQ and compander in any order") },
         { { K::ridgeStrip, "process order" }, TR_NOOP ("The order of the four vocal modules") },
@@ -349,6 +356,7 @@ const std::map<std::pair<K, std::string>, const char*>& own()
         { { K::ember, "level" }, TR_NOOP ("Level of the band after the saturation") },
         // Crest Compressor
         { { K::crestCompressor, "style" }, TR_NOOP ("The compressor's character: how it reacts to peaks and how it recovers") },
+        { { K::crestCompressor, "voicing" }, TR_NOOP ("Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering") }, // round tp172b2
         { { K::crestCompressor, "ratio" }, TR_NOOP ("How strongly the level above the threshold is reduced") },
         { { K::crestCompressor, "max lookahead" }, TR_NOOP ("Allows the longest lookahead (more latency)") },
         { { K::crestCompressor, "character pre" }, TR_NOOP ("The analog colour goes before the compression") },
