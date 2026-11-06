@@ -4166,12 +4166,16 @@ bool PianoRollComponent::playheadFrame (double)
     const auto moved = (tick < 0.0) != (playheadTick < 0.0) || std::abs ((tick - playheadTick) * pixelsPerTick) >= 0.002;
     if (moved)
     {
-        auto dirty = [this] (double t) {
-            if (t >= 0.0)
-                repaint ((int) tickToX (t) - 7, 0, 14, getHeight());
+        // (old and new column as one rectangle when they overlap: each rectangle of a repaint is a paint)
+        auto column = [this] (double t) {
+            return t >= 0.0 ? juce::Rectangle<int> ((int) tickToX (t) - 7, 0, 14, getHeight()) : juce::Rectangle<int>();
+        };
+        auto dirty = [this] (juce::Rectangle<int> r) {
+            if (! r.isEmpty())
+                repaint (r);
         };
 
-        dirty (playheadTick);
+        const auto before = column (playheadTick);
         playheadTick = tick;
 
         // Follow: a page further when the playhead leaves the view (off: the view stays where it is)
@@ -4185,8 +4189,13 @@ bool PianoRollComponent::playheadFrame (double)
             updateScrollBars();
             repaint();
         }
+        else if (const auto after = column (tick); ! before.isEmpty() && ! after.isEmpty() && std::abs (after.getX() - before.getX()) <= 14)
+            dirty (before.getUnion (after));
         else
-            dirty (tick);
+        {
+            dirty (before);
+            dirty (after);
+        }
     }
     return playing || moved;
 }

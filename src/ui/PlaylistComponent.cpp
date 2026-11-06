@@ -223,6 +223,65 @@ struct PlaylistComponent::SmallClips
     }
 };
 
+// The Playlist's image cache (round 174e): JUCE's buffered-to-image cache, plus the playhead drawn over the image and
+// the playhead's own repaints leaving the image valid
+class PlaylistComponent::PlayheadCache final : public juce::CachedComponentImage
+{
+public:
+    explicit PlayheadCache (PlaylistComponent& o) : owner (o) {}
+
+    void paint (juce::Graphics& g) override
+    {
+        const auto scale = g.getInternalContext().getPhysicalPixelScaleFactor();
+        const auto bounds = owner.getLocalBounds();
+        const auto imageBounds = bounds * scale;
+
+        if (image.isNull() || image.getBounds() != imageBounds)
+        {
+            image = juce::Image (juce::Image::RGB, juce::jmax (1, imageBounds.getWidth()), juce::jmax (1, imageBounds.getHeight()), false);
+            valid.clear();
+        }
+
+        if (! valid.containsRectangle (bounds))
+        {
+            juce::Graphics imageGraphics (image);
+            auto& context = imageGraphics.getInternalContext();
+            context.addTransform (juce::AffineTransform::scale (scale));
+            for (const auto& r : valid)
+                context.excludeClipRectangle (r);
+            owner.cachePainting = true; // (the image without the playhead: drawn over it below)
+            owner.paintEntireComponent (imageGraphics, true);
+            owner.cachePainting = false;
+        }
+        valid = bounds;
+
+        g.setColour (juce::Colours::black);
+        g.drawImageTransformed (image,
+                                juce::AffineTransform::scale ((float) bounds.getWidth() / (float) imageBounds.getWidth(),
+                                                              (float) bounds.getHeight() / (float) imageBounds.getHeight()),
+                                false);
+        owner.paintPlayhead (g);
+    }
+
+    bool invalidateAll() override
+    {
+        valid.clear();
+        return true;
+    }
+    bool invalidate (const juce::Rectangle<int>& area) override
+    {
+        if (! owner.playheadRepaintOnly)
+            valid.subtract (area);
+        return true; // (the window repaints the area either way)
+    }
+    void releaseResources() override { image = {}; }
+
+private:
+    PlaylistComponent& owner;
+    juce::Image image;
+    juce::RectangleList<int> valid;
+};
+
 PlaylistComponent::PlaylistComponent (AudioEngine& e)
     : engine (e)
 {
@@ -262,6 +321,11 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     addAndMakeVisible (snapBox);
     tools.onChange = [this] (EditTool) { updateCursor (juce::ModifierKeys::currentModifiers); };
     setOpaque (true); // paints every pixel: nothing behind it is redrawn while scrolling
+    if (const auto* v = std::getenv ("LYNX_PLAYLIST_CACHE"); v == nullptr || juce::String (v) != "0")
+    {
+        setCachedComponentImage (new PlayheadCache (*this)); // (owned by the component)
+        playheadOverlay = true;
+    }
     addAndMakeVisible (tools);
 
     // Follow (FL: "Auto scrolling"): the view pages along with the playhead in Song mode; off, it stays put
@@ -1047,7 +1111,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
             g.fillPath (dashed);
         }
 
-        if (playheadTick >= 0.0)
+        if (playheadTick >= 0.0 && ! cachePainting)
         {
             g.setColour (colour::playhead);
             g.fillRect (juce::Rectangle<float> ((float) tickToX (playheadTick) - 0.5f, (float) grid.getY(), 1.5f, (float) grid.getHeight()));
@@ -1116,7 +1180,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
             textcache::drawText (g, label, tag.reduced (3.0f, 0.0f), juce::Justification::centredLeft, false);
         }
 
-        if (playheadTick >= 0.0)
+        if (playheadTick >= 0.0 && ! cachePainting)
         {
             const auto x = (float) tickToX (playheadTick);
             juce::Path tri;
@@ -1343,6 +1407,33 @@ void PlaylistComponent::paintOverview (juce::Graphics& g, juce::Rectangle<float>
         g.setColour (c.muted ? base.withAlpha (0.35f) : base);
         g.fillRect ((float) (area.getX() + c.start * scale), y, juce::jmax (1.0f, (float) (c.length * scale) - 0.5f),
                     juce::jmax (1.0f, rowHeight - (rowHeight >= 3.0f ? 0.5f : 0.0f)));
+    }
+}
+
+// The playhead over the cached image (round 174e): the line in the grid and the triangle on the ruler, as paint()
+// draws them without the cache
+void PlaylistComponent::paintPlayhead (juce::Graphics& g)
+{
+    if (playheadTick < 0.0)
+        return;
+    using namespace theme;
+    const auto grid = gridArea();
+    const auto x = (float) tickToX (playheadTick);
+    {
+        juce::Graphics::ScopedSaveState state (g);
+        if (g.reduceClipRegion (grid))
+        {
+            g.setColour (colour::playhead);
+            g.fillRect (juce::Rectangle<float> (x - 0.5f, (float) grid.getY(), 1.5f, (float) grid.getHeight()));
+        }
+    }
+    juce::Graphics::ScopedSaveState state (g);
+    if (g.reduceClipRegion (juce::Rectangle<int> (headerWidth, rulerTop, grid.getWidth(), timelineHeight)))
+    {
+        juce::Path tri;
+        tri.addTriangle (x - 6, (float) rulerTop, x + 6, (float) rulerTop, x, (float) rulerTop + 9.0f);
+        g.setColour (colour::playhead);
+        g.fillPath (tri);
     }
 }
 
@@ -5891,13 +5982,20 @@ bool PlaylistComponent::liveFrame (double nowMs)
     const auto moved = (tick < 0.0) != (playheadTick < 0.0) || std::abs ((tick - playheadTick) * pixelsPerTick) >= 0.002;
     if (moved && isShowing())
     {
-        // only the cursor column (old and new) is repainted: large projects stay cheap
-        auto dirty = [this] (double t) {
-            if (t >= 0.0)
-                repaint ((int) tickToX (t) - 8, 0, 16, getHeight());
+        // only the cursor column (old and new) is repainted: large projects stay cheap. One rectangle for both: the
+        // two strips overlap (a frame moves the line by a pixel or less), and each rectangle of a repaint is a paint
+        auto column = [this] (double t) {
+            return t >= 0.0 ? juce::Rectangle<int> ((int) tickToX (t) - 8, 0, 16, getHeight()) : juce::Rectangle<int>();
+        };
+        auto dirty = [this] (juce::Rectangle<int> r) {
+            if (r.isEmpty())
+                return;
+            playheadRepaintOnly = playheadOverlay; // (the cached image under it stays valid)
+            repaint (r);
+            playheadRepaintOnly = false;
         };
 
-        dirty (playheadTick);
+        const auto before = column (playheadTick);
         playheadTick = tick;
 
         // Follow: if the cursor leaves the screen while playing, scrolls one page (off: the view stays put)
@@ -5911,8 +6009,13 @@ bool PlaylistComponent::liveFrame (double nowMs)
             updateScrollBars();
             repaint();
         }
+        else if (const auto after = column (tick); ! before.isEmpty() && ! after.isEmpty() && std::abs (after.getX() - before.getX()) <= 16)
+            dirty (before.getUnion (after));
         else
-            dirty (tick);
+        {
+            dirty (before);
+            dirty (after);
+        }
     }
     else if (moved)
         playheadTick = tick;

@@ -664,8 +664,11 @@ bool OutputMonitor::update (double nowMs)
         clipMs = juce::jmax (0.0, clipMs - elapsed);
 
     // silence after everything has fallen to zero (meter, hold, clip, the long view's history, the spectrum bands)
-    // looks the same frame after frame: stop repainting while nothing plays (REA round 116, idle CPU)
-    silentMs = now > 0.0f ? 0.0 : juce::jmin (silentMs + elapsed, 1.0e9);
+    // looks the same frame after frame: stop repainting while nothing plays (REA round 116, idle CPU). Below -80 dB
+    // (a plugin's noise floor, a reverb's last tail) nothing shows: a 0.003 px wiggle on the scope, under the
+    // spectrum's -72 dB floor (round 174e: it kept the toolbar repainting at the display's rate while stopped)
+    constexpr auto visible = 1.0e-4f;
+    silentMs = now > visible ? 0.0 : juce::jmin (silentMs + elapsed, 1.0e9);
     if (silentMs > ((double) history.size() + 90.0) * columnPeriod)
     {
         peak = held = column = 0.0f;
