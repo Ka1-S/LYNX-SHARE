@@ -1,4 +1,5 @@
 #include "ui/SettingsPages.h"
+#include "ui/RemoteControlSettings.h"
 #include "platform/Paths.h"
 #include "platform/FileTypes.h"
 #include "platform/Package.h"
@@ -91,7 +92,7 @@ struct Rows
 // ================================================================================================================
 // General
 // ================================================================================================================
-class GeneralPage final : public ScrollingPage
+class GeneralPage final : public ScrollingPage, private juce::Timer
 {
 public:
     GeneralPage (AudioEngine& e, SettingsHooks h, bool keep) : engine (e), hooks (std::move (h)), persistent (keep)
@@ -109,6 +110,16 @@ public:
                                                                  &sandbox, &sandboxNote, &substitutes, &substitutesNote, &managePlugins, &manageShortcuts, &shortcutsNote,
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote })
             add (*c);
+
+        add (remoteTitle);
+        add (remoteControl);
+        add (remoteStatus);
+        toggle (remoteControl, tr ("Enable local remote control"), options.remoteControl,
+                [this] (bool on) { options.remoteControl = on; });
+        remoteControl.setEnabled (hooks.setGeneral != nullptr);
+        remoteControl.setTooltip (tr ("Allows authenticated local applications to read and edit this project."));
+        styleNote (remoteStatus, tr (remoteui::status()));
+        startTimerHz (2);
 
         styleLabel (languageLabel, tr ("Language"));
         styleNote (languageNote, tr ("A new language is applied when LYNX SHARE restarts."));
@@ -347,6 +358,9 @@ private:
         r.section (reportsTitle);
         crashBox.setBounds (r.row (crashLabel, 260));
         crashNote.setBounds (r.full (46).translated (0, -3));
+        r.section (remoteTitle);
+        remoteControl.setBounds (r.full (24));
+        remoteStatus.setBounds (r.full (36));
         if (updatesTitle.isVisible())
         {
             r.section (updatesTitle);
@@ -357,6 +371,14 @@ private:
         }
         displayTitle.setVisible (false);
         return r.bottom();
+    }
+
+    void timerCallback() override
+    {
+        remoteControl.setToggleState (remoteui::enabled(), juce::dontSendNotification);
+        const auto historyError = engine.getRemoteHistoryError();
+        remoteStatus.setText (historyError.isNotEmpty() ? historyError : tr (remoteui::status()), juce::dontSendNotification);
+        remoteStatus.setColour (juce::Label::textColourId, remoteui::active() ? theme::colour::accent : theme::colour::textSecondary);
     }
 
     void toggle (juce::ToggleButton& t, const juce::String& text, bool value, std::function<void (bool)> set)
@@ -406,7 +428,9 @@ private:
     bool persistent;
     GeneralOptions options;
     SectionTitle languageTitle { tr ("Language and display") }, displayTitle, startupTitle { tr ("Startup") }, editingTitle { tr ("Editing") },
-        backupTitle { tr ("Backup") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") };
+        backupTitle { tr ("Backup") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") }, remoteTitle { tr ("Remote control") };
+    juce::ToggleButton remoteControl;
+    juce::Label remoteStatus;
     juce::Label languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote;
     juce::HyperlinkButton translationLink;
     juce::ComboBox crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox;

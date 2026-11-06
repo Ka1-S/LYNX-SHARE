@@ -103,6 +103,14 @@ public:
     std::shared_ptr<Effect> getEffect (int track, int slot) const;
 
     // Copies the plugins' current state into the Song (before saving).
+    // Remote snapshots capture into a copy and do not change working time, history or revision.
+    Song snapshotForRemoteControl();
+    juce::String remoteDeviceStateHash();
+    // Stage and validate a complete edit before one native history step. Playback must be stopped.
+    bool editSongRemoteTransaction (const std::function<void (Song&)>& stage, const std::function<bool()>& cancelled = {}, bool preserveRuntimeIdentity = false);
+    void undoRemoteControl (const std::function<bool()>& cancelled = {});
+    void redoRemoteControl (const std::function<bool()>& cancelled = {});
+    juce::String getRemoteHistoryError() const { return remoteHistoryError; }
     void capturePluginStates(); // (before every save: also adds the working time so far, see stampWorkTime)
     // FL's Project info working time (REA round 167g): wall-clock time since the project was opened, added to the
     // saved total at each save. workSecondsNow() = the saved total + this session so far.
@@ -992,13 +1000,22 @@ private:
     std::unique_ptr<StreamPrefetcher> prefetcher; // only with an audio device (playing live)
 
     std::size_t maxUndoSteps = prefs::defaultUndoLevels;
-    std::deque<Song> undoStack, redoStack;
+    struct HistoryEntry { Song song; bool remote = false; juce::String deviceHash; };
+    std::deque<HistoryEntry> undoStack, redoStack;
     // undo per user (round 169b): each local step as (before, after); `sessionAfterOpen` = the last step's "after" is
     // still the song (it is taken when the next step starts, a remote change comes in, or undo is used)
     bool sessionHistory = false, sessionAfterOpen = false;
-    std::deque<std::pair<Song, Song>> sessionUndo, sessionRedo;
+    struct SessionHistoryEntry { Song first, second; bool remote = false; juce::String deviceHash; };
+    std::deque<SessionHistoryEntry> sessionUndo, sessionRedo;
+    bool nextRemoteHistoryStep = false, remoteHistoryFailed = false, remoteHistoryUncertain = false;
+    bool remoteHistoryApiStep = false; // device fences/cancellation apply only to API undo/redo, never native history
+    juce::String remoteHistoryError;
+    std::string remoteHistoryCode = "changed";
+    std::unordered_set<std::uint64_t> remoteFreshInstances;
+    std::function<bool()> remoteHistoryCancelled;
     void closeSessionStep();
     void sessionStep (bool redo);
+    void historyStep (bool redo);
     juce::Time lastUndoPress; // mouse click that already produced an undo step
     SnapshotExchange<RackState> rackExchange;
     std::shared_ptr<LiveLevels> publishedLevels; // the last snapshot's live levels (editLevels writes them)
@@ -1007,6 +1024,12 @@ private:
     std::uint64_t levelEdits = 0;                // (diagnostics / tests)
     std::uint64_t publishCount = 0;
     void saveUndoStep();
+    void capturePluginStatesInto (Song& target, bool requireAll);
+    void syncRemotePluginStates (const Song& before);
+    juce::String finishRemoteHistory (const std::optional<Song>& before);
+    bool checkRemoteHistory (const juce::String& expected, const Song& current);
+    void failRemoteHistory (bool uncertain);
+    static juce::String remoteDeviceStateHashOf (const Song&);
     RackState lastPublishedShape; // channels + instruments of the last snapshot, to reuse voices
     std::vector<int> standInChannels, standInInserts; // (playsStandIn)
     // Issue #36 (u-he Presswerk crashed in its VST3 teardown, freed from the engine's timer callback): the racks the

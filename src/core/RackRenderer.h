@@ -10,6 +10,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "core/Arpeggiator.h"
@@ -241,6 +242,9 @@ struct RackState
         StretchedSampleProvider stretchedSamples;
         PluginInstrumentFactory pluginInstruments;
         PluginEffectFactory pluginEffects;
+        // One publish may deliberately replace selected runtime identities (remote reset/replacement).
+        // An empty set preserves the established positional fallback for ordinary project/UI edits.
+        std::unordered_set<std::uint64_t> freshInstances;
     };
 
     // Builds the next state reusing the instruments from `previous` when the
