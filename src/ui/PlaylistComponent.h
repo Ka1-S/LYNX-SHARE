@@ -167,6 +167,11 @@ private:
     std::int64_t perfClip = -1;
     std::array<std::int64_t, 64> perfShown {}; // the zone's playing / pending state last painted, to repaint on change
     void paintPerformance (juce::Graphics& g, juce::Rectangle<int> grid);
+    void paintLiveRecording (juce::Graphics& g); // round 177d
+    juce::Rectangle<float> liveBounds (int track, double from, double to) const;
+    juce::Rectangle<int> liveArea;
+    double liveRepaintMs = 0.0;
+    std::vector<float> liveColumns;
     void togglePerformanceMode();
     void zoomOnPerformanceClips();
     // round 168f: FL's Playlist track tools (core/PlaylistTrackOps.h)

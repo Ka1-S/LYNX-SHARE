@@ -1068,6 +1068,9 @@ void PlaylistComponent::paint (juce::Graphics& g)
         if (song.performanceZoneEnd() > 0)
             paintPerformance (g, grid);
 
+        if (engine.isLiveRecording())
+            paintLiveRecording (g);
+
         // the clip under the mouse: outline, the grip of the edge it is on, its menu button
         if (hover.clip >= 0 && hover.clip < (int) song.playlist.size() && drag == Drag::none)
         {
@@ -6065,7 +6068,116 @@ bool PlaylistComponent::liveFrame (double nowMs)
                 repaint (0, headerHeight, headerWidth, getHeight() - headerHeight);
         }
     }
+    // round 177d: a recording in progress grows on its tracks (its rows, from where it starts to the playhead; 30 Hz)
+    if (engine.isLiveRecording() && isShowing())
+    {
+        if (nowMs - liveRepaintMs >= 1000.0 / 30.0)
+        {
+            liveRepaintMs = nowMs;
+            const auto rec = engine.liveRecording();
+            juce::Rectangle<float> area;
+            for (const auto& a : rec.audio)
+                area = area.getUnion (liveBounds (a.track, a.span.start, a.span.start + a.span.length).expanded (2.0f, 1.0f));
+            if (rec.notes && rec.track >= 0)
+                area = area.getUnion (liveBounds (rec.track, (double) rec.from, (double) rec.to + 16.0 / pixelsPerTick).expanded (2.0f, 1.0f));
+            const auto now = area.getSmallestIntegerContainer();
+            const auto dirty = now.getUnion (liveArea).getIntersection (gridArea());
+            liveArea = now;
+            if (! dirty.isEmpty())
+                repaint (dirty);
+        }
+        return true;
+    }
+    if (! liveArea.isEmpty())
+    {
+        repaint (liveArea);
+        liveArea = {};
+    }
     return playing || moved || live;
+}
+
+// Round 177d: the recording in progress, live (MusicTech's FL 2025 review: recorded MIDI is not shown in the Playlist
+// while recording, audio recording "unintuitive"). Each audio take is a growing clip with its waveform on the track it
+// will land on; a Song-mode note take is a frame over the range it covers so far (its clip, placed with the first
+// released note, and where it will grow to), with the notes still held. At the stop they become the real clips.
+juce::Rectangle<float> PlaylistComponent::liveBounds (int track, double from, double to) const
+{
+    if (track < 0 || track >= numTracks() || to <= from)
+        return {};
+    const auto x0 = (float) tickToX (from), x1 = (float) tickToX (to);
+    return { x0, (float) trackToY (track) + 1.0f, juce::jmax (3.0f, x1 - x0 - 1.0f), (float) heightOf (track) - 3.0f };
+}
+
+void PlaylistComponent::paintLiveRecording (juce::Graphics& g)
+{
+    using namespace theme;
+    const auto live = engine.liveRecording();
+    const auto& song = engine.getSong();
+    const auto visible = g.getClipBounds().toFloat();
+
+    for (const auto& a : live.audio)
+    {
+        auto from = a.span.start, to = a.span.start + a.span.length;
+        if (live.punch.has_value()) // (only the punch range is kept)
+        {
+            from = juce::jmax (from, (double) live.punch->in);
+            to = juce::jmin (to, (double) live.punch->out);
+        }
+        const auto r = liveBounds (a.track, from, to);
+        if (r.isEmpty() || ! r.intersects (visible))
+            continue;
+        const auto body = paintClipFrame (g, r, colour::accent, a.name, ClipGlyph::audio);
+        const auto wave = body.reduced (0.0f, body.getHeight() >= 14.0f ? 2.0f : 1.0f).getIntersection (visible);
+        if (a.peaks == nullptr || wave.getWidth() < 1.0f || wave.getHeight() < 2.0f || a.span.ticksPerSample <= 0.0)
+            continue;
+        // one value per pixel column, read under one lock
+        const auto columns = (int) std::ceil (wave.getWidth());
+        liveColumns.resize ((std::size_t) columns);
+        const auto framesPerPixel = 1.0 / (pixelsPerTick * a.span.ticksPerSample);
+        const auto firstFrame = a.span.firstFrame + (xToTick ((int) wave.getX()) - a.span.start) / a.span.ticksPerSample;
+        a.peaks->read (firstFrame, framesPerPixel, columns, liveColumns.data());
+        juce::RectangleList<float> bars;
+        const auto mid = wave.getCentreY(), half = wave.getHeight() * 0.5f;
+        for (int k = 0; k < columns; ++k)
+            if (const auto h = juce::jmin (1.0f, liveColumns[(std::size_t) k]) * half; h > 0.0f)
+                bars.addWithoutMerging ({ wave.getX() + (float) k, mid - h, 1.0f, juce::jmax (1.0f, 2.0f * h) });
+        g.setColour (clipContentColour (colour::accent));
+        g.fillRectList (bars);
+        g.fillRect (wave.getX(), mid - 0.5f, wave.getWidth(), 1.0f); // the zero line, as far as the take has come
+    }
+
+    if (live.notes && live.track >= 0 && live.to > live.from)
+    {
+        const auto r = liveBounds (live.track, (double) live.from, (double) live.to);
+        if (r.isEmpty() || ! r.intersects (visible))
+            return;
+        g.setColour (colour::accent.withAlpha (0.10f));
+        g.fillRoundedRectangle (r, radius::sm);
+        g.setColour (colour::accent.withAlpha (0.85f));
+        g.drawRoundedRectangle (r.reduced (0.5f), radius::sm, 1.5f);
+        if (live.held.empty() || live.pattern < 0 || live.pattern >= (int) song.patterns.size())
+            return;
+        // the held notes at their pitch, in the pattern's key range (as the clip draws its notes)
+        int low = 127, high = 0;
+        for (const auto& n : song.patterns[(std::size_t) live.pattern].notes)
+            low = juce::jmin (low, n.key), high = juce::jmax (high, n.key);
+        for (const auto& n : live.held)
+            low = juce::jmin (low, n.key), high = juce::jmax (high, n.key);
+        const auto inner = r.withTrimmedTop (clipHeaderHeight (r)).reduced (0.0f, 3.0f);
+        const auto span = juce::jmax (6, high - low + 2);
+        const auto bottomKey = (low + high) / 2.0f - span / 2.0f;
+        const auto rows = (float) span + 1.0f;
+        const auto noteHeight = juce::jlimit (1.5f, 3.0f, inner.getHeight() / rows);
+        g.setColour (colour::accent.brighter (0.35f));
+        for (const auto& n : live.held)
+        {
+            const auto at = (double) (live.origin + n.start);
+            const auto nx = (float) tickToX (at);
+            const auto nw = juce::jmax (2.0f, (float) (n.length * pixelsPerTick) - 1.0f);
+            const auto ny = inner.getBottom() - ((float) n.key - bottomKey + 0.5f) / rows * inner.getHeight() - noteHeight * 0.5f;
+            g.fillRect (nx, ny, nw, noteHeight);
+        }
+    }
 }
 
 // Performance mode (round 165m): the launched clips (a bright frame and, with "Performance clip progress", how far the

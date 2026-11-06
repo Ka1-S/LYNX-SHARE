@@ -1146,6 +1146,77 @@ double AudioEngine::estimatedPositionNow() const noexcept
     return tick;
 }
 
+AudioEngine::LiveRecording AudioEngine::liveRecording() const
+{
+    LiveRecording live;
+    if (! isLiveRecording())
+        return live;
+    live.punch = activePunch;
+
+    // the note take
+    if (recorder.isActive() && song.currentPattern >= 0 && song.currentPattern < (int) song.patterns.size())
+    {
+        const auto now = transport.playing.load() ? estimatedPositionNow() : lastPlayingTick;
+        auto preview = recorder.preview (song, now);
+        live.notes = true;
+        live.pattern = song.currentPattern;
+        live.held = std::move (preview.notes);
+        if (song.mode == PlayMode::song && preview.origin >= 0)
+        {
+            // the take's clip (placed with its first finished note) or, before it, where it will be placed
+            const Clip* clip = nullptr;
+            for (const auto& c : song.playlist)
+                if (c.kind == ClipKind::pattern && c.pattern == song.currentPattern && c.start - c.offset == preview.origin
+                    && (clip == nullptr || c.end() > clip->end()))
+                    clip = &c;
+            live.track = clip != nullptr ? clip->track : patternClipTrack (song, song.barAt (preview.origin).tick);
+            live.from = clip != nullptr ? clip->start : preview.origin;
+            live.origin = preview.origin;
+            auto to = preview.reach;
+            for (const auto& n : live.held)
+                to = std::max (to, preview.origin + n.start + n.length);
+            if (! preview.fromClip && noteTakeLinear)
+                to = std::max (to, (std::int64_t) now); // (a linear take: the region follows the playhead)
+            live.to = std::max (live.from, to);
+        }
+    }
+
+    // the audio takes
+    const auto startTick = takeStartTick.load();
+    const auto frames = takeFrames.load();
+    if (! openTakes.empty() && startTick >= 0.0 && frames > 0)
+    {
+        const auto wraps = takeWrapCount.load();
+        const auto lastWrap = song.mode == PlayMode::song && song.hasLoop() && wraps > 0 ? (std::int64_t) takeWraps[(std::size_t) wraps - 1].load() : -1;
+        const auto span = liverec::audioSpan (startTick, frames, takeTicksPerSample, takeLatency, lastWrap, song.loopStart);
+        if (liveTakeTracks.size() != openTakes.size())
+        {
+            // the tracks takes::placeTakeClips will pick (each file's insert, one track each)
+            liveTakeTracks.clear();
+            const auto from = (std::int64_t) span.start, to = from + std::max<std::int64_t> (1, (std::int64_t) span.length);
+            for (const auto& take : openTakes)
+            {
+                auto track = takes::takeTrack (song, take->playThrough > 0 ? take->playThrough : -1, from, to);
+                for (const auto used : liveTakeTracks)
+                    if (used >= track)
+                        track = used + 1;
+                liveTakeTracks.push_back (track);
+            }
+        }
+        if (span.valid())
+            for (std::size_t k = 0; k < openTakes.size(); ++k)
+            {
+                LiveRecording::Audio a;
+                a.track = liveTakeTracks[k];
+                a.span = span;
+                a.peaks = openTakes[k]->peaks;
+                a.name = openTakes[k]->file.getFileNameWithoutExtension();
+                live.audio.push_back (std::move (a));
+            }
+    }
+    return live;
+}
+
 void AudioEngine::updateAudioRecording()
 {
     const auto wantTake = audioArmed && recordOptions.recordAudio && transport.recording.load();
@@ -1201,6 +1272,7 @@ bool AudioEngine::Take::drain()
             failed.store (true);
             break;
         }
+        peaks->append (in, stream->channels(), got);
     }
     return any;
 }
@@ -1559,6 +1631,7 @@ void AudioEngine::writeJournals()
 
 void AudioEngine::finishAudioTake()
 {
+    liveTakeTracks.clear();
     {
         const juce::SpinLock::ScopedLockType lock (takeLock);
         takes.fill (nullptr);
