@@ -2150,11 +2150,14 @@ private:
             b.fadeCurve = 1;
             song.playlist = { a, b };
             song.compCrossfadeMs = 12.5f;
+            song.playlistTracks.resize (2);
+            song.playlistTracks[0].compTrack = true;
+            song.playlistTracks[1].grouped = true;
             const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), error);
             const auto plainBack = lynx::ProjectFile::fromJson (plain, error);
             compOk = back && back->playlist.size() == 2 && back->playlist[0].fadeCurve == 2 && back->playlist[1].fadeCurve == 1
-                     && back->playlist[1].fadeIn == 20 && back->compCrossfadeMs == 12.5f && plainBack
-                     && plainBack->compCrossfadeMs == lynx::Song::defaultCompCrossfadeMs && ! plain.contains ("compCrossfadeMs");
+                     && back->playlist[1].fadeIn == 20 && back->compCrossfadeMs == 12.5f && back->playlistTracks[0].compTrack && ! back->playlistTracks[1].compTrack && plainBack
+                     && plainBack->compCrossfadeMs == lynx::Song::defaultCompCrossfadeMs && ! plain.contains ("compCrossfadeMs") && ! plain.contains ("playlistCompTracks");
         }
 
         // Misc › Mono / Porta / Slide on every generator (round 168l): kept in the file; a project saved before (an

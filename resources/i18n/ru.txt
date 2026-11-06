@@ -7359,3 +7359,9 @@ countries: ru by kz
 "{0} crashed in its separate process." = "Сбой {0} в отдельном процессе."
 "{0} stopped responding (separate process)." = "{0} не отвечает (отдельный процесс)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Затронут только его процесс: LYNX SHARE и проект продолжили работу, а плагин заглушён. Сохраните проект; плагин снова загрузится при следующем открытии."
+
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "Собрать комп из этих дублей"
+"After loop recording, only the last pass plays" = "После записи по циклу играет только последний проход"
+"Loop-recorded audio: every pass plays" = "Аудио, записанное по циклу: играют все проходы"
+"Loop-recorded audio: every pass is muted" = "Аудио, записанное по циклу: все проходы заглушены"

@@ -1405,6 +1405,9 @@ struct PlaylistTrack
     // ungrouped track above it (the group's header). `collapsed` on a header folds its members into thin rows.
     bool grouped = false;
     bool collapsed = false;
+    // A comp track (round 177c, core/Comping.h): this group header is what plays, its grouped tracks are take lanes. Set
+    // only by "Comp these takes"; a group of takes is an ordinary track group until then.
+    bool compTrack = false;
     // FL's "Track mode" (REA round 146a; .flp record 0xEE: u32 mode at byte 49 = 0 / 1 audio / 3 instrument, i32 mixer
     // track at 53, i32 channel at 57). An audio track is linked to a mixer track: audio clips placed on it play through
     // that track (their channel is routed there). An instrument track belongs to a channel (and its mixer track).

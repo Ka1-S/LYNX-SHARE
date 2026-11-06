@@ -7359,3 +7359,9 @@ countries: tw hk mo
 "{0} crashed in its separate process." = "{0} 在其獨立處理程序中崩潰。"
 "{0} stopped responding (separate process)." = "{0} 停止回應（獨立處理程序）。"
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "只有它的處理程序受到影響：LYNX SHARE 和你的專案繼續執行，外掛已靜音。請儲存專案；下次開啟時外掛會重新載入。"
+
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "用這些錄音合成"
+"After loop recording, only the last pass plays" = "循環錄音後僅播放最後一遍"
+"Loop-recorded audio: every pass plays" = "循環錄製的音訊:播放每一遍"
+"Loop-recorded audio: every pass is muted" = "循環錄製的音訊:每一遍都靜音"

@@ -45,8 +45,17 @@ R0, before a machine reboot, was seen only on screen and its project was lost: 4
 - **Where each pass lands:** one track per pass, in time order. The **first** pass is on top and is the group's header,
   the **last** pass is at the bottom.
 - **Muting:** with Blend off, **every** pass is muted after Stop, the last one too. With Blend on, every pass plays.
-- **Limit of that finding:** every Blend-off run was stopped partway through its last pass. A stop exactly on a pass
-  boundary was not tested.
+- **Stop at a pass boundary (second session, runs R6–R9 in `fl\boundary-final.flp`, Blend off):**
+
+  | Stop | Passes (ticks at FL's PPQ 96) | Tracks | All muted |
+  |---|---|---|---|
+  | within a tick of the boundary (R7) | 768, 769 | 2 | yes |
+  | 3 ticks before it (R6) | 768, 765 | 2 | yes |
+  | 6 ticks past it (R8) | 768, 769, 6 | 3 | yes |
+  | 1 tick past it (R9) | 768, 769, 1 | 3 | yes |
+
+  So the boundary changes nothing: the last pass is muted too, and FL keeps a pass of any length measured here, even 1
+  tick (about 4.5 ms), on its own track. A stop at sample precision can't be scripted; the closest run is R7.
 - **`0x2000` = muted clip, proven:** FL's Mute tool on the track 7 clip changed its flags from `0x2040` to `0x40` and its
   look from grey to bright, in the next saved `.flp`. REA_rodada2 had this as a hypothesis.
 - **Recording again over the same range:** FL uses the **next free track** and starts a **new group**. It joins no earlier
@@ -62,8 +71,8 @@ R0, before a machine reboot, was seen only on screen and its project was lost: 4
 Not observed: the state of Mixer › Disk recording › "Group loop recorded takes" (the menu did not show in my shots, so
 only its effect is known), that option off, Pattern mode, Edison.
 
-FL settings changed in this session: Loop record on, Metronome off, Recording precount off, Blend recorded notes on
-(left on). An accidental click opened "Remote control settings" for Master Volume; it was closed with X, with nothing
+FL settings changed in these sessions: Loop record on, Metronome off, Recording precount off, Blend recorded notes off
+(on in the first session, back off in the second). An accidental click opened "Remote control settings" for Master Volume; it was closed with X, with nothing
 linked as far as the shots show.
 
 ### 2.2 Strings [STR] and manual [DOC]
@@ -155,15 +164,15 @@ complain about (§4).
 
 | Piece | FL | Live 12 | Users | LYNX verdict |
 |---|---|---|---|---|
-| Where takes live | grouped Playlist tracks, first pass on top, open [OBS] | take lanes inside the track | FL users want takes nested and folded | **FL's grouped tracks** (no new format). Layout and folding: pending the user's decision, §8 |
+| Where takes live | grouped Playlist tracks, first pass on top, open [OBS] | take lanes inside the track | FL users want takes nested and folded | **FL's grouped tracks, FL's layout** (user decision, §8); folding stays one click |
 | Comp model | — | main lane holds copies; sources derived and highlighted | Logic: multiple comps per folder | **copies on the comp track; the source is derived** (same channel and audio-to-song alignment). It costs nothing and saves, exports and imports as plain clips. Several comps per group are not done (§7) |
 | Choosing a part | — | selection + Enter, or Draw-mode drag | Logic's swipe with the normal tool is the favourite | **swipe on a lane** (UI slice 177c-2), plus the old "Promote" menu, now a swipe |
 | Crossfade at a switch | — | 4 ms on clip edges, optional (clicks without it) | clicks are the top complaint; length should be adjustable | **always on, equal power, centred on the switch, 5 ms default, 0–100 ms per project** (`Song::compCrossfadeMs`; 0 = hard cut). It is shortened only where a take has no audio past the switch |
-| The last take | its own track, muted or playing per Blend [OBS] | copied to the main lane, and has a lane | — | Coded as a lane plus a copy on the comp. Differs from FL: pending §8 |
-| Recording again over a comp | next free track, new group [OBS] (the 20.1 notes said sub-tracks of the parent; not what 2026 did here) | new lanes in the same track | — | Coded as new lanes under the comp track. Differs from FL and can shift tracks: pending §8 |
+| The last take | its own track, muted or playing per Blend [OBS] | copied to the main lane, and has a lane | — | Its own lane, plus a copy on the comp after "Comp these takes" (§8) |
+| Recording again over a comp | next free track, new group [OBS] (the 20.1 notes said sub-tracks of the parent; not what 2026 did here) | new lanes in the same track | — | **As FL: a new group on the next free tracks** (user decision, §8); the comp stays as it is |
 | Audition a lane | — | T / speaker button, one lane per track | — | **`Song::auditionLane`**: that lane plays (its muted takes too) instead of the comp. Not saved, no undo entry |
 | Flatten | — | none (consolidate) | Logic: Flatten, and Flatten and Merge; FL users ask for one-click flatten | **Flatten**: the comp stays, the lanes go. Merge to one file = the existing "Consolidate this track" (QuickRender) |
-| Insert take lane | — | Create › Insert Take Lane | — | **`comp::makeLanes`**: a track's audio becomes lane "take 1", so the next take over it becomes a lane too |
+| Insert take lane | — | Create › Insert Take Lane | — | **Not built**: a take never joins a group now (§8), so a lane made this way would stay alone. Written and removed in this round |
 | Automation in takes | — | not captured (complaint) | — | not done; automation clips are separate tracks in FL's model, so a comp never overwrites them |
 
 ## 6. Slice 177c-1: the core [CODE][TEST]
@@ -181,13 +190,11 @@ complain about (§4).
   - With no audio at all past the switch, it falls back to round 163's short linear fades.
   - `removeCrossfades` undoes this, so another length can be applied again.
 - `usedRanges` tells which part of each lane the comp plays, for the lane highlight in slice 2.
-- `setAudition`, `flatten`, `addTakeLanes` and `makeLanes` are described in §5.
+- `compTakes` ("Comp these takes", §8), `setAudition` and `flatten` are described in §5.
 - `takes::promoteTake` is now a swipe of that clip.
-- `takes::placeTakeClips` changed in three ways:
-  - The last pass also gets a lane.
-  - Takes over a comp group of the same insert become more lanes of it, only when every clip they replace is also on a
-    lane (an ordinary group keeps its clips and the take goes to a new track).
-  - When the tracks under the new comp track are not empty, the lanes are inserted under it rather than spread.
+- `takes::placeTakeClips` lands loop passes as FL does, with round 163's result as an option (§8). It never touches an
+  existing group.
+- `PlaylistTrack::compTrack` marks a comp, saved as `playlistCompTracks` only when one exists.
 
 Render:
 - `Clip::fadeCurve` reaches the voice as `NoteEvent::fadeShape` bits 3 and 4. `clipFadeGainOf` uses
@@ -211,8 +218,58 @@ Tests (tests/Comp177Tests.inc, Rec163Tests.inc updated):
 | `comp177_swipe_crossfades_and_back` | three pieces, 10-tick crossfades centred on each switch, sample-exact alignment; same swipe = no change; a swipe across a switch; re-apply with 0 / 40 ticks; back to the original comp; invalid calls |
 | `comp177_crossfade_limits_and_gaps` | short-piece limit, lane gap → silence, FL's automatic crossfades don't override |
 | `comp177_equal_power_render` | rendered levels inside a 100 ms comp crossfade follow sin / cos to < 0.01, and in² + out² = 1 ± 0.02 |
-| `comp177_audition_flatten_and_more_takes` | scheduler: the audition plays the lane, not the comp; a second loop recording adds lanes (take 4–6) and puts its last pass on the comp; flatten; makeLanes + a punch take with pre-roll becomes lane "take 2" and goes to the comp with a crossfade into the pre-roll |
-| `--selftest comp_crossfades` | .lynx round trip of `fadeCurve` and `compCrossfadeMs`; a plain project has neither |
+| `comp177_audition_flatten_and_more_takes` | scheduler: the audition plays the lane, not the comp; flatten keeps the comp, removes the lanes and moves lower tracks up |
+| `comp177_fl_loop_take_layout` | §2.1's results: rows, order, mute by Blend, new group on re-record, no track moved, a tiny pass kept, a lone pass |
+| `comp177_comp_these_takes` | one comp track above the group, lanes muted and named, last pass on the comp, FL's one-channel-per-pass groups |
+| `comp177_existing_projects_do_not_change` | a round 163 group keeps Promote; comping it keeps every pass |
+| `comp177_fl_clip_mute_survives_import_and_export` | FL's flag 0x2000 through import and export |
+| `--selftest comp_crossfades` | .lynx round trip of `fadeCurve`, `compCrossfadeMs` and the comp mark; a plain project has none of them |
+
+## 8. Decision: what a loop recording leaves behind (user, 2026-11-06)
+
+**Decided: FL-exact recording by default, round 163's result as an option that is off, comping as an explicit step.**
+
+- Default (`takes::placeTakeClips`): one track per pass on the next free tracks, first pass on top as the header of a new
+  open group. Blend off mutes every pass, the last too, also a lone pass of a loop recording (R1). Blend on: every pass
+  plays. Recording again makes a new group; no track moves, nothing is inserted or replaced. A pass of any length is kept.
+- Option, record menu: **"After loop recording, only the last pass plays"** (`RecordOptions::lastLoopPassPlays`, saved in
+  the UI settings, off): exactly round 163's layout, including dropping a final pass up to a 1/16 note long.
+- **"Comp these takes"** (Playlist track menu on a group, `comp::compTakes`, one undo): inserts one comp track above the
+  group, the only time tracks move. The group's tracks become lanes (audio muted, unfolded, "<name> (take N)"), and the comp
+  plays the last pass. A partial last pass gives a comp only that long; the rest is swiped in.
+
+Still different from FL, on purpose or left as shipped:
+
+| | FL [OBS] | LYNX | Why |
+|---|---|---|---|
+| Files | one per pass | one file, clips with offsets | Round 163's crash-safe take stream; not part of this decision |
+| Row names | "REC" in some runs, "Track N" in others | always the insert's name | FL's rule was not determined |
+| Track link | none | none for loop passes; a single take still links its track (round 146a/163) | Single takes were not part of the decision |
+| Single take over a linked track | next free track (R4) | the linked track when it is free there | As above |
+
+**Best way?** Two things remain worth the user's attention:
+
+- LYNX's Blend default is **on** (`RecordMode::overdub`), so out of the box every pass plays at once after Stop. FL's install
+  showed Blend off when first opened in this round, though FL's factory default was not established.
+- A 1-tick pass gets its own track, as in FL. It is exact and a little clumsy.
+
+### Migration: existing projects do not change
+
+Nothing runs on load and no saved field changes meaning:
+
+- A project saved before this round has no `playlistCompTracks`; its tracks, groups, mutes and clips load as they were.
+- Its round 163 groups (header plays, everything below muted) keep "Promote this take to the comp track", recognised by that
+  shape (`takes::compTrackOf`). A group with that shape made by hand, such as an FL group whose first pass was unmuted, also
+  offers Promote, which replaces the header there (one undo).
+- "Comp these takes" on such a group is the only way it changes: the header's last pass becomes a lane too, so it is no
+  longer lost after a promote.
+- `playlistCompTracks` is written only when a comp exists. An older LYNX ignores it and sees an ordinary group. FLP export
+  has no such mark either: FL sees an ordinary group whose header plays and whose lanes are muted.
+- Only new recordings differ: with Blend off, the last pass no longer plays after Stop unless the option is on.
+
+**Test evidence:** `comp177_fl_loop_take_layout`, `comp177_comp_these_takes`, `comp177_existing_projects_do_not_change`, the
+round 163 test run through the option, and `--selftest` (`comp_crossfades`: the mark and a plain project through save and
+load).
 
 ## 7. Not done / next
 
@@ -226,7 +283,7 @@ Tests (tests/Comp177Tests.inc, Rec163Tests.inc updated):
   later additions on the same model.
 - Open for the UI slice: a swipe must not act on an ordinary track group (no take clips); the audition must clear when
   tracks are inserted or removed and before an export, because `scheduleSong` follows it there too.
-- Behaviour changes awaiting a decision: the last pass's extra lane, and lanes inserted under a comp pushing lower tracks
-  down.
+- A second recording over a comp is a separate group, so its passes can't be swiped into the first comp. A later explicit
+  "add these takes to the comp" is possible; not built, and not asked for.
 - Live .als take-lane import: `core/AlsImport` landed (round 175a); whether it maps `TakeLanes` to lanes is not part of this
   round (ALS-FORMAT.md documents them).

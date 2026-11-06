@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
+#include <utility>
 
 #include "core/NoteEdit.h"
 
@@ -303,61 +305,90 @@ bool flatten (Song& song, int compTrack)
     for (auto t = g.last; t >= g.first; --t)
         noteedit::removeTrack (song, t);
     if (compTrack < (int) song.playlistTracks.size())
+    {
         song.playlistTracks[(std::size_t) compTrack].collapsed = false;
+        song.playlistTracks[(std::size_t) compTrack].compTrack = false;
+    }
     setAudition (song, -1);
     return true;
 }
 
-int addTakeLanes (Song& song, int compTrack, const std::vector<Clip>& passes, bool oneLane, bool toComp)
+bool isComp (const Song& song, int track)
 {
-    if (compTrack < 0 || passes.empty())
-        return -1;
-    if ((int) song.playlistTracks.size() <= compTrack)
-        song.playlistTracks.resize ((std::size_t) compTrack + 1);
-    const auto existing = groupOf (song, compTrack).lanes();
-    const auto base = song.playlistTracks[(std::size_t) compTrack].name.empty()
-                          ? "Track " + std::to_string (compTrack + 1)
-                          : song.playlistTracks[(std::size_t) compTrack].name;
-    const auto lanes = oneLane ? 1 : (int) passes.size();
-    // oldest first, each inserted right under the comp track: the newest ends on top
-    for (int k = 0; k < lanes; ++k)
-    {
-        noteedit::insertTrack (song, compTrack + 1);
-        auto& pt = song.playlistTracks[(std::size_t) compTrack + 1];
-        pt.grouped = true;
-        pt.name = base + " (take " + std::to_string (existing + k + 1) + ")";
-        for (std::size_t p = 0; p < passes.size(); ++p)
-            if (oneLane || (int) p == k)
-            {
-                Clip c = passes[p];
-                c.track = compTrack + 1;
-                c.muted = true;
-                c.fadeCurve = 0;
-                c.uid = 0;
-                song.playlist.push_back (c);
-            }
-    }
-    auto& header = song.playlistTracks[(std::size_t) compTrack];
-    header.grouped = false;
-    header.collapsed = true;
-    setAudition (song, -1);
-    // the newest take goes to the comp where it was recorded
-    if (toComp)
-        for (const auto& p : oneLane ? passes : std::vector<Clip> { passes.back() })
-            swipe (song, compTrack + 1, p.start, p.end());
-    return compTrack + 1;
+    const auto g = groupOf (song, track);
+    return g.valid() && g.comp == track && song.playlistTracks[(std::size_t) track].compTrack;
 }
 
-int makeLanes (Song& song, int track)
+bool canComp (const Song& song, int track)
 {
-    if (track < 0 || groupOf (song, track).valid()
-        || (track < (int) song.playlistTracks.size() && track > 0 && song.playlistTracks[(std::size_t) track].grouped))
-        return -1; // already a comp group, or a member of another group
-    std::vector<Clip> clips;
-    for (const auto i : audioOn (song, track))
-        clips.push_back (song.playlist[(std::size_t) i]);
-    if (clips.empty())
+    const auto g = groupOf (song, track);
+    if (! g.valid() || isComp (song, g.comp))
+        return false;
+    return std::any_of (song.playlist.begin(), song.playlist.end(),
+                        [&g] (const Clip& c) { return c.track >= g.comp && c.track <= g.last && isAudio (c); });
+}
+
+int compTakes (Song& song, int track)
+{
+    if (! canComp (song, track))
         return -1;
-    return addTakeLanes (song, track, clips, true, false);
+    const auto g = groupOf (song, track);
+
+    // the recording order of the rows: by each row's latest clip (a pass has its own channel, or a later place in the file)
+    using Key = std::pair<int, std::int64_t>;
+    std::vector<std::pair<Key, int>> rows;
+    for (auto t = g.comp; t <= g.last; ++t)
+    {
+        const auto clips = audioOn (song, t);
+        if (clips.empty())
+            continue;
+        auto key = Key { -1, 0 };
+        for (const auto i : clips)
+        {
+            const auto& c = song.playlist[(std::size_t) i];
+            key = std::max (key, Key { c.channel, c.offset - c.start });
+        }
+        rows.push_back ({ key, t });
+    }
+    std::stable_sort (rows.begin(), rows.end(), [] (const auto& a, const auto& b) { return a.first < b.first; });
+
+    const auto base = song.playlistTracks[(std::size_t) g.comp].name;
+    noteedit::insertTrack (song, g.comp);
+    auto& comp = song.playlistTracks[(std::size_t) g.comp];
+    comp.compTrack = true;
+    comp.name = base.empty() ? "Comp" : base + " comp";
+
+    for (auto t = g.comp + 1; t <= g.last + 1; ++t)
+    {
+        auto& lane = song.playlistTracks[(std::size_t) t];
+        lane.grouped = true;
+        lane.collapsed = false;
+        if (lane.mode == PlaylistTrackMode::audio) // a later take goes to a new track, never onto a lane
+        {
+            lane.mode = PlaylistTrackMode::unassigned;
+            lane.mixerTrack = -1;
+        }
+    }
+    for (std::size_t k = 0; k < rows.size(); ++k)
+    {
+        auto& lane = song.playlistTracks[(std::size_t) rows[k].second + 1];
+        if (lane.name.empty() || lane.name == base)
+            lane.name = (base.empty() ? "Take " + std::to_string (k + 1) : base + " (take " + std::to_string (k + 1) + ")");
+    }
+    for (auto& c : song.playlist)
+        if (c.track > g.comp && c.track <= g.last + 1 && isAudio (c))
+            c.muted = true;
+    setAudition (song, -1);
+
+    const auto last = rows.back().second + 1;
+    std::int64_t from = -1, to = 0;
+    for (const auto i : audioOn (song, last))
+    {
+        const auto& c = song.playlist[(std::size_t) i];
+        from = from < 0 ? c.start : std::min (from, c.start);
+        to = std::max (to, c.end());
+    }
+    swipe (song, last, from, to);
+    return g.comp;
 }
 } // namespace lynx::comp

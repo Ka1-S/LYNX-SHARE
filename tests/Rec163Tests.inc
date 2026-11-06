@@ -422,8 +422,10 @@ TEST (rec163_take_lanes_and_comping)
     // three passes of a loop recording on insert 2
     const auto parts = loopPasses (place (1000.0, 2900.0, 0.04, 0), 1000, 2000);
     CHECK (parts.size() == 3);
-    placeTakeClips (song, { { "/rec/Gtr_Take1.wav", "Gtr_Take1", 2 } }, parts);
-    CHECK (song.playlist.size() == 4 && song.channels.back().mixerTrack == 2); // round 177c: the last pass has a lane too
+    TakeOptions lastPassPlays; // (round 177c: round 163's result is now this option; comp177_fl_loop_take_layout has the default)
+    lastPassPlays.lastPassPlays = true;
+    placeTakeClips (song, { { "/rec/Gtr_Take1.wav", "Gtr_Take1", 2 } }, parts, lastPassPlays);
+    CHECK (song.playlist.size() == 3 && song.channels.back().mixerTrack == 2);
     int top = -1;
     for (const auto& c : song.playlist)
         if (! c.muted)
@@ -431,8 +433,7 @@ TEST (rec163_take_lanes_and_comping)
     CHECK (top == 0);                                                     // the last pass plays on the take's track
     CHECK (song.playlistTracks.size() >= 3 && song.playlistTracks[0].mode == PlaylistTrackMode::audio && song.playlistTracks[0].mixerTrack == 2
            && song.playlistTracks[0].name == "Gtr" && song.playlistTracks[0].collapsed);
-    CHECK (song.playlistTracks.size() >= 4 && song.playlistTracks[1].grouped && song.playlistTracks[2].grouped && song.playlistTracks[3].grouped); // lanes folded under it
-    CHECK (song.playlistTracks.size() >= 4 && song.playlistTracks[1].name == "Gtr (take 3)" && song.playlistTracks[3].name == "Gtr (take 1)");
+    CHECK (song.playlistTracks.size() >= 3 && song.playlistTracks[1].grouped && song.playlistTracks[2].grouped); // lanes folded under it
     CHECK (compTrackOf (song, 2) == 0 && compTrackOf (song, 0) == -1);
     const auto lastPass = std::find_if (song.playlist.begin(), song.playlist.end(), [] (const Clip& c) { return ! c.muted; });
     CHECK (lastPass != song.playlist.end() && lastPass->offset == 2000); // newest pass on top
@@ -442,27 +443,28 @@ TEST (rec163_take_lanes_and_comping)
     for (int i = 0; i < (int) song.playlist.size(); ++i)
         if (song.playlist[(std::size_t) i].offset == 0)
             firstPass = i;
-    CHECK (firstPass >= 0 && song.playlist[(std::size_t) firstPass].muted && song.playlist[(std::size_t) firstPass].track == 3);
+    CHECK (firstPass >= 0 && song.playlist[(std::size_t) firstPass].muted && song.playlist[(std::size_t) firstPass].track == 2);
     CHECK (promoteTake (song, firstPass, 0, 1200, 1500));
     std::vector<Clip> comp;
     for (const auto& c : song.playlist)
         if (c.track == 0)
             comp.push_back (c);
     std::sort (comp.begin(), comp.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
-    // last pass 1000-1200, first pass 1200-1500, last pass 1500-1900 (the last pass is 900 ticks); round 177c: each
-    // switch is a 10-tick equal-power crossfade centred on it
+    // last pass 1000-1200, first pass 1200-1500, last pass 1500-1900 (the last pass is 900 ticks). Round 177c: a switch
+    // is an equal-power crossfade of 10 ticks where both takes are known to have audio there; the last pass has no lane
+    // here, so nothing is known past its first piece: short linear fades
     CHECK (comp.size() == 3);
     if (comp.size() == 3)
     {
-        CHECK (comp[0].start == 1000 && comp[0].length == 205 && comp[0].offset == 2000 && comp[0].fadeOut == 10 && comp[0].fadeCurve == 2);
-        CHECK (comp[1].start == 1195 && comp[1].length == 310 && comp[1].offset == 195 && ! comp[1].muted && comp[1].fadeIn == 10
-               && comp[1].fadeOut == 10 && comp[1].fadeCurve == 3);
+        CHECK (comp[0].start == 1000 && comp[0].length == 200 && comp[0].offset == 2000 && comp[0].fadeOut == 5 && comp[0].fadeCurve == 0);
+        CHECK (comp[1].start == 1200 && comp[1].length == 305 && comp[1].offset == 200 && ! comp[1].muted && comp[1].fadeIn == 5
+               && comp[1].fadeOut == 10 && comp[1].fadeCurve == 2);
         CHECK (comp[2].start == 1495 && comp[2].length == 405 && comp[2].offset == 2495 && comp[2].fadeIn == 10 && comp[2].fadeCurve == 1);
     }
     CHECK (! promoteTake (song, firstPass, 0, 5000, 6000)); // outside the take
 
     // a take on the same insert later lands on the linked track when it is free there
     CHECK (takeTrack (song, 2, 4000, 5000) == 0);
-    CHECK (takeTrack (song, 2, 1000, 1100) == 4); // busy: a new track after the lanes
-    CHECK (takeTrack (song, 3, 4000, 5000) == 4); // another insert: not the Gtr track
+    CHECK (takeTrack (song, 2, 1000, 1100) == 3); // busy: a new track after the lanes
+    CHECK (takeTrack (song, 3, 4000, 5000) == 3); // another insert: not the Gtr track
 }

@@ -139,8 +139,9 @@ int takeTrack (const Song& song, int insert, std::int64_t start, std::int64_t en
     int next = 0;
     for (const auto& c : song.playlist)
         next = std::max (next, c.track + 1);
-    // (a track linked to another insert or a channel is not reused for this take)
-    while (next < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) next].mode != PlaylistTrackMode::unassigned)
+    // (a track linked to another insert or a channel, or a member of a group, is not reused for this take)
+    while (next < (int) song.playlistTracks.size()
+           && (song.playlistTracks[(std::size_t) next].mode != PlaylistTrackMode::unassigned || song.playlistTracks[(std::size_t) next].grouped))
         ++next;
     return next;
 }
@@ -165,55 +166,31 @@ void linkTakeTrack (Song& song, int track, int insert)
 
 namespace
 {
-// The comp track (a track with take lanes, linked to `insert`) that has clips in [from, to): a take recorded there
-// becomes more lanes of it (round 177c). −1: none.
-int compGroupAt (const Song& song, int insert, std::int64_t from, std::int64_t to)
+// The first `count` tracks in a row that hold nothing and are nobody's, after the last one used, with no group right under
+// them to join.
+int nextFreeTracks (const Song& song, int count)
 {
-    if (insert <= 0)
-        return -1;
-    for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+    int t = 0;
+    for (const auto& c : song.playlist)
+        t = std::max (t, c.track + 1);
+    const auto isFree = [&song] (int track) {
+        if (track >= (int) song.playlistTracks.size())
+            return true;
+        const auto& pt = song.playlistTracks[(std::size_t) track];
+        return pt.mode == PlaylistTrackMode::unassigned && ! pt.grouped && pt.name.empty();
+    };
+    for (;; ++t)
     {
-        const auto& pt = song.playlistTracks[(std::size_t) t];
-        if (pt.mode != PlaylistTrackMode::audio || pt.mixerTrack != insert || pt.grouped || comp::groupOf (song, t).comp != t)
-            continue;
-        // An ordinary track group is no comp: every clip the take would replace must also be on a lane, so it stays
-        // recoverable. Anything else (a pattern clip, an audio clip of its own) keeps the old behaviour, a new track.
-        const auto g = comp::groupOf (song, t);
-        auto busy = false, safe = true;
-        for (int i = 0; i < (int) song.playlist.size(); ++i)
-        {
-            const auto& c = song.playlist[(std::size_t) i];
-            if (c.track == t && c.start < to && c.end() > from)
-            {
-                busy = true;
-                safe = safe && comp::sourceOf (song, g, i) >= 0;
-            }
-        }
-        if (busy && safe)
+        auto ok = t + count >= (int) song.playlistTracks.size() || ! song.playlistTracks[(std::size_t) (t + count)].grouped;
+        for (int k = 0; k < count && ok; ++k)
+            ok = isFree (t + k);
+        if (ok)
             return t;
     }
-    return -1;
-}
-
-std::vector<Clip> clipsOf (int channel, const std::vector<Part>& parts)
-{
-    std::vector<Clip> out;
-    for (const auto& part : parts)
-    {
-        Clip clip;
-        clip.kind = ClipKind::audio;
-        clip.channel = channel;
-        clip.start = part.start;
-        clip.length = part.length;
-        clip.offset = part.offset;
-        clip.offsetFraction = part.offsetFraction;
-        out.push_back (clip);
-    }
-    return out;
 }
 } // namespace
 
-void placeTakeClips (Song& song, const std::vector<TakeFile>& files, const std::vector<Part>& parts)
+void placeTakeClips (Song& song, const std::vector<TakeFile>& files, const std::vector<Part>& parts, TakeOptions options)
 {
     if (parts.empty())
         return;
@@ -248,62 +225,74 @@ void placeTakeClips (Song& song, const std::vector<TakeFile>& files, const std::
             song.playlist.push_back (clip);
         };
 
-        std::int64_t from = parts.front().start, to = 0;
-        for (const auto& part : parts)
-            from = std::min (from, part.start), to = std::max (to, part.start + part.length);
+        // FL: a loop-recorded pass, even a lone one, is muted when Blend is off (runs R1, R2, R3, R5 in REA round 177c)
+        const auto passMuted = ! options.blend && ! options.lastPassPlays && (lanes || options.loopRecord);
 
         if (! lanes)
         {
-            // over a comp group of this insert (round 177c): one more lane, its parts go to the comp
-            if (const auto group = compGroupAt (song, insert, from, to); group >= 0)
-            {
-                comp::addTakeLanes (song, group, clipsOf (channel, parts), true);
-                continue;
-            }
             // punch parts: one track for all of them (they don't overlap)
+            std::int64_t from = parts.front().start, to = 0;
+            for (const auto& part : parts)
+                from = std::min (from, part.start), to = std::max (to, part.start + part.length);
             const auto track = takeTrack (song, insert, from, to);
             for (const auto& part : parts)
-                add (part, track, false);
+                add (part, track, passMuted);
             linkTakeTrack (song, track, insert);
             continue;
         }
 
-        // recorded over a comp group of this insert (round 177c): the passes become more lanes of it
-        if (const auto group = compGroupAt (song, insert, from, to); group >= 0)
+        if (options.lastPassPlays)
         {
-            comp::addTakeLanes (song, group, clipsOf (channel, parts));
+            // the last pass on top, playing; the earlier ones below it, muted, newest first
+            int top = -1, previous = -1;
+            auto contiguous = true;
+            for (auto k = (int) parts.size() - 1; k >= 0; --k)
+            {
+                const auto& part = parts[(std::size_t) k];
+                const auto track = k + 1 == (int) parts.size() ? takeTrack (song, insert, part.start, part.start + part.length)
+                                                               : takeTrack (song, -1, part.start, part.start + part.length);
+                add (part, track, k + 1 != (int) parts.size());
+                if (top < 0)
+                {
+                    top = track;
+                    linkTakeTrack (song, track, insert);
+                }
+                else
+                    contiguous = contiguous && track == previous + 1;
+                previous = track;
+            }
+            // fold the lanes under the take's track (Playlist track groups)
+            if (contiguous && previous > top)
+            {
+                if ((int) song.playlistTracks.size() <= previous)
+                    song.playlistTracks.resize ((std::size_t) previous + 1);
+                song.playlistTracks[(std::size_t) top].grouped = false;
+                song.playlistTracks[(std::size_t) top].collapsed = true;
+                for (auto t = top + 1; t <= previous; ++t)
+                {
+                    auto& pt = song.playlistTracks[(std::size_t) t];
+                    pt.grouped = true;
+                    if (pt.name.empty())
+                        pt.name = song.playlistTracks[(std::size_t) top].name + " (take " + std::to_string ((int) parts.size() - (t - top)) + ")";
+                }
+            }
             continue;
         }
 
-        // the last pass on top, playing (the comp); every pass below it on a lane, muted, newest first (round 177c: the
-        // last pass has its lane too, so the comp can go back to it after a swipe)
-        const auto& lastPart = parts.back();
-        const auto top = takeTrack (song, insert, lastPart.start, lastPart.start + lastPart.length);
-        add (lastPart, top, false);
-        linkTakeTrack (song, top, insert);
+        // one track per pass, the first on top: the header of a new group, open
         const auto n = (int) parts.size();
-        auto roomBelow = true; // the tracks under it are empty: the lanes go there; else lanes are inserted under it
-        for (auto t = top + 1; t <= top + n && roomBelow; ++t)
-            roomBelow = std::none_of (song.playlist.begin(), song.playlist.end(), [t] (const Clip& c) { return c.track == t; })
-                        && (t >= (int) song.playlistTracks.size()
-                            || (song.playlistTracks[(std::size_t) t].mode == PlaylistTrackMode::unassigned && ! song.playlistTracks[(std::size_t) t].grouped
-                                && song.playlistTracks[(std::size_t) t].name.empty()));
-        if (! roomBelow)
-        {
-            comp::addTakeLanes (song, top, clipsOf (channel, parts), false, false);
-            continue;
-        }
+        const auto top = nextFreeTracks (song, n);
+        if ((int) song.playlistTracks.size() < top + n)
+            song.playlistTracks.resize ((std::size_t) (top + n));
+        const auto& mixerName = song.mixer[(std::size_t) insert].name;
+        const auto name = mixerName.empty() ? "Insert " + std::to_string (insert) : mixerName;
         for (int k = 0; k < n; ++k)
-            add (parts[(std::size_t) k], top + n - k, true);
-        if ((int) song.playlistTracks.size() <= top + n)
-            song.playlistTracks.resize ((std::size_t) (top + n) + 1);
-        song.playlistTracks[(std::size_t) top].grouped = false;
-        song.playlistTracks[(std::size_t) top].collapsed = true;
-        for (auto t = top + 1; t <= top + n; ++t)
         {
-            auto& pt = song.playlistTracks[(std::size_t) t];
-            pt.grouped = true;
-            pt.name = song.playlistTracks[(std::size_t) top].name + " (take " + std::to_string (n + 1 - (t - top)) + ")";
+            add (parts[(std::size_t) k], top + k, passMuted);
+            auto& pt = song.playlistTracks[(std::size_t) (top + k)];
+            pt.grouped = k > 0;
+            pt.collapsed = false;
+            pt.name = name;
         }
     }
 }
@@ -312,17 +301,33 @@ int compTrackOf (const Song& song, int track)
 {
     if (track <= 0 || track >= (int) song.playlistTracks.size() || ! song.playlistTracks[(std::size_t) track].grouped)
         return -1;
-    for (auto t = track - 1; t >= 0; --t)
-        if (! song.playlistTracks[(std::size_t) t].grouped)
-            return t;
-    return -1;
+    const auto g = comp::groupOf (song, track);
+    if (! g.valid())
+        return -1;
+    if (comp::isComp (song, g.comp))
+        return g.comp;
+    // round 163's group: the header plays, what is under it is muted. Any other group is not a comp yet.
+    auto headerPlays = false, lanesMuted = true, lanesHaveAudio = false;
+    for (const auto& c : song.playlist)
+    {
+        if (c.kind != ClipKind::audio || c.track < g.comp || c.track > g.last)
+            continue;
+        if (c.track == g.comp)
+            headerPlays = headerPlays || ! c.muted;
+        else
+        {
+            lanesHaveAudio = true;
+            lanesMuted = lanesMuted && c.muted;
+        }
+    }
+    return headerPlays && lanesHaveAudio && lanesMuted ? g.comp : -1;
 }
 
 bool promoteTake (Song& song, int clipIndex, int compTrack, std::int64_t from, std::int64_t to)
 {
     // round 177c: a swipe of that clip (equal-power crossfades at the switch points, core/Comping.h)
     if (clipIndex < 0 || clipIndex >= (int) song.playlist.size() || compTrack < 0
-        || comp::groupOf (song, song.playlist[(std::size_t) clipIndex].track).comp != compTrack)
+        || compTrackOf (song, song.playlist[(std::size_t) clipIndex].track) != compTrack)
         return false;
     return comp::swipeClip (song, clipIndex, from, to);
 }

@@ -7359,3 +7359,9 @@ countries: nl be
 "{0} crashed in its separate process." = "{0} is gecrasht in zijn aparte proces."
 "{0} stopped responding (separate process)." = "{0} reageert niet meer (apart proces)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Alleen het proces van de plugin werd getroffen: LYNX SHARE en je project bleven draaien en de plugin is gedempt. Sla je project op; de plugin laadt opnieuw als je het weer opent."
+
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "Comp maken van deze takes"
+"After loop recording, only the last pass plays" = "Na loopopname speelt alleen de laatste doorgang"
+"Loop-recorded audio: every pass plays" = "In loop opgenomen audio: alle doorgangen spelen"
+"Loop-recorded audio: every pass is muted" = "In loop opgenomen audio: alle doorgangen zijn gedempt"

@@ -7359,3 +7359,9 @@ countries: id
 "{0} crashed in its separate process." = "{0} crash di proses terpisahnya."
 "{0} stopped responding (separate process)." = "{0} berhenti merespons (proses terpisah)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Hanya prosesnya yang terdampak: LYNX SHARE dan proyek Anda tetap berjalan, dan plugin dibisukan. Simpan proyek Anda; plugin dimuat lagi saat Anda membukanya berikutnya."
+
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "Buat comp dari take ini"
+"After loop recording, only the last pass plays" = "Setelah rekam loop, hanya putaran terakhir yang diputar"
+"Loop-recorded audio: every pass plays" = "Audio rekaman loop: semua putaran diputar"
+"Loop-recorded audio: every pass is muted" = "Audio rekaman loop: semua putaran dibisukan"

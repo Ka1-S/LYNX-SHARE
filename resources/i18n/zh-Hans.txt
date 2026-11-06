@@ -7359,3 +7359,9 @@ countries: cn sg
 "{0} crashed in its separate process." = "{0} 在其独立进程中崩溃。"
 "{0} stopped responding (separate process)." = "{0} 停止响应（独立进程）。"
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "只有它的进程受到影响：LYNX SHARE 和你的项目继续运行，插件已静音。请保存项目；下次打开时插件会重新加载。"
+
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "用这些录音合成"
+"After loop recording, only the last pass plays" = "循环录音后仅播放最后一遍"
+"Loop-recorded audio: every pass plays" = "循环录制的音频:播放每一遍"
+"Loop-recorded audio: every pass is muted" = "循环录制的音频:每一遍都静音"

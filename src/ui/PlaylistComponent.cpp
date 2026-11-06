@@ -29,6 +29,7 @@
 #include "core/PlaylistOps.h"
 #include "core/PlaylistTrackOps.h"
 #include "core/TempoDetect.h"
+#include "core/Comping.h"
 #include "core/TakeRecording.h"
 #include "ui/ExportDialog.h"
 #include "ui/MixerComponent.h"
@@ -3897,6 +3898,12 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         menu.addItem (tr ("Auto color group"), header >= 0, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::colourGroup (s, track); }); });
         menu.addItem (tr ("Collapse grouped tracks"), header >= 0, folded, [this, track, folded] {
             engine.editSong ([track, folded] (Song& s) { noteedit::setGroupCollapsed (s, track, ! folded); });
+        });
+        // round 177c: comping starts here, recording never moves tracks
+        menu.addItem (tr ("Comp these takes"), comp::canComp (song, track), false, [this, track] {
+            setSelection ({});
+            engine.editSong ([track] (Song& s) { comp::compTakes (s, track); });
+            sortClips();
         });
     }
     menu.addSeparator();

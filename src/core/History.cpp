@@ -238,6 +238,7 @@ ChangeLabel describeChange (const Song& before, const Song& after)
         if (before.playlistTracks[i].name != after.playlistTracks[i].name || before.playlistTracks[i].muted != after.playlistTracks[i].muted
             || before.playlistTracks[i].colour != after.playlistTracks[i].colour || before.playlistTracks[i].grouped != after.playlistTracks[i].grouped
             || before.playlistTracks[i].collapsed != after.playlistTracks[i].collapsed
+            || before.playlistTracks[i].compTrack != after.playlistTracks[i].compTrack
             || before.playlistTracks[i].lockedToContent != after.playlistTracks[i].lockedToContent)
             return label (TR_NOOP ("Playlist tracks"));
 

@@ -1649,7 +1649,9 @@ void AudioEngine::finishAudioTake()
     if (keepPunch.has_value()) // pre-roll / punch in-out: only the range (the rest stays in the file)
         parts = takes::punch (placement, { *keepPunch });
     else if (song.mode == PlayMode::song && song.hasLoop())
-        parts = takes::loopPasses (placement, song.loopStart, song.loopEnd, ppq / 4, wraps); // one part per pass of the loop
+        // one part per pass of the loop; FL keeps a pass of any length (REA round 177c: a 1-tick pass got its own track),
+        // round 163's option drops one a 1/16 note long or less
+        parts = takes::loopPasses (placement, song.loopStart, song.loopEnd, recordOptions.lastLoopPassPlays ? ppq / 4 : 0, wraps);
     else if (recordOptions.recordingMarkers && song.mode == PlayMode::song)
         parts = takes::punch (placement, punchRanges (song.markers())); // FL's "Enable recording markers"
     else
@@ -1670,7 +1672,10 @@ void AudioEngine::finishAudioTake()
     for (const auto& take : kept)
         made.push_back ({ take->file.getFullPathName().toStdString(), take->file.getFileNameWithoutExtension().toStdString(), take->playThrough });
 
-    editSong ([made, parts] (Song& s) { takes::placeTakeClips (s, made, parts); });
+    // FL: Loop record over a loop region, without a punch
+    const auto loopRecorded = recordOptions.loopRecord && ! keepPunch.has_value() && song.mode == PlayMode::song && song.hasLoop();
+    const takes::TakeOptions takeOptions { loopRecorded, recordOptions.mode == RecordMode::overdub, recordOptions.lastLoopPassPlays };
+    editSong ([made, parts, takeOptions] (Song& s) { takes::placeTakeClips (s, made, parts, takeOptions); });
     dropJournals();
 }
 

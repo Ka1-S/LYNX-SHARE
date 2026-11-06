@@ -2198,6 +2198,15 @@ juce::String toJson (const Song& song)
         if (! groups.isEmpty())
             root->setProperty ("playlistTrackGroups", groups);
 
+        // comp tracks (round 177c): their indexes; a project without any has no such property
+        juce::Array<juce::var> compTracks;
+        for (std::size_t i = 0; i < song.playlistTracks.size(); ++i)
+            if (song.playlistTracks[i].compTrack)
+                compTracks.add ((int) i);
+
+        if (! compTracks.isEmpty())
+            root->setProperty ("playlistCompTracks", compTracks);
+
         // FL's track locks (round 168f): [index, lock to content 0/1, locked height (px; <= 0 = not locked)]
         juce::Array<juce::var> locks;
         for (std::size_t i = 0; i < song.playlistTracks.size(); ++i)
@@ -2575,6 +2584,16 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
 
                 song.playlistTracks[index].grouped = index > 0 && (int) t[1] != 0;
                 song.playlistTracks[index].collapsed = (int) t[2] != 0;
+            }
+
+    if (auto* compTracks = root["playlistCompTracks"].getArray())
+        for (const auto& t : *compTracks)
+            if ((int) t >= 0 && (int) t < 500)
+            {
+                const auto index = (std::size_t) (int) t;
+                if (song.playlistTracks.size() <= index)
+                    song.playlistTracks.resize (index + 1);
+                song.playlistTracks[index].compTrack = true;
             }
 
     if (auto* locks = root["playlistTrackLocks"].getArray())

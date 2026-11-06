@@ -2,12 +2,11 @@
 
 // Comping on take lanes (round 177c, docs/analise/REA_rodada177c.md).
 //
-// The model is the one LYNX's take lanes already have (round 163) and the one Ableton Live uses: a comp group is a
-// Playlist track (the comp track: what plays) with the take lanes grouped under it (FL's "Group with above track"; FL
-// itself puts loop-recorded takes on grouped tracks, "Group loop recorded takes"). The lanes hold the takes, muted; the
-// comp track holds ordinary audio clips that are pieces of them. So the comp costs nothing to play and saves, loads,
-// exports and imports like any clip; which take a comp piece came from is not stored but derived (same channel, same
-// alignment of the audio to the song).
+// Recording never makes a comp: loop passes land as FL leaves them, an ordinary track group (TakeRecording.h). "Comp
+// these takes" (compTakes) then inserts a comp track above a group: what plays, marked PlaylistTrack::compTrack. The group's
+// tracks become the take lanes, muted; the comp track holds ordinary audio clips that are pieces of them. So the comp costs
+// nothing to play and saves, loads, exports and imports like any clip; which take a comp piece came from is not stored but
+// derived (same channel, same alignment of the audio to the song).
 //
 // What this file adds over round 163's "promote":
 //   - swipe(): a range of a lane goes to the comp (empty parts of the lane clear the comp there), one undo step;
@@ -76,14 +75,15 @@ void setAudition (Song& song, int lane);
 // Flatten: the comp track's clips stay as they are, the lanes (and their clips) are removed, in every arrangement.
 bool flatten (Song& song, int compTrack);
 
-// A new take recorded over a comp group (loop passes, or the parts of one take with `oneLane`): the passes become new
-// lanes right under comp track `compTrack` (newest first, named "<comp track> (take N)", muted), and the newest one
-// goes to the comp over its range, like a swipe (`toComp` false: the comp is left as it is). Makes `compTrack` a comp
-// group when it is none yet. Returns the first new lane (−1: nothing done).
-int addTakeLanes (Song& song, int compTrack, const std::vector<Clip>& passes, bool oneLane = false, bool toComp = true);
+// Whether `track` heads a comp ("Comp these takes" was done on it, and it still has lanes).
+bool isComp (const Song& song, int track);
 
-// Ableton's "Insert Take Lane" on a track that has none: its audio clips are copied to a first lane (take 1), so what
-// is recorded over it later becomes more lanes and the comp can go back to take 1. Returns the lane (−1: the track has
-// no audio clips or is already part of a group).
-int makeLanes (Song& song, int track);
+// Whether "Comp these takes" can run on the group of `track`: a group with audio that has no comp yet.
+bool canComp (const Song& song, int track);
+
+// "Comp these takes": one new comp track right above the group of `track` (the only time comping moves tracks), the
+// group's tracks become its lanes, their audio muted, unfolded, named "<name> (take N)" in recording order. The comp plays
+// the last pass (the latest recorded: highest channel, then latest position in its file). Returns the comp track (−1: see
+// canComp).
+int compTakes (Song& song, int track);
 } // namespace lynx::comp

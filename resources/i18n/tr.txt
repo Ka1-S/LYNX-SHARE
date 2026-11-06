@@ -7359,3 +7359,9 @@ countries: tr
 "{0} crashed in its separate process." = "{0} ayrı sürecinde çöktü."
 "{0} stopped responding (separate process)." = "{0} yanıt vermiyor (ayrı süreç)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Yalnızca onun süreci etkilendi: LYNX SHARE ve projeniz çalışmaya devam etti, plugin sessize alındı. Projenizi kaydedin; plugin bir sonraki açılışta yeniden yüklenir."
+
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "Bu kayıtlardan comp oluştur"
+"After loop recording, only the last pass plays" = "Döngü kaydından sonra yalnızca son geçiş çalar"
+"Loop-recorded audio: every pass plays" = "Döngüde kaydedilen ses: tüm geçişler çalar"
+"Loop-recorded audio: every pass is muted" = "Döngüde kaydedilen ses: tüm geçişler sessize alınır"

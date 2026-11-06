@@ -7359,3 +7359,9 @@ countries: pl
 "{0} crashed in its separate process." = "{0} uległ awarii w osobnym procesie."
 "{0} stopped responding (separate process)." = "{0} przestał odpowiadać (osobny proces)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Dotyczyło to tylko jego procesu: LYNX SHARE i projekt działały dalej, a plugin został wyciszony. Zapisz projekt; plugin wczyta się ponownie przy następnym otwarciu."
+
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "Utwórz comp z tych ujęć"
+"After loop recording, only the last pass plays" = "Po nagrywaniu w pętli gra tylko ostatnie przejście"
+"Loop-recorded audio: every pass plays" = "Audio nagrane w pętli: grają wszystkie przejścia"
+"Loop-recorded audio: every pass is muted" = "Audio nagrane w pętli: wszystkie przejścia są wyciszone"

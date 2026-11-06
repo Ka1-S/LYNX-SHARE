@@ -7359,3 +7359,9 @@ countries: jp
 "{0} crashed in its separate process." = "{0} が別プロセス内でクラッシュしました。"
 "{0} stopped responding (separate process)." = "{0} が応答しなくなりました（別プロセス）。"
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "影響を受けたのはそのプロセスだけです。LYNX SHARE とプロジェクトは動作を続け、プラグインはミュートされました。プロジェクトを保存してください。次に開いたときにプラグインは再び読み込まれます。"
+
+# round 177c: comping is an explicit step; loop passes land as in FL
+"Comp these takes" = "これらのテイクでコンプを作成"
+"After loop recording, only the last pass plays" = "ループ録音後は最後のパスのみ再生"
+"Loop-recorded audio: every pass plays" = "ループ録音したオーディオ: すべてのパスを再生"
+"Loop-recorded audio: every pass is muted" = "ループ録音したオーディオ: すべてのパスをミュート"
