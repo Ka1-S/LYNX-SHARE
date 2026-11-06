@@ -166,12 +166,14 @@ below alternates builds three times.
 | base (0.1.24), base2 | 30.2 / 30.2 | 40.7 / 40.7 | 49.6 / 49.6 | 30.9 / 30.8 | 89 / 90 | 19.2 % / 17.9 % | 13.1 % / 15.0 % | 0 / 0 | 0 / 0 | 7.5–11 |
 | s2a (slice 2 before the fixes) | 143.7 / 143.7 | 38.6 / 42.7 | 105 / 107 | 141.3 / 141.2 | 134 / 136 | 21.6 % / 29.7 % | 6.7 % / 31.9 % | 0 / 1 | 0 / 22 ¹ | 5–8 |
 | s2b (+ scroll / mixer fixes) | 127.2 / 128.4 | 70.3 / 72.3 | 41.4 / 41.4 | 140.3 / 142.1 | 133 / 137 | 22.6 % / 27.4 % | 11.9 % / 31.7 % | 59 ² / 1 | 1 / 0 | 9–16 |
-| S2C_ROW |
+| s2d (final: time pacer, one union meter repaint), 13:04 | 132.4 / 130.8 | 74.0 / 79.3 | 51.8 / 53.3 | 127.7 / 125.1 | 106 / 112 | 23.1 % / 25.9 % | 13.0 % / 28.1 % | 198 ³ | 0 / 0 | 33–47 |
 | FL Studio 2026 (fl2, 60 s phases) | 135 / 126 | 125 / 118 | 128 / 128 | 90 | 70 / 77 | 72 % / 56 % | — | — | — | — |
 
 ¹ one burst of late *device* calls in 6 s during plain playback (09:01:45–51, load 7.4), LYNX's own processing
 over deadline 1. ² bars 68–78 in plain playback while the load average was ~15 (above 12: machine noise, as in
-slice 1); base2 at load 8 had 0.
+slice 1); base2 at load 8 had 0. ³ both phases together (87,376 callbacks, 0.23 %; 4–22 a minute evenly spread
+over both phases, not tied to the Mixer), with the load average at 33–47 during the whole session (the Windows and
+Linux builds of four other rounds running): not comparable with the quiet-machine rows; late device calls 0.
 
 A/B, 30 s phases, three alternating rounds (main thread while watching; fps):
 
@@ -191,13 +193,24 @@ each, x/y/z series: union 21.6 % mean, best 15.1 %; per-meter 22.4 %, best 15.0 
 0.1–0.4 ms a frame) but in the per-frame window present, which only fewer frames reduce.
 
 Animation rate, 30 s phases on s2b (before the pacer): 60 Hz = 60 fps, Mixer watch 15.3 %; 30 Hz = 29 fps,
-Mixer watch 5.7 % (gaps uneven: fixed by the pacer, AR_ROW).
+Mixer watch 5.7 % (gaps uneven: fixed by the pacer).
+After the time-based pacer (s2d, 30 s phases, load 35–45, logs `sess-d30.log`, `sess-d60.log`, `load-d*.log`):
+
+| rate | pl-watch fps | p95 / max frame | Mixer fd-watch fps | p95 / max frame | Playlist watch CPU | Mixer watch CPU | late calls |
+|---|---|---|---|---|---|---|---|
+| 30 Hz | 30.0 / 30.0 | 41.8 / 55.9 ms | 30.0 / 30.0 | 42.5 / 49.8 ms | 9.6 % | 9.1 % | 10 ⁴ |
+| 60 Hz | 60.1 / 60.1 | 23.4 / 37.5 ms | 60.0 / 60.0 | 22.9 / 41.5 ms | 10.0 % | 13.3 % | 2 ⁴ |
+| (60 Hz, frame-number pacer, car60) | 59.8 / 60.0 | 27.7 / 35.2 ms | — | — | — | — | — |
+
+At 60 Hz on the 144 Hz display the frames alternate 2 and 3 display frames (13.9 / 20.8 ms; the p95 of 23 ms is
+one display frame of present jitter), with at most one gap over 33 ms in 10 s; at 30 Hz 5 / 4 display frames.
+⁴ 30 Hz: 8 while the project loads (stopped), 2 during playback in the Playlist phase; 60 Hz: both while loading.
 
 ### 6.3 Open
 
-- **Mixer main thread at 140 fps is ~20 % (base 14 % at 31 fps)**: per frame it is a third of base's cost; the
+- **Mixer main thread at 140 fps is ~20 % (base 14 % at 31 fps; 28 % in the final s2d session at load 33–47)**: per frame it is a third of base's cost; the
   rest is the window's present at 140 Hz. Not reached: ≤ 14.5 % at 140 fps. The 60 Hz setting brings it to ~15 %.
   Next step if wanted: present the Mixer from its own child window / swap chain, or measure on a quiet machine first
   (the coordinator schedules a clean 174c re-run before the 0.1.25 tag).
-- **Zoom (Ctrl+wheel) 80–90 fps, FL 128**: every zoom step repaints the whole Playlist (~22 ms traced: clip
+- **Zoom (Ctrl+wheel) 50–90 fps (s2d: 52–53 at load 33–47), FL 128**: every zoom step repaints the whole Playlist (~22 ms traced: clip
   frames, names, waveforms). Needs a per-clip picture cache (waveform and frame images reused across zoom levels).
