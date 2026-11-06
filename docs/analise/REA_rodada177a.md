@@ -178,7 +178,8 @@ can change that order. FL itself then keeps the old *k*, which is the IL complai
   devices, fader and sends).
 - **Logic (summing stacks), Studio One (folder tracks), Cubase (folder and group channels), Reaper (folder tracks):**
   a folder hides its members; a summing folder shows its bus strip.
-- **Users:** the request (research row 4) is "fold a big mixer like Live's groups, without changing the routing".
+- **Users:** IL wishlists ask for mixer groups or folders ([IL mixer wishlist, Jun 2025](https://forum.image-line.com/viewtopic.php?p=2008787)†, [IL wishlist 2026](https://forum.image-line.com/viewtopic.php?t=338528)†). Live's simple group tracks get praise (research row 4). The request is "fold a big mixer like Live's groups, without changing the routing".
+- **Verdict:** FL's separator groups stay the default and nothing changes until a group is folded. Folding is an addition (coordinator's decision 2026-11-06: flat v1 on FL's groups, a non-bus group folds to a slim tab).
 
 ### 2.2 What LYNX does
 
