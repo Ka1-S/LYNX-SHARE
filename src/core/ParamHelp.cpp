@@ -277,6 +277,13 @@ const std::map<std::pair<K, std::string>, const char*>& own()
         { { K::ridgeStrip, "comp mix" }, TR_NOOP ("Parallel compression: blends the uncompressed signal back in") },
         { { K::ridgeStrip, "eq to sc" }, TR_NOOP ("The filters and the EQ shape only what the dynamics hear (de-essing, frequency-conscious compression); the audio keeps neither") },
         { { K::ridgeStrip, "filter split" }, TR_NOOP ("The filters go before the dynamics, even when the EQ is after them") },
+        // round tp172c6: the DRIVE section
+        { { K::ridgeStrip, "drive in" }, TR_NOOP ("Switches the drive section on: saturation at the end of the strip, before the output") },
+        { { K::ridgeStrip, "drive model" }, TR_NOOP ("The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp") },
+        { { K::ridgeStrip, "drive amount" }, TR_NOOP ("How hard the model is driven; the consoles and the clipper keep the level, the amps get louder") },
+        { { K::ridgeStrip, "drive input" }, TR_NOOP ("Level into the drive: more distortion without changing the drive") },
+        { { K::ridgeStrip, "drive trim" }, TR_NOOP ("Level after the drive") },
+        { { K::ridgeStrip, "drive mix" }, TR_NOOP ("Blends the clean signal back in") },
         // round 145: the Vocal strip voicing
         { { K::ridgeStrip, "vocal strip" }, TR_NOOP ("The vocal channel strip: de-esser, de-ploser, three-band EQ and compander in any order") },
         { { K::ridgeStrip, "process order" }, TR_NOOP ("The order of the four vocal modules") },
@@ -338,6 +345,18 @@ const std::map<std::pair<K, std::string>, const char*>& own()
         { { K::aether, "dynamic" }, TR_NOOP ("The air follows the signal: less on loud, harsh moments") },
         { { K::aether, "mid air" }, TR_NOOP ("Air on the upper mids") },
         { { K::aether, "high air" }, TR_NOOP ("Air on the very top") },
+        // Kiln Channel (round tp172c7)
+        { { K::kilnChannel, "input" }, TR_NOOP ("Level into the console model: more input drives it harder") },
+        { { K::kilnChannel, "output" }, TR_NOOP ("Level after the console model") },
+        { { K::kilnChannel, "console" }, TR_NOOP ("The console model: two British E and G channels, an American A, a British N, the Y and a tube desk") },
+        { { K::kilnChannel, "drive" }, TR_NOOP ("How hard the console's circuits are pushed: more drive, more colour and harmonics") },
+        { { K::kilnChannel, "noise reduction" }, TR_NOOP ("On: the console's hiss is left out. Off: its measured noise floor is added") },
+        { { K::kilnChannel, "group" }, TR_NOOP ("The group this channel belongs to: Group bypass on any member bypasses the whole group") },
+        { { K::kilnChannel, "group bypass" }, TR_NOOP ("Bypasses the console on every channel of the group") },
+        { { K::kilnChannel, "link i/o" }, TR_NOOP ("Links the trims: turning Input moves Output the other way, so the level stays while the drive changes") },
+        { { K::kilnChannel, "group i/o" }, TR_NOOP ("Input and Output move together on every channel of the group that has Group I/O on") },
+        { { K::kilnChannel, "main in" }, TR_NOOP ("Level into the plugin, before the console") },
+        { { K::kilnChannel, "main out" }, TR_NOOP ("Level out of the plugin, after everything") },
         // Ember Saturator
         { { K::ember, "drive" }, TR_NOOP ("How hard the signal hits the saturation") },
         { { K::ember, "style" }, TR_NOOP ("The saturation's character: tube, tape, transistor or fuzz") },
@@ -349,6 +368,7 @@ const std::map<std::pair<K, std::string>, const char*>& own()
         { { K::ember, "level" }, TR_NOOP ("Level of the band after the saturation") },
         // Crest Compressor
         { { K::crestCompressor, "style" }, TR_NOOP ("The compressor's character: how it reacts to peaks and how it recovers") },
+        { { K::crestCompressor, "voicing" }, TR_NOOP ("Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering") }, // round tp172b2
         { { K::crestCompressor, "ratio" }, TR_NOOP ("How strongly the level above the threshold is reduced") },
         { { K::crestCompressor, "max lookahead" }, TR_NOOP ("Allows the longest lookahead (more latency)") },
         { { K::crestCompressor, "character pre" }, TR_NOOP ("The analog colour goes before the compression") },
@@ -606,6 +626,16 @@ Summary fromName (K kind, const std::string& name)
         else if (contains (name, "safe")) s.text = TR_NOOP ("a safety limiter: only catches the overs");
         return s;
     }
+    if (kind == K::kilnChannel)
+    {
+        if (contains (name, "british e")) s.text = TR_NOOP ("the classic British large-format desk: tight, forward mids");
+        else if (contains (name, "british g")) s.text = TR_NOOP ("the later British desk: cleaner, a little brighter");
+        else if (contains (name, "american a")) s.text = TR_NOOP ("the American desk: thick lows, a warm push");
+        else if (contains (name, "british n")) s.text = TR_NOOP ("the British boutique desk: silky top, rich harmonics");
+        else if (contains (name, "y")) s.text = TR_NOOP ("a modern desk with heavy colour and noise");
+        else if (contains (name, "tube")) s.text = TR_NOOP ("a tube desk: round, dark, the most noise");
+        return s;
+    }
     if (kind == K::ember)
     {
         if (contains (name, "tube")) s.text = TR_NOOP ("tube saturation: soft, mostly even harmonics");
@@ -660,6 +690,7 @@ int modeParam (EffectKind kind)
         case K::atrium: case K::foilPlate: name = "Type"; break;
         case K::halo: case K::horizon: name = "Reverb mode"; break;
         case K::ember: case K::crestCompressor: case K::sentryGate: case K::apexLimiter: name = "Style"; break;
+        case K::kilnChannel: name = "Console"; break;
         default: return -1;
     }
     const auto& info = effectInfo (kind);

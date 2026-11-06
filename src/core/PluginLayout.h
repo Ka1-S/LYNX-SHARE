@@ -54,6 +54,8 @@ enum : std::uint16_t
     momentary = 1 << 13,  // toggle: a push button (never shown lit); each click flips the value, which the engine reads
                           // as "pressed" (Nebula's Clear, round 129)
     plainMenu = 1 << 14,  // menu: just its value as text (the originals' "reverb mode: mono"); a click opens the menu
+    springBack = 1 << 14, // slider / knob: returns to its centre when released (a pitch bend wheel, round 173d)
+                          // (shares its bit with plainMenu: one is read on menus only, the other on sliders only)
     wordmark = 1 << 15,   // label: the plugin's name as a wide-spaced title; "a|b" = a light first word, a dark second
 };
 

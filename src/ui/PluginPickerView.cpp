@@ -2,6 +2,7 @@
 
 #include "core/PickerView.h"
 #include "core/PluginCatalog.h"
+#include "ui/AutomationUi.h"
 #include "ui/BrowserComponent.h"
 #include "ui/I18n.h"
 #include "ui/PluginThumbs.h"
@@ -9,35 +10,51 @@
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
 
+#if JUCE_WINDOWS
+ #ifndef WIN32_LEAN_AND_MEAN
+  #define WIN32_LEAN_AND_MEAN
+ #endif
+ #ifndef NOMINMAX
+  #define NOMINMAX
+ #endif
+ #include <windows.h>
+#endif
+
 namespace lynx
 {
 namespace
 {
-constexpr const char* installedTab = "Installed"; // third-party plugins in no folder of the Plugin database (LYNX)
-constexpr int defaultEditorWidth = 420, defaultEditorHeight = 260; // a tile with no picture (yet)
+constexpr const char* installedTab = "Installed"; // third-party plugins in no folder of the Plugin database (not listed: FL)
+
+// FL's TPlugListForm measures (REA_rodada175b §1–3; all × the UI scale, 1 here)
+constexpr int edgeX = 32, edgeTop = 56, edgeBottom = 96, halvesGap = 80; // the tile box inside the form
+constexpr int tileGap = 8;                                              // between tiles in a row
+constexpr int shadow = 3;                                               // the drop shadow around a picture
+constexpr float textTileSize = 17.0f, tabSize = 19.0f, allSize = 26.0f, titleSize = 26.0f;
+// (FL draws the label in Cuprum 21 / 17, a tall face: these sizes give LYNX's face the same cap heights on screen,
+// measured on fl-1920-dynamics-hover: name ~15 px, category ~11 px)
+constexpr float labelNameSize = 25.0f, labelCategorySize = 20.0f, labelPadX = 10.0f, labelPadY = 4.0f;
 
 struct Tile
 {
-    juce::String name, detail, vendor;
+    juce::String name, detail;
     std::string key, category;
     bool generator = true, native = true;
     std::function<std::optional<ChannelDef>()> makeGenerator;
     std::function<std::optional<EffectSlot>()> makeEffect;
 
-    int editorWidth = defaultEditorWidth, editorHeight = defaultEditorHeight; // its editor's size (logical px)
-    bool hasPicture = false;   // a picture file exists (its size is known from the PNG header)
+    juce::Point<int> png;      // the picture's size in its file (FL's budget: half the editor, ≤ 258 × 128); 0 = none
     bool matching = true;      // the search: false = dimmed (FL keeps the tile, dimmed)
-    juce::Rectangle<int> bounds; // where it is drawn now (empty = not shown)
+    juce::Rectangle<int> bounds; // the tile (picture + shadow + 1 px), empty = not shown
+    int rowHeight = 0;
 
-    // the picture: none yet / loaded / not there (a native one may still come from the background drawing)
     enum class Thumb { unknown, loaded, missing } thumb = Thumb::unknown;
-    bool sparse = false;      // the picture is an almost empty editor (no sample / script yet): the name tile instead
-    juce::Image picture;      // as kept on disk
-    juce::Image scaled;       // fitted to the tile's current size (painting is a plain blit)
-    juce::Point<int> scaledFor; // (its size: a scroll moves a tile without refitting it)
-    double scaledAt = 0.0;    // the display scale it was made for
-    double nextLook = 0.0;    // missing: when to look for the file again (ms)
-    bool queued = false;      // a load / fit is on the worker thread
+    juce::Image scaled;        // the picture at its shown size, in physical pixels
+    double scaledAt = 0.0;     // (for that display scale)
+    double nextLook = 0.0;     // missing: when to look for the file again (ms)
+    bool queued = false;
+
+    bool hasPicture() const noexcept { return png.x > 0 && png.y > 0; }
 };
 
 // the size of a PNG from its header (no decoding): {0, 0} when it is not one
@@ -51,19 +68,95 @@ juce::Point<int> pngSize (const juce::File& file)
     return { be (16), be (20) };
 }
 
-// a picture scaled to w × h: halving steps, then the last one, all bilinear, in a software image (it runs on the
-// picker's worker thread; JUCE's high-quality rescale took ~20 ms per picture)
+// a picture file's size within FL's budget (an older, bigger picture is shown as if it were made for it)
+juce::Point<int> budgeted (juce::Point<int> size)
+{
+    if (size.x <= 0 || size.y <= 0)
+        return {};
+    const auto k = juce::jmin (1.0, (double) pluginthumbs::maxWidth / size.x, (double) pluginthumbs::maxHeight / size.y);
+    return { juce::jmax (1, juce::roundToInt (size.x * k)), juce::jmax (1, juce::roundToInt (size.y * k)) };
+}
+
+// a picture scaled to w × h: halving steps, then the last one (on the picker's worker thread)
 juce::Image fitImage (const juce::Image& image, int w, int h)
 {
     auto from = juce::SoftwareImageType().convert (image);
     while (from.getWidth() >= w * 2 && from.getHeight() >= h * 2)
         from = from.rescaled (from.getWidth() / 2, from.getHeight() / 2, juce::Graphics::mediumResamplingQuality);
-    return from.rescaled (w, h, juce::Graphics::mediumResamplingQuality);
+    return from.getWidth() == w && from.getHeight() == h ? from : from.rescaled (w, h, juce::Graphics::highResamplingQuality);
 }
 
-// FL Studio's Plugin picker (F8; REA_rodada169k §2.5 and REA_rodada171c §2, FL's TPlugListForm): a veil over the main
-// window, every plugin as a picture of its editor, all at one scale (a big editor is a big tile), the categories along
-// the bottom.
+// FL multiplies a picker bitmap by 1.1 (REA_rodada175b §2): done once, on the worker thread
+void brighten (juce::Image& image)
+{
+    if (! image.isValid())
+        return;
+    juce::Image::BitmapData data (image, juce::Image::BitmapData::readWrite);
+    for (int y = 0; y < data.height; ++y)
+        for (int x = 0; x < data.width; ++x)
+        {
+            const auto c = data.getPixelColour (x, y);
+            const auto up = [] (juce::uint8 v) { return (juce::uint8) juce::jmin (255, (v * 11 + 5) / 10); };
+            data.setPixelColour (x, y, juce::Colour (up (c.getRed()), up (c.getGreen()), up (c.getBlue()), c.getAlpha()));
+        }
+}
+
+// What the screen showed under the picker when it opened (FL's form is see-through: the desktop and FL show through
+// its veil). Windows: the screen's pixels; elsewhere: nothing (the veil alone).
+juce::Image captureScreen (juce::Rectangle<int> physical)
+{
+#if JUCE_WINDOWS
+    if (physical.isEmpty())
+        return {};
+    const auto w = physical.getWidth(), h = physical.getHeight();
+    auto* screen = GetDC (nullptr);
+    auto* dc = CreateCompatibleDC (screen);
+    BITMAPINFO info {};
+    info.bmiHeader.biSize = sizeof (BITMAPINFOHEADER);
+    info.bmiHeader.biWidth = w;
+    info.bmiHeader.biHeight = -h;
+    info.bmiHeader.biPlanes = 1;
+    info.bmiHeader.biBitCount = 32;
+    info.bmiHeader.biCompression = BI_RGB;
+    void* bits = nullptr;
+    auto* bitmap = CreateDIBSection (dc, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
+    juce::Image out;
+    if (bitmap != nullptr && bits != nullptr)
+    {
+        auto* old = SelectObject (dc, bitmap);
+        if (BitBlt (dc, 0, 0, w, h, screen, physical.getX(), physical.getY(), SRCCOPY))
+        {
+            GdiFlush();
+            out = juce::Image (juce::Image::RGB, w, h, false, juce::SoftwareImageType());
+            juce::Image::BitmapData data (out, juce::Image::BitmapData::writeOnly);
+            for (int y = 0; y < h; ++y)
+            {
+                const auto* row = static_cast<const std::uint8_t*> (bits) + (std::size_t) y * (std::size_t) w * 4;
+                auto* dest = data.getLinePointer (y);
+                for (int x = 0; x < w; ++x)
+                {
+                    // (JUCE's RGB images are B, G, R in memory on little-endian machines, as the DIB is)
+                    dest[x * data.pixelStride + 0] = row[x * 4 + 0];
+                    dest[x * data.pixelStride + 1] = row[x * 4 + 1];
+                    dest[x * data.pixelStride + 2] = row[x * 4 + 2];
+                }
+            }
+        }
+        SelectObject (dc, old);
+        DeleteObject (bitmap);
+    }
+    DeleteDC (dc);
+    ReleaseDC (nullptr, screen);
+    return out;
+#else
+    juce::ignoreUnused (physical);
+    return {};
+#endif
+}
+
+// FL Studio's Plugin picker (F8; REA_rodada169k §2.5, REA_rodada171c §2, REA_rodada175b): a see-through veil over the
+// whole screen, every plugin as a picture of its editor at FL's own scale, packed in rows like FL, the categories
+// along the bottom.
 class PluginPickerView final : public juce::Component,
                                public ui::HintSource,
                                private juce::Timer
@@ -89,17 +182,17 @@ public:
 
     double constructionMs() const noexcept { return buildMs; }
 
+    // the screen under the picker, taken before it shows (physical pixels of `logical`, the picker's area)
+    void takeBackdrop (juce::Rectangle<int> logical)
+    {
+        const auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect (logical);
+        const auto scale = display != nullptr ? display->scale : 1.0;
+        backdrop = captureScreen ((logical.toDouble() * scale).toNearestInt());
+        backdropShown = {};
+    }
+
     void parentHierarchyChanged() override
     {
-        // the main window under a dark veil, taken once when the picker opens (the picker is opaque: a hover repaints
-        // only the picker, never the mixer and playlist under it)
-        if (auto* parent = getParentComponent(); parent != nullptr && ! backdrop.isValid() && parent->getWidth() > 0)
-        {
-            const auto shown = isVisible();
-            setVisible (false);
-            backdrop = parent->createComponentSnapshot (parent->getLocalBounds(), true, 0.5f);
-            setVisible (shown);
-        }
         if (isShowing())
             grabKeyboardFocus();
     }
@@ -115,64 +208,50 @@ public:
         // FL's FormDeactivate: clicking another window closes the picker (not while a tile is being dragged)
         if (! dragging && isShowing())
             juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<PluginPickerView> (this)] {
-                if (safe != nullptr && ! safe->dragging && ! safe->hasKeyboardFocus (true) && ! safe->isParentOf (juce::Component::getCurrentlyFocusedComponent()))
-                    if (auto* focused = juce::Component::getCurrentlyFocusedComponent(); focused == nullptr || focused->getTopLevelComponent() != safe->getTopLevelComponent())
-                        safe->close();
+                if (safe == nullptr || safe->dragging || safe->hasKeyboardFocus (true))
+                    return;
+                auto* focused = juce::Component::getCurrentlyFocusedComponent();
+                if (focused == nullptr || focused->getTopLevelComponent() != safe->getTopLevelComponent())
+                    safe->close();
             });
     }
 
-    void resized() override { layoutTiles(); }
+    void resized() override
+    {
+        tabLayoutFor = {};
+        layoutTiles();
+    }
 
     void paint (juce::Graphics& g) override
     {
-        using namespace theme;
-        g.fillAll (colour::bg1);
-        // the window behind, dimmed: composed once at this size (a full-window scaled draw per frame was most of a frame)
         const auto pixelScale = g.getInternalContext().getPhysicalPixelScaleFactor();
-        if (backdrop.isValid() && (backdropShown.getWidth() != juce::roundToInt (getWidth() * pixelScale)
-                                   || backdropShown.getHeight() != juce::roundToInt (getHeight() * pixelScale)))
-        {
-            backdropShown = juce::Image (juce::Image::RGB, juce::jmax (1, juce::roundToInt (getWidth() * pixelScale)),
-                                         juce::jmax (1, juce::roundToInt (getHeight() * pixelScale)), false);
-            juce::Graphics b (backdropShown);
-            // a faint ghost of the window (about 7 % of it) on the picker's own clear surface, not a dimmed app
-            b.fillAll (colour::bg1);
-            b.setOpacity (0.35f);
-            b.drawImage (backdrop, backdropShown.getBounds().toFloat());
-            b.setOpacity (1.0f);
-            b.fillAll (colour::bg1.withAlpha (0.8f));
-        }
-        if (backdropShown.isValid())
-            g.drawImage (backdropShown, getLocalBounds().toFloat());
-        else
-            g.fillAll (colour::bg1);
+        if (pixelScale != paintScale && ! isTimerRunning())
+            startTimerHz (60); // (the pictures are refitted for the new display scale)
+        paintScale = pixelScale;
+        paintVeil (g, pixelScale);
 
-        const auto bounds = getLocalBounds();
-        const auto header = bounds.withHeight (headerHeight);
-        g.setColour (colour::textPrimary.withAlpha (0.85f));
-        g.setFont (font (22.0f));
+        // FL's titles over the halves, on the All tab only
         if (tab == tabs.all())
         {
-            // (over each grid: the halves' widths follow their columns)
-            const auto titleW = bounds.getWidth() / 2 - 200;
-            g.drawText (tr ("Generators"), header.withWidth (titleW).withCentre ({ leftTitleX, header.getCentreY() }), juce::Justification::centred);
-            g.drawText (tr ("Effects"), header.withWidth (titleW).withCentre ({ rightTitleX, header.getCentreY() }), juce::Justification::centred);
+            g.setColour (theme::colour::textSecondary.brighter (0.25f));
+            g.setFont (theme::font (titleSize));
+            const auto band = getLocalBounds().withHeight (juce::roundToInt (titleSize * 3.0f));
+            g.drawText (tr ("Generators"), band.withWidth (getWidth() / 2), juce::Justification::centred);
+            g.drawText (tr ("Effects"), band.withTrimmedLeft (getWidth() / 2), juce::Justification::centred);
         }
-        paintSearch (g, header);
+        paintSearch (g);
 
-        {
-            juce::Graphics::ScopedSaveState clip (g);
-            g.reduceClipRegion (tileArea());
-            const auto scale = pixelScale;
-            paintScale = scale;
-            for (int i = 0; i < (int) tiles.size(); ++i)
-                if (i != hoverTile && ! tiles[(std::size_t) i].bounds.isEmpty() && g.clipRegionIntersects (tiles[(std::size_t) i].bounds.expanded (12)))
-                    paintTile (g, i, scale, false);
-            if (juce::isPositiveAndBelow (hoverTile, (int) tiles.size())) // on top, a little bigger, with its label
-                paintTile (g, hoverTile, scale, true);
-        }
-        paintScrollbar (g);
+        for (int i = 0; i < (int) tiles.size(); ++i)
+            if (i != hoverTile && ! tiles[(std::size_t) i].bounds.isEmpty() && g.clipRegionIntersects (tiles[(std::size_t) i].bounds.expanded (4)))
+                paintTile (g, i, false);
         paintStrip (g);
+        if (juce::isPositiveAndBelow (hoverTile, (int) tiles.size())) // on top, a little bigger, with its label
+        {
+            paintTile (g, hoverTile, true);
+            shownHoverArea = hoverArea (hoverTile);
+        }
+        else
+            shownHoverArea = {};
     }
 
     void mouseMove (const juce::MouseEvent& e) override
@@ -182,8 +261,11 @@ public:
         const auto t = tabAt (e.getPosition());
         if (t != hoverTab)
         {
-            repaint (stripBounds());
+            if (hoverTab != -1)
+                repaint (tabHighlight (hoverTab).getSmallestIntegerContainer().expanded (4));
             hoverTab = t;
+            if (hoverTab != -1)
+                repaint (tabHighlight (hoverTab).getSmallestIntegerContainer().expanded (4));
         }
         if (t >= 0 && t != tab) // pointing at a tab shows it (FL)
             showTab (t);
@@ -191,14 +273,22 @@ public:
         // (FL: a dimmed tile is only pointed at with Shift held)
         if (i >= 0 && ! tiles[(std::size_t) i].matching && ! e.mods.isShiftDown())
             i = -1;
+        mouseX = e.x;
+        if (i >= 0 && i == hoverTile)
+        {
+            repaint (shownHoverArea); // (the label follows the mouse: where it was, and where it goes)
+            repaint (hoverArea (i));
+        }
         setHover (i);
-        setMouseCursor (i >= 0 || searchBounds().contains (e.getPosition()) ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+        setMouseCursor (i >= 0 || t >= 0 || ellipsisAt (e.getPosition()) != 0 || searchBounds().contains (e.getPosition())
+                            ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
     }
 
     void mouseExit (const juce::MouseEvent&) override
     {
+        if (hoverTab != -1)
+            repaint (tabHighlight (hoverTab).getSmallestIntegerContainer().expanded (4));
         hoverTab = -1;
-        repaint (stripBounds());
     }
 
     void mouseDown (const juce::MouseEvent& e) override
@@ -206,19 +296,18 @@ public:
         if (! ready())
             return;
         pressedTile = tileAt (e.getPosition());
-        draggingBar = scrollbarBounds().contains (e.getPosition());
-        if (draggingBar)
-            barGrab = e.getPosition().y - thumbBounds().getY();
         if (e.mods.isPopupMenu() || e.mods.isMiddleButtonDown())
         {
             // FL: a right-click on a tile loads it; a right / middle click elsewhere closes the picker
             if (pressedTile >= 0 && e.mods.isPopupMenu())
                 addTile (pressedTile);
-            else if (pressedTile < 0 && ! draggingBar)
+            else if (pressedTile < 0)
                 close();
             pressedTile = -1;
             return;
         }
+        if (pressedTile >= 0)
+            repaint (hoverArea (pressedTile)); // (FL's highlight turns orange while pressed: LYNX's accent)
         if (pressedTile < 0 && searchBounds().contains (e.getPosition()) && searchText.isEmpty())
         {
             showPlaceholder = true; // FL: "start to type to search plugins...."
@@ -235,13 +324,6 @@ public:
 
     void mouseDrag (const juce::MouseEvent& e) override
     {
-        if (draggingBar)
-        {
-            const auto bar = scrollbarBounds();
-            const auto room = juce::jmax (1, bar.getHeight() - thumbBounds().getHeight());
-            setScroll ((int) ((double) (e.getPosition().y - barGrab - bar.getY()) / room * maxScroll()));
-            return;
-        }
         // a tile dragged out: onto a mixer insert / slot, the Channel Rack or the Playlist; the picker gets out of the
         // way (FL closes it and starts the Browser's drag of that plugin)
         if (pressedTile >= 0 && ! dragging && e.getDistanceFromDragStart() > 6)
@@ -250,10 +332,13 @@ public:
 
     void mouseUp (const juce::MouseEvent& e) override
     {
-        draggingBar = false;
+        if (pressedTile >= 0 && ! dragging)
+            repaint (hoverArea (pressedTile));
+        pressedTile = -1;
         if (e.mouseWasDraggedSinceMouseDown() || dragging || ! ready() || ! e.mods.isLeftButtonDown())
             return;
-        // FL: a click on a tab closes the picker and opens the Browser on that category of the Plugin database
+        // FL: a click on a tab closes the picker and opens the Browser on that category of the Plugin database; the
+        // "..." at the ends open Plugin database › Installed › Generators / Effects
         if (const auto t = tabAt (e.getPosition()); t >= 0)
         {
             auto open = targets.openBrowser;
@@ -263,19 +348,20 @@ public:
             if (open)
                 open (category, generators);
         }
+        else if (const auto end = ellipsisAt (e.getPosition()); end != 0)
+        {
+            auto open = targets.openBrowser;
+            close();
+            if (open)
+                open (installedTab, end < 0);
+        }
     }
 
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
     {
         if (! ready())
             return;
-        // over the scrollbar (or with Shift) it scrolls; Ctrl+wheel steps through the tiles (FL); else one tab per notch,
-        // down = the next one to the right (FL)
-        if ((e.mods.isShiftDown() || scrollbarBounds().expanded (8).contains (e.getPosition())) && maxScroll() > 0)
-        {
-            setScroll (scroll - juce::roundToInt ((wheel.deltaY != 0.0f ? wheel.deltaY : wheel.deltaX) * 400.0f));
-            return;
-        }
+        // Ctrl+wheel steps through the tiles (FL); else one tab per notch, down = the next one to the right (FL)
         wheelAccum += wheel.deltaY;
         const auto notches = (int) std::trunc (wheelAccum / 0.1f);
         if (notches == 0)
@@ -314,7 +400,7 @@ public:
         }
         if (code == juce::KeyPress::backspaceKey)
         {
-            setSearch (mods.isCtrlDown() ? pickerview::dropLastWord (searchText.toStdString()) : searchText.dropLastCharacters (1));
+            setSearch (mods.isCtrlDown() ? juce::String (pickerview::dropLastWord (searchText.toStdString())) : searchText.dropLastCharacters (1));
             return true;
         }
         if ((mods.isCtrlDown() || mods.isCommandDown()) && (code == 'V' || code == 'v'))
@@ -349,7 +435,6 @@ public:
     int shownTab() const noexcept { return tab; }
 
 private:
-    static constexpr int headerHeight = 56, stripHeight = 64, gap = 10, barWidth = 8;
     static constexpr int maxSearch = 70;
 
     // --- the plugins -----------------------------------------------------------------------------------------------
@@ -360,7 +445,8 @@ private:
         const auto fxEntries = quickpick::effectEntries (engine);
 
         // FL's Plugin database folders as the categories (round 170b: the user's folder, else FL's category for FL's
-        // plugins, else "LYNX SHARE"); third-party plugins in no folder: "Installed"
+        // plugins, else "LYNX SHARE"). FL lists only the Plugin database's Generators and Effects: a third-party plugin
+        // in no folder of it isn't in the picker (the "..." at the ends open Installed in the Browser)
         std::vector<plugincatalog::BuiltinPlugin> genBuiltins, fxBuiltins;
         for (const auto& g : genEntries)
             if (g.folder != 3)
@@ -375,16 +461,11 @@ private:
                 return it->second.substr (0, it->second.find ('/')); // (a sub-folder belongs to its top folder's tab)
             return std::string (installedTab);
         };
-        auto vendorOf = [] (const juce::String& detail) { return detail.upToFirstOccurrenceOf (" · ", false, false); };
 
         auto add = [&] (Tile t) {
-            const auto file = pluginthumbs::fileFor (t.key, t.native);
-            if (const auto size = pngSize (file); size.x > 0 && size.y > 0)
-            {
-                t.hasPicture = true;
-                t.editorWidth = juce::roundToInt ((float) size.x / pluginthumbs::pictureScale);
-                t.editorHeight = juce::roundToInt ((float) size.y / pluginthumbs::pictureScale);
-            }
+            if (t.category == installedTab)
+                return;
+            t.png = budgeted (pngSize (pluginthumbs::fileFor (t.key, t.native)));
             tiles.push_back (std::move (t));
         };
         for (const auto& g : genEntries)
@@ -394,13 +475,42 @@ private:
             Tile t;
             t.name = quickpick::shownName (engine, g.key, g.label);
             t.detail = g.detail;
-            t.vendor = g.folder == 3 ? vendorOf (g.detail) : juce::String ("LYNX SHARE");
             t.key = g.key;
             t.category = categoryOf (genFolders, g.key);
             t.generator = true;
             t.native = g.folder != 3;
             t.makeGenerator = g.make;
             add (std::move (t));
+        }
+        // FL's Plugin database also lists Generators/Misc/Audio Clip and Automation Clip (.fst with no bitmap: text
+        // tiles). Audio Clip adds an audio clip channel (no sample yet); Automation Clip an automation linked to nothing,
+        // its clip on a free Playlist track and its editor open (LYNX keeps automations out of the Channel Rack). A drag
+        // of it does the same where it is dropped on the Channel Rack or a mixer strip.
+        {
+            Tile audio;
+            audio.name = "Audio Clip"; // (plugin names are not translated)
+            audio.key = "lynx:clip:audio";
+            audio.category = "Misc";
+            audio.generator = true;
+            audio.native = false; // (no picture to draw: a text tile, as in FL)
+            audio.makeGenerator = [name = audio.name.toStdString()]() -> std::optional<ChannelDef> {
+                ChannelDef c;
+                c.name = name;
+                c.instrument = InstrumentKind::audioClip;
+                return c;
+            };
+            add (std::move (audio));
+            Tile automation;
+            automation.name = "Automation Clip";
+            automation.key = "lynx:clip:automation";
+            automation.category = "Misc";
+            automation.generator = true;
+            automation.native = false;
+            automation.makeGenerator = [&engine = engine]() -> std::optional<ChannelDef> {
+                juce::MessageManager::callAsync ([&engine] { createUnlinkedAutomationClip (engine); });
+                return std::nullopt; // (no channel: the clip is made instead)
+            };
+            add (std::move (automation));
         }
         for (const auto& f : fxEntries)
         {
@@ -409,7 +519,6 @@ private:
             Tile t;
             t.name = quickpick::shownName (engine, f.key, f.label);
             t.detail = f.detail;
-            t.vendor = f.folder == 3 ? vendorOf (f.detail) : juce::String ("LYNX SHARE");
             t.key = f.key;
             t.category = categoryOf (fxFolders, f.key);
             t.generator = false;
@@ -417,7 +526,7 @@ private:
             t.makeEffect = f.make;
             add (std::move (t));
         }
-        // A-Z inside each side (FL lists the database A-Z)
+        // FL: each half A-Z by name (its database scan inserts every entry at its sorted place)
         std::stable_sort (tiles.begin(), tiles.end(), [] (const Tile& a, const Tile& b) {
             if (a.generator != b.generator)
                 return a.generator;
@@ -433,12 +542,11 @@ private:
             (generators ? tabs.generators : tabs.effects) = pickerview::orderTabs (names, plugincatalog::lynxCategory, installedTab);
         }
         tab = tabs.all();
-        tabLefts.clear();
     }
 
-    bool inTab (const Tile& t) const
+    bool inTab (const Tile& t, int which) const
     {
-        return tab == tabs.all() || (t.generator == tabs.isGenerator (tab) && t.category == tabs.name (tab));
+        return which == tabs.all() || (t.generator == tabs.isGenerator (which) && t.category == tabs.name (which));
     }
 
     void addTile (int i)
@@ -477,12 +585,8 @@ private:
     {
         auto& t = tiles[(std::size_t) i];
         juce::Image image;
-        if (t.picture.isValid())
-        {
-            const auto scale = juce::jmin (1.0, 160.0 / t.picture.getWidth(), 120.0 / t.picture.getHeight());
-            image = t.picture.rescaled (juce::jmax (1, (int) (t.picture.getWidth() * scale)), juce::jmax (1, (int) (t.picture.getHeight() * scale)),
-                                        juce::Graphics::mediumResamplingQuality);
-        }
+        if (t.scaled.isValid())
+            image = t.scaled;
         else
         {
             image = juce::Image (juce::Image::ARGB, 150, 40, true);
@@ -493,13 +597,17 @@ private:
             g.setFont (theme::font (theme::type::body, true));
             g.drawFittedText (t.name, image.getBounds().reduced (6, 2), juce::Justification::centred, 2);
         }
-        if (! BrowserComponent::startPluginDrag (*this, t.generator ? t.makeGenerator : nullptr, t.generator ? nullptr : t.makeEffect, t.name, image))
+        auto* owner = targets.dragOwner != nullptr ? targets.dragOwner() : nullptr;
+        if (! BrowserComponent::startPluginDrag (*this, t.generator ? t.makeGenerator : nullptr, t.generator ? nullptr : t.makeEffect, t.name, image, owner))
             return;
-        // FL: the picker closes as the drag starts (here it turns invisible and lets the mouse through until the drop:
-        // the drag needs its source) and an effect brings up the Mixer
+        // FL: the picker closes as the drag starts. Here its window shrinks to one pixel out of the way and turns
+        // invisible until the drop (the drag needs its source, which holds the mouse); an effect brings up the Mixer
         dragging = true;
+        dragContainerOwner = owner;
         setAlpha (0.0f);
         setInterceptsMouseClicks (false, false);
+        if (isOnDesktop())
+            setBounds (getBounds().withSize (1, 1));
         if (! t.generator && targets.showMixer)
             targets.showMixer();
     }
@@ -507,20 +615,17 @@ private:
     // --- search ----------------------------------------------------------------------------------------------------
     void setSearch (juce::String text)
     {
-        const auto wasSearching = searchText.isNotEmpty();
         searchText = text.substring (0, maxSearch);
         showPlaceholder = false;
-        if (wasSearching != searchText.isNotEmpty())
-            repaint(); // (the matching tiles' name captions come and go)
         const auto query = searchText.toStdString();
         for (auto& t : tiles)
         {
             const auto was = t.matching;
             t.matching = query.empty() || pickerview::nameMatches (query, t.name.toStdString());
             if (was != t.matching && ! t.bounds.isEmpty())
-                repaint (t.bounds.expanded (12));
+                repaint (t.bounds.expanded (4));
         }
-        repaint (searchBounds());
+        repaint (searchBounds().withX (0).withWidth (getWidth()));
         if (juce::isPositiveAndBelow (hoverTile, (int) tiles.size()) && ! tiles[(std::size_t) hoverTile].matching)
             setHover (-1); // (a dimmed tile isn't pointed at)
         // FL: the hover jumps to the first name that starts with the text, else to the last one that contains it
@@ -544,177 +649,181 @@ private:
         if (dragging)
         {
             // the drag ended (dropped or cancelled): the picker closes
-            if (auto* container = juce::DragAndDropContainer::findParentDragContainerFor (this); container == nullptr || ! container->isDragAndDropActive())
+            auto* container = dragContainerOwner != nullptr ? juce::DragAndDropContainer::findParentDragContainerFor (dragContainerOwner.getComponent())
+                                                            : juce::DragAndDropContainer::findParentDragContainerFor (this);
+            if (container == nullptr || ! container->isDragAndDropActive())
                 close();
             return;
         }
-        if (getAlpha() < 1.0f)
-            setAlpha ((float) juce::jlimit (0.0, 1.0, (juce::Time::getMillisecondCounterHiRes() - openedAt) / fadeMs));
-
-        // lazily: only the tiles shown. The PNG decode and the fit to the tile's size run on a worker thread (on the
-        // message thread they took the whole frame: Windows paints only when no other message waits)
         const auto now = juce::Time::getMillisecondCounterHiRes();
-        if (now < nextLoadAt)
-            return;
-        nextLoadAt = now + 33.0;
+        if (getAlpha() < 1.0f)
+            setAlpha ((float) juce::jlimit (0.0, 1.0, (now - openedAt) / fadeMs));
+
+        // the pictures: decoded and scaled to their shown size on a worker thread, a few at a time
+        bool waiting = getAlpha() < 1.0f || inFlight > 0;
         bool nativeMissing = false;
         for (int i = 0; i < (int) tiles.size(); ++i)
         {
             auto& t = tiles[(std::size_t) i];
-            if (t.bounds.isEmpty() || t.queued || ! tileArea().intersects (t.bounds))
+            if (t.bounds.isEmpty() || t.queued)
                 continue;
             if (t.thumb == Tile::Thumb::loaded)
             {
-                if (! fittedNow (t))
-                    queueFit (i, false);
+                if (t.scaledAt != paintScale)
+                    queueLoad (i);
+                waiting = waiting || t.queued;
                 continue;
             }
-            if (t.thumb == Tile::Thumb::missing && now < t.nextLook)
+            if (t.thumb == Tile::Thumb::missing)
             {
-                nativeMissing = nativeMissing || t.native;
+                if (pluginthumbs::rendering())
+                    lastRenderingSeen = now;
+                if (t.native && now - lastRenderingSeen < 2000.0)
+                {
+                    waiting = true;
+                    if (now >= t.nextLook)
+                    {
+                        t.thumb = Tile::Thumb::unknown; // (look again: the background drawing may have made it)
+                        t.nextLook = now + 400.0;
+                    }
+                }
                 continue;
             }
-            if (inFlight >= 8)
-                break;
-            const auto file = pluginthumbs::fileFor (t.key, t.native);
-            if (file.existsAsFile())
-                queueFit (i, true);
+            waiting = true;
+            if (inFlight >= 6)
+                continue;
+            if (pluginthumbs::fileFor (t.key, t.native).existsAsFile())
+                queueLoad (i);
             else
             {
                 t.thumb = Tile::Thumb::missing;
-                // a native one is being drawn in the background: look again soon; a captured one only on the next open
-                t.nextLook = t.native ? now + 400.0 : 1.0e300;
+                t.nextLook = now + 400.0;
                 nativeMissing = nativeMissing || t.native;
+                if (t.native)
+                    lastRenderingSeen = now;
             }
         }
-        if (relayoutPending && now - lastRelayout > 400.0)
+        if (nativeMissing && pluginthumbs::ensureRendering())
+            waiting = true;
+        if (relayoutPending)
         {
             relayoutPending = false;
-            lastRelayout = now;
+            tabLayoutFor = {};
             layoutTiles();
             repaint();
         }
-        if (nativeMissing)
-            pluginthumbs::ensureRendering();
+        // nothing left to load, fade or wait for: the timer stops (no idle work)
+        if (! waiting)
+            stopTimer();
     }
 
-    bool fittedNow (const Tile& t) const
+    juce::Point<int> shownPictureSize (const Tile& t, double scale) const
     {
-        return t.scaled.isValid() && t.scaledFor == juce::Point<int> (t.bounds.getWidth(), t.bounds.getHeight()) && t.scaledAt == paintScale;
+        return { juce::jmax (1, juce::roundToInt (t.png.x * 0.5 * scale)), juce::jmax (1, juce::roundToInt (t.png.y * 0.5 * scale)) };
     }
 
-    // the picture inside its card: a small frame around it, the editor's shape kept (fitted and centred, not stretched)
-    static float cardPadding (juce::Rectangle<float> cell) { return juce::jlimit (3.0f, 6.0f, juce::jmin (cell.getWidth(), cell.getHeight()) * 0.04f); }
-
-    static juce::Rectangle<float> pictureRect (const Tile& t, juce::Rectangle<float> cell)
-    {
-        const auto inner = cell.reduced (cardPadding (cell));
-        const auto ew = (float) juce::jmax (1, t.editorWidth), eh = (float) juce::jmax (1, t.editorHeight);
-        const auto k = juce::jmin (inner.getWidth() / ew, inner.getHeight() / eh);
-        return inner.withSizeKeepingCentre (ew * k, eh * k);
-    }
-
-    // a job for the worker: load the picture (`load`) and / or fit it to the tile's size now
-    void queueFit (int i, bool load)
+    void queueLoad (int i)
     {
         auto& t = tiles[(std::size_t) i];
-        if (inFlight >= 8 && ! load)
-            return;
-        const juce::Point<int> size (t.bounds.getWidth(), t.bounds.getHeight());
-        const auto inner = pictureRect (t, t.bounds.toFloat());
-        const juce::Point<float> target (inner.getWidth(), inner.getHeight());
         const auto scale = paintScale;
-        const auto file = load ? pluginthumbs::fileFor (t.key, t.native) : juce::File();
-        const auto picture = t.picture;
+        const auto file = pluginthumbs::fileFor (t.key, t.native);
+        const auto known = t.png;
         t.queued = true;
         ++inFlight;
         juce::Component::SafePointer<PluginPickerView> safe (this);
-        workers.addJob ([safe, i, file, picture, size, target, scale] {
-            auto source = file != juce::File() ? juce::ImageFileFormat::loadFrom (file) : picture;
+        workers.addJob ([safe, i, file, scale, known] {
+            auto source = juce::ImageFileFormat::loadFrom (file);
+            juce::Image fitted;
+            juce::Point<int> size;
             if (source.isValid())
-                source = juce::SoftwareImageType().convert (source);
-            const auto w = juce::jmax (1, juce::roundToInt (target.x * scale)), h = juce::jmax (1, juce::roundToInt (target.y * scale));
-            auto fitted = source.isValid() ? fitImage (source, w, h) : juce::Image();
-            const auto sparse = source.isValid() && file != juce::File() && almostEmpty (source);
-            juce::MessageManager::callAsync ([safe, i, source, fitted, size, scale, sparse] {
+            {
+                size = budgeted ({ source.getWidth(), source.getHeight() });
+                const auto w = juce::jmax (1, juce::roundToInt (size.x * 0.5 * scale)), h = juce::jmax (1, juce::roundToInt (size.y * 0.5 * scale));
+                fitted = fitImage (source, w, h);
+                brighten (fitted); // (FL draws a bitmap × 1.1)
+            }
+            juce::ignoreUnused (known);
+            juce::MessageManager::callAsync ([safe, i, fitted, size, scale] {
                 if (safe != nullptr)
-                    safe->fitDone (i, source, fitted, size, scale, sparse);
+                    safe->loadDone (i, fitted, size, scale);
             });
         });
     }
 
-    // an editor with nothing in it yet (Newtone before a sample, an empty Control Surface or Patcher) would be a blank
-    // box in the grid: few edges (a neighbour 3 px away differing by > 40) and almost no bright pixels (text, knobs).
-    // Measured on the 163 pictures: the empty ones 1.5–2.15 % edges or < 3 % with < 0.5 % bright; the sparsest real
-    // editor (Harmor) 2.4 % edges, 0.86 % bright
-    static bool almostEmpty (const juce::Image& image)
-    {
-        const juce::Image::BitmapData data (image, juce::Image::BitmapData::readOnly);
-        const auto w = image.getWidth(), h = image.getHeight();
-        if (w < 8 || h < 8)
-            return true;
-        int edges = 0, bright = 0, all = 0;
-        for (int y = 0; y < h; y += 3)
-            for (int x = 0; x + 3 < w; x += 3)
-            {
-                const auto a = data.getPixelColour (x, y), b = data.getPixelColour (x + 3, y);
-                edges += std::abs ((int) a.getRed() - (int) b.getRed()) + std::abs ((int) a.getGreen() - (int) b.getGreen())
-                             + std::abs ((int) a.getBlue() - (int) b.getBlue()) > 40 ? 1 : 0;
-                bright += 0.3f * a.getRed() + 0.59f * a.getGreen() + 0.11f * a.getBlue() > 90.0f ? 1 : 0;
-                ++all;
-            }
-        const auto edgeShare = 100.0 * edges / juce::jmax (1, all), brightShare = 100.0 * bright / juce::jmax (1, all);
-        return edgeShare < 2.2 || (edgeShare < 3.0 && brightShare < 0.5);
-    }
-
-    void fitDone (int i, const juce::Image& source, const juce::Image& fitted, juce::Point<int> size, double scale, bool sparse)
+    void loadDone (int i, const juce::Image& fitted, juce::Point<int> size, double scale)
     {
         --inFlight;
         if (! juce::isPositiveAndBelow (i, (int) tiles.size()))
             return;
         auto& t = tiles[(std::size_t) i];
         t.queued = false;
-        if (! source.isValid())
+        if (! fitted.isValid())
         {
             t.thumb = Tile::Thumb::missing;
-            t.nextLook = t.native ? juce::Time::getMillisecondCounterHiRes() + 400.0 : 1.0e300;
+            t.nextLook = juce::Time::getMillisecondCounterHiRes() + 400.0;
             return;
         }
-        if (t.thumb != Tile::Thumb::loaded)
+        t.thumb = Tile::Thumb::loaded;
+        if (size != t.png)
         {
-            // (drawn as the window's own kind of image: converted once here, not at every paint)
-            t.picture = juce::NativeImageType().convert (source);
-            t.thumb = Tile::Thumb::loaded;
-            t.sparse = sparse;
-            const auto w = juce::roundToInt ((float) source.getWidth() / pluginthumbs::pictureScale);
-            const auto h = juce::roundToInt ((float) source.getHeight() / pluginthumbs::pictureScale);
-            if (! t.hasPicture || std::abs (w - t.editorWidth) > 2 || std::abs (h - t.editorHeight) > 2)
-                relayoutPending = true; // (a picture drawn while the picker was open: its tile takes its size)
-            t.hasPicture = true;
-            t.editorWidth = w;
-            t.editorHeight = h;
+            t.png = size;
+            relayoutPending = true; // (a picture drawn while the picker was open: its tile takes its size)
         }
-        if (fitted.isValid() && size == juce::Point<int> (t.bounds.getWidth(), t.bounds.getHeight()))
-        {
-            t.scaled = juce::NativeImageType().convert (fitted);
-            t.scaledFor = size;
-            t.scaledAt = scale;
-        }
-        repaint (t.bounds.expanded (12));
+        t.scaled = juce::NativeImageType().convert (fitted);
+        t.scaledAt = scale;
+        if (! isTimerRunning())
+            startTimerHz (60);
+        repaint (t.bounds.expanded (4));
     }
 
     // --- painting --------------------------------------------------------------------------------------------------
-    juce::Rectangle<int> searchBounds() const { return getLocalBounds().withHeight (headerHeight).withSizeKeepingCentre (360, 36); }
+    void paintVeil (juce::Graphics& g, double pixelScale)
+    {
+        // FL: the screen shows through a veil of 236/256, a vertical blend of two dark tones that also darkens towards
+        // the top and bottom edges over 96 px (cubic). Composed once per size: a hover repaints only a small area.
+        const auto w = juce::jmax (1, juce::roundToInt (getWidth() * pixelScale)), h = juce::jmax (1, juce::roundToInt (getHeight() * pixelScale));
+        if (! backdropShown.isValid() || backdropShown.getWidth() != w || backdropShown.getHeight() != h)
+        {
+            backdropShown = juce::Image (juce::Image::RGB, w, h, false);
+            juce::Graphics b (backdropShown);
+            b.fillAll (juce::Colours::black);
+            if (backdrop.isValid())
+                b.drawImage (backdrop, backdropShown.getBounds().toFloat());
+            const auto top = juce::Colour (0x23, 0x20, 0x28), bottom = juce::Colour (0x17, 0x22, 0x28); // (FL's two tones)
+            const auto edge = 96.0 * pixelScale;
+            for (int y = 0; y < h; ++y)
+            {
+                auto c = top.interpolatedWith (bottom, (float) y / (float) juce::jmax (1, h - 1));
+                double k = 1.0;
+                if (y < edge)
+                {
+                    const auto f = 1.0 - y / edge;
+                    k = 1.0 - f * f * f;
+                }
+                else if (y > h - edge)
+                {
+                    const auto f = (y - (h - edge)) / edge;
+                    k = 1.0 - f * f * f;
+                }
+                c = juce::Colour::fromFloatRGBA (c.getFloatRed() * (float) k, c.getFloatGreen() * (float) k, c.getFloatBlue() * (float) k, 236.0f / 256.0f);
+                b.setColour (c);
+                b.fillRect (0, y, w, 1);
+            }
+        }
+        g.drawImage (backdropShown, getLocalBounds().toFloat());
+    }
 
-    void paintSearch (juce::Graphics& g, juce::Rectangle<int>)
+    juce::Rectangle<int> searchBounds() const { return getLocalBounds().withHeight (edgeTop).withSizeKeepingCentre (420, 44); }
+
+    void paintSearch (juce::Graphics& g)
     {
         using namespace theme;
-        const auto area = searchBounds();
         if (searchText.isEmpty() && ! showPlaceholder)
             return;
-        // FL: a magnifier and the text at the top centre, in its highlight colour (LYNX's red accent)
+        // FL: a magnifier and the text at the top centre (40 px; the hint 16 px), in its highlight colour (LYNX's accent)
+        const auto area = searchBounds();
         const auto text = searchText.isEmpty() ? tr ("start to type to search plugins....") : searchText;
-        const auto f = juce::Font (font (searchText.isEmpty() ? type::title : 22.0f));
+        const auto f = juce::Font (font (searchText.isEmpty() ? 16.0f : 34.0f));
         const auto textWidth = juce::jmin (area.getWidth() - 30, juce::GlyphArrangement::getStringWidthInt (f, text) + 4);
         const auto x = area.getCentreX() - (textWidth + 26) / 2;
         const auto glass = juce::Rectangle<float> ((float) x, (float) area.getCentreY() - 8.0f, 14.0f, 14.0f);
@@ -725,251 +834,278 @@ private:
         g.drawText (text, juce::Rectangle<int> (x + 26, area.getY(), textWidth, area.getHeight()), juce::Justification::centredLeft, true);
     }
 
-    void paintTile (juce::Graphics& g, int i, double scale, bool hover)
+    // FL's highlight behind the tile pointed at: the tile ± 3 px and 6 % of its width, the row's height + 14 px above and
+    // below, rounded; the tab pointed at likewise (± 18 px, no widening)
+    juce::Rectangle<float> highlight (juce::Rectangle<int> b, int rowHeight, bool isTab) const
+    {
+        const auto widen = isTab ? 3.0f : 3.0f + juce::roundToInt (b.getWidth() * 0.06f) + 1.0f;
+        const auto half = rowHeight / 2.0f + (isTab ? 18.0f : 14.0f);
+        return { (float) b.getX() - widen, (float) b.getCentreY() - half, (float) b.getWidth() + 2.0f * widen, 2.0f * half };
+    }
+
+    juce::Rectangle<int> hoverArea (int i) const
+    {
+        const auto& t = tiles[(std::size_t) i];
+        return highlight (t.bounds, t.rowHeight, false).expanded (6.0f).getSmallestIntegerContainer().getUnion (labelBox (i).getSmallestIntegerContainer().expanded (4));
+    }
+
+    void paintHighlight (juce::Graphics& g, juce::Rectangle<float> box, bool pressed) const
+    {
+        // FL (measured on its hover): a cool tint, strongest under the top edge, a bright glow at the middle of the top
+        // edge and of each side, and a thin rim. Held down, it takes the warm press colour (LYNX: the accent).
+        using namespace theme;
+        const auto base = pressed ? colour::accent : juce::Colour (0xff6cc4e8);
+        const auto light = pressed ? colour::accent.brighter (0.7f) : juce::Colour (0xffb3ffff);
+        juce::Graphics::ScopedSaveState keep (g);
+        juce::Path shape;
+        shape.addRoundedRectangle (box, 9.0f);
+        juce::ColourGradient fill (base.withAlpha (pressed ? 0.55f : 0.30f), 0.0f, box.getY(), base.withAlpha (pressed ? 0.30f : 0.13f), 0.0f, box.getBottom(), false);
+        fill.addColour (0.55, base.withAlpha (pressed ? 0.26f : 0.10f));
+        g.setGradientFill (fill);
+        g.fillPath (shape);
+        g.reduceClipRegion (shape);
+        const auto glow = [&] (float x, float y, float rx, float a) {
+            g.setGradientFill (juce::ColourGradient (light.withAlpha (a), x, y, light.withAlpha (0.0f), x + rx, y, true));
+            g.fillEllipse (x - rx, y - rx, rx * 2.0f, rx * 2.0f);
+        };
+        glow (box.getCentreX(), box.getY(), juce::jmin (box.getWidth() * 0.32f, 60.0f), 0.55f);
+        glow (box.getX(), box.getCentreY(), 14.0f, 0.35f);
+        glow (box.getRight(), box.getCentreY(), 14.0f, 0.35f);
+        g.setColour (base.withAlpha (pressed ? 0.9f : 0.6f));
+        g.strokePath (shape, juce::PathStrokeType (1.2f));
+        juce::ColourGradient line (light.withAlpha (0.0f), box.getX(), 0.0f, light.withAlpha (0.0f), box.getRight(), 0.0f, false);
+        line.addColour (0.5, light);
+        g.setGradientFill (line);
+        g.fillRect (box.getX(), box.getY(), box.getWidth(), 1.5f);
+    }
+
+    void paintTextTile (juce::Graphics& g, const Tile& t, juce::Rectangle<float> area, float alpha) const
+    {
+        // FL's tile for a plugin with no picture: its name, the first letter in the highlight colour, a dark outline
+        using namespace theme;
+        const auto f = juce::Font (font (textTileSize, true));
+        const auto first = t.name.substring (0, 1), rest = t.name.substring (1);
+        juce::GlyphArrangement shape;
+        shape.addLineOfText (f, t.name, 0.0f, 0.0f);
+        const auto w = shape.getBoundingBox (0, -1, true).getWidth();
+        const auto x = area.getCentreX() - w / 2.0f, baseline = area.getCentreY() + f.getAscent() / 2.0f - 1.0f;
+        g.setFont (f);
+        g.setColour (juce::Colours::black.withAlpha (0.85f * alpha));
+        for (const auto [dx, dy] : { std::pair { -1.0f, 0.0f }, std::pair { 1.0f, 0.0f }, std::pair { 0.0f, -1.0f }, std::pair { 0.0f, 1.0f }, std::pair { 1.0f, 1.0f } })
+            g.drawSingleLineText (t.name, juce::roundToInt (x + dx), juce::roundToInt (baseline + dy));
+        g.setColour (colour::accent.withAlpha (alpha));
+        g.drawSingleLineText (first, juce::roundToInt (x), juce::roundToInt (baseline));
+        g.setColour (colour::textPrimary.withAlpha (alpha));
+        g.drawSingleLineText (rest, juce::roundToInt (x + juce::GlyphArrangement::getStringWidth (f, first)), juce::roundToInt (baseline));
+    }
+
+    void paintTile (juce::Graphics& g, int i, bool hover)
     {
         using namespace theme;
         auto& t = tiles[(std::size_t) i];
-        const auto dim = ! t.matching;
-        // the tile pointed at: a little bigger, a light frame and a glow (FL), in LYNX's accent
-        const auto cell = hover ? t.bounds.toFloat().withSizeKeepingCentre (t.bounds.getWidth() * 1.08f, t.bounds.getHeight() * 1.08f) : t.bounds.toFloat();
+        const auto alpha = t.matching ? 1.0f : 0.22f;
         if (hover)
+            paintHighlight (g, highlight (t.bounds, t.rowHeight, false), i == pressedTile);
+        // the tile pointed at is drawn a little bigger (FL eases it up to ~6 %)
+        auto box = t.bounds.toFloat().reduced (1.0f);
+        if (hover)
+            box = box.withSizeKeepingCentre (box.getWidth() * 1.06f, box.getHeight() * 1.06f);
+        if (t.hasPicture())
         {
-            for (int k = 3; k >= 1; --k)
+            const auto picture = box.reduced ((float) shadow * (hover ? 1.06f : 1.0f));
+            // FL's drop shadow: a soft dark border of 3 px
+            for (int k = shadow; k >= 1; --k)
             {
-                g.setColour (colour::accent.withAlpha (0.07f * (float) k));
-                g.fillRoundedRectangle (cell.expanded ((float) (4 - k) * 3.0f), radius::lg + (float) (4 - k) * 2.0f);
+                g.setColour (juce::Colours::black.withAlpha (0.16f * alpha));
+                g.fillRoundedRectangle (picture.expanded ((float) k - 0.5f).translated (0.0f, 1.0f), (float) k);
             }
-        }
-        g.setColour (juce::Colours::black.withAlpha (dim ? 0.15f : 0.35f));
-        g.fillRect (cell.translated (0.0f, 2.0f));
-
-        if (t.thumb == Tile::Thumb::loaded && ! t.sparse)
-        {
-            // the picture fitted to the tile once (the one pointed at is that one drawn 8 % bigger); until it is fitted
-            // (the timer fits a few per frame) the kept picture is drawn scaled on the fly
-            const auto fitted = fittedNow (t);
-            juce::Graphics::ScopedSaveState quality (g);
-            if (! fitted)
-                g.setImageResamplingQuality (juce::Graphics::lowResamplingQuality);
-            // the card: a frame around the picture, which is at full brightness (only the search dims the others)
-            g.setColour (colour::bg3.withMultipliedAlpha (dim ? 0.4f : 1.0f));
-            g.fillRect (cell);
-            g.setOpacity (dim ? 0.22f : 1.0f);
-            g.drawImage (fitted ? t.scaled : t.picture, pictureRect (t, cell));
-            g.setOpacity (1.0f);
+            if (t.thumb == Tile::Thumb::loaded && t.scaled.isValid())
+            {
+                juce::Graphics::ScopedSaveState state (g);
+                if (! hover && t.scaledAt == paintScale)
+                    g.setImageResamplingQuality (juce::Graphics::lowResamplingQuality); // (1:1: a plain blit)
+                g.setOpacity (alpha);
+                g.drawImage (t.scaled, picture);
+            }
+            else
+            {
+                g.setColour (colour::bg3.withAlpha (alpha)); // (until its picture is loaded, a few frames)
+                g.fillRect (picture);
+            }
         }
         else
-        {
-            // a plain tile: LYNX's own plugins until their picture is drawn; a third-party plugin's maker and name
-            g.setColour (colour::bg3.withMultipliedAlpha (dim ? 0.35f : 1.0f));
-            g.fillRect (cell);
-            auto text = cell.reduced (juce::jmin (8.0f, cell.getWidth() * 0.06f), juce::jmin (6.0f, cell.getHeight() * 0.08f));
-            const auto alpha = dim ? 0.3f : 1.0f;
-            g.setColour (colour::accent.withAlpha (0.85f * alpha));
-            g.fillRect (text.removeFromTop (3.0f).withWidth (juce::jmin (28.0f, text.getWidth())));
-            text.removeFromTop (3.0f);
-            if (text.getHeight() > 40.0f)
-            {
-                g.setColour (colour::textSecondary.withAlpha (alpha));
-                g.setFont (font (type::caption, true));
-                g.drawFittedText (t.vendor.toUpperCase(), text.removeFromTop (14.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.7f);
-            }
-            g.setColour (colour::textPrimary.withAlpha (alpha));
-            g.setFont (font (juce::jlimit (9.0f, 16.0f, text.getHeight() * 0.3f), true));
-            g.drawFittedText (t.name, text.toNearestInt(), juce::Justification::centred, 3, 0.7f);
-        }
-        g.setColour (hover ? colour::textPrimary.withAlpha (0.8f) : colour::border.brighter (0.25f).withMultipliedAlpha (dim ? 0.4f : 1.0f));
-        g.drawRect (cell.expanded (1.0f), hover ? 1.5f : 1.0f);
-
-        if (! hover && ! dim && searchText.isNotEmpty() && t.thumb == Tile::Thumb::loaded && ! t.sparse)
-        {
-            // searching: the matching tiles carry their names (a plain tile already shows it)
-            const auto f = juce::Font (font (juce::jlimit (11.0f, 14.0f, cell.getWidth() * 0.09f), true));
-            const auto strip = cell.withTop (cell.getBottom() - juce::jmin (cell.getHeight() * 0.4f, f.getHeight() + 6.0f));
-            g.setColour (colour::bg0.withAlpha (0.86f));
-            g.fillRect (strip);
-            g.setColour (colour::textPrimary);
-            g.setFont (f);
-            g.drawFittedText (t.name, strip.reduced (4.0f, 1.0f).toNearestInt(), juce::Justification::centred, 1, 0.75f);
-        }
+            paintTextTile (g, t, box, alpha);
 
         if (hover)
         {
             // FL's dark label under it: the name, then the category
-            const auto category = categoryText (t);
-            const auto nameFont = juce::Font (font (17.0f, true)), catFont = juce::Font (font (type::body));
-            const auto box = labelBox (t, cell);
-            g.setColour (colour::bg0.withAlpha (0.94f));
-            g.fillRoundedRectangle (box, radius::md);
-            g.setColour (colour::border);
-            g.drawRoundedRectangle (box, radius::md, 1.0f);
-            auto lines = box.reduced (8.0f, 4.0f);
+            const auto lb = labelBox (i);
+            g.setColour (juce::Colour (0xf0080808));
+            g.fillRoundedRectangle (lb, 8.0f);
+            auto lines = lb.reduced (labelPadX, labelPadY);
             g.setColour (colour::textPrimary);
-            g.setFont (nameFont);
-            g.drawText (t.name, lines.removeFromTop (20.0f), juce::Justification::centredLeft);
-            g.setColour (colour::textSecondary);
-            g.setFont (catFont);
-            g.drawText (category, lines, juce::Justification::centredLeft);
+            g.setFont (font (labelNameSize, true));
+            g.drawText (t.name, lines.removeFromTop (labelNameSize), juce::Justification::centredLeft, false);
+            g.setColour (colour::accent); // (FL: white at 0xB0; LYNX: its red)
+            g.setFont (font (labelCategorySize));
+            g.drawText (tr (t.category.c_str()), lines, juce::Justification::centredLeft, false);
         }
     }
 
-    juce::String categoryText (const Tile& t) const
+    // the label under the tile pointed at: its top 3 px above the highlight's bottom; FL slides it under the mouse
+    // (its centre on the pointer, nudged towards the screen's middle by half its width × how far off-centre it is)
+    juce::Rectangle<float> labelBox (int i) const
     {
-        return (t.generator ? tr ("Generators") : tr ("Effects")) + " / " + tr (t.category.c_str());
-    }
-
-    // the label under the tile pointed at (`cell` = the tile as drawn, 8 % bigger), kept inside the tile area
-    juce::Rectangle<float> labelBox (const Tile& t, juce::Rectangle<float> cell) const
-    {
-        const auto nameFont = juce::Font (theme::font (17.0f, true)), catFont = juce::Font (theme::font (theme::type::body));
-        const auto w = juce::jmax (juce::GlyphArrangement::getStringWidthInt (nameFont, t.name), juce::GlyphArrangement::getStringWidthInt (catFont, categoryText (t))) + 16;
-        return juce::Rectangle<float> ((float) w, 44.0f).withCentre ({ cell.getCentreX(), cell.getBottom() + 26.0f })
-            .constrainedWithin (tileArea().toFloat().withTrimmedBottom (-headerHeight));
+        const auto& t = tiles[(std::size_t) i];
+        const auto nameW = juce::GlyphArrangement::getStringWidth (juce::Font (theme::font (labelNameSize, true)), t.name);
+        const auto catW = juce::GlyphArrangement::getStringWidth (juce::Font (theme::font (labelCategorySize)), tr (t.category.c_str()));
+        const auto halfW = (juce::jmax (nameW, catW) + 2.0f) * 0.5f + labelPadX;
+        const auto h = labelNameSize + labelCategorySize + 2.0f * labelPadY;
+        const auto hb = highlight (t.bounds, t.rowHeight, false);
+        const auto c = juce::jlimit ((float) t.bounds.getX(), (float) t.bounds.getRight(), (float) mouseX);
+        const auto mid = getWidth() * 0.5f;
+        const auto shift = (c - mid) / juce::jmax (1.0f, mid) * halfW * 0.5f;
+        return juce::Rectangle<float> (c - halfW - shift, hb.getBottom() - 3.0f, 2.0f * halfW, h)
+            .constrainedWithin (getLocalBounds().toFloat());
     }
 
     void paintStrip (juce::Graphics& g)
     {
         using namespace theme;
-        // the tab strip: generator categories, "All", effect categories; the shown one white and bold with a mark above
-        const auto strip = stripBounds();
+        layoutTabs();
+        if (hoverTab >= 0)
+            paintHighlight (g, tabHighlight (hoverTab), false);
         for (int i = 0; i < tabs.count(); ++i)
         {
-            const auto r = tabBounds (i);
-            if (! tabVisible (r))
-                continue;
+            const auto r = tabRects[(std::size_t) i];
             const auto shown = i == tab;
-            g.setColour (shown ? colour::textPrimary : i == hoverTab ? colour::textSecondary.brighter (0.3f) : colour::textSecondary);
-            g.setFont (font (i == tabs.all() ? 26.0f : 17.0f, shown));
-            g.drawText (tabLabel (i), r, juce::Justification::centred);
+            g.setColour (shown ? colour::textPrimary : colour::textSecondary.withMultipliedAlpha (0.85f));
+            g.setFont (font (tabFontOf (i)));
+            g.drawText (tabLabel (i), r, juce::Justification::centred, false);
             if (shown)
             {
+                // FL's mark above the shown tab
                 juce::Path mark;
-                const auto cx = (float) r.getCentreX(), top = (float) r.getY() - 2.0f;
-                mark.addTriangle (cx - 5.0f, top, cx + 5.0f, top, cx, top - 6.0f);
-                g.setColour (colour::accent);
+                const auto cx = (float) r.getCentreX(), top = (float) r.getY() - 4.0f;
+                mark.addTriangle (cx - 4.5f, top, cx + 4.5f, top, cx, top - 5.0f);
+                g.setColour (colour::textPrimary);
                 g.fillPath (mark);
             }
         }
-        g.setColour (colour::textSecondary);
-        g.setFont (font (17.0f));
-        if (stripOffset > 0)
-            g.drawText ("...", strip.withWidth (24), juce::Justification::centred);
-        if (stripWidth() - stripOffset > strip.getWidth())
-            g.drawText ("...", strip.withTrimmedLeft (strip.getWidth() - 24), juce::Justification::centred);
-    }
-
-    void paintScrollbar (juce::Graphics& g)
-    {
-        if (maxScroll() <= 0)
-            return;
-        g.setColour (theme::colour::bg3);
-        g.fillRoundedRectangle (scrollbarBounds().toFloat(), barWidth / 2.0f);
-        g.setColour (draggingBar ? theme::colour::accent : theme::colour::bg6);
-        g.fillRoundedRectangle (thumbBounds().toFloat(), barWidth / 2.0f);
+        g.setColour (colour::textSecondary.withMultipliedAlpha (0.85f));
+        g.setFont (font ((float) genTabFont));
+        for (const auto& r : { ellipsisRect (-1), ellipsisRect (1) })
+            g.drawText ("...", r, juce::Justification::centred, false);
     }
 
     // --- geometry --------------------------------------------------------------------------------------------------
-    juce::String tabLabel (int i) const
+    juce::String tabLabel (int i) const { return i == tabs.all() ? tr ("All") : tr (tabs.name (i).c_str()); }
+
+    float tabFontOf (int i) const
     {
-        return i == tabs.all() ? tr ("All") : tr (tabs.name (i).c_str());
+        if (i == tabs.all())
+            return allSize * (float) juce::jmax (genTabFont, fxTabFont) / tabSize;
+        return (float) (tabs.isGenerator (i) ? genTabFont : fxTabFont);
     }
 
-    juce::Rectangle<int> stripBounds() const { return getLocalBounds().removeFromBottom (stripHeight).reduced (8, 10); }
-    juce::Rectangle<int> tileArea() const { return getLocalBounds().withTrimmedBottom (stripHeight).withTrimmedTop (headerHeight).reduced (24, 0); }
-    juce::Rectangle<int> scrollbarBounds() const
+    // FL's tab strip (REA_rodada175b §3): each half's labels at the largest font (19…12) that fits half the form, spread
+    // over its half like a row of tiles; "All" in the middle; "..." at both ends; the row just under the tiles
+    void layoutTabs() const
     {
-        return maxScroll() > 0 ? tileArea().removeFromRight (barWidth).translated (barWidth + 6, 0).reduced (0, 4) : juce::Rectangle<int>();
-    }
-    juce::Rectangle<int> thumbBounds() const
-    {
-        const auto bar = scrollbarBounds();
-        if (bar.isEmpty())
-            return {};
-        const auto view = tileArea().getHeight();
-        const auto h = juce::jmax (24, bar.getHeight() * view / juce::jmax (1, view + maxScroll()));
-        return bar.withHeight (h).withY (bar.getY() + (bar.getHeight() - h) * scroll / juce::jmax (1, maxScroll()));
-    }
-    int maxScroll() const noexcept { return juce::jmax (0, contentHeight - tileArea().getHeight()); }
-
-    // the tabs' widths and left edges, measured once (a paint measured every label ~n² times: ~35 ms per frame)
-    void measureTabs() const
-    {
-        if ((int) tabLefts.size() == tabs.count() + 1)
+        const auto key = juce::Rectangle<int> (getWidth(), getHeight(), tabs.count(), stripReach);
+        if (tabLayoutFor == key && (int) tabRects.size() == tabs.count())
             return;
-        tabLefts.assign (1, 0);
-        for (int i = 0; i < tabs.count(); ++i)
-        {
-            const auto f = juce::Font (theme::font (i == tabs.all() ? 26.0f : 17.0f, true));
-            tabLefts.push_back (tabLefts.back() + juce::GlyphArrangement::getStringWidthInt (f, tabLabel (i)) + 34);
-        }
+        tabLayoutFor = key;
+        tabRects.assign ((std::size_t) tabs.count(), {});
+        const auto w = getWidth();
+        const auto halves = halfBoxes();
+        auto place = [&] (bool generators, juce::Range<int> span) {
+            std::vector<int> ids;
+            for (int i = 0; i < tabs.count(); ++i)
+                if (i != tabs.all() && tabs.isGenerator (i) == generators)
+                    ids.push_back (i);
+            auto widthAt = [&] (int size) {
+                int sum = 0;
+                for (const auto i : ids)
+                    sum += juce::GlyphArrangement::getStringWidthInt (juce::Font (theme::font ((float) size)), tabLabel (i));
+                return sum;
+            };
+            const auto size = pickerview::tabFontSize (widthAt, (int) ids.size(), w / 2);
+            (generators ? genTabFont : fxTabFont) = size;
+            std::vector<pickerview::PackTile> row;
+            for (const auto i : ids)
+                row.push_back ({ juce::GlyphArrangement::getStringWidthInt (juce::Font (theme::font ((float) size)), tabLabel (i)) + 6, size + 6, true, false });
+            // one row spread over the half (FL finishes the tab row as a full one: never centred)
+            int x = span.getStart(), used = 0;
+            for (const auto& t : row)
+                used += t.w + 2;
+            const auto n = (int) row.size();
+            const auto dx = n > 1 ? (double) (span.getLength() - used - tileGap * (n - 1)) / (n - 1) : 0.0;
+            double at = x;
+            for (int k = 0; k < n; ++k)
+            {
+                tabRects[(std::size_t) ids[(std::size_t) k]] = { pickerview::roundFl (at), 0, row[(std::size_t) k].w + 2, row[(std::size_t) k].h + 2 };
+                at += row[(std::size_t) k].w + 2 + tileGap + dx;
+            }
+        };
+        place (true, { halves.first.left, halves.first.right });
+        place (false, { halves.second.left, halves.second.right });
+        const auto allFont = juce::Font (theme::font (tabFontOf (tabs.all())));
+        const auto allW = juce::GlyphArrangement::getStringWidthInt (allFont, tabLabel (tabs.all())) + 8;
+        tabRects[(std::size_t) tabs.all()] = juce::Rectangle<int> (allW, juce::roundToInt (allFont.getHeight()) + 6).withCentre ({ w / 2, 0 });
+        tabRowHeight = 0;
+        for (const auto& r : tabRects)
+            tabRowHeight = juce::jmax (tabRowHeight, r.getHeight());
+        const auto cy = pickerview::tabCentreY (stripReach, getHeight(), tabRowHeight);
+        for (auto& r : tabRects)
+            r.setCentre (r.getCentreX(), cy);
     }
 
-    int tabWidth (int i) const
+    juce::Rectangle<int> ellipsisRect (int side) const
     {
-        measureTabs();
-        return tabLefts[(std::size_t) i + 1] - tabLefts[(std::size_t) i];
+        layoutTabs();
+        const auto cy = tabRects.empty() ? getHeight() - 40 : tabRects.front().getCentreY();
+        return juce::Rectangle<int> (16, 20).withCentre ({ side < 0 ? 8 : getWidth() - 8, cy });
     }
 
-    int stripWidth() const
+    int ellipsisAt (juce::Point<int> p) const
     {
-        measureTabs();
-        return tabLefts.back();
+        return ellipsisRect (-1).expanded (4).contains (p) ? -1 : ellipsisRect (1).expanded (4).contains (p) ? 1 : 0;
     }
 
-    juce::Rectangle<int> tabBounds (int i) const
+    juce::Rectangle<float> tabHighlight (int i) const
     {
-        const auto strip = stripBounds();
-        // the strip is centred on "All" when it fits, else scrolled so the shown tab stays in view
-        measureTabs();
-        const auto x = strip.getX() + juce::jmax (0, (strip.getWidth() - stripWidth()) / 2) - stripOffset + tabLefts[(std::size_t) i];
-        return { x, strip.getY() + 10, tabWidth (i), strip.getHeight() - 10 };
-    }
-
-    // a tab is drawn (and clickable) only when it is wholly inside the strip, clear of the "..." at a cut end (FL's ends)
-    bool tabVisible (juce::Rectangle<int> r) const
-    {
-        auto inner = stripBounds();
-        if (stripOffset > 0)
-            inner.removeFromLeft (24);
-        if (stripWidth() - stripOffset > stripBounds().getWidth())
-            inner.removeFromRight (24);
-        return r.getX() >= inner.getX() && r.getRight() <= inner.getRight();
+        layoutTabs();
+        return highlight (tabRects[(std::size_t) i], tabRowHeight, true);
     }
 
     int tabAt (juce::Point<int> p) const
     {
-        if (! stripBounds().contains (p))
-            return -1;
+        layoutTabs();
         for (int i = 0; i < tabs.count(); ++i)
-            if (tabVisible (tabBounds (i)) && tabBounds (i).contains (p))
+            if (tabRects[(std::size_t) i].expanded (4, 8).contains (p))
                 return i;
         return -1;
     }
 
     int tileAt (juce::Point<int> p) const
     {
-        if (! tileArea().contains (p))
-            return -1;
-        for (int i = 0; i < (int) tiles.size(); ++i)
+        // the one pointed at first (it is drawn on top), then the rest, last drawn first (overlapping rows)
+        if (juce::isPositiveAndBelow (hoverTile, (int) tiles.size()) && tiles[(std::size_t) hoverTile].bounds.contains (p))
+            return hoverTile;
+        for (int i = (int) tiles.size(); --i >= 0;)
             if (tiles[(std::size_t) i].bounds.contains (p))
                 return i;
         return -1;
     }
 
-    // the tiles shown, generators first, each half in reading order (FL's tile list order)
+    // the tiles shown, in the list's order (generators first, A-Z): FL's Up / Down order
     std::vector<int> shownInOrder() const
     {
         std::vector<int> order;
         for (int i = 0; i < (int) tiles.size(); ++i)
             if (! tiles[(std::size_t) i].bounds.isEmpty())
                 order.push_back (i);
-        std::stable_sort (order.begin(), order.end(), [&] (int a, int b) {
-            const auto& p = tiles[(std::size_t) a];
-            const auto& q = tiles[(std::size_t) b];
-            // the list order = the layout order (rows are packed in list order; a row's tiles are centred on its height,
-            // so their tops differ and can't give the order)
-            return p.generator != q.generator && p.generator;
-        });
         return order;
     }
 
@@ -977,16 +1113,10 @@ private:
     {
         if (i == hoverTile)
             return;
-        auto area = [this] (int k) {
-            const auto& t = tiles[(std::size_t) k];
-            const auto cell = t.bounds.toFloat().withSizeKeepingCentre (t.bounds.getWidth() * 1.08f, t.bounds.getHeight() * 1.08f);
-            return t.bounds.expanded (t.bounds.getWidth() / 10 + 14, 14).getUnion (labelBox (t, cell).expanded (4.0f).getSmallestIntegerContainer());
-        };
-        if (juce::isPositiveAndBelow (hoverTile, (int) tiles.size()))
-            repaint (area (hoverTile));
+        repaint (shownHoverArea); // (where the old highlight and label were painted)
         hoverTile = i;
         if (juce::isPositiveAndBelow (hoverTile, (int) tiles.size()))
-            repaint (area (hoverTile));
+            repaint (hoverArea (hoverTile));
     }
 
     // Up / Down, Ctrl+wheel (FL): the next / previous tile in the list, wrapping, skipping dimmed ones; it is shown
@@ -1005,126 +1135,129 @@ private:
 
     void focusTile (int i)
     {
+        if (juce::isPositiveAndBelow (i, (int) tiles.size()))
+            mouseX = tiles[(std::size_t) i].bounds.getCentreX();
         setHover (i);
         if (! juce::isPositiveAndBelow (i, (int) tiles.size()))
             return;
-        // keep it in view
-        const auto area = tileArea();
-        const auto b = tiles[(std::size_t) i].bounds;
-        if (b.getY() < area.getY())
-            setScroll (scroll - (area.getY() - b.getY()) - gap);
-        else if (b.getBottom() > area.getBottom())
-            setScroll (scroll + (b.getBottom() - area.getBottom()) + gap);
         // FL moves the real mouse pointer onto it (SetPhysicalCursorPos), so a click or a drag goes on from there
         if (isShowing())
             juce::Desktop::setMousePosition (localPointToGlobal (tiles[(std::size_t) i].bounds.getCentre()));
     }
 
-    void setScroll (int y)
-    {
-        const auto clamped = juce::jlimit (0, maxScroll(), y);
-        if (clamped == scroll)
-            return;
-        const auto delta = clamped - scroll;
-        scroll = clamped;
-        for (auto& t : tiles)
-            if (! t.bounds.isEmpty())
-                t.bounds.translate (0, -delta);
-        repaint();
-    }
-
     void showTab (int t)
     {
         tab = t;
-        // keep the shown tab inside the strip
-        const auto strip = stripBounds();
-        const auto over = stripWidth() - strip.getWidth();
-        if (over > 0)
-        {
-            measureTabs();
-            const auto left = tabLefts[(std::size_t) tab];
-            stripOffset = juce::jlimit (0, over, left + tabWidth (tab) / 2 - strip.getWidth() / 2);
-        }
-        else
-            stripOffset = 0;
         hoverTile = -1;
-        scroll = 0;
         layoutTiles();
         repaint();
     }
 
-    // one grid of tiles: `items` in `cols` columns of one cell size, from `topLeft`
-    void place (const std::vector<int>& items, juce::Point<int> topLeft, int cols, const pickerview::Grid& grid)
+    // the generators' and effects' boxes (FL's FUN_00ec0d40): 32 px in from the sides, 56 from the top, 96 from the
+    // bottom; on the All tab (or the other half's category) each gets its half, 80 px apart, else the whole width
+    std::pair<pickerview::PackBox, pickerview::PackBox> halfBoxes (int which = -1) const
     {
-        const auto cells = pickerview::gridCells ((int) items.size(), cols, grid.cellW, grid.cellH, gap);
-        for (std::size_t k = 0; k < items.size() && k < cells.size(); ++k)
-            tiles[(std::size_t) items[k]].bounds = { topLeft.x + cells[k].x, topLeft.y + cells[k].y, cells[k].w, cells[k].h };
+        const pickerview::PackBox all { edgeX, edgeTop, getWidth() - edgeX, getHeight() - edgeBottom };
+        const auto half = ((all.right - all.left) - halvesGap) / 2;
+        auto gens = all, fx = all;
+        if (which < 0 || ! tabs.isGenerator (which))
+            gens.right = all.left + half;
+        if (which < 0 || ! tabs.isEffect (which))
+            fx.left = all.right - half;
+        return { gens, fx };
+    }
+
+    void pack (int which, int& reach)
+    {
+        const auto boxes = halfBoxes (which);
+        for (const auto generators : { true, false })
+        {
+            std::vector<int> ids;
+            std::vector<pickerview::PackTile> in;
+            for (int i = 0; i < (int) tiles.size(); ++i)
+                if (tiles[(std::size_t) i].generator == generators)
+                {
+                    const auto& t = tiles[(std::size_t) i];
+                    pickerview::PackTile p;
+                    p.shown = inTab (t, which);
+                    p.generator = generators;
+                    if (t.hasPicture())
+                    {
+                        // FL: the picture at half its file's size (192 dpi bitmaps on a 96 dpi screen) + its shadow
+                        p.w = pickerview::roundFl (t.png.x * 0.5) + 2 * shadow;
+                        p.h = pickerview::roundFl (t.png.y * 0.5) + 2 * shadow;
+                    }
+                    else
+                    {
+                        const auto f = juce::Font (theme::font (textTileSize, true));
+                        p.w = juce::GlyphArrangement::getStringWidthInt (f, t.name) + 6;
+                        p.h = juce::roundToInt (f.getHeight()) + 6;
+                    }
+                    ids.push_back (i);
+                    in.push_back (p);
+                }
+            const auto r = pickerview::packRows (in, generators ? boxes.first : boxes.second, tileGap);
+            reach = juce::jmax (reach, r.reach);
+            for (std::size_t k = 0; k < ids.size(); ++k)
+            {
+                auto& t = tiles[(std::size_t) ids[k]];
+                const auto& p = r.tiles[k];
+                t.bounds = p.shown ? juce::Rectangle<int> (p.x, p.y, p.w, p.h) : juce::Rectangle<int>();
+                t.rowHeight = p.rowHeight;
+            }
+        }
     }
 
     void layoutTiles()
     {
-        for (auto& t : tiles)
-            t.bounds = {};
-        const auto area = tileArea().withTrimmedRight (barWidth + 4);
-        std::vector<int> gens, fx;
-        for (int i = 0; i < (int) tiles.size(); ++i)
-            if (inTab (tiles[(std::size_t) i]))
-                (tiles[(std::size_t) i].generator ? gens : fx).push_back (i);
-        // every tile the same 16:10 cell, its picture fitted inside; the largest cells at which all fit, and on the
-        // All tab each half gets the columns it needs, so both fill their height and the window's width
-        if (tab == tabs.all())
+        if (getWidth() <= 0 || getHeight() <= 0)
+            return;
+        // FL places the tab strip once, from the All tab's tiles (it stays put while the tabs change)
+        if (stripFor != getLocalBounds() || stripPictures != picturesKnown())
         {
-            const auto grid = pickerview::split ((int) gens.size(), (int) fx.size(), area.getWidth(), area.getHeight(), gap, separation,
-                                                 cellAspect, minCell, maxCell);
-            const auto lw = pickerview::gridWidth (grid.leftCols, grid.cellW, gap), rw = pickerview::gridWidth (grid.rightCols, grid.cellW, gap);
-            const auto spare = juce::jmax (0, area.getWidth() - lw - rw - separation);
-            const auto lx = area.getX() + spare / 3, rx = lx + lw + separation + spare / 3;
-            place (gens, { lx, area.getY() }, grid.leftCols, grid);
-            place (fx, { rx, area.getY() }, grid.rightCols, grid);
-            leftTitleX = lx + lw / 2;
-            rightTitleX = rx + rw / 2;
-            contentHeight = juce::jmax (pickerview::gridHeight ((int) gens.size(), grid.leftCols, grid.cellH, gap),
-                                        pickerview::gridHeight ((int) fx.size(), grid.rightCols, grid.cellH, gap));
+            int reach = 0;
+            pack (tabs.all(), reach);
+            stripReach = reach;
+            stripFor = getLocalBounds();
+            stripPictures = picturesKnown();
+            tabLayoutFor = {};
         }
-        else
-        {
-            const auto& items = tabs.isGenerator (tab) ? gens : fx;
-            const auto inner = area.withTrimmedTop (16);
-            const auto grid = pickerview::split ((int) items.size(), 0, inner.getWidth(), inner.getHeight(), gap, 0, cellAspect, minCell, maxCell);
-            const auto w = pickerview::gridWidth (grid.leftCols, grid.cellW, gap);
-            const auto h = pickerview::gridHeight ((int) items.size(), grid.leftCols, grid.cellH, gap);
-            // a category's plugins centred (FL)
-            place (items, { inner.getX() + (inner.getWidth() - w) / 2, inner.getY() + juce::jmax (0, (inner.getHeight() - h) / 2) }, grid.leftCols, grid);
-            contentHeight = h + 16;
-        }
-        scroll = juce::jlimit (0, maxScroll(), scroll);
-        for (auto& t : tiles)
-            if (! t.bounds.isEmpty())
-                t.bounds.translate (0, -scroll);
+        int unused = 0;
+        pack (tab, unused);
         if (hoverTile >= 0 && tiles[(std::size_t) hoverTile].bounds.isEmpty())
             hoverTile = -1;
+    }
+
+    int picturesKnown() const
+    {
+        int n = 0;
+        for (const auto& t : tiles)
+            n += t.hasPicture() ? 1 : 0;
+        return n;
     }
 
     AudioEngine& engine;
     PluginPickerTargets targets;
     std::vector<Tile> tiles;
     pickerview::Tabs tabs;
-    static constexpr double cellAspect = 1.6; // (16:10)
-    static constexpr int minCell = 56, maxCell = 300, separation = 32;
-    int leftTitleX = 0, rightTitleX = 0;
     juce::Image backdrop, backdropShown;
-    mutable std::vector<int> tabLefts; // (measureTabs)
+    mutable std::vector<juce::Rectangle<int>> tabRects;
+    mutable juce::Rectangle<int> tabLayoutFor;
+    mutable int genTabFont = 19, fxTabFont = 19, tabRowHeight = 0;
+    juce::Rectangle<int> stripFor;
+    int stripReach = 0, stripPictures = -1;
     double paintScale = 1.0;
     juce::ThreadPool workers { 2 };
     int inFlight = 0;
     bool relayoutPending = false;
     juce::String searchText;
     bool showPlaceholder = false;
-    int tab = 0, hoverTab = -1, hoverTile = -1, pressedTile = -1, stripOffset = 0;
-    int scroll = 0, contentHeight = 0, barGrab = 0;
-    bool dragging = false, draggingBar = false;
+    int tab = 0, hoverTab = -1, hoverTile = -1, pressedTile = -1, mouseX = 0;
+    juce::Rectangle<int> shownHoverArea; // the hovered tile's highlight and label as last painted
+    bool dragging = false;
+    juce::Component::SafePointer<juce::Component> dragContainerOwner;
     float wheelAccum = 0.0f;
-    double buildMs = 0.0, openedAt = 0.0, nextLoadAt = 0.0, lastRelayout = 0.0;
+    double buildMs = 0.0, openedAt = 0.0, lastRenderingSeen = 0.0;
     static constexpr double fadeMs = 140.0;
 };
 } // namespace
@@ -1132,5 +1265,11 @@ private:
 std::unique_ptr<juce::Component> makePluginPickerView (AudioEngine& engine, PluginPickerTargets targets)
 {
     return std::make_unique<PluginPickerView> (engine, std::move (targets));
+}
+
+void takePluginPickerBackdrop (juce::Component& view, juce::Rectangle<int> screenArea)
+{
+    if (auto* picker = dynamic_cast<PluginPickerView*> (&view))
+        picker->takeBackdrop (screenArea);
 }
 } // namespace lynx

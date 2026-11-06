@@ -17,6 +17,7 @@
 #include "core/EngineLayouts.h"
 #include "core/Effects.h"
 #include "core/MaximusFx.h"
+#include "core/MixSuite.h"
 #include "core/MultibandDelayFx.h"
 #include "core/StateParams.h"
 #include "core/Toxic.h"
@@ -1873,7 +1874,7 @@ Layout ridgeStrip()
         else
             v.push_back (toggle (194, y + 34.0f, 72, 20, extra[b], TR_NOOP ("Bell")));
     }
-    v.push_back (section (4, 520, 276, 192, TR_NOOP ("Equalizer")));
+    v.push_back (section (4, 520, 276, 124, TR_NOOP ("Equalizer")));
     // round 165: the Brown / Black curves are Ridge's own engine's (the E console voicing has the console's one curve)
     // (round tp172c: two conditions at most — the 4K and Modern voicings; in the E voicing the curve has no effect)
     v.push_back (when (when (tabs (10, 548, 150, 20, "EQ curve", TR_NOOP ("Brown|Black")), "4K voicing", 0.0f, 0.5f), "Modern voicing", 0.0f, 0.5f));
@@ -1892,6 +1893,24 @@ Layout ridgeStrip()
     v.push_back (toggle (170, 548, 104, 20, "EQ on", TR_NOOP ("EQ in")));
     // round 123: the voicing — Ridge's own engine, or the measured E-type console (substitutes start there)
     v.push_back (tabs (10, 584, 150, 20, "Voicing", TR_NOOP ("Classic|E console")));
+    // round tp172c6: the DRIVE section under the EQ — in, the model (measured saturators, consoles, tube, amps), its
+    // drive, the level into it, the trim after it and the mix
+    v.push_back (section (4, 648, 276, 64, TR_NOOP ("Drive")));
+    v.push_back (toggle (10, 666, 50, 18, "Drive in", TR_NOOP ("In")));
+    {
+        LayoutItem m;
+        m.type = Item::menu;
+        m.x = 10, m.y = 688, m.w = 96, m.h = 18;
+        m.param = "Drive model";
+        m.options = TR_NOOP ("Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp");
+        for (int k = 0; k < mixsuite::ridge::driveModels; ++k)
+            m.values.push_back (mixsuite::ridge::driveModelValue (k));
+        v.push_back (m);
+    }
+    v.push_back (dial (130, 676, 22, "Drive amount", TR_NOOP ("Drive")));
+    v.push_back (dial (174, 676, 20, "Drive input", TR_NOOP ("Input"), bipolar));
+    v.push_back (dial (216, 676, 20, "Drive trim", TR_NOOP ("Trim"), bipolar));
+    v.push_back (dial (256, 676, 20, "Drive mix", TR_NOOP ("Mix")));
 
     // --- right column: dynamics, routing
     v.push_back (section (504, 4, 272, 236, TR_NOOP ("Compressor")));
@@ -2146,6 +2165,54 @@ Layout withEmberClassic (Layout l)
     return l;
 }
 
+// round tp172c7: Kiln Channel, LYNX's console channel — the compact dark single-channel console of its role (the
+// classic console-emulation channel): the main input level and its meter in the left column, the main output on the
+// right; the centre module carries the VU (output), the name plate, Input / Output, the console selector with the six
+// models printed round it, Drive and Group, and the Noise reduction / Group bypass keys
+Layout kilnLayout()
+{
+    Layout l;
+    l.width = 460;
+    l.height = 640;
+    auto& v = l.items;
+    v.push_back (section (6, 6, 92, 628, "", boxed));
+    v.push_back (section (104, 6, 252, 628, "", boxed));
+    v.push_back (section (362, 6, 92, 628, "", boxed));
+    auto inMeter = display (14, 24, 76, 420, "iometer");
+    inMeter.colour = 0; // the input bar alone
+    v.push_back (inMeter);
+    auto outMeter = display (370, 24, 76, 420, "iometer");
+    outMeter.colour = 1; // the output bar alone
+    v.push_back (outMeter);
+    v.push_back (dial (52, 530, 50, "Main in", TR_NOOP ("In"), bipolar));
+    v.push_back (dial (408, 530, 50, "Main out", TR_NOOP ("Out"), bipolar));
+    auto vu = display (126, 40, 208, 116, "vumeter");
+    vu.steps = 0;
+    v.push_back (vu);
+    v.push_back (label (104, 166, 252, 20, TR_NOOP ("Kiln Channel"), boxed));
+    v.push_back (dial (166, 230, 46, "Input", TR_NOOP ("Input"), bipolar));
+    v.push_back (dial (294, 230, 46, "Output", TR_NOOP ("Output"), bipolar));
+    v.push_back (toggle (204, 204, 52, 18, "Group I/O", TR_NOOP ("Group I/O")));
+    v.push_back (toggle (204, 240, 52, 18, "Link I/O", TR_NOOP ("Link I/O")));
+    // the console selector: six stops 54 degrees apart over the knob's 270-degree throw, the model printed at each stop
+    const float cx = 230.0f, cy = 360.0f, rr = 66.0f;
+    v.push_back (knob (cx, cy, 64, "Console", nullptr, cy + 40.0f, noCaption | big, 6));
+    static const char* models[6] { TR_NOOP ("British E"), TR_NOOP ("British G"), TR_NOOP ("American A"), TR_NOOP ("British N"), TR_NOOP ("Y"), TR_NOOP ("Tube") };
+    for (int k = 0; k < 6; ++k)
+    {
+        const auto a = (-135.0f + 54.0f * (float) k) * 3.14159265f / 180.0f;
+        const auto px = cx + rr * std::sin (a), py = cy - rr * std::cos (a);
+        const auto w = 66.0f;
+        const auto x = std::sin (a) < -0.3f ? px - w + 8.0f : std::sin (a) > 0.3f ? px - 8.0f : px - w * 0.5f;
+        v.push_back (label (x, py - 7.0f, w, 14, models[k], (std::uint16_t) (std::sin (a) > 0.3f ? alignLeft : 0)));
+    }
+    v.push_back (dial (166, 488, 50, "Drive", TR_NOOP ("Drive")));
+    v.push_back (knob (294, 488, 50, "Group", TR_NOOP ("Group"), 488 + 45.0f, showValue, 9));
+    v.push_back (toggle (116, 576, 108, 26, "Noise reduction", TR_NOOP ("Noise reduction")));
+    v.push_back (toggle (236, 576, 108, 26, "Group bypass", TR_NOOP ("Group bypass")));
+    return l;
+}
+
 Layout emberLayout()
 {
     Layout l;
@@ -2385,6 +2452,8 @@ Layout crestCompressor()
     v.push_back (menuOf (382, 296, 112, 26, "Style", TR_NOOP ("Style"),
                          TR_NOOP ("Clean|Allround|Punch|Upward|Two-way|Vari-mu|Classic|Opto|Vocal|Bus|Pumping")));
     v.push_back (toggle (382, 330, 112, 20, "Auto release", TR_NOOP ("Auto release")));
+    // round tp172b2: Pro-C 3's Smooth / Op-El / Mastering styles (a voicing over the style)
+    v.push_back (menuOf (382, 356, 112, 22, "Voicing", TR_NOOP ("Voicing"), TR_NOOP ("None|Smooth|Op-El|Mastering")));
     v.push_back (dial (544, 310, 56, "Attack", TR_NOOP ("Attack"), big));
     v.push_back (dial (636, 310, 56, "Release", TR_NOOP ("Release"), big));
     v.push_back (dial (206, 408, 30, "Knee", TR_NOOP ("Knee")));
@@ -3716,7 +3785,7 @@ const std::vector<EffectKind>& flLayoutKinds()
 const std::vector<EffectKind>& ownLayoutKinds()
 {
     static const std::vector<EffectKind> kinds { EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser,
-                                                 EffectKind::aether, EffectKind::ember, EffectKind::epochVerb, EffectKind::atrium,
+                                                 EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::epochVerb, EffectKind::atrium,
                                                  EffectKind::foilPlate, EffectKind::nebula, EffectKind::halo, EffectKind::horizon,
                                                  EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod,
                                                  EffectKind::crestCompressor, EffectKind::prismMultiband, EffectKind::sentryGate,
@@ -3800,6 +3869,7 @@ const Layout& layoutFor (EffectKind kind)
         case EffectKind::hushDeEsser: l = hushDeEsser(); break;
         case EffectKind::aether: l = aetherLayout(); break;
         case EffectKind::ember: l = withEmberClassic (emberLayout()); break;
+        case EffectKind::kilnChannel: l = kilnLayout(); break;
         case EffectKind::epochVerb: l = captionsAbove (epochVerbLayout()); break;
         case EffectKind::atrium: l = captionsAbove (atriumLayout()); break;
         case EffectKind::foilPlate: l = captionsAbove (foilPlateLayout()); break;
@@ -4108,7 +4178,7 @@ Layout poizoneMain()
     Layout l;
     l.fl = "PoiZone";
     l.width = 856;
-    l.height = 378;
+    l.height = 486;
     auto& v = l.items;
     // a 40-pixel FL wheel at (left, top of the row) → LYNX knob with its caption
     auto wheel = [&v] (float left, float rowTop, const char* param, const char* caption, std::uint16_t style = 0) {
@@ -4215,6 +4285,13 @@ Layout poizoneMain()
     for (int i = 0; i < 16; ++i)
         v.push_back (toggle (712 + 17 * (float) (i % 8), r4 + 26 + 24 * (float) (i / 8), 16, 22,
                              stored ("Gate step " + std::to_string (i + 1)), nullptr, boxed));
+
+    // row 5: FL's two wheels under the panel (TSynthEditorForm's PitchBendWheel at x 47 and ModWheel at x 97, 19 × 94;
+    // the pitch bend springs back to the centre when released, FL's PitchBendReset)
+    const float r5 = 382;
+    v.push_back (section (6, r5, 134, 102, TR_NOOP ("Wheels")));
+    v.push_back (slider (Item::vslider, 40, r5 + 22, 25, 62, "Pitch bend", TR_NOOP ("Bend"), bipolar | springBack));
+    v.push_back (slider (Item::vslider, 90, r5 + 22, 25, 62, "Mod wheel", TR_NOOP ("Mod")));
     return l;
 }
 } // namespace

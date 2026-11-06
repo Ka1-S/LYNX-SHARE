@@ -700,6 +700,59 @@ std::string githubOsOption (std::string_view os, std::string_view arch, bool app
     return {};
 }
 
+bool hangIsFatalReport (std::string_view hangText)
+{
+    for (const auto* marker : { "RtlReportException", "RtlReportCriticalFailure", "RtlpReportHeapFailure", "WerpReportFault",
+                                "WerReportCriticalFailure" })
+        if (hangText.find (marker) != std::string_view::npos)
+            return true;
+    return false;
+}
+
+EditorCrashStep parseEditorCrashStep (std::string_view step)
+{
+    EditorCrashStep out;
+    const std::string_view prefix = editorCrashStepPrefix;
+    const auto at = step.find (prefix);
+    if (at == std::string_view::npos)
+        return out;
+    auto rest = step.substr (at + prefix.size());
+    // the name ends at the last " (" before ", trace in" (a plugin name may hold parentheses itself)
+    const std::string_view traceMarker = ", trace in autosave\\";
+    const auto trace = rest.rfind (traceMarker);
+    const auto details = rest.substr (0, trace == std::string_view::npos ? rest.size() : trace);
+    const auto open = details.rfind (" (");
+    out.plugin = std::string (details.substr (0, open == std::string_view::npos ? details.size() : open));
+    if (trace != std::string_view::npos)
+    {
+        auto file = rest.substr (trace + traceMarker.size());
+        while (! file.empty() && (file.back() == '\r' || file.back() == '\n' || file.back() == ' '))
+            file.remove_suffix (1);
+        out.traceFile = std::string (file);
+    }
+    return out;
+}
+
+bool editorFaultCatchable (std::uint32_t code) noexcept
+{
+    switch (code)
+    {
+        case 0x80000003u: // breakpoint
+        case 0x80000004u: // single step
+        case 0xC0000374u: // heap corruption: the heap is damaged, going on would only move the crash
+        case 0xC00000FDu: // stack overflow (the guard page is gone)
+        case 0xC0000409u: // fail-fast / buffer overrun (never reaches a handler anyway)
+        case 0xC0000602u: // fail-fast exception
+        case 0x406D1388u: // a thread name for a debugger
+        case 0x40010006u: case 0x4001000Au: // OutputDebugString
+        case 0x40010005u: case 0x40010008u: // Ctrl+C / Ctrl+Break
+            return false;
+        default:
+            // errors (0xC...) and C++ / other software exceptions (0xE06D7363 MSVC, 0x20474343 GCC/Clang)
+            return (code & 0xC0000000u) == 0xC0000000u || code == 0xE06D7363u || code == 0x20474343u;
+    }
+}
+
 std::string githubKindOption (std::string_view kind)
 {
     if (kind == "crash" || kind == "unclean")

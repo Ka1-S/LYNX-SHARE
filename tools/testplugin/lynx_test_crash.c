@@ -1,11 +1,15 @@
 /* A CLAP effect that crashes on purpose, for testing LYNX's crash protection (round 111):
- *   zig cc -shared -O2 -target x86_64-windows-gnu -Ithird_party/clap/include tools/testplugin/lynx_test_crash.c \
+ *   zig cc -shared -O2 -target x86_64-windows-gnu -Ithird_party/clap/include tools/testplugin/lynx_test_crash.c -luser32 -lgdi32 \
  *       -o "LYNX Test Crash.clap"
  * Environment variable LYNX_TEST_CRASH:
  *   "process" - an access violation in the 20th process() call (LYNX.exe --plugintest: the slot must be switched off,
  *               the render must finish)
  *   "exit"    - a fail-fast (0xC0000409) when the DLL is unloaded at process exit, like the Waves shell whose teardown
  *               crashed LYNX's scan child (LYNX.exe --scantest: the plugin must be found, not blacklisted)
+ *   "editor"  - (issue #32, round 174a) an access violation in its own editor window's procedure, on the window's
+ *               first WM_TIMER (~0.3 s after it opens), like the synth editor that took LYNX down
+ *               (LYNX.exe --editorcrashtest: the editor must be closed, LYNX must keep running)
+ * Its editor (CLAP gui, Win32 child window) is a plain grey 240x120 window.
  */
 #include <windows.h>
 #include <clap/clap.h>
@@ -59,9 +63,69 @@ static clap_process_status p_process (const clap_plugin_t* p, const clap_process
             proc->audio_outputs[0].data32[c][i] = 0.5f * proc->audio_inputs[0].data32[c][i];
     return CLAP_PROCESS_CONTINUE;
 }
+/* the editor: one child window; "editor" mode crashes in its window procedure */
+static HWND editor_window = NULL;
+static LRESULT CALLBACK editor_proc (HWND h, UINT m, WPARAM w, LPARAM l)
+{
+    if (m == WM_TIMER && crash_mode ("editor"))
+        *(volatile int*) (uintptr_t) 0 = 1;
+    if (m == WM_PAINT)
+    {
+        PAINTSTRUCT ps;
+        HDC dc = BeginPaint (h, &ps);
+        FillRect (dc, &ps.rcPaint, (HBRUSH) GetStockObject (GRAY_BRUSH));
+        EndPaint (h, &ps);
+        return 0;
+    }
+    return DefWindowProcA (h, m, w, l);
+}
+static bool g_api (const clap_plugin_t* p, const char* api, bool floating) { (void) p; return ! floating && strcmp (api, CLAP_WINDOW_API_WIN32) == 0; }
+static bool g_preferred (const clap_plugin_t* p, const char** api, bool* floating) { (void) p; *api = CLAP_WINDOW_API_WIN32; *floating = false; return true; }
+static bool g_create (const clap_plugin_t* p, const char* api, bool floating) { (void) p; return g_api (p, api, floating); }
+static void g_destroy (const clap_plugin_t* p)
+{
+    (void) p;
+    if (editor_window != NULL) DestroyWindow (editor_window);
+    editor_window = NULL;
+}
+static bool g_scale (const clap_plugin_t* p, double s) { (void) p; (void) s; return true; }
+static bool g_size (const clap_plugin_t* p, uint32_t* w, uint32_t* h) { (void) p; *w = 240; *h = 120; return true; }
+static bool g_can_resize (const clap_plugin_t* p) { (void) p; return false; }
+static bool g_hints (const clap_plugin_t* p, clap_gui_resize_hints_t* h) { (void) p; (void) h; return false; }
+static bool g_adjust (const clap_plugin_t* p, uint32_t* w, uint32_t* h) { (void) p; *w = 240; *h = 120; return true; }
+static bool g_set_size (const clap_plugin_t* p, uint32_t w, uint32_t h) { (void) p; (void) w; (void) h; return true; }
+static bool g_parent (const clap_plugin_t* p, const clap_window_t* window)
+{
+    static int registered = 0;
+    (void) p;
+    if (! registered)
+    {
+        WNDCLASSA c;
+        memset (&c, 0, sizeof (c));
+        c.lpfnWndProc = editor_proc;
+        c.hInstance = GetModuleHandleA (NULL);
+        c.lpszClassName = "LynxTestCrashEditor";
+        RegisterClassA (&c);
+        registered = 1;
+    }
+    editor_window = CreateWindowExA (0, "LynxTestCrashEditor", "", WS_CHILD | WS_VISIBLE, 0, 0, 240, 120, (HWND) window->win32, NULL,
+                                     GetModuleHandleA (NULL), NULL);
+    if (editor_window != NULL)
+        SetTimer (editor_window, 1, 300, NULL);
+    return editor_window != NULL;
+}
+static bool g_transient (const clap_plugin_t* p, const clap_window_t* w) { (void) p; (void) w; return false; }
+static void g_title (const clap_plugin_t* p, const char* t) { (void) p; (void) t; }
+static bool g_show (const clap_plugin_t* p) { (void) p; if (editor_window != NULL) ShowWindow (editor_window, SW_SHOW); return true; }
+static bool g_hide (const clap_plugin_t* p) { (void) p; if (editor_window != NULL) ShowWindow (editor_window, SW_HIDE); return true; }
+static const clap_plugin_gui_t gui = { g_api, g_preferred, g_create, g_destroy, g_scale, g_size, g_can_resize, g_hints, g_adjust,
+                                       g_set_size, g_parent, g_transient, g_title, g_show, g_hide };
+
 static const void* p_extension (const clap_plugin_t* p, const char* id)
 {
     (void) p;
+    if (strcmp (id, CLAP_EXT_GUI) == 0)
+        return &gui;
     return strcmp (id, CLAP_EXT_AUDIO_PORTS) == 0 ? &audio_ports : NULL;
 }
 static void p_main_thread (const clap_plugin_t* p) { (void) p; }

@@ -687,7 +687,9 @@ private:
 class HtmlNotebookEditor final : public juce::Component
 {
 public:
-    explicit HtmlNotebookEditor (const VisualTarget& t) : target (t)
+    // `demo` (the Plugin picker's picture): the address shows the page's file name only, never a folder that holds
+    // the user's name (pictures end up in shared screenshots)
+    explicit HtmlNotebookEditor (const VisualTarget& t, bool demoPicture = false) : target (t), demo (demoPicture)
     {
         addAndMakeVisible (addressBox);
         addressBox.setFont (juce::Font (theme::font (theme::type::body)));
@@ -792,7 +794,9 @@ private:
     void show()
     {
         const auto a = current();
-        addressBox.setText (juce::String::fromUTF8 (a.c_str()), false);
+        const auto shown = juce::String::fromUTF8 (a.c_str());
+        addressBox.setText (demo && ! fx::htmlnotebook::isWebAddress (a) ? juce::File (shown).getFileName() : shown, false);
+        addressBox.setReadOnly (demo);
         openButton.setEnabled (! a.empty());
         fx::htmlnotebook::Page page;
         juce::String note;
@@ -817,6 +821,7 @@ private:
     }
 
     VisualTarget target;
+    bool demo = false;
     juce::TextEditor addressBox;
     juce::TextButton browse { tr ("Browse") }, openButton { tr ("Open in browser") }, reload { tr ("Reload") };
     juce::Viewport viewport;
@@ -1330,8 +1335,17 @@ std::unique_ptr<juce::Component> makeFlExtraEditor (const VisualTarget& target, 
         case EffectKind::bigClock: return std::make_unique<BigClockEditor> (target, demo);
         case EffectKind::tuner: return std::make_unique<TunerEditor> (target, demo);
         case EffectKind::scratcher: return std::make_unique<ScratcherEditor> (target, demo);
-        default: return std::make_unique<HtmlNotebookEditor> (target);
+        default: return std::make_unique<HtmlNotebookEditor> (target, demo);
     }
+}
+
+std::unique_ptr<juce::Component> makeFlExtraSlotEditor (AudioEngine& engine, int track, int slot, bool demo)
+{
+    const auto& mixer = engine.getSong().mixer;
+    if (track < 0 || track >= (int) mixer.size() || slot < 0 || slot >= (int) mixer[(std::size_t) track].effects.size())
+        return nullptr;
+    const auto kind = mixer[(std::size_t) track].effects[(std::size_t) slot].kind;
+    return isExtraKind (kind) ? makeFlExtraEditor (slotTarget (engine, track, slot), kind, demo) : nullptr;
 }
 
 namespace FlExtraWindows
