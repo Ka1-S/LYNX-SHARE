@@ -11,6 +11,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <unordered_set>
 #include <vector>
 
 #include "core/Arpeggiator.h"
@@ -291,6 +292,9 @@ struct RackState
         PluginInstrumentFactory pluginInstruments;
         PluginEffectFactory pluginEffects;
         launcher::Runtime* clipLauncher = nullptr; // (round 181a) only the engine's own state, and only with a grid
+        // One publish may deliberately replace selected runtime identities (remote reset/replacement).
+        // An empty set preserves the established positional fallback for ordinary project/UI edits.
+        std::unordered_set<std::uint64_t> freshInstances;
     };
 
     // Builds the next state reusing the instruments from `previous` when the

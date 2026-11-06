@@ -93,6 +93,8 @@ public:
     bool hasCrashed() const noexcept { return crashed.load (std::memory_order_relaxed); }
     // The plugin's state for saving (base64, as capturePluginState), or nullopt after a crash (keep the saved one).
     std::optional<std::string> captureState();
+    // State restoration is serialized with this instance's processing by its callback lock.
+    bool restoreState (const std::string& state);
     // Sets a parameter from the UI / controllers (setValueNotifyingHost), guarded like the audio calls.
     void setParameterFromUi (int index, float value);
     void setRenderMode (bool offline);
@@ -182,6 +184,8 @@ public:
     bool hasCrashed() const noexcept { return crashed.load (std::memory_order_relaxed); }
     // The plugin's state for saving (base64, as capturePluginState), or nullopt after a crash (keep the saved one).
     std::optional<std::string> captureState();
+    // State restoration is serialized with this instance's processing by its callback lock.
+    bool restoreState (const std::string& state);
     // Sets a parameter from the UI / controllers (setValueNotifyingHost), guarded like the audio calls.
     void setParameterFromUi (int index, float value);
     void setRenderMode (bool offline);
@@ -397,6 +401,11 @@ public:
     // `wanted`: how many ready instances of this exact plugin+state the rack needs so far (one the VST3 automation
     // remap already created counts, so it is not created twice)
     void preload (const PluginRef& ref, int wanted = 1);
+    // Prepare one exact instance before an atomic control edit. A failure is reported
+    // to the caller and is not cached; the next rack build consumes the ready instance.
+    bool preloadChecked (const PluginRef& ref, double sampleRate, juce::String& error,
+                         const std::function<bool (juce::AudioPluginInstance&, juce::String&)>& validate = {});
+    void discardPreloaded (const PluginRef& ref, double sampleRate);
     void clearPreloaded();
     int preloadedCount() const;
     // Called on the message thread just before a hosted plugin is created (the progress panel names it and repaints).
