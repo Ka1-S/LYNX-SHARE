@@ -55,6 +55,14 @@ Score gridScore (std::int64_t step, float swing = 0.0f);
 std::vector<Note> notesFromScore (const Score& score, int channel);
 std::vector<std::uint8_t> writeScore (const std::vector<Note>& notes);
 
+// FL's event scores (issue #86, REA_rodada178a §4): the Event editor's Save score as / Open score. One target's events
+// as an .fsc of header format 0x18: 0x41 = 0, then 0xDF records {tick, control 0, the value normalised to 0..1 as a
+// float}. Target-agnostic: opening one puts its curve on whatever target the editor shows (a Tempo curve onto a
+// volume, and back). LYNX's lane values are the normalised values (exactly FL's for the tempo, volumes and pans).
+std::vector<std::uint8_t> writeEventScore (const std::vector<PatternEvent>& events);
+// The events of an event score at LYNX's PPQ, sorted, one per tick; nothing when the file is not one (a note score).
+std::optional<std::vector<PatternEvent>> parseEventScore (std::span<const std::uint8_t> bytes);
+
 // Per-level strengths (0..1) used when a template's levels are blended into the notes (quantizer, chopper).
 struct LevelStrengths
 {

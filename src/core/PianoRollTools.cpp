@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <bit>
 #include <cmath>
+#include <cstring>
 #include <map>
 #include <random>
 #include <set>
@@ -299,6 +300,97 @@ std::vector<std::uint8_t> writeScore (const std::vector<Note>& notes)
     for (int k = 0; k < 4; ++k)
         out[sizeAt + (std::size_t) k] = (std::uint8_t) (size >> (8 * k));
     return out;
+}
+
+std::vector<std::uint8_t> writeEventScore (const std::vector<PatternEvent>& events)
+{
+    std::vector<std::uint8_t> out;
+    auto u8 = [&out] (int v) { out.push_back ((std::uint8_t) v); };
+    auto u16 = [&u8] (int v) { u8 (v & 0xFF); u8 ((v >> 8) & 0xFF); };
+    auto u32 = [&u16] (std::uint32_t v) { u16 ((int) (v & 0xFFFF)); u16 ((int) (v >> 16)); };
+
+    // header: "FLhd", 6, format 0x18 (FL's event score mode), one channel, the PPQ
+    for (auto c : { 'F', 'L', 'h', 'd' })
+        u8 (c);
+    u32 (6);
+    u16 (0x18);
+    u16 (1);
+    u16 (ppq);
+    for (auto c : { 'F', 'L', 'd', 't' })
+        u8 (c);
+    const auto sizeAt = out.size();
+    u32 (0);
+    u8 (0x41); // the pattern (0)
+    u16 (0);
+
+    std::vector<std::uint8_t> records;
+    records.reserve (events.size() * 12);
+    auto r32 = [&records] (std::uint32_t v) { for (int k = 0; k < 4; ++k) records.push_back ((std::uint8_t) (v >> (8 * k))); };
+    for (const auto& e : events)
+    {
+        r32 ((std::uint32_t) std::max<std::int64_t> (0, e.tick));
+        r32 (0); // the control: FL sets it to 0 in an event score (FUN_012dfdb0)
+        const auto v = std::clamp (e.value, 0.0f, 1.0f);
+        std::uint32_t bits = 0;
+        std::memcpy (&bits, &v, sizeof bits);
+        r32 (bits); // the value normalised to 0..1, as a float (FUN_0105fc40)
+    }
+    u8 (0xDF);
+    auto size = records.size();
+    do
+    {
+        auto b = (int) (size & 0x7F);
+        size >>= 7;
+        u8 (size != 0 ? b | 0x80 : b);
+    } while (size != 0);
+    out.insert (out.end(), records.begin(), records.end());
+
+    const auto total = (std::uint32_t) (out.size() - sizeAt - 4);
+    for (int k = 0; k < 4; ++k)
+        out[sizeAt + (std::size_t) k] = (std::uint8_t) (total >> (8 * k));
+    return out;
+}
+
+std::optional<std::vector<PatternEvent>> parseEventScore (std::span<const std::uint8_t> bytes)
+{
+    try
+    {
+        flp::EventReader reader (bytes);
+        if (reader.header().format != 0x18)
+            return std::nullopt;
+        const auto filePpq = std::max<int> (1, reader.header().ppq);
+        flp::Event e;
+        std::vector<PatternEvent> events;
+        while (reader.next (e))
+        {
+            if (e.id != 0xDF || ! e.isData())
+                continue;
+            for (std::size_t o = 0; o + 12 <= e.data.size(); o += 12)
+            {
+                std::uint32_t tick = 0, bits = 0;
+                std::memcpy (&tick, e.data.data() + o, 4);
+                std::memcpy (&bits, e.data.data() + o + 8, 4);
+                float v = 0.0f;
+                std::memcpy (&v, &bits, sizeof v);
+                if (! std::isfinite (v))
+                    continue;
+                events.push_back ({ roundEven ((double) tick * ppq / filePpq), std::clamp (v, 0.0f, 1.0f) });
+            }
+        }
+        // sorted, one per tick (the last one of a tick wins, as FL applies them in order)
+        std::stable_sort (events.begin(), events.end(), [] (const PatternEvent& a, const PatternEvent& b) { return a.tick < b.tick; });
+        std::vector<PatternEvent> kept;
+        for (const auto& ev : events)
+            if (! kept.empty() && kept.back().tick == ev.tick)
+                kept.back() = ev;
+            else
+                kept.push_back (ev);
+        return kept;
+    }
+    catch (...)
+    {
+        return std::nullopt;
+    }
 }
 
 Score gridScore (std::int64_t step, float swing)

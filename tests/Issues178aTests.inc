@@ -208,3 +208,224 @@ TEST (issues178a_note_mod_x_moves_the_fl_voice_filter)
     CHECK (diff < 1e-6);
     CHECK (render (100, 64, std::pair { 0.5f, 0.9f }) != centred);             // Mod Y: the resonance
 }
+
+#include "core/TempoMap.h"
+#include "core/PianoRollTools.h"
+#include "core/MidiImport.h"
+#include "core/FlpExport.h"
+
+namespace issues178a
+{
+lynx::PatternEvents tempoLane (std::initializer_list<std::pair<std::int64_t, double>> events)
+{
+    lynx::PatternEvents lane;
+    lane.target = { lynx::AutomationTargetKind::tempo, 0 };
+    for (const auto& [tick, bpm] : events)
+        lane.events.push_back ({ tick, lynx::valueFromTempo (bpm) });
+    return lane;
+}
+bool near (double a, double b, double tolerance = 0.01) { return std::abs (a - b) <= tolerance; }
+} // namespace issues178a
+
+// #86, pattern mode: the current pattern's Tempo events, looped with it; before the first one, the project tempo.
+TEST (issues178a_tempo_events_in_pattern_mode)
+{
+    using namespace lynx;
+    auto song = Song::makeDefault();
+    song.bpm = 130.0;
+    song.mode = PlayMode::pattern;
+    song.patterns.resize (1);
+    song.currentPattern = 0;
+    auto& p = song.patterns[0];
+    CHECK (! tempomap::active (song));
+    CHECK (song.tempoAt (ppq) == 130.0);
+
+    p.events.push_back (issues178a::tempoLane ({ { ppq, 140.0 }, { 3 * ppq, 90.0 } }));
+    const auto length = (double) p.effectiveLength (song.beatsPerBar);
+    CHECK (tempomap::active (song));
+    CHECK (song.tempoAt (0.0) == 130.0);                                // before the first event
+    CHECK (issues178a::near (song.tempoAt (ppq), 140.0));
+    CHECK (issues178a::near (song.tempoAt (2.5 * ppq), 140.0));
+    CHECK (issues178a::near (song.tempoAt (3 * ppq), 90.0));
+    CHECK (issues178a::near (song.tempoAt (length + 0.5 * ppq), 90.0)); // the next loop: the last event still holds
+    CHECK (issues178a::near (song.tempoAt (length + ppq), 140.0));
+
+    // the time a beat lasts follows the events: one beat at 130, two at 140, then 90
+    const auto seconds = song.secondsForTicks (4 * ppq);
+    const auto expected = 60.0 / 130.0 + 2.0 * 60.0 / 140.0 + 60.0 / 90.0;
+    std::printf ("  4 beats with tempo events: %.4f s (exact %.4f s)\n", seconds, expected);
+    CHECK (std::abs (seconds - expected) < 0.01);
+
+    // another pattern without events: the project tempo
+    song.patterns.resize (2);
+    song.currentPattern = 1;
+    CHECK (! tempomap::active (song));
+    CHECK (song.tempoAt (3 * ppq) == 130.0);
+}
+
+// #86, song mode (FL's time map): pattern clips play their Tempo events while the position is inside them and the last
+// write holds afterwards (nothing is restored); inside a tempo automation clip the clip wins; after it, its last value
+// holds until a later event.
+TEST (issues178a_tempo_events_in_song_mode)
+{
+    using namespace lynx;
+    auto song = Song::makeDefault();
+    song.bpm = 120.0;
+    song.mode = PlayMode::song;
+    song.playlist.clear();
+    song.automations.clear();
+    song.patterns.resize (1);
+    auto& p = song.patterns[0];
+    p.lengthTicks = 4 * ppq;
+    p.events.push_back (issues178a::tempoLane ({ { 0, 100.0 }, { 2 * ppq, 150.0 } }));
+
+    Clip a;
+    a.kind = ClipKind::pattern;
+    a.pattern = 0;
+    a.start = 8 * ppq;
+    a.length = 4 * ppq;
+    song.playlist.push_back (a);
+    CHECK (tempomap::active (song));
+    CHECK (song.tempoAt (4 * ppq) == 120.0);                               // before the clip
+    CHECK (issues178a::near (song.tempoAt (8 * ppq), 100.0));
+    CHECK (issues178a::near (song.tempoAt (11 * ppq), 150.0));
+    CHECK (issues178a::near (song.tempoAt (40 * ppq), 150.0));             // held after the clip
+
+    // a clip that starts in the middle of its pattern (offset 2 beats) plays only the events from there on
+    Clip b = a;
+    b.start = 20 * ppq;
+    b.offset = 3 * ppq;
+    b.length = ppq;
+    b.track = 1;
+    song.playlist.push_back (b);
+    CHECK (issues178a::near (song.tempoAt (20.5 * ppq), 150.0));           // (the clip played no event: 150 holds)
+
+    // a tempo automation clip from 16 to 24: inside it, its curve wins over the pattern clip's events
+    Automation t;
+    t.target = { AutomationTargetKind::tempo, 0 };
+    t.points = { { 0, valueFromTempo (60.0) }, { 8 * ppq, valueFromTempo (60.0) } };
+    song.automations.push_back (t);
+    Clip c;
+    c.kind = ClipKind::automation;
+    c.automation = 0;
+    c.start = 16 * ppq;
+    c.length = 8 * ppq;
+    c.track = 2;
+    song.playlist.push_back (c);
+    Clip d = a; // a pattern clip overlapping the automation clip
+    d.start = 18 * ppq;
+    d.track = 3;
+    song.playlist.push_back (d);
+    CHECK (issues178a::near (song.tempoAt (12 * ppq), 150.0));
+    CHECK (issues178a::near (song.tempoAt (16 * ppq), 60.0));
+    CHECK (issues178a::near (song.tempoAt (21 * ppq), 60.0));             // the automation clip wins over d's events
+    CHECK (issues178a::near (song.tempoAt (25 * ppq), 60.0));             // after it: the value it ended with
+    Clip e = a;
+    e.start = 26 * ppq;
+    e.track = 4;
+    song.playlist.push_back (e);
+    CHECK (issues178a::near (song.tempoAt (26 * ppq), 100.0));            // a later event writes over it
+    CHECK (issues178a::near (song.tempoAt (2 * ppq), 60.0));              // before anything: the first tempo clip's value
+}
+
+// #86: FL's .flp keeps the Tempo events as BPM × 1000 (0x40000005 events) and the initialized tempo in 0xD8; both go
+// through LYNX's export and import unchanged.
+TEST (issues178a_tempo_events_survive_flp)
+{
+    using namespace lynx;
+    auto song = Song::makeDefault();
+    song.bpm = 128.0;
+    song.patterns.resize (1);
+    song.patterns[0].events.push_back (issues178a::tempoLane ({ { 0, 128.0 }, { 4 * ppq, 95.5 }, { 8 * ppq, 300.0 } }));
+    flpexport::Options options;
+    flpexport::Report report;
+    const auto project = flp::parseProject (flpexport::exportFlp (song, options, report));
+    auto found = 0;
+    for (const auto& pattern : project.patterns)
+        for (const auto& e : pattern.controlEvents)
+            if (e.id.raw == flp::ControlId::tempo)
+            {
+                ++found;
+                CHECK (e.value == 128000 || e.value == 95500 || e.value == 300000);
+            }
+    CHECK (found == 3);
+
+    FlpImportOptions io;
+    io.fileExists = [] (const std::string&) { return true; };
+    const auto back = importFlp (project, io);
+    const PatternEvents* lane = nullptr;
+    for (const auto& p : back.patterns)
+        if (const auto* l = tempomap::tempoLane (p))
+            lane = l;
+    CHECK (lane != nullptr);
+    if (lane != nullptr)
+    {
+        CHECK (lane->events.size() == 3);
+        if (lane->events.size() == 3)
+        {
+            CHECK (lane->events[1].tick == 4 * ppq);
+            CHECK (issues178a::near (tempoFromValue (lane->events[0].value), 128.0, 0.001));
+            CHECK (issues178a::near (tempoFromValue (lane->events[1].value), 95.5, 0.001));
+            CHECK (issues178a::near (tempoFromValue (lane->events[2].value), 300.0, 0.001));
+        }
+    }
+}
+
+// #86: FL's MIDI import writes every Set Tempo as a Tempo event of the new pattern, a whole BPM rounded half to even
+// (10..522); the realign moves them with the notes. LYNX used to keep only the first tempo, and a file starting at
+// exactly 120 BPM took its second one.
+TEST (issues178a_midi_tempos_become_tempo_events)
+{
+    using namespace lynx;
+    CHECK (midiimport::midiTempoBpm (60.0 / 120.0) == 120.0);
+    CHECK (midiimport::midiTempoBpm (60.0 / 120.5) == 120.0);   // half to even
+    CHECK (midiimport::midiTempoBpm (60.0 / 121.5) == 122.0);
+    CHECK (midiimport::midiTempoBpm (60.0 / 99.7) == 100.0);
+    CHECK (midiimport::midiTempoBpm (60.0 / 4.0) == 10.0);      // FL's range
+    CHECK (midiimport::midiTempoBpm (60.0 / 900.0) == 522.0);
+
+    Pattern p;
+    p.events.push_back (issues178a::tempoLane ({ { 0, 77.0 } })); // the pattern's old Tempo events are replaced
+    PatternEvents vol;
+    vol.target = { AutomationTargetKind::channelVolume, 0 };
+    vol.events.push_back ({ 0, 0.5f });
+    p.events.push_back (vol);
+    const std::vector<PatternEvent> tempos = { { 0, valueFromTempo (120.0) }, { 2 * ppq, valueFromTempo (140.0) },
+                                               { 2 * ppq, valueFromTempo (141.0) }, { 6 * ppq, valueFromTempo (90.0) } };
+    midiimport::setTempoEvents (p, tempos, ppq);
+    CHECK (p.events.size() == 2);
+    const auto* lane = tempomap::tempoLane (p);
+    CHECK (lane != nullptr);
+    if (lane != nullptr)
+    {
+        CHECK (lane->events.size() == 3);                         // one per tick: the last one of a tick wins
+        if (lane->events.size() == 3)
+        {
+            CHECK (lane->events[0].tick == 0 && issues178a::near (tempoFromValue (lane->events[0].value), 120.0));
+            CHECK (lane->events[1].tick == ppq && issues178a::near (tempoFromValue (lane->events[1].value), 141.0));
+            CHECK (lane->events[2].tick == 5 * ppq);
+        }
+    }
+    midiimport::setTempoEvents (p, {}, 0);
+    CHECK (tempomap::tempoLane (p) == nullptr && p.events.size() == 1);
+}
+
+// #86: FL's event score (.fsc of format 0x18): the Event editor's Save score as / Open score.
+TEST (issues178a_event_score_round_trip)
+{
+    using namespace lynx;
+    const std::vector<PatternEvent> events = { { 0, valueFromTempo (140.0) }, { ppq / 2, 0.25f }, { 7 * ppq, 1.0f } };
+    const auto bytes = prtools::writeEventScore (events);
+    CHECK (bytes.size() > 22 && bytes[0] == 'F' && bytes[8] == 0x18);
+    const auto back = prtools::parseEventScore (bytes);
+    CHECK (back.has_value());
+    if (back)
+        CHECK (*back == events);
+
+    // a note score is not an event score
+    std::vector<Note> notes (1);
+    notes[0].key = 60;
+    notes[0].length = ppq;
+    CHECK (! prtools::parseEventScore (prtools::writeScore (notes)).has_value());
+    CHECK (! prtools::parseEventScore (std::vector<std::uint8_t> { 1, 2, 3 }).has_value());
+}
