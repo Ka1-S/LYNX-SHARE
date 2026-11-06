@@ -640,6 +640,21 @@ protected:
                     knobLabels (g, c, knobR, hover, active, hot, ac);
                     break;
                 }
+                if (hoverValues) // round tp172b5: the caption only; the value under it while hovered or dragged
+                {
+                    g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
+                    g.setFont (font (c.size == 2 ? type::small : type::caption, true));
+                    g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, knobR.getBottom() + 3.0f, c.r.getWidth() + 28.0f, 14.0f),
+                                juce::Justification::centred, false);
+                    if (c.showValue && (hover || active))
+                    {
+                        g.setColour (active ? ac.brighter (0.3f) : skin::valueColour (true));
+                        g.setFont (font (c.size == 2 ? type::body : type::small, c.size == 2));
+                        g.drawText (text (c.param), juce::Rectangle<float> (c.r.getX() - 24.0f, knobR.getBottom() + 17.0f, c.r.getWidth() + 48.0f, 14.0f),
+                                    juce::Justification::centred, false);
+                    }
+                    break;
+                }
                 g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
                 g.setFont (font (c.size == 2 ? type::small : type::caption, true));
                 g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, knobR.getBottom() + 3.0f, c.r.getWidth() + 28.0f, 14.0f),
@@ -775,6 +790,9 @@ protected:
     // round tp172b4: the references print each knob's scale under it — the parameter's two ends, left and right — and
     // the caption under that; the value replaces the scale while the knob is hovered or dragged
     bool knobRanges = false;
+    // round tp172b5: the references that print captions only (the compressor, the limiter, the multiband): no scale,
+    // the value under the caption only while the knob is hovered or dragged
+    bool hoverValues = false;
     void rangeRow (juce::Graphics& g, int param, juce::Rectangle<float> row, bool showValue, bool big, juce::Colour ac, bool active)
     {
         using namespace theme;
@@ -848,13 +866,21 @@ protected:
         const auto barBottom = c.r.getY() + 4.0f + sag + t;
         const auto row = juce::Rectangle<float> (cx - bw * 0.5f, barBottom + 1.0f, bw, 12.0f);
         if (knobRanges)
+        {
             rangeRow (g, c.param, row, c.showValue && (hover || active), false, ac, active);
-        else if (hover || active)
-            rangeRow (g, c.param, row, true, false, ac, active);
+            g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
+            g.setFont (font (type::caption, true));
+            g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, row.getBottom() + 1.0f, c.r.getWidth() + 28.0f, 14.0f),
+                        juce::Justification::centred, false);
+            return;
+        }
+        // round tp172b5: the caption right under the bar (the reference's), the value under it while hovered or dragged
         g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
         g.setFont (font (type::caption, true));
-        g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, row.getBottom() + 1.0f, c.r.getWidth() + 28.0f, 14.0f),
+        g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, row.getY(), c.r.getWidth() + 28.0f, 14.0f),
                     juce::Justification::centred, false);
+        if (c.showValue && (hover || active))
+            rangeRow (g, c.param, row.translated (0.0f, 14.0f), true, false, ac, active);
     }
 
     // a floating panel (the knob panels over the display)

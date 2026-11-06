@@ -83,7 +83,7 @@ void scaleLabels (juce::Graphics& g, const LevelScale& s, juce::Rectangle<float>
 class ApexEditor final : public ProEditor
 {
 public:
-    ApexEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::apexLimiter, d, 950, 600) { knobRanges = true; fillDemo(); }
+    ApexEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::apexLimiter, d, 950, 600) { hoverValues = true; fillDemo(); }
 
 private:
     enum { idPanel = 1, idGain, idCeiling, idTp, idAdvanced, idLoudness, idLoudReset };
@@ -1093,7 +1093,7 @@ private:
 class CrestEditor final : public ProEditor
 {
 public:
-    CrestEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::crestCompressor, d, 860, 560) { knobRanges = true; fillDemo(); }
+    CrestEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::crestCompressor, d, 860, 560) { hoverValues = true; fillDemo(); }
 
 private:
     enum { idThreshold = 1, idKnee, idSideChain, idInMeter, idScNode0 = 10 };
@@ -1684,7 +1684,7 @@ class PrismEditor final : public ProEditor
 public:
     PrismEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::prismMultiband, d, 920, 600)
     {
-        knobRanges = true; // round tp172b4: each knob's scale under it, the value on hover
+        hoverValues = true; // round tp172b5: captions only (as the reference's band panel), the value on hover
         specArea = plot();
         specMinHz = 20.0;
         specMaxHz = 20000.0;
