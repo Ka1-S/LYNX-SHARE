@@ -327,6 +327,10 @@ inline Colour ridgeCapTint (const char* param)
     if (n.startsWith ("Gate ")) return Colour (0xff2e3033);                       // dark grey
     if (n.startsWith ("Comp") || n == "Ratio" || n == "Make-up offset") return Colour (0xffb9bbbd); // light grey
     if (n == "Input" || n == "Mic gain") return Colour (0xff26272a);
+    // tp172c6: the DRIVE section — a red drive (the amp strips' drive cap), black level trims, a grey mix
+    if (n == "Drive amount") return Colour (0xffc8202a);
+    if (n == "Drive input" || n == "Drive trim") return Colour (0xff26272a);
+    if (n == "Drive mix") return Colour (0xffb9bbbd);
     return {};
 }
 

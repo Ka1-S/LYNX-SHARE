@@ -7355,6 +7355,14 @@ countries: br
 "Main|Tweak" = "Principal|Ajuste fino"
 "E type|G type" = "Tipo E|Tipo G"
 "Modern console" = "Console moderno"
+# round tp172c6: Ridge Strip's DRIVE section
+"Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "Saturar|Console E|Console G|Console A|Console N|Console Y|Válvula|Amp. guitarra|Amp. baixo"
+"Switches the drive section on: saturation at the end of the strip, before the output" = "Liga a seção de drive: saturação no fim do canal, antes da saída"
+"The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "O tipo de saturação: um clipper suave, cinco canais de console, um estágio valvulado ou um amplificador de guitarra / baixo"
+"How hard the model is driven; the consoles and the clipper keep the level, the amps get louder" = "Quanto o modelo é levado; os consoles e o clipper mantêm o nível, os amplificadores ficam mais altos"
+"Level into the drive: more distortion without changing the drive" = "Nível na entrada do drive: mais distorção sem mudar o drive"
+"Level after the drive" = "Nível depois do drive"
+"Blends the clean signal back in" = "Mistura de volta o sinal limpo"
 
 # round tp172b: LuxeVerb's Space engine
 "LuxeVerb|Space" = "LuxeVerb|Espaço"
