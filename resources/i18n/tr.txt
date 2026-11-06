@@ -52,6 +52,7 @@ countries: tr
 "Could not open" = "Açılamadı"
 "(imported from MIDI)" = "(MIDI'den içe aktarıldı)"
 "(imported from FL Studio)" = "(FL Studio'dan içe aktarıldı)"
+"(imported from .als)" = "(.als dosyasından içe aktarıldı)"
 "Could not save" = "Kaydedilemedi"
 "File" = "Dosya"
 "Edit" = "Düzen"

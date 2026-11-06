@@ -52,6 +52,7 @@ countries: kr
 "Could not open" = "열 수 없음"
 "(imported from MIDI)" = "(MIDI에서 가져옴)"
 "(imported from FL Studio)" = "(FL Studio에서 가져옴)"
+"(imported from .als)" = "(.als에서 가져옴)"
 "Could not save" = "저장할 수 없음"
 "File" = "파일"
 "Edit" = "편집"

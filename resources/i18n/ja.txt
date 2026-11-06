@@ -52,6 +52,7 @@ countries: jp
 "Could not open" = "開けませんでした"
 "(imported from MIDI)" = "(MIDIからインポート)"
 "(imported from FL Studio)" = "(FL Studioからインポート)"
+"(imported from .als)" = "(.als から読み込み)"
 "Could not save" = "保存できませんでした"
 "File" = "ファイル"
 "Edit" = "編集"

@@ -52,6 +52,7 @@ countries: nl be
 "Could not open" = "Kan niet openen"
 "(imported from MIDI)" = "(geïmporteerd uit MIDI)"
 "(imported from FL Studio)" = "(geïmporteerd uit FL Studio)"
+"(imported from .als)" = "(geïmporteerd uit .als)"
 "Could not save" = "Kan niet opslaan"
 "File" = "Bestand"
 "Edit" = "Bewerken"
