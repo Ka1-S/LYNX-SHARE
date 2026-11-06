@@ -2,6 +2,7 @@
 #include "platform/Paths.h"
 #include "ui/ColourPicker.h"
 #include "ui/FileChoosers.h"
+#include "ui/ImageReadback.h"
 #include "ui/MixerComponent.h"
 #include "ui/SlotWatch.h"
 #include "core/ValueMath.h"
@@ -130,16 +131,90 @@ ui::ValueSpec sendSpec (const juce::String& name)
 }
 } // namespace
 
+// The Mixer strips' picture (round 174e2): JUCE's buffered-to-image cache for the visible part of the strips (they are
+// as wide as all the inserts), plus the meter levels drawn over it and the meters' own repaints leaving it valid
+class MixerStrips::MeterCache final : public juce::CachedComponentImage
+{
+public:
+    explicit MeterCache (MixerStrips& o) : owner (o) {}
+
+    void paint (juce::Graphics& g) override
+    {
+        const auto scale = g.getInternalContext().getPhysicalPixelScaleFactor();
+        auto visible = owner.getLocalBounds();
+        if (auto* parent = owner.getParentComponent())
+            visible = visible.getIntersection (owner.getLocalArea (parent, parent->getLocalBounds()));
+        if (visible.isEmpty())
+            return;
+        const auto imageSize = (visible.withZeroOrigin().toFloat() * scale).getSmallestIntegerContainer();
+
+        if (visible != shown || image.isNull() || image.getBounds() != imageSize)
+        {
+            if (image.isNull() || image.getBounds() != imageSize)
+                image = juce::Image (juce::Image::RGB, juce::jmax (1, imageSize.getWidth()), juce::jmax (1, imageSize.getHeight()), false);
+            shown = visible;
+            valid.clear();
+        }
+
+        if (! valid.containsRectangle (visible))
+        {
+            const ui::ScopedNoImageReadback noReadback; // (the picture is only ever drawn to the window)
+            juce::Graphics imageGraphics (image);
+            auto& context = imageGraphics.getInternalContext();
+            context.addTransform (juce::AffineTransform::translation ((float) -visible.getX(), (float) -visible.getY()).scaled (scale));
+            for (const auto& r : valid)
+                context.excludeClipRectangle (r);
+            context.clipToRectangle (visible);
+            owner.cachePainting = true;
+            owner.paintEntireComponent (imageGraphics, true);
+            owner.cachePainting = false;
+        }
+        valid = visible;
+
+        g.setColour (juce::Colours::black);
+        g.drawImageTransformed (image,
+                                juce::AffineTransform::scale ((float) visible.getWidth() / (float) imageSize.getWidth(),
+                                                              (float) visible.getHeight() / (float) imageSize.getHeight())
+                                    .translated ((float) visible.getX(), (float) visible.getY()),
+                                false);
+        owner.paintMeterLevels (g);
+    }
+
+    bool invalidateAll() override // (JUCE's repaint() of the whole component comes here, not to invalidate())
+    {
+        if (! owner.meterRepaintOnly)
+            valid.clear();
+        return true;
+    }
+    bool invalidate (const juce::Rectangle<int>& area) override
+    {
+        if (! owner.meterRepaintOnly)
+            valid.subtract (area);
+        return true;
+    }
+    void releaseResources() override { image = {}; }
+
+private:
+    MixerStrips& owner;
+    juce::Image image;
+    juce::Rectangle<int> shown; // the visible part the picture holds
+    juce::RectangleList<int> valid;
+};
+
 MixerStrips::MixerStrips (AudioEngine& e)
     : engine (e)
 {
+    if (const auto* v = std::getenv ("LYNX_MIXER_CACHE"); v == nullptr || juce::String (v) != "0")
+    {
+        setCachedComponentImage (new MeterCache (*this)); // (owned by the component)
+        meterCacheOn = true;
+    }
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
     engine.addChangeListener (this);
     engine.getLevelsBroadcaster().addChangeListener (this);
     updateSize();
-    // 60 Hz: faders that follow their automation move every frame (round 171c); the meters keep their 30 Hz ballistics
-    startTimerHz (60);
+    // (the meters and the automated faders move at the display's refresh: `frames`, round 174e)
 }
 
 MixerStrips::~MixerStrips()
@@ -786,21 +861,11 @@ void MixerStrips::paint (juce::Graphics& g)
         }
 
         // FL's narrow strips show the level beside the name too: two thin bars (Wide layouts)
-        if (sp.verticalName && ! sp.nameLow && ! compactLayout && t > 0)
+        if (const auto bars = nameBars (t); ! bars.isEmpty())
         {
-            const auto box = nameArea (t);
-            const auto bars = juce::Rectangle<int> (box.getRight() + 2, box.getY() + 6, plateWidth - box.getWidth() - 6, box.getHeight() - 12);
             theme::fillRoundRect (g, bars.toFloat(), 2.0f, colour::bg0.withAlpha (0.8f));
-            for (int ch = 0; ch < 2; ++ch)
-            {
-                const auto index = (std::size_t) t * 2 + (std::size_t) ch;
-                const auto level = index < levels.size() ? levels[index].level : 0.0f;
-                const auto bw = (bars.getWidth() - 3) / 2;
-                const auto bar = juce::Rectangle<int> (bars.getX() + 1 + ch * (bw + 1), bars.getY() + 1, bw, bars.getHeight() - 2);
-                const auto h = (int) (meterPosition (level) * (float) bar.getHeight());
-                g.setColour (level >= 1.0f ? colour::meterClip : level >= 0.5f ? colour::meterMid : colour::meterLow);
-                g.fillRect (bar.withTop (bar.getBottom() - h));
-            }
+            if (! cachePainting) // (cached: drawn over the picture, paintMeterLevels)
+                paintNameBars (g, t);
         }
         }
 
@@ -860,31 +925,8 @@ void MixerStrips::paint (juce::Graphics& g)
             {
                 const auto bar = juce::Rectangle<int> (meters.getX() + ch * (sp.meterWidth + 2), meters.getY(), sp.meterWidth, meters.getHeight());
                 theme::fillRoundRect (g, bar.toFloat(), 1.5f, colour::bg0);
-
-                const auto index = (std::size_t) t * 2 + (std::size_t) ch;
-                const auto meter = index < levels.size() ? levels[index] : meters::PeakHold {};
-                const auto h = (int) (meterPosition (meter.level) * (float) bar.getHeight());
-                const auto lit = bar.withTop (bar.getBottom() - h);
-                juce::ColourGradient gradient (colour::meterClip, (float) bar.getX(), (float) bar.getY(), colour::meterLow, (float) bar.getX(),
-                                               (float) bar.getBottom(), false);
-                gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (0.0f)), colour::meterClip); // above 0 dB: clip zone
-                gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-6.0f)), colour::meterMid);
-                gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-18.0f)), colour::meterLow);
-                g.setGradientFill (gradient);
-                g.fillRect (lit);
-
-                if (meter.peak > 0.001f) // peak hold line
-                {
-                    const auto peakY = bar.getBottom() - (int) (meterPosition (meter.peak) * (float) bar.getHeight());
-                    g.setColour (meter.peak >= 1.0f ? colour::meterClip : meter.peak >= 0.5f ? colour::meterMid : colour::textPrimary.withAlpha (0.85f));
-                    g.fillRect (bar.getX(), juce::jmax (bar.getY(), peakY - 1), bar.getWidth(), 2);
-                }
-
-                if (meter.clipped) // clip latch: stays until the meter is clicked
-                {
-                    g.setColour (colour::meterClip);
-                    g.fillRect (bar.withHeight (4));
-                }
+                if (! cachePainting) // (cached: the levels are drawn over the picture, paintMeterLevels)
+                    paintMeterLevel (g, t, ch, bar);
             }
 
             if (hovered (Part::meter))
@@ -2560,20 +2602,24 @@ float MixerStrips::shownVolume (int t) const
 
 void MixerStrips::repaintAutomatedStrips()
 {
-    // faders, pan and send knobs follow their automation while the song plays (issue #12): only the strips with an
-    // automated control repaint, and only when a shown value changed
+    // faders, pan and send knobs follow their automation while the song plays (issue #12): only the automated controls
+    // repaint, and only when the value they show changed (round 174e: just the fader column or the knob, not the strip)
     const auto& shown = engine.getAutomationDisplay();
     if (shown.getGeneration() == shownAutomation)
         return;
     shownAutomation = shown.getGeneration();
 
     std::vector<int> strips;
+    sendAutomatedStrips.clear();
     for (const auto& t : shown.automatedTargets())
     {
         if (t.kind == AutomationTargetKind::mixerVolume || t.kind == AutomationTargetKind::mixerPan)
             strips.push_back (t.index);
         else if (t.kind == AutomationTargetKind::mixerSend && t.index == selected)
+        {
             strips.push_back (t.slot); // (the route knob sits under the destination)
+            sendAutomatedStrips.push_back (t.slot);
+        }
     }
     std::vector<int> all = strips;
     all.insert (all.end(), automatedStrips.begin(), automatedStrips.end());
@@ -2582,54 +2628,200 @@ void MixerStrips::repaintAutomatedStrips()
         return;
     std::sort (all.begin(), all.end());
     all.erase (std::unique (all.begin(), all.end()), all.end());
-    const auto count = (int) engine.getSong().mixer.size();
+    const auto& mixer = engine.getSong().mixer;
+    const auto count = (int) mixer.size();
+    automatedShown.resize (mixer.size(), { -1.0f, -1.0f });
     for (const auto t : all)
-        if (t >= 0 && t < count)
-            repaint (stripX (t), 0, stripWidthOf (t), getHeight());
+    {
+        if (t < 0 || t >= count)
+            continue;
+        const std::array<float, 2> now { shownVolume (t),
+                                         shown.shown (AutomationTarget { AutomationTargetKind::mixerPan, t }, (mixer[(std::size_t) t].pan + 1.0f) * 0.5f) };
+        auto& was = automatedShown[(std::size_t) t];
+        if (now[0] != was[0])
+        {
+            // round 174e2: the cap's rail when the cap moved by an eighth of a pixel, the dB readout when its text changed
+            // (not the strip's whole column: the meters beside it stay in the cached picture)
+            const auto rail = faderRail (t);
+            const auto pixels = [&rail] (float v) { return juce::roundToInt (v * (float) rail.getHeight() * 8.0f); };
+            if (was[0] < 0.0f || pixels (now[0]) != pixels (was[0]))
+                repaint (rail.getX() - 3, rail.getY() - 9, rail.getWidth() + 6, rail.getHeight() + 18);
+            if (spec().dbReadout && (was[0] < 0.0f || faderToDb (now[0]) != faderToDb (was[0])))
+                repaint (stripX (t), faderArea (t).getBottom() + 3, stripWidthOf (t) - spec().gap, 14);
+        }
+        if (now[1] != was[1])
+            repaint (panArea (t).expanded (2));
+        if (std::find (sendAutomatedStrips.begin(), sendAutomatedStrips.end(), t) != sendAutomatedStrips.end())
+            repaint (routeArea (t).expanded (2)); // (a send knob: small; round 174e2: only when a send is automated)
+        was = now;
+    }
 }
 
-void MixerStrips::timerCallback()
+// The two thin level bars beside a vertical name (Wide layouts); empty when the layout has none
+juce::Rectangle<int> MixerStrips::nameBars (int t) const
+{
+    const auto& sp = spec();
+    if (! sp.verticalName || sp.nameLow || mixerlayout::isCompact (layout) || t <= 0)
+        return {};
+    const auto box = nameArea (t);
+    const auto plateWidth = stripWidthOf (t) - sp.gap;
+    return { box.getRight() + 2, box.getY() + 6, plateWidth - box.getWidth() - 6, box.getHeight() - 12 };
+}
+
+void MixerStrips::paintNameBars (juce::Graphics& g, int t) const
+{
+    using namespace theme;
+    const auto bars = nameBars (t);
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        const auto index = (std::size_t) t * 2 + (std::size_t) ch;
+        const auto level = index < levels.size() ? levels[index].level : 0.0f;
+        const auto bw = (bars.getWidth() - 3) / 2;
+        const auto bar = juce::Rectangle<int> (bars.getX() + 1 + ch * (bw + 1), bars.getY() + 1, bw, bars.getHeight() - 2);
+        const auto h = (int) (meterPosition (level) * (float) bar.getHeight());
+        if (h <= 0)
+            continue;
+        g.setColour (level >= 1.0f ? colour::meterClip : level >= 0.5f ? colour::meterMid : colour::meterLow);
+        g.fillRect (bar.withTop (bar.getBottom() - h));
+    }
+}
+
+// One meter's level, peak hold line and clip latch, inside its well (painted with the strip, or over the cached picture)
+void MixerStrips::paintMeterLevel (juce::Graphics& g, int t, int ch, juce::Rectangle<int> bar) const
+{
+    using namespace theme;
+    const auto index = (std::size_t) t * 2 + (std::size_t) ch;
+    const auto meter = index < levels.size() ? levels[index] : meters::PeakHold {};
+    const auto h = (int) (meterPosition (meter.level) * (float) bar.getHeight());
+    if (h > 0)
+    {
+        const auto lit = bar.withTop (bar.getBottom() - h);
+        // (vertical: every meter of the same height shares one gradient, so JUCE's Direct2D brush cache hits)
+        juce::ColourGradient gradient (colour::meterClip, 0.0f, (float) bar.getY(), colour::meterLow, 0.0f, (float) bar.getBottom(), false);
+        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (0.0f)), colour::meterClip); // above 0 dB: clip zone
+        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-6.0f)), colour::meterMid);
+        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-18.0f)), colour::meterLow);
+        g.setGradientFill (gradient);
+        g.fillRect (lit);
+    }
+
+    if (meter.peak > 0.001f) // peak hold line
+    {
+        const auto peakY = bar.getBottom() - (int) (meterPosition (meter.peak) * (float) bar.getHeight());
+        g.setColour (meter.peak >= 1.0f ? colour::meterClip : meter.peak >= 0.5f ? colour::meterMid : colour::textPrimary.withAlpha (0.85f));
+        g.fillRect (bar.getX(), juce::jmax (bar.getY(), peakY - 1), bar.getWidth(), 2);
+    }
+
+    if (meter.clipped) // clip latch: stays until the meter is clicked
+    {
+        g.setColour (colour::meterClip);
+        g.fillRect (bar.withHeight (4));
+    }
+}
+
+// The levels over the cached picture: every meter the clip reaches, except where a pinned dock block covers a scrolled
+// strip (paint() draws the pinned blocks over the middle one)
+void MixerStrips::paintMeterLevels (juce::Graphics& g) const
+{
+    const auto clip = g.getClipBounds();
+    const auto& sp = spec();
+    std::vector<juce::Rectangle<int>> pinned;
+    for (auto dock : { MixerDock::left, MixerDock::right })
+        if (const auto shift = pinOffset (dock); shift != 0)
+        {
+            const auto d = (int) dock;
+            pinned.emplace_back (blockStart[d] + shift, 0, blockEnd[d] - blockStart[d], getHeight());
+        }
+    const auto tracks = (int) engine.getSong().mixer.size();
+    for (int t = 0; t < tracks; ++t)
+    {
+        if (isHidden (t))
+            continue;
+        const auto meters = meterArea (t);
+        const auto bars = nameBars (t);
+        const auto meterShown = meters.intersects (clip) && g.clipRegionIntersects (meters);
+        const auto barsShown = ! bars.isEmpty() && bars.intersects (clip) && g.clipRegionIntersects (bars);
+        if (! meterShown && ! barsShown)
+            continue;
+        const juce::Graphics::ScopedSaveState state (g);
+        if (dockOf (t) == MixerDock::middle)
+            for (const auto& r : pinned)
+                g.excludeClipRegion (r);
+        if (meterShown)
+            for (int ch = 0; ch < 2; ++ch)
+                paintMeterLevel (g, t, ch, juce::Rectangle<int> (meters.getX() + ch * (sp.meterWidth + 2), meters.getY(), sp.meterWidth, meters.getHeight()));
+        if (barsShown)
+            paintNameBars (g, t);
+    }
+}
+
+bool MixerStrips::liveFrame (double nowMs)
 {
     auto& meters = engine.getMeters();
     const auto showing = isShowing();
     repaintAutomatedStrips();
-    if ((++timerTicks & 1) != 0) // (the meters and input bars: every other tick, 30 Hz)
-        return;
+    const auto elapsed = lastFrameMs > 0.0 ? juce::jlimit (0.0, 250.0, nowMs - lastFrameMs) : 1000.0 / 30.0;
+    lastFrameMs = nowMs;
     const auto& mixer = engine.getSong().mixer;
     inputLevels.resize (mixer.size(), 0.0f);
+    auto moving = engine.getTransport().playing.load (std::memory_order_relaxed);
 
+    const auto inputFall = ui::fallFor (0.8f, elapsed);
     for (std::size_t t = 1; t < mixer.size(); ++t)
     {
         const auto peak = mixer[t].inputChannel >= 0 ? juce::jmax (engine.takeInputPeak ((int) t, 0), engine.takeInputPeak ((int) t, 1)) : 0.0f;
-        auto level = juce::jmax (peak, inputLevels[t] * 0.8f);
+        auto level = juce::jmax (peak, inputLevels[t] * inputFall);
         level = level < 1e-4f ? 0.0f : level;
         if (std::abs (level - inputLevels[t]) > 1e-4f)
         {
+            moving = true;
             inputLevels[t] = level;
             if (showing)
                 repaint (inputArea ((int) t).expanded (1));
         }
     }
 
+    // every meter row that changed by a pixel goes into one rectangle, repainted once per frame (round 174e2: the A/B
+    // against one repaint per meter favoured the single rectangle, within the noise of the machine)
+    juce::Rectangle<int> dirty;
     for (std::size_t i = 0; i < levels.size(); ++i)
     {
         auto& m = levels[i];
         const auto before = m;
-        m.tick (meters.takePeak ((int) (i / 2), (int) (i % 2))); // ~20 dB/s falloff at 30 Hz, 1.5 s peak hold
+        m.advance (meters.takePeak ((int) (i / 2), (int) (i % 2)), elapsed); // ~20 dB/s falloff, 1.5 s peak hold
+        if (m.level != before.level || m.peak != before.peak)
+            moving = true;
+        if (! showing)
+            continue;
 
-        // only the meter that changed is repainted (and, in the Wide layouts, the two thin bars beside the name, which
-        // follow the same level: round 173f, they only moved when something else repainted the strip)
-        if (showing && (std::abs (m.level - before.level) > 1e-4f || std::abs (m.peak - before.peak) > 1e-4f || m.clipped != before.clipped))
+        // only the rows of the meter that changed by a pixel are repainted (round 174e: at the display's rate), and in
+        // the Wide layouts the two thin bars beside the name, which follow the same level (round 173f)
+        const auto t = (int) (i / 2);
+        const auto ch = (int) (i % 2);
+        const auto area = meterArea (t);
+        const auto& sp = spec();
+        const auto rows = meters::dirtyRows (before, m, area.getHeight(), [] (float v) { return meterPosition (v); });
+        if (! rows.empty())
         {
-            const auto t = (int) (i / 2);
-            repaint (meterArea (t).expanded (1));
-            if (const auto& sp = spec(); sp.verticalName && ! sp.nameLow && ! mixerlayout::isCompact (layout) && t > 0 && std::abs (m.level - before.level) > 1e-4f)
+            const juce::Rectangle<int> bar (area.getX() + ch * (sp.meterWidth + 2) - 1, area.getY() + rows.top - 1, sp.meterWidth + 2,
+                                            rows.bottom - rows.top + 2);
+            dirty = dirty.isEmpty() ? bar : dirty.getUnion (bar);
+            // the thin bars beside the name: only the bar that moved, and (cached) over the picture as well (round 174e2)
+            if (const auto bars = nameBars (t); ! bars.isEmpty()
+                && (int) (meterPosition (m.level) * 64.0f) != (int) (meterPosition (before.level) * 64.0f))
             {
-                const auto box = nameArea (t);
-                repaint (box.getRight(), box.getY() + 5, stripWidthOf (t) - spec().gap - box.getWidth(), box.getHeight() - 10);
+                const auto bw = (bars.getWidth() - 3) / 2;
+                dirty = dirty.getUnion ({ bars.getX() + 1 + ch * (bw + 1) - 1, bars.getY(), bw + 2, bars.getHeight() });
             }
         }
     }
+    if (! dirty.isEmpty())
+    {
+        meterRepaintOnly = meterCacheOn; // (the cached picture under the meters stays valid: they are drawn over it)
+        repaint (dirty);
+        meterRepaintOnly = false;
+    }
+    return moving;
 }
 
 // ---------------------------------------------------------------------------
@@ -2644,7 +2836,7 @@ const EffectKind allEffects[] = { EffectKind::eq,     EffectKind::parametricEq, 
                                       EffectKind::delay,  EffectKind::reverb,       EffectKind::chorus,     EffectKind::filter,
                                       EffectKind::distortion, EffectKind::utility, EffectKind::volumeGate,
                                       EffectKind::pitchShift, EffectKind::freqShift, EffectKind::lofi, EffectKind::effector, EffectKind::crossover, EffectKind::frequencySplitter, EffectKind::autoPan, EffectKind::vocoder, EffectKind::pitchCorrect,
-                                      EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::aether, EffectKind::ember, // LYNX's mixing suite
+                                      EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, // LYNX's mixing suite
                                       EffectKind::lynxTune, // LYNX's own pitch corrector
                                       EffectKind::epochVerb, EffectKind::atrium, EffectKind::foilPlate, EffectKind::nebula, EffectKind::halo, EffectKind::horizon, // LYNX's reverbs
                                       EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod, // LYNX's delay / modulation suite

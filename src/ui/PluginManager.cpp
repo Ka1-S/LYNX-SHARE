@@ -1,8 +1,10 @@
 #include "ui/PluginManager.h"
 
+#include "core/PluginCatalog.h"
 #include "core/Preferences.h"
 #include "engine/AudioEngine.h"
 #include "engine/PluginHost.h"
+#include "engine/PluginSandbox.h"
 #include "platform/Paths.h"
 #include "ui/FileChoosers.h"
 #include "ui/I18n.h"
@@ -23,7 +25,8 @@ enum Column
     typeColumn,
     formatColumn,
     statusColumn,
-    fileColumn
+    fileColumn,
+    bitsColumn // (FL's Bits column, round 176a; Windows x64 only)
 };
 
 juce::String statusText (prefs::PluginStatus s)
@@ -99,6 +102,8 @@ public:
         header.addColumn (tr ("Vendor"), vendorColumn, 140, 60, 300, flags);
         header.addColumn (tr ("Type"), typeColumn, 90, 60, 160, flags);
         header.addColumn (tr ("Format"), formatColumn, 64, 50, 100, flags);
+        if (bridge32Supported())
+            header.addColumn (tr ("Bits"), bitsColumn, 52, 40, 80, flags & ~juce::TableHeaderComponent::sortable);
         header.addColumn (tr ("Status"), statusColumn, 110, 70, 200, flags);
         header.addColumn (tr ("File"), fileColumn, 300, 80, 2000, flags);
         header.setSortColumnId (nameColumn, true);
@@ -204,9 +209,23 @@ private:
 
         rows.clear();
         const auto& favourites = host.favourites();
-        for (const auto& t : host.getKnownPlugins().getTypes())
+        const auto types = host.getKnownPlugins().getTypes();
+        // FL's Bits column and "Combine 32 and 64 bit versions of a plugin" (round 176a): one row for both builds
+        std::vector<std::string> bits ((std::size_t) types.size());
+        if (bridge32Supported())
         {
+            std::vector<std::pair<std::string, bool>> builds;
+            for (const auto& t : types)
+                builds.emplace_back (PluginHost::bitnessKey (t), isPlugin32Bit (t));
+            bits = plugincatalog::combinedBits (builds);
+        }
+        for (int i = 0; i < types.size(); ++i)
+        {
+            const auto& t = types.getReference (i);
+            if (bridge32Supported() && bits[(std::size_t) i].empty())
+                continue;
             prefs::PluginRow r;
+            r.bits = bits[(std::size_t) i];
             r.name = t.name.toStdString();
             r.vendor = t.manufacturerName.toStdString();
             r.format = t.pluginFormatName.toStdString();
@@ -297,6 +316,7 @@ private:
                       theme::colour::textSecondary);
                 break;
             case formatColumn: text (u8 (r->format), theme::colour::textSecondary); break;
+            case bitsColumn: text (u8 (r->bits), theme::colour::textSecondary); break;
             case statusColumn:
             {
                 const auto colour = ok ? theme::colour::ledOn : r->status == prefs::PluginStatus::failed ? theme::colour::accent : theme::colour::warning;

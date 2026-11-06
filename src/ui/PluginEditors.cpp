@@ -1,4 +1,5 @@
 #include "ui/SlotWatch.h"
+#include "ui/FrameTicker.h"
 #include "ui/PatcherEditor.h"
 #include "ui/ControllerEditors.h"
 #include "ui/Controllers164.h"
@@ -125,7 +126,7 @@ public:
             addAndMakeVisible (*artLayer);
             artLayer->setArt (skin::artForEffect (kind), [this] { return editorStyle() == skin::Style::themed; });
         }
-        if (kind == EffectKind::ember) // round 165: the Classic voicing's VU shows the output level, as the reference's
+        if (kind == EffectKind::ember || kind == EffectKind::kilnChannel) // round 165: the Classic voicing's VU shows the output level, as the reference's
             vuMode = 2;
         anim.onFrame = [this] { repaint(); };
         page = initialPage;
@@ -293,6 +294,8 @@ public:
     skin::Art artNow() const
     {
         const auto art = skin::artForEffect (kind);
+        if (art == skin::Art::luxe) // round tp172b4: the Space page has the Pro-R role's own look
+            return page == 1 ? skin::Art::luxeSpace : art;
         if (art != skin::Art::ridge) return art;
         const auto* fx = current();
         if (fx == nullptr) return art;
@@ -336,7 +339,7 @@ public:
             r.removeFromBottom (13.0f * s);
         }
         else if (! hasStyle (item, plugui::noCaption))
-            r.removeFromBottom ((hasStyle (item, plugui::showValue) ? 26.0f : 14.0f) * s);
+            r.removeFromBottom ((hasStyle (item, plugui::showValue) || hasStyle (item, plugui::rangeEnds) ? 26.0f : 14.0f) * s);
         const auto d = juce::jmin (r.getWidth(), r.getHeight());
         return r.withSizeKeepingCentre (d, d).withY (r.getY());
     }
@@ -808,7 +811,8 @@ public:
                 if (hasStyle (item, plugui::boxed)) // a read-out plate (FL's value boxes)
                     skin::valuePlate (g, r, radius::sm * s);
                 g.setColour (hot ? accent : (fx.enabled ? (skin::captionScale() > 1.0f ? skin::valueColour (false) : colour::textPrimary) : colour::textDisabled));
-                g.setFont (font (juce::jmax (8.0f, 11.0f * s * juce::jmin (1.25f, skin::captionScale())), skin::captionScale() > 1.0f));
+                g.setFont (hasStyle (item, plugui::big) ? font (juce::jmax (12.0f, 19.0f * s)) // round tp172b4: a big read-out (LuxeVerb's Space time)
+                                                       : font (juce::jmax (8.0f, 11.0f * s * juce::jmin (1.25f, skin::captionScale())), skin::captionScale() > 1.0f));
                 g.drawFittedText (valueText (param, value), r.toNearestInt(),
                                   hasStyle (item, plugui::alignLeft) ? juce::Justification::centredLeft : juce::Justification::centred, 1, 0.7f);
                 break;
@@ -840,6 +844,42 @@ public:
                     g.setColour (hot ? look.accent.brighter (0.3f) : skin::valueColour (false));
                     g.setFont (font (juce::jmax (8.0f, 10.5f * s * skin::captionScale()), skin::captionScale() > 1.0f));
                     g.drawFittedText (valueText (param, value), below.withHeight (13.0f * s * skin::captionScale()).expanded (10.0f * s, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
+                }
+                else if (hasStyle (item, plugui::rangeEnds)) // round tp172b4: the scale's ends, the value on hover, the caption
+                {
+                    const auto row = below.withHeight (12.0f * s);
+                    if (hot || index == dragItem)
+                    {
+                        g.setColour (hot ? look.accent.brighter (0.3f) : skin::valueColour (true));
+                        g.setFont (font (juce::jmax (8.0f, 10.0f * s), true));
+                        g.drawFittedText (valueText (param, value), row.expanded (12.0f * s, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
+                    }
+                    else
+                    {
+                        const auto shortText = [] (juce::String t) {
+            // round tp172b4: scale ends as the references print them — "1:1", "-60 dB", "5 s" (no zero decimals, no
+            // spaces round a ratio's colon)
+            t = t.replace (" : ", ":");
+            juce::String out;
+            for (int i = 0; i < t.length(); ++i)
+            {
+                if (t[i] == '.' && i > 0 && juce::CharacterFunctions::isDigit (t[i - 1]))
+                {
+                    int j = i + 1;
+                    while (j < t.length() && t[j] == '0') ++j;
+                    if (j > i + 1 && (j >= t.length() || ! juce::CharacterFunctions::isDigit (t[j]))) { i = j - 1; continue; }
+                }
+                out << juce::String::charToString (t[i]);
+            }
+            return out;
+        };
+                        const auto ends = circle.withY (row.getY()).withHeight (row.getHeight()).expanded (12.0f * s, 0.0f);
+                        g.setColour (colour::textDisabled);
+                        g.setFont (font (juce::jmax (7.5f, 9.0f * s)));
+                        g.drawText (shortText (valueText (param, 0.0f)), ends, juce::Justification::centredLeft, false);
+                        g.drawText (shortText (valueText (param, 1.0f)), ends, juce::Justification::centredRight, false);
+                    }
+                    caption (g, item, below.withTrimmedTop (12.0f * s).withHeight (13.0f * s));
                 }
                 else if (! hasStyle (item, plugui::noCaption))
                 {
@@ -2135,12 +2175,102 @@ public:
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (r.toNearestInt())));
     }
 
+    // round tp172b4: the Space engine's decay-rate EQ, the reference reverb's main display: the decay rate (100 % =
+    // the SPACE time) from 20 Hz to 20 kHz on a log grid, shaped by the low and high decay multipliers past their
+    // frequencies; percent on the left, hertz along the bottom
+    void paintDecayEq (juce::Graphics& g, juce::Rectangle<float> r, const EffectSlot& fx)
+    {
+        using namespace theme;
+        namespace sp = luxeverb::sp;
+        const auto s = scale();
+        const auto at = [&] (int i) { return valueOf (luxeVerbSpaceFirst + i); };
+        const auto plot = r.withTrimmedLeft (44.0f * s).withTrimmedRight (14.0f * s).withTrimmedTop (22.0f * s).withTrimmedBottom (20.0f * s);
+        const auto lo = std::log (20.0), hi = std::log (20000.0);
+        const auto xOf = [&] (double hz) { return plot.getX() + plot.getWidth() * (float) ((std::log (hz) - lo) / (hi - lo)); };
+        constexpr float topOct = 1.5f, bottomOct = -3.4f; // log2 of the rate: 283 % … 9.5 %
+        const auto yOf = [&] (double rate) {
+            const auto o = (float) std::log2 (juce::jmax (1.0e-3, rate));
+            return plot.getY() + plot.getHeight() * juce::jlimit (0.0f, 1.0f, (topOct - o) / (topOct - bottomOct));
+        };
+        const auto blue = skin::artAccent2 (skin::art());
+        g.setFont (font (juce::jmax (8.0f, 10.5f * s)));
+        // the frequency grid (1-2-5 marks a decade, the labelled ones brighter)
+        for (double dec = 10.0; dec <= 10000.0; dec *= 10.0)
+            for (int m = 1; m <= 9; ++m)
+            {
+                const auto hz = dec * m;
+                if (hz < 20.0 || hz > 20000.0) continue;
+                const auto x = xOf (hz);
+                const auto major = m == 1 || m == 2 || m == 5;
+                g.setColour (juce::Colours::white.withAlpha (major ? 0.05f : 0.022f));
+                g.drawVerticalLine ((int) x, plot.getY(), plot.getBottom());
+                if (major)
+                {
+                    g.setColour (colour::textDisabled);
+                    g.drawText (hz >= 1000.0 ? juce::String ((int) (hz / 1000.0)) + "k" : juce::String ((int) hz),
+                                juce::Rectangle<float> (x - 20.0f * s, plot.getBottom() + 3.0f * s, 40.0f * s, 14.0f * s), juce::Justification::centred, false);
+                }
+            }
+        // the rate grid: an octave a line, labelled on the left
+        for (int o = 1; o >= -3; --o)
+        {
+            const auto y = yOf (std::pow (2.0, o));
+            g.setColour (juce::Colours::white.withAlpha (0.05f));
+            g.drawHorizontalLine ((int) y, plot.getX(), plot.getRight());
+            g.setColour (blue.withAlpha (0.85f));
+            g.drawText (juce::String ((int) std::lround (100.0 * std::pow (2.0, o))) + "%", juce::Rectangle<float> (r.getX() + 2.0f * s, y - 7.0f * s, 38.0f * s, 14.0f * s),
+                        juce::Justification::centredLeft, false);
+        }
+        g.setColour (blue);
+        g.setFont (font (juce::jmax (8.0f, 11.0f * s)));
+        g.drawText (tr ("Decay EQ"), juce::Rectangle<float> (r.getX() + 2.0f * s, r.getY() + 2.0f * s, 200.0f * s, 16.0f * s), juce::Justification::centredLeft, false);
+        // the curve: the rate, times a smooth shelf to the low multiplier under the low frequency and to the high one over
+        // the high frequency (half an octave of transition)
+        const auto rate = sp::rateOf (at (sp::rate));
+        const auto lowMult = sp::multOf (at (sp::lowMult)), highMult = sp::multOf (at (sp::highMult));
+        const auto lowHz = sp::lowHz (at (sp::lowFreq)), highHz = sp::highHz (at (sp::highFreq));
+        const auto shelf = [] (double hz, double corner, double mult, bool below) {
+            const auto o = std::log2 (hz / corner) * (below ? -1.0 : 1.0);
+            const auto w = 1.0 / (1.0 + std::exp (-o * 4.0));
+            return std::pow (mult, w);
+        };
+        juce::Path curve;
+        const auto steps = juce::jmax (64, (int) (plot.getWidth() / (3.0f * s)));
+        for (int i = 0; i <= steps; ++i)
+        {
+            const auto hz = std::exp (lo + (hi - lo) * (double) i / (double) steps);
+            const auto y = yOf (rate * shelf (hz, lowHz, lowMult, true) * shelf (hz, highHz, highMult, false));
+            const auto x = plot.getX() + plot.getWidth() * (float) i / (float) steps;
+            if (i == 0) curve.startNewSubPath (x, y);
+            else curve.lineTo (x, y);
+        }
+        auto fill = curve;
+        fill.lineTo (plot.getRight(), plot.getBottom());
+        fill.lineTo (plot.getX(), plot.getBottom());
+        fill.closeSubPath();
+        const auto line = fx.enabled ? blue : colour::textDisabled;
+        g.setGradientFill (juce::ColourGradient (line.withAlpha (0.10f), 0.0f, plot.getY(), line.withAlpha (0.0f), 0.0f, plot.getBottom(), false));
+        g.fillPath (fill);
+        g.setColour (line);
+        g.strokePath (curve, juce::PathStrokeType (juce::jmax (1.2f, 1.5f * s)));
+        // the two corner frequencies, as handles on the curve
+        for (const auto hz : { lowHz, highHz })
+        {
+            const auto x = xOf (hz);
+            const auto y = yOf (rate * shelf (hz, lowHz, lowMult, true) * shelf (hz, highHz, highMult, false));
+            g.setColour (line.withAlpha (0.25f));
+            g.fillEllipse (juce::Rectangle<float> (14.0f * s, 14.0f * s).withCentre ({ x, y }));
+            g.setColour (line);
+            g.drawEllipse (juce::Rectangle<float> (9.0f * s, 9.0f * s).withCentre ({ x, y }), 1.4f);
+        }
+    }
+
     void paintDisplay (juce::Graphics& g, const LayoutItem& item, juce::Rectangle<float> r, const EffectSlot& fx)
     {
         using namespace theme;
         const auto s = scale();
         const juce::String id (item.display != nullptr ? item.display : "");
-        if (id != "faderscale") // round 137: the fader scale is bare text beside its fader
+        if (id != "faderscale" && id != "decayeq") // round 137: the fader scale is bare text beside its fader (tp172b4: the decay EQ lies on the field)
             skin::well (g, r, radius::md * s, fx.enabled ? accent : juce::Colours::transparentBlack);
         const auto curveColour = fx.enabled ? accent : colour::textDisabled;
         const auto inner = r.reduced (6.0f * s);
@@ -2245,6 +2375,11 @@ public:
                 g.setColour (bandColours[b].withAlpha (fx.enabled ? 0.9f : 0.3f));
                 g.drawHorizontalLine ((int) band.getY(), band.getX(), band.getRight());
             }
+        }
+        else if (id == "decayeq") // round tp172b4: LuxeVerb's Space engine — the decay time across the spectrum
+        {
+            paintDecayEq (g, r, fx);
+            return;
         }
         else if (id == "envelope") // decay shape of a reverb / delay tail
         {
@@ -2726,8 +2861,9 @@ public:
             // the originals' level meters (SSL E-Channel's IN / OUT meter, RComp's input and output, Doubler's output)
             const auto fracOf = [] (float linear) { return juce::jlimit (0.0f, 1.0f, (20.0f * std::log10 (juce::jmax (1e-6f, linear)) + 48.0f) / 48.0f); };
             const auto base = item.steps > 0 ? item.steps : 2; // round 135w: the engine's meter outputs (LYNX Tune: 3 / 4)
-            ioMeters[0].update (fracOf (liveMeter (base)), 0.02f);
-            ioMeters[1].update (fracOf (liveMeter (base + 1)), 0.02f);
+            const auto only = item.colour; // round tp172c7: 0 / 1 = the input or the output bar alone (Kiln's side columns)
+            if (only != 1) ioMeters[0].update (fracOf (liveMeter (base)), 0.02f);
+            if (only != 0) ioMeters[1].update (fracOf (liveMeter (base + 1)), 0.02f);
             ioClip = ioClip || liveMeter (base + 1) >= 0.999f; // round 135w: the clip lamp (Doubler's), click to reset
             const auto labelH = 13.0f * s, readH = 13.0f * s;
             auto area = r.reduced (2.0f * s);
@@ -2743,13 +2879,13 @@ public:
                 g.setColour (colour::textSecondary);
                 g.drawText (juce::String (db), juce::Rectangle<float> (area.getX(), y - 6.0f * s, scaleW - 2.0f * s, 12.0f * s), juce::Justification::centredRight, false);
             }
-            const auto w = bars.getWidth() / 2.0f;
+            const auto w = bars.getWidth() / (only == 0 || only == 1 ? 1.0f : 2.0f);
             const char* names[] = { TR_NOOP ("In"), TR_NOOP ("Out") };
             if (kind == EffectKind::hardwareInsert) // round 164d: what goes to the gear and what comes back
                 names[0] = TR_NOOP ("Send"), names[1] = TR_NOOP ("Return");
-            for (int k = 0; k < 2; ++k)
+            for (int k = (only == 1 ? 1 : 0); k < (only == 0 ? 1 : 2); ++k)
             {
-                const auto bar = juce::Rectangle<float> (bars.getX() + w * (float) k, bars.getY(), w, bars.getHeight()).reduced (3.0f * s, 0.0f);
+                const auto bar = juce::Rectangle<float> (bars.getX() + w * (float) (only == 1 ? 0 : k), bars.getY(), w, bars.getHeight()).reduced (3.0f * s, 0.0f);
                 skin::meter (g, bar, ioMeters[(std::size_t) k].level, ioMeters[(std::size_t) k].peak, true);
                 const auto column = juce::Rectangle<float> (bar.getX() - 4.0f * s, 0.0f, bar.getWidth() + 8.0f * s, 0.0f);
                 g.setColour (colour::textSecondary);
@@ -2874,6 +3010,12 @@ public:
             const auto face = r.reduced (2.0f * s);
             g.setColour (juce::Colour (0xffd9cfb4).withAlpha (fx.enabled ? 1.0f : 0.5f));
             g.fillRoundedRectangle (face, radius::lg * s);
+            if (kind == EffectKind::kilnChannel) // round tp172c7: the console's lamp-lit amber face, warmer in the middle
+            {
+                g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff6c66a).withAlpha (fx.enabled ? 1.0f : 0.5f), face.getCentreX(), face.getCentreY(),
+                                                         juce::Colour (0xffb8822e).withAlpha (fx.enabled ? 1.0f : 0.5f), face.getX(), face.getY(), true));
+                g.fillRoundedRectangle (face, radius::lg * s);
+            }
             g.setColour (colour::bg0);
             g.drawRoundedRectangle (face, radius::lg * s, 2.0f * s);
             const juce::Point<float> pivot { face.getCentreX(), face.getBottom() + face.getHeight() * 0.18f };
@@ -4934,29 +5076,11 @@ private:
         if (! isShowing()) return; // a hidden editor costs nothing
         if (! node.locate && shownSlot.changed (engine.getAutomationDisplay(), track, slot)) // the controls follow their automation
             repaint();
-        if (levelMeter && ! node.locate) // round 170c: the level meter wells (input / output peaks, held 1 s, falling 24 dB/s)
-            if (auto* times = engine.getProcessTimes(); times != nullptr && levelKey() < times->levelWanted.size())
-            {
-                bool moved = false;
-                for (int k = 0; k < 2; ++k)
-                {
-                    const auto peak = times->slotLevels[levelKey() * 2 + (std::size_t) k].exchange (0.0f, std::memory_order_relaxed);
-                    const auto db = juce::jlimit (-60.0f, 6.0f, juce::Decibels::gainToDecibels (peak, -100.0f));
-                    auto& shown = levelDb[(std::size_t) k];
-                    auto& hold = levelHoldDb[(std::size_t) k];
-                    const auto before = shown;
-                    shown = db >= shown ? db : juce::jmax (db, shown - 0.8f);
-                    if (db >= hold) { hold = db; levelHoldFrames[(std::size_t) k] = 30; }
-                    else if (--levelHoldFrames[(std::size_t) k] < 0) hold = juce::jmax (shown, hold - 0.8f);
-                    moved = moved || std::abs (shown - before) > 0.01f || levelHoldFrames[(std::size_t) k] >= 0;
-                }
-                levelTrail[(std::size_t) levelTrailAt] = { levelDb[0], levelDb[1] }; // the dynamics curves' live trail
-                levelTrailAt = (levelTrailAt + 1) % (int) levelTrail.size();
-                if (moved)
-                    for (const auto& item : activeLayout().items)
-                        if (item.type == Item::display && item.display != nullptr && levelDisplay (item.display) && visible (item))
-                            repaint (rectOf (item).getSmallestIntegerContainer().expanded (2));
-            }
+        if (levelMeter && ! node.locate) // the dynamics curves' live trail (the wells themselves: levelFrame)
+        {
+            levelTrail[(std::size_t) levelTrailAt] = { levelDb[0], levelDb[1] };
+            levelTrailAt = (levelTrailAt + 1) % (int) levelTrail.size();
+        }
         if (kind == EffectKind::parametricEq && ! node.locate) // round 166f: the spectrum / heatmap of the EQ's output
             for (const auto& item : activeLayout().items)
                 if (item.type == Item::display && item.display != nullptr && std::strcmp (item.display, "eq") == 0)
@@ -5048,9 +5172,46 @@ private:
     // round 170c: the "meter" wells' live levels (dBFS: input, output), their holds and the slot's key
     bool levelMeter = false;
     std::array<float, 2> levelDb { -60.0f, -60.0f }, levelHoldDb { -60.0f, -60.0f };
-    std::array<int, 2> levelHoldFrames { 0, 0 };
+    std::array<double, 2> levelHoldMs { 0.0, 0.0 };
     std::array<std::pair<float, float>, 45> levelTrail {};
     int levelTrailAt = 0;
+    double levelFrameMs = 0.0;
+    // round 170c: the level meter wells (input / output peaks, held 1 s, falling 24 dB/s); round 174e: at the display's
+    // refresh (they were on the 30 Hz timer), only the wells
+    bool levelFrame (double nowMs)
+    {
+        if (! levelMeter || node.locate)
+            return false;
+        auto* times = engine.getProcessTimes();
+        if (times == nullptr || levelKey() >= times->levelWanted.size())
+            return false;
+        const auto elapsed = levelFrameMs > 0.0 ? juce::jlimit (0.0, 250.0, nowMs - levelFrameMs) : 1000.0 / 30.0;
+        levelFrameMs = nowMs;
+        const auto fall = (float) (24.0 * elapsed / 1000.0);
+        bool moved = false;
+        for (int k = 0; k < 2; ++k)
+        {
+            const auto peak = times->slotLevels[levelKey() * 2 + (std::size_t) k].exchange (0.0f, std::memory_order_relaxed);
+            const auto db = juce::jlimit (-60.0f, 6.0f, juce::Decibels::gainToDecibels (peak, -100.0f));
+            auto& shown = levelDb[(std::size_t) k];
+            auto& hold = levelHoldDb[(std::size_t) k];
+            const auto before = shown, holdBefore = hold;
+            shown = db >= shown ? db : juce::jmax (db, shown - fall);
+            if (db >= hold)
+            {
+                hold = db;
+                levelHoldMs[(std::size_t) k] = 1000.0;
+            }
+            else if ((levelHoldMs[(std::size_t) k] -= elapsed) < 0.0)
+                hold = juce::jmax (shown, hold - fall);
+            moved = moved || std::abs (shown - before) > 0.01f || std::abs (hold - holdBefore) > 0.01f;
+        }
+        if (moved)
+            for (const auto& item : activeLayout().items)
+                if (item.type == Item::display && item.display != nullptr && levelDisplay (item.display) && visible (item))
+                    repaint (rectOf (item).getSmallestIntegerContainer().expanded (2));
+        return moved;
+    }
     static bool levelDisplay (const char* id)
     {
         return std::strcmp (id, "meter") == 0 || std::strcmp (id, "limiter") == 0 || std::strcmp (id, "compressor") == 0 || std::strcmp (id, "dynamics") == 0;
@@ -5058,6 +5219,7 @@ private:
     std::size_t levelKey() const { return (std::size_t) juce::jmax (0, track) * (std::size_t) maxEffectSlots + (std::size_t) juce::jmax (0, slot); }
     mutable ShownEffectSlot shownSlot;    // the slot with its automation's values (current())
     ui::ValueDrag drag;
+    ui::FrameTicker levelFrames { *this, [this] (double ms) { return levelFrame (ms); } };
     juce::String presetName;
     pluginheader::PresetBar bar { engine, track, slot }; // undo / redo, A / B, presets (round 129)
     peqview::Analyser eqAnalyser; // round 166f: Parametric EQ 2's spectrum and heatmap

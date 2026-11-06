@@ -241,3 +241,55 @@ TEST (report159_github_url)
             CHECK (i + 2 < cut.size() && std::isxdigit ((unsigned char) cut[i + 1]) && std::isxdigit ((unsigned char) cut[i + 2]));
     CHECK (githubIssueUrl (f, 2000).size() <= 2000);
 }
+
+// Issue #32 (round 174a): a 0.1.23 "freeze" report whose UI stack was inside Windows' heap-corruption report (free()
+// found a damaged block while a Song snapshot was disposed) — the process was dying: it is reported as a crash
+TEST (report174a_fatal_hang_is_crash)
+{
+    using lynx::crashreport::hangIsFatalReport;
+    const std::string dying = "LYNX UI thread not responding for 14862 ms (sample 1)\n"
+                              "0: ntdll.dll+0x1628a4  (ZwWaitForMultipleObjects + 0x14)\n"
+                              "1: ntdll.dll+0x80d66  (LdrShutdownProcess + 0xc66)\n"
+                              "3: ntdll.dll+0x81a48  (RtlReportException + 0x78)\n"
+                              "8: ntdll.dll+0x19f3d  (RtlRaiseException + 0x18d)\n"
+                              "13: ntdll.dll+0x2796a  (RtlFreeHeap + 0x6da)\n"
+                              "14: ucrtbase.dll+0x12d7b  (free_base + 0x1b)\n"
+                              "15: LYNX.exe+0x65a771\n";
+    CHECK (hangIsFatalReport (dying));
+    const std::string frozen = "LYNX UI thread not responding for 4012 ms (sample 1)\n"
+                               "0: ntdll.dll+0x1628a4  (ZwWaitForSingleObject + 0x14)\n"
+                               "1: KERNELBASE.dll+0x3a1f0  (WaitForSingleObjectEx + 0x9e)\n"
+                               "2: LYNX.exe+0x281b71\n";
+    CHECK (! hangIsFatalReport (frozen));
+    CHECK (! hangIsFatalReport (""));
+    CHECK (lynx::crashreport::githubKindOption ("crash") == "LYNX SHARE closed (crash)");
+}
+
+// Issue #32 (round 174a): a fault in a plugin's own editor window that LYNX caught (the editor closed, LYNX went on)
+TEST (report174a_editor_crash_step)
+{
+    using namespace lynx::crashreport;
+    const auto step = std::string ("04:42:18 ") + editorCrashStepPrefix
+                    + "Synth (x64) (access violation at Synth.dll+0x4be460), trace in autosave\\editor-crash 2026-11-06 04-42-18.txt";
+    const auto parsed = parseEditorCrashStep (step);
+    CHECK (parsed.plugin == "Synth (x64)");                       // a name with parentheses of its own
+    CHECK (parsed.traceFile == "editor-crash 2026-11-06 04-42-18.txt");
+    const auto noTime = parseEditorCrashStep (std::string (editorCrashStepPrefix) + "Meter (C++ exception at Meter.vst3+0x10)");
+    CHECK (noTime.plugin == "Meter" && noTime.traceFile.empty());
+    CHECK (parseEditorCrashStep ("04:42:18 editor shown: Synth").plugin.empty());
+    CHECK (parseEditorCrashStep ("").plugin.empty());
+
+    // what may be caught: errors and C++ exceptions; never debugger events, heap corruption, stack overflow, fail-fast
+    CHECK (editorFaultCatchable (0xC0000005u));  // access violation (the reporter's synth editor)
+    CHECK (editorFaultCatchable (0xC000001Du));  // illegal instruction
+    CHECK (editorFaultCatchable (0xC0000094u));  // integer division by zero
+    CHECK (editorFaultCatchable (0xE06D7363u));  // MSVC C++ exception leaving the plugin
+    CHECK (editorFaultCatchable (0x20474343u));  // GCC / Clang C++ exception
+    CHECK (! editorFaultCatchable (0xC0000374u)); // heap corruption
+    CHECK (! editorFaultCatchable (0xC00000FDu)); // stack overflow
+    CHECK (! editorFaultCatchable (0xC0000409u)); // fail-fast
+    CHECK (! editorFaultCatchable (0x80000003u)); // breakpoint
+    CHECK (! editorFaultCatchable (0x80000004u)); // single step
+    CHECK (! editorFaultCatchable (0x406D1388u)); // thread name
+    CHECK (! editorFaultCatchable (0x40010006u)); // OutputDebugString
+}

@@ -539,6 +539,8 @@ Layout reeverb2()
     return l;
 }
 
+LayoutItem menuOf (float x, float y, float w, float h, const char* param, const char* caption, const char* options); // (below)
+
 Layout luxeVerb()
 {
     // INPUT | REVERB | PITCH | OUTPUT on top, ENVELOPE and the analyser below; every knob has its value on a plate above
@@ -641,26 +643,33 @@ Layout luxeVerb()
     engineTabs.param = "Space engine";
     v.push_back (engineTabs);
     const auto sp = [&v] (LayoutItem i) { v.push_back (onPage (std::move (i), 1)); };
-    const auto dial = [&] (float cx, float cy, const char* param, const char* caption, std::uint16_t style = 0) {
-        sp (knob (cx, cy, 40, param, caption, cy + 30, style | valueAbove));
+    // round tp172b4: the Pro-R role's arrangement — one strip of knobs across the top (pre-delay, character,
+    // thickness, distance, the big SPACE with its decay rate beside it, brightness, width, mix; the style above
+    // character and thickness), the decay-rate EQ curve filling the rest with its four knobs in its lower corners.
+    // Values under the captions (and the decay time inside SPACE)
+    const auto dial = [&] (float cx, float cy, float d, const char* param, const char* caption, std::uint16_t style = 0, float w = 76.0f) {
+        auto i = knob (cx, cy, d, param, caption, cy + d * 0.5f + 20.0f, style | rangeEnds);
+        i.w = std::max (d, std::min (w, i.h)); // room for the caption and the value (the circle keeps its size: the height
+                                                // bounds it; never wider than tall, so no caption hides under a knob)
+        i.x = cx - i.w * 0.5f;
+        sp (std::move (i));
     };
-    sp (section (8, 18, 932, 230, TR_NOOP ("Reverb")));
-    sp (tabs (413, 40, 120, 16, "Space style", TR_NOOP ("Modern|Vintage|Plate")));
-    dial (70, 120, "Space pre-delay", TR_NOOP ("P. delay"));
-    dial (160, 120, "Space character", TR_NOOP ("Character"));
-    dial (250, 120, "Thickness", TR_NOOP ("Thickness"), bipolar);
-    dial (340, 120, "Distance", TR_NOOP ("Distance"));
-    v.push_back (onPage (value (433, 66, 80, 13, "Space", 0), 1));
-    sp (knob (473, 140, 84, "Space", TR_NOOP ("Space"), 196, big));
-    dial (473, 212, "Decay rate", TR_NOOP ("Decay rate"));
-    dial (606, 120, "Space brightness", TR_NOOP ("Brightness"), bipolar);
-    dial (696, 120, "Space width", TR_NOOP ("Width"));
-    dial (786, 120, "Space mix", TR_NOOP ("Mix"));
-    sp (section (8, 256, 932, 196, TR_NOOP ("Decay EQ")));
-    dial (120, 350, "Low decay", TR_NOOP ("Low decay"), bipolar);
-    dial (220, 350, "Low decay freq.", TR_NOOP ("Low freq"));
-    dial (727, 350, "High decay", TR_NOOP ("High decay"), bipolar);
-    dial (827, 350, "High decay freq.", TR_NOOP ("High freq"));
+    sp (menuOf (118, 22, 104, 18, "Space style", nullptr, TR_NOOP ("Modern|Vintage|Plate"))); // the reference's mode drop-down
+    dial (62, 84, 40, "Space pre-delay", TR_NOOP ("P. delay"));
+    dial (144, 84, 40, "Space character", TR_NOOP ("Character"));
+    dial (226, 84, 40, "Thickness", TR_NOOP ("Thickness"), bipolar);
+    dial (322, 80, 58, "Distance", TR_NOOP ("Distance"));
+    sp (knob (470, 92, 116, "Space", TR_NOOP ("Space"), 170, big));
+    v.push_back (onPage (value (420, 80, 100, 24, "Space", big), 1));
+    dial (566, 46, 32, "Decay rate", TR_NOOP ("Decay rate"), 0, 64.0f);
+    dial (636, 80, 58, "Space brightness", TR_NOOP ("Brightness"), bipolar);
+    dial (742, 84, 44, "Space width", TR_NOOP ("Width"));
+    dial (866, 84, 44, "Space mix", TR_NOOP ("Mix"));
+    sp (display (8, 186, 932, 266, "decayeq", "Decay rate"));
+    dial (64, 384, 32, "Low decay", TR_NOOP ("Low decay"), bipolar);
+    dial (140, 384, 32, "Low decay freq.", TR_NOOP ("Low freq"));
+    dial (808, 384, 32, "High decay", TR_NOOP ("High decay"), bipolar);
+    dial (884, 384, 32, "High decay freq.", TR_NOOP ("High freq"));
     return l;
 }
 
@@ -2136,6 +2145,54 @@ Layout withEmberClassic (Layout l)
     return l;
 }
 
+// round tp172c7: Kiln Channel, LYNX's console channel — the compact dark single-channel console of its role (the
+// classic console-emulation channel): the main input level and its meter in the left column, the main output on the
+// right; the centre module carries the VU (output), the name plate, Input / Output, the console selector with the six
+// models printed round it, Drive and Group, and the Noise reduction / Group bypass keys
+Layout kilnLayout()
+{
+    Layout l;
+    l.width = 460;
+    l.height = 640;
+    auto& v = l.items;
+    v.push_back (section (6, 6, 92, 628, "", boxed));
+    v.push_back (section (104, 6, 252, 628, "", boxed));
+    v.push_back (section (362, 6, 92, 628, "", boxed));
+    auto inMeter = display (14, 24, 76, 420, "iometer");
+    inMeter.colour = 0; // the input bar alone
+    v.push_back (inMeter);
+    auto outMeter = display (370, 24, 76, 420, "iometer");
+    outMeter.colour = 1; // the output bar alone
+    v.push_back (outMeter);
+    v.push_back (dial (52, 530, 50, "Main in", TR_NOOP ("In"), bipolar));
+    v.push_back (dial (408, 530, 50, "Main out", TR_NOOP ("Out"), bipolar));
+    auto vu = display (126, 40, 208, 116, "vumeter");
+    vu.steps = 0;
+    v.push_back (vu);
+    v.push_back (label (104, 166, 252, 20, TR_NOOP ("Kiln Channel"), boxed));
+    v.push_back (dial (166, 230, 46, "Input", TR_NOOP ("Input"), bipolar));
+    v.push_back (dial (294, 230, 46, "Output", TR_NOOP ("Output"), bipolar));
+    v.push_back (toggle (204, 204, 52, 18, "Group I/O", TR_NOOP ("Group I/O")));
+    v.push_back (toggle (204, 240, 52, 18, "Link I/O", TR_NOOP ("Link I/O")));
+    // the console selector: six stops 54 degrees apart over the knob's 270-degree throw, the model printed at each stop
+    const float cx = 230.0f, cy = 360.0f, rr = 66.0f;
+    v.push_back (knob (cx, cy, 64, "Console", nullptr, cy + 40.0f, noCaption | big, 6));
+    static const char* models[6] { TR_NOOP ("British E"), TR_NOOP ("British G"), TR_NOOP ("American A"), TR_NOOP ("British N"), TR_NOOP ("Y"), TR_NOOP ("Tube") };
+    for (int k = 0; k < 6; ++k)
+    {
+        const auto a = (-135.0f + 54.0f * (float) k) * 3.14159265f / 180.0f;
+        const auto px = cx + rr * std::sin (a), py = cy - rr * std::cos (a);
+        const auto w = 66.0f;
+        const auto x = std::sin (a) < -0.3f ? px - w + 8.0f : std::sin (a) > 0.3f ? px - 8.0f : px - w * 0.5f;
+        v.push_back (label (x, py - 7.0f, w, 14, models[k], (std::uint16_t) (std::sin (a) > 0.3f ? alignLeft : 0)));
+    }
+    v.push_back (dial (166, 488, 50, "Drive", TR_NOOP ("Drive")));
+    v.push_back (knob (294, 488, 50, "Group", TR_NOOP ("Group"), 488 + 45.0f, showValue, 9));
+    v.push_back (toggle (116, 576, 108, 26, "Noise reduction", TR_NOOP ("Noise reduction")));
+    v.push_back (toggle (236, 576, 108, 26, "Group bypass", TR_NOOP ("Group bypass")));
+    return l;
+}
+
 Layout emberLayout()
 {
     Layout l;
@@ -2749,7 +2806,7 @@ Layout withRhythmVoicing (Layout l)
     add (label (20, 190, 30, 16, TR_NOOP ("L"), alignLeft));
     add (label (154, 190, 30, 16, TR_NOOP ("C")));
     add (label (288, 190, 30, 16, TR_NOOP ("R")));
-    add (tabs (20, 216, 298, 20, "Pattern", TR_NOOP ("Left / right|8 steps")));
+    add (tabs (20, 216, 298, 20, "Pattern", TR_NOOP ("Left / right|Ramp|8 steps")));
     add (section (340, 4, 250, 242, TR_NOOP ("Rate")));
     add (tabs (350, 28, 230, 22, "Sync", TR_NOOP ("Hz|Beats")));
     add (when (dial (465, 104, 52, "Rhythm rate", TR_NOOP ("Rate"), big), "Sync", 0.0f, 0.5f));
@@ -3649,7 +3706,7 @@ const std::vector<EffectKind>& flLayoutKinds()
 const std::vector<EffectKind>& ownLayoutKinds()
 {
     static const std::vector<EffectKind> kinds { EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser,
-                                                 EffectKind::aether, EffectKind::ember, EffectKind::epochVerb, EffectKind::atrium,
+                                                 EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::epochVerb, EffectKind::atrium,
                                                  EffectKind::foilPlate, EffectKind::nebula, EffectKind::halo, EffectKind::horizon,
                                                  EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod,
                                                  EffectKind::crestCompressor, EffectKind::prismMultiband, EffectKind::sentryGate,
@@ -3733,6 +3790,7 @@ const Layout& layoutFor (EffectKind kind)
         case EffectKind::hushDeEsser: l = hushDeEsser(); break;
         case EffectKind::aether: l = aetherLayout(); break;
         case EffectKind::ember: l = withEmberClassic (emberLayout()); break;
+        case EffectKind::kilnChannel: l = kilnLayout(); break;
         case EffectKind::epochVerb: l = captionsAbove (epochVerbLayout()); break;
         case EffectKind::atrium: l = captionsAbove (atriumLayout()); break;
         case EffectKind::foilPlate: l = captionsAbove (foilPlateLayout()); break;

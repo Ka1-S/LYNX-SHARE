@@ -31,6 +31,8 @@ void closeAll();
 
 // The editor alone (snapshots): `demo` feeds the Tuner a built-in test tone and the clock a moving position
 std::unique_ptr<juce::Component> makeFlExtraEditor (const VisualTarget& target, EffectKind kind, bool demo = false);
+// The same for the editor of mixer slot (track, slot), as its window shows it (the Plugin picker's pictures)
+std::unique_ptr<juce::Component> makeFlExtraSlotEditor (AudioEngine& engine, int track, int slot, bool demo = false);
 
 // LYNX.exe --flextrashot <folder>: PNGs of every editor of round 165g in its states (Big Clock's three displays, the Tuner's
 // Basic / Dial on test tones, the HTML NoteBook on FL's DefaultHtml.html or a built-in page, Mute 2's layout, the

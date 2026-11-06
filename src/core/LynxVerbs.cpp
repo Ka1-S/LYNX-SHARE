@@ -267,7 +267,7 @@ struct Engine::Impl
         {
             pre[c].allocate ((int) (maxPreSec * sr) + 8);
             raw[c].allocate ((int) (1.05 * sr) + 8);
-            dif[c].allocate ((int) (2.05 * sr) + 8);
+            dif[c].allocate ((int) (2.65 * sr) + 8); // (Halo's build reaches 2.42 s)
             for (int k = 0; k < 4; ++k)
             {
                 inAp[c][k].len = std::max (1, (int) std::lround (inApMs[c][k] * ms));
@@ -361,7 +361,9 @@ struct Engine::Impl
             {
                 bD[c][k] = std::clamp ((int) (bT[c][k] * span * sr), 0, dif[c].mask - 4);
                 const auto u = bT[c][k];
-                const auto a = gated ? 0.6 + 0.4 * u : std::sin (pi * std::sqrt (u)); // build: rises, then falls
+                const auto a = gated ? 0.6 + 0.4 * u
+                                     : s.buildRise >= 1.0 ? std::pow (std::max (u, 1e-6), 0.5 * (s.buildRise - 1.0)) // round tp172d
+                                                          : std::sin (pi * std::sqrt (u)); // build: rises, then falls
                 bW[c][k] = (float) (a * bG[c][k]);
                 b += a * a;
             }
@@ -1346,7 +1348,15 @@ protected:
         s.shiftSemis2 = s.shiftSemis - 24.0;
         s.inDiffusion = p[3];
         s.loopDiffusion = 0.2 + 0.7 * p[3];
-        s.buildSec = 0.15 + 0.5 * size * (1.0 - p[3] * 0.5); // round tp172d: the reference blooms over ~0.5 s
+        // round tp172d (refs/halo, 20 s impulses): the reference's energy builds for 0.6 / 0.9 / 1.3 s at Size 30 / 50 / 80 %
+        // (Diffusion 92 %) — an even feed over 0.62 + 1.8 × Size seconds into the tank fits its envelope within 0.7 dB.
+        // With less diffusion it gathers late (Diffusion 50 %: a cluster near 1.2 s; 0 %: one arrival at 1.217 s): the
+        // feed leans to the end of a span that shrinks to 0.8 × (a model between those three measured points)
+        {
+            const auto d = std::clamp ((double) p[3] / 0.92, 0.0, 1.0);
+            s.buildSec = (0.62 + 1.8 * size) * (0.8 + 0.2 * d);
+            s.buildRise = 1.0 + 15.0 * (1.0 - d) * (1.0 - d);
+        }
         s.shape = 0;
         s.lineScale = m.scale * (0.3 + 1.2 * size);
         // round tp172d: the reference's RT per Size and Feedback, measured (refs/halo: 20 s impulses; Size 30 / 50 / 80 %
@@ -1355,9 +1365,13 @@ protected:
         {
             const auto fb = (double) p[2], f = std::min (1.0, std::abs (s.shiftSemis) / 2.0);
             const auto mShift = 1.0 + 1.2 * std::pow (fb, 2.5), mPlain = 1.0 + 3.3 * fb * fb * fb;
-            s.rt60 = (1.5 + 12.5 * size) * m.rtScale * (mPlain + (mShift - mPlain) * f);
+            // with less diffusion the reference's tail is shorter (Diffusion 0 / 50 %: ~5.5 / 6 s against 9.8 s at 92 %)
+            const auto dn = std::clamp ((double) p[3] / 0.92, 0.0, 1.0);
+            s.rt60 = (1.5 + 12.5 * size) * m.rtScale * (mPlain + (mShift - mPlain) * f) * (0.55 + 0.45 * dn * dn * dn);
         }
-        s.earlyLevel = 0.3; // round tp172d: its first 0.3 s are 5–9 dB under ours at 0.45
+        // round tp172d: its first 0.3 s are 5–9 dB under ours at 0.45; with less diffusion they are empty (Diffusion 50 %:
+        // −55 dB, 0 %: silent until the first arrival at 1.2 s)
+        s.earlyLevel = 0.3 * std::pow (std::clamp ((double) p[3] / 0.92, 0.0, 1.0), 8.0);
         s.earlySec = 0.03;
         s.earlyDiffusion = p[3];
         s.outLowCut = 250.0 * p[5]; // gentle: the reference's low cut barely shows at 63 Hz (§5, not confirmed)
@@ -1371,12 +1385,13 @@ protected:
         s.loopBandwidth = dark ? 5000.0 : 0.0;
         s.modRateHz = 0.05 + 4.95 * p[7];
         s.modDepthMs = 1.2 * p[8] / std::sqrt (std::max (0.3, s.modRateHz));
-        // round tp172d: the wet level measured on music and drums (refs/halo): −2 dB up to Feedback 75 %, rising to 0 dB
+        // round tp172d: the wet level measured on music and drums (refs/halo): −3 dB up to Feedback 75 %, rising to +1 dB
         // at 100 % (the reference swells). Its impulse has a fuller low end than ours (+9 / +5 dB at 63 / 125 Hz) but its
         // music and drums don't (a shelf for the impulse made drums 5 dB loud there): left flat
         {
             const auto fb = (double) p[2];
-            const auto trimDb = fb <= 0.75 ? -2.0 : -2.0 + 8.0 * (fb - 0.75);
+            const auto dn = std::clamp ((double) p[3] / 0.92, 0.0, 1.0); // less diffusion: louder (+4.5 / +5.4 dB measured at 0 / 50 %)
+            const auto trimDb = (fb <= 0.75 ? -3.0 : -3.0 + 16.0 * (fb - 0.75)) + 5.0 * (1.0 - dn * dn * dn);
             s.gain = (dark ? 0.75 : 0.95) * std::pow (10.0, trimDb / 20.0);
         }
         s.shimmerEnergy = 0.2; // the shifted voice's share added per pass (× the shimmer amount)
