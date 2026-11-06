@@ -113,3 +113,14 @@ jobs:
           name: editor-pictures-${{ runner.os }}
           path: editor-pictures
           retention-days: 14
+
+      # A plugin that kills the scan's child process is blacklisted, not described again at every start
+      - name: Crashing plugin
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir crash-plugin
+          echo 'void __attribute__ ((constructor)) crash (void) { __builtin_trap(); }' | cc -shared -fPIC -x c - -o crash-plugin/crash.clap
+          LYNX_PROFILE_DIR="$PWD/crash-profile" xvfb-run -a build/LYNX_artefacts/Release/LYNX --scantest "$PWD/crash-plugin" "$PWD/crash.txt" || true
+          cat crash.txt
+          grep -q 'blacklisted: .*crash.clap' crash.txt
