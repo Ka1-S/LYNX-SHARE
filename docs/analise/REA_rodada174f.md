@@ -32,11 +32,12 @@ Markers: **[MEAS]** measured here, **[CODE]** LYNX or JUCE source.
 ### 3.1 Profile [MEAS]
 
 `prof-n1a.txt` (first version: the lanes scaled on every frame from the picture of the last exact view, the columns
-a zoom out uncovers painted straight to the window), Thief playing, Ctrl+wheel phase: of the message thread's busy
-samples, `PlayheadCache::paint` 35 %, of which `paintExactly` → `PlaylistComponent::paint` 24 % (the uncovered
-columns, up to 42 % of the lanes after three notches out, painted again on every playhead frame too), Direct2D image
-flushes 21 %, `HintBar::paint` 5 %, the toolbar scope 2.6 %. Mixer phase: 30 % in `Direct2DGraphicsContext::endFrame`
-(the per-frame present, in the NVIDIA driver), LYNX's own paints ~15 %.
+a zoom out uncovers painted straight to the window), Thief playing, load 31–43, window 60–65 s (Ctrl+wheel). Shares of
+all samples taken after the thread had run, **including 53 % waiting** (`NtUserGetMessage`, `NtWaitForSingleObject`): this
+first profiler counted samples, not cycles, so they rank the work and are not CPU shares. `PlayheadCache::paint` 35 %, of
+which `paintExactly` → `PlaylistComponent::paint` 24 %; Direct2D image flushes 21 %; `HintBar::paint` 5 %; the toolbar scope
+2.6 %. Window 100–105 s (phase B, the Mixer, same caveat): `Direct2DGraphicsContext::endFrame` 30 %, `paintComponentAndChildren`
+15 %. The cycle-weighted profiler has not produced a run yet (see 3.2.5).
 
 ### 3.2 What changed [CODE]
 
@@ -45,10 +46,13 @@ flushes 21 %, `HintBar::paint` 5 %, the toolbar scope 2.6 %. Mixer phase: 30 % i
    scroll) is drawn like 174e2's scroll shift: the picture is copied into the spare image with the lanes scaled around
    the same ticks (`x' = a·x + b`, `a` = new / old pixels per tick, bilinear), and only what is new is painted exactly
    into it: the columns a zoom out uncovers (only the ones this notch uncovered) and the ruler; the headers, toolbar
-   and everything else are kept. Playhead frames between notches just blit. After 8 scaled steps in one gesture, or a
+   and everything else are kept. Playhead frames between notches just blit. After 2 scaled steps (`maxScaledSteps`), or a
    step of more than 2×, the lanes are painted exactly. 120 ms after the last notch (`zoomSettleMs`) the lanes are
-   painted exactly once, through the picture. A scaled frame may look slightly soft for those 120 ms; it is never
-   stretched by more than one notch (×1.2) from the previous frame's picture.
+   painted exactly once, through the picture. A scaled frame shows the clip names and waveforms stretched by the
+   zoom since the last exact picture (at most 1.2² = 1.44×) and slightly soft, until the next exact frame.
+   Decision (coordinator, by eye on the gesture-frame shots `shots/zoomframe-*.png`): one notch (×1.2) looks fine;
+   the first build allowed 8 steps, up to ~4× stretch on a long zoom-in, too visible → cap 2. Follow-up idea
+   (coordinator): adaptive — when the last exact paint was cheap (< ~6 ms), paint exactly on the next frame anyway.
 2. **Clip-grid sampling**: a clean waveform's columns (`ui::paintWaveform`) and an automation clip's curve samples were
    placed from the left edge of the repainted area, so a strip repaint (174e2's scroll shift, a hover) drew a slightly
    different envelope and line than a whole paint: visible seams after a scroll until the next whole repaint (found by
@@ -60,10 +64,14 @@ flushes 21 %, `HintBar::paint` 5 %, the toolbar scope 2.6 %. Mixer phase: 30 % i
    box, chord readout, lit keys, play button) and the Mixer's effects panel (input level, slot fitting) are stopped
    while the view is not on screen and restarted when it shows (`ui::TimerWhileShowing`, a ComponentMovementWatcher on
    the view and its parents); each reads its state again on the first tick. None of them has state that changes unseen
-   and must be caught, so none keeps a slow rate. (A minimised window reports no visibility change: those timers keep
-   running then and skip their work while `! isShowing()`.)
-5. `--cachetest`, the uiperf zoom step and the profiler (section 2). The profiler copies the suspended thread's stack and
-   unwinds after resuming it: unwinding the suspended thread hung LYNX once at start-up (it may hold the loader lock).
+   and must be caught, so none keeps a slow rate. Minimising does not count as hidden (JUCE reports no event on restore, so a
+   stopped timer would never restart): those timers keep running, as before. `--timertest` checks the transitions.
+   Idle CPU has not been measured yet.
+5. `--cachetest`, `--timertest`, the uiperf zoom step and the profiler (section 2). A profiler build that unwound the suspended
+   thread and weighted by cycles left LYNX stuck at start-up in its one run (n3a: 31 ms of main-thread CPU; the same build
+   without the profiler ran normally; the older profiler had run once without hanging). The cause was not proven; the likely one
+   is unwinding a thread suspended while it holds the loader lock. It now copies the stack while the thread is suspended and
+   unwinds after resuming it. **This version has not been run yet.**
 
 ### 3.3 Correctness [MEAS] (`--cachetest`, Thief, 1466 × 930)
 
@@ -81,22 +89,22 @@ scroll differs from the shifted one by ~1e-12 px; one coverage step of an anti-a
 | n1 (scaled, strips straight) | 31–43 | 119 / 123 | 80 / 86 | 74 / 73 | 110 / 114 | 95 / 96 |
 | n1, `LYNX_ZOOM_SCALE=0` | 23–43 | 128 / 126 | 81 / 88 | 48 / 49 | 119 / 123 | 116 / 106 |
 | n3, `LYNX_ZOOM_SCALE=0` | 13–17 | 141 / 141 | 88 / 103 | 56 / 55 | 136 / 136 | 121 / 126 |
-| **n3 (scale-shift)** | 11–15 | 139 / 143 | **99 / 108** | **115 / 116** | 140 / 140 | 125 / 128 |
+| **n3 (scale-shift, 8 steps)** | 11–15 | 139 / 143 | **99 / 108** | **115 / 116** | 140 / 140 | 125 / 128 |
 | FL Studio 2026 (174e2) | — | 135 / 126 | 125 / 118 | 128 / 128 | 90 | 70 / 77 |
 
-Zoom: 46 → 115 fps (2.5×), FL 128. dupmon's zoom sends a notch every 40 ms (25 a second), so the count is mostly
-playhead frames: a zoom step that costs more than a frame drops them. Wheel (scroll) also rose (66–70 → 99–108) from
-the plain-clip strips and the waveform fix; the loads differ between rows, so the scroll gain is partly noise.
+The n3 row is option (a), 8 scaled steps. **The build being queued is (b), 2 scaled steps; its fps has not been measured yet**
+and goes in this table at the next GUI turn. For (a): zoom 46 → 115 fps, FL 128 (FL's number is from 174e2, another session).
+dupmon's zoom sends a notch every 40 ms (25 a second) while the song plays, so the count is mostly playhead frames: a zoom
+step that costs more than a frame drops them. It does not show whether a frame is exact, nor whether FL animates its zoom.
+Wheel scroll is higher than base too, but the rows ran at different loads and no run separates the causes.
 
 ### 3.5 Is this the best way?
 
-- **FL**: FL's zoom is redrawn exactly at ~128 fps (174e2 measurement); it paints with its own GDI-style renderer and
-  far fewer primitives per clip. LYNX's exact paint of a large project is 15–30 ms on Direct2D (one geometry per
-  rounded shape, path fills for waveforms), so an exact repaint per notch cannot reach 120 fps; scaling the last
-  picture during the gesture and painting it exactly when the wheel stops gives FL-like smoothness with the same
-  final picture. Per-clip mip-mapped waveform images (the brief's other idea) would still leave the clip frames,
-  names and grid to paint per notch; the whole-picture scale covers all of it with one GPU blit.
+- **FL**: 128 fps on the same test (174e2). **How FL draws its zoom has not been studied** (no REA in this slice): whether it
+  redraws exactly, animates or scales is unknown. LYNX's exact paint of Thief is 21–34 ms in `--cachetest` (off screen,
+  with read-back, so an upper bound), so an exact repaint per notch costs several frames. Per-clip mip-mapped waveform images
+  (the brief's other idea) were not built or measured: the frames, names and grid would still be painted per notch.
 - **Ableton Live 12**: not measured in this slice (its zoom is to be compared in a later slice of the sweep).
 - **Users**: the request behind this round is the user's ("smoother and lighter everywhere, beat FL where it still
   wins"); scaling first and refining when still is the usual technique of map and image viewers.
-- Verdict: keep; exact at rest, ~2.5× smoother while zooming.
+- Verdict: keep, pending (b)'s fps; exact at rest. FL REA and the Ableton comparison are still owed.

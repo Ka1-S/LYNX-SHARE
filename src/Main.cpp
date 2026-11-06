@@ -43,6 +43,7 @@
 #include "engine/Text.h"
 #include "platform/FileTypes.h"
 #include "platform/Package.h"
+#include "ui/TimerWhileShowing.h"
 #include "ui/VideoPlayerView.h"
 #include "ui/PatcherEditor.h"
 #include "ui/VisualEditors.h"
@@ -604,6 +605,13 @@ public:
             const auto i = args.indexOf ("--cachetest");
             juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
             runCacheTest (juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()));
+            return;
+        }
+
+        if (args.contains ("--timertest"))
+        {
+            // LYNX --timertest report.txt (round 174f): ui::TimerWhileShowing through hide / show / minimise (opens a small window)
+            runTimerTest (juce::File (args[args.indexOf ("--timertest") + 1].unquoted()));
             return;
         }
 
@@ -4706,6 +4714,54 @@ private:
         report << "result=" << (ok ? "OK" : "FAILED") << "\n";
         juce::File (reportPath).replaceWithText (report);
         setApplicationReturnValue (ok ? 0 : 1);
+        quit();
+    }
+
+    // --timertest (round 174f): a view's polling timer follows the view and its parents, and survives a minimised window
+    void runTimerTest (const juce::File& report)
+    {
+        struct Ticks final : juce::Timer
+        {
+            void timerCallback() override {}
+        } timer;
+        juce::Component top, parent, view;
+        parent.addChildComponent (view);
+        top.addChildComponent (parent);
+        top.setSize (320, 200);
+        lynx::ui::TimerWhileShowing watch (view, timer, 30);
+        juce::String text;
+        auto failures = 0;
+        auto expect = [&] (const char* step, bool running) {
+            const auto ok = timer.isTimerRunning() == running;
+            failures += ok ? 0 : 1;
+            text << step << ": timer " << (timer.isTimerRunning() ? "running" : "stopped") << (ok ? "" : "  FAIL") << "\n";
+        };
+        expect ("never shown", false);
+        view.setVisible (true);
+        parent.setVisible (true);
+        expect ("view and parent visible, not on the desktop", false);
+        top.addToDesktop (juce::ComponentPeer::windowHasTitleBar);
+        top.setVisible (true);
+        expect ("window shown", true);
+        parent.setVisible (false);
+        expect ("parent hidden", false);
+        parent.setVisible (true);
+        expect ("parent shown", true);
+        view.setVisible (false);
+        expect ("view hidden", false);
+        top.getPeer()->setMinimised (true);
+        view.setVisible (true);
+        expect ("view shown while minimised", true);
+        top.getPeer()->setMinimised (false);
+        expect ("window restored", true);
+        top.setVisible (false);
+        expect ("window hidden", false);
+        top.setVisible (true);
+        expect ("window shown again", true);
+        top.removeFromDesktop();
+        text << "failures: " << failures << "\nresult=" << (failures == 0 ? "OK" : "FAIL") << "\n";
+        report.replaceWithText (text);
+        setApplicationReturnValue (failures == 0 ? 0 : 1);
         quit();
     }
 

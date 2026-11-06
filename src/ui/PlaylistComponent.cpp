@@ -390,7 +390,9 @@ public:
     bool hasScaledLanes() const { return lanesScaled; }
 
 private:
-    static constexpr int maxScaledSteps = 8; // (each step resamples the last: after 8 the lanes are painted again)
+    // (each step resamples the last: after 2 (a stretch of at most 1.44x from the last exact picture, at Ctrl+wheel's
+    // 1.2 per notch) the lanes are painted exactly; round 174f, chosen by eye: 8 steps stretched names up to 4x)
+    static constexpr int maxScaledSteps = 2;
 
     // A zoom step: column x of the picture (drawn at `from`) shows the same tick at a x + b in `to`
     struct Zoom

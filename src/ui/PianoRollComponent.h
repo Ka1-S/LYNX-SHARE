@@ -4,7 +4,7 @@
 
 #include "core/NoteTools.h"
 #include "engine/AudioEngine.h"
-#include "ui/HiddenThrottle.h"
+#include "ui/TimerWhileShowing.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
 #include "ui/FlMods.h"
