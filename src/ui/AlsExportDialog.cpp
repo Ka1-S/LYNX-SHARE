@@ -4,6 +4,8 @@
 
 #include "core/AlsExport.h"
 #include "engine/Mp3Format.h"
+#include "engine/SampleLibrary.h"
+#include "core/OggVorbis.h"
 #include "ui/FileChoosers.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
@@ -78,6 +80,41 @@ void showAlsReport (const juce::File& target, const juce::String& text)
 }
 } // namespace
 
+namespace
+{
+// A sample Live cannot read as it is: FL's WavPack (.wv), Ogg Vorbis inside a WAV file (format tags 0x674F…0x6751), or any
+// other file type LYNX decodes that is not WAV, AIFF, FLAC, Ogg or MP3
+bool needsWavForLive (const juce::File& file)
+{
+    if (! file.hasFileExtension ("wav;wave"))
+        return ! file.hasFileExtension ("aif;aiff;flac;ogg;mp3");
+    juce::MemoryBlock head;
+    if (juce::FileInputStream in (file); in.openedOk())
+        in.readIntoMemoryBlock (head, 4096);
+    return oggvorbis::isOggWav (static_cast<const std::uint8_t*> (head.getData()), head.getSize());
+}
+
+// Decodes `source` the way LYNX plays it and writes it as a 32-bit float WAV
+bool writeWavForLive (const juce::File& source, const juce::File& target)
+{
+    SampleLibrary library;
+    const auto data = library.load (source.getFullPathName());
+    if (data == nullptr || data->frames() <= 0 || data->sampleRate <= 0.0)
+        return false;
+    const auto channels = data->isStereo() ? 2 : 1;
+    std::unique_ptr<juce::OutputStream> stream (target.createOutputStream().release());
+    if (stream == nullptr)
+        return false;
+    juce::WavAudioFormat wav;
+    std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (stream.get(), data->sampleRate, (unsigned int) channels, 32, {}, 0));
+    if (writer == nullptr)
+        return false;
+    stream.release(); // the writer owns it now
+    const float* planes[2] { data->leftData(), channels > 1 ? data->rightData() : nullptr };
+    return writer->writeFromFloatArrays (planes, channels, (int) data->frames());
+}
+} // namespace
+
 // Writes "<folder>/<name> Project/<name>.als"; the samples are copied into "Samples/Imported" when `collect` is set.
 // Returns the .als written, or an empty File with `error` set.
 juce::File writeAlsProject (const Song& song, PluginHost* host, AlsVersion version, bool collect, const juce::File& folder, const juce::String& name,
@@ -112,7 +149,8 @@ juce::File writeAlsProject (const Song& song, PluginHost* host, AlsVersion versi
     options.samplePath = [&] (const std::string& path, bool& relative) -> std::string {
         relative = false;
         const juce::File source (fromUtf8 (path));
-        if (! collect || ! source.existsAsFile())
+        // a sample Live cannot read is converted even when the set refers to the samples where they are
+        if (! source.existsAsFile() || (! collect && ! needsWavForLive (source)))
             return path;
         if (auto it = copied.find (path); it != copied.end())
         {
@@ -120,6 +158,22 @@ juce::File writeAlsProject (const Song& song, PluginHost* host, AlsVersion versi
             return it->second;
         }
         samples.createDirectory();
+        // Live reads WAV (PCM / float), AIFF, FLAC, Ogg and MP3 only: FL's WavPack (.wv) and Ogg-in-WAV samples are
+        // written as plain WAV (Live 12.4: "Some of the media files could not be loaded", "Unknown unsupported format
+        // 26447 for WAV files", round 175a)
+        if (needsWavForLive (source))
+        {
+            auto target = samples.getChildFile (source.getFileNameWithoutExtension() + ".wav");
+            if (target.existsAsFile())
+                target = samples.getNonexistentChildFile (source.getFileNameWithoutExtension(), ".wav", false);
+            if (! writeWavForLive (source, target))
+            {
+                notes.add (tr ("Could not copy {0}; the set refers to it where it is", { source.getFullPathName() }));
+                return path;
+            }
+            relative = true;
+            return copied[path] = target.getRelativePathFrom (project).replaceCharacter ('\\', '/').toStdString();
+        }
         auto target = samples.getChildFile (source.getFileName());
         if (target.existsAsFile() && target.getSize() != source.getSize())
             target = samples.getNonexistentChildFile (source.getFileNameWithoutExtension(), source.getFileExtension(), false);

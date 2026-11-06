@@ -318,6 +318,15 @@ struct Exporter
         n.value ("Name/UserName", t.name);
         n.value ("Color", num (std::max (0, alsColourIndex (t.colour))));
         n.value ("TrackGroupId", num (t.group >= 0 ? groupIds[(std::size_t) t.group] : -1));
+        // a group's audio input as Live saves it. The Live 11 group template (from a public 11.0.12 set) carries an input
+        // routed to a track path of that set ("p46251/p41230/p36996"): Live 12.4 crashes loading it ("invalid map<K, T>
+        // key", round 175a: every Live 11 export with a group track) [LIVE, DATA: Live 11.3 / 12 groups]
+        if (auto* in = n.at ("DeviceChain/AudioInputRouting"); in != nullptr && t.kind == LiveTrack::Kind::group)
+        {
+            in->value ("Target", "AudioIn/External/S0");
+            in->value ("UpperDisplayString", "Ext. In");
+            in->value ("LowerDisplayString", "1/2");
+        }
         if (auto* out = n.at ("DeviceChain/AudioOutputRouting"))
         {
             // an insert that feeds only other inserts (FL's "Master" send off): no output, its sends carry it
