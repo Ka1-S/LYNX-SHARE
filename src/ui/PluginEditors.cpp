@@ -2127,7 +2127,13 @@ public:
             return;
         juce::PopupMenu menu;
         const auto chosen = fx->sendTracks[(std::size_t) part];
-        auto choose = [this, part] (int t) { editSlot ([part, t] (EffectSlot& e) { e.sendTracks[(std::size_t) part] = t; }); };
+        auto choose = [this, part] (int t) {
+            editSlot ([part, t] (EffectSlot& e) {
+                e.sendTracks[(std::size_t) part] = t;
+                if (e.kind == EffectKind::equo) // (EQUO keeps its send track in its state too, as FL saves it)
+                    equofx::setSendInsert (e.state, t);
+            });
+        };
         menu.addItem (tr ("None"), true, chosen <= 0, [choose] { choose (0); });
         const auto& mixer = engine.getSong().mixer;
         for (int t = 1; t < (int) mixer.size(); ++t)
@@ -2152,6 +2158,11 @@ public:
         if (id == "tssenvelope")
         {
             paintTransmitterEnvelope (g, inner, fx);
+            return;
+        }
+        if (id == "equosend")
+        {
+            paintTransmitterSend (g, r, fx, 0);
             return;
         }
         if (id == "tsssend0" || id == "tsssend1")
@@ -3931,6 +3942,11 @@ public:
         {
             if (mxMouseDown (e, item))
                 dragItem = index;
+            return;
+        }
+        if (item.type == Item::display && juce::String (item.display) == "equosend") // round 173d3: EQUO's send box
+        {
+            showTransmitterSendMenu (0, rectOf (item));
             return;
         }
         if (item.type == Item::display && (juce::String (item.display) == "tsssend0" || juce::String (item.display) == "tsssend1"))

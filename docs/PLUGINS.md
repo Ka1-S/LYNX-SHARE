@@ -223,7 +223,7 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | Vocoder | Fruity Vocoder | Insert | Exact | every state, 500 random runs |
 | Love Philter | Fruity Love Philter | Import | Exact | all 86 states, live and export |
 | Pitch Shifter | Pitch Shifter | Import | Exact | all 15 states and 70 random ones |
-| EQUO | EQUO | Import | Exact | the send output to another track is not routed |
+| EQUO | EQUO | Import | Exact | the band sends go to the insert chosen in the Send box (FL's send gain stage and its own downsampler; no FL render of a send yet) (round 173d3) |
 | Low Lifter | Low Lifter | Insert | Exact | the library's Faust engine (crossovers, look-ahead limiter, Chebyshev harmonics, diffuser, low cut): all 11 installation states and 12 random ones at 44.1–96 kHz bit-identical, FL's one-second silence gate included (round 154) |
 | Transporter | Transporter | Insert | Exact | FL's own engine (the library's Faust transient looper: 8-band transient detector, loops A / B, Auto / Bouncing / Adaptive / Tempo, reverse / octave / ignore probabilities, spread and auto-pan, loop send): bit-identical with the library on 190 random runs and with the plug-in on 6 states; side-chain from the input track; the send goes to the insert's routes (mapping unverified) (round 167f) |
 | Frequency Shifter | Frequency Shifter | Insert | Exact | bit-identical on the installation's 14 states and on random ones with control changes at 44.1–96 kHz, except the Tempo range at 48/96 kHz (−85 dB); while the song plays the Tempo range gets the song position in beats (FL's unit not confirmed); the ring modulator's side chain is not routed (round 154) |

@@ -256,6 +256,7 @@ Layout equoLayout()
     v.push_back (knob (515, 100, 30, "Volume", TR_NOOP ("Vol"), 126));
     v.push_back (section (407, 138, 155, 105, TR_NOOP ("Setup")));
     v.push_back (toggle (410, 160, 100, 12, "Send only", TR_NOOP ("Send only")));
+    v.push_back (display (410, 178, 100, 18, "equosend")); // the send's insert (round 173d3: FL's send box under Send only)
     v.push_back (toggle (410, 205, 100, 12, "Add mode", TR_NOOP ("Add mode")));
     v.push_back (toggle (410, 224, 100, 12, "Oversample", TR_NOOP ("Oversample")));
     v.push_back (knob (539, 200, 28, "Bandwidth", TR_NOOP ("BW"), 229));

@@ -2409,7 +2409,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         // Fruity Send / Patcher / Transmitter / Transporter: what it sends goes to its own buffer, pulled by the destination insert
         // (processed later)
         if (slots[i].kind == EffectKind::fruitySend || slots[i].kind == EffectKind::patcher || slots[i].kind == EffectKind::transmitter
-            || slots[i].kind == EffectKind::flTransporter)
+            || slots[i].kind == EffectKind::flTransporter || slots[i].kind == EffectKind::equo)
         {
             for (int o = 0; o < maxSlotSends; ++o)
             {

@@ -37,6 +37,7 @@
 #include <string>
 #include <vector>
 
+#include "core/EquoFx.h"
 #include "core/Effects.h"
 #include "core/FacetEq.h"
 #include "core/PluginLayout.h"
@@ -669,6 +670,7 @@ struct Hint
     bool sidechain = false;                  // also with the side-chain input
     int move = -1;                           // ≥ 0: this parameter jumps to moveTo in the middle of the pad
     float moveTo = 0.0f;
+    std::function<void (EffectSlot&)> edit;  // a change no parameter makes (a send track kept in the state)
 };
 
 struct Options
@@ -876,6 +878,19 @@ inline std::vector<Hint> hintsFor (EffectKind kind)
         case EffectKind::multibandDelay:
             for (int b = 1; b < 8; ++b) // the morph on bank b + 1 (a bank's cells are heard only there)
                 out.push_back (named ("the morph on bank " + std::to_string (b + 1), { { "Morph", (float) b / 7.0f } }));
+            if (kind == EffectKind::equo) // round 173d3: the band sends go to an insert (FL's send box)
+                for (int b = 0; b < 8; ++b)
+                {
+                    auto h = named (b == 0 ? std::string ("the send to insert 2") : "the send to insert 2, the morph on bank " + std::to_string (b + 1),
+                                    { { "Morph", (float) b / 7.0f } });
+                    if (b == 0)
+                        h.sets.clear();
+                    h.edit = [] (EffectSlot& e) {
+                        e.sendTracks[0] = 2;
+                        equofx::setSendInsert (e.state, 2);
+                    };
+                    out.push_back (h);
+                }
             break;
         case EffectKind::frequencySplitter:
         {
@@ -1069,6 +1084,8 @@ inline std::optional<EffectSlot> prerequisite (const std::string& key, const Eff
         for (const auto& [p, v] : hints[h].sets)
             if (p != c.param)
                 setValue (hc, p, v);
+        if (hints[h].edit)
+            hints[h].edit (hc);
         why = hints[h].note;
         if (hints[h].bpm > 0.0)
             ro.bpm = hints[h].bpm;
