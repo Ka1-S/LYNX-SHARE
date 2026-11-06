@@ -65,6 +65,7 @@ struct LayoutItem
     std::vector<float> values {};      // radio / tabs: the value of each option (empty = i / (n − 1))
     std::uint16_t style = 0;
     int page = -1;                     // only shown on this page (−1 = always)
+    int pageModulo = 0, pageStride = 1; // round 173d3: > 0 = `page` is one digit of the page: (page / stride) % modulo
     const char* display = nullptr;     // display: which graph ("limiter", "compressor", "eq", ...)
     int steps = 0;                     // discrete values: number of steps over 0..1 (stepper, stepped knobs)
     const char* whenParam = nullptr;   // only shown while this parameter is within [whenMin, whenMax) (1 included)

@@ -36,6 +36,7 @@
 #include "core/EquoFx.h"
 #include "core/MultibandDelayFx.h"
 #include "core/Vocodex.h"
+#include "core/LovePhilter.h"
 #include "core/HardwareInsert.h"
 #include "engine/Text.h"
 #include "ui/DynamicsDisplays.h"
@@ -2484,6 +2485,8 @@ public:
         }
         else if (id == "maxcurve") // Maximus: the selected band's compression curve, edited with FL's gestures (round 168x)
             paintMaximusCurve (g, inner, fx);
+        else if (id == "lpcurve") // Love Philter: the articulator part shown, edited with FL's gestures (round 173d3)
+            paintPhilterCurve (g, inner, fx);
         else if (id == "maxbands") // Maximus: the three bands over 20 Hz…20 kHz with their crossovers and the low cut
         {
             const auto raw = [&] (int p) { return maximusfx::stateParam (fx.state, p).value_or (maximusfx::stateParams()[(std::size_t) p].defaultValue); };
@@ -3096,6 +3099,7 @@ public:
 
 #include "ui/GrossBeatEditor.inc"
 #include "ui/MaximusCurveEditor.inc"
+#include "ui/LovePhilterEditor.inc"
 
     // --- the parametric EQ's graph (FL's Parametric EQ 2 arrangement) -----------------------------------
 
@@ -3829,6 +3833,8 @@ public:
             return;
         if (kind == EffectKind::maximus && mxMouseMove (i >= 0 ? activeLayout().items[(std::size_t) i] : LayoutItem {}, p)) // round 168x
             return;
+        if (kind == EffectKind::lovePhilter && lpMouseMove (i >= 0 ? activeLayout().items[(std::size_t) i] : LayoutItem {}, p)) // round 173d3
+            return;
         if (i >= 0 && isWaveShaperGraph (activeLayout().items[(std::size_t) i])) // round 165: points and handles light up
         {
             const auto& item = activeLayout().items[(std::size_t) i];
@@ -3941,6 +3947,12 @@ public:
         if (isMaximusCurve (item)) // round 168x: FL's envelope editor on Maximus' In/Out graph (issue #40)
         {
             if (mxMouseDown (e, item))
+                dragItem = index;
+            return;
+        }
+        if (isPhilterCurve (item)) // round 173d3: Love Philter's articulator editor
+        {
+            if (lpMouseDown (e, item))
                 dragItem = index;
             return;
         }
@@ -4254,6 +4266,11 @@ public:
             mxMouseDrag (e, activeLayout().items[(std::size_t) dragItem]);
             return;
         }
+        if (lpDragging && dragItem >= 0) // round 173d3: Love Philter's articulator curve
+        {
+            lpMouseDrag (e, activeLayout().items[(std::size_t) dragItem]);
+            return;
+        }
         if (wsDragState && dragItem >= 0) // round 165: the WaveShaper's curve
         {
             wsMouseDrag (e, activeLayout().items[(std::size_t) dragItem]);
@@ -4349,6 +4366,11 @@ public:
             mxMouseUp();
             dragItem = -1;
         }
+        if (lpDragging) // round 173d3
+        {
+            lpMouseUp();
+            dragItem = -1;
+        }
         if (gbDragging) // round 168m
         {
             gbEnvelopeUp();
@@ -4414,7 +4436,7 @@ public:
             rhythmDoubleClick (e, item);
             return;
         }
-        if (isRhythmPatterns (item) || isWaveShaperGraph (item) || isGbAny (item) || isMaximusCurve (item))
+        if (isRhythmPatterns (item) || isWaveShaperGraph (item) || isGbAny (item) || isMaximusCurve (item) || isPhilterCurve (item))
             return;
         if (isGeminiGraph (item)) // round 137: an EQ marker = its shelf on / off
         {
@@ -4657,7 +4679,7 @@ private:
         if (index < 0)
             return;
         const auto& item = activeLayout().items[(std::size_t) index];
-        if (isWaveShaperGraph (item) || isGbAny (item) || isMaximusCurve (item))
+        if (isWaveShaperGraph (item) || isGbAny (item) || isMaximusCurve (item) || isPhilterCurve (item))
             return;
         if (item.type == Item::display && juce::String (item.display) == "tssenvelope") // FL's envelope view speed
         {
@@ -4776,6 +4798,8 @@ private:
             return { wsHint (item, p), {}, false, true };
         if (isMaximusCurve (item)) // round 168x
             return { mxHint (item, p), {}, false, true };
+        if (isPhilterCurve (item)) // round 173d3
+            return { lpHint (item, p), {}, false, true };
         if (isGbAny (item)) // round 168m
             return { gbHint (item, p), {}, false, true };
         if (item.type == Item::display)

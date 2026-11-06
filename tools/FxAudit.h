@@ -38,6 +38,7 @@
 #include <vector>
 
 #include "core/EquoFx.h"
+#include "core/LovePhilter.h"
 #include "core/Effects.h"
 #include "core/FacetEq.h"
 #include "core/PluginLayout.h"
@@ -892,6 +893,77 @@ inline std::vector<Hint> hintsFor (EffectKind kind)
                     out.push_back (h);
                 }
             break;
+        case EffectKind::lovePhilter:
+        {
+            // round 173d3: FL's default has unit 1 on and no articulator drawn, so the units, envelopes, LFOs and maps
+            // are woken by drawing them in the state (FL: the unit page's enable boxes and the articulator editor)
+            const auto points = [] (std::initializer_list<std::pair<double, double>> xy) {
+                std::vector<philter::DocPoint> out;
+                double last = 0.0;
+                for (const auto& [x, y] : xy)
+                {
+                    philter::DocPoint q;
+                    q.dt = x - last, q.y = y;
+                    last = x;
+                    out.push_back (q);
+                }
+                return out;
+            };
+            const auto drawn = [points] (bool shaper, bool allTargets) {
+                return [points, shaper, allTargets] (EffectSlot& e) {
+                    auto d = philter::readDoc (e.state);
+                    if (! d)
+                        return;
+                    for (int u = 0; u < 8; ++u)
+                    {
+                        auto& un = d->u[(std::size_t) u];
+                        un.enabled = 1;
+                        if (un.mode == 0)
+                            un.mode = 1;
+                        if (shaper) // an S curve
+                        {
+                            un.wsOn = 1;
+                            un.ws.pts = points ({ { 0.0, 0.0 }, { 0.3, 0.1 }, { 0.5, 0.5 }, { 0.7, 0.9 }, { 1.0, 1.0 } });
+                        }
+                        for (int t = 0; t < 8; ++t)
+                        {
+                            if (! allTargets && t != 2)
+                                continue;
+                            auto& a = d->u[(std::size_t) u].art[(std::size_t) t];
+                            for (int p = 0; p < 10; ++p) // a different envelope per pattern
+                            {
+                                a.pat[(std::size_t) p].on = 1;
+                                a.pat[(std::size_t) p].pts = points ({ { 0.0, 0.1 }, { 0.25 + 0.1 * p, 0.95 }, { 1.0 + 0.1 * p, 0.2 + 0.06 * p } });
+                            }
+                            a.lfo.on = 1;
+                            a.lfo.pts = points ({ { 0.0, 1.0 }, { 4.0, 1.0 } });
+                            a.lfoDepth = 1.0f;
+                            a.maps[0].pts = points ({ { 0.0, 1.0 }, { 1.0, 0.0 } });
+                            a.maps[1].pts = points ({ { 0.0, 0.0 }, { 0.5, 1.0 }, { 1.0, 0.2 } });
+                            a.maps[2].pts = points ({ { 0.0, 1.0 }, { 0.3, 0.2 }, { 1.0, 0.0 } });
+                        }
+                    }
+                    e.state = philter::writeDoc (*d);
+                };
+            };
+            Hint units { "every unit on (FL's enable boxes)", {} };
+            units.edit = [] (EffectSlot& e) {
+                if (auto d = philter::readDoc (e.state))
+                {
+                    for (auto& un : d->u)
+                        un.enabled = 1, un.mode = un.mode == 0 ? 1 : un.mode;
+                    e.state = philter::writeDoc (*d);
+                }
+            };
+            out.push_back (units);
+            Hint cut { "every unit on, the cutoff articulators drawn: a pattern envelope per pattern, the LFO, the Mod X / Mod Y / follower maps", {} };
+            cut.edit = drawn (false, false);
+            out.push_back (cut);
+            Hint all { "every unit on with an S-curve waveshaper, every articulator drawn (envelopes, LFOs, maps)", {} };
+            all.edit = drawn (true, true);
+            out.push_back (all);
+            break;
+        }
         case EffectKind::frequencySplitter:
         {
             // (the low band down: the bands no longer sum back to the input, so the crossover is heard)

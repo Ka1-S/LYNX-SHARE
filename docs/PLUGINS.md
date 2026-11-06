@@ -221,7 +221,7 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | Frequency Splitter | Frequency Splitter | Insert | Exact | IIR mode; FFT mode within −113 dB |
 | Hardcore † | Hardcore | Insert | Exact | cabinet impulses from the installation |
 | Vocoder | Fruity Vocoder | Insert | Exact | every state, 500 random runs |
-| Love Philter | Fruity Love Philter | Import | Exact | all 86 states, live and export |
+| Love Philter | Fruity Love Philter | Import | Exact | all 86 states, live and export; FL's editor (unit page, articulator envelopes, LFOs and maps), edits written back in FL's state (round 173d3) |
 | Pitch Shifter | Pitch Shifter | Import | Exact | all 15 states and 70 random ones |
 | EQUO | EQUO | Import | Exact | the band sends go to the insert chosen in the Send box (FL's send gain stage and its own downsampler; no FL render of a send yet) (round 173d3) |
 | Low Lifter | Low Lifter | Insert | Exact | the library's Faust engine (crossovers, look-ahead limiter, Chebyshev harmonics, diffuser, low cut): all 11 installation states and 12 random ones at 44.1–96 kHz bit-identical, FL's one-second silence gate included (round 154) |

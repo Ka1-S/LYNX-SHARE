@@ -7338,3 +7338,5 @@ countries: de at ch li lu
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Koppelt die Trims: Eingang drehen bewegt Ausgang gegenläufig, der Pegel bleibt, während sich der Drive ändert"
 "Input and Output move together on every channel of the group that has Group I/O on" = "Eingang und Ausgang bewegen sich gemeinsam auf allen Kanälen der Gruppe mit eingeschaltetem Gruppen-E/A"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: der Konsolenkanal von LYNX. Regler ziehen, Alt+Klick setzt zurück, Rechtsklick für Automation"
+"Point: [LMB] drag moves  [RMB] value, delete  [Alt][RMB] delete" = "Punkt: [LMB] ziehen verschiebt  [RMB] Wert, löschen  [Alt][RMB] löschen"
+"Articulator: [RMB] add a point (hold and drag to place it)  [LMB] drag a point" = "Artikulator: [RMB] fügt einen Punkt hinzu (halten und ziehen zum Platzieren)  [LMB] zieht einen Punkt"

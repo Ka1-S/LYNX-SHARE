@@ -7338,3 +7338,5 @@ countries: tw hk mo
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "連動增益：轉動輸入時輸出反向移動，改變驅動時電平保持不變"
 "Input and Output move together on every channel of the group that has Group I/O on" = "在開啟編組輸入/輸出的同編組所有通道上，輸入與輸出一起移動"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel：LYNX 的混音台通道。拖動旋鈕，Alt+點擊復位，右鍵自動化"
+"Point: [LMB] drag moves  [RMB] value, delete  [Alt][RMB] delete" = "點：[LMB] 拖曳移動  [RMB] 數值、刪除  [Alt][RMB] 刪除"
+"Articulator: [RMB] add a point (hold and drag to place it)  [LMB] drag a point" = "調變器：[RMB] 新增點（按住並拖曳以放置）  [LMB] 拖曳點"

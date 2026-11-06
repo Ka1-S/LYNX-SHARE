@@ -7338,3 +7338,5 @@ countries: id
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Menautkan trim: memutar Input menggerakkan Output berlawanan, level tetap saat drive berubah"
 "Input and Output move together on every channel of the group that has Group I/O on" = "Input dan Output bergerak bersama di setiap kanal grup yang I/O grup-nya aktif"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: kanal konsol LYNX. Seret kenop, Alt+klik mereset, klik kanan untuk otomasi"
+"Point: [LMB] drag moves  [RMB] value, delete  [Alt][RMB] delete" = "Titik: [LMB] seret memindahkan  [RMB] nilai, hapus  [Alt][RMB] hapus"
+"Articulator: [RMB] add a point (hold and drag to place it)  [LMB] drag a point" = "Artikulator: [RMB] tambah titik (tahan dan seret untuk menempatkannya)  [LMB] seret titik"

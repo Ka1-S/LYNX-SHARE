@@ -10,6 +10,7 @@
 #include "core/ConvolverFx.h"
 #include "core/EquoFx.h"
 #include "core/FruityDelayBank.h"
+#include "core/LovePhilter.h"
 #include "core/MaximusFx.h"
 #include "core/MultibandDelayFx.h"
 #include "core/Vocodex.h"
@@ -355,6 +356,210 @@ Table convolverTable()
     return t;
 }
 
+// --- Love Philter (core/LovePhilter.h, round 173d3): the unit page's switches and selectors, the articulators' LFO and
+// envelope switches, the options; in FL's own state (philter::Doc) -------------------------------------------------
+namespace philterstate
+{
+constexpr int globals = 7, perUnit = 6, perArt = 8;
+const char* const targetNames[8] = { "pan", "volume", "cutoff", "resonance", "low", "band", "high", "shaper mix" };
+const char* const typeNames[12] = { "Chocolate state variable", "Lime low pass", "Lime high pass", "Vanilla low pass", "Vanilla band pass",
+                                    "Vanilla band stop", "Vanilla high pass", "Vanilla all pass", "Vanilla low shelf", "Vanilla peaking",
+                                    "Vanilla high shelf", "Mango low pass" };
+const char* const modeNames[6] = { "Off", "Single", "Dual", "Triple", "Alt dual", "Alt triple" };
+
+// the document of a state, cached (the editor reads many controls of one state per paint)
+std::optional<philter::Doc> docOf (const std::vector<std::uint8_t>& state)
+{
+    static std::mutex lock;
+    static std::vector<std::uint8_t> lastState;
+    static std::optional<philter::Doc> lastDoc;
+    const std::lock_guard<std::mutex> guard (lock);
+    if (state != lastState || ! lastDoc)
+        lastState = state, lastDoc = philter::readDoc (state);
+    return lastDoc;
+}
+
+// the field control `i` reads / writes (nullptr = none); `art` / `pattern` say which articulator
+int* intField (philter::Doc& d, int i, int& raw, bool write)
+{
+    (void) raw, (void) write;
+    if (i < globals)
+        return nullptr;
+    i -= globals;
+    if (i < 8 * perUnit)
+    {
+        auto& u = d.u[(std::size_t) (i / perUnit)];
+        switch (i % perUnit)
+        {
+            case 1: return &u.type;
+            case 2: return &u.mode;
+            default: return nullptr;
+        }
+    }
+    i -= 8 * perUnit;
+    auto& a = d.u[(std::size_t) (i / (8 * perArt))].art[(std::size_t) ((i / perArt) % 8)];
+    const int f = i % perArt;
+    if (f >= 1 && f <= 4 && (std::size_t) (f - 1) < a.lfoKnobs.size())
+        return &a.lfoKnobs[(std::size_t) (f - 1)];
+    return nullptr;
+}
+
+std::optional<int> get (philter::Doc& d, int i)
+{
+    if (i < globals)
+        switch (i)
+        {
+            case 0: return d.optionByte (28) != 0 ? 1 : 0;
+            case 1: return d.optionByte (29) != 0 ? 1 : 0;
+            case 2: return d.optionByte (30) != 0 ? 1 : 0;
+            case 3: return d.option (5) > 0 ? 1 : 0;
+            case 4: return d.option (6);
+            case 5: return d.use1() != 0 ? 1 : 0;
+            default: return d.option (4);
+        }
+    int raw = 0;
+    if (auto* f = intField (d, i, raw, false))
+        return *f;
+    const int j = i - globals;
+    if (j < 8 * perUnit)
+    {
+        const auto& u = d.u[(std::size_t) (j / perUnit)];
+        switch (j % perUnit)
+        {
+            case 0: return u.enabled != 0 ? 1 : 0;
+            case 3: return u.flat != 0 ? 1 : 0;
+            case 4: return u.wsOn != 0 ? 1 : 0;
+            default: return u.wsBip != 0 ? 1 : 0;
+        }
+    }
+    const int k = j - 8 * perUnit;
+    const auto& a = d.u[(std::size_t) (k / (8 * perArt))].art[(std::size_t) ((k / perArt) % 8)];
+    const auto& env = a.pat[(std::size_t) std::clamp (d.global (5) - 1, 0, 9)];
+    switch (k % perArt)
+    {
+        case 0: return a.lfo.on != 0 ? 1 : 0;
+        case 5: return (a.lfo.flags & 1) != 0 ? 1 : 0;
+        case 6: return env.on != 0 ? 1 : 0;
+        default: return (env.flags & 1) != 0 ? 1 : 0;
+    }
+}
+
+void set (philter::Doc& d, int i, int raw)
+{
+    if (i < globals)
+    {
+        switch (i)
+        {
+            case 0: d.setOptionByte (28, raw); break;
+            case 1: d.setOptionByte (29, raw); break;
+            case 2: d.setOptionByte (30, raw); break;
+            case 3: d.setOption (5, raw); break;
+            case 4: d.setOption (6, raw); break;
+            case 5: d.setUse1 (raw); break;
+            default: d.setOption (4, raw); break;
+        }
+        return;
+    }
+    int dummy = 0;
+    if (auto* f = intField (d, i, dummy, true))
+    {
+        *f = raw;
+        return;
+    }
+    const int j = i - globals;
+    if (j < 8 * perUnit)
+    {
+        auto& u = d.u[(std::size_t) (j / perUnit)];
+        switch (j % perUnit)
+        {
+            case 0: u.enabled = (std::uint8_t) raw; break;
+            case 3: u.flat = (std::uint8_t) raw; break;
+            case 4: u.wsOn = (std::uint8_t) raw; break;
+            default: u.wsBip = (std::uint8_t) raw; break;
+        }
+        return;
+    }
+    const int k = j - 8 * perUnit;
+    auto& a = d.u[(std::size_t) (k / (8 * perArt))].art[(std::size_t) ((k / perArt) % 8)];
+    auto& env = a.pat[(std::size_t) std::clamp (d.global (5) - 1, 0, 9)];
+    switch (k % perArt)
+    {
+        case 0: a.lfo.on = raw; break;
+        case 5: a.lfo.flags = raw != 0 ? (a.lfo.flags | 1) : (a.lfo.flags & ~1); break;
+        case 6: env.on = raw; break;
+        default: env.flags = raw != 0 ? (env.flags | 1) : (env.flags & ~1); break;
+    }
+}
+} // namespace philterstate
+
+Table lovePhilterTable()
+{
+    using namespace philterstate;
+    Table t;
+    t.params = { { "Smooth", 0, 1, 1 }, { "Center", 0, 1, 0 }, { "Sync pattern changes", 0, 1, 1 }, { "HQ envelopes", 0, 1, 0 },
+                 { "Oversampling", 0, 4, 1 }, { "Use unit 1", 0, 1, 0 }, { "Solo unit", -1, 7, -1 } };
+    for (int u = 1; u <= 8; ++u)
+    {
+        const auto n = "Unit " + std::to_string (u) + " ";
+        t.params.push_back ({ n + "on", 0, 1, u == 1 ? 1 : 0 });
+        t.params.push_back ({ n + "type", 0, 11, 0 });
+        t.params.push_back ({ n + "mode", 0, 5, 1 });
+        t.params.push_back ({ n + "ALT", 0, 1, 0 });
+        t.params.push_back ({ n + "shaper on", 0, 1, 0 });
+        t.params.push_back ({ n + "shaper unipolar", 0, 1, 0 });
+    }
+    for (int u = 1; u <= 8; ++u)
+        for (const auto* target : targetNames)
+        {
+            const auto n = "Unit " + std::to_string (u) + " " + target + " ";
+            t.params.push_back ({ n + "LFO on", 0, 1, 0 });
+            t.params.push_back ({ n + "LFO speed", 0, 65536, 40000 });
+            t.params.push_back ({ n + "LFO tension", -128, 128, 0 });
+            t.params.push_back ({ n + "LFO skew", -128, 128, 0 });
+            t.params.push_back ({ n + "LFO pulse width", -112, 112, 0 });
+            t.params.push_back ({ n + "LFO tempo", 0, 1, 0 });
+            t.params.push_back ({ n + "envelope on", 0, 1, 0 });
+            t.params.push_back ({ n + "envelope tempo", 0, 1, 0 });
+        }
+    t.get = [] (const std::vector<std::uint8_t>& state, int i) -> std::optional<int> {
+        auto d = docOf (state);
+        if (! d || i < 0 || i >= globals + 8 * perUnit + 64 * perArt)
+            return std::nullopt;
+        return get (*d, i);
+    };
+    t.with = [table = t.params] (const std::vector<std::uint8_t>& state, int i, int raw) {
+        auto d = docOf (state);
+        if (! d || i < 0 || i >= (int) table.size())
+            return state;
+        set (*d, i, std::clamp (raw, table[(std::size_t) i].minimum, table[(std::size_t) i].maximum));
+        return philter::writeDoc (*d);
+    };
+    t.text = [] (const std::vector<std::uint8_t>&, int i, int raw) -> std::string {
+        if (i == 4)
+            return raw == 0 ? "Off" : format ("%.0fx", std::pow (2.0, raw));
+        if (i == 6)
+            return raw < 0 ? "None" : format ("Unit %.0f", raw + 1.0);
+        if (i < globals)
+            return raw != 0 ? "On" : "Off";
+        const int j = i - globals;
+        if (j < 8 * perUnit)
+        {
+            if (j % perUnit == 1)
+                return typeNames[std::clamp (raw, 0, 11)];
+            if (j % perUnit == 2)
+                return modeNames[std::clamp (raw, 0, 5)];
+            return raw != 0 ? "On" : "Off";
+        }
+        const int f = (j - 8 * perUnit) % perArt;
+        if (f == 1)
+            return format ("%.2f Hz", (std::pow (10001.0, raw / 65536.0) - 1.0) / 625.0);
+        if (f >= 2 && f <= 4)
+            return format ("%.0f%%", raw / 1.28);
+        return raw != 0 ? "On" : "Off";
+    };
+    return t;
+}
+
 // --- Vocodex (core/Vocodex.h): FL's 20 controls, the options block and the eight switches, in place in the state -----
 // Ranges from FL's form (REA_rodada20 §4.2.2); those of attack / release curve, mod band width, unison pitch and
 // unison pan are not confirmed (chosen around the installation presets' values).
@@ -482,6 +687,7 @@ const Table* tableFor (EffectKind kind)
         case EffectKind::equo: t = equoTable(); break;
         case EffectKind::convolver: t = convolverTable(); break;
         case EffectKind::vocodex: t = vocodexTable(); break;
+        case EffectKind::lovePhilter: t = lovePhilterTable(); break;
         default: return nullptr;
     }
     return &tables.emplace (kind, std::move (t)).first->second;
