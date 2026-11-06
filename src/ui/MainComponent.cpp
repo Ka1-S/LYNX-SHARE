@@ -1943,6 +1943,11 @@ void MainComponent::loadUiSettings()
             skin::overridesFromString (line.fromFirstOccurrenceOf ("=", false, false).trim());
         else if (key == "reducedEffects")
             skin::setReducedEffects (on);
+        else if (key == "animationRate") // round 174e2: 0 = the display's refresh, else 60 / 30
+        {
+            const auto hz = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue();
+            ui::FrameTicker::rateLimit() = hz == 30 || hz == 60 ? hz : 0;
+        }
         else if (key == "artMotion")
             skin::setArtMotion (on);
         else if (key == "waveStereo")
@@ -2107,6 +2112,7 @@ void MainComponent::saveUiSettings()
                                       + "\nrackPlayheadColumn=" + juce::String (ChannelRackComponent::playheadColumn.load() ? 1 : 0)
                                       + "\nrackStepsChannelColour=" + juce::String (ChannelRackComponent::stepsChannelColour.load() ? 1 : 0)
                                       + "\nreducedEffects=" + juce::String (skin::reducedEffects() ? 1 : 0)
+                                      + "\nanimationRate=" + juce::String (ui::FrameTicker::rateLimit())
                                       + "\nartMotion=" + juce::String (skin::artMotion() ? 1 : 0)
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
                                       + "\npluginStyleOverrides=" + skin::overridesToString()
@@ -4059,6 +4065,22 @@ void MainComponent::timerCallback()
                 { names[names.size() - 1] }));
     }
 
+    // round 176a: a plugin in a separate process (Make bridged, or a 32-bit plugin in the 32-bit bridge) crashed or hung:
+    // only that process went; the plugin is muted. Round 174a's prompt, logged like the other plugin crashes.
+    if (const auto deaths = pluginSandboxDeathCount(); deaths != sandboxDeathsSeen)
+    {
+        sandboxDeathsSeen = deaths;
+        const auto all = pluginSandboxDeaths();
+        if (! all.empty())
+        {
+            const auto& d = all.back();
+            PluginHost::settingsFolder().getChildFile ("plugin-crashes.log").appendText (
+                juce::Time::getCurrentTime().toISO8601 (true) + "  " + d.plugin + "  " + (d.crashed ? "crashed" : "stopped responding")
+                + (d.bits32 ? " (32-bit bridge)" : " (separate process)") + "\n");
+            announceSeparateProcessCrash (d.plugin, d.crashed, d.bits32);
+        }
+    }
+
     // issue #32 (round 174a): a plugin's own editor window faulted; LYNX closed that editor and kept running
     if (const auto crashes = PluginWindows::editorCrashCount(); crashes != editorCrashesSeen)
     {
@@ -4903,6 +4925,26 @@ void MainComponent::announceEditorCrash (const juce::String& plugin)
     });
 }
 
+// Round 176a: round 174a's "Plugin crashed" prompt for a plugin whose separate process died. LYNX itself is unharmed
+// (the plugin ran in its own process), so it offers the save and says how to get the plugin back.
+void MainComponent::announceSeparateProcessCrash (const juce::String& plugin, bool crashed, bool bits32)
+{
+    const auto name = plugin.isNotEmpty() ? plugin : tr ("A plugin");
+    const auto where = bits32 ? tr ("{0} crashed in the 32-bit bridge.", { name }) : tr ("{0} crashed in its separate process.", { name });
+    auto options = juce::MessageBoxOptions()
+                       .withIconType (juce::MessageBoxIconType::WarningIcon)
+                       .withTitle (tr ("Plugin crashed"))
+                       .withMessage ((crashed ? where : tr ("{0} stopped responding (separate process).", { name })) + "\n\n"
+                                     + tr ("Only its process was affected: LYNX SHARE and your project kept running, and the plugin "
+                                           "was muted. Save your project; the plugin loads again the next time you open it."))
+                       .withButton (tr ("Save as..."))
+                       .withButton (tr ("Close"));
+    juce::AlertWindow::showAsync (options, [safe = juce::Component::SafePointer<MainComponent> (this)] (int result) {
+        if (safe != nullptr && result == 1)
+            safe->save (true);
+    });
+}
+
 void MainComponent::saveAsTemplate()
 {
     auto* w = new juce::AlertWindow (tr ("Save as template"), tr ("The template appears in File › New project... (saved in {0})", { userTemplatesFolder().getFullPathName() }),
@@ -4928,7 +4970,7 @@ void MainComponent::chooseFileToOpen()
 void MainComponent::chooseFileToOpenNow()
 {
     fileChooser = lynx::ui::makeFileChooser (tr ("Open project"), currentFile.getParentDirectory(),
-                                                       juce::String ("*") + ProjectFile::extension + ";*.dawproj;*.flp;*.zip;*.lynxpack;*.mid;*.midi");
+                                                       juce::String ("*") + ProjectFile::extension + ";*.dawproj;*.flp;*.als;*.zip;*.lynxpack;*.mid;*.midi");
 
     lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [this] (const juce::FileChooser& chooser) {
@@ -4985,7 +5027,7 @@ void MainComponent::openFile (const juce::File& file)
         return;
     }
 
-    if (file.hasFileExtension ("flp"))
+    if (file.hasFileExtension ("flp;als")) // (a Live set takes the .flp import's path, round 175a)
     {
         if (! persistent) // (command-line modes open synchronously, without scanning)
         {
@@ -5034,7 +5076,7 @@ void MainComponent::flpImported (const juce::File& file)
         importedFlpFile = file;
         projectName = file.getFileNameWithoutExtension();
         rememberRecent (file);
-        importedSuffix = " " + tr ("(imported from FL Studio)");
+        importedSuffix = " " + (file.hasFileExtension ("als") ? tr ("(imported from .als)") : tr ("(imported from FL Studio)"));
         updateTitle();
         playlist.showSongAfterOpen();
 
@@ -5105,6 +5147,7 @@ void MainComponent::openSettings (int page)
         o.rackPlayheadColumn = ChannelRackComponent::playheadColumn.load();
         o.rackStepsChannelColour = ChannelRackComponent::stepsChannelColour.load();
         o.reducedEffects = skin::reducedEffects();
+        o.animationRate = ui::FrameTicker::rateLimit();
         o.artMotion = skin::artMotion();
         o.gpuRendering = gpuRenderingEnabled();
         o.pluginStyle = skin::forcedStyle();
@@ -5141,6 +5184,7 @@ void MainComponent::openSettings (int page)
             self.setToolbarLayout (layout, true);
         }
         theme::menus::setCompact (o.compactMenus);
+        ui::FrameTicker::rateLimit() = o.animationRate; // (the tickers read it every frame)
         if (o.reducedEffects != skin::reducedEffects() || o.pluginStyle != skin::forcedStyle() || o.artMotion != skin::artMotion())
         {
             skin::setArtMotion (o.artMotion);

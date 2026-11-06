@@ -275,7 +275,11 @@ std::optional<float> rawValue (const ChannelDef& def, int index)
         case InstrumentKind::slayer:
         {
             const auto at = 4 + 4 * (std::size_t) index;
-            if (! slayerStateUsable (s) || at + 4 > s.size())
+            if (! slayerStateUsable (s))
+                return std::nullopt;
+            if (index == 28 && at + 4 > s.size())
+                return 0.0f; // (a version-0 state, every installation preset: no mod wheel saved, FL's wheel at 0)
+            if (at + 4 > s.size())
                 return std::nullopt;
             return (float) i32 (s, at);
         }
@@ -325,7 +329,17 @@ bool setRawValue (ChannelDef& def, int index, float v)
         case InstrumentKind::slayer:
         {
             const auto at = 4 + 4 * (std::size_t) index;
-            if (! slayerStateUsable (s) || at + 4 > s.size())
+            if (! slayerStateUsable (s))
+                return false;
+            // round 173d2: the mod wheel (parameter 28, "Pitchbend 2") of a version-0 state (28 ints, every installation
+            // preset) had no slot, so the editor's wheel did nothing. FL 2026 saves version 1 with it (REA_rodada68
+            // §6.1): the state is upgraded the same way
+            if (index == 28 && s.size() == 4 + 4 * 28 && i32 (s, 0) == 0)
+            {
+                s.resize (4 + 4 * 29, 0);
+                put32 (0, 1);
+            }
+            if (at + 4 > s.size())
                 return false;
             put32 (at, (std::int32_t) std::lround (v));
             return true;

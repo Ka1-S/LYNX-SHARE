@@ -37,6 +37,9 @@ add_library(lynx_core STATIC
     src/core/ModuleWarmup.cpp
     src/core/FlpImport.cpp
     src/core/FlpExport.cpp
+    src/core/XmlLite.cpp
+    src/core/Gzip.cpp
+    src/core/AlsImport.cpp
     src/flp/FlpWrite.cpp
     src/core/Effects.cpp
     src/core/NoteEdit.cpp
@@ -383,6 +386,8 @@ if(LYNX_BUILD_APP)
         src/engine/PluginHost.cpp
         src/engine/FlStudio.cpp
         src/engine/PluginSandbox.cpp
+        src/engine/SandboxWorker.cpp
+        src/engine/Bridge32Test.cpp
         src/engine/Exporter.cpp
         src/engine/FlStudioExport.cpp
         src/engine/StreamPrefetcher.cpp
