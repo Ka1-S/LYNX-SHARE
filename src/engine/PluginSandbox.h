@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -24,10 +25,31 @@ void setPluginSandboxEnabled (bool enabled);
 bool pluginAlwaysSeparate (const juce::String& name);
 void setPluginAlwaysSeparate (const juce::String& name, bool on);
 
+// 32-bit plugins (round 176a, Windows x64 only): LYNX is 64-bit and can't load a 32-bit module, so a 32-bit VST2 / VST3
+// always runs in the 32-bit bridge LYNX-bridge32.exe (next to LYNX.exe) — the same separate-process protocol as "Make
+// bridged", as FL runs them in its System\Tools\Bridge\32bit\ilbridge.exe. The scan describes them there too.
+bool bridge32Supported();               // this build can run them (Windows x64); elsewhere the option is hidden
+juce::File bridge32Executable();        // LYNX-bridge32.exe beside LYNX.exe (it may be missing)
+bool isModule32Bit (const juce::String& fileOrIdentifier); // a 32-bit x86 VST2 DLL / VST3 bundle or file
+bool isPlugin32Bit (const juce::PluginDescription& description);
+// A sandbox proxy running in the 32-bit bridge.
+bool isBridged32 (const juce::AudioPluginInstance& plugin);
+
 // Opens the plugin in a child process, already prepared (rate, block, base64 state). nullptr + `error` on
 // failure (child didn't start, plugin didn't load, timeout).
 std::unique_ptr<juce::AudioPluginInstance> createSandboxedPlugin (const juce::PluginDescription& description, double sampleRate,
                                                                   int blockSize, const std::string& stateBase64, juce::String& error);
+
+// Separate-process plugins whose process died this session (round 176a; newest last; UI thread): the plugin's name, and
+// whether it crashed (else it stopped responding) and ran in the 32-bit bridge. `count` only grows, so the UI notices a
+// new one by comparing it (MainComponent shows round 174a's "Plugin crashed" prompt).
+struct SandboxDeath
+{
+    juce::String plugin;
+    bool crashed = false, bits32 = false;
+};
+int pluginSandboxDeathCount() noexcept;
+std::vector<SandboxDeath> pluginSandboxDeaths();
 
 // True if the plugin is a sandbox proxy and its process died (hung, exited or stopped responding).
 bool isSandboxedPluginDead (const juce::AudioPluginInstance& plugin);
@@ -41,6 +63,8 @@ void shutdownPluginSandboxWorker();
 // hang on its next audio call (to check the timeout).
 void setPluginSandboxAlerts (bool show);
 void hangSandboxedPluginForTest (juce::AudioPluginInstance& plugin);
+// Test (--bridge32test): the child's process id (0 when unknown).
+int sandboxedPluginProcessId (const juce::AudioPluginInstance& plugin);
 // Test: makes the child process crash (abort) as a misbehaving plugin would; LYNX must keep running.
 void crashSandboxedPluginForTest (juce::AudioPluginInstance& plugin);
 } // namespace lynx

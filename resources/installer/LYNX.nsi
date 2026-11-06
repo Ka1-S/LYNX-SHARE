@@ -97,6 +97,7 @@ Section "!$(SecApp)" SecMain
     File "${STAGE}\THIRD_PARTY.md"
     File /nonfatal "${STAGE}\PRIVACY.md"
     File /nonfatal "${STAGE}\Demo.lynx"
+    File /nonfatal "${STAGE}\LYNX-bridge32.exe" ; 32-bit plugins run in it (round 176a)
     ; LYNX ASIO (REA round 97): LYNX loads it directly; the .bat files register it for other programs (administrator)
     File /nonfatal "${STAGE}\lynx-asio.dll"
     File /nonfatal "${STAGE}\lynx-asio32.dll" ; for 32-bit programs (REA round 106)
@@ -176,6 +177,7 @@ Section "Uninstall"
         ExecShellWait "runas" "$WINDIR\SysWOW64\regsvr32.exe" '/u /s "$INSTDIR\lynx-asio32.dll"'
     ${EndIf}
     Delete "$INSTDIR\onnxruntime.dll"
+    Delete "$INSTDIR\LYNX-bridge32.exe"
     Delete "$INSTDIR\lynx-asio.dll"
     Delete "$INSTDIR\lynx-asio32.dll"
     Delete "$INSTDIR\Register LYNX ASIO.bat"
