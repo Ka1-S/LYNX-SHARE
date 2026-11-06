@@ -726,9 +726,50 @@ public:
         rate = sampleRate;
         engine.prepare (sampleRate);
     }
-    void reset() noexcept override { engine.reset(); }
+    void reset() noexcept override
+    {
+        engine.reset();
+        fade = Fade::none;
+        started = false;
+    }
 
     void process (float* left, float* right, int n, const EffectParams& p, double bpm) noexcept override
+    {
+        // round 173d: a new type / mode re-tunes the whole tank at once (line lengths, taps, band limits): the wet part
+        // fades out on the old one, the new one starts and fades in (11 ms each way) instead of a click of 10…15 dB
+        const auto st = structure (p);
+        if (! started)
+            lastStructure = st, started = true;
+        if (st != lastStructure && fade == Fade::none)
+        {
+            fade = Fade::out;
+            fadeLeft = fadeLength;
+            held = last;
+        }
+        for (int done = 0; done < n;)
+        {
+            const auto m = fade == Fade::none ? n - done : std::min (n - done, fadeLeft);
+            run (left + done, right + done, m, fade == Fade::out ? held : p, bpm);
+            done += m;
+            if (fade != Fade::none && (fadeLeft -= m) <= 0)
+            {
+                if (fade == Fade::out)
+                    fade = Fade::in, fadeLeft = fadeLength, lastStructure = st;
+                else
+                    fade = Fade::none;
+            }
+        }
+        last = p;
+    }
+
+protected:
+    // the setting that rebuilds the tank's structure (its type / mode), −1 = none
+    virtual int structure (const EffectParams&) const noexcept { return -1; }
+    virtual void configure (const EffectParams& p, double bpm, Settings& s, float& mix) const noexcept = 0;
+    virtual void preStage (float*, float*, int, const EffectParams&, double) noexcept {}
+    virtual void postStage (float*, float*, int, const EffectParams&, double) noexcept {}
+
+    void run (float* left, float* right, int n, const EffectParams& p, double bpm) noexcept
     {
         Settings s;
         float mix = 1.0f;
@@ -747,18 +788,25 @@ public:
             postStage (l, r, m, p, bpm);
             for (int i = 0; i < m; ++i)
             {
-                l[i] = dry * dl[(std::size_t) i] + wet * l[i];
-                r[i] = dry * dr[(std::size_t) i] + wet * r[i];
+                auto w = wet;
+                if (fade != Fade::none)
+                {
+                    const auto g = (float) (fadeLeft - start - i) / (float) fadeLength; // 1 … 0 over the fade
+                    w *= fade == Fade::out ? g : 1.0f - g;
+                }
+                l[i] = dry * dl[(std::size_t) i] + w * l[i];
+                r[i] = dry * dr[(std::size_t) i] + w * r[i];
             }
         }
     }
 
-protected:
-    virtual void configure (const EffectParams& p, double bpm, Settings& s, float& mix) const noexcept = 0;
-    virtual void preStage (float*, float*, int, const EffectParams&, double) noexcept {}
-    virtual void postStage (float*, float*, int, const EffectParams&, double) noexcept {}
-
     static constexpr int chunk = 1024;
+    static constexpr int fadeLength = 512;
+    enum class Fade { none, out, in };
+    Fade fade = Fade::none;
+    int fadeLeft = 0, lastStructure = -1;
+    bool started = false;
+    EffectParams last {}, held {};
     EffectKind kind;
     Engine engine;
     double rate = 48000.0;
@@ -870,6 +918,7 @@ public:
     EpochFx() : VerbEffect (EffectKind::epochVerb, 0.25, 0.62) {}
 
 protected:
+    int structure (const EffectParams& p) const noexcept override { return choice (p[16], epoch::modeCount); }
     void configure (const EffectParams& p, double, Settings& s, float& mix) const noexcept override
     {
         const auto modeIndex = choice (p[16], epoch::modeCount);
@@ -963,6 +1012,7 @@ public:
     AtriumFx() : VerbEffect (EffectKind::atrium, 0.25, 1.05) {}
 
 protected:
+    int structure (const EffectParams& p) const noexcept override { return choice (p[19], atrium::typeCount); }
     void configure (const EffectParams& p, double, Settings& s, float& mix) const noexcept override
     {
         const auto& t = atriumTypes[choice (p[19], atrium::typeCount)];
@@ -1078,6 +1128,7 @@ public:
     FoilFx() : VerbEffect (EffectKind::foilPlate, 0.2, 0.62) {}
 
 protected:
+    int structure (const EffectParams& p) const noexcept override { return choice (p[11], foil::typeCount); }
     void configure (const EffectParams& p, double, Settings& s, float& mix) const noexcept override
     {
         const auto& t = foilTypes[choice (p[11], foil::typeCount)];
@@ -1196,6 +1247,7 @@ private:
 protected:
 
 protected:
+    int structure (const EffectParams& p) const noexcept override { return choice (p[12], nebula::modeCount); }
     void configure (const EffectParams& p, double bpm, Settings& s, float& mix) const noexcept override
     {
         const auto& m = nebulaModes[choice (p[12], nebula::modeCount)];
@@ -1400,6 +1452,7 @@ public:
     }
 
 protected:
+    int structure (const EffectParams& p) const noexcept override { return choice (p[22], horizon::reverbModeCount); }
     void configure (const EffectParams& p, double, Settings& s, float& mix) const noexcept override
     {
         const auto& m = horizonReverbs[choice (p[22], horizon::reverbModeCount)];

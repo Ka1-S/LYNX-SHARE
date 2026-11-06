@@ -9,6 +9,7 @@
 #include "engine/ProjectFile.h"
 #include "engine/SessionPack.h"
 #include "platform/Paths.h"
+#include "ui/FileChoosers.h"
 #include "ui/I18n.h"
 
 namespace lynx::sessionui
@@ -213,8 +214,8 @@ void sendProject (Context c)
                             }
                             const auto start = defaultFolder (c).getChildFile (
                                 juce::File::createLegalFileName (projectTitle (c) + " - " + tr ("for {0}", { guest })) + sessionpack::extension);
-                            chooser() = std::make_unique<juce::FileChooser> (tr ("Send project"), start, juce::String ("*") + sessionpack::extension);
-                            chooser()->launchAsync (
+                            chooser() = lynx::ui::makeFileChooser (tr ("Send project"), start, juce::String ("*") + sessionpack::extension);
+                            lynx::ui::launchChooser (chooser(), 
                                 juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                                 [c, guest, invited] (const juce::FileChooser& fc) {
                                     auto file = fc.getResult();
@@ -256,8 +257,8 @@ void sendPartBack (Context c)
     const auto hostName = host != nullptr ? str (host->name) : tr ("the host");
     const auto start = platform::documentsFolder().getChildFile (
         juce::File::createLegalFileName (projectTitle (c) + " - " + tr ("{0}'s part", { str (self->name) })) + sessionpack::extension);
-    chooser() = std::make_unique<juce::FileChooser> (tr ("Send my part back"), start, juce::String ("*") + sessionpack::extension);
-    chooser()->launchAsync (
+    chooser() = lynx::ui::makeFileChooser (tr ("Send my part back"), start, juce::String ("*") + sessionpack::extension);
+    lynx::ui::launchChooser (chooser(), 
         juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting, [c, hostName] (const juce::FileChooser& fc) {
             auto file = fc.getResult();
             if (file == juce::File())
@@ -415,8 +416,8 @@ void mergePart (Context c)
         warn (tr ("Merge a part"), tr ("Parts are merged by the host, in the host's project. This is a copy you received."));
         return;
     }
-    chooser() = std::make_unique<juce::FileChooser> (tr ("Merge a part"), platform::documentsFolder(), juce::String ("*") + sessionpack::extension);
-    chooser()->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [c] (const juce::FileChooser& fc) {
+    chooser() = lynx::ui::makeFileChooser (tr ("Merge a part"), platform::documentsFolder(), juce::String ("*") + sessionpack::extension);
+    lynx::ui::launchChooser (chooser(), juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [c] (const juce::FileChooser& fc) {
         const auto file = fc.getResult();
         if (! file.existsAsFile())
             return;

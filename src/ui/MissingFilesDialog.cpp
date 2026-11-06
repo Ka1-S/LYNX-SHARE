@@ -2,6 +2,7 @@
 #include "core/SearchIndex.h"
 
 #include "engine/PluginHost.h"
+#include "ui/FileChoosers.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/WindowOwner.h"
@@ -422,9 +423,9 @@ private:
     // --- actions ------------------------------------------------------------------------------
     void chooseSearchFolder()
     {
-        chooser = std::make_unique<juce::FileChooser> (tr ("Search a folder (and its sub-folders) for the missing samples"),
+        chooser = lynx::ui::makeFileChooser (tr ("Search a folder (and its sub-folders) for the missing samples"),
                                                        folders.empty() ? juce::File::getSpecialLocation (juce::File::userHomeDirectory) : juce::File (u8 (folders.front())));
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
                               [safe = juce::Component::SafePointer<MissingFilesPanel> (this)] (const juce::FileChooser& c) {
                                   if (safe == nullptr || ! c.getResult().isDirectory())
                                       return;
@@ -440,9 +441,9 @@ private:
             return;
         const auto wanted = u8 (pathFileName (info.files[(std::size_t) row].path));
         const auto start = folders.empty() ? juce::File::getSpecialLocation (juce::File::userHomeDirectory) : juce::File (u8 (folders.front()));
-        chooser = std::make_unique<juce::FileChooser> (tr ("Where is {0}?", { wanted }), start.getChildFile (wanted),
+        chooser = lynx::ui::makeFileChooser (tr ("Where is {0}?", { wanted }), start.getChildFile (wanted),
                                                        "*" + juce::File (wanted).getFileExtension());
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [safe = juce::Component::SafePointer<MissingFilesPanel> (this), row] (const juce::FileChooser& c) {
                                   if (safe == nullptr || ! c.getResult().existsAsFile())
                                       return;

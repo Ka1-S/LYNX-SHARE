@@ -140,6 +140,22 @@ void cachedLayer (juce::Graphics& g, juce::Rectangle<float> a, juce::Colour acce
             ig.addTransform (juce::AffineTransform::scale ((float) w / a.getWidth(), (float) h / a.getHeight()));
             draw (ig, { 0.0f, 0.0f, a.getWidth(), a.getHeight() }, accent);
         }
+        // Both layers (canvas, backdrop) are an editor's opaque base: every canvas starts with an opaque fill. Quartz's
+        // 8-bit source-over rounds the alpha of an opaque pixel under a faint translucent blit (a bloom sprite) down to
+        // 254, so on macOS the base came out a hair see-through (CI selftest plugin_art). Snap such pixels back to opaque
+        // (premultiplied data: the colour stays valid); real translucency is far below this threshold.
+        {
+            juce::Image::BitmapData px (img, juce::Image::BitmapData::readWrite);
+            for (int y = 0; y < px.height; ++y)
+            {
+                auto* row = px.getLinePointer (y);
+                for (int x = 0; x < px.width; ++x)
+                {
+                    auto* p = reinterpret_cast<juce::PixelARGB*> (row + x * px.pixelStride);
+                    if (p->getAlpha() >= 0xfc && p->getAlpha() < 0xff) p->setAlpha (0xff);
+                }
+            }
+        }
         it = cache.emplace (key, img).first;
     }
     g.setOpacity (1.0f);

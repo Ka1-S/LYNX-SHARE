@@ -109,7 +109,7 @@ TEST (crash169g_transistor_bass_plays_with_other_fl_builds)
     // the same DLL with its data 0x400 bytes further on (another build's layout): found by shape, same sound
     auto bytes = readAll (dll26);
     bytes.insert (bytes.begin() + 0x1000, 0x400, (std::uint8_t) 0);
-    const auto shifted = (fs::temp_directory_path() / "lynx-crash169g-tbass-shifted.dll").string();
+    const auto shifted = (fs::temp_directory_path() / ("lynx-crash169g-tbass-shifted-" + processTempTag() + ".dll")).string();
     writeAll (shifted, bytes);
     CHECK (lynx::transistorBassDllUsable (shifted));
     CHECK (lynx::tbass::renderReference (state, shifted, notes, 44100.0, 66150) == reference);
@@ -135,7 +135,7 @@ TEST (crash169g_transistor_bass_from_the_plugin_list_with_fl_2025)
     const auto dll25 = fl25 ("3392.dll");
     if (realFlpDir.empty() || dll25.empty())
         return;
-    const auto root = fs::temp_directory_path() / "lynx-crash169g-fl25";
+    const auto root = fs::temp_directory_path() / ("lynx-crash169g-fl25-" + processTempTag());
     fs::create_directories (root / "Plugins" / "Fruity" / "Generators" / "Transistor Bass");
     fs::copy_file (dll25, root / "Plugins" / "Fruity" / "Generators" / "Transistor Bass" / "engine_x64.dll", fs::copy_options::overwrite_existing);
     auto fl = natives142::flAccess();

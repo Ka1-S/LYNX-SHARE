@@ -1,4 +1,5 @@
 #include "ui/PluginPresetMenu.h"
+#include "ui/FileChoosers.h"
 #include "ui/QuickPick.h"
 #include "engine/FlStudio.h"
 #include "ui/BrowserComponent.h"
@@ -3107,8 +3108,8 @@ void BrowserComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
 
 void BrowserComponent::addUserFolder()
 {
-    chooser = std::make_unique<juce::FileChooser> (tr ("Add a folder to the Browser"), juce::File::getSpecialLocation (juce::File::userMusicDirectory));
-    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories, [this] (const juce::FileChooser& fc) {
+    chooser = lynx::ui::makeFileChooser (tr ("Add a folder to the Browser"), juce::File::getSpecialLocation (juce::File::userMusicDirectory));
+    lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories, [this] (const juce::FileChooser& fc) {
         const auto folder = fc.getResult();
         if (! folder.isDirectory())
             return;

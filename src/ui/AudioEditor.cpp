@@ -22,6 +22,7 @@
 #include "engine/SampleLibrary.h"
 #include "engine/Text.h"
 #include "platform/Paths.h"
+#include "ui/FileChoosers.h"
 #include "ui/HintBar.h"
 #include "ui/ValueControl.h"
 #include "ui/I18n.h"
@@ -2098,8 +2099,8 @@ private:
             const auto key = job->ref.key.toStdString();
             if (form.controls.size() == 1 && form.controls[0].hint == "file") // Sample.LoadFromFile_Ask
             {
-                auto chooser = std::make_shared<juce::FileChooser> (tr ("Open"), juce::File(), "*.wav;*.flac;*.aif;*.aiff;*.ogg;*.mp3");
-                chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [self, job, form, chooser] (const juce::FileChooser& fc) {
+                auto chooser = lynx::ui::makeSharedFileChooser (tr ("Open"), juce::File(), "*.wav;*.flac;*.aif;*.aiff;*.ogg;*.mp3");
+                lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [self, job, form, chooser] (const juce::FileChooser& fc) {
                     if (self == nullptr)
                         return;
                     auto answer = form;
@@ -2594,9 +2595,9 @@ private:
             return;
         auto start = lastFile.existsAsFile() ? lastFile.getSiblingFile (safeTitle() + ".wav")
                                              : juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile (safeTitle() + ".wav");
-        chooser = std::make_unique<juce::FileChooser> (tr ("Save as WAV"), start, "*.wav");
+        chooser = lynx::ui::makeFileChooser (tr ("Save as WAV"), start, "*.wav");
         juce::Component::SafePointer<AudioEditor> self (this);
-        chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting,
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting,
                               [self, format] (const juce::FileChooser& fc) {
                                   if (self == nullptr || fc.getResult() == juce::File {})
                                       return;
@@ -2614,9 +2615,9 @@ private:
 
     void openFileDialog()
     {
-        chooser = std::make_unique<juce::FileChooser> (tr ("Open audio file"), lastFile, engine.getSampleLibrary().wildcard());
+        chooser = lynx::ui::makeFileChooser (tr ("Open audio file"), lastFile, engine.getSampleLibrary().wildcard());
         juce::Component::SafePointer<AudioEditor> self (this);
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [self] (const juce::FileChooser& fc) {
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [self] (const juce::FileChooser& fc) {
             if (self == nullptr || ! fc.getResult().existsAsFile())
                 return;
             self->stopPlayback();
@@ -2657,9 +2658,9 @@ private:
             setStatus (tr ("No regions or markers to export"), true);
             return;
         }
-        chooser = std::make_unique<juce::FileChooser> (tr ("Export regions to a folder"), juce::File::getSpecialLocation (juce::File::userMusicDirectory));
+        chooser = lynx::ui::makeFileChooser (tr ("Export regions to a folder"), juce::File::getSpecialLocation (juce::File::userMusicDirectory));
         juce::Component::SafePointer<AudioEditor> self (this);
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
                               [self, parts, names] (const juce::FileChooser& fc) {
                                   if (self == nullptr || ! fc.getResult().isDirectory())
                                       return;

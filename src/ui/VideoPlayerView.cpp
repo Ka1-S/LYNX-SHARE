@@ -13,6 +13,7 @@
 #include "engine/AudioEngine.h"
 #include "platform/Paths.h"
 #include "ui/ControllerKnob.h"
+#include "ui/FileChoosers.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
@@ -1141,10 +1142,10 @@ private:
 
     void chooseFile()
     {
-        chooser = std::make_unique<juce::FileChooser> (tr ("Load video file..."), resolveVideo (settings.path).getParentDirectory(),
+        chooser = lynx::ui::makeFileChooser (tr ("Load video file..."), resolveVideo (settings.path).getParentDirectory(),
                                                        juce::String ("*.") + juce::String (videoExtensions).replace (";", ";*."));
         juce::Component::SafePointer<VideoPlayerEditor> self (this);
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [self] (const juce::FileChooser& fc) {
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [self] (const juce::FileChooser& fc) {
             if (self != nullptr && fc.getResult().existsAsFile())
                 self->load (fc.getResult());
         });
@@ -1168,14 +1169,14 @@ private:
 
     void chooseFfmpeg()
     {
-        chooser = std::make_unique<juce::FileChooser> (tr ("Locate ffmpeg"), juce::File(),
+        chooser = lynx::ui::makeFileChooser (tr ("Locate ffmpeg"), juce::File(),
 #if JUCE_WINDOWS
                                                        "ffmpeg.exe");
 #else
                                                        "*");
 #endif
         juce::Component::SafePointer<VideoPlayerEditor> self (this);
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [self] (const juce::FileChooser& fc) {
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [self] (const juce::FileChooser& fc) {
             if (self == nullptr || ! fc.getResult().existsAsFile())
                 return;
             setFfmpegLocation (fc.getResult());
