@@ -3633,6 +3633,8 @@ private:
     }
 };
 
+#include "ui/ProEditorsStrips.inc"
+
 // --- windows -------------------------------------------------------------------------------------------------
 std::unique_ptr<ProEditor> make (AudioEngine& engine, int track, int slot, bool demo)
 {
@@ -3649,6 +3651,8 @@ std::unique_ptr<ProEditor> make (AudioEngine& engine, int track, int slot, bool 
         case EffectKind::ember: return std::make_unique<EmberEditor> (engine, track, slot, demo);
         case EffectKind::aether: return std::make_unique<AetherEditor> (engine, track, slot, demo);
         case EffectKind::kilnChannel: return std::make_unique<KilnEditor> (engine, track, slot, demo);
+        case EffectKind::fretChannel: return std::make_unique<FretEditor> (engine, track, slot, demo);
+        case EffectKind::shellChannel: return std::make_unique<ShellEditor> (engine, track, slot, demo);
         default: return nullptr;
     }
 }
@@ -3729,7 +3733,8 @@ bool handles (EffectKind kind) noexcept
 {
     return kind == EffectKind::apexLimiter || kind == EffectKind::hushDeEsser || kind == EffectKind::crestCompressor
            || kind == EffectKind::sentryGate || kind == EffectKind::prismMultiband || kind == EffectKind::ember
-           || kind == EffectKind::aether || kind == EffectKind::kilnChannel;
+           || kind == EffectKind::aether || kind == EffectKind::kilnChannel || kind == EffectKind::fretChannel
+           || kind == EffectKind::shellChannel;
 }
 
 void open (AudioEngine& engine, int track, int slot)

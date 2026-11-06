@@ -3671,10 +3671,13 @@ const EffectInfo& emberInfo()
 
 std::unique_ptr<Effect> makeHush (const EffectParams* params) { return std::make_unique<hush::DeEsser> (params); }
 
+std::unique_ptr<Effect> makeFret();  // round tp172c8 (core/StripSuite.inc)
+std::unique_ptr<Effect> makeShell();
 bool isSuiteKind (EffectKind kind) noexcept
 {
     return kind == EffectKind::ridgeStrip || kind == EffectKind::glowLeveler || kind == EffectKind::hushDeEsser
-           || kind == EffectKind::aether || kind == EffectKind::ember || kind == EffectKind::kilnChannel;
+           || kind == EffectKind::aether || kind == EffectKind::ember || kind == EffectKind::kilnChannel
+           || kind == EffectKind::fretChannel || kind == EffectKind::shellChannel;
 }
 
 std::unique_ptr<Effect> make (EffectKind kind)
@@ -3687,6 +3690,8 @@ std::unique_ptr<Effect> make (EffectKind kind)
         case EffectKind::aether: return std::make_unique<aether::Air>();
         case EffectKind::ember: return std::make_unique<ember::Saturator>();
         case EffectKind::kilnChannel: return ridge::makeKiln();
+        case EffectKind::fretChannel: return makeFret();
+        case EffectKind::shellChannel: return makeShell();
         default: return nullptr;
     }
 }
@@ -3714,6 +3719,8 @@ std::string fmt (const char* f, double v)
 
 std::string onOff (float v) { return on (v) ? "on" : "off"; }
 } // namespace
+
+#include "core/StripSuite.inc" // round tp172c8: Fret Channel, Shell Channel
 
 namespace glow
 {
@@ -3838,6 +3845,10 @@ std::string vocalParamText (int param, float v)
 
 std::string paramText (EffectKind kind, int param, float v)
 {
+    if (kind == EffectKind::fretChannel)
+        return fretParamText (param, v);
+    if (kind == EffectKind::shellChannel)
+        return shellParamText (param, v);
     if (kind == EffectKind::kilnChannel)
     {
         namespace k = kiln;
