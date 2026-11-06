@@ -9089,6 +9089,25 @@ private:
             offline.dispatchPendingMessages();
             saveSnapshot (ui, prefix + "-playlist-timesel.png");
             ui.getPlaylistForSnapshot().setToolForSnapshot (lynx::EditTool::pencil);
+            // round 177b: automation lanes on (two lanes under track 2: a volume ramp and a pan wobble)
+            {
+                const auto before = offline.getSong();
+                offline.editSong ([] (lynx::Song& s) {
+                    s.loopStart = s.loopEnd = 0; // (no time selection in this one)
+                    const auto bar = (std::int64_t) lynx::ppq * s.beatsPerBar;
+                    const auto vol = lynx::autolanes::addLane (s, 1, { lynx::AutomationTargetKind::mixerVolume, 1, 0, 0 }, "Insert 1 - Volume", 0.3f);
+                    s.automations[(std::size_t) vol].points = { { 0, 0.3f, 0.0f }, { bar * 2, 0.8f, 0.4f }, { bar * 4, 0.6f, 0.0f } };
+                    const auto pan = lynx::autolanes::addLane (s, 1, { lynx::AutomationTargetKind::mixerPan, 1, 0, 0 }, "Insert 1 - Pan", 0.5f);
+                    s.automations[(std::size_t) pan].points = { { 0, 0.5f, 0.0f }, { bar, 0.2f, 0.0f }, { bar * 2, 0.8f, 0.0f }, { bar * 3, 0.5f, 0.0f } };
+                }, false);
+                lynx::autolanes::setShown (true);
+                ui.getPlaylistForSnapshot().resized();
+                offline.dispatchPendingMessages();
+                saveSnapshot (ui, prefix + "-playlist-lanes.png");
+                lynx::autolanes::setShown (false);
+                offline.editSong ([before] (lynx::Song& s) { s = before; }, false);
+                offline.dispatchPendingMessages();
+            }
             // round 104: a folded track group (FL's thin member rows) and the Picker's audio tab
             {
                 int header = -1;

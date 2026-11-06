@@ -1151,7 +1151,7 @@ public:
         refresh();
     }
 
-    static constexpr int headHeight = 52, routeHeight = 44;
+    static constexpr int headHeight = 58, routeHeight = 52;
     int wantedHeight() const
     {
         const auto* m = mod();
