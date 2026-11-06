@@ -119,3 +119,31 @@ TEST (lanes177b_conversions_and_export)
     (void) lynx::flpexport::toProject (song, {}, report);
     CHECK (std::any_of (report.notes.begin(), report.notes.end(), [] (const std::string& n) { return n.rfind ("Automation lanes", 0) == 0; }));
 }
+
+TEST (lanes177b_track_for_a_target)
+{
+    namespace al = lynx::autolanes;
+    auto song = lanes177bSong();
+    CHECK (! al::shown()); // off by default: FL users see no lanes
+    song.channels.resize (2);
+    song.channels[1].mixerTrack = 1;
+    song.playlistTracks.resize (6);
+    song.playlistTracks[3].mode = lynx::PlaylistTrackMode::instrument;
+    song.playlistTracks[3].channel = 1;
+    song.playlistTracks[3].mixerTrack = 1;
+    song.playlistTracks[4].mode = lynx::PlaylistTrackMode::audio;
+    song.playlistTracks[4].mixerTrack = 2;
+    lynx::Clip clip;
+    clip.track = 0;
+    clip.length = 960;
+    song.playlist.push_back (clip);
+
+    using K = lynx::AutomationTargetKind;
+    CHECK (al::trackFor (song, { K::channelVolume, 1, 0, 0 }) == 3); // the channel's instrument track
+    CHECK (al::trackFor (song, { K::mixerPan, 2, 0, 0 }) == 4);       // the audio track of its insert
+    CHECK (al::trackFor (song, { K::effectParam, 1, 0, 3 }) == 3);    // the insert of the instrument track
+    CHECK (al::trackFor (song, { K::tempo, 0, 0, 0 }) == 1);          // else the first empty track (0 has a clip)
+    al::addLane (song, 5, { K::tempo, 0, 0, 0 }, "Tempo", 0.3f);
+    CHECK (al::trackFor (song, { K::tempo, 0, 0, 0 }) == 5);          // the track that already has its lane
+    CHECK (al::trackFor (song, { K::mixerVolume, 0, 0, 0 }) == 1);
+}

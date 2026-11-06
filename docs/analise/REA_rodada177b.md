@@ -167,11 +167,21 @@ writes lanes as clips on free tracks.
 - Tests: `lanes177b_lane_plays_and_clips_win` (rendered levels: lane between clips, clip inside, muted track),
   `lanes177b_conversions_and_export`; selftest `lanes_saved` (project round trip).
 
-### UI (slice 3b — after the UI gate)
-Playlist › View › "Automation lanes" (off); fold arrow and "+A" on a track header; the "+A" picker lists the linked
-channel / insert parameters first, then Last tweaked, then everything; "Automate in lane" in every control's menu next
-to "Create automation clip"; lane editing with LYNX's in-Playlist clip gestures (drag, add, right-click delete,
-Alt-drag curve), value readout; "Hide all lanes"; clip menu "Move into lane" / lane menu "To automation clip".
+### UI (slice 3b, built; lands after the UI gate)
+| Piece | Where |
+|---|---|
+| Playlist options menu and the main menu's Playlist part: "Automation lanes" (off; an app setting, `automationLanes` in the UI settings; action `playlist.automationLanes` for a shortcut). `autolanes::shown()` is the flag round 175a's layout mode sets | `ui/PlaylistComponent`, `ui/MainComponent`, `core/KeyMap`, `core/PlaylistOps.h` |
+| Layout: a track's lanes sit under its row (34 px each at 100 %, follow the vertical zoom); `heightOf` stays the row, so clips never draw into lanes; `trackTops` include them | `PlaylistComponent::laneBlockHeight`, `laneRow`, `refreshTrackLayout` |
+| Track header: a fold arrow when the track has lanes; "+A" on hover adds a lane — the picker lists the track's own channel / mixer track volume and pan, then the two last tweaked controls, then Tempo and Master volume | `trackLaneArrow`, `trackAddLane`, `showAddLaneMenu` |
+| Every control's menu: "Automate in lane" under "Create automation clip" (only while lanes are on: FL's menu is unchanged otherwise). The lane goes on `autolanes::trackFor`: the track that has its lane, else the channel's instrument track, else the audio / instrument track of its mixer track, else the first empty track | `ui/AutomationUi` `createAutomationLane`, `core/PlaylistOps` |
+| Lane editing, the same in every tool: [LMB] adds a point and drags it ([Shift]: on the line), drag a point moves it ([Shift] / [Ctrl] after the click keep time / value, as in clips), [RMB] or [Alt]+click on a point deletes it, [Alt]+drag on the line bends the segment (FL's tension), [RMB] elsewhere = lane menu. The hint bar shows the value under the mouse and while dragging | `laneMouseDown`, `mouseDrag` `lanePoint` / `laneTension` |
+| Where a clip of the same target plays, the lane is shaded (the clip wins) | `paintLanes` |
+| Lane header: the target's name; [RMB] menu: Edit points..., To automation clip, Remove the lane, Fold the lanes, Hide all lanes; [2xLMB] opens the point editor | `paintLaneHeaders`, `showLaneMenu` |
+| Clip menu (automation clips, lanes on): "Move into lane" (`clipToLane` on `trackFor`) | `buildClipMenu` |
+| Test: `lanes177b_track_for_a_target` (off by default; where a lane goes) | `tests/Lanes177bTests.inc` |
+
+Not in this slice (open): "Everything" in the "+A" picker (any control reaches a lane through its own menu instead);
+lanes following moved clips (phase 2); lanes in PDC "Compensate automation".
 
 ---
 

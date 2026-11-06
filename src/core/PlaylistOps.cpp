@@ -697,6 +697,53 @@ int laneFor (const Song& song, int track, const AutomationTarget& target)
 }
 } // namespace
 
+int trackFor (const Song& song, const AutomationTarget& target)
+{
+    const auto& tracks = song.playlistTracks;
+    for (int t = 0; t < (int) tracks.size(); ++t)
+        if (laneFor (song, t, target) >= 0)
+            return t;
+
+    int channel = -1, insert = -1;
+    switch (target.kind)
+    {
+        case AutomationTargetKind::channelVolume:
+        case AutomationTargetKind::channelPan:
+        case AutomationTargetKind::channelParam:
+            channel = target.index;
+            if (channel >= 0 && channel < (int) song.channels.size())
+                insert = song.channels[(std::size_t) channel].mixerTrack;
+            break;
+        case AutomationTargetKind::mixerVolume:
+        case AutomationTargetKind::mixerPan:
+        case AutomationTargetKind::effectParam:
+        case AutomationTargetKind::effectMix:
+        case AutomationTargetKind::mixerSend:
+            insert = target.index;
+            break;
+        case AutomationTargetKind::none:
+        case AutomationTargetKind::tempo:
+            break;
+    }
+    if (channel >= 0)
+        for (int t = 0; t < (int) tracks.size(); ++t)
+            if (tracks[(std::size_t) t].mode == PlaylistTrackMode::instrument && tracks[(std::size_t) t].channel == channel)
+                return t;
+    if (insert > 0)
+        for (int t = 0; t < (int) tracks.size(); ++t)
+            if (tracks[(std::size_t) t].mode != PlaylistTrackMode::unassigned && tracks[(std::size_t) t].mixerTrack == insert)
+                return t;
+
+    for (int t = 0; t < 500; ++t)
+    {
+        if (t < (int) tracks.size() && ! tracks[(std::size_t) t].lanes.empty())
+            continue;
+        if (std::none_of (song.playlist.begin(), song.playlist.end(), [t] (const Clip& c) { return c.track == t; }))
+            return t;
+    }
+    return 0;
+}
+
 int addLane (Song& song, int track, const AutomationTarget& target, const std::string& name, float value)
 {
     if (track < 0 || track >= 500)

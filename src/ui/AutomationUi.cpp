@@ -18,6 +18,7 @@
 #include "ui/EditorTools.h"
 #include "ui/EventEditor.h"
 #include "ui/I18n.h"
+#include "ui/HintBar.h"
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
 
@@ -802,7 +803,9 @@ juce::String describeTargetValue (AudioEngine& engine, const AutomationTarget& t
     return text.empty() ? juce::String (juce::roundToInt (value * 100.0f)) + "%" : juce::String::fromUTF8 (text.c_str());
 }
 
-void createAutomationClip (AudioEngine& engine, const AutomationTarget& target)
+namespace
+{
+float valueToAutomate (AudioEngine& engine, const AutomationTarget& target)
 {
     auto value = engine.getSong().targetValue (target);
 
@@ -810,11 +813,34 @@ void createAutomationClip (AudioEngine& engine, const AutomationTarget& target)
         value = midiControlValue (engine, target);
     else if (auto* plugin = pluginFor (engine, target); plugin != nullptr && target.param >= 0 && target.param < plugin->getParameters().size())
         value = plugin->getParameters()[target.param]->getValue();
+    return value;
+}
+} // namespace
 
+void createAutomationClip (AudioEngine& engine, const AutomationTarget& target)
+{
+    const auto value = valueToAutomate (engine, target);
     if (value < 0.0f)
         return;
 
     addAutomationClip (engine, target, describeAutomationTarget (engine, target).toStdString(), value);
+}
+
+void createAutomationLane (AudioEngine& engine, const AutomationTarget& target, int track)
+{
+    const auto value = valueToAutomate (engine, target);
+    if (value < 0.0f)
+        return;
+
+    const auto name = describeAutomationTarget (engine, target).toStdString();
+    int placed = -1;
+    engine.editSong ([&] (Song& s) {
+        placed = track >= 0 ? track : autolanes::trackFor (s, target);
+        if (autolanes::addLane (s, placed, target, name, value) < 0)
+            placed = -1;
+    });
+    if (placed >= 0)
+        ui::postHint ({ tr ("Automation lane added under {0}", { tr ("Track {0}", { juce::String (placed + 1) }) }), juce::String::fromUTF8 (name.c_str()) }, 3000);
 }
 
 void addAutomationClip (AudioEngine& engine, const AutomationTarget& target, const std::string& name, float value)
@@ -1004,6 +1030,8 @@ void addAutomationItem (juce::PopupMenu& menu, AudioEngine& engine, const Automa
         engine.editSong ([target] (Song& s) { s.removeInitialValue (target); });
     });
     menu.addItem (tr ("Create automation clip"), [&engine, target] { createAutomationClip (engine, target); });
+    if (autolanes::shown()) // round 177b: only while Playlist › Automation lanes is on (FL's menu is unchanged otherwise)
+        menu.addItem (tr ("Automate in lane"), [&engine, target] { createAutomationLane (engine, target); });
     {
         // FL's "Edit automation clip..." (the clip that automates this control)
         const auto& automations = engine.getSong().automations;

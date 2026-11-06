@@ -179,6 +179,20 @@ Place forNewClip (const Song& song, bool atPlayback, std::int64_t playTick);
 // Round 177b: optional automation lanes under Playlist tracks (Song.h AutomationLane). Plain edits for editSong.
 namespace lynx::autolanes
 {
+// Playlist › "Automation lanes" (round 177b): whether lanes are shown under their tracks. Off by default (FL has no
+// lanes); an app setting, not saved in projects. The Ableton-style layout (round 175a) turns it on by default.
+inline std::atomic<bool>& shownFlag() noexcept
+{
+    static std::atomic<bool> on { false };
+    return on;
+}
+inline bool shown() noexcept { return shownFlag().load (std::memory_order_relaxed); }
+inline void setShown (bool on) noexcept { shownFlag().store (on, std::memory_order_relaxed); }
+
+// The track a new lane for `target` goes on: the track that already has a lane for it; else the instrument track of
+// its channel; else an audio / instrument track linked to its mixer track (a channel's own insert counts); else the
+// first track with no clips and no lanes.
+int trackFor (const Song& song, const AutomationTarget& target);
 // The track whose lanes hold automation `a`, or -1 (an automation clip's automation, a live link...).
 int ownerTrack (const Song& song, int automation);
 // A new lane on `track` for `target`, a flat line at `value` over the song; returns the automation index (-1: bad track).
