@@ -40,7 +40,13 @@ runs only. Over / late = over-deadline / late callbacks in phase A / B.
 | new3 (aligned frames, toolbar 72 Hz, culling, device boost) | 70.2 / 72.0 | 29.6 / 36.2 | 112.0 / 105.7 | 90.4 / 90.5 | 26.6 % / 42.4 % | 17.5 % / 38.0 % | 100 / 29 | 0 / 1 | 15→19 |
 | new4 (sub-pixel playhead) | 127.9 / 132.6 | 30.5 / 31.1 | 104.6 / 103.2 | 86.6 / 90.0 | 40.6 % / 52.1 % | 41.4 % / 43.3 % | 18 / 22 | 0 / 0 | 19→19 |
 | **new5 (Playlist image cache)** | **143.5 / 143.6** | 23.4 / 27.9 | **140.4 / 141.4** | **131.1 / 136.7** | 17.7 % / 34.3 % | **7.3 %** / 37.6 % | 1 / 0 | **1 / 0** | 13→7 |
+| **new6 (+ scrolls painted direct)**, local build running | **143.4 / 143.3** | **33.2 / 41.8** | 135.8 / 135.6 | 117.1 / 119.4 | 18.4 % / 37.1 % | 9.5 % / 38.7 % | 1 / 0 | 17 / 37 ¹ | 18→11 |
+| new6b, tests running in phase A | 130.8 / 124.5 | 34.0 / 37.6 | 140.7 / 141.8 | 128.4 / 130.4 | 19.7 % / 36.1 % | 19.1 % ² / 23.5 % | 45 / 0 | 15 / 1 | 6→10 |
 | FL Studio 2026 (fl1) | 135 / 129 | 125 / 118 | 88 / 85 | 66 / 78 | 54–61 % (watch) | — | — | — | — |
+
+¹ new6's late calls came in clusters every 50–70 s, also while stopped right after start and during plain playback,
+while a full build-local compiled on the same machine; new5 (same code without the scroll bypass, quiet machine) had
+1 / 0 and new6b's phase B (after the tests) 1. ² `lynx_tests` ran during new6b's phase A.
 
 FL's process uses 106–110 % CPU while playing Thief; its main thread alone uses 54–61 % watching: about twice LYNX's
 GUI cost at a higher frame rate on the Playlist.
