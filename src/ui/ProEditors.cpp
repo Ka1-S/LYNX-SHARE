@@ -83,7 +83,7 @@ void scaleLabels (juce::Graphics& g, const LevelScale& s, juce::Rectangle<float>
 class ApexEditor final : public ProEditor
 {
 public:
-    ApexEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::apexLimiter, d, 950, 600) { hoverValues = true; fillDemo(); }
+    ApexEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::apexLimiter, d, 950, 600) { knobRanges = true; fillDemo(); }
 
 private:
     enum { idPanel = 1, idGain, idCeiling, idTp, idAdvanced, idLoudness, idLoudReset };
@@ -1684,7 +1684,7 @@ class PrismEditor final : public ProEditor
 public:
     PrismEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::prismMultiband, d, 920, 600)
     {
-        hoverValues = true; // round tp172b5: captions only (as the reference's band panel), the value on hover
+        knobRanges = true; // round tp172b4: each knob's scale under it (as the reference's band panel), the value on hover
         specArea = plot();
         specMinHz = 20.0;
         specMaxHz = 20000.0;

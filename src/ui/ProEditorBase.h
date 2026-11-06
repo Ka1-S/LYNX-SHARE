@@ -790,7 +790,7 @@ protected:
     // round tp172b4: the references print each knob's scale under it — the parameter's two ends, left and right — and
     // the caption under that; the value replaces the scale while the knob is hovered or dragged
     bool knobRanges = false;
-    // round tp172b5: the references that print captions only (the compressor, the limiter, the multiband): no scale,
+    // round tp172b5: the references that print captions only (the compressor; the reverb uses the layout flag): no scale,
     // the value under the caption only while the knob is hovered or dragged
     bool hoverValues = false;
     void rangeRow (juce::Graphics& g, int param, juce::Rectangle<float> row, bool showValue, bool big, juce::Colour ac, bool active)
