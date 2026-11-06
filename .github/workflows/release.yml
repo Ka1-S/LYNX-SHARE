@@ -197,7 +197,13 @@ jobs:
           if ($v.ProductName -ne 'LYNX SHARE' -or $v.ProductVersion -ne $env:VERSION) { throw "version resource mismatch" }
           $sig = Get-AuthenticodeSignature $exe.FullName
           "Authenticode: $($sig.Status) $($sig.SignerCertificate.Subject)"
-          if ('${{ needs.sign.result }}' -eq 'success' -and $sig.Status -ne 'Valid') { throw "signed build is not validly signed" }
+          if ('${{ needs.sign.result }}' -eq 'success') {
+            # the test-signing policy signs with SignPath's self-signed test certificate: Windows does not trust it
+            # (status UnknownError/NotTrusted), so only check that a signature from that certificate is present
+            if ('${{ vars.SIGNPATH_POLICY_SLUG }}' -eq 'test-signing') {
+              if ($sig.Status -eq 'NotSigned' -or $sig.SignerCertificate.Subject -notmatch 'Test certificate') { throw "test-signed build carries no test signature" }
+            } elseif ($sig.Status -ne 'Valid') { throw "signed build is not validly signed" }
+          }
 
       - name: Self-test
         shell: pwsh
