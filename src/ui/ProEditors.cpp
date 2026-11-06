@@ -1137,7 +1137,7 @@ private:
         out.push_back (custom ({ p.getX() + 24.0f, sc().y ((float) thresholdDb(), p) - 5.0f, p.getWidth() - 24.0f, 10.0f }, idThreshold, threshold,
                                tr ("Threshold: drag up or down")));
         out.push_back (button ({ kneeOpen ? kneeArea().getRight() : p.getX(), p.getY() + 80.0f, 20.0f, 64.0f }, idKnee,
-                               juce::String::fromUTF8 (kneeOpen ? "\xc2\xab" : "\xc2\xbb"), false, tr ("Knee: show the transfer curve"))); // (a grey tab, as the reference's)
+                               {}, false, tr ("Knee: show the transfer curve"))); // (a grey tab, as the reference's; its arrow and KNEE: paintOverlay)
         // the knob row over the bottom of the display
         const auto by = p.getBottom() - 190.0f;
         // round tp172b5: no Auto buttons — AUTO is a word in the caption (AUTO THRESHOLD, AUTO RELEASE, AUTO GAIN), clicked
@@ -1315,6 +1315,25 @@ private:
             g.setFont (font (type::caption, true));
             g.drawText (juce::String (b + 1), juce::Rectangle<float> (12.0f, 12.0f).withCentre (n), juce::Justification::centred, false);
         }
+    }
+
+    // round tp172b5: the knee tab carries its arrow and KNEE written down it, as the reference's
+    void paintOverlay (juce::Graphics& g, const EffectSlot&) override
+    {
+        using namespace theme;
+        Ctl tab;
+        for (const auto& c : controls())
+            if (c.type == K::button && c.id == idKnee) tab = c;
+        if (tab.r.isEmpty()) return;
+        g.setColour (colour::textSecondary);
+        g.setFont (font (type::small, true));
+        g.drawText (juce::String::fromUTF8 (kneeOpen ? "\xc2\xab" : "\xc2\xbb"), tab.r.withHeight (18.0f), juce::Justification::centred, false);
+        const juce::Point<float> centre (tab.r.getCentreX(), tab.r.getCentreY() + 8.0f);
+        g.saveState();
+        g.addTransform (juce::AffineTransform::rotation (juce::MathConstants<float>::halfPi, centre.x, centre.y));
+        g.setFont (font (type::caption, true));
+        g.drawText (caps (tr ("Knee")), juce::Rectangle<float> (tab.r.getHeight() - 20.0f, 14.0f).withCentre (centre), juce::Justification::centred, false);
+        g.restoreState();
     }
 
     void paintBody (juce::Graphics& g, const EffectSlot& fx) override
