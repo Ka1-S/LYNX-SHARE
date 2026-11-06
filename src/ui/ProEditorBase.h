@@ -102,6 +102,7 @@ protected:
         bool lit = false;           // buttons: drawn as on
         bool showValue = true;
         juce::Colour cap {};        // knobs: the cap's own colour (themes that read KnobLook::capTint; transparent = the theme's)
+        juce::String endLow, endHigh; // sliders (round tp172b5): words printed at the scale's ends (HARD / SOFT) instead of its values
         int autoParam = -1;         // knobs (round tp172b5): a toggle shown as an AUTO prefix word in the caption, clicked
                                     // there; dim when off, the accent when on (the compressor reference's AUTO THRESHOLD)
         int look = 0;               // knobs: 0 = a knob, 1 = a short curved bar (round tp172b4: the compressor reference's
@@ -435,6 +436,8 @@ protected:
                     }
                     dragCtl = c.param;
                     hDragStart = v (c.param);
+                    hDragAnchorX = e.position.x;
+                    hDragFine = e.mods.isCtrlDown();
                     valueDrag.begin (e, v (c.param));
                     return;
                 default: return;
@@ -451,8 +454,14 @@ protected:
             auto x = valueDrag.update (e, spec);
             if (pressed.type == K::fader && pressed.look == 1) // a horizontal slider follows the pointer left / right
             {
-                const auto fine = e.mods.isCtrlDown() ? 0.2f : 1.0f;
-                x = juce::jlimit (0.0, 1.0, (double) (hDragStart + fine * (e.position.x - e.mouseDownPosition.x) / juce::jmax (1.0f, pressed.r.getWidth() - 8.0f)));
+                const auto fine = e.mods.isCtrlDown();
+                if (fine != hDragFine) // (Ctrl pressed or released mid-drag: carries on from here, no jump)
+                {
+                    hDragStart = v (dragCtl);
+                    hDragAnchorX = e.position.x;
+                    hDragFine = fine;
+                }
+                x = juce::jlimit (0.0, 1.0, (double) (hDragStart + (fine ? 0.2f : 1.0f) * (e.position.x - hDragAnchorX) / juce::jmax (1.0f, pressed.r.getWidth() - 8.0f)));
             }
             set ({ { dragCtl, (float) x } });
             ui::showValueTip (*this, pressed.r.toNearestInt(), spec.text (x));
@@ -850,7 +859,8 @@ protected:
     }
     // round tp172b5: the reference limiter's panel prints each knob's name ABOVE it (its scale still under it)
     bool captionAbove = false;
-    void rangeRow (juce::Graphics& g, int param, juce::Rectangle<float> row, bool showValue, bool big, juce::Colour ac, bool active)
+    void rangeRow (juce::Graphics& g, int param, juce::Rectangle<float> row, bool showValue, bool big, juce::Colour ac, bool active,
+                   const juce::String& endLow = {}, const juce::String& endHigh = {})
     {
         using namespace theme;
         if (showValue)
@@ -875,13 +885,15 @@ protected:
                 }
                 out << juce::String::charToString (t[i]);
             }
+            if (out.startsWithChar ('-') && out.length() > 1 && out[1] == '0' && ! juce::CharacterFunctions::isDigit (out[2]) && out[2] != '.')
+                out = out.substring (1); // "-0 dB": a scale's end reads "0 dB"
             return out;
         };
         g.setColour (colour::textDisabled);
         g.setFont (font (type::caption));
         const auto half = row.getWidth() * 0.5f + 6.0f;
-        g.drawText (shortText (text (param, 0.0f)), row.withWidth (half).translated (-6.0f, 0.0f), juce::Justification::centredLeft, false);
-        g.drawText (shortText (text (param, 1.0f)), row.withTrimmedLeft (row.getWidth() - half).translated (6.0f, 0.0f), juce::Justification::centredRight, false);
+        g.drawText (endLow.isNotEmpty() ? endLow : shortText (text (param, 0.0f)), row.withWidth (half).translated (-6.0f, 0.0f), juce::Justification::centredLeft, false);
+        g.drawText (endHigh.isNotEmpty() ? endHigh : shortText (text (param, 1.0f)), row.withTrimmedLeft (row.getWidth() - half).translated (6.0f, 0.0f), juce::Justification::centredRight, false);
     }
     void knobLabels (juce::Graphics& g, const Ctl& c, juce::Rectangle<float> knobR, bool hover, bool active, float hot, juce::Colour ac)
     {
@@ -916,7 +928,7 @@ protected:
         g.fillRect (juce::Rectangle<float> (hx - 1.5f, bar.getY() + 1.0f, 3.0f, bar.getHeight() - 2.0f));
         // (rangeRow pushes the ends 6 px past the row: the slider keeps them within its own bar, clear of its neighbours)
         const auto row = juce::Rectangle<float> (bar.getX() + 6.0f, bar.getBottom() + 2.0f, bar.getWidth() - 12.0f, 12.0f);
-        rangeRow (g, c.param, row, c.showValue && (hover || active), false, ac, active);
+        rangeRow (g, c.param, row, c.showValue && (hover || active), false, ac, active, c.endLow, c.endHigh);
         g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
         g.setFont (font (type::caption, true));
         g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, row.getBottom() + 1.0f, c.r.getWidth() + 28.0f, 14.0f),
@@ -1198,7 +1210,8 @@ protected:
     juce::Point<float> mouse { -1.0f, -1.0f };
     int dragCtl = -1;
     Ctl pressed;
-    float hDragStart = 0.0f; // a horizontal slider's value when the drag began
+    float hDragStart = 0.0f, hDragAnchorX = 0.0f; // a horizontal slider's drag: the value and the pointer where it began
+    bool hDragFine = false;
     ui::ValueDrag valueDrag;
 
 private:
