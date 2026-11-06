@@ -2,6 +2,7 @@
 #include "engine/FileSort.h"
 #include "platform/Paths.h"
 
+#include "core/Comping.h"
 #include "core/Drumaxx.h"
 #include "core/PatternBlocks.h"
 #include "core/LoadTrace.h"
@@ -1412,6 +1413,16 @@ public:
             // LYNX.exe --patchershot prefix [project]: every Patcher's editor (round 141) as PNGs (a demo one without a project)
             const auto i = args.indexOf ("--patchershot");
             runPatcherShot (args[i + 1].unquoted(), i + 2 < args.size() ? args[i + 2].unquoted() : juce::String());
+            quit();
+            return;
+        }
+
+        if (args.contains ("--comp177shot"))
+        {
+            // LYNX.exe --comp177shot prefix project (round 177c): a project of loop takes in the maximised
+            // Playlist as it opened; every group after "Comp these takes", with a swipe on the first; the track and record menus
+            const auto i = args.indexOf ("--comp177shot");
+            runComp177Shot (args[i + 1].unquoted(), args[i + 2].unquoted());
             quit();
             return;
         }
@@ -5852,6 +5863,10 @@ private:
             o.punchLoopRegion = mode == 2;
             o.preRollBars = mode == 2 ? 1 : 0;
             o.postRollBars = mode == 2 ? 1 : 0;
+            // (round 177c: LYNX_RECTEST_BLEND_OFF=1: Blend off; LYNX_RECTEST_LAST_PASS=1: "only the last pass plays")
+            if (juce::SystemStats::getEnvironmentVariable ("LYNX_RECTEST_BLEND_OFF", {}) == "1")
+                o.mode = lynx::RecordMode::replace;
+            o.lastLoopPassPlays = juce::SystemStats::getEnvironmentVariable ("LYNX_RECTEST_LAST_PASS", {}) == "1";
             engine->setRecordOptions (o);
             engine->stop();
             engine->rewind();
@@ -5939,6 +5954,7 @@ private:
                             step (juce::String ("punch_clip_matches_range=") + (exact ? "yes" : "no"));
                             ok = ok && clips == 1 && exact && checked == 8;
                         }
+                        report.getSiblingFile (report.getFileNameWithoutExtension() + "-project.lynx").replaceWithText (lynx::ProjectFile::toJson (engine->getSong()));
                         step (juce::String ("result=") + (ok ? "OK" : "FAILED"));
                         finish (ok ? 0 : 1);
                     });
@@ -8328,6 +8344,80 @@ private:
             offline.dispatchPendingMessages();
             savePng (ui.createComponentSnapshot (ui.getLocalBounds()), prefix + "-mixer-renamed.png");
             offline.getPluginHost().setPluginName (key, "");
+        }
+    }
+
+    void runComp177Shot (const juce::String& prefix, const juce::String& projectPath)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        {
+            lynx::MainComponent ui (offline, false);
+            const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+            ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+            ui.openFile (juce::File (projectPath));
+            offline.dispatchPendingMessages();
+            ui.selectTabForSnapshot (2);
+            offline.dispatchPendingMessages();
+            auto& playlist = ui.getPlaylistForSnapshot();
+
+            std::int64_t last = 0;
+            for (const auto& c : offline.getSong().playlist)
+                last = std::max (last, c.end());
+            const auto bars = juce::jmax (1, (int) (last / (4 * lynx::ppq)) + 1);
+            playlist.setViewForSnapshot (juce::jmax (60.0, (ui.getWidth() - 300.0) / bars), 0, 0);
+            offline.dispatchPendingMessages();
+            saveSnapshot (ui, prefix + "-opened.png");
+
+            juce::String report;
+            const auto listTracks = [&offline, &report] (const juce::String& title) {
+                const auto& s = offline.getSong();
+                report << title << "\n";
+                for (int t = 0; t < (int) s.playlistTracks.size(); ++t)
+                {
+                    int clips = 0, muted = 0;
+                    for (const auto& c : s.playlist)
+                        if (c.track == t)
+                            ++clips, muted += c.muted ? 1 : 0;
+                    const auto& pt = s.playlistTracks[(std::size_t) t];
+                    if (clips > 0 || pt.grouped || ! pt.name.empty())
+                        report << "track " << (t + 1) << " '" << juce::String::fromUTF8 (pt.name.c_str()) << "' grouped=" << (pt.grouped ? 1 : 0) << " collapsed=" << (pt.collapsed ? 1 : 0)
+                               << " comp=" << (pt.compTrack ? 1 : 0) << " clips=" << clips << " muted=" << muted << "\n";
+                }
+            };
+            listTracks ("opened");
+
+            // the first group's header (a member's menu holds "Comp these takes" too)
+            int firstGroup = -1;
+            for (int t = 0; t < (int) offline.getSong().playlistTracks.size() && firstGroup < 0; ++t)
+                if (lynx::comp::canComp (offline.getSong(), t))
+                    firstGroup = t;
+            report << "first group with takes: track " << (firstGroup + 1) << "\n";
+
+            if (firstGroup >= 0)
+            {
+                saveMenus (juce::StringArray { "Playlist track" }, std::vector<juce::PopupMenu> { playlist.getTrackMenuForSnapshot (firstGroup) }, prefix + "-trackmenu.png");
+                int comp = -1;
+                offline.editSong ([firstGroup, &comp] (lynx::Song& s) { comp = lynx::comp::compTakes (s, firstGroup); });
+                offline.dispatchPendingMessages();
+                saveSnapshot (ui, prefix + "-comped.png");
+                listTracks ("after Comp these takes");
+
+                const auto g = lynx::comp::groupOf (offline.getSong(), comp);
+                std::int64_t from = -1, to = 0;
+                for (const auto& c : offline.getSong().playlist)
+                    if (c.track == g.first)
+                        from = from < 0 ? c.start : std::min (from, c.start), to = std::max (to, c.end());
+                if (g.valid() && to > from)
+                {
+                    offline.editSong ([&g, from, to] (lynx::Song& s) { lynx::comp::swipe (s, g.first, from + (to - from) / 4, from + (to - from) / 2); });
+                    offline.dispatchPendingMessages();
+                    saveSnapshot (ui, prefix + "-swiped.png");
+                    listTracks ("after a swipe of the middle of the first lane");
+                }
+            }
+            saveMenus (juce::StringArray { "Record" }, std::vector<juce::PopupMenu> { ui.getRecordMenuForSnapshot() }, prefix + "-recordmenu.png");
+            juce::File (prefix + "-tracks.txt").replaceWithText (report);
         }
     }
 
