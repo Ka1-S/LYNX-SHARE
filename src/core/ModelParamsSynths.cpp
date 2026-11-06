@@ -234,11 +234,14 @@ void ogunCommon (Builder& b)
     b.knob (23, "Chorus spread", 0, 128);
     b.knob (24, "Chorus cross", -128, 128);
     b.knob (25, "Chorus mix", -128, 128);
+    b.sw (ogunDelayOnIndex, "Delay on");
+    b.sw (ogunDelayTempoIndex, "Delay tempo sync");
     b.knob (26, "Delay feedback", 0, 127);
     b.knob (27, "Delay time", 0, 384);
     b.knob (28, "Delay stereo offset", -512, 512);
     b.knob (29, "Delay volume", -128, 128);
     b.knob (30, "Delay feedback mode", 0, 3);
+    b.sw (ogunReverbOnIndex, "Reverb on");
     b.knob (31, "Reverb low cut", 19, 3000);
     b.knob (32, "Reverb high cut", 5, 221);
     b.knob (33, "Reverb predelay", 0, 384);

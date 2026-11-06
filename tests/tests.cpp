@@ -174,6 +174,7 @@ namespace
 {
 int failures = 0;
 int checks = 0;
+std::string processTempTag(); // per-process suffix for scratch files (defined further down)
 std::vector<std::pair<const char*, std::function<void()>>>& registry()
 {
     static std::vector<std::pair<const char*, std::function<void()>>> r;
@@ -3342,7 +3343,7 @@ TEST (flp_paths_resolve_and_samplers_import)
     {
         // POSIX roots (macOS, Linux, Wine prefix): backslashes become '/', letter case follows the disk (round 117)
         namespace fs = std::filesystem;
-        const auto base = fs::temp_directory_path() / "lynx-case-test";
+        const auto base = fs::temp_directory_path() / ("lynx-case-test-" + processTempTag());
         fs::remove_all (base);
         fs::create_directories (base / "Data" / "Patches" / "Packs");
         { std::ofstream (base / "Data" / "Patches" / "Packs" / "Kick.WAV") << "x"; }
@@ -9118,7 +9119,7 @@ TEST (ogun_engine)
         std::ofstream (dump, std::ios::binary).write ((const char*) blob.data(), (std::streamsize) blob.size());
     CHECK (lynx::ogunStateUsable (blob));
     CHECK (lynx::ogunFallbacks (blob).empty());
-    CHECK (lynx::ogunParam (blob, 17) == 180 && lynx::ogunParam (blob, 52) == 9 && ! lynx::ogunParam (blob, 64));
+    CHECK (lynx::ogunParam (blob, 17) == 180 && lynx::ogunParam (blob, 52) == 9 && ! lynx::ogunParam (blob, lynx::ogunDelayOnIndex + 1));
     auto broken = blob;
     broken.resize (broken.size() - 300);
     CHECK (! lynx::ogunStateUsable (broken));
@@ -12329,7 +12330,12 @@ TEST (sytrus_main_settings)
         return -1;
     };
     const int master = find ("Master level"), unison = find ("Unison"), porta = find ("Porta"), live = find ("Live oversampling");
-    CHECK (master >= 0 && unison >= 0 && porta >= 0 && live >= 0 && S.size() == 25u);
+    // 25 main controls, then the matrix (round 172a): FM 9 × 9 (sources, PAN, FX, OUT) and RM 9 × 6
+    CHECK (master >= 0 && unison >= 0 && porta >= 0 && live >= 0 && S.size() == 25u + 81u + 54u);
+    const int out1 = find ("Op 1 out"), fm21 = find ("FM op 2 to op 1"), rm3f2 = find ("RM op 3 to filter 2");
+    CHECK (out1 >= 0 && fm21 >= 0 && rm3f2 >= 0 && find ("RM op 1 pan") < 0);
+    CHECK (out1 >= 0 && S[(std::size_t) out1].index == 3 + 8 && S[(std::size_t) rm3f2].index == 3 + 81 + 9 * 7 + 2);
+    CHECK (lynx::sytrus::settingValue (blob, out1) == 256 && lynx::sytrus::settingValue (blob, fm21) == 0);
     CHECK (lynx::sytrus::settingValue (blob, master) == 128 && lynx::sytrus::settingValue (blob, unison) == 3);
     CHECK (lynx::sytrus::settingValue (blob, porta) == 0 && lynx::sytrus::settingValue (blob, find ("Mod X")) == 256);
     CHECK (! lynx::sytrus::settingValue (blob, -1) && ! lynx::sytrus::settingValue (blob, (int) S.size()));
@@ -12357,6 +12363,9 @@ TEST (sytrus_main_settings)
     CHECK (lynx::sytrus::setSetting (edited, porta, 1) && lynx::sytrus::settingValue (edited, porta) == 1);
     CHECK (lynx::sytrus::setSetting (edited, live, 2) && lynx::sytrus::settingValue (edited, live) == 2);
     CHECK (lynx::sytrus::parsePatch (edited) != nullptr);
+    // a matrix cell: op 2 modulates op 1 (FM), clamped to ±256; the patch stays playable
+    CHECK (lynx::sytrus::setSetting (edited, fm21, 999) && lynx::sytrus::settingValue (edited, fm21) == 256);
+    CHECK (lynx::sytrus::settingValue (edited, out1) == 256 && lynx::sytrus::parsePatch (edited) != nullptr);
 }
 
 TEST (harmor_effects_rack)
@@ -13298,9 +13307,15 @@ std::string processTempTag()
     {
         ~Cleanup()
         {
+            // every scratch file or folder whose name carries this process's tag (round 173e: the SoundFont, case,
+            // missing-file, Crash169g, Natives142 and Rea167l scratch paths are per process too)
             std::error_code ec;
-            std::filesystem::remove (std::filesystem::temp_directory_path (ec) / ("lynx_test_oscdata_" + tag + ".dat"), ec);
-            std::filesystem::remove_all (std::filesystem::temp_directory_path (ec) / ("lynx_bassdrum_test_" + tag), ec);
+            std::vector<std::filesystem::path> mine;
+            for (const auto& e : std::filesystem::directory_iterator (std::filesystem::temp_directory_path (ec), ec))
+                if (e.path().filename().string().find (tag) != std::string::npos)
+                    mine.push_back (e.path());
+            for (const auto& p : mine)
+                std::filesystem::remove_all (p, ec);
         }
     } cleanup;
     (void) cleanup;
@@ -15169,6 +15184,7 @@ TEST (slayer_and_fruity_dance_import)
 #include "UiPolish2Tests.inc"
 #include "UiToolbarTests.inc"
 #include "LuxeVerbTests.inc"
+#include "Parity172bTests.inc"
 #include "ConvolverTests.inc"
 
 // --- Newtone / Newtime (REA_rodada73) -----------------------------------------------------------------------------
@@ -15489,7 +15505,7 @@ TEST (missing_files_inside_patcher)
 TEST (missing_files_folder_search)
 {
     namespace fs = std::filesystem;
-    const auto root = fs::temp_directory_path() / "lynx-missing-test";
+    const auto root = fs::temp_directory_path() / ("lynx-missing-test-" + processTempTag());
     fs::remove_all (root);
     fs::create_directories (root / "a" / "deep" / "Kicks");
     fs::create_directories (root / "b");
@@ -16341,6 +16357,7 @@ TEST (plugin_layout_options_match_the_engine_values)
 }
 #include "FabMeasureTests99.inc"
 #include "DynamicsTests108.inc"
+#include "Crest173dTests.inc"
 #include "LynxTuneTests95.inc"
 #include "LynxVerbTests100.inc"
 #include "FacetTests103.inc"
@@ -17042,6 +17059,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Gap169kAlignTests.inc"
 #include "FlQ170iTests.inc"
 #include "FlQ170i2Tests.inc"
+#include "FlQ170i3Tests.inc"
 #include "Speech168bTests.inc"
 #include "Design168pTests.inc"
 #include "Typing168tTests.inc"
@@ -17076,3 +17094,6 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issue32dTests.inc"
 #include "FlpExport171eTests.inc"
 #include "Tp172cTests.inc"
+#include "Layout172aTests.inc"
+#include "Issues173aTests.inc"
+#include "FxAudit173dTests.inc"

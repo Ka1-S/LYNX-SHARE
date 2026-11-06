@@ -691,9 +691,50 @@ public:
         rate = sampleRate;
         engine.prepare (sampleRate);
     }
-    void reset() noexcept override { engine.reset(); }
+    void reset() noexcept override
+    {
+        engine.reset();
+        fade = Fade::none;
+        started = false;
+    }
 
     void process (float* left, float* right, int n, const EffectParams& p, double bpm) noexcept override
+    {
+        // round 173d: a new type / mode re-tunes the whole tank at once (line lengths, taps, band limits): the wet part
+        // fades out on the old one, the new one starts and fades in (11 ms each way) instead of a click of 10…15 dB
+        const auto st = structure (p);
+        if (! started)
+            lastStructure = st, started = true;
+        if (st != lastStructure && fade == Fade::none)
+        {
+            fade = Fade::out;
+            fadeLeft = fadeLength;
+            held = last;
+        }
+        for (int done = 0; done < n;)
+        {
+            const auto m = fade == Fade::none ? n - done : std::min (n - done, fadeLeft);
+            run (left + done, right + done, m, fade == Fade::out ? held : p, bpm);
+            done += m;
+            if (fade != Fade::none && (fadeLeft -= m) <= 0)
+            {
+                if (fade == Fade::out)
+                    fade = Fade::in, fadeLeft = fadeLength, lastStructure = st;
+                else
+                    fade = Fade::none;
+            }
+        }
+        last = p;
+    }
+
+protected:
+    // the setting that rebuilds the tank's structure (its type / mode), −1 = none
+    virtual int structure (const EffectParams&) const noexcept { return -1; }
+    virtual void configure (const EffectParams& p, double bpm, Settings& s, float& mix) const noexcept = 0;
+    virtual void preStage (float*, float*, int, const EffectParams&, double) noexcept {}
+    virtual void postStage (float*, float*, int, const EffectParams&, double) noexcept {}
+
+    void run (float* left, float* right, int n, const EffectParams& p, double bpm) noexcept
     {
         Settings s;
         float mix = 1.0f;
@@ -712,18 +753,25 @@ public:
             postStage (l, r, m, p, bpm);
             for (int i = 0; i < m; ++i)
             {
-                l[i] = dry * dl[(std::size_t) i] + wet * l[i];
-                r[i] = dry * dr[(std::size_t) i] + wet * r[i];
+                auto w = wet;
+                if (fade != Fade::none)
+                {
+                    const auto g = (float) (fadeLeft - start - i) / (float) fadeLength; // 1 … 0 over the fade
+                    w *= fade == Fade::out ? g : 1.0f - g;
+                }
+                l[i] = dry * dl[(std::size_t) i] + w * l[i];
+                r[i] = dry * dr[(std::size_t) i] + w * r[i];
             }
         }
     }
 
-protected:
-    virtual void configure (const EffectParams& p, double bpm, Settings& s, float& mix) const noexcept = 0;
-    virtual void preStage (float*, float*, int, const EffectParams&, double) noexcept {}
-    virtual void postStage (float*, float*, int, const EffectParams&, double) noexcept {}
-
     static constexpr int chunk = 1024;
+    static constexpr int fadeLength = 512;
+    enum class Fade { none, out, in };
+    Fade fade = Fade::none;
+    int fadeLeft = 0, lastStructure = -1;
+    bool started = false;
+    EffectParams last {}, held {};
     EffectKind kind;
     Engine engine;
     double rate = 48000.0;
@@ -835,6 +883,7 @@ public:
     EpochFx() : VerbEffect (EffectKind::epochVerb, 0.25, 0.62) {}
 
 protected:
+    int structure (const EffectParams& p) const noexcept override { return choice (p[16], epoch::modeCount); }
     void configure (const EffectParams& p, double, Settings& s, float& mix) const noexcept override
     {
         const auto modeIndex = choice (p[16], epoch::modeCount);
@@ -928,6 +977,7 @@ public:
     AtriumFx() : VerbEffect (EffectKind::atrium, 0.25, 1.05) {}
 
 protected:
+    int structure (const EffectParams& p) const noexcept override { return choice (p[19], atrium::typeCount); }
     void configure (const EffectParams& p, double, Settings& s, float& mix) const noexcept override
     {
         const auto& t = atriumTypes[choice (p[19], atrium::typeCount)];
@@ -1043,6 +1093,7 @@ public:
     FoilFx() : VerbEffect (EffectKind::foilPlate, 0.2, 0.62) {}
 
 protected:
+    int structure (const EffectParams& p) const noexcept override { return choice (p[11], foil::typeCount); }
     void configure (const EffectParams& p, double, Settings& s, float& mix) const noexcept override
     {
         const auto& t = foilTypes[choice (p[11], foil::typeCount)];
@@ -1161,6 +1212,7 @@ private:
 protected:
 
 protected:
+    int structure (const EffectParams& p) const noexcept override { return choice (p[12], nebula::modeCount); }
     void configure (const EffectParams& p, double bpm, Settings& s, float& mix) const noexcept override
     {
         const auto& m = nebulaModes[choice (p[12], nebula::modeCount)];
@@ -1262,7 +1314,9 @@ protected:
         s.buildSec = 0.02 + 0.3 * size * (1.0 - p[3] * 0.5);
         s.shape = 0;
         s.lineScale = m.scale * (0.3 + 1.2 * size);
-        s.rt60 = (1.5 + 12.5 * size) * m.rtScale * std::min (3.0, 1.0 + 2.8 * p[2] * p[2]); // feedback lengthens the tail (§5)
+        // round tp172d: the reference's tail barely follows Size at feedback 0 (music / impulse, Size 30 % and 50 %: RT
+        // ≈ 7.6 and 8 s; ours was 4.7 and 6.7 s)
+        s.rt60 = (4.5 + 7.0 * size) * m.rtScale * std::min (3.0, 1.0 + 2.8 * p[2] * p[2]); // feedback lengthens the tail (§5)
         s.earlyLevel = 0.45; // it speaks at once
         s.earlySec = 0.03;
         s.earlyDiffusion = p[3];
@@ -1277,7 +1331,10 @@ protected:
         s.loopBandwidth = dark ? 5000.0 : 0.0;
         s.modRateHz = 0.05 + 4.95 * p[7];
         s.modDepthMs = 1.2 * p[8] / std::sqrt (std::max (0.3, s.modRateHz));
-        s.gain = dark ? 0.75 : 0.95;
+        // round tp172d: without feedback the reference is quieter on music and drums (Mix 100 %: −4…−8 dB against
+        // ours; at Feedback 50 % within 1 dB) but not on its impulse (the shimmer is not linear: the two disagree),
+        // so the trim is −3 dB, fading out by half feedback
+        s.gain = (dark ? 0.75 : 0.95) * std::pow (10.0, -3.0 * (1.0 - std::min (1.0, 2.0 * (double) p[2])) / 20.0);
         if (m.stereo == 2)
             s.crossFeed = 0.0, s.splitSides = true; // the two sides stay apart
     }
@@ -1350,6 +1407,7 @@ public:
     }
 
 protected:
+    int structure (const EffectParams& p) const noexcept override { return choice (p[22], horizon::reverbModeCount); }
     void configure (const EffectParams& p, double, Settings& s, float& mix) const noexcept override
     {
         const auto& m = horizonReverbs[choice (p[22], horizon::reverbModeCount)];

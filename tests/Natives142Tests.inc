@@ -35,7 +35,7 @@ lynx::natives::FlAccess flAccess()
         return out;
     };
     fl.saveEmbedded = [] (const std::vector<std::uint8_t>& wav, const std::string& name) {
-        const auto path = (fs::temp_directory_path() / ("lynx-natives142-" + std::to_string (wav.size()) + "-" + std::to_string (name.size()) + ".wav")).string();
+        const auto path = (fs::temp_directory_path() / ("lynx-natives142-" + processTempTag() + "-" + std::to_string (wav.size()) + "-" + std::to_string (name.size()) + ".wav")).string();
         std::ofstream (path, std::ios::binary).write ((const char*) wav.data(), (std::streamsize) wav.size());
         return path;
     };

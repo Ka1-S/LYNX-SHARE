@@ -64,8 +64,8 @@ there.
 | Horizon | ValhallaFutureVerb | 8 | 9 | 2 | 8 | 135 |  |
 | Orbit | ValhallaSpaceModulator | 8 | 9 | 3 | 8 | 135 |  |
 | Facet EQ | Pro-Q 4 | 9 | 8 | 8 | 7 | 152c | 170c: Stability 5 → 7 (draws on macOS CI, steady analyser) |
-| Crest Compressor | Pro-C 3 | 9 | 8 | 5 | 6 | 137 |  |
-| Sentry Gate | Pro-G | 9 | 8 | 3 | 8 | 135 |  |
+| Crest Compressor | Pro-C 3 | 9 | 8 | 6 | 6 | tp172b | tp172b: sound 4.7 → 5.7 measured (auto gain and release follow the attack, detector floor); look toward the reference |
+| Sentry Gate | Pro-G | 9 | 8 | 7 | 8 | tp172b | tp172b: sound 3 → 7 (first programme comparison: 7.2; upward law, hysteresis) |
 | Ember Saturator | Saturn 2 | 9 | 8 | 5 | 6 | 152b |  |
 | Aether | Fresh Air | 9 | 8 | 8 | 9 | tp172c | issue #77: the measured dynamic air model is the default (a new Aether ran the round-114 shelf + exciter: Mid air nearly inaudible, High air ~1.5 dB short of loudness); fxparity on Mid / High air 0–100 % sweeps 5.0 → 8.3; look: frosted plate, white disc knobs |
 | Glow Leveler | CLA-2A (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165x | 9 → 9 → 10 / 8 → 8 (165w: the measured release; 165x: the measured attack, Auto Makeup's reference, the VU display saved and translated) |
@@ -76,20 +76,36 @@ there.
 | Auto-pan (stand-in) | PanMan | 9 | 8 | 6 | 8 | 152 |  |
 | Foil Plate | Little Plate | 9 | 8 | 6 | 8 | 152 |  |
 | Ember Saturator | Decapitator | 9 | 9 | 5 | 6 | 165a | 8 → 9 / 7 → 9 |
-| Apex Limiter | Pro-L 2 | 9 | 9 | 2 | 6 | 135 |  |
+| Apex Limiter | Pro-L 2 | 9 | 9 | 7 | 6 | tp172b | tp172b: sound 2 → 7 (first programme comparison: 5.7 → 6.9; two-stage release) |
 | Epoch Verb | ValhallaVintageVerb | 9 | 9 | 5 | 8 | 135 |  |
 | Nebula | Valhalla Supermassive | 9 | 9 | 3 | 8 | 135 |  |
 | Spiral Echo | ValhallaFreqEcho | 9 | 9 | 7 | 8 | 129 |  |
 | Lattice Mod | ValhallaUberMod | 9 | 9 | 4 | 8 | 144 |  |
 | Quell Denoiser | NS1 (Waves) | 9 | 9 | 4 (ref expired) | 6 | 137 |  |
-| Hush De-esser | Pro-DS | 10 | 9 | 5 | 6 | 165x | 8 → 9 → 10 / 8 → 8 → 9 (165w: pans, state levels; 165x: ranges, the 0 … 200 % link knob) |
+| Hush De-esser | Pro-DS | 10 | 9 | 6 | 6 | tp172b | 8 → 9 → 10 / 8 → 8 → 9 (165w: pans, state levels; 165x: ranges, the 0 … 200 % link knob) |
 | Foil Plate | ValhallaPlate | 9 | 10 | 3 | 8 | 135 |  |
 | Gemini Doubler | Doubler2 / Doubler4 (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165w | 9 → 10 / 8 → 8 (defaults; 165w: shelf range −88 … +12 and law) |
 | Compressor (stand-in) | Renaissance Compressor (Waves) | 10 | 8 | 6 (ref expired) | 8 | 152 |  |
 | LYNX Tune | Waves Tune Real-Time | 10 | 8 | 6 (ref expired) | 8 | 152b | 165j: sound only (measured; scores unchanged) |
 | Echoform | EchoBoy / PrimalTap | 10 | 8 | 6 | 6 | 150 |  |
 | Voice Shift | Little AlterBoy | 10 | 8 | 4 | 8 | 137 |  |
-| Prism Multiband | Pro-MB | 10 | 10 | 8 | 6 | 152 |  |
+| Prism Multiband | Pro-MB | 10 | 10 | 8 | 6 | tp172b | tp172b: programme 5.9 → 7.6 (default state level fixed) |
+| LuxeVerb (Space engine) | Pro-R 2 | 7 | 7 | 8 | 8 | tp172b | new: Space engine page, verb score 7.4 → 8.9 (RT60 / EDC / early / stereo / modulation, measured) |
+
+## Round tp172b: FabFilter roles measured against the trials (black-box, programme material)
+
+Our own host rendered bursts / drums / music / stair / sweep / vocal through each trial at its default and 3–5 saved
+settings; LYNX rendered the same with the translated states (`tools/fxrender`, `scripts/fxparity.py`). Mean score
+before → after (0–10): Facet / Pro-Q 4 9.3 → 9.3; Crest / Pro-C 3 4.7 → 5.7 (auto gain follows the attack; the release shortens with a slow attack; a 1 ms detector floor in Clean / Allround / Opto);
+Apex / Pro-L 2 5.7 → 6.9 (two-stage release, per-style laws); Prism / Pro-MB 5.9 → 7.6; Sentry / Pro-G 6.2 → 7.2;
+Hush / Pro-DS 6.0 → 6.4 (Allround follows the measured level law, 0.2 dB per dB); Saturn 2 5.1 (Ember: round 172d). LuxeVerb gained a **Space** engine page for the Pro-R 2
+role (16-line FDN with per-band decay; Modern / Vintage / Plate; distance, thickness, character, width, decay EQ),
+fitted from measured RT60 per octave, EDC, early energy and modulation; `fxparity verb` 7.4 → 8.9 on the programme
+states, 8.9 over 28 probe settings. Saved Pro-R 2 states translate to it (`translate = pro-r2`). The FL engine stays the
+default and FL-exact. Looks: Facet, Crest, Apex, Prism, Sentry and Hush moved toward their references' palettes and
+flat caps; Fruity Delay 3 stays FL-exact (Timeless 3 compared for design only). Open: Pro-G's burst attenuation (S3),
+Crest S1 / S3 music −1 … −1.6 dB and S4 (Bus, auto gain) +1 … +2 dB, Apex's default attack, Sentry's Upward knobs, the Space
+engine's early onset at 100 % mix. Data and pictures: /mnt/e/lynx-work/tp172b (report.md).
 
 ## Round 172d: Soundtoys / Valhalla / Waves roles — measured sound, before → after
 
@@ -116,7 +132,8 @@ Both numbers are given below.
 | Foil Plate (plate voicing) | Little Plate | 1.4 → 2.2 | 6.0 → 7.5 | level re-measured at Mix 100 % (it was 6–16 dB low, most at short decays: knots per decade of Decay); darker above 2.5 kHz (−5 dB shelf, 7 kHz low-pass); early part −9 dB; RT per band already within 5 % |
 | Lattice Mod | ValhallaUberMod | 3.1 → 3.9 | — | the wet is in phase with the dry (the dry + wet comb notch measured on music; round 101's inverted wet does not hold here) |
 | Ember Saturator (Classic) | Decapitator | 4.6 → 4.8 | — | with Punish on, E / N / T / P saturate at the measured level (the curve, knees and bias, scaled ×0.40 / 0.90 / 0.65 / 0.86; the small-signal law is unchanged) |
-| Orbit / Spiral Echo / Epoch Verb / Halo | Space Modulator / Freq Echo / VintageVerb / Shimmer | 3.8 / 3.4 / 2.9 / 2.2 (unchanged) | Epoch 7.0, Halo 6.2 | open: Epoch has a 39 Hz tank mode at Size 100 %; Halo is 6–9 dB loud on sustained music at Mix 100 % (the original seems to limit its loop) |
+| Halo | ValhallaShimmer | 2.2 → 2.3 | 6.2 → 6.1 | without feedback the wet is trimmed −3 dB, fading out by Feedback 50 %; the tail follows Size less (4.5 + 7 × Size s). On music / drums (original − LYNX) the error is now D −0.1 / −0.3, S1 +0.6 / +1.1, S2 −5 / −7, S3 −3 / −1 dB (it was up to −9). The original's impulse and music levels disagree (its shimmer is not linear), so a full −5 dB trim (music within 1–5 dB) cost verb's impulse-level part (verb 5.8): −3 dB is the compromise. Its music renders' demo dropouts were checked and are negligible (≤ 2 windows of 35). Open: at Feedback 50 % our shimmer tail falls 60 dB in ~2 s where the original's lasts ~14 s (the shifted crossfade loses energy each pass; an energy-keeping crossfade rang out, so it was not kept). |
+| Orbit / Spiral Echo / Epoch Verb | Space Modulator / Freq Echo / VintageVerb | 3.8 / 3.4 / 2.9 (unchanged) | Epoch 7.0 | Epoch's "39 Hz mode" is not a mode. 85 % of the music stimulus's energy is three bass notes (32, 44 and 48 Hz). The original's response has a notch there (−10…−13 dB below its low-end mean); ours has a peak (+6…+9). The impulse's band levels and RTs per octave match within 2 dB. Left alone: matching the original's mode positions would tune to the stimulus, not to the reverb. |
 | Echoform | EchoBoy / ValhallaDelay / H-Delay | 5.2 / 3.8 / 5.9 | — | measure only (EchoBoy's mapping fixed: feedback units) |
 | Auto-pan / Voice Shift | PanMan / Little AlterBoy | 3.2 / 2.0 | — | measure only |
 | Glow Leveler / Compressor / Gemini / Quell | CLA-2A / RComp / Doubler2 / NS1 (Waves) | 4.3 / 6.4 / 4.4 / 4.0 | — | measure only (refcap licence of 11-04) |
@@ -128,11 +145,53 @@ Both numbers are given below.
 - Echoform, Ember, Voice Shift and Auto-pan carry a Soundtoys-style hardware theme: black face, walnut cheeks, rubber knobs and wide-tracked caps.
 - Everything is drawn by LYNX code, with LYNX names.
 
+**Look, second slice (the Soundtoys roles' panels):**
+- **Ember ← Decapitator.** An Ember added from the mixer opens on the Classic panel, laid out like the original:
+  - Punish top left, the VU in the middle with the name beside it, Output and Auto under the name;
+  - the big Drive left, then Low cut (Thump under it), Tone, High cut (Steep under it) and Mix in one row;
+  - the five style keys (A E N T P) joined by a line along the bottom.
+  
+  "Advanced" swaps the window for the multiband page, whose "Classic" key swaps back. Loaded projects keep their voicing: only the mixer's Add sets Classic, and Ember's default parameters are unchanged.
+- **Echoform ← EchoBoy.** Three rounded pods:
+  - the echo pod: Mix, Echo time and Feedback; Low cut, Prime numbers and High cut under them;
+  - the tempo pod: the tap pad, Groove / Feel and the echo mode;
+  - the saturation pod: Saturation, Age and Output, with the Style and Tape menus.
+  
+  The Tweak strip and the rest of the controls sit below.
+- **Voice Shift ← Little AlterBoy:**
+  - the three printed fields (mustard pitch / formant, teal mode, red drive / mix);
+  - square mode keys;
+  - the name strip along the bottom.
+- **Auto-pan ← PanMan:** rounded pods and square keys.
+- **The hardware themes:**
+  - square bevelled keys for tabs, switches and option lists;
+  - wider walnut cheeks;
+  - a fill colour per section.
+
+**Look, third slice:**
+- **Echoform ← EchoBoy.**
+  - The default page is the three pods only, with bigger knobs (Echo time 84 px), generous spacing and the walnut cheeks.
+  - The Tweak strip, the switch rows and the Style edit moved behind a "Main | Tweak" key pair, bottom left: EchoBoy's TWEAK key.
+- **Auto-pan ← PanMan.**
+  - Bigger pan knobs (52 px), the name in the free corner, and the walnut cheeks.
+  - The Rhythm voicing's Tweak and Trigger rows are on a Tweak page, so the panel is 290 px tall instead of 444.
+  - The plain panner (Voicing off) shows on both pages.
+
+**Look, fourth slice (the Waves roles with a trial):**
+- **Glow Leveler ← CLA-2A:**
+  - a light brushed-silver faceplate with corner screws and black bakelite knobs read off their pointers;
+  - red lit keys and dark legends;
+  - a near-black lower strip under the trims (Analog, HF emphasis, Mix, Trim, Makeup ref), with light legends.
+- **Quell Denoiser ← NS1:**
+  - a graphite plate;
+  - a dark recessed meter well with a thin soft light bar and its scale on both sides, and a small orange read-out;
+  - a large grooved metal fader cap on a recessed slot, with the 0 … 100 scale on both sides.
+- Gemini Doubler already matched Doubler's look.
+- **Pending a licence:** LYNX Tune ← Auto-Tune Pro. The trial has expired. Once a licence is in, sound captures (correction speed, humanize, formant, the artefact character) and the look will be done together.
+
 **Design gaps still open:**
-- Echoform keeps its own multi-role layout; EchoBoy's three-zone face is not reproduced.
-- Ember's editor is the multiband view, and Classic is reached through its style tabs.
-- Voice Shift uses one panel colour where the original has mustard / teal / red zones.
 - Atrium's Predelay and Decay bars draw linear while the original's are skewed.
+- Ember's Drive has no printed 0 … 10 scale, and the VU reads "VU". The original's meter face and logo are not reproduced, as the rules require.
 
 ## Round 165j: LYNX Tune sound quality, before → after (measured)
 

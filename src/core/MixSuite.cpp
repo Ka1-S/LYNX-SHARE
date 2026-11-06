@@ -1484,10 +1484,15 @@ private:
                 for (auto& o : *bank) { o.setFactor (std::max (2, factor)); o.reset(); }
         }
         const bool over = osFactor > 1;
-        vocalOn = vocal (p);
+        // round tp172b [EXEC] (Pro-DS trial, 1 / 7 kHz sine and pink / white noise stairs, threshold −40, range 8): the
+        // reference's Allround follows the single-vocal level law (0.2 dB per dB here, range × over / −threshold) without
+        // the vocal gate, where the old law reached the full range ~6 dB over the threshold
+        const bool proAllround = extLaw && on (p[allround]) && ! classic (p);
+        vocalOn = vocal (p) || proAllround;
         if (vocalOn) // round 148: the measured single-vocal de-esser
         {
             vmatch::vocalds::Settings v;
+            v.gate = ! proAllround || vocal (p);
             v.thresholdDb = thresholdDb (p[threshold]);
             v.rangeDb = rangeDb (p[hush::range]);
             v.hpHz = hpHz (p[frequency], extLaw);

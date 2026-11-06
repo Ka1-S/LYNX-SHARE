@@ -1,4 +1,5 @@
 #include "ui/FlMods.h"
+#include "ui/FileChoosers.h"
 #include "ui/PianoRollComponent.h"
 #include "core/KeyMap.h"
 #include "core/NoteNames.h"
@@ -3397,9 +3398,9 @@ bool PianoRollComponent::runAction (const std::string& id)
     {
         // FL: Import MIDI and Open score share one file window (FUN_0120b340): .fsc, .mid or both
         const auto score = is ("pianoRoll.openScore");
-        chooser = std::make_unique<juce::FileChooser> (score ? tr ("Open score") : tr ("Import MIDI"), juce::File(),
+        chooser = lynx::ui::makeFileChooser (score ? tr ("Open score") : tr ("Import MIDI"), juce::File(),
                                                        score ? "*.fsc;*.mid;*.midi" : "*.mid;*.midi");
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [safe = juce::Component::SafePointer<PianoRollComponent> (this)] (const juce::FileChooser& fc) {
                                   if (safe != nullptr && fc.getResult().existsAsFile())
                                       safe->loadFile (fc.getResult());
@@ -3409,9 +3410,9 @@ bool PianoRollComponent::runAction (const std::string& id)
     {
         const auto& song = engine.getSong();
         const auto name = juce::String::fromUTF8 (song.patterns[(std::size_t) song.currentPattern].name.c_str());
-        chooser = std::make_unique<juce::FileChooser> (tr ("Export MIDI"), juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile (name + ".mid"),
+        chooser = lynx::ui::makeFileChooser (tr ("Export MIDI"), juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile (name + ".mid"),
                                                        "*.mid");
-        chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                               [safe = juce::Component::SafePointer<PianoRollComponent> (this)] (const juce::FileChooser& fc) {
                                   auto file = fc.getResult();
                                   if (safe == nullptr || file == juce::File())
@@ -3429,10 +3430,10 @@ bool PianoRollComponent::runAction (const std::string& id)
         const auto& song = engine.getSong();
         auto name = channel >= 0 && channel < (int) song.channels.size() ? juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str())
                                                                         : juce::String ("Score");
-        chooser = std::make_unique<juce::FileChooser> (tr ("Save score as"),
+        chooser = lynx::ui::makeFileChooser (tr ("Save score as"),
                                                        juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile (juce::File::createLegalFileName (name) + ".fsc"),
                                                        "*.fsc;*.mid");
-        chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                               [safe = juce::Component::SafePointer<PianoRollComponent> (this)] (const juce::FileChooser& fc) {
                                   auto file = fc.getResult();
                                   if (safe == nullptr || file == juce::File())

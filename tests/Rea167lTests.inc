@@ -324,7 +324,7 @@ TEST (rea167l_export_wav_extras_song_markers)
     CHECK (s.markers[0].frame == 44100);
 
     // appended to a WAV file: the RIFF size follows, the frames are read back
-    const auto path = (std::filesystem::temp_directory_path() / "lynx_rea167l_extras.wav").string();
+    const auto path = (std::filesystem::temp_directory_path() / ("lynx_rea167l_extras_" + processTempTag() + ".wav")).string();
     {
         std::vector<std::uint8_t> w;
         auto put = [&w] (const char* t) { w.insert (w.end(), t, t + 4); };

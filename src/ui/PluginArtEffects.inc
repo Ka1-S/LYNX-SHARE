@@ -41,9 +41,9 @@ inline const Theme& facetTheme()
         Theme x;
         x.name = "Facet EQ";
         x.base = Style::glow;
-        x.pal = { Colour (0xff161e2b), Colour (0xff090d14), Colour (0xffffc95a), Colour (0xff66d6ff), Colour (0xd8172030), Colour (0xe80e131c),
-                  Colour (0xff7189ab), Colour (0xffe7eef8), Colour (0xff070a10), Colour (0xff2a3446), Colour (0xff141a25), Colour (0xff2a3446),
-                  Colour (0xfff4f7fb), Colour (0xff151c28) };
+        x.pal = { Colour (0xff1f1d1c), Colour (0xff0d0c0c), Colour (0xffffc84a), Colour (0xff7fd0ff), Colour (0xd820201f), Colour (0xe80f0f0e),
+                  Colour (0xff6a6560), Colour (0xfff2eee6), Colour (0xff090808), Colour (0xff35322f), Colour (0xff1a1817), Colour (0xff2c2a28),
+                  Colour (0xfff7f3ea), Colour (0xff1c1a19) };
         x.canvas = canvasFacet;
         x.thin = true;
         x.kerning = 0.06f;
@@ -216,7 +216,7 @@ inline void canvasSoundtoys (juce::Graphics& g, Rectangle<float> a, bool display
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
     if (display) return;
-    const auto cheek = juce::jlimit (8.0f, 16.0f, a.getWidth() * 0.016f);
+    const auto cheek = th().cheek > 0.0f ? th().cheek : juce::jlimit (8.0f, 16.0f, a.getWidth() * 0.016f);
     woodCheek (g, a.withWidth (cheek), 7);
     woodCheek (g, a.withTrimmedLeft (a.getWidth() - cheek), 11);
     const auto face = a.reduced (cheek, 0.0f);
@@ -508,7 +508,8 @@ inline const Theme& crestTheme()
         x.titleEmblem = crestEmblem;
         x.cap = Cap::flat;
         x.pointer = Pointer::glowLine;
-        x.arcGlow = 0.25f;
+        x.arcGlow = 0.06f;
+        x.thin = true; // round tp172b: the reference's look
         return x;
     }();
     return t;
@@ -572,13 +573,13 @@ inline const Theme& apexTheme()
         Theme x;
         x.name = "Apex Limiter";
         x.base = Style::glow;
-        x.pal = { Colour (0xff131c27), Colour (0xff05080c), Colour (0xff4fb3ff), Colour (0xffd9ecff), Colour (0x9c131c27), Colour (0xb8070b10),
-                  Colour (0xff4f6f92), Colour (0xffe6f1ff), Colour (0xff04070b), Colour (0xffc9d2dc), Colour (0xff59626d), Colour (0xff17212c),
-                  Colour (0xff0f1720), Colour (0xff17202b) };
+        x.pal = { Colour (0xff1d1b1e), Colour (0xff0d0c0e), Colour (0xffe0404a), Colour (0xffd8d8de), Colour (0x9c1e1c20), Colour (0xb80c0b0d),
+                  Colour (0xff5a4f55), Colour (0xfff0e8ea), Colour (0xff09080a), Colour (0xff3a373b), Colour (0xff1d1b1e), Colour (0xff2a2629),
+                  Colour (0xfff2f0f2), Colour (0xff1f1d21) };
         x.canvas = canvasApex;
         x.titleEmblem = apexEmblem;
-        x.drawCap = capBrushed;
-        x.arcGlow = 0.22f;
+        x.arcGlow = 0.08f;
+        x.thin = true; // round tp172b: the reference's look
         return x;
     }();
     return t;
@@ -645,13 +646,15 @@ inline const Theme& prismTheme()
         Theme x;
         x.name = "Prism Multiband";
         x.base = Style::glow;
-        x.pal = { Colour (0xff17141f), Colour (0xff07060b), Colour (0xffb98cff), Colour (0xff6fe3ff), Colour (0x9c191624), Colour (0xb80a0910),
-                  Colour (0xff8e86b0), Colour (0xfff0ecff), Colour (0xff050409), Colour (0xff3b3552), Colour (0xff100e18), Colour (0xff221f2e),
-                  Colour (0xffffffff), Colour (0xff1a1724) };
+        x.pal = { Colour (0xff222124), Colour (0xff0f0f11), Colour (0xffffc23a), Colour (0xff8fd0ff), Colour (0x9c242326), Colour (0xb80e0e10),
+                  Colour (0xff5d5a60), Colour (0xfff2efe8), Colour (0xff0a0a0b), Colour (0xff38363a), Colour (0xff1c1b1e), Colour (0xff2b2a2e),
+                  Colour (0xfffff3d6), Colour (0xff1f1e22) };
         x.canvas = canvasPrism;
         x.titleEmblem = prismEmblem;
-        x.twoTone = true;
-        x.cap = Cap::orb;
+        x.twoTone = false;
+        x.cap = Cap::flat;
+        x.thin = true; // round tp172b: the reference's look
+        x.arcGlow = 0.08f; // round tp172b: the reference's look
         return x;
     }();
     return t;
@@ -720,58 +723,45 @@ inline const Theme& sentryTheme()
     {
         Theme x;
         x.name = "Sentry Gate";
-        x.base = Style::hardware;
-        x.pal = { Colour (0xff1a252c), Colour (0xff070b0e), Colour (0xffffc864), Colour (0xff6fc6c0), Colour (0x9c182228), Colour (0xb80a0f12),
-                  Colour (0xff5b6a70), Colour (0xffeee4cc), Colour (0xff050709), Colour (0xff3a3f42), Colour (0xff111315), Colour (0xff1c2428),
-                  Colour (0xffffe2a8), Colour (0xff192127) };
+        x.base = Style::glow;
+        x.pal = { Colour (0xff3d4560), Colour (0xff262b3d), Colour (0xff8fb4ff), Colour (0xffe8ecf6), Colour (0x9c434b66), Colour (0xb82a3043),
+                  Colour (0xff6c7593), Colour (0xffeef1fa), Colour (0xff1c2030), Colour (0xffd7dced), Colour (0xff8a93ad), Colour (0xff2b3146),
+                  Colour (0xff1d2232), Colour (0xff30364b) };
         x.canvas = canvasSentry;
-        x.sectionDeco = sentryRivets;
         x.titleEmblem = sentryEmblem;
-        x.drawCap = capIron;
-        x.pointer = Pointer::glowLine;
-        x.arcGlow = 0.2f;
+        x.pointer = Pointer::line;
+        x.arcGlow = 0.05f;
+        x.cap = Cap::porcelain; // round tp172b: the reference's look
         return x;
     }();
     return t;
 }
 
-// === Glow Leveler (opto-leveler role): a hammertone rack panel lit by its electro-luminescent cell ==================
+// === Glow Leveler (opto-leveler role): round tp172d — the reference's silver faceplate: light brushed aluminium,
+// black knobs on printed scales, the cream VU in a dark bezel, a dark strip along the bottom for the trims ==========
 
 inline void canvasGlowLeveler (juce::Graphics& g, Rectangle<float> a, bool display)
 {
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
     if (display) return;
-    if (! reduced) // hammertone: a seeded mottle of soft light and dark dabs
-    {
-        juce::Random rnd (2);
-        for (int i = 0; i < (int) (a.getWidth() * a.getHeight() / 260.0f); ++i)
-        {
-            const Point<float> c { a.getX() + rnd.nextFloat() * a.getWidth(), a.getY() + rnd.nextFloat() * a.getHeight() };
-            const auto r = 2.0f + rnd.nextFloat() * 5.0f;
-            g.setColour ((rnd.nextBool() ? Colours::white : Colours::black).withAlpha (0.03f));
-            g.fillEllipse (Rectangle<float> (r * 2.0f, r * 1.6f).withCentre (c));
-        }
-    }
-    softLight (g, { a.getCentreX(), a.getY() + a.getHeight() * 0.3f }, a.getWidth() * 0.45f, p.accent2, 0.13f); // the cell's glow
-    for (const auto x : { a.getX(), a.getRight() - 16.0f }) // rack ears
-    {
-        g.setColour (Colours::black.withAlpha (0.25f));
-        g.fillRect (Rectangle<float> (x, a.getY(), 16.0f, a.getHeight()));
-        for (const auto f : { 0.12f, 0.88f })
-            styles::screw (g, { x + 8.0f, a.getY() + a.getHeight() * f }, 7.0f);
-    }
-    vignette (g, a, 0.3f);
+    brushedLines (g, a, 41, 0.05f);
+    if (! reduced) bloom (g, { a.getX() + a.getWidth() * 0.3f, a.getY() }, a.getWidth() * 0.7f, Colours::white, 0.10f); // the top light
+    for (const auto& c : { a.getTopLeft().translated (11.0f, 11.0f), a.getTopRight().translated (-11.0f, 11.0f),
+                           a.getBottomLeft().translated (11.0f, -11.0f), a.getBottomRight().translated (-11.0f, -11.0f) })
+        styles::screw (g, c, 6.0f);
+    g.setColour (Colours::black.withAlpha (0.22f)); // the faceplate's edge
+    g.drawRect (a.reduced (1.0f), 1.0f);
 }
 
-inline void glowLevelerEmblem (juce::Graphics& g, Point<float> c, float r) // the glowing cell
+inline void glowLevelerEmblem (juce::Graphics& g, Point<float> c, float r) // the cell, a small red lamp on the plate
 {
-    const auto& p = pal();
-    if (! reduced) bloom (g, c, r * 3.0f, p.accent2, 0.45f);
-    g.setColour (p.accent2);
+    g.setColour (Colour (0xff5a0d0a));
     g.fillEllipse (Rectangle<float> (r * 1.3f, r * 1.3f).withCentre (c));
-    g.setColour (Colours::white.withAlpha (0.8f));
-    g.fillEllipse (Rectangle<float> (r * 0.5f, r * 0.5f).withCentre (c));
+    g.setColour (pal().accent);
+    g.fillEllipse (Rectangle<float> (r * 0.9f, r * 0.9f).withCentre (c));
+    g.setColour (Colours::white.withAlpha (0.7f));
+    g.fillEllipse (Rectangle<float> (r * 0.3f, r * 0.3f).withCentre (c.translated (-r * 0.15f, -r * 0.15f)));
 }
 
 inline const Theme& glowLevelerTheme()
@@ -781,19 +771,28 @@ inline const Theme& glowLevelerTheme()
         Theme x;
         x.name = "Glow Leveler";
         x.base = Style::hardware;
-        x.pal = { Colour (0xff4a5560), Colour (0xff262c33), Colour (0xfff0e2c0), Colour (0xff8fe6d8), Colour (0xd83e4852), Colour (0xe82a3038),
-                  Colour (0xff8a96a2), Colour (0xfff4ead2), Colour (0xff12171c), Colour (0xff2d2d2d), Colour (0xff0c0c0c), Colour (0xff1f252b),
-                  Colour (0xfff4ead2), Colour (0xff353d46) };
+        x.pal = { Colour (0xffd0d3d5), Colour (0xffa9adb1), Colour (0xffc8231b), Colour (0xffe8463c), Colour (0x00000000), Colour (0x00000000),
+                  Colour (0xff6e7277), Colour (0xff1c1d1f), Colour (0xff1a1c1e), Colour (0xff3c3d3f), Colour (0xff050505), Colour (0xff55595d),
+                  Colour (0xfff4f4f4), Colour (0xff45484c) };
         x.canvas = canvasGlowLeveler;
-        x.sectionDeco = ridgeScrews;
         x.titleEmblem = glowLevelerEmblem;
         x.cap = Cap::bakelite;
         x.pointerFrom = 0.15f;
         x.ticks = 11;
+        x.boldTicks = false;
         x.buttTrack = true;
         x.arcGlow = 0.0f;
         x.knobScale = 1.04f;
         x.thumbPointer = true;
+        x.noValueArc = true;               // the value reads off the pointer and the printed scale
+        x.flatSections = true;             // one faceplate: no cards
+        x.rimWidth = 0.0f;
+        x.captionCol = Colour (0xff1c1d1f);
+        x.valueCol = Colour (0xff2e3033);
+        x.offLabelCol = Colour (0xff2e3033);
+        x.hwKeys = true;
+        x.headerCol = Colour (0xff2b2d30);
+        x.sectionFills[1] = Colour (0xff17181a); // the dark lower strip (Analog, HF emphasis, Mix, Trim)
         return x;
     }();
     return t;
@@ -847,13 +846,14 @@ inline const Theme& hushTheme()
         Theme x;
         x.name = "Hush De-esser";
         x.base = Style::glow;
-        x.pal = { Colour (0xff261b35), Colour (0xff0b0910), Colour (0xffc792ff), Colour (0xffffb3e0), Colour (0x9c221830), Colour (0xb80d0a13),
-                  Colour (0xff86709e), Colour (0xfff1e8ff), Colour (0xff07050b), Colour (0xff3a2e4c), Colour (0xff17121f), Colour (0xff221a2e),
-                  Colour (0xfff6eaff), Colour (0xff1e1729) };
+        x.pal = { Colour (0xff3a3a33), Colour (0xff23231f), Colour (0xffe8b923), Colour (0xff9fd36a), Colour (0x9c3d3d36), Colour (0xb8262622),
+                  Colour (0xff6b6a5c), Colour (0xffeeeadb), Colour (0xff1b1b18), Colour (0xfff5cf45), Colour (0xffb88a10), Colour (0xff2e2e29),
+                  Colour (0xfffff6d8), Colour (0xff34342e) };
         x.canvas = canvasHush;
         x.titleEmblem = hushEmblem;
-        x.drawCap = capVelvet;
-        x.twoTone = true;
+        x.twoTone = false;
+        x.cap = Cap::orb; // round tp172b: the reference's look
+        x.arcGlow = 0.06f; // round tp172b: the reference's look
         return x;
     }();
     return t;
@@ -1254,6 +1254,9 @@ inline const Theme& echoformTheme()
     static const Theme t = []
     {
         auto x = soundtoysTheme ("Echoform", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
+        x.cornerScale = 4.0f; // the original's three rounded pods
+        x.hwKeys = true;
+        x.cheek = 30.0f; // (the layout leaves room for them)
         return x;
     }();
     return t;
@@ -1711,6 +1714,9 @@ inline const Theme& emberTheme()
     static const Theme t = []
     {
         auto x = soundtoysTheme ("Ember Saturator", Colour (0xffff7a45), Colour (0xffe9e2d0), Colour (0xff121213), Colour (0xff3c3c3e), 1.0f);
+        x.hwKeys = true;  // Punish / Thump / Steep and the five style keys
+        x.cheek = 30.0f;
+        x.captionScale = 1.25f;
         return x;
     }();
     return t;
@@ -3599,38 +3605,29 @@ inline const Theme& voiceShiftTheme()
         x.valueCol = Colour (0xffff4a3a);
         x.captionCol = Colours::white; // the original's white legends on the mustard panels
         x.pal.well = Colour (0xff1a0806);
+        // the original's three printed fields: mustard (pitch / formant), teal (mode), red (drive / mix)
+        x.sectionFills[0] = Colour (0xffc39a1a);
+        x.sectionFills[1] = Colour (0xff1d5a6c);
+        x.sectionFills[2] = Colour (0xffb51d1d);
+        x.hwKeys = true;
+        x.cheek = 30.0f;
+        x.cornerScale = 0.5f;
         return x;
     }();
     return t;
 }
 
-// === Quell Denoiser: calm water — a still lake with a single ring, grain fading away ===============================
+// === Quell Denoiser (noise-suppressor role): round tp172d — the reference's look: graphite metal shading darker to
+// the bottom, a black meter well, a chrome fader cap on a black slot, orange read-outs ==============================
 
 inline void canvasQuell (juce::Graphics& g, Rectangle<float> a, bool display)
 {
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
     if (display) return;
-    if (! reduced) // the noise: fine grain on the left, fading out to the right
-    {
-        juce::Random rnd (17);
-        for (int i = 0; i < (int) (a.getWidth() * a.getHeight() / 60.0f); ++i)
-        {
-            const auto u = rnd.nextFloat();
-            if (rnd.nextFloat() > (1.0f - u) * (1.0f - u)) continue;
-            g.setColour (Colours::white.withAlpha (0.05f));
-            g.fillRect (Rectangle<float> (a.getX() + u * a.getWidth(), a.getY() + rnd.nextFloat() * a.getHeight(), 1.0f, 1.0f));
-        }
-    }
-    const auto c = Point<float> (a.getX() + a.getWidth() * 0.68f, a.getY() + a.getHeight() * 0.62f);
-    for (int i = 1; i < 6; ++i) // one ring spreading on still water
-    {
-        g.setColour (p.accent.withAlpha (0.12f - 0.018f * (float) i));
-        g.drawEllipse (Rectangle<float> ((float) i * 40.0f, (float) i * 12.0f).withCentre (c), 1.2f);
-    }
-    g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.04f), 0.0f, c.y - 2.0f, Colours::transparentWhite, 0.0f, a.getBottom(), false));
-    g.fillRect (a.withTop (c.y - 2.0f)); // the water's sheen
-    vignette (g, a, 0.4f);
+    brushedLines (g, a, 17, 0.035f);
+    if (! reduced) bloom (g, { a.getX() + a.getWidth() * 0.6f, a.getY() }, a.getWidth() * 0.8f, Colours::white, 0.10f); // the top light
+    vignette (g, a, 0.35f);
 }
 
 inline void quellEmblem (juce::Graphics& g, Point<float> c, float r)
@@ -3647,14 +3644,23 @@ inline const Theme& quellTheme()
     {
         Theme x;
         x.name = "Quell Denoiser";
-        x.base = Style::glow;
-        x.pal = { Colour (0xff0e2228), Colour (0xff04090b), Colour (0xff5ad8d0), Colour (0xffcaf4f0), Colour (0x9c0e2026), Colour (0xb804090b),
-                  Colour (0xff4a7a7a), Colour (0xffe6fbf8), Colour (0xff03080a), Colour (0xffbcc8c4), Colour (0xff6a7874), Colour (0xff16292d),
-                  Colour (0xff10302c), Colour (0xff10242a) };
+        x.base = Style::hardware;
+        x.pal = { Colour (0xff8c9299), Colour (0xff43484e), Colour (0xffeb9a2e), Colour (0xffffc46b), Colour (0x00000000), Colour (0x00000000),
+                  Colour (0xff2a2d31), Colour (0xffeef0f2), Colour (0xff0a0b0c), Colour (0xffe2e5e8), Colour (0xff5f6368), Colour (0xff0d0e10),
+                  Colour (0xff1a1a1a), Colour (0xff34383d) };
         x.canvas = canvasQuell;
         x.titleEmblem = quellEmblem;
-        x.drawCap = capStone;
-        x.arcGlow = 0.15f;
+        x.cap = Cap::bakelite;
+        x.arcGlow = 0.0f;
+        x.buttTrack = true;
+        x.flatSections = true;
+        x.rimWidth = 0.0f;
+        x.captionCol = Colour (0xffeef0f2);
+        x.valueCol = Colour (0xffffa63d);
+        x.offLabelCol = Colour (0xffd8dbde);
+        x.bigThumb = 5.0f; // the reference's large grooved metal fader cap
+        x.hwKeys = true;
+        x.headerCol = Colour (0xff2b2d30);
         return x;
     }();
     return t;
@@ -4373,7 +4379,15 @@ LYNX_LITE_THEME (basicChorusTheme, "Chorus", Style::glow, Colour (0xff121c2a), C
 // round tp172d: PanMan's hardware look (Auto-pan's role) — black face, walnut cheeks, white outlines, a red LED meter
 inline const Theme& autoPanTheme()
 {
-    static const Theme t = soundtoysTheme ("Auto-pan", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
+    // round tp172d: PanMan's look (its role) — black face, walnut cheeks, rounded pods with white outlines, square keys
+    static const Theme t = []
+    {
+        auto x = soundtoysTheme ("Auto-pan", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
+        x.cornerScale = 4.0f;
+        x.hwKeys = true;
+        x.cheek = 30.0f;
+        return x;
+    }();
     return t;
 }
 LYNX_LITE_THEME (panOMaticTheme, "Fruity PanOMatic", Style::vivid, Colour (0xff1e1430), Colour (0xff09060f), Colour (0xffff7ad0), Colour (0xff9ae8ff), canvasPan, Cap::rubber)

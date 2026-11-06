@@ -17,7 +17,7 @@ namespace sft
 {
 std::string tempDir (const char* name)
 {
-    const auto dir = std::filesystem::temp_directory_path() / ("lynx-sf158-" + std::string (name));
+    const auto dir = std::filesystem::temp_directory_path() / ("lynx-sf158-" + processTempTag() + "-" + std::string (name)); // per process: parallel runs clobbered each other
     std::error_code ec;
     std::filesystem::remove_all (dir, ec);
     std::filesystem::create_directories (dir);

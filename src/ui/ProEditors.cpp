@@ -1,5 +1,6 @@
 #include "ui/SlotWatch.h"
 #include "ui/ProEditors.h"
+#include "ui/PluginEditors.h"
 
 #include <cmath>
 #include <map>
@@ -2318,7 +2319,7 @@ public:
     }
 
 private:
-    enum { idRemove = 1, idPrev, idNext, idPower, idSolo, idMute, idBands, idMod };
+    enum { idRemove = 1, idPrev, idNext, idPower, idSolo, idMute, idBands, idMod, idClassic };
     int selected = 0, dragHandle = -1, dragEdge = -1, hoverHandle = -1;
     bool showMod = false; // round 152: the panel shows the modulation (LFOs, follower, four slots) instead of the band
     int xp (int b, int f) const { return mixsuite::ember::bandExtra (b, f); } // round 128: a band's power, state, tone, feedback, dynamics
@@ -2464,6 +2465,9 @@ private:
         // they end left of the IN / OUT meter
         out.push_back (barValue ({ s.getX() + 698.0f, s.getY(), 86.0f, s.getHeight() }, inputPan, tr ("In pan")));
         out.push_back (barValue ({ s.getX() + 788.0f, s.getY(), 86.0f, s.getHeight() }, outputPan, tr ("Out pan")));
+        // round tp172d: back to the Classic panel (the Voicing on; Ember's Classic window replaces this one)
+        out.push_back (button ({ s.getX() + 880.0f, s.getY(), 64.0f, s.getHeight() }, idClassic, tr ("Classic"), false,
+                                   tr ("The Classic panel: one-screen hardware saturator (Drive, Punish, five styles)")));
         const auto bar = barArea();
         const auto cy = bar.getCentreY();
         out.push_back (barMenu ({ 10.0f, cy - 11.0f, 150.0f, 22.0f }, xoverSlope, tr ("Crossover"), "12 dB/oct|24 dB/oct|48 dB/oct", { 0.0f, 0.5f, 1.0f }));
@@ -2556,6 +2560,12 @@ private:
         else if (c.id == idNext) selected = (selected + 1) % count();
         else if (c.id == idBands) showBandsMenu();
         else if (c.id == idMod) showMod = ! showMod; // round 152
+        else if (c.id == idClassic) // round tp172d
+        {
+            set ({ { mixsuite::ember::voicing, 1.0f } });
+            if (! demo) NativeEffectWindows::switchEmberEditor (engine, track, slot, true);
+            return;
+        }
         repaint();
     }
 
@@ -3139,6 +3149,7 @@ void open (AudioEngine& engine, int track, int slot)
     open[key] = std::make_unique<ProEditorWindow> (std::move (editor), title, engine, track, slot);
 }
 
+void close (int track, int slot) { windows().erase ({ track, slot }); }
 void closeAll() { windows().clear(); }
 } // namespace ProEditorWindows
 

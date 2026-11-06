@@ -1,4 +1,5 @@
 #include "core/LuxeVerb.h"
+#include "core/SpaceVerb.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1456,6 +1457,95 @@ void Engine::process (float* left, float* right, int n, const float* scLeft, con
 }
 } // namespace luxeverb
 
+// ------------------------------------------------------------------------------------------------- Space engine
+
+namespace luxeverb::sp
+{
+const std::array<const char*, luxeVerbSpaceCount> names { { "Space engine", "Space style", "Space", "Decay rate", "Distance",
+                                                             "Space brightness", "Space character", "Thickness", "Space width",
+                                                             "Space pre-delay", "Space mix", "Low decay", "Low decay freq.",
+                                                             "High decay", "High decay freq." } };
+// off; Modern, 2.5 s, 100 %, 50 %, 0 %, 30 %, 0 %, 70 %, 0 ms, 30 %, ×1 below 200 Hz, ×1 above 4 kHz (the reference's defaults)
+const std::array<float, luxeVerbSpaceCount> defaults { { 0.0f, 0.0f, 0.5f, 0.5f, 0.5f, 0.5f, 0.3f, 0.5f, 0.7f, 0.0f, 0.3f,
+                                                         0.5f, 0.5f, 0.5f, 0.56370f } };
+namespace
+{
+// "Space" knob → seconds; the knots are where the reference's own knob reads 0.5, 1, 2.5, 4 and 6 s (its saved values)
+constexpr std::array<std::pair<double, double>, 7> spaceKnots { { { 0.0, 0.3 }, { 0.1286, 0.5 }, { 0.25, 1.0 }, { 0.5, 2.5 },
+                                                                  { 0.7, 4.0 }, { 0.8444, 6.0 }, { 1.0, 10.0 } } };
+}
+double decaySeconds (float v) noexcept
+{
+    const double x = std::clamp ((double) v, 0.0, 1.0);
+    for (std::size_t i = 1; i < spaceKnots.size(); ++i)
+        if (x <= spaceKnots[i].first)
+        {
+            const auto [x0, y0] = spaceKnots[i - 1];
+            const auto [x1, y1] = spaceKnots[i];
+            return y0 + (y1 - y0) * (x - x0) / (x1 - x0);
+        }
+    return spaceKnots.back().second;
+}
+float decayValue (double seconds) noexcept
+{
+    const double y = std::clamp (seconds, spaceKnots.front().second, spaceKnots.back().second);
+    for (std::size_t i = 1; i < spaceKnots.size(); ++i)
+        if (y <= spaceKnots[i].second)
+        {
+            const auto [x0, y0] = spaceKnots[i - 1];
+            const auto [x1, y1] = spaceKnots[i];
+            return (float) (x0 + (x1 - x0) * (y - y0) / (y1 - y0));
+        }
+    return 1.0f;
+}
+double rateOf (float v) noexcept { return std::pow (4.0, 2.0 * std::clamp ((double) v, 0.0, 1.0) - 1.0); }
+double predelayMs (float v) noexcept { const double x = std::clamp ((double) v, 0.0, 1.0); return 500.0 * x * x * x; }
+double multOf (float v) noexcept { return rateOf (v); }
+double lowHz (float v) noexcept { return 20.0 * std::pow (100.0, std::clamp ((double) v, 0.0, 1.0)); }
+double highHz (float v) noexcept { return 500.0 * std::pow (40.0, std::clamp ((double) v, 0.0, 1.0)); }
+
+std::string text (int index, float v)
+{
+    char b[48];
+    const auto pct = [&] (double x) { std::snprintf (b, sizeof b, "%.0f%%", x); return std::string (b); };
+    switch (index)
+    {
+        case engine: return v >= 0.5f ? "Space" : "LuxeVerb";
+        case style: return v < 0.25f ? "Modern" : v < 0.75f ? "Vintage" : "Plate";
+        case space: std::snprintf (b, sizeof b, "%.2f s", decaySeconds (v)); return b;
+        case rate: return pct (100.0 * rateOf (v));
+        case distance: case character: case width: case mix: return pct (100.0 * std::clamp (v, 0.0f, 1.0f));
+        case brightness: case thickness: return pct (100.0 * (2.0 * std::clamp (v, 0.0f, 1.0f) - 1.0));
+        case predelay: std::snprintf (b, sizeof b, predelayMs (v) < 10.0 ? "%.1f ms" : "%.0f ms", predelayMs (v)); return b;
+        case lowMult: case highMult: std::snprintf (b, sizeof b, "x%.2f", multOf (v)); return b;
+        case lowFreq: std::snprintf (b, sizeof b, "%.0f Hz", lowHz (v)); return b;
+        case highFreq: std::snprintf (b, sizeof b, highHz (v) < 1000.0 ? "%.0f Hz" : "%.1f kHz", highHz (v) < 1000.0 ? highHz (v) : highHz (v) / 1000.0); return b;
+        default: return {};
+    }
+}
+
+static spaceverb::Settings settingsOf (const EffectParams& p) noexcept
+{
+    const auto at = [&] (int i) { return p[(std::size_t) (luxeVerbSpaceFirst + i)]; };
+    spaceverb::Settings s;
+    s.style = at (style) < 0.25f ? spaceverb::Style::modern : at (style) < 0.75f ? spaceverb::Style::vintage : spaceverb::Style::plate;
+    s.decaySec = decaySeconds (at (space));
+    s.rate = rateOf (at (rate));
+    s.distance = at (distance);
+    s.brightness = 2.0 * at (brightness) - 1.0;
+    s.character = at (character);
+    s.thickness = 2.0 * at (thickness) - 1.0;
+    s.width = at (width);
+    s.predelayMs = predelayMs (at (predelay));
+    s.mix = at (mix);
+    s.lowMult = multOf (at (lowMult));
+    s.lowHz = lowHz (at (lowFreq));
+    s.highMult = multOf (at (highMult));
+    s.highHz = highHz (at (highFreq));
+    return s;
+}
+} // namespace luxeverb::sp
+
 // ------------------------------------------------------------------------------------------------- effect slot
 
 namespace
@@ -1467,12 +1557,14 @@ public:
     {
         rate = (int) std::lround (sampleRate);
         engine.create (rate > 0 ? rate : 44100); // allocates the lines here, not in the audio callback
+        spaceEngine.prepare (rate > 0 ? rate : 44100);
         created = true;
         ready = false;
     }
     void reset() noexcept override
     {
         if (created) engine.flush();
+        spaceEngine.reset();
     }
     void setSidechain (const float* l, const float* r) noexcept override
     {
@@ -1482,6 +1574,19 @@ public:
     }
     void process (float* left, float* right, int n, const EffectParams& params, double bpm) noexcept override
     {
+        if (params[(std::size_t) luxeVerbSpaceFirst] >= 0.5f) // the Space engine (round tp172b)
+        {
+            if (! spaceOn)
+                spaceEngine.reset();
+            spaceOn = true;
+            spaceEngine.set (luxeverb::sp::settingsOf (params));
+            spaceEngine.process (left, right, n);
+            scL = scR = nullptr;
+            return;
+        }
+        if (spaceOn && created)
+            engine.flush();
+        spaceOn = false;
         const auto s = luxeverb::fromParams (params);
         const double t = bpm > 0.0 ? bpm : 120.0;
         if (! ready)
@@ -1503,6 +1608,8 @@ public:
 
 private:
     luxeverb::Engine engine;
+    spaceverb::Engine spaceEngine;
+    bool spaceOn = false;
     int rate = 44100;
     bool created = false, ready = false;
     const float* scL = nullptr;
@@ -1528,11 +1635,14 @@ std::optional<EffectSlot> luxeVerbFromFl (const std::vector<std::uint8_t>& state
     slot.kind = EffectKind::luxeVerb;
     slot.params = {};
     luxeverb::toParams (*s, slot.params);
+    for (int i = 0; i < luxeVerbSpaceCount; ++i) // the Space engine stays off, at its defaults
+        slot.params[(std::size_t) (luxeVerbSpaceFirst + i)] = luxeverb::sp::defaults[(std::size_t) i];
     return slot;
 }
 
 std::string luxeVerbParamText (int param, float value01)
 {
+    if (param >= luxeVerbSpaceFirst) return luxeverb::sp::text (param - luxeVerbSpaceFirst, value01);
     if (param >= luxeVerbControlCount) return value01 >= 0.5f ? "on" : "off";
     if (param < 0) return {};
     const auto rg = luxeverb::ranges[(size_t) param];

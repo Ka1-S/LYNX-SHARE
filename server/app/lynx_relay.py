@@ -96,6 +96,9 @@ async def create_room(request: web.Request) -> web.Response:
         chosen = body.get("token") or ""
         if chosen and (not isinstance(chosen, str) or not CHOSEN_TOKEN.match(chosen)):
             return fail(400, "token: 43 to 128 characters A-Z a-z 0-9 _ -")
+    # Body reads yield to other creates: reserve capacity only after the last await.
+    if len(rooms) >= MAX_ROOMS:
+        return fail(503, "relay is full, try again later", {"Retry-After": "300"})
     rid = random_id(7)[:10]
     while rid in rooms:
         rid = random_id(7)[:10]

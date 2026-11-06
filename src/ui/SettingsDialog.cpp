@@ -1,4 +1,5 @@
 #include "ui/SettingsDialog.h"
+#include "ui/FileChoosers.h"
 #include "ui/ThemeSettings.h"
 
 #include "core/MissingFiles.h"
@@ -478,8 +479,8 @@ private:
 
     void add()
     {
-        chooser = std::make_unique<juce::FileChooser> (tr ("Add a folder"), juce::File::getSpecialLocation (juce::File::userHomeDirectory));
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+        chooser = lynx::ui::makeFileChooser (tr ("Add a folder"), juce::File::getSpecialLocation (juce::File::userHomeDirectory));
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
                               [safe = juce::Component::SafePointer<FolderList> (this)] (const juce::FileChooser& c) {
                                   if (safe == nullptr || ! c.getResult().isDirectory())
                                       return;

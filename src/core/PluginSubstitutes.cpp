@@ -186,6 +186,8 @@ vendor = FabFilter
 lynx = LuxeVerb
 names = FabFilter Pro-R; FabFilter Pro-R 2; Pro-R; Pro-R 2
 mix = 1
+# round tp172b: a Pro-R 2 state opens LuxeVerb's Space engine at its settings (core/SpaceVerb.h)
+translate = pro-r2
 
 [soundtoys-littleplate]
 product = Little Plate
@@ -396,6 +398,9 @@ product = FabFilter Pro-L
 vendor = FabFilter
 lynx = Apex Limiter
 names = FabFilter Pro-L; FabFilter Pro-L 2; Pro-L; Pro-L 2
+# round tp172b: a Pro-L 2 state (component "FabF", 32 values, measured black-box) is translated: gain, style, look-ahead,
+# attack, release, channel links, oversampling, true peak, dither, noise shaping, DC filter, side chain, output level
+translate = pro-l2
 
 # ---------------------------------------------------------------- compressors -> Compressor
 [waves-rcomp]

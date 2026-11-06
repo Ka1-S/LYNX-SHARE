@@ -1,6 +1,7 @@
 #include "ui/FlMods.h"
 #include "platform/Paths.h"
 #include "ui/ColourPicker.h"
+#include "ui/FileChoosers.h"
 #include "ui/MixerComponent.h"
 #include "ui/SlotWatch.h"
 #include "core/ValueMath.h"
@@ -605,6 +606,9 @@ void MixerStrips::paint (juce::Graphics& g)
     const auto& song = engine.getSong();
     const auto tracks = (int) song.mixer.size();
     const auto clip = g.getClipBounds();
+    // round 173f: a frame of the meters' timer repaints only the meter rectangles, but the clip's bounds span every strip
+    // between them, so each strip's parts are drawn only where the frame's region (not its bounds) reaches them
+    const auto needs = [&g] (juce::Rectangle<int> area) { return g.clipRegionIntersects (area.expanded (3)); };
     g.fillAll (colour::bg1);
 
     // the routing lane runs under all strips
@@ -703,7 +707,7 @@ void MixerStrips::paint (juce::Graphics& g)
         }
 
         // record arm: the input recording goes through this insert
-        if (t > 0)
+        if (t > 0 && needs (armArea (t).getUnion (inputArea (t))))
         {
             const auto armed = engine.isInsertArmed (t);
             const auto r = armArea (t).toFloat().reduced (2.0f);
@@ -730,6 +734,8 @@ void MixerStrips::paint (juce::Graphics& g)
 
         // header: number and effect count on one line, the icon under them (FL's place), then the name: on the
         // header's last row (Extra large) or up a column of the strip (round 168h)
+        if (needs (juce::Rectangle<int> (x, 0, plateWidth, 18).getUnion (iconArea (t))))
+        {
         g.setColour (isSelected ? colour::accent : colour::textSecondary);
         g.setFont (font (compactLayout ? 9.5f : type::caption, isSelected));
         textcache::drawFittedText (g, t == 0 ? juce::String ("M") : juce::String (t), juce::Rectangle<int> (x, 4, plateWidth, 13),
@@ -748,7 +754,10 @@ void MixerStrips::paint (juce::Graphics& g)
             else // narrow strips: a dot at the number's right
                 g.fillEllipse ((float) (x + plateWidth) - 7.0f, 8.0f, 4.0f, 4.0f);
         }
+        }
 
+        if (needs (nameArea (t).withX (x).withWidth (plateWidth)))
+        {
         g.setColour (track.muted ? colour::textDisabled : (hovered (Part::header) ? colour::textPrimary : colour::textPrimary.withAlpha (0.9f)));
         g.setFont (font (compactLayout ? 10.0f : type::small, isSelected));
         // Online Sessions (round 168a): a plugin of this insert is not installed here, its stand-in render plays (an
@@ -773,7 +782,7 @@ void MixerStrips::paint (juce::Graphics& g)
             juce::Graphics::ScopedSaveState state (g);
             g.addTransform (juce::AffineTransform::rotation (-juce::MathConstants<float>::halfPi, (float) column.getCentreX(), (float) column.getCentreY()));
             const auto rotated = juce::Rectangle<int> (column.getHeight(), column.getWidth()).withCentre (column.getCentre());
-            g.drawFittedText (name, rotated, juce::Justification::centredLeft, 1, 0.8f);
+            textcache::drawFittedText (g, name, rotated, juce::Justification::centredLeft, 1, 0.8f); // (laid out once: round 173f)
         }
 
         // FL's narrow strips show the level beside the name too: two thin bars (Wide layouts)
@@ -793,9 +802,10 @@ void MixerStrips::paint (juce::Graphics& g)
                 g.fillRect (bar.withTop (bar.getBottom() - h));
             }
         }
+        }
 
         // compensated latency (PDC) on the Master
-        if (t == 0 && engine.getLatencySamples() > 0 && ! compactLayout)
+        if (t == 0 && engine.getLatencySamples() > 0 && ! compactLayout && needs (soloArea (t).withX (x).withWidth (w)))
         {
             const auto ms = 1000.0 * engine.getLatencySamples() / juce::jmax (1.0, engine.getTransport().sampleRate.load());
             g.setColour (colour::textSecondary);
@@ -807,14 +817,18 @@ void MixerStrips::paint (juce::Graphics& g)
         // pan and stereo separation
         const auto knob = (float) sp.knobSize;
         const auto stereoKnob = sp.stackedKnobs ? knob - 6.0f : 22.0f;
+        if (needs (panArea (t).getUnion (stereoArea (t))))
+        {
         drawKnob (g, panArea (t).toFloat().withSizeKeepingCentre (knob, knob),
                   engine.getAutomationDisplay().shown (AutomationTarget { AutomationTargetKind::mixerPan, t }, (track.pan + 1.0f) * 0.5f), true,
                   dragging (Part::pan) ? colour::accent : colour::info, hovered (Part::pan) || dragging (Part::pan));
         if (sp.stereoKnob)
             drawKnob (g, stereoArea (t).toFloat().withSizeKeepingCentre (stereoKnob, stereoKnob), (track.stereo + 1.0f) * 0.5f, true,
                       dragging (Part::stereo) ? colour::accent : colour::knobArc, hovered (Part::stereo) || dragging (Part::stereo));
+        }
 
         // mute and solo
+        if (needs (muteArea (t).getUnion (soloArea (t))))
         {
             const auto led = compactLayout ? 10.0f : 12.0f;
             const auto m = muteArea (t).toFloat().withSizeKeepingCentre (led, led);
@@ -937,7 +951,7 @@ void MixerStrips::paint (juce::Graphics& g)
         }
 
         // routing lane: send switch from the selected insert to this one, and its level knob
-        if (selected > 0 && t != selected && selected < tracks)
+        if (selected > 0 && t != selected && selected < tracks && needs (routeArea (t).getUnion (sendArea (t))))
         {
             const auto r = routeArea (t).toFloat();
             const auto on = song.routes (selected, t);
@@ -2181,10 +2195,10 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         file.addItem (tr ("Open mixer track state..."), [this, targets] {
             auto& chooser = mixerStateChooser();
             const auto start = mixerpresets::folders().isEmpty() ? mixerStatesFolder() : mixerpresets::folders()[0];
-            chooser = std::make_unique<juce::FileChooser> (tr ("Open mixer track state"), start,
+            chooser = lynx::ui::makeFileChooser (tr ("Open mixer track state"), start,
                                                            juce::String ("*.fst;*") + ProjectFile::mixerTrackStateExtension);
             juce::Component::SafePointer<MixerStrips> safe (this);
-            chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe, targets] (const juce::FileChooser& fc) {
+            lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe, targets] (const juce::FileChooser& fc) {
                 if (safe != nullptr && fc.getResult().existsAsFile() && ! mixerpresets::loadOnTracks (safe->engine, targets, fc.getResult()))
                     juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Open mixer track state"),
                                                             tr ("This file is not a mixer track state LYNX SHARE can read."));
@@ -2193,11 +2207,11 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         file.addItem (tr ("Save mixer track state as...") + "\tCtrl+Shift+S", [this, t, trackName] {
             auto& chooser = mixerStateChooser();
             const auto name = juce::File::createLegalFileName (trackName.isNotEmpty() ? trackName : tr ("Mixer track {0}", { juce::String (t) }));
-            chooser = std::make_unique<juce::FileChooser> (tr ("Save mixer track state"), mixerStatesFolder().getChildFile (name + ProjectFile::mixerTrackStateExtension),
+            chooser = lynx::ui::makeFileChooser (tr ("Save mixer track state"), mixerStatesFolder().getChildFile (name + ProjectFile::mixerTrackStateExtension),
                                                            juce::String ("*") + ProjectFile::mixerTrackStateExtension);
             juce::Component::SafePointer<MixerStrips> safe (this);
             mixerStatesFolder().createDirectory();
-            chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting, [safe, t] (const juce::FileChooser& fc) {
+            lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting, [safe, t] (const juce::FileChooser& fc) {
                 if (safe != nullptr && fc.getResult() != juce::File())
                     saveMixerTrackState (safe->engine, t, fc.getResult().withFileExtension (ProjectFile::mixerTrackStateExtension));
             });
@@ -2507,8 +2521,18 @@ void MixerStrips::changeListenerCallback (juce::ChangeBroadcaster*)
             const std::array<float, 3> now { mixer[t].volume, mixer[t].pan, mixer[t].stereo };
             if (now != shownLevels[t])
             {
+                // round 173f: just the control that moved (the fader with its cap and dB read-out, or a knob)
+                const auto track = (int) t;
+                if (now[0] != shownLevels[t][0])
+                {
+                    const auto fader = faderArea (track);
+                    repaint (stripX (track), fader.getY() - 9, stripWidthOf (track), fader.getHeight() + 9 + 20);
+                }
+                if (now[1] != shownLevels[t][1])
+                    repaint (panArea (track).expanded (2));
+                if (now[2] != shownLevels[t][2])
+                    repaint (stereoArea (track).expanded (2));
                 shownLevels[t] = now;
-                repaint (stripX ((int) t), 0, stripWidthOf ((int) t), getHeight());
             }
         }
         return;
@@ -2593,9 +2617,18 @@ void MixerStrips::timerCallback()
         const auto before = m;
         m.tick (meters.takePeak ((int) (i / 2), (int) (i % 2))); // ~20 dB/s falloff at 30 Hz, 1.5 s peak hold
 
-        // only the meter that changed is repainted
+        // only the meter that changed is repainted (and, in the Wide layouts, the two thin bars beside the name, which
+        // follow the same level: round 173f, they only moved when something else repainted the strip)
         if (showing && (std::abs (m.level - before.level) > 1e-4f || std::abs (m.peak - before.peak) > 1e-4f || m.clipped != before.clipped))
-            repaint (meterArea ((int) (i / 2)).expanded (1));
+        {
+            const auto t = (int) (i / 2);
+            repaint (meterArea (t).expanded (1));
+            if (const auto& sp = spec(); sp.verticalName && ! sp.nameLow && ! mixerlayout::isCompact (layout) && t > 0 && std::abs (m.level - before.level) > 1e-4f)
+            {
+                const auto box = nameArea (t);
+                repaint (box.getRight(), box.getY() + 5, stripWidthOf (t) - spec().gap - box.getWidth(), box.getHeight() - 10);
+            }
+        }
     }
 }
 
@@ -5054,9 +5087,9 @@ void EffectsPanel::showSlotMenu (int slot)
         juce::PopupMenu source;
         source.addItem (fx.samplePath.empty() ? tr ("No sample") : current.getFileName(), false, false, [] {});
         source.addItem (tr ("Choose a sample..."), [this, slot, current] {
-            sampleChooser = std::make_unique<juce::FileChooser> (tr ("Source sample"), current.existsAsFile() ? current : juce::File(),
+            sampleChooser = lynx::ui::makeFileChooser (tr ("Source sample"), current.existsAsFile() ? current : juce::File(),
                                                                  "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
-            sampleChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+            lynx::ui::launchChooser (sampleChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                                         [this, slot] (const juce::FileChooser& fc) {
                                             const auto file = fc.getResult();
                                             if (file == juce::File())
@@ -5446,8 +5479,8 @@ void chooseRecordTo (AudioEngine& engine, int track)
         initial = folder.getChildFile (name + ".wav");
     }
     static std::unique_ptr<juce::FileChooser> chooser;
-    chooser = std::make_unique<juce::FileChooser> (tr ("Record {0} to", { insert }), initial, "*.wav");
-    chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+    chooser = lynx::ui::makeFileChooser (tr ("Record {0} to", { insert }), initial, "*.wav");
+    lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                           [&engine, track] (const juce::FileChooser& fc) {
                               auto file = fc.getResult();
                               if (file == juce::File() || track >= (int) engine.getSong().mixer.size())

@@ -120,6 +120,33 @@ launch each for screenshots. FL opened every file (.flp and .zip) with no error 
 The p1 level gap (FL 5.5 dB louder, shape identical) is LYNX-vs-FL engine parity of the instruments themselves (the
 VST/CLAP test synth and the 3x Osc default patch), not the file: LYNX's import of the export plays within 1.1 dB of the original (env_corr 0.998).
 
+### 5.4 Round 171e2: the +6 dB of every export, found and fixed [FL]
+
+FL session 3 (the `out3` exports): the fixes held (p2 no longer piles up: env_corr 1.000; thief's tempo is right and
+the music ends at 240 s), but **every export played louder in FL than the same file in LYNX, as a pure gain**:
+p1 +6.0 dB, p2 +5.9 dB, p2sub +6.7 dB, thief +3.7 dB over FL's own render. Bisection (sessions 4–7, `/R` renders of
+single-variable files, `E:\lynx-work\flpexport171e\flr4…flr8`):
+
+| variant | result |
+|---|---|
+| channel byte 0x29 = 1 (FL's value), channel 0xD7 records as FL wrote them, both | no change |
+| no Master route level (0x2000) controls; FL's 0x100 / version records; the TEMPO clip as FL wrote it | no change |
+| every channel alone (sampler, audio clip, 3x Osc, the VST3 / CLAP synth) | each exactly **+6.02 dB** (×2.000) |
+| thief + LYNX's globals / thief + LYNX's mixer section | 0.0 dB / **+4.6 dB**: it is in the mixer section |
+| the kick alone without the last mixer record | **bit-exact with LYNX** (esr −84 dB) |
+
+**Cause**: the last mixer record is FL's "Current" track (it plays the selected insert). The writer wrote it like
+any unused insert, routed to the Master, so FL played the song twice. FL writes it with flags 0x0C, route list `00`
+and no control values; `flp::writeProject` now does the same (test `flpexport171e2_current_track_is_not_routed_to_the_master`).
+
+Also fixed: **side-chain inputs** (a route at level 0) were dropped, so FL's compressors / limiters on thief lost
+their kick ducking; the export now writes a level-0 route for every side-chain source LYNX keeps (thief's routes
+are again FL's own: KICK → 0, 11, 12, 14, 21). With that, FL thief vs export: env_corr 0.84 → 0.92.
+
+Open: FL renders the re-exported thief to 492 s (music ends at 240 s, then silence). Not in the globals or the mixer
+section (swaps), so in the patterns / channels / Playlist part; the patterns are renumbered (FL keeps an empty
+pattern 5 "BELL", LYNX writes the patterns in order) — next suspect.
+
 ## 6. Decisions for the user
 
 1. LYNX-made FL-engine effects (e.g. Fruity Reeverb 2 added inside LYNX, never seen by FL) have no FL state LYNX can

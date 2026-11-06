@@ -16,6 +16,7 @@ namespace ProEditorWindows
 {
 bool handles (EffectKind kind) noexcept;
 void open (AudioEngine& engine, int track, int slot);
+void close (int track, int slot); // round tp172d: the slot's window, if open (Ember's Classic / multiband swap)
 void closeAll();
 } // namespace ProEditorWindows
 

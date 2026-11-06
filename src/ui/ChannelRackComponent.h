@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <atomic>
 
 #include <functional>
@@ -43,6 +44,9 @@ public:
     // LYNX extra (on by default; Options › General "Playhead column in the Channel Rack"): a soft highlight of the
     // playing step's column under every row's steps, and the first step of each bar marked on the playing-step strip
     static inline std::atomic<bool> playheadColumn { true };
+    // LYNX extra (on by default; Options › General "Steps use channel colour"): a lit step in its channel's colour
+    // (themes::litStepColour); FL's steps stay white / pink ("Colorful channel controls" only colours the insert box)
+    static inline std::atomic<bool> stepsChannelColour { true };
     explicit ChannelRackComponent (AudioEngine& engine);
     ~ChannelRackComponent() override;
     void visibilityChanged() override;
@@ -236,6 +240,7 @@ private:
     juce::Rectangle<int> controlBounds (Area area, int row) const; // knob / route box under the mouse (value tip)
     std::uint32_t shownAutomation = 0; // AutomationDisplay generation last drawn (issue #12)
     std::vector<int> automatedRows;
+    std::vector<std::array<float, 2>> shownLevels; // volume, pan per channel at the last full refresh (round 173f)
     void showTip (Area area, int row, bool transient);
     Area hoverArea = Area::none;
     int hoverRow = -1, hoverStep = -1;
