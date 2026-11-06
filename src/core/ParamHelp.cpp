@@ -356,6 +356,7 @@ const std::map<std::pair<K, std::string>, const char*>& own()
         { { K::ember, "level" }, TR_NOOP ("Level of the band after the saturation") },
         // Crest Compressor
         { { K::crestCompressor, "style" }, TR_NOOP ("The compressor's character: how it reacts to peaks and how it recovers") },
+        { { K::crestCompressor, "voicing" }, TR_NOOP ("Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering") }, // round tp172b2
         { { K::crestCompressor, "ratio" }, TR_NOOP ("How strongly the level above the threshold is reduced") },
         { { K::crestCompressor, "max lookahead" }, TR_NOOP ("Allows the longest lookahead (more latency)") },
         { { K::crestCompressor, "character pre" }, TR_NOOP ("The analog colour goes before the compression") },
