@@ -597,6 +597,16 @@ public:
             return;
         }
 
+        if (args.contains ("--cachetest"))
+        {
+            // LYNX --cachetest project.(flp|lynx) report.txt (round 174f): the Playlist's cached picture against exact
+            // paints after zooms, scrolls and repaints, off screen (no window)
+            const auto i = args.indexOf ("--cachetest");
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            runCacheTest (juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()));
+            return;
+        }
+
         if (args.contains ("--livetest"))
         {
             // LYNX --livetest report.txt [--relay URL]: a live session of four peers over the relay (round 169b)
@@ -1539,6 +1549,9 @@ public:
              + "\nstart=" + juce::String ((juce::int64) lynx::crashguard::processStartTime())
              + "\nstarted=" + juce::Time::getCurrentTime().toISO8601 (true) + "\n").toStdString());
         startHangWatch();
+        // LYNX_PROFILE_MAIN=<file> (round 174f): the message thread sampled every millisecond, 5-second windows
+        if (const auto profile = juce::SystemStats::getEnvironmentVariable ("LYNX_PROFILE_MAIN", {}); profile.isNotEmpty())
+            lynx::crashguard::startMainProfiler (profile.toStdString());
 
         startupTrace.mark ("initialise (normal start)");
         if (startupTrace.on)
@@ -1899,6 +1912,7 @@ public:
         heartbeat.stopTimer();
         lynx::crashreporter::shutdown(); // (an upload in flight gets a moment, never long)
         lynx::crashguard::stopHangWatch();
+        lynx::crashguard::stopMainProfiler();
         lynx::crashguard::endSession(); // a clean exit: no breadcrumb left behind
 
         // everything is saved and closed: a process that loaded third-party plugins ends here, before the DLLs' own
@@ -4695,6 +4709,34 @@ private:
         quit();
     }
 
+    // --cachetest (round 174f): PlaylistComponent::cacheSelfTest on the project, the Playlist off screen at 1466 x 930
+    void runCacheTest (const juce::File& project, const juce::File& report)
+    {
+        engine = std::make_unique<lynx::AudioEngine>();
+        juce::String error;
+        auto ok = false;
+        if (project.hasFileExtension ("flp"))
+            ok = engine->importFlpFile (project, error);
+        else if (auto song = lynx::ProjectFile::load (project, error))
+        {
+            engine->setSong (std::move (*song));
+            ok = true;
+        }
+        juce::String text = "project: " + project.getFullPathName() + "\n";
+        if (ok)
+        {
+            auto playlist = std::make_unique<lynx::PlaylistComponent> (*engine);
+            playlist->setBounds (0, 0, 1466, 930);
+            playlist->setVisible (true);
+            text << playlist->cacheSelfTest ([] { lynx::ui::WaveformCache::getInstance()->waitUntilIdle (60000); }, report.getParentDirectory());
+        }
+        else
+            text << "result=ERROR " << error << "\n";
+        report.replaceWithText (text);
+        setApplicationReturnValue (ok && text.contains ("result=OK") ? 0 : 1);
+        quit();
+    }
+
     // --uiperf (round 161): opens the project in the normal window, plays it, and drives the heavy UI cases of round 151
     // through the window's own event path — the default layout, the Mixer maximised (meters while playing, then
     // scrolled), the Playlist maximised (scroll down, scroll sideways, zoom in and out) and the Channel rack scrolled.
@@ -4703,6 +4745,8 @@ private:
     // process CPU. The same on every OS, so Linux (X11, XWayland) and Windows numbers can be put side by side.
     void runUiPerf (const juce::File& project, const juce::File& report)
     {
+        if (const auto profile = juce::SystemStats::getEnvironmentVariable ("LYNX_PROFILE_MAIN", {}); profile.isNotEmpty())
+            lynx::crashguard::startMainProfiler (profile.toStdString()); // (stopped in shutdown)
         startupOptions = lynx::StartupOptions::load();
         engine = std::make_unique<lynx::AudioEngine>();
         lynx::videoview::install (*engine); // (Fruity Video Player channels: their sound tracks)
@@ -4941,6 +4985,13 @@ private:
                                  [wheelAt, ui, none] (int f) { wheelAt (ui->getPlaylistForSnapshot(), 0.0f, f < 40 ? -0.15f : 0.15f, none); }, 80 });
         run->steps.push_back ({ "playlist scroll sideways", {},
                                  [wheelAt, ui, none] (int f) { wheelAt (ui->getPlaylistForSnapshot(), f < 40 ? -0.15f : 0.15f, 0.0f, none); }, 80 });
+        // round 174f: Ctrl+wheel zoom, a notch every third frame (~20 a second), three in then three out, as dupmon drives it
+        run->steps.push_back ({ "playlist zoom (Ctrl+wheel)", {},
+                                 [wheelAt, ui] (int f) {
+                                     if (f % 3 == 0)
+                                         wheelAt (ui->getPlaylistForSnapshot(), 0.0f, (f / 9) % 2 == 0 ? 0.15f : -0.15f, juce::ModifierKeys (juce::ModifierKeys::ctrlModifier));
+                                 }, 120 });
+        run->steps.push_back ({ "playlist after the zoom (settles)", {}, {}, 500 });
         run->steps.push_back ({ "whole window repainted", {}, [this] (int) { mainWindow->repaint(); }, 40 });
         run->steps.push_back ({ "channel rack scroll", [ui] { ui->selectTabForSnapshot (0); },
                                  [wheelAt, ui, none] (int f) { wheelAt (ui->getRackViewportForSnapshot(), 0.0f, f < 30 ? -0.25f : 0.25f, none); }, 60 });
