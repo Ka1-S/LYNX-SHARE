@@ -153,3 +153,18 @@ own files, **[FL]** seen in a running FL, **[CODE]** LYNX source, **[model]** ou
   the i18n files only (`resources/i18n/*.txt`, `src/ui/I18nData.h`, `src/ui/i18n/*.h`). #76 conflicts in
   `src/engine/AudioEngine.cpp` plus the i18n headers. Open point on #71: `editSongRemoteTransaction` /
   `snapshotForRemoteControl` still hold the device callback lock around whole-project JSON. Rebase requests drafted.
+
+## 8. #95 Invisible waveform on a white theme (a LYNX bug; FL has no such theme)
+
+- **Reporter (brenhyltin):** Options › Theme, background #FFFFFF: the audio clip's waveform is invisible. The screenshot
+  shows a pale blue body with nothing on it.
+- **Cause:** `clipContentColour` (src/ui/PlaylistComponent.cpp) always tinted the clip colour 70% toward white, while the
+  body mixes it 72% toward the theme background. On a white background both come out pale.
+- **LYNX now:** when the body's perceived brightness is above 0.6, the content is the body mixed 65% toward black. Darker
+  bodies keep the old colour. The same function draws pattern-clip notes and automation curves, so they follow.
+
+## 9. Triage: #94 and #93 (nothing built)
+
+- **#94 SPL Transient Designer:** a commercial plugin, so its code can't be used. LYNX already has FL's Transient Processor.
+  A level-independent shaper of LYNX's own is a possible new effect, a decision for the user.
+- **#93 MCP server:** the local control API is #75, with early work in #71. An MCP server could sit on top of it.
