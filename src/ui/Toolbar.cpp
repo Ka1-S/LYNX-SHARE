@@ -3,6 +3,7 @@
 #include <juce_dsp/juce_dsp.h>
 
 #include "core/Timecode.h"
+#include "ui/FrameTicker.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Icons.h"
@@ -633,44 +634,59 @@ ui::Hint PerformanceMeter::hintAt (juce::Point<int> p)
 
 // --- output monitor ------------------------------------------------------------------------------
 
-void OutputMonitor::update()
+bool OutputMonitor::update (double nowMs)
 {
     if (! isShowing() || getWidth() <= 0)
-        return;
+        return false;
+
+    // the time since the last frame (the falloffs below are per 1/30 s, as when this ran on a 30 Hz timer)
+    const auto elapsed = lastMs > 0.0 ? juce::jlimit (0.0, 250.0, nowMs - lastMs) : 1000.0 / 30.0;
+    lastMs = nowMs;
+    constexpr auto columnPeriod = 1000.0 / 30.0;
 
     engine.copyScope (samples.data(), (int) samples.size());
     float now = 0.0f;
     for (auto s : samples)
         now = juce::jmax (now, std::abs (s));
 
-    peak = juce::jmax (now, peak * 0.82f); // fast attack, smooth fall
+    peak = juce::jmax (now, peak * ui::fallFor (0.82f, elapsed)); // fast attack, smooth fall
 
-    if (now >= held || holdFrames <= 0)
+    holdMs -= elapsed;
+    if (now >= held || holdMs <= 0.0)
     {
         held = now;
-        holdFrames = 30; // about a second at 30 Hz
+        holdMs = 1000.0; // the hold line stays about a second
     }
-    else
-        --holdFrames;
 
     if (now >= 0.999f)
-        clipFrames = 60;
-    else if (clipFrames > 0)
-        --clipFrames;
+        clipMs = 2000.0;
+    else
+        clipMs = juce::jmax (0.0, clipMs - elapsed);
 
     // silence after everything has fallen to zero (meter, hold, clip, the long view's history, the spectrum bands)
-    // looks the same frame after frame: stop repainting at 30 Hz while nothing plays (REA round 116, idle CPU)
-    silentFrames = now > 0.0f ? 0 : juce::jmin (silentFrames + 1, 1 << 20);
-    if (silentFrames > (int) history.size() + 90)
+    // looks the same frame after frame: stop repainting while nothing plays (REA round 116, idle CPU)
+    silentMs = now > 0.0f ? 0.0 : juce::jmin (silentMs + elapsed, 1.0e9);
+    if (silentMs > ((double) history.size() + 90.0) * columnPeriod)
     {
-        peak = held = 0.0f;
+        peak = held = column = 0.0f;
         bands.fill (0.0f);
-        return;
+        columnMs = 0.0;
+        return false;
     }
 
-    // long view: the level scrolls from right to left
-    std::rotate (history.begin(), history.begin() + 1, history.end());
-    history.back() = now;
+    // long view: the level scrolls from right to left, one column per 1/30 s (the loudest frame of it)
+    column = juce::jmax (column, now);
+    columnMs += elapsed;
+    if (columnMs >= columnPeriod)
+    {
+        const auto columns = juce::jmin ((int) history.size(), (int) (columnMs / columnPeriod));
+        columnMs -= columns * columnPeriod;
+        std::rotate (history.begin(), history.begin() + columns, history.end());
+        std::fill (history.end() - columns, history.end(), column);
+        column = 0.0f;
+        if (mode == longView)
+            repaint();
+    }
 
     if (mode == spectrum)
     {
@@ -682,6 +698,7 @@ void OutputMonitor::update()
         fft.performFrequencyOnlyForwardTransform (data.data(), true);
 
         const auto rate = juce::jmax (8000.0, engine.getTransport().sampleRate.load());
+        const auto fall = ui::fallFor (0.85f, elapsed);
         for (std::size_t b = 0; b < bands.size(); ++b)
         {
             const auto f0 = 20.0 * std::pow (1000.0, (double) b / (double) bands.size());
@@ -694,11 +711,14 @@ void OutputMonitor::update()
                 m = juce::jmax (m, data[(std::size_t) i]);
             const auto db = juce::Decibels::gainToDecibels (m / 256.0f, -72.0f);
             const auto level = juce::jlimit (0.0f, 1.0f, (db + 72.0f) / 72.0f);
-            bands[b] = juce::jmax (level, bands[b] * 0.85f); // fast up, smooth fall
+            bands[b] = juce::jmax (level, bands[b] * fall); // fast up, smooth fall
         }
     }
 
-    repaint();
+    // (the long view only moves with its columns, above; the scope and the spectrum every frame)
+    if (mode != longView)
+        repaint();
+    return true;
 }
 
 juce::String OutputMonitor::modeName (int m)
@@ -731,7 +751,7 @@ void OutputMonitor::mouseDown (const juce::MouseEvent& e)
         menu.addSeparator();
         menu.addItem (tr ("Reset the peak hold and clip light"), [this] {
             held = 0.0f;
-            clipFrames = holdFrames = 0;
+            clipMs = holdMs = 0.0;
             repaint();
         });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
@@ -763,14 +783,14 @@ void OutputMonitor::paint (juce::Graphics& g)
         g.setColour (colour::textSecondary);
         g.fillRect (meter.withHeight (1.0f).withY (meter.getBottom() - meter.getHeight() * level (held)));
     }
-    if (clipFrames > 0)
+    if (clipMs > 0.0)
     {
         g.setColour (colour::meterClip);
         g.fillRoundedRectangle (meter.withHeight (4.0f), 1.0f);
     }
 
     auto scope = area.reduced (4.0f, 3.0f);
-    const auto lineColour = (clipFrames > 0 ? colour::meterClip : colour::accent).withAlpha (0.9f);
+    const auto lineColour = (clipMs > 0.0 ? colour::meterClip : colour::accent).withAlpha (0.9f);
 
     if (mode == longView) // the level of the last seconds, newest on the right, mirrored around the centre
     {

@@ -11,6 +11,7 @@
 #include "core/PickerSelection.h"
 #include "engine/AudioEngine.h"
 #include "ui/EditorTools.h"
+#include "ui/FrameTicker.h"
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
 
@@ -48,7 +49,6 @@ class PlaylistComponent final : public juce::Component,
                                 public juce::DragAndDropTarget,
                                 public ui::HintSource,
                                 private juce::ChangeListener,
-                                private juce::Timer,
                                 private juce::ScrollBar::Listener
 {
 public:
@@ -181,7 +181,9 @@ private:
     bool showClipProgress = true, showTrackProgress = true; // FL's View › Performance clip / track progress
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
-    void timerCallback() override;
+    // the playhead and Performance mode's live clips, at the display's refresh (round 174e; was a 30 Hz timer)
+    bool liveFrame (double nowMs);
+    double perfRepaintMs = 0.0;
     void scrollBarMoved (juce::ScrollBar*, double) override;
 
     juce::Rectangle<int> gridArea() const;
@@ -392,6 +394,7 @@ private:
     void glideBy (double ticks, double pixels, bool immediate = false);
     void glideFrame();
     juce::VBlankAttachment vblank { this, [this] { glideFrame(); } };
+    ui::FrameTicker frames { *this, [this] (double ms) { return liveFrame (ms); } };
 
     void zoomAroundCentre (double factor);
     void zoomToBars (int bars);

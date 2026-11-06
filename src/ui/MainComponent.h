@@ -23,6 +23,7 @@
 #include "ui/LiveSessionUi.h"
 #include "ui/HintBar.h"
 #include "ui/Splash.h"
+#include "ui/FrameTicker.h"
 #include "ui/Toolbar.h"
 #include "ui/Updater.h"
 #include "ui/ValueControl.h"
@@ -499,6 +500,10 @@ private:
     int midiInputTicks = 0;
     bool realtimeHintChecked = false; // Linux: the real-time priority hint was considered (round 161)
     toolbar::OutputMonitor output { engine };
+    // the toolbar's live displays (output monitor, song position, time), at the display's refresh up to 72 Hz (round
+    // 174e: the oscilloscope is a 1024-point path; at 72 Hz it already moves fluidly and costs half of 144)
+    bool toolbarFrame (double nowMs);
+    ui::FrameTicker toolbarFrames { *this, [this] (double ms) { return toolbarFrame (ms); }, 72.0 };
     int meterTicks = 0;
     juce::String driverTipType; // the device type the ASIO suggestion was worked out for
 

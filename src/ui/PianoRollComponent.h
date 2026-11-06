@@ -5,6 +5,7 @@
 #include "core/NoteTools.h"
 #include "engine/AudioEngine.h"
 #include "ui/EditorTools.h"
+#include "ui/FrameTicker.h"
 #include "ui/FlMods.h"
 #include "ui/NoteToolDialogs.h"
 #include "ui/ValueControl.h"
@@ -176,6 +177,8 @@ private:
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
     void timerCallback() override;
+    // the playhead, at the display's refresh (round 174e; it was on the 30 Hz timer)
+    bool playheadFrame (double nowMs);
     void scrollBarMoved (juce::ScrollBar*, double) override;
 
     juce::Rectangle<int> gridArea() const;
@@ -338,6 +341,7 @@ private:
     void glideBy (double ticks, double pixels, bool immediate = false);
     void glideFrame();
     juce::VBlankAttachment vblank { this, [this] { glideFrame(); } };
+    ui::FrameTicker frames { *this, [this] (double ms) { return playheadFrame (ms); } };
 
     double pixelsPerTick = 24.0 / ticksPerStep; // 24 px per step
     double scrollTicks = 0.0;

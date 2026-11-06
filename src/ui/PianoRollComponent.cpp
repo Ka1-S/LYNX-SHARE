@@ -4140,22 +4140,31 @@ void PianoRollComponent::timerCallback()
         repaint (0, headerHeight, keyboardWidth, getHeight() - headerHeight);
     }
 
+    if (const bool playing = engine.getTransport().playing.load(); playButton.getToggleState() != playing)
+        playButton.setToggleState (playing, juce::dontSendNotification);
+}
+
+bool PianoRollComponent::playheadFrame (double)
+{
     auto& transport = engine.getTransport();
     auto tick = -1.0;
-
-    if (const bool playing = transport.playing.load(); playButton.getToggleState() != playing)
-        playButton.setToggleState (playing, juce::dontSendNotification);
+    const auto playing = transport.playing.load();
 
     // the playhead shows while the edited pattern plays: Pattern mode, or a clip of it in Song mode (round 162);
     // stopped in Step edit too (round 170e5): it is where the next played note goes (FL enters step-edit notes at the
     // song position, which it draws in the Piano roll), and it moves a snap step on after each one
-    if ((transport.playing.load() || engine.isStepEdit()) && isShowing())
+    if ((playing || engine.isStepEdit()) && isShowing())
     {
         const auto& song = engine.getSong();
-        tick = transportedit::patternPlayhead (song, song.currentPattern, transport.positionTicks.load(), engine.patternLinearOrigin());
+        // (between two audio blocks it moves on at the song's tempo: smooth at 144 Hz, round 174e)
+        tick = transportedit::patternPlayhead (song, song.currentPattern, transport.positionTicks.load() + engine.playheadAdvanceTicks(),
+                                               engine.patternLinearOrigin());
     }
 
-    if (tick != playheadTick)
+    // only when it moved on screen: the line is anti-aliased, so a twentieth of a pixel already shows (zoomed out, a
+    // playhead crossing a few pixels a second still glides instead of stepping)
+    const auto moved = (tick < 0.0) != (playheadTick < 0.0) || std::abs ((tick - playheadTick) * pixelsPerTick) >= 0.05;
+    if (moved)
     {
         auto dirty = [this] (double t) {
             if (t >= 0.0)
@@ -4179,6 +4188,7 @@ void PianoRollComponent::timerCallback()
         else
             dirty (tick);
     }
+    return playing || moved;
 }
 // --- round 168g: FL's Piano roll File / Edit / View items ----------------------------------------------------------------
 
