@@ -240,7 +240,7 @@ APP_SOURCES+=(src/core/UpdateCheck.cpp src/ui/Updater.cpp)
 # visual plugins: Wave Candy, Visualizer, video export (round 164c)
 APP_SOURCES+=(src/core/VisualFx.cpp src/ui/VisualEditors.cpp)
 # FL plugins LYNX lacked: Mute 2, Big Clock, Tuner, HTML NoteBook (round 165g)
-APP_SOURCES+=(src/core/FlExtraFx.cpp src/core/Scratcher.cpp src/core/Dvs.cpp src/core/Transmitter.cpp src/ui/FlExtraEditors.cpp src/core/VideoPlayer.cpp src/ui/VideoPlayerView.cpp)
+APP_SOURCES+=(src/core/FlExtraFx.cpp src/core/Scratcher.cpp src/core/Dvs.cpp src/core/Transmitter.cpp src/ui/FlExtraEditors.cpp src/core/VideoPlayer.cpp src/core/VideoTime.cpp src/core/VideoTrack.cpp src/core/Adr.cpp src/core/DialogueAlign.cpp src/ui/VideoPlayerView.cpp src/ui/VideoMedia.cpp src/ui/VideoMediaWindows.cpp src/ui/VideoTracks.cpp src/ui/AdrWindow.cpp)
 APP_SOURCES+=(src/core/VisualFx.cpp src/core/FruityDance.cpp src/ui/VisualEditors.cpp src/ui/VisualGl.cpp src/ui/DanceView.cpp)
 
 for lib in wavpack vorbis lame pocketpy monocypher; do declare "TP_KEY_$lib=$(tree_hash third_party/$lib)"; done
@@ -325,7 +325,7 @@ for src in "${APP_SOURCES[@]}"; do APP_OBJECTS+=("$OUT/app/$(echo "$src" | tr / 
     -Wl,--subsystem,windows \
     -lole32 -loleaut32 -luuid -lwinmm -lws2_32 -lshlwapi -lversion -lwininet -limm32 -lcomdlg32 \
     -lgdi32 -luser32 -lcomctl32 -lshell32 -ladvapi32 -lrpcrt4 -ldbghelp -lsetupapi -luxtheme -ldwmapi \
-    -ld2d1 -ldcomp -ldwrite -ldxgi -ld3d11 -ldxguid -lwsock32 -lopengl32 -lpropsys -lmfplat -lmfuuid -lksuser -lavrt -lwinhttp
+    -ld2d1 -ldcomp -ldwrite -ldxgi -ld3d11 -ldxguid -lwsock32 -lopengl32 -lpropsys -lmfplat -lmfreadwrite -lmfuuid -lksuser -lavrt -lwinhttp
 
 ls -la "$OUT/LYNX.exe"
 

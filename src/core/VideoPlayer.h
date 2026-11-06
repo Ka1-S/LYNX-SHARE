@@ -31,6 +31,11 @@ namespace lynx
 class Instrument;
 }
 
+namespace lynx
+{
+struct Song;
+}
+
 namespace lynx::video
 {
 constexpr std::int64_t unitsPerSecond = 10000000; // FL's times (100 ns)
@@ -85,10 +90,12 @@ struct Info
 // Parses ffmpeg's "-i" report (stderr): Duration, the first video stream's size and rate, an audio stream
 Info parseFfmpegReport (const std::string& report);
 
-// The video's time at a song position, FL's clock:
-// - slaved, following the tempo: the song's beats at the song's tempo (a tempo change changes the video's speed);
-// - slaved, Ignore tempo changes: real time since the play position (seconds), re-anchored at jumps;
-// then the delay (the video starts when the song reaches it), the start time, and the end / loop.
+// The video's time at a song position, FL's clock (round 174d A3 [DECOMP Fruity Video Player_x64.dll FUN_0072fff0 /
+// FUN_00730ff0]: slaved, the video time is the host's mixing time asked as absolute milliseconds, FHD_GetMixingTime
+// 0x24 with GT_AbsoluteMS — the song's real time, tempo changes included; the plugin's own tempo (+0x184, kept by
+// "Ignore tempo changes") feeds a samples-per-tick value nothing reads, and FL hides that menu item): the song's
+// real time (`songSeconds`, Song::secondsForTicks), then the delay (the video starts when the song reaches it), the
+// start time, and the end / loop.
 struct Clock
 {
     // videoSeconds for a song time (s) given as seconds since the song's start; < 0 before the delay
@@ -112,6 +119,9 @@ void setAudioProvider (AudioProvider provider);
 // transport plays when not slaved). Its clock is published for the video window.
 class Player;
 std::unique_ptr<Instrument> makeInstrument();
+// The song's tempo map for the instruments' clock (UI thread, at every song publish; cheap when the tempo did not
+// change). Without tempo automation the instruments use the song's tempo.
+void publishTempo (const Song& song);
 Player* playerOf (Instrument* instrument) noexcept;
 
 class Player

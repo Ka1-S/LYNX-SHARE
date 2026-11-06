@@ -83,7 +83,12 @@ std::int64_t Song::songLength() const noexcept
     // Pattern Blocks (round 170f) play with the clips
     const auto blocksEnd = patternblocks::end (*this);
     end = std::max (end, blocksEnd);
-    const bool arranged = ! playlist.empty() || blocksEnd > 0;
+    // video clips (round 174d): a project with only its picture so far plays to the picture's end, not one bar
+    std::int64_t videoEndTicks = 0;
+    if (const auto videoSeconds = videotrack::videoEnd (videoTracks); videoSeconds > 0.0)
+        videoEndTicks = (std::int64_t) std::ceil (videotrack::ticksForSeconds (*this, videoSeconds) - 1e-6);
+    end = std::max (end, videoEndTicks);
+    const bool arranged = ! playlist.empty() || blocksEnd > 0 || videoEndTicks > 0;
 
     // an empty Playlist (e.g. recording the first take in Song mode) loops the current pattern's length, not one bar
     if (! arranged && currentPattern >= 0 && currentPattern < (int) patterns.size())

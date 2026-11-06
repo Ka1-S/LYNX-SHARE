@@ -18,6 +18,7 @@
 namespace lynx
 {
 class PatternBlocksView;
+class VideoLanesView;
 
 // FL-style Playlist (arrangement): tracks vertically, time horizontally.
 //  - a tool strip (Pencil, Brush, Eraser, Mute, Knife, Lasso, Zoom, Listen, Slip); with the Pencil:
@@ -153,6 +154,12 @@ public:
     void turnBlocksIntoClips();       // FL's "Turn pattern instances into clips"
     void scrollTicksBy (double ticks); // (the blocks section's drag past its edges)
     PatternBlocksView* getBlocksViewForSnapshot() { return blocksView.get(); }
+    // Video tracks (round 174d, ui/VideoTracks.h): the section between the ruler and the clip tracks while the project
+    // has video tracks. `height` = the section's height (the divider drag; 0 = fit the lanes), clamped to the window.
+    void setVideoHeight (int height);
+    int videoSectionHeight() const;
+    int tracksTop() const { return headerHeight + videoSectionHeight(); } // the clip tracks' top edge
+    VideoLanesView* getVideoLanesForSnapshot() { return videoLanes.get(); }
     static juce::Colour audioClipColour (const ChannelDef& channel);
 
     // A project was just opened: scroll to the start and, when the song is longer than the view, zoom out
@@ -415,6 +422,10 @@ private:
     std::unique_ptr<PatternBlocksView> blocksView;
     int blocksHeight = 0; // 0 = the default (a third of the grid)
     bool blocksShown = false;
+    // Video tracks (round 174d)
+    friend class VideoLanesView;
+    std::unique_ptr<VideoLanesView> videoLanes;
+    int videoHeight = 0; // 0 = fit the lanes
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PlaylistComponent)
 };

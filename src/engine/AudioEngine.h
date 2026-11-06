@@ -190,6 +190,10 @@ public:
         bool punchLoopRegion = false;
         int preRollBars = 0;
         int postRollBars = 0;
+        // round 174d (ADR): pre / post-roll in seconds instead of bars while ≥ 0 (the ADR window sets them for its
+        // record cycle; not saved)
+        double preRollSeconds = -1.0;
+        double postRollSeconds = -1.0;
         // FL's "Loop record" (toolbar LoopRecordBtn / Options, round 170e3 [DECOMP 0xf1e2a0 toggles a global that
         // FUN_011d4800 reads: off while recording, the play end becomes "never", so playback runs on]): on, Song mode
         // recording loops the loop region (one take per pass); off, it plays straight through the region and the notes

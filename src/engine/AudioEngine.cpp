@@ -1,4 +1,5 @@
 #include "engine/AudioEngine.h"
+#include "core/VideoPlayer.h"
 
 #include "core/LiveSession.h"
 
@@ -744,12 +745,22 @@ void AudioEngine::startPlayback()
         const auto punching = recordOptions.punchLoopRegion && song.mode == PlayMode::song && song.hasLoop();
         const auto in = punching ? song.loopStart : here;
         const auto out = punching ? song.loopEnd : std::numeric_limits<std::int64_t>::max() / 4;
-        const auto pre = recordOptions.preRollBars > 0 ? countInLength (song, recordOptions.preRollBars, std::max<std::int64_t> (0, in - 1)) : 0;
+        // (seconds: the ADR window's pre-roll, round 174d)
+        auto secondsBack = [this] (std::int64_t at, double seconds) {
+            const auto from = std::max (0.0, song.secondsForTicks (at) - seconds);
+            return std::max<std::int64_t> (0, at - (std::int64_t) std::llround (videotrack::ticksForSeconds (song, from)));
+        };
+        auto secondsOn = [this] (std::int64_t at, double seconds) {
+            return std::max<std::int64_t> (0, (std::int64_t) std::llround (videotrack::ticksForSeconds (song, song.secondsForTicks (at) + seconds)) - at);
+        };
+        const auto pre = recordOptions.preRollSeconds >= 0.0 ? secondsBack (in, recordOptions.preRollSeconds)
+                         : recordOptions.preRollBars > 0 ? countInLength (song, recordOptions.preRollBars, std::max<std::int64_t> (0, in - 1)) : 0;
         if (punching || pre > 0)
         {
             activePunch = PunchRange { in, out };
             if (punching)
-                punchStopAt = out + (recordOptions.postRollBars > 0 ? countInLength (song, recordOptions.postRollBars, out) : 0);
+                punchStopAt = out + (recordOptions.postRollSeconds >= 0.0 ? secondsOn (out, recordOptions.postRollSeconds)
+                                     : recordOptions.postRollBars > 0 ? countInLength (song, recordOptions.postRollBars, out) : 0);
             startAt = std::max<std::int64_t> (0, in - pre);
             transport.seekRequest.store ((double) startAt);
         }
@@ -3060,6 +3071,9 @@ void AudioEngine::publishSong()
     ++publishCount;
     // Online Sessions (round 168a): every entity has its stable id after any edit, import or load
     uids::normalize (song);
+    // round 174d A3: the Video Player's clock follows the song's tempo map (FL: the song's real time)
+    if (std::any_of (song.channels.begin(), song.channels.end(), [] (const ChannelDef& c) { return c.instrument == InstrumentKind::videoplayer; }))
+        video::publishTempo (song);
     // pasted / duplicated channels and effect slots get their own instance (round 168s: instances follow their channel)
     song.uniqueInstances();
     // diagnostics (round 149): with LYNX_TRACE_EDITS set, each publish's time goes to %APPDATA%\LYNX\edits.log

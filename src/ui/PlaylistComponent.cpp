@@ -8,6 +8,7 @@
 #include "ui/TextCache.h"
 #include "ui/PlaylistComponent.h"
 #include "ui/PatternBlocksView.h"
+#include "ui/VideoTracks.h"
 #include "core/PatternBlocks.h"
 #include "ui/StemExtract.h"
 
@@ -325,6 +326,8 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     // FL's legacy Pattern Blocks (round 170f): shown under the clip tracks while the project's option is on
     blocksView = std::make_unique<PatternBlocksView> (engine, *this);
     addChildComponent (*blocksView);
+    videoLanes = std::make_unique<VideoLanesView> (engine, *this);
+    addChildComponent (*videoLanes);
 
     grid::fillEditorBox (snapBox);
     snapBox.setTooltip (tr ("Playlist snap (magnet): \"Main\" follows the snap in the toolbar, or pick this window's own; hold Alt while dragging to ignore it"));
@@ -500,7 +503,7 @@ juce::Colour PlaylistComponent::patternColour (const Song& song, int pattern)
 
 juce::Rectangle<int> PlaylistComponent::gridArea() const
 {
-    return getLocalBounds().withTrimmedLeft (headerWidth).withTrimmedTop (headerHeight)
+    return getLocalBounds().withTrimmedLeft (headerWidth).withTrimmedTop (tracksTop())
         .withTrimmedRight (scrollBarSize).withTrimmedBottom (blocksSectionHeight());
 }
 
@@ -508,13 +511,32 @@ int PlaylistComponent::blocksSectionHeight() const
 {
     if (! engine.getSong().patternBlocksOn)
         return 0;
-    const auto available = getHeight() - headerHeight;
+    const auto available = getHeight() - tracksTop();
     const auto least = PatternBlocksView::dividerHeight + 3 * PatternBlocksView::rowHeight;
     const auto most = juce::jmax (least, available - 2 * trackHeight); // the clip tracks keep two rows
     // by default a third of the grid, or less when every row (and a spare one) fits in less
     const auto rows = PatternBlocksView::dividerHeight + ((int) engine.getSong().patterns.size() + 1) * PatternBlocksView::rowHeight;
     const auto wanted = blocksHeight > 0 ? blocksHeight : juce::jmin (available / 3, rows);
     return juce::jlimit (least, most, wanted);
+}
+
+int PlaylistComponent::videoSectionHeight() const
+{
+    const auto natural = VideoLanesView::contentHeight (engine.getSong());
+    if (natural <= 0)
+        return 0;
+    // (the clip tracks keep two rows; with the Pattern Blocks section too, the video lanes take at most half)
+    const auto available = getHeight() - headerHeight;
+    const auto least = VideoLanesView::dividerHeight + 20;
+    const auto most = juce::jmax (least, engine.getSong().patternBlocksOn ? available / 2 : available - 2 * trackHeight);
+    return juce::jlimit (least, most, videoHeight > 0 ? videoHeight : natural);
+}
+
+void PlaylistComponent::setVideoHeight (int height)
+{
+    videoHeight = juce::jmax (0, height);
+    resized();
+    repaint();
 }
 
 void PlaylistComponent::setBlocksHeight (int height)
@@ -606,13 +628,13 @@ void PlaylistComponent::setTrackZoom (double zoom, int anchorY)
         return;
 
     // the track under `anchorY` stays where it is
-    anchorY = juce::jlimit (headerHeight, juce::jmax (headerHeight, gridArea().getBottom() - 1), anchorY);
+    anchorY = juce::jlimit (tracksTop(), juce::jmax (tracksTop(), gridArea().getBottom() - 1), anchorY);
     const auto track = yToTrack (anchorY);
     const auto within = heightOf (track) > 0 ? (double) (anchorY - trackToY (track)) / heightOf (track) : 0.0;
     trackZoom = zoom;
     refreshTrackLayout();
-    const auto top = trackToY (track) + scrollY - headerHeight; // the track's top in the content
-    scrollY = juce::jmax (0, top + (int) std::lround (within * heightOf (track)) - (anchorY - headerHeight));
+    const auto top = trackToY (track) + scrollY - tracksTop(); // the track's top in the content
+    scrollY = juce::jmax (0, top + (int) std::lround (within * heightOf (track)) - (anchorY - tracksTop()));
     updateScrollBars();
     repaint();
     ui::postHint ({ tr ("Track height (vertical zoom)"), juce::String (juce::roundToInt (trackZoom * 100.0)) + "%", false, false });
@@ -639,12 +661,12 @@ int PlaylistComponent::trackToY (int track) const
     const auto top = trackTops.empty() ? track * defaultRowHeight()
                      : track <= last   ? trackTops[(std::size_t) juce::jmax (0, track)]
                                        : trackTops.back() + (track - last) * defaultRowHeight();
-    return headerHeight + top - scrollY;
+    return tracksTop() + top - scrollY;
 }
 
 int PlaylistComponent::yToTrack (int y) const
 {
-    const auto offset = y - headerHeight + scrollY;
+    const auto offset = y - tracksTop() + scrollY;
 
     if (trackTops.size() < 2)
         return juce::jlimit (0, numTracks() - 1, offset / defaultRowHeight());
@@ -657,7 +679,7 @@ int PlaylistComponent::yToTrack (int y) const
 int PlaylistComponent::dividerAt (juce::Point<int> p) const
 {
     // the bottom edge of a track header (4 px band) resizes that track
-    if (p.x >= headerWidth || p.y < headerHeight || p.y >= gridArea().getBottom())
+    if (p.x >= headerWidth || p.y < tracksTop() || p.y >= gridArea().getBottom())
         return -1;
 
     const auto track = yToTrack (p.y);
@@ -789,9 +811,12 @@ void PlaylistComponent::resized()
     overview.setBounds (headerWidth, toolbarHeight, getWidth() - headerWidth - scrollBarSize, overviewHeight);
     const auto blocks = blocksSectionHeight();
     blocksShown = blocks > 0;
-    vBar.setBounds (getWidth() - scrollBarSize, headerHeight, scrollBarSize, getHeight() - headerHeight - blocks);
+    vBar.setBounds (getWidth() - scrollBarSize, tracksTop(), scrollBarSize, getHeight() - tracksTop() - blocks);
     blocksView->setBounds (0, getHeight() - blocks, getWidth(), blocks);
     blocksView->setVisible (blocksShown);
+    const auto video = videoSectionHeight();
+    videoLanes->setBounds (0, headerHeight, getWidth(), video);
+    videoLanes->setVisible (video > 0);
     updateScrollBars();
 
     if (fitSongPending)
@@ -1209,7 +1234,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
     // tracks sit indented on a block in their header's colour; members of a folded group are thin rows
     {
         const uitrace::Scope traceHeaders ("Playlist headers", false);
-        const auto headers = juce::Rectangle<int> (0, headerHeight, headerWidth, grid.getHeight());
+        const auto headers = juce::Rectangle<int> (0, tracksTop(), headerWidth, grid.getHeight());
         juce::Graphics::ScopedSaveState state (g);
         if (g.reduceClipRegion (headers)) // (not repainted, e.g. the playhead's strip: nothing to draw; round 174e)
         {
@@ -2237,7 +2262,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 
     // track header: the LED mutes (Ctrl+click or right-click on it: solo), a group header's arrow folds the
     // group, a click elsewhere selects the track; right-click elsewhere: track menu
-    if (e.x < headerWidth && e.y >= headerHeight && e.y < gridArea().getBottom())
+    if (e.x < headerWidth && e.y >= tracksTop() && e.y < gridArea().getBottom())
     {
         const auto track = yToTrack (e.y);
 
@@ -2265,7 +2290,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
                 else
                     mixerinput::showMenu (engine, insert, this);
             }
-            repaint (0, headerHeight, headerWidth, getHeight() - headerHeight);
+            repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
             return;
         }
 
@@ -2302,7 +2327,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             else
                 selectedTracks = { track };
             currentTrack = track;
-            repaint (0, headerHeight, headerWidth, getHeight() - headerHeight);
+            repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
         }
         return;
     }
@@ -2850,7 +2875,7 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
 
     if (drag == Drag::trackZoom)
     {
-        setTrackZoom (trackZoomStart * std::pow (2.0, -e.getDistanceFromDragStartY() / 80.0), headerHeight);
+        setTrackZoom (trackZoomStart * std::pow (2.0, -e.getDistanceFromDragStartY() / 80.0), tracksTop());
         return;
     }
 
@@ -4705,7 +4730,7 @@ void PlaylistComponent::zoomToSelection()
         }
 
     zoomToTicks ((double) from, (double) to);
-    scrollY = juce::jmax (0, trackToY (top) - headerHeight + scrollY);
+    scrollY = juce::jmax (0, trackToY (top) - tracksTop() + scrollY);
     updateScrollBars();
     repaint();
 }
@@ -5437,7 +5462,7 @@ PlaylistComponent::Hover PlaylistComponent::hoverAt (juce::Point<int> p) const
 {
     Hover h;
 
-    if (p.x < headerWidth && p.y >= headerHeight && p.y < gridArea().getBottom())
+    if (p.x < headerWidth && p.y >= tracksTop() && p.y < gridArea().getBottom())
     {
         h.header = true;
         h.track = yToTrack (p.y);
@@ -5628,7 +5653,7 @@ void PlaylistComponent::mouseDoubleClick (const juce::MouseEvent& e)
 {
     if (trackZoomHandle().contains (e.getPosition())) // the vertical zoom handle: back to 100%
     {
-        setTrackZoom (1.0, headerHeight);
+        setTrackZoom (1.0, tracksTop());
         return;
     }
 
@@ -5640,7 +5665,7 @@ void PlaylistComponent::mouseDoubleClick (const juce::MouseEvent& e)
     }
 
     // double-click a track header: open the source of the track's first clip (FL); empty tracks: rename
-    if (e.x < headerWidth && e.y >= headerHeight && e.y < gridArea().getBottom() && e.mods.isLeftButtonDown())
+    if (e.x < headerWidth && e.y >= tracksTop() && e.y < gridArea().getBottom() && e.mods.isLeftButtonDown())
     {
         const auto track = yToTrack (e.y);
 
@@ -5713,7 +5738,7 @@ void PlaylistComponent::openClipSource (int hit, bool other)
 bool PlaylistComponent::isInterestedInFileDrag (const juce::StringArray& files)
 {
     for (const auto& f : files)
-        if (SampleLibrary::isSampleFile (juce::File (f)))
+        if (SampleLibrary::isSampleFile (juce::File (f)) || videotracks::isVideoFile (juce::File (f)))
             return true;
 
     return false;
@@ -5779,7 +5804,10 @@ void PlaylistComponent::filesDropped (const juce::StringArray& files, int x, int
     auto track = yToTrack (y);
 
     for (const auto& f : files)
-        if (addAudioClip (engine, juce::File (f), start, track, false))
+        if (videotracks::isVideoFile (juce::File (f)))
+            // a video dropped on the clip tracks: a video clip on a video track, where it was dropped (round 174d)
+            videotracks::importVideo (engine, juce::File (f), engine.getSong().secondsForTicks (start));
+        else if (addAudioClip (engine, juce::File (f), start, track, false))
             ++track; // multiple files: one below the other
 }
 
@@ -5872,7 +5900,7 @@ void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::M
     const auto ctrl = flmods::ctrl (e.mods), alt = e.mods.isAltDown(), shift = e.mods.isShiftDown();
 
     // Shift+wheel over a track header: moves the track up / down
-    if (shift && ! ctrl && e.x < headerWidth && e.y >= headerHeight && wheel.deltaY != 0.0f)
+    if (shift && ! ctrl && e.x < headerWidth && e.y >= tracksTop() && wheel.deltaY != 0.0f)
     {
         const auto track = yToTrack (e.y);
         const auto other = track + (wheel.deltaY > 0 ? -1 : 1);
@@ -5975,7 +6003,10 @@ void PlaylistComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
     refreshTrackLayout();
     if (engine.getSong().patternBlocksOn != blocksShown) // Pattern Blocks turned on / off (menu, undo, another project)
         resized();
+    if (videoSectionHeight() != videoLanes->getHeight()) // video tracks added / removed / resized (round 174d)
+        resized();
     blocksView->refresh();
+    videoLanes->refresh();
     updateScrollBars();
     repaint();
 }
@@ -6062,7 +6093,7 @@ bool PlaylistComponent::liveFrame (double nowMs)
             if (x1 > grid.getX())
                 repaint (juce::Rectangle<int> (grid.getX(), grid.getY(), x1 - grid.getX(), grid.getHeight()));
             if (showTrackProgress)
-                repaint (0, headerHeight, headerWidth, getHeight() - headerHeight);
+                repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
         }
     }
     return playing || moved || live;
