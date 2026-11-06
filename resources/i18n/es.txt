@@ -7332,3 +7332,7 @@ countries: es mx ar co cl pe ve
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Vincula los ajustes: girar la Entrada mueve la Salida al revés, el nivel se mantiene mientras cambia el drive"
 "Input and Output move together on every channel of the group that has Group I/O on" = "Entrada y Salida se mueven juntas en todos los canales del grupo con E/S del grupo activada"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: el canal de consola de LYNX. Arrastra una perilla, Alt+clic la reinicia, clic derecho para automatización"
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "Ninguno|Smooth|Op-El|Mastering"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Tres caracteres de compresor más, en lugar del estilo: suave, optoelectrónico o masterización"
+"Wheels" = "Ruedas"

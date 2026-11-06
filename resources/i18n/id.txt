@@ -7332,3 +7332,7 @@ countries: id
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Menautkan trim: memutar Input menggerakkan Output berlawanan, level tetap saat drive berubah"
 "Input and Output move together on every channel of the group that has Group I/O on" = "Input dan Output bergerak bersama di setiap kanal grup yang I/O grup-nya aktif"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: kanal konsol LYNX. Seret kenop, Alt+klik mereset, klik kanan untuk otomasi"
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "Tidak ada|Smooth|Op-El|Mastering"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Tiga karakter kompresor lagi, dipakai menggantikan gaya: halus, opto-elektronik, atau mastering"
+"Wheels" = "Roda"

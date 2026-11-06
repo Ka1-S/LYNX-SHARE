@@ -100,6 +100,7 @@ public:
     void noteOnMidi (int key, float velocity, int midiChannel) noexcept override;
     void noteOffMidi (int key, int midiChannel) noexcept override;
     void midiMessage (const std::uint8_t* bytes, int size) noexcept override { midi.addEvent (bytes, size, 0); }
+    void pitchBend (float) noexcept override {} // (the plugin takes the raw MIDI pitch bend, midiMessage)
     int takeMidiOutput (MidiOutNote* out, int max) noexcept override;
     // Issue #14: the channel's PITCH knob, fine tune and main pitch reach the plugin as MIDI pitch bend (scaled by the
     // wrapper's pitch bend range), and a slide note bends the sounding notes to its key over its length
