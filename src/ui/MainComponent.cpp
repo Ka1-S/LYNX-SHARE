@@ -1164,8 +1164,6 @@ void MainComponent::resized()
         danceStage->setBounds (getLocalBounds());
         danceStage->toFront (false);
     }
-    if (pluginPickerView != nullptr)
-        pluginPickerView->setBounds (getLocalBounds());
     if (setupOverlay != nullptr)
     {
         setupOverlay->setBounds (getLocalBounds());
@@ -2641,10 +2639,20 @@ void MainComponent::togglePluginPicker()
         safe->showPanel (Panel::browser);
         safe->browser.showPluginDatabase (category.empty() ? juce::String() : tr (category.c_str()), category.empty() ? -1 : (generators ? 1 : 0));
     };
+    targets.dragOwner = [safe]() -> juce::Component* { return safe.getComponent(); };
     pluginPickerView = makePluginPickerView (engine, std::move (targets));
-    addAndMakeVisible (*pluginPickerView);
-    pluginPickerView->setBounds (getLocalBounds());
+    // FL's picker form covers the work area of the main window's monitor, whatever the main window's size (round 175b:
+    // FL at 1280 × 720 in a 1920 screen still opens it over the whole screen), and lets the screen show through
+    const auto* top = getTopLevelComponent();
+    const auto& displays = juce::Desktop::getInstance().getDisplays();
+    const auto* display = displays.getDisplayForRect (top != nullptr ? top->getScreenBounds() : getScreenBounds());
+    const auto area = display != nullptr ? display->userArea : getScreenBounds();
+    takePluginPickerBackdrop (*pluginPickerView, area);
+    pluginPickerView->setBounds (area);
+    pluginPickerView->addToDesktop (0); // (no frame, not on the taskbar)
+    pluginPickerView->setVisible (true);
     pluginPickerView->toFront (true);
+    pluginPickerView->grabKeyboardFocus();
 }
 
 void MainComponent::showQuickAdd()

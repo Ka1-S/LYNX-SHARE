@@ -4823,13 +4823,14 @@ private:
         // F8's Plugin picker (round 171c): opening it (the "show" time = building it + its first paint), its pictures
         // loading while it stays open, pointing at the tiles, then closing it
         run->steps.push_back ({ "plugin picker open (F8)", [ui] { ui->togglePluginPickerForSnapshot(); }, {}, 2500 });
-        run->steps.push_back ({ "plugin picker, pointing at tiles", {}, [this, ui] (int f) {
-                                   if (auto* picker = ui->pluginPickerForSnapshot(); picker != nullptr && mainWindow->getPeer() != nullptr)
+        run->steps.push_back ({ "plugin picker, pointing at tiles", {}, [ui] (int f) {
+                                   // (round 175b: the picker is its own window)
+                                   if (auto* picker = ui->pluginPickerForSnapshot(); picker != nullptr && picker->getPeer() != nullptr)
                                    {
                                        const auto p = picker->localPointToGlobal (juce::Point<int> (60 + (f * 37) % juce::jmax (1, picker->getWidth() - 120),
                                                                                                       90 + (f * 53) % juce::jmax (1, picker->getHeight() - 200)));
-                                       const auto local = mainWindow->getPeer()->globalToLocal (p.toFloat());
-                                       mainWindow->getPeer()->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, local, {}, 0.0f, 0.0f,
+                                       const auto local = picker->getPeer()->globalToLocal (p.toFloat());
+                                       picker->getPeer()->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, local, {}, 0.0f, 0.0f,
                                                                                juce::Time::currentTimeMillis());
                                    }
                                }, 60 });
