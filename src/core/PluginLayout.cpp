@@ -4022,7 +4022,7 @@ Layout poizoneMain()
     Layout l;
     l.fl = "PoiZone";
     l.width = 856;
-    l.height = 378;
+    l.height = 486;
     auto& v = l.items;
     // a 40-pixel FL wheel at (left, top of the row) → LYNX knob with its caption
     auto wheel = [&v] (float left, float rowTop, const char* param, const char* caption, std::uint16_t style = 0) {
@@ -4129,6 +4129,13 @@ Layout poizoneMain()
     for (int i = 0; i < 16; ++i)
         v.push_back (toggle (712 + 17 * (float) (i % 8), r4 + 26 + 24 * (float) (i / 8), 16, 22,
                              stored ("Gate step " + std::to_string (i + 1)), nullptr, boxed));
+
+    // row 5: FL's two wheels under the panel (TSynthEditorForm's PitchBendWheel at x 47 and ModWheel at x 97, 19 × 94;
+    // the pitch bend springs back to the centre when released, FL's PitchBendReset)
+    const float r5 = 382;
+    v.push_back (section (6, r5, 134, 102, TR_NOOP ("Wheels")));
+    v.push_back (slider (Item::vslider, 40, r5 + 22, 25, 62, "Pitch bend", TR_NOOP ("Bend"), bipolar | springBack));
+    v.push_back (slider (Item::vslider, 90, r5 + 22, 25, 62, "Mod wheel", TR_NOOP ("Mod")));
     return l;
 }
 } // namespace
