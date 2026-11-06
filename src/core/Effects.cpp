@@ -1633,7 +1633,7 @@ public:
             s.width = 210.0 * std::clamp ((double) p[rb + 4], 0.0, 1.0);
             s.offset = -105.0 + 210.0 * std::clamp ((double) p[rb + 5], 0.0, 1.0);
             s.smoothing = std::clamp ((double) p[rb + 6], 0.0, 1.0);
-            s.pattern = p[rb + 7] > 0.5f ? 1 : 0;
+            s.pattern = p[rb + 7] < 0.25f ? 0 : (p[rb + 7] < 0.75f ? 2 : 1); // left / right, ramp (round tp172d), 8 steps
             s.amount = std::clamp ((double) p[rb + 8], 0.0, 1.0);
             s.phase = std::clamp ((double) p[rb + 9], 0.0, 1.0);
             s.analog = p[rb + 10] < 0.25f ? 0 : (p[rb + 10] < 0.75f ? 1 : 2); // off / analog / hot
@@ -3596,7 +3596,7 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
                     case 10: std::snprintf (text, sizeof (text), "%.3g beats", rhythmpan::beats (v)); break;
                     case 11: std::snprintf (text, sizeof (text), "%.1f deg", 210.0f * v); break;
                     case 12: std::snprintf (text, sizeof (text), "%+.1f deg", -105.0f + 210.0f * v); break;
-                    case 14: return v > 0.5f ? "8 steps" : "left / right";
+                    case 14: return v < 0.25f ? "left / right" : (v < 0.75f ? "ramp" : "8 steps");
                     case 17: return v < 0.25f ? "digital" : (v < 0.75f ? "analog" : "analog (hot)");
                     case 18: std::snprintf (text, sizeof (text), "%+.1f dB", -24.0f + 48.0f * v); break;
                     case 19: std::snprintf (text, sizeof (text), "%+.2f oct", -3.0f + 6.0f * v); break;

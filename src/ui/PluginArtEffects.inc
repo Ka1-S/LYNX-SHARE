@@ -89,6 +89,16 @@ inline void vfill (juce::Graphics& g, Rectangle<float> a, Colour top, Colour bot
     g.fillRect (a);
 }
 
+// round tp172b4: the references' fields — light under the header, darkest a little past the middle, lifting again
+// toward the bottom bar
+inline void valley (juce::Graphics& g, Rectangle<float> a, Colour top, Colour mid, Colour bottom, float at)
+{
+    ColourGradient grad (top, 0.0f, a.getY(), bottom, 0.0f, a.getBottom(), false);
+    grad.addColour (juce::jlimit (0.05, 0.95, (double) at), mid);
+    g.setGradientFill (grad);
+    g.fillRect (a);
+}
+
 // fine horizontal hairlines (brushed metal); deterministic
 inline void brushedLines (juce::Graphics& g, Rectangle<float> a, juce::int64 seed, float alpha)
 {
@@ -715,12 +725,12 @@ inline void canvasCrest (juce::Graphics& g, Rectangle<float> a, bool display)
             else { const auto d = x - th + knee; y = x + (1.0f / ratio - 1.0f) * d * d / (4.0f * knee); }
             curve.lineTo (o.x + x * s, o.y - y * s);
         }
-        g.setColour ((k == 0 ? p.accent2 : p.accent).withAlpha (0.08f));
+        g.setColour ((k == 0 ? p.accent2 : p.accent).withAlpha (0.03f)); // (tp172b4: fainter, the field reads plain)
         g.strokePath (curve, juce::PathStrokeType (1.4f));
     }
-    softLight (g, { a.getX() + a.getWidth() * 0.25f, a.getY() }, a.getWidth() * 0.5f, p.accent, 0.10f);
-    vignette (g, a, 0.4f);
-    displayDim (g, a, display);
+    softLight (g, { a.getX() + a.getWidth() * 0.25f, a.getY() }, a.getWidth() * 0.5f, p.accent, 0.04f);
+    // round tp172b4: no dimming — the reference's display is its graphite field itself (sampled #242225 … #323134)
+    juce::ignoreUnused (display);
 }
 
 inline void crestEmblem (juce::Graphics& g, Point<float> c, float r) // a knee
@@ -740,15 +750,18 @@ inline const Theme& crestTheme()
         Theme x;
         x.name = "Crest Compressor";
         x.base = Style::glow;
-        x.pal = { Colour (0xff1c1e24), Colour (0xff0a0b0e), Colour (0xffffb340), Colour (0xff7fe3ff), Colour (0x9c1a1c22), Colour (0xb80c0d10),
-                  Colour (0xff6e6450), Colour (0xfff2e6cf), Colour (0xff07080a), Colour (0xff2c2e33), Colour (0xff111215), Colour (0xff22242a),
-                  Colour (0xfffff3d9), Colour (0xff191b20) };
+        // round tp172b4: the reference's warm graphite field, dark caps and a thin yellow arc (sampled: arc #f8c838,
+        // caps #29252a, field #262429)
+        x.pal = { Colour (0xff2b292e), Colour (0xff1c1a1e), Colour (0xfff8c838), Colour (0xff7fe3ff), Colour (0x9c2a282d), Colour (0xb81c1a1e),
+                  Colour (0xff4e4a50), Colour (0xffd6d0d6), Colour (0xff1f1d21), Colour (0xff353136), Colour (0xff1f1c20), Colour (0xff151316),
+                  Colour (0xfff8c838), Colour (0xff2e2b30) };
         x.canvas = canvasCrest;
         x.titleEmblem = crestEmblem;
         x.cap = Cap::flat;
         x.pointer = Pointer::glowLine;
         x.arcGlow = 0.06f;
         x.thin = true; // round tp172b: the reference's look
+        x.arcInCap = true; // round tp172b4: caps as big as the reference's, the arc inside the rim
         return x;
     }();
     return t;
@@ -758,10 +771,11 @@ inline const Theme& crestTheme()
 
 inline void canvasApex (juce::Graphics& g, Rectangle<float> a, bool display)
 {
+    // round tp172b4: the reference's plum-graphite field, plain (sampled: #262228 under the header, #19171a in the
+    // valley, #2a262c over the bottom bar); our ceiling motif stays as a faint silhouette
     const auto& p = pal();
-    vfill (g, a, p.bgTop, p.bgBottom);
+    valley (g, a, p.bgTop, Colour (0xff19171a), p.bgBottom, 0.3f);
     const auto ceil = a.getY() + a.getHeight() * 0.3f;
-    // a waveform's silhouette pressing up, flat-topped at the ceiling
     juce::Path wave;
     juce::Random rnd (909);
     wave.startNewSubPath (a.getX(), a.getBottom());
@@ -774,22 +788,8 @@ inline void canvasApex (juce::Graphics& g, Rectangle<float> a, bool display)
     }
     wave.lineTo (a.getRight(), a.getBottom());
     wave.closeSubPath();
-    g.setGradientFill (ColourGradient (p.accent2.withAlpha (0.13f), 0.0f, ceil, p.accent2.withAlpha (0.01f), 0.0f, a.getBottom(), false));
+    g.setColour (p.accent2.withAlpha (display ? 0.018f : 0.03f));
     g.fillPath (wave);
-    // the ceiling: a line of light, a glow under it and a hint of red where the peaks touch
-    if (! reduced)
-    {
-        g.setGradientFill (ColourGradient (p.accent.withAlpha (0.0f), 0.0f, ceil - 14.0f, p.accent.withAlpha (0.18f), 0.0f, ceil, false));
-        g.fillRect (Rectangle<float> (a.getX(), ceil - 14.0f, a.getWidth(), 14.0f));
-    }
-    ColourGradient line (p.accent.withAlpha (0.0f), a.getX(), ceil, p.accent.withAlpha (0.0f), a.getRight(), ceil, false);
-    line.addColour (0.2, p.accent.withAlpha (0.55f));
-    line.addColour (0.5, Colour (0xffff5a5a).withAlpha (0.5f));
-    line.addColour (0.8, p.accent.withAlpha (0.55f));
-    g.setGradientFill (line);
-    g.fillRect (Rectangle<float> (a.getX(), ceil - 0.75f, a.getWidth(), 1.5f));
-    vignette (g, a, 0.4f);
-    displayDim (g, a, display);
 }
 
 inline void apexEmblem (juce::Graphics& g, Point<float> c, float r) // bars under a line
@@ -812,9 +812,11 @@ inline const Theme& apexTheme()
         Theme x;
         x.name = "Apex Limiter";
         x.base = Style::glow;
-        x.pal = { Colour (0xff1d1b1e), Colour (0xff0d0c0e), Colour (0xffe0404a), Colour (0xffd8d8de), Colour (0x9c1e1c20), Colour (0xb80c0b0d),
-                  Colour (0xff5a4f55), Colour (0xfff0e8ea), Colour (0xff09080a), Colour (0xff3a373b), Colour (0xff1d1b1e), Colour (0xff2a2629),
-                  Colour (0xfff2f0f2), Colour (0xff1f1d21) };
+        // round tp172b4: the reference's field (sampled #262228 / #19171a / #2a262c), its dim red ceiling (#a93d49) as
+        // the accent's darker side, graphite caps
+        x.pal = { Colour (0xff272329), Colour (0xff2a262c), Colour (0xffd2404e), Colour (0xffd8d8de), Colour (0xe0262228), Colour (0xf01c1a1e),
+                  Colour (0xff4a4250), Colour (0xffe6e0e8), Colour (0xff1d1a1e), Colour (0xff3a363c), Colour (0xff1f1c21), Colour (0xff141215),
+                  Colour (0xfff2f0f2), Colour (0xff2b272d) };
         x.canvas = canvasApex;
         x.titleEmblem = apexEmblem;
         x.arcGlow = 0.08f;
@@ -828,17 +830,13 @@ inline const Theme& apexTheme()
 
 inline void canvasPrism (juce::Graphics& g, Rectangle<float> a, bool display)
 {
+    // round tp172b4: the reference's neutral graphite field (sampled #3c3c3c under the header, #10100f in the valley,
+    // #2a2a2a over the bottom bar); our prism and its fan stay as a faint watermark
     const auto& p = pal();
-    vfill (g, a, p.bgTop, p.bgBottom);
+    valley (g, a, p.bgTop, Colour (0xff111110), p.bgBottom, 0.68f);
     const auto pc = Point<float> (a.getX() + a.getWidth() * 0.28f, a.getY() + a.getHeight() * 0.42f);
     const auto pr = juce::jmin (a.getWidth(), a.getHeight()) * 0.16f;
-    // the white beam coming in
-    juce::Path beam;
-    beam.startNewSubPath (a.getX(), pc.y + pr * 0.35f);
-    beam.lineTo (pc.x - pr * 0.4f, pc.y + pr * 0.05f);
-    g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.0f), a.getX(), 0.0f, Colours::white.withAlpha (0.35f), pc.x, 0.0f, false));
-    g.strokePath (beam, juce::PathStrokeType (3.0f));
-    // four bands fanning out to the right, low (warm) to high (cool)
+    const auto k = display ? 0.12f : 0.2f;
     const Colour bands[] { Colour (0xffff5a4e), Colour (0xffffc04a), Colour (0xff4fe08a), Colour (0xff4fa8ff) };
     for (int i = 0; i < 4; ++i)
     {
@@ -851,18 +849,13 @@ inline void canvasPrism (juce::Graphics& g, Rectangle<float> a, bool display)
         fan.lineTo (a.getRight(), yb);
         fan.lineTo (pc.x + pr * 0.45f, y0 + pr * 0.08f);
         fan.closeSubPath();
-        g.setGradientFill (ColourGradient (bands[i].withAlpha (0.30f), pc.x, 0.0f, bands[i].withAlpha (0.03f), a.getRight(), 0.0f, false));
+        g.setGradientFill (ColourGradient (bands[i].withAlpha (0.30f * k), pc.x, 0.0f, bands[i].withAlpha (0.0f), a.getRight(), 0.0f, false));
         g.fillPath (fan);
     }
-    // the prism: a glass triangle with a bright edge
     juce::Path tri;
     tri.addTriangle (pc.x, pc.y - pr, pc.x - pr * 0.9f, pc.y + pr * 0.6f, pc.x + pr * 0.9f, pc.y + pr * 0.6f);
-    g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.16f), pc.x, pc.y - pr, Colour (0xff8ab4ff).withAlpha (0.05f), pc.x, pc.y + pr, false));
-    g.fillPath (tri);
-    g.setColour (Colours::white.withAlpha (0.35f));
-    g.strokePath (tri, juce::PathStrokeType (1.2f));
-    vignette (g, a, 0.35f);
-    displayDim (g, a, display);
+    g.setColour (Colours::white.withAlpha (0.25f * k));
+    g.strokePath (tri, juce::PathStrokeType (1.0f));
 }
 
 inline void prismEmblem (juce::Graphics& g, Point<float> c, float r)
@@ -885,9 +878,11 @@ inline const Theme& prismTheme()
         Theme x;
         x.name = "Prism Multiband";
         x.base = Style::glow;
-        x.pal = { Colour (0xff222124), Colour (0xff0f0f11), Colour (0xffffc23a), Colour (0xff8fd0ff), Colour (0x9c242326), Colour (0xb80e0e10),
-                  Colour (0xff5d5a60), Colour (0xfff2efe8), Colour (0xff0a0a0b), Colour (0xff38363a), Colour (0xff1c1b1e), Colour (0xff2b2a2e),
-                  Colour (0xfffff3d6), Colour (0xff1f1e22) };
+        // round tp172b4: the reference's neutral graphite (sampled #3c3c3c / #10100f / #2a2a2a), its orange 0 dB line
+        // (#f3af44) as the accent
+        x.pal = { Colour (0xff3d3d3d), Colour (0xff2a2a2a), Colour (0xfff3af44), Colour (0xff8fd0ff), Colour (0xe02e2e2e), Colour (0xf01b1b1b),
+                  Colour (0xff5a5a5a), Colour (0xffe8e8e8), Colour (0xff121212), Colour (0xff3a3a3a), Colour (0xff1e1e1e), Colour (0xff161616),
+                  Colour (0xfff3af44), Colour (0xff2a2a2a) };
         x.canvas = canvasPrism;
         x.titleEmblem = prismEmblem;
         x.twoTone = false;
@@ -903,36 +898,19 @@ inline const Theme& prismTheme()
 
 inline void canvasSentry (juce::Graphics& g, Rectangle<float> a, bool display)
 {
+    // round tp172b4: the reference's slate-blue field, plain (sampled #2f2d42 under the header to #1c1f2f over the
+    // bottom bar); our gate stays as a faint row of bars behind the display
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
-    // stone courses
-    for (float y = a.getY(); y < a.getBottom(); y += 26.0f)
-    {
-        const auto shift = ((int) ((y - a.getY()) / 26.0f)) % 2 == 0 ? 0.0f : 34.0f;
-        g.setColour (Colours::black.withAlpha (0.18f));
-        g.fillRect (Rectangle<float> (a.getX(), y, a.getWidth(), 1.0f));
-        for (float x = a.getX() - shift; x < a.getRight(); x += 68.0f)
-            g.fillRect (Rectangle<float> (x, y, 1.0f, 26.0f));
-    }
-    // the lantern's light, upper left
-    softLight (g, { a.getX() + a.getWidth() * 0.1f, a.getY() + a.getHeight() * 0.18f }, a.getWidth() * 0.45f, p.accent, 0.16f);
-    // the gate: iron bars with spear tips and two rails
     const auto gate = Rectangle<float> (a.getX() + a.getWidth() * 0.35f, a.getY() + a.getHeight() * 0.08f, a.getWidth() * 0.6f, a.getHeight() * 0.92f);
-    g.setColour (Colour (0xff05080a).withAlpha (0.55f));
+    g.setColour (Colour (0xff05080a).withAlpha (display ? 0.03f : 0.05f));
     for (float x = gate.getX(); x < gate.getRight(); x += 22.0f)
     {
-        g.fillRect (Rectangle<float> (x, gate.getY() + 10.0f, 4.0f, gate.getHeight() - 10.0f));
+        g.fillRect (Rectangle<float> (x, gate.getY() + 10.0f, 3.0f, gate.getHeight() - 10.0f));
         juce::Path tip;
-        tip.addTriangle (x - 3.0f, gate.getY() + 11.0f, x + 7.0f, gate.getY() + 11.0f, x + 2.0f, gate.getY());
+        tip.addTriangle (x - 3.0f, gate.getY() + 11.0f, x + 6.0f, gate.getY() + 11.0f, x + 1.5f, gate.getY());
         g.fillPath (tip);
     }
-    for (const auto f : { 0.18f, 0.82f })
-        g.fillRect (Rectangle<float> (gate.getX() - 4.0f, gate.getY() + gate.getHeight() * f, gate.getWidth(), 5.0f));
-    g.setColour (p.accent.withAlpha (0.10f)); // the lantern's glint on the bars
-    for (float x = gate.getX(); x < gate.getRight(); x += 22.0f)
-        g.fillRect (Rectangle<float> (x, gate.getY() + 10.0f, 1.0f, gate.getHeight() - 10.0f));
-    vignette (g, a, 0.45f);
-    displayDim (g, a, display);
 }
 
 inline void sentryEmblem (juce::Graphics& g, Point<float> c, float r) // a keyhole
@@ -963,14 +941,17 @@ inline const Theme& sentryTheme()
         Theme x;
         x.name = "Sentry Gate";
         x.base = Style::glow;
-        x.pal = { Colour (0xff3d4560), Colour (0xff262b3d), Colour (0xff8fb4ff), Colour (0xffe8ecf6), Colour (0x9c434b66), Colour (0xb82a3043),
-                  Colour (0xff6c7593), Colour (0xffeef1fa), Colour (0xff1c2030), Colour (0xffd7dced), Colour (0xff8a93ad), Colour (0xff2b3146),
-                  Colour (0xff1d2232), Colour (0xff30364b) };
+        // round tp172b4: the reference's slate field (#2f2d42 → #1c1f2f), blue-grey grip caps (#7b839f) with a light
+        // thumb, dark ticked rings (#34344a)
+        x.pal = { Colour (0xff2f2d42), Colour (0xff1c1f2f), Colour (0xff9fb0e0), Colour (0xffe8ecf6), Colour (0xe0363650), Colour (0xf0222336),
+                  Colour (0xff5d6380), Colour (0xffd8dbe6), Colour (0xff1e2030), Colour (0xff8e96b2), Colour (0xff5f667e), Colour (0xff2e2e42),
+                  Colour (0xffe6e6ec), Colour (0xff2b2a3e) };
         x.canvas = canvasSentry;
         x.titleEmblem = sentryEmblem;
         x.pointer = Pointer::line;
-        x.arcGlow = 0.05f;
-        x.cap = Cap::porcelain; // round tp172b: the reference's look
+        x.arcGlow = 0.0f;
+        x.cap = Cap::porcelain;
+        x.gripKnob = true;
         return x;
     }();
     return t;
@@ -1041,31 +1022,18 @@ inline const Theme& glowLevelerTheme()
 
 inline void canvasHush (juce::Graphics& g, Rectangle<float> a, bool display)
 {
+    // round tp172b4: the reference's charcoal field (sampled #3b3a3a under the header, #141414 at the display's foot,
+    // #2f2f2f under the knobs); our S ribbon stays as a faint watermark
     const auto& p = pal();
-    vfill (g, a, p.bgTop, p.bgBottom);
-    juce::Random rnd (5);
-    for (float x = a.getX() + a.getWidth() * 0.35f; x < a.getRight(); x += 3.0f)
-    {
-        const auto u = (x - a.getX()) / a.getWidth();
-        const auto h = a.getHeight() * (0.15f + 0.5f * rnd.nextFloat() * (1.0f - u));
-        g.setColour (p.accent2.withAlpha (0.05f * (1.2f - u)));
-        g.fillRect (Rectangle<float> (x, a.getCentreY() - h * 0.5f, 1.0f, h));
-    }
-    juce::Path s; // the S ribbon
+    valley (g, a, p.bgTop, Colour (0xff151515), p.bgBottom, 0.45f);
+    juce::Path s;
     const auto c = Point<float> (a.getX() + a.getWidth() * 0.22f, a.getCentreY());
     const auto r = a.getHeight() * 0.28f;
     s.startNewSubPath (c.x + r * 0.8f, c.y - r * 1.1f);
     s.cubicTo (c.x - r * 0.4f, c.y - r * 1.6f, c.x - r * 1.4f, c.y - r * 0.2f, c.x, c.y);
     s.cubicTo (c.x + r * 1.4f, c.y + r * 0.2f, c.x + r * 0.4f, c.y + r * 1.6f, c.x - r * 0.8f, c.y + r * 1.1f);
-    if (! reduced)
-    {
-        g.setColour (p.accent.withAlpha (0.06f));
-        g.strokePath (s, stroke (r * 0.5f));
-    }
-    g.setGradientFill (ColourGradient (p.accent.withAlpha (0.25f), c.x, c.y - r, p.accent2.withAlpha (0.05f), c.x, c.y + r * 1.2f, false));
+    g.setColour (p.accent.withAlpha (display ? 0.025f : 0.04f));
     g.strokePath (s, stroke (r * 0.12f));
-    vignette (g, a, 0.4f);
-    displayDim (g, a, display);
 }
 
 inline void hushEmblem (juce::Graphics& g, Point<float> c, float r)
@@ -1085,14 +1053,17 @@ inline const Theme& hushTheme()
         Theme x;
         x.name = "Hush De-esser";
         x.base = Style::glow;
-        x.pal = { Colour (0xff3a3a33), Colour (0xff23231f), Colour (0xffe8b923), Colour (0xff9fd36a), Colour (0x9c3d3d36), Colour (0xb8262622),
-                  Colour (0xff6b6a5c), Colour (0xffeeeadb), Colour (0xff1b1b18), Colour (0xfff5cf45), Colour (0xffb88a10), Colour (0xff2e2e29),
-                  Colour (0xfffff6d8), Colour (0xff34342e) };
+        // round tp172b4: the reference's charcoal field (#3b3a3a / #141414 / #2f2f2f), big amber grip caps (#e2aa12)
+        // with a white thumb on dark ticked rings (#262425); the small knobs grey (their own cap tint)
+        x.pal = { Colour (0xff3b3a3a), Colour (0xff2f2f2f), Colour (0xffe2aa12), Colour (0xff9fd36a), Colour (0xe0333232), Colour (0xf0222222),
+                  Colour (0xff5a5856), Colour (0xffdedcd8), Colour (0xff1c1c1c), Colour (0xfff2bc1c), Colour (0xffc68c06), Colour (0xff232122),
+                  Colour (0xffe9e9e9), Colour (0xff302f2f) };
         x.canvas = canvasHush;
         x.titleEmblem = hushEmblem;
         x.twoTone = false;
-        x.cap = Cap::orb; // round tp172b: the reference's look
-        x.arcGlow = 0.06f; // round tp172b: the reference's look
+        x.cap = Cap::orb;
+        x.arcGlow = 0.0f;
+        x.gripKnob = true;
         return x;
     }();
     return t;
@@ -1423,6 +1394,86 @@ inline const Theme& luxeTheme()
         x.thin = true;
         x.kerning = 0.2f;
         x.arcGlow = 0.15f;
+        return x;
+    }();
+    return t;
+}
+
+// === LuxeVerb, Space page (round tp172b4, the Pro-R role): a night-navy strip of knobs across the top whose lower
+// edge swells under the big SPACE dial, lit from below by a thin blue line; the field under it near black ============
+
+inline void canvasLuxeSpace (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, Colour (0xff040305), p.bgBottom); // the field (sampled #030203 at the top of the display, #121013 low)
+    if (display) return;
+    // the strip: its edge 150 px into the 456 px page (under a 26 px header), swelling to 180 under the centre
+    const auto edgeY = [&] (float u) {
+        const auto d = (u - 0.497f) / 0.2f;
+        return a.getY() + a.getHeight() * (176.0f + 30.0f * std::exp (-d * d * 2.2f)) / 482.0f;
+    };
+    juce::Path strip, edge;
+    strip.startNewSubPath (a.getX(), a.getY());
+    strip.lineTo (a.getRight(), a.getY());
+    for (int i = 64; i >= 0; --i)
+    {
+        const auto u = (float) i / 64.0f;
+        const juce::Point<float> pt { a.getX() + a.getWidth() * u, edgeY (u) };
+        strip.lineTo (pt);
+    }
+    strip.closeSubPath();
+    for (int i = 0; i <= 64; ++i)
+    {
+        const auto u = (float) i / 64.0f;
+        const juce::Point<float> pt { a.getX() + a.getWidth() * u, edgeY (u) };
+        if (i == 0) edge.startNewSubPath (pt); else edge.lineTo (pt);
+    }
+    const auto bottom = edgeY (0.497f);
+    ColourGradient sg (p.bgTop, 0.0f, a.getY(), Colour (0xff0d1622), 0.0f, bottom, false);
+    sg.addColour (0.55, p.bgTop);
+    g.setGradientFill (sg);
+    g.fillPath (strip);
+    if (! reduced)
+    {
+        g.setColour (p.accent2.withAlpha (0.10f)); // the glow along the edge
+        g.strokePath (edge, juce::PathStrokeType (6.0f));
+    }
+    g.setColour (p.accent2.withAlpha (0.55f));
+    g.strokePath (edge, juce::PathStrokeType (1.0f));
+}
+
+inline void capNavy (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    const auto& p = pal();
+    g.setGradientFill (ColourGradient (p.capTop.brighter (hover * 0.15f), c.x, cap.getY(), p.capBottom, c.x, cap.getBottom(), false));
+    g.fillEllipse (cap);
+    if (fx)
+    {
+        g.setColour (p.accent2.withAlpha (0.18f)); // a cold glint along the rim
+        g.drawEllipse (cap.reduced (0.5f), 1.0f);
+    }
+}
+
+inline const Theme& luxeSpaceTheme()
+{
+    static const Theme t = []
+    {
+        Theme x;
+        x.name = "LuxeVerb Space";
+        x.base = Style::glow;
+        // sampled from the reference: strip #130f16, caps #171d29, rings #165a85 (the blue glow round them), arcs #dfad34,
+        // the decay curve's blue #2d7ca7
+        x.pal = { Colour (0xff130f16), Colour (0xff121013), Colour (0xffdfad34), Colour (0xff2d8cc0), Colour (0xe0141a26), Colour (0xf00c1018),
+                  Colour (0xff1d4a6e), Colour (0xffd8dce4), Colour (0xff070608), Colour (0xff1b2130), Colour (0xff141924), Colour (0xff165a85),
+                  Colour (0xffe8e4d8), Colour (0xff161b26) };
+        x.canvas = canvasLuxeSpace;
+        x.titleEmblem = luxeEmblem;
+        x.drawCap = capNavy;
+        x.thin = true;
+        x.arcGlow = 0.0f;
+        x.pointerFrom = 0.55f;
+        x.captionCol = Colour (0xffd2d6de);
+        x.valueCol = Colour (0xff8e97a8);
         return x;
     }();
     return t;
@@ -4681,6 +4732,7 @@ const Theme* effectTheme (Art a)
         case Art::horizon: return &horizonTheme();
         case Art::reeverb2: return &reeverb2Theme();
         case Art::luxe: return &luxeTheme();
+        case Art::luxeSpace: return &luxeSpaceTheme();
         case Art::reeverb1: return &reeverb1Theme();
         case Art::echoform: return &echoformTheme();
         case Art::spiralEcho: return &spiralTheme();

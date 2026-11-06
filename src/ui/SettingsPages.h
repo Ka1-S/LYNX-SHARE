@@ -45,6 +45,7 @@ struct GeneralOptions
     bool checkUpdates = true;      // "Check for updates automatically" (ui/Updater.h, round 166b)
     bool reducedEffects = false;
     bool artMotion = true;         // round 170j: the Themed plugins' art moves (falling petals, glows...)
+    int animationRate = 0;         // round 174e2: playhead / meters / scopes at the display's refresh (0), or at most 60 / 30 Hz
     bool gpuRendering = true;      // Windows: Direct2D (JUCE 8's default) or GDI for every LYNX window (round 157a)
     int pluginStyle = -1;          // −1 automatic (each plugin its own style), else a skin::Style forced everywhere   // plugin editors without glows, blooms or the open animation (ui/PluginSkin.h)
 
