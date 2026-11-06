@@ -7338,3 +7338,18 @@ countries: kr
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "트림 연결: 입력을 돌리면 출력이 반대로 움직여 드라이브를 바꿔도 레벨이 유지됩니다"
 "Input and Output move together on every channel of the group that has Group I/O on" = "그룹 I/O가 켜진 그룹의 모든 채널에서 입력과 출력이 함께 움직입니다"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: LYNX의 콘솔 채널. 노브를 드래그, Alt+클릭으로 초기화, 오른쪽 클릭으로 오토메이션"
+
+# round 176a: the 32-bit plugin bridge
+"Native" = "네이티브"
+"32 bit" = "32비트"
+"64 bit" = "64비트"
+"Bit size" = "비트 크기"
+"Which build of the plugin loads when both a 32-bit and a 64-bit one are installed" = "32비트와 64비트 버전이 모두 설치되어 있을 때 불러올 플러그인 빌드"
+"32bit - bridged" = "32비트 - 브리지"
+"64bit - bridged" = "64비트 - 브리지"
+"64bit - native" = "64비트 - 네이티브"
+"A plugin" = "플러그인"
+"{0} crashed in the 32-bit bridge." = "{0}이(가) 32비트 브리지에서 충돌했습니다."
+"{0} crashed in its separate process." = "{0}이(가) 별도 프로세스에서 충돌했습니다."
+"{0} stopped responding (separate process)." = "{0}이(가) 응답하지 않습니다(별도 프로세스)."
+"Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "해당 프로세스만 영향을 받았습니다. LYNX SHARE와 프로젝트는 계속 실행되었고 플러그인은 음소거되었습니다. 프로젝트를 저장하세요. 다음에 열 때 플러그인이 다시 로드됩니다."

@@ -98,6 +98,28 @@ public:
         latency.setTooltip (tr ("Latency used by the delay compensation: what the plugin reports, or a value set by hand"));
         latency.onClick = [this] { showLatencyMenu(); };
         addChildComponent (latency);
+        // FL's Settings › Options › "Bit size" (round 176a, Windows x64): which build of a plugin installed as both
+        // 32-bit and 64-bit loads [UI fl36c]. Changing it re-creates the plugin with its state, like "Make bridged".
+        bitSize.addItem (tr ("Native"), 1);
+        bitSize.addItem (tr ("32 bit"), 2);
+        bitSize.addItem (tr ("64 bit"), 3);
+        bitSize.setTooltip (tr ("Which build of the plugin loads when both a 32-bit and a 64-bit one are installed"));
+        bitSize.onChange = [this] {
+            const auto value = bitSize.getSelectedId() == 2 ? 32 : bitSize.getSelectedId() == 3 ? 64 : 0;
+            auto* ref = find (const_cast<Song&> (engine.getSong()));
+            if (ref == nullptr || ref->bitSize == value)
+                return;
+            juce::MessageManager::callAsync ([en = &engine, fn = find, inst = &plugin, value] {
+                if (PluginWindows::isOpen (*inst))
+                    PluginWindows::close (*inst);
+                en->capturePluginStates(); // the other build starts from the current settings
+                en->editSong ([fn, value] (Song& song) {
+                    if (auto* r = fn (song))
+                        r->bitSize = value;
+                });
+            });
+        };
+        addChildComponent (bitSize);
         locate.setButtonText (tr ("Locate"));
         locate.setTooltip (tr ("Show the plugin's file in the file manager"));
         locate.onClick = [this] { juce::File (plugin.getPluginDescription().fileOrIdentifier).revealToUser(); };
@@ -110,7 +132,7 @@ public:
 
     ~WrapperSettingsPage() override { engine.removeChangeListener (this); }
 
-    int preferredHeight() const { return 410; }
+    int preferredHeight() const { return bridge32Supported() ? 474 : 410; } // (+ Options › Bit size where it applies)
 
     void paint (juce::Graphics& g) override
     {
@@ -166,7 +188,7 @@ public:
             auto info = group (area, headerHeight + 6 * rowHeight + 8, tr ("Info"));
             const std::pair<juce::String, juce::String> lines[] = {
                 { tr ("Name"), d.name + (d.manufacturerName.isNotEmpty() ? " (" + d.manufacturerName + ")" : juce::String()) },
-                { tr ("Type"), d.pluginFormatName + (d.isInstrument ? "  " + tr ("instrument") : "  " + tr ("effect")) },
+                { tr ("Type"), d.pluginFormatName + (d.isInstrument ? "  " + tr ("instrument") : "  " + tr ("effect")) + bitsText() },
                 { tr ("Category"), d.category },
                 { tr ("Inputs / outputs"), juce::String (plugin.getTotalNumInputChannels()) + " / " + juce::String (plugin.getTotalNumOutputChannels()) },
                 { tr ("Parameters"), juce::String (plugin.getParameters().size()) },
@@ -201,16 +223,23 @@ public:
                         show (bendRange, row.removeFromRight (70).reduced (0, 2));
                     show (*toggles[(int) i], row);
                 }
+            if (bridge32Supported())
+            {
+                auto options = group (area, headerHeight + rowHeight + 8, tr ("Options"));
+                auto row = options.removeFromTop (rowHeight);
+                label (row.removeFromLeft (80), tr ("Bit size"));
+                show (bitSize, row.removeFromLeft (110).reduced (0, 2));
+            }
         }
         else
         {
             const juce::String section = tab == 1 ? "Processing" : "Compatibility";
             int rows = 0;
-            for (const auto& o : wrapperOptions())
-                rows += section == o.section ? 1 : 0;
+            for (std::size_t i = 0; i < wrapperOptions().size(); ++i)
+                rows += section == wrapperOptions()[i].section && ! hiddenOption (i) ? 1 : 0;
             auto box = group (area, headerHeight + rows * rowHeight + 8, tr (tab == 1 ? "Options" : "Compatibility"));
             for (std::size_t i = 0; i < wrapperOptions().size(); ++i)
-                if (section == wrapperOptions()[i].section)
+                if (section == wrapperOptions()[i].section && ! hiddenOption (i))
                     show (*toggles[(int) i], box.removeFromTop (rowHeight).withTrimmedLeft (wrapperOptions()[i].needsFixed ? 22 : 0));
             if (tab == 2)
             {
@@ -225,6 +254,22 @@ public:
 
 private:
     static constexpr int tabHeight = 24, headerHeight = 24, rowHeight = 24;
+
+    // A 32-bit plugin always runs bridged: FL's Processing page has no "Make bridged" for it [UI fl25c vs fl34c]
+    bool hiddenOption (std::size_t i) const
+    {
+        return wrapperOptions()[i].member == &PluginRef::separateProcess && isBridged32 (plugin);
+    }
+
+    // FL's Info › Type ends with the build and how it runs: "(32bit - bridged)", "(64bit - native)" [UI fl23c, fl33c]
+    juce::String bitsText() const
+    {
+        if (! bridge32Supported())
+            return {};
+        if (isBridged32 (plugin))
+            return "  (" + tr ("32bit - bridged") + ")";
+        return "  (" + (sandboxedPluginProcessId (plugin) != 0 || isSandboxedPluginDead (plugin) ? tr ("64bit - bridged") : tr ("64bit - native")) + ")";
+    }
 
     void showTab (int t)
     {
@@ -300,6 +345,7 @@ private:
         for (std::size_t i = 0; i < options.size(); ++i)
             if (options[i].member == &PluginRef::separateProcess && pluginSandboxEnabled())
                 toggles[(int) i]->setToggleState (true, juce::dontSendNotification), toggles[(int) i]->setEnabled (false);
+        bitSize.setSelectedId (ref->bitSize == 32 ? 2 : ref->bitSize == 64 ? 3 : 1, juce::dontSendNotification);
         inPort.setSelectedId (ref->midiInPort + 2, juce::dontSendNotification);
         bendRange.setSelectedId (ref->bendRange, juce::dontSendNotification);
         bendRange.setEnabled (ref->sendBendRange);
@@ -324,7 +370,7 @@ private:
     juce::AudioPluginInstance& plugin;
     juce::OwnedArray<juce::TextButton> tabs;
     juce::OwnedArray<juce::ToggleButton> toggles;
-    juce::ComboBox inPort, outPort, bendRange;
+    juce::ComboBox inPort, outPort, bendRange, bitSize;
     juce::TextButton latency, locate;
     int tab = 0;
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> groups;
@@ -880,10 +926,13 @@ juce::PopupMenu pluginProcessingMenu (AudioEngine& engine, const PluginRef& curr
                   [toggle] { toggle (&PluginRef::hostMaxBuffer); });
     // with Options › "Run plugins in a separate process" on, every plugin already runs in one
     const auto all = pluginSandboxEnabled();
-    menu.addItem (all ? tr ("Run in a separate process (on for all plugins in Options)") : tr ("Run in a separate process"), ! all,
-                  all || current.separateProcess, [toggle] { toggle (&PluginRef::separateProcess); });
+    // a 32-bit plugin always runs in the 32-bit bridge: no "Make bridged" for it (FL's wrapper has none either, round 176a)
+    const auto bits32 = instance != nullptr && isBridged32 (*instance);
+    if (! bits32)
+        menu.addItem (all ? tr ("Run in a separate process (on for all plugins in Options)") : tr ("Run in a separate process"), ! all,
+                      all || current.separateProcess, [toggle] { toggle (&PluginRef::separateProcess); });
     // round 157a: this plugin always in its own process, in every project (e.g. after its editor crashed LYNX)
-    if (! all && ! current.name.empty())
+    if (! all && ! bits32 && ! current.name.empty())
     {
         const auto name = juce::String::fromUTF8 (current.name.c_str());
         const auto always = pluginAlwaysSeparate (name);

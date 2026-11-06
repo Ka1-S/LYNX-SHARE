@@ -4052,6 +4052,22 @@ void MainComponent::timerCallback()
                 { names[names.size() - 1] }));
     }
 
+    // round 176a: a plugin in a separate process (Make bridged, or a 32-bit plugin in the 32-bit bridge) crashed or hung:
+    // only that process went; the plugin is muted. Round 174a's prompt, logged like the other plugin crashes.
+    if (const auto deaths = pluginSandboxDeathCount(); deaths != sandboxDeathsSeen)
+    {
+        sandboxDeathsSeen = deaths;
+        const auto all = pluginSandboxDeaths();
+        if (! all.empty())
+        {
+            const auto& d = all.back();
+            PluginHost::settingsFolder().getChildFile ("plugin-crashes.log").appendText (
+                juce::Time::getCurrentTime().toISO8601 (true) + "  " + d.plugin + "  " + (d.crashed ? "crashed" : "stopped responding")
+                + (d.bits32 ? " (32-bit bridge)" : " (separate process)") + "\n");
+            announceSeparateProcessCrash (d.plugin, d.crashed, d.bits32);
+        }
+    }
+
     // issue #32 (round 174a): a plugin's own editor window faulted; LYNX closed that editor and kept running
     if (const auto crashes = PluginWindows::editorCrashCount(); crashes != editorCrashesSeen)
     {
@@ -4893,6 +4909,26 @@ void MainComponent::announceEditorCrash (const juce::String& plugin)
                             fx.plugin.separateProcess = true;
             });
         }
+    });
+}
+
+// Round 176a: round 174a's "Plugin crashed" prompt for a plugin whose separate process died. LYNX itself is unharmed
+// (the plugin ran in its own process), so it offers the save and says how to get the plugin back.
+void MainComponent::announceSeparateProcessCrash (const juce::String& plugin, bool crashed, bool bits32)
+{
+    const auto name = plugin.isNotEmpty() ? plugin : tr ("A plugin");
+    const auto where = bits32 ? tr ("{0} crashed in the 32-bit bridge.", { name }) : tr ("{0} crashed in its separate process.", { name });
+    auto options = juce::MessageBoxOptions()
+                       .withIconType (juce::MessageBoxIconType::WarningIcon)
+                       .withTitle (tr ("Plugin crashed"))
+                       .withMessage ((crashed ? where : tr ("{0} stopped responding (separate process).", { name })) + "\n\n"
+                                     + tr ("Only its process was affected: LYNX SHARE and your project kept running, and the plugin "
+                                           "was muted. Save your project; the plugin loads again the next time you open it."))
+                       .withButton (tr ("Save as..."))
+                       .withButton (tr ("Close"));
+    juce::AlertWindow::showAsync (options, [safe = juce::Component::SafePointer<MainComponent> (this)] (int result) {
+        if (safe != nullptr && result == 1)
+            safe->save (true);
     });
 }
 

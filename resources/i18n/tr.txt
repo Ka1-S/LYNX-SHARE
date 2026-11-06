@@ -7338,3 +7338,18 @@ countries: tr
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Ayarları bağlar: Girişi çevirmek Çıkışı ters yönde hareket ettirir, drive değişirken seviye korunur"
 "Input and Output move together on every channel of the group that has Group I/O on" = "Giriş ve Çıkış, Grup G/Ç açık olan grubun her kanalında birlikte hareket eder"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: LYNX'in konsol kanalı. Düğmeyi sürükleyin, Alt+tık sıfırlar, sağ tık otomasyon"
+
+# round 176a: the 32-bit plugin bridge
+"Native" = "Yerel"
+"32 bit" = "32 bit"
+"64 bit" = "64 bit"
+"Bit size" = "Bit boyutu"
+"Which build of the plugin loads when both a 32-bit and a 64-bit one are installed" = "Hem 32 bit hem 64 bit sürümü kuruluysa eklentinin hangi sürümünün yükleneceği"
+"32bit - bridged" = "32 bit - köprülü"
+"64bit - bridged" = "64 bit - köprülü"
+"64bit - native" = "64 bit - yerel"
+"A plugin" = "Bir plugin"
+"{0} crashed in the 32-bit bridge." = "{0} 32 bit köprüde çöktü."
+"{0} crashed in its separate process." = "{0} ayrı sürecinde çöktü."
+"{0} stopped responding (separate process)." = "{0} yanıt vermiyor (ayrı süreç)."
+"Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Yalnızca onun süreci etkilendi: LYNX SHARE ve projeniz çalışmaya devam etti, plugin sessize alındı. Projenizi kaydedin; plugin bir sonraki açılışta yeniden yüklenir."

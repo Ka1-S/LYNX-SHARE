@@ -7338,3 +7338,18 @@ countries: tw hk mo
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "連動增益：轉動輸入時輸出反向移動，改變驅動時電平保持不變"
 "Input and Output move together on every channel of the group that has Group I/O on" = "在開啟編組輸入/輸出的同編組所有通道上，輸入與輸出一起移動"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel：LYNX 的混音台通道。拖動旋鈕，Alt+點擊復位，右鍵自動化"
+
+# round 176a: the 32-bit plugin bridge
+"Native" = "原生"
+"32 bit" = "32 位元"
+"64 bit" = "64 位元"
+"Bit size" = "位元數"
+"Which build of the plugin loads when both a 32-bit and a 64-bit one are installed" = "同時安裝了 32 位元和 64 位元版本時載入哪個版本的外掛"
+"32bit - bridged" = "32 位元 - 橋接"
+"64bit - bridged" = "64 位元 - 橋接"
+"64bit - native" = "64 位元 - 原生"
+"A plugin" = "外掛"
+"{0} crashed in the 32-bit bridge." = "{0} 在 32 位元橋接中崩潰。"
+"{0} crashed in its separate process." = "{0} 在其獨立處理程序中崩潰。"
+"{0} stopped responding (separate process)." = "{0} 停止回應（獨立處理程序）。"
+"Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "只有它的處理程序受到影響：LYNX SHARE 和你的專案繼續執行，外掛已靜音。請儲存專案；下次開啟時外掛會重新載入。"

@@ -7338,3 +7338,18 @@ countries: nl be
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Koppelt de trims: Ingang draaien beweegt Uitgang andersom, het niveau blijft terwijl de drive verandert"
 "Input and Output move together on every channel of the group that has Group I/O on" = "Ingang en Uitgang bewegen samen op elk kanaal van de groep met Groeps-I/O aan"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: het consolekanaal van LYNX. Sleep een knop, Alt+klik zet terug, rechtsklik voor automatisering"
+
+# round 176a: the 32-bit plugin bridge
+"Native" = "Systeemeigen"
+"32 bit" = "32 bit"
+"64 bit" = "64 bit"
+"Bit size" = "Bitgrootte"
+"Which build of the plugin loads when both a 32-bit and a 64-bit one are installed" = "Welke versie van de plugin laadt als er zowel een 32-bits als een 64-bits versie is geïnstalleerd"
+"32bit - bridged" = "32-bit - bridge"
+"64bit - bridged" = "64-bit - bridge"
+"64bit - native" = "64-bit - systeemeigen"
+"A plugin" = "Een plugin"
+"{0} crashed in the 32-bit bridge." = "{0} is gecrasht in de 32-bits bridge."
+"{0} crashed in its separate process." = "{0} is gecrasht in zijn aparte proces."
+"{0} stopped responding (separate process)." = "{0} reageert niet meer (apart proces)."
+"Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Alleen het proces van de plugin werd getroffen: LYNX SHARE en je project bleven draaien en de plugin is gedempt. Sla je project op; de plugin laadt opnieuw als je het weer opent."
