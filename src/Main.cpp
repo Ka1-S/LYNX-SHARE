@@ -23,6 +23,9 @@
 #include "core/SynthPresets.h"
 #include "core/FlWrapper.h"
 #include "engine/AudioEngine.h"
+#include "engine/RemoteControl.h"
+#include "engine/RemoteError.h"
+#include "ui/RemoteControlSettings.h"
 #include "engine/Metronome.h"
 #include "engine/AudioLogger.h"
 #include "engine/DllAsioDevice.h"
@@ -1655,6 +1658,19 @@ public:
         lynx::applyRenderingChoice (*mainWindow); // (GPU rendering off: GDI; round 157a)
         lynx::startRenderingWatch();
         startupTrace.mark ("main window built");
+        lynx::remoteui::install ([this] (bool enabled) {
+            remoteControl = nullptr;
+            if (enabled)
+                remoteControl = lynx::RemoteControl::create (*engine, true, [this] {
+                    const auto title = mainWindow != nullptr ? mainWindow->getName() : juce::String ("Untitled");
+                    const auto separator = title.indexOf (" - ");
+                    return separator >= 0 ? title.substring (separator + 3) : title;
+                }, [this] {
+                    const auto file = mainWindow != nullptr ? mainWindow->getContent().getCurrentProjectFile() : juce::File();
+                    return file == juce::File() ? juce::String() : file.getFullPathName();
+                });
+            lynx::remoteui::setRuntimeStatus (remoteControl != nullptr && remoteControl->active());
+        });
     }
 
     // the previous run ended without closing (see collectUncleanSessions): say so once, with its last step — and, as
@@ -1876,6 +1892,8 @@ public:
         lynx::shutdownStemExtraction(); // (a separation in flight stops before its window and the engine go)
         if (mainWindow != nullptr && mainWindow->isVisible())
             mainWindow->saveState();
+        lynx::remoteui::shutdown();
+        remoteControl = nullptr; // cancels queued control work before its engine and UI go
         mainWindow = nullptr; // the UI goes before the engine
         lynx::updater::shutdown(); // (a check or download in flight stops)
         crashEngine = nullptr;
@@ -2189,6 +2207,174 @@ private:
         offline.redo();
         const auto undoOk = afterUndo == 99.0 && offline.getSong().bpm == 101.0 && offline.canUndo() && ! offline.canRedo()
                             && offline.isModified();
+
+        // Remote-owned steps still behave as ordinary native history when no RemoteControl instance is enabled.
+        // Only API undo/redo refuse device drift; no history publication may hold the audio-device callback lock.
+        const auto remoteHistoryResult = []() -> juce::String {
+            int checks = 0;
+            const auto require = [&] (bool condition, const char* message) {
+                ++checks;
+                if (! condition) throw std::runtime_error (message);
+            };
+            try
+            {
+                for (const auto session : { false, true })
+                {
+                    lynx::AudioEngine history (false);
+                    lynx::Song initial;
+                    initial.channels.resize (1);
+                    initial.channels[0].instrument = lynx::InstrumentKind::synth;
+                    initial.mixer = lynx::Song::defaultMixer (1);
+                    initial.bpm = 120.0;
+                    history.setSong (std::move (initial));
+                    history.setSessionHistory (session);
+                    const auto editTempo = [&] (double bpm) {
+                        require (history.editSongRemoteTransaction ([&] (lynx::Song& s) { s.bpm = bpm; }), "remote tempo edit was not committed");
+                    };
+                    const auto refused = [&] (const std::function<void()>& operation) {
+                        const auto position = history.getHistoryPosition();
+                        const auto before = lynx::ProjectFile::toJsonExact (history.getSong());
+                        bool changed = false;
+                        try { operation(); }
+                        catch (const lynx::RemoteError& e) { changed = e.code == "changed" && ! e.uncertain; }
+                        require (changed, "API history did not refuse untracked device changes");
+                        require (history.getHistoryPosition() == position && lynx::ProjectFile::toJsonExact (history.getSong()) == before,
+                                 "refused API history changed the project or history position");
+                    };
+                    const auto withoutDeviceLock = [&] (const std::function<void()>& operation) {
+                        juce::WaitableEvent locked, release;
+                        bool timedOut = false;
+                        std::thread callback ([&] {
+                            const juce::ScopedLock lock (history.getDeviceManager().getAudioCallbackLock());
+                            locked.signal();
+                            timedOut = ! release.wait (3000);
+                        });
+                        const auto acquired = locked.wait (3000);
+                        try { if (acquired) operation(); }
+                        catch (...) { release.signal(); callback.join(); throw; }
+                        release.signal();
+                        callback.join();
+                        require (acquired && ! timedOut, "history publication waited for the audio-device callback lock");
+                    };
+
+                    editTempo (130.0);
+                    history.editSong ([] (lynx::Song& s) { s.channels[0].volume = 0.23f; }, false);
+                    refused ([&] { history.undoRemoteControl(); });
+                    withoutDeviceLock ([&] { history.undo(); });
+                    require (history.getHistoryPosition() == 0 && history.getSong().bpm == 120.0 && history.getRemoteHistoryError().isEmpty(),
+                             "native undo refused device drift while remote control was disabled");
+                    history.editSong ([] (lynx::Song& s) { s.channels[0].name = "Untracked change"; }, false);
+                    refused ([&] { history.redoRemoteControl(); });
+                    withoutDeviceLock ([&] { history.redo(); });
+                    require (history.getHistoryPosition() == 1 && history.getSong().bpm == 130.0 && history.getRemoteHistoryError().isEmpty(),
+                             "native redo refused device drift while remote control was disabled");
+
+                    editTempo (140.0);
+                    history.editSong ([] (lynx::Song& s) { s.channels[0].volume = 0.42f; }, false);
+                    withoutDeviceLock ([&] { history.jumpToHistory (0); });
+                    require (history.getHistoryPosition() == 0 && history.getSong().bpm == 120.0, "native history jump stopped at a remote step");
+                    withoutDeviceLock ([&] { history.jumpToHistory (2); });
+                    require (history.getHistoryPosition() == 2 && history.getSong().bpm == 140.0, "native redo jump stopped at a remote step");
+                    withoutDeviceLock ([&] { history.undoRemoteControl(); });
+                    require (history.getHistoryPosition() == 1 && history.getSong().bpm == 130.0, "API undo failed with an unchanged device fence");
+                    withoutDeviceLock ([&] { history.redoRemoteControl(); });
+                    require (history.getHistoryPosition() == 2 && history.getSong().bpm == 140.0, "API redo failed with an unchanged device fence");
+
+                    int cancelledChecks = 0;
+                    bool cancelled = false;
+                    try { history.undoRemoteControl ([&] { return ++cancelledChecks >= 2; }); }
+                    catch (const lynx::RemoteError& e) { cancelled = e.code == "failed" && ! e.uncertain; }
+                    require (cancelled && history.getHistoryPosition() == 2 && history.getSong().bpm == 140.0,
+                             "cancelled API history moved a step");
+                    withoutDeviceLock ([&] { history.undo(); });
+                    require (history.getHistoryPosition() == 1 && history.getSong().bpm == 130.0 && history.getRemoteHistoryError().isEmpty(),
+                             "API cancellation leaked into native history");
+                }
+                return "OK (" + juce::String (checks) + " checks)";
+            }
+            catch (const std::exception& e) { return "ERROR " + juce::String::fromUTF8 (e.what()); }
+        }();
+
+        // Hosted state access and processing share a per-instance lock, including fixed blocks and deferred resets.
+        const auto hostedStateLockResult = []() -> juce::String {
+            struct Probe final : juce::AudioPluginInstance
+            {
+                Probe() : AudioPluginInstance (BusesProperties().withInput ("Input", juce::AudioChannelSet::stereo(), true)
+                                                               .withOutput ("Output", juce::AudioChannelSet::stereo(), true)) {}
+                const juce::String getName() const override { return "State lock probe"; }
+                void fillInPluginDescription (juce::PluginDescription& d) const override { d.name = getName(); }
+                void prepareToPlay (double, int) override {}
+                void releaseResources() override {}
+                void processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer&) override { access (blocks); audio.clear(); }
+                void reset() override { access (resets); }
+                double getTailLengthSeconds() const override { return 0.0; }
+                bool acceptsMidi() const override { return true; }
+                bool producesMidi() const override { return false; }
+                bool hasEditor() const override { return false; }
+                juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+                int getNumPrograms() override { return 1; }
+                int getCurrentProgram() override { return 0; }
+                void setCurrentProgram (int) override {}
+                const juce::String getProgramName (int) override { return {}; }
+                void changeProgramName (int, const juce::String&) override {}
+                void getStateInformation (juce::MemoryBlock& state) override { access (captures); state.replaceAll ("state", 5); }
+                void setStateInformation (const void*, int) override { access (restores); }
+                void access (std::atomic<int>& calls)
+                {
+                    ++calls;
+                    if (active.fetch_add (1) != 0) overlap = true;
+                    juce::Thread::sleep (1); // widen the concurrent vendor-call window without using real plugins
+                    --active;
+                }
+                std::atomic<int> active { 0 }, blocks { 0 }, resets { 0 }, captures { 0 }, restores { 0 };
+                std::atomic<bool> overlap { false };
+            };
+            int checks = 0;
+            const auto require = [&] (bool condition, const char* message) {
+                ++checks;
+                if (! condition) throw std::runtime_error (message);
+            };
+            const auto exercise = [&] (auto& adapter, Probe& probe, const auto& render, const auto& reset) {
+                const auto saved = adapter.captureState();
+                require (saved.has_value(), "mock hosted state could not be captured");
+                juce::WaitableEvent start (true);
+                std::thread audio ([&] {
+                    start.wait();
+                    for (int i = 0; i < 32; ++i) { reset(); render(); }
+                });
+                const juce::ScopeGuard joinAudio { [&] { if (audio.joinable()) audio.join(); } };
+                start.signal();
+                bool stateOk = true;
+                for (int i = 0; i < 32; ++i)
+                {
+                    stateOk = adapter.captureState().has_value() && stateOk;
+                    stateOk = adapter.restoreState (*saved) && stateOk;
+                    if (i % 8 == 0) adapter.resetForExport();
+                }
+                audio.join();
+                require (stateOk && probe.blocks > 0 && probe.resets > 0 && probe.captures > 0 && probe.restores > 0,
+                         "mock did not exercise processing, resets and hosted state access");
+                require (! probe.overlap, "hosted processing/reset overlapped state capture or restoration");
+                require (! adapter.hasCrashed(), "mock hosted adapter crashed");
+            };
+            try
+            {
+                for (const auto fixed : { 0, 64 })
+                {
+                    std::array<float, 128> left {}, right {};
+                    auto instrument = std::make_unique<Probe>();
+                    auto* instrumentProbe = instrument.get();
+                    lynx::PluginInstrument voice (std::move (instrument), 128, fixed);
+                    exercise (voice, *instrumentProbe, [&] { voice.render (left.data(), right.data(), 128, 1.0f, 1.0f); }, [&] { voice.panic(); });
+                    auto effect = std::make_unique<Probe>();
+                    auto* effectProbe = effect.get();
+                    lynx::PluginEffect fx (std::move (effect), 128, fixed);
+                    exercise (fx, *effectProbe, [&] { fx.process (left.data(), right.data(), 128, {}, 120.0); }, [&] { fx.transportReset(); });
+                }
+                return "OK (" + juce::String (checks) + " checks)";
+            }
+            catch (const std::exception& e) { return "ERROR " + juce::String::fromUTF8 (e.what()); }
+        }();
 
         // recording from the PC keyboard: a one-beat note lands in the pattern, in a single undo step
         const auto notesBefore = offline.getSong().patterns[0].notes.size();
@@ -2790,7 +2976,8 @@ private:
 
         const auto ok = audioOk && projectOk && richOk && hwOutOk && flp168jOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
-                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK";
+                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
+                        && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK");
 
         juce::String report;
         report << "connections=" << offline.getNumGraphConnections() << "\n"
@@ -2806,6 +2993,8 @@ private:
                << "patcher=" << (patcherOk ? "OK" : "ERROR") << "\n"
                << "native_engines=" << nativesResult << " (" << nativesMade << " made)\n"
                << "undo=" << (undoOk ? "OK" : "ERROR") << "\n"
+               << "remote_history=" << remoteHistoryResult << "\n"
+               << "hosted_state_lock=" << hostedStateLockResult << "\n"
                << "recording=" << (recordOk && recordUndoOk ? "OK" : "ERROR") << "\n"
                << "midi=" << (midiOk ? "OK" : "ERROR") << "\n"
                << "package=" << (packageOk ? "OK" : "ERROR") << "\n"
@@ -10292,6 +10481,7 @@ private:
 
     lynx::theme::LookAndFeel lookAndFeel;
     std::unique_ptr<lynx::AudioEngine> engine;
+    std::unique_ptr<lynx::RemoteControl> remoteControl;
     std::unique_ptr<juce::XmlElement> savedDeviceState; // --rtstress: the user's device before this run's --type/--buffer
 
     // Hidden test mode --asiodll "<driver.dll>[|{CLSID}]" (REA round 97): an ASIO driver loaded straight from its file,

@@ -16,6 +16,8 @@ constexpr const char* extension = ".lynx";
 constexpr int currentVersion = 1;
 
 juce::String toJson (const Song& song);
+// Same native JSON fields, retaining live model float precision for remote snapshots/transactions.
+juce::String toJsonExact (const Song& song);
 std::optional<Song> fromJson (const juce::String& json, juce::String& error);
 
 bool save (const Song& song, const juce::File& file, juce::String& error);
