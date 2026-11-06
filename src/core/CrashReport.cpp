@@ -700,6 +700,15 @@ std::string githubOsOption (std::string_view os, std::string_view arch, bool app
     return {};
 }
 
+bool hangIsFatalReport (std::string_view hangText)
+{
+    for (const auto* marker : { "RtlReportException", "RtlReportCriticalFailure", "RtlpReportHeapFailure", "WerpReportFault",
+                                "WerReportCriticalFailure" })
+        if (hangText.find (marker) != std::string_view::npos)
+            return true;
+    return false;
+}
+
 std::string githubKindOption (std::string_view kind)
 {
     if (kind == "crash" || kind == "unclean")

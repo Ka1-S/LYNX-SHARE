@@ -54,7 +54,8 @@ juce::String Session::kind() const
     if (crashFile.existsAsFile())
         return "crash";
     if (hangFile != juce::File())
-        return "hang";
+        // (issue #32, round 174a: the UI thread was inside Windows' fatal-error report — the process was dying)
+        return crashreport::hangIsFatalReport (hangFile.loadFileAsString().toStdString()) ? "crash" : "hang";
     return "unclean";
 }
 

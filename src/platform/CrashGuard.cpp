@@ -294,6 +294,7 @@ const char* describe (std::uint32_t code) noexcept
         case 0xC00000FDu: return "stack overflow";
         case 0xC000008Eu: case 0xC0000090u: case 0xC0000091u: case 0xC0000093u: return "floating-point exception";
         case 0xC0000409u: return "buffer overrun";
+        case 0xC0000374u: return "heap corruption";
         case 0xE06D7363u: case 0x20474343u: return "C++ exception";
         default: return "exception";
     }
@@ -337,6 +338,15 @@ std::string symbolOf (DWORD64 address)
     DWORD64 displacement = 0;
     if (! SymFromAddr (GetCurrentProcess(), address, &displacement, info))
         return {};
+    // LYNX.exe's own frames without its PDB: the nearest export is one of the few the exe has (pocketpy's py_*), not
+    // the function (issue #32 reports named main and the CRT start-up "py_tpbase + 0x18a9"); the offset says more alone
+    if (info->ModBase == (DWORD64) (std::uintptr_t) GetModuleHandleW (nullptr))
+    {
+        IMAGEHLP_MODULEW64 module {};
+        module.SizeOfStruct = sizeof (module);
+        if (! SymGetModuleInfoW64 (GetCurrentProcess(), address, &module) || module.SymType == SymExport || module.SymType == SymNone)
+            return {};
+    }
     char text[320];
     std::snprintf (text, sizeof (text), "%s + 0x%llx", info->Name, (unsigned long long) displacement);
     return text;

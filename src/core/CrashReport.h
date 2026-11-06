@@ -104,6 +104,11 @@ std::string jsonEscape (std::string_view utf8);     // the quoted JSON string
 std::string repairUtf8 (std::string_view text);     // invalid bytes -> U+FFFD
 std::string truncateUtf8 (std::string_view text, std::size_t maxBytes); // never cuts a character
 bool validId (std::string_view id);                 // lower-case UUID v4 (what the server accepts)
+// Issue #32 (round 174a): a "freeze" whose sampled UI stack is inside Windows' own fatal-error report (heap corruption
+// found by free(), or another exception Windows is reporting: RtlReportException / WER under KiUserExceptionDispatcher)
+// is the process dying, not a frozen UI. Its hang file is the only stack such a crash leaves (a fail-fast skips the
+// crash handler), so the report says "crash".
+bool hangIsFatalReport (std::string_view hangText);
 std::string formatUuid (const std::uint8_t (&bytes)[16]); // the v4 UUID text of 16 random bytes (version bits set)
 
 // ---- GitHub ------------------------------------------------------------------------------------------------------

@@ -241,3 +241,26 @@ TEST (report159_github_url)
             CHECK (i + 2 < cut.size() && std::isxdigit ((unsigned char) cut[i + 1]) && std::isxdigit ((unsigned char) cut[i + 2]));
     CHECK (githubIssueUrl (f, 2000).size() <= 2000);
 }
+
+// Issue #32 (round 174a): a 0.1.23 "freeze" report whose UI stack was inside Windows' heap-corruption report (free()
+// found a damaged block while a Song snapshot was disposed) — the process was dying: it is reported as a crash
+TEST (report174a_fatal_hang_is_crash)
+{
+    using lynx::crashreport::hangIsFatalReport;
+    const std::string dying = "LYNX UI thread not responding for 14862 ms (sample 1)\n"
+                              "0: ntdll.dll+0x1628a4  (ZwWaitForMultipleObjects + 0x14)\n"
+                              "1: ntdll.dll+0x80d66  (LdrShutdownProcess + 0xc66)\n"
+                              "3: ntdll.dll+0x81a48  (RtlReportException + 0x78)\n"
+                              "8: ntdll.dll+0x19f3d  (RtlRaiseException + 0x18d)\n"
+                              "13: ntdll.dll+0x2796a  (RtlFreeHeap + 0x6da)\n"
+                              "14: ucrtbase.dll+0x12d7b  (free_base + 0x1b)\n"
+                              "15: LYNX.exe+0x65a771\n";
+    CHECK (hangIsFatalReport (dying));
+    const std::string frozen = "LYNX UI thread not responding for 4012 ms (sample 1)\n"
+                               "0: ntdll.dll+0x1628a4  (ZwWaitForSingleObject + 0x14)\n"
+                               "1: KERNELBASE.dll+0x3a1f0  (WaitForSingleObjectEx + 0x9e)\n"
+                               "2: LYNX.exe+0x281b71\n";
+    CHECK (! hangIsFatalReport (frozen));
+    CHECK (! hangIsFatalReport (""));
+    CHECK (lynx::crashreport::githubKindOption ("crash") == "LYNX SHARE closed (crash)");
+}
