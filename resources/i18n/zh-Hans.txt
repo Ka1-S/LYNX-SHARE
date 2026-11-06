@@ -7320,3 +7320,9 @@ countries: cn sg
 "Choose the folder for the Live set" = "选择 Live 套装的文件夹"
 "Ableton Live set (.als)..." = "Ableton Live 套装 (.als)..."
 "The set is saved as \"<name> Project/<name>.als\". Tracks, clips, notes, mixer levels, sends, VST plugins with their state, markers and tempo go over; a report lists the rest." = "套装保存为“<名称> Project/<名称>.als”。轨道、片段、音符、混音器电平、发送、带状态的 VST 插件、标记和速度都会转入；其余内容列在报告中。"
+
+# --- warp modes (round 175a, N4)
+"Warp: Beats" = "变速: 节拍"
+"Warp: Tones" = "变速: 音调"
+"Warp: Texture" = "变速: 纹理"
+"Warp: Complex" = "变速: 复杂"

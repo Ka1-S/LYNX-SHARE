@@ -7320,3 +7320,9 @@ countries: kr
 "Choose the folder for the Live set" = "Live 세트 폴더 선택"
 "Ableton Live set (.als)..." = "Ableton Live 세트 (.als)..."
 "The set is saved as \"<name> Project/<name>.als\". Tracks, clips, notes, mixer levels, sends, VST plugins with their state, markers and tempo go over; a report lists the rest." = "세트는 \"<이름> Project/<이름>.als\"로 저장됩니다. 트랙, 클립, 노트, 믹서 레벨, 센드, 상태를 포함한 VST 플러그인, 마커, 템포가 옮겨지며 나머지는 보고서에 표시됩니다."
+
+# --- warp modes (round 175a, N4)
+"Warp: Beats" = "워프: 비트"
+"Warp: Tones" = "워프: 톤"
+"Warp: Texture" = "워프: 텍스처"
+"Warp: Complex" = "워프: 컴플렉스"

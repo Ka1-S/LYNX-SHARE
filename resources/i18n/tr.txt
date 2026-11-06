@@ -7320,3 +7320,9 @@ countries: tr
 "Choose the folder for the Live set" = "Live seti için klasör seçin"
 "Ableton Live set (.als)..." = "Ableton Live seti (.als)..."
 "The set is saved as \"<name> Project/<name>.als\". Tracks, clips, notes, mixer levels, sends, VST plugins with their state, markers and tempo go over; a report lists the rest." = "Set \"<ad> Project/<ad>.als\" olarak kaydedilir. Kanallar, klipler, notalar, mikser seviyeleri, gönderimler, durumlarıyla VST eklentileri, işaretçiler ve tempo aktarılır; bir rapor geri kalanını listeler."
+
+# --- warp modes (round 175a, N4)
+"Warp: Beats" = "Warp: Vuruşlar"
+"Warp: Tones" = "Warp: Tonlar"
+"Warp: Texture" = "Warp: Doku"
+"Warp: Complex" = "Warp: Karmaşık"

@@ -527,13 +527,12 @@ int patternFromMidiClip (Ctx& ctx, const Element& clip, int channel, double leng
     return (int) ctx.song.patterns.size() - 1;
 }
 
-// Live's warp mode → LYNX's stretch: Re-Pitch (3) resamples; Beats (0) keeps the transients; Tones (1) a single
-// voice; Texture (2), Complex (4) and Complex Pro (6) the general stretcher [DATA: WarpMode values; mapping: model,
-// to be matched by measurement in slice N4]
+// Live's warp mode → LYNX's warp modes (round 175a, N4): Re-Pitch (3) resamples; Beats (0), Tones (1), Texture (2)
+// map to LYNX's modes of the same names, Complex (4) and Complex Pro (6) to Complex [DATA: WarpMode values]
 void applyWarpMode (int mode, SamplerSettings& s)
 {
     s.keepPitch = mode != 3;
-    s.stretchMethod = mode == 0 ? StretchMethod::transients : mode == 1 ? StretchMethod::mono : StretchMethod::general;
+    s.stretchMethod = mode == 0 ? StretchMethod::beats : mode == 1 ? StretchMethod::tones : mode == 2 ? StretchMethod::texture : StretchMethod::complex;
 }
 
 int audioChannelFor (Ctx& ctx, const std::string& path, int mixerTrack, int warpMode, bool warped)

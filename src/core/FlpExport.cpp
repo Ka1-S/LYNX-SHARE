@@ -974,7 +974,7 @@ struct Converter
         {
             c.stretchTime = s.stretchBeats * 192.0f;
             c.stretchMul = 0;
-            c.stretchMode = ! s.keepPitch ? 0 : s.stretchMethod == StretchMethod::mono ? 2 : s.stretchMethod == StretchMethod::transients ? 7 : -2;
+            c.stretchMode = ! s.keepPitch ? 0 : s.stretchMethod == StretchMethod::mono || s.stretchMethod == StretchMethod::tones ? 2 : s.stretchMethod == StretchMethod::transients || s.stretchMethod == StretchMethod::beats ? 7 : -2;
         }
         if (s.cut && c.cutGroup == 0 && c.cutBy == 0)
             c.cutGroup = c.cutBy = freeCutGroup++; // "cut itself"

@@ -193,8 +193,11 @@ int warpModeOf (const SamplerSettings& s)
         return 3; // Re-Pitch
     switch (s.stretchMethod)
     {
-        case StretchMethod::transients: return 0; // Beats
-        case StretchMethod::mono: return 1;       // Tones
+        case StretchMethod::transients:
+        case StretchMethod::beats: return 0;      // Beats
+        case StretchMethod::mono:
+        case StretchMethod::tones: return 1;      // Tones
+        case StretchMethod::texture: return 2;    // Texture
         default: return 4;                        // Complex
     }
 }
