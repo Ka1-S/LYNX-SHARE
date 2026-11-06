@@ -1164,8 +1164,6 @@ void MainComponent::resized()
         danceStage->setBounds (getLocalBounds());
         danceStage->toFront (false);
     }
-    if (pluginPickerView != nullptr)
-        pluginPickerView->setBounds (getLocalBounds());
     if (setupOverlay != nullptr)
     {
         setupOverlay->setBounds (getLocalBounds());
@@ -2641,10 +2639,20 @@ void MainComponent::togglePluginPicker()
         safe->showPanel (Panel::browser);
         safe->browser.showPluginDatabase (category.empty() ? juce::String() : tr (category.c_str()), category.empty() ? -1 : (generators ? 1 : 0));
     };
+    targets.dragOwner = [safe]() -> juce::Component* { return safe.getComponent(); };
     pluginPickerView = makePluginPickerView (engine, std::move (targets));
-    addAndMakeVisible (*pluginPickerView);
-    pluginPickerView->setBounds (getLocalBounds());
+    // FL's picker form covers the work area of the main window's monitor, whatever the main window's size (round 175b:
+    // FL at 1280 × 720 in a 1920 screen still opens it over the whole screen), and lets the screen show through
+    const auto* top = getTopLevelComponent();
+    const auto& displays = juce::Desktop::getInstance().getDisplays();
+    const auto* display = displays.getDisplayForRect (top != nullptr ? top->getScreenBounds() : getScreenBounds());
+    const auto area = display != nullptr ? display->userArea : getScreenBounds();
+    takePluginPickerBackdrop (*pluginPickerView, area);
+    pluginPickerView->setBounds (area);
+    pluginPickerView->addToDesktop (0); // (no frame, not on the taskbar)
+    pluginPickerView->setVisible (true);
     pluginPickerView->toFront (true);
+    pluginPickerView->grabKeyboardFocus();
 }
 
 void MainComponent::showQuickAdd()
@@ -3976,14 +3984,19 @@ void MainComponent::applyStepEdit()
     }
 }
 
+bool MainComponent::toolbarFrame (double nowMs)
+{
+    const auto moved = output.update (nowMs);
+    timeDisplay.update();
+    songPosition.update();
+    return moved || engine.getTransport().playing.load (std::memory_order_relaxed);
+}
+
 void MainComponent::timerCallback()
 {
     const uitrace::Scope trace ("MainComponent timer", false);
     {
         const uitrace::Scope part ("timer: toolbar displays", false);
-        output.update();
-        timeDisplay.update();
-        songPosition.update();
         masterVolume.update();
         masterPitch.update();
         updateRecordQuantise();
@@ -4042,6 +4055,15 @@ void MainComponent::timerCallback()
             tr ("The plugin \"{0}\" crashed and was switched off, so LYNX SHARE and your project kept running (the effect is bypassed, an "
                 "instrument stays silent). Save your project; the plugin loads again the next time you open it.",
                 { names[names.size() - 1] }));
+    }
+
+    // issue #32 (round 174a): a plugin's own editor window faulted; LYNX closed that editor and kept running
+    if (const auto crashes = PluginWindows::editorCrashCount(); crashes != editorCrashesSeen)
+    {
+        editorCrashesSeen = crashes;
+        const auto all = PluginWindows::editorCrashes();
+        if (! all.empty())
+            announceEditorCrash (all.back().plugin);
     }
 
     auto& transport = engine.getTransport();
@@ -4839,6 +4861,44 @@ void MainComponent::startNewProject (Song song, const juce::File& file)
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"), error);
     }
     updateTitle();
+}
+
+// The user's choice after a plugin's editor crashed (issue #32): save under a new name now, and/or run that plugin in a
+// separate process from now on (like Processing › "Always run … in a separate process": persisted, applied at once)
+void MainComponent::announceEditorCrash (const juce::String& plugin)
+{
+    const auto offerSeparate = ! pluginSandboxEnabled() && ! pluginAlwaysSeparate (plugin) && plugin != "?";
+    auto options = juce::MessageBoxOptions()
+                       .withIconType (juce::MessageBoxIconType::WarningIcon)
+                       .withTitle (tr ("Plugin crashed"))
+                       .withMessage (tr ("{0} crashed. Save your project now (as a new file is safest).", { plugin }) + "\n\n"
+                                     + tr ("Its window was closed so that LYNX SHARE could keep running. The plugin may not work "
+                                           "properly until the project is opened again."))
+                       .withButton (tr ("Save as..."));
+    if (offerSeparate)
+        options = options.withButton (tr ("Always run {0} in a separate process", { plugin }));
+    options = options.withButton (tr ("Close"));
+    juce::AlertWindow::showAsync (options, [safe = juce::Component::SafePointer<MainComponent> (this), plugin, offerSeparate] (int result) {
+        if (safe == nullptr)
+            return;
+        if (result == 1)
+            safe->save (true);
+        else if (result == 2 && offerSeparate)
+        {
+            safe->engine.capturePluginStates(); // the new instances start from the current settings
+            setPluginAlwaysSeparate (plugin, true);
+            const auto name = plugin.toStdString();
+            safe->engine.editSong ([name] (Song& song) {
+                for (auto& c : song.channels)
+                    if (c.instrument == InstrumentKind::plugin && c.plugin.name == name)
+                        c.plugin.separateProcess = true;
+                for (auto& track : song.mixer)
+                    for (auto& fx : track.effects)
+                        if (fx.kind == EffectKind::plugin && fx.plugin.name == name)
+                            fx.plugin.separateProcess = true;
+            });
+        }
+    });
 }
 
 void MainComponent::saveAsTemplate()

@@ -71,6 +71,10 @@ public:
     // while the song plays on past its end (a Song-mode recording without a loop region, FL [EXEC] round 168k: the
     // counter reads 8:08 after recording a 1-bar song from bar 1; a bounce) or with a loop region
     double songPlayheadTicks() const noexcept;
+    // Round 174e: how far the playhead has moved since the last audio block, for screens drawing faster than the blocks
+    // come (144 Hz against 256-sample blocks, or larger buffers): the time since that block at its tempo, never more
+    // than one block (so the next block's position is never passed: the playhead only moves forward). 0 when stopped.
+    double playheadAdvanceTicks() const noexcept;
     SampleLibrary& getSampleLibrary() noexcept { return samples; }
     MeterBank& getMeters() noexcept { return meters; }
     // Tools > Audio logger (REA round 153): records everything the Master plays to a WAV in the background.
@@ -841,6 +845,13 @@ private:
     std::atomic<int> extraLiveCount { 0 };
     void publishSelection();
     std::atomic<double> blockTimeMs { 0.0 };         // when positionTicks was last updated
+    std::atomic<double> blockDurationMs { 0.0 };     // the last block's length (round 174e: playheadAdvanceTicks)
+    // round 174e: the device's callback thread (Windows): its priority when first seen and after LYNX raised it to the
+    // workers' MMCSS "Pro Audio" class (a driver's own thread at normal priority competed with the UI; LYNX_DEVICE_BOOST=0:
+    // left as the driver made it). Shown in the real-time report.
+    std::atomic<unsigned long> deviceThreadId { 0 };
+    std::atomic<int> deviceThreadPriorityBefore { -100 }, deviceThreadPriorityAfter { -100 };
+    bool boostDeviceThread = true;
     // the live clock (round 170d): the musical position of the next block (count-in included), its tempo, and whether
     // it runs; the output latency the played notes are moved back by
     std::atomic<double> clockTick { 0.0 }, clockTicksPerMs { 0.0 }, outputCompensationMs { 0.0 };

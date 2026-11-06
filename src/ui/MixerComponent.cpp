@@ -138,8 +138,7 @@ MixerStrips::MixerStrips (AudioEngine& e)
     engine.addChangeListener (this);
     engine.getLevelsBroadcaster().addChangeListener (this);
     updateSize();
-    // 60 Hz: faders that follow their automation move every frame (round 171c); the meters keep their 30 Hz ballistics
-    startTimerHz (60);
+    // (the meters and the automated faders move at the display's refresh: `frames`, round 174e)
 }
 
 MixerStrips::~MixerStrips()
@@ -2560,8 +2559,8 @@ float MixerStrips::shownVolume (int t) const
 
 void MixerStrips::repaintAutomatedStrips()
 {
-    // faders, pan and send knobs follow their automation while the song plays (issue #12): only the strips with an
-    // automated control repaint, and only when a shown value changed
+    // faders, pan and send knobs follow their automation while the song plays (issue #12): only the automated controls
+    // repaint, and only when the value they show changed (round 174e: just the fader column or the knob, not the strip)
     const auto& shown = engine.getAutomationDisplay();
     if (shown.getGeneration() == shownAutomation)
         return;
@@ -2582,29 +2581,48 @@ void MixerStrips::repaintAutomatedStrips()
         return;
     std::sort (all.begin(), all.end());
     all.erase (std::unique (all.begin(), all.end()), all.end());
-    const auto count = (int) engine.getSong().mixer.size();
+    const auto& mixer = engine.getSong().mixer;
+    const auto count = (int) mixer.size();
+    automatedShown.resize (mixer.size(), { -1.0f, -1.0f });
     for (const auto t : all)
-        if (t >= 0 && t < count)
-            repaint (stripX (t), 0, stripWidthOf (t), getHeight());
+    {
+        if (t < 0 || t >= count)
+            continue;
+        const std::array<float, 2> now { shownVolume (t),
+                                         shown.shown (AutomationTarget { AutomationTargetKind::mixerPan, t }, (mixer[(std::size_t) t].pan + 1.0f) * 0.5f) };
+        auto& was = automatedShown[(std::size_t) t];
+        if (now[0] != was[0])
+        {
+            const auto fader = faderArea (t);
+            repaint (stripX (t), fader.getY() - 9, stripWidthOf (t), fader.getHeight() + 9 + 20);
+        }
+        if (now[1] != was[1])
+            repaint (panArea (t).expanded (2));
+        repaint (routeArea (t).expanded (2)); // (a send knob: small)
+        was = now;
+    }
 }
 
-void MixerStrips::timerCallback()
+bool MixerStrips::liveFrame (double nowMs)
 {
     auto& meters = engine.getMeters();
     const auto showing = isShowing();
     repaintAutomatedStrips();
-    if ((++timerTicks & 1) != 0) // (the meters and input bars: every other tick, 30 Hz)
-        return;
+    const auto elapsed = lastFrameMs > 0.0 ? juce::jlimit (0.0, 250.0, nowMs - lastFrameMs) : 1000.0 / 30.0;
+    lastFrameMs = nowMs;
     const auto& mixer = engine.getSong().mixer;
     inputLevels.resize (mixer.size(), 0.0f);
+    auto moving = engine.getTransport().playing.load (std::memory_order_relaxed);
 
+    const auto inputFall = ui::fallFor (0.8f, elapsed);
     for (std::size_t t = 1; t < mixer.size(); ++t)
     {
         const auto peak = mixer[t].inputChannel >= 0 ? juce::jmax (engine.takeInputPeak ((int) t, 0), engine.takeInputPeak ((int) t, 1)) : 0.0f;
-        auto level = juce::jmax (peak, inputLevels[t] * 0.8f);
+        auto level = juce::jmax (peak, inputLevels[t] * inputFall);
         level = level < 1e-4f ? 0.0f : level;
         if (std::abs (level - inputLevels[t]) > 1e-4f)
         {
+            moving = true;
             inputLevels[t] = level;
             if (showing)
                 repaint (inputArea ((int) t).expanded (1));
@@ -2615,21 +2633,31 @@ void MixerStrips::timerCallback()
     {
         auto& m = levels[i];
         const auto before = m;
-        m.tick (meters.takePeak ((int) (i / 2), (int) (i % 2))); // ~20 dB/s falloff at 30 Hz, 1.5 s peak hold
+        m.advance (meters.takePeak ((int) (i / 2), (int) (i % 2)), elapsed); // ~20 dB/s falloff, 1.5 s peak hold
+        if (m.level != before.level || m.peak != before.peak)
+            moving = true;
+        if (! showing)
+            continue;
 
-        // only the meter that changed is repainted (and, in the Wide layouts, the two thin bars beside the name, which
-        // follow the same level: round 173f, they only moved when something else repainted the strip)
-        if (showing && (std::abs (m.level - before.level) > 1e-4f || std::abs (m.peak - before.peak) > 1e-4f || m.clipped != before.clipped))
+        // only the rows of the meter that changed by a pixel are repainted (round 174e: at the display's rate), and in
+        // the Wide layouts the two thin bars beside the name, which follow the same level (round 173f)
+        const auto t = (int) (i / 2);
+        const auto ch = (int) (i % 2);
+        const auto area = meterArea (t);
+        const auto& sp = spec();
+        const auto rows = meters::dirtyRows (before, m, area.getHeight(), [] (float v) { return meterPosition (v); });
+        if (! rows.empty())
         {
-            const auto t = (int) (i / 2);
-            repaint (meterArea (t).expanded (1));
-            if (const auto& sp = spec(); sp.verticalName && ! sp.nameLow && ! mixerlayout::isCompact (layout) && t > 0 && std::abs (m.level - before.level) > 1e-4f)
+            repaint (area.getX() + ch * (sp.meterWidth + 2) - 1, area.getY() + rows.top - 1, sp.meterWidth + 2, rows.bottom - rows.top + 2);
+            if (sp.verticalName && ! sp.nameLow && ! mixerlayout::isCompact (layout) && t > 0
+                && (int) (meterPosition (m.level) * 64.0f) != (int) (meterPosition (before.level) * 64.0f))
             {
                 const auto box = nameArea (t);
-                repaint (box.getRight(), box.getY() + 5, stripWidthOf (t) - spec().gap - box.getWidth(), box.getHeight() - 10);
+                repaint (box.getRight(), box.getY() + 5, stripWidthOf (t) - sp.gap - box.getWidth(), box.getHeight() - 10);
             }
         }
     }
+    return moving;
 }
 
 // ---------------------------------------------------------------------------
@@ -2644,7 +2672,7 @@ const EffectKind allEffects[] = { EffectKind::eq,     EffectKind::parametricEq, 
                                       EffectKind::delay,  EffectKind::reverb,       EffectKind::chorus,     EffectKind::filter,
                                       EffectKind::distortion, EffectKind::utility, EffectKind::volumeGate,
                                       EffectKind::pitchShift, EffectKind::freqShift, EffectKind::lofi, EffectKind::effector, EffectKind::crossover, EffectKind::frequencySplitter, EffectKind::autoPan, EffectKind::vocoder, EffectKind::pitchCorrect,
-                                      EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::aether, EffectKind::ember, // LYNX's mixing suite
+                                      EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, // LYNX's mixing suite
                                       EffectKind::lynxTune, // LYNX's own pitch corrector
                                       EffectKind::epochVerb, EffectKind::atrium, EffectKind::foilPlate, EffectKind::nebula, EffectKind::halo, EffectKind::horizon, // LYNX's reverbs
                                       EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod, // LYNX's delay / modulation suite

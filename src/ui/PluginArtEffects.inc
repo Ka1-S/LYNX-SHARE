@@ -337,6 +337,10 @@ inline Colour ridgeCapTint (const char* param)
     if (n.startsWith ("Gate ")) return Colour (0xff2e3033);                       // dark grey
     if (n.startsWith ("Comp") || n == "Ratio" || n == "Make-up offset") return Colour (0xffb9bbbd); // light grey
     if (n == "Input" || n == "Mic gain") return Colour (0xff26272a);
+    // tp172c6: the DRIVE section — a red drive (the amp strips' drive cap), black level trims, a grey mix
+    if (n == "Drive amount") return Colour (0xffc8202a);
+    if (n == "Drive input" || n == "Drive trim") return Colour (0xff26272a);
+    if (n == "Drive mix") return Colour (0xffb9bbbd);
     return {};
 }
 
@@ -451,6 +455,100 @@ inline const Theme& ridge4kTheme()
         x.offLabelCol = Colour (0xffb4b8bf);
         x.captionCol = Colour (0xffd9dadc);
         x.valueCol = Colour (0xffb9bcc1);
+        return x;
+    }();
+    return t;
+}
+
+// === Kiln Channel (console-emulation channel role, round tp172c7): a compact single-channel console — near-black ===
+// side columns for the main level and meters, a dark gunmetal centre module with fine brushing and corner screws, an
+// amber-lit VU, a kiln-mouth emblem (LYNX's own mark for the plugin) and amber key lamps
+
+inline void kilnEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    // a kiln's arched mouth with a flame inside, in a rounded badge
+    const auto badge = Rectangle<float> (r * 2.0f, r * 2.2f).withCentre (c);
+    g.setColour (Colour (0xff0d0d0e));
+    g.fillRoundedRectangle (badge, r * 0.35f);
+    g.setColour (Colour (0xffb9bcc1).withAlpha (0.8f));
+    g.drawRoundedRectangle (badge, r * 0.35f, juce::jmax (1.0f, r * 0.09f));
+    juce::Path mouth;
+    const auto m = badge.reduced (r * 0.42f, r * 0.45f);
+    mouth.startNewSubPath (m.getX(), m.getBottom());
+    mouth.lineTo (m.getX(), m.getY() + m.getHeight() * 0.45f);
+    mouth.quadraticTo (m.getCentreX(), m.getY() - m.getHeight() * 0.15f, m.getRight(), m.getY() + m.getHeight() * 0.45f);
+    mouth.lineTo (m.getRight(), m.getBottom());
+    g.strokePath (mouth, juce::PathStrokeType (juce::jmax (1.0f, r * 0.12f)));
+    juce::Path flame;
+    const auto fx = m.getCentreX(), fb = m.getBottom() - r * 0.08f, fh = m.getHeight() * 0.62f, fw = m.getWidth() * 0.26f;
+    flame.startNewSubPath (fx, fb - fh);
+    flame.cubicTo (fx + fw * 1.4f, fb - fh * 0.45f, fx + fw, fb, fx, fb);
+    flame.cubicTo (fx - fw, fb, fx - fw * 1.4f, fb - fh * 0.45f, fx, fb - fh);
+    g.setGradientFill (ColourGradient (Colour (0xffffd27a), fx, fb, Colour (0xffd2461e), fx, fb - fh, false));
+    g.fillPath (flame);
+}
+
+inline void canvasKiln (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    const auto& p = pal();
+    vfill (g, a, p.bgTop, p.bgBottom);
+    if (display) return;
+    const auto sx = a.getWidth() / 460.0f, sy = a.getHeight() / 640.0f;
+    const auto mod = Rectangle<float> (a.getX() + 104.0f * sx, a.getY() + 6.0f * sy, 252.0f * sx, 628.0f * sy);
+    for (const auto col : { Rectangle<float> (a.getX() + 6.0f * sx, mod.getY(), 92.0f * sx, mod.getHeight()),
+                            Rectangle<float> (a.getX() + 362.0f * sx, mod.getY(), 92.0f * sx, mod.getHeight()) })
+    {
+        g.setColour (Colour (0xff0b0b0c));
+        g.fillRoundedRectangle (col, 6.0f);
+        g.setColour (Colours::white.withAlpha (0.05f));
+        g.drawRoundedRectangle (col.reduced (0.5f), 6.0f, 1.0f);
+    }
+    // the centre module: dark gunmetal, vertical brushing, a soft top light, worn edges
+    vfill (g, mod, Colour (0xff2b2c2f), Colour (0xff17181a));
+    brushedLines (g, mod, 224, 0.045f);
+    softLight (g, { mod.getCentreX(), mod.getY() + mod.getHeight() * 0.25f }, mod.getWidth() * 0.9f, Colour (0xfffff0d8), 0.07f);
+    g.setColour (Colours::black.withAlpha (0.7f));
+    g.drawRect (mod, 1.5f);
+    g.setColour (Colours::white.withAlpha (0.07f));
+    g.drawRect (mod.reduced (2.0f), 1.0f);
+    cornerScrews (g, mod.reduced (2.0f), 9.0f * sx, 7.0f * sx);
+    kilnEmblem (g, { mod.getCentreX(), mod.getY() + 17.0f * sy }, 11.0f * sx);
+    // the VU's bezel
+    const auto bezel = Rectangle<float> (a.getX() + 120.0f * sx, a.getY() + 36.0f * sy, 220.0f * sx, 124.0f * sy);
+    g.setColour (Colour (0xff060606));
+    g.fillRoundedRectangle (bezel, 6.0f);
+    g.setColour (Colours::white.withAlpha (0.10f));
+    g.drawRoundedRectangle (bezel.reduced (1.0f), 6.0f, 1.0f);
+    vignette (g, mod, 0.3f);
+}
+
+inline Colour kilnCapTint (const char* param)
+{
+    const juce::String n (param);
+    if (n == "Console") return Colour (0xff141416);
+    return Colour (0xff1d1e21);
+}
+
+inline const Theme& kilnTheme()
+{
+    static const Theme t = []
+    {
+        Theme x = ridgeTheme();
+        x.name = "Kiln Channel";
+        x.pal = { Colour (0xff141415), Colour (0xff0a0a0b), Colour (0xfff2a33a), Colour (0xffffc46a),
+                  Colour (0x00000000), Colour (0x00000000), Colour (0x00000000), Colour (0xffe8e6e0),
+                  Colour (0xff070707), Colour (0xff2e2f33), Colour (0xff111214), Colour (0xff55585c), Colour (0xfff4f4f2),
+                  Colour (0xff2a2b2e) };
+        x.canvas = canvasKiln;
+        x.headerDeco = nullptr;
+        x.flatSections = true;
+        x.rimWidth = 0.0f;
+        x.capTint = kilnCapTint;
+        x.hwKeys = true;                     // Noise reduction / Group bypass: square keys, lit amber
+        x.offLabelCol = Colour (0xffb4b8bf);
+        x.captionCol = Colour (0xffd9dadc);
+        x.valueCol = Colour (0xffb9bcc1);
+        x.headerCol = Colour (0xff0e0e0f);
         return x;
     }();
     return t;
@@ -4477,6 +4575,7 @@ const Theme* effectTheme (Art a)
         case Art::nebula: return &nebulaTheme();
         case Art::ridge: return &ridgeTheme();
         case Art::ridge4k: return &ridge4kTheme();
+        case Art::kiln: return &kilnTheme();
         case Art::crest: return &crestTheme();
         case Art::apex: return &apexTheme();
         case Art::prism: return &prismTheme();
@@ -4605,6 +4704,7 @@ Art artForEffect (EffectKind kind)
         case EffectKind::fruityDelay3: return Art::delay3;
         case EffectKind::fruityDelayBank: return Art::delayBank;
         case EffectKind::ember: return Art::ember;
+        case EffectKind::kilnChannel: return Art::kiln;
         case EffectKind::aether: return Art::aether;
         case EffectKind::fruityBloodOverdrive: return Art::blood;
         case EffectKind::fruityFastDist: return Art::fastDist;

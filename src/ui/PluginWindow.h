@@ -32,6 +32,16 @@ void closeOrphans();
 std::vector<juce::AudioPluginInstance*> openPlugins();
 bool isOpen (const juce::AudioPluginInstance& plugin);
 void close (const juce::AudioPluginInstance& plugin);
+// Faults inside a plugin's own editor window (issue #32, round 174a; Windows): the editor was closed and LYNX went on.
+// The main window shows each new one once (save the project, run the plugin in a separate process).
+struct EditorCrash
+{
+    juce::String plugin; // its name (as PluginRef::name / pluginAlwaysSeparate)
+    juce::String detail; // "access violation at Synth.dll+0x4be460"
+    juce::File traceFile; // autosave\editor-crash <time>.txt
+};
+int editorCrashCount();
+std::vector<EditorCrash> editorCrashes();
 // A parameter gesture in an open plugin editor (`starting` = begin, else end), on the UI thread; the plugin is only
 // compared, it may be gone (REA round 143: Last tweaked, automation recording).
 extern std::function<void (const juce::AudioPluginInstance&, int, bool)> onGesture;

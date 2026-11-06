@@ -161,3 +161,278 @@ TEST (aether_issue77_default_model_and_levels_tp172c)
     lynx::upgradeLoadedEffectParams (now, (std::size_t) air::count);
     CHECK (now.params[air::dynamic] == 1.0f);
 }
+
+// slice 5: Harrison 32Classic and MPC channel strip states -> Ridge's own engine (laws fitted on their trials)
+namespace tp172c
+{
+inline lynx::EffectSlot harrisonSlot (const std::string& plugin, const std::string& xml)
+{
+    using namespace lynx;
+    ForeignPlugin fp;
+    fp.format = ForeignPlugin::Format::vst3;
+    fp.name = plugin;
+    fp.state = substtest::flVst3State (substtest::juceXmlComponent (xml));
+    const auto id = pluginIdentity (fp);
+    const auto* entry = findPluginSubstitute (id, false);
+    if (entry == nullptr)
+        return {};
+    int n = 0;
+    return makeSubstituteSlot (*entry, &id, &n);
+}
+inline std::string p32 (const char* id, double v) { return std::string ("<PARAM id=\"") + id + "\" value=\"" + std::to_string (v) + "\"/>"; }
+} // namespace tp172c
+
+TEST (ridge_harrison_strips_translated_tp172c5)
+{
+    using namespace lynx;
+    using tp172c::p32;
+    namespace r = mixsuite::ridge;
+    const std::string base = p32 ("bypass", 0) + p32 ("compressor_in", 1) + p32 ("compressor_mode", 1) + p32 ("compressor_attack", 20)
+                             + p32 ("compressor_release", 50) + p32 ("gate_in", 1) + p32 ("gate_depth", 0) + p32 ("gate_threshold", 0)
+                             + p32 ("equalizer_in", 1) + p32 ("equalizer_eq_in", 1) + p32 ("equalizer_filters_in", 1)
+                             + p32 ("equalizer_highpass_filter_freq", 25) + p32 ("equalizer_lowpass_filter_freq", 20000)
+                             + p32 ("input_trim", 0) + p32 ("output_trim", 0) + p32 ("FaderLevel", 0);
+    auto c32 = [&] (const std::string& params) {
+        return tp172c::harrisonSlot ("Harrison 32Classic Channel Strip",
+                                     "<SSL_PLUGIN_STATE PluginName=\"Harrison 32Classic Channel Strip\" Version=\"2.0.20\" StateASelected=\"1\"><A><PROCESSOR_STATE>"
+                                         + base + params + "</PROCESSOR_STATE></A><B><PROCESSOR_STATE/></B></SSL_PLUGIN_STATE>");
+    };
+    auto s = c32 (p32 ("equalizer_band_freq_2", 1421.74) + p32 ("equalizer_band_gain_2", -4.0) + p32 ("compressor_ratio", 4.0)
+                  + p32 ("compressor_threshold", -20.0) + p32 ("CompAutoMakeUp", 1.0));
+    auto& p = s.params;
+    CHECK (s.kind == EffectKind::ridgeStrip && ! r::k4Voicing (p) && ! r::modernVoicing (p) && p[r::curve] < 0.5f);
+    CHECK (std::abs (r::hmfHz (p[r::hmfFreq]) - 1421.74) < 0.5 && std::abs (r::bandGainDb (p[r::hmfGain], false) + 4.0) < 1e-3);
+    CHECK (std::abs (r::ratio (p[r::compRatio]) - 4.0) < 0.01 && std::abs (r::compThresholdDb (p[r::compThreshold]) + 19.0) < 1e-3);
+    CHECK (std::abs (r::trimDb (p[r::output]) - 7.5) < 0.01);      // its auto make-up: half of 20 dB x (1 - 1/4)
+    CHECK (std::abs (r::hpfHz (p[r::hpf]) - 23.25) < 0.1 && p[r::lpf] > 0.0f); // 12 dB/oct 25 Hz -> Ridge's 18 dB/oct lower
+    s = c32 (p32 ("compressor_mode", 0) + p32 ("compressor_ratio", 10.0) + p32 ("gate_depth", 20) + p32 ("gate_threshold", -30)
+             + p32 ("gate_mode", 1) + p32 ("equalizer_band_freq_4", 111.35) + p32 ("equalizer_band_gain_4", 13.74));
+    CHECK (s.params[r::compRatio] == 0.0f);                                         // the Leveler: no static reduction
+    {   // a -45 dBFS threshold: Ridge's -40 floor + 4 dB more input, taken back at the output
+        const auto d = c32 (p32 ("compressor_ratio", 30.0) + p32 ("compressor_threshold", -45.0) + p32 ("CompAutoMakeUp", 0.0));
+        CHECK (std::abs (r::compThresholdDb (d.params[r::compThreshold]) + 40.0) < 1e-3 && std::abs (r::trimDb (d.params[r::input]) - 4.0) < 0.01);
+        CHECK (std::abs (r::trimDb (d.params[r::output]) + 4.0) < 0.01);
+    }
+    CHECK (std::abs (r::gateRangeDb (s.params[r::gateRange]) - 20.0) < 1e-3 && s.params[r::expander] > 0.5f);
+    CHECK (std::abs (r::lfHz (s.params[r::lfFreq]) - 174.2) < 0.5 && std::abs (r::bandGainDb (s.params[r::lfGain], false) - 11.67) < 0.01);
+
+    const std::string mpc = "<HarrisonMPCChannelStrip plugin_size=\"1.0\" version=\"327936\">" + p32 ("bypass", 0) + p32 ("mpc_compressorin", 1)
+                            + p32 ("mpccomp_ratio", 1.5) + p32 ("mpccomp_threshold", -10) + p32 ("mpccomp_release", 100) + p32 ("mpccomp_attack", 5)
+                            + p32 ("mpc_equalizerin", 1) + p32 ("mpceq_bandGain3", 6) + p32 ("mpceq_bandFreq3", 185) + p32 ("mpceq_bandQ3", 3)
+                            + p32 ("mpceq_bandShape3", 7) + p32 ("mpceq_bandGain6", -5) + p32 ("mpceq_bandFreq6", 1838) + p32 ("mpceq_bandQ6", 3)
+                            + p32 ("mpceq_bandShape6", 7) + p32 ("mpc_trim", 0) + "</HarrisonMPCChannelStrip>";
+    s = tp172c::harrisonSlot ("Harrison_MPCChannelStrip", mpc);
+    CHECK (s.kind == EffectKind::ridgeStrip && std::abs (r::ratio (s.params[r::compRatio]) - 1.5) < 0.01);
+    CHECK (std::abs (r::lmfHz (s.params[r::lmfFreq]) - 200.0) < 0.5 && std::abs (r::bandGainDb (s.params[r::lmfGain], false) - 6.0) < 1e-3);
+    CHECK (std::abs (r::hmfHz (s.params[r::hmfFreq]) - 1838.0) < 1.0 && std::abs (r::bandGainDb (s.params[r::hmfGain], false) + 5.0) < 1e-3);
+}
+
+// slice 6: Ridge's DRIVE section (off by default: the old sound, no latency), its curve, and the states that use it
+// (Harrison 32C saturator, SSL Guitarstrip; the VCC Channel moved to Kiln Channel in slice 7)
+TEST (ridge_drive_section_tp172c6)
+{
+    using namespace lynx;
+    using tp172c::p32;
+    namespace r = mixsuite::ridge;
+    auto p = makeEffectSlot (EffectKind::ridgeStrip).params;
+    CHECK ((int) effectInfo (EffectKind::ridgeStrip).params.size() == r::count && p[r::driveOn] == 0.0f);
+    auto run = [] (const EffectParams& q, int* latency) {
+        auto fx = makeEffect (EffectKind::ridgeStrip);
+        fx->prepare (48000.0);
+        std::vector<float> l (24000), rr (24000);
+        for (int i = 0; i < 24000; ++i) l[(std::size_t) i] = rr[(std::size_t) i] = 0.3f * (float) std::sin (2.0 * 3.14159265358979 * 440.0 * i / 48000.0);
+        for (int at = 0; at < 24000; at += 512)
+            fx->process (l.data() + at, rr.data() + at, std::min (512, 24000 - at), q, 120.0);
+        if (latency != nullptr)
+            *latency = fx->latencySamples();
+        return l;
+    };
+    int lat = -1;
+    const auto off = run (p, &lat);
+    CHECK (lat == 0);
+    auto q = p;
+    q[r::driveModel] = r::driveModelValue (r::driveTube);   // the model alone changes nothing while the section is out
+    q[r::driveAmount] = 1.0f;
+    CHECK (run (q, nullptr) == off);
+    q[r::driveOn] = 1.0f;
+    const auto on = run (q, &lat);
+    CHECK (lat == mixsuite::Oversampler::latency() && on != off);
+    // the curve: Saturate at 0 dB = its measured +0.9 dB small-signal gain, compressing toward full scale
+    auto c = p;
+    c[r::driveModel] = r::driveModelValue (r::driveSaturate);
+    c[r::driveAmount] = r::driveAmountValue (r::driveSaturate, 0.0);
+    CHECK (std::abs (20.0 * std::log10 (r::driveCurve (c, 1e-4) / 1e-4) - 0.9) < 0.05);
+    CHECK (r::driveCurve (c, 1.0) < 1.0 && r::driveCurve (c, 0.5) > r::driveCurve (c, 0.25) && r::driveCurve (c, -0.5) < 0.0);
+    CHECK (std::abs (r::driveAmountUnits (r::driveSaturate, r::driveAmountValue (r::driveSaturate, 6.0)) - 6.0) < 1e-4);
+    CHECK (std::string (r::driveModelName (r::driveGuitarAmp)) == "Guitar amp");
+
+    // the 32C's saturator -> Saturate at its dial
+    auto s = tp172c::harrisonSlot ("Harrison 32Classic Channel Strip",
+                                   "<SSL_PLUGIN_STATE PluginName=\"Harrison 32Classic Channel Strip\" Version=\"2.0.20\" StateASelected=\"1\"><A><PROCESSOR_STATE>"
+                                       + p32 ("bypass", 0) + p32 ("compressor_in", 0) + p32 ("gate_in", 0) + p32 ("equalizer_in", 1)
+                                       + p32 ("input_trim", 0) + p32 ("output_trim", 0) + p32 ("FaderLevel", 0) + p32 ("saturator_in", 1)
+                                       + p32 ("saturator_drive", 12.0) + p32 ("equalizer_eq_in", 1) + p32 ("equalizer_filters_in", 0)
+                                       + p32 ("compressor_mode", 1) + "</PROCESSOR_STATE></A><B><PROCESSOR_STATE/></B></SSL_PLUGIN_STATE>");
+    CHECK (s.params[r::driveOn] == 1.0f && r::driveModelIndex (s.params[r::driveModel]) == r::driveSaturate);
+    CHECK (std::abs (r::driveAmountUnits (r::driveSaturate, s.params[r::driveAmount]) - 12.0) < 1e-3);
+
+    // Guitarstrip: EQ, the compressor's mode -> ratio, the amp and its pre-amp
+    auto gs = [] (const std::string& params) {
+        return tp172c::harrisonSlot ("SSL Guitarstrip",
+                                     "<SSL_PLUGIN_STATE PluginName=\"SSL Guitarstrip\" Version=\"1.3.2\" StateASelected=\"0\"><A><PROCESSOR_STATE>"
+                                         + p32 ("Drive", 0) + "</PROCESSOR_STATE></A><B><PROCESSOR_STATE>" + p32 ("Bypass", 0) + p32 ("EQ", 1)
+                                         + p32 ("Input Gain", 0) + p32 ("Output Gain", 0) + p32 ("Compressor Mix", 100) + p32 ("Drive Mix", 100)
+                                         + p32 ("Low Gain", 0) + p32 ("High Gain", 0) + p32 ("Mid Gain", 0) + params
+                                         + "</PROCESSOR_STATE></B></SSL_PLUGIN_STATE>");
+    };
+    s = gs (p32 ("Mid Frequency", 2.65) + p32 ("Mid Gain", 6) + p32 ("Compressor", 1) + p32 ("Compressor Mode", 4) + p32 ("Compressor Threshold", -18)
+            + p32 ("Drive", 1) + p32 ("Drive Type", 0) + p32 ("Guitar Drive", 5.5) + p32 ("Guitar Pre-Amp", 12) + p32 ("High-Pass Filter", 20));
+    CHECK (s.kind == EffectKind::ridgeStrip && ! r::k4Voicing (s.params) && s.params[r::curve] < 0.5f);
+    CHECK (std::abs (r::hmfHz (s.params[r::hmfFreq]) - 2650.0) < 1.0 && std::abs (r::bandGainDb (s.params[r::hmfGain], false) - 6.0) < 1e-3);
+    CHECK (std::abs (r::ratio (s.params[r::compRatio]) - 4.0) < 0.01 && std::abs (r::compThresholdDb (s.params[r::compThreshold]) + 15.0) < 1e-3);
+    CHECK (s.params[r::driveOn] == 1.0f && r::driveModelIndex (s.params[r::driveModel]) == r::driveGuitarAmp);
+    CHECK (std::abs (r::driveAmountUnits (r::driveGuitarAmp, s.params[r::driveAmount]) - 5.5) < 1e-3);
+    CHECK (std::abs (r::driveInputDb (s.params[r::driveInput]) - 12.0) < 1e-3 && s.params[r::hpf] == 0.0f);
+    s = gs (p32 ("Compressor", 0) + p32 ("Drive", 1) + p32 ("Drive Type", 1) + p32 ("Bass Drive", 11) + p32 ("Low-Pass Filter", 20));
+    CHECK (s.params[r::compRatio] == 0.0f && r::driveModelIndex (s.params[r::driveModel]) == r::driveBassAmp && s.params[r::driveAmount] == 1.0f);
+    CHECK (s.params[r::lpf] == 0.0f);
+
+    // Drumstrip: its gate (open threshold, range capped at Ridge's 60 dB, release) and trims
+    s = tp172c::harrisonSlot ("SSL Native Drumstrip v6",
+                              "<SSL_PLUGIN_STATE PluginName=\"SSL Native Drumstrip v6\" Version=\"6.0\" StateASelected=\"1\"><A><PROCESSOR_STATE>"
+                                  + p32 ("bypass", 0) + p32 ("gateOn", 1) + p32 ("gateOpen", -24) + p32 ("gateClose", -30) + p32 ("gateRange", 80)
+                                  + p32 ("gateRelease", 0.5) + p32 ("gateAttack", 0.05) + p32 ("input", 3) + p32 ("output", -2) + p32 ("TransOn", 0)
+                                  + p32 ("hfOn", 0) + p32 ("lfOn", 0) + p32 ("lmcOn", 0) + "</PROCESSOR_STATE></A><B><PROCESSOR_STATE/></B></SSL_PLUGIN_STATE>");
+    CHECK (s.kind == EffectKind::ridgeStrip && s.params[r::dynOn] == 1.0f && s.params[r::compRatio] == 0.0f);
+    CHECK (std::abs (r::gateRangeDb (s.params[r::gateRange]) - 60.0) < 1e-3 && std::abs (r::gateThresholdDb (s.params[r::gateThreshold]) + 24.0) < 1e-3);
+    CHECK (std::abs (r::trimDb (s.params[r::input]) - 3.0) < 0.01 && std::abs (r::trimDb (s.params[r::output]) + 2.0) < 0.01);
+}
+
+// slice 7: Kiln Channel, LYNX's console channel — the six console models on the measured drive stages, its noise floor,
+// group bypass shared by the group's members, the meters, and the VCC Channel state translated onto it
+TEST (kiln_channel_tp172c7)
+{
+    using namespace lynx;
+    namespace k = mixsuite::kiln;
+    namespace r = mixsuite::ridge;
+    const auto& info = effectInfo (EffectKind::kilnChannel);
+    CHECK ((int) info.params.size() == k::count && std::string (info.name) == "Kiln Channel");
+    auto p = makeEffectSlot (EffectKind::kilnChannel).params;
+    CHECK (p[k::noiseReduction] == 1.0f && p[k::group] == 0.0f && std::abs (k::driveDb (p[k::drive]) - 6.0) < 1e-3);
+    CHECK (std::abs (k::trimDb (p[k::input])) < 1e-6 && std::abs (k::mainDb (p[k::mainOut])) < 1e-6);
+    for (int c = 0; c < 6; ++c)
+        CHECK (k::consoleStep (k::consoleValue (c)) == c);
+    CHECK (mixsuite::paramText (EffectKind::kilnChannel, k::console, k::consoleValue (2)) == "American A");
+    CHECK (mixsuite::paramText (EffectKind::kilnChannel, k::group, 0.0f) == "None" && mixsuite::paramText (EffectKind::kilnChannel, k::group, 0.5f) == "4");
+    auto run = [] (const EffectParams& q, int* latency, std::unique_ptr<Effect>* keep = nullptr) {
+        auto fx = makeEffect (EffectKind::kilnChannel);
+        fx->prepare (48000.0);
+        std::vector<float> l (24000), rr (24000);
+        for (int i = 0; i < 24000; ++i) l[(std::size_t) i] = rr[(std::size_t) i] = 0.25f * (float) std::sin (2.0 * 3.14159265358979 * 440.0 * i / 48000.0);
+        for (int at = 0; at < 24000; at += 512)
+            fx->process (l.data() + at, rr.data() + at, std::min (512, 24000 - at), q, 120.0);
+        if (latency != nullptr)
+            *latency = fx->latencySamples();
+        if (keep != nullptr)
+            *keep = std::move (fx);
+        return l;
+    };
+    auto rmsDb = [] (const std::vector<float>& x, int from) {
+        double e = 0;
+        for (std::size_t i = (std::size_t) from; i < x.size(); ++i) e += (double) x[i] * x[i];
+        return 10.0 * std::log10 (std::max (1e-30, e / (double) (x.size() - (std::size_t) from)));
+    };
+    int lat = -1;
+    const auto a = run (p, &lat);
+    CHECK (lat == mixsuite::Oversampler::latency());
+    // each console colours the sine its own way; the level stays near unity (the stages are normalised at 1 kHz)
+    auto q = p;
+    q[k::console] = k::consoleValue (5);
+    const auto tube = run (q, nullptr);
+    CHECK (tube != a && std::abs (rmsDb (a, 4800) - rmsDb (tube, 4800)) < 3.0);
+    CHECK (std::abs (rmsDb (a, 4800) - 20.0 * std::log10 (0.25 / std::sqrt (2.0))) < 2.0);
+    // the output trim and the main output move the level by their dB
+    q = p;
+    q[k::output] = (float) ((6.0 + 18.0) / 36.0);
+    CHECK (std::abs (rmsDb (run (q, nullptr), 4800) - rmsDb (a, 4800) - 6.0) < 0.1);
+    q = p;
+    q[k::mainOut] = (float) ((-12.0 + 24.0) / 48.0);
+    CHECK (std::abs (rmsDb (run (q, nullptr), 4800) - rmsDb (a, 4800) + 12.0) < 0.1);
+    // noise: off by default (noise reduction on); with it off, silence carries the console's hiss (Tube: ~ -102 dBFS)
+    auto silence = [] (const EffectParams& q) {
+        auto fx = makeEffect (EffectKind::kilnChannel);
+        fx->prepare (48000.0);
+        std::vector<float> l (24000, 0.0f), rr (24000, 0.0f);
+        for (int at = 0; at < 24000; at += 512)
+            fx->process (l.data() + at, rr.data() + at, std::min (512, 24000 - at), q, 120.0);
+        double e = 0;
+        for (const auto x : l) e += (double) x * x;
+        return 10.0 * std::log10 (std::max (1e-30, e / 24000.0));
+    };
+    q = p;
+    q[k::console] = k::consoleValue (5);
+    CHECK (silence (q) < -200.0);
+    q[k::noiseReduction] = 0.0f;
+    CHECK (std::abs (silence (q) + 101.9) < 1.5);
+    // group bypass: the console out (the main gains stay), shared by every member of the group
+    q = p;
+    q[k::groupBypass] = 1.0f;
+    const auto byp = run (q, nullptr);
+    CHECK (std::abs (rmsDb (byp, 4800) - 20.0 * std::log10 (0.25 / std::sqrt (2.0))) < 0.05);
+    {
+        auto member = p, other = p;
+        member[k::group] = other[k::group] = 3.0f / 8.0f;
+        member[k::groupBypass] = 1.0f;
+        std::unique_ptr<Effect> held;
+        run (member, nullptr, &held);
+        const auto o = run (other, nullptr);
+        CHECK (std::abs (rmsDb (o, 4800) - 20.0 * std::log10 (0.25 / std::sqrt (2.0))) < 0.05);
+        held.reset();
+        CHECK (run (other, nullptr) == a);
+    }
+    // the meters: input and output peaks on control outputs 2 / 3 (the VU and the side columns)
+    {
+        std::unique_ptr<Effect> fx;
+        run (p, nullptr, &fx);
+        CHECK (fx->controlOutput (2) > 0.2f && fx->controlOutput (3) > 0.2f);
+    }
+
+    // VCC Channel -> Kiln Channel: the playing slot's console, drive, trims and switches, the group and the main gains
+    auto vcc = [] (const std::string& slot1Console, const std::string& group) {
+        ForeignPlugin fp;
+        fp.format = ForeignPlugin::Format::vst3;
+        fp.name = "VM VCC Channel";
+        const std::string xml = "<VccC-state><package version=\"1.0\"><section id=\"Common\"><entry id=\"Current slot\" type=\"uint32\" value=\"1\"/>"
+                                "<entry id=\"Group\" type=\"float64\" value=\"" + group + "\"/></section>"
+                                "<section id=\"Slot0\"><entry id=\"Console\" type=\"float64\" value=\"0.0\"/><entry id=\"Drive\" type=\"float64\" value=\"0.1\"/></section>"
+                                "<section id=\"Slot1\"><entry id=\"Console\" type=\"float64\" value=\"" + slot1Console + "\"/>"
+                                "<entry id=\"Drive\" type=\"float64\" value=\"0.75\"/><entry id=\"Input\" type=\"float64\" value=\"0.75\"/>"
+                                "<entry id=\"Output\" type=\"float64\" value=\"0.25\"/><entry id=\"NoiseReduction\" type=\"float64\" value=\"0.25\"/>"
+                                "<entry id=\"GroupBypass\" type=\"float64\" value=\"0.75\"/><entry id=\"StandaloneOutputGain\" type=\"float64\" value=\"0.625\"/>"
+                                "<entry id=\"Bypass\" type=\"float64\" value=\"0.25\"/></section></package></VccC-state>";
+        fp.state = substtest::flVst3State (std::vector<std::uint8_t> (xml.begin(), xml.end()));
+        const auto id = pluginIdentity (fp);
+        const auto* entry = findPluginSubstitute (id, false);
+        if (entry == nullptr)
+            return EffectSlot {};
+        int n = 0;
+        return makeSubstituteSlot (*entry, &id, &n);
+    };
+    auto s = vcc ("0.45", "0.5");                                         // the third step: US A; Group 4
+    CHECK (s.kind == EffectKind::kilnChannel && s.enabled && k::consoleStep (s.params[k::console]) == 2);
+    CHECK (std::abs (s.params[k::drive] - 0.75f) < 1e-6 && s.params[k::noiseReduction] == 0.0f && s.params[k::groupBypass] == 1.0f);
+    CHECK (std::abs (k::trimDb (s.params[k::input]) - 9.0) < 0.01 && std::abs (k::trimDb (s.params[k::output]) + 9.0) < 0.01);
+    CHECK (k::groupOf (s.params[k::group]) == 4 && std::abs (k::mainDb (s.params[k::mainOut]) - 6.0) < 0.01 && std::abs (k::mainDb (s.params[k::mainIn])) < 1e-6);
+    CHECK (s.params[k::ioLink] == 1.0f && s.params[k::ioGroup] == 1.0f);         // absent from the state: the original's defaults (on)
+    // Link I/O: the output moves against the input; off, the input moves alone
+    {
+        auto q = makeEffectSlot (EffectKind::kilnChannel).params;
+        auto e = k::linkedEdit (q, k::input, 0.75f);
+        CHECK (e.size() == 2 && e[1].first == k::output && std::abs (k::trimDb (e[1].second) + 9.0) < 0.01);
+        q[k::ioLink] = 0.0f;
+        CHECK (k::linkedEdit (q, k::input, 0.75f).size() == 1 && k::linkedEdit (q, k::output, 0.75f).size() == 1);
+    }
+    s = vcc ("0.95", "0.0");
+    CHECK (k::consoleStep (s.params[k::console]) == 5 && k::groupOf (s.params[k::group]) == 0);
+    (void) r::count;
+}

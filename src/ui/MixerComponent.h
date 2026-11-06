@@ -14,6 +14,7 @@
 #include "core/MixerLayout.h"
 #include "core/MixerOps.h"
 #include "engine/AudioEngine.h"
+#include "ui/FrameTicker.h"
 #include "ui/ValueControl.h"
 
 namespace lynx
@@ -113,8 +114,7 @@ void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects);
 class MixerStrips final : public juce::Component,
                           public ui::HintSource,
                           public juce::DragAndDropTarget,
-                          private juce::ChangeListener,
-                          private juce::Timer
+                          private juce::ChangeListener
 {
 public:
     explicit MixerStrips (AudioEngine& engine);
@@ -181,7 +181,6 @@ private:
     enum class Part { none, pan, stereo, fader, meter, mute, solo, route, send, header, body, add, arm, input };
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
-    void timerCallback() override;
 
     int stripX (int track) const noexcept;
     // FL's docks and separators (REA round 146a): the strips' x in display order (left block, middle, right), the
@@ -227,8 +226,11 @@ private:
     juce::Rectangle<int> faderArea (int track) const;
     float shownVolume (int track) const; // the fader's value, or its automation's while the song plays (issue #12)
     void repaintAutomatedStrips();
+    // the meters, input bars and automated controls, at the display's refresh (round 174e; was a 60 / 30 Hz timer)
+    bool liveFrame (double nowMs);
     std::uint32_t shownAutomation = 0;
-    unsigned timerTicks = 0;
+    double lastFrameMs = 0.0;
+    std::vector<std::array<float, 2>> automatedShown; // the volume and pan drawn per strip while automated (round 174e)
     std::uint64_t seenPublish = 0;                     // AudioEngine::getPublishCount at the last full refresh
     std::vector<std::array<float, 3>> shownLevels;   // volume, pan, separation per strip then (round 171c)
     std::vector<int> automatedStrips;
@@ -281,6 +283,7 @@ private:
 
     std::vector<meters::PeakHold> levels; // per track*2: bar, peak hold and clip latch
     std::vector<float> inputLevels;       // per track: input level (decaying)
+    ui::FrameTicker frames { *this, [this] (double ms) { return liveFrame (ms); } };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MixerStrips)
 };

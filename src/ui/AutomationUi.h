@@ -14,6 +14,11 @@ juce::String describeTargetValue (AudioEngine& engine, const AutomationTarget& t
 // Creates an automation for the target, starting at the current value, plus a clip of it in the Playlist
 // (from the start of the song to its end, on a free track), like FL's "Create automation clip".
 void createAutomationClip (AudioEngine& engine, const AutomationTarget& target);
+// The same with a given name and value (a flat line), for any target (none: an unlinked clip).
+void addAutomationClip (AudioEngine& engine, const AutomationTarget& target, const std::string& name, float value);
+// FL's "Automation Clip" generator (Plugin picker, round 175b): an automation linked to nothing, its clip on a free
+// Playlist track, its editor open.
+void createUnlinkedAutomationClip (AudioEngine& engine);
 
 // Round 165: shared by the point editor and the Playlist's in-clip editing — a point's value as text (percent, or BPM
 // for the tempo), the copied value of FL's "Copy value" (< 0 = none) and FL's "Type in value..." dialog.
