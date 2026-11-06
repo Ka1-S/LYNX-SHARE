@@ -5666,7 +5666,7 @@ void PlaylistComponent::filesDropped (const juce::StringArray& files, int x, int
     auto track = yToTrack (y);
 
     for (const auto& f : files)
-        if (addAudioClip (engine, juce::File (f), start, track, false))
+        if (addAudioClip (engine, juce::File (f), start, track, true))
             ++track; // multiple files: one below the other
 }
 
@@ -5755,8 +5755,23 @@ void PlaylistComponent::mouseMagnify (const juce::MouseEvent& e, float scale)
 
 void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& rawWheel)
 {
-    const auto wheel = flmods::normalisedWheel (rawWheel); // Windows touchpads: pieces of a notch (round 170e)
+    const auto wheel = flmods::normalisedWheel (rawWheel);
     const auto ctrl = flmods::ctrl (e.mods), alt = e.mods.isAltDown(), shift = e.mods.isShiftDown();
+
+    // RMB held + wheel = change tool (wheel up = previous, wheel down = next; flip if you prefer)
+    if (e.mods.isRightButtonDown())
+    {
+        toolWheelAccum += wheel.deltaY;
+
+        while (toolWheelAccum >= 1.0f)  { if (onStepTool) onStepTool (-1); toolWheelAccum -= 1.0f; toolWheelUsed = true; }
+        while (toolWheelAccum <= -1.0f) { if (onStepTool) onStepTool (+1); toolWheelAccum += 1.0f; toolWheelUsed = true; }
+
+        drag = Drag::none;   // cancel any right-drag that already started
+        return;              // no scroll/zoom while RMB is held
+    }
+
+    // ...your existing code continues here
+
 
     // Shift+wheel over a track header: moves the track up / down
     if (shift && ! ctrl && e.x < headerWidth && e.y >= headerHeight && wheel.deltaY != 0.0f)
