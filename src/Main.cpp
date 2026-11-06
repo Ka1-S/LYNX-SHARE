@@ -6760,11 +6760,14 @@ private:
         offline.setSong (std::move (song));
         offline.dispatchPendingMessages();
         const bool facet = kind == lynx::EffectKind::facetEq;
+        // round tp172b4: the originals are pictured idle (nothing playing), so the display-first editors are too: no demo
+        // history unless LYNX_PARITYSHOT_DEMO=1 asks for the running display
+        const bool demoDisplay = juce::SystemStats::getEnvironmentVariable ("LYNX_PARITYSHOT_DEMO", {}) == "1";
         // (Ember in its Classic voicing: the Classic panel, as the mixer opens it)
         const bool pro = lynx::ProEditorWindows::handles (kind)
                          && ! (kind == lynx::EffectKind::ember && fx.params[(std::size_t) lynx::mixsuite::ember::voicing] > 0.5f);
         auto editor = facet ? lynx::makeFacetEqEditor (offline, 1, 0, false)
-                            : pro ? lynx::makeProEditor (offline, 1, 0, true) : lynx::makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
+                            : pro ? lynx::makeProEditor (offline, 1, 0, demoDisplay) : lynx::makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
         if (editor == nullptr)
             return;
         if (! pro) // the demo song through the effect, the editor ticked 30 times a second of audio as its timer would
