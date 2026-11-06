@@ -1,6 +1,6 @@
 // Round tp172c: Ridge Strip's reference strips — SSL Native Channel Strip 2, 4K G and 4K B states load into the 4K
 // voicing (Channel Strip 2: E / G EQ = Brown / Black, its own "out" positions, no VCA colour; 4K G: Black, LMF ÷3 /
-// HMF ×3; 4K B: Brown, its compressor not modelled); the editor's three columns fit the window.
+// HMF ×3; 4K B: Brown, its stepped compressor read as the 4K's, slice 4); the editor's three columns fit the window.
 namespace tp172c
 {
 inline lynx::EffectSlot sslSlot (const std::string& plugin, const std::string& params)
@@ -50,8 +50,40 @@ TEST (ridge_channel_strip_2_state_translated_tp172c)
     CHECK (r::k4Voicing (p) && r::k4ColourIndex (p[r::k4Colour]) == 1);
     CHECK (std::abs (r::lmfHz (p[r::lmfFreq]) - 500.0) < 0.1 && std::abs (r::hmfHz (p[r::hmfFreq]) - 6000.0) < 1.0);
     p = tp172c::sslSlot ("SSL 4K B", "<PARAM id=\"LowEqGain\" value=\"6.0\"/><PARAM id=\"CompRatio\" value=\"3.0\"/>").params;
-    CHECK (r::k4Voicing (p) && r::k4ColourIndex (p[r::k4Colour]) == 0 && p[r::compRatio] == 0.0f);
+    CHECK (r::k4Voicing (p) && r::k4ColourIndex (p[r::k4Colour]) == 0);
     CHECK (std::abs (r::bandGainDb (p[r::lfGain], false) - 6.0) < 1e-4);
+}
+
+// slice 4: the 4K B's stepped compressor (K4B_dyn / K4B_mk on its trial) and the 4K compressor's blend between its
+// measured ratio nodes (a 10:1 dial acted like ~100:1: the 4K E's S4 setting was 6 dB too deep)
+TEST (ridge_4k_b_steps_and_ratio_blend_tp172c4)
+{
+    using namespace lynx;
+    namespace r = mixsuite::ridge;
+    auto p = tp172c::sslSlot ("SSL 4K B", "<PARAM id=\"CompRatio\" value=\"2.0\"/><PARAM id=\"CompThreshold\" value=\"-15.0\"/>"
+                                         "<PARAM id=\"CompAutoMakeUp\" value=\"1.0\"/><PARAM id=\"CompRelease\" value=\"3.0\"/>").params;
+    CHECK (r::k4Voicing (p) && r::ratio (p[r::compRatio]) > 1e6);                    // "4:1" = near-limiting here
+    CHECK (std::abs (r::eCompThresholdDb (p[r::compThreshold]) + 7.0) < 1e-3);       // its knee 8 dB higher
+    CHECK (p[r::autoMakeup] < 0.5f && std::abs (r::trimDb (p[r::output]) - 12.6) < 0.01); // its make-up, in the output
+    CHECK (std::abs (r::releaseSeconds (p[r::compRelease]) - 0.8) < 1e-3);           // step 3 = .8 s
+    p = tp172c::sslSlot ("SSL 4K B", "<PARAM id=\"CompRatio\" value=\"0.0\"/><PARAM id=\"SaturationIn\" value=\"1.0\"/>"
+                                     "<PARAM id=\"SaturationAmount\" value=\"50.0\"/>").params;
+    CHECK (p[r::compRatio] == 0.0f && p[r::k4Pre] > 0.5f && std::abs (r::k4MicDb (p[r::k4Mic]) - 27.5) < 0.01);
+
+    vmatch::echannel::Settings e;
+    e.model = 1;
+    e.autoMakeup = false;
+    e.compRatio = 10.0;
+    double last = 0.0;
+    for (const double t : { -20.0, -15.0, -12.0, -10.0, -8.0, -5.0, 0.0, 5.0 }) // deeper for every lower threshold
+    {
+        e.compThreshold = t;
+        const auto g = vmatch::echannel::compStaticGainDb (e, -9.0);
+        CHECK (t == -20.0 || g > last);
+        last = g;
+    }
+    e.compThreshold = -10.0;
+    CHECK (vmatch::echannel::compStaticGainDb (e, -9.0) > -19.5); // the trial: about -17 dB (S4); it gave -23
 }
 
 TEST (ridge_three_column_layout_fits_tp172c)
@@ -95,4 +127,37 @@ TEST (ridge_modern_voicing_laws_tp172c)
     bool finite = true;
     for (float v : l) finite = finite && std::isfinite (v);
     CHECK (finite && strip.compReductionDb() > 1.0f);
+}
+
+// issue #77: a new Aether runs the measured dynamic air model (its Mid air was the round-114 exciter, nearly
+// inaudible); its steady-tone lifts sit on the Fresh Air trial's (black-box sweep renders, -12 dBFS: Mid air 50 %
+// +2.2 dB at 5 kHz, 100 % +4.8 dB at 8 kHz; High air 100 % +1.0 dB at 1 kHz) and quiet highs come up strongly
+TEST (aether_issue77_default_model_and_levels_tp172c)
+{
+    using namespace mixsuite96;
+    namespace air = lynx::mixsuite::aether;
+    auto p = defaults (EffectKind::aether);
+    CHECK (p[air::dynamic] == 1.0f);
+    const double sr = 48000.0;
+    auto gainDb = [&] (const lynx::EffectParams& q, double hz, double amp) {
+        const auto y = run (EffectKind::aether, q, sine (hz, amp, 48000, sr), sr);
+        return 20.0 * std::log10 (amplitude (y, hz, 24000, 16384, sr) / amp);
+    };
+    CHECK (std::abs (gainDb (p, 5000.0, 0.25)) < 0.3); // both amounts at 0: transparent
+    p[air::midAir] = 0.5f;
+    const auto mid50 = gainDb (p, 5000.0, 0.25);
+    CHECK (mid50 > 1.5 && std::abs (mid50 - 2.2) < 1.0); // Mid air is clearly audible
+    p[air::midAir] = 1.0f;
+    CHECK (std::abs (gainDb (p, 8000.0, 0.25) - 4.8) < 1.0);
+    p[air::midAir] = 0.0f;
+    p[air::highAir] = 1.0f;
+    CHECK (std::abs (gainDb (p, 1000.0, 0.25) - 1.0) < 0.6);
+    CHECK (gainDb (p, 12000.0, 0.01) > 15.0); // a quiet 12 kHz tone: the dynamic lift (vocal air +20 dB on the trial)
+    // a project saved before the dynamic model existed keeps the shelf + exciter it was set up with
+    lynx::EffectSlot old = lynx::makeEffectSlot (EffectKind::aether);
+    lynx::upgradeLoadedEffectParams (old, (std::size_t) air::dynamic);
+    CHECK (old.params[air::dynamic] == 0.0f);
+    lynx::EffectSlot now = lynx::makeEffectSlot (EffectKind::aether);
+    lynx::upgradeLoadedEffectParams (now, (std::size_t) air::count);
+    CHECK (now.params[air::dynamic] == 1.0f);
 }

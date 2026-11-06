@@ -1,4 +1,5 @@
 #include "ui/WaveTravellerEditor.h"
+#include "ui/FileChoosers.h"
 #include "ui/PluginSkin.h"
 
 #include <algorithm>
@@ -604,9 +605,9 @@ private:
 
     void chooseSample()
     {
-        chooser = std::make_unique<juce::FileChooser> (tr ("Load sample..."), juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
+        chooser = lynx::ui::makeFileChooser (tr ("Load sample..."), juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
         juce::Component::SafePointer<WaveTravellerEditor> self (this);
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [self] (const juce::FileChooser& fc) {
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [self] (const juce::FileChooser& fc) {
             if (self != nullptr && fc.getResult().existsAsFile())
                 self->setSample (fc.getResult().getFullPathName());
         });

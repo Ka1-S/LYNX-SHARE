@@ -4,6 +4,7 @@
 #include "core/FruityDance.h"
 #include "core/VideoPlayer.h"
 #include "ui/ColourPicker.h"
+#include "ui/FileChoosers.h"
 #include "ui/TrackIcons.h"
 #include "core/TrackIcons.h"
 #include "ui/PatcherEditor.h"
@@ -2667,8 +2668,8 @@ void ChannelRackComponent::showAddChannelMenu (int insertAt)
 
 void ChannelRackComponent::chooseSample (int channel, int insertAt)
 {
-    fileChooser = std::make_unique<juce::FileChooser> (tr ("Choose sample"), juce::File(), engine.getSampleLibrary().wildcard());
-    fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+    fileChooser = lynx::ui::makeFileChooser (tr ("Choose sample"), juce::File(), engine.getSampleLibrary().wildcard());
+    lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [this, channel, insertAt] (const juce::FileChooser& chooser) {
                                   if (! chooser.getResult().existsAsFile())
                                       return;
@@ -2856,8 +2857,24 @@ void ChannelRackComponent::filesDropped (const juce::StringArray& files, int x, 
     }
 }
 
-void ChannelRackComponent::changeListenerCallback (juce::ChangeBroadcaster*)
+void ChannelRackComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
 {
+    // a level drag (AudioEngine::editLevels, round 171c) changed only levels: repaint just the knobs that moved. Round
+    // 173f (discussion #10): every mouse move of a Mixer fader resized and repainted the whole rack, which moved nothing
+    const auto& channels = engine.getSong().channels;
+    if (source == &engine.getLevelsBroadcaster() && shownLevels.size() == channels.size())
+    {
+        for (std::size_t i = 0; i < channels.size(); ++i)
+            if (const std::array<float, 2> now { channels[i].volume, channels[i].pan }; now != shownLevels[i])
+            {
+                shownLevels[i] = now;
+                repaint (controlBounds (Area::pan, (int) i).getUnion (controlBounds (Area::volume, (int) i)).expanded (2));
+            }
+        return;
+    }
+    shownLevels.resize (channels.size());
+    for (std::size_t i = 0; i < channels.size(); ++i)
+        shownLevels[i] = { channels[i].volume, channels[i].pan };
     updateSize();
     repaint();
 }

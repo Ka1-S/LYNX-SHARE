@@ -203,9 +203,9 @@ Robot                  | Mode = Robot; Drive = 3.0
 Harmony a fifth up     | Pitch = +7.0 st; Mix = 50 %
 
 [Aether]
-Vocal air              | Air = 4.5 dB; Harmonics = 25 %
-Gentle sheen           | Air = 2 dB; Harmonics = 10 %
-Bright                 | Air = 9 dB; Harmonics = 50 %
+Vocal air              | Mid air = 25 %; High air = 45 %
+Gentle sheen           | Mid air = 10 %; High air = 25 %
+Bright                 | Mid air = 40 %; High air = 75 %
 )PRESETS";
 }
 }

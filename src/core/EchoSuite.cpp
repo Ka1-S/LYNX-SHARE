@@ -2432,7 +2432,7 @@ public:
             c.fb = 0.0f;
         }
         vibPhase = 0.0;
-        base = {};
+        tapsLive = false;
     }
 
     void process (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept override
@@ -2491,9 +2491,23 @@ public:
         }
         const auto driveFn = [inGain, outGain] (float x) { return outGain * std::tanh (inGain * x); };
 
+        // round 173d (issue #77): the taps glide to new times over the smoothing time (it glided a constant 1, so
+        // Smoothing did nothing and a new delay time or sync value jumped the read heads: a click)
+        const auto glideA = 1.0 - std::exp (-1.0 / std::max (1.0, smoothS * sr));
+        for (int c = 0; c < 2; ++c)
+            for (int k = 0; k < nTaps; ++k)
+                if (! tapsLive || k >= liveTaps)
+                    tapNow[(std::size_t) c][(std::size_t) k] = tap[(std::size_t) c][(std::size_t) k];
+        tapsLive = true;
+        liveTaps = nTaps;
         for (int i = 0; i < n; ++i)
         {
-            const auto scale = base.next (1.0, smoothS, sr); // glides the taps after a change (smoothing time)
+            for (int c = 0; c < 2; ++c)
+                for (int k = 0; k < nTaps; ++k)
+                {
+                    auto& t = tapNow[(std::size_t) c][(std::size_t) k];
+                    t += (tap[(std::size_t) c][(std::size_t) k] - t) * glideA;
+                }
             vibPhase += vibHz / sr;
             vibPhase -= std::floor (vibPhase);
             float wet[2];
@@ -2511,7 +2525,7 @@ public:
                 {
                     const auto det = detuneAmp > 0.0 ? detuneAmp * (double) s.detune[(std::size_t) k].next (detuneHz, sr) / 2.1 : 0.0;
                     const auto vib = vibAmp > 0.0 ? vibAmp * std::sin (twoPi * (vibPhase + (double) k / (double) nTaps)) : 0.0;
-                    const auto d = tap[(std::size_t) c][(std::size_t) k] * scale + std::abs (det) + vibAmp + sign * (det + vib) * 0.5;
+                    const auto d = tapNow[(std::size_t) c][(std::size_t) k] + std::abs (det) + vibAmp + sign * (det + vib) * 0.5;
                     y += gains[(std::size_t) k] * (double) s.line.at (std::max (2.0, d));
                 }
                 auto v = (float) y;
@@ -2561,7 +2575,9 @@ private:
     double sr = 48000.0;
     std::array<Channel, 2> ch;
     double vibPhase = 0.0;
-    Glide base;
+    std::array<std::array<double, 16>, 2> tapNow {}; // the taps' gliding read positions (samples)
+    bool tapsLive = false;
+    int liveTaps = 0;
 };
 } // namespace
 } // namespace lattice

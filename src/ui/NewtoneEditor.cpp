@@ -1,4 +1,5 @@
 #include "ui/SlotWatch.h"
+#include "ui/FileChoosers.h"
 #include "ui/NewtoneEditor.h"
 
 #include <algorithm>
@@ -913,8 +914,8 @@ private:
     void chooseSample()
     {
         const juce::File current (juce::String::fromUTF8 (samplePath.c_str()));
-        chooser = std::make_unique<juce::FileChooser> (tr ("Source sample"), current.existsAsFile() ? current : juce::File(), engine.getSampleLibrary().wildcard());
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+        chooser = lynx::ui::makeFileChooser (tr ("Source sample"), current.existsAsFile() ? current : juce::File(), engine.getSampleLibrary().wildcard());
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [safe = juce::Component::SafePointer<NewtoneEditor> (this)] (const juce::FileChooser& fc) {
                                   if (safe != nullptr && fc.getResult().existsAsFile())
                                       safe->useSample (fc.getResult());
@@ -1049,8 +1050,8 @@ private:
         if (sample == nullptr)
             return;
         const juce::File src (juce::String::fromUTF8 (samplePath.c_str()));
-        chooser = std::make_unique<juce::FileChooser> (tr ("Save the edited audio"), src.getSiblingFile (src.getFileNameWithoutExtension() + " (edited).wav"), "*.wav");
-        chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+        chooser = lynx::ui::makeFileChooser (tr ("Save the edited audio"), src.getSiblingFile (src.getFileNameWithoutExtension() + " (edited).wav"), "*.wav");
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                               [safe = juce::Component::SafePointer<NewtoneEditor> (this)] (const juce::FileChooser& fc) {
                                   if (safe == nullptr || fc.getResult() == juce::File())
                                       return;
@@ -1102,8 +1103,8 @@ private:
     void saveMidi()
     {
         const juce::File src (juce::String::fromUTF8 (samplePath.c_str()));
-        chooser = std::make_unique<juce::FileChooser> (tr ("Save the notes as MIDI"), src.getSiblingFile (src.getFileNameWithoutExtension() + ".mid"), "*.mid");
-        chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+        chooser = lynx::ui::makeFileChooser (tr ("Save the notes as MIDI"), src.getSiblingFile (src.getFileNameWithoutExtension() + ".mid"), "*.mid");
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                               [safe = juce::Component::SafePointer<NewtoneEditor> (this)] (const juce::FileChooser& fc) {
                                   if (safe == nullptr || fc.getResult() == juce::File())
                                       return;

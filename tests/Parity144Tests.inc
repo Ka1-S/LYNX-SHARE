@@ -179,7 +179,7 @@ TEST (echoform_rhythm_editor_layout_round144)
             std::vector<const plugui::LayoutItem*> shown;
             bool grid = false;
             for (const auto& item : l.items)
-                if ((plugui::isValueControl (item.type) || item.type == plugui::Item::display) && plugui::isShown (kind, item, 0, params))
+                if ((plugui::isValueControl (item.type) || item.type == plugui::Item::display) && plugui::isShown (kind, item, 1, params)) // (tp172d: the Tweak page)
                 {
                     shown.push_back (&item);
                     grid = grid || (item.param != nullptr && std::strcmp (item.param, "Rhythm grid") == 0);

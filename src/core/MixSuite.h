@@ -271,7 +271,8 @@ namespace aether
 {
 // `dynamic` (appended, round 124) switches to the dynamic air model: two parallel high-passed bands (Mid air from
 // ~3 kHz, High air from ~9 kHz), each lifted by a compressed copy of itself, so quiet highs come up more than loud
-// ones; `midAir` / `highAir` set the two amounts (0..1). Off (the default) keeps the shelf + exciter above.
+// ones; `midAir` / `highAir` set the two amounts (0..1). On by default since issue #77 (round tp172c); off keeps the
+// shelf + exciter above (projects saved before round 124 load with it off).
 enum Param { air, airFreq, harmonics, exciterFreq, character, mix, output, dynamic, midAir, highAir, count };
 double airDb (float v) noexcept;       // 0 .. +15 dB
 double airHz (float v) noexcept;       // 5 .. 20 kHz

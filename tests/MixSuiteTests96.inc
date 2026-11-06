@@ -295,6 +295,7 @@ TEST (mixsuite96_aether_air_and_harmonics)
     using namespace mixsuite96;
     using namespace lynx::mixsuite::aether;
     auto p = defaults (EffectKind::aether);
+    p[dynamic] = 0.0f; // issue #77: this checks the round-114 shelf + exciter (the dynamic model is the default now)
     std::unique_ptr<lynx::Effect> fx;
     // neutral settings: a pure delay of the reported latency
     const auto in = sine (440.0, 0.5, 8192);
@@ -317,6 +318,7 @@ TEST (mixsuite96_aether_air_and_harmonics)
 
     // exciter: a 5 kHz tone gets a 2nd harmonic (even character), a 300 Hz tone gets nothing (below the band)
     p = defaults (EffectKind::aether);
+    p[dynamic] = 0.0f;
     p[harmonics] = 1.0f;
     p[character] = 0.0f;
     p[exciterFreq] = (float) (std::log (3000.0 / 1000.0) / std::log (12.0));

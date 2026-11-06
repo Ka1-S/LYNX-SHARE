@@ -140,8 +140,10 @@ Table delayBankTable()
     t.params.push_back ({ "Oversample", 0, 2, 0 });
 
     const auto n = (int) t.params.size();
+    // round 173d: a new Fruity Delay Bank has no state yet (the engine runs FL's defaults): its controls read and edit
+    // those defaults (before, every bank control of a new instance did nothing)
     t.get = [n] (const std::vector<std::uint8_t>& bytes, int i) -> std::optional<int> {
-        const auto s = fldbank::parse (bytes);
+        const auto s = bytes.empty() ? std::optional<fldbank::State> (fldbank::defaultState()) : fldbank::parse (bytes);
         if (! s || i < 0 || i >= n)
             return std::nullopt;
         if (const auto c = dbankControlOf (i); c >= 0)
@@ -153,7 +155,7 @@ Table delayBankTable()
         return dbankOption (s->bank[(std::size_t) (i / dbankPerBank)], i % dbankPerBank - dbankControls);
     };
     t.with = [table = t.params, n] (const std::vector<std::uint8_t>& bytes, int i, int raw) {
-        auto s = fldbank::parse (bytes);
+        auto s = bytes.empty() ? std::optional<fldbank::State> (fldbank::defaultState()) : fldbank::parse (bytes);
         if (! s || i < 0 || i >= n)
             return bytes;
         raw = std::clamp (raw, table[(std::size_t) i].minimum, table[(std::size_t) i].maximum);
@@ -219,14 +221,15 @@ Table multibandDelayTable()
     t.params.push_back ({ "Bank", 0, mbdelay::numBanks - 1, def.bank });
     constexpr int cells = mbdelay::numBanks * 48;
 
+    // round 173d: a new Multiband Delay has no state yet (the engine runs its defaults): the same for its controls
     t.get = [] (const std::vector<std::uint8_t>& bytes, int i) -> std::optional<int> {
-        const auto s = mbdelay::parse (bytes);
+        const auto s = bytes.empty() ? std::optional<mbdelay::State> (mbdelay::State {}) : mbdelay::parse (bytes);
         if (! s || i < 0 || i > cells + 1)
             return std::nullopt;
         return i < cells ? s->raw[(std::size_t) i] : i == cells ? s->targetSel : s->bank;
     };
     t.with = [] (const std::vector<std::uint8_t>& bytes, int i, int raw) {
-        auto s = mbdelay::parse (bytes);
+        auto s = bytes.empty() ? std::optional<mbdelay::State> (mbdelay::State {}) : mbdelay::parse (bytes);
         if (! s || i < 0 || i > cells + 1)
             return bytes;
         if (i < cells)

@@ -816,6 +816,7 @@ struct Voice
     float baseCents = 0, gainBase = 1, panL = 1, panR = 1, reverb = 0, chorus = 0;
     float lastGain = 0;
     float slideCents = 0, slideStep = 0; int slideLeft = 0;
+    float restAtStart = 0; // the channel's fine tune + main pitch in baseCents (they move it live: setChannelPitchNow)
     float filterBaseCents = 13500, filterQ = 0.7071f;
     bool oneShot = false;
 };
@@ -1037,6 +1038,14 @@ public:
     void noteOn (int key, float velocity) noexcept override { pending.push ({ key, velocity, true, nextPan, nextCents }); nextPan = 0, nextCents = 0; }
     void noteOff (int key) noexcept override { pending.push ({ key, 0.0f, false, 0, 0 }); }
     void setNextNoteExpression (float pan, float cents, bool) noexcept override { nextPan = pan, nextCents = cents; }
+    // The channel's PITCH knob (issue #73: an FL project's SoundFont Player detuned −400 cents played undetuned) and its
+    // fine tune + main pitch, before every render. FL's generators follow both on the sounding notes (round 167a): the
+    // knob is added to every voice, the rest is in the note's cents and moves by how much it changed since.
+    void setChannelPitchNow (float knob, float rest) noexcept override
+    {
+        knobCents = std::isfinite (knob) ? knob : 0.0f;
+        restCents = std::isfinite (rest) ? rest : 0.0f;
+    }
 
     void allNotesOff() noexcept override
     {
@@ -1406,6 +1415,7 @@ private:
         v.looping = loops && r.loop != LoopMode::none;
         v.loopUntilRelease = loops && r.loop == LoopMode::untilRelease;
         v.baseCents = (float) (playedKey - r.rootKey) * (float) r.keyTrack + (float) r.transpose * 100.0f + (float) r.tune + noteCents;
+        v.restAtStart = restCents;
 
         // envelopes: the region's, the overrides when their knob is above the minimum
         const auto keyAdjust = [playedKey] (float value, float perKey) { return perKey != 0.0f ? timecentsToSeconds (value + perKey * (float) (60 - playedKey)) : value; };
@@ -1520,7 +1530,7 @@ private:
             const auto modLfo = v.modLfo.value(), vibLfo = v.vibLfo.value();
             if (v.slideLeft > 0)
                 v.slideCents += v.slideStep, --v.slideLeft;
-            auto cents = v.baseCents + v.slideCents + bendCents + modLevel * (float) r.modEnvToPitch + modLfo * (float) r.modLfoToPitch;
+            auto cents = v.baseCents + knobCents + (restCents - v.restAtStart) + v.slideCents + bendCents + modLevel * (float) r.modEnvToPitch + modLfo * (float) r.modLfoToPitch;
             cents += vibLfo * ((lfoOverride ? lfoDepth : (float) r.vibLfoToPitch) + (std::max (modWheel, param (pModWheel)) + pressure) * 50.0f);
             const auto step = (double) centsToRatio (cents) * (double) r.sampleRate / (double) rate;
             if (v.filter.on)
@@ -1626,6 +1636,7 @@ private:
     std::uint32_t rng = 0x9E3779B9u;
     Pending pending;
     float nextPan = 0, nextCents = 0;
+    float knobCents = 0, restCents = 0; // setChannelPitchNow
     SettingsBuffer settings;
     std::array<float, paramCount> params {};
     std::array<std::atomic<float>, paramCount> automated {};
