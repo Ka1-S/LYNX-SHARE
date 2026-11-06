@@ -2805,7 +2805,7 @@ private:
         const auto hostedStateLockResult = []() -> juce::String {
             struct Probe final : juce::AudioPluginInstance
             {
-                struct Parameter final : juce::AudioProcessorParameter
+                struct Parameter final : juce::HostedAudioProcessorParameter
                 {
                     explicit Parameter (Probe& p) : owner (p) {}
                     float getValue() const override { owner.access (owner.parameterReads); return value.load(); }
@@ -2813,6 +2813,7 @@ private:
                     float getDefaultValue() const override { return 0.0f; }
                     juce::String getName (int) const override { return "Value"; }
                     juce::String getLabel() const override { return {}; }
+                    juce::String getParameterID() const override { return "value"; }
                     float getValueForText (const juce::String& text) const override { return text.getFloatValue(); }
                     Probe& owner;
                     std::atomic<float> value { 0.0f };
@@ -2820,7 +2821,7 @@ private:
                 Probe() : AudioPluginInstance (BusesProperties().withInput ("Input", juce::AudioChannelSet::stereo(), true)
                                                                .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
                 {
-                    addParameter (new Parameter (*this));
+                    addHostedParameter (std::make_unique<Parameter> (*this));
                 }
                 const juce::String getName() const override { return "State lock probe"; }
                 void fillInPluginDescription (juce::PluginDescription& d) const override { d.name = getName(); }
