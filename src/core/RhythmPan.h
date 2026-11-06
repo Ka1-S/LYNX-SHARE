@@ -5,7 +5,9 @@
 // nothing decompiled or copied), so that her projects that used it pan the same through LYNX
 // (docs/analise/REA_rodada136.md §2).
 //
-// Measured structure [EXEC]: a pattern of N step values per period (2 steps: left / right; 8 steps: a stepped ramp);
+// Measured structure [EXEC]: a pattern of N step values per period (2 steps: left / right; 8 steps: a stepped ramp;
+// round tp172d, the trial's default shape: a continuous ramp from right to left whose return to the right takes
+// 45 ms + smoothing × a quarter of the period, fitted on its 0.25 / 0.63 Hz pan trajectories within 1°);
 // each step glides linearly from the previous value over `smoothing` of its length (at least ~1.1 ms); the pan
 // angle is 45° + offset / 2 + width / 4 · value, clipped to 0 … 90°; equal-power balance gains (left · cos, right ·
 // sin: a balance, the channels are not summed). The period is free (Hz, from the start of the song) or a number of
@@ -26,7 +28,7 @@ struct Settings
     double width = 180.0;      // degrees (0 … 210)
     double offset = 0.0;       // degrees (−105 … 105)
     double smoothing = 0.0;    // 0 … 1 of a step
-    int pattern = 0;           // 0: left / right (2 steps), 1: 8-step ramp
+    int pattern = 0;           // 0: left / right (2 steps), 1: 8-step ramp, 2: ramp (round tp172d: PanMan's default shape)
     double amount = 1.0;       // the pattern's values scaled by this
     double phase = 0.0;        // start phase (cycles) at song position 0
     int analog = 1;            // 0 off, 1 the analog input stage (soft saturation), 2 the "hot" stage (a fast compressor)

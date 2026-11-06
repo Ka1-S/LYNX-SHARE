@@ -972,7 +972,11 @@ bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& f
     // a result file of our own: several LYNX processes (and scans) may run at once
     const auto result = juce::File::getSpecialLocation (juce::File::tempDirectory)
                             .getChildFile ("lynx-scan-" + juce::String::toHexString (juce::Random::getSystemRandom().nextInt64()) + ".xml");
-    const auto exe = juce::File::getSpecialLocation (juce::File::currentExecutableFile);
+    // a 32-bit module (round 176a) is described by the 32-bit bridge, which can load it; without the bridge it is skipped
+    const auto bits32 = isModule32Bit (file);
+    const auto exe = bits32 ? bridge32Executable() : juce::File::getSpecialLocation (juce::File::currentExecutableFile);
+    if (bits32 && ! exe.existsAsFile())
+        return false;
     juce::ChildProcess child;
     auto ok = child.start (juce::StringArray { exe.getFullPathName(), "--scan-one", format.getName(), file, result.getFullPathName() }, 0);
     if (ok)
@@ -1122,6 +1126,16 @@ void PluginHost::startBackgroundScanOfFiles (const juce::StringArray& files)
     background->startThread (juce::Thread::Priority::low);
 }
 
+namespace
+{
+// the file of a scan-empty.txt line ("<date>|<file>", "|bridge32" after it for a 32-bit module the bridge described)
+juce::String emptyScanFile (const juce::String& line)
+{
+    auto file = line.fromFirstOccurrenceOf ("|", false, false);
+    return file.endsWith ("|bridge32") ? file.dropLastCharacters (9) : file;
+}
+} // namespace
+
 void PluginHost::forgetFile (const juce::String& file)
 {
     for (const auto& t : known.getTypes())
@@ -1133,7 +1147,7 @@ void PluginHost::forgetFile (const juce::String& file)
         const auto list = settingsFolder().getChildFile ("scan-empty.txt");
         lines.addLines (list.loadFileAsString());
         for (int i = lines.size(); --i >= 0;)
-            if (lines[i].fromFirstOccurrenceOf ("|", false, false) == file)
+            if (emptyScanFile (lines[i]) == file)
                 lines.remove (i);
         if (persistent)
             list.replaceWithText (lines.joinIntoString ("\n"));
@@ -1158,7 +1172,9 @@ bool PluginHost::emptyScanIsCurrent (const juce::String& file)
     const auto stamp = juce::String (juce::File (file).getLastModificationTime().toMilliseconds());
     juce::StringArray lines;
     lines.addLines (settingsFolder().getChildFile ("scan-empty.txt").loadFileAsString());
-    return lines.contains (stamp + "|" + file);
+    // round 176a: a 32-bit module counts as empty only when the 32-bit bridge described it ("|bridge32"); the 64-bit
+    // scans before the bridge could not load it at all, so those are looked at again
+    return lines.contains (stamp + "|" + file + (isModule32Bit (file) ? "|bridge32" : ""));
 }
 
 void PluginHost::rememberEmptyScan (const juce::String& file)
@@ -1169,9 +1185,9 @@ void PluginHost::rememberEmptyScan (const juce::String& file)
     juce::StringArray lines;
     lines.addLines (list.loadFileAsString());
     for (int i = lines.size(); --i >= 0;)
-        if (lines[i].trim().isEmpty() || lines[i].fromFirstOccurrenceOf ("|", false, false) == file)
+        if (lines[i].trim().isEmpty() || emptyScanFile (lines[i]) == file)
             lines.remove (i);
-    lines.add (juce::String (juce::File (file).getLastModificationTime().toMilliseconds()) + "|" + file);
+    lines.add (juce::String (juce::File (file).getLastModificationTime().toMilliseconds()) + "|" + file + (isModule32Bit (file) ? "|bridge32" : ""));
     list.replaceWithText (lines.joinIntoString ("\n"));
 }
 
@@ -1359,6 +1375,16 @@ int PluginHost::addPluginFile (const juce::File& file)
                         known.scanAndAddFile (uri, true, found, *format);
             }
     }
+    else if (isModule32Bit (file.getFullPathName()))
+    {
+        // a 32-bit module (round 176a): described by the 32-bit bridge, as a scan does
+        for (auto* format : formats.getFormats())
+            if (format->fileMightContainThisPluginType (file.getFullPathName()))
+            {
+                scanOne (*format, file.getFullPathName());
+                break;
+            }
+    }
     else
         for (auto* format : formats.getFormats())
             known.scanAndAddFile (file.getFullPathName(), true, found, *format);
@@ -1377,6 +1403,36 @@ void PluginHost::findLv2Plugins()
 std::unique_ptr<juce::PluginDescription> PluginHost::find (const juce::String& id) const
 {
     return known.getTypeForIdentifierString (id);
+}
+
+std::string PluginHost::bitnessKey (const juce::PluginDescription& d)
+{
+    return (d.pluginFormatName + "|" + juce::String::toHexString (d.uniqueId) + "|" + d.name).toStdString();
+}
+
+std::unique_ptr<juce::PluginDescription> PluginHost::otherBuild (const juce::PluginDescription& description) const
+{
+    if (! bridge32Supported())
+        return nullptr;
+    const auto key = bitnessKey (description);
+    const auto is32 = isPlugin32Bit (description);
+    for (const auto& t : known.getTypes())
+        if (t.fileOrIdentifier != description.fileOrIdentifier && bitnessKey (t) == key && isPlugin32Bit (t) != is32)
+            return std::make_unique<juce::PluginDescription> (t);
+    return nullptr;
+}
+
+std::unique_ptr<juce::PluginDescription> PluginHost::buildFor (const PluginRef& ref) const
+{
+    auto description = find (juce::String::fromUTF8 (ref.id.c_str()));
+    if (description == nullptr)
+        return nullptr;
+    // FL's wrapper "Bit size" [UI fl33c/fl36c]: Native loads the 64-bit build of a "32+64" plugin, "32 bit" the other
+    const auto want32 = ref.bitSize == 32;
+    if (isPlugin32Bit (*description) != want32)
+        if (auto other = otherBuild (*description))
+            return other;
+    return description;
 }
 
 namespace
@@ -1900,7 +1956,8 @@ void setPluginSubstitutesEnabled (bool enabled)
 std::string PluginHost::preloadKey (const PluginRef& ref, double sampleRate)
 {
     return ref.id + "|" + std::to_string (std::hash<std::string> {} (ref.state)) + "|" + std::to_string (ref.state.size()) + "|"
-           + std::to_string ((long long) std::llround (sampleRate)) + (ref.separateProcess ? "|own process" : "");
+           + std::to_string ((long long) std::llround (sampleRate)) + (ref.separateProcess ? "|own process" : "")
+           + (ref.bitSize != 0 ? "|bits" + std::to_string (ref.bitSize) : "");
 }
 
 void PluginHost::preload (const PluginRef& ref, int wanted)
@@ -1996,7 +2053,7 @@ std::unique_ptr<juce::AudioPluginInstance> PluginHost::createInstance (const Plu
         onInstantiate (juce::String::fromUTF8 (ref.name.c_str()));
     const loadtrace::Scope timing ("plugin_instantiate");
     const loadtrace::Scope each ("plugin " + ref.name); // per plugin in load.log: which one is slow
-    const auto description = find (juce::String::fromUTF8 (ref.id.c_str()));
+    const auto description = buildFor (ref); // (the 32-bit or the 64-bit build: "Bit size", round 176a)
 
     if (description == nullptr)
     {
@@ -2016,11 +2073,13 @@ std::unique_ptr<juce::AudioPluginInstance> PluginHost::createInstance (const Plu
     // the block size the plugin is told (FL's wrapper, REA rounds 134/139): with fixed size buffers it is only ever
     // called with that block, so it is prepared for it — unless "Use maximum buffer size from host" is on
     const auto preparedBlock = ref.fixedBuffers && ! ref.hostMaxBuffer ? fixedPluginBlock (ref.maxSizeBuffers) : maxBlockSize;
+    const auto bits32 = isPlugin32Bit (*description);
     // the session's plugin list (round 159: an opt-in crash report names the third-party plugins that were loaded)
     crashguard::notePlugin ((description->name + "|" + description->manufacturerName + "|" + description->pluginFormatName + "|" + description->version
-                             + (pluginSandboxEnabled() || ref.separateProcess || pluginAlwaysSeparate (description->name) ? "|separate process" : ""))
+                             + (bits32 ? "|32-bit bridge" : (pluginSandboxEnabled() || ref.separateProcess || pluginAlwaysSeparate (description->name) ? "|separate process" : "")))
                                 .toStdString());
-    if (pluginSandboxEnabled() || ref.separateProcess || pluginAlwaysSeparate (description->name))
+    // a 32-bit plugin always runs in the 32-bit bridge (round 176a; FL bridges them the same way, whatever "Make bridged" says)
+    if (bits32 || pluginSandboxEnabled() || ref.separateProcess || pluginAlwaysSeparate (description->name))
     {
         // separate process (for every plugin, or this one only — FL's "Make bridged"): the child prepares the plugin and applies the state
         if (auto remote = createSandboxedPlugin (*description, sampleRate, preparedBlock, ref.state, message))
@@ -2129,6 +2188,8 @@ void startModuleOf (const juce::PluginDescription& d)
 {
     if (pluginSandboxEnabled() || std::getenv ("LYNX_NO_MODULE_WARMUP") != nullptr) // (the env var: A/B measurements)
         return;
+    if (isPlugin32Bit (d)) // (it loads in the 32-bit bridge, never in LYNX's own process)
+        return;
     if (modulewarm::worthStartingAhead (d.pluginFormatName.toStdString(), d.fileOrIdentifier.toStdString()))
         warmup().start (d.fileOrIdentifier.toStdString());
 }
@@ -2145,7 +2206,7 @@ void PluginHost::startModulesFor (const std::vector<PluginRef>& refs)
 {
     for (const auto& ref : refs)
         if (! ref.separateProcess && ! ref.id.empty())
-            if (const auto d = find (juce::String::fromUTF8 (ref.id.c_str())))
+            if (const auto d = buildFor (ref))
                 startModuleOf (*d);
 }
 

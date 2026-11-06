@@ -5,7 +5,7 @@
 // view's frame step at the display's refresh instead (juce::VBlankAttachment: one per window, on the display that
 // window is on), and only while the view animates:
 //  - attached: one step per vertical blank (at most `maxHz`, 170 by default: a 240 Hz display gets every other one;
-//    capped tickers all run on the same frames);
+//    capped tickers all run on the same frames; Settings › General › Animation rate caps them all at 60 or 30);
 //  - after ~0.3 s of steps that changed nothing (transport stopped, meters fallen) it detaches; a light idle poll
 //    (20 Hz, the same step) brings it back as soon as something moves, so an idle view costs no repaint at all;
 //  - the poll also covers a window that gets no vertical blank (no peer yet, a platform without them).
@@ -16,10 +16,13 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "core/FramePacing.h"
+
 #include <atomic>
 #include <cmath>
 #include <cstdlib>
 #include <functional>
+#include <map>
 
 namespace lynx::ui
 {
@@ -54,6 +57,14 @@ public:
     {
         static std::atomic<int> n { 0 };
         return n;
+    }
+
+    // Settings › General › Animation rate (round 174e2): 0 = the display's refresh, else at most this many frames a
+    // second (60, 30) for every ticker, still on the display's vertical blanks (message thread)
+    static int& rateLimit()
+    {
+        static int hz = 0;
+        return hz;
     }
 
     // LYNX_FRAME_HZ: a fixed rate instead of the display's (0: the display's)
@@ -96,9 +107,8 @@ private:
     {
         const auto nowMs = juce::Time::getMillisecondCounterHiRes();
         lastVBlankMs = nowMs;
-        // at most maxHz, on the same frames for every ticker (one window present per frame instead of one per ticker):
-        // the display's frame period (measured from the vertical blanks' own clock, shared by all the tickers) gives
-        // a frame number; a ticker capped to a half of the refresh runs on the even frames, a third on every third...
+        // at most maxHz (or the Animation rate), on the same frames for every ticker (one window present per frame
+        // instead of one per ticker): the display's frame period is measured from the vertical blanks' own clock
         const auto frameMs = seconds * 1000.0;
         auto& period = framePeriodMs();
         if (const auto delta = frameMs - lastFrameMs; lastFrameMs > 0.0 && delta > 2.0 && delta < 50.0)
@@ -108,8 +118,10 @@ private:
         lastFrameMs = frameMs;
         if (period > 0.0)
         {
-            const auto divisor = juce::jmax (1, (int) std::ceil (1000.0 / (period * maxHz) - 0.15));
-            if (divisor > 1 && std::llround (frameMs / period) % divisor != 0)
+            // below the refresh, the frames where this cap's next one is due (core/FramePacing.h): 72 Hz on a 144 Hz
+            // display = every other frame, 60 Hz = every 2nd / 3rd, the same frames for every ticker with that cap
+            const auto cap = rateLimit() > 0 ? juce::jmin (maxHz, (double) rateLimit()) : maxHz;
+            if (! pacerFor (cap).runs (frameMs, period, cap))
                 return;
         }
 
@@ -117,6 +129,13 @@ private:
             quiet = 0;
         else
             ++quiet; // (detached by the timer: not from inside the attachment's own callback)
+    }
+
+    // One pacer per cap, shared by the tickers with that cap (they run on the same frames). Message thread.
+    static framepace::Pacer& pacerFor (double capHz)
+    {
+        static std::map<int, framepace::Pacer> pacers;
+        return pacers[juce::roundToInt (capHz * 10.0)];
     }
 
     static double& framePeriodMs()

@@ -222,6 +222,7 @@ private:
     juce::Rectangle<int> foldArea (int track) const;
     float tabLevel (int track) const noexcept;
     void paintFoldTab (juce::Graphics& g, int track);
+    void paintFoldTabLevel (juce::Graphics& g, int track) const;
     // VCA faders (round 177a): their own block left of the Master. A VCA strip goes by a pseudo track index
     // (vcaStrip (i) = -2 - i), so the strips' area helpers place its fader, mute and solo. All empty without a VCA.
     std::vector<int> vcaXs;
@@ -233,6 +234,7 @@ private:
     ui::ValueSpec vcaSpec (int i) const;
     void setVcaLevel (int i, double value);
     void paintVcaStrip (juce::Graphics& g, int i);
+    void paintVcaMeter (juce::Graphics& g, int i) const;
     void vcaMouseDown (const juce::MouseEvent& e, int i);
     void showVcaMenu (int i);
     void soloVca (int i);
@@ -260,6 +262,18 @@ private:
     void repaintAutomatedStrips();
     // the meters, input bars and automated controls, at the display's refresh (round 174e; was a 60 / 30 Hz timer)
     bool liveFrame (double nowMs);
+    // The strips kept as a picture of the visible part, with empty meter wells; the levels are drawn over it (round
+    // 174e2): a meter frame blits its rows and draws the bars instead of painting the strips under them again. Other
+    // repaints (a fader, a name, hover) refresh their area of the picture. LYNX_MIXER_CACHE=0: off.
+    class MeterCache;
+    bool meterCacheOn = false;
+    bool meterRepaintOnly = false; // set around the meters' own repaints: the picture stays valid
+    bool cachePainting = false;    // paint() is filling the picture: wells without levels
+    void paintMeterLevel (juce::Graphics& g, int track, int channel, juce::Rectangle<int> bar) const;
+    void paintMeterLevels (juce::Graphics& g) const; // every meter in the clip, over the picture
+    juce::Rectangle<int> nameBars (int track) const; // the thin level bars beside a vertical name (Wide layouts)
+    void paintNameBars (juce::Graphics& g, int track) const;
+    std::vector<int> sendAutomatedStrips;           // strips whose route knob shows an automated send
     std::uint32_t shownAutomation = 0;
     double lastFrameMs = 0.0;
     std::vector<std::array<float, 2>> automatedShown; // the volume and pan drawn per strip while automated (round 174e)
