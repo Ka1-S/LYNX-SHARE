@@ -3451,6 +3451,7 @@ private:
             juce::String reportPath, report;
             std::unique_ptr<lynx::PluginHost> host;
             juce::AudioPluginInstance* plugin = nullptr;
+            std::shared_ptr<juce::AudioPluginInstance> keep; // a window whose plugin nobody else holds is closed as orphaned
             std::function<void (bool)> done;
             int ticks = 0, crashesBefore = 0;
 
@@ -3521,6 +3522,7 @@ private:
         }
         lynx::preparePlugin (*instance, 48000.0, 512);
         test->plugin = instance.get();
+        test->keep = instance;
         test->crashesBefore = lynx::PluginWindows::editorCrashCount();
         lynx::PluginWindows::open (instance, *instance, instance->getName()); // (the window keeps the plugin alive)
         test->step ("window_open=" + juce::String ((int) lynx::PluginWindows::isOpen (*instance)));
