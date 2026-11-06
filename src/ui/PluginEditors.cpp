@@ -125,7 +125,7 @@ public:
             addAndMakeVisible (*artLayer);
             artLayer->setArt (skin::artForEffect (kind), [this] { return editorStyle() == skin::Style::themed; });
         }
-        if (kind == EffectKind::ember) // round 165: the Classic voicing's VU shows the output level, as the reference's
+        if (kind == EffectKind::ember || kind == EffectKind::kilnChannel) // round 165: the Classic voicing's VU shows the output level, as the reference's
             vuMode = 2;
         anim.onFrame = [this] { repaint(); };
         page = initialPage;
@@ -2726,8 +2726,9 @@ public:
             // the originals' level meters (SSL E-Channel's IN / OUT meter, RComp's input and output, Doubler's output)
             const auto fracOf = [] (float linear) { return juce::jlimit (0.0f, 1.0f, (20.0f * std::log10 (juce::jmax (1e-6f, linear)) + 48.0f) / 48.0f); };
             const auto base = item.steps > 0 ? item.steps : 2; // round 135w: the engine's meter outputs (LYNX Tune: 3 / 4)
-            ioMeters[0].update (fracOf (liveMeter (base)), 0.02f);
-            ioMeters[1].update (fracOf (liveMeter (base + 1)), 0.02f);
+            const auto only = item.colour; // round tp172c7: 0 / 1 = the input or the output bar alone (Kiln's side columns)
+            if (only != 1) ioMeters[0].update (fracOf (liveMeter (base)), 0.02f);
+            if (only != 0) ioMeters[1].update (fracOf (liveMeter (base + 1)), 0.02f);
             ioClip = ioClip || liveMeter (base + 1) >= 0.999f; // round 135w: the clip lamp (Doubler's), click to reset
             const auto labelH = 13.0f * s, readH = 13.0f * s;
             auto area = r.reduced (2.0f * s);
@@ -2743,13 +2744,13 @@ public:
                 g.setColour (colour::textSecondary);
                 g.drawText (juce::String (db), juce::Rectangle<float> (area.getX(), y - 6.0f * s, scaleW - 2.0f * s, 12.0f * s), juce::Justification::centredRight, false);
             }
-            const auto w = bars.getWidth() / 2.0f;
+            const auto w = bars.getWidth() / (only == 0 || only == 1 ? 1.0f : 2.0f);
             const char* names[] = { TR_NOOP ("In"), TR_NOOP ("Out") };
             if (kind == EffectKind::hardwareInsert) // round 164d: what goes to the gear and what comes back
                 names[0] = TR_NOOP ("Send"), names[1] = TR_NOOP ("Return");
-            for (int k = 0; k < 2; ++k)
+            for (int k = (only == 1 ? 1 : 0); k < (only == 0 ? 1 : 2); ++k)
             {
-                const auto bar = juce::Rectangle<float> (bars.getX() + w * (float) k, bars.getY(), w, bars.getHeight()).reduced (3.0f * s, 0.0f);
+                const auto bar = juce::Rectangle<float> (bars.getX() + w * (float) (only == 1 ? 0 : k), bars.getY(), w, bars.getHeight()).reduced (3.0f * s, 0.0f);
                 skin::meter (g, bar, ioMeters[(std::size_t) k].level, ioMeters[(std::size_t) k].peak, true);
                 const auto column = juce::Rectangle<float> (bar.getX() - 4.0f * s, 0.0f, bar.getWidth() + 8.0f * s, 0.0f);
                 g.setColour (colour::textSecondary);
@@ -2874,6 +2875,12 @@ public:
             const auto face = r.reduced (2.0f * s);
             g.setColour (juce::Colour (0xffd9cfb4).withAlpha (fx.enabled ? 1.0f : 0.5f));
             g.fillRoundedRectangle (face, radius::lg * s);
+            if (kind == EffectKind::kilnChannel) // round tp172c7: the console's lamp-lit amber face, warmer in the middle
+            {
+                g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff6c66a).withAlpha (fx.enabled ? 1.0f : 0.5f), face.getCentreX(), face.getCentreY(),
+                                                         juce::Colour (0xffb8822e).withAlpha (fx.enabled ? 1.0f : 0.5f), face.getX(), face.getY(), true));
+                g.fillRoundedRectangle (face, radius::lg * s);
+            }
             g.setColour (colour::bg0);
             g.drawRoundedRectangle (face, radius::lg * s, 2.0f * s);
             const juce::Point<float> pivot { face.getCentreX(), face.getBottom() + face.getHeight() * 0.18f };

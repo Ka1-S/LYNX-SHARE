@@ -228,6 +228,7 @@ const char* effectId (EffectKind k)
         case EffectKind::hushDeEsser: return "hushDeEsser";
         case EffectKind::aether: return "aether";
         case EffectKind::ember: return "ember";
+        case EffectKind::kilnChannel: return "kilnChannel";
         case EffectKind::lynxTune: return "lynxTune";
         case EffectKind::fruityPhaser: return "fruityPhaser";
         case EffectKind::epochVerb: return "epochVerb";
@@ -951,7 +952,8 @@ std::optional<EffectKind> effectFromId (const juce::String& id)
                     EffectKind::flPhaseInverter, EffectKind::flCenter, EffectKind::flBassBoost, EffectKind::fl7BandEq, EffectKind::flDelay1,
                     EffectKind::xyController, EffectKind::xyzController, EffectKind::controlSurface, EffectKind::hardwareInsert,
                     EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook,
-                    EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis, EffectKind::flTransporter })
+                    EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis, EffectKind::flTransporter,
+                    EffectKind::kilnChannel })
         if (id == effectId (k))
             return k;
 
