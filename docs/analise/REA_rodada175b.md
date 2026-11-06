@@ -134,5 +134,5 @@ Checks against FL. `tests/Picker175bTests.inc` runs the same numbers through `pi
   - Pictures use FL's budget (half the editor, ≤ 258 × 128); they go to a new cache folder, `<version>-r3`.
   - Editors that are empty when new are drawn in use, with LYNX-made content: Newtone and Newtime analyse a synthetic
     sung phrase, Control Surface has two knobs, Video Player shows a drawn still, and VFX Script has a script with
-    controls; the HTML NoteBook shows a sample page (its picture was drawn from the wrong slot target and showed "No
+    controls; the HTML NoteBook shows a sample page, its address shown as "notes.html" only (its picture was drawn from the wrong slot target and showed "No
     page").

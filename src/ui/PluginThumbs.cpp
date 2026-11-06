@@ -148,7 +148,7 @@ juce::Image demoVideoFrame()
 // A page for the HTML NoteBook's picture (written next to the pictures, deleted after the render)
 juce::File demoPage (const juce::File& folder)
 {
-    auto file = folder.getChildFile ("demo-notebook.html");
+    auto file = folder.getChildFile ("notes.html");
     file.replaceWithText ("<html><head><title>Session notes</title></head><body>"
                           "<h1>Session notes</h1>"
                           "<p><b>Song:</b> Night Drive &mdash; 124 BPM, A minor</p>"
@@ -304,9 +304,9 @@ bool startedOnce = false;
 
 juce::File nativeFolder()
 {
-    // (-r2: the pictures trimmed to the editor's drawn part; -r3/-r4: FL's budget and the editors' demo content (round
+    // (-r2: the pictures trimmed to the editor's drawn part; -r3 to -r5: FL's budget and the editors' demo content (round
     // 175b); a new drawing rule = a new folder)
-    return root().getChildFile (juce::String (JUCE_APPLICATION_VERSION_STRING).retainCharacters ("0123456789.-abcdefghijklmnopqrstuvwxyz") + "-r4");
+    return root().getChildFile (juce::String (JUCE_APPLICATION_VERSION_STRING).retainCharacters ("0123456789.-abcdefghijklmnopqrstuvwxyz") + "-r5");
 }
 
 juce::File capturedFolder()
@@ -416,7 +416,7 @@ int renderNative (const juce::File& folder, const juce::StringArray& only, const
     }
     engine.setSong (Song {});
     folder.getChildFile ("demo-voice.wav").deleteFile();
-    folder.getChildFile ("demo-notebook.html").deleteFile();
+    folder.getChildFile ("notes.html").deleteFile();
     return drawn;
 }
 
