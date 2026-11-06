@@ -7302,4 +7302,7 @@ countries: cn sg
 "{0} in {1}" = "{1} 中的 {0}"
 "Playlist clip" = "Playlist 片段"
 "ON" = "开"
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "无|Smooth|Op-El|Mastering"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "另外三种压缩器特性，代替风格使用：平滑、光电或母带"
 "Wheels" = "滚轮"

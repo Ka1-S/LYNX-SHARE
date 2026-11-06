@@ -7302,4 +7302,7 @@ countries: es mx ar co cl pe ve
 "{0} in {1}" = "{0} en {1}"
 "Playlist clip" = "Clip de la Playlist"
 "ON" = "ACT."
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "Ninguno|Smooth|Op-El|Mastering"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Tres caracteres de compresor más, en lugar del estilo: suave, optoelectrónico o masterización"
 "Wheels" = "Ruedas"

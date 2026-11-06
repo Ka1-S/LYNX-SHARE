@@ -7302,4 +7302,7 @@ countries: jp
 "{0} in {1}" = "{1}の{0}"
 "Playlist clip" = "Playlistクリップ"
 "ON" = "オン"
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "なし|Smooth|Op-El|Mastering"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "スタイルの代わりに使える3つのコンプレッサーキャラクター：スムーズ、オプトエレクトロニック、マスタリング"
 "Wheels" = "ホイール"

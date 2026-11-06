@@ -7302,4 +7302,7 @@ countries: kr
 "{0} in {1}" = "{1}의 {0}"
 "Playlist clip" = "Playlist 클립"
 "ON" = "켬"
+# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
+"None|Smooth|Op-El|Mastering" = "없음|Smooth|Op-El|Mastering"
+"Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "스타일 대신 쓰는 컴프레서 캐릭터 세 가지: 스무스, 광전자식, 마스터링"
 "Wheels" = "휠"
