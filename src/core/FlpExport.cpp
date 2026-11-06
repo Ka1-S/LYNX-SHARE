@@ -1394,7 +1394,8 @@ struct Converter
             for (int b = 0; b < 3; ++b)
             {
                 const auto& eq = track.eq;
-                control (0, flp::ControlId::mixerEqBase + b, std::clamp (iround (eq.gainDb[(std::size_t) b] * 100.0), -1800, 1800));
+                // (a bypassed EQ, LYNX's own: FL has no bypass, so it goes flat — what is heard stays the same)
+                control (0, flp::ControlId::mixerEqBase + b, eq.bypassed ? 0 : std::clamp (iround (eq.gainDb[(std::size_t) b] * 100.0), -1800, 1800));
                 const auto hz = std::clamp ((double) eq.hz[(std::size_t) b], 10.0, 16000.0);
                 control (0, flp::ControlId::mixerEqBase + 8 + b, std::clamp (iround (65536.0 * std::log ((hz - 10.0) / 159.9 + 1.0) / std::log (101.0)), 0, 65536));
                 control (0, flp::ControlId::mixerEqBase + 16 + b, std::clamp (iround (eq.width[(std::size_t) b] * 65536.0), 0, 65536));

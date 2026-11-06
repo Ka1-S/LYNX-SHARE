@@ -57,6 +57,12 @@ int sidechainTo (Song& song, int from, int to);
 // The effects a sidechain link feeds (round 170h): LYNX's Compressor, FL's Fruity Limiter / Fruity Compressor
 // (FL users sidechain with these) and the vocoder.
 bool listensToSidechain (EffectKind kind) noexcept;
+// Round 177d (the user's decision on an FL wishlist item): LYNX's own dynamics whose live meter 0 is their gain
+// reduction, 0..1 over 0..30 dB (Effect::controlOutput; published for every slot in ProcessTimes::effectMeters): the
+// Compressor, Apex Limiter, Crest Compressor, Sentry Gate, Quell Denoiser, Ridge Strip, Glow Leveler and Hush De-esser.
+// The mixer strip shows a gain-reduction meter only when it holds one of them.
+bool reportsGainReduction (EffectKind kind) noexcept;
+constexpr float gainReductionRangeDb = 30.0f;
 // The one insert whose send into `to` is a sidechain link (a level-0 send, as "Sidechain to this track" makes
 // it), or -1 when there is none or more than one.
 int soleSidechainSender (const Song& song, int to);

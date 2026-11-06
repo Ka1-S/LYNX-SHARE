@@ -951,8 +951,11 @@ struct TrackEq
     std::array<float, 3> gainDb { 0.0f, 0.0f, 0.0f };          // ±18
     std::array<float, 3> hz { 90.0f, 1500.0f, 8000.0f };       // 10 Hz .. 16 kHz
     std::array<float, 3> width { 0.267f, 0.267f, 0.267f };     // 0..1: peak Q / shelf slope
+    // round 177d (an FL wishlist item; LYNX's own): the EQ is skipped and its settings kept (FL has no bypass for it)
+    bool bypassed = false;
 
-    bool active() const noexcept { return gainDb[0] != 0.0f || gainDb[1] != 0.0f || gainDb[2] != 0.0f; }
+    bool hasBoostOrCut() const noexcept { return gainDb[0] != 0.0f || gainDb[1] != 0.0f || gainDb[2] != 0.0f; }
+    bool active() const noexcept { return ! bypassed && hasBoostOrCut(); }
     bool operator== (const TrackEq&) const = default;
 
     // FL conversions: peak Q = 0.0999·(1001^w − 1) + 0.1; shelves S = 1.9·w + 0.1

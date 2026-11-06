@@ -1832,6 +1832,8 @@ juce::var mixerTrackToVar (const MixerTrack& t)
     if (! (t.eq == TrackEq {})) // [gains dB, frequencies Hz, widths 0..1] of the 3 bands
         o->setProperty ("eq", juce::Array<juce::var> { t.eq.gainDb[0], t.eq.gainDb[1], t.eq.gainDb[2], t.eq.hz[0], t.eq.hz[1], t.eq.hz[2],
                                                        t.eq.width[0], t.eq.width[1], t.eq.width[2] });
+    if (t.eq.bypassed)
+        o->setProperty ("eqBypassed", true);
 
     if (! t.sends.empty())
     {
@@ -1905,6 +1907,7 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
             track.eq.hz[b] = juce::jlimit (10.0f, 16000.0f, (float) (double) eq[(int) b + 3]);
             track.eq.width[b] = juce::jlimit (0.0f, 1.0f, (float) (double) eq[(int) b + 6]);
         }
+    track.eq.bypassed = (bool) t.getProperty ("eqBypassed", false);
 
     if (auto* sends = t["sends"].getArray())
         for (const auto& send : *sends)
