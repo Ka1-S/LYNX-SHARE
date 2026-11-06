@@ -3984,14 +3984,19 @@ void MainComponent::applyStepEdit()
     }
 }
 
+bool MainComponent::toolbarFrame (double nowMs)
+{
+    const auto moved = output.update (nowMs);
+    timeDisplay.update();
+    songPosition.update();
+    return moved || engine.getTransport().playing.load (std::memory_order_relaxed);
+}
+
 void MainComponent::timerCallback()
 {
     const uitrace::Scope trace ("MainComponent timer", false);
     {
         const uitrace::Scope part ("timer: toolbar displays", false);
-        output.update();
-        timeDisplay.update();
-        songPosition.update();
         masterVolume.update();
         masterPitch.update();
         updateRecordQuantise();
