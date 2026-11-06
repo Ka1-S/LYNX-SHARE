@@ -174,6 +174,7 @@ namespace
 {
 int failures = 0;
 int checks = 0;
+std::string processTempTag(); // per-process suffix for scratch files (defined further down)
 std::vector<std::pair<const char*, std::function<void()>>>& registry()
 {
     static std::vector<std::pair<const char*, std::function<void()>>> r;
@@ -3342,7 +3343,7 @@ TEST (flp_paths_resolve_and_samplers_import)
     {
         // POSIX roots (macOS, Linux, Wine prefix): backslashes become '/', letter case follows the disk (round 117)
         namespace fs = std::filesystem;
-        const auto base = fs::temp_directory_path() / "lynx-case-test";
+        const auto base = fs::temp_directory_path() / ("lynx-case-test-" + processTempTag());
         fs::remove_all (base);
         fs::create_directories (base / "Data" / "Patches" / "Packs");
         { std::ofstream (base / "Data" / "Patches" / "Packs" / "Kick.WAV") << "x"; }
@@ -13306,9 +13307,15 @@ std::string processTempTag()
     {
         ~Cleanup()
         {
+            // every scratch file or folder whose name carries this process's tag (round 173e: the SoundFont, case,
+            // missing-file, Crash169g, Natives142 and Rea167l scratch paths are per process too)
             std::error_code ec;
-            std::filesystem::remove (std::filesystem::temp_directory_path (ec) / ("lynx_test_oscdata_" + tag + ".dat"), ec);
-            std::filesystem::remove_all (std::filesystem::temp_directory_path (ec) / ("lynx_bassdrum_test_" + tag), ec);
+            std::vector<std::filesystem::path> mine;
+            for (const auto& e : std::filesystem::directory_iterator (std::filesystem::temp_directory_path (ec), ec))
+                if (e.path().filename().string().find (tag) != std::string::npos)
+                    mine.push_back (e.path());
+            for (const auto& p : mine)
+                std::filesystem::remove_all (p, ec);
         }
     } cleanup;
     (void) cleanup;
@@ -15498,7 +15505,7 @@ TEST (missing_files_inside_patcher)
 TEST (missing_files_folder_search)
 {
     namespace fs = std::filesystem;
-    const auto root = fs::temp_directory_path() / "lynx-missing-test";
+    const auto root = fs::temp_directory_path() / ("lynx-missing-test-" + processTempTag());
     fs::remove_all (root);
     fs::create_directories (root / "a" / "deep" / "Kicks");
     fs::create_directories (root / "b");
@@ -17088,3 +17095,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FlpExport171eTests.inc"
 #include "Tp172cTests.inc"
 #include "Layout172aTests.inc"
+#include "Issues173aTests.inc"
+#include "FxAudit173dTests.inc"

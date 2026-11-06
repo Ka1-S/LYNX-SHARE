@@ -1960,10 +1960,38 @@ public:
     PitchCorrect() { dsp.reserve (maxSampleRate); }
 
     void prepare (double sr) noexcept override { dsp.prepare (sr); }
-    void reset() noexcept override { dsp.reset(); }
+    void reset() noexcept override
+    {
+        dsp.reset();
+        dsp.allNotesOff();
+        sounding = {};
+    }
+    // round 173d: the notes held on the Channel Rack reach the MIDI / Harmonize modes (before, nothing ever called
+    // the DSP's noteOn: MIDI, Octaves, Vel and the four voice pans did nothing)
+    void setHeldNotes (const NoteMask* channels, int count) noexcept override
+    {
+        held = channels;
+        heldCount = count;
+    }
 
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
     {
+        NoteMask now {};
+        for (int c = 0; held != nullptr && c < heldCount; ++c)
+            now[0] |= held[c][0], now[1] |= held[c][1];
+        if (now != sounding)
+        {
+            for (int k = 0; k < 128; ++k)
+            {
+                const auto bit = 1ull << (k & 63);
+                const bool was = (sounding[(std::size_t) (k >> 6)] & bit) != 0, is = (now[(std::size_t) (k >> 6)] & bit) != 0;
+                if (is && ! was)
+                    dsp.noteOn (k, 100); // (the Channel Rack's held notes carry no velocity: FL's default 100)
+                else if (was && ! is)
+                    dsp.noteOff (k);
+            }
+            sounding = now;
+        }
         auto on = [&p] (int i) { return p[(std::size_t) i] > 0.5f; };
         pitcher::Params q;
         q.speed = std::clamp (p[0], 0.0f, 1.0f);
@@ -1998,6 +2026,9 @@ public:
 private:
     pitcher::Pitcher dsp;
     std::atomic<int> latency { 9 };
+    const NoteMask* held = nullptr;
+    int heldCount = 0;
+    NoteMask sounding {};
 };
 
 class LoFi final : public Effect
@@ -3863,6 +3894,10 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 165x: a Hush De-esser saved before the extended law keeps ±12 dB levels, the 2 … 16 kHz high-pass, its own link
     if (slot.kind == EffectKind::hushDeEsser && savedCount <= (std::size_t) mixsuite::hush::rangeLaw)
         slot.params[(std::size_t) mixsuite::hush::rangeLaw] = 0.0f;
+    // issue #77 (round tp172c): the dynamic air model became Aether's default; an Aether saved before it existed
+    // (round 124) keeps the shelf + exciter it was set up with
+    if (slot.kind == EffectKind::aether && savedCount <= (std::size_t) mixsuite::aether::dynamic)
+        slot.params[(std::size_t) mixsuite::aether::dynamic] = 0.0f;
     // round 152: a Compressor saved before the measured vintage curve keeps the round-150 curve
     if (slot.kind == EffectKind::compressor && savedCount <= 18 && slot.params.size() > 18)
         slot.params[18] = 0.0f;

@@ -6789,7 +6789,7 @@ countries: br
 "Sidechain to this track" = "Sidechain para esta faixa"
 "Sidechain to this track only" = "Sidechain somente para esta faixa"
 "Assign to free mixer track" = "Atribuir a uma faixa livre do mixer"
-"[LMB] drag or [Wheel] changes  [2xLMB] show in the Mixer  [RMB] menu" = "[LMB] arrastar ou [Roda] muda  [2xLMB] mostrar no Mixer  [RMB] menu"
+"[LMB] drag or [Wheel] changes  [2xLMB] show in the Mixer  [RMB] menu" = "[LMB] arrastar ou [Wheel] muda  [2xLMB] mostrar no Mixer  [RMB] menu"
 "Snap off: notes and clips move freely. [Backspace] turns snap back on" = "Snap desligado: notas e clipes se movem livremente. [Backspace] liga o snap de novo"
 "Snap on: {0}. [Backspace] turns it off" = "Snap ligado: {0}. [Backspace] desliga"
 "Autodetect" = "Detectar automaticamente"
@@ -7351,6 +7351,8 @@ countries: br
 "Worth knowing" = "Bom saber"
 "Samples not on this PC" = "Samples que não estão neste PC"
 "Steps use channel colour" = "Passos com a cor do canal"
+# round tp172d: the Echoform / Auto-pan page switch
+"Main|Tweak" = "Principal|Ajuste fino"
 "E type|G type" = "Tipo E|Tipo G"
 "Modern console" = "Console moderno"
 
@@ -7363,6 +7365,18 @@ countries: br
 "Low decay" = "Decaimento grave"
 "High decay" = "Decaimento agudo"
 
+# --- Online session entity names (round 173e) and plugin hardware keys
+"Pattern {0}" = "Pattern {0}"
+"a pattern" = "um pattern"
+"a channel" = "um canal"
+"Tempo & project settings" = "Tempo e configurações do projeto"
+"Participants" = "Participantes"
+"MIDI links" = "Links MIDI"
+"Item order" = "Ordem dos itens"
+"Arrangement" = "Arranjo"
+"{0} in {1}" = "{0} em {1}"
+"Playlist clip" = "Clip da Playlist"
+"ON" = "LIG."
 # round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
 "None|Smooth|Op-El|Mastering" = "Nenhum|Suave|Op-El|Masterização"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Mais três caracteres de compressor, usados no lugar do estilo: suave, optoeletrônico ou masterização"

@@ -1,6 +1,7 @@
 #include "ui/PluginPresetMenu.h"
 
 #include "core/PresetCycle.h"
+#include "ui/FileChoosers.h"
 #include "ui/HintBar.h"
 
 #include "engine/PluginHost.h"
@@ -535,9 +536,9 @@ void PresetBar::saveAs()
 
 void PresetBar::loadFile()
 {
-    chooser = std::make_unique<juce::FileChooser> (tr ("Load preset"), folderFor (plugin.getName()), "*.lynxpreset;*.fxp;*.fxb;*.vstpreset");
+    chooser = lynx::ui::makeFileChooser (tr ("Load preset"), folderFor (plugin.getName()), "*.lynxpreset;*.fxp;*.fxb;*.vstpreset");
     juce::Component::SafePointer<PresetBar> safe (this);
-    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
+    lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
         if (safe != nullptr && fc.getResult().existsAsFile())
             safe->apply ({ -1, fc.getResult(), fc.getResult().getFileNameWithoutExtension() });
     });
@@ -546,9 +547,9 @@ void PresetBar::loadFile()
 void PresetBar::exportFile()
 {
     const auto start = folderFor (plugin.getName()).getChildFile (juce::File::createLegalFileName (current.isEmpty() ? plugin.getName() : current) + pp::extension);
-    chooser = std::make_unique<juce::FileChooser> (tr ("Export preset"), start, saveWildcard (plugin));
+    chooser = lynx::ui::makeFileChooser (tr ("Export preset"), start, saveWildcard (plugin));
     juce::Component::SafePointer<PresetBar> safe (this);
-    chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
+    lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
                               | juce::FileBrowserComponent::warnAboutOverwriting,
                           [safe] (const juce::FileChooser& fc) {
                               auto file = fc.getResult();

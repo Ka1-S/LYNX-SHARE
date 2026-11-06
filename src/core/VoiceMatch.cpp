@@ -450,7 +450,12 @@ CompLaw k4CompLaw (const Settings& s) noexcept
     const double fade = u < k4U[0] ? u / k4U[0] : 1.0;
     c.thresholdOffset = bil (k4Static, 3, 0);
     c.knee = std::max (0.2, bil (k4Static, 3, 1));
-    c.slope = bil (k4Static, 3, 2) * fade;
+    // round tp172c4: the slope blends geometrically (log slope), not linearly: the infinity nodes' slopes are ~100 x the
+    // 9.3:1 ones, so a plain blend made a 10:1 dial act like ~100:1 (the 4K E trial's S4: 6 dB too deep)
+    {
+        auto w = [&] (int a, int b) { return std::log (std::max (1e-6, k4Static[(a * nU + b) * 3 + 2])); };
+        c.slope = std::exp ((1 - tt) * ((1 - tu) * w (ti, ui) + tu * w (ti, ui + 1)) + tt * ((1 - tu) * w (ti + 1, ui) + tu * w (ti + 1, ui + 1))) * fade;
+    }
     // the automatic make-up (measured at -60 dBFS) and its offset: [EXEC] +-6 dB of offset moves the make-up by
     // 1.15 / 1.37 / 1.88 dB at 2.9:1 / 5:1 / inf:1 (never below 0)
     double mk = bil (k4Makeup, 1, 0) * fade;

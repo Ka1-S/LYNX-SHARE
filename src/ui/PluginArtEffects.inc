@@ -737,43 +737,31 @@ inline const Theme& sentryTheme()
     return t;
 }
 
-// === Glow Leveler (opto-leveler role): a hammertone rack panel lit by its electro-luminescent cell ==================
+// === Glow Leveler (opto-leveler role): round tp172d — the reference's silver faceplate: light brushed aluminium,
+// black knobs on printed scales, the cream VU in a dark bezel, a dark strip along the bottom for the trims ==========
 
 inline void canvasGlowLeveler (juce::Graphics& g, Rectangle<float> a, bool display)
 {
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
     if (display) return;
-    if (! reduced) // hammertone: a seeded mottle of soft light and dark dabs
-    {
-        juce::Random rnd (2);
-        for (int i = 0; i < (int) (a.getWidth() * a.getHeight() / 260.0f); ++i)
-        {
-            const Point<float> c { a.getX() + rnd.nextFloat() * a.getWidth(), a.getY() + rnd.nextFloat() * a.getHeight() };
-            const auto r = 2.0f + rnd.nextFloat() * 5.0f;
-            g.setColour ((rnd.nextBool() ? Colours::white : Colours::black).withAlpha (0.03f));
-            g.fillEllipse (Rectangle<float> (r * 2.0f, r * 1.6f).withCentre (c));
-        }
-    }
-    softLight (g, { a.getCentreX(), a.getY() + a.getHeight() * 0.3f }, a.getWidth() * 0.45f, p.accent2, 0.13f); // the cell's glow
-    for (const auto x : { a.getX(), a.getRight() - 16.0f }) // rack ears
-    {
-        g.setColour (Colours::black.withAlpha (0.25f));
-        g.fillRect (Rectangle<float> (x, a.getY(), 16.0f, a.getHeight()));
-        for (const auto f : { 0.12f, 0.88f })
-            styles::screw (g, { x + 8.0f, a.getY() + a.getHeight() * f }, 7.0f);
-    }
-    vignette (g, a, 0.3f);
+    brushedLines (g, a, 41, 0.05f);
+    if (! reduced) bloom (g, { a.getX() + a.getWidth() * 0.3f, a.getY() }, a.getWidth() * 0.7f, Colours::white, 0.10f); // the top light
+    for (const auto& c : { a.getTopLeft().translated (11.0f, 11.0f), a.getTopRight().translated (-11.0f, 11.0f),
+                           a.getBottomLeft().translated (11.0f, -11.0f), a.getBottomRight().translated (-11.0f, -11.0f) })
+        styles::screw (g, c, 6.0f);
+    g.setColour (Colours::black.withAlpha (0.22f)); // the faceplate's edge
+    g.drawRect (a.reduced (1.0f), 1.0f);
 }
 
-inline void glowLevelerEmblem (juce::Graphics& g, Point<float> c, float r) // the glowing cell
+inline void glowLevelerEmblem (juce::Graphics& g, Point<float> c, float r) // the cell, a small red lamp on the plate
 {
-    const auto& p = pal();
-    if (! reduced) bloom (g, c, r * 3.0f, p.accent2, 0.45f);
-    g.setColour (p.accent2);
+    g.setColour (Colour (0xff5a0d0a));
     g.fillEllipse (Rectangle<float> (r * 1.3f, r * 1.3f).withCentre (c));
-    g.setColour (Colours::white.withAlpha (0.8f));
-    g.fillEllipse (Rectangle<float> (r * 0.5f, r * 0.5f).withCentre (c));
+    g.setColour (pal().accent);
+    g.fillEllipse (Rectangle<float> (r * 0.9f, r * 0.9f).withCentre (c));
+    g.setColour (Colours::white.withAlpha (0.7f));
+    g.fillEllipse (Rectangle<float> (r * 0.3f, r * 0.3f).withCentre (c.translated (-r * 0.15f, -r * 0.15f)));
 }
 
 inline const Theme& glowLevelerTheme()
@@ -783,19 +771,28 @@ inline const Theme& glowLevelerTheme()
         Theme x;
         x.name = "Glow Leveler";
         x.base = Style::hardware;
-        x.pal = { Colour (0xff4a5560), Colour (0xff262c33), Colour (0xfff0e2c0), Colour (0xff8fe6d8), Colour (0xd83e4852), Colour (0xe82a3038),
-                  Colour (0xff8a96a2), Colour (0xfff4ead2), Colour (0xff12171c), Colour (0xff2d2d2d), Colour (0xff0c0c0c), Colour (0xff1f252b),
-                  Colour (0xfff4ead2), Colour (0xff353d46) };
+        x.pal = { Colour (0xffd0d3d5), Colour (0xffa9adb1), Colour (0xffc8231b), Colour (0xffe8463c), Colour (0x00000000), Colour (0x00000000),
+                  Colour (0xff6e7277), Colour (0xff1c1d1f), Colour (0xff1a1c1e), Colour (0xff3c3d3f), Colour (0xff050505), Colour (0xff55595d),
+                  Colour (0xfff4f4f4), Colour (0xff45484c) };
         x.canvas = canvasGlowLeveler;
-        x.sectionDeco = ridgeScrews;
         x.titleEmblem = glowLevelerEmblem;
         x.cap = Cap::bakelite;
         x.pointerFrom = 0.15f;
         x.ticks = 11;
+        x.boldTicks = false;
         x.buttTrack = true;
         x.arcGlow = 0.0f;
         x.knobScale = 1.04f;
         x.thumbPointer = true;
+        x.noValueArc = true;               // the value reads off the pointer and the printed scale
+        x.flatSections = true;             // one faceplate: no cards
+        x.rimWidth = 0.0f;
+        x.captionCol = Colour (0xff1c1d1f);
+        x.valueCol = Colour (0xff2e3033);
+        x.offLabelCol = Colour (0xff2e3033);
+        x.hwKeys = true;
+        x.headerCol = Colour (0xff2b2d30);
+        x.sectionFills[1] = Colour (0xff17181a); // the dark lower strip (Analog, HF emphasis, Mix, Trim)
         return x;
     }();
     return t;
@@ -1259,7 +1256,7 @@ inline const Theme& echoformTheme()
         auto x = soundtoysTheme ("Echoform", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
         x.cornerScale = 4.0f; // the original's three rounded pods
         x.hwKeys = true;
-        x.cheek = 16.0f; // (the pods fill the face)
+        x.cheek = 30.0f; // (the layout leaves room for them)
         return x;
     }();
     return t;
@@ -3620,33 +3617,17 @@ inline const Theme& voiceShiftTheme()
     return t;
 }
 
-// === Quell Denoiser: calm water — a still lake with a single ring, grain fading away ===============================
+// === Quell Denoiser (noise-suppressor role): round tp172d — the reference's look: graphite metal shading darker to
+// the bottom, a black meter well, a chrome fader cap on a black slot, orange read-outs ==============================
 
 inline void canvasQuell (juce::Graphics& g, Rectangle<float> a, bool display)
 {
     const auto& p = pal();
     vfill (g, a, p.bgTop, p.bgBottom);
     if (display) return;
-    if (! reduced) // the noise: fine grain on the left, fading out to the right
-    {
-        juce::Random rnd (17);
-        for (int i = 0; i < (int) (a.getWidth() * a.getHeight() / 60.0f); ++i)
-        {
-            const auto u = rnd.nextFloat();
-            if (rnd.nextFloat() > (1.0f - u) * (1.0f - u)) continue;
-            g.setColour (Colours::white.withAlpha (0.05f));
-            g.fillRect (Rectangle<float> (a.getX() + u * a.getWidth(), a.getY() + rnd.nextFloat() * a.getHeight(), 1.0f, 1.0f));
-        }
-    }
-    const auto c = Point<float> (a.getX() + a.getWidth() * 0.68f, a.getY() + a.getHeight() * 0.62f);
-    for (int i = 1; i < 6; ++i) // one ring spreading on still water
-    {
-        g.setColour (p.accent.withAlpha (0.12f - 0.018f * (float) i));
-        g.drawEllipse (Rectangle<float> ((float) i * 40.0f, (float) i * 12.0f).withCentre (c), 1.2f);
-    }
-    g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.04f), 0.0f, c.y - 2.0f, Colours::transparentWhite, 0.0f, a.getBottom(), false));
-    g.fillRect (a.withTop (c.y - 2.0f)); // the water's sheen
-    vignette (g, a, 0.4f);
+    brushedLines (g, a, 17, 0.035f);
+    if (! reduced) bloom (g, { a.getX() + a.getWidth() * 0.6f, a.getY() }, a.getWidth() * 0.8f, Colours::white, 0.10f); // the top light
+    vignette (g, a, 0.35f);
 }
 
 inline void quellEmblem (juce::Graphics& g, Point<float> c, float r)
@@ -3663,14 +3644,23 @@ inline const Theme& quellTheme()
     {
         Theme x;
         x.name = "Quell Denoiser";
-        x.base = Style::glow;
-        x.pal = { Colour (0xff0e2228), Colour (0xff04090b), Colour (0xff5ad8d0), Colour (0xffcaf4f0), Colour (0x9c0e2026), Colour (0xb804090b),
-                  Colour (0xff4a7a7a), Colour (0xffe6fbf8), Colour (0xff03080a), Colour (0xffbcc8c4), Colour (0xff6a7874), Colour (0xff16292d),
-                  Colour (0xff10302c), Colour (0xff10242a) };
+        x.base = Style::hardware;
+        x.pal = { Colour (0xff8c9299), Colour (0xff43484e), Colour (0xffeb9a2e), Colour (0xffffc46b), Colour (0x00000000), Colour (0x00000000),
+                  Colour (0xff2a2d31), Colour (0xffeef0f2), Colour (0xff0a0b0c), Colour (0xffe2e5e8), Colour (0xff5f6368), Colour (0xff0d0e10),
+                  Colour (0xff1a1a1a), Colour (0xff34383d) };
         x.canvas = canvasQuell;
         x.titleEmblem = quellEmblem;
-        x.drawCap = capStone;
-        x.arcGlow = 0.15f;
+        x.cap = Cap::bakelite;
+        x.arcGlow = 0.0f;
+        x.buttTrack = true;
+        x.flatSections = true;
+        x.rimWidth = 0.0f;
+        x.captionCol = Colour (0xffeef0f2);
+        x.valueCol = Colour (0xffffa63d);
+        x.offLabelCol = Colour (0xffd8dbde);
+        x.bigThumb = 5.0f; // the reference's large grooved metal fader cap
+        x.hwKeys = true;
+        x.headerCol = Colour (0xff2b2d30);
         return x;
     }();
     return t;

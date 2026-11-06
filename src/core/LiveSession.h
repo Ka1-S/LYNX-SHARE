@@ -57,7 +57,9 @@ struct Key
 };
 std::string toString (const Key& k);              // "c:0000010000000003" … (the wire form)
 std::optional<Key> keyFromString (const std::string& s);
-std::string describe (const Key& k, const Song& song); // for the hint bar: "Pattern 3", "Insert 12", "Kick"
+// for the hint bar: "Pattern 3", "Insert 12", "Kick"; `translate` maps each TR_NOOP template (ui tr()) - empty: English
+using Translate = std::function<std::string (const char* english)>;
+std::string describe (const Key& k, const Song& song, const Translate& translate = {});
 
 // What changed between two states: `changed` keys take their value from `carrier`, `removed` keys are deleted.
 struct Patch

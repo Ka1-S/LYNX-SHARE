@@ -134,3 +134,60 @@ TEST (fader171c_no_live_levels_uses_the_song)
     const auto target = lynx::mixerMatrix (rig.song.mixer[2], 0.4f, 0.0f, rig.song.panTriangular);
     CHECK (std::abs (rig.l[200] - 0.25f * target.ll) < 1e-4f);
 }
+
+// Round 173f (discussion #10, "is the DAW fluid?"): a fader or pan knob dragged hard while the song plays never steps
+// the sound. Each new value arrives at the playing snapshot through its live levels (round 171c) and every gain glides
+// at most 0.001 per sample toward it (FL's glide, REA_rodada85 §3), however fast and far the targets jump.
+
+TEST (smooth173f_a_fast_fader_drag_never_steps_the_gain)
+{
+    Fader171cRig rig; // insert 2 plays a DC of 0.25: its output is the gain curve itself
+    auto state = lynx::RackState::build (rig.song, nullptr, 48000.0);
+    rig.block (*state);
+
+    // a new fader value every 256 samples (5 ms: faster than any screen), jumping between the bottom and the top
+    float previous = rig.l[255], worstStep = 0.0f;
+    std::uint32_t seed = 173;
+    for (int b = 0; b < 64; ++b)
+    {
+        seed = seed * 1664525u + 1013904223u;
+        const auto position = (b & 1) != 0 ? 0.05f + 0.1f * (float) (seed >> 24) / 255.0f : 0.95f - 0.1f * (float) (seed >> 24) / 255.0f;
+        state->live->mixerVolume[2].store (position);
+        rig.block (*state);
+        for (int i = 0; i < 256; ++i)
+        {
+            worstStep = std::max (worstStep, std::abs (rig.l[(std::size_t) i] - previous));
+            previous = rig.l[(std::size_t) i];
+        }
+    }
+    CHECK (worstStep <= 0.001f * 0.25f + 1e-6f); // no sample-to-sample jump: no zipper, no click
+
+    // released: the gain settles on the last value
+    const auto last = 0.6f;
+    state->live->mixerVolume[2].store (last);
+    for (int b = 0; b < 8; ++b)
+        rig.block (*state);
+    const auto target = lynx::mixerMatrix (rig.song.mixer[2], last, 0.0f, rig.song.panTriangular);
+    CHECK (std::abs (rig.l[200] - 0.25f * target.ll) < 1e-4f);
+}
+
+TEST (smooth173f_a_fast_pan_drag_never_steps_either_side)
+{
+    Fader171cRig rig;
+    auto state = lynx::RackState::build (rig.song, nullptr, 48000.0);
+    rig.block (*state);
+    float previousL = rig.l[255], previousR = rig.r[255], worstStep = 0.0f;
+    for (int b = 0; b < 48; ++b)
+    {
+        state->live->mixerPan[2].store ((b & 1) != 0 ? -1.0f : 1.0f); // hard left, hard right, every block
+        rig.block (*state);
+        for (int i = 0; i < 256; ++i)
+        {
+            worstStep = std::max ({ worstStep, std::abs (rig.l[(std::size_t) i] - previousL), std::abs (rig.r[(std::size_t) i] - previousR) });
+            previousL = rig.l[(std::size_t) i];
+            previousR = rig.r[(std::size_t) i];
+        }
+    }
+    // each output side sums two gliding coefficients (its own and the folded one): 2 × 0.001 × the 0.25 input at most
+    CHECK (worstStep <= 2.0f * 0.001f * 0.25f + 1e-6f);
+}

@@ -266,6 +266,8 @@ float captionScale();
 bool hwKeys();
 void hwKey (juce::Graphics&, juce::Rectangle<float> area, bool lit, bool hover);
 void setSectionOrdinal (int ordinal); // -1 = none
+void setOnDarkFill (bool dark);      // the next items sit on a dark section fill: light legends
+bool sectionFillIsDark (int ordinal); // the theme fills that top-level section dark
 
 // --- animation -----------------------------------------------------------------------------------
 // Smooth hover / press levels per control id, advanced by a 60 Hz timer that runs ONLY while something is

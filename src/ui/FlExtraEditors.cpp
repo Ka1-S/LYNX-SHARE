@@ -16,6 +16,7 @@
 #include "engine/AudioEngine.h"
 #include "platform/Paths.h"
 #include "ui/BrowserComponent.h"
+#include "ui/FileChoosers.h"
 #include "ui/I18n.h"
 #include "ui/PluginEditors.h"
 #include "ui/PluginSkin.h"
@@ -750,8 +751,8 @@ private:
     {
         const auto start = juce::File::isAbsolutePath (juce::String::fromUTF8 (current().c_str())) ? juce::File (juce::String::fromUTF8 (current().c_str()))
                                                                                                     : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
-        chooser = std::make_unique<juce::FileChooser> (tr ("Choose the .html page to show"), start, "*.html;*.htm");
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+        chooser = lynx::ui::makeFileChooser (tr ("Choose the .html page to show"), start, "*.html;*.htm");
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [safe = juce::Component::SafePointer (this)] (const juce::FileChooser& c) {
                                   if (safe != nullptr && c.getResult() != juce::File())
                                       safe->setAddress (c.getResult().getFullPathName().toStdString());
@@ -1219,9 +1220,9 @@ private:
             return;
         const auto* e = target.current();
         const juce::File current (juce::String::fromUTF8 (e != nullptr ? e->samplePath.c_str() : ""));
-        chooser = std::make_unique<juce::FileChooser> (tr ("Load sample"), current.existsAsFile() ? current : juce::File(),
+        chooser = lynx::ui::makeFileChooser (tr ("Load sample"), current.existsAsFile() ? current : juce::File(),
                                                        target.engine->getSampleLibrary().wildcard());
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [safe = juce::Component::SafePointer<ScratcherEditor> (this)] (const juce::FileChooser& fc) {
                                   if (safe != nullptr && fc.getResult().existsAsFile())
                                       safe->useSample (fc.getResult());

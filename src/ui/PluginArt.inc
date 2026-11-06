@@ -110,6 +110,7 @@ struct Theme
     Colour sectionFills[4] {};      // flat sections: the n-th top-level section's own fill (transparent = panelTop)
     bool hwKeys = false;            // option tabs and switches as square hardware keys (grey caps, lit in the accent)
     float cheek = 0.0f;             // the hardware canvases' wooden cheeks, px (0 = their own default)
+    float bigThumb = 0.0f;          // round tp172d: vertical faders get a large grooved metal cap (× the thumb thickness) on a dark slot, no lit fill
 
     // the moving layer (ArtLayer): motes and/or a painter for the stage strip; all null/0 = a still theme
     int motes = 0;
@@ -372,6 +373,7 @@ inline bool headerBar (juce::Graphics& g, Rectangle<float> a, Colour)
 }
 
 inline int sectionOrdinal = -1; // round tp172d: the section being drawn, in layout order (sectionFills)
+inline bool onDarkFill = false; // round tp172d: the item being drawn sits on a dark section fill (light legends)
 
 // round tp172d: a square hardware key — a bevelled grey cap, lit in the accent (the originals' style and switch keys)
 inline void hwKey (juce::Graphics& g, Rectangle<float> r, bool lit, bool hover)
@@ -391,7 +393,7 @@ inline void hwKey (juce::Graphics& g, Rectangle<float> r, bool lit, bool hover)
     g.drawLine (r.getX() + corner, r.getY() + 0.8f, r.getRight() - corner, r.getY() + 0.8f, 1.0f);
     g.setColour (Colour (0xff141414));
     g.drawRoundedRectangle (r, corner, 1.0f);
-    if (lit && ! reduced) bloom (g, r.getCentre(), r.getWidth() * 0.9f, p.accent, 0.16f);
+    if (lit && ! reduced && p.bgTop.getBrightness() < 0.6f) bloom (g, r.getCentre(), r.getWidth() * 0.9f, p.accent, 0.16f); // (no lamp glow on a light faceplate)
 }
 
 inline bool section (juce::Graphics& g, Rectangle<float> a, float corner, bool raised, Colour)
@@ -744,6 +746,33 @@ inline bool slider (juce::Graphics& g, Rectangle<float> tr, float v, bool vertic
         }
         return true;
     }
+    if (th0.bigThumb > 0.0f && vertical) // round tp172d: the noise suppressor's big metal fader cap on a recessed slot
+    {
+        const auto slot = tr.withSizeKeepingCentre (thumbLength * 0.45f, tr.getHeight());
+        g.setGradientFill (ColourGradient (Colour (0xff050607), slot.getX(), 0.0f, Colour (0xff2a2d31), slot.getRight(), 0.0f, false));
+        g.fillRoundedRectangle (slot, 3.0f);
+        g.setColour (Colours::white.withAlpha (0.18f));
+        g.drawRoundedRectangle (slot.expanded (1.5f), 4.0f, 1.0f);
+        const auto capH = juce::jmin (tr.getHeight() * 0.18f, thumbThickness * th0.bigThumb);
+        const auto travel = slot.reduced (0.0f, capH * 0.5f);
+        const auto y = travel.getBottom() - v * travel.getHeight();
+        const auto cap = Rectangle<float> (thumbLength * 2.4f, capH).withCentre ({ slot.getCentreX(), y });
+        g.setColour (Colours::black.withAlpha (0.5f));
+        g.fillRoundedRectangle (cap.translated (0.0f, 3.0f), 3.0f);
+        g.setGradientFill (ColourGradient (p.capTop.brighter (hot ? 0.2f : 0.0f), 0.0f, cap.getY(), p.capBottom, 0.0f, cap.getBottom(), false));
+        g.fillRoundedRectangle (cap, 3.0f);
+        for (int k = 1; k < 7; ++k) // the grooves
+        {
+            const auto gy = cap.getY() + cap.getHeight() * (float) k / 7.0f;
+            g.setColour (Colours::black.withAlpha (0.28f));
+            g.drawHorizontalLine ((int) gy, cap.getX() + 3.0f, cap.getRight() - 3.0f);
+            g.setColour (Colours::white.withAlpha (0.25f));
+            g.drawHorizontalLine ((int) gy + 1, cap.getX() + 3.0f, cap.getRight() - 3.0f);
+        }
+        g.setColour (enabled ? p.accent : theme::colour::textDisabled); // the index line
+        g.fillRect (cap.withSizeKeepingCentre (cap.getWidth() - 4.0f, 1.6f));
+        return true;
+    }
     const auto track = vertical ? tr.withSizeKeepingCentre (juce::jmin (4.0f, tr.getWidth()), tr.getHeight()) : tr.withSizeKeepingCentre (tr.getWidth(), juce::jmin (4.0f, tr.getHeight()));
     g.setColour (p.track);
     g.fillRoundedRectangle (track, 2.0f);
@@ -873,11 +902,13 @@ const std::vector<Art>& allArts()
 
 juce::Colour captionColour()
 {
+    if (currentStyle == Style::themed && artkit::onDarkFill) return juce::Colour (0xffe4e6e8);
     if (currentStyle == Style::themed && artkit::th().captionCol.getAlpha() > 0) return artkit::th().captionCol;
     return juce::Colour (0xff8c919c);
 }
 juce::Colour valueColour (bool hot)
 {
+    if (currentStyle == Style::themed && artkit::onDarkFill) return hot ? juce::Colours::white : juce::Colour (0xffc9ccd0);
     if (currentStyle == Style::themed && artkit::th().valueCol.getAlpha() > 0)
         return hot ? artkit::th().valueCol.brighter (0.3f) : artkit::th().valueCol;
     return hot ? theme::colour::textPrimary : juce::Colour (0xffd3d6dd);
@@ -886,6 +917,13 @@ float captionScale() { return currentStyle == Style::themed ? artkit::th().capti
 bool hwKeys() { return currentStyle == Style::themed && artkit::th().hwKeys; }
 void hwKey (juce::Graphics& g, juce::Rectangle<float> r, bool lit, bool hover) { artkit::hwKey (g, r, lit, hover); }
 void setSectionOrdinal (int ordinal) { artkit::sectionOrdinal = ordinal; }
+void setOnDarkFill (bool dark) { artkit::onDarkFill = dark; }
+bool sectionFillIsDark (int ordinal)
+{
+    if (currentStyle != Style::themed || ordinal < 0 || ordinal >= 4) return false;
+    const auto c = artkit::th().sectionFills[ordinal];
+    return c.getAlpha() > 0 && c.getBrightness() < 0.35f;
+}
 
 Style baseStyleOf (Art a) { return a == Art::none ? Style::glow : artkit::themeOf (a).base; }
 juce::Colour artAccent (Art a) { return a == Art::none ? colour::crimson : artkit::palette (a).accent; }

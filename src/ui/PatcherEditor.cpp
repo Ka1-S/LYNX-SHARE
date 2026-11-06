@@ -1,4 +1,5 @@
 #include "ui/VideoPlayerView.h"
+#include "ui/FileChoosers.h"
 #include "ui/WaveTravellerEditor.h"
 #include "ui/PatcherEditor.h"
 #include "ui/VisualEditors.h"
@@ -1596,9 +1597,9 @@ private:
 
     void chooseSampleNode (juce::Point<float> at)
     {
-        sampleChooser = std::make_unique<juce::FileChooser> (tr ("Choose sample"), juce::File(), engine.getSampleLibrary().wildcard());
+        sampleChooser = lynx::ui::makeFileChooser (tr ("Choose sample"), juce::File(), engine.getSampleLibrary().wildcard());
         juce::Component::SafePointer<PatcherEditor> safe (this);
-        sampleChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe, at] (const juce::FileChooser& chooser) {
+        lynx::ui::launchChooser (sampleChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe, at] (const juce::FileChooser& chooser) {
             const auto file = chooser.getResult();
             if (safe == nullptr || ! file.existsAsFile())
                 return;
@@ -1896,10 +1897,10 @@ private:
         const auto pluginName = plugin->getName();
         const auto folder = pluginpresetui::folderFor (pluginName);
         folder.createDirectory();
-        presetChooser = std::make_unique<juce::FileChooser> (tr ("Save preset as..."), folder.getChildFile (juce::String::fromUTF8 (patcher::nodeName (d->nodes[(std::size_t) n]).c_str()) + ".lynxpreset"),
+        presetChooser = lynx::ui::makeFileChooser (tr ("Save preset as..."), folder.getChildFile (juce::String::fromUTF8 (patcher::nodeName (d->nodes[(std::size_t) n]).c_str()) + ".lynxpreset"),
                                                              pluginpresetui::saveWildcard (*plugin));
         juce::Component::SafePointer<PatcherEditor> safe (this);
-        presetChooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting, [safe, n] (const juce::FileChooser& chooser) {
+        lynx::ui::launchChooser (presetChooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting, [safe, n] (const juce::FileChooser& chooser) {
             const auto file = chooser.getResult();
             if (safe == nullptr || file == juce::File())
                 return;
