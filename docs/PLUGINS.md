@@ -239,9 +239,9 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | Effector | Effector | Insert | Near-exact | all 12 algorithms; reverb −100 dB |
 | Maximus † | Maximus | Import | Near-exact | 96/100 demo states within −139 dB; v15 linear-phase split and Master Mid keep an approximation |
 | Soundgoodizer † | Soundgoodizer | Import | Near-exact | within −126 dB on every preset/amount |
-| Convolver † | Fruity Convolver | Import | Near-exact | −127…−152 dB; states with a shaped EQ curve are approximated |
+| Convolver † | Fruity Convolver | Import | Near-exact | −127…−152 dB; shaped EQ curves −124…−133 dB (FL's linear-phase FIR from the curve, round 173d3); the equalizer page draws and edits the curve |
 | Distructor † | Distructor | Import | Near-exact | bit-identical except the Harmor shapes and the cabinet |
-| Vocodex † | Vocodex | Import | Near-exact | −136…−145 dB (internal Sytrus carrier −112 dB) |
+| Vocodex † | Vocodex | Import | Near-exact | −136…−145 dB (internal Sytrus carrier −112 dB); all 13 maps read, edited and played (≤ −141 dB, round 173d3) |
 | Vintage Phaser | Vintage Phaser | Import | Near-exact | within −121 dB |
 | Pitch correction | Pitcher | Insert | Close | bit-exact with the reference model; MIDI mode / Harmonize get no MIDI in LYNX SHARE |
 | Newtone | Newtone | Import | Close | pass-through as FL; in slave mode the note edits (pitch offsets and transitions, drift, vibrato, tremolo, ramps, formant, volume, timing, disabled notes) rendered by LYNX SHARE's own pitch engine: against FL's own engine on 135 states every note's level within 0.4 dB and its median pitch within 9 cents, unedited notes bit-identical; legato glides with long smooth times (up to 40 c) and FL's sample re-alignment after edits differ (round 165g) |
