@@ -52,6 +52,7 @@ countries: id
 "Could not open" = "Tidak dapat membuka"
 "(imported from MIDI)" = "(diimpor dari MIDI)"
 "(imported from FL Studio)" = "(diimpor dari FL Studio)"
+"(imported from .als)" = "(diimpor dari .als)"
 "Could not save" = "Tidak dapat menyimpan"
 "File" = "File"
 "Edit" = "Edit"

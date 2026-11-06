@@ -52,6 +52,7 @@ countries: es mx ar co cl pe ve
 "Could not open" = "No se pudo abrir"
 "(imported from MIDI)" = "(importado de MIDI)"
 "(imported from FL Studio)" = "(importado de FL Studio)"
+"(imported from .als)" = "(importado de .als)"
 "Could not save" = "No se pudo guardar"
 "File" = "Archivo"
 "Edit" = "Editar"

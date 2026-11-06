@@ -52,6 +52,7 @@ countries: tw hk mo
 "Could not open" = "無法開啟"
 "(imported from MIDI)" = "（從MIDI匯入）"
 "(imported from FL Studio)" = "（從FL Studio匯入）"
+"(imported from .als)" = "(從 .als 匯入)"
 "Could not save" = "無法儲存"
 "File" = "檔案"
 "Edit" = "編輯"

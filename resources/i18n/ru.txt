@@ -52,6 +52,7 @@ countries: ru by kz
 "Could not open" = "Не удалось открыть"
 "(imported from MIDI)" = "(импорт из MIDI)"
 "(imported from FL Studio)" = "(импорт из FL Studio)"
+"(imported from .als)" = "(импортировано из .als)"
 "Could not save" = "Не удалось сохранить"
 "File" = "Файл"
 "Edit" = "Правка"
