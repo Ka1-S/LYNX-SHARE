@@ -1633,7 +1633,7 @@ public:
             s.width = 210.0 * std::clamp ((double) p[rb + 4], 0.0, 1.0);
             s.offset = -105.0 + 210.0 * std::clamp ((double) p[rb + 5], 0.0, 1.0);
             s.smoothing = std::clamp ((double) p[rb + 6], 0.0, 1.0);
-            s.pattern = p[rb + 7] < 0.25f ? 0 : (p[rb + 7] < 0.75f ? 2 : 1); // left / right, ramp (round tp172d), 8 steps
+            s.pattern = p[rb + 7] < 0.25f ? 0 : p[rb + 7] < 0.625f ? 2 : p[rb + 7] < 0.875f ? 3 : 1; // left / right, ramp ◀ / ▶ (round tp172d), 8 steps
             s.amount = std::clamp ((double) p[rb + 8], 0.0, 1.0);
             s.phase = std::clamp ((double) p[rb + 9], 0.0, 1.0);
             s.analog = p[rb + 10] < 0.25f ? 0 : (p[rb + 10] < 0.75f ? 1 : 2); // off / analog / hot
@@ -1663,6 +1663,13 @@ public:
                 rhythm.set (s);
                 rhythmSet = s;
             }
+            // round tp172d (look slice): PanMan's INPUT (-24 … +24 dB, 0 dB at the default) ahead of the panner and its analog stage
+            if (const auto gIn = (float) std::pow (10.0, autopan::inputDb (p[autopan::inputGain]) / 20.0); std::abs (gIn - 1.0f) > 1.0e-6f)
+                for (int i = 0; i < n; ++i)
+                {
+                    l[i] *= gIn;
+                    r[i] *= gIn;
+                }
             rhythm.process (l, r, n, beats, bpm);
             current = rhythm.currentPan();
             position.store (current, std::memory_order_relaxed);
@@ -3582,7 +3589,7 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
                     case 10: std::snprintf (text, sizeof (text), "%.3g beats", rhythmpan::beats (v)); break;
                     case 11: std::snprintf (text, sizeof (text), "%.1f deg", 210.0f * v); break;
                     case 12: std::snprintf (text, sizeof (text), "%+.1f deg", -105.0f + 210.0f * v); break;
-                    case 14: return v < 0.25f ? "left / right" : (v < 0.75f ? "ramp" : "8 steps");
+                    case 14: return v < 0.25f ? "left / right" : v < 0.625f ? "ramp" : v < 0.875f ? "ramp right" : "8 steps";
                     case 17: return v < 0.25f ? "digital" : (v < 0.75f ? "analog" : "analog (hot)");
                     case 18: std::snprintf (text, sizeof (text), "%+.1f dB", -24.0f + 48.0f * v); break;
                     case 19: std::snprintf (text, sizeof (text), "%+.2f oct", -3.0f + 6.0f * v); break;

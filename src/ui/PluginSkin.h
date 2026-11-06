@@ -262,9 +262,13 @@ void playOpenAnimation (juce::Component& content, Style = Style::glow);
 juce::Colour captionColour();
 juce::Colour valueColour (bool hot);
 float captionScale();
+bool lowerCaptions(); // round tp172d: the theme writes captions and plain menus in lower case
+bool ledReadouts();   // round tp172d: read-outs and stepped menus as red LED displays
+bool titleRules();    // round tp172d: the big name label between two rules
+bool vuBezel();       // round tp172d: a chrome bezel round the VU
 // round tp172d: the hardware themes' square keys (option tabs, switches) and the section being drawn (its own fill)
 bool hwKeys();
-void hwKey (juce::Graphics&, juce::Rectangle<float> area, bool lit, bool hover);
+void hwKey (juce::Graphics&, juce::Rectangle<float> area, bool lit, bool hover, juce::Colour litColour = {}); // (litColour: the accent when transparent)
 void setSectionOrdinal (int ordinal); // -1 = none
 void setOnDarkFill (bool dark);      // the next items sit on a dark section fill: light legends
 bool sectionFillIsDark (int ordinal); // the theme fills that top-level section dark

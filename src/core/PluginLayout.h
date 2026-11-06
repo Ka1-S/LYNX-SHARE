@@ -50,8 +50,11 @@ enum : std::uint16_t
     raised = 1 << 10,     // section: a lighter inset panel inside another one
     inverted = 1 << 11,   // toggle: lit while the value is off (FL's white "enabled" LEDs over mute switches)
     captionAbove = 1 << 12, // knob: the caption above the knob and the value under it (the reference reverbs' panels, round 114)
+                            // (tp172d: on a hardware-key toggle, a small key on a joining line, its caption under it)
     momentary = 1 << 13,  // toggle: a push button (never shown lit); each click flips the value, which the engine reads
                           // as "pressed" (Nebula's Clear, round 129)
+    plainMenu = 1 << 14,  // menu: just its value as text (the originals' "reverb mode: mono"); a click opens the menu
+    wordmark = 1 << 15,   // label: the plugin's name as a wide-spaced title; "a|b" = a light first word, a dark second
 };
 
 struct LayoutItem
