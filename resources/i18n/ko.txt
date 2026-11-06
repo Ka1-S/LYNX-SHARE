@@ -7306,3 +7306,8 @@ countries: kr
 "None|Smooth|Op-El|Mastering" = "없음|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "스타일 대신 쓰는 컴프레서 캐릭터 세 가지: 스무스, 광전자식, 마스터링"
 "Wheels" = "휠"
+"Animation rate" = "애니메이션 속도"
+"Display (default)" = "디스플레이 (기본값)"
+"60 Hz" = "60 Hz"
+"30 Hz" = "30 Hz"
+"How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); 60 Hz or 30 Hz use less CPU on slower computers." = "재생 헤드, 미터, 스코프가 움직이는 빈도입니다. 디스플레이는 화면 주사율을 따릅니다(가장 부드러움). 60 Hz 또는 30 Hz는 느린 컴퓨터에서 CPU를 덜 사용합니다."

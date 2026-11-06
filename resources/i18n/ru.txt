@@ -7306,3 +7306,8 @@ countries: ru by kz
 "None|Smooth|Op-El|Mastering" = "Нет|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Ещё три характера компрессора вместо стиля: мягкий, оптоэлектронный или мастеринг"
 "Wheels" = "Колёса"
+"Animation rate" = "Частота анимации"
+"Display (default)" = "Дисплей (по умолчанию)"
+"60 Hz" = "60 Гц"
+"30 Hz" = "30 Гц"
+"How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); 60 Hz or 30 Hz use less CPU on slower computers." = "Как часто движутся курсор воспроизведения, индикаторы уровня и осциллографы. «Дисплей» следует частоте обновления экрана (плавнее всего); 60 Гц или 30 Гц расходуют меньше ресурсов CPU на медленных компьютерах."

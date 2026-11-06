@@ -64,6 +64,12 @@
 #    MidiEventList now numbers the host's note ons (per plugin, counting up) and gives each note off the id of the
 #    oldest sounding note on the same channel and key (poly pressure: that note's id too; none: -1 as before).
 #
+# 15. Windows only, juce_graphics/native/juce_Direct2DImage_windows.cpp (round 174e2): every Graphics drawing into a
+#    Direct2D image ends with a full GPU -> CPU readback of the image into its software copy (JUCE keeps both). For
+#    the Playlist's and the Mixer's cached pictures (redrawn while scrolling, 1920x1000 px) that readback cost more than
+#    the drawing. A context made while juce::lynxSkipImageReadback is set skips it; LYNX sets it only around images it
+#    never reads back (the picture is only drawn to the window; a new device gets a full repaint anyway).
+#
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
 
@@ -128,6 +134,16 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("menu accelerator keys" "LYNX patch (round 170a): accelerator letters"
             "            dismissMenu (nullptr);|NL|        }|NL|        else|NL|        {|NL|            return false;|NL|        }"
             "            dismissMenu (nullptr);|NL|        }|NL|        else if (! lynxMenuMnemonic (key)) // LYNX patch (round 170a): accelerator letters|NL|        {|NL|            return false;|NL|        }")
+    elseif(file MATCHES "juce_Direct2DImage_windows.cpp$")
+        lynx_juce_fix("image contexts without readback" "LYNX patch (round 174e2): no readback flag"
+            "/*  Returns new software bitmap storage with content matching the provided hardware bitmap. */"
+            "// LYNX patch (round 174e2): no readback flag. Contexts made while it is set do not copy the image back to its|NL|// software copy when they end (cmake/LynxPatchJuce.cmake, fix 15)|NL|bool lynxSkipImageReadback = false;|NL||NL|/*  Returns new software bitmap storage with content matching the provided hardware bitmap. */")
+        lynx_juce_fix("image contexts without readback (end)" "LYNX patch (round 174e2): readback skipped"
+            "            endFrame();|NL|            readFromDirect2DBitmap (storedContext, storedTarget, backup);"
+            "            endFrame();|NL|            if (! skipReadback) // LYNX patch (round 174e2): readback skipped when asked|NL|                readFromDirect2DBitmap (storedContext, storedTarget, backup);")
+        lynx_juce_fix("image contexts without readback (member)" "LYNX patch (round 174e2): the flag when made"
+            "        ImagePixelData::Ptr backup;|NL|    };"
+            "        ImagePixelData::Ptr backup;|NL|        const bool skipReadback = lynxSkipImageReadback; // LYNX patch (round 174e2): the flag when made|NL|    };")
     elseif(file MATCHES "juce_Windowing_linux.cpp$")
         lynx_juce_fix("no X focus for menu windows" "LYNX patch (issue #45): never takes the X focus"
             "    void grabFocus() override|NL|    {|NL|"
@@ -184,6 +200,7 @@ function(lynx_patch_juce juce_dir)
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/desktop/juce_Displays.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_XWindowSystem_linux.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/native/juce_CoreGraphicsContext_mac.mm")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/native/juce_Direct2DImage_windows.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3Common.h")
 endfunction()
 

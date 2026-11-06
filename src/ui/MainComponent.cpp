@@ -1943,6 +1943,11 @@ void MainComponent::loadUiSettings()
             skin::overridesFromString (line.fromFirstOccurrenceOf ("=", false, false).trim());
         else if (key == "reducedEffects")
             skin::setReducedEffects (on);
+        else if (key == "animationRate") // round 174e2: 0 = the display's refresh, else 60 / 30
+        {
+            const auto hz = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue();
+            ui::FrameTicker::rateLimit() = hz == 30 || hz == 60 ? hz : 0;
+        }
         else if (key == "artMotion")
             skin::setArtMotion (on);
         else if (key == "waveStereo")
@@ -2107,6 +2112,7 @@ void MainComponent::saveUiSettings()
                                       + "\nrackPlayheadColumn=" + juce::String (ChannelRackComponent::playheadColumn.load() ? 1 : 0)
                                       + "\nrackStepsChannelColour=" + juce::String (ChannelRackComponent::stepsChannelColour.load() ? 1 : 0)
                                       + "\nreducedEffects=" + juce::String (skin::reducedEffects() ? 1 : 0)
+                                      + "\nanimationRate=" + juce::String (ui::FrameTicker::rateLimit())
                                       + "\nartMotion=" + juce::String (skin::artMotion() ? 1 : 0)
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
                                       + "\npluginStyleOverrides=" + skin::overridesToString()
@@ -5048,6 +5054,7 @@ void MainComponent::openSettings (int page)
         o.rackPlayheadColumn = ChannelRackComponent::playheadColumn.load();
         o.rackStepsChannelColour = ChannelRackComponent::stepsChannelColour.load();
         o.reducedEffects = skin::reducedEffects();
+        o.animationRate = ui::FrameTicker::rateLimit();
         o.artMotion = skin::artMotion();
         o.gpuRendering = gpuRenderingEnabled();
         o.pluginStyle = skin::forcedStyle();
@@ -5084,6 +5091,7 @@ void MainComponent::openSettings (int page)
             self.setToolbarLayout (layout, true);
         }
         theme::menus::setCompact (o.compactMenus);
+        ui::FrameTicker::rateLimit() = o.animationRate; // (the tickers read it every frame)
         if (o.reducedEffects != skin::reducedEffects() || o.pluginStyle != skin::forcedStyle() || o.artMotion != skin::artMotion())
         {
             skin::setArtMotion (o.artMotion);

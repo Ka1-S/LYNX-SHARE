@@ -7306,3 +7306,8 @@ countries: es mx ar co cl pe ve
 "None|Smooth|Op-El|Mastering" = "Ninguno|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Tres caracteres de compresor más, en lugar del estilo: suave, optoelectrónico o masterización"
 "Wheels" = "Ruedas"
+"Animation rate" = "Frecuencia de animación"
+"Display (default)" = "Pantalla (predeterminado)"
+"60 Hz" = "60 Hz"
+"30 Hz" = "30 Hz"
+"How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); 60 Hz or 30 Hz use less CPU on slower computers." = "Con qué frecuencia se mueven el cursor de reproducción, los medidores y los osciloscopios. Pantalla sigue la frecuencia de actualización de tu monitor (lo más fluido); 60 Hz o 30 Hz usan menos CPU en ordenadores más lentos."

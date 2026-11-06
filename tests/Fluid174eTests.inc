@@ -70,3 +70,39 @@ TEST (fluid174e_meter_dirty_rows)
     r = lynx::meters::dirtyRows (a, b, 100, lin);
     CHECK (! r.empty() && r.top >= 28 && r.bottom <= 33);
 }
+
+// Round 174e2: Settings › General › Animation rate. A capped animation runs on evenly spread display frames, the same
+// frames for every animation with that cap.
+#include "core/FramePacing.h"
+
+TEST (fluid174e2_frame_pacing)
+{
+    auto count = [] (double perFrame, int frames, int start = 1000) {
+        int n = 0, longestGap = 0, gap = 0;
+        for (int i = start; i < start + frames; ++i)
+        {
+            ++gap;
+            if (lynx::framepace::runs ((double) i, perFrame))
+            {
+                ++n;
+                longestGap = std::max (longestGap, gap);
+                gap = 0;
+            }
+        }
+        return std::make_pair (n, longestGap);
+    };
+    // a 144 Hz display, one second
+    CHECK (count (1.0, 144).first == 144);           // the display's rate
+    CHECK (count (170.0 / 144.0, 144).first == 144); // a cap above the refresh: every frame
+    CHECK (count (72.0 / 144.0, 144) == std::make_pair (72, 2));
+    const auto at60 = count (60.0 / 144.0, 144);
+    CHECK (at60.first >= 59 && at60.first <= 61 && at60.second <= 3); // 60 Hz: every 2nd or 3rd frame
+    const auto at30 = count (30.0 / 144.0, 144);
+    CHECK (at30.first >= 29 && at30.first <= 31 && at30.second <= 5);
+    // a 60 Hz display with a 30 Hz cap: every other frame; with the toolbar's 72 Hz cap: every frame
+    CHECK (count (0.5, 60).first == 30);
+    CHECK (count (72.0 / 60.0, 60).first == 60);
+    // two animations with the same cap run on the same frames
+    for (int i = 0; i < 500; ++i)
+        CHECK (lynx::framepace::runs ((double) i, 60.0 / 144.0) == lynx::framepace::runs ((double) i, 60.0 / 144.0));
+}

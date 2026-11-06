@@ -7306,3 +7306,8 @@ countries: nl be
 "None|Smooth|Op-El|Mastering" = "Geen|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Nog drie compressorkarakters, in plaats van de stijl: zacht, opto-elektronisch of mastering"
 "Wheels" = "Wielen"
+"Animation rate" = "Animatiesnelheid"
+"Display (default)" = "Scherm (standaard)"
+"60 Hz" = "60 Hz"
+"30 Hz" = "30 Hz"
+"How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); 60 Hz or 30 Hz use less CPU on slower computers." = "Hoe vaak de afspeelkop, meters en scopes bewegen. Scherm volgt de verversingsfrequentie van je monitor (het vloeiendst); 60 Hz of 30 Hz gebruiken minder CPU op langzamere computers."

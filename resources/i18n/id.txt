@@ -7306,3 +7306,8 @@ countries: id
 "None|Smooth|Op-El|Mastering" = "Tidak ada|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Tiga karakter kompresor lagi, dipakai menggantikan gaya: halus, opto-elektronik, atau mastering"
 "Wheels" = "Roda"
+"Animation rate" = "Laju animasi"
+"Display (default)" = "Layar (default)"
+"60 Hz" = "60 Hz"
+"30 Hz" = "30 Hz"
+"How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); 60 Hz or 30 Hz use less CPU on slower computers." = "Seberapa sering playhead, meter, dan osiloskop bergerak. Layar mengikuti refresh rate monitor Anda (paling halus); 60 Hz atau 30 Hz memakai lebih sedikit CPU di komputer yang lebih lambat."
