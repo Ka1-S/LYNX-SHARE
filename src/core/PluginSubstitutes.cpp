@@ -1694,6 +1694,8 @@ int translateHarrisonStrip (const std::vector<std::uint8_t>& state, EffectSlot& 
         p[r::compRelease] = logNorm (at ("compressor_release", 50.0) / 1000.0, 0.1, 4.0);
         p[r::compFastAttack] = at ("compressor_attack", 20.0) < 3.0 ? 1.0f : 0.0f;
         p[r::compMix] = (float) std::clamp (at ("CompMix", 100.0) / 100.0, 0.0, 1.0);
+        // tp172c10: its reduction stops at exactly 27.5 dB (H32_dyn stairs, Compressor and Limiter at low thresholds)
+        p[r::compGrCap] = compIn ? (float) (27.5 / 60.0) : 0.0f;
         if (compIn)
             outDb += at ("compressor_makeup_gain", 0.0) + (sw ("CompAutoMakeUp", true) ? harrison::autoMakeupDb (thr, ratio) : 0.0);
         // gate (gate_mode 1 = the 1:2 expander), depth = the range

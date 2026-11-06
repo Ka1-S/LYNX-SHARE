@@ -212,6 +212,20 @@ TEST (ridge_harrison_strips_translated_tp172c5)
         const auto d = c32 (p32 ("compressor_ratio", 30.0) + p32 ("compressor_threshold", -45.0) + p32 ("CompAutoMakeUp", 0.0));
         CHECK (std::abs (r::compThresholdDb (d.params[r::compThreshold]) + 40.0) < 1e-3 && std::abs (r::trimDb (d.params[r::input]) - 4.0) < 0.01);
         CHECK (std::abs (r::trimDb (d.params[r::output]) + 4.0) < 0.01);
+        // tp172c10: its reduction stops at 27.5 dB (hidden, saved with the slot); the Leveler (no compressor) has none
+        CHECK (std::abs (r::compGrCapDb (d.params[r::compGrCap]) - 27.5) < 1e-3);
+        CHECK (std::abs ((0.0 - r::compressorCurveDb (d.params, 0.0)) - 27.5) < 1e-3);
+        CHECK (r::compGrCapDb (makeEffectSlot (EffectKind::ridgeStrip).params[r::compGrCap]) > 1e6);
+        auto fx = makeEffect (EffectKind::ridgeStrip);
+        fx->prepare (48000.0);
+        std::vector<float> l (24000), rr (24000);
+        for (int i = 0; i < 24000; ++i) l[(std::size_t) i] = rr[(std::size_t) i] = 0.7f * (float) std::sin (2.0 * 3.14159265358979 * 1000.0 * i / 48000.0);
+        for (int at = 0; at < 24000; at += 512)
+            fx->process (l.data() + at, rr.data() + at, std::min (512, 24000 - at), d.params, 120.0);
+        double e = 0;
+        for (std::size_t i = 12000; i < l.size(); ++i) e += (double) l[i] * l[i];
+        const auto outDb = 10.0 * std::log10 (e / 12000.0), inDb = 20.0 * std::log10 (0.7 / std::sqrt (2.0));
+        CHECK (outDb - inDb > -27.5 - 1.0 && outDb - inDb < -27.5 + 1.0); // +4 dB in, -4 dB out: the cap alone
     }
     CHECK (std::abs (r::gateRangeDb (s.params[r::gateRange]) - 20.0) < 1e-3 && s.params[r::expander] > 0.5f);
     CHECK (std::abs (r::lfHz (s.params[r::lfFreq]) - 174.2) < 0.5 && std::abs (r::bandGainDb (s.params[r::lfGain], false) - 11.67) < 0.01);

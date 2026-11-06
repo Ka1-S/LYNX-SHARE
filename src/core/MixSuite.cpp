@@ -556,11 +556,14 @@ double responseDb (const EffectParams& p, double sampleRate, double hz)
     return gainToDb (m);
 }
 
+double compGrCapDb (float v) noexcept { return v > 1e-6f ? 60.0 * std::min (1.0f, v) : 1e9; }
+
 double compressorCurveDb (const EffectParams& p, double inputDb)
 {
     if (modernVoicing (p)) // round tp172c: the Modern voicing's measured law
         return vmatch::strip2::compStaticDb (modernSettingsOf (p), inputDb);
-    return gainComputer (inputDb, compThresholdDb (p[compThreshold]), ratio (p[compRatio]));
+    const auto out = gainComputer (inputDb, compThresholdDb (p[compThreshold]), ratio (p[compRatio]));
+    return std::max (out, inputDb - compGrCapDb (p[compGrCap]));
 }
 
 // ---- round tp172c6: the DRIVE section ----
@@ -1059,6 +1062,7 @@ public:
 
         // compressor
         const auto thr = compThresholdDb (p[compThreshold]), rat = ratio (p[compRatio]);
+        const auto grCap = compGrCapDb (p[compGrCap]);
         const auto compAttack = coef (on (p[compFastAttack]) ? 0.001 : 0.010, sr);
         const auto compRel = coef (releaseSeconds (p[ridge::compRelease]), sr);
         const auto cmix = (float) std::clamp (p[compMix], 0.0f, 1.0f);
@@ -1116,7 +1120,7 @@ public:
                 if (compOn)
                 {
                     const auto x = gainToDb (peak) - gateGr;
-                    const auto want = x - gainComputer (x, thr, rat);
+                    const auto want = std::min (x - gainComputer (x, thr, rat), grCap);
                     compGr = want > compGr ? compAttack * compGr + (1.0 - compAttack) * want
                                            : compRel * compGr + (1.0 - compRel) * want;
                 }

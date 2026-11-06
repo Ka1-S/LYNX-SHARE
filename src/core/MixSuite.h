@@ -135,8 +135,13 @@ enum Param
     // (before the output trim in Ridge's own engine, after the voicings' own output): a static curve per model and
     // drive position (fitted on the trials' stairs, 4x oversampled), its tone, an input gain into it, a trim and a mix
     driveOn, driveModel, driveAmount, driveInput, driveTrim, driveMix,
-    count
+    count,
+    // round tp172c10, hidden (not in the info, saved only while non-zero): the compressor's largest gain reduction
+    // (0 = none, else 60 dB x the value), set by the Harrison 32Classic translation (that console caps it at 27.5 dB;
+    // the original has no control for it)
+    compGrCap = count
 };
+double compGrCapDb (float v) noexcept;   // 0 = no cap (a huge value), else 0 .. 60 dB
 // round tp172c6: the drive models (DRIVE section), in the Model selector's order
 enum DriveModel { driveSaturate, driveConsoleE, driveConsoleG, driveConsoleA, driveConsoleN, driveConsoleY, driveTube,
                   driveGuitarAmp, driveBassAmp, driveModels };
