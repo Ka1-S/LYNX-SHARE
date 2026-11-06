@@ -1236,19 +1236,12 @@ struct Converter
             a.name = arrangement.name;
             for (const auto& m : current ? song.markers() : arrangement.markers)
                 a.markers.push_back (marker (m));
-            int muted = 0;
             for (const auto& clip : clips)
-            {
-                if (clip.muted)
-                {
-                    ++muted; // (FL's clip mute is not in the model: a muted clip is left out, as it is heard)
-                    continue;
-                }
                 if (auto item = playlistItem (clip))
+                {
+                    item->flags = clip.muted ? 0x2040 : 0x40; // FL's clip mute (round 177c)
                     a.items.push_back (*item);
-            }
-            if (muted > 0)
-                report.notes.push_back ("Arrangement '" + a.name + "': " + std::to_string (muted) + " muted clip(s) left out");
+                }
             std::stable_sort (a.items.begin(), a.items.end(), [] (const flp::PlaylistItem& x, const flp::PlaylistItem& y) { return x.position < y.position; });
             for (int t = 0; t < (int) song.playlistTracks.size() && t < 500; ++t)
                 a.tracks.push_back (trackInfo (song.playlistTracks[(std::size_t) t], t));

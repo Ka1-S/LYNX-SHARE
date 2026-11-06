@@ -264,3 +264,32 @@ TEST (comp177_a_take_never_replaces_clips_of_an_ordinary_group)
     CHECK (comp::groupOf (song, 0).lanes() == 1);       // no lane was added
     CHECK (song.playlist.size() == 2 && song.playlist.back().track >= 2); // the take went to a new track, as before
 }
+
+TEST (comp177_fl_clip_mute_survives_import_and_export)
+{
+    using namespace lynx;
+    // FL's item flag 0x2000 = muted clip (FL's Mute tool toggled it, and FL leaves loop-recorded takes muted when "Blend
+    // recorded notes" is off): such a clip must stay silent in LYNX and come back muted in FL
+    auto song = comp177::loopTakes();
+    int muted = 0, playing = 0;
+    for (const auto& c : song.playlist)
+        ++(c.muted ? muted : playing);
+    CHECK (muted == 3 && playing == 1);
+    flpexport::Options options;
+    flpexport::Report report;
+    const auto project = flp::parseProject (flpexport::exportFlp (song, options, report));
+    CHECK (project.arrangements.size() == 1);
+    if (project.arrangements.size() == 1)
+    {
+        CHECK (project.arrangements[0].items.size() == 4);
+        int flagged = 0;
+        for (const auto& item : project.arrangements[0].items)
+            flagged += item.muted() ? 1 : 0;
+        CHECK (flagged == 3);
+    }
+    const auto back = importFlp (project, {});
+    int mutedBack = 0;
+    for (const auto& c : back.playlist)
+        mutedBack += c.muted ? 1 : 0;
+    CHECK (back.playlist.size() == 4 && mutedBack == 3);
+}

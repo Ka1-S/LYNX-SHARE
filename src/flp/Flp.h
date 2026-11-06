@@ -309,7 +309,9 @@ struct PlaylistItem
     int track = 0;               // 0 = first playlist track
     Kind kind = Kind::pattern;
     int index = 0;               // pattern index, or channel index (audio/automation clip)
+    // 0x0040 is always set; 0x2000 = the clip is muted (FL's Mute tool toggles it: observed round 177c, §2)
     std::uint16_t flags = 0;
+    bool muted() const noexcept { return (flags & 0x2000) != 0; }
 
     // The same 8 bytes mean different things per clip type:
     //  - pattern: two int32 in ticks (start/end of the pattern section); -1 = no trimming

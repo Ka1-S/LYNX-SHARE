@@ -21,25 +21,84 @@ Evidence markers: [STR] strings in the vendor's own binary, [DOC] vendor manual,
 | Flatten | ❌ | — |
 | More takes over an existing comp | ❌ went to a new track below everything | [CODE] `takes::takeTrack` |
 
-## 2. FL Studio 2026 [STR][DOC]
+## 2. FL Studio 2026 (v26.1.7 build 5654)
 
-Strings in `FLEngine_x64.dll` (FL 2026, `strings -n5`, ASCII + UTF-16):
-- Mixer › Disk recording: `Group loop recorded takes`, `Ignore silent takes`, `Loop recording`, `Loop record`.
-- The lanes' name format `%s (Take %d)`; MIDI: `midi loop recording (take %d)`, `Put each take in a separate pattern`,
-  `Merge takes to a single pattern`, `Sample multiple takes`.
-- Undo: `Undoing an entry with a take that was discarded`.
-- No string for a comp lane, a swipe/comp tool, take audition or flatten.
+Added marker: [OBS] seen in FL's window and read back from the `.flp` FL saved. Saved test project:
+`E:\lynx-work\comp177c\fl\takes-final.flp` with its WAVs in `fl\Project_1\Audio`; shots in `E:\lynx-work\comp177c\fl\`
+(`c0x`, `c13c`, `c18c`, `d08c`, `e05c`, `f00`).
 
-FL's manual (recording_audio.htm, see §4) describes Playlist loop recording: each pass becomes an audio clip, "Blend
-recording" decides whether earlier passes stay audible, and the advice for combining takes is to bounce, or to use
-Edison's loop markers (arrows step between takes, Shift+C sends a selection to the Playlist). Since FL 20.1, takes of
-the same input appear as tracks grouped under the parent (Neowin 20.1 notes, §4).
+### 2.1 Observed [OBS]
 
-**Verdict (inferred, not yet observed):** the strings and the web sources point to FL storing takes as ordinary grouped
-Playlist tracks (`.flp` 0xEE byte 46 "grouped with above", which LYNX already imports, round 104). If so, an FL project's
-loop-recorded takes open in LYNX as a group with lanes, with no new import code. Not checked yet: a real FL recording or
-`.flp` with takes, which track FL's last pass lands on, and whether FL mutes the earlier passes. An FL GUI session has
-been requested to check these. FL shows no comping in its strings or manual, so comping is a LYNX addition.
+Setup, every run: Song mode, a 2-bar Playlist loop region, record filter "Audio, into the playlist as an audio clip", FL
+Studio ASIO In 1–In 2 on one insert named "REC", Recording starts playback on.
+
+| Run | Loop record | Blend recorded notes | Passes | Tracks | Grouped (`.flp` 0xEE byte 46) | Clip flags |
+|---|---|---|---|---|---|---|
+| R1 | on | off | 1 (stopped early, 226 ticks) | 1 | no | 0x2040 muted |
+| R2 | on | off | 4 (last 303 ticks) | 2–5 | 2 no, 3–5 yes | all 0x2040 muted |
+| R3 | on | off | 2 (last 745 ticks) | 6–7 | 6 no, 7 yes | all 0x2040 muted |
+| R4 | off | off | 1 (768 ticks, the full region) | 8 | no | 0x40 plays |
+| R5 | on | on | 3 (last 223 ticks) | 9–11 | 9 no, 10–11 yes | all 0x40 play |
+
+R0, before a machine reboot, was seen only on screen and its project was lost: 4 clips on tracks 1–4, grey like R2.
+
+- **Where each pass lands:** one track per pass, in time order. The **first** pass is on top and is the group's header,
+  the **last** pass is at the bottom.
+- **Muting:** with Blend off, **every** pass is muted after Stop, the last one too. With Blend on, every pass plays.
+- **Limit of that finding:** every Blend-off run was stopped partway through its last pass. A stop exactly on a pass
+  boundary was not tested.
+- **`0x2000` = muted clip, proven:** FL's Mute tool on the track 7 clip changed its flags from `0x2040` to `0x40` and its
+  look from grey to bright, in the next saved `.flp`. REA_rodada2 had this as a hypothesis.
+- **Recording again over the same range:** FL uses the **next free track** and starts a **new group**. It joins no earlier
+  group, replaces nothing and shifts no track.
+- **Files:** one WAV and one audio-clip channel per pass (`..._REC`, `_REC_2`, `_REC_3`), all routed to the same insert.
+- **Group storage:** ordinary tracks. Header `grouped` 0, members 1, `expanded` (byte 61) 1, so the group is **not folded**;
+  track mode 0, mixer −1. No take or comp record was found in the fields read.
+- **Names:** in R0 all four tracks took the insert's name "REC". In R2–R5 the tracks kept "Track N". The `%s (Take %d)`
+  string did not appear on these audio takes.
+- **Loop record off (R4):** a single unmuted clip the length of the region. Whether FL kept recording past the region end
+  was not determined.
+
+Not observed: the state of Mixer › Disk recording › "Group loop recorded takes" (the menu did not show in my shots, so
+only its effect is known), that option off, Pattern mode, Edison.
+
+FL settings changed in this session: Loop record on, Metronome off, Recording precount off, Blend recorded notes on
+(left on). An accidental click opened "Remote control settings" for Master Volume; it was closed with X, with nothing
+linked as far as the shots show.
+
+### 2.2 Strings [STR] and manual [DOC]
+
+`FLEngine_x64.dll`: `Group loop recorded takes`, `Ignore silent takes`, `Loop recording`, `Blend recorded notes`,
+`%s (Take %d)`, `midi loop recording (take %d)`, `Put each take in a separate pattern`, `Merge takes to a single
+pattern`. No string for a comp lane, a swipe tool, take audition or flatten was found by this keyword search, and FL's
+manual describes none (recording_audio.htm, §4).
+
+### 2.3 Inferred, not observed
+
+- FL has no comping: inferred from the absence above and from users asking for it, not from an exhaustive REA.
+- FL's project import in LYNX: the group flags import (Flp.cpp). A real `.flp` of takes has not yet been checked on screen
+  in LYNX.
+
+### 2.4 LYNX bug found: FL's clip mute was lost
+
+`FlpImport` never read the `0x2000` flag, so all of FL's muted takes **played at once** in LYNX, and `FlpExport` dropped
+muted clips. Fixed: `PlaylistItem::muted()`, imported for pattern, audio and automation clips, and exported as `0x2040`.
+Test: `comp177_fl_clip_mute_survives_import_and_export`.
+
+### 2.5 How LYNX differs from FL
+
+| | FL, Blend off | FL, Blend on | LYNX main (round 163) | wip 177c |
+|---|---|---|---|---|
+| Top track | first pass | first pass | last pass | last pass (a copy) |
+| Order below it | oldest to newest | oldest to newest | newest to oldest | newest to oldest |
+| What plays after Stop | **nothing** | **every pass** | last pass | last pass |
+| Tracks for n passes | n | n | n | **n + 1** |
+| Group after recording | open | open | folded | folded |
+| Files | one per pass | one per pass | one, with offsets | one, with offsets |
+| Recording again over it | next free track, new group | same | next free track, no group for a single take | **more lanes in the group; can insert tracks and shift lower tracks** |
+
+The first three columns are all of FL's and main's behaviour that this round checked; main's own differences predate this
+round.
 
 ## 3. Ableton Live 12 [STR][DOC]
 
@@ -96,12 +155,12 @@ complain about (§4).
 
 | Piece | FL | Live 12 | Users | LYNX verdict |
 |---|---|---|---|---|
-| Where takes live | grouped Playlist tracks | take lanes inside the track | FL users want takes nested and folded | **FL's grouped tracks, folded under the comp track** (FL-compatible both ways, no new format) |
+| Where takes live | grouped Playlist tracks, first pass on top, open [OBS] | take lanes inside the track | FL users want takes nested and folded | **FL's grouped tracks** (no new format). Layout and folding: pending the user's decision, §8 |
 | Comp model | — | main lane holds copies; sources derived and highlighted | Logic: multiple comps per folder | **copies on the comp track; the source is derived** (same channel and audio-to-song alignment). It costs nothing and saves, exports and imports as plain clips. Several comps per group are not done (§7) |
 | Choosing a part | — | selection + Enter, or Draw-mode drag | Logic's swipe with the normal tool is the favourite | **swipe on a lane** (UI slice 177c-2), plus the old "Promote" menu, now a swipe |
 | Crossfade at a switch | — | 4 ms on clip edges, optional (clicks without it) | clicks are the top complaint; length should be adjustable | **always on, equal power, centred on the switch, 5 ms default, 0–100 ms per project** (`Song::compCrossfadeMs`; 0 = hard cut). It is shortened only where a take has no audio past the switch |
-| The last take | — | copied to the main lane, and has a lane | — | **now also on a lane** (before: only on the comp, lost after a swipe) |
-| Recording again over a comp | sub-tracks under the parent (20.1) | new lanes in the same track | — | **new lanes under the comp track, newest first; the newest take goes to the comp where it was recorded** (loop passes and punch takes) |
+| The last take | its own track, muted or playing per Blend [OBS] | copied to the main lane, and has a lane | — | Coded as a lane plus a copy on the comp. Differs from FL: pending §8 |
+| Recording again over a comp | next free track, new group [OBS] (the 20.1 notes said sub-tracks of the parent; not what 2026 did here) | new lanes in the same track | — | Coded as new lanes under the comp track. Differs from FL and can shift tracks: pending §8 |
 | Audition a lane | — | T / speaker button, one lane per track | — | **`Song::auditionLane`**: that lane plays (its muted takes too) instead of the comp. Not saved, no undo entry |
 | Flatten | — | none (consolidate) | Logic: Flatten, and Flatten and Merge; FL users ask for one-click flatten | **Flatten**: the comp stays, the lanes go. Merge to one file = the existing "Consolidate this track" (QuickRender) |
 | Insert take lane | — | Create › Insert Take Lane | — | **`comp::makeLanes`**: a track's audio becomes lane "take 1", so the next take over it becomes a lane too |
@@ -169,4 +228,5 @@ Tests (tests/Comp177Tests.inc, Rec163Tests.inc updated):
   tracks are inserted or removed and before an export, because `scheduleSong` follows it there too.
 - Behaviour changes awaiting a decision: the last pass's extra lane, and lanes inserted under a comp pushing lower tracks
   down.
-- Live .als take-lane import: LYNX has no .als importer yet (ALS-FORMAT.md documents `TakeLanes`).
+- Live .als take-lane import: `core/AlsImport` landed (round 175a); whether it maps `TakeLanes` to lanes is not part of this
+  round (ALS-FORMAT.md documents them).
