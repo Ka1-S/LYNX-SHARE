@@ -1140,8 +1140,10 @@ private:
                                juce::String::fromUTF8 (kneeOpen ? "\xc2\xab" : "\xc2\xbb"), false, tr ("Knee: show the transfer curve"))); // (a grey tab, as the reference's)
         // the knob row over the bottom of the display
         const auto by = p.getBottom() - 190.0f;
-        out.push_back (knob ({ 96.0f, by, 104.0f, 118.0f }, threshold, tr ("Threshold"), 2));
-        out.push_back (toggle ({ 108.0f, by - 26.0f, 80.0f, 20.0f }, autoThreshold, tr ("Auto")));
+        // round tp172b5: no Auto buttons — AUTO is a word in the caption (AUTO THRESHOLD, AUTO RELEASE, AUTO GAIN), clicked
+        // there, dim when off and lit when on, as the reference prints it
+        const auto withAuto = [] (Ctl c, int a) { c.autoParam = a; return c; };
+        out.push_back (withAuto (knob ({ 96.0f, by, 104.0f, 118.0f }, threshold, tr ("Threshold"), 2), autoThreshold));
         out.push_back (knob ({ 214.0f, by, 104.0f, 118.0f }, ratio, tr ("Ratio"), 2));
         // round tp172b4: the style button at the knobs' height, then the character and the voicing under it (labelled),
         // where the reference keeps its character control
@@ -1156,10 +1158,8 @@ private:
         // round tp172b2: Pro-C 3's Smooth / Op-El / Mastering characters, a voicing over the style
         out.push_back (barMenu ({ 318.0f, by + 82.0f, 128.0f, 18.0f }, voicing, tr ("Voicing"), "None|Smooth|Op-El|Mastering"));
         out.push_back (knob ({ 446.0f, by, 104.0f, 118.0f }, attack, tr ("Attack"), 2));
-        out.push_back (knob ({ 564.0f, by, 104.0f, 118.0f }, release, tr ("Release"), 2));
-        out.push_back (toggle ({ 576.0f, by - 26.0f, 80.0f, 20.0f }, autoRelease, tr ("Auto")));
-        out.push_back (knob ({ 680.0f, by - 6.0f, 62.0f, 82.0f }, P ("Output"), tr ("Gain"), 1, true));
-        out.push_back (toggle ({ 670.0f, by + 76.0f, 82.0f, 20.0f }, autoGain, tr ("Auto gain")));
+        out.push_back (withAuto (knob ({ 564.0f, by, 104.0f, 118.0f }, release, tr ("Release"), 2), autoRelease));
+        out.push_back (withAuto (knob ({ 680.0f, by - 6.0f, 62.0f, 82.0f }, P ("Output"), tr ("Gain"), 1, true), autoGain));
         out.push_back (knob ({ 680.0f, by + 100.0f, 62.0f, 82.0f }, dryGain, tr ("Dry")));
         // the display's scale (bottom right, like the reference's dB box) and the input meter switch
         out.push_back (menu ({ p.getRight() - 16.0f, p.getBottom() - 20.0f, 60.0f, 20.0f }, meterScale, {}, "9 dB|18 dB|36 dB|72 dB|90 dB"));
@@ -1961,9 +1961,9 @@ private:
             add (knob ({ a.getX() + 446.0f, a.getY() + 14.0f, 70.0f, 90.0f }, bp (b, fLevel), tr ("Output"), 1, true));
             add (tabs ({ a.getX() + 86.0f, a.getY() + 128.0f, 184.0f, 26.0f }, bp (b, fMode), "Compress|Expand"));
             // round tp172b5: RATIO, KNEE and LOOKAHEAD are horizontal sliders, as the reference's band panel draws them
-            add (hslider ({ a.getX() + 284.0f, a.getY() + 118.0f, 80.0f, 44.0f }, bp (b, fRatio), tr ("Ratio")));
-            add (hslider ({ a.getX() + 362.0f, a.getY() + 118.0f, 80.0f, 44.0f }, bp (b, fKnee), tr ("Knee")));
-            add (hslider ({ a.getX() + 440.0f, a.getY() + 118.0f, 80.0f, 44.0f }, bandLookaheadParam (b), tr ("Lookahead")));
+            add (hslider ({ a.getX() + 284.0f, a.getY() + 118.0f, 72.0f, 44.0f }, bp (b, fRatio), tr ("Ratio")));
+            add (hslider ({ a.getX() + 364.0f, a.getY() + 118.0f, 72.0f, 44.0f }, bp (b, fKnee), tr ("Knee")));
+            add (hslider ({ a.getX() + 444.0f, a.getY() + 118.0f, 72.0f, 44.0f }, bandLookaheadParam (b), tr ("Lookahead")));
             add (knob ({ a.getX() + 522.0f, a.getY() + 112.0f, 66.0f, 54.0f }, bandPanParam (b), tr ("Pan"), 0, true)); // round 135: the band's output balance
             // round 144: the crossover slope (one for every band) and the side-chain input, in the band panel
             out.push_back (menu ({ a.getX() + 522.0f, a.getY() + 36.0f, 70.0f, 22.0f }, slope, tr ("Slope"), "12 dB|24 dB|48 dB"));

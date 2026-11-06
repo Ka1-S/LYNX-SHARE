@@ -102,6 +102,8 @@ protected:
         bool lit = false;           // buttons: drawn as on
         bool showValue = true;
         juce::Colour cap {};        // knobs: the cap's own colour (themes that read KnobLook::capTint; transparent = the theme's)
+        int autoParam = -1;         // knobs (round tp172b5): a toggle shown as an AUTO prefix word in the caption, clicked
+                                    // there; dim when off, the accent when on (the compressor reference's AUTO THRESHOLD)
         int look = 0;               // knobs: 0 = a knob, 1 = a short curved bar (round tp172b4: the compressor reference's
                                     // KNEE / RANGE bars); menus: 1 = a plain pill button showing the choice (no arrow)
     };
@@ -390,6 +392,11 @@ protected:
         if (controlAt (e.position, c))
         {
             pressed = c;
+            if (c.type == K::knob && c.autoParam >= 0 && autoPrefixAt (c).contains (e.position) && ! e.mods.isPopupMenu())
+            {
+                set ({ { c.autoParam, v (c.autoParam) >= 0.5f ? 0.0f : 1.0f } }); // the AUTO word: its toggle
+                return;
+            }
             if (c.type == K::custom)
             {
                 customDown (c, e);
@@ -656,10 +663,25 @@ protected:
                 }
                 if (hoverValues) // round tp172b5: the caption only; the value under it while hovered or dragged
                 {
-                    g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
+                    const auto capR = juce::Rectangle<float> (c.r.getX() - 14.0f, knobR.getBottom() + 3.0f, c.r.getWidth() + 28.0f, 14.0f);
+                    const auto captionColour = active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f);
+                    g.setColour (captionColour);
                     g.setFont (font (c.size == 2 ? type::small : type::caption, true));
-                    g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, knobR.getBottom() + 3.0f, c.r.getWidth() + 28.0f, 14.0f),
-                                juce::Justification::centred, false);
+                    if (c.autoParam >= 0) // "AUTO" (dim / lit) then the caption, centred together
+                    {
+                        const auto prefix = autoPrefixRect (c, capR);
+                        const auto f = g.getCurrentFont();
+                        const auto lit = v (c.autoParam) >= 0.5f;
+                        const auto prefixHot = prefix.contains (mouse);
+                        g.setColour (lit ? ac.brighter (prefixHot ? 0.3f : 0.0f)
+                                         : colour::textDisabled.interpolatedWith (colour::textSecondary, prefixHot ? 0.7f : 0.0f));
+                        g.drawText ("AUTO", prefix, juce::Justification::centredLeft, false);
+                        g.setColour (captionColour);
+                        g.drawText (caps (c.caption), capR.withLeft (prefix.getRight() + juce::GlyphArrangement::getStringWidth (f, " ")),
+                                    juce::Justification::centredLeft, false);
+                    }
+                    else
+                        g.drawText (caps (c.caption), capR, juce::Justification::centred, false);
                     if (c.showValue && (hover || active))
                     {
                         g.setColour (active ? ac.brighter (0.3f) : skin::valueColour (true));
@@ -812,6 +834,20 @@ protected:
     // round tp172b5: the references that print captions only (the compressor; the reverb uses the layout flag): no scale,
     // the value under the caption only while the knob is hovered or dragged
     bool hoverValues = false;
+    // the AUTO prefix of a knob's caption (Ctl::autoParam): where it is drawn and clicked, within the caption's row
+    juce::Rectangle<float> autoPrefixRect (const Ctl& c, juce::Rectangle<float> captionRow) const
+    {
+        using namespace theme;
+        const auto f = font (c.size == 2 ? type::small : type::caption, true);
+        const auto prefixW = juce::GlyphArrangement::getStringWidth (f, "AUTO");
+        const auto total = juce::GlyphArrangement::getStringWidth (f, "AUTO " + caps (c.caption));
+        return { captionRow.getCentreX() - total * 0.5f, captionRow.getY(), prefixW, captionRow.getHeight() };
+    }
+    juce::Rectangle<float> autoPrefixAt (const Ctl& c) const // (the same row paintControl uses for a hoverValues knob)
+    {
+        const auto d = c.size == 2 ? juce::jmin (c.r.getWidth() - 4.0f, c.r.getHeight() - 36.0f) : juce::jmin (c.r.getWidth() - 10.0f, c.r.getHeight() - 34.0f);
+        return autoPrefixRect (c, { c.r.getX() - 14.0f, c.r.getY() + 2.0f + d + 3.0f, c.r.getWidth() + 28.0f, 14.0f }).expanded (3.0f, 2.0f);
+    }
     // round tp172b5: the reference limiter's panel prints each knob's name ABOVE it (its scale still under it)
     bool captionAbove = false;
     void rangeRow (juce::Graphics& g, int param, juce::Rectangle<float> row, bool showValue, bool big, juce::Colour ac, bool active)
@@ -878,7 +914,8 @@ protected:
         const auto hx = bar.getX() + bar.getWidth() * value;
         g.setColour (on ? (active ? ac.brighter (0.25f) : colour::textPrimary.withAlpha (0.85f)) : colour::textDisabled);
         g.fillRect (juce::Rectangle<float> (hx - 1.5f, bar.getY() + 1.0f, 3.0f, bar.getHeight() - 2.0f));
-        const auto row = juce::Rectangle<float> (bar.getX(), bar.getBottom() + 2.0f, bar.getWidth(), 12.0f);
+        // (rangeRow pushes the ends 6 px past the row: the slider keeps them within its own bar, clear of its neighbours)
+        const auto row = juce::Rectangle<float> (bar.getX() + 6.0f, bar.getBottom() + 2.0f, bar.getWidth() - 12.0f, 12.0f);
         rangeRow (g, c.param, row, c.showValue && (hover || active), false, ac, active);
         g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
         g.setFont (font (type::caption, true));
