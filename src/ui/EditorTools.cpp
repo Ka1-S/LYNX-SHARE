@@ -189,14 +189,21 @@ void ToolStrip::paint (juce::Graphics& g)
     }
 }
 
-void ToolStrip::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
+// ToolStrip.cpp
+void ToolStrip::stepTool (int direction)
 {
-    if (wheel.deltaY == 0.0f || tools.empty())
+    if (tools.empty())
         return;
 
-    const auto at = (int) (std::find (tools.begin(), tools.end(), tool) - tools.begin());
-    const auto next = juce::jlimit (0, (int) tools.size() - 1, at + (wheel.deltaY < 0.0f ? 1 : -1));
+    const auto at   = (int) (std::find (tools.begin(), tools.end(), tool) - tools.begin());
+    const auto next = juce::jlimit (0, (int) tools.size() - 1, at + direction);
     setTool (tools[(std::size_t) next]);
+}
+
+void ToolStrip::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
+{
+    if (wheel.deltaY != 0.0f)
+        stepTool (wheel.deltaY < 0.0f ? 1 : -1);   // keep whatever your original direction was
 }
 
 // --- cursors ---------------------------------------------------------------------------
