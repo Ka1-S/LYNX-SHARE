@@ -1972,7 +1972,8 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
     instrument.beginChunk (n); // (extra outputs: a generator Patcher's, REA_rodada141)
     // issue #14: the channel's pitch as it is now (a hosted plugin bends to it; native engines took it at note on)
     // (round 167a: the native generators move their sounding notes with it, as FL's do)
-    instrument.setChannelPitchNow (c.sampler.pitch * 100.0f, c.misc.fineTune + (c.misc.mainPitch ? state.song.masterPitch : 0.0f));
+    // (round 173d: + the controller's pitch wheel, which FL's generators follow through the channel's pitch)
+    instrument.setChannelPitchNow (c.sampler.pitch * 100.0f, c.misc.fineTune + (c.misc.mainPitch ? state.song.masterPitch : 0.0f) + instrument.wheelCents());
     if (c.instrument == InstrumentKind::patcher) // its Hardware Insert nodes: this chunk's device buses (round 165c)
         instrument.setHardwareIo (liveInput, hwOut != nullptr && hwOut->active.load (std::memory_order_relaxed) ? hwOut : nullptr, liveInputOffset);
 
@@ -2120,7 +2121,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
             if (! c.muted && inRegion)
             {
                 // (an audio clip follows its fine tune, not the main pitch: LYNX never moved clips with it)
-                const auto noteCents = e.cents + c.misc.fineTune
+                const auto noteCents = e.cents + c.misc.fineTune + instrument.wheelCents()
                                        + (c.misc.mainPitch && c.instrument != InstrumentKind::audioClip ? state.song.masterPitch : 0.0f);
                 // FL's channel Mono / Porta (round 168l): a Mono note over a held one moves the sounding voice instead
                 const auto mode = polyMode (c, instrument);
@@ -2764,7 +2765,7 @@ void RackRenderer::process (const RackState* state,
                 const auto& c = def[(std::size_t) e.channel];
                 // a played note is tuned like the song's notes: Misc › Fine tune and the main pitch (round 162, issue
                 // #9: the fine tune did nothing to the keys played live)
-                const auto cents = c.misc.fineTune + (c.misc.mainPitch ? state->song.masterPitch : 0.0f);
+                const auto cents = c.misc.fineTune + (c.misc.mainPitch ? state->song.masterPitch : 0.0f) + instrument.wheelCents();
                 // FL's channel Mono / Porta (round 168l), as for the song's notes
                 const auto mode = polyMode (c, instrument);
                 const auto glideSamples = (float) (channelpoly::glideBeats (mode.portaBeats) * ppq / std::max (1.0e-9, tps));
@@ -2962,6 +2963,13 @@ void RackRenderer::applyLiveControl (const RackState& state, const NoteEvent& e)
     {
         const auto range = (std::size_t) e.channel < state.song.channels.size() ? state.song.channels[(std::size_t) e.channel].misc.pitchRange : 2;
         instrument->pitchBend (std::clamp (value, -1.0f, 1.0f) * (float) std::max (0, range));
+        // (round 173d: an FL-native engine follows the wheel through the channel's pitch; tell it now, so that a note
+        // started before the next chunk anchors the same pitch it is tuned to)
+        if (const auto& ch = state.song.channels; (std::size_t) e.channel < ch.size())
+        {
+            const auto& c = ch[(std::size_t) e.channel];
+            instrument->setChannelPitchNow (c.sampler.pitch * 100.0f, c.misc.fineTune + (c.misc.mainPitch ? state.song.masterPitch : 0.0f) + instrument->wheelCents());
+        }
     }
     else if (e.key < 128)
         instrument->controlChange (e.key, std::clamp (value, 0.0f, 1.0f));
