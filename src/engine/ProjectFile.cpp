@@ -228,6 +228,7 @@ const char* effectId (EffectKind k)
         case EffectKind::hushDeEsser: return "hushDeEsser";
         case EffectKind::aether: return "aether";
         case EffectKind::ember: return "ember";
+        case EffectKind::kilnChannel: return "kilnChannel";
         case EffectKind::lynxTune: return "lynxTune";
         case EffectKind::fruityPhaser: return "fruityPhaser";
         case EffectKind::epochVerb: return "epochVerb";
@@ -318,6 +319,8 @@ juce::var pluginToVar (const PluginRef& p)
         o->setProperty ("resetOnFlush", false);
     if (! p.sendLoopPosition)
         o->setProperty ("sendLoopPosition", false);
+    if (p.bitSize != 0)
+        o->setProperty ("bitSize", p.bitSize);
     return juce::var (o.release());
 }
 
@@ -346,6 +349,9 @@ PluginRef pluginFromVar (const juce::var& v)
     p.allNotesOffOnStop = (bool) v.getProperty ("allNotesOffOnStop", true);
     p.resetOnFlush = (bool) v.getProperty ("resetOnFlush", true);
     p.sendLoopPosition = (bool) v.getProperty ("sendLoopPosition", true);
+    p.bitSize = (int) v.getProperty ("bitSize", 0);
+    if (p.bitSize != 32 && p.bitSize != 64)
+        p.bitSize = 0;
     return p;
 }
 
@@ -951,7 +957,8 @@ std::optional<EffectKind> effectFromId (const juce::String& id)
                     EffectKind::flPhaseInverter, EffectKind::flCenter, EffectKind::flBassBoost, EffectKind::fl7BandEq, EffectKind::flDelay1,
                     EffectKind::xyController, EffectKind::xyzController, EffectKind::controlSurface, EffectKind::hardwareInsert,
                     EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook,
-                    EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis, EffectKind::flTransporter })
+                    EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis, EffectKind::flTransporter,
+                    EffectKind::kilnChannel })
         if (id == effectId (k))
             return k;
 

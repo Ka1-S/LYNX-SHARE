@@ -159,7 +159,8 @@ public:
     // The same drag started elsewhere (the Plugin picker's tiles, round 171c): `source` must sit in a drag container
     // (the main window); one of the two makers is set. Returns whether the drag started.
     static bool startPluginDrag (juce::Component& source, std::function<std::optional<ChannelDef>()> generator,
-                                 std::function<std::optional<EffectSlot>()> effect, const juce::String& label, const juce::Image& image);
+                                 std::function<std::optional<EffectSlot>()> effect, const juce::String& label, const juce::Image& image,
+                                 juce::Component* containerOwner = nullptr);
     static bool isAudioFile (const juce::File& file);
 
     void resized() override;

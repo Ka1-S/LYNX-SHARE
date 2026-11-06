@@ -7,6 +7,11 @@
 #include <algorithm>
 #include <map>
 
+#if JUCE_WINDOWS
+ #include <windows.h>
+#endif
+
+#include "core/CrashReport.h"
 #include "core/FlWrapper.h"
 #include "core/LastTweaked.h"
 #include "engine/PluginSandbox.h"
@@ -15,6 +20,14 @@
 #include "ui/I18n.h"
 #include "platform/Paths.h"
 #include "ui/Theme.h"
+
+#if JUCE_WINDOWS
+namespace juce
+{
+// cmake/LynxPatchJuce.cmake fix 15 (juce_events, Windows): the message loop's DispatchMessage through this hook
+extern void (*lynxDispatchMessageHook) (const void*);
+} // namespace juce
+#endif
 
 namespace lynx
 {
@@ -85,6 +98,28 @@ public:
         latency.setTooltip (tr ("Latency used by the delay compensation: what the plugin reports, or a value set by hand"));
         latency.onClick = [this] { showLatencyMenu(); };
         addChildComponent (latency);
+        // FL's Settings › Options › "Bit size" (round 176a, Windows x64): which build of a plugin installed as both
+        // 32-bit and 64-bit loads [UI fl36c]. Changing it re-creates the plugin with its state, like "Make bridged".
+        bitSize.addItem (tr ("Native"), 1);
+        bitSize.addItem (tr ("32 bit"), 2);
+        bitSize.addItem (tr ("64 bit"), 3);
+        bitSize.setTooltip (tr ("Which build of the plugin loads when both a 32-bit and a 64-bit one are installed"));
+        bitSize.onChange = [this] {
+            const auto value = bitSize.getSelectedId() == 2 ? 32 : bitSize.getSelectedId() == 3 ? 64 : 0;
+            auto* ref = find (const_cast<Song&> (engine.getSong()));
+            if (ref == nullptr || ref->bitSize == value)
+                return;
+            juce::MessageManager::callAsync ([en = &engine, fn = find, inst = &plugin, value] {
+                if (PluginWindows::isOpen (*inst))
+                    PluginWindows::close (*inst);
+                en->capturePluginStates(); // the other build starts from the current settings
+                en->editSong ([fn, value] (Song& song) {
+                    if (auto* r = fn (song))
+                        r->bitSize = value;
+                });
+            });
+        };
+        addChildComponent (bitSize);
         locate.setButtonText (tr ("Locate"));
         locate.setTooltip (tr ("Show the plugin's file in the file manager"));
         locate.onClick = [this] { juce::File (plugin.getPluginDescription().fileOrIdentifier).revealToUser(); };
@@ -97,7 +132,7 @@ public:
 
     ~WrapperSettingsPage() override { engine.removeChangeListener (this); }
 
-    int preferredHeight() const { return 410; }
+    int preferredHeight() const { return bridge32Supported() ? 474 : 410; } // (+ Options › Bit size where it applies)
 
     void paint (juce::Graphics& g) override
     {
@@ -105,7 +140,9 @@ public:
         g.fillAll (colour::bg1);
         g.setColour (colour::textSecondary);
         g.setFont (font (type::caption));
-        g.drawText (tr ("version {0}", { plugin.getPluginDescription().version }), getWidth() - 200, 8, 184, tabHeight, juce::Justification::centredRight);
+        // the plugin's own version; nothing when it reports none (VST2's effGetVendorVersion 0 arrives as "0")
+        if (const auto version = plugin.getPluginDescription().version.trim(); version.containsAnyOf ("123456789"))
+            g.drawText (tr ("version {0}", { version }), getWidth() - 200, 8, 184, tabHeight, juce::Justification::centredRight);
         for (const auto& [area, title] : groups)
         {
             g.setColour (colour::bg2);
@@ -153,7 +190,7 @@ public:
             auto info = group (area, headerHeight + 6 * rowHeight + 8, tr ("Info"));
             const std::pair<juce::String, juce::String> lines[] = {
                 { tr ("Name"), d.name + (d.manufacturerName.isNotEmpty() ? " (" + d.manufacturerName + ")" : juce::String()) },
-                { tr ("Type"), d.pluginFormatName + (d.isInstrument ? "  " + tr ("instrument") : "  " + tr ("effect")) },
+                { tr ("Type"), d.pluginFormatName + (d.isInstrument ? "  " + tr ("instrument") : "  " + tr ("effect")) + bitsText() },
                 { tr ("Category"), d.category },
                 { tr ("Inputs / outputs"), juce::String (plugin.getTotalNumInputChannels()) + " / " + juce::String (plugin.getTotalNumOutputChannels()) },
                 { tr ("Parameters"), juce::String (plugin.getParameters().size()) },
@@ -188,16 +225,23 @@ public:
                         show (bendRange, row.removeFromRight (70).reduced (0, 2));
                     show (*toggles[(int) i], row);
                 }
+            if (bridge32Supported())
+            {
+                auto options = group (area, headerHeight + rowHeight + 8, tr ("Options"));
+                auto row = options.removeFromTop (rowHeight);
+                label (row.removeFromLeft (80), tr ("Bit size"));
+                show (bitSize, row.removeFromLeft (110).reduced (0, 2));
+            }
         }
         else
         {
             const juce::String section = tab == 1 ? "Processing" : "Compatibility";
             int rows = 0;
-            for (const auto& o : wrapperOptions())
-                rows += section == o.section ? 1 : 0;
+            for (std::size_t i = 0; i < wrapperOptions().size(); ++i)
+                rows += section == wrapperOptions()[i].section && ! hiddenOption (i) ? 1 : 0;
             auto box = group (area, headerHeight + rows * rowHeight + 8, tr (tab == 1 ? "Options" : "Compatibility"));
             for (std::size_t i = 0; i < wrapperOptions().size(); ++i)
-                if (section == wrapperOptions()[i].section)
+                if (section == wrapperOptions()[i].section && ! hiddenOption (i))
                     show (*toggles[(int) i], box.removeFromTop (rowHeight).withTrimmedLeft (wrapperOptions()[i].needsFixed ? 22 : 0));
             if (tab == 2)
             {
@@ -212,6 +256,22 @@ public:
 
 private:
     static constexpr int tabHeight = 24, headerHeight = 24, rowHeight = 24;
+
+    // A 32-bit plugin always runs bridged: FL's Processing page has no "Make bridged" for it [UI fl25c vs fl34c]
+    bool hiddenOption (std::size_t i) const
+    {
+        return wrapperOptions()[i].member == &PluginRef::separateProcess && isBridged32 (plugin);
+    }
+
+    // FL's Info › Type ends with the build and how it runs: "(32bit - bridged)", "(64bit - native)" [UI fl23c, fl33c]
+    juce::String bitsText() const
+    {
+        if (! bridge32Supported())
+            return {};
+        if (isBridged32 (plugin))
+            return "  (" + tr ("32bit - bridged") + ")";
+        return "  (" + (sandboxedPluginProcessId (plugin) != 0 || isSandboxedPluginDead (plugin) ? tr ("64bit - bridged") : tr ("64bit - native")) + ")";
+    }
 
     void showTab (int t)
     {
@@ -287,6 +347,7 @@ private:
         for (std::size_t i = 0; i < options.size(); ++i)
             if (options[i].member == &PluginRef::separateProcess && pluginSandboxEnabled())
                 toggles[(int) i]->setToggleState (true, juce::dontSendNotification), toggles[(int) i]->setEnabled (false);
+        bitSize.setSelectedId (ref->bitSize == 32 ? 2 : ref->bitSize == 64 ? 3 : 1, juce::dontSendNotification);
         inPort.setSelectedId (ref->midiInPort + 2, juce::dontSendNotification);
         bendRange.setSelectedId (ref->bendRange, juce::dontSendNotification);
         bendRange.setEnabled (ref->sendBendRange);
@@ -311,7 +372,7 @@ private:
     juce::AudioPluginInstance& plugin;
     juce::OwnedArray<juce::TextButton> tabs;
     juce::OwnedArray<juce::ToggleButton> toggles;
-    juce::ComboBox inPort, outPort, bendRange;
+    juce::ComboBox inPort, outPort, bendRange, bitSize;
     juce::TextButton latency, locate;
     int tab = 0;
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> groups;
@@ -618,6 +679,103 @@ OrphanReaper& reaper()
     return *r;
 }
 
+// --- a fault inside a plugin's own editor window (issue #32, round 174a) ------------------------------------------
+std::vector<PluginWindows::EditorCrash>& editorCrashList()
+{
+    static std::vector<PluginWindows::EditorCrash> list;
+    return list;
+}
+
+#if JUCE_WINDOWS
+// the module path belongs to this plugin: its file, or a file inside its bundle (a .vst3 / .clap folder)
+bool moduleOfPlugin (const juce::String& module, const juce::AudioPluginInstance& plugin)
+{
+    const auto file = plugin.getPluginDescription().fileOrIdentifier;
+    if (file.isEmpty())
+        return false;
+    return module.equalsIgnoreCase (file) || module.startsWithIgnoreCase (file.trimCharactersAtEnd ("\\/") + "\\");
+}
+
+// crashguard's claim: the open editor whose window (or, for a timer / thread message, whose plugin module) faulted
+void* claimEditorWindow (void* window, const wchar_t* faultModule)
+{
+    const auto module = juce::String (faultModule);
+    if (window == nullptr) // a timer / thread message: by the faulting module
+    {
+        for (const auto& [plugin, w] : windows())
+            if (w->getWindowHandle() != nullptr && moduleOfPlugin (module, *plugin))
+                return w->getWindowHandle();
+        return nullptr;
+    }
+    // a message for one of the plugin's windows: a child of the editor's window, or a popup up its owner chain (LYNX
+    // makes the editor window itself owned by the main window, so the walk stops at the first editor window). LYNX's
+    // own frame window around the editor is not the plugin's.
+    auto h = GetAncestor (static_cast<HWND> (window), GA_ROOT);
+    for (int i = 0; i < 8 && h != nullptr; ++i)
+    {
+        for (const auto& [plugin, w] : windows())
+            if (auto* own = w->getWindowHandle(); own != nullptr && h == static_cast<HWND> (own))
+                return window != own ? own : nullptr;
+        const auto owner = GetWindow (h, GW_OWNER);
+        h = owner != nullptr ? GetAncestor (owner, GA_ROOT) : nullptr;
+    }
+    return nullptr;
+}
+
+void onEditorFault (const crashguard::WindowFault& fault)
+{
+    juce::AudioPluginInstance* faulted = nullptr;
+    for (const auto& [plugin, w] : windows())
+        if (w->getWindowHandle() == fault.rootWindow)
+            faulted = plugin;
+    const auto name = faulted != nullptr ? faulted->getPluginDescription().name : juce::String ("?");
+
+    // the trace next to the crash / hang files; the session names it (a later report of this session carries it)
+    const auto stamp = juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H-%M-%S");
+    const auto folder = platform::settingsFile ("autosave");
+    folder.createDirectory();
+    const auto traceFile = folder.getChildFile ("editor-crash " + stamp + ".txt");
+    traceFile.replaceWithText ("LYNX: the editor of " + name + " crashed in its own window; LYNX closed the editor and went on\n"
+                               + juce::String::fromUTF8 (fault.trace.c_str()));
+    crashguard::note ((juce::String (crashreport::editorCrashStepPrefix) + name + " (" + crashguard::describe (fault.code) + " at "
+                       + juce::String::fromUTF8 (fault.where.c_str()) + "), trace in autosave\\" + traceFile.getFileName())
+                          .toStdString());
+    PluginHost::settingsFolder().getChildFile ("plugin-crashes.log")
+        .appendText (juce::Time::getCurrentTime().toISO8601 (true) + "  " + name + "  editor: " + crashguard::describe (fault.code) + " 0x"
+                     + juce::String::toHexString ((juce::int64) fault.code) + " at " + juce::String::fromUTF8 (fault.where.c_str()) + "\n");
+    editorCrashList().push_back ({ name, juce::String (crashguard::describe (fault.code)) + " at " + juce::String::fromUTF8 (fault.where.c_str()), traceFile });
+
+    // close the editor from a message of its own (not inside the dispatch that faulted). Its teardown calls into the
+    // plugin again (editor close): when that faults too, the window object is left behind (hidden) rather than
+    // taking LYNX down
+    auto* root = fault.rootWindow;
+    juce::MessageManager::callAsync ([faulted, root] {
+        auto& open = windows();
+        if (auto it = open.find (faulted); faulted != nullptr && it != open.end() && it->second->getWindowHandle() == root)
+        {
+            auto window = std::move (it->second);
+            open.erase (it);
+            auto* raw = window.release();
+            if (const auto code = crashguard::run ([raw] { delete raw; }); code != 0)
+                crashguard::note (("the editor's teardown crashed too (" + juce::String (crashguard::describe (code)) + "): left behind").toStdString());
+        }
+        crashguard::forgetWindow (root);
+    });
+}
+#endif
+
+void installEditorGuard()
+{
+   #if JUCE_WINDOWS
+    static bool installed = false;
+    if (installed)
+        return;
+    installed = true;
+    crashguard::setWindowGuard (claimEditorWindow, onEditorFault);
+    juce::lynxDispatchMessageHook = crashguard::dispatchGuarded;
+   #endif
+}
+
 void PluginWindow::closeButtonPressed()
 {
     const auto* k = key();
@@ -673,6 +831,7 @@ void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const
         return;
     }
 
+    installEditorGuard(); // (issue #32: a fault in the plugin's own window closes the editor, not LYNX)
     open[&plugin] = std::make_unique<PluginWindow> (std::move (owner), plugin, title, std::move (context));
     if (! reaper().isTimerRunning())
         reaper().startTimerHz (4);
@@ -709,6 +868,16 @@ bool isOpen (const juce::AudioPluginInstance& plugin)
 void close (const juce::AudioPluginInstance& plugin)
 {
     windows().erase (const_cast<juce::AudioPluginInstance*> (&plugin));
+}
+
+int editorCrashCount()
+{
+    return (int) editorCrashList().size();
+}
+
+std::vector<EditorCrash> editorCrashes()
+{
+    return editorCrashList();
 }
 } // namespace PluginWindows
 
@@ -759,10 +928,13 @@ juce::PopupMenu pluginProcessingMenu (AudioEngine& engine, const PluginRef& curr
                   [toggle] { toggle (&PluginRef::hostMaxBuffer); });
     // with Options › "Run plugins in a separate process" on, every plugin already runs in one
     const auto all = pluginSandboxEnabled();
-    menu.addItem (all ? tr ("Run in a separate process (on for all plugins in Options)") : tr ("Run in a separate process"), ! all,
-                  all || current.separateProcess, [toggle] { toggle (&PluginRef::separateProcess); });
+    // a 32-bit plugin always runs in the 32-bit bridge: no "Make bridged" for it (FL's wrapper has none either, round 176a)
+    const auto bits32 = instance != nullptr && isBridged32 (*instance);
+    if (! bits32)
+        menu.addItem (all ? tr ("Run in a separate process (on for all plugins in Options)") : tr ("Run in a separate process"), ! all,
+                      all || current.separateProcess, [toggle] { toggle (&PluginRef::separateProcess); });
     // round 157a: this plugin always in its own process, in every project (e.g. after its editor crashed LYNX)
-    if (! all && ! current.name.empty())
+    if (! all && ! bits32 && ! current.name.empty())
     {
         const auto name = juce::String::fromUTF8 (current.name.c_str());
         const auto always = pluginAlwaysSeparate (name);
