@@ -45,27 +45,29 @@ COMMON=(-target "$TARGET" -std=c++20 -O2 -DNDEBUG=1 -fno-sanitize=undefined
         -include "$OUT/JuceConfig.h" -include cmake/mingw/mingw_compat.h
         -I"$OUT/shim" -I"$JUCE_DIR/modules" -I"$JUCE_DIR/modules/juce_audio_processors/format_types/VST3_SDK" -Ithird_party/clap/include -Ithird_party/wavpack/include -Ithird_party/vorbis/include -Ithird_party/lame/include -Ithird_party/asiosdk/common -Ithird_party/sse2neon -Ithird_party/pocketpy -Ithird_party/monocypher -Ithird_party/onnxruntime -Isrc)
 
-# juce_gui_basics, juce_audio_processors and juce_events are compiled from patched copies (cmake/LynxPatchJuce.cmake:
-# issue #11 drag & drop and menu fixes; issue #70 VST3 note ids; issue #32 the message dispatch hook of the plugin
-# window crash guard), so the JUCE checkout itself is never modified. The copies are only
-# replaced when their patched sources change (module cache).
+# juce_gui_basics, juce_audio_processors, juce_graphics and juce_events are compiled from patched copies
+# (cmake/LynxPatchJuce.cmake: issue #11 drag & drop and menu fixes; issue #70 VST3 note ids; round 174e2 Direct2D image
+# readback; issue #32 the message dispatch hook of the plugin window crash guard), so the JUCE checkout itself is never
+# modified. The copies are only replaced when their patched sources change (module cache).
 GUI_BASICS_SRC="$JUCE_DIR/modules/juce_gui_basics"
 AUDIO_PROCESSORS_SRC="$JUCE_DIR/modules/juce_audio_processors"
+GRAPHICS_SRC="$JUCE_DIR/modules/juce_graphics"
 EVENTS_SRC="$JUCE_DIR/modules/juce_events"
 CMAKE="${CMAKE:-$(command -v cmake || ls "$HOME"/opt/cmake-*/bin/cmake 2>/dev/null | head -n 1)}"
 if [[ -n "$CMAKE" ]]; then
     rm -rf "$OUT/juce-patched.new"
     mkdir -p "$OUT/juce-patched.new/modules"
-    cp -r "$JUCE_DIR/modules/juce_gui_basics" "$JUCE_DIR/modules/juce_audio_processors" "$JUCE_DIR/modules/juce_events" "$OUT/juce-patched.new/modules/"
+    cp -r "$JUCE_DIR/modules/juce_gui_basics" "$JUCE_DIR/modules/juce_audio_processors" "$JUCE_DIR/modules/juce_graphics" "$JUCE_DIR/modules/juce_events" "$OUT/juce-patched.new/modules/"
     "$CMAKE" -DJUCE_DIR="$OUT/juce-patched.new" -P cmake/LynxPatchJuce.cmake
     if diff -rq "$OUT/juce-patched.new" "$OUT/juce-patched" >/dev/null 2>&1; then
         rm -rf "$OUT/juce-patched.new"
     else
         rm -rf "$OUT/juce-patched" && mv "$OUT/juce-patched.new" "$OUT/juce-patched"
-        rm -f "$OUT/juce/juce_gui_basics.o" "$OUT/juce/juce_audio_processors.o" "$OUT/juce/juce_events.o"
+        rm -f "$OUT/juce/juce_gui_basics.o" "$OUT/juce/juce_audio_processors.o" "$OUT/juce/juce_graphics.o" "$OUT/juce/juce_events.o"
     fi
     GUI_BASICS_SRC="$OUT/juce-patched/modules/juce_gui_basics"
     AUDIO_PROCESSORS_SRC="$OUT/juce-patched/modules/juce_audio_processors"
+    GRAPHICS_SRC="$OUT/juce-patched/modules/juce_graphics"
     EVENTS_SRC="$OUT/juce-patched/modules/juce_events"
 else
     echo "warning: cmake not found; JUCE's drag & drop fixes (cmake/LynxPatchJuce.cmake) are not applied" >&2
@@ -123,8 +125,9 @@ cached_pp() {
 JUCE_KEY="$JUCE_DIR $(cat "$OUT/JuceConfig.h" cmake/mingw/mingw_compat.h "$OUT/shim/Dbghelp.h" "$JUCE_DIR/modules/juce_core/system/juce_StandardHeader.h" | sha256sum | cut -c1-64)"
 GUI_BASICS_KEY="$(tree_hash "$GUI_BASICS_SRC")"
 AUDIO_PROCESSORS_KEY="$(tree_hash "$AUDIO_PROCESSORS_SRC")"
+GRAPHICS_KEY="$(tree_hash "$GRAPHICS_SRC")"
 EVENTS_KEY="$(tree_hash "$EVENTS_SRC")"
-export ZIG OUT JUCE_DIR TARGET GUI_BASICS_SRC AUDIO_PROCESSORS_SRC EVENTS_SRC OBJ_CACHE ZIG_VERSION JUCE_KEY GUI_BASICS_KEY AUDIO_PROCESSORS_KEY EVENTS_KEY
+export ZIG OUT JUCE_DIR TARGET GUI_BASICS_SRC AUDIO_PROCESSORS_SRC GRAPHICS_SRC EVENTS_SRC OBJ_CACHE ZIG_VERSION JUCE_KEY GUI_BASICS_KEY AUDIO_PROCESSORS_KEY GRAPHICS_KEY EVENTS_KEY
 export -f cached cached_pp
 mkdir -p "$OBJ_CACHE" && find "$OBJ_CACHE" -maxdepth 1 -type f -mtime +10 -delete 2>/dev/null || true
 export COMMON_STR="${COMMON[*]}"
@@ -143,6 +146,7 @@ for m in "${MODULES[@]}" juce_core_CompilationTime juce_graphics_Harfbuzz juce_g
         key="$JUCE_KEY"
         [[ "$m" == juce_gui_basics ]] && src="$GUI_BASICS_SRC/$m.cpp" && key="$JUCE_KEY $GUI_BASICS_KEY"
         [[ "$m" == juce_audio_processors ]] && src="$AUDIO_PROCESSORS_SRC/$m.cpp" && key="$JUCE_KEY $AUDIO_PROCESSORS_KEY"
+        [[ "$m" == juce_graphics ]] && src="$GRAPHICS_SRC/$m.cpp" && key="$JUCE_KEY $GRAPHICS_KEY"
         [[ "$m" == juce_events ]] && src="$EVENTS_SRC/$m.cpp" && key="$JUCE_KEY $EVENTS_KEY"
         case "$m" in
             juce_core_CompilationTime) src="$JUCE_DIR/modules/juce_core/$m.cpp" ;;

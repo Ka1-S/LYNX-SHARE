@@ -7309,6 +7309,11 @@ countries: tr
 "{0} crashed. Save your project now (as a new file is safest)." = "{0} çöktü. Projenizi şimdi kaydedin (en güvenlisi yeni bir dosya olarak)."
 "Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "LYNX SHARE çalışmaya devam edebilsin diye penceresi kapatıldı. Proje yeniden açılana kadar plugin düzgün çalışmayabilir."
 "Wheels" = "Tekerlekler"
+"Animation rate" = "Animasyon hızı"
+"Display (default)" = "Ekran (varsayılan)"
+"60 Hz" = "60 Hz"
+"30 Hz" = "30 Hz"
+"How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); 60 Hz or 30 Hz use less CPU on slower computers." = "Çalma imleci, ölçerler ve osiloskopların ne sıklıkla hareket ettiği. Ekran, monitörünüzün yenileme hızını izler (en akıcı); 60 Hz veya 30 Hz daha yavaş bilgisayarlarda daha az CPU kullanır."
 
 # round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"

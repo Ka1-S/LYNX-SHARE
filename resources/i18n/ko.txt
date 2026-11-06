@@ -7309,6 +7309,11 @@ countries: kr
 "{0} crashed. Save your project now (as a new file is safest)." = "{0}이(가) 충돌했습니다. 지금 프로젝트를 저장하세요(새 파일로 저장하는 것이 가장 안전합니다)."
 "Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "LYNX SHARE가 계속 실행될 수 있도록 해당 창을 닫았습니다. 프로젝트를 다시 열 때까지 플러그인이 제대로 작동하지 않을 수 있습니다."
 "Wheels" = "휠"
+"Animation rate" = "애니메이션 속도"
+"Display (default)" = "디스플레이 (기본값)"
+"60 Hz" = "60 Hz"
+"30 Hz" = "30 Hz"
+"How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); 60 Hz or 30 Hz use less CPU on slower computers." = "재생 헤드, 미터, 스코프가 움직이는 빈도입니다. 디스플레이는 화면 주사율을 따릅니다(가장 부드러움). 60 Hz 또는 30 Hz는 느린 컴퓨터에서 CPU를 덜 사용합니다."
 
 # round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"

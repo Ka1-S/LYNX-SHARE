@@ -7309,6 +7309,11 @@ countries: nl be
 "{0} crashed. Save your project now (as a new file is safest)." = "{0} is gecrasht. Sla je project nu op (als nieuw bestand is het veiligst)."
 "Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "Het venster is gesloten zodat LYNX SHARE kon blijven werken. De plugin werkt misschien pas weer goed als het project opnieuw wordt geopend."
 "Wheels" = "Wielen"
+"Animation rate" = "Animatiesnelheid"
+"Display (default)" = "Scherm (standaard)"
+"60 Hz" = "60 Hz"
+"30 Hz" = "30 Hz"
+"How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); 60 Hz or 30 Hz use less CPU on slower computers." = "Hoe vaak de afspeelkop, meters en scopes bewegen. Scherm volgt de verversingsfrequentie van je monitor (het vloeiendst); 60 Hz of 30 Hz gebruiken minder CPU op langzamere computers."
 
 # round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"

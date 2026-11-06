@@ -7309,6 +7309,11 @@ countries: ru by kz
 "{0} crashed. Save your project now (as a new file is safest)." = "{0}: сбой. Сохраните проект сейчас (надёжнее всего — как новый файл)."
 "Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "Его окно закрыто, чтобы LYNX SHARE продолжал работать. Плагин может работать неправильно, пока проект не будет открыт заново."
 "Wheels" = "Колёса"
+"Animation rate" = "Частота анимации"
+"Display (default)" = "Дисплей (по умолчанию)"
+"60 Hz" = "60 Гц"
+"30 Hz" = "30 Гц"
+"How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); 60 Hz or 30 Hz use less CPU on slower computers." = "Как часто движутся курсор воспроизведения, индикаторы уровня и осциллографы. «Дисплей» следует частоте обновления экрана (плавнее всего); 60 Гц или 30 Гц расходуют меньше ресурсов CPU на медленных компьютерах."
 
 # round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"
