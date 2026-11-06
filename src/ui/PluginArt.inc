@@ -93,6 +93,10 @@ struct Theme
     // round tp172c: the label of an OFF toggle (transparent = the global disabled text; a light panel needs its own)
     Colour offLabelCol { 0 };
     bool noValueArc = false;        // round tp172c: knobs show their value by the pointer on a printed scale only (consoles)
+    // round tp172b4: the "grip" knob of the gate / de-esser references, in our own drawing — a solid domed cap with soft
+    // dimples round its edge, a light thumb riding the edge at the value (with a short mark), on a dark ticked ring; no
+    // lit arc. A knob's capTint (KnobLook) recolours the cap (the small grey knobs beside the big coloured ones)
+    bool gripKnob = false;
 
     // round tp172d: the flat "hardware graphic" look of the third-party originals (Valhalla, Soundtoys...) — solid
     // colour fields, bold outlines, big plain type; every field defaults to the look above
@@ -625,6 +629,78 @@ inline void knob (juce::Graphics& g, Rectangle<float> area, const KnobLook& k)
         const auto pw = juce::jlimit (1.6f, 6.0f, size * 0.075f);
         g.setColour (k.enabled ? p.pointer : p.pointer.withAlpha (0.5f));
         g.drawLine ({ c + dir * discR * th0.pointerFrom, c + dir * (discR - pw * 0.2f) }, pw);
+        return;
+    }
+
+    if (th0.gripKnob)
+    {
+        // the ring: a dark band with fine marks along the travel
+        const auto ringW = juce::jlimit (2.0f, 7.0f, size * 0.075f);
+        const auto outerR = size * 0.5f - 0.5f;
+        g.setColour (p.track.withAlpha (k.enabled ? 1.0f : 0.6f));
+        g.drawEllipse (Rectangle<float> (2.0f * (outerR - ringW * 0.5f), 2.0f * (outerR - ringW * 0.5f)).withCentre (c), ringW);
+        if (size >= 30.0f)
+        {
+            g.setColour (p.title.withAlpha (0.45f));
+            for (int i = 0; i < 11; ++i)
+            {
+                const auto ang = arcStart + arcRange * (float) i / 10.0f;
+                const Point<float> d { std::sin (ang), -std::cos (ang) };
+                g.drawLine ({ c + d * (outerR - 0.5f), c + d * (outerR - ringW * (i % 5 == 0 ? 0.95f : 0.6f)) }, 1.0f);
+            }
+        }
+        // the cap
+        const auto capR = juce::jmax (3.0f, outerR - ringW - juce::jmax (1.0f, size * 0.015f));
+        const auto cap = Rectangle<float> (capR * 2.0f, capR * 2.0f).withCentre (c);
+        auto top = k.capTint.getAlpha() > 0 ? k.capTint : p.capTop;
+        auto bottom = k.capTint.getAlpha() > 0 ? k.capTint.darker (0.45f) : p.capBottom;
+        if (! k.enabled) { top = top.withMultipliedSaturation (0.3f); bottom = bottom.withMultipliedSaturation (0.3f); }
+        if (fx)
+        {
+            g.setColour (Colours::black.withAlpha (0.4f));
+            g.fillEllipse (cap.translated (0.0f, capR * 0.08f).expanded (1.0f));
+        }
+        g.setGradientFill (ColourGradient (top.brighter (hover * 0.10f), c.x, cap.getY(), bottom, c.x, cap.getBottom(), false));
+        g.fillEllipse (cap);
+        if (fx) // soft dimples round the edge
+        {
+            g.saveState();
+            g.reduceClipRegion (juce::Path ([&] { juce::Path e; e.addEllipse (cap); return e; }()));
+            const int n = 10;
+            for (int i = 0; i < n; ++i)
+            {
+                const auto ang = juce::MathConstants<float>::twoPi * ((float) i + 0.5f) / (float) n;
+                const Point<float> d { std::sin (ang), -std::cos (ang) };
+                const auto dc = c + d * capR * 1.02f;
+                g.setColour (Colours::black.withAlpha (0.16f));
+                g.fillEllipse (Rectangle<float> (capR * 0.42f, capR * 0.42f).withCentre (dc));
+                g.setColour (Colours::white.withAlpha (0.07f));
+                g.drawEllipse (Rectangle<float> (capR * 0.42f, capR * 0.42f).withCentre (dc), 0.8f);
+            }
+            g.restoreState();
+        }
+        g.setColour (Colours::black.withAlpha (0.35f));
+        g.drawEllipse (cap.reduced (0.5f), 1.0f);
+        // the thumb: a light disc on the cap's edge at the value, clipped to the cap, with a short dark mark
+        {
+            g.saveState();
+            g.reduceClipRegion (juce::Path ([&] { juce::Path e; e.addEllipse (cap.reduced (0.6f)); return e; }()));
+            const auto tc = c + dir * capR * 0.72f;
+            const auto tr = capR * 0.46f;
+            const auto light = k.enabled ? p.pointer : p.pointer.withMultipliedSaturation (0.2f).darker (0.4f);
+            g.setColour (Colours::black.withAlpha (0.22f));
+            g.fillEllipse (Rectangle<float> (tr * 2.1f, tr * 2.1f).withCentre (tc.translated (0.0f, tr * 0.08f)));
+            g.setGradientFill (ColourGradient (light.brighter (0.15f + hover * 0.1f), tc.x, tc.y - tr, light.darker (0.18f), tc.x, tc.y + tr, false));
+            g.fillEllipse (Rectangle<float> (tr * 2.0f, tr * 2.0f).withCentre (tc));
+            g.restoreState();
+            g.setColour (p.capBottom.darker (0.6f).withAlpha (0.85f));
+            g.drawLine ({ tc - dir * tr * 0.35f, tc + dir * tr * 0.25f }, juce::jmax (1.0f, size * 0.014f));
+        }
+        if (k.active)
+        {
+            g.setColour (lit.withAlpha (0.55f));
+            g.drawEllipse (cap.expanded (1.0f), 1.2f);
+        }
         return;
     }
 

@@ -101,6 +101,7 @@ protected:
         juce::String hint;          // what it does (the hint bar)
         bool lit = false;           // buttons: drawn as on
         bool showValue = true;
+        juce::Colour cap {};        // knobs: the cap's own colour (themes that read KnobLook::capTint; transparent = the theme's)
     };
 
     static Ctl knob (juce::Rectangle<float> r, int p, const juce::String& caption, int size = 1, bool bipolar = false)
@@ -625,6 +626,7 @@ protected:
                 look.hover = hot;
                 look.active = active;
                 look.enabled = on;
+                look.capTint = c.cap;
                 skin::knob (g, knobR, look);
                 g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
                 g.setFont (font (c.size == 2 ? type::small : type::caption, true));
