@@ -7305,4 +7305,6 @@ countries: id
 # round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
 "None|Smooth|Op-El|Mastering" = "Tidak ada|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Tiga karakter kompresor lagi, dipakai menggantikan gaya: halus, opto-elektronik, atau mastering"
+"{0} crashed. Save your project now (as a new file is safest)." = "{0} crash. Simpan proyek sekarang (paling aman sebagai file baru)."
+"Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "Jendelanya ditutup agar LYNX SHARE tetap berjalan. Plugin mungkin tidak bekerja dengan benar sampai proyek dibuka lagi."
 "Wheels" = "Roda"

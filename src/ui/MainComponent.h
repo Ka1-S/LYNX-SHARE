@@ -141,6 +141,8 @@ private:
     void showShortcutManager();
     int scansSeen = 0; // background plugin scans already announced in the hint bar
     int pluginCrashesSeen = 0; // hosted plugins that crashed (engine/PluginHost.h) and were already announced
+    int editorCrashesSeen = 0; // faults in plugin editor windows (ui/PluginWindow.h, issue #32) already announced
+    void announceEditorCrash (const juce::String& plugin);
     void showHelp();
     void closeUnfocusedWindows();
     void closeHelp();

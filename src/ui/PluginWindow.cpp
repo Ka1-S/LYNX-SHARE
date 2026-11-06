@@ -7,6 +7,11 @@
 #include <algorithm>
 #include <map>
 
+#if JUCE_WINDOWS
+ #include <windows.h>
+#endif
+
+#include "core/CrashReport.h"
 #include "core/FlWrapper.h"
 #include "core/LastTweaked.h"
 #include "engine/PluginSandbox.h"
@@ -15,6 +20,14 @@
 #include "ui/I18n.h"
 #include "platform/Paths.h"
 #include "ui/Theme.h"
+
+#if JUCE_WINDOWS
+namespace juce
+{
+// cmake/LynxPatchJuce.cmake fix 15 (juce_events, Windows): the message loop's DispatchMessage through this hook
+extern void (*lynxDispatchMessageHook) (const void*);
+} // namespace juce
+#endif
 
 namespace lynx
 {
@@ -618,6 +631,103 @@ OrphanReaper& reaper()
     return *r;
 }
 
+// --- a fault inside a plugin's own editor window (issue #32, round 174a) ------------------------------------------
+std::vector<PluginWindows::EditorCrash>& editorCrashList()
+{
+    static std::vector<PluginWindows::EditorCrash> list;
+    return list;
+}
+
+#if JUCE_WINDOWS
+// the module path belongs to this plugin: its file, or a file inside its bundle (a .vst3 / .clap folder)
+bool moduleOfPlugin (const juce::String& module, const juce::AudioPluginInstance& plugin)
+{
+    const auto file = plugin.getPluginDescription().fileOrIdentifier;
+    if (file.isEmpty())
+        return false;
+    return module.equalsIgnoreCase (file) || module.startsWithIgnoreCase (file.trimCharactersAtEnd ("\\/") + "\\");
+}
+
+// crashguard's claim: the open editor whose window (or, for a timer / thread message, whose plugin module) faulted
+void* claimEditorWindow (void* window, const wchar_t* faultModule)
+{
+    const auto module = juce::String (faultModule);
+    if (window == nullptr) // a timer / thread message: by the faulting module
+    {
+        for (const auto& [plugin, w] : windows())
+            if (w->getWindowHandle() != nullptr && moduleOfPlugin (module, *plugin))
+                return w->getWindowHandle();
+        return nullptr;
+    }
+    // a message for one of the plugin's windows: a child of the editor's window, or a popup up its owner chain (LYNX
+    // makes the editor window itself owned by the main window, so the walk stops at the first editor window). LYNX's
+    // own frame window around the editor is not the plugin's.
+    auto h = GetAncestor (static_cast<HWND> (window), GA_ROOT);
+    for (int i = 0; i < 8 && h != nullptr; ++i)
+    {
+        for (const auto& [plugin, w] : windows())
+            if (auto* own = w->getWindowHandle(); own != nullptr && h == static_cast<HWND> (own))
+                return window != own ? own : nullptr;
+        const auto owner = GetWindow (h, GW_OWNER);
+        h = owner != nullptr ? GetAncestor (owner, GA_ROOT) : nullptr;
+    }
+    return nullptr;
+}
+
+void onEditorFault (const crashguard::WindowFault& fault)
+{
+    juce::AudioPluginInstance* faulted = nullptr;
+    for (const auto& [plugin, w] : windows())
+        if (w->getWindowHandle() == fault.rootWindow)
+            faulted = plugin;
+    const auto name = faulted != nullptr ? faulted->getPluginDescription().name : juce::String ("?");
+
+    // the trace next to the crash / hang files; the session names it (a later report of this session carries it)
+    const auto stamp = juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H-%M-%S");
+    const auto folder = platform::settingsFile ("autosave");
+    folder.createDirectory();
+    const auto traceFile = folder.getChildFile ("editor-crash " + stamp + ".txt");
+    traceFile.replaceWithText ("LYNX: the editor of " + name + " crashed in its own window; LYNX closed the editor and went on\n"
+                               + juce::String::fromUTF8 (fault.trace.c_str()));
+    crashguard::note ((juce::String (crashreport::editorCrashStepPrefix) + name + " (" + crashguard::describe (fault.code) + " at "
+                       + juce::String::fromUTF8 (fault.where.c_str()) + "), trace in autosave\\" + traceFile.getFileName())
+                          .toStdString());
+    PluginHost::settingsFolder().getChildFile ("plugin-crashes.log")
+        .appendText (juce::Time::getCurrentTime().toISO8601 (true) + "  " + name + "  editor: " + crashguard::describe (fault.code) + " 0x"
+                     + juce::String::toHexString ((juce::int64) fault.code) + " at " + juce::String::fromUTF8 (fault.where.c_str()) + "\n");
+    editorCrashList().push_back ({ name, juce::String (crashguard::describe (fault.code)) + " at " + juce::String::fromUTF8 (fault.where.c_str()), traceFile });
+
+    // close the editor from a message of its own (not inside the dispatch that faulted). Its teardown calls into the
+    // plugin again (editor close): when that faults too, the window object is left behind (hidden) rather than
+    // taking LYNX down
+    auto* root = fault.rootWindow;
+    juce::MessageManager::callAsync ([faulted, root] {
+        auto& open = windows();
+        if (auto it = open.find (faulted); faulted != nullptr && it != open.end() && it->second->getWindowHandle() == root)
+        {
+            auto window = std::move (it->second);
+            open.erase (it);
+            auto* raw = window.release();
+            if (const auto code = crashguard::run ([raw] { delete raw; }); code != 0)
+                crashguard::note (("the editor's teardown crashed too (" + juce::String (crashguard::describe (code)) + "): left behind").toStdString());
+        }
+        crashguard::forgetWindow (root);
+    });
+}
+#endif
+
+void installEditorGuard()
+{
+   #if JUCE_WINDOWS
+    static bool installed = false;
+    if (installed)
+        return;
+    installed = true;
+    crashguard::setWindowGuard (claimEditorWindow, onEditorFault);
+    juce::lynxDispatchMessageHook = crashguard::dispatchGuarded;
+   #endif
+}
+
 void PluginWindow::closeButtonPressed()
 {
     const auto* k = key();
@@ -673,6 +783,7 @@ void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const
         return;
     }
 
+    installEditorGuard(); // (issue #32: a fault in the plugin's own window closes the editor, not LYNX)
     open[&plugin] = std::make_unique<PluginWindow> (std::move (owner), plugin, title, std::move (context));
     if (! reaper().isTimerRunning())
         reaper().startTimerHz (4);
@@ -709,6 +820,16 @@ bool isOpen (const juce::AudioPluginInstance& plugin)
 void close (const juce::AudioPluginInstance& plugin)
 {
     windows().erase (const_cast<juce::AudioPluginInstance*> (&plugin));
+}
+
+int editorCrashCount()
+{
+    return (int) editorCrashList().size();
+}
+
+std::vector<EditorCrash> editorCrashes()
+{
+    return editorCrashList();
 }
 } // namespace PluginWindows
 

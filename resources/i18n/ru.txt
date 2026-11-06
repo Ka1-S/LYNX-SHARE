@@ -7305,4 +7305,6 @@ countries: ru by kz
 # round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
 "None|Smooth|Op-El|Mastering" = "Нет|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Ещё три характера компрессора вместо стиля: мягкий, оптоэлектронный или мастеринг"
+"{0} crashed. Save your project now (as a new file is safest)." = "{0}: сбой. Сохраните проект сейчас (надёжнее всего — как новый файл)."
+"Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "Его окно закрыто, чтобы LYNX SHARE продолжал работать. Плагин может работать неправильно, пока проект не будет открыт заново."
 "Wheels" = "Колёса"
