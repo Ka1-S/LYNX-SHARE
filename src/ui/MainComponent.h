@@ -258,7 +258,7 @@ private:
     void flUndo();
     bool alternateUndo = false; // Settings › General › "Alternate undo mode" (FL's default: off)
     std::unique_ptr<toolbar::EditOverlay> toolbarEditor;
-    std::unique_ptr<juce::Component> pluginPickerView; // FL's Plugin picker (F8), over the main window (round 169k)
+    std::unique_ptr<juce::Component> pluginPickerView; // FL's Plugin picker (F8), its own window over the screen (rounds 169k, 175b)
     void togglePluginPicker();
     std::unique_ptr<juce::Component> setupOverlay; // the first-start / Options > Setup wizard, over everything
     toolbar::EditOverlay::Bounds panelBounds {}; // each shown toolbar panel (for the edit mode)

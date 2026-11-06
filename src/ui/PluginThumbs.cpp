@@ -14,7 +14,10 @@
 #include "ui/PluginSkin.h"
 #include "ui/ProEditors.h"
 #include "ui/QuickPick.h"
+#include "ui/VideoPlayerView.h"
 #include "ui/VisualEditors.h"
+#include "core/FlExtraFx.h"
+#include "core/Vfx.h"
 
 #if JUCE_WINDOWS
  #ifndef WIN32_LEAN_AND_MEAN
@@ -67,6 +70,155 @@ std::unique_ptr<juce::Component> generatorEditor (AudioEngine& engine, ChannelDe
     return makeChannelFrame (engine, 0, 0);
 }
 
+// --- round 175b: the editors that are empty until they get something to show ---------------------------------------
+// (FL's own pictures show them in use: Newtone with a sung phrase, Control Surface with two knobs, Video Player with a
+// picture.) LYNX draws its own stand-ins here; nothing of FL's is used.
+
+// a short sung-like phrase (a voice's harmonics, vibrato, a glide into each note, gaps between them) for Newtone and
+// Newtime to analyse and draw
+juce::File demoVoice (const juce::File& folder)
+{
+    const auto file = folder.getChildFile ("demo-voice.wav");
+    if (file.existsAsFile())
+        return file;
+    constexpr double rate = 44100.0;
+    const int steps[] = { 0, 4, 7, 9, 7, 4, 2, 5, 4, 0 };
+    const auto noteLength = 0.34, gapLength = 0.06;
+    const auto total = (int) (rate * (noteLength + gapLength) * (double) std::size (steps)) + (int) rate / 4;
+    juce::AudioBuffer<float> buffer (1, total);
+    buffer.clear();
+    auto* out = buffer.getWritePointer (0);
+    double phase = 0.0, freq = 220.0;
+    for (int k = 0; k < (int) std::size (steps); ++k)
+    {
+        const auto start = (int) (rate * (noteLength + gapLength) * k);
+        const auto target = 220.0 * std::pow (2.0, (steps[k] + 3) / 12.0);
+        const auto n = (int) (rate * noteLength);
+        for (int i = 0; i < n && start + i < total; ++i)
+        {
+            const auto t = i / rate;
+            freq += (target - freq) * 0.0015;                                    // the glide
+            const auto f = freq * (1.0 + 0.012 * std::sin (2.0 * juce::MathConstants<double>::pi * 5.5 * t) * juce::jmin (1.0, t * 4.0));
+            phase += 2.0 * juce::MathConstants<double>::pi * f / rate;
+            double v = 0.0;
+            for (int h = 1; h <= 10; ++h)
+                v += std::sin (phase * h) / (h * (h < 4 ? 1.0 : 1.6));
+            const auto env = juce::jmin (1.0, t / 0.03) * juce::jmin (1.0, (noteLength - t) / 0.05);
+            out[start + i] = (float) (0.28 * v * env * (0.8 + 0.2 * std::sin (k * 1.7)));
+        }
+    }
+    folder.createDirectory();
+    juce::WavAudioFormat wav;
+    std::unique_ptr<juce::OutputStream> stream (file.createOutputStream().release());
+    if (stream == nullptr)
+        return {};
+    if (auto writer = std::unique_ptr<juce::AudioFormatWriter> (wav.createWriterFor (stream.get(), rate, 1, 16, {}, 0)))
+    {
+        stream.release();
+        writer->writeFromAudioSampleBuffer (buffer, 0, total);
+    }
+    return file;
+}
+
+// a still for the Video Player's screen: a dusk landscape (drawn here, no video needed)
+juce::Image demoVideoFrame()
+{
+    juce::Image frame (juce::Image::RGB, 640, 360, true);
+    juce::Graphics g (frame);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff1d2b53), 0.0f, 0.0f, juce::Colour (0xfff2845c), 0.0f, 250.0f, false));
+    g.fillAll();
+    g.setColour (juce::Colour (0xffffd29a).withAlpha (0.9f));
+    g.fillEllipse (400.0f, 150.0f, 90.0f, 90.0f);
+    auto ridge = [&] (float base, float amp, float seed, juce::Colour c) {
+        juce::Path p;
+        p.startNewSubPath (0.0f, 360.0f);
+        for (int x = 0; x <= 640; x += 8)
+            p.lineTo ((float) x, base - amp * (0.5f + 0.5f * std::sin (x * 0.011f + seed)) - amp * 0.35f * std::sin (x * 0.037f + seed * 2.0f));
+        p.lineTo (640.0f, 360.0f);
+        p.closeSubPath();
+        g.setColour (c);
+        g.fillPath (p);
+    };
+    ridge (250.0f, 60.0f, 0.3f, juce::Colour (0xff6b3b5c));
+    ridge (285.0f, 45.0f, 2.1f, juce::Colour (0xff3a2443));
+    ridge (325.0f, 30.0f, 4.0f, juce::Colour (0xff1a1323));
+    return frame;
+}
+
+// A page for the HTML NoteBook's picture (written next to the pictures, deleted after the render)
+juce::File demoPage (const juce::File& folder)
+{
+    auto file = folder.getChildFile ("notes.html");
+    file.replaceWithText ("<html><head><title>Session notes</title></head><body>"
+                          "<h1>Session notes</h1>"
+                          "<p><b>Song:</b> Night Drive &mdash; 124 BPM, A minor</p>"
+                          "<h2>To do</h2><ul>"
+                          "<li>Record the second verse vocal</li>"
+                          "<li>Tighten the bass under the kick (sidechain)</li>"
+                          "<li>Automate the filter in the break</li>"
+                          "<li>Bounce stems for the mix</li></ul>"
+                          "<h2>Lyrics</h2>"
+                          "<p><i>City lights are fading, the road keeps calling me home...</i></p>"
+                          "</body></html>");
+    return file;
+}
+
+void addDemoContent (EffectSlot& slot, const juce::File& folder)
+{
+    if (slot.kind == EffectKind::htmlNotebook && flextra::htmlnotebook::address (slot.state).empty())
+        slot.state = flextra::htmlnotebook::stateFor (demoPage (folder).getFullPathName().toStdString());
+    if (slot.kind == EffectKind::newtone || slot.kind == EffectKind::newtime)
+        if (const auto voice = demoVoice (folder); voice.existsAsFile())
+            slot.samplePath = voice.getFullPathName().toStdString();
+    if (slot.kind == EffectKind::controlSurface && slot.patcher.surface.empty())
+    {
+        SurfaceControl a, b;
+        a.name = "Knob 1";
+        a.value = 0.72f;
+        a.x = 24.0f;
+        a.y = 24.0f;
+        a.size = 1.6f;
+        b = a;
+        b.name = "Knob 2";
+        b.value = 0.35f;
+        b.x = 130.0f;
+        b.y = 60.0f;
+        slot.patcher.surface = { a, b };
+        if (slot.params.size() > 1)
+        {
+            slot.params[0] = a.value;
+            slot.params[1] = b.value;
+        }
+    }
+}
+
+void addDemoContent (ChannelDef& channel)
+{
+    if (channel.instrument == InstrumentKind::vfx)
+        if (auto st = vfx::readState (channel.pluginState); st && st->kind == vfx::Kind::script)
+        {
+            auto settings = vfx::parseScript (st->fl).value_or (vfx::defaultScript());
+            settings.setSource ("import flvfx as vfx\n\n"
+                                "def createDialog():\n"
+                                "    form = vfx.ScriptDialog('Humanize', 'Moves each note a little in time and velocity.')\n"
+                                "    form.addInputKnob('Timing', 0.2, 0, 1)\n"
+                                "    form.addInputKnob('Velocity', 0.35, 0, 1)\n"
+                                "    form.addInputKnob('Length', 0.1, 0, 1)\n"
+                                "    form.addInputCombo('Mode', ['Random', 'Groove'], 0)\n"
+                                "    form.addInputCheckbox('Bypass', 0)\n"
+                                "    return form\n\n"
+                                "def onTriggerVoice(incomingVoice):\n"
+                                "    v = incomingVoice.copy()\n"
+                                "    v.trigger()\n\n"
+                                "def onReleaseVoice(incomingVoice):\n"
+                                "    for v in vfx.context.voices:\n"
+                                "        if v.note == incomingVoice.note:\n"
+                                "            v.release()\n");
+            st->fl = vfx::writeScript (settings);
+            channel.pluginState = vfx::writeState (*st);
+        }
+}
+
 std::unique_ptr<juce::Component> effectEditor (AudioEngine& engine, EffectSlot slot)
 {
     Song song;
@@ -91,7 +243,7 @@ std::unique_ptr<juce::Component> effectEditor (AudioEngine& engine, EffectSlot s
     if (VisualWindows::handles (kind))
         return makeVisualEditor (engine, 1, 0, true);
     if (FlExtraWindows::handles (kind))
-        return makeFlExtraEditor (VisualTarget::mixerSlot (engine, 1, 0), kind, true);
+        return makeFlExtraSlotEditor (engine, 1, 0, true); // (its own slot target: the NoteBook reads its page from it)
     if (kind == EffectKind::formulaController)
         return FormulaControllerWindows::makeEditor (engine, 1, 0);
     if (NewtoneWindows::handles (kind))
@@ -152,8 +304,9 @@ bool startedOnce = false;
 
 juce::File nativeFolder()
 {
-    // (-r2: the pictures trimmed to the editor's drawn part; a new drawing rule = a new folder)
-    return root().getChildFile (juce::String (JUCE_APPLICATION_VERSION_STRING).retainCharacters ("0123456789.-abcdefghijklmnopqrstuvwxyz") + "-r2");
+    // (-r2: the pictures trimmed to the editor's drawn part; -r3 to -r5: FL's budget and the editors' demo content (round
+    // 175b); a new drawing rule = a new folder)
+    return root().getChildFile (juce::String (JUCE_APPLICATION_VERSION_STRING).retainCharacters ("0123456789.-abcdefghijklmnopqrstuvwxyz") + "-r5");
 }
 
 juce::File capturedFolder()
@@ -244,7 +397,12 @@ int renderNative (const juce::File& folder, const juce::StringArray& only, const
             shoot (g.key, PatcherWindows::makeChannelEditor (engine, 0), 0);
             continue;
         }
-        shoot (g.key, generatorEditor (engine, std::move (*channel)), channelFrameHeaderHeight());
+        addDemoContent (*channel);
+        const auto video = channel->instrument == InstrumentKind::videoplayer;
+        auto editor = generatorEditor (engine, std::move (*channel));
+        if (video && editor != nullptr)
+            showVideoStill (*editor, demoVideoFrame());
+        shoot (g.key, std::move (editor), channelFrameHeaderHeight());
     }
     for (const auto& f : quickpick::effectEntries (engine))
     {
@@ -253,9 +411,12 @@ int renderNative (const juce::File& folder, const juce::StringArray& only, const
         auto slot = f.make();
         if (! slot.has_value())
             continue;
+        addDemoContent (*slot, folder);
         shoot (f.key, effectEditor (engine, std::move (*slot)), 0);
     }
     engine.setSong (Song {});
+    folder.getChildFile ("demo-voice.wav").deleteFile();
+    folder.getChildFile ("notes.html").deleteFile();
     return drawn;
 }
 

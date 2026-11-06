@@ -813,8 +813,11 @@ void createAutomationClip (AudioEngine& engine, const AutomationTarget& target)
     if (value < 0.0f)
         return;
 
-    const auto name = describeAutomationTarget (engine, target).toStdString();
+    addAutomationClip (engine, target, describeAutomationTarget (engine, target).toStdString(), value);
+}
 
+void addAutomationClip (AudioEngine& engine, const AutomationTarget& target, const std::string& name, float value)
+{
     engine.editSong ([&] (Song& s) {
         // the Playlist time selection gives the clip its place and length; otherwise the whole song
         const auto bar = (std::int64_t) ppq * std::max (1, s.beatsPerBar);
@@ -840,6 +843,12 @@ void createAutomationClip (AudioEngine& engine, const AutomationTarget& target)
     });
 
     openAutomationEditor (engine, (int) engine.getSong().automations.size() - 1);
+}
+
+void createUnlinkedAutomationClip (AudioEngine& engine)
+{
+    // (FL's "Automation Clip" generator: a clip linked to nothing yet; link it with its editor's / the control's menu)
+    addAutomationClip (engine, AutomationTarget {}, "Automation Clip", 0.5f); // (FL's plugin name)
 }
 
 void openAutomationEditor (AudioEngine& engine, int index)
