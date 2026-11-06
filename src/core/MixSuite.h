@@ -301,8 +301,9 @@ namespace kiln
 {
 // Input / Output ±18 dB around the console, Console = six steps (British E, British G, American A, British N, Y, Tube =
 // the drive models Console E .. Tube), Drive 0 .. 18 dB, the console's noise while Noise reduction is off, Group 0
-// (none) .. 8 with a Group bypass shared by the group, Main in / out ±24 dB around everything
-enum Param { input, output, console, drive, noiseReduction, group, groupBypass, mainIn, mainOut, count };
+// (none) .. 8 with a Group bypass shared by the group, Main in / out ±24 dB around everything. Link I/O (the output
+// follows the input inversely) and Group I/O (the trims move with the group's) are the editor's: no DSP of their own
+enum Param { input, output, console, drive, noiseReduction, group, groupBypass, mainIn, mainOut, ioLink, ioGroup, count };
 double trimDb (float v) noexcept;
 double mainDb (float v) noexcept;
 double driveDb (float v) noexcept;
@@ -310,6 +311,8 @@ int consoleStep (float v) noexcept;   // 0 .. 5
 float consoleValue (int step) noexcept;
 int groupOf (float v) noexcept;       // 0 = none, 1 .. 8
 const char* consoleName (int step) noexcept;
+// The edits one control change makes on this channel (Link I/O: an input change moves the output the other way)
+std::vector<std::pair<int, float>> linkedEdit (const EffectParams& p, int param, float value);
 } // namespace kiln
 
 // ---- Ember (saturator) ----

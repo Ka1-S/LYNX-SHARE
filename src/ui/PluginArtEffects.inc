@@ -502,7 +502,7 @@ inline void canvasKiln (juce::Graphics& g, Rectangle<float> a, bool display)
     g.setColour (Colours::white.withAlpha (0.07f));
     g.drawRect (mod.reduced (2.0f), 1.0f);
     cornerScrews (g, mod.reduced (2.0f), 9.0f * sx, 7.0f * sx);
-    kilnEmblem (g, { mod.getCentreX(), mod.getY() + 20.0f * sy }, 9.0f * sx);
+    kilnEmblem (g, { mod.getCentreX(), mod.getY() + 17.0f * sy }, 11.0f * sx);
     // the VU's bezel
     const auto bezel = Rectangle<float> (a.getX() + 120.0f * sx, a.getY() + 36.0f * sy, 220.0f * sx, 124.0f * sy);
     g.setColour (Colour (0xff060606));

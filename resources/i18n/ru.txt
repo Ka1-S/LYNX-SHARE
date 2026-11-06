@@ -7327,3 +7327,8 @@ countries: ru by kz
 "the British boutique desk: silky top, rich harmonics" = "британский бутиковый пульт: шелковистый верх, богатые гармоники"
 "a modern desk with heavy colour and noise" = "современный пульт с сильной окраской и шумом"
 "a tube desk: round, dark, the most noise" = "ламповый пульт: округлый, тёмный, самый шумный"
+"Group I/O" = "Вход/выход группы"
+"Link I/O" = "Связать вход/выход"
+"Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Связывает регулировки: поворот Входа двигает Выход в обратную сторону, уровень сохраняется при смене драйва"
+"Input and Output move together on every channel of the group that has Group I/O on" = "Вход и Выход двигаются вместе на всех каналах группы с включённым «Вход/выход группы»"
+"Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: консольный канал LYNX. Тяните ручку, Alt+клик сбрасывает, правый клик — автоматизация"

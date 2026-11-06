@@ -1838,7 +1838,7 @@ int translateHarrisonStrip (const std::vector<std::uint8_t>& state, EffectSlot& 
 // Ridge's DRIVE section): the console selector (Brit 4k E / Brit 4k G / US A / Brit N / Y / RC-Tube -> Kiln's six
 // steps, the same order), the drive 0 .. 18 dB, Input and Output (-18 .. +18 dB), Noise Reduction and Group Bypass (its
 // switches store 0.25 = off, 0.75 = on), the Group in Common (None, 1 .. 8 over nine equal bins) and the main gains
-// (StandaloneInputGain / StandaloneOutputGain, -24 .. +24 dB)
+// (StandaloneInputGain / StandaloneOutputGain, -24 .. +24 dB); its GROUP I/O and LINK I/O lamps (IOGroup / IOLink, Common)
 int translateVccChannel (const std::vector<std::uint8_t>& state, EffectSlot& slot)
 {
     namespace k = mixsuite::kiln;
@@ -1879,6 +1879,8 @@ int translateVccChannel (const std::vector<std::uint8_t>& state, EffectSlot& slo
     p[k::group] = (float) group / 8.0f;
     p[k::mainIn] = (float) std::clamp (at ("StandaloneInputGain", 0.5), 0.0, 1.0);   // both -24 .. +24 dB, linear
     p[k::mainOut] = (float) std::clamp (at ("StandaloneOutputGain", 0.5), 0.0, 1.0);
+    p[k::ioLink] = (common.count ("IOLink") ? common.at ("IOLink") : 0.75) >= 0.5 ? 1.0f : 0.0f;   // in Common, 0.25 / 0.75
+    p[k::ioGroup] = (common.count ("IOGroup") ? common.at ("IOGroup") : 0.75) >= 0.5 ? 1.0f : 0.0f;
     if (at ("Bypass", 0.0) >= 0.5)
         slot.enabled = false;
     return (int) v.size();

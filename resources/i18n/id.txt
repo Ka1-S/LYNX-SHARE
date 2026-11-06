@@ -7327,3 +7327,8 @@ countries: id
 "the British boutique desk: silky top, rich harmonics" = "meja butik Inggris: treble halus, harmonik kaya"
 "a modern desk with heavy colour and noise" = "meja modern dengan banyak warna dan derau"
 "a tube desk: round, dark, the most noise" = "meja tabung: bulat, gelap, paling berderau"
+"Group I/O" = "I/O grup"
+"Link I/O" = "Tautkan I/O"
+"Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Menautkan trim: memutar Input menggerakkan Output berlawanan, level tetap saat drive berubah"
+"Input and Output move together on every channel of the group that has Group I/O on" = "Input dan Output bergerak bersama di setiap kanal grup yang I/O grup-nya aktif"
+"Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: kanal konsol LYNX. Seret kenop, Alt+klik mereset, klik kanan untuk otomasi"

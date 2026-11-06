@@ -7327,3 +7327,8 @@ countries: it ch sm
 "the British boutique desk: silky top, rich harmonics" = "il banco britannico boutique: alti setosi, armoniche ricche"
 "a modern desk with heavy colour and noise" = "un banco moderno con molto colore e rumore"
 "a tube desk: round, dark, the most noise" = "un banco valvolare: rotondo, scuro, il più rumoroso"
+"Group I/O" = "I/O del gruppo"
+"Link I/O" = "Collega I/O"
+"Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Collega i trim: girando l'Ingresso l'Uscita si muove al contrario, il livello resta mentre cambia il drive"
+"Input and Output move together on every channel of the group that has Group I/O on" = "Ingresso e Uscita si muovono insieme su tutti i canali del gruppo con I/O del gruppo attivo"
+"Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: il canale console di LYNX. Trascina una manopola, Alt+clic la azzera, clic destro per l'automazione"

@@ -7327,3 +7327,8 @@ countries: cn sg
 "the British boutique desk: silky top, rich harmonics" = "英式精品调音台：丝滑的高频，丰富的谐波"
 "a modern desk with heavy colour and noise" = "染色与噪声都很重的现代调音台"
 "a tube desk: round, dark, the most noise" = "电子管调音台：圆润、偏暗，噪声最大"
+"Group I/O" = "编组输入/输出"
+"Link I/O" = "联动输入/输出"
+"Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "联动增益：转动输入时输出反向移动，改变驱动时电平保持不变"
+"Input and Output move together on every channel of the group that has Group I/O on" = "在开启编组输入/输出的同编组所有通道上，输入与输出一起移动"
+"Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel：LYNX 的调音台通道。拖动旋钮，Alt+单击复位，右键自动化"

@@ -7327,3 +7327,8 @@ countries: es mx ar co cl pe ve
 "the British boutique desk: silky top, rich harmonics" = "la mesa británica boutique: agudos sedosos, armónicos ricos"
 "a modern desk with heavy colour and noise" = "una mesa moderna con mucho color y ruido"
 "a tube desk: round, dark, the most noise" = "una mesa a válvulas: redonda, oscura, la más ruidosa"
+"Group I/O" = "E/S del grupo"
+"Link I/O" = "Vincular E/S"
+"Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Vincula los ajustes: girar la Entrada mueve la Salida al revés, el nivel se mantiene mientras cambia el drive"
+"Input and Output move together on every channel of the group that has Group I/O on" = "Entrada y Salida se mueven juntas en todos los canales del grupo con E/S del grupo activada"
+"Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: el canal de consola de LYNX. Arrastra una perilla, Alt+clic la reinicia, clic derecho para automatización"

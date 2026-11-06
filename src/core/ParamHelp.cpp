@@ -353,6 +353,8 @@ const std::map<std::pair<K, std::string>, const char*>& own()
         { { K::kilnChannel, "noise reduction" }, TR_NOOP ("On: the console's hiss is left out. Off: its measured noise floor is added") },
         { { K::kilnChannel, "group" }, TR_NOOP ("The group this channel belongs to: Group bypass on any member bypasses the whole group") },
         { { K::kilnChannel, "group bypass" }, TR_NOOP ("Bypasses the console on every channel of the group") },
+        { { K::kilnChannel, "link i/o" }, TR_NOOP ("Links the trims: turning Input moves Output the other way, so the level stays while the drive changes") },
+        { { K::kilnChannel, "group i/o" }, TR_NOOP ("Input and Output move together on every channel of the group that has Group I/O on") },
         { { K::kilnChannel, "main in" }, TR_NOOP ("Level into the plugin, before the console") },
         { { K::kilnChannel, "main out" }, TR_NOOP ("Level out of the plugin, after everything") },
         // Ember Saturator

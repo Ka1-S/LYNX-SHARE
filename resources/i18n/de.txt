@@ -7327,3 +7327,8 @@ countries: de at ch li lu
 "the British boutique desk: silky top, rich harmonics" = "das britische Boutique-Pult: seidige Höhen, reiche Obertöne"
 "a modern desk with heavy colour and noise" = "ein modernes Pult mit viel Färbung und Rauschen"
 "a tube desk: round, dark, the most noise" = "ein Röhrenpult: rund, dunkel, am meisten Rauschen"
+"Group I/O" = "Gruppen-E/A"
+"Link I/O" = "E/A koppeln"
+"Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Koppelt die Trims: Eingang drehen bewegt Ausgang gegenläufig, der Pegel bleibt, während sich der Drive ändert"
+"Input and Output move together on every channel of the group that has Group I/O on" = "Eingang und Ausgang bewegen sich gemeinsam auf allen Kanälen der Gruppe mit eingeschaltetem Gruppen-E/A"
+"Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: der Konsolenkanal von LYNX. Regler ziehen, Alt+Klick setzt zurück, Rechtsklick für Automation"

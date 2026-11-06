@@ -7327,3 +7327,8 @@ countries: tr
 "the British boutique desk: silky top, rich harmonics" = "İngiliz butik masa: ipeksi tizler, zengin harmonikler"
 "a modern desk with heavy colour and noise" = "çok renk ve gürültü katan modern bir masa"
 "a tube desk: round, dark, the most noise" = "lambalı masa: yuvarlak, koyu, en gürültülü"
+"Group I/O" = "Grup G/Ç"
+"Link I/O" = "G/Ç bağla"
+"Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Ayarları bağlar: Girişi çevirmek Çıkışı ters yönde hareket ettirir, drive değişirken seviye korunur"
+"Input and Output move together on every channel of the group that has Group I/O on" = "Giriş ve Çıkış, Grup G/Ç açık olan grubun her kanalında birlikte hareket eder"
+"Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: LYNX'in konsol kanalı. Düğmeyi sürükleyin, Alt+tık sıfırlar, sağ tık otomasyon"

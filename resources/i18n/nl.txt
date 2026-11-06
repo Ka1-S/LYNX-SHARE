@@ -7327,3 +7327,8 @@ countries: nl be
 "the British boutique desk: silky top, rich harmonics" = "de Britse boutique-tafel: zijdezacht hoog, rijke harmonischen"
 "a modern desk with heavy colour and noise" = "een moderne tafel met veel kleur en ruis"
 "a tube desk: round, dark, the most noise" = "een buizentafel: rond, donker, de meeste ruis"
+"Group I/O" = "Groeps-I/O"
+"Link I/O" = "I/O koppelen"
+"Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Koppelt de trims: Ingang draaien beweegt Uitgang andersom, het niveau blijft terwijl de drive verandert"
+"Input and Output move together on every channel of the group that has Group I/O on" = "Ingang en Uitgang bewegen samen op elk kanaal van de groep met Groeps-I/O aan"
+"Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: het consolekanaal van LYNX. Sleep een knop, Alt+klik zet terug, rechtsklik voor automatisering"

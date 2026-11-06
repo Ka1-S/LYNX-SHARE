@@ -7327,3 +7327,8 @@ countries: kr
 "the British boutique desk: silky top, rich harmonics" = "브리티시 부티크 콘솔: 실크 같은 고역, 풍부한 배음"
 "a modern desk with heavy colour and noise" = "색채와 노이즈가 많은 모던 콘솔"
 "a tube desk: round, dark, the most noise" = "진공관 콘솔: 둥글고 어둡고 노이즈가 가장 많음"
+"Group I/O" = "그룹 I/O"
+"Link I/O" = "I/O 연결"
+"Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "트림 연결: 입력을 돌리면 출력이 반대로 움직여 드라이브를 바꿔도 레벨이 유지됩니다"
+"Input and Output move together on every channel of the group that has Group I/O on" = "그룹 I/O가 켜진 그룹의 모든 채널에서 입력과 출력이 함께 움직입니다"
+"Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: LYNX의 콘솔 채널. 노브를 드래그, Alt+클릭으로 초기화, 오른쪽 클릭으로 오토메이션"

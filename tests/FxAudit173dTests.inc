@@ -46,6 +46,8 @@ const std::vector<Allowed>& allowed()
 {
     static const std::vector<Allowed> a {
         { "Echoform", "Filter link", "inert", "editor-only: moving one cut moves the other (core/EchoSuite.cpp linkedEdit); no DSP of its own" },
+        { "Kiln Channel", "Link I/O", "inert", "editor-only: an Input change moves Output the other way (kiln::linkedEdit); no DSP of its own" },
+        { "Kiln Channel", "Group I/O", "inert", "editor-only: Input / Output edits reach the group's other channels; no DSP of its own" },
         { "Kiln Channel", "Group", "inert", "routing only: which group's Group bypass this channel follows (a lone instance sounds the same in every group, as the original)" },
         { "Ember Saturator", "Classic auto", "inert", "editor-only: with Auto on, editing Classic drive also sets Classic output (linkedEdit); no DSP of its own" },
         { "Multiband Delay", "Target", "inert", "editor-only: which cells (volume / pan) the band display draws" },

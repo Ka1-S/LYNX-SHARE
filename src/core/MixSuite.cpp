@@ -842,7 +842,8 @@ public:
     }
     void reset() noexcept override { drive.reset(); }
     int latencySamples() const noexcept override { return DriveStage::latency(); }
-    float controlOutput (int k) const noexcept override { return meters.read (k); }
+    // 0..3 = the suite's meters (2 / 3: input / output peaks), 4..7 = input L / R and output L / R (the side columns)
+    float controlOutput (int k) const noexcept override { return k >= 4 && k < 8 ? sides[k - 4].load (std::memory_order_relaxed) : meters.read (k); }
 
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
     {
@@ -858,6 +859,8 @@ public:
             r[i] *= mainIn;
         }
         const auto inPeak = Meters::peak (l, r, n);
+        sides[0].store (Meters::peak (l, l, n), std::memory_order_relaxed);
+        sides[1].store (Meters::peak (r, r, n), std::memory_order_relaxed);
         const auto step = k::consoleStep (p[k::console]);
         const auto model = driveConsoleE + step;
         // the console in or out (out: the same latency, so a group bypass never moves the timing)
@@ -879,6 +882,8 @@ public:
             r[i] *= mainOut;
         }
         meters.set (0.0f, 0.0f, inPeak, Meters::peak (l, r, n));
+        sides[2].store (Meters::peak (l, l, n), std::memory_order_relaxed);
+        sides[3].store (Meters::peak (r, r, n), std::memory_order_relaxed);
     }
 
 private:
@@ -908,6 +913,7 @@ private:
 
     DriveStage drive;
     Meters meters;
+    std::array<std::atomic<float>, 4> sides {};
     std::uint32_t noiseL = 0x9e3779b9u, noiseR = 0x7f4a7c15u;
     int votedGroup = 0;
     bool votedOn = false;
@@ -1928,6 +1934,13 @@ const char* consoleName (int step) noexcept
 {
     static const char* names[6] { "British E", "British G", "American A", "British N", "Y", "Tube" };
     return names[std::clamp (step, 0, 5)];
+}
+std::vector<std::pair<int, float>> linkedEdit (const EffectParams& p, int param, float value)
+{
+    std::vector<std::pair<int, float>> edits { { param, value } };
+    if (param == input && p[ioLink] >= 0.5f) // both trims are -18 .. +18 dB, linear in the value: the same step down
+        edits.push_back ({ output, std::clamp (p[output] - (value - p[input]), 0.0f, 1.0f) });
+    return edits;
 }
 } // namespace kiln
 
@@ -3594,7 +3607,7 @@ const EffectInfo& kilnInfo()
     static const EffectInfo info { "Kiln Channel",
                                    { { "Input", 0.5f }, { "Output", 0.5f }, { "Console", 0.0f }, { "Drive", 1.0f / 3.0f },
                                      { "Noise reduction", 1.0f }, { "Group", 0.0f }, { "Group bypass", 0.0f },
-                                     { "Main in", 0.5f }, { "Main out", 0.5f } } };
+                                     { "Main in", 0.5f }, { "Main out", 0.5f }, { "Link I/O", 1.0f }, { "Group I/O", 1.0f } } };
     return info;
 }
 

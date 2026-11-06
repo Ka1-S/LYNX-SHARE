@@ -2163,6 +2163,8 @@ Layout kilnLayout()
     v.push_back (label (104, 166, 252, 20, TR_NOOP ("Kiln Channel"), boxed));
     v.push_back (dial (166, 230, 46, "Input", TR_NOOP ("Input"), bipolar));
     v.push_back (dial (294, 230, 46, "Output", TR_NOOP ("Output"), bipolar));
+    v.push_back (toggle (204, 204, 52, 18, "Group I/O", TR_NOOP ("Group I/O")));
+    v.push_back (toggle (204, 240, 52, 18, "Link I/O", TR_NOOP ("Link I/O")));
     // the console selector: six stops 54 degrees apart over the knob's 270-degree throw, the model printed at each stop
     const float cx = 230.0f, cy = 360.0f, rr = 66.0f;
     v.push_back (knob (cx, cy, 64, "Console", nullptr, cy + 40.0f, noCaption | big, 6));
@@ -2173,7 +2175,7 @@ Layout kilnLayout()
         const auto px = cx + rr * std::sin (a), py = cy - rr * std::cos (a);
         const auto w = 66.0f;
         const auto x = std::sin (a) < -0.3f ? px - w + 8.0f : std::sin (a) > 0.3f ? px - 8.0f : px - w * 0.5f;
-        v.push_back (label (x, py - 7.0f, w, 14, models[k], (std::uint16_t) (dim | (std::sin (a) > 0.3f ? alignLeft : 0))));
+        v.push_back (label (x, py - 7.0f, w, 14, models[k], (std::uint16_t) (std::sin (a) > 0.3f ? alignLeft : 0)));
     }
     v.push_back (dial (166, 488, 50, "Drive", TR_NOOP ("Drive")));
     v.push_back (knob (294, 488, 50, "Group", TR_NOOP ("Group"), 488 + 45.0f, showValue, 9));

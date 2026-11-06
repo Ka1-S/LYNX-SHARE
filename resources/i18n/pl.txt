@@ -7327,3 +7327,8 @@ countries: pl
 "the British boutique desk: silky top, rich harmonics" = "brytyjska konsola butikowa: jedwabista góra, bogate harmoniczne"
 "a modern desk with heavy colour and noise" = "nowoczesna konsola z dużym kolorem i szumem"
 "a tube desk: round, dark, the most noise" = "konsola lampowa: okrągła, ciemna, najwięcej szumu"
+"Group I/O" = "We/Wy grupy"
+"Link I/O" = "Połącz We/Wy"
+"Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Łączy trimy: obrót Wejścia przesuwa Wyjście odwrotnie, poziom zostaje, gdy zmienia się drive"
+"Input and Output move together on every channel of the group that has Group I/O on" = "Wejście i Wyjście ruszają się razem na każdym kanale grupy z włączonym We/Wy grupy"
+"Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: kanał konsoli LYNX. Przeciągnij pokrętło, Alt+klik resetuje, prawy klik – automatyka"

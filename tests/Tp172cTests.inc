@@ -423,6 +423,15 @@ TEST (kiln_channel_tp172c7)
     CHECK (std::abs (s.params[k::drive] - 0.75f) < 1e-6 && s.params[k::noiseReduction] == 0.0f && s.params[k::groupBypass] == 1.0f);
     CHECK (std::abs (k::trimDb (s.params[k::input]) - 9.0) < 0.01 && std::abs (k::trimDb (s.params[k::output]) + 9.0) < 0.01);
     CHECK (k::groupOf (s.params[k::group]) == 4 && std::abs (k::mainDb (s.params[k::mainOut]) - 6.0) < 0.01 && std::abs (k::mainDb (s.params[k::mainIn])) < 1e-6);
+    CHECK (s.params[k::ioLink] == 1.0f && s.params[k::ioGroup] == 1.0f);         // absent from the state: the original's defaults (on)
+    // Link I/O: the output moves against the input; off, the input moves alone
+    {
+        auto q = makeEffectSlot (EffectKind::kilnChannel).params;
+        auto e = k::linkedEdit (q, k::input, 0.75f);
+        CHECK (e.size() == 2 && e[1].first == k::output && std::abs (k::trimDb (e[1].second) + 9.0) < 0.01);
+        q[k::ioLink] = 0.0f;
+        CHECK (k::linkedEdit (q, k::input, 0.75f).size() == 1 && k::linkedEdit (q, k::output, 0.75f).size() == 1);
+    }
     s = vcc ("0.95", "0.0");
     CHECK (k::consoleStep (s.params[k::console]) == 5 && k::groupOf (s.params[k::group]) == 0);
     (void) r::count;
