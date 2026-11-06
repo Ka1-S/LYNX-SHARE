@@ -1155,15 +1155,15 @@ float Song::automationValueAt (int index, double tick) const
             break;
 
         if (tick < (double) c->end())
-            return automation.valueAt (tick - (double) c->start + (double) c->offset);
+            return automation.playAt (tick - (double) c->start + (double) c->offset, tick);
 
         before = c;
     }
 
     if (before != nullptr)
-        return automation.valueAt ((double) (before->length + before->offset));
+        return automation.playAt ((double) (before->length + before->offset), (double) before->end());
 
-    return automation.valueAt ((double) clips.front()->offset);
+    return automation.playAt ((double) clips.front()->offset, (double) clips.front()->start);
 }
 
 double Song::tempoAt (double tick) const
@@ -1224,6 +1224,11 @@ float PatternEvents::valueAt (double tick) const noexcept
 
 float Automation::valueAt (double tick) const noexcept
 {
+    return automationCurveAt (points, tick);
+}
+
+float automationCurveAt (const std::vector<AutomationPoint>& points, double tick) noexcept
+{
     if (points.empty())
         return 0.5f;
 
@@ -1249,6 +1254,88 @@ float Automation::valueAt (double tick) const noexcept
     }
 
     return points.back().value;
+}
+
+// --- FL's automation clip LFO (REA round 177b; FUN_00ba1700, FUN_00ba0710, FUN_00ba03d0, FUN_00677660/820) ---------
+bool AutomationLfo::isDefault() const noexcept
+{
+    return *this == AutomationLfo {};
+}
+
+double AutomationLfo::cyclesPerBeat (int speed) noexcept
+{
+    // rate = (10001^(speed/65536) − 1) · 2^32/625 phase units per beat (FL: 45819 = 1 beat, 40898 = 2, 26257 = 16)
+    return (std::pow (10001.0, (double) speed / 65536.0) - 1.0) / 625.0;
+}
+
+int AutomationLfo::speedForBeats (double beatsPerCycle) noexcept
+{
+    if (beatsPerCycle <= 0.0)
+        return 65536;
+    const auto speed = 65536.0 * std::log (625.0 / beatsPerCycle + 1.0) / std::log (10001.0);
+    return (int) std::clamp (std::lround (speed), 512L, 65536L);
+}
+
+float AutomationLfo::shape (std::uint32_t phase, int tensionKnob, int skewKnob, int pulseWidthKnob, bool unipolar) noexcept
+{
+    constexpr double full = 4294967296.0; // 2^32: one cycle
+    const auto p = (double) pulseWidthKnob / 128.0;
+    const auto s = (double) skewKnob / 256.0;
+    const auto s7 = p > 0.0 ? std::round ((1.0 - p) * full - 1.0) : 4294967295.0;
+    const auto d = std::clamp (((1.0 - p) * 0.5 - s * (1.0 - std::abs (p))) * full, 1.0, s7 - 1.0);
+    const auto s5 = std::round (d);
+    const auto s6 = p < 0.0 ? std::max (1.0, std::round (d + p * full)) : s5;
+    const auto phi = (double) phase;
+
+    double x;
+    if (phi > s7)
+        return 1.0f; // the pulse's top (p > 0)
+    if (phi < s6)
+        x = 1.0 - phi * (2.0 / s6); // falling +1 → −1
+    else if (phi < s5)
+        return -1.0f; // the pulse's bottom (p < 0)
+    else
+        x = (phi - s5) * (2.0 / (s7 - s5)) - 1.0; // rising −1 → +1
+
+    // tension (FUN_00ba0250): T = sign(t)·((1e18)^((21^(|t|/128) − 1)·0.05) − 1)
+    const auto t = (double) tensionKnob;
+    const auto T = t == 0.0 ? 0.0 : (t > 0.0 ? 1.0 : -1.0) * (std::pow (9.99999984e17, (std::pow (21.0, std::abs (t) / 128.0) - 1.0) * 0.05) - 1.0);
+    auto curve = [T] (double a) {
+        if (T == 0.0)
+            return a;
+        if (T > 0.0)
+            return 1.0 - (std::pow (T + 1.0, 1.0 - a) - 1.0) / T;
+        return (std::pow (-T + 1.0, a) - 1.0) / -T;
+    };
+    const auto y = unipolar ? 2.0 * curve ((x + 1.0) * 0.5) - 1.0 : (x < 0.0 ? -curve (-x) : curve (x));
+    return (float) std::clamp (y, -1.0, 1.0);
+}
+
+float AutomationLfo::output (double clipTick, double songTick) const noexcept
+{
+    constexpr double full = 4294967296.0;
+    const auto amplitude = automationCurveAt (amp, clipTick);
+    // the start: the middle of the rising ramp (the LFO starts at 0 going up) plus the phase knob (FUN_00ba06a0)
+    const auto p = (double) pulseWidth / 128.0, sk = (double) skew / 256.0;
+    const auto s7 = p > 0.0 ? std::round ((1.0 - p) * full - 1.0) : 4294967295.0;
+    const auto s5 = std::round (std::clamp (((1.0 - p) * 0.5 - sk * (1.0 - std::abs (p))) * full, 1.0, s7 - 1.0));
+    const auto start = std::fmod (s5 + (s7 - s5) * 0.5 + 1.0 + (double) phase, full);
+    // frozen: no movement inside the clip; global: the phase runs with the song instead of restarting with the clip
+    const auto frozen = (flags & 8) != 0, global = (flags & 2) != 0;
+    const auto beats = frozen ? 0.0 : std::max (0.0, global ? songTick : clipTick) / (double) ppq;
+    auto cycles = beats * cyclesPerBeat (speed);
+    cycles -= std::floor (cycles);
+    const auto at = (std::uint32_t) (std::uint64_t) std::fmod (start + cycles * full, full);
+    return amplitude * shape (at, tension, skew, pulseWidth, (flags & 4) != 0);
+}
+
+float AutomationLfo::apply (float value, double clipTick, double songTick) const noexcept
+{
+    // TACArticulator.Compute (FUN_00ba1700): add mode out += L·amount; multiply mode out *= 1 + 2·L·amount
+    const auto amount = (float) level / 128.0f * range;
+    const auto l = output (clipTick, songTick);
+    const auto out = add ? value + l * amount : value * (1.0f + 2.0f * l * amount);
+    return std::clamp (out, 0.0f, 1.0f);
 }
 
 std::int64_t Automation::length() const noexcept

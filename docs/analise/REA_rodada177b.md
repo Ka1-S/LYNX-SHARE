@@ -112,7 +112,6 @@ the renderer, cleared after use); no allocation on the audio thread (the fixed-b
   it was free over the new clip's span. The decompiled "span" check is read that way (the start track / range it is
   given cover the whole track); LYNX follows what FL does. [EXEC]
 
-
 ### Is this the best way? — verdict
 - FL's way is already one step from any LYNX control (right-click › Create automation clip). The missing piece was
   FL's placement: at the playhead, on the first free track. Built **FL-exact**, with FL's option (on by default).
@@ -184,6 +183,60 @@ Not in this slice (open): "Everything" in the "+A" picker (any control reaches a
 lanes following moved clips (phase 2); lanes in PDC "Compensate automation".
 
 ---
+
+## Slice 3c — FL's automation clip LFO ("LFO mode", coordinator: build it FL-exact)
+
+Full REA: `/mnt/e/lynx-work/177b/lfo/FL-AUTOMATION-LFO.md` (headless Ghidra on `FLEngine_x64.dll`, 1,781 0xEA events of
+1,300+ local .flp files).
+
+### FL Studio [DECOMP] [DATA] [DFM]
+- LFO mode is **not** a loop of the clip's points: every automation clip (`TACArticulator`, VMT 0x00FE2580) carries a
+  main envelope (its points) and a `TMLFO` with its own points (the LFO's amplitude over the clip's time) and FL's
+  usual LFO knobs. "LFO mode" = the LFO's enabled LongBool; the editor then edits the LFO's points (FUN_00f6b6a0).
+- .flp: everything is in event 0xEA. The "112-byte trailer" LYNX wrote as a constant is the main envelope's tail
+  (flags, enabled, 3 loop points, A/D/S/R knobs 128/128/0/128) plus the LFO stream (kind 5, version 3, M points,
+  flags, enabled, 3 loop points, speed, tension, skew, pulse width, phase): `112 + 24·(M − 1)` bytes. Header +4 = LFO
+  level (−128…128, 64), +8 = mode (0 multiply, 1 add). Writer FUN_00fe8640 → FUN_00b9fd20 / FUN_00b97c40 /
+  FUN_00ba01a0. Every local file parses with 0 bytes left.
+- Evaluation: `out = base + env·range`; LFO on: add `out += L·level/128·range`, multiply `out *= 1 + 2·L·level/128·range`
+  (FUN_00ba1700, constants 2.0 / 1.0 read from the binary). `L = amp(t)·shape(phase)` (FUN_00ba0710); the phase is a
+  u32 per cycle starting at the middle of the rising ramp + PHASE (FUN_00ba06a0); cycles per beat =
+  `(10001^(speed/65536) − 1)/625` (FUN_00ba03d0; 45819 = 1 beat, 40898 = 2, 26257 = 16 [DATA]); the waveform
+  (FUN_00677660/820) is a triangle bent by tension `T = sign·((1e18)^((21^(|t|/128) − 1)·0.05) − 1)`, skewed, with
+  pulse-width flat zones. Flags: 1 tempo, 2 global phase, 4 unipolar tension ("Bipolar LFO tension" off), 8 frozen
+  (FL sets 2 with it).
+- UI: channel settings "LFO" panel (LFO box, speed / tension / skew / pulse width / level wheels, "Multiply" box) and the
+  automation editor's " LFO" button; menu "Bipolar LFO tension", "Frozen LFO". Delete: the LFO keeps ≥ 1 point.
+
+### Ableton Live 12 / users
+- Live has no LFO inside an automation envelope; it is a device (LFO Max device, Shaper) mapped to a parameter — the
+  modulators slice (4). Bitwig: modulators per device. FL users praise the clip LFO for quick wobbles without a plugin
+  and complain that it is hidden in the channel settings (r/FL_Studio threads on "automation clip LFO", snippet level).
+
+### Is this the best way? — verdict
+FL-exact: the same model (points + LFO), the same math, the same file bytes, and FL 2026's editor layout (checked live
+at the UI gate): the "Automation editor | LFO" row above the grid; in LFO mode the small SPD / TNS / SKEW / PW / AMNT
+knobs, MUL and the options arrow bottom-left under the grid; the wave that plays is the main line. The options menu
+has FL's two flags only (Bipolar LFO tension, Frozen LFO). PHASE and the global-phase flag have no control in FL: LYNX
+keeps them as passthrough values (read, played, written back).
+- Possible option (not built, for the user): draw the LFO's amplitude points as the bold line with the played wave thin
+  behind (LYNX's first draft). It shows the amplitude envelope better, but it is not FL's look; FL's stays the default.
+
+### Built
+| Piece | Where |
+|---|---|
+| `AutomationLfo` (on, level, add, flags, speed, tension, skew, pulse width, phase, range, amplitude points; FL's unused fields + raw point records kept), `shape`, `cyclesPerBeat`, `speedForBeats`, `apply`; `Automation::playAt` | `core/Song` |
+| Playback: clips (and the value between clips), Performance-mode clips, `Song::automationValueAt` use `playAt`; nothing computed while the LFO is off | `core/RackRenderer`, `core/Song.cpp` |
+| .flp read: the whole 0xEA layout; write: from the fields (an untouched clip writes FL's 112 bytes exactly as before), the LFO point records byte for byte while unchanged | `flp/Flp`, `flp/FlpWrite` |
+| Import / export through the song (the clip's range kept: the level is scaled by it on export) | `core/FlpImport`, `core/FlpExport` |
+| Project files: `lfo` / `lfoFl` per automation | `engine/ProjectFile` |
+| Editor (FL 2026's layout): "Automation editor \| LFO" row (the LFO toggle edits the LFO's points while on); bottom-left SPD (shown in beats), TNS, SKEW, PW, AMNT knobs, MUL, options (Bipolar LFO tension, Frozen LFO); the played wave is the main line, the amplitude points small on a thin line; Playlist clips draw the played curve | `ui/AutomationUi`, `ui/PlaylistComponent` |
+| Tests: `lfo177b_untouched_clip_writes_fls_tail`, `lfo177b_flp_round_trip_is_byte_exact` (FL's Astes clip: 136-byte trailer, unknown bytes kept), `lfo177b_rate_and_shape_match_fl` | `tests/Lfo177bTests.inc` |
+
+Open: FL's knobs 0x600–0x604 are automatable channel parameters (not automatable in LYNX yet); FL's rate cap per tick
+(805306368) is not applied (it is above the fastest speed at FL's PPQ); the playlist call site and FL's final clamp
+were not traced (LYNX clamps to 0…1); "Global / retriggered LFO" handler not traced (LYNX: phase from the song start);
+the LFO under a non-linear target map (an imported effect parameter) is applied in LYNX's value space.
 
 ## Slice 4 — modulators (proposal only, not built)
 

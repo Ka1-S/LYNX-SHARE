@@ -3537,6 +3537,47 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             a.points.push_back ({ tick, value, 0.0f });
         }
 
+        // FL's clip LFO (round 177b, REA FUN_00fe8640 / FUN_00ba1700): kept whole, so the file writes back byte for byte
+        if (const auto& f = c.automationLfo; f.present || f.level != 64 || f.mode != 0)
+        {
+            auto& lfo = a.lfo;
+            lfo.on = f.enabled != 0;
+            lfo.level = f.level;
+            lfo.add = f.mode == 1;
+            lfo.flags = f.flags;
+            lfo.speed = f.speed;
+            lfo.tension = f.tension;
+            lfo.skew = f.skew;
+            lfo.pulseWidth = f.pulseWidth;
+            lfo.phase = f.phase;
+            lfo.range = (float) (hi - lo);
+            lfo.amp.clear();
+            for (std::size_t i = 0; i < f.points.size(); ++i) // (the same curve rules as the clip's points)
+            {
+                const auto& p = f.points[i];
+                const auto tick = (std::int64_t) std::llround (p.position * ppq);
+                if (i > 0)
+                {
+                    auto& previous = lfo.amp.back();
+                    if (p.curve == 0 || p.curve == 1)
+                        previous.tension = std::clamp (-p.tension, -1.0f, 1.0f);
+                    else if (p.curve == 2 && tick - previous.tick > 1)
+                        lfo.amp.push_back ({ tick - 1, previous.value, 0.0f });
+                }
+                lfo.amp.push_back ({ tick, (float) std::clamp (p.value, 0.0, 1.0), 0.0f });
+            }
+            if (lfo.amp.empty())
+                lfo.amp.push_back ({ 0, 1.0f, 0.0f });
+            lfo.fl.present = f.present;
+            lfo.fl.mainFlags = f.mainFlags;
+            lfo.fl.mainEnabled = f.mainEnabled;
+            lfo.fl.mainLoop = f.mainLoop;
+            lfo.fl.adsr = f.adsr;
+            lfo.fl.lfoLoop = f.lfoLoop;
+            lfo.fl.rawPoints = f.rawPoints;
+            lfo.fl.rawAmp = lfo.amp;
+        }
+
         automationMap[c.index] = (int) song.automations.size();
         song.automations.push_back (std::move (a));
     }

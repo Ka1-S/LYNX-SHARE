@@ -21,6 +21,7 @@
 #include "ui/HintBar.h"
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
+#include "ui/ControllerKnob.h"
 
 namespace lynx
 {
@@ -81,8 +82,39 @@ public:
           automation (index)
     {
         engine.addChangeListener (this);
-        setSize (760, 300);
+        buildLfoPanel();
+        refreshLfoPanel();
+        setSize (760, 330);
         startTimerHz (30);
+    }
+
+    // round 177b: FL's LFO mode (REA FUN_00f62690 / FUN_00f6b6a0): with the LFO on, the editor edits the LFO's own points
+    // (its amplitude over the clip) instead of the clip's points
+    static const std::vector<AutomationPoint>& editedPoints (const Automation& a) { return a.lfo.on ? a.lfo.amp : a.points; }
+    static std::vector<AutomationPoint>& editedPoints (Automation& a) { return a.lfo.on ? a.lfo.amp : a.points; }
+    static float curveAt (const Automation& a, double tick) { return automationCurveAt (editedPoints (a), tick); }
+
+    void resized() override
+    {
+        // FL's layout: the "Automation editor | LFO" row above the grid; in LFO mode the small knobs, MUL and the
+        // options arrow sit under the grid, bottom-left
+        auto top = getLocalBounds().removeFromTop (tabRowHeight).reduced (8, 2);
+        top.removeFromLeft (editorCaptionWidth());
+        lfoButton.setBounds (top.removeFromLeft (64));
+        const auto* a = current();
+        const auto on = a != nullptr && a->lfo.on;
+        auto bar = getLocalBounds().removeFromBottom (lfoBarHeight()).reduced (8, 2);
+        for (auto* k : lfoKnobs)
+        {
+            k->setVisible (on);
+            k->setBounds (bar.removeFromLeft (38));
+        }
+        bar.removeFromLeft (4);
+        mulButton.setVisible (on);
+        mulButton.setBounds (bar.removeFromLeft (44).withSizeKeepingCentre (44, 20));
+        bar.removeFromLeft (2);
+        lfoOptions.setVisible (on);
+        lfoOptions.setBounds (bar.removeFromLeft (24).withSizeKeepingCentre (24, 20));
     }
 
     ~AutomationEditor() override { engine.removeChangeListener (this); }
@@ -93,6 +125,9 @@ public:
     {
         using namespace theme;
         g.fillAll (colour::bg1);
+        g.setColour (colour::textPrimary);
+        g.setFont (font (type::small));
+        g.drawText (tr ("Automation editor"), 8, 0, editorCaptionWidth(), tabRowHeight, juce::Justification::centredLeft);
         const auto* a = current();
 
         if (a == nullptr)
@@ -124,7 +159,7 @@ public:
             {
                 g.setColour (colour::textSecondary);
                 g.setFont (font (type::caption));
-                g.drawText (juce::String (tick / bar + 1), x + 3, 2, 40, 16, juce::Justification::centredLeft);
+                g.drawText (juce::String (tick / bar + 1), x + 3, tabRowHeight + 2, 40, 16, juce::Justification::centredLeft);
             }
         }
 
@@ -134,18 +169,30 @@ public:
             g.drawHorizontalLine ((int) valueToY (v), (float) area.getX(), (float) area.getRight());
         }
 
-        // curve
-        juce::Path curve;
-        const auto& points = a->points;
+        // curve: the clip's points, or in LFO mode (FL-exact) the wave that plays, with the LFO's amplitude points as
+        // handles on a thin line
+        juce::Path curve, amp;
+        const auto& points = editedPoints (*a);
+        const auto lfo = a->lfo.on;
 
-        for (auto x = area.getX(); x <= area.getRight(); x += 2)
+        for (auto x = area.getX(); x <= area.getRight(); x += lfo ? 1 : 2)
         {
-            const auto y = valueToY (a->valueAt (xToTick (x)));
+            const auto tick = xToTick (x);
+            const auto y = valueToY (lfo ? a->playAt (tick, tick) : curveAt (*a, tick));
 
             if (x == area.getX())
                 curve.startNewSubPath ((float) x, y);
             else
                 curve.lineTo ((float) x, y);
+
+            if (lfo)
+            {
+                const auto ya = valueToY (curveAt (*a, tick));
+                if (x == area.getX())
+                    amp.startNewSubPath ((float) x, ya);
+                else
+                    amp.lineTo ((float) x, ya);
+            }
         }
 
         // soft fill under the curve, then the line
@@ -156,7 +203,12 @@ public:
         g.setColour (colour::automation.withAlpha (0.10f));
         g.fillPath (fill);
         g.setColour (colour::automation);
-        g.strokePath (curve, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.strokePath (curve, juce::PathStrokeType (lfo ? 1.5f : 2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        if (lfo)
+        {
+            g.setColour (colour::textSecondary.withAlpha (0.45f));
+            g.strokePath (amp, juce::PathStrokeType (1.0f));
+        }
 
         // round 165: FL's tension handles, hollow, in the middle of each segment
         for (int i = 0; i + 1 < (int) points.size(); ++i)
@@ -170,10 +222,11 @@ public:
         {
             const auto p = pointPosition (points[i]);
             const auto active = (int) i == hoverPoint || (int) i == dragPoint;
+            const auto r = lfo ? 3.5f : 4.5f; // LFO mode: the amplitude points stay small, the wave is the main line
             g.setColour (colour::bg0);
-            g.fillEllipse (p.x - 6.0f, p.y - 6.0f, 12.0f, 12.0f);
-            g.setColour (active ? colour::textPrimary : colour::automation);
-            g.fillEllipse (p.x - 4.5f, p.y - 4.5f, 9.0f, 9.0f);
+            g.fillEllipse (p.x - r - 1.5f, p.y - r - 1.5f, (r + 1.5f) * 2.0f, (r + 1.5f) * 2.0f);
+            g.setColour (active ? colour::textPrimary : (lfo ? colour::textSecondary : colour::automation));
+            g.fillEllipse (p.x - r, p.y - r, r * 2.0f, r * 2.0f);
         }
 
         // playback cursor (at the position of the clip currently playing)
@@ -190,8 +243,8 @@ public:
             g.setColour (colour::textPrimary);
             g.setFont (font (type::small));
             const auto value = points[(std::size_t) hoverPoint].value;
-            g.drawText (a->target.kind == AutomationTargetKind::tempo ? juce::String (tempoFromValue (value), 1) + " BPM"
-                                                                       : juce::String (juce::roundToInt (value * 100.0f)) + "%",
+            g.drawText (a->target.kind == AutomationTargetKind::tempo && ! a->lfo.on ? juce::String (tempoFromValue (value), 1) + " BPM"
+                                                                                       : juce::String (juce::roundToInt (value * 100.0f)) + "%",
                         (int) p.x + 8, (int) p.y - 18, 60, 14, juce::Justification::centredLeft);
         }
     }
@@ -249,7 +302,7 @@ public:
             hint.text = tr ("[LMB] or [RMB] new point (hold and drag)  [Shift][RMB] point on the curve  [Alt][LMB] bend  [Ctrl][Wheel] zoom  [MMB] scroll");
 
         if (a != nullptr)
-            hint.value = valueText (point >= 0 ? a->points[(std::size_t) point].value : yToValue (position.y));
+            hint.value = valueText (point >= 0 ? editedPoints (*a)[(std::size_t) point].value : yToValue (position.y));
         return hint;
     }
 
@@ -284,8 +337,8 @@ public:
             if (handle >= 0) // FL: right-click on the tension handle = straight segment
             {
                 edit ([handle] (Automation& x) {
-                    if (handle < (int) x.points.size())
-                        x.points[(std::size_t) handle].tension = 0.0f;
+                    if (handle < (int) editedPoints (x).size())
+                        editedPoints (x)[(std::size_t) handle].tension = 0.0f;
                 });
                 return;
             }
@@ -293,7 +346,7 @@ public:
             // level); the whole-curve commands are in the point menu
             AutomationPoint p;
             p.tick = snap (xToTick (e.x), ! e.mods.isAltDown());
-            p.value = e.mods.isShiftDown() ? a->valueAt ((double) p.tick) : yToValue (e.y);
+            p.value = e.mods.isShiftDown() ? curveAt (*a, (double) p.tick) : yToValue (e.y);
             addAndDrag (p);
             return;
         }
@@ -307,8 +360,8 @@ public:
         if (handle >= 0) // the tension handle: up / down bends the segment
         {
             tensionPoint = handle;
-            tensionStart = a->points[(std::size_t) handle].tension;
-            tensionSign = a->points[(std::size_t) handle + 1].value >= a->points[(std::size_t) handle].value ? -1.0f : 1.0f;
+            tensionStart = editedPoints (*a)[(std::size_t) handle].tension;
+            tensionSign = editedPoints (*a)[(std::size_t) handle + 1].value >= editedPoints (*a)[(std::size_t) handle].value ? -1.0f : 1.0f;
             return;
         }
 
@@ -318,14 +371,14 @@ public:
             tensionPoint = -1;
             const auto tick = xToTick (e.x);
 
-            for (int i = 0; i + 1 < (int) a->points.size(); ++i)
-                if (tick >= (double) a->points[(std::size_t) i].tick && tick < (double) a->points[(std::size_t) i + 1].tick)
+            for (int i = 0; i + 1 < (int) editedPoints (*a).size(); ++i)
+                if (tick >= (double) editedPoints (*a)[(std::size_t) i].tick && tick < (double) editedPoints (*a)[(std::size_t) i + 1].tick)
                     tensionPoint = i;
 
             if (tensionPoint >= 0)
             {
-                tensionStart = a->points[(std::size_t) tensionPoint].tension;
-                tensionSign = a->points[(std::size_t) tensionPoint + 1].value >= a->points[(std::size_t) tensionPoint].value ? -1.0f : 1.0f;
+                tensionStart = editedPoints (*a)[(std::size_t) tensionPoint].tension;
+                tensionSign = editedPoints (*a)[(std::size_t) tensionPoint + 1].value >= editedPoints (*a)[(std::size_t) tensionPoint].value ? -1.0f : 1.0f;
             }
             return;
         }
@@ -345,12 +398,12 @@ public:
     void addAndDrag (const AutomationPoint& p)
     {
         edit ([p] (Automation& x) {
-            x.points.push_back (p);
-            std::stable_sort (x.points.begin(), x.points.end(), [] (auto& l, auto& r) { return l.tick < r.tick; });
+            editedPoints (x).push_back (p);
+            std::stable_sort (editedPoints (x).begin(), editedPoints (x).end(), [] (auto& l, auto& r) { return l.tick < r.tick; });
         });
 
-        for (int i = 0; i < (int) current()->points.size(); ++i)
-            if (current()->points[(std::size_t) i].tick == p.tick && current()->points[(std::size_t) i].value == p.value)
+        for (int i = 0; i < (int) editedPoints (*current()).size(); ++i)
+            if (editedPoints (*current())[(std::size_t) i].tick == p.tick && editedPoints (*current())[(std::size_t) i].value == p.value)
                 dragPoint = i;
     }
 
@@ -368,19 +421,19 @@ public:
             return;
         }
 
-        if (tensionPoint >= 0 && tensionPoint < (int) a->points.size())
+        if (tensionPoint >= 0 && tensionPoint < (int) editedPoints (*a).size())
         {
             const auto up = -(float) e.getDistanceFromDragStartY() / (flmods::ctrl (e.mods) ? 400.0f : 100.0f);
             const auto tension = juce::jlimit (-1.0f, 1.0f, tensionStart + tensionSign * up); // the segment follows the mouse
-            edit ([i = tensionPoint, tension] (Automation& x) { x.points[(std::size_t) i].tension = tension; });
+            edit ([i = tensionPoint, tension] (Automation& x) { editedPoints (x)[(std::size_t) i].tension = tension; });
             return;
         }
 
-        if (dragPoint < 0 || dragPoint >= (int) a->points.size())
+        if (dragPoint < 0 || dragPoint >= (int) editedPoints (*a).size())
             return;
 
         // the point can't pass its neighbours (order doesn't change while dragging)
-        const auto& points = a->points;
+        const auto& points = editedPoints (*a);
         auto tick = snap (xToTick (e.x), ! e.mods.isShiftDown() && ! e.mods.isAltDown());
         const auto lo = dragPoint > 0 ? points[(std::size_t) dragPoint - 1].tick : 0;
         const auto hi = dragPoint + 1 < (int) points.size() ? points[(std::size_t) dragPoint + 1].tick : std::numeric_limits<std::int64_t>::max();
@@ -394,8 +447,8 @@ public:
             value = points[(std::size_t) dragPoint].value;
 
         edit ([i = dragPoint, tick, value] (Automation& x) {
-            x.points[(std::size_t) i].tick = tick;
-            x.points[(std::size_t) i].value = value;
+            editedPoints (x)[(std::size_t) i].tick = tick;
+            editedPoints (x)[(std::size_t) i].value = value;
         });
     }
 
@@ -429,34 +482,36 @@ private:
     juce::String valueText (float v) const
     {
         const auto* a = current();
+        if (a != nullptr && a->lfo.on) // the LFO's amplitude
+            return tr ("LFO amplitude") + " " + juce::String (juce::roundToInt (v * 100.0f)) + "%";
         return a != nullptr ? automationPointValueText (a->target, v) : juce::String();
     }
 
     void showPointMenu (int point)
     {
         const auto* a = current();
-        const auto value = a->points[(std::size_t) point].value;
+        const auto value = editedPoints (*a)[(std::size_t) point].value;
         juce::PopupMenu menu;
         menu.addSectionHeader (valueText (value));
         menu.addItem (tr ("Type value..."), [this, point] { typeValue (point); });
         menu.addItem (tr ("Copy value"), [value] { copiedAutomationValue() = value; });
         menu.addItem (tr ("Paste value"), copiedAutomationValue() >= 0.0f, false, [this, point] {
             edit ([point, v = copiedAutomationValue()] (Automation& x) {
-                if (point < (int) x.points.size())
-                    x.points[(std::size_t) point].value = v;
+                if (point < (int) editedPoints (x).size())
+                    editedPoints (x)[(std::size_t) point].value = v;
             });
         });
         menu.addItem (tr ("Straight segment (reset the curve)"), [this, point] {
             edit ([point] (Automation& x) {
-                if (point < (int) x.points.size())
-                    x.points[(std::size_t) point].tension = 0.0f;
+                if (point < (int) editedPoints (x).size())
+                    editedPoints (x)[(std::size_t) point].tension = 0.0f;
             });
         });
         menu.addSeparator();
-        menu.addItem (tr ("Delete point"), a->points.size() > 1, false, [this, point] {
+        menu.addItem (tr ("Delete point"), editedPoints (*a).size() > 1, false, [this, point] {
             edit ([point] (Automation& x) {
-                if (point < (int) x.points.size() && x.points.size() > 1)
-                    x.points.erase (x.points.begin() + point);
+                if (point < (int) editedPoints (x).size() && editedPoints (x).size() > 1)
+                    editedPoints (x).erase (editedPoints (x).begin() + point);
             });
         });
         menu.addSeparator();
@@ -472,13 +527,13 @@ private:
         menu.addItem (tr ("Scale the values into a range..."), [this] { rerange(); });
         menu.addItem (tr ("Flip the values upside down"), [this] {
             edit ([] (Automation& x) {
-                for (auto& p : x.points)
+                for (auto& p : editedPoints (x))
                     p.value = 1.0f - p.value;
             });
         });
         menu.addItem (tr ("All segments straight"), [this] {
             edit ([] (Automation& x) {
-                for (auto& p : x.points)
+                for (auto& p : editedPoints (x))
                     p.tension = 0.0f;
             });
         });
@@ -499,11 +554,11 @@ private:
                                      const auto lo = juce::jlimit (0.0f, 1.0f, window->getTextEditorContents ("min").getFloatValue() / 100.0f);
                                      const auto hi = juce::jlimit (0.0f, 1.0f, window->getTextEditorContents ("max").getFloatValue() / 100.0f);
                                      edit ([lo, hi] (Automation& x) {
-                                         if (x.points.empty())
+                                         if (editedPoints (x).empty())
                                              return;
-                                         auto [mn, mx] = std::minmax_element (x.points.begin(), x.points.end(), [] (auto& a, auto& b) { return a.value < b.value; });
+                                         auto [mn, mx] = std::minmax_element (editedPoints (x).begin(), editedPoints (x).end(), [] (auto& a, auto& b) { return a.value < b.value; });
                                          const auto from = mn->value, span = mx->value - mn->value;
-                                         for (auto& p : x.points)
+                                         for (auto& p : editedPoints (x))
                                              p.value = span > 1e-6f ? lo + (p.value - from) / span * (hi - lo) : lo;
                                      });
                                  }),
@@ -524,7 +579,113 @@ private:
         });
     }
 
-    juce::Rectangle<int> plotArea() const { return getLocalBounds().withTrimmedTop (18).withTrimmedBottom (4).reduced (8, 4); }
+    juce::Rectangle<int> plotArea() const
+    {
+        return getLocalBounds().withTrimmedTop (tabRowHeight + 18).withTrimmedBottom (lfoBarHeight() + 4).reduced (8, 4);
+    }
+
+    // --- the LFO panel (FL's channel settings "LFO" panel and the editor's LFO button; REA round 177b) ---------------
+    static constexpr int tabRowHeight = 24;
+    static int editorCaptionWidth() { return 120; }
+    int lfoBarHeight() const
+    {
+        const auto* a = current();
+        return a != nullptr && a->lfo.on ? 44 : 0;
+    }
+
+    void editLfo (const std::function<void (AutomationLfo&)>& fn)
+    {
+        edit ([&fn] (Automation& x) { fn (x.lfo); });
+    }
+
+    void addLfoKnob (const juce::String& name, const juce::String& shortName, double lo, double hi, double initial,
+                     std::function<juce::String (double)> text, std::function<double (const AutomationLfo&)> get,
+                     std::function<void (AutomationLfo&, double)> set)
+    {
+        ui::ValueSpec spec;
+        spec.name = name;
+        spec.minimum = lo;
+        spec.maximum = hi;
+        spec.defaultValue = initial;
+        spec.interval = 1.0;
+        spec.toText = std::move (text);
+        auto knob = std::make_unique<ctlui::Knob> (
+            &engine, spec, [this, get] { const auto* a = current(); return a != nullptr ? get (a->lfo) : 0.0; },
+            [this, set] (double v) { editLfo ([&set, v] (AutomationLfo& l) { set (l, v); }); });
+        knob->shortName = shortName;
+        addChildComponent (*knob);
+        lfoKnobs.push_back (knob.get());
+        ownedKnobs.push_back (std::move (knob));
+    }
+
+    void buildLfoPanel()
+    {
+        lfoButton.setButtonText (tr ("LFO"));
+        lfoButton.setClickingTogglesState (false);
+        lfoButton.setTooltip (tr ("LFO mode: a waveform shapes the clip's value; the editor then edits the LFO's amplitude"));
+        lfoButton.onClick = [this] { editLfo ([] (AutomationLfo& l) { l.on = ! l.on; }); };
+        addAndMakeVisible (lfoButton);
+
+        auto plain = [] (double v) { return juce::String ((int) v); };
+        addLfoKnob (tr ("LFO speed"), tr ("SPD"), 512, 65536, 45819, [] (double v) {
+                const auto beats = 1.0 / AutomationLfo::cyclesPerBeat ((int) v);
+                return beats >= 1.0 ? tr ("{0} beats", { juce::String (beats, beats < 10.0 ? 2 : 1) })
+                                    : "1/" + juce::String (1.0 / beats, 1) + " " + tr ("beat");
+            },
+            [] (const AutomationLfo& l) { return (double) l.speed; }, [] (AutomationLfo& l, double v) { l.speed = (int) v; });
+        addLfoKnob (tr ("LFO tension"), tr ("TNS"), -128, 128, 0, plain, [] (const AutomationLfo& l) { return (double) l.tension; },
+                    [] (AutomationLfo& l, double v) { l.tension = (int) v; });
+        addLfoKnob (tr ("LFO skew"), tr ("SKEW"), -128, 128, 0, plain, [] (const AutomationLfo& l) { return (double) l.skew; },
+                    [] (AutomationLfo& l, double v) { l.skew = (int) v; });
+        addLfoKnob (tr ("LFO pulse width"), tr ("PW"), -112, 112, 0, plain, [] (const AutomationLfo& l) { return (double) l.pulseWidth; },
+                    [] (AutomationLfo& l, double v) { l.pulseWidth = (int) v; });
+        // FL's AMNT: the LFO's level (the clip's PHASE stays a passthrough value: FL shows no control for it)
+        addLfoKnob (tr ("LFO amount"), tr ("AMNT"), -128, 128, 64, plain, [] (const AutomationLfo& l) { return (double) l.level; },
+                    [] (AutomationLfo& l, double v) { l.level = (int) v; });
+
+        mulButton.setButtonText (tr ("MUL"));
+        mulButton.setColour (juce::TextButton::buttonOnColourId, theme::colour::automation.withAlpha (0.55f));
+        mulButton.setTooltip (tr ("Multiply with envelope level (off: the LFO is added)"));
+        mulButton.onClick = [this] { editLfo ([] (AutomationLfo& l) { l.add = ! l.add; }); };
+        addChildComponent (mulButton);
+
+        lfoOptions.setButtonText (juce::String::fromUTF8 ("\xe2\x96\xbe"));
+        lfoOptions.setTooltip (tr ("LFO options"));
+        lfoOptions.onClick = [this] {
+            const auto* a = current();
+            if (a == nullptr)
+                return;
+            const auto flags = a->lfo.flags;
+            juce::PopupMenu menu;
+            menu.addItem (tr ("Bipolar LFO tension"), true, (flags & 4) == 0, [this] { editLfo ([] (AutomationLfo& l) { l.flags ^= 4; }); });
+            menu.addItem (tr ("Frozen LFO"), true, (flags & 8) != 0, [this] { // (FL sets the global phase with it)
+                editLfo ([] (AutomationLfo& l) { l.flags = (l.flags & 8) != 0 ? (l.flags & ~8) : (l.flags | 8 | 2); });
+            });
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&lfoOptions));
+        };
+        addChildComponent (lfoOptions);
+    }
+
+    void refreshLfoPanel()
+    {
+        const auto* a = current();
+        const auto on = a != nullptr && a->lfo.on;
+        lfoButton.setToggleState (on, juce::dontSendNotification);
+        mulButton.setToggleState (a != nullptr && ! a->lfo.add, juce::dontSendNotification);
+        if (on != lfoShown)
+        {
+            lfoShown = on;
+            resized();
+        }
+        for (auto* k : lfoKnobs)
+            k->repaint();
+    }
+
+    juce::ToggleButton lfoButton; // FL's "LFO" radio next to "Automation editor"
+    juce::TextButton mulButton, lfoOptions;
+    std::vector<std::unique_ptr<ctlui::Knob>> ownedKnobs;
+    std::vector<ctlui::Knob*> lfoKnobs;
+    bool lfoShown = false;
     double tickToX (double tick) const { return plotArea().getX() + (tick - scroll) * pixelsPerTick; }
     double xToTick (int x) const { return juce::jmax (0.0, (x - plotArea().getX()) / pixelsPerTick + scroll); }
     float valueToY (float v) const { return (float) plotArea().getBottom() - v * (float) plotArea().getHeight(); }
@@ -542,13 +703,13 @@ private:
     juce::Point<float> handlePosition (int i) const
     {
         const auto* a = current();
-        if (a == nullptr || i < 0 || i + 1 >= (int) a->points.size())
+        if (a == nullptr || i < 0 || i + 1 >= (int) editedPoints (*a).size())
             return { -1.0f, -1.0f };
-        const auto p0 = pointPosition (a->points[(std::size_t) i]), p1 = pointPosition (a->points[(std::size_t) i + 1]);
+        const auto p0 = pointPosition (editedPoints (*a)[(std::size_t) i]), p1 = pointPosition (editedPoints (*a)[(std::size_t) i + 1]);
         if (p1.x - p0.x < 20.0f)
             return { -1.0f, -1.0f };
-        const auto mid = 0.5 * (double) (a->points[(std::size_t) i].tick + a->points[(std::size_t) i + 1].tick);
-        return { 0.5f * (p0.x + p1.x), valueToY (a->valueAt (mid)) };
+        const auto mid = 0.5 * (double) (editedPoints (*a)[(std::size_t) i].tick + editedPoints (*a)[(std::size_t) i + 1].tick);
+        return { 0.5f * (p0.x + p1.x), valueToY (curveAt (*a, mid)) };
     }
 
     int handleAt (juce::Point<float> pos) const
@@ -556,7 +717,7 @@ private:
         const auto* a = current();
         if (a == nullptr)
             return -1;
-        for (int i = 0; i + 1 < (int) a->points.size(); ++i)
+        for (int i = 0; i + 1 < (int) editedPoints (*a).size(); ++i)
             if (const auto h = handlePosition (i); h.x >= 0.0f && h.getDistanceFrom (pos) < 7.0f)
                 return i;
         return -1;
@@ -569,8 +730,8 @@ private:
         if (a == nullptr)
             return -1;
 
-        for (int i = (int) a->points.size() - 1; i >= 0; --i)
-            if (pointPosition (a->points[(std::size_t) i]).getDistanceFrom (pos) < 8.0f)
+        for (int i = (int) editedPoints (*a).size() - 1; i >= 0; --i)
+            if (pointPosition (editedPoints (*a)[(std::size_t) i]).getDistanceFrom (pos) < 8.0f)
                 return i;
 
         return -1;
@@ -590,6 +751,7 @@ private:
         if (auto* w = findParentComponentOfClass<juce::DocumentWindow>())
             w->setName (tr ("Automation - {0}", { juce::String::fromUTF8 (current()->name.c_str()) }));
 
+        refreshLfoPanel();
         repaint();
     }
 

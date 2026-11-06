@@ -2125,6 +2125,27 @@ juce::String toJson (const Song& song)
                 curve.add (juce::roundToInt (v * 10000.0f) / 10000.0);
             o->setProperty ("curve", curve);
         }
+        if (const auto& l = a.lfo; ! l.isDefault()) // round 177b: FL's clip LFO
+        {
+            juce::Array<juce::var> amp;
+            for (const auto& pt : l.amp)
+                amp.add (juce::Array<juce::var> { (juce::int64) pt.tick, (double) pt.value, (double) pt.tension });
+            o->setProperty ("lfo", juce::Array<juce::var> { l.on, l.level, l.add, l.flags, l.speed, l.tension, l.skew, l.pulseWidth,
+                                                            (juce::int64) l.phase, (double) l.range, amp });
+            if (l.fl.present)
+            {
+                juce::Array<juce::var> fl { l.fl.mainFlags, l.fl.mainEnabled };
+                for (const auto v : l.fl.mainLoop)
+                    fl.add (v);
+                for (const auto v : l.fl.adsr)
+                    fl.add (v);
+                for (const auto v : l.fl.lfoLoop)
+                    fl.add (v);
+                // the FL records of the LFO's points, while they still match `amp`
+                fl.add (l.amp == l.fl.rawAmp ? juce::Base64::toBase64 (l.fl.rawPoints.data(), l.fl.rawPoints.size()) : juce::String());
+                o->setProperty ("lfoFl", fl);
+            }
+        }
         automations.add (juce::var (o.release()));
     }
 
@@ -2517,6 +2538,46 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
 
             std::stable_sort (automation.points.begin(), automation.points.end(),
                               [] (const AutomationPoint& x, const AutomationPoint& y) { return x.tick < y.tick; });
+            if (const auto& l = a["lfo"]; l.isArray() && l.size() >= 11) // round 177b: FL's clip LFO
+            {
+                auto& lfo = automation.lfo;
+                lfo.on = (bool) l[0];
+                lfo.level = juce::jlimit (-128, 128, (int) l[1]);
+                lfo.add = (bool) l[2];
+                lfo.flags = (int) l[3];
+                lfo.speed = juce::jlimit (512, 65536, (int) l[4]);
+                lfo.tension = juce::jlimit (-128, 128, (int) l[5]);
+                lfo.skew = juce::jlimit (-128, 128, (int) l[6]);
+                lfo.pulseWidth = juce::jlimit (-112, 112, (int) l[7]);
+                lfo.phase = (std::uint32_t) (juce::int64) l[8];
+                lfo.range = juce::jlimit (0.0f, 1.0f, (float) (double) l[9]);
+                lfo.amp.clear();
+                if (auto* amp = l[10].getArray())
+                    for (const auto& pt : *amp)
+                        if (pt.isArray() && pt.size() >= 3)
+                            lfo.amp.push_back ({ juce::jmax<juce::int64> (0, (juce::int64) pt[0]), juce::jlimit (0.0f, 1.0f, (float) (double) pt[1]),
+                                                 juce::jlimit (-1.0f, 1.0f, (float) (double) pt[2]) });
+                if (lfo.amp.empty())
+                    lfo.amp.push_back ({ 0, 1.0f, 0.0f });
+                if (const auto& f = a["lfoFl"]; f.isArray() && f.size() >= 13)
+                {
+                    lfo.fl.present = true;
+                    lfo.fl.mainFlags = (int) f[0];
+                    lfo.fl.mainEnabled = (int) f[1];
+                    for (int k = 0; k < 3; ++k)
+                        lfo.fl.mainLoop[(std::size_t) k] = (int) f[2 + k];
+                    for (int k = 0; k < 4; ++k)
+                        lfo.fl.adsr[(std::size_t) k] = (int) f[5 + k];
+                    for (int k = 0; k < 3; ++k)
+                        lfo.fl.lfoLoop[(std::size_t) k] = (int) f[9 + k];
+                    juce::MemoryOutputStream raw;
+                    if (f[12].toString().isNotEmpty() && juce::Base64::convertFromBase64 (raw, f[12].toString()))
+                    {
+                        lfo.fl.rawPoints.assign ((const std::uint8_t*) raw.getData(), (const std::uint8_t*) raw.getData() + raw.getDataSize());
+                        lfo.fl.rawAmp = lfo.amp;
+                    }
+                }
+            }
             song.automations.push_back (std::move (automation));
         }
 

@@ -1691,16 +1691,16 @@ float automationValueAt (const Song& song, const Automation& automation, const s
             break;
 
         if (tick < (double) c.end())
-            return automation.valueAt (tick - (double) c.start + (double) c.offset);
+            return automation.playAt (tick - (double) c.start + (double) c.offset, tick); // (+ its LFO: round 177b)
 
         before = &c;
     }
 
     if (before != nullptr)
-        return automation.valueAt ((double) (before->length + before->offset));
+        return automation.playAt ((double) (before->length + before->offset), (double) before->end());
 
     const auto& first = song.playlist[(std::size_t) clips.front()];
-    return automation.valueAt ((double) first.offset);
+    return automation.playAt ((double) first.offset, (double) first.start);
 }
 } // namespace
 
@@ -1835,7 +1835,7 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
                 || v.automation >= RackState::maxAutomations)
                 continue;
             const auto local = std::clamp (perfClock - (double) v.start, 0.0, (double) v.length);
-            automationValues[(std::size_t) v.automation] = song.automations[(std::size_t) v.automation].valueAt (local + (double) v.offset);
+            automationValues[(std::size_t) v.automation] = song.automations[(std::size_t) v.automation].playAt (local + (double) v.offset, perfClock);
         }
 
     compensateTick = tick;

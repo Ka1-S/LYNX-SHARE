@@ -1371,6 +1371,56 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                     p.curve = e.data[o + 20];
                     points.push_back (p);
                 }
+
+                // the articulator around the points (REA round 177b, FUN_00fe8640): header +4 LFO level, +8 mode; after
+                // the points the main envelope's tail, the A/D/S/R knobs and FL's automation clip LFO
+                auto& lfo = channel().automationLfo;
+                lfo = {};
+                lfo.level = readLE<std::int32_t> (e.data, 4);
+                lfo.mode = e.data[8];
+                const auto tail = automationHeaderSize + (std::size_t) count * automationPointSize;
+                if (e.data.size() >= tail + 112)
+                {
+                    const auto lfoPoints = readLE<std::uint32_t> (e.data, tail + 44);
+                    const auto end = tail + 48 + (std::size_t) lfoPoints * automationPointSize + 40;
+                    if (lfoPoints >= 1 && lfoPoints < 100000 && end == e.data.size() && readLE<std::int32_t> (e.data, tail + 36) == 5)
+                    {
+                        auto i32 = [&e] (std::size_t at) { return readLE<std::int32_t> (e.data, at); };
+                        lfo.present = true;
+                        lfo.mainFlags = i32 (tail);
+                        lfo.mainEnabled = i32 (tail + 4);
+                        for (int k = 0; k < 3; ++k)
+                            lfo.mainLoop[(std::size_t) k] = i32 (tail + 8 + 4 * (std::size_t) k);
+                        for (int k = 0; k < 4; ++k)
+                            lfo.adsr[(std::size_t) k] = i32 (tail + 20 + 4 * (std::size_t) k);
+                        const auto first = tail + 48;
+                        lfo.rawPoints.assign (e.data.begin() + (std::ptrdiff_t) first,
+                                              e.data.begin() + (std::ptrdiff_t) (first + (std::size_t) lfoPoints * automationPointSize));
+                        lfo.points.clear();
+                        double at = 0.0;
+                        for (std::uint32_t k = 0; k < lfoPoints; ++k)
+                        {
+                            const auto o = first + (std::size_t) k * automationPointSize;
+                            AutomationPoint p;
+                            at += readLE<double> (e.data, o);
+                            p.position = at;
+                            p.value = readLE<double> (e.data, o + 8);
+                            p.tension = readLE<float> (e.data, o + 16);
+                            p.curve = e.data[o + 20];
+                            lfo.points.push_back (p);
+                        }
+                        auto o = first + (std::size_t) lfoPoints * automationPointSize;
+                        lfo.flags = i32 (o);
+                        lfo.enabled = i32 (o + 4);
+                        for (int k = 0; k < 3; ++k)
+                            lfo.lfoLoop[(std::size_t) k] = i32 (o + 8 + 4 * (std::size_t) k);
+                        lfo.speed = i32 (o + 20);
+                        lfo.tension = i32 (o + 24);
+                        lfo.skew = i32 (o + 28);
+                        lfo.pulseWidth = i32 (o + 32);
+                        lfo.phase = readLE<std::uint32_t> (e.data, o + 36);
+                    }
+                }
                 break;
             }
 

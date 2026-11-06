@@ -1851,7 +1851,7 @@ void PlaylistComponent::paintAutomationClip (juce::Graphics& g, const Clip& c, j
 
     for (auto x = std::max (body.getX(), clip.getX()); x <= std::min (body.getRight(), clip.getRight()); x += 2.0f)
     {
-        const auto value = automation.valueAt ((double) c.offset + xToTick ((int) x) - (double) c.start);
+        const auto value = automation.playAt ((double) c.offset + xToTick ((int) x) - (double) c.start, xToTick ((int) x)); // (with its LFO)
         const auto y = body.getBottom() - value * body.getHeight();
 
         if (! started)

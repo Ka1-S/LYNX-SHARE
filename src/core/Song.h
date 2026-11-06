@@ -1244,11 +1244,56 @@ struct AutomationPoint
     bool operator== (const AutomationPoint&) const = default;
 };
 
+// Value of a point list at `tick` (before the first point = first value; after the last = last; tension bends a segment).
+float automationCurveAt (const std::vector<AutomationPoint>& points, double tick) noexcept;
+
+// FL's automation clip LFO ("LFO mode", REA round 177b: TACArticulator's TMLFO, .flp event 0xEA after the points;
+// docs/analise/REA_rodada177b.md §LFO). Off: the clip plays its points only. On: a waveform (triangle bent by tension,
+// skew and pulse width) whose amplitude follows the LFO's own points over the clip's time, added to or multiplying
+// the clip's value.
+struct AutomationLfo
+{
+    bool on = false;        // FL's LFO enabled LongBool (the "LFO" box / the editor's LFO button)
+    int level = 64;         // -128..128 (FL's "LFO level")
+    bool add = false;       // FL's "Multiply" box unchecked: the LFO is added (checked: multiplies the envelope level)
+    int flags = 1;          // FL's bits: 1 tempo, 2 global phase, 4 unipolar tension, 8 frozen
+    int speed = 45819;      // 512..65536 (45819 = one cycle per beat, FL's default for a new clip)
+    int tension = 0, skew = 0; // -128..128
+    int pulseWidth = 0;     // -112..112
+    std::uint32_t phase = 0; // start phase, a fraction of a cycle × 2^32
+    float range = 1.0f;     // the clip's range in the target's 0..1 (an imported FL clip's levels)
+    std::vector<AutomationPoint> amp { { 0, 1.0f, 0.0f } }; // the LFO's amplitude over the clip's time (≥ 1 point)
+
+    // FL's articulator fields LYNX does not use, kept so an imported .flp clip writes back byte for byte
+    struct Fl
+    {
+        bool present = false;
+        std::int32_t mainFlags = 1, mainEnabled = -1;
+        std::array<std::int32_t, 3> mainLoop { -1, -1, -1 };
+        std::array<std::int32_t, 4> adsr { 128, 128, 0, 128 };
+        std::array<std::int32_t, 3> lfoLoop { -1, -1, -1 };
+        std::vector<std::uint8_t> rawPoints;    // the LFO's point records as read (24 B each)
+        std::vector<AutomationPoint> rawAmp;    // `amp` as decoded from them (unchanged = write rawPoints)
+        bool operator== (const Fl&) const = default;
+    } fl;
+
+    bool isDefault() const noexcept;        // what FL writes for a clip whose LFO was never touched
+    // The value played: `value` (the clip's own curve) with the LFO at `clipTick` (ticks from the clip's start, its
+    // offset included) and `songTick` (the global phase).
+    float apply (float value, double clipTick, double songTick) const noexcept;
+    float output (double clipTick, double songTick) const noexcept; // the LFO alone: amplitude × waveform, -1..1
+    static double cyclesPerBeat (int speed) noexcept;               // FL's speed → rate (FUN_00ba03d0)
+    static int speedForBeats (double beatsPerCycle) noexcept;       // the inverse (FUN_00ba0490)
+    static float shape (std::uint32_t phase, int tension, int skew, int pulseWidth, bool unipolar) noexcept;
+    bool operator== (const AutomationLfo&) const = default;
+};
+
 struct Automation
 {
     std::string name;
     AutomationTarget target;
     std::vector<AutomationPoint> points; // sorted by tick (kept by the editor)
+    AutomationLfo lfo;                   // round 177b: FL's clip LFO (off by default: no cost)
 
     // Live source (FL controller link, REA_rodada14 §7): the value comes from output `output` of the
     // controller effect in slot (track, slot), passed through the curve (points evenly spaced over 0..1; empty =
@@ -1266,6 +1311,9 @@ struct Automation
 
     // Value at `tick` (before the first point = first value; after the last = last).
     float valueAt (double tick) const noexcept;
+    // What plays at `tick` of the automation (clip time, offset included) at song position `songTick`: valueAt plus
+    // the LFO when it is on.
+    float playAt (double tick, double songTick) const noexcept { return lfo.on ? lfo.apply (valueAt (tick), tick, songTick) : valueAt (tick); }
     std::int64_t length() const noexcept; // tick of the last point (minimum 1)
     bool operator== (const Automation&) const = default;
 };
@@ -1425,7 +1473,7 @@ struct PlaylistTrack
     // height in px whatever the vertical zoom and the Size menu; ≤ 0 = not locked (FL keeps −the last locked height).
     int lockedHeight = -1;
     int icon = 0; // FL's playlist track icon (.flp 0xEE u32 at 8, REA round 168j): FL's icon index, 0 = none. Kept and saved.
-    std::vector<AutomationLane> lanes; // round 177b: optional automation lanes (shared by every arrangement)
+    std::vector<AutomationLane> lanes {}; // round 177b: optional automation lanes (shared by every arrangement)
     bool lanesFolded = false;          // the lanes are hidden under the track
     bool operator== (const PlaylistTrack&) const = default;
 };
