@@ -4140,29 +4140,42 @@ void PianoRollComponent::timerCallback()
         repaint (0, headerHeight, keyboardWidth, getHeight() - headerHeight);
     }
 
+    if (const bool playing = engine.getTransport().playing.load(); playButton.getToggleState() != playing)
+        playButton.setToggleState (playing, juce::dontSendNotification);
+}
+
+bool PianoRollComponent::playheadFrame (double)
+{
     auto& transport = engine.getTransport();
     auto tick = -1.0;
-
-    if (const bool playing = transport.playing.load(); playButton.getToggleState() != playing)
-        playButton.setToggleState (playing, juce::dontSendNotification);
+    const auto playing = transport.playing.load();
 
     // the playhead shows while the edited pattern plays: Pattern mode, or a clip of it in Song mode (round 162);
     // stopped in Step edit too (round 170e5): it is where the next played note goes (FL enters step-edit notes at the
     // song position, which it draws in the Piano roll), and it moves a snap step on after each one
-    if ((transport.playing.load() || engine.isStepEdit()) && isShowing())
+    if ((playing || engine.isStepEdit()) && isShowing())
     {
         const auto& song = engine.getSong();
-        tick = transportedit::patternPlayhead (song, song.currentPattern, transport.positionTicks.load(), engine.patternLinearOrigin());
+        // (between two audio blocks it moves on at the song's tempo: smooth at 144 Hz, round 174e)
+        tick = transportedit::patternPlayhead (song, song.currentPattern, transport.positionTicks.load() + engine.playheadAdvanceTicks(),
+                                               engine.patternLinearOrigin());
     }
 
-    if (tick != playheadTick)
+    // whenever it moved: the line is anti-aliased, so even a fraction of a pixel shows (zoomed out, a playhead crossing
+    // a few pixels a second glides at the display's rate instead of stepping, as FL's does)
+    const auto moved = (tick < 0.0) != (playheadTick < 0.0) || std::abs ((tick - playheadTick) * pixelsPerTick) >= 0.002;
+    if (moved)
     {
-        auto dirty = [this] (double t) {
-            if (t >= 0.0)
-                repaint ((int) tickToX (t) - 7, 0, 14, getHeight());
+        // (old and new column as one rectangle when they overlap: each rectangle of a repaint is a paint)
+        auto column = [this] (double t) {
+            return t >= 0.0 ? juce::Rectangle<int> ((int) tickToX (t) - 7, 0, 14, getHeight()) : juce::Rectangle<int>();
+        };
+        auto dirty = [this] (juce::Rectangle<int> r) {
+            if (! r.isEmpty())
+                repaint (r);
         };
 
-        dirty (playheadTick);
+        const auto before = column (playheadTick);
         playheadTick = tick;
 
         // Follow: a page further when the playhead leaves the view (off: the view stays where it is)
@@ -4176,9 +4189,15 @@ void PianoRollComponent::timerCallback()
             updateScrollBars();
             repaint();
         }
+        else if (const auto after = column (tick); ! before.isEmpty() && ! after.isEmpty() && std::abs (after.getX() - before.getX()) <= 14)
+            dirty (before.getUnion (after));
         else
-            dirty (tick);
+        {
+            dirty (before);
+            dirty (after);
+        }
     }
+    return playing || moved;
 }
 // --- round 168g: FL's Piano roll File / Edit / View items ----------------------------------------------------------------
 
