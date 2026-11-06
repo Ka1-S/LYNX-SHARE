@@ -222,6 +222,25 @@ private:
     juce::Rectangle<int> foldArea (int track) const;
     float tabLevel (int track) const noexcept;
     void paintFoldTab (juce::Graphics& g, int track);
+    // VCA faders (round 177a): their own block left of the Master. A VCA strip goes by a pseudo track index
+    // (vcaStrip (i) = -2 - i), so the strips' area helpers place its fader, mute and solo. All empty without a VCA.
+    std::vector<int> vcaXs;
+    static constexpr int vcaStrip (int i) noexcept { return -2 - i; }
+    int vcaAt (int x) const noexcept;
+    Part vcaPartAt (int i, juce::Point<int> p) const;
+    float vcaMeter (int i, int channel) const noexcept; // the loudest member's level
+    float vcaShownLevel (int i) const noexcept;         // the VCA's fader (its automation's value while it plays)
+    ui::ValueSpec vcaSpec (int i) const;
+    void setVcaLevel (int i, double value);
+    void paintVcaStrip (juce::Graphics& g, int i);
+    void vcaMouseDown (const juce::MouseEvent& e, int i);
+    void showVcaMenu (int i);
+    void soloVca (int i);
+    ui::Hint vcaHint (int i, juce::Point<int> p) const;
+    void repaintVca (int i);
+    juce::String vcaNote (int track) const; // a member's fader hint: the VCAs and the level that plays
+    int dragVca = -1;
+    std::vector<float> vcaLevelsShown, vcaMetersShown;
     // the strip's rows for the current layout and height (top to bottom)
     struct Rows
     {

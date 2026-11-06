@@ -45,6 +45,7 @@ struct LiveLevels
 
     std::vector<std::atomic<float>> mixerVolume, mixerPan, mixerStereo;
     std::vector<std::atomic<float>> channelVolume, channelPan;
+    std::vector<std::atomic<float>> vcaLevel; // VCA faders (round 177a)
 };
 
 // Immutable snapshot published by the UI. Instruments are shared between
@@ -139,6 +140,10 @@ struct RackState
     // Mixer: insert processing order and which ones sound with the current solo.
     std::vector<int> mixerOrder;
     std::vector<char> mixerAudible;
+    // VCA faders (round 177a slice 3): per insert, the VCAs acting on it (members and parents, empty = none: the whole
+    // table is empty while the song has no VCA); per VCA, its automation slot (-1 = none). Built with the mixer graph.
+    std::vector<std::vector<int>> vcaChains;
+    std::vector<int> vcaLevelAuto;
 
     // "Pull" model: each track sums the (post-fader) outputs of the tracks that send to it.
     struct MixerInput
@@ -179,6 +184,7 @@ struct RackState
     std::vector<int> graphRoots;                      // tasks with nothing before them, heaviest kind first
     std::vector<std::vector<int>> trackChannels;      // [track] the channels playing into it, in channel order
     void buildMixerGraph();
+    void applyVcas(); // VCA mutes into mixerAudible, the VCA chains (round 177a)
     void buildTaskGraph (const std::vector<int>& depth);
 
     void buildAutomationTables();

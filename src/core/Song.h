@@ -1084,6 +1084,21 @@ struct MixerTrack
 
 constexpr float maxTrackLatencyMs = 5000.0f; // FL's clamp (FUN_012a7230)
 
+// A VCA fader (round 177a slice 3, REA_rodada177a §3; LYNX's addition, FL Studio has none). It carries no audio: its
+// level multiplies the fader gain of each member insert (the levels add in dB), so post-fader sends follow and pre-fader
+// ones don't. An insert can be in several VCAs, and a VCA can follow a parent VCA. Muting a VCA mutes its members.
+// The members keep their own fader values and automation.
+struct Vca
+{
+    std::string name;
+    std::uint32_t colour = 0;     // 0xFFRRGGBB; 0 = theme default
+    float level = unityFader;     // fader position (unityFader = 0 dB)
+    bool muted = false;
+    std::vector<int> members;     // mixer inserts (1…), sorted; kept by mixerops' remap
+    int parent = -1;              // the VCA this one follows (index into Song::vcas), -1 = none
+    bool operator== (const Vca&) const = default;
+};
+
 struct Note
 {
     std::int64_t start = 0;   // ticks
@@ -1121,7 +1136,8 @@ enum class AutomationTargetKind : std::uint8_t
     effectParam,   // index = track, slot, param (built-in effect or plugin)
     tempo,         // song tempo: 0..1 = minTempo..maxTempo BPM
     effectMix,     // index = track, slot: slot dry/wet (0..1)
-    mixerSend      // index = source insert, slot = destination (0 = Master): the route's level knob (fader curve; issue #12)
+    mixerSend,     // index = source insert, slot = destination (0 = Master): the route's level knob (fader curve; issue #12)
+    vcaLevel       // index = VCA (Song::vcas): its fader (round 177a; LYNX's own, FL has no VCA)
 };
 
 constexpr double minTempo = 10.0, maxTempo = 522.0; // FL's range
@@ -1624,6 +1640,7 @@ struct Song
     Bar barAt (std::int64_t tick) const;
 
     std::vector<MixerTrack> mixer; // [0] = Master; empty = everything straight to the output
+    std::vector<Vca> vcas;         // VCA faders (round 177a); empty = none (no cost anywhere)
     // A/B of the LYNX substitutes (round 113): when set, every substitute slot plays as bypassed (the project's own
     // effects and the hosted plugins still play). Saved with the project.
     bool substitutesBypassed = false;
