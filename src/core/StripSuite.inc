@@ -336,6 +336,21 @@ public:
         const auto model = bass ? ridge::driveBassAmp : ridge::driveGuitarAmp;
         const auto amount = ridge::driveAmountValue (model, f::ampDrive (p[bass ? f::bassDrive : f::guitarDrive]));
         const auto pre = bass ? 1.0f : (float) dbToGain (f::preAmpDb (p[f::preAmp]));
+        // the bass voicings sit before the amp (tp172c9: at drive their lift and cut are squashed by it, GS_x), the guitar's
+        // after it (its Boost cuts deeper at drive than at rest: not a pre-drive tone)
+        if (driveIn && bass)
+        {
+            if (bassPunchOn)
+            {
+                bassA.processBlock (l, r, n);
+                bassB.processBlock (l, r, n);
+            }
+            if (shapeOn)
+            {
+                shapeBell.processBlock (l, r, n);
+                shapeHigh.processBlock (l, r, n);
+            }
+        }
         amp.process (l, r, n, model, amount, driveIn ? pre : 1.0f, 1.0f, driveIn ? std::clamp (p[f::driveMix], 0.0f, 1.0f) : 0.0f);
         if (driveIn)
         {
@@ -347,19 +362,6 @@ public:
                 {
                     edgeBroad.processBlock (l, r, n);
                     edgeHigh.processBlock (l, r, n);
-                }
-            }
-            else
-            {
-                if (bassPunchOn)
-                {
-                    bassA.processBlock (l, r, n);
-                    bassB.processBlock (l, r, n);
-                }
-                if (shapeOn)
-                {
-                    shapeBell.processBlock (l, r, n);
-                    shapeHigh.processBlock (l, r, n);
                 }
             }
         }
@@ -437,14 +439,15 @@ private:
         // Boost: a first-order low shelf, half gain at 250 Hz, ±15 dB at ±100 %
         const auto boostPct = f::voicePct (p[f::guitarBoost]) / 100.0;
         boostOn = std::abs (boostPct) > 1e-4;
-        firstOrderShelf (boost, sr, 250.0, 15.0 * boostPct, false);
+        // the knob's law (GS_x at +-50 %: -11 / +5 dB at 40 Hz): the cut comes in fast, the lift late
+        firstOrderShelf (boost, sr, 250.0, boostPct < 0.0 ? -15.0 * std::pow (-boostPct, 0.45) : 15.0 * std::pow (boostPct, 1.4), false);
         // Punch: a wide mid bell, a deeper and narrower cut (-27 dB at 710 Hz) than the very broad lift (+12 dB round 840 Hz)
         const auto punchPct = f::voicePct (p[f::guitarPunch]) / 100.0;
         punchOn = std::abs (punchPct) > 1e-4;
         if (punchPct < 0.0)
-            punch.peaking (sr, 712.0, 0.51, 27.3 * punchPct);
+            punch.peaking (sr, 712.0, 0.51, -27.3 * std::pow (-punchPct, 0.82)); // -15 dB at -50 % (GS_x)
         else
-            punch.peaking (sr, 843.0, 0.15, 11.7 * punchPct);
+            punch.peaking (sr, 843.0, 0.15, 11.7 * std::pow (punchPct, 1.8)); // +3.4 dB at +50 % (GS_x)
         // Edge (0 .. 10): a broad first-order high shelf from ~200 Hz plus a steeper presence shelf from ~6 kHz
         const auto e = f::voiceSteps (p[f::guitarEdge]);
         edgeOn = e > 1e-3;

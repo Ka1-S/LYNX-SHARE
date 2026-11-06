@@ -356,6 +356,64 @@ TEST (fret_shell_channels_tp172c8)
     t[d::lfDrive] = 0.5f;
     t[d::lfAmount] = 1.0f;
     CHECK (run (EffectKind::shellChannel, t, nullptr) != sa);
+    // tp172c9: the guitar Boost's knob law at drive (post-amp, asymmetric: about -11 dB at -50 %, +5 dB at +50 %), the bass
+    // voicings ahead of the amp
+    {
+        auto low = [] (const EffectParams& v) {
+            auto fx = makeEffect (EffectKind::fretChannel);
+            fx->prepare (48000.0);
+            std::vector<float> l (24000), rr (24000);
+            for (int i = 0; i < 24000; ++i) l[(std::size_t) i] = rr[(std::size_t) i] = 0.01f * (float) std::sin (2.0 * 3.14159265358979 * 50.0 * i / 48000.0);
+            for (int at = 0; at < 24000; at += 512)
+                fx->process (l.data() + at, rr.data() + at, std::min (512, 24000 - at), v, 120.0);
+            double e = 0;
+            for (std::size_t i = 4800; i < l.size(); ++i) e += (double) l[i] * l[i];
+            return 10.0 * std::log10 (std::max (1e-30, e / (double) (l.size() - 4800)));
+        };
+        auto g = fp;
+        g[f::driveIn] = 1.0f;
+        g[f::guitarDrive] = 0.5f;
+        const auto g0 = low (g);
+        g[f::guitarBoost] = 0.25f;
+        const auto gCut = low (g) - g0;
+        g[f::guitarBoost] = 0.75f;
+        const auto gLift = low (g) - g0;
+        CHECK (gCut < -6.0 && gLift > 2.0 && gLift < 9.0 && -gCut > gLift);
+        auto b = fp;
+        b[f::driveIn] = 1.0f;
+        b[f::driveModel] = 1.0f;
+        b[f::bassDrive] = 0.5f;
+        const auto b0 = run (EffectKind::fretChannel, b, nullptr);
+        b[f::bassPunch] = 0.75f;
+        CHECK (run (EffectKind::fretChannel, b, nullptr) != b0);
+    }
+    // tp172c9: part of the amps' tone sits before the curve: with the pre-amp at +30 dB the guitar amp compresses a
+    // 10 kHz sine far less than a 1 kHz one (the original: +24 / +9 dB over drive 0), the bass amp its highs more
+    {
+        auto tone = [] (const EffectParams& v, double hz) {
+            auto fx = makeEffect (EffectKind::fretChannel);
+            fx->prepare (48000.0);
+            std::vector<float> l (24000), rr (24000);
+            for (int i = 0; i < 24000; ++i) l[(std::size_t) i] = rr[(std::size_t) i] = 0.178f * (float) std::sin (2.0 * 3.14159265358979 * hz * i / 48000.0);
+            for (int at = 0; at < 24000; at += 512)
+                fx->process (l.data() + at, rr.data() + at, std::min (512, 24000 - at), v, 120.0);
+            double e = 0;
+            for (std::size_t i = 9600; i < l.size(); ++i) e += (double) l[i] * l[i];
+            return 10.0 * std::log10 (std::max (1e-30, e / (double) (l.size() - 9600)));
+        };
+        auto g = fp;
+        g[f::driveIn] = 1.0f;
+        const auto lo1 = tone (g, 1000.0), lo10 = tone (g, 10000.0);
+        g[f::preAmp] = 1.0f;
+        const auto hi1 = tone (g, 1000.0), hi10 = tone (g, 10000.0);
+        CHECK ((hi10 - lo10) - (hi1 - lo1) > 8.0);
+        auto b = fp;
+        b[f::driveIn] = 1.0f;
+        b[f::driveModel] = 1.0f;
+        const auto b1 = tone (b, 1000.0), b5 = tone (b, 5000.0);
+        b[f::bassDrive] = 1.0f;
+        CHECK ((tone (b, 5000.0) - b5) < (tone (b, 1000.0) - b1) - 2.0);
+    }
 
     // Guitarstrip -> Fret Channel, 1:1 in its own units
     auto gs = [&p32] (const std::string& params) {
