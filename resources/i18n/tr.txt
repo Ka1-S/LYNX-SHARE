@@ -3941,7 +3941,7 @@ countries: tr
 "Off|Ping-pong tape|Studio tape|Studio tape hot" = "Kapalı|Ping-pong tape|Studio tape|Studio tape hot"
 "Measured rhythm voicing" = "Ölçülmüş ritim voicing'i"
 "Hz|Beats" = "Hz|Vuruş"
-"Left / right|8 steps" = "Sol / sağ|8 step"
+"Left / right|Ramp|8 steps" = "Sol / sağ|Rampa|8 step"
 "Digital|Analog|Hot" = "Dijital|Analog|Hot"
 "Separator" = "Ayırıcı"
 "Create group" = "Grup oluştur"

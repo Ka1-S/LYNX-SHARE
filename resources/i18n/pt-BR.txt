@@ -3979,7 +3979,7 @@ countries: br
 # round 138 (merge of rounds 135 / 136): Auto-pan's measured Rhythm voicing panel
 "Measured rhythm voicing" = "Voz rítmica medida"
 "Hz|Beats" = "Hz|Tempos"
-"Left / right|8 steps" = "Esquerda / direita|8 passos"
+"Left / right|Ramp|8 steps" = "Esquerda / direita|Rampa|8 passos"
 "Digital|Analog|Hot" = "Digital|Analógico|Quente"
 "Separator" = "Separador"
 "Create group" = "Criar grupo"

@@ -3941,7 +3941,7 @@ countries: tw hk mo
 "Off|Ping-pong tape|Studio tape|Studio tape hot" = "關|Ping-pong tape|Studio tape|Studio tape hot"
 "Measured rhythm voicing" = "實測節奏音色風格"
 "Hz|Beats" = "Hz|拍"
-"Left / right|8 steps" = "左/右|8步"
+"Left / right|Ramp|8 steps" = "左/右|斜坡|8步"
 "Digital|Analog|Hot" = "數位|類比|熱"
 "Separator" = "分隔線"
 "Create group" = "建立群組"

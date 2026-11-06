@@ -3941,7 +3941,7 @@ countries: it ch sm
 "Off|Ping-pong tape|Studio tape|Studio tape hot" = "Off|Ping-pong tape|Studio tape|Studio tape hot"
 "Measured rhythm voicing" = "Voicing ritmico misurato"
 "Hz|Beats" = "Hz|Beat"
-"Left / right|8 steps" = "Sinistra / destra|8 step"
+"Left / right|Ramp|8 steps" = "Sinistra / destra|Rampa|8 step"
 "Digital|Analog|Hot" = "Digitale|Analogico|Hot"
 "Separator" = "Separatore"
 "Create group" = "Crea gruppo"

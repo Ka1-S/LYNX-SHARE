@@ -3941,7 +3941,7 @@ countries: de at ch li lu
 "Off|Ping-pong tape|Studio tape|Studio tape hot" = "Aus|Ping-Pong-Band|Studioband|Studioband heiß"
 "Measured rhythm voicing" = "Gemessenes Rhythmus-Voicing"
 "Hz|Beats" = "Hz|Schläge"
-"Left / right|8 steps" = "Links / rechts|8 Steps"
+"Left / right|Ramp|8 steps" = "Links / rechts|Rampe|8 Steps"
 "Digital|Analog|Hot" = "Digital|Analog|Heiß"
 "Separator" = "Trenner"
 "Create group" = "Gruppe erstellen"

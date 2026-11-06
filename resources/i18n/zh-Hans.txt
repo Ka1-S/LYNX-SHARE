@@ -3941,7 +3941,7 @@ countries: cn sg
 "Off|Ping-pong tape|Studio tape|Studio tape hot" = "关|Ping-pong tape|Studio tape|Studio tape hot"
 "Measured rhythm voicing" = "实测节奏音色风格"
 "Hz|Beats" = "Hz|拍"
-"Left / right|8 steps" = "左/右|8步"
+"Left / right|Ramp|8 steps" = "左/右|斜坡|8步"
 "Digital|Analog|Hot" = "数字|模拟|热"
 "Separator" = "分隔符"
 "Create group" = "创建组"
