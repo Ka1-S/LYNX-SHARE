@@ -6774,6 +6774,25 @@ private:
             };
             offline.renderOffline (o);
         }
+        // round tp172b5: LYNX_PARITYSHOT_CLICKS="x,y x,y ..." clicks the editor at those points first (a folded knob
+        // panel, a band), as the originals' pictures were taken with their panels open; the pointer then leaves
+        for (const auto& pair : juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_PARITYSHOT_CLICKS", {}), " ", ""))
+        {
+            const juce::Point<int> at (pair.upToFirstOccurrenceOf (",", false, false).getIntValue(), pair.fromFirstOccurrenceOf (",", false, false).getIntValue());
+            auto* target = editor->getComponentAt (at);
+            if (target == nullptr)
+                continue;
+            const auto local = target->getLocalPoint (editor.get(), at).toFloat();
+            const auto now = juce::Time::getCurrentTime();
+            auto source = juce::Desktop::getInstance().getMainMouseSource();
+            const juce::MouseEvent down (source, local, juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                         target, target, now, local, now, 1, false);
+            const juce::MouseEvent up (source, local, {}, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, target, target, now, local, now, 1, false);
+            target->mouseMove (up);
+            target->mouseDown (down);
+            target->mouseUp (up);
+            target->mouseExit (up.withNewPosition (juce::Point<float> (-1000.0f, -1000.0f)));
+        }
         juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);
         {
             juce::Graphics g (image);

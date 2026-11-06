@@ -793,6 +793,8 @@ protected:
     // round tp172b5: the references that print captions only (the compressor; the reverb uses the layout flag): no scale,
     // the value under the caption only while the knob is hovered or dragged
     bool hoverValues = false;
+    // round tp172b5: the reference limiter's panel prints each knob's name ABOVE it (its scale still under it)
+    bool captionAbove = false;
     void rangeRow (juce::Graphics& g, int param, juce::Rectangle<float> row, bool showValue, bool big, juce::Colour ac, bool active)
     {
         using namespace theme;
@@ -832,7 +834,8 @@ protected:
         rangeRow (g, c.param, knobR.withY (knobR.getBottom() + 1.0f).withHeight (12.0f), c.showValue && (hover || active), c.size == 2, ac, active);
         g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
         g.setFont (font (c.size == 2 ? type::small : type::caption, true));
-        g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, knobR.getBottom() + 14.0f, c.r.getWidth() + 28.0f, 14.0f),
+        const auto captionY = captionAbove ? c.r.getY() - 14.0f : knobR.getBottom() + 14.0f;
+        g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, captionY, c.r.getWidth() + 28.0f, 14.0f),
                     juce::Justification::centred, false);
     }
     // a short curved bar (a smile) filled in the accent up to the value, the scale and the caption under it
