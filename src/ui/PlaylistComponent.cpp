@@ -236,6 +236,19 @@ public:
         const auto bounds = owner.getLocalBounds();
         const auto imageBounds = bounds * scale;
 
+        // a scroll, a zoom, a resize: (almost) everything changes, painted straight to the window (through the image it
+        // costs a render and a full blit: wheel scrolling went from ~33 to ~26 fps). The image is rebuilt once the
+        // view has been still for a moment, by the next playhead frame.
+        const auto nowMs = juce::Time::getMillisecondCounterHiRes();
+        const auto clip = g.getClipBounds();
+        if ((double) clip.getWidth() * clip.getHeight() > 0.5 * bounds.getWidth() * bounds.getHeight())
+            lastLargeMs = nowMs;
+        if (nowMs - lastLargeMs < 300.0 && ! valid.containsRectangle (clip))
+        {
+            owner.paintEntireComponent (g, false);
+            return;
+        }
+
         if (image.isNull() || image.getBounds() != imageBounds)
         {
             image = juce::Image (juce::Image::RGB, juce::jmax (1, imageBounds.getWidth()), juce::jmax (1, imageBounds.getHeight()), false);
@@ -280,6 +293,7 @@ private:
     PlaylistComponent& owner;
     juce::Image image;
     juce::RectangleList<int> valid;
+    double lastLargeMs = 0.0;
 };
 
 PlaylistComponent::PlaylistComponent (AudioEngine& e)
