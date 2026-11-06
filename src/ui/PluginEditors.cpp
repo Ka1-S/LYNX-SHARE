@@ -2505,8 +2505,10 @@ public:
         }
         else if (id == "maxcurve") // Maximus: the selected band's compression curve, edited with FL's gestures (round 168x)
             paintMaximusCurve (g, inner, fx);
-        else if (id == "lpcurve") // Love Philter: the articulator part shown, edited with FL's gestures (round 173d3)
+        else if (id == "lpcurve" || id == "cvcurve" || id == "vxcurve") // Love Philter's articulators, Convolver's EQ, Vocodex's maps (round 173d3)
             paintPhilterCurve (g, inner, fx);
+        else if (id == "vxmapsel") // Vocodex: the map shown (round 173d3)
+            paintVxMapSelector (g, r);
         else if (id == "maxbands") // Maximus: the three bands over 20 Hz…20 kHz with their crossovers and the low cut
         {
             const auto raw = [&] (int p) { return maximusfx::stateParam (fx.state, p).value_or (maximusfx::stateParams()[(std::size_t) p].defaultValue); };
@@ -3853,7 +3855,7 @@ public:
             return;
         if (kind == EffectKind::maximus && mxMouseMove (i >= 0 ? activeLayout().items[(std::size_t) i] : LayoutItem {}, p)) // round 168x
             return;
-        if (kind == EffectKind::lovePhilter && lpMouseMove (i >= 0 ? activeLayout().items[(std::size_t) i] : LayoutItem {}, p)) // round 173d3
+        if ((kind == EffectKind::lovePhilter || kind == EffectKind::convolver || kind == EffectKind::vocodex) && lpMouseMove (i >= 0 ? activeLayout().items[(std::size_t) i] : LayoutItem {}, p)) // round 173d3
             return;
         if (i >= 0 && isWaveShaperGraph (activeLayout().items[(std::size_t) i])) // round 165: points and handles light up
         {
@@ -3974,6 +3976,11 @@ public:
         {
             if (lpMouseDown (e, item))
                 dragItem = index;
+            return;
+        }
+        if (item.type == Item::display && juce::String (item.display) == "vxmapsel") // round 173d3: Vocodex's map dropdown
+        {
+            vxMapMenu (rectOf (item));
             return;
         }
         if (item.type == Item::display && juce::String (item.display) == "equosend") // round 173d3: EQUO's send box

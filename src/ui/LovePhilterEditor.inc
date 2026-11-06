@@ -11,6 +11,10 @@
 //   right-click a tension handle  straight segment           left-drag a point / handle   move / bend
 // The first point stays at time 0. Every edit is written back into FL's own state (philter::readDoc / writeDoc), so a
 // project or preset saved after the edit opens in FL with the same curve.
+//
+// The same editor draws the other FL maps of round 173d3: Fruity Convolver's equalizer page ("cvcurve", the EQ curve
+// over FL's frequency axis, convolver::readEqCurve / writeEqCurve) and Vocodex's map editor ("vxcurve", the map picked
+// in the "vxmapsel" dropdown = the page, vocodex::readMaps / withMap).
 
     struct LpPoint
     {
@@ -26,13 +30,21 @@
     float lpTensionStart = 0.0f, lpLastTension = 0.0f;
     static inline float lpCopiedValue = -1.0f;
 
-    static bool isPhilterCurve (const LayoutItem& item) { return item.type == Item::display && item.display != nullptr && juce::String (item.display) == "lpcurve"; }
+    static bool isPhilterCurve (const LayoutItem& item)
+    {
+        if (item.type != Item::display || item.display == nullptr)
+            return false;
+        const juce::String id (item.display);
+        return id == "lpcurve" || id == "cvcurve" || id == "vxcurve";
+    }
+    bool lpOther() const { return kind == EffectKind::convolver || kind == EffectKind::vocodex; } // a map of another plugin
+    int vxMap() const { return juce::jlimit (0, 12, page); }
 
     int lpUnit() const { return page % 8; }
     static constexpr int lpShaper = 7; // the WS target: the unit's shaper curve
     int lpTarget() const { return (page / 8) % 9; }
     int lpPart() const { return (page / 72) % 5; } // 0 pattern envelope, 1 LFO, 2 Mod X, 3 Mod Y, 4 follower
-    bool lpMap() const { return lpTarget() == lpShaper || lpPart() >= 2; }
+    bool lpMap() const { return lpOther() || lpTarget() == lpShaper || lpPart() >= 2; }
     int lpPattern() const // the "Pattern" knob (FL 1…10) picks the pattern envelope shown
     {
         const auto* fx = current();
@@ -50,7 +62,7 @@
     std::optional<philter::DocEnv> lpEnv() const
     {
         const auto* fx = current();
-        if (fx == nullptr)
+        if (fx == nullptr || lpOther())
             return std::nullopt;
         auto d = philter::readDoc (fx->state);
         if (! d)
@@ -78,8 +90,56 @@
     {
         if (lpDragging)
             return lpDragPoints;
+        if (const auto* fx = current(); fx != nullptr && kind == EffectKind::convolver)
+        {
+            std::vector<LpPoint> out;
+            if (const auto c = convolver::readEqCurve (fx->state))
+            {
+                double sum = 0.0, x = 0.0;
+                for (std::size_t i = 1; i < c->size(); ++i)
+                    sum += std::max (0.0, (*c)[i].dt);
+                for (std::size_t i = 0; i < c->size(); ++i) // (FL scales the steps to a sum of 1)
+                {
+                    x += i == 0 ? 0.0 : std::max (0.0, (*c)[i].dt) / (sum > 0.0 ? sum : 1.0);
+                    out.push_back ({ x, (float) juce::jlimit (0.0, 1.0, (*c)[i].y), (*c)[i].tension, (*c)[i].mode });
+                }
+            }
+            return out;
+        }
+        if (const auto* fx = current(); fx != nullptr && kind == EffectKind::vocodex)
+        {
+            std::vector<LpPoint> out;
+            if (const auto maps = vocodex::readMaps (fx->state))
+                for (const auto& q : (*maps)[(std::size_t) vxMap()])
+                    out.push_back ({ q.x, (float) q.y, q.tension, q.mode });
+            return out;
+        }
         const auto e = lpEnv();
         return e ? lpPointsOf (*e) : std::vector<LpPoint> {};
+    }
+
+    // the curve as the plugin reads it at `count` evenly spaced x over 0…span
+    std::vector<float> lpShape (const std::vector<LpPoint>& pts, int count, double span) const
+    {
+        if (kind == EffectKind::convolver)
+        {
+            std::vector<convolver::EnvPoint> c;
+            for (std::size_t i = 0; i < pts.size(); ++i)
+                c.push_back ({ i == 0 ? 0.0 : pts[i].x - pts[i - 1].x, (double) pts[i].y, pts[i].tension, pts[i].mode });
+            return convolver::eqCurveLevels (c, count);
+        }
+        if (kind == EffectKind::vocodex)
+        {
+            vocodex::Map m;
+            for (const auto& q : pts)
+                m.x.push_back (q.x), m.y.push_back (q.y), m.tension.push_back (q.tension), m.mode.push_back (q.mode);
+            std::vector<float> out ((std::size_t) count);
+            for (int i = 0; i < count; ++i)
+                out[(std::size_t) i] = (float) vocodex::mapValue (m, count > 1 ? (double) i / (double) (count - 1) : 0.0);
+            return out;
+        }
+        const auto e = lpEnv();
+        return e ? philter::curveShape (lpWithPoints (*e, pts, -1, -1), lpMap(), count, span) : std::vector<float> ((std::size_t) count, 0.0f);
     }
 
     // the time shown across the graph: a map's 0…1, an envelope's length and a little room after its last point
@@ -128,6 +188,30 @@
         const auto* fx = current();
         if (fx == nullptr || points.empty())
             return;
+        if (lpOther())
+        {
+            auto bytes = fx->state;
+            if (kind == EffectKind::convolver)
+            {
+                std::vector<convolver::EnvPoint> c;
+                for (std::size_t i = 0; i < points.size(); ++i)
+                    c.push_back ({ i == 0 ? 0.0 : points[i].x - points[i - 1].x, (double) points[i].y, points[i].tension, points[i].mode });
+                if (! convolver::writeEqCurve (bytes, c))
+                    return;
+            }
+            else
+            {
+                std::vector<vocodex::MapPoint> m;
+                for (const auto& q : points)
+                    m.push_back ({ q.x, (double) q.y, q.tension, q.mode });
+                bytes = vocodex::withMap (bytes, vxMap(), m);
+            }
+            if (usesBar())
+                bar.willEdit();
+            editSlot ([bytes] (EffectSlot& target) { target.state = bytes; });
+            repaint();
+            return;
+        }
         auto d = philter::readDoc (fx->state);
         if (! d)
             return;
@@ -156,11 +240,10 @@
     // the curve as the plugin steps it at x (the engine's own curve maths), for the handles and "stick to the curve"
     float lpLevelAt (const std::vector<LpPoint>& pts, double x, double span) const
     {
-        const auto e = lpEnv();
-        if (! e || pts.empty())
-            return pts.empty() ? 0.0f : pts.front().y;
+        if (pts.empty())
+            return 0.0f;
         constexpr int n = 256;
-        const auto shape = philter::curveShape (lpWithPoints (*e, pts, -1, -1), lpMap(), n + 1, span);
+        const auto shape = lpShape (pts, n + 1, span);
         const auto f = juce::jlimit (0.0, 1.0, x / span) * n;
         const auto i = juce::jmin (n - 1, (int) f);
         return shape[(std::size_t) i] + (shape[(std::size_t) i + 1] - shape[(std::size_t) i]) * (float) (f - i);
@@ -202,6 +285,8 @@
 
     juce::String lpXText (double x) const
     {
+        if (kind == EffectKind::convolver)
+            return juce::String (juce::roundToInt (convolver::eqXToFrequency (x))) + " Hz";
         if (lpMap())
             return juce::String (juce::roundToInt (x * 100.0)) + "%";
         const auto e = lpEnv();
@@ -455,13 +540,45 @@
                                  true);
     }
 
+    // Vocodex's map dropdown (FL: the map names under their sections Equalizer / Envelope follower / …)
+    void vxMapMenu (juce::Rectangle<float> r)
+    {
+        juce::PopupMenu menu;
+        juce::String group;
+        for (int m = 0; m < 13; ++m)
+        {
+            const auto& info = vocodex::mapInfo (m);
+            if (group != info.group)
+                menu.addSectionHeader (tr (info.group)), group = info.group;
+            menu.addItem (tr (info.name), true, m == vxMap(), [this, m] {
+                page = m;
+                repaint();
+            });
+        }
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (r.toNearestInt())));
+    }
+
+    void paintVxMapSelector (juce::Graphics& g, juce::Rectangle<float> r)
+    {
+        using namespace theme;
+        const auto s = scale();
+        g.setColour (colour::textPrimary);
+        g.setFont (font (juce::jmax (8.0f, 10.0f * s)));
+        g.drawText (tr (vocodex::mapInfo (vxMap()).name), r.reduced (4.0f * s, 0.0f).withTrimmedRight (12.0f * s).toNearestInt(), juce::Justification::centredLeft, true);
+        const auto a = r.removeFromRight (12.0f * s).reduced (2.0f * s, r.getHeight() * 0.35f);
+        juce::Path down;
+        down.addTriangle (a.getX(), a.getY(), a.getRight(), a.getY(), a.getCentreX(), a.getBottom());
+        g.fillPath (down);
+    }
+
     juce::String lpHint (const LayoutItem& item, juce::Point<float> p) const
     {
         if (lpPointAt (item, p) >= 0)
             return tr ("Point: [LMB] drag moves  [RMB] shape, value, delete  [Alt][RMB] delete");
         if (lpHandleAt (item, p) >= 0)
             return tr ("Tension: [LMB] drag up / down bends the segment ([Ctrl] fine)  [RMB] straight");
-        return tr ("Articulator: [RMB] add a point (hold and drag to place it)  [LMB] drag a point");
+        return lpOther() ? tr ("Map: [RMB] add a point (hold and drag to place it)  [LMB] drag a point")
+                         : tr ("Articulator: [RMB] add a point (hold and drag to place it)  [LMB] drag a point");
     }
 
     void paintPhilterCurve (juce::Graphics& g, juce::Rectangle<float> inner, const EffectSlot& fx)
@@ -471,17 +588,33 @@
         const auto c = fx.enabled ? colour::accent : colour::textDisabled;
         const auto span = lpSpan();
         g.setColour (colour::gridBeat);
-        const auto lines = lpMap() ? 4 : juce::jmax (1, (int) std::ceil (span));
+        if (kind == EffectKind::convolver) // FL's equalizer page: the frequency axis (Hz along the bottom), 0 dB in the middle
+        {
+            g.setFont (font (juce::jmax (8.0f, 9.0f * s)));
+            for (const auto hz : { 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 15000.0 })
+            {
+                const auto x = inner.getX() + inner.getWidth() * (float) convolver::eqFrequencyToX (hz);
+                g.setColour (colour::gridBeat);
+                g.drawVerticalLine ((int) x, inner.getY(), inner.getBottom());
+                g.setColour (colour::textSecondary);
+                g.drawText (hz >= 1000.0 ? juce::String (juce::roundToInt (hz / 1000.0)) + "k" : juce::String (juce::roundToInt (hz)),
+                            juce::Rectangle<float> (x + 2.0f * s, inner.getBottom() - 12.0f * s, 30.0f * s, 11.0f * s).toNearestInt(), juce::Justification::left, false);
+            }
+            g.setColour (colour::gridBar);
+            g.drawHorizontalLine ((int) inner.getCentreY(), inner.getX(), inner.getRight());
+        }
+        const auto lines = kind == EffectKind::convolver ? 1 : lpMap() ? 4 : juce::jmax (1, (int) std::ceil (span));
+        g.setColour (colour::gridBeat);
         for (int i = 1; i < lines; ++i)
             g.drawVerticalLine ((int) (inner.getX() + inner.getWidth() * (float) i / (float) lines), inner.getY(), inner.getBottom());
         for (int i = 1; i < 4; ++i)
             g.drawHorizontalLine ((int) (inner.getY() + inner.getHeight() * (float) i / 4.0f), inner.getX(), inner.getRight());
         const auto e = lpEnv();
         const auto pts = lpPoints();
-        if (e && ! pts.empty())
+        if (! pts.empty())
         {
             const auto steps = juce::jmax (32, (int) inner.getWidth() / 2);
-            const auto shape = philter::curveShape (lpWithPoints (*e, pts, -1, -1), lpMap(), steps + 1, span);
+            const auto shape = lpShape (pts, steps + 1, span);
             juce::Path p;
             for (int i = 0; i <= steps; ++i)
             {
@@ -499,7 +632,7 @@
             g.fillPath (fill);
             g.setColour (c);
             g.strokePath (p, juce::PathStrokeType (juce::jmax (1.5f, 2.0f * s)));
-            if (! lpMap() && e->sus >= 0 && e->sus < (int) pts.size()) // the sustain point's time
+            if (! lpMap() && e && e->sus >= 0 && e->sus < (int) pts.size()) // the sustain point's time
             {
                 g.setColour (colour::textSecondary.withAlpha (0.6f));
                 g.drawVerticalLine ((int) lpPos (inner, pts[(std::size_t) e->sus].x, 0.0f, span).x, inner.getY(), inner.getBottom());

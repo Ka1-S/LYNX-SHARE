@@ -87,28 +87,19 @@ const std::vector<Allowed>& allowed()
         { "Transmitter", "", "clip", "behaviour: FL's Transmitter, Bounce sums 32 taps and the delay its feedback (exact engine)" },
         { "Transmitter", "", "click", "behaviour: FL's Transmitter, a new section effect starts on the running part (exact engine)" },
         { "Transmitter", "", "dc", "behaviour: FL's Transmitter, Bounce's 32 taps of the kicks' tails (exact engine)" },
+        { "Fruity Love Philter", "Unit 1 on", "silent", "behaviour: FL's Love Philter outputs the sum of its units; its default has unit 1 on only, so unit 1 off is silence (exact engine)" },
     };
     return a;
 }
 
-// NOT legitimately silent: FL-parity gaps scheduled for the 0.1.25 rounds (REPORT.md, "Known gaps", ids gap173d-1 …
-// gap173d-4). Each is a dead control today; listed so build-local stays green until its round lands, and every entry
-// here is an open item. Nothing else may be added without a tracker id.
+// NOT legitimately silent: FL-parity gaps scheduled for a later round (REPORT.md, "Known gaps", with a tracker id).
+// Each is a dead control today; listed so build-local stays green until its round lands, and every entry here is an
+// open item. Nothing else may be added without a tracker id.
 const std::vector<Allowed>& knownGaps()
 {
-    static const char* const philter = "gap173d-2: a new Love Philter has unit 1 only and no articulators; LYNX's editor can't set unit types / draw articulators";
-    static const std::vector<Allowed> a {
-        { "EQUO", "Master send *", "inert", "gap173d-1: EQUO's send levels feed a mixer track in FL; LYNX computes the send gains but routes nothing" },
-        { "EQUO", "Bank * send *", "inert", "gap173d-1: EQUO's send levels feed a mixer track in FL; LYNX computes the send gains but routes nothing" },
-        { "Fruity Love Philter", "Unit * envelope amount", "inert", philter },
-        { "Fruity Love Philter", "Unit 2 *", "inert", philter }, { "Fruity Love Philter", "Unit 3 *", "inert", philter },
-        { "Fruity Love Philter", "Unit 4 *", "inert", philter }, { "Fruity Love Philter", "Unit 5 *", "inert", philter },
-        { "Fruity Love Philter", "Unit 6 *", "inert", philter }, { "Fruity Love Philter", "Unit 7 *", "inert", philter },
-        { "Fruity Love Philter", "Unit 8 *", "inert", philter }, { "Fruity Love Philter", "Follower *", "inert", philter },
-        { "Fruity Love Philter", "Master LFO", "inert", philter }, { "Fruity Love Philter", "Mod X", "inert", philter },
-        { "Fruity Love Philter", "Mod Y", "inert", philter }, { "Fruity Love Philter", "Pattern", "inert", philter },
-        { "Fruity Convolver", "EQ", "inert", "gap173d-3: the amount of a drawn EQ curve; FL's default curve is flat at 0 dB (×1, REA_rodada60 §6) and LYNX's editor can't draw one" },
-    };
+    // round 173d3: gap173d-1 (EQUO sends), gap173d-2 (Love Philter units / articulators), gap173d-3 (Convolver EQ
+    // curve) and gap173d-4 (Vocodex maps) are closed; the list stays for the next tracked gap
+    static const std::vector<Allowed> a {};
     return a;
 }
 

@@ -315,8 +315,9 @@ Layout multibandDelayLayout()
 Layout convolverLayout()
 {
     // dry, in (input separation), wet, wet separation · delay, self-conv, stretch, eq (the state's knobs); NORMALIZE;
-    // the impulse response's waveform with its rate, format and length. FL's sample editor tools and its equalizer page
-    // are not reproduced (LYNX keeps the state's EQ curve as it is).
+    // the impulse response's waveform with its rate, format and length on the impulse page; the equalizer page draws and
+    // edits the EQ curve over FL's frequency axis (round 173d3, FL shot: the "impulse | equalizer" switch under the
+    // logo). FL's sample editor tools are not reproduced.
     constexpr auto k = EffectKind::convolver;
     Layout l;
     l.fl = "Fruity Convolver";
@@ -334,8 +335,10 @@ Layout convolverLayout()
     v.push_back (knob (456, 32, 40, stateName (k, "EQ"), TR_NOOP ("EQ"), 68));
     v.push_back (toggle (622, 8, 90, 12, stateName (k, "Normalize"), TR_NOOP ("Normalize")));
     v.push_back (label (560, 28, 150, 40, "Fruity Convolver", dim));
-    v.push_back (display (5, 104, 712, 20, "irinfo"));
-    v.push_back (display (5, 128, 712, 168, "irwave"));
+    v.push_back (pageTabs (540, 76, 170, 18, TR_NOOP ("Impulse|Equalizer")));
+    v.push_back (onPage (display (5, 104, 712, 20, "irinfo"), 0));
+    v.push_back (onPage (display (5, 128, 712, 168, "irwave"), 0));
+    v.push_back (onPage (display (5, 104, 712, 192, "cvcurve"), 1));
     return l;
 }
 
@@ -520,8 +523,9 @@ Layout vocodexLayout()
 {
     // Mixer (WET, SG, MOD, CAR, +NOISE faders, the three filters, MOD / CAR inputs, L-R ENCODING), Contour (from car /
     // consonants, to mod / noise), DRAFT, THREADED; the envelope follower (HOLD, ATT, REL, their curves, PEAK / RMS,
-    // MIN TIMES, freeze), ORDER, the band and unison knobs, the number of bands; then the band map (read-only: FL's map
-    // editor and the carrier synthesizer's patch browser are not reproduced). All controls live in the slot state.
+    // MIN TIMES, freeze), ORDER, the band and unison knobs, the number of bands; then FL's map editor (round 173d3: the
+    // map dropdown over the 13 maps, the page = the map shown; the carrier synthesizer's patch browser is not
+    // reproduced). All controls live in the slot state.
     constexpr auto k = EffectKind::vocodex;
     const auto p = [] (const char* name) { return stateName (EffectKind::vocodex, name); };
     Layout l;
@@ -585,7 +589,8 @@ Layout vocodexLayout()
     v.push_back (label (537, 250, 48, 12, TR_NOOP ("Uni. pan")));
     v.push_back (stepper (266, 262, 36, 17, p ("Bands"), nullptr, 95));
     v.push_back (label (306, 262, 130, 17, TR_NOOP ("Bands - distribution"), alignLeft));
-    v.push_back (display (10, 288, 578, 280, "vcxmap"));
+    v.push_back (display (10, 288, 160, 17, "vxmapsel"));
+    v.push_back (display (10, 308, 578, 260, "vxcurve"));
     v.push_back (display (10, 574, 578, 22, "vcxcarrier"));
     l.menuSwitches = { p ("Subtractive gate") };
     (void) k;

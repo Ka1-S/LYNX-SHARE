@@ -964,6 +964,16 @@ inline std::vector<Hint> hintsFor (EffectKind kind)
             Hint all { "every unit on with an S-curve waveshaper, every articulator drawn (envelopes, LFOs, maps)", {} };
             all.edit = drawn (true, true);
             out.push_back (all);
+            // (the envelopes' and LFOs' TEMPO: FL's free time runs at 2 units a second, its tempo time at BPM / 60, the same at
+            // 120 BPM; the B / H articulators scale the band / high levels, so they act once those are up)
+            auto tempo = named ("every articulator drawn, the band and high levels up, at 90 BPM", {});
+            for (int u = 1; u <= 8; ++u)
+                for (const auto* f : { " band", " high" })
+                    if (const auto i = plugui::paramIndex (kind, ("Unit " + std::to_string (u) + f).c_str()); i >= 0)
+                        tempo.sets.push_back ({ i, 0.6f });
+            tempo.edit = drawn (true, true);
+            tempo.bpm = 90.0;
+            out.push_back (tempo);
             break;
         }
         case EffectKind::convolver:
