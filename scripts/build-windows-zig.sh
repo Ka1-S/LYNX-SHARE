@@ -45,27 +45,29 @@ COMMON=(-target "$TARGET" -std=c++20 -O2 -DNDEBUG=1 -fno-sanitize=undefined
         -include "$OUT/JuceConfig.h" -include cmake/mingw/mingw_compat.h
         -I"$OUT/shim" -I"$JUCE_DIR/modules" -I"$JUCE_DIR/modules/juce_audio_processors/format_types/VST3_SDK" -Ithird_party/clap/include -Ithird_party/wavpack/include -Ithird_party/vorbis/include -Ithird_party/lame/include -Ithird_party/asiosdk/common -Ithird_party/sse2neon -Ithird_party/pocketpy -Ithird_party/monocypher -Ithird_party/onnxruntime -Isrc)
 
-# juce_gui_basics, juce_audio_processors and juce_events are compiled from patched copies (cmake/LynxPatchJuce.cmake:
-# issue #11 drag & drop and menu fixes; issue #70 VST3 note ids; issue #32 the message dispatch hook of the plugin
-# window crash guard), so the JUCE checkout itself is never modified. The copies are only
-# replaced when their patched sources change (module cache).
+# juce_gui_basics, juce_audio_processors, juce_graphics and juce_events are compiled from patched copies
+# (cmake/LynxPatchJuce.cmake: issue #11 drag & drop and menu fixes; issue #70 VST3 note ids; round 174e2 Direct2D image
+# readback; issue #32 the message dispatch hook of the plugin window crash guard), so the JUCE checkout itself is never
+# modified. The copies are only replaced when their patched sources change (module cache).
 GUI_BASICS_SRC="$JUCE_DIR/modules/juce_gui_basics"
 AUDIO_PROCESSORS_SRC="$JUCE_DIR/modules/juce_audio_processors"
+GRAPHICS_SRC="$JUCE_DIR/modules/juce_graphics"
 EVENTS_SRC="$JUCE_DIR/modules/juce_events"
 CMAKE="${CMAKE:-$(command -v cmake || ls "$HOME"/opt/cmake-*/bin/cmake 2>/dev/null | head -n 1)}"
 if [[ -n "$CMAKE" ]]; then
     rm -rf "$OUT/juce-patched.new"
     mkdir -p "$OUT/juce-patched.new/modules"
-    cp -r "$JUCE_DIR/modules/juce_gui_basics" "$JUCE_DIR/modules/juce_audio_processors" "$JUCE_DIR/modules/juce_events" "$OUT/juce-patched.new/modules/"
+    cp -r "$JUCE_DIR/modules/juce_gui_basics" "$JUCE_DIR/modules/juce_audio_processors" "$JUCE_DIR/modules/juce_graphics" "$JUCE_DIR/modules/juce_events" "$OUT/juce-patched.new/modules/"
     "$CMAKE" -DJUCE_DIR="$OUT/juce-patched.new" -P cmake/LynxPatchJuce.cmake
     if diff -rq "$OUT/juce-patched.new" "$OUT/juce-patched" >/dev/null 2>&1; then
         rm -rf "$OUT/juce-patched.new"
     else
         rm -rf "$OUT/juce-patched" && mv "$OUT/juce-patched.new" "$OUT/juce-patched"
-        rm -f "$OUT/juce/juce_gui_basics.o" "$OUT/juce/juce_audio_processors.o" "$OUT/juce/juce_events.o"
+        rm -f "$OUT/juce/juce_gui_basics.o" "$OUT/juce/juce_audio_processors.o" "$OUT/juce/juce_graphics.o" "$OUT/juce/juce_events.o"
     fi
     GUI_BASICS_SRC="$OUT/juce-patched/modules/juce_gui_basics"
     AUDIO_PROCESSORS_SRC="$OUT/juce-patched/modules/juce_audio_processors"
+    GRAPHICS_SRC="$OUT/juce-patched/modules/juce_graphics"
     EVENTS_SRC="$OUT/juce-patched/modules/juce_events"
 else
     echo "warning: cmake not found; JUCE's drag & drop fixes (cmake/LynxPatchJuce.cmake) are not applied" >&2
@@ -123,8 +125,9 @@ cached_pp() {
 JUCE_KEY="$JUCE_DIR $(cat "$OUT/JuceConfig.h" cmake/mingw/mingw_compat.h "$OUT/shim/Dbghelp.h" "$JUCE_DIR/modules/juce_core/system/juce_StandardHeader.h" | sha256sum | cut -c1-64)"
 GUI_BASICS_KEY="$(tree_hash "$GUI_BASICS_SRC")"
 AUDIO_PROCESSORS_KEY="$(tree_hash "$AUDIO_PROCESSORS_SRC")"
+GRAPHICS_KEY="$(tree_hash "$GRAPHICS_SRC")"
 EVENTS_KEY="$(tree_hash "$EVENTS_SRC")"
-export ZIG OUT JUCE_DIR TARGET GUI_BASICS_SRC AUDIO_PROCESSORS_SRC EVENTS_SRC OBJ_CACHE ZIG_VERSION JUCE_KEY GUI_BASICS_KEY AUDIO_PROCESSORS_KEY EVENTS_KEY
+export ZIG OUT JUCE_DIR TARGET GUI_BASICS_SRC AUDIO_PROCESSORS_SRC GRAPHICS_SRC EVENTS_SRC OBJ_CACHE ZIG_VERSION JUCE_KEY GUI_BASICS_KEY AUDIO_PROCESSORS_KEY GRAPHICS_KEY EVENTS_KEY
 export -f cached cached_pp
 mkdir -p "$OBJ_CACHE" && find "$OBJ_CACHE" -maxdepth 1 -type f -mtime +10 -delete 2>/dev/null || true
 export COMMON_STR="${COMMON[*]}"
@@ -143,6 +146,7 @@ for m in "${MODULES[@]}" juce_core_CompilationTime juce_graphics_Harfbuzz juce_g
         key="$JUCE_KEY"
         [[ "$m" == juce_gui_basics ]] && src="$GUI_BASICS_SRC/$m.cpp" && key="$JUCE_KEY $GUI_BASICS_KEY"
         [[ "$m" == juce_audio_processors ]] && src="$AUDIO_PROCESSORS_SRC/$m.cpp" && key="$JUCE_KEY $AUDIO_PROCESSORS_KEY"
+        [[ "$m" == juce_graphics ]] && src="$GRAPHICS_SRC/$m.cpp" && key="$JUCE_KEY $GRAPHICS_KEY"
         [[ "$m" == juce_events ]] && src="$EVENTS_SRC/$m.cpp" && key="$JUCE_KEY $EVENTS_KEY"
         case "$m" in
             juce_core_CompilationTime) src="$JUCE_DIR/modules/juce_core/$m.cpp" ;;
@@ -157,10 +161,10 @@ for m in "${MODULES[@]}" juce_core_CompilationTime juce_graphics_Harfbuzz juce_g
 
 APP_SOURCES=(src/Main.cpp
              src/engine/AudioEngine.cpp src/engine/ChannelRackProcessor.cpp src/engine/Metronome.cpp
-             src/engine/SampleLibrary.cpp src/engine/WavPackFormat.cpp src/engine/Mp3Format.cpp src/engine/ProjectFile.cpp src/engine/ProjectPackage.cpp src/engine/PluginHost.cpp src/engine/PluginSandbox.cpp src/engine/Exporter.cpp src/engine/FlStudioExport.cpp src/engine/StreamPrefetcher.cpp src/engine/DllAsioDevice.cpp src/engine/PipeWireDevice.cpp src/platform/LinuxRealtime.cpp src/engine/ClapFormat.cpp src/engine/Vst2Format.cpp src/engine/MidiFileIo.cpp src/engine/AudioLogger.cpp src/engine/PreviewPlayer.cpp
+             src/engine/SampleLibrary.cpp src/engine/WavPackFormat.cpp src/engine/Mp3Format.cpp src/engine/ProjectFile.cpp src/engine/ProjectPackage.cpp src/engine/PluginHost.cpp src/engine/PluginSandbox.cpp src/engine/SandboxWorker.cpp src/engine/Bridge32Test.cpp src/engine/Exporter.cpp src/engine/FlStudioExport.cpp src/engine/StreamPrefetcher.cpp src/engine/DllAsioDevice.cpp src/engine/PipeWireDevice.cpp src/platform/LinuxRealtime.cpp src/engine/ClapFormat.cpp src/engine/Vst2Format.cpp src/engine/MidiFileIo.cpp src/engine/AudioLogger.cpp src/engine/PreviewPlayer.cpp
              src/ui/MainComponent.cpp src/ui/ChannelRackComponent.cpp src/ui/PianoRollComponent.cpp src/ui/PlaylistComponent.cpp src/ui/PatternBlocksView.cpp src/ui/MixerComponent.cpp src/ui/QuickPick.cpp src/ui/PluginWindow.cpp src/ui/PluginPresetMenu.cpp src/ui/ProjectLoading.cpp src/ui/WindowOwner.cpp src/ui/ParametricEqEditor.cpp src/ui/FacetEqEditor.cpp src/ui/ProEditors.cpp src/ui/PluginHeader.cpp src/ui/PluginSkin.cpp src/ui/ExportDialog.cpp src/ui/FlStudioExportDialog.cpp src/ui/StemExtract.cpp src/ui/AutoSamplerDialog.cpp src/ui/AutomationUi.cpp src/ui/ChannelSettings.cpp src/ui/BrowserComponent.cpp src/ui/Theme.cpp src/ui/Icons.cpp src/ui/I18n.cpp src/ui/EditorTools.cpp
              src/core/Song.cpp src/core/MarkerPlan.cpp src/core/Scheduler.cpp src/core/Performance.cpp src/core/Patcherize.cpp src/core/Instruments.cpp src/core/RackRenderer.cpp src/core/LoadTrace.cpp src/core/ModuleWarmup.cpp
-             src/core/FlpImport.cpp src/core/FlpExport.cpp src/flp/FlpWrite.cpp src/core/Effects.cpp src/core/NoteEdit.cpp src/core/Recorder.cpp src/core/TakeRecording.cpp src/core/Pdc.cpp src/core/WorkerPool.cpp src/core/TimeStretch.cpp src/core/Arpeggiator.cpp src/core/SynthPresets.cpp src/core/Slicer.cpp src/core/Templates.cpp src/core/FlWrapper.cpp src/core/FlEffects.cpp src/core/Effector.cpp src/core/VintagePhaser.cpp src/core/EmphasizerFx.cpp src/core/EmphasisFx.cpp src/core/TransporterFl.cpp src/core/EmphasisEngine.cpp src/core/FreqShifterFl.cpp src/core/LowLifterFl.cpp src/core/FlLegacyFx.cpp src/core/Reeverb2.cpp src/core/LuxeVerb.cpp src/core/IldspMath.cpp src/core/ConvolverFx.cpp src/core/EquoFx.cpp src/core/PitchShifterFl.cpp src/core/SimSynth.cpp src/core/Wasp.cpp src/core/Granulizer.cpp src/core/Drumaxx.cpp src/core/FruityFilters.cpp src/core/NewtoneFx.cpp src/core/VocalPitch.cpp src/core/LynxTune.cpp src/core/LynxVerbs.cpp src/core/MixSuite.cpp src/core/VoiceMatch.cpp src/core/EchoSuite.cpp src/core/LovePhilter.cpp src/core/DistructorFx.cpp src/core/MultibandDelayFx.cpp src/core/FrequencySplitter.cpp src/core/Slayer.cpp src/core/FlangusFastDist.cpp src/core/FruityPhaser.cpp src/core/FruityDelayBank.cpp src/core/FruityMultiband.cpp src/core/Vocodex.cpp src/core/FruityVocoder.cpp src/core/DelphiMath.cpp src/core/MaximusFx.cpp src/core/ParametricEqFl.cpp src/core/ParametricEqLinear.cpp src/core/FruityBasicFx.cpp src/core/TransistorBass.cpp src/core/GrossBeat.cpp src/core/StereoFx.cpp src/core/FruityDelay.cpp src/core/FruityShapers.cpp src/core/ChorusFx.cpp src/core/FruityDynamics.cpp src/core/FlSamplers.cpp src/core/FlSynths.cpp src/core/FlSytrus.cpp src/core/FlGenerators.cpp src/core/PhysicalModels.cpp src/core/DrumSynthLive.cpp src/core/SytrusEngine.cpp src/core/Harmless.cpp src/core/HarmlessFx.cpp src/core/Harmor.cpp src/core/Gms.cpp src/core/Morphine.cpp src/core/Ogun.cpp src/core/Toxic.cpp src/core/ToxicFx.cpp src/core/FruitKick.cpp src/core/BassDrum.cpp src/core/MiniSynth.cpp src/core/Dx10.cpp src/core/Kepler.cpp src/core/PoiZone.cpp src/core/FlPatcher.cpp src/core/Patcher.cpp src/core/Vfx.cpp src/core/VfxSequencer.cpp src/core/Inflate.cpp src/core/WavPack.cpp src/flp/Flp.cpp src/core/EmberClassic.cpp src/core/RhythmPan.cpp src/core/VoxStrip.cpp
+             src/core/FlpImport.cpp src/core/FlpExport.cpp src/core/XmlLite.cpp src/core/Gzip.cpp src/core/AlsImport.cpp src/flp/FlpWrite.cpp src/core/Effects.cpp src/core/NoteEdit.cpp src/core/Recorder.cpp src/core/TakeRecording.cpp src/core/Pdc.cpp src/core/WorkerPool.cpp src/core/TimeStretch.cpp src/core/Arpeggiator.cpp src/core/SynthPresets.cpp src/core/Slicer.cpp src/core/Templates.cpp src/core/FlWrapper.cpp src/core/FlEffects.cpp src/core/Effector.cpp src/core/VintagePhaser.cpp src/core/EmphasizerFx.cpp src/core/EmphasisFx.cpp src/core/TransporterFl.cpp src/core/EmphasisEngine.cpp src/core/FreqShifterFl.cpp src/core/LowLifterFl.cpp src/core/FlLegacyFx.cpp src/core/Reeverb2.cpp src/core/LuxeVerb.cpp src/core/IldspMath.cpp src/core/ConvolverFx.cpp src/core/EquoFx.cpp src/core/PitchShifterFl.cpp src/core/SimSynth.cpp src/core/Wasp.cpp src/core/Granulizer.cpp src/core/Drumaxx.cpp src/core/FruityFilters.cpp src/core/NewtoneFx.cpp src/core/VocalPitch.cpp src/core/LynxTune.cpp src/core/LynxVerbs.cpp src/core/MixSuite.cpp src/core/VoiceMatch.cpp src/core/EchoSuite.cpp src/core/LovePhilter.cpp src/core/DistructorFx.cpp src/core/MultibandDelayFx.cpp src/core/FrequencySplitter.cpp src/core/Slayer.cpp src/core/FlangusFastDist.cpp src/core/FruityPhaser.cpp src/core/FruityDelayBank.cpp src/core/FruityMultiband.cpp src/core/Vocodex.cpp src/core/FruityVocoder.cpp src/core/DelphiMath.cpp src/core/MaximusFx.cpp src/core/ParametricEqFl.cpp src/core/ParametricEqLinear.cpp src/core/FruityBasicFx.cpp src/core/TransistorBass.cpp src/core/GrossBeat.cpp src/core/StereoFx.cpp src/core/FruityDelay.cpp src/core/FruityShapers.cpp src/core/ChorusFx.cpp src/core/FruityDynamics.cpp src/core/FlSamplers.cpp src/core/FlSynths.cpp src/core/FlSytrus.cpp src/core/FlGenerators.cpp src/core/PhysicalModels.cpp src/core/DrumSynthLive.cpp src/core/SytrusEngine.cpp src/core/Harmless.cpp src/core/HarmlessFx.cpp src/core/Harmor.cpp src/core/Gms.cpp src/core/Morphine.cpp src/core/Ogun.cpp src/core/Toxic.cpp src/core/ToxicFx.cpp src/core/FruitKick.cpp src/core/BassDrum.cpp src/core/MiniSynth.cpp src/core/Dx10.cpp src/core/Kepler.cpp src/core/PoiZone.cpp src/core/FlPatcher.cpp src/core/Patcher.cpp src/core/Vfx.cpp src/core/VfxSequencer.cpp src/core/Inflate.cpp src/core/WavPack.cpp src/flp/Flp.cpp src/core/EmberClassic.cpp src/core/RhythmPan.cpp src/core/VoxStrip.cpp
              src/platform/MingwFixes.cpp)
 
 # workflow shell: core (key map, workspace layout, rack operations) and UI (workspace desktop, control contract)
@@ -331,3 +335,6 @@ ls -la "$OUT/LYNX.exe"
 
 # LYNX ASIO driver (REA round 97), shipped next to LYNX.exe
 OUT="$OUT" ZIG="$ZIG" scripts/build-lynx-asio.sh
+
+# the 32-bit plugin bridge (round 176a), shipped next to LYNX.exe; it reuses the patched JUCE copies and the object cache
+OUT="$OUT" ZIG="$ZIG" JUCE_DIR="$JUCE_DIR" JOBS="$JOBS" scripts/build-bridge32.sh

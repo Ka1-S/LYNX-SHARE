@@ -221,6 +221,7 @@ struct PluginRow
     bool instrument = false;
     PluginStatus status = PluginStatus::ok;
     bool favourite = false;
+    std::string bits = {}; // FL's Bits column (Windows, round 176a): "64", "32" or "32+64"
 };
 
 enum class PluginFilter { all, instruments, effects, favourites, failed };

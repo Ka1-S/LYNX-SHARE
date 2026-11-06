@@ -33,6 +33,7 @@
 #include "engine/MidiFileIo.h"
 #include "engine/PluginHost.h"
 #include "engine/PluginSandbox.h"
+#include "engine/Bridge32Test.h"
 #include "engine/ProjectFile.h"
 #include "core/Sha256.h"
 #include "engine/SessionPack.h"
@@ -497,6 +498,17 @@ public:
         {
             const auto i = args.indexOf ("--sandboxtest");
             runSandboxTest (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+
+        if (args.contains ("--bridge32test"))
+        {
+            // LYNX.exe --bridge32test "LYNX Test Synth 32.dll" report.txt [--compare "LYNX Test Synth.dll"] (round 176a):
+            // the 32-bit plugin bridge (engine/Bridge32Test.cpp)
+            const auto i = args.indexOf ("--bridge32test");
+            const auto compare = args.contains ("--compare") ? args[args.indexOf ("--compare") + 1].unquoted() : juce::String();
+            setApplicationReturnValue (lynx::runBridge32Test (args[i + 1].unquoted(), args[i + 2].unquoted(), compare));
+            quit();
             return;
         }
 
@@ -6387,7 +6399,7 @@ private:
         juce::String error, report;
         bool ok = false;
 
-        if (input.hasFileExtension ("flp"))
+        if (input.hasFileExtension ("flp;als"))
             ok = offline.importFlpFile (input, error);
         else if (auto song = lynx::ProjectFile::load (input, error))
         {

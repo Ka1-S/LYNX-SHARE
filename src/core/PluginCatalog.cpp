@@ -522,4 +522,18 @@ Folders withDefaultCategories (const Folders& user, bool instruments, const std:
     }
     return out;
 }
+std::vector<std::string> combinedBits (const std::vector<std::pair<std::string, bool>>& items)
+{
+    std::map<std::string, int> builds; // identity -> bit 1: a 32-bit build, bit 2: a 64-bit build
+    for (const auto& [key, is32] : items)
+        builds[key] |= is32 ? 1 : 2;
+    std::vector<std::string> out;
+    out.reserve (items.size());
+    for (const auto& [key, is32] : items)
+    {
+        const auto both = builds[key] == 3;
+        out.push_back (both ? (is32 ? "" : "32+64") : (is32 ? "32" : "64"));
+    }
+    return out;
+}
 } // namespace lynx::plugincatalog

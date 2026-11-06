@@ -4,6 +4,8 @@
 #include "core/Vfx.h"
 #include "ui/I18n.h"
 #include "ui/PluginManager.h"
+#include "engine/PluginHost.h"
+#include "engine/PluginSandbox.h"
 #include "ui/TextCache.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
@@ -38,12 +40,26 @@ public:
         : engine (e), onChosen (std::move (chosen)), onBuiltIn (std::move (builtIn))
     {
         const auto& renamed = engine.getPluginHost().pluginNames(); // (the Plugin database's names: "1_EQ", round 165c)
-        for (const auto& type : engine.getPluginHost().getKnownPlugins().getTypes())
+        const auto types = engine.getPluginHost().getKnownPlugins().getTypes();
+        // FL's Bits column and its "Combine 32 and 64 bit versions" (round 176a; Windows x64, where 32-bit plugins run)
+        std::vector<std::string> bits (types.size());
+        if (bridge32Supported())
         {
+            std::vector<std::pair<std::string, bool>> builds;
+            for (const auto& type : types)
+                builds.emplace_back (PluginHost::bitnessKey (type), isPlugin32Bit (type));
+            bits = plugincatalog::combinedBits (builds);
+        }
+        for (int i = 0; i < types.size(); ++i)
+        {
+            const auto& type = types.getReference (i);
+            if (bridge32Supported() && bits[(std::size_t) i].empty())
+                continue; // the 32-bit build of a "32+64" plugin: its 64-bit entry stands for both
             const auto id = type.createIdentifierString().toStdString();
             const auto it = renamed.find (id);
             entries.push_back ({ id, type.name.toStdString(), type.manufacturerName.toStdString(), type.pluginFormatName.toStdString(),
-                                 type.category.toStdString(), type.isInstrument, it != renamed.end() ? it->second : std::string() });
+                                 type.category.toStdString(), type.isInstrument, it != renamed.end() ? it->second : std::string(),
+                                 bits[(std::size_t) i] });
         }
         if (onBuiltIn) // FL's VFX note effects, built in (round 164b)
             for (const auto kind : vfx::allKinds)
@@ -138,14 +154,17 @@ public:
 
         PluginPicker* picker = nullptr;
 
-        // the columns: star, name, vendor, format, category (fractions of the width after the star)
-        static constexpr int starWidth = 26;
+        // the columns: star, name, vendor, format, bits, category (fractions of the width after the star). Bits (FL's
+        // column, round 176a) only where 32-bit plugins run (Windows x64); elsewhere it has no width.
+        static constexpr int starWidth = 26, columnCount = 5;
         static juce::Rectangle<int> column (int index, int width, int height)
         {
-            const float splits[] = { 0.0f, 0.44f, 0.70f, 0.80f, 1.0f };
+            static const float withBits[] = { 0.0f, 0.42f, 0.66f, 0.76f, 0.84f, 1.0f };
+            static const float withoutBits[] = { 0.0f, 0.44f, 0.70f, 0.80f, 0.80f, 1.0f };
+            const auto* splits = bridge32Supported() ? withBits : withoutBits;
             const auto rest = (float) (width - starWidth);
             const auto x0 = starWidth + (int) (rest * splits[index]), x1 = starWidth + (int) (rest * splits[index + 1]);
-            return { x0 + 6, 0, x1 - x0 - 8, height };
+            return { x0 + 6, 0, juce::jmax (0, x1 - x0 - 8), height };
         }
 
     private:
@@ -158,8 +177,8 @@ public:
                 g.setColour (theme::colour::textSecondary);
                 g.setFont (theme::font (theme::type::caption, true));
                 textcache::drawText (g, star, juce::Rectangle<int> (0, 0, starWidth, getHeight()), juce::Justification::centred);
-                const juce::String titles[] = { tr ("Name"), tr ("Vendor"), tr ("Format"), tr ("Category") };
-                for (int i = 0; i < 4; ++i)
+                const juce::String titles[] = { tr ("Name"), tr ("Vendor"), tr ("Format"), bridge32Supported() ? tr ("Bits") : juce::String(), tr ("Category") };
+                for (int i = 0; i < columnCount; ++i)
                     textcache::drawText (g, titles[i], column (i, getWidth(), getHeight()), juce::Justification::centredLeft);
                 g.setColour (theme::colour::border);
                 g.fillRect (0, getHeight() - 1, getWidth(), 1);
@@ -188,8 +207,9 @@ public:
             g.setFont (theme::font (theme::type::body));
             textcache::drawText (g, star, juce::Rectangle<int> (0, 0, starWidth, height), juce::Justification::centred);
             const juce::String cells[] = { juce::String::fromUTF8 (e.shownName().c_str()), juce::String::fromUTF8 (e.vendor.c_str()),
-                                           juce::String::fromUTF8 (e.format.c_str()), tr (juce::String (plugincatalog::categoryOf (e))) };
-            for (int i = 0; i < 4; ++i)
+                                           juce::String::fromUTF8 (e.format.c_str()), juce::String::fromUTF8 (e.bits.c_str()),
+                                           tr (juce::String (plugincatalog::categoryOf (e))) };
+            for (int i = 0; i < columnCount; ++i)
             {
                 g.setColour (i == 0 ? theme::colour::textPrimary : theme::colour::textSecondary);
                 g.setFont (theme::font (i == 0 ? theme::type::body : theme::type::small));

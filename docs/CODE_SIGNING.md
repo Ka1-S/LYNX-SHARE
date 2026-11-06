@@ -66,6 +66,10 @@ SignPath creates an organization for LYNX and invites you to <https://app.signpa
        <pe-file path="LYNX.exe">
          <authenticode-sign/>
        </pe-file>
+       <!-- the 32-bit plugin bridge (round 176a), started by LYNX.exe for 32-bit plugins -->
+       <pe-file path="LYNX-bridge32.exe">
+         <authenticode-sign/>
+       </pe-file>
      </zip-file>
    </artifact-configuration>
    ```
