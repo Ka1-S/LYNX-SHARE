@@ -74,6 +74,12 @@ The shots are in the round's work folder (`fl15c` … `fl36c`).
   2026-11-06: match FL** — embedded by default plus an "External window" toggle — in a follow-up round. 176a ships
   with the floating window.
 - **The scan option.** FL has an on/off scan option for combining (on by default). LYNX always combines.
+- **The Settings page layout.** FL uses two columns: Info, Reload plugin / Refresh plugin properties and MIDI on the
+  left; "Options (for this plugin)" (Autosave, Save, Delete, Reset, Bit size), Presets, GUI and Automation on the
+  right. LYNX keeps its one column, with Bit size in its own Options box at the bottom. Logged as an FL-exact
+  follow-up (coordinator, 2026-11-06).
+- **The version label.** The wrapper's Settings tabs no longer show "version 0" when a plugin reports no version
+  (VST2's `effGetVendorVersion` returning 0); a real version is shown as before.
 - **The `.flp` field.** Where FL stores "Bit size" in the `.flp` was not looked for. LYNX imports and exports it as
   Native.
 
