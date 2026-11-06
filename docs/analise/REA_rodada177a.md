@@ -213,6 +213,8 @@ inserts move.
 - **Pro Tools, Cubase, Studio One, Logic, Reaper (VCA faders / VCA groups):** a VCA strip carries no audio. It offsets
   its members' faders in dB, its mute and solo act on them, VCAs nest, and Pro Tools' *Coalesce VCA* (Studio One:
   *merge*) bakes the VCA into the members. **Ableton Live 12** has none.
+- **Users:** FL users have asked for a VCA since 2021 ([IL VCA 2021](https://forum.image-line.com/viewtopic.php?p=1646924)†), and Live users ask too ([Ableton forum](https://forum.ableton.com/viewtopic.php?p=1774646)). Studio One's folder tracks with VCA get praise ([MusicRadar](https://musicradar.com/how-to/vca-grouping)).
+- **Verdict:** an addition, since FL has none: nothing changes until a VCA is made. Coordinator's decision 2026-11-06: VCA block left of the Master, *Merge VCA into members* in v1 (undoable).
 
 ### 3.2 What LYNX does
 
