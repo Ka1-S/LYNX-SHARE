@@ -228,6 +228,16 @@ Both numbers are given below.
 - **Glow Leveler ← CLA-2A:** Gain and Peak reduction printed 0 … 100; the lower strip's scale words beside its knobs.
 - The arrows, LED read-outs, bezel and wordmarks are drawn by LYNX code. No logo, bitmap or font of the originals is used.
 
+**Look, sixth slice (round tp172d8):**
+- **Glow Leveler ← CLA-2A:**
+  - the original's wide proportions (660 × 312) on one untitled faceplate;
+  - Gain and Peak reduction as chrome domes in black knurled skirts, printed 0 … 100, the number at the pointer in red;
+  - COMPRESS / LIMIT and AUTO MAKEUP as metal bat toggles on hex nuts, the active word red (AUTO MAKEUP above, OFF under);
+  - VU DISPLAY as a black pointer knob with INPUT / GR / OUTPUT printed round it (the chosen one red), the VU in a gunmetal frame, "GLOW" in big type under it;
+  - a charcoal strip with gold 50Hz / 60Hz / OFF keys (the lit one cream), HI FREQ as a big cream chicken-head pointer knob, MIX and TRIM as medium knurled knobs, and big ANALOG / HI FREQ / MIX / TRIM captions; [ FLAT ], 0 / 100 and -18 / 18 printed as on the original;
+  - LYNX's extras (Modern / Opto classic, the opto law and release) are one compact group of small muted keys where the original has its badge (full while hovered, the chosen one red); Makeup ref sits at the strip's right end.
+- **Echoform ← EchoBoy:** the name block top left ("Echoform" and LYNX's own subtitle); LOWCUT / HIGHCUT and RUSHIN / DRAGGIN printed as on the original; thicker, whiter pod outlines.
+
 **Design gaps still open:**
 - Atrium's Predelay and Decay bars draw linear while the original's are skewed.
 - Ember's VU reads "VU". The original's meter face and logo are not reproduced, as the rules require (the Drive's printed 0 … 10 came in the fifth look slice).
