@@ -123,6 +123,14 @@ protected:
         c.type = K::fader;
         return c;
     }
+    // round tp172b5: a horizontal slider (the reference multiband's RATIO / KNEE / LOOKAHEAD): the bar, its scale's
+    // ends under it (the value there while hovered or dragged), the caption under that; dragged left / right
+    static Ctl hslider (juce::Rectangle<float> r, int p, const juce::String& caption, bool bipolar = false)
+    {
+        Ctl c = fader (r, p, caption, bipolar);
+        c.look = 1;
+        return c;
+    }
     static Ctl toggle (juce::Rectangle<float> r, int p, const juce::String& caption)
     {
         Ctl c;
@@ -419,6 +427,7 @@ protected:
                         return;
                     }
                     dragCtl = c.param;
+                    hDragStart = v (c.param);
                     valueDrag.begin (e, v (c.param));
                     return;
                 default: return;
@@ -432,7 +441,12 @@ protected:
         if (dragCtl >= 0)
         {
             const auto spec = specFor (dragCtl);
-            const auto x = valueDrag.update (e, spec);
+            auto x = valueDrag.update (e, spec);
+            if (pressed.type == K::fader && pressed.look == 1) // a horizontal slider follows the pointer left / right
+            {
+                const auto fine = e.mods.isCtrlDown() ? 0.2f : 1.0f;
+                x = juce::jlimit (0.0, 1.0, (double) (hDragStart + fine * (e.position.x - e.mouseDownPosition.x) / juce::jmax (1.0f, pressed.r.getWidth() - 8.0f)));
+            }
             set ({ { dragCtl, (float) x } });
             ui::showValueTip (*this, pressed.r.toNearestInt(), spec.text (x));
             return;
@@ -670,6 +684,11 @@ protected:
             }
             case K::fader:
             {
+                if (c.look == 1)
+                {
+                    paintHSlider (g, c, hover, dragCtl == c.param && c.param >= 0, hot, ac, on);
+                    break;
+                }
                 const auto track = juce::Rectangle<float> (c.r.getCentreX() - 2.0f, c.r.getY() + 6.0f, 4.0f, c.r.getHeight() - 42.0f);
                 const auto active = dragCtl == c.param && c.param >= 0;
                 skin::slider (g, track, v (c.param), true, c.bipolar, ac, active || hot > 0.5f, on, 26.0f, 12.0f);
@@ -836,6 +855,34 @@ protected:
         g.setFont (font (c.size == 2 ? type::small : type::caption, true));
         const auto captionY = captionAbove ? c.r.getY() - 14.0f : knobR.getBottom() + 14.0f;
         g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, captionY, c.r.getWidth() + 28.0f, 14.0f),
+                    juce::Justification::centred, false);
+    }
+    void paintHSlider (juce::Graphics& g, const Ctl& c, bool hover, bool active, float hot, juce::Colour ac, bool on)
+    {
+        using namespace theme;
+        const auto bar = juce::Rectangle<float> (c.r.getX() + 4.0f, c.r.getY() + 2.0f, c.r.getWidth() - 8.0f, 16.0f);
+        const auto value = juce::jlimit (0.0f, 1.0f, v (c.param));
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.fillRoundedRectangle (bar.expanded (1.0f), 3.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.06f + 0.04f * hot));
+        g.fillRoundedRectangle (bar, 2.5f);
+        const auto from = c.bipolar ? 0.5f : 0.0f;
+        const auto x0 = bar.getX() + bar.getWidth() * juce::jmin (from, value), x1 = bar.getX() + bar.getWidth() * juce::jmax (from, value);
+        if (x1 - x0 > 0.5f)
+        {
+            const auto fill = juce::Rectangle<float> (x0, bar.getY(), x1 - x0, bar.getHeight());
+            const auto base = on ? juce::Colours::white.withAlpha (active ? 0.42f : 0.30f + 0.06f * hot) : colour::textDisabled.withAlpha (0.4f);
+            g.setGradientFill (juce::ColourGradient (base.brighter (0.2f), 0.0f, fill.getY(), base.darker (0.3f), 0.0f, fill.getBottom(), false));
+            g.fillRoundedRectangle (fill, 2.5f);
+        }
+        const auto hx = bar.getX() + bar.getWidth() * value;
+        g.setColour (on ? (active ? ac.brighter (0.25f) : colour::textPrimary.withAlpha (0.85f)) : colour::textDisabled);
+        g.fillRect (juce::Rectangle<float> (hx - 1.5f, bar.getY() + 1.0f, 3.0f, bar.getHeight() - 2.0f));
+        const auto row = juce::Rectangle<float> (bar.getX(), bar.getBottom() + 2.0f, bar.getWidth(), 12.0f);
+        rangeRow (g, c.param, row, c.showValue && (hover || active), false, ac, active);
+        g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
+        g.setFont (font (type::caption, true));
+        g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, row.getBottom() + 1.0f, c.r.getWidth() + 28.0f, 14.0f),
                     juce::Justification::centred, false);
     }
     // a short curved bar (a smile) filled in the accent up to the value, the scale and the caption under it
@@ -1114,6 +1161,7 @@ protected:
     juce::Point<float> mouse { -1.0f, -1.0f };
     int dragCtl = -1;
     Ctl pressed;
+    float hDragStart = 0.0f; // a horizontal slider's value when the drag began
     ui::ValueDrag valueDrag;
 
 private:

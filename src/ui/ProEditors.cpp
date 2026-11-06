@@ -1960,9 +1960,10 @@ private:
             add (knob ({ a.getX() + 362.0f, a.getY() + 14.0f, 70.0f, 90.0f }, bp (b, fRelease), tr ("Release")));
             add (knob ({ a.getX() + 446.0f, a.getY() + 14.0f, 70.0f, 90.0f }, bp (b, fLevel), tr ("Output"), 1, true));
             add (tabs ({ a.getX() + 86.0f, a.getY() + 128.0f, 184.0f, 26.0f }, bp (b, fMode), "Compress|Expand"));
-            add (knob ({ a.getX() + 290.0f, a.getY() + 112.0f, 66.0f, 54.0f }, bp (b, fRatio), tr ("Ratio"), 0));
-            add (knob ({ a.getX() + 366.0f, a.getY() + 112.0f, 66.0f, 54.0f }, bp (b, fKnee), tr ("Knee"), 0));
-            add (knob ({ a.getX() + 446.0f, a.getY() + 112.0f, 66.0f, 54.0f }, bandLookaheadParam (b), tr ("Lookahead"), 0));
+            // round tp172b5: RATIO, KNEE and LOOKAHEAD are horizontal sliders, as the reference's band panel draws them
+            add (hslider ({ a.getX() + 284.0f, a.getY() + 118.0f, 80.0f, 44.0f }, bp (b, fRatio), tr ("Ratio")));
+            add (hslider ({ a.getX() + 362.0f, a.getY() + 118.0f, 80.0f, 44.0f }, bp (b, fKnee), tr ("Knee")));
+            add (hslider ({ a.getX() + 440.0f, a.getY() + 118.0f, 80.0f, 44.0f }, bandLookaheadParam (b), tr ("Lookahead")));
             add (knob ({ a.getX() + 522.0f, a.getY() + 112.0f, 66.0f, 54.0f }, bandPanParam (b), tr ("Pan"), 0, true)); // round 135: the band's output balance
             // round 144: the crossover slope (one for every band) and the side-chain input, in the band panel
             out.push_back (menu ({ a.getX() + 522.0f, a.getY() + 36.0f, 70.0f, 22.0f }, slope, tr ("Slope"), "12 dB|24 dB|48 dB"));

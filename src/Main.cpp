@@ -6779,6 +6779,7 @@ private:
         for (const auto& pair : juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_PARITYSHOT_CLICKS", {}), " ", ""))
         {
             const juce::Point<int> at (pair.upToFirstOccurrenceOf (",", false, false).getIntValue(), pair.fromFirstOccurrenceOf (",", false, false).getIntValue());
+            editor->setVisible (true); // (getComponentAt finds nothing in a hidden component; it never goes on screen)
             auto* target = editor->getComponentAt (at);
             if (target == nullptr)
                 continue;
