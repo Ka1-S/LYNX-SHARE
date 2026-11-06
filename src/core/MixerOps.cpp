@@ -963,6 +963,90 @@ std::vector<int> groupOf (const Song& song, int track)
     return out;
 }
 
+bool canFold (const Song& song, int track)
+{
+    const auto group = groupOf (song, track);
+    if (group.size() < 2)
+        return false;
+    if (song.mixer[(std::size_t) group.front()].separator)
+        return true;
+    const auto order = displayOrder (song);
+    const auto after = std::find (order.begin(), order.end(), group.back()) + 1;
+    return after != order.end() && *after > 0 && song.mixer[(std::size_t) *after].separator
+           && song.mixer[(std::size_t) *after].dock == song.mixer[(std::size_t) group.back()].dock;
+}
+
+int groupBus (const Song& song, const std::vector<int>& group)
+{
+    for (const auto bus : group)
+    {
+        auto all = true;
+        for (const auto t : group)
+        {
+            if (t == bus)
+                continue;
+            const auto& m = song.mixer[(std::size_t) t];
+            if (m.toMaster || m.sends.size() != 1 || m.sends.front().target != bus)
+            {
+                all = false;
+                break;
+            }
+        }
+        if (all)
+            return bus;
+    }
+    return -1;
+}
+
+bool isFolded (const Song& song, int track)
+{
+    const auto group = groupOf (song, track);
+    return ! group.empty() && song.mixer[(std::size_t) group.front()].folded && canFold (song, track);
+}
+
+std::vector<FoldShow> foldView (const Song& song)
+{
+    std::vector<FoldShow> out (song.mixer.size(), FoldShow::strip);
+    for (std::size_t t = 1; t < song.mixer.size(); ++t)
+    {
+        if (! song.mixer[t].folded || out[t] != FoldShow::strip)
+            continue;
+        const auto group = groupOf (song, (int) t);
+        if (group.empty() || group.front() != (int) t || ! canFold (song, (int) t))
+            continue;
+        const auto bus = groupBus (song, group);
+        for (const auto m : group)
+            out[(std::size_t) m] = m == bus ? FoldShow::strip : FoldShow::hidden;
+        if (bus < 0)
+            out[(std::size_t) group.front()] = FoldShow::tab;
+    }
+    return out;
+}
+
+bool toggleFold (Song& song, int track)
+{
+    if (! canFold (song, track))
+        return false;
+    const auto head = groupOf (song, track).front();
+    auto& flag = song.mixer[(std::size_t) head].folded;
+    flag = ! flag;
+    return flag;
+}
+
+int foldAll (Song& song, bool fold)
+{
+    int changed = 0;
+    for (int t = 1; t < (int) song.mixer.size(); ++t)
+    {
+        const auto group = groupOf (song, t);
+        if (group.empty() || group.front() != t || ! canFold (song, t) || song.mixer[(std::size_t) t].folded == fold)
+            continue;
+        song.mixer[(std::size_t) t].folded = fold;
+        ++changed;
+    }
+    return changed;
+}
+
 void createGroup (Song& song, const std::vector<int>& tracks, int current)
 {
     const auto order = displayOrder (song);

@@ -172,6 +172,36 @@ void MixerStrips::layoutStrips()
     if (showUsedOnly)
         for (int t = 1; t < tracks; ++t)
             hidden[(std::size_t) t] = revealed.count (t) == 0 && ! song.insertInUse (t);
+    // folded groups (round 177a): nothing is computed unless a group is folded
+    foldShow.clear();
+    tabOf.clear();
+    foldHead.assign ((std::size_t) tracks + 1, false);
+    for (int t = 1; t < tracks; ++t)
+        if (song.mixer[(std::size_t) t].separator || (t + 1 < tracks && song.mixer[(std::size_t) t + 1].separator))
+        {
+            // the first strip of a group that can fold carries the chevron (a separator sets groups off)
+            const auto group = mixerops::groupOf (song, t);
+            if (! group.empty() && group.front() == t && mixerops::canFold (song, t))
+                foldHead[(std::size_t) t] = true;
+        }
+    if (std::any_of (song.mixer.begin() + std::min<std::ptrdiff_t> (1, (std::ptrdiff_t) song.mixer.size()), song.mixer.end(),
+                     [] (const MixerTrack& m) { return m.folded; }))
+    {
+        foldShow = mixerops::foldView (song);
+        tabOf.assign ((std::size_t) tracks, -1);
+        for (int t = 1; t < tracks; ++t)
+        {
+            if (foldShow[(std::size_t) t] == mixerops::FoldShow::hidden)
+                hidden[(std::size_t) t] = true;
+            if (foldShow[(std::size_t) t] == mixerops::FoldShow::tab)
+                for (const auto m : mixerops::groupOf (song, t))
+                    tabOf[(std::size_t) m] = t;
+        }
+        for (int t = 1; t < tracks; ++t) // a folded summing group: its bus strip carries the chevron (to unfold it)
+            if (foldHead[(std::size_t) t] && hidden[(std::size_t) t] && song.mixer[(std::size_t) t].folded)
+                if (const auto bus = mixerops::groupBus (song, mixerops::groupOf (song, t)); bus > 0)
+                    foldHead[(std::size_t) bus] = true;
+    }
     dockGaps.clear();
     separatorLines.clear();
 
@@ -384,6 +414,70 @@ MixerStrips::Rows MixerStrips::rows() const noexcept
     return r;
 }
 
+juce::Rectangle<int> MixerStrips::foldArea (int t) const
+{
+    // the chevron left of the number on a group's first strip (round 177a)
+    return { stripX (t) + 1, 3, 12, 15 };
+}
+
+float MixerStrips::tabLevel (int t) const noexcept
+{
+    float level = 0.0f;
+    for (std::size_t m = 0; m < tabOf.size(); ++m)
+        if (tabOf[m] == t)
+            for (std::size_t ch = 0; ch < 2; ++ch)
+                if (const auto i = m * 2 + ch; i < levels.size())
+                    level = juce::jmax (level, levels[i].level);
+    return level;
+}
+
+void MixerStrips::paintFoldTab (juce::Graphics& g, int t)
+{
+    // a folded group without a bus (round 177a): a slim tab in the group's colour with its name, how many inserts it
+    // holds and the loudest member's level; a click unfolds it. The members are never hidden without a trace.
+    using namespace theme;
+    const auto& song = engine.getSong();
+    const auto& head = song.mixer[(std::size_t) t];
+    const auto x = stripX (t);
+    const auto area = juce::Rectangle<int> (x, 2, foldTabWidth - 2, laneTop() - 2).toFloat();
+    const auto hoveredTab = hoverTrack == t;
+    auto plate = hoveredTab ? colour::bg3 : colour::bg2;
+    if (head.colour != 0)
+        plate = plate.interpolatedWith (tame (juce::Colour (head.colour)), 0.3f);
+    theme::fillRoundRect (g, area, radius::md, plate);
+    if (head.colour != 0)
+        theme::fillRoundRect (g, area.withHeight (3.0f).reduced (3.0f, 0.0f), 1.5f, tame (juce::Colour (head.colour)));
+    g.setColour (hoveredTab ? colour::borderStrong : colour::border);
+    g.drawRoundedRectangle (area.reduced (0.5f), radius::md, 1.0f);
+    icons::draw (g, Icon::chevronDown, juce::Rectangle<float> (12.0f, 12.0f).withCentre ({ area.getCentreX(), 12.0f }).transformedBy (
+                                           juce::AffineTransform::rotation (-juce::MathConstants<float>::halfPi, area.getCentreX(), 12.0f)),
+                 hoveredTab ? colour::textPrimary : colour::textSecondary);
+
+    const auto members = (int) mixerops::groupOf (song, t).size();
+    g.setColour (colour::textSecondary);
+    g.setFont (font (9.0f, true));
+    textcache::drawText (g, juce::String (members), (int) area.getX(), 22, (int) area.getWidth(), 12, juce::Justification::centred);
+
+    // the loudest member's level: one thin bar along the fader rows
+    const auto rail = faderRail (t);
+    const auto bar = juce::Rectangle<float> (area.getRight() - 6.0f, (float) rail.getY(), 3.0f, (float) rail.getHeight());
+    theme::fillRoundRect (g, bar, 1.0f, colour::bg0);
+    const auto level = tabLevel (t);
+    const auto h = meterPosition (level) * bar.getHeight();
+    g.setColour (level >= 1.0f ? colour::meterClip : level >= 0.5f ? colour::meterMid : colour::meterLow);
+    g.fillRect (bar.withTop (bar.getBottom() - h));
+
+    // the group's name, bottom to top
+    const auto name = juce::String::fromUTF8 (head.name.c_str());
+    const auto column = juce::Rectangle<int> ((int) area.getX() + 1, 40, (int) area.getWidth() - 8, juce::jmax (20, rail.getY() - 46));
+    juce::Graphics::ScopedSaveState state (g);
+    g.addTransform (juce::AffineTransform::rotation (-juce::MathConstants<float>::halfPi, (float) column.getCentreX(), (float) column.getCentreY()));
+    g.setColour (colour::textPrimary.withAlpha (0.9f));
+    g.setFont (font (type::small, false));
+    textcache::drawFittedText (g, name, juce::Rectangle<int> (column.getHeight(), column.getWidth()).withCentre (column.getCentre()),
+                               juce::Justification::centredLeft, 1, 0.8f);
+}
+
 juce::Rectangle<int> MixerStrips::headerArea (int t) const
 {
     return { stripX (t), 0, stripWidthOf (t) - spec().gap, rows().header };
@@ -507,6 +601,11 @@ MixerStrips::Part MixerStrips::partAt (int t, juce::Point<int> p) const
         return Part::none;
 
     const auto sending = selected > 0 && t != selected && selected < (int) song.mixer.size();
+
+    if (isFoldTab (t))
+        return Part::tab;
+    if (t > 0 && t < (int) foldHead.size() && foldHead[(std::size_t) t] && foldArea (t).contains (p))
+        return Part::fold;
 
     if (t > 0 && armArea (t).expanded (1).contains (p))
         return Part::arm;
@@ -663,6 +762,12 @@ void MixerStrips::paint (juce::Graphics& g)
         if (x > clip.getRight() || x + w < clip.getX())
             continue;
 
+        if (isFoldTab (t))
+        {
+            paintFoldTab (g, t);
+            continue;
+        }
+
         const auto& track = song.mixer[(std::size_t) t];
         const auto& sp = spec();
         const auto plateWidth = w - sp.gap;
@@ -739,6 +844,17 @@ void MixerStrips::paint (juce::Graphics& g)
         g.setFont (font (compactLayout ? 9.5f : type::caption, isSelected));
         textcache::drawFittedText (g, t == 0 ? juce::String ("M") : juce::String (t), juce::Rectangle<int> (x, 4, plateWidth, 13),
                                    juce::Justification::centred, 1, 0.6f);
+
+        if (t < (int) foldHead.size() && foldHead[(std::size_t) t]) // round 177a: fold / unfold the group
+        {
+            const auto folded = mixerops::isFolded (song, t);
+            const auto box = foldArea (t).toFloat();
+            const auto c = box.getCentre();
+            icons::draw (g, Icon::chevronDown,
+                         juce::Rectangle<float> (10.0f, 10.0f).withCentre (c).transformedBy (
+                             juce::AffineTransform::rotation ((folded ? -1.0f : 1.0f) * juce::MathConstants<float>::halfPi, c.x, c.y)),
+                         hovered (Part::fold) ? colour::textPrimary : colour::textSecondary);
+        }
 
         if (const auto icon = trackicons::iconFor (track.icon); icon != trackicons::Icon::none)
             ui::drawTrackIcon (g, icon, iconArea (t).toFloat(), track.muted ? colour::textDisabled : colour::textPrimary.withAlpha (0.88f));
@@ -1101,6 +1217,20 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
             updateSize();
             selectTrack (added);
         }
+        return;
+    }
+
+    if ((part == Part::fold || part == Part::tab) && ! flmods::popup (e.mods))
+    {
+        // round 177a: fold / unfold the group; Alt: every group (to the state this one takes)
+        const auto all = e.mods.isAltDown();
+        engine.editSong ([t, all] (Song& s) {
+            const auto folded = mixerops::toggleFold (s, t);
+            if (all)
+                mixerops::foldAll (s, folded);
+        });
+        updateSize();
+        repaint();
         return;
     }
 
@@ -1654,6 +1784,13 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
         case Part::meter: h.text = name + " - " + tr ("Peak meter (left/right) with peak hold  [LMB] selects the track and clears the clip light"); break;
         case Part::route: h.text = name + " - " + tr ("Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu"); h.hasMenu = true; break;
         case Part::add: h.text = tr ("Add a mixer insert"); break;
+        case Part::fold:
+            h.text = name + " - " + (mixerops::isFolded (song, t) ? tr ("Unfold this group  [Alt]+[LMB] all groups")
+                                                                : tr ("Fold this group to its bus strip, or to a slim tab  [Alt]+[LMB] all groups"));
+            break;
+        case Part::tab:
+            h.text = tr ("Folded group: {0} ({1} inserts)  [LMB] unfold", { name, juce::String ((int) mixerops::groupOf (song, t).size()) });
+            break;
         case Part::header:
             h.text = name + " - " + tr ("[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu") + feeds() + latency();
             h.hasMenu = true;
@@ -2394,6 +2531,21 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         menu.addItem (tr ("Create group"), [this, targets, t] { engine.editSong ([targets, t] (Song& s) { mixerops::createGroup (s, targets, t); }); });
         menu.addItem (tr ("Auto color group"), song.mixer[(std::size_t) t].colour != 0, false,
                       [this, t] { engine.editSong ([t] (Song& s) { mixerops::autoColorGroup (s, t); }); });
+        // LYNX's addition (round 177a): a group folds to its bus strip, or to a slim tab when it has no bus
+        const auto canFold = mixerops::canFold (song, t);
+        const auto folded = mixerops::isFolded (song, t);
+        menu.addItem (folded ? tr ("Unfold group") : tr ("Fold group"), canFold, false, [this, t] {
+            engine.editSong ([t] (Song& s) { mixerops::toggleFold (s, t); });
+            updateSize();
+        });
+        menu.addItem (tr ("Fold all groups"), [this] {
+            engine.editSong ([] (Song& s) { mixerops::foldAll (s, true); });
+            updateSize();
+        });
+        menu.addItem (tr ("Unfold all groups"), [this] {
+            engine.editSong ([] (Song& s) { mixerops::foldAll (s, false); });
+            updateSize();
+        });
     }
 
     // --- FL's "Layout" section --------------------------------------------------------------------------
@@ -2643,6 +2795,12 @@ bool MixerStrips::liveFrame (double nowMs)
         // the Wide layouts the two thin bars beside the name, which follow the same level (round 173f)
         const auto t = (int) (i / 2);
         const auto ch = (int) (i % 2);
+        if (t < (int) tabOf.size() && tabOf[(std::size_t) t] > 0 && m.level != before.level) // a folded group's tab
+        {
+            const auto tab = tabOf[(std::size_t) t];
+            const auto rail = faderRail (tab);
+            repaint (stripX (tab) + foldTabWidth - 10, rail.getY() - 1, 8, rail.getHeight() + 2);
+        }
         const auto area = meterArea (t);
         const auto& sp = spec();
         const auto rows = meters::dirtyRows (before, m, area.getHeight(), [] (float v) { return meterPosition (v); });

@@ -1060,6 +1060,9 @@ struct MixerTrack
     // FL's mixer track menu "Group › Separator" (REA round 146a; .flp insert flag 0x400): a gap is drawn on the left of
     // this track; a run of tracks between two separators is a group ("Create group", "Select › Group", "Auto color group")
     bool separator = false;
+    // LYNX's folded mixer group (round 177a, an addition to FL's groups): set on a group's first strip, the group is shown
+    // folded — only its bus strip when the group is a summing group, else a slim tab (mixerops::foldView). View only.
+    bool folded = false;
     // FL's "Layout › Dock to" (.flp insert flags bits 6-7 = dock 0 left / 1 middle / 2 right): the strip is shown in the
     // left block, the middle or the right block of the mixer
     MixerDock dock = MixerDock::middle;

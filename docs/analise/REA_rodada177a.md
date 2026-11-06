@@ -166,3 +166,38 @@ can change that order. FL itself then keeps the old *k*, which is the IL complai
   side-chain sources. Unmoved, it exports byte for byte. After the two sources swap places it exports `k = 1`, which
   still names the same source; FL itself would keep 2. Nothing else in the state changes.
 - `UiFl115Tests`: a deleted side-chain source is now −1 (none), no longer 0 (which the renderer reads as the Master).
+
+## 2. Mixer groups fold (slice 177a-2)
+
+### 2.1 FL and the others
+
+- **FL Studio 2026:** a mixer "group" is a run of inserts set off by separators (Group › Separator / Create group /
+  Auto color group; REA_rodada146a). FL draws the separator line and tints the strips. It has no way to fold a group:
+  a large mixer is only scrolled, docked, or narrowed with the Mixer layouts.
+- **Ableton Live 12:** a group track folds its members into one strip; the group strip is a real bus (its own
+  devices, fader and sends).
+- **Logic (summing stacks), Studio One (folder tracks), Cubase (folder and group channels), Reaper (folder tracks):**
+  a folder hides its members; a summing folder shows its bus strip.
+- **Users:** the request (research row 4) is "fold a big mixer like Live's groups, without changing the routing".
+
+### 2.2 What LYNX does
+
+LYNX folds FL's own separator groups. No new group object is added and the routing never changes:
+
+- A group can fold when a separator sets it off and it has two or more inserts (`mixerops::canFold`). Its first strip
+  shows a chevron after the number. A click folds or unfolds it; **Alt+click** does every group. The insert menu's
+  Group section has *Fold group* / *Unfold group*, *Fold all groups* and *Unfold all groups*.
+- **A summing group** (a member every other member sends only to, as *Create submix* makes it; `groupBus`) folds to
+  its bus strip. The bus carries the chevron, to unfold.
+- **Any other group** folds to a slim tab (20 px) in the group's colour. It shows the chevron, the number of inserts
+  and one bar with the loudest member's level. A click unfolds it. The members are never hidden without a trace.
+- The fold flag is saved with the project (`folded` on the group's first insert). FL projects don't carry it; the .flp
+  export leaves it out.
+- **Cost:** nothing is computed while no group is folded. The fold view is built only at layout time.
+
+### 2.3 Tests
+
+`tests/Mixer177a2Tests.inc` (`mixer177a2_groups_fold_to_their_bus_or_a_tab`): which groups can fold, the bus of a
+summing group, the fold view of a summing group (only the bus shows) and of a group without a bus (a tab), a member
+with a second output (the group then folds to a tab), Fold all / Unfold all, and the fold following its group when the
+inserts move.

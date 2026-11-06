@@ -1784,6 +1784,8 @@ juce::var mixerTrackToVar (const MixerTrack& t)
         o->setProperty ("threaded", false);
     if (t.separator)
         o->setProperty ("separator", true);
+    if (t.folded)
+        o->setProperty ("folded", true);
     if (t.dock != MixerDock::middle)
         o->setProperty ("dock", t.dock == MixerDock::left ? "left" : "right");
 
@@ -1867,6 +1869,7 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     track.soloSources = (bool) t.getProperty ("soloSources", true);
     track.threaded = (bool) t.getProperty ("threaded", true);
     track.separator = (bool) t.getProperty ("separator", false);
+    track.folded = (bool) t.getProperty ("folded", false);
     track.dock = t["dock"].toString() == "left" ? MixerDock::left : t["dock"].toString() == "right" ? MixerDock::right : MixerDock::middle;
     track.toMaster = (bool) t.getProperty ("toMaster", true);
     track.masterLevel = juce::jlimit (0.0f, maxFaderGain, (float) (double) t.getProperty ("masterLevel", 1.0));
