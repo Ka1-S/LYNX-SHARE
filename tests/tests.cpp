@@ -17093,6 +17093,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Tb169g2Tests.inc"
 #include "Issues171aTests.inc"
 #include "CtlAudit170i3Tests.inc"
+#include "CtlWake173dTests.inc"
 #include "Issue32dTests.inc"
 #include "FlpExport171eTests.inc"
 #include "Tp172cTests.inc"
