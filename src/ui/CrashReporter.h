@@ -30,7 +30,12 @@ struct Session
     juce::StringArray plugins; // "name|vendor|format|version[|separate process]"
     juce::StringPairArray info; // info.<key> lines (audio)
     juce::File crashFile, hangFile;
-    juce::String kind() const; // "crash" (crash file), "hang" (ended while frozen), else "unclean"
+    // the newest fault in a plugin's editor window that LYNX caught and went on (issue #32, round 174a)
+    juce::String editorCrashPlugin;
+    juce::File editorCrashFile;
+    // "crash" (crash file, or a hang file sampled inside Windows' fatal-error report), "hang" (ended while frozen),
+    // else "unclean"
+    juce::String kind() const;
 };
 Session parseSession (const juce::String& sessionFileText);
 

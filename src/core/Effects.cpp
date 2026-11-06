@@ -2976,6 +2976,7 @@ const EffectInfo& effectInfo (EffectKind kind)
         case EffectKind::hushDeEsser: return mixsuite::hushInfo();
         case EffectKind::aether: return mixsuite::aetherInfo();
         case EffectKind::ember: return mixsuite::emberInfo();
+        case EffectKind::kilnChannel: return mixsuite::kilnInfo();
         case EffectKind::lynxTune: return lynxtune::info();
         case EffectKind::fruityPhaser: return fruityPhaserInfo;
         case EffectKind::epochVerb:
@@ -3235,6 +3236,17 @@ const EffectInfo& effectInfo (EffectKind kind)
 
 std::string formatEffectParam (EffectKind kind, int param, float v, double bpm, const EffectParams& context)
 {
+    if (kind == EffectKind::ridgeStrip && param == mixsuite::ridge::driveAmount) // round tp172c6: the model's own dial
+    {
+        const auto model = mixsuite::ridge::driveModelIndex (context[(std::size_t) mixsuite::ridge::driveModel]);
+        const auto u = mixsuite::ridge::driveAmountUnits (model, v);
+        char text[32];
+        if (model >= mixsuite::ridge::driveGuitarAmp)
+            std::snprintf (text, sizeof text, "%.2f", u);
+        else
+            std::snprintf (text, sizeof text, model == mixsuite::ridge::driveSaturate ? "%+.1f dB" : "%.1f dB", u);
+        return text;
+    }
     if (kind == EffectKind::ridgeStrip && mixsuite::ridge::modernVoicing (context)) // round tp172c: the Modern voicing's
         return mixsuite::ridge::modernParamText (param, v);
     if (kind == EffectKind::ridgeStrip && mixsuite::ridge::k4Voicing (context)) // round 148: the 4K console's scales
@@ -3702,6 +3714,7 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
         case EffectKind::hushDeEsser:
         case EffectKind::aether:
         case EffectKind::ember:
+        case EffectKind::kilnChannel:
             return mixsuite::paramText (kind, param, v);
         case EffectKind::lynxTune:
             return lynxtune::paramText (param, v);
@@ -4047,7 +4060,8 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::glowLeveler:
         case EffectKind::hushDeEsser:
         case EffectKind::aether:
-        case EffectKind::ember: return mixsuite::make (kind); // LYNX's own mixing suite (REA_rodada96)
+        case EffectKind::ember:
+        case EffectKind::kilnChannel: return mixsuite::make (kind); // LYNX's own mixing suite (REA_rodada96)
         case EffectKind::lynxTune: return lynxtune::make(); // LYNX's own pitch corrector (REA_rodada95)
         case EffectKind::fruityPhaser: return phaserfx::make(); // FL's Fruity Phaser, exact (REA_rodada105_phaser)
         case EffectKind::epochVerb:

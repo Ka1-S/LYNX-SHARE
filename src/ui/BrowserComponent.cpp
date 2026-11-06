@@ -3812,9 +3812,14 @@ juce::File BrowserComponent::draggedFile (const juce::DragAndDropTarget::SourceD
 }
 
 bool BrowserComponent::startPluginDrag (juce::Component& source, std::function<std::optional<ChannelDef>()> generator,
-                                        std::function<std::optional<EffectSlot>()> effect, const juce::String& label, const juce::Image& image)
+                                        std::function<std::optional<EffectSlot>()> effect, const juce::String& label, const juce::Image& image,
+                                        juce::Component* containerOwner)
 {
-    auto* container = juce::DragAndDropContainer::findParentDragContainerFor (&source);
+    // (`containerOwner`: the Plugin picker is its own window, outside the main window's drag container)
+    // (findParentDragContainerFor looks from the parent up, so the owner itself is tried first)
+    auto* container = dynamic_cast<juce::DragAndDropContainer*> (containerOwner);
+    if (container == nullptr)
+        container = juce::DragAndDropContainer::findParentDragContainerFor (containerOwner != nullptr ? containerOwner : &source);
     if (container == nullptr || (generator == nullptr && effect == nullptr))
         return false;
     const auto isGenerator = generator != nullptr;

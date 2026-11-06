@@ -1,4 +1,5 @@
 #include "ui/SlotWatch.h"
+#include "ui/FrameTicker.h"
 #include "ui/PatcherEditor.h"
 #include "ui/ControllerEditors.h"
 #include "ui/Controllers164.h"
@@ -125,7 +126,7 @@ public:
             addAndMakeVisible (*artLayer);
             artLayer->setArt (skin::artForEffect (kind), [this] { return editorStyle() == skin::Style::themed; });
         }
-        if (kind == EffectKind::ember) // round 165: the Classic voicing's VU shows the output level, as the reference's
+        if (kind == EffectKind::ember || kind == EffectKind::kilnChannel) // round 165: the Classic voicing's VU shows the output level, as the reference's
             vuMode = 2;
         anim.onFrame = [this] { repaint(); };
         page = initialPage;
@@ -2860,8 +2861,9 @@ public:
             // the originals' level meters (SSL E-Channel's IN / OUT meter, RComp's input and output, Doubler's output)
             const auto fracOf = [] (float linear) { return juce::jlimit (0.0f, 1.0f, (20.0f * std::log10 (juce::jmax (1e-6f, linear)) + 48.0f) / 48.0f); };
             const auto base = item.steps > 0 ? item.steps : 2; // round 135w: the engine's meter outputs (LYNX Tune: 3 / 4)
-            ioMeters[0].update (fracOf (liveMeter (base)), 0.02f);
-            ioMeters[1].update (fracOf (liveMeter (base + 1)), 0.02f);
+            const auto only = item.colour; // round tp172c7: 0 / 1 = the input or the output bar alone (Kiln's side columns)
+            if (only != 1) ioMeters[0].update (fracOf (liveMeter (base)), 0.02f);
+            if (only != 0) ioMeters[1].update (fracOf (liveMeter (base + 1)), 0.02f);
             ioClip = ioClip || liveMeter (base + 1) >= 0.999f; // round 135w: the clip lamp (Doubler's), click to reset
             const auto labelH = 13.0f * s, readH = 13.0f * s;
             auto area = r.reduced (2.0f * s);
@@ -2877,13 +2879,13 @@ public:
                 g.setColour (colour::textSecondary);
                 g.drawText (juce::String (db), juce::Rectangle<float> (area.getX(), y - 6.0f * s, scaleW - 2.0f * s, 12.0f * s), juce::Justification::centredRight, false);
             }
-            const auto w = bars.getWidth() / 2.0f;
+            const auto w = bars.getWidth() / (only == 0 || only == 1 ? 1.0f : 2.0f);
             const char* names[] = { TR_NOOP ("In"), TR_NOOP ("Out") };
             if (kind == EffectKind::hardwareInsert) // round 164d: what goes to the gear and what comes back
                 names[0] = TR_NOOP ("Send"), names[1] = TR_NOOP ("Return");
-            for (int k = 0; k < 2; ++k)
+            for (int k = (only == 1 ? 1 : 0); k < (only == 0 ? 1 : 2); ++k)
             {
-                const auto bar = juce::Rectangle<float> (bars.getX() + w * (float) k, bars.getY(), w, bars.getHeight()).reduced (3.0f * s, 0.0f);
+                const auto bar = juce::Rectangle<float> (bars.getX() + w * (float) (only == 1 ? 0 : k), bars.getY(), w, bars.getHeight()).reduced (3.0f * s, 0.0f);
                 skin::meter (g, bar, ioMeters[(std::size_t) k].level, ioMeters[(std::size_t) k].peak, true);
                 const auto column = juce::Rectangle<float> (bar.getX() - 4.0f * s, 0.0f, bar.getWidth() + 8.0f * s, 0.0f);
                 g.setColour (colour::textSecondary);
@@ -3008,6 +3010,12 @@ public:
             const auto face = r.reduced (2.0f * s);
             g.setColour (juce::Colour (0xffd9cfb4).withAlpha (fx.enabled ? 1.0f : 0.5f));
             g.fillRoundedRectangle (face, radius::lg * s);
+            if (kind == EffectKind::kilnChannel) // round tp172c7: the console's lamp-lit amber face, warmer in the middle
+            {
+                g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff6c66a).withAlpha (fx.enabled ? 1.0f : 0.5f), face.getCentreX(), face.getCentreY(),
+                                                         juce::Colour (0xffb8822e).withAlpha (fx.enabled ? 1.0f : 0.5f), face.getX(), face.getY(), true));
+                g.fillRoundedRectangle (face, radius::lg * s);
+            }
             g.setColour (colour::bg0);
             g.drawRoundedRectangle (face, radius::lg * s, 2.0f * s);
             const juce::Point<float> pivot { face.getCentreX(), face.getBottom() + face.getHeight() * 0.18f };
@@ -5068,29 +5076,11 @@ private:
         if (! isShowing()) return; // a hidden editor costs nothing
         if (! node.locate && shownSlot.changed (engine.getAutomationDisplay(), track, slot)) // the controls follow their automation
             repaint();
-        if (levelMeter && ! node.locate) // round 170c: the level meter wells (input / output peaks, held 1 s, falling 24 dB/s)
-            if (auto* times = engine.getProcessTimes(); times != nullptr && levelKey() < times->levelWanted.size())
-            {
-                bool moved = false;
-                for (int k = 0; k < 2; ++k)
-                {
-                    const auto peak = times->slotLevels[levelKey() * 2 + (std::size_t) k].exchange (0.0f, std::memory_order_relaxed);
-                    const auto db = juce::jlimit (-60.0f, 6.0f, juce::Decibels::gainToDecibels (peak, -100.0f));
-                    auto& shown = levelDb[(std::size_t) k];
-                    auto& hold = levelHoldDb[(std::size_t) k];
-                    const auto before = shown;
-                    shown = db >= shown ? db : juce::jmax (db, shown - 0.8f);
-                    if (db >= hold) { hold = db; levelHoldFrames[(std::size_t) k] = 30; }
-                    else if (--levelHoldFrames[(std::size_t) k] < 0) hold = juce::jmax (shown, hold - 0.8f);
-                    moved = moved || std::abs (shown - before) > 0.01f || levelHoldFrames[(std::size_t) k] >= 0;
-                }
-                levelTrail[(std::size_t) levelTrailAt] = { levelDb[0], levelDb[1] }; // the dynamics curves' live trail
-                levelTrailAt = (levelTrailAt + 1) % (int) levelTrail.size();
-                if (moved)
-                    for (const auto& item : activeLayout().items)
-                        if (item.type == Item::display && item.display != nullptr && levelDisplay (item.display) && visible (item))
-                            repaint (rectOf (item).getSmallestIntegerContainer().expanded (2));
-            }
+        if (levelMeter && ! node.locate) // the dynamics curves' live trail (the wells themselves: levelFrame)
+        {
+            levelTrail[(std::size_t) levelTrailAt] = { levelDb[0], levelDb[1] };
+            levelTrailAt = (levelTrailAt + 1) % (int) levelTrail.size();
+        }
         if (kind == EffectKind::parametricEq && ! node.locate) // round 166f: the spectrum / heatmap of the EQ's output
             for (const auto& item : activeLayout().items)
                 if (item.type == Item::display && item.display != nullptr && std::strcmp (item.display, "eq") == 0)
@@ -5182,9 +5172,46 @@ private:
     // round 170c: the "meter" wells' live levels (dBFS: input, output), their holds and the slot's key
     bool levelMeter = false;
     std::array<float, 2> levelDb { -60.0f, -60.0f }, levelHoldDb { -60.0f, -60.0f };
-    std::array<int, 2> levelHoldFrames { 0, 0 };
+    std::array<double, 2> levelHoldMs { 0.0, 0.0 };
     std::array<std::pair<float, float>, 45> levelTrail {};
     int levelTrailAt = 0;
+    double levelFrameMs = 0.0;
+    // round 170c: the level meter wells (input / output peaks, held 1 s, falling 24 dB/s); round 174e: at the display's
+    // refresh (they were on the 30 Hz timer), only the wells
+    bool levelFrame (double nowMs)
+    {
+        if (! levelMeter || node.locate)
+            return false;
+        auto* times = engine.getProcessTimes();
+        if (times == nullptr || levelKey() >= times->levelWanted.size())
+            return false;
+        const auto elapsed = levelFrameMs > 0.0 ? juce::jlimit (0.0, 250.0, nowMs - levelFrameMs) : 1000.0 / 30.0;
+        levelFrameMs = nowMs;
+        const auto fall = (float) (24.0 * elapsed / 1000.0);
+        bool moved = false;
+        for (int k = 0; k < 2; ++k)
+        {
+            const auto peak = times->slotLevels[levelKey() * 2 + (std::size_t) k].exchange (0.0f, std::memory_order_relaxed);
+            const auto db = juce::jlimit (-60.0f, 6.0f, juce::Decibels::gainToDecibels (peak, -100.0f));
+            auto& shown = levelDb[(std::size_t) k];
+            auto& hold = levelHoldDb[(std::size_t) k];
+            const auto before = shown, holdBefore = hold;
+            shown = db >= shown ? db : juce::jmax (db, shown - fall);
+            if (db >= hold)
+            {
+                hold = db;
+                levelHoldMs[(std::size_t) k] = 1000.0;
+            }
+            else if ((levelHoldMs[(std::size_t) k] -= elapsed) < 0.0)
+                hold = juce::jmax (shown, hold - fall);
+            moved = moved || std::abs (shown - before) > 0.01f || std::abs (hold - holdBefore) > 0.01f;
+        }
+        if (moved)
+            for (const auto& item : activeLayout().items)
+                if (item.type == Item::display && item.display != nullptr && levelDisplay (item.display) && visible (item))
+                    repaint (rectOf (item).getSmallestIntegerContainer().expanded (2));
+        return moved;
+    }
     static bool levelDisplay (const char* id)
     {
         return std::strcmp (id, "meter") == 0 || std::strcmp (id, "limiter") == 0 || std::strcmp (id, "compressor") == 0 || std::strcmp (id, "dynamics") == 0;
@@ -5192,6 +5219,7 @@ private:
     std::size_t levelKey() const { return (std::size_t) juce::jmax (0, track) * (std::size_t) maxEffectSlots + (std::size_t) juce::jmax (0, slot); }
     mutable ShownEffectSlot shownSlot;    // the slot with its automation's values (current())
     ui::ValueDrag drag;
+    ui::FrameTicker levelFrames { *this, [this] (double ms) { return levelFrame (ms); } };
     juce::String presetName;
     pluginheader::PresetBar bar { engine, track, slot }; // undo / redo, A / B, presets (round 129)
     peqview::Analyser eqAnalyser; // round 166f: Parametric EQ 2's spectrum and heatmap

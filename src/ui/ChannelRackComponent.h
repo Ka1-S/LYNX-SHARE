@@ -11,6 +11,7 @@
 
 #include "core/RackOps.h"
 #include "engine/AudioEngine.h"
+#include "ui/FrameTicker.h"
 #include "ui/ValueControl.h"
 
 namespace lynx
@@ -164,6 +165,8 @@ private:
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
     void timerCallback() override;
+    // the playing step (and the selectors' hit flashes), at the display's refresh (round 174e; was the 30 Hz timer)
+    bool playheadFrame (double nowMs);
     void followPlayhead();
 
     Area areaAt (int x, int y, int& row) const;
@@ -267,6 +270,7 @@ private:
     int selectionAnchor = 0;
 
     std::unique_ptr<juce::FileChooser> fileChooser;
+    ui::FrameTicker frames { *this, [this] (double ms) { return playheadFrame (ms); } };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChannelRackComponent)
 };
