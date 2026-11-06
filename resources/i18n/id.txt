@@ -7359,3 +7359,6 @@ countries: id
 "{0} crashed in its separate process." = "{0} crash di proses terpisahnya."
 "{0} stopped responding (separate process)." = "{0} berhenti merespons (proses terpisah)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Hanya prosesnya yang terdampak: LYNX SHARE dan proyek Anda tetap berjalan, dan plugin dibisukan. Simpan proyek Anda; plugin dimuat lagi saat Anda membukanya berikutnya."
+"Open or save the events of this control as a score (.fsc)" = "Buka atau simpan event kontrol ini sebagai skor (.fsc)"
+"This file is not an event score." = "File ini bukan skor event."
+"There are no events to save, or the file could not be written." = "Tidak ada event untuk disimpan, atau file tidak dapat ditulis."

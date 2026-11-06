@@ -7359,3 +7359,6 @@ countries: es mx ar co cl pe ve
 "{0} crashed in its separate process." = "{0} falló en su proceso aparte."
 "{0} stopped responding (separate process)." = "{0} dejó de responder (proceso aparte)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Solo se vio afectado su proceso: LYNX SHARE y tu proyecto siguieron funcionando, y el plugin se silenció. Guarda tu proyecto; el plugin se carga de nuevo la próxima vez que lo abras."
+"Open or save the events of this control as a score (.fsc)" = "Abre o guarda los eventos de este control como partitura (.fsc)"
+"This file is not an event score." = "Este archivo no es una partitura de eventos."
+"There are no events to save, or the file could not be written." = "No hay eventos que guardar, o no se pudo escribir el archivo."

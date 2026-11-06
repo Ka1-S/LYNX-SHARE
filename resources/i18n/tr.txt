@@ -7359,3 +7359,6 @@ countries: tr
 "{0} crashed in its separate process." = "{0} ayrı sürecinde çöktü."
 "{0} stopped responding (separate process)." = "{0} yanıt vermiyor (ayrı süreç)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Yalnızca onun süreci etkilendi: LYNX SHARE ve projeniz çalışmaya devam etti, plugin sessize alındı. Projenizi kaydedin; plugin bir sonraki açılışta yeniden yüklenir."
+"Open or save the events of this control as a score (.fsc)" = "Bu kontrolün olaylarını partisyon (.fsc) olarak aç veya kaydet"
+"This file is not an event score." = "Bu dosya bir olay partisyonu değil."
+"There are no events to save, or the file could not be written." = "Kaydedilecek olay yok veya dosya yazılamadı."

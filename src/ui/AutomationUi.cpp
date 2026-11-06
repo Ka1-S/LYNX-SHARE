@@ -986,15 +986,13 @@ void addAutomationItem (juce::PopupMenu& menu, AudioEngine& engine, const Automa
 {
     if (headers)
         menu.addSectionHeader (tr ("Automation"));
-    if (target.kind != AutomationTargetKind::tempo)
-    {
-        menu.addItem (tr ("Edit events in the pattern"), [&engine, target] { openEventEditor (engine, target); });
-        if (onEditEventsInPianoRoll)
-            menu.addItem (tr ("Edit events in piano roll"), [target] {
-                if (onEditEventsInPianoRoll)
-                    onEditEventsInPianoRoll (target);
-            });
-    }
+    // (the tempo too, as in FL: its menu's "Edit events" / "Edit events in piano roll" write pattern Tempo events, issue #86)
+    menu.addItem (tr ("Edit events in the pattern"), [&engine, target] { openEventEditor (engine, target); });
+    if (onEditEventsInPianoRoll)
+        menu.addItem (tr ("Edit events in piano roll"), [target] {
+            if (onEditEventsInPianoRoll)
+                onEditEventsInPianoRoll (target);
+        });
     // FL's initialized controls (REA round 146): the value the song resets this control to whenever it starts
     const auto initial = engine.getSong().findInitialValue (target);
     menu.addItem (tr ("Init song with this position"), engine.currentTargetValue (target) >= 0.0f, initial >= 0, [&engine, target] {

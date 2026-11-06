@@ -7359,3 +7359,6 @@ countries: ru by kz
 "{0} crashed in its separate process." = "Сбой {0} в отдельном процессе."
 "{0} stopped responding (separate process)." = "{0} не отвечает (отдельный процесс)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Затронут только его процесс: LYNX SHARE и проект продолжили работу, а плагин заглушён. Сохраните проект; плагин снова загрузится при следующем открытии."
+"Open or save the events of this control as a score (.fsc)" = "Открыть или сохранить события этого регулятора как партитуру (.fsc)"
+"This file is not an event score." = "Этот файл не является партитурой событий."
+"There are no events to save, or the file could not be written." = "Нет событий для сохранения, или файл не удалось записать."

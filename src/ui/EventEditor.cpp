@@ -9,6 +9,8 @@
 #include <optional>
 
 #include "core/EventEdit.h"
+#include "core/PianoRollTools.h"
+#include "ui/FileChoosers.h"
 #include "ui/AutomationUi.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
@@ -131,6 +133,12 @@ public:
         toAutoButton.setTooltip (tr ("Turn these events into an automation clip (the events are removed from the pattern)"));
         toAutoButton.onClick = [this] { showConvertToAutomation(); };
         addAndMakeVisible (toAutoButton);
+
+        // FL's event editor File menu: Open score / Save score as (issue #86): an event .fsc of the shown target
+        scoreButton.setButtonText (tr ("Score"));
+        scoreButton.setTooltip (tr ("Open or save the events of this control as a score (.fsc)"));
+        scoreButton.onClick = [this] { showScoreMenu(); };
+        addAndMakeVisible (scoreButton);
 
         rebuildTargets();
         setSize (900, 400);
@@ -264,7 +272,9 @@ public:
         {
             g.setColour (colour::textPrimary);
             g.setFont (font (type::small));
-            g.drawText (juce::String (juce::roundToInt (hoverValue * 100.0f)) + "%", area.getRight() - 60, area.getY() + 4, 54, 16,
+            g.drawText (target.kind == AutomationTargetKind::tempo ? automationPointValueText (target, hoverValue) // (issue #86: BPM)
+                                                                : juce::String (juce::roundToInt (hoverValue * 100.0f)) + "%",
+                        area.getRight() - 90, area.getY() + 4, 84, 16,
                         juce::Justification::centredRight);
         }
 
@@ -288,8 +298,9 @@ public:
             modeWidth[i++] = theme::buttonWidth (*b, 64, 120);
         const auto clearWidth = theme::buttonWidth (clearButton, 70, 120);
         const auto toAutoWidth = theme::buttonWidth (toAutoButton, 120, 180); // (round 165l)
+        const auto scoreWidth = theme::buttonWidth (scoreButton, 60, 110);    // (issue #86)
         const auto gridWidth = theme::labelColumnWidth ({ &gridLabel }, 40, 110);
-        const auto fixedTop = 240 + 12 + modeWidth[0] + modeWidth[1] + modeWidth[2] + 12 + gridWidth + 110 + clearWidth + 4 + toAutoWidth;
+        const auto fixedTop = 240 + 12 + modeWidth[0] + modeWidth[1] + modeWidth[2] + 12 + gridWidth + 110 + clearWidth + 4 + toAutoWidth + 4 + scoreWidth;
         auto titleWidth = juce::jlimit (120, 230, top.getWidth() - fixedTop), boxWidth = 240;
         // a title longer than its room ("Événements - Pattern 1") takes up to 80 px from the target box
         const auto titleNeeds = juce::jmin (230, theme::labelColumnWidth ({ &title }, 0, 400));
@@ -311,6 +322,8 @@ public:
         clearButton.setBounds (top.removeFromRight (clearWidth).reduced (0, 2));
         top.removeFromRight (4);
         toAutoButton.setBounds (top.removeFromRight (toAutoWidth).reduced (0, 2));
+        top.removeFromRight (4);
+        scoreButton.setBounds (top.removeFromRight (scoreWidth).reduced (0, 2));
 
         auto tools = r.removeFromBottom (32);
         r.removeFromBottom (6);
@@ -519,7 +532,7 @@ private:
         const auto& song = engine.getSong();
         targets.clear();
         const auto add = [this] (const AutomationTarget& t) {
-            if (t.kind != AutomationTargetKind::none && t.kind != AutomationTargetKind::tempo
+            if (t.kind != AutomationTargetKind::none // (the tempo too: FL's pattern Tempo events, issue #86)
                 && std::none_of (targets.begin(), targets.end(), [&] (const AutomationTarget& o) { return sameTarget (o, t); }))
                 targets.push_back (t);
         };
@@ -612,6 +625,69 @@ private:
         beginGesture();
         previewGesture ([&] (PatternEvents& lane) { fn (lane, from, to); });
         commitGesture();
+    }
+
+    // FL's event editor Open score / Save score as (REA_rodada178a §4): the shown target's events as an event score
+    // (.fsc, values normalised to 0..1); opening one replaces the shown target's events, whatever target it was saved
+    // from (FL's scores are target-agnostic: a Tempo curve can go onto a volume).
+    void showScoreMenu()
+    {
+        const auto* lane = eventedit::findLane (currentPattern(), target);
+        const auto hasEvents = lane != nullptr && ! lane->events.empty();
+        juce::PopupMenu menu;
+        menu.addItem (theme::mnemonic (tr ("Open score..."), 'O'), target.kind != AutomationTargetKind::none, false, [this] { openScore(); });
+        menu.addItem (theme::mnemonic (tr ("Save score as..."), 'S'), hasEvents, false, [this] { saveScore(); });
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&scoreButton));
+    }
+
+    void openScore()
+    {
+        chooser = lynx::ui::makeFileChooser (tr ("Open score"), juce::File(), "*.fsc");
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                                 [safe = juce::Component::SafePointer<EventEditor> (this)] (const juce::FileChooser& fc) {
+                                     if (safe != nullptr && fc.getResult().existsAsFile())
+                                         safe->loadScore (fc.getResult());
+                                 });
+    }
+
+    bool loadScore (const juce::File& file)
+    {
+        juce::MemoryBlock data;
+        if (target.kind == AutomationTargetKind::none || ! file.loadFileAsData (data))
+            return false;
+        const auto events = prtools::parseEventScore (std::span<const std::uint8_t> ((const std::uint8_t*) data.getData(), data.getSize()));
+        if (! events)
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Open score"),
+                                                    tr ("This file is not an event score."));
+            return false;
+        }
+        beginGesture();
+        previewGesture ([&] (PatternEvents& l) { l.events = *events; });
+        commitGesture();
+        return true;
+    }
+
+    void saveScore()
+    {
+        const auto name = describeAutomationTarget (engine, target);
+        chooser = lynx::ui::makeFileChooser (tr ("Save score as"),
+                                             juce::File::getSpecialLocation (juce::File::userMusicDirectory)
+                                                 .getChildFile (juce::File::createLegalFileName (name) + ".fsc"),
+                                             "*.fsc");
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                                 [safe = juce::Component::SafePointer<EventEditor> (this)] (const juce::FileChooser& fc) {
+                                     auto file = fc.getResult();
+                                     if (safe == nullptr || file == juce::File())
+                                         return;
+                                     if (! file.hasFileExtension ("fsc"))
+                                         file = file.withFileExtension (".fsc");
+                                     const auto* l = eventedit::findLane (safe->currentPattern(), safe->target);
+                                     const auto bytes = prtools::writeEventScore (l != nullptr ? l->events : std::vector<PatternEvent> {});
+                                     if (l == nullptr || l->events.empty() || ! file.replaceWithData (bytes.data(), bytes.size()))
+                                         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save score as"),
+                                                                                 tr ("There are no events to save, or the file could not be written."));
+                                 });
     }
 
     void showConvertToAutomation()
@@ -847,7 +923,8 @@ private:
 
     juce::Label title, gridLabel, scaleLabel, offsetLabel, randomLabel, lfoLabel;
     juce::ComboBox targetBox, gridBox, shapeBox, periodBox;
-    juce::TextButton drawButton, lineButton, selectButton, randomButton, lfoButton, clearButton, toAutoButton;
+    juce::TextButton drawButton, lineButton, selectButton, randomButton, lfoButton, clearButton, toAutoButton, scoreButton;
+    std::unique_ptr<juce::FileChooser> chooser;
     juce::Slider scaleSlider, offsetSlider, amountSlider;
 
     juce::Rectangle<int> canvas;
