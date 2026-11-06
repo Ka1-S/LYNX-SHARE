@@ -222,6 +222,7 @@ private:
     juce::Rectangle<int> foldArea (int track) const;
     float tabLevel (int track) const noexcept;
     void paintFoldTab (juce::Graphics& g, int track);
+    void paintFoldTabLevel (juce::Graphics& g, int track) const;
     // the strip's rows for the current layout and height (top to bottom)
     struct Rows
     {

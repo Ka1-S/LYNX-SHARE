@@ -538,10 +538,8 @@ void MixerStrips::paintFoldTab (juce::Graphics& g, int t)
     const auto rail = faderRail (t);
     const auto bar = juce::Rectangle<float> (area.getRight() - 6.0f, (float) rail.getY(), 3.0f, (float) rail.getHeight());
     theme::fillRoundRect (g, bar, 1.0f, colour::bg0);
-    const auto level = tabLevel (t);
-    const auto h = meterPosition (level) * bar.getHeight();
-    g.setColour (level >= 1.0f ? colour::meterClip : level >= 0.5f ? colour::meterMid : colour::meterLow);
-    g.fillRect (bar.withTop (bar.getBottom() - h));
+    if (! cachePainting) // (cached: drawn over the picture, paintMeterLevels)
+        paintFoldTabLevel (g, t);
 
     // the group's name, bottom to top
     const auto name = juce::String::fromUTF8 (head.name.c_str());
@@ -552,6 +550,16 @@ void MixerStrips::paintFoldTab (juce::Graphics& g, int t)
     g.setFont (font (type::small, false));
     textcache::drawFittedText (g, name, juce::Rectangle<int> (column.getHeight(), column.getWidth()).withCentre (column.getCentre()),
                                juce::Justification::centredLeft, 1, 0.8f);
+}
+
+void MixerStrips::paintFoldTabLevel (juce::Graphics& g, int t) const
+{
+    using namespace theme;
+    const auto rail = faderRail (t);
+    const auto bar = juce::Rectangle<float> ((float) (stripX (t) + foldTabWidth - 2) - 6.0f, (float) rail.getY(), 3.0f, (float) rail.getHeight());
+    const auto level = tabLevel (t);
+    g.setColour (level >= 1.0f ? colour::meterClip : level >= 0.5f ? colour::meterMid : colour::meterLow);
+    g.fillRect (bar.withTop (bar.getBottom() - meterPosition (level) * bar.getHeight()));
 }
 
 juce::Rectangle<int> MixerStrips::headerArea (int t) const
@@ -2889,6 +2897,19 @@ void MixerStrips::paintMeterLevels (juce::Graphics& g) const
     {
         if (isHidden (t))
             continue;
+        if (isFoldTab (t)) // (a folded group's tab: one bar, and no meter of its own)
+        {
+            const auto rail = faderRail (t);
+            if (const juce::Rectangle<int> bar (stripX (t), rail.getY(), foldTabWidth, rail.getHeight()); bar.intersects (clip))
+            {
+                const juce::Graphics::ScopedSaveState state (g);
+                if (dockOf (t) == MixerDock::middle)
+                    for (const auto& r : pinned)
+                        g.excludeClipRegion (r);
+                paintFoldTabLevel (g, t);
+            }
+            continue;
+        }
         const auto meters = meterArea (t);
         const auto bars = nameBars (t);
         const auto meterShown = meters.intersects (clip) && g.clipRegionIntersects (meters);
@@ -2954,8 +2975,11 @@ bool MixerStrips::liveFrame (double nowMs)
         {
             const auto tab = tabOf[(std::size_t) t];
             const auto rail = faderRail (tab);
-            repaint (stripX (tab) + foldTabWidth - 10, rail.getY() - 1, 8, rail.getHeight() + 2);
+            const juce::Rectangle<int> bar (stripX (tab) + foldTabWidth - 10, rail.getY() - 1, 8, rail.getHeight() + 2);
+            dirty = dirty.isEmpty() ? bar : dirty.getUnion (bar);
         }
+        if (isHidden (t) || isFoldTab (t))
+            continue;
         const auto area = meterArea (t);
         const auto& sp = spec();
         const auto rows = meters::dirtyRows (before, m, area.getHeight(), [] (float v) { return meterPosition (v); });
