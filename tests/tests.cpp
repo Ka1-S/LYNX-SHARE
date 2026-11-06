@@ -17092,6 +17092,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issues171aTests.inc"
 #include "CtlAudit170i3Tests.inc"
 #include "Issue32dTests.inc"
+#include "Issue81Tests.inc"
 #include "FlpExport171eTests.inc"
 #include "Tp172cTests.inc"
 #include "Layout172aTests.inc"
