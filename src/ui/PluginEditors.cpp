@@ -65,7 +65,7 @@ using plugui::LayoutItem;
 
 constexpr float headerHeight = 26.0f; // the presets bar (not scaled with the body)
 
-bool hasStyle (const LayoutItem& item, std::uint16_t flag) noexcept
+bool hasStyle (const LayoutItem& item, std::uint32_t flag) noexcept
 {
     return (item.style & flag) != 0;
 }
@@ -294,6 +294,8 @@ public:
     skin::Art artNow() const
     {
         const auto art = skin::artForEffect (kind);
+        if (art == skin::Art::luxe) // round tp172b4: the Space page has the Pro-R role's own look
+            return page == 1 ? skin::Art::luxeSpace : art;
         if (art != skin::Art::ridge) return art;
         const auto* fx = current();
         if (fx == nullptr) return art;
@@ -337,7 +339,7 @@ public:
             r.removeFromBottom (13.0f * s);
         }
         else if (! hasStyle (item, plugui::noCaption))
-            r.removeFromBottom ((hasStyle (item, plugui::showValue) ? 26.0f : 14.0f) * s);
+            r.removeFromBottom ((hasStyle (item, plugui::showValue) || hasStyle (item, plugui::rangeEnds) ? 26.0f : 14.0f) * s);
         const auto d = juce::jmin (r.getWidth(), r.getHeight());
         return r.withSizeKeepingCentre (d, d).withY (r.getY());
     }
@@ -845,7 +847,8 @@ public:
                 if (hasStyle (item, plugui::boxed)) // a read-out plate (FL's value boxes)
                     skin::valuePlate (g, r, radius::sm * s);
                 g.setColour (hot ? accent : (fx.enabled ? (skin::captionScale() > 1.0f ? skin::valueColour (false) : colour::textPrimary) : colour::textDisabled));
-                g.setFont (font (juce::jmax (8.0f, 11.0f * s * juce::jmin (1.25f, skin::captionScale())), skin::captionScale() > 1.0f));
+                g.setFont (hasStyle (item, plugui::big) ? font (juce::jmax (12.0f, 19.0f * s)) // round tp172b4: a big read-out (LuxeVerb's Space time)
+                                                       : font (juce::jmax (8.0f, 11.0f * s * juce::jmin (1.25f, skin::captionScale())), skin::captionScale() > 1.0f));
                 g.drawFittedText (valueText (param, value), r.toNearestInt(),
                                   hasStyle (item, plugui::alignLeft) ? juce::Justification::centredLeft : juce::Justification::centred, 1, 0.7f);
                 break;
@@ -879,6 +882,42 @@ public:
                     g.setColour (hot ? look.accent.brighter (0.3f) : skin::valueColour (false));
                     g.setFont (font (juce::jmax (8.0f, 10.5f * s * skin::captionScale()), skin::captionScale() > 1.0f));
                     g.drawFittedText (valueText (param, value), below.withHeight (13.0f * s * skin::captionScale()).expanded (10.0f * s, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
+                }
+                else if (hasStyle (item, plugui::rangeEnds)) // round tp172b4: the scale's ends, the value on hover, the caption
+                {
+                    const auto row = below.withHeight (12.0f * s);
+                    if (hot || index == dragItem)
+                    {
+                        g.setColour (hot ? look.accent.brighter (0.3f) : skin::valueColour (true));
+                        g.setFont (font (juce::jmax (8.0f, 10.0f * s), true));
+                        g.drawFittedText (valueText (param, value), row.expanded (12.0f * s, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
+                    }
+                    else
+                    {
+                        const auto shortText = [] (juce::String t) {
+            // round tp172b4: scale ends as the references print them — "1:1", "-60 dB", "5 s" (no zero decimals, no
+            // spaces round a ratio's colon)
+            t = t.replace (" : ", ":");
+            juce::String out;
+            for (int i = 0; i < t.length(); ++i)
+            {
+                if (t[i] == '.' && i > 0 && juce::CharacterFunctions::isDigit (t[i - 1]))
+                {
+                    int j = i + 1;
+                    while (j < t.length() && t[j] == '0') ++j;
+                    if (j > i + 1 && (j >= t.length() || ! juce::CharacterFunctions::isDigit (t[j]))) { i = j - 1; continue; }
+                }
+                out << juce::String::charToString (t[i]);
+            }
+            return out;
+        };
+                        const auto ends = circle.withY (row.getY()).withHeight (row.getHeight()).expanded (12.0f * s, 0.0f);
+                        g.setColour (colour::textDisabled);
+                        g.setFont (font (juce::jmax (7.5f, 9.0f * s)));
+                        g.drawText (shortText (valueText (param, 0.0f)), ends, juce::Justification::centredLeft, false);
+                        g.drawText (shortText (valueText (param, 1.0f)), ends, juce::Justification::centredRight, false);
+                    }
+                    caption (g, item, below.withTrimmedTop (12.0f * s).withHeight (13.0f * s));
                 }
                 else if (! hasStyle (item, plugui::noCaption))
                 {
@@ -2274,12 +2313,102 @@ public:
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (r.toNearestInt())));
     }
 
+    // round tp172b4: the Space engine's decay-rate EQ, the reference reverb's main display: the decay rate (100 % =
+    // the SPACE time) from 20 Hz to 20 kHz on a log grid, shaped by the low and high decay multipliers past their
+    // frequencies; percent on the left, hertz along the bottom
+    void paintDecayEq (juce::Graphics& g, juce::Rectangle<float> r, const EffectSlot& fx)
+    {
+        using namespace theme;
+        namespace sp = luxeverb::sp;
+        const auto s = scale();
+        const auto at = [&] (int i) { return valueOf (luxeVerbSpaceFirst + i); };
+        const auto plot = r.withTrimmedLeft (44.0f * s).withTrimmedRight (14.0f * s).withTrimmedTop (22.0f * s).withTrimmedBottom (20.0f * s);
+        const auto lo = std::log (20.0), hi = std::log (20000.0);
+        const auto xOf = [&] (double hz) { return plot.getX() + plot.getWidth() * (float) ((std::log (hz) - lo) / (hi - lo)); };
+        constexpr float topOct = 1.5f, bottomOct = -3.4f; // log2 of the rate: 283 % … 9.5 %
+        const auto yOf = [&] (double rate) {
+            const auto o = (float) std::log2 (juce::jmax (1.0e-3, rate));
+            return plot.getY() + plot.getHeight() * juce::jlimit (0.0f, 1.0f, (topOct - o) / (topOct - bottomOct));
+        };
+        const auto blue = skin::artAccent2 (skin::art());
+        g.setFont (font (juce::jmax (8.0f, 10.5f * s)));
+        // the frequency grid (1-2-5 marks a decade, the labelled ones brighter)
+        for (double dec = 10.0; dec <= 10000.0; dec *= 10.0)
+            for (int m = 1; m <= 9; ++m)
+            {
+                const auto hz = dec * m;
+                if (hz < 20.0 || hz > 20000.0) continue;
+                const auto x = xOf (hz);
+                const auto major = m == 1 || m == 2 || m == 5;
+                g.setColour (juce::Colours::white.withAlpha (major ? 0.05f : 0.022f));
+                g.drawVerticalLine ((int) x, plot.getY(), plot.getBottom());
+                if (major)
+                {
+                    g.setColour (colour::textDisabled);
+                    g.drawText (hz >= 1000.0 ? juce::String ((int) (hz / 1000.0)) + "k" : juce::String ((int) hz),
+                                juce::Rectangle<float> (x - 20.0f * s, plot.getBottom() + 3.0f * s, 40.0f * s, 14.0f * s), juce::Justification::centred, false);
+                }
+            }
+        // the rate grid: an octave a line, labelled on the left
+        for (int o = 1; o >= -3; --o)
+        {
+            const auto y = yOf (std::pow (2.0, o));
+            g.setColour (juce::Colours::white.withAlpha (0.05f));
+            g.drawHorizontalLine ((int) y, plot.getX(), plot.getRight());
+            g.setColour (blue.withAlpha (0.85f));
+            g.drawText (juce::String ((int) std::lround (100.0 * std::pow (2.0, o))) + "%", juce::Rectangle<float> (r.getX() + 2.0f * s, y - 7.0f * s, 38.0f * s, 14.0f * s),
+                        juce::Justification::centredLeft, false);
+        }
+        g.setColour (blue);
+        g.setFont (font (juce::jmax (8.0f, 11.0f * s)));
+        g.drawText (tr ("Decay EQ"), juce::Rectangle<float> (r.getX() + 2.0f * s, r.getY() + 2.0f * s, 200.0f * s, 16.0f * s), juce::Justification::centredLeft, false);
+        // the curve: the rate, times a smooth shelf to the low multiplier under the low frequency and to the high one over
+        // the high frequency (half an octave of transition)
+        const auto rate = sp::rateOf (at (sp::rate));
+        const auto lowMult = sp::multOf (at (sp::lowMult)), highMult = sp::multOf (at (sp::highMult));
+        const auto lowHz = sp::lowHz (at (sp::lowFreq)), highHz = sp::highHz (at (sp::highFreq));
+        const auto shelf = [] (double hz, double corner, double mult, bool below) {
+            const auto o = std::log2 (hz / corner) * (below ? -1.0 : 1.0);
+            const auto w = 1.0 / (1.0 + std::exp (-o * 4.0));
+            return std::pow (mult, w);
+        };
+        juce::Path curve;
+        const auto steps = juce::jmax (64, (int) (plot.getWidth() / (3.0f * s)));
+        for (int i = 0; i <= steps; ++i)
+        {
+            const auto hz = std::exp (lo + (hi - lo) * (double) i / (double) steps);
+            const auto y = yOf (rate * shelf (hz, lowHz, lowMult, true) * shelf (hz, highHz, highMult, false));
+            const auto x = plot.getX() + plot.getWidth() * (float) i / (float) steps;
+            if (i == 0) curve.startNewSubPath (x, y);
+            else curve.lineTo (x, y);
+        }
+        auto fill = curve;
+        fill.lineTo (plot.getRight(), plot.getBottom());
+        fill.lineTo (plot.getX(), plot.getBottom());
+        fill.closeSubPath();
+        const auto line = fx.enabled ? blue : colour::textDisabled;
+        g.setGradientFill (juce::ColourGradient (line.withAlpha (0.10f), 0.0f, plot.getY(), line.withAlpha (0.0f), 0.0f, plot.getBottom(), false));
+        g.fillPath (fill);
+        g.setColour (line);
+        g.strokePath (curve, juce::PathStrokeType (juce::jmax (1.2f, 1.5f * s)));
+        // the two corner frequencies, as handles on the curve
+        for (const auto hz : { lowHz, highHz })
+        {
+            const auto x = xOf (hz);
+            const auto y = yOf (rate * shelf (hz, lowHz, lowMult, true) * shelf (hz, highHz, highMult, false));
+            g.setColour (line.withAlpha (0.25f));
+            g.fillEllipse (juce::Rectangle<float> (14.0f * s, 14.0f * s).withCentre ({ x, y }));
+            g.setColour (line);
+            g.drawEllipse (juce::Rectangle<float> (9.0f * s, 9.0f * s).withCentre ({ x, y }), 1.4f);
+        }
+    }
+
     void paintDisplay (juce::Graphics& g, const LayoutItem& item, juce::Rectangle<float> r, const EffectSlot& fx)
     {
         using namespace theme;
         const auto s = scale();
         const juce::String id (item.display != nullptr ? item.display : "");
-        if (id != "faderscale") // round 137: the fader scale is bare text beside its fader
+        if (id != "faderscale" && id != "decayeq") // round 137: the fader scale is bare text beside its fader (tp172b4: the decay EQ lies on the field)
             skin::well (g, r, radius::md * s, fx.enabled ? accent : juce::Colours::transparentBlack);
         const auto curveColour = fx.enabled ? accent : colour::textDisabled;
         const auto inner = r.reduced (6.0f * s);
@@ -2384,6 +2513,11 @@ public:
                 g.setColour (bandColours[b].withAlpha (fx.enabled ? 0.9f : 0.3f));
                 g.drawHorizontalLine ((int) band.getY(), band.getX(), band.getRight());
             }
+        }
+        else if (id == "decayeq") // round tp172b4: LuxeVerb's Space engine — the decay time across the spectrum
+        {
+            paintDecayEq (g, r, fx);
+            return;
         }
         else if (id == "envelope") // decay shape of a reverb / delay tail
         {

@@ -194,6 +194,7 @@ private:
     void setMode (int newMode);
     AudioEngine& engine;
     std::array<float, 1024> samples {};
+    juce::Image scopeImage, scopeNative; // the oscilloscope's stroke, drawn in software, and its copy for the window (round 174e2)
     std::array<float, 256> history {};     // long view: one peak per 1/30 s, oldest first
     std::array<float, 128> bands {};       // spectrum: smoothed level per band, 0..1
     float peak = 0.0f, held = 0.0f;

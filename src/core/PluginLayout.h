@@ -35,7 +35,7 @@ enum class Item : std::uint8_t
 };
 
 // style flags
-enum : std::uint16_t
+enum : std::uint32_t
 {
     bipolar = 1 << 0,     // knob arc grows from the centre
     showValue = 1 << 1,   // the value is written under the caption (FL's compressor style)
@@ -54,9 +54,10 @@ enum : std::uint16_t
     momentary = 1 << 13,  // toggle: a push button (never shown lit); each click flips the value, which the engine reads
                           // as "pressed" (Nebula's Clear, round 129)
     plainMenu = 1 << 14,  // menu: just its value as text (the originals' "reverb mode: mono"); a click opens the menu
-    springBack = 1 << 14, // slider / knob: returns to its centre when released (a pitch bend wheel, round 173d)
-                          // (shares its bit with plainMenu: one is read on menus only, the other on sliders only)
     wordmark = 1 << 15,   // label: the plugin's name as a wide-spaced title; "a|b" = a light first word, a dark second
+    springBack = 1 << 16, // slider: returns to its centre when released (a pitch bend wheel, round 173d)
+    rangeEnds = 1 << 17,  // knob: its scale's two ends under it (left / right), the value there only while hovered or
+                          // dragged, the caption under that (round tp172b4: the reference reverb's knobs)
 };
 
 struct LayoutItem
@@ -67,7 +68,7 @@ struct LayoutItem
     const char* label = nullptr;       // caption / title (English; translated by the editor)
     const char* options = nullptr;     // radio / tabs: "|"-separated captions
     std::vector<float> values {};      // radio / tabs: the value of each option (empty = i / (n − 1))
-    std::uint16_t style = 0;
+    std::uint32_t style = 0;
     int page = -1;                     // only shown on this page (−1 = always)
     const char* display = nullptr;     // display: which graph ("limiter", "compressor", "eq", ...)
     int steps = 0;                     // discrete values: number of steps over 0..1 (stepper, stepped knobs)

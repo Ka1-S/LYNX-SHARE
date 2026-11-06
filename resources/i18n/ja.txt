@@ -52,6 +52,7 @@ countries: jp
 "Could not open" = "開けませんでした"
 "(imported from MIDI)" = "(MIDIからインポート)"
 "(imported from FL Studio)" = "(FL Studioからインポート)"
+"(imported from .als)" = "(.als から読み込み)"
 "Could not save" = "保存できませんでした"
 "File" = "ファイル"
 "Edit" = "編集"
@@ -7317,6 +7318,11 @@ countries: jp
 "{0} crashed. Save your project now (as a new file is safest)." = "{0} がクラッシュしました。今すぐプロジェクトを保存してください（新しいファイルとして保存するのが最も安全です）。"
 "Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "LYNX SHARE を動作させ続けるため、そのウィンドウを閉じました。プロジェクトを開き直すまで、プラグインが正しく動作しない可能性があります。"
 "Wheels" = "ホイール"
+"Animation rate" = "アニメーションレート"
+"Display (default)" = "ディスプレイ（既定）"
+"60 Hz" = "60 Hz"
+"30 Hz" = "30 Hz"
+"How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); 60 Hz or 30 Hz use less CPU on slower computers." = "再生ヘッド、メーター、スコープが動く頻度です。ディスプレイは画面のリフレッシュレートに合わせます（最も滑らか）。60 Hz または 30 Hz は低速なコンピューターで CPU 使用量を抑えます。"
 
 # round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"
@@ -7347,3 +7353,18 @@ countries: jp
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "トリムを連動：入力を回すと出力が逆に動き、ドライブを変えてもレベルが保たれます"
 "Input and Output move together on every channel of the group that has Group I/O on" = "グループI/Oがオンのグループ内全チャンネルで入力と出力が一緒に動きます"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel：LYNXのコンソールチャンネル。ノブをドラッグ、Alt+クリックでリセット、右クリックでオートメーション"
+
+# round 176a: the 32-bit plugin bridge
+"Native" = "ネイティブ"
+"32 bit" = "32 ビット"
+"64 bit" = "64 ビット"
+"Bit size" = "ビット数"
+"Which build of the plugin loads when both a 32-bit and a 64-bit one are installed" = "32 ビット版と 64 ビット版の両方がインストールされているときに読み込むプラグインのビルド"
+"32bit - bridged" = "32 ビット - ブリッジ"
+"64bit - bridged" = "64 ビット - ブリッジ"
+"64bit - native" = "64 ビット - ネイティブ"
+"A plugin" = "プラグイン"
+"{0} crashed in the 32-bit bridge." = "{0} が 32 ビットブリッジ内でクラッシュしました。"
+"{0} crashed in its separate process." = "{0} が別プロセス内でクラッシュしました。"
+"{0} stopped responding (separate process)." = "{0} が応答しなくなりました（別プロセス）。"
+"Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "影響を受けたのはそのプロセスだけです。LYNX SHARE とプロジェクトは動作を続け、プラグインはミュートされました。プロジェクトを保存してください。次に開いたときにプラグインは再び読み込まれます。"

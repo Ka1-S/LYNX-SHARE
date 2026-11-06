@@ -33,7 +33,7 @@ namespace
 {
 // --- builders (positions in FL's window pixels, body origin) -----------------------------------------
 
-LayoutItem section (float x, float y, float w, float h, const char* title, std::uint16_t style = 0)
+LayoutItem section (float x, float y, float w, float h, const char* title, std::uint32_t style = 0)
 {
     LayoutItem i;
     i.type = Item::section;
@@ -44,7 +44,7 @@ LayoutItem section (float x, float y, float w, float h, const char* title, std::
 }
 
 // a knob centred at (cx, cy), `d` wide, its caption centred at `captionY`
-LayoutItem knob (float cx, float cy, float d, const char* param, const char* caption, float captionY, std::uint16_t style = 0, int steps = 0)
+LayoutItem knob (float cx, float cy, float d, const char* param, const char* caption, float captionY, std::uint32_t style = 0, int steps = 0)
 {
     LayoutItem i;
     i.type = Item::knob;
@@ -61,7 +61,7 @@ LayoutItem knob (float cx, float cy, float d, const char* param, const char* cap
     return i;
 }
 
-LayoutItem label (float x, float y, float w, float h, const char* text, std::uint16_t style = 0)
+LayoutItem label (float x, float y, float w, float h, const char* text, std::uint32_t style = 0)
 {
     LayoutItem i;
     i.type = Item::label;
@@ -71,7 +71,7 @@ LayoutItem label (float x, float y, float w, float h, const char* text, std::uin
     return i;
 }
 
-LayoutItem value (float x, float y, float w, float h, const char* param, std::uint16_t style = alignLeft)
+LayoutItem value (float x, float y, float w, float h, const char* param, std::uint32_t style = alignLeft)
 {
     LayoutItem i;
     i.type = Item::value;
@@ -81,7 +81,7 @@ LayoutItem value (float x, float y, float w, float h, const char* param, std::ui
     return i;
 }
 
-LayoutItem slider (Item type, float x, float y, float w, float h, const char* param, const char* caption = nullptr, std::uint16_t style = 0)
+LayoutItem slider (Item type, float x, float y, float w, float h, const char* param, const char* caption = nullptr, std::uint32_t style = 0)
 {
     LayoutItem i;
     i.type = type;
@@ -103,7 +103,7 @@ LayoutItem radio (float x, float y, float w, float h, const char* param, const c
     return i;
 }
 
-LayoutItem tabs (float x, float y, float w, float h, const char* param, const char* options, std::vector<float> values = {}, std::uint16_t style = 0)
+LayoutItem tabs (float x, float y, float w, float h, const char* param, const char* options, std::vector<float> values = {}, std::uint32_t style = 0)
 {
     LayoutItem i;
     i.type = Item::tabs;
@@ -121,7 +121,7 @@ LayoutItem pageTabs (float x, float y, float w, float h, const char* options)
     return i;
 }
 
-LayoutItem toggle (float x, float y, float w, float h, const char* param, const char* caption, std::uint16_t style = 0)
+LayoutItem toggle (float x, float y, float w, float h, const char* param, const char* caption, std::uint32_t style = 0)
 {
     LayoutItem i;
     i.style = style;
@@ -539,6 +539,8 @@ Layout reeverb2()
     return l;
 }
 
+LayoutItem menuOf (float x, float y, float w, float h, const char* param, const char* caption, const char* options); // (below)
+
 Layout luxeVerb()
 {
     // INPUT | REVERB | PITCH | OUTPUT on top, ENVELOPE and the analyser below; every knob has its value on a plate above
@@ -547,7 +549,7 @@ Layout luxeVerb()
     l.width = 947;
     l.height = 456;
     auto& v = l.items;
-    const auto tile = [&v] (float cx, float cy, const char* param, const char* caption, float captionY, std::uint16_t style = 0) {
+    const auto tile = [&v] (float cx, float cy, const char* param, const char* caption, float captionY, std::uint32_t style = 0) {
         v.push_back (knob (cx, cy, 34, param, caption, captionY, style | valueAbove));
     };
     const auto fader = [&v] (float cx, const char* param, const char* caption) {
@@ -641,26 +643,33 @@ Layout luxeVerb()
     engineTabs.param = "Space engine";
     v.push_back (engineTabs);
     const auto sp = [&v] (LayoutItem i) { v.push_back (onPage (std::move (i), 1)); };
-    const auto dial = [&] (float cx, float cy, const char* param, const char* caption, std::uint16_t style = 0) {
-        sp (knob (cx, cy, 40, param, caption, cy + 30, style | valueAbove));
+    // round tp172b4: the Pro-R role's arrangement — one strip of knobs across the top (pre-delay, character,
+    // thickness, distance, the big SPACE with its decay rate beside it, brightness, width, mix; the style above
+    // character and thickness), the decay-rate EQ curve filling the rest with its four knobs in its lower corners.
+    // Values under the captions (and the decay time inside SPACE)
+    const auto dial = [&] (float cx, float cy, float d, const char* param, const char* caption, std::uint32_t style = 0, float w = 76.0f) {
+        auto i = knob (cx, cy, d, param, caption, cy + d * 0.5f + 20.0f, style | rangeEnds);
+        i.w = std::max (d, std::min (w, i.h)); // room for the caption and the value (the circle keeps its size: the height
+                                                // bounds it; never wider than tall, so no caption hides under a knob)
+        i.x = cx - i.w * 0.5f;
+        sp (std::move (i));
     };
-    sp (section (8, 18, 932, 230, TR_NOOP ("Reverb")));
-    sp (tabs (413, 40, 120, 16, "Space style", TR_NOOP ("Modern|Vintage|Plate")));
-    dial (70, 120, "Space pre-delay", TR_NOOP ("P. delay"));
-    dial (160, 120, "Space character", TR_NOOP ("Character"));
-    dial (250, 120, "Thickness", TR_NOOP ("Thickness"), bipolar);
-    dial (340, 120, "Distance", TR_NOOP ("Distance"));
-    v.push_back (onPage (value (433, 66, 80, 13, "Space", 0), 1));
-    sp (knob (473, 140, 84, "Space", TR_NOOP ("Space"), 196, big));
-    dial (473, 212, "Decay rate", TR_NOOP ("Decay rate"));
-    dial (606, 120, "Space brightness", TR_NOOP ("Brightness"), bipolar);
-    dial (696, 120, "Space width", TR_NOOP ("Width"));
-    dial (786, 120, "Space mix", TR_NOOP ("Mix"));
-    sp (section (8, 256, 932, 196, TR_NOOP ("Decay EQ")));
-    dial (120, 350, "Low decay", TR_NOOP ("Low decay"), bipolar);
-    dial (220, 350, "Low decay freq.", TR_NOOP ("Low freq"));
-    dial (727, 350, "High decay", TR_NOOP ("High decay"), bipolar);
-    dial (827, 350, "High decay freq.", TR_NOOP ("High freq"));
+    sp (menuOf (118, 22, 104, 18, "Space style", nullptr, TR_NOOP ("Modern|Vintage|Plate"))); // the reference's mode drop-down
+    dial (62, 84, 40, "Space pre-delay", TR_NOOP ("P. delay"));
+    dial (144, 84, 40, "Space character", TR_NOOP ("Character"));
+    dial (226, 84, 40, "Thickness", TR_NOOP ("Thickness"), bipolar);
+    dial (322, 80, 58, "Distance", TR_NOOP ("Distance"));
+    sp (knob (470, 92, 116, "Space", TR_NOOP ("Space"), 170, big));
+    v.push_back (onPage (value (420, 80, 100, 24, "Space", big), 1));
+    dial (566, 46, 32, "Decay rate", TR_NOOP ("Decay rate"), 0, 64.0f);
+    dial (636, 80, 58, "Space brightness", TR_NOOP ("Brightness"), bipolar);
+    dial (742, 84, 44, "Space width", TR_NOOP ("Width"));
+    dial (866, 84, 44, "Space mix", TR_NOOP ("Mix"));
+    sp (display (8, 186, 932, 266, "decayeq", "Decay rate"));
+    dial (64, 384, 32, "Low decay", TR_NOOP ("Low decay"), bipolar);
+    dial (140, 384, 32, "Low decay freq.", TR_NOOP ("Low freq"));
+    dial (808, 384, 32, "High decay", TR_NOOP ("High decay"), bipolar);
+    dial (884, 384, 32, "High decay freq.", TR_NOOP ("High freq"));
     return l;
 }
 
@@ -1763,7 +1772,7 @@ Layout vintagePhaser()
     fader (708, "Mix", TR_NOOP ("Mix"));
 
     // second page: the engine's other controls
-    auto adv = [&] (int k, const char* param, const char* caption, std::uint16_t style = 0) {
+    auto adv = [&] (int k, const char* param, const char* caption, std::uint32_t style = 0) {
         const auto cx = 50.0f + 92.0f * (float) (k % 8), cy = 82.0f + 70.0f * (float) (k / 8);
         v.push_back (onPage (knob (cx, cy, 34, param, caption, cy + 26, style | showValue), 1));
     };
@@ -1805,16 +1814,16 @@ Layout soundgoodizer()
 // same conventions (titled sections, knobs with captions and read-outs, the graph on top, switches as tabs). -------
 
 // a knob with its caption and its value under it (`d` wide, centred at cx, cy)
-LayoutItem dial (float cx, float cy, float d, const char* param, const char* caption, std::uint16_t style = 0)
+LayoutItem dial (float cx, float cy, float d, const char* param, const char* caption, std::uint32_t style = 0)
 {
-    return knob (cx, cy, d, param, caption, cy + d * 0.5f + 20.0f, (std::uint16_t) (style | showValue));
+    return knob (cx, cy, d, param, caption, cy + d * 0.5f + 20.0f, (std::uint32_t) (style | showValue));
 }
 
 // round tp172d (look slice): a hardware original's knob — the caption above, no value text (the drag tip shows it);
 // its printed range words go under it as labels
-LayoutItem hwKnob (float cx, float cy, float d, const char* param, const char* caption, std::uint16_t style = 0)
+LayoutItem hwKnob (float cx, float cy, float d, const char* param, const char* caption, std::uint32_t style = 0)
 {
-    auto k = knob (cx, cy, d, param, caption, cy + d * 0.5f + 7.0f, (std::uint16_t) (style | captionAbove));
+    auto k = knob (cx, cy, d, param, caption, cy + d * 0.5f + 7.0f, (std::uint32_t) (style | captionAbove));
     k.y -= 14.0f;
     k.h += 14.0f;
     return k;
@@ -2204,7 +2213,7 @@ Layout kilnLayout()
         const auto px = cx + rr * std::sin (a), py = cy - rr * std::cos (a);
         const auto w = 66.0f;
         const auto x = std::sin (a) < -0.3f ? px - w + 8.0f : std::sin (a) > 0.3f ? px - 8.0f : px - w * 0.5f;
-        v.push_back (label (x, py - 7.0f, w, 14, models[k], (std::uint16_t) (std::sin (a) > 0.3f ? alignLeft : 0)));
+        v.push_back (label (x, py - 7.0f, w, 14, models[k], (std::uint32_t) (std::sin (a) > 0.3f ? alignLeft : 0)));
     }
     v.push_back (dial (166, 488, 50, "Drive", TR_NOOP ("Drive")));
     v.push_back (knob (294, 488, 50, "Group", TR_NOOP ("Group"), 488 + 45.0f, showValue, 9));
@@ -2992,11 +3001,11 @@ Layout voiceShiftLayout()
     v.push_back (section (4, 4, 632, 264, nullptr, boxed)); // the face
     v.push_back (section (14, 14, 292, 204, nullptr, boxed));
     v.push_back (label (34, 24, 92, 22, TR_NOOP ("Pitch")));
-    v.push_back (knob (80, 102, 74, "Pitch", TR_NOOP ("Pitch"), 0, (std::uint16_t) (big | bipolar | noCaption)));
+    v.push_back (knob (80, 102, 74, "Pitch", TR_NOOP ("Pitch"), 0, (std::uint32_t) (big | bipolar | noCaption)));
     v.push_back (value (44, 172, 72, 26, "Pitch", boxed));
     v.push_back (toggle (117, 89, 74, 48, "Link", TR_NOOP ("Link"), captionAbove)); // tp172d: a small key on a line between the knobs, LINK under it
     v.push_back (label (182, 24, 92, 22, TR_NOOP ("Formant")));
-    v.push_back (knob (228, 102, 74, "Formant", TR_NOOP ("Formant"), 0, (std::uint16_t) (big | bipolar | noCaption)));
+    v.push_back (knob (228, 102, 74, "Formant", TR_NOOP ("Formant"), 0, (std::uint32_t) (big | bipolar | noCaption)));
     v.push_back (value (192, 172, 72, 26, "Formant", boxed));
     v.push_back (section (314, 14, 124, 204, TR_NOOP ("Mode")));
     v.push_back (radio (322, 50, 110, 112, "Mode", TR_NOOP ("Transpose|Quantize|Robot")));
@@ -3004,11 +3013,11 @@ Layout voiceShiftLayout()
     v.push_back (stepper (320, 168, 112, 34, "MIDI", TR_NOOP ("MIDI channel"), 129));
     v.push_back (section (446, 14, 180, 204, nullptr, boxed));
     v.push_back (label (458, 24, 76, 22, TR_NOOP ("Drive")));
-    v.push_back (knob (496, 104, 66, "Drive", TR_NOOP ("Drive"), 0, (std::uint16_t) (big | noCaption)));
+    v.push_back (knob (496, 104, 66, "Drive", TR_NOOP ("Drive"), 0, (std::uint32_t) (big | noCaption)));
     v.push_back (label (460, 140, 36, 14, TR_NOOP ("Min"), dim));
     v.push_back (label (498, 140, 36, 14, TR_NOOP ("Max"), dim));
     v.push_back (label (546, 24, 76, 22, TR_NOOP ("Mix")));
-    v.push_back (knob (584, 104, 66, "Mix", TR_NOOP ("Mix"), 0, (std::uint16_t) (big | noCaption)));
+    v.push_back (knob (584, 104, 66, "Mix", TR_NOOP ("Mix"), 0, (std::uint32_t) (big | noCaption)));
     v.push_back (label (548, 140, 36, 14, TR_NOOP ("Dry"), dim));
     v.push_back (label (586, 140, 36, 14, TR_NOOP ("Wet"), dim));
     v.push_back (label (14, 226, 300, 34, "voice|shift", plugui::wordmark));
@@ -3071,7 +3080,7 @@ Layout captionsAbove (Layout l)
     for (auto& i : l.items)
         if (i.type == Item::knob && (i.style & showValue) != 0 && (i.style & noCaption) == 0)
         {
-            i.style = (std::uint16_t) (i.style | captionAbove);
+            i.style = (std::uint32_t) (i.style | captionAbove);
             i.y -= 14.0f;
         }
     return l;
@@ -3591,7 +3600,7 @@ Layout spiralLayout()
     v.push_back (section (4, 4, 522, 202, nullptr, boxed));
     v.push_back (dial (54, 74, 46, "Mix", TR_NOOP ("Mix")));
     v.push_back (dial (134, 74, 46, "Delay", TR_NOOP ("Delay")));
-    v.push_back (dial (232, 82, 82, "Shift", TR_NOOP ("Shift"), (std::uint16_t) (big | bipolar)));
+    v.push_back (dial (232, 82, 82, "Shift", TR_NOOP ("Shift"), (std::uint32_t) (big | bipolar)));
     v.push_back (dial (330, 74, 46, "Feedback", TR_NOOP ("Feedback")));
     v.push_back (dial (402, 74, 46, "Low cut", TR_NOOP ("Low cut")));
     v.push_back (dial (474, 74, 46, "High cut", TR_NOOP ("High cut")));
@@ -4015,7 +4024,7 @@ Layout toxicMain()
             v.push_back (knob (367 + 38 * (float) j, 106 + 25 * (float) i, 21,
                                stored ("FM " + std::to_string (i + 1) + " to " + std::to_string (j + 1)), nullptr, 0, noCaption));
     }
-    struct Row { const char* caption; const char* field; float cy; std::uint16_t style; };
+    struct Row { const char* caption; const char* field; float cy; std::uint32_t style; };
     const Row rows[] = { { TR_NOOP ("Mix"), "mix", 262, 0 }, { TR_NOOP ("Pan"), "pan", 288, bipolar } };
     for (const auto& r : rows)
     {
@@ -4119,7 +4128,7 @@ Layout toxicMain()
     // FILTER
     v.push_back (section (208, 406, 504, 112, TR_NOOP ("Filter")));
     v.push_back (tabs (216, 426, 176, 20, "Filter mode", "Off|LP|BP|HP"));
-    struct K { float cx; const char* param; const char* caption; std::uint16_t style; };
+    struct K { float cx; const char* param; const char* caption; std::uint32_t style; };
     const K filter[] = { { 238, "Cutoff", TR_NOOP ("Cutoff"), big }, { 296, "Resonance", TR_NOOP ("Reso"), 0 },
                          { 350, "Key tracking", TR_NOOP ("Key trk"), 0 }, { 404, "Velocity tracking", TR_NOOP ("Vel trk"), 0 },
                          { 458, "Filter env amount", TR_NOOP ("EG amount"), bipolar }, { 512, "Filter LFO 1 amount", TR_NOOP ("LFO 1"), 0 } };
@@ -4181,7 +4190,7 @@ Layout poizoneMain()
     l.height = 486;
     auto& v = l.items;
     // a 40-pixel FL wheel at (left, top of the row) → LYNX knob with its caption
-    auto wheel = [&v] (float left, float rowTop, const char* param, const char* caption, std::uint16_t style = 0) {
+    auto wheel = [&v] (float left, float rowTop, const char* param, const char* caption, std::uint32_t style = 0) {
         v.push_back (knob (left + 20, rowTop + 18, 34, param, caption, rowTop + 46, style));
     };
     auto button = [&v] (float left, float rowTop, const char* param, const char* caption) {
@@ -4208,7 +4217,7 @@ Layout poizoneMain()
 
     // row 2: mod wheel, LFO, modulation envelope, amplifier envelope
     const float r2 = 86;
-    auto fader = [&v, r2] (float left, const char* param, const char* caption, std::uint16_t style = 0) {
+    auto fader = [&v, r2] (float left, const char* param, const char* caption, std::uint32_t style = 0) {
         v.push_back (slider (Item::vslider, left, r2 + 22, 25, 86, param, caption, style));
     };
     auto selector = [&v, r2] (float left, float w, const char* param, const char* options) {

@@ -56,6 +56,7 @@ countries: br
 "Could not open" = "Não foi possível abrir"
 "(imported from MIDI)" = "(importado de MIDI)"
 "(imported from FL Studio)" = "(importado do FL Studio)"
+"(imported from .als)" = "(importado de .als)"
 "Could not save" = "Não foi possível salvar"
 "File" = "Arquivo"
 "Edit" = "Editar"
@@ -7400,6 +7401,11 @@ countries: br
 "{0} crashed. Save your project now (as a new file is safest)." = "{0} travou. Salve seu projeto agora (como um arquivo novo é o mais seguro)."
 "Its window was closed so that LYNX SHARE could keep running. The plugin may not work properly until the project is opened again." = "A janela dele foi fechada para que o LYNX SHARE continuasse funcionando. O plugin pode não funcionar direito até o projeto ser aberto de novo."
 "Wheels" = "Rodas"
+"Animation rate" = "Taxa de animação"
+"Display (default)" = "Tela (padrão)"
+"60 Hz" = "60 Hz"
+"30 Hz" = "30 Hz"
+"How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); 60 Hz or 30 Hz use less CPU on slower computers." = "Com que frequência o cursor de reprodução, os medidores e os osciloscópios se movem. Tela segue a taxa de atualização do seu monitor (mais suave); 60 Hz ou 30 Hz usam menos CPU em computadores mais lentos."
 
 # round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"
@@ -7430,3 +7436,18 @@ countries: br
 "Links the trims: turning Input moves Output the other way, so the level stays while the drive changes" = "Liga os ajustes: girar a Entrada move a Saída ao contrário, mantendo o nível enquanto o drive muda"
 "Input and Output move together on every channel of the group that has Group I/O on" = "Entrada e Saída se movem juntas em todos os canais do grupo com E/S do grupo ligada"
 "Kiln Channel: LYNX's console channel. Drag a knob, Alt+click resets it, right-click for automation" = "Kiln Channel: o canal de console do LYNX. Arraste um botão, Alt+clique reinicia, clique direito para automação"
+
+# round 176a: the 32-bit plugin bridge
+"Native" = "Nativo"
+"32 bit" = "32 bits"
+"64 bit" = "64 bits"
+"Bit size" = "Tamanho em bits"
+"Which build of the plugin loads when both a 32-bit and a 64-bit one are installed" = "Qual versão do plugin carrega quando há uma de 32 bits e uma de 64 bits instaladas"
+"32bit - bridged" = "32 bits - em ponte"
+"64bit - bridged" = "64 bits - em ponte"
+"64bit - native" = "64 bits - nativo"
+"A plugin" = "Um plugin"
+"{0} crashed in the 32-bit bridge." = "{0} travou na ponte de 32 bits."
+"{0} crashed in its separate process." = "{0} travou no seu processo separado."
+"{0} stopped responding (separate process)." = "{0} parou de responder (processo separado)."
+"Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Só o processo dele foi afetado: o LYNX SHARE e o seu projeto continuaram rodando, e o plugin foi silenciado. Salve o projeto; o plugin carrega de novo na próxima vez que você abrir."
