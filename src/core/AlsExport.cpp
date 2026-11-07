@@ -12,6 +12,7 @@
 
 #include "core/AlsImport.h"
 #include "core/AlsSkeleton.h"
+#include "core/ClipLauncher.h"
 #include "core/Effects.h"
 #include "core/FlWrapper.h"
 #include "core/Gzip.h"
@@ -246,6 +247,7 @@ struct Exporter
     AlsExportResult& result;
     bool live11 = false;
     std::set<std::string> noted;
+    int sceneCount = 1; // the set's scenes: the clip grid's rows (round 181c), else one
 
     void note (const std::string& what)
     {
@@ -376,21 +378,28 @@ struct Exporter
         // save it empty; "List of group track freeze sequencer slots not empty" otherwise) [LIVE, DATA]
         if (auto* groupSlots = n.child ("Slots"); groupSlots != nullptr && ! groupSlots->kids.empty())
         {
-            Node slot = groupSlots->kids.front();
-            slot.set ("Id", "0");
+            const Node slot = groupSlots->kids.front();
             groupSlots->kids.clear();
-            groupSlots->add (std::move (slot));
+            for (int s = 0; s < sceneCount; ++s)
+            {
+                Node one = slot;
+                one.set ("Id", num (s));
+                groupSlots->add (std::move (one));
+            }
         }
-        // one clip slot per scene (one scene), in the main and the freeze sequencer [LIVE: §9 rule 6]
+        // one clip slot per scene, in the main and the freeze sequencer [LIVE: §9 rule 6]
         for (const auto* seq : { "DeviceChain/MainSequencer/ClipSlotList", "DeviceChain/FreezeSequencer/ClipSlotList" })
             if (auto* slots = n.at (seq))
             {
                 slots->kids.clear();
                 if (t.kind == LiveTrack::Kind::group)
                     continue;
-                Node slot = sk["ClipSlot"];
-                slot.set ("Id", "0");
-                slots->add (std::move (slot));
+                for (int s = 0; s < sceneCount; ++s)
+                {
+                    Node slot = sk["ClipSlot"];
+                    slot.set ("Id", num (s));
+                    slots->add (std::move (slot));
+                }
             }
         return n;
     }
@@ -573,6 +582,55 @@ struct Exporter
         return c;
     }
 
+    // ---- the clip grid → Session view (round 181c). Launch numbers as read in Live 12's Clip View [LIVE: REA_rodada181a.md]
+    void sessionSettings (Node& c, const ClipGridSlot& slot, double contentStart, double contentEnd)
+    {
+        if (! slot.name.empty())
+            c.value ("Name", slot.name);
+        if (slot.colour != 0)
+            c.value ("Color", num (std::max (0, alsColourIndex (slot.colour))));
+        c.value ("LaunchMode", num ((int) slot.mode));
+        c.value ("LaunchQuantisation", num ((int) slot.quant));
+        c.value ("Legato", boolean (slot.legato));
+        if (auto* loop = c.child ("Loop"))
+        {
+            loop->value ("LoopStart", num (contentStart));
+            loop->value ("LoopEnd", num (contentEnd));
+            loop->value ("StartRelative", "0");
+            loop->value ("LoopOn", boolean (slot.loop));
+            loop->value ("OutMarker", num (contentEnd));
+        }
+        const auto& f = slot.follow;
+        c.value ("FollowAction/FollowTime", num (beats (f.ticks)));
+        c.value ("FollowAction/IsLinked", boolean (f.linked));
+        c.value ("FollowAction/LoopIterations", num (f.iterations));
+        c.value ("FollowAction/FollowActionA", num ((int) f.a));
+        c.value ("FollowAction/FollowActionB", num ((int) f.b));
+        c.value ("FollowAction/FollowChanceA", num (f.chanceA));
+        c.value ("FollowAction/FollowChanceB", num (f.chanceB));
+        c.value ("FollowAction/JumpIndexA", num (f.jumpA)); // [INFERRED] a scene index, as the import reads it
+        c.value ("FollowAction/JumpIndexB", num (f.jumpB));
+        c.value ("FollowAction/FollowActionEnabled", boolean (f.enabled));
+    }
+
+    // The slot node of `scene` in a track's main clip slot list (nullptr past the list)
+    Node* sessionSlot (Node& track, int scene)
+    {
+        auto* slots = track.at ("DeviceChain/MainSequencer/ClipSlotList");
+        return slots != nullptr && scene >= 0 && scene < (int) slots->kids.size() ? &slots->kids[(std::size_t) scene] : nullptr;
+    }
+
+    // Puts a session clip in a slot; false when the slot already holds one (two LYNX clips met in one Live slot)
+    bool putSessionClip (Node& track, int scene, Node clip)
+    {
+        auto* slot = sessionSlot (track, scene);
+        auto* value = slot != nullptr ? slot->at ("ClipSlot/Value") : nullptr;
+        if (value == nullptr || ! value->kids.empty())
+            return false;
+        value->add (std::move (clip));
+        return true;
+    }
+
     // ---- automation
     void addEnvelope (Node& owner, const std::string& pointee, const std::vector<std::pair<double, double>>& events, int& envelopeId)
     {
@@ -623,8 +681,25 @@ struct Exporter
             else if (c.kind != ClipKind::pattern && c.kind != ClipKind::audio && c.kind != ClipKind::automation)
                 note ("Playlist clips of this kind are not exported (video, pattern blocks...)");
         }
+        // the clip grid → Session view (round 181c): one Live scene per grid row
+        std::vector<const Clip*> gridPatternClips, gridAudioClips;
+        const ClipGrid* grid = song.clipGrid ? &*song.clipGrid : nullptr;
+        if (grid != nullptr)
+            for (const auto& c : grid->clips)
+            {
+                if (c.length <= 0 || c.gridSlot < 0 || c.gridSlot >= (int) grid->slots.size())
+                    continue;
+                if (c.kind == ClipKind::pattern && c.pattern >= 0 && c.pattern < (int) song.patterns.size())
+                    gridPatternClips.push_back (&c);
+                else if (c.kind == ClipKind::audio && c.channel >= 0 && c.channel < (int) song.channels.size())
+                    gridAudioClips.push_back (&c);
+            }
+        const auto session = ! gridPatternClips.empty() || ! gridAudioClips.empty();
+        if (session)
+            sceneCount = std::clamp ((int) grid->scenes.size(), 1, launcher::maxScenes);
+
         Clip patternModeClip;
-        if (patternClips.empty() && audioClips.empty() && ! song.patterns.empty())
+        if (patternClips.empty() && audioClips.empty() && ! session && ! song.patterns.empty())
         {
             const auto cur = std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1);
             patternModeClip.pattern = cur;
@@ -633,6 +708,10 @@ struct Exporter
             note ("The song had no Playlist clips: the current pattern is exported at the start");
         }
         std::vector<bool> plays (song.channels.size(), false);
+        for (const auto* c : gridPatternClips)
+            for (const auto& n : song.patterns[(std::size_t) c->pattern].notes)
+                if (n.channel >= 0 && n.channel < (int) plays.size())
+                    plays[(std::size_t) n.channel] = true;
         for (const auto* c : patternClips)
             for (const auto& n : song.patterns[(std::size_t) c->pattern].notes)
                 if (n.channel >= 0 && n.channel < (int) plays.size())
@@ -663,6 +742,8 @@ struct Exporter
         }
         std::map<int, std::vector<const Clip*>> rows;
         for (const auto* c : audioClips)
+            rows[c->track].push_back (c);
+        for (const auto* c : gridAudioClips)
             rows[c->track].push_back (c);
         for (const auto& [row, clips] : rows)
         {
@@ -855,6 +936,20 @@ struct Exporter
                         if (has)
                             events->add (midiClip (p, t.channel, c->start, c->length, c->offset, c->muted, clipId++));
                     }
+                for (const auto* c : gridPatternClips)
+                {
+                    const auto& p = song.patterns[(std::size_t) c->pattern];
+                    const auto has = std::any_of (p.notes.begin(), p.notes.end(), [&] (const Note& x) {
+                        return x.channel == t.channel && x.start >= c->offset && x.start < c->offset + c->length;
+                    });
+                    if (! has)
+                        continue;
+                    const auto& slot = grid->slots[(std::size_t) c->gridSlot];
+                    Node clip = midiClip (p, t.channel, 0, c->length, c->offset, c->muted, clipId++);
+                    sessionSettings (clip, slot, 0.0, beats (c->length));
+                    if (! putSessionClip (n, slot.scene, std::move (clip)))
+                        note ("Grid clips of one channel in the same scene: only the first is exported (" + ch.name + ")");
+                }
             }
             else if (t.kind == LiveTrack::Kind::audio)
             {
@@ -862,6 +957,39 @@ struct Exporter
                     for (const auto* c : audioClips)
                         if (c->track == t.row)
                             events->add (audioClip (*c, clipId++));
+                for (const auto* c : gridAudioClips)
+                    if (c->track == t.row)
+                    {
+                        const auto& slot = grid->slots[(std::size_t) c->gridSlot];
+                        Node clip = audioClip (*c, clipId++);
+                        const auto from = beats (c->offset) + (double) c->offsetFraction / ppq;
+                        sessionSettings (clip, slot, from, from + beats (c->length));
+                        putSessionClip (n, slot.scene, std::move (clip));
+                    }
+            }
+            // an empty slot without its stop button: the Playlist track's (an instrument track's channel, or the row
+            // of the channel's first grid clip)
+            if (session && (t.kind == LiveTrack::Kind::midi || t.kind == LiveTrack::Kind::audio))
+            {
+                auto row = t.kind == LiveTrack::Kind::audio ? t.row : -1;
+                for (std::size_t r = 0; row < 0 && r < song.playlistTracks.size(); ++r)
+                    if (song.playlistTracks[r].mode == PlaylistTrackMode::instrument && song.playlistTracks[r].channel == t.channel)
+                        row = (int) r;
+                for (const auto* c : gridPatternClips)
+                {
+                    if (row >= 0)
+                        break;
+                    for (const auto& x : song.patterns[(std::size_t) c->pattern].notes)
+                        if (x.channel == t.channel)
+                        {
+                            row = c->track;
+                            break;
+                        }
+                }
+                for (int sc = 0; row >= 0 && sc < sceneCount; ++sc)
+                    if (auto* slot = sessionSlot (n, sc); slot != nullptr && ! launcher::hasStopButton (*grid, row, sc))
+                        if (const auto* v = slot->at ("ClipSlot/Value"); v != nullptr && v->kids.empty())
+                            slot->value ("HasStop", "false");
             }
             if (t.ownsInsert)
                 insertEffects (n, t.insert);
@@ -906,10 +1034,32 @@ struct Exporter
         if (auto* scenes = set.child ("Scenes"))
         {
             scenes->kids.clear();
-            Node s = sk["Scene"];
-            s.set ("Id", "0");
-            scenes->add (std::move (s));
+            for (int i = 0; i < sceneCount; ++i)
+            {
+                Node s = sk["Scene"];
+                s.set ("Id", num (i));
+                if (session && i < (int) grid->scenes.size())
+                {
+                    const auto& g = grid->scenes[(std::size_t) i];
+                    s.value ("Name", g.name);
+                    s.value ("Color", g.colour != 0 ? num (std::max (0, alsColourIndex (g.colour))) : std::string ("-1"));
+                    if (g.tempo > 0.0)
+                    {
+                        s.value ("Tempo", num (g.tempo));
+                        s.value ("IsTempoEnabled", "true");
+                    }
+                    if (g.beatsPerBar > 0)
+                    {
+                        s.value ("TimeSignatureId", num (alsTimeSignatureCode (g.beatsPerBar, 4)));
+                        s.value ("IsTimeSignatureEnabled", "true");
+                    }
+                }
+                scenes->add (std::move (s));
+            }
         }
+        // the set-wide quantisation has no Global entry: Live's number is the clip number − 1 [LIVE: 9 = 1/8]
+        if (session && grid->globalQuant != LaunchQuant::global)
+            set.value ("GlobalQuantisation", num ((int) grid->globalQuant - 1));
         if (auto* locs = set.at ("Locators/Locators"))
         {
             locs->kids.clear();

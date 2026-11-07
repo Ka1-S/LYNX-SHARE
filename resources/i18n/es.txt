@@ -7833,3 +7833,6 @@ countries: es mx ar co cl pe ve
 "There are no audio clip channels selected." = "No hay canales de clip de audio seleccionados."
 "Change declicking mode?" = "¿Cambiar el modo de declicking?"
 "Change the declicking mode of all selected audio clip channels?" = "¿Cambiar el modo de declicking de todos los canales de clip de audio seleccionados?"
+"Session clips of Live sets" = "Clips de sesión de sets de Live"
+"Clip grid (default)" = "Cuadrícula de clips (predeterminado)"
+"Playlist, after the arrangement" = "Playlist, después del arreglo"

@@ -8,6 +8,7 @@
 #include <set>
 #include <unordered_map>
 
+#include "core/ClipLauncher.h"
 #include "core/FlWrapper.h"
 #include "core/Gzip.h"
 #include "core/MissingFiles.h"
@@ -493,12 +494,12 @@ std::vector<Pass> passesOf (const ClipLoop& loop, double length)
     return passes;
 }
 
-int patternFromMidiClip (Ctx& ctx, const Element& clip, int channel, double length)
+int patternFromMidiClip (Ctx& ctx, const Element& clip, int channel, double length, const ClipLoop* loopOverride = nullptr)
 {
     Pattern p;
     p.name = clip.value ("Name");
     p.colour = alsColour ((int) clip.number ("Color", -1));
-    const auto passes = passesOf (loopOf (clip), length);
+    const auto passes = passesOf (loopOverride != nullptr ? *loopOverride : loopOf (clip), length);
     for (const auto& keyTrack : clip.path ("Notes/KeyTracks").children ("KeyTrack"))
     {
         const auto key = (int) keyTrack.number ("MidiKey", 60);
@@ -562,7 +563,9 @@ int audioChannelFor (Ctx& ctx, const std::string& path, int mixerTrack, int warp
     return index;
 }
 
-void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, double at, double length, const std::string& user)
+// `out`: the clips go there instead of the Playlist; `loopOverride`: the content played instead of the clip's own Loop
+void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, double at, double length, const std::string& user,
+                   std::vector<Clip>* out = nullptr, const ClipLoop* loopOverride = nullptr)
 {
     const auto path = ctx.resolveSample (clip.child ("SampleRef"), "Audio clip: " + user);
     if (path.empty() || length <= 0)
@@ -613,7 +616,7 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
         beatsPitch = bakePitch ? transpose : 0.0;
     }
     const auto channel = audioChannelFor (ctx, path, mixerTrack, mode, warped, fileBeats, beatsPitch);
-    const auto loop = loopOf (clip);
+    const auto loop = loopOverride != nullptr ? *loopOverride : loopOf (clip);
     // not warped: the loop values are seconds [DATA: IsWarped=false clips]; the clip length is in beats either way
     auto unwarpedLoop = loop;
     if (! warped)
@@ -641,22 +644,41 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
             c.fadeIn = std::clamp (ticksOf (clip.number ("Fades/FadeInLength", 0)), (std::int64_t) 0, c.length);
         if (&pass == &passes.back())
             c.fadeOut = std::clamp (ticksOf (clip.number ("Fades/FadeOutLength", 0)), (std::int64_t) 0, c.length);
-        ctx.song.playlist.push_back (c);
+        (out != nullptr ? *out : ctx.song.playlist).push_back (c);
     }
 }
 
-void addMidiClip (Ctx& ctx, const Element& clip, int row, int channel, double at, double length)
+void addMidiClip (Ctx& ctx, const Element& clip, int row, int channel, double at, double length, std::vector<Clip>* out = nullptr,
+                  const ClipLoop* loopOverride = nullptr)
 {
     if (length <= 0)
         return;
     Clip c;
     c.kind = ClipKind::pattern;
-    c.pattern = patternFromMidiClip (ctx, clip, channel, length);
+    c.pattern = patternFromMidiClip (ctx, clip, channel, length, loopOverride);
     c.track = row;
     c.start = ticksOf (at);
     c.length = ticksOf (length);
     c.muted = clip.boolean ("Disabled", false);
-    ctx.song.playlist.push_back (c);
+    (out != nullptr ? *out : ctx.song.playlist).push_back (c);
+}
+
+// A clip's or scene's FollowAction block [DATA: section 5; numbers LIVE: REA_rodada181a.md, read in Live 12's Clip View]
+ClipFollow followOf (const Element& f)
+{
+    ClipFollow c;
+    c.enabled = f.boolean ("FollowActionEnabled", false);
+    c.a = (FollowKind) std::clamp ((int) f.number ("FollowActionA", 4), 0, 9);
+    c.b = (FollowKind) std::clamp ((int) f.number ("FollowActionB", 0), 0, 9); // [INFERRED] B uses A's numbers
+    c.chanceA = std::clamp ((int) std::lround (f.number ("FollowChanceA", 100)), 0, 100);
+    c.chanceB = std::clamp ((int) std::lround (f.number ("FollowChanceB", 0)), 0, 100);
+    // [INFERRED] the jump target is the scene index (LYNX's jump row); not yet read in Live
+    c.jumpA = std::clamp ((int) f.number ("JumpIndexA", 0), 0, launcher::maxScenes - 1);
+    c.jumpB = std::clamp ((int) f.number ("JumpIndexB", 0), 0, launcher::maxScenes - 1);
+    c.linked = f.boolean ("IsLinked", true);
+    c.iterations = std::clamp ((int) std::lround (f.number ("LoopIterations", 1)), 1, 999);
+    c.ticks = std::max<std::int64_t> (1, ticksOf (f.number ("FollowTime", 4)));
+    return c;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -722,6 +744,108 @@ void registerMixerTargets (Ctx& ctx, const Element& mixer, int insert, const std
     if (const auto id = targetId (mixer.child ("Pan")); ! id.empty())
         ctx.targets[id] = { AutomationTarget { AutomationTargetKind::mixerPan, insert, 0, 0 }, ValueMap::pan, "pan" };
     (void) name;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Session view → the clip grid (round 181c). Each track's ClipSlotList holds one ClipSlot per scene [DATA: section 5];
+// launch settings use the numbers read in Live 12's Clip View [LIVE: REA_rodada181a.md]. A grid clip plays one pass of
+// what Live loops: a looping clip becomes its loop region with the slot's Loop on, a one-shot its start…end span.
+void sessionToGrid (Ctx& ctx, const Element& set, const std::vector<Element>& tracks, const std::vector<int>& rowOf,
+                    const std::vector<int>& channelOf, const std::vector<int>& insertOf, const std::vector<Element>& scenes)
+{
+    auto& song = ctx.song;
+    bool any = false;
+    for (std::size_t i = 0; i < tracks.size(); ++i)
+    {
+        const auto kind = tracks[i].name();
+        if (rowOf[i] < 0 || (kind != "MidiTrack" && kind != "AudioTrack"))
+            continue;
+        const auto list = tracks[i].path ("DeviceChain/MainSequencer/ClipSlotList").children ("ClipSlot");
+        for (std::size_t s = 0; s < list.size(); ++s)
+        {
+            if ((int) s >= launcher::maxScenes)
+            {
+                ctx.note (&FlpImportReport::unsupported, "Session scenes past LYNX's grid limit");
+                break;
+            }
+            bool placed = false;
+            for (const auto& clip : list[s].path ("ClipSlot/Value").children())
+            {
+                if (clip.name() != "MidiClip" && clip.name() != "AudioClip")
+                    continue;
+                const auto own = loopOf (clip);
+                auto body = own;
+                if (own.on)
+                {
+                    body.start = own.loopStart;
+                    body.end = own.loopEnd;
+                    if (std::abs (own.start - own.loopStart) > 1e-6)
+                        ctx.note (&FlpImportReport::approximated, "Session clip whose start marker is inside its loop (it starts at the loop start)");
+                }
+                body.on = false; // one pass: the grid's Loop repeats the clip
+                auto length = body.end - body.start;
+                if (clip.name() == "AudioClip" && ! clip.boolean ("IsWarped", true))
+                    length *= song.bpm / 60.0; // an unwarped clip's loop values are seconds [DATA]
+                if (length <= 1e-9)
+                    continue;
+                std::vector<Clip> made;
+                if (clip.name() == "MidiClip" && channelOf[i] >= 0)
+                    addMidiClip (ctx, clip, rowOf[i], channelOf[i], 0.0, length, &made, &body);
+                else if (clip.name() == "AudioClip")
+                    addAudioClip (ctx, clip, rowOf[i], insertOf[i], 0.0, length, song.mixer[(std::size_t) insertOf[i]].name, &made, &body);
+                if (made.empty())
+                    continue;
+                const auto id = launcher::setClip (song, rowOf[i], (int) s, made.front());
+                if (id < 0)
+                {
+                    ctx.note (&FlpImportReport::unsupported, "Session clips past LYNX's grid limits");
+                    continue;
+                }
+                auto& slot = song.clipGrid->slots[(std::size_t) id];
+                slot.name = clip.value ("Name");
+                slot.colour = alsColour ((int) clip.number ("Color", -1));
+                slot.mode = (LaunchMode) std::clamp ((int) clip.number ("LaunchMode", 0), 0, 3);
+                slot.quant = (LaunchQuant) std::clamp ((int) clip.number ("LaunchQuantisation", 0), 0, 14);
+                slot.legato = clip.boolean ("Legato", false);
+                slot.loop = own.on;
+                slot.follow = followOf (clip.child ("FollowAction"));
+                any = placed = true;
+                break; // one clip per slot
+            }
+            if (! placed && ! list[s].boolean ("HasStop", true))
+            {
+                launcher::ensureGrid (song);
+                launcher::setStopButton (song, rowOf[i], (int) s, false);
+            }
+        }
+    }
+    if (! any)
+    {
+        song.clipGrid.reset(); // only stop buttons, no clip: a set without Session clips adds no grid
+        return;
+    }
+    auto& grid = launcher::ensureGrid (song);
+    if (grid.scenes.size() < scenes.size())
+        grid.scenes.resize (std::min<std::size_t> (scenes.size(), (std::size_t) launcher::maxScenes));
+    for (std::size_t s = 0; s < scenes.size() && s < grid.scenes.size(); ++s)
+    {
+        auto& sc = grid.scenes[s];
+        sc.name = scenes[s].value ("Name");
+        sc.colour = alsColour ((int) scenes[s].number ("Color", -1));
+        if (scenes[s].boolean ("IsTempoEnabled", false))
+            sc.tempo = std::clamp (scenes[s].number ("Tempo", 120), 10.0, 999.0);
+        int n = 4, d = 4;
+        if (scenes[s].boolean ("IsTimeSignatureEnabled", false) && alsTimeSignature ((int) scenes[s].number ("TimeSignatureId", 201), n, d))
+        {
+            sc.beatsPerBar = n;
+            if (d != 4)
+                ctx.note (&FlpImportReport::approximated, "Scene time signatures other than n/4 (the numerator is kept)");
+        }
+        if (scenes[s].boolean ("FollowAction/FollowActionEnabled", false))
+            ctx.note (&FlpImportReport::unsupported, "Scene follow actions");
+    }
+    // the set-wide value has no Global entry: a clip's number is that + 1 [LIVE: 9 = 1/8 = clip 10]
+    grid.globalQuant = (LaunchQuant) std::clamp ((int) set.number ("GlobalQuantisation", 4) + 1, 1, 14);
 }
 } // namespace
 
@@ -1111,56 +1235,62 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
             ctx.note (&FlpImportReport::unsupported, "Take lanes (only the main lane is kept)");
     }
 
-    // Session clips: after the arrangement, one section per scene [the user's choice, 2026-11-06]
-    std::int64_t end = 0;
-    for (const auto& c : song.playlist)
-        end = std::max (end, c.end());
-    const auto bar = den == 4 ? (std::int64_t) song.beatsPerBar * ppq : (std::int64_t) num * ppq * 4 / den;
-    const auto roundUp = [bar] (std::int64_t t) { return bar > 0 ? (t + bar - 1) / bar * bar : t; };
-    auto cursor = roundUp (end);
+    // Session clips: on the Playlist after the arrangement, one section per scene [the user's choice, 2026-11-06], or
+    // (round 181c, the default) in the clip grid
     const auto scenes = set.child ("Scenes").children ("Scene");
-    for (std::size_t s = 0; s < std::max<std::size_t> (scenes.size(), 1); ++s)
+    if (options.sessionOnPlaylist)
     {
-        double longest = 0;
-        struct Slot
+        std::int64_t end = 0;
+        for (const auto& c : song.playlist)
+            end = std::max (end, c.end());
+        const auto bar = den == 4 ? (std::int64_t) song.beatsPerBar * ppq : (std::int64_t) num * ppq * 4 / den;
+        const auto roundUp = [bar] (std::int64_t t) { return bar > 0 ? (t + bar - 1) / bar * bar : t; };
+        auto cursor = roundUp (end);
+        for (std::size_t s = 0; s < std::max<std::size_t> (scenes.size(), 1); ++s)
         {
-            std::size_t track;
-            Element clip;
-        };
-        std::vector<Slot> slots;
-        for (std::size_t i = 0; i < tracks.size(); ++i)
-        {
-            const auto list = tracks[i].path ("DeviceChain/MainSequencer/ClipSlotList").children ("ClipSlot");
-            if (s >= list.size())
+            double longest = 0;
+            struct Slot
+            {
+                std::size_t track;
+                Element clip;
+            };
+            std::vector<Slot> slots;
+            for (std::size_t i = 0; i < tracks.size(); ++i)
+            {
+                const auto list = tracks[i].path ("DeviceChain/MainSequencer/ClipSlotList").children ("ClipSlot");
+                if (s >= list.size())
+                    continue;
+                const auto value = list[s].path ("ClipSlot/Value");
+                for (const auto& clip : value.children())
+                    if (clip.name() == "MidiClip" || clip.name() == "AudioClip")
+                    {
+                        slots.push_back ({ i, clip });
+                        longest = std::max (longest, clip.number ("CurrentEnd", 0) - clip.number ("CurrentStart", 0));
+                    }
+            }
+            if (slots.empty())
                 continue;
-            const auto value = list[s].path ("ClipSlot/Value");
-            for (const auto& clip : value.children())
-                if (clip.name() == "MidiClip" || clip.name() == "AudioClip")
-                {
-                    slots.push_back ({ i, clip });
-                    longest = std::max (longest, clip.number ("CurrentEnd", 0) - clip.number ("CurrentStart", 0));
-                }
+            const auto at = (double) cursor / ppq;
+            for (const auto& [i, clip] : slots)
+            {
+                const auto length = clip.number ("CurrentEnd", 0) - clip.number ("CurrentStart", 0);
+                if (clip.name() == "MidiClip" && channelOf[i] >= 0)
+                    addMidiClip (ctx, clip, rowOf[i], channelOf[i], at, length);
+                else if (clip.name() == "AudioClip" && rowOf[i] >= 0)
+                    addAudioClip (ctx, clip, rowOf[i], insertOf[i], at, length, song.mixer[(std::size_t) insertOf[i]].name);
+            }
+            Marker m;
+            m.tick = cursor;
+            m.name = s < scenes.size() ? scenes[s].value ("Name") : std::string();
+            if (m.name.empty())
+                m.name = "Scene " + std::to_string (s + 1);
+            song.addMarker (m);
+            cursor = roundUp (cursor + std::max<std::int64_t> (bar, ticksOf (longest)));
+            ctx.note (&FlpImportReport::approximated, "Session clips (placed after the arrangement, one section per scene)");
         }
-        if (slots.empty())
-            continue;
-        const auto at = (double) cursor / ppq;
-        for (const auto& [i, clip] : slots)
-        {
-            const auto length = clip.number ("CurrentEnd", 0) - clip.number ("CurrentStart", 0);
-            if (clip.name() == "MidiClip" && channelOf[i] >= 0)
-                addMidiClip (ctx, clip, rowOf[i], channelOf[i], at, length);
-            else if (clip.name() == "AudioClip" && rowOf[i] >= 0)
-                addAudioClip (ctx, clip, rowOf[i], insertOf[i], at, length, song.mixer[(std::size_t) insertOf[i]].name);
-        }
-        Marker m;
-        m.tick = cursor;
-        m.name = s < scenes.size() ? scenes[s].value ("Name") : std::string();
-        if (m.name.empty())
-            m.name = "Scene " + std::to_string (s + 1);
-        song.addMarker (m);
-        cursor = roundUp (cursor + std::max<std::int64_t> (bar, ticksOf (longest)));
-        ctx.note (&FlpImportReport::approximated, "Session clips (placed after the arrangement, one section per scene)");
     }
+    else
+        sessionToGrid (ctx, set, tracks, rowOf, channelOf, insertOf, scenes);
 
     // drum racks: one sampler channel per pad (as an FL drum sampler); later channels shift, so from the last one
     for (std::size_t i = tracks.size(); i-- > 0;)

@@ -7833,3 +7833,6 @@ countries: nl be
 "There are no audio clip channels selected." = "Er zijn geen audioclipkanalen geselecteerd."
 "Change declicking mode?" = "Declickingmodus wijzigen?"
 "Change the declicking mode of all selected audio clip channels?" = "De declickingmodus van alle geselecteerde audioclipkanalen wijzigen?"
+"Session clips of Live sets" = "Sessieclips uit Live-sets"
+"Clip grid (default)" = "Clipraster (standaard)"
+"Playlist, after the arrangement" = "Playlist, na het arrangement"

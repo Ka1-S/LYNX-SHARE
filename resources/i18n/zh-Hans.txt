@@ -7833,3 +7833,6 @@ countries: cn sg
 "There are no audio clip channels selected." = "未选择音频片段通道。"
 "Change declicking mode?" = "更改去咔嗒模式?"
 "Change the declicking mode of all selected audio clip channels?" = "更改所有所选音频片段通道的去咔嗒模式?"
+"Session clips of Live sets" = "Live 工程的会话片段"
+"Clip grid (default)" = "片段网格（默认）"
+"Playlist, after the arrangement" = "播放列表，编曲之后"

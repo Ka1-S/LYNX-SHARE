@@ -1514,10 +1514,12 @@ public:
 
         if (args.contains ("--gridshot"))
         {
-            // LYNX.exe --gridshot prefix: the Clip-launch workflow's layout off-screen, with a grid of sample clips, some
-            // playing and waiting, at the size of LYNX_SNAPSHOT_SIZE (round 181a)
+            // LYNX.exe --gridshot prefix [project]: the Clip-launch workflow's layout off-screen, with a grid of sample
+            // clips, some playing and waiting, at the size of LYNX_SNAPSHOT_SIZE (round 181a); with a project (.lynx,
+            // .flp, .als), that project's grid instead (round 181c: a Live set's Session view as LYNX imports it)
             const auto i = args.indexOf ("--gridshot");
-            runGridShot (args[i + 1].unquoted());
+            const auto project = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String();
+            runGridShot (args[i + 1].unquoted(), project);
             quit();
             return;
         }
@@ -9239,7 +9241,7 @@ private:
         }
     }
 
-    void runGridShot (const juce::String& prefix)
+    void runGridShot (const juce::String& prefix, const juce::String& projectPath = {})
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         lynx::AudioEngine offline (false);
@@ -9253,6 +9255,23 @@ private:
             juce::PNGImageFormat().writeImageToStream (ui.createComponentSnapshot (ui.getLocalBounds(), true, 1.0f), out);
         };
         ui.selectTabForSnapshot (2); // the Playlist panel, maximized
+        if (projectPath.isNotEmpty())
+        {
+            ui.openFile (juce::File (projectPath));
+            offline.dispatchPendingMessages();
+            ui.setClipLaunchWorkflow (true);
+            offline.dispatchPendingMessages();
+            write ("file-both");
+            ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
+            write ("file-grid");
+            const auto& song = offline.getSong();
+            juce::String info;
+            info << "grid " << (song.clipGrid ? "yes" : "no") << ", clips " << (song.clipGrid ? (int) song.clipGrid->clips.size() : 0)
+                 << ", scenes " << (song.clipGrid ? (int) song.clipGrid->scenes.size() : 0) << ", playlist clips " << (int) song.playlist.size() << "\n";
+            juce::File (prefix + "-file.txt").replaceWithText (info);
+            ui.setClipLaunchWorkflow (false);
+            return;
+        }
         write ("pattern"); // Pattern workflow: nothing of the grid exists yet
         const auto madeBefore = lynx::launcher::Runtime::instances.load();
 

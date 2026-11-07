@@ -7833,3 +7833,6 @@ countries: id
 "There are no audio clip channels selected." = "Tidak ada saluran klip audio yang dipilih."
 "Change declicking mode?" = "Ubah mode declicking?"
 "Change the declicking mode of all selected audio clip channels?" = "Ubah mode declicking semua saluran klip audio yang dipilih?"
+"Session clips of Live sets" = "Klip sesi dari set Live"
+"Clip grid (default)" = "Kisi klip (bawaan)"
+"Playlist, after the arrangement" = "Playlist, setelah aransemen"

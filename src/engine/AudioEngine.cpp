@@ -2922,6 +2922,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                 AlsImportOptions alsOptions;
                 alsOptions.common = options;
                 alsOptions.libraryRoots = liveLibraryRoots();
+                alsOptions.sessionOnPlaylist = alsSessionOnPlaylist.load();
                 std::string alsError;
                 auto song = importAls (std::vector<std::uint8_t> (fileBytes, fileBytes + data.getSize()), alsOptions, &alsError);
                 if (! song)
