@@ -523,4 +523,43 @@ void scheduleSong (const Song& song, double startTick, int numSamples, double tp
 
     out.sortByOffset();
 }
+void scheduleSongAround (const Song& song, const TrackMask& taken, const TrackMask& givenBack, double startTick, int numSamples,
+                         double tps, EventBuffer& out, bool resume, const ScheduleIndex* index, bool wrap, bool chase) noexcept
+{
+    if (taken.none() && givenBack.none())
+        return scheduleSong (song, startTick, numSamples, tps, out, resume, index, wrap, chase);
+    if (numSamples <= 0 || tps <= 0.0 || song.playlist.empty())
+        return;
+
+    const auto endTick = startTick + numSamples * tps;
+    auto loop = index != nullptr ? index->songLength : song.songLength();
+    if (! wrap)
+        loop = std::max<std::int64_t> (loop, (std::int64_t) std::ceil (endTick) + 1) * 2;
+    const auto loopStart = std::fmod (startTick, (double) loop);
+    const auto loopEnd = loopStart + (endTick - startTick);
+    const auto zoneEnd = song.performanceZoneEnd();
+
+    for (std::size_t clipIndex = 0; clipIndex < song.playlist.size(); ++clipIndex)
+    {
+        const auto& clip = song.playlist[clipIndex];
+        if (clip.muted || song.isTrackMuted (clip.track) || clip.start < zoneEnd)
+            continue;
+        const auto inMask = clip.track >= 0 && clip.track < scheduleMaskTracks;
+        if (inMask && taken[(std::size_t) clip.track])
+        {
+            // only the ends: what the track was sounding still stops
+            const auto first = out.size();
+            scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, false, index, out);
+            auto kept = first;
+            for (int i = first; i < out.size(); ++i)
+                if (out[i].type == NoteEvent::Type::off)
+                    out.at (kept++) = out[i];
+            out.resize (kept);
+            continue;
+        }
+        const auto back = inMask && givenBack[(std::size_t) clip.track];
+        scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume || back, index, out, chase || back);
+    }
+    out.sortByOffset();
+}
 } // namespace lynx
