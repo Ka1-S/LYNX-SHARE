@@ -139,13 +139,14 @@ showed about 17–145). Cause in section 3.5c.
 | build | before | after |
 |---|---|---|
 | 0.1.24 | 28 / 30 | 34 / 35 |
-| base (s2d) | 76 / 72 | 75 / 76 |
+| base (s2d), rbase | 76 / 72 | 75 / 76 |
+| base commit with paint log, bl2 (cloud exe) | 70.1 / 72.8 | 32.0 / 31.5 |
 | n6 (174f-1) | 92 / 97 | 35 / 31 |
 | n6, `LYNX_ZOOM_SCALE=0` | 84 / 87 | 32 / 33 |
 | n8 with paint log (l1) | 82 / 88 | 30.8 / 28.9 |
 | n9 with the fix (n94, cloud exe) | 80.4 / 84.7 | 90.9 / 93.4 |
 
-Before and after compare within a row. The n94 row comes from a cloud-built exe and the others from local builds, so its fps should not be compared with theirs. None of these is a final figure.
+Before and after compare within a row. The n94 and bl2 rows come from cloud-built exes and the others from local builds, so their fps should not be compared with the local rows. None of these is a final figure.
 
 **Cause, from `LYNX_CACHE_LOG` (l1, 11808 paints).** After the zoom, the scroll frames alternate between ticks 50154.321 and 50462.963 at one zoom (0.002592 px per tick), that is 130.0 and 130.8 px, with
 dxExact +0.8 / -0.8. Each is rejected by `cacheShift` as not a whole pixel and painted whole (reason `dx-fraction`, 428 paints in the session, about 24–33 ms each). `cacheShift` was right to refuse; the view
@@ -166,9 +167,9 @@ This fits q2, whose view stayed at bar 1 (whole pixels); q2 was not re-run with 
 **Second bug, same test.** A sideways glide into the end of the song never finished without the fix (13 moves in 400 frames): the target was rounded past the end, the scroll bar clamped the view short of it, and
 the glide went on trying. The glide now takes the clamped position as its target.
 
-**Not explained: why base does not drop.** Base has the same `glideFrame`, and an exact paint of this size costs about the same, so 75 fps there does not fit the flip. A base build with a paint log (bl1) aborted
-before its zoom runs (another round's `--no-window` LYNX took the foreground; the guard stopped the session). This is about the history and does not change the fix. 174f-1 is the first build measured with the drop; what
-in it exposes the flip is unknown.
+**Base has the same flip; the earlier base row does not repeat.** A build of base's commit (c75e99267) with a paint log, session bl2, same sequence: wheel 70.1 / 72.8 before the zoom runs, 32.0 / 31.5 after (load 25–34), with
+ticks alternating between the same two values, 50154.3 and 50463.0. So the flip dates from 174e2 (c258fd7fb, which added the whole-pixel rounding), not 174f-1. The rbase row above (75 / 76 after) is not reproduced by this run and remains unexplained: rbase used the local `base` exe,
+bl2 a cloud build, with no log in rbase to compare. An earlier attempt (bl1) aborted before its zoom runs, when another round's `--no-window` LYNX took the foreground and the guard stopped the session.
 
 ### 3.5d Tried and dropped: scale each step from the last exact picture (stretch) [MEAS]
 
