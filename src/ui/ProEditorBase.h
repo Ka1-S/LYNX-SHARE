@@ -106,7 +106,17 @@ protected:
         int autoParam = -1;         // knobs (round tp172b5): a toggle shown as an AUTO prefix word in the caption, clicked
                                     // there; dim when off, the accent when on (the compressor reference's AUTO THRESHOLD)
         int look = 0;               // knobs: 0 = a knob, 1 = a short curved bar (round tp172b4: the compressor reference's
-                                    // KNEE / RANGE bars); menus: 1 = a plain pill button showing the choice (no arrow)
+                                    // KNEE / RANGE bars), 2 = a chunky grey face with a white pointer (round tp172b6: the
+                                    // multiband reference's), 3 = the same, small, inside a ring (`outer`), 4 = that ring;
+                                    // menus: 1 = a plain pill button showing the choice (no arrow);
+                                    // tabs: 1 = a raised pill with a marker at the chosen end
+        float rowTrim = 0.0f;         // sliders: room kept at the scale row's right end (round tp172b6: the stereo link's MID key)
+        bool keepCase = false;        // tabs look 1 (round tp172b6): the options as written (the reference's Band / Free, In / Ext)
+        bool bare = false;            // buttons (round tp172b6): no face of their own (the editor paints them in its overlay)
+        float levelArc = -1.0f;       // look 2: a level on the knob's own scale, drawn along its ring (0 ... 1; below 0: none)
+        juce::Rectangle<float> outer; // look 3: the whole knob, ring included (the labels sit under it)
+        int ringParam = -1;           // look 3: the ring's parameter (its value shows while the ring is hovered or dragged)
+        juce::String ringLow, ringHigh; // look 3: the ring's own ends, printed outside the knob's (M and S)
     };
 
     static Ctl knob (juce::Rectangle<float> r, int p, const juce::String& caption, int size = 1, bool bipolar = false)
@@ -655,6 +665,11 @@ protected:
                     paintArcBar (g, c, hover, active, hot, ac, on);
                     break;
                 }
+                if (c.look >= 2)
+                {
+                    paintFaceKnob (g, c, hover, active, hot, ac, on, d);
+                    break;
+                }
                 const auto knobR = juce::Rectangle<float> (c.r.getCentreX() - d / 2.0f, c.r.getY() + 2.0f, d, d);
                 skin::KnobLook look;
                 look.value = v (c.param);
@@ -753,6 +768,8 @@ protected:
             }
             case K::button:
             {
+                if (c.bare)
+                    break;
                 skin::button (g, c.r, c.lit, hover, ac);
                 g.setColour (c.lit || hover ? colour::textPrimary : colour::textSecondary);
                 g.setFont (font (type::small, c.lit));
@@ -797,6 +814,36 @@ protected:
             {
                 const auto n = juce::jmax (1, c.options.size());
                 const auto sel = optionIndex (c);
+                if (c.look == 1) // round tp172b6: a raised grey pill, a marker at the chosen end (the multiband reference's)
+                {
+                    g.setColour (juce::Colours::black.withAlpha (0.55f));
+                    g.fillRoundedRectangle (c.r, 4.0f);
+                    const auto pill = c.r.reduced (1.0f);
+                    g.setGradientFill (juce::ColourGradient (juce::Colour (on ? 0xff5d5d5du : 0xff444444u), 0.0f, pill.getY(), juce::Colour (on ? 0xff444343u : 0xff343434u), 0.0f, pill.getBottom(), false));
+                    g.fillRoundedRectangle (pill, 3.0f);
+                    const auto marker = 4.0f;
+                    for (int i = 0; i < n; ++i)
+                    {
+                        auto cell = juce::Rectangle<float> (pill.getX() + pill.getWidth() * (float) i / (float) n, pill.getY(), pill.getWidth() / (float) n, pill.getHeight());
+                        if (i > 0)
+                        {
+                            g.setColour (juce::Colours::black.withAlpha (0.45f));
+                            g.drawVerticalLine ((int) cell.getX(), cell.getY(), cell.getBottom());
+                        }
+                        if (cell.contains (mouse))
+                        {
+                            g.setColour (juce::Colours::white.withAlpha (0.05f));
+                            g.fillRect (cell);
+                        }
+                        g.setColour (juce::Colour (on ? 0xffd2d2d2u : 0xff8a8a8au)); // (the reference prints both options alike: the marker tells)
+                        g.setFont (font (type::small));
+                        g.drawText (c.keepCase ? tr (c.options[i]) : caps (tr (c.options[i])), cell, juce::Justification::centred, true);
+                    }
+                    const auto mx = sel <= 0 ? pill.getX() : pill.getRight() - marker;
+                    g.setColour (on ? juce::Colour (0xffdca103) : colour::textDisabled);
+                    g.fillRect (juce::Rectangle<float> (mx, pill.getY(), marker, pill.getHeight()));
+                    break;
+                }
                 skin::valuePlate (g, c.r, radius::md);
                 for (int i = 0; i < n; ++i)
                 {
@@ -843,6 +890,7 @@ protected:
     // round tp172b5: the references that print captions only (the compressor; the reverb uses the layout flag): no scale,
     // the value under the caption only while the knob is hovered or dragged
     bool hoverValues = false;
+    bool referenceLabels = false; // round tp172b6: the multiband reference's panel text: neutral greys, a larger, regular caption
     // the AUTO prefix of a knob's caption (Ctl::autoParam): where it is drawn and clicked, within the caption's row
     juce::Rectangle<float> autoPrefixRect (const Ctl& c, juce::Rectangle<float> captionRow) const
     {
@@ -889,18 +937,30 @@ protected:
                 out = out.substring (1); // "-0 dB": a scale's end reads "0 dB"
             return out;
         };
-        g.setColour (colour::textDisabled);
+        g.setColour (referenceLabels ? juce::Colour (0xff6e6e6e) : colour::textDisabled);
         g.setFont (font (type::caption));
         const auto half = row.getWidth() * 0.5f + 6.0f;
         g.drawText (endLow.isNotEmpty() ? endLow : shortText (text (param, 0.0f)), row.withWidth (half).translated (-6.0f, 0.0f), juce::Justification::centredLeft, false);
         g.drawText (endHigh.isNotEmpty() ? endHigh : shortText (text (param, 1.0f)), row.withTrimmedLeft (row.getWidth() - half).translated (6.0f, 0.0f), juce::Justification::centredRight, false);
     }
+    void captionStyle (juce::Graphics& g, bool active, float hot, juce::Colour ac, float size) const
+    {
+        using namespace theme;
+        if (referenceLabels)
+        {
+            g.setColour (active ? ac.brighter (0.3f) : juce::Colour (0xff9c9c9c).interpolatedWith (colour::textPrimary, hot * 0.5f));
+            g.setFont (font (12.0f));
+            return;
+        }
+        g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
+        g.setFont (font (size, true));
+    }
     void knobLabels (juce::Graphics& g, const Ctl& c, juce::Rectangle<float> knobR, bool hover, bool active, float hot, juce::Colour ac)
     {
         using namespace theme;
-        rangeRow (g, c.param, knobR.withY (knobR.getBottom() + 1.0f).withHeight (12.0f), c.showValue && (hover || active), c.size == 2, ac, active);
-        g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
-        g.setFont (font (c.size == 2 ? type::small : type::caption, true));
+        // (rangeRow pushes the ends 6 px past the row: the reference keeps them within the knob's ring)
+        rangeRow (g, c.param, knobR.withY (knobR.getBottom() + 1.0f).withHeight (12.0f).reduced (referenceLabels ? 6.0f : 0.0f, 0.0f), c.showValue && (hover || active), c.size == 2, ac, active);
+        captionStyle (g, active, hot, ac, c.size == 2 ? type::small : type::caption);
         const auto captionY = captionAbove ? c.r.getY() - 14.0f : knobR.getBottom() + 14.0f;
         g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, captionY, c.r.getWidth() + 28.0f, 14.0f),
                     juce::Justification::centred, false);
@@ -912,7 +972,10 @@ protected:
         const auto value = juce::jlimit (0.0f, 1.0f, v (c.param));
         g.setColour (juce::Colours::black.withAlpha (0.45f));
         g.fillRoundedRectangle (bar.expanded (1.0f), 3.0f);
-        g.setColour (juce::Colours::white.withAlpha (0.06f + 0.04f * hot));
+        if (referenceLabels) // round tp172b6: the multiband reference's slider: a lighter part up to the value on a grey bar, no handle
+            g.setGradientFill (juce::ColourGradient (juce::Colour (0xff363636).brighter (0.1f * hot), 0.0f, bar.getY(), juce::Colour (0xff484848).brighter (0.1f * hot), 0.0f, bar.getBottom(), false));
+        else
+            g.setColour (juce::Colours::white.withAlpha (0.06f + 0.04f * hot));
         g.fillRoundedRectangle (bar, 2.5f);
         const auto from = c.bipolar ? 0.5f : 0.0f;
         const auto x0 = bar.getX() + bar.getWidth() * juce::jmin (from, value), x1 = bar.getX() + bar.getWidth() * juce::jmax (from, value);
@@ -920,19 +983,148 @@ protected:
         {
             const auto fill = juce::Rectangle<float> (x0, bar.getY(), x1 - x0, bar.getHeight());
             const auto base = on ? juce::Colours::white.withAlpha (active ? 0.42f : 0.30f + 0.06f * hot) : colour::textDisabled.withAlpha (0.4f);
-            g.setGradientFill (juce::ColourGradient (base.brighter (0.2f), 0.0f, fill.getY(), base.darker (0.3f), 0.0f, fill.getBottom(), false));
+            if (referenceLabels && on)
+                g.setGradientFill (juce::ColourGradient (juce::Colour (0xff6c6c6c).brighter (0.25f * hot), 0.0f, fill.getY(), juce::Colour (0xff484848).brighter (0.25f * hot), 0.0f, fill.getBottom(), false));
+            else
+                g.setGradientFill (juce::ColourGradient (base.brighter (0.2f), 0.0f, fill.getY(), base.darker (0.3f), 0.0f, fill.getBottom(), false));
             g.fillRoundedRectangle (fill, 2.5f);
         }
         const auto hx = bar.getX() + bar.getWidth() * value;
-        g.setColour (on ? (active ? ac.brighter (0.25f) : colour::textPrimary.withAlpha (0.85f)) : colour::textDisabled);
-        g.fillRect (juce::Rectangle<float> (hx - 1.5f, bar.getY() + 1.0f, 3.0f, bar.getHeight() - 2.0f));
+        if (referenceLabels)
+        {
+            g.setColour (juce::Colours::black.withAlpha (0.35f));
+            g.fillRect (juce::Rectangle<float> (hx - 0.5f, bar.getY() + 1.0f, 1.0f, bar.getHeight() - 2.0f));
+        }
+        else
+        {
+            g.setColour (on ? (active ? ac.brighter (0.25f) : colour::textPrimary.withAlpha (0.85f)) : colour::textDisabled);
+            g.fillRect (juce::Rectangle<float> (hx - 1.5f, bar.getY() + 1.0f, 3.0f, bar.getHeight() - 2.0f));
+        }
         // (rangeRow pushes the ends 6 px past the row: the slider keeps them within its own bar, clear of its neighbours)
-        const auto row = juce::Rectangle<float> (bar.getX() + 6.0f, bar.getBottom() + 2.0f, bar.getWidth() - 12.0f, 12.0f);
+        const auto row = juce::Rectangle<float> (bar.getX() + 6.0f, bar.getBottom() + 2.0f, bar.getWidth() - 12.0f - c.rowTrim, 12.0f);
         rangeRow (g, c.param, row, c.showValue && (hover || active), false, ac, active, c.endLow, c.endHigh);
-        g.setColour (active ? ac.brighter (0.3f) : skin::captionColour().interpolatedWith (colour::textPrimary, hot * 0.5f));
-        g.setFont (font (type::caption, true));
+        captionStyle (g, active, hot, ac, type::caption);
         g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, row.getBottom() + 1.0f, c.r.getWidth() + 28.0f, 14.0f),
                     juce::Justification::centred, false);
+    }
+    // round tp172b6: the multiband reference's knob, our own drawing: a chunky grey face, a white pointer cut into its
+    // rim with a dark line in it, an outlined scale ring around it with ticks and a gap at the bottom
+    static constexpr float faceSweep = juce::MathConstants<float>::pi * 0.75f;
+    static void facePointer (juce::Graphics& g, juce::Point<float> ct, float radius, float value, float size, bool on)
+    {
+        const auto angle = faceSweep * (2.0f * juce::jlimit (0.0f, 1.0f, value) - 1.0f);
+        const auto dir = juce::Point<float> (std::sin (angle), -std::cos (angle));
+        const auto side = juce::Point<float> (dir.y * -1.0f, dir.x);
+        juce::Path disc;
+        disc.addEllipse (juce::Rectangle<float> (radius * 2.0f, radius * 2.0f).withCentre (ct));
+        // a rounded fin: wide at the rim, its convex sides meeting in a round end towards the centre (`size` = half its width)
+        const auto depth = size * 1.75f; // from the rim inwards
+        const auto at = [&] (float along, float across) { return ct + dir * along + side * across; };
+        juce::Path fin;
+        fin.startNewSubPath (at (radius + 2.0f, -size * 1.1f));
+        fin.quadraticTo (at (radius - depth * 0.55f, -size * 1.1f), at (radius - depth * 0.92f, -size * 0.42f));
+        fin.quadraticTo (at (radius - depth * 1.08f, 0.0f), at (radius - depth * 0.92f, size * 0.42f));
+        fin.quadraticTo (at (radius - depth * 0.55f, size * 1.1f), at (radius + 2.0f, size * 1.1f));
+        fin.closeSubPath();
+        juce::Graphics::ScopedSaveState keep (g);
+        g.reduceClipRegion (disc);
+        const auto light = juce::Colour (on ? 0xfff4f4f4u : 0xff9a9a9au), shade = juce::Colour (on ? 0xffb4b4b4u : 0xff707070u);
+        const auto mid = at (radius - depth * 0.5f, 0.0f);
+        g.setColour (juce::Colours::black.withAlpha (0.35f));
+        g.strokePath (fin, juce::PathStrokeType (2.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setGradientFill (juce::ColourGradient (light, mid.x, mid.y - size, shade, mid.x, mid.y + size, false));
+        g.strokePath (fin, juce::PathStrokeType (1.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.fillPath (fin);
+        g.setColour (juce::Colour (0xff3a3a3a).withAlpha (0.85f));
+        g.drawLine (juce::Line<float> (at (radius - depth * 0.72f, 0.0f), at (radius - depth * 0.28f, 0.0f)), 1.0f);
+    }
+    static void faceDisc (juce::Graphics& g, juce::Point<float> ct, float radius, juce::Colour top, juce::Colour bottom, float hot)
+    {
+        const auto r = juce::Rectangle<float> (radius * 2.0f, radius * 2.0f).withCentre (ct);
+        g.setColour (juce::Colours::black.withAlpha (0.55f));
+        g.fillEllipse (r.expanded (1.2f));
+        g.setGradientFill (juce::ColourGradient (top.brighter (0.12f * hot), ct.x - radius * 0.3f, ct.y - radius, bottom.brighter (0.12f * hot), ct.x + radius * 0.3f, ct.y + radius, false));
+        g.fillEllipse (r);
+    }
+    void paintFaceKnob (juce::Graphics& g, const Ctl& c, bool hover, bool active, float hot, juce::Colour ac, bool on, float d)
+    {
+        using namespace theme;
+        const auto value = v (c.param);
+        if (c.look == 3) // the small knob inside the ring; the labels belong to it
+        {
+            const auto ct = c.r.getCentre();
+            const auto radius = c.r.getWidth() * 0.5f;
+            faceDisc (g, ct, radius, juce::Colour (0xff868686), juce::Colour (0xff585858), hot);
+            facePointer (g, ct, radius, value, radius * 0.38f, on);
+            const auto row = juce::Rectangle<float> (c.outer.getX() + 5.0f, c.outer.getBottom() + 1.0f, c.outer.getWidth() - 10.0f, 12.0f);
+            const auto ringActive = c.ringParam >= 0 && dragCtl == c.ringParam;
+            const auto ringHover = c.ringParam >= 0 && c.outer.contains (mouse) && ! c.r.contains (mouse);
+            const auto valueNow = c.showValue && (hover || active);
+            if (ringActive || ringHover)
+                rangeRow (g, c.ringParam, row, true, false, ac, ringActive);
+            else
+                rangeRow (g, c.param, row, valueNow, false, ac, active);
+            if (! (ringActive || ringHover || valueNow))
+            {
+                g.setColour (colour::textDisabled.withAlpha (0.6f));
+                g.setFont (font (type::caption));
+                g.drawText (c.ringLow, row.withWidth (12.0f).translated (-17.0f, 0.0f), juce::Justification::centredRight, false);
+                g.drawText (c.ringHigh, row.withX (row.getRight()).withWidth (12.0f).translated (5.0f, 0.0f), juce::Justification::centredLeft, false);
+            }
+            captionStyle (g, active || ringActive, hot, ac, type::caption);
+            g.drawText (caps (c.caption), juce::Rectangle<float> (c.outer.getX() - 14.0f, row.getBottom() + 1.0f, c.outer.getWidth() + 28.0f, 14.0f), juce::Justification::centred, false);
+            return;
+        }
+        if (c.look == 4)
+            d = c.r.getWidth(); // (the ring's rectangle is the knob itself, no labels)
+        const auto box = c.look == 4 ? c.r : juce::Rectangle<float> (d, d).withCentre ({ c.r.getCentreX(), c.r.getY() + 2.0f + d * 0.5f });
+        const auto ct = box.getCentre();
+        const auto scaleR = d * 0.5f - 2.5f;
+        const auto radius = d * 0.5f - 6.5f;
+        // the scale ring: a thin outlined band with the gap at the bottom and its ticks
+        juce::Path band;
+        band.addCentredArc (ct.x, ct.y, scaleR + 2.5f, scaleR + 2.5f, 0.0f, -faceSweep, faceSweep, true);
+        band.addCentredArc (ct.x, ct.y, scaleR - 2.5f, scaleR - 2.5f, 0.0f, faceSweep, -faceSweep, false);
+        band.closeSubPath();
+        g.setColour (juce::Colours::white.withAlpha (0.035f));
+        g.fillPath (band);
+        g.setColour (juce::Colours::white.withAlpha (0.13f));
+        g.strokePath (band, juce::PathStrokeType (1.0f));
+        for (int k = 0; k <= 6; ++k)
+        {
+            const auto a = faceSweep * (2.0f * (float) k / 6.0f - 1.0f);
+            const auto dir = juce::Point<float> (std::sin (a), -std::cos (a));
+            g.drawLine (juce::Line<float> (ct + dir * (scaleR - 2.5f), ct + dir * (scaleR + 2.5f)), 1.0f);
+        }
+        if (c.levelArc > 0.0f && on) // round tp172b6: the live level on the scale ring, green turning to gold as it rises
+        {
+            static constexpr int steps = 28;
+            const auto green = juce::Colour (0xff7fa62c), gold = juce::Colour (0xffd9a21f);
+            const auto top = juce::jmin (1.0f, c.levelArc);
+            for (int k = 0; k < steps; ++k)
+            {
+                const auto u0 = top * (float) k / (float) steps, u1 = top * (float) (k + 1) / (float) steps;
+                if (u1 <= u0) continue;
+                juce::Path bit;
+                bit.addCentredArc (ct.x, ct.y, scaleR, scaleR, 0.0f, faceSweep * (2.0f * u0 - 1.0f), faceSweep * (2.0f * u1 - 1.0f), true);
+                g.setColour (green.interpolatedWith (gold, juce::jlimit (0.0f, 1.0f, (u1 - 0.45f) / 0.25f)));
+                g.strokePath (bit, juce::PathStrokeType (4.0f));
+            }
+        }
+        if (c.bipolar) // the centre mark above the ring
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.28f));
+            g.drawLine (juce::Line<float> (ct.x, ct.y - scaleR - 7.0f, ct.x, ct.y - scaleR - 3.5f), 1.0f);
+        }
+        if (c.look == 4) // the ring knob: a darker face; the small knob lies on top of it
+        {
+            faceDisc (g, ct, radius, juce::Colour (0xff5e5e5e), juce::Colour (0xff3e3e3e), hot);
+            facePointer (g, ct, radius, value, radius * 0.26f, on);
+            return;
+        }
+        faceDisc (g, ct, radius, juce::Colour (0xff6e6e6e), juce::Colour (0xff474747), hot);
+        facePointer (g, ct, radius, value, radius * 0.40f, on);
+        knobLabels (g, c, box, hover, active, hot, ac);
     }
     // a short curved bar (a smile) filled in the accent up to the value, the scale and the caption under it
     void paintArcBar (juce::Graphics& g, const Ctl& c, bool hover, bool active, float hot, juce::Colour ac, bool on)
@@ -1190,6 +1382,7 @@ protected:
         g.setFont (font (type::caption));
         for (const auto hz : { 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0 })
         {
+            if (hz < specMinHz * 0.999 || hz > specMaxHz * 1.001) continue; // (outside the display: no label pinned to its edge)
             const auto x = xForHz (hz, a);
             g.setColour (colour::gridBeat);
             g.drawVerticalLine ((int) x, a.getY(), a.getBottom());
