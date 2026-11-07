@@ -317,6 +317,17 @@ These runs prove where passes land. Each report says `result=FAILED` because the
 
 Shots: `LYNX --comp177shot <prefix> <project>` draws them offscreen, in `E:\lynx-work\comp177c\lx\shots\`.
 
+**Final build, `44d664b93` [RUN].** Recording runs in `lx\rec2\`: Blend off, tracks 1, 2, 3 all muted; Blend on, none muted; Blend
+off with the setting, passes 3, 2, 1 with passes 1-2 muted. Rows stay "Track N" in the first two. `result=FAILED` in each report
+only means no cable was connected (ping `no signal`, 0 clicks checked), so it is not a real pass or fail of placement.
+
+Guarded GUI session on that build, real clicks, shots in `lx\shots\` (`GUI-177c-sequence.png`, `g02`-`g09`):
+right-click on a take row showed "Comp these takes"; clicking it gave "Insert 6 comp" and "Insert 6 (take 1-3)"; one click on the
+toolbar's undo restored "Track 2-4" with the three muted clips; clicking the setting wrote `recordLastPassPlays=1` and showed the
+tick; the tick was still there after closing and restarting LYNX; clicking it again wrote `0`.
+
+Seen in that session: undo labels the step "Undone: Add clips". It should say "Comp these takes" (`describeChange`).
+
 **Muted clip look:** FL marks a muted clip with an X on its header, LYNX with a veil and a diagonal across the clip. The diagonal
 dates from `5833ba6fa` (2026-10-14, "Playlist: tools, clip edges, fade fix and time selection"). Round 165q only records it as
 "the muted look"; no search of the docs here found a decision to differ from FL. It applies to every muted clip, so it is left for
