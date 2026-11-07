@@ -226,8 +226,9 @@ struct AudioEngine::Drainer final : juce::TimeSliceClient
 };
 
 
-AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads)
+AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPluginList)
     : workers (std::make_unique<WorkerPool> (workerThreads >= 0 ? workerThreads : workerCount(), raiseAudioThreadPriority)),
+      plugins (userPluginList),
       song (Song::makeDefault())
 {
     boostDeviceThread = juce::SystemStats::getEnvironmentVariable ("LYNX_DEVICE_BOOST", {}) != "0";
