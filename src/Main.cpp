@@ -1173,6 +1173,8 @@ public:
             // of the third-party parity pictures (round tp172b)
             const auto i = args.indexOf ("--parityshot");
             runParityShot (args[i + 1].unquoted(), args[i + 2].unquoted(), i + 3 < args.size() ? args[i + 3].unquoted() : juce::String());
+            if (parityShotFailed)
+                setApplicationReturnValue (2);
             if (parityShow == nullptr)
                 quit();
             return;
@@ -7105,6 +7107,7 @@ private:
         ~ParityShow() { window.reset(); editor.reset(); engine.reset(); }
     };
     std::shared_ptr<ParityShow> parityShow;
+    bool parityShotFailed = false; // --parityshot: the effect name matched no built-in effect
 
     void runParityShot (const juce::String& path, const juce::String& effectName, const juce::String& paramsFile)
     {
@@ -7114,7 +7117,13 @@ private:
             if (juce::String::fromUTF8 (lynx::effectInfo ((lynx::EffectKind) k).name).equalsIgnoreCase (effectName))
                 kindIndex = k;
         if (kindIndex < 0)
+        {
+            // round tp172b7: say so and fail (a silent exit 0 hid a split effect name in a launch script)
+            std::fprintf (stderr, "unknown effect: %s\n", effectName.toRawUTF8());
+            std::fflush (stderr);
+            parityShotFailed = true;
             return;
+        }
         const auto kind = (lynx::EffectKind) kindIndex;
         auto fx = lynx::makeEffectSlot (kind);
         if (paramsFile.isNotEmpty())
