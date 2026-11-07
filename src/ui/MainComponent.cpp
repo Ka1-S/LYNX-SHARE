@@ -5918,6 +5918,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         });
         menu.addItem (tr ("One-click audio recording: arm the selected insert..."), [this] { armSelectedInsertForAudio(); });
         menu.addItem (tr ("Plugin performance monitor..."), [this] { showPluginMonitor (engine); });
+        addAudioLoggerMenu (menu); // FL's Tools menu has it just above "Last tweaked parameters"
         // FL's "Last tweaked parameters" section (LastTweaked1Menu / LastTweaked2Menu → FUN_0123d1d0, REA round 143):
         // the parameter's own menu for the last two moved controls
         menu.addSectionHeader (tr ("Last tweaked parameters"));
@@ -6187,7 +6188,6 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             menu.addSubMenu (tr ("Recording"), recording);
         }
         {
-            addAudioLoggerMenu (menu);
             // LYNX's own (REA round 153): everything the Master plays, after the fader, goes to a WAV in the background
             auto& logger = engine.getAudioLogger();
             menu.addItem (tr ("Record the Master to a file"), true, logger.isLogging(), [this] {
