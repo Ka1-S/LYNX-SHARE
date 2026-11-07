@@ -681,6 +681,15 @@ public:
             text = bar.place (area, true, ledC.x + 10.0f - area.getX() + skin::titleMinWidth (name, area.getHeight())).withLeft (ledC.x + 10.0f);
         const auto nameWidth = skin::titleText (g, text.withHeight (area.getHeight()), name, accent);
         text.removeFromLeft (nameWidth);
+        // round 177b: the "Sidechain from" picker at the right end of the title space (when it fits)
+        sidechainChip = {};
+        if (showsSidechain())
+            if (constexpr float w = 118.0f; text.getWidth() >= w + 14.0f)
+            {
+                sidechainChip = { text.getRight() - w, 3.0f, w, 20.0f };
+                text.setRight (sidechainChip.getX() - 4.0f);
+                paintSidechainChip (g, fx);
+            }
         g.setFont (font (type::small));
         g.setColour (colour::textSecondary);
         // where it is: only when it fits whole (round 170k2: no "(I…" stub beside the name)
@@ -707,6 +716,29 @@ public:
         drawArrow (g, prevButton(), juce::MathConstants<float>::pi, hoverHeader == 3 ? accent : colour::textSecondary);
         drawArrow (g, nextButton(), 0.0f, hoverHeader == 4 ? accent : colour::textSecondary);
     }
+
+    // round 177b: a mixer slot's effect with a side input shows its "Sidechain from" picker in the header
+    bool showsSidechain() const { return ! node.locate && pluginheader::takesSidechain (engine, track, slot); }
+    void paintSidechainChip (juce::Graphics& g, const EffectSlot& fx)
+    {
+        using namespace theme;
+        const auto box = sidechainChip;
+        const auto source = pluginheader::sidechainSourceText (engine.getSong(), fx);
+        skin::valuePlate (g, box, radius::md);
+        if (hoverHeader == 6 || source.isNotEmpty())
+        {
+            g.setColour (accent.withAlpha (hoverHeader == 6 ? 0.7f : 0.45f));
+            g.drawRoundedRectangle (box.reduced (0.5f), radius::md, 1.0f);
+        }
+        const auto modulator = kind == EffectKind::vocoder || kind == EffectKind::vocodex;
+        const auto text = (modulator ? tr ("Modulator") : tr ("SC")) + ": " + (source.isNotEmpty() ? source : tr ("None"));
+        g.setColour (source.isNotEmpty() ? colour::textPrimary : colour::textSecondary);
+        ui::drawFittingText (g, text, box.reduced (7.0f, 0.0f).withTrimmedRight (9.0f), juce::Justification::centredLeft,
+                             font (type::small, source.isNotEmpty()), 8.0f, 0.0f, 0.75f);
+        drawArrow (g, { box.getRight() - 14.0f, box.getY(), 10.0f, box.getHeight() }, juce::MathConstants<float>::halfPi,
+                   hoverHeader == 6 ? accent : colour::textSecondary);
+    }
+    juce::Rectangle<float> sidechainChip; // where the header drew it (empty: not shown)
 
     static void drawArrow (juce::Graphics& g, juce::Rectangle<float> r, float angle, juce::Colour c)
     {
@@ -3918,6 +3950,8 @@ public:
             return 0;
         if (menuButton().expanded (2.0f).contains (p))
             return 1;
+        if (! sidechainChip.isEmpty() && sidechainChip.contains (p))
+            return 6;
         if (usesBar())
             return bar.contains (p) ? 5 : 0;
         if (presetBox().contains (p))
@@ -3991,6 +4025,11 @@ public:
 
         if (const auto h = headerItemAt (e.position); h > 0)
         {
+            if (h == 6)
+            {
+                pluginheader::showSidechainPicker (engine, track, slot, this, sidechainChip.getSmallestIntegerContainer());
+                return;
+            }
             if (h == 5)
             {
                 const auto flFiles = presetFiles(); // round 168r: ◀ ▶ also run through FL's presets after LYNX's bank
@@ -4859,6 +4898,8 @@ private:
             case 3: return { tr ("Previous preset"), {}, false, false };
             case 4: return { tr ("Next preset"), {}, false, false };
             case 5: return { bar.hintFor (bar.partAt (p)), bar.presetLabel(), false, true };
+            case 6: return { tr ("Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose"),
+                             {}, false, true };
             default: break;
         }
         const auto index = itemAt (p);
@@ -5011,6 +5052,12 @@ private:
         juce::PopupMenu menu;
         if (presets.getNumItems() > 0)
             menu.addSubMenu (tr ("Presets"), presets);
+        if (showsSidechain()) // round 177b
+        {
+            juce::PopupMenu side;
+            pluginheader::addSidechainPicker (side, engine, track, slot);
+            menu.addSubMenu (kind == EffectKind::vocoder || kind == EffectKind::vocodex ? tr ("Modulator from") : tr ("Sidechain from"), side);
+        }
         skin::addStyleMenu (menu, styleKey(), [safe = juce::Component::SafePointer<NativeEffectEditor> (this)] {
             if (safe != nullptr) safe->repaint();
         });
