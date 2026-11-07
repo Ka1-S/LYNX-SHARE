@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <thread>
 
@@ -575,8 +576,21 @@ PluginEffect::PluginEffect (std::unique_ptr<juce::AudioPluginInstance> instance,
 {
     buffer.setSize (bufferChannels (*plugin), blockSize);
     midi.ensureSize (2048); // MIDI CC "parameters" (core/MidiControls.h)
+    if (const auto side = sideInputChannels (*plugin); side > 0)
+    {
+        const auto first = plugin->getChannelIndexInProcessBlockBuffer (true, 1, 0);
+        if (first >= 2 && first + side <= buffer.getNumChannels())
+        {
+            sideChannel = first;
+            sideCount = juce::jmin (2, side);
+        }
+    }
     if (fixedBlock > 0)
-        fixed = std::make_unique<FixedBlock> (juce::jmin (fixedBlock, blockSize), 2);
+    {
+        fixed = std::make_unique<FixedBlock> (juce::jmin (fixedBlock, blockSize), sideChannel >= 0 ? 4 : 2);
+        if (sideChannel >= 0)
+            sideScratch.assign ((std::size_t) blockSize * 2, 0.0f);
+    }
     options = o;
     plugin->setPlayHead (&timelinePlayHead (options.sendLoopPosition));
 }
@@ -640,8 +654,105 @@ void PluginEffect::setParameter (int index, float value) noexcept
         failed (code);
 }
 
+int sideInputChannels (const juce::AudioPluginInstance& plugin)
+{
+    if (plugin.getBusCount (true) < 2)
+        return 0;
+    const auto* bus = plugin.getBus (true, 1);
+    return bus != nullptr && bus->isEnabled() ? bus->getNumberOfChannels() : 0;
+}
+
+namespace
+{
+// a plugin that plays its side input (bus 1) and drops its main input: what reaches the bus is what comes out
+class SideEchoPlugin final : public juce::AudioPluginInstance
+{
+public:
+    SideEchoPlugin()
+        : AudioPluginInstance (BusesProperties()
+                                   .withInput ("Input", juce::AudioChannelSet::stereo(), true)
+                                   .withInput ("Sidechain", juce::AudioChannelSet::stereo(), true)
+                                   .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
+    {
+    }
+    void fillInPluginDescription (juce::PluginDescription& d) const override { d.name = "LYNX side echo"; d.pluginFormatName = "Internal"; }
+    const juce::String getName() const override { return "LYNX side echo"; }
+    void prepareToPlay (double, int) override {}
+    void releaseResources() override {}
+    bool isBusesLayoutSupported (const BusesLayout&) const override { return true; }
+    void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override
+    {
+        auto side = getBusBuffer (buffer, true, 1);
+        for (int c = 0; c < 2; ++c)
+            buffer.copyFrom (c, 0, side, c, 0, buffer.getNumSamples());
+    }
+    double getTailLengthSeconds() const override { return 0.0; }
+    bool acceptsMidi() const override { return false; }
+    bool producesMidi() const override { return false; }
+    juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+    bool hasEditor() const override { return false; }
+    int getNumPrograms() override { return 1; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram (int) override {}
+    const juce::String getProgramName (int) override { return {}; }
+    void changeProgramName (int, const juce::String&) override {}
+    void getStateInformation (juce::MemoryBlock&) override {}
+    void setStateInformation (const void*, int) override {}
+};
+} // namespace
+
+juce::String pluginSidechainSelfTest()
+{
+    constexpr int block = 256;
+    for (const auto fixedBlock : { 0, 64 })
+    {
+        auto instance = std::make_unique<SideEchoPlugin>();
+        preparePlugin (*instance, 48000.0, block);
+        if (sideInputChannels (*instance) != 2)
+            return "ERROR no side bus";
+        PluginEffect fx (std::move (instance), block, fixedBlock);
+        if (! fx.hasSideInput())
+            return "ERROR side bus not found";
+        std::vector<float> l (block, 0.25f), r (block, 0.25f), sl (block), sr (block);
+        for (int i = 0; i < block; ++i)
+        {
+            sl[(std::size_t) i] = 0.5f;
+            sr[(std::size_t) i] = -0.5f;
+        }
+        EffectParams params {};
+        // fixed blocks delay by one block: two passes, the second one carries the first's side input
+        for (int pass = 0; pass < (fixedBlock > 0 ? 2 : 1); ++pass)
+        {
+            std::fill (l.begin(), l.end(), 0.25f);
+            std::fill (r.begin(), r.end(), 0.25f);
+            fx.setSidechain (sl.data(), sr.data());
+            fx.process (l.data(), r.data(), block, params, 120.0);
+        }
+        if (std::abs (l[block - 1] - 0.5f) > 1.0e-6f || std::abs (r[block - 1] + 0.5f) > 1.0e-6f)
+            return "ERROR side input not heard (fixed " + juce::String (fixedBlock) + ")";
+        // the slot's sidechain removed: silence on the bus (two more passes for the fixed blocks' delay)
+        for (int pass = 0; pass < (fixedBlock > 0 ? 2 : 1); ++pass)
+            fx.process (l.data(), r.data(), block, params, 120.0);
+        if (std::abs (l[block - 1]) > 1.0e-6f || std::abs (r[block - 1]) > 1.0e-6f)
+            return "ERROR stale side input (fixed " + juce::String (fixedBlock) + ")";
+    }
+    return "OK";
+}
+
 void PluginEffect::process (float* left, float* right, int n, const EffectParams&, double) noexcept
 {
+    // this block's sidechain (null = silence); cleared so a slot whose side input is removed hears silence again
+    const auto* scL = sideL;
+    const auto* scR = sideR != nullptr ? sideR : sideL;
+    sideL = sideR = nullptr;
+    // copies the sidechain into the side bus channels of `view` from sample `from` of the block (silence without one)
+    auto feedSide = [this, scL, scR] (juce::AudioBuffer<float>& view, int from, int count) noexcept {
+        if (sideChannel < 0 || scL == nullptr)
+            return; // (the view was cleared)
+        view.copyFrom (sideChannel, 0, scL + from, count);
+        if (sideCount > 1)
+            view.copyFrom (sideChannel + 1, 0, scR + from, count);
+    };
     if (crashed.load (std::memory_order_relaxed))
         return; // bypassed: the input plays through
     if (resetPending.exchange (false, std::memory_order_relaxed))
@@ -654,7 +765,21 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
 
     if (fixed != nullptr)
     {
-        float* io[2] = { left, right };
+        // the sidechain rides along as channels 2 and 3 of the fixed blocks (copies: FixedBlock writes them back)
+        const auto sideRun = sideChannel >= 0 && n <= blockSize;
+        float* io[4] = { left, right, sideScratch.data(), sideScratch.data() + blockSize };
+        if (sideChannel >= 0)
+        {
+            const auto m = juce::jmin (n, blockSize);
+            for (int c = 0; c < 2; ++c)
+            {
+                const auto* src = c == 0 ? scL : scR;
+                if (src != nullptr && sideRun)
+                    std::memcpy (io[2 + c], src, sizeof (float) * (size_t) m);
+                else
+                    std::fill (io[2 + c], io[2 + c] + m, 0.0f);
+            }
+        }
         fixed->run (io, n, true, [this] (float* const* ch, int count) {
             if (crashed.load (std::memory_order_relaxed))
                 return; // (crashed in an earlier block of this call: the input passes through)
@@ -662,6 +787,12 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
             view.clear();
             view.copyFrom (0, 0, ch[0], count);
             view.copyFrom (1, 0, ch[1], count);
+            if (sideChannel >= 0)
+            {
+                view.copyFrom (sideChannel, 0, ch[2], count);
+                if (sideCount > 1)
+                    view.copyFrom (sideChannel + 1, 0, ch[3], count);
+            }
             if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }); code != 0)
             {
                 midi.clear();
@@ -682,6 +813,7 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
         view.clear();
         view.copyFrom (0, 0, left + done, count);
         view.copyFrom (1, 0, right + done, count);
+        feedSide (view, done, count);
         if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }); code != 0)
         {
             midi.clear();
@@ -724,13 +856,30 @@ juce::FileSearchPath lv2SearchFolders()
 }
 
 // The plugin files (VST2/VST3/CLAP) and LV2 URIs found in these folders, by every format that scans.
-juce::StringArray listPluginFiles (juce::AudioPluginFormatManager& formats, const juce::FileSearchPath& paths)
+juce::StringArray listPluginFiles (juce::AudioPluginFormatManager& formats, const juce::FileSearchPath& paths, bool withLv2 = true)
 {
     juce::StringArray files;
     for (auto* format : formats.getFormats())
-        if (format->canScanForPlugins())
+        if (format->canScanForPlugins() && (withLv2 || format->getName() != "LV2"))
             files.addArray (format->searchPathsForPlugins (format->getName() == "LV2" ? lv2Folders (paths) : paths, true, false));
     return files;
+}
+
+// `--scan-one LV2 <this><folders>`: one child describes every LV2 plugin of these folders
+const juce::String lv2BatchPrefix ("lv2-folders:");
+
+juce::String lv2Stamp (const juce::FileSearchPath& folders)
+{
+    std::vector<std::pair<std::string, long long>> bundles;
+    for (int i = 0; i < folders.getNumPaths(); ++i)
+        for (const auto& bundle : folders[i].findChildFiles (juce::File::findDirectories, false, "*.lv2"))
+        {
+            auto newest = 0LL; // (a plugin's own .ttl can change while manifest.ttl does not)
+            for (const auto& ttl : bundle.findChildFiles (juce::File::findFiles, false, "*.ttl"))
+                newest = juce::jmax (newest, (long long) ttl.getLastModificationTime().toMilliseconds());
+            bundles.emplace_back (bundle.getFullPathName().toStdString(), newest);
+        }
+    return juce::String::fromUTF8 (scanpolicy::lv2Stamp (std::move (bundles)).c_str());
 }
 } // namespace
 
@@ -967,7 +1116,7 @@ void logScanFailure (const juce::String& file, const juce::String& why, juce::ui
 
 } // namespace
 
-bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& file)
+bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& file, const std::function<bool()>& keepGoing)
 {
     // a result file of our own: several LYNX processes (and scans) may run at once
     const auto result = juce::File::getSpecialLocation (juce::File::tempDirectory)
@@ -977,18 +1126,21 @@ bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& f
     const auto exe = bits32 ? bridge32Executable() : juce::File::getSpecialLocation (juce::File::currentExecutableFile);
     if (bits32 && ! exe.existsAsFile())
         return false;
+    ++scanChildren;
     juce::ChildProcess child;
     auto ok = child.start (juce::StringArray { exe.getFullPathName(), "--scan-one", format.getName(), file, result.getFullPathName() }, 0);
+    const auto started = juce::Time::getMillisecondCounter();
     if (ok)
     {
         // wait in short steps so a cancelled scan (or LYNX closing) doesn't wait for a slow plugin; a file holding
         // many plugins (Waves shell) gets more time once the child has said how many (core/PluginScanPolicy.h)
-        const auto started = juce::Time::getMillisecondCounter();
         auto timeout = (juce::uint32) scanpolicy::baseTimeoutMs;
         auto classesKnown = false;
         while (child.isRunning() && ! stopScan && juce::Time::getMillisecondCounter() - started < timeout)
         {
             child.waitForProcessToFinish (100);
+            if (keepGoing && ! keepGoing())
+                stopScan = true;
             if (! classesKnown && classCountFile (result).existsAsFile())
             {
                 classesKnown = true;
@@ -1013,7 +1165,8 @@ bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& f
             logScanFailure (file, "exit code " + juce::String ((int) child.getExitCode()), juce::Time::getMillisecondCounter() - started);
     }
     ok = ok && (child.isRunning() || child.getExitCode() == 0 || scanResultComplete (result));
-    if (auto xml = ok ? juce::XmlDocument::parse (result) : nullptr)
+    const auto xml = ok ? juce::XmlDocument::parse (result) : nullptr;
+    if (xml != nullptr)
     {
         auto added = 0;
         for (auto* e : xml->getChildIterator())
@@ -1025,19 +1178,67 @@ bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& f
         if (xml->getNumChildElements() == 0 && added == 0)
             rememberEmptyScan (file); // nothing in it: not described again on every open until it changes
     }
-    else if (! ok)
+    else
+    {
+        if (ok) // on Linux and macOS, JUCE reports exit code 0 for a child killed by a signal: no answer is the only sign
+            logScanFailure (file, "ended without an answer", juce::Time::getMillisecondCounter() - started);
         known.addToBlacklist (file);
+    }
     result.deleteFile();
     classCountFile (result).deleteFile();
-    return true;
+    return xml != nullptr; // a child can also end "well" without an answer
 }
 
 int PluginHost::scan (const juce::FileSearchPath& paths, const std::function<bool (float, const juce::String&)>& progress)
 {
-    const auto found = scanFiles (listPluginFiles (formats, paths), progress);
+    const auto before = known.getNumTypes();
+    auto lv2Done = false;
+    {
+        const std::scoped_lock lock (scanLock);
+        stopScan = false;
+        lv2Done = describeLv2 (paths, progress);
+    }
+    if (! stopScan)
+        scanFiles (listPluginFiles (formats, paths, ! lv2Done), progress);
     if (! stopScan)
         forgetMisses(); // everything was looked at again: the projects' missing plugins may be findable now
-    return found;
+    return known.getNumTypes() - before;
+}
+
+// LV2 plugins are described from their data files, and JUCE reads all the folders in every process that starts, so a
+// child per plugin repeats the same seconds of work hundreds of times. One child does them all, and only when the
+// folders changed. False if it failed or was cancelled: the scan then asks plugin by plugin, as a bad bundle needs.
+bool PluginHost::describeLv2 (const juce::FileSearchPath& paths, const std::function<bool (float, const juce::String&)>& progress)
+{
+    for (auto* format : formats.getFormats())
+    {
+        if (format->getName() != "LV2")
+            continue;
+        const auto folders = lv2Folders (paths);
+        auto searched = folders;
+        searched.addPath (format->getDefaultLocationsToSearch());
+        const auto stamp = lv2Stamp (searched);
+        // (with how many are listed: a plugin list that was lost is not "nothing changed")
+        const auto listed = [this] {
+            const auto types = known.getTypes();
+            return juce::String ((int) std::count_if (types.begin(), types.end(), [] (const auto& d) { return d.pluginFormatName == "LV2"; }));
+        };
+        const auto saved = settingsFolder().getChildFile ("scan-lv2.txt");
+        if (persistent && saved.loadFileAsString() == stamp + listed())
+            return true;
+        const auto batch = lv2BatchPrefix + folders.toString();
+        if (! scanOne (*format, batch, [&progress] { return ! progress || progress (0.0f, "LV2"); }))
+        {
+            known.removeFromBlacklist (batch);
+            return false;
+        }
+        format->searchPathsForPlugins (folders, true, false); // this process's own list learns the new bundles
+        save(); // before the stamp: the stamp says these plugins are in the list on disk
+        if (persistent)
+            saved.replaceWithText (stamp + listed(), false, false, "\n");
+        return true;
+    }
+    return false;
 }
 
 namespace
@@ -1152,6 +1353,8 @@ void PluginHost::forgetFile (const juce::String& file)
         if (persistent)
             list.replaceWithText (lines.joinIntoString ("\n"));
     }
+    if (persistent && ! juce::File::isAbsolutePath (file)) // an LV2 URI: the next scan describes the LV2 folders again
+        settingsFolder().getChildFile ("scan-lv2.txt").deleteFile();
     save();
 }
 
@@ -1160,7 +1363,10 @@ void PluginHost::forgetAll()
     known.clear();
     known.clearBlacklistedFiles();
     if (persistent)
+    {
         settingsFolder().getChildFile ("scan-empty.txt").deleteFile();
+        settingsFolder().getChildFile ("scan-lv2.txt").deleteFile();
+    }
     forgetMisses();
     save();
 }
@@ -1323,7 +1529,21 @@ int PluginHost::scanOneFile (const juce::String& formatName, const juce::String&
     addPluginFormats (manager);
     juce::OwnedArray<juce::PluginDescription> found;
     for (auto* format : manager.getFormats())
-        if (format->getName() == formatName)
+        if (format->getName() == formatName && formatName == "LV2" && file.startsWith (lv2BatchPrefix))
+        {
+            // (--lv2scantest: a child that dies, and one that a cancel has to stop)
+            const auto fault = juce::SystemStats::getEnvironmentVariable ("LYNX_TEST_CRASH", {});
+            if (fault == "lv2-batch")
+                std::abort();
+            if (fault == "lv2-batch-hang")
+                juce::Thread::sleep (60000);
+            auto ids = format->searchPathsForPlugins (juce::FileSearchPath (file.fromFirstOccurrenceOf (lv2BatchPrefix, false, false)), true, false);
+            ids.removeDuplicates (false); // newer JUCE lists a bundle once per plugin, and describes all of them each time
+            classCountFile (output).replaceWithText (juce::String (ids.size())); // (a large collection gets the time it needs)
+            for (const auto& id : ids)
+                format->findAllTypesForFile (found, id);
+        }
+        else if (format->getName() == formatName)
         {
             // an LV2 URI is looked up in the folders the scan listed it from: JUCE alone knows only ~/.lv2 and one
             // of /usr/lib/lv2 or /usr/lib64/lv2

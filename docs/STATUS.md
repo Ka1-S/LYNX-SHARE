@@ -8,7 +8,7 @@ exports the 30 demo projects shipped with FL Studio 2026.
 
 Windows x64, macOS 11+ (universal: Apple Silicon + Intel) and Linux x86_64 build from the same source; CI builds and
 self-tests the app on all three (`docs/PLATFORMS.md`). Windows-only: ASIO and the LYNX ASIO driver. VST2 hosting on
-Windows and Linux; the out-of-process plugin sandbox on Windows and Linux (round 161: POSIX shared memory, crash noticed
+Windows and Linux; the out-of-process plugin sandbox on all three (round 161: POSIX shared memory, crash noticed
 at once through a pidfd, LV2/VST3 and yabridge-bridged Windows plugins). macOS adds Audio Units, Linux LV2; drivers
 Core Audio / ALSA + JACK (PipeWire).
 

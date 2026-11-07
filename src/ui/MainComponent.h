@@ -55,6 +55,9 @@ public:
 
     // Opens .lynx or .flp (also used by the command line).
     void openFile (const juce::File& file);
+    // A file the operating system asks LYNX to open while it runs (macOS Finder): as File › Open, unsaved changes are
+    // asked about first; waits for a project still loading.
+    void openFileRequest (const juce::File& file);
     void showSetupWizard(); // first run, or Options > Setup wizard (an overlay over this component)
     void closeSetupWizardForSnapshot() { setupOverlay.reset(); }
     void refreshTweakReadoutForSnapshot() { refreshTweakReadout(); resized(); }
@@ -271,7 +274,9 @@ private:
     void saveAsTemplate();
     void chooseFileToOpen();
     void chooseFileToOpenNow();
-    void save (bool askForFile);
+    // `afterSaved`: runs once the project is on disk, also when a "Save as" dialog had to ask first (never after a
+    // cancelled dialog or a failed save).
+    void save (bool askForFile, std::function<void()> afterSaved = {});
     void exportAudio (int format = -1); // −1: the last export's format(s); 0 WAV, 1 MP3, 2 OGG, 3 FLAC alone
     void exportMidiFile();
     void switchSmartDisableForAll();
