@@ -193,8 +193,12 @@ User decisions (2026-11-06, through the coordinator):
 
 ## 5. Found along the way, and later proposals
 
-### Bug: audio-take track name and take name disagree
-Seen at the 177d-1 GUI check (shots l25/l26). An audio take recorded through Insert 6 is named "Insert 6_Take1", but the Playlist track it lands on is renamed "Insert 7". This is LYNX-side (FL names the track after the take's insert). It is not caused by 177d-1, which only draws the take while it records. To be fixed in a later 177d slice.
+### Audio-take track name and take name disagree (traced: a routing choice, not a naming bug)
+Seen at the 177d-1 GUI check (shots l25/l26). An audio take recorded through Insert 6 is named "Insert 6_Take1", but its Playlist track is named "Insert 7".
+
+Both names are right about different things. The file name uses the insert that was recorded (`AudioEngine`, `takes::takeName`). The track name uses the insert the clip plays back through (`takes::linkTakeTrack`). A take tapped at Post effects or later sets `playThrough = 0`, so `placeTakeClips` claims a new free insert, because playing through its own insert would apply the effects twice. Post EQ is the default position (`MixerTrack::recordSource`), so an ordinary recording takes this path.
+
+Round 168x chose this routing and noted "FL's routing of such a clip was not measured". Still to do: record through an insert in FL at Post EQ and see which insert the clip plays through, then compare. 177d-1 did not cause this: it only draws the take while it records. Nothing changes until that FL check is done.
 
 ### Proposal: undo steps for tweaks made in a plugin's own GUI (pain point 16)
 Plugin parameter moves made in the plugin's own window make no undo step today, and the History labels name the channel or insert, not the parameter. This needs the plugin state captured before and after a gesture (`PluginWindows::onGesture` already reports begin and end) and stored in History. That is a larger change, logged as a later proposal (coordinator, 2026-11-06).
