@@ -9732,7 +9732,7 @@ private:
 
                 // round 177b: the same clip in FL's LFO mode: FL's defaults, then one shaped state (the UI gate pairs)
                 const auto before = offline.getSong().automations[0].lfo;
-                const auto lfoShot = [&offline] (std::function<void (lynx::AutomationLfo&)> set, const char* suffix) {
+                const auto lfoShot = [&offline, &saveWindow] (std::function<void (lynx::AutomationLfo&)> set, const char* suffix) {
                     offline.editSong ([&set] (lynx::Song& song) {
                         auto& lfo = song.automations[0].lfo;
                         lfo = lynx::AutomationLfo {};
