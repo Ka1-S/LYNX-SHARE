@@ -361,10 +361,12 @@ float Parameter::getValueForText (const juce::String& text) const
         if (getText (near, 64) == text)
             return near;
         // the nearest number may sit between two shown values: the value nearby that shows exactly this text
-        for (int i = 1; i <= 2000; ++i)
-            for (const auto v : { near - (float) i * 1.0e-5f, near + (float) i * 1.0e-5f })
-                if (v >= 0.0f && v <= 1.0f && getText (v, 64) == text)
-                    return v;
+        // (in steps finer than the text's last digit anywhere on a log scale: 1e-6 near it, then 1e-5 further out)
+        for (const auto [step, count] : { std::pair { 1.0e-6f, 4000 }, std::pair { 1.0e-5f, 2000 } })
+            for (int i = 1; i <= count; ++i)
+                for (const auto v : { near - (float) i * step, near + (float) i * step })
+                    if (v >= 0.0f && v <= 1.0f && getText (v, 64) == text)
+                        return v;
         return near;
     }
     if (const auto* p = modelparams::find (owner.entry.synth, engineIndex); p != nullptr && p->high > p->low)
