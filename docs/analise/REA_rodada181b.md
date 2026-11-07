@@ -50,7 +50,7 @@ default is Standard, as FL behaves.
 ### Naming differential
 
 FL's naming function (0xc43c20) was called on its own process with random key sets; LYNX's `nameKeys` got the same sets.
-FL's nine joke names (5 or more unrelated keys, picked at random) count as one class, because LYNX words its own.
+FL's nine joke names (seen on 7 to 10 keys in this sample, varying between names) count as one class, because LYNX words its own.
 
 | Set | Key sets | Differences |
 |---|---|---|
@@ -70,7 +70,7 @@ A sample of 80 measured names is in `tests/Logger181bTests.inc`. Measured at 22:
 | Documents/LYNX/Audio logger | Audio/Recorded | LYNX's own folder |
 | `Audiolog-YYYY-MM-DD HH-MM-SS.wav` | System date text | Same name on every system |
 | Opens LYNX's audio editor | Edison on the Master | LYNX's editor |
-| Joke name stable for the same keys, own wording | Random, FL's wording | Clean-room, and no flicker |
+| Joke name stable for the same keys, own wording | FL's wording; picks not traced | Clean-room, and no flicker |
 | Keys polled at the UI timer rate | Note entry called per event | Audio thread stays free of UI work; very short blips can be missed |
 | Post position always taps | Idle Master skips it | Same audio; the silence stop covers idle |
 | Chord style item | Hidden | LYNX addition, see above |
