@@ -143,7 +143,9 @@ private:
     int scansSeen = 0; // background plugin scans already announced in the hint bar
     int pluginCrashesSeen = 0; // hosted plugins that crashed (engine/PluginHost.h) and were already announced
     int editorCrashesSeen = 0; // faults in plugin editor windows (ui/PluginWindow.h, issue #32) already announced
+    int sandboxDeathsSeen = 0; // separate-process plugins that died (engine/PluginSandbox.h, round 176a) already announced
     void announceEditorCrash (const juce::String& plugin);
+    void announceSeparateProcessCrash (const juce::String& plugin, bool crashed, bool bits32);
     void showHelp();
     void closeUnfocusedWindows();
     void closeHelp();

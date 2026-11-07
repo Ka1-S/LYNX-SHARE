@@ -196,6 +196,25 @@ private:
     bool playheadOverlay = false;      // the cache is on: the playhead's own repaints keep its image
     bool playheadRepaintOnly = false;  // set around the playhead's own repaints: the image stays valid
     bool cachePainting = false;        // paint() is filling the image: no playhead in it
+    bool scrollRepaintOnly = false;    // set around a scroll's repaint: the cache shifts its picture (round 174e2)
+    struct CacheView
+    {
+        double scrollTicks = -1.0;
+        int scrollY = -1;
+        double pixelsPerTick = 0.0;
+        int tracksHeight = 0, tracks = 0;
+        bool overlays = false; // the Ripple / Performance tags in the grid's corner (they do not scroll)
+        int width = 0, height = 0;
+        bool operator== (const CacheView&) const = default;
+    };
+    struct CacheShift
+    {
+        juce::Rectangle<int> area, alsoChanged;
+        int dx = 0, dy = 0;
+    };
+    CacheView cacheView() const;
+    CacheShift cacheShift (const CacheView& from, const CacheView& to, float scale) const;
+    void repaintScrolled();
     void paintPlayhead (juce::Graphics& g);
     void scrollBarMoved (juce::ScrollBar*, double) override;
 

@@ -5,6 +5,7 @@
 #include "core/TrackIcons.h"
 #include "ui/ClipProperties.h"
 #include "ui/UiTrace.h"
+#include "ui/ImageReadback.h"
 #include "ui/TextCache.h"
 #include "ui/PlaylistComponent.h"
 #include "ui/PatternBlocksView.h"
@@ -235,38 +236,94 @@ public:
         const auto scale = g.getInternalContext().getPhysicalPixelScaleFactor();
         const auto bounds = owner.getLocalBounds();
         const auto imageBounds = bounds * scale;
-
-        // a scroll, a zoom, a resize: (almost) everything changes, painted straight to the window (through the image it
-        // costs a render and a full blit: wheel scrolling went from ~33 to ~26 fps). The image is rebuilt once the
-        // view has been still for a moment, by the next playhead frame.
         const auto nowMs = juce::Time::getMillisecondCounterHiRes();
         const auto clip = g.getClipBounds();
-        if ((double) clip.getWidth() * clip.getHeight() > 0.5 * bounds.getWidth() * bounds.getHeight())
-            lastLargeMs = nowMs;
-        if (nowMs - lastLargeMs < 300.0 && ! valid.containsRectangle (clip))
-        {
-            owner.paintEntireComponent (g, false);
-            return;
-        }
 
         if (image.isNull() || image.getBounds() != imageBounds)
         {
             image = juce::Image (juce::Image::RGB, juce::jmax (1, imageBounds.getWidth()), juce::jmax (1, imageBounds.getHeight()), false);
+            spare = {};
             valid.clear();
         }
 
-        if (! valid.containsRectangle (bounds))
+        // the view moved since the picture was drawn. A scroll by whole pixels (round 174e2): the picture is shifted
+        // and only the columns / rows it uncovered are painted (FL scrolls at ~120 fps). A zoom, a track resize, a
+        // fractional scroll: everything is painted again.
+        const auto view = owner.cacheView();
+        CacheShift shift;
+        if (view != drawnView)
         {
-            juce::Graphics imageGraphics (image);
-            auto& context = imageGraphics.getInternalContext();
-            context.addTransform (juce::AffineTransform::scale (scale));
-            for (const auto& r : valid)
-                context.excludeClipRectangle (r);
-            owner.cachePainting = true; // (the image without the playhead: drawn over it below)
-            owner.paintEntireComponent (imageGraphics, true);
-            owner.cachePainting = false;
+            shift = owner.cacheShift (drawnView, view, scale);
+            if (shift.area.isEmpty())
+                valid.clear();
         }
+        auto validNow = valid;
+        if (! shift.area.isEmpty())
+        {
+            juce::RectangleList<int> moved;
+            for (const auto& r : valid)
+                if (const auto in = r.getIntersection (shift.area); ! in.isEmpty())
+                    moved.addWithoutMerging (in.translated (shift.dx, shift.dy).getIntersection (shift.area));
+            validNow.subtract (shift.area);
+            validNow.subtract (shift.alsoChanged);
+            validNow.add (moved);
+        }
+
+        // a repaint of (almost) everything (a zoom, an edit): painted straight to the window (through the picture it costs
+        // a render and a full blit); the picture is rebuilt once the view has been still for a moment, by the next
+        // playhead frame. Not a scroll: it goes through the picture, so the next frame can shift it (painted straight,
+        // every scroll frame found the picture gone and painted everything again)
+        auto invalid = juce::RectangleList<int> (bounds);
+        invalid.subtract (validNow);
+        const auto half = 0.5 * bounds.getWidth() * bounds.getHeight();
+        if ((double) clip.getWidth() * clip.getHeight() > half && area (invalid) > half)
+            lastLargeMs = nowMs;
+        if (nowMs - lastLargeMs < 300.0 && shift.area.isEmpty() && ! validNow.containsRectangle (clip))
+        {
+            if (view != drawnView)
+            {
+                valid.clear(); // (the picture is of another view now; later invalidations are in this one's coordinates)
+                drawnView = view;
+            }
+            owner.paintEntireComponent (g, false);
+            return;
+        }
+
+        const auto shifting = ! shift.area.isEmpty();
+        if (shifting || ! invalid.isEmpty())
+        {
+            if (shifting && (spare.isNull() || spare.getBounds() != image.getBounds()))
+                spare = juce::Image (juce::Image::RGB, image.getWidth(), image.getHeight(), false);
+            auto& target = shifting ? spare : image;
+            const ui::ScopedNoImageReadback noReadback; // (the picture is only ever drawn to the window)
+            juce::Graphics imageGraphics (target);
+            if (shifting)
+            {
+                const auto physical = (shift.area.toFloat() * scale).getSmallestIntegerContainer();
+                {
+                    const juce::Graphics::ScopedSaveState state (imageGraphics);
+                    imageGraphics.excludeClipRegion (physical);
+                    imageGraphics.drawImageAt (image, 0, 0);
+                }
+                const juce::Graphics::ScopedSaveState state (imageGraphics);
+                if (imageGraphics.reduceClipRegion (physical))
+                    imageGraphics.drawImageAt (image, juce::roundToInt ((float) shift.dx * scale), juce::roundToInt ((float) shift.dy * scale));
+            }
+            if (! invalid.isEmpty())
+            {
+                auto& context = imageGraphics.getInternalContext();
+                context.addTransform (juce::AffineTransform::scale (scale));
+                for (const auto& r : validNow)
+                    context.excludeClipRectangle (r);
+                owner.cachePainting = true; // (the picture without the playhead: drawn over it below)
+                owner.paintEntireComponent (imageGraphics, true);
+                owner.cachePainting = false;
+            }
+        }
+        if (shifting)
+            std::swap (image, spare);
         valid = bounds;
+        drawnView = view;
 
         g.setColour (juce::Colours::black);
         g.drawImageTransformed (image,
@@ -276,25 +333,83 @@ public:
         owner.paintPlayhead (g);
     }
 
-    bool invalidateAll() override
+    bool invalidateAll() override // (JUCE's repaint() of the whole component comes here, not to invalidate())
     {
-        valid.clear();
+        if (! owner.playheadRepaintOnly && ! owner.scrollRepaintOnly)
+            valid.clear();
         return true;
     }
-    bool invalidate (const juce::Rectangle<int>& area) override
+    bool invalidate (const juce::Rectangle<int>& r) override
     {
-        if (! owner.playheadRepaintOnly)
-            valid.subtract (area);
+        if (! owner.playheadRepaintOnly && ! owner.scrollRepaintOnly)
+            valid.subtract (r);
         return true; // (the window repaints the area either way)
     }
-    void releaseResources() override { image = {}; }
+    void releaseResources() override
+    {
+        image = {};
+        spare = {};
+    }
 
 private:
+    static double area (const juce::RectangleList<int>& list)
+    {
+        double a = 0.0;
+        for (const auto& r : list)
+            a += (double) r.getWidth() * r.getHeight();
+        return a;
+    }
+
     PlaylistComponent& owner;
-    juce::Image image;
+    juce::Image image, spare; // spare: the shifted copy is drawn into it, then they swap
     juce::RectangleList<int> valid;
+    CacheView drawnView;
     double lastLargeMs = 0.0;
 };
+
+// What the cached picture depends on beyond what repaints say (round 174e2)
+PlaylistComponent::CacheView PlaylistComponent::cacheView() const
+{
+    return { scrollTicks, scrollY, pixelsPerTick, trackTops.empty() ? 0 : trackTops.back(), (int) trackTops.size(),
+             ripple || engine.getSong().performanceMode, getWidth(), getHeight() };
+}
+
+// The picture of view `from` shown as `to` by shifting it: the area that moves and by how much (whole physical pixels).
+// Horizontal: the ruler and the lanes (the headers stay); vertical: the headers and the lanes (the ruler stays).
+// Empty area: not a plain scroll (zoom, resize, track heights, both directions at once, the corner tags).
+PlaylistComponent::CacheShift PlaylistComponent::cacheShift (const CacheView& from, const CacheView& to, float scale) const
+{
+    if (from.pixelsPerTick != to.pixelsPerTick || from.tracksHeight != to.tracksHeight || from.tracks != to.tracks
+        || from.overlays || to.overlays || from.width != to.width || from.height != to.height)
+        return {};
+    const auto grid = gridArea();
+    const auto dxExact = (from.scrollTicks - to.scrollTicks) * to.pixelsPerTick;
+    const auto dx = (int) std::lround (dxExact), dy = from.scrollY - to.scrollY;
+    const auto whole = [scale] (int d) { return std::abs ((float) d * scale - (float) juce::roundToInt ((float) d * scale)) < 0.01f; };
+    if (std::abs (dxExact - dx) > 0.01 || (dx != 0 && dy != 0) || ! whole (dx) || ! whole (dy))
+        return {};
+    CacheShift shift;
+    if (dx != 0)
+    {
+        shift.area = { headerWidth, rulerTop, grid.getRight() - headerWidth, grid.getBottom() - rulerTop };
+        shift.alsoChanged = { headerWidth, grid.getBottom(), grid.getWidth(), getHeight() - grid.getBottom() }; // (the pattern blocks)
+    }
+    else
+        shift.area = { 0, headerHeight, grid.getRight(), grid.getHeight() };
+    shift.dx = dx;
+    shift.dy = dy;
+    if (std::abs (dx) >= shift.area.getWidth() || std::abs (dy) >= shift.area.getHeight())
+        return {};
+    return shift;
+}
+
+// A repaint after the view scrolled: the cached picture is shifted instead of painted again (round 174e2)
+void PlaylistComponent::repaintScrolled()
+{
+    scrollRepaintOnly = playheadOverlay;
+    repaint();
+    scrollRepaintOnly = false;
+}
 
 PlaylistComponent::PlaylistComponent (AudioEngine& e)
     : engine (e)
@@ -5815,6 +5930,8 @@ void PlaylistComponent::glideBy (double ticks, double pixels, bool immediate)
 
     const auto grid = gridArea();
     glideX.target = juce::jlimit (0.0, juce::jmax (0.0, hBar.getMaximumRangeLimit() - grid.getWidth() / pixelsPerTick), glideX.target + ticks);
+    if (ticks != 0.0) // (a whole number of pixels from the start: the cached picture shifts, round 174e2)
+        glideX.target = std::round (glideX.target * pixelsPerTick) / pixelsPerTick;
     glideY.target = juce::jlimit (0.0, juce::jmax (0.0, (double) tracksHeight() - grid.getHeight()), glideY.target + pixels);
     if (immediate)
     {
@@ -5824,7 +5941,7 @@ void PlaylistComponent::glideBy (double ticks, double pixels, bool immediate)
         updateScrollBars();
         glideX.jumpTo (scrollTicks); // the scroll bar may have clamped it
         glideY.jumpTo (scrollY);
-        repaint();
+        repaintScrolled();
         return;
     }
     glideFrame();
@@ -5842,13 +5959,19 @@ void PlaylistComponent::glideFrame()
         return;
     }
 
-    scrollTicks = glideX.step (0.45, 0.5 / pixelsPerTick);
+    // whole pixels sideways (round 174e2: the cached picture then shifts instead of being painted again), at least one
+    // pixel towards the target each frame
+    const auto fromPixels = scrollTicks * pixelsPerTick;
+    const auto steppedPixels = glideX.step (0.45, 0.5 / pixelsPerTick) * pixelsPerTick;
+    scrollTicks = (glideX.target * pixelsPerTick > fromPixels ? std::ceil (steppedPixels - 1.0e-6) : std::floor (steppedPixels + 1.0e-6)) / pixelsPerTick;
+    if ((glideX.target - scrollTicks) * (glideX.target * pixelsPerTick - fromPixels) < 0.0) // (never past the target)
+        scrollTicks = glideX.target;
     scrollY = (int) std::round (glideY.step (0.45, 1.0));
     glideY.current = scrollY;
     updateScrollBars();
     glideX.current = scrollTicks;
     gliding = glideX.isMoving() || glideY.isMoving();
-    repaint();
+    repaintScrolled();
 }
 
 void PlaylistComponent::mouseMagnify (const juce::MouseEvent& e, float scale)
@@ -5946,7 +6069,7 @@ void PlaylistComponent::scrollBarMoved (juce::ScrollBar* bar, double start)
     else
         scrollY = (int) start;
 
-    repaint();
+    repaintScrolled();
 }
 
 void PlaylistComponent::changeListenerCallback (juce::ChangeBroadcaster* source)

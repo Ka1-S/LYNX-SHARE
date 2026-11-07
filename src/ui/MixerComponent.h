@@ -228,6 +228,18 @@ private:
     void repaintAutomatedStrips();
     // the meters, input bars and automated controls, at the display's refresh (round 174e; was a 60 / 30 Hz timer)
     bool liveFrame (double nowMs);
+    // The strips kept as a picture of the visible part, with empty meter wells; the levels are drawn over it (round
+    // 174e2): a meter frame blits its rows and draws the bars instead of painting the strips under them again. Other
+    // repaints (a fader, a name, hover) refresh their area of the picture. LYNX_MIXER_CACHE=0: off.
+    class MeterCache;
+    bool meterCacheOn = false;
+    bool meterRepaintOnly = false; // set around the meters' own repaints: the picture stays valid
+    bool cachePainting = false;    // paint() is filling the picture: wells without levels
+    void paintMeterLevel (juce::Graphics& g, int track, int channel, juce::Rectangle<int> bar) const;
+    void paintMeterLevels (juce::Graphics& g) const; // every meter in the clip, over the picture
+    juce::Rectangle<int> nameBars (int track) const; // the thin level bars beside a vertical name (Wide layouts)
+    void paintNameBars (juce::Graphics& g, int track) const;
+    std::vector<int> sendAutomatedStrips;           // strips whose route knob shows an automated send
     std::uint32_t shownAutomation = 0;
     double lastFrameMs = 0.0;
     std::vector<std::array<float, 2>> automatedShown; // the volume and pan drawn per strip while automated (round 174e)

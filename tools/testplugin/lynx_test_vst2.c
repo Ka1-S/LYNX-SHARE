@@ -2,10 +2,20 @@
  * plugins. Written against the VST 2.4 binary interface as LYNX declares it (no Steinberg headers):
  *   zig cc -shared -O2 -target x86_64-windows-gnu tools/testplugin/lynx_test_vst2.c -o "LYNX Test Synth.dll"
  *   LYNX.exe --vst2test "LYNX Test Synth.dll" report.txt
+ * 32-bit build (round 176a, the 32-bit bridge LYNX-bridge32.exe):
+ *   zig cc -shared -O2 -target x86-windows-gnu tools/testplugin/lynx_test_vst2.c -luser32 -o "LYNX Test Synth 32.dll"
+ *   LYNX.exe --bridge32test "LYNX Test Synth 32.dll" report.txt
  * Sound: a sine at the played note, amplitude = parameter 0 ("Gain") × velocity.
  * Parameter 1 ("Tempo") reports the host tempo / 1000 it last read through audioMasterGetTime.
  * State: a program chunk ('LXV2' + gain + last tempo/1000), so a host must restore it with effSetChunk.
+ * Parameter 2 ("Bits"): the plugin's pointer size / 64 (0.5 in a 32-bit build): which process it runs in.
+ * Editor (Windows): a plain 240x120 child window. Environment (inherited by a bridge process):
+ *   LYNX_TEST_VST2_CRASH=process  an access violation in the 20th processReplacing call (crash isolation tests)
+ *   LYNX_TEST_VST2_LATENCY=<n>    reports n samples of latency (initialDelay)
  */
+#ifdef _WIN32
+ #include <windows.h>
+#endif
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -62,6 +72,8 @@ typedef struct
     float amplitude;
     double phase;
     unsigned char chunk[12];
+    int blocks, crash;
+    void* window;
 } Synth;
 
 static intptr_t dispatch (Effect* e, int32_t op, int32_t index, intptr_t value, void* ptr, float opt)
@@ -72,7 +84,23 @@ static intptr_t dispatch (Effect* e, int32_t op, int32_t index, intptr_t value, 
     {
         case 1: free (s); return 0;                                 /* close */
         case 10: s->rate = opt; return 0;                           /* setSampleRate */
-        case 8: strcpy ((char*) ptr, index == 0 ? "Gain" : "Tempo"); return 0; /* getParamName */
+        case 8: strcpy ((char*) ptr, index == 0 ? "Gain" : index == 1 ? "Tempo" : "Bits"); return 0; /* getParamName */
+#ifdef _WIN32
+        case 13:                                                    /* editGetRect */
+        {
+            static short rect[4] = { 0, 0, 120, 240 };              /* top, left, bottom, right */
+            *(short**) ptr = rect;
+            return 1;
+        }
+        case 14:                                                    /* editOpen: a child of the host's window */
+            s->window = CreateWindowExA (0, "STATIC", "LYNX Test Synth", WS_CHILD | WS_VISIBLE | SS_CENTER, 0, 0, 240, 120,
+                                         (HWND) ptr, 0, GetModuleHandleA (0), 0);
+            return s->window != 0;
+        case 15:                                                    /* editClose */
+            if (s->window != 0) DestroyWindow ((HWND) s->window);
+            s->window = 0;
+            return 0;
+#endif
         case 23:                                                    /* getChunk */
             memcpy (s->chunk, "LXV2", 4);
             memcpy (s->chunk + 4, &s->gain, 4);
@@ -111,13 +139,15 @@ static void setParam (Effect* e, int32_t i, float v)
 static float getParam (Effect* e, int32_t i)
 {
     Synth* s = (Synth*) e->object;
-    return i == 0 ? s->gain : s->tempo;
+    return i == 0 ? s->gain : i == 1 ? s->tempo : (float) (sizeof (void*) * 8) / 64.0f;
 }
 
 static void processReplacing (Effect* e, float** in, float** out, int32_t n)
 {
     Synth* s = (Synth*) e->object;
     (void) in;
+    if (s->crash && ++s->blocks == 20)
+        *(volatile int*) 0 = 1;                                     /* LYNX_TEST_VST2_CRASH=process */
     const TimeInfo* t = (const TimeInfo*) s->host (e, 7, 0, 0, 0, 0.0f);
     if (t != 0 && (t->flags & (1 << 10)))
         s->tempo = (float) (t->tempo / 1000.0);
@@ -147,10 +177,19 @@ __declspec (dllexport) Effect* VSTPluginMain (HostCallback host)
     s->effect.getParameter = getParam;
     s->effect.processReplacing = processReplacing;
     s->effect.numPrograms = 1;
-    s->effect.numParams = 2;
+    s->effect.numParams = 3;
     s->effect.numInputs = 0;
     s->effect.numOutputs = 2;
     s->effect.flags = (1 << 4) | (1 << 5) | (1 << 8); /* replacing, program chunks, synth */
+#ifdef _WIN32
+    s->effect.flags |= 1;                               /* has editor */
+#endif
+    {
+        const char* crash = getenv ("LYNX_TEST_VST2_CRASH");
+        const char* latency = getenv ("LYNX_TEST_VST2_LATENCY");
+        s->crash = crash != 0 && strcmp (crash, "process") == 0;
+        s->effect.initialDelay = latency != 0 ? atoi (latency) : 0;
+    }
     s->effect.object = s;
     s->effect.uniqueId = 0x4C585632;                    /* 'LXV2' */
     s->effect.version = 1;
