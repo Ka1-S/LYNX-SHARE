@@ -265,3 +265,26 @@ TEST (audit173d3b_waveshaper_old_maps)
         CHECK (back && back->points.size() == 3 && std::abs (back->points[1].y - 0.75f) < 1e-6f && back->oversampling == 2);
     }
 }
+
+// Round 173d3b: Maximus states of version 1…2 (11 of FL's 41 presets) in FL's version-3 layout (FUN_0083ef50: the
+// same block with two ints FL sets to 0x8000 at 0x18 and 0x104), so the exact engine and the editor read them
+TEST (audit173d3b_maximus_pre_v3_states)
+{
+    std::vector<std::uint8_t> v2 (4 + 0x1e6 + 40);
+    v2[0] = 2;
+    for (std::size_t i = 4; i < v2.size(); ++i)
+        v2[i] = (std::uint8_t) (i * 7);
+    const auto v3 = lynx::hlfx::maximusStateAsV3 (v2);
+    CHECK (v3.size() == v2.size() + 8 && v3[0] == 3);
+    CHECK (std::equal (v2.begin() + 4, v2.begin() + 4 + 0x18, v3.begin() + 4));
+    CHECK (v3[4 + 0x18] == 0 && v3[4 + 0x19] == 0x80 && v3[4 + 0x104] == 0 && v3[4 + 0x105] == 0x80);
+    CHECK (std::equal (v2.begin() + 4 + 0x18, v2.begin() + 4 + 0x100, v3.begin() + 4 + 0x1c));
+    CHECK (std::equal (v2.begin() + 4 + 0x100, v2.end(), v3.begin() + 4 + 0x108));
+    CHECK (lynx::hlfx::maximusStateAsV3 (v3) == v3);
+    if (realFlpDir.empty())
+        return;
+    std::ifstream in (std::filesystem::path (realFlpDir) / "Patches" / "Plugin presets" / "Effects" / "Maximus" / "Insert" / "NY compression.fst", std::ios::binary);
+    const std::vector<std::uint8_t> bytes ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
+    const auto fx = lynx::effectFromFlPreset (bytes, 130.0);
+    CHECK (fx && fx->kind == lynx::EffectKind::maximus);
+}

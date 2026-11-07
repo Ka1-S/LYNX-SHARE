@@ -915,7 +915,7 @@ std::optional<EffectSlot> fruityLimiterCompressor (const std::vector<std::uint8_
 std::optional<EffectSlot> maximusExact (const std::vector<std::uint8_t>& state)
 {
     maximusfx::Blob blob;
-    blob.state = state;
+    blob.state = hlfx::maximusStateAsV3 (state); // (round 173d3b: the editor's curves read the v3 layout)
     if (maximusfx::presetOf (blob) == nullptr)
         return std::nullopt;
     auto slot = makeEffectSlot (EffectKind::maximus);
