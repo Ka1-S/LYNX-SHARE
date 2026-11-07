@@ -2506,6 +2506,24 @@ private:
             };
             const auto power = juce::Rectangle<float> (a.getX(), a.getY(), 22.0f, 22.0f);
             const auto lit = bandOn (selected);
+            if (expert) // Audition, a raised grey key as the reference's (an accent marker while it plays this band); drawn
+                        // before the dimming of a switched-off band's panel
+            {
+                const auto key = juce::Rectangle<float> (a.getX() + panelW - 14.0f + 12.0f, a.getY() + 68.0f, 90.0f, 20.0f);
+                const auto playing = current() != nullptr && auditionBand (current()->params) == selected;
+                g.setColour (juce::Colours::black.withAlpha (0.55f));
+                g.fillRoundedRectangle (key, 4.0f);
+                g.setGradientFill (juce::ColourGradient (juce::Colour (0xff5d5d5d).brighter (key.contains (mouse) ? 0.12f : 0.0f), 0.0f, key.getY(), juce::Colour (0xff444343).brighter (key.contains (mouse) ? 0.12f : 0.0f), 0.0f, key.getBottom(), false));
+                g.fillRoundedRectangle (key.reduced (1.0f), 3.0f);
+                if (playing)
+                {
+                    g.setColour (juce::Colour (0xffdca103));
+                    g.fillRect (key.reduced (1.0f).withWidth (4.0f));
+                }
+                g.setColour (juce::Colour (0xffd2d2d2));
+                g.setFont (font (type::small));
+                g.drawText (tr ("Audition"), key, juce::Justification::centred, false);
+            }
             if (! lit) // a switched-off band's panel is dimmed, as the reference's; its power tile stays bright
             {
                 g.setColour (juce::Colour (0xff3c3c3c).withAlpha (0.45f));
@@ -2529,23 +2547,6 @@ private:
             mark.addTriangle (m.x - 5.0f, m.y - 2.5f, m.x + 5.0f, m.y - 2.5f, m.x, m.y + 2.5f);
             g.setColour (juce::Colour (0xffb4b4b4));
             g.fillPath (mark);
-            if (expert) // Audition, a raised grey key as the reference's (an accent marker while it plays this band)
-            {
-                const auto key = juce::Rectangle<float> (a.getX() + panelW - 14.0f + 12.0f, a.getY() + 68.0f, 90.0f, 20.0f);
-                const auto playing = current() != nullptr && auditionBand (current()->params) == selected;
-                g.setColour (juce::Colours::black.withAlpha (0.55f));
-                g.fillRoundedRectangle (key, 4.0f);
-                g.setGradientFill (juce::ColourGradient (juce::Colour (0xff5d5d5d).brighter (key.contains (mouse) ? 0.12f : 0.0f), 0.0f, key.getY(), juce::Colour (0xff444343).brighter (key.contains (mouse) ? 0.12f : 0.0f), 0.0f, key.getBottom(), false));
-                g.fillRoundedRectangle (key.reduced (1.0f), 3.0f);
-                if (playing)
-                {
-                    g.setColour (juce::Colour (0xffdca103));
-                    g.fillRect (key.reduced (1.0f).withWidth (4.0f));
-                }
-                g.setColour (juce::Colour (0xffd2d2d2));
-                g.setFont (font (type::small));
-                g.drawText (tr ("Audition"), key, juce::Justification::centred, false);
-            }
             const auto tab = expertTab();
             juce::Path tabShape;
             tabShape.addRoundedRectangle (tab.getX(), tab.getY(), tab.getWidth(), tab.getHeight(), 6.0f, 6.0f, true, false, true, false);
