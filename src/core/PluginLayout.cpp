@@ -2193,6 +2193,128 @@ Layout kilnLayout()
     return l;
 }
 
+// round tp172c8: Fret Channel, LYNX's guitar / bass channel strip (its role: the guitar channel strip measured on the
+// SSL Guitarstrip trial). The generic layout the parameter view falls back to (the window is core/ui ProEditors' own
+// panel): input column (meter, high-pass, input), PHASE CORRECTION (align to, delay, polarity, all-pass), EQUALISER
+// (low / mid / high, low-pass, pre / post), COMP (mode, threshold, mix, auto gain), DRIVE (amp model, pre-amp, drive,
+// the voicings, mix), output column (meter, output mix, output)
+Layout fretLayout()
+{
+    Layout l;
+    l.width = 976;
+    l.height = 540;
+    auto& v = l.items;
+    v.push_back (section (0, 0, 100, 540, TR_NOOP ("Input"), boxed));
+    v.push_back (section (100, 56, 386, 306, TR_NOOP ("Phase correction")));
+    v.push_back (section (486, 56, 390, 306, TR_NOOP ("Equaliser")));
+    v.push_back (section (100, 362, 290, 178, TR_NOOP ("Comp")));
+    v.push_back (section (390, 362, 486, 178, TR_NOOP ("Drive")));
+    v.push_back (section (876, 0, 100, 540, TR_NOOP ("Output"), boxed));
+    auto inMeter = display (20, 40, 60, 320, "iometer");
+    inMeter.colour = 0;
+    v.push_back (inMeter);
+    auto outMeter = display (896, 40, 60, 320, "iometer");
+    outMeter.colour = 1;
+    v.push_back (outMeter);
+    v.push_back (dial (50, 400, 34, "High-pass", TR_NOOP ("High pass")));
+    v.push_back (dial (50, 480, 40, "Input", TR_NOOP ("Input"), bipolar));
+    v.push_back (dial (926, 400, 34, "Output mix", TR_NOOP ("Mix")));
+    v.push_back (dial (926, 480, 40, "Output", TR_NOOP ("Output"), bipolar));
+    v.push_back (toggle (116, 66, 60, 22, "Phase correction", TR_NOOP ("On")));
+    v.push_back (menuOf (118, 118, 96, 22, "Align to", TR_NOOP ("Align to"), TR_NOOP ("Side chain|Left|Right")));
+    v.push_back (toggle (364, 66, 52, 26, "Side-chain listen", TR_NOOP ("S/C listen")));
+    v.push_back (toggle (422, 66, 52, 26, "Mono listen", TR_NOOP ("Mono listen")));
+    v.push_back (toggle (132, 196, 46, 22, "Delay in", TR_NOOP ("In")));
+    v.push_back (toggle (222, 196, 46, 22, "Phase invert", TR_NOOP ("Invert")));
+    v.push_back (dial (200, 262, 36, "Delay", TR_NOOP ("Time"), bipolar));
+    v.push_back (toggle (320, 196, 46, 22, "All-pass in", TR_NOOP ("In")));
+    v.push_back (toggle (406, 196, 52, 22, "All-pass order", TR_NOOP ("2nd order")));
+    v.push_back (dial (342, 300, 30, "All-pass freq.", TR_NOOP ("Freq")));
+    v.push_back (dial (432, 300, 30, "All-pass Q", TR_NOOP ("Q")));
+    v.push_back (toggle (502, 66, 40, 22, "EQ in", TR_NOOP ("On")));
+    v.push_back (toggle (752, 66, 52, 26, "EQ auto listen", TR_NOOP ("Auto listen")));
+    v.push_back (toggle (812, 66, 52, 26, "EQ post", TR_NOOP ("Pre / post")));
+    v.push_back (dial (536, 200, 36, "Low gain", TR_NOOP ("LF gain"), bipolar));
+    v.push_back (dial (607, 152, 30, "Mid freq.", TR_NOOP ("MF freq")));
+    v.push_back (dial (668, 200, 36, "Mid gain", TR_NOOP ("MF gain"), bipolar));
+    v.push_back (dial (750, 200, 36, "High gain", TR_NOOP ("HF gain"), bipolar));
+    v.push_back (dial (816, 152, 36, "Low-pass", TR_NOOP ("Low pass")));
+    v.push_back (toggle (116, 384, 40, 22, "Compressor", TR_NOOP ("On")));
+    v.push_back (menuOf (210, 384, 80, 22, "Comp. mode", TR_NOOP ("Mode"), TR_NOOP ("Fastest|Fast|Medium|Slow|Slowest")));
+    v.push_back (toggle (320, 388, 50, 26, "Auto gain", TR_NOOP ("Auto gain")));
+    v.push_back (meter (222, 436, 46, 92, 0, TR_NOOP ("Reduction")));
+    v.push_back (dial (148, 480, 36, "Threshold", TR_NOOP ("Threshold")));
+    v.push_back (dial (342, 480, 36, "Comp. mix", TR_NOOP ("Mix")));
+    v.push_back (toggle (408, 396, 40, 22, "Drive in", TR_NOOP ("On")));
+    v.push_back (menuOf (622, 394, 100, 22, "Amp model", TR_NOOP ("Model"), TR_NOOP ("Guitar amp|Bass amp")));
+    v.push_back (dial (440, 480, 36, "Pre-amp", TR_NOOP ("Pre-amp")));
+    v.push_back (dial (516, 480, 36, "Guitar drive", TR_NOOP ("Drive")));
+    v.push_back (when (dial (600, 480, 36, "Boost", TR_NOOP ("Boost"), bipolar), "Amp model", 0.0f, 0.49f));
+    v.push_back (when (dial (672, 480, 36, "Punch", TR_NOOP ("Punch"), bipolar), "Amp model", 0.0f, 0.49f));
+    v.push_back (when (dial (744, 480, 36, "Edge", TR_NOOP ("Edge")), "Amp model", 0.0f, 0.49f));
+    v.push_back (when (dial (600, 480, 36, "Bass drive", TR_NOOP ("Drive")), "Amp model", 0.5f, 1.0f));
+    v.push_back (when (dial (672, 480, 36, "Bass punch", TR_NOOP ("Punch"), bipolar), "Amp model", 0.5f, 1.0f));
+    v.push_back (when (dial (744, 480, 36, "Bass shape", TR_NOOP ("Shape")), "Amp model", 0.5f, 1.0f));
+    v.push_back (dial (830, 480, 36, "Drive mix", TR_NOOP ("Mix")));
+    return l;
+}
+
+// round tp172c8: Shell Channel, LYNX's drum channel strip (its role: the drum channel strip measured on the SSL Native
+// Drumstrip trial). The generic layout: input column, GATE and TRANSIENT SHAPER on top, the LOW / HIGH FREQ ENHANCERS and
+// the LISTEN MIC COMPRESSOR below, the process order under them, output column
+Layout shellLayout()
+{
+    Layout l;
+    l.width = 1000;
+    l.height = 500;
+    auto& v = l.items;
+    v.push_back (section (0, 0, 110, 500, TR_NOOP ("Input"), boxed));
+    v.push_back (section (110, 20, 486, 214, TR_NOOP ("Gate")));
+    v.push_back (section (596, 20, 294, 214, TR_NOOP ("Transient shaper")));
+    v.push_back (section (110, 234, 244, 168, TR_NOOP ("Low freq enhancer")));
+    v.push_back (section (354, 234, 244, 168, TR_NOOP ("High freq enhancer")));
+    v.push_back (section (598, 234, 292, 168, TR_NOOP ("Listen mic compressor")));
+    v.push_back (section (890, 0, 110, 500, TR_NOOP ("Output"), boxed));
+    auto inMeter = display (30, 30, 50, 260, "iometer");
+    inMeter.colour = 0;
+    v.push_back (inMeter);
+    auto outMeter = display (920, 30, 50, 260, "iometer");
+    outMeter.colour = 1;
+    v.push_back (outMeter);
+    v.push_back (dial (55, 400, 48, "Input", TR_NOOP ("Gain"), bipolar));
+    v.push_back (dial (945, 330, 36, "Output mix", TR_NOOP ("Mix")));
+    v.push_back (dial (945, 420, 36, "Output", TR_NOOP ("Gain"), bipolar));
+    v.push_back (meter (124, 46, 30, 160, 1, TR_NOOP ("Gain reduction")));
+    v.push_back (dial (318, 96, 34, "Gate open", TR_NOOP ("Open")));
+    v.push_back (dial (318, 186, 34, "Gate close", TR_NOOP ("Close")));
+    v.push_back (dial (392, 128, 34, "Gate range", TR_NOOP ("Range")));
+    v.push_back (dial (466, 128, 34, "Gate hold", TR_NOOP ("Hold")));
+    v.push_back (dial (542, 96, 34, "Gate attack", TR_NOOP ("Attack")));
+    v.push_back (dial (542, 186, 34, "Gate release", TR_NOOP ("Release")));
+    v.push_back (toggle (432, 210, 40, 22, "Gate", TR_NOOP ("Gate")));
+    v.push_back (toggle (616, 106, 44, 22, "Shaper invert", TR_NOOP ("Invert")));
+    v.push_back (toggle (616, 154, 44, 22, "Shaper listen", TR_NOOP ("Listen")));
+    v.push_back (dial (724, 124, 34, "Shaper speed", TR_NOOP ("Speed")));
+    v.push_back (dial (800, 96, 34, "Shaper gain", TR_NOOP ("Gain"), bipolar));
+    v.push_back (dial (800, 186, 34, "Shaper amount", TR_NOOP ("Amount")));
+    v.push_back (toggle (626, 214, 40, 22, "Transient shaper", TR_NOOP ("On")));
+    v.push_back (dial (166, 310, 34, "Low amount", TR_NOOP ("Amount")));
+    v.push_back (dial (232, 356, 34, "Low freq.", TR_NOOP ("Hz")));
+    v.push_back (dial (302, 356, 34, "Low drive", TR_NOOP ("Drive")));
+    v.push_back (toggle (300, 286, 40, 22, "Low enhancer", TR_NOOP ("On")));
+    v.push_back (toggle (380, 286, 40, 22, "High enhancer", TR_NOOP ("On")));
+    v.push_back (dial (404, 356, 34, "High drive", TR_NOOP ("Drive")));
+    v.push_back (dial (474, 356, 34, "High freq.", TR_NOOP ("kHz")));
+    v.push_back (dial (544, 310, 34, "High amount", TR_NOOP ("Amount")));
+    v.push_back (toggle (624, 286, 40, 22, "Listen mic", TR_NOOP ("On")));
+    v.push_back (toggle (624, 346, 40, 22, "Narrow band", TR_NOOP ("Narrow band")));
+    v.push_back (dial (700, 356, 34, "LMC comp", TR_NOOP ("Comp")));
+    v.push_back (dial (770, 356, 34, "LMC make-up", TR_NOOP ("Makeup gain"), bipolar));
+    v.push_back (dial (840, 310, 34, "LMC mix", TR_NOOP ("Mix")));
+    v.push_back (knob (505, 446, 34, "Process order", TR_NOOP ("Process order"), 482, showValue, 120));
+    return l;
+}
+
 Layout emberLayout()
 {
     Layout l;
@@ -3706,7 +3828,7 @@ const std::vector<EffectKind>& flLayoutKinds()
 const std::vector<EffectKind>& ownLayoutKinds()
 {
     static const std::vector<EffectKind> kinds { EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser,
-                                                 EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::epochVerb, EffectKind::atrium,
+                                                 EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::epochVerb, EffectKind::atrium,
                                                  EffectKind::foilPlate, EffectKind::nebula, EffectKind::halo, EffectKind::horizon,
                                                  EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod,
                                                  EffectKind::crestCompressor, EffectKind::prismMultiband, EffectKind::sentryGate,
@@ -3791,6 +3913,8 @@ const Layout& layoutFor (EffectKind kind)
         case EffectKind::aether: l = aetherLayout(); break;
         case EffectKind::ember: l = withEmberClassic (emberLayout()); break;
         case EffectKind::kilnChannel: l = kilnLayout(); break;
+        case EffectKind::fretChannel: l = fretLayout(); break;
+        case EffectKind::shellChannel: l = shellLayout(); break;
         case EffectKind::epochVerb: l = captionsAbove (epochVerbLayout()); break;
         case EffectKind::atrium: l = captionsAbove (atriumLayout()); break;
         case EffectKind::foilPlate: l = captionsAbove (foilPlateLayout()); break;
