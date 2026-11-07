@@ -370,6 +370,7 @@ Song makeRenderSong (const Song& original, const Options& o, std::int64_t tailTi
     }
     else
         base = makeExportSong (song, o.range == Range::song || (o.range == Range::selection), 0, length);
+        base.auditionLane = base.auditionComp = -1; // (made from the song again: the audition stays out)
 
     length = std::max<std::int64_t> (1, length);
     loopTicks = length;

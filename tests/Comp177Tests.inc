@@ -474,7 +474,8 @@ TEST (comp177_existing_projects_do_not_change)
     CHECK (comp177::onTrack (comped, 0).size() == 1 && comp177::onTrack (comped, 0)[0].offset == 2000 && ! comp177::onTrack (comped, 0)[0].muted);
     CHECK (comp177::onTrack (comped, 1)[0].offset == 2000 && comp177::onTrack (comped, 1)[0].muted);
     CHECK (comped.playlistTracks[1].mode == PlaylistTrackMode::unassigned);
-    CHECK (comped.playlistTracks[1].name == "Track 1 (take 3)" && comped.playlistTracks[3].name == "Track 1 (take 1)");
+    // (round 163 named the group's header after its insert, "Gtr": a header name is kept, as a user's is)
+    CHECK (comped.playlistTracks[1].name == "Gtr (take 3)" && comped.playlistTracks[3].name == "Gtr (take 1)");
 
     // a header the user named gives its name: "<name> comp", "<name> (take N)"
     auto named = song;
