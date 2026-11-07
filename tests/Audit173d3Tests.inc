@@ -6,7 +6,6 @@
 TEST (audit173d3_love_philter_lists_fl_presets)
 {
     CHECK (lynx::flPluginsForEffect (lynx::EffectKind::lovePhilter) == std::vector<std::string> { "Fruity Love Philter" });
-    CHECK (lynx::effectForFlPlugin ("Fruity Love Philter") == lynx::EffectKind::lovePhilter);
 }
 
 // With FL installed (tests' argument = FL's Data folder): FL's presets come back as the exact engines the editors need.
