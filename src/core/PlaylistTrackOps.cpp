@@ -6,6 +6,7 @@
 #include <map>
 #include <tuple>
 
+#include "core/EventEdit.h"
 #include "core/NoteEdit.h"
 #include "core/PlaylistOps.h"
 #include "core/RackOps.h"
@@ -300,6 +301,8 @@ MergeResult mergePatternClips (Song& song, const std::vector<int>& clips, int* n
     for (const auto i : list)
         if (song.playlist[(std::size_t) i].kind != ClipKind::pattern)
             return MergeResult::mixedKinds;
+    // FUN_012dc060's mask 0xa0: muted clips stay out
+    list.erase (std::remove_if (list.begin(), list.end(), [&song] (int i) { return song.playlist[(std::size_t) i].muted; }), list.end());
     if (list.size() < 2)
         return MergeResult::notEnough;
 
@@ -311,11 +314,13 @@ MergeResult mergePatternClips (Song& song, const std::vector<int>& clips, int* n
     const auto first = song.playlist[(std::size_t) list.front()];
     int lowest = (int) song.patterns.size();
     std::int64_t end = first.end();
+    int topTrack = first.track;
     for (const auto i : list)
     {
         const auto& c = song.playlist[(std::size_t) i];
         lowest = std::min (lowest, c.pattern);
         end = std::max (end, c.end());
+        topTrack = std::min (topTrack, c.track);
     }
 
     // the content: what each clip shows of its pattern (FL copies the clip's window; LYNX repeats a pattern along a
@@ -382,13 +387,285 @@ MergeResult mergePatternClips (Song& song, const std::vector<int>& clips, int* n
     Clip c;
     c.kind = ClipKind::pattern;
     c.pattern = index;
-    c.track = first.track;
+    c.track = topTrack;
     c.start = first.start;
     c.length = std::max<std::int64_t> (1, end - first.start);
     song.playlist.push_back (c);
     if (newClip != nullptr)
         *newClip = (int) song.playlist.size() - 1;
     return MergeResult::merged;
+}
+
+MergeResult mergeSimilarPatternClips (Song& song, const std::vector<int>& clips, int* similarGroups)
+{
+    if (similarGroups != nullptr)
+        *similarGroups = 0;
+
+    // what FUN_012dc060 keeps of the list: unmuted pattern clips
+    std::vector<int> list;
+    for (const auto i : clips)
+        if (i >= 0 && i < (int) song.playlist.size())
+            if (const auto& c = song.playlist[(std::size_t) i]; c.kind == ClipKind::pattern && ! c.muted)
+                list.push_back (i);
+    std::sort (list.begin(), list.end());
+    list.erase (std::unique (list.begin(), list.end()), list.end());
+    if (list.size() < 2)
+        return MergeResult::notEnough;
+
+    // the group to look for, in time order
+    struct Wanted
+    {
+        int pattern;
+        std::int64_t start, offset, length;
+        bool found;
+    };
+    std::vector<Wanted> group;
+    for (const auto i : list)
+    {
+        const auto& c = song.playlist[(std::size_t) i];
+        group.push_back ({ c.pattern, c.start, c.offset, c.length, false });
+    }
+    std::stable_sort (group.begin(), group.end(), [] (const Wanted& a, const Wanted& b) { return a.start < b.start; });
+
+    int added = -1;
+    if (const auto result = mergePatternClips (song, list, &added); result != MergeResult::merged)
+        return result;
+    const auto merged = song.playlist[(std::size_t) added];
+    for (auto& w : group) // the new pattern pushed the later ones up
+        if (w.pattern >= merged.pattern)
+            ++w.pattern;
+
+    // FUN_012dbac0: the tracks don't count, and a clip that has no pattern window is simply offset 0 + its length
+    const auto same = [] (const Wanted& w, const Clip& c) {
+        return c.kind == ClipKind::pattern && ! c.muted && c.pattern == w.pattern && c.offset == w.offset && c.length == w.length;
+    };
+
+    // FUN_012dbb20, restarted from the first clip after every hit (as FUN_012dc060's loop does)
+    for (bool again = true; again;)
+    {
+        again = false;
+        std::vector<int> order ((std::size_t) song.playlist.size());
+        for (std::size_t i = 0; i < order.size(); ++i)
+            order[i] = (int) i;
+        std::stable_sort (order.begin(), order.end(), [&song] (int a, int b) { return song.playlist[(std::size_t) a].start < song.playlist[(std::size_t) b].start; });
+
+        for (const auto anchorIndex : order)
+        {
+            const auto anchor = song.playlist[(std::size_t) anchorIndex];
+            if (! same (group.front(), anchor))
+                continue;
+
+            for (auto& w : group)
+                w.found = false;
+            std::vector<int> hits;
+            int topTrack = anchor.track;
+            std::size_t found = 0;
+            const auto shift = group.front().start - anchor.start;
+            const auto from = std::lower_bound (order.begin(), order.end(), anchor.start,
+                                                [&song] (int i, std::int64_t tick) { return song.playlist[(std::size_t) i].start < tick; });
+            for (auto it = from; it != order.end(); ++it)
+            {
+                const auto& c = song.playlist[(std::size_t) *it];
+                for (auto& w : group)
+                    if (! w.found && w.start == c.start + shift && same (w, c))
+                    {
+                        w.found = true;
+                        ++found;
+                        hits.push_back (*it);
+                        topTrack = std::min (topTrack, c.track);
+                        if (found >= group.size())
+                            break;
+                    }
+            }
+            if (found < group.size())
+                continue;
+
+            std::sort (hits.begin(), hits.end());
+            hits.erase (std::unique (hits.begin(), hits.end()), hits.end());
+            for (auto h = hits.rbegin(); h != hits.rend(); ++h)
+                song.playlist.erase (song.playlist.begin() + *h);
+            auto instance = merged;
+            instance.uid = 0;
+            instance.start = anchor.start;
+            instance.track = topTrack;
+            song.playlist.push_back (instance);
+            if (similarGroups != nullptr)
+                ++*similarGroups;
+            again = true;
+            break;
+        }
+    }
+    return MergeResult::merged;
+}
+
+// The automation clips of `clips` in time order, or nothing when one of them isn't a plain automation clip
+static std::vector<Clip> automationClipsInOrder (const Song& song, const std::vector<int>& clips)
+{
+    std::vector<Clip> list;
+    for (const auto i : clips)
+    {
+        if (i < 0 || i >= (int) song.playlist.size())
+            continue;
+        const auto& c = song.playlist[(std::size_t) i];
+        if (c.kind != ClipKind::automation || c.automation < 0 || c.automation >= (int) song.automations.size()
+            || song.automations[(std::size_t) c.automation].isLive())
+            return {};
+        list.push_back (c);
+    }
+    std::stable_sort (list.begin(), list.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
+    return list;
+}
+
+// FL's clip with no window (−1, −1): the whole automation. A LYNX clip may also run on past its last point, which only
+// holds that point's value.
+static bool showsWholeAutomation (const Clip& c, const Automation& a)
+{
+    return c.offset == 0 && c.length >= a.length();
+}
+
+// FUN_013007a0: a window needs control points at its start and its end
+static bool hasControlPointsAtEnds (const Clip& c, const Automation& a)
+{
+    if (showsWholeAutomation (c, a))
+        return true;
+    const auto has = [&a] (std::int64_t tick) {
+        return std::any_of (a.points.begin(), a.points.end(), [tick] (const AutomationPoint& p) { return p.tick == tick; });
+    };
+    return has (c.offset) && has (c.offset + c.length);
+}
+
+AutomationMergeCheck checkAutomationMerge (const Song& song, const std::vector<int>& clips)
+{
+    if (clips.size() < 2)
+        return AutomationMergeCheck::tooFew;
+    const auto list = automationClipsInOrder (song, clips);
+    if (list.size() < 2)
+        return AutomationMergeCheck::notAutomation;
+    for (const auto& c : list)
+        if (! hasControlPointsAtEnds (c, song.automations[(std::size_t) c.automation]))
+            return AutomationMergeCheck::missingEnds;
+    for (std::size_t i = 0; i + 1 < list.size(); ++i)
+        if (list[i + 1].start < list[i].end())
+            return AutomationMergeCheck::overlapping;
+    return AutomationMergeCheck::ok;
+}
+
+bool automationLinksConflict (const Song& song, const std::vector<int>& clips)
+{
+    const auto list = automationClipsInOrder (song, clips);
+    for (std::size_t i = 1; i < list.size(); ++i)
+        if (! (song.automations[(std::size_t) list[i].automation].target == song.automations[(std::size_t) list.front().automation].target))
+            return true;
+    return false;
+}
+
+int mergeAutomationClips (Song& song, const std::vector<int>& clips, AutomationLinks links, bool lossy)
+{
+    auto list = automationClipsInOrder (song, clips);
+    if (list.size() < 2)
+        return -1;
+    const auto first = list.front();
+    const auto origin = first.start;
+
+    Automation merged;
+    if (lossy)
+    {
+        // FUN_012ff0d0: a clip that overlaps the next one stops where the next one starts
+        for (std::size_t i = 0; i + 1 < list.size(); ++i)
+            list[i].length = std::min (list[i].length, list[i + 1].start - list[i].start);
+        PatternEvents samples;
+        for (std::size_t i = 0; i < list.size(); ++i)
+        {
+            const auto& c = list[i];
+            const auto& a = song.automations[(std::size_t) c.automation];
+            const auto at = c.start - origin;
+            if (! samples.events.empty() && samples.events.back().tick < at - 1)
+                samples.events.push_back ({ at - 1, samples.events.back().value }); // the gap holds
+            const auto last = i + 1 == list.size() ? c.length : c.length - 1; // the next clip takes over at its own start
+            for (std::int64_t t = 0; t <= last; ++t)
+                samples.events.push_back ({ at + t, a.valueAt ((double) (c.offset + t)) });
+        }
+        // just short of "exact" (a step per sample): FL's FUN_01304100 fits lines through them with a very small tolerance
+        merged.points = eventedit::toAutomationPoints (samples, 0.998f);
+    }
+    else
+    {
+        for (std::size_t i = 0; i < list.size(); ++i)
+        {
+            const auto& c = list[i];
+            const auto& a = song.automations[(std::size_t) c.automation];
+            const auto at = c.start - origin;
+            if (i > 0)
+            {
+                // FL's FUN_013009f0: a point with the last value where the next clip starts holds across a gap
+                if (! merged.points.empty())
+                {
+                    merged.points.back().tension = 0.0f; // the curve after a clip's last point isn't shown
+                    if (list[i - 1].end() < c.start)
+                        merged.points.push_back ({ at, merged.points.back().value, 0.0f });
+                }
+            }
+            const auto whole = showsWholeAutomation (c, a);
+            for (auto p : a.points)
+                if (whole || (p.tick >= c.offset && p.tick <= c.offset + c.length))
+                {
+                    p.tick += at - c.offset;
+                    merged.points.push_back (p);
+                }
+        }
+    }
+
+    const auto& source = song.automations[(std::size_t) first.automation];
+    merged.name = freeName (source.name + " - merged", [&song] (const std::string& n) {
+        return std::any_of (song.automations.begin(), song.automations.end(), [&n] (const Automation& a) { return a.name == n; });
+    });
+    if (links != AutomationLinks::deleteAll)
+        merged.target = source.target;
+
+    std::vector<AutomationTarget> otherTargets;
+    if (links == AutomationLinks::mergeAll)
+        for (const auto& c : list)
+        {
+            const auto& t = song.automations[(std::size_t) c.automation].target;
+            if (! (t == merged.target) && std::find (otherTargets.begin(), otherTargets.end(), t) == otherTargets.end())
+                otherTargets.push_back (t);
+        }
+
+    std::int64_t end = origin;
+    for (const auto& c : list)
+        end = std::max (end, c.end());
+
+    std::vector<int> doomed;
+    for (const auto i : clips)
+        if (i >= 0 && i < (int) song.playlist.size())
+            doomed.push_back (i);
+    std::sort (doomed.rbegin(), doomed.rend());
+    doomed.erase (std::unique (doomed.begin(), doomed.end()), doomed.end());
+    for (const auto i : doomed)
+        song.playlist.erase (song.playlist.begin() + i);
+
+    const auto addClip = [&] (const Automation& a) {
+        song.automations.push_back (a);
+        Clip c;
+        c.kind = ClipKind::automation;
+        c.automation = (int) song.automations.size() - 1;
+        c.track = first.track;
+        c.start = origin;
+        c.length = std::max<std::int64_t> (1, end - origin);
+        song.playlist.push_back (c);
+        return (int) song.playlist.size() - 1;
+    };
+    const auto result = addClip (merged);
+    for (const auto& target : otherTargets)
+    {
+        auto extra = merged;
+        extra.target = target;
+        extra.name = freeName (merged.name, [&song] (const std::string& n) {
+            return std::any_of (song.automations.begin(), song.automations.end(), [&n] (const Automation& a) { return a.name == n; });
+        });
+        addClip (extra);
+    }
+    return result;
 }
 
 std::string uniqueTrackName (const Song& song, const std::string& base, int except)

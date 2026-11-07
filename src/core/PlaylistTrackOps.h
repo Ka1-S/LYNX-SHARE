@@ -64,13 +64,41 @@ int purgeUnusedAudioClips (Song& song);
 
 // Which clips Ctrl+G merges: the selected ones, or every clip when nothing is selected (FL's selection mask).
 std::vector<int> mergeCandidates (const Song& song, const std::vector<int>& selection);
-// Every clip of `clips` must be a pattern clip and there must be at least two; the content each clip shows goes into a
-// new pattern (inserted after the lowest pattern involved, named and coloured after the first clip's pattern — the
-// name made unique), and one clip of it replaces them at the first clip's start on its track. Returns the new clip's
-// index, or -1 (FL: "Could not find enough valid pattern clips or instances to merge." / "The selection contains
-// different clip types, can't merge.").
+// Every clip of `clips` must be a pattern clip and at least two of them must be unmuted (FL's mask 0xa0: muted clips stay
+// out of the merge); the content each clip shows goes into a new pattern (inserted after the lowest pattern involved,
+// named and coloured after the first clip's pattern — the name made unique), and one clip of it replaces them at the
+// first clip's start, on the topmost of their tracks (FL: the largest stored row, stored as 500 − track). Returns the
+// new clip's index, or -1 (FL: "Could not find enough valid pattern clips or instances to merge." / "The selection
+// contains different clip types, can't merge.").
 enum class MergeResult { merged, notEnough, mixedKinds };
 MergeResult mergePatternClips (Song& song, const std::vector<int>& clips, int* newClip = nullptr);
+
+// --- Merge similar pattern clips (Ctrl+Shift+G; EEMergeSimAction → FUN_012dc060 (1, 1)) --------------------------------
+
+// Merges `clips` as mergePatternClips does, but other kinds in the list are skipped rather than refused (this action
+// doesn't go through FUN_01302d30's check). Then every other group of clips in the arrangement with the same content at
+// the same relative times (FUN_012dbb20 / FUN_012dbac0: same pattern, same window, not muted; the tracks don't count)
+// becomes one more clip of the new pattern, at that group's first time and topmost track. `similarGroups` = how many.
+MergeResult mergeSimilarPatternClips (Song& song, const std::vector<int>& clips, int* similarGroups = nullptr);
+
+// --- Merge automation clips (Ctrl+Alt+G; EEMergeAutoClipsAction → FUN_013009f0, lossy FUN_012ff0d0) --------------------
+
+// In FL's order of checks. tooFew: "Please select at least two automation clips."; notAutomation: "The selection may
+// only contain automation clips."; missingEnds: a clip's window lacks control points at its start and end (FUN_013007a0);
+// overlapping: clips overlap in time. The last two can only merge lossily, after FL's question. LYNX has no counterpart
+// of FL's other refusals: its clips have no per-clip min / max and no LFO mode.
+enum class AutomationMergeCheck { ok, tooFew, notAutomation, missingEnds, overlapping };
+AutomationMergeCheck checkAutomationMerge (const Song& song, const std::vector<int>& clips);
+// FL's "Target links conflict": the clips don't all drive the same parameter (FUN_012e1a80).
+bool automationLinksConflict (const Song& song, const std::vector<int>& clips);
+// The answers to that question. FL's clip can hold several links, a LYNX automation one target: mergeAll gives every
+// other target a clip of its own with the same curve, on the same track.
+enum class AutomationLinks { keepFirst, mergeAll, deleteAll };
+// A new automation "<first clip's name> - merged" (made unique) holding what each clip shows, one clip of it at the
+// first clip's place; the old clips go, their automations stay (as FL's channels do). A gap between two clips holds the
+// last value. Lossy: each clip's curve is sampled instead, later clips cutting off overlapping ones (FUN_012ff0d0).
+// Returns the new clip's index, or -1 when the clips can't be merged at all.
+int mergeAutomationClips (Song& song, const std::vector<int>& clips, AutomationLinks links, bool lossy);
 
 // --- Clone selected playlist track(s) (Ctrl+Shift+B; EEClonePLTracksAction → FUN_012edbe0 / FUN_012ee550) --------------
 

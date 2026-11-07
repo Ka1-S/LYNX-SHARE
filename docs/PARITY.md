@@ -1989,3 +1989,6 @@ voicing 3.6, with the Modern voicing **7.1** (defaults 7…9, EQ settings 6…8,
 remaining error: the dense drum transients through the fast peak compressor + gate (S4 drums 5) and the make-up with
 the dynamics before the EQ (S5, +0.5 dB).
 
+## Round 180c: Merge similar pattern clips, Merge automation clips (issue #74)
+
+FL's Ctrl+Shift+G and Ctrl+Alt+G, from `FLEngine_x64.dll`. See `docs/analise/REA_rodada180c.md`, including its list of differences from FL.

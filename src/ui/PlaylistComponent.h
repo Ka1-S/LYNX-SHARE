@@ -171,6 +171,8 @@ private:
     void zoomOnPerformanceClips();
     // round 168f: FL's Playlist track tools (core/PlaylistTrackOps.h)
     void mergePatternClipsByKey();               // Ctrl+G
+    void mergeSimilarClipsByKey();               // Ctrl+Shift+G
+    void mergeAutomationClipsByKey();            // Ctrl+Alt+G (Ctrl+G on a selection of automation clips too)
     void makeSelectionUnique();                  // Ctrl+Shift+V
     void cloneTracksWithDialog (std::vector<int> tracks); // Ctrl+Shift+B, track menu "Clone..."
     void lockAllTracks (bool lock);              // Tools › Lock / Unlock all playlist tracks (to / from) content

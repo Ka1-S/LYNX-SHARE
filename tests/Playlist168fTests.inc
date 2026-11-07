@@ -336,6 +336,8 @@ TEST (pl168f_keys_and_flp_import)
     // Ctrl+Shift+V, EEZoomOnPerformanceClipsAction Shift+6
     const std::pair<const char*, keys::Chord> expected[] = {
         { "playlist.mergePatternClips", keys::Chord { 'G', keys::ctrl } },
+        { "playlist.mergeSimilarClips", keys::Chord { 'G', (std::uint8_t) (keys::ctrl | keys::shift) } },
+        { "playlist.mergeAutomationClips", keys::Chord { 'G', (std::uint8_t) (keys::ctrl | keys::alt) } },
         { "playlist.cloneTracks", keys::Chord { 'B', (std::uint8_t) (keys::ctrl | keys::shift) } },
         { "playlist.makeUnique", keys::Chord { 'V', (std::uint8_t) (keys::ctrl | keys::shift) } },
         { "playlist.zoomPerformance", keys::Chord { '6', keys::shift } },
