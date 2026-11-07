@@ -65,7 +65,7 @@ TEST (merge180c_similar_replaces_every_group)
     CHECK ((pltracks::mergeSimilarPatternClips (song, { 0, 1 }, &groups) == pltracks::MergeResult::merged));
     CHECK (groups == 1);
     // new pattern after P1 (index 1), P2 moved to 2: 2 clips of it, and the six left-alone clips
-    CHECK (song.patterns.size() == 4 && song.patterns[1].notes.size() == 2);
+    CHECK (song.patterns.size() == 4 && song.patterns[1].notes.size() == 2 && song.patterns[1].name == "P1 #2 (merged)");
     CHECK (merge180c::countClips (song, 1) == 2);
     CHECK (song.playlist.size() == 8);
     bool first = false, second = false;

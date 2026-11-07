@@ -369,9 +369,10 @@ MergeResult mergePatternClips (Song& song, const std::vector<int>& clips, int* n
     }
     const auto& source = song.patterns[(std::size_t) std::clamp (first.pattern, 0, (int) song.patterns.size() - 1)];
     merged.colour = source.colour;
+    // FL (seen in FL 2026, round 180c): the free name, then " (merged)" ("P1" → "P1 #2 (merged)")
     merged.name = freeName (source.name, [&song] (const std::string& n) {
         return std::any_of (song.patterns.begin(), song.patterns.end(), [&n] (const Pattern& p) { return p.name == n; });
-    });
+    }) + " (merged)";
 
     // the clips go, the new pattern comes after the lowest one involved, one clip of it at the first clip's place
     auto doomed = list;

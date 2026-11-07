@@ -230,7 +230,7 @@ TEST (pl168f_merge_pattern_clips)
     int added = -1;
     CHECK ((pltracks::mergePatternClips (song, { 0, 1 }, &added) == pltracks::MergeResult::merged));
     // the new pattern sits after the lowest one involved (pattern 0) → index 1; old pattern 1 moved to 2
-    CHECK (song.patterns.size() == 4 && song.patterns[1].name == "P1 #2" && song.patterns[1].colour == song.patterns[0].colour);
+    CHECK (song.patterns.size() == 4 && song.patterns[1].name == "P1 #2 (merged)" && song.patterns[1].colour == song.patterns[0].colour);
     CHECK (song.patterns[2].name == "P2");
     CHECK (song.playlist.size() == 2 && added == 1);
     const auto& m = song.playlist[(std::size_t) added];

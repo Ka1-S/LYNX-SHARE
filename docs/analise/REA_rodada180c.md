@@ -52,13 +52,29 @@ Lossy (`FUN_012ff0d0 (1)`): overlapping clips are cut at the next clip's start, 
 
 1. **Merge all links.** An FL clip holds several links; a LYNX `Automation` holds one target. Each other target gets its
    own clip with the same curve, on the same track. The sound is the same, but there is more than one clip.
-2. **Lossy tool.** FL opens its events-to-automation tool (`TMEEventsToAutoTool`, `FUN_00dfb410`); Cancel there deletes
+2. **"Remember my choice"** on FL's lossy question is not in LYNX.
+3. **Lossy tool.** FL opens its events-to-automation tool (`TMEEventsToAutoTool`, `FUN_00dfb410`); Cancel there deletes
    the new channel and changes nothing. LYNX opens its own "Convert to automation" panel at the same step, starting at
-   99.8 % rather than the panel's usual 100 % (a step per sample would make thousands of points). The panel isn't modal
-   here, so a later edit of those clips cancels the merge.
-3. **Legacy pattern blocks** (id `0x60000000`) take part in FL's merges. They do not in LYNX's, as with Ctrl+G since 168f.
-4. **A clip past its last point.** LYNX lets a clip run on past its automation's last point (painted clips are 4 bars).
+   99.8 % rather than at the top as FL does (LYNX's 100 % makes a step per sample, thousands of points). FL also shows
+   the new channel's editor as a preview; LYNX shows the point count. The panel isn't modal here, so a later edit of
+   those clips cancels the merge.
+4. **Legacy pattern blocks** (id `0x60000000`) take part in FL's merges. They do not in LYNX's, as with Ctrl+G since 168f.
+5. **A clip past its last point.** LYNX lets a clip run on past its automation's last point (painted clips are 4 bars).
    It only holds a value, so it counts as whole, not as a window missing its end point.
+
+## Checked in FL Studio 2026 (2026-11-07, test projects in `C:\Users\kauan\lynx-test\r180c`, shots `/mnt/e/lynx-work/issues180c/shots/f00–f18`)
+
+Each project was made by LYNX's `--export-flp`. Mute and selection bits went into the `.flp` item flags; FL kept the
+mute but not the selection, so the selections were made with Ctrl+drag. Results were read back from FL's saved files
+with `flpdump`.
+
+| Case | FL | LYNX |
+|---|---|---|
+| Ctrl+G, nothing selected: P1 on track 6, P2 on track 4 a bar later, P3 muted on track 2 | one clip "P1 #2 (merged)" at bar 1 on **track 4** (the topmost), 2 bars; P3 stays (f02) | same (the name fixed after this run: LYNX said "P1 #2") |
+| Ctrl+Shift+G on P1+P2 at bar 1 (tracks 3, 4) | bar 1 → track 3; the copy at bar 9 (tracks 7, 6) → track 6; the copies one bar apart, with another window, or with a muted clip stay (f06, saved file) | same (test `merge180c_similar_replaces_every_group` is this project) |
+| Ctrl+G on two automation clips | automation merge: "Cut - merged" on the first clip's track, the gap held, 4 bars (f08) | same |
+| Ctrl+Alt+G on overlapping clips | "Can't perform lossless merge — The selection contains overlapping clips. Perform lossy merge ?" Yes / No and a "Remember my choice" tick (f10); Yes opens "Convert to automation" (Sensitivity, Reset, Accept) beside the new channel's editor (f12); closing it leaves everything as it was (f13) | the same question without the tick; Yes opens LYNX's "Convert to automation" panel; Cancel leaves everything as it was |
+| Ctrl+Alt+G on clips of different targets | "Target links conflict" with three buttons and a close box (f16); Merge all links gives one clip "Cut - merged" (f17) | same question plus Cancel; Merge all links gives one clip per target |
 
 ## Found and fixed in Ctrl+G (168f)
 
