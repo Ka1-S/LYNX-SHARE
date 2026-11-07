@@ -2057,3 +2057,5 @@ Proof: `docs/analise/REA_rodada181b.md`.
 | Tools › Riff machine | opens LYNX's Riff machine on the selected channel | ⚠️ | FL inserts a new Sytrus channel from `Data\System\Riff machine\*.fst` first |
 | Tools › Chord progression tool | opens LYNX's chord progression generator | ⚠️ | FL's is its own Python window (`cpt.pyscript`), much larger |
 | Tools › Macros › Remove all Edison instances | — | ❌ | not added: LYNX has no Edison instances |
+| Tools › Clipboard › Save audio / MIDI clipboard to browser, greyed when empty | same, into the Browser's "Clipboard files" | ⚠️ | audio: CF_WAVE on Windows, else LYNX's audio editor clipboard; " (2)" naming INFERRED |
+| Tools › Score logger (Dump score log to selected pattern, Clear log) | same, moved from Options to Tools | ✅ | |
