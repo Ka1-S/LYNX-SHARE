@@ -24,9 +24,19 @@ struct ParsedMidi
 {
     std::vector<std::string> trackNames; // per file track ("" = none)
     std::vector<RawEvent> events;        // in time order per track
-    double bpm = 120.0;
+    double bpm = 120.0;                  // the first Set Tempo (FL's whole BPM, 10..522), 120 without one
     int numerator = 0, denominator = 4;  // the first time signature (0 = none)
+    // every Set Tempo, in time order (issue #86): LYNX ticks, FL's BPM (round half even of 60 000 000 / µs per quarter,
+    // 10..522, FUN_009864f0); File › Import writes them as the new pattern's Tempo events, as FL does
+    std::vector<PatternEvent> tempos;    // value = valueFromTempo (bpm)
 };
+
+// FL's MIDI tempo (REA_rodada178a §5): a whole BPM, rounded half to even, 10..522.
+double midiTempoBpm (double secondsPerQuarter) noexcept;
+
+// The pattern's Tempo lane from a file's Set Tempo events (moved earlier by `shift` ticks, the realign), as FL's
+// whole-file MIDI import writes them (FUN_00e1d090: the destination pattern's Tempo events are replaced).
+void setTempoEvents (Pattern& pattern, const std::vector<PatternEvent>& tempos, std::int64_t shift);
 
 struct Options
 {
