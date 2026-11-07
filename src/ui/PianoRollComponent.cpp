@@ -328,7 +328,7 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     engine.addChangeListener (this);
     EditorGlobals::get().addChangeListener (this);
     refreshChannelBox();
-    startTimerHz (30);
+    showingTimer = std::make_unique<ui::TimerWhileShowing> (*this, static_cast<juce::Timer&> (*this), 30); // (stopped while hidden; round 174f)
 }
 
 PianoRollComponent::~PianoRollComponent()

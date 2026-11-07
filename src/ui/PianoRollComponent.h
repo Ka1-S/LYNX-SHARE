@@ -4,6 +4,7 @@
 
 #include "core/NoteTools.h"
 #include "engine/AudioEngine.h"
+#include "ui/TimerWhileShowing.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
 #include "ui/FlMods.h"
@@ -424,5 +425,6 @@ private:
     void showPatternMarkerMenu (int index);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRollComponent)
+    std::unique_ptr<ui::TimerWhileShowing> showingTimer; // the polling timer, only while on screen (round 174f)
 };
 } // namespace lynx

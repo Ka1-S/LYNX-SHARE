@@ -156,7 +156,7 @@ ChannelRackComponent::ChannelRackComponent (AudioEngine& e)
     engine.getLevelsBroadcaster().addChangeListener (this);
     previews.setSender ([this] (int channel, int key, float velocity, bool on) { engine.sendLiveNote (channel, key, velocity, on); });
     updateSize();
-    startTimerHz (30);
+    showingTimer = std::make_unique<ui::TimerWhileShowing> (*this, static_cast<juce::Timer&> (*this), 30); // (stopped while hidden; round 174f)
 }
 
 ChannelRackComponent::~ChannelRackComponent()

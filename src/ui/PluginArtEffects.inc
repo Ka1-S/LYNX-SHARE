@@ -522,6 +522,147 @@ inline void canvasKiln (juce::Graphics& g, Rectangle<float> a, bool display)
     vignette (g, mod, 0.3f);
 }
 
+// === Fret Channel (guitar / bass channel strip role, round tp172c8): a mid-grey brushed panel between near-black input /
+// output columns, darker recessed sections (phase correction, EQ, comp, drive), teal read-out screens, colour-coded caps
+// (blue mid band, red high gain and drive, silver trims)
+inline void canvasFret (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    vfill (g, a, Colour (0xff6a6c70), Colour (0xff505256));
+    if (display) return;
+    const auto sx = a.getWidth() / 976.0f, sy = a.getHeight() / 540.0f;
+    brushedLines (g, a, 225, 0.03f);
+    for (const auto col : { Rectangle<float> (a.getX(), a.getY(), 100.0f * sx, a.getHeight()),
+                            Rectangle<float> (a.getRight() - 100.0f * sx, a.getY(), 100.0f * sx, a.getHeight()) })
+    {
+        vfill (g, col, Colour (0xff35363a), Colour (0xff26272a));
+        g.setColour (Colour (0xff0f1012));
+        g.fillRoundedRectangle (Rectangle<float> (col.getX() + 20.0f * sx, col.getY() + 50.0f * sy, 60.0f * sx, 310.0f * sy), 3.0f);
+    }
+    for (const auto r : { Rectangle<float> (118.0f, 160.0f, 168.0f, 190.0f), Rectangle<float> (300.0f, 160.0f, 170.0f, 190.0f),
+                          Rectangle<float> (560.0f, 110.0f, 150.0f, 140.0f), Rectangle<float> (204.0f, 368.0f, 92.0f, 166.0f),
+                          Rectangle<float> (556.0f, 368.0f, 232.0f, 166.0f) })
+    {
+        const auto rr = Rectangle<float> (a.getX() + r.getX() * sx, a.getY() + r.getY() * sy, r.getWidth() * sx, r.getHeight() * sy);
+        g.setColour (Colour (0xff47494d));
+        g.fillRoundedRectangle (rr, 4.0f);
+    }
+    g.setColour (Colour (0xff0d2622));
+    g.fillRoundedRectangle (Rectangle<float> (a.getX() + 504.0f * sx, a.getY() + 270.0f * sy, 356.0f * sx, 84.0f * sy), 3.0f);
+    vignette (g, a, 0.25f);
+}
+
+inline Colour fretCapTint (const char* param)
+{
+    const juce::String n (param);
+    if (n == "Mid freq." || n == "Mid gain") return Colour (0xff2f6fb3);
+    if (n == "High gain" || n == "Guitar drive" || n == "Bass drive") return Colour (0xffb3262b);
+    if (n == "Low gain" || n == "Boost" || n == "Punch" || n == "Edge" || n == "Bass punch" || n == "Bass shape" || n == "Threshold" || n == "Delay"
+        || n == "Input" || n == "Output")
+        return Colour (0xff1c1d20);
+    return Colour (0xffc9cbcf);
+}
+
+inline const Theme& fretTheme()
+{
+    static const Theme t = []
+    {
+        Theme x = ridgeTheme();
+        x.name = "Fret Channel";
+        x.pal = { Colour (0xff626468), Colour (0xff4c4e52), Colour (0xfff08a3a), Colour (0xffffb46a),
+                  Colour (0x00000000), Colour (0x00000000), Colour (0x00000000), Colour (0xfff1f1ef),
+                  Colour (0xff2a2b2e), Colour (0xff47494d), Colour (0xff3a3c40), Colour (0xff8a8c90), Colour (0xfff4f4f2),
+                  Colour (0xff3a3c40) };
+        x.canvas = canvasFret;
+        x.headerDeco = nullptr;
+        x.flatSections = true;
+        x.rimWidth = 0.0f;
+        x.capTint = fretCapTint;
+        x.hwKeys = true;
+        x.offLabelCol = Colour (0xffd0d2d6);
+        x.captionCol = Colour (0xffeeeeec);
+        x.valueCol = Colour (0xffd0d2d6);
+        x.headerCol = Colour (0xff3a3b3f);
+        return x;
+    }();
+    return t;
+}
+
+// === Shell Channel (drum channel strip role, round tp172c8): charcoal modules on a near-black frame, a lighter header
+// band, green-capped gate / speed / comp knobs, a blue low and a red high frequency cap, silver amounts, and the five
+// chevrons of the process order along the bottom
+inline void canvasShell (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    vfill (g, a, Colour (0xff2c2d30), Colour (0xff1e1f21));
+    if (display) return;
+    const auto sx = a.getWidth() / 1000.0f, sy = a.getHeight() / 500.0f;
+    for (const auto col : { Rectangle<float> (a.getX(), a.getY(), 110.0f * sx, a.getHeight()),
+                            Rectangle<float> (a.getRight() - 110.0f * sx, a.getY(), 110.0f * sx, a.getHeight()) })
+    {
+        vfill (g, col, Colour (0xff232427), Colour (0xff18191b));
+        g.setColour (Colour (0xff0a0b0c));
+        g.fillRoundedRectangle (Rectangle<float> (col.getX() + 30.0f * sx, col.getY() + 24.0f * sy, 50.0f * sx, 270.0f * sy), 2.0f);
+    }
+    for (const auto r : { Rectangle<float> (112.0f, 20.0f, 484.0f, 212.0f), Rectangle<float> (598.0f, 20.0f, 290.0f, 212.0f),
+                          Rectangle<float> (112.0f, 236.0f, 240.0f, 164.0f), Rectangle<float> (356.0f, 236.0f, 240.0f, 164.0f),
+                          Rectangle<float> (600.0f, 236.0f, 288.0f, 164.0f) })
+    {
+        const auto rr = Rectangle<float> (a.getX() + r.getX() * sx, a.getY() + r.getY() * sy, r.getWidth() * sx, r.getHeight() * sy);
+        vfill (g, rr, Colour (0xff3a3b3e), Colour (0xff2f3033));
+        g.setColour (Colours::black.withAlpha (0.5f));
+        g.drawRect (rr, 1.0f);
+    }
+    // the process order's chevrons
+    for (int i = 0; i < 5; ++i)
+    {
+        const auto r = Rectangle<float> (a.getX() + (186.0f + 130.0f * i) * sx, a.getY() + 440.0f * sy, 124.0f * sx, 22.0f * sy);
+        juce::Path p;
+        p.startNewSubPath (r.getX(), r.getY());
+        p.lineTo (r.getRight() - 10.0f * sx, r.getY());
+        p.lineTo (r.getRight(), r.getCentreY());
+        p.lineTo (r.getRight() - 10.0f * sx, r.getBottom());
+        p.lineTo (r.getX(), r.getBottom());
+        p.lineTo (r.getX() + 10.0f * sx, r.getCentreY());
+        p.closeSubPath();
+        g.setColour (Colour (0xff3d3e42));
+        g.strokePath (p, juce::PathStrokeType (1.2f));
+    }
+    vignette (g, a, 0.3f);
+}
+
+inline Colour shellCapTint (const char* param)
+{
+    const juce::String n (param);
+    if (n == "Gate hold" || n == "Gate attack" || n == "Gate release" || n == "Shaper speed" || n == "LMC comp") return Colour (0xff1f7a4c);
+    if (n == "Low freq.") return Colour (0xff2f6fb3);
+    if (n == "High freq.") return Colour (0xffb3262b);
+    return Colour (0xffc9cbcf);
+}
+
+inline const Theme& shellTheme()
+{
+    static const Theme t = []
+    {
+        Theme x = ridgeTheme();
+        x.name = "Shell Channel";
+        x.pal = { Colour (0xff2c2d30), Colour (0xff1e1f21), Colour (0xfff08a3a), Colour (0xffffb46a),
+                  Colour (0x00000000), Colour (0x00000000), Colour (0x00000000), Colour (0xffe8e8e6),
+                  Colour (0xff0a0b0c), Colour (0xff3a3b3e), Colour (0xff2f3033), Colour (0xff6a6c70), Colour (0xfff4f4f2),
+                  Colour (0xff2f3033) };
+        x.canvas = canvasShell;
+        x.headerDeco = nullptr;
+        x.flatSections = true;
+        x.rimWidth = 0.0f;
+        x.capTint = shellCapTint;
+        x.hwKeys = true;
+        x.offLabelCol = Colour (0xffb4b8bf);
+        x.captionCol = Colour (0xffe2e2e0);
+        x.valueCol = Colour (0xffb9bcc1);
+        x.headerCol = Colour (0xff8c8d90);
+        return x;
+    }();
+    return t;
+}
+
 inline Colour kilnCapTint (const char* param)
 {
     const juce::String n (param);
@@ -4576,6 +4717,8 @@ const Theme* effectTheme (Art a)
         case Art::ridge: return &ridgeTheme();
         case Art::ridge4k: return &ridge4kTheme();
         case Art::kiln: return &kilnTheme();
+        case Art::fret: return &fretTheme();
+        case Art::shell: return &shellTheme();
         case Art::crest: return &crestTheme();
         case Art::apex: return &apexTheme();
         case Art::prism: return &prismTheme();
@@ -4705,6 +4848,8 @@ Art artForEffect (EffectKind kind)
         case EffectKind::fruityDelayBank: return Art::delayBank;
         case EffectKind::ember: return Art::ember;
         case EffectKind::kilnChannel: return Art::kiln;
+        case EffectKind::fretChannel: return Art::fret;
+        case EffectKind::shellChannel: return Art::shell;
         case EffectKind::aether: return Art::aether;
         case EffectKind::fruityBloodOverdrive: return Art::blood;
         case EffectKind::fruityFastDist: return Art::fastDist;

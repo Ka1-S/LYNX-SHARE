@@ -5,14 +5,17 @@
 #include "core/EffectPresets.h"
 #include "core/Effects.h"
 #include "core/FlEffects.h"
+#include "core/MixerOps.h"
 #include "core/ParamHelp.h"
 #include "engine/AudioEngine.h"
+#include "engine/PluginHost.h"
 #include "engine/Text.h"
 #include "platform/Paths.h"
 #include "ui/I18n.h"
 #include "ui/PluginSkin.h"
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
+#include "ui/HintBar.h"
 
 namespace lynx::pluginheader
 {
@@ -583,4 +586,73 @@ void PresetBar::saveAs (juce::Component& owner)
         safe->repaint();
     }), true);
 }
+// --- One-click sidechain (round 177b) ------------------------------------------------------------------------------
+bool takesSidechain (AudioEngine& engine, int track, int slot)
+{
+    const auto& song = engine.getSong();
+    if (track < 0 || track >= (int) song.mixer.size() || slot < 0 || slot >= (int) song.mixer[(std::size_t) track].effects.size())
+        return false;
+    const auto kind = song.mixer[(std::size_t) track].effects[(std::size_t) slot].kind;
+    if (kind == EffectKind::plugin)
+    {
+        const auto effect = engine.getEffect (track, slot);
+        const auto* plugin = dynamic_cast<const PluginEffect*> (effect.get());
+        return plugin != nullptr && plugin->hasSideInput();
+    }
+    return mixerops::acceptsSidechain (kind);
+}
+
+juce::String sidechainSourceText (const Song& song, const EffectSlot& fx, bool second)
+{
+    const auto source = second ? fx.sidechain2 : fx.sidechain;
+    if (source <= 0 || source >= (int) song.mixer.size())
+        return {};
+    return juce::String (source) + " " + juce::String::fromUTF8 (song.mixer[(std::size_t) source].name.c_str());
+}
+
+void addSidechainPicker (juce::PopupMenu& menu, AudioEngine& engine, int track, int slot, bool second)
+{
+    const auto& song = engine.getSong();
+    if (track < 0 || track >= (int) song.mixer.size() || slot < 0 || slot >= (int) song.mixer[(std::size_t) track].effects.size())
+        return;
+    const auto& fx = song.mixer[(std::size_t) track].effects[(std::size_t) slot];
+    const auto current = second ? fx.sidechain2 : fx.sidechain;
+    auto pick = [&engine, track, slot, second] (int from) {
+        auto result = mixerops::SidechainPick::invalid;
+        engine.editSong ([&] (Song& s) { result = mixerops::sidechainFrom (s, track, slot, from, second); });
+        const auto& now = engine.getSong();
+        if (result == mixerops::SidechainPick::linked && from < (int) now.mixer.size())
+            ui::postHint ({ tr ("Sidechain") + ": " + juce::String (from) + " " + juce::String::fromUTF8 (now.mixer[(std::size_t) from].name.c_str())
+                                + juce::String::fromUTF8 (" \xe2\x86\x92 ") + juce::String (track) + " "
+                                + juce::String::fromUTF8 (now.mixer[(std::size_t) track].name.c_str()),
+                            tr ("The source still plays through its own outputs.") }, 4000);
+        else if (result == mixerops::SidechainPick::cycle)
+            ui::postHint ({ tr ("Sidechain"), tr ("That track is fed by this one: the link would make a loop.") }, 4000);
+    };
+    menu.addItem (tr ("None"), true, current < 0, [pick] { pick (-1); });
+    menu.addSeparator();
+    for (int t = 1; t < (int) song.mixer.size(); ++t)
+    {
+        if (t == track)
+            continue;
+        const auto loop = track != 0 && ! song.routes (t, track) && ! song.canRoute (t, track);
+        auto text = juce::String (t) + " " + juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str());
+        if (loop)
+            text << " (" << tr ("loop") << ")";
+        menu.addItem (text, ! loop, current == t, [pick, t] { pick (t); });
+    }
+}
+
+void showSidechainPicker (AudioEngine& engine, int track, int slot, juce::Component* target, juce::Rectangle<int> area, bool second)
+{
+    juce::PopupMenu menu;
+    menu.addSectionHeader (second ? tr ("Carrier from") : tr ("Sidechain from"));
+    addSidechainPicker (menu, engine, track, slot, second);
+    auto options = juce::PopupMenu::Options();
+    if (target != nullptr)
+        options = area.isEmpty() ? options.withTargetComponent (target)
+                                 : options.withTargetScreenArea (target->localAreaToGlobal (area));
+    menu.showMenuAsync (options);
+}
+
 } // namespace lynx::pluginheader
