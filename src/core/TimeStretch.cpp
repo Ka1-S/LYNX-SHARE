@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <numeric>
 
 #if defined(__clang__)
@@ -234,7 +235,9 @@ double correlation (const float* a, const float* b, long n)
 // Puts each detected attack of the input back, unstretched, over the spectral stretcher's output: the original from a
 // few ms before the attack to `hold` after it replaces the stretched signal (which smears attacks over its analysis
 // block), with short crossfades placed where both signals correlate best.
-void spliceAttacks (Planar& out, const Planar& in, double ratio, double sampleRate, double minRiseDb, double holdSeconds)
+// `toOut`: where an input frame lands in the output (one ratio, or a warp map)
+void spliceAttacks (Planar& out, const Planar& in, const std::function<double (double)>& toOut, double sampleRate, double minRiseDb,
+                    double holdSeconds)
 {
     const auto mono = monoOf (in);
     const auto attacks = stretchdetail::detectAttacks (mono.data(), (long) mono.size(), sampleRate, minRiseDb);
@@ -257,11 +260,11 @@ void spliceAttacks (Planar& out, const Planar& in, double ratio, double sampleRa
     for (std::size_t a = 0; a < attacks.size(); ++a)
     {
         const auto o = attacks[a];
-        const auto p = (long) std::llround ((double) o * ratio);
+        const auto p = (long) std::llround (toOut ((double) o));
         const auto shift = p - o; // output index = input index + shift inside the spliced region
 
         // room before the next attack (in output frames) and before the previous splice
-        const auto nextOut = a + 1 < attacks.size() ? (long) std::llround ((double) attacks[a + 1] * ratio) : m;
+        const auto nextOut = a + 1 < attacks.size() ? (long) std::llround (toOut ((double) attacks[a + 1])) : m;
         const auto room = nextOut - p - pre - fadeIn - fadeOut;
         if (room < fadeOut)
             continue;
@@ -318,10 +321,10 @@ void spliceAttacks (Planar& out, const Planar& in, double ratio, double sampleRa
 // faster from its start, so it is shorter and higher — and still starts at its own place on the grid; the gap up to the
 // next piece is filled back and forth as when slower. Rendered offline per clip pitch (round 175a, the coordinator's
 // "match Live by resampling each piece").
-Planar beatsStretch (const Planar& in, long outFrames, double sampleRate, double semitones = 0.0)
+// With a warp map (`toOut`, round 175a M1) each piece starts where the map puts its attack.
+Planar beatsStretch (const Planar& in, long outFrames, double sampleRate, double semitones, const std::function<double (double)>& toOut)
 {
     const auto n = in.frames();
-    const auto ratio = (double) outFrames / (double) n;
     const auto mono = monoOf (in);
     auto cuts = stretchdetail::beatsCuts (mono.data(), n, sampleRate);
     cuts.insert (cuts.begin(), 0L);
@@ -349,8 +352,8 @@ Planar beatsStretch (const Planar& in, long outFrames, double sampleRate, double
     for (std::size_t k = 0; k + 1 < cuts.size(); ++k)
     {
         const auto a = cuts[k], length = cuts[k + 1] - a;
-        const auto o0 = (long) std::llround ((double) a * ratio);
-        const auto o1 = k + 2 == cuts.size() ? outFrames : (long) std::llround ((double) cuts[k + 1] * ratio);
+        const auto o0 = std::clamp ((long) std::llround (toOut ((double) a)), 0L, outFrames);
+        const auto o1 = k + 2 == cuts.size() ? outFrames : std::clamp ((long) std::llround (toOut ((double) cuts[k + 1])), o0, outFrames);
         const auto last = k + 2 == cuts.size();
         const auto span = std::min (outFrames - o0, (o1 - o0) + (last ? 0L : fade));
         if (length <= 0 || span <= 0)
@@ -539,7 +542,10 @@ std::shared_ptr<SampleData> stretchWith (const SampleData& in, double ratio, con
     const auto outFrames = std::max (1L, (long) std::llround ((double) frames * ratio));
     auto out = spectralStretch (planar, outFrames, in.sampleRate, preset.blockSeconds, preset.intervalSeconds);
     if (preset.attackRiseDb > 0.0)
-        spliceAttacks (out, planar, (double) outFrames / (double) frames, in.sampleRate, preset.attackRiseDb, preset.holdSeconds);
+    {
+        const auto ratio = (double) outFrames / (double) frames;
+        spliceAttacks (out, planar, [ratio] (double x) { return x * ratio; }, in.sampleRate, preset.attackRiseDb, preset.holdSeconds);
+    }
     return sampleOf (std::move (out), in);
 }
 } // namespace stretchdetail
@@ -618,7 +624,10 @@ std::shared_ptr<SampleData> timeStretch (const SampleData& in, double ratio, Str
     if (frames >= 4 && ratio > 0.0 && semitones != 0.0)
     {
         const auto outFrames = std::max (1L, (long) std::llround ((double) frames * std::clamp (ratio, 0.05, 20.0)));
-        return sampleOf (beatsStretch (planarOf (in), outFrames, in.sampleRate, std::clamp (semitones, -48.0, 48.0)), in);
+    {
+        const auto r = (double) outFrames / (double) frames;
+        return sampleOf (beatsStretch (planarOf (in), outFrames, in.sampleRate, std::clamp (semitones, -48.0, 48.0), [r] (double x) { return x * r; }), in);
+    }
     }
 
     if (frames < 4 || ! (ratio > 0.0) || std::abs (ratio - 1.0) < 1e-9)
@@ -638,13 +647,160 @@ std::shared_ptr<SampleData> timeStretch (const SampleData& in, double ratio, Str
     if (std::abs (ratio - 1.0) <= stretchdetail::resampleTolerance)
         return sampleOf (resampleTo (planar, outFrames), in);
 
+    const auto r = (double) outFrames / (double) frames;
+    const auto linear = [r] (double x) { return x * r; };
     if (method == StretchMethod::beats)
-        return sampleOf (beatsStretch (planar, outFrames, in.sampleRate), in);
+        return sampleOf (beatsStretch (planar, outFrames, in.sampleRate, 0.0, linear), in);
 
     const auto preset = stretchdetail::presetFor (method);
     auto out = spectralStretch (planar, outFrames, in.sampleRate, preset.blockSeconds, preset.intervalSeconds);
     if (preset.attackRiseDb > 0.0)
-        spliceAttacks (out, planar, (double) outFrames / (double) frames, in.sampleRate, preset.attackRiseDb, preset.holdSeconds);
+        spliceAttacks (out, planar, linear, in.sampleRate, preset.attackRiseDb, preset.holdSeconds);
+    return sampleOf (std::move (out), in);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Warp maps (round 175a, warp markers M1)
+
+double stretchMapOutput (const StretchMap& map, double x) noexcept
+{
+    if (map.size() < 2)
+        return x;
+    std::size_t i = 1;
+    while (i + 1 < map.size() && x > map[i].first)
+        ++i;
+    const auto& a = map[i - 1];
+    const auto& b = map[i];
+    return a.second + (x - a.first) * (b.second - a.second) / std::max (1e-12, b.first - a.first);
+}
+
+double stretchMapSource (const StretchMap& map, double y) noexcept
+{
+    if (map.size() < 2)
+        return y;
+    std::size_t i = 1;
+    while (i + 1 < map.size() && y > map[i].second)
+        ++i;
+    const auto& a = map[i - 1];
+    const auto& b = map[i];
+    return a.first + (y - a.second) * (b.first - a.first) / std::max (1e-12, b.second - a.second);
+}
+
+StretchMap warpStretchMap (const std::vector<WarpPoint>& warp, double frames, double sampleRate, double outFrames)
+{
+    if (warp.size() < 2 || ! (frames > 0.0) || ! (sampleRate > 0.0) || ! (outFrames > 0.0))
+        return {};
+    // the markers, sorted, both coordinates strictly increasing
+    std::vector<WarpPoint> w (warp);
+    std::sort (w.begin(), w.end(), [] (const WarpPoint& a, const WarpPoint& b) { return a.seconds < b.seconds; });
+    std::vector<WarpPoint> m;
+    for (const auto& p : w)
+        if (m.empty() || (p.seconds > m.back().seconds + 1e-9 && p.beats > m.back().beats + 1e-9))
+            m.push_back (p);
+    if (m.size() < 2)
+        return {};
+    StretchMap beats; // sample seconds → beats
+    for (const auto& p : m)
+        beats.push_back ({ p.seconds, p.beats });
+    const auto end = frames / sampleRate;
+    const auto b0 = stretchMapOutput (beats, 0.0), b1 = stretchMapOutput (beats, end);
+    if (! (b1 > b0))
+        return {};
+    const auto scale = outFrames / (b1 - b0);
+    StretchMap map { { 0.0, 0.0 } };
+    for (const auto& p : m)
+        if (p.seconds > 0.0 && p.seconds < end)
+        {
+            const auto x = p.seconds * sampleRate, y = (p.beats - b0) * scale;
+            if (x > map.back().first + 0.5 && y > map.back().second + 0.5)
+                map.push_back ({ x, y });
+        }
+    if (map.size() > 1 && (! (outFrames > map.back().second + 0.5) || ! (frames > map.back().first + 0.5)))
+        map.pop_back();
+    map.push_back ({ frames, outFrames });
+    // one tempo: no map (the plain stretch, and the same cached file as before)
+    const auto overall = outFrames / frames;
+    bool bends = false;
+    for (std::size_t i = 1; i < map.size(); ++i)
+    {
+        const auto r = (map[i].second - map[i - 1].second) / (map[i].first - map[i - 1].first);
+        bends = bends || std::abs (r / overall - 1.0) > 1e-4;
+    }
+    return bends && map.size() >= 3 ? map : StretchMap {};
+}
+
+namespace
+{
+// Signalsmith Stretch along a warp map, in one pass (no seams): the stretcher's playback rate follows the map, 256
+// output frames at a time. As exact() does for one ratio, the input runs its analysis latency ahead and the output is
+// pre-rolled by outputSeek; past the end the input is silence, and the output is cut to the map's length.
+Planar spectralStretchMapped (const Planar& in, const StretchMap& map, double sampleRate, double blockSeconds, double intervalSeconds)
+{
+    const auto channels = (int) in.ch.size();
+    const auto outFrames = (long) std::llround (map.back().second);
+    signalsmith::stretch::SignalsmithStretch<float> stretch { 1651L };
+    stretch.configure (channels, (int) std::lround (sampleRate * blockSeconds), (int) std::lround (sampleRate * intervalSeconds));
+    const auto inLatency = (double) stretch.inputLatency(), outLatency = (double) stretch.outputLatency();
+    const auto inputFor = [&] (double outputFrame) { return (long) std::llround (stretchMapSource (map, outputFrame) + inLatency); };
+
+    Planar src = in;
+    const auto need = std::max (in.frames(), inputFor ((double) outFrames + outLatency) + 16);
+    for (auto& c : src.ch)
+        c.resize ((std::size_t) need, 0.0f);
+    std::vector<const float*> inputs ((std::size_t) channels);
+    const auto at = [&] (long frame) {
+        for (int c = 0; c < channels; ++c)
+            inputs[(std::size_t) c] = src.ch[(std::size_t) c].data() + frame;
+        return inputs.data();
+    };
+
+    Planar out;
+    out.ch.assign ((std::size_t) channels, std::vector<float> ((std::size_t) outFrames, 0.0f));
+    std::vector<float*> outputs ((std::size_t) channels);
+
+    auto inPos = std::max (0L, inputFor (outLatency));
+    stretch.outputSeek (at (0), (int) inPos);
+    constexpr long chunk = 256;
+    for (long o = 0; o < outFrames; o += chunk)
+    {
+        const auto length = std::min (chunk, outFrames - o);
+        const auto inEnd = std::clamp (inputFor ((double) (o + length) + outLatency), inPos, need);
+        for (int c = 0; c < channels; ++c)
+            outputs[(std::size_t) c] = out.ch[(std::size_t) c].data() + o;
+        stretch.process (at (inPos), (int) (inEnd - inPos), outputs.data(), (int) length);
+        inPos = inEnd;
+    }
+    return out;
+}
+} // namespace
+
+std::shared_ptr<SampleData> timeStretchMapped (const SampleData& in, const StretchMap& map, StretchMethod method, double semitones)
+{
+    const auto frames = (long) in.frames();
+    const auto plain = [&] {
+        const auto ratio = frames > 0 && ! map.empty() ? map.back().second / (double) frames : 1.0;
+        return timeStretch (in, ratio, method, semitones);
+    };
+    if (map.size() < 3 || frames < 4 || std::abs (map.back().first - (double) frames) > 0.5 || map.front() != std::pair<double, double> { 0.0, 0.0 })
+        return plain();
+    for (std::size_t i = 1; i < map.size(); ++i)
+    {
+        const auto dx = map[i].first - map[i - 1].first, dy = map[i].second - map[i - 1].second;
+        if (! (dx > 0.0) || ! (dy > 0.0) || dy / dx < 0.05 || dy / dx > 20.0)
+            return plain();
+    }
+    if (method != StretchMethod::beats)
+        semitones = 0.0;
+    const auto outFrames = std::max (1L, (long) std::llround (map.back().second));
+    const auto planar = planarOf (in);
+    const auto toOut = [&map] (double x) { return stretchMapOutput (map, x); };
+    if (method == StretchMethod::beats)
+        return sampleOf (beatsStretch (planar, outFrames, in.sampleRate, std::clamp (semitones, -48.0, 48.0), toOut), in);
+
+    const auto preset = stretchdetail::presetFor (method);
+    auto out = spectralStretchMapped (planar, map, in.sampleRate, preset.blockSeconds, preset.intervalSeconds);
+    if (preset.attackRiseDb > 0.0)
+        spliceAttacks (out, planar, toOut, in.sampleRate, preset.attackRiseDb, preset.holdSeconds);
     return sampleOf (std::move (out), in);
 }
 } // namespace lynx

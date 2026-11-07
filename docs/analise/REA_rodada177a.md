@@ -335,8 +335,13 @@ Both items are one handler, `AssignAudiotrackMenuClick` (0x12a2a90), split on th
   insert -1. Name and colour stay.
 - There is one undo step, and the Playlist refreshes.
 
-FL skips an insert when 0x12a7620 (t, true) >= 0 or 0x12a76e0 (t, false) is true. The first walks the channels routed
-to the insert and checks a channel kind. LYNX skips an insert that already has a linked audio track. Whether FL also
-skips an insert with an audio clip channel routed to it is still to be checked in FL's window.
+FL skips an insert in two cases:
+
+- 0x12a76e0 (t, false) is true when any Playlist track's insert field (+0xdc) is t, in any mode.
+- 0x12a7620 (t, true) >= 0 when a channel routed to t (+0x258) is on an instrument track (mode 3, via 0xffac90 /
+  0xffaee0) and is the only channel on that insert (0xffae00 with false). Channel types 1, 4 (audio clip) and 5 are
+  excluded by the mask 0b110010.
+
+LYNX's `assignNewAudioTracks` follows both (`hasPlaylistTrack`); the test is `mixer177a_d_...`.
 
 The menu items are enabled as in FL's shot: Assign when a selected insert has no audio track, Unassign when one has.

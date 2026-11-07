@@ -51,11 +51,14 @@ namespace lynx
 {
 namespace
 {
-// a hosted plugin is created again when its processing options change (fixed blocks, own process)
+// a hosted plugin is created again when its processing options change (fixed blocks, own process) or the options it
+// gets at creation (HostedOptions: the wrapper's MIDI and reset options, which did nothing until a reload otherwise)
 bool samePluginProcessing (const PluginRef& a, const PluginRef& b) noexcept
 {
     return a.fixedBuffers == b.fixedBuffers && a.separateProcess == b.separateProcess && a.maxSizeBuffers == b.maxSizeBuffers
-           && a.hostMaxBuffer == b.hostMaxBuffer && a.bitSize == b.bitSize;
+           && a.hostMaxBuffer == b.hostMaxBuffer && a.bitSize == b.bitSize && a.releaseVelocity == b.releaseVelocity
+           && a.sendBendRange == b.sendBendRange && a.bendRange == b.bendRange && a.modXAftertouch == b.modXAftertouch
+           && a.allNotesOffOnStop == b.allNotesOffOnStop && a.resetOnFlush == b.resetOnFlush && a.sendLoopPosition == b.sendLoopPosition;
 }
 
 // Silent instrument: plugin channel that could not be loaded.
@@ -241,7 +244,9 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
         const auto target = channel.sampler.stretchBeats * 60.0 / std::max (1.0, bpm);
         const auto ratio = target / ((double) sample->frames() / sample->sampleRate);
 
-        if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch))
+        const auto map = warpStretchMap (channel.sampler.warp, (double) sample->frames(), sample->sampleRate,
+                                         (double) std::llround ((double) sample->frames() * ratio));
+        if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch, map))
             sample = std::move (stretched);
     }
 
@@ -487,6 +492,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                     && (! channel.sampler.keepPitch
                         || (previous->song.channels[p].sampler.stretchBeats == channel.sampler.stretchBeats
                             && previous->song.channels[p].sampler.stretchMethod == channel.sampler.stretchMethod
+                            && previous->song.channels[p].sampler.stretchPitch == channel.sampler.stretchPitch
+                            && previous->song.channels[p].sampler.warp == channel.sampler.warp
                             && previous->song.bpm == song.bpm))))
             && (kind != InstrumentKind::plugin
                 || (previous->song.channels[p].plugin.id == channel.plugin.id && previous->sampleRate == sampleRate
@@ -639,6 +646,12 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         std::stable_sort (p.notes.begin(), p.notes.end(), [] (const Note& a, const Note& b) { return a.start < b.start; });
     state->schedule = makeScheduleIndex (state->song);
     state->performanceZone = perf::zoneClips (state->song);
+    if (factories.clipLauncher != nullptr && state->song.clipGrid)
+    {
+        state->clipLauncher = factories.clipLauncher;
+        state->gridIndex = launcher::makeIndex (*state->song.clipGrid);
+    }
+    state->launchers = ! state->performanceZone.empty() || state->clipLauncher != nullptr;
     state->sampleRate = sampleRate;
     state->buildMidiRoutes();
     state->buildAutomationTables();
@@ -1294,10 +1307,34 @@ void RackState::buildAutomationTables()
         hasAutomation = hasAutomation || used;
     };
 
-    // the last automation of the same target wins
+    // issue #97: the automations with clips on one target share a slot, the clip that plays decides (automationValueAt)
+    automationGroups.assign ((std::size_t) count, {});
+    automationFollowers.assign ((std::size_t) count, 0);
+    const auto playsClips = [&] (int a) {
+        const auto& automation = automations[(std::size_t) a];
+        return ! automationClips[(std::size_t) a].empty() && ! automation.isLive() && zoneAutomations[(std::size_t) a] == 0
+               && automation.target.kind != AutomationTargetKind::none;
+    };
+    for (int a = count - 1; a > 0; --a)
+    {
+        if (automationFollowers[(std::size_t) a] != 0 || ! playsClips (a))
+            continue;
+        auto& group = automationGroups[(std::size_t) a];
+        for (int b = 0; b < a; ++b)
+            if (playsClips (b) && automations[(std::size_t) b].target == automations[(std::size_t) a].target)
+            {
+                group.push_back (b);
+                automationFollowers[(std::size_t) b] = 1;
+            }
+        if (! group.empty())
+            group.push_back (a);
+    }
+
+    // otherwise the last automation of the same target wins (a live controller link, Performance mode clips)
     for (int a = 0; a < count; ++a)
     {
-        if (automationClips[(std::size_t) a].empty() && ! automations[(std::size_t) a].isLive() && zoneAutomations[(std::size_t) a] == 0)
+        if (automationFollowers[(std::size_t) a] != 0
+            || (automationClips[(std::size_t) a].empty() && ! automations[(std::size_t) a].isLive() && zoneAutomations[(std::size_t) a] == 0))
             continue;
 
         bind (a, automations[(std::size_t) a].target);
@@ -1688,31 +1725,45 @@ float RackRenderer::automated (int automation, float base) const noexcept
 
 namespace
 {
-// Value of an automation at a song position: inside a clip, the curve; between clips,
-// the last value of the previous clip; before the first, its initial value. Depends only on
-// position, so playing from any point (or exporting) gives the same result.
-float automationValueAt (const Song& song, const Automation& automation, const std::vector<int>& clips, double tick) noexcept
+// Value of an automation slot at a song position, as FL plays it (FL renders, issue #97, REA_rodada177b.md): where clips
+// of the target play, the one that started last (same start: the lowest automation); between clips, the end of the clip
+// that ended last, whichever automation it belongs to; before the first clip, NaN: the control's own value. Depends only
+// on position, so playing from any point (or exporting) gives the same result.
+float automationValueAt (const RackState& state, int slot, double tick) noexcept
 {
-    const Clip* before = nullptr;
+    const auto& song = state.song;
+    const auto& group = state.automationGroups[(std::size_t) slot];
+    const Clip* playing = nullptr;
+    const Clip* ended = nullptr;
+    int playingAutomation = -1, endedAutomation = -1;
 
-    for (auto i : clips) // sorted by start
-    {
-        const auto& c = song.playlist[(std::size_t) i];
+    const auto scan = [&] (int a) {
+        for (const auto i : state.automationClips[(std::size_t) a]) // sorted by start
+        {
+            const auto& c = song.playlist[(std::size_t) i];
+            if (tick < (double) c.start)
+                break;
+            if (tick < (double) c.end())
+            {
+                if (playing == nullptr || c.start > playing->start)
+                    playing = &c, playingAutomation = a;
+            }
+            else if (ended == nullptr || c.end() > ended->end() || (c.end() == ended->end() && c.start > ended->start))
+                ended = &c, endedAutomation = a;
+        }
+    };
 
-        if (tick < (double) c.start)
-            break;
+    if (group.empty())
+        scan (slot);
+    else
+        for (const auto a : group) // ascending: the lowest automation keeps a tie
+            scan (a);
 
-        if (tick < (double) c.end())
-            return automation.valueAt (tick - (double) c.start + (double) c.offset);
-
-        before = &c;
-    }
-
-    if (before != nullptr)
-        return automation.valueAt ((double) (before->length + before->offset));
-
-    const auto& first = song.playlist[(std::size_t) clips.front()];
-    return automation.valueAt ((double) first.offset);
+    if (playing != nullptr)
+        return song.automations[(std::size_t) playingAutomation].valueAt (tick - (double) playing->start + (double) playing->offset);
+    if (ended != nullptr)
+        return song.automations[(std::size_t) endedAutomation].valueAt ((double) (ended->length + ended->offset));
+    return std::numeric_limits<float>::quiet_NaN();
 }
 } // namespace
 
@@ -1821,8 +1872,8 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
     const auto tick = std::fmod (std::max (0.0, startTick), length);
 
     for (std::size_t a = 0; a < state.automationClips.size(); ++a)
-        if (! state.automationClips[a].empty())
-            automationValues[a] = automationValueAt (song, song.automations[a], state.automationClips[a], tick);
+        if (! state.automationClips[a].empty() && state.automationFollowers[a] == 0)
+            automationValues[a] = automationValueAt (state, (int) a, tick);
 
     // Performance mode: the launched automation clips (the last block's passes) drive their automation
     if (perfRunning)
@@ -1854,8 +1905,8 @@ float RackRenderer::compensatedAutomation (const RackState& state, int automatio
     const auto lag = state.pdc.slotInput[(std::size_t) track][(std::size_t) slot];
     if (lag <= 0)
         return current;
-    return automationValueAt (state.song, state.song.automations[(std::size_t) automation], state.automationClips[(std::size_t) automation],
-                              std::max (0.0, compensateTick - lag * compensateTicksPerSample));
+    const auto earlier = automationValueAt (state, automation, std::max (0.0, compensateTick - lag * compensateTicksPerSample));
+    return std::isnan (earlier) ? current : earlier;
 }
 
 void RackRenderer::applyPluginParams (const RackState& state, int firstSlot, bool andLive) noexcept
@@ -3221,32 +3272,70 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     events.clear();
 
     const auto songPlaying = playing && song.mode == PlayMode::song;
-    if (songPlaying)
+    // The launchers: Performance mode's clips (round 165m) and the clip grid (round 181a). Without either, this is the
+    // one test a block makes for them, the one Performance mode always made.
+    if (songPlaying && (state.launchers || launchersRunning))
     {
-        scheduleSong (song, startTick, numSamples, ticksPerSample (bpm, sampleRate), events, resumeAudio, &state.schedule,
-                      liveInput == nullptr || ! liveInput->linearSong.load (std::memory_order_relaxed), chaseNotes);
-    }
-    // Performance mode (round 165m): the launched clips, on the Player's steady clock (the transport's ticks from
-    // where playback started, never wrapping with the song loop)
-    if (songPlaying && (! state.performanceZone.empty() || perfRunning))
-    {
-        if (! perfRunning)
-            perfClock = startTick;
-        perfRunning = true;
+        launchersRunning = true;
         const auto tps = ticksPerSample (bpm, sampleRate);
-        perfPlayer.process (song, state.performanceZone, perfLive, perfClock, startTick, numSamples * tps, true);
-        schedulePerformance (song, perfPlayer, perfClock, numSamples, tps, events, &state.schedule);
-        perfClock += numSamples * tps;
+        const auto wrap = liveInput == nullptr || ! liveInput->linearSong.load (std::memory_order_relaxed);
+        if (state.clipLauncher != nullptr)
+        {
+            if (runningLauncher == nullptr)
+                state.clipLauncher->clock = startTick;
+            runningLauncher = state.clipLauncher;
+            launcher::playBlock (*state.clipLauncher, song, *song.clipGrid, state.gridIndex, startTick, numSamples, tps, events, resumeAudio,
+                                 &state.schedule, wrap, chaseNotes, *scheduledNotes);
+        }
+        else
+        {
+            if (runningLauncher != nullptr)
+            {
+                runningLauncher->player.stopAll (runningLauncher);
+                runningLauncher = nullptr;
+            }
+            scheduleSong (song, startTick, numSamples, tps, events, resumeAudio, &state.schedule, wrap, chaseNotes);
+        }
+        // Performance mode (round 165m): the launched clips, on the Player's steady clock (the transport's ticks from
+        // where playback started, never wrapping with the song loop)
+        if (! state.performanceZone.empty() || perfRunning)
+        {
+            if (! perfRunning)
+                perfClock = startTick;
+            perfRunning = true;
+            perfPlayer.process (song, state.performanceZone, perfLive, perfClock, startTick, numSamples * tps, true);
+            schedulePerformance (song, perfPlayer, perfClock, numSamples, tps, events, &state.schedule);
+            perfClock += numSamples * tps;
+        }
+        else if (perfLive != nullptr)
+        {
+            perf::Command c;
+            while (perfLive->commands.pop (c)) {} // nothing launches without a zone
+        }
     }
-    else if (perfRunning || (perfLive != nullptr && perfLive->anyPlaying.load (std::memory_order_relaxed)))
+    else
     {
-        perfPlayer.process (song, state.performanceZone, perfLive, perfClock, startTick, 0.0, false);
-        perfRunning = false;
-    }
-    else if (perfLive != nullptr)
-    {
-        perf::Command c;
-        while (perfLive->commands.pop (c)) {} // nothing launches while stopped or in Pattern mode
+        if (songPlaying)
+            scheduleSong (song, startTick, numSamples, ticksPerSample (bpm, sampleRate), events, resumeAudio, &state.schedule,
+                          liveInput == nullptr || ! liveInput->linearSong.load (std::memory_order_relaxed), chaseNotes);
+        if (launchersRunning || (perfLive != nullptr && perfLive->anyPlaying.load (std::memory_order_relaxed)))
+        {
+            perfPlayer.process (song, state.performanceZone, perfLive, perfClock, startTick, 0.0, false);
+            perfRunning = false;
+            launchersRunning = false;
+            if (runningLauncher != nullptr)
+            {
+                if (song.clipGrid)
+                    runningLauncher->player.recordStop (*song.clipGrid, state.gridIndex, runningLauncher);
+                runningLauncher->player.stopAll (runningLauncher, song.clipGrid && song.clipGrid->backOnStop);
+                runningLauncher = nullptr;
+            }
+        }
+        else if (perfLive != nullptr)
+        {
+            perf::Command c;
+            while (perfLive->commands.pop (c)) {} // nothing launches while stopped or in Pattern mode
+        }
     }
 
     if (! songPlaying && playing && ! song.patterns.empty())

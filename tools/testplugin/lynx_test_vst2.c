@@ -5,6 +5,8 @@
  * 32-bit build (round 176a, the 32-bit bridge LYNX-bridge32.exe):
  *   zig cc -shared -O2 -target x86-windows-gnu tools/testplugin/lynx_test_vst2.c -luser32 -o "LYNX Test Synth 32.dll"
  *   LYNX.exe --bridge32test "LYNX Test Synth 32.dll" report.txt
+ * The wrapper's MIDI options on a running plugin (round 181c):
+ *   LYNX_TEST_VST2_MIDILOG=midi.txt LYNX.exe --wrappermiditest "LYNX Test Synth.dll" report.txt
  * Sound: a sine at the played note, amplitude = parameter 0 ("Gain") × velocity.
  * Parameter 1 ("Tempo") reports the host tempo / 1000 it last read through audioMasterGetTime.
  * State: a program chunk ('LXV2' + gain + last tempo/1000), so a host must restore it with effSetChunk.
@@ -18,6 +20,7 @@
 #endif
 #include <math.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -117,6 +120,15 @@ static intptr_t dispatch (Effect* e, int32_t op, int32_t index, intptr_t value, 
             for (int i = 0; i < ev->numEvents; ++i)
             {
                 const unsigned char* d = ev->events[i]->data;
+                { /* LYNX_TEST_VST2_MIDILOG = a file: every MIDI event as the host sent it (--wrappermiditest) */
+                    const char* path = getenv ("LYNX_TEST_VST2_MIDILOG");
+                    FILE* log = path != 0 ? fopen (path, "a") : 0;
+                    if (log != 0)
+                    {
+                        fprintf (log, "%p %d %d %d\n", (void*) s, d[0], d[1], d[2]);
+                        fclose (log);
+                    }
+                }
                 if ((d[0] & 0xF0) == 0x90 && d[2] > 0) { s->note = d[1]; s->amplitude = d[2] / 127.0f; }
                 else if ((d[0] & 0xF0) == 0x80 || ((d[0] & 0xF0) == 0x90 && d[2] == 0)) { if (d[1] == s->note) s->amplitude = 0.0f; }
             }
