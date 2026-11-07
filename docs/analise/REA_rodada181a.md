@@ -8,7 +8,7 @@ Tags: **[MANUAL]** published manual, **[DATA]** read from shipped sets, **[INFER
 |---|---|---|
 | Launch Quantisation: Global, None, 8/4/2/1 bars, 1/2, 1/2T … 1/32 | [MANUAL] Launching Clips 16.4 | `LaunchQuant` |
 | A clip's quantisation number 0 = Global | [DATA] every default clip | `LaunchQuant::global` |
-| Set-wide default 1 Bar is stored as `GlobalQuantisation` 4, so a clip's number is that + 1 and 1 = None | [INFERRED] from default sets (4 everywhere) and the label order | enum order; the .als mapping must confirm it |
+| Set-wide default 1 Bar is stored as `GlobalQuantisation` 4, so a clip's number is that + 1 and 1 = None | [DATA] for one value: a set saved with `GlobalQuantisation` 9 shows "1/8" in Live 12's toolbar (181a Live turn, 2026-11-07), which is the 10th label (Global, None, 8, 4, 2, 1 bars, 1/2, 1/2T, 1/4, 1/4T, 1/8), i.e. clip number = global + 1. Other values still [INFERRED] | enum order; per-clip values to read in the next Live turn |
 | Trigger: up ignored. Gate: up stops. Toggle: next down stops. Repeat: retriggers at the clip quantisation rate while held | [MANUAL] 16.2 | `LaunchMode`; numbers 0…3 [DATA] ALS-FORMAT §5 |
 | Gate's stop on release waits for the global quantisation | [OPEN] | as stated |
 | After Repeat is released the clip plays on | [OPEN] | as stated |
@@ -54,7 +54,7 @@ Settings > General > Workflow and View > Layout style: "Pattern workflow (defaul
 ## .als mapping, what is proven
 Read feature/ableton175a-2 (docs/analise/ALS_FORMAT.md, src/core/AlsImport.cpp). Its import places session clips on the Playlist, one section per scene, and leaves the real launcher to this slice. It does not read launch settings.
 - `LaunchMode` 0 trigger, 1 gate, 2 toggle, 3 repeat: documented by 175a, matches `LaunchMode` here.
-- `LaunchQuantisation` 0 = global: documented by 175a. [INFERRED] the other values, `GlobalQuantisation`, `FollowActionA/B`: from default sets only, no proof yet. To settle in the Live GUI turn: set each value, save a set, read the file.
+- `LaunchQuantisation` 0 = global: documented by 175a. [INFERRED] the other values, `GlobalQuantisation`, `FollowActionA/B`: from default sets only, no proof yet, except `GlobalQuantisation` 9 = "1/8" seen in Live (global + 1 holds there). Per-clip values were not read: Live's startup plugin scan raised a PACE licence window and the turn was stopped. To settle in the next Live GUI turn: set each value, save a set, read the file.
 
 ## Real window session (Windows build, guarded clicks)
 Exercised in the running window: View > Layout style both ways, grid menu, put pattern, launch (starts the transport), follow of progress, pending blink at 8 bars, Stop all clips (quantised), Back to Playlist, Grid / Song / Both, per-style layout restored, style kept across restarts both ways. Found and fixed there: the switch lit two buttons (JUCE's radio group "clicks" the one it turns off), the switch kept its old view on re-entry, the Browser's search box took the keys after a layout swap, a quantised stop gave no feedback.
