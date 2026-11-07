@@ -28,6 +28,10 @@
 //   pump <ms>                         deliver the plugin's pending Win32 messages for a while
 //   editor <out.png> [ms] [x y]       open the plugin's own editor in a window, let it draw (default 1500 ms), optionally
 //                                     click at (x, y) as a user would (a trial's "Evaluate"), save a PNG (PrintWindow)
+//   editor <out.png> <ms> [action]...  (round tp172b6) each action runs in order, posted to the editor's own window (no
+//                                     injected input): x y (click), drag x0 y0 x1 y1, hover x y, wheel x y delta, dblclick x y, play <wav> (run the file
+//                                     through the plugin while the editor draws), shot <out.png> (a picture now). Every
+//                                     parameter an action changed is logged ("changed <name> a -> b (text)")
 //   echo <text>
 //   editor <ms> [x y]                 show the plugin's own editor in a window at (x, y) for ms milliseconds (for screenshots
 //                                     taken from outside, e.g. with a screen-capture script); prints its screen bounds
@@ -156,7 +160,7 @@ struct Host
 
 
     // the plugin's editor in a top-level window, captured with PrintWindow (round 108: reference screenshots)
-    void editorShot (const juce::File& out, int ms, std::vector<POINT> clicks = {})
+    void editorShot (const juce::File& out, int ms, const juce::StringArray& actions = {})
     {
         std::unique_ptr<juce::AudioProcessorEditor> ed (plugin->createEditorIfNeeded());
         if (ed == nullptr) { log ("error: no editor"); return; }
@@ -169,7 +173,8 @@ struct Host
         runSilence ((int) rate / 4);
         pump (ms);
         auto* hwnd = (HWND) w.getPeer()->getNativeHandle();
-        for (const auto pt : clicks) // clicks as the user would make them (a trial's "Evaluate" button, then a panel tab)
+        // the deepest child window at a client point of hwnd, and the point in that child's coordinates
+        const auto hit = [hwnd] (POINT pt, LPARAM& lp)
         {
             HWND target = hwnd;
             for (;;)
@@ -182,13 +187,110 @@ struct Host
             }
             POINT local = pt;
             MapWindowPoints (hwnd, target, &local, 1);
-            const auto lp = MAKELPARAM (local.x, local.y);
-            PostMessageW (target, WM_MOUSEMOVE, 0, lp);
-            PostMessageW (target, WM_LBUTTONDOWN, MK_LBUTTON, lp);
-            pump (80);
-            PostMessageW (target, WM_LBUTTONUP, 0, lp);
-            pump (ms);
+            lp = MAKELPARAM (local.x, local.y);
+            return target;
+        };
+        std::vector<float> before;
+        const auto remember = [&] { before.clear(); for (auto* p : plugin->getParameters()) before.push_back (p->getValue()); };
+        const auto logChanges = [&]
+        {
+            const auto& ps = plugin->getParameters();
+            for (int i = 0; i < ps.size() && i < (int) before.size(); ++i)
+                if (std::abs (ps[i]->getValue() - before[(size_t) i]) > 1.0e-5f)
+                    log ("changed " + ps[i]->getName (256) + " " + norm (before[(size_t) i]) + " -> " + norm (ps[i]->getValue()) + " (" + ps[i]->getCurrentValueAsText() + ")");
+        };
+        for (int i = 0; i < actions.size();)
+        {
+            remember();
+            if (actions[i] == "shot")
+            {
+                windowPicture (hwnd, juce::File (actions[i + 1]));
+                i += 2;
+            }
+            else if (actions[i] == "play")
+            {
+                playWhileDrawing (juce::File (actions[i + 1]));
+                i += 2;
+            }
+            else if (actions[i] == "hover")
+            {
+                LPARAM lp;
+                const POINT pt { actions[i + 1].getIntValue(), actions[i + 2].getIntValue() };
+                auto* target = hit (pt, lp);
+                PostMessageW (target, WM_MOUSEMOVE, 0, lp);
+                pump (ms);
+                i += 3;
+            }
+            else if (actions[i] == "wheel") // wheel x y <delta, 120 = one notch up>
+            {
+                const POINT pt { actions[i + 1].getIntValue(), actions[i + 2].getIntValue() };
+                POINT screen = pt;
+                ClientToScreen (hwnd, &screen);
+                LPARAM lp;
+                auto* target = hit (pt, lp);
+                PostMessageW (target, WM_MOUSEMOVE, 0, lp);
+                pump (60);
+                PostMessageW (target, WM_MOUSEWHEEL, MAKEWPARAM (0, (short) actions[i + 3].getIntValue()), MAKELPARAM (screen.x, screen.y));
+                pump (ms);
+                i += 4;
+            }
+            else if (actions[i] == "dblclick")
+            {
+                LPARAM lp;
+                const POINT pt { actions[i + 1].getIntValue(), actions[i + 2].getIntValue() };
+                auto* target = hit (pt, lp);
+                PostMessageW (target, WM_MOUSEMOVE, 0, lp);
+                PostMessageW (target, WM_LBUTTONDOWN, MK_LBUTTON, lp);
+                PostMessageW (target, WM_LBUTTONUP, 0, lp);
+                PostMessageW (target, WM_LBUTTONDBLCLK, MK_LBUTTON, lp);
+                PostMessageW (target, WM_LBUTTONUP, 0, lp);
+                pump (ms);
+                i += 3;
+            }
+            else if (actions[i] == "drag")
+            {
+                const POINT a { actions[i + 1].getIntValue(), actions[i + 2].getIntValue() }, b { actions[i + 3].getIntValue(), actions[i + 4].getIntValue() };
+                LPARAM lp;
+                auto* target = hit (a, lp);
+                PostMessageW (target, WM_MOUSEMOVE, 0, lp);
+                pump (60);
+                PostMessageW (target, WM_LBUTTONDOWN, MK_LBUTTON, lp);
+                pump (80);
+                POINT origin { 0, 0 };
+                MapWindowPoints (hwnd, target, &origin, 1); // the target keeps the mouse for the whole drag
+                for (int k = 1; k <= 12; ++k)
+                {
+                    const auto x = (int) a.x + ((int) b.x - (int) a.x) * k / 12 + (int) origin.x, y = (int) a.y + ((int) b.y - (int) a.y) * k / 12 + (int) origin.y;
+                    PostMessageW (target, WM_MOUSEMOVE, MK_LBUTTON, MAKELPARAM (x, y));
+                    pump (25);
+                }
+                PostMessageW (target, WM_LBUTTONUP, 0, MAKELPARAM ((int) b.x + (int) origin.x, (int) b.y + (int) origin.y));
+                pump (ms);
+                i += 5;
+            }
+            else // x y: a click as the user would make it (a trial's "Evaluate" button, then a panel tab)
+            {
+                LPARAM lp;
+                const POINT pt { actions[i].getIntValue(), actions[i + 1].getIntValue() };
+                auto* target = hit (pt, lp);
+                PostMessageW (target, WM_MOUSEMOVE, 0, lp);
+                PostMessageW (target, WM_LBUTTONDOWN, MK_LBUTTON, lp);
+                pump (80);
+                PostMessageW (target, WM_LBUTTONUP, 0, lp);
+                pump (ms);
+                i += 2;
+            }
+            logChanges();
         }
+        windowPicture (hwnd, out);
+        w.clearContentComponent();
+        ed.reset();
+        pump (100);
+    }
+
+    // a picture of the window's client area (PrintWindow)
+    void windowPicture (HWND hwnd, const juce::File& out)
+    {
         RECT rc;
         GetClientRect (hwnd, &rc);
         const int width = rc.right - rc.left, height = rc.bottom - rc.top;
@@ -219,9 +321,33 @@ struct Host
         juce::FileOutputStream os (out);
         juce::PNGImageFormat().writeImageToStream (img, os);
         log ("editor " + juce::String (width) + "x" + juce::String (height) + " -> " + out.getFullPathName());
-        w.clearContentComponent();
-        ed.reset();
-        pump (100);
+    }
+
+    // a file through the plugin at about real time, with the editor's messages delivered between blocks (so its meters
+    // and live displays move as they do in a host); the output is thrown away
+    void playWhileDrawing (const juce::File& in)
+    {
+        juce::AudioBuffer<float> input;
+        if (! readWav (in, input)) { log ("error: cannot read " + in.getFullPathName()); return; }
+        const int mainIn = juce::jmax (1, plugin->getMainBusNumInputChannels());
+        const int totalIn = plugin->getTotalNumInputChannels();
+        const int ch = juce::jmax (totalIn, plugin->getTotalNumOutputChannels());
+        juce::AudioBuffer<float> buf (ch, block);
+        const auto start = juce::Time::getMillisecondCounter();
+        for (int pos = 0; pos < input.getNumSamples(); pos += block)
+        {
+            const int n = juce::jmin (block, input.getNumSamples() - pos);
+            buf.setSize (ch, n, false, false, true);
+            buf.clear();
+            for (int c = 0; c < juce::jmin (mainIn, totalIn); ++c)
+                buf.copyFrom (c, 0, input, juce::jmin (c, input.getNumChannels() - 1), pos, n);
+            midi.clear();
+            plugin->processBlock (buf, midi);
+            playHead.samples += n;
+            const auto due = start + (juce::uint32) ((double) (pos + n) * 1000.0 / rate);
+            do pump (1); while (juce::Time::getMillisecondCounter() < due);
+        }
+        log ("played " + in.getFileName());
     }
 
     void runSilence (int samples)
@@ -512,10 +638,10 @@ struct Host
             else if (cmd == "process") process (juce::File (a[1]), juce::File (a[2]), a.size() > 3 ? juce::File (a[3]) : juce::File());
             else if (cmd == "editor")
             {
-                std::vector<POINT> clicks; // `editor <out.png> <ms> [x y]...`: each pair is one click, in order
-                for (int i = 3; i + 1 < a.size(); i += 2)
-                    clicks.push_back ({ a[i].getIntValue(), a[i + 1].getIntValue() });
-                editorShot (juce::File (a[1]), a.size() > 2 ? a[2].getIntValue() : 1500, clicks);
+                juce::StringArray actions; // see the header: clicks, drag, hover, play, shot, in order
+                for (int i = 3; i < a.size(); ++i)
+                    actions.add (a[i]);
+                editorShot (juce::File (a[1]), a.size() > 2 ? a[2].getIntValue() : 1500, actions);
             }
             else if (cmd == "latency") { pump (50); log ("latency " + juce::String (plugin->getLatencySamples())); }
             else if (cmd == "savestate")

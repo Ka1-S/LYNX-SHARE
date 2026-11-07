@@ -212,7 +212,7 @@ TEST (prism_stereo_link_round147)
 {
     using namespace lynx;
     namespace m = dyn::prism;
-    CHECK (m::bandLink0 == 88 && m::count == 156 && (int) effectInfo (EffectKind::prismMultiband).params.size() == m::count);
+    CHECK (m::bandLink0 == 88 && m::count == 157 && (int) effectInfo (EffectKind::prismMultiband).params.size() == m::count);
     CHECK (formatEffectParam (EffectKind::prismMultiband, m::bandLink0, 0.25f, 120.0) == "50%");
     CHECK (formatEffectParam (EffectKind::prismMultiband, m::bandLink0 + 2, 0.75f, 120.0) == "100%, 50% only");
     CHECK (formatEffectParam (EffectKind::prismMultiband, m::bandScLow0, m::scFilterValue (2000.0), 120.0) == "2.00 kHz");
@@ -367,4 +367,94 @@ TEST (prism_per_crossover_slopes_round147)
         CHECK (std::abs (g - expected) < 0.15);
         CHECK (std::abs (m::responseDb (q, gains, 48000.0, hz) - expected) < 0.05);
     }
+}
+
+// round tp172b6 [EXEC]: Pro-MB's ratio top is a true limit (1 kHz stair, threshold -30, range -30, knee 0: -6.01 / -12.01 /
+// -18.01 / -24.01 dB at 6 ... 24 dB over; 0.99 of its range, 91.9 : 1: -5.95 dB). Only the exact top changes: every value
+// below keeps the law it had, so a saved project only moves if its ratio sits at the very top.
+TEST (prism_ratio_top_is_a_true_limit_round172b6)
+{
+    using namespace lynx;
+    namespace m = dyn::prism;
+    CHECK (m::isInfiniteRatio (1.0f) && ! m::isInfiniteRatio (0.9999f));
+    CHECK (dyn::paramText (EffectKind::prismMultiband, m::param (0, m::fRatio), 1.0f) == "\xe2\x88\x9e : 1");
+    CHECK (dyn::paramText (EffectKind::prismMultiband, m::param (0, m::fRatio), 0.5f) != "\xe2\x88\x9e : 1");
+    auto top = p147::wholeBand (-30.0, 100.0);
+    CHECK (top[(std::size_t) m::param (0, m::fRatio)] == 1.0f);
+    for (const auto over : { 6.0, 12.0, 18.0, 24.0 })
+    {
+        const auto gain = m::bandStaticDb (top, 0, -30.0 + over);
+        std::printf ("  Prism ratio top: %.0f dB over gives %.3f dB\n", over, gain);
+        CHECK (std::abs (gain + over) < 0.001);
+    }
+    // just under the top: the old law, untouched
+    auto under = top;
+    under[(std::size_t) m::param (0, m::fRatio)] = 0.9f;
+    const auto r = m::ratioOf (0.9f);
+    CHECK (std::abs (m::bandStaticDb (under, 0, -18.0) + 12.0 * (1.0 - 1.0 / r)) < 0.001);
+    // and the audio follows the curve: a -6 dBFS tone (24 dB over) comes out 24 dB down, not the 23.76 of 100 : 1
+    const auto g = p147::stereoGains (top, 0.5, 0.5);
+    std::printf ("  Prism ratio top: 200 Hz at -6 dBFS: %.2f dB\n", g[0]);
+    CHECK (std::abs (g[0] + 24.0) < 0.15);
+}
+
+// round tp172b6 [EXEC]: Crest's ratio top limits as Pro-C 3's does; nothing below it moves
+TEST (crest_ratio_top_is_a_true_limit_round172b6)
+{
+    using namespace lynx;
+    namespace c = dyn::crest;
+    CHECK (std::abs (c::ratioOf (0.9f) - std::exp (std::log (100.0) * std::pow (0.9f, 2.2))) < 1.0e-6);
+    CHECK (c::ratioOf (0.9999f) < 100.0 && c::ratioOf (1.0f) > 1.0e6);
+    CHECK (dyn::paramText (EffectKind::crestCompressor, c::ratio, 1.0f) == "\xe2\x88\x9e : 1");
+    auto p = makeEffectSlot (EffectKind::crestCompressor).params;
+    p[(std::size_t) c::ratio] = 1.0f;
+    p[(std::size_t) c::threshold] = 0.5f; // -30 dB
+    const auto a = c::staticGainDb (p, -12.0), b = c::staticGainDb (p, -6.0);
+    p[(std::size_t) c::ratio] = 0.99f;
+    const auto a2 = c::staticGainDb (p, -12.0), b2 = c::staticGainDb (p, -6.0);
+    std::printf ("  Crest ratio top: 6 dB more input, %.3f dB more reduction (0.99: %.3f)\n", a - b, a2 - b2);
+    CHECK (a - b > a2 - b2);
+}
+
+// round tp172b6 [EXEC]: Audition: the output is what the band's detector hears: its band shape (-6 dB at the edges of a
+// 24 dB/oct band), whatever its level, range and mix; the Output still applies; a switched-off band still sounds; off, nothing changes
+TEST (prism_audition_round172b6)
+{
+    using namespace lynx;
+    namespace m = dyn::prism;
+    auto p = dyn108::defaults (EffectKind::prismMultiband);
+    p[m::bandCountParam] = m::bandCountValue (1);
+    p[m::bandLayout] = 1.0f;
+    p[(std::size_t) m::bandLo0] = m::edgeValue (500.0);
+    p[(std::size_t) m::bandHi0] = m::edgeValue (8000.0);
+    p[(std::size_t) m::param (0, m::fRange)] = 0.5f;
+    const auto tone = [] (const EffectParams& q, double hz) {
+        auto slot = makeEffectSlot (EffectKind::prismMultiband);
+        slot.params = q;
+        auto fx = makeEffect (slot);
+        fx->prepare (dyn108::sr);
+        fx->reset();
+        const int n = 48000;
+        std::vector<float> l (n), r (n);
+        for (int i = 0; i < n; ++i)
+            l[(std::size_t) i] = r[(std::size_t) i] = (float) (0.1 * std::sin (2.0 * dyn108::pi * hz * i / dyn108::sr));
+        for (int off = 0; off < n; off += 512)
+            fx->process (l.data() + off, r.data() + off, std::min (512, n - off), q, 120.0);
+        double e = 0.0;
+        for (int i = n / 2; i < n; ++i)
+            e += (double) l[(std::size_t) i] * l[(std::size_t) i];
+        return 10.0 * std::log10 (e / (n / 2) / (0.5 * 0.1 * 0.1));
+    };
+    CHECK (std::abs (tone (p, 200.0)) < 0.05); // off: the band does nothing here
+    p[(std::size_t) m::audition] = 1.0f / 6.0f;
+    CHECK (m::auditionBand (p) == 0);
+    const auto in = tone (p, 2000.0), low = tone (p, 125.0);
+    std::printf ("  Prism audition: 2 kHz %.2f dB, 125 Hz %.2f dB\n", in, low);
+    CHECK (std::abs (in) < 0.5);
+    CHECK (low < -30.0);
+    p[(std::size_t) m::param (0, m::fLevel)] = 0.7f; // +12 dB: not heard
+    CHECK (std::abs (tone (p, 2000.0) - in) < 0.05);
+    p[(std::size_t) m::param (0, m::fLevel)] = 0.5f;
+    p[(std::size_t) m::param (0, m::fEnabled)] = 0.0f;
+    CHECK (std::abs (tone (p, 2000.0) - in) < 0.05);
 }
