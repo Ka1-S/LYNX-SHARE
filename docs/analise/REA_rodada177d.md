@@ -248,3 +248,22 @@ Round 168x chose this routing and noted "FL's routing of such a clip was not mea
 
 ### Proposal: undo steps for tweaks made in a plugin's own GUI (pain point 16)
 Plugin parameter moves made in the plugin's own window make no undo step today, and the History labels name the channel or insert, not the parameter. This needs the plugin state captured before and after a gesture (`PluginWindows::onGesture` already reports begin and end) and stored in History. That is a larger change, logged as a later proposal (coordinator, 2026-11-06).
+
+## 6. Measurement: does the forced backup disturb the sound? (15)
+
+**Setup.** Windows build of `wip/rec177d` with `--rtstress <project> <report> 60 --no-window --backuptest <every> --buffer 128`. The test project is the Demo with 8 ValhallaSupermassive instances on inserts 1-8. The test turns the Master fader down, so these are deadline counts, not listening checks. The device is WASAPI shared; 128 samples was requested and 480 (10 ms) was given. Every 100 ms the test sends MIDI clock (0xF8) and every third tick active sensing (0xFE). A = no forced backup, B = a forced backup every 10 s. Other rounds were building at the same time, so the machine load was uneven. All of it ran under the GUI lock with the idle gate.
+
+**Finding 4 (MIDI clock and active sensing do not hold backups back).** In every run the "light" MIDI count kept rising (797 per 60 s run) while the "played" count stayed 0. A real 740 s run wrote exactly one backup, at the 10-minute limit, while the song played. One played note then moved the played count to 2.
+
+**Glitches.** Since commit e66010b37 the test lists each callback over (or near) its deadline, with its time since the last forced backup, seen within 100 ms.
+
+| Run set (60 s each) | Over deadline, A | Over deadline, B | Forced backups | Longest forced backup (message thread) |
+|---|---|---|---|---|
+| 2026-11-07 04:14-04:40, 6 A + 5 B | 1 in 36,000 | 3 in 30,000 | 25 | 6.6 ms |
+| 2026-11-07 09:18-09:25, 3 A + 3 B | 4 in 18,000 | 5 in 18,000 | 15 | 25.2 ms |
+
+- Every run has one miss as the device starts, before playback ("at bar 1.00 (stopped)" in audio-glitches.log), with or without a backup.
+- Of the 40 forced backups, one was followed within 100 ms by a callback over its deadline (tb1, 09:19-09:20, "+0.1 s after the last forced backup"). The same A run (ta1) had as many misses during playback with no backup at all.
+- No near-budget count follows the forced backups more than the A runs.
+
+**Verdict.** No difference between A and B can be measured at this load: the misses with and without forced backups are of the same order. A forced backup does its work on the message thread (up to 25 ms there), not on the audio thread. Not checked: listening with the Master up, an ASIO device, and buffers below 480 samples.
