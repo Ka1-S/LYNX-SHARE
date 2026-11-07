@@ -87,6 +87,15 @@ jobs:
           cat selftest.txt
           grep -q '^result=OK' selftest.txt
 
+      # Issue #85: no LV2 child while nothing changed, one when something did; a child that fails changes nothing
+      - name: LV2 scan
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          LYNX_PROFILE_DIR="$PWD/lv2-profile" xvfb-run -a build/LYNX_artefacts/Release/LYNX --lv2scantest "$PWD/lv2scan.txt" || true
+          cat lv2scan.txt
+          grep -q '^result=OK' lv2scan.txt
+
       # Round 170c (issue #11): the plugin editors as this platform draws them (macOS = CoreGraphics), one PNG each,
       # and the renderer probe (gradient text / empty paths must stay inside their shapes). Kept as an artifact.
       - name: Editor pictures
@@ -113,3 +122,14 @@ jobs:
           name: editor-pictures-${{ runner.os }}
           path: editor-pictures
           retention-days: 14
+
+      # A plugin that kills the scan's child process is blacklisted, not described again at every start
+      - name: Crashing plugin
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir crash-plugin
+          echo 'void __attribute__ ((constructor)) crash (void) { __builtin_trap(); }' | cc -shared -fPIC -x c - -o crash-plugin/crash.clap
+          LYNX_PROFILE_DIR="$PWD/crash-profile" xvfb-run -a build/LYNX_artefacts/Release/LYNX --scantest "$PWD/crash-plugin" "$PWD/crash.txt" || true
+          cat crash.txt
+          grep -q 'blacklisted: .*crash.clap' crash.txt

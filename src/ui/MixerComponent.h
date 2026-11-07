@@ -14,6 +14,7 @@
 #include "core/MixerLayout.h"
 #include "core/MixerOps.h"
 #include "engine/AudioEngine.h"
+#include "ui/TimerWhileShowing.h"
 #include "ui/FrameTicker.h"
 #include "ui/ValueControl.h"
 
@@ -178,7 +179,7 @@ public:
     juce::Rectangle<int> faderRailForSnapshot (int track) const { return faderRail (track); }
 
 private:
-    enum class Part { none, pan, stereo, fader, meter, mute, solo, route, send, header, body, add, arm, input };
+    enum class Part { none, pan, stereo, fader, meter, mute, solo, route, send, header, body, add, arm, input, fold, tab };
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
 
@@ -208,7 +209,21 @@ private:
     MixerDock dockOf (int track) const noexcept;
     void moved() override { repaint(); }
     static constexpr int dockGap = 14, separatorGap = 8;
-    int stripWidthOf (int track) const noexcept { return track == 0 ? spec().masterWidth : spec().stripWidth; }
+    int stripWidthOf (int track) const noexcept
+    {
+        return track == 0 ? spec().masterWidth : isFoldTab (track) ? foldTabWidth : spec().stripWidth;
+    }
+    // Folded mixer groups (round 177a): how each strip shows (mixerops::foldView), the tab each hidden member's meter
+    // feeds (-1 = none), and the fold chevron of a group's first strip. All empty / unused while no group is folded.
+    std::vector<mixerops::FoldShow> foldShow;
+    std::vector<int> tabOf;
+    std::vector<bool> foldHead;
+    static constexpr int foldTabWidth = 20;
+    bool isFoldTab (int track) const noexcept { return track > 0 && track < (int) foldShow.size() && foldShow[(std::size_t) track] == mixerops::FoldShow::tab; }
+    juce::Rectangle<int> foldArea (int track) const;
+    float tabLevel (int track) const noexcept;
+    void paintFoldTab (juce::Graphics& g, int track);
+    void paintFoldTabLevel (juce::Graphics& g, int track) const;
     // the strip's rows for the current layout and height (top to bottom)
     struct Rows
     {
@@ -428,6 +443,11 @@ private:
     void openEditor (int slot);
     void toggleEditor (int slot); // FL: a click on the slot's name shows or hides its window (round 170b)
     juce::Rectangle<int> editorButtonBounds() const;
+    // Round 177b: the selected effect's "Sidechain from" picker (effects with a side input; empty bounds = none)
+    juce::Rectangle<int> sidechainButtonBounds() const;
+    int titleRowY() const;
+    void paintSidechainButton (juce::Graphics& g, const EffectSlot& slot);
+    bool hoverSidechain = false;
     void openPluginWindow (int slot);
     juce::Rectangle<int> fxSwitchBounds() const; // all effects on/off; right-click opens/closes their windows
     void toggleAllWindows();
@@ -451,6 +471,7 @@ private:
     ui::ValueDrag drag;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (EffectsPanel)
+    std::unique_ptr<ui::TimerWhileShowing> showingTimer; // the polling timer, only while on screen (round 174f)
 };
 
 // FL's "Mixer layout" drop-down in the Mixer's title bar (issue #52, REA round 168h): the current layout's name and a

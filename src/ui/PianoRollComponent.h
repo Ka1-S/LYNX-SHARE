@@ -4,6 +4,7 @@
 
 #include "core/NoteTools.h"
 #include "engine/AudioEngine.h"
+#include "ui/TimerWhileShowing.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
 #include "ui/FlMods.h"
@@ -80,6 +81,7 @@ public:
     bool isScaleSnapOn() const noexcept { return scaleSnap; }
     void setScaleSnap (bool on);
     bool hasScale() const { return scaleIndex() > 0; } // a scale is chosen in the toolbar
+    int scaleTonic() const { return hasScale() ? scaleRoot() : -1; } // its root (pitch class), or -1
     // "Fold to the scale" (round 166d, issue #14; LYNX's own — FL only highlights the scale): only the in-scale keys
     // are shown, and the notes on the other keys are hidden and left alone by the edits.
     bool isFoldedToScale() const noexcept { return foldToScale; }
@@ -106,6 +108,8 @@ public:
     // default): a selection of 2 to 10 different keys shows its chord name over the grid's top-left corner. The main
     // window saves both with the UI options.
     static inline bool gridHighlights = true, showChordName = false;
+    // the keys of the selection, on every change (the toolbar's chord panel)
+    static inline std::function<void (const std::vector<int>&)> onSelectedKeys;
     // View › Background waveform (Alt+N): an audio file dropped on the Piano roll is drawn behind the notes from the
     // pattern's start at the song tempo (FL's FUN_00e70bf0 / FUN_00e45a00); one for every editor, not saved.
     static bool isBackgroundWaveShown() noexcept;
@@ -359,6 +363,7 @@ private:
     NoteMask soundingNow() const;
     bool isLit (int key) const noexcept { return key >= 0 && key < 128 && ((litKeys[(std::size_t) (key >> 6)] >> (key & 63)) & 1u) != 0; }
     double playheadTick = -1.0;
+    juce::Rectangle<int> liveHeldArea; // round 177d: where the held notes of a take were last drawn
 
     std::vector<int> selection;     // indices into Pattern::notes, sorted
     std::vector<int> selectionBefore; // selection at the start of a Shift+rectangle
@@ -402,6 +407,7 @@ private:
     juce::Label chordBubble;                   // "Show chord name for selection"
     juce::uint32 chordBubbleUntil = 0;
     std::vector<int> chordBubbleSelection;     // the selection it was shown for
+    std::vector<int> chordPanelSelection;      // the selection the toolbar's chord panel last heard of
     void updateChordBubble();
     void paintBackgroundWave (juce::Graphics& g, juce::Rectangle<int> grid);
     void spaceOperation (int kind);            // 0 insert, 1 slice & insert, 2 delete, 3 trim
@@ -420,5 +426,6 @@ private:
     void showPatternMarkerMenu (int index);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRollComponent)
+    std::unique_ptr<ui::TimerWhileShowing> showingTimer; // the polling timer, only while on screen (round 174f)
 };
 } // namespace lynx

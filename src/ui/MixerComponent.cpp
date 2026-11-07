@@ -18,6 +18,7 @@
 #include "core/LiveInput.h"
 #include "core/HardwareOutput.h"
 #include "core/MixerOps.h"
+#include "ui/PluginHeader.h"
 #include "core/ProjectSafety.h"
 #include "core/Templates.h"
 #include "core/RackOps.h"
@@ -248,6 +249,36 @@ void MixerStrips::layoutStrips()
     if (showUsedOnly)
         for (int t = 1; t < tracks; ++t)
             hidden[(std::size_t) t] = revealed.count (t) == 0 && ! song.insertInUse (t);
+    // folded groups (round 177a): nothing is computed unless a group is folded
+    foldShow.clear();
+    tabOf.clear();
+    foldHead.assign ((std::size_t) tracks + 1, false);
+    for (int t = 1; t < tracks; ++t)
+        if (song.mixer[(std::size_t) t].separator || (t + 1 < tracks && song.mixer[(std::size_t) t + 1].separator))
+        {
+            // the first strip of a group that can fold carries the chevron (a separator sets groups off)
+            const auto group = mixerops::groupOf (song, t);
+            if (! group.empty() && group.front() == t && mixerops::canFold (song, t))
+                foldHead[(std::size_t) t] = true;
+        }
+    if (std::any_of (song.mixer.begin() + std::min<std::ptrdiff_t> (1, (std::ptrdiff_t) song.mixer.size()), song.mixer.end(),
+                     [] (const MixerTrack& m) { return m.folded; }))
+    {
+        foldShow = mixerops::foldView (song);
+        tabOf.assign ((std::size_t) tracks, -1);
+        for (int t = 1; t < tracks; ++t)
+        {
+            if (foldShow[(std::size_t) t] == mixerops::FoldShow::hidden)
+                hidden[(std::size_t) t] = true;
+            if (foldShow[(std::size_t) t] == mixerops::FoldShow::tab)
+                for (const auto m : mixerops::groupOf (song, t))
+                    tabOf[(std::size_t) m] = t;
+        }
+        for (int t = 1; t < tracks; ++t) // a folded summing group: its bus strip carries the chevron (to unfold it)
+            if (foldHead[(std::size_t) t] && hidden[(std::size_t) t] && song.mixer[(std::size_t) t].folded)
+                if (const auto bus = mixerops::groupBus (song, mixerops::groupOf (song, t)); bus > 0)
+                    foldHead[(std::size_t) bus] = true;
+    }
     dockGaps.clear();
     separatorLines.clear();
 
@@ -460,6 +491,78 @@ MixerStrips::Rows MixerStrips::rows() const noexcept
     return r;
 }
 
+juce::Rectangle<int> MixerStrips::foldArea (int t) const
+{
+    // the chevron left of the number on a group's first strip (round 177a)
+    return { stripX (t) + 1, 3, 12, 15 };
+}
+
+float MixerStrips::tabLevel (int t) const noexcept
+{
+    float level = 0.0f;
+    for (std::size_t m = 0; m < tabOf.size(); ++m)
+        if (tabOf[m] == t)
+            for (std::size_t ch = 0; ch < 2; ++ch)
+                if (const auto i = m * 2 + ch; i < levels.size())
+                    level = juce::jmax (level, levels[i].level);
+    return level;
+}
+
+void MixerStrips::paintFoldTab (juce::Graphics& g, int t)
+{
+    // a folded group without a bus (round 177a): a slim tab in the group's colour with its name, how many inserts it
+    // holds and the loudest member's level; a click unfolds it. The members are never hidden without a trace.
+    using namespace theme;
+    const auto& song = engine.getSong();
+    const auto& head = song.mixer[(std::size_t) t];
+    const auto x = stripX (t);
+    const auto area = juce::Rectangle<int> (x, 2, foldTabWidth - 2, laneTop() - 2).toFloat();
+    const auto hoveredTab = hoverTrack == t;
+    auto plate = hoveredTab ? colour::bg3 : colour::bg2;
+    if (head.colour != 0)
+        plate = plate.interpolatedWith (tame (juce::Colour (head.colour)), 0.3f);
+    theme::fillRoundRect (g, area, radius::md, plate);
+    if (head.colour != 0)
+        theme::fillRoundRect (g, area.withHeight (3.0f).reduced (3.0f, 0.0f), 1.5f, tame (juce::Colour (head.colour)));
+    g.setColour (hoveredTab ? colour::borderStrong : colour::border);
+    g.drawRoundedRectangle (area.reduced (0.5f), radius::md, 1.0f);
+    icons::draw (g, Icon::chevronDown, juce::Rectangle<float> (12.0f, 12.0f).withCentre ({ area.getCentreX(), 12.0f }).transformedBy (
+                                           juce::AffineTransform::rotation (-juce::MathConstants<float>::halfPi, area.getCentreX(), 12.0f)),
+                 hoveredTab ? colour::textPrimary : colour::textSecondary);
+
+    const auto members = (int) mixerops::groupOf (song, t).size();
+    g.setColour (colour::textSecondary);
+    g.setFont (font (9.0f, true));
+    textcache::drawText (g, juce::String (members), (int) area.getX(), 22, (int) area.getWidth(), 12, juce::Justification::centred);
+
+    // the loudest member's level: one thin bar along the fader rows
+    const auto rail = faderRail (t);
+    const auto bar = juce::Rectangle<float> (area.getRight() - 6.0f, (float) rail.getY(), 3.0f, (float) rail.getHeight());
+    theme::fillRoundRect (g, bar, 1.0f, colour::bg0);
+    if (! cachePainting) // (cached: drawn over the picture, paintMeterLevels)
+        paintFoldTabLevel (g, t);
+
+    // the group's name, bottom to top
+    const auto name = juce::String::fromUTF8 (head.name.c_str());
+    const auto column = juce::Rectangle<int> ((int) area.getX() + 1, 40, (int) area.getWidth() - 8, juce::jmax (20, rail.getY() - 46));
+    juce::Graphics::ScopedSaveState state (g);
+    g.addTransform (juce::AffineTransform::rotation (-juce::MathConstants<float>::halfPi, (float) column.getCentreX(), (float) column.getCentreY()));
+    g.setColour (colour::textPrimary.withAlpha (0.9f));
+    g.setFont (font (type::small, false));
+    textcache::drawFittedText (g, name, juce::Rectangle<int> (column.getHeight(), column.getWidth()).withCentre (column.getCentre()),
+                               juce::Justification::centredLeft, 1, 0.8f);
+}
+
+void MixerStrips::paintFoldTabLevel (juce::Graphics& g, int t) const
+{
+    using namespace theme;
+    const auto rail = faderRail (t);
+    const auto bar = juce::Rectangle<float> ((float) (stripX (t) + foldTabWidth - 2) - 6.0f, (float) rail.getY(), 3.0f, (float) rail.getHeight());
+    const auto level = tabLevel (t);
+    g.setColour (level >= 1.0f ? colour::meterClip : level >= 0.5f ? colour::meterMid : colour::meterLow);
+    g.fillRect (bar.withTop (bar.getBottom() - meterPosition (level) * bar.getHeight()));
+}
+
 juce::Rectangle<int> MixerStrips::headerArea (int t) const
 {
     return { stripX (t), 0, stripWidthOf (t) - spec().gap, rows().header };
@@ -583,6 +686,11 @@ MixerStrips::Part MixerStrips::partAt (int t, juce::Point<int> p) const
         return Part::none;
 
     const auto sending = selected > 0 && t != selected && selected < (int) song.mixer.size();
+
+    if (isFoldTab (t))
+        return Part::tab;
+    if (t > 0 && t < (int) foldHead.size() && foldHead[(std::size_t) t] && foldArea (t).contains (p))
+        return Part::fold;
 
     if (t > 0 && armArea (t).expanded (1).contains (p))
         return Part::arm;
@@ -739,6 +847,12 @@ void MixerStrips::paint (juce::Graphics& g)
         if (x > clip.getRight() || x + w < clip.getX())
             continue;
 
+        if (isFoldTab (t))
+        {
+            paintFoldTab (g, t);
+            continue;
+        }
+
         const auto& track = song.mixer[(std::size_t) t];
         const auto& sp = spec();
         const auto plateWidth = w - sp.gap;
@@ -815,6 +929,17 @@ void MixerStrips::paint (juce::Graphics& g)
         g.setFont (font (compactLayout ? 9.5f : type::caption, isSelected));
         textcache::drawFittedText (g, t == 0 ? juce::String ("M") : juce::String (t), juce::Rectangle<int> (x, 4, plateWidth, 13),
                                    juce::Justification::centred, 1, 0.6f);
+
+        if (t < (int) foldHead.size() && foldHead[(std::size_t) t]) // round 177a: fold / unfold the group
+        {
+            const auto folded = mixerops::isFolded (song, t);
+            const auto box = foldArea (t).toFloat();
+            const auto c = box.getCentre();
+            icons::draw (g, Icon::chevronDown,
+                         juce::Rectangle<float> (10.0f, 10.0f).withCentre (c).transformedBy (
+                             juce::AffineTransform::rotation ((folded ? -1.0f : 1.0f) * juce::MathConstants<float>::halfPi, c.x, c.y)),
+                         hovered (Part::fold) ? colour::textPrimary : colour::textSecondary);
+        }
 
         if (const auto icon = trackicons::iconFor (track.icon); icon != trackicons::Icon::none)
             ui::drawTrackIcon (g, icon, iconArea (t).toFloat(), track.muted ? colour::textDisabled : colour::textPrimary.withAlpha (0.88f));
@@ -1144,6 +1269,20 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
             updateSize();
             selectTrack (added);
         }
+        return;
+    }
+
+    if ((part == Part::fold || part == Part::tab) && ! flmods::popup (e.mods))
+    {
+        // round 177a: fold / unfold the group; Alt: every group (to the state this one takes)
+        const auto all = e.mods.isAltDown();
+        engine.editSong ([t, all] (Song& s) {
+            const auto folded = mixerops::toggleFold (s, t);
+            if (all)
+                mixerops::foldAll (s, folded);
+        });
+        updateSize();
+        repaint();
         return;
     }
 
@@ -1697,6 +1836,13 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
         case Part::meter: h.text = name + " - " + tr ("Peak meter (left/right) with peak hold  [LMB] selects the track and clears the clip light"); break;
         case Part::route: h.text = name + " - " + tr ("Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu"); h.hasMenu = true; break;
         case Part::add: h.text = tr ("Add a mixer insert"); break;
+        case Part::fold:
+            h.text = name + " - " + (mixerops::isFolded (song, t) ? tr ("Unfold this group  [Alt]+[LMB] all groups")
+                                                                : tr ("Fold this group to its bus strip, or to a slim tab  [Alt]+[LMB] all groups"));
+            break;
+        case Part::tab:
+            h.text = tr ("Folded group: {0} ({1} inserts)  [LMB] unfold", { name, juce::String ((int) mixerops::groupOf (song, t).size()) });
+            break;
         case Part::header:
             h.text = name + " - " + tr ("[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu") + feeds() + latency();
             h.hasMenu = true;
@@ -2437,6 +2583,21 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         menu.addItem (tr ("Create group"), [this, targets, t] { engine.editSong ([targets, t] (Song& s) { mixerops::createGroup (s, targets, t); }); });
         menu.addItem (tr ("Auto color group"), song.mixer[(std::size_t) t].colour != 0, false,
                       [this, t] { engine.editSong ([t] (Song& s) { mixerops::autoColorGroup (s, t); }); });
+        // LYNX's addition (round 177a): a group folds to its bus strip, or to a slim tab when it has no bus
+        const auto canFold = mixerops::canFold (song, t);
+        const auto folded = mixerops::isFolded (song, t);
+        menu.addItem (folded ? tr ("Unfold group") : tr ("Fold group"), canFold, false, [this, t] {
+            engine.editSong ([t] (Song& s) { mixerops::toggleFold (s, t); });
+            updateSize();
+        });
+        menu.addItem (tr ("Fold all groups"), [this] {
+            engine.editSong ([] (Song& s) { mixerops::foldAll (s, true); });
+            updateSize();
+        });
+        menu.addItem (tr ("Unfold all groups"), [this] {
+            engine.editSong ([] (Song& s) { mixerops::foldAll (s, false); });
+            updateSize();
+        });
     }
 
     // --- FL's "Layout" section --------------------------------------------------------------------------
@@ -2633,7 +2794,7 @@ void MixerStrips::repaintAutomatedStrips()
     automatedShown.resize (mixer.size(), { -1.0f, -1.0f });
     for (const auto t : all)
     {
-        if (t < 0 || t >= count)
+        if (t < 0 || t >= count || isHidden (t) || isFoldTab (t)) // (a folded member has no control on screen to move)
             continue;
         const std::array<float, 2> now { shownVolume (t),
                                          shown.shown (AutomationTarget { AutomationTargetKind::mixerPan, t }, (mixer[(std::size_t) t].pan + 1.0f) * 0.5f) };
@@ -2737,6 +2898,19 @@ void MixerStrips::paintMeterLevels (juce::Graphics& g) const
     {
         if (isHidden (t))
             continue;
+        if (isFoldTab (t)) // (a folded group's tab: one bar, and no meter of its own)
+        {
+            const auto rail = faderRail (t);
+            if (const juce::Rectangle<int> bar (stripX (t), rail.getY(), foldTabWidth, rail.getHeight()); bar.intersects (clip))
+            {
+                const juce::Graphics::ScopedSaveState state (g);
+                if (dockOf (t) == MixerDock::middle)
+                    for (const auto& r : pinned)
+                        g.excludeClipRegion (r);
+                paintFoldTabLevel (g, t);
+            }
+            continue;
+        }
         const auto meters = meterArea (t);
         const auto bars = nameBars (t);
         const auto meterShown = meters.intersects (clip) && g.clipRegionIntersects (meters);
@@ -2798,6 +2972,15 @@ bool MixerStrips::liveFrame (double nowMs)
         // the Wide layouts the two thin bars beside the name, which follow the same level (round 173f)
         const auto t = (int) (i / 2);
         const auto ch = (int) (i % 2);
+        if (t < (int) tabOf.size() && tabOf[(std::size_t) t] > 0 && m.level != before.level) // a folded group's tab
+        {
+            const auto tab = tabOf[(std::size_t) t];
+            const auto rail = faderRail (tab);
+            const juce::Rectangle<int> bar (stripX (tab) + foldTabWidth - 10, rail.getY() - 1, 8, rail.getHeight() + 2);
+            dirty = dirty.isEmpty() ? bar : dirty.getUnion (bar);
+        }
+        if (isHidden (t) || isFoldTab (t))
+            continue;
         const auto area = meterArea (t);
         const auto& sp = spec();
         const auto rows = meters::dirtyRows (before, m, area.getHeight(), [] (float v) { return meterPosition (v); });
@@ -2836,7 +3019,7 @@ const EffectKind allEffects[] = { EffectKind::eq,     EffectKind::parametricEq, 
                                       EffectKind::delay,  EffectKind::reverb,       EffectKind::chorus,     EffectKind::filter,
                                       EffectKind::distortion, EffectKind::utility, EffectKind::volumeGate,
                                       EffectKind::pitchShift, EffectKind::freqShift, EffectKind::lofi, EffectKind::effector, EffectKind::crossover, EffectKind::frequencySplitter, EffectKind::autoPan, EffectKind::vocoder, EffectKind::pitchCorrect,
-                                      EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, // LYNX's mixing suite
+                                      EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, // LYNX's mixing suite
                                       EffectKind::lynxTune, // LYNX's own pitch corrector
                                       EffectKind::epochVerb, EffectKind::atrium, EffectKind::foilPlate, EffectKind::nebula, EffectKind::halo, EffectKind::horizon, // LYNX's reverbs
                                       EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod, // LYNX's delay / modulation suite
@@ -2920,7 +3103,7 @@ EffectsPanel::EffectsPanel (AudioEngine& e)
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
     engine.addChangeListener (this);
-    startTimerHz (30);
+    showingTimer = std::make_unique<ui::TimerWhileShowing> (*this, static_cast<juce::Timer&> (*this), 30); // (stopped while hidden; round 174f)
 }
 
 EffectsPanel::~EffectsPanel()
@@ -4055,6 +4238,7 @@ void EffectsPanel::paint (juce::Graphics& g)
         g.setColour (colour::textSecondary);
         g.setFont (font (type::caption));
         textcache::drawText (g, quickpick::slotName (engine, slot), button.translated (0, 34), juce::Justification::centred);
+        paintSidechainButton (g, slot);
         return;
     }
 
@@ -4117,7 +4301,8 @@ void EffectsPanel::paint (juce::Graphics& g)
     const auto tune = slot.kind == EffectKind::lynxTune;
     const auto editorButton = ! gate && ! vocoder && NativeEffectWindows::canOpen (slot.kind);
     const auto titleY = (gate ? gateStepsBounds().getY() : vocoder ? bandLevelsBounds().getY() : tune ? tuneKeysBounds().getY() : knobBounds (0).getY()) - 28;
-    const auto titleRight = getWidth() - 10 - (editorButton ? editorButtonBounds().getWidth() + 6 : 0);
+    const auto scButton = sidechainButtonBounds();
+    const auto titleRight = scButton.isEmpty() ? getWidth() - 10 - (editorButton ? editorButtonBounds().getWidth() + 6 : 0) : scButton.getX() - 6;
     textcache::drawText (g, juce::String::fromUTF8 (info.name), 10, titleY, titleRight - 10, 20, juce::Justification::centredLeft, true);
     if (slot.isSubstitute()) // which missing plugin this stands in for (the project keeps it)
     {
@@ -4140,6 +4325,7 @@ void EffectsPanel::paint (juce::Graphics& g)
         g.setFont (font (type::small));
         textcache::drawFittedText (g, tr ("Editor"), b.withTrimmedLeft (24.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
     }
+    paintSidechainButton (g, slot);
 
     if (tune) // the scale's notes on one octave; a note switched off is never a target
     {
@@ -4246,6 +4432,12 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
 
     if (s == nullptr)
         return;
+
+    if (const auto sc = sidechainButtonBounds(); ! sc.isEmpty() && sc.contains (e.getPosition()))
+    {
+        pluginheader::showSidechainPicker (engine, track, selectedSlot, this, sc);
+        return;
+    }
 
     if (eqFoldBounds().contains (e.getPosition()) && e.mods.isLeftButtonDown())
     {
@@ -4676,6 +4868,12 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
         return ui::valueHint (specFor (param, selectedSlot), valueOf (param, selectedSlot), gesture);
 
     ui::Hint h;
+    if (const auto sc = sidechainButtonBounds(); ! sc.isEmpty() && sc.contains (p))
+    {
+        h.text = tr ("Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose");
+        h.hasMenu = true;
+        return h;
+    }
     if (const auto* s = slots(); s != nullptr && selectedSlot >= 0 && selectedSlot < (int) s->size()
                                  && NativeEffectWindows::canOpen ((*s)[(std::size_t) selectedSlot].kind) && editorButtonBounds().contains (p))
     {
@@ -4837,6 +5035,12 @@ void EffectsPanel::mouseMove (const juce::MouseEvent& e)
         }
     if (slot >= 0)
         led = ledBounds (slot).contains (p);
+
+    if (const auto sc = sidechainButtonBounds(); sc.contains (p) != hoverSidechain) // round 177b
+    {
+        hoverSidechain = ! hoverSidechain;
+        repaint (sc);
+    }
 
     if (slot != hoverSlot || param != hoverParam || led != hoverLed || input != hoverInput || eq != hoverEq || output != hoverOutput || arrow != hoverArrow)
     {
@@ -5095,6 +5299,62 @@ juce::Rectangle<int> EffectsPanel::editorButtonBounds() const
     return { getWidth() - 96, (tuneSelected() ? tuneKeysBounds().getY() : knobBounds (0).getY()) - 29, 86, 20 };
 }
 
+void EffectsPanel::paintSidechainButton (juce::Graphics& g, const EffectSlot& slot)
+{
+    using namespace theme;
+    const auto b = sidechainButtonBounds().toFloat();
+    if (b.isEmpty())
+        return;
+    const auto source = pluginheader::sidechainSourceText (engine.getSong(), slot);
+    const auto hover = b.contains (getMouseXYRelative().toFloat());
+    theme::fillRoundRect (g, b, radius::md, hover ? colour::bg5 : colour::bg4);
+    if (source.isNotEmpty()) // linked: the accent edge, as a lit route
+    {
+        g.setColour (colour::accent.withAlpha (0.8f));
+        g.drawRoundedRectangle (b.reduced (0.5f), radius::md, 1.0f);
+    }
+    icons::draw (g, Icon::link, b.withWidth (22.0f).withSizeKeepingCentre (13.0f, 13.0f).translated (4.0f, 0.0f),
+                 source.isNotEmpty() ? colour::accent : colour::textSecondary);
+    const auto modulator = slot.kind == EffectKind::vocoder || slot.kind == EffectKind::vocodex;
+    const auto text = (modulator ? tr ("Modulator") : tr ("SC")) + ": " + (source.isNotEmpty() ? source : tr ("None"));
+    g.setColour (source.isNotEmpty() ? colour::textPrimary : colour::textSecondary);
+    g.setFont (font (type::small));
+    textcache::drawFittedText (g, text, b.withTrimmedLeft (24.0f).withTrimmedRight (14.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
+    juce::Path tri; // ▾: it opens a list
+    const auto a = juce::Point<float> (b.getRight() - 9.0f, b.getCentreY());
+    tri.addTriangle (a.x - 3.5f, a.y - 2.0f, a.x + 3.5f, a.y - 2.0f, a.x, a.y + 2.5f);
+    g.setColour (colour::textSecondary);
+    g.fillPath (tri);
+}
+
+int EffectsPanel::titleRowY() const
+{
+    return (gateSelected() ? gateStepsBounds().getY() : vocoderSelected() ? bandLevelsBounds().getY()
+            : tuneSelected() ? tuneKeysBounds().getY() : knobBounds (0).getY()) - 28;
+}
+
+juce::Rectangle<int> EffectsPanel::sidechainButtonBounds() const
+{
+    const auto* s = slots();
+    if (s == nullptr || selectedSlot < 0 || selectedSlot >= (int) s->size() || track < 0)
+        return {};
+    const auto& slot = (*s)[(std::size_t) selectedSlot];
+    if (slot.kind == EffectKind::facetEq || slot.kind == EffectKind::parametricEq || slot.kind == EffectKind::parallel
+        || isSoundgoodizerApprox (slot)) // (Facet EQ: its own picker on its curve page)
+        return {};
+    if (! pluginheader::takesSidechain (engine, track, selectedSlot))
+        return {};
+    if (slot.kind == EffectKind::plugin) // under the plugin's name
+    {
+        const auto button = pluginButtonBounds();
+        return { button.getX(), button.getBottom() + 38, button.getWidth(), 22 };
+    }
+    const auto editorButton = slot.kind != EffectKind::volumeGate && ! vocoderSelected() && NativeEffectWindows::canOpen (slot.kind);
+    const auto right = editorButton ? editorButtonBounds().getX() - 6 : getWidth() - 10;
+    const auto width = juce::jmin (130, juce::jmax (0, right - 90));
+    return width < 60 ? juce::Rectangle<int>() : juce::Rectangle<int> (right - width, titleRowY(), width, 20);
+}
+
 void EffectsPanel::openPluginWindow (int slot)
 {
     auto effect = engine.getEffect (track, slot);
@@ -5114,7 +5374,7 @@ void EffectsPanel::openPluginWindow (int slot)
                                   if (t >= (int) song.mixer.size() || slot >= (int) song.mixer[(std::size_t) t].effects.size())
                                       return nullptr;
                                   return &song.mixer[(std::size_t) t].effects[(std::size_t) slot].plugin;
-                              } });
+                              }, false, track, slot });
         return;
     }
 
@@ -5242,35 +5502,21 @@ void EffectsPanel::showSlotMenu (int slot)
             menu.addSubMenu (tr ("FL presets"), presets);
     }
 
-    // side inputs: another track's output feeds the compressor's detector, or the vocoder's modulator/carrier
+    // side inputs: another track's output feeds the compressor's detector, or the vocoder's modulator/carrier. Round
+    // 177b: every effect with a side input (plugins with a sidechain bus too) gets the picker, which makes the route
     const auto kind = (*slots())[(std::size_t) slot].kind;
     auto sideMenu = [&] (const juce::String& title, bool second) {
         juce::PopupMenu side;
-        const auto& fx = (*slots())[(std::size_t) slot];
-        const auto current = second ? fx.sidechain2 : fx.sidechain;
-        auto assign = [this, slot, second] (int source) {
-            engine.editSong ([tk = track, slot, second, source] (Song& s) {
-                auto& target = s.mixer[(std::size_t) tk].effects[(std::size_t) slot];
-                (second ? target.sidechain2 : target.sidechain) = source;
-                if (target.kind == EffectKind::vocoder && source >= 0)
-                    target.params[16] = 1.0f; // separate inputs (otherwise L = modulator, R = carrier)
-            });
-        };
-        side.addItem (tr ("None"), true, current < 0, [assign] { assign (-1); });
-        const auto& song = engine.getSong();
-        for (int t = 1; t < (int) song.mixer.size(); ++t)
-            if (t != track)
-                side.addItem (juce::String (t) + " " + juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()), true, current == t,
-                              [assign, t] { assign (t); });
+        pluginheader::addSidechainPicker (side, engine, track, slot, second);
         menu.addSubMenu (title, side);
     };
-    if (kind == EffectKind::compressor || kind == EffectKind::fruityLimiter || kind == EffectKind::fruityCompressor || kind == EffectKind::facetEq)
-        sideMenu (tr ("Sidechain from"), false);
     if (kind == EffectKind::vocoder || kind == EffectKind::vocodex)
     {
         sideMenu (tr ("Modulator from"), false);
         sideMenu (tr ("Carrier from"), true);
     }
+    else if (pluginheader::takesSidechain (engine, track, slot))
+        sideMenu (tr ("Sidechain from"), false);
     if (kind == EffectKind::newtone || kind == EffectKind::newtime)
     {
         // the sample the plugin plays in slave mode (REA_rodada73): FL's edits are kept in the state but not reproduced

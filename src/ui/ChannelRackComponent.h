@@ -11,6 +11,7 @@
 
 #include "core/RackOps.h"
 #include "engine/AudioEngine.h"
+#include "ui/TimerWhileShowing.h"
 #include "ui/FrameTicker.h"
 #include "ui/ValueControl.h"
 
@@ -273,6 +274,7 @@ private:
     ui::FrameTicker frames { *this, [this] (double ms) { return playheadFrame (ms); } };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChannelRackComponent)
+    std::unique_ptr<ui::TimerWhileShowing> showingTimer; // the polling timer, only while on screen (round 174f)
 };
 
 // The Channel Rack panel's viewport: a sample, SoundFont or generator dropped on the free space under the channels

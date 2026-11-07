@@ -2,6 +2,7 @@
 #include "ui/Motion.h"
 #include "ui/FileChoosers.h"
 #include "ui/PianoRollComponent.h"
+#include "core/ChordReadout.h"
 #include "core/KeyMap.h"
 #include "core/NoteNames.h"
 
@@ -85,16 +86,24 @@ const std::vector<notetools::ScaleInfo>& scales()
 // a detected chord in the chosen note names (Settings › General, round 165f): "Do m7/Mib"; "" when none
 juce::String chordName (const std::vector<int>& keys)
 {
-    const auto chord = prtools::detectChord (keys, notenames::flats());
-    if (! chord)
+    // FL's own names (round 181b, core/ChordReadout.h): the same for the panel, this readout and the bubble
+    if ((int) keys.size() < chordread::minKeys || (int) keys.size() > chordread::maxKeys)
         return {};
-    auto name = juce::String (chord->name);
-    auto quality = name.fromFirstOccurrenceOf (name.substring (0, name.length() > 1 && (name[1] == '#' || name[1] == 'b') ? 2 : 1), false, false)
-                       .upToFirstOccurrenceOf ("/", false, false);
-    auto text = juce::String (notenames::pitchName (chord->root)) + quality;
-    if (name.contains ("/"))
-        text << "/" << notenames::pitchName (chord->bass);
-    return text;
+    std::array<std::string, 12> notes;
+    for (int pc = 0; pc < 12; ++pc)
+    {
+        auto name = juce::String (notenames::pitchName (pc));
+        if (name.endsWithChar ('#'))
+            name = name.dropLastCharacters (1) + juce::String::charToString ((juce::juce_wchar) 0x266F);
+        else if (name.length() > 1 && name.endsWithChar ('b'))
+            name = name.dropLastCharacters (1) + juce::String::charToString ((juce::juce_wchar) 0x266D);
+        notes[(std::size_t) pc] = name.toStdString();
+    }
+    chordread::NameOptions options;
+    options.notes = &notes;
+    const auto named = chordread::nameKeys (keys, options);
+    const auto text = juce::String::fromUTF8 (named.text.c_str());
+    return named.novelty ? tr (text) : text;
 }
 
 // View › Background waveform (round 168g): one for every editor, like FL's (PTR_DAT_015e2698 / DAT_016ba824)
@@ -329,7 +338,7 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     engine.addChangeListener (this);
     EditorGlobals::get().addChangeListener (this);
     refreshChannelBox();
-    startTimerHz (30);
+    showingTimer = std::make_unique<ui::TimerWhileShowing> (*this, static_cast<juce::Timer&> (*this), 30); // (stopped while hidden; round 174f)
 }
 
 PianoRollComponent::~PianoRollComponent()
@@ -956,6 +965,28 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 textcache::drawText (g, keyName (n.key), r.reduced (n.slide || n.porta ? 11.0f : 4.0f, 0.0f), juce::Justification::centredLeft, true);
             }
         }
+
+        // round 177d: the notes being played into a take grow with the playhead until they are released (then the
+        // recorded note takes their place); FL 2026 draws them so, as ordinary notes (REA_rodada177d §1.3, g03)
+        if (engine.isLiveRecording())
+            for (const auto& n : engine.liveRecording().held)
+            {
+                if (! edits (n) || ! rows.shown (n.key))
+                    continue;
+                const auto r = juce::Rectangle<float> ((float) tickToX ((double) n.start), (float) keyToY (n.key) + 1,
+                                                       juce::jmax (4.0f, (float) (n.length * pixelsPerTick) - 1.0f), (float) rowHeight - 2);
+                const auto fill = theme::noteGroupColour (n.colour, n.velocity);
+                g.setColour (fill);
+                g.fillRoundedRectangle (r, 2.5f);
+                g.setColour (bg0.withAlpha (0.6f));
+                g.drawRoundedRectangle (r, 2.5f, 1.0f);
+                if (gesture::noteLabelFits (r.getWidth(), rowHeight))
+                {
+                    g.setColour (fill.getPerceivedBrightness() > 0.55f ? bg0.withAlpha (0.85f) : textPrimary.withAlpha (0.9f));
+                    g.setFont (theme::font (gesture::labelHeight (rowHeight) - 1.0f));
+                    textcache::drawText (g, keyName (n.key), r.reduced (4.0f, 0.0f), juce::Justification::centredLeft, true);
+                }
+            }
 
         // the selection's stretch handle: a tab at its right end with two grips
         if (const auto handle = stretchHandle(); ! handle.isEmpty() && (drag == Drag::none || drag == Drag::stretch))
@@ -2240,7 +2271,9 @@ void PianoRollComponent::postDragHint (const juce::MouseEvent& e)
             const auto lane = velocityArea();
             const auto value = juce::jlimit (0.0f, 1.0f, (float) (lane.getBottom() - 2 - e.y) / (float) (lane.getHeight() - 8));
             hint.text = drag == Drag::eventErase ? tr ("Deleting events") : tr ("Drawing events: {0}", { laneBox.getText() });
-            hint.value = juce::String (juce::roundToInt (value * 100.0f)) + "%";
+            const auto target = eventLaneTarget();
+            hint.value = target && target->kind == AutomationTargetKind::tempo ? juce::String (tempoFromValue (value), 3) + " BPM" // (issue #86: as FL's hint)
+                                                                               : juce::String (juce::roundToInt (value * 100.0f)) + "%";
             break;
         }
         case Drag::velocity:
@@ -3291,6 +3324,20 @@ void PianoRollComponent::updateChordReadout()
 void PianoRollComponent::updateChordBubble()
 {
     const auto now = juce::Time::getMillisecondCounter();
+    if (selection != chordPanelSelection)
+    {
+        // the toolbar's chord panel follows the selection whether this bubble is on or not (FL: FUN_00d32da0)
+        chordPanelSelection = selection;
+        if (onSelectedKeys)
+        {
+            const auto& notes = currentPattern (engine.getSong()).notes;
+            std::vector<int> keys;
+            for (auto i : selection)
+                if (i >= 0 && i < (int) notes.size() && ! notes[(std::size_t) i].muted)
+                    keys.push_back (notes[(std::size_t) i].key);
+            onSelectedKeys (keys);
+        }
+    }
     if (! showChordName)
     {
         chordBubble.setVisible (false);
@@ -4202,6 +4249,26 @@ bool PianoRollComponent::playheadFrame (double)
             dirty (before);
             dirty (after);
         }
+    }
+    // round 177d: the notes held in a take grow with the playhead (only their rows, from their start)
+    if (engine.isLiveRecording() && isShowing())
+    {
+        juce::Rectangle<int> area;
+        for (const auto& n : engine.liveRecording().held)
+        {
+            const auto x0 = (int) tickToX ((double) n.start) - 2;
+            const auto x1 = juce::jmax (x0 + 8, (int) tickToX ((double) (n.start + n.length)) + 8);
+            area = area.getUnion (juce::Rectangle<int> (x0, keyToY (n.key), x1 - x0, rowHeight + 1));
+        }
+        const auto dirty = area.getUnion (liveHeldArea).getIntersection (gridArea());
+        liveHeldArea = area;
+        if (! dirty.isEmpty())
+            repaint (dirty);
+    }
+    else if (! liveHeldArea.isEmpty())
+    {
+        repaint (liveHeldArea);
+        liveHeldArea = {};
     }
     return playing || moved;
 }

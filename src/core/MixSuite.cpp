@@ -556,11 +556,15 @@ double responseDb (const EffectParams& p, double sampleRate, double hz)
     return gainToDb (m);
 }
 
+double compGrCapDb (float v) noexcept { return v > 1e-6f ? 60.0 * std::min (1.0f, v) : 1e9; }
+double compAttackFineSeconds (float v) noexcept { return 0.25 * std::clamp (v, 0.0f, 1.0f); }
+
 double compressorCurveDb (const EffectParams& p, double inputDb)
 {
     if (modernVoicing (p)) // round tp172c: the Modern voicing's measured law
         return vmatch::strip2::compStaticDb (modernSettingsOf (p), inputDb);
-    return gainComputer (inputDb, compThresholdDb (p[compThreshold]), ratio (p[compRatio]));
+    const auto out = gainComputer (inputDb, compThresholdDb (p[compThreshold]), ratio (p[compRatio]));
+    return std::max (out, inputDb - compGrCapDb (p[compGrCap]));
 }
 
 // ---- round tp172c6: the DRIVE section ----
@@ -585,6 +589,14 @@ struct DriveModelDef
     int lpSections;
     double hpHz, hpQ, bell2Hz, bell2Q, bell2Db;
     double apHz;            // first-order all-pass (0 = none)
+    // round tp172c9: the parts of the tone that sit before the curve (the amps': their sweeps compress the highs less /
+    // more than the 1 kHz stair at drive): preMask = the elements run ahead of it (1 bell, 2 shelf, 8 high-pass,
+    // 16 second bell); preLpHz / preLpQ = a low-pass ahead of it whose inverse the cabinet low-pass takes after it
+    // (that one becomes LP(lpHz) / LP(preLpHz): the same linear tone); preShelfDb = a pre-emphasis shelf. Both halves
+    // stay 0 dB at 1 kHz.
+    int preMask;
+    double preLpHz, preLpQ;
+    double preShelfDb;      // a high shelf at shelfHz ahead of the curve (the node's own shelf stays after it)
 };
 #include "core/RidgeDriveTables.inc"
 
@@ -682,7 +694,7 @@ public:
     {
         for (auto& o : os)
             o.reset();
-        for (auto* b : { &bell, &bell2, &shelf, &lp, &lp2, &hp, &ap })
+        for (auto* b : { &bell, &bell2, &shelf, &lp, &lp2, &hp, &ap, &preLp, &emphShelf })
             b->reset();
         dc[0] = dc[1] = dcIn[0] = dcIn[1] = 0.0;
         for (auto& ring : dry)
@@ -726,6 +738,19 @@ private:
         lpSections = m.lpHz > 0.0 ? m.lpSections : 0;
         lp.filter (sr, 0, std::min (m.lpHz > 0.0 ? m.lpHz : 20000.0, sr * 0.45), m.lpQ);
         lp2 = lp;
+        preLpOn = m.preLpHz > 0.0 && lpSections == 1;
+        if (preLpOn)
+        {
+            // LP(lpHz) / LP(preLpHz): both share the (1 + z^-1)^2 numerator, so the quotient is a stable biquad
+            preLp.filter (sr, 0, std::min (m.preLpHz, sr * 0.45), m.preLpQ);
+            const auto gain = (lp.b0) / preLp.b0;
+            lp.b0 = gain;
+            lp.b1 = gain * preLp.a1;
+            lp.b2 = gain * preLp.a2;
+        }
+        pre = m.preMask;
+        preShelfOn = std::abs (m.preShelfDb) > 1e-6;
+        emphShelf.shelf (sr, std::min (m.shelfHz, sr * 0.45), m.preShelfDb, true);
         hpOn = m.hpHz > 0.0;
         hp.filter (sr, 1, std::max (m.hpHz, 1.0), m.hpQ);
         // first-order all-pass (s - a) / (s + a) by the bilinear transform: unit gain, so the tone's 1 kHz norm ignores it
@@ -739,13 +764,19 @@ private:
             ap.a1 = (k - 1.0) / (k + 1.0);
             ap.a2 = 0.0;
         }
-        // the curve's gain was measured at 1 kHz: the tone is 0 dB there
+        // the curve's gain was measured at 1 kHz: the tone (each half) is 0 dB there
         const auto w = 2.0 * 3.141592653589793 * 1000.0 / sr;
-        double g = biquadMag (bell, w) * biquadMag (shelf, w);
-        if (bell2On) g *= biquadMag (bell2, w);
+        double g = 1.0, gp = 1.0;
+        auto part = [&] (const Biquad& b, int bit) { (pre & bit ? gp : g) *= biquadMag (b, w); };
+        part (bell, preBell);
+        part (shelf, preShelf);
+        if (bell2On) part (bell2, preBell2);
         for (int k = 0; k < lpSections; ++k) g *= biquadMag (lp, w);
-        if (hpOn) g *= biquadMag (hp, w);
+        if (preLpOn) gp *= biquadMag (preLp, w);
+        if (preShelfOn) gp *= biquadMag (emphShelf, w);
+        if (hpOn) part (hp, preHp);
         toneNorm = (float) (1.0 / std::max (1e-6, g));
+        preNorm = (float) (1.0 / std::max (1e-6, gp));
     }
 
     void run (float* l, float* r, int n, float inGain, float trim, float mix) noexcept
@@ -763,6 +794,18 @@ private:
                 ch[c][i] *= inGain;
             }
         dryPos = (dryPos + n) & (ringSize - 1);
+        if (pre != 0 || preLpOn || preShelfOn)
+        {
+            if (preShelfOn) emphShelf.processBlock (l, r, n);
+            if (pre & preBell) bell.processBlock (l, r, n);
+            if (pre & preShelf) shelf.processBlock (l, r, n);
+            if (bell2On && (pre & preBell2)) bell2.processBlock (l, r, n);
+            if (preLpOn) preLp.processBlock (l, r, n);
+            if (hpOn && (pre & preHp)) hp.processBlock (l, r, n);
+            for (int c = 0; c < 2; ++c)
+                for (int i = 0; i < n; ++i)
+                    ch[c][i] *= preNorm;
+        }
         for (int c = 0; c < 2; ++c)
             os[(std::size_t) c].process (ch[c], n, [this] (float x) noexcept { return lookup (x); });
         for (int c = 0; c < 2; ++c)
@@ -775,15 +818,17 @@ private:
                 dc[c] = y;
                 ch[c][i] = (float) y;
             }
-        bell.processBlock (l, r, n);
-        shelf.processBlock (l, r, n);
-        if (bell2On)
+        if (! (pre & preBell))
+            bell.processBlock (l, r, n);
+        if (! (pre & preShelf))
+            shelf.processBlock (l, r, n);
+        if (bell2On && ! (pre & preBell2))
             bell2.processBlock (l, r, n);
         if (lpSections > 0)
             lp.processBlock (l, r, n);
         if (lpSections > 1)
             lp2.processBlock (l, r, n);
-        if (hpOn)
+        if (hpOn && ! (pre & preHp))
             hp.processBlock (l, r, n);
         if (apOn)
             ap.processBlock (l, r, n);
@@ -810,10 +855,11 @@ private:
     std::array<Oversampler, 2> os;
     std::array<float, tableSize> table {};
     DriveShape shape;
-    Biquad bell, bell2, shelf, lp, lp2, hp, ap;
-    bool bell2On = false, hpOn = false, apOn = false, built = false;
-    int lpSections = 0;
-    float toneNorm = 1.0f;
+    Biquad bell, bell2, shelf, lp, lp2, hp, ap, preLp, emphShelf;
+    bool bell2On = false, hpOn = false, apOn = false, preLpOn = false, preShelfOn = false, built = false;
+    int lpSections = 0, pre = 0;
+    float toneNorm = 1.0f, preNorm = 1.0f;
+    static constexpr int preBell = 1, preShelf = 2, preHp = 8, preBell2 = 16;
     int lastModel = -1;
     float lastAmount = -1.0f;
     double dc[2] {}, dcIn[2] {}, dcCoef = 0.9997;
@@ -1017,7 +1063,8 @@ public:
 
         // compressor
         const auto thr = compThresholdDb (p[compThreshold]), rat = ratio (p[compRatio]);
-        const auto compAttack = coef (on (p[compFastAttack]) ? 0.001 : 0.010, sr);
+        const auto grCap = compGrCapDb (p[compGrCap]);
+        const auto compAttack = coef (p[compAttackFine] > 1e-6f ? compAttackFineSeconds (p[compAttackFine]) : (on (p[compFastAttack]) ? 0.001 : 0.010), sr);
         const auto compRel = coef (releaseSeconds (p[ridge::compRelease]), sr);
         const auto cmix = (float) std::clamp (p[compMix], 0.0f, 1.0f);
         const bool compOn = p[compRatio] > 0.0005f;
@@ -1074,7 +1121,7 @@ public:
                 if (compOn)
                 {
                     const auto x = gainToDb (peak) - gateGr;
-                    const auto want = x - gainComputer (x, thr, rat);
+                    const auto want = std::min (x - gainComputer (x, thr, rat), grCap);
                     compGr = want > compGr ? compAttack * compGr + (1.0 - compAttack) * want
                                            : compRel * compGr + (1.0 - compRel) * want;
                 }
@@ -3671,10 +3718,13 @@ const EffectInfo& emberInfo()
 
 std::unique_ptr<Effect> makeHush (const EffectParams* params) { return std::make_unique<hush::DeEsser> (params); }
 
+std::unique_ptr<Effect> makeFret();  // round tp172c8 (core/StripSuite.inc)
+std::unique_ptr<Effect> makeShell();
 bool isSuiteKind (EffectKind kind) noexcept
 {
     return kind == EffectKind::ridgeStrip || kind == EffectKind::glowLeveler || kind == EffectKind::hushDeEsser
-           || kind == EffectKind::aether || kind == EffectKind::ember || kind == EffectKind::kilnChannel;
+           || kind == EffectKind::aether || kind == EffectKind::ember || kind == EffectKind::kilnChannel
+           || kind == EffectKind::fretChannel || kind == EffectKind::shellChannel;
 }
 
 std::unique_ptr<Effect> make (EffectKind kind)
@@ -3687,6 +3737,8 @@ std::unique_ptr<Effect> make (EffectKind kind)
         case EffectKind::aether: return std::make_unique<aether::Air>();
         case EffectKind::ember: return std::make_unique<ember::Saturator>();
         case EffectKind::kilnChannel: return ridge::makeKiln();
+        case EffectKind::fretChannel: return makeFret();
+        case EffectKind::shellChannel: return makeShell();
         default: return nullptr;
     }
 }
@@ -3714,6 +3766,8 @@ std::string fmt (const char* f, double v)
 
 std::string onOff (float v) { return on (v) ? "on" : "off"; }
 } // namespace
+
+#include "core/StripSuite.inc" // round tp172c8: Fret Channel, Shell Channel
 
 namespace glow
 {
@@ -3838,6 +3892,10 @@ std::string vocalParamText (int param, float v)
 
 std::string paramText (EffectKind kind, int param, float v)
 {
+    if (kind == EffectKind::fretChannel)
+        return fretParamText (param, v);
+    if (kind == EffectKind::shellChannel)
+        return shellParamText (param, v);
     if (kind == EffectKind::kilnChannel)
     {
         namespace k = kiln;

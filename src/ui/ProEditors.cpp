@@ -6,6 +6,7 @@
 #include <map>
 #include <tuple>
 
+#include "core/MixerOps.h"
 #include "core/ApexLimiter.h"
 #include "core/DynamicsSuite.h"
 #include "core/FacetEq.h"
@@ -83,7 +84,7 @@ void scaleLabels (juce::Graphics& g, const LevelScale& s, juce::Rectangle<float>
 class ApexEditor final : public ProEditor
 {
 public:
-    ApexEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::apexLimiter, d, 950, 600) { knobRanges = true; fillDemo(); }
+    ApexEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::apexLimiter, d, 950, 600) { knobRanges = captionAbove = true; fillDemo(); }
 
 private:
     enum { idPanel = 1, idGain, idCeiling, idTp, idAdvanced, idLoudness, idLoudReset };
@@ -232,8 +233,9 @@ private:
             out.push_back (knob ({ p.getX() + 122.0f, p.getY() + 22.0f, 68.0f, 72.0f }, apex::pLookahead, tr ("Lookahead")));
             out.push_back (knob ({ p.getX() + 192.0f, p.getY() + 22.0f, 68.0f, 72.0f }, apex::pAttack, tr ("Attack")));
             out.push_back (knob ({ p.getX() + 262.0f, p.getY() + 22.0f, 68.0f, 72.0f }, apex::pRelease, tr ("Release")));
-            out.push_back (knob ({ p.getX() + 346.0f, p.getY() + 22.0f, 80.0f, 72.0f }, apex::pLink, tr ("Transients")));
-            out.push_back (knob ({ p.getX() + 428.0f, p.getY() + 22.0f, 80.0f, 72.0f }, apex::pLinkRelease, tr ("Release")));
+            // (the linking knobs a row lower: their names sit under the CHANNEL LINKING heading, as the reference's)
+            out.push_back (knob ({ p.getX() + 346.0f, p.getY() + 34.0f, 80.0f, 66.0f }, apex::pLink, tr ("Transients")));
+            out.push_back (knob ({ p.getX() + 428.0f, p.getY() + 34.0f, 80.0f, 66.0f }, apex::pLinkRelease, tr ("Release")));
             out.push_back (button ({ p.getRight() - 30.0f, p.getY() + 4.0f, 26.0f, p.getHeight() - 8.0f }, idAdvanced,
                                    juce::String::fromUTF8 (advancedOpen ? "\xc2\xab" : "\xc2\xbb"), advancedOpen,
                                    tr ("Advanced: DC offset filter, unity gain, audition limiting, side-chain triggering")));
@@ -470,7 +472,6 @@ private:
             const auto pn = panel();
             drawPanel (g, pn);
             caption (g, { pn.getX() + 16.0f, pn.getY() + 8.0f, 96.0f, 14.0f }, tr ("Style"));
-            caption (g, { pn.getX() + 120.0f, pn.getY() + 8.0f, 212.0f, 14.0f }, tr ("Envelope"));
             caption (g, { pn.getX() + 340.0f, pn.getY() + 8.0f, 176.0f, 14.0f }, tr ("Channel linking"));
             g.setColour (colour::border);
             g.drawVerticalLine ((int) pn.getX() + 116, pn.getY() + 10.0f, pn.getBottom() - 10.0f);
@@ -783,8 +784,10 @@ private:
         const auto assign = [this] (int source) {
             const auto p = P ("External SC");
             engine.editSong ([tk = track, sl = slot, source, p] (Song& s) {
+                // round 177b: the pick makes the route (a level-0 send) as the mixer's picker does; a loop changes nothing
+                if (mixerops::sidechainFrom (s, tk, sl, source) == mixerops::SidechainPick::cycle)
+                    return;
                 auto& target = s.mixer[(std::size_t) tk].effects[(std::size_t) sl];
-                target.sidechain = source;
                 target.params[(std::size_t) p] = source >= 0 ? 1.0f : 0.0f;
             });
         };
@@ -1093,7 +1096,7 @@ private:
 class CrestEditor final : public ProEditor
 {
 public:
-    CrestEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::crestCompressor, d, 860, 560) { knobRanges = true; fillDemo(); }
+    CrestEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::crestCompressor, d, 860, 560) { hoverValues = true; fillDemo(); }
 
 private:
     enum { idThreshold = 1, idKnee, idSideChain, idInMeter, idScNode0 = 10 };
@@ -1137,11 +1140,13 @@ private:
         out.push_back (custom ({ p.getX() + 24.0f, sc().y ((float) thresholdDb(), p) - 5.0f, p.getWidth() - 24.0f, 10.0f }, idThreshold, threshold,
                                tr ("Threshold: drag up or down")));
         out.push_back (button ({ kneeOpen ? kneeArea().getRight() : p.getX(), p.getY() + 80.0f, 20.0f, 64.0f }, idKnee,
-                               juce::String::fromUTF8 (kneeOpen ? "\xc2\xab" : "\xc2\xbb"), false, tr ("Knee: show the transfer curve"))); // (a grey tab, as the reference's)
+                               {}, false, tr ("Knee: show the transfer curve"))); // (a grey tab, as the reference's; its arrow and KNEE: paintOverlay)
         // the knob row over the bottom of the display
         const auto by = p.getBottom() - 190.0f;
-        out.push_back (knob ({ 96.0f, by, 104.0f, 118.0f }, threshold, tr ("Threshold"), 2));
-        out.push_back (toggle ({ 108.0f, by - 26.0f, 80.0f, 20.0f }, autoThreshold, tr ("Auto")));
+        // round tp172b5: no Auto buttons — AUTO is a word in the caption (AUTO THRESHOLD, AUTO RELEASE, AUTO GAIN), clicked
+        // there, dim when off and lit when on, as the reference prints it
+        const auto withAuto = [] (Ctl c, int a) { c.autoParam = a; return c; };
+        out.push_back (withAuto (knob ({ 96.0f, by, 104.0f, 118.0f }, threshold, tr ("Threshold"), 2), autoThreshold));
         out.push_back (knob ({ 214.0f, by, 104.0f, 118.0f }, ratio, tr ("Ratio"), 2));
         // round tp172b4: the style button at the knobs' height, then the character and the voicing under it (labelled),
         // where the reference keeps its character control
@@ -1156,10 +1161,8 @@ private:
         // round tp172b2: Pro-C 3's Smooth / Op-El / Mastering characters, a voicing over the style
         out.push_back (barMenu ({ 318.0f, by + 82.0f, 128.0f, 18.0f }, voicing, tr ("Voicing"), "None|Smooth|Op-El|Mastering"));
         out.push_back (knob ({ 446.0f, by, 104.0f, 118.0f }, attack, tr ("Attack"), 2));
-        out.push_back (knob ({ 564.0f, by, 104.0f, 118.0f }, release, tr ("Release"), 2));
-        out.push_back (toggle ({ 576.0f, by - 26.0f, 80.0f, 20.0f }, autoRelease, tr ("Auto")));
-        out.push_back (knob ({ 680.0f, by - 6.0f, 62.0f, 82.0f }, P ("Output"), tr ("Gain"), 1, true));
-        out.push_back (toggle ({ 670.0f, by + 76.0f, 82.0f, 20.0f }, autoGain, tr ("Auto gain")));
+        out.push_back (withAuto (knob ({ 564.0f, by, 104.0f, 118.0f }, release, tr ("Release"), 2), autoRelease));
+        out.push_back (withAuto (knob ({ 680.0f, by - 6.0f, 62.0f, 82.0f }, P ("Output"), tr ("Gain"), 1, true), autoGain));
         out.push_back (knob ({ 680.0f, by + 100.0f, 62.0f, 82.0f }, dryGain, tr ("Dry")));
         // the display's scale (bottom right, like the reference's dB box) and the input meter switch
         out.push_back (menu ({ p.getRight() - 16.0f, p.getBottom() - 20.0f, 60.0f, 20.0f }, meterScale, {}, "9 dB|18 dB|36 dB|72 dB|90 dB"));
@@ -1315,6 +1318,25 @@ private:
             g.setFont (font (type::caption, true));
             g.drawText (juce::String (b + 1), juce::Rectangle<float> (12.0f, 12.0f).withCentre (n), juce::Justification::centred, false);
         }
+    }
+
+    // round tp172b5: the knee tab carries its arrow and KNEE written down it, as the reference's
+    void paintOverlay (juce::Graphics& g, const EffectSlot&) override
+    {
+        using namespace theme;
+        Ctl tab;
+        for (const auto& c : controls())
+            if (c.type == K::button && c.id == idKnee) tab = c;
+        if (tab.r.isEmpty()) return;
+        g.setColour (colour::textSecondary);
+        g.setFont (font (type::small, true));
+        g.drawText (juce::String::fromUTF8 (kneeOpen ? "\xc2\xab" : "\xc2\xbb"), tab.r.withHeight (18.0f), juce::Justification::centred, false);
+        const juce::Point<float> centre (tab.r.getCentreX(), tab.r.getCentreY() + 8.0f);
+        g.saveState();
+        g.addTransform (juce::AffineTransform::rotation (juce::MathConstants<float>::halfPi, centre.x, centre.y));
+        g.setFont (font (type::caption, true));
+        g.drawText (caps (tr ("Knee")), juce::Rectangle<float> (tab.r.getHeight() - 20.0f, 14.0f).withCentre (centre), juce::Justification::centred, false);
+        g.restoreState();
     }
 
     void paintBody (juce::Graphics& g, const EffectSlot& fx) override
@@ -1684,7 +1706,7 @@ class PrismEditor final : public ProEditor
 public:
     PrismEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::prismMultiband, d, 920, 600)
     {
-        knobRanges = true; // round tp172b4: each knob's scale under it, the value on hover
+        knobRanges = true; // round tp172b4: each knob's scale under it (as the reference's band panel), the value on hover
         specArea = plot();
         specMinHz = 20.0;
         specMaxHz = 20000.0;
@@ -1960,9 +1982,15 @@ private:
             add (knob ({ a.getX() + 362.0f, a.getY() + 14.0f, 70.0f, 90.0f }, bp (b, fRelease), tr ("Release")));
             add (knob ({ a.getX() + 446.0f, a.getY() + 14.0f, 70.0f, 90.0f }, bp (b, fLevel), tr ("Output"), 1, true));
             add (tabs ({ a.getX() + 86.0f, a.getY() + 128.0f, 184.0f, 26.0f }, bp (b, fMode), "Compress|Expand"));
-            add (knob ({ a.getX() + 290.0f, a.getY() + 112.0f, 66.0f, 54.0f }, bp (b, fRatio), tr ("Ratio"), 0));
-            add (knob ({ a.getX() + 366.0f, a.getY() + 112.0f, 66.0f, 54.0f }, bp (b, fKnee), tr ("Knee"), 0));
-            add (knob ({ a.getX() + 446.0f, a.getY() + 112.0f, 66.0f, 54.0f }, bandLookaheadParam (b), tr ("Lookahead"), 0));
+            // round tp172b5: RATIO, KNEE and LOOKAHEAD are horizontal sliders, as the reference's band panel draws them
+            add (hslider ({ a.getX() + 284.0f, a.getY() + 118.0f, 72.0f, 44.0f }, bp (b, fRatio), tr ("Ratio")));
+            {
+                auto kneeSlider = hslider ({ a.getX() + 364.0f, a.getY() + 118.0f, 72.0f, 44.0f }, bp (b, fKnee), tr ("Knee"));
+                kneeSlider.endLow = tr ("Hard"); // (the reference's words; the value in dB on hover)
+                kneeSlider.endHigh = tr ("Soft");
+                add (kneeSlider);
+            }
+            add (hslider ({ a.getX() + 444.0f, a.getY() + 118.0f, 72.0f, 44.0f }, bandLookaheadParam (b), tr ("Lookahead")));
             add (knob ({ a.getX() + 522.0f, a.getY() + 112.0f, 66.0f, 54.0f }, bandPanParam (b), tr ("Pan"), 0, true)); // round 135: the band's output balance
             // round 144: the crossover slope (one for every band) and the side-chain input, in the band panel
             out.push_back (menu ({ a.getX() + 522.0f, a.getY() + 36.0f, 70.0f, 22.0f }, slope, tr ("Slope"), "12 dB|24 dB|48 dB"));
@@ -3253,6 +3281,14 @@ private:
     }
 
     int dragParam = -1;
+    bool powerPending = false;
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        if (powerPending && ! e.mouseWasDraggedSinceMouseDown())
+            toggleEnabled();
+        powerPending = false;
+        ProEditor::mouseUp (e);
+    }
     bool dragging (int p) const { return dragParam == p && isMouseButtonDown(); }
     void customDown (const Ctl& c, const juce::MouseEvent& e) override
     {
@@ -3275,13 +3311,12 @@ private:
             edit (p, v (p) >= 0.5f ? 0.0f : 1.0f);
             return;
         }
-        if (p == k::mainOut && e.position.getDistanceFrom (knobCentre (p)) < knobRadius (p) * 0.55f)
-        {
-            toggleEnabled(); // the power symbol on the OUT knob: the plugin on / bypassed
-            return;
-        }
+        // the power symbol on the OUT knob (measured on the original, tp172c8): a click on it (no drag) switches the
+        // plugin on / bypassed; a drag, from the symbol or the ring, moves the main output gain
+        powerPending = p == k::mainOut && e.position.getDistanceFrom (knobCentre (p)) < knobRadius (p) * 0.55f;
         if (ui::isResetClick (e))
         {
+            powerPending = false;
             edit (p, (float) specFor (p).defaultValue);
             return;
         }
@@ -3726,6 +3761,8 @@ private:
     }
 };
 
+#include "ui/ProEditorsStrips.inc"
+
 // --- windows -------------------------------------------------------------------------------------------------
 std::unique_ptr<ProEditor> make (AudioEngine& engine, int track, int slot, bool demo)
 {
@@ -3742,6 +3779,8 @@ std::unique_ptr<ProEditor> make (AudioEngine& engine, int track, int slot, bool 
         case EffectKind::ember: return std::make_unique<EmberEditor> (engine, track, slot, demo);
         case EffectKind::aether: return std::make_unique<AetherEditor> (engine, track, slot, demo);
         case EffectKind::kilnChannel: return std::make_unique<KilnEditor> (engine, track, slot, demo);
+        case EffectKind::fretChannel: return std::make_unique<FretEditor> (engine, track, slot, demo);
+        case EffectKind::shellChannel: return std::make_unique<ShellEditor> (engine, track, slot, demo);
         default: return nullptr;
     }
 }
@@ -3822,7 +3861,8 @@ bool handles (EffectKind kind) noexcept
 {
     return kind == EffectKind::apexLimiter || kind == EffectKind::hushDeEsser || kind == EffectKind::crestCompressor
            || kind == EffectKind::sentryGate || kind == EffectKind::prismMultiband || kind == EffectKind::ember
-           || kind == EffectKind::aether || kind == EffectKind::kilnChannel;
+           || kind == EffectKind::aether || kind == EffectKind::kilnChannel || kind == EffectKind::fretChannel
+           || kind == EffectKind::shellChannel;
 }
 
 void open (AudioEngine& engine, int track, int slot)

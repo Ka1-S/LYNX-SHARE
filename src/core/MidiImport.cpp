@@ -1,6 +1,7 @@
 #include "core/MidiImport.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <map>
 #include <set>
@@ -224,6 +225,33 @@ void addControllerLane (Pattern& pattern, const AutomationTarget& target, const 
 }
 } // namespace
 
+double midiTempoBpm (double secondsPerQuarter) noexcept
+{
+    if (! (secondsPerQuarter > 0.0))
+        return 120.0;
+    return std::clamp (std::nearbyint (60.0 / secondsPerQuarter), 10.0, 522.0); // (the default rounding: half to even)
+}
+
+void setTempoEvents (Pattern& pattern, const std::vector<PatternEvent>& tempos, std::int64_t shift)
+{
+    pattern.events.erase (std::remove_if (pattern.events.begin(), pattern.events.end(),
+                                          [] (const PatternEvents& l) { return l.target.kind == AutomationTargetKind::tempo; }),
+                          pattern.events.end());
+    if (tempos.empty())
+        return;
+    PatternEvents lane;
+    lane.target = { AutomationTargetKind::tempo, 0 };
+    for (const auto& t : tempos)
+    {
+        const auto tick = std::max<std::int64_t> (0, t.tick - shift);
+        if (! lane.events.empty() && lane.events.back().tick >= tick)
+            lane.events.back().value = t.value; // one event per tick: the last one wins
+        else
+            lane.events.push_back ({ tick, t.value });
+    }
+    pattern.events.push_back (std::move (lane));
+}
+
 bool importInto (Song& song, const ParsedMidi& midi, const Options& o, const std::string& patternName, std::string& error)
 {
     const auto gs = groups (midi, o);
@@ -280,6 +308,8 @@ bool importInto (Song& song, const ParsedMidi& midi, const Options& o, const std
         else
             addControllerLane (pattern, controllerTarget (o.controller, channel), g.controller, shift);
     }
+    // every Set Tempo of the file as the pattern's Tempo events (issue #86; FL's whole-file import, REA_rodada178a §5)
+    setTempoEvents (pattern, midi.tempos, shift);
     pattern.sortNotes();
     song.patterns.push_back (std::move (pattern));
     song.currentPattern = (int) song.patterns.size() - 1;

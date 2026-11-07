@@ -229,6 +229,8 @@ const char* effectId (EffectKind k)
         case EffectKind::aether: return "aether";
         case EffectKind::ember: return "ember";
         case EffectKind::kilnChannel: return "kilnChannel";
+        case EffectKind::fretChannel: return "fretChannel";
+        case EffectKind::shellChannel: return "shellChannel";
         case EffectKind::lynxTune: return "lynxTune";
         case EffectKind::fruityPhaser: return "fruityPhaser";
         case EffectKind::epochVerb: return "epochVerb";
@@ -958,7 +960,7 @@ std::optional<EffectKind> effectFromId (const juce::String& id)
                     EffectKind::xyController, EffectKind::xyzController, EffectKind::controlSurface, EffectKind::hardwareInsert,
                     EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook,
                     EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis, EffectKind::flTransporter,
-                    EffectKind::kilnChannel })
+                    EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel })
         if (id == effectId (k))
             return k;
 
@@ -1693,7 +1695,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         def.sampler.sustain = juce::jlimit (0.0f, 1.0f, (float) (double) s.getProperty ("sustain", 1.0));
         def.sampler.stretchBeats = juce::jmax (0.0f, (float) (double) s.getProperty ("stretchBeats", 0.0));
         def.sampler.keepPitch = (bool) s.getProperty ("keepPitch", false);
-        def.sampler.stretchMethod = (StretchMethod) juce::jlimit (0, 2, (int) s.getProperty ("stretchMethod", 0));
+        def.sampler.stretchMethod = (StretchMethod) juce::jlimit (0, stretchMethodCount - 1, (int) s.getProperty ("stretchMethod", 0));
 
         if (auto* slices = s["slices"].getArray())
             for (const auto& v : *slices)
@@ -1789,6 +1791,8 @@ juce::var mixerTrackToVar (const MixerTrack& t)
         o->setProperty ("threaded", false);
     if (t.separator)
         o->setProperty ("separator", true);
+    if (t.folded)
+        o->setProperty ("folded", true);
     if (t.dock != MixerDock::middle)
         o->setProperty ("dock", t.dock == MixerDock::left ? "left" : "right");
 
@@ -1872,6 +1876,7 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     track.soloSources = (bool) t.getProperty ("soloSources", true);
     track.threaded = (bool) t.getProperty ("threaded", true);
     track.separator = (bool) t.getProperty ("separator", false);
+    track.folded = (bool) t.getProperty ("folded", false);
     track.dock = t["dock"].toString() == "left" ? MixerDock::left : t["dock"].toString() == "right" ? MixerDock::right : MixerDock::middle;
     track.toMaster = (bool) t.getProperty ("toMaster", true);
     track.masterLevel = juce::jlimit (0.0f, maxFaderGain, (float) (double) t.getProperty ("masterLevel", 1.0));
@@ -2147,6 +2152,106 @@ juce::String toJson (const Song& song)
         for (const auto& v : song.initialValues)
             values.add (juce::Array<juce::var> { targetKindName (v.target.kind), v.target.index, v.target.slot, v.target.param, v.value });
         root->setProperty ("initialValues", values);
+    }
+
+    // video tracks and the project's video settings (round 174d, core/VideoTrack.h)
+    if (! song.videoTracks.empty() || ! (song.video == VideoSettings {}))
+    {
+        auto* v = new juce::DynamicObject();
+        v->setProperty ("rate", str (vtime::rateId (song.video.rate)));
+        v->setProperty ("startTimecode", song.video.startTimecode);
+        v->setProperty ("rateFromVideo", song.video.rateFromVideo);
+        v->setProperty ("timecodeRuler", song.video.showTimecodeRuler);
+        v->setProperty ("burnIn", song.video.burnIn);
+        juce::Array<juce::var> tracks;
+        for (const auto& t : song.videoTracks)
+        {
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("name", str (t.name));
+            if (t.muted)
+                o->setProperty ("muted", true);
+            if (t.height > 0)
+                o->setProperty ("height", t.height);
+            if (t.colour != 0)
+                o->setProperty ("colour", (int) (t.colour & 0xFFFFFF));
+            juce::Array<juce::var> clips;
+            for (const auto& c : t.clips)
+            {
+                auto* k = new juce::DynamicObject();
+                k->setProperty ("path", str (c.path));
+                k->setProperty ("start", c.start);
+                k->setProperty ("offset", c.offset);
+                k->setProperty ("length", c.length);
+                k->setProperty ("duration", c.duration);
+                k->setProperty ("uid", uidVar (c.uid));
+                clips.add (juce::var (k));
+            }
+            o->setProperty ("clips", clips);
+            tracks.add (juce::var (o));
+        }
+        v->setProperty ("tracks", tracks);
+        root->setProperty ("video", juce::var (v));
+    }
+
+    // the ADR session (round 174d, core/Adr.h)
+    if (! (song.adr == AdrSession {}))
+    {
+        const auto& a = song.adr;
+        auto* o = new juce::DynamicObject();
+        auto* st = new juce::DynamicObject();
+        st->setProperty ("preRoll", a.settings.preRoll);
+        st->setProperty ("postRoll", a.settings.postRoll);
+        st->setProperty ("beeps", a.settings.beeps);
+        st->setProperty ("beepFrequency", a.settings.beepFrequency);
+        st->setProperty ("streamer", a.settings.streamer);
+        st->setProperty ("streamerLength", a.settings.streamerLength);
+        st->setProperty ("streamerColour", (int) (a.settings.streamerColour & 0xFFFFFF));
+        st->setProperty ("punch", a.settings.punch);
+        st->setProperty ("cycle", a.settings.cycle);
+        st->setProperty ("guideInsert", a.settings.guideInsert);
+        st->setProperty ("headphoneOutput", a.settings.headphoneOutput);
+        st->setProperty ("recordInsert", a.settings.recordInsert);
+        st->setProperty ("takeTrack", a.settings.takeTrack);
+        o->setProperty ("settings", juce::var (st));
+        o->setProperty ("current", a.current);
+        juce::Array<juce::var> cues;
+        for (const auto& c : a.cues)
+        {
+            auto* k = new juce::DynamicObject();
+            k->setProperty ("id", str (c.id));
+            k->setProperty ("in", c.in);
+            k->setProperty ("out", c.out);
+            k->setProperty ("character", str (c.character));
+            k->setProperty ("line", str (c.line));
+            k->setProperty ("notes", str (c.notes));
+            k->setProperty ("status", str (adr::statusName (c.status)));
+            k->setProperty ("selected", c.selected);
+            juce::Array<juce::var> takes;
+            for (const auto& t : c.takes)
+            {
+                auto* tk = new juce::DynamicObject();
+                tk->setProperty ("number", t.number);
+                tk->setProperty ("name", str (t.name));
+                tk->setProperty ("clip", uidVar (t.clip));
+                tk->setProperty ("rating", t.rating);
+                tk->setProperty ("circled", t.circled);
+                tk->setProperty ("note", str (t.note));
+                tk->setProperty ("aligned", t.aligned);
+                takes.add (juce::var (tk));
+            }
+            k->setProperty ("takes", takes);
+            juce::Array<juce::var> comp;
+            for (const auto& p : c.comp)
+                comp.add (juce::Array<juce::var> { p.from, p.to, p.take });
+            k->setProperty ("comp", comp);
+            juce::Array<juce::var> compClips;
+            for (const auto u : c.compClips)
+                compClips.add (uidVar (u));
+            k->setProperty ("compClips", compClips);
+            cues.add (juce::var (k));
+        }
+        o->setProperty ("cues", cues);
+        root->setProperty ("adr", juce::var (o));
     }
 
     root->setProperty ("playlist", clipsToVar (song.playlist));
@@ -2522,6 +2627,104 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
             if (v.isArray() && v.size() == 5)
                 song.setInitialValue ({ targetKindFromName (v[0].toString()), (int) v[1], (int) v[2], (int) v[3] }, (float) (double) v[4]);
 
+    if (const auto& v = root["video"]; v.isObject())
+    {
+        if (const auto r = vtime::rateFromId (v["rate"].toString().toStdString()))
+            song.video.rate = *r;
+        song.video.startTimecode = juce::jlimit (0.0, 86400.0, (double) v.getProperty ("startTimecode", 0.0));
+        song.video.rateFromVideo = (bool) v.getProperty ("rateFromVideo", true);
+        song.video.showTimecodeRuler = (bool) v.getProperty ("timecodeRuler", true);
+        song.video.burnIn = (bool) v.getProperty ("burnIn", false);
+        if (auto* tracks = v["tracks"].getArray())
+            for (const auto& t : *tracks)
+            {
+                if (! t.isObject() || song.videoTracks.size() >= 64)
+                    continue;
+                VideoTrack track;
+                track.name = t["name"].toString().toStdString();
+                track.muted = (bool) t.getProperty ("muted", false);
+                track.height = juce::jlimit (0, 2000, (int) t.getProperty ("height", 0));
+                if (const int c = (int) t.getProperty ("colour", 0); c != 0)
+                    track.colour = 0xFF000000u | ((std::uint32_t) c & 0xFFFFFFu);
+                if (auto* clips = t["clips"].getArray())
+                    for (const auto& k : *clips)
+                    {
+                        if (! k.isObject())
+                            continue;
+                        VideoClip c;
+                        c.path = k["path"].toString().toStdString();
+                        c.start = juce::jmax (0.0, (double) k.getProperty ("start", 0.0));
+                        c.offset = juce::jmax (0.0, (double) k.getProperty ("offset", 0.0));
+                        c.length = juce::jmax (0.001, (double) k.getProperty ("length", 1.0));
+                        c.duration = juce::jmax (0.0, (double) k.getProperty ("duration", 0.0));
+                        c.uid = uids::fromHex (k["uid"].toString().toStdString());
+                        if (! c.path.empty())
+                            track.clips.push_back (c);
+                    }
+                std::stable_sort (track.clips.begin(), track.clips.end(), [] (const VideoClip& a, const VideoClip& b) { return a.start < b.start; });
+                song.videoTracks.push_back (std::move (track));
+            }
+    }
+
+    if (const auto& a = root["adr"]; a.isObject())
+    {
+        auto& d = song.adr;
+        if (const auto& st = a["settings"]; st.isObject())
+        {
+            d.settings.preRoll = juce::jlimit (0.0, 30.0, (double) st.getProperty ("preRoll", 3.0));
+            d.settings.postRoll = juce::jlimit (0.0, 30.0, (double) st.getProperty ("postRoll", 1.0));
+            d.settings.beeps = (bool) st.getProperty ("beeps", true);
+            d.settings.beepFrequency = juce::jlimit (100.0, 8000.0, (double) st.getProperty ("beepFrequency", 1000.0));
+            d.settings.streamer = (bool) st.getProperty ("streamer", true);
+            d.settings.streamerLength = juce::jlimit (0.25, 10.0, (double) st.getProperty ("streamerLength", 2.0));
+            d.settings.streamerColour = 0xFF000000u | ((std::uint32_t) (int) st.getProperty ("streamerColour", 0xFFFFFF) & 0xFFFFFFu);
+            d.settings.punch = (bool) st.getProperty ("punch", true);
+            d.settings.cycle = (bool) st.getProperty ("cycle", false);
+            d.settings.guideInsert = (int) st.getProperty ("guideInsert", -1);
+            d.settings.headphoneOutput = (int) st.getProperty ("headphoneOutput", -1);
+            d.settings.recordInsert = (int) st.getProperty ("recordInsert", -1);
+            d.settings.takeTrack = (int) st.getProperty ("takeTrack", -1);
+        }
+        if (auto* cues = a["cues"].getArray())
+            for (const auto& k : *cues)
+            {
+                if (! k.isObject() || d.cues.size() >= 10000)
+                    continue;
+                AdrCue c;
+                c.id = k["id"].toString().toStdString();
+                c.in = juce::jmax (0.0, (double) k.getProperty ("in", 0.0));
+                c.out = juce::jmax (c.in, (double) k.getProperty ("out", c.in + 2.0));
+                c.character = k["character"].toString().toStdString();
+                c.line = k["line"].toString().toStdString();
+                c.notes = k["notes"].toString().toStdString();
+                c.status = adr::statusFromName (k["status"].toString().toStdString()).value_or (AdrCue::Status::todo);
+                c.selected = (int) k.getProperty ("selected", 0);
+                if (auto* takes = k["takes"].getArray())
+                    for (const auto& t : *takes)
+                        if (t.isObject())
+                        {
+                            AdrTake take;
+                            take.number = juce::jmax (1, (int) t.getProperty ("number", 1));
+                            take.name = t["name"].toString().toStdString();
+                            take.clip = uids::fromHex (t["clip"].toString().toStdString());
+                            take.rating = juce::jlimit (0, 5, (int) t.getProperty ("rating", 0));
+                            take.circled = (bool) t.getProperty ("circled", false);
+                            take.note = t["note"].toString().toStdString();
+                            take.aligned = (bool) t.getProperty ("aligned", false);
+                            c.takes.push_back (take);
+                        }
+                if (auto* comp = k["comp"].getArray())
+                    for (const auto& p : *comp)
+                        if (p.isArray() && p.size() == 3)
+                            c.comp.push_back ({ (double) p[0], (double) p[1], (int) p[2] });
+                if (auto* cc = k["compClips"].getArray())
+                    for (const auto& u : *cc)
+                        c.compClips.push_back (uids::fromHex (u.toString().toStdString()));
+                d.cues.push_back (std::move (c));
+            }
+        d.current = juce::jlimit (0, juce::jmax (0, (int) d.cues.size() - 1), (int) a.getProperty ("current", 0));
+    }
+
     if (auto* tracks = root["playlistTracks"].getArray())
         for (const auto& t : *tracks)
             if (t.isArray() && t.size() == 3 && (int) t[0] >= 0 && (int) t[0] < 500)
@@ -2730,14 +2933,27 @@ bool save (const Song& song, const juce::File& file, juce::String& error)
 {
     // Write to a temp file and swap, so a mid-write error doesn't destroy the previous project.
     juce::TemporaryFile temp (file);
+    const auto json = toJson (song);
 
-    if (! temp.getFile().replaceWithText (toJson (song)) || ! temp.overwriteTargetFileWithTemporary())
+    if (! temp.getFile().replaceWithText (json, false, false, nullptr) || ! temp.overwriteTargetFileWithTemporary())
     {
         error = utf8 ("could not write ") + file.getFullPathName();
         return false;
     }
 
+    // a save that "worked" on a full disk, a sync folder or a failing drive must not look like a save (D#92, round 180a)
+    if (file.loadFileAsString() != json)
+    {
+        error = utf8 ("the saved file could not be read back correctly: ") + file.getFullPathName();
+        return false;
+    }
+
     return true;
+}
+
+juce::File withProjectExtension (const juce::File& file)
+{
+    return file.getSiblingFile (juce::String::fromUTF8 (safety::withProjectExtension (file.getFileName().toStdString(), extension).c_str()));
 }
 
 std::optional<Song> load (const juce::File& file, juce::String& error)

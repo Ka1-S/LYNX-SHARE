@@ -65,6 +65,24 @@ int soleSidechainSender (const Song& song, int to);
 // Returns whether it was linked.
 bool linkAddedSidechain (Song& song, int to, int slot);
 
+// --- One-click sidechain (round 177b) -------------------------------------------------------------------
+// The effects that read a side input (Effect::setSidechain): the compressors, limiters, gates, de-esser, vocoders,
+// Facet EQ, LuxeVerb, Transmitter, Transporter and Patcher. A hosted plugin listens when it has a second input bus
+// (asked of the instance, outside core: pluginhost::sideInputChannels).
+bool acceptsSidechain (EffectKind kind) noexcept;
+enum class SidechainPick
+{
+    linked,     // slot `slot` of `to` now listens to `from` (a level-0 send was added when there was no route)
+    cleared,    // from < 0: the slot listens to nothing (the routing is left as it is, as FL leaves its sends)
+    cycle,      // `from` is fed by `to`: a sidechain would make a loop, nothing changed
+    invalid     // no such insert / slot
+};
+// The wrapper's "Sidechain from" picker: slot `slot` of insert `to` listens to insert `from` (`second`: the second side
+// input, a vocoder's carrier). Like FL's "Sidechain to this track", a missing route becomes a level-0 send, so `from`
+// is processed first and still goes to the Master and its other sends; an existing route keeps its level. On the
+// Master (`to` = 0) no route is needed (every insert plays before it).
+SidechainPick sidechainFrom (Song& song, int to, int slot, int from, bool second = false);
+
 // Moves effect slot `from` to position `to` of the same insert (the others shift); automations follow. The rows the
 // effects showed in stay in use (the moved effect takes the row of the one it lands on).
 bool moveEffectSlot (Song& song, int track, int from, int to);
@@ -123,6 +141,22 @@ int autoColorGroup (Song& song, int track);
 // "Group › Separator" and "Layout › Dock to" for the selected tracks (inserts; the Master can be docked).
 void setSeparator (Song& song, const std::vector<int>& tracks, bool on);
 void dockTracks (Song& song, const std::vector<int>& tracks, MixerDock dock);
+
+// --- Folded mixer groups (round 177a, LYNX's addition to FL's groups; REA_rodada177a §2) ---------------------------------
+// A group can fold when it is set off by a separator (on its first strip or after its last) and holds 2+ inserts.
+bool canFold (const Song& song, int track);
+// The insert a group sums into: a member every other member sends only to (no Master route, no other send), the way
+// "Create submix" makes it. -1 = not a summing group.
+int groupBus (const Song& song, const std::vector<int>& group);
+// How a strip is shown: normally, hidden (a member of a folded group) or as the slim tab of a folded group that has no
+// bus (its first strip). A folded summing group shows only its bus strip.
+enum class FoldShow : std::uint8_t { strip, hidden, tab };
+std::vector<FoldShow> foldView (const Song& song); // one per mixer track (all `strip` when no group is folded)
+// Folds / unfolds `track`'s group (the flag sits on its first strip). Returns the new state.
+bool toggleFold (Song& song, int track);
+bool isFolded (const Song& song, int track);
+// Folds (or unfolds) every group that can fold. Returns how many changed.
+int foldAll (Song& song, bool fold);
 
 // --- FL's mixer track menu › Routing (REA round 165f-mixer: FUN_012ac520 / FUN_012ac950) ------------------------------
 enum class RouteKind

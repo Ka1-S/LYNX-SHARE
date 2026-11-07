@@ -18,6 +18,7 @@
 namespace lynx
 {
 class PatternBlocksView;
+class VideoLanesView;
 
 // FL-style Playlist (arrangement): tracks vertically, time horizontally.
 //  - a tool strip (Pencil, Brush, Eraser, Mute, Knife, Lasso, Zoom, Listen, Slip); with the Pencil:
@@ -62,6 +63,7 @@ public:
     int knownCurrentPattern = -1;
 
     explicit PlaylistComponent (AudioEngine& engine);
+    juce::String cacheSelfTest (const std::function<void()>& waitForWaveforms, const juce::File& dumpFolder = {}); // --cachetest (round 174f)
     ~PlaylistComponent() override;
     void visibilityChanged() override;
 
@@ -153,6 +155,12 @@ public:
     void turnBlocksIntoClips();       // FL's "Turn pattern instances into clips"
     void scrollTicksBy (double ticks); // (the blocks section's drag past its edges)
     PatternBlocksView* getBlocksViewForSnapshot() { return blocksView.get(); }
+    // Video tracks (round 174d, ui/VideoTracks.h): the section between the ruler and the clip tracks while the project
+    // has video tracks. `height` = the section's height (the divider drag; 0 = fit the lanes), clamped to the window.
+    void setVideoHeight (int height);
+    int videoSectionHeight() const;
+    int tracksTop() const { return headerHeight + videoSectionHeight(); } // the clip tracks' top edge
+    VideoLanesView* getVideoLanesForSnapshot() { return videoLanes.get(); }
     static juce::Colour audioClipColour (const ChannelDef& channel);
 
     // A project was just opened: scroll to the start and, when the song is longer than the view, zoom out
@@ -167,6 +175,11 @@ private:
     std::int64_t perfClip = -1;
     std::array<std::int64_t, 64> perfShown {}; // the zone's playing / pending state last painted, to repaint on change
     void paintPerformance (juce::Graphics& g, juce::Rectangle<int> grid);
+    void paintLiveRecording (juce::Graphics& g); // round 177d
+    juce::Rectangle<float> liveBounds (int track, double from, double to) const;
+    juce::Rectangle<int> liveArea;
+    double liveRepaintMs = 0.0;
+    std::vector<float> liveColumns;
     void togglePerformanceMode();
     void zoomOnPerformanceClips();
     // round 168f: FL's Playlist track tools (core/PlaylistTrackOps.h)
@@ -210,6 +223,15 @@ private:
     CacheView cacheView() const;
     CacheShift cacheShift (const CacheView& from, const CacheView& to, float scale) const;
     void repaintScrolled();
+    // a continuous zoom (round 174f): its frames scale the cached picture's lanes; exact once still for zoomSettleMs
+    void repaintZoomed();
+    void settleZoom();
+    bool zoomRecent (double nowMs) const;
+    juce::Rectangle<int> rulerArea() const;
+    static constexpr int zoomSettleMs = 120;
+    bool zoomGesture = false;
+    double zoomEndMs = -1.0e9;
+    juce::TimedCallback zoomSettle { [this] { settleZoom(); } };
     void paintPlayhead (juce::Graphics& g);
     void scrollBarMoved (juce::ScrollBar*, double) override;
 
@@ -434,6 +456,10 @@ private:
     std::unique_ptr<PatternBlocksView> blocksView;
     int blocksHeight = 0; // 0 = the default (a third of the grid)
     bool blocksShown = false;
+    // Video tracks (round 174d)
+    friend class VideoLanesView;
+    std::unique_ptr<VideoLanesView> videoLanes;
+    int videoHeight = 0; // 0 = fit the lanes
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PlaylistComponent)
 };

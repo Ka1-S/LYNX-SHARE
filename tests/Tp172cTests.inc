@@ -212,6 +212,27 @@ TEST (ridge_harrison_strips_translated_tp172c5)
         const auto d = c32 (p32 ("compressor_ratio", 30.0) + p32 ("compressor_threshold", -45.0) + p32 ("CompAutoMakeUp", 0.0));
         CHECK (std::abs (r::compThresholdDb (d.params[r::compThreshold]) + 40.0) < 1e-3 && std::abs (r::trimDb (d.params[r::input]) - 4.0) < 0.01);
         CHECK (std::abs (r::trimDb (d.params[r::output]) + 4.0) < 0.01);
+        // tp172c10: its reduction stops at 27.5 dB (hidden, saved with the slot); the Leveler (no compressor) has none
+        CHECK (std::abs (r::compGrCapDb (d.params[r::compGrCap]) - 27.5) < 1e-3);
+        CHECK (std::abs ((0.0 - r::compressorCurveDb (d.params, 0.0)) - 27.5) < 1e-3);
+        CHECK (r::compGrCapDb (makeEffectSlot (EffectKind::ridgeStrip).params[r::compGrCap]) > 1e6);
+        // tp172c11: the attack dial is a real time constant (Limiter mode 2.5 ms), the release 0.25 s at a 50 ms dial (Limiter mode half)
+        CHECK (std::abs (r::compAttackFineSeconds (d.params[r::compAttackFine]) - 0.020) < 1e-5);
+        CHECK (std::abs (r::releaseSeconds (d.params[r::compRelease]) - 0.25) < 1e-3);
+        const auto lim = c32 (p32 ("compressor_mode", 2) + p32 ("compressor_ratio", 30.0) + p32 ("compressor_threshold", -45.0));
+        CHECK (std::abs (r::compAttackFineSeconds (lim.params[r::compAttackFine]) - 0.0025) < 1e-5);
+        CHECK (std::abs (r::releaseSeconds (lim.params[r::compRelease]) - 0.125) < 1e-3);
+        CHECK (makeEffectSlot (EffectKind::ridgeStrip).params[r::compAttackFine] == 0.0f);
+        auto fx = makeEffect (EffectKind::ridgeStrip);
+        fx->prepare (48000.0);
+        std::vector<float> l (24000), rr (24000);
+        for (int i = 0; i < 24000; ++i) l[(std::size_t) i] = rr[(std::size_t) i] = 0.7f * (float) std::sin (2.0 * 3.14159265358979 * 1000.0 * i / 48000.0);
+        for (int at = 0; at < 24000; at += 512)
+            fx->process (l.data() + at, rr.data() + at, std::min (512, 24000 - at), d.params, 120.0);
+        double e = 0;
+        for (std::size_t i = 12000; i < l.size(); ++i) e += (double) l[i] * l[i];
+        const auto outDb = 10.0 * std::log10 (e / 12000.0), inDb = 20.0 * std::log10 (0.7 / std::sqrt (2.0));
+        CHECK (outDb - inDb > -27.5 - 1.0 && outDb - inDb < -27.5 + 1.0); // +4 dB in, -4 dB out: the cap alone
     }
     CHECK (std::abs (r::gateRangeDb (s.params[r::gateRange]) - 20.0) < 1e-3 && s.params[r::expander] > 0.5f);
     CHECK (std::abs (r::lfHz (s.params[r::lfFreq]) - 174.2) < 0.5 && std::abs (r::bandGainDb (s.params[r::lfGain], false) - 11.67) < 0.01);
@@ -275,37 +296,179 @@ TEST (ridge_drive_section_tp172c6)
                                        + p32 ("compressor_mode", 1) + "</PROCESSOR_STATE></A><B><PROCESSOR_STATE/></B></SSL_PLUGIN_STATE>");
     CHECK (s.params[r::driveOn] == 1.0f && r::driveModelIndex (s.params[r::driveModel]) == r::driveSaturate);
     CHECK (std::abs (r::driveAmountUnits (r::driveSaturate, s.params[r::driveAmount]) - 12.0) < 1e-3);
+}
 
-    // Guitarstrip: EQ, the compressor's mode -> ratio, the amp and its pre-amp
-    auto gs = [] (const std::string& params) {
+// slice 8: Fret Channel and Shell Channel, LYNX's guitar / bass and drum channel strips — their laws, latencies, process
+// order, DSP sanity and the Guitarstrip / Drumstrip states translated 1:1 onto them
+TEST (fret_shell_channels_tp172c8)
+{
+    using namespace lynx;
+    namespace f = mixsuite::fret;
+    namespace d = mixsuite::shell;
+    namespace r = mixsuite::ridge;
+    auto p32 = [] (const char* id, double x) { return std::string ("<PARAM id=\"") + id + "\" value=\"" + std::to_string (x) + "\"/>"; };
+    CHECK ((int) effectInfo (EffectKind::fretChannel).params.size() == f::count && std::string (effectInfo (EffectKind::fretChannel).name) == "Fret Channel");
+    CHECK ((int) effectInfo (EffectKind::shellChannel).params.size() == d::count && std::string (effectInfo (EffectKind::shellChannel).name) == "Shell Channel");
+    // the laws round-trip in the reference's units
+    CHECK (std::abs (f::midKHz (f::midValue (2.65)) - 2.65) < 1e-3 && std::abs (f::midKHz (f::midValue (0.7)) - 0.7) < 1e-3);
+    CHECK (f::hpfHz (0.0f) == 0.0 && std::abs (f::hpfHz (f::hpfValue (80.0)) - 80.0) < 0.01);
+    CHECK (std::abs (f::lpfKHz (f::lpfValue (8.0)) - 8.0) < 1e-3);
+    for (int m = 0; m < 5; ++m)
+        CHECK (f::modeOf (f::modeValue (m)) == m);
+    CHECK (std::abs (d::thresholdDb (d::thresholdValue (-24.0)) + 24.0) < 1e-3 && std::abs (d::releaseS (d::releaseValue (0.5)) - 0.5) < 1e-4);
+    CHECK (std::abs (d::hfHz (d::hfValue (8000.0)) - 8000.0) < 0.5 && std::abs (d::lfHz (d::lfValue (60.0)) - 60.0) < 0.01);
+    // the process order: 120 orders, lexicographic over gate, shaper, low, high, listen mic; index <-> value <-> order
+    for (int i = 0; i < 120; ++i)
+    {
+        CHECK (d::orderIndex (d::orderValue (i)) == i);
+        CHECK (d::indexOf (d::orderOf (i)) == i);
+    }
+    CHECK ((d::orderOf (0) == std::array<int, d::modules> { d::gate, d::shaper, d::lowEnhancer, d::highEnhancer, d::listenMic }));
+    CHECK ((d::orderOf (119) == std::array<int, d::modules> { d::listenMic, d::highEnhancer, d::lowEnhancer, d::shaper, d::gate }));
+
+    auto run = [] (EffectKind kind, const EffectParams& q, int* latency) {
+        auto fx = makeEffect (kind);
+        fx->prepare (48000.0);
+        std::vector<float> l (24000), rr (24000);
+        for (int i = 0; i < 24000; ++i) l[(std::size_t) i] = rr[(std::size_t) i] = 0.25f * (float) std::sin (2.0 * 3.14159265358979 * 440.0 * i / 48000.0);
+        for (int at = 0; at < 24000; at += 512)
+            fx->process (l.data() + at, rr.data() + at, std::min (512, 24000 - at), q, 120.0);
+        if (latency != nullptr) *latency = fx->latencySamples();
+        return l;
+    };
+    auto rmsDb = [] (const std::vector<float>& x, int from) {
+        double e = 0;
+        for (std::size_t i = (std::size_t) from; i < x.size(); ++i) e += (double) x[i] * x[i];
+        return 10.0 * std::log10 (std::max (1e-30, e / (double) (x.size() - (std::size_t) from)));
+    };
+    const auto ref = 20.0 * std::log10 (0.25 / std::sqrt (2.0));
+    // the latencies: Fret's 20 ms centre delay + the drive's oversampler, Shell's fixed 4.1 ms
+    int lat = -1;
+    const auto fp = makeEffectSlot (EffectKind::fretChannel).params;
+    const auto fa = run (EffectKind::fretChannel, fp, &lat);
+    CHECK (lat == f::baseDelaySamples (48000.0) + mixsuite::Oversampler::latency() && f::baseDelaySamples (48000.0) == 960);
+    CHECK (std::abs (rmsDb (fa, 4800) - ref) < 1.0);
+    const auto sp = makeEffectSlot (EffectKind::shellChannel).params;
+    const auto sa = run (EffectKind::shellChannel, sp, &lat);
+    CHECK (lat == 199 && d::latencySamples (48000.0) == 199);
+    CHECK (std::abs (rmsDb (sa, 4800) - ref) < 1.0);
+    // the output gains move the level by their dB; the drive colours the sine
+    auto q = fp;
+    q[f::output] = (float) ((6.0 + 24.0) / 48.0);
+    CHECK (std::abs (rmsDb (run (EffectKind::fretChannel, q, nullptr), 4800) - rmsDb (fa, 4800) - 6.0) < 0.1);
+    q = fp;
+    q[f::driveIn] = 1.0f;
+    q[f::guitarDrive] = 0.6f;
+    CHECK (run (EffectKind::fretChannel, q, nullptr) != fa);
+    auto t = sp;
+    t[d::output] = (float) ((-6.0 + 20.0) / 40.0);
+    CHECK (std::abs (rmsDb (run (EffectKind::shellChannel, t, nullptr), 4800) - rmsDb (sa, 4800) + 6.0) < 0.1);
+    // EQ Auto listen: nothing on its own (the original renders the same with it on); the band the editor holds, alone
+    q = fp;
+    q[f::autoListen] = 1.0f;
+    CHECK (run (EffectKind::fretChannel, q, nullptr) == fa);
+    q[f::listenBand] = 2.0f / 3.0f;
+    q[f::midFreq] = f::midValue (5.0);
+    CHECK (rmsDb (run (EffectKind::fretChannel, q, nullptr), 4800) < rmsDb (fa, 4800) - 12.0); // 440 Hz far under a 5 kHz band
+    q[f::midFreq] = f::midValue (0.5);
+    CHECK (std::abs (rmsDb (run (EffectKind::fretChannel, q, nullptr), 4800) - rmsDb (fa, 4800)) < 3.0);
+    t = sp;
+    t[d::lfOn] = 1.0f;
+    t[d::lfDrive] = 0.5f;
+    t[d::lfAmount] = 1.0f;
+    CHECK (run (EffectKind::shellChannel, t, nullptr) != sa);
+    // tp172c9: the guitar Boost's knob law at drive (post-amp, asymmetric: about -11 dB at -50 %, +5 dB at +50 %), the bass
+    // voicings ahead of the amp
+    {
+        auto low = [] (const EffectParams& v) {
+            auto fx = makeEffect (EffectKind::fretChannel);
+            fx->prepare (48000.0);
+            std::vector<float> l (24000), rr (24000);
+            for (int i = 0; i < 24000; ++i) l[(std::size_t) i] = rr[(std::size_t) i] = 0.01f * (float) std::sin (2.0 * 3.14159265358979 * 50.0 * i / 48000.0);
+            for (int at = 0; at < 24000; at += 512)
+                fx->process (l.data() + at, rr.data() + at, std::min (512, 24000 - at), v, 120.0);
+            double e = 0;
+            for (std::size_t i = 4800; i < l.size(); ++i) e += (double) l[i] * l[i];
+            return 10.0 * std::log10 (std::max (1e-30, e / (double) (l.size() - 4800)));
+        };
+        auto g = fp;
+        g[f::driveIn] = 1.0f;
+        g[f::guitarDrive] = 0.5f;
+        const auto g0 = low (g);
+        g[f::guitarBoost] = 0.25f;
+        const auto gCut = low (g) - g0;
+        g[f::guitarBoost] = 0.75f;
+        const auto gLift = low (g) - g0;
+        CHECK (gCut < -6.0 && gLift > 2.0 && gLift < 9.0 && -gCut > gLift);
+        auto b = fp;
+        b[f::driveIn] = 1.0f;
+        b[f::driveModel] = 1.0f;
+        b[f::bassDrive] = 0.5f;
+        const auto b0 = run (EffectKind::fretChannel, b, nullptr);
+        b[f::bassPunch] = 0.75f;
+        CHECK (run (EffectKind::fretChannel, b, nullptr) != b0);
+    }
+    // tp172c9: part of the amps' tone sits before the curve: with the pre-amp at +30 dB the guitar amp compresses a
+    // 10 kHz sine far less than a 1 kHz one (the original: +24 / +9 dB over drive 0), the bass amp its highs more
+    {
+        auto tone = [] (const EffectParams& v, double hz) {
+            auto fx = makeEffect (EffectKind::fretChannel);
+            fx->prepare (48000.0);
+            std::vector<float> l (24000), rr (24000);
+            for (int i = 0; i < 24000; ++i) l[(std::size_t) i] = rr[(std::size_t) i] = 0.178f * (float) std::sin (2.0 * 3.14159265358979 * hz * i / 48000.0);
+            for (int at = 0; at < 24000; at += 512)
+                fx->process (l.data() + at, rr.data() + at, std::min (512, 24000 - at), v, 120.0);
+            double e = 0;
+            for (std::size_t i = 9600; i < l.size(); ++i) e += (double) l[i] * l[i];
+            return 10.0 * std::log10 (std::max (1e-30, e / (double) (l.size() - 9600)));
+        };
+        auto g = fp;
+        g[f::driveIn] = 1.0f;
+        const auto lo1 = tone (g, 1000.0), lo10 = tone (g, 10000.0);
+        g[f::preAmp] = 1.0f;
+        const auto hi1 = tone (g, 1000.0), hi10 = tone (g, 10000.0);
+        CHECK ((hi10 - lo10) - (hi1 - lo1) > 8.0);
+        auto b = fp;
+        b[f::driveIn] = 1.0f;
+        b[f::driveModel] = 1.0f;
+        const auto b1 = tone (b, 1000.0), b5 = tone (b, 5000.0);
+        b[f::bassDrive] = 1.0f;
+        CHECK ((tone (b, 5000.0) - b5) < (tone (b, 1000.0) - b1) - 2.0);
+    }
+
+    // Guitarstrip -> Fret Channel, 1:1 in its own units
+    auto gs = [&p32] (const std::string& params) {
         return tp172c::harrisonSlot ("SSL Guitarstrip",
                                      "<SSL_PLUGIN_STATE PluginName=\"SSL Guitarstrip\" Version=\"1.3.2\" StateASelected=\"0\"><A><PROCESSOR_STATE>"
-                                         + p32 ("Drive", 0) + "</PROCESSOR_STATE></A><B><PROCESSOR_STATE>" + p32 ("Bypass", 0) + p32 ("EQ", 1)
-                                         + p32 ("Input Gain", 0) + p32 ("Output Gain", 0) + p32 ("Compressor Mix", 100) + p32 ("Drive Mix", 100)
-                                         + p32 ("Low Gain", 0) + p32 ("High Gain", 0) + p32 ("Mid Gain", 0) + params
+                                         + p32 ("Drive", 0) + "</PROCESSOR_STATE></A><B><PROCESSOR_STATE>" + params
                                          + "</PROCESSOR_STATE></B></SSL_PLUGIN_STATE>");
     };
-    s = gs (p32 ("Mid Frequency", 2.65) + p32 ("Mid Gain", 6) + p32 ("Compressor", 1) + p32 ("Compressor Mode", 4) + p32 ("Compressor Threshold", -18)
-            + p32 ("Drive", 1) + p32 ("Drive Type", 0) + p32 ("Guitar Drive", 5.5) + p32 ("Guitar Pre-Amp", 12) + p32 ("High-Pass Filter", 20));
-    CHECK (s.kind == EffectKind::ridgeStrip && ! r::k4Voicing (s.params) && s.params[r::curve] < 0.5f);
-    CHECK (std::abs (r::hmfHz (s.params[r::hmfFreq]) - 2650.0) < 1.0 && std::abs (r::bandGainDb (s.params[r::hmfGain], false) - 6.0) < 1e-3);
-    CHECK (std::abs (r::ratio (s.params[r::compRatio]) - 4.0) < 0.01 && std::abs (r::compThresholdDb (s.params[r::compThreshold]) + 15.0) < 1e-3);
-    CHECK (s.params[r::driveOn] == 1.0f && r::driveModelIndex (s.params[r::driveModel]) == r::driveGuitarAmp);
-    CHECK (std::abs (r::driveAmountUnits (r::driveGuitarAmp, s.params[r::driveAmount]) - 5.5) < 1e-3);
-    CHECK (std::abs (r::driveInputDb (s.params[r::driveInput]) - 12.0) < 1e-3 && s.params[r::hpf] == 0.0f);
-    s = gs (p32 ("Compressor", 0) + p32 ("Drive", 1) + p32 ("Drive Type", 1) + p32 ("Bass Drive", 11) + p32 ("Low-Pass Filter", 20));
-    CHECK (s.params[r::compRatio] == 0.0f && r::driveModelIndex (s.params[r::driveModel]) == r::driveBassAmp && s.params[r::driveAmount] == 1.0f);
-    CHECK (s.params[r::lpf] == 0.0f);
+    auto s = gs (p32 ("Mid Frequency", 2.65) + p32 ("Mid Gain", 6) + p32 ("Compressor", 1) + p32 ("Compressor Mode", 4) + p32 ("Compressor Threshold", -18)
+                 + p32 ("Drive", 1) + p32 ("Drive Type", 0) + p32 ("Guitar Drive", 5.5) + p32 ("Guitar Pre-Amp", 12) + p32 ("High-Pass Filter", 20));
+    CHECK (s.kind == EffectKind::fretChannel && s.enabled);
+    CHECK (std::abs (f::midKHz (s.params[f::midFreq]) - 2.65) < 1e-3 && std::abs (f::shelfDb (s.params[f::midGain]) - 6.0) < 1e-3);
+    CHECK (s.params[f::compIn] == 1.0f && f::modeOf (s.params[f::compMode]) == 4 && std::abs (f::thresholdDb (s.params[f::compThreshold]) + 18.0) < 1e-3);
+    CHECK (s.params[f::driveIn] == 1.0f && s.params[f::driveModel] == 0.0f && std::abs (f::ampDrive (s.params[f::guitarDrive]) - 5.5) < 1e-3);
+    CHECK (std::abs (f::preAmpDb (s.params[f::preAmp]) - 12.0) < 1e-3 && s.params[f::hpf] == 0.0f);
+    CHECK (s.params[f::autoListen] == 0.0f);
+    // (a state needs its ten-odd parameters to count as one)
+    s = gs (p32 ("Bypass", 1) + p32 ("Drive", 1) + p32 ("Drive Type", 1) + p32 ("Bass Drive", 11) + p32 ("Low-Pass Filter", 20) + p32 ("EQ", 1)
+            + p32 ("Input Gain", 0) + p32 ("Output Gain", 0) + p32 ("Low Gain", 0) + p32 ("Mid Gain", 0) + p32 ("High Gain", 0));
+    CHECK (s.kind == EffectKind::fretChannel && ! s.enabled && s.params[f::driveModel] == 1.0f && s.params[f::bassDrive] == 1.0f && s.params[f::lpf] == 1.0f);
 
-    // Drumstrip: its gate (open threshold, range capped at Ridge's 60 dB, release) and trims
+    // Drumstrip -> Shell Channel: every module, and its process order
     s = tp172c::harrisonSlot ("SSL Native Drumstrip v6",
                               "<SSL_PLUGIN_STATE PluginName=\"SSL Native Drumstrip v6\" Version=\"6.0\" StateASelected=\"1\"><A><PROCESSOR_STATE>"
                                   + p32 ("bypass", 0) + p32 ("gateOn", 1) + p32 ("gateOpen", -24) + p32 ("gateClose", -30) + p32 ("gateRange", 80)
-                                  + p32 ("gateRelease", 0.5) + p32 ("gateAttack", 0.05) + p32 ("input", 3) + p32 ("output", -2) + p32 ("TransOn", 0)
-                                  + p32 ("hfOn", 0) + p32 ("lfOn", 0) + p32 ("lmcOn", 0) + "</PROCESSOR_STATE></A><B><PROCESSOR_STATE/></B></SSL_PLUGIN_STATE>");
-    CHECK (s.kind == EffectKind::ridgeStrip && s.params[r::dynOn] == 1.0f && s.params[r::compRatio] == 0.0f);
-    CHECK (std::abs (r::gateRangeDb (s.params[r::gateRange]) - 60.0) < 1e-3 && std::abs (r::gateThresholdDb (s.params[r::gateThreshold]) + 24.0) < 1e-3);
-    CHECK (std::abs (r::trimDb (s.params[r::input]) - 3.0) < 0.01 && std::abs (r::trimDb (s.params[r::output]) + 2.0) < 0.01);
+                                  + p32 ("gateRelease", 0.5) + p32 ("gateAttack", 0.05) + p32 ("input", 3) + p32 ("output", -2) + p32 ("TransOn", 1)
+                                  + p32 ("hfOn", 1) + p32 ("hfFreq", 8000) + p32 ("lfOn", 0) + p32 ("lmcOn", 1) + p32 ("processOrder", 119.0 / 119.0)
+                                  + "</PROCESSOR_STATE></A><B><PROCESSOR_STATE/></B></SSL_PLUGIN_STATE>");
+    CHECK (s.kind == EffectKind::shellChannel && s.enabled);
+    CHECK (s.params[d::gateOn] == 1.0f && std::abs (d::thresholdDb (s.params[d::gateOpen]) + 24.0) < 1e-3 && std::abs (d::rangeDb (s.params[d::gateRange]) - 80.0) < 1e-3);
+    CHECK (std::abs (d::releaseS (s.params[d::gateRelease]) - 0.5) < 1e-4 && std::abs (d::attackS (s.params[d::gateAttack]) - 0.05) < 1e-4);
+    CHECK (std::abs (d::gainDb (s.params[d::input]) - 3.0) < 1e-3 && std::abs (d::gainDb (s.params[d::output]) + 2.0) < 1e-3);
+    CHECK (s.params[d::tsOn] == 1.0f && s.params[d::hfOn] == 1.0f && s.params[d::lfOn] == 0.0f && s.params[d::lmcOn] == 1.0f);
+    CHECK (std::abs (d::hfHz (s.params[d::hfFreq]) - 8000.0) < 0.5 && d::orderIndex (s.params[d::processOrder]) == 119);
 }
 
 // slice 7: Kiln Channel, LYNX's console channel — the six console models on the measured drive stages, its noise floor,

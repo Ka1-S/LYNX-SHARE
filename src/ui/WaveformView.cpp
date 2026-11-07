@@ -340,9 +340,19 @@ bool appendWaveformPath (juce::Path& out, float scale, juce::Rectangle<float> bo
 void paintWaveform (juce::Graphics& g, juce::Rectangle<float> body, const wave::Summary& summary, double startFrame, double framesPerPixel,
                     const WaveStyle& style)
 {
-    const auto visible = body.getIntersection (g.getClipBounds().toFloat());
+    auto visible = body.getIntersection (g.getClipBounds().toFloat());
     if (visible.isEmpty() || summary.levels.empty() || framesPerPixel == 0.0 || body.getHeight() < 2.0f)
         return;
+    // the columns on the body's own pixel grid, two more on each side (the clean style smooths over neighbours): a
+    // repaint of part of the body (a scrolled strip, round 174f) draws the same pixels as a paint of the whole body
+    {
+        const auto gridScale = juce::jlimit (1.0f, 4.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+        const auto first = juce::jmax (0.0f, std::floor ((visible.getX() - body.getX()) * gridScale) - 2.0f);
+        const auto last = juce::jmin (std::ceil (body.getWidth() * gridScale), std::ceil ((visible.getRight() - body.getX()) * gridScale) + 2.0f);
+        visible = visible.withX (body.getX() + first / gridScale).withWidth (juce::jmax (0.0f, last - first) / gridScale);
+        if (visible.isEmpty())
+            return;
+    }
 
     if (! style.spectral)
     {

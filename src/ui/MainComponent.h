@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/ChordReadout.h"
+
 #include <atomic>
 #include <map>
 #include <memory>
@@ -56,6 +58,9 @@ public:
 
     // Opens .lynx or .flp (also used by the command line).
     void openFile (const juce::File& file);
+    // A file the operating system asks LYNX to open while it runs (macOS Finder): as File › Open, unsaved changes are
+    // asked about first; waits for a project still loading.
+    void openFileRequest (const juce::File& file);
     void showSetupWizard(); // first run, or Options > Setup wizard (an overlay over this component)
     void closeSetupWizardForSnapshot() { setupOverlay.reset(); }
     void refreshTweakReadoutForSnapshot() { refreshTweakReadout(); resized(); }
@@ -272,7 +277,9 @@ private:
     void saveAsTemplate();
     void chooseFileToOpen();
     void chooseFileToOpenNow();
-    void save (bool askForFile);
+    // `afterSaved`: runs once the project is on disk, also when a "Save as" dialog had to ask first (never after a
+    // cancelled dialog or a failed save).
+    void save (bool askForFile, std::function<void()> afterSaved = {});
     void exportAudio (int format = -1); // −1: the last export's format(s); 0 WAV, 1 MP3, 2 OGG, 3 FLAC alone
     void exportMidiFile();
     void switchSmartDisableForAll();
@@ -499,6 +506,19 @@ private:
     toolbar::MasterKnob masterVolume { engine, toolbar::MasterKnob::Kind::volume };
     toolbar::MasterKnob masterPitch { engine, toolbar::MasterKnob::Kind::pitch };
     toolbar::PerformanceMeter perfMeter;
+    toolbar::ChordPanel chordPanel;
+    toolbar::ChordHint chordNearHint; // View › Toolbars: "Show detected MIDI chords near the hint bar"
+    chordread::Readout chordReadout;
+    std::array<std::array<std::uint64_t, 2>, chordread::channels> chordHeld {};
+    std::array<std::string, 12> chordNotes;
+    bool chordShowNearHint = false;
+    std::uint32_t chordNearHintUntil = 0;
+    void updateChordPanel();
+    void showChordPanelMenu();
+    void showChordText();
+    void addAudioLoggerMenu (juce::PopupMenu& menu);
+    void dumpAudioLog();
+    void refreshChordOptions();
     uitrace::Monitor uiTraceMonitor; // LYNX_TRACE_UI: message-thread stalls to ui.log (round 151)
     toolbar::MidiActivityLight midiLight;
     juce::StringArray midiLightInputs; // the open MIDI inputs (refreshed once a second)
