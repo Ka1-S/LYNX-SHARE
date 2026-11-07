@@ -980,6 +980,22 @@ int setDeclickOfAudioClips (Song& song, const std::vector<int>& channels, int mo
     return count;
 }
 
+int setStretchOfAudioClips (Song& song, const std::vector<int>& channels, bool keepPitch, StretchMethod method)
+{
+    int count = 0;
+    for (const auto c : channels)
+        if (c >= 0 && c < (int) song.channels.size() && song.channels[(std::size_t) c].instrument == InstrumentKind::audioClip)
+        {
+            auto& s = song.channels[(std::size_t) c].sampler;
+            s.keepPitch = keepPitch;
+            if (keepPitch)
+                s.stretchMethod = method;
+            s.moveBakedPitchToKnob(); // (outside Beats nothing renders a baked pitch; round 175a)
+            ++count;
+        }
+    return count;
+}
+
 void prepareForMidiExport (Song& song)
 {
     constexpr int drums = 9; // (MIDI channel 10)

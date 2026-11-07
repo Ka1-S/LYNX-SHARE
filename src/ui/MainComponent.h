@@ -284,6 +284,8 @@ private:
     void switchSmartDisableForAll();
     void confirmPrepareForMidiExport();
     void saveClipboardToBrowser (bool midi);
+    juce::PopupMenu makeSwitchAudioClipsMenu (bool selectedOnly);
+    void switchAudioClips (bool selectedOnly, bool keepPitch, StretchMethod method, const juce::String& modeName);
     void changeDeclickOfSelectedClips (int mode);
     void prepareForPerformance(); // Tools › Macros (round 165m)
     void refreshToolbar();
