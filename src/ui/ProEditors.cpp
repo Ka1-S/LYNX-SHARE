@@ -1708,6 +1708,7 @@ public:
     PrismEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::prismMultiband, d, 920, 600)
     {
         knobRanges = true; // round tp172b4: each knob's scale under it (as the reference's band panel), the value on hover
+        referenceLabels = true;
         specArea = plot();
         specMinHz = 20.0;
         specMaxHz = 20000.0;
@@ -1741,7 +1742,7 @@ private:
         return { x, p.getBottom() - 176.0f, w, 164.0f };
     }
     static constexpr float panelW = 460.0f, expertW = 296.0f;
-    juce::Rectangle<float> expertTab() const { const auto a = panelArea(); return { a.getRight() - 14.0f, a.getY() + 44.0f, 14.0f, 92.0f }; }
+    juce::Rectangle<float> expertTab() const { const auto a = panelArea(); return { a.getRight() - 14.0f, a.getY() + 40.0f, 14.0f, 86.0f }; }
     // the band colours, measured on the reference's six bands (magenta, blue, green, violet, red, cyan)
     static juce::Colour bandHue (int b)
     {
@@ -2038,24 +2039,26 @@ private:
                 out.push_back (inner);
             }
             {
-                auto mode = tabs ({ a.getX() + 16.0f, a.getY() + 111.0f, 140.0f, 26.0f }, bp (b, fMode), "Compress|Expand");
+                auto mode = tabs ({ a.getX() + 16.0f, a.getY() + 114.0f, 140.0f, 26.0f }, bp (b, fMode), "Compress|Expand");
                 mode.look = 1;
                 out.push_back (mode);
             }
             // round tp172b5: RATIO, KNEE and LOOKAHEAD are horizontal sliders, as the reference's band panel draws them
-            out.push_back (hslider ({ a.getX() + 168.0f, a.getY() + 109.0f, 84.0f, 44.0f }, bp (b, fRatio), tr ("Ratio")));
+            out.push_back (hslider ({ a.getX() + 168.0f, a.getY() + 114.0f, 84.0f, 44.0f }, bp (b, fRatio), tr ("Ratio")));
             {
-                auto kneeSlider = hslider ({ a.getX() + 260.0f, a.getY() + 109.0f, 84.0f, 44.0f }, bp (b, fKnee), tr ("Knee"));
-                kneeSlider.endLow = tr ("Hard"); // (the reference's words; the value in dB on hover)
-                kneeSlider.endHigh = tr ("Soft");
+                auto kneeSlider = hslider ({ a.getX() + 260.0f, a.getY() + 114.0f, 84.0f, 44.0f }, bp (b, fKnee), tr ("Knee"));
+                kneeSlider.endLow = caps (tr ("Hard")); // (the reference's words; the value in dB on hover)
+                kneeSlider.endHigh = caps (tr ("Soft"));
                 out.push_back (kneeSlider);
             }
-            out.push_back (hslider ({ a.getX() + 352.0f, a.getY() + 109.0f, 84.0f, 44.0f }, bandLookaheadParam (b), tr ("Lookahead")));
-            out.push_back (button ({ a.getX() + 2.0f, a.getY() + 2.0f, 22.0f, 22.0f }, idPower, {}, false, tr ("Band on / off: a band switched off passes clean")));
-            out.push_back (button ({ a.getRight() - 24.0f, a.getY() + 2.0f, 22.0f, 22.0f }, idClose, juce::String::fromUTF8 ("\xc3\x97"), false, tr ("Close the band panel (click on the empty display does the same)")));
-            out.push_back (button ({ a.getRight() - 46.0f, a.getY() + 4.0f, 18.0f, 18.0f }, idBandMenu, {}, false, tr ("Band menu")));
-            out.push_back (button (expertTab(), idExpert, {}, expert,
-                                   tr ("Show the band's expert settings: side-chain filtering (band or a free range) and the stereo link")));
+            out.push_back (hslider ({ a.getX() + 352.0f, a.getY() + 114.0f, 84.0f, 44.0f }, bandLookaheadParam (b), tr ("Lookahead")));
+            const auto bare = [] (Ctl c) { c.bare = true; return c; }; // (their faces: paintOverlay)
+            out.push_back (bare (button ({ a.getX(), a.getY(), 22.0f, 22.0f }, idPower, {}, false, tr ("Band on / off: a band switched off passes clean"))));
+            out.push_back (button ({ a.getRight() - 22.0f, a.getY(), 22.0f, 22.0f }, idClose, {}, false, tr ("Close the band panel (click on the empty display does the same)")));
+            out.back().bare = true;
+            out.push_back (bare (button ({ a.getRight() - 46.0f, a.getY() + 4.0f, 18.0f, 18.0f }, idBandMenu, {}, false, tr ("Band menu"))));
+            out.push_back (bare (button (expertTab(), idExpert, {}, expert,
+                                   tr ("Show the band's expert settings: side-chain filtering (band or a free range) and the stereo link"))));
             if (expert)
             {
                 const auto x0 = a.getX() + panelW - 14.0f;
@@ -2094,7 +2097,7 @@ private:
                 }
                 pill ({ x1, a.getY() + 80.0f, 52.0f, 20.0f }, panMode, "L/R|M/S"); // round 144: what the ring balances
                 pill ({ x1 + 56.0f, a.getY() + 80.0f, 52.0f, 20.0f }, bandLinkMode0 + b, "Mid|Side");
-                out.push_back (hslider ({ x1, a.getY() + 109.0f, 108.0f, 44.0f }, bandLink0 + b, tr ("Stereo link")));
+                out.push_back (hslider ({ x1, a.getY() + 114.0f, 108.0f, 44.0f }, bandLink0 + b, tr ("Stereo link")));
             }
         }
         const auto bar = barArea();
@@ -2443,31 +2446,48 @@ private:
         if (selected >= 0)
         {
             const auto a = panelArea();
-            const auto power = juce::Rectangle<float> (a.getX() + 2.0f, a.getY() + 2.0f, 22.0f, 22.0f);
+            // the corner tiles (power, close) and the EXPERT tab, as the reference's: raised, one with the panel's corner
+            const auto cornerTile = [&] (juce::Rectangle<float> r, bool left, bool hot, juce::Colour face) {
+                juce::Path tile;
+                tile.addRoundedRectangle (r.getX(), r.getY(), r.getWidth(), r.getHeight(), 5.0f, 5.0f, left, ! left, ! left, left);
+                g.setColour (face.brighter (hot ? 0.18f : 0.0f));
+                g.fillPath (tile);
+                g.setColour (juce::Colours::white.withAlpha (0.08f));
+                g.strokePath (tile, juce::PathStrokeType (1.0f));
+            };
+            const auto power = juce::Rectangle<float> (a.getX(), a.getY(), 22.0f, 22.0f);
             const auto lit = bandOn (selected);
-            if (! lit)
-            {
-                g.setColour (juce::Colour (0xffb32a2a));
-                g.fillRoundedRectangle (power.reduced (1.0f), 3.0f);
-            }
+            cornerTile (power, true, power.contains (mouse), lit ? juce::Colour (0xff404040) : juce::Colour (0xffb32a2a));
             const auto ct = power.getCentre();
             juce::Path ring;
             ring.addCentredArc (ct.x, ct.y, 5.5f, 5.5f, 0.0f, 0.6f, juce::MathConstants<float>::twoPi - 0.6f, true);
-            g.setColour (lit ? colour::textSecondary : colour::textPrimary);
+            g.setColour (lit ? juce::Colour (0xffa8a8a8) : colour::textPrimary);
             g.strokePath (ring, juce::PathStrokeType (1.4f));
             g.drawLine (ct.x, ct.y - 7.0f, ct.x, ct.y - 1.0f, 1.4f);
+            const auto closeR = juce::Rectangle<float> (a.getRight() - 22.0f, a.getY(), 22.0f, 22.0f);
+            cornerTile (closeR, false, closeR.contains (mouse), juce::Colour (0xff414141));
+            const auto cc = closeR.getCentre();
+            g.setColour (juce::Colour (0xffb4b4b4));
+            g.drawLine (cc.x - 4.0f, cc.y - 4.0f, cc.x + 4.0f, cc.y + 4.0f, 2.0f);
+            g.drawLine (cc.x - 4.0f, cc.y + 4.0f, cc.x + 4.0f, cc.y - 4.0f, 2.0f);
             const auto m = juce::Point<float> (a.getRight() - 37.0f, a.getY() + 13.0f);
             juce::Path mark;
             mark.addTriangle (m.x - 5.0f, m.y - 2.5f, m.x + 5.0f, m.y - 2.5f, m.x, m.y + 2.5f);
-            g.setColour (colour::textSecondary);
+            g.setColour (juce::Colour (0xffb4b4b4));
             g.fillPath (mark);
             const auto tab = expertTab();
-            g.setFont (font (type::small, true));
-            g.drawText (juce::String::fromUTF8 (expert ? "\xc2\xab" : "\xc2\xbb"), tab.withHeight (16.0f), juce::Justification::centred, false);
+            juce::Path tabShape;
+            tabShape.addRoundedRectangle (tab.getX(), tab.getY(), tab.getWidth(), tab.getHeight(), 6.0f, 6.0f, true, false, true, false);
+            g.setGradientFill (juce::ColourGradient (juce::Colour (0xff747474).brighter (tab.contains (mouse) ? 0.15f : 0.0f), tab.getX(), 0.0f, juce::Colour (0xff5c5c5c).brighter (tab.contains (mouse) ? 0.15f : 0.0f), tab.getRight(), 0.0f, false));
+            g.fillPath (tabShape);
+            g.setColour (juce::Colour (0xff222222));
+            g.setFont (font (15.0f, true));
+            g.drawText (juce::String::fromUTF8 (expert ? "\xc2\xab" : "\xc2\xbb"), tab.withHeight (18.0f).translated (0.0f, 2.0f), juce::Justification::centred, false);
             g.saveState();
-            const auto mid = juce::Point<float> (tab.getCentreX(), tab.getCentreY() + 7.0f);
+            const auto mid = juce::Point<float> (tab.getCentreX(), tab.getCentreY() + 8.0f);
             g.addTransform (juce::AffineTransform::rotation (-juce::MathConstants<float>::halfPi, mid.x, mid.y));
-            g.setFont (font (type::caption, true));
+            g.setColour (juce::Colour (0xff303030));
+            g.setFont (font (11.5f));
             g.drawText (caps (tr ("Expert")), juce::Rectangle<float> (tab.getHeight() - 18.0f, 14.0f).withCentre (mid), juce::Justification::centred, false);
             g.restoreState();
         }
@@ -2538,20 +2558,23 @@ private:
             const auto c = bandHue (b);
             const auto region = juce::Rectangle<float> (bandLoX (b), p.getY(), juce::jmax (0.0f, bandHiX (b) - bandLoX (b)), p.getHeight());
             const auto on = bandOn (b);
-            const auto strength = on ? (b == selected ? 0.17f : 0.10f) : 0.04f;
-            g.setGradientFill (juce::ColourGradient (c.withAlpha (strength), 0.0f, region.getY(), c.withAlpha (strength * 0.55f), 0.0f, region.getBottom(), false));
+            // (measured on the reference's picture: a faint tint of a darkened hue over the plot's grey; a selected band a little more)
+            const auto deep = c.withMultipliedBrightness (0.6f);
+            const auto strength = on ? (b == selected ? 0.075f : 0.04f) : 0.015f;
+            g.setGradientFill (juce::ColourGradient (deep.withAlpha (strength), 0.0f, region.getY(), deep.withAlpha (strength * 0.8f), 0.0f, region.getBottom(), false));
             g.fillRect (region);
             gains[b] = on ? liveDb (b) + levelDb (v (bp (b, fLevel))) : 0.0;
             // the band's reduction curve: filled between its level and its range, as the reference draws it
             if (const auto& curve = bandCurves[(std::size_t) b]; ! curve.fill.isEmpty())
             {
-                g.setColour (c.withAlpha (on ? 0.26f : 0.08f));
+                // (the reference's fill darkens the plot too: a deep hue at 40 %; its line about two thirds of the full hue)
+                g.setColour (c.withMultipliedBrightness (0.42f).withMultipliedSaturation (1.3f).withAlpha (on ? 0.40f : 0.12f));
                 g.fillPath (curve.fill);
-                g.setColour (c.interpolatedWith (juce::Colours::black, 0.18f).withAlpha (on ? 0.95f : 0.4f));
+                g.setColour (c.withMultipliedBrightness (0.68f).withMultipliedSaturation (1.3f).withAlpha (on ? 1.0f : 0.4f));
                 g.strokePath (curve.bound, juce::PathStrokeType (1.3f));
                 const auto ry = gainY (levelDb (v (bp (b, fLevel))) + rangeDb (v (bp (b, fRange))));
                 const auto glow = juce::Rectangle<float> (region.getX() + 8.0f, ry - 7.0f, juce::jmax (0.0f, region.getWidth() - 16.0f), 7.0f);
-                g.setGradientFill (juce::ColourGradient (c.withAlpha (0.0f), 0.0f, glow.getY(), c.withAlpha (on ? 0.22f : 0.06f), 0.0f, glow.getBottom(), false));
+                g.setGradientFill (juce::ColourGradient (c.withAlpha (0.0f), 0.0f, glow.getY(), c.withAlpha (on ? 0.14f : 0.04f), 0.0f, glow.getBottom(), false));
                 g.fillRect (glow);
             }
         }
@@ -2608,17 +2631,19 @@ private:
             shape.setUsingNonZeroWinding (true);
             g.setColour (juce::Colours::black.withAlpha (0.28f));
             g.strokePath (shape, juce::PathStrokeType (3.0f));
-            g.setColour (juce::Colour (0xff363637).withAlpha (0.93f));
+            g.setColour (juce::Colour (0xff3c3c3c).withAlpha (0.93f));
             g.fillPath (shape);
             g.setColour (juce::Colours::white.withAlpha (0.05f));
             g.drawRoundedRectangle (a.reduced (0.5f), 7.0f, 1.0f);
-            caption (g, { a.getX() + 16.0f, a.getY() + 139.0f, 140.0f, 14.0f }, tr ("Mode"));
+            captionStyle (g, false, 0.0f, accent, type::caption);
+            g.drawText (caps (tr ("Mode")), juce::Rectangle<float> (a.getX() + 16.0f, a.getY() + 147.0f, 140.0f, 14.0f), juce::Justification::centred, false);
             if (expert) // the expert part's separator and captions
             {
                 const auto x0 = a.getX() + panelW - 14.0f;
                 g.setColour (juce::Colours::black.withAlpha (0.4f));
                 g.drawVerticalLine ((int) x0, a.getY() + 2.0f, a.getBottom() - 2.0f);
-                caption (g, { x0 + 8.0f, a.getY() + 139.0f, 108.0f, 14.0f }, tr ("Side chain"));
+                captionStyle (g, false, 0.0f, accent, type::caption);
+                g.drawText (caps (tr ("Side chain")), juce::Rectangle<float> (x0 + 8.0f, a.getY() + 147.0f, 108.0f, 14.0f), juce::Justification::centred, false);
             }
         }
         // output meter
