@@ -271,6 +271,22 @@ Nothing runs on load and no saved field changes meaning:
 round 163 test run through the option, and `--selftest` (`comp_crossfades`: the mark and a plain project through save and
 load).
 
+### Run evidence [RUN]
+
+Real recordings through `AudioEngine` on Windows: `LYNX --rectest <report> 18 --loop --type ASIO --device "FL Studio ASIO"` at
+120 BPM, 3 passes over bars 2-4. Reports and projects are in `E:\lynx-work\comp177c\lx\rec\`.
+
+| Run | Tracks (0 = the test's click track) | Muted | Group |
+|---|---|---|---|
+| Blend off | pass 1, 2, 3 on tracks 1, 2, 3 | all 3 | header 1, open |
+| Blend on | pass 1, 2, 3 on tracks 1, 2, 3 | none | header 1, open |
+| Blend off + "only the last pass plays" | pass 3, 2, 1 on tracks 1, 2, 3 | passes 1 and 2 | header 1, folded |
+
+These runs prove where passes land. Each report says `result=FAILED` because there was no cable: the input stayed silent
+(ping `no signal`), so no click was checked and placement accuracy was not measured here (round 163c measured it).
+
+Shots: `LYNX --comp177shot <prefix> <project>` draws them offscreen, in `E:\lynx-work\comp177c\lx\shots\`.
+
 ## 7. Not done / next
 
 - **Slice 177c-2 (UI)**, after the coordinator's FL | Ableton | LYNX shot review:
