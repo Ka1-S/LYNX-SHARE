@@ -9,6 +9,10 @@
 
 #include "core/Instruments.h"
 #include "core/Song.h"
+#include "core/VideoTrack.h"
+
+#include <atomic>
+#include <deque>
 
 namespace lynx::video
 {
@@ -126,8 +130,8 @@ const char* timeDisplayName (int mode) noexcept
         case smpte30: return "SMPTE (30 fps NONDROP)";
         case smpteAuto: return "SMPTE (Auto)";
         case smpte2997: return "SMPTE (29.97 fps NONDROP)";
-        case smpte48: return "SMPTE (48 fps NONDROP)";
-        case smpte50: return "SMPTE (50 fps NONDROP)";
+        case smpte48: return "SMPTE (48fps NONDROP)"; // (FL's captions: no space before fps for 48 and 50)
+        case smpte50: return "SMPTE (50fps NONDROP)";
         case smpte5994drop: return "SMPTE (59.94 fps DROP)";
         case smpte5994: return "SMPTE (59.94 fps NONDROP)";
         case smpte60: return "SMPTE (60 fps NONDROP)";
@@ -389,6 +393,61 @@ void setAudioProvider (AudioProvider p)
 
 namespace
 {
+// The published tempo map (round 174d A3): the audio thread reads `current`; replaced maps are kept for the next
+// 16 publishes (a reader holds one for a block at most) and freed after
+struct TempoSlot
+{
+    std::atomic<const videotrack::TempoMap*> current { nullptr };
+    std::mutex lock;
+    std::deque<std::unique_ptr<const videotrack::TempoMap>> kept;
+    std::vector<Automation> tempos;
+    std::vector<Clip> tempoClips;
+    double bpm = -1.0;
+    PlayMode mode = PlayMode::pattern;
+};
+TempoSlot& tempoSlot()
+{
+    static TempoSlot slot;
+    return slot;
+}
+} // namespace
+
+void publishTempo (const Song& song)
+{
+    auto& slot = tempoSlot();
+    std::vector<Automation> tempos;
+    std::vector<Clip> clips;
+    for (std::size_t i = 0; i < song.automations.size(); ++i)
+        if (song.automations[i].target.kind == AutomationTargetKind::tempo)
+        {
+            tempos.push_back (song.automations[i]);
+            for (const auto& c : song.playlist)
+                if (c.kind == ClipKind::automation && c.automation == (int) i)
+                    clips.push_back (c);
+        }
+    std::lock_guard<std::mutex> l (slot.lock);
+    if (slot.bpm == song.bpm && slot.mode == song.mode && slot.tempos == tempos && slot.tempoClips == clips)
+        return;
+    slot.bpm = song.bpm;
+    slot.mode = song.mode;
+    slot.tempos = std::move (tempos);
+    slot.tempoClips = std::move (clips);
+    const videotrack::TempoMap* fresh = nullptr;
+    if (! slot.tempos.empty() && song.mode == PlayMode::song)
+    {
+        std::int64_t end = 0;
+        for (const auto& c : song.playlist)
+            end = std::max (end, c.end());
+        slot.kept.push_back (std::make_unique<const videotrack::TempoMap> (song, song.secondsForTicks (end) + 600.0));
+        fresh = slot.kept.back().get();
+    }
+    slot.current.store (fresh, std::memory_order_release);
+    while (slot.kept.size() > 16)
+        slot.kept.pop_front();
+}
+
+namespace
+{
 std::shared_ptr<const AudioTrack> provide (const std::string& path, bool wait)
 {
     AudioProvider p;
@@ -452,10 +511,12 @@ public:
         if (moved && lastBlock > 0)
             lastTps = (ticks - lastTicks) / (double) lastBlock;
         lastTicks = ticks;
-        if (ignoreTempo.load (std::memory_order_relaxed) && moved && ! jumped)
-            songSeconds += (double) lastBlock / rate; // real time
+        // FL's clock (round 174d A3): the song's real time, tempo changes included
+        if (const auto* map = tempoSlot().current.load (std::memory_order_acquire))
+            songSeconds = map->seconds (ticks);
         else
             songSeconds = beatSeconds;
+        (void) jumped;
         songRunning.store (moved, std::memory_order_relaxed);
     }
 

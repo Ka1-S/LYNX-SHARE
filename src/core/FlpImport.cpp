@@ -3384,6 +3384,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         return target;
     };
 
+    // FL's time map starts at the initialized Tempo (0xD8) when there is one, not at the project's tempo (REA_rodada178a
+    // §3; Secret Agent Rendezvous: 110 vs 120)
+    std::optional<float> initialTempo;
+
     // Pattern events (.flp 0xDF, REA_rodada85): per pattern and target, FL's raw values held from their tick on.
     // They become the pattern's event lanes (round 83) in FL's normalised scale, then our target's (valueMap).
     {
@@ -3411,7 +3415,17 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             std::function<float (float)> valueMap;
             target = resolveTarget (id, valueMap);
             const auto plugin = pluginOf (id);
-            if (target.kind == AutomationTargetKind::none || target.kind == AutomationTargetKind::tempo)
+            if (target.kind == AutomationTargetKind::tempo)
+            {
+                // FL's Tempo events (issue #86, REA_rodada178a §2): BPM × 1000 (10 000…522 000), whole BPM in files
+                // saved before FL 10.1.0 (FL's loader multiplies them, FUN_00f45960) — LYNX's tempo scale exactly
+                const auto oldFile = project.versionNumber > 0 && project.versionNumber < 10001000u;
+                return [oldFile] (std::int32_t raw) {
+                    const auto milli = oldFile ? (double) raw * 1000.0 : (double) raw;
+                    return (float) std::clamp ((milli - 10000.0) / 512000.0, 0.0, 1.0);
+                };
+            }
+            if (target.kind == AutomationTargetKind::none)
             {
                 note ("target not reproduced" + (plugin.empty() ? std::string() : " (" + plugin + ")"));
                 return {};
@@ -3480,7 +3494,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             if (const auto convert = convertor (c.id, target))
             {
                 const auto value = convert (c.value);
-                song.setTargetValue (target, value);
+                if (target.kind == AutomationTargetKind::tempo)
+                    initialTempo = value; // (applied at the end: the audio clips' millisecond offsets use the file's tempo)
+                else
+                    song.setTargetValue (target, value);
                 song.setInitialValue (target, value); // kept: reset whenever the song starts (REA round 146)
             }
         }
@@ -3888,6 +3905,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     numberChorusInstances (song); // the random LFO phases FL gives each Hyper Chorus instance (REA_rodada59 §2.6)
     flpexport::stampOrigins (song); // what the import made of each FL plugin (Export to FL Studio, round 171e)
     clipops::updateCrossfades (song); // the project's "Automatic crossfades" on its overlapping audio clips (round 167a)
+    if (initialTempo)
+        song.setTargetValue ({ AutomationTargetKind::tempo, 0 }, *initialTempo);
     return song;
 }
 std::optional<MixerTrack> mixerTrackFromFlPreset (std::span<const std::uint8_t> fileBytes, const FlpImportOptions& options)

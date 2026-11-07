@@ -16948,6 +16948,7 @@ TEST (fl_low_lifter_matches_fl_engine)
     CHECK (lynx::formatEffectParam (lynx::EffectKind::flLowLifter, 3, 0.721f, 120.0) == "-6.0 dB");
 }
 #include "Rea153Tests.inc"
+#include "Logger181bTests.inc"
 #include "Render155Tests.inc"
 #include "Tune157Tests.inc"
 #include "Tune165Tests.inc"
@@ -16995,6 +16996,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FlScratch165Tests.inc"
 #include "FlTrans165Tests.inc"
 #include "VideoPlayer165Tests.inc"
+#include "Video174dTests.inc"
 #include "Dash165Tests.inc"
 #include "LinuxMouse165Tests.inc"
 #include "Fl165Tests.inc"
@@ -17110,6 +17112,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Fluid174eTests.inc"
 #include "AlsImport175aTests.inc"
 #include "Bridge176aTests.inc"
+#include "Issues178aTests.inc"
 #include "Mixer177aTests.inc"
 #include "FlExport180dTests.inc"
 #include "FlFades180dTests.inc"

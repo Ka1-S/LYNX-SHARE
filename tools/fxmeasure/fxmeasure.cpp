@@ -156,7 +156,7 @@ struct Host
 
 
     // the plugin's editor in a top-level window, captured with PrintWindow (round 108: reference screenshots)
-    void editorShot (const juce::File& out, int ms, int clickX = -1, int clickY = -1)
+    void editorShot (const juce::File& out, int ms, std::vector<POINT> clicks = {})
     {
         std::unique_ptr<juce::AudioProcessorEditor> ed (plugin->createEditorIfNeeded());
         if (ed == nullptr) { log ("error: no editor"); return; }
@@ -169,9 +169,8 @@ struct Host
         runSilence ((int) rate / 4);
         pump (ms);
         auto* hwnd = (HWND) w.getPeer()->getNativeHandle();
-        if (clickX >= 0) // a click as the user would make it (e.g. a trial's "Evaluate" button)
+        for (const auto pt : clicks) // clicks as the user would make them (a trial's "Evaluate" button, then a panel tab)
         {
-            POINT pt { clickX, clickY };
             HWND target = hwnd;
             for (;;)
             {
@@ -511,7 +510,13 @@ struct Host
             }
             else if (cmd == "settle") runSilence ((int) (a[1].getDoubleValue() * rate));
             else if (cmd == "process") process (juce::File (a[1]), juce::File (a[2]), a.size() > 3 ? juce::File (a[3]) : juce::File());
-            else if (cmd == "editor") editorShot (juce::File (a[1]), a.size() > 2 ? a[2].getIntValue() : 1500, a.size() > 4 ? a[3].getIntValue() : -1, a.size() > 4 ? a[4].getIntValue() : -1);
+            else if (cmd == "editor")
+            {
+                std::vector<POINT> clicks; // `editor <out.png> <ms> [x y]...`: each pair is one click, in order
+                for (int i = 3; i + 1 < a.size(); i += 2)
+                    clicks.push_back ({ a[i].getIntValue(), a[i + 1].getIntValue() });
+                editorShot (juce::File (a[1]), a.size() > 2 ? a[2].getIntValue() : 1500, clicks);
+            }
             else if (cmd == "latency") { pump (50); log ("latency " + juce::String (plugin->getLatencySamples())); }
             else if (cmd == "savestate")
             {

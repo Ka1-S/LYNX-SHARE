@@ -31,7 +31,8 @@ int flStretchMode (const SamplerSettings& s) noexcept
         return 0;
     if (s.flStretchMode != 0 && stretchMethodForFlMode (s.flStretchMode) == s.stretchMethod)
         return s.flStretchMode;
-    return s.stretchMethod == StretchMethod::mono ? 2 : s.stretchMethod == StretchMethod::transients ? 7 : -1;
+    const auto m = s.stretchMethod;
+    return m == StretchMethod::mono || m == StretchMethod::tones ? 2 : m == StretchMethod::transients || m == StretchMethod::beats ? 7 : -1;
 }
 
 std::uint32_t rgb (std::uint32_t argb) noexcept { return argb & 0xFFFFFFu; }
@@ -174,6 +175,7 @@ std::int32_t rawValue (const AutomationTarget& t, float v)
         case AutomationTargetKind::mixerSend: return iround (v * 16000.0);
         case AutomationTargetKind::mixerPan: return iround ((v * 2.0 - 1.0) * 6400.0);
         case AutomationTargetKind::effectMix: return iround (v * 12800.0);
+        case AutomationTargetKind::tempo: return iround (10000.0 + 512000.0 * v); // BPM × 1000 (issue #86, REA_rodada178a §2)
         default: return iround (v * 65536.0);
     }
 }

@@ -818,6 +818,24 @@ void writeProfileWindow (const std::string& file, double fromS, double toS, long
     std::fclose (out);
 }
 
+// One unwind step on a copied stack. The copy holds whatever the thread had: a frame register can point anywhere, so
+// the unwinder may read an unmapped address (an access violation in RtlVirtualUnwind killed LYNX at start-up, round 174f).
+// A fault only ends this sample's stack. No C++ objects in this frame (SEH and C++ unwinding must not share one function).
+bool unwindStepGuarded (DWORD64 imageBase, DWORD64 rip, PRUNTIME_FUNCTION function, CONTEXT* context) noexcept
+{
+    __try
+    {
+        void* handlerData = nullptr;
+        DWORD64 establisher = 0;
+        RtlVirtualUnwind (UNW_FLAG_NHANDLER, imageBase, rip, function, context, &handlerData, &establisher, nullptr);
+        return true;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        return false;
+    }
+}
+
 // One sample of the message thread without unwinding it while it is suspended: suspended, only its registers and the
 // used part of its stack are copied (no locks, no allocation); resumed; then unwound on the copy. Unwinding needs the
 // loader's function tables, whose lock the suspended thread may hold (a profiler that unwound the suspended thread
@@ -844,10 +862,15 @@ std::vector<std::uintptr_t> sampleByCopy (HANDLE thread, std::uintptr_t stackBas
     const auto low = (std::uintptr_t) context.Rsp, high = low + length;
     const auto delta = (std::intptr_t) ((std::uintptr_t) copy.data() - low);
     auto inStack = [&] (DWORD64 v) { return v >= low && v < high; };
-    // registers pointing into the stack (the frame pointer, saved stack addresses) are moved onto the copy
-    for (auto* r : { &context.Rsp, &context.Rbp, &context.Rbx, &context.Rsi, &context.Rdi, &context.R12, &context.R13, &context.R14, &context.R15 })
-        if (inStack (*r))
-            *r = (DWORD64) ((std::intptr_t) *r + delta);
+    // registers pointing into the stack (the frame pointer, saved stack addresses) are moved onto the copy; the ones an
+    // unwind step restores from the copy point at the real stack again, and any of them can be a function's frame register
+    auto rebase = [&] {
+        for (auto* r : { &context.Rbp, &context.Rbx, &context.Rsi, &context.Rdi, &context.R12, &context.R13, &context.R14, &context.R15 })
+            if (inStack (*r))
+                *r = (DWORD64) ((std::intptr_t) *r + delta);
+    };
+    context.Rsp = (DWORD64) ((std::intptr_t) context.Rsp + delta);
+    rebase();
     const auto copyLow = (DWORD64) (std::uintptr_t) copy.data(), copyHigh = copyLow + length;
 
     std::vector<std::uintptr_t> frames;
@@ -864,11 +887,9 @@ std::vector<std::uintptr_t> sampleByCopy (HANDLE thread, std::uintptr_t stackBas
             context.Rsp += 8;
             continue;
         }
-        void* handlerData = nullptr;
-        DWORD64 establisher = 0;
-        RtlVirtualUnwind (UNW_FLAG_NHANDLER, imageBase, context.Rip, function, &context, &handlerData, &establisher, nullptr);
-        if (inStack (context.Rbp)) // (a frame pointer restored from the copy points at the real stack)
-            context.Rbp = (DWORD64) ((std::intptr_t) context.Rbp + delta);
+        if (! unwindStepGuarded (imageBase, context.Rip, function, &context))
+            break;
+        rebase();
     }
     return frames;
 }
