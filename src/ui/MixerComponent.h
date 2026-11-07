@@ -177,6 +177,7 @@ public:
     void mouseExit (const juce::MouseEvent& e) override;
     // --uiperf (round 173f): where a fader drag starts (the fader's rail, strip coordinates)
     juce::Rectangle<int> faderRailForSnapshot (int track) const { return faderRail (track); }
+    void stepHeldRail(); // one step of the rail press being held (also called by --selftest, without the timer)
     // --uiperf: how many repaints spoiled the strips' picture and how often it was drawn again, since the last call
     std::pair<int, int> cacheCountersForPerf() noexcept { return { std::exchange (pictureInvalidations, 0), std::exchange (pictureRefills, 0) }; }
 
@@ -298,6 +299,14 @@ private:
     int laneTop() const noexcept;
     void paintRouting (juce::Graphics& g);
     void showTip (Part part, int track, bool transient);
+    // a press on a fader's rail (FL: steps towards the mouse while held, REA_rodada177a section 4.2): the insert or VCA strip
+    // held (railNone: nothing), and where the mouse is; the repeat runs only while the button is down
+    static constexpr int railNone = -1000000;
+    int railStrip = railNone;
+    int railMouseY = 0;
+    juce::TimedCallback railRepeat { [this] { stepHeldRail(); } };
+    void pressRail (int strip, int mouseY);
+    float railTarget (int strip) const;
     juce::Rectangle<int> tipArea (Part part, int track) const;
     void setHover (Part part, int track);
     Part hoverPart = Part::none;
@@ -370,6 +379,7 @@ public:
 
     void setTrack (int track);
     int getSelectedSlot() const noexcept { return selectedSlot; }
+    juce::Rectangle<int> slotBoundsForCheck (int row) const { return slotBounds (row); } // --selftest (ui/MixerBasicsCheck.h)
     void deleteSlot (int slot); // removes the slot's effect (its menu's Delete, the Delete key)
     void selectSlot (int slot)
     {

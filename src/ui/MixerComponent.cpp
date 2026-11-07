@@ -754,17 +754,14 @@ void MixerStrips::vcaMouseDown (const juce::MouseEvent& e, int i)
                 setVcaLevel (i, unityFader);
                 return;
             }
-            auto start = song.vcas[(std::size_t) i].level;
-            if (! flmods::ctrl (e.mods)) // clicking the rail jumps the fader there (as an insert's)
+            const auto start = song.vcas[(std::size_t) i].level;
+            if (! flmods::ctrl (e.mods)) // a press on the rail steps the fader towards the mouse (as an insert's)
             {
                 const auto rail = faderRail (v);
                 if (std::abs ((float) e.y - ((float) rail.getBottom() - start * (float) rail.getHeight())) > 9.0f)
                 {
-                    start = juce::jlimit (0.0f, 1.0f, (float) (rail.getBottom() - e.y) / (float) rail.getHeight());
-                    engine.editSong ([i, start] (Song& s) {
-                        if (i < (int) s.vcas.size())
-                            s.vcas[(std::size_t) i].level = start;
-                    });
+                    pressRail (v, e.y);
+                    return;
                 }
             }
             dragVca = i;
@@ -1915,19 +1912,6 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
             dragTrack = t;
             dragStartValue = part == Part::pan ? track.pan : track.volume;
 
-            if (part == Part::fader && ! flmods::ctrl (e.mods)) // clicking the track jumps the fader there
-            {
-                const auto area = faderRail (t);
-                const auto capY = area.getBottom() - track.volume * (float) area.getHeight();
-
-                if (std::abs ((float) e.y - capY) > 9.0f)
-                {
-                    dragStartValue = juce::jlimit (0.0f, 1.0f, (float) (area.getBottom() - e.y) / (float) area.getHeight());
-                    engine.editSong ([t, v = dragStartValue] (Song& s) { s.mixer[(std::size_t) t].volume = v; });
-                }
-            }
-
-            drag.begin (e, dragStartValue);
             groupStart.clear();
             groupGrab = dragStartValue;
             if (selection.size() > 1) // the selected strips follow, keeping their offsets
@@ -1935,6 +1919,21 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
                     if (s != t && s < (int) engine.getSong().mixer.size())
                         groupStart.push_back ({ s, part == Part::pan ? engine.getSong().mixer[(std::size_t) s].pan
                                                                       : engine.getSong().mixer[(std::size_t) s].volume });
+
+            if (part == Part::fader && ! flmods::ctrl (e.mods)) // a press on the rail steps the fader towards the mouse
+            {
+                const auto area = faderRail (t);
+                const auto capY = area.getBottom() - track.volume * (float) area.getHeight();
+
+                if (std::abs ((float) e.y - capY) > 9.0f)
+                {
+                    pressRail (t, e.y);
+                    showTip (part, t, false);
+                    return;
+                }
+            }
+
+            drag.begin (e, dragStartValue);
             showTip (part, t, false);
             return;
 
@@ -1974,8 +1973,47 @@ void MixerStrips::dragSelectTo (int t)
     setSelection ({ s.begin(), s.end() }, primary);
 }
 
+void MixerStrips::pressRail (int strip, int mouseY)
+{
+    railStrip = strip;
+    railMouseY = mouseY;
+    stepHeldRail();
+    railRepeat.startTimer (faderRailRepeatMs);
+}
+
+float MixerStrips::railTarget (int strip) const
+{
+    const auto rail = faderRail (strip);
+    return juce::jlimit (0.0f, 1.0f, (float) (rail.getBottom() - railMouseY) / (float) rail.getHeight());
+}
+
+void MixerStrips::stepHeldRail()
+{
+    const auto& song = engine.getSong();
+    if (railStrip <= vcaStrip (0))
+    {
+        const auto i = -2 - railStrip;
+        if (i < (int) song.vcas.size())
+        {
+            setVcaLevel (i, faderRailStepTowards (song.vcas[(std::size_t) i].level, railTarget (railStrip)));
+            ui::showValueTip (*this, faderRail (railStrip), vcaSpec (i).text (vcaShownLevel (i)));
+        }
+    }
+    else if (railStrip >= 0 && railStrip < (int) song.mixer.size())
+    {
+        setValue (Part::fader, railStrip, faderRailStepTowards (song.mixer[(std::size_t) railStrip].volume, railTarget (railStrip)));
+        showTip (Part::fader, railStrip, false);
+    }
+}
+
 void MixerStrips::mouseDrag (const juce::MouseEvent& e)
 {
+    if (railStrip != railNone) // the cap goes on towards where the mouse is now
+    {
+        railMouseY = e.y;
+        return;
+    }
+
     if (selectAnchor > 0)
     {
         if (const auto t = trackAt (juce::jlimit (0, getWidth() - 1, e.x)); t >= 0)
@@ -2340,6 +2378,9 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
 
 void MixerStrips::mouseUp (const juce::MouseEvent&)
 {
+    railRepeat.stopTimer();
+    railStrip = railNone;
+
     if (headerDragged)
         setMouseCursor (juce::MouseCursor::NormalCursor);
 
