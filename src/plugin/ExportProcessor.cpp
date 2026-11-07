@@ -9,6 +9,7 @@
 #include "core/Instruments.h"
 #include "core/LynxBanks.h"
 #include "core/ModelParams.h"
+#include "core/PluginLayout.h"
 #include "core/RackRenderer.h"
 #include "core/SnapshotExchange.h"
 #include "engine/AudioEngine.h"
@@ -89,6 +90,7 @@ public:
           song (makeSong (e)),
           renderer (std::make_unique<RackRenderer>())
     {
+        plugui::hostedElsewhere = true;
         if (entry.instrument)
         {
             if (const auto* table = modelparams::tableOf (entry.synth); table != nullptr && table->params != nullptr && ! song.channels.empty())
@@ -161,7 +163,9 @@ public:
             return;
         const juce::ScopedLock sl (songLock);
         song = std::move (*loaded);
-        if (! entry.instrument)
+        if (entry.instrument)
+            song.channels[0].name = entry.name; // (the name of this build's table, plugin/plugins.def)
+        else
             slot().smartDisable = false;
         showValues();
         if (rate > 0.0)

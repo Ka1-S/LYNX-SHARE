@@ -180,6 +180,13 @@ Audio directInstrument (const Entry& entry)
 void writeEditorPicture (const Entry& entry, const juce::String& prefix)
 {
     std::unique_ptr<juce::AudioProcessor> p (plugexport::makeProcessor (entry));
+    {
+        juce::MemoryBlock state; // (in-process: a VST3 host sees it inside JUCE's own chunk)
+        p->getStateInformation (state);
+        juce::String parseError;
+        check (ProjectFile::fromJson (juce::String::createStringFromData (state.getData(), (int) state.getSize()), parseError).has_value(),
+               "the state opens as a .lynx project " + parseError);
+    }
     const auto before = memoryMb();
     std::unique_ptr<juce::AudioProcessorEditor> editor (p->createEditorIfNeeded());
     check (editor != nullptr && editor->getWidth() > 100 && editor->getHeight() > 50,
@@ -233,43 +240,49 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
     report << "  " << blocks << " blocks of " << block << ": " << juce::String (100.0 * seconds / (blocks * block / rate), 2) << " % of real time\n";
     check (sound.peak() > 1.0e-3, "makes sound, peak " + juce::String (sound.peak(), 4));
 
-    const auto direct = entry->instrument ? directInstrument (*entry) : directEffect (entry->effect, makeEffectSlot (entry->effect).params);
+    auto direct = entry->instrument ? directInstrument (*entry) : directEffect (entry->effect, makeEffectSlot (entry->effect).params);
     const auto nulled = sound.difference (direct);
-    check (nulled < 1.0e-5, "null test against the engine run directly: peak difference " + juce::String (nulled, 8));
+    check (nulled < 1.0e-5, "null test at the defaults: peak difference " + juce::String (nulled, 8));
 
-    // automation: a parameter moved by the host changes the sound, as the same value does on the direct engine
     auto& parameters = instance->getParameters();
-    int moved = -1;
-    for (int i = 0; i < parameters.size() && moved < 0; ++i)
-        if (! entry->instrument && parameters[i]->getName (64).containsIgnoreCase ("gain") && ! parameters[i]->getName (64).containsIgnoreCase ("out"))
-            moved = i;
-    if (entry->instrument)
-        moved = parameters.size() > 1 ? 1 : 0;
-    if (moved >= 0)
+    if (! entry->instrument)
     {
-        const auto was = parameters[moved]->getValue();
-        const auto target = was < 0.5f ? was + 0.3f : was - 0.3f;
-        parameters[moved]->setValue (target);
-        report << "  moved '" << parameters[moved]->getName (64) << "' " << was << " -> " << parameters[moved]->getValue() << "\n";
-        const auto changed = render (*instance, entry->instrument);
-        check (changed.difference (sound) > 1.0e-4 || entry->instrument, "the moved parameter changes the sound, difference " + juce::String (changed.difference (sound), 6));
-
-        // state: a new instance of what we just heard sounds the same
-        juce::MemoryBlock state;
-        instance->getStateInformation (state);
-        report << "  state: " << (int) state.getSize() << " bytes\n";
-        juce::String parseError;
-        check (ProjectFile::fromJson (juce::String::createStringFromData (state.getData(), (int) state.getSize()), parseError).has_value(), "the state opens as a .lynx project " + parseError);
-        auto second = make();
-        check (second != nullptr, "second instance");
-        if (second != nullptr)
+        // every named parameter moved through the host, against the same values on the engine run directly. Facet EQ's
+        // defaults are flat (its output is its input), so this is the null test that says something.
+        auto params = makeEffectSlot (entry->effect).params;
+        const auto named = (int) effectInfo (entry->effect).params.size();
+        for (int i = 0; i < named && i < parameters.size(); ++i)
         {
-            second->setStateInformation (state.getData(), (int) state.getSize());
-            check (std::abs (second->getParameters()[moved]->getValue() - parameters[moved]->getValue()) < 1.0e-5f, "state restores the parameter");
-            const auto first = render (*instance, entry->instrument), restored = render (*second, entry->instrument);
-            const auto d = restored.difference (first);
-            check (d < 1.0e-3, "state restores the sound: peak difference " + juce::String (d, 8));
+            const auto v = 0.5f + 0.45f * (float) std::sin ((double) i * 0.7);
+            parameters[i]->setValue (v);
+            params[(std::size_t) i] = parameters[i]->getValue();
         }
+        const auto wet = render (*instance, false);
+        const auto d = wet.difference (direct = directEffect (entry->effect, params));
+        check (d < 1.0e-5, "null test with " + juce::String (named) + " parameters moved by the host: peak difference " + juce::String (d, 8));
+        check (wet.difference (sound) > 1.0e-3, "those settings change the sound, difference " + juce::String (wet.difference (sound), 5));
+    }
+    else
+    {
+        const auto was = parameters[1]->getValue();
+        parameters[1]->setValue (was < 0.5f ? was + 0.3f : was - 0.3f);
+        report << "  moved '" << parameters[1]->getName (64) << "' " << was << " -> " << parameters[1]->getValue() << "\n";
+        const auto changed = render (*instance, true);
+        check (changed.difference (sound) > 1.0e-3, "the moved parameter changes the sound, difference " + juce::String (changed.difference (sound), 5));
+    }
+
+    // state: a new instance of what we just heard sounds the same
+    juce::MemoryBlock state;
+    instance->getStateInformation (state);
+    report << "  state: " << (int) state.getSize() << " bytes\n";
+    auto second = make();
+    check (second != nullptr, "second instance");
+    if (second != nullptr)
+    {
+        second->setStateInformation (state.getData(), (int) state.getSize());
+        const auto first = render (*instance, entry->instrument), restored = render (*second, entry->instrument);
+        const auto d = restored.difference (first);
+        check (d < 1.0e-3, "state restores the sound: peak difference " + juce::String (d, 8));
     }
 
     // hosted editor object (never put on the screen)

@@ -354,6 +354,7 @@ if [[ "${LYNX_BUILD_PLUGINS:-0}" == 1 ]]; then
     plugin_link() { # <output> <objects...>
         local output="$1"; shift
         "$ZIG" c++ -target "$TARGET" -O2 -shared -s -o "$output" "$@" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "${PLUGIN_LIBS[@]}" -Wl,--gc-sections
+        rm -f "$(dirname "$output")"/*.lib "$(dirname "$output")"/*.pdb # (the linker's import library: not part of a plugin)
     }
     plugin_cxx "$OUT/plugin/ExportProcessor.o" src/plugin/ExportProcessor.cpp -Wall -Wextra
     plugin_cxx "$OUT/plugin/ClapEntry.o" src/plugin/ClapEntry.cpp -Wall -Wextra

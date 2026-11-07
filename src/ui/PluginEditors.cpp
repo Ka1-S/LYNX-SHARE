@@ -693,7 +693,7 @@ public:
         g.setFont (font (type::small));
         g.setColour (colour::textSecondary);
         // where it is: only when it fits whole (round 170k2: no "(I…" stub beside the name)
-        if (const auto where = "(" + trackName() + ")"; juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), where) <= text.getWidth() - 9.0f)
+        if (const auto where = "(" + trackName() + ")"; ! plugui::hostedElsewhere && juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), where) <= text.getWidth() - 9.0f)
             g.drawText (where, text.withTrimmedLeft (8.0f), juce::Justification::centredLeft, false);
 
         if (usesBar())
