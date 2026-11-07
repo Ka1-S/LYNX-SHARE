@@ -8000,3 +8000,4 @@ countries: cn sg
 "Tones" = "音调"
 "Texture" = "纹理"
 "Complex" = "复杂"
+"Comp takes" = "用这些录音合成"

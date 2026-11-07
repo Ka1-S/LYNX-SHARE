@@ -8000,3 +8000,4 @@ countries: de at ch li lu
 "Tones" = "Töne"
 "Texture" = "Textur"
 "Complex" = "Komplex"
+"Comp takes" = "Comp aus diesen Takes erstellen"

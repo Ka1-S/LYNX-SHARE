@@ -8000,3 +8000,4 @@ countries: pl
 "Tones" = "Tony"
 "Texture" = "Tekstura"
 "Complex" = "Złożony"
+"Comp takes" = "Utwórz comp z tych ujęć"

@@ -8000,3 +8000,4 @@ countries: es mx ar co cl pe ve
 "Tones" = "Tonos"
 "Texture" = "Textura"
 "Complex" = "Complejo"
+"Comp takes" = "Crear comp con estas tomas"

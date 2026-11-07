@@ -8000,3 +8000,4 @@ countries: ru by kz
 "Tones" = "Тона"
 "Texture" = "Текстура"
 "Complex" = "Комплексный"
+"Comp takes" = "Собрать комп из этих дублей"

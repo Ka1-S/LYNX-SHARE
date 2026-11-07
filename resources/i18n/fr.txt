@@ -8000,3 +8000,4 @@ countries: fr be ch ca lu
 "Tones" = "Tons"
 "Texture" = "Texture"
 "Complex" = "Complexe"
+"Comp takes" = "Créer un comp avec ces prises"

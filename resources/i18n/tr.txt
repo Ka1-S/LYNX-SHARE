@@ -8000,3 +8000,4 @@ countries: tr
 "Tones" = "Tonlar"
 "Texture" = "Doku"
 "Complex" = "Karmaşık"
+"Comp takes" = "Bu kayıtlardan comp oluştur"
