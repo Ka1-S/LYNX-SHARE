@@ -10,7 +10,7 @@ settings folders keep "LYNX" so existing installs, links and AppImage updates ke
   "Open with LYNX SHARE" for `.flp` (FL Studio stays the default program), uninstaller in *Apps & features*. The workflow
   also installs and uninstalls it silently as a check.
 - `LYNX-x.y.z-windows-x64.zip` — portable build (extract and run), with `Demo.lynx`.
-- `LYNX-x.y.z-x86_64.AppImage` — Linux, one file (no "linux" in the name: AppImage naming rule; embeds AppImageUpdate information, with its `.zsync` next to it; the AppImage
+- `LYNX-x.y.z-x86_64.AppImage` — Linux, one file (no "linux" in the name: AppImage naming rule; embeds update information for a fixed address, `https://lynx-share.com/update/LYNX-x86_64.AppImage.zsync`, with its `.zsync` next to it. After publishing a release, run `scripts/publish-appimage-update.sh v<label>`: until then Linux update checks keep offering the previous release. The target lives only on the site, never in `website/`, and `scripts/deploy-site.sh` keeps it and reminds you when it is behind; the AppImage
   catalog warns otherwise). Built in an Ubuntu 22.04 container, so it needs only glibc 2.35; the job fails when
   `scripts/check-linux-compat.sh` finds a newer glibc symbol or a dependency on the system's libstdc++, or when
   `scripts/check-appimage-start.sh` sees it quit within 12 s offline. Carries AppStream metadata
