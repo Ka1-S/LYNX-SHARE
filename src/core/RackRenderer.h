@@ -68,6 +68,11 @@ struct RackState
     static constexpr int maxAutomations = 1024;
     std::vector<std::vector<int>> automationClips; // per automation: clips in the Playlist
     std::vector<char> zoneAutomations;             // per automation: it has clips in the performance zone
+    // Several automations with clips on one target play as one (issue #97, FL's rule: docs/analise/REA_rodada177b.md):
+    // the last of them holds the slot and lists them all here (ascending; empty = it plays alone); the others are
+    // marked as followers: they bind nothing and compute nothing.
+    std::vector<std::vector<int>> automationGroups;
+    std::vector<char> automationFollowers;
     std::vector<int> channelVolumeAuto, channelPanAuto;
     std::vector<int> mixerVolumeAuto, mixerPanAuto;
     std::vector<std::vector<std::array<int, maxEffectParams>>> effectParamAuto; // [track][slot][param] (built-in)
