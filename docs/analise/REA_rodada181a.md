@@ -41,6 +41,13 @@ Tags: **[MANUAL]** published manual, **[DATA]** read from shipped sets, **[INFER
 | Scene tempo and time signature apply when the scene is launched | [MANUAL] Session View | `ClipGridScene::tempo`, `beatsPerBar`; applied at the press, not at the grid point ([OPEN]) |
 | With record on, launched clips are logged into the arrangement | [MANUAL] Session View | `updateLauncherRecording`: a pass becomes a Playlist clip; clip property, mixer and tempo logging are not built |
 
+## Layout style (slice N6)
+Settings > General > Workflow and View > Layout style: "Pattern workflow (default)" or "Clip-launch workflow". Stored in the UI settings as `clipLaunchWorkflow=0/1`; absent means Pattern.
+- The workspace layout is kept per style in `workspace-pattern.txt` and `workspace-cliplaunch.txt`, so going back restores the Pattern layout. First time in Clip-launch: Playlist shown, Channel Rack hidden (one click away on the toolbar).
+- Clip-launch calls `autolanes::setShown (true)`; the earlier value is remembered (`lanesBeforeClipLaunch`, saved so it survives a restart) and restored on the way back, then the Playlist repaints. A hand change of the lanes while in Clip-launch is not kept when going back.
+- Pattern selected: no grid component, no timer, no model, no runtime. Opening the grid does not change the project either: a project gets a `clipGrid` with its first clip or grid setting.
+- `autolanes` in `core/PlaylistOps.h` is a marked stub of the wip/177b-s3 contract until 177b lands.
+
 ## Not built yet
 Scene follow actions, velocity amount, select next scene on launch, drag and drop into slots, audio slots from the UI (the engine plays them), per-cell screen-reader names, .als mapping of the grid (with round 175a).
 

@@ -679,7 +679,7 @@ TEST (grid181a_follow_actions)
         s3.clipGrid->followActions = false;
         grid181a::Run r3 (std::move (s3));
         r3.launch (0, 0);
-        r3.until (3 * bar);
+        r3.until (3 * bar - 2 * r3.block * r3.tps);
         CHECK (r3.runtime.tracks[0].playing.load() == 0);
         CHECK (r3.onsOf (60).size() == 3);
     }

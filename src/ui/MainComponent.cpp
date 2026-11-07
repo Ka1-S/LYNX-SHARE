@@ -5262,7 +5262,7 @@ void MainComponent::openSettings (int page)
         o.alternateUndo = safe->alternateUndo;
         o.rememberSeek = EditorGlobals::get().rememberSeek;
         o.stretchedClipsLoop = stretchedClipsLoop();
-        o.clipLaunchWorkflow = self.clipLaunchWorkflow;
+        o.clipLaunchWorkflow = safe->clipLaunchWorkflow;
         o.editPatternsIn = PlaylistComponent::editPatternsIn;
         o.undoLevels = safe->engine.getUndoLevels();
         o.autosaveMinutes = safe->autosaveMinutes;
