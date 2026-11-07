@@ -1110,11 +1110,11 @@ bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& f
         return false;
     juce::ChildProcess child;
     auto ok = child.start (juce::StringArray { exe.getFullPathName(), "--scan-one", format.getName(), file, result.getFullPathName() }, 0);
+    const auto started = juce::Time::getMillisecondCounter();
     if (ok)
     {
         // wait in short steps so a cancelled scan (or LYNX closing) doesn't wait for a slow plugin; a file holding
         // many plugins (Waves shell) gets more time once the child has said how many (core/PluginScanPolicy.h)
-        const auto started = juce::Time::getMillisecondCounter();
         auto timeout = (juce::uint32) scanpolicy::baseTimeoutMs;
         auto classesKnown = false;
         while (child.isRunning() && ! stopScan && juce::Time::getMillisecondCounter() - started < timeout)
@@ -1156,8 +1156,12 @@ bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& f
         if (xml->getNumChildElements() == 0 && added == 0)
             rememberEmptyScan (file); // nothing in it: not described again on every open until it changes
     }
-    else if (! ok)
+    else
+    {
+        if (ok) // on Linux and macOS, JUCE reports exit code 0 for a child killed by a signal: no answer is the only sign
+            logScanFailure (file, "ended without an answer", juce::Time::getMillisecondCounter() - started);
         known.addToBlacklist (file);
+    }
     result.deleteFile();
     classCountFile (result).deleteFile();
     return true;
