@@ -3,7 +3,6 @@
 # for its catalog entry, and one CLAP module holds every entry.
 
 add_library(lynx_plugin_runtime STATIC src/plugin/ExportProcessor.cpp ${LYNX_APP_SOURCES})
-_juce_initialise_target(lynx_plugin_runtime)
 set(LYNX_PLUGIN_DEFINES
     JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_PLUGINHOST_VST3=1 JUCE_USE_MP3AUDIOFORMAT=0
     JUCE_STANDALONE_APPLICATION=0 JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1
