@@ -127,7 +127,7 @@ public:
         // FL: the MUL light right of the knobs; the options arrow on the row below, under SPD
         auto row = bar.removeFromBottom (lfoArrowRow);
         lfoOptions.setVisible (on);
-        lfoOptions.setBounds (row.removeFromLeft (38).withSizeKeepingCentre (20, 14));
+        lfoOptions.setBounds (row.removeFromLeft (38).withSizeKeepingCentre (10, 8));
         for (auto* k : lfoKnobs)
         {
             k->setVisible (on);
@@ -650,7 +650,9 @@ private:
 
         auto plain = [] (double v) { return juce::String ((int) v); };
         addLfoKnob (tr ("LFO speed"), tr ("SPD"), 512, 65536, 45819, [] (double v) {
-                const auto beats = 1.0 / AutomationLfo::cyclesPerBeat ((int) v);
+                auto beats = 1.0 / AutomationLfo::cyclesPerBeat ((int) v);
+                if (std::abs (beats - std::round (beats)) < 0.005) // (FL's speeds for whole beats land a hair off)
+                    beats = std::round (beats);
                 return beats >= 1.0 ? tr ("{0} beats", { juce::String (beats, beats < 10.0 ? 2 : 1) })
                                     : "1/" + juce::String (1.0 / beats, 1) + " " + tr ("beat");
             },
@@ -670,7 +672,6 @@ private:
         mulButton.onClick = [this] { editLfo ([] (AutomationLfo& l) { l.add = ! l.add; }); };
         addChildComponent (mulButton);
 
-        lfoOptions.setButtonText (juce::String::fromUTF8 ("\xe2\x96\xbe"));
         lfoOptions.setTooltip (tr ("LFO options"));
         lfoOptions.onClick = [this] {
             const auto* a = current();
@@ -705,7 +706,7 @@ private:
     juce::ToggleButton lfoButton; // FL's "LFO" radio next to "Automation editor"
     static constexpr int lfoArrowRow = 16;
     LedToggle mulButton { "MUL" };
-    juce::TextButton lfoOptions;
+    juce::ArrowButton lfoOptions { "LFO options", 0.25f, theme::colour::textSecondary }; // FL's small arrow, pointing down
     std::vector<std::unique_ptr<ctlui::Knob>> ownedKnobs;
     std::vector<ctlui::Knob*> lfoKnobs;
     bool lfoShown = false;
