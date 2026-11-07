@@ -147,10 +147,23 @@ Per instance, measured in plugexporttest:
 - an open editor: 22 to 25 MB;
 - CPU: 0.15 to 0.32 % of real time.
 
+## Installing (for testers)
+
+- **VST3:** put the `.vst3` bundles in `C:\Program Files\Common Files\VST3` on Windows, or `~/.vst3` on Linux. FL
+  Studio scans custom search paths only for VST 1 and 2 plugins. Its manual says VST3 plugins "must be installed to
+  default system locations" (Options > File settings, "Plugin search paths").
+- **CLAP:** put `LYNX Plugins.clap` in `C:\Program Files\Common Files\CLAP` on Windows, or `~/.clap` on Linux. Another
+  folder works only if the host reads the `CLAP_PATH` environment variable.
+  - The CLAP standard (`clap/entry.h`) says a host must read `CLAP_PATH`, a list of folders.
+  - FL Studio's Plugin Manager contains the string `CLAP_PATH` (observed in `PluginManager.exe`, next to its CLAP
+    loading code). Image-Line staff say on the forum that FL reads it. This has not been tested here.
+
 ## Known gaps
 
 - There is no host sidechain bus, so Facet's sidechain controls are hidden in the plugins.
 - Ableton Live has not been tested, at the user's request.
+- Not yet tested in FL Studio. The plugins are validated with pluginval, clap-validator and the LYNX host on Windows
+  and Linux. FL's quick scan, with verification off, found neither plugin in a custom search path.
 - Editors other than Facet EQ and FM10 need to be checked for FL wording before they are exported.
 - The plugins are unsigned.
 - macOS is not built or tested. The app's macOS-only `VideoMediaMac.mm` is not in the shared source list.
