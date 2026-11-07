@@ -2261,7 +2261,9 @@ void PianoRollComponent::postDragHint (const juce::MouseEvent& e)
             const auto lane = velocityArea();
             const auto value = juce::jlimit (0.0f, 1.0f, (float) (lane.getBottom() - 2 - e.y) / (float) (lane.getHeight() - 8));
             hint.text = drag == Drag::eventErase ? tr ("Deleting events") : tr ("Drawing events: {0}", { laneBox.getText() });
-            hint.value = juce::String (juce::roundToInt (value * 100.0f)) + "%";
+            const auto target = eventLaneTarget();
+            hint.value = target && target->kind == AutomationTargetKind::tempo ? juce::String (tempoFromValue (value), 3) + " BPM" // (issue #86: as FL's hint)
+                                                                               : juce::String (juce::roundToInt (value * 100.0f)) + "%";
             break;
         }
         case Drag::velocity:

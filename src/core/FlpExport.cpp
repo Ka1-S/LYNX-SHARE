@@ -161,6 +161,7 @@ std::int32_t rawValue (const AutomationTarget& t, float v)
         case AutomationTargetKind::mixerSend: return iround (v * 16000.0);
         case AutomationTargetKind::mixerPan: return iround ((v * 2.0 - 1.0) * 6400.0);
         case AutomationTargetKind::effectMix: return iround (v * 12800.0);
+        case AutomationTargetKind::tempo: return iround (10000.0 + 512000.0 * v); // BPM × 1000 (issue #86, REA_rodada178a §2)
         default: return iround (v * 65536.0);
     }
 }

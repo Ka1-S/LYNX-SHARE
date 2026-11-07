@@ -69,7 +69,17 @@ juce::Colour clipTitleText (juce::Colour band)
 // the header keeps a hint of the clip colour, greyed so the names read and the bodies carry the colour
 juce::Colour clipHeaderColour (juce::Colour base) { return base.interpolatedWith (juce::Colour (0xff4b525a), 0.5f); }
 juce::Colour clipBodyColour (juce::Colour base) { return base.interpolatedWith (theme::colour::bg1, 0.72f); }
-juce::Colour clipContentColour (juce::Colour base) { return base.interpolatedWith (juce::Colours::white, 0.7f); }
+// The content in a light tint of the clip colour; on the pale body of a light theme (issue #95: background #FFFFFF, the
+// white-tinted waveform vanished) a dark shade of that body instead.
+juce::Colour clipContentColour (juce::Colour base)
+{
+    const auto body = clipBodyColour (base);
+    if (body.getPerceivedBrightness() <= 0.6f)
+        return base.interpolatedWith (juce::Colours::white, 0.7f);
+    // a dark shade of the body, or of the clip colour when that is darker (a dark clip on white: PR #100's point)
+    const auto shade = body.interpolatedWith (juce::Colours::black, 0.65f), deep = base.interpolatedWith (juce::Colours::black, 0.55f);
+    return deep.getPerceivedBrightness() < shade.getPerceivedBrightness() ? deep : shade;
+}
 
 float clipHeaderHeight (juce::Rectangle<float> r) { return juce::jmin (clipTitleHeight, juce::jmax (0.0f, r.getHeight() - 8.0f)); }
 
@@ -4843,7 +4853,7 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
                                                  else if (result == 2 || result == 3)
                                                  {
                                                      const auto bpm = juce::jlimit (minTempo, maxTempo, result == 3 ? std::round (found.bpm) : found.bpm);
-                                                     engine.editSong ([bpm] (Song& s) { s.bpm = bpm; });
+                                                     engine.editSong ([bpm] (Song& s) { clipops::followTempo (s, bpm); });
                                                  }
                                              }),
                                              true);

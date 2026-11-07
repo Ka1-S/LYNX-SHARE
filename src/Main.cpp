@@ -9836,6 +9836,23 @@ private:
                 }, false);
                 saveWindow (lynx::makeEventEditor (offline, volume), "-eventeditor.png");
                 offline.editSong ([&] (lynx::Song& s) { s.patterns[(std::size_t) s.currentPattern].events = before; }, false);
+                // issue #86: the same editor on the Tempo target, with the project's own Tempo events (a sample ramp if none)
+                const lynx::AutomationTarget tempo { lynx::AutomationTargetKind::tempo, 0 };
+                offline.editSong ([&] (lynx::Song& s) {
+                    auto& lane = lynx::eventedit::laneFor (s.patterns[(std::size_t) s.currentPattern], tempo);
+                    if (lane.events.empty())
+                        lynx::eventedit::line (lane, 0, lynx::ppq * 2, 0.05f, 0.11f, lynx::ticksPerStep);
+                }, false);
+                saveWindow (lynx::makeEventEditor (offline, tempo), "-eventeditor-tempo.png");
+                {
+                    auto compact = lynx::makeEventEditor (offline, tempo); // the toolbar in a small window
+                    compact->setSize (640, 300);
+                    saveWindow (std::move (compact), "-eventeditor-tempo-small.png");
+                    auto narrowest = lynx::makeEventEditor (offline, tempo); // the tool window's lower limit
+                    narrowest->setSize (400, 300);
+                    saveWindow (std::move (narrowest), "-eventeditor-tempo-narrowest.png");
+                }
+                offline.editSong ([&] (lynx::Song& s) { s.patterns[(std::size_t) s.currentPattern].events = before; }, false);
             }
 
             // round 86: the audio editor with a synthetic drum loop (markers, a region, a loop), waveform and spectrogram,

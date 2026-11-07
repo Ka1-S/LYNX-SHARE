@@ -17109,6 +17109,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Fluid174eTests.inc"
 #include "AlsImport175aTests.inc"
 #include "Bridge176aTests.inc"
+#include "Issues178aTests.inc"
 #include "Mixer177aTests.inc"
 #include "FlExport180dTests.inc"
 #include "Sc177bTests.inc"
