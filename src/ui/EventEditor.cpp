@@ -323,17 +323,26 @@ public:
             titleWidth += taken;
             boxWidth -= taken;
         }
-        // (issue #86: the File button got no room at the default width) the target box gives way down to 150 px
+        // the target box gives way down to 150 px; below that the toolbar wraps, so nothing becomes unreachable (issue #86)
         boxWidth = juce::jmax (150, boxWidth - juce::jmax (0, titleWidth + boxWidth + fixedTop - 240 - top.getWidth()));
+        const auto modesWidth = modeWidth[0] + modeWidth[1] + modeWidth[2];
+        const auto rightWidth = fileWidth + 4 + toAutoWidth + 4 + clearWidth;
+        const auto roomFor = [&r, &top] (int width) {
+            if (width > top.getWidth())
+                top = r.removeFromTop (30);
+        };
         title.setBounds (top.removeFromLeft (titleWidth));
         targetBox.setBounds (top.removeFromLeft (boxWidth).reduced (0, 2));
+        roomFor (12 + modesWidth);
         top.removeFromLeft (12);
         i = 0;
         for (auto* b : { &drawButton, &lineButton, &selectButton })
             b->setBounds (top.removeFromLeft (modeWidth[i++]).reduced (1, 2));
+        roomFor (12 + gridWidth + 110);
         top.removeFromLeft (12);
         gridLabel.setBounds (top.removeFromLeft (gridWidth));
         gridBox.setBounds (top.removeFromLeft (110).reduced (0, 2));
+        roomFor (rightWidth);
         clearButton.setBounds (top.removeFromRight (clearWidth).reduced (0, 2));
         top.removeFromRight (4);
         toAutoButton.setBounds (top.removeFromRight (toAutoWidth).reduced (0, 2));

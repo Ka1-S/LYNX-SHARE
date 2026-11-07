@@ -74,8 +74,11 @@ juce::Colour clipBodyColour (juce::Colour base) { return base.interpolatedWith (
 juce::Colour clipContentColour (juce::Colour base)
 {
     const auto body = clipBodyColour (base);
-    return body.getPerceivedBrightness() > 0.6f ? body.interpolatedWith (juce::Colours::black, 0.65f)
-                                                : base.interpolatedWith (juce::Colours::white, 0.7f);
+    if (body.getPerceivedBrightness() <= 0.6f)
+        return base.interpolatedWith (juce::Colours::white, 0.7f);
+    // a dark shade of the body, or of the clip colour when that is darker (a dark clip on white: PR #100's point)
+    const auto shade = body.interpolatedWith (juce::Colours::black, 0.65f), deep = base.interpolatedWith (juce::Colours::black, 0.55f);
+    return deep.getPerceivedBrightness() < shade.getPerceivedBrightness() ? deep : shade;
 }
 
 float clipHeaderHeight (juce::Rectangle<float> r) { return juce::jmin (clipTitleHeight, juce::jmax (0.0f, r.getHeight() - 8.0f)); }

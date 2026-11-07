@@ -5609,7 +5609,12 @@ void MainComponent::setTweakedValue (const AutomationTarget& target, float value
 {
     value = juce::jlimit (0.0f, 1.0f, value);
     auto plugin = false;
-    engine.editSong ([&] (Song& s) { plugin = ! s.setTargetValue (target, value); });
+    engine.editSong ([&] (Song& s) {
+        if (target.kind == AutomationTargetKind::tempo)
+            clipops::followTempo (s, tempoFromValue (value)); // (issue #87: audio clips follow)
+        else
+            plugin = ! s.setTargetValue (target, value);
+    });
     if (plugin)
     {
         if (target.kind == AutomationTargetKind::channelParam)

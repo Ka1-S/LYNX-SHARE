@@ -9784,6 +9784,9 @@ private:
                     auto compact = lynx::makeEventEditor (offline, tempo); // the toolbar in a small window
                     compact->setSize (640, 300);
                     saveWindow (std::move (compact), "-eventeditor-tempo-small.png");
+                    auto narrowest = lynx::makeEventEditor (offline, tempo); // the tool window's lower limit
+                    narrowest->setSize (400, 300);
+                    saveWindow (std::move (narrowest), "-eventeditor-tempo-narrowest.png");
                 }
                 offline.editSong ([&] (lynx::Song& s) { s.patterns[(std::size_t) s.currentPattern].events = before; }, false);
             }

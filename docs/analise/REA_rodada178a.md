@@ -197,3 +197,5 @@ e5, e7, e8, e11, f2. Files FL wrote: fl/tempoev.fsc, fl/t87b.flp.
 - **Held value:** FL fills a Tempo lane's last value to the visible edge, past the pattern end (t87b at 86 BPM and the Default template at 130 BPM). LYNX
   now does so for Tempo only; other FL lanes were not observed.
 - **Title and hint:** "Events - Tempo", 3 decimals in the hint (Event editor and piano roll event lane), as in FL.
+- **Tempo followers (#87):** tempo display, tap tempo, Detect tempo, Settings, Loop Starter's genre change and setTweakedValue. MIDI import changes the tempo only for a new project, so there is nothing to follow. Left out: a linked controller (AudioEngine's per-move edit): rounding would drift on every move.
+- **Toolbar:** below the width of one row it wraps (a second or third row), so File, To automation and Clear stay reachable down to the window's 400 px limit.
