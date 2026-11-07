@@ -67,7 +67,7 @@ A sample of 80 measured names is in `tests/Logger181bTests.inc`. Measured at 22:
 | LYNX | FL | Why |
 |---|---|---|
 | Changing the length keeps the newest audio | Storage-order copy | FL's copy can mix the order |
-| Logging pauses only for the copy; the WAV is written off the UI thread | Paused during the whole dump | No freeze |
+| While a dump or a new length has the ring, the audio waits in a 1 s spill and joins at the next block; the WAV is written off the UI thread | The audio thread waits on a critical section | No loss and no wait on the audio thread |
 | Documents/LYNX/Audio logger | Audio/Recorded | LYNX's own folder |
 | `Audiolog-YYYY-MM-DD HH-MM-SS.wav` | System date text | Same name on every system |
 | Opens LYNX's audio editor | Edison on the Master | LYNX's editor |
@@ -88,7 +88,7 @@ Stereo float, 8 bytes per frame, allocated up front on the control side, freed w
 | 5 min | 101 MiB | 110 MiB | 220 MiB |
 | 10 min | 202 MiB | 220 MiB | 440 MiB |
 
-A dump doubles this for the moment of the copy.
+A dump doubles this for the moment of the copy. One second of spill is on top (0.35 MiB at 44.1 kHz, 0.73 MiB at 96 kHz).
 
 `push` on a 512-frame block, measured with a plain loop on one core (3 runs, -O2, this machine):
 
@@ -98,6 +98,17 @@ A dump doubles this for the moment of the copy.
 | On, the other position | 0.5–5 | under 0.0001 % |
 | On, signal | 1135–1253 | 0.011 % |
 | On, past the 8 s silence stop (scan only) | 777–881 | 0.008 % |
+
+## Audio during a dump or a length change
+
+Stress test with numbered frames, 200 runs and 6000 dumps while lengths change (50 us per 64-frame block):
+
+| Logger | Gaps in dumps | Torn frames |
+|---|---|---|
+| First version (dropped blocks during the pause) | 42597 | 0 |
+| With the spill | 0 | 0 |
+
+ThreadSanitizer: 20 runs, no reports. One core: 50 runs, no gaps.
 
 ## Best way?
 
