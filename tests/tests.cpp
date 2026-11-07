@@ -16947,6 +16947,7 @@ TEST (fl_low_lifter_matches_fl_engine)
     CHECK (lynx::formatEffectParam (lynx::EffectKind::flLowLifter, 3, 0.721f, 120.0) == "-6.0 dB");
 }
 #include "Rea153Tests.inc"
+#include "Logger181bTests.inc"
 #include "Render155Tests.inc"
 #include "Tune157Tests.inc"
 #include "Tune165Tests.inc"
