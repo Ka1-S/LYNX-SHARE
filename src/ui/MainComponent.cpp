@@ -1,3 +1,5 @@
+#include "ui/VideoTracks.h"
+#include "ui/AdrWindow.h"
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
 #include "core/ClipOps.h"
@@ -6005,6 +6007,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             // FL's File › Import (ImportMenu › ImportMIDIMenu → FileImportMIDIFileAction, REA round 143)
             juce::PopupMenu imports;
             imports.addItem (tr ("MIDI file..."), [this] { importMidiFile(); });
+            imports.addItem (tr ("Video file..."), [this] { videotracks::chooseAndImport (engine, this); }); // round 174d
             menu.addSubMenu (tr ("Import"), imports);
         }
         {
@@ -6221,6 +6224,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             addRecordOptions (recording);
             menu.addSubMenu (tr ("Recording"), recording);
         }
+        // LYNX's own ADR (round 174d, issue #83): cues, the record cycle with streamers and beeps, takes, comp, Align
+        menu.addItem (tr ("ADR (dialogue replacement)..."), [this] { adrwindow::show (engine); });
         {
             // LYNX's own (REA round 153): everything the Master plays, after the fader, goes to a WAV in the background
             auto& logger = engine.getAudioLogger();
