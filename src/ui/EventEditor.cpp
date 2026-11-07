@@ -619,62 +619,18 @@ private:
         const auto* lane = eventedit::findLane (currentPattern(), target);
         if (lane == nullptr || lane->events.empty())
             return;
-        struct Panel final : public juce::Component
-        {
-            Panel (EventEditor& o) : owner (&o)
-            {
-                label.setText (tr ("Sensitivity"), juce::dontSendNotification);
-                addAndMakeVisible (label);
-                slider.setRange (40.0, 100.0, 0.1);
-                slider.setValue (100.0, juce::dontSendNotification);
-                slider.setDoubleClickReturnValue (true, 100.0);
-                slider.setTextValueSuffix ("%");
-                slider.onValueChange = [this] { update(); };
-                addAndMakeVisible (slider);
-                info.setFont (theme::font (theme::type::small));
-                info.setColour (juce::Label::textColourId, theme::colour::textSecondary);
-                addAndMakeVisible (info);
-                accept.setButtonText (tr ("Accept"));
-                accept.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
-                cancel.setButtonText (tr ("Cancel"));
-                accept.onClick = [this] {
-                    if (owner != nullptr)
-                        owner->convertToAutomation ((float) slider.getValue() / 100.0f);
-                    closeToolWindowOf (*this);
-                };
-                cancel.onClick = [this] { closeToolWindowOf (*this); };
-                addAndMakeVisible (accept);
-                addAndMakeVisible (cancel);
-                setSize (380, 130);
-                update();
-            }
-            void update()
-            {
-                if (owner == nullptr)
-                    return;
-                const auto* l = eventedit::findLane (owner->currentPattern(), owner->target);
-                const auto n = l != nullptr ? eventedit::toAutomationPoints (*l, (float) slider.getValue() / 100.0f).size() : 0u;
-                info.setText (tr ("{0} events become {1} automation points", { juce::String (l != nullptr ? (int) l->events.size() : 0), juce::String ((int) n) }), juce::dontSendNotification);
-            }
-            void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg2); }
-            void resized() override
-            {
-                auto r = getLocalBounds().reduced (12);
-                auto row = r.removeFromTop (28);
-                label.setBounds (row.removeFromLeft (90));
-                slider.setBounds (row);
-                info.setBounds (r.removeFromTop (28));
-                auto b = r.removeFromBottom (28);
-                cancel.setBounds (b.removeFromRight (84));
-                b.removeFromRight (6);
-                accept.setBounds (b.removeFromRight (84));
-            }
-            juce::Component::SafePointer<EventEditor> owner;
-            juce::Label label, info;
-            juce::Slider slider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
-            juce::TextButton accept, cancel;
-        };
-        openToolWindow (std::make_unique<Panel> (*this), tr ("Convert to automation"), "eventeditor-toauto");
+        juce::Component::SafePointer<EventEditor> safe (this);
+        openConvertToAutomationPanel ((int) lane->events.size(), 100.0,
+                                      [safe] (float sensitivity) {
+                                          if (safe == nullptr)
+                                              return 0;
+                                          const auto* l = eventedit::findLane (safe->currentPattern(), safe->target);
+                                          return l != nullptr ? (int) eventedit::toAutomationPoints (*l, sensitivity).size() : 0;
+                                      },
+                                      [safe] (float sensitivity) {
+                                          if (safe != nullptr)
+                                              safe->convertToAutomation (sensitivity);
+                                      });
     }
 
     void convertToAutomation (float sensitivity)
@@ -861,6 +817,68 @@ private:
     std::uint32_t seed = 1;
 };
 } // namespace
+
+void openConvertToAutomationPanel (int events, double initialPercent, std::function<int (float)> pointsFor, std::function<void (float)> onAccept)
+{
+    struct Panel final : public juce::Component
+    {
+        Panel (int eventCount, double percent, std::function<int (float)> points, std::function<void (float)> acceptFn)
+            : events (eventCount), pointsFor (std::move (points)), onAccept (std::move (acceptFn))
+        {
+            label.setText (tr ("Sensitivity"), juce::dontSendNotification);
+            addAndMakeVisible (label);
+            slider.setRange (40.0, 100.0, 0.1);
+            slider.setValue (percent, juce::dontSendNotification);
+            slider.setDoubleClickReturnValue (true, percent);
+            slider.setTextValueSuffix ("%");
+            slider.onValueChange = [this] { update(); };
+            addAndMakeVisible (slider);
+            info.setFont (theme::font (theme::type::small));
+            info.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+            addAndMakeVisible (info);
+            accept.setButtonText (tr ("Accept"));
+            accept.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
+            cancel.setButtonText (tr ("Cancel"));
+            accept.onClick = [this] {
+                const auto fn = onAccept;
+                const auto sensitivity = (float) slider.getValue() / 100.0f;
+                closeToolWindowOf (*this); // (deletes this)
+                if (fn)
+                    fn (sensitivity);
+            };
+            cancel.onClick = [this] { closeToolWindowOf (*this); };
+            addAndMakeVisible (accept);
+            addAndMakeVisible (cancel);
+            setSize (380, 130);
+            update();
+        }
+        void update()
+        {
+            const auto n = pointsFor ? pointsFor ((float) slider.getValue() / 100.0f) : 0;
+            info.setText (tr ("{0} events become {1} automation points", { juce::String (events), juce::String (n) }), juce::dontSendNotification);
+        }
+        void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg2); }
+        void resized() override
+        {
+            auto r = getLocalBounds().reduced (12);
+            auto row = r.removeFromTop (28);
+            label.setBounds (row.removeFromLeft (90));
+            slider.setBounds (row);
+            info.setBounds (r.removeFromTop (28));
+            auto b = r.removeFromBottom (28);
+            cancel.setBounds (b.removeFromRight (84));
+            b.removeFromRight (6);
+            accept.setBounds (b.removeFromRight (84));
+        }
+        int events;
+        std::function<int (float)> pointsFor;
+        std::function<void (float)> onAccept;
+        juce::Label label, info;
+        juce::Slider slider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+        juce::TextButton accept, cancel;
+    };
+    openToolWindow (std::make_unique<Panel> (events, initialPercent, std::move (pointsFor), std::move (onAccept)), tr ("Convert to automation"), "eventeditor-toauto");
+}
 
 void openEventEditor (AudioEngine& engine, const AutomationTarget& target)
 {

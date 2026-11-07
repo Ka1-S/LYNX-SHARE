@@ -7,6 +7,9 @@
 // before describing them, and the limit grows with that number.
 
 #include <algorithm>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace lynx::scanpolicy
 {
@@ -20,5 +23,16 @@ constexpr int timeoutMs (int classes) noexcept
         return baseTimeoutMs;
     const auto extra = (long long) (classes - 1) * perClassMs;
     return (int) std::min<long long> ((long long) baseTimeoutMs + extra, maxTimeoutMs);
+}
+
+// What the LV2 folders hold: each bundle and the date of its newest .ttl, in any order the disk lists them. An LV2 plugin
+// has no file of its own to compare (JUCE's pluginNeedsRescanning is always true for LV2), so this text stands for all.
+inline std::string lv2Stamp (std::vector<std::pair<std::string, long long>> bundles)
+{
+    std::sort (bundles.begin(), bundles.end());
+    std::string stamp;
+    for (const auto& [path, newestTtl] : bundles)
+        stamp += path + "|" + std::to_string (newestTtl) + "\n";
+    return stamp;
 }
 } // namespace lynx::scanpolicy

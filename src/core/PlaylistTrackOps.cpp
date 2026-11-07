@@ -559,61 +559,40 @@ bool automationLinksConflict (const Song& song, const std::vector<int>& clips)
     return false;
 }
 
-int mergeAutomationClips (Song& song, const std::vector<int>& clips, AutomationLinks links, bool lossy)
+// FUN_012ff0d0: a clip that overlaps the next one stops where the next one starts
+static void cutOverlaps (std::vector<Clip>& list)
 {
+    for (std::size_t i = 0; i + 1 < list.size(); ++i)
+        list[i].length = std::min (list[i].length, list[i + 1].start - list[i].start);
+}
+
+PatternEvents automationMergeSamples (const Song& song, const std::vector<int>& clips)
+{
+    PatternEvents samples;
     auto list = automationClipsInOrder (song, clips);
     if (list.size() < 2)
-        return -1;
+        return samples;
+    cutOverlaps (list);
+    const auto origin = list.front().start;
+    for (std::size_t i = 0; i < list.size(); ++i)
+    {
+        const auto& c = list[i];
+        const auto& a = song.automations[(std::size_t) c.automation];
+        const auto at = c.start - origin;
+        if (! samples.events.empty() && samples.events.back().tick < at - 1)
+            samples.events.push_back ({ at - 1, samples.events.back().value }); // the gap holds
+        const auto last = i + 1 == list.size() ? c.length : c.length - 1; // the next clip takes over at its own start
+        for (std::int64_t t = 0; t <= last; ++t)
+            samples.events.push_back ({ at + t, a.valueAt ((double) (c.offset + t)) });
+    }
+    return samples;
+}
+
+// The new automation (points already made) takes the clips' place
+static int replaceWithMergedAutomation (Song& song, const std::vector<int>& clips, std::vector<Clip> list, Automation merged, AutomationLinks links)
+{
     const auto first = list.front();
     const auto origin = first.start;
-
-    Automation merged;
-    if (lossy)
-    {
-        // FUN_012ff0d0: a clip that overlaps the next one stops where the next one starts
-        for (std::size_t i = 0; i + 1 < list.size(); ++i)
-            list[i].length = std::min (list[i].length, list[i + 1].start - list[i].start);
-        PatternEvents samples;
-        for (std::size_t i = 0; i < list.size(); ++i)
-        {
-            const auto& c = list[i];
-            const auto& a = song.automations[(std::size_t) c.automation];
-            const auto at = c.start - origin;
-            if (! samples.events.empty() && samples.events.back().tick < at - 1)
-                samples.events.push_back ({ at - 1, samples.events.back().value }); // the gap holds
-            const auto last = i + 1 == list.size() ? c.length : c.length - 1; // the next clip takes over at its own start
-            for (std::int64_t t = 0; t <= last; ++t)
-                samples.events.push_back ({ at + t, a.valueAt ((double) (c.offset + t)) });
-        }
-        // just short of "exact" (a step per sample): FL's FUN_01304100 fits lines through them with a very small tolerance
-        merged.points = eventedit::toAutomationPoints (samples, 0.998f);
-    }
-    else
-    {
-        for (std::size_t i = 0; i < list.size(); ++i)
-        {
-            const auto& c = list[i];
-            const auto& a = song.automations[(std::size_t) c.automation];
-            const auto at = c.start - origin;
-            if (i > 0)
-            {
-                // FL's FUN_013009f0: a point with the last value where the next clip starts holds across a gap
-                if (! merged.points.empty())
-                {
-                    merged.points.back().tension = 0.0f; // the curve after a clip's last point isn't shown
-                    if (list[i - 1].end() < c.start)
-                        merged.points.push_back ({ at, merged.points.back().value, 0.0f });
-                }
-            }
-            const auto whole = showsWholeAutomation (c, a);
-            for (auto p : a.points)
-                if (whole || (p.tick >= c.offset && p.tick <= c.offset + c.length))
-                {
-                    p.tick += at - c.offset;
-                    merged.points.push_back (p);
-                }
-        }
-    }
 
     const auto& source = song.automations[(std::size_t) first.automation];
     merged.name = freeName (source.name + " - merged", [&song] (const std::string& n) {
@@ -666,6 +645,48 @@ int mergeAutomationClips (Song& song, const std::vector<int>& clips, AutomationL
         addClip (extra);
     }
     return result;
+}
+
+int mergeAutomationClips (Song& song, const std::vector<int>& clips, AutomationLinks links)
+{
+    const auto list = automationClipsInOrder (song, clips);
+    if (list.size() < 2)
+        return -1;
+    const auto origin = list.front().start;
+
+    Automation merged;
+    for (std::size_t i = 0; i < list.size(); ++i)
+    {
+        const auto& c = list[i];
+        const auto& a = song.automations[(std::size_t) c.automation];
+        const auto at = c.start - origin;
+        // FL's FUN_013009f0: a point with the last value where the next clip starts holds across a gap
+        if (i > 0 && ! merged.points.empty())
+        {
+            merged.points.back().tension = 0.0f; // the curve after a clip's last point isn't shown
+            if (list[i - 1].end() < c.start)
+                merged.points.push_back ({ at, merged.points.back().value, 0.0f });
+        }
+        const auto whole = showsWholeAutomation (c, a);
+        for (auto p : a.points)
+            if (whole || (p.tick >= c.offset && p.tick <= c.offset + c.length))
+            {
+                p.tick += at - c.offset;
+                merged.points.push_back (p);
+            }
+    }
+    return replaceWithMergedAutomation (song, clips, list, std::move (merged), links);
+}
+
+int mergeAutomationClipsLossy (Song& song, const std::vector<int>& clips, AutomationLinks links, float sensitivity)
+{
+    auto list = automationClipsInOrder (song, clips);
+    if (list.size() < 2)
+        return -1;
+    Automation merged;
+    merged.points = eventedit::toAutomationPoints (automationMergeSamples (song, clips), sensitivity);
+    cutOverlaps (list);
+    return replaceWithMergedAutomation (song, clips, std::move (list), std::move (merged), links);
 }
 
 std::string uniqueTrackName (const Song& song, const std::string& base, int except)

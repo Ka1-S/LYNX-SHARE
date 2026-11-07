@@ -96,9 +96,13 @@ bool automationLinksConflict (const Song& song, const std::vector<int>& clips);
 enum class AutomationLinks { keepFirst, mergeAll, deleteAll };
 // A new automation "<first clip's name> - merged" (made unique) holding what each clip shows, one clip of it at the
 // first clip's place; the old clips go, their automations stay (as FL's channels do). A gap between two clips holds the
-// last value. Lossy: each clip's curve is sampled instead, later clips cutting off overlapping ones (FUN_012ff0d0).
-// Returns the new clip's index, or -1 when the clips can't be merged at all.
-int mergeAutomationClips (Song& song, const std::vector<int>& clips, AutomationLinks links, bool lossy);
+// last value. Returns the new clip's index, or -1 when the clips can't be merged at all.
+int mergeAutomationClips (Song& song, const std::vector<int>& clips, AutomationLinks links);
+// Lossy (FUN_012ff0d0): each clip's curve is sampled, later clips cutting off overlapping ones; the samples then go
+// through the events-to-automation tool at `sensitivity` (eventedit::toAutomationPoints), as FL's lossy merge opens its
+// TMEEventsToAutoTool.
+PatternEvents automationMergeSamples (const Song& song, const std::vector<int>& clips);
+int mergeAutomationClipsLossy (Song& song, const std::vector<int>& clips, AutomationLinks links, float sensitivity);
 
 // --- Clone selected playlist track(s) (Ctrl+Shift+B; EEClonePLTracksAction → FUN_012edbe0 / FUN_012ee550) --------------
 

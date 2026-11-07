@@ -14,10 +14,12 @@
 #include "core/CrashReport.h"
 #include "core/FlWrapper.h"
 #include "core/LastTweaked.h"
+#include "engine/PluginHost.h"
 #include "engine/PluginSandbox.h"
 #include "engine/Text.h"
 #include "platform/CrashGuard.h"
 #include "ui/I18n.h"
+#include "ui/PluginHeader.h"
 #include "platform/Paths.h"
 #include "ui/Theme.h"
 
@@ -384,9 +386,21 @@ class WrappedEditor final : public juce::Component
 {
 public:
     WrappedEditor (juce::AudioProcessorEditor* e, AudioEngine& engine, std::function<PluginRef* (Song&)> find, juce::AudioPluginInstance& plugin,
-                   bool channel)
-        : editor (e), page (engine, std::move (find), plugin, channel), presets (plugin, [&engine] { engine.markModified(); })
+                   bool channel, int scTrack = -1, int scSlot = -1)
+        : engineRef (engine), sideTrack (scTrack), sideSlot (scSlot),
+          editor (e), page (engine, std::move (find), plugin, channel), presets (plugin, [&engine] { engine.markModified(); })
     {
+        // round 177b: a plugin with a sidechain input gets the picker in its header (the input is fed from the slot's
+        // sidechain, engine/PluginHost.h PluginEffect::setSidechain)
+        if (sideTrack >= 0 && sideSlot >= 0 && sideInputChannels (plugin) > 0)
+        {
+            addAndMakeVisible (sidechain);
+            sidechain.setTooltip (tr ("Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs"));
+            sidechain.onClick = [this] {
+                pluginheader::showSidechainPicker (engineRef, sideTrack, sideSlot, &sidechain);
+            };
+            refreshSidechain();
+        }
         addAndMakeVisible (presets); // FL's wrapper presets: ◀ ▶ and the menu (round 162d, issue #8)
         for (auto* b : { &pluginTab, &settingsTab })
         {
@@ -410,6 +424,23 @@ public:
 
     bool isEditorResizable() const { return editor != nullptr && editor->isResizable(); }
 
+    // the picker's label follows the slot's side input (the window's timer)
+    void refreshSidechain()
+    {
+        if (! sidechain.isVisible())
+            return;
+        const auto& song = engineRef.getSong();
+        juce::String source;
+        if (sideTrack < (int) song.mixer.size() && sideSlot < (int) song.mixer[(std::size_t) sideTrack].effects.size())
+            source = pluginheader::sidechainSourceText (song, song.mixer[(std::size_t) sideTrack].effects[(std::size_t) sideSlot]);
+        const auto text = tr ("SC") + ": " + (source.isNotEmpty() ? source : tr ("None")) + juce::String::fromUTF8 (" \xe2\x96\xbe");
+        if (text != sidechain.getButtonText())
+        {
+            sidechain.setButtonText (text);
+            sidechain.setToggleState (source.isNotEmpty(), juce::dontSendNotification);
+        }
+    }
+
     void paint (juce::Graphics& g) override
     {
         g.setColour (theme::colour::bg0);
@@ -424,6 +455,11 @@ public:
         header.removeFromLeft (4);
         settingsTab.setBounds (header.removeFromLeft (130));
         header.removeFromLeft (8);
+        if (sidechain.isVisible())
+        {
+            sidechain.setBounds (header.removeFromRight (juce::jmin (150, juce::jmax (0, header.getWidth() - 160))));
+            header.removeFromRight (6);
+        }
         presets.setBounds (header.removeFromLeft (juce::jmin (presets.preferredWidth(), header.getWidth())));
         page.setBounds (area);
         if (editor != nullptr && ! settings)
@@ -444,6 +480,9 @@ public:
 
 private:
     static constexpr int headerHeight = 30, minWidth = 4 + 80 + 4 + 130 + 8 + 250 + 4;
+    AudioEngine& engineRef;
+    int sideTrack = -1, sideSlot = -1;
+    juce::TextButton sidechain;
 
     void fitEditor()
     {
@@ -516,7 +555,7 @@ public:
         shownEditor = editor;
         thumbKey = plugin.getPluginDescription().createIdentifierString().toStdString();
         if (context.engine != nullptr && context.find) // FL's wrapper header and settings page (round 146a)
-            setContentOwned (new WrappedEditor (editor, *context.engine, std::move (context.find), plugin, context.channel), true);
+            setContentOwned (new WrappedEditor (editor, *context.engine, std::move (context.find), plugin, context.channel, context.track, context.slot), true);
         else
             setContentOwned (editor, true);
         setResizable (resizable, false);
@@ -600,6 +639,8 @@ private:
             pluginthumbs::captureEditor (thumbKey, *shownEditor);
         const auto mouse = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition().roundToInt();
         const auto active = isActiveWindow() || (isShowing() && getScreenBounds().contains (mouse));
+        if (auto* wrapped = dynamic_cast<WrappedEditor*> (getContentComponent()))
+            wrapped->refreshSidechain();
         if (const auto moved = changes.tick (active); moved >= 0 && PluginWindows::onGesture)
         {
             PluginWindows::onGesture (plugin, moved, true);

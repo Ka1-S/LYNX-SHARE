@@ -52,9 +52,10 @@ Lossy (`FUN_012ff0d0 (1)`): overlapping clips are cut at the next clip's start, 
 
 1. **Merge all links.** An FL clip holds several links; a LYNX `Automation` holds one target. Each other target gets its
    own clip with the same curve, on the same track. The sound is the same, but there is more than one clip.
-2. **Lossy dialog.** FL then opens its events-to-automation tool (`TMEEventsToAutoTool`, `FUN_00dfb410`), where the fit can
-   be adjusted. LYNX skips the tool and fits lines with a small fixed tolerance (FL's own non-interactive path uses
-   `FUN_01304100` at 1e-6). What the FL tool's dialog looks like at this point has not been checked in FL.
+2. **Lossy tool.** FL opens its events-to-automation tool (`TMEEventsToAutoTool`, `FUN_00dfb410`); Cancel there deletes
+   the new channel and changes nothing. LYNX opens its own "Convert to automation" panel at the same step, starting at
+   99.8 % rather than the panel's usual 100 % (a step per sample would make thousands of points). The panel isn't modal
+   here, so a later edit of those clips cancels the merge.
 3. **Legacy pattern blocks** (id `0x60000000`) take part in FL's merges. They do not in LYNX's, as with Ctrl+G since 168f.
 4. **A clip past its last point.** LYNX lets a clip run on past its automation's last point (painted clips are 4 bars).
    It only holds a value, so it counts as whole, not as a window missing its end point.

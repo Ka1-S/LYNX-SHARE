@@ -173,7 +173,7 @@ TEST (merge180c_automation_lossless_keeps_points_and_holds_gaps)
     song.playlist.push_back (merge180c::automationClip (a, 1, bar, bar));
 
     const auto before = (int) song.automations.size();
-    const auto index = pltracks::mergeAutomationClips (song, { 0, 1 }, pltracks::AutomationLinks::keepFirst, false);
+    const auto index = pltracks::mergeAutomationClips (song, { 0, 1 }, pltracks::AutomationLinks::keepFirst);
     CHECK (index >= 0);
     if (index < 0)
         return;
@@ -206,7 +206,7 @@ TEST (merge180c_automation_lossy_cuts_overlap_and_follows_the_curve)
     song.playlist.push_back (merge180c::automationClip (a, 0, 0, bar));
     song.playlist.push_back (merge180c::automationClip (b, 0, bar / 2, bar));
     CHECK ((pltracks::checkAutomationMerge (song, { 0, 1 }) == pltracks::AutomationMergeCheck::overlapping));
-    const auto index = pltracks::mergeAutomationClips (song, { 0, 1 }, pltracks::AutomationLinks::keepFirst, true);
+    const auto index = pltracks::mergeAutomationClipsLossy (song, { 0, 1 }, pltracks::AutomationLinks::keepFirst, 0.998f);
     CHECK (index >= 0);
     if (index < 0)
         return;
@@ -231,16 +231,16 @@ TEST (merge180c_automation_link_answers)
     };
 
     auto first = make();
-    pltracks::mergeAutomationClips (first, { 0, 1 }, pltracks::AutomationLinks::keepFirst, false);
+    pltracks::mergeAutomationClips (first, { 0, 1 }, pltracks::AutomationLinks::keepFirst);
     CHECK (first.playlist.size() == 1 && first.automations.back().target.index == 3);
 
     auto none = make();
-    pltracks::mergeAutomationClips (none, { 0, 1 }, pltracks::AutomationLinks::deleteAll, false);
+    pltracks::mergeAutomationClips (none, { 0, 1 }, pltracks::AutomationLinks::deleteAll);
     CHECK (none.playlist.size() == 1 && none.automations.back().target.kind == AutomationTargetKind::none);
 
     // one LYNX automation holds one target: the other target gets its own clip with the same curve
     auto all = make();
-    const auto index = pltracks::mergeAutomationClips (all, { 0, 1 }, pltracks::AutomationLinks::mergeAll, false);
+    const auto index = pltracks::mergeAutomationClips (all, { 0, 1 }, pltracks::AutomationLinks::mergeAll);
     CHECK (all.playlist.size() == 2 && all.automations.size() == 4);
     CHECK (all.automations[2].target.index == 3 && all.automations[3].target.index == 4);
     CHECK (all.automations[2].points == all.automations[3].points);
