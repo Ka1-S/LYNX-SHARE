@@ -199,6 +199,14 @@ struct Pattern
     int releaseBlocks = 30;  // then released (0.35 s)
     int editBlock = 8;       // the live / automation edit lands here (0.09 s in)
     double bpm = 120.0;
+    // round 173d2: the performance a control may need (defaults: none of it)
+    float bend = 0.0f;            // the pitch wheel (semitones) from bendBlock on
+    float channelPitch = 0.0f;    // the channel's PITCH knob (cents) from bendBlock on (FL's pitch bend of a generator)
+    int bendBlock = 12;
+    float modWheel = -1.0f;       // CC 1 (0…1) before the first note, ≥ 0 = sent
+    float releaseVelocity = -1.0f; // the note-off velocity (0…1), ≥ 0 = sent
+    bool offline = false;         // rendered as an export (setOfflineRendering: the render-quality settings)
+    int firstOffBlock = -1;       // ≥ 0: the first keys are released here, before the second ones (a gap between notes)
 };
 
 // the pattern for an engine: drum engines play their pads
@@ -228,6 +236,7 @@ struct Player
         ch.mixerTrack = 1;
         song.channels.push_back (ch);
         song.patterns.emplace_back();
+        setOfflineRendering (p.offline); // (read when the engines are prepared)
         state = RackState::build (song, nullptr, rate, samples);
     }
     Instrument* inst() const { return state != nullptr && ! state->instruments.empty() ? state->instruments[0].get() : nullptr; }
@@ -261,12 +270,26 @@ inline std::vector<float> render (const ChannelDef& c, const Pattern& p, const S
     auto* i = pl.inst();
     if (i == nullptr)
         return out;
+    if (p.modWheel >= 0.0f)
+        i->controlChange (1, p.modWheel);
     for (const auto k : p.keys)
         i->noteOn (k, p.velocity);
     for (int b = 0; b < p.heldBlocks + p.releaseBlocks; ++b)
     {
         if (b == p.editBlock && edit)
             edit (pl);
+        if (b == p.bendBlock && (p.bend != 0.0f || p.channelPitch != 0.0f))
+            if (auto* now = pl.inst())
+            {
+                if (p.bend != 0.0f)
+                    now->pitchBend (p.bend);
+                if (p.channelPitch != 0.0f)
+                    now->setChannelPitchNow (p.channelPitch, 0.0f);
+            }
+        if (b == p.firstOffBlock)
+            if (auto* now = pl.inst())
+                for (const auto k : p.keys)
+                    now->noteOff (k);
         if (b == p.secondBlock)
             if (auto* now = pl.inst())
                 for (const auto k : p.keys2)
@@ -275,10 +298,20 @@ inline std::vector<float> render (const ChannelDef& c, const Pattern& p, const S
             if (auto* now = pl.inst())
             {
                 for (const auto k : p.keys)
+                {
+                    if (p.firstOffBlock >= 0 && p.firstOffBlock < p.heldBlocks)
+                        break; // (released already)
+                    if (p.releaseVelocity >= 0.0f)
+                        now->setNextNoteRelease (p.releaseVelocity);
                     now->noteOff (k);
+                }
                 for (const auto k : p.keys2)
                     if (std::find (p.keys.begin(), p.keys.end(), k) == p.keys.end())
+                    {
+                        if (p.releaseVelocity >= 0.0f)
+                            now->setNextNoteRelease (p.releaseVelocity);
                         now->noteOff (k);
+                    }
             }
         pl.block (out);
     }

@@ -20,10 +20,10 @@ class AudioEngine;
 
 namespace lynx::pluginthumbs
 {
-// The pictures are kept at this fraction of the editor's size (pixels per logical pixel), so the picker knows each
-// editor's size from its picture alone and lays them all out at one scale, as FL does; at most maxWidth × maxHeight.
-constexpr float pictureScale = 0.45f;
-constexpr int maxWidth = 900, maxHeight = 700;
+// FL's picture budget (its Plugin database bitmaps, round 175b): half the editor's size, at most 258 × 128 pixels, kept
+// as "192 dpi" pictures that the picker shows at half their size on a 100 % display (a quarter of the editor).
+constexpr float pictureScale = 0.5f;
+constexpr int maxWidth = 258, maxHeight = 128;
 
 // <cache>/plugin-thumbs/<LYNX version>: the pictures of LYNX's own plugins (redrawn by each version: the art changes)
 juce::File nativeFolder();

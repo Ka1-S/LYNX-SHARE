@@ -229,6 +229,7 @@ AudioEngine::AudioEngine (bool openAudioDevice)
     : workers (std::make_unique<WorkerPool> (workerCount(), raiseAudioThreadPriority)),
       song (Song::makeDefault())
 {
+    boostDeviceThread = juce::SystemStats::getEnvironmentVariable ("LYNX_DEVICE_BOOST", {}) != "0";
     inputSlot.fill (-1);
     outputSlot.fill (-1);
     // VFX Script (round 165d): the audio thread waits a bounded time for the Python thread (exports wait for it)
@@ -1079,6 +1080,14 @@ double AudioEngine::songPlayheadTicks() const noexcept
     if (song.hasLoop() || liveInput.linearSong.load (std::memory_order_relaxed))
         return tick;
     return std::fmod (tick, (double) juce::jmax<std::int64_t> (1, song.songLength()));
+}
+
+double AudioEngine::playheadAdvanceTicks() const noexcept
+{
+    if (! transport.playing.load (std::memory_order_relaxed) || ! clockRunning.load (std::memory_order_relaxed))
+        return 0.0;
+    const auto since = juce::Time::getMillisecondCounterHiRes() - blockTimeMs.load (std::memory_order_acquire);
+    return juce::jlimit (0.0, juce::jmax (0.0, blockDurationMs.load (std::memory_order_relaxed)), since) * clockTicksPerMs.load (std::memory_order_relaxed);
 }
 
 LiveClock AudioEngine::liveClock() const noexcept
@@ -3094,7 +3103,9 @@ void AudioEngine::keepRunningPlugins (PreparedFlp& prepared)
 const AutomationDisplay& AudioEngine::getAutomationDisplay()
 {
     const auto now = juce::Time::getMillisecondCounterHiRes();
-    if (now - automationDisplayAtMs >= 12.0) // (editors ask from their own timers: once per frame is enough)
+    // (editors ask from their own frames: once per display frame is enough; round 174e: 5 ms, i.e. every frame at 144
+    // Hz, unless a big project's automation takes long to evaluate, then 12 ms as before)
+    if (now - automationDisplayAtMs >= (automationDisplayCostMs > 0.5 ? 12.0 : 5.0))
     {
         automationDisplayAtMs = now;
         const auto playing = transport.playing.load (std::memory_order_relaxed);
@@ -4015,6 +4026,12 @@ juce::String AudioEngine::describeRealtime (bool withUnits) const
        #if JUCE_LINUX
         text << "  audio thread: " << (rt::status() == rt::Status::unknown ? juce::String ("not seen yet") : rt::describe()) << "\n";
        #endif
+       #if JUCE_WINDOWS
+        if (const auto before = deviceThreadPriorityBefore.load (std::memory_order_relaxed); before > -100)
+            text << "  device thread priority " << before << (deviceThreadPriorityAfter.load (std::memory_order_relaxed) != before
+                                                                ? " -> " + juce::String (deviceThreadPriorityAfter.load (std::memory_order_relaxed)) + " (raised to MMCSS Pro Audio)"
+                                                                : juce::String (boostDeviceThread ? " (kept)" : " (kept: LYNX_DEVICE_BOOST=0)")) << "\n";
+       #endif
     }
     else
         text << "  device: none\n";
@@ -4189,6 +4206,20 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
     // hosted plugins' graph nodes around it ran without
     const ScopedFlushDenormals noDenormals;
     rt::noteAudioThread(); // Linux: the message thread asks for real-time priority for this thread once
+   #if JUCE_WINDOWS
+    // round 174e: a new device thread (first callback, a device restart) gets the workers' real-time class unless the
+    // driver already runs it time-critical: the callback waits on the workers, and a normal-priority callback thread
+    // lost the CPU to the UI's frames (more late calls while the screen was busy)
+    if (const auto id = (unsigned long) GetCurrentThreadId(); id != deviceThreadId.load (std::memory_order_relaxed))
+    {
+        deviceThreadId.store (id, std::memory_order_relaxed);
+        const auto before = GetThreadPriority (GetCurrentThread());
+        deviceThreadPriorityBefore.store (before, std::memory_order_relaxed);
+        if (boostDeviceThread && before < THREAD_PRIORITY_TIME_CRITICAL)
+            raiseAudioThreadPriority();
+        deviceThreadPriorityAfter.store (GetThreadPriority (GetCurrentThread()), std::memory_order_relaxed);
+    }
+   #endif
     // real-time health: how long this callback took against its deadline (the buffer's duration)
     const auto callbackStart = juce::Time::getMillisecondCounterHiRes();
     struct Measure
@@ -4503,6 +4534,8 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         clockTicksPerMs.store (tps * transport.sampleRate.load (std::memory_order_relaxed) * 0.001, std::memory_order_relaxed);
         clockRunning.store (nowPlaying || counting, std::memory_order_relaxed);
     }
+    if (const auto rate = transport.sampleRate.load (std::memory_order_relaxed); rate > 0.0)
+        blockDurationMs.store (1000.0 * numSamples / rate, std::memory_order_relaxed);
     blockTimeMs.store (juce::Time::getMillisecondCounterHiRes(), std::memory_order_release);
 }
 

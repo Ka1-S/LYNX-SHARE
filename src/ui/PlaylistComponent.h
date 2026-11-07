@@ -11,6 +11,7 @@
 #include "core/PickerSelection.h"
 #include "engine/AudioEngine.h"
 #include "ui/EditorTools.h"
+#include "ui/FrameTicker.h"
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
 
@@ -48,7 +49,6 @@ class PlaylistComponent final : public juce::Component,
                                 public juce::DragAndDropTarget,
                                 public ui::HintSource,
                                 private juce::ChangeListener,
-                                private juce::Timer,
                                 private juce::ScrollBar::Listener
 {
 public:
@@ -181,7 +181,36 @@ private:
     bool showClipProgress = true, showTrackProgress = true; // FL's View › Performance clip / track progress
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
-    void timerCallback() override;
+    // the playhead and Performance mode's live clips, at the display's refresh (round 174e; was a 30 Hz timer)
+    bool liveFrame (double nowMs);
+    double perfRepaintMs = 0.0;
+    // The view kept as an image, the playhead drawn over it (round 174e): a playhead frame only blits its column of the
+    // image and draws the line, instead of painting the lanes, clips and waveforms under it again 144 times a second.
+    // Any other repaint (an edit, a scroll, a child) refreshes its area of the image. LYNX_PLAYLIST_CACHE=0: off.
+    class PlayheadCache;
+    bool playheadOverlay = false;      // the cache is on: the playhead's own repaints keep its image
+    bool playheadRepaintOnly = false;  // set around the playhead's own repaints: the image stays valid
+    bool cachePainting = false;        // paint() is filling the image: no playhead in it
+    bool scrollRepaintOnly = false;    // set around a scroll's repaint: the cache shifts its picture (round 174e2)
+    struct CacheView
+    {
+        double scrollTicks = -1.0;
+        int scrollY = -1;
+        double pixelsPerTick = 0.0;
+        int tracksHeight = 0, tracks = 0;
+        bool overlays = false; // the Ripple / Performance tags in the grid's corner (they do not scroll)
+        int width = 0, height = 0;
+        bool operator== (const CacheView&) const = default;
+    };
+    struct CacheShift
+    {
+        juce::Rectangle<int> area, alsoChanged;
+        int dx = 0, dy = 0;
+    };
+    CacheView cacheView() const;
+    CacheShift cacheShift (const CacheView& from, const CacheView& to, float scale) const;
+    void repaintScrolled();
+    void paintPlayhead (juce::Graphics& g);
     void scrollBarMoved (juce::ScrollBar*, double) override;
 
     juce::Rectangle<int> gridArea() const;
@@ -392,6 +421,7 @@ private:
     void glideBy (double ticks, double pixels, bool immediate = false);
     void glideFrame();
     juce::VBlankAttachment vblank { this, [this] { glideFrame(); } };
+    ui::FrameTicker frames { *this, [this] (double ms) { return liveFrame (ms); } };
 
     void zoomAroundCentre (double factor);
     void zoomToBars (int bars);

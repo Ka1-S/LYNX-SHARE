@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdlib>
 #include <string>
 #include <vector>
@@ -158,94 +159,169 @@ inline int stepWrapping (const std::vector<char>& usable, int at, int delta)
     return k;
 }
 
-// The tiles: one cell box for every plugin (a fixed 16:10 shape; its picture is fitted inside, letterboxed), in a
-// grid per half. `split` finds the largest cell width (in [minW, maxW]) at which both halves fit `height`, giving
-// each half as many columns as it needs (the generators fewer than the effects), so neither leaves a big empty zone.
-struct Box
+// --- round 175b: FL's own packing (TPlugListForm, docs/analise/REA_rodada175b.md) ------------------------------------
+//
+// FL lays each half out as rows of tiles at their pictures' own sizes (FUN_00ec0510, row finisher FUN_00ec0180):
+//  * a tile is its picture + 2 px; tiles go left to right with an 8 px gap; a tile that would pass the right edge starts
+//    a new row;
+//  * a row is as tall as its tallest tile, every tile centred on it;
+//  * a finished row is spread over the whole width (the spare room shared between its gaps), except: a row with a single
+//    tile — the only row: centred; a generator: pushed to the right edge (FL's quirk); else at the left — and when the
+//    only row has room to spare, its gaps are at most 32 px and the row is centred;
+//  * the rows are stacked with min(16, spare / gaps) between them (negative when they don't fit: they overlap, FL never
+//    scrolls), the block centred in the box.
+struct PackTile
 {
-    int x = 0, y = 0, w = 0, h = 0;
+    int w = 0, h = 0;       // the picture (the tile is 2 px bigger)
+    bool shown = true;      // in the shown tab
+    bool generator = false; // (the single-tile row quirk)
 };
 
-struct Grid
+struct Packed
 {
-    int cellW = 0, cellH = 0;
-    int leftCols = 0, rightCols = 0;
-    bool fits = true; // false: the smallest cells, the view scrolls
+    int x = 0, y = 0, w = 0, h = 0; // the tile (picture + 2), top-left; empty when not shown
+    int row = -1, rowHeight = 0;
+    bool shown = false;
 };
 
-inline int gridRows (int n, int cols) { return n <= 0 || cols <= 0 ? 0 : (n + cols - 1) / cols; }
-
-inline int gridHeight (int n, int cols, int cellH, int gap)
+struct PackBox
 {
-    const auto rows = gridRows (n, cols);
-    return rows == 0 ? 0 : rows * cellH + (rows - 1) * gap;
-}
+    int left = 0, top = 0, right = 0, bottom = 0;
+};
 
-inline int gridWidth (int cols, int cellW, int gap) { return cols <= 0 ? 0 : cols * cellW + (cols - 1) * gap; }
-
-// `right` = 0: one grid (a category tab); else two, `separation` apart
-inline Grid split (int left, int right, int width, int height, int gap, int separation, double aspect, int minW, int maxW)
+struct PackResult
 {
-    Grid best;
-    auto tryWidth = [&] (int w, bool needFit) -> bool {
-        const auto h = std::max (1, (int) (w / aspect + 0.5));
-        const auto room = right > 0 ? width - separation : width;
-        const auto total = (room + gap) / (w + gap) - (right > 0 ? 1 : 0); // (two grids: one gap fewer)
-        if (total < (left > 0 ? 1 : 0) + (right > 0 ? 1 : 0))
-            return false;
-        int bestL = -1, bestHeight = 1 << 30;
-        if (right <= 0)
-        {
-            bestL = std::min (total, std::max (1, left));
-            bestHeight = gridHeight (left, bestL, h, gap);
-        }
-        else
-            for (int l = left > 0 ? 1 : 0; l <= total - 1; ++l)
+    std::vector<Packed> tiles;
+    int rows = 0;      // rows used
+    int reach = 0;     // max (tile bottom + 2 × its row height): where FL's tab strip may go (TPlugListForm +0x804)
+};
+
+inline int roundFl (double v) { return (int) std::nearbyint (v); } // (Delphi's Round: halves to even)
+
+inline PackResult packRows (const std::vector<PackTile>& in, PackBox box, int gap = 8, int rowGapMax = 16, int spreadMax = 32)
+{
+    PackResult out;
+    out.tiles.resize (in.size());
+    std::vector<double> cx (in.size()), cy (in.size());
+    int x = box.left, rowTop = 0, row = 0, total = 0;
+    std::vector<int> rowItems; // the current row's tiles, hidden ones too
+
+    auto finish = [&] (bool last) -> int {
+        int rowH = 0, n = 0;
+        for (const auto i : rowItems)
+            if (in[(std::size_t) i].shown)
             {
-                const auto hh = std::max (gridHeight (left, l, h, gap), gridHeight (right, total - l, h, gap));
-                if (hh < bestHeight)
-                {
-                    bestHeight = hh;
-                    bestL = l;
-                }
+                rowH = std::max (rowH, out.tiles[(std::size_t) i].h);
+                ++n;
             }
-        if (bestL < 0 || (needFit && bestHeight > height))
-            return false;
-        best = { w, h, bestL, right > 0 ? total - bestL : 0, bestHeight <= height };
-        return true;
+        for (const auto i : rowItems)
+            if (in[(std::size_t) i].shown)
+            {
+                auto& t = out.tiles[(std::size_t) i];
+                cy[(std::size_t) i] = roundFl (rowTop + rowH * 0.5);
+                total = std::max (total, roundFl (cy[(std::size_t) i] + t.h * 0.5));
+                t.rowHeight = rowH;
+            }
+        if (n > 0)
+        {
+            double dx = (double) (box.right - (x - gap)) / (double) std::max (1, n - 1);
+            double start = box.left;
+            if (n == 1)
+            {
+                if (last && row == 0)
+                    start += dx * 0.5;
+                else if (! rowItems.empty() && in[(std::size_t) rowItems.back()].generator)
+                    start += dx;
+            }
+            else if (last && row == 0 && dx > spreadMax)
+            {
+                start += (n - 1) * (dx - spreadMax) * 0.5;
+                dx = spreadMax;
+            }
+            for (const auto i : rowItems)
+                if (in[(std::size_t) i].shown)
+                {
+                    const auto w = out.tiles[(std::size_t) i].w;
+                    const auto l = roundFl (start);
+                    cx[(std::size_t) i] = roundFl ((l + l + w) * 0.5);
+                    start += w + gap + dx;
+                }
+        }
+        return rowH;
     };
-    for (int w = maxW; w >= minW; --w)
-        if (tryWidth (w, true))
-            return best;
-    if (! tryWidth (minW, false))
-        best = { minW, std::max (1, (int) (minW / aspect + 0.5)), std::max (0, std::min (left, 1)), right > 0 ? 1 : 0, false };
-    return best;
-}
 
-// the cells of `n` tiles in `cols` columns, rows left to right, the last row centred
-inline std::vector<Box> gridCells (int n, int cols, int cellW, int cellH, int gap)
-{
-    std::vector<Box> out;
-    if (cols <= 0)
-        return out;
-    const auto full = gridWidth (cols, cellW, gap);
-    for (int i = 0; i < n; ++i)
+    for (int i = 0; i < (int) in.size(); ++i)
     {
-        const auto row = i / cols, col = i % cols;
-        const auto inRow = std::min (cols, n - row * cols);
-        const auto offset = (full - gridWidth (inRow, cellW, gap)) / 2;
-        out.push_back ({ offset + col * (cellW + gap), row * (cellH + gap), cellW, cellH });
+        auto& t = out.tiles[(std::size_t) i];
+        if (in[(std::size_t) i].shown)
+        {
+            t.w = in[(std::size_t) i].w + 2;
+            t.h = in[(std::size_t) i].h + 2;
+            if (box.right < x + t.w)
+            {
+                rowTop += finish (false);
+                rowItems.clear();
+                x = box.left;
+                ++row;
+            }
+            t.row = row;
+            t.shown = true;
+            x += t.w + gap;
+        }
+        rowItems.push_back (i);
     }
+    finish (true);
+
+    auto spare = (box.bottom - box.top) - total;
+    int rowGap = 0;
+    if (row > 0)
+    {
+        rowGap = std::min (rowGapMax, spare / row);
+        spare -= rowGap * row;
+    }
+    const auto y0 = box.top + spare / 2;
+    for (std::size_t i = 0; i < in.size(); ++i)
+    {
+        auto& t = out.tiles[i];
+        if (! t.shown)
+            continue;
+        const auto centreX = (int) cx[i], centreY = roundFl (cy[i] + y0 + t.row * rowGap);
+        t.x = centreX - t.w / 2;
+        t.y = centreY - t.h / 2;
+        out.reach = std::max (out.reach, t.y + t.h + t.rowHeight * 2);
+    }
+    out.rows = row + 1;
     return out;
 }
 
-// a picture of `w` × `h` fitted inside a cell, centred, its shape kept (never stretched or bigger than the cell)
-inline Box fitInside (Box cell, int w, int h)
+// The tab labels of one half (FL's FUN_00ec3e10): the largest font from 19 down to 12 (× the UI scale) at which the
+// labels, each with 2 × the size around it, fit in `room` (the half's width; the whole width with one half).
+// `textWidth (size)` = the labels' summed text width at that size.
+template <typename WidthAt>
+int tabFontSize (WidthAt textWidth, int count, int room, double uiScale = 1.0)
 {
-    if (w <= 0 || h <= 0 || cell.w <= 0 || cell.h <= 0)
-        return cell;
-    const auto k = std::min ((double) cell.w / w, (double) cell.h / h);
-    const auto fw = std::max (1, (int) (w * k + 0.5)), fh = std::max (1, (int) (h * k + 0.5));
-    return { cell.x + (cell.w - fw) / 2, cell.y + (cell.h - fh) / 2, fw, fh };
+    auto size = roundFl (uiScale * 19.0);
+    for (; size > 12; --size)
+        if (textWidth (size) + count * size * 2 < room)
+            break;
+    return size;
+}
+
+// The tab strip's row (FL's TPlugListForm.show): just under the tiles (their reach + 80), at most the form's height;
+// the tabs' centre line is half the tallest tab + 21 above it.
+inline int tabCentreY (int reach, int formHeight, int tabHeight, double uiScale = 1.0)
+{
+    const auto base = std::min (formHeight, reach + roundFl (80.0 * uiScale));
+    return base - (tabHeight / 2 + roundFl (21.0 * uiScale));
+}
+
+// FL's picture budget for a plugin (its Plugin database bitmaps, 192 dpi): half the editor, at most 258 × 128 pixels;
+// shown at half that size on a 100 % display.
+inline std::pair<int, int> pictureSize (int editorW, int editorH, int maxW = 258, int maxH = 128)
+{
+    if (editorW <= 0 || editorH <= 0)
+        return { 0, 0 };
+    const auto k = std::min ({ 0.5, (double) maxW / editorW, (double) maxH / editorH });
+    return { std::max (1, (int) std::lround (editorW * k)), std::max (1, (int) std::lround (editorH * k)) };
 }
 } // namespace lynx::pickerview

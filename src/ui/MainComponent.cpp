@@ -1165,8 +1165,6 @@ void MainComponent::resized()
         danceStage->setBounds (getLocalBounds());
         danceStage->toFront (false);
     }
-    if (pluginPickerView != nullptr)
-        pluginPickerView->setBounds (getLocalBounds());
     if (setupOverlay != nullptr)
     {
         setupOverlay->setBounds (getLocalBounds());
@@ -1944,6 +1942,11 @@ void MainComponent::loadUiSettings()
             skin::overridesFromString (line.fromFirstOccurrenceOf ("=", false, false).trim());
         else if (key == "reducedEffects")
             skin::setReducedEffects (on);
+        else if (key == "animationRate") // round 174e2: 0 = the display's refresh, else 60 / 30
+        {
+            const auto hz = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue();
+            ui::FrameTicker::rateLimit() = hz == 30 || hz == 60 ? hz : 0;
+        }
         else if (key == "artMotion")
             skin::setArtMotion (on);
         else if (key == "waveStereo")
@@ -2108,6 +2111,7 @@ void MainComponent::saveUiSettings()
                                       + "\nrackPlayheadColumn=" + juce::String (ChannelRackComponent::playheadColumn.load() ? 1 : 0)
                                       + "\nrackStepsChannelColour=" + juce::String (ChannelRackComponent::stepsChannelColour.load() ? 1 : 0)
                                       + "\nreducedEffects=" + juce::String (skin::reducedEffects() ? 1 : 0)
+                                      + "\nanimationRate=" + juce::String (ui::FrameTicker::rateLimit())
                                       + "\nartMotion=" + juce::String (skin::artMotion() ? 1 : 0)
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
                                       + "\npluginStyleOverrides=" + skin::overridesToString()
@@ -2642,10 +2646,20 @@ void MainComponent::togglePluginPicker()
         safe->showPanel (Panel::browser);
         safe->browser.showPluginDatabase (category.empty() ? juce::String() : tr (category.c_str()), category.empty() ? -1 : (generators ? 1 : 0));
     };
+    targets.dragOwner = [safe]() -> juce::Component* { return safe.getComponent(); };
     pluginPickerView = makePluginPickerView (engine, std::move (targets));
-    addAndMakeVisible (*pluginPickerView);
-    pluginPickerView->setBounds (getLocalBounds());
+    // FL's picker form covers the work area of the main window's monitor, whatever the main window's size (round 175b:
+    // FL at 1280 × 720 in a 1920 screen still opens it over the whole screen), and lets the screen show through
+    const auto* top = getTopLevelComponent();
+    const auto& displays = juce::Desktop::getInstance().getDisplays();
+    const auto* display = displays.getDisplayForRect (top != nullptr ? top->getScreenBounds() : getScreenBounds());
+    const auto area = display != nullptr ? display->userArea : getScreenBounds();
+    takePluginPickerBackdrop (*pluginPickerView, area);
+    pluginPickerView->setBounds (area);
+    pluginPickerView->addToDesktop (0); // (no frame, not on the taskbar)
+    pluginPickerView->setVisible (true);
     pluginPickerView->toFront (true);
+    pluginPickerView->grabKeyboardFocus();
 }
 
 void MainComponent::showQuickAdd()
@@ -3977,14 +3991,19 @@ void MainComponent::applyStepEdit()
     }
 }
 
+bool MainComponent::toolbarFrame (double nowMs)
+{
+    const auto moved = output.update (nowMs);
+    timeDisplay.update();
+    songPosition.update();
+    return moved || engine.getTransport().playing.load (std::memory_order_relaxed);
+}
+
 void MainComponent::timerCallback()
 {
     const uitrace::Scope trace ("MainComponent timer", false);
     {
         const uitrace::Scope part ("timer: toolbar displays", false);
-        output.update();
-        timeDisplay.update();
-        songPosition.update();
         masterVolume.update();
         masterPitch.update();
         updateRecordQuantise();
@@ -4043,6 +4062,31 @@ void MainComponent::timerCallback()
             tr ("The plugin \"{0}\" crashed and was switched off, so LYNX SHARE and your project kept running (the effect is bypassed, an "
                 "instrument stays silent). Save your project; the plugin loads again the next time you open it.",
                 { names[names.size() - 1] }));
+    }
+
+    // round 176a: a plugin in a separate process (Make bridged, or a 32-bit plugin in the 32-bit bridge) crashed or hung:
+    // only that process went; the plugin is muted. Round 174a's prompt, logged like the other plugin crashes.
+    if (const auto deaths = pluginSandboxDeathCount(); deaths != sandboxDeathsSeen)
+    {
+        sandboxDeathsSeen = deaths;
+        const auto all = pluginSandboxDeaths();
+        if (! all.empty())
+        {
+            const auto& d = all.back();
+            PluginHost::settingsFolder().getChildFile ("plugin-crashes.log").appendText (
+                juce::Time::getCurrentTime().toISO8601 (true) + "  " + d.plugin + "  " + (d.crashed ? "crashed" : "stopped responding")
+                + (d.bits32 ? " (32-bit bridge)" : " (separate process)") + "\n");
+            announceSeparateProcessCrash (d.plugin, d.crashed, d.bits32);
+        }
+    }
+
+    // issue #32 (round 174a): a plugin's own editor window faulted; LYNX closed that editor and kept running
+    if (const auto crashes = PluginWindows::editorCrashCount(); crashes != editorCrashesSeen)
+    {
+        editorCrashesSeen = crashes;
+        const auto all = PluginWindows::editorCrashes();
+        if (! all.empty())
+            announceEditorCrash (all.back().plugin);
     }
 
     auto& transport = engine.getTransport();
@@ -4842,6 +4886,64 @@ void MainComponent::startNewProject (Song song, const juce::File& file)
     updateTitle();
 }
 
+// The user's choice after a plugin's editor crashed (issue #32): save under a new name now, and/or run that plugin in a
+// separate process from now on (like Processing › "Always run … in a separate process": persisted, applied at once)
+void MainComponent::announceEditorCrash (const juce::String& plugin)
+{
+    const auto offerSeparate = ! pluginSandboxEnabled() && ! pluginAlwaysSeparate (plugin) && plugin != "?";
+    auto options = juce::MessageBoxOptions()
+                       .withIconType (juce::MessageBoxIconType::WarningIcon)
+                       .withTitle (tr ("Plugin crashed"))
+                       .withMessage (tr ("{0} crashed. Save your project now (as a new file is safest).", { plugin }) + "\n\n"
+                                     + tr ("Its window was closed so that LYNX SHARE could keep running. The plugin may not work "
+                                           "properly until the project is opened again."))
+                       .withButton (tr ("Save as..."));
+    if (offerSeparate)
+        options = options.withButton (tr ("Always run {0} in a separate process", { plugin }));
+    options = options.withButton (tr ("Close"));
+    juce::AlertWindow::showAsync (options, [safe = juce::Component::SafePointer<MainComponent> (this), plugin, offerSeparate] (int result) {
+        if (safe == nullptr)
+            return;
+        if (result == 1)
+            safe->save (true);
+        else if (result == 2 && offerSeparate)
+        {
+            safe->engine.capturePluginStates(); // the new instances start from the current settings
+            setPluginAlwaysSeparate (plugin, true);
+            const auto name = plugin.toStdString();
+            safe->engine.editSong ([name] (Song& song) {
+                for (auto& c : song.channels)
+                    if (c.instrument == InstrumentKind::plugin && c.plugin.name == name)
+                        c.plugin.separateProcess = true;
+                for (auto& track : song.mixer)
+                    for (auto& fx : track.effects)
+                        if (fx.kind == EffectKind::plugin && fx.plugin.name == name)
+                            fx.plugin.separateProcess = true;
+            });
+        }
+    });
+}
+
+// Round 176a: round 174a's "Plugin crashed" prompt for a plugin whose separate process died. LYNX itself is unharmed
+// (the plugin ran in its own process), so it offers the save and says how to get the plugin back.
+void MainComponent::announceSeparateProcessCrash (const juce::String& plugin, bool crashed, bool bits32)
+{
+    const auto name = plugin.isNotEmpty() ? plugin : tr ("A plugin");
+    const auto where = bits32 ? tr ("{0} crashed in the 32-bit bridge.", { name }) : tr ("{0} crashed in its separate process.", { name });
+    auto options = juce::MessageBoxOptions()
+                       .withIconType (juce::MessageBoxIconType::WarningIcon)
+                       .withTitle (tr ("Plugin crashed"))
+                       .withMessage ((crashed ? where : tr ("{0} stopped responding (separate process).", { name })) + "\n\n"
+                                     + tr ("Only its process was affected: LYNX SHARE and your project kept running, and the plugin "
+                                           "was muted. Save your project; the plugin loads again the next time you open it."))
+                       .withButton (tr ("Save as..."))
+                       .withButton (tr ("Close"));
+    juce::AlertWindow::showAsync (options, [safe = juce::Component::SafePointer<MainComponent> (this)] (int result) {
+        if (safe != nullptr && result == 1)
+            safe->save (true);
+    });
+}
+
 void MainComponent::saveAsTemplate()
 {
     auto* w = new juce::AlertWindow (tr ("Save as template"), tr ("The template appears in File › New project... (saved in {0})", { userTemplatesFolder().getFullPathName() }),
@@ -5044,6 +5146,7 @@ void MainComponent::openSettings (int page)
         o.rackPlayheadColumn = ChannelRackComponent::playheadColumn.load();
         o.rackStepsChannelColour = ChannelRackComponent::stepsChannelColour.load();
         o.reducedEffects = skin::reducedEffects();
+        o.animationRate = ui::FrameTicker::rateLimit();
         o.artMotion = skin::artMotion();
         o.gpuRendering = gpuRenderingEnabled();
         o.pluginStyle = skin::forcedStyle();
@@ -5080,6 +5183,7 @@ void MainComponent::openSettings (int page)
             self.setToolbarLayout (layout, true);
         }
         theme::menus::setCompact (o.compactMenus);
+        ui::FrameTicker::rateLimit() = o.animationRate; // (the tickers read it every frame)
         if (o.reducedEffects != skin::reducedEffects() || o.pluginStyle != skin::forcedStyle() || o.artMotion != skin::artMotion())
         {
             skin::setArtMotion (o.artMotion);

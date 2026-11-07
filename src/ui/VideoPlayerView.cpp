@@ -685,6 +685,14 @@ class VideoPlayerEditor final : public juce::Component,
                                 private juce::ChangeListener
 {
 public:
+    // a picture on the screen in place of a video (the Plugin picker's thumbnail, round 175b)
+    void showStill (const juce::Image& still)
+    {
+        surface.image = still;
+        locateButton.setVisible (false);
+        surface.repaint();
+    }
+
     VideoPlayerEditor (AudioEngine& e, std::function<ChannelDef* (Song&)> l, int c) : engine (e), locate (std::move (l)), channel (c)
     {
         setWantsKeyboardFocus (true);
@@ -1366,6 +1374,17 @@ juce::String report (const juce::String& path)
 std::unique_ptr<juce::Component> makeVideoPlayerEditor (AudioEngine& engine, std::function<ChannelDef* (Song&)> locate, int channel)
 {
     return std::make_unique<VideoPlayerEditor> (engine, std::move (locate), channel);
+}
+
+void showVideoStill (juce::Component& root, const juce::Image& still)
+{
+    if (auto* editor = dynamic_cast<VideoPlayerEditor*> (&root))
+    {
+        editor->showStill (still);
+        return;
+    }
+    for (auto* child : root.getChildren())
+        showVideoStill (*child, still);
 }
 
 std::unique_ptr<juce::Component> makeVideoPlayerEditor (AudioEngine& engine, int channel)

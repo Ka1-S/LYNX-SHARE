@@ -169,6 +169,6 @@ TEST (flui115_mixer_insert_one_and_delete)
     CHECK (lynx::mixerops::deleteTrack (song, 3) && song.mixer.size() == 6); // "bass" goes, a blank takes the end
     CHECK (song.channels[0].mixerTrack == 0 && song.channels[1].mixerTrack == 3);
     CHECK (song.mixer[3].name == "Insert 3" && song.mixer[5].name == "Insert 5" && song.mixer[5].effects.empty());
-    CHECK (song.mixer[4].effects.size() == 1 && song.mixer[4].effects[0].sidechain == 0);
+    CHECK (song.mixer[4].effects.size() == 1 && song.mixer[4].effects[0].sidechain == -1); // (round 177a: none, not the Master)
     CHECK (! lynx::mixerops::deleteTrack (song, 0) && ! lynx::mixerops::deleteTrack (song, 6));
 }

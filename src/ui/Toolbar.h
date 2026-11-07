@@ -171,7 +171,9 @@ class OutputMonitor final : public juce::Component,
 {
 public:
     explicit OutputMonitor (AudioEngine& e) : engine (e) {}
-    void update();
+    // one display frame (round 174e: at the display's refresh; the falloffs and the long view's scroll go by time, as
+    // they did at 30 Hz). Returns true while the display moves (false once a silent output has fallen to zero).
+    bool update (double nowMs);
     void paint (juce::Graphics& g) override;
     ui::Hint hintAt (juce::Point<int> position) override;
     void mouseDown (const juce::MouseEvent& e) override;
@@ -192,11 +194,13 @@ private:
     void setMode (int newMode);
     AudioEngine& engine;
     std::array<float, 1024> samples {};
-    std::array<float, 256> history {};     // long view: one peak per update, oldest first
+    juce::Image scopeImage, scopeNative; // the oscilloscope's stroke, drawn in software, and its copy for the window (round 174e2)
+    std::array<float, 256> history {};     // long view: one peak per 1/30 s, oldest first
     std::array<float, 128> bands {};       // spectrum: smoothed level per band, 0..1
     float peak = 0.0f, held = 0.0f;
-    int holdFrames = 0, clipFrames = 0;
-    int silentFrames = 0; // updates in a row with a silent output: once everything has decayed, no more repaints
+    float column = 0.0f;                   // the long view's next column: the loudest frame since the last one
+    double holdMs = 0.0, clipMs = 0.0, columnMs = 0.0, lastMs = 0.0;
+    double silentMs = 0.0; // how long the output has been silent: once everything has decayed, no more repaints
 };
 
 // "Customize toolbar": the groups in toolbar order, each with a check box (shown / hidden), Move up / Move

@@ -149,6 +149,7 @@ double driveInputDb (float v) noexcept;  // -24 .. +24 dB
 double driveTrimDb (float v) noexcept;   // -24 .. +24 dB
 // the drive stage's static curve (no tone, no oversampling) at the current settings: output for one input sample
 double driveCurve (const EffectParams& p, double x) noexcept;
+std::unique_ptr<Effect> makeKiln(); // round tp172c7: Kiln Channel (its console models are the DRIVE section's)
 // round 147b: the auto make-up (dB) for Ridge's own compressor: the console's for the same threshold (dBFS + 18 = the
 // console's dBu scale) and ratio; 0 with the compressor off
 double autoMakeupDb (const EffectParams& p) noexcept;
@@ -294,6 +295,25 @@ double airDb (float v) noexcept;       // 0 .. +15 dB
 double airHz (float v) noexcept;       // 5 .. 20 kHz
 double exciterHz (float v) noexcept;   // 1 .. 12 kHz
 } // namespace aether
+
+// ---- Kiln Channel (round tp172c7: one console channel on the DRIVE section's console models) ----
+namespace kiln
+{
+// Input / Output ±18 dB around the console, Console = six steps (British E, British G, American A, British N, Y, Tube =
+// the drive models Console E .. Tube), Drive 0 .. 18 dB, the console's noise while Noise reduction is off, Group 0
+// (none) .. 8 with a Group bypass shared by the group, Main in / out ±24 dB around everything. Link I/O (the output
+// follows the input inversely) and Group I/O (the trims move with the group's) are the editor's: no DSP of their own
+enum Param { input, output, console, drive, noiseReduction, group, groupBypass, mainIn, mainOut, ioLink, ioGroup, count };
+double trimDb (float v) noexcept;
+double mainDb (float v) noexcept;
+double driveDb (float v) noexcept;
+int consoleStep (float v) noexcept;   // 0 .. 5
+float consoleValue (int step) noexcept;
+int groupOf (float v) noexcept;       // 0 = none, 1 .. 8
+const char* consoleName (int step) noexcept;
+// The edits one control change makes on this channel (Link I/O: an input change moves the output the other way)
+std::vector<std::pair<int, float>> linkedEdit (const EffectParams& p, int param, float value);
+} // namespace kiln
 
 // ---- Ember (saturator) ----
 namespace ember
@@ -490,6 +510,7 @@ const EffectInfo& glowInfo();
 const EffectInfo& hushInfo();
 const EffectInfo& aetherInfo();
 const EffectInfo& emberInfo();
+const EffectInfo& kilnInfo();
 
 std::string paramText (EffectKind kind, int param, float v);
 std::unique_ptr<Effect> make (EffectKind kind);

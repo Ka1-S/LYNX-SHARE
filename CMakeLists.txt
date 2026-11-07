@@ -383,6 +383,8 @@ if(LYNX_BUILD_APP)
         src/engine/PluginHost.cpp
         src/engine/FlStudio.cpp
         src/engine/PluginSandbox.cpp
+        src/engine/SandboxWorker.cpp
+        src/engine/Bridge32Test.cpp
         src/engine/Exporter.cpp
         src/engine/FlStudioExport.cpp
         src/engine/StreamPrefetcher.cpp

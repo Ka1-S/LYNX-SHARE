@@ -5,6 +5,7 @@
 #include "core/TrackIcons.h"
 #include "ui/ClipProperties.h"
 #include "ui/UiTrace.h"
+#include "ui/ImageReadback.h"
 #include "ui/TextCache.h"
 #include "ui/PlaylistComponent.h"
 #include "ui/PatternBlocksView.h"
@@ -223,6 +224,193 @@ struct PlaylistComponent::SmallClips
     }
 };
 
+// The Playlist's image cache (round 174e): JUCE's buffered-to-image cache, plus the playhead drawn over the image and
+// the playhead's own repaints leaving the image valid
+class PlaylistComponent::PlayheadCache final : public juce::CachedComponentImage
+{
+public:
+    explicit PlayheadCache (PlaylistComponent& o) : owner (o) {}
+
+    void paint (juce::Graphics& g) override
+    {
+        const auto scale = g.getInternalContext().getPhysicalPixelScaleFactor();
+        const auto bounds = owner.getLocalBounds();
+        const auto imageBounds = bounds * scale;
+        const auto nowMs = juce::Time::getMillisecondCounterHiRes();
+        const auto clip = g.getClipBounds();
+
+        if (image.isNull() || image.getBounds() != imageBounds)
+        {
+            image = juce::Image (juce::Image::RGB, juce::jmax (1, imageBounds.getWidth()), juce::jmax (1, imageBounds.getHeight()), false);
+            spare = {};
+            valid.clear();
+        }
+
+        // the view moved since the picture was drawn. A scroll by whole pixels (round 174e2): the picture is shifted
+        // and only the columns / rows it uncovered are painted (FL scrolls at ~120 fps). A zoom, a track resize, a
+        // fractional scroll: everything is painted again.
+        const auto view = owner.cacheView();
+        CacheShift shift;
+        if (view != drawnView)
+        {
+            shift = owner.cacheShift (drawnView, view, scale);
+            if (shift.area.isEmpty())
+                valid.clear();
+        }
+        auto validNow = valid;
+        if (! shift.area.isEmpty())
+        {
+            juce::RectangleList<int> moved;
+            for (const auto& r : valid)
+                if (const auto in = r.getIntersection (shift.area); ! in.isEmpty())
+                    moved.addWithoutMerging (in.translated (shift.dx, shift.dy).getIntersection (shift.area));
+            validNow.subtract (shift.area);
+            validNow.subtract (shift.alsoChanged);
+            validNow.add (moved);
+        }
+
+        // a repaint of (almost) everything (a zoom, an edit): painted straight to the window (through the picture it costs
+        // a render and a full blit); the picture is rebuilt once the view has been still for a moment, by the next
+        // playhead frame. Not a scroll: it goes through the picture, so the next frame can shift it (painted straight,
+        // every scroll frame found the picture gone and painted everything again)
+        auto invalid = juce::RectangleList<int> (bounds);
+        invalid.subtract (validNow);
+        const auto half = 0.5 * bounds.getWidth() * bounds.getHeight();
+        if ((double) clip.getWidth() * clip.getHeight() > half && area (invalid) > half)
+            lastLargeMs = nowMs;
+        if (nowMs - lastLargeMs < 300.0 && shift.area.isEmpty() && ! validNow.containsRectangle (clip))
+        {
+            if (view != drawnView)
+            {
+                valid.clear(); // (the picture is of another view now; later invalidations are in this one's coordinates)
+                drawnView = view;
+            }
+            owner.paintEntireComponent (g, false);
+            return;
+        }
+
+        const auto shifting = ! shift.area.isEmpty();
+        if (shifting || ! invalid.isEmpty())
+        {
+            if (shifting && (spare.isNull() || spare.getBounds() != image.getBounds()))
+                spare = juce::Image (juce::Image::RGB, image.getWidth(), image.getHeight(), false);
+            auto& target = shifting ? spare : image;
+            const ui::ScopedNoImageReadback noReadback; // (the picture is only ever drawn to the window)
+            juce::Graphics imageGraphics (target);
+            if (shifting)
+            {
+                const auto physical = (shift.area.toFloat() * scale).getSmallestIntegerContainer();
+                {
+                    const juce::Graphics::ScopedSaveState state (imageGraphics);
+                    imageGraphics.excludeClipRegion (physical);
+                    imageGraphics.drawImageAt (image, 0, 0);
+                }
+                const juce::Graphics::ScopedSaveState state (imageGraphics);
+                if (imageGraphics.reduceClipRegion (physical))
+                    imageGraphics.drawImageAt (image, juce::roundToInt ((float) shift.dx * scale), juce::roundToInt ((float) shift.dy * scale));
+            }
+            if (! invalid.isEmpty())
+            {
+                auto& context = imageGraphics.getInternalContext();
+                context.addTransform (juce::AffineTransform::scale (scale));
+                for (const auto& r : validNow)
+                    context.excludeClipRectangle (r);
+                owner.cachePainting = true; // (the picture without the playhead: drawn over it below)
+                owner.paintEntireComponent (imageGraphics, true);
+                owner.cachePainting = false;
+            }
+        }
+        if (shifting)
+            std::swap (image, spare);
+        valid = bounds;
+        drawnView = view;
+
+        g.setColour (juce::Colours::black);
+        g.drawImageTransformed (image,
+                                juce::AffineTransform::scale ((float) bounds.getWidth() / (float) imageBounds.getWidth(),
+                                                              (float) bounds.getHeight() / (float) imageBounds.getHeight()),
+                                false);
+        owner.paintPlayhead (g);
+    }
+
+    bool invalidateAll() override // (JUCE's repaint() of the whole component comes here, not to invalidate())
+    {
+        if (! owner.playheadRepaintOnly && ! owner.scrollRepaintOnly)
+            valid.clear();
+        return true;
+    }
+    bool invalidate (const juce::Rectangle<int>& r) override
+    {
+        if (! owner.playheadRepaintOnly && ! owner.scrollRepaintOnly)
+            valid.subtract (r);
+        return true; // (the window repaints the area either way)
+    }
+    void releaseResources() override
+    {
+        image = {};
+        spare = {};
+    }
+
+private:
+    static double area (const juce::RectangleList<int>& list)
+    {
+        double a = 0.0;
+        for (const auto& r : list)
+            a += (double) r.getWidth() * r.getHeight();
+        return a;
+    }
+
+    PlaylistComponent& owner;
+    juce::Image image, spare; // spare: the shifted copy is drawn into it, then they swap
+    juce::RectangleList<int> valid;
+    CacheView drawnView;
+    double lastLargeMs = 0.0;
+};
+
+// What the cached picture depends on beyond what repaints say (round 174e2)
+PlaylistComponent::CacheView PlaylistComponent::cacheView() const
+{
+    return { scrollTicks, scrollY, pixelsPerTick, trackTops.empty() ? 0 : trackTops.back(), (int) trackTops.size(),
+             ripple || engine.getSong().performanceMode, getWidth(), getHeight() };
+}
+
+// The picture of view `from` shown as `to` by shifting it: the area that moves and by how much (whole physical pixels).
+// Horizontal: the ruler and the lanes (the headers stay); vertical: the headers and the lanes (the ruler stays).
+// Empty area: not a plain scroll (zoom, resize, track heights, both directions at once, the corner tags).
+PlaylistComponent::CacheShift PlaylistComponent::cacheShift (const CacheView& from, const CacheView& to, float scale) const
+{
+    if (from.pixelsPerTick != to.pixelsPerTick || from.tracksHeight != to.tracksHeight || from.tracks != to.tracks
+        || from.overlays || to.overlays || from.width != to.width || from.height != to.height)
+        return {};
+    const auto grid = gridArea();
+    const auto dxExact = (from.scrollTicks - to.scrollTicks) * to.pixelsPerTick;
+    const auto dx = (int) std::lround (dxExact), dy = from.scrollY - to.scrollY;
+    const auto whole = [scale] (int d) { return std::abs ((float) d * scale - (float) juce::roundToInt ((float) d * scale)) < 0.01f; };
+    if (std::abs (dxExact - dx) > 0.01 || (dx != 0 && dy != 0) || ! whole (dx) || ! whole (dy))
+        return {};
+    CacheShift shift;
+    if (dx != 0)
+    {
+        shift.area = { headerWidth, rulerTop, grid.getRight() - headerWidth, grid.getBottom() - rulerTop };
+        shift.alsoChanged = { headerWidth, grid.getBottom(), grid.getWidth(), getHeight() - grid.getBottom() }; // (the pattern blocks)
+    }
+    else
+        shift.area = { 0, headerHeight, grid.getRight(), grid.getHeight() };
+    shift.dx = dx;
+    shift.dy = dy;
+    if (std::abs (dx) >= shift.area.getWidth() || std::abs (dy) >= shift.area.getHeight())
+        return {};
+    return shift;
+}
+
+// A repaint after the view scrolled: the cached picture is shifted instead of painted again (round 174e2)
+void PlaylistComponent::repaintScrolled()
+{
+    scrollRepaintOnly = playheadOverlay;
+    repaint();
+    scrollRepaintOnly = false;
+}
+
 PlaylistComponent::PlaylistComponent (AudioEngine& e)
     : engine (e)
 {
@@ -262,6 +450,11 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     addAndMakeVisible (snapBox);
     tools.onChange = [this] (EditTool) { updateCursor (juce::ModifierKeys::currentModifiers); };
     setOpaque (true); // paints every pixel: nothing behind it is redrawn while scrolling
+    if (const auto* v = std::getenv ("LYNX_PLAYLIST_CACHE"); v == nullptr || juce::String (v) != "0")
+    {
+        setCachedComponentImage (new PlayheadCache (*this)); // (owned by the component)
+        playheadOverlay = true;
+    }
     addAndMakeVisible (tools);
 
     // Follow (FL: "Auto scrolling"): the view pages along with the playhead in Song mode; off, it stays put
@@ -300,7 +493,6 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     engine.addChangeListener (this);
     EditorGlobals::get().addChangeListener (this);
     ui::WaveformCache::getInstance()->addChangeListener (this); // a waveform became ready, or the settings changed
-    startTimerHz (30);
 }
 
 namespace
@@ -774,13 +966,14 @@ void PlaylistComponent::paint (juce::Graphics& g)
         const uitrace::Scope traceGrid ("Playlist lanes+clips", false);
         juce::Graphics::ScopedSaveState state (g);
         g.reduceClipRegion (grid);
+        const auto paintedRows = g.getClipBounds();
 
         for (int t = 0; t < tracks; ++t)
         {
             const auto y = trackToY (t);
             const auto trackHeight = heightOf (t);
 
-            if (y > grid.getBottom() || y + trackHeight < grid.getY())
+            if (y > grid.getBottom() || y + trackHeight < grid.getY() || y > paintedRows.getBottom() || y + trackHeight < paintedRows.getY())
                 continue;
             const uitrace::Part tally (uitrace::part::lanes);
 
@@ -795,7 +988,11 @@ void PlaylistComponent::paint (juce::Graphics& g)
 
         const auto beatPixels = ppq * pixelsPerTick;
 
-        for (const auto& b : song.barsBetween ((std::int64_t) std::max (0.0, scrollTicks), (std::int64_t) xToTick (grid.getRight()) + 1))
+        // (only the bars of the repainted columns: a playhead strip is 16 px wide, the view can hold hundreds of bars,
+        // and every line is a renderer call even where it is clipped away; round 174e)
+        const auto paintedX = grid.getIntersection (g.getClipBounds());
+        for (const auto& b : song.barsBetween (juce::jmax ((std::int64_t) std::max (0.0, scrollTicks), (std::int64_t) xToTick (paintedX.getX()) - bar),
+                                               juce::jmin ((std::int64_t) xToTick (grid.getRight()), (std::int64_t) xToTick (paintedX.getRight())) + 1))
         {
             g.setColour (colour::gridBar);
             g.drawVerticalLine ((int) tickToX ((double) b.tick), (float) grid.getY(), (float) grid.getBottom());
@@ -1043,7 +1240,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
             g.fillPath (dashed);
         }
 
-        if (playheadTick >= 0.0)
+        if (playheadTick >= 0.0 && ! cachePainting)
         {
             g.setColour (colour::playhead);
             g.fillRect (juce::Rectangle<float> ((float) tickToX (playheadTick) - 0.5f, (float) grid.getY(), 1.5f, (float) grid.getHeight()));
@@ -1075,7 +1272,9 @@ void PlaylistComponent::paint (juce::Graphics& g)
         const auto barPixels = bar * pixelsPerTick;
         const auto every = barPixels < 30.0 ? (barPixels < 10.0 ? 16 : 4) : 1; // numbers spaced further apart when zoomed out
 
-        for (const auto& b : song.barsBetween ((std::int64_t) std::max (0.0, scrollTicks), (std::int64_t) xToTick (grid.getRight()) + 1))
+        const auto rulerClip = g.getClipBounds(); // (the numbers reach 40 px right of their bar line)
+        for (const auto& b : song.barsBetween (juce::jmax ((std::int64_t) std::max (0.0, scrollTicks), (std::int64_t) xToTick (rulerClip.getX() - 44) - bar),
+                                               juce::jmin ((std::int64_t) xToTick (grid.getRight()), (std::int64_t) xToTick (rulerClip.getRight())) + 1))
         {
             if ((b.number - 1) % every != 0)
                 continue;
@@ -1110,7 +1309,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
             textcache::drawText (g, label, tag.reduced (3.0f, 0.0f), juce::Justification::centredLeft, false);
         }
 
-        if (playheadTick >= 0.0)
+        if (playheadTick >= 0.0 && ! cachePainting)
         {
             const auto x = (float) tickToX (playheadTick);
             juce::Path tri;
@@ -1127,150 +1326,152 @@ void PlaylistComponent::paint (juce::Graphics& g)
         const uitrace::Scope traceHeaders ("Playlist headers", false);
         const auto headers = juce::Rectangle<int> (0, headerHeight, headerWidth, grid.getHeight());
         juce::Graphics::ScopedSaveState state (g);
-        g.reduceClipRegion (headers);
-        g.setColour (colour::bg2);
-        g.fillRect (headers);
-        g.setFont (font (type::small));
-
-        auto colourOf = [&song] (int t) { return t >= 0 && t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].colour : 0u; };
-
-        // group blocks first (behind the headers): from the header's top to the last member's bottom
-        for (int t = 0; t < tracks; ++t)
+        if (g.reduceClipRegion (headers)) // (not repainted, e.g. the playhead's strip: nothing to draw; round 174e)
         {
-            if (! noteedit::isGroupHeader (song, t))
-                continue;
-            const auto members = noteedit::groupMembers (song, t);
-            const auto last = members.empty() ? t : members.back();
-            const auto top = trackToY (t), bottom = trackToY (last) + heightOf (last);
-            if (top > headers.getBottom() || bottom < headers.getY())
-                continue;
-            auto block = colour::bg3;
-            if (const auto c = colourOf (t); c != 0)
-                block = block.interpolatedWith (tame (juce::Colour (c)), 0.28f);
-            g.setColour (block);
-            g.fillRoundedRectangle (juce::Rectangle<float> (1.0f, (float) top + 1.0f, (float) headerWidth - 2.0f, (float) (bottom - top) - 2.0f), radius::md);
-        }
+            g.setColour (colour::bg2);
+            g.fillRect (headers);
+            g.setFont (font (type::small));
 
-        for (int t = 0; t < tracks; ++t)
-        {
-            const auto y = trackToY (t);
-            const auto trackHeight = heightOf (t);
+            auto colourOf = [&song] (int t) { return t >= 0 && t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].colour : 0u; };
 
-            if (y > headers.getBottom() || y + trackHeight < headers.getY())
-                continue;
-
-            if (noteedit::isFoldedAway (song, t))
-                continue; // the group block shows through: a thin row, as FL draws a folded group
-
-            const auto muted = song.isTrackMuted (t);
-            const auto custom = t < (int) song.playlistTracks.size() && ! song.playlistTracks[(std::size_t) t].name.empty();
-            const auto hovered = hover.header && hover.track == t;
-            const auto member = noteedit::groupHeaderOf (song, t) >= 0 && ! noteedit::isGroupHeader (song, t);
-            const auto groupHead = noteedit::isGroupHeader (song, t);
-            const auto left = member ? (float) groupIndent : 2.0f;
-            auto plate = muted ? colour::bg2 : colour::bg3;
-            const auto trackColour = colourOf (t);
-            if (trackColour != 0) // the track's colour (FL projects colour their track headers by group)
-                plate = plate.interpolatedWith (tame (juce::Colour (trackColour)), muted ? 0.22f : (groupHead ? 0.62f : 0.5f));
-            if (hovered)
-                plate = plate.interpolatedWith (colour::bg5, 0.6f);
-            const auto plateArea = juce::Rectangle<float> (left, (float) y + 1.0f, (float) headerWidth - 2.0f - left, (float) trackHeight - 3.0f);
-            g.setColour (plate);
-            g.fillRoundedRectangle (plateArea, radius::sm);
-
-            if (isTrackSelected (t)) // the selected tracks (FL marks them next to the LED)
+            // group blocks first (behind the headers): from the header's top to the last member's bottom
+            for (int t = 0; t < tracks; ++t)
             {
-                g.setColour (colour::accent);
-                g.fillRoundedRectangle (plateArea.withWidth (3.0f).reduced (0.0f, 3.0f), 1.5f);
+                if (! noteedit::isGroupHeader (song, t))
+                    continue;
+                const auto members = noteedit::groupMembers (song, t);
+                const auto last = members.empty() ? t : members.back();
+                const auto top = trackToY (t), bottom = trackToY (last) + heightOf (last);
+                if (top > headers.getBottom() || bottom < headers.getY())
+                    continue;
+                auto block = colour::bg3;
+                if (const auto c = colourOf (t); c != 0)
+                    block = block.interpolatedWith (tame (juce::Colour (c)), 0.28f);
+                g.setColour (block);
+                g.fillRoundedRectangle (juce::Rectangle<float> (1.0f, (float) top + 1.0f, (float) headerWidth - 2.0f, (float) (bottom - top) - 2.0f), radius::md);
             }
 
-            const auto led = trackLed (t).toFloat();
-            g.setColour (muteLed (muted));
-            g.fillEllipse (led.withSizeKeepingCentre (8.0f, 8.0f));
-            if (hovered && hover.led) // the LED is a button: ring it
+            for (int t = 0; t < tracks; ++t)
             {
-                g.setColour (colour::textPrimary.withAlpha (0.7f));
-                g.drawEllipse (led.withSizeKeepingCentre (12.0f, 12.0f), 1.0f);
-            }
+                const auto y = trackToY (t);
+                const auto trackHeight = heightOf (t);
 
-            auto textRight = led.getX() - 2.0f;
+                if (y > headers.getBottom() || y + trackHeight < headers.getY())
+                    continue;
 
-            // an audio track's record arm (and, on tall rows, input) button: red while its mixer track is armed (FL 2026)
-            if (const auto armBox = trackArm (t); ! armBox.isEmpty())
-            {
-                const auto insert = trackmodes::armableInsert (song, t);
-                const auto armed = engine.isInsertArmed (insert);
-                const auto b = armBox.toFloat();
-                const auto lit = hovered && hover.arm;
-                if (armed)
+                if (noteedit::isFoldedAway (song, t))
+                    continue; // the group block shows through: a thin row, as FL draws a folded group
+
+                const auto muted = song.isTrackMuted (t);
+                const auto custom = t < (int) song.playlistTracks.size() && ! song.playlistTracks[(std::size_t) t].name.empty();
+                const auto hovered = hover.header && hover.track == t;
+                const auto member = noteedit::groupHeaderOf (song, t) >= 0 && ! noteedit::isGroupHeader (song, t);
+                const auto groupHead = noteedit::isGroupHeader (song, t);
+                const auto left = member ? (float) groupIndent : 2.0f;
+                auto plate = muted ? colour::bg2 : colour::bg3;
+                const auto trackColour = colourOf (t);
+                if (trackColour != 0) // the track's colour (FL projects colour their track headers by group)
+                    plate = plate.interpolatedWith (tame (juce::Colour (trackColour)), muted ? 0.22f : (groupHead ? 0.62f : 0.5f));
+                if (hovered)
+                    plate = plate.interpolatedWith (colour::bg5, 0.6f);
+                const auto plateArea = juce::Rectangle<float> (left, (float) y + 1.0f, (float) headerWidth - 2.0f - left, (float) trackHeight - 3.0f);
+                g.setColour (plate);
+                g.fillRoundedRectangle (plateArea, radius::sm);
+
+                if (isTrackSelected (t)) // the selected tracks (FL marks them next to the LED)
                 {
-                    g.setColour (colour::record);
-                    g.fillEllipse (b.withSizeKeepingCentre (10.0f, 10.0f));
+                    g.setColour (colour::accent);
+                    g.fillRoundedRectangle (plateArea.withWidth (3.0f).reduced (0.0f, 3.0f), 1.5f);
                 }
-                else
+
+                const auto led = trackLed (t).toFloat();
+                g.setColour (muteLed (muted));
+                g.fillEllipse (led.withSizeKeepingCentre (8.0f, 8.0f));
+                if (hovered && hover.led) // the LED is a button: ring it
                 {
-                    g.setColour ((lit ? colour::textPrimary : colour::textSecondary).withAlpha (muted ? 0.5f : 1.0f));
-                    g.fillEllipse (b.withSizeKeepingCentre (4.0f, 4.0f));
+                    g.setColour (colour::textPrimary.withAlpha (0.7f));
+                    g.drawEllipse (led.withSizeKeepingCentre (12.0f, 12.0f), 1.0f);
                 }
-                g.setColour (armed ? colour::record.brighter (lit ? 0.4f : 0.0f) : (lit ? colour::textPrimary : colour::textSecondary.withAlpha (0.7f)));
-                g.drawEllipse (b.withSizeKeepingCentre (10.0f, 10.0f), 1.2f);
-                textRight = b.getX() - 2.0f;
 
-                if (const auto inBox = trackInput (t); ! inBox.isEmpty())
+                auto textRight = led.getX() - 2.0f;
+
+                // an audio track's record arm (and, on tall rows, input) button: red while its mixer track is armed (FL 2026)
+                if (const auto armBox = trackArm (t); ! armBox.isEmpty())
                 {
-                    // "Audio input source": an arrow into a bar, lit when the mixer track has an input
-                    const auto r = inBox.toFloat().reduced (1.5f);
-                    const auto hasInput = song.mixer[(std::size_t) insert].inputChannel >= 0;
-                    g.setColour (hovered && hover.input ? colour::textPrimary : (hasInput ? colour::accent : colour::textSecondary));
-                    juce::Path in;
-                    const auto cy = r.getCentreY();
-                    in.startNewSubPath (r.getX(), cy);
-                    in.lineTo (r.getRight() - 3.5f, cy);
-                    in.startNewSubPath (r.getRight() - 6.5f, cy - 3.0f);
-                    in.lineTo (r.getRight() - 3.5f, cy);
-                    in.lineTo (r.getRight() - 6.5f, cy + 3.0f);
-                    g.strokePath (in, juce::PathStrokeType (1.2f));
-                    g.fillRect (juce::Rectangle<float> (r.getRight() - 1.5f, r.getY(), 1.3f, r.getHeight()));
-                    textRight = r.getX() - 2.0f;
+                    const auto insert = trackmodes::armableInsert (song, t);
+                    const auto armed = engine.isInsertArmed (insert);
+                    const auto b = armBox.toFloat();
+                    const auto lit = hovered && hover.arm;
+                    if (armed)
+                    {
+                        g.setColour (colour::record);
+                        g.fillEllipse (b.withSizeKeepingCentre (10.0f, 10.0f));
+                    }
+                    else
+                    {
+                        g.setColour ((lit ? colour::textPrimary : colour::textSecondary).withAlpha (muted ? 0.5f : 1.0f));
+                        g.fillEllipse (b.withSizeKeepingCentre (4.0f, 4.0f));
+                    }
+                    g.setColour (armed ? colour::record.brighter (lit ? 0.4f : 0.0f) : (lit ? colour::textPrimary : colour::textSecondary.withAlpha (0.7f)));
+                    g.drawEllipse (b.withSizeKeepingCentre (10.0f, 10.0f), 1.2f);
+                    textRight = b.getX() - 2.0f;
+
+                    if (const auto inBox = trackInput (t); ! inBox.isEmpty())
+                    {
+                        // "Audio input source": an arrow into a bar, lit when the mixer track has an input
+                        const auto r = inBox.toFloat().reduced (1.5f);
+                        const auto hasInput = song.mixer[(std::size_t) insert].inputChannel >= 0;
+                        g.setColour (hovered && hover.input ? colour::textPrimary : (hasInput ? colour::accent : colour::textSecondary));
+                        juce::Path in;
+                        const auto cy = r.getCentreY();
+                        in.startNewSubPath (r.getX(), cy);
+                        in.lineTo (r.getRight() - 3.5f, cy);
+                        in.startNewSubPath (r.getRight() - 6.5f, cy - 3.0f);
+                        in.lineTo (r.getRight() - 3.5f, cy);
+                        in.lineTo (r.getRight() - 6.5f, cy + 3.0f);
+                        g.strokePath (in, juce::PathStrokeType (1.2f));
+                        g.fillRect (juce::Rectangle<float> (r.getRight() - 1.5f, r.getY(), 1.3f, r.getHeight()));
+                        textRight = r.getX() - 2.0f;
+                    }
                 }
-            }
 
-            if (const auto arrow = trackArrow (t); ! arrow.isEmpty())
-            {
-                const auto collapsed = t < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) t].collapsed;
-                const auto a = arrow.toFloat().withSizeKeepingCentre (8.0f, 5.0f);
-                juce::Path tri;
-                if (collapsed) // folded: points down (FL), open: up
-                    tri.addTriangle (a.getX(), a.getY(), a.getRight(), a.getY(), a.getCentreX(), a.getBottom());
-                else
-                    tri.addTriangle (a.getX(), a.getBottom(), a.getRight(), a.getBottom(), a.getCentreX(), a.getY());
-                g.setColour (hovered && hover.arrow ? colour::textPrimary : colour::textSecondary);
-                g.fillPath (tri);
-                textRight = juce::jmin (textRight, (float) arrow.getX());
-            }
+                if (const auto arrow = trackArrow (t); ! arrow.isEmpty())
+                {
+                    const auto collapsed = t < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) t].collapsed;
+                    const auto a = arrow.toFloat().withSizeKeepingCentre (8.0f, 5.0f);
+                    juce::Path tri;
+                    if (collapsed) // folded: points down (FL), open: up
+                        tri.addTriangle (a.getX(), a.getY(), a.getRight(), a.getY(), a.getCentreX(), a.getBottom());
+                    else
+                        tri.addTriangle (a.getX(), a.getBottom(), a.getRight(), a.getBottom(), a.getCentreX(), a.getY());
+                    g.setColour (hovered && hover.arrow ? colour::textPrimary : colour::textSecondary);
+                    g.fillPath (tri);
+                    textRight = juce::jmin (textRight, (float) arrow.getX());
+                }
 
-            // the track's icon before its name, as FL's track header shows it (round 168h)
-            auto textLeft = (int) left + 6;
-            if (const auto icon = trackicons::iconFor (t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].icon : 0);
-                icon != trackicons::Icon::none && trackHeight >= 14)
-            {
-                const auto size = (float) juce::jmin (14, trackHeight - 4);
-                ui::drawTrackIcon (g, icon, juce::Rectangle<float> ((float) textLeft, (float) y + ((float) trackHeight - size) * 0.5f, size, size),
-                                   muted ? colour::textDisabled : colour::textSecondary.brighter (0.3f));
-                textLeft += (int) size + 4;
-            }
-            g.setColour (muted ? colour::textDisabled : (custom ? colour::textPrimary : colour::textSecondary));
-            g.setFont (font (type::small, groupHead));
-            textcache::drawFittedText (g, custom ? juce::String::fromUTF8 (song.playlistTracks[(std::size_t) t].name.c_str())
-                                     : tr ("Track {0}", { juce::String (t + 1) }),
-                              textLeft, y, juce::jmax (8, (int) textRight - textLeft - 2), trackHeight, juce::Justification::centredLeft,
-                              trackHeight >= 30 ? 2 : 1, 0.8f);
+                // the track's icon before its name, as FL's track header shows it (round 168h)
+                auto textLeft = (int) left + 6;
+                if (const auto icon = trackicons::iconFor (t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].icon : 0);
+                    icon != trackicons::Icon::none && trackHeight >= 14)
+                {
+                    const auto size = (float) juce::jmin (14, trackHeight - 4);
+                    ui::drawTrackIcon (g, icon, juce::Rectangle<float> ((float) textLeft, (float) y + ((float) trackHeight - size) * 0.5f, size, size),
+                                       muted ? colour::textDisabled : colour::textSecondary.brighter (0.3f));
+                    textLeft += (int) size + 4;
+                }
+                g.setColour (muted ? colour::textDisabled : (custom ? colour::textPrimary : colour::textSecondary));
+                g.setFont (font (type::small, groupHead));
+                textcache::drawFittedText (g, custom ? juce::String::fromUTF8 (song.playlistTracks[(std::size_t) t].name.c_str())
+                                         : tr ("Track {0}", { juce::String (t + 1) }),
+                                  textLeft, y, juce::jmax (8, (int) textRight - textLeft - 2), trackHeight, juce::Justification::centredLeft,
+                                  trackHeight >= 30 ? 2 : 1, 0.8f);
 
-            // the divider under the header: lit while hovered or dragged (drag resizes the track)
-            if (hover.divider == t || (drag == Drag::trackResize && (resizeTrack == t || resizeAll)))
-            {
-                g.setColour (colour::accent);
-                g.fillRoundedRectangle (juce::Rectangle<float> (6.0f, (float) (y + trackHeight) - 2.0f, (float) headerWidth - 12.0f, 3.0f), 1.5f);
+                // the divider under the header: lit while hovered or dragged (drag resizes the track)
+                if (hover.divider == t || (drag == Drag::trackResize && (resizeTrack == t || resizeAll)))
+                {
+                    g.setColour (colour::accent);
+                    g.fillRoundedRectangle (juce::Rectangle<float> (6.0f, (float) (y + trackHeight) - 2.0f, (float) headerWidth - 12.0f, 3.0f), 1.5f);
+                }
             }
         }
     }
@@ -1335,6 +1536,33 @@ void PlaylistComponent::paintOverview (juce::Graphics& g, juce::Rectangle<float>
         g.setColour (c.muted ? base.withAlpha (0.35f) : base);
         g.fillRect ((float) (area.getX() + c.start * scale), y, juce::jmax (1.0f, (float) (c.length * scale) - 0.5f),
                     juce::jmax (1.0f, rowHeight - (rowHeight >= 3.0f ? 0.5f : 0.0f)));
+    }
+}
+
+// The playhead over the cached image (round 174e): the line in the grid and the triangle on the ruler, as paint()
+// draws them without the cache
+void PlaylistComponent::paintPlayhead (juce::Graphics& g)
+{
+    if (playheadTick < 0.0)
+        return;
+    using namespace theme;
+    const auto grid = gridArea();
+    const auto x = (float) tickToX (playheadTick);
+    {
+        juce::Graphics::ScopedSaveState state (g);
+        if (g.reduceClipRegion (grid))
+        {
+            g.setColour (colour::playhead);
+            g.fillRect (juce::Rectangle<float> (x - 0.5f, (float) grid.getY(), 1.5f, (float) grid.getHeight()));
+        }
+    }
+    juce::Graphics::ScopedSaveState state (g);
+    if (g.reduceClipRegion (juce::Rectangle<int> (headerWidth, rulerTop, grid.getWidth(), timelineHeight)))
+    {
+        juce::Path tri;
+        tri.addTriangle (x - 6, (float) rulerTop, x + 6, (float) rulerTop, x, (float) rulerTop + 9.0f);
+        g.setColour (colour::playhead);
+        g.fillPath (tri);
     }
 }
 
@@ -5699,6 +5927,8 @@ void PlaylistComponent::glideBy (double ticks, double pixels, bool immediate)
 
     const auto grid = gridArea();
     glideX.target = juce::jlimit (0.0, juce::jmax (0.0, hBar.getMaximumRangeLimit() - grid.getWidth() / pixelsPerTick), glideX.target + ticks);
+    if (ticks != 0.0) // (a whole number of pixels from the start: the cached picture shifts, round 174e2)
+        glideX.target = std::round (glideX.target * pixelsPerTick) / pixelsPerTick;
     glideY.target = juce::jlimit (0.0, juce::jmax (0.0, (double) tracksHeight() - grid.getHeight()), glideY.target + pixels);
     if (immediate)
     {
@@ -5708,7 +5938,7 @@ void PlaylistComponent::glideBy (double ticks, double pixels, bool immediate)
         updateScrollBars();
         glideX.jumpTo (scrollTicks); // the scroll bar may have clamped it
         glideY.jumpTo (scrollY);
-        repaint();
+        repaintScrolled();
         return;
     }
     glideFrame();
@@ -5726,13 +5956,19 @@ void PlaylistComponent::glideFrame()
         return;
     }
 
-    scrollTicks = glideX.step (0.45, 0.5 / pixelsPerTick);
+    // whole pixels sideways (round 174e2: the cached picture then shifts instead of being painted again), at least one
+    // pixel towards the target each frame
+    const auto fromPixels = scrollTicks * pixelsPerTick;
+    const auto steppedPixels = glideX.step (0.45, 0.5 / pixelsPerTick) * pixelsPerTick;
+    scrollTicks = (glideX.target * pixelsPerTick > fromPixels ? std::ceil (steppedPixels - 1.0e-6) : std::floor (steppedPixels + 1.0e-6)) / pixelsPerTick;
+    if ((glideX.target - scrollTicks) * (glideX.target * pixelsPerTick - fromPixels) < 0.0) // (never past the target)
+        scrollTicks = glideX.target;
     scrollY = (int) std::round (glideY.step (0.45, 1.0));
     glideY.current = scrollY;
     updateScrollBars();
     glideX.current = scrollTicks;
     gliding = glideX.isMoving() || glideY.isMoving();
-    repaint();
+    repaintScrolled();
 }
 
 void PlaylistComponent::mouseMagnify (const juce::MouseEvent& e, float scale)
@@ -5830,7 +6066,7 @@ void PlaylistComponent::scrollBarMoved (juce::ScrollBar* bar, double start)
     else
         scrollY = (int) start;
 
-    repaint();
+    repaintScrolled();
 }
 
 void PlaylistComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
@@ -5867,24 +6103,36 @@ void PlaylistComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
     repaint();
 }
 
-void PlaylistComponent::timerCallback()
+bool PlaylistComponent::liveFrame (double nowMs)
 {
     auto& transport = engine.getTransport();
     const auto& song = engine.getSong();
+    const auto playing = transport.playing.load();
     auto tick = -1.0;
 
-    if (song.mode == PlayMode::song && (transport.playing.load() || transport.positionTicks.load() > 0.0))
-        tick = engine.songPlayheadTicks();
+    // (between two audio blocks the playhead moves on at the song's tempo: smooth at 144 Hz, round 174e)
+    if (song.mode == PlayMode::song && (playing || transport.positionTicks.load() > 0.0))
+        tick = engine.songPlayheadTicks() + engine.playheadAdvanceTicks();
 
-    if (tick != playheadTick && isShowing())
+    // whenever it moved: the line is anti-aliased, so even a fraction of a pixel shows (zoomed out, a playhead crossing
+    // a few pixels a second glides at the display's rate instead of stepping, as FL's does)
+    const auto moved = (tick < 0.0) != (playheadTick < 0.0) || std::abs ((tick - playheadTick) * pixelsPerTick) >= 0.002;
+    if (moved && isShowing())
     {
-        // only the cursor column (old and new) is repainted: large projects stay cheap
-        auto dirty = [this] (double t) {
-            if (t >= 0.0)
-                repaint ((int) tickToX (t) - 8, 0, 16, getHeight());
+        // only the cursor column (old and new) is repainted: large projects stay cheap. One rectangle for both: the
+        // two strips overlap (a frame moves the line by a pixel or less), and each rectangle of a repaint is a paint
+        auto column = [this] (double t) {
+            return t >= 0.0 ? juce::Rectangle<int> ((int) tickToX (t) - 8, 0, 16, getHeight()) : juce::Rectangle<int>();
+        };
+        auto dirty = [this] (juce::Rectangle<int> r) {
+            if (r.isEmpty())
+                return;
+            playheadRepaintOnly = playheadOverlay; // (the cached image under it stays valid)
+            repaint (r);
+            playheadRepaintOnly = false;
         };
 
-        dirty (playheadTick);
+        const auto before = column (playheadTick);
         playheadTick = tick;
 
         // Follow: if the cursor leaves the screen while playing, scrolls one page (off: the view stays put)
@@ -5892,34 +6140,46 @@ void PlaylistComponent::timerCallback()
         const auto newStart = transportedit::followViewStart (scrollTicks, grid.getWidth() / pixelsPerTick, tick, 20.0 / pixelsPerTick,
                                                               20.0 / pixelsPerTick);
 
-        if (EditorGlobals::get().isFollowing (false) && transport.playing.load() && newStart != scrollTicks)
+        if (EditorGlobals::get().isFollowing (false) && playing && newStart != scrollTicks)
         {
             scrollTicks = newStart;
             updateScrollBars();
             repaint();
         }
+        else if (const auto after = column (tick); ! before.isEmpty() && ! after.isEmpty() && std::abs (after.getX() - before.getX()) <= 16)
+            dirty (before.getUnion (after));
         else
-            dirty (tick);
+        {
+            dirty (before);
+            dirty (after);
+        }
     }
+    else if (moved)
+        playheadTick = tick;
 
     // Performance mode: the launched and waiting clips (frames, progress) and the headers' track progress
+    auto live = false;
     if (song.performanceMode && isShowing())
     {
-        const auto& live = engine.performanceState();
+        const auto& perfState = engine.performanceState();
         const auto zoneEnd = song.performanceZoneEnd();
         auto changed = false;
         for (int t = 0; t < (int) perfShown.size(); ++t)
         {
-            const auto v = live.tracks[(std::size_t) t].playing.load (std::memory_order_relaxed) * 2 + 1
-                           + (live.tracks[(std::size_t) t].pending.load (std::memory_order_relaxed) + 1) * 7919;
+            const auto v = perfState.tracks[(std::size_t) t].playing.load (std::memory_order_relaxed) * 2 + 1
+                           + (perfState.tracks[(std::size_t) t].pending.load (std::memory_order_relaxed) + 1) * 7919;
             if (v != perfShown[(std::size_t) t])
             {
                 perfShown[(std::size_t) t] = v;
                 changed = true;
             }
         }
-        if (zoneEnd > 0 && (changed || live.anyPlaying.load (std::memory_order_relaxed)))
+        live = perfState.anyPlaying.load (std::memory_order_relaxed);
+        // (the clips' progress and the waiting clips' blink cover the whole zone: 30 times a second, as before)
+        const auto due = live && nowMs - perfRepaintMs >= 1000.0 / 30.0;
+        if (zoneEnd > 0 && (changed || due))
         {
+            perfRepaintMs = nowMs;
             const auto grid = gridArea();
             const auto x1 = juce::jmin (grid.getRight(), (int) tickToX ((double) zoneEnd) + 2);
             if (x1 > grid.getX())
@@ -5928,6 +6188,7 @@ void PlaylistComponent::timerCallback()
                 repaint (0, headerHeight, headerWidth, getHeight() - headerHeight);
         }
     }
+    return playing || moved || live;
 }
 
 // Performance mode (round 165m): the launched clips (a bright frame and, with "Performance clip progress", how far the
