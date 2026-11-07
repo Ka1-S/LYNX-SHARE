@@ -41,6 +41,8 @@ public:
     static constexpr float silenceLevel = 1.0e-6f;
     // ... and after this long of it nothing more is stored, so a pause doesn't push the music out of the buffer
     static constexpr int silenceHoldSeconds = 8;
+    // While a dump or a new length has the ring, the audio waits in a small second buffer; it joins at the next block.
+    static constexpr double spillSeconds = 1.0;
 
     RollingAudioLog() = default;
     RollingAudioLog (const RollingAudioLog&) = delete;
@@ -61,6 +63,8 @@ public:
     double sampleRate() const;
     std::size_t bytesInUse() const;
     std::size_t framesCapacity() const;
+    // Frames that didn't fit the second buffer during a pause (a control thread stalled for over spillSeconds).
+    std::size_t lostFrames() const noexcept { return lost.load (std::memory_order_relaxed); }
 
     struct Dump
     {
@@ -75,21 +79,29 @@ public:
     // `r` may equal `l` (mono). `at` says where in the Master's chain the caller stands.
     void push (Position at, const float* l, const float* r, int n) noexcept
     {
-        if (! writable.load (std::memory_order_relaxed) || position.load (std::memory_order_relaxed) != at)
+        if (! active.load (std::memory_order_relaxed) || position.load (std::memory_order_relaxed) != at)
             return;
         pushBlock (l, r, n);
     }
 
 private:
     void pushBlock (const float* l, const float* r, int n) noexcept;
+    void store (const float* l, const float* r, std::size_t n) noexcept;
     void reallocate (std::size_t frames, bool keep);
     void stopWriter() noexcept;
     void startWriter() noexcept;
+    void stopCompletely() noexcept;
 
-    std::atomic<bool> writable { false };
+    std::atomic<bool> active { false };   // a ring exists; false: the writer touches nothing
+    std::atomic<bool> writable { false }; // false: the control side has the ring, the writer fills the spill
+    std::atomic<std::size_t> lost { 0 };
     std::atomic<bool> writing { false };
     std::atomic<Position> position { Position::postEffects };
 
+    // the spill (left, then right), and how much of it is used: the writer's while `active`
+    std::unique_ptr<float[]> spill;
+    std::size_t spillCapacity = 0;
+    std::size_t spillUsed = 0;
     // owned by the writer while `writable`, by the control side otherwise
     std::unique_ptr<float[]> samples; // interleaved left / right
     std::size_t capacity = 0;         // frames

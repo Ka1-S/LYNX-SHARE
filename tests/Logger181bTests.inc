@@ -146,39 +146,76 @@ TEST (logger181b_resize_keeps_the_newest_audio)
     CHECK (! log.dump (d));
 }
 
-TEST (logger181b_audio_thread_keeps_running_while_the_ui_swaps)
+// Every frame carries its number, so a lost, repeated or torn frame shows in a dump.
+TEST (logger181b_no_audio_is_lost_while_dumps_and_new_lengths_have_the_ring)
+{
+    lynx::RollingAudioLog log;
+    log.setSampleRate (48000.0);
+    log.setEnabled (true);
+    std::atomic<bool> stop { false };
+    std::atomic<int> blocks { 0 };
+    std::thread audio ([&] {
+        float next = 1.0f;
+        std::vector<float> l (64), r (64);
+        while (! stop.load())
+        {
+            for (int i = 0; i < 64; ++i)
+            {
+                l[(std::size_t) i] = next;
+                r[(std::size_t) i] = -next;
+                next += 1.0f;
+            }
+            log.push (RollPos::postEffects, l.data(), r.data(), 64);
+            blocks.fetch_add (1);
+            std::this_thread::sleep_for (std::chrono::microseconds (20)); // (faster than real time, not free-running)
+        }
+    });
+
+    auto intact = true;
+    lynx::RollingAudioLog::Dump d;
+    for (int i = 0; i < 60; ++i)
+    {
+        const auto before = blocks.load();
+        while (blocks.load() < before + 2)
+            std::this_thread::yield();
+        log.setLengthSeconds (i % 3 + 1);
+        if (log.dump (d))
+            for (std::size_t f = 0; f < d.left.size(); ++f)
+                intact = intact && d.right[f] == -d.left[f] && (f == 0 || d.left[f] == d.left[f - 1] + 1.0f);
+    }
+    stop.store (true);
+    audio.join();
+    CHECK (log.lostFrames() > 0 || intact); // (a thread stalled for over a second is the one case that may leave a gap)
+    CHECK (log.isEnabled());
+}
+
+TEST (logger181b_audio_comes_back_after_switching_off_and_on)
 {
     lynx::RollingAudioLog log;
     log.setSampleRate (1000.0);
     log.setEnabled (true);
     std::atomic<bool> stop { false };
+    std::atomic<int> blocks { 0 };
     std::thread audio ([&] {
         const auto block = rollingRamp (64, 0.1f);
         while (! stop.load())
+        {
             log.push (RollPos::postEffects, block.data(), block.data(), 64);
+            blocks.fetch_add (1);
+        }
     });
     lynx::RollingAudioLog::Dump d;
-    for (int i = 0; i < 200; ++i)
+    for (int i = 0; i < 100; ++i)
     {
-        log.setLengthSeconds (i % 3 + 1);
-        log.dump (d);
-        if (i % 7 == 0)
-        {
-            log.setEnabled (false);
-            log.setEnabled (true);
-        }
-    }
-    // audio comes back after all of it (the audio thread may not have run since the last change, so give it time)
-    auto dumped = false;
-    for (int i = 0; i < 500 && ! dumped; ++i)
-    {
-        dumped = log.dump (d);
-        if (! dumped)
-            std::this_thread::sleep_for (std::chrono::milliseconds (10));
+        log.setEnabled (false);
+        log.setEnabled (true);
+        const auto before = blocks.load();
+        while (blocks.load() < before + 3) // the third block has certainly met the new ring
+            std::this_thread::yield();
+        CHECK (log.dump (d));
     }
     stop.store (true);
     audio.join();
-    CHECK (log.isEnabled() && dumped);
 }
 
 TEST (chord181b_names)
@@ -305,9 +342,23 @@ TEST (toolbar181b_chord_panel_is_on_the_default_toolbar)
     old.orderFromString ("transport,master,record,snap,windows,file,meters,output"); // from an older version
     CHECK (old.isShown (Group::chord) && old.isDefault());
 
+    // a customised toolbar keeps its order and what it hides, and doesn't gain the panel (it is in the edit mode)
     Layout custom;
-    custom.orderFromString ("master,-transport,output,file"); // a user's own order is kept, what is missing joins it
-    CHECK (custom.orderToString() == "master,record,snap,windows,-transport,output,file,chord,meters");
+    custom.orderFromString ("transport,-master,snap,record,file,windows,output,meters");
+    CHECK (custom.orderToString() == "transport,-master,snap,record,file,-chord,windows,output,meters");
+    CHECK (! custom.isShown (Group::chord));
+    custom.setShown (Group::chord, true); // and it stays once shown
+    Layout again;
+    again.orderFromString (custom.orderToString());
+    CHECK (again.isShown (Group::chord) && again.orderToString() == "transport,-master,snap,record,file,chord,windows,output,meters");
+    // the default order with one panel hidden is customised too
+    Layout hidden;
+    hidden.orderFromString ("transport,master,record,snap,windows,file,-meters,output");
+    CHECK (! hidden.isShown (Group::chord) && ! hidden.isShown (Group::meters) && hidden.isShown (Group::output));
+    // a saved preset still reads as that preset
+    Layout compact;
+    compact.orderFromString (applyPreset (Layout::makeDefault(), Preset::compact).orderToString());
+    CHECK (matchingPreset (compact) == (int) Preset::compact);
 
     d.setShown (Group::chord, false); // and hiding it stays
     CHECK (! d.isDefault());

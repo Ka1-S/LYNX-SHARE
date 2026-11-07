@@ -10,7 +10,8 @@ namespace lynx
 {
 void RollingAudioLog::stopWriter() noexcept
 {
-    // pairs with pushBlock: either it sees writable == false, or this sees writing == true and waits for that one block
+    // pairs with pushBlock: either it sees writable == false, or this sees writing == true and waits for that one block.
+    // From here on the writer leaves the ring alone and fills the spill.
     writable.store (false, std::memory_order_seq_cst);
     while (writing.load (std::memory_order_seq_cst))
         std::this_thread::yield();
@@ -18,38 +19,70 @@ void RollingAudioLog::stopWriter() noexcept
 
 void RollingAudioLog::startWriter() noexcept
 {
-    writable.store (samples != nullptr, std::memory_order_seq_cst);
+    writable.store (true, std::memory_order_seq_cst);
+}
+
+void RollingAudioLog::stopCompletely() noexcept
+{
+    // the same handshake: after this the writer touches nothing at all
+    active.store (false, std::memory_order_seq_cst);
+    writable.store (false, std::memory_order_seq_cst);
+    while (writing.load (std::memory_order_seq_cst))
+        std::this_thread::yield();
+}
+
+void RollingAudioLog::store (const float* l, const float* r, std::size_t n) noexcept
+{
+    // both channels within the level? stops at the first sample that isn't (at once, while music plays)
+    auto silent = true;
+    for (std::size_t i = 0; i < n && silent; ++i)
+        silent = std::abs (l[i]) <= silenceLevel && std::abs (r[i]) <= silenceLevel;
+
+    silentFrames = silent ? silentFrames + (std::int64_t) n : 0;
+    if (silentFrames > silenceLimit)
+        return;
+
+    // a block longer than the whole buffer: only its end can stay
+    const auto count = std::min (n, capacity);
+    const auto skip = n - count;
+    auto* out = samples.get();
+    auto at = head;
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        out[at * 2] = l[skip + i];
+        out[at * 2 + 1] = r[skip + i];
+        if (++at == capacity)
+            at = 0;
+    }
+    head = at;
 }
 
 void RollingAudioLog::pushBlock (const float* l, const float* r, int n) noexcept
 {
     writing.store (true, std::memory_order_seq_cst);
-    if (writable.load (std::memory_order_seq_cst) && l != nullptr && n > 0)
+    if (active.load (std::memory_order_seq_cst) && l != nullptr && n > 0)
     {
         if (r == nullptr)
             r = l;
 
-        // both channels within the level? stops at the first sample that isn't (at once, while music plays)
-        auto silent = true;
-        for (int i = 0; i < n && silent; ++i)
-            silent = std::abs (l[i]) <= silenceLevel && std::abs (r[i]) <= silenceLevel;
-
-        silentFrames = silent ? silentFrames + n : 0;
-        if (silentFrames <= silenceLimit)
+        if (writable.load (std::memory_order_seq_cst))
         {
-            // a block longer than the whole buffer: only its end can stay
-            const auto count = std::min<std::size_t> ((std::size_t) n, capacity);
-            const auto skip = (std::size_t) n - count;
-            auto* out = samples.get();
-            auto at = head;
-            for (std::size_t i = 0; i < count; ++i)
+            if (spillUsed > 0) // what came during a pause goes first
             {
-                out[at * 2] = l[skip + i];
-                out[at * 2 + 1] = r[skip + i];
-                if (++at == capacity)
-                    at = 0;
+                store (spill.get(), spill.get() + spillCapacity, spillUsed);
+                spillUsed = 0;
             }
-            head = at;
+            store (l, r, (std::size_t) n);
+        }
+        else
+        {
+            // the control side has the ring for a moment: keep the audio aside rather than lose it or wait
+            const auto count = std::min ((std::size_t) n, spillCapacity - spillUsed);
+            std::copy_n (l, count, spill.get() + spillUsed);
+            std::copy_n (r, count, spill.get() + spillCapacity + spillUsed);
+            spillUsed += count;
+            if (count < (std::size_t) n)
+                lost.fetch_add ((std::size_t) n - count, std::memory_order_relaxed);
         }
     }
     writing.store (false, std::memory_order_seq_cst);
@@ -57,24 +90,23 @@ void RollingAudioLog::pushBlock (const float* l, const float* r, int n) noexcept
 
 void RollingAudioLog::reallocate (std::size_t frames, bool keep)
 {
-    // (the new buffer is made and cleared before the writer stops, so the pause is only the copy)
+    // (the new buffers are made and cleared before the writer stops, so the pause is only the copy)
     std::unique_ptr<float[]> fresh;
     if (frames > 0)
         fresh.reset (new (std::nothrow) float[frames * 2]());
 
-    stopWriter();
-    auto old = std::move (samples);
-    const auto oldCapacity = capacity;
-    const auto oldHead = head;
-
-    samples = std::move (fresh);
-    capacity = samples != nullptr ? frames : 0;
-    head = 0;
-    silentFrames = 0;
-    silenceLimit = (std::int64_t) (rate * silenceHoldSeconds);
-
-    if (keep && old != nullptr && samples != nullptr)
+    if (keep)
     {
+        if (fresh == nullptr) // no memory for the new length: the log stays as it is
+            return;
+
+        stopWriter();
+        const auto old = std::move (samples);
+        const auto oldCapacity = capacity;
+        const auto oldHead = head;
+        samples = std::move (fresh);
+        capacity = frames;
+
         // the newest frames, in time order; an unfilled start stays zeros and a dump trims it
         const auto kept = std::min (oldCapacity, capacity);
         for (std::size_t i = 0; i < kept; ++i)
@@ -84,9 +116,34 @@ void RollingAudioLog::reallocate (std::size_t frames, bool keep)
             samples[i * 2 + 1] = old[from * 2 + 1];
         }
         head = kept % capacity;
+        startWriter();
+        return; // `old` goes here, off the audio thread
     }
-    startWriter();
-    // `old` goes here, off the audio thread
+
+    std::unique_ptr<float[]> freshSpill;
+    const auto freshSpillCapacity = fresh != nullptr ? (std::size_t) std::ceil (rate * spillSeconds) : (std::size_t) 0;
+    if (freshSpillCapacity > 0)
+        freshSpill.reset (new (std::nothrow) float[freshSpillCapacity * 2]());
+    if (freshSpill == nullptr)
+        fresh.reset();
+
+    stopCompletely();
+    const auto oldSamples = std::move (samples);
+    const auto oldSpill = std::move (spill);
+    samples = std::move (fresh);
+    spill = std::move (freshSpill);
+    capacity = samples != nullptr ? frames : 0;
+    spillCapacity = samples != nullptr ? freshSpillCapacity : 0;
+    spillUsed = 0;
+    head = 0;
+    silentFrames = 0;
+    silenceLimit = (std::int64_t) (rate * silenceHoldSeconds);
+    lost.store (0, std::memory_order_relaxed);
+    if (samples != nullptr)
+    {
+        writable.store (true, std::memory_order_seq_cst);
+        active.store (true, std::memory_order_seq_cst);
+    }
 }
 
 void RollingAudioLog::setEnabled (bool on)

@@ -242,6 +242,21 @@ struct Layout
                     parsed.push_back ({ (Group) i, shown });
         }
 
+        // Round 181b: the Chord detection panel is new. A line that is just the old default gets it as a new install
+        // does; a customised toolbar stays as its user made it (FL saves the list of placed panels, so one that isn't
+        // listed stays in the toolbar's edit mode). It can be shown from there.
+        const auto plainOldDefault = [&parsed] {
+            const std::array<Group, 8> old { Group::transport, Group::master, Group::record, Group::snap, Group::windows, Group::file, Group::meters, Group::output };
+            if (parsed.empty())
+                return true;
+            if (parsed.size() != old.size())
+                return false;
+            for (std::size_t i = 0; i < old.size(); ++i)
+                if (parsed[i].group != old[i] || ! parsed[i].shown)
+                    return false;
+            return true;
+        }();
+
         const auto& order = defaultOrder();
         for (std::size_t i = 0; i < order.size(); ++i)
         {
@@ -261,7 +276,7 @@ struct Layout
                     break;
                 }
             }
-            parsed.insert (at, { group, true });
+            parsed.insert (at, { group, group != Group::chord || plainOldDefault });
         }
 
         entries = parsed;
