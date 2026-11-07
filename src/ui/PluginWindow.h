@@ -21,6 +21,9 @@ struct WrapperContext
     AudioEngine* engine = nullptr;
     std::function<PluginRef* (Song&)> find;
     bool channel = false; // a Channel rack plugin (the MIDI output port applies)
+    // round 177b: a mixer slot's plugin (insert, slot): a plugin with a sidechain input gets the header's
+    // "Sidechain from" picker; -1 = not a mixer slot
+    int track = -1, slot = -1;
 };
 // `owner` is the adapter (PluginInstrument/PluginEffect) that holds the plugin.
 void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title, WrapperContext context = {});

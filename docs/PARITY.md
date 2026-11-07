@@ -191,9 +191,57 @@ Both numbers are given below.
 - Gemini Doubler already matched Doubler's look.
 - **Pending a licence:** LYNX Tune ← Auto-Tune Pro. The trial has expired. Once a licence is in, sound captures (correction speed, humanize, formant, the artefact character) and the look will be done together.
 
+**Look, fifth slice (round tp172d7: the Soundtoys and Valhalla roles, closer to their originals):**
+- **The rule for every third-party look:** a caption over each knob and the original's printed scale words under it (Min / Max, Dry / Wet, −24 / +24, 20 Hz / 1 kHz…); the value shows only while the knob is hovered or dragged. Halo keeps its values under the knobs because its original prints them there.
+- **Halo ← ValhallaShimmer:**
+  - a thin, wide-spaced, two-tone lower-case "lynx halo" wordmark;
+  - nine big flat discs shading from black to light grey, with no ring;
+  - large lower-case captions and values;
+  - the three modes as large "reverb mode  mono" text along the bottom (a click opens the menu).
+- **Auto-pan ← PanMan (the Rhythm voicing):**
+  - the name block top left;
+  - three bowed pods with scale words;
+  - the direction keys as square keys with drawn arrows (◄ ramp, ◄► left / right, ► ramp the other way, plus 8 steps), lit amber;
+  - Input and Output in the level pod: the Rhythm voicing now reads Auto-pan's Input, ±24 dB, 0 dB by default;
+  - the TWEAK key.
+  - Ramp ► is a new pattern: the measured ramp, left to right.
+- **Voice Shift ← Little AlterBoy:**
+  - a dark face round the three printed fields;
+  - big legends;
+  - LINK as a small key on a line joining Pitch and Formant;
+  - Min / Max and Dry / Wet under Drive and Mix;
+  - a "voice shift" wordmark.
+- **Echoform ← EchoBoy:**
+  - TIME / NOTE / DOT / TRIP keys over a red LED time read-out;
+  - a TAP TEMPO pod with its key and LED tempo;
+  - Groove (Shuffle / Swing) and Feel (Rushing / Dragging);
+  - the echo mode as a rotary with its five modes printed round it;
+  - Input / Saturation / Output;
+  - Style and Tape on red LED displays with step keys;
+  - spaced pod titles.
+- **Ember ← Decapitator:**
+  - chunky black caps on rings of dots, with no lit arc;
+  - the big Drive printed 0 … 10;
+  - bigger spaced legends;
+  - EMBER between two rules;
+  - a chrome bezel round the VU.
+- **Glow Leveler ← CLA-2A:** Gain and Peak reduction printed 0 … 100; the lower strip's scale words beside its knobs.
+- The arrows, LED read-outs, bezel and wordmarks are drawn by LYNX code. No logo, bitmap or font of the originals is used.
+
+**Look, sixth slice (round tp172d8):**
+- **Glow Leveler ← CLA-2A:**
+  - the original's wide proportions (660 × 312) on one untitled faceplate;
+  - Gain and Peak reduction as chrome domes in black knurled skirts, printed 0 … 100, the number at the pointer in red;
+  - COMPRESS / LIMIT and AUTO MAKEUP as metal bat toggles on hex nuts, the active word red (AUTO MAKEUP above, OFF under);
+  - VU DISPLAY as a black pointer knob with INPUT / GR / OUTPUT printed round it (the chosen one red), the VU in a gunmetal frame, "GLOW" in big type under it;
+  - a charcoal strip with gold 50Hz / 60Hz / OFF keys (the lit one cream), HI FREQ as a big cream chicken-head pointer knob, MIX and TRIM as medium knurled knobs, and big ANALOG / HI FREQ / MIX / TRIM captions; [ FLAT ], 0 / 100 and -18 / 18 printed as on the original;
+  - LYNX's extras (Modern / Opto classic, the opto law and release) are one compact group of small muted keys where the original has its badge (full while hovered, the chosen one red); Makeup ref sits at the strip's right end.
+- **Echoform ← EchoBoy:** the name block top left ("Echoform" and LYNX's own subtitle); LOWCUT / HIGHCUT and RUSHIN / DRAGGIN printed as on the original; thicker, whiter pod outlines.
+
 **Design gaps still open:**
 - Atrium's Predelay and Decay bars draw linear while the original's are skewed.
-- Ember's Drive has no printed 0 … 10 scale, and the VU reads "VU". The original's meter face and logo are not reproduced, as the rules require.
+- Ember's VU reads "VU". The original's meter face and logo are not reproduced, as the rules require (the Drive's printed 0 … 10 came in the fifth look slice).
+- Auto-pan has no LFO key: the Rhythm voicing has no free-LFO switch to put there.
 
 ## Round 165j: LYNX Tune sound quality, before → after (measured)
 

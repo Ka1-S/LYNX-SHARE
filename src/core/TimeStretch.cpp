@@ -307,10 +307,87 @@ void spliceAttacks (Planar& out, const Planar& in, double ratio, double sampleRa
         }
     }
 }
+
+// LYNX's Beats warp mode (round 175a, N4), modelled on Ableton Live's Beats mode by measurement (Live 12.4 renders of a
+// test voice at 0.8×, 1.25× speed; /mnt/e/lynx-work/ableton175a/n4): the audio is cut at its attacks and each piece
+// keeps its own speed (no stretching at all inside a piece). Slower: when a piece has played to its end before the
+// next one starts, it plays on backwards from its end, then forwards again ("back and forth"), until the next piece.
+// Faster: the piece is cut where the next one begins. The pieces meet in 16 ms linear crossfades (the length that
+// matched Live's spectrum best: 0.2–0.3 dB mean deviation; 1–4 ms left clicks Live does not have).
+Planar beatsStretch (const Planar& in, long outFrames, double sampleRate)
+{
+    const auto n = in.frames();
+    const auto ratio = (double) outFrames / (double) n;
+    const auto mono = monoOf (in);
+    auto cuts = stretchdetail::beatsCuts (mono.data(), n, sampleRate);
+    cuts.insert (cuts.begin(), 0L);
+    cuts.push_back (n);
+    const auto fade = std::max (16L, (long) std::lround (sampleRate * 0.016));
+
+    Planar out;
+    out.ch.assign (in.ch.size(), std::vector<float> ((std::size_t) outFrames, 0.0f));
+    for (std::size_t k = 0; k + 1 < cuts.size(); ++k)
+    {
+        const auto a = cuts[k], length = cuts[k + 1] - a;
+        const auto o0 = (long) std::llround ((double) a * ratio);
+        const auto o1 = k + 2 == cuts.size() ? outFrames : (long) std::llround ((double) cuts[k + 1] * ratio);
+        const auto last = k + 2 == cuts.size();
+        const auto span = std::min (outFrames - o0, (o1 - o0) + (last ? 0L : fade));
+        if (length <= 0 || span <= 0)
+            continue;
+        const auto period = 2 * length;
+        for (long i = 0; i < span; ++i)
+        {
+            const auto m = i % period;
+            const auto src = a + (m < length ? m : period - 1 - m);
+            float w = 1.0f;
+            if (k > 0 && i < fade)
+                w = (float) i / (float) fade;
+            if (i >= o1 - o0)
+                w *= 1.0f - (float) (i - (o1 - o0)) / (float) fade;
+            for (std::size_t c = 0; c < in.ch.size(); ++c)
+                out.ch[c][(std::size_t) (o0 + i)] += w * in.ch[c][(std::size_t) src];
+        }
+    }
+    return out;
+}
 } // namespace
 
 namespace stretchdetail
 {
+std::vector<long> beatsCuts (const float* mono, long n, double sampleRate)
+{
+    auto cuts = detectAttacks (mono, n, sampleRate, 6.0);
+    // each cut moves to where the attack rises fastest: the start of the 10 ms window before the steepest 10 ms rise of
+    // the RMS level, within −30…+50 ms (Live cuts a tone at its very start and a swell at its steepest point; LYNX's
+    // attack detector marks the half-peak point, 16 ms late on a tone and 37 ms early on a swell) [measured]
+    {
+        std::vector<double> sum ((std::size_t) n + 1, 0.0);
+        for (long i = 0; i < n; ++i)
+            sum[(std::size_t) i + 1] = sum[(std::size_t) i] + (double) mono[i] * mono[i];
+        const auto w = std::max (8L, (long) std::lround (sampleRate * 0.010));
+        const auto hop = std::max (1L, (long) std::lround (sampleRate * 0.0005));
+        const auto rms = [&] (long at) { return std::sqrt ((sum[(std::size_t) (at + w)] - sum[(std::size_t) at]) / (double) w); };
+        for (auto& c : cuts)
+        {
+            const auto from = std::max (0L, c - (long) (sampleRate * 0.030));
+            const auto to = std::min (n - 2 * w, c + (long) (sampleRate * 0.050));
+            double steepest = -1.0;
+            for (long k = from; k < to; k += hop)
+                if (const auto rise = rms (k + w) - rms (k); rise > steepest)
+                {
+                    steepest = rise;
+                    c = k;
+                }
+        }
+        std::sort (cuts.begin(), cuts.end());
+        const auto minGap = (long) (sampleRate * 0.010);
+        cuts.erase (std::unique (cuts.begin(), cuts.end(), [minGap] (long a, long b) { return b - a < minGap; }), cuts.end());
+    }
+    cuts.erase (std::remove_if (cuts.begin(), cuts.end(), [n] (long c) { return c <= 0 || c >= n; }), cuts.end());
+    return cuts;
+}
+
 std::vector<long> detectAttacks (const float* mono, long frames, double sampleRate, double minRiseDb)
 {
     // An attack = the (high-passed) RMS envelope rising by at least `minRiseDb` within ~3 ms over its level just before, above an
@@ -408,6 +485,15 @@ Preset presetFor (StretchMethod method) noexcept
     {
         case StretchMethod::transients: return { 0.06, 0.01, 6.0, 0.030 };
         case StretchMethod::mono: return { 0.06, 0.01, 9.0, 0.020 };
+        // LYNX's warp modes (round 175a, N4), fitted to Live 12's Tones / Texture / Complex renders of a voice at
+        // 0.8× and 1.25× (envelope correlation / mean spectral deviation): no attack splicing (it doubled Live's
+        // spectral deviation), tones 40 ms blocks (0.977 / 1.06 dB), texture 60 ms (0.985 / 0.98 dB), complex 90 ms
+        // (0.994 / 0.88 dB; full mixes and chords want long blocks, REA_rodada160 §2). Beats has its own engine
+        // (beatsStretch); its preset only picks the voice pitch shifter's block.
+        case StretchMethod::beats: return { 0.06, 0.01, 6.0, 0.030 };
+        case StretchMethod::tones: return { 0.04, 0.04 / 6.0, 0.0, 0.0 };
+        case StretchMethod::texture: return { 0.06, 0.01, 0.0, 0.0 };
+        case StretchMethod::complex: return { 0.09, 0.015, 0.0, 0.0 };
         case StretchMethod::general: break;
     }
     return { 0.12, 0.02, 9.0, 0.020 };
@@ -438,7 +524,7 @@ void VoicePitchShifter::allocate (double sampleRate, StretchMethod method)
     impl = std::make_unique<Impl>();
     // real time (measured round 162): 100 ms blocks, overlap 4 — pitch exact to 0.05 cent down to 55 Hz, about 2 % of a
     // core per voice and ~1 ms to prime a note (60 ms blocks missed low notes by 40 cents); drums: 80 ms
-    const auto block = method == StretchMethod::transients ? 0.08 : 0.1;
+    const auto block = method == StretchMethod::transients || method == StretchMethod::beats ? 0.08 : 0.1;
     impl->stretch.configure (2, (int) std::lround (sampleRate * block), (int) std::lround (sampleRate * block / 4.0));
     // one silent run sizes every internal buffer, so the audio thread's first note does not allocate
     std::vector<float> silence ((std::size_t) std::max (maxPrimeLength(), 1024), 0.0f), out (256, 0.0f);
@@ -510,6 +596,9 @@ std::shared_ptr<SampleData> timeStretch (const SampleData& in, double ratio, Str
 
     if (std::abs (ratio - 1.0) <= stretchdetail::resampleTolerance)
         return sampleOf (resampleTo (planar, outFrames), in);
+
+    if (method == StretchMethod::beats)
+        return sampleOf (beatsStretch (planar, outFrames, in.sampleRate), in);
 
     const auto preset = stretchdetail::presetFor (method);
     auto out = spectralStretch (planar, outFrames, in.sampleRate, preset.blockSeconds, preset.intervalSeconds);
