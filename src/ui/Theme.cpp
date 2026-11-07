@@ -2,12 +2,19 @@
 
 #include "core/MenuMnemonic.h"
 
+#if LYNX_BUNDLED_FONT
+ #include <LynxFontData.h>
+#endif
+
 #include <algorithm>
+#include <array>
 #include <limits>
 #include <unordered_map>
 #include <vector>
 
 #include "core/MenuPlacement.h"
+#include "core/UiFontChoice.h"
+#include "platform/Paths.h"
 #include "ui/Icons.h"
 #include "ui/PluginSkin.h"
 
@@ -443,6 +450,17 @@ LookAndFeel::LookAndFeel()
     // Segoe UI on Windows (the JUCE default there is Verdana, wider and dated)
    #if JUCE_WINDOWS
     setDefaultSansSerifTypefaceName ("Segoe UI");
+   #elif LYNX_BUNDLED_FONT
+    // Linux: JUCE would take the first of Verdana, Bitstream Vera, Luxi, Liberation, DejaVu, 8-32 % wider than the font
+    // the layouts are made with. Open Sans comes with LYNX SHARE (resources/fonts, SIL OFL), so it looks the same everywhere.
+    {
+        static const std::array<juce::Typeface::Ptr, 2> faces { // (the name finds a memory face only while it lives)
+            juce::Typeface::createSystemTypefaceFor (lynxfontdata::OpenSansRegular_ttf, (size_t) lynxfontdata::OpenSansRegular_ttfSize),
+            juce::Typeface::createSystemTypefaceFor (lynxfontdata::OpenSansBold_ttf, (size_t) lynxfontdata::OpenSansBold_ttfSize)
+        };
+        if (faces[0] != nullptr)
+            setDefaultSansSerifTypefaceName (faces[0]->getName());
+    }
    #endif
     refreshColours();
 }
@@ -492,6 +510,57 @@ juce::String LookAndFeel::applyLanguageFont (const juce::String& languageId)
     if (family.isNotEmpty())
         setDefaultSansSerifTypefaceName (family);
     return family; // empty: JUCE's per-glyph font fallback still finds whatever CJK font the OS has
+}
+
+juce::String defaultUiFont()
+{
+   #if JUCE_WINDOWS
+    return "Segoe UI";
+   #elif LYNX_BUNDLED_FONT
+    return "Open Sans";
+   #else
+    return {}; // macOS: what JUCE picks there, unchanged
+   #endif
+}
+
+juce::StringArray installedUiFonts()
+{
+    auto names = juce::Font::findAllTypefaceNames();
+    names.removeDuplicates (false);
+    names.removeEmptyStrings();
+    names.sortNatural();
+    return names;
+}
+
+static juce::File uiFontFile() { return platform::settingsFile ("ui-font.txt"); }
+
+juce::String savedUiFont() { return uiFontFile().loadFileAsString().trim(); }
+
+void saveUiFont (const juce::String& family)
+{
+    if (family.isEmpty())
+        uiFontFile().deleteFile();
+    else
+        uiFontFile().replaceWithText (family);
+}
+
+juce::String LookAndFeel::applyInterfaceFont (const juce::String& languageId, const juce::String& runOverride)
+{
+    const auto saved = runOverride.isNotEmpty() ? runOverride : savedUiFont();
+    if (saved.isNotEmpty())
+    {
+        const auto installed = juce::Font::findAllTypefaceNames(); // (only when a font was chosen: it costs a scan)
+        const auto family = chooseUiFont (saved.toStdString(), [&installed] (const std::string& name) {
+            return installed.contains (juce::String::fromUTF8 (name.c_str()));
+        });
+        if (! family.empty())
+        {
+            // the user's font also in Chinese, Japanese and Korean: what it lacks comes from JUCE's per-glyph fallback
+            setDefaultSansSerifTypefaceName (juce::String::fromUTF8 (family.c_str()));
+            return juce::String::fromUTF8 (family.c_str());
+        }
+    }
+    return applyLanguageFont (languageId);
 }
 
 void LookAndFeel::refreshColours()

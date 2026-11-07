@@ -24,6 +24,7 @@
 #include "ui/HintBar.h"
 #include "ui/Splash.h"
 #include "ui/FrameTicker.h"
+#include "ui/Motion.h"
 #include "ui/Toolbar.h"
 #include "ui/Updater.h"
 #include "ui/ValueControl.h"

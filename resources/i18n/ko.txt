@@ -7359,3 +7359,7 @@ countries: kr
 "{0} crashed in its separate process." = "{0}이(가) 별도 프로세스에서 충돌했습니다."
 "{0} stopped responding (separate process)." = "{0}이(가) 응답하지 않습니다(별도 프로세스)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "해당 프로세스만 영향을 받았습니다. LYNX SHARE와 프로젝트는 계속 실행되었고 플러그인은 음소거되었습니다. 프로젝트를 저장하세요. 다음에 열 때 플러그인이 다시 로드됩니다."
+"Interface font" = "인터페이스 글꼴"
+"Default ({0})" = "기본값 ({0})"
+"A new interface font is applied when LYNX SHARE restarts." = "새 인터페이스 글꼴은 LYNX SHARE를 다시 시작하면 적용됩니다."
+"Animations: panels fade in and out, buttons light up gently, the wheel glides" = "애니메이션: 패널이 서서히 나타나고 사라지며, 버튼이 부드럽게 켜지고, 휠 스크롤이 부드럽게 움직입니다"

@@ -17,6 +17,7 @@ class AudioEngine;
 struct GeneralOptions
 {
     juce::String language;      // i18n id ("en", "pt-BR")
+    juce::String uiFont;        // family; empty: the platform's default (ui-font.txt, read at start-up)
     int uiScale = 100;          // percent
     bool compactMenus = true;   // menu density: compact (native-like rows) or comfortable (round 163)
     bool waveSpectral = false, waveStereo = false;
@@ -44,6 +45,7 @@ struct GeneralOptions
     int crashReports = 0;          // crashreport::Consent: 0 ask, 1 always send, 2 never (round 159)
     bool checkUpdates = true;      // "Check for updates automatically" (ui/Updater.h, round 166b)
     bool reducedEffects = false;
+    bool uiAnimations = true;      // round 179a: panel fades, hover fades, wheel glide (ui/Motion.h)
     bool artMotion = true;         // round 170j: the Themed plugins' art moves (falling petals, glows...)
     int animationRate = 0;         // round 174e2: playhead / meters / scopes at the display's refresh (0), or at most 60 / 30 Hz
     bool gpuRendering = true;      // Windows: Direct2D (JUCE 8's default) or GDI for every LYNX window (round 157a)

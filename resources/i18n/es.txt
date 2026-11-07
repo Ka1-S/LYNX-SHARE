@@ -7359,3 +7359,7 @@ countries: es mx ar co cl pe ve
 "{0} crashed in its separate process." = "{0} falló en su proceso aparte."
 "{0} stopped responding (separate process)." = "{0} dejó de responder (proceso aparte)."
 "Only its process was affected: LYNX SHARE and your project kept running, and the plugin was muted. Save your project; the plugin loads again the next time you open it." = "Solo se vio afectado su proceso: LYNX SHARE y tu proyecto siguieron funcionando, y el plugin se silenció. Guarda tu proyecto; el plugin se carga de nuevo la próxima vez que lo abras."
+"Interface font" = "Fuente de la interfaz"
+"Default ({0})" = "Predeterminada ({0})"
+"A new interface font is applied when LYNX SHARE restarts." = "La nueva fuente de la interfaz se aplica al reiniciar LYNX SHARE."
+"Animations: panels fade in and out, buttons light up gently, the wheel glides" = "Animaciones: los paneles aparecen y desaparecen con un fundido, los botones se iluminan suavemente, la rueda se desliza"

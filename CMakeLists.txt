@@ -522,6 +522,16 @@ if(LYNX_BUILD_APP)
         target_link_libraries(LYNX PRIVATE ${CMAKE_DL_LIBS})
     endif()
 
+    # the UI font on Linux and the BSDs (src/ui/Theme.cpp); Windows and macOS use their own and don't carry the files
+    if(UNIX AND NOT APPLE)
+        juce_add_binary_data(LynxFontData
+            HEADER_NAME LynxFontData.h
+            NAMESPACE lynxfontdata
+            SOURCES resources/fonts/OpenSans-Regular.ttf resources/fonts/OpenSans-Bold.ttf)
+        target_link_libraries(LYNX PRIVATE LynxFontData)
+        target_compile_definitions(LYNX PRIVATE LYNX_BUNDLED_FONT=1)
+    endif()
+
     target_link_libraries(LYNX
         PRIVATE
             lynx_core

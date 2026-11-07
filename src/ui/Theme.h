@@ -105,6 +105,13 @@ juce::String mnemonic (const juce::String& text, char key);
 juce::String uiFontForLanguage (const juce::String& languageId);
 bool needsOwnFont (const juce::String& languageId);
 
+// Settings › General › Interface font (round 179a). The platform's default family (empty on macOS: JUCE's own pick), the
+// installed families for the list, and the choice saved in the profile (empty: the default).
+juce::String defaultUiFont();
+juce::StringArray installedUiFonts();
+juce::String savedUiFont();
+void saveUiFont (const juce::String& family);
+
 // Same for a text button (its padding included).
 int buttonWidth (const juce::TextButton& button, int minWidth, int maxWidth);
 
@@ -233,6 +240,10 @@ public:
     // other Latin UI fonts have no CJK glyphs; the font fallback would otherwise pick a CJK face per run, which may be
     // a Chinese face for Japanese text). Returns the chosen family, or empty when the default is kept.
     juce::String applyLanguageFont (const juce::String& languageId);
+
+    // At start-up: the font saved in Settings (runOverride: --uifont, for this run only) when it is installed, else
+    // the default for this language (applyLanguageFont). Returns the family chosen, empty when the default stays.
+    juce::String applyInterfaceFont (const juce::String& languageId, const juce::String& runOverride = {});
 
     // property set on a Button / TabBarButton to draw one of lynx::Icon next to (or instead of) its text
     static constexpr const char* iconProperty = "lynxIcon";
