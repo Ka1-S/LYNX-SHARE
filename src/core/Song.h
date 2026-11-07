@@ -4,6 +4,7 @@
 // The UI edits a copy and publishes an immutable snapshot to the audio thread
 // (see SnapshotExchange.h), so nothing here needs to be thread-safe.
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
