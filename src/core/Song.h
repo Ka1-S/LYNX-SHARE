@@ -33,6 +33,14 @@ constexpr float unityFader = 0.8f;    // fader position that gives 0 dB, as in F
 // mouse, one step at once and one every ~64 ms while the button is held, and stops under the mouse. It never jumps.
 constexpr float faderRailStep = 0.0056f; // of the fader's travel (100 clicks: 100 % -> 30 % in FL's hint)
 constexpr int faderRailRepeatMs = 64;
+// The first repeat comes later than the rate, so a click never takes two steps however long the button stays down in it.
+// 300 ms is INFERRED (the usual Windows first delay) until FL's own is measured (REA_rodada177a section 4.2).
+constexpr int faderRailFirstRepeatMs = 300;
+// how many steps a press held `heldMs` takes: one at once, one at the first delay, then one every faderRailRepeatMs
+constexpr int faderRailStepsForHold (int heldMs) noexcept
+{
+    return heldMs < faderRailFirstRepeatMs ? 1 : 2 + (heldMs - faderRailFirstRepeatMs) / faderRailRepeatMs;
+}
 constexpr float faderRailStepTowards (float value, float target) noexcept
 {
     const auto distance = target - value;
