@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <limits>
 
 // FL's Fruity Slicer (Fruity Slicer_x64.dll, docs/analise/REA_rodada180c.md §Fruity Slicer). The sample edits keep FL's
 // arithmetic: double-precision ramps, Delphi's Round (half to even, std::nearbyint), the result stored as float (FL turns the sample to float before its declick).
@@ -106,8 +107,8 @@ std::optional<State> parse (const std::vector<std::uint8_t>& bytes)
         Slice slice;
         slice.name = in.str8();
         slice.position = in.read<std::int32_t>();
-        slice.extraA = in.read<std::int32_t>();
-        slice.extraB = in.read<float>();
+        slice.key = in.read<std::int32_t>();
+        slice.beat = in.read<float>();
         slice.flags = in.read<std::uint8_t>();
         s.slices.push_back (std::move (slice));
     }
@@ -147,8 +148,8 @@ std::vector<std::uint8_t> write (const State& s)
     {
         out.str8 (slice.name);
         out.put (slice.position);
-        out.put (slice.extraA);
-        out.put (slice.extraB);
+        out.put (slice.key);
+        out.put (slice.beat);
         out.put (slice.flags);
     }
     out.put (s.animate);
@@ -317,6 +318,9 @@ void configureSampler (ChannelDef& def, const State& state, std::int64_t frames)
                 def.sampler.slices.push_back ((float) ((double) slice.position / (double) frames));
     def.sampler.sliceFirstKey = state.firstNote;
     def.sampler.slicesToEnd = state.playToEnd != 0;
+    // PS: FL shifts the pitch and keeps the length through its licensed stretch engine; LYNX resamples (the slice gets
+    // shorter or longer with the pitch)
+    def.sampler.pitch = std::clamp (def.sampler.pitch + (float) state.pitchCents / 100.0f, -24.0f, 24.0f);
 }
 
 State fresh (const std::string& path, int sampleRate)
@@ -326,5 +330,161 @@ State fresh (const std::string& path, int sampleRate)
     s.sampleRate = sampleRate;
     s.slices.push_back ({});
     return s;
+}
+int sliceKey (const State& state, int index)
+{
+    // FUN_0076b4f0
+    auto key = index >= 0 && index < (int) state.slices.size() ? state.slices[(std::size_t) index].key : -1;
+    if (key < 0)
+        key = state.firstNote + index;
+    return std::clamp (key, 0, 124);
+}
+
+std::vector<DumpNote> dumpNotes (const State& state, int tag, std::int64_t frames, double sampleRate, double bpm, int ppq,
+                                 const std::function<int (int)>& random)
+{
+    // FUN_0076b640 and its two local functions (FUN_0076b570: sample position → ticks, FUN_0076b5b0: rounding,
+    // quantize and swing). FL hands it the project's PPQ; P+0x188 is taken as 4 (HYP: the bar's beats, /4 cancels it).
+    std::vector<DumpNote> notes;
+    const auto n = (int) state.slices.size();
+    if (n <= 0)
+        return notes;
+    const int beatsPerBar = 4;
+    float perFrame = 0.0f;
+    if (frames != 0)
+        perFrame = (((float) (ppq * beatsPerBar) * state.lengthBeats) / (float) frames) / 4.0f;
+    int stereo = -16;
+    int threshold = -(ppq / 8);
+    const int step = ppq / 4;
+    const int repeat = tag < 13 ? 1 : 1 << (tag - 12);
+    float realTime = 0.0f;
+    if (tag == 9)
+        realTime = (float) ((double) frames / (sampleRate * 60.0)) * (float) bpm * (float) ppq;
+
+    const auto toTicks = [&] (std::int32_t position) {
+        return tag == 9 ? ((float) position * realTime) / (float) frames : (float) position * perFrame;
+    };
+    const auto place = [&] (float t) {
+        if (tag == 2 || tag == 3)
+        {
+            const auto q = (int) std::nearbyint ((double) (t / (float) step));
+            auto r = q * step;
+            if (tag == 3 && (q & 1) == 1)
+                r += step / 3;
+            return r;
+        }
+        return (int) std::nearbyint ((double) t);
+    };
+
+    std::vector<int> times;
+    for (const auto& slice : state.slices)
+        times.push_back (slice.beat < 0.0f || tag == 9 ? place (toTicks (slice.position)) : place ((float) (unsigned) (slice.beat * (float) ppq)));
+    times.push_back (tag == 9 ? (int) std::nearbyint ((double) realTime)
+                              : (int) std::nearbyint ((double) ((state.lengthBeats * (float) ppq * (float) beatsPerBar) / 4.0f)));
+
+    for (int i = 0; i < n; ++i)
+    {
+        DumpNote note;
+        note.start = times[(std::size_t) i];
+        int length = std::numeric_limits<int>::max();
+        for (const auto t : times)
+            if (t > note.start)
+                length = std::min (length, t - (int) note.start);
+        note.length = length == std::numeric_limits<int>::max() ? 1 : length;
+
+        int index = i;
+        if (tag == 1)
+            index = n - i - 1;
+        else if (tag == 4)
+            index = random (n);
+        else if (tag == 5)
+            index = 0;
+        else if (tag == 10)
+            index = i - 1;
+        else if (tag == 11)
+            index = i + 1;
+        index = (index + n) % n;
+        note.key = sliceKey (state, index);
+
+        if (tag == 6)
+        {
+            if (note.start < threshold)
+                note.velocity = 0.7421875f;
+            else
+            {
+                note.velocity = 0.859375f;
+                threshold += ppq;
+            }
+        }
+        else if (tag == 7)
+        {
+            if (threshold <= note.start)
+            {
+                if (note.start < threshold + ppq)
+                    note.pitchCents = 300;
+                else
+                    threshold += ppq * 2;
+            }
+        }
+        else if (tag == 8)
+        {
+            note.pan = stereo;
+            stereo = -stereo;
+        }
+        else if (tag == 12)
+        {
+            note.pan = random (17) - 8;
+            note.velocity = (float) (random (20) + 90) / 128.0f;
+            note.pitchCents = random (801) - 200;
+        }
+
+        if (repeat > 1)
+        {
+            const auto first = note.start, whole = note.length;
+            auto at = first;
+            for (int k = 1; k <= repeat; ++k)
+            {
+                const auto next = first + (k * whole) / repeat;
+                auto part = note;
+                part.start = at;
+                part.length = std::max<std::int64_t> (1, next - at);
+                notes.push_back (part);
+                at = next;
+            }
+        }
+        else
+            notes.push_back (note);
+    }
+    return notes;
+}
+
+std::vector<std::int32_t> gridSlices (const State& state, std::int64_t frames, double beats)
+{
+    std::vector<std::int32_t> starts;
+    if (frames <= 0 || beats <= 0.0 || state.lengthBeats <= 0.0f)
+        return { 0 };
+    const auto framesPerBeat = (double) frames / (double) state.lengthBeats;
+    for (double b = 0.0; b * framesPerBeat < (double) frames - 0.5; b += beats)
+        starts.push_back ((std::int32_t) std::nearbyint (b * framesPerBeat));
+    return starts;
+}
+
+std::vector<std::int32_t> zeroCrossSlices (const std::vector<std::int32_t>& starts, const SampleData& sample)
+{
+    const auto frames = (std::int64_t) sample.frames();
+    const auto* x = sample.leftData();
+    auto crossing = [&] (std::int64_t i) { return i <= 0 || i >= frames || (x[i - 1] <= 0.0f) != (x[i] <= 0.0f); };
+    std::vector<std::int32_t> out;
+    for (const auto s : starts)
+    {
+        std::int64_t best = s;
+        for (std::int64_t d = 0; d < 4096; ++d)
+        {
+            if (crossing (s - d)) { best = s - d; break; }
+            if (crossing (s + d)) { best = s + d; break; }
+        }
+        out.push_back ((std::int32_t) std::clamp<std::int64_t> (best, 0, std::max<std::int64_t> (0, frames - 1)));
+    }
+    return out;
 }
 } // namespace lynx::fslicer

@@ -1338,7 +1338,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     if (def.instrument == InstrumentKind::fruityslicer)
                         def.pluginState = c.pluginState;
                     def.samplePath = path;
-                    def.sampler.pitch = std::clamp (def.sampler.pitch + sliced->pitchCents / 100.0f, -24.0f, 24.0f);
+                    if (def.instrument != InstrumentKind::fruityslicer) // (Fruity Slicer: its state's PS, at the rack)
+                        def.sampler.pitch = std::clamp (def.sampler.pitch + sliced->pitchCents / 100.0f, -24.0f, 24.0f);
                     // Slicex: FL's host hands the plugin Init.Vol (REA_rodada170i §6; Fruity Slicer's render test is
                     // ruled by its licensed stretch and does not show it, so it keeps the linear velocity)
                     def.sampler.flVelocityLaw = name == "slicex";

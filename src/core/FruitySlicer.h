@@ -6,6 +6,7 @@
 // slice at the sample's own pitch.
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -22,8 +23,8 @@ struct Slice
 {
     std::string name;
     std::int32_t position = 0;  // first frame of the slice in the sample
-    std::int32_t extraA = -1;   // two fields FL always saves as −1 / −1.0
-    float extraB = -1.0f;
+    std::int32_t key = -1;      // the slice's own key (SliceKeyMenu); −1 = the first note + its index
+    float beat = -1.0f;         // its place in beats when it came with one (a .zgr groove); −1 = from its position
     std::uint8_t flags = 0;     // bit 0: reversed ("REV")
 
     bool reversed() const noexcept { return (flags & 1) != 0; }
@@ -77,5 +78,29 @@ void configureSampler (ChannelDef& def, const State& state, std::int64_t frames)
 
 // A new Fruity Slicer state for a sample: one slice at the start, FL's defaults
 State fresh (const std::string& path, int sampleRate);
+
+// "Dump beat to piano roll" (FUN_0076b640): FL's menu tags — 0 Normal, 1 Reverse, 2 Quantize, 3 Swing, 4 Random,
+// 5 Flatten, 6 Accentuate beat, 7 Pitch up beat, 8 Widen stereo, 9 Original length, 10 Shift up, 11 Shift down,
+// 12 Crazy, 13 Stutter (half), 14 Stutter (fourth)
+struct DumpNote
+{
+    std::int64_t start = 0, length = 1; // ticks at `ppq`
+    int key = 60;
+    float velocity = 0.78125f;          // FL's 100/128
+    int pan = 0;                        // FL's −64…64
+    int pitchCents = 0;
+};
+// `frames` / `sampleRate`: the sample; `bpm`: the project's tempo (Original length places the slices in real time).
+// `random` (0 ≤ r < n) stands in for Delphi's Random, whose seed LYNX does not share.
+std::vector<DumpNote> dumpNotes (const State& state, int tag, std::int64_t frames, double sampleRate, double bpm, int ppq,
+                                 const std::function<int (int)>& random);
+
+// Slice starts every `beats` beats (FL's 1/6 … 1 beat slicing: tags 106, 104, 103, 102, 101) of a sample that lasts
+// state.lengthBeats
+std::vector<std::int32_t> gridSlices (const State& state, std::int64_t frames, double beats);
+// "Zero-cross check slices": each start moved to the nearest zero crossing of the left channel
+std::vector<std::int32_t> zeroCrossSlices (const std::vector<std::int32_t>& starts, const SampleData& sample);
+// The key of slice i (its own key, else the first note + i)
+int sliceKey (const State& state, int index);
 } // namespace fslicer
 } // namespace lynx
