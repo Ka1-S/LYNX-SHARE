@@ -8008,3 +8008,5 @@ countries: kr
 "Audition this take: it plays instead of the comp" = "이 테이크 미리 듣기: 컴프 대신 재생됩니다"
 "Drag across this take to send that range to the comp. Drag its title to move it" = "테이크 위로 드래그하면 그 범위를 컴프로 보냅니다. 옮기려면 제목을 드래그하세요"
 "Swipe to comp" = "컴프로 스와이프"
+"Send the time selection to the comp" = "시간 선택을 컴프로 보내기"
+"Send the time selection of the take lane to its comp" = "테이크 레인의 시간 선택을 해당 컴프로 보내기"

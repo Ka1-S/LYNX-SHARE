@@ -446,6 +446,24 @@ from a 48 kHz file, so the residual against the source (−16.5 dB) is the resam
   name is no longer used (the GUI session above still showed "Insert 6 comp"). Test: `comp177_comp_these_takes`.
 - **Open:** FL's render ends about 6 ms (280 samples at 44.1 kHz) after LYNX's on the same `.flp` (§12). Not looked into.
 
+## 13. How Live swipes, and the swipe choice [RUN]
+
+Live 12.4.16 Trial, a copy of Live's own Patience demo with "Vocal Main" given three audio take lanes and a comp in progress
+(`E:\lynx-work\comp177c\live\`): a plain drag on a lane body only makes a time selection (main lane unchanged); Enter then
+copies it to the main lane; in Draw mode (B) a drag on a lane copies at once. Used parts are lit in the take's colour.
+LYNX swipes on a plain drag (Logic's Quick Swipe). The choice is the user's: (a) keep, (b) Live's way, (c) both.
+
+Prepared behind `PlaylistComponent::swipeStyle` (default (a), so nothing changes until the decision):
+- (b) `liveSelectEnter`: only the brush tool (LYNX's nearest to Live's Draw mode; LYNX's default pencil is FL's) swipes on a
+  drag; "Send the time selection to the comp" (lane track menu, action `playlist.swipeSelectionToComp`) does Live's Enter.
+- (c) `both`: the drag swipes with any tool, and the command works too.
+- No key is bound: Enter is FL's "Maximize or restore the Playlist" (`panel.maximisePlaylist`). Giving Enter to the comp
+  when a lane has a time selection would change an FL key, which needs the user's word.
+
+Live session notes: Live's plug-in scan raised Antares PACE "Subscription License Has Expired" boxes (3 at start, 16 on the
+restored scan), each closed with Quit only. Live's VST3 system folders were turned off for the session in Live's Settings and
+turned back on the same way; `Preferences.cfg` then differed from the backup in the recent-files list and browser rows.
+
 ## 14. Living with round 180d's FL fades (merge of 2026-11-08)
 
 Round 180d (FL's fade tension, straight fades, FL's fade flags) landed first and owns the clip array's indices 17-20. The comp

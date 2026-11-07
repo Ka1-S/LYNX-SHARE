@@ -8008,3 +8008,5 @@ countries: nl be
 "Audition this take: it plays instead of the comp" = "Deze take beluisteren: speelt in plaats van de comp"
 "Drag across this take to send that range to the comp. Drag its title to move it" = "Sleep over deze take om dat bereik naar de comp te sturen. Sleep de titel om de take te verplaatsen"
 "Swipe to comp" = "Naar de comp vegen"
+"Send the time selection to the comp" = "Tijdselectie naar de comp sturen"
+"Send the time selection of the take lane to its comp" = "Tijdselectie van de take-baan naar de comp sturen"

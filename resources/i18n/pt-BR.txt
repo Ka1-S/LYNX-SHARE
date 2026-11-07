@@ -8091,3 +8091,5 @@ countries: br
 "Audition this take: it plays instead of the comp" = "Ouvir este take: ele toca no lugar do comp"
 "Drag across this take to send that range to the comp. Drag its title to move it" = "Arraste sobre este take para enviar o trecho ao comp. Arraste o título para mover"
 "Swipe to comp" = "Enviar ao comp"
+"Send the time selection to the comp" = "Enviar a seleção de tempo ao comp"
+"Send the time selection of the take lane to its comp" = "Enviar a seleção de tempo da trilha de take ao comp"

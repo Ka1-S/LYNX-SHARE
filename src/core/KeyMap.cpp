@@ -263,6 +263,8 @@ std::vector<Action> makeActions()
         { "playlist.blocksToClips", TR_NOOP ("Turn pattern blocks into clips"), Context::playlist, {} },
         // FL's Select › time (round 167k: EESelAroundSelAction, EESelPrevAction / EESelNextAction, Playlist focused)
         { "playlist.selectTimeAround", TR_NOOP ("Select time around selection"), Context::playlist, { chord (enter, ctrl) } },
+        // comping (round 177c, Live's select + Enter; no key yet: Enter is FL's "Maximize or restore the Playlist")
+        { "playlist.swipeSelectionToComp", TR_NOOP ("Send the time selection of the take lane to its comp"), Context::playlist, {} },
         { "playlist.timePrevious", TR_NOOP ("Select previous time"), Context::playlist, { chord (left, ctrl) } },
         { "playlist.timeNext", TR_NOOP ("Select next time"), Context::playlist, { chord (right, ctrl) } },
         // FL 2026's Playlist › Time markers (round 167k: EEMarkerAdd2Menu 32852, EEMarkerAddAutoMenu 16468,

@@ -8008,3 +8008,5 @@ countries: tw hk mo
 "Audition this take: it plays instead of the comp" = "試聽此錄音：取代合成軌播放"
 "Drag across this take to send that range to the comp. Drag its title to move it" = "在此錄音上拖曳可將該範圍送入合成軌。拖曳標題可移動"
 "Swipe to comp" = "劃入合成軌"
+"Send the time selection to the comp" = "將時間選區送入合成軌"
+"Send the time selection of the take lane to its comp" = "將錄音軌的時間選區送入其合成軌"

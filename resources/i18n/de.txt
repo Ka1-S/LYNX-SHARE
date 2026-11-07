@@ -8008,3 +8008,5 @@ countries: de at ch li lu
 "Audition this take: it plays instead of the comp" = "Diesen Take vorhören: Er spielt anstelle der Comp"
 "Drag across this take to send that range to the comp. Drag its title to move it" = "Über diesen Take ziehen, um den Bereich in die Comp zu übernehmen. Am Titel ziehen, um ihn zu verschieben"
 "Swipe to comp" = "Zum Comp wischen"
+"Send the time selection to the comp" = "Zeitauswahl in die Comp übernehmen"
+"Send the time selection of the take lane to its comp" = "Zeitauswahl der Take-Spur in ihre Comp übernehmen"

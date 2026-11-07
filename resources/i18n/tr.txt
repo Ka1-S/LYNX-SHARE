@@ -8008,3 +8008,5 @@ countries: tr
 "Audition this take: it plays instead of the comp" = "Bu kaydı dinle: comp yerine çalar"
 "Drag across this take to send that range to the comp. Drag its title to move it" = "Aralığı comp'a göndermek için kaydın üzerinde sürükleyin. Taşımak için başlığını sürükleyin"
 "Swipe to comp" = "Comp'a aktar"
+"Send the time selection to the comp" = "Zaman seçimini comp'a gönder"
+"Send the time selection of the take lane to its comp" = "Kayıt şeridinin zaman seçimini comp'una gönder"

@@ -8008,3 +8008,5 @@ countries: id
 "Audition this take: it plays instead of the comp" = "Dengarkan take ini: diputar sebagai ganti comp"
 "Drag across this take to send that range to the comp. Drag its title to move it" = "Seret di atas take ini untuk mengirim rentang itu ke comp. Seret judulnya untuk memindahkan"
 "Swipe to comp" = "Sapu ke comp"
+"Send the time selection to the comp" = "Kirim pilihan waktu ke comp"
+"Send the time selection of the take lane to its comp" = "Kirim pilihan waktu lajur take ke comp-nya"

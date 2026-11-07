@@ -8008,3 +8008,5 @@ countries: ru by kz
 "Audition this take: it plays instead of the comp" = "Прослушать этот дубль: звучит вместо компа"
 "Drag across this take to send that range to the comp. Drag its title to move it" = "Проведите по дублю, чтобы отправить диапазон в комп. Перетащите заголовок, чтобы переместить"
 "Swipe to comp" = "Перенос в комп"
+"Send the time selection to the comp" = "Отправить выделение времени в комп"
+"Send the time selection of the take lane to its comp" = "Отправить выделение времени дорожки дубля в её комп"
