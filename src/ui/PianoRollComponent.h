@@ -4,6 +4,7 @@
 
 #include "core/NoteTools.h"
 #include "engine/AudioEngine.h"
+#include "ui/TimerWhileShowing.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
 #include "ui/FlMods.h"
@@ -362,6 +363,7 @@ private:
     NoteMask soundingNow() const;
     bool isLit (int key) const noexcept { return key >= 0 && key < 128 && ((litKeys[(std::size_t) (key >> 6)] >> (key & 63)) & 1u) != 0; }
     double playheadTick = -1.0;
+    juce::Rectangle<int> liveHeldArea; // round 177d: where the held notes of a take were last drawn
 
     std::vector<int> selection;     // indices into Pattern::notes, sorted
     std::vector<int> selectionBefore; // selection at the start of a Shift+rectangle
@@ -424,5 +426,6 @@ private:
     void showPatternMarkerMenu (int index);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRollComponent)
+    std::unique_ptr<ui::TimerWhileShowing> showingTimer; // the polling timer, only while on screen (round 174f)
 };
 } // namespace lynx
