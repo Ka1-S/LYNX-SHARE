@@ -895,7 +895,7 @@ void MainComponent::resized()
     auto minHint = juce::jmax (menuWidth + 8, 320);
     const auto maxHint = room >= 3000 ? 1000 : 620;
     auto visible = toolbarlayout::fit (toolbarLayout, widths, gap, room, minHint);
-    // round 181b: the Chord detection panel is on the default toolbar, as in FL. At 1920 px it misses by about 80 px:
+    // round 181b: the Chord detection panel is on the default toolbar, as in FL. At 1920 px it misses by about 90 px:
     // tighter displays and gaps make the room (they get wider again when there is more); all the panels stay
     if (toolbarLayout.visible && toolbarLayout.isShown (Group::chord) && ! visible[(std::size_t) Group::chord] && visible[(std::size_t) Group::record])
     {
@@ -903,12 +903,12 @@ void MainComponent::resized()
         tighter[(std::size_t) Group::transport] -= 12 + 36; // the tempo and the song position, as narrow as the compact ones
         tighter[(std::size_t) Group::snap] -= 16;
         tighter[(std::size_t) Group::chord] = 88;
-        if (const auto fits = toolbarlayout::fit (toolbarLayout, tighter, 15, room, minHint); fits[(std::size_t) Group::chord])
+        if (const auto fits = toolbarlayout::fit (toolbarLayout, tighter, 13, room, minHint); fits[(std::size_t) Group::chord])
         {
             widths = tighter;
             tempoWidth -= 12;
             timeWidth -= 36;
-            gap = 15;
+            gap = 13;
             visible = fits;
         }
     }
