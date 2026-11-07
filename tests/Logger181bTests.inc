@@ -168,9 +168,17 @@ TEST (logger181b_audio_thread_keeps_running_while_the_ui_swaps)
             log.setEnabled (true);
         }
     }
+    // audio comes back after all of it (the audio thread may not have run since the last change, so give it time)
+    auto dumped = false;
+    for (int i = 0; i < 500 && ! dumped; ++i)
+    {
+        dumped = log.dump (d);
+        if (! dumped)
+            std::this_thread::sleep_for (std::chrono::milliseconds (10));
+    }
     stop.store (true);
     audio.join();
-    CHECK (log.isEnabled() && log.dump (d));
+    CHECK (log.isEnabled() && dumped);
 }
 
 TEST (chord181b_names)
