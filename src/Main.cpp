@@ -9517,6 +9517,11 @@ private:
                         lynx::eventedit::line (lane, 0, lynx::ppq * 2, 0.05f, 0.11f, lynx::ticksPerStep);
                 }, false);
                 saveWindow (lynx::makeEventEditor (offline, tempo), "-eventeditor-tempo.png");
+                {
+                    auto compact = lynx::makeEventEditor (offline, tempo); // the toolbar in a small window
+                    compact->setSize (640, 300);
+                    saveWindow (std::move (compact), "-eventeditor-tempo-small.png");
+                }
                 offline.editSong ([&] (lynx::Song& s) { s.patterns[(std::size_t) s.currentPattern].events = before; }, false);
             }
 

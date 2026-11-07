@@ -187,5 +187,13 @@ e5, e7, e8, e11, f2. Files FL wrote: fl/tempoev.fsc, fl/t87b.flp.
   was not tested.
 - **Deliberate difference from FL (coordinator's decision, 2026-11-06):** LYNX keeps "Edit events in piano roll" enabled for the
   tempo, as a LYNX addition, because issue #86 asks for that route. This item is not FL-exact.
-- **Lane view, open difference:** FL's Tempo lane has a vertical scrollbar and opened zoomed in: 66.651 BPM sat about 77% up the lane. LYNX's
-  lane always shows 10..522 BPM, so usual tempos stay near the bottom. FL's rule for the zoom was not read in the code.
+- **Tempo lane zoom:** FUN_00e3d440 calls virtual +0x1f0 of the form's +0x7c8 control with **7 for 0x40000005 (Tempo)**, 20 for a channel's
+  param 4 (pitch), 1 otherwise; FUN_00e3d310 (note properties) passes 1. §1 read this as a "display kind"; the measurements fit a vertical zoom
+  factor: drawing at the lane's y=250 and y=926 showed 82.714 and 10.321 BPM, so 0.10709 BPM per pixel, 10 BPM at y=929 and 83.1 BPM at the lane's
+  top (y=246): 512 / 7 = 73.14 BPM of range from the bottom. Same scrollbar position at project tempos 86 and 130, so it does not follow the
+  project tempo (and 130 BPM starts out of view). [DECOMP + measured] UNPROVEN: that +0x7c8 is the zoom control by name.
+- **LYNX now:** the Tempo lane opens on 10..83.14 BPM with a scrollbar for the rest. Other lanes keep their full range, including channel pitch (FL's 20x is not matched).
+  The piano roll's event lane is unchanged.
+- **Held value:** FL fills a Tempo lane's last value to the visible edge, past the pattern end (t87b at 86 BPM and the Default template at 130 BPM). LYNX
+  now does so for Tempo only; other FL lanes were not observed.
+- **Title and hint:** "Events - Tempo", 3 decimals in the hint (Event editor and piano roll event lane), as in FL.

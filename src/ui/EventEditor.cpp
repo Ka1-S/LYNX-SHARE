@@ -33,6 +33,7 @@ bool bipolarTarget (const AutomationTarget& t) noexcept
 
 class EventEditor final : public juce::Component,
                           private juce::ChangeListener,
+                          private juce::ScrollBar::Listener,
                           private juce::Timer
 {
 public:
@@ -50,6 +51,7 @@ public:
             {
                 target = targets[(std::size_t) i];
                 selectionStart = selectionEnd = -1;
+                targetChanged();
                 repaint();
             }
         };
@@ -140,8 +142,11 @@ public:
         fileButton.onClick = [this] { showFileMenu(); };
         addAndMakeVisible (fileButton);
 
+        valueBar.addListener (this);
+        addChildComponent (valueBar);
         rebuildTargets();
         setSize (980, 400);
+        targetChanged();
         setWantsKeyboardFocus (true);
         startTimerHz (30);
     }
@@ -191,6 +196,10 @@ public:
             }
         }
 
+        // (a zoomed lane has values above its top: nothing of them may reach the toolbar)
+        g.saveState();
+        g.reduceClipRegion (area);
+
         for (auto v : { 0.25f, 0.5f, 0.75f })
         {
             g.setColour (colour::gridStep.brighter (v == 0.5f && bipolarTarget (target) ? 0.4f : 0.15f));
@@ -231,7 +240,9 @@ public:
             const auto& ev = lane->events;
             for (std::size_t i = 0; i < ev.size(); ++i)
             {
-                const auto end = i + 1 < ev.size() ? ev[i + 1].tick : juce::jmax (length, ev[i].tick + gridTicks());
+                // the last value holds to the pattern's end; a Tempo event's to the visible edge, as in FL (seen in two projects)
+                const auto holdTo = target.kind == AutomationTargetKind::tempo ? juce::jmax (length, (std::int64_t) std::ceil (xToTick (area.getRight()))) : length;
+                const auto end = i + 1 < ev.size() ? ev[i + 1].tick : juce::jmax (holdTo, ev[i].tick + gridTicks());
                 const auto x0 = (float) tickToX ((double) ev[i].tick) + 1.0f, x1 = (float) tickToX ((double) end) - 1.0f;
 
                 if (x1 < (float) area.getX() || x0 > (float) area.getRight())
@@ -260,6 +271,8 @@ public:
             g.drawLine ((float) tickToX ((double) lineFrom->first), valueToY (lineFrom->second), (float) lineTo.x, (float) lineTo.y, 1.5f);
         }
 
+        g.restoreState();
+
         // playback position
         if (playhead >= 0.0)
         {
@@ -272,7 +285,7 @@ public:
         {
             g.setColour (colour::textPrimary);
             g.setFont (font (type::small));
-            g.drawText (target.kind == AutomationTargetKind::tempo ? automationPointValueText (target, hoverValue) // (issue #86: BPM)
+            g.drawText (target.kind == AutomationTargetKind::tempo ? juce::String (tempoFromValue (hoverValue), 3) + " BPM" // (issue #86: as FL's hint)
                                                                 : juce::String (juce::roundToInt (hoverValue * 100.0f)) + "%",
                         area.getRight() - 90, area.getY() + 4, 84, 16,
                         juce::Justification::centredRight);
@@ -330,6 +343,11 @@ public:
         auto tools = r.removeFromBottom (32);
         r.removeFromBottom (6);
         canvas = r.withTrimmedTop (4);
+        if (valueBar.isVisible())
+        {
+            auto bar = canvas.removeFromRight (14);
+            valueBar.setBounds (bar.withTrimmedTop (rulerHeight));
+        }
 
         const auto scaleW = theme::labelColumnWidth ({ &scaleLabel }, 42, 120), offsetW = theme::labelColumnWidth ({ &offsetLabel }, 44, 120),
                    randomW = theme::labelColumnWidth ({ &randomLabel }, 66, 140), lfoW = theme::labelColumnWidth ({ &lfoLabel }, 28, 80);
@@ -560,12 +578,42 @@ private:
                 targetBox.setSelectedItemIndex ((int) i, juce::dontSendNotification);
         }
 
-        const auto newTitle = tr ("Events - {0}", { juce::String::fromUTF8 (currentPattern().name.c_str()) });
+        updateTitle();
+    }
+
+    // FL names the Tempo lane in its title ("Events - Tempo"); LYNX's other lanes keep the pattern's name
+    void updateTitle()
+    {
+        const auto name = target.kind == AutomationTargetKind::tempo ? describeAutomationTarget (engine, target)
+                                                                     : juce::String::fromUTF8 (currentPattern().name.c_str());
+        const auto newTitle = tr ("Events - {0}", { name });
         if (newTitle != title.getText())
         {
             title.setText (newTitle, juce::dontSendNotification);
             resized(); // the title's width follows its text
         }
+    }
+
+    // FL opens the Tempo lane zoomed 7x from its bottom: 10..83.14 BPM, the rest behind a scrollbar (REA_rodada178a §10);
+    // the other lanes show their whole range
+    void targetChanged()
+    {
+        const auto zoomed = target.kind == AutomationTargetKind::tempo;
+        viewLow = 0.0f;
+        viewHigh = zoomed ? 1.0f / 7.0f : 1.0f;
+        valueBar.setRangeLimits (0.0, 1.0, juce::dontSendNotification);
+        valueBar.setCurrentRange (1.0 - viewHigh, viewHigh - viewLow, juce::dontSendNotification);
+        valueBar.setVisible (zoomed);
+        updateTitle();
+        resized();
+    }
+
+    void scrollBarMoved (juce::ScrollBar*, double start) override
+    {
+        const auto span = viewHigh - viewLow;
+        viewHigh = (float) (1.0 - start);
+        viewLow = viewHigh - span;
+        repaint();
     }
 
     // --- editing --------------------------------------------------------------------------------
@@ -876,12 +924,13 @@ private:
     float valueToY (float v) const
     {
         const auto a = plotArea().reduced (0, 6);
-        return (float) a.getBottom() - v * (float) a.getHeight();
+        return (float) a.getBottom() - (v - viewLow) / (viewHigh - viewLow) * (float) a.getHeight();
     }
     float yToValue (int y) const
     {
         const auto a = plotArea().reduced (0, 6);
-        return juce::jlimit (0.0f, 1.0f, (float) (a.getBottom() - y) / (float) juce::jmax (1, a.getHeight()));
+        const auto inView = juce::jlimit (0.0f, 1.0f, (float) (a.getBottom() - y) / (float) juce::jmax (1, a.getHeight()));
+        return viewLow + inView * (viewHigh - viewLow);
     }
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override
@@ -934,6 +983,8 @@ private:
     double pixelsPerTick = 0.05, scroll = 0.0, playhead = -1.0;
     bool fitted = false, resettingSliders = false;
     float hoverValue = -1.0f;
+    float viewLow = 0.0f, viewHigh = 1.0f; // the part of the 0..1 range the lane shows
+    juce::ScrollBar valueBar { true };
     std::int64_t selectionStart = -1, selectionEnd = -1, selectionAnchor = -1;
     std::optional<std::pair<std::int64_t, float>> lineFrom, lastDraw;
     juce::Point<int> lineTo;
