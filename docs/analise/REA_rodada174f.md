@@ -130,7 +130,45 @@ is badly blurred, names unreadable. **Neither cap matches FL**, which is sharp a
 
 **The wheel slows down after a zoom.** Same session, same build: w1 wheel 92 / 97 fps before the zoom runs, 35 / 31 after (median 29–34 ms, about an exact repaint). With the scaled zoom off (w0): 84 / 87
 before, 32 / 33 after, so the scaled zoom is not the cause. Slow too: q8 33–39, q2b 30–34. Not slow: q2 113–126 at load 6, whose view after zooming still started at bar 1 (bars 1–161; the slow ones
-showed about 17–145). Cause not found. Unverified candidate: `cacheShift` only shifts by whole pixels (174e2), which a view at a zoomed scale may not satisfy. Whether builds before 174f do this was not measured.
+showed about 17–145). Cause in section 3.5c.
+
+### 3.5c The wheel after a zoom: the cause and the fix [MEAS]
+
+**Regression check**, wheel fps before and after the zoom runs, same session each:
+
+| build | before | after |
+|---|---|---|
+| 0.1.24 | 28 / 30 | 34 / 35 |
+| base (s2d) | 76 / 72 | 75 / 76 |
+| n6 (174f-1) | 92 / 97 | 35 / 31 |
+| n6, `LYNX_ZOOM_SCALE=0` | 84 / 87 | 32 / 33 |
+| n8 with paint log (l1) | 82 / 88 | 30.8 / 28.9 |
+| n9 with the fix (n94, cloud exe) | 80.4 / 84.7 | 90.9 / 93.4 |
+
+Before and after compare within a row. The n94 row comes from a cloud-built exe and the others from local builds, so its fps should not be compared with theirs. None of these is a final figure.
+
+**Cause, from `LYNX_CACHE_LOG` (l1, 11808 paints).** After the zoom, the scroll frames alternate between ticks 50154.321 and 50462.963 at one zoom (0.002592 px per tick), that is 130.0 and 130.8 px, with
+dxExact +0.8 / -0.8. Each is rejected by `cacheShift` as not a whole pixel and painted whole (reason `dx-fraction`, 428 paints in the session, about 24–33 ms each). `cacheShift` was right to refuse; the view
+should not have moved. `glideFrame` rounded X to whole pixels on every frame, even when the glide was only vertical. A view between two pixels, which an anchored zoom leaves, went down to 130.0 on one frame
+and back to the target at 130.8 on the next, for as long as the wheel glide ran. A flip of 0.8 px per frame should also be visible as a sideways shake; no shot was taken to check that.
+
+**View position, not the zoom, is the variable** (`--cachetest`, Thief, plain-wheel glide of 7 frames, sideways moves):
+
+| build | view at 0.0 px | 130.0 px | 130.8 px |
+|---|---|---|---|
+| n9a, test without the fix | 0 | 0 | 7 |
+| n9, fix | 0 | 0 | 0 |
+
+This fits q2, whose view stayed at bar 1 (whole pixels); q2 was not re-run with the log, so that part is an inference.
+
+**Fix** (`glideFrame`): X is only rounded and stepped while it is moving sideways. n94: 0 `dx-fraction` paints, and wheel after the zoom no slower than before. `--cachetest` and Windows `--selftest` pass on n9.
+
+**Second bug, same test.** A sideways glide into the end of the song never finished without the fix (13 moves in 400 frames): the target was rounded past the end, the scroll bar clamped the view short of it, and
+the glide went on trying. The glide now takes the clamped position as its target.
+
+**Not explained: why base does not drop.** Base has the same `glideFrame`, and an exact paint of this size costs about the same, so 75 fps there does not fit the flip. A base build with a paint log (bl1) aborted
+before its zoom runs (another round's `--no-window` LYNX took the foreground; the guard stopped the session). This is about the history and does not change the fix. 174f-1 is the first build measured with the drop; what
+in it exposes the flip is unknown.
 
 ### 3.6 Invalid sessions, the profiler crash, the input guard [MEAS]
 
