@@ -229,6 +229,8 @@ const char* effectId (EffectKind k)
         case EffectKind::aether: return "aether";
         case EffectKind::ember: return "ember";
         case EffectKind::kilnChannel: return "kilnChannel";
+        case EffectKind::fretChannel: return "fretChannel";
+        case EffectKind::shellChannel: return "shellChannel";
         case EffectKind::lynxTune: return "lynxTune";
         case EffectKind::fruityPhaser: return "fruityPhaser";
         case EffectKind::epochVerb: return "epochVerb";
@@ -958,7 +960,7 @@ std::optional<EffectKind> effectFromId (const juce::String& id)
                     EffectKind::xyController, EffectKind::xyzController, EffectKind::controlSurface, EffectKind::hardwareInsert,
                     EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook,
                     EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis, EffectKind::flTransporter,
-                    EffectKind::kilnChannel })
+                    EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel })
         if (id == effectId (k))
             return k;
 
@@ -1695,7 +1697,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         def.sampler.sustain = juce::jlimit (0.0f, 1.0f, (float) (double) s.getProperty ("sustain", 1.0));
         def.sampler.stretchBeats = juce::jmax (0.0f, (float) (double) s.getProperty ("stretchBeats", 0.0));
         def.sampler.keepPitch = (bool) s.getProperty ("keepPitch", false);
-        def.sampler.stretchMethod = (StretchMethod) juce::jlimit (0, 2, (int) s.getProperty ("stretchMethod", 0));
+        def.sampler.stretchMethod = (StretchMethod) juce::jlimit (0, stretchMethodCount - 1, (int) s.getProperty ("stretchMethod", 0));
 
         if (auto* slices = s["slices"].getArray())
             for (const auto& v : *slices)
@@ -2780,14 +2782,27 @@ bool save (const Song& song, const juce::File& file, juce::String& error)
 {
     // Write to a temp file and swap, so a mid-write error doesn't destroy the previous project.
     juce::TemporaryFile temp (file);
+    const auto json = toJson (song);
 
-    if (! temp.getFile().replaceWithText (toJson (song)) || ! temp.overwriteTargetFileWithTemporary())
+    if (! temp.getFile().replaceWithText (json, false, false, nullptr) || ! temp.overwriteTargetFileWithTemporary())
     {
         error = utf8 ("could not write ") + file.getFullPathName();
         return false;
     }
 
+    // a save that "worked" on a full disk, a sync folder or a failing drive must not look like a save (D#92, round 180a)
+    if (file.loadFileAsString() != json)
+    {
+        error = utf8 ("the saved file could not be read back correctly: ") + file.getFullPathName();
+        return false;
+    }
+
     return true;
+}
+
+juce::File withProjectExtension (const juce::File& file)
+{
+    return file.getSiblingFile (juce::String::fromUTF8 (safety::withProjectExtension (file.getFileName().toStdString(), extension).c_str()));
 }
 
 std::optional<Song> load (const juce::File& file, juce::String& error)

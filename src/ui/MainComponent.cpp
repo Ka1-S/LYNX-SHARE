@@ -63,6 +63,7 @@
 #include "ui/AudioEditor.h"
 #include "ui/TempoTapper.h"
 #include "ui/ExportDialog.h"
+#include "ui/AlsExportDialog.h"
 #include "ui/FlStudioExportDialog.h"
 #include "ui/ParametricEqEditor.h"
 #include "ui/PluginWindow.h"
@@ -4248,11 +4249,7 @@ void MainComponent::confirmDiscard (std::function<void()> then)
     auto* window = makeConfirmDiscardWindow().release();
     window->enterModalState (true, juce::ModalCallbackFunction::create ([this, then] (int result) {
                                  if (result == 1)
-                                 {
-                                     save (false);
-                                     if (! engine.isModified()) // saved (did not cancel "save as")
-                                         offerToDeleteUnusedRecordings (true, then);
-                                 }
+                                     save (false, [this, then] { offerToDeleteUnusedRecordings (true, then); }); // (not after a cancelled "save as")
                                  else if (result == 2)
                                      offerToDeleteUnusedRecordings (false, then);
                              }),
@@ -4977,6 +4974,23 @@ void MainComponent::chooseFileToOpenNow()
                               });
 }
 
+void MainComponent::openFileRequest (const juce::File& file)
+{
+    const juce::Component::SafePointer<MainComponent> safe (this);
+    if (projectLoadRunning())
+    {
+        juce::Timer::callAfterDelay (500, [safe, file] {
+            if (safe != nullptr)
+                safe->openFileRequest (file);
+        });
+        return;
+    }
+    confirmDiscard ([safe, file] {
+        if (safe != nullptr)
+            safe->openFile (file);
+    });
+}
+
 void MainComponent::openFile (const juce::File& file)
 {
     juce::String error;
@@ -5474,12 +5488,9 @@ void MainComponent::exportMidiFile()
                               });
 }
 
-void MainComponent::save (bool askForFile)
+void MainComponent::save (bool askForFile, std::function<void()> afterSaved)
 {
-    auto write = [this] (juce::File file) {
-        if (! file.hasFileExtension (ProjectFile::extension))
-            file = file.withFileExtension (ProjectFile::extension);
-
+    auto write = [this, afterSaved] (const juce::File& file) {
         juce::String error;
         engine.capturePluginStates(); // plugin state lives in the plugins; copy it before saving
         keepOverwrittenCopy (file);   // the version this save replaces goes to the backup folder (like FL)
@@ -5492,6 +5503,8 @@ void MainComponent::save (bool askForFile)
             projectName = file.getFileNameWithoutExtension();
             importedSuffix = {};
             updateTitle();
+            if (afterSaved)
+                afterSaved();
         }
         else
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"), error);
@@ -5500,7 +5513,7 @@ void MainComponent::save (bool askForFile)
     // a project opened from the backup folder is saved somewhere else (old backups there are deleted)
     if (! askForFile && currentFile != juce::File() && ! currentFile.isAChildOf (autosaveFolder()))
     {
-        write (currentFile);
+        write (ProjectFile::withProjectExtension (currentFile));
         return;
     }
 
@@ -5509,10 +5522,18 @@ void MainComponent::save (bool askForFile)
     fileChooser = lynx::ui::makeFileChooser (tr ("Save project"), startFolder, juce::String ("*") + ProjectFile::extension);
 
     lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
-                              [write] (const juce::FileChooser& chooser) {
-                                  const auto file = chooser.getResult();
-                                  if (file == juce::File())
+                              [this, write] (const juce::FileChooser& chooser) {
+                                  const auto chosen = chooser.getResult();
+                                  if (chosen == juce::File())
                                       return;
+                                  const auto file = ProjectFile::withProjectExtension (chosen);
+                                  // the dialog's overwrite warning was about the name typed, without the extension
+                                  if (file != chosen && file != currentFile && file.existsAsFile())
+                                  {
+                                      juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"),
+                                                                              tr ("{0} already exists. Choose another name or folder.", { file.getFullPathName() }));
+                                      return;
+                                  }
                                   if (! file.isAChildOf (autosaveFolder()))
                                   {
                                       write (file);
@@ -5747,6 +5768,13 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                                           currentFile != juce::File() ? currentFile.getParentDirectory()
                                                                       : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
                                           projectStem (projectName));
+            });
+            // Export to Live 12 / Live 11 (round 175a, N2): "<name> Project/<name>.als" with the samples alongside
+            exports.addItem (tr ("Ableton Live set (.als)..."), [this] {
+                showAlsExportDialog (engine,
+                                     currentFile != juce::File() ? currentFile.getParentDirectory()
+                                                                 : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                                     projectStem (projectName));
             });
             // FL's "Project bones..." (FileExportProjectBonesAction; REA round 168e)
             exports.addItem (tr ("Project bones..."), [this] { exportProjectBones (engine, currentFile.getParentDirectory(), projectName); });
