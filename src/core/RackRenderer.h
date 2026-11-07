@@ -24,6 +24,7 @@
 #include "core/LiveInput.h"
 #include "core/Meters.h"
 #include "core/Pdc.h"
+#include "core/ClipLauncher.h"
 #include "core/Performance.h"
 #include "core/Scheduler.h"
 #include "core/Vfx.h"
@@ -99,6 +100,11 @@ struct RackState
     std::shared_ptr<LiveLevels> live;
     ScheduleIndex schedule; // index to schedule the Playlist without scanning every note
     std::vector<int> performanceZone; // Performance mode: the zone's clips (perf::zoneClips), empty when off
+    // The Clip-launch workflow's grid (core/ClipLauncher.h): the engine's runtime while the song has a grid, else nullptr
+    // (always, in an export). `launchers`: Performance mode has a zone, or there is a grid.
+    launcher::Runtime* clipLauncher = nullptr;
+    launcher::GridIndex gridIndex;
+    bool launchers = false;
     int tempoAutomation = -1; // tempo automation, if any
     bool tempoMap = false;    // the tempo moves while playing (tempo automation or pattern Tempo events, core/TempoMap.h)
 
@@ -248,6 +254,7 @@ struct RackState
         StretchedSampleProvider stretchedSamples;
         PluginInstrumentFactory pluginInstruments;
         PluginEffectFactory pluginEffects;
+        launcher::Runtime* clipLauncher = nullptr; // (round 181a) only the engine's own state, and only with a grid
     };
 
     // Builds the next state reusing the instruments from `previous` when the
@@ -533,6 +540,8 @@ private:
     perf::Player perfPlayer;
     double perfClock = 0.0;      // the Player's steady clock (ticks): the transport's position, never wrapping
     bool perfRunning = false;
+    bool launchersRunning = false;                 // the launchers' branch of the block is on (Performance mode, the grid)
+    launcher::Runtime* runningLauncher = nullptr;  // the grid's runtime while it plays
     std::vector<float> hwScratch; // 2 × blockCapacity
     void mixHardwareOutputs (const RackState& state, int n) noexcept;
     int liveInputOffset = 0; // of the chunk within the process() block

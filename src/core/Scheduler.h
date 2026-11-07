@@ -4,6 +4,7 @@
 // an audio block. Runs on the audio thread: no allocation, no locks.
 
 #include <array>
+#include <bitset>
 #include <cstdint>
 #include <vector>
 
@@ -109,6 +110,19 @@ public:
         clock = 0.0;
     }
     void process (EventBuffer& events, int numSamples, double tps) noexcept;
+    // The sounding notes of (channel, key) end `offsetTicks` into the next process() block at the latest. False when
+    // none sounds. (A launched clip cut off, core/ClipLauncher.h.)
+    bool shorten (int channel, int key, double offsetTicks) noexcept
+    {
+        auto found = false;
+        for (int k = 0; k < count; ++k)
+            if (auto& entry = entries[(std::size_t) k]; entry.channel == channel && entry.key == key)
+            {
+                entry.end = std::min (entry.end, clock + offsetTicks);
+                found = true;
+            }
+        return found;
+    }
     // channels inserted, removed or moved: from[c] = the old index of channel c (−1 = a new channel)
     void moveChannels (const std::vector<int>& from) noexcept;
     int sounding() const noexcept { return count; }
@@ -199,6 +213,15 @@ void scheduleSong (const Song& song,
                    const ScheduleIndex* index = nullptr,
                    bool wrap = true,
                    bool chase = false) noexcept;
+// The Playlist while clips of the grid hold tracks (Clip-launch workflow, core/ClipLauncher.h). As scheduleSong, except: on a
+// `taken` track nothing starts (the ends of what was sounding still come), and on a `givenBack` track what is in
+// progress at startTick starts there, in the middle.
+constexpr int scheduleMaskTracks = 500;
+using TrackMask = std::bitset<scheduleMaskTracks>;
+void scheduleSongAround (const Song& song, const TrackMask& taken, const TrackMask& givenBack, double startTick, int numSamples,
+                         double ticksPerSampleValue, EventBuffer& out, bool resume, const ScheduleIndex* index, bool wrap,
+                         bool chase) noexcept;
+
 // One clip played once where it is (no song loop), its events in the block (not sorted): Performance mode's passes.
 void scheduleSingleClip (const Song& song, const Clip& clip, std::size_t clipIndex, double startTick, int numSamples, double tps,
                          EventBuffer& out, const ScheduleIndex* index = nullptr) noexcept;
