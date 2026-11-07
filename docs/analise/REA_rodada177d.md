@@ -153,7 +153,7 @@ Who builds what now (coordinator, 2026-11-06; this replaces the batch plan above
 
 ### 15. Backups that never stutter the sound
 - **FL:** postpones the timed backup while recording (LYNX did the same; the earlier round's note, not re-measured here).
-- **Ableton:** see the "Best way?" note at the end of this section.
+- **Ableton:** Live keeps the ten most recent saved versions of a Set in its Backup folder, written when you save, so the copy is tied to a save the user chose to make, not to a timer ([Backup Sets](https://help.ableton.com/hc/en-us/articles/360000377870-Backup-Sets)). Live's separate crash recovery was not looked at for this note.
 - **Users:** "Pause autosave/backup during playback, recording or MIDI input, so saving never causes stutter" ([IL forum](https://forum.image-line.com/viewtopic.php?t=337399), via research-web-2.md §3 #15).
 - **Review fix:** only channel messages hold a backup back (`prefs::midiMeansPlaying`). MIDI clock and active sensing, which a plugged-in device can send without pause, would otherwise have held it back for good.
 - **User decision (2026-11-06, through the coordinator):** the wait has a limit. After 10 minutes without a backup one is written anyway, playing or not (`prefs::backupMayRun`, Settings › General "Make a backup anyway after this long without one": 5 to 60 minutes). Never during a recording. Measurement: §6.
@@ -183,7 +183,7 @@ Who builds what now (coordinator, 2026-11-06; this replaces the batch plan above
 
 ### 37. Opening a project saved by a newer LYNX SHARE
 - **FL (FLEngine_x64.dll strings):** "Warning|This project has been created using a more recent version of %s (|%s|) than yours (|%s|), and is likely not to open correctly." An earlier version of this note quoted a different text and said FL warns only when the format needs it. The string gives the two versions, so it compares versions; when exactly it fires has not been traced.
-- **Ableton:** the manual section read says Live "does not allow overwriting Live Sets that were created by older major versions" and asks for Save As. What a newer Set does in an older Live was not found in the part of the manual read.
+- **Ableton:** the manual section read says Live "does not allow overwriting Live Sets that were created by older major versions" and asks for Save As. Ableton's help page says Sets made in a newer Live do not open in an older one ([Backward Compatibility](https://help.ableton.com/hc/en-us/articles/360000841004)); this was read on that page, not tested in Live.
 - **Users:** "Newer projects won't open in older FL"; "Save copy for older version, or at least a clear downgrade warning" ([IL KB 515](https://support.image-line.com/action/knowledgebase?ans=515), via research-web-2.md §3 #37).
 - **Verdict:** a warning like FL's, plus what it costs (the new parts can be lost) and how to keep the original. Saving for an older version is not built.
 - **LYNX before:** the `.lynx` format is at version 1. A file from a later build opened silently, and saving it dropped any field this build does not know.
@@ -226,6 +226,11 @@ Who builds what now (coordinator, 2026-11-06; this replaces the batch plan above
 - **Change:** a 3 px bar to the right of the strip's level meters, hanging from the top (0 to 30 dB, `mixerops::gainReductionRangeDb`). It is drawn only on strips that have an enabled LYNX compressor, Apex limiter, Crest compressor, Sentry gate, Quell denoiser, Ridge strip, Glow leveler or Hush de-esser (`mixerops::reportsGainReduction`). It reads the effect meters the engine already publishes (output 0), so the audio thread does no new work. The UI checks only strips that show a meter.
 
 ## 5. Found along the way, and later proposals
+
+### Check of 3: mixer track presets that hold no level (no code change yet)
+- **FL's factory presets:** all 18 factory `.fst` files read store level and pan (events 0x1FC0/0x1FC1 in new files, 0x1F60/0x1F61 in old ones).
+- **LYNX:** `applyMixerTrackState` always copies `state.volume`, so a preset without a level would reset the fader. This comes from reading the code; it was not run.
+- **Not measured:** what FL does with a preset that has no level. The plan is to load a copy with the level stripped onto a moved fader, in FL and in LYNX, at a GUI turn. Nothing changes until then.
 
 ### Audio-take track name and take name disagree (traced: a routing choice, not a naming bug)
 Seen at the 177d-1 GUI check (shots l25/l26). An audio take recorded through Insert 6 is named "Insert 6_Take1", but its Playlist track is named "Insert 7".
