@@ -1131,40 +1131,29 @@ bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
     return false;
 }
 
-float Song::automationValueAt (int index, double tick) const
+float Song::targetValueAt (const AutomationTarget& target, double tick) const
 {
-    if (index < 0 || index >= (int) automations.size())
-        return std::numeric_limits<float>::quiet_NaN();
-
-    std::vector<const Clip*> clips;
-
+    // the same rule as playback (RackRenderer's automationValueAt, issue #97)
+    const Clip* playing = nullptr;
+    const Clip* ended = nullptr;
     for (const auto& c : playlist)
-        if (c.kind == ClipKind::automation && c.automation == index && c.length > 0 && ! c.muted && ! isTrackMuted (c.track))
-            clips.push_back (&c);
-
-    if (clips.empty())
-        return std::numeric_limits<float>::quiet_NaN();
-
-    std::stable_sort (clips.begin(), clips.end(), [] (const Clip* a, const Clip* b) { return a->start < b->start; });
-    const auto& automation = automations[(std::size_t) index];
-    const Clip* before = nullptr;
-
-    // same rule as playback: inside a clip the curve; between clips the last value; before, the first
-    for (const auto* c : clips)
     {
-        if (tick < (double) c->start)
-            break;
-
-        if (tick < (double) c->end())
-            return automation.playAt (tick - (double) c->start + (double) c->offset, tick);
-
-        before = c;
+        if (c.kind != ClipKind::automation || c.automation < 0 || c.automation >= (int) automations.size() || c.length <= 0 || c.muted
+            || isTrackMuted (c.track) || ! (automations[(std::size_t) c.automation].target == target) || tick < (double) c.start)
+            continue;
+        if (tick < (double) c.end())
+        {
+            if (playing == nullptr || c.start > playing->start || (c.start == playing->start && c.automation < playing->automation))
+                playing = &c;
+        }
+        else if (ended == nullptr || c.end() > ended->end() || (c.end() == ended->end() && c.start > ended->start))
+            ended = &c;
     }
-
-    if (before != nullptr)
-        return automation.playAt ((double) (before->length + before->offset), (double) before->end());
-
-    return automation.playAt ((double) clips.front()->offset, (double) clips.front()->start);
+    if (playing != nullptr)
+        return automations[(std::size_t) playing->automation].playAt (tick - (double) playing->start + (double) playing->offset, tick);
+    if (ended != nullptr)
+        return automations[(std::size_t) ended->automation].playAt ((double) (ended->length + ended->offset), (double) ended->end());
+    return std::numeric_limits<float>::quiet_NaN();
 }
 
 double Song::tempoAt (double tick) const
@@ -1172,10 +1161,10 @@ double Song::tempoAt (double tick) const
     if (mode != PlayMode::song)
         return bpm;
 
-    for (int i = (int) automations.size() - 1; i >= 0; --i) // the last tempo automation wins
-        if (automations[(std::size_t) i].target.kind == AutomationTargetKind::tempo)
-            if (const auto v = automationValueAt (i, tick); ! std::isnan (v))
-                return tempoFromValue (v);
+    AutomationTarget tempo;
+    tempo.kind = AutomationTargetKind::tempo;
+    if (const auto v = targetValueAt (tempo, tick); ! std::isnan (v))
+        return tempoFromValue (v);
 
     return bpm;
 }

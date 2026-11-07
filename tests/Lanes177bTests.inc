@@ -72,6 +72,36 @@ TEST (lanes177b_lane_plays_and_clips_win)
     // (the project round trip of the lanes: LYNX.exe --selftest, lanes_saved)
 }
 
+TEST (lanes177b_clips_of_two_automations_win_over_a_lane)
+{
+    // issue #97: two automations of one target share a slot; the lane still gets the value of whichever clip plays
+    auto song = lanes177bSong();
+    const lynx::AutomationTarget master { lynx::AutomationTargetKind::mixerVolume, 0, 0, 0 };
+    int index = 0;
+    for (const auto value : { 0.8f, 0.4f })
+    {
+        lynx::Automation a;
+        a.target = master;
+        a.points = { { 0, value, 0.0f }, { 1000, value, 0.0f } };
+        song.automations.push_back (a);
+        lynx::Clip c;
+        c.kind = lynx::ClipKind::automation;
+        c.automation = index;
+        c.track = 1;
+        c.start = 1000 + index * 5000;
+        c.length = 1000;
+        song.playlist.push_back (c);
+        ++index;
+    }
+    const auto first = lanes177bLevel (song, 1500.0), second = lanes177bLevel (song, 6500.0);
+    CHECK (first > 0.05f && second > 0.05f && first > second * 1.2f);
+
+    lynx::autolanes::addLane (song, 0, master, "Master volume", 0.0f);
+    CHECK (std::abs (lanes177bLevel (song, 1500.0) - first) < 1.0e-4f);  // (the follower's clip)
+    CHECK (std::abs (lanes177bLevel (song, 6500.0) - second) < 1.0e-4f); // (the slot holder's clip)
+    CHECK (lanes177bLevel (song, 3000.0) < 1.0e-4f);                     // between the clips: the lane
+}
+
 TEST (lanes177b_conversions_and_export)
 {
     namespace al = lynx::autolanes;

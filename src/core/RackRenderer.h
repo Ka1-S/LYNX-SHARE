@@ -10,6 +10,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "core/Arpeggiator.h"
@@ -72,6 +73,7 @@ struct RackState
     {
         int automation = -1;
         std::vector<int> clipPeers;
+        std::vector<std::pair<int, int>> clipSlots; // peer -> the slot holding its value, for peers that share one (issue #97)
     };
     std::vector<LanePlay> laneAutomations;
     // round 177b: modulator routings — each drives its own slot (bound last: it wins) from the target's value, or the
@@ -84,6 +86,11 @@ struct RackState
         float depth = 0.0f;
     };
     std::vector<ModPlay> modRoutes;
+    // Several automations with clips on one target play as one (issue #97, FL's rule: docs/analise/REA_rodada177b.md):
+    // the last of them holds the slot and lists them all here (ascending; empty = it plays alone); the others are
+    // marked as followers: they bind nothing and compute nothing.
+    std::vector<std::vector<int>> automationGroups;
+    std::vector<char> automationFollowers;
     std::vector<int> channelVolumeAuto, channelPanAuto;
     std::vector<int> mixerVolumeAuto, mixerPanAuto;
     std::vector<std::vector<std::array<int, maxEffectParams>>> effectParamAuto; // [track][slot][param] (built-in)

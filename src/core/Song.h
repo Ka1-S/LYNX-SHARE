@@ -1843,7 +1843,7 @@ struct Song
     bool setTargetValue (const AutomationTarget& target, float value) noexcept;
 
     // Value of an automation at a song position (the same one playback uses); NaN without clips.
-    float automationValueAt (int automation, double tick) const;
+    float targetValueAt (const AutomationTarget& target, double tick) const; // the clips of that target, as playback plays them
     // Tempo at `tick`, taking tempo automation into account (in song mode).
     double tempoAt (double tick) const;
     // Duration in seconds of the first `ticks` of the song, integrating the tempo automation.

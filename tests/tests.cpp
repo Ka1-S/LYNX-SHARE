@@ -17115,3 +17115,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Lanes177bTests.inc"
 #include "Lfo177bTests.inc"
 #include "Mod177bTests.inc"
+#include "Issue97Tests.inc"

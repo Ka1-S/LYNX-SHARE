@@ -290,3 +290,31 @@ the LFO under a non-linear target map (an imported effect parameter) is applied 
 Open (phases, as proposed): the depth ring and drag-to-route on knobs (P1b, after the UI gate), plugin parameters
 (their value lives in the plugin: needs a base read from the plugin), envelope follower (P2), note envelopes / steps
 (P3), per-voice (P4).
+## Issue #97 — several automation clips on one target
+
+**Report** (Disar, 0.1.24): a second automation clip on a plugin's CC silences the first clip.
+
+**Cause in LYNX [CODE]:** `RackState::build` bound one automation per target, "the last automation of the same target wins", and an automation with any clip produced a value at every tick (it held its first or last point outside its clips). So the highest-numbered automation drove the target for the whole song. This applied to every target kind: channel and mixer volume and pan, effect knobs, plugin parameters, MIDI CC, tempo. Plugin and CC bindings were made per automation, so both wrote every block and the last write stayed. `AutomationDisplay` and `Song::tempoAt` repeated the same rule.
+
+**FL's rule [EXEC]:** FL 2026 command-line renders (`FL64 /R /Ewav`, no input injected) of generated projects: a 440 Hz tone on channel 0, automation channels A (ch 1) and B (ch 2) both linked to channel 0's volume, 120 BPM, 1 bar = 2 s. Generator, projects and renders: `/mnt/e/lynx-work/177b/issue97/` (`py/mk97.py`, `mk97r.py`, `mk97s.py`, `flr/fl/`). Ramps: A 0.1→0.3, B 0.5→0.7, so the level names the clip.
+
+| Case | Clips (bars) | What FL plays |
+|---|---|---|
+| ra / rb | A 4–6, B 8–10 (and swapped) | own value before the first clip; each clip; the last clip's end value holds between and after; channel order does not matter |
+| rc / rd | A 4–8, B 6–10 (and swapped) | the later start takes over at its start and plays to its end |
+| re / rf | one clip 4–10, the other 6–8 inside it, on an upper track | the inner clip, then the outer one resumes at its own position |
+| rg / rh / ri | same span, tracks swapped, file order swapped | A, the lower channel, after a short B blip at the start in rg and rh |
+| rj | the same automation twice, 4–8 and 6–10 | the later clip restarts the curve |
+
+**Rule built:** where clips of the target play, the one that started last (same start: the lowest automation); between clips, the end value of the clip that ended last; before the first clip, the control's own value. `RackState` gives the automations of a target one slot (`automationGroups`, `automationFollowers`); `AutomationDisplay` and `Song::targetValueAt` (tempo) use the same rule. Tests: `tests/Issue97Tests.inc`.
+
+**Behaviour change beyond the report:** before the first clip LYNX used to play the clip's first point. It now keeps the control's own value, as in ra and rb. REA_rodada83 already recorded this rule for pattern events.
+
+**Other target kinds [EXEC]:** the Master fader (`y_mv_ra`, `y_mv_rc`, `y_mv_re`) and a plugin parameter, Emphasizer's input gain on the Master, slot 9, id `0x8000` (`pa`–`pk`, `py/mk97p2.py`), follow the same main rule: own value before the first clip, the later start wins, a clip still playing resumes, the end value holds. Renders in `/mnt/e/lynx-work/177b/issue97/out/`, launched with `render180d/flrun.ps1` (not activated). In these renders the slot marker 0x62 comes after the slot's plugin events, so the plugin before `0x62 = 9` is slot 9. A MIDI CC target itself was not measured.
+
+**Known differences (FL's evaluator not traced):** REA was time-boxed. It reached the clip's range setup (`FUN_00fe9b90`), but `TACArticulator.Compute` (FUN_00ba1700) has only virtual-table references and the per-tick loop was not found. LYNX keeps the simple rule in these cases:
+- `rk_three` and `pk` (A 4–6, B 5–8, A 6–9): FL plays A's second clip for t = 12–14 s, then B until B ends at 16 s, then A. The rule predicts A from 12 s to 18 s. FL does the same on channel volume and on the plugin parameter, so this is not noise.
+- Overlapping flat clips (`c`, `g` in `py/mk97.py`): the earlier clip comes back about a second after the later one starts (c at about 13.1 s, g at about 13.7 s).
+- The same start: on channel volume A, the lower channel, wins whatever the track or file order (`rg`, `rh`, `ri`). On the plugin parameter, `pg` stays on B and `ph` plays B for 4 s and then A. LYNX uses the lowest automation on every target.
+
+**Not checked:** the report's "removing the last clip does not bring the first back". In the engine the first automation takes the slot again (`issue97_one_target_shares_a_slot`). Not run in the GUI with sforzando.
