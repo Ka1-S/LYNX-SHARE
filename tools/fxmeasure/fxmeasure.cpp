@@ -35,6 +35,8 @@
 //   echo <text>
 //   editor <ms> [x y]                 show the plugin's own editor in a window at (x, y) for ms milliseconds (for screenshots
 //                                     taken from outside, e.g. with a screen-capture script); prints its screen bounds
+#include <thread>
+#include <atomic>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_events/juce_events.h>
@@ -234,6 +236,41 @@ struct Host
                 pump (ms);
                 i += 4;
             }
+            else if (actions[i] == "menu") // menu x y: a click that opens a native pop-up menu: its items go to the log, then it is cancelled
+            {
+                LPARAM lp;
+                const POINT pt { actions[i + 1].getIntValue(), actions[i + 2].getIntValue() };
+                auto* target = hit (pt, lp);
+                std::atomic<bool> done { false };
+                std::thread reader ([&done] {
+                    for (int tries = 0; tries < 200 && ! done.load(); ++tries)
+                    {
+                        Sleep (25);
+                        HWND popup = nullptr;
+                        while ((popup = FindWindowExW (nullptr, popup, L"#32768", nullptr)) != nullptr)
+                        {
+                            DWORD pid = 0;
+                            GetWindowThreadProcessId (popup, &pid);
+                            if (pid != GetCurrentProcessId() || ! IsWindowVisible (popup))
+                                continue;
+                            Sleep (150);
+                            logMenu ((HMENU) SendMessageW (popup, 0x01E1 /* MN_GETHMENU */, 0, 0), 0);
+                            PostMessageW (popup, WM_KEYDOWN, VK_ESCAPE, 0);
+                            return;
+                        }
+                    }
+                    std::printf ("menu: no pop-up menu opened\n");
+                    std::fflush (stdout);
+                });
+                PostMessageW (target, WM_MOUSEMOVE, 0, lp);
+                PostMessageW (target, WM_LBUTTONDOWN, MK_LBUTTON, lp);
+                pump (80);
+                PostMessageW (target, WM_LBUTTONUP, 0, lp);
+                pump (ms);
+                done = true;
+                reader.join();
+                i += 3;
+            }
             else if (actions[i] == "dblclick")
             {
                 LPARAM lp;
@@ -286,6 +323,20 @@ struct Host
         w.clearContentComponent();
         ed.reset();
         pump (100);
+    }
+
+    static void logMenu (HMENU menu, int depth)
+    {
+        for (int k = 0, n = GetMenuItemCount (menu); k < n; ++k)
+        {
+            wchar_t name[256] {};
+            GetMenuStringW (menu, (UINT) k, name, 255, MF_BYPOSITION);
+            const auto state = GetMenuState (menu, (UINT) k, MF_BYPOSITION);
+            std::printf ("menu %*s%s%s%s\n", depth * 2, "", juce::String (name).toRawUTF8(), (state & MF_CHECKED) ? " [checked]" : "", (state & MF_GRAYED) ? " [greyed]" : "");
+            if (auto* sub = GetSubMenu (menu, k))
+                logMenu (sub, depth + 1);
+        }
+        std::fflush (stdout);
     }
 
     // a picture of the window's client area (PrintWindow)

@@ -110,6 +110,7 @@ protected:
                                     // multiband reference's), 3 = the same, small, inside a ring (`outer`), 4 = that ring;
                                     // menus: 1 = a plain pill button showing the choice (no arrow);
                                     // tabs: 1 = a raised pill with a marker at the chosen end
+        float rowTrim = 0.0f;         // sliders: room kept at the scale row's right end (round tp172b6: the stereo link's MID key)
         bool bare = false;            // buttons (round tp172b6): no face of their own (the editor paints them in its overlay)
         float levelArc = -1.0f;       // look 2: a level on the knob's own scale, drawn along its ring (0 ... 1; below 0: none)
         juce::Rectangle<float> outer; // look 3: the whole knob, ring included (the labels sit under it)
@@ -999,7 +1000,7 @@ protected:
             g.fillRect (juce::Rectangle<float> (hx - 1.5f, bar.getY() + 1.0f, 3.0f, bar.getHeight() - 2.0f));
         }
         // (rangeRow pushes the ends 6 px past the row: the slider keeps them within its own bar, clear of its neighbours)
-        const auto row = juce::Rectangle<float> (bar.getX() + 6.0f, bar.getBottom() + 2.0f, bar.getWidth() - 12.0f, 12.0f);
+        const auto row = juce::Rectangle<float> (bar.getX() + 6.0f, bar.getBottom() + 2.0f, bar.getWidth() - 12.0f - c.rowTrim, 12.0f);
         rangeRow (g, c.param, row, c.showValue && (hover || active), false, ac, active, c.endLow, c.endHigh);
         captionStyle (g, active, hot, ac, type::caption);
         g.drawText (caps (c.caption), juce::Rectangle<float> (c.r.getX() - 14.0f, row.getBottom() + 1.0f, c.r.getWidth() + 28.0f, 14.0f),
@@ -1015,14 +1016,14 @@ protected:
         const auto side = juce::Point<float> (dir.y * -1.0f, dir.x);
         juce::Path disc;
         disc.addEllipse (juce::Rectangle<float> (radius * 2.0f, radius * 2.0f).withCentre (ct));
-        // a rounded fin: wide at the rim, its convex sides meeting in a soft point towards the centre (`size` = half its width)
-        const auto depth = size * 1.9f; // from the rim inwards
+        // a rounded fin: wide at the rim, its convex sides meeting in a round end towards the centre (`size` = half its width)
+        const auto depth = size * 1.75f; // from the rim inwards
         const auto at = [&] (float along, float across) { return ct + dir * along + side * across; };
         juce::Path fin;
         fin.startNewSubPath (at (radius + 2.0f, -size * 1.1f));
-        fin.quadraticTo (at (radius - depth * 0.62f, -size * 1.02f), at (radius - depth, -size * 0.08f));
-        fin.lineTo (at (radius - depth, size * 0.08f));
-        fin.quadraticTo (at (radius - depth * 0.62f, size * 1.02f), at (radius + 2.0f, size * 1.1f));
+        fin.quadraticTo (at (radius - depth * 0.55f, -size * 1.1f), at (radius - depth * 0.92f, -size * 0.42f));
+        fin.quadraticTo (at (radius - depth * 1.08f, 0.0f), at (radius - depth * 0.92f, size * 0.42f));
+        fin.quadraticTo (at (radius - depth * 0.55f, size * 1.1f), at (radius + 2.0f, size * 1.1f));
         fin.closeSubPath();
         juce::Graphics::ScopedSaveState keep (g);
         g.reduceClipRegion (disc);

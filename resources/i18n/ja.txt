@@ -7553,3 +7553,4 @@ countries: jp
 "That track is fed by this one: the link would make a loop." = "そのトラックはこのトラックから信号を受けています。リンクするとループになります。"
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "サイドチェイン入力：このエフェクトが聴くインサート。選ぶとレベル0でここへルーティングされ、元の出力はそのまま残ります  [LMB] 選択"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "サイドチェイン入力：このプラグインのサイド入力が聴くインサート。選ぶとレベル0でここへルーティングされ、元の出力はそのまま残ります"
+"Side" = "サイド"

@@ -1716,9 +1716,10 @@ public:
     }
 
 private:
-    enum { idPower = 1, idBandMenu, idClose, idRange, idAnalyzer, idClassic, idExpert, idClassicDet, idSplit, idFree, idAudition, idSolo0 = 20, idMute0 = 30 };
+    enum { idPower = 1, idBandMenu, idClose, idRange, idAnalyzer, idClassic, idExpert, idClassicDet, idSplit, idFree, idAudition, idLinkMode, idSolo0 = 20, idMute0 = 30 };
     // round tp172b4: no band panel until a band is clicked (the reference opens on the bare display)
     int selected = -1, hoverBand = -1, dragBand = -1, dragEdge = -1;
+    int dragScHandle = -1; // round tp172b6: 0 / 1 = the free side-chain filter's low / high handle in the drag
     bool expert = false; // round 147: the band panel's expert part (side-chain filtering, stereo link), view only
     double rangeView = 12.0;
     int analyzer = 3; // 0 off, 1 pre, 2 post, 3 pre + post (view only)
@@ -1741,7 +1742,22 @@ private:
         const auto x = juce::jlimit (p.getX() + 14.0f, juce::jmax (p.getX() + 14.0f, (float) getWidth() - 20.0f - w), cx - w * 0.5f);
         return { x, p.getBottom() - 176.0f, w, 164.0f };
     }
-    static constexpr float panelW = 460.0f, expertW = 296.0f;
+    static constexpr float panelW = 460.0f, expertW = 116.0f; // (the reference's widths)
+    // round tp172b6 [EXEC, the reference's editor]: Free side-chain filtering: a bar in the band's colour above the panel with
+    // a grey handle at each end (they replace LYNX's Low / High knobs), joined to the Free key by a thin line
+    bool scFreeShown() const { return selected >= 0 && expert && v (dyn::prism::bandScFree0 + selected) >= 0.5f; }
+    float scBarY() const { return panelArea().getY() - 22.0f; }
+    float scHandleX (int h) const
+    {
+        using namespace dyn::prism;
+        const auto value = v ((h == 0 ? bandScLow0 : bandScHigh0) + selected);
+        return juce::jlimit (plot().getX() + 2.0f, plot().getRight() - 2.0f, xForHz (30.0 * std::pow (1000.0, (double) value), plot()));
+    }
+    juce::Rectangle<float> scHandleBox (int h) const
+    {
+        const auto x = scHandleX (h);
+        return { h == 0 ? x : x - 18.0f, scBarY() - 8.0f, 18.0f, 17.0f };
+    }
     juce::Rectangle<float> expertTab() const { const auto a = panelArea(); return { a.getRight() - 14.0f, a.getY() + 40.0f, 14.0f, 86.0f }; }
     // the band colours, measured on the reference's six bands (magenta, blue, green, violet, red, cyan)
     static juce::Colour bandHue (int b)
@@ -2067,37 +2083,21 @@ private:
                 const auto pill = [&] (juce::Rectangle<float> r, int prm, const juce::String& options) { auto t = tabs (r, prm, options); t.look = 1; out.push_back (t); };
                 // SIDE CHAIN, as the reference stacks it: band or free range, the input, Audition; the free range's two
                 // knobs have a column of their own (the reference sets them on its own side-chain curve)
-                pill ({ x0 + 8.0f, a.getY() + 8.0f, 108.0f, 22.0f }, bandScFree0 + b, "Band|Free");
+                pill ({ x0 + 12.0f, a.getY() + 16.0f, 90.0f, 20.0f }, bandScFree0 + b, "Band|Free");
                 {
-                    auto input = menu ({ x0 + 8.0f, a.getY() + 36.0f, 52.0f, 22.0f }, bandScInput0 + b, {}, "Global|Plug-in|External");
-                    input.hint = tr ("Input");
+                    // In / Ext, the reference's two keys (a project that follows the global switch reads as In until a key is
+                    // pressed; the three-way choice and the global switch are in the band menu)
+                    auto input = tabs ({ x0 + 12.0f, a.getY() + 42.0f, 90.0f, 20.0f }, bandScInput0 + b, "In|Ext", { 0.5f, 1.0f });
+                    input.look = 1;
                     out.push_back (input);
-                    auto global = menu ({ x0 + 64.0f, a.getY() + 36.0f, 52.0f, 22.0f }, scExternal, {}, "Int|Ext");
-                    global.hint = tr ("Side chain");
-                    out.push_back (global);
                 }
-                out.push_back (button ({ x0 + 8.0f, a.getY() + 64.0f, 108.0f, 22.0f }, idAudition, tr ("Audition"), auditionNow == b,
+                out.push_back (button ({ x0 + 12.0f, a.getY() + 68.0f, 90.0f, 20.0f }, idAudition, tr ("Audition"), auditionNow == b,
                                        tr ("Audition: hear what this band's detector hears")));
-                out.push_back (knob ({ x0 + 238.0f, a.getY() + 26.0f, 56.0f, 62.0f }, bandScLow0 + b, tr ("Low"), 0));
-                out.push_back (knob ({ x0 + 238.0f, a.getY() + 92.0f, 56.0f, 62.0f }, bandScHigh0 + b, tr ("High"), 0));
-                // SLOPE: every band's, then this band's own low and high; the pan mode; the stereo link
-                const auto x1 = x0 + 124.0f;
-                out.push_back (menu ({ x1, a.getY() + 8.0f, 56.0f, 20.0f }, slope, tr ("Slope"), "12 dB|24 dB|48 dB"));
-                if (isFree())
-                {
-                    out.push_back (menu ({ x1, a.getY() + 44.0f, 52.0f, 20.0f }, bandLoSlope0 + b, tr ("Low slope"), "6|12|18|24|30|36|42|48"));
-                    out.push_back (menu ({ x1 + 56.0f, a.getY() + 44.0f, 52.0f, 20.0f }, bandHiSlope0 + b, tr ("High slope"), "6|12|18|24|30|36|42|48"));
-                }
-                else
-                {
-                    if (b > 0)
-                        out.push_back (menu ({ x1, a.getY() + 44.0f, 52.0f, 20.0f }, xoverSlope0 + b - 1, tr ("Low slope"), "Global|12|24|48"));
-                    if (b < nb() - 1)
-                        out.push_back (menu ({ x1 + 56.0f, a.getY() + 44.0f, 52.0f, 20.0f }, xoverSlope0 + b, tr ("High slope"), "Global|12|24|48"));
-                }
-                pill ({ x1, a.getY() + 80.0f, 52.0f, 20.0f }, panMode, "L/R|M/S"); // round 144: what the ring balances
-                pill ({ x1 + 56.0f, a.getY() + 80.0f, 52.0f, 20.0f }, bandLinkMode0 + b, "Mid|Side");
-                out.push_back (hslider ({ x1, a.getY() + 114.0f, 108.0f, 44.0f }, bandLink0 + b, tr ("Stereo link")));
+                auto link = hslider ({ x0 + 8.0f, a.getY() + 114.0f, 98.0f, 44.0f }, bandLink0 + b, tr ("Stereo link"));
+                link.rowTrim = 28.0f;
+                out.push_back (link);
+                out.push_back (button ({ x0 + 72.0f, a.getY() + 133.0f, 30.0f, 13.0f }, idLinkMode, caps (tr (v (bandLinkMode0 + b) >= 0.5f ? "Side" : "Mid")), false,
+                                       tr ("Stereo link")));
             }
         }
         const auto bar = barArea();
@@ -2115,9 +2115,10 @@ private:
         // untouched) and the old-project indicators, in the column right of the display (the bottom bar is full)
         {
             const auto x = p.getRight() + 6.0f;
-            out.push_back (button ({ x, p.getY() + 28.0f, 30.0f, 20.0f }, idSplit, tr ("Split"), ! isFree(),
+            // (inside the plot's top right corner: in the column they covered the +9 of the level scale)
+            out.push_back (button ({ p.getRight() - 66.0f, p.getY() + 4.0f, 30.0f, 20.0f }, idSplit, tr ("Split"), ! isFree(),
                                    tr ("Split layout: the bands sit side by side on crossovers")));
-            out.push_back (button ({ x + 32.0f, p.getY() + 28.0f, 30.0f, 20.0f }, idFree, tr ("Free"), isFree(),
+            out.push_back (button ({ p.getRight() - 34.0f, p.getY() + 4.0f, 30.0f, 20.0f }, idFree, tr ("Free"), isFree(),
                                    tr ("Free layout (as Pro-MB): each band has its own edges and slopes; the room between bands passes untouched")));
             auto y = p.getY() + 54.0f;
             // round 147: a project saved before the measured Dynamic phase keeps its classic engine; one click updates it
@@ -2143,6 +2144,7 @@ private:
         else if (c.id == idBandMenu && selected >= 0) { showBandMenu (selected); return; }
         else if (c.id == idAudition && selected >= 0)
             set ({ { audition, current() != nullptr && auditionBand (current()->params) == selected ? 0.0f : (float) (selected + 1) / (float) bands } }); // [EXEC] the button toggles: Band n, then Off
+        else if (c.id == idLinkMode && selected >= 0) set ({ { bandLinkMode0 + selected, v (bandLinkMode0 + selected) >= 0.5f ? 0.0f : 1.0f } });
         else if (c.id == idClose) selected = -1;
         else if (c.id == idRange) rangeView = rangeView >= 30.0 ? 3.0 : rangeView >= 12.0 ? 30.0 : rangeView >= 6.0 ? 12.0 : 6.0;
         else if (c.id == idAnalyzer) { showAnalyzerMenu(); return; }
@@ -2200,6 +2202,32 @@ private:
         m.addItem (tr ("Compress"), true, v (bp (b, fMode)) < 0.5f, [this, b] { set ({ { bp (b, fMode), 0.0f } }); });
         m.addItem (tr ("Expand"), true, v (bp (b, fMode)) >= 0.5f, [this, b] { set ({ { bp (b, fMode), 1.0f } }); });
         m.addSeparator();
+        // round tp172b6: LYNX's own settings the reference's panel doesn't show: the slopes, the pan ring's mode, the side chain's three-way input
+        const auto choice = [&] (const char* title, int param, const juce::String& options) {
+            const auto c = menu ({}, param, {}, options);
+            juce::PopupMenu sub;
+            for (int i = 0; i < c.options.size(); ++i)
+            {
+                const auto value = optionValue (c, i);
+                sub.addItem (tr (c.options[i]), true, optionIndex (c) == i, [this, param, value] { set ({ { param, value } }); });
+            }
+            m.addSubMenu (tr (title), sub);
+        };
+        choice ("Slope", slope, "12 dB|24 dB|48 dB");
+        if (isFree())
+        {
+            choice ("Low slope", bandLoSlope0 + b, "6|12|18|24|30|36|42|48");
+            choice ("High slope", bandHiSlope0 + b, "6|12|18|24|30|36|42|48");
+        }
+        else
+        {
+            if (b > 0) choice ("Low slope", xoverSlope0 + b - 1, "Global|12|24|48");
+            if (b < nb() - 1) choice ("High slope", xoverSlope0 + b, "Global|12|24|48");
+        }
+        choice ("Pan", panMode, "L/R|M/S");
+        choice ("Input", bandScInput0 + b, "Global|Plug-in|External");
+        choice ("Side chain", scExternal, "Int|Ext");
+        m.addSeparator();
         m.addItem (tr ("Reset the band"), [this, b] {
             std::vector<std::pair<int, float>> c;
             const auto& in = effectInfo (kind);
@@ -2220,6 +2248,14 @@ private:
         if (selected >= 0 && panelArea().contains (p)) return false;
         if (! plot().contains (p)) return false;
         dragBand = dragEdge = -1;
+        dragScHandle = -1;
+        if (scFreeShown())
+            for (int h = 0; h < 2; ++h)
+                if (scHandleBox (h).contains (p))
+                {
+                    dragScHandle = h;
+                    return true;
+                }
         if (const auto b = nodeAt (p); b >= 0)
         {
             selected = b;
@@ -2280,6 +2316,15 @@ private:
     {
         using namespace dyn::prism;
         std::vector<std::pair<int, float>> c;
+        if (dragScHandle >= 0 && selected >= 0) // the free side-chain filter's handle, 30 Hz ... 30 kHz, the two kept apart
+        {
+            const auto prm = (dragScHandle == 0 ? bandScLow0 : bandScHigh0) + selected;
+            const auto hz = juce::jlimit (30.0, 30000.0, hzForX (e.position.x, plot()));
+            const auto value = (float) (std::log (hz / 30.0) / std::log (1000.0));
+            set ({ { prm, dragScHandle == 0 ? juce::jmin (value, v (bandScHigh0 + selected) - 0.01f) : juce::jmax (value, v (bandScLow0 + selected) + 0.01f) } });
+            ui::showValueTip (*this, juce::Rectangle<int> (16, 16).withCentre (e.position.toInt()), text (prm));
+            return;
+        }
         if (dragEdge > 0)
         {
             moveEdge (dragEdge, e.position.x, c);
@@ -2457,6 +2502,11 @@ private:
             };
             const auto power = juce::Rectangle<float> (a.getX(), a.getY(), 22.0f, 22.0f);
             const auto lit = bandOn (selected);
+            if (! lit) // a switched-off band's panel is dimmed, as the reference's; its power tile stays bright
+            {
+                g.setColour (juce::Colour (0xff3c3c3c).withAlpha (0.45f));
+                g.fillRoundedRectangle (a, 7.0f);
+            }
             cornerTile (power, true, power.contains (mouse), lit ? juce::Colour (0xff404040) : juce::Colour (0xffb32a2a));
             const auto ct = power.getCentre();
             juce::Path ring;
@@ -2568,9 +2618,10 @@ private:
             if (const auto& curve = bandCurves[(std::size_t) b]; ! curve.fill.isEmpty())
             {
                 // (the reference's fill darkens the plot too: a deep hue at 40 %; its line about two thirds of the full hue)
-                g.setColour (c.withMultipliedBrightness (0.42f).withMultipliedSaturation (1.3f).withAlpha (on ? 0.40f : 0.12f));
-                g.fillPath (curve.fill);
-                g.setColour (c.withMultipliedBrightness (0.68f).withMultipliedSaturation (1.3f).withAlpha (on ? 1.0f : 0.4f));
+                g.setColour (c.withMultipliedBrightness (0.42f).withMultipliedSaturation (1.3f).withAlpha (0.40f));
+                if (on)
+                    g.fillPath (curve.fill);
+                g.setColour (c.withMultipliedBrightness (0.68f).withMultipliedSaturation (1.3f).withAlpha (on ? 1.0f : 0.8f));
                 g.strokePath (curve.bound, juce::PathStrokeType (1.3f));
                 const auto ry = gainY (levelDb (v (bp (b, fLevel))) + rangeDb (v (bp (b, fRange))));
                 const auto glow = juce::Rectangle<float> (region.getX() + 8.0f, ry - 7.0f, juce::jmax (0.0f, region.getWidth() - 16.0f), 7.0f);
@@ -2615,8 +2666,32 @@ private:
             g.fillEllipse (r.expanded (1.0f));
             g.setColour (b == selected || b == hoverBand ? juce::Colours::white : juce::Colour (0xff2a2a2a));
             g.fillEllipse (r);
-            g.setColour (bandOn (b) ? c : c.withAlpha (0.35f).overlaidWith (juce::Colour (0xff303030).withAlpha (0.5f)));
+            g.setColour (c); // (the reference keeps a switched-off band's node in its colour)
             g.fillEllipse (r.reduced (big ? 2.0f : 1.0f));
+        }
+        if (scFreeShown())
+        {
+            const auto y = scBarY();
+            const auto hue = bandHue (selected);
+            const auto x0 = scHandleX (0), x1 = scHandleX (1);
+            g.setColour (juce::Colour (0xff4a4a4a));
+            const auto key = panelArea().getX() + panelW - 14.0f + 12.0f + 67.5f; // over the Free key
+            g.fillRect (key - 1.0f, y, 2.0f, panelArea().getY() + 16.0f - y);
+            g.setColour (hue.withMultipliedBrightness (0.62f));
+            g.fillRect (x0, y - 2.0f, x1 - x0, 4.0f);
+            g.setColour (hue.withMultipliedBrightness (0.78f).withAlpha (0.7f));
+            g.fillRect (x0, y - 2.0f, x1 - x0, 1.0f);
+            g.fillRect (x0, y + 1.0f, x1 - x0, 1.0f);
+            for (int h = 0; h < 2; ++h)
+            {
+                const auto r = scHandleBox (h);
+                juce::Path t;
+                if (h == 0) t.addTriangle (r.getX(), r.getY(), r.getX(), r.getBottom(), r.getRight(), r.getBottom());
+                else t.addTriangle (r.getX(), r.getY(), r.getRight(), r.getY(), r.getRight(), r.getBottom());
+                g.setGradientFill (juce::ColourGradient (juce::Colour (0xffb0b0b0).brighter (r.contains (mouse) ? 0.15f : 0.0f), 0.0f, r.getY(), juce::Colour (0xff808080).brighter (r.contains (mouse) ? 0.15f : 0.0f), 0.0f, r.getBottom(), false));
+                g.fillPath (t, juce::AffineTransform());
+                g.strokePath (t, juce::PathStrokeType (1.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            }
         }
         // the band panel: dark and neutral, one shape with the notch that points at its node
         if (selected >= 0)
@@ -2643,7 +2718,7 @@ private:
                 g.setColour (juce::Colours::black.withAlpha (0.4f));
                 g.drawVerticalLine ((int) x0, a.getY() + 2.0f, a.getBottom() - 2.0f);
                 captionStyle (g, false, 0.0f, accent, type::caption);
-                g.drawText (caps (tr ("Side chain")), juce::Rectangle<float> (x0 + 8.0f, a.getY() + 147.0f, 108.0f, 14.0f), juce::Justification::centred, false);
+                g.drawText (caps (tr ("Side chain")), juce::Rectangle<float> (x0 + 8.0f, a.getY() + 91.0f, 98.0f, 14.0f), juce::Justification::centred, false);
             }
         }
         // output meter
