@@ -50,7 +50,8 @@ private:
 // `onPreview` gets every change while the pop-up is open (live preview; may be empty); `onDone` gets the final colour
 // on OK, `onCancel` runs when the change is dropped.
 void showColourPickerPopup (juce::Rectangle<int> screenArea, const juce::String& title, juce::Colour initial, std::function<void (juce::Colour)> onPreview,
-                            std::function<void (juce::Colour)> onDone, std::function<void()> onCancel = {});
+                            std::function<void (juce::Colour)> onDone, std::function<void()> onCancel = {},
+                            std::function<void()> onReset = {}); // (given: a Reset button, as FL's colour selector)
 
 // The "Change color" submenu of mixer tracks, channels, patterns, playlist tracks and clips: Default, LYNX's palette and
 // "Custom color..." (the picker in a pop-up at `screenArea`). `set` gets the chosen colour (0 = default).

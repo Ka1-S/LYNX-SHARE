@@ -21,6 +21,14 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_
     set_source_files_properties(src/core/Slayer.cpp PROPERTIES COMPILE_OPTIONS "-fno-inline")
 endif()
 
+# The plugins are shared libraries: everything they link must be position independent (the option is declared below)
+if(LYNX_BUILD_PLUGINS)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    if(NOT MSVC)
+        add_compile_options(-ffunction-sections -fdata-sections) # (what the plugins' --gc-sections can drop)
+    endif()
+endif()
+
 # ---------------------------------------------------------------------------
 # JUCE-free core: model, sequencer, built-in instruments and .flp reader
 
@@ -30,6 +38,7 @@ add_library(lynx_core STATIC
     src/core/Scheduler.cpp
     src/core/MarkerPlan.cpp
     src/core/Performance.cpp
+    src/core/ClipLauncher.cpp
     src/core/Patcherize.cpp
     src/core/Instruments.cpp
     src/core/RackRenderer.cpp
@@ -363,8 +372,8 @@ if(LYNX_BUILD_APP)
         HARDENED_RUNTIME_ENABLED FALSE
         PLIST_TO_MERGE "<plist><dict><key>CFBundleName</key><string>LYNX SHARE</string><key>CFBundleDisplayName</key><string>LYNX SHARE</string><key>LSMinimumSystemVersion</key><string>11.0</string><key>NSHighResolutionCapable</key><true/></dict></plist>")
 
-    target_sources(LYNX PRIVATE
-        src/Main.cpp
+    # (a list: the plugin build, cmake/LynxPlugins.cmake, compiles the same sources without Main.cpp)
+    set(LYNX_APP_SOURCES
         src/platform/FileTypes.cpp
         src/platform/CrashGuard.cpp
         src/platform/Paths.cpp
@@ -456,7 +465,7 @@ if(LYNX_BUILD_APP)
         src/ui/EditorTools.cpp)
 
     # workflow shell: workspace desktop, control contract, dialogs
-    target_sources(LYNX PRIVATE
+    list(APPEND LYNX_APP_SOURCES
         src/ui/Workspace.cpp
         src/ui/ValueControl.cpp
         src/ui/Dialogs.cpp
@@ -464,16 +473,16 @@ if(LYNX_BUILD_APP)
         src/ui/Splash.cpp)
 
     # main window chrome: hint bar and toolbar widgets
-    target_sources(LYNX PRIVATE
+    list(APPEND LYNX_APP_SOURCES
         src/ui/HintBar.cpp
         src/ui/Toolbar.cpp)
 
     # spectral waveforms: background analysis cache and drawing
-    target_sources(LYNX PRIVATE
+    list(APPEND LYNX_APP_SOURCES
         src/ui/WaveformView.cpp)
 
     # workflow P2: note tool dialogs, tool windows, undo history, quick-add palette
-    target_sources(LYNX PRIVATE
+    list(APPEND LYNX_APP_SOURCES
         src/ui/NoteToolDialogs.cpp
         src/ui/MidiClipboard.cpp
         src/ui/EventEditor.cpp
@@ -492,6 +501,7 @@ if(LYNX_BUILD_APP)
         src/ui/NewProjectDialog.cpp
         src/ui/ClipProperties.cpp
         src/ui/PluginMonitorWindow.cpp
+        src/ui/ClipGridComponent.cpp
         src/ui/TouchKeyboard.cpp
         src/ui/QuickAddPalette.cpp
         src/ui/PluginPickerView.cpp
@@ -500,6 +510,7 @@ if(LYNX_BUILD_APP)
         src/ui/CrashReporter.cpp
         src/ui/Updater.cpp
         src/ui/StemExtract.cpp)
+    target_sources(LYNX PRIVATE src/Main.cpp ${LYNX_APP_SOURCES})
     target_include_directories(LYNX PRIVATE third_party/onnxruntime) # loaded at run time, never linked
 
     target_include_directories(LYNX PRIVATE third_party/clap/include)
@@ -559,6 +570,13 @@ if(LYNX_BUILD_APP)
         PUBLIC
             juce::juce_recommended_config_flags
             juce::juce_recommended_lto_flags)
+endif()
+
+# LYNX's own effects and instruments as VST3 / CLAP plugins for other hosts (round 180b, docs/PLUGIN_EXPORT.md). Off by
+# default: nothing of it is configured or compiled in the normal build.
+option(LYNX_BUILD_PLUGINS "Build LYNX's own plugins as VST3 and CLAP" OFF)
+if(LYNX_BUILD_APP AND LYNX_BUILD_PLUGINS)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/LynxPlugins.cmake)
 endif()
 
 if(LYNX_BUILD_APP AND UNIX AND NOT APPLE)

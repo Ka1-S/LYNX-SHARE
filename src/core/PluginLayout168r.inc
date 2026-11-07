@@ -536,47 +536,144 @@ Layout lynxStepGate()
 
 // --- Love Philter (FL: 670 × 400) and Distructor (FL: 924 × 385) -----------------------------------------------------
 
+// the names of Love Philter's per-unit controls ("Unit 3 cutoff", "Unit 3 type", "Unit 3 cutoff LFO speed"…) as stable C strings
+const char* philterName (int unit, const char* field)
+{
+    static std::map<std::string, std::string> names;
+    auto key = "Unit " + std::to_string (unit + 1) + " " + field;
+    return names.emplace (key, key).first->second.c_str();
+}
+
 Layout lovePhilterLayout()
 {
-    // FL's form (REA_rodada168r §2.9): the eight filter units' cutoff / resonance / envelope / pan / volume, the master
-    // level and LFO, the input envelope follower and the Mod X / Y pad. The units' filter types, envelopes and routing
-    // come from the FL state (a preset or a project) and play as FL's; the page edits the automatable controls.
+    // FL's form (Fruity Love Philter_x64.dll, TSynthEditorForm 670 × 400, read from the DFM in round 173d3): the unit
+    // page on the left — the eight enable boxes, the unit tabs, IN, FILTER (type, mode, ALT, ENV / CUT / RES, L / B / H
+    // or GAIN), WS (ON, AMP, MIX, unipolar / bipolar), OUT (PAN, VOL, NEXT) — over the articulator editor (target,
+    // part, pattern number, the curve and its LFO / envelope panel); the main panel on the right: the X / Y pad with
+    // SMOOTH and the X / Y wheels, the master level, master LFO and follower (IEF) level sliders, the follower's USE1 /
+    // ATT / REL, CENTER, HQ ENVELOPES and OVERSAMPLING. The page = unit (×1) + editor target (×8, nine) + articulator part (×72).
     Layout l;
     l.fl = "Fruity Love Philter";
     l.width = 670;
-    l.height = 330;
+    l.height = 400;
     auto& v = l.items;
-    v.push_back (section (0, 0, 164, 330, TR_NOOP ("MASTER"), boxed));
-    v.push_back (knob (44, 52, 40, "Master level", TR_NOOP ("Level"), 84));
-    v.push_back (knob (120, 52, 40, "Master LFO", TR_NOOP ("LFO"), 84));
-    v.push_back (label (8, 98, 148, 14, TR_NOOP ("Envelope follower"), dim));
-    v.push_back (knob (32, 132, 30, "Follower level", TR_NOOP ("Level"), 158));
-    v.push_back (knob (82, 132, 30, "Follower attack", TR_NOOP ("Att"), 158));
-    v.push_back (knob (132, 132, 30, "Follower release", TR_NOOP ("Rel"), 158));
-    v.push_back (label (8, 172, 60, 14, TR_NOOP ("Pattern"), dim | alignLeft));
-    v.push_back (value (70, 172, 86, 14, "Pattern"));
-    v.push_back (display (18, 192, 128, 130, "xy", "Mod X", "Mod Y"));
-    v.push_back (section (170, 0, 500, 330, TR_NOOP ("FILTER UNITS"), boxed));
-    static const char* const names[8][5] = {
-        { "Unit 1 cutoff", "Unit 1 resonance", "Unit 1 envelope amount", "Unit 1 pan", "Unit 1 volume" },
-        { "Unit 2 cutoff", "Unit 2 resonance", "Unit 2 envelope amount", "Unit 2 pan", "Unit 2 volume" },
-        { "Unit 3 cutoff", "Unit 3 resonance", "Unit 3 envelope amount", "Unit 3 pan", "Unit 3 volume" },
-        { "Unit 4 cutoff", "Unit 4 resonance", "Unit 4 envelope amount", "Unit 4 pan", "Unit 4 volume" },
-        { "Unit 5 cutoff", "Unit 5 resonance", "Unit 5 envelope amount", "Unit 5 pan", "Unit 5 volume" },
-        { "Unit 6 cutoff", "Unit 6 resonance", "Unit 6 envelope amount", "Unit 6 pan", "Unit 6 volume" },
-        { "Unit 7 cutoff", "Unit 7 resonance", "Unit 7 envelope amount", "Unit 7 pan", "Unit 7 volume" },
-        { "Unit 8 cutoff", "Unit 8 resonance", "Unit 8 envelope amount", "Unit 8 pan", "Unit 8 volume" } };
-    static const char* const numbers[8] = { "1", "2", "3", "4", "5", "6", "7", "8" };
-    static const char* const rows[5] = { TR_NOOP ("Cutoff"), TR_NOOP ("Res"), TR_NOOP ("Env"), TR_NOOP ("Pan"), TR_NOOP ("Vol") };
-    for (int r = 0; r < 5; ++r)
-        v.push_back (label (176, 42.0f + 56.0f * (float) r, 40, 14, rows[r], dim | alignLeft));
-    for (int u = 0; u < 8; ++u)
+    constexpr int units = 8, targets = 9, shaperTarget = 7;
+    const auto unitItem = [&] (LayoutItem i, int u) {
+        i.page = u, i.pageModulo = units, i.pageStride = 1;
+        v.push_back (std::move (i));
+    };
+    // --- unit page
+    v.push_back (section (0, 0, 443, 400, nullptr, boxed));
+    for (int u = 0; u < units; ++u) // EnableBank1…8 (right-click: solo, in the options)
+        v.push_back (toggle (7.0f + 29.8f * (float) u, 8, 14, 14, philterName (u, "on"), nullptr)); // (FL: LEDs)
+    v.push_back (pageDigit (3, 26, 240, 31, "1|2|3|4|5|6|7|8", 1));
+    v.push_back (label (4, 59, 47, 16, "IN", boxed));
+    v.push_back (label (55, 59, 235, 16, "FILTER", boxed));
+    v.push_back (label (294, 59, 72, 16, "WS", boxed));
+    v.push_back (label (370, 59, 69, 16, "OUT", boxed));
+    v.push_back (section (4, 74, 47, 119, nullptr, boxed | raised));
+    v.push_back (section (55, 74, 235, 119, nullptr, boxed | raised));
+    v.push_back (section (294, 74, 72, 119, nullptr, boxed | raised));
+    v.push_back (section (370, 74, 69, 119, nullptr, boxed | raised));
+    v.push_back (section (68, 79, 146, 53, nullptr, boxed));
+    for (int u = 0; u < units; ++u)
     {
-        const auto cx = 240.0f + 56.0f * (float) u;
-        v.push_back (label (cx - 24.0f, 22, 48, 14, numbers[u]));
-        for (int r = 0; r < 5; ++r)
-            v.push_back (knob (cx, 56.0f + 56.0f * (float) r, 30, names[u][r], nullptr, 0, noCaption | (r == 3 ? bipolar : 0)));
+        const auto shelf = [&] (LayoutItem i, bool gain) { // L / B / H for the plain filters, GAIN (or DRIVE) for shelves, peaking, Mango
+            // (FL shot: L / B / H mix the state variable filter's outputs, so only the Chocolate type shows them)
+            return gain ? when (std::move (i), philterName (u, "type"), 7.5f / 11.0f, 1.0f)
+                        : when (std::move (i), philterName (u, "type"), 0.0f, 0.5f / 11.0f);
+        };
+        unitItem (knob (27, 161, 36, philterName (u, "input"), "VOL", 184), u);
+        unitItem (stepper (72, 95, 27, 21, philterName (u, "type"), nullptr, 11), u);
+        // (FL shot: two columns, OFF / SINGLE / DUAL then TRIPLE / ALT DUAL / ALT TRIPLE; the grid fills rows first)
+        auto mode = radio (105, 81, 106, 48, philterName (u, "mode"), "OFF|TRIPLE|SINGLE|ALT DUAL|DUAL|ALT TRIPLE",
+                           { 0.0f, 0.6f, 0.2f, 0.8f, 0.4f, 1.0f });
+        mode.columns = 2;
+        unitItem (mode, u);
+        unitItem (toggle (246, 61, 40, 12, philterName (u, "ALT"), "ALT"), u);
+        unitItem (knob (98, 161, 36, philterName (u, "envelope amount"), "ENV", 184), u);
+        unitItem (knob (141, 159, 42, philterName (u, "cutoff"), "CUT", 184), u);
+        unitItem (knob (185, 161, 36, philterName (u, "resonance"), "RES", 184), u);
+        unitItem (shelf (slider (Item::vslider, 225, 81, 16, 96, philterName (u, "low"), "L"), false), u);
+        unitItem (shelf (slider (Item::vslider, 245, 81, 16, 96, philterName (u, "band"), "B"), false), u);
+        unitItem (shelf (slider (Item::vslider, 265, 81, 16, 96, philterName (u, "high"), "H"), false), u);
+        unitItem (shelf (knob (253, 161, 36, philterName (u, "low"), "GAIN", 184), true), u);
+        unitItem (toggle (300, 98, 23, 36, philterName (u, "shaper on"), "ON"), u);
+        unitItem (knob (344, 101, 36, philterName (u, "shaper pre amp"), "AMP", 123), u);
+        unitItem (knob (344, 161, 36, philterName (u, "shaper mix"), "MIX", 184), u);
+        unitItem (toggle (300, 154, 22, 24, philterName (u, "shaper unipolar"), nullptr, boxed), u);
+        unitItem (label (295, 180, 32, 9, "MODE"), u);
+        unitItem (knob (392, 101, 36, philterName (u, "pan"), "PAN", 123, bipolar), u);
+        unitItem (knob (392, 161, 36, philterName (u, "volume"), "VOL", 184), u);
+        if (u < units - 1) // (the last unit has nothing to feed)
+            unitItem (slider (Item::vslider, 417, 81, 16, 98, philterName (u, "to next"), "NEXT", bipolar), u);
     }
+    // --- the articulator editor: target, part, pattern, the curve and the part's panel
+    v.push_back (section (3, 197, 436, 200, nullptr, boxed | raised));
+    // FL shot: nine targets (WS = the unit's shaper curve, a map with no part row or panel; WMIX = the shaper mix's
+    // articulator) and the part row PAT / LFO / MOD X / MOD Y / IEF with the pattern number left of it
+    v.push_back (pageDigit (4, 199, 434, 15, "PAN|VOL|CUT|RES|LOW|BAND|HIGH|WS|WMIX", units));
+    for (int t = 0; t < targets; ++t)
+        if (t != shaperTarget)
+        {
+            auto pattern = stepper (4, 216, 41, 17, "Pattern", nullptr, 9);
+            auto parts = pageDigit (46, 217, 392, 15, "PAT|LFO|MOD X|MOD Y|IEF", units * targets);
+            for (auto* i : { &pattern, &parts })
+            {
+                i->page = t, i->pageStride = units, i->pageModulo = targets;
+                v.push_back (*i);
+            }
+        }
+    v.push_back (display (4, 235, 434, 129, "lpcurve"));
+    static const char* const artNames[8] = { "pan", "volume", "cutoff", "resonance", "low", "band", "high", "shaper mix" };
+    for (int u = 0; u < units; ++u)
+        for (int t = 0; t < targets; ++t)
+        {
+            if (t == shaperTarget)
+                continue;
+            const auto art = t < shaperTarget ? t : 7;
+            const auto at = [&] (const char* field) { return philterName (u, (std::string (artNames[art]) + " " + field).c_str()); };
+            const int envPage = u + units * t, lfoPage = envPage + units * targets;
+            v.push_back (onPage (toggle (5, 366, 16, 16, at ("envelope on"), nullptr, boxed), envPage));
+            v.push_back (onPage (toggle (114, 365, 42, 17, at ("envelope tempo"), "TEMPO"), envPage));
+            v.push_back (onPage (toggle (5, 366, 16, 16, at ("LFO on"), nullptr, boxed), lfoPage));
+            v.push_back (onPage (knob (33, 378, 20, at ("LFO speed"), "SPD", 393, noCaption), lfoPage));
+            v.push_back (onPage (knob (56, 378, 20, at ("LFO tension"), "TNS", 393, noCaption | bipolar), lfoPage));
+            v.push_back (onPage (knob (79, 378, 20, at ("LFO skew"), "SKEW", 393, noCaption | bipolar), lfoPage));
+            v.push_back (onPage (knob (102, 378, 20, at ("LFO pulse width"), "PW", 393, noCaption | bipolar), lfoPage));
+            for (const auto& [x, c] : { std::pair<float, const char*> { 24, "SPD" }, { 47, "TNS" }, { 68, "SKEW" }, { 93, "PW" } })
+                v.push_back (onPage (label (x, 389, 22, 8, c), lfoPage));
+            v.push_back (onPage (toggle (114, 365, 42, 17, at ("LFO tempo"), "TEMPO"), lfoPage));
+        }
+    // --- the main panel (FL's x + 443)
+    constexpr float m = 443;
+    v.push_back (section (m, 0, 227, 400, nullptr, boxed));
+    v.push_back (label (m + 5, 2, 58, 26, "FRUITY", alignLeft));
+    v.push_back (label (m + 5, 27, 65, 26, "PHILTER", alignLeft));
+    v.push_back (section (m + 5, 55, 152, 242, nullptr, boxed | raised));
+    v.push_back (display (m + 12, 63, 138, 138, "xy", "Mod X", "Mod Y"));
+    v.push_back (toggle (m + 8, 207, 64, 15, "Smooth", "SMOOTH"));
+    v.push_back (knob (m + 85, 256, 44, "Mod X", "X", 284));
+    v.push_back (knob (m + 131, 256, 44, "Mod Y", "Y", 284));
+    v.push_back (label (m + 8, 277, 54, 15, "Modulation", alignLeft));
+    v.push_back (slider (Item::vslider, m + 161, 52, 15, 88, "Master level", nullptr, noCaption));
+    v.push_back (slider (Item::vslider, m + 185, 52, 15, 88, "Master LFO", nullptr, noCaption | bipolar));
+    v.push_back (slider (Item::vslider, m + 208, 52, 15, 88, "Follower level", nullptr, noCaption));
+    v.push_back (label (m + 159, 141, 15, 9, "VOL"));
+    v.push_back (label (m + 175, 141, 31, 9, "LFO"));
+    v.push_back (label (m + 201, 141, 26, 9, "IEF"));
+    v.push_back (label (m + 162, 153, 61, 18, "IEF", boxed));
+    v.push_back (section (m + 162, 171, 61, 126, nullptr, boxed | raised));
+    v.push_back (toggle (m + 170, 174, 47, 17, "Use unit 1", "USE1"));
+    v.push_back (knob (m + 193, 211, 38, "Follower attack", "ATT", 234));
+    v.push_back (knob (m + 193, 263, 38, "Follower release", "REL", 287));
+    v.push_back (toggle (m + 0, 301, 61, 19, "Center", "CENTER"));
+    v.push_back (toggle (m + 63, 301, 95, 19, "HQ envelopes", "HQ ENVELOPES"));
+    v.push_back (stepper (m + 191, 321, 32, 20, "Oversampling", nullptr, 4));
+    v.push_back (label (m + 108, 326, 79, 9, "OVERSAMPLING"));
+    // the solo (FL: right-click an enable box) and the sync of pattern changes (FL's options menu)
+    l.editedElsewhere = { "Solo unit", "Sync pattern changes" };
+    // every articulator's switches for the patterns not shown (one pattern's at a time) live in the state too
     return l;
 }
 

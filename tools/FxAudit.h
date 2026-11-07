@@ -37,10 +37,14 @@
 #include <string>
 #include <vector>
 
+#include "core/ConvolverFx.h"
+#include "core/EquoFx.h"
+#include "core/LovePhilter.h"
 #include "core/Effects.h"
 #include "core/FacetEq.h"
 #include "core/PluginLayout.h"
 #include "core/StateParams.h"
+#include "core/Vocodex.h"
 
 namespace lynx::fxaudit
 {
@@ -669,6 +673,7 @@ struct Hint
     bool sidechain = false;                  // also with the side-chain input
     int move = -1;                           // ≥ 0: this parameter jumps to moveTo in the middle of the pad
     float moveTo = 0.0f;
+    std::function<void (EffectSlot&)> edit = nullptr; // a change no parameter makes (a send track kept in the state)
 };
 
 struct Options
@@ -876,7 +881,114 @@ inline std::vector<Hint> hintsFor (EffectKind kind)
         case EffectKind::multibandDelay:
             for (int b = 1; b < 8; ++b) // the morph on bank b + 1 (a bank's cells are heard only there)
                 out.push_back (named ("the morph on bank " + std::to_string (b + 1), { { "Morph", (float) b / 7.0f } }));
+            if (kind == EffectKind::equo) // round 173d3: the band sends go to an insert (FL's send box)
+                for (int b = 0; b < 8; ++b)
+                {
+                    auto h = named (b == 0 ? std::string ("the send to insert 2") : "the send to insert 2, the morph on bank " + std::to_string (b + 1),
+                                    { { "Morph", (float) b / 7.0f } });
+                    if (b == 0)
+                        h.sets.clear();
+                    h.edit = [] (EffectSlot& e) {
+                        e.sendTracks[0] = 2;
+                        equofx::setSendInsert (e.state, 2);
+                    };
+                    out.push_back (h);
+                }
             break;
+        case EffectKind::lovePhilter:
+        {
+            // round 173d3: FL's default has unit 1 on and no articulator drawn, so the units, envelopes, LFOs and maps
+            // are woken by drawing them in the state (FL: the unit page's enable boxes and the articulator editor)
+            const auto points = [] (std::initializer_list<std::pair<double, double>> xy) {
+                std::vector<philter::DocPoint> out;
+                double last = 0.0;
+                for (const auto& [x, y] : xy)
+                {
+                    philter::DocPoint q;
+                    q.dt = x - last, q.y = y;
+                    last = x;
+                    out.push_back (q);
+                }
+                return out;
+            };
+            const auto drawn = [points] (bool shaper, bool allTargets) {
+                return [points, shaper, allTargets] (EffectSlot& e) {
+                    auto d = philter::readDoc (e.state);
+                    if (! d)
+                        return;
+                    for (int u = 0; u < 8; ++u)
+                    {
+                        auto& un = d->u[(std::size_t) u];
+                        un.enabled = 1;
+                        if (un.mode == 0)
+                            un.mode = 1;
+                        if (shaper) // an S curve
+                        {
+                            un.wsOn = 1;
+                            un.ws.pts = points ({ { 0.0, 0.0 }, { 0.3, 0.1 }, { 0.5, 0.5 }, { 0.7, 0.9 }, { 1.0, 1.0 } });
+                        }
+                        for (int t = 0; t < 8; ++t)
+                        {
+                            if (! allTargets && t != 2)
+                                continue;
+                            auto& a = d->u[(std::size_t) u].art[(std::size_t) t];
+                            for (int p = 0; p < 10; ++p) // a different envelope per pattern
+                            {
+                                a.pat[(std::size_t) p].on = 1;
+                                a.pat[(std::size_t) p].pts = points ({ { 0.0, 0.1 }, { 0.25 + 0.1 * p, 0.95 }, { 1.0 + 0.1 * p, 0.2 + 0.06 * p } });
+                            }
+                            a.lfo.on = 1;
+                            a.lfo.pts = points ({ { 0.0, 1.0 }, { 4.0, 1.0 } });
+                            a.lfoDepth = 1.0f;
+                            a.maps[0].pts = points ({ { 0.0, 1.0 }, { 1.0, 0.0 } });
+                            a.maps[1].pts = points ({ { 0.0, 0.0 }, { 0.5, 1.0 }, { 1.0, 0.2 } });
+                            a.maps[2].pts = points ({ { 0.0, 1.0 }, { 0.3, 0.2 }, { 1.0, 0.0 } });
+                        }
+                    }
+                    e.state = philter::writeDoc (*d);
+                };
+            };
+            Hint units { "every unit on (FL's enable boxes)", {} };
+            units.edit = [] (EffectSlot& e) {
+                if (auto d = philter::readDoc (e.state))
+                {
+                    for (auto& un : d->u)
+                        un.enabled = 1, un.mode = un.mode == 0 ? 1 : un.mode;
+                    e.state = philter::writeDoc (*d);
+                }
+            };
+            out.push_back (units);
+            Hint cut { "every unit on, the cutoff articulators drawn: a pattern envelope per pattern, the LFO, the Mod X / Mod Y / follower maps", {} };
+            cut.edit = drawn (false, false);
+            out.push_back (cut);
+            Hint all { "every unit on with an S-curve waveshaper, every articulator drawn (envelopes, LFOs, maps)", {} };
+            all.edit = drawn (true, true);
+            out.push_back (all);
+            // (the envelopes' and LFOs' TEMPO: FL's free time runs at 2 units a second, its tempo time at BPM / 60, the same at
+            // 120 BPM; the B / H articulators scale the band / high levels, so they act once those are up)
+            auto tempo = named ("every articulator drawn, the band and high levels up, at 90 BPM", {});
+            for (int u = 1; u <= 8; ++u)
+                for (const auto* f : { " band", " high" })
+                    if (const auto i = plugui::paramIndex (kind, ("Unit " + std::to_string (u) + f).c_str()); i >= 0)
+                        tempo.sets.push_back ({ i, 0.6f });
+            tempo.edit = drawn (true, true);
+            tempo.bpm = 90.0;
+            out.push_back (tempo);
+            break;
+        }
+        case EffectKind::convolver:
+        {
+            // round 173d3 (gap173d-3): FL's default EQ curve is flat (its gain acts at any EQ amount), so the EQ amount
+            // is heard only once a curve is drawn: a low shelf down, a high boost
+            Hint h { "an EQ curve drawn (lows down, highs up)", {} };
+            h.edit = [] (EffectSlot& e) {
+                std::vector<convolver::EnvPoint> pts (4);
+                pts[0].y = 0.15, pts[1].dt = 0.3, pts[1].y = 0.5, pts[2].dt = 0.4, pts[2].y = 0.5, pts[3].dt = 0.3, pts[3].y = 0.95;
+                convolver::writeEqCurve (e.state, pts);
+            };
+            out.push_back (h);
+            break;
+        }
         case EffectKind::frequencySplitter:
         {
             // (the low band down: the bands no longer sum back to the input, so the crossover is heard)
@@ -906,6 +1018,15 @@ inline std::vector<Hint> hintsFor (EffectKind kind)
         case EffectKind::pitchCorrect:
             out.push_back (named ("Harmonize from the held notes, mixed", { { "Harmonize", 1.0f }, { "MIDI", 1.0f }, { "Mix", 1.0f } }));
             break;
+        case EffectKind::vocodex:
+        {
+            // round 173d3 (gap173d-4): a new instance's gate map ("Modulator noise level") is flat at 0, so the
+            // Subtractive gate switch has no threshold to act on until the map is drawn
+            Hint h { "the gate map drawn (a rising line)", {} };
+            h.edit = [] (EffectSlot& e) { e.state = vocodex::withMap (e.state, 3, { { 0.0, 0.0 }, { 1.0, 0.8 } }); };
+            out.push_back (h);
+            break;
+        }
         default:
             break;
     }
@@ -1069,6 +1190,8 @@ inline std::optional<EffectSlot> prerequisite (const std::string& key, const Eff
         for (const auto& [p, v] : hints[h].sets)
             if (p != c.param)
                 setValue (hc, p, v);
+        if (hints[h].edit)
+            hints[h].edit (hc);
         why = hints[h].note;
         if (hints[h].bpm > 0.0)
             ro.bpm = hints[h].bpm;

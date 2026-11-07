@@ -537,10 +537,11 @@ void applyWarpMode (int mode, SamplerSettings& s)
 
 // `stretchBeats` > 0: the channel plays the file stretched offline to that many beats at the song tempo (the warp
 // modes' own engines, core/TimeStretch); 0: the clips stretch it in real time (their `stretch`)
-int audioChannelFor (Ctx& ctx, const std::string& path, int mixerTrack, int warpMode, bool warped, double stretchBeats = 0.0)
+int audioChannelFor (Ctx& ctx, const std::string& path, int mixerTrack, int warpMode, bool warped, double stretchBeats = 0.0,
+                     double beatsPitch = 0.0)
 {
     const auto key = path + "|" + std::to_string (mixerTrack) + "|" + std::to_string (warped ? warpMode : -1) + "|"
-                     + std::to_string (std::llround (stretchBeats * 1.0e6));
+                     + std::to_string (std::llround (stretchBeats * 1.0e6)) + "|" + std::to_string (std::llround (beatsPitch * 100.0));
     if (const auto it = ctx.audioChannels.find (key); it != ctx.audioChannels.end())
         return it->second;
     ChannelDef c;
@@ -554,6 +555,7 @@ int audioChannelFor (Ctx& ctx, const std::string& path, int mixerTrack, int warp
     if (warped)
         applyWarpMode (warpMode, c.sampler);
     c.sampler.stretchBeats = (float) stretchBeats;
+    c.sampler.stretchPitch = (float) beatsPitch;
     ctx.song.channels.push_back (std::move (c));
     const auto index = (int) ctx.song.channels.size() - 1;
     ctx.audioChannels[key] = index;
@@ -599,13 +601,18 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
     // DefaultSampleRate]: the channel stretches the whole file offline with the clip's warp mode (round 175a, N4:
     // LYNX's Beats engine only runs offline), to the file's length in content beats; the clip then plays it as is
     const auto fileFrames = clip.number ("SampleRef/DefaultDuration", 0), fileRate = clip.number ("SampleRef/DefaultSampleRate", 0);
-    double fileBeats = 0.0;
-    if (warped && mode != 3 && fileFrames > 0 && fileRate > 0 && std::abs (stretch - 1.0) > 1.0e-9)
+    // Beats with a transpose: Live resamples each piece (higher and shorter, still on its beat), so the transposition is
+    // rendered offline with the stretch, keyed by the pitch, and the clip itself plays untransposed [LIVE: Beats-up5]
+    const auto transpose = std::clamp (clip.number ("PitchCoarse", 0) + clip.number ("PitchFine", 0) / 100.0, -48.0, 48.0);
+    const auto bakePitch = warped && mode == 0 && transpose != 0.0;
+    double fileBeats = 0.0, beatsPitch = 0.0;
+    if (warped && mode != 3 && fileFrames > 0 && fileRate > 0 && (std::abs (stretch - 1.0) > 1.0e-9 || bakePitch))
     {
         fileBeats = rate * fileFrames / fileRate;
         stretch = 1.0;
+        beatsPitch = bakePitch ? transpose : 0.0;
     }
-    const auto channel = audioChannelFor (ctx, path, mixerTrack, mode, warped, fileBeats);
+    const auto channel = audioChannelFor (ctx, path, mixerTrack, mode, warped, fileBeats, beatsPitch);
     const auto loop = loopOf (clip);
     // not warped: the loop values are seconds [DATA: IsWarped=false clips]; the clip length is in beats either way
     auto unwarpedLoop = loop;
@@ -628,8 +635,7 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
         c.gain = (float) clip.number ("SampleVolume", 1);
         // Re-Pitch ignores the clip's transpose: the tempo alone sets the pitch [LIVE: +5 st on a Re-Pitch clip renders
         // at the original pitch, 2026-11-06]
-        c.pitch = warped && mode == 3 ? 0.0f
-                                      : (float) std::clamp (clip.number ("PitchCoarse", 0) + clip.number ("PitchFine", 0) / 100.0, -12.0, 12.0);
+        c.pitch = (warped && mode == 3) || beatsPitch != 0.0 ? 0.0f : (float) std::clamp (transpose, -12.0, 12.0);
         c.muted = clip.boolean ("Disabled", false);
         if (&pass == &passes.front())
             c.fadeIn = std::clamp (ticksOf (clip.number ("Fades/FadeInLength", 0)), (std::int64_t) 0, c.length);
