@@ -5793,10 +5793,10 @@ juce::PopupMenu MainComponent::makeSwitchAudioClipsMenu (bool selectedOnly)
     item (TR_NOOP ("Drums / transients"), true, StretchMethod::transients);
     item (TR_NOOP ("Vocal / mono"), true, StretchMethod::mono);
     m.addSectionHeader (tr ("Warp (Ableton-style)"));
-    item (TR_NOOP ("Warp: Beats"), true, StretchMethod::beats);
-    item (TR_NOOP ("Warp: Tones"), true, StretchMethod::tones);
-    item (TR_NOOP ("Warp: Texture"), true, StretchMethod::texture);
-    item (TR_NOOP ("Warp: Complex"), true, StretchMethod::complex);
+    item (TR_NOOP ("Beats"), true, StretchMethod::beats);
+    item (TR_NOOP ("Tones"), true, StretchMethod::tones);
+    item (TR_NOOP ("Texture"), true, StretchMethod::texture);
+    item (TR_NOOP ("Complex"), true, StretchMethod::complex);
     return m;
 }
 

@@ -7933,3 +7933,6 @@ countries: br
 "No audio clip channels were found." = "Nenhum canal de clipe de áudio foi encontrado."
 "Selected audio clip channels will be set to {0} mode. Some channels may need manual time adjustment." = "Os canais de clipe de áudio selecionados serão definidos para o modo {0}. Alguns canais podem precisar de ajuste manual de tempo."
 "All audio clip channels will be set to {0} mode. Some channels may need manual time adjustment." = "Todos os canais de clipe de áudio serão definidos para o modo {0}. Alguns canais podem precisar de ajuste manual de tempo."
+"Tones" = "Tons"
+"Texture" = "Textura"
+"Complex" = "Complexo"

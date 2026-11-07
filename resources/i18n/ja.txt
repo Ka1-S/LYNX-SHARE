@@ -7850,3 +7850,6 @@ countries: jp
 "No audio clip channels were found." = "オーディオクリップチャンネルが見つかりません。"
 "Selected audio clip channels will be set to {0} mode. Some channels may need manual time adjustment." = "選択したオーディオクリップチャンネルを {0} モードにします。一部のチャンネルは手動で時間の調整が必要になる場合があります。"
 "All audio clip channels will be set to {0} mode. Some channels may need manual time adjustment." = "すべてのオーディオクリップチャンネルを {0} モードにします。一部のチャンネルは手動で時間の調整が必要になる場合があります。"
+"Tones" = "トーン"
+"Texture" = "テクスチャ"
+"Complex" = "コンプレックス"

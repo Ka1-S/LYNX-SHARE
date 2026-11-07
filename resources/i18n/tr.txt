@@ -7850,3 +7850,6 @@ countries: tr
 "No audio clip channels were found." = "Hiçbir ses klibi kanalı bulunamadı."
 "Selected audio clip channels will be set to {0} mode. Some channels may need manual time adjustment." = "Seçili ses klibi kanalları {0} moduna ayarlanacak. Bazı kanallar elle zaman ayarı gerektirebilir."
 "All audio clip channels will be set to {0} mode. Some channels may need manual time adjustment." = "Tüm ses klibi kanalları {0} moduna ayarlanacak. Bazı kanallar elle zaman ayarı gerektirebilir."
+"Tones" = "Tonlar"
+"Texture" = "Doku"
+"Complex" = "Karmaşık"

@@ -7850,3 +7850,6 @@ countries: cn sg
 "No audio clip channels were found." = "未找到音频片段通道。"
 "Selected audio clip channels will be set to {0} mode. Some channels may need manual time adjustment." = "所选音频片段通道将设为 {0} 模式。部分通道可能需要手动调整时间。"
 "All audio clip channels will be set to {0} mode. Some channels may need manual time adjustment." = "所有音频片段通道将设为 {0} 模式。部分通道可能需要手动调整时间。"
+"Tones" = "音调"
+"Texture" = "纹理"
+"Complex" = "复杂"

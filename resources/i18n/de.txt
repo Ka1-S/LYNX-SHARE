@@ -7850,3 +7850,6 @@ countries: de at ch li lu
 "No audio clip channels were found." = "Es wurden keine Audioclip-Kanäle gefunden."
 "Selected audio clip channels will be set to {0} mode. Some channels may need manual time adjustment." = "Die ausgewählten Audioclip-Kanäle werden auf den Modus {0} gestellt. Manche Kanäle brauchen eventuell eine manuelle Zeitanpassung."
 "All audio clip channels will be set to {0} mode. Some channels may need manual time adjustment." = "Alle Audioclip-Kanäle werden auf den Modus {0} gestellt. Manche Kanäle brauchen eventuell eine manuelle Zeitanpassung."
+"Tones" = "Töne"
+"Texture" = "Textur"
+"Complex" = "Komplex"

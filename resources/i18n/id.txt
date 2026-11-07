@@ -7850,3 +7850,6 @@ countries: id
 "No audio clip channels were found." = "Tidak ada saluran klip audio yang ditemukan."
 "Selected audio clip channels will be set to {0} mode. Some channels may need manual time adjustment." = "Saluran klip audio terpilih akan diatur ke mode {0}. Beberapa saluran mungkin perlu penyesuaian waktu manual."
 "All audio clip channels will be set to {0} mode. Some channels may need manual time adjustment." = "Semua saluran klip audio akan diatur ke mode {0}. Beberapa saluran mungkin perlu penyesuaian waktu manual."
+"Tones" = "Nada"
+"Texture" = "Tekstur"
+"Complex" = "Kompleks"
