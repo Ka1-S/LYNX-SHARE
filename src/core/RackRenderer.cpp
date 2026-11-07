@@ -1,4 +1,5 @@
 #include "core/RackRenderer.h"
+#include "core/MixerOps.h"
 #include "core/TempoMap.h"
 #include "core/ModelParams.h"
 #include "core/SamplePrecompute.h"
@@ -113,14 +114,14 @@ public:
 
 LiveLevels::LiveLevels (const Song& song)
     : mixerVolume (song.mixer.size()), mixerPan (song.mixer.size()), mixerStereo (song.mixer.size()),
-      channelVolume (song.channels.size()), channelPan (song.channels.size())
+      channelVolume (song.channels.size()), channelPan (song.channels.size()), vcaLevel (song.vcas.size())
 {
     store (song);
 }
 
 bool LiveLevels::matches (const Song& song) const noexcept
 {
-    return mixerVolume.size() == song.mixer.size() && channelVolume.size() == song.channels.size();
+    return mixerVolume.size() == song.mixer.size() && channelVolume.size() == song.channels.size() && vcaLevel.size() == song.vcas.size();
 }
 
 void LiveLevels::store (const Song& song) noexcept
@@ -138,6 +139,8 @@ void LiveLevels::store (const Song& song) noexcept
         channelVolume[c].store (song.channels[c].volume, std::memory_order_relaxed);
         channelPan[c].store (song.channels[c].pan, std::memory_order_relaxed);
     }
+    for (std::size_t v = 0; v < song.vcas.size(); ++v)
+        vcaLevel[v].store (song.vcas[v].level, std::memory_order_relaxed);
 }
 
 std::unique_ptr<const RackState> RackState::build (Song song,
@@ -238,7 +241,7 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
         const auto target = channel.sampler.stretchBeats * 60.0 / std::max (1.0, bpm);
         const auto ratio = target / ((double) sample->frames() / sample->sampleRate);
 
-        if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod))
+        if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch))
             sample = std::move (stretched);
     }
 
@@ -699,8 +702,24 @@ std::unique_ptr<const RackState> RackState::build (Song song,
     });
     const auto audible = state->song.soloAudible();
     state->mixerAudible.assign (audible.begin(), audible.end());
+    state->applyVcas();
     loadtrace::add ("rack_schedule_graph", loadtrace::msSince (tailStarted));
     return state;
+}
+
+void RackState::applyVcas()
+{
+    // VCA faders (round 177a): a muted VCA silences its members; the chains let the audio thread multiply the gains
+    vcaChains.clear();
+    if (song.vcas.empty())
+        return;
+    vcaChains.assign (song.mixer.size(), {});
+    for (int t = 1; t < (int) song.mixer.size(); ++t)
+    {
+        vcaChains[(std::size_t) t] = mixerops::vcasOf (song, t);
+        if (mixerops::vcaMuted (song, t) && (std::size_t) t < mixerAudible.size())
+            mixerAudible[(std::size_t) t] = 0;
+    }
 }
 
 void RackState::buildMixerGraph()
@@ -708,6 +727,7 @@ void RackState::buildMixerGraph()
     mixerOrder = song.mixerOrder();
     const auto audible = song.soloAudible();
     mixerAudible.assign (audible.begin(), audible.end());
+    applyVcas();
 
     const auto tracks = std::max<int> (1, (int) song.mixer.size());
     mixerInputs.assign ((std::size_t) tracks, {});
@@ -1165,6 +1185,7 @@ void RackState::buildAutomationTables()
     channelPanAuto.assign (song.channels.size(), -1);
     mixerVolumeAuto.assign (song.mixer.size(), -1);
     mixerPanAuto.assign (song.mixer.size(), -1);
+    vcaLevelAuto.assign (song.vcas.size(), -1);
     effectParamAuto.assign (song.mixer.size(), {});
     effectMixAuto.assign (song.mixer.size(), {});
 
@@ -1248,6 +1269,12 @@ void RackState::buildAutomationTables()
                 break;
 
             case AutomationTargetKind::tempo: tempoAutomation = a; break;
+            case AutomationTargetKind::vcaLevel:
+                if (t.index >= 0 && t.index < (int) song.vcas.size())
+                    vcaLevelAuto[(std::size_t) t.index] = a;
+                else
+                    used = false;
+                break;
             case AutomationTargetKind::mixerSend:
                 if (trackOk && song.routes (t.index, t.slot))
                 {
@@ -2475,7 +2502,8 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             effects[i]->setPlaying (chunkPlaying);
             effects[i]->setHeldNotes (heldNotes.data(), maxChannels);
             setSidechain (state, slots[i], *effects[i], track);
-            timed (key, [&] { effects[i]->process (l, r, n, slots[i].params, bpm); });
+            const auto& shown = overrideParams != nullptr && track == overrideTrack && (int) i == overrideSlot ? *overrideParams : slots[i].params;
+            timed (key, [&] { effects[i]->process (l, r, n, shown, bpm); });
         }
 
         // an effect that output NaN / inf (an unstable setting): this block of it is muted and its state reset, so the
@@ -3806,6 +3834,22 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
         const auto volume = state.hasAutomation ? automated (state.mixerVolumeAuto[(std::size_t) t], fader) : fader;
         const auto pan = state.hasAutomation ? automated (state.mixerPanAuto[(std::size_t) t], (knob + 1.0f) * 0.5f) * 2.0f - 1.0f : knob;
         level = mixerMatrix (track, volume, pan, state.song.panTriangular, liveLevel (state, &LiveLevels::mixerStereo, t, track.stereo));
+        if ((std::size_t) t < state.vcaChains.size() && ! state.vcaChains[(std::size_t) t].empty()) // VCA faders (round 177a)
+        {
+            auto g = 1.0f;
+            for (const auto v : state.vcaChains[(std::size_t) t])
+            {
+                const auto position = liveLevel (state, &LiveLevels::vcaLevel, v, state.song.vcas[(std::size_t) v].level);
+                const auto automatedPosition = state.hasAutomation && (std::size_t) v < state.vcaLevelAuto.size()
+                                                   ? automated (state.vcaLevelAuto[(std::size_t) v], position)
+                                                   : position;
+                g *= faderGain (automatedPosition);
+            }
+            level.ll *= g;
+            level.lr *= g;
+            level.rl *= g;
+            level.rr *= g;
+        }
         if (! silent)
             target = level;
     }

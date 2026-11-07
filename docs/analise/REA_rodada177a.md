@@ -203,6 +203,64 @@ summing group, the fold view of a summing group (only the bus shows) and of a gr
 with a second output (the group then folds to a tab), Fold all / Unfold all, and the fold following its group when the
 inserts move.
 
+## 3. VCA faders (slice 177a-3)
+
+### 3.1 FL and the others
+
+- **FL Studio 2026:** no VCA. The closest tools are linking several faders to one controller (Multilink / a
+  Formula or Peak controller) or a submix bus. A bus changes the sound path (one more insert, its effects, its PDC);
+  a link moves the faders themselves, so the members' own fader values are lost.
+- **Pro Tools, Cubase, Studio One, Logic, Reaper (VCA faders / VCA groups):** a VCA strip carries no audio. It offsets
+  its members' faders in dB, its mute and solo act on them, VCAs nest, and Pro Tools' *Coalesce VCA* (Studio One:
+  *merge*) bakes the VCA into the members. **Ableton Live 12** has none.
+- **Users:** FL users have asked for a VCA since 2021 ([IL VCA 2021](https://forum.image-line.com/viewtopic.php?p=1646924)†), and Live users ask too ([Ableton forum](https://forum.ableton.com/viewtopic.php?p=1774646)). Studio One's folder tracks with VCA get praise ([MusicRadar](https://musicradar.com/how-to/vca-grouping)).
+- **Verdict:** an addition, since FL has none: nothing changes until a VCA is made. Coordinator's decision 2026-11-06: VCA block left of the Master, *Merge VCA into members* in v1 (undoable).
+
+### 3.2 What LYNX does
+
+A **VCA** (`Song::vcas`) has a name, a colour, a fader, a mute, its members (mixer inserts) and an optional parent
+VCA.
+
+- **Make one:** insert menu › Group › VCA › *New VCA from selected*. *Assign to VCA* and *Remove from VCA* are in the
+  same submenu. A VCA's own menu has *Assign selected inserts* and *Remove selected inserts*.
+- **Where:** the VCA strips have their own block, left of the Master, in the Master's dock. A VCA strip shows "VCA"
+  where an insert shows its number, the member count, the name, mute, solo, the loudest member's meter and the
+  fader. A dashed outline marks it as a strip that carries no audio. It has no slots, pan, EQ or routing.
+- **Fader:** the VCA's gain (FL's fader curve; unity = 0 dB) multiplies each member's fader gain, so the levels add
+  in dB. A member keeps its own fader value and automation. A tick on the member's fader shows the level that plays,
+  and the member's fader hint names its VCAs and that level. The VCA fader drags, takes the wheel and resets on a
+  double-click like an insert's. Its level is an automation target (*VCA level*).
+- **Mute / solo:** the VCA's mute mutes its members. Its solo solos them with FL's solo rules (`soloSelected`). A
+  click on the VCA's name selects its members.
+- **Nesting:** *Follow VCA* sets a parent. The parent's gain and mute reach the child's members. The menu never
+  offers a parent that would make a loop, and the gain code has a cycle guard too.
+- **Merge VCA into members** (undoable): each member's fader and volume automation take the VCA's gain, then the VCA
+  goes back to unity. The sound doesn't change, within the faders' range. **Delete VCA:** the members keep their
+  faders, child VCAs lose their parent, the VCA's automation loses its target.
+- **Moves:** inserting, moving or deleting inserts keeps the members (the slice-1 remap). A deleted member leaves
+  the VCA.
+- **Saving:** VCAs are saved in the project (`vcas`). FL has no VCA. The .flp export writes each member's fader with
+  its VCA gain baked in, and its report says that VCA automation and mutes are left out.
+
+### 3.3 Cost and the audio thread
+
+- With no VCA, `RackState::vcaChains` is empty and the per-insert check is one `empty()` test.
+- With VCAs, the snapshot holds each insert's VCA chain, built off the audio thread. The audio thread multiplies the
+  insert's levels by the chain's gains, read from the snapshot's `LiveLevels::vcaLevel` atomics (a live drag) or the
+  VCA's automation. It takes no locks and makes no allocations. A VCA mute is baked into `mixerAudible` when the
+  snapshot is built.
+
+### 3.4 Tests
+
+`tests/Mixer177a3Tests.inc`:
+
+- `mixer177a3_vca_gains_add_in_db_nest_and_follow_moves`: unity on create, dB adding, nesting, mute through the parent,
+  membership after inserts move and a member is deleted, assign / remove.
+- `mixer177a3_merge_and_delete_vca`: merge keeps each member's level and scales its volume automation; merge at unity
+  does nothing; the *VCA level* target reads and writes; delete clears children's parent and the automation target.
+- `mixer177a3_vca_scales_its_members_in_the_render`: no VCA leaves the snapshot without chains; a −6 dB VCA lowers
+  only its member by 6 dB; a live level store reaches the render without a rebuild; a VCA mute silences only its
+  member.
 ## 4. Measured in the real windows (2026-11-07)
 
 ### 4.1 The mixer picture and folded groups
@@ -226,5 +284,24 @@ A click on the rail away from the cap does **not** jump the fader. Each click mo
 the click: below the cap 748 → 749, above it 748 → 747, and ten more clicks below it 750 → 760. A press on the rail
 followed by a 20 px drag moved the cap 7 px, so the drag is relative to the press and doesn't jump either.
 
-LYNX jumps the fader to the click (`MixerStrips::mouseDown`, "clicking the track jumps the fader there"). This differs
-from FL. It is unchanged here and goes to the coordinator. The exact step in fader units isn't measured yet.
+The step, measured in fader units: one click moves the value by 0.0056 of the travel (FL's hint: 0.0 dB → -0.2 dB at
+unity). Held, the press repeats about every 64 ms (about 15.6 steps a second, with no first delay) and stops once the
+cap's centre is under the mouse.
+
+LYNX (slice 177a-4) now does the same by default, as the coordinator decided: a stray click can't jump a mix.
+`faderRailStep = 0.0056` and `faderRailRepeatMs = 64` are in `Song.h`, and Ctrl+click still resets. The VCA faders
+behave the same. In the real LYNX window one click gave -0.2 dB, as FL. Ten quick clicks first gave -2.1 dB against
+FL's -1.6 dB: the repeat timer fired before a late mouse-up reached the message thread. Commit c4229c2b9 stops the
+repeat once no button is down. That fix is covered by the offscreen check (`mixer_basics`), but it has not been
+clicked again in a real window yet.
+
+### 4.3 The mixer track menu against FL's
+
+Added in 177a-4: "Change color..." opens the colour picker at once (mixer only, with a Reset), "Open audio editor and
+record" (Shift+E), "Track routing" as a submenu name, and "Compensate for master latency" in the main menu.
+
+The label stays "Rename and color..." where FL says "Rename, color and icon...". The LYNX dialog sets the name and the
+colour only. The icon is the separate "Change icon..." item, so FL's text would promise something the dialog doesn't do.
+
+Still open, each as its own slice: FL's "Gradient color" and "Assign to new Audio track(s)" / "Unassign from Audio
+track(s)".
