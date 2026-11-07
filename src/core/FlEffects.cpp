@@ -1613,8 +1613,10 @@ std::optional<EffectSlot> effectFromFlPreset (const std::vector<std::uint8_t>& b
         if (project.channels.empty() || project.channels.front().pluginState.empty())
             return std::nullopt;
 
-        return data ? effectFromFl (project.channels.front().pluginName, project.channels.front().pluginState, bpm, data)
-                    : effectFromFl (project.channels.front().pluginName, project.channels.front().pluginState, bpm);
+        // (FL 3 era presets: "Fruity fast dist", "Fruity soft clipper" — the exact engines want FL's own spelling)
+        const auto name = canonicalFlEffectName (project.channels.front().pluginName);
+        return data ? effectFromFl (name, project.channels.front().pluginState, bpm, data)
+                    : effectFromFl (name, project.channels.front().pluginState, bpm);
     }
     catch (const flp::Error&)
     {
@@ -1704,6 +1706,9 @@ std::vector<std::string> flPluginsForEffect (EffectKind kind)
         case EffectKind::vocoder: return { "Fruity Vocoder" };
         case EffectKind::vocodex: return { "Vocodex" };
         case EffectKind::lovePhilter: return { "Fruity Love Philter" }; // round 173d3: FL's presets in its preset bar and pictures
+        case EffectKind::squeeze: return { "Fruity Squeeze" }; // round 173d3b: their FL presets in the preset bar
+        case EffectKind::vintagePhaser: return { "Vintage Phaser" };
+        case EffectKind::peakController: return { "Fruity Peak Controller" };
         case EffectKind::effector: return { "Effector" };
         case EffectKind::frequencySplitter: return { "Frequency Splitter" };
         default: return {};

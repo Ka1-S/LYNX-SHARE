@@ -207,3 +207,22 @@ TEST (audit173d3_love_philter_unit_parameters)
     philter::upgradeParams (slot, 48);
     CHECK (slot.params[48 + 5] > 0.0f); // IN (raw 128 of −160…160) is not 0
 }
+
+// Round 173d3b: FL 3 era presets spell the plugin in lower case ("Fruity fast dist", "Fruity soft clipper"); the exact
+// engines are picked by FL's own spelling, so 7 of FL's 8 Fast Dist presets became a generic distortion that the preset
+// bar ignored. Squeeze, Vintage Phaser and Peak Controller had no preset folder in the list.
+TEST (audit173d3b_old_preset_spellings_reach_the_exact_engines)
+{
+    CHECK (lynx::canonicalFlEffectName ("Fruity fast dist") == "Fruity Fast Dist");
+    CHECK (lynx::canonicalFlEffectName ("Fruity soft clipper") == "Fruity Soft Clipper");
+    CHECK (lynx::canonicalFlEffectName ("Some VST") == "Some VST");
+    CHECK (lynx::flPluginsForEffect (lynx::EffectKind::squeeze) == std::vector<std::string> { "Fruity Squeeze" });
+    CHECK (lynx::flPluginsForEffect (lynx::EffectKind::vintagePhaser) == std::vector<std::string> { "Vintage Phaser" });
+    CHECK (lynx::flPluginsForEffect (lynx::EffectKind::peakController) == std::vector<std::string> { "Fruity Peak Controller" });
+    if (realFlpDir.empty())
+        return;
+    std::ifstream in (std::filesystem::path (realFlpDir) / "Patches" / "Plugin presets" / "Effects" / "Fruity Fast Dist" / "The Heat.fst", std::ios::binary);
+    const std::vector<std::uint8_t> bytes ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
+    const auto fx = lynx::effectFromFlPreset (bytes, 130.0);
+    CHECK (fx && fx->kind == lynx::EffectKind::fruityFastDist);
+}
