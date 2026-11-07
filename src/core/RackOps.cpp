@@ -1,4 +1,6 @@
 #include "core/RackOps.h"
+
+#include "core/MidiControls.h"
 #include "core/PatternBlocks.h"
 
 #include <algorithm>
@@ -957,4 +959,54 @@ int stepPatternCreating (Song& song, int delta)
     return std::clamp (target, 0, last);
 }
 
+int audioClipsAmong (const Song& song, const std::vector<int>& channels)
+{
+    int count = 0;
+    for (const auto c : channels)
+        if (c >= 0 && c < (int) song.channels.size() && song.channels[(std::size_t) c].instrument == InstrumentKind::audioClip)
+            ++count;
+    return count;
+}
+
+int setDeclickOfAudioClips (Song& song, const std::vector<int>& channels, int mode)
+{
+    int count = 0;
+    for (const auto c : channels)
+        if (c >= 0 && c < (int) song.channels.size() && song.channels[(std::size_t) c].instrument == InstrumentKind::audioClip)
+        {
+            song.channels[(std::size_t) c].sampler.declickMode = std::clamp (mode, 0, 5);
+            ++count;
+        }
+    return count;
+}
+
+void prepareForMidiExport (Song& song)
+{
+    constexpr int drums = 9; // (MIDI channel 10)
+    int next = 0;
+    for (auto& c : song.channels)
+    {
+        // FL skips channels with a flag whose meaning is not known yet (REA round 181b); LYNX keeps the channels
+        // that make no sound of their own and drive others, which a MIDI Out could not stand in for
+        if (c.instrument == InstrumentKind::controller || c.instrument == InstrumentKind::layer
+            || c.instrument == InstrumentKind::dashboard || c.instrument == InstrumentKind::voltage)
+            continue;
+        midictl::MidiOutSettings settings;
+        if (c.plugin.name == "FPC")
+        {
+            settings.channel = drums;
+        }
+        else
+        {
+            settings.channel = next;
+            next = (next + 1) & 15;
+            if (next == drums)
+                ++next;
+        }
+        c.instrument = InstrumentKind::midiOut;
+        c.plugin = {};
+        c.pluginState.clear();
+        midictl::writeMidiOut (c.pluginState, settings);
+    }
+}
 } // namespace lynx

@@ -614,7 +614,8 @@ void LookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button,
     g.setColour (base);
     g.fillPath (p);
 
-    if (button.hasKeyboardFocus (false) && button.getWantsKeyboardFocus())
+    if ((button.hasKeyboardFocus (false) || button.getProperties().contains ("lynxSnapshotFocus")) // (--snapshot: see saveWindow)
+        && button.getWantsKeyboardFocus())
     {
         g.setColour (accent.withAlpha (0.6f));
         g.strokePath (p, juce::PathStrokeType (1.0f));
@@ -695,7 +696,7 @@ void LookAndFeel::drawComboBox (juce::Graphics& g, int width, int height, bool, 
     const auto hover = box.isMouseOver (true) && box.isEnabled();
     fillRounded (g, bounds, radius::md, hover ? bg5 : box.findColour (juce::ComboBox::backgroundColourId));
 
-    if (box.hasKeyboardFocus (true) && box.getWantsKeyboardFocus())
+    if ((box.hasKeyboardFocus (true) || box.getProperties().contains ("lynxSnapshotFocus")) && box.getWantsKeyboardFocus())
         outlineRounded (g, bounds, radius::md, accent.withAlpha (0.7f));
     else if (! box.findColour (juce::ComboBox::outlineColourId).isTransparent())
         outlineRounded (g, bounds, radius::md, box.findColour (juce::ComboBox::outlineColourId));

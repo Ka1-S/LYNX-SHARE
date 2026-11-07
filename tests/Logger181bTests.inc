@@ -473,3 +473,45 @@ TEST (chord181b_names_match_the_measured_fl_sample)
         { { 39, 41, 55, 59, 64, 67, 80, 81, 85, 88 }, "II ∆♯11♭13♯13" },
     }, inG);
 }
+
+TEST (macros181b_declick_changes_only_selected_audio_clips)
+{
+    lynx::Song song;
+    song.channels.resize (3);
+    song.channels[0].instrument = lynx::InstrumentKind::audioClip;
+    song.channels[1].instrument = lynx::InstrumentKind::sampler;
+    song.channels[2].instrument = lynx::InstrumentKind::audioClip;
+    CHECK (lynx::audioClipsAmong (song, { 1 }) == 0);
+    CHECK (lynx::audioClipsAmong (song, { 0, 1, 7, -1 }) == 1);
+    CHECK (lynx::setDeclickOfAudioClips (song, { 0, 1 }, 4) == 1);
+    CHECK (song.channels[0].sampler.declickMode == 4);
+    CHECK (song.channels[1].sampler.declickMode == 0);
+    CHECK (song.channels[2].sampler.declickMode == 0);
+}
+
+TEST (macros181b_prepare_for_midi_export_follows_fl)
+{
+    lynx::Song song;
+    song.channels.resize (20);
+    song.channels[2].plugin.name = "FPC";
+    song.channels[3].name = "Lead";
+    lynx::prepareForMidiExport (song);
+    std::vector<int> channels;
+    for (const auto& c : song.channels)
+    {
+        CHECK (c.instrument == lynx::InstrumentKind::midiOut);
+        CHECK (c.plugin.name.empty());
+        channels.push_back (lynx::midictl::parseMidiOut (c.pluginState).channel);
+    }
+    // 0 1 FPC 2 3 ... 8, skipping 9 (MIDI channel 10), 10 ... 15, then 0 again
+    const std::vector<int> expected { 0, 1, 9, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3 };
+    CHECK (channels == expected);
+    CHECK (song.channels[3].name == "Lead");
+
+    lynx::Song kept;
+    kept.channels.resize (3);
+    kept.channels[1].instrument = lynx::InstrumentKind::layer;
+    lynx::prepareForMidiExport (kept);
+    CHECK (kept.channels[1].instrument == lynx::InstrumentKind::layer);
+    CHECK (lynx::midictl::parseMidiOut (kept.channels[2].pluginState).channel == 1);
+}
