@@ -1130,6 +1130,15 @@ public:
         // FL's arrangement of the plugin's page (core/PluginLayout.cpp): the knobs at FL's places, faders and
         // switches drawn by the panel
         layout = plugui::instrumentLayout (def.instrument);
+        if (layout != nullptr && plugui::hostedElsewhere) // (round 180b: the plate prints the plugin's name)
+        {
+            hostedName = def.name;
+            hostedLayout = *layout;
+            for (auto& item : hostedLayout.items)
+                if ((item.style & plugui::enginePlate) != 0)
+                    item.label = hostedName.c_str();
+            layout = &hostedLayout;
+        }
         // a state the engine cannot read gives no knobs: keep the plain page then
         if (layout != nullptr && ! wasp && std::none_of (knobs.begin(), knobs.end(), [this] (const auto& k) { return itemFor (k->getName()) != nullptr; }))
             layout = nullptr;
@@ -2130,6 +2139,8 @@ public:
     // the engine's description (what it is and where its data comes from)
     juce::String description() const
     {
+        if (plugui::hostedElsewhere)
+            return juce::String::fromUTF8 (hostedName.c_str());
         return drumsynth ? tr ("DrumSynth Live — FL's engine, patch on key {0}", { juce::String (editorKey) })
                                + (wavesFound ? tr (" (next hit; recorded waves from your FL installation)")
                                              : tr (" (next hit; recorded waves not found: silent)"))
@@ -2641,6 +2652,8 @@ private:
     std::vector<std::pair<juce::Slider*, const drumcontrols::Control*>> partKnobs;
     std::vector<std::unique_ptr<juce::Slider>> knobs;
     const plugui::Layout* layout = nullptr;
+    plugui::Layout hostedLayout;
+    std::string hostedName;
     const modelparams::Table* modelTable = nullptr; // the engine's listed parameters (round 168n)
     InstrumentKind instrumentKind = InstrumentKind::synth;
     const plugui::LayoutItem* stepperDrag = nullptr; // (round 169h)
@@ -2938,6 +2951,12 @@ public:
         stretchMethod.addItem (tr ("General"), 1);
         stretchMethod.addItem (tr ("Drums / transients"), 2);
         stretchMethod.addItem (tr ("Vocal / mono"), 3);
+        // LYNX's warp modes modelled on Ableton Live's (round 175a, N4)
+        stretchMethod.addSeparator();
+        stretchMethod.addItem (tr ("Warp: Beats"), 4);
+        stretchMethod.addItem (tr ("Warp: Tones"), 5);
+        stretchMethod.addItem (tr ("Warp: Texture"), 6);
+        stretchMethod.addItem (tr ("Warp: Complex"), 7);
         stretchMethod.setTooltip (tr ("How the stretch keeping pitch is computed: General for full mixes and chords, Drums for loops and percussive sounds (attacks kept sharp), Vocal for a single voice or instrument"));
         stretchMethod.onChange = [this] { apply(); };
         addAndMakeVisible (stretchMethod);
@@ -3238,8 +3257,12 @@ private:
         if (changed == &stretch || stretch.getValue() != shownStretch) // (unmoved: keep the exact value, not the knob's)
             s.stretchBeats = (float) (shownStretch = stretch.getValue());
         s.keepPitch = keepPitch.getToggleState();
-        s.stretchMethod = (StretchMethod) juce::jlimit (0, 2, stretchMethod.getSelectedId() - 1);
+        s.stretchMethod = (StretchMethod) juce::jlimit (0, stretchMethodCount - 1, stretchMethod.getSelectedId() - 1);
         stretchMethod.setEnabled (s.keepPitch);
+        // leaving Beats (or Keep length): an imported clip's offline transposition moves to the Pitch knob, which the other
+        // modes apply in real time, so the sample stays at its pitch
+        if (s.moveBakedPitchToKnob())
+            pitch.setValue (s.pitch, juce::dontSendNotification);
         s.regionStart = (float) regionStart.getValue();
         s.regionEnd = (float) regionEnd.getValue();
         s.release = (float) release.getValue();

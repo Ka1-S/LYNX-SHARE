@@ -36,6 +36,7 @@
 #include "core/EquoFx.h"
 #include "core/MultibandDelayFx.h"
 #include "core/Vocodex.h"
+#include "core/LovePhilter.h"
 #include "core/HardwareInsert.h"
 #include "engine/Text.h"
 #include "ui/DynamicsDisplays.h"
@@ -339,7 +340,7 @@ public:
             r.removeFromBottom (13.0f * s);
         }
         else if (! hasStyle (item, plugui::noCaption))
-            r.removeFromBottom ((hasStyle (item, plugui::showValue) || hasStyle (item, plugui::rangeEnds) ? 26.0f : 14.0f) * s);
+            r.removeFromBottom ((hasStyle (item, plugui::showValue) || hasStyle (item, plugui::hoverValue) ? 26.0f : 14.0f) * s);
         const auto d = juce::jmin (r.getWidth(), r.getHeight());
         return r.withSizeKeepingCentre (d, d).withY (r.getY());
     }
@@ -693,7 +694,7 @@ public:
         g.setFont (font (type::small));
         g.setColour (colour::textSecondary);
         // where it is: only when it fits whole (round 170k2: no "(I…" stub beside the name)
-        if (const auto where = "(" + trackName() + ")"; juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), where) <= text.getWidth() - 9.0f)
+        if (const auto where = "(" + trackName() + ")"; ! plugui::hostedElsewhere && juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), where) <= text.getWidth() - 9.0f)
             g.drawText (where, text.withTrimmedLeft (8.0f), juce::Justification::centredLeft, false);
 
         if (usesBar())
@@ -934,41 +935,16 @@ public:
                     g.setFont (font (juce::jmax (8.0f, 10.5f * s * skin::captionScale()), skin::captionScale() > 1.0f));
                     g.drawFittedText (valueText (param, value), below.withHeight (13.0f * s * skin::captionScale()).expanded (10.0f * s, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
                 }
-                else if (hasStyle (item, plugui::rangeEnds)) // round tp172b4: the scale's ends, the value on hover, the caption
+                else if (hasStyle (item, plugui::hoverValue)) // round tp172b5: the caption, the value under it on hover / drag
                 {
-                    const auto row = below.withHeight (12.0f * s);
+                    caption (g, item, below.withHeight (12.0f * s));
                     if (hot || index == dragItem)
                     {
                         g.setColour (hot ? look.accent.brighter (0.3f) : skin::valueColour (true));
                         g.setFont (font (juce::jmax (8.0f, 10.0f * s), true));
-                        g.drawFittedText (valueText (param, value), row.expanded (12.0f * s, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
+                        g.drawFittedText (valueText (param, value), below.withTrimmedTop (12.0f * s).withHeight (13.0f * s).expanded (12.0f * s, 0.0f).toNearestInt(),
+                                          juce::Justification::centred, 1, 0.7f);
                     }
-                    else
-                    {
-                        const auto shortText = [] (juce::String t) {
-            // round tp172b4: scale ends as the references print them — "1:1", "-60 dB", "5 s" (no zero decimals, no
-            // spaces round a ratio's colon)
-            t = t.replace (" : ", ":");
-            juce::String out;
-            for (int i = 0; i < t.length(); ++i)
-            {
-                if (t[i] == '.' && i > 0 && juce::CharacterFunctions::isDigit (t[i - 1]))
-                {
-                    int j = i + 1;
-                    while (j < t.length() && t[j] == '0') ++j;
-                    if (j > i + 1 && (j >= t.length() || ! juce::CharacterFunctions::isDigit (t[j]))) { i = j - 1; continue; }
-                }
-                out << juce::String::charToString (t[i]);
-            }
-            return out;
-        };
-                        const auto ends = circle.withY (row.getY()).withHeight (row.getHeight()).expanded (12.0f * s, 0.0f);
-                        g.setColour (colour::textDisabled);
-                        g.setFont (font (juce::jmax (7.5f, 9.0f * s)));
-                        g.drawText (shortText (valueText (param, 0.0f)), ends, juce::Justification::centredLeft, false);
-                        g.drawText (shortText (valueText (param, 1.0f)), ends, juce::Justification::centredRight, false);
-                    }
-                    caption (g, item, below.withTrimmedTop (12.0f * s).withHeight (13.0f * s));
                 }
                 else if (! hasStyle (item, plugui::noCaption))
                 {
@@ -1321,7 +1297,11 @@ public:
                 drawSmallArrow (g, arrows, false);
                 g.setColour (colour::textPrimary);
                 g.setFont (font (juce::jmax (8.0f, 11.0f * s), true));
-                g.drawFittedText (valueText (param, value), box.toNearestInt(), juce::Justification::centred, 1, 0.6f);
+                // (Love Philter's type box: FL's short names; the hint and the list keep the long ones)
+                g.drawFittedText (kind == EffectKind::lovePhilter && juce::String (item.param).endsWith (" type")
+                                      ? juce::String (philter::typeShortName (juce::roundToInt (value * 11.0f)))
+                                      : valueText (param, value),
+                                  box.toNearestInt(), juce::Justification::centred, 1, 0.6f);
                 break;
             }
 
@@ -2448,9 +2428,24 @@ public:
             return;
         juce::PopupMenu menu;
         const auto chosen = fx->sendTracks[(std::size_t) part];
-        auto choose = [this, part] (int t) { editSlot ([part, t] (EffectSlot& e) { e.sendTracks[(std::size_t) part] = t; }); };
-        menu.addItem (tr ("None"), true, chosen <= 0, [choose] { choose (0); });
+        auto choose = [this, part] (int t) {
+            editSlot ([part, t] (EffectSlot& e) {
+                e.sendTracks[(std::size_t) part] = t;
+                if (e.kind == EffectKind::equo) // (EQUO keeps its send track in its state too, as FL saves it)
+                    equofx::setSendInsert (e.state, t);
+            });
+        };
         const auto& mixer = engine.getSong().mixer;
+        if (fx->kind == EffectKind::equo) // FL's EQUO send box: (none) and the tracks this insert routes to (round 173d3)
+        {
+            menu.addItem ("(" + tr ("none") + ")", true, chosen <= 0, [choose] { choose (0); });
+            for (int t = 1; t < (int) mixer.size(); ++t)
+                if (t != track && (engine.getSong().routes (track, t) || t == chosen))
+                    menu.addItem (insertName (t), true, t == chosen, [choose, t] { choose (t); });
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (r.toNearestInt())));
+            return;
+        }
+        menu.addItem (tr ("None"), true, chosen <= 0, [choose] { choose (0); });
         for (int t = 1; t < (int) mixer.size(); ++t)
             if (t != track)
                 menu.addItem (juce::String (t) + "  " + insertName (t), engine.getSong().canRoute (track, t) || t == chosen, t == chosen, [choose, t] { choose (t); });
@@ -2563,6 +2558,22 @@ public:
         if (id == "tssenvelope")
         {
             paintTransmitterEnvelope (g, inner, fx);
+            return;
+        }
+        if (id == "equosend") // FL's send track box: "---" (none) or the insert's number, with its up / down marks
+        {
+            const auto t = fx.sendTracks[0];
+            g.setColour (theme::colour::bg0.withAlpha (0.35f));
+            g.fillRect (r);
+            g.setColour (t > 0 ? theme::colour::textPrimary : theme::colour::textSecondary);
+            g.setFont (theme::font (juce::jmax (8.0f, 10.0f * scale())));
+            g.drawText (t > 0 ? juce::String (t) : juce::String ("---"), r.withTrimmedRight (9.0f * scale()).toNearestInt(), juce::Justification::centredRight, false);
+            const auto ar = r.removeFromRight (9.0f * scale()).reduced (1.5f * scale(), r.getHeight() * 0.22f);
+            juce::Path up, down;
+            up.addTriangle (ar.getX(), ar.getCentreY() - 1.0f, ar.getRight(), ar.getCentreY() - 1.0f, ar.getCentreX(), ar.getY());
+            down.addTriangle (ar.getX(), ar.getCentreY() + 1.0f, ar.getRight(), ar.getCentreY() + 1.0f, ar.getCentreX(), ar.getBottom());
+            g.fillPath (up);
+            g.fillPath (down);
             return;
         }
         if (id == "tsssend0" || id == "tsssend1")
@@ -2889,6 +2900,10 @@ public:
         }
         else if (id == "maxcurve") // Maximus: the selected band's compression curve, edited with FL's gestures (round 168x)
             paintMaximusCurve (g, inner, fx);
+        else if (id == "lpcurve" || id == "cvcurve" || id == "vxcurve") // Love Philter's articulators, Convolver's EQ, Vocodex's maps (round 173d3)
+            paintPhilterCurve (g, inner, fx);
+        else if (id == "vxmapsel") // Vocodex: the map shown (round 173d3)
+            paintVxMapSelector (g, r);
         else if (id == "maxbands") // Maximus: the three bands over 20 Hz…20 kHz with their crossovers and the low cut
         {
             const auto raw = [&] (int p) { return maximusfx::stateParam (fx.state, p).value_or (maximusfx::stateParams()[(std::size_t) p].defaultValue); };
@@ -3530,6 +3545,7 @@ public:
 
 #include "ui/GrossBeatEditor.inc"
 #include "ui/MaximusCurveEditor.inc"
+#include "ui/LovePhilterEditor.inc"
 
     // --- the parametric EQ's graph (FL's Parametric EQ 2 arrangement) -----------------------------------
 
@@ -4265,6 +4281,8 @@ public:
             return;
         if (kind == EffectKind::maximus && mxMouseMove (i >= 0 ? activeLayout().items[(std::size_t) i] : LayoutItem {}, p)) // round 168x
             return;
+        if ((kind == EffectKind::lovePhilter || kind == EffectKind::convolver || kind == EffectKind::vocodex) && lpMouseMove (i >= 0 ? activeLayout().items[(std::size_t) i] : LayoutItem {}, p)) // round 173d3
+            return;
         if (i >= 0 && isWaveShaperGraph (activeLayout().items[(std::size_t) i])) // round 165: points and handles light up
         {
             const auto& item = activeLayout().items[(std::size_t) i];
@@ -4383,6 +4401,22 @@ public:
         {
             if (mxMouseDown (e, item))
                 dragItem = index;
+            return;
+        }
+        if (isPhilterCurve (item)) // round 173d3: Love Philter's articulator editor
+        {
+            if (lpMouseDown (e, item))
+                dragItem = index;
+            return;
+        }
+        if (item.type == Item::display && juce::String (item.display) == "vxmapsel") // round 173d3: Vocodex's map dropdown
+        {
+            vxMapMenu (rectOf (item));
+            return;
+        }
+        if (item.type == Item::display && juce::String (item.display) == "equosend") // round 173d3: EQUO's send box
+        {
+            showTransmitterSendMenu (0, rectOf (item));
             return;
         }
         if (item.type == Item::display && (juce::String (item.display) == "tsssend0" || juce::String (item.display) == "tsssend1"))
@@ -4701,6 +4735,11 @@ public:
             mxMouseDrag (e, activeLayout().items[(std::size_t) dragItem]);
             return;
         }
+        if (lpDragging && dragItem >= 0) // round 173d3: Love Philter's articulator curve
+        {
+            lpMouseDrag (e, activeLayout().items[(std::size_t) dragItem]);
+            return;
+        }
         if (wsDragState && dragItem >= 0) // round 165: the WaveShaper's curve
         {
             wsMouseDrag (e, activeLayout().items[(std::size_t) dragItem]);
@@ -4796,6 +4835,11 @@ public:
             mxMouseUp();
             dragItem = -1;
         }
+        if (lpDragging) // round 173d3
+        {
+            lpMouseUp();
+            dragItem = -1;
+        }
         if (gbDragging) // round 168m
         {
             gbEnvelopeUp();
@@ -4861,7 +4905,7 @@ public:
             rhythmDoubleClick (e, item);
             return;
         }
-        if (isRhythmPatterns (item) || isWaveShaperGraph (item) || isGbAny (item) || isMaximusCurve (item))
+        if (isRhythmPatterns (item) || isWaveShaperGraph (item) || isGbAny (item) || isMaximusCurve (item) || isPhilterCurve (item))
             return;
         if (isGeminiGraph (item)) // round 137: an EQ marker = its shelf on / off
         {
@@ -5104,7 +5148,7 @@ private:
         if (index < 0)
             return;
         const auto& item = activeLayout().items[(std::size_t) index];
-        if (isWaveShaperGraph (item) || isGbAny (item) || isMaximusCurve (item))
+        if (isWaveShaperGraph (item) || isGbAny (item) || isMaximusCurve (item) || isPhilterCurve (item))
             return;
         if (item.type == Item::display && juce::String (item.display) == "tssenvelope") // FL's envelope view speed
         {
@@ -5225,6 +5269,10 @@ private:
             return { wsHint (item, p), {}, false, true };
         if (isMaximusCurve (item)) // round 168x
             return { mxHint (item, p), {}, false, true };
+        if (isPhilterCurve (item)) // round 173d3
+            return { lpHint (item, p), {}, false, true };
+        if (item.type == Item::display && juce::String (item.display) == "equosend") // round 173d3: FL's hint
+            return { tr ("Send track number"), current() != nullptr && current()->sendTracks[0] > 0 ? insertName (current()->sendTracks[0]) : juce::String ("---"), false, false };
         if (isGbAny (item)) // round 168m
             return { gbHint (item, p), {}, false, true };
         if (item.type == Item::display)
@@ -5263,7 +5311,7 @@ private:
         if (! f.loadFileAsData (data))
             return;
         const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-        auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm);
+        auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm, natives::flDataReader (flStudioAccess()));
         if (! fx || fx->kind != kind)
             return;
         presetName = f.getFileNameWithoutExtension();

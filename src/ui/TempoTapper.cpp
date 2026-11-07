@@ -1,5 +1,6 @@
 #include "ui/TempoTapper.h"
 
+#include "core/ClipOps.h"
 #include "core/ValueMath.h"
 #include "ui/I18n.h"
 #include "ui/Icons.h"
@@ -206,7 +207,7 @@ private:
     {
         bpm = controls::clampTempo (bpm);
         if (std::abs (bpm - engine.getSong().bpm) > 1e-9)
-            engine.editSong ([bpm] (Song& s) { s.bpm = bpm; });
+            engine.editSong ([bpm] (Song& s) { clipops::followTempo (s, bpm); });
     }
 
     // while a nudge is held the song runs 4% slower or faster (no undo step); the release restores the tempo

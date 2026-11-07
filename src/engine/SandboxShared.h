@@ -16,13 +16,19 @@
 
 #if JUCE_WINDOWS
  #include <windows.h>
-#elif JUCE_LINUX || JUCE_BSD
+#elif JUCE_LINUX || JUCE_BSD || JUCE_MAC
  #include <cerrno>
  #include <ctime>
  #include <fcntl.h>
  #include <semaphore.h>
  #include <sys/mman.h>
  #include <unistd.h>
+ #if JUCE_MAC
+  #include <poll.h>
+  #include <sys/event.h>
+  #include <sys/stat.h>
+  #include <thread>
+ #endif
  #if JUCE_LINUX
   #include <poll.h>
   #include <sys/eventfd.h>
@@ -127,7 +133,8 @@ inline juce::Optional<juce::AudioPlayHead::PositionInfo> readTransport (const Sh
 
 // The shared block plus the two "doorbells" (request: parent -> child, response: child -> parent).
 // Windows: a named file mapping and two auto-reset events. Linux/BSD (round 161): a POSIX shared-memory object
-// (/dev/shm) holding the block and two process-shared semaphores.
+// (/dev/shm) holding the block and two process-shared semaphores. macOS: the same shared memory, but it has no
+// process-shared sem_init and no timed sem_wait, so each doorbell is a named FIFO (one byte per ring, poll to wait).
 class SandboxChannel
 {
 public:
@@ -164,9 +171,21 @@ public:
             return false;
         posix = static_cast<Posix*> (p);
         std::memset (&posix->block, 0, sizeof (SharedBlock));
+       #if JUCE_MAC
+        for (const auto* suffix : { "-req", "-resp" })
+        {
+            const auto fifo = fifoPath (suffix);
+            ::unlink (fifo.toRawUTF8()); // (a leftover of a crashed LYNX with the same pid)
+            if (::mkfifo (fifo.toRawUTF8(), 0600) != 0)
+                return false;
+        }
+        if (! openFifos())
+            return false;
+       #else
         if (::sem_init (&posix->request, 1, 0) != 0 || ::sem_init (&posix->response, 1, 0) != 0)
             return false;
         semaphores = true;
+       #endif
         shared = &posix->block;
        #endif
         shared->magic = SharedBlock::magicValue;
@@ -195,6 +214,10 @@ public:
             return false;
         posix = static_cast<Posix*> (p);
         shared = &posix->block;
+       #if JUCE_MAC
+        if (! openFifos())
+            return false;
+       #endif
        #endif
         return shared != nullptr && shared->magic == SharedBlock::magicValue;
     }
@@ -204,7 +227,13 @@ public:
     {
        #if LYNX_POSIX_SANDBOX
         if (owner && ! unlinked)
+        {
             unlinked = ::shm_unlink (shmPath().toRawUTF8()) == 0 || errno == ENOENT;
+           #if JUCE_MAC
+            ::unlink (fifoPath ("-req").toRawUTF8()); // (both sides hold the FIFOs open: the names can go)
+            ::unlink (fifoPath ("-resp").toRawUTF8());
+           #endif
+        }
        #endif
     }
 
@@ -242,8 +271,44 @@ private:
         SharedBlock block;
     };
 
-    juce::String shmPath() const { return "/" + name; }
+    juce::String shmPath() const { return "/" + name; } // (macOS: at most 31 characters; "/LYNX-sandbox-<pid>-<n>" fits)
 
+   #if JUCE_MAC
+    juce::String fifoPath (const char* suffix) const
+    {
+        return juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile (name + suffix).getFullPathName();
+    }
+
+    // O_RDWR: opening never blocks waiting for the other side, and a FIFO with no other writer never reads as closed
+    bool openFifos()
+    {
+        requestFd = ::open (fifoPath ("-req").toRawUTF8(), O_RDWR | O_NONBLOCK | O_CLOEXEC);
+        responseFd = ::open (fifoPath ("-resp").toRawUTF8(), O_RDWR | O_NONBLOCK | O_CLOEXEC);
+        return requestFd >= 0 && responseFd >= 0;
+    }
+
+    void post (bool req) noexcept
+    {
+        const char ring = 1;
+        juce::ignoreUnused (::write (req ? requestFd : responseFd, &ring, 1));
+    }
+
+    bool wait (bool req, int timeoutMs) noexcept
+    {
+        pollfd p { req ? requestFd : responseFd, POLLIN, 0 };
+        for (;;)
+        {
+            const auto n = ::poll (&p, 1, timeoutMs);
+            if (n > 0)
+            {
+                char ring;
+                return ::read (p.fd, &ring, 1) == 1;
+            }
+            if (n == 0 || errno != EINTR)
+                return false;
+        }
+    }
+   #else
     void post (bool req) noexcept { ::sem_post (req ? &posix->request : &posix->response); }
 
     bool wait (bool req, int timeoutMs) noexcept
@@ -266,16 +331,27 @@ private:
                 return false;
         }
     }
+   #endif
 
     void close()
     {
+       #if JUCE_MAC
+        for (auto* fd : { &requestFd, &responseFd })
+            if (*fd >= 0)
+            {
+                ::close (*fd);
+                *fd = -1;
+            }
+       #endif
         if (posix != nullptr)
         {
+           #if ! JUCE_MAC // (deprecated there, and never initialised: the doorbells are FIFOs)
             if (semaphores)
             {
                 ::sem_destroy (&posix->request);
                 ::sem_destroy (&posix->response);
             }
+           #endif
             ::munmap (posix, sizeof (Posix));
         }
         unlinkName();
@@ -285,6 +361,9 @@ private:
 
     Posix* posix = nullptr;
     bool owner = false, unlinked = false, semaphores = false;
+   #if JUCE_MAC
+    int requestFd = -1, responseFd = -1;
+   #endif
    #endif
     juce::String name;
     SharedBlock* shared = nullptr;

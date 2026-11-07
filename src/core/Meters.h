@@ -4,6 +4,7 @@
 #include <atomic>
 
 #include "core/AudioCapture.h"
+#include "core/RollingAudioLog.h"
 #include "core/Song.h"
 
 namespace lynx
@@ -36,6 +37,8 @@ public:
     AudioCapture capture;
     // the audio logger's tap (REA round 153): the Master, while Tools > Audio logger is on
     AudioCapture logTap;
+    // the Audio logger's memory (round 181b): the last minutes of the Master, pre or post effects
+    RollingAudioLog rollingLog;
     // the real-time bounce's tap (round 165c): the Master while the song plays, during Export › "Render through the
     // hardware in real time"
     AudioCapture bounceTap;

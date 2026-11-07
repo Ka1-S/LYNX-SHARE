@@ -386,9 +386,8 @@ On every state load / knob change the plugin rebuilds the kernel from the decode
    `p + k·speed` in blocks of 1024 elsewhere; frames before the start repeat the first, past the end the last; output
    length `Round(n · ratio)` **[DECOMP + EXEC]** (−111 dB on a sparse test impulse, see C.6 for the residual).
 6. **EQ curve.** A flat curve at level `v` multiplies by `(3^(2v) − 1)/2` (exactly 1 at 0.5; a flat 0.2 gives 0.27592
-   **[EXEC]**). A shaped curve with the EQ amount above 0 designs a linear-phase FIR from the curve (frequency mapping
-   `FUN_00637aa0`, response smoothing `FUN_00624620`, inverse FFT, window `FUN_00636ca0`) and mixes the filtered sample
-   by the EQ amount — **not decoded** (3 installation states: LYNX keeps its approximation for them).
+   **[EXEC]**), whatever the EQ amount. A shaped curve with the EQ amount above 0 filters the sample with a
+   linear-phase FIR designed from the curve and mixes the result by the EQ amount — decoded in C.7 (round 173d3).
 7. **Trailing silence** (both channels below 2⁻²⁴) is cut; the length at this point plus the predelay is the **tail**:
    the number of samples the plugin keeps processing after its input falls silent.
 8. **Predelay knob** (×0.001): `Round((float)(7^x − 1) · 83.333 · 0.001 · fs)` samples (0…500 ms). With the leading
@@ -428,7 +427,7 @@ in dB (`-INFdB` at 0), separations "Original", "N% merged" (> 0) or "N% separate
   reader (`%FLStudioFactoryData%\X` → `X`, `%FLStudioData%\X` → `Data\X`; user-data paths are not read); the slot's
   `state` keeps a blob `"LXCV" | 1 | FL state | file bytes`, so a saved LYNX project plays without the installation.
   Unsupported → `nullopt` (the importer keeps the generic reverb approximation): unreadable file, non-default first /
-  third envelopes, a shaped fourth or volume envelope, a shaped EQ curve with EQ amount > 0.
+  third envelopes, a shaped fourth or volume envelope. (Shaped EQ curves are supported since round 173d3, C.7.)
 - Kernel preparation in `buildKernel` (double precision where the DLL uses float FFTs/recurrences; stores in float as the
   DLL does); the engine is a zero-latency partitioned convolution (128-tap direct head, then uniform overlap-save levels
   of 128 / 1024 / 8192 / 16384 samples whose partitions never start before their own size), FFTs in double, spectra
@@ -454,7 +453,7 @@ state, blocks of 512 unless stated, 1024 silent frames before the signal (FL's m
 | 11 Purps (embedded float; speed −372) | embedded | −138.0 dB | −138.2 dB | — |
 | 14 Treben (forest .wv 48 kHz) | file | −101.0 dB | −135.5 dB | — |
 | 15 Dubstep (Default.wav, separations −1000, speed +1000) | file | −136.8 dB | −136.5 dB | DLL not reproducible |
-| 1, 12, 13 (shaped EQ curve, amount > 0) | — | approximation kept | | |
+| 1, 12, 13 (shaped EQ curve, amount > 0; round 173d3, C.7) | file | −131.0 / −131.4 / −133.3 dB | −132.8 / −124.4 / −127.9 dB | — |
 
 At 96 kHz the DLL's own output for states 10 and 15 changed from run to run (by +14 dB; spikes in its kernel beyond
 ~53 000 samples) — a timing problem of the plugin's background preparation in the harness, not a property of the
@@ -485,13 +484,100 @@ at 48 kHz.
   samples, outputs whose read position falls within ~10⁻¹² of an integer differ by up to 0.2 % (the DLL builds the
   sine of the tap next to the read position from double-precision phases, which loses digits there); elsewhere −110 dB.
   Whole-kernel effect −85…−100 dB on the affected states; **not reproduced**.
-- The EQ curve's filter (shaped curve, amount > 0), the first and third time envelopes, shaped volume envelopes and the
-  int after the flags: **not decoded** (no installation state needs the envelopes; three need the EQ).
+- The first and third time envelopes, shaped volume envelopes and the int after the flags: **not decoded** (no
+  installation state needs them). The EQ curve's filter is decoded in C.7.
 - The sample's own regions (a `regn`/loop chunk in an embedded WAV) — the kernel step that keeps region 0 was seen in
   the code but not exercised (no installation WAV carries one): **not confirmed**.
 - More than two channels in a WAV: LYNX uses the first two — **not confirmed**.
 - FL's host order (rate before/after the state) does not matter here: the kernel is rebuilt at the rate in effect, and
   the gains snap on the first silent block.
+
+### C.7 EQ curve (round 173d3) **[DECOMP + EXEC]**
+
+Material: the round-60 decompilation (`FUN_0087b2b0` and the sample library's filter designer), the runtime values of
+the plugin's globals and IPP entry points read through the EXEC harness, and wet kernels of the unmodified DLL on states
+built here (scripts in `/mnt/e/lynx-work/audit173d3/cv/py`: `eq.py` Python model, `t3run.py` / `t5.py` comparisons,
+`gold173.py` test goldens).
+
+**Where.** Step 6 of C.2, right after the speed resampling and before the trailing-silence cut. The kernel builder asks
+the curve whether it is flat (`FUN_00793a00`). Flat → the gain `(3^(2v) − 1)/2`, applied whatever the EQ amount, even 0.
+Shaped → `FUN_0087b2b0`, which does nothing at all when the EQ amount (knob 4 × 0.001, a float) is 0 — not even a gain:
+the kernel then equals the raw impulse response to −136.7 dB **[EXEC]**.
+
+**Steps of the shaped curve** (`rate` = the sample's rate at this point, i.e. `(float)(fs · speed)`):
+
+1. **Size.** `M = 2^b`, `b` = the smallest integer ≥ 1 with `2^b ≥ Round(2 · rate)`, clamped to 4…20 (M = 131 072 at
+   44.1 and 48 kHz, 262 144 at 96 kHz). The response has M + 1 bins: 0 … Nyquist of a 2M-point transform.
+2. **Frequency of each bin.** `x_k = (float)(k · rate / (M · 22050 · speed · 2))` — bin `k` at `k · fs / (2M)` Hz,
+   divided by 22 050 — then the editor's frequency axis (`FUN_00637aa0` on the object built by `FUN_00637830` with
+   `fmin = 440 · e^(−21 · ln2/12)` ≈ 130.81 Hz, `fmax = 22050`, curvature 1, flags 0): with `f = 22050 · x`,
+   `c = fmax/fmin`, `p1 = ln 2 / ln(2 · fmax / fmin)` (≈ 0.119),
+   `u = p1 + ln((f − fmin) · c / (fmax − fmin) + 1) / ln(c + 1) · (1 − p1)` for `f ≥ fmin`, else `u = f · p1 / fmin`
+   (the bottom 12 % of the display is linear from 0 to 130.8 Hz, the rest logarithmic-like up to 22 050 Hz at the
+   top). `u` is rounded to float. Bins above 22 050 Hz (at 48 kHz and higher) fall past the curve's end and take its
+   last level.
+3. **Curve.** FL's map: the Δx are scaled to a sum of 1 (Δx summing to 0.6 or 2 match the DLL only when scaled,
+   −134.8 dB; unscaled −4.1 / +3.6 dB **[EXEC]**); a first point that starts after 0 behaves as if a point at 0 with its
+   level came first **[EXEC]**. The map iterator (`FUN_00791500`) is FL's shared envelope law — the segment modes 0–12
+   of round 66 §3.2 (Love Philter's `Curve`), with the point's prepared parameters in float and the evaluation in
+   double. It is walked bin by bin, advanced by the difference of successive `u`.
+4. **Gain** per bin: level `v` → `(float)((e^((float)(2v) · ln 3) − 1) · 0.5)` — the flat curve's law: 0 at the
+   bottom (−inf), 1 at the middle, 4 (+12 dB) at the top.
+5. **Smoothing** (`FUN_00624620`, width parameter 1/128). A Gaussian `g_j = e^(−½ (j·s)²)`, `j = 0 … 65 536`,
+   `s = (float)(1 / (65 537 · (1/128) · 0.25))` (IPP `VectorSlope` / `Sqr` / `MulC(−0.5)` / `Exp`, float) is turned into
+   a centred 131 072-tap FIR by the designer of step 6. The response (two channels: the gains and a phase of 0) is
+   extended at each end by M + 1 copies of its end value, convolved with that FIR, and the middle M + 1 values are kept
+   (float). In effect the response is blurred along the bins by a Gaussian of about 163 bins (≈ 27 Hz at 44.1 kHz).
+6. **FIR design** (`FUN_00624910`). The M + 1 values are a real spectrum (the second channel is the phase:
+   `re = g·cos φ`, `im = g·sin φ`, φ = 0 here) in IPP's packed format; an inverse real FFT of 2M points divided by 2M
+   (IPP `DIV_INV_BY_N`), rotated by M (time 0 at tap M), then multiplied by a Hann window
+   `w_i = 0.5 − 0.5 · cos(2π i / (2M + 1))`, `i = 1 … 2M` (`FUN_00636ca0` type 2 over 2M + 2 points, both end points
+   dropped — so the window's peak sits half a tap before the FIR's centre). 2M taps, float, the filter's delay
+   `(2M − 1) >> 1 = M − 1` compensated by the convolution.
+7. **Filtering** (`FUN_00624f90`, float overlap-save FFTs of `2^⌈log2(2M + 32768)⌉` points): `y[t] = Σ_m h[m] ·
+   x[t + M − m]` for `t = 0 … n − 1` — zero-phase, aligned, cut to the sample's length, zeros outside the sample.
+8. **Mix** (`FUN_00625690`): the filtered sample times the amount `a`, plus the original times `1 − a` (the tool's wet
+   and dry gains), stored as float.
+
+The filtered sample then continues with C.2 steps 7–8 (trailing silence, leading silence and predelay), so the FIR's
+pre-ringing into leading silence counts as signal there **[EXEC: chain cases below]**.
+
+**State format of the curve's points** **[DATA]**: 24 bytes — Δx (double), level (double), tension (float), then the
+bytes `mode, 0, 0, sign` where `sign` is what the curve's preparation computes (0 on the first point, 2 for a straight
+segment — tension 0 in modes 0, 1, 7, 8, 9, 11, 12 —, 1 / 0xFF for a positive / negative tension). In the installation
+states byte 22 of one point is 1 (an editor flag; no effect seen). The map's 20-byte trailer is `0, −1, −1, −1, −1`.
+
+**LYNX** (`src/core/ConvolverFx.cpp`): `applyEqCurve` (steps 1–8; `EqCurve` is the map iterator, `FreqAxis` the
+frequency axis, `centredFir` the designer, `smoothResponse` the smoother — its constant ends are added from running
+sums of the smoother instead of padding the response). FFTs in double. `kernelSupported` no longer rejects shaped
+curves. Cost on top of the kernel preparation: ≈ 0.2–0.3 s at 44.1/48 kHz, ≈ 2.5 s at 96 kHz (2^21-point transforms
+for a 9-s impulse response). For the editor: `readEqCurve` / `writeEqCurve` (the curve of a slot blob; writing keeps
+the rest of the FL state byte for byte), `eqCurveLevels` (the curve at evenly spaced x by the same law),
+`eqFrequencyToX` / `eqXToFrequency` (the display's axis, `FUN_00637aa0` / `FUN_006379d0`) and `eqLevelGain`.
+
+**Verification** (wet kernels as in C.5; LYNX's C++ through `cvrun`):
+
+| Case | 44.1 kHz | 48 kHz |
+|---|---|---|
+| noise IR at the host rate, the curves of installation states 1 / 12 / 13, EQ amount 0 | −136.0 / −135.9 / −136.0 dB | −135.9 / −135.9 / −135.9 dB |
+| … EQ amount 300 | −135.7 / −135.8 / −135.0 dB | −135.5 / −135.5 / −135.9 dB |
+| … EQ amount 1000 | −134.9 / −135.1 / −132.2 dB | −134.7 / −134.9 / −135.3 dB |
+| segment modes 1–12, tensions +0.4 / −0.6 (5-point curves) | −131.9 … −135.6 dB | |
+| Δx summing to 0.6 / 2, a first point after 0 (Python model) | −134.8 / −134.8 / −134.6 dB | |
+| 96 kHz IR at 96 kHz (M = 2^18), curve 12, amount 1000 | | −134.6 dB at 96 kHz |
+| chain: 44.1 kHz IR with 40 leading zeros, normalised; knobs (predelay, blend, speed, EQ) = (0, 0, −300, 1000) / (80, 200, 0, 700) / (150, 0, 250, 1000) | −116.3 / −130.7 / −111.0 dB | −117.3 / −105.9 / −111.0 dB |
+| the same chain with EQ amount 0 (the resampler residual of C.6) | −109.6 / −132.8 / −110.2 dB | −109.5 / −104.7 / −110.3 dB |
+| installation states 1 / 12 / 13, wet kernel | −112.1 / −133.9 / −134.1 dB | −112.1 / −114.9 / −118.5 dB |
+| … the same states with EQ amount 0 (resampler residual) | −117.0 / −145.5 / −145.5 dB | −117.0 / −110.5 / −110.5 dB |
+| installation states 1 / 12 / 13, music 4 s through the engine (own controls) | −131.0 / −131.4 / −133.3 dB | −132.8 / −124.4 / −127.9 dB |
+| unit-test states (`tests/ConvolverTests.inc`): 16-bit stereo IR with a 7-point curve (modes 0, 1, 2, 10), amount 600; mono float 48-kHz IR at 44.1 kHz with speed 150, predelay 60, a curve whose Δx sum to 2, amount 1000 | −131.3 dB (and −128.1 dB) | −111.8 dB (IR resampled) |
+
+Every case that is not at the DLL's float-FFT floor (≈ −132…−136 dB) is a resampled one, and the same states with the
+EQ amount at 0 show the same residual: the resampler's near-integer read positions of C.6, not the EQ.
+
+Not confirmed: points with a negative Δx (the preparation clamps them to 0 as in the other maps — not run); a
+non-default byte 22 or map trailer; host rates above 96 kHz (b = 20 caps the size at 2^20 bins once the rate passes
+524 288 Hz).
 
 ## 8. Open items
 
@@ -505,5 +591,6 @@ at 48 kHz.
   rate change.
 - LuxeVerb: the plugin's own display of the synced delays ("beats:sixteenths" style) is not reproduced; LYNX shows
   sixteenths.
-- Fruity Convolver: see §7 C.6 (resampled impulse responses at −85…−117 dB, the shaped EQ curve and the first/third
-  time envelopes not decoded — those states keep the approximation, regions and > 2 channels not confirmed).
+- Fruity Convolver: see §7 C.6 (resampled impulse responses at −85…−117 dB, the first/third time envelopes not
+  decoded — those states keep the approximation, regions and > 2 channels not confirmed). The EQ curve is exact since
+  round 173d3 (C.7).

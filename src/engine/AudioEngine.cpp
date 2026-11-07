@@ -1,4 +1,5 @@
 #include "engine/AudioEngine.h"
+#include "core/VideoPlayer.h"
 
 #include "core/LiveSession.h"
 
@@ -225,8 +226,8 @@ struct AudioEngine::Drainer final : juce::TimeSliceClient
 };
 
 
-AudioEngine::AudioEngine (bool openAudioDevice)
-    : workers (std::make_unique<WorkerPool> (workerCount(), raiseAudioThreadPriority)),
+AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads)
+    : workers (std::make_unique<WorkerPool> (workerThreads >= 0 ? workerThreads : workerCount(), raiseAudioThreadPriority)),
       song (Song::makeDefault())
 {
     boostDeviceThread = juce::SystemStats::getEnvironmentVariable ("LYNX_DEVICE_BOOST", {}) != "0";
@@ -655,6 +656,8 @@ void AudioEngine::forEachHostedPlugin (const std::function<void (juce::AudioPlug
 
 ProcessTimes* AudioEngine::getProcessTimes() noexcept
 {
+    if (externalTimes != nullptr)
+        return externalTimes;
     return rackProcessor != nullptr ? &rackProcessor->processTimes() : nullptr;
 }
 
@@ -745,12 +748,22 @@ void AudioEngine::startPlayback()
         const auto punching = recordOptions.punchLoopRegion && song.mode == PlayMode::song && song.hasLoop();
         const auto in = punching ? song.loopStart : here;
         const auto out = punching ? song.loopEnd : std::numeric_limits<std::int64_t>::max() / 4;
-        const auto pre = recordOptions.preRollBars > 0 ? countInLength (song, recordOptions.preRollBars, std::max<std::int64_t> (0, in - 1)) : 0;
+        // (seconds: the ADR window's pre-roll, round 174d)
+        auto secondsBack = [this] (std::int64_t at, double seconds) {
+            const auto from = std::max (0.0, song.secondsForTicks (at) - seconds);
+            return std::max<std::int64_t> (0, at - (std::int64_t) std::llround (videotrack::ticksForSeconds (song, from)));
+        };
+        auto secondsOn = [this] (std::int64_t at, double seconds) {
+            return std::max<std::int64_t> (0, (std::int64_t) std::llround (videotrack::ticksForSeconds (song, song.secondsForTicks (at) + seconds)) - at);
+        };
+        const auto pre = recordOptions.preRollSeconds >= 0.0 ? secondsBack (in, recordOptions.preRollSeconds)
+                         : recordOptions.preRollBars > 0 ? countInLength (song, recordOptions.preRollBars, std::max<std::int64_t> (0, in - 1)) : 0;
         if (punching || pre > 0)
         {
             activePunch = PunchRange { in, out };
             if (punching)
-                punchStopAt = out + (recordOptions.postRollBars > 0 ? countInLength (song, recordOptions.postRollBars, out) : 0);
+                punchStopAt = out + (recordOptions.postRollSeconds >= 0.0 ? secondsOn (out, recordOptions.postRollSeconds)
+                                     : recordOptions.postRollBars > 0 ? countInLength (song, recordOptions.postRollBars, out) : 0);
             startAt = std::max<std::int64_t> (0, in - pre);
             transport.seekRequest.store ((double) startAt);
         }
@@ -938,11 +951,11 @@ double AudioEngine::getPreviewPosition() const noexcept
     return preview != nullptr ? preview->getPlayPosition() : -1.0;
 }
 
-void AudioEngine::markHeldKey (int key, bool on) noexcept
+void AudioEngine::markHeldKey (int midiChannel, int key, bool on) noexcept
 {
-    if (key < 0 || key > 127)
+    if (key < 0 || key > 127 || midiChannel < 0 || midiChannel > 15)
         return;
-    auto& count = heldKeyCount[(std::size_t) key];
+    auto& count = heldKeyCount[midiChannel][(std::size_t) key];
     auto before = count.load();
     std::uint8_t after = 0;
     do
@@ -950,9 +963,9 @@ void AudioEngine::markHeldKey (int key, bool on) noexcept
     while (! count.compare_exchange_weak (before, after));
     const auto bit = std::uint64_t { 1 } << (key & 63);
     if (after > 0)
-        heldKeyBits[key >> 6].fetch_or (bit);
+        heldKeyBits[midiChannel][key >> 6].fetch_or (bit);
     else
-        heldKeyBits[key >> 6].fetch_and (~bit);
+        heldKeyBits[midiChannel][key >> 6].fetch_and (~bit);
 }
 
 void AudioEngine::logPlayedNote (int channel, int key, float velocity, bool on, double tick, bool recorded)
@@ -1010,21 +1023,34 @@ NoteMask AudioEngine::soundingKeys (int channel) const noexcept
 std::vector<int> AudioEngine::heldInputKeys() const
 {
     std::vector<int> keys;
+    std::uint64_t all[2] {};
+    for (const auto& channel : heldKeyBits)
+        for (int word = 0; word < 2; ++word)
+            all[word] |= channel[word].load();
     for (int word = 0; word < 2; ++word)
-    {
-        const auto bits = heldKeyBits[word].load();
         for (int b = 0; b < 64; ++b)
-            if ((bits >> b & 1u) != 0)
+            if ((all[word] >> b & 1u) != 0)
                 keys.push_back (word * 64 + b);
-    }
     return keys;
+}
+
+std::array<std::uint64_t, 2> AudioEngine::heldInputKeyBits (int midiChannel) const noexcept
+{
+    if (midiChannel < 0 || midiChannel > 15)
+        return {};
+    return { heldKeyBits[midiChannel][0].load (std::memory_order_relaxed), heldKeyBits[midiChannel][1].load (std::memory_order_relaxed) };
+}
+
+RollingAudioLog& AudioEngine::getRollingLog() noexcept
+{
+    return meters.rollingLog;
 }
 
 void AudioEngine::sendLiveNote (int channel, int key, float velocity, bool on, bool record)
 {
     if (record) // played notes (the PC keyboard) follow the scale snap; previews don't
     {
-        markHeldKey (key, on);
+        markHeldKey (0, key, on); // (FL sends the typing keyboard as MIDI channel 1)
         // the note-off stops the key its note-on started, even if the snap changed in between
         const auto requested = key;
         if (on)
@@ -1059,10 +1085,12 @@ void AudioEngine::panic()
     e.type = NoteEvent::Type::choke;
     e.channel = -1; // every channel
     liveEvents.push (e);
-    for (auto& c : heldKeyCount)
-        c.store (0);
-    for (auto& w : heldKeyBits)
-        w.store (0);
+    for (auto& channel : heldKeyCount)
+        for (auto& c : channel)
+            c.store (0);
+    for (auto& channel : heldKeyBits)
+        for (auto& w : channel)
+            w.store (0);
 }
 
 void AudioEngine::stopSound()
@@ -2109,7 +2137,7 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
         return;
 
     const auto on = m.isNoteOn();
-    markHeldKey (m.getNoteNumber(), on);
+    markHeldKey (m.getChannel() - 1, m.getNoteNumber(), on);
 
     if (on)
         startOnInput();
@@ -2971,6 +2999,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             std::string path;
             double ratio;
             StretchMethod method;
+            double semitones;
         };
         std::vector<Stretch> stretches;
         for (const auto& c : out.song.channels)
@@ -2981,8 +3010,10 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                     const auto target = c.sampler.stretchBeats * 60.0 / std::max (1.0, out.song.bpm);
                     const auto ratio = target / ((double) data->frames() / data->sampleRate);
                     const auto method = c.sampler.stretchMethod;
-                    if (std::none_of (stretches.begin(), stretches.end(), [&] (const Stretch& x) { return x.path == c.samplePath && x.ratio == ratio && x.method == method; }))
-                        stretches.push_back ({ c.samplePath, ratio, method });
+                    const auto semitones = (double) c.sampler.stretchPitch;
+                    if (std::none_of (stretches.begin(), stretches.end(), [&] (const Stretch& x) {
+                            return x.path == c.samplePath && x.ratio == ratio && x.method == method && x.semitones == semitones; }))
+                        stretches.push_back ({ c.samplePath, ratio, method, semitones });
                 }
         if (! stretches.empty())
         {
@@ -2990,7 +3021,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             std::atomic<std::size_t> nextStretch { 0 };
             auto stretchWorker = [&] {
                 for (auto i = nextStretch++; i < stretches.size(); i = nextStretch++)
-                    if (auto stretched = library.loadStretched (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].ratio, stretches[i].method))
+                    if (auto stretched = library.loadStretched (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].ratio, stretches[i].method, stretches[i].semitones))
                     {
                         const std::scoped_lock l (keep); // held until the rack is built (the cache drops unused lengths)
                         out.decoded.push_back (std::move (stretched));
@@ -3194,6 +3225,9 @@ void AudioEngine::publishSong()
     ++publishCount;
     // Online Sessions (round 168a): every entity has its stable id after any edit, import or load
     uids::normalize (song);
+    // round 174d A3: the Video Player's clock follows the song's tempo map (FL: the song's real time)
+    if (std::any_of (song.channels.begin(), song.channels.end(), [] (const ChannelDef& c) { return c.instrument == InstrumentKind::videoplayer; }))
+        video::publishTempo (song);
     // pasted / duplicated channels and effect slots get their own instance (round 168s: instances follow their channel)
     song.uniqueInstances();
     // diagnostics (round 149): with LYNX_TRACE_EDITS set, each publish's time goes to %APPDATA%\LYNX\edits.log
@@ -3261,9 +3295,9 @@ void AudioEngine::publishSong()
         const loadtrace::Scope timing ("rack_samples");
         return samples.load (juce::String::fromUTF8 (path.c_str()));
     };
-    factories.stretchedSamples = [this] (const std::string& path, double ratio, StretchMethod method) {
+    factories.stretchedSamples = [this] (const std::string& path, double ratio, StretchMethod method, double semitones) {
         const loadtrace::Scope timing ("rack_stretch");
-        return samples.loadStretched (juce::String::fromUTF8 (path.c_str()), ratio, method);
+        return samples.loadStretched (juce::String::fromUTF8 (path.c_str()), ratio, method, semitones);
     };
     factories.pluginInstruments = [this] (const PluginRef& ref, double sr) { return plugins.makeInstrument (ref, sr); };
     factories.pluginEffects = [this] (const PluginRef& ref, double sr) { return plugins.makeEffect (ref, sr); };
@@ -4137,6 +4171,9 @@ std::shared_ptr<Instrument> AudioEngine::getChannelInstrument (int channel) cons
 
 std::shared_ptr<Effect> AudioEngine::getEffect (int track, int slot) const
 {
+    if (externalEffect)
+        return externalEffect();
+
     const auto& effects = lastPublishedShape.effects;
 
     if (track < 0 || track >= (int) effects.size() || slot < 0 || slot >= (int) effects[(std::size_t) track].size())
@@ -4617,6 +4654,7 @@ void AudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     rtStats.deviceRestarted();
     rt::resetForNewDevice();
     transport.sampleRate.store (device->getCurrentSampleRate());
+    meters.rollingLog.setSampleRate (device->getCurrentSampleRate()); // (the audio thread isn't running yet: it may allocate)
     midiSync.deviceStarted (device->getCurrentSampleRate(), device->getCurrentBufferSizeSamples(), device->getOutputLatencyInSamples());
     // what is heard comes out one output buffer + the driver's output latency after it was rendered (round 170d, as
     // the MIDI clock output counts it)

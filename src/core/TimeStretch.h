@@ -16,7 +16,10 @@
 namespace lynx
 {
 // `ratio` = output duration / input duration (2 = twice as long, same pitch).
-std::shared_ptr<SampleData> timeStretch (const SampleData& input, double ratio, StretchMethod method = StretchMethod::general);
+// `semitones` (Beats only, else ignored): each piece is also resampled by that much, offline (Live's clip transpose in
+// Beats mode); the pieces keep their places on the grid.
+std::shared_ptr<SampleData> timeStretch (const SampleData& input, double ratio, StretchMethod method = StretchMethod::general,
+                                         double semitones = 0.0);
 
 // FL's stretch mode (channel record 0xD7 +0x6C, REA_rodada3 §5.2) → LYNX's method. 0 (Resample) has no
 // pitch-preserving stretch; callers keep resampling for it.
@@ -56,6 +59,8 @@ namespace stretchdetail
 {
 // Exposed for the tests: attack positions (frames) found in a mono signal, strongest-first filtering already applied.
 std::vector<long> detectAttacks (const float* mono, long frames, double sampleRate, double minRiseDb);
+// Where LYNX's Beats warp mode cuts the audio (round 175a, N4): the attacks, each moved to where it rises fastest.
+std::vector<long> beatsCuts (const float* mono, long frames, double sampleRate);
 // The ratio band that is resampled instead of stretched.
 constexpr double resampleTolerance = 0.001;
 

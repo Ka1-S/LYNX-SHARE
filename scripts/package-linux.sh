@@ -58,9 +58,11 @@ if [[ ! -x "$TOOL" ]]; then
     chmod +x "$TOOL"
 fi
 # no FUSE needed to run the tool itself (containers, CI)
-# update information (AppImageUpdate): the newest release of Ka1-S/LYNX-SHARE, pre-releases included; appimagetool writes
-# the matching .zsync next to the AppImage, and the release job attaches it with the other files in dist/
-UPDATE_INFO="${UPDATE_INFO-gh-releases-zsync|Ka1-S|LYNX-SHARE|latest-all|LYNX-*-$ARCH.AppImage.zsync}"
+# update information (Gear Lever, AppImageUpdate): a fixed address on lynx-share.com, no GitHub API (issue #48: its
+# anonymous limit of 60 requests an hour shows up as "no updates"). scripts/publish-appimage-update.sh points that address
+# at a published release's .zsync. Its URL line is absolute, because readers resolve a relative one against the fixed address.
+UPDATE_INFO="${UPDATE_INFO-zsync|https://lynx-share.com/update/LYNX-$ARCH.AppImage.zsync}"
+APPIMAGE_URL="${APPIMAGE_URL-https://github.com/Ka1-S/LYNX-SHARE/releases/download/v$LABEL/$APPIMAGE}"
 APPIMAGE_EXTRACT_AND_RUN=1 ARCH="$ARCH" "$TOOL" ${UPDATE_INFO:+-u "$UPDATE_INFO"} "$APPDIR" "$OUTDIR/$APPIMAGE" \
     > "$WORK/appimagetool.log" 2>&1 || { cat "$WORK/appimagetool.log"; exit 1; }
 if [[ -n "$UPDATE_INFO" && ! -f "$OUTDIR/$APPIMAGE.zsync" ]]; then
@@ -70,18 +72,21 @@ if [[ -n "$UPDATE_INFO" && ! -f "$OUTDIR/$APPIMAGE.zsync" ]]; then
         || { echo "no $APPIMAGE.zsync written"; cat "$WORK/appimagetool.log"; exit 1; }
 fi
 chmod 755 "$OUTDIR/$APPIMAGE"
-# issue #48 (Gear Lever, AppImageUpdate): what they read must stay right. The embedded update information is ours,
-# the release asset name matches its file pattern, and the .zsync points at the AppImage beside it.
+if [[ -n "$UPDATE_INFO" && -f "$OUTDIR/$APPIMAGE.zsync" ]]; then
+    ( cd "$OUTDIR" && zsyncmake -u "$APPIMAGE_URL" -o "$APPIMAGE.zsync" "$APPIMAGE" )
+fi
+# issue #48 (Gear Lever, AppImageUpdate): what they read must stay right. The embedded update information is ours, the
+# .zsync points at this release's AppImage, and its name still matches the pattern embedded up to 0.1.24, which those
+# versions use to find it on the releases.
 if [[ -n "$UPDATE_INFO" ]]; then
     if command -v readelf > /dev/null; then
         embedded="$(readelf --string-dump=.upd_info --wide "$OUTDIR/$APPIMAGE" | sed -n 's/^ *\[ *0\] *//p' | sed 's/ *$//')"
         [[ "$embedded" == "$UPDATE_INFO" ]] || { echo "update information is '$embedded', not '$UPDATE_INFO'"; exit 1; }
     fi
-    # shellcheck disable=SC2254
-    case "$APPIMAGE.zsync" in ${UPDATE_INFO##*|}) ;; *) echo "$APPIMAGE.zsync does not match ${UPDATE_INFO##*|}"; exit 1 ;; esac
+    case "$APPIMAGE.zsync" in LYNX-*-$ARCH.AppImage.zsync) ;; *) echo "$APPIMAGE.zsync does not match LYNX-*-$ARCH.AppImage.zsync"; exit 1 ;; esac
     if [[ -f "$OUTDIR/$APPIMAGE.zsync" ]]; then
         url="$(head -c 4096 "$OUTDIR/$APPIMAGE.zsync" | sed -n 's/^URL: //p' | head -1)"
-        [[ "$url" == "$APPIMAGE" ]] || { echo "$APPIMAGE.zsync points at '$url'"; exit 1; }
+        [[ "$url" == "$APPIMAGE_URL" ]] || { echo "$APPIMAGE.zsync points at '$url'"; exit 1; }
     fi
 fi
 ls -la "$OUTDIR/$NAME.tar.gz" "$OUTDIR/$APPIMAGE"*

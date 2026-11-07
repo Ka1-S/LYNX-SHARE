@@ -6,6 +6,7 @@
 #include "core/Drumaxx.h"
 #include "core/PatternBlocks.h"
 #include "core/LoadTrace.h"
+#include "core/ProjectSafety.h"
 #include "core/Patcher.h"
 #include "core/Patcherize.h"
 #include "core/Performance.h"
@@ -48,7 +49,12 @@
 #include "core/AlsImport.h"
 #include "ui/AlsExportDialog.h"
 #include "ui/TimerWhileShowing.h"
+#include "ui/MixerBasicsCheck.h"
 #include "ui/VideoPlayerView.h"
+#include "ui/VideoMedia.h"
+#include "ui/VideoTracks.h"
+#include "ui/AdrWindow.h"
+#include "ui/PlaylistComponent.h"
 #include "ui/PatcherEditor.h"
 #include "ui/VisualEditors.h"
 #include "ui/FlExtraEditors.h"
@@ -434,6 +440,28 @@ public:
     const juce::String getApplicationVersion() override { return JUCE_APPLICATION_VERSION_STRING; }
     // the plugin scan runs copies of LYNX as child processes
     bool moreThanOneInstanceAllowed() override { return true; }
+
+    // A file handed to the running application. macOS does this for every Finder double-click, "Open With" and Dock drop,
+    // also the one that starts LYNX (its argv has no file). On Windows and Linux a second start is a second process
+    // (moreThanOneInstanceAllowed) with the file as an argument, so this is not called there. Only the first file of a
+    // multiple selection opens: a project replaces the one before it. (D#92, round 180a)
+    void anotherInstanceStarted (const juce::String& commandLine) override
+    {
+        const auto files = lynx::safety::filesInCommandLine (commandLine.toStdString());
+        if (files.empty())
+            return;
+        const auto file = juce::File::getCurrentWorkingDirectory().getChildFile (juce::String::fromUTF8 (files.front().c_str()));
+        if (! startupFileHandled) // still starting: openStartupFile takes it, nothing to ask about yet
+        {
+            fileToOpen = file;
+            return;
+        }
+        if (mainWindow != nullptr)
+        {
+            mainWindow->toFront (true);
+            mainWindow->getContent().openFileRequest (file);
+        }
+    }
 
     void initialise (const juce::String& commandLine) override
     {
@@ -1099,7 +1127,7 @@ public:
                         if (file.existsAsFile() && file.loadFileAsData (data))
                         {
                             const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-                            if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0); loaded && loaded->kind == kind)
+                            if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0, lynx::natives::flDataReader (lynx::flStudioAccess())); loaded && loaded->kind == kind)
                                 fx = *loaded;
                         }
                         break;
@@ -1425,6 +1453,16 @@ public:
             return;
         }
 
+        if (args.contains ("--videotrackshot") && args.indexOf ("--videotrackshot") + 2 < args.size())
+        {
+            // LYNX.exe --videotrackshot prefix video [video2]: round 174d — the Playlist with video tracks (filmstrips,
+            // timecode row) and the video window at a few song positions, as PNGs + report.txt (the decoder, the
+            // frame shown for each wanted time: frame accuracy, frames dropped)
+            const auto i = args.indexOf ("--videotrackshot");
+            runVideoTrackShot (args[i + 1].unquoted(), args[i + 2].unquoted(), i + 3 < args.size() ? args[i + 3].unquoted() : juce::String());
+            return;
+        }
+
         if (args.contains ("--vfxshot"))
         {
             // LYNX.exe --vfxshot prefix: the VFX note effects' editors (round 164b), on channels and in a Patcher, as PNGs
@@ -1598,9 +1636,20 @@ public:
         startupOptions = lynx::StartupOptions::load();
         lynx::registerFileTypes();
         startupTrace.mark ("options + file types");
-        // Double-clicking a .lynx/.flp opens LYNX with the file as an argument.
-        if (args.size() > 0 && juce::File::isAbsolutePath (args[0].unquoted()))
-            fileToOpen = juce::File (args[0].unquoted());
+        // Double-clicking a .lynx/.flp opens LYNX with the file as an argument; a path typed in a terminal may be relative
+        // (D#92, round 180a: it was ignored, leaving the blank project with no message). A missing file gets "Could not open".
+        if (args.size() > 0 && lynx::safety::isFileArgument (args[0].unquoted().toStdString()))
+            fileToOpen = juce::File::getCurrentWorkingDirectory().getChildFile (args[0].unquoted());
+        // LYNX_TEST_MODE=1 LYNX --open-event-test <ms> <file>: the file arrives the way macOS's Finder delivers it (a Linux
+        // or Windows run can exercise that path): 0 ms = at once, before the window exists
+        if (lynx::platform::testMode() && args[0] == "--open-event-test" && args.size() > 2)
+        {
+            const auto file = args[2].unquoted().quoted();
+            if (args[1].getIntValue() == 0)
+                anotherInstanceStarted (file);
+            else
+                juce::Timer::callAfterDelay (args[1].getIntValue(), [this, file] { anotherInstanceStarted (file); });
+        }
         // LYNX --opentime project.(flp|lynx)|- report.txt [idle seconds] (round 165i): the normal start-up (splash, audio
         // device, window) opens the project, waits until it is loaded and LYNX has gone quiet, measures the idle CPU and
         // memory, writes the times and quits normally (a benchmark that killed LYNX left "closed unexpectedly" behind)
@@ -1926,6 +1975,7 @@ public:
 
     void openStartupFile()
     {
+        startupFileHandled = true;
         if (fileToOpen != juce::File() && mainWindow != nullptr)
             mainWindow->openFile (fileToOpen);
     }
@@ -2421,6 +2471,34 @@ private:
                     packageOk = back.existsAsFile() && back.isAChildOf (project.getParentDirectory()) && back.getSize() == wav.getSize();
                 }
             }
+            dir.deleteRecursively();
+        }
+
+        // D#92, round 180a: a non-ASCII folder and a dotted name save and load back; an unwritable place says so, and a
+        // relative path resolves as the start-up argument does
+        bool projectSaveOk = false;
+        {
+            const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-selftest-save180a");
+            dir.deleteRecursively();
+            const auto folder = dir.getChildFile (juce::String::fromUTF8 ("M\xc3\xbasica nova"));
+            folder.createDirectory();
+            const auto named = lynx::ProjectFile::withProjectExtension (folder.getChildFile (juce::String::fromUTF8 ("Can\xc3\xa7\xc3\xa3o.v2")));
+            auto song = lynx::Song::makeDefault();
+            lynx::Note note;
+            note.length = 240;
+            note.key = 64;
+            song.patterns[0].notes.push_back (note);
+            juce::String error, blockedError;
+            const auto again = lynx::ProjectFile::save (song, named, error) ? lynx::ProjectFile::load (named, error) : std::nullopt;
+            const auto blocker = dir.getChildFile ("a file");
+            blocker.replaceWithText ("x");
+            const auto cwd = juce::File::getCurrentWorkingDirectory();
+            folder.setAsCurrentWorkingDirectory();
+            const auto relative = juce::File::getCurrentWorkingDirectory().getChildFile (named.getFileName());
+            cwd.setAsCurrentWorkingDirectory();
+            projectSaveOk = named.getFileName().endsWith (".v2.lynx") && again && again->patterns[0].notes.size() == song.patterns[0].notes.size()
+                            && relative == named && ! lynx::ProjectFile::save (song, blocker.getChildFile ("x.lynx"), blockedError)
+                            && blockedError.isNotEmpty() && lynx::ProjectFile::withProjectExtension (named) == named;
             dir.deleteRecursively();
         }
 
@@ -2972,7 +3050,8 @@ private:
                 lanesResult = "ERROR " + why;
         }
 
-        const auto ok = audioOk && projectOk && richOk && hwOutOk && flp168jOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && recordOk && recordUndoOk && midiOk && packageOk
+        const auto mixerBasics = lynx::mixerbasics::run();
+        const auto ok = mixerBasics == "OK" && audioOk && projectOk && richOk && hwOutOk && flp168jOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK";
@@ -2991,9 +3070,11 @@ private:
                << "patcher=" << (patcherOk ? "OK" : "ERROR") << "\n"
                << "native_engines=" << nativesResult << " (" << nativesMade << " made)\n"
                << "undo=" << (undoOk ? "OK" : "ERROR") << "\n"
+               << "mixer_basics=" << mixerBasics << "\n"
                << "recording=" << (recordOk && recordUndoOk ? "OK" : "ERROR") << "\n"
                << "midi=" << (midiOk ? "OK" : "ERROR") << "\n"
                << "package=" << (packageOk ? "OK" : "ERROR") << "\n"
+               << "projectSave=" << (projectSaveOk ? "OK" : "ERROR") << "\n"
                << "online_session=" << sessionResult << "\n"
                << "live_session=" << liveResult << "\n"
                << "wavpack=" << wavpack << "\n"
@@ -5155,6 +5236,24 @@ private:
         run->steps.push_back ({ "after the drag (released)", {}, {}, 600, [drag] { return drag->released(); } });
         run->steps.push_back ({ "desktop, playing", [this, ui] { ui->showDesktopForSnapshot (false); engine->rewind(); engine->play(); }, {}, 3000 });
         run->steps.push_back ({ "mixer maximised, playing", [ui] { ui->selectTabForSnapshot (3); }, {}, 3000 });
+        // round 177a: only the meters move, so the strips' picture must stay valid, also with a folded group's tab and VCA
+        // strips on screen (their levels are drawn over the picture, like the inserts' meters)
+        run->steps.push_back ({ "mixer meters over the picture, playing", [this, ui] {
+                                   ui->selectTabForSnapshot (3);
+                                   engine->getTransport().songMode = false;
+                                   engine->rewind();
+                                   engine->play();
+                                   ui->getMixerForSnapshot().getStripsForSnapshot().cacheCountersForPerf();
+                               }, {}, 6000, [this, ui, report] {
+                                   const auto [spoiled, refills] = ui->getMixerForSnapshot().getStripsForSnapshot().cacheCountersForPerf();
+                                   if (juce::FileOutputStream out (report.withFileExtension ("png")); out.openedOk())
+                                   {
+                                       out.setPosition (0);
+                                       out.truncate();
+                                       juce::PNGImageFormat().writeImageToStream (mainWindow->createComponentSnapshot (mainWindow->getLocalBounds()), out);
+                                   }
+                                   return juce::String ("    mixer picture: spoiled ") + juce::String (spoiled) + " times, drawn again " + juce::String (refills) + " times\n";
+                               } });
         run->steps.push_back ({ "mixer scroll", {}, [wheelAt, ui, none] (int f) { wheelAt (ui->getMixerForSnapshot(), 0.0f, f < 30 ? -0.25f : 0.25f, none); }, 60 });
         // a fader dragged while the song plays (round 171c, discussion #10): 4 mouse moves per frame on insert 1's fader,
         // through the old path (a whole snapshot per move) and through editLevels
@@ -5201,6 +5300,9 @@ private:
         run->steps.push_back ({ "whole window repainted", {}, [this] (int) { mainWindow->repaint(); }, 40 });
         run->steps.push_back ({ "channel rack scroll", [ui] { ui->selectTabForSnapshot (0); },
                                  [wheelAt, ui, none] (int f) { wheelAt (ui->getRackViewportForSnapshot(), 0.0f, f < 30 ? -0.25f : 0.25f, none); }, 60 });
+        // LYNX_UIPERF_ONLY=text: only the steps whose name has that text
+        if (const auto only = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_ONLY", {}); only.isNotEmpty())
+            run->steps.erase (std::remove_if (run->steps.begin(), run->steps.end(), [&only] (const auto& s) { return ! juce::String (s.name).contains (only); }), run->steps.end());
         // let the window draw the project first
         perf = std::move (run);
         juce::Timer::callAfterDelay (1500, [this] { if (perf != nullptr) perf->startTimer (16); });
@@ -7082,6 +7184,40 @@ private:
             };
             offline.renderOffline (o);
         }
+        // round tp172b5: LYNX_PARITYSHOT_CLICKS drives the editor before the picture (the originals' pictures have their
+        // panels open), tokens in order: "x,y" a click, then the pointer leaves; "h:x,y" the pointer rests there (a hover);
+        // "d:x,y,x2,y2" a drag from there to there, the button still down in the picture
+        for (const auto& token : juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_PARITYSHOT_CLICKS", {}), " ", ""))
+        {
+            const auto hover = token.startsWith ("h:"), drag = token.startsWith ("d:");
+            const auto xy = juce::StringArray::fromTokens (hover || drag ? token.substring (2) : token, ",", "");
+            if (xy.size() < (drag ? 4 : 2))
+                continue;
+            const juce::Point<int> at (xy[0].getIntValue(), xy[1].getIntValue());
+            editor->setVisible (true); // (getComponentAt finds nothing in a hidden component; it never goes on screen)
+            auto* target = editor->getComponentAt (at);
+            if (target == nullptr)
+                continue;
+            const auto local = target->getLocalPoint (editor.get(), at).toFloat();
+            const auto now = juce::Time::getCurrentTime();
+            auto source = juce::Desktop::getInstance().getMainMouseSource();
+            const juce::ModifierKeys left (juce::ModifierKeys::leftButtonModifier);
+            const auto event = [&] (juce::Point<float> p, juce::ModifierKeys mods, bool dragged) {
+                return juce::MouseEvent (source, p, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, target, target, now, local, now, 1, dragged);
+            };
+            target->mouseMove (event (local, {}, false));
+            if (hover)
+                continue;
+            target->mouseDown (event (local, left, false));
+            if (drag)
+            {
+                const auto end = target->getLocalPoint (editor.get(), juce::Point<int> (xy[2].getIntValue(), xy[3].getIntValue())).toFloat();
+                target->mouseDrag (event (end, left, true));
+                continue;
+            }
+            target->mouseUp (event (local, {}, false));
+            target->mouseExit (event ({ -1000.0f, -1000.0f }, {}, false));
+        }
         juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);
         {
             juce::Graphics g (image);
@@ -7605,8 +7741,15 @@ private:
 
             auto maximusPasses = 0; // Maximus has its own page (first pass); the second pass shows Soundgoodizer
             auto ridgePasses = 0;
+            // round 173d3: the parity pictures of one editor — LYNX_PLUGUI_ONLY=<effect name>, LYNX_PLUGUI_PRESET=<.fst>,
+            // LYNX_PLUGUI_PAGES=<page,page,…> (the page numbers as the editor encodes them)
+            const auto only = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGUI_ONLY", {});
+            const auto onlyPreset = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGUI_PRESET", {});
+            const auto onlyPages = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGUI_PAGES", {}), ",", "");
             for (const auto kind : kinds)
             {
+                if (only.isNotEmpty() && only != lynx::effectInfo (kind).name)
+                    continue;
                 auto fx = lynx::makeEffectSlot (kind);
                 juce::String name (lynx::effectInfo (kind).name);
                 for (const auto& plugin : lynx::flPluginsForEffect (kind))
@@ -7616,6 +7759,8 @@ private:
                     if (! file.existsAsFile()) // plugins without presets: their entry of FL's plugin database
                         for (const auto& f : database.findChildFiles (juce::File::findFiles, true, juce::String::fromUTF8 (plugin.c_str()) + ".fst"))
                             file = f;
+                    if (only.isNotEmpty() && onlyPreset.isNotEmpty())
+                        file = juce::File (onlyPreset);
                     if (! file.existsAsFile())
                     {
                         auto files = dir.findChildFiles (juce::File::findFiles, true, "*.fst");
@@ -7626,7 +7771,7 @@ private:
                     if (file.existsAsFile() && file.loadFileAsData (data))
                     {
                         const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-                        if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0); loaded && loaded->kind == kind)
+                        if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0, lynx::natives::flDataReader (lynx::flStudioAccess())); loaded && loaded->kind == kind)
                             fx = *loaded;
                     }
                     name = juce::String::fromUTF8 (plugin.c_str());
@@ -7714,7 +7859,16 @@ private:
                 }
 
                 const auto pages = name == "Soundgoodizer" ? 1 : juce::jmax (1, (int) lynx::plugui::layoutFor (kind).pages.size());
+                std::vector<int> pageList;
                 for (int page = 0; page < pages; ++page)
+                    pageList.push_back (page);
+                if (only.isNotEmpty() && ! onlyPages.isEmpty())
+                {
+                    pageList.clear();
+                    for (const auto& p : onlyPages)
+                        pageList.push_back (p.getIntValue());
+                }
+                for (const auto page : pageList)
                 {
                     auto editor = lynx::makeNativeEffectEditor (offline, 1, 0, 1.0f, page);
                     juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);
@@ -8050,9 +8204,19 @@ private:
             void timerCallback() override
             {
                 static constexpr double times[] = { 0.0, 1.5, 3.25 };
-                if (step > 0 && editor != nullptr)
+                constexpr int typeInStep = (int) std::size (times) + 1;
+                if (step > 0 && step < typeInStep && editor != nullptr)
                     savePng (editor->createComponentSnapshot (editor->getLocalBounds()), prefix + "-" + juce::String (step - 1) + ".png");
-                if (editor == nullptr || step >= (int) std::size (times))
+                if (editor != nullptr && step == (int) std::size (times))
+                {
+                    // round 174d: FL's in-place type-in of the current time (a right click on it)
+                    lynx::videoview::openTypeIn (*editor, 2);
+                    ++step;
+                    return;
+                }
+                if (editor != nullptr && step == typeInStep)
+                    savePng (editor->createComponentSnapshot (editor->getLocalBounds()), prefix + "-typein.png");
+                if (editor == nullptr || step >= typeInStep)
                 {
                     stopTimer();
                     juce::File (prefix + "-report.txt").replaceWithText (report);
@@ -8079,6 +8243,40 @@ private:
         c.pluginState = lynx::video::write (vs);
         song.channels.push_back (c);
         song.patterns.emplace_back();
+        {
+            // round 174d (A3): the same Video Player in a song whose tempo drops from 120 to 60 BPM at bar 5, for FL
+            // (LYNX.exe --export-flp <prefix>-tempo.lynx <prefix>-tempo.flp), to compare FL's video clock with LYNX's
+            auto fl = song;
+            fl.bpm = 120.0;
+            fl.mode = lynx::PlayMode::song;
+            auto settings = vs;
+            settings.delay = 0;
+            settings.timeDisplay = lynx::video::Settings {}.timeDisplay;
+            fl.channels[0].pluginState = lynx::video::write (settings);
+            fl.patterns[0].name = "Pattern 1";
+            lynx::Automation tempo;
+            tempo.name = "Tempo";
+            tempo.target = { lynx::AutomationTargetKind::tempo, 0, 0, 0 };
+            const auto bar = (std::int64_t) lynx::ppq * 4;
+            tempo.points = { { 0, lynx::valueFromTempo (120.0), 0.0f }, { bar * 4 - 1, lynx::valueFromTempo (120.0), 0.0f },
+                             { bar * 4, lynx::valueFromTempo (60.0), 0.0f }, { bar * 8, lynx::valueFromTempo (60.0), 0.0f } };
+            fl.automations.push_back (tempo);
+            lynx::Clip at;
+            at.kind = lynx::ClipKind::automation;
+            at.automation = 0;
+            at.track = 1;
+            at.start = 0;
+            at.length = bar * 8;
+            fl.playlist.push_back (at);
+            lynx::Clip pc;
+            pc.pattern = 0;
+            pc.track = 0;
+            pc.start = 0;
+            pc.length = bar * 8;
+            fl.playlist.push_back (pc);
+            juce::String error;
+            lynx::ProjectFile::save (fl, juce::File (prefix + "-tempo.lynx"), error);
+        }
         offline.setSong (std::move (song));
         offline.dispatchPendingMessages();
         auto& report = shot->report;
@@ -8089,6 +8287,189 @@ private:
             shot->editor->setVisible (true);
         shot->done = [this] { juce::MessageManager::callAsync ([this] { shot.reset(); quit(); }); };
         shot->startTimer (1500);
+    }
+
+    void runVideoTrackShot (const juce::String& prefix, const juce::String& videoPath, const juce::String& secondPath)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        struct TrackShot final : juce::Timer
+        {
+            lynx::AudioEngine offline { false };
+            std::unique_ptr<lynx::PlaylistComponent> playlist;
+            std::unique_ptr<lynx::media::FrameDecoder> decoder;
+            juce::String prefix, report, path;
+            double fps = 25.0;
+            int step = 0, waits = 0, adrStep = 0;
+            std::unique_ptr<juce::Component> adrPanel;
+            std::function<void()> done;
+            // song times (s): before, inside the first clip (on and between frame edges), across the second clip
+            std::vector<double> times { 0.0, 1.0, 2.0 + 1.0 / 25.0, 2.5, 4.0, 7.3 };
+            void timerCallback() override
+            {
+                if (step > 0 && adrStep == 0)
+                {
+                    // the frame the decoder shows for the wanted file time (the clip starts at song 1.0 s, offset 0)
+                    const auto want = times[(std::size_t) step - 1] - 1.0;
+                    double ft = -1.0;
+                    const auto img = decoder->frame (ft);
+                    const auto expected = std::floor (want * fps + 1e-6) / fps;
+                    if (want >= 0.0 && ft < expected - 1e-3 && ++waits < 20)
+                        return; // (still decoding)
+                    waits = 0;
+                    report << "song " << juce::String (times[(std::size_t) step - 1], 3) << " s: wanted file time " << juce::String (want, 4)
+                           << ", frame shown at " << juce::String (ft, 4) << " (expected " << juce::String (expected, 4) << ")"
+                           << (want < 0.0 ? "  [before the clip]" : std::abs (ft - expected) < 1e-3 ? "  OK" : "  MISMATCH") << "\n";
+                    savePng (playlist->createComponentSnapshot (playlist->getLocalBounds()), prefix + "-playlist-" + juce::String (step - 1) + ".png");
+                    if (img.isValid())
+                        savePng (img, prefix + "-frame-" + juce::String (step - 1) + ".png");
+                    for (int w = 0; w < juce::Desktop::getInstance().getNumComponents(); ++w)
+                        if (auto* c = juce::Desktop::getInstance().getComponent (w); c != nullptr && c->getName().startsWith ("Picture"))
+                            savePng (c->createComponentSnapshot (c->getLocalBounds()), prefix + "-window-" + juce::String (step - 1) + ".png");
+                }
+                if (step >= (int) times.size() && adrStep == 0)
+                {
+                    // the ADR window: two cues, takes on the first; the play position inside the streamer before the in
+                    // point (4.0 s), so the video window shows the streamer and the line
+                    adrStep = 1;
+                    offline.editSong ([] (lynx::Song& s) {
+                        lynx::AdrCue a, b;
+                        a.id = "SC1-01";
+                        a.in = 4.0;
+                        a.out = 6.4;
+                        a.character = "Dr. Silva";
+                        a.line = "We have to leave before the storm reaches the coast.";
+                        a.notes = "softer, out of breath";
+                        a.status = lynx::AdrCue::Status::recorded;
+                        for (int n = 1; n <= 3; ++n)
+                        {
+                            lynx::AdrTake t;
+                            t.number = n;
+                            t.name = lynx::adr::takeName (a, n);
+                            t.rating = n == 2 ? 4 : n;
+                            t.circled = n == 2;
+                            a.takes.push_back (t);
+                        }
+                        a.selected = 2;
+                        lynx::adr::setCompRange (a, 4.0, 5.1, 2);
+                        lynx::adr::setCompRange (a, 5.1, 6.4, 3);
+                        b.id = "SC1-02";
+                        b.in = 8.0;
+                        b.out = 9.5;
+                        b.character = "Marta";
+                        b.line = "Then we go now.";
+                        s.adr.cues = { a, b };
+                        s.adr.current = 0;
+                    });
+                    adrPanel = lynx::adrwindow::makePanel (offline);
+                    adrPanel->setSize (1200, 640);
+                    adrPanel->setVisible (true);
+                    offline.getTransport().positionTicks.store (3.0 * offline.getSong().bpm / 60.0 * lynx::ppq);
+                    decoder->request (2.0, false);
+                    return;
+                }
+                if (adrStep == 1)
+                {
+                    adrStep = 2;
+                    savePng (adrPanel->createComponentSnapshot (adrPanel->getLocalBounds()), prefix + "-adr.png");
+                    for (int w = 0; w < juce::Desktop::getInstance().getNumComponents(); ++w)
+                        if (auto* c = juce::Desktop::getInstance().getComponent (w); c != nullptr && c->getName().startsWith ("Picture"))
+                            savePng (c->createComponentSnapshot (c->getLocalBounds()), prefix + "-adr-window.png");
+                    offline.getTransport().positionTicks.store (4.5 * offline.getSong().bpm / 60.0 * lynx::ppq);
+                    decoder->request (3.5, false);
+                    return;
+                }
+                if (adrStep == 2)
+                {
+                    for (int w = 0; w < juce::Desktop::getInstance().getNumComponents(); ++w)
+                        if (auto* c = juce::Desktop::getInstance().getComponent (w); c != nullptr && c->getName().startsWith ("Picture"))
+                            savePng (c->createComponentSnapshot (c->getLocalBounds()), prefix + "-adr-window-line.png");
+                    adrPanel.reset();
+                    // export with video: a 3 s mix under the picture, re-encoded (the clip starts at 1 s) and copied (from 1 s)
+                    {
+                        const juce::File wav (prefix + "-mix.wav");
+                        wav.deleteFile();
+                        juce::WavAudioFormat format;
+                        if (std::unique_ptr<juce::OutputStream> os (wav.createOutputStream().release()); os != nullptr)
+                            if (std::unique_ptr<juce::AudioFormatWriter> w (format.createWriterFor (os.get(), 48000.0, 2, 16, {}, 0)); w != nullptr)
+                            {
+                                os.release();
+                                juce::AudioBuffer<float> b (2, 48000 * 3);
+                                for (int k = 0; k < b.getNumSamples(); ++k)
+                                    b.setSample (0, k, 0.25f * (float) std::sin (k * 2.0 * juce::MathConstants<double>::pi * 330.0 / 48000.0)), b.setSample (1, k, b.getSample (0, k));
+                                w->writeFromAudioSampleBuffer (b, 0, b.getNumSamples());
+                            }
+                        for (const auto origin : { 0.0, 1.0 })
+                        {
+                            const juce::File out (prefix + "-mux-" + juce::String ((int) origin) + ".mp4");
+                            const auto t0 = juce::Time::getMillisecondCounterHiRes();
+                            const auto error = lynx::videotracks::muxWithVideo (offline.getSong(), origin, wav, out);
+                            report << "export with video from " << origin << " s: " << (error.isEmpty() ? "OK " + juce::String (out.getSize()) + " bytes" : "FAILED " + error)
+                                   << " (" << juce::String ((juce::Time::getMillisecondCounterHiRes() - t0) / 1000.0, 2) << " s)\n";
+                        }
+                    }
+                    stopTimer();
+                    report << "frames decoded " << decoder->frameCount() << ", dropped " << decoder->droppedCount() << "\n";
+                    juce::File (prefix + "-report.txt").replaceWithText (report);
+                    if (done)
+                        done();
+                    return;
+                }
+                const auto t = times[(std::size_t) step++];
+                offline.getTransport().positionTicks.store (t * offline.getSong().bpm / 60.0 * lynx::ppq);
+                decoder->request (std::max (0.0, t - 1.0), false);
+            }
+        };
+        static std::unique_ptr<TrackShot> shot;
+        shot = std::make_unique<TrackShot>();
+        shot->prefix = prefix;
+        auto& offline = shot->offline;
+        lynx::Song song;
+        song.mixer = lynx::Song::defaultMixer (2);
+        song.patterns.emplace_back();
+        song.mode = lynx::PlayMode::song;
+        song.bpm = 120.0;
+        offline.setSong (std::move (song));
+        offline.dispatchPendingMessages();
+        const juce::File video (videoPath);
+        const auto pr = lynx::media::probe (video.getFullPathName());
+        auto& report = shot->report;
+        report << "decoder: " << (pr.backend.isEmpty() ? juce::String ("none") : pr.backend) << " (system: " << lynx::media::nativeBackendName()
+               << ", ffmpeg: " << lynx::findFfmpeg().getFullPathName() << ")\n";
+        report << "video: " << pr.info.width << "x" << pr.info.height << " " << juce::String (pr.info.fps, 3) << " fps " << juce::String (pr.info.duration, 3)
+               << " s, sound " << (pr.info.hasAudio ? "yes" : "no") << "\n";
+        shot->fps = pr.info.fps > 1.0 ? pr.info.fps : 25.0;
+        shot->times[2] = 2.0 + 1.0 / shot->fps; // (exactly on a frame edge)
+        lynx::videotracks::importVideo (offline, video, 1.0, -1);
+        if (secondPath.isNotEmpty())
+            lynx::videotracks::importVideo (offline, juce::File (secondPath), 3.0, 1);
+        offline.editSong ([] (lynx::Song& s) {
+            s.video.startTimecode = 3600.0;
+            s.video.burnIn = true;
+            if (s.videoTracks.size() < 2)
+                s.videoTracks.push_back ({});
+            s.videoTracks[0].name = "Picture";
+            s.videoTracks[1].name = "Reference";
+        });
+        report << "project rate: " << lynx::vtime::rateName (offline.getSong().video.rate) << ", clip 1: "
+               << juce::String (offline.getSong().videoTracks[0].clips.empty() ? -1.0 : offline.getSong().videoTracks[0].clips[0].length, 3) << " s\n";
+        // the project round trip
+        {
+            const juce::File file (prefix + "-project.lynx");
+            juce::String error;
+            lynx::ProjectFile::save (offline.getSong(), file, error);
+            const auto back = lynx::ProjectFile::load (file, error);
+            report << "project file round trip: " << (back && back->videoTracks == offline.getSong().videoTracks && back->video == offline.getSong().video ? "OK" : "MISMATCH " + error) << "\n";
+        }
+        shot->playlist = std::make_unique<lynx::PlaylistComponent> (offline);
+        shot->playlist->setSize (1400, 640);
+        shot->playlist->setVisible (true);
+        shot->decoder = std::make_unique<lynx::media::FrameDecoder>();
+        shot->decoder->setSource (video.getFullPathName(), pr.info);
+        shot->decoder->setSize (pr.info.width, pr.info.height);
+        shot->decoder->startThread (juce::Thread::Priority::low);
+        lynx::videotracks::showWindow (offline, 0);
+        shot->done = [this] { juce::MessageManager::callAsync ([this] { shot.reset(); quit(); }); };
+        shot->startTimer (700);
     }
 
     void runDanceShot (const juce::String& prefix)
@@ -9868,6 +10249,23 @@ private:
                 }, false);
                 saveWindow (lynx::makeEventEditor (offline, volume), "-eventeditor.png");
                 offline.editSong ([&] (lynx::Song& s) { s.patterns[(std::size_t) s.currentPattern].events = before; }, false);
+                // issue #86: the same editor on the Tempo target, with the project's own Tempo events (a sample ramp if none)
+                const lynx::AutomationTarget tempo { lynx::AutomationTargetKind::tempo, 0 };
+                offline.editSong ([&] (lynx::Song& s) {
+                    auto& lane = lynx::eventedit::laneFor (s.patterns[(std::size_t) s.currentPattern], tempo);
+                    if (lane.events.empty())
+                        lynx::eventedit::line (lane, 0, lynx::ppq * 2, 0.05f, 0.11f, lynx::ticksPerStep);
+                }, false);
+                saveWindow (lynx::makeEventEditor (offline, tempo), "-eventeditor-tempo.png");
+                {
+                    auto compact = lynx::makeEventEditor (offline, tempo); // the toolbar in a small window
+                    compact->setSize (640, 300);
+                    saveWindow (std::move (compact), "-eventeditor-tempo-small.png");
+                    auto narrowest = lynx::makeEventEditor (offline, tempo); // the tool window's lower limit
+                    narrowest->setSize (400, 300);
+                    saveWindow (std::move (narrowest), "-eventeditor-tempo-narrowest.png");
+                }
+                offline.editSong ([&] (lynx::Song& s) { s.patterns[(std::size_t) s.currentPattern].events = before; }, false);
             }
 
             // round 86: the audio editor with a synthetic drum loop (markers, a region, a loop), waveform and spectrogram,
@@ -10800,6 +11198,7 @@ private:
     double splashDuration = lynx::SplashScreen::minimumDuration; // seconds of its clock (round 121: from the process start)
     lynx::StartupOptions startupOptions;
     juce::File fileToOpen;
+    bool startupFileHandled = false;
     juce::File openTimeReport; // --opentime
     int openTimeIdleSeconds = 10;
 };
