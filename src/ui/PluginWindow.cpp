@@ -83,9 +83,15 @@ public:
             bendRange.addItem (juce::String (st), st);
         bendRange.setTooltip (tr ("The pitch bend range sent to the plugin (semitones)"));
         bendRange.onChange = [this] {
-            engine.editSong ([fn = find, v = bendRange.getSelectedId()] (Song& song) {
-                if (auto* ref = fn (song); ref != nullptr && v > 0)
-                    ref->bendRange = v;
+            // as the toggles beside it: the new instance takes the range, and starts from the current settings
+            juce::MessageManager::callAsync ([en = &engine, fn = find, inst = &plugin, v = bendRange.getSelectedId()] {
+                if (PluginWindows::isOpen (*inst))
+                    PluginWindows::close (*inst);
+                en->capturePluginStates();
+                en->editSong ([fn, v] (Song& song) {
+                    if (auto* ref = fn (song); ref != nullptr && v > 0)
+                        ref->bendRange = v;
+                });
             });
         };
         addChildComponent (bendRange);

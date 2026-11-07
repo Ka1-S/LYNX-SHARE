@@ -49,11 +49,14 @@ namespace lynx
 {
 namespace
 {
-// a hosted plugin is created again when its processing options change (fixed blocks, own process)
+// a hosted plugin is created again when its processing options change (fixed blocks, own process) or the options it
+// gets at creation (HostedOptions: the wrapper's MIDI and reset options, which did nothing until a reload otherwise)
 bool samePluginProcessing (const PluginRef& a, const PluginRef& b) noexcept
 {
     return a.fixedBuffers == b.fixedBuffers && a.separateProcess == b.separateProcess && a.maxSizeBuffers == b.maxSizeBuffers
-           && a.hostMaxBuffer == b.hostMaxBuffer && a.bitSize == b.bitSize;
+           && a.hostMaxBuffer == b.hostMaxBuffer && a.bitSize == b.bitSize && a.releaseVelocity == b.releaseVelocity
+           && a.sendBendRange == b.sendBendRange && a.bendRange == b.bendRange && a.modXAftertouch == b.modXAftertouch
+           && a.allNotesOffOnStop == b.allNotesOffOnStop && a.resetOnFlush == b.resetOnFlush && a.sendLoopPosition == b.sendLoopPosition;
 }
 
 // Silent instrument: plugin channel that could not be loaded.
