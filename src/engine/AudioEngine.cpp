@@ -3390,6 +3390,15 @@ void AudioEngine::removeGlobalLink (const AutomationTarget& target)
     setMidiPrefs (p, saveGlobalLinks);
 }
 
+void AudioEngine::setMultilink (bool on)
+{
+    if (on)
+        multilink.emplace();
+    else
+        multilink.reset();
+    sendChangeMessage();
+}
+
 void AudioEngine::learnMidiController (const AutomationTarget& target)
 {
     learning = target;
@@ -3403,6 +3412,9 @@ void AudioEngine::noteTweaked (const AutomationTarget& target, bool held)
 {
     if (target.kind == AutomationTargetKind::none)
         return;
+
+    if (multilink) // round 177b-4: FL's Multilink queues the moved controls in order
+        multilink->add (target);
 
     if (! (lastTweaked[0] == target))
     {
@@ -3674,6 +3686,22 @@ void AudioEngine::applyControllers()
             learning = {};
             learningGlobal = false;
             setMidiPrefs (p, saveGlobalLinks);
+        }
+        else if (learning.kind == AutomationTargetKind::none && multilink)
+        {
+            // FL's Multilink (round 177b-4): the first message of each controller links the next queued control
+            if (const auto link = multilink->controller (e.cc, e.channel))
+            {
+                editSong ([l = *link] (Song& s) {
+                    s.midiLinks.erase (std::remove_if (s.midiLinks.begin(), s.midiLinks.end(), [&] (const MidiLink& m) { return m.target == l.target; }),
+                                       s.midiLinks.end());
+                    s.midiLinks.push_back ({ l.cc, l.channel, l.target });
+                });
+                if (multilink->complete())
+                    multilink.reset(); // FL: "the process will auto-close once the number of hardware controls tweaked
+                                       // equals the number of software targets"
+                sendChangeMessage();
+            }
         }
         else if (learning.kind != AutomationTargetKind::none)
         {

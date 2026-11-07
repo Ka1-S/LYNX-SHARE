@@ -1589,6 +1589,7 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("transport.nextMarker")) engine.jumpToNextMarker (true);
     else if (is ("transport.previousMarker")) engine.jumpToNextMarker (false);
     else if (is ("view.typingPiano")) toggleTypingPiano();
+    else if (is ("options.multilink")) engine.setMultilink (! engine.isMultilinkOn());
     else if (is ("view.toolbar"))
     {
         auto layout = toolbarLayout;
@@ -3867,6 +3868,10 @@ juce::String MainComponent::idleHint() const
 
     if (engine.isCountingIn())
         return tr ("Recording: count-in...");
+
+    // FL's text while "Multilink to controllers" is on (round 177b-4); the controls moved show their own hint
+    if (engine.isMultilinkOn())
+        return tr ("Please tweak the controls you want to link...");
 
     if (const auto scan = engine.getPluginHost().backgroundScan(); scan.running)
         return tr ("Scanning for plugins in the background: {0}% {1}", { juce::String (juce::roundToInt (scan.progress * 100.0f)), scan.file });
@@ -6237,6 +6242,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                     g.setFollowingView (v, ! on);
             });
         }
+        // FL's "Multilink to controllers" (Ctrl+J), the last of FL's Switches (after Auto scrolling and Enable groups;
+        // round 177b-4): the controls moved while it is on link, in that order, to the controllers moved next
+        menu.addItem (tr ("Multilink to controllers") + shortcutText ("options.multilink"), true, engine.isMultilinkOn(),
+                      [this] { runAction ("options.multilink"); });
         {
             juce::PopupMenu recording;
             addRecordOptions (recording);

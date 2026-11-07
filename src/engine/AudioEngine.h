@@ -10,6 +10,7 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include "core/Multilink.h"
 #include "core/AutomationDisplay.h"
 #include "core/HeldNotes.h"
 #include "core/RecordLoop.h"
@@ -484,6 +485,11 @@ public:
     // Global links (FL's "Override global link...", REA round 146): links in the MIDI settings that every project
     // follows unless it links the same target or controller itself. The next CC received becomes `target`'s.
     void learnGlobalLink (const AutomationTarget& target);
+    // FL's "Multilink to controllers" (Options › Switches, Ctrl+J; round 177b-4, core/Multilink.h): the controls moved
+    // while it is on link, in that order, to the controllers moved next; it switches itself off when all are linked
+    void setMultilink (bool on);
+    bool isMultilinkOn() const noexcept { return multilink.has_value(); }
+    int multilinkQueued() const noexcept { return multilink ? (int) multilink->targets.size() : 0; }
     void removeGlobalLink (const AutomationTarget& target);
     std::optional<MidiLink> globalLinkOf (const AutomationTarget& target) const;
     std::vector<MidiLink> getGlobalLinks() const;
@@ -843,6 +849,7 @@ private:
     // selected channel's instrument (round 162); written by applyControllers, read by the MIDI thread
     std::array<std::atomic<std::uint64_t>, 2> linkedCcs {};
     AutomationTarget learning;
+    std::optional<MultilinkSession> multilink;
     bool learningGlobal = false;
     bool saveGlobalLinks = false; // only the engine with an audio device (the app) writes the settings file
     void applyControllers();
