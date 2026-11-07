@@ -3248,12 +3248,8 @@ private:
         stretchMethod.setEnabled (s.keepPitch);
         // leaving Beats (or Keep length): an imported clip's offline transposition moves to the Pitch knob, which the other
         // modes apply in real time, so the sample stays at its pitch
-        if (s.stretchPitch != 0.0f && (s.stretchMethod != StretchMethod::beats || ! s.keepPitch))
-        {
-            s.pitch = juce::jlimit (-24.0f, 24.0f, s.pitch + s.stretchPitch);
-            s.stretchPitch = 0.0f;
+        if (s.moveBakedPitchToKnob())
             pitch.setValue (s.pitch, juce::dontSendNotification);
-        }
         s.regionStart = (float) regionStart.getValue();
         s.regionEnd = (float) regionEnd.getValue();
         s.release = (float) release.getValue();

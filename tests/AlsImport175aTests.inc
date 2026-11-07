@@ -799,3 +799,30 @@ TEST (als175a_beats_clip_transpose_is_rendered_offline)
     const auto als = exportAls (*song, options);
     CHECK (als.xml.find ("<PitchCoarse Value=\"2\" />") != std::string::npos);
 }
+
+TEST (als175a_leaving_beats_moves_the_baked_transpose_to_the_pitch_knob)
+{
+    using namespace lynx;
+    SamplerSettings s;
+    s.keepPitch = true;
+    s.stretchMethod = StretchMethod::beats;
+    s.stretchPitch = 5.0f;
+    s.pitch = 1.0f;
+    CHECK (! s.moveBakedPitchToKnob()); // still Beats with Keep length: stays baked
+    CHECK (s.stretchPitch == 5.0f && s.pitch == 1.0f);
+
+    s.stretchMethod = StretchMethod::tones;
+    CHECK (s.moveBakedPitchToKnob());
+    CHECK (s.stretchPitch == 0.0f && s.pitch == 6.0f);
+    CHECK (! s.moveBakedPitchToKnob()); // nothing left to move
+
+    s.stretchMethod = StretchMethod::beats;
+    s.stretchPitch = -3.0f;
+    s.keepPitch = false; // Keep length off
+    CHECK (s.moveBakedPitchToKnob());
+    CHECK (s.stretchPitch == 0.0f && s.pitch == 3.0f);
+
+    s.stretchPitch = 40.0f; // a transpose beyond the knob's range is limited to it
+    CHECK (s.moveBakedPitchToKnob());
+    CHECK (s.pitch == 24.0f);
+}

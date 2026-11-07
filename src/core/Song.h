@@ -277,6 +277,16 @@ struct SamplerSettings
     bool keepPitch = false;    // with stretch: stretches without changing pitch (core/TimeStretch); otherwise resamples
     StretchMethod stretchMethod = StretchMethod::general; // with keepPitch: the stretcher's preset
     float stretchPitch = 0.0f; // Beats: semitones each piece is resampled by, offline (a Live clip's transpose; round 175a)
+    // outside Beats nothing renders stretchPitch offline: it moves to the Pitch knob (-24..24), so the sample stays at its
+    // pitch. True if it moved.
+    bool moveBakedPitchToKnob() noexcept
+    {
+        if (stretchPitch == 0.0f || (stretchMethod == StretchMethod::beats && keepPitch))
+            return false;
+        pitch = std::clamp (pitch + stretchPitch, -24.0f, 24.0f);
+        stretchPitch = 0.0f;
+        return true;
+    }
     float regionStart = 0.0f;  // played region of the sample (fractions 0..1)
     float regionEnd = 1.0f;
     float startOffset = 0.0f;  // FL's start offset (0xD7 f64 at 0x90): where notes start, a fraction of the region (after
