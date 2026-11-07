@@ -1,6 +1,7 @@
 #include "ui/FlMods.h"
 #include "ui/FileChoosers.h"
 #include "ui/PianoRollComponent.h"
+#include "core/ChordReadout.h"
 #include "core/KeyMap.h"
 #include "core/NoteNames.h"
 
@@ -84,16 +85,24 @@ const std::vector<notetools::ScaleInfo>& scales()
 // a detected chord in the chosen note names (Settings › General, round 165f): "Do m7/Mib"; "" when none
 juce::String chordName (const std::vector<int>& keys)
 {
-    const auto chord = prtools::detectChord (keys, notenames::flats());
-    if (! chord)
+    // FL's own names (round 181b, core/ChordReadout.h): the same for the panel, this readout and the bubble
+    if ((int) keys.size() < chordread::minKeys || (int) keys.size() > chordread::maxKeys)
         return {};
-    auto name = juce::String (chord->name);
-    auto quality = name.fromFirstOccurrenceOf (name.substring (0, name.length() > 1 && (name[1] == '#' || name[1] == 'b') ? 2 : 1), false, false)
-                       .upToFirstOccurrenceOf ("/", false, false);
-    auto text = juce::String (notenames::pitchName (chord->root)) + quality;
-    if (name.contains ("/"))
-        text << "/" << notenames::pitchName (chord->bass);
-    return text;
+    std::array<std::string, 12> notes;
+    for (int pc = 0; pc < 12; ++pc)
+    {
+        auto name = juce::String (notenames::pitchName (pc));
+        if (name.endsWithChar ('#'))
+            name = name.dropLastCharacters (1) + juce::String::charToString ((juce::juce_wchar) 0x266F);
+        else if (name.length() > 1 && name.endsWithChar ('b'))
+            name = name.dropLastCharacters (1) + juce::String::charToString ((juce::juce_wchar) 0x266D);
+        notes[(std::size_t) pc] = name.toStdString();
+    }
+    chordread::NameOptions options;
+    options.notes = &notes;
+    const auto named = chordread::nameKeys (keys, options);
+    const auto text = juce::String::fromUTF8 (named.text.c_str());
+    return named.novelty ? tr (text) : text;
 }
 
 // View › Background waveform (round 168g): one for every editor, like FL's (PTR_DAT_015e2698 / DAT_016ba824)
@@ -2261,7 +2270,9 @@ void PianoRollComponent::postDragHint (const juce::MouseEvent& e)
             const auto lane = velocityArea();
             const auto value = juce::jlimit (0.0f, 1.0f, (float) (lane.getBottom() - 2 - e.y) / (float) (lane.getHeight() - 8));
             hint.text = drag == Drag::eventErase ? tr ("Deleting events") : tr ("Drawing events: {0}", { laneBox.getText() });
-            hint.value = juce::String (juce::roundToInt (value * 100.0f)) + "%";
+            const auto target = eventLaneTarget();
+            hint.value = target && target->kind == AutomationTargetKind::tempo ? juce::String (tempoFromValue (value), 3) + " BPM" // (issue #86: as FL's hint)
+                                                                               : juce::String (juce::roundToInt (value * 100.0f)) + "%";
             break;
         }
         case Drag::velocity:
@@ -3312,6 +3323,20 @@ void PianoRollComponent::updateChordReadout()
 void PianoRollComponent::updateChordBubble()
 {
     const auto now = juce::Time::getMillisecondCounter();
+    if (selection != chordPanelSelection)
+    {
+        // the toolbar's chord panel follows the selection whether this bubble is on or not (FL: FUN_00d32da0)
+        chordPanelSelection = selection;
+        if (onSelectedKeys)
+        {
+            const auto& notes = currentPattern (engine.getSong()).notes;
+            std::vector<int> keys;
+            for (auto i : selection)
+                if (i >= 0 && i < (int) notes.size() && ! notes[(std::size_t) i].muted)
+                    keys.push_back (notes[(std::size_t) i].key);
+            onSelectedKeys (keys);
+        }
+    }
     if (! showChordName)
     {
         chordBubble.setVisible (false);

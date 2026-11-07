@@ -15,6 +15,9 @@
 #include <vector>
 #include <utility>
 
+#include "core/Adr.h"
+#include "core/VideoTrack.h"
+
 namespace lynx
 {
 constexpr int ppq = 960;              // ticks per quarter note
@@ -228,7 +231,12 @@ enum LfoTarget { lfoPan, lfoVolume, lfoCutoff, lfoPitch, lfoTargets };
 // How a pitch-preserving stretch is computed (core/TimeStretch, REA_rodada160): general = polyphonic material and full
 // mixes (FL's élastique Pro / E3 generic / Auto), transients = drums and loops (FL's E2 transient, slice modes), mono =
 // a single voice or instrument (FL's E3 mono, E2 mono / speech).
-enum class StretchMethod : int { general = 0, transients = 1, mono = 2 };
+// Round 175a (N4) adds LYNX's warp modes modelled on Ableton Live's (measured against Live 12 renders, see
+// docs/analise/ALS_FORMAT.md §12): beats = the audio cut at its attacks, each piece played at its own speed and its
+// gap filled by playing it back and forth (Live's Beats); tones = a single pitched voice (Live's Tones); texture =
+// dense material without a clear pitch (Live's Texture); complex = full mixes (Live's Complex / Complex Pro).
+enum class StretchMethod : int { general = 0, transients = 1, mono = 2, beats = 3, tones = 4, texture = 5, complex = 6 };
+constexpr int stretchMethodCount = 7;
 
 // FL's Sampler › "Precomputed effects" (REA_rodada167h §1–§2): computed once on the sample, in FL's order, before it
 // plays (core/SamplePrecompute.h). Raw FL values: fadeIn / fadeOut 0…1024 (256 = a ramp over the whole sample),
@@ -1673,6 +1681,10 @@ struct Song
     bool slotActive (const EffectSlot& slot) const noexcept { return slot.enabled && ! (substitutesBypassed && slot.isSubstitute()); }
     std::vector<Automation> automations;
     std::vector<PlaylistTrack> playlistTracks; // index = track; tracks past the end use the default
+    // Video tracks and the project's video settings (round 174d, core/VideoTrack.h): LYNX's own, above the clip tracks
+    std::vector<VideoTrack> videoTracks;
+    VideoSettings video;
+    AdrSession adr; // the ADR cue list, its takes and its settings (round 174d, core/Adr.h)
     std::vector<MidiLink> midiLinks;
     // FL's "initialized controls" (.flp 0xD8; the parameter menu's "Init song with this position", REA round 146):
     // values the targets are reset to whenever the song starts playing in song mode (from any position), before

@@ -118,6 +118,18 @@ struct Theme
     bool hwKeys = false;            // option tabs and switches as square hardware keys (grey caps, lit in the accent)
     float cheek = 0.0f;             // the hardware canvases' wooden cheeks, px (0 = their own default)
     float bigThumb = 0.0f;          // round tp172d: vertical faders get a large grooved metal cap (× the thumb thickness) on a dark slot, no lit fill
+    bool lowerCaptions = false;     // round tp172d: captions and plain menus in lower case (the originals' minimal type)
+    float bow = 0.0f;               // round tp172d: flat sections' sides bulge out by this × their size (the bowed pods)
+    bool numerals = false;          // round tp172d: big knobs (≥ 70 px) print 0 … 10 around their scale (a hardware Drive)
+    int numeralStep = 1;            // round tp172d: the printed numbers count in this step (10: 0 … 100, an opto leveler)
+    bool ledReadouts = false;       // round tp172d: read-outs, stepped menus and the tap pad's tempo as red LED displays (EchoBoy)
+    bool dotTicks = false;          // round tp172d: the knobs' printed scale as a ring of dots (Decapitator)
+    bool titleRules = false;        // round tp172d: the plugin's name set between two rules (a hardware title bar)
+    bool vuBezel = false;           // round tp172d: the VU meter in a chrome bezel
+    bool vuBezelDark = false;       // round tp172d (slice 8): ... a dark gunmetal one
+    bool goldKeys = false;          // round tp172d (slice 8): keys on a dark section fill are gold (lit: pale cream)
+    bool numeralLit = false;        // round tp172d (slice 8): the printed number nearest the pointer in the accent
+    Colour pointerKnobTint { 0 };   // round tp172d (slice 8): a knob whose capTint is this colour is a chicken-head pointer knob
 
     // the moving layer (ArtLayer): motes and/or a painter for the stage strip; all null/0 = a still theme
     int motes = 0;
@@ -383,14 +395,15 @@ inline int sectionOrdinal = -1; // round tp172d: the section being drawn, in lay
 inline bool onDarkFill = false; // round tp172d: the item being drawn sits on a dark section fill (light legends)
 
 // round tp172d: a square hardware key — a bevelled grey cap, lit in the accent (the originals' style and switch keys)
-inline void hwKey (juce::Graphics& g, Rectangle<float> r, bool lit, bool hover)
+inline void hwKey (juce::Graphics& g, Rectangle<float> r, bool lit, bool hover, Colour litColour = {})
 {
     const auto& p = pal();
+    const auto lamp = litColour.getAlpha() > 0 ? litColour : p.accent;
     const auto corner = juce::jmin (3.0f, r.getHeight() * 0.12f);
     g.setColour (Colours::black.withAlpha (0.55f));
     g.fillRoundedRectangle (r.translated (0.0f, 1.5f).expanded (1.0f), corner + 1.0f);
-    const auto top = lit ? p.accent.brighter (0.25f) : Colour (0xff9b9c9e).brighter (hover ? 0.12f : 0.0f);
-    const auto bottom = lit ? p.accent.darker (0.35f) : Colour (0xff4f5053);
+    const auto top = lit ? lamp.brighter (0.25f) : Colour (0xff9b9c9e).brighter (hover ? 0.12f : 0.0f);
+    const auto bottom = lit ? lamp.darker (0.35f) : Colour (0xff4f5053);
     g.setGradientFill (ColourGradient (top, 0.0f, r.getY(), bottom, 0.0f, r.getBottom(), false));
     g.fillRoundedRectangle (r, corner);
     const auto face = r.reduced (juce::jmax (2.0f, r.getHeight() * 0.12f));
@@ -400,7 +413,109 @@ inline void hwKey (juce::Graphics& g, Rectangle<float> r, bool lit, bool hover)
     g.drawLine (r.getX() + corner, r.getY() + 0.8f, r.getRight() - corner, r.getY() + 0.8f, 1.0f);
     g.setColour (Colour (0xff141414));
     g.drawRoundedRectangle (r, corner, 1.0f);
-    if (lit && ! reduced && p.bgTop.getBrightness() < 0.6f) bloom (g, r.getCentre(), r.getWidth() * 0.9f, p.accent, 0.16f); // (no lamp glow on a light faceplate)
+    if (lit && ! reduced && p.bgTop.getBrightness() < 0.6f) bloom (g, r.getCentre(), r.getWidth() * 0.9f, lamp, 0.16f); // (no lamp glow on a light faceplate)
+}
+
+// round tp172d (slice 8): an opto leveler's strip keys — gold caps, the lit one pale cream
+inline void goldKey (juce::Graphics& g, Rectangle<float> r, bool lit, bool hover)
+{
+    const auto corner = juce::jmin (2.5f, r.getHeight() * 0.12f);
+    g.setColour (Colours::black.withAlpha (0.6f));
+    g.fillRoundedRectangle (r.translated (0.0f, 1.2f).expanded (1.0f), corner + 1.0f);
+    const auto top = lit ? Colour (0xfffbf5d2) : Colour (0xffc9c196).brighter (hover ? 0.1f : 0.0f);
+    const auto bottom = lit ? Colour (0xffe2d699) : Colour (0xff8f8760);
+    g.setGradientFill (ColourGradient (top, 0.0f, r.getY(), bottom, 0.0f, r.getBottom(), false));
+    g.fillRoundedRectangle (r, corner);
+    if (lit && ! reduced)
+        bloom (g, r.getCentre(), r.getWidth() * 0.8f, Colour (0xfffff2b0), 0.18f);
+    g.setColour (Colours::white.withAlpha (lit ? 0.6f : 0.35f));
+    g.drawLine (r.getX() + corner, r.getY() + 0.8f, r.getRight() - corner, r.getY() + 0.8f, 1.0f);
+    g.setColour (Colour (0xff1a1810));
+    g.drawRoundedRectangle (r, corner, 1.0f);
+}
+
+// round tp172d (slice 8): a metal bat toggle — a hex nut on a washer, the chrome lever leaning up or down from it
+inline void batToggle (juce::Graphics& g, Rectangle<float> r, bool up, bool hover, bool enabled)
+{
+    const auto c = r.getCentre();
+    const auto n = juce::jmin (r.getWidth(), r.getHeight()) * 0.5f; // the nut's radius
+    // the washer
+    g.setColour (Colours::black.withAlpha (0.35f));
+    g.fillEllipse (Rectangle<float> (n * 2.5f, n * 2.5f).withCentre (c.translated (0.0f, n * 0.12f)));
+    g.setGradientFill (ColourGradient (Colour (0xffd4d6d8), c.x, c.y - n * 1.2f, Colour (0xff5c5f63), c.x, c.y + n * 1.2f, false));
+    g.fillEllipse (Rectangle<float> (n * 2.3f, n * 2.3f).withCentre (c));
+    // the hex nut
+    juce::Path hex;
+    for (int i = 0; i < 6; ++i)
+    {
+        const auto a = juce::MathConstants<float>::pi / 3.0f * (float) i + juce::MathConstants<float>::pi / 6.0f;
+        const Point<float> q { c.x + std::cos (a) * n * 0.95f, c.y + std::sin (a) * n * 0.95f };
+        if (i == 0) hex.startNewSubPath (q); else hex.lineTo (q);
+    }
+    hex.closeSubPath();
+    g.setGradientFill (ColourGradient (Colour (0xffeeeff0), c.x - n, c.y - n, Colour (0xff6d7075), c.x + n, c.y + n, false));
+    g.fillPath (hex);
+    g.setColour (Colour (0xff2a2b2d));
+    g.strokePath (hex, juce::PathStrokeType (1.0f));
+    // the lever: a tapered chrome bat from the nut's centre, its rounded tip `len` away (foreshortened: it leans out)
+    const auto d = up ? -1.0f : 1.0f;
+    const auto len = n * 1.55f;
+    const Point<float> tip { c.x + n * 0.18f, c.y + d * len };
+    const auto wBase = n * 0.42f, wTip = n * 0.62f;
+    juce::Path bat;
+    bat.startNewSubPath (c.x - wBase * 0.5f, c.y);
+    bat.lineTo (tip.x - wTip * 0.5f, tip.y);
+    bat.lineTo (tip.x + wTip * 0.5f, tip.y);
+    bat.lineTo (c.x + wBase * 0.5f, c.y);
+    bat.closeSubPath();
+    g.setColour (Colours::black.withAlpha (0.4f)); // its shadow on the plate
+    g.fillPath (bat, juce::AffineTransform::translation (n * 0.35f, n * 0.3f));
+    const auto hi = enabled ? Colour (0xfff7f8f9).brighter (hover ? 0.1f : 0.0f) : Colour (0xffb8babc);
+    g.setGradientFill (ColourGradient (Colour (0xff6a6d72), tip.x - wTip * 0.5f, 0.0f, hi, tip.x + wTip * 0.05f, 0.0f, false));
+    g.fillPath (bat);
+    g.setGradientFill (ColourGradient (hi, tip.x, tip.y - wTip * 0.4f, Colour (0xff7d8086), tip.x, tip.y + wTip * 0.4f, false));
+    g.fillEllipse (Rectangle<float> (wTip, wTip * 0.85f).withCentre (tip));
+    g.setColour (Colour (0xff2a2b2d).withAlpha (0.8f));
+    g.drawEllipse (Rectangle<float> (wTip, wTip * 0.85f).withCentre (tip), 0.8f);
+    g.setColour (Colour (0xff3a3c40));
+    g.fillEllipse (Rectangle<float> (wBase, wBase).withCentre (c));
+}
+
+// round tp172d (slice 8): a selector — a glossy black pointer knob with a white line, turned to `angle`
+inline void selectorKnob (juce::Graphics& g, Rectangle<float> r, float angle, bool hover, bool enabled)
+{
+    const auto c = r.getCentre();
+    const auto rad = juce::jmin (r.getWidth(), r.getHeight()) * 0.5f;
+    g.setColour (Colours::black.withAlpha (0.45f));
+    g.fillEllipse (Rectangle<float> (rad * 2.0f, rad * 2.0f).withCentre (c.translated (rad * 0.12f, rad * 0.22f)));
+    g.setGradientFill (ColourGradient (Colour (0xff3c3d40).brighter (hover ? 0.15f : 0.0f), c.x - rad * 0.4f, c.y - rad * 0.6f,
+                                       Colour (0xff050506), c.x + rad * 0.5f, c.y + rad, true));
+    g.fillEllipse (Rectangle<float> (rad * 2.0f, rad * 2.0f).withCentre (c));
+    g.setColour (Colours::white.withAlpha (0.22f)); // the gloss
+    g.fillEllipse (Rectangle<float> (rad * 0.9f, rad * 0.5f).withCentre (c.translated (-rad * 0.25f, -rad * 0.45f)));
+    const Point<float> dir { std::sin (angle), -std::cos (angle) };
+    g.setColour (enabled ? Colours::white : Colour (0xff9a9c9e));
+    g.drawLine ({ c + dir * rad * 0.15f, c + dir * rad * 0.92f }, juce::jmax (1.6f, rad * 0.12f));
+}
+
+// round tp172d: a pod whose four sides bow outwards (the hardware originals' rounded cut-outs), inside `a`
+inline juce::Path bowedRect (Rectangle<float> a, float corner, float bow)
+{
+    const auto bx = a.getWidth() * bow, by = a.getHeight() * bow * 0.5f;
+    const auto r = a.reduced (bx * 0.5f, by * 0.5f);
+    const auto c = juce::jmin (corner, r.getWidth() * 0.25f, r.getHeight() * 0.25f);
+    juce::Path p;
+    p.startNewSubPath (r.getX() + c, r.getY());
+    p.quadraticTo (r.getCentreX(), r.getY() - by, r.getRight() - c, r.getY());
+    p.quadraticTo (r.getRight(), r.getY(), r.getRight(), r.getY() + c);
+    p.quadraticTo (r.getRight() + bx, r.getCentreY(), r.getRight(), r.getBottom() - c);
+    p.quadraticTo (r.getRight(), r.getBottom(), r.getRight() - c, r.getBottom());
+    p.quadraticTo (r.getCentreX(), r.getBottom() + by, r.getX() + c, r.getBottom());
+    p.quadraticTo (r.getX(), r.getBottom(), r.getX(), r.getBottom() - c);
+    p.quadraticTo (r.getX() - bx, r.getCentreY(), r.getX(), r.getY() + c);
+    p.quadraticTo (r.getX(), r.getY(), r.getX() + c, r.getY());
+    p.closeSubPath();
+    return p;
 }
 
 inline bool section (juce::Graphics& g, Rectangle<float> a, float corner, bool raised, Colour)
@@ -416,6 +531,18 @@ inline bool section (juce::Graphics& g, Rectangle<float> a, float corner, bool r
             g.setGradientFill (ColourGradient (fill.brighter (0.08f), 0.0f, a.getY(), fill.darker (0.12f), 0.0f, a.getBottom(), false));
         else
             g.setColour (fill);
+        if (t.bow > 0.0f && ! raised) // round tp172d: the bowed pods
+        {
+            const auto shape = bowedRect (a.reduced (t.rimWidth * 0.5f), corner, t.bow);
+            g.fillPath (shape);
+            if (t.sectionDeco != nullptr) t.sectionDeco (g, a, corner);
+            if (t.rimWidth > 0.0f)
+            {
+                g.setColour (p.rim);
+                g.strokePath (shape, juce::PathStrokeType (t.rimWidth));
+            }
+            return true;
+        }
         g.fillRoundedRectangle (a, corner);
         if (t.sectionDeco != nullptr) t.sectionDeco (g, a, corner);
         if (t.rimWidth > 0.0f)
@@ -621,7 +748,8 @@ inline void knob (juce::Graphics& g, Rectangle<float> area, const KnobLook& k)
             }
         }
         const auto disc = Rectangle<float> (discR * 2.0f, discR * 2.0f).withCentre (c);
-        const auto capCol = k.enabled ? p.capTop.brighter (hover * 0.12f) : p.capTop.withMultipliedSaturation (0.3f);
+        const auto capBase = knobTint.isTransparent() ? p.capTop : knobTint; // round tp172d: a shade per knob (Halo's row)
+        const auto capCol = k.enabled ? capBase.brighter (hover * 0.12f) : capBase.withMultipliedSaturation (0.3f);
         g.setColour (capCol);
         g.fillEllipse (disc);
         if (p.capBottom != p.capTop)
@@ -748,7 +876,25 @@ inline void knob (juce::Graphics& g, Rectangle<float> area, const KnobLook& k)
         {
             const auto ang = arcStart + arcRange * (float) i / (float) (n - 1);
             const Point<float> d { std::sin (ang), -std::cos (ang) };
-            g.drawLine ({ c + d * (size * 0.5f - 0.5f), c + d * (size * 0.5f - (i % 5 == 0 ? 4.5f : 2.5f)) }, th0.boldTicks ? 1.6f : 1.0f);
+            if (th0.dotTicks) // round tp172d: a dot per mark
+            {
+                const auto dot = juce::jmax (2.0f, size * 0.045f);
+                g.fillEllipse (Rectangle<float> (dot, dot).withCentre (c + d * (size * 0.5f - dot * 0.5f)));
+            }
+            else
+                g.drawLine ({ c + d * (size * 0.5f - 0.5f), c + d * (size * 0.5f - (i % 5 == 0 ? 4.5f : 2.5f)) }, th0.boldTicks ? 1.6f : 1.0f);
+        }
+        if (th0.numerals && size >= 70.0f) // round tp172d (look slice): the printed 0 … 10
+        {
+            g.setFont (juce::FontOptions (juce::jmax (8.0f, size * 0.11f), juce::Font::bold));
+            const auto litNumeral = th0.numeralLit && k.enabled ? juce::roundToInt (value * 10.0f) : -1; // (slice 8: the nearest one in red)
+            for (int i = 0; i <= 10; ++i)
+            {
+                g.setColour (i == litNumeral ? p.accent : (th0.boldTicks ? p.accent2.withAlpha (0.7f) : p.title.withAlpha (0.65f)));
+                const auto ang = arcStart + arcRange * (float) i / 10.0f;
+                const auto q = c + Point<float> { std::sin (ang), -std::cos (ang) } * (size * 0.5f + size * 0.09f);
+                g.drawText (juce::String (i * th0.numeralStep), Rectangle<float> (size * (th0.numeralStep > 1 ? 0.26f : 0.16f), size * 0.12f).withCentre (q), juce::Justification::centred, false);
+            }
         }
     }
     const auto r = scale ? ringR - 4.0f : ringR;
@@ -772,6 +918,35 @@ inline void knob (juce::Graphics& g, Rectangle<float> area, const KnobLook& k)
                 g.setColour (lit);
             g.strokePath (v, stroke (t));
         }
+    }
+
+    // round tp172d (slice 8): a chicken-head pointer knob (an opto leveler's HI FREQ): a round base, a tapered bar across it
+    if (th0.pointerKnobTint.getAlpha() > 0 && knobTint == th0.pointerKnobTint)
+    {
+        const auto base = juce::jmax (3.0f, r);
+        const auto cream = k.enabled ? th0.pointerKnobTint.brighter (hover * 0.08f) : th0.pointerKnobTint.withMultipliedSaturation (0.3f);
+        g.setColour (Colours::black.withAlpha (0.45f));
+        g.fillEllipse (Rectangle<float> (base * 1.3f, base * 1.3f).withCentre (c.translated (base * 0.08f, base * 0.14f)));
+        g.setGradientFill (ColourGradient (cream.brighter (0.15f), c.x, c.y - base * 0.6f, cream.darker (0.35f), c.x, c.y + base * 0.6f, false));
+        g.fillEllipse (Rectangle<float> (base * 1.2f, base * 1.2f).withCentre (c));
+        juce::Path bar; // the head: long and pointed at the value, short and round behind
+        const auto w = base * 0.42f;
+        bar.startNewSubPath (0.0f, -base * 0.98f);
+        bar.lineTo (w * 0.5f, -base * 0.55f);
+        bar.lineTo (w * 0.55f, base * 0.55f);
+        bar.quadraticTo (0.0f, base * 0.8f, -w * 0.55f, base * 0.55f);
+        bar.lineTo (-w * 0.5f, -base * 0.55f);
+        bar.closeSubPath();
+        bar.applyTransform (juce::AffineTransform::rotation (to).translated (c));
+        g.setColour (Colours::black.withAlpha (0.4f));
+        g.fillPath (bar, juce::AffineTransform::translation (base * 0.06f, base * 0.12f));
+        g.setGradientFill (ColourGradient (cream.brighter (0.25f), c.x - base * 0.5f, c.y - base * 0.5f, cream.darker (0.25f), c.x + base * 0.5f, c.y + base * 0.5f, false));
+        g.fillPath (bar);
+        g.setColour (Colour (0xff3a3328).withAlpha (0.7f));
+        g.strokePath (bar, juce::PathStrokeType (0.9f));
+        g.setColour (Colour (0xff2a2520));
+        g.drawLine ({ c + dir * base * 0.2f, c + dir * base * 0.88f }, juce::jmax (1.2f, base * 0.07f)); // its index line
+        return;
     }
 
     // the cap (round tp172c: without the arc it fills the scale, a console knob)
@@ -1020,8 +1195,17 @@ juce::Colour valueColour (bool hot)
     return hot ? theme::colour::textPrimary : juce::Colour (0xffd3d6dd);
 }
 float captionScale() { return currentStyle == Style::themed ? artkit::th().captionScale : 1.0f; }
+bool lowerCaptions() { return currentStyle == Style::themed && artkit::th().lowerCaptions; }
+bool ledReadouts() { return currentStyle == Style::themed && artkit::th().ledReadouts; }
+bool titleRules() { return currentStyle == Style::themed && artkit::th().titleRules; }
+bool vuBezel() { return currentStyle == Style::themed && (artkit::th().vuBezel || artkit::th().vuBezelDark); }
+bool vuBezelDark() { return currentStyle == Style::themed && artkit::th().vuBezelDark; }
+bool goldKeys() { return currentStyle == Style::themed && artkit::th().goldKeys && artkit::onDarkFill; }
+void goldKey (juce::Graphics& g, juce::Rectangle<float> r, bool lit, bool hover) { artkit::goldKey (g, r, lit, hover); }
+void batToggle (juce::Graphics& g, juce::Rectangle<float> r, bool up, bool hover, bool enabled) { artkit::batToggle (g, r, up, hover, enabled); }
+void selectorKnob (juce::Graphics& g, juce::Rectangle<float> r, float angle, bool hover, bool enabled) { artkit::selectorKnob (g, r, angle, hover, enabled); }
 bool hwKeys() { return currentStyle == Style::themed && artkit::th().hwKeys; }
-void hwKey (juce::Graphics& g, juce::Rectangle<float> r, bool lit, bool hover) { artkit::hwKey (g, r, lit, hover); }
+void hwKey (juce::Graphics& g, juce::Rectangle<float> r, bool lit, bool hover, juce::Colour litColour) { artkit::hwKey (g, r, lit, hover, litColour); }
 void setSectionOrdinal (int ordinal) { artkit::sectionOrdinal = ordinal; }
 void setOnDarkFill (bool dark) { artkit::onDarkFill = dark; }
 bool sectionFillIsDark (int ordinal)
