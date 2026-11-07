@@ -7725,3 +7725,4 @@ countries: it ch sm
 "Export as score sheet..." = "Esporta come spartito..."
 "Which controller to import?" = "Quale controller importare?"
 "Adds the file's time signature to the pattern's markers" = "Aggiunge il tempo del file ai marcatori del pattern"
+"Scores" = "Partiture"

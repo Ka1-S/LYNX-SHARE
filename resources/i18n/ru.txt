@@ -7725,3 +7725,4 @@ countries: ru by kz
 "Export as score sheet..." = "Экспорт как партитура..."
 "Which controller to import?" = "Какой контроллер импортировать?"
 "Adds the file's time signature to the pattern's markers" = "Добавляет размер из файла в маркеры паттерна"
+"Scores" = "Партитуры"

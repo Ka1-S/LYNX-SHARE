@@ -7808,3 +7808,4 @@ countries: br
 "Export as score sheet..." = "Exportar como partitura..."
 "Which controller to import?" = "Qual controlador importar?"
 "Adds the file's time signature to the pattern's markers" = "Adiciona a fórmula de compasso do arquivo aos marcadores do pattern"
+"Scores" = "Partituras"

@@ -7725,3 +7725,4 @@ countries: id
 "Export as score sheet..." = "Ekspor sebagai lembar skor..."
 "Which controller to import?" = "Kontroler mana yang diimpor?"
 "Adds the file's time signature to the pattern's markers" = "Menambahkan birama file ke penanda pola"
+"Scores" = "Skor"

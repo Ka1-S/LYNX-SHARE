@@ -7725,3 +7725,4 @@ countries: nl be
 "Export as score sheet..." = "Exporteren als partituur..."
 "Which controller to import?" = "Welke controller importeren?"
 "Adds the file's time signature to the pattern's markers" = "Voegt de maatsoort van het bestand toe aan de markers van het patroon"
+"Scores" = "Partituren"

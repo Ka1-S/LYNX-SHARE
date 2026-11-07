@@ -7725,3 +7725,4 @@ countries: tr
 "Export as score sheet..." = "Nota kâğıdı olarak dışa aktar..."
 "Which controller to import?" = "Hangi kontrolcü içe aktarılsın?"
 "Adds the file's time signature to the pattern's markers" = "Dosyanın ölçü birimini desenin işaretçilerine ekler"
+"Scores" = "Skorlar"

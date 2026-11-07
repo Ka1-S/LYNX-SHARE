@@ -7725,3 +7725,4 @@ countries: tw hk mo
 "Export as score sheet..." = "匯出為樂譜..."
 "Which controller to import?" = "匯入哪個控制器?"
 "Adds the file's time signature to the pattern's markers" = "將檔案的拍號加入模式的標記"
+"Scores" = "樂譜"

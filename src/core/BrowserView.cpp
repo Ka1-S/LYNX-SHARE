@@ -142,4 +142,41 @@ View View::fromText (const std::string& text)
     }
     return v;
 }
+MergedListing mergeListings (const std::vector<Listing>& listings)
+{
+    auto lower = [] (std::string s) {
+        for (auto& c : s)
+            c = (char) std::tolower ((unsigned char) c);
+        return s;
+    };
+    MergedListing out;
+    auto add = [&] (std::vector<MergedEntry>& entries, const std::vector<std::string>& names, int from, bool merge) {
+        for (const auto& name : names)
+        {
+            const auto key = lower (name);
+            const auto it = std::find_if (entries.begin(), entries.end(), [&] (const MergedEntry& e) { return lower (e.name) == key; });
+            if (it == entries.end())
+                entries.push_back ({ name, from, {} });
+            else if (merge && it->from != from && std::find (it->also.begin(), it->also.end(), from) == it->also.end())
+                it->also.push_back (from);
+        }
+    };
+    for (int i = 0; i < (int) listings.size(); ++i)
+    {
+        add (out.folders, listings[(std::size_t) i].folders, i, true);
+        add (out.files, listings[(std::size_t) i].files, i, false);
+    }
+    return out;
+}
+bool migrateMergedRoot (View& view, const std::string& rootId, const std::vector<std::string>& formerIds)
+{
+    bool changed = false;
+    for (const auto& id : formerIds)
+        if (id != rootId && view.hidden.erase (id) > 0)
+        {
+            view.hidden.insert (rootId);
+            changed = true;
+        }
+    return changed;
+}
 } // namespace lynx::browserview

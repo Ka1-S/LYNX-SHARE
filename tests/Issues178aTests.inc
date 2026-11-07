@@ -497,3 +497,53 @@ TEST (issues178a_event_lane_takes_the_chosen_controller)
     o.controller = 74;
     CHECK (midiimport::controllerEvents (midi, o).empty()); // FL then empties the lane
 }
+
+// FL's Browser shows one "Scores" root for Data\Patches\Scores and the user's Presets\Scores: a folder in both is one
+// folder (its other copies merged in turn), a file in both takes the first folder's, case doesn't matter.
+TEST (issues178a_merged_roots_list_the_union_of_their_folders)
+{
+    browserview::Listing user, data;
+    user.folders = { "Automation" };
+    user.files = { "Mine.fsc", "Randomness.fsc" };
+    data.folders = { "Arpeggiator", "automation", "Chopping" };
+    data.files = { "4 steps.fsc", "randomness.FSC" };
+
+    const auto m = browserview::mergeListings ({ user, data });
+    CHECK (m.folders.size() == 3);
+    CHECK (m.folders[0].name == "Automation" && m.folders[0].from == 0);
+    CHECK (m.folders[0].also == std::vector<int> { 1 });
+    CHECK (m.folders[1].name == "Arpeggiator" && m.folders[1].from == 1 && m.folders[1].also.empty());
+    CHECK (m.folders[2].name == "Chopping" && m.folders[2].from == 1);
+    CHECK (m.files.size() == 3);
+    CHECK (m.files[1].name == "Randomness.fsc" && m.files[1].from == 0 && m.files[1].also.empty());
+    CHECK (m.files[2].name == "4 steps.fsc" && m.files[2].from == 1);
+
+    // one folder alone lists as it is; none lists nothing
+    CHECK (browserview::mergeListings ({ data }).folders.size() == 3);
+    CHECK (browserview::mergeListings ({}).files.empty());
+}
+
+// Settings from before the merged roots: a user who hid "FL MIDI" (Data\Patches\Scores) or "Mixer presets (FL)"
+// doesn't see the merged root appear; the old id goes, so showing the root again sticks.
+TEST (issues178a_merged_roots_keep_a_hidden_old_root_hidden)
+{
+    const std::string user = "C:/Users/u/Documents/Image-Line/FL Studio/Presets/Scores";
+    const std::string data = "C:/Program Files/Image-Line/FL Studio 2026/Data/Patches/Scores";
+
+    browserview::View v;
+    v.setShown (data, false);
+    CHECK (browserview::migrateMergedRoot (v, user, { data }));
+    CHECK (! v.shows (user) && v.hidden.count (data) == 0);
+
+    v.setShown (user, true); // shown again by the user: the next start keeps it
+    CHECK (! browserview::migrateMergedRoot (v, user, { data }));
+    CHECK (v.shows (user));
+
+    browserview::View untouched; // nothing hidden: nothing changes
+    CHECK (! browserview::migrateMergedRoot (untouched, user, { data }) && untouched.hidden.empty());
+
+    // FL not installed or no user folder: the root is the one folder there is, nothing merged
+    browserview::View alone;
+    alone.setShown (data, false);
+    CHECK (! browserview::migrateMergedRoot (alone, data, {}) && ! alone.shows (data));
+}
