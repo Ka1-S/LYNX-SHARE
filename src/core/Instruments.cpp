@@ -2576,8 +2576,8 @@ public:
         v.pitchMul = pr.pitch != 0.0f ? std::exp2 ((double) pr.pitch / 1200.0) : 1.0;
 
         const auto first = pr.first;
-        const auto cx = ((float) S.modX * 0.00390625f + 0.0f) + pr.cut;
-        const auto cy = ((float) S.modY * 0.00390625f + 0.0f) + pr.res;
+        const auto cx = ((float) S.modX * 0.00390625f + pr.noteCut) + pr.cut; // + the note's Init.FCut (issue #63)
+        const auto cy = ((float) S.modY * 0.00390625f + pr.noteRes) + pr.res;
         if (pr.kind == 0)
         {
             flvp::coefFast (cx, cy, pr.fc, pr.fq, S.rateRatio);
