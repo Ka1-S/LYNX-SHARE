@@ -5002,7 +5002,12 @@ private:
         backupTest->ui = ui;
         backupTest->everyMs = cli[at + 1].getDoubleValue() * 1000.0;
         backupTest->startMs = backupTest->lastForcedMs = juce::Time::getMillisecondCounterHiRes();
-        engine->editSong ([] (lynx::Song&) {}); // (the project counts as changed: a backup has something to write)
+        // (the project counts as changed, so a backup has something to write; the Master's fader is down, so a long run
+        // makes no sound: everything else is processed as usual)
+        engine->editSong ([] (lynx::Song& s) {
+            if (! s.mixer.empty())
+                s.mixer[0].volume = 0.0f;
+        });
         backupTest->startTimer (100);
     }
 
