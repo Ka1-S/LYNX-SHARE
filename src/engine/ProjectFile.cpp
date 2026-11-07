@@ -1,5 +1,6 @@
 #include "engine/ProjectFile.h"
 
+#include "core/ClipLauncher.h"
 #include "core/PatternBlocks.h"
 #include "core/SessionIds.h"
 
@@ -1170,6 +1171,116 @@ std::vector<Clip> clipsFromVar (const juce::var& v, const Song& song)
     return out;
 }
 
+// The clip grid (round 181a). One object per clip: its settings, and the Clip in the form the Playlist's clips are saved in.
+juce::var clipGridToVar (const ClipGrid& grid)
+{
+    auto root = std::make_unique<juce::DynamicObject>();
+    root->setProperty ("quant", (int) grid.globalQuant);
+    if (grid.backOnStop)
+        root->setProperty ("backOnStop", true);
+    if (! grid.followActions)
+        root->setProperty ("followActions", false);
+    juce::Array<juce::var> scenes;
+    for (const auto& scene : grid.scenes)
+    {
+        auto o = std::make_unique<juce::DynamicObject>();
+        if (! scene.name.empty())
+            o->setProperty ("name", str (scene.name));
+        if (scene.colour != 0)
+            o->setProperty ("colour", (juce::int64) scene.colour);
+        if (scene.tempo > 0.0)
+            o->setProperty ("tempo", scene.tempo);
+        if (scene.beatsPerBar > 0)
+            o->setProperty ("beatsPerBar", scene.beatsPerBar);
+        scenes.add (juce::var (o.release()));
+    }
+    root->setProperty ("scenes", scenes);
+    juce::Array<juce::var> clips;
+    for (const auto& clip : grid.clips)
+    {
+        if (clip.gridSlot < 0 || clip.gridSlot >= (int) grid.slots.size())
+            continue;
+        const auto& slot = grid.slots[(std::size_t) clip.gridSlot];
+        auto o = std::make_unique<juce::DynamicObject>();
+        o->setProperty ("scene", slot.scene);
+        if (! slot.name.empty())
+            o->setProperty ("name", str (slot.name));
+        if (slot.colour != 0)
+            o->setProperty ("colour", (juce::int64) slot.colour);
+        if (slot.mode != LaunchMode::trigger)
+            o->setProperty ("mode", (int) slot.mode);
+        if (slot.quant != LaunchQuant::global)
+            o->setProperty ("quant", (int) slot.quant);
+        if (slot.legato)
+            o->setProperty ("legato", true);
+        if (! slot.loop)
+            o->setProperty ("loop", false);
+        if (slot.noStop)
+            o->setProperty ("noStop", true);
+        if (slot.follow != ClipFollow {})
+        {
+            const auto& f = slot.follow;
+            juce::Array<juce::var> follow { f.enabled, (int) f.a, (int) f.b, f.chanceA, f.chanceB, f.jumpA, f.jumpB, f.linked, f.iterations, (juce::int64) f.ticks };
+            o->setProperty ("follow", follow);
+        }
+        o->setProperty ("clip", clipsToVar ({ clip }));
+        clips.add (juce::var (o.release()));
+    }
+    root->setProperty ("clips", clips);
+    return juce::var (root.release());
+}
+
+std::optional<ClipGrid> clipGridFromVar (const juce::var& v, const Song& song)
+{
+    if (! v.isObject())
+        return std::nullopt;
+    ClipGrid grid;
+    grid.globalQuant = (LaunchQuant) juce::jlimit (1, (int) LaunchQuant::thirtySecond, (int) v.getProperty ("quant", (int) LaunchQuant::bar));
+    grid.backOnStop = (bool) v.getProperty ("backOnStop", false);
+    grid.followActions = (bool) v.getProperty ("followActions", true);
+    if (const auto* scenes = v["scenes"].getArray())
+        for (const auto& o : *scenes)
+        {
+            ClipGridScene scene;
+            scene.name = o["name"].toString().toStdString();
+            scene.colour = (std::uint32_t) (juce::int64) o.getProperty ("colour", 0);
+            scene.tempo = (double) o.getProperty ("tempo", 0.0);
+            scene.beatsPerBar = (int) o.getProperty ("beatsPerBar", 0);
+            grid.scenes.push_back (std::move (scene));
+        }
+    if (const auto* clips = v["clips"].getArray())
+        for (const auto& o : *clips)
+        {
+            auto read = clipsFromVar (o["clip"], song);
+            if (read.size() != 1 || (int) grid.slots.size() >= launcher::maxSlots)
+                continue;
+            ClipGridSlot slot;
+            slot.scene = juce::jlimit (0, launcher::maxScenes - 1, (int) o["scene"]);
+            slot.name = o["name"].toString().toStdString();
+            slot.colour = (std::uint32_t) (juce::int64) o.getProperty ("colour", 0);
+            slot.mode = (LaunchMode) juce::jlimit (0, (int) LaunchMode::repeat, (int) o.getProperty ("mode", 0));
+            slot.quant = (LaunchQuant) juce::jlimit (0, (int) LaunchQuant::thirtySecond, (int) o.getProperty ("quant", 0));
+            slot.legato = (bool) o.getProperty ("legato", false);
+            slot.loop = (bool) o.getProperty ("loop", true);
+            slot.noStop = (bool) o.getProperty ("noStop", false);
+            if (const auto f = o["follow"]; f.isArray() && f.size() >= 10)
+            {
+                const auto kind = [] (const juce::var& k) { return (FollowKind) juce::jlimit (0, (int) FollowKind::jump, (int) k); };
+                slot.follow = { (bool) f[0], kind (f[1]), kind (f[2]), (int) f[3], (int) f[4], (int) f[5], (int) f[6], (bool) f[7], juce::jmax (1, (int) f[8]), juce::jmax<juce::int64> (1, (juce::int64) f[9]) };
+            }
+            auto& clip = read[0];
+            clip.start = 0;
+            clip.gridSlot = (std::int16_t) grid.slots.size();
+            while ((int) grid.scenes.size() <= slot.scene)
+                grid.scenes.emplace_back();
+            grid.slots.push_back (std::move (slot));
+            grid.clips.push_back (clip);
+        }
+    if (grid.scenes.empty())
+        grid.scenes.emplace_back();
+    return grid;
+}
+
 juce::var channelToVar (const ChannelDef& c)
 {
     auto o = std::make_unique<juce::DynamicObject>();
@@ -2283,6 +2394,8 @@ juce::String toJson (const Song& song)
     }
 
     root->setProperty ("playlist", clipsToVar (song.playlist));
+    if (song.clipGrid) // the Clip-launch workflow's grid (round 181a): only in a project that has one
+        root->setProperty ("clipGrid", clipGridToVar (*song.clipGrid));
     if (song.patternBlocksOn)
         root->setProperty ("patternBlocks", true);
     if (! song.blocks.empty())
@@ -2641,6 +2754,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error)
         }
 
     song.playlist = clipsFromVar (root["playlist"], song);
+    song.clipGrid = clipGridFromVar (root["clipGrid"], song);
     song.patternBlocksOn = (bool) root.getProperty ("patternBlocks", false);
     song.blocks = blocksFromVar (root["blocks"], song);
 

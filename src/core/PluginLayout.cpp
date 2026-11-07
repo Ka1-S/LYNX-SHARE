@@ -2760,6 +2760,9 @@ Layout prismMultiband()
     // round 152: the measured model's revision (gain-stage attack, narrow Dynamic-phase bands, 0.8-octave minimum)
     v.push_back (label (620, 736, 76, 22, TR_NOOP ("Model")));
     v.push_back (tabs (700, 736, 180, 22, "Revision", TR_NOOP ("Round 150|Round 152")));
+    // round tp172b6: Audition, off or the band whose detector signal replaces the output (value = band / 6)
+    v.push_back (label (16, 736, 76, 22, TR_NOOP ("Audition")));
+    v.push_back (menuOf (96, 736, 180, 22, "Audition", nullptr, "Off|1|2|3|4|5|6"));
     l.height = 766;
     return l;
 }
