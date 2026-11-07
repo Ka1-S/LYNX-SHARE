@@ -17,6 +17,7 @@
 //   - flatten: the comp stays, the lanes go.
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "core/Song.h"
@@ -71,6 +72,16 @@ void removeCrossfades (Song& song, int compTrack);
 // Audition (Ableton's "Audition Take Lane"): `lane` plays instead of its comp track; −1 (or a track that is no lane):
 // off. Only one lane at a time. Changes nothing saved.
 void setAudition (Song& song, int lane);
+
+// The audition follows a row, not a take: an edit that moves rows ends it. What an edit has to compare, taken before it
+// (empty without an audition, so a song that auditions nothing costs a compare).
+struct AuditionedTrack
+{
+    int lane = -1;
+    std::string name;
+};
+AuditionedTrack auditionedTrack (const Song& song);
+void checkAudition (Song& song, const AuditionedTrack& before);
 
 // Flatten: the comp track's clips stay as they are, the lanes (and their clips) are removed, in every arrangement.
 bool flatten (Song& song, int compTrack);

@@ -333,6 +333,7 @@ Song makeRenderSong (const Song& original, const Options& o, std::int64_t tailTi
         patternblocks::expandSong (expanded.emplace (original));
     const Song& song = expanded ? *expanded : original;
     Song base = song;
+    base.auditionLane = base.auditionComp = -1; // an audition is for listening: an export renders what the song plays (round 177c)
     std::int64_t length = 0;
 
     if (o.range == Range::selection && hasSelection (song))

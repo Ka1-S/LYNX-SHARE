@@ -266,7 +266,7 @@ Tests (tests/Comp177Tests.inc, Rec163Tests.inc updated):
 - Option, record menu: **"After loop recording, only the last pass plays"** (`RecordOptions::lastLoopPassPlays`, saved in
   the UI settings, off): exactly round 163's layout, including dropping a final pass up to a 1/16 note long.
 - **"Comp these takes"** (Playlist track menu on a group, `comp::compTakes`, one undo): inserts one comp track above the
-  group, the only time tracks move. The group's tracks become lanes (audio muted, unfolded, "<name> (take N)"; <name> is the header's, else the insert's), and the comp
+  group, the only time tracks move. The group's tracks become lanes (audio muted, unfolded, "<name> (take N)"; <name> is the header's, else "Track N"), and the comp
   plays the last pass. A partial last pass gives a comp only that long; the rest is swiped in.
 
 Still different from FL, on purpose or left as shipped:
@@ -388,6 +388,63 @@ automation clips from 14 px wide, drawn over the veil so that it stays readable,
 a plain X: no FL artwork is used. Painting cost for unmuted clips is unchanged.
 
 The 14 px cutoff has **no FL evidence below about 36 px**, FL's narrowest clip in these shots: narrower LYNX clips show no X and rely on the dimming. The neutral grey of the muted waveform is the theme's and stays (FL's is blue-grey).
+## 11. Comping UI (slice 177c-2)
+
+FL has no comp UI (§2), so this follows Ableton's lanes and Logic's Quick Swipe, the favourite in §4.
+
+| Piece | Ableton Live | Logic | LYNX |
+|---|---|---|---|
+| Swipe | Draw mode, or selection + Enter | Normal Pointer | Normal tool. A drag on a lane clip's **body** swipes; its title still moves it and its edges still resize |
+| Used parts | Highlighted, the rest desaturated | Highlighted | The used part stays undimmed with an accent bar along its foot; the rest stays dimmed with the X |
+| Audition | T or speaker button, one lane | — | Speaker button on the lane header, one lane, no undo entry, not saved |
+| Crossfade | 4 ms in Settings › Record | Per comp | 5 ms by default, Project settings › Comp crossfade, 0 to 100 ms, re-applied to every comp in one undo step |
+| Flatten | None (consolidate) | Flatten | Track menu, "Flatten comp" |
+
+**Best way?** Swiping with the normal tool costs nothing to learn, but it takes the body drag away from moving a lane clip. The
+title keeps that, and only lanes of a comp track change. An ordinary group is not touched: `comp::isComp` must hold.
+
+Guards from §7:
+- The audition ends on any edit that moves or renames the auditioned row (`comp::checkAudition` in `AudioEngine::editSong`),
+  on undo and redo, and is ignored by a render (`exportopts::makeRenderSong`). It costs one compare when unused.
+- The used ranges are worked out once per paint, and only if a comp track exists.
+- Undo names: "Comp takes", "Swipe to comp", "Flatten comp".
+
+**Guarded GUI session [RUN]** (Windows build of `ffe735c99`, shots in `E:\lynx-work\comp177c\lx\ui\g-*.png`):
+- Blend: a fresh profile starts **off**; a profile with a pre-0.1.25 `ui-options.txt` (no `recordBlend`) starts **on**; one
+  click turns it off and writes `recordBlend=0`; after a restart it is still off.
+- Muted clips in the live window: X in the title, clip dimmed (`g-1`).
+- Track menu › Comp these takes; a drag across take 1's body shows the range while dragging and swipes it on release
+  (`g-4pair`): the comp gets three pieces, take 1's used part and take 3's two parts are lit.
+- The speaker on take 2 lights and the hint bar says what it does (`g-5c`). Flatten comp from the comp track's menu leaves
+  the comp's three clips and removes the lanes (`g-78`).
+- Undo (Ctrl+Alt+Z) reads "Undone: Flatten comp", then "Add clips" for the swipe (now "Swipe to comp", fixed after this
+  session; test `comp177_undo_labels_for_the_comp_steps`), then "Comp takes". The undo also ended the audition.
+- Project settings shows "Comp crossfade 5.0 ms" (`g-14`). Changing it was not tried in the GUI.
+- Not checked here: the audition by ear, and the crossfade curve in the live window (offscreen shot `u-crossfade.png`).
+
+## 12. `.flp` offsets with a real signal [RUN]
+
+The take WAV of `lx\rec2\off-project.lynx` replaced by seeded noise (`lx\offs\gen.py`; every range unique), four projects:
+each pass unmuted alone, and a comp of three one-bar pieces from passes 1, 3, 2. LYNX renders them (`--export`); FL renders
+LYNX's `.flp` exports with its own command line (`FL64.exe /R /Ewav`, no input, no registry edit). `cmp.py` finds where each
+render's audio comes from in the source; `d.py` compares the FL and LYNX renders.
+
+| Project | Source position FL plays (expected) | FL vs LYNX |
+|---|---|---|
+| pass 1 | 173 406 (173 400 + 6) | lag 0, correlation 0.99990, gain 0.9998 |
+| pass 2 | 461 406 (461 400 + 6) | lag 0, correlation 0.99929, gain 0.9998 |
+| pass 3 | 723 981 (723 975 + 6) | lag 0, correlation 0.99991, gain 0.9999 |
+| comp, 3 pieces | 125 400 / 797 400 / 605 400, exact | lag 0, correlation 0.99966, gain 0.9986 |
+
+The 6 samples are the passes' saved sub-tick fraction (0.24 tick), which both play; the comp pieces have none. Both start the
+audio at exactly 2.000 s. FL's audio ends about 280 samples (6 ms) after LYNX's, a tail not looked into. Renders at 44.1 kHz
+from a 48 kHz file, so the residual against the source (−16.5 dB) is the resampling, not an offset.
+
+**Coordinator review of 177c-2 (2026-11-07):**
+- Comp row names: "Track N comp" (N = the group header's row number, which the comp takes over), lanes "Track N (take K)",
+  in line with the take rows' "Track N". A header the user named gives "<name> comp" / "<name> (take K)". The insert's mixer
+  name is no longer used (the GUI session above still showed "Insert 6 comp"). Test: `comp177_comp_these_takes`.
+- **Open:** FL's render ends about 6 ms (280 samples at 44.1 kHz) after LYNX's on the same `.flp` (§12). Not looked into.
 
 ## 14. Living with round 180d's FL fades (merge of 2026-11-08)
 
