@@ -42,7 +42,7 @@ Tags: **[MANUAL]** published manual, **[DATA]** read from shipped sets, **[INFER
 | With record on, launched clips are logged into the arrangement | [MANUAL] Session View | `updateLauncherRecording`: a pass becomes a Playlist clip; clip property, mixer and tempo logging are not built |
 
 ## Notes at a takeover or a stop
-A note sounding when a track is taken or a clip stops ends there, including a note longer than its pattern, or crossing the pattern's wrap, in a clip that loops its pattern. Test: `grid181a_a_note_longer_than_its_pattern_does_not_hang` (7 checks failed before the fix). Limit that remains: `ScheduledNotes::shorten` works by channel and key, so another track playing the same key on the same channel ends with it.
+A note sounding when a track is taken or a clip stops ends there, including a note longer than its pattern, or crossing the pattern's wrap, in a clip that loops its pattern. Test: `grid181a_a_note_longer_than_its_pattern_does_not_hang` (7 checks failed before the fix). Known limit: `ScheduledNotes::shorten` works by channel and key, so another track playing the same key on the same channel ends with it. Heard only when two tracks play one channel's same key at once. If a user can hear this in normal use, the next slice tags notes per track.
 
 ## Layout style (slice N6)
 Settings > General > Workflow and View > Layout style: "Pattern workflow (default)" or "Clip-launch workflow". Stored in the UI settings as `clipLaunchWorkflow=0/1`; absent means Pattern.
