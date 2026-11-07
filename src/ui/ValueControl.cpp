@@ -237,6 +237,17 @@ controls::WheelScrollLatch& wheelLatch() noexcept
 void noteWheelScroll() noexcept { wheelLatch().scrolled (juce::Time::getMillisecondCounterHiRes()); }
 bool wheelScrolling() noexcept { return wheelLatch().scrolling (juce::Time::getMillisecondCounterHiRes()); }
 
+double wheelNotchSize() noexcept
+{
+   #if JUCE_WINDOWS
+    return 120.0 * 0.5 / 256.0;
+   #elif JUCE_LINUX || JUCE_BSD
+    return 50.0 / 256.0;
+   #else
+    return 0.12;
+   #endif
+}
+
 std::optional<double> wheelValue (double value, const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel, const ValueSpec& spec)
 {
     const auto delta = std::abs (wheel.deltaY) >= std::abs (wheel.deltaX) ? wheel.deltaY : -wheel.deltaX;
@@ -244,14 +255,7 @@ std::optional<double> wheelValue (double value, const juce::MouseEvent& e, const
     if (delta == 0.0f || wheelScrolling())
         return std::nullopt;
 
-   #if JUCE_WINDOWS
-    constexpr double notchSize = 120.0 * 0.5 / 256.0;
-   #elif JUCE_LINUX || JUCE_BSD
-    constexpr double notchSize = 50.0 / 256.0;
-   #else
-    constexpr double notchSize = 0.12;
-   #endif
-    const auto notches = (wheel.isReversed ? -1.0 : 1.0) * controls::wheelNotches (delta, notchSize);
+    const auto notches = (wheel.isReversed ? -1.0 : 1.0) * controls::wheelNotches (delta, wheelNotchSize());
     reportTweak (spec);
 
     if (spec.wheelPerNotch > 0.0)
