@@ -522,6 +522,147 @@ inline void canvasKiln (juce::Graphics& g, Rectangle<float> a, bool display)
     vignette (g, mod, 0.3f);
 }
 
+// === Fret Channel (guitar / bass channel strip role, round tp172c8): a mid-grey brushed panel between near-black input /
+// output columns, darker recessed sections (phase correction, EQ, comp, drive), teal read-out screens, colour-coded caps
+// (blue mid band, red high gain and drive, silver trims)
+inline void canvasFret (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    vfill (g, a, Colour (0xff6a6c70), Colour (0xff505256));
+    if (display) return;
+    const auto sx = a.getWidth() / 976.0f, sy = a.getHeight() / 540.0f;
+    brushedLines (g, a, 225, 0.03f);
+    for (const auto col : { Rectangle<float> (a.getX(), a.getY(), 100.0f * sx, a.getHeight()),
+                            Rectangle<float> (a.getRight() - 100.0f * sx, a.getY(), 100.0f * sx, a.getHeight()) })
+    {
+        vfill (g, col, Colour (0xff35363a), Colour (0xff26272a));
+        g.setColour (Colour (0xff0f1012));
+        g.fillRoundedRectangle (Rectangle<float> (col.getX() + 20.0f * sx, col.getY() + 50.0f * sy, 60.0f * sx, 310.0f * sy), 3.0f);
+    }
+    for (const auto r : { Rectangle<float> (118.0f, 160.0f, 168.0f, 190.0f), Rectangle<float> (300.0f, 160.0f, 170.0f, 190.0f),
+                          Rectangle<float> (560.0f, 110.0f, 150.0f, 140.0f), Rectangle<float> (204.0f, 368.0f, 92.0f, 166.0f),
+                          Rectangle<float> (556.0f, 368.0f, 232.0f, 166.0f) })
+    {
+        const auto rr = Rectangle<float> (a.getX() + r.getX() * sx, a.getY() + r.getY() * sy, r.getWidth() * sx, r.getHeight() * sy);
+        g.setColour (Colour (0xff47494d));
+        g.fillRoundedRectangle (rr, 4.0f);
+    }
+    g.setColour (Colour (0xff0d2622));
+    g.fillRoundedRectangle (Rectangle<float> (a.getX() + 504.0f * sx, a.getY() + 270.0f * sy, 356.0f * sx, 84.0f * sy), 3.0f);
+    vignette (g, a, 0.25f);
+}
+
+inline Colour fretCapTint (const char* param)
+{
+    const juce::String n (param);
+    if (n == "Mid freq." || n == "Mid gain") return Colour (0xff2f6fb3);
+    if (n == "High gain" || n == "Guitar drive" || n == "Bass drive") return Colour (0xffb3262b);
+    if (n == "Low gain" || n == "Boost" || n == "Punch" || n == "Edge" || n == "Bass punch" || n == "Bass shape" || n == "Threshold" || n == "Delay"
+        || n == "Input" || n == "Output")
+        return Colour (0xff1c1d20);
+    return Colour (0xffc9cbcf);
+}
+
+inline const Theme& fretTheme()
+{
+    static const Theme t = []
+    {
+        Theme x = ridgeTheme();
+        x.name = "Fret Channel";
+        x.pal = { Colour (0xff626468), Colour (0xff4c4e52), Colour (0xfff08a3a), Colour (0xffffb46a),
+                  Colour (0x00000000), Colour (0x00000000), Colour (0x00000000), Colour (0xfff1f1ef),
+                  Colour (0xff2a2b2e), Colour (0xff47494d), Colour (0xff3a3c40), Colour (0xff8a8c90), Colour (0xfff4f4f2),
+                  Colour (0xff3a3c40) };
+        x.canvas = canvasFret;
+        x.headerDeco = nullptr;
+        x.flatSections = true;
+        x.rimWidth = 0.0f;
+        x.capTint = fretCapTint;
+        x.hwKeys = true;
+        x.offLabelCol = Colour (0xffd0d2d6);
+        x.captionCol = Colour (0xffeeeeec);
+        x.valueCol = Colour (0xffd0d2d6);
+        x.headerCol = Colour (0xff3a3b3f);
+        return x;
+    }();
+    return t;
+}
+
+// === Shell Channel (drum channel strip role, round tp172c8): charcoal modules on a near-black frame, a lighter header
+// band, green-capped gate / speed / comp knobs, a blue low and a red high frequency cap, silver amounts, and the five
+// chevrons of the process order along the bottom
+inline void canvasShell (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    vfill (g, a, Colour (0xff2c2d30), Colour (0xff1e1f21));
+    if (display) return;
+    const auto sx = a.getWidth() / 1000.0f, sy = a.getHeight() / 500.0f;
+    for (const auto col : { Rectangle<float> (a.getX(), a.getY(), 110.0f * sx, a.getHeight()),
+                            Rectangle<float> (a.getRight() - 110.0f * sx, a.getY(), 110.0f * sx, a.getHeight()) })
+    {
+        vfill (g, col, Colour (0xff232427), Colour (0xff18191b));
+        g.setColour (Colour (0xff0a0b0c));
+        g.fillRoundedRectangle (Rectangle<float> (col.getX() + 30.0f * sx, col.getY() + 24.0f * sy, 50.0f * sx, 270.0f * sy), 2.0f);
+    }
+    for (const auto r : { Rectangle<float> (112.0f, 20.0f, 484.0f, 212.0f), Rectangle<float> (598.0f, 20.0f, 290.0f, 212.0f),
+                          Rectangle<float> (112.0f, 236.0f, 240.0f, 164.0f), Rectangle<float> (356.0f, 236.0f, 240.0f, 164.0f),
+                          Rectangle<float> (600.0f, 236.0f, 288.0f, 164.0f) })
+    {
+        const auto rr = Rectangle<float> (a.getX() + r.getX() * sx, a.getY() + r.getY() * sy, r.getWidth() * sx, r.getHeight() * sy);
+        vfill (g, rr, Colour (0xff3a3b3e), Colour (0xff2f3033));
+        g.setColour (Colours::black.withAlpha (0.5f));
+        g.drawRect (rr, 1.0f);
+    }
+    // the process order's chevrons
+    for (int i = 0; i < 5; ++i)
+    {
+        const auto r = Rectangle<float> (a.getX() + (186.0f + 130.0f * i) * sx, a.getY() + 440.0f * sy, 124.0f * sx, 22.0f * sy);
+        juce::Path p;
+        p.startNewSubPath (r.getX(), r.getY());
+        p.lineTo (r.getRight() - 10.0f * sx, r.getY());
+        p.lineTo (r.getRight(), r.getCentreY());
+        p.lineTo (r.getRight() - 10.0f * sx, r.getBottom());
+        p.lineTo (r.getX(), r.getBottom());
+        p.lineTo (r.getX() + 10.0f * sx, r.getCentreY());
+        p.closeSubPath();
+        g.setColour (Colour (0xff3d3e42));
+        g.strokePath (p, juce::PathStrokeType (1.2f));
+    }
+    vignette (g, a, 0.3f);
+}
+
+inline Colour shellCapTint (const char* param)
+{
+    const juce::String n (param);
+    if (n == "Gate hold" || n == "Gate attack" || n == "Gate release" || n == "Shaper speed" || n == "LMC comp") return Colour (0xff1f7a4c);
+    if (n == "Low freq.") return Colour (0xff2f6fb3);
+    if (n == "High freq.") return Colour (0xffb3262b);
+    return Colour (0xffc9cbcf);
+}
+
+inline const Theme& shellTheme()
+{
+    static const Theme t = []
+    {
+        Theme x = ridgeTheme();
+        x.name = "Shell Channel";
+        x.pal = { Colour (0xff2c2d30), Colour (0xff1e1f21), Colour (0xfff08a3a), Colour (0xffffb46a),
+                  Colour (0x00000000), Colour (0x00000000), Colour (0x00000000), Colour (0xffe8e8e6),
+                  Colour (0xff0a0b0c), Colour (0xff3a3b3e), Colour (0xff2f3033), Colour (0xff6a6c70), Colour (0xfff4f4f2),
+                  Colour (0xff2f3033) };
+        x.canvas = canvasShell;
+        x.headerDeco = nullptr;
+        x.flatSections = true;
+        x.rimWidth = 0.0f;
+        x.capTint = shellCapTint;
+        x.hwKeys = true;
+        x.offLabelCol = Colour (0xffb4b8bf);
+        x.captionCol = Colour (0xffe2e2e0);
+        x.valueCol = Colour (0xffb9bcc1);
+        x.headerCol = Colour (0xff8c8d90);
+        return x;
+    }();
+    return t;
+}
+
 inline Colour kilnCapTint (const char* param)
 {
     const juce::String n (param);
@@ -843,6 +984,44 @@ inline void glowLevelerEmblem (juce::Graphics& g, Point<float> c, float r) // th
     g.fillEllipse (Rectangle<float> (r * 0.3f, r * 0.3f).withCentre (c.translated (-r * 0.15f, -r * 0.15f)));
 }
 
+// round tp172d (slice 8): the opto leveler's knob — a black knurled skirt round a polished chrome dome
+inline void glowLevelerCap (juce::Graphics& g, Rectangle<float> cap, Point<float> c, float capR, float hover, bool fx)
+{
+    g.setGradientFill (ColourGradient (Colour (0xff3a3b3e).brighter (hover * 0.1f), c.x, cap.getY(), Colour (0xff0b0b0c), c.x, cap.getBottom(), false));
+    g.fillEllipse (cap);
+    if (fx) // the knurling round the skirt: lit ridges, so the black skirt reads on the charcoal strip too
+    {
+        const int n = capR > 30.0f ? 48 : 28;
+        for (int i = 0; i < n; ++i)
+        {
+            const auto a = juce::MathConstants<float>::twoPi * (float) i / (float) n;
+            const Point<float> d { std::sin (a), -std::cos (a) };
+            g.setColour (Colours::white.withAlpha (0.08f + 0.14f * juce::jmax (0.0f, -d.y))); // brighter on the top half
+            g.drawLine ({ c + d * capR * 0.8f, c + d * capR * 0.98f }, 1.0f);
+        }
+    }
+    g.setColour (Colour (0xff76797e)); // the skirt's turned edge
+    g.drawEllipse (cap.reduced (0.6f), 1.2f);
+    // the chrome dome: a dark rim, then rings of light and shade (a spun metal cap) — half the skirt, as on the original
+    const auto dome = capR * 0.5f;
+    g.setColour (Colour (0xff17181a));
+    g.fillEllipse (Rectangle<float> (dome * 2.16f, dome * 2.16f).withCentre (c));
+    g.setGradientFill (ColourGradient (Colour (0xfff4f5f6), c.x - dome * 0.5f, c.y - dome * 0.7f, Colour (0xff6c7075), c.x + dome * 0.6f, c.y + dome * 0.9f, false));
+    g.fillEllipse (Rectangle<float> (dome * 2.0f, dome * 2.0f).withCentre (c));
+    if (fx)
+    {
+        g.setGradientFill (ColourGradient (Colour (0xffa9adb2), c.x - dome * 0.5f, c.y - dome * 0.5f, Colour (0xffeceef0), c.x + dome * 0.5f, c.y + dome * 0.5f, false));
+        g.fillEllipse (Rectangle<float> (dome * 1.3f, dome * 1.3f).withCentre (c));
+        g.setColour (Colours::white.withAlpha (0.55f));
+        g.fillEllipse (Rectangle<float> (dome * 0.7f, dome * 0.4f).withCentre (c.translated (-dome * 0.32f, -dome * 0.5f)));
+    }
+}
+
+inline Colour glowLevelerCapTint (const char* param)
+{
+    return param != nullptr && juce::String (param) == "Emphasis" ? Colour (0xffe9dfc4) : Colour();
+}
+
 inline const Theme& glowLevelerTheme()
 {
     static const Theme t = []
@@ -855,8 +1034,10 @@ inline const Theme& glowLevelerTheme()
                   Colour (0xfff4f4f4), Colour (0xff45484c) };
         x.canvas = canvasGlowLeveler;
         x.titleEmblem = glowLevelerEmblem;
-        x.cap = Cap::bakelite;
-        x.pointerFrom = 0.15f;
+        x.drawCap = glowLevelerCap;        // round tp172d (slice 8): chrome domes in knurled black skirts
+        x.pointerFrom = 0.56f;             // ... the white line on the skirt
+        x.capTint = glowLevelerCapTint;    // ... HI FREQ is a cream chicken-head pointer knob
+        x.pointerKnobTint = Colour (0xffe9dfc4);
         x.ticks = 11;
         x.boldTicks = false;
         x.buttTrack = true;
@@ -864,6 +1045,8 @@ inline const Theme& glowLevelerTheme()
         x.knobScale = 1.04f;
         x.thumbPointer = true;
         x.noValueArc = true;               // the value reads off the pointer and the printed scale
+        x.numerals = true;                 // round tp172d (look slice): the reference's printed 0 … 100
+        x.numeralStep = 10;
         x.flatSections = true;             // one faceplate: no cards
         x.rimWidth = 0.0f;
         x.captionCol = Colour (0xff1c1d1f);
@@ -871,7 +1054,10 @@ inline const Theme& glowLevelerTheme()
         x.offLabelCol = Colour (0xff2e3033);
         x.hwKeys = true;
         x.headerCol = Colour (0xff2b2d30);
-        x.sectionFills[1] = Colour (0xff17181a); // the dark lower strip (Analog, HF emphasis, Mix, Trim)
+        x.sectionFills[1] = Colour (0xff2d2e30); // the charcoal lower strip (Analog, HF emphasis, Mix, Trim)
+        x.goldKeys = true;                 // round tp172d (slice 8): its gold 50Hz / 60Hz / OFF keys
+        x.numeralLit = true;               // ... the number at the pointer printed red
+        x.vuBezelDark = true;              // ... the meter in a gunmetal frame
         return x;
     }();
     return t;
@@ -1037,6 +1223,17 @@ inline const Theme& foilTheme()
 
 // === Halo (ValhallaShimmer role): the original's light minimal look — pale grey ground, graphite disc knobs, dark type ===
 
+// round tp172d (look slice): the original's row of flat discs runs from black to a light grey in signal order
+inline Colour haloCapTint (const char* param)
+{
+    static const char* const order[] = { "Mix", "Shift", "Feedback", "Diffusion", "Size", "Low cut", "High cut", "Mod rate", "Mod depth" };
+    if (param != nullptr)
+        for (int i = 0; i < 9; ++i)
+            if (std::strcmp (param, order[i]) == 0)
+                return Colour::greyLevel (0.02f + 0.48f * (float) i / 8.0f);
+    return {};
+}
+
 inline const Theme& haloTheme()
 {
     static const Theme t = []
@@ -1059,6 +1256,15 @@ inline const Theme& haloTheme()
         x.rimWidth = 0.0f;
         x.headerCol = Colour (0xff3a3a3f);
         x.pal.accent2 = Colour (0xff3a3a40);
+        // round tp172d (look slice): big discs shading across the row, no value ring, a short light tick at the edge,
+        // lower-case captions and modes
+        x.capTint = haloCapTint;
+        x.discRing = false;
+        x.pointerFrom = 0.62f;
+        x.pal.pointer = Colour (0xffc4c4c8);
+        x.pal.capBottom = x.pal.capTop;
+        x.lowerCaptions = true;
+        x.captionScale = 1.7f; // the original's legends: captions and values about a quarter of the knob's radius tall
         return x;
     }();
     return t;
@@ -1402,10 +1608,12 @@ inline const Theme& echoformTheme()
     // round tp172d: EchoBoy's hardware look (its role) — black face, walnut cheeks, bold white rounded outlines, red LEDs
     static const Theme t = []
     {
-        auto x = soundtoysTheme ("Echoform", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
+        auto x = soundtoysTheme ("Echoform", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xfff2f2ef), 3.0f); // (slice 8 review: thicker, whiter pod outlines)
         x.cornerScale = 4.0f; // the original's three rounded pods
+        x.bow = 0.05f;        // round tp172d (look slice): with bowed sides
         x.hwKeys = true;
         x.cheek = 30.0f; // (the layout leaves room for them)
+        x.ledReadouts = true; // round tp172d (look slice): the time, tap tempo and style on red LED read-outs
         return x;
     }();
     return t;
@@ -1865,7 +2073,15 @@ inline const Theme& emberTheme()
         auto x = soundtoysTheme ("Ember Saturator", Colour (0xffff7a45), Colour (0xffe9e2d0), Colour (0xff121213), Colour (0xff3c3c3e), 1.0f);
         x.hwKeys = true;  // Punish / Thump / Steep and the five style keys
         x.cheek = 30.0f;
-        x.captionScale = 1.25f;
+        x.numerals = true; // round tp172d (look slice): the big Drive's printed 0 … 10
+        // round tp172d (look slice): the original's chunky black caps on a ring of dots, no lit arc; bigger spaced
+        // legends; the name between two rules; the VU in a chrome bezel
+        x.cap = Cap::bakelite;
+        x.noValueArc = true;
+        x.dotTicks = true;
+        x.captionScale = 1.45f;
+        x.titleRules = true;
+        x.vuBezel = true;
         return x;
     }();
     return t;
@@ -3755,12 +3971,15 @@ inline const Theme& voiceShiftTheme()
         x.captionCol = Colours::white; // the original's white legends on the mustard panels
         x.pal.well = Colour (0xff1a0806);
         // the original's three printed fields: mustard (pitch / formant), teal (mode), red (drive / mix)
-        x.sectionFills[0] = Colour (0xffc39a1a);
-        x.sectionFills[1] = Colour (0xff1d5a6c);
-        x.sectionFills[2] = Colour (0xffb51d1d);
+        // round tp172d (look slice): the black face that frames them comes first
+        x.sectionFills[0] = Colour (0xff131416);
+        x.sectionFills[1] = Colour (0xffc39a1a);
+        x.sectionFills[2] = Colour (0xff1d5a6c);
+        x.sectionFills[3] = Colour (0xffb51d1d);
         x.hwKeys = true;
         x.cheek = 30.0f;
         x.cornerScale = 0.5f;
+        x.captionScale = 1.45f; // round tp172d (look slice): the original's big legends
         return x;
     }();
     return t;
@@ -4531,8 +4750,9 @@ inline const Theme& autoPanTheme()
     // round tp172d: PanMan's look (its role) — black face, walnut cheeks, rounded pods with white outlines, square keys
     static const Theme t = []
     {
-        auto x = soundtoysTheme ("Auto-pan", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xffd9d9d6), 2.0f);
+        auto x = soundtoysTheme ("Auto-pan", Colour (0xffe8402c), Colour (0xffeeeeea), Colour (0xff0b0b0c), Colour (0xff6a6a6c), 2.0f);
         x.cornerScale = 4.0f;
+        x.bow = 0.05f; // round tp172d (look slice): PanMan's bowed pods, a grey bevel instead of the white outline
         x.hwKeys = true;
         x.cheek = 30.0f;
         return x;
@@ -4576,6 +4796,8 @@ const Theme* effectTheme (Art a)
         case Art::ridge: return &ridgeTheme();
         case Art::ridge4k: return &ridge4kTheme();
         case Art::kiln: return &kilnTheme();
+        case Art::fret: return &fretTheme();
+        case Art::shell: return &shellTheme();
         case Art::crest: return &crestTheme();
         case Art::apex: return &apexTheme();
         case Art::prism: return &prismTheme();
@@ -4705,6 +4927,8 @@ Art artForEffect (EffectKind kind)
         case EffectKind::fruityDelayBank: return Art::delayBank;
         case EffectKind::ember: return Art::ember;
         case EffectKind::kilnChannel: return Art::kiln;
+        case EffectKind::fretChannel: return Art::fret;
+        case EffectKind::shellChannel: return Art::shell;
         case EffectKind::aether: return Art::aether;
         case EffectKind::fruityBloodOverdrive: return Art::blood;
         case EffectKind::fruityFastDist: return Art::fastDist;
