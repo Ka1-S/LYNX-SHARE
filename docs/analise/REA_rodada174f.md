@@ -149,6 +149,18 @@ showed about 17–145). Cause not found. Unverified candidate: `cacheShift` only
   button released afterwards. In that run the foreground passed to **WindowsTerminal** when LYNX died: an app dying under a scripted session
   hands the foreground to the terminal.
 
+### 3.7 Disabled scripts: do not re-enable (2026-11-06)
+
+They send injected input with no window check and at fixed coordinates, so they were renamed to `*.disabled` (rename only, nothing deleted). Use `E:\lynx-work\fluid174f\session4.sh` and `dupmon3.exe` instead.
+
+- `E:\lynx-work\fluid174f`: `session3.sh`
+- `E:\lynx-work\fluid174e`: `session.sh`, `play.sh`, `idle.sh`
+- `E:\lynx-work\fluid174e2`: `session2.sh`, `chain-s2d.sh`, `tool\dupmon2.exe`
+- `E:\lynx-work\perf174c`: `run.sh`, `fluid.sh`, `fluid-lynx.cmd`, `fluid-fl.cmd`, `bench.ps1`, `sess.ps1`
+- `C:\Users\kauan\lynx-test\perf174c`: `bench.ps1`, `sess.ps1`, `dupmon.exe`
+- `C:\Users\kauan\lynx-test\fluid174e`: `dupmon.exe`, `dupmon2.exe`
+- `C:\Users\kauan\lynx-test\fluid174f`: `dupmon.exe`, `dupmon2.exe`
+
 ### 3.5 Is this the best way?
 
 - **FL**: 128 fps on the same test (174e2). **How FL draws its zoom has not been studied** (no REA in this slice): whether it
