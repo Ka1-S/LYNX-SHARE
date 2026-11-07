@@ -241,7 +241,9 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
         const auto target = channel.sampler.stretchBeats * 60.0 / std::max (1.0, bpm);
         const auto ratio = target / ((double) sample->frames() / sample->sampleRate);
 
-        if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch))
+        const auto map = warpStretchMap (channel.sampler.warp, (double) sample->frames(), sample->sampleRate,
+                                         (double) std::llround ((double) sample->frames() * ratio));
+        if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch, map))
             sample = std::move (stretched);
     }
 
@@ -487,6 +489,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                     && (! channel.sampler.keepPitch
                         || (previous->song.channels[p].sampler.stretchBeats == channel.sampler.stretchBeats
                             && previous->song.channels[p].sampler.stretchMethod == channel.sampler.stretchMethod
+                            && previous->song.channels[p].sampler.stretchPitch == channel.sampler.stretchPitch
+                            && previous->song.channels[p].sampler.warp == channel.sampler.warp
                             && previous->song.bpm == song.bpm))))
             && (kind != InstrumentKind::plugin
                 || (previous->song.channels[p].plugin.id == channel.plugin.id && previous->sampleRate == sampleRate

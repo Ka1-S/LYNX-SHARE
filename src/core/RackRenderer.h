@@ -20,6 +20,7 @@
 #include "core/Effects.h"
 #include "core/HardwareOutput.h"
 #include "core/Instruments.h"
+#include "core/TimeStretch.h"
 #include "core/LiveEventQueue.h"
 #include "core/LiveInput.h"
 #include "core/Meters.h"
@@ -240,7 +241,9 @@ struct RackState
     using PluginEffectFactory = std::function<std::shared_ptr<Effect> (const PluginRef&, double sampleRate)>;
 
     // Sample stretched without changing pitch (ratio = new / original duration); cached in the app.
-    using StretchedSampleProvider = std::function<std::shared_ptr<const SampleData> (const std::string& path, double ratio, StretchMethod method, double semitones)>;
+    // `map`: the channel's warp map (core/TimeStretch warpStretchMap; empty = one ratio)
+    using StretchedSampleProvider = std::function<std::shared_ptr<const SampleData> (const std::string& path, double ratio, StretchMethod method,
+                                                                                     double semitones, const StretchMap& map)>;
 
     struct Factories
     {

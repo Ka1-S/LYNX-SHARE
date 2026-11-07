@@ -1376,6 +1376,13 @@ juce::var channelToVar (const ChannelDef& c)
             sampler->setProperty ("stretchMethod", (int) c.sampler.stretchMethod);
         if (c.sampler.stretchPitch != 0.0f)
             sampler->setProperty ("stretchPitch", c.sampler.stretchPitch);
+        if (! c.sampler.warp.empty()) // warp markers (round 175a, M1): [seconds, beats] pairs
+        {
+            juce::Array<juce::var> warp;
+            for (const auto& w : c.sampler.warp)
+                warp.add (juce::Array<juce::var> { w.seconds, w.beats });
+            sampler->setProperty ("warp", warp);
+        }
         sampler->setProperty ("region", juce::Array<juce::var> { c.sampler.regionStart, c.sampler.regionEnd });
         if (c.sampler.startOffset > 0.0f)
             sampler->setProperty ("startOffset", c.sampler.startOffset);
@@ -1701,6 +1708,11 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         def.sampler.keepPitch = (bool) s.getProperty ("keepPitch", false);
         def.sampler.stretchMethod = (StretchMethod) juce::jlimit (0, stretchMethodCount - 1, (int) s.getProperty ("stretchMethod", 0));
         def.sampler.stretchPitch = juce::jlimit (-48.0f, 48.0f, (float) (double) s.getProperty ("stretchPitch", 0.0));
+        const auto warpVar = s.getProperty ("warp", {});
+        if (const auto* warp = warpVar.getArray())
+            for (const auto& w : *warp)
+                if (const auto* pair = w.getArray(); pair != nullptr && pair->size() >= 2)
+                    def.sampler.warp.push_back ({ (double) (*pair)[0], (double) (*pair)[1] });
 
         if (auto* slices = s["slices"].getArray())
             for (const auto& v : *slices)
