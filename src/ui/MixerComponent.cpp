@@ -2982,6 +2982,7 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
     }
     menu.addItem (tr ("Open audio editor") + "\tCtrl+E", [this] { openAudioEditor (engine); });
     menu.addItem (tr ("Open audio editor and record") + "\tShift+E", [this] { openAudioEditorRecording (engine); });
+    menu.addSeparator(); // (FL: a line before Reset)
     menu.addItem (tr ("Reset selected track(s) to default"), [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::resetToDefault (s, targets); }); });
 
     // --- FL's "Routing" section -----------------------------------------------------------------------
