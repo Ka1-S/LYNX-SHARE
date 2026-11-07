@@ -454,7 +454,7 @@ if(LYNX_BUILD_APP)
         src/ui/EditorTools.cpp)
 
     # workflow shell: workspace desktop, control contract, dialogs
-    target_sources(LYNX PRIVATE
+    list(APPEND LYNX_APP_SOURCES
         src/ui/Workspace.cpp
         src/ui/ValueControl.cpp
         src/ui/Dialogs.cpp
@@ -462,16 +462,16 @@ if(LYNX_BUILD_APP)
         src/ui/Splash.cpp)
 
     # main window chrome: hint bar and toolbar widgets
-    target_sources(LYNX PRIVATE
+    list(APPEND LYNX_APP_SOURCES
         src/ui/HintBar.cpp
         src/ui/Toolbar.cpp)
 
     # spectral waveforms: background analysis cache and drawing
-    target_sources(LYNX PRIVATE
+    list(APPEND LYNX_APP_SOURCES
         src/ui/WaveformView.cpp)
 
     # workflow P2: note tool dialogs, tool windows, undo history, quick-add palette
-    target_sources(LYNX PRIVATE
+    list(APPEND LYNX_APP_SOURCES
         src/ui/NoteToolDialogs.cpp
         src/ui/MidiClipboard.cpp
         src/ui/EventEditor.cpp

@@ -569,6 +569,7 @@ ExportProcessor::~ExportProcessor() = default;
 } // namespace
 
 juce::AudioProcessor* makeProcessor (const Entry& entry) { return new ExportProcessor (entry); }
+juce::AudioProcessor* makeProcessorAt (int catalogIndex) { return makeProcessor (catalog[(size_t) catalogIndex]); }
 
 bool loadState (juce::AudioProcessor& processor, const void* data, int size)
 {

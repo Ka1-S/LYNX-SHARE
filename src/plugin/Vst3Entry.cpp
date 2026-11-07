@@ -1,6 +1,6 @@
 // One VST3 plugin: JUCE's wrapper around the catalog entry LYNX_EXPORT_INDEX (compiled once per plugin, round 180b)
 
-#include "plugin/ExportProcessor.h"
+// No LYNX or JUCE header before JUCE's wrapper below: it has to include juce_gui_basics itself (with the X11 headers on Linux)
 
 #ifndef LYNX_EXPORT_INDEX
  #error "LYNX_EXPORT_INDEX: the plugin's index in plugin/ExportCatalog.h"
@@ -40,7 +40,9 @@
 
 #include <juce_audio_plugin_client/juce_audio_plugin_client_VST3.cpp>
 
+namespace lynx::plugexport { juce::AudioProcessor* makeProcessorAt (int catalogIndex); } // plugin/ExportProcessor.h
+
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
-    return lynx::plugexport::makeProcessor (lynx::plugexport::catalog[LYNX_EXPORT_INDEX]);
+    return lynx::plugexport::makeProcessorAt (LYNX_EXPORT_INDEX);
 }

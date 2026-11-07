@@ -13,6 +13,10 @@
 
 #include "plugin/ExportProcessor.h"
 
+#if JUCE_LINUX || JUCE_BSD
+namespace juce::detail { bool dispatchNextMessageOnSystemQueue (bool returnIfNoPendingMessages); } // juce_Messaging_linux.cpp
+#endif
+
 namespace lynx::plugexport
 {
 namespace
@@ -370,7 +374,7 @@ private:
         static const clap_plugin_timer_support_t timer {
             [] (const clap_plugin_t*, clap_id) {
                #if JUCE_LINUX || JUCE_BSD
-                for (int i = 0; i < 16 && juce::MessageManager::getInstance()->dispatchNextMessageOnSystemQueue (true); ++i) {}
+                for (int i = 0; i < 16 && juce::detail::dispatchNextMessageOnSystemQueue (true); ++i) {}
                #endif
             }
         };
