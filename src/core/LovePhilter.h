@@ -90,6 +90,10 @@ struct DocArt // one articulator of a unit (targets: 0 pan, 1 volume, 2 cutoff, 
     std::vector<std::int32_t> lfoKnobs;                      // speed, tension, skew, pulse width (, phase)
     std::array<DocEnv, 3> maps;                              // Mod X, Mod Y, envelope follower
 };
+// FL's short name of a filter type in the unit's type box (Fruity Love Philter_x64.dll's label table, same order as the
+// long names of its hint bar: SVF LP HP LP2 BP BS HP2 AP LS PK HS LP3)
+const char* typeShortName (int type) noexcept;
+
 struct DocUnit
 {
     std::array<std::int32_t, 12> p {}; // cutoff, res, env, L, B, H, WS pre, WS mix, pan, vol, IN, NEXT (FL raw)

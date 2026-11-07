@@ -6,6 +6,9 @@
 TEST (audit173d3_love_philter_lists_fl_presets)
 {
     CHECK (lynx::flPluginsForEffect (lynx::EffectKind::lovePhilter) == std::vector<std::string> { "Fruity Love Philter" });
+    // the type box reads FL's labels (FL's shot: type 1, "Lime low pass", reads LP)
+    CHECK (std::string (lynx::philter::typeShortName (0)) == "SVF" && std::string (lynx::philter::typeShortName (1)) == "LP"
+           && std::string (lynx::philter::typeShortName (3)) == "LP2" && std::string (lynx::philter::typeShortName (11)) == "LP3");
 }
 
 // With FL installed (tests' argument = FL's Data folder): FL's presets come back as the exact engines the editors need.

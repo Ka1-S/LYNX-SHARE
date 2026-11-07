@@ -1132,7 +1132,11 @@ public:
                 drawSmallArrow (g, arrows, false);
                 g.setColour (colour::textPrimary);
                 g.setFont (font (juce::jmax (8.0f, 11.0f * s), true));
-                g.drawFittedText (valueText (param, value), box.toNearestInt(), juce::Justification::centred, 1, 0.6f);
+                // (Love Philter's type box: FL's short names; the hint and the list keep the long ones)
+                g.drawFittedText (kind == EffectKind::lovePhilter && juce::String (item.param).endsWith (" type")
+                                      ? juce::String (philter::typeShortName (juce::roundToInt (value * 11.0f)))
+                                      : valueText (param, value),
+                                  box.toNearestInt(), juce::Justification::centred, 1, 0.6f);
                 break;
             }
 

@@ -3062,6 +3062,12 @@ void Doc::setUse1 (int v) noexcept
         head[at] = (std::uint8_t) (v != 0);
 }
 
+const char* typeShortName (int type) noexcept
+{
+    static const char* const names[12] = { "SVF", "LP", "HP", "LP2", "BP", "BS", "HP2", "AP", "LS", "PK", "HS", "LP3" };
+    return names[std::clamp (type, 0, 11)];
+}
+
 std::optional<Doc> readDoc (const std::vector<std::uint8_t>& blob)
 {
     if (parse (blob) == nullptr) // (the same acceptance as the engine's)
