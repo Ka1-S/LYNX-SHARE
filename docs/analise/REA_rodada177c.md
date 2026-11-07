@@ -376,6 +376,19 @@ in a project changes. Blend isn't a project setting in LYNX or in FL.
 **Test evidence:** `comp177_blend_starts_off_only_for_new_installs`. Command-line record runners (`--rectest`,
 `--countinrectest`, `--bendrectest`) now set their mode explicitly, so their reports keep meaning what they did.
 
+## 10. Muted clips look as in FL (slice 177c-mute)
+
+**FL [OBS]** (`fl\f00.png`, `takes-final.flp`): an X sits where the clip's type glyph is, in the title, even on a clip too narrow
+for the name. The whole clip is dimmed, title included, and the waveform stays readable.
+
+**LYNX before:** a veil plus a diagonal line across the clip (`5833ba6fa`, 2026-10-14), which reads like an automation line.
+
+**Now:** no diagonal. The veil stays and is a little lighter (0.62 to 0.55) and the X takes the glyph's place on audio, pattern and
+automation clips from 14 px wide, drawn over the veil so that it stays readable, in the theme's secondary text colour: a little above the dimmed name, as FL's is (FL's X peaks at about (127, 141, 151), its muted name at about (112, 131, 141)). It is LYNX's own drawing of
+a plain X: no FL artwork is used. Painting cost for unmuted clips is unchanged.
+
+The 14 px cutoff has **no FL evidence below about 36 px**, FL's narrowest clip in these shots: narrower LYNX clips show no X and rely on the dimming. The neutral grey of the muted waveform is the theme's and stays (FL's is blue-grey).
+
 ## 14. Living with round 180d's FL fades (merge of 2026-11-08)
 
 Round 180d (FL's fade tension, straight fades, FL's fade flags) landed first and owns the clip array's indices 17-20. The comp
