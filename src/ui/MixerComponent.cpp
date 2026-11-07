@@ -2920,7 +2920,7 @@ EffectsPanel::EffectsPanel (AudioEngine& e)
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
     engine.addChangeListener (this);
-    startTimerHz (30);
+    showingTimer = std::make_unique<ui::TimerWhileShowing> (*this, static_cast<juce::Timer&> (*this), 30); // (stopped while hidden; round 174f)
 }
 
 EffectsPanel::~EffectsPanel()
