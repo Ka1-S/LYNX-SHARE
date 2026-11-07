@@ -7827,12 +7827,12 @@ countries: tw hk mo
 "Folders" = "資料夾"
 
 # round 177a: the mixer menu as FL's
-"Change color..." = "{'de': 'Farbe ändern...', 'es': 'Cambiar color...', 'fr': 'Changer la couleur...', 'id': 'Ubah warna...', 'it': 'Cambia colore...', 'ja': '色を変更...', 'ko': '색상 변경...', 'nl': 'Kleur wijzigen...', 'pl': 'Zmień kolor...', 'pt-BR': 'Mudar cor...', 'ru': 'Изменить цвет...', 'tr': 'Rengi değiştir...', 'zh-Hans': '更改颜色...', 'zh-Hant': '變更顏色...'}"
-"Track routing" = "{'de': 'Spur-Routing', 'es': 'Enrutamiento de pistas', 'fr': 'Routage de piste', 'id': 'Perutean trek', 'it': 'Instradamento traccia', 'ja': 'トラックのルーティング', 'ko': '트랙 라우팅', 'nl': 'Trackroutering', 'pl': 'Routing ścieżki', 'pt-BR': 'Roteamento de faixas', 'ru': 'Маршрутизация дорожки', 'tr': 'Parça yönlendirme', 'zh-Hans': '轨道路由', 'zh-Hant': '軌道路由'}"
-"Open audio editor and record" = "{'de': 'Audio-Editor öffnen und aufnehmen', 'es': 'Abrir el editor de audio y grabar', 'fr': "Ouvrir l'éditeur audio et enregistrer", 'id': 'Buka editor audio dan rekam', 'it': "Apri l'editor audio e registra", 'ja': 'オーディオエディターを開いて録音', 'ko': '오디오 편집기를 열고 녹음', 'nl': 'Audio-editor openen en opnemen', 'pl': 'Otwórz edytor audio i nagrywaj', 'pt-BR': 'Abrir editor de áudio e gravar', 'ru': 'Открыть аудиоредактор и записать', 'tr': 'Ses düzenleyiciyi aç ve kaydet', 'zh-Hans': '打开音频编辑器并录音', 'zh-Hant': '開啟音訊編輯器並錄音'}"
-"Assign to new Audio track(s)" = "{'de': 'Neuer Audiospur zuweisen', 'es': 'Asignar a nueva(s) pista(s) de audio', 'fr': 'Assigner à de nouvelles pistes audio', 'id': 'Tetapkan ke trek Audio baru', 'it': 'Assegna a nuove tracce audio', 'ja': '新しいオーディオトラックに割り当て', 'ko': '새 오디오 트랙에 할당', 'nl': 'Toewijzen aan nieuwe audiotrack(s)', 'pl': 'Przypisz do nowych ścieżek audio', 'pt-BR': 'Atribuir a nova(s) faixa(s) de áudio', 'ru': 'Назначить новым аудиодорожкам', 'tr': 'Yeni ses parçalarına ata', 'zh-Hans': '分配到新的音频轨道', 'zh-Hant': '指派到新的音訊軌道'}"
-"Unassign from Audio track(s)" = "{'de': 'Zuweisung zu Audiospuren aufheben', 'es': 'Desasignar de pista(s) de audio', 'fr': 'Désassigner des pistes audio', 'id': 'Lepaskan dari trek Audio', 'it': 'Rimuovi assegnazione dalle tracce audio', 'ja': 'オーディオトラックの割り当てを解除', 'ko': '오디오 트랙 할당 해제', 'nl': 'Toewijzing aan audiotrack(s) opheffen', 'pl': 'Odłącz od ścieżek audio', 'pt-BR': 'Desatribuir de faixa(s) de áudio', 'ru': 'Снять назначение с аудиодорожек', 'tr': 'Ses parçalarından atamayı kaldır', 'zh-Hans': '取消分配音频轨道', 'zh-Hant': '取消指派音訊軌道'}"
-"Open the audio editor and record" = "{'de': 'Den Audio-Editor öffnen und aufnehmen', 'es': 'Abrir el editor de audio y grabar', 'fr': "Ouvrir l'éditeur audio et enregistrer", 'id': 'Buka editor audio dan rekam', 'it': "Apri l'editor audio e registra", 'ja': 'オーディオエディターを開いて録音', 'ko': '오디오 편집기를 열고 녹음', 'nl': 'De audio-editor openen en opnemen', 'pl': 'Otwórz edytor audio i nagrywaj', 'pt-BR': 'Abrir o editor de áudio e gravar', 'ru': 'Открыть аудиоредактор и записать', 'tr': 'Ses düzenleyiciyi aç ve kaydet', 'zh-Hans': '打开音频编辑器并录音', 'zh-Hant': '開啟音訊編輯器並錄音'}"
+"Change color..." = "變更顏色..."
+"Track routing" = "軌道路由"
+"Open audio editor and record" = "開啟音訊編輯器並錄音"
+"Assign to new Audio track(s)" = "指派到新的音訊軌道"
+"Unassign from Audio track(s)" = "取消指派音訊軌道"
+"Open the audio editor and record" = "開啟音訊編輯器並錄音"
 "Chord progression tool..." = "和弦進行工具..."
 "Prepare for MIDI export" = "準備匯出 MIDI"
 "Confirm" = "確認"
