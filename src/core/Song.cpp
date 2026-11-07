@@ -1,4 +1,5 @@
 #include "core/Song.h"
+#include "core/TempoMap.h"
 #include "core/ModelParams.h"
 #include "core/FlSynths.h"
 #include "core/VoltageController.h"
@@ -83,7 +84,12 @@ std::int64_t Song::songLength() const noexcept
     // Pattern Blocks (round 170f) play with the clips
     const auto blocksEnd = patternblocks::end (*this);
     end = std::max (end, blocksEnd);
-    const bool arranged = ! playlist.empty() || blocksEnd > 0;
+    // video clips (round 174d): a project with only its picture so far plays to the picture's end, not one bar
+    std::int64_t videoEndTicks = 0;
+    if (const auto videoSeconds = videotrack::videoEnd (videoTracks); videoSeconds > 0.0)
+        videoEndTicks = (std::int64_t) std::ceil (videotrack::ticksForSeconds (*this, videoSeconds) - 1e-6);
+    end = std::max (end, videoEndTicks);
+    const bool arranged = ! playlist.empty() || blocksEnd > 0 || videoEndTicks > 0;
 
     // an empty Playlist (e.g. recording the first take in Song mode) loops the current pattern's length, not one bar
     if (! arranged && currentPattern >= 0 && currentPattern < (int) patterns.size())
@@ -1160,24 +1166,13 @@ float Song::automationValueAt (int index, double tick) const
 
 double Song::tempoAt (double tick) const
 {
-    if (mode != PlayMode::song)
-        return bpm;
-
-    for (int i = (int) automations.size() - 1; i >= 0; --i) // the last tempo automation wins
-        if (automations[(std::size_t) i].target.kind == AutomationTargetKind::tempo)
-            if (const auto v = automationValueAt (i, tick); ! std::isnan (v))
-                return tempoFromValue (v);
-
-    return bpm;
+    // tempo automation and FL's pattern Tempo events (issue #86, core/TempoMap.h)
+    return tempomap::tempoAt (*this, tick);
 }
 
 double Song::secondsForTicks (std::int64_t ticks) const
 {
-    const auto hasTempo = mode == PlayMode::song
-                          && std::any_of (automations.begin(), automations.end(),
-                                          [] (const Automation& a) { return a.target.kind == AutomationTargetKind::tempo; });
-
-    if (! hasTempo)
+    if (! tempomap::active (*this))
         return (double) ticks * 60.0 / (std::max (1.0, bpm) * ppq);
 
     // integrate in 1/16 steps (playback changes tempo block by block; the difference is minimal)

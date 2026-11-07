@@ -216,6 +216,13 @@ TEST (ridge_harrison_strips_translated_tp172c5)
         CHECK (std::abs (r::compGrCapDb (d.params[r::compGrCap]) - 27.5) < 1e-3);
         CHECK (std::abs ((0.0 - r::compressorCurveDb (d.params, 0.0)) - 27.5) < 1e-3);
         CHECK (r::compGrCapDb (makeEffectSlot (EffectKind::ridgeStrip).params[r::compGrCap]) > 1e6);
+        // tp172c11: the attack dial is a real time constant (Limiter mode 2.5 ms), the release 0.25 s at a 50 ms dial (Limiter mode half)
+        CHECK (std::abs (r::compAttackFineSeconds (d.params[r::compAttackFine]) - 0.020) < 1e-5);
+        CHECK (std::abs (r::releaseSeconds (d.params[r::compRelease]) - 0.25) < 1e-3);
+        const auto lim = c32 (p32 ("compressor_mode", 2) + p32 ("compressor_ratio", 30.0) + p32 ("compressor_threshold", -45.0));
+        CHECK (std::abs (r::compAttackFineSeconds (lim.params[r::compAttackFine]) - 0.0025) < 1e-5);
+        CHECK (std::abs (r::releaseSeconds (lim.params[r::compRelease]) - 0.125) < 1e-3);
+        CHECK (makeEffectSlot (EffectKind::ridgeStrip).params[r::compAttackFine] == 0.0f);
         auto fx = makeEffect (EffectKind::ridgeStrip);
         fx->prepare (48000.0);
         std::vector<float> l (24000), rr (24000);

@@ -15,6 +15,9 @@
 #include <vector>
 #include <utility>
 
+#include "core/Adr.h"
+#include "core/VideoTrack.h"
+
 namespace lynx
 {
 constexpr int ppq = 960;              // ticks per quarter note
@@ -1070,6 +1073,9 @@ struct MixerTrack
     // FL's mixer track menu "Group › Separator" (REA round 146a; .flp insert flag 0x400): a gap is drawn on the left of
     // this track; a run of tracks between two separators is a group ("Create group", "Select › Group", "Auto color group")
     bool separator = false;
+    // LYNX's folded mixer group (round 177a, an addition to FL's groups): set on a group's first strip, the group is shown
+    // folded — only its bus strip when the group is a summing group, else a slim tab (mixerops::foldView). View only.
+    bool folded = false;
     // FL's "Layout › Dock to" (.flp insert flags bits 6-7 = dock 0 left / 1 middle / 2 right): the strip is shown in the
     // left block, the middle or the right block of the mixer
     MixerDock dock = MixerDock::middle;
@@ -1678,6 +1684,10 @@ struct Song
     bool slotActive (const EffectSlot& slot) const noexcept { return slot.enabled && ! (substitutesBypassed && slot.isSubstitute()); }
     std::vector<Automation> automations;
     std::vector<PlaylistTrack> playlistTracks; // index = track; tracks past the end use the default
+    // Video tracks and the project's video settings (round 174d, core/VideoTrack.h): LYNX's own, above the clip tracks
+    std::vector<VideoTrack> videoTracks;
+    VideoSettings video;
+    AdrSession adr; // the ADR cue list, its takes and its settings (round 174d, core/Adr.h)
     std::vector<MidiLink> midiLinks;
     // FL's "initialized controls" (.flp 0xD8; the parameter menu's "Init song with this position", REA round 146):
     // values the targets are reset to whenever the song starts playing in song mode (from any position), before

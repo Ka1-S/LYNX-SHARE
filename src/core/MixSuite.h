@@ -139,9 +139,14 @@ enum Param
     // round tp172c10, hidden (not in the info, saved only while non-zero): the compressor's largest gain reduction
     // (0 = none, else 60 dB x the value), set by the Harrison 32Classic translation (that console caps it at 27.5 dB;
     // the original has no control for it)
-    compGrCap = count
+    compGrCap = count,
+    // round tp172c11, hidden the same way: the compressor's attack time constant (0 = the Fast switch's 1 / 10 ms, else
+    // 0.25 s x the value), set by the Harrison 32Classic translation (its dial is a real time constant, 2.5 ms in Limiter
+    // mode; Ridge has only the switch)
+    compAttackFine
 };
 double compGrCapDb (float v) noexcept;   // 0 = no cap (a huge value), else 0 .. 60 dB
+double compAttackFineSeconds (float v) noexcept; // 0 .. 0.25 s
 // round tp172c6: the drive models (DRIVE section), in the Model selector's order
 enum DriveModel { driveSaturate, driveConsoleE, driveConsoleG, driveConsoleA, driveConsoleN, driveConsoleY, driveTube,
                   driveGuitarAmp, driveBassAmp, driveModels };
