@@ -221,9 +221,9 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | Frequency Splitter | Frequency Splitter | Insert | Exact | IIR mode; FFT mode within −113 dB |
 | Hardcore † | Hardcore | Insert | Exact | cabinet impulses from the installation |
 | Vocoder | Fruity Vocoder | Insert | Exact | every state, 500 random runs |
-| Love Philter | Fruity Love Philter | Import | Exact | all 86 states, live and export |
+| Love Philter | Fruity Love Philter | Import | Exact | all 86 states, live and export; FL's editor (unit page, articulator envelopes, LFOs and maps), edits written back in FL's state (round 173d3) |
 | Pitch Shifter | Pitch Shifter | Import | Exact | all 15 states and 70 random ones |
-| EQUO | EQUO | Import | Exact | the send output to another track is not routed |
+| EQUO | EQUO | Import | Exact | the band sends go to the insert chosen in the Send box (FL's send gain stage and its own downsampler; no FL render of a send yet) (round 173d3) |
 | Low Lifter | Low Lifter | Insert | Exact | the library's Faust engine (crossovers, look-ahead limiter, Chebyshev harmonics, diffuser, low cut): all 11 installation states and 12 random ones at 44.1–96 kHz bit-identical, FL's one-second silence gate included (round 154) |
 | Transporter | Transporter | Insert | Exact | FL's own engine (the library's Faust transient looper: 8-band transient detector, loops A / B, Auto / Bouncing / Adaptive / Tempo, reverse / octave / ignore probabilities, spread and auto-pan, loop send): bit-identical with the library on 190 random runs and with the plug-in on 6 states; side-chain from the input track; the send goes to the insert's routes (mapping unverified) (round 167f) |
 | Frequency Shifter | Frequency Shifter | Insert | Exact | bit-identical on the installation's 14 states and on random ones with control changes at 44.1–96 kHz, except the Tempo range at 48/96 kHz (−85 dB); while the song plays the Tempo range gets the song position in beats (FL's unit not confirmed); the ring modulator's side chain is not routed (round 154) |
@@ -239,9 +239,9 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | Effector | Effector | Insert | Near-exact | all 12 algorithms; reverb −100 dB |
 | Maximus † | Maximus | Import | Near-exact | 96/100 demo states within −139 dB; v15 linear-phase split and Master Mid keep an approximation |
 | Soundgoodizer † | Soundgoodizer | Import | Near-exact | within −126 dB on every preset/amount |
-| Convolver † | Fruity Convolver | Import | Near-exact | −127…−152 dB; states with a shaped EQ curve are approximated |
+| Convolver † | Fruity Convolver | Import | Near-exact | −127…−152 dB; shaped EQ curves −124…−133 dB (FL's linear-phase FIR from the curve, round 173d3); the equalizer page draws and edits the curve |
 | Distructor † | Distructor | Import | Near-exact | bit-identical except the Harmor shapes and the cabinet |
-| Vocodex † | Vocodex | Import | Near-exact | −136…−145 dB (internal Sytrus carrier −112 dB) |
+| Vocodex † | Vocodex | Import | Near-exact | −136…−145 dB (internal Sytrus carrier −112 dB); all 13 maps read, edited and played (≤ −141 dB, round 173d3) |
 | Vintage Phaser | Vintage Phaser | Import | Near-exact | within −121 dB |
 | Pitch correction | Pitcher | Insert | Close | bit-exact with the reference model; MIDI mode / Harmonize get no MIDI in LYNX SHARE |
 | Newtone | Newtone | Import | Close | pass-through as FL; in slave mode the note edits (pitch offsets and transitions, drift, vibrato, tremolo, ramps, formant, volume, timing, disabled notes) rendered by LYNX SHARE's own pitch engine: against FL's own engine on 135 states every note's level within 0.4 dB and its median pitch within 9 cents, unedited notes bit-identical; legato glides with long smooth times (up to 40 c) and FL's sample re-alignment after edits differ (round 165g) |

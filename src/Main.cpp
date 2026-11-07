@@ -48,6 +48,7 @@
 #include "core/AlsImport.h"
 #include "ui/AlsExportDialog.h"
 #include "ui/TimerWhileShowing.h"
+#include "ui/MixerBasicsCheck.h"
 #include "ui/VideoPlayerView.h"
 #include "ui/VideoMedia.h"
 #include "ui/VideoTracks.h"
@@ -1125,7 +1126,7 @@ public:
                         if (file.existsAsFile() && file.loadFileAsData (data))
                         {
                             const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-                            if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0); loaded && loaded->kind == kind)
+                            if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0, lynx::natives::flDataReader (lynx::flStudioAccess())); loaded && loaded->kind == kind)
                                 fx = *loaded;
                         }
                         break;
@@ -3059,7 +3060,8 @@ private:
         // round 177b: a plugin's sidechain bus gets the slot's sidechain (one-click sidechain)
         const auto sidechainResult = lynx::pluginSidechainSelfTest();
 
-        const auto ok = audioOk && projectOk && richOk && hwOutOk && flp168jOk && clipFades180dOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && midiOk && packageOk
+        const auto mixerBasics = lynx::mixerbasics::run();
+        const auto ok = mixerBasics == "OK" && audioOk && projectOk && richOk && hwOutOk && flp168jOk && clipFades180dOk && blocksOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK";
@@ -3079,6 +3081,7 @@ private:
                << "patcher=" << (patcherOk ? "OK" : "ERROR") << "\n"
                << "native_engines=" << nativesResult << " (" << nativesMade << " made)\n"
                << "undo=" << (undoOk ? "OK" : "ERROR") << "\n"
+               << "mixer_basics=" << mixerBasics << "\n"
                << "recording=" << (recordOk && recordUndoOk ? "OK" : "ERROR") << "\n"
                << "midi=" << (midiOk ? "OK" : "ERROR") << "\n"
                << "package=" << (packageOk ? "OK" : "ERROR") << "\n"
@@ -5243,6 +5246,24 @@ private:
         run->steps.push_back ({ "after the drag (released)", {}, {}, 600, [drag] { return drag->released(); } });
         run->steps.push_back ({ "desktop, playing", [this, ui] { ui->showDesktopForSnapshot (false); engine->rewind(); engine->play(); }, {}, 3000 });
         run->steps.push_back ({ "mixer maximised, playing", [ui] { ui->selectTabForSnapshot (3); }, {}, 3000 });
+        // round 177a: only the meters move, so the strips' picture must stay valid, also with a folded group's tab and VCA
+        // strips on screen (their levels are drawn over the picture, like the inserts' meters)
+        run->steps.push_back ({ "mixer meters over the picture, playing", [this, ui] {
+                                   ui->selectTabForSnapshot (3);
+                                   engine->getTransport().songMode = false;
+                                   engine->rewind();
+                                   engine->play();
+                                   ui->getMixerForSnapshot().getStripsForSnapshot().cacheCountersForPerf();
+                               }, {}, 6000, [this, ui, report] {
+                                   const auto [spoiled, refills] = ui->getMixerForSnapshot().getStripsForSnapshot().cacheCountersForPerf();
+                                   if (juce::FileOutputStream out (report.withFileExtension ("png")); out.openedOk())
+                                   {
+                                       out.setPosition (0);
+                                       out.truncate();
+                                       juce::PNGImageFormat().writeImageToStream (mainWindow->createComponentSnapshot (mainWindow->getLocalBounds()), out);
+                                   }
+                                   return juce::String ("    mixer picture: spoiled ") + juce::String (spoiled) + " times, drawn again " + juce::String (refills) + " times\n";
+                               } });
         run->steps.push_back ({ "mixer scroll", {}, [wheelAt, ui, none] (int f) { wheelAt (ui->getMixerForSnapshot(), 0.0f, f < 30 ? -0.25f : 0.25f, none); }, 60 });
         // a fader dragged while the song plays (round 171c, discussion #10): 4 mouse moves per frame on insert 1's fader,
         // through the old path (a whole snapshot per move) and through editLevels
@@ -5289,6 +5310,9 @@ private:
         run->steps.push_back ({ "whole window repainted", {}, [this] (int) { mainWindow->repaint(); }, 40 });
         run->steps.push_back ({ "channel rack scroll", [ui] { ui->selectTabForSnapshot (0); },
                                  [wheelAt, ui, none] (int f) { wheelAt (ui->getRackViewportForSnapshot(), 0.0f, f < 30 ? -0.25f : 0.25f, none); }, 60 });
+        // LYNX_UIPERF_ONLY=text: only the steps whose name has that text
+        if (const auto only = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_ONLY", {}); only.isNotEmpty())
+            run->steps.erase (std::remove_if (run->steps.begin(), run->steps.end(), [&only] (const auto& s) { return ! juce::String (s.name).contains (only); }), run->steps.end());
         // let the window draw the project first
         perf = std::move (run);
         juce::Timer::callAfterDelay (1500, [this] { if (perf != nullptr) perf->startTimer (16); });
@@ -7727,8 +7751,15 @@ private:
 
             auto maximusPasses = 0; // Maximus has its own page (first pass); the second pass shows Soundgoodizer
             auto ridgePasses = 0;
+            // round 173d3: the parity pictures of one editor — LYNX_PLUGUI_ONLY=<effect name>, LYNX_PLUGUI_PRESET=<.fst>,
+            // LYNX_PLUGUI_PAGES=<page,page,…> (the page numbers as the editor encodes them)
+            const auto only = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGUI_ONLY", {});
+            const auto onlyPreset = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGUI_PRESET", {});
+            const auto onlyPages = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGUI_PAGES", {}), ",", "");
             for (const auto kind : kinds)
             {
+                if (only.isNotEmpty() && only != lynx::effectInfo (kind).name)
+                    continue;
                 auto fx = lynx::makeEffectSlot (kind);
                 juce::String name (lynx::effectInfo (kind).name);
                 for (const auto& plugin : lynx::flPluginsForEffect (kind))
@@ -7738,6 +7769,8 @@ private:
                     if (! file.existsAsFile()) // plugins without presets: their entry of FL's plugin database
                         for (const auto& f : database.findChildFiles (juce::File::findFiles, true, juce::String::fromUTF8 (plugin.c_str()) + ".fst"))
                             file = f;
+                    if (only.isNotEmpty() && onlyPreset.isNotEmpty())
+                        file = juce::File (onlyPreset);
                     if (! file.existsAsFile())
                     {
                         auto files = dir.findChildFiles (juce::File::findFiles, true, "*.fst");
@@ -7748,7 +7781,7 @@ private:
                     if (file.existsAsFile() && file.loadFileAsData (data))
                     {
                         const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-                        if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0); loaded && loaded->kind == kind)
+                        if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0, lynx::natives::flDataReader (lynx::flStudioAccess())); loaded && loaded->kind == kind)
                             fx = *loaded;
                     }
                     name = juce::String::fromUTF8 (plugin.c_str());
@@ -7836,7 +7869,16 @@ private:
                 }
 
                 const auto pages = name == "Soundgoodizer" ? 1 : juce::jmax (1, (int) lynx::plugui::layoutFor (kind).pages.size());
+                std::vector<int> pageList;
                 for (int page = 0; page < pages; ++page)
+                    pageList.push_back (page);
+                if (only.isNotEmpty() && ! onlyPages.isEmpty())
+                {
+                    pageList.clear();
+                    for (const auto& p : onlyPages)
+                        pageList.push_back (p.getIntValue());
+                }
+                for (const auto page : pageList)
                 {
                     auto editor = lynx::makeNativeEffectEditor (offline, 1, 0, 1.0f, page);
                     juce::Image image (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);

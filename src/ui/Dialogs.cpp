@@ -249,9 +249,10 @@ public:
 class MidiImportWindow final : public juce::AlertWindow
 {
 public:
-    MidiImportWindow (const juce::String& fileName, const midiimport::ParsedMidi& midi, const midiimport::Options& o, bool pianoRoll)
+    MidiImportWindow (const juce::String& fileName, const midiimport::ParsedMidi& midi, const midiimport::Options& o, bool pianoRoll, bool eventLane = false)
         : juce::AlertWindow (tr ("Import MIDI data"), fileName, juce::MessageBoxIconType::NoIcon),
           roll (pianoRoll),
+          lane (eventLane),
           kept (o)
     {
         auto add = [this] (juce::ToggleButton& b, const juce::String& text, const juce::String& hint, bool on) {
@@ -263,7 +264,13 @@ public:
         };
         // FL's two columns of options (REA round 149 [EXEC]): new project / realign / time signatures, then one channel
         // per track / mixer tracks / zero velocity notes
-        if (pianoRoll)
+        if (eventLane) // FL's Event editor (REA_rodada178a §11): no Blend and no project options
+        {
+            add (realign, tr ("Realign events"), tr ("Removes any silent part at the beginning"), o.realign);
+            add (timeSignatures, tr ("Import time signatures"), tr ("Adds the file's time signature to the pattern's markers"), o.timeSignatures);
+            add (zeroVelocity, tr ("Import zero velocity notes"), tr ("Don't treat note on messages with zero velocity as note off"), o.zeroVelocityNotes);
+        }
+        else if (pianoRoll)
         {
             add (blend, tr ("Blend with existing data"), tr ("Don't delete the channel's notes before importing"), o.blend);
             add (realign, tr ("Realign events"), tr ("Removes any silent part at the beginning"), o.realign);
@@ -304,12 +311,19 @@ public:
         channelType.setTooltip (tr ("MIDI Out channels play the plugins on their MIDI port, on the note's MIDI channel"));
 
         // Which controller to import? (the ones LYNX applies: 7 / 11 volume, 10 pan, when the file has them)
-        controller.addItem (tr ("None"), 1);
+        controller.addItem (eventLane ? juce::String ("---") : tr ("None"), 1); // (FL's "---" in the Event editor: every controller)
         controllerIds.push_back (-1);
         std::set<int> present;
         for (const auto& e : midi.events)
             if ((e.status & 0xF0) == 0xB0)
                 present.insert (e.data1);
+        if (eventLane) // FL: any controller, typed 0..127 (the lane is the shown control's, not the controller's own)
+            for (int cc = 0; cc < 128; ++cc)
+            {
+                controller.addItem (juce::String (cc) + (present.count (cc) > 0 ? " *" : ""), (int) controllerIds.size() + 1);
+                controllerIds.push_back (cc);
+            }
+        else
         for (const auto& [cc, label] : { std::pair<int, const char*> { 7, TR_NOOP ("CC 7 (volume) → channel volume") },
                                          { 11, TR_NOOP ("CC 11 (expression) → channel volume") }, { 10, TR_NOOP ("CC 10 (pan) → channel pan") } })
             if (present.count (cc) > 0 || cc == o.controller)
@@ -335,16 +349,16 @@ public:
         content.addAndMakeVisible (tracks);
         label (tr ("Which channels to import?"));
         content.addAndMakeVisible (channels);
-        if (! pianoRoll)
+        if (! pianoRoll && ! eventLane)
         {
             label (tr ("Channel type"));
             content.addAndMakeVisible (channelType);
         }
-        label (tr ("Which controller?"));
+        label (eventLane ? tr ("Which controller to import?") : tr ("Which controller?"));
         content.addAndMakeVisible (controller);
 
         content.onLayout = [this] { layout(); };
-        const auto rows = pianoRoll ? 3 : 4;
+        const auto rows = pianoRoll || eventLane ? 3 : 4;
         content.setSize (440, rows * 30 + 22 + ((int) optionBoxes.size() + 1) / 2 * 26 + 12);
         addCustomComponent (&content);
 
@@ -355,7 +369,9 @@ public:
     midiimport::Options options() const
     {
         auto o = kept;
-        if (roll)
+        if (lane)
+            o.timeSignatures = timeSignatures.getToggleState();
+        else if (roll)
             o.blend = blend.getToggleState();
         else
         {
@@ -400,7 +416,7 @@ private:
         };
         row (tracks, 24);
         row (channels, 44);
-        if (! roll)
+        if (! roll && ! lane)
             row (channelType, 24);
         row (controller, 24);
         area.removeFromTop (6);
@@ -410,7 +426,7 @@ private:
             optionBoxes[i]->setBounds (((int) i < half ? left : area).removeFromTop (26));
     }
 
-    bool roll = false;
+    bool roll = false, lane = false;
     midiimport::Options kept;
     Content content;
     juce::ToggleButton newProject, perTrack, realign, timeSignatures, mixerTracks, zeroVelocity, blend;
@@ -426,6 +442,18 @@ void showMidiImportDialog (const juce::String& fileName, const midiimport::Parse
                            std::function<void (const midiimport::Options&)> onAccept)
 {
     auto* window = new MidiImportWindow (fileName, midi, current, pianoRoll);
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([window, onAccept] (int result) {
+                                 if (result == 1)
+                                     onAccept (window->options());
+                             }),
+                             true);
+    keepAboveMainWindow (*window);
+}
+
+void showEventLaneMidiImportDialog (const juce::String& fileName, const midiimport::ParsedMidi& midi, const midiimport::Options& current,
+                                    std::function<void (const midiimport::Options&)> onAccept)
+{
+    auto* window = new MidiImportWindow (fileName, midi, current, false, true);
     window->enterModalState (true, juce::ModalCallbackFunction::create ([window, onAccept] (int result) {
                                  if (result == 1)
                                      onAccept (window->options());

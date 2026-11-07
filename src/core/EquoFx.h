@@ -44,7 +44,7 @@ struct State
     std::array<int, 5> knob { 0, 128, 0, 170, 128 };               // shift, mix, morph, smoothness, volume (raw)
     int oversample = 0;  // ×2^oversample around the whole EQ
     int bandwidth = 150; // percent of an octave … (raw 80…500)
-    int sendTrack = -1;  // mixer track the "send" levels go to (−1 = none; not routed by LYNX)
+    int sendTrack = -1;  // the "send" levels' mixer insert minus 1 (−1 = none; FL hands the send to insert sendTrack + 1)
     bool sendOnly = false, addMode = false;
 
     float& cell (int bank, int band, int t) noexcept { return table[(std::size_t) ((bank * numBands + band) * numTargets + t)]; }
@@ -53,6 +53,10 @@ struct State
 
 // FL's saved state; nullopt = not an EQUO state (versions 3 and 4 are read)
 std::optional<State> parse (const std::vector<std::uint8_t>& state);
+
+// the state's send track as a mixer insert (1…; 0 = none) and back (FL keeps the insert minus 1, −1 = none: §2.1)
+int sendInsert (const std::vector<std::uint8_t>& state) noexcept;
+bool setSendInsert (std::vector<std::uint8_t>& state, int insert) noexcept; // false = not an EQUO state
 
 // slot parameters ⇄ the knobs and options of a state
 void toParams (const State& s, EffectParams& params) noexcept;
@@ -71,7 +75,8 @@ public:
     void setBands (const State& s) noexcept; // band table / band mode changes on the running engine (values glide)
     void reset() noexcept;              // as freshly loaded: filters cleared, gains ramp in from zero (smoother kept)
     void flush() noexcept;              // FL's Flush message: filters cleared, gains jump to their targets
-    void process (float* left, float* right, int n) noexcept; // stereo, in place, any n (FL blocks of 512)
+    // stereo, in place, any n (FL blocks of 512); the send (when a send track is set) is added into sendLeft / sendRight
+    void process (float* left, float* right, int n, float* sendLeft = nullptr, float* sendRight = nullptr) noexcept;
 
     // motion smoothing: FL calls the plugin once per song tick (samples per tick; 0 = no ticks); tick() = one call
     void setSamplesPerTick (double samplesPerTick) noexcept;

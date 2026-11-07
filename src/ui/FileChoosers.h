@@ -181,6 +181,13 @@ std::function<void (const juce::FileChooser&)> watched (const juce::FileChooser*
 }
 } // namespace filechooser
 
+// A save dialog lists the folder's files, so you can see what's there and pick a name. JUCE's built-in chooser empties
+// its file filter without canSelectFiles, which left the list blank.
+inline int chooserFlags (int flags)
+{
+    return (flags & juce::FileBrowserComponent::saveMode) != 0 ? flags | juce::FileBrowserComponent::canSelectFiles : flags;
+}
+
 // chooser->launchAsync (flags, callback), with the built-in chooser opened in its place when the system's dialog never
 // showed. `holder` keeps the chooser (and, after a fallback, the built-in one that replaced it).
 inline void launchChooser (std::unique_ptr<juce::FileChooser>& holder, int flags, std::function<void (const juce::FileChooser&)> callback)
@@ -188,6 +195,7 @@ inline void launchChooser (std::unique_ptr<juce::FileChooser>& holder, int flags
     if (holder == nullptr)
         return;
     auto* chooser = holder.get();
+    flags = chooserFlags (flags);
     chooser->launchAsync (flags, filechooser::watched (chooser, flags, std::move (callback), [&holder] (std::unique_ptr<juce::FileChooser> next) {
                               // (called from inside the old chooser's callback: it is deleted after it returns)
                               std::shared_ptr<juce::FileChooser> old (holder.release());
@@ -201,6 +209,7 @@ inline void launchChooser (const std::shared_ptr<juce::FileChooser>& chooser, in
 {
     if (chooser == nullptr)
         return;
+    flags = chooserFlags (flags);
     chooser->launchAsync (flags, filechooser::watched (chooser.get(), flags, std::move (callback), [] (std::unique_ptr<juce::FileChooser> next) {
                               // the built-in one replacing it lives until the end of the session (at most one per
                               // dialog that failed: the later ones are built-in from the start)

@@ -458,3 +458,42 @@ TEST (issues178a_event_score_from_real_fl_file)
     CHECK (written[written.size() - 8] == 5);
     CHECK (prtools::parseEventScore (written) == events);
 }
+
+TEST (issues178a_event_lane_takes_the_chosen_controller)
+{
+    using namespace lynx;
+    // the file FL imported in the Event editor (REA_rodada178a §11): C notes with CC 1 at 5, 21, ... each beat
+    midiimport::ParsedMidi midi;
+    midi.trackNames = { "", "other" };
+    const std::int64_t beat = ppq;
+    for (int i = 0; i < 8; ++i)
+    {
+        midi.events.push_back ({ 0, beat * i + beat, 0x90, (std::uint8_t) (48 + i), 100 });
+        midi.events.push_back ({ 0, beat * i + beat, 0xB0, 1, (std::uint8_t) (i * 16 + 5) });
+    }
+    midi.events.push_back ({ 1, 0, 0xB1, 1, 127 });  // another track and MIDI channel
+    midi.events.push_back ({ 0, 0, 0xB0, 7, 64 });   // another controller
+
+    midiimport::Options o;
+    CHECK (midiimport::controllerEvents (midi, o).size() == 10); // FL's "---": every controller, merged
+    CHECK (midiimport::controllerEvents (midi, o)[0].tick == 0);
+
+    o.controller = 1;
+    o.track = 0;
+    auto lane = midiimport::controllerEvents (midi, o);
+    CHECK (lane.size() == 8);
+    CHECK (lane[0].tick == beat && std::fabs (lane[0].value - 5.0f / 127.0f) < 1.0e-6f); // FL's .fsc: 0.03937
+    CHECK (lane[1].tick == 2 * beat && std::fabs (lane[1].value - 21.0f / 127.0f) < 1.0e-6f); // FL's .fsc: 0.16535
+
+    o.realign = true;
+    CHECK (midiimport::controllerEvents (midi, o)[0].tick == 0); // the silence before the first note goes
+
+    o.realign = false;
+    o.track = -1;
+    o.channels = 2; // MIDI channel 2 alone
+    lane = midiimport::controllerEvents (midi, o);
+    CHECK (lane.size() == 1 && lane[0].tick == 0 && lane[0].value == 1.0f);
+
+    o.controller = 74;
+    CHECK (midiimport::controllerEvents (midi, o).empty()); // FL then empties the lane
+}

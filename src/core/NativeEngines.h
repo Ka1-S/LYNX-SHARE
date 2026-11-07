@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 
+#include "core/FlEffects.h"
 #include "core/FlpImport.h"
 #include "core/Song.h"
 
@@ -59,6 +60,9 @@ struct FlAccess
     std::function<std::vector<std::string> (const std::string& folder)> listPresets; // the preset files under a folder, sorted
     std::function<std::string (const std::vector<std::uint8_t>& wav, const std::string& name)> saveEmbedded; // (FL Keys' raw tables)
 };
+
+// A file of that installation by its path relative to %FLStudioFactoryData%; empty = not available
+FlDataReader flDataReader (const FlAccess& fl);
 
 // The presets a new instance may start from, in order: Default.fst in <Data>\Patches\Plugin presets\<Generators|Effects>\<folder>,
 // then the folder's other presets (the first one LYNX's engine reads exactly is used: some engines don't

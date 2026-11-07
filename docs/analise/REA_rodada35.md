@@ -92,8 +92,9 @@ is confirmed. New readings:
 - **Block `+0x170`:** `i32` hold mode (**0 = PEAK, 1 = RMS**, §4.2), `i32` filter order K (1…4), `i32` **unison
   order U (0…4, number of extra analysis voices; the UI shows U + 1, the engine clamps the UI value to 5 and stores
   value − 1)**, `i32` bands N (5…100), `i32` **Draft (0 = Draft button on)**, `i32` ModIn, `i32` CarIn, then bytes
-  L-R encoding, MIN TIMES, TO MOD, THREADED, **subtractive-gate flag `+0x190`** (set to 1 by the loader for every
-  version, otherwise toggled by a menu item `FUN_0084dc20`; meaning in §4.3), TO NOISE, FROM CAR, FROM CONSONANTS.
+  L-R encoding, MIN TIMES, TO MOD, THREADED, **subtractive-gate flag `+0x190`** (preset to 1 by the loader before the
+  block is read, so the stored byte wins from version 5 on — see §12.2; toggled by the options-menu item
+  "Subtractive denoising", `FUN_0084dc20`; meaning in §4.2), TO NOISE, FROM CAR, FROM CONSONANTS.
 - **The 13 option bytes (`+0x1FC`)** select, per map m, the x-coordinate at which the map is read for a band:
   0 → the band's own frequency, 1 → the frequency **after the modulator pitch shift** (§3.1). Data: maps 3 and 4 use 1
   in every state. (Map 3 is always read at the shifted position regardless of its byte.)
@@ -101,7 +102,8 @@ is confirmed. New readings:
   `0x406`, default values 0.5); maps 3, 4, 11 default to 0, all others to 0.5 (mask `0x818`) **[DECOMP `FUN_0084f730`;
   EXEC: dumped pitch/pan/offset fields]**.
 - **Map evaluation:** straight segments between points (all demo maps have zero tension). Curved segments (tension
-  ≠ 0) go through the FL envelope curve code `FUN_00782b50` — **not decoded** (no demo uses them).
+  ≠ 0) go through the FL envelope curve code `FUN_00782b50` — decoded in round 173d3, §12.1 (the same curves as
+  Love Philter's).
 - Parameter values are clamped to each control's range on load **[DECOMP]**.
 
 ### 2.2 Parameter laws **[DECOMP `FUN_00853e80`, `FUN_00851dd0`; EXEC field dumps]** (completes round 20 §4.2.2)
@@ -208,7 +210,11 @@ Per band and per modulator voice (block of n frames at the band's level) **[DECO
 - **Gate** (map 3): with the subtractive flag (all data) `e ← max(e − |T|, 0)`; without it values below T are zeroed.
 - **Saturation** (only when map 11 ≠ 0; no demo): `e ← e·g_v·(1 − mix) + mix·4·table(e·g_v/4)/32768`, table of
   16 384 linear-interpolated steps holding `8191.75·c₃(map12(x))` at `x = ln(1 + 8u)/ln 9`, u = 0…1; the voice's pan
-  gains then use 1 instead of `g_v` **[DECOMP `FUN_00859150`, `FUN_0062bc80`; EXEC −99 dB]**.
+  gains then use 1 instead of `g_v` **[DECOMP `FUN_00859150`, `FUN_0062bc80`; EXEC −99 dB, −141 dB since round
+  173d3]**. The kernel `FUN_0062bc80` runs on the x87 with extended precision and truncating rounding (control word
+  `0x0F3F`): the table index is `trunc(x·scale)`, and the interpolation and `x·dry + v·wet` are evaluated in extended
+  precision and rounded to float once at the end. The table itself is built with one map cursor stepped forward along
+  the log-spaced x values (§12.1). The −99 dB of round 35 came from a float model of this kernel.
 
 ### 4.3 Smoothing **[DECOMP `FUN_00606730`, `FUN_006064e0`, `FUN_00606600` (x87); EXEC]**
 
@@ -359,17 +365,18 @@ Demo instances (speech-like test modulator, chord carrier; SG forced to 0; "HQ" 
 | Ookay / NewStuff as stored | both outputs silent in the harness (no synth, contour from the silent carrier) | — |
 | With SG as stored: model + SG_x64.dll vs DLL (8 instances) | −135.8…−154.3 dB | — |
 
-The −95…−127 dB cases come from the map evaluator (FL's cursor arithmetic is reproduced only to ~10⁻⁷ in x).
+The −95…−127 dB cases came from the map evaluator (FL's cursor arithmetic reproduced only to ~10⁻⁷ in x) and from
+the saturation kernel's precision. Both are exact since round 173d3 (§12.4: every map case ≤ −141 dB).
 
 ---
 
 ## 10. Not decoded / open
 
-- Map segments with tension ≠ 0 (curve code `FUN_00782b50` types 0–12); no demo uses them.
+- ~~Map segments with tension ≠ 0~~ — decoded in round 173d3 (§12.1).
 - The Soundgoodizer engine and whether FL's instance ends up with `SG.dat` or its default state (EXEC with SG.dat
   path resolution not achieved).
 - The internal Sytrus synth's sound (EXEC not achieved); the meaning of the host flags `+0x514`/`+0x519` beyond
-  metering; the menu name of the subtractive-gate flag.
+  metering. (The subtractive flag's menu name, "Subtractive denoising", was found in round 173d3, §12.2.)
 - The exact host option that sets ProcessMode bit value 2 (inference: "HQ for all plugins").
 
 ---
@@ -416,13 +423,157 @@ The −95…−127 dB cases come from the map evaluator (FL's cursor arithmetic 
 6. Update `docs/STATUS.md` accordingly (band filters, maps, noise, HP/LP, unison and output level are now exact;
    Soundgoodizer and the internal synth remain approximations).
 
+## 12. Maps and the subtractive gate (round 173d3)
+
+**Date:** 2026-11-06. Same DLL as above (SHA-256 `43d10692…14bb0`, unchanged). New Ghidra project (full
+auto-analysis, read-only runs), scratch `/mnt/e/lynx-work/audit173d3/vx/` (`out/d*.c` decompilations, `exec/` and
+`golden/` EXEC runs). The round-35 EXEC harness `vcx.c` was rebuilt unchanged (Zig 0.14.1).
+
+### 12.1 The map object **[DECOMP `FUN_00784790`, VMT `0x77ba50`, `FUN_0077bd00`, `FUN_0077ef50`, `FUN_0077fa70`, `FUN_00781c40`, `FUN_00782b50`, `FUN_00783730`, `FUN_007812a0`]**
+
+Each of the 13 maps is an instance of FL's envelope library class in its "map" flavour (constructor `FUN_00784790`:
+kind 3, length 1, option byte `0x20`). It is the same library code that Love Philter's maps use (round 66 §3.2,
+round 31 §4.4); the differences are noted below.
+
+- **Stored record** (load/save `FUN_0077bd00`, record version 3): `i32` kind (3), `i32` version (3), `i32` n, then n
+  points of 24 bytes — `f64` Δx, `f64` level, `f32` tension, `u8` curve mode, two flag bytes, `i8` **sign** — then
+  five `i32` (flags, on, decay, loop, sustain; Vocodex writes 0, −1, −1, −1, −1). The loader reads the rest of a record
+  only when its stored kind is 3. In memory the level is kept as a **float** (a NaN level takes the previous point's, starting
+  from 0); Δx stays double. The sign byte is not an input: the loader recomputes it (see below) and the saver writes
+  the recomputed value (that is why stored files show `…02` on every point but the first). The map flavour drops
+  decay / loop / sustain (sets them to −1) and clears the second flag byte.
+- **Normalisation** (`FUN_0077ef50`, at every load): if the first Δx is positive a point (x = 0, same level) is
+  inserted in front; then with `T = ΣΔx`, if `T > 0` every Δx is multiplied by `1/T` (skipped when that factor is
+  exactly 1), otherwise a point at x = 1 with the last level is appended. Negative Δx are set to 0 afterwards.
+- **Preparation** (`FUN_0077fa70`, per point i ≥ 1): `sign = 0` for a zero tension, else ±1 by the tension's sign
+  bit; the curve constants of modes 0–12 exactly as round 66 §3.2 / round 31 §4.4 (step count
+  `Round(0.001·(float(1000001^float(1 − 0.6|t|)) − 1))` for modes 3–6, +1 for stairs with t ≥ 0; mode 0/1
+  `k = float(1000001^|t| − 1)·sgn t`, `1/|k|`, `ln(|k| + 1)`; mode 10 "smooth" from its neighbours; modes 11/12 from
+  `1 − (1 − max(0.9|t|, 2⁻¹⁶))³`); `sign = 2` (straight) for modes 0, 1, 7, 8, 9, 11, 12 with t = 0 (mask `0x1B83`), for
+  mode 10 when the level step is below 2⁻²⁴, and for mode 6 with no steps and t > 0.
+- **Read** (`FUN_00783730`, used by the band set-up for every map): a cursor is started (`FUN_00781c40`: index 0;
+  rate 1 and phase 1 when the first Δx is 0, else rate `1/Δx₀` and phase 0; start = level₀, delta 0) and advanced
+  once by x (`FUN_00782b50`): `phase += x·rate`; while the phase's high word says ≥ 1: `phase = (phase − 1)/rate`
+  (x when the rate is 0), start = level(idx), idx + 1 (not past the last point), delta = level(idx) − start, and the
+  new rate `1/Δx` (rate 1 and phase + 1 for Δx ≤ 0; rate and phase 0 when the index did not move). The value is
+  `start + shape(idx, phase)·delta`, **all in double** (Love Philter rounds start, delta and the shape to float; the
+  map read here does not). `level(i) = double(float level) − c`, with c = 0.5 for the centred maps 1, 2, 10.
+- **Shapes** (`FUN_00782b50`): identical formulas to round 66 for every mode (0 single curve, 1 double curve, 2 hold
+  = 0 until the point, 3 stairs, 4 smooth stairs, 5 pulse, 6 wave, 7/8 single/double curve 2, 9 half sine, 10 smooth,
+  11/12 single/double curve 3), with `sign = 2` giving the straight line, evaluated in double (the stairs product is
+  float). Exp/Ln/Sin/Cos are the Delphi runtime's (`FUN_0040ad30`, `FUN_0040bf50`, `FUN_0040ba10`, `FUN_0040b920`).
+
+**So the round-35 open item is closed:** curved map segments are FL's envelope curves, the same law as Love
+Philter's, read once per band at set-up.
+
+### 12.2 The subtractive flag **[DECOMP `FUN_0084efb0`, `FUN_0084dc20`, `FUN_0084de50`; DATA: the form resource]**
+
+- **Menu:** Vocodex's options menu (the button `|Options` at the top of the form, popup `SynthResModule.OptionsMenu`)
+  holds, in order: **"&Detect modulator noise level"** (`DetectNoiseMenu`), **"Subtractive denoising"**
+  (`SubNoiseThresMenu`, AutoCheck), a separator, **"&About"**. The popup handler `FUN_0084de50` sets the check mark
+  from `+0x190`; the click `FUN_0084dc20` copies the check mark into `+0x190` and re-runs the band set-up
+  (`FUN_00851dd0`) under the plugin lock. So the flag's caption is **"Subtractive denoising"**.
+- **Loader correction to §2.1:** the loader sets `+0x190 = 1` (and clears `+0x191…0x193`) *before* reading the
+  `0x24`-byte block, so for state versions ≥ 5 the stored byte wins; only versions < 5 (shorter block) keep the forced
+  1. All demo states store 1.
+- **Meaning** (§4.2, unchanged): with the flag on the follower's envelope becomes `max(e − T, 0)`; off, values below T
+  are zeroed. `T = (1025^m − 1)/1024 / max(g_v, 2⁻¹⁶)`, m = map 3 read at the pitch-shifted band position. A new
+  instance's map 3 is flat at 0 (T = 0), so the switch does nothing until map 3 is drawn or detected.
+- **"Detect modulator noise level"** (`FUN_0084dba0` → `FUN_00850e20(…, 0)`; the end `FUN_0085fce0` →
+  `FUN_00850e20(…, 1)`): map 3 is reset flat at 0 and, for `Round(2·fs)` samples of playback (counted down in the
+  render, which then posts a window message), each band's modulator voices record the maximum over blocks of
+  (follower envelope before the gate × g_v). At the end every voice adds a point at its shifted position
+  `x = S⁻¹(f·p)` (when 0 ≤ x ≤ 1) with level `clamp(ln(float(peak·1792) + 1)/ln 1025, 0, 1)` — i.e. a threshold of
+  1.75 × the measured noise peak — then the first and last points copy their neighbours' levels, the points are
+  sorted, the band set-up re-runs and the editor switches to map 3. Not ported in this round (it needs a 2-second
+  measuring mode in LYNX's engine and an editor command).
+
+### 12.3 How FL presents the maps **[DATA: form `TSynthEditorForm`; DECOMP `FUN_0084f730`, `FUN_00858de0`, `FUN_008604e0`]**
+
+The map editor (`TMEnvEditor`) shows one map at a time, chosen in the combo `ArtSelect` (hint "|Editor target"). Its
+items, with the section headers FL draws as separators, map to the map indices in order:
+
+| # | Section | Caption | Centred | New instance | Editor colour (RGB) | "Follows pitch" button |
+|---|---|---|---|---|---|---|
+| 0 | Equalizer | Band gain multiplier | no | flat 0.5 | `#D2E168` | yes |
+| 1 | Equalizer | Band panning | yes | flat 0.5 | `#D2E168` | yes |
+| 2 | Equalizer | Band gain offset | yes | flat 0.5 | `#D2E168` | yes |
+| 3 | Equalizer | **Modulator noise level** (the gate map) | no | flat 0 | `#D2E168` | — (always shifted) |
+| 4 | Equalizer | Modulator pass-through | no | flat 0 | `#D2E168` | yes (on by default) |
+| 5 | Envelope follower | Hold | no | flat 0.5 | `#5B00F4` | yes |
+| 6 | Envelope follower | Envelope attack | no | flat 0.5 | `#5B00F4` | yes |
+| 7 | Envelope follower | Envelope release | no | flat 0.5 | `#5B00F4` | yes |
+| 8 | Spectral distribution | Band distribution | no | line S⁻¹(E2 = 440·2^(−29/12) Hz) → S⁻¹(20 kHz) = 0.142937… → 0.991756… | `#99F400` | — |
+| 9 | Spectral distribution | Band width | no | flat 0.5 | `#99F400` | yes |
+| 10 | Spectral distribution | Modulator pitch shift | yes | flat 0.5 | `#F4CA00` | — |
+| 11 | Envelope saturation | Saturation mix | no | flat 0 | `#00F4AB` | yes |
+| 12 | Envelope saturation | Saturation curve | no | line 0 → 1 | `#00F4AB` | — |
+
+- Defaults: constructor masks `0x818` (maps 3, 4, 11 at 0) and `0x406` (maps 1, 2, 10 centred); two points per map
+  (x = 0 and 1, tension 0, mode 0). Option bytes: a new instance has maps 3 and 4 on "Follows modulator pitch shift" (`FUN_0084ef70`, mask `0x18`;
+  also applied to states older than version 4).
+- **"Follows modulator pitch shift"** (the button `PitchShiftMapBtn`, `FUN_008604e0`) writes the shown map's option
+  byte and re-runs the band set-up; it is hidden for maps 3, 8, 10, 12 (mask `0x1508`).
+- **Editor grid** (`FUN_00858de0` → `FUN_0081e3b0`; reading the arguments as grid steps is an **inference**): x
+  steps of 1/112 (map 8: one band, 1/(N − 1)); y steps of 1/32 with 8 sub-steps (map 8: 1/112; map 10: 1/24 = a
+  semitone of its ±1 octave).
+- **Point menu** (the envelope editor's, form strings): "&Delete", then "Mode": Hold (2), Smooth (10), Single curve
+  (0), Single curve 2 (7), Single curve 3 (11), Double curve (1), Double curve 2 (8), Double curve 3 (12), Half sine
+  (9), Stairs (3), Smooth stairs (4), Pulse (5), Wave (6) (value = stored mode). Tension is the point's curve handle.
+- Every map edit (draw, point move, the pitch button, the subtractive item, Detect) re-runs `FUN_00851dd0` under the
+  plugin lock; that set-up recomputes coefficients, gains, thresholds, follower windows and smoother constants but
+  does **not** clear the filter states (the biquad design `FUN_00626690` only writes coefficients), so an edit does
+  not restart the sound.
+
+### 12.4 EXEC
+
+The map cases start from a demo state (Olbaid 71, 47 bands, Draft off, SG 0) or, for the unit-test states, from FL's
+default instance (24 bands); the modulator is on side input 1 and the carrier on side input 2, and the maps are
+written by LYNX's `vocodex::withMap`. Runs last 0.5–1.5 s at 44.1 kHz with block 512. The modulator is noise bursts
+plus a buzz (the demo rows use the round-35 test signals) and the carrier is four saws. LYNX = `vocodex::Engine` (the shipping code); error =
+`20·log10(rms(LYNX − DLL)/rms(DLL))`.
+
+| Case (47 bands unless noted) | Error (dB) | Peak error (dB) |
+|---|---|---|
+| base (demo state Olbaid 71, Draft off) | −162.0 | −143.6 |
+| curves on gain / pan / offset maps | −170.0 | −146.0 |
+| gate map line 0 → 0.5, subtractive on / off | −162.6 / −162.0 | −143.5 / −143.6 |
+| curved gate map, subtractive on / off | −162.0 / −162.0 | −143.2 / −143.6 |
+| curved band distribution | −157.1 | −144.3 |
+| curved pitch and band width maps | −160.1 | −144.7 |
+| saturation mix only; + straight curve; + smooth curve | −142.4 / −141.1 / −141.7 | −137.5 / −136.2 / −138.8 |
+| every curve mode 0…12 on one map, two tension sets | −162.7 / −158.8 | −147.3 / −144.8 |
+| curved hold / attack / release maps | −162.2 | −143.6 |
+| the six unit-test states (FL's default instance, 24 bands, 0.5 s) | −142.5…−163.2 | — |
+| the six demo instances with stored maps (SG 0) | −141.7…−163.8 | — |
+
+In FL itself the subtractive flag changes the output by −36.8 dB (gate line 0 → 0.5) and −22.1 dB (curved gate map,
+unit-test state) relative to the signal, so the switch is audible once map 3 is drawn.
+
+### 12.5 For LYNX (done in this round)
+
+- `core/Vocodex`: the maps keep tension and curve mode per point; `MapReader` is the map read of §12.1 (normalisation,
+  float levels, every curve mode, double-precision cursor) and the engine reads every map through it. New API:
+  `readMaps`, `withMap` (FL's record layout, sign byte as FL's loader computes it, header / trailer / install data
+  kept), `withMapFollowsPitch`, `mapValue`, `mapInfo` (captions, sections, centring, defaults), `defaultMap`,
+  `MapCurve` (FL's mode numbers).
+- The effect takes an edited state without a rebuild (`acceptState`): the new set-up is prepared off the audio thread
+  and takes over the running filters, followers, smoothers, FIFOs and gain ramps (`Engine::takeOver`), as FL's
+  in-place band set-up does. A new layout (band count, order, unison, hold mode, Draft), carrier or SG amount still
+  builds a new instance.
+- Open: the editor UI (captions above), "Detect modulator noise level" (§12.2).
+
 ---
 
 ## Evidence index
 
 | Function / data | What it shows | Marker |
 |---|---|---|
-| `FUN_0084efb0` | state loader: block sizes per version, option bytes, subtractive flag forced to 1, tone and notes | DECOMP |
+| `FUN_00782b50`, `FUN_00781c40`, `FUN_00783730`, `FUN_0077fa70`, `FUN_0077ef50`, `FUN_0077bd00` | map read: cursor, curve shapes, preparation, normalisation, record load/save (§12.1) | DECOMP + EXEC |
+| `FUN_0084dc20`, `FUN_0084de50`, form `SubNoiseThresMenu` | "Subtractive denoising" menu item ↔ `+0x190` (§12.2) | DECOMP + DATA |
+| `FUN_00850e20`, `FUN_0084dba0`, `FUN_0085fce0` | "Detect modulator noise level" (§12.2) | DECOMP |
+| `FUN_0084f730`, `FUN_008604e0`, `FUN_00858de0`, form `ArtSelect` | map captions, defaults, follows-pitch button, editor grid (§12.3) | DECOMP + DATA |
+| `FUN_0084efb0` | state loader: block sizes per version, option bytes, subtractive flag preset to 1 (stored byte wins from version 5, §12.2), tone and notes | DECOMP |
 | `FUN_00853e80` | parameter laws, filters for tags 3/5/7, ×4 contour factors, SG forwarding | DECOMP |
 | `FUN_00851880`, `FUN_0084e660` (ProcessMode branch) | draft decision, levels 5/1, follower class per hold mode, contour objects | DECOMP + EXEC (`disp=1,2`) |
 | `FUN_00851dd0` (+ `b1dd0.asm` for hidden `2^x` arguments) | centres, pitch, maps, widths, gains, sub-filters, oversampling, levels, windows, smoother times, tail | DECOMP + EXEC dumps (`cmpsetup.py`) |
