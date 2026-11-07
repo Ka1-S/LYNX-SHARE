@@ -368,9 +368,16 @@ public:
 private:
     void handleMessageFromWorker (const juce::MemoryBlock& data) override
     {
+        auto message = juce::ValueTree::readFromData (data.getData(), data.getSize());
+        if (message.hasType ("key")) // a key the plugin's window left unused (issue #99), never an ask() reply
+        {
+            const juce::KeyPress key ((int) message["code"], juce::ModifierKeys ((int) message["mods"]), (juce::juce_wchar) (int) message["char"]);
+            juce::MessageManager::callAsync ([key] { runSecondaryWindowKey (key); });
+            return;
+        }
         {
             const std::scoped_lock l (replyMutex);
-            reply = juce::ValueTree::readFromData (data.getData(), data.getSize());
+            reply = std::move (message);
         }
         trace ("parent: reply received " + reply.getType().toString());
         replyReady.signal();
