@@ -4423,9 +4423,25 @@ private:
                 engine->editSong ([&] (lynx::Song& song) { option.change (song.channels[0].plugin); });
                 const auto after = play (*engine);
                 const auto sameInstance = engine->getChannelInstrument (0).get() == instrumentBefore;
-                const auto a = option.seen (control), b = option.seen (before), c = option.seen (after);
-                const auto visible = a != b;
-                const auto works = c == a;
+                // the counts differ between phases (how many blocks the note spans, how many instances the phase made):
+                // what matters is whether each kind of event is there at all
+                auto shape = [] (const juce::String& seen) {
+                    juce::String out;
+                    for (const auto& token : juce::StringArray::fromTokens (seen, " ", {}))
+                        out << token.upToFirstOccurrenceOf ("=", false, false) << (token.fromFirstOccurrenceOf ("=", false, false).getIntValue() > 0 ? "=yes " : "=no ");
+                    return out;
+                };
+                auto instances = [] (const std::vector<Event>& events) {
+                    std::set<juce::String> made;
+                    for (const auto& e : events)
+                        made.insert (e.instance);
+                    return (int) made.size();
+                };
+                const auto a = option.seen (control) + " instances=" + juce::String (instances (control)),
+                           b = option.seen (before) + " instances=" + juce::String (instances (before)),
+                           c = option.seen (after) + " instances=" + juce::String (instances (after));
+                const auto visible = shape (option.seen (control)) != shape (option.seen (before));
+                const auto works = shape (option.seen (after)) == shape (option.seen (control));
                 report << option.name << ": control " << a << " | before " << b << " | after the change " << c << " | same_instance=" << (int) sameInstance
                        << " | test_sees_the_option=" << (int) visible << " | " << (! visible ? "NOT PROVEN" : works ? "acts on the plugin" : "DEAD until re-created") << "\n";
                 ok = ok && visible && works;
