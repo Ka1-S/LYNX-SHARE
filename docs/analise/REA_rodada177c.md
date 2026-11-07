@@ -318,8 +318,9 @@ These runs prove where passes land. Each report says `result=FAILED` because the
 Shots: `LYNX --comp177shot <prefix> <project>` draws them offscreen, in `E:\lynx-work\comp177c\lx\shots\`.
 
 **Muted clip look:** FL marks a muted clip with an X on its header, LYNX with a veil and a diagonal across the clip. The diagonal
-came in `72d40f6f2` (2026-10-16, "FL-style clip look"), as part of that round's own clip recipe; no FL evidence for the line was
-found in that commit's comment. It applies to every muted clip, so it is left for a separate slice.
+dates from `5833ba6fa` (2026-10-14, "Playlist: tools, clip edges, fade fix and time selection"). Round 165q only records it as
+"the muted look"; no search of the docs here found a decision to differ from FL. It applies to every muted clip, so it is left for
+a separate slice.
 
 **What this slice gives users:** comping today means "Comp these takes" plus "Promote this take" on a lane clip. Swipe, audition
 and Flatten are in the core and have no UI until slice 177c-2.
