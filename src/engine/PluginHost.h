@@ -292,6 +292,9 @@ public:
     const plugincatalog::Folders& databaseFolders() const noexcept { return userFolders; }
     void setDatabaseFolders (const plugincatalog::Folders& folders);
 
+    // How many scan child processes this host has started (--lv2scantest).
+    int scanChildrenStarted() const noexcept { return scanChildren; }
+
     // Scan child mode: describes a file's plugins into `output` (XML). Returns the number found.
     static int scanOneFile (const juce::String& formatName, const juce::String& file, const juce::File& output);
 
@@ -422,8 +425,9 @@ private:
     std::map<juce::String, bool> existsCache;
     std::mutex existsLock;
     void rememberEmptyScan (const juce::String& file);
+    bool describeLv2 (const juce::FileSearchPath& paths, const std::function<bool (float, const juce::String&)>& progress);
     void save();
-    bool scanOne (juce::AudioPluginFormat& format, const juce::String& file);
+    bool scanOne (juce::AudioPluginFormat& format, const juce::String& file, const std::function<bool()>& keepGoing = {});
 
     juce::AudioPluginFormatManager formats;
     juce::KnownPluginList known;
@@ -431,6 +435,7 @@ private:
 
     std::mutex scanLock, saveLock, flDbLock;
     std::atomic<bool> stopScan { false };
+    std::atomic<int> scanChildren { 0 };
     FlPluginDb flDb;
     int flDbFiles = 0;
     bool flDbLoaded = false;

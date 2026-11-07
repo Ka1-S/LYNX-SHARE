@@ -17100,6 +17100,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "CtlWake173dTests.inc"
 #include "Issue32dTests.inc"
 #include "Issue81Tests.inc"
+#include "Issue85Tests.inc"
 #include "FlpExport171eTests.inc"
 #include "Tp172cTests.inc"
 #include "Layout172aTests.inc"

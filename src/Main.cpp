@@ -963,6 +963,12 @@ public:
             return;
         }
 
+        if (args.contains ("--lv2scantest"))
+        {
+            runLv2ScanTest (args[args.indexOf ("--lv2scantest") + 1].unquoted());
+            return;
+        }
+
         if (args.contains ("--wrappertest"))
         {
             const auto i = args.indexOf ("--wrappertest");
@@ -1974,6 +1980,90 @@ private:
     bool relaunched = false; // relaunchFromAsciiPath ran LYNX from its short path: this process only waited
     bool updateHelper = false; // --apply-update (round 166b)
     juce::String uncleanLastStep; // last step of a previous run that ended without closing
+
+    // LYNX_PROFILE_DIR=<folder> LYNX --lv2scantest report.txt (Linux, issue #85): the LV2 scan's promise, with real child
+    // processes. A new PluginHost per step, as every start of LYNX has. The LV2 folders of the machine are read too.
+    void runLv2ScanTest (const juce::String& reportPath)
+    {
+        juce::String report;
+        auto ok = lynx::platform::profileOverride() != juce::File();
+       #if JUCE_LINUX
+        const auto folder = lynx::platform::profileOverride().getChildFile ("lv2-test");
+        const juce::FileSearchPath paths (folder.getFullPathName());
+        const auto check = [&] (const juce::String& name, bool passed) {
+            report << name << "=" << (passed ? "ok" : "FAILED") << "\n";
+            ok = ok && passed;
+        };
+        const auto install = [&] (const juce::String& name) {
+            const auto bundle = folder.getChildFile (name + ".lv2");
+            bundle.createDirectory();
+            bundle.getChildFile ("manifest.ttl").replaceWithText ("@prefix lv2: <http://lv2plug.in/ns/lv2core#> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                                                                  "<urn:lynx-test:" + name + "> a lv2:Plugin ; lv2:binary <" + name + ".so> ; rdfs:seeAlso <plugin.ttl> .\n");
+            bundle.getChildFile ("plugin.ttl").replaceWithText ("@prefix doap: <http://usefulinc.com/ns/doap#> .\n<urn:lynx-test:" + name + "> doap:name \"" + name + "\" .\n");
+        };
+        auto date = juce::Time::getCurrentTime();
+        const auto touch = [&] { // the next date, whatever the file system's date resolution
+            date += juce::RelativeTime::seconds (2.0);
+            folder.getChildFile ("a.lv2/plugin.ttl").setLastModificationTime (date);
+        };
+        const auto listed = [] (lynx::PluginHost& host, const juce::String& name) {
+            for (const auto& d : host.getKnownPlugins().getTypes())
+                if (d.fileOrIdentifier == "urn:lynx-test:" + name)
+                    return true;
+            return false;
+        };
+        const auto step = [&] (const juce::String& name, int children, const std::function<void (lynx::PluginHost&)>& prepare = {}) {
+            lynx::PluginHost host (true);
+            if (prepare)
+                prepare (host);
+            host.scan (paths, {});
+            check (name, host.scanChildrenStarted() == children && listed (host, "a"));
+        };
+
+        install ("a");
+        step ("first_scan_one_child", 1);
+        step ("nothing_changed_no_child", 0);
+        touch();
+        step ("ttl_updated", 1);
+        install ("b");
+        step ("bundle_installed", 1);
+        step ("forget_file", 1, [] (lynx::PluginHost& host) { host.forgetFile ("urn:lynx-test:a"); });
+        step ("forget_all", 1, [] (lynx::PluginHost& host) { host.forgetAll(); });
+        lynx::platform::settingsFile ("plugins.xml").deleteFile();
+        step ("list_lost", 1);
+        step ("nothing_changed_again", 0);
+
+        // cancelled while the child works: stopped at once, and nothing is taken for done
+        touch();
+        setenv ("LYNX_TEST_CRASH", "lv2-batch-hang", 1);
+        {
+            lynx::PluginHost host (true);
+            const auto started = juce::Time::getMillisecondCounter();
+            host.scan (paths, [] (float, const juce::String&) { return false; });
+            check ("cancel_stops_the_child", host.scanChildrenStarted() == 1 && juce::Time::getMillisecondCounter() - started < 20000);
+        }
+        unsetenv ("LYNX_TEST_CRASH");
+        step ("described_after_cancel", 1);
+
+        // the child dies: plugin by plugin takes over (stopped after two of them: a machine may have hundreds)
+        touch();
+        setenv ("LYNX_TEST_CRASH", "lv2-batch", 1);
+        {
+            lynx::PluginHost host (true);
+            host.scan (paths, [&host] (float, const juce::String&) { return host.scanChildrenStarted() < 3; });
+            check ("crash_falls_back_plugin_by_plugin", host.scanChildrenStarted() == 3);
+            auto blamed = false;
+            for (const auto& file : host.getKnownPlugins().getBlacklistedFiles())
+                blamed = blamed || file.startsWith ("lv2-folders:");
+            check ("crash_blacklists_nothing", ! blamed);
+        }
+        unsetenv ("LYNX_TEST_CRASH");
+        step ("described_after_crash", 1);
+       #endif
+        juce::File (reportPath).replaceWithText (report + "result=" + (ok ? "OK" : "FAILED") + "\n");
+        setApplicationReturnValue (ok ? 0 : 1);
+        quit();
+    }
 
     // LYNX.exe --selftest report.txt: renders 2 s without a sound card and writes the result.
     // Exit code 0 = audio came out, 1 = silence.
