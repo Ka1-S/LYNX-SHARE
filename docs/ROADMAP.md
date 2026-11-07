@@ -102,6 +102,6 @@ Ordered to get something usable as early as possible without ever breaking the a
 - [ ] Complex Pro formants (Live keeps formants when transposing; LYNX's +5 st is 3 dB louder with a different tilt)
 - [ ] Excess level at 60–95 Hz in the stretched renders
 - [ ] Beats and Texture parameters (Transient Loop Mode/Envelope, Grain Size, Flux) beyond the defaults
-- [ ] Clips with several warp markers at different rates (today one rate per clip)
+- [x] Clips with several warp markers at different rates: kept, rendered segment by segment (round 175a, M1; editing them = M3)
 - [ ] LYNX's built-in instruments and effects in exported sets (N3; listed in the export report for now)
 - [ ] Session view (N5) and an optional Live-style layout (N6)

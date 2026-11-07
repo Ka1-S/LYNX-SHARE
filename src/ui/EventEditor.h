@@ -5,6 +5,7 @@
 // pattern): scale/offset, randomise, FL's LFO, clear. Each gesture is one undo step. While the pattern plays, its
 // events drive the target (core/RackRenderer).
 
+#include <functional>
 #include <memory>
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -20,6 +21,10 @@ namespace EventEditorHooks
 // File › Browse automations: opens the Browser at the automation scores (set by the main window)
 extern std::function<void()> onBrowseAutomations;
 }
+
+// FL's events-to-automation tool ("Convert to automation"), also opened by the Playlist's lossy automation merge:
+// `pointsFor` says how many points a sensitivity gives (0..1), `onAccept` runs on Accept; Cancel does nothing.
+void openConvertToAutomationPanel (int events, double initialPercent, std::function<int (float)> pointsFor, std::function<void (float)> onAccept);
 
 // Just the editor (for --snapshot mode).
 std::unique_ptr<juce::Component> makeEventEditor (AudioEngine& engine, const AutomationTarget& target);
