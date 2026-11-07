@@ -142,6 +142,22 @@ int autoColorGroup (Song& song, int track);
 void setSeparator (Song& song, const std::vector<int>& tracks, bool on);
 void dockTracks (Song& song, const std::vector<int>& tracks, MixerDock dock);
 
+// --- Folded mixer groups (round 177a, LYNX's addition to FL's groups; REA_rodada177a §2) ---------------------------------
+// A group can fold when it is set off by a separator (on its first strip or after its last) and holds 2+ inserts.
+bool canFold (const Song& song, int track);
+// The insert a group sums into: a member every other member sends only to (no Master route, no other send), the way
+// "Create submix" makes it. -1 = not a summing group.
+int groupBus (const Song& song, const std::vector<int>& group);
+// How a strip is shown: normally, hidden (a member of a folded group) or as the slim tab of a folded group that has no
+// bus (its first strip). A folded summing group shows only its bus strip.
+enum class FoldShow : std::uint8_t { strip, hidden, tab };
+std::vector<FoldShow> foldView (const Song& song); // one per mixer track (all `strip` when no group is folded)
+// Folds / unfolds `track`'s group (the flag sits on its first strip). Returns the new state.
+bool toggleFold (Song& song, int track);
+bool isFolded (const Song& song, int track);
+// Folds (or unfolds) every group that can fold. Returns how many changed.
+int foldAll (Song& song, bool fold);
+
 // --- FL's mixer track menu › Routing (REA round 165f-mixer: FUN_012ac520 / FUN_012ac950) ------------------------------
 enum class RouteKind
 {
