@@ -302,7 +302,7 @@ std::vector<std::uint8_t> writeScore (const std::vector<Note>& notes)
     return out;
 }
 
-std::vector<std::uint8_t> writeEventScore (const std::vector<PatternEvent>& events)
+std::vector<std::uint8_t> writeEventScore (const std::vector<PatternEvent>& events, std::uint32_t control)
 {
     std::vector<std::uint8_t> out;
     auto u8 = [&out] (int v) { out.push_back ((std::uint8_t) v); };
@@ -329,7 +329,7 @@ std::vector<std::uint8_t> writeEventScore (const std::vector<PatternEvent>& even
     for (const auto& e : events)
     {
         r32 ((std::uint32_t) std::max<std::int64_t> (0, e.tick));
-        r32 (0); // the control: FL sets it to 0 in an event score (FUN_012dfdb0)
+        r32 (control); // FL 2026's own Save automation as wrote 5 for Tempo (REC_Tempo's low bits); others not observed yet
         const auto v = std::clamp (e.value, 0.0f, 1.0f);
         std::uint32_t bits = 0;
         std::memcpy (&bits, &v, sizeof bits);

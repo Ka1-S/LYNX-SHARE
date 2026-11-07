@@ -59,7 +59,7 @@ std::vector<std::uint8_t> writeScore (const std::vector<Note>& notes);
 // as an .fsc of header format 0x18: 0x41 = 0, then 0xDF records {tick, control 0, the value normalised to 0..1 as a
 // float}. Target-agnostic: opening one puts its curve on whatever target the editor shows (a Tempo curve onto a
 // volume, and back). LYNX's lane values are the normalised values (exactly FL's for the tempo, volumes and pans).
-std::vector<std::uint8_t> writeEventScore (const std::vector<PatternEvent>& events);
+std::vector<std::uint8_t> writeEventScore (const std::vector<PatternEvent>& events, std::uint32_t control = 0);
 // The events of an event score at LYNX's PPQ, sorted, one per tick; nothing when the file is not one (a note score).
 std::optional<std::vector<PatternEvent>> parseEventScore (std::span<const std::uint8_t> bytes);
 

@@ -168,3 +168,20 @@ own files, **[FL]** seen in a running FL, **[CODE]** LYNX source, **[model]** ou
 - **#94 SPL Transient Designer:** a commercial plugin, so its code can't be used. LYNX already has FL's Transient Processor.
   A level-independent shaper of LYNX's own is a possible new effect, a decision for the user.
 - **#93 MCP server:** the local control API is #75, with early work in #71. An MCP server could sit on top of it.
+
+## 10. #86 checked in a running FL 2026.1.7 (corrects §4 and §1)
+
+GUI session 2026-11-06 on t87b.flp and on the "Default (Basic with limiter)" template. Shots: /mnt/e/lynx-work/issues178a/fl/e2,
+e5, e7, e8, e11, f2. Files FL wrote: fl/tempoev.fsc, fl/t87b.flp.
+
+- **Menu text:** the Event editor's File menu reads *Open automation… / Browse automations / Save automation as… / Import
+  MIDI file… / Paste from MIDI clipboard… / Export as score sheet…*, not "Open score / Save score as". The dialog's filter is
+  "FL Studio score file (*.fsc)". LYNX now has a File button with Open automation… and Save automation as…. Browse, MIDI
+  import and paste, and the score sheet are not in LYNX's Event editor.
+- **Event .fsc, measured:** FLhd format 0x18, PPQ 96, `0xDF {u32 tick, u32 5, f32 0..1}` for a Tempo lane. §4 said the control
+  field is 0; FL wrote 5 here. LYNX writes 5 for Tempo and 0 for the others. Other targets were not observed in FL.
+- **Project storage, measured:** t87b.flp holds `0xDF {tick, 0x40000005, BPM × 1000}`. Last record 66651, and FL's hint bar showed
+  "Tempo - 66.651 BPM"; the .fsc's last value 0.110646 is the same tempo on the 10..522 BPM scale. This confirms §2.
+- **Tempo menu:** "Edit events" is enabled and gets a check mark once events exist. "Edit events in new window" and "Edit events in
+  piano roll" were greyed in both projects, before and after drawing events (t87b) and on the empty template. What enables them
+  was not tested. LYNX enables its piano roll item for the tempo: a difference for the user to decide on.
