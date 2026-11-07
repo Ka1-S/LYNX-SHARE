@@ -82,10 +82,10 @@ int takeTrack (const Song& song, int insert, std::int64_t start, std::int64_t en
 void linkTakeTrack (Song& song, int track, int insert);
 
 // Puts recorded takes on the Playlist: one audio channel per file (through its insert; 0 = a new free insert) and a
-// clip per part. Several parts that cover the same song range (loop passes) land as FL 26 leaves them (observed, REA round
-// 177c): one track per pass on the next free tracks, the first pass on top as the header of a new track group, open;
-// recording again makes another group, nothing else moves. With Blend off every pass is muted, with Blend on every pass
-// plays. Comping is a later, explicit step (comp::compTakes).
+// clip per part. Loop passes land as FL 26 leaves them (observed, REA round 177c): one track per pass, each on the next track
+// with no clip in its range. The first keeps what it was, usually the header of a new open group; the others join it and take
+// its name if it has one, else they stay "Track N". With Blend off every pass is muted, with Blend on every pass plays.
+// Comping is a later, explicit step (comp::compTakes).
 struct TakeFile
 {
     std::string path, name;

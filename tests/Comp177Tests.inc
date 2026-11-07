@@ -245,7 +245,7 @@ TEST (comp177_fl_loop_take_layout)
             lastPass = i;
     CHECK (! takes::promoteTake (song, lastPass, 0, 1000, 1100));
 
-    // recording again over it: a new group on the next free tracks; nothing replaced, no track moved
+    // recording again over it: a new group on the next tracks free in that range; nothing replaced, no track moved
     Clip other;
     other.pattern = 0;
     other.track = 5;
@@ -257,9 +257,88 @@ TEST (comp177_fl_loop_take_layout)
     CHECK (song.playlist.size() == before.size() + 3);
     for (std::size_t i = 0; i < before.size(); ++i)
         CHECK (song.playlist[i].track == before[i].track && song.playlist[i].start == before[i].start);
-    CHECK (comp177::onTrack (song, 6).size() == 1 && comp177::onTrack (song, 8).size() == 1 && comp177::onTrack (song, 6)[0].offset == 0);
-    CHECK (! song.playlistTracks[6].grouped && song.playlistTracks[7].grouped && song.playlistTracks[8].grouped);
+    CHECK (comp177::onTrack (song, 3).size() == 1 && comp177::onTrack (song, 4).size() == 1 && comp177::onTrack (song, 3)[0].offset == 0);
+    CHECK (comp177::onTrack (song, 5).size() == 2); // the pattern clip (ticks 0-100) is outside this range
+    CHECK (! song.playlistTracks[3].grouped && song.playlistTracks[4].grouped && song.playlistTracks[5].grouped);
     CHECK (comp::groupOf (song, 0).last == 2 && tracksBefore <= song.playlistTracks.size());
+
+    // rows stay "Track N": the insert's name is not used (R10)
+    CHECK (song.playlistTracks[0].name.empty() && song.playlistTracks[1].name.empty() && song.playlistTracks[2].name.empty());
+
+    // the first track free in the range, not the first after everything (R11, R12): nothing plays at tick 5000 yet
+    {
+        auto later = song;
+        takes::Part far;
+        far.start = 5000;
+        far.length = 100;
+        takes::TakeOptions loop;
+        loop.loopRecord = true;
+        const auto count = later.playlist.size();
+        takes::placeTakeClips (later, { { "/rec/c.wav", "c", 2 } }, { far }, loop);
+        CHECK (later.playlist.size() == count + 1 && later.playlist.back().track == 0);
+    }
+
+    // a named first track: the other passes take its name (R13)
+    {
+        auto named = clean;
+        named.playlistTracks.resize (1);
+        named.playlistTracks[0].name = "REC";
+        takes::placeTakeClips (named, { { "/rec/a.wav", "a", 2 } }, parts);
+        CHECK (named.playlistTracks[0].name == "REC" && named.playlistTracks[1].name == "REC" && named.playlistTracks[2].name == "REC");
+    }
+
+    // started in the middle of the loop (R11): the first pass goes to the first track free in its part of the loop and stays
+    // what that track was, the next passes follow below it and join its group
+    {
+        auto mid = clean;
+        Clip early;
+        early.kind = ClipKind::audio;
+        early.channel = 0;
+        early.track = 2;
+        early.start = 1000;
+        early.length = 200;
+        Clip a = early, b = early;
+        a.track = 0, a.length = 1000;
+        b.track = 1, b.length = 1000;
+        mid.playlist = { a, b, early };
+        mid.playlistTracks.resize (3);
+        mid.playlistTracks[1].grouped = mid.playlistTracks[2].grouped = true;
+        std::vector<takes::Part> passes (2);
+        passes[0].start = 1500, passes[0].length = 500, passes[0].offset = 0;
+        passes[1].start = 1000, passes[1].length = 1000, passes[1].offset = 500;
+        takes::placeTakeClips (mid, { { "/rec/m.wav", "m", 2 } }, passes);
+        const auto row2 = comp177::onTrack (mid, 2), row3 = comp177::onTrack (mid, 3);
+        CHECK (row2.size() == 2 && row2[1].start == 1500 && row3.size() == 1 && row3[0].start == 1000);
+        CHECK (mid.playlistTracks[2].grouped && mid.playlistTracks[3].grouped && comp::groupOf (mid, 0).last == 3);
+    }
+
+    // passes that don't overlap (R12): still one track per pass, in a new group
+    {
+        auto apart = clean;
+        std::vector<takes::Part> passes (2);
+        passes[0].start = 1500, passes[0].length = 500;
+        passes[1].start = 1000, passes[1].length = 100, passes[1].offset = 500;
+        takes::TakeOptions loop;
+        loop.loopRecord = true;
+        takes::placeTakeClips (apart, { { "/rec/n.wav", "n", 2 } }, passes, loop);
+        CHECK (comp177::onTrack (apart, 0).size() == 1 && comp177::onTrack (apart, 1).size() == 1 && ! apart.playlistTracks[0].grouped && apart.playlistTracks[1].grouped);
+        for (const auto& c : apart.playlist)
+            CHECK (c.muted);
+    }
+
+    // never onto a comp group: it must keep what it plays
+    {
+        auto comped = clean;
+        takes::placeTakeClips (comped, { { "/rec/a.wav", "a", 2 } }, parts);
+        comp::compTakes (comped, 0);
+        takes::Part far;
+        far.start = 5000;
+        far.length = 100;
+        takes::TakeOptions loop;
+        loop.loopRecord = true;
+        takes::placeTakeClips (comped, { { "/rec/c.wav", "c", 2 } }, { far }, loop);
+        CHECK (comped.playlist.back().track == 4);
+    }
 
     // stopped just past a pass boundary: FL keeps even a 1-tick pass, on its own track, muted
     song = clean;
@@ -302,40 +381,41 @@ TEST (comp177_comp_these_takes)
     Clip above, below;
     above.pattern = below.pattern = 0;
     above.track = 0;
-    above.length = 100;
-    below.track = 9;
+    above.start = 1000;
+    above.length = 1000;
+    below.track = 5;
     below.length = 100;
     song.playlist = { above, below };
     song.playlistTracks.resize (1);
     song.playlistTracks[0].name = "Drums";
     const auto parts = takes::loopPasses (takes::place (1000.0, 2900.0, 0.04, 0), 1000, 2000);
     takes::placeTakeClips (song, { { "/rec/a.wav", "a", 2 } }, parts);
-    CHECK (comp177::onTrack (song, 10).size() == 1 && comp177::onTrack (song, 12).size() == 1);
+    CHECK (comp177::onTrack (song, 1).size() == 1 && comp177::onTrack (song, 3).size() == 1);
 
-    CHECK (! comp::canComp (song, 0) && comp::canComp (song, 11));
+    CHECK (! comp::canComp (song, 0) && comp::canComp (song, 2));
     CHECK (comp::compTakes (song, 0) == -1); // no group there
-    CHECK (comp::compTakes (song, 12) == 10);
+    CHECK (comp::compTakes (song, 3) == 1);
 
     // one comp track above the group: what is above it stays, the group moves down by one
-    CHECK (song.playlistTracks[10].compTrack && song.playlistTracks[10].name == "Vox comp" && ! song.playlistTracks[10].grouped
-           && ! song.playlistTracks[10].collapsed);
-    CHECK (comp177::onTrack (song, 0).size() == 1 && comp177::onTrack (song, 9).size() == 1);
+    CHECK (song.playlistTracks[1].compTrack && song.playlistTracks[1].name == "Vox comp" && ! song.playlistTracks[1].grouped
+           && ! song.playlistTracks[1].collapsed);
+    CHECK (comp177::onTrack (song, 0).size() == 1 && comp177::onTrack (song, 6).size() == 1);
     CHECK (song.playlistTracks[0].name == "Drums");
     for (int k = 0; k < 3; ++k)
     {
-        const auto lane = comp177::onTrack (song, 11 + k);
+        const auto lane = comp177::onTrack (song, 2 + k);
         CHECK (lane.size() == 1 && lane[0].muted && lane[0].offset == k * 1000);
-        CHECK (song.playlistTracks[(std::size_t) (11 + k)].grouped && song.playlistTracks[(std::size_t) (11 + k)].name == "Vox (take " + std::to_string (k + 1) + ")");
+        CHECK (song.playlistTracks[(std::size_t) (2 + k)].grouped && song.playlistTracks[(std::size_t) (2 + k)].name == "Vox (take " + std::to_string (k + 1) + ")");
     }
-    const auto c = comp177::onTrack (song, 10);
+    const auto c = comp177::onTrack (song, 1);
     CHECK (c.size() == 1 && ! c[0].muted && c[0].offset == 2000 && c[0].length == 900);
-    CHECK (comp::isComp (song, 10) && ! comp::canComp (song, 12) && takes::compTrackOf (song, 12) == 10);
-    CHECK (comp::compTakes (song, 12) == -1);
+    CHECK (comp::isComp (song, 1) && ! comp::canComp (song, 3) && takes::compTrackOf (song, 3) == 1);
+    CHECK (comp::compTakes (song, 3) == -1);
 
     // a take recorded over it does not join it
-    const auto lanes = comp::groupOf (song, 10).lanes();
+    const auto lanes = comp::groupOf (song, 1).lanes();
     takes::placeTakeClips (song, { { "/rec/b.wav", "b", 2 } }, parts);
-    CHECK (comp::groupOf (song, 10).lanes() == lanes && comp177::onTrack (song, 10).size() == 1 && comp177::onTrack (song, 10)[0].offset == 2000);
+    CHECK (comp::groupOf (song, 1).lanes() == lanes && comp177::onTrack (song, 1).size() == 1 && comp177::onTrack (song, 1)[0].offset == 2000);
 
     // every pass was playing (Blend on), and FL's own takes have one channel per pass: all muted, the newest channel plays
     song = Song::makeDefault();

@@ -166,25 +166,21 @@ void linkTakeTrack (Song& song, int track, int insert)
 
 namespace
 {
-// The first `count` tracks in a row that hold nothing and are nobody's, after the last one used, with no group right under
-// them to join.
-int nextFreeTracks (const Song& song, int count)
+// A loop pass lands on the first track from `from` on with no clip in the pass's range (FL 26, REA round 177c §2.1: runs R10
+// to R12). A named track or a member of a group counts as free; a track linked to an insert or a channel, and a comp group
+// (LYNX's own, it must keep what it plays) do not.
+int firstFreeTrack (const Song& song, int from, std::int64_t start, std::int64_t end)
 {
-    int t = 0;
-    for (const auto& c : song.playlist)
-        t = std::max (t, c.track + 1);
-    const auto isFree = [&song] (int track) {
-        if (track >= (int) song.playlistTracks.size())
-            return true;
-        const auto& pt = song.playlistTracks[(std::size_t) track];
-        return pt.mode == PlaylistTrackMode::unassigned && ! pt.grouped && pt.name.empty();
-    };
-    for (;; ++t)
+    for (auto t = from;; ++t)
     {
-        auto ok = t + count >= (int) song.playlistTracks.size() || ! song.playlistTracks[(std::size_t) (t + count)].grouped;
-        for (int k = 0; k < count && ok; ++k)
-            ok = isFree (t + k);
-        if (ok)
+        if (t < (int) song.playlistTracks.size())
+        {
+            const auto& pt = song.playlistTracks[(std::size_t) t];
+            const auto g = comp::groupOf (song, t);
+            if (pt.mode != PlaylistTrackMode::unassigned || comp::isComp (song, g.comp))
+                continue;
+        }
+        if (std::none_of (song.playlist.begin(), song.playlist.end(), [t, start, end] (const Clip& c) { return c.track == t && c.start < end && c.end() > start; }))
             return t;
     }
 }
@@ -225,10 +221,12 @@ void placeTakeClips (Song& song, const std::vector<TakeFile>& files, const std::
             song.playlist.push_back (clip);
         };
 
-        // FL: a loop-recorded pass, even a lone one, is muted when Blend is off (runs R1, R2, R3, R5 in REA round 177c)
-        const auto passMuted = ! options.blend && ! options.lastPassPlays && (lanes || options.loopRecord);
+        // FL: every loop-recorded pass has its own track, even a lone one or passes that don't overlap, and is muted when
+        // Blend is off (runs R1, R2, R3, R5, R11, R12 in REA round 177c)
+        const auto flPasses = ! options.lastPassPlays && (lanes || options.loopRecord);
+        const auto passMuted = flPasses && ! options.blend;
 
-        if (! lanes)
+        if (! lanes && ! flPasses)
         {
             // punch parts: one track for all of them (they don't overlap)
             std::int64_t from = parts.front().start, to = 0;
@@ -236,7 +234,7 @@ void placeTakeClips (Song& song, const std::vector<TakeFile>& files, const std::
                 from = std::min (from, part.start), to = std::max (to, part.start + part.length);
             const auto track = takeTrack (song, insert, from, to);
             for (const auto& part : parts)
-                add (part, track, passMuted);
+                add (part, track, false);
             linkTakeTrack (song, track, insert);
             continue;
         }
@@ -279,20 +277,29 @@ void placeTakeClips (Song& song, const std::vector<TakeFile>& files, const std::
             continue;
         }
 
-        // one track per pass, the first on top: the header of a new group, open
-        const auto n = (int) parts.size();
-        const auto top = nextFreeTracks (song, n);
-        if ((int) song.playlistTracks.size() < top + n)
-            song.playlistTracks.resize ((std::size_t) (top + n));
-        const auto& mixerName = song.mixer[(std::size_t) insert].name;
-        const auto name = mixerName.empty() ? "Insert " + std::to_string (insert) : mixerName;
-        for (int k = 0; k < n; ++k)
+        // one track per pass, in order, each on the next track free in its own range. The first keeps what it was (the header
+        // of a new group, or a member of the group it landed in); the others join it, open, and take its name if it has one
+        // (FL shows "Track N" otherwise: the insert's name is not used)
+        auto previous = -1;
+        std::string firstName;
+        for (std::size_t k = 0; k < parts.size(); ++k)
         {
-            add (parts[(std::size_t) k], top + k, passMuted);
-            auto& pt = song.playlistTracks[(std::size_t) (top + k)];
-            pt.grouped = k > 0;
+            const auto& part = parts[k];
+            const auto track = firstFreeTrack (song, previous + 1, part.start, part.start + part.length);
+            if ((int) song.playlistTracks.size() <= track)
+                song.playlistTracks.resize ((std::size_t) track + 1);
+            add (part, track, passMuted);
+            auto& pt = song.playlistTracks[(std::size_t) track];
             pt.collapsed = false;
-            pt.name = name;
+            if (k == 0)
+                firstName = pt.name;
+            else
+            {
+                pt.grouped = true;
+                if (pt.name.empty())
+                    pt.name = firstName;
+            }
+            previous = track;
         }
     }
 }

@@ -352,7 +352,20 @@ int compTakes (Song& song, int track)
     }
     std::stable_sort (rows.begin(), rows.end(), [] (const auto& a, const auto& b) { return a.first < b.first; });
 
-    const auto base = song.playlistTracks[(std::size_t) g.comp].name;
+    // the names: the header's, else the insert's (loop passes leave their rows unnamed, as in FL)
+    auto base = song.playlistTracks[(std::size_t) g.comp].name;
+    if (base.empty())
+        for (const auto i : audioOn (song, rows.front().second))
+        {
+            const auto channel = song.playlist[(std::size_t) i].channel;
+            if (channel >= 0 && channel < (int) song.channels.size())
+            {
+                const auto insert = song.channels[(std::size_t) channel].mixerTrack;
+                if (insert > 0 && insert < (int) song.mixer.size())
+                    base = song.mixer[(std::size_t) insert].name;
+            }
+            break;
+        }
     noteedit::insertTrack (song, g.comp);
     auto& comp = song.playlistTracks[(std::size_t) g.comp];
     comp.compTrack = true;

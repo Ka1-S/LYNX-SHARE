@@ -68,6 +68,35 @@ R0, before a machine reboot, was seen only on screen and its project was lost: 4
 - **Loop record off (R4):** a single unmuted clip the length of the region. Whether FL kept recording past the region end
   was not determined.
 
+- **Third session, runs R10-R13 (`E:\lynx-work\comp177c\fl2\`, Blend off, 140 BPM, loop region 2 bars). Each started from
+  `takes-final.flp` with the clips, groups and first track's name and icon patched out, except where noted:**
+
+  | Run | Setup | Clips (start tick, ticks) | Result |
+  |---|---|---|---|
+  | R10 | empty project, insert named REC, tracks unnamed | 408/768, 408/769, 408/219 | tracks 1-3, 2-3 grouped, **names stay "Track N"** |
+  | R11 | R10's project, playhead mid-loop | 792/385, 408/768, 408/47 | **pass 1 on track 3** (free there, in R10's group), passes 2-3 on tracks 4-5, joining that group |
+  | R11b | same, stopped early, 1 pass | 792/310 | track 5, the first free in that range |
+  | R12 | same, stopped 131 ticks into pass 2 | 792/385, 408/131 | track 6 (header), track 7 (member): **own track though they don't overlap** |
+  | R13 | track 1 kept its name "REC" and icon, no clips | 408/768, 408/769, 408/219 | tracks 1-3, **tracks 2-3 named "REC"**, no icon |
+
+- **Rule for rows:** pass 1 goes to the first track with no clip in its range, whether named or grouped; each later pass goes
+  to the next such track below the previous one, gets `grouped`, and takes the first track's name if it has one.
+- **Why "REC" appeared:** the first track already had that name. Recording never takes the insert's name (R10). R0's and R1's
+  track 1 showed the name, mic icon and a meter already in the first frame of recording. Which earlier action named it was not
+  established; the track-link fields in the `.flp` read mode 0, mixer −1.
+- **Which insert records:** the selected one. With an insert without an input selected, FL says "You didn't select an audio
+  input" and aborts.
+- **`.flp` export of LYNX's takes opens in FL** (`lx\rec\loopoff-export.flp`, one screenshot, no input sent): one channel shared
+  by the three passes with separate sample offsets, the group and mutes as saved, row names as saved. Those takes are silent,
+  so that the offsets play the right audio in FL was not heard.
+- **Blend's factory default is off, from FL's own form data:** `OptionsBlendRecordedNotesAction` has no `"Checked"` in FL's DFM
+  (`/mnt/e/lynx-work/r167j/dfm-all.txt` line 5164), while its neighbours `OptionsRecordingPrecountAction` and
+  `OptionsTypingKbToPianoAction` have `"Checked": true`. This install's `HKCU\Software\Image-Line\FL Studio 26\ToolbarForm`
+  has `BlendRecordBtn = 0` (read only, and this round toggled it earlier). A fresh settings state was not run: the registry also
+  holds the licence and was left alone, and code that sets it after the form loads was not ruled out.
+- Also read there: `FruityLoopsMainForm\AutoGroupLoopRecordedTakes = 1`, the "Group loop recorded takes" setting.
+- FL settings changed in this session: none on purpose. The record dialog's choice ("Audio, into the playlist") was made each time.
+
 Not observed: the state of Mixer › Disk recording › "Group loop recorded takes" (the menu did not show in my shots, so
 only its effect is known), that option off, Pattern mode, Edison.
 
@@ -232,10 +261,12 @@ Tests (tests/Comp177Tests.inc, Rec163Tests.inc updated):
 - Default (`takes::placeTakeClips`): one track per pass on the next free tracks, first pass on top as the header of a new
   open group. Blend off mutes every pass, the last too, also a lone pass of a loop recording (R1). Blend on: every pass
   plays. Recording again makes a new group; no track moves, nothing is inserted or replaced. A pass of any length is kept.
+  Rows follow FL's rule in §2.1 (R10-R13), with one LYNX addition: a comp group and a track linked to an insert or a channel are
+  never used. How FL treats a linked track was not tested.
 - Option, record menu: **"After loop recording, only the last pass plays"** (`RecordOptions::lastLoopPassPlays`, saved in
   the UI settings, off): exactly round 163's layout, including dropping a final pass up to a 1/16 note long.
 - **"Comp these takes"** (Playlist track menu on a group, `comp::compTakes`, one undo): inserts one comp track above the
-  group, the only time tracks move. The group's tracks become lanes (audio muted, unfolded, "<name> (take N)"), and the comp
+  group, the only time tracks move. The group's tracks become lanes (audio muted, unfolded, "<name> (take N)"; <name> is the header's, else the insert's), and the comp
   plays the last pass. A partial last pass gives a comp only that long; the rest is swiped in.
 
 Still different from FL, on purpose or left as shipped:
@@ -243,7 +274,6 @@ Still different from FL, on purpose or left as shipped:
 | | FL [OBS] | LYNX | Why |
 |---|---|---|---|
 | Files | one per pass | one file, clips with offsets | Round 163's crash-safe take stream; not part of this decision |
-| Row names | "REC" in some runs, "Track N" in others | always the insert's name | FL's rule was not determined |
 | Track link | none | none for loop passes; a single take still links its track (round 146a/163) | Single takes were not part of the decision |
 | Single take over a linked track | next free track (R4) | the linked track when it is free there | As above |
 
@@ -273,7 +303,7 @@ load).
 
 ### Run evidence [RUN]
 
-Real recordings through `AudioEngine` on Windows: `LYNX --rectest <report> 18 --loop --type ASIO --device "FL Studio ASIO"` at
+These ran before the row rule in §2.1 R10-R13 went in; see the end of this section for the runs on the final build. Real recordings through `AudioEngine` on Windows: `LYNX --rectest <report> 18 --loop --type ASIO --device "FL Studio ASIO"` at
 120 BPM, 3 passes over bars 2-4. Reports and projects are in `E:\lynx-work\comp177c\lx\rec\`.
 
 | Run | Tracks (0 = the test's click track) | Muted | Group |
@@ -286,6 +316,13 @@ These runs prove where passes land. Each report says `result=FAILED` because the
 (ping `no signal`), so no click was checked and placement accuracy was not measured here (round 163c measured it).
 
 Shots: `LYNX --comp177shot <prefix> <project>` draws them offscreen, in `E:\lynx-work\comp177c\lx\shots\`.
+
+**Muted clip look:** FL marks a muted clip with an X on its header, LYNX with a veil and a diagonal across the clip. The diagonal
+came in `72d40f6f2` (2026-10-16, "FL-style clip look"), as part of that round's own clip recipe; no FL evidence for the line was
+found in that commit's comment. It applies to every muted clip, so it is left for a separate slice.
+
+**What this slice gives users:** comping today means "Comp these takes" plus "Promote this take" on a lane clip. Swipe, audition
+and Flatten are in the core and have no UI until slice 177c-2.
 
 ## 7. Not done / next
 
